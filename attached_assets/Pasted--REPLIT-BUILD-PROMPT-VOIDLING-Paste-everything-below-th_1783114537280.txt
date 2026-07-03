@@ -1,0 +1,130 @@
+# REPLIT BUILD PROMPT — VOIDLING
+
+Paste everything below this line into Replit Agent.
+
+---
+
+You are building **VOIDLING**, a mobile-first HTML5 arcade game designed for viral shareability and hybrid-casual retention. Build it as a single-page web app (PWA) that runs flawlessly in a phone browser in portrait mode. No frameworks, no build step, no login, no server. Everything below is the spec. Do not add features that are not in it.
+
+## The pitch
+
+You are a cute baby black hole (the Voidling) dropped into a miniature toy diorama. Drag anywhere to move. Anything smaller than you gets sucked in. Here's the twist: everything you swallow **orbits your rim** as a little icon, and when three of the same type are orbiting, they **merge and burst**, growing you much faster and building a combo. You have 90 seconds to devour as much of the map as possible. There is no way to die. The only question is how big you got.
+
+A stranger watching 3 seconds of gameplay must understand the game completely. That constraint governs every decision.
+
+## Non-negotiables
+
+1. Portrait, one-thumb play. The entire game is a single drag gesture.
+2. 60fps on a mid-range phone. Fixed-timestep update loop, canvas sized to devicePixelRatio.
+3. Loads in under 2 seconds. Zero image assets — every visual is drawn with Canvas 2D. All audio is synthesized with WebAudio oscillators. No downloads beyond the code itself.
+4. Works offline after first load (service worker + manifest = installable PWA).
+5. No fail state, no energy system, no forced waits. A round always ends with a score.
+6. No tutorial screens. Teach by doing: a ghost hand shows "drag to move" for the first 5 seconds of the first round, then never again.
+
+## Core loop rules (exact)
+
+- **Player:** a circle of radius `r`, starting at 22px (logical units). Growth is area-based: absorbing an object of size `s` adds `s * 0.4` to the player's area; radius = sqrt(area/π). Growth animates over 250ms (never snaps).
+- **Absorb rule:** on contact, if `object.size < r * 0.9`, the object tweens into the player over 200ms (scale to zero, slight spiral) and is absorbed. Objects at or above that threshold physically block the player and visibly wobble when touched — a clear "come back when you're bigger" signal.
+- **Orbit ring:** the last 6 absorbed objects orbit the player's rim as small icons (about 35% object scale), evenly spaced, rotating slowly. Oldest is evicted when a 7th arrives (fades out, no penalty).
+- **Merge rule:** the moment 3 icons of the same type are in the ring, they pull together over 300ms, flash white, and burst. Effect: bonus growth equal to 3x a normal absorb of that type, +150 score x current combo, combo +1.
+- **Combo:** starts at x1, +1 per merge, decays back one step every 4 seconds without a merge. Show it big when ≥ x2.
+- **Timer:** 90 seconds per round. At 30s and 60s remaining, pause the action and present a **boon pick** — 3 cards, tap one, resume instantly.
+- **Boon pool** (draw 3 without replacement per pick): Magnet (absorb reach +40%), Overdrive (move speed +25%), Twin Merge (merges need only 2 of a kind), Time Shard (+10 seconds), Tremor (touching a too-big object shrinks its size 15%), Greed (all score x1.5).
+- **Round end:** timer hits zero → slow-motion final second → results screen: score, % of map devoured, biggest merge chain, grade (C < 40%, B < 60%, A < 80%, S ≥ 80% devoured), coins earned = floor(score/100).
+- **Fleeing objects:** small mobile objects (ducks, people, dogs) flee at moderate speed when the player is within 3 radii. This is the comedy engine — chasing a panicked duck is the clip.
+
+## Map: "Sunny Park" (MVP ships with exactly one map)
+
+A dense park diorama, roughly 3x3 screens, camera follows the player with soft lerp. Size tiers so escalation is readable at a glance:
+
+| Tier | Size | Objects |
+|---|---|---|
+| 1 | 8–14 | pebbles, flowers, apples, cups |
+| 2 | 16–26 | ducks, pigeons, picnic baskets, balls |
+| 3 | 30–45 | people, dogs, benches, bushes |
+| 4 | 50–75 | trees, food carts, fountains |
+| 5 | 85–120 | the gazebo, the food truck, the playground |
+
+Populate ~140 objects with sensible clustering (picnic zones, a pond with ducks, a path with people). All objects are drawn shapes: two-tone flat fills, a soft ellipse shadow beneath each, tiny idle wobble animation. Each type needs a distinct silhouette — silhouettes are how the orbit-ring icons stay readable.
+
+## Game feel (this section is not optional — it is the product)
+
+- Player squash-stretches (scale 1.08 then settle) on every absorb.
+- Merges: 10–14 confetti triangles, a white ring shockwave, floating "+450" text, 120ms screen shake at 3px, `navigator.vibrate(30)` where supported.
+- The Voidling has a face: two white eyes that look toward the drag direction, squint during fast movement, and go wide just before a merge bursts. This face is the brand — it goes on the app icon and every skin.
+- Audio: rising synthesized "blip" per absorb whose pitch climbs with combo (this is the ASMR hook), a warm chord on merge, a soft tick on the final 5 seconds. Mute toggle persists.
+- Objects near the player lean away slightly before fleeing or being eaten. Anticipation sells the power fantasy.
+
+## Meta, retention, and hooks
+
+- **Coins → skins.** Skin shop with 8 launch skins, purely cosmetic: body colors, eye styles, orbit-trail colors, alternate absorb sounds. Prices 300–1500 coins. Equipped skin persists.
+- **Daily Bite:** one seeded daily layout (seed derived from the date so every player worldwide gets the identical map). One free attempt per day; one extra attempt via rewarded ad stub. Result feeds the streak.
+- **Streak:** consecutive Daily Bite days, shown on home screen with a small calendar. Missing a day resets it (no paid streak repair — keep it honest).
+- **Share card:** after any round, "Share" renders a 1080x1920 canvas PNG — Voidling face, score, grade, % devoured, streak, game name — and calls the Web Share API (download fallback). This is the organic acquisition engine; make it beautiful.
+- **3 daily missions** (rotating from a pool: "eat 20 ducks," "reach Tier 4 size," "hit a x4 combo," "devour 60% of the map") paying 50–150 coins each.
+- All state in localStorage under a single versioned key: coins, skins, equipped, streak, daily state, best scores, settings.
+
+## Monetization (stubbed — build the seams, not the SDKs)
+
+Implement two services with clean interfaces and mock implementations so real SDKs are a one-file swap later:
+
+- **AdService.showRewarded(placement) → Promise.** Mock: a 3-second fake ad overlay, then resolve. Placements: `round_extend` (offered once per round at timer end: "+15 seconds?"), `double_coins` (results screen), `daily_retry` (second Daily Bite attempt). Rewarded ads only in MVP — they must always feel like the player extending strategy, never escaping failure.
+- **AdService.showInterstitial().** Mock overlay. Cap: at most 1 per 3 completed rounds, never during a round, never in the player's first 3 sessions. Suppressed entirely if `remove_ads` is owned.
+- **IAPService** with a catalog and mock purchase flow: `remove_ads` $4.99, `starter_pack` $2.99 (2000 coins + exclusive skin), premium skins $1.99–2.99. Purchases persist in localStorage.
+- **Hard rules:** nothing purchasable affects score or difficulty. No loot boxes. No energy. No countdown-pressure offers. The economy sells identity (skins) and convenience (no ads), never power. This is both the ethical line and, per 2026 market data, the durable one.
+
+## Analytics stub
+
+A `track(event, props)` function that console-logs and queues to localStorage (swap for a real endpoint later). Instrument: `session_start`, `round_start`, `round_end` (score, grade, %devoured, duration), `merge` (type, combo), `boon_pick` (id), `ad_offer` / `ad_complete` (placement), `iap_view` / `iap_click` (sku), `share_click`, `daily_complete` (streak). Retention lives or dies on this data — do not skip it.
+
+## Art direction
+
+- **Style:** toy-diorama pop. Flat two-tone vector shapes, generous rounding, soft ellipse shadows, warm daylight. Cute + destruction is the tonal joke.
+- **Palette:** canvas/sky `#FDF6EC` cream; ground `#A8E6CF` mint with `#FFD3B6` sand paths; object pops `#FF8B94`, `#FFDA77`, `#6EB5FF`, `#FFAAA5`; Voidling body `#2B2140` near-black violet with an `#8C7CFF` glow rim and pure white eyes; UI text `#2B2140`; primary buttons `#6C5CE7` with white labels.
+- **Typography:** Fredoka for the logo, scores, and grades; Nunito for UI. Google Fonts, preloaded.
+- **Anti-patterns — do not do these:** no emoji as game art (draw every shape), no gradients-on-everything, no drop-shadow soup, no dark UI (this is a daylight game), no text-heavy menus, no more than 2 fonts, nothing that reads as generic template UI.
+- HUD is minimal: timer top-center, score top-right, combo appears center only when active. The diorama is the interface.
+
+## Screens
+
+1. **Home:** Voidling idling with its face animating, PLAY, Daily Bite (with streak flame), Shop, mute/settings gear.
+2. **Game:** the round.
+3. **Boon pick:** 3 cards, tap to resume.
+4. **Results:** score count-up, grade stamp animation, coins, Share, Play Again (Play Again must be reachable in one tap — restart friction kills arcade games), double-coins ad offer.
+5. **Shop:** skin grid, preview on the Voidling, buy/equip.
+6. **Daily Bite intro:** today's date, streak, one-attempt framing, GO.
+
+## File structure
+
+`index.html`, `style.css`, `manifest.json`, `sw.js`, and `/js`: `main.js` (loop + state machine), `world.js` (map gen, objects, physics), `player.js` (voidling, orbit ring, merges), `fx.js` (particles, shake, floating text), `audio.js` (WebAudio synth), `ui.js` (screens, HUD), `meta.js` (coins, skins, missions, daily, streak, storage), `services.js` (AdService, IAPService, track). Plain ES modules. Comment the top of each file with its single responsibility. Put every tuning value (sizes, speeds, growth rates, timings, prices, caps) in one exported `CONFIG` object in `main.js` so balance changes never require touching logic.
+
+## Build order — do these in sequence and confirm each works before the next
+
+1. Sandbox: canvas, camera, drag movement, objects, absorb + growth. (The game must already feel good here. If absorbing isn't satisfying yet, fix it before moving on.)
+2. Orbit ring + merge + combo + score.
+3. Timer, round end, results screen, Play Again.
+4. Juice pass: squash-stretch, particles, shake, face, audio, haptics.
+5. Boon picks at 30s/60s.
+6. Meta: coins, shop, skins, localStorage, missions.
+7. Daily Bite + streak + share card.
+8. Monetization stubs + interstitial caps + analytics events.
+9. PWA: manifest, icons (draw the Voidling face programmatically to canvas and export), service worker, offline check.
+
+## Phase 2 — explicitly out of scope, do not build now
+
+More maps, real ad SDK integration, Capacitor iOS wrap for the App Store, server leaderboards, ghost replays of friends' Daily Bite runs, season pass.
+
+## Acceptance criteria — the build is done when every one of these passes on a phone
+
+- Cold-loads to the home screen in under 2 seconds; installs as a PWA and launches offline.
+- A full round is playable one-thumbed in portrait: drag works everywhere on screen, absorb threshold behaves exactly per spec, growth is smooth.
+- Swallowing three ducks visibly merges them in the orbit ring with burst, bonus growth, combo increment, and haptic.
+- Boon picker appears at 30s and 60s remaining and applies its effect for the rest of the round.
+- Results screen shows score, grade, % devoured, and coins; Play Again restarts in one tap; Share produces a correct 1080x1920 image.
+- The same Daily Bite layout generates for the same date across two different devices; streak increments and resets correctly.
+- Buying a skin with coins persists across a page reload; `remove_ads` mock purchase suppresses interstitials.
+- Interstitial never fires during a round, more than once per 3 rounds, or in the first 3 sessions.
+- Every analytics event in the list fires and is visible in the console.
+- No console errors across a 5-round session.
+
+Start with step 1 of the build order. Show me the sandbox before continuing.

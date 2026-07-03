@@ -1,6 +1,6 @@
-# [Project name]
+# VOIDLING
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A mobile-first HTML5 arcade game where you play as a cute baby black hole devouring a toy park diorama. Drag to move, absorb smaller objects, chain merges for combos. Pure Canvas 2D, no assets, installable as a PWA.
 
 ## Run & Operate
 
