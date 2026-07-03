@@ -53,24 +53,34 @@ export function initGame(canvas: HTMLCanvasElement) {
   window.addEventListener('resize', resize);
   resize();
 
+  // Track touch start position to detect tap vs drag
+  let touchStartX = 0, touchStartY = 0;
+
+  const getCoords = (e: PointerEvent | TouchEvent): {x: number, y: number} => {
+    const rect = canvas.getBoundingClientRect();
+    if (e.type.startsWith('touch')) {
+      const te = e as TouchEvent;
+      // changedTouches works on touchend; touches[0] on touchstart/move
+      const t = te.changedTouches[0] || te.touches[0];
+      if (!t) return { x: 0, y: 0 };
+      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    }
+    const pe = e as PointerEvent;
+    return { x: pe.clientX - rect.left, y: pe.clientY - rect.top };
+  };
+
   const handlePointer = (e: PointerEvent | TouchEvent) => {
     e.preventDefault();
-    let cx = 0, cy = 0;
-    if (e.type.startsWith('touch')) {
-      cx = (e as TouchEvent).touches[0]?.clientX || 0;
-      cy = (e as TouchEvent).touches[0]?.clientY || 0;
-    } else {
-      cx = (e as PointerEvent).clientX;
-      cy = (e as PointerEvent).clientY;
-    }
-    
+    const { x: cx, y: cy } = getCoords(e);
+
     if (e.type === 'pointerdown' || e.type === 'touchstart') {
       isDragging = true;
       pointerX = cx;
       pointerY = cy;
-      clickEvent = { x: cx, y: cy };
-      
-      // Attempt to init audio on first touch
+      touchStartX = cx;
+      touchStartY = cy;
+
+      // Resume audio context on first touch
       if (audio.ctx && audio.ctx.state === 'suspended') {
         audio.ctx.resume();
       }
@@ -81,28 +91,49 @@ export function initGame(canvas: HTMLCanvasElement) {
       }
     } else if (e.type === 'pointerup' || e.type === 'touchend') {
       isDragging = false;
+      // Only register as a click if the finger barely moved (tap, not drag)
+      const dx = cx - touchStartX;
+      const dy = cy - touchStartY;
+      if (Math.hypot(dx, dy) < 20) {
+        // Use start position for UI since end coords can be 0,0 on some iOS versions
+        const tapX = cx !== 0 ? cx : touchStartX;
+        const tapY = cy !== 0 ? cy : touchStartY;
+        clickEvent = { x: tapX, y: tapY };
+        console.log('[VOIDLING] tap registered', tapX, tapY, 'state=', state);
+      }
     }
   };
+
+  const cancelDrag = () => { isDragging = false; };
 
   canvas.addEventListener('pointerdown', handlePointer);
   canvas.addEventListener('pointermove', handlePointer);
   canvas.addEventListener('pointerup', handlePointer);
+  canvas.addEventListener('pointercancel', cancelDrag);
   canvas.addEventListener('touchstart', handlePointer, {passive: false});
   canvas.addEventListener('touchmove', handlePointer, {passive: false});
   canvas.addEventListener('touchend', handlePointer, {passive: false});
+  canvas.addEventListener('touchcancel', cancelDrag);
 
   const startGame = (daily: boolean) => {
-    isDaily = daily;
-    const seed = daily ? new Date().toDateString() : Date.now().toString();
-    world = new WorldManager(CONFIG.MAP_SIZE);
-    world.init(seed);
-    
-    player = new Player(CONFIG.MAP_SIZE/2, CONFIG.MAP_SIZE/2, fx);
-    timeLeft = CONFIG.GAME_DURATION * 1000;
-    nextBoonTime = 60 * 1000; // first boon at 60s left
-    
-    state = GameState.GAME;
-    track('round_start', { daily });
+    try {
+      console.log('[VOIDLING] startGame called, daily=', daily);
+      isDaily = daily;
+      const seed = daily ? new Date().toDateString() : Date.now().toString();
+      world = new WorldManager(CONFIG.MAP_SIZE);
+      world.init(seed);
+      console.log('[VOIDLING] world objects:', world.objects.length);
+      
+      player = new Player(CONFIG.MAP_SIZE/2, CONFIG.MAP_SIZE/2, fx);
+      timeLeft = CONFIG.GAME_DURATION * 1000;
+      nextBoonTime = 60 * 1000; // first boon at 60s left
+      
+      state = GameState.GAME;
+      console.log('[VOIDLING] state set to GAME');
+      track('round_start', { daily });
+    } catch (err) {
+      console.error('[VOIDLING] startGame error:', err);
+    }
   };
 
   const drawHome = (dt: number) => {
@@ -527,13 +558,17 @@ export function initGame(canvas: HTMLCanvasElement) {
 
     ctx.clearRect(0, 0, fw, fh);
 
-    switch(state) {
-      case GameState.HOME: drawHome(dt); break;
-      case GameState.DAILY_INTRO: drawDailyIntro(); break;
-      case GameState.GAME: drawGame(dt); break;
-      case GameState.BOON_PICK: drawBoon(); break;
-      case GameState.RESULTS: drawResults(); break;
-      case GameState.SHOP: drawShop(); break;
+    try {
+      switch(state) {
+        case GameState.HOME: drawHome(dt); break;
+        case GameState.DAILY_INTRO: drawDailyIntro(); break;
+        case GameState.GAME: drawGame(dt); break;
+        case GameState.BOON_PICK: drawBoon(); break;
+        case GameState.RESULTS: drawResults(); break;
+        case GameState.SHOP: drawShop(); break;
+      }
+    } catch (err) {
+      console.error('[VOIDLING] render error in state', state, err);
     }
 
     clickEvent = null;
@@ -547,8 +582,10 @@ export function initGame(canvas: HTMLCanvasElement) {
     canvas.removeEventListener('pointerdown', handlePointer);
     canvas.removeEventListener('pointermove', handlePointer);
     canvas.removeEventListener('pointerup', handlePointer);
+    canvas.removeEventListener('pointercancel', cancelDrag);
     canvas.removeEventListener('touchstart', handlePointer);
     canvas.removeEventListener('touchmove', handlePointer);
     canvas.removeEventListener('touchend', handlePointer);
+    canvas.removeEventListener('touchcancel', cancelDrag);
   };
 }
