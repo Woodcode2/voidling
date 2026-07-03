@@ -1,0 +1,112 @@
+# REPLIT BUILD PROMPT — VOIDLING v2
+
+Paste everything below this line into the same Repl as v1, as one message.
+
+---
+
+You are upgrading **VOIDLING**, an existing HTML5 arcade game in this Repl. v1 has drag movement, absorbing, growth, score, and a timer. This pass has six jobs, in priority order below. Refactor in place — do not rebuild from scratch. If a v1 system referenced here (shop, coins, share card, orbit-ring merges, boon picker) was never actually built, build it per the original spec as part of this pass. All prior non-negotiables still apply: portrait, one thumb, 60fps, zero image assets (everything canvas-drawn), offline PWA, no fail state, no login.
+
+## P0-A — Controls rewrite (the game lives or dies here)
+
+The current controls feel laggy and the thumb covers the character. Replace the input system entirely:
+
+- **Pointer Events only**: `pointerdown` / `pointermove` / `pointerup` with `setPointerCapture` on the canvas. Delete any mouse/touch duplicate handlers.
+- CSS: `canvas { touch-action: none; }`, `html, body { overscroll-behavior: none; position: fixed; overflow: hidden; }`. Kill double-tap zoom, text selection, and pull-to-refresh completely.
+- **Relative-drag control scheme (virtual joystick — the Hole.io/Agar standard):** on pointerdown anywhere, record that point as the anchor. Movement direction = vector from anchor to current pointer position. Speed = `clamp(distance / 110px, 0, 1) * maxSpeed`. On release, decelerate to zero over 200ms. The Voidling is **never** under the finger.
+- While touching, draw a faint joystick hint: 15%-opacity anchor ring + a dot at the clamped pointer offset.
+- Simulation on a fixed 60Hz timestep with interpolated rendering; clamp delta time to 50ms so backgrounding the tab never teleports anything.
+- **Feel target:** direction changes register within one frame. If movement feels floaty after this, reduce smoothing until it feels like the void is glued to your intent.
+
+## P0-B — Buttons and the death of beige
+
+- Every tappable control is a real `<button>` element: min-height 64px, primary CTA full-width minus 24px side margins, generous padding, `:active` scale 0.96 over 80ms. Audit z-index — nothing may overlay a button and steal its taps. Tapping anywhere on the visible button must work.
+- Grep the codebase for `#FDF6EC` and every cream/beige value and delete them all. New palette below is total.
+
+## 1 — Visual overhaul: "Electric Pop"
+
+- **UI screens (home, results, shop, boon cards):** background deep space violet `#14082B` with a sparse hand-drawn starfield; headings pure white in Fredoka; the PLAY button is hot coral `#FF3D68` with white text and a solid darker-coral bottom edge 6px tall (chunky 2.5D arcade button); secondary buttons electric yellow `#FFD23F` with `#14082B` text.
+- **Arena:** saturated turquoise field `#1CC6AE`; paths `#FFD23F`; pond `#2D9CDB`; picnic blankets in coral/white check. No gradients on large surfaces — flat, vivid, confident color.
+- **Sticker object style (this is the "crisp HD" look):** every object gets a saturated fill, a 3px solid white outline, a hard offset shadow (4px down, rgba(0,0,0,0.12), zero blur), and a simple two-tone highlight. Rendered at devicePixelRatio (cap 3) with no blurry scaling.
+- Anti-patterns still banned: emoji as art, gradient soup, drop-shadow blur everywhere, more than 2 fonts, template-looking UI.
+
+## 2 — Voidling glow-up (cuter)
+
+- Eyes grow to ~30% of body height: white, big pupils, two shine dots each. Blink every 3–5 seconds, occasionally one eye first. Pupils track movement direction, or the nearest edible object when idle.
+- A mouth: tiny contented smile at rest; opens wide when within 1.5 radii of something edible; visible chomp on every absorb.
+- Cheek blush ovals. Idle breathing (scale 1.00–1.03, 2s cycle). Jelly wobble on sharp direction changes. Glow rim pulses brighter as the combo climbs.
+
+## 3 — Themed skins (accessory system, not color swaps)
+
+Refactor skins into `{ bodyColor, glowColor, eyeStyle, accessories[] }` where accessories are procedural draw layers at anchor points: `hat` (top center, rotates with body), `face` (eye line), `cheek`, `trail` (behind movement). Ship 8:
+
+1. **Classic** — free. Default violet.
+2. **Pirate** — 800 coins. Black tricorn hat with a white skull dot, eyepatch over the left eye, gold hoop earring.
+3. **Princess** — 800 coins. Gold tiara with a pink gem, long lashes, extra blush, sparkle particle trail.
+4. **Astronaut** — 1000 coins. White helmet dome with a diagonal reflection streak, small chest badge.
+5. **Ninja** — 800 coins. Dark headband with two trailing tails, slightly angled determined eyes.
+6. **Wizard** — 1000 coins. Purple pointed hat with stars and a brim, tiny white beard arc.
+7. **Kitty** — 600 coins. Triangle ears with pink inners, whiskers, a `:3` mouth.
+8. **Devil** — 1200 coins. Red horns, a pointed tail that sways, mischievous eyebrow ridges.
+
+Shop shows each skin on a live animated Voidling preview. The equipped skin renders in-game, in the boon cards, and on the share card.
+
+## 4 — Real objects (kill the placeholder shapes)
+
+Replace every generic circle/triangle/square with drawn park objects. Each is one draw function, reused at small scale for the orbit-ring icons. Recipes:
+
+- **Apple** (T1): red circle, brown stem, one green leaf ellipse.
+- **Flower** (T1): five petal circles around a yellow center, green stem.
+- **Mushroom** (T1): cream stem, red cap with white dots.
+- **Duck** (T2): yellow body ellipse, head circle, orange beak triangle, dot eye, wing arc. Waddles; flees the player.
+- **Dog** (T2–3): brown body, head with floppy ears, wagging tail. Flees.
+- **Person** (T3): torso capsule in varied shirt colors, head, legs; when fleeing, arms go up and legs scramble.
+- **Bench** (T3): brown slats + legs. **Bush** (T3): three overlapping green circles + berry dots.
+- **Car** (T3–4): rounded rect, window band, two wheels; varied colors.
+- **Tree** (T4): trunk + three stacked foliage circles.
+- **Fountain** (T4): blue basin ellipse, center column, animated water-arc dots.
+- **Food cart** (T4): box body, striped awning, wheels. **Gazebo** (T5): the map's crown jewel.
+
+A stranger must be able to name duck, tree, and car at a glance. Silhouettes must stay distinct at orbit-icon size.
+
+## 5 — Rival voidlings: multiplayer feel, zero servers
+
+Do **not** build networking. Build rivals behind a `RivalController` interface (`update(dt, world) → intents`) implemented today by `BotController`, so a future `NetController` can replace bots without touching game code.
+
+- Spawn **5 rivals** per round: distinct body/glow colors, names drawn from pools and shown as `Name · CC` country tags (e.g., `Kai · JP`, `Luna · BR`, `Maks · PL`, `Ava · US`, `Rin · KR`), randomized each round.
+- Starting sizes seeded around the player: two smaller, two similar, one bigger.
+- **Bot brain** — a 3-state machine with 150–400ms reaction delays and wander noise so they feel human: `GRAZE` (seek the densest edible cluster), `HUNT` (chase any void or object ≥20% smaller within range), `FLEE` (run from any void ≥20% bigger within 4 radii). Bots absorb map objects and grow (they don't need a visible orbit ring — performance).
+- **Eat rule, both directions:** overlap ≥60% of the smaller AND eater radius ≥ 1.15× the eaten → chomp. Eating a rival: they spiral in dramatically, you gain 50% of their mass, burst effect, banner "CHOMPED Luna · BR!", +500 × combo score.
+- **Player gets eaten:** never game over. Ghost mode 2.5s (transparent, invulnerable), respawn at 65% of your mass with a wobbly "Ouch!". The clock remains the only true enemy.
+- **Live leaderboard** top-left: six rows sorted by mass, You highlighted, updating in real time. Results screen adds final placement (#1–#6) and voids eaten; finishing #1 stamps a crown and pays bonus coins.
+
+## 6 — Power-ups that provably work
+
+Each boon must mutate live CONFIG-driven state, and active boons render as small icons under the timer:
+
+| Boon | Effect | Manual test |
+|---|---|---|
+| Magnet | absorb reach +40%, rest of round | object visibly pulls in from farther away |
+| Overdrive | move speed +25% | cross the screen measurably faster |
+| Twin Merge | merges need only 2 of a kind | two apples in ring burst |
+| Time Shard | +10 seconds, instant | timer jumps up on pick |
+| Tremor | touching a too-big object shrinks it 15% | bump a tree three times, then eat it |
+| Greed | all score ×1.5 | absorb values visibly larger |
+
+Boon picker still pauses at 60s and 30s remaining; cards are min 30% of screen height with fat tap areas.
+
+## Acceptance criteria — verify every one on a phone
+
+- Touch anywhere and drag: joystick-style movement, instant direction changes, zero page scroll/zoom/bounce, character never under the thumb.
+- Home screen is dark violet with a coral PLAY button; the entire button surface taps; no cream pixel exists anywhere in the app.
+- Objects are recognizable real things; orbit icons stay readable.
+- Five named rivals visibly graze, hunt, and flee; you can eat a smaller rival (banner fires) and be eaten (ghost + respawn, not game over).
+- Leaderboard live-updates; results show placement and voids eaten; #1 shows the crown.
+- All six boons pass their manual test in the table.
+- Pirate and Princess skins render with accessories in-game, in shop preview, and on the share card.
+- Steady 60fps with 5 bots + ~140 objects on a mid-range phone; zero console errors across 5 rounds.
+
+## Out of scope this pass — do not touch
+
+Websocket networking, new maps, iOS wrap, real ad/IAP SDKs. Keep the existing monetization stubs, Daily Bite, streaks, and analytics events working exactly as specified in v1.
+
+Do P0-A first and confirm controls on a real phone, then complete the rest in one continuous pass.

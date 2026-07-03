@@ -3,10 +3,20 @@ import { meta } from './meta';
 export const track = (event: string, props: any = {}) => {
   console.log(`[Analytics] ${event}`, props);
   // Stub for actual tracking
-  const queue = JSON.parse(localStorage.getItem('voidling_events') || '[]');
+  let queue: unknown[] = [];
+  try {
+    const raw = JSON.parse(localStorage.getItem('voidling_events') || '[]');
+    if (Array.isArray(raw)) queue = raw;
+  } catch {
+    // corrupt queue — start fresh
+  }
   queue.push({ event, props, time: Date.now() });
   if (queue.length > 50) queue.shift();
-  localStorage.setItem('voidling_events', JSON.stringify(queue));
+  try {
+    localStorage.setItem('voidling_events', JSON.stringify(queue));
+  } catch {
+    // storage full/unavailable — ignore
+  }
 };
 
 export const AdService = {

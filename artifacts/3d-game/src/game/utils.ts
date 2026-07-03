@@ -10,13 +10,30 @@ export function clamp(val: number, min: number, max: number) {
   return Math.max(min, Math.min(max, val));
 }
 
+// Shortest-path angle interpolation
+export function lerpAngle(a: number, b: number, t: number) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
+// Mulberry32 seeded PRNG
 export function prng(seed: number) {
-  return function() {
-    let t = seed += 0x6D2B79F5;
+  return function () {
+    let t = (seed += 0x6d2b79f5);
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function hashString(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
   }
+  return hash;
 }
 
 export function formatTime(ms: number) {
@@ -30,4 +47,10 @@ export function easeOutBack(x: number): number {
   const c1 = 1.70158;
   const c3 = c1 + 1;
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+}
+
+// radius <-> area helpers (growth is area-based so it feels fair)
+export function addAreaToRadius(radius: number, addedArea: number) {
+  const area = Math.PI * radius * radius + addedArea;
+  return Math.sqrt(area / Math.PI);
 }

@@ -12,8 +12,8 @@ export interface GameMeta {
 
 const DEFAULT_META: GameMeta = {
   coins: 0,
-  skinsOwned: ['default'],
-  equippedSkin: 'default',
+  skinsOwned: ['classic'],
+  equippedSkin: 'classic',
   streak: 0,
   lastDailyDate: '',
   highScore: 0,
@@ -26,14 +26,29 @@ export const meta = {
   data: { ...DEFAULT_META },
 
   load() {
+    this.data = { ...DEFAULT_META };
     const saved = localStorage.getItem('voidling_meta_v1');
     if (saved) {
       try {
-        this.data = { ...DEFAULT_META, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          this.data = { ...DEFAULT_META, ...parsed };
+        }
       } catch (e) {
         console.error("Failed to load meta");
       }
     }
+    // coerce corrupt/legacy shapes back to safe defaults before use
+    if (!Array.isArray(this.data.skinsOwned)) this.data.skinsOwned = [...DEFAULT_META.skinsOwned];
+    if (!Array.isArray(this.data.missions)) this.data.missions = [];
+    if (typeof this.data.equippedSkin !== 'string') this.data.equippedSkin = 'classic';
+    if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
+    // migrate legacy skin id 'default' -> 'classic'
+    this.data.skinsOwned = this.data.skinsOwned.map((s) => (s === 'default' ? 'classic' : s));
+    if (!this.data.skinsOwned.includes('classic')) this.data.skinsOwned.unshift('classic');
+    if (this.data.equippedSkin === 'default') this.data.equippedSkin = 'classic';
+    // never leave the player with an unowned skin equipped
+    if (!this.data.skinsOwned.includes(this.data.equippedSkin)) this.data.equippedSkin = 'classic';
     // initialize missions if empty
     if (this.data.missions.length === 0) {
       this.generateMissions();
