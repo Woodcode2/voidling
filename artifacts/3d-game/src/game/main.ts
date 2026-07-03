@@ -35,6 +35,7 @@ export function initGame(canvas: HTMLCanvasElement) {
   let nextBoonTime = 0;
   let boonCards: any[] = [];
   let isDaily = false;
+  let homeTime = 0; // accumulates ms for home-screen idle animation
 
   meta.load();
   audio.init();
@@ -104,18 +105,76 @@ export function initGame(canvas: HTMLCanvasElement) {
     track('round_start', { daily });
   };
 
-  const drawHome = () => {
+  const drawHome = (dt: number) => {
+    homeTime += dt;
     ctx.fillStyle = CONFIG.COLORS.bg;
     ctx.fillRect(0, 0, fw, fh);
     
     ctx.fillStyle = CONFIG.COLORS.uiText;
     ctx.font = 'bold 48px Fredoka, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('VOIDLING', fw/2, fh * 0.2);
+    ctx.fillText('VOIDLING', fw/2, fh * 0.12);
+
+    // ── Animated idle Voidling ──────────────────────────────────────────────
+    const cx = fw / 2;
+    const cy = fh * 0.32 + Math.sin(homeTime / 700) * 6; // gentle bob
+    const r  = Math.min(fw, fh) * 0.13 + Math.sin(homeTime / 900) * 2; // breathing pulse
+
+    // Glow
+    ctx.save();
+    ctx.shadowColor = '#8C7CFF';
+    ctx.shadowBlur  = 28;
+    ctx.fillStyle   = '#8C7CFF';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Body
+    ctx.fillStyle = '#2B2140';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Eyes — look in a slow circular pattern
+    const lookAngle = homeTime / 1800;
+    const eyeOffX = Math.cos(lookAngle) * r * 0.22;
+    const eyeOffY = Math.sin(lookAngle) * r * 0.12;
+    const eyeR    = r * 0.16;
+    const eyeSep  = r * 0.32;
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(cx - eyeSep + eyeOffX, cy - r * 0.1 + eyeOffY, eyeR, 0, Math.PI * 2);
+    ctx.arc(cx + eyeSep + eyeOffX, cy - r * 0.1 + eyeOffY, eyeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Occasional blink (every ~3 s, squish vertically for 120 ms)
+    const blinkPhase = (homeTime % 3200);
+    if (blinkPhase < 120) {
+      const blinkScale = 1 - Math.sin((blinkPhase / 120) * Math.PI) * 0.9;
+      ctx.fillStyle = '#2B2140';
+      ctx.save();
+      ctx.translate(cx - eyeSep + eyeOffX, cy - r * 0.1 + eyeOffY);
+      ctx.scale(1, blinkScale);
+      ctx.beginPath();
+      ctx.arc(0, 0, eyeR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(cx + eyeSep + eyeOffX, cy - r * 0.1 + eyeOffY);
+      ctx.scale(1, blinkScale);
+      ctx.beginPath();
+      ctx.arc(0, 0, eyeR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // ── End Voidling ────────────────────────────────────────────────────────
 
     // Play Button
     const playW = 200, playH = 60;
-    const playX = fw/2 - playW/2, playY = fh * 0.5;
+    const playX = fw/2 - playW/2, playY = fh * 0.52;
     UIHelper.drawButton(ctx, 'PLAY', playX, playY, playW, playH, CONFIG.COLORS.primaryButton, '#FFF');
 
     // Daily Button
@@ -469,7 +528,7 @@ export function initGame(canvas: HTMLCanvasElement) {
     ctx.clearRect(0, 0, fw, fh);
 
     switch(state) {
-      case GameState.HOME: drawHome(); break;
+      case GameState.HOME: drawHome(dt); break;
       case GameState.DAILY_INTRO: drawDailyIntro(); break;
       case GameState.GAME: drawGame(dt); break;
       case GameState.BOON_PICK: drawBoon(); break;
