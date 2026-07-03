@@ -1,0 +1,1 @@
+- [VOIDLING architecture](voidling-architecture.md) — React-DOM menus + canvas-only arena, joined by a createGame() engine snapshot/subscribe API that notifies on discrete state changes (never per-frame).
