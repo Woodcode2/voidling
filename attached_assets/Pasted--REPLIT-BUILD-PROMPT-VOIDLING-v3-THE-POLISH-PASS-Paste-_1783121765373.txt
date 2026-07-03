@@ -1,0 +1,108 @@
+# REPLIT BUILD PROMPT — VOIDLING v3: THE POLISH PASS
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are polishing **VOIDLING** to shipping quality. v2 works: menus, shop with themed skins, sticker objects, rival bots, leaderboard. This pass is about game feel and visual cohesion — the difference between "a working prototype" and "a game people clip and share." Follow every number in this spec literally. Do not add new screens or systems except Evolutions (section 6). All prior rules hold: 60fps, portrait, canvas-drawn everything, no fail state.
+
+## 0 — Fix the collision bug (players get stuck inside too-big objects)
+
+- Implement proper circle-vs-circle collision response every frame: compute overlap along the collision normal, push the player out by the full overlap amount (positional correction), then remove the velocity component pointing into the object so the player **slides along the surface** instead of sticking.
+- If still overlapping after correction (spawned inside, multi-object squeeze), apply an extra 2px/frame separation until clear.
+- Make "too big to eat" read as intentional: on contact, the object does a quick 4° shake, shows a brief white pulse ring sized to the object, and fires `navigator.vibrate(15)`. Cooldown 500ms so it can't spam.
+
+## 1 — One world, one outline (art cohesion)
+
+Everything that exists in the arena — the player, all 5 rivals, every object — gets the identical treatment: **4px solid white outline + hard offset shadow (0, 5px, rgba(0,0,0,0.14), zero blur)**. The voidling currently uses soft gradients and blur while the world is crisp stickers; that mismatch is why it looks blurry. One art style, no exceptions.
+
+## 2 — Background recedes, characters pop
+
+- Delete the loud checkerboard. The field is **one base teal `#1FBFA8`** with large soft irregular patches at only ±4% lightness, plus sparse tiny details (grass ticks, 3-dot flowers, pebbles) drawn at 18–25% opacity. Paths become a single muted sand tone `#E8D9A8` at low contrast, max 15% of ground area. Rule: **nothing in the background may have more contrast than the smallest edible object.**
+- Character glow: replace blur-glow with **two crisp concentric rings** (player color at 25% and 12% opacity, 6px and 14px outside the outline). Rivals get the same in their color.
+- Every rival gets a floating name pill above it: dark `#14082B` rounded pill, white 12px name, small colored dot. This sells "other players" instantly.
+- **Camera zoom:** scale the camera so the player always renders between 64px and 140px tall on screen — zoom out smoothly (lerp 0.08) as you grow. The player must never be a speck.
+
+## 3 — Crisp character rendering (the performance + sharpness trick)
+
+- Pre-render each skin's static body (body fill, two-tone bottom crescent, outline, accessories that don't animate) to an **offscreen canvas at 2× the max display size**, once per skin equip. Draw that cached sprite each frame, then draw the live parts on top: eyes, pupils, blink, mouth, blush, animated accessories.
+- Body fill goes flat: solid `#2E2158` with a darker `#241A47` bottom crescent and one crisp white highlight ellipse top-left. No canvas `shadowBlur` anywhere on characters — it is both fuzzy and slow.
+- Eyes: pure white circles with hard edges, large dark pupils, two shine dots. Everything drawn on exact device-pixel boundaries where possible.
+
+## 4 — Absorb juice: the chomp spec (make every bite an event)
+
+Every absorb runs this 350ms sequence, no exceptions:
+
+1. Object squash-stretches and tweens into the mouth (not the center) over 160ms while the mouth opens wide.
+2. Bite frame: mouth snaps shut, 6–10 crumb particles burst in **the object's color**, living objects emit a tiny comic "!" instead of crumbs.
+3. Player body pulses to scale 1.12 and settles over 150ms; glow rings flash one step brighter.
+4. Floating score text "+N" in the object's color with a white outline, rises 40px and fades over 600ms.
+5. **Pitch-ladder pop sound:** each absorb within 1.5s of the last plays one semitone higher, up to +12, then holds; resets after 1.5s idle. This ladder is the ASMR engine — implement it exactly.
+6. 1–2px camera punch toward the object. `navigator.vibrate(10)`.
+
+Orbit ring upgrade: icons at 50% object scale (minimum 14px), gentle bob, and when **two of a kind** are in the ring they glow gold and lean toward each other — telegraphing the merge builds anticipation. Merge burst upgrade: radial shockwave ring, 18 confetti pieces, one full-screen 60ms white flash at 10% opacity, 4px/150ms shake, a stamped "TRIPLE!" label, `vibrate(40)`.
+
+## 5 — Frenzy streak
+
+- Consecutive absorbs within 1.5s of each other build a streak. At 5+, show "x5 FRENZY" in Fredoka, center-top, scaling up with each step, plus a soft pulsing colored border vignette around the screen edge that intensifies with the streak.
+- Streak breaks after 1.5s without eating: the counter pops and fades, score bonus = streak peak × 10.
+- Frenzy exists to make dense-cluster eating feel explosive. It costs nothing and doubles perceived juice.
+
+## 6 — EVOLUTIONS (new system — the round's story arc)
+
+Per-round evolution ladder driven by player radius. Thresholds live in CONFIG; tune spawn density and growth so a **median run peaks at Chomper, a good run at Devourer, and WORLD EATER is rare** (roughly the top ~10% of runs).
+
+| Form | Radius | Permanent visual layer gained |
+|---|---|---|
+| Speck | start (22) | — |
+| Snacker | 34 | thin rotating energy ring |
+| Chomper | 50 | 3 small debris chunks orbiting outside the ring |
+| Devourer | 72 | crown of purple flame licks on top |
+| WORLD EATER | 100 | screen-edge violet vignette + background stars/details bend subtly toward you |
+
+**Evolution moment (every threshold):** world slows to 0.3× for 600ms, white ring expands from the player, the voidling spins once and scales 1.2→1.0, banner "EVOLVED: CHOMPER!" in Fredoka, fanfare chord, `vibrate([30,40,60])`. Each form also grants +8% move speed (stacking).
+
+- HUD: slim progress bar under the timer filling toward the next form, labeled with the next form's name in 11px caps.
+- Being chomped by a rival never removes a form — mass loss can't cross an already-reached threshold downward. Forms only go up. The ladder is the reason to replay.
+- Results screen adds "Reached: DEVOURER" with the form's icon; hitting WORLD EATER stamps a special results treatment and +200 bonus coins.
+- The share card includes the reached form. "I hit WORLD EATER" is the brag loop.
+
+## 7 — Bot aggression curve
+
+- Add `aggression(t)`: **0.0 for the first 15 seconds** (bots may only graze objects, never target the player), then ramps linearly to 1.0 by the 45-second mark. HUNT against the player requires aggression ≥ 0.5.
+- The bigger-than-player rival spawns at least 1.5 screen-widths away.
+- Rubber band: if the player is in 6th place with ≤30s remaining, the nearest rival quietly stops gaining mass for 10s. Never show or mention this.
+- Bots also respect a 1.5s "just respawned" truce after the player gets chomped.
+
+## 8 — HUD and in-game controls cleanup
+
+- Remove the floating sound and X buttons from the lower playfield (they overlap gameplay). Replace with **one small pause button, top-right** (40px, low-opacity dark pill) opening a pause sheet: Resume / Sound toggle / Quit to menu. Pausing freezes the sim.
+- Leaderboard: the "You" row gets a distinct treatment — white text on a soft player-color pill — so it never reads as just another rival. Keep it to 6 compact rows, 13px.
+- Timer bar, evolution bar, and score must never overlap the leaderboard; reflow for small screens (test at 375px width).
+
+## 9 — Micro-polish checklist (billion-dollar feel is 30 tiny things)
+
+- 300ms slide-fade transitions between all screens; nothing ever hard-cuts.
+- Results screen: score counts up over 1s with tick sounds; grade stamps in with a thud; coins fly one-by-one into the coin counter (max 8 coin sprites, then a lump sum).
+- Every button plays a soft press sound and scales 0.96 on `:active`.
+- Menu starfield gets 2-layer parallax drifting slowly; the home-screen voidling blinks, bobs, and its pupils occasionally track a drifting star.
+- Haptics map: absorb 10ms, merge 40ms, evolve pattern, chomped 60ms, button 5ms. Single `haptic(type)` helper; silently no-op where unsupported.
+- One spacing unit (8px grid), one outline weight (4px), one shadow style, everywhere. Delete any stragglers.
+- Number formatting: 1,240 not 1240; mass shown as whole numbers only.
+
+## Acceptance criteria — verify each on a real phone
+
+- Push into a tree from three angles: you slide around it, never stick; the tree shakes and pulses.
+- The player and rivals visibly pop off the field from arm's length; a screenshot passes the squint test (blur your eyes — the actors still read).
+- Eat 8 objects in a row fast: pitch ladder audibly climbs, FRENZY appears at 5, border vignette pulses, each bite shows crumbs + floating score.
+- Reach Snacker and Chomper in one run: slow-mo, banner, ring/debris layers appear and persist; evolution bar shows progress between forms.
+- Sit still for the first 15 seconds: no rival ever moves toward you; by ~45s they hunt normally.
+- Two-of-a-kind orbit icons visibly glow gold before the third completes the TRIPLE.
+- Pause works mid-round; no controls overlap the playfield; leaderboard "You" row is unmistakable.
+- Steady 60fps with 5 bots, ~140 objects, a frenzy, and an evolution firing simultaneously; zero console errors over 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, new maps, iOS wrap, real ad/IAP SDKs, new skins, monetization stubs, Daily Bite logic. This pass changes how the game **feels**, not what it is.
+
+Work top to bottom: collision first, then cohesion, then juice, then evolutions, then AI, then micro-polish. One continuous pass.
