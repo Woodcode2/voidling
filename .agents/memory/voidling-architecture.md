@@ -18,3 +18,15 @@ VOIDLING (`artifacts/3d-game/`, preview path `/`) is a mobile-first Canvas 2D ar
 - The in-game overlay container is `pointer-events: none` with `pointer-events: auto` only on its buttons, so the full-canvas relative-drag joystick still receives pointer events everywhere else.
 - Simulation uses a fixed timestep + interpolation alpha; pause the rAF loop on `visibilitychange` (hidden) and reset the clock on resume so a backgrounded tab doesn't accumulate a huge catch-up delta.
 - Palette is "Electric Pop" (violet `#14082B` base); there must be no cream `#FDF6EC` anywhere. Default skin id is `classic` (legacy `default` is migrated to `classic` on meta load).
+
+## Service worker / PWA caching
+
+VOIDLING ships as an installable PWA with a service worker.
+
+**Why this matters:** an early service worker cached the app shell cache-first with a fixed cache name and no cleanup, so browsers permanently served an OLD build — users saw the pre-refactor look in preview while the dev server served fresh code. The screenshot tool runs a fresh browser with no SW, so it showed the new build and masked the problem.
+
+**Policy:**
+- Never let the service worker run against the dev server: register it only in production; in dev, unregister it and clear its caches so preview is always fresh.
+- The SW must be self-healing — take over immediately, purge stale caches, and reload open tabs — so a stuck browser recovers on its own without a manual cache clear.
+- Navigations are network-first (new versions appear immediately); only content-hashed static assets are cache-first. Bump the cache version whenever cached content or strategy changes.
+- First suspect for any "preview shows the old version" report is the SW cache.
