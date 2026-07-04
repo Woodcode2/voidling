@@ -20,7 +20,7 @@ interface OrbitItem {
 }
 
 export interface FxEvent {
-  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve';
+  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve' | 'score';
   x: number;
   y: number;
   text?: string;
@@ -29,6 +29,7 @@ export interface FxEvent {
   kind?: ObjectKind;
   form?: number;    // v6 §3: form index reached (for 'evolve')
   tier?: number;    // v8 §5: object tier (for the eat sound's T3+ sub thump)
+  amount?: number;  // v10 §3: score points for pooled +N text
 }
 
 export class Player extends Void {
@@ -280,6 +281,9 @@ export class Player extends Void {
     });
     this.pendingFx.push({ type: 'absorb', x: obj.x, y: obj.y, color: CONFIG.COLORS.tierTint[obj.tier - 1] });
     this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: obj.kind, tier: obj.tier });
+    // v10 §3: floating +N score — pooled by engine within 150ms window
+    this.pendingFx.push({ type: 'score', x: obj.x, y: obj.y - obj.size, amount: gain,
+      color: CONFIG.COLORS.tierTint[obj.tier - 1] || '#FFFFFF', tier: obj.tier });
 
     // v5 §4: cap at 6 — the oldest fades out on overflow
     while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {

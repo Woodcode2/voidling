@@ -21,6 +21,7 @@ export interface FloatingText {
   maxLife: number;
   color: string;
   size: number;
+  vy?: number;  // v10 §3: px/ms rise speed (default 0.05)
 }
 
 export interface Ring {
@@ -56,7 +57,7 @@ export class FXManager {
 
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
-      t.y -= 0.05 * dt;
+      t.y -= (t.vy ?? 0.05) * dt;
       t.life -= dt;
       if (t.life <= 0) this.texts.splice(i, 1);
     }
@@ -211,8 +212,17 @@ export class FXManager {
     }
   }
 
-  addText(x: number, y: number, text: string, color: string, size = 24) {
-    this.texts.push({ x, y, text, color, life: 1000, maxLife: 1000, size });
+  addText(x: number, y: number, text: string, color: string, size = 24): FloatingText {
+    const t: FloatingText = { x, y, text, color, life: 1000, maxLife: 1000, size };
+    this.texts.push(t);
+    return t;
+  }
+
+  // v10 §3: score pop — 22px+, rises 40px over 600ms, white outline. Returns ref for pooling.
+  addScoreText(x: number, y: number, amount: number, color: string): FloatingText {
+    const t: FloatingText = { x, y, text: `+${amount}`, color, life: 600, maxLife: 600, size: 22, vy: 0.067 };
+    this.texts.push(t);
+    return t;
   }
 
   addRing(x: number, y: number, color: string, r0 = 8, vr = 260, width = 4, life = 420) {

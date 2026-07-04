@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createGame, type GameEngine, type Snapshot } from './game/engine';
 import { UILayer } from './ui/UILayer';
 import { DebugPanel } from './ui/DebugPanel';
+import { preloadSprites } from './game/sprites';
+
+// v10 §1: fire-and-forget sprite preload at app boot
+preloadSprites(import.meta.env.BASE_URL);
 
 const DEBUG = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 

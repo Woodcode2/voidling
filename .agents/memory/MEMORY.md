@@ -1,3 +1,3 @@
 - [VOIDLING architecture](voidling-architecture.md) — React-DOM menus + canvas-only arena, joined by a createGame() engine snapshot/subscribe API that notifies on discrete state changes (never per-frame).
 - [VOIDLING audio + lifecycle](voidling-audio.md) — procedural WebAudio (SFX + music buses, setInterval scheduler); any long-lived scheduler/interval MUST be torn down in engine.destroy() or it leaks on unmount.
-- [VOIDLING rendering & perf](voidling-rendering.md) — post-`restore()` transform is dpr (screen space = CSS px); per-frame helpers must bound work + cache patterns/sprites; missions have no target field to scale.
+- [VOIDLING rendering & perf](voidling-rendering.md) — world-space badge/overlay placement; sprite pipeline (skinSprites/layerSprites); score pooling rolling window; orbit-chip clearance rule.

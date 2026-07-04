@@ -1,6 +1,6 @@
 import { CONFIG, type BoonDef, type SkinDef } from './config';
 import { audio } from './audio';
-import { FXManager } from './fx';
+import { FXManager, type FloatingText } from './fx';
 import { WorldManager } from './world';
 import { Player } from './player';
 import { Void } from './void';
@@ -137,6 +137,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let coinBonus = 0;             // extra coins already granted mid-round (finale)
   let evoCoinBonus = 0;         // v6 §3: WORLD EATER results bonus (+200)
   let gnomeLord = false;        // v9 §8: secret — ate every gnome this round
+  // v10 §3: score-text pooling — rapid eats accumulate into one rising number
+  let lastScoreText: FloatingText | null = null;
+  let lastScoreMs = 0;
+  // v10 §5: form badge — full opacity for 2s after any evolution
+  let lastEvoElapsed = -9999;
   let goldenTimer = 0;          // v6 §2: golden-object spawn cadence (from 2:45)
   let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
@@ -255,6 +260,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     coinBonus = 0;
     evoCoinBonus = 0;
     gnomeLord = false;
+    lastScoreText = null; lastScoreMs = 0;
+    lastEvoElapsed = -9999;
     goldenTimer = 0;
     luckyTimer = 0;
     dashTimer = 0;
@@ -575,9 +582,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     for (const ev of player.pendingFx) {
       if (ev.type === 'absorb') {
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
+      } else if (ev.type === 'score') {
+        // v10 §3: pool absorb points — rolling 150ms window; each merge resets the clock
+        if (lastScoreText && lastScoreText.life > 0 && roundElapsed - lastScoreMs < 150) {
+          const prev = parseInt(lastScoreText.text.replace('+', '')) || 0;
+          lastScoreText.text = `+${prev + (ev.amount || 0)}`;
+          lastScoreMs = roundElapsed; // rolling window: timer resets on each merge
+        } else {
+          lastScoreText = fx.addScoreText(ev.x, ev.y, ev.amount || 0, ev.color || '#FFF');
+          lastScoreMs = roundElapsed;
+        }
       } else if (ev.type === 'chomp') {
         audio.playChomp(ev.tier || 1);
         if (ev.kind) audio.playSignature(ev.kind);
+        // v10 §3: T4+ objects land with a deep 2px camera punch
+        if ((ev.tier || 0) >= 4) fx.shake(80, 2, 0);
         // v8 §6: eat-streak ladder (chains within 1.2s); §7 frenzy counts double
         const inc = events.frenzyActive ? 2 : 1;
         const prevStreak = (roundElapsed - lastEatMs < 1200) ? eatStreak : 0;
@@ -601,6 +620,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       } else if (ev.type === 'finale') {
         triggerFinale(ev.x, ev.y);
       } else if (ev.type === 'evolve') {
+        lastEvoElapsed = roundElapsed; // v10 §5: reset form-badge full-opacity window
         triggerEvolution(ev.x, ev.y, ev.form || 0, ev.text || '');
       }
     }
@@ -743,10 +763,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const px = player.prevX + (player.x - player.prevX) * alpha;
     const py = player.prevY + (player.y - player.prevY) * alpha;
 
-    // ── camera: zoom OUT as the player grows (v5 §1) ──
+    // ── camera: zoom OUT as the player grows (v5 §1 / v10 §4: WORLD ENDER extends to 2200) ──
+    const isWorldEnder = player.formIndex >= CONFIG.FORMS.length - 1;
+    const viewMax = isWorldEnder ? 2200 : CONFIG.CAM_VIEW_MAX;
     const viewHeight = clamp(
       CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
-      CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
+      CONFIG.CAM_VIEW_BASE, viewMax,
     );
     const targetZoom = fh / viewHeight;
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
@@ -780,13 +802,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.translate(-camCX, -camCY);
 
     world.drawGround(ctx, view, clock, player?.x ?? camCX, player?.y ?? camCY);
-    world.drawDressing(ctx, view, clock);
+    world.drawDressing(ctx, view, clock, camZoom);
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);
     drawPowerAuras(clock); // v6 §4: auras under the player
     player.draw(ctx, clock, alpha);
     if (gnomeLord) drawGnomeCrown(clock); // v9 §8: secret GNOME LORD crown
+    drawFormBadge(); // v10 §5: form name pill under player (and DEVOURER+ rivals)
 
     if (!paused) fx.update(frameDt);
     fx.draw(ctx);
@@ -1243,7 +1266,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const g = c.getContext('2d')!;
     const grd = g.createRadialGradient(fw / 2, fh / 2, Math.min(fw, fh) * 0.34, fw / 2, fh / 2, Math.max(fw, fh) * 0.72);
     grd.addColorStop(0, 'rgba(0,0,0,0)');
-    grd.addColorStop(1, 'rgba(10,4,24,0.45)');
+    grd.addColorStop(1, 'rgba(10,4,24,0.03)'); // v10 §2: barely-there vignette (was 0.45)
     g.fillStyle = grd;
     g.fillRect(0, 0, fw, fh);
     vignetteCanvas = c; vignetteW = fw; vignetteH = fh;
@@ -1265,6 +1288,50 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     grainCanvas = c;
     return c;
   }
+  // v10 §5: form-name pill badge drawn in world space, always ~10 screen-px tall.
+  // Full opacity for 2s after evolving; 40% afterwards. Rivals shown at DEVOURER+.
+  function drawFormBadge() {
+    if (!player || camZoom < 0.05) return;
+    const fs = Math.max(5, 10 / camZoom); // constant ~10 screen-px regardless of zoom
+
+    function drawOneBadge(bx: number, by: number, br: number, name: string, alpha: number) {
+      if (!name) return;
+      const txt = name.toUpperCase();
+      ctx.save();
+      ctx.font = `600 ${fs}px Fredoka, sans-serif`;
+      const tw = ctx.measureText(txt).width;
+      const pillH = fs * 2.0;
+      const pillW = tw + pillH;
+      const pillX = bx - pillW / 2;
+      // Orbit chips sit at r + ORBIT_RADIUS_OFFSET (26) + chip radius (~11) = r + 37.
+      // Place badge top edge just below that to guarantee no overlap.
+      const pillY = by + br + 44 + pillH / 2;
+      const rr = pillH / 2;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(0,0,0,0.60)';
+      ctx.beginPath();
+      (ctx as CanvasRenderingContext2D & { roundRect: (...a: any[]) => void })
+        .roundRect(pillX, pillY - pillH / 2, pillW, pillH, rr);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(txt, bx, pillY);
+      ctx.restore();
+    }
+
+    const fullOpacity = roundElapsed - lastEvoElapsed < 2000;
+    drawOneBadge(player.x, player.y, player.radius, player.formName, fullOpacity ? 1.0 : 0.4);
+
+    // Rivals: only show when at DEVOURER form or beyond (formIndex ≥ 3)
+    const devoIdx = CONFIG.DEVOURER_FORM_INDEX ?? 3;
+    for (const r of rivals) {
+      if (!r.alive || r.formIndex < devoIdx) continue;
+      const rname = CONFIG.FORMS[r.formIndex]?.name || '';
+      drawOneBadge(r.x, r.y, r.radius, rname, 0.4);
+    }
+  }
+
   // v9 §8: a little golden crown floating above the GNOME LORD (secret reward)
   function drawGnomeCrown(clock: number) {
     if (!player) return;
@@ -1298,7 +1365,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!grainPattern) grainPattern = ctx.createPattern(getGrain(), 'repeat');
     if (grainPattern) {
       ctx.save();
-      ctx.globalAlpha = 0.035;
+      ctx.globalAlpha = 0.02; // v10 §2: lighter grain (was 0.035)
       ctx.globalCompositeOperation = 'overlay';
       const ox = (clock * 0.05) % 128, oy = (clock * 0.07) % 128;
       ctx.fillStyle = grainPattern;
