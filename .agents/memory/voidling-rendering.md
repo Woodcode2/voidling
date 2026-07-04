@@ -33,6 +33,14 @@ description: Canvas render-transform state, hot-path perf rules, and the mission
   decremented in `player.update`, reset to ~500ms on log) — an un-throttled log inside a
   contact branch floods the console at 60fps and skews profiling.
 
+## Every spawnable ObjectKind needs a KIND_INFO entry
+- `world.makeObj(kind)` reads `CONFIG.KIND_INFO[kind].minR/maxR/tier` with no guard. A kind that
+  exists in the `ObjectKind` union / `LIVING_KINDS` / any `spawnX()` but is missing from the
+  `KIND_INFO` table throws `undefined is not an object (evaluating 'info.minR')` at populate time,
+  which crashes the whole round on Play (and silently kills audio, since `startMusic()` runs after
+  population). **Why:** the union type doesn't force a KIND_INFO row. When adding an object kind,
+  add its KIND_INFO sizing row in the same edit.
+
 ## Missions have no numeric targets
 - `meta.ts` missions are only `{id, progress, completed}` — there is **no** target/threshold
   field anywhere, and no mission UI surfaces them. So a spec item like "daily mission
