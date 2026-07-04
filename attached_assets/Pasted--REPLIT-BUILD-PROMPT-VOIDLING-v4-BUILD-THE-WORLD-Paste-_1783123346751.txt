@@ -1,0 +1,78 @@
+# REPLIT BUILD PROMPT — VOIDLING v4: BUILD THE WORLD
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are rebuilding VOIDLING's arena into a real place and fixing how eating feels. The abstract colored-square arena is being **deleted** and replaced with a procedurally drawn toy neighborhood. The character, skins, rivals, evolutions, frenzy, boons, menus, and shop all stay exactly as they are. Follow every number literally.
+
+## 1 — The world: "Maple Court," a candy-colored toy neighborhood
+
+Delete the checkerboard/quilt ground entirely. Generate a structured top-down neighborhood, world size ~2800×2800:
+
+**Layout algorithm:** a 3×3 grid of blocks (~800px each) separated by 120px roads. Roads: muted slate asphalt `#8A93A6` at reduced saturation, 40%-opacity dashed white center lines, flanked by 44px warm-gray sidewalks `#D8D3C8` with faint seam lines. Ground must obey the standing rule: **nothing in the ground layer may have more contrast than the smallest edible object.** Lawns use 2–3 muted greens (`#8FCDA0`, `#7FC494`, `#98D3A8`) in soft irregular patches — no hard checker edges anywhere.
+
+**Block types (assign across the 9):**
+- **6 residential blocks:** each holds 2–3 lots. A lot = pastel house (varied body colors — butter, rose, sky, sage — white trim, triangle roof in a deeper tone, door, 2 windows), a driveway with a parked car, and yard objects scattered logically: garden gnome, 2–3 flower pots, mailbox at the curb, trash cans beside the house, a bike, occasionally a doghouse with a dog, a sandbox, a birdbath.
+- **1 park block:** pond (muted blue, white outline) with 4–6 ducks, benches, picnic blankets with baskets and apples, trees, the fountain.
+- **1 plaza block:** 2 food carts, café tables with people, planters, a newspaper stand.
+- **1 landmark block:** the **WATER TOWER** — the largest object in the game, drawn tall with legs, tank, and a little flag. It is edible **only** in WORLD EATER form. Eating it triggers a finale: slow-mo, full confetti, banner "YOU ATE THE WATER TOWER," +500 coins, and its own line on the share card.
+
+**Object tier remap:** T1 flower pot, gnome, apple, flower · T2 mailbox, hydrant, trash can, duck, bike · T3 person, dog, bench, birdbath, café table · T4 car, tree, food cart, shed · T5 house · Landmark: water tower. Total population 250–350 objects. **Density rule: from any camera position mid-game, at least 12 edible objects are on screen.** If a region empties, trickle-respawn small T1–T2 objects at map edges (fade in, never inside the visible screen).
+
+**A living world:** 6–10 cars drive the roads at 60 px/s, pausing at intersections; if the player (smaller than a car) is adjacent, the car honks (short synth honk) — if the player is bigger, the car swerves and flees at 140 px/s. People wander sidewalks at 30 px/s and flee at 120 px/s with a "!" and scrambling arms. Ducks paddle the pond. Dogs chase ducks occasionally. The world should feel busy before the player disturbs anything.
+
+## 2 — Suction physics (the missing feel)
+
+Replace pop-on-contact absorption with a **gravity well**:
+
+- Any edible object whose center is within **1.35× player radius** is captured: it accelerates toward the player center (up to 600 px/s), scaling down and rotating slightly as it falls, and is absorbed when it crosses **0.75× radius**. The chomp sequence from v3 (mouth, crumbs, pitch ladder, pulse, floating score) fires at that moment.
+- Captured objects that are living (person, duck, dog) flail while being pulled. Objects being pulled can pass over ground decor freely.
+- If the player moves away before absorption completes, the object escapes: it skids to a stop where it was, slightly displaced. Escapes must be possible — that's what makes suction feel physical rather than scripted.
+- Non-edible contact keeps the v3 slide + shake + pulse. No sticking, ever.
+
+## 3 — Movement feel contract (hard numbers, not vibes)
+
+- Acceleration 2400 px/s² toward the joystick vector; max speed 340 px/s at base size (evolution bonuses stack on top). On release, decelerate at 1800 px/s².
+- Direction changes retarget instantly — this is an arcade blob, not a car.
+- Camera: position lerp 0.10 with a 40px dead zone (no micro-jitter), zoom lerp 0.06, player rendered 64–140px tall as before.
+- Brushing an edible you haven't captured nudges it a few pixels. Small mass in motion everywhere.
+
+## 4 — Orbit-merge: verify or restore (core loop audit)
+
+The orbit ring (last 6 eaten items circling the rim; 3-of-a-kind pulls together and bursts for bonus growth + combo) is a core system and is currently not visible in gameplay. Audit it:
+
+- If it exists but is invisible, fix rendering: icons at 50% object scale, minimum 14px, white-outlined like everything else, orbiting just outside the glow rings.
+- If it was never fully built, implement it now per the original spec, including the two-of-a-kind gold-glow telegraph and the TRIPLE burst.
+- It must be plainly visible in any gameplay screenshot. This is an acceptance criterion.
+
+## 5 — Render order and HUD fixes (bugs from live build)
+
+- **Strict draw order every frame:** ground → ground decor → shadows → objects (y-sorted so lower objects draw in front) → characters → suction/particles → screen FX (vignette, frenzy border) → **HUD last, always on top.** A tree must never overlap the leaderboard again.
+- Leaderboard gets a 60%-opacity dark rounded backdrop, max-width 150px. The timer bar may not extend into the leaderboard's column — shorten it or move it below the timer text; verify at 375px width.
+- **Remove the floating sound and X buttons from the playfield.** This was specified previously and not done. Replace with the single 40px pause pill, top-right, opening Resume / Sound / Quit. Their absence from the playfield is an acceptance criterion.
+- Ghost state after being devoured: player at 40% opacity with a dashed outline, "SAFE" countdown stays; rivals render normally beneath the toast banner.
+
+## 6 — Reaction flavor (cheap life, big returns)
+
+- People scream-pose when captured; a tiny hat pops off some of them.
+- Eating a whole house: it shakes for 300ms, sheds 3–4 debris chunks, then spirals in; leaves a dirt patch on the lot that fades over 10s.
+- Gnomes squeak. Trash cans clatter (two-note synth). Cars crunch with a deeper pop. Each family of objects gets one signature sound layered under the pitch ladder — 5 tiny synth variants total, no assets.
+
+## Acceptance criteria — verify each on a real phone
+
+- The arena is recognizably a neighborhood: roads with moving cars, sidewalks, pastel houses with yards, a pond with ducks, the water tower. Zero abstract checker squares remain.
+- Squint test still passes: characters and edibles pop; ground recedes.
+- Park a finger: nearby small objects visibly slide into you, shrinking as they fall; walking away mid-pull lets an object escape and skid.
+- At least 12 edible objects visible at all times during normal play.
+- The orbit ring is clearly visible with icons; a third matching item triggers the TRIPLE burst.
+- A tree, house, or any object never renders over the leaderboard or timer; no floating sound/X buttons exist in the playfield; pause pill works.
+- Cars honk at small-you and flee big-you; people flee with "!"; eating a house leaves a fading dirt patch.
+- WORLD EATER can eat the water tower and the finale fires; smaller forms cannot.
+- Steady 60fps with traffic, 5 rivals, 250+ objects; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, ad/IAP SDKs, new skins, menus, shop, Daily Bite, evolutions logic, boons. This pass builds the world and fixes the feel. Nothing else.
+
+Order of work: world generation → suction → movement contract → orbit audit → render order/HUD → reaction flavor. One continuous pass.
