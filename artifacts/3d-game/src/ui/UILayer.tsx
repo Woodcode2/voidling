@@ -108,7 +108,7 @@ function Confetti() {
 }
 
 // ── screens ────────────────────────────────────────────────────────────────────
-function Home({ snap, engine, onHelp }: { snap: Snapshot; engine: GameEngine; onHelp: () => void }) {
+function Home({ snap, engine, onHelp, onPlay }: { snap: Snapshot; engine: GameEngine; onHelp: () => void; onPlay: () => void }) {
   return (
     <div className="vd-overlay vd-overlay--solid">
       <StarField />
@@ -132,7 +132,7 @@ function Home({ snap, engine, onHelp }: { snap: Snapshot; engine: GameEngine; on
         {snap.highScore > 0 && (
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
         )}
-        <button className="vd-btn vd-btn--play vd-btn--pulse" onClick={() => engine.start(false)}>PLAY</button>
+        <button className="vd-btn vd-btn--play vd-btn--pulse" onClick={onPlay}>PLAY</button>
         <div className="vd-row">
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openDaily()}>DAILY BITE</button>
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openShop()}>SHOP</button>
@@ -315,6 +315,7 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         <div className="vd-big-num">{r.score.toLocaleString()}</div>
         {r.newBest && <span className="vd-badge">NEW BEST!</span>}
         {r.reachedForm && <div className="vd-reached">Reached: {r.reachedForm}</div>}
+        {r.gnomeLord && <div className="vd-reached">👑 GNOME LORD — ate every gnome!</div>}
         <div style={{ width: '100%', maxWidth: 320, marginTop: 8 }}>
           <div className="vd-stat-row"><span>Placement</span><span>#{r.placement}</span></div>
           <div className="vd-stat-row"><span>Devoured</span><span>{r.devoured.toFixed(0)}%</span></div>
@@ -448,21 +449,34 @@ const ONBOARD_KEY = 'vd_onboarded';
 
 export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const [showOnboard, setShowOnboard] = useState(false);
-
-  useEffect(() => {
-    let seen = true;
-    try { seen = localStorage.getItem(ONBOARD_KEY) === '1'; } catch { /* ignore */ }
-    if (!seen) setShowOnboard(true);
-  }, []);
+  // v9 §7: onboarding fires on the FIRST PLAY tap (before the first countdown),
+  // never on home load. When it finishes we start the game. The "?" replays it
+  // without auto-starting. This ref carries the action to run after the intro.
+  const afterOnboard = useRef<null | (() => void)>(null);
 
   const finishOnboard = () => {
-    try { localStorage.setItem(ONBOARD_KEY, '1'); } catch { /* ignore */ }
     setShowOnboard(false);
+    const next = afterOnboard.current;
+    afterOnboard.current = null;
+    // Only the first PLAY-triggered intro marks onboarding complete + starts the
+    // game. The "?" replay path leaves the flag alone so the real first PLAY still
+    // shows the intro.
+    if (next) {
+      try { localStorage.setItem(ONBOARD_KEY, '1'); } catch { /* ignore */ }
+      next();
+    }
+  };
+
+  const handlePlay = () => {
+    let seen = true;
+    try { seen = localStorage.getItem(ONBOARD_KEY) === '1'; } catch { /* ignore */ }
+    if (!seen) { afterOnboard.current = () => engine.start(false); setShowOnboard(true); }
+    else engine.start(false);
   };
 
   let screen: React.ReactNode = null;
   switch (snap.screen) {
-    case 'home': screen = <Home snap={snap} engine={engine} onHelp={() => setShowOnboard(true)} />; break;
+    case 'home': screen = <Home snap={snap} engine={engine} onHelp={() => setShowOnboard(true)} onPlay={handlePlay} />; break;
     case 'shop': screen = <Shop snap={snap} engine={engine} />; break;
     case 'results': screen = <Results snap={snap} engine={engine} />; break;
     case 'boon': screen = <Boon snap={snap} engine={engine} />; break;

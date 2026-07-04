@@ -1,5 +1,6 @@
 import { CONFIG, type SkinDef, type ObjectKind } from './config';
-import { clamp, lerp, growRadius } from './utils';
+import { clamp, lerp } from './utils';
+import { Void } from './void';
 import { drawParkObject } from './objects';
 import { drawVoidling, drawUnderdogTrail, type VoidlingVisual } from './voidling';
 import type { WorldObject } from './world';
@@ -30,19 +31,13 @@ export interface FxEvent {
   tier?: number;    // v8 §5: object tier (for the eat sound's T3+ sub thump)
 }
 
-export class Player {
-  x = 0; y = 0; prevX = 0; prevY = 0;
-  vx = 0; vy = 0;                    // px/s
+export class Player extends Void {
   private inDirX = 0; private inDirY = 0; private inMag = 0;
   private inputActive = false;
 
-  radius = CONFIG.PLAYER_BASE_RADIUS;
-  score = 0;
   combo = 0;
   comboTimer = 0;
 
-  // v6 §3: evolution form ladder — index into CONFIG.FORMS; only goes up
-  formIndex = 0;
   cheekPuff = 0;        // 400ms after eating T3+
   dizzy = 0;            // 1s after being chomped
   lick = 0;             // 800ms after a TRIPLE
@@ -68,17 +63,11 @@ export class Player {
   dashActive = false;    // VOID DASH held (engine runs the 6s auto-dash)
   luckyActive = false;   // LUCKY GNOME held (engine spawns goldens)
   tremorLogCd = 0;       // throttle for the TENDERIZER debug log
-  underdogSpeed = 1;      // v6 §2: 5th/6th place move-speed bonus (silent)
-  underdogGrowth = 1;     // v6 §2: 5th/6th place growth bonus
-  underdog = false;       // v6 §2: faint blue trail when trailing
-  eventSlow = 1;          // v6 §5: firetruck water / event slow (reset each frame)
 
-  // identity
-  skin: SkinDef;
+  // identity (skin + form state + underdog + eventSlow live on the shared Void base)
   name = 'You';
 
   // state
-  ghostTime = 0;
   tooBigCd = 0;                      // ms cooldown on "too big" feedback
 
   // animation
@@ -97,7 +86,7 @@ export class Player {
   lookTarget: { x: number; y: number } | null = null;
 
   constructor(skin: SkinDef) {
-    this.skin = skin;
+    super(skin);
   }
 
   reset(x: number, y: number, skin: SkinDef) {
@@ -139,8 +128,6 @@ export class Player {
     this.chomp = 0;
   }
 
-  get ghost() { return this.ghostTime > 0; }
-
   get comboMult() { return 1 + Math.min(this.combo, 25) * 0.1; }
 
   private sizeSpeedFactor() {
@@ -156,6 +143,7 @@ export class Player {
   }
 
   update(dt: number) {
+    this.tickMorph(dt); // v9 §3: advance the body-morph crossfade
     const dtSec = dt / 1000;
 
     // ── velocity: accel toward joystick vector, decel to stop on release (px/s) ──
@@ -273,7 +261,7 @@ export class Player {
     let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult * this.frenzyMult);
     if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT; // v7 §3: drone worth 2×
     this.score += gain;
-    this.radius = growRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
+    this.absorbObjectMass(obj.size); // v9 §1: shared growth curve + size cap
     if (obj.tier >= 3) this.cheekPuff = 1; // v6 §9: cheek puff on T3+
     this.checkEvolution();
 
@@ -318,7 +306,7 @@ export class Player {
         this.orbit = this.orbit.filter((o) => !merge.includes(o));
         const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier * this.twinBonus * this.frenzyMult);
         this.score += bonus;
-        this.radius = growRadius(this.radius, 260 * tier * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
+        this.absorbMergeMass(260 * tier); // v9 §1: shared growth curve
         this.bumpCombo();
         this.lick = 1; // v6 §9: tongue-lick grin after a TRIPLE
         this.pendingFx.push({ type: 'merge', x: this.x, y: this.y, text: `TRIPLE! +${bonus}`, color: '#FFD23F', big: true });
@@ -331,7 +319,7 @@ export class Player {
   eatRival(rivalRadius: number) {
     const bonus = Math.round(500 * Math.max(1, this.comboMult));
     this.score += bonus;
-    this.radius = growRadius(this.radius, Math.PI * rivalRadius * rivalRadius * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
+    this.absorbVoidMass(rivalRadius); // v9 §1: shared growth curve + size cap
     this.bumpCombo();
     this.chomp = 1;
     this.cheekPuff = 1;
@@ -339,31 +327,20 @@ export class Player {
     this.checkEvolution();
   }
 
-  // v6 §3: promote through the form ladder; forms only go up within a round.
+  // v6 §3: promote through the shared form ladder; forms only go up within a round.
   private checkEvolution() {
-    while (
-      this.formIndex < CONFIG.FORMS.length - 1 &&
-      this.radius >= CONFIG.FORMS[this.formIndex + 1].radius
-    ) {
-      this.formIndex++;
+    this.advanceForms((formIndex) => {
       this.pendingFx.push({
         type: 'evolve', x: this.x, y: this.y,
-        form: this.formIndex, text: CONFIG.FORMS[this.formIndex].name,
+        form: formIndex, text: CONFIG.FORMS[formIndex].name,
       });
-    }
+    });
   }
-
-  // v6 §3: floor the radius at the current form's threshold (chomp/decay can't demote)
-  get formFloor() {
-    return Math.max(CONFIG.PLAYER_BASE_RADIUS, CONFIG.FORMS[this.formIndex].radius);
-  }
-
-  get formName() { return CONFIG.FORMS[this.formIndex].name; }
 
   // Player got eaten -> lose mass, ghost, keep playing
   getEaten() {
     // v6 §3: being chomped can't drop you below a form you've already reached
-    this.radius = Math.max(this.formFloor, this.radius * CONFIG.RESPAWN_MASS_FRAC);
+    this.shrinkOnEaten();
     this.ghostTime = CONFIG.GHOST_TIME;
     this.combo = 0;
     this.dizzy = 1; // v6 §9: dizzy swirl eyes for 1s
@@ -388,6 +365,7 @@ export class Player {
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
       form: this.formIndex,
+      morph: this.morph,
       cheekPuff: this.cheekPuff,
       dizzy: this.dizzy,
       lick: this.lick,

@@ -40,11 +40,13 @@ export interface PlayerStats {
   count: number;
   ducks: number;
   maxTier: number;
+  gnomes: number;   // v9 §8: garden gnomes eaten this round (secret GNOME LORD)
 }
 
 type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
+interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail
 
 const MARGIN = (CONFIG.MAP_SIZE - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
 const STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
@@ -84,60 +86,87 @@ function drawStars(ctx: CanvasRenderingContext2D, view: View) {
   ctx.restore();
 }
 
-function drawEdgeDither(ctx: CanvasRenderingContext2D, view: View, S: number) {
-  const F = CONFIG.EDGE_FADE, step = 8;
-  const vx0 = Math.max(0, view.x), vy0 = Math.max(0, view.y);
-  const vx1 = Math.min(S, view.x + view.w), vy1 = Math.min(S, view.y + view.h);
-  ctx.save();
-  ctx.fillStyle = CONFIG.COLORS.uiBg;
-  // Only the F-wide border bands need dithering, so iterate those strips
-  // (work ∝ edge length × F) rather than the whole visible map area.
-  const cell = (x: number, y: number) => {
-    const d = Math.min(x, y, S - x, S - y);
-    if (d > F) return;
-    const prob = 1 - d / F;
-    if ((hashInt(x, y) % 100) / 100 < prob * 0.9) ctx.fillRect(x, y, step, step);
+// v9 §4: the world's edge is torn earth, not a hazard barrier. Each visible map
+// edge gets an irregular bitten profile (8–14px amplitude), a soil-dark underside
+// line, and an undulating violet-pink accretion glow that brightens near the player.
+function drawTornRim(ctx: CanvasRenderingContext2D, view: View, S: number, t: number, px: number, py: number) {
+  const step = 16;
+  const bg = CONFIG.COLORS.uiBg;
+  const soil = '#3A2A18';
+  const jag = (i: number) => 8 + (hashInt(i, 777) % 7); // 8..14 px inward bite
+  const vx0 = Math.max(0, view.x), vx1 = Math.min(S, view.x + view.w);
+  const vy0 = Math.max(0, view.y), vy1 = Math.min(S, view.y + view.h);
+
+  // Build a jagged edge profile, carve the outer sliver to space, then trace it.
+  const edge = (
+    build: (i: number) => [number, number],   // point on the jag line at column/row i
+    outer: (i: number) => [number, number],   // matching point on the clean map edge
+    a: number, b: number,
+  ) => {
+    const n = Math.max(1, Math.ceil((b - a) / step));
+    const pts: [number, number][] = [];
+    for (let k = 0; k <= n; k++) pts.push(build(a + (k * (b - a)) / n));
+    // carve: fill the strip between the clean edge and the jag line with space bg
+    ctx.save();
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    const o0 = outer(a); ctx.moveTo(o0[0], o0[1]);
+    const oN = outer(b); ctx.lineTo(oN[0], oN[1]);
+    for (let k = pts.length - 1; k >= 0; k--) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.closePath(); ctx.fill();
+    // soil-dark underside line
+    ctx.beginPath();
+    for (let k = 0; k < pts.length; k++) (k ? ctx.lineTo : ctx.moveTo).call(ctx, pts[k][0], pts[k][1]);
+    ctx.strokeStyle = soil; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.stroke();
+    // accretion glow — undulating, brighter near the player
+    for (let k = 0; k < pts.length; k++) {
+      const [gx, gy] = pts[k];
+      const near = clamp(1 - Math.hypot(px - gx, py - gy) / 900, 0, 1);
+      const shimmer = 0.35 + 0.25 * Math.sin(t / 260 + gx * 0.02 + gy * 0.02);
+      ctx.globalAlpha = clamp(shimmer + near * 0.5, 0, 1);
+      ctx.fillStyle = '#F06BC8';
+      ctx.beginPath(); ctx.arc(gx, gy, 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   };
-  const xa = Math.floor(vx0 / step) * step, xb = vx1;
-  const ya = Math.floor(vy0 / step) * step, yb = vy1;
-  const topEnd = Math.min(yb, F + step);
-  const botStart = Math.max(ya, Math.floor((S - F) / step) * step);
-  for (let x = xa; x < xb; x += step) {
-    for (let y = ya; y < topEnd; y += step) cell(x, y);
-    for (let y = botStart; y < yb; y += step) cell(x, y);
-  }
-  const yInnerA = Math.max(ya, F + step);
-  const yInnerB = Math.min(yb, botStart);
-  const leftEnd = Math.min(xb, F + step);
-  const rightStart = Math.max(xa, Math.floor((S - F) / step) * step);
-  for (let y = yInnerA; y < yInnerB; y += step) {
-    for (let x = xa; x < leftEnd; x += step) cell(x, y);
-    for (let x = rightStart; x < xb; x += step) cell(x, y);
-  }
-  ctx.restore();
+
+  if (view.y < 0 && view.y + view.h > 0)      // top edge (y = 0)
+    edge((x) => [x, jag(x)], (x) => [x, 0], vx0, vx1);
+  if (view.y < S && view.y + view.h > S)      // bottom edge (y = S)
+    edge((x) => [x, S - jag(x)], (x) => [x, S], vx0, vx1);
+  if (view.x < 0 && view.x + view.w > 0)      // left edge (x = 0)
+    edge((y) => [jag(y), y], (y) => [0, y], vy0, vy1);
+  if (view.x < S && view.x + view.w > S)      // right edge (x = S)
+    edge((y) => [S - jag(y), y], (y) => [S, y], vy0, vy1);
 }
 
-function drawBarrier(ctx: CanvasRenderingContext2D, view: View, S: number) {
-  const w = 14;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, S, S);
-  ctx.rect(w, w, S - 2 * w, S - 2 * w);
-  ctx.clip('evenodd');
-  ctx.fillStyle = '#FFD23F';
-  ctx.fillRect(Math.max(0, view.x), Math.max(0, view.y),
-    Math.min(S, view.x + view.w) - Math.max(0, view.x),
-    Math.min(S, view.y + view.h) - Math.max(0, view.y));
-  ctx.strokeStyle = '#14082B';
-  ctx.lineWidth = 8;
-  const start = Math.floor((view.x - S) / 22) * 22;
-  const end = view.x + view.w;
-  ctx.beginPath();
-  for (let dx = start; dx < end; dx += 22) {
-    ctx.moveTo(dx, view.y); ctx.lineTo(dx + view.h, view.y + view.h);
+// v9 §4: a torn-loose ground chunk floating in space — grass clod, fence bit or flowerpot.
+function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(10,6,24,0.6)'; ctx.lineWidth = 1.5;
+  if (type === 0) {
+    // grass clod — soil underside + green cap
+    ctx.fillStyle = '#5A4327';
+    ctx.beginPath(); ctx.ellipse(0, s * 0.2, s, s * 0.55, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5FBF6A';
+    ctx.beginPath(); ctx.ellipse(0, -s * 0.1, s * 0.92, s * 0.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (type === 1) {
+    // fence bit — cream picket
+    ctx.fillStyle = '#F2E6C8';
+    ctx.beginPath();
+    ctx.moveTo(0, -s); ctx.lineTo(s * 0.34, -s * 0.6); ctx.lineTo(s * 0.34, s * 0.8);
+    ctx.lineTo(-s * 0.34, s * 0.8); ctx.lineTo(-s * 0.34, -s * 0.6); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else {
+    // flowerpot shard — terracotta trapezoid with soil top
+    ctx.fillStyle = '#C86B3C';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.7, -s * 0.5); ctx.lineTo(s * 0.7, -s * 0.5);
+    ctx.lineTo(s * 0.5, s * 0.6); ctx.lineTo(-s * 0.5, s * 0.6); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5A4327';
+    ctx.beginPath(); ctx.ellipse(0, -s * 0.5, s * 0.7, s * 0.18, 0, 0, Math.PI * 2); ctx.fill();
   }
-  ctx.stroke();
-  ctx.restore();
 }
 
 const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower'];
@@ -146,6 +175,9 @@ export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
   dirt: DirtPatch[] = [];
+  fissures: Fissure[] = [];   // v9 §3: WORLD ENDER cracked-reality trail (violet, not brown)
+  // v9 §4: torn-loose ground chunks drifting in the space beyond the rim
+  private spaceChunks: { bx: number; by: number; ox: number; oy: number; ang: number; spin: number; type: number; s: number }[] = [];
   // v5 §3 — precomputed ground-dressing (low-contrast, non-colliding)
   private dressTufts: { x: number; y: number; type: number; rot: number; s: number; a: number }[] = [];
   private dressFence: { x: number; y: number; v: boolean }[] = [];
@@ -158,7 +190,9 @@ export class WorldManager {
   initialMass = 0;         // v8 §3: frozen starting edible mass (% devoured denom)
   private rampageCd = 0;   // v8 §3: DEVOURER+ instant-pop cadence (≤10/s)
   initialPopulation = 0;   // v6 §2: baseline count for the 85% respawn target
-  playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0 };
+  playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0 };
+  gnomeTotal = 0;              // v9 §8: gnomes present at round start (fixed — gnomes never respawn)
+  gnomeLordPending = false;    // v9 §8: set once the player eats every gnome
   private nextId = 0;
   private respawnTimer = 0;
   private rand: () => number = Math.random;
@@ -206,13 +240,29 @@ export class WorldManager {
     this.objects = [];
     this.blocks = [];
     this.dirt = [];
+    this.fissures = [];
     this.eatenArea = 0;
     this.totalStartArea = 0;
     this.nextId = 0;
     this.respawnTimer = 0;
-    this.playerStats = { count: 0, ducks: 0, maxTier: 0 };
+    this.playerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0 };
+    this.gnomeTotal = 0;
+    this.gnomeLordPending = false;
     const rand = prng(hashString(seedStr));
     this.rand = rand;
+
+    // v9 §4: scatter torn-loose ground chunks in the space beyond the rim
+    this.spaceChunks = [];
+    const S = this.size, cxm = S / 2, cym = S / 2;
+    for (let i = 0; i < 10; i++) {
+      let cx: number, cy: number;
+      do {
+        cx = -220 + rand() * (S + 440);
+        cy = -220 + rand() * (S + 440);
+      } while (cx > -20 && cx < S + 20 && cy > -20 && cy < S + 20);
+      let ox = cx - cxm, oy = cy - cym; const od = Math.hypot(ox, oy) || 1; ox /= od; oy /= od;
+      this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
+    }
 
     // v7 §2: 4×4 = 16 blocks — 12 residential, 1 park, 1 playground, 1 plaza,
     // 1 school. The water tower sits on a residential corner lot (placed below).
@@ -270,6 +320,8 @@ export class WorldManager {
     // v6 §2: remember the starting count so respawn can top back up to 85%
     this.initialPopulation = this.objects.length;
     this.initialMass = this.totalStartArea; // v8 §3: freeze the % devoured denominator
+    // v9 §8: freeze the gnome count — gnomes never respawn, so eating them all is a real feat
+    this.gnomeTotal = this.objects.filter((o) => o.kind === 'gnome').length;
   }
 
   // v5 §3 — guarantee edible coverage across the whole map
@@ -642,6 +694,11 @@ export class WorldManager {
       this.dirt[i].life -= dt;
       if (this.dirt[i].life <= 0) this.dirt.splice(i, 1);
     }
+    // v9 §3: fissure trail fades
+    for (let i = this.fissures.length - 1; i >= 0; i--) {
+      this.fissures[i].life -= dt;
+      if (this.fissures[i].life <= 0) this.fissures.splice(i, 1);
+    }
 
     // v8 §2: deficit-scaled respawn toward ≥90% of the starting population —
     // 4/s normally, ramping to 8/s once the world drops below 80%.
@@ -671,7 +728,8 @@ export class WorldManager {
       if (rp) { const o = this.makeObj('apple', rp.x, rp.y); o.arrive = 200; this.spawnPuff(rp.x, rp.y, fx); }
       return;
     }
-    const kinds: ObjectKind[] = ['flower', 'flowerpot', 'gnome', 'apple', 'mailbox', 'hydrant', 'trashcan'];
+    // v9 §8: gnomes deliberately omitted — they never respawn so GNOME LORD stays achievable
+    const kinds: ObjectKind[] = ['flower', 'flowerpot', 'apple', 'mailbox', 'hydrant', 'trashcan'];
     const zones = this.blocks.filter((b) => b.type === 'residential' || b.type === 'park' || b.type === 'plaza');
     if (!zones.length) return;
     let bx = 0, by = 0, bestScore = -Infinity;
@@ -724,9 +782,24 @@ export class WorldManager {
     fx.addCrumbs(x, y, '#D8C7A2', 6);
   }
 
-  // v8 §3: WORLD EATER leaves a cracked-ground trail that fades over ~8s
+  // v9 §3: WORLD ENDER's path leaves jagged violet fissure segments (cracked
+  // reality, never brown) — 2–3 branching lines per step, fading over 8s.
   dropCrack(x: number, y: number, radius: number) {
-    this.dirt.push({ x, y, r: radius * 0.45, life: 8000, maxLife: 8000 });
+    const lines = 2 + Math.floor(this.rand() * 2); // 2–3 branching cracks
+    for (let i = 0; i < lines; i++) {
+      const ang = this.rand() * Math.PI * 2;
+      const len = radius * (0.5 + this.rand() * 0.6);
+      const steps = 4;
+      const pts: number[][] = [];
+      let cx = x, cy = y;
+      for (let k = 0; k <= steps; k++) {
+        pts.push([cx, cy]);
+        cx += Math.cos(ang) * (len / steps) + (this.rand() - 0.5) * radius * 0.2;
+        cy += Math.sin(ang) * (len / steps) + (this.rand() - 0.5) * radius * 0.2;
+      }
+      this.fissures.push({ pts, life: 8000, maxLife: 8000 });
+    }
+    if (this.fissures.length > 90) this.fissures.splice(0, this.fissures.length - 90);
   }
 
   // v6 §2: golden object — 3× mass (bigger radius) and 3× score on consume.
@@ -937,7 +1010,7 @@ export class WorldManager {
     else if (edge === 1) { x = t; y = m - MARGIN * 0.5; }
     else if (edge === 2) { x = MARGIN * 0.5; y = t; }
     else { x = m - MARGIN * 0.5; y = t; }
-    this.makeObj(pick(['flower', 'flowerpot', 'gnome', 'apple', 'mailbox', 'hydrant'] as ObjectKind[], this.rand), x, y);
+    this.makeObj(pick(['flower', 'flowerpot', 'apple', 'mailbox', 'hydrant'] as ObjectKind[], this.rand), x, y); // v9 §8: no gnomes on respawn
   }
 
   private consumeByPlayer(obj: WorldObject, player: Player, fx: FXManager) {
@@ -946,6 +1019,13 @@ export class WorldManager {
     this.playerStats.count++;
     if (obj.kind === 'duck') this.playerStats.ducks++;
     this.playerStats.maxTier = Math.max(this.playerStats.maxTier, obj.tier);
+    // v9 §8: secret — eat EVERY gnome in one round to become GNOME LORD
+    if (obj.kind === 'gnome') {
+      this.playerStats.gnomes++;
+      if (!this.gnomeLordPending && this.gnomeTotal > 0 && this.playerStats.gnomes >= this.gnomeTotal) {
+        this.gnomeLordPending = true;
+      }
+    }
 
     // reaction flavor
     if (obj.kind === 'house') {
@@ -972,8 +1052,23 @@ export class WorldManager {
     }
   }
 
+  // v9 §4: draw the drifting torn-loose ground chunks out in space
+  private drawSpaceChunks(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t: number) {
+    for (const c of this.spaceChunks) {
+      const drift = (t * 0.004) % 220;          // slow outward drift, wraps every ~55s
+      const x = c.bx + c.ox * drift, y = c.by + c.oy * drift;
+      if (x < view.x - 60 || x > view.x + view.w + 60 || y < view.y - 60 || y > view.y + view.h + 60) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.translate(x, y);
+      ctx.rotate(c.ang + t * c.spin);
+      drawChunk(ctx, c.type, c.s);
+      ctx.restore();
+    }
+  }
+
   // ── ground + decor (drawn before objects, under the world transform) ──
-  drawGround(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }) {
+  drawGround(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t = 0, px = 0, py = 0) {
     const G = CONFIG.COLORS.ground;
     const S = this.size;
 
@@ -981,6 +1076,8 @@ export class WorldManager {
     ctx.fillStyle = CONFIG.COLORS.uiBg;
     ctx.fillRect(view.x, view.y, view.w, view.h);
     drawStars(ctx, view);
+    // v9 §4: floating ground-chunks torn loose, drifting in the deep space beyond the rim
+    this.drawSpaceChunks(ctx, view, t);
 
     // ground clipped to the map rect so it can dissolve into space at the edge
     ctx.save();
@@ -1041,12 +1138,10 @@ export class WorldManager {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // v6 §7: dissolve the ground into the starfield near the edge
-    drawEdgeDither(ctx, view, S);
     ctx.restore(); // end ground clip
 
-    // v6 §7: striped hazard barrier frames the playable world
-    drawBarrier(ctx, view, S);
+    // v9 §4: torn-earth rim — irregular bitten edge + undulating accretion glow
+    drawTornRim(ctx, view, S, t, px, py);
 
     // dirt patches (ground decor)
     for (const d of this.dirt) {
@@ -1057,6 +1152,21 @@ export class WorldManager {
       ctx.beginPath();
       ctx.ellipse(d.x, d.y, d.r, d.r * 0.7, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+    }
+
+    // v9 §3: WORLD ENDER fissure trail — dark cracks with glowing violet edges
+    for (const f of this.fissures) {
+      const a = clamp(f.life / f.maxLife, 0, 1);
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let k = 0; k < f.pts.length; k++) {
+        const [px, py] = f.pts[k];
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.globalAlpha = a * 0.9; ctx.strokeStyle = '#2A1650'; ctx.lineWidth = 5; ctx.stroke();
+      ctx.globalAlpha = a * 0.7; ctx.strokeStyle = '#9D6BFF'; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
     }
   }

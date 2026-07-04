@@ -19,6 +19,7 @@ export interface VoidlingVisual {
   breathe: number;        // idle breathing scale (~1)
   ghost?: boolean;        // translucent respawn state
   form?: number;          // v6 §3: evolution form index (0..4) → stacked visual layers
+  morph?: number;         // v9 §3: 0..1 crossfade of the newest form's body morph
   cheekPuff?: number;     // v6 §9: 0..1, puffed cheeks after eating T3+
   dizzy?: number;         // v6 §9: 0..1, swirl eyes after being chomped
   lick?: number;          // v6 §9: 0..1, tongue-lick grin after a TRIPLE
@@ -61,11 +62,14 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   // ── v8 §8: premium surface effects painted onto the body (clipped to the orb) ─
   drawSkinBody(ctx, skin, r, v.t);
 
+  // ── v9 §3: evolution BODY morphs painted onto/into the orb (clipped) ─────────
+  drawFormBody(ctx, v);
+
   // ── Face (crisp, unsquashed) ────────────────────────────────────────────────
   drawFace(ctx, v);
 
   // ── Front accessories ───────────────────────────────────────────────────────
-  drawSkinFront(ctx, skin, r, v.t);
+  drawSkinFront(ctx, skin, r, v.t, v.lick || 0);
 
   ctx.restore();
 }
@@ -121,18 +125,47 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
       }
       ctx.stroke();
     } else if (v.blink < 0.7) {
-      const pr = eyeRX * 0.56;
+      const form = v.form || 0;
+      const grow = form >= 1 ? 1.15 : 1;      // v9 §3: MUNCHER+ pupils grow 15%
+      const pr = eyeRX * 0.56 * grow;
       const px = v.lookX * eyeRX * 0.42;
       const py = v.lookY * eyeRY * 0.42;
-      ctx.fillStyle = '#1A0B33';
+      const ender = form >= 4, devour = form >= 3;
+      // v9 §6: premium skins with glowing eyes (lava, dragon) cast a warm halo
+      if (v.skin.eyeGlow && !devour) {
+        const pulse = 0.4 + Math.sin(v.t / 300) * 0.25;
+        ctx.fillStyle = hexA(v.skin.eyeGlow, pulse);
+        ctx.beginPath();
+        ctx.ellipse(px, py, pr * 1.9, pr * 1.9 * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // v9 §3: DEVOURER eyes glow violet-white; WORLD ENDER eyes blaze white
+      if (devour) {
+        ctx.fillStyle = hexA(ender ? '#FFFFFF' : '#B466FF', 0.5);
+        ctx.beginPath();
+        ctx.ellipse(px, py, pr * 1.7, pr * 1.7 * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = ender ? '#FFFFFF' : devour ? '#E6D2FF' : '#1A0B33';
       ctx.beginPath();
       ctx.ellipse(px, py, pr, pr * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
       ctx.fill();
-      // moving eye sparkle
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(px - pr * 0.3, py - pr * 0.35, pr * 0.34, 0, Math.PI * 2);
-      ctx.fill();
+      if (ender) {
+        // v9 §3: lens-flare cross blazing across the eye
+        ctx.strokeStyle = hexA('#FFFFFF', 0.9);
+        ctx.lineWidth = Math.max(1, pr * 0.28);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(px - pr * 1.8, py); ctx.lineTo(px + pr * 1.8, py);
+        ctx.moveTo(px, py - pr * 1.8); ctx.lineTo(px, py + pr * 1.8);
+        ctx.stroke();
+      } else {
+        // moving eye sparkle
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(px - pr * 0.3, py - pr * 0.35, pr * 0.34, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     // eyelid line when nearly closed
     if (v.blink >= 0.6) {
@@ -195,66 +228,235 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   }
 }
 
-// v6 §3: each evolution form adds a permanent visual layer, drawn behind the body.
+// v6 §3 / v9 §3: each evolution form adds a permanent visual layer behind the body.
+// The newest form's layer fades in over 500ms (v.morph) so the change is unmissable.
 function drawFormLayers(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   const { r, t } = v;
   const form = v.form || 0;
   if (form <= 0) return;
 
   // MUNCHER (1+): thin rotating dashed energy ring
-  ctx.save();
-  ctx.rotate((t / 1400) % (Math.PI * 2));
-  ctx.strokeStyle = hexA(v.skin.glowColor, 0.6);
-  ctx.lineWidth = Math.max(1.4, r * 0.05);
-  ctx.setLineDash([r * 0.5, r * 0.4]);
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 1.18, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
+  {
+    ctx.save();
+    ctx.globalAlpha *= form === 1 ? (v.morph ?? 1) : 1;
+    ctx.rotate((t / 1400) % (Math.PI * 2));
+    ctx.strokeStyle = hexA(v.skin.glowColor, 0.6);
+    ctx.lineWidth = Math.max(1.4, r * 0.05);
+    ctx.setLineDash([r * 0.5, r * 0.4]);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.18, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
-  // GOBBLER (2+): three chunky debris shards orbiting outside
+  // GOBBLER (2+): three recognizable debris chunks — brick / shingle / picket
   if (form >= 2) {
-    const spin = t / 900;
-    for (let i = 0; i < 3; i++) {
-      const a = spin + (i / 3) * Math.PI * 2;
-      ctx.save();
-      ctx.translate(Math.cos(a) * r * 1.42, Math.sin(a) * r * 1.42);
-      ctx.rotate(a * 2);
-      ctx.fillStyle = '#2A1747';
-      ctx.strokeStyle = '#0E0620';
-      ctx.lineWidth = 2;
-      const s = r * 0.14;
+    ctx.save();
+    ctx.globalAlpha *= form === 2 ? (v.morph ?? 1) : 1;
+    drawDebris(ctx, v);
+    ctx.restore();
+  }
+
+  // DEVOURER (3+): flame crown (turns white-violet at WORLD ENDER)
+  if (form >= 3) {
+    ctx.save();
+    ctx.globalAlpha *= form === 3 ? (v.morph ?? 1) : 1;
+    drawFlames(ctx, v);
+    ctx.restore();
+  }
+
+  // WORLD ENDER (4): a thin gravitational lens ring undulating just outside the outline
+  if (form >= 4) {
+    ctx.save();
+    ctx.globalAlpha *= v.morph ?? 1;
+    ctx.strokeStyle = hexA('#B98CFF', 0.5);
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    ctx.beginPath();
+    for (let k = 0; k <= 44; k++) {
+      const ang = (k / 44) * Math.PI * 2;
+      const rr = r * 1.06 + Math.sin(ang * 6 + t / 300) * r * 0.02;
+      const px = Math.cos(ang) * rr, py = Math.sin(ang) * rr;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// v9 §3: GOBBLER's orbiting debris — a brick, a roof shingle and a fence picket,
+// white-outlined (no dark squares).
+function drawDebris(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
+  const { r, t } = v;
+  const spin = t / 900;
+  const s = Math.max(9, r * 0.16);
+  for (let i = 0; i < 3; i++) {
+    const a = spin + (i / 3) * Math.PI * 2;
+    ctx.save();
+    ctx.translate(Math.cos(a) * r * 1.42, Math.sin(a) * r * 1.42);
+    ctx.rotate(a * 1.3);
+    ctx.lineJoin = 'round';
+    if (i === 0) {
+      // brick — red-brown rect with a mortar line
+      ctx.fillStyle = '#A24B32';
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.rect(-s * 0.7, -s * 0.45, s * 1.4, s * 0.9); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(-s * 0.7, 0); ctx.lineTo(s * 0.7, 0); ctx.stroke();
+    } else if (i === 1) {
+      // roof shingle — grey trapezoid
+      ctx.fillStyle = '#8A8F98';
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(-s, -s * 0.6); ctx.lineTo(s * 0.8, -s);
-      ctx.lineTo(s, s * 0.7); ctx.lineTo(-s * 0.6, s); ctx.closePath();
+      ctx.moveTo(-s * 0.7, -s * 0.4); ctx.lineTo(s * 0.7, -s * 0.4);
+      ctx.lineTo(s * 0.5, s * 0.4); ctx.lineTo(-s * 0.5, s * 0.4); ctx.closePath();
       ctx.fill(); ctx.stroke();
+    } else {
+      // fence picket — cream plank with a pointed top
+      ctx.fillStyle = '#F2E6C8';
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.75); ctx.lineTo(s * 0.32, -s * 0.35);
+      ctx.lineTo(s * 0.32, s * 0.6); ctx.lineTo(-s * 0.32, s * 0.6);
+      ctx.lineTo(-s * 0.32, -s * 0.35); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+// v9 §3: DEVOURER's flame crown — 7 two-tone teardrop flames flickering at ~8Hz.
+// White-violet once the void reaches WORLD ENDER.
+function drawFlames(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
+  const { r, t } = v;
+  const ender = (v.form || 0) >= 4;
+  const outer = ender ? '#C9A8FF' : '#7A2BE0';
+  const inner = ender ? '#FFFFFF' : '#E0B0FF';
+  const licks = 7;
+  for (let i = 0; i < licks; i++) {
+    const a = -Math.PI / 2 + (i - (licks - 1) / 2) * 0.34;
+    const flick = Math.sin(t / 160 + i) * 0.10;
+    const pulse = 1 + 0.1 * Math.sin(t * 0.0503 + i * 1.7); // ~8Hz, scale 0.9–1.1
+    const len = r * (0.34 + Math.abs(Math.sin(t / 220 + i * 1.3)) * 0.24) * pulse;
+    const nx = -Math.sin(a), ny = Math.cos(a);
+    const bx = Math.cos(a) * r, by = Math.sin(a) * r;
+    const tx = Math.cos(a + flick) * (r + len), ty = Math.sin(a + flick) * (r + len);
+    teardrop(ctx, bx, by, tx, ty, nx, ny, r * 0.15, outer);
+    const itx = bx + (tx - bx) * 0.62, ity = by + (ty - by) * 0.62;
+    teardrop(ctx, bx, by, itx, ity, nx, ny, r * 0.075, inner);
+  }
+}
+
+// bulged-base → fine-tip teardrop flame shape
+function teardrop(ctx: CanvasRenderingContext2D, bx: number, by: number, tx: number, ty: number, nx: number, ny: number, w: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(bx + nx * w, by + ny * w);
+  ctx.quadraticCurveTo(tx + nx * w * 1.1, ty + ny * w * 1.1, tx, ty);
+  ctx.quadraticCurveTo(tx - nx * w * 1.1, ty - ny * w * 1.1, bx - nx * w, by - ny * w);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// v9 §3: form morphs painted INTO the orb (clipped): core glow, darken+swirl,
+// glowing cracks, then the WORLD ENDER internal galaxy.
+function drawFormBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
+  const { r, t } = v;
+  const form = v.form || 0;
+  if (form <= 0) return;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip();
+
+  // MUNCHER (1+): soft inner core glow (stacked discs, no radial halo)
+  {
+    const a = (form === 1 ? (v.morph ?? 1) : 1) * (0.28 + 0.12 * Math.sin(t / 500));
+    ctx.save();
+    ctx.globalAlpha *= Math.max(0, a);
+    for (let k = 3; k >= 1; k--) {
+      ctx.fillStyle = hexA(v.skin.glowColor, 0.22);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.16 * k, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // GOBBLER (2+): darken one shade + faint swirl texture
+  if (form >= 2) {
+    const a = form === 2 ? (v.morph ?? 1) : 1;
+    ctx.save();
+    ctx.globalAlpha *= a * 0.16;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha *= a * 0.22;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    ctx.beginPath();
+    for (let k = 0; k <= 40; k++) {
+      const tt = k / 40;
+      const ang = tt * Math.PI * 4 + t / 1200;
+      const rad = tt * r * 0.8;
+      const px = Math.cos(ang) * rad, py = Math.sin(ang) * rad;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // DEVOURER (3+): 3 jagged glowing crack lines across the body
+  if (form >= 3) {
+    ctx.save();
+    ctx.globalAlpha *= form === 3 ? (v.morph ?? 1) : 1;
+    ctx.strokeStyle = hexA('#9D6BFF', 0.9);
+    ctx.lineWidth = Math.max(1.4, r * 0.05);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let c = 0; c < 3; c++) {
+      const base = c * 2.1 + 0.6;
+      let px = Math.cos(base) * -r, py = Math.sin(base) * -r;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      const ang = base + Math.PI;
+      const ex = Math.cos(ang) * r, ey = Math.sin(ang) * r;
+      const steps = 4;
+      for (let k = 1; k <= steps; k++) {
+        const tt = k / steps;
+        const jx = px + (ex - px) * tt + Math.sin(c * 5 + k) * r * 0.14;
+        const jy = py + (ey - py) * tt + Math.cos(c * 3 + k) * r * 0.14;
+        ctx.lineTo(jx, jy);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // WORLD ENDER (4): internal galaxy — 2 nebula wisps + 6 pinprick stars
+  if (form >= 4) {
+    const a = v.morph ?? 1;
+    ctx.save();
+    ctx.globalAlpha *= a;
+    ctx.fillStyle = hexA('#0D0821', 0.55);
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    const drift = t / 2400;
+    const wisps: [string, number][] = [['#FF3CAC', drift], ['#2BD2FF', drift + Math.PI]];
+    for (const [col, ph] of wisps) {
+      ctx.save();
+      ctx.globalAlpha *= 0.4;
+      ctx.fillStyle = col;
+      ctx.rotate(ph);
+      ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 0.55, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-  }
-
-  // DEVOURER (3+): crown of purple flame licks around the top
-  if (form >= 3) {
-    const licks = 7;
-    for (let i = 0; i < licks; i++) {
-      const a = -Math.PI / 2 + (i - (licks - 1) / 2) * 0.34;
-      const flick = Math.sin(t / 160 + i) * 0.12;
-      const len = r * (0.36 + Math.abs(Math.sin(t / 200 + i * 1.3)) * 0.26);
-      const nx = -Math.sin(a), ny = Math.cos(a);
-      const bx = Math.cos(a) * r, by = Math.sin(a) * r;
-      const tx = Math.cos(a + flick) * (r + len), ty = Math.sin(a + flick) * (r + len);
-      ctx.fillStyle = i % 2 ? '#B466FF' : '#7A2BE0';
-      // v7 §6: teardrop flame lick — bulged base curving to a fine tip
-      ctx.beginPath();
-      ctx.moveTo(bx + nx * r * 0.13, by + ny * r * 0.13);
-      ctx.quadraticCurveTo(tx + nx * r * 0.16, ty + ny * r * 0.16, tx, ty);
-      ctx.quadraticCurveTo(tx - nx * r * 0.16, ty - ny * r * 0.16, bx - nx * r * 0.13, by - ny * r * 0.13);
-      ctx.closePath();
-      ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = 0; i < 6; i++) {
+      const ang = i * 2.3 + t / 3000;
+      const rad = ((i * 53) % 100) / 100 * r * 0.8;
+      const tw = 0.4 + 0.6 * Math.abs(Math.sin(t / 300 + i));
+      ctx.globalAlpha = a * tw;
+      ctx.beginPath(); ctx.arc(Math.cos(ang) * rad, Math.sin(ang) * rad, Math.max(0.8, r * 0.02), 0, Math.PI * 2); ctx.fill();
     }
+    ctx.restore();
   }
 
-  // WORLD EATER (4): warp is rendered at the SCREEN EDGES in engine drawPostFX,
-  // never as a character-attached ring (v7 §6). Nothing to draw on the body here.
+  ctx.restore(); // end body clip
 }
 
 // v6 §2: faint blue underdog trail streaming behind a moving void.

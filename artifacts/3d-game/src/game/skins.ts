@@ -59,7 +59,7 @@ export function drawSkinBack(ctx: CanvasRenderingContext2D, skin: SkinDef, r: nu
 }
 
 // ── FRONT (over body + face) ─────────────────────────────────────────────────
-export function drawSkinFront(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number) {
+export function drawSkinFront(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number, lick = 0) {
   const o = Math.max(2, r * 0.06);
 
   if (has(skin, 'helmet')) {
@@ -268,9 +268,87 @@ export function drawSkinFront(ctx: CanvasRenderingContext2D, skin: SkinDef, r: n
     ctx.restore();
   }
   if (skin.id === 'disco') {
+    // rotating rainbow light dots cast around the body + specular twinkles
+    const cols = ['#FF4D6D', '#4DD2FF', '#FFE04D', '#7A5CFF', '#4DFF9E', '#FF8AD8'];
+    for (let i = 0; i < 6; i++) {
+      const a = t / 700 + (i / 6) * Math.PI * 2;
+      const d = r * (1.25 + Math.sin(t / 400 + i) * 0.1);
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = cols[i];
+      ctx.beginPath(); ctx.arc(Math.cos(a) * d, Math.sin(a) * d * 0.7, r * 0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     for (let i = 0; i < 3; i++) {
       const tw = (Math.sin(t / 200 + i * 2.4) + 1) * 0.5;
       if (tw > 0.6) drawStar(ctx, (i - 1) * r * 0.55, -r * 0.5 + i * r * 0.25, r * 0.1 * tw, '#FFFFFF');
+    }
+  }
+
+  // v9 §6: GALAXY — an orbiting comet with a fading tail sweeping around the body
+  if (skin.id === 'galaxy') {
+    const a = t / 900;
+    const d = r * 1.25;
+    const hx = Math.cos(a) * d, hy = Math.sin(a) * d * 0.75;
+    ctx.save();
+    // tail
+    for (let k = 0; k < 6; k++) {
+      const ta = a - k * 0.12;
+      const tx = Math.cos(ta) * d, ty = Math.sin(ta) * d * 0.75;
+      ctx.globalAlpha = (1 - k / 6) * 0.5;
+      ctx.fillStyle = '#CDBBFF';
+      ctx.beginPath(); ctx.arc(tx, ty, r * (0.09 - k * 0.012), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(hx, hy, r * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // v9 §6: DRAGON — curved horns, a dorsal spine ridge, lazy smoke, flame on TRIPLE
+  if (skin.id === 'dragon') {
+    // horns
+    for (const s of [-1, 1]) {
+      sticker(ctx, (c) => {
+        c.moveTo(s * r * 0.42, -r * 0.7);
+        c.quadraticCurveTo(s * r * 1.0, -r * 1.0, s * r * 0.7, -r * 1.45);
+        c.quadraticCurveTo(s * r * 0.5, -r * 1.05, s * r * 0.6, -r * 0.66);
+        c.closePath();
+      }, '#E8D8B0', { outline: o });
+    }
+    // dorsal spine ridge — 4 triangular plates down the back
+    for (let i = 0; i < 4; i++) {
+      const yy = -r * 0.5 + i * r * 0.36;
+      sticker(ctx, (c) => {
+        c.moveTo(-r * 0.98, yy);
+        c.lineTo(-r * 1.3, yy - r * 0.12);
+        c.lineTo(-r * 0.98, yy + r * 0.16);
+        c.closePath();
+      }, '#0E7A3C', { outline: 1, shadow: false });
+    }
+    // lazy smoke puff cycling ~every 3s from above
+    const sm = (t % 3000) / 3000;
+    ctx.save();
+    ctx.globalAlpha = (1 - sm) * 0.5;
+    ctx.fillStyle = '#9AA6B0';
+    const sy = -r * 0.9 - sm * r * 1.2;
+    ctx.beginPath(); ctx.arc(r * 0.2 + Math.sin(sm * 6) * r * 0.15, sy, r * 0.16 * (0.6 + sm), 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // flame breath on TRIPLE (driven by the tongue-lick timer)
+    if (lick > 0.02) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, lick);
+      for (let i = 0; i < 4; i++) {
+        const fy = r * 0.4 + i * r * 0.3;
+        const flick = Math.sin(t / 90 + i) * r * 0.08;
+        ctx.fillStyle = i % 2 ? '#FFD23F' : '#FF6A00';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.12, fy);
+        ctx.quadraticCurveTo(r * 0.15 + flick, fy + r * 0.2, 0, fy + r * 0.45);
+        ctx.quadraticCurveTo(-r * 0.15 + flick, fy + r * 0.2, -r * 0.12, fy);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
     }
   }
 }
@@ -285,6 +363,9 @@ export function drawSkinBody(ctx: CanvasRenderingContext2D, skin: SkinDef, r: nu
     case 'lava': return lavaBody(ctx, r, t);
     case 'midas': return midasBody(ctx, r, t);
     case 'disco': return discoBody(ctx, r, t);
+    case 'dragon': return dragonBody(ctx, r, t);
+    case 'ghost': return ghostBody(ctx, r, t);
+    case 'devil': return devilBody(ctx, r);
   }
 }
 
@@ -294,95 +375,187 @@ function clipBody(ctx: CanvasRenderingContext2D, r: number) {
   ctx.clip();
 }
 
+// inner rim light stroke, clipped inside the body
+function rimLight(ctx: CanvasRenderingContext2D, r: number, color: string, w = 0.06) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.5, r * w);
+  ctx.beginPath(); ctx.arc(0, 0, r - ctx.lineWidth / 2, 0, Math.PI * 2); ctx.stroke();
+}
+
+// v9 §6: GALAXY — deep base, two drifting nebula blobs, 8 twinkling stars, rim light.
 function galaxyBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.save();
   clipBody(ctx, r);
-  const rot = t / 3400;
-  for (let i = 0; i < 4; i++) {
-    const a = rot + (i / 4) * Math.PI * 2;
-    const bx = Math.cos(a) * r * 0.38, by = Math.sin(a) * r * 0.38;
-    const col = i % 2 ? '138,107,255' : '255,90,190';
-    const grad = ctx.createRadialGradient(bx, by, 0, bx, by, r * 0.95);
-    grad.addColorStop(0, `rgba(${col},0.55)`);
-    grad.addColorStop(1, `rgba(${col},0)`);
+  // layer 1: deep base
+  ctx.fillStyle = '#0D0821';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  // layer 2: two nebula blobs at 40% opacity, drifting
+  const blobs: [string, number][] = [['#FF3CAC', t / 3000], ['#2BD2FF', t / 3000 + Math.PI]];
+  for (const [col, ph] of blobs) {
+    const bx = Math.cos(ph) * r * 0.34, by = Math.sin(ph * 1.2) * r * 0.3;
+    const grad = ctx.createRadialGradient(bx, by, 0, bx, by, r * 0.85);
+    grad.addColorStop(0, hexA40(col));
+    grad.addColorStop(1, col + '00');
     ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(bx, by, r * 0.95, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx, by, r * 0.85, 0, Math.PI * 2); ctx.fill();
   }
-  for (let i = 0; i < 11; i++) {
-    const sa = i * 2.39917, sr = ((i * 37) % 100) / 100 * r * 0.88;
+  // layer 3: 8 white 1–2px stars twinkling
+  for (let i = 0; i < 8; i++) {
+    const sa = i * 2.39917, sr = ((i * 41) % 100) / 100 * r * 0.85;
     const sx = Math.cos(sa) * sr, sy = Math.sin(sa * 1.3) * sr;
-    const tw = (Math.sin(t / 300 + i) + 1) * 0.5;
-    ctx.globalAlpha = 0.35 + tw * 0.6;
+    const tw = (Math.sin(t / 280 + i) + 1) * 0.5;
+    ctx.globalAlpha = 0.3 + tw * 0.7;
     ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath(); ctx.arc(sx, sy, r * 0.028 + tw * r * 0.015, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx, sy, 1 + tw, 0, Math.PI * 2); ctx.fill();
   }
+  ctx.globalAlpha = 1;
+  rimLight(ctx, r, '#B98CFF');
   ctx.restore();
 }
 
+// v9 §6: LAVA — near-black base, orange crack network with hot yellow cores, pulsing.
 function lavaBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.save();
   clipBody(ctx, r);
-  const pulse = 0.5 + Math.sin(t / 380) * 0.5;
-  // hot pool glowing up from the bottom
-  const g = ctx.createLinearGradient(0, -r * 0.2, 0, r);
-  g.addColorStop(0, 'rgba(255,120,20,0)');
-  g.addColorStop(1, `rgba(255,90,10,${0.35 + pulse * 0.35})`);
-  ctx.fillStyle = g;
-  ctx.fillRect(-r, -r, r * 2, r * 2);
-  // molten cracks
-  ctx.strokeStyle = `rgba(255,${110 + pulse * 90 | 0},40,0.85)`;
-  ctx.lineWidth = Math.max(2, r * 0.07);
+  ctx.fillStyle = '#14090A';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  const pulse = 0.5 + Math.sin(t / 750) * 0.5; // ~1.5s cycle
+  // crack network — outer #FF4D00 with #FFC300 cores
   ctx.lineCap = 'round';
-  for (let v = 0; v < 3; v++) {
-    ctx.beginPath();
-    let px = -r * 0.75, py = (v - 1) * r * 0.42;
-    ctx.moveTo(px, py);
-    for (let k = 1; k <= 5; k++) {
-      px += r * 0.34;
-      py += Math.sin(t / 480 + v * 2.1 + k) * r * 0.16;
-      ctx.lineTo(px, py);
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.strokeStyle = pass === 0 ? '#FF4D00' : '#FFC300';
+    ctx.lineWidth = pass === 0 ? Math.max(2.4, r * 0.09) : Math.max(1, r * 0.035);
+    ctx.globalAlpha = pass === 0 ? 0.6 + pulse * 0.4 : 0.7 + pulse * 0.3;
+    for (let v = 0; v < 3; v++) {
+      ctx.beginPath();
+      let px = -r * 0.8, py = (v - 1) * r * 0.42;
+      ctx.moveTo(px, py);
+      for (let k = 1; k <= 5; k++) {
+        px += r * 0.36;
+        py += Math.sin(t / 900 + v * 2.1 + k) * r * 0.16;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
   }
   ctx.restore();
 }
 
+// v9 §6: KING MIDAS — metallic gold, bottom shade, diagonal sheen band sweeping every 2s.
 function midasBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.save();
   clipBody(ctx, r);
-  // diagonal sheen sweeping across the gold
-  const cx = (((t / 1500) % 1) * 2 - 1) * r * 1.6;
+  // base + bottom shade
+  const bg = ctx.createLinearGradient(0, -r, 0, r);
+  bg.addColorStop(0, '#FFD447');
+  bg.addColorStop(1, '#C9971C');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  // diagonal sheen band sweeping every 2s
+  const cx = (((t / 2000) % 1) * 2 - 1) * r * 1.6;
+  ctx.save();
   ctx.translate(cx, 0);
   ctx.rotate(-0.5);
   const g = ctx.createLinearGradient(-r * 0.4, 0, r * 0.4, 0);
-  g.addColorStop(0, 'rgba(255,240,180,0)');
-  g.addColorStop(0.5, 'rgba(255,250,215,0.8)');
-  g.addColorStop(1, 'rgba(255,240,180,0)');
+  g.addColorStop(0, 'rgba(255,243,196,0)');
+  g.addColorStop(0.5, 'rgba(255,243,196,0.85)');
+  g.addColorStop(1, 'rgba(255,243,196,0)');
   ctx.fillStyle = g;
   ctx.fillRect(-r * 0.4, -r * 1.6, r * 0.8, r * 3.2);
   ctx.restore();
+  ctx.restore();
 }
 
+// v9 §6: DISCO — facet grid of alternating tiles with specular flashes.
 function discoBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.save();
   clipBody(ctx, r);
-  // rotating colored light patches
-  const cols = ['#FF4D6D', '#4DD2FF', '#FFE04D', '#7A5CFF', '#4DFF9E'];
-  ctx.globalAlpha = 0.5;
-  for (let i = 0; i < 5; i++) {
-    const a = t / 620 + (i / 5) * Math.PI * 2;
-    const bx = Math.cos(a) * r * 0.48, by = Math.sin(a) * r * 0.48;
-    ctx.fillStyle = cols[i];
-    ctx.beginPath(); ctx.arc(bx, by, r * 0.3, 0, Math.PI * 2); ctx.fill();
+  const step = r * 0.4;
+  let row = 0;
+  for (let gy = -r; gy < r; gy += step, row++) {
+    let col = 0;
+    for (let gx = -r; gx < r; gx += step, col++) {
+      ctx.fillStyle = (row + col) % 2 ? '#52527A' : '#3A3A55';
+      ctx.fillRect(gx, gy, step + 1, step + 1);
+    }
   }
-  // mirror-ball facet grid
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-  ctx.lineWidth = Math.max(1, r * 0.02);
-  const step = r * 0.34;
-  for (let gx = -r; gx <= r; gx += step) { ctx.beginPath(); ctx.moveTo(gx, -r); ctx.lineTo(gx, r); ctx.stroke(); }
-  for (let gy = -r; gy <= r; gy += step) { ctx.beginPath(); ctx.moveTo(-r, gy); ctx.lineTo(r, gy); ctx.stroke(); }
+  // 2–3 specular flashes per second on random facets
+  for (let i = 0; i < 3; i++) {
+    const seed = Math.floor(t / 330) + i * 7;
+    const fx = (((seed * 53) % 100) / 100 - 0.5) * 2 * r * 0.7;
+    const fy = (((seed * 97) % 100) / 100 - 0.5) * 2 * r * 0.7;
+    const life = (t % 330) / 330;
+    ctx.globalAlpha = (1 - life) * 0.9;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(fx, fy, step * 0.5, step * 0.5);
+  }
   ctx.restore();
+}
+
+// v9 §6: DRAGON — green scale rows (3 arcs of overlapping semicircles) + spine ridges.
+function dragonBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  // base gradient body
+  const bg = ctx.createLinearGradient(0, -r, 0, r);
+  bg.addColorStop(0, '#1DB954');
+  bg.addColorStop(1, '#0E7A3C');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  // 3 rows of overlapping scale semicircles
+  ctx.strokeStyle = 'rgba(9,60,30,0.7)';
+  ctx.lineWidth = Math.max(1, r * 0.02);
+  const sc = r * 0.24;
+  for (let rowI = 0; rowI < 3; rowI++) {
+    const yy = -r * 0.35 + rowI * sc * 1.1;
+    const off = rowI % 2 ? sc * 0.5 : 0;
+    for (let xx = -r - off; xx < r; xx += sc) {
+      ctx.fillStyle = rowI % 2 ? '#19A94B' : '#17A247';
+      ctx.beginPath();
+      ctx.arc(xx + off, yy, sc * 0.55, Math.PI, 0);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// v9 §6: GHOST — pale ethereal body with a soft flicker + cyan rim.
+function ghostBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  // 20%-opacity phase flicker roughly every ~5s
+  const flick = (t % 5000) < 180 ? 0.55 : 1;
+  ctx.globalAlpha = 0.35 * flick;
+  ctx.fillStyle = '#EAF2FF';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  // wavering inner highlight
+  ctx.globalAlpha = 0.4;
+  const wob = Math.sin(t / 320) * r * 0.08;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath(); ctx.ellipse(-r * 0.25, -r * 0.25 + wob, r * 0.4, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+  rimLight(ctx, r, '#7FDBFF');
+  ctx.restore();
+}
+
+// v9 §6: DEVIL — true red with darker bottom shade (was reading brown).
+function devilBody(ctx: CanvasRenderingContext2D, r: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  const g = ctx.createLinearGradient(0, -r * 0.3, 0, r);
+  g.addColorStop(0, 'rgba(230,57,70,0)');
+  g.addColorStop(1, '#B02A35');
+  ctx.fillStyle = g;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.restore();
+}
+
+function hexA40(hex: string): string {
+  // 40% opacity rgba from a #RRGGBB color
+  const h = hex.replace('#', '');
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},0.4)`;
 }
 
 function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string) {
