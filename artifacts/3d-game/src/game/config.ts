@@ -283,6 +283,7 @@ export const CONFIG = {
     trampoline: { tier: 4, minR: 42, maxR: 48 },
     hoop:       { tier: 4, minR: 42, maxR: 48 },
     icecream:   { tier: 4, minR: 44, maxR: 50 },
+    schoolbus:  { tier: 5, minR: 78, maxR: 90 },
     // v7 §2: playground + school
     sandbox:    { tier: 3, minR: 34, maxR: 40 },
     seesaw:     { tier: 3, minR: 34, maxR: 40 },
