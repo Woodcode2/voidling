@@ -10,6 +10,11 @@ export function clamp(val: number, min: number, max: number) {
   return Math.max(min, Math.min(max, val));
 }
 
+// v7 §11: XP needed to advance FROM level n to n+1.
+export function xpForLevel(n: number) {
+  return 500 + n * 250;
+}
+
 // Shortest-path angle interpolation
 export function lerpAngle(a: number, b: number, t: number) {
   let d = b - a;
@@ -53,4 +58,13 @@ export function easeOutBack(x: number): number {
 export function addAreaToRadius(radius: number, addedArea: number) {
   const area = Math.PI * radius * radius + addedArea;
   return Math.sqrt(area / Math.PI);
+}
+
+// v7 §1: anti-snowball growth. Mass gained is scaled by (base / current)^0.5 so
+// small voids grow fast and giants crawl, then radius is hard-capped. At the cap
+// absorbs still score but add no size (caller keeps score separate).
+export function growRadius(current: number, addedArea: number, base: number, cap: number) {
+  if (current >= cap) return cap;
+  const factor = Math.sqrt(base / Math.max(base, current));
+  return Math.min(cap, addAreaToRadius(current, addedArea * factor));
 }

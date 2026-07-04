@@ -170,6 +170,19 @@ export const audio = {
     this.playTone(360, 'square', 0.12, 0.05, 0.02);
   },
 
+  // v7 §3: ice-cream cart jingle
+  playJingle() {
+    if (!this.sfxOn || !this.ctx) return;
+    [659.25, 784, 659.25, 523.25].forEach((f, i) => this.playTone(f, 'triangle', 0.12, 0.045, i * 0.12));
+  },
+
+  // v7 §3: trampoline boing
+  playBounce() {
+    if (!this.sfxOn || !this.ctx) return;
+    this.playTone(180, 'sine', 0.14, 0.08);
+    this.playTone(520, 'sine', 0.16, 0.05, 0.05);
+  },
+
   // merge / TRIPLE: 3-note chord + upward noise sweep
   playMerge() {
     if (!this.sfxOn || !this.ctx) return;

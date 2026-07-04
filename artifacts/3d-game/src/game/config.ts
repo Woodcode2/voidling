@@ -15,6 +15,11 @@ export type ObjectKind =
   | 'house'
   // Landmark
   | 'watertower'
+  // v7 §3: new objects with personality
+  | 'cat' | 'squirrel' | 'bird' | 'trampoline' | 'drone' | 'schoolbus'
+  | 'bbq' | 'mower' | 'hoop' | 'icecream' | 'scooter'
+  // v7 §2: playground equipment + school trophy
+  | 'sandbox' | 'swingset' | 'slide' | 'seesaw' | 'school'
   // legacy decor (still drawable, used sparingly)
   | 'mushroom' | 'bush' | 'gazebo';
 
@@ -38,6 +43,8 @@ export interface SkinDef {
   eyeStyle: EyeStyle;
   extraBlush?: boolean;
   accessories: AccessoryType[];
+  premium?: boolean;    // v7 §9: real-money skin (mock IAP)
+  priceUSD?: number;    // v7 §9: display price for premium skins
 }
 
 export interface BoonDef {
@@ -60,11 +67,11 @@ export const CONFIG = {
 
   // ── v6 §1: match structure ──
   BOON_PICK_TIMES: [150000, 100000, 50000], // ms remaining: 2:30, 1:40, 0:50
-  COINS_PER_SCORE: 150,                       // coins = floor(score / this)
+  COINS_PER_SCORE: 200,                       // v7 §9: coins = floor(score / 200)
 
   // ── v6 §3: evolution ladder (radius-driven, forms only go up in a round) ──
   FORMS: [
-    { name: 'VOIDLING',    radius: 22 },
+    { name: 'VOIDLING',    radius: 18 },
     { name: 'MUNCHER',     radius: 36 },
     { name: 'GOBBLER',     radius: 54 },
     { name: 'DEVOURER',    radius: 78 },
@@ -110,7 +117,7 @@ export const CONFIG = {
   EDGE_FADE: 60,
 
   // ── v6 §11: home ──
-  HOME_TAGLINE: 'SO CUTE. SO HUNGRY.',
+  HOME_TAGLINE: 'THE CUTE WORLD EATER',
 
   // Controls (relative-drag virtual joystick)
   JOYSTICK_MAX_DIST: 110,   // px from anchor for full speed
@@ -139,23 +146,34 @@ export const CONFIG = {
   // Too-big collision feedback — §0 fix
   TOOBIG_COOLDOWN: 500,     // ms
 
-  // World — v5 §3: shrink the map so the arena reads dense
-  MAP_SIZE: 2400,
-  BLOCK_SIZE: 700,           // 3*700 + 2*120 roads = 2340, margin 30
+  // World — v7 §2: the full town — 4×4 grid, 3200×3200
+  MAP_SIZE: 3200,
+  BLOCK_SIZE: 700,           // 4*700 + 3*120 roads = 3160, margin 20
   ROAD_WIDTH: 120,
   SIDEWALK: 44,
-  GRID: 3,
-  PLAYER_BASE_RADIUS: 22,    // v5 §1: everyone starts here (no seeded spread)
+  GRID: 4,
+  PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
+  MAX_RADIUS: 140,           // v7 §1: hard size cap — at cap, absorbs score but don't grow
+  DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff
 
   // Living world speeds (px/s)
   CAR_SPEED: 60, CAR_FLEE_SPEED: 140,
   PERSON_SPEED: 30, PERSON_FLEE_SPEED: 120,
   DUCK_SPEED: 22, DOG_SPEED: 70,
+  // v7 §3: new movers
+  BIRD_SPEED: 40, BIRD_FLEE_SPEED: 240,   // birds bolt early and fast
+  CRITTER_SPEED: 46, CRITTER_FLEE_SPEED: 210,  // cat / squirrel
+  DRONE_SPEED: 115, DRONE_SCORE_MULT: 2,  // delivery drone: fast, 2× score
+  BUS_SPEED: 82,                          // school bus cruises the grid
+  MOWER_SPEED: 34,                        // lawn mower putters
+  TRAMPOLINE_BOUNCE: 120,                 // px launch for a too-small player
+  ICECREAM_JINGLE_RANGE: 320,             // play jingle when player within
 
-  // Population / respawn — v5 §3: fuller world (350–450)
-  TARGET_POPULATION: 400,
-  RESPAWN_MIN: 350,         // trickle small objects if below this
+  // Population / respawn — v7 §2: full town (550–700)
+  TARGET_POPULATION: 620,
+  RESPAWN_MIN: 540,         // trickle small objects if below this
   DENSITY_MULT: 1,          // v5 §7: debug-panel density multiplier
+  TRAFFIC_CARS: 12,         // v7 §2: cars cruising the road grid (10–14)
 
   // Absorb / orbit / merge
   ABSORB_SHRINK_TIME: 190,
@@ -254,6 +272,23 @@ export const CONFIG = {
     house:      { tier: 5, minR: 92, maxR: 116 },
     // Landmark
     watertower: { tier: 6, minR: 150, maxR: 150 },
+    // v7 §3: new objects
+    squirrel:   { tier: 1, minR: 12, maxR: 15 },
+    bird:       { tier: 1, minR: 10, maxR: 13 },
+    cat:        { tier: 2, minR: 18, maxR: 22 },
+    scooter:    { tier: 2, minR: 20, maxR: 24 },
+    drone:      { tier: 3, minR: 22, maxR: 26 },
+    bbq:        { tier: 3, minR: 28, maxR: 33 },
+    mower:      { tier: 3, minR: 26, maxR: 31 },
+    trampoline: { tier: 4, minR: 42, maxR: 48 },
+    hoop:       { tier: 4, minR: 42, maxR: 48 },
+    icecream:   { tier: 4, minR: 44, maxR: 50 },
+    // v7 §2: playground + school
+    sandbox:    { tier: 3, minR: 34, maxR: 40 },
+    seesaw:     { tier: 3, minR: 34, maxR: 40 },
+    swingset:   { tier: 4, minR: 50, maxR: 58 },
+    slide:      { tier: 4, minR: 46, maxR: 54 },
+    school:     { tier: 5, minR: 104, maxR: 122 },
     // decor
     bush:       { tier: 2, minR: 22, maxR: 30 },
     mushroom:   { tier: 1, minR: 10, maxR: 14 },
@@ -272,6 +307,11 @@ export const CONFIG = {
     { id: 'wizard',    name: 'Wizard',    cost: 1000, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
     { id: 'kitty',     name: 'Kitty',     cost: 600,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
     { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#C42A2A', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
+    // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
+    { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#241155', glowColor: '#8A6BFF', eyeStyle: 'normal', accessories: ['sparkleTrail'] },
+    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#5A1414', glowColor: '#FF7A2B', eyeStyle: 'angry', accessories: ['horns'] },
+    { id: 'ghost',     name: 'Ghost',     cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#DDE6F2', glowColor: '#BFE6FF', eyeStyle: 'normal', accessories: [] },
+    { id: 'midas',     name: 'King Midas', cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#C99A17', glowColor: '#FFD23F', eyeStyle: 'normal', accessories: ['tiara'] },
   ] as SkinDef[],
 
   // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)
@@ -282,7 +322,19 @@ export const CONFIG = {
     { id: 'time',      name: 'Borrowed Time',   desc: '+15 seconds, instantly' },
     { id: 'tremor',    name: 'Tenderizer',      desc: 'Touch shrinks big things' },
     { id: 'greed',     name: 'Midas Mouth',     desc: 'All score ×1.5' },
+    // v7 §5: four new power-ups
+    { id: 'echo',      name: 'Echo Bite',       desc: 'Every 5th bite pulls snacks in' },
+    { id: 'shield',    name: 'Bubble Shield',   desc: 'Blocks one chomp, then pops' },
+    { id: 'dash',      name: 'Void Dash',       desc: 'Auto-dash 100px every 6s' },
+    { id: 'lucky',     name: 'Lucky Gnome',     desc: 'A golden snack every 10s' },
   ] as BoonDef[],
+
+  // v7 §5: synergies — auto-trigger when BOTH members are active at once.
+  SYNERGIES: [
+    { id: 'sonic',    name: 'SONIC SNACK',   needs: ['overdrive', 'dash'] },   // rainbow speed trail
+    { id: 'horizon',  name: 'EVENT HORIZON', needs: ['magnet', 'echo'] },      // constant gentle pull
+    { id: 'goldrush', name: 'GOLD RUSH',     needs: ['greed', 'lucky'] },      // faster golden spawns
+  ] as { id: string; name: string; needs: string[] }[],
 
   // Rival identity pools
   BOT_NAMES: ['Kai', 'Luna', 'Maks', 'Ava', 'Rin', 'Zoe', 'Leo', 'Mia', 'Yuki', 'Bex', 'Nova', 'Oda', 'Pia', 'Rex', 'Sol', 'Tao'],

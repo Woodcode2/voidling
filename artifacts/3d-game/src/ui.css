@@ -396,8 +396,120 @@
   font-weight: 700;
   font-size: clamp(13px, 4vw, 17px);
   letter-spacing: 3px;
-  color: #FFC2E2;
-  opacity: 0.92;
+  text-transform: uppercase;
+  color: #FFFFFF;
+  opacity: 0.95;
+}
+.vd-tease {
+  margin-top: 10px;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(199, 125, 255, 0.14);
+  border: 1px solid rgba(199, 125, 255, 0.4);
+  font-family: Nunito, sans-serif;
+  font-size: 13px;
+  color: #EBD9FF;
+  cursor: pointer;
+  text-align: center;
+}
+.vd-tease .vd-tease-name { font-weight: 800; color: #FFD23F; }
+.vd-tease b { color: #FFFFFF; }
+
+/* v7 §9: premium shop row */
+.vd-shop-subhead {
+  margin: 18px 0 6px;
+  font-family: Fredoka, sans-serif;
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 14px;
+  color: #FFD23F;
+  text-align: center;
+}
+.vd-tag--cash {
+  background: linear-gradient(180deg, #34C759, #1FA24A);
+  color: #FFFFFF;
+  font-weight: 800;
+}
+.vd-rarity--premium {
+  background: linear-gradient(180deg, #FFD23F, #E0A400);
+  color: #2A1747;
+}
+.vd-rar--premium { border-color: rgba(255, 210, 63, 0.7); }
+.vd-fineprint {
+  margin-top: 8px;
+  font-family: Nunito, sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* v7 §11: player level badge + name pill */
+.vd-namepill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+  padding: 5px 14px 5px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #FFFFFF;
+}
+.vd-lvbadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #C77DFF, #8A4FE0);
+  font-size: 12px;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+.vd-xp {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 10px;
+  text-align: center;
+}
+.vd-xp-head {
+  display: flex;
+  justify-content: space-between;
+  font-family: Nunito, sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: #EBD9FF;
+  margin-bottom: 4px;
+}
+.vd-xp-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(20, 8, 43, 0.6);
+  overflow: hidden;
+}
+.vd-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8A4FE0, #C77DFF);
+  box-shadow: 0 0 10px rgba(199, 125, 255, 0.7);
+  transition: width 0.6s ease;
+}
+.vd-xp-sub {
+  margin-top: 4px;
+  font-family: Nunito, sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.vd-levelup {
+  font-family: Fredoka, sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 1px;
+  color: #FFD23F;
+  margin-bottom: 6px;
 }
 .vd-plaque {
   display: inline-flex;

@@ -239,26 +239,18 @@ function drawFormLayers(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
       const bx = Math.cos(a) * r, by = Math.sin(a) * r;
       const tx = Math.cos(a + flick) * (r + len), ty = Math.sin(a + flick) * (r + len);
       ctx.fillStyle = i % 2 ? '#B466FF' : '#7A2BE0';
+      // v7 §6: teardrop flame lick — bulged base curving to a fine tip
       ctx.beginPath();
-      ctx.moveTo(bx + nx * r * 0.11, by + ny * r * 0.11);
-      ctx.lineTo(tx, ty);
-      ctx.lineTo(bx - nx * r * 0.11, by - ny * r * 0.11);
+      ctx.moveTo(bx + nx * r * 0.13, by + ny * r * 0.13);
+      ctx.quadraticCurveTo(tx + nx * r * 0.16, ty + ny * r * 0.16, tx, ty);
+      ctx.quadraticCurveTo(tx - nx * r * 0.16, ty - ny * r * 0.16, bx - nx * r * 0.13, by - ny * r * 0.13);
       ctx.closePath();
       ctx.fill();
     }
   }
 
-  // WORLD EATER (4): pulsing violet warp ring
-  if (form >= 4) {
-    ctx.save();
-    ctx.globalAlpha = 0.5 + Math.sin(t / 300) * 0.2;
-    ctx.strokeStyle = '#C77DFF';
-    ctx.lineWidth = Math.max(2, r * 0.04);
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.6 + Math.sin(t / 240) * r * 0.08, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
+  // WORLD EATER (4): warp is rendered at the SCREEN EDGES in engine drawPostFX,
+  // never as a character-attached ring (v7 §6). Nothing to draw on the body here.
 }
 
 // v6 §2: faint blue underdog trail streaming behind a moving void.

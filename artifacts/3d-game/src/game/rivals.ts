@@ -1,5 +1,6 @@
 import { CONFIG, type SkinDef } from './config';
-import { clamp, lerp, dist, addAreaToRadius } from './utils';
+import { meta } from './meta';
+import { clamp, lerp, dist, growRadius } from './utils';
 import { drawVoidling, drawUnderdogTrail } from './voidling';
 import type { WorldObject } from './world';
 
@@ -34,7 +35,12 @@ export class Rival {
   underdogGrowth = 1;
   underdog = false;
   eventSlow = 1;          // v6 §5: event slow (firetruck water), reset each frame
+  eventFlee: { x: number; y: number } | null = null; // v7 §4: hazard to run from
   reachedForm = 0;
+  // v7 §8: which shop skin this bot is showing off this round
+  wearsUnownedSkin = false;
+  shopSkinId = '';
+  shopSkinName = '';
   // v6 §6: bot brain timers
   satedTime = 0;          // grazes only while > 0 (SATED after a meal)
   timeSinceEat = 0;       // ms since last successful eat (anti-idle)
@@ -112,10 +118,10 @@ export class Rival {
     this.timeSinceEat += dt;
     this.idleTimer += dt;
     if (this.idleTimer >= CONFIG.BOT_ANTIIDLE_MS) {
+      // v7 §1: anti-idle triggers on MOVEMENT alone — a giant vacuuming in place
+      // is idle even while eating, so it gets force-relocated to a far cluster.
       const moved = dist(this.x, this.y, this.idleAnchorX, this.idleAnchorY);
-      if (moved < CONFIG.BOT_ANTIIDLE_DIST || this.timeSinceEat > CONFIG.BOT_NOEAT_MS) {
-        this.forceRetarget = true;
-      }
+      if (moved < CONFIG.BOT_ANTIIDLE_DIST) this.forceRetarget = true;
       this.idleTimer = 0;
       this.idleAnchorX = this.x;
       this.idleAnchorY = this.y;
@@ -146,8 +152,8 @@ export class Rival {
   }
 
   eatObject(obj: WorldObject) {
-    this.score += Math.round(obj.size * 1.3 * (obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1));
-    this.radius = addAreaToRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth);
+    this.score += Math.round(obj.size * 1.3 * (obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1) * (obj.kind === 'drone' ? CONFIG.DRONE_SCORE_MULT : 1));
+    this.radius = growRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
     this.chompV = 1;
     this.satedTime = CONFIG.BOT_SATED_MS;
     this.timeSinceEat = 0;
@@ -156,7 +162,7 @@ export class Rival {
 
   eatVoid(radius: number) {
     this.score += 400;
-    this.radius = addAreaToRadius(this.radius, Math.PI * radius * radius * 0.5 * this.underdogGrowth);
+    this.radius = growRadius(this.radius, Math.PI * radius * radius * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
     this.chompV = 1;
     this.satedTime = CONFIG.BOT_SATED_MS;
     this.timeSinceEat = 0;
@@ -260,6 +266,7 @@ export class BotController implements RivalController {
   private roamAngle = Math.random() * Math.PI * 2;
   private roamTimer = 0;
   private bias: number;   // personality bias on target scoring
+  private relocating = false;   // v7 §1: committed march to a far dense cluster
 
   constructor(reactionDelay = 240, bias = 1) {
     this.reactionDelay = reactionDelay;
@@ -273,12 +280,10 @@ export class BotController implements RivalController {
   think(rival: Rival, view: WorldView, dt: number): Intent {
     const aggression = this.aggressionFrom(view.elapsed);
 
-    // v6 §6: anti-idle — a stuck/hungry bot immediately re-picks a target
+    // v7 §1: anti-idle — a stuck bot commits to marching at a far dense cluster
     if (rival.forceRetarget) {
       rival.forceRetarget = false;
-      this.decisionTimer = 0;
-      this.hasTarget = false;
-      this.roamAngle = Math.random() * Math.PI * 2;
+      this.pickRelocate(rival, view);
     }
 
     // FLEE is always evaluated (survival first)
@@ -292,8 +297,29 @@ export class BotController implements RivalController {
     }
     if (threat) {
       this.state = 'FLEE';
+      this.relocating = false;
       const a = Math.atan2(rival.y - threat.y, rival.x - threat.x);
       return this.avoidWalls(rival, { dirX: Math.cos(a), dirY: Math.sin(a), mag: 1 });
+    }
+
+    // v7 §4: react to world events — bolt away from a shrink storm / firetrucks
+    // that are hunting me this frame.
+    if (rival.eventFlee) {
+      this.state = 'FLEE';
+      this.relocating = false;
+      const a = Math.atan2(rival.y - rival.eventFlee.y, rival.x - rival.eventFlee.x);
+      return this.avoidWalls(rival, { dirX: Math.cos(a), dirY: Math.sin(a), mag: 1 });
+    }
+
+    // v7 §1: while relocating, march straight to the cluster until we arrive
+    if (this.relocating) {
+      const dd = dist(rival.x, rival.y, this.tx, this.ty);
+      if (dd < 180) { this.relocating = false; this.hasTarget = false; this.decisionTimer = 0; }
+      else {
+        this.state = 'HUNT';
+        const dx = this.tx - rival.x, dy = this.ty - rival.y, d = Math.hypot(dx, dy) || 1;
+        return this.avoidWalls(rival, { dirX: dx / d, dirY: dy / d, mag: 1 });
+      }
     }
 
     // HUNT / GRAZE targets refresh on a reaction delay
@@ -337,6 +363,37 @@ export class BotController implements RivalController {
     return { dirX: dx / d, dirY: dy / d, mag: Math.min(1, Math.max(intent.mag, Math.hypot(rx, ry))) };
   }
 
+  // v7 §1: find the farthest DENSE cluster of edibles and commit to marching there.
+  private pickRelocate(rival: Rival, view: WorldView) {
+    const cell = 400;
+    const buckets = new Map<string, { n: number; sx: number; sy: number }>();
+    for (const o of view.objects) {
+      if (o.eaten) continue;
+      if (rival.radius < o.size * CONFIG.EAT_RATIO) continue; // only edible clusters
+      const cx = Math.floor(o.x / cell), cy = Math.floor(o.y / cell);
+      const key = `${cx},${cy}`;
+      const b = buckets.get(key) || { n: 0, sx: 0, sy: 0 };
+      b.n++; b.sx += o.x; b.sy += o.y;
+      buckets.set(key, b);
+    }
+    let best = -Infinity, bx = 0, by = 0, found = false;
+    for (const b of buckets.values()) {
+      const cx = b.sx / b.n, cy = b.sy / b.n;
+      const d = dist(rival.x, rival.y, cx, cy);
+      const score = b.n * (d + 200); // dense AND far
+      if (score > best) { best = score; bx = cx; by = cy; found = true; }
+    }
+    if (!found) {
+      // no edible clusters — head to the opposite corner
+      bx = rival.x < view.map / 2 ? view.map - 300 : 300;
+      by = rival.y < view.map / 2 ? view.map - 300 : 300;
+    }
+    this.tx = bx; this.ty = by;
+    this.relocating = true;
+    this.hasTarget = true;
+    this.state = 'HUNT';
+  }
+
   private pickTarget(rival: Rival, view: WorldView, aggression: number) {
     this.hasTarget = false;
     let best = Infinity;
@@ -370,23 +427,36 @@ export class BotController implements RivalController {
 export function makeRivals(): Rival[] {
   const names = shuffle(CONFIG.BOT_NAMES).slice(0, CONFIG.RIVAL_COUNT);
   const countries = shuffle(CONFIG.BOT_COUNTRIES).slice(0, CONFIG.RIVAL_COUNT);
-  const colors = shuffle([...CONFIG.BOT_COLORS]).slice(0, CONFIG.RIVAL_COUNT);
+
+  // v7 §8: bots wear real SHOP skins (accessories render automatically), drawn
+  // without replacement and weighted 3× toward skins the player does NOT own —
+  // a moving billboard for the store.
+  const owned = new Set(meta.data.skinsOwned);
+  const pool: SkinDef[] = [];
+  for (const s of CONFIG.SKINS) {
+    const weight = owned.has(s.id) ? 1 : 3;
+    for (let k = 0; k < weight; k++) pool.push(s);
+  }
+  const chosen: SkinDef[] = [];
+  const usedIds = new Set<string>();
+  while (chosen.length < CONFIG.RIVAL_COUNT && pool.length) {
+    const s = pool[Math.floor(Math.random() * pool.length)];
+    if (!usedIds.has(s.id)) { usedIds.add(s.id); chosen.push(s); }
+    for (let k = pool.length - 1; k >= 0; k--) if (pool[k].id === s.id) pool.splice(k, 1);
+  }
+
   const rivals: Rival[] = [];
   for (let i = 0; i < CONFIG.RIVAL_COUNT; i++) {
-    const col = colors[i % colors.length];
-    const skin: SkinDef = {
-      id: `bot_${i}`,
-      name: names[i],
-      cost: 0,
-      bodyColor: col.body,
-      glowColor: col.glow,
-      eyeStyle: 'normal',
-      accessories: [],
-    };
+    const base = chosen[i % Math.max(1, chosen.length)] || CONFIG.SKINS[0];
+    const skin: SkinDef = { ...base, id: `bot_${i}_${base.id}` }; // unique id, same look
     const reaction = 180 + Math.random() * 260;
     const bias = 0.7 + Math.random() * 0.8;
     const speedScale = 0.9 + Math.random() * 0.2;
-    rivals.push(new Rival(names[i], countries[i], skin, new BotController(reaction, bias), speedScale));
+    const r = new Rival(names[i], countries[i], skin, new BotController(reaction, bias), speedScale);
+    r.wearsUnownedSkin = !owned.has(base.id);
+    r.shopSkinId = base.id;
+    r.shopSkinName = base.name;
+    rivals.push(r);
   }
   return rivals;
 }
