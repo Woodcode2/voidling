@@ -27,6 +27,7 @@ export interface FxEvent {
   big?: boolean;
   kind?: ObjectKind;
   form?: number;    // v6 §3: form index reached (for 'evolve')
+  tier?: number;    // v8 §5: object tier (for the eat sound's T3+ sub thump)
 }
 
 export class Player {
@@ -55,6 +56,7 @@ export class Player {
   twinMerge = false;
   tremorActive = false;
   greedMultiplier = 1;
+  frenzyMult = 1;          // v8 §7: FRENZY MINUTE score ×1.25
   // v7 §5: new power-up effect state
   tremorFactor = 0.85;   // TENDERIZER shrink-per-touch (Lvl I 15%, Lvl II 25%)
   twinBonus = 1;         // DOUBLE STOMACH II: +50% merge bonus
@@ -119,6 +121,7 @@ export class Player {
     this.twinMerge = false;
     this.tremorActive = false;
     this.greedMultiplier = 1;
+    this.frenzyMult = 1;
     this.tremorFactor = 0.85;
     this.twinBonus = 1;
     this.echoActive = false;
@@ -267,7 +270,7 @@ export class Player {
     // v7 §5: ECHO BITE — every 5th absorb queues a shockwave pulse (engine fires it)
     if (this.echoActive && (++this.echoCount % 5 === 0)) this.echoPulse = true;
     const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1; // v6 §2
-    let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult);
+    let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult * this.frenzyMult);
     if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT; // v7 §3: drone worth 2×
     this.score += gain;
     this.radius = growRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
@@ -288,7 +291,7 @@ export class Player {
       fromY: obj.y,
     });
     this.pendingFx.push({ type: 'absorb', x: obj.x, y: obj.y, color: CONFIG.COLORS.tierTint[obj.tier - 1] });
-    this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: obj.kind });
+    this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: obj.kind, tier: obj.tier });
 
     // v5 §4: cap at 6 — the oldest fades out on overflow
     while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {
@@ -313,7 +316,7 @@ export class Player {
       if (arr.length >= need) {
         const merge = arr.slice(0, need);
         this.orbit = this.orbit.filter((o) => !merge.includes(o));
-        const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier * this.twinBonus);
+        const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier * this.twinBonus * this.frenzyMult);
         this.score += bonus;
         this.radius = growRadius(this.radius, 260 * tier * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
         this.bumpCombo();

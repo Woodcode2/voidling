@@ -1,7 +1,7 @@
 // Shared voidling renderer — used by the player AND every rival bot.
 // Draws a cute jelly black-hole creature centered at (x,y) with a given skin.
 import type { SkinDef } from './config';
-import { drawSkinBack, drawSkinFront } from './skins';
+import { drawSkinBack, drawSkinFront, drawSkinBody } from './skins';
 
 export interface VoidlingVisual {
   r: number;
@@ -29,6 +29,7 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.save();
   ctx.translate(x, y);
   if (v.ghost) ctx.globalAlpha = 0.4;
+  if (skin.id === 'ghost') ctx.globalAlpha *= 0.6; // v8 §8: translucent floaty ghost
   ctx.rotate(v.lean);
 
   // ── Glow: crisp concentric rings (v5 §6 — no radial halo / shadowBlur) ──────
@@ -56,6 +57,9 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   const sprite = getBodySprite(skin.bodyColor);
   ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
   ctx.restore();
+
+  // ── v8 §8: premium surface effects painted onto the body (clipped to the orb) ─
+  drawSkinBody(ctx, skin, r, v.t);
 
   // ── Face (crisp, unsquashed) ────────────────────────────────────────────────
   drawFace(ctx, v);

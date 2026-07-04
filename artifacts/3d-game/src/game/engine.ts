@@ -75,7 +75,8 @@ export interface GameEngine {
 }
 
 interface ActiveBoon { id: string; name: string; remaining: number; duration: number; level: number; }
-interface Banner { text: string; color: string; life: number; max: number; }
+// v8 §6: one managed callout component — stamped center-top, one at a time, priority ordered
+interface Callout { text: string; color: string; priority: number; sparkles: boolean; pulse: boolean; }
 
 const DAILY_MODS = [
   { id: 'golden', name: 'Golden Hour', desc: 'Coins earned this run are doubled.' },
@@ -114,7 +115,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const activeBoons: ActiveBoon[] = [];
   const boonRank = new Map<string, number>();     // v7 §5: times each boon picked (→ level)
   const activeSynergies = new Set<string>();       // v7 §5: currently firing synergies
-  const banners: Banner[] = [];
+  // v8 §6: callout queue (only one shows at a time)
+  const calloutQueue: Callout[] = [];
+  let callout: (Callout & { t: number }) | null = null; // active, t = elapsed ms
+  let borderPulse = 0;      // ms of RAMPAGE screen-border pulse remaining
+  let storedBest = 0;       // personal best captured at round start
+  let bestBeaten = false;   // NEW PERSONAL BEST fired once per round
+  let prevRank = 99;        // leaderboard-position tracking
+  let saidFirst = false;    // YOU'RE #1! fired
+  let saidTop3 = false;     // TOP 3! fired
+  let eatStreak = 0;        // absorbs chained within 1.2s
+  let lastEatMs = 0;
   let evoTitle: { name: string; life: number; max: number } | null = null; // v6 §3 title card
   let powerStamp: { name: string; color: string; life: number; max: number } | null = null; // v6 §4
   let maxCombo = 0;
@@ -126,6 +137,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let goldenTimer = 0;          // v6 §2: golden-object spawn cadence (from 2:45)
   let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
+  let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
+  let countStep = 0;           // v8 §1: last countdown number beeped
+  let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
 
   // camera state (world-space centre + zoom), smoothed each frame
   let camCX = CONFIG.MAP_SIZE / 2;
@@ -172,10 +186,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   window.addEventListener('resize', resize);
   resize();
 
-  function banner(text: string, color = '#FFFFFF') {
-    banners.push({ text, color, life: 1900, max: 1900 });
-    if (banners.length > 4) banners.shift();
-    audio.duckMusic(); // v5 §5: duck the track under banners
+  // v8 §6: everything routes through the callout queue so nothing overlaps/stacks
+  function banner(text: string, color = '#FFFFFF', priority = 1, opts: { sparkles?: boolean; pulse?: boolean } = {}) {
+    if (callout?.text === text || calloutQueue.some((c) => c.text === text)) return; // dedupe
+    calloutQueue.push({ text, color, priority, sparkles: !!opts.sparkles, pulse: !!opts.pulse });
+    if (calloutQueue.length > 5) { calloutQueue.sort((a, b) => b.priority - a.priority); calloutQueue.length = 5; }
   }
 
   // ── round lifecycle ──
@@ -211,13 +226,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       // v5 §1: everyone starts at the same base radius — no seeded size spread
       rivals[i].spawn(c + Math.cos(a) * rr, c + Math.sin(a) * rr, CONFIG.PLAYER_BASE_RADIUS);
     }
+    // v8 §1: keep every void off a food cluster at spawn so no bot pops a pile
+    // of objects on the first frame (the "bots have 100+ in 2s" bug).
+    world.clearSpawnFootprint([
+      { x: player.x, y: player.y, radius: player.radius },
+      ...rivals.map((r) => ({ x: r.x, y: r.y, radius: r.radius })),
+    ]);
 
     timeLeft = duration;
     boonUsed.clear();
     activeBoons.length = 0;
     boonRank.clear();
     activeSynergies.clear();
-    banners.length = 0;
+    calloutQueue.length = 0; callout = null; borderPulse = 0;
+    storedBest = meta.data.highScore; bestBeaten = false;
+    prevRank = 99; saidFirst = false; saidTop3 = false;
+    eatStreak = 0; lastEatMs = 0;
     evoTitle = null;
     powerStamp = null;
     maxCombo = 0;
@@ -229,6 +253,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     goldenTimer = 0;
     luckyTimer = 0;
     dashTimer = 0;
+    countdown = 0;
+    countStep = 0;
+    crackTimer = 0;
     events.reset();
     fx.particles.length = 0;
     fx.texts.length = 0;
@@ -248,6 +275,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     results = null;
     screen = 'game';
+    countdown = CONFIG.COUNTDOWN_MS; // v8 §1: freeze everyone through "3..2..1"
+    countStep = 0;
     joystick.setEnabled(true);
     resetClock();
     track('round_start', { daily });
@@ -333,7 +362,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const crown = placement === 1;
     const worldEater = player.formIndex >= CONFIG.FORMS.length - 1;
     if (worldEater) evoCoinBonus = 200; // v6 §3: reaching WORLD EATER awards 200 coins
-    const devoured = world.totalStartArea > 0 ? (world.eatenArea / world.totalStartArea) * 100 : 0;
+    const devoured = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
     const coins = Math.floor((player.score / CONFIG.COINS_PER_SCORE + (crown ? 60 : 0)) * coinMult) + coinBonus + evoCoinBonus;
     const newBest = player.score > meta.data.highScore;
 
@@ -405,6 +434,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     evoTitle = { name, life: 1600, max: 1600 };
     audio.playEvolve();
     audio.duckMusic();
+    // v8 §5: the new form's music layer drops in on the sting's boom (~400ms)
+    window.setTimeout(() => audio.setMusicForm(form), 400);
     banner('EVOLVED → ' + name, '#C77DFF');
   }
 
@@ -459,6 +490,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // objects (suction + eat + living-world AI)
     world.update(dt, player, rivals, fx);
 
+    // v8 §3: WORLD EATER carves a cracked-ground trail while it roams
+    if (player.formIndex >= CONFIG.FORMS.length - 1) {
+      crackTimer -= dt;
+      if (crackTimer <= 0 && Math.hypot(player.vx, player.vy) > 30) {
+        crackTimer = 130;
+        world.dropCrack(player.x, player.y, player.radius);
+      }
+    }
+
     // v6 §2: golden objects begin at 2:45 remaining, ~every 12s
     if (timeLeft <= CONFIG.GOLDEN_START_MS && timeLeft > 0) {
       goldenTimer -= dt;
@@ -499,6 +539,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // v6 §5: world events
     events.update(dt, timeLeft);
+    // v8 §7: FRENZY MINUTE — ×1.25 score (double streaks handled in the chomp loop)
+    player.frenzyMult = events.frenzyActive ? 1.25 : 1;
 
     // void vs void
     resolveVoids();
@@ -508,8 +550,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       if (ev.type === 'absorb') {
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
       } else if (ev.type === 'chomp') {
-        audio.playChomp();
+        audio.playChomp(ev.tier || 1);
         if (ev.kind) audio.playSignature(ev.kind);
+        // v8 §6: eat-streak ladder (chains within 1.2s); §7 frenzy counts double
+        const inc = events.frenzyActive ? 2 : 1;
+        const prevStreak = (roundElapsed - lastEatMs < 1200) ? eatStreak : 0;
+        eatStreak = prevStreak + inc;
+        lastEatMs = roundElapsed;
+        if (prevStreak < 5 && eatStreak >= 5) banner('DOUBLE BITE!', '#8AE6FF', 3);
+        else if (prevStreak < 10 && eatStreak >= 10) banner('FEAST!', '#FFD23F', 4);
+        else if (prevStreak < 15 && eatStreak >= 15) banner('RAMPAGE!', '#FF5A3C', 5, { pulse: true });
       } else if (ev.type === 'merge') {
         audio.playMerge();
         audio.duckMusic();
@@ -529,6 +579,23 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
     player.pendingFx.length = 0;
+
+    // v8 §6: personal-best + leaderboard-position callouts
+    if (!bestBeaten && storedBest > 0 && player.score > storedBest) {
+      bestBeaten = true;
+      banner('NEW PERSONAL BEST!', '#FFD23F', 6, { sparkles: true });
+    }
+    // identity-aware rank with no per-frame allocation/sort: strict-overtake semantics
+    let rank = 1;
+    for (const r of rivals) if (r.score > player.score) rank++;
+    if (rank < prevRank && prevRank !== 99) {
+      if (rank === 1 && !saidFirst) { saidFirst = true; banner("YOU'RE #1!", '#FFD23F', 5); }
+      else if (rank <= 3 && !saidTop3) { saidTop3 = true; banner('TOP 3!', '#8AE6FF', 3); }
+    } else if (rank > prevRank && prevRank === 1) {
+      banner('OVERTAKEN!', '#FF6B6B', 2);
+      saidFirst = false; // allow re-claiming #1
+    }
+    prevRank = rank;
 
     maxCombo = Math.max(maxCombo, player.combo);
     audio.setMusicIntensity(player.combo); // v5 §5: combo ≥ 2 brightens the loop
@@ -691,12 +758,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // ── world transform: ground → objects (y-sorted) → voidlings → fx ──
     ctx.save();
-    ctx.translate(fw / 2 + shake.x, fh / 2 + shake.y);
+    // v8 §3: WORLD EATER — constant 1px screen rumble while moving
+    let rmbX = 0, rmbY = 0;
+    if (player && player.formIndex >= CONFIG.FORMS.length - 1 && Math.hypot(player.vx, player.vy) > 20) {
+      rmbX = (Math.random() - 0.5) * 2; rmbY = (Math.random() - 0.5) * 2;
+    }
+    ctx.translate(fw / 2 + shake.x + rmbX, fh / 2 + shake.y + rmbY);
     ctx.scale(camZoom, camZoom);
     ctx.translate(-camCX, -camCY);
 
     world.drawGround(ctx, view);
-    world.drawDressing(ctx, view);
+    world.drawDressing(ctx, view, clock);
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);
@@ -715,8 +787,31 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     if (screen === 'game') {
       drawHUD();
-      drawJoystickHint();
+      if (countdown > 0) drawCountdown();
+      else drawJoystickHint();
     }
+  }
+
+  // v8 §1: giant frozen "3..2..1" with a per-number pop-in
+  function drawCountdown() {
+    const n = Math.ceil(countdown / 1200);
+    if (n < 1) return;
+    const inStep = countdown - (n - 1) * 1200; // ms remaining within this number
+    const age = 1200 - inStep;                 // ms since it appeared
+    const pop = clamp(age / 200, 0, 1);
+    const scale = 0.55 + pop * 0.45 + Math.sin(pop * Math.PI) * 0.12;
+    ctx.save();
+    ctx.translate(fw / 2, fh * 0.42);
+    ctx.scale(scale, scale);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '800 130px Fredoka, sans-serif';
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.strokeText(String(n), 0, 0);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(String(n), 0, 0);
+    ctx.restore();
   }
 
   function drawHUD() {
@@ -754,6 +849,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillStyle = '#FFD23F';
       ctx.font = '700 18px Fredoka, sans-serif';
       ctx.fillText(`COMBO ×${player.comboMult.toFixed(1)}`, scoreRight, 58);
+    }
+    // v8 §3: running "% OF TOWN DEVOURED" under the score
+    if (world) {
+      const dv = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.font = '700 14px Fredoka, sans-serif';
+      ctx.fillText(`${dv.toFixed(0)}% DEVOURED`, scoreRight, player.combo > 1 ? 78 : 56);
     }
 
     // leaderboard (top left, dark backdrop, dropped below the timer so it never
@@ -797,23 +899,86 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     ctx.restore();
 
-    // banners (center)
+    // v8 §6: unified callout — bouncy scale-in, 900ms hold, whoosh-out, one at a time
     ctx.textAlign = 'center';
-    for (let i = 0; i < banners.length; i++) {
-      const b = banners[i];
-      if (!paused) b.life -= 16;
-      const a = clamp(b.life / 400, 0, 1);
-      ctx.globalAlpha = a;
-      ctx.fillStyle = b.color;
-      ctx.font = '700 22px Fredoka, sans-serif';
-      ctx.strokeStyle = 'rgba(20,8,43,0.6)';
-      ctx.lineWidth = 4;
-      const y = fh * 0.2 + i * 30;
-      ctx.strokeText(b.text, fw / 2, y);
-      ctx.fillText(b.text, fw / 2, y);
-      ctx.globalAlpha = 1;
+    ctx.textBaseline = 'middle';
+    if (!callout && calloutQueue.length) {
+      calloutQueue.sort((a, b) => b.priority - a.priority);
+      callout = { ...calloutQueue.shift()!, t: 0 };
+      audio.whoosh();
+      audio.duckMusic();
+      if (callout.pulse) borderPulse = 900;
     }
-    for (let i = banners.length - 1; i >= 0; i--) if (banners[i].life <= 0) banners.splice(i, 1);
+    if (callout) {
+      if (!paused) callout.t += 16;
+      const IN = 260, HOLD = 900, OUT = 260, total = IN + HOLD + OUT;
+      let scale = 1, alpha = 1, dx = 0;
+      if (callout.t < IN) {
+        const p = callout.t / IN;
+        const c1 = 1.70158, c3 = c1 + 1;
+        scale = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); // easeOutBack
+        alpha = clamp(p * 1.6, 0, 1);
+      } else if (callout.t > IN + HOLD) {
+        const p = (callout.t - IN - HOLD) / OUT;
+        alpha = 1 - p;
+        dx = p * p * 70; // whoosh out to the right
+      }
+      const cy = fh * 0.2;
+      ctx.save();
+      ctx.globalAlpha = clamp(alpha, 0, 1);
+      ctx.translate(fw / 2 + dx, cy);
+      ctx.scale(scale, scale);
+      ctx.font = '800 27px Fredoka, sans-serif';
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(20,8,43,0.7)';
+      ctx.strokeText(callout.text, 0, 0);
+      ctx.fillStyle = callout.color;
+      ctx.fillText(callout.text, 0, 0);
+      if (callout.sparkles) {
+        const w = ctx.measureText(callout.text).width;
+        for (let s = 0; s < 5; s++) {
+          const sa = (roundElapsed / 200 + s * 1.3);
+          const sx = (Math.sin(sa) * (w / 2 + 16));
+          const sy = Math.cos(sa * 1.4) * 16;
+          ctx.fillStyle = '#FFF3B0';
+          ctx.beginPath(); ctx.arc(sx, sy, 2.2, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+      if (callout.t >= total) callout = null;
+    }
+    ctx.textBaseline = 'alphabetic';
+    // v8 §7: FRENZY MINUTE — warm glow along the screen edges
+    if (events.frenzyActive) {
+      const pulse = 0.5 + Math.sin(roundElapsed / 180) * 0.25;
+      const grad = ctx.createLinearGradient(0, 0, 0, fh);
+      grad.addColorStop(0, `rgba(255,150,60,${0.34 * pulse})`);
+      grad.addColorStop(0.16, 'rgba(255,150,60,0)');
+      grad.addColorStop(0.84, 'rgba(255,150,60,0)');
+      grad.addColorStop(1, `rgba(255,150,60,${0.34 * pulse})`);
+      ctx.save();
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, fw, fh);
+      const gradX = ctx.createLinearGradient(0, 0, fw, 0);
+      gradX.addColorStop(0, `rgba(255,120,40,${0.28 * pulse})`);
+      gradX.addColorStop(0.14, 'rgba(255,120,40,0)');
+      gradX.addColorStop(0.86, 'rgba(255,120,40,0)');
+      gradX.addColorStop(1, `rgba(255,120,40,${0.28 * pulse})`);
+      ctx.fillStyle = gradX;
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.restore();
+    }
+    // v8 §6: RAMPAGE! screen-border pulse
+    if (borderPulse > 0) {
+      if (!paused) borderPulse -= 16;
+      const pa = (Math.sin(borderPulse / 55) * 0.5 + 0.5) * clamp(borderPulse / 900, 0, 1) * 0.6;
+      ctx.save();
+      ctx.globalAlpha = pa;
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = '#FF5A3C';
+      ctx.strokeRect(6, 6, fw - 12, fh - 12);
+      ctx.restore();
+    }
 
     // v7 §7: evolution progress as a bottom-center pill — glowing fill, form
     // labels inside, raised off the bottom edge to clear the device safe area.
@@ -1149,7 +1314,23 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (delta < 0) delta = 0;
     clock += delta;
 
-    if (screen === 'game' && !paused) {
+    if (screen === 'game' && !paused && countdown > 0) {
+      // v8 §1: frozen pre-round — count down in real time, nobody moves or scores
+      countdown -= delta;
+      const n = Math.ceil(countdown / 1200); // 3 → 2 → 1
+      if (n !== countStep && n >= 1) { countStep = n; audio.countBeep(n); }
+      if (countdown <= 0) {
+        countdown = 0;
+        countStep = 0;
+        audio.eatGo();
+        banner('EAT!', '#5AFFA0');
+        if (player) {
+          fx.addRing(player.x, player.y, '#5AFFA0', player.radius, player.radius + 170, 6, 500);
+          fx.addConfetti(player.x, player.y, ['#5AFFA0', '#FFD23F', '#FFFFFF']);
+        }
+        resetClock(); // don't let the frozen interval count as catch-up time
+      }
+    } else if (screen === 'game' && !paused) {
       // slow-motion (finale): stretch time without starving the loop
       let simDelta = delta;
       if (slowmo > 0) {

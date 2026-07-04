@@ -23,6 +23,7 @@ export const audio = {
   _step: 0,
   _nextStepTime: 0,
   _intense: false,
+  _musicForm: 0,          // v8 §5: evolution form → number of active music layers
 
   get muted() { return !this.sfxOn; },
 
@@ -111,8 +112,9 @@ export const audio = {
     src.start(time); src.stop(time + dur + 0.02);
   },
 
-  // ── gulp-pop absorb (~70ms): Layer A noise "p" + Layer B bending triangle ──────
-  playChomp() {
+  // ── v8 §5: eat sound v3 — percussive "chest" thump, not a chime ────────────────
+  // transient click + 90Hz sine punch + ladder-carrying pitch-down blip (+ T3+ sub).
+  playChomp(tier = 1) {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
     const ms = now * 1000;
@@ -120,20 +122,38 @@ export const audio = {
     else this._ladder = 0;
     this._lastAbsorb = ms;
 
-    // Layer A: 15ms band-passed noise transient
-    this._noise(now, 0.015, 'bandpass', 1800, 6, 0.5);
+    // 1) 2ms transient click
+    this._noise(now, 0.004, 'highpass', 4000, 0.9, 0.5);
 
-    // Layer B: triangle @ 520Hz (+ladder), bending down 30% over 55ms, exp decay
-    const f0 = 520 * Math.pow(2, this._ladder / 12);
-    const osc = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(f0, now);
-    osc.frequency.exponentialRampToValueAtTime(f0 * 0.7, now + 0.055);
-    g.gain.setValueAtTime(0.16, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
-    osc.connect(g); g.connect(this.sfxGain);
-    osc.start(now); osc.stop(now + 0.09);
+    // 2) ~90Hz sine punch, 50ms fast decay
+    const p = this.ctx.createOscillator(); const pg = this.ctx.createGain();
+    p.type = 'sine';
+    p.frequency.setValueAtTime(120, now);
+    p.frequency.exponentialRampToValueAtTime(80, now + 0.05);
+    pg.gain.setValueAtTime(0.5, now);
+    pg.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    p.connect(pg); pg.connect(this.sfxGain); p.start(now); p.stop(now + 0.07);
+
+    // 3) short pitch-down blip carrying the ladder
+    const f0 = 620 * Math.pow(2, this._ladder / 12);
+    const b = this.ctx.createOscillator(); const bg = this.ctx.createGain();
+    b.type = 'triangle';
+    b.frequency.setValueAtTime(f0, now);
+    b.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.06);
+    bg.gain.setValueAtTime(0.12, now);
+    bg.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    b.connect(bg); bg.connect(this.sfxGain); b.start(now); b.stop(now + 0.09);
+
+    // 4) faint sub thump on T3+
+    if (tier >= 3) {
+      const s = this.ctx.createOscillator(); const sg = this.ctx.createGain();
+      s.type = 'sine';
+      s.frequency.setValueAtTime(55, now);
+      s.frequency.exponentialRampToValueAtTime(40, now + 0.14);
+      sg.gain.setValueAtTime(0.28, now);
+      sg.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      s.connect(sg); sg.connect(this.sfxGain); s.start(now); s.stop(now + 0.18);
+    }
   },
 
   // Layer C — per-family flavour, layered under the gulp-pop
@@ -169,6 +189,36 @@ export const audio = {
     this.playTone(300, 'square', 0.12, 0.06);
     this.playTone(360, 'square', 0.12, 0.05, 0.02);
   },
+
+  // v8 §3: 2-note car alarm chirp when a DEVOURER+ player looms past
+  carAlarm() {
+    if (!this.sfxOn || !this.ctx) return;
+    this.playTone(880, 'square', 0.08, 0.05);
+    this.playTone(660, 'square', 0.09, 0.05, 0.1);
+  },
+
+  // v8 §6: callout whoosh — swept noise as a banner stamps in
+  whoosh() {
+    if (!this.sfxOn || !this.ctx) return;
+    this._noise(this.ctx.currentTime, 0.18, 'bandpass', 700, 0.8, 0.14, 3600);
+  },
+
+  // v8 §7: meteor impact thump
+  meteorThump() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, now);
+    o.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+    g.gain.setValueAtTime(0.4, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.22);
+    this._noise(now, 0.1, 'lowpass', 800, 0.7, 0.25);
+  },
+
+  // v8 §5: the music grows with the player — set the active layer count
+  setMusicForm(f: number) { this._musicForm = Math.max(0, f | 0); },
 
   // v7 §3: ice-cream cart jingle
   playJingle() {
@@ -212,20 +262,60 @@ export const audio = {
 
   playTick() { this.playTone(800, 'square', 0.05, 0.05); },
 
+  // v8 §1: round-start countdown beeps (3/2/1 climb) + the "EAT!" go signal
+  countBeep(n: number) {
+    const f = n >= 3 ? 440 : n === 2 ? 554 : 659; // A4 → C#5 → E5
+    this.playTone(f, 'triangle', 0.16, 0.18);
+    this.playTone(f * 2, 'sine', 0.10, 0.06, 0.005);
+  },
+  eatGo() {
+    // rising triumphant stab + noise transient
+    this.playTone(660, 'triangle', 0.20, 0.20);
+    this.playTone(990, 'triangle', 0.30, 0.15, 0.02);
+    this.playTone(1320, 'sine', 0.34, 0.10, 0.04);
+    if (this.ctx) this._noise(this.ctx.currentTime, 0.06, 'highpass', 2000, 1, 0.16);
+  },
+
   playBoon() {
     this.playTone(600, 'sine', 0.1, 0.1);
     this.playTone(800, 'sine', 0.2, 0.1, 0.1);
   },
 
-  // v6 §10: evolution — rising 4-note fanfare
+  // v8 §5: evolution sting — 400ms riser → boom → 3-chord stab w/ echo → 1s shimmer
   playEvolve() {
-    if (!this.sfxOn || !this.ctx) return;
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C E G C
-    notes.forEach((f, i) => {
-      this.playTone(f, 'triangle', 0.28, 0.16, i * 0.09);
-      this.playTone(f * 2, 'sine', 0.2, 0.05, i * 0.09);
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    // 1) white-noise riser sweeping up over 400ms
+    if (this._noiseBuf) {
+      const src = this.ctx.createBufferSource(); src.buffer = this._noiseBuf; src.loop = true;
+      const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass';
+      filt.frequency.setValueAtTime(300, now);
+      filt.frequency.exponentialRampToValueAtTime(6000, now + 0.4);
+      filt.Q.value = 1.2;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.03, now);
+      g.gain.exponentialRampToValueAtTime(0.22, now + 0.4);
+      src.connect(filt); filt.connect(g); g.connect(this.sfxGain);
+      src.start(now); src.stop(now + 0.42);
+    }
+    // 2) impact boom at +0.4s (55Hz sine sweep + low noise burst)
+    const boom = now + 0.4;
+    const bo = this.ctx.createOscillator(); const bg = this.ctx.createGain();
+    bo.type = 'sine';
+    bo.frequency.setValueAtTime(85, boom);
+    bo.frequency.exponentialRampToValueAtTime(45, boom + 0.28);
+    bg.gain.setValueAtTime(0.6, boom);
+    bg.gain.exponentialRampToValueAtTime(0.001, boom + 0.3);
+    bo.connect(bg); bg.connect(this.sfxGain); bo.start(boom); bo.stop(boom + 0.32);
+    this._noise(boom, 0.14, 'lowpass', 1200, 0.7, 0.4);
+    // 3) triumphant 3-chord stab with echo tail (starts on the boom)
+    [523.25, 659.25, 783.99].forEach((f) => {
+      this.playTone(f, 'triangle', 0.5, 0.14, 0.42);
+      this.playTone(f, 'triangle', 0.4, 0.06, 0.6);  // echo
+      this.playTone(f, 'triangle', 0.3, 0.03, 0.78); // echo tail
     });
-    if (this.ctx) this._noise(this.ctx.currentTime + 0.36, 0.3, 'bandpass', 700, 2, 0.1, 5000);
+    // 4) ~1s shimmer
+    if (this._noiseBuf) this._noise(now + 0.55, 1.0, 'highpass', 6500, 1, 0.05);
   },
 
   // v6 §10: world event — attention-grabbing two-note horn
@@ -260,6 +350,7 @@ export const audio = {
     if (!this.ctx || this._musicPlaying) return;
     this._musicPlaying = true;
     this._musicPaused = false;
+    this._musicForm = 0;
     this._step = 0;
     this._nextStepTime = this.ctx.currentTime + 0.1;
     this._musicTimer = window.setInterval(() => this._musicScheduler(), 25);
@@ -295,53 +386,80 @@ export const audio = {
 
   _musicScheduler() {
     if (!this.ctx) return;
-    const eighth = (60 / 96) / 2; // seconds per 8th note (96 BPM)
+    const six = (60 / 120) / 4; // sixteenth note @ 120 BPM = 0.125s
     while (this._nextStepTime < this.ctx.currentTime + 0.1) {
-      // ~8% swing: nudge every off-beat 8th later
-      const swing = this._step % 2 === 1 ? eighth * 0.08 : 0;
+      // subtle swing on off-beat 16ths
+      const swing = this._step % 2 === 1 ? six * 0.06 : 0;
       this._scheduleStep(this._step, this._nextStepTime + swing);
-      this._nextStepTime += eighth;
-      this._step = (this._step + 1) % 64;
+      this._nextStepTime += six;
+      this._step = (this._step + 1) % 64; // 4 bars of 16 sixteenths
     }
   },
 
+  // v8 §5: modern hyper-casual driver. Layers unlock by evolution form:
+  //  0 VOIDLING = kick + hats · 1 MUNCHER +bass · 2 GOBBLER +pluck lead
+  //  3 DEVOURER +counter-melody · 4 WORLD EATER +sub-rumble drone
   _scheduleStep(step: number, time: number) {
     if (!this.ctx) return;
-    const eighth = (60 / 96) / 2;
-    const inBar = step % 8;
-    const bar = Math.floor(step / 8);        // 0..7
-    const chordIdx = Math.floor(bar / 2);    // 0..3  → I V vi IV
+    const inBar = step % 16;                 // 0..15 sixteenths
+    const bar = Math.floor(step / 16);       // 0..3
+    const chordIdx = bar % 4;                // I V vi IV
     const roots = [65.41, 98.0, 110.0, 87.31]; // C2 G2 A2 F2
+    const form = this._musicForm;
 
-    // triangle bass on beats 1 & 3
-    if (inBar === 0 || inBar === 4) {
-      this._musicVoice(roots[chordIdx], 'triangle', eighth * 3.4, 0.2, time);
+    // four-on-the-floor kick on every beat (always)
+    if (inBar % 4 === 0) this._musicKick(time);
+    // hats on the off-beat 8th (always); doubled when intense
+    if (inBar % 4 === 2) this._musicHat(time);
+    if (this._intense && inBar % 2 === 1) this._musicHat(time);
+
+    // bass (MUNCHER+): root on beat 1, off-beat drive on the "and"s
+    if (form >= 1) {
+      if (inBar === 0) this._musicBass(roots[chordIdx] / 2, time);
+      if (inBar % 4 === 2) this._musicBass(roots[chordIdx], time);
     }
 
-    // sine pad triad, retriggered at each chord change (every 2 bars)
-    if (inBar === 0 && bar % 2 === 0) {
-      const triads = [
-        [261.63, 329.63, 392.0],
-        [196.0, 246.94, 293.66],
-        [220.0, 261.63, 329.63],
-        [174.61, 220.0, 261.63],
-      ];
-      const padVol = this._intense ? 0.06 : 0.04;
-      const padLp = this._intense ? 2600 : 1600;
-      for (const f of triads[chordIdx]) this._musicVoice(f, 'sine', eighth * 15, padVol, time, padLp);
+    // bright plucky lead with delay echo (GOBBLER+)
+    if (form >= 2) {
+      const motif: (number | null)[] = [0, null, 7, null, 12, null, 7, null, 4, null, 7, null, 0, null, 4, null];
+      const semi = motif[inBar];
+      if (semi !== null) this._musicPluck(roots[chordIdx] * 4 * Math.pow(2, semi / 12), time);
     }
 
-    // v6 §10: soft marimba lead — 8-note motif with rests
-    const motif: (number | null)[] = [0, 4, 7, null, 12, 7, null, 4];
-    const semi = motif[inBar];
-    if (semi !== null) {
-      const f = roots[chordIdx] * 4 * Math.pow(2, semi / 12);
-      this._musicMarimba(f, time);
+    // counter-melody + energy (DEVOURER+)
+    if (form >= 3) {
+      const counter: (number | null)[] = [null, null, 3, null, null, 5, null, 7, null, null, 3, null, 5, null, 7, null];
+      const s2 = counter[inBar];
+      if (s2 !== null) this._musicVoice(roots[chordIdx] * 6 * Math.pow(2, s2 / 12), 'sawtooth', 0.18, 0.03, time, 2600);
     }
 
-    // noise hats on 8ths, doubling to 16ths when intense
-    this._musicHat(time);
-    if (this._intense) this._musicHat(time + eighth / 2);
+    // low sub-rumble drone (WORLD EATER)
+    if (form >= 4 && inBar === 0) this._musicSub(roots[chordIdx] / 2, time);
+  },
+
+  _musicKick(time: number) {
+    if (!this.ctx || !this.musicGain) return;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, time);
+    o.frequency.exponentialRampToValueAtTime(50, time + 0.09);
+    g.gain.setValueAtTime(0.5, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+    o.connect(g); g.connect(this.musicGain); o.start(time); o.stop(time + 0.16);
+  },
+
+  _musicBass(freq: number, time: number) {
+    this._musicVoice(freq, 'triangle', 0.2, 0.18, time, 900);
+  },
+
+  _musicPluck(freq: number, time: number) {
+    // fast-decay triangle pluck + a delayed echo (~dotted 8th later)
+    this._musicVoice(freq, 'triangle', 0.16, 0.09, time, 3200);
+    this._musicVoice(freq, 'triangle', 0.13, 0.035, time + 0.19, 3200);
+  },
+
+  _musicSub(freq: number, time: number) {
+    this._musicVoice(freq, 'sine', 1.7, 0.14, time, 200);
   },
 
   _musicVoice(freq: number, type: OscillatorType, dur: number, vol: number, time: number, lp?: number) {

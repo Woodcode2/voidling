@@ -435,7 +435,17 @@
   background: linear-gradient(180deg, #FFD23F, #E0A400);
   color: #2A1747;
 }
-.vd-rar--premium { border-color: rgba(255, 210, 63, 0.7); }
+.vd-rar--premium {
+  border-color: rgba(255, 210, 63, 0.85);
+  background: linear-gradient(180deg, #2A1747, #1E0F3D);
+  animation: vd-premium-glow 2.2s ease-in-out infinite;
+}
+/* v8 §8: larger, punchier portraits on premium cards */
+.vd-rar--premium .vd-skinwrap { transform: scale(1.14); margin: 4px 0 2px; }
+@keyframes vd-premium-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 210, 63, 0.35), 0 0 14px rgba(255, 210, 63, 0.28); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.7), 0 0 26px rgba(255, 210, 63, 0.55); }
+}
 .vd-fineprint {
   margin-top: 8px;
   font-family: Nunito, sans-serif;

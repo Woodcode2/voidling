@@ -1,6 +1,6 @@
 import { CONFIG, type ObjectKind } from './config';
-import { prng, dist, hashString, clamp } from './utils';
-import { drawParkObject } from './objects';
+import { prng, dist, hashString, clamp, lerp } from './utils';
+import { drawParkObject, wind } from './objects';
 import { audio } from './audio';
 import type { FXManager } from './fx';
 import type { Player } from './player';
@@ -33,6 +33,7 @@ export interface WorldObject {
   captureRot: number;
   alertT: number;        // "!" bubble timer (people)
   golden: boolean;       // v6 §2: golden object — 3× mass/score
+  arrive: number;        // v8 §2: ms of pop-in scale-up remaining (0 = settled)
 }
 
 export interface PlayerStats {
@@ -154,6 +155,8 @@ export class WorldManager {
   size: number;
   totalStartArea = 0;
   eatenArea = 0;
+  initialMass = 0;         // v8 §3: frozen starting edible mass (% devoured denom)
+  private rampageCd = 0;   // v8 §3: DEVOURER+ instant-pop cadence (≤10/s)
   initialPopulation = 0;   // v6 §2: baseline count for the 85% respawn target
   playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0 };
   private nextId = 0;
@@ -191,6 +194,7 @@ export class WorldManager {
       captureRot: 0,
       alertT: 0,
       golden: false,
+      arrive: 0,
       ...opts,
     };
     this.objects.push(o);
@@ -265,6 +269,7 @@ export class WorldManager {
     this.buildDressing(rand);
     // v6 §2: remember the starting count so respawn can top back up to 85%
     this.initialPopulation = this.objects.length;
+    this.initialMass = this.totalStartArea; // v8 §3: freeze the % devoured denominator
   }
 
   // v5 §3 — guarantee edible coverage across the whole map
@@ -501,6 +506,8 @@ export class WorldManager {
 
   update(dt: number, player: Player, rivals: Rival[], fx: FXManager) {
     const dtSec = dt / 1000;
+    if (this.rampageCd > 0) this.rampageCd -= dt; // v8 §3
+    const pForm = player.formIndex;               // v8 §3: fear/rampage scale with form
     const voids = [player, ...rivals];
     let nearestEdibleD = Infinity;
     let nearestEdible: WorldObject | null = null;
@@ -508,6 +515,7 @@ export class WorldManager {
     for (const obj of this.objects) {
       if (obj.eaten) continue;
       obj.wobble += dt * 0.004;
+      if (obj.arrive > 0) obj.arrive = Math.max(0, obj.arrive - dt); // v8 §2 pop-in
       if (obj.alertT > 0) obj.alertT -= dt;
       if (obj.honkCd > 0 && !obj.living) obj.honkCd -= dt; // v7 §3: prop cooldowns (jingle)
 
@@ -521,8 +529,17 @@ export class WorldManager {
       }
       const reach = player.radius * CONFIG.CAPTURE_RADIUS_MULT * player.magnetMultiplier;
 
+      // v8 §3: RAMPAGE — at DEVOURER+ the player obliterates T1–T2 on contact with
+      // NO suction pull, rapid-fire capped at 10 pops/sec (the eat pitch-ladder races).
+      const rampage = pForm >= CONFIG.DEVOURER_FORM_INDEX && obj.tier <= 2;
+      if (rampage && !player.ghost && canPlayerEat && dp < player.radius + obj.size * 0.6 && this.rampageCd <= 0) {
+        this.rampageCd = 100;
+        this.consumeByPlayer(obj, player, fx);
+        continue;
+      }
+
       // ── gravity-well suction (player only) ──
-      if (!player.ghost && canPlayerEat && dp < reach + obj.size * 0.5) {
+      if (!player.ghost && canPlayerEat && !rampage && dp < reach + obj.size * 0.5) {
         obj.captured = true;
         const nx = (player.x - obj.x) / (dp || 1);
         const ny = (player.y - obj.y) / (dp || 1);
@@ -626,46 +643,90 @@ export class WorldManager {
       if (this.dirt[i].life <= 0) this.dirt.splice(i, 1);
     }
 
-    // v6 §2: trickle respawn (2–4/s) toward ≥85% of the starting population,
-    // spawning off-screen in the emptiest candidate spot (sparse-weighted).
+    // v8 §2: deficit-scaled respawn toward ≥90% of the starting population —
+    // 4/s normally, ramping to 8/s once the world drops below 80%.
     this.respawnTimer -= dt;
     if (this.respawnTimer <= 0) {
-      this.respawnTimer = 250 + this.rand() * 250; // ~2–4 spawns per second
       const target = Math.round(this.initialPopulation * CONFIG.RESPAWN_TARGET_FRAC);
-      if (this.remaining < target) this.spawnRespawn(player, voids);
+      const rem = this.remaining;
+      if (rem < target) {
+        const frac = rem / Math.max(1, this.initialPopulation);
+        const rate = frac >= 0.80 ? 4 : lerp(4, 8, clamp((0.80 - frac) / 0.20, 0, 1));
+        this.respawnTimer = 1000 / rate;
+        this.spawnRespawn(player, voids, fx);
+      } else {
+        this.respawnTimer = 300; // at floor — recheck a few times a second
+      }
     }
   }
 
-  // v6 §2 / v7 §1: choose an off-screen, sparse spot — never within 2× radius of
-  // ANY void — and drop a T1–T3 edible there (no more feeding stationary giants).
-  private spawnRespawn(player: Player, voids: { x: number; y: number; radius: number }[]) {
-    const m = CONFIG.MAP_SIZE;
+  // v8 §2: respawn T1–T2 edibles onto proper ground — lawns/sidewalks, park, and
+  // plaza only (never road asphalt) — off the player's screen and never within
+  // 1.5× radius of any void. 5% of spawns are a crosswalk apple on a road. Every
+  // arrival pops in with a bounce + dust puff so players SEE food returning.
+  private spawnRespawn(player: Player, voids: { x: number; y: number; radius: number }[], fx: FXManager) {
+    // occasional crosswalk apple on the road grid (≤5% of spawns)
+    if (this.rand() < 0.05) {
+      const rp = this.roadPoint(player, voids);
+      if (rp) { const o = this.makeObj('apple', rp.x, rp.y); o.arrive = 200; this.spawnPuff(rp.x, rp.y, fx); }
+      return;
+    }
     const kinds: ObjectKind[] = ['flower', 'flowerpot', 'gnome', 'apple', 'mailbox', 'hydrant', 'trashcan'];
+    const zones = this.blocks.filter((b) => b.type === 'residential' || b.type === 'park' || b.type === 'plaza');
+    if (!zones.length) return;
     let bx = 0, by = 0, bestScore = -Infinity;
-    for (let i = 0; i < 10; i++) {
-      const x = MARGIN + this.rand() * (m - MARGIN * 2);
-      const y = MARGIN + this.rand() * (m - MARGIN * 2);
-      const dPlayer = dist(x, y, player.x, player.y);
+    for (let i = 0; i < 12; i++) {
+      const b = zones[Math.floor(this.rand() * zones.length)];
+      const pt = this.pointInBlock(b, this.rand);
+      const dPlayer = dist(pt.x, pt.y, player.x, player.y);
       if (dPlayer < 520) continue; // keep it off the player's screen
-      // v7 §1: reject if inside any void's 2× radius buffer
       let voidClear = true, nearVoid = Infinity;
       for (const v of voids) {
-        const d = dist(x, y, v.x, v.y);
-        if (d < v.radius * 2) { voidClear = false; break; }
+        const d = dist(pt.x, pt.y, v.x, v.y);
+        if (d < v.radius * 1.5) { voidClear = false; break; }
         if (d < nearVoid) nearVoid = d;
       }
       if (!voidClear) continue;
       let near = Infinity;
       for (const o of this.objects) {
         if (o.eaten) continue;
-        const d = dist(x, y, o.x, o.y);
+        const d = dist(pt.x, pt.y, o.x, o.y);
         if (d < near) near = d;
       }
       const score = dPlayer * 0.15 + near + nearVoid * 0.05; // favour distant + sparse
-      if (score > bestScore) { bestScore = score; bx = x; by = y; }
+      if (score > bestScore) { bestScore = score; bx = pt.x; by = pt.y; }
     }
     if (bestScore === -Infinity) return; // no safe spot this tick; try again next
-    this.makeObj(pick(kinds, this.rand), bx, by);
+    const o = this.makeObj(pick(kinds, this.rand), bx, by);
+    o.arrive = 200;
+    this.spawnPuff(bx, by, fx);
+  }
+
+  // v8 §2: a point on the road grid (for the occasional crosswalk apple), still
+  // off the player's screen and clear of every void.
+  private roadPoint(player: Player, voids: { x: number; y: number; radius: number }[]) {
+    const m = CONFIG.MAP_SIZE;
+    for (let i = 0; i < 12; i++) {
+      const along = MARGIN + this.rand() * (m - MARGIN * 2);
+      const center = ROAD_CENTERS[Math.floor(this.rand() * ROAD_CENTERS.length)];
+      const horizontal = this.rand() < 0.5;
+      const x = horizontal ? along : center;
+      const y = horizontal ? center : along;
+      if (dist(x, y, player.x, player.y) < 520) continue;
+      if (voids.some((v) => dist(x, y, v.x, v.y) < v.radius * 1.5)) continue;
+      return { x, y };
+    }
+    return null;
+  }
+
+  // v8 §2: a small dust puff so arrivals read as "popping in"
+  private spawnPuff(x: number, y: number, fx: FXManager) {
+    fx.addCrumbs(x, y, '#D8C7A2', 6);
+  }
+
+  // v8 §3: WORLD EATER leaves a cracked-ground trail that fades over ~8s
+  dropCrack(x: number, y: number, radius: number) {
+    this.dirt.push({ x, y, r: radius * 0.45, life: 8000, maxLife: 8000 });
   }
 
   // v6 §2: golden object — 3× mass (bigger radius) and 3× score on consume.
@@ -680,6 +741,35 @@ export class WorldManager {
       o.x += (dx / d) * k;
       o.y += (dy / d) * k;
     }
+  }
+
+  // v8 §1: nudge any edibles off the round-start footprint of every void so a
+  // rival never begins the round sitting inside a cluster (which let bots pop a
+  // dozen objects in the first frame and hit 100+ score instantly). Relocates
+  // rather than deletes, so the starting population is preserved.
+  clearSpawnFootprint(voids: { x: number; y: number; radius: number }[]) {
+    const m = CONFIG.MAP_SIZE;
+    for (const o of this.objects) {
+      if (o.eaten) continue;
+      const onVoid = voids.some((v) => dist(o.x, o.y, v.x, v.y) < v.radius * 1.8 + o.size);
+      if (!onVoid) continue;
+      for (let i = 0; i < 24; i++) {
+        const nx = MARGIN + this.rand() * (m - MARGIN * 2);
+        const ny = MARGIN + this.rand() * (m - MARGIN * 2);
+        if (!voids.some((v) => dist(nx, ny, v.x, v.y) < v.radius * 2 + o.size)) {
+          o.x = nx; o.y = ny; break;
+        }
+      }
+    }
+  }
+
+  // v8 §7: METEOR SNACK SHOWER — drop an edible snack at an exact point, with a puff.
+  dropSnack(x: number, y: number, fx: FXManager) {
+    const info = CONFIG.KIND_INFO['apple'];
+    const base = (info.minR + this.rand() * (info.maxR - info.minR)) * Math.sqrt(CONFIG.GOLDEN_MASS_MULT);
+    const o = this.makeObj('apple', x, y, { golden: true, baseSize: base, size: base });
+    o.arrive = 200;
+    this.spawnPuff(x, y, fx);
   }
 
   spawnGolden(player: Player) {
@@ -707,7 +797,15 @@ export class WorldManager {
       if (v.ghost) continue;
       if (!this.canEat(v.radius, obj.size)) continue;
       const d = dist(obj.x, obj.y, v.x, v.y);
-      const range = skittish ? v.radius * 5 + 240 : v.radius * 4 + 120; // v7 §3: critters bolt early
+      const isPlayer = (v as unknown) === player;
+      // v8 §3: escalating world fear as the player's form grows.
+      let radii: number;
+      if (skittish) radii = 5;
+      else if (obj.kind === 'person') radii = (isPlayer && player.formIndex >= 2) ? 5 : 3; // GOBBLER+: scream-flee from 5
+      else radii = 4;
+      // DEVOURER+: critters evacuate the whole visible block ahead of the player
+      if (isPlayer && skittish && player.formIndex >= CONFIG.DEVOURER_FORM_INDEX) radii = 9;
+      const range = v.radius * radii + (skittish ? 240 : 120);
       if (d < range && d < threatD) { threatD = d; threat = v; }
     }
 
@@ -802,6 +900,10 @@ export class WorldManager {
     if (!playerBigger && dp < 240 && obj.honkCd <= 0 && !player.ghost) {
       audio.playHonk();
       obj.honkCd = 2200;
+    } else if (player.formIndex >= CONFIG.DEVOURER_FORM_INDEX && dp < player.radius * 4 && obj.honkCd <= 0 && !player.ghost) {
+      // v8 §3: DEVOURER+ sets off 2-note car alarms as it looms past
+      audio.carAlarm();
+      obj.honkCd = 2600;
     }
     if (playerBigger && dp < 300 && !player.ghost) {
       // flee: reverse direction away from the player along the road
@@ -850,13 +952,18 @@ export class WorldManager {
       fx.shake(300, 10, 20);
       fx.addDebris(obj.x, obj.y, '#C4736B', 4);
       fx.addDebris(obj.x, obj.y, '#F6E7B0', 2);
-      this.dirt.push({ x: obj.x, y: obj.y, r: obj.baseSize * 0.9, life: 10000, maxLife: 10000 });
     } else if (obj.kind === 'person') {
       fx.addCrumbs(obj.x, obj.y - obj.baseSize * 0.4, '#FF6FB0', 4); // hat pops off
     } else {
       fx.addCrumbs(obj.x, obj.y, CONFIG.COLORS.tierTint[obj.tier - 1] || '#FFF', 6);
     }
     fx.addRing(obj.x, obj.y, '#FFFFFF', obj.baseSize * 0.6, 220, 3, 300);
+
+    // v8 §3: every T3+ object eaten leaves a persistent scar for the whole round
+    if (obj.tier >= 3) {
+      const r = obj.baseSize * (obj.kind === 'house' ? 0.9 : 0.55);
+      this.dirt.push({ x: obj.x, y: obj.y, r, life: 1e9, maxLife: 1e9 });
+    }
 
     player.absorbObject(obj);
 
@@ -955,7 +1062,7 @@ export class WorldManager {
   }
 
   // ── v5 §3: ground-dressing layer (between ground and objects) ──
-  drawDressing(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }) {
+  drawDressing(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t = 0) {
     const inset = CONFIG.SIDEWALK;
     const inView = (x: number, y: number, pad = 20) =>
       x >= view.x - pad && x <= view.x + view.w + pad && y >= view.y - pad && y <= view.y + view.h + pad;
@@ -1045,16 +1152,17 @@ export class WorldManager {
     }
 
     // grass tufts / daisies / clover / leaves
+    const gust = wind(t); // v8 §4: shared wind so tufts lean with the world
     for (const d of this.dressTufts) {
       if (!inView(d.x, d.y)) continue;
-      this.drawTuft(ctx, d);
+      this.drawTuft(ctx, d, gust);
     }
   }
 
-  private drawTuft(ctx: CanvasRenderingContext2D, d: { x: number; y: number; type: number; rot: number; s: number; a: number }) {
+  private drawTuft(ctx: CanvasRenderingContext2D, d: { x: number; y: number; type: number; rot: number; s: number; a: number }, gust = 0) {
     ctx.save();
     ctx.translate(d.x, d.y);
-    ctx.rotate(d.rot);
+    ctx.rotate(d.rot + gust * (d.type === 0 ? 0.22 : 0.08)); // blades lean most
     ctx.scale(d.s, d.s);
     ctx.globalAlpha = d.a;
     if (d.type === 0) {
@@ -1133,6 +1241,13 @@ export class WorldManager {
       } else {
         const tilt = obj.fleeing ? Math.sin(obj.wobble * 3) * 0.16 : Math.sin(obj.wobble) * 0.04;
         ctx.rotate(tilt);
+      }
+      if (obj.arrive > 0) {
+        // v8 §2: 200ms scale-up bounce (easeOutBack overshoot) on arrival
+        const p = 1 - obj.arrive / 200;
+        const c1 = 1.70158, c3 = c1 + 1;
+        const s = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+        ctx.scale(s, s);
       }
       drawParkObject(ctx, obj.kind, obj.size, { t, fleeing: obj.fleeing, variant: obj.variant });
       ctx.restore();
