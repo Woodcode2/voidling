@@ -26,6 +26,10 @@ description: Canvas render-transform state, hot-path perf rules, and the mission
   is one `drawImage` per void. Dynamic parts (face/eyes/mouth/form layers) stay live.
 - Module/closure-scoped caches (body sprites, vignette, grain) are fine for this
   single-canvas SPA — bounded, reused, no teardown needed.
+- The fixed-step `simulate()` runs every tick too: keep per-tick logic allocation-free.
+  Derive leaderboard rank by counting `rivals` with strictly greater score (O(n), no
+  temp array/sort) rather than building+sorting a scores array each frame. **Why:** a
+  per-tick `[...].sort()` was flagged as a 60fps regression in review.
 
 ## Gameplay debug logs must be throttled
 - Effect-fired `console.log`s (spec asks each power-up to log when it fires) live in per-frame

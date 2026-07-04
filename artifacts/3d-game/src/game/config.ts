@@ -64,6 +64,7 @@ export const CONFIG = {
   FIXED_DT: 1000 / 60,   // fixed simulation step (ms)
   MAX_DT: 50,            // clamp frame delta so backgrounding never teleports
   GAME_DURATION: 180,    // v6 §1: 3-minute rounds
+  COUNTDOWN_MS: 3600,    // v8 §1: frozen "3..2..1" pre-round (1200ms per count)
 
   // ── v6 §1: match structure ──
   BOON_PICK_TIMES: [150000, 100000, 50000], // ms remaining: 2:30, 1:40, 0:50
@@ -83,7 +84,7 @@ export const CONFIG = {
   DEVOURER_FORM_INDEX: 3,        // leader decay applies above this form
 
   // ── v6 §2: respawn + catch-up ──
-  RESPAWN_TARGET_FRAC: 0.85,     // keep world ≥85% of initial population
+  RESPAWN_TARGET_FRAC: 0.90,     // v8 §2: keep world ≥90% of initial population
   RESPAWN_RATE_MIN: 2,           // objects/sec
   RESPAWN_RATE_MAX: 4,
   GOLDEN_START_MS: 165000,       // 2:45 remaining — golden objects begin
@@ -187,7 +188,7 @@ export const CONFIG = {
   WATERTOWER_EAT_RADIUS: 300,
 
   // Audio master levels — v5 §5 (debug-panel adjustable)
-  MUSIC_GAIN: 0.35,
+  MUSIC_GAIN: 0.3,
   SFX_GAIN: 1,
 
   // Rivals
@@ -310,9 +311,10 @@ export const CONFIG = {
     { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#C42A2A', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
     // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
     { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#241155', glowColor: '#8A6BFF', eyeStyle: 'normal', accessories: ['sparkleTrail'] },
-    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#5A1414', glowColor: '#FF7A2B', eyeStyle: 'angry', accessories: ['horns'] },
+    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#3A0D0D', glowColor: '#FF7A2B', eyeStyle: 'angry', accessories: [] },
     { id: 'ghost',     name: 'Ghost',     cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#DDE6F2', glowColor: '#BFE6FF', eyeStyle: 'normal', accessories: [] },
     { id: 'midas',     name: 'King Midas', cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#C99A17', glowColor: '#FFD23F', eyeStyle: 'normal', accessories: ['tiara'] },
+    { id: 'disco',     name: 'Disco',     cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#241A3A', glowColor: '#FF5AF0', eyeStyle: 'normal', accessories: [] },
   ] as SkinDef[],
 
   // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)

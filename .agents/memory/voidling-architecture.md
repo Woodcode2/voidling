@@ -21,7 +21,11 @@ React DOM renders menus (`ui/UILayer.tsx`); the canvas renders the arena + HUD o
 ## Cross-round state
 - `start()` must reset every accumulator or state leaks between rounds: `roundElapsed`, `slowmo`, `paused`, `coinBonus`, fx buffers (particles/texts/**rings**), and snap the camera onto the player.
 - **Finale coins**: accrue to `coinBonus` only; the single grant happens in `endRound` (`coins = base + coinBonus`). Do NOT also `meta.addCoins` in the finale trigger — that double-awards.
-- **Pause must freeze all time-based systems**, not just `simulate`: gate `slowmo` decay, `fx.update`, and HUD banner-lifetime decrements behind `!paused`.
+- **Pause must freeze all time-based systems**, not just `simulate`: gate `slowmo` decay, `fx.update`, and callout/border-pulse phase timers behind `!paused`.
+
+## Callouts (single-active queue)
+- `banner(text, color, priority?, opts?)` in `engine.ts` does NOT draw a stacked list anymore — it enqueues into one priority-ordered queue that shows ONE callout at a time (bouncy scale-in / hold / whoosh-out). Everything (form titles, CHOMPED, synergy, event warnings, streak ladder, personal-best, rank changes) routes through it so nothing overlaps. Do not reintroduce a parallel banner array. Dedupe is text-based; queue bounded to 5 (lowest priority pruned).
+- **Why:** stacked banners overlapped/flickered; v8 spec requires one clean managed callout.
 
 ## Camera
 Center-based with `CAM_LERP` follow + `CAM_DEADZONE` (screen px → world via `/zoom`) and `ZOOM_LERP` toward `PLAYER_SCREEN_TALL/(2·radius)`. Render transform: `translate(fw/2+shake, fh/2+shake); scale(zoom); translate(-camCenter)`. `fx.draw(ctx)` runs INSIDE that transform (world space); `fx.drawFlash` runs after (screen space).

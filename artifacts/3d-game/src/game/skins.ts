@@ -10,6 +10,21 @@ function has(skin: SkinDef, a: AccessoryType) {
 
 // ── BACK (behind body) ───────────────────────────────────────────────────────
 export function drawSkinBack(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number) {
+  // v8 §8: GHOST — a wavering scalloped tail trailing below the body
+  if (skin.id === 'ghost') {
+    const wig = Math.sin(t / 320) * r * 0.14;
+    ctx.save();
+    ctx.fillStyle = 'rgba(220,235,250,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.72, r * 0.35);
+    ctx.quadraticCurveTo(-r * 0.3, r * 1.15, -r * 0.28 + wig, r * 1.5);
+    ctx.quadraticCurveTo(-r * 0.16 + wig, r * 1.2, 0 + wig, r * 1.45);
+    ctx.quadraticCurveTo(r * 0.16 + wig, r * 1.2, r * 0.28 + wig, r * 1.5);
+    ctx.quadraticCurveTo(r * 0.3, r * 1.15, r * 0.72, r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
   if (has(skin, 'sparkleTrail')) {
     for (let i = 0; i < 5; i++) {
       const a = t / 500 + i * 1.3;
@@ -231,6 +246,143 @@ export function drawSkinFront(ctx: CanvasRenderingContext2D, skin: SkinDef, r: n
       ctx.stroke();
     }
   }
+
+  // v8 §8: premium front glints/particles (over the face)
+  if (skin.id === 'midas') {
+    const spots = [[-r * 0.5, -r * 0.3], [r * 0.45, r * 0.1], [r * 0.1, -r * 0.55]];
+    for (let i = 0; i < spots.length; i++) {
+      const tw = (Math.sin(t / 240 + i * 2.1) + 1) * 0.5;
+      if (tw > 0.55) drawStar(ctx, spots[i][0], spots[i][1], r * 0.12 * tw, '#FFF6C0');
+    }
+  }
+  if (skin.id === 'lava') {
+    ctx.save();
+    for (let i = 0; i < 6; i++) {
+      const p = ((t / 950) + i / 6) % 1;
+      const ex = Math.sin(i * 3.1 + t / 420) * r * 0.6;
+      const ey = r * 0.5 - p * r * 1.9;
+      ctx.globalAlpha = (1 - p) * 0.85;
+      ctx.fillStyle = i % 2 ? '#FFB03A' : '#FF5A1E';
+      ctx.beginPath(); ctx.arc(ex, ey, r * 0.075 * (1 - p * 0.5), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (skin.id === 'disco') {
+    for (let i = 0; i < 3; i++) {
+      const tw = (Math.sin(t / 200 + i * 2.4) + 1) * 0.5;
+      if (tw > 0.6) drawStar(ctx, (i - 1) * r * 0.55, -r * 0.5 + i * r * 0.25, r * 0.1 * tw, '#FFFFFF');
+    }
+  }
+}
+
+// ── BODY SURFACE (over the flat body sprite, clipped to the orb) ──────────────
+// v8 §8: premium skins get living, powerful surfaces — nebulae, molten crust,
+// gold sheen, disco facets — all animated so they read in shop cards, the preview
+// modal, in-game, and on rival bots (every path renders through drawVoidling).
+export function drawSkinBody(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number) {
+  switch (skin.id) {
+    case 'galaxy': return galaxyBody(ctx, r, t);
+    case 'lava': return lavaBody(ctx, r, t);
+    case 'midas': return midasBody(ctx, r, t);
+    case 'disco': return discoBody(ctx, r, t);
+  }
+}
+
+function clipBody(ctx: CanvasRenderingContext2D, r: number) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.clip();
+}
+
+function galaxyBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  const rot = t / 3400;
+  for (let i = 0; i < 4; i++) {
+    const a = rot + (i / 4) * Math.PI * 2;
+    const bx = Math.cos(a) * r * 0.38, by = Math.sin(a) * r * 0.38;
+    const col = i % 2 ? '138,107,255' : '255,90,190';
+    const grad = ctx.createRadialGradient(bx, by, 0, bx, by, r * 0.95);
+    grad.addColorStop(0, `rgba(${col},0.55)`);
+    grad.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(bx, by, r * 0.95, 0, Math.PI * 2); ctx.fill();
+  }
+  for (let i = 0; i < 11; i++) {
+    const sa = i * 2.39917, sr = ((i * 37) % 100) / 100 * r * 0.88;
+    const sx = Math.cos(sa) * sr, sy = Math.sin(sa * 1.3) * sr;
+    const tw = (Math.sin(t / 300 + i) + 1) * 0.5;
+    ctx.globalAlpha = 0.35 + tw * 0.6;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(sx, sy, r * 0.028 + tw * r * 0.015, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function lavaBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  const pulse = 0.5 + Math.sin(t / 380) * 0.5;
+  // hot pool glowing up from the bottom
+  const g = ctx.createLinearGradient(0, -r * 0.2, 0, r);
+  g.addColorStop(0, 'rgba(255,120,20,0)');
+  g.addColorStop(1, `rgba(255,90,10,${0.35 + pulse * 0.35})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+  // molten cracks
+  ctx.strokeStyle = `rgba(255,${110 + pulse * 90 | 0},40,0.85)`;
+  ctx.lineWidth = Math.max(2, r * 0.07);
+  ctx.lineCap = 'round';
+  for (let v = 0; v < 3; v++) {
+    ctx.beginPath();
+    let px = -r * 0.75, py = (v - 1) * r * 0.42;
+    ctx.moveTo(px, py);
+    for (let k = 1; k <= 5; k++) {
+      px += r * 0.34;
+      py += Math.sin(t / 480 + v * 2.1 + k) * r * 0.16;
+      ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function midasBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  // diagonal sheen sweeping across the gold
+  const cx = (((t / 1500) % 1) * 2 - 1) * r * 1.6;
+  ctx.translate(cx, 0);
+  ctx.rotate(-0.5);
+  const g = ctx.createLinearGradient(-r * 0.4, 0, r * 0.4, 0);
+  g.addColorStop(0, 'rgba(255,240,180,0)');
+  g.addColorStop(0.5, 'rgba(255,250,215,0.8)');
+  g.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(-r * 0.4, -r * 1.6, r * 0.8, r * 3.2);
+  ctx.restore();
+}
+
+function discoBody(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  ctx.save();
+  clipBody(ctx, r);
+  // rotating colored light patches
+  const cols = ['#FF4D6D', '#4DD2FF', '#FFE04D', '#7A5CFF', '#4DFF9E'];
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 5; i++) {
+    const a = t / 620 + (i / 5) * Math.PI * 2;
+    const bx = Math.cos(a) * r * 0.48, by = Math.sin(a) * r * 0.48;
+    ctx.fillStyle = cols[i];
+    ctx.beginPath(); ctx.arc(bx, by, r * 0.3, 0, Math.PI * 2); ctx.fill();
+  }
+  // mirror-ball facet grid
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = Math.max(1, r * 0.02);
+  const step = r * 0.34;
+  for (let gx = -r; gx <= r; gx += step) { ctx.beginPath(); ctx.moveTo(gx, -r); ctx.lineTo(gx, r); ctx.stroke(); }
+  for (let gy = -r; gy <= r; gy += step) { ctx.beginPath(); ctx.moveTo(-r, gy); ctx.lineTo(r, gy); ctx.stroke(); }
+  ctx.restore();
 }
 
 function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string) {

@@ -10,6 +10,10 @@ function ow(r: number) {
 }
 
 // deterministic palette pick
+// v8 §4: one global wind oscillator (~6s period, −1..1) so the whole world
+// breathes together — every organic sway reads from this same value.
+export function wind(t: number) { return Math.sin(t * (Math.PI * 2 / 6000)); }
+
 function pick<T>(arr: T[], variant: number) {
   return arr[Math.abs(variant) % arr.length];
 }
@@ -39,7 +43,7 @@ function drawApple(ctx: CanvasRenderingContext2D, r: number, _t: number) {
 function drawFlower(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 0) {
   const o = ow(r);
   const petal = pick(['#FF6FB0', '#FFD23F', '#8ECBFF', '#FF8A5C', '#C9A6FF'], variant);
-  const sway = Math.sin(t / 700 + variant) * 0.12;
+  const sway = wind(t) * 0.18 + Math.sin(t / 700 + variant) * 0.03; // v8 §4 wind lean + tiny bob
   ctx.save();
   ctx.rotate(sway);
   for (let i = 0; i < 6; i++) {
@@ -111,9 +115,10 @@ function drawDog(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = 
   ctx.rotate(wag);
   sticker(ctx, (c) => roundRectPath(c, -r * 0.12, -r * 0.6, r * 0.24, r * 0.6, r * 0.12), body, { outline: o });
   ctx.restore();
-  // legs
-  for (const lx of [-0.4, 0.35]) {
-    sticker(ctx, (c) => roundRectPath(c, r * lx, r * 0.35, r * 0.22, r * 0.5, r * 0.08), dark, { outline: o, shadow: false });
+  // v8 §4: trot cycle — legs swing fore/aft in opposite phase
+  const trot = Math.sin(t / (fleeing ? 90 : 150)) * r * 0.16;
+  for (const l of [{ x: -0.4, s: trot }, { x: 0.35, s: -trot }]) {
+    sticker(ctx, (c) => roundRectPath(c, r * l.x + l.s, r * 0.35, r * 0.22, r * 0.5, r * 0.08), dark, { outline: o, shadow: false });
   }
   // body
   stickerEllipse(ctx, -r * 0.05, r * 0.1, r * 0.7, r * 0.52, body, 0, { outline: o });
@@ -135,12 +140,23 @@ function drawPerson(ctx: CanvasRenderingContext2D, r: number, t: number, variant
   const shirt = pick(['#FF3D68', '#2D9CDB', '#33C46B', '#FF9F1C', '#9B5DE5'], variant);
   const skin = pick(['#F4C79B', '#E0A876', '#C98A5B', '#FBD9B8'], variant + 1);
   const hair = pick(['#3A2A1E', '#1A1A22', '#7A4A2B', '#E8C15A'], variant + 2);
-  const swing = Math.sin(t / (fleeing ? 120 : 320)) * r * 0.12;
-  // legs
-  sticker(ctx, (c) => roundRectPath(c, -r * 0.28, r * 0.25, r * 0.22, r * 0.6 + swing, r * 0.08), '#3B4A63', { outline: o });
-  sticker(ctx, (c) => roundRectPath(c, r * 0.06, r * 0.25, r * 0.22, r * 0.6 - swing, r * 0.08), '#3B4A63', { outline: o, shadow: false });
+  const leg = '#3B4A63';
+  // v8 §4: real walk cycle — alternating legs, opposite arm swing, 2px vertical bob
+  const ph = t / (fleeing ? 120 : 320);
+  const stride = Math.sin(ph) * r * 0.2;           // fwd/back leg offset
+  const armA = -stride * 0.9;                        // arms swing opposite the legs
+  const bob = Math.abs(Math.sin(ph)) * r * 0.09;    // ~2px vertical bounce
+  ctx.save();
+  ctx.translate(0, -bob);
+  // back arm (behind body, drawn first)
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.52 + armA, -r * 0.3, r * 0.16, r * 0.5, r * 0.07), skin, { outline: o, shadow: false });
+  // legs (one forward, one back)
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.26 + stride, r * 0.25, r * 0.2, r * 0.6, r * 0.08), leg, { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, r * 0.06 - stride, r * 0.25, r * 0.2, r * 0.6, r * 0.08), leg, { outline: o, shadow: false });
   // body
   sticker(ctx, (c) => roundRectPath(c, -r * 0.4, -r * 0.35, r * 0.8, r * 0.72, r * 0.2), shirt, { outline: o });
+  // front arm (over body)
+  sticker(ctx, (c) => roundRectPath(c, r * 0.36 - armA, -r * 0.3, r * 0.16, r * 0.5, r * 0.07), skin, { outline: o, shadow: false });
   // head
   stickerCircle(ctx, 0, -r * 0.62, r * 0.34, skin, { outline: o });
   // hair cap
@@ -152,6 +168,7 @@ function drawPerson(ctx: CanvasRenderingContext2D, r: number, t: number, variant
   const ey = -r * 0.6;
   dot(ctx, -r * 0.11, ey, fleeing ? r * 0.07 : r * 0.05, '#1A0B33');
   dot(ctx, r * 0.11, ey, fleeing ? r * 0.07 : r * 0.05, '#1A0B33');
+  ctx.restore();
 }
 
 function drawBench(ctx: CanvasRenderingContext2D, r: number, _t: number) {
@@ -170,7 +187,7 @@ function drawBench(ctx: CanvasRenderingContext2D, r: number, _t: number) {
 }
 
 function drawBush(ctx: CanvasRenderingContext2D, r: number, t: number) {
-  const sway = Math.sin(t / 900) * r * 0.03;
+  const sway = wind(t) * r * 0.05; // v8 §4 wind
   const g = '#2FA55A';
   // v5 §6: unified silhouette — no white seams between the three lobes
   silhouette(ctx, [
@@ -188,13 +205,28 @@ function drawCar(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 
   const o = ow(r);
   const body = pick(['#FF3D68', '#2D9CDB', '#FFD23F', '#9B5DE5', '#33C46B'], variant);
   const roll = t / 400;
-  // wheels
+  // v8 §4: 1px suspension bob + puff of exhaust every ~2s
+  const bob = Math.sin(t / 220) * r * 0.03;
+  const puff = ((t % 2000) / 2000);
+  if (puff < 0.35) {
+    ctx.save();
+    ctx.globalAlpha = (0.35 - puff) * 0.8;
+    ctx.fillStyle = '#B9BCC6';
+    ctx.beginPath();
+    ctx.arc(-r * 0.95 - puff * r * 0.6, r * 0.28, r * 0.12 + puff * r * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.translate(0, bob);
+  // wheels — rim notch makes rotation clearly visible
   for (const wx of [-0.52, 0.52]) {
     stickerCircle(ctx, r * wx, r * 0.42, r * 0.24, '#22222C', { outline: o });
     ctx.save();
     ctx.translate(r * wx, r * 0.42);
     ctx.rotate(roll);
     dot(ctx, 0, 0, r * 0.1, '#C9CCD6');
+    ctx.fillStyle = '#5A5E6B';
+    ctx.fillRect(-r * 0.03, -r * 0.2, r * 0.06, r * 0.2); // notch spoke
     ctx.restore();
   }
   // body lower
@@ -220,7 +252,7 @@ function drawCar(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 
 }
 
 function drawTree(ctx: CanvasRenderingContext2D, r: number, t: number) {
-  const sway = Math.sin(t / 1100) * r * 0.04;
+  const sway = wind(t) * r * 0.06 + Math.sin(t / 1100) * r * 0.01; // v8 §4 unified wind sway
   const green = '#33B463';
   // v5 §6: trunk + canopy share ONE silhouette (drawn back-to-front for fills)
   silhouette(ctx, [
@@ -344,7 +376,7 @@ function drawFlowerpot(ctx: CanvasRenderingContext2D, r: number, t: number, vari
   }, '#C86B3C', { outline: o });
   sticker(ctx, (c) => roundRectPath(c, -r * 0.62, -r * 0.02, r * 1.24, r * 0.24, r * 0.08), '#E07C46', { outline: o, shadow: false });
   // little bloom
-  const sway = Math.sin(t / 700 + variant) * 0.1;
+  const sway = wind(t) * 0.14 + Math.sin(t / 700 + variant) * 0.03; // v8 §4 wind
   ctx.save();
   ctx.translate(0, -r * 0.2);
   ctx.rotate(sway);

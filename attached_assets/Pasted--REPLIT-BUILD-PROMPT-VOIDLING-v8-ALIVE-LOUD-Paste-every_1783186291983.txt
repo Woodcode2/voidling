@@ -1,0 +1,84 @@
+# REPLIT BUILD PROMPT — VOIDLING v8: ALIVE & LOUD
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are fine-tuning VOIDLING's feel, sound, and fantasy. Work the sections **in order**; before reporting done, verify every Acceptance Criteria line on the running game and explicitly confess anything skipped. Standing rules hold: 60fps, portrait, canvas-drawn everything, one art style, no shadowBlur on characters, auras never past radius + 40px.
+
+## 1 — Round start fairness + countdown
+
+- **Bug hunt first:** bots currently show 100+ score within 2 seconds of round start. Find why (early ticks, pre-round eating, score carryover, or inflated bot scoring) and fix it.
+- Add a **round-start countdown**: world visible but frozen, "3… 2… 1…" in giant Fredoka with beeps, then **"EAT!"** slams in with a burst and everyone unfreezes simultaneously. Nobody — player or bot — may move or score during it.
+
+## 2 — Spawn economy v3 (kill scarcity, place food properly)
+
+- Population floor rises to **90%** of initial; respawn rate scales with deficit: 4/s normally, up to 8/s when below 80%.
+- **Placement zones:** T1–T2 respawns go to lawns, sidewalks, park, and plaza — never on road asphalt (roads get only vehicles and the occasional crosswalk apple, max 5% of spawns). Never within 1.5× radius of any void, never on-screen for the player.
+- **Visible arrival:** respawned objects pop in with a 200ms scale-up bounce and a tiny dust puff. Players should regularly *see* food arriving — that's what kills the scarce feeling.
+
+## 3 — THE WORLD EATER FANTASY (make scale felt)
+
+- **Rampage consumption:** growth stays on the diminishing curve (do not touch balance), but at DEVOURER and above, T1–T2 objects skip the suction pull entirely — they vanish instantly on contact in rapid-fire streams (max 10 pops/second, pitch ladder racing). Plowing through a flowerbed should sound like popcorn. Spectacle scales even though growth doesn't.
+- **% OF TOWN DEVOURED:** track total edible mass consumed by the PLAYER vs the map's initial mass. Show it small under the score ("12% DEVOURED"), big on the results screen, and on the share card. This is the stat that says *you ate a place*.
+- **Escalating world fear, per form:** MUNCHER — nothing new. GOBBLER — people scream-flee from 5 radii instead of 3. DEVOURER — car alarms chirp (2-note synth) as you pass within 4 radii; birds evacuate the whole visible block. WORLD EATER — constant subtle screen rumble (1px, only while moving), nearby houses tremble, streetlights flicker, and your path leaves a cracked-ground trail that fades over 8 seconds.
+- **Persistent scars:** every T3+ object eaten leaves a subtle mark (flattened grass patch, dirt oval, crack) that persists all round. By the final 30 seconds, the town must look visibly devoured wherever the players have been.
+
+## 4 — ALIVE pass (kill the cutout feel)
+
+- **Global wind system:** one wind value oscillating slowly (strength 0–1, period ~6s). Tree canopies sway ±2°, flowers and grass tufts bob and lean, clotheslines flutter, pond ripples drift. Everything organic moves a little, always, from the same wind — the whole world breathes together.
+- **People v2:** real walk cycle (alternating legs, opposite arm swing, 2px vertical bob). Variety generator: 4 shirt colors × 3 hair styles × 3 skin tones × occasional hat; 20% are kids (smaller, faster, higher flee squeal). Idle behaviors: stop and check phone (3s), wave at a passing person, sit on benches.
+- **Dogs:** trot cycle with visible leg motion, sniff-the-ground idle, and occasionally chase a squirrel for 3 seconds.
+- **Cars:** wheels visibly rotate (rim notch), body has 1px suspension bob, small exhaust puffs every 2s, slight lean into turns.
+- Fleeing anything drops its idle and runs with proper panic animation. Reaction and locomotion are what make it alive — no static sliding allowed anywhere.
+
+## 5 — Audio v3 (modern, layered, loud where it counts)
+
+- **Music rebuilt** — modern hyper-casual driver, not 1980s arcade: 120 BPM, four-on-the-floor kick (soft 55Hz sine thump), off-beat bass line, bright plucky lead (triangle, fast decay, delay echo), hi-hats. **Layers unlock by the player's evolution form:** VOIDLING = kick + hats; MUNCHER adds bass; GOBBLER adds pluck lead; DEVOURER adds a counter-melody + energy; WORLD EATER adds a low sub-rumble drone. The soundtrack literally grows with you. Duck under banners as before; master gain 0.3.
+- **Eat sound v3:** transient click (2ms noise) + 90Hz sine punch (50ms, fast decay) + short pitch-down blip carrying the ladder + faint sub thump on T3+. It should feel percussive in the chest, not a chime. Rampage streams at DEVOURER+ rapid-fire these with the ladder racing upward.
+- **Evolution sting (killer):** 400ms white-noise riser sweeping up → impact boom (55Hz sine + noise burst, screen flash synced) → triumphant 3-chord stab with echo tail → 1s shimmer. Music layer for the new form drops in exactly on the boom.
+- New stingers: countdown beeps + EAT! hit, callout whooshes (section 6), car alarm chirp, meteor impact thumps.
+
+## 6 — Callout system (arcade pop-ups)
+
+One managed component: center-top stamped banners in Fredoka, bouncy scale-in, 900ms hold, whoosh-out; queue max 1 at a time, priority ordered. Triggers:
+
+- **NEW PERSONAL BEST!** (gold, sparkles) — the moment the run's score passes the stored best, once per round.
+- **YOU'RE #1!** / **TOP 3!** — on overtaking into those leaderboard positions (once each per round). Losing #1 gets a small red "OVERTAKEN!"
+- **Eat-streak ladder** (absorbs within 1.2s chains): 5 = **DOUBLE BITE!**, 10 = **FEAST!**, 15 = **RAMPAGE!** (with screen border pulse). Resets on a 1.2s gap.
+- Existing form titles, CHOMPED banners, synergy banners, and event warnings route through this same system so they never overlap or stack.
+
+## 7 — Events v2.1 (variety + fair targeting)
+
+- **Targeting rule:** SHRINK STORM targets the current leader, but never the same void twice in a row; if 1st and 2nd place are within 15%, pick randomly between them.
+- **Event pool:** each round draws 2 scheduled events (at ~2:05 and ~1:10) from: GOLDEN RUSH, SHRINK STORM, **METEOR SNACK SHOWER** (new — 10 seconds of snacks falling with drop shadows and impact puffs across the map, edible by everyone, bots scramble for them), and **FRENZY MINUTE** (new — for 15s all absorbs count double toward streaks and score ×1.25, screen edges glow warm). TOWN FIGHTS BACK stays triggered by any WORLD EATER, unchanged.
+- No two rounds in a row may draw the identical event pair.
+
+## 8 — Premium skins: redesigned to feel POWERFUL (coin skins sell cute; premium sells power)
+
+Rebuild all premium skin rendering — effects must run live **in the shop cards and preview modal**, not just in-game. Premium cards get a slowly pulsing gold border and larger portraits.
+
+- **GALAXY $2.99:** deep indigo body containing an actual swirling nebula — 3 soft colored blobs (magenta/cyan/violet) drifting inside a body mask — 8 twinkling stars inside, one tiny comet orbiting with a fading tail, pink-violet rim light. Flavor: "Contains one (1) universe."
+- **LAVA $1.99:** near-black body with bright orange crack lines that pulse-glow on a 1.5s cycle, embers continuously rising and fading above it, eyes glow warm orange. Remove the current antler-looking artifacts entirely. Flavor: "Do not touch. Will anyway."
+- **GHOST $1.99:** 60% opacity body with a subtly wavering sine edge, two trailing wisps that lag its movement, a detached shadow floating 6px below (it hovers), and a brief 20%-opacity phase flicker every ~5s. Flavor: "Technically not here."
+- **KING MIDAS $2.99:** metallic gold body with a diagonal sheen sweep passing every 2s, a proper jeweled crown (3 points, 3 gems), coin sparkles shedding as it moves. Flavor: "Everything he eats turns to profit."
+- **DISCO $2.99 (new):** mirror-ball facet grid on the body, 6 small rainbow light dots slowly sweeping the ground around it, tiny music-note particles while moving. Flavor: "The party is mandatory."
+- All five render their full effects on bots when bots wear them (bots may wear premium — that's the ad).
+
+## Acceptance criteria — verify every line on a real phone
+
+- Countdown freezes everyone; at "EAT!" all six scores are exactly 0. No bot has 100+ score in the first 5 seconds.
+- Play to 0:15 remaining: food is visibly present everywhere; respawns pop in with bounce+puff on lawns/sidewalks, not scattered across roads.
+- Reach DEVOURER: driving through a flowerbed pops objects instantly in a rapid stream; car alarms chirp as you pass; the "% DEVOURED" stat ticks under the score. At WORLD EATER: screen rumbles while moving, cracked trail appears and fades, houses tremble nearby. Eaten T3+ objects leave visible marks that persist; the endgame town looks chewed.
+- The world moves at idle: trees sway, flowers bob, clotheslines flutter — record 5 seconds of an untouched area and confirm nothing is static. People walk with legs/arms/bob and show idles; dogs trot and sniff; car wheels turn.
+- Music: audibly gains a layer at each evolution (test by evolving twice in one round); WORLD EATER adds sub-rumble; eating thumps rather than chimes; the evolution sting lands riser→boom→stab with the new music layer on the boom.
+- Callouts: NEW PERSONAL BEST fires once when passing best; overtaking into #1 stamps YOU'RE #1!; a 15-chain stamps RAMPAGE! with border pulse; no two callouts ever render simultaneously.
+- Across 3 rounds: the SHRINK STORM never hits the same void twice consecutively; at least 3 different events appear; METEOR SNACK SHOWER rains visibly and bots scramble.
+- Shop: all five premium skins run their live effects inside their cards and the preview modal; LAVA has zero antler artifacts; DISCO's rainbow dots sweep the ground; bots occasionally appear in-game wearing premium skins with full effects.
+- Steady 60fps during a rampage stream + event + music at full layers; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Balance curves from v7 (starts, diminishing growth, caps, decay), networking, iOS wrap, real payments, Daily Bite logic, debug panel (keep working).
+
+Work strictly in order 1→8, then self-audit against the acceptance list and report deviations explicitly.
