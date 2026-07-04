@@ -1,6 +1,7 @@
 import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
+import { objectSprites } from './sprites'; // v11: world-object PNG art
 import { audio } from './audio';
 import type { FXManager } from './fx';
 import type { Player } from './player';
@@ -1385,7 +1386,48 @@ export class WorldManager {
         const s = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
         ctx.scale(s, s);
       }
-      drawParkObject(ctx, obj.kind, obj.size, { t, fleeing: obj.fleeing, variant: obj.variant });
+      // v11: PNG sprite replaces procedural drawing when present
+      const r = obj.size;
+      let spriteKey: string | null = null;
+      if (obj.kind === 'house') {
+        // Use obj.id (not variant) for the A/B/procedural split so that color variant
+        // is fully available to procedural houses regardless of sprite loading state.
+        const houseChoice = obj.id % 3; // 0 → house_a, 1 → house_b, 2 → procedural
+        spriteKey = houseChoice === 0 ? 'house_a' : houseChoice === 1 ? 'house_b' : null;
+      } else {
+        spriteKey = obj.kind; // matches objectSprites keys (tree, bush, gnome …)
+      }
+      const objSprite = spriteKey ? objectSprites.get(spriteKey) : undefined;
+
+      if (objSprite) {
+        // Drop shadow only for grounded objects — captured objects have the v10 §3
+        // planted shadow at obj.shadowX/Y; drawing one here would rotate with the tumble.
+        if (!obj.captured) {
+          ctx.save();
+          ctx.fillStyle = CONFIG.COLORS.shadow;
+          ctx.beginPath();
+          ctx.ellipse(2, 3, r * 0.7, r * 0.22, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        if (obj.captured) {
+          // During tumble: draw centered so it spins around its visual centre
+          ctx.drawImage(objSprite, -r, -r, r * 2, r * 2);
+        } else if (obj.kind === 'tree' || obj.kind === 'bush') {
+          // Foliage: bottom-anchored + ±2° global wind sway around ground point
+          const sway = wind(t) * (2 * Math.PI / 180);
+          ctx.save();
+          ctx.rotate(sway);
+          ctx.drawImage(objSprite, -r, -r * 2, r * 2, r * 2);
+          ctx.restore();
+        } else {
+          // All others: bottom-anchored (base = obj.y, sprite extends 2r upward)
+          ctx.drawImage(objSprite, -r, -r * 2, r * 2, r * 2);
+        }
+      } else {
+        drawParkObject(ctx, obj.kind, obj.size, { t, fleeing: obj.fleeing, variant: obj.variant });
+      }
       ctx.restore();
 
       // "!" alert bubble over fleeing people

@@ -83,3 +83,12 @@ description: Canvas render-transform state, hot-path perf rules, and the mission
 - `lastScoreText: FloatingText | null` ref mutated directly: `lastScoreText.text = '+N'`.
 - Rolling 150ms window: `lastScoreMs` resets on EVERY merge, not just on creation.
 - Score events pushed by `player.absorbObject`; engine drains `pendingFx` once per frame.
+
+## v11 world-object sprite pipeline
+- `objectSprites: Map<string, HTMLImageElement>` in sprites.ts; preloads from `assets/objects/`.
+- **House A/B/procedural selection uses `obj.id % 3`** (NOT variant) so procedural houses still cycle all 5 color variants (`obj.variant` [0..4] passed through unchanged to drawHouse).
+- Bottom-anchored sprites: `ctx.drawImage(sprite, -r, -r*2, r*2, r*2)` — base at obj.y, extends 2r up.
+- During capture (tumble): draw centered `(-r,-r,2r,2r)` so it spins around visual centre.
+- Drop shadow skipped during capture — v10 §3 planted shadow at obj.shadowX/Y covers that case.
+- Wind sway (tree/bush): extra `wind(t) * 2° * Math.PI/180` rotate inside extra save/restore, on top of normal tilt.
+- Orbit chips call `drawParkObject` directly from player.ts — unaffected by this path.

@@ -1,0 +1,34 @@
+# REPLIT BUILD PROMPT — VOIDLING v11: WORLD-OBJECT SPRITES
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are extending the v10 asset pipeline to world objects. Same rules as the skin pipeline: graceful fallback, no per-frame decoding, 60fps. Animated creatures (people, dogs, cats, ducks, squirrels, birds) and vehicles stay fully procedural — do not touch them.
+
+## 1 — Object sprite loader
+
+- Create `/assets/objects/`. At boot, attempt to preload a PNG for each of these object type ids, exactly these filenames:
+  `house_a.png, house_b.png, tree.png, bush.png, gnome.png, bench.png, hydrant.png, mailbox.png, trashcan.png, foodcart.png, fountain.png, watertower.png`
+- **If a PNG exists:** render it instead of the procedural drawing for that type. **If missing:** procedural fallback, silently. Extend the boot log to list object assets loaded vs fallback.
+- Houses alternate between `house_a` and `house_b` (plus the existing procedural color variants for any lots beyond two when sprites are active — a lot may randomly pick sprite A, sprite B, or a procedural variant so streets don't repeat).
+
+## 2 — Sprite rendering rules
+
+- **Bottom-anchored:** the sprite's base sits at the object's ground position; y-sorting uses that base so voids and creatures pass in front/behind correctly.
+- The engine's offset shadow still draws **beneath** the sprite (same SE direction as everything else). Do not rely on any shadow baked into the art.
+- Scale each sprite to its type's tier size (same footprint as the procedural version — collision, absorb thresholds, and suction ranges are unchanged; sprites are visual only).
+- **Wind:** `tree.png` and `bush.png` sway ±2° around their bottom anchor with the global wind, same as procedural foliage.
+- Eat behavior unchanged: sprites tumble/rotate through the fall-in animation, houses still shake and shed debris chunks before spiraling in, scars still appear.
+- Orbit chips keep their simplified procedural mini-icons — painted sprites turn to mud at 14px. Do not scale object sprites into chips.
+
+## 3 — Acceptance criteria
+
+- Boot log lists all 12 object assets; with an empty folder the world renders exactly as v10.
+- Drop `tree.png` alone: trees render the sprite, sway with wind, y-sort correctly (a void passes in front when below, behind when above), tumble on absorb; everything else stays procedural.
+- With all 12 dropped: mixed streets show sprite houses A/B plus procedural variants; shadows sit under sprites in the same direction as everything else; collision and absorb feel identical to before.
+- 60fps at full population with all sprites active; zero console errors across 3 rounds.
+
+## Out of scope
+
+People/animal/vehicle rendering, balance, ground, everything else. This is plumbing only.
