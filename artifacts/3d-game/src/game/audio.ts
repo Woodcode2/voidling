@@ -204,7 +204,44 @@ export const audio = {
     this.playTone(800, 'sine', 0.2, 0.1, 0.1);
   },
 
-  // ── procedural background music (104 BPM, C major, 8-bar loop) ─────────────────
+  // v6 §10: evolution — rising 4-note fanfare
+  playEvolve() {
+    if (!this.sfxOn || !this.ctx) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C E G C
+    notes.forEach((f, i) => {
+      this.playTone(f, 'triangle', 0.28, 0.16, i * 0.09);
+      this.playTone(f * 2, 'sine', 0.2, 0.05, i * 0.09);
+    });
+    if (this.ctx) this._noise(this.ctx.currentTime + 0.36, 0.3, 'bandpass', 700, 2, 0.1, 5000);
+  },
+
+  // v6 §10: world event — attention-grabbing two-note horn
+  playEvent() {
+    if (!this.sfxOn || !this.ctx) return;
+    this.playTone(392, 'sawtooth', 0.24, 0.12);
+    this.playTone(523.25, 'sawtooth', 0.34, 0.12, 0.2);
+  },
+
+  // v6 §10: win — a short crowd-cheer swell (filtered noise)
+  playWin() {
+    if (!this.sfxOn || !this.ctx || !this._noiseBuf || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuf; src.loop = true;
+    const filt = this.ctx.createBiquadFilter();
+    filt.type = 'bandpass'; filt.frequency.setValueAtTime(900, now);
+    filt.frequency.linearRampToValueAtTime(1600, now + 0.7);
+    filt.Q.value = 0.8;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(0.18, now + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+    src.connect(filt); filt.connect(g); g.connect(this.sfxGain);
+    src.start(now); src.stop(now + 1.5);
+    [523.25, 659.25, 783.99].forEach((f, i) => this.playTone(f, 'triangle', 0.5, 0.1, i * 0.05));
+  },
+
+  // ── procedural background music (v6 §10: 96 BPM marimba, C major, 8-bar loop) ──
   startMusic() {
     this.init();
     if (!this.ctx || this._musicPlaying) return;
@@ -245,7 +282,7 @@ export const audio = {
 
   _musicScheduler() {
     if (!this.ctx) return;
-    const eighth = (60 / 104) / 2; // seconds per 8th note
+    const eighth = (60 / 96) / 2; // seconds per 8th note (96 BPM)
     while (this._nextStepTime < this.ctx.currentTime + 0.1) {
       // ~8% swing: nudge every off-beat 8th later
       const swing = this._step % 2 === 1 ? eighth * 0.08 : 0;
@@ -257,7 +294,7 @@ export const audio = {
 
   _scheduleStep(step: number, time: number) {
     if (!this.ctx) return;
-    const eighth = (60 / 104) / 2;
+    const eighth = (60 / 96) / 2;
     const inBar = step % 8;
     const bar = Math.floor(step / 8);        // 0..7
     const chordIdx = Math.floor(bar / 2);    // 0..3  → I V vi IV
@@ -281,12 +318,12 @@ export const audio = {
       for (const f of triads[chordIdx]) this._musicVoice(f, 'sine', eighth * 15, padVol, time, padLp);
     }
 
-    // soft square lead — 8-note motif with rests
+    // v6 §10: soft marimba lead — 8-note motif with rests
     const motif: (number | null)[] = [0, 4, 7, null, 12, 7, null, 4];
     const semi = motif[inBar];
     if (semi !== null) {
       const f = roots[chordIdx] * 4 * Math.pow(2, semi / 12);
-      this._musicVoice(f, 'square', eighth * 0.9, 0.05, time, 900);
+      this._musicMarimba(f, time);
     }
 
     // noise hats on 8ths, doubling to 16ths when intense
@@ -313,6 +350,13 @@ export const audio = {
     }
     g.connect(this.musicGain);
     osc.start(time); osc.stop(time + dur + 0.05);
+  },
+
+  // v6 §10: marimba lead voice — wooden triangle body + short sine mallet ping
+  _musicMarimba(freq: number, time: number) {
+    if (!this.ctx || !this.musicGain) return;
+    this._musicVoice(freq, 'triangle', 0.34, 0.06, time, 1400);
+    this._musicVoice(freq * 4, 'sine', 0.12, 0.02, time);
   },
 
   _musicHat(time: number) {

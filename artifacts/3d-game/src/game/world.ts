@@ -32,6 +32,7 @@ export interface WorldObject {
   captureScale: number;
   captureRot: number;
   alertT: number;        // "!" bubble timer (people)
+  golden: boolean;       // v6 §2: golden object — 3× mass/score
 }
 
 export interface PlayerStats {
@@ -53,6 +54,91 @@ for (let i = 0; i < CONFIG.GRID - 1; i++) {
   ROAD_CENTERS.push(MARGIN + CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH / 2 + i * STRIDE);
 }
 
+// ── v6 §7: world edge (starfield beyond the map, dither transition, barrier) ──
+type View = { x: number; y: number; w: number; h: number };
+
+function hashInt(x: number, y: number): number {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) | 0;
+  return h >>> 0;
+}
+
+function drawStars(ctx: CanvasRenderingContext2D, view: View) {
+  const cell = 80;
+  const x0 = Math.floor(view.x / cell) - 1, y0 = Math.floor(view.y / cell) - 1;
+  const x1 = Math.ceil((view.x + view.w) / cell) + 1, y1 = Math.ceil((view.y + view.h) / cell) + 1;
+  ctx.save();
+  ctx.fillStyle = '#FFFFFF';
+  for (let gx = x0; gx <= x1; gx++) {
+    for (let gy = y0; gy <= y1; gy++) {
+      const h = hashInt(gx, gy);
+      if ((h & 3) !== 0) continue; // ~25% of cells carry a star
+      const px = gx * cell + (h % cell);
+      const py = gy * cell + ((h >> 8) % cell);
+      const r = 0.6 + ((h >> 16) & 3) * 0.5;
+      ctx.globalAlpha = 0.28 + ((h >> 20) & 7) / 16;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawEdgeDither(ctx: CanvasRenderingContext2D, view: View, S: number) {
+  const F = CONFIG.EDGE_FADE, step = 8;
+  const vx0 = Math.max(0, view.x), vy0 = Math.max(0, view.y);
+  const vx1 = Math.min(S, view.x + view.w), vy1 = Math.min(S, view.y + view.h);
+  ctx.save();
+  ctx.fillStyle = CONFIG.COLORS.uiBg;
+  // Only the F-wide border bands need dithering, so iterate those strips
+  // (work ∝ edge length × F) rather than the whole visible map area.
+  const cell = (x: number, y: number) => {
+    const d = Math.min(x, y, S - x, S - y);
+    if (d > F) return;
+    const prob = 1 - d / F;
+    if ((hashInt(x, y) % 100) / 100 < prob * 0.9) ctx.fillRect(x, y, step, step);
+  };
+  const xa = Math.floor(vx0 / step) * step, xb = vx1;
+  const ya = Math.floor(vy0 / step) * step, yb = vy1;
+  const topEnd = Math.min(yb, F + step);
+  const botStart = Math.max(ya, Math.floor((S - F) / step) * step);
+  for (let x = xa; x < xb; x += step) {
+    for (let y = ya; y < topEnd; y += step) cell(x, y);
+    for (let y = botStart; y < yb; y += step) cell(x, y);
+  }
+  const yInnerA = Math.max(ya, F + step);
+  const yInnerB = Math.min(yb, botStart);
+  const leftEnd = Math.min(xb, F + step);
+  const rightStart = Math.max(xa, Math.floor((S - F) / step) * step);
+  for (let y = yInnerA; y < yInnerB; y += step) {
+    for (let x = xa; x < leftEnd; x += step) cell(x, y);
+    for (let x = rightStart; x < xb; x += step) cell(x, y);
+  }
+  ctx.restore();
+}
+
+function drawBarrier(ctx: CanvasRenderingContext2D, view: View, S: number) {
+  const w = 14;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, S, S);
+  ctx.rect(w, w, S - 2 * w, S - 2 * w);
+  ctx.clip('evenodd');
+  ctx.fillStyle = '#FFD23F';
+  ctx.fillRect(Math.max(0, view.x), Math.max(0, view.y),
+    Math.min(S, view.x + view.w) - Math.max(0, view.x),
+    Math.min(S, view.y + view.h) - Math.max(0, view.y));
+  ctx.strokeStyle = '#14082B';
+  ctx.lineWidth = 8;
+  const start = Math.floor((view.x - S) / 22) * 22;
+  const end = view.x + view.w;
+  ctx.beginPath();
+  for (let dx = start; dx < end; dx += 22) {
+    ctx.moveTo(dx, view.y); ctx.lineTo(dx + view.h, view.y + view.h);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog'];
 
 export class WorldManager {
@@ -68,6 +154,7 @@ export class WorldManager {
   size: number;
   totalStartArea = 0;
   eatenArea = 0;
+  initialPopulation = 0;   // v6 §2: baseline count for the 85% respawn target
   playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0 };
   private nextId = 0;
   private respawnTimer = 0;
@@ -103,6 +190,7 @@ export class WorldManager {
       captureScale: 1,
       captureRot: 0,
       alertT: 0,
+      golden: false,
       ...opts,
     };
     this.objects.push(o);
@@ -160,6 +248,8 @@ export class WorldManager {
     this.validateDensity(rand);
     // v5 §3: build the ground-dressing layer (drawn under objects)
     this.buildDressing(rand);
+    // v6 §2: remember the starting count so respawn can top back up to 85%
+    this.initialPopulation = this.objects.length;
   }
 
   // v5 §3 — guarantee edible coverage across the whole map
@@ -436,14 +526,52 @@ export class WorldManager {
       if (this.dirt[i].life <= 0) this.dirt.splice(i, 1);
     }
 
-    // trickle respawn of small edibles at the map edges
+    // v6 §2: trickle respawn (2–4/s) toward ≥85% of the starting population,
+    // spawning off-screen in the emptiest candidate spot (sparse-weighted).
     this.respawnTimer -= dt;
     if (this.respawnTimer <= 0) {
-      this.respawnTimer = 500;
-      if (this.remaining < CONFIG.RESPAWN_MIN && this.objects.length < CONFIG.TARGET_POPULATION + 40) {
-        for (let i = 0; i < 3; i++) this.spawnEdge();
-      }
+      this.respawnTimer = 250 + this.rand() * 250; // ~2–4 spawns per second
+      const target = Math.round(this.initialPopulation * CONFIG.RESPAWN_TARGET_FRAC);
+      if (this.remaining < target) this.spawnRespawn(player);
     }
+  }
+
+  // v6 §2: choose an off-screen, sparse spot and drop a T1–T3 edible there.
+  private spawnRespawn(player: Player) {
+    const m = CONFIG.MAP_SIZE;
+    const kinds: ObjectKind[] = ['flower', 'flowerpot', 'gnome', 'apple', 'mailbox', 'hydrant', 'trashcan'];
+    let bx = 0, by = 0, bestScore = -Infinity;
+    for (let i = 0; i < 6; i++) {
+      const x = MARGIN + this.rand() * (m - MARGIN * 2);
+      const y = MARGIN + this.rand() * (m - MARGIN * 2);
+      const dPlayer = dist(x, y, player.x, player.y);
+      if (dPlayer < 520) continue; // keep it off the player's screen
+      let near = Infinity;
+      for (const o of this.objects) {
+        if (o.eaten) continue;
+        const d = dist(x, y, o.x, o.y);
+        if (d < near) near = d;
+      }
+      const score = dPlayer * 0.15 + near; // favour distant + sparse
+      if (score > bestScore) { bestScore = score; bx = x; by = y; }
+    }
+    if (bestScore === -Infinity) { bx = MARGIN + this.rand() * (m - MARGIN * 2); by = MARGIN + this.rand() * (m - MARGIN * 2); }
+    this.makeObj(pick(kinds, this.rand), bx, by);
+  }
+
+  // v6 §2: golden object — 3× mass (bigger radius) and 3× score on consume.
+  spawnGolden(player: Player) {
+    const m = CONFIG.MAP_SIZE;
+    let x = MARGIN + this.rand() * (m - MARGIN * 2);
+    let y = MARGIN + this.rand() * (m - MARGIN * 2);
+    for (let i = 0; i < 10; i++) {
+      x = MARGIN + this.rand() * (m - MARGIN * 2);
+      y = MARGIN + this.rand() * (m - MARGIN * 2);
+      if (dist(x, y, player.x, player.y) > 320) break;
+    }
+    const info = CONFIG.KIND_INFO['apple'];
+    const base = (info.minR + this.rand() * (info.maxR - info.minR)) * Math.sqrt(CONFIG.GOLDEN_MASS_MULT);
+    this.makeObj('apple', x, y, { golden: true, baseSize: base, size: base });
   }
 
   private stepLiving(obj: WorldObject, dt: number, dtSec: number, voids: { x: number; y: number; radius: number; ghost: boolean }[], player: Player, fx: FXManager) {
@@ -583,7 +711,16 @@ export class WorldManager {
     const G = CONFIG.COLORS.ground;
     const S = this.size;
 
-    // grass base (borders + default)
+    // v6 §7: space beyond the world — starfield behind everything
+    ctx.fillStyle = CONFIG.COLORS.uiBg;
+    ctx.fillRect(view.x, view.y, view.w, view.h);
+    drawStars(ctx, view);
+
+    // ground clipped to the map rect so it can dissolve into space at the edge
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, S, S); ctx.clip();
+
+    // grass base
     ctx.fillStyle = G.lawns[0];
     ctx.fillRect(view.x, view.y, view.w, view.h);
 
@@ -607,6 +744,14 @@ export class WorldManager {
       if (paved) ctx.fillStyle = G.pavement;
       else ctx.fillStyle = G.lawns[(b.gx + b.gy) % G.lawns.length];
       ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
+      // v6 §8: zone grading — a faint per-district tint so areas read differently
+      const tint = b.type === 'park' ? 'rgba(120,220,140,0.06)'
+        : b.type === 'plaza' ? 'rgba(255,210,120,0.05)'
+        : b.type === 'landmark' ? 'rgba(180,140,255,0.07)' : null;
+      if (tint) {
+        ctx.fillStyle = tint;
+        ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
+      }
       // pond
       const pond = (b as any).pond;
       if (pond) {
@@ -629,10 +774,12 @@ export class WorldManager {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // map border hedge
-    ctx.strokeStyle = '#12907C';
-    ctx.lineWidth = 24;
-    ctx.strokeRect(0, 0, S, S);
+    // v6 §7: dissolve the ground into the starfield near the edge
+    drawEdgeDither(ctx, view, S);
+    ctx.restore(); // end ground clip
+
+    // v6 §7: striped hazard barrier frames the playable world
+    drawBarrier(ctx, view, S);
 
     // dirt patches (ground decor)
     for (const d of this.dirt) {
@@ -800,6 +947,25 @@ export class WorldManager {
     visible.sort((a, b) => a.y - b.y);
 
     for (const obj of visible) {
+      // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)
+      if (obj.golden) {
+        ctx.save();
+        ctx.translate(obj.x, obj.y);
+        ctx.strokeStyle = '#FFD23F';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(0, 0, obj.size * 1.3 + Math.sin(t / 200) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#FFF3B0';
+        for (let i = 0; i < 4; i++) {
+          const a = t / 500 + (i / 4) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * obj.size * 1.5, Math.sin(a) * obj.size * 1.5, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
       ctx.save();
       ctx.translate(obj.x, obj.y);
       if (obj.captured) {

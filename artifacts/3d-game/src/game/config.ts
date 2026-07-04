@@ -56,7 +56,61 @@ export const CONFIG = {
   // Timing
   FIXED_DT: 1000 / 60,   // fixed simulation step (ms)
   MAX_DT: 50,            // clamp frame delta so backgrounding never teleports
-  GAME_DURATION: 90,     // seconds
+  GAME_DURATION: 180,    // v6 §1: 3-minute rounds
+
+  // ── v6 §1: match structure ──
+  BOON_PICK_TIMES: [150000, 100000, 50000], // ms remaining: 2:30, 1:40, 0:50
+  COINS_PER_SCORE: 150,                       // coins = floor(score / this)
+
+  // ── v6 §3: evolution ladder (radius-driven, forms only go up in a round) ──
+  FORMS: [
+    { name: 'VOIDLING',    radius: 22 },
+    { name: 'MUNCHER',     radius: 36 },
+    { name: 'GOBBLER',     radius: 54 },
+    { name: 'DEVOURER',    radius: 78 },
+    { name: 'WORLD EATER', radius: 105 },
+  ] as { name: string; radius: number }[],
+  FORM_SPEED_BONUS: 0.08,        // +8% move speed per form gained, stacking
+  EVO_SLOWMO_MS: 600,
+  EVO_SLOWMO_SCALE: 0.3,
+  DEVOURER_FORM_INDEX: 3,        // leader decay applies above this form
+
+  // ── v6 §2: respawn + catch-up ──
+  RESPAWN_TARGET_FRAC: 0.85,     // keep world ≥85% of initial population
+  RESPAWN_RATE_MIN: 2,           // objects/sec
+  RESPAWN_RATE_MAX: 4,
+  GOLDEN_START_MS: 165000,       // 2:45 remaining — golden objects begin
+  GOLDEN_INTERVAL: 12000,
+  GOLDEN_MASS_MULT: 3,
+  GOLDEN_SCORE_MULT: 3,
+  UNDERDOG_SPEED: 0.12,          // 5th/6th place move-speed bonus
+  UNDERDOG_GROWTH: 0.25,         // 5th/6th place growth bonus
+  LEADER_DECAY_RATE: 0.004,      // mass fraction/sec above DEVOURER
+
+  // ── v6 §5: world events (times are ms remaining) ──
+  EVENT_WARN_MS: 2000,
+  GOLDEN_RUSH_TIME: 125000,      // 2:05
+  GOLDEN_RUSH_DURATION: 10000,
+  SHRINK_STORM_TIME: 70000,      // 1:10
+  SHRINK_STORM_DURATION: 12000,
+  SHRINK_STORM_SPEED_FRAC: 0.7,  // cloud speed vs base player speed
+  SHRINK_STORM_LOSS: 0.12,
+  FIRETRUCK_DURATION: 8000,
+  FIRETRUCK_SLOW: 0.15,
+
+  // ── v6 §6: bot brain ──
+  BOT_SATED_MS: 6000,            // after eating, only graze for this long
+  BOT_ANTIIDLE_MS: 4000,         // window to check for being stuck
+  BOT_ANTIIDLE_DIST: 80,         // moved less than this in the window → retarget
+  BOT_NOEAT_MS: 6000,            // no eat for this long → retarget
+  BOT_WALL_MARGIN: 150,          // start steering away within this of an edge
+  BOT_WALL_FORCE: 1.2,           // repulsion strength near walls
+
+  // ── v6 §7: world edge fade to starfield ──
+  EDGE_FADE: 60,
+
+  // ── v6 §11: home ──
+  HOME_TAGLINE: 'SO CUTE. SO HUNGRY.',
 
   // Controls (relative-drag virtual joystick)
   JOYSTICK_MAX_DIST: 110,   // px from anchor for full speed
@@ -220,13 +274,14 @@ export const CONFIG = {
     { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#C42A2A', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
   ] as SkinDef[],
 
+  // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)
   BOONS: [
-    { id: 'magnet',    name: 'Magnet',     desc: 'Absorb reach +40%' },
-    { id: 'overdrive', name: 'Overdrive',  desc: 'Move speed +25%' },
-    { id: 'twin',      name: 'Twin Merge', desc: 'Merges need only 2' },
-    { id: 'time',      name: 'Time Shard', desc: '+10 seconds now' },
-    { id: 'tremor',    name: 'Tremor',     desc: 'Bumps shrink big things' },
-    { id: 'greed',     name: 'Greed',      desc: 'All score ×1.5' },
+    { id: 'magnet',    name: 'Gravity Glutton', desc: 'Absorb reach +40%' },
+    { id: 'overdrive', name: 'Zoomies',         desc: 'Move speed +25%' },
+    { id: 'twin',      name: 'Double Stomach',  desc: 'Merges need only 2' },
+    { id: 'time',      name: 'Borrowed Time',   desc: '+15 seconds, instantly' },
+    { id: 'tremor',    name: 'Tenderizer',      desc: 'Touch shrinks big things' },
+    { id: 'greed',     name: 'Midas Mouth',     desc: 'All score ×1.5' },
   ] as BoonDef[],
 
   // Rival identity pools

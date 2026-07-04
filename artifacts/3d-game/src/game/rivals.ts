@@ -1,6 +1,6 @@
 import { CONFIG, type SkinDef } from './config';
 import { clamp, lerp, dist, addAreaToRadius } from './utils';
-import { drawVoidling } from './voidling';
+import { drawVoidling, drawUnderdogTrail } from './voidling';
 import type { WorldObject } from './world';
 
 export interface VoidView { x: number; y: number; radius: number; }
@@ -28,6 +28,20 @@ export class Rival {
   skin: SkinDef;
   controller: RivalController;
   speedScale: number;
+
+  // v6 §2/§3: catch-up + evolution
+  underdogSpeed = 1;
+  underdogGrowth = 1;
+  underdog = false;
+  eventSlow = 1;          // v6 §5: event slow (firetruck water), reset each frame
+  reachedForm = 0;
+  // v6 §6: bot brain timers
+  satedTime = 0;          // grazes only while > 0 (SATED after a meal)
+  timeSinceEat = 0;       // ms since last successful eat (anti-idle)
+  idleTimer = 0;          // rolling anti-idle window
+  idleAnchorX = 0;        // position at window start
+  idleAnchorY = 0;
+  forceRetarget = false;  // set when stuck/hungry → controller re-picks
 
   // anim
   private blinkTimer = 1000 + Math.random() * 3000;
@@ -69,7 +83,9 @@ export class Rival {
     const dtSec = dt / 1000;
     const grown = this.radius / CONFIG.PLAYER_BASE_RADIUS;
     const sizeFactor = clamp(1.05 - grown * 0.05, 0.7, 1.05);
-    const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedScale * sizeFactor * 0.95;
+    // v6 §2/§3: form speed bonus (+8% each, stacking) + underdog boost
+    const formSpeed = 1 + this.reachedForm * CONFIG.FORM_SPEED_BONUS;
+    const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedScale * sizeFactor * 0.95 * formSpeed * this.underdogSpeed * this.eventSlow;
 
     const tvx = this.inDirX * this.inMag * maxSpeed;
     const tvy = this.inDirY * this.inMag * maxSpeed;
@@ -82,11 +98,28 @@ export class Rival {
     this.prevX = this.x; this.prevY = this.y;
     this.x += this.vx * dtSec;
     this.y += this.vy * dtSec;
+    // v6 §7: soft-bounce boundary
     const m = CONFIG.MAP_SIZE;
-    this.x = clamp(this.x, this.radius, m - this.radius);
-    this.y = clamp(this.y, this.radius, m - this.radius);
+    if (this.x < this.radius) { this.x = this.radius; this.vx = Math.abs(this.vx) * 0.4; }
+    else if (this.x > m - this.radius) { this.x = m - this.radius; this.vx = -Math.abs(this.vx) * 0.4; }
+    if (this.y < this.radius) { this.y = this.radius; this.vy = Math.abs(this.vy) * 0.4; }
+    else if (this.y > m - this.radius) { this.y = m - this.radius; this.vy = -Math.abs(this.vy) * 0.4; }
 
     if (this.ghostTime > 0) this.ghostTime -= dt;
+
+    // v6 §6: bot brain timers — sated countdown + anti-idle detection
+    if (this.satedTime > 0) this.satedTime -= dt;
+    this.timeSinceEat += dt;
+    this.idleTimer += dt;
+    if (this.idleTimer >= CONFIG.BOT_ANTIIDLE_MS) {
+      const moved = dist(this.x, this.y, this.idleAnchorX, this.idleAnchorY);
+      if (moved < CONFIG.BOT_ANTIIDLE_DIST || this.timeSinceEat > CONFIG.BOT_NOEAT_MS) {
+        this.forceRetarget = true;
+      }
+      this.idleTimer = 0;
+      this.idleAnchorX = this.x;
+      this.idleAnchorY = this.y;
+    }
 
     // anim
     this.breathePhase += dt;
@@ -113,22 +146,40 @@ export class Rival {
   }
 
   eatObject(obj: WorldObject) {
-    this.score += Math.round(obj.size * 1.3);
-    this.radius = addAreaToRadius(this.radius, Math.PI * obj.size * obj.size * 0.5);
+    this.score += Math.round(obj.size * 1.3 * (obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1));
+    this.radius = addAreaToRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth);
     this.chompV = 1;
+    this.satedTime = CONFIG.BOT_SATED_MS;
+    this.timeSinceEat = 0;
+    this.updateForm();
   }
 
   eatVoid(radius: number) {
     this.score += 400;
-    this.radius = addAreaToRadius(this.radius, Math.PI * radius * radius * 0.5);
+    this.radius = addAreaToRadius(this.radius, Math.PI * radius * radius * 0.5 * this.underdogGrowth);
     this.chompV = 1;
+    this.satedTime = CONFIG.BOT_SATED_MS;
+    this.timeSinceEat = 0;
+    this.updateForm();
+  }
+
+  // v6 §3: promote through the form ladder (rivals evolve too)
+  private updateForm() {
+    while (this.reachedForm < CONFIG.FORMS.length - 1 && this.radius >= CONFIG.FORMS[this.reachedForm + 1].radius) {
+      this.reachedForm++;
+    }
+  }
+
+  get formFloor() {
+    return Math.max(CONFIG.PLAYER_BASE_RADIUS, CONFIG.FORMS[this.reachedForm].radius);
   }
 
   // Respawn small elsewhere, briefly ghosted; keep cumulative score.
   // If still bigger than the avoid point's threat, respawn far away.
   getEaten(avoidX?: number, avoidY?: number, minDist = 0) {
     const m = CONFIG.MAP_SIZE;
-    this.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, this.radius * CONFIG.RESPAWN_MASS_FRAC);
+    // v6 §3: being chomped can't demote below a form already reached
+    this.radius = Math.max(this.formFloor, this.radius * CONFIG.RESPAWN_MASS_FRAC);
     let nx = 200 + Math.random() * (m - 400);
     let ny = 200 + Math.random() * (m - 400);
     if (avoidX !== undefined && avoidY !== undefined && minDist > 0) {
@@ -146,6 +197,7 @@ export class Rival {
   draw(ctx: CanvasRenderingContext2D, t: number, alpha: number) {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
+    if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
     drawVoidling(ctx, rx, ry, {
       r: this.radius,
       skin: this.skin,
@@ -161,6 +213,7 @@ export class Rival {
       glow: 0.15,
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
+      form: this.reachedForm,
     });
     this.drawTag(ctx, rx, ry);
   }
@@ -220,6 +273,14 @@ export class BotController implements RivalController {
   think(rival: Rival, view: WorldView, dt: number): Intent {
     const aggression = this.aggressionFrom(view.elapsed);
 
+    // v6 §6: anti-idle — a stuck/hungry bot immediately re-picks a target
+    if (rival.forceRetarget) {
+      rival.forceRetarget = false;
+      this.decisionTimer = 0;
+      this.hasTarget = false;
+      this.roamAngle = Math.random() * Math.PI * 2;
+    }
+
     // FLEE is always evaluated (survival first)
     let threat: VoidView | null = null;
     let threatD = Infinity;
@@ -232,14 +293,15 @@ export class BotController implements RivalController {
     if (threat) {
       this.state = 'FLEE';
       const a = Math.atan2(rival.y - threat.y, rival.x - threat.x);
-      return { dirX: Math.cos(a), dirY: Math.sin(a), mag: 1 };
+      return this.avoidWalls(rival, { dirX: Math.cos(a), dirY: Math.sin(a), mag: 1 });
     }
 
     // HUNT / GRAZE targets refresh on a reaction delay
     this.decisionTimer -= dt;
     if (this.decisionTimer <= 0 || !this.hasTarget) {
       this.decisionTimer = this.reactionDelay + Math.random() * 120;
-      this.pickTarget(rival, view, aggression);
+      // v6 §6: SATED bots graze only — no hunting for a beat after a meal
+      this.pickTarget(rival, view, rival.satedTime > 0 ? 0 : aggression);
     }
 
     if (!this.hasTarget) {
@@ -250,18 +312,29 @@ export class BotController implements RivalController {
         this.roamAngle += (Math.random() - 0.5) * 1.6;
         this.roamTimer = 1200 + Math.random() * 1200;
       }
-      const m = view.map;
-      if (rival.x < 200) this.roamAngle = 0;
-      else if (rival.x > m - 200) this.roamAngle = Math.PI;
-      if (rival.y < 200) this.roamAngle = Math.PI / 2;
-      else if (rival.y > m - 200) this.roamAngle = -Math.PI / 2;
-      return { dirX: Math.cos(this.roamAngle), dirY: Math.sin(this.roamAngle), mag: 0.55 };
+      return this.avoidWalls(rival, { dirX: Math.cos(this.roamAngle), dirY: Math.sin(this.roamAngle), mag: 0.55 });
     }
 
     const dx = this.tx - rival.x;
     const dy = this.ty - rival.y;
     const d = Math.hypot(dx, dy) || 1;
-    return { dirX: dx / d, dirY: dy / d, mag: this.state === 'HUNT' ? 1 : 0.85 };
+    return this.avoidWalls(rival, { dirX: dx / d, dirY: dy / d, mag: this.state === 'HUNT' ? 1 : 0.85 });
+  }
+
+  // v6 §6: blend in a repulsion vector when within BOT_WALL_MARGIN of an edge.
+  private avoidWalls(rival: Rival, intent: Intent): Intent {
+    const m = CONFIG.MAP_SIZE;
+    const marg = CONFIG.BOT_WALL_MARGIN;
+    let rx = 0, ry = 0;
+    if (rival.x < marg) rx += (marg - rival.x) / marg;
+    if (rival.x > m - marg) rx -= (marg - (m - rival.x)) / marg;
+    if (rival.y < marg) ry += (marg - rival.y) / marg;
+    if (rival.y > m - marg) ry -= (marg - (m - rival.y)) / marg;
+    if (rx === 0 && ry === 0) return intent;
+    let dx = intent.dirX * intent.mag + rx * CONFIG.BOT_WALL_FORCE;
+    let dy = intent.dirY * intent.mag + ry * CONFIG.BOT_WALL_FORCE;
+    const d = Math.hypot(dx, dy) || 1;
+    return { dirX: dx / d, dirY: dy / d, mag: Math.min(1, Math.max(intent.mag, Math.hypot(rx, ry))) };
   }
 
   private pickTarget(rival: Rival, view: WorldView, aggression: number) {
