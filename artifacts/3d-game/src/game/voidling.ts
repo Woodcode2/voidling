@@ -27,15 +27,17 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   if (v.ghost) ctx.globalAlpha = 0.4;
   ctx.rotate(v.lean);
 
-  // ── Glow (pulses with combo) ───────────────────────────────────────────────
-  const glowR = r * (1.35 + v.glow * 0.7) + Math.sin(v.t / 260) * r * 0.05 * v.glow;
-  const g = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, glowR);
-  g.addColorStop(0, hexA(skin.glowColor, 0.55 + v.glow * 0.35));
-  g.addColorStop(1, hexA(skin.glowColor, 0));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(0, 0, glowR, 0, Math.PI * 2);
-  ctx.fill();
+  // ── Glow: crisp concentric rings (v5 §6 — no radial halo / shadowBlur) ──────
+  const ringCount = 3;
+  const baseA = 0.2 + v.glow * 0.45;
+  ctx.lineWidth = Math.max(1.5, r * 0.06);
+  for (let i = 1; i <= ringCount; i++) {
+    const wobble = Math.sin(v.t / 260 + i) * r * 0.02 * v.glow;
+    ctx.strokeStyle = hexA(skin.glowColor, baseA * (1 - (i - 1) / ringCount));
+    ctx.beginPath();
+    ctx.arc(0, 0, r + i * (r * 0.12) + wobble, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   // ── Back accessories ────────────────────────────────────────────────────────
   drawSkinBack(ctx, skin, r, v.t);

@@ -36,6 +36,8 @@ export interface Snapshot {
   results: ResultData | null;
   daily: DailyData | null;
   muted: boolean;
+  musicOn: boolean;
+  sfxOn: boolean;
   paused: boolean;
 }
 
@@ -51,6 +53,8 @@ export interface GameEngine {
   goHome(): void;
   togglePause(): void;
   toggleMute(): boolean;
+  toggleMusic(): boolean;
+  toggleSfx(): boolean;
   destroy(): void;
 }
 
@@ -98,6 +102,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let camCX = CONFIG.MAP_SIZE / 2;
   let camCY = CONFIG.MAP_SIZE / 2;
   let camZoom = 0.5;
+  let camLookX = 0, camLookY = 0;   // v5 §1: smoothed velocity lookahead
 
   // daily modifier round flags
   let baseGreed = 1;
@@ -126,6 +131,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   function banner(text: string, color = '#FFFFFF') {
     banners.push({ text, color, life: 1900, max: 1900 });
     if (banners.length > 4) banners.shift();
+    audio.duckMusic(); // v5 §5: duck the track under banners
   }
 
   // ── round lifecycle ──
@@ -158,7 +164,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     for (let i = 0; i < rivals.length; i++) {
       const a = (i / rivals.length) * Math.PI * 2;
       const rr = CONFIG.MAP_SIZE * 0.32;
-      rivals[i].spawn(c + Math.cos(a) * rr, c + Math.sin(a) * rr, CONFIG.PLAYER_BASE_RADIUS * (0.9 + Math.random() * 0.6));
+      // v5 §1: everyone starts at the same base radius — no seeded size spread
+      rivals[i].spawn(c + Math.cos(a) * rr, c + Math.sin(a) * rr, CONFIG.PLAYER_BASE_RADIUS);
     }
 
     timeLeft = duration;
@@ -174,10 +181,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     fx.texts.length = 0;
     fx.rings.length = 0;
 
-    // snap the camera onto the player so the round doesn't open mid-pan
+    // v5 §1: spawn already correctly framed (no zoom-in animation)
     camCX = player.x;
     camCY = player.y;
-    camZoom = clamp(CONFIG.PLAYER_SCREEN_TALL / (2 * player.radius), 0.15, 2);
+    camLookX = camLookY = 0;
+    const startView = clamp(
+      CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
+      CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
+    );
+    camZoom = fh / startView;
+
+    audio.startMusic();
 
     results = null;
     screen = 'game';
@@ -237,6 +251,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     };
     track('round_end', { score: player.score, placement, coins });
     audio.playMerge();
+    audio.stopMusic();
     screen = 'results';
     notify();
   }
@@ -308,6 +323,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (ev.kind) audio.playSignature(ev.kind);
       } else if (ev.type === 'merge') {
         audio.playMerge();
+        audio.duckMusic();
         fx.addConfetti(ev.x, ev.y, CONFIG.COLORS.pops);
         fx.shake(220, 8);
         if (ev.text) fx.addText(ev.x, ev.y - 20, ev.text, ev.color || '#FFF');
@@ -324,6 +340,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     player.pendingFx.length = 0;
 
     maxCombo = Math.max(maxCombo, player.combo);
+    audio.setMusicIntensity(player.combo); // v5 §5: combo ≥ 2 brightens the loop
 
     // boon picker gates at 60s and 30s remaining
     for (const th of [60000, 30000]) {
@@ -373,6 +390,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         } else if (canEatVoid(r.radius, player.radius, d)) {
           const pr = player.radius;
           fx.shake(360, 16); fx.flash();
+          audio.playEaten(); // v5 §5: descending wah when you get eaten
           player.getEaten();
           r.eatVoid(pr);
           banner(`${r.name} devoured you — ghosting!`, '#FF6B6B');
@@ -405,22 +423,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const px = player.prevX + (player.x - player.prevX) * alpha;
     const py = player.prevY + (player.y - player.prevY) * alpha;
 
-    // ── camera: zoom lerp toward target on-screen size ──
-    const targetZoom = clamp(CONFIG.PLAYER_SCREEN_TALL / (2 * player.radius), 0.15, 2);
-    camZoom = lerp(camZoom, targetZoom, CONFIG.ZOOM_LERP);
+    // ── camera: zoom OUT as the player grows (v5 §1) ──
+    const viewHeight = clamp(
+      CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
+      CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
+    );
+    const targetZoom = fh / viewHeight;
+    camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
 
-    // ── camera: centre lerp with a dead zone (screen px → world) ──
-    const dzx = px - camCX, dzy = py - camCY;
-    const dd = Math.hypot(dzx, dzy);
-    const dead = CONFIG.CAM_DEADZONE / camZoom;
-    let tcx = camCX, tcy = camCY;
-    if (dd > dead) {
-      const pull = (dd - dead) / dd;
-      tcx = camCX + dzx * pull;
-      tcy = camCY + dzy * pull;
-    }
-    camCX = lerp(camCX, tcx, CONFIG.CAM_LERP);
-    camCY = lerp(camCY, tcy, CONFIG.CAM_LERP);
+    // ── camera: follow with lookahead, NO dead zone (v5 §1) ──
+    const pspd = Math.hypot(player.vx, player.vy);
+    const lax = pspd > 0.0001 ? (player.vx / pspd) * CONFIG.CAM_LOOKAHEAD : 0;
+    const lay = pspd > 0.0001 ? (player.vy / pspd) * CONFIG.CAM_LOOKAHEAD : 0;
+    camLookX = lerp(camLookX, lax, CONFIG.CAM_LOOKAHEAD_LERP);
+    camLookY = lerp(camLookY, lay, CONFIG.CAM_LOOKAHEAD_LERP);
+    camCX = lerp(camCX, px + camLookX, CONFIG.CAM_POS_LERP);
+    camCY = lerp(camCY, py + camLookY, CONFIG.CAM_POS_LERP);
 
     const shake = fx.getShake();
     const viewW = fw / camZoom, viewH = fh / camZoom;
@@ -437,6 +455,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.translate(-camCX, -camCY);
 
     world.drawGround(ctx, view);
+    world.drawDressing(ctx, view);
     world.draw(ctx, clock, view);
     for (const r of rivals) r.draw(ctx, clock, alpha);
     player.draw(ctx, clock, alpha);
@@ -478,15 +497,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ibx += 40;
     }
 
-    // score + combo (top right)
+    // score + combo (top right) — v5 §6: keep clear of the 40px pause pill.
+    // pill right edge = 12px inset + 40px wide; score right edge sits 8px left of it.
+    const scoreRight = fw - (12 + 40 + 8);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '700 26px Fredoka, sans-serif';
-    ctx.fillText(String(player.score), fw - 16, 40);
+    ctx.fillText(String(player.score), scoreRight, 34);
     if (player.combo > 1) {
       ctx.fillStyle = '#FFD23F';
       ctx.font = '700 18px Fredoka, sans-serif';
-      ctx.fillText(`COMBO ×${player.comboMult.toFixed(1)}`, fw - 16, 64);
+      ctx.fillText(`COMBO ×${player.comboMult.toFixed(1)}`, scoreRight, 58);
     }
 
     // leaderboard (top left, dark backdrop, dropped below the timer so it never
@@ -566,6 +587,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
 
   function drawJoystickHint() {
+    if (!CONFIG.SHOW_JOYSTICK_RING) return; // v5 §2: nothing renders at the finger
     const s = joystick.state;
     if (!s.active) return;
     ctx.save();
@@ -643,6 +665,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       results,
       daily: dailyData,
       muted: audio.muted,
+      musicOn: audio.musicOn,
+      sfxOn: audio.sfxOn,
       paused,
     };
   }
@@ -676,19 +700,23 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       screen = 'dailyIntro';
       notify();
     },
-    goHome() { screen = 'home'; paused = false; joystick.setEnabled(false); notify(); },
+    goHome() { screen = 'home'; paused = false; audio.stopMusic(); joystick.setEnabled(false); notify(); },
     togglePause() {
       if (screen !== 'game') return;
       paused = !paused;
       joystick.setEnabled(!paused);
+      if (paused) audio.pauseMusic(); else audio.resumeMusic();
       if (!paused) resetClock();
       notify();
     },
     toggleMute() { const m = audio.toggleMute(); notify(); return m; },
+    toggleMusic() { const on = audio.toggleMusic(); notify(); return on; },
+    toggleSfx() { const on = audio.toggleSfx(); notify(); return on; },
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', onVisibility);
+      audio.stopMusic(); // prevent the music scheduler interval from leaking on unmount
       joystick.destroy();
     },
   };

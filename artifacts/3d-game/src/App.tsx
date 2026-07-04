@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createGame, type GameEngine, type Snapshot } from './game/engine';
 import { UILayer } from './ui/UILayer';
+import { DebugPanel } from './ui/DebugPanel';
+
+const DEBUG = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -24,6 +27,7 @@ export default function App() {
     <>
       <canvas ref={canvasRef} className="vd-canvas" />
       {snap && engineRef.current && <UILayer snap={snap} engine={engineRef.current} />}
+      {DEBUG && <DebugPanel />}
     </>
   );
 }

@@ -59,6 +59,12 @@ export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
   dirt: DirtPatch[] = [];
+  // v5 §3 — precomputed ground-dressing (low-contrast, non-colliding)
+  private dressTufts: { x: number; y: number; type: number; rot: number; s: number; a: number }[] = [];
+  private dressFence: { x: number; y: number; v: boolean }[] = [];
+  private dressHedges: { x: number; y: number; r: number }[] = [];
+  private dressMats: { x: number; y: number }[] = [];
+  private dressManholes: { x: number; y: number }[] = [];
   size: number;
   totalStartArea = 0;
   eatenArea = 0;
@@ -141,12 +147,85 @@ export class WorldManager {
     for (let i = 0; i < 8; i++) this.spawnCar(rand);
 
     // trickle up to a healthy population with scattered small edibles
-    while (this.objects.length < CONFIG.TARGET_POPULATION) {
+    const target = Math.round(CONFIG.TARGET_POPULATION * CONFIG.DENSITY_MULT);
+    while (this.objects.length < target) {
       const b = this.blocks[Math.floor(rand() * this.blocks.length)];
       const p = this.pointInBlock(b, rand);
       const kind = pick(['flower', 'flowerpot', 'gnome', 'apple'] as ObjectKind[], rand);
       if (dist(p.x, p.y, spawnX, spawnY) < 70) continue;
       this.makeObj(kind, p.x, p.y);
+    }
+
+    // v5 §3: hard rule — no 300px circle may be edible-empty; patch with T1–T2
+    this.validateDensity(rand);
+    // v5 §3: build the ground-dressing layer (drawn under objects)
+    this.buildDressing(rand);
+  }
+
+  // v5 §3 — guarantee edible coverage across the whole map
+  private validateDensity(rand: () => number) {
+    const step = 300, R = 300;
+    const patch: ObjectKind[] = ['flower', 'flowerpot', 'gnome', 'apple', 'mailbox'];
+    for (let cy = step / 2; cy < this.size; cy += step) {
+      for (let cx = step / 2; cx < this.size; cx += step) {
+        let has = false;
+        for (const o of this.objects) {
+          if (o.eaten || o.kind === 'watertower') continue;
+          if (dist(o.x, o.y, cx, cy) <= R) { has = true; break; }
+        }
+        if (!has) {
+          this.makeObj(
+            pick(patch, rand),
+            clamp(cx, MARGIN + 20, this.size - MARGIN - 20),
+            clamp(cy, MARGIN + 20, this.size - MARGIN - 20),
+          );
+        }
+      }
+    }
+  }
+
+  // v5 §3 — precompute deterministic dressing so it never flickers frame-to-frame
+  private buildDressing(rand: () => number) {
+    this.dressTufts = []; this.dressFence = []; this.dressHedges = [];
+    this.dressMats = []; this.dressManholes = [];
+    const inset = CONFIG.SIDEWALK;
+    for (const b of this.blocks) {
+      if ((b as any).paved) continue;
+      const ix = b.x0 + inset, iy = b.y0 + inset;
+      const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
+      // grass tufts / daisies / clover / leaves
+      for (let i = 0; i < 60; i++) {
+        this.dressTufts.push({
+          x: ix + rand() * iw, y: iy + rand() * ih,
+          type: Math.floor(rand() * 4), rot: rand() * Math.PI * 2,
+          s: 0.7 + rand() * 0.8, a: 0.2 + rand() * 0.1,
+        });
+      }
+      if (b.type === 'residential') {
+        const step = 18;
+        for (let x = ix; x <= ix + iw; x += step) {
+          this.dressFence.push({ x, y: iy, v: false });
+          this.dressFence.push({ x, y: iy + ih, v: false });
+        }
+        for (let y = iy; y <= iy + ih; y += step) {
+          this.dressFence.push({ x: ix, y, v: true });
+          this.dressFence.push({ x: ix + iw, y, v: true });
+        }
+        const hr = 34;
+        this.dressHedges.push({ x: ix + hr, y: iy + hr, r: hr });
+        this.dressHedges.push({ x: ix + iw - hr, y: iy + hr, r: hr });
+        this.dressHedges.push({ x: ix + hr, y: iy + ih - hr, r: hr });
+        this.dressHedges.push({ x: ix + iw - hr, y: iy + ih - hr, r: hr });
+      }
+    }
+    for (const o of this.objects) {
+      if (o.kind === 'house') this.dressMats.push({ x: o.x, y: o.y + o.size * 0.55 });
+    }
+    for (let i = 0; i < 12; i++) {
+      const c = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
+      const along = MARGIN + rand() * (this.size - MARGIN * 2);
+      if (rand() < 0.5) this.dressManholes.push({ x: along, y: c });
+      else this.dressManholes.push({ x: c, y: along });
     }
   }
 
@@ -568,6 +647,149 @@ export class WorldManager {
     }
   }
 
+  // ── v5 §3: ground-dressing layer (between ground and objects) ──
+  drawDressing(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }) {
+    const inset = CONFIG.SIDEWALK;
+    const inView = (x: number, y: number, pad = 20) =>
+      x >= view.x - pad && x <= view.x + view.w + pad && y >= view.y - pad && y <= view.y + view.h + pad;
+
+    // mowing stripes (±3% lightness, ~90px bands) on grass blocks
+    for (const b of this.blocks) {
+      if ((b as any).paved) continue;
+      if (b.x0 + CONFIG.BLOCK_SIZE < view.x || b.x0 > view.x + view.w) continue;
+      if (b.y0 + CONFIG.BLOCK_SIZE < view.y || b.y0 > view.y + view.h) continue;
+      const ix = b.x0 + inset, iy = b.y0 + inset;
+      const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
+      const band = 90;
+      let k = 0;
+      for (let sy = iy; sy < iy + ih; sy += band, k++) {
+        ctx.fillStyle = k % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+        ctx.fillRect(ix, sy, iw, band);
+      }
+      ctx.restore();
+    }
+
+    // road crosswalks at intersections + curb grime
+    ctx.save();
+    for (const cx of ROAD_CENTERS) {
+      for (const cy of ROAD_CENTERS) {
+        if (!inView(cx, cy, CONFIG.ROAD_WIDTH)) continue;
+        const half = CONFIG.ROAD_WIDTH / 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        // stripes on the four approaches
+        for (let i = -2; i <= 2; i++) {
+          const off = i * 14;
+          ctx.fillRect(cx - half, cy - half - 20, 8, 16); // north approach column
+          ctx.fillRect(cx + off - 4, cy - half - 22, 8, 16);
+          ctx.fillRect(cx + off - 4, cy + half + 6, 8, 16);
+          ctx.fillRect(cx - half - 22, cy + off - 4, 16, 8);
+          ctx.fillRect(cx + half + 6, cy + off - 4, 16, 8);
+        }
+      }
+    }
+    ctx.restore();
+
+    // manholes on the roads
+    for (const m of this.dressManholes) {
+      if (!inView(m.x, m.y)) continue;
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath(); ctx.arc(m.x, m.y, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(m.x, m.y, 8, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // cream picket fences
+    for (const f of this.dressFence) {
+      if (!inView(f.x, f.y)) continue;
+      ctx.fillStyle = 'rgba(251,239,214,0.55)';
+      if (f.v) ctx.fillRect(f.x - 6, f.y - 2, 12, 4);
+      else ctx.fillRect(f.x - 2, f.y - 7, 4, 14);
+    }
+
+    // corner hedges (low-contrast green blobs)
+    for (const h of this.dressHedges) {
+      if (!inView(h.x, h.y, h.r)) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#2C9A56';
+      roundRect(ctx, h.x - h.r, h.y - h.r * 0.7, h.r * 2, h.r * 1.4, 12);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // welcome mats + stepping stones at house doors
+    for (const m of this.dressMats) {
+      if (!inView(m.x, m.y, 40)) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#B98A5E';
+      roundRect(ctx, m.x - 16, m.y - 7, 32, 14, 4);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(240,235,225,0.55)';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.ellipse(m.x - 18 + i * 18, m.y + 22 + i * 12, 9, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // grass tufts / daisies / clover / leaves
+    for (const d of this.dressTufts) {
+      if (!inView(d.x, d.y)) continue;
+      this.drawTuft(ctx, d);
+    }
+  }
+
+  private drawTuft(ctx: CanvasRenderingContext2D, d: { x: number; y: number; type: number; rot: number; s: number; a: number }) {
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.rot);
+    ctx.scale(d.s, d.s);
+    ctx.globalAlpha = d.a;
+    if (d.type === 0) {
+      // tuft: three blades
+      ctx.strokeStyle = '#2F8F4E';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      for (const dx of [-3, 0, 3]) {
+        ctx.beginPath();
+        ctx.moveTo(dx, 4);
+        ctx.quadraticCurveTo(dx * 1.4, -3, dx * 1.8, -8);
+        ctx.stroke();
+      }
+    } else if (d.type === 1) {
+      // daisy
+      ctx.fillStyle = '#FFFFFF';
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(a) * 4, Math.sin(a) * 4, 2.4, 1.4, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#FFD23F';
+      ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
+    } else if (d.type === 2) {
+      // clover: three dots
+      ctx.fillStyle = '#3AA35C';
+      for (const a of [0, 2.09, 4.18]) {
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * 3, Math.sin(a) * 3, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // fallen leaf
+      ctx.fillStyle = '#C87B3A';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5, 2.6, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // ── objects (y-sorted) ──
   draw(ctx: CanvasRenderingContext2D, t: number, view: { x: number; y: number; w: number; h: number }) {
     const visible = this.objects.filter((o) =>
@@ -605,4 +827,15 @@ export class WorldManager {
 
 function pick<T>(arr: T[], rand: () => number): T {
   return arr[Math.floor(rand() * arr.length)];
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
 }

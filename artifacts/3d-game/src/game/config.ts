@@ -60,19 +60,21 @@ export const CONFIG = {
 
   // Controls (relative-drag virtual joystick)
   JOYSTICK_MAX_DIST: 110,   // px from anchor for full speed
+  SHOW_JOYSTICK_RING: false, // v5 §2: anchor-ring viz OFF by default (nothing at finger)
 
   // Movement feel contract (px/s, px/s²) — v4 §3
   MOVE_ACCEL: 2400,         // toward joystick vector
   MOVE_MAX_SPEED: 340,      // at base size (boons stack on top)
   MOVE_DECEL: 1800,         // on release
 
-  // Camera — v4 §3
-  CAM_LERP: 0.10,
-  CAM_DEADZONE: 40,         // screen px
-  ZOOM_LERP: 0.06,
-  PLAYER_SCREEN_TALL: 100,  // target on-screen diameter
-  PLAYER_SCREEN_MIN: 64,
-  PLAYER_SCREEN_MAX: 140,
+  // Camera — v5 §1 (zoom OUT as you grow; no dead zone; velocity lookahead)
+  CAM_VIEW_BASE: 680,          // world px shown vertically at base radius
+  CAM_VIEW_GROWTH: 8,          // + world px per (radius - base radius)
+  CAM_VIEW_MAX: 1500,
+  CAM_ZOOM_LERP: 0.05,
+  CAM_POS_LERP: 0.12,
+  CAM_LOOKAHEAD: 70,           // px lead in normalized velocity direction
+  CAM_LOOKAHEAD_LERP: 0.08,
 
   // Suction physics — v4 §2
   CAPTURE_RADIUS_MULT: 1.35,
@@ -83,33 +85,38 @@ export const CONFIG = {
   // Too-big collision feedback — §0 fix
   TOOBIG_COOLDOWN: 500,     // ms
 
-  // World
-  MAP_SIZE: 2800,
-  BLOCK_SIZE: 800,
+  // World — v5 §3: shrink the map so the arena reads dense
+  MAP_SIZE: 2400,
+  BLOCK_SIZE: 700,           // 3*700 + 2*120 roads = 2340, margin 30
   ROAD_WIDTH: 120,
   SIDEWALK: 44,
   GRID: 3,
-  PLAYER_BASE_RADIUS: 26,
+  PLAYER_BASE_RADIUS: 22,    // v5 §1: everyone starts here (no seeded spread)
 
   // Living world speeds (px/s)
   CAR_SPEED: 60, CAR_FLEE_SPEED: 140,
   PERSON_SPEED: 30, PERSON_FLEE_SPEED: 120,
   DUCK_SPEED: 22, DOG_SPEED: 70,
 
-  // Population / respawn
-  TARGET_POPULATION: 300,
-  RESPAWN_MIN: 250,         // trickle small objects if below this
+  // Population / respawn — v5 §3: fuller world (350–450)
+  TARGET_POPULATION: 400,
+  RESPAWN_MIN: 350,         // trickle small objects if below this
+  DENSITY_MULT: 1,          // v5 §7: debug-panel density multiplier
 
   // Absorb / orbit / merge
   ABSORB_SHRINK_TIME: 190,
-  ORBIT_RADIUS_OFFSET: 22,
-  ORBIT_SPEED: 0.0024,
+  ORBIT_RADIUS_OFFSET: 26,   // v5 §4: chips sit at playerRadius + 26
+  ORBIT_SPEED: 0.6,          // v5 §4: rad/s (applied as orbitClock/1000 * this)
   ORBIT_MAX: 6,
   COMBO_DECAY_TIME: 4200,
   EAT_RATIO: 0.9,           // eater.radius must exceed target.size * this to absorb objects
 
   // Water tower is a WORLD-EATER-scale prize
   WATERTOWER_EAT_RADIUS: 300,
+
+  // Audio master levels — v5 §5 (debug-panel adjustable)
+  MUSIC_GAIN: 0.35,
+  SFX_GAIN: 1,
 
   // Rivals
   RIVAL_COUNT: 5,

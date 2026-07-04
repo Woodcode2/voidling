@@ -2,7 +2,7 @@
 // Every function draws centered at the origin (0,0), sized to fit within radius r.
 // The same functions are reused at tiny scale as orbit icons.
 import type { ObjectKind } from './config';
-import { sticker, stickerCircle, stickerEllipse, highlight, dot, roundRectPath } from './draw';
+import { sticker, stickerCircle, stickerEllipse, highlight, dot, roundRectPath, silhouette } from './draw';
 
 // outline width scales down for tiny icons so small objects don't turn into blobs
 function ow(r: number) {
@@ -170,17 +170,17 @@ function drawBench(ctx: CanvasRenderingContext2D, r: number, _t: number) {
 }
 
 function drawBush(ctx: CanvasRenderingContext2D, r: number, t: number) {
-  const o = ow(r);
   const sway = Math.sin(t / 900) * r * 0.03;
   const g = '#2FA55A';
-  sticker(ctx, (c) => {
-    c.arc(-r * 0.5 + sway, r * 0.1, r * 0.52, 0, Math.PI * 2);
-    c.arc(r * 0.5 + sway, r * 0.1, r * 0.52, 0, Math.PI * 2);
-    c.arc(0 + sway, -r * 0.3, r * 0.6, 0, Math.PI * 2);
-  }, g, { outline: o });
-  highlight(ctx, -r * 0.25, -r * 0.35, r * 0.5, 0.25);
-  dot(ctx, r * 0.1, r * 0.0, r * 0.1, '#FF6FB0');
-  dot(ctx, -r * 0.35, r * 0.18, r * 0.09, '#FFD23F');
+  // v5 §6: unified silhouette — no white seams between the three lobes
+  silhouette(ctx, [
+    { path: (c) => c.arc(-r * 0.5 + sway, r * 0.1, r * 0.52, 0, Math.PI * 2), fill: g },
+    { path: (c) => c.arc(r * 0.5 + sway, r * 0.1, r * 0.52, 0, Math.PI * 2), fill: g },
+    { path: (c) => c.arc(0 + sway, -r * 0.3, r * 0.6, 0, Math.PI * 2), fill: g },
+  ], { expand: ow(r) + 1 });
+  highlight(ctx, -r * 0.25 + sway, -r * 0.35, r * 0.5, 0.25);
+  dot(ctx, r * 0.1 + sway, 0, r * 0.1, '#FF6FB0');
+  dot(ctx, -r * 0.35 + sway, r * 0.18, r * 0.09, '#FFD23F');
 }
 
 // ── T4 ───────────────────────────────────────────────────────────────────────
@@ -220,19 +220,19 @@ function drawCar(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 
 }
 
 function drawTree(ctx: CanvasRenderingContext2D, r: number, t: number) {
-  const o = ow(r);
   const sway = Math.sin(t / 1100) * r * 0.04;
-  // trunk
-  sticker(ctx, (c) => roundRectPath(c, -r * 0.16, r * 0.05, r * 0.32, r * 0.8, r * 0.08), '#8A5A2E', { outline: o });
-  // canopy
+  const green = '#33B463';
+  // v5 §6: trunk + canopy share ONE silhouette (drawn back-to-front for fills)
+  silhouette(ctx, [
+    { path: (c) => roundRectPath(c, -r * 0.16, r * 0.05, r * 0.32, r * 0.8, r * 0.08), fill: '#8A5A2E' },
+    { path: (c) => c.arc(-r * 0.42 + sway, -r * 0.15, r * 0.5, 0, Math.PI * 2), fill: green },
+    { path: (c) => c.arc(r * 0.42 + sway, -r * 0.15, r * 0.5, 0, Math.PI * 2), fill: green },
+    { path: (c) => c.arc(0 + sway, -r * 0.55, r * 0.56, 0, Math.PI * 2), fill: green },
+    { path: (c) => c.arc(0 + sway, -r * 0.1, r * 0.5, 0, Math.PI * 2), fill: green },
+  ], { expand: ow(r) + 1 });
+  // details on the canopy
   ctx.save();
   ctx.translate(sway, 0);
-  sticker(ctx, (c) => {
-    c.arc(-r * 0.42, -r * 0.15, r * 0.5, 0, Math.PI * 2);
-    c.arc(r * 0.42, -r * 0.15, r * 0.5, 0, Math.PI * 2);
-    c.arc(0, -r * 0.55, r * 0.56, 0, Math.PI * 2);
-    c.arc(0, -r * 0.1, r * 0.5, 0, Math.PI * 2);
-  }, '#33B463', { outline: o });
   highlight(ctx, -r * 0.2, -r * 0.5, r * 0.5, 0.22);
   dot(ctx, r * 0.3, -r * 0.1, r * 0.09, '#EF4B4B');
   dot(ctx, -r * 0.3, -r * 0.35, r * 0.09, '#EF4B4B');

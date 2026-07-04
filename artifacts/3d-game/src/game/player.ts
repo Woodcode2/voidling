@@ -7,10 +7,13 @@ import type { WorldObject } from './world';
 interface OrbitItem {
   kind: WorldObject['kind'];
   tier: number;
-  iconR: number;
-  angle: number;
-  phase: 'in' | 'orbit';
+  iconR: number;          // intake-tween start size only
+  angle: number;          // intake target angle
+  slotA: number;          // live orbit angle (kept when fading out)
+  bob: number;            // per-chip bob phase offset
+  phase: 'in' | 'orbit' | 'out';
   inT: number;
+  outT: number;
   fromX: number;
   fromY: number;
 }
@@ -187,12 +190,21 @@ export class Player {
     this.lookX = lerp(this.lookX, tx, Math.min(1, dt * 0.012));
     this.lookY = lerp(this.lookY, ty, Math.min(1, dt * 0.012));
 
-    // orbit item intake tween
-    for (const it of this.orbit) {
+    // orbit item intake tween + overflow fade-out
+    for (let i = this.orbit.length - 1; i >= 0; i--) {
+      const it = this.orbit[i];
       if (it.phase === 'in') {
         it.inT += dt / CONFIG.ABSORB_SHRINK_TIME;
         if (it.inT >= 1) it.phase = 'orbit';
+      } else if (it.phase === 'out') {
+        it.outT += dt / 220;
+        if (it.outT >= 1) this.orbit.splice(i, 1);
       }
+    }
+    // v5 §4: enforce the 6-chip cap after intake transitions (oldest fades out)
+    while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {
+      const idx = this.orbit.findIndex((o) => o.phase === 'orbit');
+      if (idx >= 0) this.orbit[idx].phase = 'out'; else break;
     }
   }
 
@@ -214,18 +226,21 @@ export class Player {
       tier: obj.tier,
       iconR: clamp(obj.size * 0.5, 14, 30),
       angle: Math.random() * Math.PI * 2,
+      slotA: 0,
+      bob: Math.random() * Math.PI * 2,
       phase: 'in',
       inT: 0,
+      outT: 0,
       fromX: obj.x,
       fromY: obj.y,
     });
     this.pendingFx.push({ type: 'absorb', x: obj.x, y: obj.y, color: CONFIG.COLORS.tierTint[obj.tier - 1] });
     this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: obj.kind });
 
-    // trim
+    // v5 §4: cap at 6 — the oldest fades out on overflow
     while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {
       const idx = this.orbit.findIndex((o) => o.phase === 'orbit');
-      if (idx >= 0) this.orbit.splice(idx, 1); else break;
+      if (idx >= 0) this.orbit[idx].phase = 'out'; else break;
     }
 
     this.checkMerge();
@@ -320,49 +335,89 @@ export class Player {
   }
 
   private drawOrbit(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number) {
+    // v5 §4: white circular chips on a faint dashed orbit at playerRadius+26
+    const CHIP_R = 11;                  // 22px chip
+    const ICON_R = CHIP_R * 0.7;        // icon fills 70%
+    const orbitR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET;
     const orbiting = this.orbit.filter((o) => o.phase === 'orbit');
-    const maxIcon = orbiting.reduce((m, o) => Math.max(m, o.iconR), 14);
-    const baseR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET + maxIcon;
+    const outs = this.orbit.filter((o) => o.phase === 'out');
 
-    // which tiers are one short of a merge -> gold telegraph
+    // faint dashed orbit path
+    if (orbiting.length + outs.length > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // tiers one short of a merge -> gold telegraph
     const need = this.twinMerge ? 2 : 3;
     const tierCount = new Map<number, number>();
     for (const o of orbiting) tierCount.set(o.tier, (tierCount.get(o.tier) || 0) + 1);
     const telegraph = new Set<number>();
     for (const [tier, n] of tierCount) if (n >= need - 1) telegraph.add(tier);
 
-    orbiting.forEach((it, i) => {
-      const a = it.angle + this.orbitClock * CONFIG.ORBIT_SPEED + (i / Math.max(1, orbiting.length)) * Math.PI * 2;
-      const ox = cx + Math.cos(a) * baseR;
-      const oy = cy + Math.sin(a) * baseR;
+    const spin = (this.orbitClock / 1000) * CONFIG.ORBIT_SPEED; // rad (0.6 rad/s)
+
+    const drawChip = (it: OrbitItem, a: number, alpha: number, rr: number) => {
+      const ox = cx + Math.cos(a) * rr;
+      const oy = cy + Math.sin(a) * rr;
       ctx.save();
       ctx.translate(ox, oy);
-      if (telegraph.has(it.tier)) {
+      ctx.globalAlpha = alpha;
+      const accent = CONFIG.COLORS.tierTint[it.tier - 1] || '#FFFFFF';
+      if (telegraph.has(it.tier) && it.phase === 'orbit') {
         const pulse = 0.5 + Math.sin(t / 140) * 0.5;
         ctx.save();
-        ctx.globalAlpha = 0.35 + pulse * 0.4;
+        ctx.globalAlpha = alpha * (0.3 + pulse * 0.4);
         ctx.fillStyle = '#FFD23F';
         ctx.beginPath();
-        ctx.arc(0, 0, it.iconR * 1.5, 0, Math.PI * 2);
+        ctx.arc(0, 0, CHIP_R + 5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
-      drawParkObject(ctx, it.kind, it.iconR, { t });
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(0, 0, CHIP_R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, CHIP_R - 1, 0, Math.PI * 2);
+      ctx.stroke();
+      drawParkObject(ctx, it.kind, ICON_R, { t });
       ctx.restore();
+    };
+
+    orbiting.forEach((it, i) => {
+      const a = spin + (i / orbiting.length) * Math.PI * 2;
+      it.slotA = a;
+      const twin = telegraph.has(it.tier);
+      const bob = Math.sin(t / 300 + it.bob) * 2;               // ±2px bob
+      const drift = twin ? Math.sin(t / 200 + i) * 3 : 0;        // gold drift
+      drawChip(it, a, 1, orbitR + bob + drift);
     });
 
-    // intake tween
+    // fading overflow chips drift outward
+    for (const it of outs) drawChip(it, it.slotA, 1 - it.outT, orbitR + it.outT * 18);
+
+    // intake tween (flying into the ring)
     for (const it of this.orbit) {
       if (it.phase !== 'in') continue;
       const e = it.inT;
-      const tx = cx + Math.cos(it.angle) * baseR;
-      const ty = cy + Math.sin(it.angle) * baseR;
+      const tx = cx + Math.cos(it.angle) * orbitR;
+      const ty = cy + Math.sin(it.angle) * orbitR;
       const px = lerp(it.fromX, tx, e);
       const py = lerp(it.fromY, ty, e);
       ctx.save();
       ctx.translate(px, py);
       ctx.globalAlpha = 0.5 + e * 0.5;
-      drawParkObject(ctx, it.kind, lerp(it.iconR * 2.2, it.iconR, e), { t });
+      drawParkObject(ctx, it.kind, lerp(it.iconR * 1.6, ICON_R, e), { t });
       ctx.restore();
     }
   }
