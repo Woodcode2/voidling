@@ -5,6 +5,10 @@ import App from './App';
 import './index.css';
 import './ui.css';
 
+// v5 §2: suppress the long-press callout menu and pinch/gesture zoom on touch.
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('gesturestart' as keyof DocumentEventMap, (e: Event) => e.preventDefault());
+
 if (import.meta.env.PROD) {
   // Production: register the PWA service worker for offline + installability.
   if ('serviceWorker' in navigator) {

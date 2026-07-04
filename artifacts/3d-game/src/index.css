@@ -5,6 +5,8 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* v5 §2: kill the grey iOS tap-highlight flash everywhere */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body, #root {
@@ -15,8 +17,13 @@ html, body, #root {
   overscroll-behavior: none;
 }
 
-body {
+/* v5 §2: no callout menu / text selection on the interactive surfaces */
+html, body, canvas {
+  -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  -webkit-tap-highlight-color: transparent;
+}
+
+canvas {
+  touch-action: none;
 }

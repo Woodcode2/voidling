@@ -214,8 +214,11 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           <div className="vd-sheet">
             <h2 className="vd-heading">PAUSED</h2>
             <button className="vd-btn vd-btn--play" onClick={() => engine.togglePause()}>RESUME</button>
-            <button className="vd-btn vd-btn--secondary" onClick={() => engine.toggleMute()}>
-              {snap.muted ? 'SOUND: OFF' : 'SOUND: ON'}
+            <button className="vd-btn vd-btn--secondary" onClick={() => engine.toggleMusic()}>
+              {snap.musicOn ? 'MUSIC: ON' : 'MUSIC: OFF'}
+            </button>
+            <button className="vd-btn vd-btn--secondary" onClick={() => engine.toggleSfx()}>
+              {snap.sfxOn ? 'SFX: ON' : 'SFX: OFF'}
             </button>
             <button className="vd-btn vd-btn--ghost" onClick={() => engine.goHome()}>QUIT ROUND</button>
           </div>

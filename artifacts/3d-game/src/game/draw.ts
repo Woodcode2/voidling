@@ -69,6 +69,35 @@ export function stickerEllipse(
   sticker(ctx, (c) => c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2), fill, opts);
 }
 
+// v5 §6 — silhouette-outline technique for COMPOSITE objects (trees/bushes/etc).
+// Draw every component enlarged in white (a single unified outline with no seams
+// where shapes overlap), then the colour fills on top, then details separately.
+export function silhouette(
+  ctx: CanvasRenderingContext2D,
+  parts: { path: (c: CanvasRenderingContext2D) => void; fill: string }[],
+  opts: { expand?: number; shadow?: boolean } = {}
+) {
+  const { expand = 4, shadow = true } = opts;
+  if (shadow) {
+    ctx.save();
+    ctx.translate(0, 4);
+    ctx.fillStyle = CONFIG.COLORS.shadow;
+    for (const p of parts) { ctx.beginPath(); p.path(ctx); ctx.fill(); }
+    ctx.restore();
+  }
+  // unified white silhouette: stroke+fill each part expanded by `expand`
+  ctx.save();
+  ctx.fillStyle = CONFIG.COLORS.outline;
+  ctx.strokeStyle = CONFIG.COLORS.outline;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = expand * 2;
+  for (const p of parts) { ctx.beginPath(); p.path(ctx); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+  // colour fills (no stroke — keeps interior seam-free)
+  for (const p of parts) { ctx.fillStyle = p.fill; ctx.beginPath(); p.path(ctx); ctx.fill(); }
+}
+
 // A soft two-tone highlight blob (upper-left sheen). Draw AFTER the fill.
 export function highlight(
   ctx: CanvasRenderingContext2D,

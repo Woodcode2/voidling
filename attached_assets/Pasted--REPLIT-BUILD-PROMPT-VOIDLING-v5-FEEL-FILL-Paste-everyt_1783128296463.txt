@@ -1,0 +1,90 @@
+# REPLIT BUILD PROMPT — VOIDLING v5: FEEL & FILL
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are fixing VOIDLING's game feel and filling out its world. v4's neighborhood exists; this pass corrects the camera and round start, dresses the empty ground, redesigns the orbit presentation, overhauls audio (including background music), sharpens rendering, and adds a hidden tuning panel. Follow every number literally. All standing rules hold: 60fps, portrait, canvas-drawn everything, ground never louder than the smallest edible.
+
+## 1 — Round start and camera (the headline fix)
+
+**Everyone starts equal.** The player and all 5 rivals begin every round at the identical radius of 22. Delete the seeded size spread. Rivals grow only by eating, same as the player.
+
+**The camera zooms OUT as you grow — never the reverse.** Implement:
+
+- `cameraViewHeight = clamp(680 + (playerRadius − 22) × 8, 680, 1500)` — the height of world visible on screen. At spawn you see 680px of world (the player reads ~55px tall, small in a big place); at radius 100 you see ~1300px (player ~130px, the world shrunk beneath you). Ease zoom changes with lerp 0.05 — zoom must feel like breathing, never stepping.
+- **Delete the camera dead zone.** Follow with position lerp 0.12 plus a lookahead offset of 70px in the normalized velocity direction, eased at lerp 0.08. The camera slightly leads where you're going.
+- On spawn, the camera starts already framed correctly — no zoom-in animation from a wrong state.
+
+## 2 — Kill the grey circle and clean the touch layer
+
+- CSS, applied globally: `* { -webkit-tap-highlight-color: transparent; }` and on html/body/canvas: `-webkit-touch-callout: none; user-select: none; -webkit-user-select: none;`
+- JS: `preventDefault()` on `contextmenu` and `gesturestart`; keep `touch-action: none` on the canvas.
+- The joystick anchor-ring visualization becomes a CONFIG flag, **default OFF**. Nothing should render at the touch point. If any grey/system artifact still appears on press-and-hold after this, hunt it down — zero visual noise at the finger is an acceptance criterion.
+
+## 3 — Fill the world (density math + a dressing layer)
+
+- **Shrink the world to 2400×2400** and raise object population to 350–450. Enforce a hard rule at generation time: **no circle of radius 300px anywhere in the world may contain zero edible objects.** Validate after generation; patch sparse spots with T1–T2 objects.
+- **Ground dressing layer** (drawn between ground and objects, all obeying the low-contrast rule, none colliding):
+  - Lawn mowing stripes: alternating bands ±3% lightness, ~90px wide, angle varying per lot.
+  - Scatter per lot: grass tufts, 3-petal daisies, clover patches, 2–3 fallen leaves — at 20–30% opacity.
+  - Stepping-stone path from each front door to the sidewalk; a welcome mat at each door.
+  - Flowerbed strips along house fronts; low picket fences between lots (thin, cream, decorative, non-colliding); hedge clusters at some corners.
+  - Roads: crosswalk stripes at intersections, occasional manhole circle, faint edge-grime line along curbs.
+- The screenshot test for this section: any random mid-game frame contains a house element, dressing details, and 12+ edibles. Flat empty green expanses may not exist anywhere.
+
+## 4 — Orbit ring: chips attached to you, not pickups on the field
+
+The current yellow badge icons read as loose objects lying on the map. Redesign:
+
+- Each eaten item renders as a **22px white circular chip** with a 2px accent ring in the item family's color and the item's icon at 70% scale inside.
+- Chips sit on a **faint dashed orbit path** (1px white at 25% opacity) at radius `playerRadius + 26px`, evenly spaced, rotating at 0.6 rad/s with a ±2px bob. They move 1:1 with the player — visibly *attached*, unmistakably not world objects.
+- Two-of-a-kind behavior stays: matching chips glow gold and drift toward each other; the third triggers the TRIPLE burst.
+- Cap 6 chips; oldest fades out on overflow.
+
+## 5 — Audio overhaul: gulp, not ding — and music
+
+**Replace the absorb "ding"** with a designed gulp-pop, fully synthesized, ~70ms:
+- Layer A: band-passed noise burst, 15ms — the "p" of the pop.
+- Layer B: triangle oscillator starting at 520Hz (plus the existing pitch-ladder semitone offset), bending **down** 30% over 55ms with exponential gain decay — the swallow.
+- Layer C: the per-family flavor (gnome squeak, can clatter, car crunch) stays layered underneath.
+- Merge/TRIPLE: a bright 3-note chord stab plus an upward noise sweep. Being chomped: a comedic descending wah.
+
+**Background music** — a procedural WebAudio loop, no audio files:
+- 104 BPM, C major, 8-bar loop: triangle bass on the roots of I–V–vi–IV; a soft square-wave lead playing a simple 8-note motif with rests (write something cheerful and singable, not a scale); a quiet sine pad holding chord tones; noise hi-hat on 8th notes at gain ~0.05, ~8% swing.
+- Master music gain 0.35. Duck music to 0.2 for 400ms during merge bursts and banners, then recover.
+- Intensity layer: when combo ≥ 2, hi-hats double to 16ths and the pad brightens slightly; drops back when the combo dies.
+- Music starts on first user interaction (autoplay rules), loops seamlessly, and pauses with the game.
+- The pause sheet gains **separate Music and SFX toggles**, both persisted.
+
+## 6 — Crisp pass
+
+- **Silhouette-outline technique for composite objects.** The trees currently render as overlapping outlined circles — a venn-diagram mess. For any multi-shape object (tree canopies, bushes, hedges, clouds): first draw all component shapes filled in white, each enlarged by 4px (this forms one unified outline), then draw the actual color fills on top, then interior details. **No white lines inside a silhouette, ever.** Rebuild the tree and bush draw functions this way.
+- The character's blur-halo glow has crept back. Re-enforce: **no `shadowBlur`, no radial-gradient halos on characters** — crisp concentric rings only, per the standing spec.
+- HUD overlap: the score currently hides behind the pause pill. Reflow the top bar — timer centered, score right-aligned with its right edge 8px left of the pause pill, combo label below the score. Verify at 375px width with a 4-digit score.
+
+## 7 — Debug tuning panel (how we dial in feel from here)
+
+- Loading the game with `?debug=1` shows a collapsible overlay panel (top-left, small): live sliders for `cameraViewHeight` base and growth factor, camera lerps and lookahead, acceleration, max speed, release friction, suction radius multiplier and pull speed, music and SFX gain, and object density multiplier. Plus an FPS counter.
+- Slider changes apply **live, mid-game**, writing into CONFIG.
+- A **"COPY CONFIG"** button copies the current values as formatted JSON to the clipboard.
+- No link to this from normal UI; it exists only via the URL flag. It ships in production harmlessly.
+
+## Acceptance criteria — verify each on a real phone
+
+- New round: your voidling and all rivals are visibly the same small size; the world feels large around you; as you grow, the view widens smoothly and the world reveals itself. At no point does the character fill the screen.
+- Press and hold anywhere: no grey circle, no magnifier, no highlight — nothing renders at the finger.
+- Camera motion has no lurch or catch-up snap; it gently leads your direction of travel.
+- Any three random mid-game screenshots each show ground dressing, a structure, and 12+ edibles. No flat empty green frame exists.
+- Eaten items appear as white chips on a dashed ring around you, moving with you; nobody could mistake them for map pickups.
+- Absorbing sounds like a pop-gulp that climbs in pitch on chains — not a bell. Music plays, loops cleanly, intensifies on combo, and ducks under merge banners; Music and SFX toggle independently and persist.
+- Trees and bushes have one clean unified outline with zero interior lines; the character glow is crisp rings, not blur.
+- Score never touches the pause pill, including at 4 digits on a 375px-wide screen.
+- `?debug=1` shows the panel; sliders change feel live; COPY CONFIG puts valid JSON on the clipboard; normal URLs show nothing.
+- Steady 60fps with music playing, traffic, 5 rivals, 350+ objects; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, ad/IAP SDKs, evolutions, frenzy, new skins, menus, shop, Daily Bite. This pass is feel, fill, sound, and sharpness. Nothing else.
+
+Order of work: camera/start → touch layer → world fill → orbit chips → audio → crisp pass → debug panel. One continuous pass.
