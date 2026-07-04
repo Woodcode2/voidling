@@ -45,6 +45,7 @@ export interface SkinDef {
   accessories: AccessoryType[];
   premium?: boolean;    // v7 §9: real-money skin (mock IAP)
   priceUSD?: number;    // v7 §9: display price for premium skins
+  eyeGlow?: string;     // v9 §6: glowing eye color (lava, dragon)
 }
 
 export interface BoonDef {
@@ -76,10 +77,13 @@ export const CONFIG = {
     { name: 'MUNCHER',     radius: 36 },
     { name: 'GOBBLER',     radius: 54 },
     { name: 'DEVOURER',    radius: 78 },
-    { name: 'WORLD EATER', radius: 105 },
+    // v9 §1: final threshold raised (105→125) so the crown/final form stays rare (~top 10%)
+    // v9 §3: final form renamed WORLD EATER → WORLD ENDER
+    { name: 'WORLD ENDER', radius: 125 },
   ] as { name: string; radius: number }[],
   FORM_SPEED_BONUS: 0.08,        // +8% move speed per form gained, stacking
   EVO_SLOWMO_MS: 600,
+  EVO_MORPH_MS: 500,             // v9 §3: body morph crossfade on each evolution
   EVO_SLOWMO_SCALE: 0.3,
   DEVOURER_FORM_INDEX: 3,        // leader decay applies above this form
 
@@ -103,8 +107,8 @@ export const CONFIG = {
   SHRINK_STORM_DURATION: 12000,
   SHRINK_STORM_SPEED_FRAC: 0.7,  // cloud speed vs base player speed
   SHRINK_STORM_LOSS: 0.12,
-  FIRETRUCK_DURATION: 8000,
-  FIRETRUCK_SLOW: 0.15,
+  FIRETRUCK_DURATION: 12000,     // v9 §5: TOWN FIGHTS BACK v2 lasts 12s
+  FIRETRUCK_SLOW: 0.25,          // v9 §5: 25% slow under spray
 
   // ── v6 §6: bot brain ──
   BOT_SATED_MS: 6000,            // after eating, only graze for this long
@@ -113,12 +117,14 @@ export const CONFIG = {
   BOT_NOEAT_MS: 6000,            // no eat for this long → retarget
   BOT_WALL_MARGIN: 150,          // start steering away within this of an edge
   BOT_WALL_FORCE: 1.2,           // repulsion strength near walls
+  BOT_PERCEPTION: 850,           // v9 §2: bots only sense within ~1.5 screen-widths (no global map knowledge)
+  BOT_AIM_ERROR_DEG: 15,         // v9 §2: ±aim error, re-corrected every 300–600ms
 
   // ── v6 §7: world edge fade to starfield ──
   EDGE_FADE: 60,
 
   // ── v6 §11: home ──
-  HOME_TAGLINE: 'THE CUTE WORLD EATER',
+  HOME_TAGLINE: 'THE CUTE WORLD ENDER',
 
   // Controls (relative-drag virtual joystick)
   JOYSTICK_MAX_DIST: 110,   // px from anchor for full speed
@@ -308,13 +314,14 @@ export const CONFIG = {
     { id: 'ninja',     name: 'Ninja',     cost: 800,  bodyColor: '#2A2A38', glowColor: '#5E6E8C', eyeStyle: 'angled', accessories: ['headband'] },
     { id: 'wizard',    name: 'Wizard',    cost: 1000, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
     { id: 'kitty',     name: 'Kitty',     cost: 600,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
-    { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#C42A2A', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
+    { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
     // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
-    { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#241155', glowColor: '#8A6BFF', eyeStyle: 'normal', accessories: ['sparkleTrail'] },
-    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#3A0D0D', glowColor: '#FF7A2B', eyeStyle: 'angry', accessories: [] },
-    { id: 'ghost',     name: 'Ghost',     cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#DDE6F2', glowColor: '#BFE6FF', eyeStyle: 'normal', accessories: [] },
-    { id: 'midas',     name: 'King Midas', cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#C99A17', glowColor: '#FFD23F', eyeStyle: 'normal', accessories: ['tiara'] },
-    { id: 'disco',     name: 'Disco',     cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#241A3A', glowColor: '#FF5AF0', eyeStyle: 'normal', accessories: [] },
+    { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#0D0821', glowColor: '#B98CFF', eyeStyle: 'normal', accessories: [] },
+    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#14090A', glowColor: '#FF7A2B', eyeStyle: 'angry', eyeGlow: '#FF6A00', accessories: [] },
+    { id: 'ghost',     name: 'Ghost',     cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#EAF2FF', glowColor: '#7FDBFF', eyeStyle: 'normal', accessories: [] },
+    { id: 'midas',     name: 'King Midas', cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#FFD447', glowColor: '#FFD23F', eyeStyle: 'normal', accessories: ['tiara'] },
+    { id: 'disco',     name: 'Disco',     cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#3A3A55', glowColor: '#FF5AF0', eyeStyle: 'normal', accessories: [] },
+    { id: 'dragon',    name: 'Dragon',    cost: 0, premium: true, priceUSD: 3.99, bodyColor: '#1DB954', glowColor: '#7CFF6B', eyeStyle: 'angry', eyeGlow: '#FFB000', accessories: [] },
   ] as SkinDef[],
 
   // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)

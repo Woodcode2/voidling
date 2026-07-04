@@ -1,0 +1,91 @@
+# REPLIT BUILD PROMPT — VOIDLING v9: DESTRUCTION INCARNATE
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are fixing VOIDLING's fairness architecture, evolution identity, and event drama. Work sections **in order**; verify every Acceptance Criteria line on the running game before reporting done, and explicitly confess anything skipped. Standing rules hold: 60fps, portrait, canvas-drawn, one art style, auras ≤ radius + 40px.
+
+## 1 — ONE VOID CLASS (fairness by architecture, not promises)
+
+- Refactor so the player and all bots are instances of a single `Void` class sharing the exact same functions for: growth (diminishing curve), absorb rules, size cap, leader decay, respawn-eat rules, underdog aura, and event effects. Controllers differ (input vs AI); physics and rules may not. Delete any bot-specific growth, scoring, or size code paths.
+- **Debug proof:** every 10s, log all six radii + masses to console. Across 3 test rounds, no bot may exceed the size an equally-skilled player could reach; if bots consistently out-size the player, the shared-path refactor is incomplete — keep going.
+- Fix the crown bug: crowns render ONLY for voids currently in the final form. If all six routinely reach it, the thresholds are tuned wrong — raise the final threshold until it's rare again (~top 10% of runs).
+
+## 2 — Bot personalities + fallibility (this is the "discovery")
+
+Bots keep the shared physics but get human texture:
+
+- **Perception limit:** bots only sense objects and voids within 1.5 screen-widths. No global map knowledge.
+- **Aim noise:** targeting has ±15° error, re-corrected every 300–600ms. **Mistakes:** 30% of retargets pick the second-best option.
+- **Five archetypes, one per bot, randomized names each round:** TIMID (grazes map edges, flees early at 30% size disadvantage), GREEDY (over-prioritizes golden objects, ignores danger), HUNTER (prefers stalking smaller voids over grazing), WANDERER (patrols in loops, eats opportunistically), BULLY (camps the mid-map, contests clusters, hunts only when clearly bigger).
+- SATED, anti-idle, wall-avoidance, and event reactions all stay. The result to hit: watching bots for 60 seconds, you can *tell them apart* by behavior.
+
+## 3 — Evolution identity: the BODY transforms every stage
+
+Accessory layers weren't enough. Each form now visibly morphs the void itself. (Final form renamed **WORLD ENDER** — update all strings, banners, results, share card; keep it a CONFIG string.)
+
+| Form | Body transformation (in addition to prior layers) |
+|---|---|
+| VOIDLING | baseline |
+| MUNCHER | body gains a soft inner core glow; energy ring becomes visible rotating dashes; pupils grow 15% |
+| GOBBLER | body darkens one shade with faint swirl texture; **debris finally fixed:** 3 orbiting recognizable chunks — a brick (red-brown rect with mortar line), a roof shingle (grey trapezoid), a fence picket (cream) — 12px, white-outlined |
+| DEVOURER | eyes turn glowing violet-white; 3 jagged crack lines glow across the body; **flames redesigned:** 7 actual flame shapes (teardrop with inner bright core + outer tone, flickering scale 0.9–1.1 at ~8Hz) replacing the finger blobs |
+| WORLD ENDER | full metamorphosis: body interior becomes a slowly swirling galaxy (2 nebula wisps + 6 pinprick stars inside a body mask), eyes blaze white with lens-flare crosses, a thin gravitational lens ring distorts just outside the outline, flame crown turns white-violet |
+
+- Transformation moments stay (slow-mo, shockwave, title card, sting) — but each also runs a 500ms **body morph tween** (old look crossfades to new) so the change is unmissable.
+- **Trail fix:** delete the brown oval trail. WORLD ENDER's path leaves jagged violet fissure segments (dark #2A1650 cracks with glowing #9D6BFF edges, 2–3 branching lines per step) fading over 8s. It must read as cracked reality, not anything brown.
+
+## 4 — The cosmic edge (the universe already got eaten)
+
+- Delete the hazard stripes and pixel-dither band entirely.
+- The world now ends in a **jagged torn-earth rim**: an irregular bitten edge (8–14px amplitude zigzag) with a thin soil-dark underside line, as if the neighborhood was ripped out of a planet.
+- Just beyond the rim: 6–10 small floating ground-chunks (grass-topped clods, a lone fence bit, half a flowerpot) drifting slowly outward and rotating, plus deep space with stars.
+- Along the rim itself: a thin **accretion glow** — a 3px violet-pink line that slowly undulates and shimmers, brightening subtly near the player.
+- Wall physics unchanged (soft bounce at the visual rim). Roads still terminate at hedges before the rim.
+
+## 5 — Events v3: killer, with teeth
+
+- **TOWN FIGHTS BACK v2** (any void reaching WORLD ENDER): **4 firetrucks + 2 police cars** with flashing light bars converge from off-screen with a siren layer. Water arcs visibly push the target (25% slow + slight knockback). **Real damage:** every 2 full seconds under spray = −3% mass, capped at −15% per event, never below a reached form's floor. Duration 12s. **The trucks are edible by a WORLD ENDER** — eating one fires the callout "DELICIOUS IRONY!" (+500 score) and removes it from the assault. Dodge it or eat it; ignoring it now costs you.
+- **SHRINK STORM:** add 3 telegraphed lightning strikes (ground ring flashes 0.8s, then bolt + crack sound, −8% to anything standing in it) while the cloud hunts. Screen dims 8% during the storm.
+- **METEOR SNACK SHOWER:** each impact adds a 2px screen bump and dust ring; the sky tints warm during it.
+- Event banners get 30% bigger with a dedicated horn per event. Every event must change how you play for its duration — that's the test.
+
+## 6 — Premium skins: exact specs, no interpretation (attempt three)
+
+**Hard rule: no premium body color may have saturation below 60%** (exceptions: Ghost's white, Galaxy's deep base). If any skin reads brown or muddy, it is wrong — fix before reporting. Draw in the exact layer order given. Effects run live in shop cards, preview modal, and in-game (including on bots).
+
+- **GALAXY $2.99** — base #0D0821; layer 2: two nebula blobs #FF3CAC and #2BD2FF at 40% opacity drifting inside a body clip mask; layer 3: 8 white 1–2px stars twinkling; layer 4: orbiting comet (white head, 12px fading tail); rim light #B98CFF.
+- **LAVA $1.99** — base #14090A (near-black, NOT brown); crack network in #FF4D00 with #FFC300 cores, pulsing glow 1.5s cycle; 4 embers/s rising and fading; eyes glow #FF6A00.
+- **GHOST $1.99** — body #EAF2FF at 55% opacity; wavering sine outline; two trailing wisps; detached soft shadow 6px below; cyan #7FDBFF rim; 20%-opacity phase flicker every ~5s.
+- **KING MIDAS $2.99** — body metallic gold: base #FFD447, bottom shade #C9971C, diagonal sheen band #FFF3C4 sweeping every 2s; jeweled crown (#FFD447 with #FF3CAC / #2BD2FF / #7CFF6B gems); coin sparkles shed while moving.
+- **DISCO $2.99** — facet grid of alternating #3A3A55 / #52527A tiles with 2–3 white specular flashes/s; 6 saturated rainbow dots (#FF3CAC #FFD23F #2BD2FF #7CFF6B) sweeping the ground; music-note particles while moving.
+- **DRAGON $3.99 (new flagship)** — body #1DB954-to-#0E7A3C scale rows (draw 3 arcs of overlapping scale semicircles), two cream horns, small spine ridges, amber glowing eyes #FFB000, a smoke puff from the mouth every 3s, and on any TRIPLE it exhales a brief 300ms flame lick. Flavor: "Technically also a void."
+- **Coin-skin fix:** DEVIL's body becomes true red #E63946 with darker #B02A35 shading (it is currently brown).
+
+## 7 — Onboarding timing
+
+- The 3-panel intro no longer appears on first load over the home screen. It shows **after the first PLAY tap**, before the first countdown. The "?" on home still replays it. Home screen loads clean.
+
+## 8 — One secret (discovery seed)
+
+- Eating **all garden gnomes on the map in a single round** fires a hidden callout "GNOME LORD 👑" (drawn crown, not emoji), +150 coins, and a "Gnome Lord" line on the results screen. Not documented anywhere in-game. Let players find it.
+
+## Acceptance criteria — verify every line on a real phone
+
+- Console logs six radii every 10s; across 3 rounds bots and player stay within a fair band; no code path exists where bot growth differs from player growth (cite the shared class in your report).
+- Watching bots 60s: at least three behave visibly differently (name the archetypes you observed). A bot visibly misses/mistakes a target at least once.
+- Each evolution visibly morphs the BODY (crossfade tween observed); GOBBLER debris is a brick/shingle/picket — zero dark squares anywhere; DEVOURER shows real flickering flames and glowing eyes; WORLD ENDER shows the internal galaxy + lens ring; all strings say WORLD ENDER.
+- The trail is violet glowing fissures; nothing brown follows the player.
+- The world edge: torn earth rim, floating ground chunks drifting in space, undulating accretion glow — no hazard stripes, no pixel dither.
+- TOWN FIGHTS BACK: 6 vehicles converge with sirens; staying in spray visibly drains mass; eating a truck fires DELICIOUS IRONY. The storm's lightning telegraphs then strikes. Meteor impacts bump the screen.
+- Shop: LAVA is black with neon orange cracks (zero brown), GALAXY has moving nebula + stars + comet, MIDAS has a sweeping sheen, DISCO flashes and casts rainbow dots, DRAGON has scales/horns/smoke and flames on TRIPLE, DEVIL is red. All effects animate inside the shop cards.
+- First load: home screen is clean; intro appears only after tapping PLAY the first time.
+- Eat every gnome in one round: GNOME LORD fires with drawn crown and +150 coins.
+- Steady 60fps during TOWN FIGHTS BACK with full population; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, real payments, Daily Bite, balance constants from v7 (the shared-class refactor must preserve them, not retune them), debug panel (keep working, add the radius logging).
+
+Work strictly in order 1→8, then self-audit against the acceptance list and report deviations explicitly.

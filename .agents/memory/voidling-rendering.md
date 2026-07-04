@@ -45,6 +45,21 @@ description: Canvas render-transform state, hot-path perf rules, and the mission
   population). **Why:** the union type doesn't force a KIND_INFO row. When adding an object kind,
   add its KIND_INFO sizing row in the same edit.
 
+## Fixed-count event spawners: count total, never live-array length
+- A limited spawner ("exactly N lightning strikes per storm") must gate on a running
+  total counter reset when the parent event starts, NOT on `activeArray.length < N`.
+  Expired entries are spliced out, which frees slots and lets extra spawns slip through
+  late in the window. **Why:** the SHRINK-STORM strike cap allowed a 4th strike because
+  the check used the live `strikes[]` length. **How to apply:** any bounded-per-event
+  spawner (strikes, waves) keeps a `xCount` incremented on spawn, gated `xCount < N`,
+  reset in both the event-start method and `reset()`.
+
+## Storm dim / meteor tint / screen bump are engine-side, event-driven
+- Full-screen tints (storm 8% dim, meteor warm tint) live in `engine.drawPostFX`, gated on
+  boolean getters exposed by EventManager (`stormActive`, `meteorActive`) — the event file
+  never draws screen-space overlays itself (it renders in world space before the post-fx
+  pass). A one-off "screen bump" is just `fx.shake(dur, smallAmp, freq)`, not a new system.
+
 ## Missions have no numeric targets
 - `meta.ts` missions are only `{id, progress, completed}` — there is **no** target/threshold
   field anywhere, and no mission UI surfaces them. So a spec item like "daily mission

@@ -3,6 +3,7 @@ import { audio } from './audio';
 import { FXManager } from './fx';
 import { WorldManager } from './world';
 import { Player } from './player';
+import { Void } from './void';
 import { makeRivals, type Rival, type WorldView } from './rivals';
 import { meta } from './meta';
 import { track } from './services';
@@ -25,6 +26,7 @@ export interface ResultData {
   reachedForm: string;    // v6 §3: highest evolution form reached
   reachedIndex: number;
   worldEater: boolean;
+  gnomeLord?: boolean;    // v9 §8: secret — ate every gnome in one round
   skinTease?: { botName: string; skinName: string; skinId: string } | null; // v7 §8
   // v7 §11: player-level meta
   xpGain: number;
@@ -134,6 +136,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let slowmo = 0;                 // ms of slow-motion remaining (finale/evolution)
   let coinBonus = 0;             // extra coins already granted mid-round (finale)
   let evoCoinBonus = 0;         // v6 §3: WORLD EATER results bonus (+200)
+  let gnomeLord = false;        // v9 §8: secret — ate every gnome this round
   let goldenTimer = 0;          // v6 §2: golden-object spawn cadence (from 2:45)
   let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
@@ -153,6 +156,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let grainCanvas: HTMLCanvasElement | null = null;
   let grainPattern: CanvasPattern | null = null;
   let decayLogAccum = 0;   // v7 §1: throttle for the leader-decay debug log
+  let radiiLogAccum = 0;   // v9 §1: 10s cadence for the fairness radius/mass proof log
 
   // daily modifier round flags
   let baseGreed = 1;
@@ -250,6 +254,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     paused = false;
     coinBonus = 0;
     evoCoinBonus = 0;
+    gnomeLord = false;
     goldenTimer = 0;
     luckyTimer = 0;
     dashTimer = 0;
@@ -397,6 +402,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       score: player.score, placement, total: board.length, devoured,
       coins, isDaily, crown, highScore: meta.data.highScore, newBest,
       reachedForm: player.formName, reachedIndex: player.formIndex, worldEater,
+      gnomeLord,
       skinTease,
       xpGain, level: meta.data.level, xpInLevel: meta.data.xp,
       xpNext: xpForLevel(meta.data.level), leveledTo,
@@ -537,8 +543,28 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v6 §2: catch-up economy — underdog aura + leader decay
     applyCatchUp(dt);
 
+    // v9 §1: fairness proof — every 10s log all six radii + masses. If bots
+    // consistently out-size the player, the shared-Void refactor is incomplete.
+    radiiLogAccum += dt;
+    if (radiiLogAccum >= 10000) {
+      radiiLogAccum = 0;
+      const all: Void[] = [player, ...rivals];
+      const line = all
+        .map((v) => `${v === player ? 'YOU' : (v as Rival).name}: r=${v.radius.toFixed(1)} m=${Math.round(v.mass)} (${v.formName})`)
+        .join('  |  ');
+      console.debug('[radii] ' + line);
+    }
+
     // v6 §5: world events
     events.update(dt, timeLeft);
+
+    // v9 §8: secret — the moment the last gnome is eaten, crown the GNOME LORD
+    if (world.gnomeLordPending && !gnomeLord) {
+      gnomeLord = true;
+      coinBonus += 150;
+      banner('GNOME LORD! +150', '#8FE36B', 5, { sparkles: true });
+      audio.playWin();
+    }
     // v8 §7: FRENZY MINUTE — ×1.25 score (double streaks handled in the chomp loop)
     player.frenzyMult = events.frenzyActive ? 1.25 : 1;
 
@@ -618,33 +644,19 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   function applyCatchUp(dt: number) {
     if (!player) return;
     const dtSec = dt / 1000;
-    const standings = [player as Player | Rival, ...rivals].sort((a, b) => b.score - a.score);
-    for (let i = 0; i < standings.length; i++) {
-      const e = standings[i];
-      const under = i >= 4; // 5th place onward
-      if (e === player) {
-        player.underdog = under;
-        player.underdogSpeed = under ? 1 + CONFIG.UNDERDOG_SPEED : 1;
-        player.underdogGrowth = under ? 1 + CONFIG.UNDERDOG_GROWTH : 1;
-      } else {
-        const r = e as Rival;
-        r.underdog = under;
-        r.underdogSpeed = under ? 1 + CONFIG.UNDERDOG_SPEED : 1;
-        r.underdogGrowth = under ? 1 + CONFIG.UNDERDOG_GROWTH : 1;
-      }
-    }
+    // v9 §1: player + all bots are Void instances — the SAME setUnderdog()/
+    // applyLeaderDecay() run for everyone, so no controller can be treated specially.
+    const standings: Void[] = [player, ...rivals].sort((a, b) => b.score - a.score);
+    for (let i = 0; i < standings.length; i++) standings[i].setUnderdog(i >= 4); // 5th place onward
     const leader = standings[0];
-    const leaderForm = leader === player ? player.formIndex : (leader as Rival).reachedForm;
-    if (leaderForm >= CONFIG.DEVOURER_FORM_INDEX) {
-      const floor = leader === player ? player.formFloor : (leader as Rival).formFloor;
-      const before = leader.radius;
-      leader.radius = Math.max(floor, leader.radius * (1 - CONFIG.LEADER_DECAY_RATE * dtSec));
+    const shed = leader.applyLeaderDecay(dtSec);
+    if (shed > 0) {
       // v7 §1: debug — confirm leader decay applies (to bots too), throttled to ~1/s
       decayLogAccum += dt;
       if (decayLogAccum >= 1000) {
         decayLogAccum = 0;
         const who = leader === player ? 'YOU' : (leader as Rival).name;
-        console.debug(`[decay] leader ${who} r=${before.toFixed(1)}→${leader.radius.toFixed(1)} (${(CONFIG.LEADER_DECAY_RATE * 100).toFixed(1)}%/s)`);
+        console.debug(`[decay] leader ${who} shed ${shed.toFixed(2)}px → r=${leader.radius.toFixed(1)} (${(CONFIG.LEADER_DECAY_RATE * 100).toFixed(1)}%/s)`);
       }
     }
   }
@@ -767,13 +779,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.scale(camZoom, camZoom);
     ctx.translate(-camCX, -camCY);
 
-    world.drawGround(ctx, view);
+    world.drawGround(ctx, view, clock, player?.x ?? camCX, player?.y ?? camCY);
     world.drawDressing(ctx, view, clock);
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);
     drawPowerAuras(clock); // v6 §4: auras under the player
     player.draw(ctx, clock, alpha);
+    if (gnomeLord) drawGnomeCrown(clock); // v9 §8: secret GNOME LORD crown
 
     if (!paused) fx.update(frameDt);
     fx.draw(ctx);
@@ -860,10 +873,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // leaderboard (top left, dark backdrop, dropped below the timer so it never
     // overlaps the centred timer/bar at narrow widths e.g. 375px)
-    const weRadius = CONFIG.FORMS[CONFIG.FORMS.length - 1].radius;
+    // v9 §1: crowns render ONLY for voids currently in the final (WORLD ENDER) form
+    const finalForm = CONFIG.FORMS.length - 1;
     const board = [
-      { name: 'You', score: player.score, color: player.skin.glowColor, me: true, radius: player.radius },
-      ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, radius: r.radius })),
+      { name: 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm },
+      ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm })),
     ].sort((a, b) => b.score - a.score);
     const LB_X = 8, LB_W = 150, LB_TOP = 84, ROW = 20;
     const lbH = board.length * ROW + 12;
@@ -891,8 +905,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.font = (e.me ? '700 ' : '600 ') + '12px Nunito, sans-serif';
       const nm = e.name.length > 9 ? e.name.slice(0, 8) + '…' : e.name;
       ctx.fillText(nm, LB_X + 38, y);
-      // v6 §3: crown WORLD EATERs on the leaderboard
-      if (e.radius >= weRadius) drawMiniCrown(LB_X + 42 + ctx.measureText(nm).width, y - 8);
+      // v9 §1: crown only voids currently at the final form on the leaderboard
+      if (e.final) drawMiniCrown(LB_X + 42 + ctx.measureText(nm).width, y - 8);
       ctx.textAlign = 'right';
       ctx.fillText(String(e.score), LB_X + LB_W - 8, y);
       ctx.textAlign = 'left';
@@ -928,8 +942,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.globalAlpha = clamp(alpha, 0, 1);
       ctx.translate(fw / 2 + dx, cy);
       ctx.scale(scale, scale);
-      ctx.font = '800 27px Fredoka, sans-serif';
-      ctx.lineWidth = 6;
+      ctx.font = '800 35px Fredoka, sans-serif'; // v9 §5: banners 30% bigger
+      ctx.lineWidth = 8;
       ctx.strokeStyle = 'rgba(20,8,43,0.7)';
       ctx.strokeText(callout.text, 0, 0);
       ctx.fillStyle = callout.color;
@@ -1023,7 +1037,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillStyle = '#FFD23F';
       ctx.font = '800 14px Fredoka, sans-serif';
       ctx.textBaseline = 'middle';
-      ctx.fillText('★ WORLD EATER ★', fw / 2, pillY + pillH / 2 + 1);
+      ctx.fillText('★ WORLD ENDER ★', fw / 2, pillY + pillH / 2 + 1);
       ctx.textBaseline = 'alphabetic';
       ctx.restore();
     }
@@ -1251,6 +1265,34 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     grainCanvas = c;
     return c;
   }
+  // v9 §8: a little golden crown floating above the GNOME LORD (secret reward)
+  function drawGnomeCrown(clock: number) {
+    if (!player) return;
+    const cw = Math.max(18, player.radius * 0.7);
+    const cy = player.y - player.radius - cw * 0.9 - Math.sin(clock / 400) * 3;
+    ctx.save();
+    ctx.translate(player.x, cy);
+    ctx.fillStyle = '#FFD23F';
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = Math.max(1, cw * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(-cw / 2, cw * 0.35);
+    ctx.lineTo(-cw / 2, -cw * 0.15);
+    ctx.lineTo(-cw / 4, cw * 0.1);
+    ctx.lineTo(0, -cw * 0.32);
+    ctx.lineTo(cw / 4, cw * 0.1);
+    ctx.lineTo(cw / 2, -cw * 0.15);
+    ctx.lineTo(cw / 2, cw * 0.35);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // gem dots
+    for (const gx of [-cw / 3, 0, cw / 3]) {
+      ctx.fillStyle = gx === 0 ? '#FF6FB0' : '#8ECBFF';
+      ctx.beginPath(); ctx.arc(gx, cw * 0.18, cw * 0.07, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawPostFX(clock: number) {
     // the grain tile never changes, so build its repeat pattern once
     if (!grainPattern) grainPattern = ctx.createPattern(getGrain(), 'repeat');
@@ -1265,6 +1307,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.restore();
     }
     ctx.drawImage(getVignette(), 0, 0);
+
+    // v9 §5: SHRINK STORM dims the scene 8%; METEOR SHOWER tints the sky warm
+    if (events.stormActive) {
+      ctx.save();
+      ctx.globalAlpha = 0.08; ctx.fillStyle = '#0A1030';
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.restore();
+    }
+    if (events.meteorActive) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'overlay';
+      ctx.globalAlpha = 0.12; ctx.fillStyle = '#FF8A3C';
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.restore();
+    }
 
     // v7 §6: WORLD EATER — reality warps ONLY at the screen edges (never a
     // character-attached ring), a pulsing violet edge bloom.

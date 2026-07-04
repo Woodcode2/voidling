@@ -1,6 +1,7 @@
 import { CONFIG, type SkinDef } from './config';
 import { meta } from './meta';
-import { clamp, lerp, dist, growRadius } from './utils';
+import { clamp, lerp, dist } from './utils';
+import { Void } from './void';
 import { drawVoidling, drawUnderdogTrail } from './voidling';
 import type { WorldObject } from './world';
 
@@ -15,28 +16,16 @@ export interface RivalController {
   think(rival: Rival, view: WorldView, dt: number): Intent;
 }
 
-export class Rival {
-  x = 0; y = 0; prevX = 0; prevY = 0;
-  vx = 0; vy = 0;                    // px/s
+export class Rival extends Void {
   private inDirX = 0; private inDirY = 0; private inMag = 0;
-  radius = CONFIG.PLAYER_BASE_RADIUS;
-  score = 0;
   alive = true;
-  ghostTime = 0;
 
-  name: string;
   country: string;
-  skin: SkinDef;
   controller: RivalController;
   speedScale: number;
 
-  // v6 §2/§3: catch-up + evolution
-  underdogSpeed = 1;
-  underdogGrowth = 1;
-  underdog = false;
-  eventSlow = 1;          // v6 §5: event slow (firetruck water), reset each frame
+  // v9 §1: radius/score/formIndex/ghostTime/underdog*/eventSlow/skin/name are on Void
   eventFlee: { x: number; y: number } | null = null; // v7 §4: hazard to run from
-  reachedForm = 0;
   // v7 §8: which shop skin this bot is showing off this round
   wearsUnownedSkin = false;
   shopSkinId = '';
@@ -60,14 +49,12 @@ export class Rival {
   private breathePhase = Math.random() * 1000;
 
   constructor(name: string, country: string, skin: SkinDef, controller: RivalController, speedScale = 1) {
+    super(skin);
     this.name = name;
     this.country = country;
-    this.skin = skin;
     this.controller = controller;
     this.speedScale = speedScale;
   }
-
-  get ghost() { return this.ghostTime > 0; }
 
   spawn(x: number, y: number, radius: number) {
     this.x = this.prevX = x;
@@ -83,6 +70,7 @@ export class Rival {
   }
 
   update(dt: number, view: WorldView) {
+    this.tickMorph(dt); // v9 §3: advance the body-morph crossfade
     const intent = this.controller.think(this, view, dt);
     this.setInput(intent.dirX, intent.dirY, intent.mag);
 
@@ -90,7 +78,7 @@ export class Rival {
     const grown = this.radius / CONFIG.PLAYER_BASE_RADIUS;
     const sizeFactor = clamp(1.05 - grown * 0.05, 0.7, 1.05);
     // v6 §2/§3: form speed bonus (+8% each, stacking) + underdog boost
-    const formSpeed = 1 + this.reachedForm * CONFIG.FORM_SPEED_BONUS;
+    const formSpeed = 1 + this.formIndex * CONFIG.FORM_SPEED_BONUS;
     const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedScale * sizeFactor * 0.95 * formSpeed * this.underdogSpeed * this.eventSlow;
 
     const tvx = this.inDirX * this.inMag * maxSpeed;
@@ -153,31 +141,20 @@ export class Rival {
 
   eatObject(obj: WorldObject) {
     this.score += Math.round(obj.size * 1.3 * (obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1) * (obj.kind === 'drone' ? CONFIG.DRONE_SCORE_MULT : 1));
-    this.radius = growRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
+    this.absorbObjectMass(obj.size); // v9 §1: shared growth curve + size cap
     this.chompV = 1;
     this.satedTime = CONFIG.BOT_SATED_MS;
     this.timeSinceEat = 0;
-    this.updateForm();
+    this.advanceForms();
   }
 
   eatVoid(radius: number) {
     this.score += 400;
-    this.radius = growRadius(this.radius, Math.PI * radius * radius * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
+    this.absorbVoidMass(radius); // v9 §1: shared growth curve + size cap
     this.chompV = 1;
     this.satedTime = CONFIG.BOT_SATED_MS;
     this.timeSinceEat = 0;
-    this.updateForm();
-  }
-
-  // v6 §3: promote through the form ladder (rivals evolve too)
-  private updateForm() {
-    while (this.reachedForm < CONFIG.FORMS.length - 1 && this.radius >= CONFIG.FORMS[this.reachedForm + 1].radius) {
-      this.reachedForm++;
-    }
-  }
-
-  get formFloor() {
-    return Math.max(CONFIG.PLAYER_BASE_RADIUS, CONFIG.FORMS[this.reachedForm].radius);
+    this.advanceForms();
   }
 
   // Respawn small elsewhere, briefly ghosted; keep cumulative score.
@@ -185,7 +162,7 @@ export class Rival {
   getEaten(avoidX?: number, avoidY?: number, minDist = 0) {
     const m = CONFIG.MAP_SIZE;
     // v6 §3: being chomped can't demote below a form already reached
-    this.radius = Math.max(this.formFloor, this.radius * CONFIG.RESPAWN_MASS_FRAC);
+    this.shrinkOnEaten();
     let nx = 200 + Math.random() * (m - 400);
     let ny = 200 + Math.random() * (m - 400);
     if (avoidX !== undefined && avoidY !== undefined && minDist > 0) {
@@ -219,7 +196,8 @@ export class Rival {
       glow: 0.15,
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
-      form: this.reachedForm,
+      form: this.formIndex,
+      morph: this.morph,
     });
     this.drawTag(ctx, rx, ry);
   }
@@ -252,13 +230,42 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+// v9 §2: five bot archetypes, one assigned per bot and randomized each round.
+export type Archetype = 'TIMID' | 'GREEDY' | 'HUNTER' | 'WANDERER' | 'BULLY';
+export const ARCHETYPES: Archetype[] = ['TIMID', 'GREEDY', 'HUNTER', 'WANDERER', 'BULLY'];
+
+interface Personality {
+  fleeThreat: number;    // flee from a void >= rival.radius * this
+  fleeRange: number;     // flee-detection distance multiplier
+  huntAggroMin: number;  // aggression required before it will hunt voids
+  huntAdvantage: number; // must out-size a void by this ratio to hunt it
+  goldenBias: number;    // graze weighting toward golden snacks
+  grazeRange: number;    // only graze within radius*this (Infinity = anywhere in sight)
+  homeBias: number;      // -1 hugs the edges, +1 camps the centre, 0 neutral
+}
+
+// TIMID grazes edges & flees early; GREEDY chases gold & ignores danger; HUNTER
+// stalks smaller voids; WANDERER patrols & eats opportunistically; BULLY camps
+// mid-map and only hunts when clearly bigger.
+const PERSONALITIES: Record<Archetype, Personality> = {
+  TIMID:    { fleeThreat: 1.02, fleeRange: 1.7,  huntAggroMin: 0.95, huntAdvantage: 1.6,  goldenBias: 1,   grazeRange: Infinity, homeBias: -1 },
+  GREEDY:   { fleeThreat: 1.6,  fleeRange: 0.6,  huntAggroMin: 0.7,  huntAdvantage: 1.15, goldenBias: 6,   grazeRange: Infinity, homeBias: 0 },
+  HUNTER:   { fleeThreat: 1.12, fleeRange: 1.0,  huntAggroMin: 0.3,  huntAdvantage: 1.12, goldenBias: 1,   grazeRange: Infinity, homeBias: 0 },
+  WANDERER: { fleeThreat: 1.15, fleeRange: 1.0,  huntAggroMin: 0.6,  huntAdvantage: 1.25, goldenBias: 1,   grazeRange: 6,        homeBias: 0 },
+  BULLY:    { fleeThreat: 1.3,  fleeRange: 0.85, huntAggroMin: 0.5,  huntAdvantage: 1.45, goldenBias: 1.5, grazeRange: Infinity, homeBias: 1 },
+};
+
 // ── Bot brain: GRAZE / HUNT / FLEE with a time-based aggression curve ──────────
 // Aggression is 0 for the first AGGRO_START_MS, then ramps linearly to 1.0 by
-// AGGRO_FULL_MS. Bots may only graze until aggression >= HUNT_MIN_AGGRO; only
-// then may they HUNT (target other voids, including the player).
+// AGGRO_FULL_MS. Bots may only graze until aggression >= huntAggroMin; only then
+// may they HUNT (target other voids). v9 §2: perception is limited to
+// BOT_PERCEPTION (no global map knowledge), targeting carries a re-corrected aim
+// error, and 30% of retargets fumble to the 2nd-best pick.
 export class BotController implements RivalController {
   kind = 'bot';
   state: 'GRAZE' | 'HUNT' | 'FLEE' = 'GRAZE';
+  readonly arch: Archetype;
+  private p: Personality;
   private decisionTimer = 0;
   private reactionDelay: number;
   private tx = 0; private ty = 0;
@@ -266,33 +273,55 @@ export class BotController implements RivalController {
   private roamAngle = Math.random() * Math.PI * 2;
   private roamTimer = 0;
   private bias: number;   // personality bias on target scoring
-  private relocating = false;   // v7 §1: committed march to a far dense cluster
+  private relocating = false;   // v7 §1: committed march to a far random point
+  private aimError = 0;   // v9 §2: current ±aim error (radians)
+  private aimTimer = 0;   // v9 §2: countdown to re-roll the aim error
 
-  constructor(reactionDelay = 240, bias = 1) {
+  constructor(reactionDelay = 240, bias = 1, arch: Archetype = 'HUNTER') {
     this.reactionDelay = reactionDelay;
     this.bias = bias;
+    this.arch = arch;
+    this.p = PERSONALITIES[arch];
   }
 
   private aggressionFrom(elapsed: number) {
     return clamp((elapsed - CONFIG.AGGRO_START_MS) / (CONFIG.AGGRO_FULL_MS - CONFIG.AGGRO_START_MS), 0, 1);
   }
 
+  // v9 §2: re-roll a fresh ±BOT_AIM_ERROR_DEG aim error every 300–600ms
+  private updateAim(dt: number) {
+    this.aimTimer -= dt;
+    if (this.aimTimer <= 0) {
+      this.aimTimer = 300 + Math.random() * 300;
+      this.aimError = (Math.random() * 2 - 1) * (CONFIG.BOT_AIM_ERROR_DEG * Math.PI / 180);
+    }
+  }
+
+  // v9 §2: rotate a targeting intent by the current aim error (survival/flee is exact)
+  private aim(intent: Intent): Intent {
+    if (!this.aimError) return intent;
+    const a = Math.atan2(intent.dirY, intent.dirX) + this.aimError;
+    return { dirX: Math.cos(a), dirY: Math.sin(a), mag: intent.mag };
+  }
+
   think(rival: Rival, view: WorldView, dt: number): Intent {
     const aggression = this.aggressionFrom(view.elapsed);
+    this.updateAim(dt);
+    const perceive = CONFIG.BOT_PERCEPTION; // v9 §2: limited sight, no global map knowledge
 
-    // v7 §1: anti-idle — a stuck bot commits to marching at a far dense cluster
+    // v7 §1: anti-idle — a stuck bot commits to marching to a far random point
     if (rival.forceRetarget) {
       rival.forceRetarget = false;
       this.pickRelocate(rival, view);
     }
 
-    // FLEE is always evaluated (survival first)
+    // FLEE is always evaluated (survival first) — within sight only
     let threat: VoidView | null = null;
     let threatD = Infinity;
     for (const v of view.voids) {
-      if (v.radius >= rival.radius * CONFIG.RIVAL_EAT_RATIO) {
+      if (v.radius >= rival.radius * this.p.fleeThreat) {
         const d = dist(rival.x, rival.y, v.x, v.y);
-        if (d < rival.radius * 7 + 100 && d < threatD) { threatD = d; threat = v; }
+        if (d < perceive && d < rival.radius * 7 * this.p.fleeRange + 100 && d < threatD) { threatD = d; threat = v; }
       }
     }
     if (threat) {
@@ -311,14 +340,14 @@ export class BotController implements RivalController {
       return this.avoidWalls(rival, { dirX: Math.cos(a), dirY: Math.sin(a), mag: 1 });
     }
 
-    // v7 §1: while relocating, march straight to the cluster until we arrive
+    // v7 §1: while relocating, march to the point until we arrive (with aim wobble)
     if (this.relocating) {
       const dd = dist(rival.x, rival.y, this.tx, this.ty);
       if (dd < 180) { this.relocating = false; this.hasTarget = false; this.decisionTimer = 0; }
       else {
         this.state = 'HUNT';
         const dx = this.tx - rival.x, dy = this.ty - rival.y, d = Math.hypot(dx, dy) || 1;
-        return this.avoidWalls(rival, { dirX: dx / d, dirY: dy / d, mag: 1 });
+        return this.avoidWalls(rival, this.aim({ dirX: dx / d, dirY: dy / d, mag: 1 }));
       }
     }
 
@@ -327,24 +356,32 @@ export class BotController implements RivalController {
     if (this.decisionTimer <= 0 || !this.hasTarget) {
       this.decisionTimer = this.reactionDelay + Math.random() * 120;
       // v6 §6: SATED bots graze only — no hunting for a beat after a meal
-      this.pickTarget(rival, view, rival.satedTime > 0 ? 0 : aggression);
+      this.pickTarget(rival, view, rival.satedTime > 0 ? 0 : aggression, perceive);
     }
 
     if (!this.hasTarget) {
-      // roam
+      // roam — homeBias steers TIMID toward edges and BULLY toward the centre
       this.state = 'GRAZE';
       this.roamTimer -= dt;
       if (this.roamTimer <= 0) {
         this.roamAngle += (Math.random() - 0.5) * 1.6;
         this.roamTimer = 1200 + Math.random() * 1200;
       }
-      return this.avoidWalls(rival, { dirX: Math.cos(this.roamAngle), dirY: Math.sin(this.roamAngle), mag: 0.55 });
+      let rdx = Math.cos(this.roamAngle), rdy = Math.sin(this.roamAngle);
+      if (this.p.homeBias !== 0) {
+        let hx = view.map / 2 - rival.x, hy = view.map / 2 - rival.y;
+        const hd = Math.hypot(hx, hy) || 1;
+        const w = 0.5 * this.p.homeBias; // + toward centre, - toward edge
+        rdx += (hx / hd) * w; rdy += (hy / hd) * w;
+        const rd = Math.hypot(rdx, rdy) || 1; rdx /= rd; rdy /= rd;
+      }
+      return this.avoidWalls(rival, this.aim({ dirX: rdx, dirY: rdy, mag: 0.55 }));
     }
 
     const dx = this.tx - rival.x;
     const dy = this.ty - rival.y;
     const d = Math.hypot(dx, dy) || 1;
-    return this.avoidWalls(rival, { dirX: dx / d, dirY: dy / d, mag: this.state === 'HUNT' ? 1 : 0.85 });
+    return this.avoidWalls(rival, this.aim({ dirX: dx / d, dirY: dy / d, mag: this.state === 'HUNT' ? 1 : 0.85 }));
   }
 
   // v6 §6: blend in a repulsion vector when within BOT_WALL_MARGIN of an edge.
@@ -363,30 +400,15 @@ export class BotController implements RivalController {
     return { dirX: dx / d, dirY: dy / d, mag: Math.min(1, Math.max(intent.mag, Math.hypot(rx, ry))) };
   }
 
-  // v7 §1: find the farthest DENSE cluster of edibles and commit to marching there.
+  // v9 §2: anti-idle without global map knowledge — commit to a far random point.
   private pickRelocate(rival: Rival, view: WorldView) {
-    const cell = 400;
-    const buckets = new Map<string, { n: number; sx: number; sy: number }>();
-    for (const o of view.objects) {
-      if (o.eaten) continue;
-      if (rival.radius < o.size * CONFIG.EAT_RATIO) continue; // only edible clusters
-      const cx = Math.floor(o.x / cell), cy = Math.floor(o.y / cell);
-      const key = `${cx},${cy}`;
-      const b = buckets.get(key) || { n: 0, sx: 0, sy: 0 };
-      b.n++; b.sx += o.x; b.sy += o.y;
-      buckets.set(key, b);
-    }
-    let best = -Infinity, bx = 0, by = 0, found = false;
-    for (const b of buckets.values()) {
-      const cx = b.sx / b.n, cy = b.sy / b.n;
-      const d = dist(rival.x, rival.y, cx, cy);
-      const score = b.n * (d + 200); // dense AND far
-      if (score > best) { best = score; bx = cx; by = cy; found = true; }
-    }
-    if (!found) {
-      // no edible clusters — head to the opposite corner
-      bx = rival.x < view.map / 2 ? view.map - 300 : 300;
-      by = rival.y < view.map / 2 ? view.map - 300 : 300;
+    const m = view.map, margin = 300;
+    let bx = 0, by = 0, bd = -1;
+    for (let i = 0; i < 5; i++) {
+      const x = margin + Math.random() * (m - margin * 2);
+      const y = margin + Math.random() * (m - margin * 2);
+      const d = dist(rival.x, rival.y, x, y);
+      if (d > bd) { bd = d; bx = x; by = y; }
     }
     this.tx = bx; this.ty = by;
     this.relocating = true;
@@ -394,32 +416,49 @@ export class BotController implements RivalController {
     this.state = 'HUNT';
   }
 
-  private pickTarget(rival: Rival, view: WorldView, aggression: number) {
+  private pickTarget(rival: Rival, view: WorldView, aggression: number, perceive: number) {
     this.hasTarget = false;
-    let best = Infinity;
 
-    // Hunt: smaller voids to devour — only once aggression has ramped up
-    if (aggression >= CONFIG.HUNT_MIN_AGGRO) {
+    // Hunt: smaller voids to devour — only once aggression has ramped past the
+    // archetype's threshold. Tracks best + 2nd-best so mistakes can fumble.
+    if (aggression >= this.p.huntAggroMin) {
+      let best = Infinity, second = Infinity;
+      let bx = 0, by = 0, sx = 0, sy = 0, found = false, foundS = false;
       for (const v of view.voids) {
-        if (rival.radius >= v.radius * CONFIG.RIVAL_EAT_RATIO) {
+        if (rival.radius >= v.radius * this.p.huntAdvantage) {
           const d = dist(rival.x, rival.y, v.x, v.y);
-          const score = d / (this.bias * aggression);
-          if (d < rival.radius * 9 && score < best) {
-            best = score; this.tx = v.x; this.ty = v.y; this.hasTarget = true; this.state = 'HUNT';
-          }
+          if (d > perceive || d > rival.radius * 9) continue;
+          const score = d / (this.bias * Math.max(0.001, aggression));
+          if (score < best) { second = best; sx = bx; sy = by; foundS = found; best = score; bx = v.x; by = v.y; found = true; }
+          else if (score < second) { second = score; sx = v.x; sy = v.y; foundS = true; }
         }
       }
-      if (this.hasTarget) return;
+      if (found) {
+        // v9 §2: 30% of the time, fumble to the 2nd-best pick (if any)
+        if (foundS && Math.random() < 0.3) { this.tx = sx; this.ty = sy; }
+        else { this.tx = bx; this.ty = by; }
+        this.hasTarget = true; this.state = 'HUNT';
+        return;
+      }
     }
 
-    // Graze: nearest edible object, biased toward bigger (juicier) ones
-    best = Infinity;
+    // Graze: nearest edible object, biased toward bigger (juicier) & golden ones.
+    let best = Infinity, second = Infinity;
+    let bx = 0, by = 0, sx = 0, sy = 0, found = false, foundS = false;
     for (const o of view.objects) {
       if (o.eaten) continue;
       if (rival.radius < o.size * CONFIG.EAT_RATIO) continue;
       const d = dist(rival.x, rival.y, o.x, o.y);
-      const score = d - o.size * 4;
-      if (score < best) { best = score; this.tx = o.x; this.ty = o.y; this.hasTarget = true; this.state = 'GRAZE'; }
+      if (d > perceive) continue;
+      if (d > rival.radius * this.p.grazeRange) continue; // WANDERER only grabs close snacks
+      const score = d - o.size * 4 - (o.golden ? this.p.goldenBias * 300 : 0);
+      if (score < best) { second = best; sx = bx; sy = by; foundS = found; best = score; bx = o.x; by = o.y; found = true; }
+      else if (score < second) { second = score; sx = o.x; sy = o.y; foundS = true; }
+    }
+    if (found) {
+      if (foundS && Math.random() < 0.3) { this.tx = sx; this.ty = sy; }
+      else { this.tx = bx; this.ty = by; }
+      this.hasTarget = true; this.state = 'GRAZE';
     }
   }
 }
@@ -427,6 +466,8 @@ export class BotController implements RivalController {
 export function makeRivals(): Rival[] {
   const names = shuffle(CONFIG.BOT_NAMES).slice(0, CONFIG.RIVAL_COUNT);
   const countries = shuffle(CONFIG.BOT_COUNTRIES).slice(0, CONFIG.RIVAL_COUNT);
+  // v9 §2: one archetype per bot, shuffled so name↔personality randomize each round
+  const arches = shuffle(ARCHETYPES);
 
   // v7 §8: bots wear real SHOP skins (accessories render automatically), drawn
   // without replacement and weighted 3× toward skins the player does NOT own —
@@ -452,7 +493,8 @@ export function makeRivals(): Rival[] {
     const reaction = 180 + Math.random() * 260;
     const bias = 0.7 + Math.random() * 0.8;
     const speedScale = 0.9 + Math.random() * 0.2;
-    const r = new Rival(names[i], countries[i], skin, new BotController(reaction, bias), speedScale);
+    const arch = arches[i % arches.length];
+    const r = new Rival(names[i], countries[i], skin, new BotController(reaction, bias, arch), speedScale);
     r.wearsUnownedSkin = !owned.has(base.id);
     r.shopSkinId = base.id;
     r.shopSkinName = base.name;

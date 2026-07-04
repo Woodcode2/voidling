@@ -325,6 +325,60 @@ export const audio = {
     this.playTone(523.25, 'sawtooth', 0.34, 0.12, 0.2);
   },
 
+  // v9 §5: a distinct horn per event so each announcement sounds unique
+  eventHorn(id: string) {
+    if (!this.sfxOn || !this.ctx) return;
+    switch (id) {
+      case 'goldenRush': // bright rising major arpeggio
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.playTone(f, 'triangle', 0.22, 0.12, i * 0.08));
+        break;
+      case 'shrinkStorm': // ominous descending minor
+        [440, 349.23, 293.66].forEach((f, i) => this.playTone(f, 'sawtooth', 0.3, 0.12, i * 0.12));
+        break;
+      case 'meteor': // two low booming honks
+        this.playTone(196, 'sawtooth', 0.3, 0.14);
+        this.playTone(261.63, 'sawtooth', 0.4, 0.12, 0.22);
+        break;
+      case 'frenzy': // fast triple stab
+        [659.25, 659.25, 880].forEach((f, i) => this.playTone(f, 'square', 0.14, 0.1, i * 0.09));
+        break;
+      case 'town': // urgent alarm two-tone
+        this.playTone(587.33, 'square', 0.2, 0.12);
+        this.playTone(440, 'square', 0.24, 0.12, 0.18);
+        break;
+      default: this.playEvent();
+    }
+  },
+
+  // v9 §5: TOWN FIGHTS BACK siren layer — a wailing two-tone sweep
+  siren() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(650, now);
+    o.frequency.linearRampToValueAtTime(950, now + 0.4);
+    o.frequency.linearRampToValueAtTime(650, now + 0.8);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(0.06, now + 0.1);
+    g.gain.linearRampToValueAtTime(0.0001, now + 0.85);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.9);
+  },
+
+  // v9 §5: SHRINK STORM lightning — a sharp thunder crack
+  lightningCrack() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this._noise(now, 0.35, 'highpass', 1200, 0.7, 0.35);
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(90, now);
+    o.frequency.exponentialRampToValueAtTime(40, now + 0.3);
+    g.gain.setValueAtTime(0.35, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.37);
+  },
+
   // v6 §10: win — a short crowd-cheer swell (filtered noise)
   playWin() {
     if (!this.sfxOn || !this.ctx || !this._noiseBuf || !this.sfxGain) return;
