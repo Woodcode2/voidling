@@ -1,0 +1,135 @@
+# REPLIT BUILD PROMPT — VOIDLING v6: THE HOLE.IO STANDARD
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are taking VOIDLING from "good prototype" to "App Store quality." This is a large pass. Work the sections **in order**, and before reporting done, re-read the Acceptance Criteria section and verify every line yourself on the running game. Do not silently skip anything; if something must be cut, say so explicitly. All standing rules hold: 60fps, portrait, canvas-drawn everything, one art style (4px white outlines, hard offset shadows, no shadowBlur, no gradient halos), ground quieter than the smallest edible.
+
+## 1 — Match structure: 3-minute rounds
+
+- Round length becomes **180 seconds**. Power-up picks at **2:30, 1:40, and 0:50** remaining (three picks per round).
+- Economy retune: coins earned = floor(score / 150). Daily mission targets scale ×1.5.
+- Evolution thresholds (section 3) tuned so a median run peaks at GOBBLER, a good run at DEVOURER, and WORLD EATER lands in roughly the top 10% of runs.
+
+## 2 — Respawn + catch-up (nobody is ever mathematically dead)
+
+- **Trickle respawn:** maintain the world at ≥85% of its initial object population at all times. Respawn T1–T3 objects only (houses and the water tower are finite trophies), always off-screen for the player, weighted toward the sparsest regions, at 2–4 objects/second as needed. The map must never feel eaten-out.
+- **Golden objects:** starting at 2:45 remaining, spawn one golden variant every ~12s — any T1–T3 object with a gold tint, sparkle particles, and a soft ping. Worth 3× mass and 3× score. Bots chase them too.
+- **Underdog aura (silent):** whoever is in 5th or 6th place gets +12% move speed and +25% growth, with only a faint blue sparkle trail as a tell. No banner, no explanation.
+- **Leader decay:** any void above the DEVOURER threshold passively loses 0.4% mass/second (big bodies burn fuel). Decay can never drop a void below the floor of a form it has already reached.
+
+## 3 — EVOLUTIONS (the milestone system — build in full)
+
+Per-round form ladder driven by radius. Forms only go up within a round; being chomped can't remove one.
+
+| Form | Radius | Visual layer gained (permanent for the round) |
+|---|---|---|
+| VOIDLING | 22 (start) | — |
+| MUNCHER | 36 | thin rotating energy ring |
+| GOBBLER | 54 | 3 debris chunks orbiting outside the ring |
+| DEVOURER | 78 | crown of purple flame licks |
+| WORLD EATER | 105 | violet screen-edge warp; background stars bend toward you; nearby objects visibly lean away in fear |
+
+**Transformation moment, every threshold:** world slows to 0.3× for 600ms → white shockwave ring → the void spins once, scaling 1.25→1.0 → **giant Fredoka title card slams in ("GOBBLER!") with a confetti burst (24 pieces)** → fanfare chord → `vibrate([30,40,60])`. Each form grants +8% move speed, stacking.
+
+- HUD: the evolution progress bar under the timer glows as it fills and pops with a flash at each threshold, labeled with the next form's name.
+- Leaderboard shows a tiny crown on any WORLD EATER. Results screen shows "Reached: DEVOURER" with the form icon; WORLD EATER results get a special gold treatment and +200 coins. The share card includes the form reached.
+
+## 4 — Power-ups: renamed, and picking one must feel like a hit
+
+Rename the boon system to **POWER-UPS** with these names and card art (drawn icons, not text-only):
+
+| New name | Old | Effect | Aura on the void while active |
+|---|---|---|---|
+| ZOOMIES | Overdrive | +25% speed | comic speed lines trailing |
+| GRAVITY GLUTTON | Magnet | +40% absorb reach | wider dashed reach ring, pulsing |
+| DOUBLE STOMACH | Twin Merge | merges need only 2 | orbit chips glow warm |
+| TENDERIZER | Tremor | touching too-big objects shrinks them 15% | tiny hammer sparks on contact |
+| MIDAS MOUTH | Greed | score ×1.5 | gold tint + sparkle drift |
+| BORROWED TIME | Time Shard | +15 seconds, instant | clock flash |
+
+**Pickup moment:** on card tap — 0.4s freeze, the card flies into the void, the void flashes the power-up's color with a ring pulse, the name stamps center-screen in Fredoka for 700ms, sound sting, `vibrate(25)`. Active power-up icons stay under the timer with duration rings.
+
+## 5 — WORLD EVENTS (drama + catch-up pressure)
+
+Each event announces with a 2-second warning banner + horn before it starts.
+
+- **GOLDEN RUSH** at 2:05 remaining: for 10 seconds, golden objects rain in around all players (2/second each).
+- **SHRINK STORM** at 1:10 remaining: a dark purple cloud with lightning spawns and slowly hunts **the current #1** for 12 seconds; anyone it touches loses 12% mass (never below a reached form's floor). It's escapable — cloud speed is 70% of base player speed.
+- **TOWN FIGHTS BACK** — triggered the moment anyone reaches WORLD EATER: two tiny firetrucks chase that void for 8 seconds, spraying water arcs that apply a -15% speed aura while connected. Purely comedic, fully drawn (truck, ladder, water particles). This is a signature clip moment — make it charming.
+- Bots react to all events: chase golden spawns, flee the storm, scatter from firetrucks.
+
+## 6 — Bot brain fixes
+
+- **SATED state:** after a bot eats the player OR any rival, it enters SATED for 6 seconds — drifts away from its victim, only grazes, cannot target voids. Kills the instant re-chase problem.
+- **Anti-idle:** if a bot has moved less than 80px net over 4 seconds, or hasn't eaten anything for 6 seconds, force-retarget it to the nearest dense object cluster. No bot may camp a corner.
+- **Wall avoidance:** steering adds a repulsion vector within 150px of the world edge so bots never hug or jitter against walls.
+- Bots respect the respawn economy (they benefit from underdog aura and suffer leader decay identically to the player).
+
+## 7 — World edge: the neighborhood floats in space
+
+- In the final 60px before the world boundary, the ground dissolves into the starfield void with a dithered fade — the town is an island floating in space. On-brand and intentional.
+- Every road ends at a striped barrier with a hedge behind it, placed **before** the fade. No road, sidewalk, or lawn may render past the barrier line — nothing may visually continue beyond the playable edge.
+- Hitting the boundary: soft bounce, squash wobble on the void, quiet "thunk." The invisible wall sits exactly at the visual edge.
+
+## 8 — Environment art pass (kill the flat-board look)
+
+- **Global lighting:** every object's hard offset shadow lengthens and angles consistently to the southeast (offset 6px x, 8px y) — one sun, one world. Add a very soft warm vignette (3% orange, screen edges).
+- **Grain:** a static 2%-opacity noise texture overlay on the ground layer only. This alone removes the "flat game board" feel.
+- **Zone grading:** park block grades slightly cooler green; plaza slightly warmer; residential neutral. Subtle, but the map should feel like districts.
+- **New props:** backyard pools (T4, blue ellipse + deck), streetlights (T3, edible, lamp glow dot), stop signs (T2), bus stop bench with sign (T3), clotheslines between some houses (decor), a mail truck that drives and flees (T4). Two house sizes for variety; some lots get picket-fenced backyards.
+- Puddles get a faint sky-tint highlight. Pond gets 2–3 drawn lily pads and a slow ripple ring.
+
+## 9 — Character: crisper and more alive
+
+- Rebuild the cached body sprite at 3× resolution. Flat fill + darker bottom crescent + one crisp highlight — verify no residual gradient or blur survives anywhere, including the home screen and shop.
+- **Expression states:** idle contented smile; mouth opens approaching food; visible chomp; **cheek puff for 400ms after eating anything T3+**; dizzy swirl eyes for 1s after being chomped; tongue-lick grin (drawn, not emoji) for 800ms after a TRIPLE.
+- Eyes get a moving sparkle dot; blink timing stays organic; pupils lead into turns.
+
+## 10 — Audio v2 (no more Sonic rings)
+
+- **Eat sound rebuilt:** layered 100ms gulp — a low sine thump (120Hz, 40ms), a band-passed noise "nom" sweeping downward (80ms), and a small triangle blip that carries the pitch ladder. Bigger tiers = deeper thump + a crunch noise burst. It should sound like swallowing, not collecting a coin.
+- Merge/TRIPLE: fat triple-pop + warm chord. Evolution: rising fanfare (4 notes). Event warning: two-note horn. Win: tiny synth crowd cheer.
+- Music: soften to plucked marimba-style triangle notes with fast decay, 96 BPM, gain 0.25, same I–V–vi–IV loop and combo intensity layer. It should sit *under* the game, never compete with it.
+
+## 11 — Home screen: make it lovable
+
+- Add the tagline under the logo in white Fredoka caps: **"SO CUTE. SO HUNGRY."** (single CONFIG string, easy to swap).
+- The home voidling: 20% bigger, breathing, blinking, pupils tracking a drifting star — and every ~8 seconds a small star drifts near, it opens wide, and eats it with the gulp sound and a tiny burst. This is the moment of delight; get the timing cute.
+- Best score styled as a small gold plaque under the tagline. PLAY button gets a slow idle pulse (scale 1.0→1.03). Occasional shooting star crosses the starfield.
+
+## 12 — Shop: preview + polish
+
+- **Tap any skin card → preview modal:** a large live animated voidling wearing the skin (breathing, blinking), which every few seconds chomps a small floating gnome. Skin name, a one-line flavor text (write one per skin — e.g., Pirate: "Yarr. Eats ships for breakfast."), price, and BUY or EQUIP button. Close on backdrop tap.
+- Card polish: skin-colored soft glow behind each portrait, rarity tag by price (600 Common / 800 Rare / 1000+ Epic), a checkmark badge on owned skins, buy buttons disabled-styled when unaffordable.
+- Buying: coin fly-out + confetti + "Equipped!" toast (auto-equip on purchase).
+
+## 13 — Onboarding intro (first launch)
+
+- A 3-panel overlay using real game art, shown once (localStorage flag), replayable via a small "?" on the home screen:
+  1. Voidling chomping a gnome — "EAT everything smaller than you!"
+  2. Three matching orbit chips bursting — "MATCH 3 snacks to GROW FAST!"
+  3. A huge crowned void over the town — "BECOME THE WORLD EATER!"
+- Big Fredoka text, bouncy panel transitions, confetti on panel 3, tap anywhere to advance, skippable. Total read time ~10 seconds. The first round's ghost-hand "drag to move" hint stays.
+
+## Acceptance criteria — verify every line on a real phone before reporting done
+
+- A full round lasts 3:00 with power-up picks at 2:30 / 1:40 / 0:50; GOLDEN RUSH fires at 2:05; SHRINK STORM at 1:10 hunts the leader and is escapable; reaching WORLD EATER summons firetrucks that spray and slow.
+- Late game: the map still visibly has food at 0:20 remaining; golden objects appear and bots chase them; finishing a round in 6th, you can observably close distance next round (underdog trail visible).
+- Each evolution threshold: slow-mo, shockwave, spin, title card + confetti, fanfare, new visual layer persists; progress bar glows and pops; WORLD EATER warps the screen edges and objects lean away.
+- Picking a power-up freezes briefly, flashes, stamps its name; each active power-up shows its aura on the void; all six renamed cards have drawn icons.
+- A bot that eats you wanders away sated — repeat this three times to confirm. No bot idles in a corner for more than a few seconds. No bot hugs walls.
+- Every road ends at a barrier + hedge before ground dissolves into starfield; nothing renders past the edge; hitting the wall bounces softly with a thunk.
+- The ground shows grain, one consistent SE shadow direction, and district color grading; pools, streetlights, stop signs, mail truck, and clotheslines exist in the world.
+- Eating sounds like a gulp (deep thump on big objects), never a coin ring; music sits quietly underneath; evolution fanfare and event horn play.
+- Home: tagline present, voidling eats a drifting star every ~8s, PLAY pulses, best-score plaque shows.
+- Shop: tapping a card opens the live preview modal with flavor text; buying fires confetti and equips; rarity tags and owned badges render.
+- First launch on a cleared browser shows the 3-panel intro once; the "?" replays it.
+- Steady 60fps during an event with 5 bots and full population; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, real ad/IAP SDKs, Daily Bite logic, new skins beyond flavor text, the debug panel (keep it working).
+
+Work strictly in order 1→13, then self-audit against the acceptance list and report any deviations explicitly.

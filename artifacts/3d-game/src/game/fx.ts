@@ -219,7 +219,7 @@ export class FXManager {
     this.rings.push({ x, y, r: r0, vr, life, maxLife: life, color, width });
   }
 
-  shake(duration: number, magnitude: number, vibrate = 30) {
+  shake(duration: number, magnitude: number, vibrate: number | number[] = 30) {
     this.shakeTime = duration;
     this.shakeMagnitude = magnitude;
     if (vibrate && navigator.vibrate) navigator.vibrate(vibrate);

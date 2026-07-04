@@ -1,7 +1,7 @@
 import { CONFIG, type SkinDef, type ObjectKind } from './config';
 import { clamp, lerp, addAreaToRadius } from './utils';
 import { drawParkObject } from './objects';
-import { drawVoidling, type VoidlingVisual } from './voidling';
+import { drawVoidling, drawUnderdogTrail, type VoidlingVisual } from './voidling';
 import type { WorldObject } from './world';
 
 interface OrbitItem {
@@ -19,13 +19,14 @@ interface OrbitItem {
 }
 
 export interface FxEvent {
-  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale';
+  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve';
   x: number;
   y: number;
   text?: string;
   color?: string;
   big?: boolean;
   kind?: ObjectKind;
+  form?: number;    // v6 §3: form index reached (for 'evolve')
 }
 
 export class Player {
@@ -39,6 +40,12 @@ export class Player {
   combo = 0;
   comboTimer = 0;
 
+  // v6 §3: evolution form ladder — index into CONFIG.FORMS; only goes up
+  formIndex = 0;
+  cheekPuff = 0;        // 400ms after eating T3+
+  dizzy = 0;            // 1s after being chomped
+  lick = 0;             // 800ms after a TRIPLE
+
   orbit: OrbitItem[] = [];
   pendingFx: FxEvent[] = [];
 
@@ -48,6 +55,10 @@ export class Player {
   twinMerge = false;
   tremorActive = false;
   greedMultiplier = 1;
+  underdogSpeed = 1;      // v6 §2: 5th/6th place move-speed bonus (silent)
+  underdogGrowth = 1;     // v6 §2: 5th/6th place growth bonus
+  underdog = false;       // v6 §2: faint blue trail when trailing
+  eventSlow = 1;          // v6 §5: firetruck water / event slow (reset each frame)
 
   // identity
   skin: SkinDef;
@@ -86,6 +97,10 @@ export class Player {
     this.score = 0;
     this.combo = 0;
     this.comboTimer = 0;
+    this.formIndex = 0;
+    this.cheekPuff = 0;
+    this.dizzy = 0;
+    this.lick = 0;
     this.orbit = [];
     this.pendingFx = [];
     this.magnetMultiplier = 1;
@@ -120,7 +135,9 @@ export class Player {
     const dtSec = dt / 1000;
 
     // ── velocity: accel toward joystick vector, decel to stop on release (px/s) ──
-    const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedMultiplier * this.sizeSpeedFactor();
+    // v6 §3: each form gained grants +8% move speed, stacking.
+    const formSpeed = 1 + this.formIndex * CONFIG.FORM_SPEED_BONUS;
+    const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedMultiplier * this.sizeSpeedFactor() * formSpeed * this.underdogSpeed * this.eventSlow;
     const tvx = this.inputActive ? this.inDirX * this.inMag * maxSpeed : 0;
     const tvy = this.inputActive ? this.inDirY * this.inMag * maxSpeed : 0;
     const dvx = tvx - this.vx;
@@ -139,9 +156,12 @@ export class Player {
     this.x += this.vx * dtSec;
     this.y += this.vy * dtSec;
 
+    // v6 §7: soft-bounce boundary — nudge back in and reflect a little energy
     const m = CONFIG.MAP_SIZE;
-    this.x = clamp(this.x, this.radius, m - this.radius);
-    this.y = clamp(this.y, this.radius, m - this.radius);
+    if (this.x < this.radius) { this.x = this.radius; this.vx = Math.abs(this.vx) * 0.4; }
+    else if (this.x > m - this.radius) { this.x = m - this.radius; this.vx = -Math.abs(this.vx) * 0.4; }
+    if (this.y < this.radius) { this.y = this.radius; this.vy = Math.abs(this.vy) * 0.4; }
+    else if (this.y > m - this.radius) { this.y = m - this.radius; this.vy = -Math.abs(this.vy) * 0.4; }
 
     if (this.ghostTime > 0) this.ghostTime -= dt;
     if (this.tooBigCd > 0) this.tooBigCd -= dt;
@@ -178,6 +198,11 @@ export class Player {
     // mouth: open near food
     this.mouthOpen = lerp(this.mouthOpen, this.approach, Math.min(1, dt * 0.02));
     if (this.chomp > 0) this.chomp = Math.max(0, this.chomp - dt / 240);
+
+    // v6 §9: expression timers (cheek puff 400ms, dizzy 1s, tongue-lick 800ms)
+    if (this.cheekPuff > 0) this.cheekPuff = Math.max(0, this.cheekPuff - dt / 400);
+    if (this.dizzy > 0) this.dizzy = Math.max(0, this.dizzy - dt / 1000);
+    if (this.lick > 0) this.lick = Math.max(0, this.lick - dt / 800);
 
     // look direction
     let tx = dx, ty = dy;
@@ -217,9 +242,12 @@ export class Player {
   absorbObject(obj: WorldObject): number {
     this.bumpCombo();
     this.chomp = 1;
-    const gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier);
+    const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1; // v6 §2
+    const gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult);
     this.score += gain;
-    this.radius = addAreaToRadius(this.radius, Math.PI * obj.size * obj.size * 0.5);
+    this.radius = addAreaToRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth);
+    if (obj.tier >= 3) this.cheekPuff = 1; // v6 §9: cheek puff on T3+
+    this.checkEvolution();
 
     this.orbit.push({
       kind: obj.kind,
@@ -262,9 +290,11 @@ export class Player {
         this.orbit = this.orbit.filter((o) => !merge.includes(o));
         const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier);
         this.score += bonus;
-        this.radius = addAreaToRadius(this.radius, 260 * tier);
+        this.radius = addAreaToRadius(this.radius, 260 * tier * this.underdogGrowth);
         this.bumpCombo();
+        this.lick = 1; // v6 §9: tongue-lick grin after a TRIPLE
         this.pendingFx.push({ type: 'merge', x: this.x, y: this.y, text: `TRIPLE! +${bonus}`, color: '#FFD23F', big: true });
+        this.checkEvolution();
       }
     }
   }
@@ -273,17 +303,42 @@ export class Player {
   eatRival(rivalRadius: number) {
     const bonus = Math.round(500 * Math.max(1, this.comboMult));
     this.score += bonus;
-    this.radius = addAreaToRadius(this.radius, Math.PI * rivalRadius * rivalRadius * 0.5);
+    this.radius = addAreaToRadius(this.radius, Math.PI * rivalRadius * rivalRadius * 0.5 * this.underdogGrowth);
     this.bumpCombo();
     this.chomp = 1;
+    this.cheekPuff = 1;
     this.pendingFx.push({ type: 'eatRival', x: this.x, y: this.y, text: `DEVOURED +${bonus}`, color: '#FFD23F', big: true });
+    this.checkEvolution();
   }
+
+  // v6 §3: promote through the form ladder; forms only go up within a round.
+  private checkEvolution() {
+    while (
+      this.formIndex < CONFIG.FORMS.length - 1 &&
+      this.radius >= CONFIG.FORMS[this.formIndex + 1].radius
+    ) {
+      this.formIndex++;
+      this.pendingFx.push({
+        type: 'evolve', x: this.x, y: this.y,
+        form: this.formIndex, text: CONFIG.FORMS[this.formIndex].name,
+      });
+    }
+  }
+
+  // v6 §3: floor the radius at the current form's threshold (chomp/decay can't demote)
+  get formFloor() {
+    return Math.max(CONFIG.PLAYER_BASE_RADIUS, CONFIG.FORMS[this.formIndex].radius);
+  }
+
+  get formName() { return CONFIG.FORMS[this.formIndex].name; }
 
   // Player got eaten -> lose mass, ghost, keep playing
   getEaten() {
-    this.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, this.radius * CONFIG.RESPAWN_MASS_FRAC);
+    // v6 §3: being chomped can't drop you below a form you've already reached
+    this.radius = Math.max(this.formFloor, this.radius * CONFIG.RESPAWN_MASS_FRAC);
     this.ghostTime = CONFIG.GHOST_TIME;
     this.combo = 0;
+    this.dizzy = 1; // v6 §9: dizzy swirl eyes for 1s
     this.orbit = [];
     this.vx = this.vy = 0;
   }
@@ -304,12 +359,18 @@ export class Player {
       glow: clamp(this.combo / 16, 0, 1),
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
+      form: this.formIndex,
+      cheekPuff: this.cheekPuff,
+      dizzy: this.dizzy,
+      lick: this.lick,
     };
   }
 
   draw(ctx: CanvasRenderingContext2D, t: number, alpha: number) {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
+
+    if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
 
     this.drawOrbit(ctx, rx, ry, t);
 

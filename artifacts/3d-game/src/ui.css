@@ -382,3 +382,215 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+/* ── v6 §11: home polish ────────────────────────────────────────────────────── */
+.vd-topbar-right { display: flex; gap: 10px; align-items: center; }
+.vd-hero-void { animation: vd-float 3.4s ease-in-out infinite; }
+@keyframes vd-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.vd-tagline {
+  margin: -4px 0 2px;
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: clamp(13px, 4vw, 17px);
+  letter-spacing: 3px;
+  color: #FFC2E2;
+  opacity: 0.92;
+}
+.vd-plaque {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #14082B;
+  padding: 8px 20px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #FFE27A 0%, #FFB020 100%);
+  box-shadow: 0 4px 0 #C79A12, inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.vd-plaque-label { font-size: 13px; letter-spacing: 2px; opacity: 0.7; }
+.vd-btn--pulse { animation: vd-pulse 1.7s ease-in-out infinite; }
+@keyframes vd-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+.vd-btn--pulse:active:not(:disabled) { animation: none; }
+
+/* shooting stars */
+.vd-shooting {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 4px 1px rgba(255, 255, 255, 0.7);
+  opacity: 0;
+  animation-name: vd-shoot;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in;
+}
+.vd-shooting::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.8));
+  transform: translateX(-100%);
+}
+@keyframes vd-shoot {
+  0% { opacity: 0; transform: translate(0, 0) rotate(18deg); }
+  8% { opacity: 1; }
+  30% { opacity: 1; }
+  50%, 100% { opacity: 0; transform: translate(220px, 72px) rotate(18deg); }
+}
+
+/* ── v6 §12: shop rarity + modal + toast + confetti ─────────────────────────── */
+.vd-card--btn {
+  position: relative;
+  appearance: none;
+  cursor: pointer;
+  color: #fff;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease;
+}
+.vd-card--btn:active { transform: scale(0.97); }
+.vd-rarity {
+  align-self: center;
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #14082B;
+}
+.vd-rarity--starter { background: #8A8AA0; color: #fff; }
+.vd-rarity--common { background: #6FD6B0; }
+.vd-rarity--rare { background: #5AC8FF; }
+.vd-rarity--epic { background: #C77DFF; color: #fff; }
+.vd-rarity--legendary { background: linear-gradient(90deg, #FFD23F, #FF7DA8); }
+.vd-rar--rare { border-color: rgba(90, 200, 255, 0.5); }
+.vd-rar--epic { border-color: rgba(199, 125, 255, 0.6); }
+.vd-rar--legendary { border-color: rgba(255, 210, 63, 0.7); box-shadow: 0 0 0 2px rgba(255, 210, 63, 0.18); }
+
+.vd-modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 4, 24, 0.72);
+  backdrop-filter: blur(3px);
+  animation: vd-fade 0.15s ease;
+}
+@keyframes vd-fade { from { opacity: 0; } to { opacity: 1; } }
+.vd-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(340px, 86vw);
+  padding: 26px 22px 24px;
+  border-radius: 26px;
+  background: radial-gradient(120% 80% at 50% 0%, #2A1152 0%, rgba(42, 17, 82, 0) 60%), #1A0B38;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.5);
+  animation: vd-pop 0.18s ease;
+}
+@keyframes vd-pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.vd-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.vd-modal-void { margin: 4px 0; }
+.vd-modal-name { margin: 0; font-family: Fredoka, sans-serif; font-weight: 700; font-size: 26px; color: #fff; }
+
+.vd-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  background: #1CC6AE;
+  color: #06251f;
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  animation: vd-toast-in 0.25s ease;
+}
+@keyframes vd-toast-in { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+.vd-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  overflow: hidden;
+}
+.vd-confetti span {
+  position: absolute;
+  top: 52%;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: vd-confetti-fly 0.95s ease-out forwards;
+}
+@keyframes vd-confetti-fly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); }
+}
+
+/* ── v6 §13: onboarding ─────────────────────────────────────────────────────── */
+.vd-onboard { background: radial-gradient(120% 80% at 50% 0%, #2A1152 0%, rgba(42,17,82,0) 60%), rgba(15, 6, 33, 0.94); z-index: 60; }
+.vd-onboard-skip {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  right: 18px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.vd-onboard-body { margin: 0; max-width: 300px; font-size: 16px; font-weight: 600; line-height: 1.4; opacity: 0.9; }
+.vd-dots { display: flex; gap: 8px; margin: 4px 0; }
+.vd-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.28); transition: all 0.2s ease; }
+.vd-dot--on { background: #FF3D68; width: 22px; border-radius: 999px; }
+
+/* results: reached-form line */
+.vd-reached {
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #C9A6FF;
+  letter-spacing: 0.5px;
+}
