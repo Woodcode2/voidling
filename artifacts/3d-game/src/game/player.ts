@@ -1,4 +1,4 @@
-import { CONFIG, type SkinDef } from './config';
+import { CONFIG, type SkinDef, type ObjectKind } from './config';
 import { clamp, lerp, addAreaToRadius } from './utils';
 import { drawParkObject } from './objects';
 import { drawVoidling, type VoidlingVisual } from './voidling';
@@ -16,18 +16,19 @@ interface OrbitItem {
 }
 
 export interface FxEvent {
-  type: 'absorb' | 'merge' | 'eatRival' | 'chomp';
+  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale';
   x: number;
   y: number;
   text?: string;
   color?: string;
   big?: boolean;
+  kind?: ObjectKind;
 }
 
 export class Player {
   x = 0; y = 0; prevX = 0; prevY = 0;
-  vx = 0; vy = 0;
-  private targetVX = 0; private targetVY = 0;
+  vx = 0; vy = 0;                    // px/s
+  private inDirX = 0; private inDirY = 0; private inMag = 0;
   private inputActive = false;
 
   radius = CONFIG.PLAYER_BASE_RADIUS;
@@ -51,6 +52,7 @@ export class Player {
 
   // state
   ghostTime = 0;
+  tooBigCd = 0;                      // ms cooldown on "too big" feedback
 
   // animation
   private blinkTimer = 2000;
@@ -63,8 +65,8 @@ export class Player {
   private breathePhase = 0;
   private orbitClock = 0;
 
-  // per-frame hints set by the engine
-  approach = 0;                       // 0..1 how close to an edible
+  // per-frame hints set by the world
+  approach = 0;
   lookTarget: { x: number; y: number } | null = null;
 
   constructor(skin: SkinDef) {
@@ -74,7 +76,9 @@ export class Player {
   reset(x: number, y: number, skin: SkinDef) {
     this.x = this.prevX = x;
     this.y = this.prevY = y;
-    this.vx = this.vy = this.targetVX = this.targetVY = 0;
+    this.vx = this.vy = 0;
+    this.inDirX = this.inDirY = this.inMag = 0;
+    this.inputActive = false;
     this.radius = CONFIG.PLAYER_BASE_RADIUS;
     this.score = 0;
     this.combo = 0;
@@ -87,6 +91,7 @@ export class Player {
     this.tremorActive = false;
     this.greedMultiplier = 1;
     this.ghostTime = 0;
+    this.tooBigCd = 0;
     this.skin = skin;
     this.mouthOpen = 0;
     this.chomp = 0;
@@ -102,30 +107,41 @@ export class Player {
   }
 
   setInput(dirX: number, dirY: number, mag: number) {
-    const speed = CONFIG.PLAYER_MAX_SPEED * this.speedMultiplier * this.sizeSpeedFactor();
-    this.targetVX = dirX * mag * speed;
-    this.targetVY = dirY * mag * speed;
+    this.inDirX = dirX;
+    this.inDirY = dirY;
+    this.inMag = mag;
     this.inputActive = mag > 0.01;
   }
 
   update(dt: number) {
-    // velocity toward target; slow glide on release
-    const respond = this.inputActive
-      ? Math.min(1, dt * 0.018)
-      : Math.min(1, dt / CONFIG.RELEASE_DECEL_MS);
-    this.vx += (this.targetVX - this.vx) * respond;
-    this.vy += (this.targetVY - this.vy) * respond;
+    const dtSec = dt / 1000;
+
+    // ── velocity: accel toward joystick vector, decel to stop on release (px/s) ──
+    const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedMultiplier * this.sizeSpeedFactor();
+    const tvx = this.inputActive ? this.inDirX * this.inMag * maxSpeed : 0;
+    const tvy = this.inputActive ? this.inDirY * this.inMag * maxSpeed : 0;
+    const dvx = tvx - this.vx;
+    const dvy = tvy - this.vy;
+    const dlen = Math.hypot(dvx, dvy);
+    const step = (this.inputActive ? CONFIG.MOVE_ACCEL : CONFIG.MOVE_DECEL) * dtSec;
+    if (dlen <= step || dlen < 0.0001) {
+      this.vx = tvx; this.vy = tvy;
+    } else {
+      this.vx += (dvx / dlen) * step;
+      this.vy += (dvy / dlen) * step;
+    }
 
     this.prevX = this.x;
     this.prevY = this.y;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+    this.x += this.vx * dtSec;
+    this.y += this.vy * dtSec;
 
     const m = CONFIG.MAP_SIZE;
     this.x = clamp(this.x, this.radius, m - this.radius);
     this.y = clamp(this.y, this.radius, m - this.radius);
 
     if (this.ghostTime > 0) this.ghostTime -= dt;
+    if (this.tooBigCd > 0) this.tooBigCd -= dt;
 
     // combo decay
     if (this.comboTimer > 0) {
@@ -139,7 +155,7 @@ export class Player {
     this.wobblePhase += dt * 0.009;
 
     const spd = Math.hypot(this.vx, this.vy);
-    const maxSpd = CONFIG.PLAYER_MAX_SPEED;
+    const maxSpd = CONFIG.MOVE_MAX_SPEED;
     const stretch = clamp(spd / maxSpd, 0, 1) * 0.14;
     const dx = spd > 0.0001 ? this.vx / spd : 0;
     const dy = spd > 0.0001 ? this.vy / spd : 0;
@@ -196,7 +212,7 @@ export class Player {
     this.orbit.push({
       kind: obj.kind,
       tier: obj.tier,
-      iconR: clamp(obj.size * 0.32, 5, 13),
+      iconR: clamp(obj.size * 0.5, 14, 30),
       angle: Math.random() * Math.PI * 2,
       phase: 'in',
       inT: 0,
@@ -204,7 +220,7 @@ export class Player {
       fromY: obj.y,
     });
     this.pendingFx.push({ type: 'absorb', x: obj.x, y: obj.y, color: CONFIG.COLORS.tierTint[obj.tier - 1] });
-    this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y });
+    this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: obj.kind });
 
     // trim
     while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {
@@ -233,7 +249,7 @@ export class Player {
         this.score += bonus;
         this.radius = addAreaToRadius(this.radius, 260 * tier);
         this.bumpCombo();
-        this.pendingFx.push({ type: 'merge', x: this.x, y: this.y, text: `MERGE +${bonus}`, color: CONFIG.COLORS.tierTint[tier - 1], big: true });
+        this.pendingFx.push({ type: 'merge', x: this.x, y: this.y, text: `TRIPLE! +${bonus}`, color: '#FFD23F', big: true });
       }
     }
   }
@@ -269,7 +285,7 @@ export class Player {
       blink: this.blinkVal,
       wobbleX: this.wobbleX,
       wobbleY: this.wobbleY,
-      lean: clamp(this.vx / CONFIG.PLAYER_MAX_SPEED, -1, 1) * 0.14,
+      lean: clamp(this.vx / CONFIG.MOVE_MAX_SPEED, -1, 1) * 0.14,
       glow: clamp(this.combo / 16, 0, 1),
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
@@ -280,14 +296,23 @@ export class Player {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
 
-    // orbit ring (behind body handled by draw order in engine; here after)
     this.drawOrbit(ctx, rx, ry, t);
 
-    // ghost flicker
     if (this.ghost) {
+      // 40% opacity + dashed outline ring, plus a soft flicker
       ctx.save();
-      ctx.globalAlpha = 0.5 + Math.sin(t / 90) * 0.15;
+      ctx.globalAlpha = 0.4;
       drawVoidling(ctx, rx, ry, this.visual(t));
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 6]);
+      ctx.lineDashOffset = -(t / 40) % 14;
+      ctx.beginPath();
+      ctx.arc(rx, ry, this.radius + 5, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     } else {
       drawVoidling(ctx, rx, ry, this.visual(t));
@@ -295,17 +320,37 @@ export class Player {
   }
 
   private drawOrbit(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number) {
-    const baseR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET;
     const orbiting = this.orbit.filter((o) => o.phase === 'orbit');
+    const maxIcon = orbiting.reduce((m, o) => Math.max(m, o.iconR), 14);
+    const baseR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET + maxIcon;
+
+    // which tiers are one short of a merge -> gold telegraph
+    const need = this.twinMerge ? 2 : 3;
+    const tierCount = new Map<number, number>();
+    for (const o of orbiting) tierCount.set(o.tier, (tierCount.get(o.tier) || 0) + 1);
+    const telegraph = new Set<number>();
+    for (const [tier, n] of tierCount) if (n >= need - 1) telegraph.add(tier);
+
     orbiting.forEach((it, i) => {
       const a = it.angle + this.orbitClock * CONFIG.ORBIT_SPEED + (i / Math.max(1, orbiting.length)) * Math.PI * 2;
       const ox = cx + Math.cos(a) * baseR;
       const oy = cy + Math.sin(a) * baseR;
       ctx.save();
       ctx.translate(ox, oy);
+      if (telegraph.has(it.tier)) {
+        const pulse = 0.5 + Math.sin(t / 140) * 0.5;
+        ctx.save();
+        ctx.globalAlpha = 0.35 + pulse * 0.4;
+        ctx.fillStyle = '#FFD23F';
+        ctx.beginPath();
+        ctx.arc(0, 0, it.iconR * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
       drawParkObject(ctx, it.kind, it.iconR, { t });
       ctx.restore();
     });
+
     // intake tween
     for (const it of this.orbit) {
       if (it.phase !== 'in') continue;

@@ -4,7 +4,7 @@ import { drawVoidling } from './voidling';
 import type { WorldObject } from './world';
 
 export interface VoidView { x: number; y: number; radius: number; }
-export interface WorldView { objects: WorldObject[]; voids: VoidView[]; map: number; }
+export interface WorldView { objects: WorldObject[]; voids: VoidView[]; map: number; elapsed: number; }
 
 export interface Intent { dirX: number; dirY: number; mag: number; }
 
@@ -16,8 +16,8 @@ export interface RivalController {
 
 export class Rival {
   x = 0; y = 0; prevX = 0; prevY = 0;
-  vx = 0; vy = 0;
-  private targetVX = 0; private targetVY = 0;
+  vx = 0; vy = 0;                    // px/s
+  private inDirX = 0; private inDirY = 0; private inMag = 0;
   radius = CONFIG.PLAYER_BASE_RADIUS;
   score = 0;
   alive = true;
@@ -52,29 +52,36 @@ export class Rival {
   spawn(x: number, y: number, radius: number) {
     this.x = this.prevX = x;
     this.y = this.prevY = y;
-    this.vx = this.vy = this.targetVX = this.targetVY = 0;
+    this.vx = this.vy = 0;
+    this.inDirX = this.inDirY = this.inMag = 0;
     this.radius = radius;
     this.alive = true;
   }
 
   setInput(dirX: number, dirY: number, mag: number) {
-    const grown = this.radius / CONFIG.PLAYER_BASE_RADIUS;
-    const sizeFactor = clamp(1.05 - grown * 0.05, 0.7, 1.05);
-    const speed = CONFIG.PLAYER_MAX_SPEED * this.speedScale * sizeFactor * 0.95;
-    this.targetVX = dirX * mag * speed;
-    this.targetVY = dirY * mag * speed;
+    this.inDirX = dirX; this.inDirY = dirY; this.inMag = mag;
   }
 
   update(dt: number, view: WorldView) {
     const intent = this.controller.think(this, view, dt);
     this.setInput(intent.dirX, intent.dirY, intent.mag);
 
-    const respond = Math.min(1, dt * 0.014);
-    this.vx += (this.targetVX - this.vx) * respond;
-    this.vy += (this.targetVY - this.vy) * respond;
+    const dtSec = dt / 1000;
+    const grown = this.radius / CONFIG.PLAYER_BASE_RADIUS;
+    const sizeFactor = clamp(1.05 - grown * 0.05, 0.7, 1.05);
+    const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedScale * sizeFactor * 0.95;
+
+    const tvx = this.inDirX * this.inMag * maxSpeed;
+    const tvy = this.inDirY * this.inMag * maxSpeed;
+    const dvx = tvx - this.vx, dvy = tvy - this.vy;
+    const dlen = Math.hypot(dvx, dvy);
+    const step = (this.inMag > 0.01 ? CONFIG.MOVE_ACCEL : CONFIG.MOVE_DECEL) * dtSec;
+    if (dlen <= step || dlen < 0.0001) { this.vx = tvx; this.vy = tvy; }
+    else { this.vx += (dvx / dlen) * step; this.vy += (dvy / dlen) * step; }
+
     this.prevX = this.x; this.prevY = this.y;
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+    this.x += this.vx * dtSec;
+    this.y += this.vy * dtSec;
     const m = CONFIG.MAP_SIZE;
     this.x = clamp(this.x, this.radius, m - this.radius);
     this.y = clamp(this.y, this.radius, m - this.radius);
@@ -85,7 +92,7 @@ export class Rival {
     this.breathePhase += dt;
     this.wobblePhase += dt * 0.009;
     const spd = Math.hypot(this.vx, this.vy);
-    const stretch = clamp(spd / CONFIG.PLAYER_MAX_SPEED, 0, 1) * 0.13;
+    const stretch = clamp(spd / CONFIG.MOVE_MAX_SPEED, 0, 1) * 0.13;
     const dx = spd > 0.0001 ? this.vx / spd : 0;
     const dy = spd > 0.0001 ? this.vy / spd : 0;
     const j = Math.sin(this.wobblePhase) * 0.03;
@@ -117,12 +124,21 @@ export class Rival {
     this.chompV = 1;
   }
 
-  getEaten() {
-    // respawn small elsewhere, briefly ghosted; keep cumulative score
+  // Respawn small elsewhere, briefly ghosted; keep cumulative score.
+  // If still bigger than the avoid point's threat, respawn far away.
+  getEaten(avoidX?: number, avoidY?: number, minDist = 0) {
     const m = CONFIG.MAP_SIZE;
     this.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, this.radius * CONFIG.RESPAWN_MASS_FRAC);
-    this.x = this.prevX = 200 + Math.random() * (m - 400);
-    this.y = this.prevY = 200 + Math.random() * (m - 400);
+    let nx = 200 + Math.random() * (m - 400);
+    let ny = 200 + Math.random() * (m - 400);
+    if (avoidX !== undefined && avoidY !== undefined && minDist > 0) {
+      for (let i = 0; i < 20 && dist(nx, ny, avoidX, avoidY) < minDist; i++) {
+        nx = 200 + Math.random() * (m - 400);
+        ny = 200 + Math.random() * (m - 400);
+      }
+    }
+    this.x = this.prevX = nx;
+    this.y = this.prevY = ny;
     this.vx = this.vy = 0;
     this.ghostTime = CONFIG.GHOST_TIME;
   }
@@ -141,7 +157,7 @@ export class Rival {
       blink: this.blinkVal,
       wobbleX: this.wobbleX,
       wobbleY: this.wobbleY,
-      lean: clamp(this.vx / CONFIG.PLAYER_MAX_SPEED, -1, 1) * 0.12,
+      lean: clamp(this.vx / CONFIG.MOVE_MAX_SPEED, -1, 1) * 0.12,
       glow: 0.15,
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
@@ -177,7 +193,10 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-// ── Bot brain: GRAZE / HUNT / FLEE with reaction delay ─────────────────────────
+// ── Bot brain: GRAZE / HUNT / FLEE with a time-based aggression curve ──────────
+// Aggression is 0 for the first AGGRO_START_MS, then ramps linearly to 1.0 by
+// AGGRO_FULL_MS. Bots may only graze until aggression >= HUNT_MIN_AGGRO; only
+// then may they HUNT (target other voids, including the player).
 export class BotController implements RivalController {
   kind = 'bot';
   state: 'GRAZE' | 'HUNT' | 'FLEE' = 'GRAZE';
@@ -187,14 +206,20 @@ export class BotController implements RivalController {
   private hasTarget = false;
   private roamAngle = Math.random() * Math.PI * 2;
   private roamTimer = 0;
-  private aggression: number;
+  private bias: number;   // personality bias on target scoring
 
-  constructor(reactionDelay = 240, aggression = 1) {
+  constructor(reactionDelay = 240, bias = 1) {
     this.reactionDelay = reactionDelay;
-    this.aggression = aggression;
+    this.bias = bias;
+  }
+
+  private aggressionFrom(elapsed: number) {
+    return clamp((elapsed - CONFIG.AGGRO_START_MS) / (CONFIG.AGGRO_FULL_MS - CONFIG.AGGRO_START_MS), 0, 1);
   }
 
   think(rival: Rival, view: WorldView, dt: number): Intent {
+    const aggression = this.aggressionFrom(view.elapsed);
+
     // FLEE is always evaluated (survival first)
     let threat: VoidView | null = null;
     let threatD = Infinity;
@@ -214,7 +239,7 @@ export class BotController implements RivalController {
     this.decisionTimer -= dt;
     if (this.decisionTimer <= 0 || !this.hasTarget) {
       this.decisionTimer = this.reactionDelay + Math.random() * 120;
-      this.pickTarget(rival, view);
+      this.pickTarget(rival, view, aggression);
     }
 
     if (!this.hasTarget) {
@@ -225,7 +250,6 @@ export class BotController implements RivalController {
         this.roamAngle += (Math.random() - 0.5) * 1.6;
         this.roamTimer = 1200 + Math.random() * 1200;
       }
-      // steer away from walls
       const m = view.map;
       if (rival.x < 200) this.roamAngle = 0;
       else if (rival.x > m - 200) this.roamAngle = Math.PI;
@@ -240,28 +264,31 @@ export class BotController implements RivalController {
     return { dirX: dx / d, dirY: dy / d, mag: this.state === 'HUNT' ? 1 : 0.85 };
   }
 
-  private pickTarget(rival: Rival, view: WorldView) {
+  private pickTarget(rival: Rival, view: WorldView, aggression: number) {
     this.hasTarget = false;
     let best = Infinity;
 
-    // Hunt: smaller rival voids to devour
-    for (const v of view.voids) {
-      if (rival.radius >= v.radius * CONFIG.RIVAL_EAT_RATIO) {
-        const d = dist(rival.x, rival.y, v.x, v.y);
-        const score = d / this.aggression;
-        if (d < rival.radius * 9 && score < best) {
-          best = score; this.tx = v.x; this.ty = v.y; this.hasTarget = true; this.state = 'HUNT';
+    // Hunt: smaller voids to devour — only once aggression has ramped up
+    if (aggression >= CONFIG.HUNT_MIN_AGGRO) {
+      for (const v of view.voids) {
+        if (rival.radius >= v.radius * CONFIG.RIVAL_EAT_RATIO) {
+          const d = dist(rival.x, rival.y, v.x, v.y);
+          const score = d / (this.bias * aggression);
+          if (d < rival.radius * 9 && score < best) {
+            best = score; this.tx = v.x; this.ty = v.y; this.hasTarget = true; this.state = 'HUNT';
+          }
         }
       }
+      if (this.hasTarget) return;
     }
-    if (this.hasTarget) return;
 
-    // Graze: nearest edible object, prefer bigger (more mass) when close
+    // Graze: nearest edible object, biased toward bigger (juicier) ones
+    best = Infinity;
     for (const o of view.objects) {
       if (o.eaten) continue;
       if (rival.radius < o.size * CONFIG.EAT_RATIO) continue;
       const d = dist(rival.x, rival.y, o.x, o.y);
-      const score = d - o.size * 4; // bias toward larger, juicier objects
+      const score = d - o.size * 4;
       if (score < best) { best = score; this.tx = o.x; this.ty = o.y; this.hasTarget = true; this.state = 'GRAZE'; }
     }
   }
@@ -284,9 +311,9 @@ export function makeRivals(): Rival[] {
       accessories: [],
     };
     const reaction = 180 + Math.random() * 260;
-    const aggression = 0.7 + Math.random() * 0.8;
+    const bias = 0.7 + Math.random() * 0.8;
     const speedScale = 0.9 + Math.random() * 0.2;
-    rivals.push(new Rival(names[i], countries[i], skin, new BotController(reaction, aggression), speedScale));
+    rivals.push(new Rival(names[i], countries[i], skin, new BotController(reaction, bias), speedScale));
   }
   return rivals;
 }

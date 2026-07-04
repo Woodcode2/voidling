@@ -285,3 +285,38 @@
 }
 
 .vd-shop-list { width: 100%; overflow-y: auto; }
+
+/* single pause pill (top-right) — replaces the old floating sound/close buttons */
+.vd-pause-pill {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(20, 8, 43, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+.vd-pause-pill:active { transform: scale(0.92); background: rgba(20, 8, 43, 0.75); }
+
+.vd-overlay--dim { background: rgba(15, 6, 33, 0.72); backdrop-filter: blur(3px); }
+.vd-pause-overlay { pointer-events: auto; }
+
+.vd-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(300px, 82vw);
+  padding: 24px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #2A1152 0%, rgba(42,17,82,0) 60%),
+    #1A0B38;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}

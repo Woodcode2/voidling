@@ -36,6 +36,14 @@ function BackIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
+function PauseIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+      <rect x="6" y="5" width="4" height="14" rx="1.5" />
+      <rect x="14" y="5" width="4" height="14" rx="1.5" />
+    </svg>
+  );
+}
 function CrownIcon({ size = 64 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 48" aria-hidden="true">
@@ -195,14 +203,24 @@ function Daily({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
 function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   return (
     <div className="vd-game-ui">
-      <div className="vd-controls">
-        <button className="vd-icon-btn" onClick={() => engine.toggleMute()} aria-label="Toggle sound">
-          <SoundIcon muted={snap.muted} />
+      {/* single 40px pause pill, top-right — no floating buttons over the arena */}
+      {!snap.paused && (
+        <button className="vd-pause-pill" onClick={() => engine.togglePause()} aria-label="Pause">
+          <PauseIcon />
         </button>
-        <button className="vd-icon-btn" onClick={() => engine.goHome()} aria-label="Leave round">
-          <CloseIcon />
-        </button>
-      </div>
+      )}
+      {snap.paused && (
+        <div className="vd-overlay vd-overlay--dim vd-pause-overlay">
+          <div className="vd-sheet">
+            <h2 className="vd-heading">PAUSED</h2>
+            <button className="vd-btn vd-btn--play" onClick={() => engine.togglePause()}>RESUME</button>
+            <button className="vd-btn vd-btn--secondary" onClick={() => engine.toggleMute()}>
+              {snap.muted ? 'SOUND: OFF' : 'SOUND: ON'}
+            </button>
+            <button className="vd-btn vd-btn--ghost" onClick={() => engine.goHome()}>QUIT ROUND</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

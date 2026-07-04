@@ -1,32 +1,28 @@
 ---
 name: VOIDLING architecture
-description: The React-DOM-menus / canvas-arena split and engine snapshot API that VOIDLING is built on.
+description: How the VOIDLING .io game (artifacts/3d-game) is structured — engine snapshot API, canvas vs DOM split, world/eating model, and the units/timestep contract.
 ---
 
-# VOIDLING engine ↔ UI split
+# VOIDLING architecture
 
-VOIDLING (`artifacts/3d-game/`, preview path `/`) is a mobile-first Canvas 2D arcade PWA. Its UI is split two ways and joined by a single engine API:
+React DOM renders menus (`ui/UILayer.tsx`); the canvas renders the arena + HUD only. `createGame(canvas)` returns an engine (`game/engine.ts`) exposing `getSnapshot()/subscribe()/start()/togglePause()/...`. The engine notifies subscribers only on discrete state changes (screen switch, pause, coins), never per-frame — the canvas loop runs independently via `requestAnimationFrame`.
 
-- **React DOM renders ALL menus** (Home / Shop / Results / BoonPicker / DailyIntro) plus the in-game control buttons — every control is a real `<button>`.
-- **Canvas renders ONLY the arena + HUD** (timer, score, leaderboard, boon icons, banners).
-- They are connected by `createGame(canvas)` → `GameEngine` with `getSnapshot()`, `subscribe(cb)`, and control methods (`start / chooseBoon / buySkin / equipSkin / openShop / openDaily / goHome / toggleMute / destroy`). `App.tsx` subscribes and re-renders `UILayer` from the snapshot.
+## Units & timestep (easy to get wrong)
+- **World units == pixels.** The map is `CONFIG.MAP_SIZE` px square.
+- The fixed-step loop passes `dt` in **milliseconds** (`FIXED_DT ≈ 16.67`). All v4 movement/physics constants are **px/second**, so every system converts with `dtSec = dt / 1000`. Mixing ms and px/s silently makes things ~16x too fast/slow.
+- Game runtime may use `performance.now()` / `Math.random()` freely — durability only matters inside the CodeExecution sandbox, not app code.
 
-**Why:** Rendering menus/buttons on the canvas caused unreliable taps on mobile. Moving menus to real DOM buttons fixed tap handling and accessibility. Keeping the arena on canvas keeps the 60fps sim off React's reconciler.
+## World & eating model (`game/world.ts`)
+- Arena is a procedurally-drawn 3×3 block neighborhood ("Maple Court"): residential/park/plaza/landmark blocks, roads between them, `drawGround()` paints asphalt/lawns/sidewalks/pond, `draw()` y-sorts objects.
+- **Player eats via a gravity well**, not contact: object within `CAPTURE_RADIUS_MULT·radius` is `captured`, accelerates toward the player (`SUCTION_ACCEL`, capped `SUCTION_MAX_SPEED`), absorbed at `ABSORB_RADIUS_MULT·radius`; it *escapes* if the player leaves. **Rivals eat by pop-on-contact** (different model). A captured object is skipped by the rival loop so it can't be double-eaten.
+- Non-edible (too-big) objects are solid: push the player out along the normal + tangential slide, with a `tooBigCd`-gated shake/ring/vibrate. **Recompute the collision normal AFTER living-AI movement each frame** — using the pre-movement distance makes moving cars/people jitter.
+- Water tower is a solid obstacle until `player.radius >= WATERTOWER_EAT_RADIUS`, then it's edible and fires the finale.
 
-**How to apply:**
-- `engine.subscribe` must fire ONLY on discrete state changes (screen transitions, coins/skin/mute changes) — NEVER per frame — or React re-renders at 60fps during gameplay. Keep `notify()` calls out of the rAF loop.
-- The in-game overlay container is `pointer-events: none` with `pointer-events: auto` only on its buttons, so the full-canvas relative-drag joystick still receives pointer events everywhere else.
-- Simulation uses a fixed timestep + interpolation alpha; pause the rAF loop on `visibilitychange` (hidden) and reset the clock on resume so a backgrounded tab doesn't accumulate a huge catch-up delta.
-- Palette is "Electric Pop" (violet `#14082B` base); there must be no cream `#FDF6EC` anywhere. Default skin id is `classic` (legacy `default` is migrated to `classic` on meta load).
+## Cross-round state
+- `start()` must reset every accumulator or state leaks between rounds: `roundElapsed`, `slowmo`, `paused`, `coinBonus`, fx buffers (particles/texts/**rings**), and snap the camera onto the player.
+- **Finale coins**: accrue to `coinBonus` only; the single grant happens in `endRound` (`coins = base + coinBonus`). Do NOT also `meta.addCoins` in the finale trigger — that double-awards.
+- **Pause must freeze all time-based systems**, not just `simulate`: gate `slowmo` decay, `fx.update`, and HUD banner-lifetime decrements behind `!paused`.
 
-## Service worker / PWA caching
-
-VOIDLING ships as an installable PWA with a service worker.
-
-**Why this matters:** an early service worker cached the app shell cache-first with a fixed cache name and no cleanup, so browsers permanently served an OLD build — users saw the pre-refactor look in preview while the dev server served fresh code. The screenshot tool runs a fresh browser with no SW, so it showed the new build and masked the problem.
-
-**Policy:**
-- Never let the service worker run against the dev server: register it only in production; in dev, unregister it and clear its caches so preview is always fresh.
-- The SW must be self-healing — take over immediately, purge stale caches, and reload open tabs — so a stuck browser recovers on its own without a manual cache clear.
-- Navigations are network-first (new versions appear immediately); only content-hashed static assets are cache-first. Bump the cache version whenever cached content or strategy changes.
-- First suspect for any "preview shows the old version" report is the SW cache.
+## Camera
+Center-based with `CAM_LERP` follow + `CAM_DEADZONE` (screen px → world via `/zoom`) and `ZOOM_LERP` toward `PLAYER_SCREEN_TALL/(2·radius)`. Render transform: `translate(fw/2+shake, fh/2+shake); scale(zoom); translate(-camCenter)`. `fx.draw(ctx)` runs INSIDE that transform (world space); `fx.drawFlash` runs after (screen space).
+**Why note this:** the literal `PLAYER_SCREEN_TALL=100` makes early game very zoomed-in (player ~100px), so a lone frame on a wide road can look sparse — that's intended, not a bug.
