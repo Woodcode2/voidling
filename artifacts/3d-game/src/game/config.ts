@@ -1,13 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// VOIDLING v2 — central tuning + data. Everything the game reads lives here.
+// VOIDLING v4 — central tuning + data. Everything the game reads lives here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ObjectKind =
-  | 'apple' | 'flower' | 'mushroom'          // T1
-  | 'duck' | 'dog'                           // T2
-  | 'person' | 'bench' | 'bush'              // T3
-  | 'car' | 'tree' | 'fountain' | 'foodcart' // T4
-  | 'gazebo';                                // T5
+  // T1
+  | 'apple' | 'flower' | 'flowerpot' | 'gnome'
+  // T2
+  | 'mailbox' | 'hydrant' | 'trashcan' | 'duck' | 'bike'
+  // T3
+  | 'person' | 'dog' | 'bench' | 'birdbath' | 'cafetable'
+  // T4
+  | 'car' | 'tree' | 'foodcart' | 'shed' | 'fountain'
+  // T5
+  | 'house'
+  // Landmark
+  | 'watertower'
+  // legacy decor (still drawable, used sparingly)
+  | 'mushroom' | 'bush' | 'gazebo';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -37,12 +46,10 @@ export interface BoonDef {
   desc: string;
 }
 
-export interface TierDef {
+export interface KindInfo {
   tier: number;
-  kinds: ObjectKind[];
   minR: number;
   maxR: number;
-  count: number;
 }
 
 export const CONFIG = {
@@ -53,51 +60,99 @@ export const CONFIG = {
 
   // Controls (relative-drag virtual joystick)
   JOYSTICK_MAX_DIST: 110,   // px from anchor for full speed
-  PLAYER_MAX_SPEED: 0.46,   // world units / ms at full tilt
-  RELEASE_DECEL_MS: 200,    // glide to a stop on release
+
+  // Movement feel contract (px/s, px/s²) — v4 §3
+  MOVE_ACCEL: 2400,         // toward joystick vector
+  MOVE_MAX_SPEED: 340,      // at base size (boons stack on top)
+  MOVE_DECEL: 1800,         // on release
+
+  // Camera — v4 §3
+  CAM_LERP: 0.10,
+  CAM_DEADZONE: 40,         // screen px
+  ZOOM_LERP: 0.06,
+  PLAYER_SCREEN_TALL: 100,  // target on-screen diameter
+  PLAYER_SCREEN_MIN: 64,
+  PLAYER_SCREEN_MAX: 140,
+
+  // Suction physics — v4 §2
+  CAPTURE_RADIUS_MULT: 1.35,
+  ABSORB_RADIUS_MULT: 0.75,
+  SUCTION_MAX_SPEED: 600,   // px/s
+  SUCTION_ACCEL: 2800,      // px/s²
+
+  // Too-big collision feedback — §0 fix
+  TOOBIG_COOLDOWN: 500,     // ms
 
   // World
-  MAP_SIZE: 3200,
+  MAP_SIZE: 2800,
+  BLOCK_SIZE: 800,
+  ROAD_WIDTH: 120,
+  SIDEWALK: 44,
+  GRID: 3,
   PLAYER_BASE_RADIUS: 26,
+
+  // Living world speeds (px/s)
+  CAR_SPEED: 60, CAR_FLEE_SPEED: 140,
+  PERSON_SPEED: 30, PERSON_FLEE_SPEED: 120,
+  DUCK_SPEED: 22, DOG_SPEED: 70,
+
+  // Population / respawn
+  TARGET_POPULATION: 300,
+  RESPAWN_MIN: 250,         // trickle small objects if below this
 
   // Absorb / orbit / merge
   ABSORB_SHRINK_TIME: 190,
-  ORBIT_RADIUS_OFFSET: 16,
+  ORBIT_RADIUS_OFFSET: 22,
   ORBIT_SPEED: 0.0024,
   ORBIT_MAX: 6,
   COMBO_DECAY_TIME: 4200,
   EAT_RATIO: 0.9,           // eater.radius must exceed target.size * this to absorb objects
 
+  // Water tower is a WORLD-EATER-scale prize
+  WATERTOWER_EAT_RADIUS: 300,
+
   // Rivals
   RIVAL_COUNT: 5,
   RIVAL_EAT_RATIO: 1.15,    // eater radius >= 1.15x eaten radius
-  RIVAL_OVERLAP: 0.6,       // overlap >= 60% of smaller
   GHOST_TIME: 2500,         // invulnerable ms after being eaten
   RESPAWN_MASS_FRAC: 0.65,  // respawn at 65% of mass
 
+  // Bot aggression curve — §7 fix
+  AGGRO_START_MS: 15000,    // 0 aggression before this much elapsed
+  AGGRO_FULL_MS: 45000,     // 1.0 aggression at/after this
+  HUNT_MIN_AGGRO: 0.5,      // HUNT (targeting voids) needs at least this
+  RIVAL_SPAWN_SCREENS: 1.5, // bigger-than-player rivals spawn this many screens away
+
   COLORS: {
-    // ── Electric Pop ──────────────────────────────────────────────────────
-    uiBg: '#14082B',          // deep space violet (UI screens)
-    uiBg2: '#1E0F3D',         // slightly lighter panel violet
+    // ── UI: Electric Pop ──
+    uiBg: '#14082B',
+    uiBg2: '#1E0F3D',
     uiText: '#FFFFFF',
-    playBtn: '#FF3D68',       // hot coral
-    playBtnEdge: '#B81E44',   // darker coral bottom edge (2.5D)
-    secondaryBtn: '#FFD23F',  // electric yellow
+    playBtn: '#FF3D68',
+    playBtnEdge: '#B81E44',
+    secondaryBtn: '#FFD23F',
     secondaryBtnEdge: '#C79A12',
     secondaryText: '#14082B',
 
-    // Arena
-    field: '#1CC6AE',         // saturated turquoise
-    fieldDark: '#15A892',
-    path: '#FFD23F',
-    pond: '#2D9CDB',
-    pondEdge: '#1E7BB0',
-    checkA: '#FF3D68',
-    checkB: '#FFFFFF',
+    // ── Ground: muted so it recedes (nothing more contrasty than smallest edible) ──
+    ground: {
+      asphalt: '#8A93A6',
+      asphaltEdge: '#7C8598',
+      sidewalk: '#D8D3C8',
+      sidewalkSeam: 'rgba(0,0,0,0.06)',
+      lane: 'rgba(255,255,255,0.4)',
+      lawns: ['#8FCDA0', '#7FC494', '#98D3A8'],
+      pavement: '#E4DECF',
+      pavementSeam: 'rgba(0,0,0,0.05)',
+      pond: '#8FBFE0',
+      pondEdge: '#FFFFFF',
+      driveway: '#C9C4B8',
+      dirt: '#B79A6B',
+    },
 
     // Sticker style
     outline: '#FFFFFF',
-    shadow: 'rgba(0,0,0,0.12)',
+    shadow: 'rgba(0,0,0,0.14)',
 
     // Voidling default
     voidBody: '#3A1E6B',
@@ -106,17 +161,43 @@ export const CONFIG = {
     pupil: '#1A0B33',
 
     pops: ['#FF3D68', '#FFD23F', '#2D9CDB', '#1CC6AE', '#B388FF', '#FF9F1C'],
-    tierTint: ['#FF6F91', '#FFD23F', '#7ED0FF', '#B388FF', '#FF9F1C'],
+    tierTint: ['#FF6F91', '#FFD23F', '#7ED0FF', '#B388FF', '#FF9F1C', '#FFFFFF'],
   },
 
-  // Object generation
-  TIER_DEFS: [
-    { tier: 1, kinds: ['apple', 'flower', 'mushroom'],        minR: 10, maxR: 16, count: 58 },
-    { tier: 2, kinds: ['duck', 'dog'],                        minR: 18, maxR: 27, count: 34 },
-    { tier: 3, kinds: ['person', 'bench', 'bush', 'dog'],     minR: 30, maxR: 44, count: 26 },
-    { tier: 4, kinds: ['car', 'tree', 'fountain', 'foodcart'],minR: 52, maxR: 74, count: 14 },
-    { tier: 5, kinds: ['gazebo'],                             minR: 92, maxR: 118, count: 3 },
-  ] as TierDef[],
+  // Per-kind sizing + tier (structured placement reads this)
+  KIND_INFO: {
+    // T1
+    flower:     { tier: 1, minR: 11, maxR: 15 },
+    flowerpot:  { tier: 1, minR: 12, maxR: 15 },
+    gnome:      { tier: 1, minR: 13, maxR: 16 },
+    apple:      { tier: 1, minR: 11, maxR: 14 },
+    // T2
+    mailbox:    { tier: 2, minR: 19, maxR: 22 },
+    hydrant:    { tier: 2, minR: 18, maxR: 21 },
+    trashcan:   { tier: 2, minR: 20, maxR: 24 },
+    duck:       { tier: 2, minR: 18, maxR: 24 },
+    bike:       { tier: 2, minR: 24, maxR: 28 },
+    // T3
+    person:     { tier: 3, minR: 28, maxR: 34 },
+    dog:        { tier: 3, minR: 28, maxR: 33 },
+    bench:      { tier: 3, minR: 36, maxR: 44 },
+    birdbath:   { tier: 3, minR: 30, maxR: 36 },
+    cafetable:  { tier: 3, minR: 34, maxR: 40 },
+    // T4
+    car:        { tier: 4, minR: 54, maxR: 66 },
+    tree:       { tier: 4, minR: 58, maxR: 72 },
+    foodcart:   { tier: 4, minR: 56, maxR: 66 },
+    shed:       { tier: 4, minR: 62, maxR: 74 },
+    fountain:   { tier: 4, minR: 58, maxR: 68 },
+    // T5
+    house:      { tier: 5, minR: 92, maxR: 116 },
+    // Landmark
+    watertower: { tier: 6, minR: 150, maxR: 150 },
+    // decor
+    bush:       { tier: 2, minR: 22, maxR: 30 },
+    mushroom:   { tier: 1, minR: 10, maxR: 14 },
+    gazebo:     { tier: 5, minR: 92, maxR: 110 },
+  } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void
   FLEEING_KINDS: ['duck', 'dog', 'person'] as ObjectKind[],

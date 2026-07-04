@@ -330,6 +330,288 @@ function drawGazebo(ctx: CanvasRenderingContext2D, r: number, t: number) {
   }, '#2D9CDB', { outline: o, shadow: false });
 }
 
+// ── v4 neighborhood objects ────────────────────────────────────────────────
+function drawFlowerpot(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 0) {
+  const o = ow(r);
+  const petal = pick(['#FF6FB0', '#FFD23F', '#8ECBFF', '#FF8A5C'], variant);
+  // pot
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.55, r * 0.15);
+    c.lineTo(r * 0.55, r * 0.15);
+    c.lineTo(r * 0.4, r * 0.8);
+    c.lineTo(-r * 0.4, r * 0.8);
+    c.closePath();
+  }, '#C86B3C', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.62, -r * 0.02, r * 1.24, r * 0.24, r * 0.08), '#E07C46', { outline: o, shadow: false });
+  // little bloom
+  const sway = Math.sin(t / 700 + variant) * 0.1;
+  ctx.save();
+  ctx.translate(0, -r * 0.2);
+  ctx.rotate(sway);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    sticker(ctx, (c) => c.ellipse(Math.cos(a) * r * 0.34, Math.sin(a) * r * 0.34 - r * 0.2, r * 0.26, r * 0.18, a, 0, Math.PI * 2), petal, { outline: o, shadow: false });
+  }
+  dot(ctx, 0, -r * 0.2, r * 0.14, '#FFD23F');
+  ctx.restore();
+}
+
+function drawGnome(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.42, -r * 0.05, r * 0.84, r * 0.85, r * 0.3), '#3F8CE0', { outline: o });
+  // beard
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.36, -r * 0.05);
+    c.quadraticCurveTo(0, r * 0.75, r * 0.36, -r * 0.05);
+    c.quadraticCurveTo(0, r * 0.15, -r * 0.36, -r * 0.05);
+    c.closePath();
+  }, '#F1F1F5', { outline: o, shadow: false });
+  // face
+  stickerCircle(ctx, 0, -r * 0.2, r * 0.3, '#F4C79B', { outline: o, shadow: false });
+  dot(ctx, 0, -r * 0.14, r * 0.12, '#E88A5A'); // nose
+  dot(ctx, -r * 0.14, -r * 0.26, r * 0.05, '#1A0B33');
+  dot(ctx, r * 0.14, -r * 0.26, r * 0.05, '#1A0B33');
+  // hat
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.5, -r * 0.28);
+    c.quadraticCurveTo(0, -r * 0.55, r * 0.5, -r * 0.28);
+    c.lineTo(r * 0.06, -r * 1.15);
+    c.closePath();
+  }, '#E23B4E', { outline: o });
+}
+
+function drawMailbox(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // post
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.12, r * 0.05, r * 0.24, r * 0.85, r * 0.06), '#8A5A2E', { outline: o });
+  // box
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.55, r * 0.1);
+    c.lineTo(-r * 0.55, -r * 0.3);
+    c.arc(0, -r * 0.3, r * 0.55, Math.PI, 0);
+    c.lineTo(r * 0.55, r * 0.1);
+    c.closePath();
+  }, '#3F7FD0', { outline: o });
+  // flag
+  sticker(ctx, (c) => roundRectPath(c, r * 0.5, -r * 0.5, r * 0.22, r * 0.22, r * 0.04), '#E23B4E', { outline: o, shadow: false });
+  dot(ctx, -r * 0.2, -r * 0.2, r * 0.12, '#EAF2FF');
+}
+
+function drawHydrant(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  const red = '#E23B4E';
+  // base
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.5, r * 0.55, r * 1.0, r * 0.22, r * 0.06), '#C42A3C', { outline: o });
+  // body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.42, -r * 0.35, r * 0.84, r * 0.95, r * 0.24), red, { outline: o });
+  // cap
+  sticker(ctx, (c) => c.arc(0, -r * 0.4, r * 0.42, Math.PI, 0), red, { outline: o, shadow: false });
+  dot(ctx, 0, -r * 0.55, r * 0.14, '#FFD23F'); // bolt
+  // side nozzles
+  dot(ctx, -r * 0.5, r * 0.02, r * 0.16, '#C42A3C');
+  dot(ctx, r * 0.5, r * 0.02, r * 0.16, '#C42A3C');
+}
+
+function drawTrashcan(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  const metal = '#5E6472';
+  // body
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.5, -r * 0.35);
+    c.lineTo(r * 0.5, -r * 0.35);
+    c.lineTo(r * 0.4, r * 0.75);
+    c.lineTo(-r * 0.4, r * 0.75);
+    c.closePath();
+  }, metal, { outline: o });
+  // ridges
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  for (const dx of [-0.2, 0.2]) {
+    ctx.beginPath();
+    ctx.moveTo(r * dx, -r * 0.3);
+    ctx.lineTo(r * dx * 0.85, r * 0.7);
+    ctx.stroke();
+  }
+  // lid
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.6, -r * 0.55, r * 1.2, r * 0.24, r * 0.1), '#6E7484', { outline: o, shadow: false });
+  dot(ctx, 0, -r * 0.62, r * 0.1, '#8A90A0');
+}
+
+function drawBike(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const frame = pick(['#E23B4E', '#2D9CDB', '#33C46B', '#FF9F1C'], variant);
+  const wr = r * 0.42;
+  // wheels
+  for (const wx of [-0.6, 0.6]) {
+    ctx.save();
+    ctx.strokeStyle = '#22222C';
+    ctx.lineWidth = Math.max(2, r * 0.12);
+    ctx.beginPath();
+    ctx.arc(r * wx, r * 0.35, wr, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    dot(ctx, r * wx, r * 0.35, r * 0.08, '#C9CCD6');
+  }
+  // frame
+  ctx.strokeStyle = frame;
+  ctx.lineWidth = Math.max(2.4, r * 0.14);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.6, r * 0.35);
+  ctx.lineTo(0, r * 0.35);
+  ctx.lineTo(-r * 0.1, -r * 0.2);
+  ctx.lineTo(r * 0.45, -r * 0.2);
+  ctx.lineTo(r * 0.6, r * 0.35);
+  ctx.moveTo(0, r * 0.35);
+  ctx.lineTo(r * 0.45, -r * 0.2);
+  ctx.stroke();
+  // seat + handle
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.22, -r * 0.34, r * 0.24, r * 0.12, r * 0.05), '#2A1A0E', { outline: 0, shadow: false });
+  ctx.strokeStyle = '#2A1A0E';
+  ctx.beginPath();
+  ctx.moveTo(r * 0.45, -r * 0.2);
+  ctx.lineTo(r * 0.6, -r * 0.4);
+  ctx.stroke();
+}
+
+function drawBirdbath(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const stone = '#C7CBD6';
+  // pedestal
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.2, -r * 0.1, r * 0.4, r * 0.8, r * 0.08), '#9CA2B2', { outline: o });
+  stickerEllipse(ctx, 0, r * 0.72, r * 0.55, r * 0.2, stone, 0, { outline: o });
+  // basin
+  stickerEllipse(ctx, 0, -r * 0.2, r * 0.85, r * 0.34, stone, 0, { outline: o });
+  stickerEllipse(ctx, 0, -r * 0.24, r * 0.66, r * 0.24, '#8FBFE0', 0, { outline: o, shadow: false });
+  // ripple + bird
+  const bob = Math.sin(t / 400) * r * 0.03;
+  dot(ctx, r * 0.2, -r * 0.26 + bob, r * 0.12, '#FF8A5C');
+  dot(ctx, r * 0.14, -r * 0.3 + bob, r * 0.05, '#1A0B33');
+}
+
+function drawCafetable(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const shade = pick(['#E23B4E', '#2D9CDB', '#33C46B'], variant);
+  // table top
+  stickerEllipse(ctx, 0, r * 0.35, r * 0.7, r * 0.24, '#EFE7D5', 0, { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.06, r * 0.35, r * 0.12, r * 0.4, r * 0.03), '#B7AF98', { outline: o, shadow: false });
+  // umbrella pole
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.05, -r * 0.7, r * 0.1, r * 1.1, r * 0.03), '#8A8570', { outline: o, shadow: false });
+  // umbrella
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.85, -r * 0.55);
+    c.quadraticCurveTo(0, -r * 1.15, r * 0.85, -r * 0.55);
+    c.quadraticCurveTo(0, -r * 0.4, -r * 0.85, -r * 0.55);
+    c.closePath();
+  }, shade, { outline: o });
+  for (const dx of [-0.42, 0, 0.42]) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.62);
+    ctx.lineTo(r * dx, -r * 0.5);
+    ctx.stroke();
+  }
+}
+
+function drawShed(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const wall = pick(['#B98A5A', '#A87C4E', '#C79A6A'], variant);
+  // walls
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.72, -r * 0.15, r * 1.44, r * 0.9, r * 0.04), wall, { outline: o });
+  // roof
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.85, -r * 0.1);
+    c.lineTo(0, -r * 0.75);
+    c.lineTo(r * 0.85, -r * 0.1);
+    c.closePath();
+  }, '#6E4A2A', { outline: o });
+  // door
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.22, r * 0.05, r * 0.44, r * 0.7, r * 0.04), '#5A3E22', { outline: o, shadow: false });
+  dot(ctx, r * 0.12, r * 0.4, r * 0.06, '#FFD23F');
+}
+
+function drawHouse(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const body = pick(['#F6E7B0', '#F6C6C6', '#BFE0F2', '#CFE6C4', '#EAD7F2'], variant);
+  const roof = pick(['#C4736B', '#8A6BB0', '#6E93B8', '#7EA07A', '#C79A5A'], variant + 1);
+  // body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.72, -r * 0.05, r * 1.44, r * 0.95, r * 0.05), body, { outline: o });
+  // roof
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.9, 0);
+    c.lineTo(0, -r * 0.78);
+    c.lineTo(r * 0.9, 0);
+    c.closePath();
+  }, roof, { outline: o });
+  // door
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.16, r * 0.32, r * 0.32, r * 0.58, r * 0.05), '#8A5A2E', { outline: o, shadow: false });
+  dot(ctx, r * 0.08, r * 0.62, r * 0.05, '#FFD23F');
+  // windows
+  for (const wx of [-0.46, 0.46]) {
+    sticker(ctx, (c) => roundRectPath(c, r * wx - r * 0.16, r * 0.15, r * 0.32, r * 0.32, r * 0.04), '#BFEAFF', { outline: o, shadow: false });
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    ctx.beginPath();
+    ctx.moveTo(r * wx, r * 0.15); ctx.lineTo(r * wx, r * 0.47);
+    ctx.moveTo(r * wx - r * 0.16, r * 0.31); ctx.lineTo(r * wx + r * 0.16, r * 0.31);
+    ctx.stroke();
+  }
+}
+
+function drawWatertower(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const tank = '#D8DCE6';
+  // legs
+  ctx.strokeStyle = '#9098A8';
+  ctx.lineWidth = Math.max(3, r * 0.06);
+  ctx.lineCap = 'round';
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(s * r * 0.5, -r * 0.1);
+    ctx.lineTo(s * r * 0.72, r * 0.9);
+    ctx.moveTo(s * r * 0.2, -r * 0.1);
+    ctx.lineTo(s * r * 0.32, r * 0.9);
+    ctx.stroke();
+  }
+  // cross braces
+  ctx.lineWidth = Math.max(2, r * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.6, r * 0.45); ctx.lineTo(r * 0.6, r * 0.45);
+  ctx.moveTo(-r * 0.55, r * 0.15); ctx.lineTo(r * 0.55, r * 0.72);
+  ctx.moveTo(r * 0.55, r * 0.15); ctx.lineTo(-r * 0.55, r * 0.72);
+  ctx.stroke();
+  // tank
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.62, -r * 0.55, r * 1.24, r * 0.6, r * 0.18), tank, { outline: o });
+  // conical top
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.62, -r * 0.5);
+    c.lineTo(0, -r * 0.95);
+    c.lineTo(r * 0.62, -r * 0.5);
+    c.closePath();
+  }, '#B8BECD', { outline: o, shadow: false });
+  // little flag
+  ctx.strokeStyle = '#7A4A2B';
+  ctx.lineWidth = Math.max(1.6, r * 0.02);
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.95); ctx.lineTo(0, -r * 1.2);
+  ctx.stroke();
+  const wave = Math.sin(t / 400);
+  sticker(ctx, (c) => {
+    c.moveTo(0, -r * 1.2);
+    c.lineTo(r * 0.28 + wave * r * 0.04, -r * 1.13);
+    c.lineTo(0, -r * 1.03);
+    c.closePath();
+  }, '#E23B4E', { outline: o, shadow: false });
+  // label
+  ctx.fillStyle = '#5E6472';
+  ctx.font = `bold ${Math.max(6, r * 0.16)}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('MAPLE', 0, -r * 0.25);
+}
+
 // ── Dispatcher ─────────────────────────────────────────────────────────────
 export interface DrawOpts {
   t?: number;
@@ -360,5 +642,16 @@ export function drawParkObject(
     case 'fountain': return drawFountain(ctx, r, t);
     case 'foodcart': return drawFoodcart(ctx, r, t);
     case 'gazebo': return drawGazebo(ctx, r, t);
+    case 'flowerpot': return drawFlowerpot(ctx, r, t, v);
+    case 'gnome': return drawGnome(ctx, r, t);
+    case 'mailbox': return drawMailbox(ctx, r, t);
+    case 'hydrant': return drawHydrant(ctx, r, t);
+    case 'trashcan': return drawTrashcan(ctx, r, t);
+    case 'bike': return drawBike(ctx, r, t, v);
+    case 'birdbath': return drawBirdbath(ctx, r, t);
+    case 'cafetable': return drawCafetable(ctx, r, t, v);
+    case 'shed': return drawShed(ctx, r, t, v);
+    case 'house': return drawHouse(ctx, r, t, v);
+    case 'watertower': return drawWatertower(ctx, r, t);
   }
 }

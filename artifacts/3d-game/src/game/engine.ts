@@ -6,7 +6,7 @@ import { Player } from './player';
 import { makeRivals, type Rival, type WorldView } from './rivals';
 import { meta } from './meta';
 import { track } from './services';
-import { formatTime, dist, clamp } from './utils';
+import { formatTime, dist, clamp, lerp } from './utils';
 import { createJoystick } from './input';
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
@@ -36,6 +36,7 @@ export interface Snapshot {
   results: ResultData | null;
   daily: DailyData | null;
   muted: boolean;
+  paused: boolean;
 }
 
 export interface GameEngine {
@@ -48,6 +49,7 @@ export interface GameEngine {
   openShop(): void;
   openDaily(): void;
   goHome(): void;
+  togglePause(): void;
   toggleMute(): boolean;
   destroy(): void;
 }
@@ -87,6 +89,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const activeBoons: ActiveBoon[] = [];
   const banners: Banner[] = [];
   let maxCombo = 0;
+  let paused = false;
+  let roundElapsed = 0;
+  let slowmo = 0;                 // ms of slow-motion remaining (finale)
+  let coinBonus = 0;             // extra coins already granted mid-round (finale)
+
+  // camera state (world-space centre + zoom), smoothed each frame
+  let camCX = CONFIG.MAP_SIZE / 2;
+  let camCY = CONFIG.MAP_SIZE / 2;
+  let camZoom = 0.5;
 
   // daily modifier round flags
   let baseGreed = 1;
@@ -155,8 +166,18 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     activeBoons.length = 0;
     banners.length = 0;
     maxCombo = 0;
+    roundElapsed = 0;
+    slowmo = 0;
+    paused = false;
+    coinBonus = 0;
     fx.particles.length = 0;
     fx.texts.length = 0;
+    fx.rings.length = 0;
+
+    // snap the camera onto the player so the round doesn't open mid-pan
+    camCX = player.x;
+    camCY = player.y;
+    camZoom = clamp(CONFIG.PLAYER_SCREEN_TALL / (2 * player.radius), 0.15, 2);
 
     results = null;
     screen = 'game';
@@ -198,7 +219,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const placement = board.findIndex((e) => e === player) + 1;
     const crown = placement === 1;
     const devoured = world.totalStartArea > 0 ? (world.eatenArea / world.totalStartArea) * 100 : 0;
-    const coins = Math.floor((player.score / 120 + (crown ? 60 : 0)) * coinMult);
+    const coins = Math.floor((player.score / 120 + (crown ? 60 : 0)) * coinMult) + coinBonus;
     const newBest = player.score > meta.data.highScore;
 
     meta.addCoins(coins);
@@ -220,11 +241,27 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     notify();
   }
 
+  function triggerFinale(x: number, y: number) {
+    slowmo = 600;
+    fx.flash();
+    fx.shake(500, 18, 60);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      fx.addConfetti(x + Math.cos(a) * 120, y + Math.sin(a) * 120, CONFIG.COLORS.pops, 26);
+    }
+    fx.addRing(x, y, '#FFD23F', 20, 900, 8, 900);
+    banner('YOU ATE THE WATER TOWER', '#FFD23F');
+    // single source of truth: accrue here, granted once via endRound's coin total
+    coinBonus += 500;
+    audio.playMerge();
+  }
+
   // ── simulation (fixed step) ──
   function simulate(dt: number) {
     if (!world || !player) return;
 
     timeLeft -= dt;
+    roundElapsed += dt;
 
     // boons expiry + live effects
     for (let i = activeBoons.length - 1; i >= 0; i--) {
@@ -253,11 +290,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           others.push({ x: rivals[j].x, y: rivals[j].y, radius: rivals[j].radius });
         }
       }
-      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE });
+      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed });
     }
 
-    // objects (eat + flee)
-    world.update(dt, player, rivals);
+    // objects (suction + eat + living-world AI)
+    world.update(dt, player, rivals, fx);
 
     // void vs void
     resolveVoids();
@@ -265,8 +302,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // drain player fx
     for (const ev of player.pendingFx) {
       if (ev.type === 'absorb') {
-        audio.playBlip(Math.min(player.combo, 12));
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
+      } else if (ev.type === 'chomp') {
+        audio.playChomp();
+        if (ev.kind) audio.playSignature(ev.kind);
       } else if (ev.type === 'merge') {
         audio.playMerge();
         fx.addConfetti(ev.x, ev.y, CONFIG.COLORS.pops);
@@ -278,6 +317,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         fx.shake(300, 12);
         fx.flash();
         if (ev.text) fx.addText(ev.x, ev.y - 30, ev.text, ev.color || '#FFD23F');
+      } else if (ev.type === 'finale') {
+        triggerFinale(ev.x, ev.y);
       }
     }
     player.pendingFx.length = 0;
@@ -314,6 +355,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   function resolveVoids() {
     if (!player) return;
+    // bigger rivals respawn at least 1.5 screen-widths away from the player
+    const minDist = (1.5 * fw) / Math.max(0.05, camZoom);
     // player vs rivals
     if (!player.ghost) {
       for (const r of rivals) {
@@ -325,7 +368,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           fx.addConfetti(r.x, r.y, CONFIG.COLORS.pops);
           fx.shake(280, 12); fx.flash();
           player.eatRival(rr);
-          r.getEaten();
+          r.getEaten(player.x, player.y, minDist);
           banner(`You devoured ${r.name}!`, '#FFD23F');
         } else if (canEatVoid(r.radius, player.radius, d)) {
           const pr = player.radius;
@@ -343,8 +386,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (a.ghost || b.ghost) continue;
         const d = dist(a.x, a.y, b.x, b.y);
         if (d > a.radius + b.radius) continue;
-        if (canEatVoid(a.radius, b.radius, d)) { a.eatVoid(b.radius); b.getEaten(); }
-        else if (canEatVoid(b.radius, a.radius, d)) { b.eatVoid(a.radius); a.getEaten(); }
+        if (canEatVoid(a.radius, b.radius, d)) { a.eatVoid(b.radius); b.getEaten(player.x, player.y, minDist); }
+        else if (canEatVoid(b.radius, a.radius, d)) { b.eatVoid(a.radius); a.getEaten(player.x, player.y, minDist); }
       }
     }
   }
@@ -361,74 +404,54 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     const px = player.prevX + (player.x - player.prevX) * alpha;
     const py = player.prevY + (player.y - player.prevY) * alpha;
+
+    // ── camera: zoom lerp toward target on-screen size ──
+    const targetZoom = clamp(CONFIG.PLAYER_SCREEN_TALL / (2 * player.radius), 0.15, 2);
+    camZoom = lerp(camZoom, targetZoom, CONFIG.ZOOM_LERP);
+
+    // ── camera: centre lerp with a dead zone (screen px → world) ──
+    const dzx = px - camCX, dzy = py - camCY;
+    const dd = Math.hypot(dzx, dzy);
+    const dead = CONFIG.CAM_DEADZONE / camZoom;
+    let tcx = camCX, tcy = camCY;
+    if (dd > dead) {
+      const pull = (dd - dead) / dd;
+      tcx = camCX + dzx * pull;
+      tcy = camCY + dzy * pull;
+    }
+    camCX = lerp(camCX, tcx, CONFIG.CAM_LERP);
+    camCY = lerp(camCY, tcy, CONFIG.CAM_LERP);
+
     const shake = fx.getShake();
-    const camX = px - fw / 2 + shake.x;
-    const camY = py - fh / 2 + shake.y;
+    const viewW = fw / camZoom, viewH = fh / camZoom;
+    const view = { x: camCX - viewW / 2, y: camCY - viewH / 2, w: viewW, h: viewH };
 
-    drawArena(camX, camY);
+    // background outside the map
+    ctx.fillStyle = CONFIG.COLORS.uiBg;
+    ctx.fillRect(0, 0, fw, fh);
 
+    // ── world transform: ground → objects (y-sorted) → voidlings → fx ──
     ctx.save();
-    ctx.translate(-camX, -camY);
-    world.draw(ctx, clock, { x: camX, y: camY, w: fw, h: fh });
+    ctx.translate(fw / 2 + shake.x, fh / 2 + shake.y);
+    ctx.scale(camZoom, camZoom);
+    ctx.translate(-camCX, -camCY);
+
+    world.drawGround(ctx, view);
+    world.draw(ctx, clock, view);
     for (const r of rivals) r.draw(ctx, clock, alpha);
     player.draw(ctx, clock, alpha);
+
+    if (!paused) fx.update(frameDt);
+    fx.draw(ctx);
     ctx.restore();
 
-    fx.update(frameDt);
-    fx.draw(ctx, camX, camY);
+    // screen-space FX + HUD
     fx.drawFlash(ctx, fw, fh);
 
     if (screen === 'game') {
       drawHUD();
       drawJoystickHint();
     }
-  }
-
-  function drawArena(camX: number, camY: number) {
-    const C = CONFIG.COLORS;
-    ctx.fillStyle = C.field;
-    ctx.fillRect(0, 0, fw, fh);
-
-    ctx.save();
-    ctx.translate(-camX, -camY);
-
-    // checker texture
-    const cell = 220;
-    const x0 = Math.floor(camX / cell) * cell;
-    const y0 = Math.floor(camY / cell) * cell;
-    ctx.fillStyle = C.fieldDark;
-    for (let x = x0; x < camX + fw + cell; x += cell) {
-      for (let y = y0; y < camY + fh + cell; y += cell) {
-        if (((x / cell) + (y / cell)) % 2 === 0) ctx.fillRect(x, y, cell, cell);
-      }
-    }
-
-    const S = CONFIG.MAP_SIZE;
-    // paths
-    ctx.fillStyle = 'rgba(255,210,63,0.85)';
-    roundRectFill(ctx, S * 0.08, S * 0.54, S * 0.84, 96, 40);
-    roundRectFill(ctx, S * 0.46, S * 0.08, 96, S * 0.84, 40);
-
-    // pond
-    const pondX = S * 0.7, pondY = S * 0.34, pr = 280;
-    ctx.fillStyle = C.pondEdge;
-    ctx.beginPath(); ctx.ellipse(pondX, pondY, pr + 12, pr * 0.62 + 12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = C.pond;
-    ctx.beginPath(); ctx.ellipse(pondX, pondY, pr, pr * 0.62, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.25; ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath(); ctx.ellipse(pondX - pr * 0.3, pondY - pr * 0.25, pr * 0.4, pr * 0.16, -0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // hedge border
-    ctx.lineWidth = 46;
-    ctx.strokeStyle = '#12907C';
-    ctx.lineJoin = 'round';
-    ctx.strokeRect(0, 0, S, S);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.strokeRect(23, 23, S - 46, S - 46);
-
-    ctx.restore();
   }
 
   function drawHUD() {
@@ -466,29 +489,34 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillText(`COMBO ×${player.comboMult.toFixed(1)}`, fw - 16, 64);
     }
 
-    // leaderboard (top left)
+    // leaderboard (top left, dark backdrop, dropped below the timer so it never
+    // overlaps the centred timer/bar at narrow widths e.g. 375px)
     const board = [
       { name: 'You', score: player.score, color: player.skin.glowColor, me: true },
       ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false })),
     ].sort((a, b) => b.score - a.score);
+    const LB_X = 8, LB_W = 150, LB_TOP = 84, ROW = 20;
+    ctx.fillStyle = 'rgba(20,8,43,0.55)';
+    roundRectFill(ctx, LB_X, LB_TOP, LB_W, board.length * ROW + 12, 10);
     ctx.textAlign = 'left';
     for (let i = 0; i < board.length; i++) {
       const e = board[i];
-      const y = 30 + i * 22;
+      const y = LB_TOP + 18 + i * ROW;
       if (e.me) {
         ctx.fillStyle = 'rgba(255,255,255,0.16)';
-        roundRectFill(ctx, 6, y - 15, 168, 20, 6);
+        roundRectFill(ctx, LB_X + 3, y - 14, LB_W - 6, ROW - 1, 6);
       }
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '700 13px Nunito, sans-serif';
-      ctx.fillText(`${i + 1}`, 12, y);
+      ctx.font = '700 12px Nunito, sans-serif';
+      ctx.fillText(`${i + 1}`, LB_X + 8, y);
       ctx.fillStyle = e.color;
-      ctx.beginPath(); ctx.arc(30, y - 5, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(LB_X + 26, y - 4, 5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = e.me ? '#FFD23F' : '#FFFFFF';
-      ctx.font = (e.me ? '700 ' : '600 ') + '13px Nunito, sans-serif';
-      ctx.fillText(e.name, 42, y);
+      ctx.font = (e.me ? '700 ' : '600 ') + '12px Nunito, sans-serif';
+      const nm = e.name.length > 9 ? e.name.slice(0, 8) + '…' : e.name;
+      ctx.fillText(nm, LB_X + 38, y);
       ctx.textAlign = 'right';
-      ctx.fillText(String(e.score), 172, y);
+      ctx.fillText(String(e.score), LB_X + LB_W - 8, y);
       ctx.textAlign = 'left';
     }
 
@@ -496,7 +524,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.textAlign = 'center';
     for (let i = 0; i < banners.length; i++) {
       const b = banners[i];
-      b.life -= 16;
+      if (!paused) b.life -= 16;
       const a = clamp(b.life / 400, 0, 1);
       ctx.globalAlpha = a;
       ctx.fillStyle = b.color;
@@ -567,8 +595,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (delta < 0) delta = 0;
     clock += delta;
 
-    if (screen === 'game') {
-      acc += delta;
+    if (screen === 'game' && !paused) {
+      // slow-motion (finale): stretch time without starving the loop
+      let simDelta = delta;
+      if (slowmo > 0) {
+        slowmo -= delta;
+        simDelta = delta * 0.35;
+      }
+      acc += simDelta;
       let steps = 0;
       while (acc >= CONFIG.FIXED_DT && steps < 5) {
         simulate(CONFIG.FIXED_DT);
@@ -609,6 +643,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       results,
       daily: dailyData,
       muted: audio.muted,
+      paused,
     };
   }
 
@@ -641,7 +676,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       screen = 'dailyIntro';
       notify();
     },
-    goHome() { screen = 'home'; joystick.setEnabled(false); notify(); },
+    goHome() { screen = 'home'; paused = false; joystick.setEnabled(false); notify(); },
+    togglePause() {
+      if (screen !== 'game') return;
+      paused = !paused;
+      joystick.setEnabled(!paused);
+      if (!paused) resetClock();
+      notify();
+    },
     toggleMute() { const m = audio.toggleMute(); notify(); return m; },
     destroy() {
       cancelAnimationFrame(raf);
