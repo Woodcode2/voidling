@@ -59,9 +59,9 @@ export class EventManager {
   update(dt: number, timeLeft: number) {
     const player = this.deps.getPlayer();
     const rivals = this.deps.getRivals();
-    // reset per-frame event slow on every void
+    // reset per-frame event state on every void
     player.eventSlow = 1;
-    for (const r of rivals) r.eventSlow = 1;
+    for (const r of rivals) { r.eventSlow = 1; r.eventFlee = null; }
 
     this.schedule('goldenRush', CONFIG.GOLDEN_RUSH_TIME, timeLeft, 'GOLDEN RUSH INCOMING', () => this.startGoldenRush(timeLeft));
     this.schedule('shrinkStorm', CONFIG.SHRINK_STORM_TIME, timeLeft, 'SHRINK STORM INCOMING', () => this.startStorm(timeLeft));
@@ -113,6 +113,8 @@ export class EventManager {
     if (!s) return;
     if (timeLeft <= s.until) { this.storm = null; return; }
     const l = this.leader(); // always hunts #1
+    // v7 §4: if #1 is a bot, it panics and runs from the cloud
+    if (l !== this.deps.getPlayer()) (l as Rival).eventFlee = { x: s.x, y: s.y };
     const a = Math.atan2(l.y - s.y, l.x - s.x);
     const sp = CONFIG.MOVE_MAX_SPEED * CONFIG.SHRINK_STORM_SPEED_FRAC * (dt / 1000); // escapable at 70%
     s.x += Math.cos(a) * sp;
@@ -136,7 +138,9 @@ export class EventManager {
       { x: target.x + 220, y: target.y + 200, until },
     ];
     this.truckCd = CONFIG.FIRETRUCK_DURATION + 15000;
-    this.deps.banner('TOWN FIGHTS BACK!', '#FF6B6B');
+    // v7 §4: name the WORLD EATER the town is rallying against
+    const nm = target === this.deps.getPlayer() ? 'YOU' : ((target as Rival).name || 'THE EATER');
+    this.deps.banner(`TOWN FIGHTS BACK vs ${nm}!`, '#FF6B6B');
     audio.playEvent();
   }
 
@@ -144,12 +148,18 @@ export class EventManager {
     if (this.trucks.length === 0) return;
     const target = this.truckTarget;
     if (target) {
+      let nearest: Truck | null = null, nd = Infinity;
       for (const t of this.trucks) {
         const a = Math.atan2(target.y - t.y, target.x - t.x);
         const sp = CONFIG.MOVE_MAX_SPEED * 0.9 * (dt / 1000);
         const d = dist(t.x, t.y, target.x, target.y);
         if (d > 200) { t.x += Math.cos(a) * sp; t.y += Math.sin(a) * sp; }
         if (d < 280) target.eventSlow = Math.min(target.eventSlow, 1 - CONFIG.FIRETRUCK_SLOW);
+        if (d < nd) { nd = d; nearest = t; }
+      }
+      // v7 §4: a targeted bot runs from the nearest firetruck
+      if (nearest && target !== this.deps.getPlayer()) {
+        (target as Rival).eventFlee = { x: nearest.x, y: nearest.y };
       }
     }
     if (timeLeft <= this.trucks[0].until) { this.trucks = []; this.truckTarget = null; }

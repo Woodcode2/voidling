@@ -127,6 +127,8 @@ function Home({ snap, engine, onHelp }: { snap: Snapshot; engine: GameEngine; on
         </div>
         <h1 className="vd-title">VOIDLING</h1>
         <p className="vd-tagline">{CONFIG.HOME_TAGLINE}</p>
+        {/* v7 §11: player level badge + name pill */}
+        <div className="vd-namepill"><span className="vd-lvbadge">Lv{snap.level}</span> You</div>
         {snap.highScore > 0 && (
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
         )}
@@ -143,6 +145,7 @@ function Home({ snap, engine, onHelp }: { snap: Snapshot; engine: GameEngine; on
 function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const [denied, setDenied] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [iap, setIap] = useState<string | null>(null); // v7 §9: mock IAP modal
   const [toast, setToast] = useState<string | null>(null);
   const [confetti, setConfetti] = useState(0);
   const timers = useRef<number[]>([]);
@@ -181,7 +184,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
       <div className="vd-stack vd-shop-list">
         <h2 className="vd-heading">SHOP</h2>
         <div className="vd-grid">
-          {CONFIG.SKINS.map((skin) => {
+          {CONFIG.SKINS.filter((s) => !s.premium).map((skin) => {
             const owned = snap.ownedSkins.includes(skin.id);
             const equipped = snap.equippedSkin === skin.id;
             const rar = rarityOf(skin.cost);
@@ -211,7 +214,58 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
             );
           })}
         </div>
+
+        {/* v7 §9: PREMIUM cash-skin row (mock IAP) */}
+        <h3 className="vd-shop-subhead">PREMIUM</h3>
+        <div className="vd-grid">
+          {CONFIG.SKINS.filter((s) => s.premium).map((skin) => {
+            const owned = snap.ownedSkins.includes(skin.id);
+            const equipped = snap.equippedSkin === skin.id;
+            return (
+              <button
+                key={skin.id}
+                className={'vd-card vd-card--btn vd-rar--premium' + (equipped ? ' vd-card--equipped' : '') + (!owned ? ' vd-card--locked' : '')}
+                onClick={() => { if (owned) { engine.equipSkin(skin.id); } else { engine.iapView(skin.id); setIap(skin.id); } }}
+              >
+                <span className="vd-rarity vd-rarity--premium">PREMIUM</span>
+                <div className="vd-skinwrap"><SkinPreview skinId={skin.id} size={92} glow={0.4} /></div>
+                <div className="vd-skin-name">{skin.name}</div>
+                {equipped ? (
+                  <span className="vd-tag vd-tag--on">EQUIPPED</span>
+                ) : owned ? (
+                  <span className="vd-tag vd-tag--equip">OWNED</span>
+                ) : (
+                  <span className="vd-tag vd-tag--cash">${skin.priceUSD?.toFixed(2)}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* v7 §9: mock IAP modal */}
+      {iap && (() => {
+        const s = CONFIG.SKINS.find((x) => x.id === iap);
+        if (!s) return null;
+        return (
+          <div className="vd-modal-scrim" onClick={() => setIap(null)}>
+            <div className="vd-modal vd-rar--premium" onClick={(e) => e.stopPropagation()}>
+              <button className="vd-modal-close" onClick={() => setIap(null)} aria-label="Close"><CloseIcon /></button>
+              <span className="vd-rarity vd-rarity--premium">PREMIUM</span>
+              <div className="vd-modal-void"><SkinPreview skinId={s.id} size={168} glow={0.7} /></div>
+              <h3 className="vd-modal-name">{s.name}</h3>
+              <p className="vd-sub">Unlock instantly + 100 bonus coins</p>
+              <button
+                className="vd-btn vd-btn--play"
+                onClick={() => { engine.iapPurchase(s.id); setConfetti((c) => c + 1); showToast(`${s.name} unlocked!`); setIap(null); }}
+              >
+                ${s.priceUSD?.toFixed(2)} · BUY
+              </button>
+              <p className="vd-fineprint">Mock purchase — no real charge.</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* v6 §12: skin preview modal */}
       {previewSkin && (() => {
@@ -267,6 +321,24 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           <div className="vd-stat-row"><span>Coins earned</span><span>+{r.coins}</span></div>
           {r.isDaily && <div className="vd-stat-row"><span>Daily streak</span><span>{snap.streak}🔥</span></div>}
         </div>
+        {/* v7 §11: XP bar + level-up flourish */}
+        <div className="vd-xp">
+          {r.leveledTo != null && <div className="vd-levelup">LEVEL {r.leveledTo}!</div>}
+          <div className="vd-xp-head">
+            <span>Lv{r.level}</span>
+            <span>+{r.xpGain} XP</span>
+          </div>
+          <div className="vd-xp-track">
+            <div className="vd-xp-fill" style={{ width: `${Math.min(100, (r.xpInLevel / r.xpNext) * 100)}%` }} />
+          </div>
+          <div className="vd-xp-sub">{r.xpInLevel} / {r.xpNext} to Lv{r.level + 1}</div>
+        </div>
+        {r.leveledTo != null && <Confetti key={`lvl-${r.leveledTo}`} />}
+        {r.skinTease && (
+          <div className="vd-tease" onClick={() => engine.openShop()}>
+            <span className="vd-tease-name">{r.skinTease.botName}</span> flexed the <b>{r.skinTease.skinName}</b> skin — grab it in the Shop!
+          </div>
+        )}
         <button className="vd-btn vd-btn--play" onClick={() => engine.start(r.isDaily)}>PLAY AGAIN</button>
         <button className="vd-btn vd-btn--ghost" onClick={() => engine.goHome()}>HOME</button>
       </div>

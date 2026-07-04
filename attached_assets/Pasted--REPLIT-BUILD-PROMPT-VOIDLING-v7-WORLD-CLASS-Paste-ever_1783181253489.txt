@@ -1,0 +1,121 @@
+# REPLIT BUILD PROMPT — VOIDLING v7: WORLD CLASS
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are balancing, expanding, and refining VOIDLING. Work the sections **in order**. Before reporting done, re-read the Acceptance Criteria and verify every line on the running game; explicitly confess anything skipped or cut. All standing rules hold: 60fps, portrait, canvas-drawn everything, one art style, ground quieter than the smallest edible, no shadowBlur/gradient halos on characters.
+
+## 1 — Balance reset: kill the snowball (highest priority)
+
+- **Everyone starts at radius 18** — player and all 5 bots, identical, every round. Verify no seeded size spread survives anywhere.
+- **Diminishing growth:** mass gained from any absorb is multiplied by `(18 / currentRadius) ^ 0.5`. Small voids grow fast; giants grow slowly. This applies to player and bots identically and is the core anti-runaway mechanic.
+- **Hard size cap:** radius 140. At cap, absorbs give score but no growth.
+- **Leader decay** (0.4%/s above the DEVOURER threshold) — verify it actually applies to bots. Log it in debug.
+- **Respawn placement:** respawned objects may never appear within 2× radius of ANY void (player or bot). No more feeding stationary giants.
+- **Anti-idle rewrite:** trigger on movement alone — any bot with net displacement under 80px over 4 seconds gets force-relocated toward the farthest dense cluster, even if it's actively eating. A giant vacuuming in place is idle.
+- Retune evolution thresholds for the new curve so a median 3:00 run still peaks at GOBBLER and WORLD EATER stays ~top 10%. Use the debug panel to verify pacing across 3 test rounds.
+
+## 2 — Bigger world: the full town
+
+- World grows to **3200×3200**, a 4×4 grid of blocks: 11 residential, 1 park (pond + ducks + benches), 1 playground park (swing set, slide, seesaw, sandbox, trampoline), 1 plaza, 1 school block (the SCHOOL building is a second T5 trophy with a flag and basketball hoop), plus the water tower on one residential corner lot.
+- Population 550–700 objects, same density rule (no empty 300px circle), respawn economy scaled up. Traffic scales to 10–14 cars.
+- **Performance:** cull all off-screen drawing; if object queries are the bottleneck, add a simple spatial hash grid (cell 200px). 60fps at full population is an acceptance criterion.
+
+## 3 — New objects with personality (not basic stuff)
+
+Add these, each with a drawn recipe, correct tier, and its micro-animation:
+
+- **Cat** (T2): sits and tail-flicks; flees fast, occasionally hops a fence.
+- **Squirrel** (T1): darts in zigzags between trees.
+- **Birds** (T1): peck in groups of 3; scatter and FLY AWAY (escape upward, fading) when the player nears — the only prey that can truly escape.
+- **Trampoline** (T4, playground): if the player touches it while smaller than it, they get bounced 120px with a boing — comedy physics. Edible once big enough.
+- **Delivery drone** (T3): flies a slow patrol above the streets with a package; worth 2× score; catchable only with GRAVITY GLUTTON reach or at high speed — a chase target.
+- **School bus** (T5 vehicle): big, yellow, drives slowly, honks deep.
+- **BBQ grill** (T3, smoke wisps), **lawn mower** (T3, drives lawns slowly), **basketball hoop** (T4), **ice cream cart** (T4, plays 3-note jingle when near), **scooter** (T2), **garden shed** (T4).
+- Every animal reacts: cats arch, squirrels freeze then bolt, birds burst upward. Reaction is what makes them feel alive.
+
+## 4 — Events v2: target everyone, and make them visible
+
+- **SHRINK STORM** hunts the current #1 **whoever it is** — player or bot. Verify by letting a bot lead.
+- **TOWN FIGHTS BACK** triggers when ANY void reaches WORLD EATER: banner reads "THE TOWN FIGHTS BACK vs {name}!", two firetrucks visibly chase and spray that void for 8s with the slow aura. If it never fires in testing, force a bot to WORLD EATER via debug and confirm the trucks render and chase.
+- All bots must observably react to all events (chase golden spawns, flee the storm, scatter from trucks).
+
+## 5 — Power-ups v2: stacking, four new, and synergies
+
+- **No dead duplicates.** Draw cards without replacement per round. If a power-up you already hold is drawn, its card renders as an **upgrade: "ZOOMIES II"** with a level badge and stronger effect. Two levels max, then it's removed from the pool.
+
+| Power-up | Level I | Level II |
+|---|---|---|
+| ZOOMIES | +25% speed | +40% speed |
+| GRAVITY GLUTTON | +40% reach | +70% reach |
+| DOUBLE STOMACH | 2-match merges | merges also give +50% bonus |
+| TENDERIZER | shrink big objects 15%/touch | 25%/touch |
+| MIDAS MOUTH | score ×1.5 | score ×2 |
+| BORROWED TIME | +15s (instant, can repeat) | — |
+
+- **Verify every effect actually applies** — especially TENDERIZER. Each power-up needs a debug log line when its effect fires.
+- **Four new power-ups** join the pool: **ECHO BITE** (every 5th absorb emits a shockwave pulling nearby edibles in), **BUBBLE SHIELD** (blocks one chomp, pops with a big burst, then gone), **VOID DASH** (every 6s, auto-dash 100px in your movement direction with afterimages), **LUCKY GNOME** (a golden object spawns near you every 10s).
+- **Synergies** — when both halves are active, stamp a banner and add the FX:
+  - ZOOMIES + VOID DASH = **SONIC SNACK**: rainbow speed trail.
+  - GRAVITY GLUTTON + ECHO BITE = **EVENT HORIZON**: constant gentle pull aura (30% of Echo pulse, always on) with slow-orbiting particles.
+  - MIDAS MOUTH + LUCKY GNOME = **GOLD RUSH**: gold coin-sparkle trail, golden spawns every 7s instead of 10.
+
+## 6 — Evolution FX quality pass (fix what the screenshots show)
+
+- **DEVOURER flames:** replace the giant purple spikes with 6–8 small teardrop flame licks (10–14px) that flicker along the top rim, drawn in two warm-purple tones. Cute fire, not spikes.
+- **GOBBLER debris:** replace the dark squares with tiny recognizable chunks — a brick, a roof shingle, a leaf cluster — 10–14px, white-outlined like everything else, orbiting outside the chip ring.
+- **WORLD EATER warp:** confined to a screen-EDGE effect only — violet vignette plus stars bending at the borders. **No rings or arcs may render across the play field.** Any void's total aura (glow rings, reach ring, synergy FX) may not extend beyond `radius + 40px`.
+- Result to hit: a WORLD EATER on screen looks powerful and readable — not like the display is glitching.
+
+## 7 — HUD fixes
+
+- Fix the leaderboard text-bleed (stray characters rendering behind rows) — the backdrop must fully clip its contents.
+- **Crown icons appear ONLY next to voids currently in WORLD EATER form.** No crown for any other form, ever.
+- Style the evolution bar as a proper bottom-center pill: dark backdrop, current form label left, next form label right, glowing fill — one clean component, safe-area aware.
+
+## 8 — Bots wear shop skins
+
+- Each bot randomly equips a skin each round, weighted 3× toward skins the player does NOT own. Accessories render on bots exactly as on the player.
+- Results screen: if a bot wearing an unowned skin finished top 3, add one tasteful line with its portrait: "{name} rocked PIRATE → Shop" (tapping opens the shop on that skin's preview).
+
+## 9 — Shop v2 + coin economy
+
+- Coin earn rate tightens to `floor(score / 200)`.
+- **New PREMIUM row** in the shop, labeled "PREMIUM", with four cash-priced animated skins (mock checkout via IAPService stub — a clean modal with price, Apple-Pay-style button, then "Purchases coming soon! 🎁 +100 coins for trying" so tapping isn't punished). Log `iap_view` on modal open and `iap_click` on buy tap — this is demand measurement.
+  - **GALAXY** $2.99 — deep-space body with drifting internal stars, tiny comet orbit.
+  - **LAVA** $1.99 — ember-crack body, small dripping ember particles.
+  - **GHOST** $1.99 — translucent body, trailing wisps, spooky-cute eyes.
+  - **KING MIDAS** $2.99 — gold body, crown, coin-sparkle trail.
+- Premium skins show a small "$" tag on their cards; coin skins unchanged and remain earnable. Flavor text for all four.
+
+## 10 — Home screen
+
+- Tagline becomes **"THE CUTE WORLD EATER"** — bold, pure white, Fredoka caps, letter-spaced. (Still one CONFIG string.)
+- Keep the star-eating idle. Verify no dev artifacts (debug text, placeholder strings) are visible anywhere on home.
+
+## 11 — Player level (light meta)
+
+- XP = score/100 per round. Level curve: `xpForLevel(n) = 500 + n × 250`.
+- Level badge on the home screen next to Best score; the player's in-game name pill reads "You · Lv {n}".
+- **Level 5 reward:** KITTY skin unlocks free with a celebration toast. Results screen shows an XP bar filling with a satisfying tick; level-ups get confetti + "LEVEL 6!" stamp.
+
+## Acceptance criteria — verify every line on a real phone before reporting done
+
+- Round start: all six voids visibly identical at radius 18 — screenshot it. By 1:00 remaining, no void has more than ~3× the median mass across three test rounds (diminishing growth working). No bot ever sits still while growing.
+- Respawns never appear touching or inside any void's reach. The map has visible food at 0:10 remaining.
+- With a bot in #1, the SHRINK STORM hunts the bot. Force a bot to WORLD EATER in debug: banner names it and firetrucks visibly chase and spray it.
+- Drawing a held power-up shows a Level II upgrade card; TENDERIZER demonstrably shrinks a tree (debug log fires). Each of the four new power-ups works; each synergy banner + FX triggers when both halves are active.
+- DEVOURER shows small flame licks, GOBBLER shows tiny recognizable debris chunks, WORLD EATER warps only the screen edges — zero arcs across the field; no aura extends past radius + 40px.
+- Leaderboard has no text bleed; crowns appear only on WORLD EATER-form voids.
+- Bots visibly wear varied skins; an unowned-skin bot in top 3 produces the shop hint line, and tapping it opens that skin's preview.
+- Premium row renders with four animated skins and $ tags; tapping buy opens the mock checkout, grants the +100 coin consolation, and logs iap_view/iap_click to the console.
+- Home shows THE CUTE WORLD EATER in bold white. Level badge shows; finishing a round fills the XP bar; reaching Lv 5 unlocks KITTY with a toast.
+- Trampoline bounces a small player; birds fly away and escape; the drone patrols and is catchable with GRAVITY GLUTTON; the ice cream cart jingles.
+- Steady 60fps at full population (4×4 world, 550+ objects, traffic, an event firing); zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, REAL payments (mock only), Daily Bite logic, debug panel (keep working, add the new logs).
+
+Work strictly in order 1→11, then self-audit against the acceptance list and report deviations explicitly.

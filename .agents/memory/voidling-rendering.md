@@ -27,6 +27,12 @@ description: Canvas render-transform state, hot-path perf rules, and the mission
 - Module/closure-scoped caches (body sprites, vignette, grain) are fine for this
   single-canvas SPA — bounded, reused, no teardown needed.
 
+## Gameplay debug logs must be throttled
+- Effect-fired `console.log`s (spec asks each power-up to log when it fires) live in per-frame
+  collision/update hot paths. Gate them behind a small ms cooldown (e.g. a `tremorLogCd`
+  decremented in `player.update`, reset to ~500ms on log) — an un-throttled log inside a
+  contact branch floods the console at 60fps and skews profiling.
+
 ## Missions have no numeric targets
 - `meta.ts` missions are only `{id, progress, completed}` — there is **no** target/threshold
   field anywhere, and no mission UI surfaces them. So a spec item like "daily mission

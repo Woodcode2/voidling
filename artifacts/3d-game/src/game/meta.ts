@@ -8,6 +8,8 @@ export interface GameMeta {
   removeAds: boolean;
   missions: { id: string; progress: number; completed: boolean }[];
   firstTime: boolean;
+  xp: number;    // v7 §11: XP within the current level
+  level: number; // v7 §11: player meta level (starts at 1)
 }
 
 const DEFAULT_META: GameMeta = {
@@ -19,7 +21,9 @@ const DEFAULT_META: GameMeta = {
   highScore: 0,
   removeAds: false,
   missions: [],
-  firstTime: true
+  firstTime: true,
+  xp: 0,
+  level: 1,
 };
 
 export const meta = {
@@ -43,6 +47,8 @@ export const meta = {
     if (!Array.isArray(this.data.missions)) this.data.missions = [];
     if (typeof this.data.equippedSkin !== 'string') this.data.equippedSkin = 'classic';
     if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
+    if (typeof this.data.xp !== 'number' || !Number.isFinite(this.data.xp)) this.data.xp = 0;
+    if (typeof this.data.level !== 'number' || !Number.isFinite(this.data.level) || this.data.level < 1) this.data.level = 1;
     // migrate legacy skin id 'default' -> 'classic'
     this.data.skinsOwned = this.data.skinsOwned.map((s) => (s === 'default' ? 'classic' : s));
     if (!this.data.skinsOwned.includes('classic')) this.data.skinsOwned.unshift('classic');
@@ -62,6 +68,29 @@ export const meta = {
   addCoins(amount: number) {
     this.data.coins += amount;
     this.save();
+  },
+
+  // v7 §11: grant XP (= floor(score/100)) and roll up any level-ups. Returns the
+  // list of levels reached this call plus any freebies unlocked (e.g. L5 → Kitty).
+  addXP(score: number): { levelsGained: number[]; unlocked: string[] } {
+    const gain = Math.floor(score / 100);
+    this.data.xp += gain;
+    const levelsGained: number[] = [];
+    const unlocked: string[] = [];
+    // xpForLevel(n) = 500 + n*250 (kept in sync with utils.xpForLevel)
+    let need = 500 + this.data.level * 250;
+    while (this.data.xp >= need) {
+      this.data.xp -= need;
+      this.data.level += 1;
+      levelsGained.push(this.data.level);
+      if (this.data.level === 5 && !this.data.skinsOwned.includes('kitty')) {
+        this.data.skinsOwned.push('kitty');
+        unlocked.push('kitty');
+      }
+      need = 500 + this.data.level * 250;
+    }
+    this.save();
+    return { levelsGained, unlocked };
   },
 
   unlockSkin(id: string) {

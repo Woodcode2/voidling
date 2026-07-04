@@ -1,5 +1,5 @@
 import { CONFIG, type SkinDef, type ObjectKind } from './config';
-import { clamp, lerp, addAreaToRadius } from './utils';
+import { clamp, lerp, growRadius } from './utils';
 import { drawParkObject } from './objects';
 import { drawVoidling, drawUnderdogTrail, type VoidlingVisual } from './voidling';
 import type { WorldObject } from './world';
@@ -55,6 +55,17 @@ export class Player {
   twinMerge = false;
   tremorActive = false;
   greedMultiplier = 1;
+  // v7 §5: new power-up effect state
+  tremorFactor = 0.85;   // TENDERIZER shrink-per-touch (Lvl I 15%, Lvl II 25%)
+  twinBonus = 1;         // DOUBLE STOMACH II: +50% merge bonus
+  echoActive = false;    // ECHO BITE held
+  echoCount = 0;         // absorbs counted toward the next pulse
+  echoPulse = false;     // set on every 5th absorb; engine fires the shockwave
+  shieldCharge = false;  // BUBBLE SHIELD: one chomp-block available
+  shieldPopped = false;  // set when the shield eats a chomp; engine consumes it
+  dashActive = false;    // VOID DASH held (engine runs the 6s auto-dash)
+  luckyActive = false;   // LUCKY GNOME held (engine spawns goldens)
+  tremorLogCd = 0;       // throttle for the TENDERIZER debug log
   underdogSpeed = 1;      // v6 §2: 5th/6th place move-speed bonus (silent)
   underdogGrowth = 1;     // v6 §2: 5th/6th place growth bonus
   underdog = false;       // v6 §2: faint blue trail when trailing
@@ -108,6 +119,16 @@ export class Player {
     this.twinMerge = false;
     this.tremorActive = false;
     this.greedMultiplier = 1;
+    this.tremorFactor = 0.85;
+    this.twinBonus = 1;
+    this.echoActive = false;
+    this.echoCount = 0;
+    this.echoPulse = false;
+    this.shieldCharge = false;
+    this.shieldPopped = false;
+    this.dashActive = false;
+    this.luckyActive = false;
+    this.tremorLogCd = 0;
     this.ghostTime = 0;
     this.tooBigCd = 0;
     this.skin = skin;
@@ -165,6 +186,7 @@ export class Player {
 
     if (this.ghostTime > 0) this.ghostTime -= dt;
     if (this.tooBigCd > 0) this.tooBigCd -= dt;
+    if (this.tremorLogCd > 0) this.tremorLogCd -= dt; // v7 §5: throttle tremor log
 
     // combo decay
     if (this.comboTimer > 0) {
@@ -242,10 +264,13 @@ export class Player {
   absorbObject(obj: WorldObject): number {
     this.bumpCombo();
     this.chomp = 1;
+    // v7 §5: ECHO BITE — every 5th absorb queues a shockwave pulse (engine fires it)
+    if (this.echoActive && (++this.echoCount % 5 === 0)) this.echoPulse = true;
     const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1; // v6 §2
-    const gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult);
+    let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult);
+    if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT; // v7 §3: drone worth 2×
     this.score += gain;
-    this.radius = addAreaToRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth);
+    this.radius = growRadius(this.radius, Math.PI * obj.size * obj.size * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
     if (obj.tier >= 3) this.cheekPuff = 1; // v6 §9: cheek puff on T3+
     this.checkEvolution();
 
@@ -288,9 +313,9 @@ export class Player {
       if (arr.length >= need) {
         const merge = arr.slice(0, need);
         this.orbit = this.orbit.filter((o) => !merge.includes(o));
-        const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier);
+        const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier * this.twinBonus);
         this.score += bonus;
-        this.radius = addAreaToRadius(this.radius, 260 * tier * this.underdogGrowth);
+        this.radius = growRadius(this.radius, 260 * tier * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
         this.bumpCombo();
         this.lick = 1; // v6 §9: tongue-lick grin after a TRIPLE
         this.pendingFx.push({ type: 'merge', x: this.x, y: this.y, text: `TRIPLE! +${bonus}`, color: '#FFD23F', big: true });
@@ -303,7 +328,7 @@ export class Player {
   eatRival(rivalRadius: number) {
     const bonus = Math.round(500 * Math.max(1, this.comboMult));
     this.score += bonus;
-    this.radius = addAreaToRadius(this.radius, Math.PI * rivalRadius * rivalRadius * 0.5 * this.underdogGrowth);
+    this.radius = growRadius(this.radius, Math.PI * rivalRadius * rivalRadius * 0.5 * this.underdogGrowth, CONFIG.DIMINISH_BASE, CONFIG.MAX_RADIUS);
     this.bumpCombo();
     this.chomp = 1;
     this.cheekPuff = 1;

@@ -41,7 +41,7 @@ export interface PlayerStats {
   maxTier: number;
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'landmark';
+type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
 
@@ -139,7 +139,7 @@ function drawBarrier(ctx: CanvasRenderingContext2D, view: View, S: number) {
   ctx.restore();
 }
 
-const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog'];
+const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower'];
 
 export class WorldManager {
   objects: WorldObject[] = [];
@@ -210,11 +210,13 @@ export class WorldManager {
     const rand = prng(hashString(seedStr));
     this.rand = rand;
 
-    // 9 block types: 6 residential, 1 park, 1 plaza, 1 landmark
+    // v7 §2: 4×4 = 16 blocks — 12 residential, 1 park, 1 playground, 1 plaza,
+    // 1 school. The water tower sits on a residential corner lot (placed below).
     const layout: BlockType[] = [
-      'plaza', 'residential', 'residential',
-      'residential', 'park', 'residential',
-      'residential', 'residential', 'landmark',
+      'residential', 'residential', 'plaza',       'residential',
+      'residential', 'park',        'playground',  'residential',
+      'residential', 'school',      'residential', 'residential',
+      'residential', 'residential', 'residential', 'residential',
     ];
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
@@ -228,11 +230,24 @@ export class WorldManager {
       if (b.type === 'residential') this.fillResidential(b, rand);
       else if (b.type === 'park') this.fillPark(b, rand, spawnX, spawnY);
       else if (b.type === 'plaza') this.fillPlaza(b, rand);
-      else this.fillLandmark(b, rand);
+      else if (b.type === 'playground') this.fillPlayground(b, rand);
+      else if (b.type === 'school') this.fillSchool(b, rand);
     }
 
-    // 8 living cars cruising the road grid
-    for (let i = 0; i < 8; i++) this.spawnCar(rand);
+    // v7 §2: water tower on a residential corner lot (the last residential block)
+    const resBlocks = this.blocks.filter((b) => b.type === 'residential');
+    const wtBlock = resBlocks[resBlocks.length - 1];
+    if (wtBlock) {
+      const inset = CONFIG.SIDEWALK + 90;
+      this.makeObj('watertower', wtBlock.x0 + CONFIG.BLOCK_SIZE - inset, wtBlock.y0 + inset);
+    }
+
+    // v7 §2: living cars cruising the road grid (10–14)
+    for (let i = 0; i < CONFIG.TRAFFIC_CARS; i++) this.spawnCar(rand);
+    // v7 §3: two delivery drones roaming + one school bus on the grid
+    this.spawnDrone(rand);
+    this.spawnDrone(rand);
+    this.spawnBus(rand);
 
     // trickle up to a healthy population with scattered small edibles
     const target = Math.round(CONFIG.TARGET_POPULATION * CONFIG.DENSITY_MULT);
@@ -349,6 +364,13 @@ export class WorldManager {
     this.scatter(b, rand, 'gnome', 3);
     this.scatter(b, rand, 'person', 2);
     this.scatter(b, rand, 'dog', 1);
+    // v7 §3: neighborhood critters + props
+    this.scatter(b, rand, 'cat', 1);
+    this.scatter(b, rand, 'squirrel', 1);
+    this.scatter(b, rand, 'scooter', 1);
+    if (rand() < 0.6) this.scatter(b, rand, 'bbq', 1);
+    if (rand() < 0.4) this.scatter(b, rand, 'mower', 1);
+    if (rand() < 0.7) this.spawnBirds(b, rand, 3);
   }
 
   private fillPark(b: Block, rand: () => number, spawnX: number, spawnY: number) {
@@ -369,6 +391,9 @@ export class WorldManager {
     this.scatter(b, rand, 'flower', 10);
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'dog', 2);
+    this.scatter(b, rand, 'squirrel', 2);
+    this.spawnBirds(b, rand, 3);
+    this.spawnBirds(b, rand, 3);
     // guarantee small edibles right around the player spawn
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2, rr = 60 + rand() * 70;
@@ -385,16 +410,36 @@ export class WorldManager {
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 4);
     this.scatter(b, rand, 'gnome', 2);
+    this.scatter(b, rand, 'icecream', 1);
+    this.scatter(b, rand, 'scooter', 2);
   }
 
-  private fillLandmark(b: Block, rand: () => number) {
+  // v7 §2/§3: playground park — equipment + trampoline (bounce) + hoop, plus greenery.
+  private fillPlayground(b: Block, rand: () => number) {
+    this.scatter(b, rand, 'tree', 3);
+    this.scatter(b, rand, 'bench', 3);
+    this.scatter(b, rand, 'trampoline', 1);
+    this.scatter(b, rand, 'hoop', 1);
+    this.scatter(b, rand, 'sandbox', 1);
+    this.scatter(b, rand, 'swingset', 1);
+    this.scatter(b, rand, 'slide', 1);
+    this.scatter(b, rand, 'seesaw', 1);
+    this.scatter(b, rand, 'flower', 8);
+    this.scatter(b, rand, 'person', 3);
+    this.scatter(b, rand, 'dog', 1);
+  }
+
+  // v7 §2/§3: school block — the SCHOOL is a second T5 trophy (flag + hoop).
+  private fillSchool(b: Block, rand: () => number) {
     (b as any).paved = true;
-    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2, cy = b.y0 + CONFIG.BLOCK_SIZE / 2;
-    this.makeObj('watertower', cx, cy);
+    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2, cy = b.y0 + CONFIG.BLOCK_SIZE * 0.42;
+    this.makeObj('school', cx, cy);
+    this.scatter(b, rand, 'hoop', 1, cx, cy);
     this.scatter(b, rand, 'bench', 3, cx, cy);
-    this.scatter(b, rand, 'tree', 4, cx, cy);
+    this.scatter(b, rand, 'tree', 3, cx, cy);
+    this.scatter(b, rand, 'person', 4, cx, cy);
     this.scatter(b, rand, 'flower', 6, cx, cy);
-    this.scatter(b, rand, 'person', 2, cx, cy);
+    this.scatter(b, rand, 'trashcan', 2, cx, cy);
   }
 
   private spawnCar(rand: () => number) {
@@ -407,6 +452,37 @@ export class WorldManager {
     const o = this.makeObj('car', x, y);
     o.roadAxis = horizontal ? 'h' : 'v';
     o.homeX = center + lane; o.homeY = center + lane; // fixed cross-axis coord
+    o.roadDir = rand() < 0.5 ? 1 : -1;
+  }
+
+  // v7 §3: a startled flock — three birds clustered so they scatter together
+  private spawnBirds(b: Block, rand: () => number, n: number) {
+    const p = this.pointInBlock(b, rand);
+    for (let i = 0; i < n; i++) {
+      const o = this.makeObj('bird', p.x + (rand() - 0.5) * 70, p.y + (rand() - 0.5) * 70);
+      o.homeX = p.x; o.homeY = p.y; o.tether = 150;
+    }
+  }
+
+  // v7 §3: delivery drone — spawns anywhere, roams to a first waypoint
+  private spawnDrone(rand: () => number) {
+    const x = MARGIN + rand() * (this.size - MARGIN * 2);
+    const y = MARGIN + rand() * (this.size - MARGIN * 2);
+    const o = this.makeObj('drone', x, y);
+    o.homeX = MARGIN + rand() * (this.size - MARGIN * 2);
+    o.homeY = MARGIN + rand() * (this.size - MARGIN * 2);
+    o.tether = 99999;
+  }
+
+  // v7 §3: school bus — big vehicle on the road grid (drives like a car)
+  private spawnBus(rand: () => number) {
+    const horizontal = rand() < 0.5;
+    const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
+    const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
+    const along = MARGIN + rand() * (this.size - MARGIN * 2);
+    const o = this.makeObj('schoolbus', horizontal ? along : center + lane, horizontal ? center + lane : along);
+    o.roadAxis = horizontal ? 'h' : 'v';
+    o.homeX = center + lane; o.homeY = center + lane;
     o.roadDir = rand() < 0.5 ? 1 : -1;
   }
 
@@ -433,9 +509,16 @@ export class WorldManager {
       if (obj.eaten) continue;
       obj.wobble += dt * 0.004;
       if (obj.alertT > 0) obj.alertT -= dt;
+      if (obj.honkCd > 0 && !obj.living) obj.honkCd -= dt; // v7 §3: prop cooldowns (jingle)
 
       const canPlayerEat = this.canEatByPlayer(player, obj);
       const dp = dist(obj.x, obj.y, player.x, player.y);
+
+      // v7 §3: ice-cream cart jingle when the player is near
+      if (obj.kind === 'icecream' && dp < CONFIG.ICECREAM_JINGLE_RANGE && obj.honkCd <= 0 && !player.ghost) {
+        audio.playJingle();
+        obj.honkCd = 4200;
+      }
       const reach = player.radius * CONFIG.CAPTURE_RADIUS_MULT * player.magnetMultiplier;
 
       // ── gravity-well suction (player only) ──
@@ -481,6 +564,16 @@ export class WorldManager {
       if (!player.ghost && !canPlayerEat && cd < player.radius + obj.size) {
         const nx = cdx / cd;
         const ny = cdy / cd;
+        // v7 §3: trampoline launches a too-small player 120px the opposite way
+        if (obj.kind === 'trampoline' && player.tooBigCd <= 0) {
+          const bn = CONFIG.TRAMPOLINE_BOUNCE;
+          player.x += nx * bn; player.y += ny * bn;
+          player.vx = nx * bn * 5; player.vy = ny * bn * 5;
+          fx.addRing(obj.x, obj.y, '#8ECBFF', obj.size, 260, 4, 320);
+          audio.playBounce();
+          player.tooBigCd = CONFIG.TOOBIG_COOLDOWN;
+          continue;
+        }
         const overlap = (player.radius + obj.size) - cd;
         player.x += nx * overlap;
         player.y += ny * overlap;
@@ -492,7 +585,14 @@ export class WorldManager {
           fx.addRing(obj.x, obj.y, '#FF6B6B', obj.size * 0.9, 220, 4, 340);
           player.tooBigCd = CONFIG.TOOBIG_COOLDOWN;
         }
-        if (player.tremorActive) { obj.baseSize *= 0.92; obj.size = obj.baseSize; }
+        if (player.tremorActive) {
+          // v7 §5: level-aware shrink (Lvl I 15%/touch, Lvl II 25%/touch)
+          obj.baseSize *= player.tremorFactor; obj.size = obj.baseSize;
+          if (player.tremorLogCd <= 0) {
+            console.log(`[boon] TENDERIZER shrank ${obj.kind} → ${obj.size.toFixed(1)}`);
+            player.tremorLogCd = 500; // throttle to avoid 60fps log spam
+          }
+        }
       } else if (canPlayerEat && cd < nearestEdibleD) {
         nearestEdibleD = cd;
         nearestEdible = obj;
@@ -532,34 +632,56 @@ export class WorldManager {
     if (this.respawnTimer <= 0) {
       this.respawnTimer = 250 + this.rand() * 250; // ~2–4 spawns per second
       const target = Math.round(this.initialPopulation * CONFIG.RESPAWN_TARGET_FRAC);
-      if (this.remaining < target) this.spawnRespawn(player);
+      if (this.remaining < target) this.spawnRespawn(player, voids);
     }
   }
 
-  // v6 §2: choose an off-screen, sparse spot and drop a T1–T3 edible there.
-  private spawnRespawn(player: Player) {
+  // v6 §2 / v7 §1: choose an off-screen, sparse spot — never within 2× radius of
+  // ANY void — and drop a T1–T3 edible there (no more feeding stationary giants).
+  private spawnRespawn(player: Player, voids: { x: number; y: number; radius: number }[]) {
     const m = CONFIG.MAP_SIZE;
     const kinds: ObjectKind[] = ['flower', 'flowerpot', 'gnome', 'apple', 'mailbox', 'hydrant', 'trashcan'];
     let bx = 0, by = 0, bestScore = -Infinity;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 10; i++) {
       const x = MARGIN + this.rand() * (m - MARGIN * 2);
       const y = MARGIN + this.rand() * (m - MARGIN * 2);
       const dPlayer = dist(x, y, player.x, player.y);
       if (dPlayer < 520) continue; // keep it off the player's screen
+      // v7 §1: reject if inside any void's 2× radius buffer
+      let voidClear = true, nearVoid = Infinity;
+      for (const v of voids) {
+        const d = dist(x, y, v.x, v.y);
+        if (d < v.radius * 2) { voidClear = false; break; }
+        if (d < nearVoid) nearVoid = d;
+      }
+      if (!voidClear) continue;
       let near = Infinity;
       for (const o of this.objects) {
         if (o.eaten) continue;
         const d = dist(x, y, o.x, o.y);
         if (d < near) near = d;
       }
-      const score = dPlayer * 0.15 + near; // favour distant + sparse
+      const score = dPlayer * 0.15 + near + nearVoid * 0.05; // favour distant + sparse
       if (score > bestScore) { bestScore = score; bx = x; by = y; }
     }
-    if (bestScore === -Infinity) { bx = MARGIN + this.rand() * (m - MARGIN * 2); by = MARGIN + this.rand() * (m - MARGIN * 2); }
+    if (bestScore === -Infinity) return; // no safe spot this tick; try again next
     this.makeObj(pick(kinds, this.rand), bx, by);
   }
 
   // v6 §2: golden object — 3× mass (bigger radius) and 3× score on consume.
+  // v7 §5: ECHO BITE shockwave / EVENT HORIZON aura — pull nearby edibles inward.
+  attractEdibles(px: number, py: number, range: number, pull: number) {
+    for (const o of this.objects) {
+      if (o.eaten) continue;
+      const dx = px - o.x, dy = py - o.y;
+      const d = Math.hypot(dx, dy);
+      if (d > range || d < 1) continue;
+      const k = pull * (1 - d / range);
+      o.x += (dx / d) * k;
+      o.y += (dy / d) * k;
+    }
+  }
+
   spawnGolden(player: Player) {
     const m = CONFIG.MAP_SIZE;
     let x = MARGIN + this.rand() * (m - MARGIN * 2);
@@ -575,16 +697,18 @@ export class WorldManager {
   }
 
   private stepLiving(obj: WorldObject, dt: number, dtSec: number, voids: { x: number; y: number; radius: number; ghost: boolean }[], player: Player, fx: FXManager) {
-    if (obj.kind === 'car') return this.stepCar(obj, dtSec, player);
+    if (obj.kind === 'car' || obj.kind === 'schoolbus') return this.stepCar(obj, dtSec, player);
 
     // nearest bigger threat
+    const skittish = obj.kind === 'bird' || obj.kind === 'cat' || obj.kind === 'squirrel';
     let threat: { x: number; y: number } | null = null;
     let threatD = Infinity;
     for (const v of voids) {
       if (v.ghost) continue;
       if (!this.canEat(v.radius, obj.size)) continue;
       const d = dist(obj.x, obj.y, v.x, v.y);
-      if (d < v.radius * 4 + 120 && d < threatD) { threatD = d; threat = v; }
+      const range = skittish ? v.radius * 5 + 240 : v.radius * 4 + 120; // v7 §3: critters bolt early
+      if (d < range && d < threatD) { threatD = d; threat = v; }
     }
 
     if (obj.kind === 'dog' && !threat) {
@@ -605,8 +729,22 @@ export class WorldManager {
       }
     }
 
-    const speed = obj.kind === 'duck' ? CONFIG.DUCK_SPEED : CONFIG.PERSON_SPEED;
-    const fleeSpeed = obj.kind === 'duck' ? CONFIG.DUCK_SPEED * 2 : CONFIG.PERSON_FLEE_SPEED;
+    // v7 §3: delivery drone flies a path — roams waypoints across the whole map
+    if (obj.kind === 'drone' && !threat) {
+      if (dist(obj.x, obj.y, obj.homeX, obj.homeY) < 90) {
+        obj.homeX = MARGIN + Math.random() * (this.size - MARGIN * 2);
+        obj.homeY = MARGIN + Math.random() * (this.size - MARGIN * 2);
+      }
+      const a = Math.atan2(obj.homeY - obj.y, obj.homeX - obj.x);
+      obj.vx = Math.cos(a) * CONFIG.DRONE_SPEED;
+      obj.vy = Math.sin(a) * CONFIG.DRONE_SPEED;
+      obj.fleeing = false;
+      this.integrateWander(obj, dtSec);
+      return;
+    }
+
+    const speed = this.moverSpeed(obj);
+    const fleeSpeed = this.moverFleeSpeed(obj);
 
     if (threat) {
       obj.fleeing = true;
@@ -629,6 +767,27 @@ export class WorldManager {
     this.integrateWander(obj, dtSec);
   }
 
+  private moverSpeed(obj: WorldObject) {
+    switch (obj.kind) {
+      case 'duck': return CONFIG.DUCK_SPEED;
+      case 'bird': return CONFIG.BIRD_SPEED;
+      case 'cat': case 'squirrel': return CONFIG.CRITTER_SPEED;
+      case 'drone': return CONFIG.DRONE_SPEED;
+      case 'mower': return CONFIG.MOWER_SPEED;
+      default: return CONFIG.PERSON_SPEED;
+    }
+  }
+
+  private moverFleeSpeed(obj: WorldObject) {
+    switch (obj.kind) {
+      case 'duck': return CONFIG.DUCK_SPEED * 2;
+      case 'bird': return CONFIG.BIRD_FLEE_SPEED;
+      case 'cat': case 'squirrel': return CONFIG.CRITTER_FLEE_SPEED;
+      case 'drone': return CONFIG.DRONE_SPEED * 1.3;
+      default: return CONFIG.PERSON_FLEE_SPEED;
+    }
+  }
+
   private integrateWander(obj: WorldObject, dtSec: number) {
     obj.x = clamp(obj.x + obj.vx * dtSec, obj.size, this.size - obj.size);
     obj.y = clamp(obj.y + obj.vy * dtSec, obj.size, this.size - obj.size);
@@ -637,7 +796,7 @@ export class WorldManager {
   private stepCar(obj: WorldObject, dtSec: number, player: Player) {
     const dp = dist(obj.x, obj.y, player.x, player.y);
     const playerBigger = this.canEat(player.radius, obj.size);
-    let speed = CONFIG.CAR_SPEED;
+    let speed = obj.kind === 'schoolbus' ? CONFIG.BUS_SPEED : CONFIG.CAR_SPEED;
 
     if (obj.honkCd > 0) obj.honkCd -= dtSec * 1000;
     if (!playerBigger && dp < 240 && obj.honkCd <= 0 && !player.ghost) {
@@ -747,7 +906,8 @@ export class WorldManager {
       // v6 §8: zone grading — a faint per-district tint so areas read differently
       const tint = b.type === 'park' ? 'rgba(120,220,140,0.06)'
         : b.type === 'plaza' ? 'rgba(255,210,120,0.05)'
-        : b.type === 'landmark' ? 'rgba(180,140,255,0.07)' : null;
+        : b.type === 'playground' ? 'rgba(255,150,200,0.05)'
+        : b.type === 'school' ? 'rgba(180,140,255,0.07)' : null;
       if (tint) {
         ctx.fillStyle = tint;
         ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);

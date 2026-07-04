@@ -6,7 +6,7 @@ import { Player } from './player';
 import { makeRivals, type Rival, type WorldView } from './rivals';
 import { meta } from './meta';
 import { track } from './services';
-import { formatTime, dist, clamp, lerp } from './utils';
+import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
 
@@ -25,6 +25,13 @@ export interface ResultData {
   reachedForm: string;    // v6 §3: highest evolution form reached
   reachedIndex: number;
   worldEater: boolean;
+  skinTease?: { botName: string; skinName: string; skinId: string } | null; // v7 §8
+  // v7 §11: player-level meta
+  xpGain: number;
+  level: number;
+  xpInLevel: number;
+  xpNext: number;
+  leveledTo: number | null;   // top level reached this round, or null
 }
 
 export interface DailyData { id: string; seed: string; name: string; desc: string; }
@@ -36,6 +43,9 @@ export interface Snapshot {
   streak: number;
   equippedSkin: string;
   ownedSkins: string[];
+  level: number;      // v7 §11
+  xpInLevel: number;  // v7 §11
+  xpNext: number;     // v7 §11
   boonChoices: BoonDef[];
   results: ResultData | null;
   daily: DailyData | null;
@@ -52,6 +62,8 @@ export interface GameEngine {
   chooseBoon(id: string): void;
   buySkin(id: string): { ok: boolean; reason?: string };
   equipSkin(id: string): void;
+  iapView(id: string): void;             // v7 §9: mock IAP modal opened
+  iapPurchase(id: string): void;         // v7 §9: mock IAP confirmed
   openShop(): void;
   openDaily(): void;
   goHome(): void;
@@ -62,7 +74,7 @@ export interface GameEngine {
   destroy(): void;
 }
 
-interface ActiveBoon { id: string; name: string; remaining: number; duration: number; }
+interface ActiveBoon { id: string; name: string; remaining: number; duration: number; level: number; }
 interface Banner { text: string; color: string; life: number; max: number; }
 
 const DAILY_MODS = [
@@ -73,7 +85,12 @@ const DAILY_MODS = [
 
 const BOON_DURATION: Record<string, number> = {
   magnet: 18000, overdrive: 16000, twin: 20000, tremor: 14000, greed: 18000,
+  // v7 §5
+  echo: 16000, shield: 14000, dash: 12000, lucky: 18000,
 };
+
+// v7 §5: max power-up level (picking a dupe once → Level II, then it's retired)
+const BOON_MAX_LEVEL = 2;
 
 function skinById(id: string): SkinDef {
   return CONFIG.SKINS.find((s) => s.id === id) || CONFIG.SKINS[0];
@@ -95,6 +112,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let results: ResultData | null = null;
   const boonUsed = new Set<number>();
   const activeBoons: ActiveBoon[] = [];
+  const boonRank = new Map<string, number>();     // v7 §5: times each boon picked (→ level)
+  const activeSynergies = new Set<string>();       // v7 §5: currently firing synergies
   const banners: Banner[] = [];
   let evoTitle: { name: string; life: number; max: number } | null = null; // v6 §3 title card
   let powerStamp: { name: string; color: string; life: number; max: number } | null = null; // v6 §4
@@ -105,6 +124,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let coinBonus = 0;             // extra coins already granted mid-round (finale)
   let evoCoinBonus = 0;         // v6 §3: WORLD EATER results bonus (+200)
   let goldenTimer = 0;          // v6 §2: golden-object spawn cadence (from 2:45)
+  let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
+  let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
 
   // camera state (world-space centre + zoom), smoothed each frame
   let camCX = CONFIG.MAP_SIZE / 2;
@@ -117,6 +138,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let vignetteW = 0, vignetteH = 0;
   let grainCanvas: HTMLCanvasElement | null = null;
   let grainPattern: CanvasPattern | null = null;
+  let decayLogAccum = 0;   // v7 §1: throttle for the leader-decay debug log
 
   // daily modifier round flags
   let baseGreed = 1;
@@ -193,6 +215,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     timeLeft = duration;
     boonUsed.clear();
     activeBoons.length = 0;
+    boonRank.clear();
+    activeSynergies.clear();
     banners.length = 0;
     evoTitle = null;
     powerStamp = null;
@@ -203,6 +227,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     coinBonus = 0;
     evoCoinBonus = 0;
     goldenTimer = 0;
+    luckyTimer = 0;
+    dashTimer = 0;
     events.reset();
     fx.particles.length = 0;
     fx.texts.length = 0;
@@ -229,6 +255,40 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
 
   function hasBoon(id: string) { return activeBoons.some((b) => b.id === id); }
+  function boonLevel(id: string) { const b = activeBoons.find((x) => x.id === id); return b ? b.level : 0; }
+
+  // v7 §5: VOID DASH — blink 100px along movement direction, leaving afterimages.
+  // SONIC SNACK synergy (ZOOMIES + VOID DASH) recolours the trail rainbow.
+  function performDash() {
+    if (!player) return;
+    let dx = player.vx, dy = player.vy;
+    const mag = Math.hypot(dx, dy);
+    if (mag < 1) { dx = 1; dy = 0; } else { dx /= mag; dy /= mag; }
+    const rainbow = activeSynergies.has('sonic');
+    for (let i = 1; i <= 5; i++) {
+      const t = i / 5;
+      const col = rainbow ? `hsl(${(roundElapsed * 0.4 + i * 55) % 360}, 90%, 66%)` : '#5AFFA0';
+      fx.addRing(player.x + dx * 100 * t, player.y + dy * 100 * t, col, player.radius * 0.85, player.radius * 0.85 + 16, 3, 320);
+    }
+    player.x = clamp(player.x + dx * 100, player.radius, CONFIG.MAP_SIZE - player.radius);
+    player.y = clamp(player.y + dy * 100, player.radius, CONFIG.MAP_SIZE - player.radius);
+    console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} 100px`);
+  }
+
+  // v7 §5: light up / retire synergies as their member power-ups come and go
+  function checkSynergies() {
+    for (const syn of CONFIG.SYNERGIES) {
+      const on = syn.needs.every((n) => hasBoon(n));
+      if (on && !activeSynergies.has(syn.id)) {
+        activeSynergies.add(syn.id);
+        banner(`SYNERGY · ${syn.name}!`, '#FFD23F');
+        console.log(`[synergy] ${syn.name} ACTIVE (${syn.needs.join(' + ')})`);
+      } else if (!on && activeSynergies.has(syn.id)) {
+        activeSynergies.delete(syn.id);
+        console.log(`[synergy] ${syn.name} ended`);
+      }
+    }
+  }
 
   function chooseBoon(id: string) {
     if (screen !== 'boon' || !player) return;
@@ -236,16 +296,27 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!def) return;
     track('boon_pick', { id });
     triggerPowerPickup(def.id, def.name); // v6 §4: pickup moment
+
+    // v7 §5: draw-without-replacement bookkeeping — a duplicate pick promotes the
+    // power-up to Level II; after that it's retired from the pool (see openBoonPick).
+    // BORROWED TIME is exempt: it's instant and repeatable, so it never retires.
+    const rank = id === 'time' ? 1 : Math.min(BOON_MAX_LEVEL, (boonRank.get(id) || 0) + 1);
+    if (id !== 'time') boonRank.set(id, rank);
+
     if (id === 'time') {
       timeLeft += 15000; // v6 §4: BORROWED TIME
       banner('+15 SECONDS', '#FFD23F');
+      console.log('[boon] BORROWED TIME +15s');
     } else {
       const dur = BOON_DURATION[id] || 16000;
       const existing = activeBoons.find((b) => b.id === id);
-      if (existing) existing.remaining = dur;
-      else activeBoons.push({ id, name: def.name, remaining: dur, duration: dur });
-      banner(def.name.toUpperCase() + '!', '#1CC6AE');
+      if (existing) { existing.remaining = dur; existing.level = rank; }
+      else activeBoons.push({ id, name: def.name, remaining: dur, duration: dur, level: rank });
+      if (id === 'shield') player.shieldCharge = true; // v7 §5: grant one chomp-block
+      banner(def.name.toUpperCase() + (rank >= 2 ? ' II' : '') + '!', '#1CC6AE');
+      console.log(`[boon] ${def.name} → Level ${rank}`);
     }
+    checkSynergies();
     audio.playBoon();
     screen = 'game';
     joystick.setEnabled(true);
@@ -275,10 +346,31 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     meta.updateMission('combo_4', maxCombo);
     meta.updateMission('tier_4', world.playerStats.maxTier);
 
+    // v7 §8: if a bot in the top 3 is showing off a skin the player doesn't own,
+    // surface it on the results screen as a soft nudge toward the shop.
+    let skinTease: ResultData['skinTease'] = null;
+    for (let i = 0; i < Math.min(3, board.length); i++) {
+      const e = board[i];
+      if (e !== player && (e as Rival).wearsUnownedSkin) {
+        const r = e as Rival;
+        skinTease = { botName: r.name, skinName: r.shopSkinName, skinId: r.shopSkinId };
+        break;
+      }
+    }
+
+    // v7 §11: award XP and roll up any level-ups (L5 unlocks Kitty free)
+    const xpGain = Math.floor(player.score / 100);
+    const { levelsGained, unlocked } = meta.addXP(player.score);
+    const leveledTo = levelsGained.length ? levelsGained[levelsGained.length - 1] : null;
+    if (unlocked.includes('kitty')) track('unlock_kitty', { level: 5 });
+
     results = {
       score: player.score, placement, total: board.length, devoured,
       coins, isDaily, crown, highScore: meta.data.highScore, newBest,
       reachedForm: player.formName, reachedIndex: player.formIndex, worldEater,
+      skinTease,
+      xpGain, level: meta.data.level, xpInLevel: meta.data.xp,
+      xpNext: xpForLevel(meta.data.level), leveledTo,
     };
     track('round_end', { score: player.score, placement, coins });
     audio.stopMusic();
@@ -328,12 +420,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       activeBoons[i].remaining -= dt;
       if (activeBoons[i].remaining <= 0) activeBoons.splice(i, 1);
     }
-    // v6 §4: power-up effect magnitudes per spec
-    player.magnetMultiplier = 1 + (hasBoon('magnet') ? 0.4 : 0);   // GRAVITY GLUTTON: +40% reach
-    player.speedMultiplier = 1 + (hasBoon('overdrive') ? 0.25 : 0); // ZOOMIES: +25% speed
-    player.twinMerge = hasBoon('twin');                             // DOUBLE STOMACH
+    // v7 §5: power-up effect magnitudes — Level II strengthens each per the spec
+    // table. Synergies are handled separately (dash trail / echo aura / spawn rate).
+    checkSynergies();
+    const mL = boonLevel('magnet'), oL = boonLevel('overdrive');
+    const gL = boonLevel('greed'), tL = boonLevel('tremor'), twL = boonLevel('twin');
+
+    player.magnetMultiplier = 1 + (mL ? (mL >= 2 ? 0.7 : 0.4) : 0); // GRAVITY GLUTTON: +40%/+70% reach
+    player.speedMultiplier  = 1 + (oL ? (oL >= 2 ? 0.4 : 0.25) : 0); // ZOOMIES: +25%/+40% speed
+    player.twinMerge = hasBoon('twin');                             // DOUBLE STOMACH: 2-match merges
+    player.twinBonus = twL >= 2 ? 1.5 : 1;                          // DOUBLE STOMACH II: +50% merge bonus
     player.tremorActive = hasBoon('tremor');                        // TENDERIZER
-    player.greedMultiplier = baseGreed * (hasBoon('greed') ? 1.5 : 1); // MIDAS MOUTH: ×1.5
+    player.tremorFactor = tL >= 2 ? 0.75 : 0.85;                    // 25% / 15% shrink per touch
+    player.greedMultiplier = baseGreed * (gL ? (gL >= 2 ? 2 : 1.5) : 1); // MIDAS MOUTH: ×1.5 / ×2
+    player.echoActive = hasBoon('echo');                            // ECHO BITE (pulse fired in absorbObject)
+    player.dashActive = hasBoon('dash');                            // VOID DASH (auto-dash below)
+    player.luckyActive = hasBoon('lucky');                          // LUCKY GNOME (golden rain below)
 
     // input
     if (joystick.state.active) {
@@ -361,6 +463,35 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (timeLeft <= CONFIG.GOLDEN_START_MS && timeLeft > 0) {
       goldenTimer -= dt;
       if (goldenTimer <= 0) { goldenTimer = CONFIG.GOLDEN_INTERVAL; world.spawnGolden(player); }
+    }
+
+    // v7 §5: LUCKY GNOME — a golden object every 10s (GOLD RUSH synergy → 7s)
+    if (player.luckyActive) {
+      luckyTimer -= dt;
+      if (luckyTimer <= 0) {
+        const gold = activeSynergies.has('goldrush');
+        luckyTimer = (gold ? 7000 : 10000) * (boonLevel('lucky') >= 2 ? 0.7 : 1);
+        world.spawnGolden(player);
+        console.log(`[boon] LUCKY GNOME dropped a golden snack${gold ? ' (GOLD RUSH)' : ''}`);
+      }
+    } else luckyTimer = 0;
+
+    // v7 §5: VOID DASH — every 6s blink 100px along movement, with afterimages
+    if (player.dashActive) {
+      dashTimer -= dt;
+      if (dashTimer <= 0) { dashTimer = 6000; performDash(); }
+    } else dashTimer = 0;
+
+    // v7 §5: ECHO BITE shockwave (every 5th absorb) pulls nearby edibles inward
+    if (player.echoPulse) {
+      player.echoPulse = false;
+      world.attractEdibles(player.x, player.y, 260, 46);
+      fx.addRing(player.x, player.y, '#7DF9FF', player.radius, player.radius + 130, 5, 420);
+      console.log('[boon] ECHO BITE shockwave');
+    }
+    // v7 §5: EVENT HORIZON — constant gentle pull aura (≈30% of the echo pulse)
+    if (activeSynergies.has('horizon')) {
+      world.attractEdibles(player.x, player.y, 210, 40 * (dt / 1000));
     }
 
     // v6 §2: catch-up economy — underdog aura + leader decay
@@ -439,12 +570,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const leaderForm = leader === player ? player.formIndex : (leader as Rival).reachedForm;
     if (leaderForm >= CONFIG.DEVOURER_FORM_INDEX) {
       const floor = leader === player ? player.formFloor : (leader as Rival).formFloor;
+      const before = leader.radius;
       leader.radius = Math.max(floor, leader.radius * (1 - CONFIG.LEADER_DECAY_RATE * dtSec));
+      // v7 §1: debug — confirm leader decay applies (to bots too), throttled to ~1/s
+      decayLogAccum += dt;
+      if (decayLogAccum >= 1000) {
+        decayLogAccum = 0;
+        const who = leader === player ? 'YOU' : (leader as Rival).name;
+        console.debug(`[decay] leader ${who} r=${before.toFixed(1)}→${leader.radius.toFixed(1)} (${(CONFIG.LEADER_DECAY_RATE * 100).toFixed(1)}%/s)`);
+      }
     }
   }
 
   function openBoonPick() {
-    const pool = [...CONFIG.BOONS];
+    // v7 §5: draw WITHOUT replacement — retire any power-up already at max level
+    const pool = CONFIG.BOONS.filter((b) => (boonRank.get(b.id) || 0) < BOON_MAX_LEVEL);
     boonChoices = [];
     for (let i = 0; i < 3 && pool.length; i++) {
       boonChoices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
@@ -477,12 +617,24 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           r.getEaten(player.x, player.y, minDist);
           banner(`You devoured ${r.name}!`, '#FFD23F');
         } else if (canEatVoid(r.radius, player.radius, d)) {
-          const pr = player.radius;
-          fx.shake(360, 16); fx.flash();
-          audio.playEaten(); // v5 §5: descending wah when you get eaten
-          player.getEaten();
-          r.eatVoid(pr);
-          banner(`${r.name} devoured you — ghosting!`, '#FF6B6B');
+          if (player.shieldCharge) {
+            // v7 §5: BUBBLE SHIELD blocks this chomp, pops with a burst, then is gone
+            player.shieldCharge = false;
+            const bi = activeBoons.findIndex((b) => b.id === 'shield');
+            if (bi >= 0) activeBoons.splice(bi, 1);
+            fx.addConfetti(player.x, player.y, CONFIG.COLORS.pops);
+            fx.addRing(player.x, player.y, '#8AB0FF', player.radius, player.radius + 170, 6, 480);
+            fx.shake(220, 11); fx.flash();
+            banner('BUBBLE SHIELD popped!', '#8AB0FF');
+            console.log('[boon] BUBBLE SHIELD blocked a chomp');
+          } else {
+            const pr = player.radius;
+            fx.shake(360, 16); fx.flash();
+            audio.playEaten(); // v5 §5: descending wah when you get eaten
+            player.getEaten();
+            r.eatVoid(pr);
+            banner(`${r.name} devoured you — ghosting!`, '#FF6B6B');
+          }
         }
       }
     }
@@ -612,8 +764,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, radius: r.radius })),
     ].sort((a, b) => b.score - a.score);
     const LB_X = 8, LB_W = 150, LB_TOP = 84, ROW = 20;
+    const lbH = board.length * ROW + 12;
     ctx.fillStyle = 'rgba(20,8,43,0.55)';
-    roundRectFill(ctx, LB_X, LB_TOP, LB_W, board.length * ROW + 12, 10);
+    roundRectFill(ctx, LB_X, LB_TOP, LB_W, lbH, 10);
+    // v7 §7: clip rows to the backdrop so long names / crowns never bleed out
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(LB_X, LB_TOP, LB_W, lbH);
+    ctx.clip();
     ctx.textAlign = 'left';
     for (let i = 0; i < board.length; i++) {
       const e = board[i];
@@ -637,6 +795,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillText(String(e.score), LB_X + LB_W - 8, y);
       ctx.textAlign = 'left';
     }
+    ctx.restore();
 
     // banners (center)
     ctx.textAlign = 'center';
@@ -656,28 +815,52 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     for (let i = banners.length - 1; i >= 0; i--) if (banners[i].life <= 0) banners.splice(i, 1);
 
-    // v6 §3: evolution progress bar (bottom center)
+    // v7 §7: evolution progress as a bottom-center pill — glowing fill, form
+    // labels inside, raised off the bottom edge to clear the device safe area.
     const forms = CONFIG.FORMS;
     const fi = player.formIndex;
-    const ebW = Math.min(230, fw * 0.62), ebx = fw / 2 - ebW / 2, eby = fh - 52;
+    const SAFE_B = 26;                                   // reserve for home indicator
+    const pillW = Math.min(260, fw * 0.68), pillH = 22;
+    const pillX = fw / 2 - pillW / 2, pillY = fh - SAFE_B - pillH;
     ctx.textAlign = 'center';
     if (fi < forms.length - 1) {
       const cur = forms[fi].radius, next = forms[fi + 1].radius;
       const prog = clamp((player.radius - cur) / (next - cur), 0, 1);
-      ctx.fillStyle = 'rgba(20,8,43,0.55)';
-      roundRectFill(ctx, ebx, eby, ebW, 9, 5);
+      // pill track
+      ctx.fillStyle = 'rgba(20,8,43,0.62)';
+      roundRectFill(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      // glowing fill
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(pillX, pillY, pillW * prog, pillH);
+      ctx.clip();
+      ctx.shadowColor = '#C77DFF';
+      ctx.shadowBlur = 14;
       ctx.fillStyle = '#C77DFF';
-      roundRectFill(ctx, ebx, eby, ebW * prog, 9, 5);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = '700 11px Nunito, sans-serif';
+      roundRectFill(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      ctx.restore();
+      // labels inside the pill
+      ctx.font = '800 11px Fredoka, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'left';
-      ctx.fillText(forms[fi].name, ebx, eby - 5);
+      ctx.fillText(forms[fi].name, pillX + 12, pillY + pillH / 2 + 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.textAlign = 'right';
-      ctx.fillText('→ ' + forms[fi + 1].name, ebx + ebW, eby - 5);
+      ctx.fillText(forms[fi + 1].name, pillX + pillW - 12, pillY + pillH / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
     } else {
+      ctx.save();
+      ctx.shadowColor = '#FFD23F';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = 'rgba(20,8,43,0.62)';
+      roundRectFill(ctx, pillX, pillY, pillW, pillH, pillH / 2);
       ctx.fillStyle = '#FFD23F';
-      ctx.font = '700 14px Fredoka, sans-serif';
-      ctx.fillText('★ WORLD EATER ★', fw / 2, eby + 4);
+      ctx.font = '800 14px Fredoka, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('★ WORLD EATER ★', fw / 2, pillY + pillH / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.restore();
     }
 
     // v6 §3: evolution title card (big Fredoka, scales in then settles)
@@ -766,6 +949,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.beginPath();
     ctx.arc(0, 0, r + 2, -Math.PI / 2, -Math.PI / 2 + (b.remaining / b.duration) * Math.PI * 2);
     ctx.stroke();
+    // v7 §5: Level II badge
+    if (b.level >= 2) {
+      ctx.fillStyle = '#FFD23F';
+      ctx.font = '700 9px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('II', r - 1, -r + 1);
+    }
     ctx.restore();
     ctx.textBaseline = 'alphabetic';
   }
@@ -779,6 +970,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       case 'tremor': return '#FF6B6B';
       case 'greed': return '#FFD23F';
       case 'time': return '#1CC6AE';
+      case 'echo': return '#7DF9FF';
+      case 'shield': return '#8AB0FF';
+      case 'dash': return '#5AFFA0';
+      case 'lucky': return '#FFC24B';
       default: return '#FFD23F';
     }
   }
@@ -851,7 +1046,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.globalAlpha = 0.5;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(player.x, player.y, (player.radius + 9 + i * 6) * pulse, 0, Math.PI * 2);
+      // v7 §6: keep every aura ring within radius+40 no matter how many stack
+      const auraOff = Math.min(40, 9 + i * 6);
+      ctx.arc(player.x, player.y, (player.radius + auraOff) * pulse, 0, Math.PI * 2);
       ctx.stroke();
       i++;
     }
@@ -903,6 +1100,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.restore();
     }
     ctx.drawImage(getVignette(), 0, 0);
+
+    // v7 §6: WORLD EATER — reality warps ONLY at the screen edges (never a
+    // character-attached ring), a pulsing violet edge bloom.
+    if (player && player.formIndex >= CONFIG.FORMS.length - 1) {
+      const pulse = 0.26 + Math.sin(clock / 260) * 0.12;
+      const g = ctx.createRadialGradient(
+        fw / 2, fh / 2, Math.min(fw, fh) * 0.44,
+        fw / 2, fh / 2, Math.max(fw, fh) * 0.64,
+      );
+      g.addColorStop(0, 'rgba(199,125,255,0)');
+      g.addColorStop(1, `rgba(199,125,255,${pulse})`);
+      ctx.save();
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.restore();
+    }
   }
 
   function drawJoystickHint() {
@@ -980,6 +1193,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       streak: meta.data.streak,
       equippedSkin: meta.data.equippedSkin,
       ownedSkins: meta.data.skinsOwned,
+      level: meta.data.level,
+      xpInLevel: meta.data.xp,
+      xpNext: xpForLevel(meta.data.level),
       boonChoices,
       results,
       daily: dailyData,
@@ -1005,6 +1221,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       track('skin_buy', { id });
       notify();
       return { ok: true };
+    },
+    iapView(id) { track('iap_view', { id }); },
+    iapPurchase(id) {
+      // v7 §9: MOCK ONLY — no real payment. Unlock + equip the premium skin and
+      // grant a +100 coin goodwill bonus.
+      track('iap_click', { id });
+      meta.unlockSkin(id);
+      meta.equipSkin(id);
+      meta.addCoins(100);
+      notify();
     },
     equipSkin(id) {
       meta.equipSkin(id);

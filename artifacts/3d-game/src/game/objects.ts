@@ -612,6 +612,204 @@ function drawWatertower(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.fillText('MAPLE', 0, -r * 0.25);
 }
 
+// ── v7 §3: new objects with personality ─────────────────────────────────────
+function drawCat(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = false) {
+  const o = ow(r);
+  const fur = '#9AA0AD';
+  const flick = Math.sin(t / 200) * (fleeing ? 0.6 : 0.25);
+  ctx.save(); ctx.translate(-r * 0.5, r * 0.2); ctx.rotate(flick);
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.12, -r * 0.9, r * 0.24, r * 0.9, r * 0.12), fur, { outline: o });
+  ctx.restore();
+  stickerEllipse(ctx, 0, r * 0.3, r * 0.55, r * 0.45, fur, 0, { outline: o });
+  stickerCircle(ctx, r * 0.1, -r * 0.28, r * 0.42, fur, { outline: o });
+  const arch = fleeing ? -r * 0.12 : 0;
+  sticker(ctx, (c) => { c.moveTo(-r * 0.2, -r * 0.5 + arch); c.lineTo(-r * 0.34, -r * 0.95 + arch); c.lineTo(r * 0.04, -r * 0.66 + arch); c.closePath(); }, fur, { outline: o, shadow: false });
+  sticker(ctx, (c) => { c.moveTo(r * 0.4, -r * 0.5 + arch); c.lineTo(r * 0.54, -r * 0.95 + arch); c.lineTo(r * 0.16, -r * 0.66 + arch); c.closePath(); }, fur, { outline: o, shadow: false });
+  const er = fleeing ? r * 0.12 : r * 0.08;
+  dot(ctx, r * -0.04, -r * 0.28, er, '#1A0B33');
+  dot(ctx, r * 0.24, -r * 0.28, er, '#1A0B33');
+  dot(ctx, r * 0.1, -r * 0.14, r * 0.05, '#FF8AA8');
+}
+
+function drawSquirrel(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const fur = '#B5713C', light = '#E8C7A0';
+  const twitch = Math.sin(t / 150) * 0.15;
+  ctx.save(); ctx.translate(-r * 0.4, r * 0.1); ctx.rotate(twitch);
+  sticker(ctx, (c) => c.ellipse(-r * 0.3, -r * 0.4, r * 0.42, r * 0.72, -0.5, 0, Math.PI * 2), fur, { outline: o });
+  ctx.restore();
+  stickerEllipse(ctx, r * 0.1, r * 0.2, r * 0.4, r * 0.5, fur, -0.2, { outline: o });
+  stickerEllipse(ctx, r * 0.2, r * 0.3, r * 0.2, r * 0.3, light, -0.2, { outline: 0, shadow: false });
+  stickerCircle(ctx, r * 0.3, -r * 0.35, r * 0.32, fur, { outline: o });
+  dot(ctx, r * 0.2, -r * 0.6, r * 0.12, fur);
+  dot(ctx, r * 0.4, -r * 0.4, r * 0.09, '#1A0B33');
+}
+
+function drawBird(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = false) {
+  const o = ow(r);
+  const body = '#5AA9E6';
+  const flap = Math.sin(t / (fleeing ? 60 : 120)) * r * 0.14;
+  stickerEllipse(ctx, 0, 0, r * 0.6, r * 0.5, body, 0, { outline: o });
+  sticker(ctx, (c) => c.ellipse(-r * 0.1, -r * 0.1 + flap, r * 0.3, r * 0.18, -0.3, 0, Math.PI * 2), '#3E8AC7', { outline: o, shadow: false });
+  stickerCircle(ctx, r * 0.45, -r * 0.2, r * 0.3, body, { outline: o });
+  sticker(ctx, (c) => { c.moveTo(r * 0.7, -r * 0.2); c.lineTo(r * 1.0, -r * 0.12); c.lineTo(r * 0.7, -r * 0.04); c.closePath(); }, '#FF9F1C', { outline: o, shadow: false });
+  dot(ctx, r * 0.5, -r * 0.24, r * 0.07, '#1A0B33');
+}
+
+function drawTrampoline(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  ctx.strokeStyle = '#5E6472'; ctx.lineWidth = Math.max(2, r * 0.06); ctx.lineCap = 'round';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * r * 0.6, r * 0.1); ctx.lineTo(s * r * 0.75, r * 0.8); ctx.stroke(); }
+  stickerEllipse(ctx, 0, 0, r * 0.95, r * 0.5, '#3A5BC7', 0, { outline: o });
+  const bounce = Math.sin(t / 300) * r * 0.04;
+  stickerEllipse(ctx, 0, bounce, r * 0.72, r * 0.34, '#2A2A38', 0, { outline: o, shadow: false });
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = Math.max(1, r * 0.03);
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.34); ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.45); ctx.stroke(); }
+}
+
+function drawDrone(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const spin = t / 30;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as [number, number][]) {
+    const cx = sx * r * 0.6, cy = sy * r * 0.4;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(spin * sx * sy);
+    stickerEllipse(ctx, 0, 0, r * 0.4, r * 0.08, '#C9CCD6', 0, { outline: Math.max(1, o * 0.6), shadow: false });
+    ctx.restore();
+    dot(ctx, cx, cy, r * 0.08, '#5E6472');
+  }
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.4, -r * 0.25, r * 0.8, r * 0.5, r * 0.12), '#FF3D68', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.22, r * 0.3, r * 0.44, r * 0.4, r * 0.05), '#C79A5A', { outline: o, shadow: false });
+  ctx.strokeStyle = '#8A5A2E'; ctx.lineWidth = Math.max(1, r * 0.03);
+  ctx.beginPath(); ctx.moveTo(0, r * 0.3); ctx.lineTo(0, r * 0.7); ctx.stroke();
+  dot(ctx, r * 0.2, -r * 0.05, r * 0.07, '#BFEAFF');
+}
+
+function drawSchoolbus(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const roll = t / 400;
+  const yellow = '#FFC61A';
+  for (const wx of [-0.6, 0.55]) { stickerCircle(ctx, r * wx, r * 0.5, r * 0.2, '#22222C', { outline: o }); ctx.save(); ctx.translate(r * wx, r * 0.5); ctx.rotate(roll); dot(ctx, 0, 0, r * 0.08, '#C9CCD6'); ctx.restore(); }
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.95, -r * 0.5, r * 1.9, r * 1.0, r * 0.12), yellow, { outline: o });
+  for (let i = 0; i < 4; i++) sticker(ctx, (c) => roundRectPath(c, -r * 0.8 + i * r * 0.42, -r * 0.35, r * 0.32, r * 0.3, r * 0.05), '#BFEAFF', { outline: o, shadow: false });
+  dot(ctx, r * 0.86, r * 0.15, r * 0.07, '#FFF3B0');
+  ctx.strokeStyle = '#22222C'; ctx.lineWidth = Math.max(1.5, r * 0.05);
+  ctx.beginPath(); ctx.moveTo(-r * 0.95, r * 0.15); ctx.lineTo(r * 0.9, r * 0.15); ctx.stroke();
+}
+
+function drawBBQ(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  ctx.save(); ctx.globalAlpha = 0.4;
+  for (let i = 0; i < 3; i++) { const p = (t / 600 + i * 0.4) % 1; dot(ctx, r * 0.1 + Math.sin(p * 6 + i) * r * 0.15, -r * 0.6 - p * r * 0.6, r * 0.12 * (1 - p * 0.5), '#D8D8E0'); }
+  ctx.restore();
+  ctx.strokeStyle = '#2A2A38'; ctx.lineWidth = Math.max(2, r * 0.06); ctx.lineCap = 'round';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * r * 0.3, 0); ctx.lineTo(s * r * 0.5, r * 0.8); ctx.stroke(); }
+  sticker(ctx, (c) => { c.moveTo(-r * 0.6, -r * 0.1); c.arc(0, -r * 0.1, r * 0.6, 0, Math.PI); c.closePath(); }, '#3A3A46', { outline: o });
+  sticker(ctx, (c) => c.arc(0, -r * 0.1, r * 0.6, Math.PI, 0), '#E23B4E', { outline: o, shadow: false });
+  dot(ctx, 0, -r * 0.72, r * 0.1, '#2A2A38');
+  dot(ctx, -r * 0.2, -r * 0.12, r * 0.08, '#FF7A1C'); dot(ctx, r * 0.15, -r * 0.12, r * 0.08, '#FFB020');
+}
+
+function drawMower(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  stickerCircle(ctx, -r * 0.4, r * 0.5, r * 0.22, '#2A2A38', { outline: o });
+  stickerCircle(ctx, r * 0.5, r * 0.55, r * 0.16, '#2A2A38', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.7, r * 0.1, r * 1.2, r * 0.4, r * 0.1), '#33C46B', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.4, -r * 0.2, r * 0.5, r * 0.4, r * 0.06), '#5E6472', { outline: o, shadow: false });
+  ctx.strokeStyle = '#3B4A63'; ctx.lineWidth = Math.max(2, r * 0.06); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r * 0.4, r * 0.2); ctx.lineTo(r * 0.9, -r * 0.6); ctx.moveTo(r * 0.75, -r * 0.4); ctx.lineTo(r * 1.0, -r * 0.55); ctx.stroke();
+}
+
+function drawHoop(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.1, -r * 0.2, r * 0.2, r * 1.0, r * 0.05), '#5E6472', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.6, -r * 0.9, r * 1.2, r * 0.7, r * 0.05), '#F2F2F5', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.2, -r * 0.6, r * 0.4, r * 0.3, r * 0.03), '#E23B4E', { outline: o, shadow: false });
+  ctx.strokeStyle = '#FF7A1C'; ctx.lineWidth = Math.max(2, r * 0.08);
+  ctx.beginPath(); ctx.ellipse(0, -r * 0.25, r * 0.28, r * 0.1, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = Math.max(1, r * 0.03);
+  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.11, -r * 0.22); ctx.lineTo(i * r * 0.06, r * 0.1); ctx.stroke(); }
+}
+
+function drawIcecream(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  for (const wx of [-0.5, 0.5]) { stickerCircle(ctx, r * wx, r * 0.6, r * 0.18, '#22222C', { outline: o }); dot(ctx, r * wx, r * 0.6, r * 0.07, '#C9CCD6'); }
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.7, -r * 0.05, r * 1.4, r * 0.6, r * 0.1), '#8ECBFF', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.7, r * 0.25, r * 1.4, r * 0.14, r * 0.05), '#FF6FB0', { outline: o, shadow: false });
+  sticker(ctx, (c) => { c.moveTo(0, r * 0.1); c.lineTo(-r * 0.18, -r * 0.4); c.lineTo(r * 0.18, -r * 0.4); c.closePath(); }, '#E8C7A0', { outline: o });
+  stickerCircle(ctx, -r * 0.08, -r * 0.45, r * 0.16, '#FF6FB0', { outline: o, shadow: false });
+  stickerCircle(ctx, r * 0.1, -r * 0.5, r * 0.16, '#FFFFFF', { outline: o, shadow: false });
+  dot(ctx, 0, -r * 0.62, r * 0.08, '#E23B4E');
+}
+
+function drawScooter(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  for (const wx of [-0.6, 0.55]) { ctx.save(); ctx.strokeStyle = '#22222C'; ctx.lineWidth = Math.max(2, r * 0.1); ctx.beginPath(); ctx.arc(r * wx, r * 0.5, r * 0.22, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); dot(ctx, r * wx, r * 0.5, r * 0.06, '#C9CCD6'); }
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.65, r * 0.3, r * 1.2, r * 0.14, r * 0.06), '#E23B4E', { outline: o });
+  ctx.strokeStyle = '#5E6472'; ctx.lineWidth = Math.max(2, r * 0.08); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r * 0.5, r * 0.35); ctx.lineTo(r * 0.6, -r * 0.5); ctx.moveTo(r * 0.4, -r * 0.5); ctx.lineTo(r * 0.8, -r * 0.5); ctx.stroke();
+}
+
+function drawSandbox(ctx: CanvasRenderingContext2D, r: number) {
+  const o = ow(r);
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.8, -r * 0.5, r * 1.6, r * 1.0, r * 0.08), '#C77B3C', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.62, -r * 0.32, r * 1.24, r * 0.7, r * 0.05), '#F2D9A0', { outline: 0, shadow: false });
+  sticker(ctx, (c) => { c.moveTo(-r * 0.35, -r * 0.1); c.lineTo(-r * 0.15, -r * 0.1); c.lineTo(-r * 0.2, r * 0.25); c.lineTo(-r * 0.3, r * 0.25); c.closePath(); }, '#E23B4E', { outline: o, shadow: false });
+  dot(ctx, r * 0.3, r * 0.05, r * 0.14, '#2D9CDB');
+}
+
+function drawSwingset(ctx: CanvasRenderingContext2D, r: number) {
+  const o = ow(r);
+  ctx.strokeStyle = '#5E6472'; ctx.lineWidth = Math.max(2.5, r * 0.07); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.7, r * 0.8); ctx.lineTo(-r * 0.4, -r * 0.7); ctx.lineTo(r * 0.4, -r * 0.7); ctx.lineTo(r * 0.7, r * 0.8);
+  ctx.moveTo(-r * 0.55, r * 0.8); ctx.lineTo(-r * 0.28, -r * 0.7); ctx.moveTo(r * 0.55, r * 0.8); ctx.lineTo(r * 0.28, -r * 0.7);
+  ctx.moveTo(-r * 0.4, -r * 0.7); ctx.lineTo(r * 0.4, -r * 0.7);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(60,60,80,0.8)'; ctx.lineWidth = Math.max(1.5, r * 0.04);
+  for (const sx of [-0.18, 0.18]) {
+    ctx.beginPath(); ctx.moveTo(r * sx - r * 0.08, -r * 0.7); ctx.lineTo(r * sx - r * 0.08, r * 0.2); ctx.moveTo(r * sx + r * 0.08, -r * 0.7); ctx.lineTo(r * sx + r * 0.08, r * 0.2); ctx.stroke();
+    sticker(ctx, (c) => roundRectPath(c, r * sx - r * 0.14, r * 0.2, r * 0.28, r * 0.1, r * 0.03), '#FFD23F', { outline: o, shadow: false });
+  }
+}
+
+function drawSlide(ctx: CanvasRenderingContext2D, r: number) {
+  const o = ow(r);
+  ctx.strokeStyle = '#5E6472'; ctx.lineWidth = Math.max(2, r * 0.06); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r * 0.45, -r * 0.6); ctx.lineTo(r * 0.6, r * 0.7); ctx.moveTo(r * 0.65, -r * 0.6); ctx.lineTo(r * 0.8, r * 0.7); ctx.stroke();
+  for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(r * 0.48, -r * 0.5 + i * r * 0.35); ctx.lineTo(r * 0.78, -r * 0.5 + i * r * 0.35); ctx.stroke(); }
+  sticker(ctx, (c) => { c.moveTo(r * 0.45, -r * 0.62); c.lineTo(r * 0.65, -r * 0.62); c.quadraticCurveTo(-r * 0.3, r * 0.2, -r * 0.8, r * 0.7); c.lineTo(-r * 0.55, r * 0.7); c.quadraticCurveTo(-r * 0.1, r * 0.25, r * 0.55, -r * 0.4); c.closePath(); }, '#2D9CDB', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, r * 0.4, -r * 0.72, r * 0.35, r * 0.14, r * 0.04), '#FF9F1C', { outline: o, shadow: false });
+}
+
+function drawSeesaw(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const tilt = Math.sin(t / 500) * 0.2;
+  sticker(ctx, (c) => { c.moveTo(-r * 0.3, r * 0.5); c.lineTo(0, -r * 0.05); c.lineTo(r * 0.3, r * 0.5); c.closePath(); }, '#5E6472', { outline: o });
+  ctx.save(); ctx.translate(0, -r * 0.1); ctx.rotate(tilt);
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.95, -r * 0.1, r * 1.9, r * 0.2, r * 0.08), '#E23B4E', { outline: o });
+  for (const sx of [-0.8, 0.8]) { ctx.strokeStyle = '#FFD23F'; ctx.lineWidth = Math.max(2, r * 0.07); ctx.beginPath(); ctx.moveTo(r * sx, -r * 0.1); ctx.lineTo(r * sx * 0.9, -r * 0.5); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawSchool(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const wall = '#F2C6A0', roof = '#8A6BB0';
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.85, -r * 0.25, r * 1.7, r * 1.05, r * 0.05), wall, { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.9, -r * 0.4, r * 1.8, r * 0.2, r * 0.04), roof, { outline: o, shadow: false });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.22, -r * 0.75, r * 0.44, r * 0.5, r * 0.04), wall, { outline: o });
+  sticker(ctx, (c) => { c.moveTo(-r * 0.28, -r * 0.72); c.lineTo(0, -r * 1.05); c.lineTo(r * 0.28, -r * 0.72); c.closePath(); }, roof, { outline: o });
+  stickerCircle(ctx, 0, -r * 0.5, r * 0.14, '#FFFFFF', { outline: o, shadow: false });
+  dot(ctx, 0, -r * 0.5, r * 0.03, '#1A0B33');
+  ctx.strokeStyle = '#7A4A2B'; ctx.lineWidth = Math.max(1.5, r * 0.02);
+  ctx.beginPath(); ctx.moveTo(0, -r * 1.05); ctx.lineTo(0, -r * 1.35); ctx.stroke();
+  const wave = Math.sin(t / 400);
+  sticker(ctx, (c) => { c.moveTo(0, -r * 1.35); c.lineTo(r * 0.3 + wave * r * 0.04, -r * 1.28); c.lineTo(0, -r * 1.18); c.closePath(); }, '#E23B4E', { outline: o, shadow: false });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.16, r * 0.35, r * 0.32, r * 0.45, r * 0.04), '#8A5A2E', { outline: o, shadow: false });
+  for (const wx of [-0.55, 0.55]) sticker(ctx, (c) => roundRectPath(c, r * wx - r * 0.15, r * 0.0, r * 0.3, r * 0.3, r * 0.03), '#BFEAFF', { outline: o, shadow: false });
+  ctx.fillStyle = '#5E6472'; ctx.font = `bold ${Math.max(6, r * 0.14)}px Fredoka, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('SCHOOL', 0, -r * 0.12);
+}
+
 // ── Dispatcher ─────────────────────────────────────────────────────────────
 export interface DrawOpts {
   t?: number;
@@ -653,5 +851,22 @@ export function drawParkObject(
     case 'shed': return drawShed(ctx, r, t, v);
     case 'house': return drawHouse(ctx, r, t, v);
     case 'watertower': return drawWatertower(ctx, r, t);
+    // v7 §3 new objects
+    case 'cat': return drawCat(ctx, r, t, f);
+    case 'squirrel': return drawSquirrel(ctx, r, t);
+    case 'bird': return drawBird(ctx, r, t, f);
+    case 'trampoline': return drawTrampoline(ctx, r, t);
+    case 'drone': return drawDrone(ctx, r, t);
+    case 'schoolbus': return drawSchoolbus(ctx, r, t);
+    case 'bbq': return drawBBQ(ctx, r, t);
+    case 'mower': return drawMower(ctx, r, t);
+    case 'hoop': return drawHoop(ctx, r, t);
+    case 'icecream': return drawIcecream(ctx, r, t);
+    case 'scooter': return drawScooter(ctx, r, t);
+    case 'sandbox': return drawSandbox(ctx, r);
+    case 'swingset': return drawSwingset(ctx, r);
+    case 'slide': return drawSlide(ctx, r);
+    case 'seesaw': return drawSeesaw(ctx, r, t);
+    case 'school': return drawSchool(ctx, r, t);
   }
 }
