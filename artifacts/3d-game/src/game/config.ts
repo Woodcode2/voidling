@@ -136,7 +136,7 @@ export const CONFIG = {
   MOVE_DECEL: 1800,         // on release
 
   // Camera — v5 §1 (zoom OUT as you grow; no dead zone; velocity lookahead)
-  CAM_VIEW_BASE: 680,          // world px shown vertically at base radius
+  CAM_VIEW_BASE: 620,          // v10 §4: street-level intimacy at round start
   CAM_VIEW_GROWTH: 8,          // + world px per (radius - base radius)
   CAM_VIEW_MAX: 1500,
   CAM_ZOOM_LERP: 0.05,
@@ -156,7 +156,7 @@ export const CONFIG = {
   // World — v7 §2: the full town — 4×4 grid, 3200×3200
   MAP_SIZE: 3200,
   BLOCK_SIZE: 700,           // 4*700 + 3*120 roads = 3160, margin 20
-  ROAD_WIDTH: 120,
+  ROAD_WIDTH: 100,             // v10 §6: narrower roads (was 120)
   SIDEWALK: 44,
   GRID: 4,
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
@@ -230,7 +230,7 @@ export const CONFIG = {
       lawns: ['#8FCDA0', '#7FC494', '#98D3A8'],
       pavement: '#E4DECF',
       pavementSeam: 'rgba(0,0,0,0.05)',
-      pond: '#8FBFE0',
+      pond: '#2D9CDB',          // v10 §2: vivid palette match
       pondEdge: '#FFFFFF',
       driveway: '#C9C4B8',
       dirt: '#B79A6B',

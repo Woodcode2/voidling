@@ -2,6 +2,7 @@
 // Draws a cute jelly black-hole creature centered at (x,y) with a given skin.
 import type { SkinDef } from './config';
 import { drawSkinBack, drawSkinFront, drawSkinBody } from './skins';
+import { skinSprites, layerSprites } from './sprites'; // v10 §1: PNG art when present
 
 export interface VoidlingVisual {
   r: number;
@@ -54,13 +55,20 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   // ── Body (jelly squash + breathing) ─────────────────────────────────────────
   ctx.save();
   ctx.scale(v.wobbleX * v.breathe, v.wobbleY * v.breathe);
-  // v6 §9: body drawn from a 3× supersampled, cached sprite (flat, no gradient/blur)
-  const sprite = getBodySprite(skin.bodyColor);
-  ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
+  const artSprite = skinSprites.get(skin.id); // v10 §1: PNG art overrides procedural body
+  if (artSprite) {
+    // Sprite is drawn slightly oversized to include its own outline/glow allowance
+    const d = r * 2.2;
+    ctx.drawImage(artSprite, -d / 2, -d / 2, d, d);
+  } else {
+    // Fallback: procedural body (3× supersampled cached sprite)
+    const sprite = getBodySprite(skin.bodyColor);
+    ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
+  }
   ctx.restore();
 
-  // ── v8 §8: premium surface effects painted onto the body (clipped to the orb) ─
-  drawSkinBody(ctx, skin, r, v.t);
+  // ── v8 §8: premium surface effects — skipped when art sprite is active (it includes them) ─
+  if (!artSprite) drawSkinBody(ctx, skin, r, v.t);
 
   // ── v9 §3: evolution BODY morphs painted onto/into the orb (clipped) ─────────
   drawFormBody(ctx, v);
@@ -325,13 +333,26 @@ function drawDebris(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   }
 }
 
-// v9 §3: DEVOURER's flame crown — 7 two-tone teardrop flames flickering at ~8Hz.
-// White-violet once the void reaches WORLD ENDER.
+// v10 §6 / v9 §3: DEVOURER's flame crown — 7 two-tone teardrop flames flickering at ~8Hz.
+// Warm orange/yellow fire normally; white-violet when reaching WORLD ENDER.
 function drawFlames(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   const { r, t } = v;
+
+  // v10 §1: art sprite replaces procedural flames entirely
+  const crownSprite = layerSprites.get('flame-crown');
+  if (crownSprite) {
+    const d = r * 3.2;
+    const flicker = 1 + Math.sin(t / 80) * 0.04;
+    ctx.save();
+    ctx.scale(flicker, flicker);
+    ctx.drawImage(crownSprite, -d / 2, -d * 0.9, d, d);
+    ctx.restore();
+    return;
+  }
+
   const ender = (v.form || 0) >= 4;
-  const outer = ender ? '#C9A8FF' : '#7A2BE0';
-  const inner = ender ? '#FFFFFF' : '#E0B0FF';
+  const outer = ender ? '#C9A8FF' : '#FF6A00'; // warm orange / cosmic violet
+  const inner = ender ? '#FFFFFF' : '#FFD23F';  // warm yellow / bright white
   const licks = 7;
   for (let i = 0; i < licks; i++) {
     const a = -Math.PI / 2 + (i - (licks - 1) / 2) * 0.34;
@@ -347,13 +368,17 @@ function drawFlames(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   }
 }
 
-// bulged-base → fine-tip teardrop flame shape
+// v10 §6: concave-sided pointed teardrop flame (spec: "pointed teardrop with slightly
+// concave sides" — NOT convex "bunny ears"). Control point sits on the centre axis
+// (65% toward the tip) so both sides curve INWARD, producing a sharp tapered tip.
 function teardrop(ctx: CanvasRenderingContext2D, bx: number, by: number, tx: number, ty: number, nx: number, ny: number, w: number, color: string) {
+  const ctrlX = bx * 0.35 + tx * 0.65;  // on the flame axis, 65% toward tip
+  const ctrlY = by * 0.35 + ty * 0.65;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(bx + nx * w, by + ny * w);
-  ctx.quadraticCurveTo(tx + nx * w * 1.1, ty + ny * w * 1.1, tx, ty);
-  ctx.quadraticCurveTo(tx - nx * w * 1.1, ty - ny * w * 1.1, bx - nx * w, by - ny * w);
+  ctx.quadraticCurveTo(ctrlX, ctrlY, tx, ty);              // right side: concave inward
+  ctx.quadraticCurveTo(ctrlX, ctrlY, bx - nx * w, by - ny * w); // left side: concave inward
   ctx.closePath();
   ctx.fill();
 }
@@ -433,25 +458,31 @@ function drawFormBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     const a = v.morph ?? 1;
     ctx.save();
     ctx.globalAlpha *= a;
-    ctx.fillStyle = hexA('#0D0821', 0.55);
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    const drift = t / 2400;
-    const wisps: [string, number][] = [['#FF3CAC', drift], ['#2BD2FF', drift + Math.PI]];
-    for (const [col, ph] of wisps) {
-      ctx.save();
-      ctx.globalAlpha *= 0.4;
-      ctx.fillStyle = col;
-      ctx.rotate(ph);
-      ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 0.55, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-    ctx.fillStyle = '#FFFFFF';
-    for (let i = 0; i < 6; i++) {
-      const ang = i * 2.3 + t / 3000;
-      const rad = ((i * 53) % 100) / 100 * r * 0.8;
-      const tw = 0.4 + 0.6 * Math.abs(Math.sin(t / 300 + i));
-      ctx.globalAlpha = a * tw;
-      ctx.beginPath(); ctx.arc(Math.cos(ang) * rad, Math.sin(ang) * rad, Math.max(0.8, r * 0.02), 0, Math.PI * 2); ctx.fill();
+    // v10 §1: art sprite replaces the procedural galaxy interior
+    const galaxySprite = layerSprites.get('galaxy-core');
+    if (galaxySprite) {
+      ctx.drawImage(galaxySprite, -r, -r, r * 2, r * 2);
+    } else {
+      ctx.fillStyle = hexA('#0D0821', 0.55);
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      const drift = t / 2400;
+      const wisps: [string, number][] = [['#FF3CAC', drift], ['#2BD2FF', drift + Math.PI]];
+      for (const [col, ph] of wisps) {
+        ctx.save();
+        ctx.globalAlpha *= 0.4;
+        ctx.fillStyle = col;
+        ctx.rotate(ph);
+        ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 0.55, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#FFFFFF';
+      for (let i = 0; i < 6; i++) {
+        const ang = i * 2.3 + t / 3000;
+        const rad = ((i * 53) % 100) / 100 * r * 0.8;
+        const tw = 0.4 + 0.6 * Math.abs(Math.sin(t / 300 + i));
+        ctx.globalAlpha = a * tw;
+        ctx.beginPath(); ctx.arc(Math.cos(ang) * rad, Math.sin(ang) * rad, Math.max(0.8, r * 0.02), 0, Math.PI * 2); ctx.fill();
+      }
     }
     ctx.restore();
   }

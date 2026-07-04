@@ -31,6 +31,8 @@ export interface WorldObject {
   captured: boolean;
   captureScale: number;
   captureRot: number;
+  shadowX: number;       // v10 §3: ground-shadow anchor (set on first capture frame)
+  shadowY: number;
   alertT: number;        // "!" bubble timer (people)
   golden: boolean;       // v6 §2: golden object — 3× mass/score
   arrive: number;        // v8 §2: ms of pop-in scale-up remaining (0 = settled)
@@ -226,6 +228,7 @@ export class WorldManager {
       captured: false,
       captureScale: 1,
       captureRot: 0,
+      shadowX: 0, shadowY: 0,
       alertT: 0,
       golden: false,
       arrive: 0,
@@ -328,8 +331,12 @@ export class WorldManager {
   private validateDensity(rand: () => number) {
     const step = 300, R = 300;
     const patch: ObjectKind[] = ['flower', 'flowerpot', 'gnome', 'apple', 'mailbox'];
+    const hw = CONFIG.ROAD_WIDTH / 2 + 8; // v10 §6: road half-width + margin for asphalt check
     for (let cy = step / 2; cy < this.size; cy += step) {
       for (let cx = step / 2; cx < this.size; cx += step) {
+        // v10 §6: skip grid cells whose centre sits on the asphalt band
+        const onRoad = ROAD_CENTERS.some((c) => Math.abs(cx - c) < hw || Math.abs(cy - c) < hw);
+        if (onRoad) continue;
         let has = false;
         for (const o of this.objects) {
           if (o.eaten || o.kind === 'watertower') continue;
@@ -592,6 +599,8 @@ export class WorldManager {
 
       // ── gravity-well suction (player only) ──
       if (!player.ghost && canPlayerEat && !rampage && dp < reach + obj.size * 0.5) {
+        // v10 §3: record shadow anchor on the first frame of capture
+        if (!obj.captured) { obj.shadowX = obj.x; obj.shadowY = obj.y; }
         obj.captured = true;
         const nx = (player.x - obj.x) / (dp || 1);
         const ny = (player.y - obj.y) / (dp || 1);
@@ -605,7 +614,8 @@ export class WorldManager {
         obj.x += obj.vx * dtSec;
         obj.y += obj.vy * dtSec;
         obj.captureScale = clamp(dp / (player.radius + obj.size), 0.2, 1);
-        obj.captureRot += dt * (obj.living ? 0.03 : 0.012);
+        // v10 §3: increased spin — 180-360° during capture. Living things flail faster.
+        obj.captureRot += dt * (obj.living ? 0.08 : 0.028);
         obj.size = obj.baseSize * obj.captureScale;
         if (dp < player.radius * CONFIG.ABSORB_RADIUS_MULT) {
           this.consumeByPlayer(obj, player, fx);
@@ -1172,7 +1182,7 @@ export class WorldManager {
   }
 
   // ── v5 §3: ground-dressing layer (between ground and objects) ──
-  drawDressing(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t = 0) {
+  drawDressing(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t = 0, zoom = 1) {
     const inset = CONFIG.SIDEWALK;
     const inView = (x: number, y: number, pad = 20) =>
       x >= view.x - pad && x <= view.x + view.w + pad && y >= view.y - pad && y <= view.y + view.h + pad;
@@ -1262,9 +1272,11 @@ export class WorldManager {
     }
 
     // grass tufts / daisies / clover / leaves
+    // v10 §4: skip tufts that would render below ~4px on screen (max-zoom perf cull)
     const gust = wind(t); // v8 §4: shared wind so tufts lean with the world
     for (const d of this.dressTufts) {
       if (!inView(d.x, d.y)) continue;
+      if (d.s * 10 * zoom < 4) continue; // screen px ≈ d.s * 10 * zoom
       this.drawTuft(ctx, d, gust);
     }
   }
@@ -1323,6 +1335,20 @@ export class WorldManager {
       o.y + o.size >= view.y && o.y - o.size <= view.y + view.h
     );
     visible.sort((a, b) => a.y - b.y);
+
+    // v10 §3: ground shadows for captured objects — stay planted as object lifts toward void
+    for (const obj of visible) {
+      if (!obj.captured || !obj.shadowX) continue;
+      const a = obj.captureScale * 0.45;
+      if (a < 0.02) continue;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(obj.shadowX, obj.shadowY, obj.baseSize * 0.75, obj.baseSize * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     for (const obj of visible) {
       // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)

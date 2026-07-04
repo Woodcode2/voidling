@@ -65,3 +65,21 @@ description: Canvas render-transform state, hot-path perf rules, and the mission
   field anywhere, and no mission UI surfaces them. So a spec item like "daily mission
   targets ×1.5" has nothing to scale; implementing it would mean inventing a whole
   mission-target system (scope creep). Left untouched intentionally.
+
+## v10 sprite pipeline (§1)
+- `sprites.ts` holds two Maps: `skinSprites` (by skin id) and `layerSprites` (`flame-crown`, `galaxy-core`).
+- `preloadSprites(BASE_URL)` is fire-and-forget at App boot; missing PNGs resolve silently.
+- `voidling.ts` checks `skinSprites.get(skin.id)` before calling `getBodySprite`; skips `drawSkinBody` when sprite active.
+- Layer sprites hook: `drawFlames` early-exits if `layerSprites.get('flame-crown')` exists; `drawFormBody` WORLD ENDER section uses `layerSprites.get('galaxy-core')` when present.
+
+## v10 form badge (§5)
+- Drawn in world space inside the world transform (camZoom in scope as closure var).
+- Font size = `max(5, 10/camZoom)` → always ~10 screen px regardless of zoom.
+- Badge pill centre: `by + br + 44 + pillH/2` — clears orbit chips which extend to `r+37` (ORBIT_RADIUS_OFFSET 26 + chip radius 11).
+- Full opacity 2s after evolution (`roundElapsed - lastEvoElapsed < 2000`), then 40%.
+- Rivals shown only at formIndex ≥ DEVOURER_FORM_INDEX (≥3).
+
+## v10 score pooling (§3)
+- `lastScoreText: FloatingText | null` ref mutated directly: `lastScoreText.text = '+N'`.
+- Rolling 150ms window: `lastScoreMs` resets on EVERY merge, not just on creation.
+- Score events pushed by `player.absorbObject`; engine drains `pendingFx` once per frame.

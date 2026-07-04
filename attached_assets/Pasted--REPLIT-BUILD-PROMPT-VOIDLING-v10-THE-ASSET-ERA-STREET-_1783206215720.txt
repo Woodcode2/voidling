@@ -1,0 +1,64 @@
+# REPLIT BUILD PROMPT — VOIDLING v10: THE ASSET ERA + STREET TO SPACE
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are wiring VOIDLING for real art assets and closing the feel gap with Hole.io's presentation. Work sections **in order**; verify every Acceptance Criteria line on the running game and confess anything skipped. Standing rules hold — with one change: **image assets are now permitted** via the pipeline in section 1. No other rules change: 60fps, portrait, one art style, auras ≤ radius + 40px, no 3D rebuild.
+
+## 1 — Sprite asset pipeline (art will be supplied; build the plumbing now)
+
+- Create `/assets/skins/` and `/assets/layers/`. At boot, attempt to preload `assets/skins/{skinId}.png` for every skin id (classic, pirate, princess, astronaut, ninja, wizard, kitty, devil, galaxy, lava, ghost, midas, disco, dragon) and `assets/layers/flame-crown.png` + `assets/layers/galaxy-core.png`.
+- **If a skin PNG exists:** use it as the cached body sprite — it replaces ONLY the procedural body/effect layers. The live face (eyes, pupils, blink, mouth states, blush, cheek puff) and motion (squash, wobble, breathe) are still drawn on top by the engine, exactly as today. Scale the sprite to the void's current diameter + outline allowance; render at devicePixelRatio; never decode per-frame.
+- **If a PNG is missing:** fall back to the current procedural rendering silently. The game must run perfectly with zero assets present.
+- `flame-crown.png`, when present, replaces the procedural DEVOURER crown (drawn behind the head, gentle flicker via scale 0.96–1.04). `galaxy-core.png`, when present, replaces the WORLD ENDER internal galaxy (clipped to the body circle, slow rotation).
+- Shop cards and preview modal use the same sprites. Bots wearing skins use them too.
+- Add a console log at boot listing which assets loaded vs fell back — that's how we verify drops.
+
+## 2 — Kill the wash-out (the whole game has gone pale)
+
+- The arena currently renders hazy and desaturated compared to spec. Audit every full-screen overlay (vignettes, event tints, fear effects, WORLD ENDER edge warp, grain) for one that is stuck on, stacking, or applied at the wrong opacity — and fix it. Overlays must fully reset at round start.
+- Re-assert the palette at full saturation: lawns `#8FCDA0 / #7FC494 / #98D3A8`, roads `#8A93A6`, sidewalks `#D8D3C8`, pond `#2D9CDB`. The warm vignette maxes at 3%; grain at 2%; nothing else tints the world at rest.
+- Acceptance is a side-by-side: a gameplay screenshot's greens must visibly match the vivid green of the shop's EQUIPPED badge, not a pastel wash of it.
+
+## 3 — Consume feedback, Hole.io grade (consistency is the polish)
+
+- **Every absorb shows its points. No exceptions.** Floating "+N" in the object's color with a white outline, minimum 22px, rises 40px, fades 600ms. If rapid-stream eating would spam, pool them: numbers within 150ms merge into one accumulating counter that ticks up — but something always shows.
+- **Fall-in animation:** captured objects rotate 180–360° while scaling to zero with slight acceleration toward your center, and their drop shadow stays on the ground and fades separately — the separation is what sells "falling in." Living things flail while falling. T4+ objects land with a deep thunk and a 2px camera punch.
+- Every object family must produce identical-quality feedback — same timing, same weight. Audit each type once.
+
+## 4 — Street → space: the camera arc IS the story
+
+- Round start zoom tightens: initial `cameraViewHeight` becomes **620px** — street-level intimacy, a flower's petals readable, the world towering around a tiny you.
+- **WORLD ENDER extends max zoom to 2200px**, far enough that the torn island edge and surrounding space enter the frame — the player sees themselves, the whole town, and the void around it at once. Ease the zoom transitions as before (nothing snaps).
+- The share card for a WORLD ENDER run uses this wide framing: void, town, space.
+- If performance dips at 2200px view, cull harder (skip ground decor below 4px on-screen size) — 60fps holds at full zoom.
+
+## 5 — Form badge (Hole.io's Size pill, our way)
+
+- A small pill renders under the player's void: current form name in 11px Fredoka caps on a 60%-dark backdrop. Full opacity for 2s after any evolution, then rests at 40%. Moves with the void, never overlaps the orbit chips.
+- Bots show their badge only at DEVOURER or above (that's the "watch out" signal).
+
+## 6 — World hygiene (still-open sores from screenshots)
+
+- **Roads narrow to 100px** and intersections shrink to match — asphalt is currently eating too much of the frame.
+- Re-enforce spawn zones: zero T1–T2 respawns on asphalt. Flowerpots are still appearing mid-road; find why the placement rule is being bypassed (initial generation vs respawn paths both must obey it).
+- Until the flame-crown asset arrives, fix the procedural DEVOURER crown one more time: a flame silhouette is a **pointed teardrop with slightly concave sides** — the current rounded petals read as bunny ears. Concave sides, sharp tips, two warm tones, flicker.
+
+## Acceptance criteria — verify on a real phone
+
+- Boot log lists every asset checked, loaded or fallback; with an empty /assets folder the game runs identically to v9.
+- Drop any test PNG named `assets/skins/lava.png`: the Lava shop card, preview, in-game body, and any bot wearing it all show the sprite, with live eyes/mouth/blush animating on top.
+- A gameplay screenshot's saturation matches the shop UI's vibrancy; no haze remains at round start; overlays reset every round.
+- Eat 10 different object types: every single one shows a +N number and tumbles/rotates as it falls in with a detaching shadow; rapid streams pool numbers instead of dropping them.
+- Round start is visibly closer (street level); reaching WORLD ENDER pulls the camera until space and the torn edge are in frame with the whole area; 60fps holds at max zoom.
+- Your form pill sits under your void and updates on evolve; a DEVOURER bot shows its pill.
+- Roads are visibly narrower; three full rounds show zero flowerpots/apples resting on asphalt.
+- Procedural DEVOURER flames have pointed concave-sided tips — screenshot passes the "is it fire or is it ears" test.
+- Zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+3D rebuild, networking, iOS wrap, real payments, balance constants, Daily Bite, debug panel (keep working, keep the asset boot log).
+
+Work strictly in order 1→6, then self-audit against the acceptance list and report deviations explicitly.
