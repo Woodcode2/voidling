@@ -1,0 +1,66 @@
+# REPLIT PROMPT — VOIDLING ASSET MANIFEST (fetch and place all art)
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+Download the following image files and save each one to its exact target path. Create the directories `assets/skins/`, `assets/layers/`, and `assets/objects/` if they don't exist. Use curl or a Node fetch script — either is fine. All URLs share this base:
+
+`BASE = https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/`
+
+## assets/skins/
+
+| Save as | File at BASE |
+|---|---|
+| assets/skins/classic.png | hf_20260704_220447_43eabab9-e157-4a71-b8a6-1fb6257ae0cc.png |
+| assets/skins/pirate.png | hf_20260704_220455_e9fe48cc-c84b-40e4-ab1c-e37f8b0c5b2c.png |
+| assets/skins/princess.png | hf_20260704_220503_c8f81bbb-0107-4d65-8012-6af9e414f6d1.png |
+| assets/skins/astronaut.png | hf_20260704_220510_dac2f192-50a3-40a8-87a5-a4ea465a4cdf.png |
+| assets/skins/ninja.png | hf_20260704_220518_35fa2871-ad4e-44fe-99bd-2edc9f263794.png |
+| assets/skins/wizard.png | hf_20260704_220553_8851fa4c-4560-4154-84ce-0c38e9b1b1dd.png |
+| assets/skins/kitty.png | hf_20260704_220600_847d3a83-e190-4c58-bf57-cb1e4f25cbe8.png |
+| assets/skins/devil.png | hf_20260704_220607_d83e0318-52f0-46a2-a835-08025087cf78.png |
+| assets/skins/galaxy.png | hf_20260704_220614_7913b617-f7cb-4af2-b89c-93f7340a9d87.png |
+| assets/skins/ghost.png | hf_20260704_220622_318f328d-967d-4636-8f9a-218f878ad038.png |
+| assets/skins/midas.png | hf_20260704_220629_fc734e9c-eedf-427d-816e-ba5d51463d55.png |
+| assets/skins/disco.png | hf_20260704_220638_90ae2865-971c-474b-95a5-f9fc0b493a51.png |
+| assets/skins/dragon.png | hf_20260704_220647_e0e93634-82d7-4ead-8ce3-3dfb1caca433.png |
+| assets/skins/lava.png | hf_20260704_215720_e0fb78da-af2b-4fb5-ad72-af5d2c223a09.png |
+
+## assets/layers/
+
+| Save as | File at BASE |
+|---|---|
+| assets/layers/flame-crown.png | hf_20260704_220655_ccb51917-6e74-4f0f-be19-fde50e241168.png |
+| assets/layers/galaxy-core.png | hf_20260704_220703_440c27d9-7cf3-4405-b9f8-ed5f7e69604c.png |
+
+## assets/objects/
+
+| Save as | File at BASE |
+|---|---|
+| assets/objects/house_a.png | hf_20260705_000732_c8ab7f51-f79b-4a17-8d08-68b0ce5b4be6.png |
+| assets/objects/house_b.png | hf_20260705_000740_116e1680-268a-4093-bf4b-e39d772de5f0.png |
+| assets/objects/tree.png | hf_20260705_000747_825dcab4-3166-44b3-9a5f-ca5a3f818265.png |
+| assets/objects/bush.png | hf_20260705_000755_02d3b5c9-8c0f-452b-944c-5520de754686.png |
+| assets/objects/gnome.png | hf_20260705_000807_fc2f81f6-51f3-4a23-a32c-27514d2bd566.png |
+| assets/objects/bench.png | hf_20260705_000815_f76683d4-7507-42f8-a010-6b6687a54e0a.png |
+| assets/objects/hydrant.png | hf_20260705_000823_d5003f24-83df-4256-b18a-86449798507d.png |
+| assets/objects/mailbox.png | hf_20260705_000832_058dbd33-e013-4e39-8671-74202f9d539e.png |
+| assets/objects/trashcan.png | hf_20260705_000841_abc1f46c-ab3e-42cf-a1fc-99d86d6073ee.png |
+| assets/objects/foodcart.png | hf_20260705_000849_4944d6c6-877e-4391-bd25-92b82bdf7156.png |
+| assets/objects/fountain.png | hf_20260705_000856_a8b45825-b97d-4fa6-a0d8-e0570ad26626.png |
+| assets/objects/watertower.png | hf_20260705_000903_43e702d7-0d3a-4472-a2c5-286143289cc3.png |
+
+## App icon (this one keeps its background)
+
+| Save as | File at BASE |
+|---|---|
+| assets/icon-512.png | hf_20260704_215958_b96c68f2-3838-45b7-bbb8-367520eb3e21.png |
+
+Update `manifest.json` so its icons array points at `assets/icon-512.png` for both the 512 and 192 entries.
+
+## Verify, then report
+
+1. After downloading, verify EVERY file: it exists, is larger than 10KB, and begins with the PNG magic bytes (`89 50 4E 47`). Re-download any that fail; if a URL 404s, report which one — do not substitute anything.
+2. Do not modify any game code beyond the manifest.json icon paths — the v10/v11 loaders already look for these exact paths.
+3. Restart the app, then paste the full asset boot log into your report: every entry should now read **loaded**, none should read fallback.
