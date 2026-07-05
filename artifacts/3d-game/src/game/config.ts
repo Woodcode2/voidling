@@ -82,11 +82,11 @@ export const CONFIG = {
   // Timing
   FIXED_DT: 1000 / 60,   // fixed simulation step (ms)
   MAX_DT: 50,            // clamp frame delta so backgrounding never teleports
-  GAME_DURATION: 180,    // v6 §1: 3-minute rounds
+  GAME_DURATION: 210,    // v16.2 §6: 3:30 rounds
   COUNTDOWN_MS: 3600,    // v8 §1: frozen "3..2..1" pre-round (1200ms per count)
 
   // ── v6 §1: match structure ──
-  BOON_PICK_TIMES: [150000, 100000, 50000], // ms remaining: 2:30, 1:40, 0:50
+  BOON_PICK_TIMES: [170000, 110000, 60000], // v16.2 §6: ms remaining in 3:30 round (2:50, 1:50, 1:00)
   COINS_PER_SCORE: 200,                       // v7 §9: coins = floor(score / 200)
 
   // ── v6 §3: evolution ladder (radius-driven, forms only go up in a round) ──
@@ -170,12 +170,22 @@ export const CONFIG = {
   // Too-big collision feedback — §0 fix
   TOOBIG_COOLDOWN: 500,     // ms
 
-  // World — v12 §1: the full town — 5×5 grid, 4000×4000
-  MAP_SIZE: 4000,
-  BLOCK_SIZE: 700,           // 5*700 + 4*100 roads = 3900 + 50*2 margin = 4000
-  ROAD_WIDTH: 100,             // v10 §6: narrower roads (was 120)
+  // v16.2 §0: bot radius cap — a bot's radius may never exceed player × this factor
+  BOT_RADIUS_CAP_FRAC: 1.25,
+
+  // v16.2 §2: The Guard blockade constants
+  GUARD_JEEP_COUNT: 4,
+  GUARD_SOLDIER_PER_LINE: 9,
+  GUARD_BLOCKADE_LINES: 2,
+  GUARD_SECOND_WAVE_DELAY: 45000, // ms after first blockade eaten
+
+  // World — v16.2 §6: the full city — 6×6 grid, 4800×4800
+  MAP_SIZE: 4800,
+  BLOCK_SIZE: 700,           // 6*700 + 5*100 roads = 4700 + 50*2 margin = 4800
+  ROAD_WIDTH: 100,
   SIDEWALK: 44,
-  GRID: 5,
+  GRID: 6,
+  PLAN_NAMES: ['METRO', 'SUBURBIA', 'SEASIDE'] as string[], // v16.2 §6: rotating city plans
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
   MAX_RADIUS: 135,           // v16 §0: lowered to match new WORLD ENDER threshold (110)
   DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff

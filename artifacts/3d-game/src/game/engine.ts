@@ -65,6 +65,9 @@ export interface Snapshot {
   // v16
   ticker: string | null;
   contracts: Array<{id: string; name: string; done: boolean; reward: number}>;
+  // v16.2
+  hearts?: number;   // player hearts remaining (0 = FINAL HEART state)
+  planName?: string; // today's city plan name
 }
 
 export interface GameEngine {
@@ -194,6 +197,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     '🏗️ Downtown construction halted after crane operator reports unbelievable sight',
     '🎪 Gnome collectors alarmed as garden ornaments reported missing citywide',
   ];
+  // v16.2 §1: queue an event-driven ticker line immediately (overrides random cadence)
+  function queueTicker(line: string, durationMs = 6500) {
+    currentTicker = line;
+    tickerCd = Math.max(tickerCd, 25000); // reset random timer so event line isn't immediately overridden
+    window.setTimeout(() => { if (currentTicker === line) { currentTicker = null; notify(); } }, durationMs);
+    notify();
+  }
+
   const CONTRACT_POOL = [
     { id: 'eat_houses', name: 'Eat 3 houses', reward: 40 },
     { id: 'eat_cars', name: 'Eat 5 cars', reward: 35 },
@@ -227,6 +238,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // v12 §2: FINAL FEAST state
   let finalFeastFired = false;
   let finalFeastActive = false;
+  // v16.2 §1: event-based ticker gate flags (prevent repeat fires per round)
+  let openingBeatDone = false;
+  let roundStartTickerDone = false; // separate gate for the 3s round-start line
+  let firstHouseTickerDone = false;
+  let zooBreakTickerDone = false;
+  let townhallTickerDone = false;
+  let devoured15Done = false;
   // v12 §4: daily mod effect flags (reset in start())
   let dailyFrenzyWindow = 1200;    // ms window for eat streaks (FRENZY FRIDAY → 2400)
   let dailyGoldenInterval = -1;   // -1 = use CONFIG.GOLDEN_INTERVAL; override for GOLDEN HOUR
@@ -364,6 +382,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     crackTimer = 0;
     finalFeastFired = false;
     finalFeastActive = false;
+    openingBeatDone = false;
+    roundStartTickerDone = false;
+    firstHouseTickerDone = false;
+    zooBreakTickerDone = false;
+    townhallTickerDone = false;
+    devoured15Done = false;
     roundTriples = 0;
     roundRivalEats = 0;
     events.reset();
@@ -606,6 +630,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v8 §5: the new form's music layer drops in on the sting's boom (~400ms)
     window.setTimeout(() => audio.setMusicForm(form), 400);
     banner('EVOLVED → ' + name, '#C77DFF');
+    // v16.2 §1: voice ticker on milestone evolutions
+    if (form === 2) { // GOBBLER
+      queueTicker('🚨 Traffic cameras detect enormous mass entering the downtown core!');
+    } else if (form >= CONFIG.FORMS.length - 1) { // WORLD ENDER
+      queueTicker('⚠️ EMERGENCY: Category-5 void event underway. Please eat indoors.');
+    }
   }
 
   // ── simulation (fixed step) ──
@@ -666,7 +696,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           others.push({ x: rivals[j].x, y: rivals[j].y, radius: rivals[j].radius });
         }
       }
-      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0 });
+      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0, playerRadius: player?.radius ?? CONFIG.PLAYER_BASE_RADIUS });
     }
 
     // objects (suction + eat + living-world AI)
@@ -693,6 +723,39 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       finalFeastFired = true;
       finalFeastActive = true;
       banner('FINAL FEAST! STEAL THEIR SCORE!', '#FF6B6B', 7, { pulse: true });
+      queueTicker('🍽️ FINAL FEAST! All voids entering maximum consumption mode!');
+    }
+
+    // v16.2 §1: opening beat — person near spawn whispers at t=2s
+    if (!openingBeatDone && roundElapsed >= 2000 && world) {
+      openingBeatDone = true;
+      world.setBubble(world.openingBeatPersonId, 'Huh… is that a void?', 4500);
+    }
+
+    // v16.2 §1: round-start ticker fires once at 3s (dedicated gate)
+    if (!roundStartTickerDone && roundElapsed >= 3000) {
+      roundStartTickerDone = true;
+      queueTicker('🏙️ City wakes to reports of unusual void activity in the downtown core…');
+    }
+
+    // v16.2 §1: event-based ticker checks
+    if (world && player) {
+      if (!firstHouseTickerDone && world.playerStats.houses >= 1) {
+        firstHouseTickerDone = true;
+        queueTicker('🚨 BREAKING: Homeowner reports house consumed overnight — residents panicking');
+      }
+      if (!zooBreakTickerDone && world.zooSmashed) {
+        zooBreakTickerDone = true;
+        queueTicker('🦁 BREAKING: Zoo wall breached! Animals reportedly on the loose!');
+      }
+      if (!townhallTickerDone && world.townhallEaten) {
+        townhallTickerDone = true;
+        queueTicker('🏛️ BREAKING: City Hall has been devoured. Mayor unavailable for comment.');
+      }
+      if (!devoured15Done && world.initialMass > 0 && (world.eatenArea / world.initialMass) * 100 >= 15) {
+        devoured15Done = true;
+        queueTicker('📉 Scientists confirm city is 15% smaller than yesterday');
+      }
     }
 
     // v7 §5: LUCKY GNOME — a golden object every 10s (GOLD RUSH synergy → 7s)
@@ -1000,8 +1063,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           const rr = r.radius;
           fx.addConfetti(r.x, r.y, CONFIG.COLORS.pops);
           fx.shake(280, 12); fx.flash();
-          // v12 §2: score steal on rival eat (25%, or 50% during FINAL FEAST)
-          const stealFrac = finalFeastActive ? 0.5 : 0.25;
+          // v16.2 §3: escalating steal based on rival's hearts; FINAL HEART doubles player's steal
+          r.hearts = Math.max(0, r.hearts - 1);
+          const rivalStealMap: Record<number, number> = { 2: 0.25, 1: 0.35, 0: 0.50 };
+          const baseStealFrac = rivalStealMap[r.hearts] ?? 0.25;
+          // FINAL FEAST cap: 0.5; FINAL HEART (player.hearts===0): double the base steal
+          const stealFrac = finalFeastActive ? Math.max(baseStealFrac, 0.5) : (player.hearts === 0 ? Math.min(0.75, baseStealFrac * 2) : baseStealFrac);
           const stolen = Math.floor(r.score * stealFrac);
           r.score = Math.max(0, r.score - stolen);
           meta.updateTrophyCounter('totalVoidsEaten', 1, 'sum');
@@ -1024,9 +1091,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             const pr = player.radius;
             fx.shake(360, 16); fx.flash();
             audio.playEaten(); // v5 §5: descending wah when you get eaten
+            // v16.2 §3: hearts system — escalating score steal per chomp
+            // Steal % is determined by hearts BEFORE this chomp: 3hp→25%, 2hp→35%, 1hp→50%
+            const preHp = player.hearts;
+            player.hearts = Math.max(0, player.hearts - 1);
+            const hpStealMap: Record<number, number> = { 3: 0.25, 2: 0.35, 1: 0.50, 0: 0.50 };
+            const heartStealFrac = hpStealMap[preHp] ?? 0.25;
+            const heartScoreLost = Math.floor(player.score * heartStealFrac);
+            player.score = Math.max(0, player.score - heartScoreLost);
             player.getEaten();
             r.eatVoid(pr);
-            banner(`${r.name} devoured you — ghosting!`, '#FF6B6B');
+            const heartLoseMsg = player.hearts === 0
+              ? `${r.name} devoured you! FINAL HEART — your steals are now doubled!`
+              : `${r.name} devoured you! -${heartScoreLost} score · ${player.hearts}♥ left`;
+            banner(heartLoseMsg, '#FF6B6B');
+            if (preHp > 0 && player.hearts === 0) queueTicker('💀 The void is wounded! No hearts remain — steals are now doubled!');
           }
         }
       }
@@ -1270,6 +1349,28 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillText(`${dv.toFixed(0)}% DEVOURED`, scoreRight, player.combo > 1 ? 78 : 56);
     }
 
+    // v16.2 §3: heart pips under score (3 hearts, grey when lost)
+    {
+      const hBase = (player.combo > 1 ? 90 : 68);
+      const hs = 7; // heart half-size
+      for (let h = 0; h < 3; h++) {
+        const filled = h < player.hearts;
+        const hx = scoreRight - (2 - h) * 20;
+        const hy = hBase;
+        ctx.save();
+        ctx.globalAlpha = filled ? 0.92 : 0.28;
+        ctx.fillStyle = filled ? '#FF4466' : '#774466';
+        ctx.beginPath();
+        ctx.moveTo(hx, hy + hs * 0.3);
+        ctx.bezierCurveTo(hx, hy, hx - hs, hy, hx - hs, hy + hs * 0.35);
+        ctx.bezierCurveTo(hx - hs, hy + hs * 0.75, hx, hy + hs * 1.05, hx, hy + hs * 1.25);
+        ctx.bezierCurveTo(hx, hy + hs * 1.05, hx + hs, hy + hs * 0.75, hx + hs, hy + hs * 0.35);
+        ctx.bezierCurveTo(hx + hs, hy, hx, hy, hx, hy + hs * 0.3);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
     // leaderboard (top left, dark backdrop, dropped below the timer so it never
     // overlaps the centred timer/bar at narrow widths e.g. 375px)
     // v9 §1: crowns render ONLY for voids currently in the final (WORLD ENDER) form
@@ -1361,6 +1462,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       if (callout.t >= total) callout = null;
     }
     ctx.textBaseline = 'alphabetic';
+    // v16.2 §3: FINAL HEART — pulsing red vignette when hearts = 0
+    if (player && player.hearts <= 0) {
+      const fp = 0.42 + Math.sin(roundElapsed / 240) * 0.28;
+      const vg = ctx.createRadialGradient(fw / 2, fh / 2, Math.min(fw, fh) * 0.22, fw / 2, fh / 2, Math.min(fw, fh) * 0.76);
+      vg.addColorStop(0, 'rgba(180,0,0,0)');
+      vg.addColorStop(1, `rgba(180,0,0,${fp * 0.45})`);
+      ctx.save(); ctx.fillStyle = vg; ctx.fillRect(0, 0, fw, fh); ctx.restore();
+    }
+
     // v8 §7: FRENZY MINUTE — warm glow along the screen edges
     if (events.frenzyActive) {
       const pulse = 0.5 + Math.sin(roundElapsed / 180) * 0.25;
@@ -1613,21 +1723,96 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (navigator.vibrate) navigator.vibrate(25);
   }
 
-  // v6 §4: active power-up auras — one coloured pulsing ring per active boon.
+  // v6 §4 + v16.2 §4: active power-up auras — pulsing ring per boon + per-boon persistent visual signature.
   function drawPowerAuras(clock: number) {
     if (!player || activeBoons.length === 0) return;
+    const px = player.x, py = player.y, pr = player.radius;
     ctx.save();
     let i = 0;
     for (const b of activeBoons) {
+      // base ring (unchanged)
       const pulse = 1 + Math.sin(clock / 220 + i) * 0.04;
       ctx.strokeStyle = powerColor(b.id);
       ctx.globalAlpha = 0.5;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      // v7 §6: keep every aura ring within radius+40 no matter how many stack
       const auraOff = Math.min(40, 9 + i * 6);
-      ctx.arc(player.x, player.y, (player.radius + auraOff) * pulse, 0, Math.PI * 2);
+      ctx.arc(px, py, (pr + auraOff) * pulse, 0, Math.PI * 2);
       ctx.stroke();
+
+      // v16.2 §4: per-boon persistent visual signature
+      ctx.save();
+      if (b.id === 'magnet') {
+        // faint spiral pull-particles at absorb-reach edge
+        const reach = pr * ((player as any).magnetMultiplier || 1);
+        for (let s = 0; s < 6; s++) {
+          const a = (clock / 400 + s * Math.PI / 3) % (Math.PI * 2);
+          const rr = reach + Math.sin(clock / 300 + s) * 10;
+          ctx.globalAlpha = 0.45; ctx.fillStyle = '#8B5CF6';
+          ctx.beginPath(); ctx.arc(px + Math.cos(a) * rr, py + Math.sin(a) * rr, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (b.id === 'overdrive') {
+        // motion streak lines behind the void
+        const spd = Math.hypot(player.vx, player.vy);
+        if (spd > 25) {
+          const ang = Math.atan2(-player.vy, -player.vx);
+          for (let s = 0; s < 4; s++) {
+            ctx.globalAlpha = 0.28 - s * 0.05; ctx.strokeStyle = '#00FF88'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(px, py);
+            ctx.lineTo(px + Math.cos(ang + (s - 1.5) * 0.18) * (pr + 28 + s * 10), py + Math.sin(ang + (s - 1.5) * 0.18) * (pr + 28 + s * 10));
+            ctx.stroke();
+          }
+        }
+      } else if (b.id === 'greed') {
+        // gold coin sparkles orbiting the void
+        for (let s = 0; s < 5; s++) {
+          const a = (clock / 550 + s * Math.PI * 2 / 5) % (Math.PI * 2);
+          const rr = pr + 16; const sx = px + Math.cos(a) * rr, sy = py + Math.sin(a) * rr;
+          ctx.globalAlpha = 0.65; ctx.fillStyle = '#FFD23F';
+          ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.35; ctx.fillStyle = '#FFEB8A';
+          ctx.beginPath(); ctx.arc(sx + 1, sy - 1, 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (b.id === 'echo') {
+        // faint expanding ring every 2.5s
+        const echoPh = (clock % 2500) / 2500;
+        if (echoPh < 0.55) {
+          ctx.globalAlpha = (0.55 - echoPh) * 0.55;
+          ctx.strokeStyle = '#7DF9FF'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(px, py, pr + echoPh * 90, 0, Math.PI * 2); ctx.stroke();
+        }
+      } else if (b.id === 'shield') {
+        // shimmering dashed bubble outline
+        const shPulse = 0.45 + Math.sin(clock / 600) * 0.15;
+        ctx.globalAlpha = shPulse; ctx.strokeStyle = '#8AB0FF'; ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.arc(px, py, pr + 7, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (b.id === 'lucky') {
+        // golden sparkle halo
+        for (let s = 0; s < 5; s++) {
+          const a = (clock / 800 + s * Math.PI * 2 / 5) % (Math.PI * 2);
+          const rr = pr + 22 + Math.sin(clock / 400 + s) * 4;
+          ctx.globalAlpha = 0.75; ctx.fillStyle = '#FFD23F';
+          ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('✦', px + Math.cos(a) * rr, py + Math.sin(a) * rr);
+        }
+      } else if (b.id === 'twin') {
+        // double-ring pulse every 1.8s
+        const twinPh = (clock % 1800) / 1800;
+        ctx.globalAlpha = (1 - twinPh) * 0.35; ctx.strokeStyle = '#FF9F5A'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(px, py, pr + twinPh * 50, 0, Math.PI * 2); ctx.stroke();
+      } else if (b.id === 'dash') {
+        // soft persistent afterimage ring between dashes
+        ctx.globalAlpha = 0.2 * (0.5 + 0.5 * Math.sin(clock / 280)); ctx.strokeStyle = '#5AFFA0'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(px, py, pr + 14, 0, Math.PI * 2); ctx.stroke();
+      } else if (b.id === 'tremor') {
+        // pulsing impact rings to hint at the radius-shrink power
+        const trmPh = (clock % 900) / 900;
+        ctx.globalAlpha = (1 - trmPh) * 0.4; ctx.strokeStyle = '#FF7A00'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(px, py, pr + trmPh * 35, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
       i++;
     }
     ctx.restore();
@@ -1908,6 +2093,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       showHitboxes,
       ticker: currentTicker,
       contracts: [...activeContracts],
+      hearts: player?.hearts,    // v16.2 §3
+      planName: world?.planName, // v16.2 §6
     };
   }
 

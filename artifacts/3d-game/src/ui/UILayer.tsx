@@ -5,8 +5,8 @@ import { audio } from '../game/audio';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
-// v16 build stamp — increment on every deploy
-const BUILD_STAMP = 'v16 · 2';
+// v16.2 build stamp — increment on every deploy
+const BUILD_STAMP = 'v16 · 3';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -244,6 +244,12 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
         </div>
         <h1 className="vd-title">VOIDLING</h1>
         <p className="vd-tagline">{CONFIG.HOME_TAGLINE}</p>
+        {snap.planName && (
+          <p style={{
+            fontSize: 10, letterSpacing: '0.12em', fontFamily: 'monospace',
+            color: 'rgba(255,255,255,0.42)', marginTop: -10, userSelect: 'none',
+          }}>TODAY: {snap.planName} DAY</p>
+        )}
         {/* v7 §11: player level badge + name pill */}
         <div className="vd-namepill"><span className="vd-lvbadge">Lv{snap.level}</span> You</div>
         {snap.highScore > 0 && (

@@ -1,0 +1,77 @@
+# REPLIT BUILD PROMPT — v16.2: PRESSURE & PERSONALITY
+
+Paste everything below this line into the same Repl, as one message. Work in order; the acceptance list is the contract. Increment BUILD_STAMP to `v16 · 3`. Standing rules hold (60fps, portrait, loaders with silent fallbacks, Growth Law stays).
+
+---
+
+## 0 — The Relative Size Law (bots may never dwarf the player again)
+
+- In the shared growth path, add a second clamp for BOT voids only: a bot's radius may not exceed **playerRadius × 1.25**. Ease it (absorbs beyond the cap still score for them but grant no growth) so it never visibly pops.
+- Verify the rubber-band pacer throttles **absorb attempts** (mass), not just score display — if any code path adjusts score targets without gating actual captures, fix it. Add a MASS column to the debug RADII section.
+- Report: one round's every-10s radius+mass log; at no timestamp may any bot exceed player × 1.25.
+
+## 1 — The town gets its voice (currently silent — verify, wire, or build)
+
+The live build shows **no news ticker and no speech bubbles**. For each: if the system exists in state but isn't rendered, wire it; if it doesn't exist, build it now:
+
+- **News ticker:** slim bar directly under the timer, one line at a time (6s, slide in/out), queued. Trigger lines per v16 §5 (round start, first house, GOBBLER, zoo break, town hall, 15% devoured, WORLD ENDER/Guard, events). Cite where each trigger fires.
+- **People bubbles:** small rounded-rect bubbles drawn on the canvas above people (2.5s, max 2 on screen): ambient / panic / café-queue pools from v16 §5.
+- **Void banter (new):** rival voids get bubbles too — ambient every ~15s (one on screen max): "I need to go on a diet…", "So many snacks, so little time.", "Hey void — looking good!" (aimed at player when near); reactive: after chomping "Delicious.", while fleeing "NOPE NOPE NOPE", during FINAL FEAST "FEAST TIME!". Kid-safe, playful, never mean-spirited beyond cartoon villainy.
+- **Opening beat:** the player always spawns within 1.5 screens of a food cart with 2 people queued; at 0:02 one of them bubbles: **"Huh… is that a void?"**
+
+## 2 — The Guard applies real pressure
+
+- Escalate the arrival: **4 jeeps**, soldiers dismount and form **shield blockades across two street segments** in the player's current district (8–10 soldiers per line, shields up, whistles — play `beep.ogg` at rate 1.6 in short trills). Blockades physically block voids below WORLD ENDER size (bounce + rattle); WORLD ENDERs push through at −15% speed while soldiers comically tumble aside.
+- Soldiers place 4–6 **STOP-sign barriers** (T3, edible) around the blockades.
+- If a blockade is fully eaten, a **second wave** arrives once at ~0:45 with a ticker line: "REINFORCEMENTS! (please stop eating them)".
+- All kid-safe: shields, whistles, tumbles — no weapons.
+
+## 3 — Hearts (stakes without elimination)
+
+- Player gets **3 hearts**, drawn (not emoji) under the score. Being chomped costs a heart and an escalating score steal: 1st = 25%, 2nd = 35%, 3rd = 50%.
+- At 0 hearts: **FINAL HEART state** — a thin red pulsing vignette, steals against the player double, and the ticker fires "The void is wounded!" No elimination ever — comeback stays possible; the drama is the point.
+- Hearts reset each round; bots have hearts too (same rules) so late-game hunting has texture.
+
+## 4 — Boon signatures (every pick visibly changes you)
+
+Give EVERY boon a persistent visual signature while held. Implement for all existing boons; the pattern by example:
+- Gravity Glutton → faint spiral pull-particles at the absorb-reach edge
+- Midas Mouth → gold shimmer trail + coin sparkle on every absorb
+- Echo Bite → every 5th bite fires a visible expanding echo ring
+- Tenderizer → hammer-sparkle burst + a brief comic squash on the touched object
+- Any speed boon → motion streak lines
+List each remaining boon and its assigned signature in your report. Spells already have looks; don't touch them.
+
+## 5 — WORLD ENDER effects: from crayon to cataclysm
+
+- New loader dir `assets/fx/`: `fissure_a.png`, `fissure_b.png`, `scar.png`. When present: WORLD ENDER ground cracks render as these decals (random pick, rotate/scale 0.7–1.3, fade over 8s, multiply-ish blend so they sit IN the ground) instead of the current procedural scribble lines; devoured-structure scars use `scar.png`.
+- Procedural fallback gets tuned regardless: crack lines 3px with a soft violet glow (additive), max 6 segments, no chicken-scratch webs.
+- Shockwave rings: thicker (4px), additive glow, slight chromatic offset. Movement trail at WORLD ENDER: soft fading glow orbs, not lines.
+
+## 6 — THE BIG MAP: 6×6 with rotating city plans
+
+- World grows to **6×6 blocks (4800×4800)**; round length **3:30**; density budget +30% with culling asserted (60fps at max zoom is acceptance).
+- Three hand-authored plans rotate by date seed (C=coast, D=downtown, V=civic, R=residential, P=park, Z=zoo, S=stadium-empty-lot for events):
+
+```
+PLAN A (metro)      PLAN B (suburbia)    PLAN C (seaside)
+R R V V R R         R R R V R R          C C C C C C
+R D D D D R         R R R R R R          C R R V R C
+P D D D D R         P R D D R R          R R D D R R
+Z D D D D R         Z R D D V R          Z R D D R P
+R R V R R R         R R R R R R          R R V R R R
+C C C C C C         C C R R C C          R R R R R R
+```
+- Home screen shows today's plan name under the tagline ("Today: METRO DAY"). Contracts, districts, Guard, zoo, and density rules all operate against whichever plan is live.
+- Report which plan rendered during your test and a full-map screenshot.
+
+## Acceptance — verify on a real phone
+
+- Radius+mass log pasted; no bot ever exceeds player × 1.25; the pacer demonstrably throttles captures.
+- Within 10s of round start: a ticker line has shown AND the food-cart "Huh… is that a void?" beat fired; within 30s a person bubble and a void banter bubble have each appeared.
+- Guard: blockades physically stop a DEVOURER at street lines; whistles audible; second wave fires after a blockade is eaten.
+- Hearts UI visible; three chomps show 25/35/50% steals and FINAL HEart state; a bot loses hearts too.
+- Every boon shows its signature while held (list in report).
+- With fx decals present: WORLD ENDER cracks are painted fissures fading over 8s; without them: tuned 3px glow-cracks, zero scribble webs.
+- Today's plan renders per the date; map is 6×6; 3:30 rounds; 60fps at max zoom during FINAL FEAST; zero console errors across 3 rounds.
+- BUILD_STAMP reads `v16 · 3`.

@@ -6,7 +6,7 @@ import { drawVoidling, drawUnderdogTrail } from './voidling';
 import type { WorldObject } from './world';
 
 export interface VoidView { x: number; y: number; radius: number; }
-export interface WorldView { objects: WorldObject[]; voids: VoidView[]; map: number; elapsed: number; playerScore: number; }
+export interface WorldView { objects: WorldObject[]; voids: VoidView[]; map: number; elapsed: number; playerScore: number; playerRadius: number; }
 
 export interface Intent { dirX: number; dirY: number; mag: number; }
 
@@ -73,6 +73,10 @@ export class Rival extends Void {
   update(dt: number, view: WorldView) {
     this.tickMorph(dt);     // v9 §3: advance the body-morph crossfade
     this.tickCaptures(dt);  // v15 §0: drain the deferred-absorb orbit queue
+    // v16.2 §0: bot radius cap — never more than player × 1.25; absorbs beyond still score them
+    if (view.playerRadius > 0 && this.radius > view.playerRadius * CONFIG.BOT_RADIUS_CAP_FRAC) {
+      this.radius = view.playerRadius * CONFIG.BOT_RADIUS_CAP_FRAC;
+    }
     const intent = this.controller.think(this, view, dt);
     this.setInput(intent.dirX, intent.dirY, intent.mag);
 
