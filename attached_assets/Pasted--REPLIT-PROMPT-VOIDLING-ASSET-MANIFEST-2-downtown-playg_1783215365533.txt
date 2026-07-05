@@ -1,0 +1,40 @@
+# REPLIT PROMPT — VOIDLING ASSET MANIFEST 2 (downtown, playground, ground)
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+Download the following image files and save each one to its exact target path. Same rules as the first manifest. All URLs share this base:
+
+`BASE = https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/`
+
+## assets/objects/
+
+| Save as | File at BASE |
+|---|---|
+| assets/objects/school.png | hf_20260705_003553_6c434659-e9aa-4a27-bc30-646c19071f64.png |
+| assets/objects/library.png | hf_20260705_003617_9adc2420-f1d7-4ddb-871a-41c31da388ab.png |
+| assets/objects/skyscraper_a.png | hf_20260705_003624_337d024d-d813-4299-93a6-c51f2a71cb64.png |
+| assets/objects/skyscraper_b.png | hf_20260705_003632_50430357-fd38-431f-a825-ff00f6de7448.png |
+| assets/objects/office.png | hf_20260705_003641_e44b0d95-efd3-4393-bf64-018ef194a4c5.png |
+| assets/objects/shop_a.png | hf_20260705_003648_0ce455f1-5fde-45fc-854d-ee67d2ef155d.png |
+| assets/objects/shop_b.png | hf_20260705_003655_f7b8a8b6-f491-4467-aa55-ba16de78226d.png |
+| assets/objects/gazebo.png | hf_20260705_003703_d092eb80-bd0c-4b5f-aee0-99a9a7940747.png |
+| assets/objects/swingset.png | hf_20260705_003713_f6799899-079c-4f67-b114-8cc19c973c5b.png |
+| assets/objects/slide.png | hf_20260705_003723_74287a50-0a76-4b7b-889c-6de64f8d843e.png |
+| assets/objects/pool.png | hf_20260705_003730_b44448cb-5b15-4e28-a914-9ea9a83841df.png |
+
+## assets/ground/
+
+| Save as | File at BASE | Note |
+|---|---|---|
+| assets/ground/grass.png | hf_20260705_003110_1d379e34-e9e7-4890-b654-45d424dc54d2.png | full-bleed tile — do NOT expect transparency |
+| assets/ground/asphalt.png | hf_20260705_003120_fb0ff0b2-f8a6-494b-baf7-4addc8b52b8d.png | full-bleed tile |
+| assets/ground/sidewalk.png | hf_20260705_003130_f2db5a4c-a685-4f60-a892-12cdc369e434.png | full-bleed tile |
+| assets/ground/pond.png | hf_20260705_003737_fd91e83f-7ce6-499d-9eb6-9433bf1704ec.png | transparent decal |
+
+## Verify, then report
+
+1. Verify EVERY file exists, is larger than 10KB, and begins with PNG magic bytes (`89 50 4E 47`). Re-download failures; report any 404 verbatim — substitute nothing.
+2. Do not modify game code — the v12 loaders already expect these exact paths, and `useGroundTiles` governs the tiles.
+3. Restart, then paste the asset boot log: the 11 new object entries and 4 ground entries should read **loaded**.
