@@ -1,32 +1,48 @@
 ---
 name: VOIDLING architecture
-description: How the VOIDLING .io game (artifacts/3d-game) is structured — engine snapshot API, canvas vs DOM split, world/eating model, and the units/timestep contract.
+description: Overall engine/UI architecture for the VOIDLING game (artifacts/3d-game)
 ---
 
-# VOIDLING architecture
+# VOIDLING Architecture
 
-React DOM renders menus (`ui/UILayer.tsx`); the canvas renders the arena + HUD only. `createGame(canvas)` returns an engine (`game/engine.ts`) exposing `getSnapshot()/subscribe()/start()/togglePause()/...`. The engine notifies subscribers only on discrete state changes (screen switch, pause, coins), never per-frame — the canvas loop runs independently via `requestAnimationFrame`.
+## Core pattern
+React-DOM menus + HTML5 Canvas arena, joined by a `createGame()` engine that exposes a snapshot/subscribe API (notifies only on discrete state changes, never per-frame).
 
-## Units & timestep (easy to get wrong)
-- **World units == pixels.** The map is `CONFIG.MAP_SIZE` px square.
-- The fixed-step loop passes `dt` in **milliseconds** (`FIXED_DT ≈ 16.67`). All v4 movement/physics constants are **px/second**, so every system converts with `dtSec = dt / 1000`. Mixing ms and px/s silently makes things ~16x too fast/slow.
-- Game runtime may use `performance.now()` / `Math.random()` freely — durability only matters inside the CodeExecution sandbox, not app code.
+## World size (v12)
+- MAP_SIZE = 4000, 5×5 grid (25 blocks), STRIDE = 800, MARGIN = 50
+- TARGET_POPULATION = 800
+- Block types: residential | park | plaza | playground | school | downtown | mixed
+- DOWNTOWN blocks: gx∈{2,3} × gy∈{2,3} — contain skyscrapers, offices, street life
+- Player spawns at map center (2000,2000); T1 edibles seeded around spawn in init()
 
-## World & eating model (`game/world.ts`)
-- Arena is a procedurally-drawn 3×3 block neighborhood ("Maple Court"): residential/park/plaza/landmark blocks, roads between them, `drawGround()` paints asphalt/lawns/sidewalks/pond, `draw()` y-sorts objects.
-- **Player eats via a gravity well**, not contact: object within `CAPTURE_RADIUS_MULT·radius` is `captured`, accelerates toward the player (`SUCTION_ACCEL`, capped `SUCTION_MAX_SPEED`), absorbed at `ABSORB_RADIUS_MULT·radius`; it *escapes* if the player leaves. **Rivals eat by pop-on-contact** (different model). A captured object is skipped by the rival loop so it can't be double-eaten.
-- Non-edible (too-big) objects are solid: push the player out along the normal + tangential slide, with a `tooBigCd`-gated shake/ring/vibrate. **Recompute the collision normal AFTER living-AI movement each frame** — using the pre-movement distance makes moving cars/people jitter.
-- Water tower is a solid obstacle until `player.radius >= WATERTOWER_EAT_RADIUS`, then it's edible and fires the finale.
+## Skyscraper
+- Edible only by player at radius ≥ CONFIG.SKYSCRAPER_EAT_RADIUS (125)
+- Visual collapse FX: 3 shake pulses + debris shower + twin rings
+- Rivals skip skyscrapers (same as watertower)
+- Scores 3× via absorbObject multiplier
 
-## Cross-round state
-- `start()` must reset every accumulator or state leaks between rounds: `roundElapsed`, `slowmo`, `paused`, `coinBonus`, fx buffers (particles/texts/**rings**), and snap the camera onto the player.
-- **Finale coins**: accrue to `coinBonus` only; the single grant happens in `endRound` (`coins = base + coinBonus`). Do NOT also `meta.addCoins` in the finale trigger — that double-awards.
-- **Pause must freeze all time-based systems**, not just `simulate`: gate `slowmo` decay, `fx.update`, and callout/border-pulse phase timers behind `!paused`.
+## Daily mods (v12 §4)
+- 7 weekday mods (index = Date.getDay(), 0=Sun..6=Sat): zoom/gnome/golden/tiny/merge/frenzy/double
+- **Critical**: reset dailyFrenzyWindow/dailyGoldenInterval/dailyZoomies/dailyAllTiny BEFORE the switch in start(), not in the bulk reset block afterward.
+- **Critical**: in simulate(), compose daily effects with boon effects (multiply, not overwrite):
+  - speedMultiplier = dailyZoomies × (1 + boon bonus)
+  - twinMerge = hasBoon('twin') || (isDaily && dailyData?.id === 'merge')
 
-## Callouts (single-active queue)
-- `banner(text, color, priority?, opts?)` in `engine.ts` does NOT draw a stacked list anymore — it enqueues into one priority-ordered queue that shows ONE callout at a time (bouncy scale-in / hold / whoosh-out). Everything (form titles, CHOMPED, synergy, event warnings, streak ladder, personal-best, rank changes) routes through it so nothing overlaps. Do not reintroduce a parallel banner array. Dedupe is text-based; queue bounded to 5 (lowest priority pruned).
-- **Why:** stacked banners overlapped/flickered; v8 spec requires one clean managed callout.
+## FINAL FEAST (v12 §2)
+- Triggers at timeLeft ≤ CONFIG.FINAL_FEAST_MS (30000ms)
+- Score steal: stealFrac = finalFeastActive ? 0.5 : 0.25
+- Stolen score subtracted from rival, added to player via eatRival(rr, stolen)
 
-## Camera
-Center-based with `CAM_LERP` follow + `CAM_DEADZONE` (screen px → world via `/zoom`) and `ZOOM_LERP` toward `PLAYER_SCREEN_TALL/(2·radius)`. Render transform: `translate(fw/2+shake, fh/2+shake); scale(zoom); translate(-camCenter)`. `fx.draw(ctx)` runs INSIDE that transform (world space); `fx.drawFlash` runs after (screen space).
-**Why note this:** the literal `PLAYER_SCREEN_TALL=100` makes early game very zoomed-in (player ~100px), so a lone frame on a wide road can look sparse — that's intended, not a bug.
+## Screen flow
+Snapshot.screen drives UILayer switch: home → (splash on mount 1800ms) → home | shop | dailyIntro | boon | game | results
+- showSplash and showTrophies are local UILayer state, early-return before switch
+- Trophy Room: 18 defs, reads snap.trophies.earned
+
+## Snapshot
+Includes: screen, coins, highScore, streak, equippedSkin, ownedSkins, level, xpInLevel, xpNext, boonChoices, results, daily, muted, musicOn, sfxOn, paused, trophies
+
+## Sprite alpha bounding box (v12 §0)
+- spriteBounds Map<string, {x,y,w,h}> (normalized 0..1) stored in sprites.ts
+- draw() uses 6-arg drawImage with trimmed source rect to cut transparent padding
+- Glow rings: 2 rings at r×0.05 step, max r×1.10 (was 3 @ r×0.12)
+- drawFormBadge() moved AFTER fx.draw() so it's always on top in world space

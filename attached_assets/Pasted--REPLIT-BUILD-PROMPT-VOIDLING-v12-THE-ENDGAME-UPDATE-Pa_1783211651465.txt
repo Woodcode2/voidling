@@ -1,0 +1,69 @@
+# REPLIT BUILD PROMPT — VOIDLING v12: THE ENDGAME UPDATE
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are fixing sprite collision, expanding the world, and building VOIDLING's endgame and retention systems. Work sections **in order**; verify every Acceptance Criteria line and confess anything skipped. Standing rules hold: 60fps, portrait, one art style, asset loaders with silent procedural fallbacks.
+
+## 0 — Sprite collision fix (highest priority)
+
+- On loading any sprite, scan its alpha channel once and compute the **tight bounding box** of non-transparent pixels; store it. All rendering scales use that trimmed box, so padding never inflates visuals.
+- **Collision, absorb, suction, and "too big" push radii come ONLY from the CONFIG type-size table** — never from image dimensions. Audit every place a radius is computed and remove any reference to sprite width/height.
+- Result: you can brush right up against a house's visible edge before anything pushes back. Test with the tree and both houses.
+- Audit and remove the oversized faint ring currently rendering around the player (visible in live build) — every ring/aura must hug its owner's visual edge (max +10%).
+- Minor: nothing may render on top of the evolution pill (a gnome sprite currently overlaps it) — HUD draws last, always.
+
+## 1 — World 5×5 + DOWNTOWN
+
+- World grows to **4000×4000**, a 5×5 block grid. The center **2×2 becomes DOWNTOWN**: 4–6 skyscrapers, a library, an office building, 4 storefront shops lining the streets, café tables, denser sidewalk crowds (2× people, office-outfit variants added to the people generator), heavier traffic with the school bus route passing through.
+- Remaining 21 blocks: residential (14), park with pond (1), playground park (1), plaza (1), school block (1), and 3 mixed blocks (residential + corner shop). Water tower keeps its corner lot.
+- **New object tiers:** SHOP (T4, storefront with awning), LIBRARY (T5, columns + steps), OFFICE (T5), **SKYSCRAPER (new T6)** — edible only at WORLD ENDER, worth 3× a house, collapses floor-by-floor over 500ms when eaten (3 shake pulses, debris, then spiral). School stays T5.
+- Population scales to **700–900** with the density rule intact; spatial-hash culling is mandatory; 60fps at full population is an acceptance criterion.
+- Until sprites arrive, ALL new buildings render procedurally (skyscraper: tall two-tone slab with a lit-window grid; library: pediment + columns; shop: awning + display window). The v11 loader list extends with slots: `school, library, skyscraper_a, skyscraper_b, office, shop_a, shop_b, gazebo, swingset, slide, pool` — same fallback rules.
+
+## 2 — Eat the voids: stealing progress + FINAL FEAST
+
+- **Score steal:** chomping any void transfers **25% of the victim's current score** to the eater (victim keeps 75%). The steal animates: a stream of score sparks flies from victim to eater, both leaderboard rows flash, and the CHOMPED banner shows "+{stolen}!"
+- **Chip theft:** the victim's orbit chips fly across and fill the eater's open slots (excess is lost). Instant TRIPLE if a theft completes a match — chef's kiss moment.
+- Mass transfer, ghost respawn, sated state, and form floors all stay as-is.
+- **FINAL FEAST — the last 30 seconds of every round:** banner + horn at 0:30, a subtle gold tint pulses at the screen edges, every void gets +10% speed, void-steals double to 50% for the duration, and small-object respawns taper to zero at 0:20. Bots' HUNT weighting doubles during it. The endgame is hunting each other, and the leaderboard should routinely flip in the final seconds.
+
+## 3 — Splash screen
+
+- On app open, before home: deep-space background, the voidling drops in with a bounce, does one big chomp (gulp sound), the VOIDLING logo slams in with the tagline beneath, then auto-transitions to home. Total ≤ 1.8s, tap-to-skip, uses the equipped skin's sprite. No loading spinners — asset preloading happens behind it.
+
+## 4 — Daily Bite v2
+
+- Keep the date-seeded map and one free attempt (+1 via rewarded stub). Add a **daily modifier**, deterministic by weekday so it's global:
+  - Mon GNOME DAY (gnomes worth 5×) · Tue GOLDEN HOUR (golden spawns every 6s) · Wed TINY TOWN (all objects one tier smaller) · Thu MEGA MERGE (all merges need only 2) · Fri FRENZY FRIDAY (streak window 2s) · Sat DOUBLE TROUBLE (two shrink storms) · Sun ZOOMIES DAY (all voids +20% speed).
+- Daily Bite intro screen shows today's modifier with a drawn icon and the **streak calendar** (current week, flames on completed days). Completing it stamps the streak and feeds trophies. The daily share card includes the modifier name.
+
+## 5 — TROPHY ROOM
+
+- New screen from home (small trophy button next to Shop): a grid of trophies, each with icon, name, description, progress bar where applicable, and a coin reward. Locked = greyed; hidden ones show "???" until earned. Persistent in localStorage; lifetime counters tracked (objects by family, voids eaten, trees, dogs, score total).
+- **The eighteen:** FIRST BITE (eat 1 object, 25c) · TRIPLE THREAT (first TRIPLE, 25c) · TIMBER (100 trees lifetime, 50c) · DOG DAYS (50 dogs, 50c) · HIGHER EDUCATION (eat the school, 75c) · BOOKWORM (eat the library, 75c) · SKYLINE SNACK (eat a skyscraper, 100c) · TOWER TAKEDOWN (eat the water tower, 100c) · WORLD ENDER (reach final form, 100c) · RAMPAGE (15-chain, 75c) · SERIAL CHOMPER (10 voids lifetime, 100c) · UNTOUCHABLE (finish #1 uneaten, 150c) · COMEBACK KID (#1 after being 6th at 1:00, 150c) · HALF THE TOWN (50% devoured, 150c) · WEEK OF HUNGER (7-day streak, 200c) · COLLECTOR (own 5 skins, 100c) · MILLION MUNCH (1,000,000 lifetime score, 300c) · GNOME LORD (hidden "???" — the existing secret, 150c).
+- Unlock moment: results screen shows the trophy stamping in with confetti + coin payout; home shows "🏆 {earned}/18" as a drawn badge, not emoji.
+
+## 6 — Ground texture slots (test with a kill-switch)
+
+- New loader dir `assets/ground/`: `grass.png`, `asphalt.png`, `sidewalk.png` (tileable textures) and `pond.png` (a decal replacing the procedural pond, bottom-anchored like object sprites).
+- Tiles render as repeating patterns **multiplied with the existing district color grading** so zones keep their tint, at reduced contrast so the ground never outshouts the actors.
+- CONFIG flag `useGroundTiles` (default true when files exist). **If tiling seams or repetition are visibly distracting, we flip it off** — flat color returns, decals stay. Build the flag now.
+
+## Acceptance criteria — verify on a real phone
+
+- Brush against a tree, both houses, and a skyscraper: contact happens at the visible edge, no invisible push; no oversized ring renders anywhere; nothing overlaps the evolution pill.
+- Downtown exists: skyscrapers with window grids, library, shops, office crowds, bus traffic; a WORLD ENDER eats a skyscraper floor-by-floor; smaller forms cannot.
+- Chomp a bot: score sparks stream over, your score visibly jumps by the banner's +amount, their chips fill your ring; get chomped: you visibly lose score. At 0:30 FINAL FEAST fires and bots observably turn on each other; a lead change in the final 30s happens within three test rounds.
+- App open shows the splash (≤1.8s, skippable) with the equipped skin, then home.
+- Daily Bite intro shows today's correct weekday modifier + streak calendar; the modifier demonstrably applies in the run.
+- Trophy room lists 18 (one as "???"), progress bars tick, earning one fires the results stamp + coins, home badge counts up.
+- With ground tiles present the districts keep their tints; toggling `useGroundTiles` off reverts cleanly.
+- 60fps at 900 objects downtown during FINAL FEAST; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, real payments, balance curves (steal % is new, not a curve change), the asset pipeline plumbing from v10/v11.
+
+Work strictly in order 0→6, then self-audit against the acceptance list and report deviations explicitly.

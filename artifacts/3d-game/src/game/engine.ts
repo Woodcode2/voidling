@@ -55,6 +55,7 @@ export interface Snapshot {
   musicOn: boolean;
   sfxOn: boolean;
   paused: boolean;
+  trophies: { earned: string[]; counters: import('./meta').TrophyCounters }; // v12 §5
 }
 
 export interface GameEngine {
@@ -80,10 +81,15 @@ interface ActiveBoon { id: string; name: string; remaining: number; duration: nu
 // v8 §6: one managed callout component — stamped center-top, one at a time, priority ordered
 interface Callout { text: string; color: string; priority: number; sparkles: boolean; pulse: boolean; }
 
+// v12 §4: 7 weekday-specific daily modifiers (index = Date.getDay(), 0=Sun..6=Sat)
 const DAILY_MODS = [
-  { id: 'golden', name: 'Golden Hour', desc: 'Coins earned this run are doubled.' },
-  { id: 'giant', name: 'Head Start', desc: 'You begin extra chunky.' },
-  { id: 'frenzy', name: 'Feeding Frenzy', desc: 'Every bite scores 30% more.' },
+  { id: 'zoom',   name: 'ZOOM ZOOM',      desc: 'All voids move 20% faster today.' },        // Sun
+  { id: 'gnome',  name: 'GNOME DAY',      desc: 'Gnomes are worth 5× score today.' },         // Mon
+  { id: 'golden', name: 'GOLDEN HOUR',    desc: 'Golden snacks spawn twice as fast.' },        // Tue
+  { id: 'tiny',   name: 'TINY TOWN',      desc: 'Every object is a bit smaller today.' },      // Wed
+  { id: 'merge',  name: 'MEGA MERGE',     desc: 'Only 2 matches needed for a TRIPLE.' },       // Thu
+  { id: 'frenzy', name: 'FRENZY FRIDAY',  desc: 'Eat streaks last twice as long.' },           // Fri
+  { id: 'double', name: 'DOUBLE SCORE',   desc: 'All score is doubled today.' },               // Sat
 ];
 
 const BOON_DURATION: Record<string, number> = {
@@ -166,6 +172,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // daily modifier round flags
   let baseGreed = 1;
   let coinMult = 1;
+  // v12 §2: FINAL FEAST state
+  let finalFeastFired = false;
+  let finalFeastActive = false;
+  // v12 §4: daily mod effect flags (reset in start())
+  let dailyFrenzyWindow = 1200;    // ms window for eat streaks (FRENZY FRIDAY → 2400)
+  let dailyGoldenInterval = -1;   // -1 = use CONFIG.GOLDEN_INTERVAL; override for GOLDEN HOUR
+  let dailyZoomies = 1;            // speed multiplier applied at round start (ZOOM ZOOM → 1.2)
+  let dailyAllTiny = false;        // TINY TOWN: shrink all objects one tier
+  // v12 §5: per-round trophy tracking
+  let roundTriples = 0;
+  let roundRivalEats = 0;
 
   const fx = new FXManager();
   const joystick = createJoystick(canvas);
@@ -206,17 +223,28 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   function start(daily: boolean) {
     audio.init();
     isDaily = daily;
+    // Reset all per-round flags FIRST, then apply the selected daily mod below
     baseGreed = 1;
     coinMult = 1;
+    dailyFrenzyWindow = 1200;
+    dailyGoldenInterval = -1;
+    dailyZoomies = 1;
+    dailyAllTiny = false;
     let startRadius = CONFIG.PLAYER_BASE_RADIUS;
     let duration = CONFIG.GAME_DURATION * 1000;
 
     let seed = 'run_' + Math.floor(Math.random() * 1e9);
     if (daily && dailyData) {
       seed = dailyData.seed;
-      if (dailyData.id === 'golden') coinMult = 2;
-      if (dailyData.id === 'giant') startRadius = CONFIG.PLAYER_BASE_RADIUS * 1.7;
-      if (dailyData.id === 'frenzy') baseGreed = 1.3;
+      switch (dailyData.id) {
+        case 'zoom':   dailyZoomies = 1.2;  break;           // ZOOM ZOOM
+        case 'gnome':  /* applied after player created */ break;
+        case 'golden': dailyGoldenInterval = CONFIG.GOLDEN_INTERVAL * 0.5; break; // GOLDEN HOUR: 2× rate
+        case 'tiny':   dailyAllTiny = true;  break;           // TINY TOWN
+        case 'merge':  /* handled via player.twinMerge below */ break;
+        case 'frenzy': dailyFrenzyWindow = 2400; break;       // FRENZY FRIDAY: 2× streak window
+        case 'double': baseGreed = 2; coinMult = 2; break;    // DOUBLE SCORE
+      }
     }
 
     world = new WorldManager(CONFIG.MAP_SIZE);
@@ -227,6 +255,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!player) player = new Player(skin);
     player.reset(c, c, skin);
     player.radius = startRadius;
+    // v12 §4: daily mod post-player-init effects
+    if (daily && dailyData) {
+      if (dailyData.id === 'gnome') player.gnomeScoreMult = 5;
+      if (dailyData.id === 'zoom')  player.speedMultiplier = Math.max(player.speedMultiplier, dailyZoomies);
+      if (dailyData.id === 'merge') player.twinMerge = true; // pre-grant MEGA MERGE
+    }
+    // TINY TOWN: shrink all world objects one size tier
+    if (dailyAllTiny) {
+      for (const obj of world.objects) { obj.size = Math.max(8, obj.size * 0.72); obj.baseSize = obj.size; }
+    }
 
     rivals = makeRivals();
     for (let i = 0; i < rivals.length; i++) {
@@ -268,6 +306,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     countdown = 0;
     countStep = 0;
     crackTimer = 0;
+    finalFeastFired = false;
+    finalFeastActive = false;
+    roundTriples = 0;
+    roundRivalEats = 0;
     events.reset();
     fx.particles.length = 0;
     fx.texts.length = 0;
@@ -387,6 +429,35 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     meta.updateMission('combo_4', maxCombo);
     meta.updateMission('tier_4', world.playerStats.maxTier);
 
+    // v12 §5: trophy counter updates
+    meta.updateTrophyCounter('totalBites', world.playerStats.count, 'sum');
+    meta.updateTrophyCounter('totalTriples', roundTriples, 'sum');
+    meta.updateTrophyCounter('bestRoundBites', world.playerStats.count, 'max');
+    meta.updateTrophyCounter('bestDucks', world.playerStats.ducks, 'max');
+    meta.updateTrophyCounter('bestDevoured', Math.round(devoured), 'max');
+    if (gnomeLord) meta.updateTrophyCounter('gnomeLordTotal', 1, 'sum');
+    if (crown) meta.updateTrophyCounter('totalWins', 1, 'sum');
+    if (worldEater) meta.updateTrophyCounter('worldEnder', 1, 'sum');
+    if (crown) meta.earnTrophy('first_win');
+    if (worldEater) meta.earnTrophy('world_ender_form');
+    if (gnomeLord) meta.earnTrophy('gnome_lord');
+    if (player.score >= 1000) meta.earnTrophy('score_1000');
+    if (player.score >= 5000) meta.earnTrophy('score_5000');
+    if (player.score >= 10000) meta.earnTrophy('score_10000');
+    if (player.formIndex >= 1) meta.earnTrophy('form_bite');
+    if (player.formIndex >= 3) meta.earnTrophy('form_devourer');
+    if (worldEater) meta.earnTrophy('form_world_ender');
+    if (devoured >= 50) meta.earnTrophy('devoured_50pct');
+    if (devoured >= 100) meta.earnTrophy('devoured_100pct');
+    if (world.playerStats.ducks >= 5) meta.earnTrophy('duck_5');
+    if (maxCombo >= 10) meta.earnTrophy('combo_10');
+    if (roundTriples >= 3) meta.earnTrophy('triple_combo');
+    if (roundRivalEats >= 1) meta.earnTrophy('void_eater');
+    if (roundRivalEats >= 5) meta.earnTrophy('void_destroyer');
+    if (isDaily) meta.earnTrophy('daily_player');
+    if (isDaily && crown) meta.earnTrophy('daily_winner');
+    finalFeastFired = false; finalFeastActive = false;
+
     // v7 §8: if a bot in the top 3 is showing off a skin the player doesn't own,
     // surface it on the results screen as a soft nudge toward the shop.
     let skinTease: ResultData['skinTease'] = null;
@@ -471,8 +542,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const gL = boonLevel('greed'), tL = boonLevel('tremor'), twL = boonLevel('twin');
 
     player.magnetMultiplier = 1 + (mL ? (mL >= 2 ? 0.7 : 0.4) : 0); // GRAVITY GLUTTON: +40%/+70% reach
-    player.speedMultiplier  = 1 + (oL ? (oL >= 2 ? 0.4 : 0.25) : 0); // ZOOMIES: +25%/+40% speed
-    player.twinMerge = hasBoon('twin');                             // DOUBLE STOMACH: 2-match merges
+    // v12 §4: compose daily ZOOM ZOOM with boon ZOOMIES so neither overwrites the other
+    player.speedMultiplier  = dailyZoomies * (1 + (oL ? (oL >= 2 ? 0.4 : 0.25) : 0));
+    // v12 §4: compose daily MEGA MERGE with boon DOUBLE STOMACH
+    player.twinMerge = hasBoon('twin') || (isDaily && dailyData?.id === 'merge');
     player.twinBonus = twL >= 2 ? 1.5 : 1;                          // DOUBLE STOMACH II: +50% merge bonus
     player.tremorActive = hasBoon('tremor');                        // TENDERIZER
     player.tremorFactor = tL >= 2 ? 0.75 : 0.85;                    // 25% / 15% shrink per touch
@@ -512,10 +585,18 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
 
-    // v6 §2: golden objects begin at 2:45 remaining, ~every 12s
+    // v6 §2: golden objects begin at 2:45 remaining, ~every 12s (GOLDEN HOUR → 2×)
     if (timeLeft <= CONFIG.GOLDEN_START_MS && timeLeft > 0) {
       goldenTimer -= dt;
-      if (goldenTimer <= 0) { goldenTimer = CONFIG.GOLDEN_INTERVAL; world.spawnGolden(player); }
+      const gi = dailyGoldenInterval >= 0 ? dailyGoldenInterval : CONFIG.GOLDEN_INTERVAL;
+      if (goldenTimer <= 0) { goldenTimer = gi; world.spawnGolden(player); }
+    }
+
+    // v12 §2: FINAL FEAST — triggers at 30s remaining
+    if (!finalFeastFired && timeLeft <= CONFIG.FINAL_FEAST_MS && timeLeft > 0) {
+      finalFeastFired = true;
+      finalFeastActive = true;
+      banner('FINAL FEAST! STEAL THEIR SCORE!', '#FF6B6B', 7, { pulse: true });
     }
 
     // v7 §5: LUCKY GNOME — a golden object every 10s (GOLD RUSH synergy → 7s)
@@ -597,9 +678,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (ev.kind) audio.playSignature(ev.kind);
         // v10 §3: T4+ objects land with a deep 2px camera punch
         if ((ev.tier || 0) >= 4) fx.shake(80, 2, 0);
-        // v8 §6: eat-streak ladder (chains within 1.2s); §7 frenzy counts double
+        // v12 §1: skyscraper topple banner
+        if (ev.kind === 'skyscraper') banner('SKYSCRAPER TOPPLED!', '#5AC8FF', 7, { sparkles: true });
+        // v8 §6: eat-streak ladder; v12 §4: FRENZY FRIDAY doubles window
         const inc = events.frenzyActive ? 2 : 1;
-        const prevStreak = (roundElapsed - lastEatMs < 1200) ? eatStreak : 0;
+        const prevStreak = (roundElapsed - lastEatMs < dailyFrenzyWindow) ? eatStreak : 0;
         eatStreak = prevStreak + inc;
         lastEatMs = roundElapsed;
         if (prevStreak < 5 && eatStreak >= 5) banner('DOUBLE BITE!', '#8AE6FF', 3);
@@ -611,7 +694,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         fx.addConfetti(ev.x, ev.y, CONFIG.COLORS.pops);
         fx.shake(220, 8);
         if (ev.text) fx.addText(ev.x, ev.y - 20, ev.text, ev.color || '#FFF');
+        roundTriples++; // v12 §5: track triple combos for trophy
+        meta.updateTrophyCounter('totalTriples', 1, 'sum');
       } else if (ev.type === 'eatRival') {
+        roundRivalEats++; // v12 §5: track rival eats for trophy
         audio.playMerge();
         fx.addConfetti(ev.x, ev.y, CONFIG.COLORS.pops);
         fx.shake(300, 12);
@@ -712,9 +798,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           const rr = r.radius;
           fx.addConfetti(r.x, r.y, CONFIG.COLORS.pops);
           fx.shake(280, 12); fx.flash();
-          player.eatRival(rr);
+          // v12 §2: score steal on rival eat (25%, or 50% during FINAL FEAST)
+          const stealFrac = finalFeastActive ? 0.5 : 0.25;
+          const stolen = Math.floor(r.score * stealFrac);
+          r.score = Math.max(0, r.score - stolen);
+          meta.updateTrophyCounter('totalVoidsEaten', 1, 'sum');
+          player.eatRival(rr, stolen);
           r.getEaten(player.x, player.y, minDist);
           banner(`You devoured ${r.name}!`, '#FFD23F');
+          if (stolen > 0) banner(`Stole ${stolen} score!`, '#FF9F5A', 3);
         } else if (canEatVoid(r.radius, player.radius, d)) {
           if (player.shieldCharge) {
             // v7 §5: BUBBLE SHIELD blocks this chomp, pops with a burst, then is gone
@@ -809,10 +901,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     drawPowerAuras(clock); // v6 §4: auras under the player
     player.draw(ctx, clock, alpha);
     if (gnomeLord) drawGnomeCrown(clock); // v9 §8: secret GNOME LORD crown
-    drawFormBadge(); // v10 §5: form name pill under player (and DEVOURER+ rivals)
 
     if (!paused) fx.update(frameDt);
     fx.draw(ctx);
+    drawFormBadge(); // v12 §0: form badge after fx (always on top in world space)
     ctx.restore();
 
     // v6 §8: environment post-processing (grain + vignette), under the HUD
@@ -1508,6 +1600,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       musicOn: audio.musicOn,
       sfxOn: audio.sfxOn,
       paused,
+          trophies: { earned: meta.data.trophiesEarned, counters: meta.data.trophyCounters }, // v12 §5
     };
   }
 
@@ -1545,7 +1638,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     openShop() { screen = 'shop'; notify(); },
     openDaily() {
       const today = new Date().toDateString();
-      const mod = DAILY_MODS[Math.abs(hashDate(today)) % DAILY_MODS.length];
+      // v12 §4: daily mod determined by day-of-week (0=Sun…6=Sat)
+      const mod = DAILY_MODS[new Date().getDay()];
       dailyData = { id: mod.id, seed: 'daily_' + today, name: mod.name, desc: mod.desc };
       screen = 'dailyIntro';
       notify();

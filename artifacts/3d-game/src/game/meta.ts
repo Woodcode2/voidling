@@ -1,3 +1,20 @@
+// v12 §5: Trophy tracking added to GameMeta
+
+export interface TrophyCounters {
+  totalBites: number;
+  totalTriples: number;
+  totalVoidsEaten: number;
+  totalWins: number;
+  bestRoundBites: number;
+  bestDucks: number;
+  gnomeLordTotal: number;
+  bestDevoured: number;  // 0–100 (% of world area eaten)
+  muncher: number;
+  gobbler: number;
+  devourer: number;
+  worldEnder: number;
+}
+
 export interface GameMeta {
   coins: number;
   skinsOwned: string[];
@@ -10,7 +27,16 @@ export interface GameMeta {
   firstTime: boolean;
   xp: number;    // v7 §11: XP within the current level
   level: number; // v7 §11: player meta level (starts at 1)
+  // v12 §5: trophies
+  trophiesEarned: string[];
+  trophyCounters: TrophyCounters;
 }
+
+const DEFAULT_TROPHY_COUNTERS: TrophyCounters = {
+  totalBites: 0, totalTriples: 0, totalVoidsEaten: 0, totalWins: 0,
+  bestRoundBites: 0, bestDucks: 0, gnomeLordTotal: 0, bestDevoured: 0,
+  muncher: 0, gobbler: 0, devourer: 0, worldEnder: 0,
+};
 
 const DEFAULT_META: GameMeta = {
   coins: 0,
@@ -24,19 +50,21 @@ const DEFAULT_META: GameMeta = {
   firstTime: true,
   xp: 0,
   level: 1,
+  trophiesEarned: [],
+  trophyCounters: { ...DEFAULT_TROPHY_COUNTERS },
 };
 
 export const meta = {
-  data: { ...DEFAULT_META },
+  data: { ...DEFAULT_META, trophyCounters: { ...DEFAULT_TROPHY_COUNTERS } },
 
   load() {
-    this.data = { ...DEFAULT_META };
+    this.data = { ...DEFAULT_META, trophyCounters: { ...DEFAULT_TROPHY_COUNTERS } };
     const saved = localStorage.getItem('voidling_meta_v1');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          this.data = { ...DEFAULT_META, ...parsed };
+          this.data = { ...DEFAULT_META, trophyCounters: { ...DEFAULT_TROPHY_COUNTERS }, ...parsed };
         }
       } catch (e) {
         console.error("Failed to load meta");
@@ -49,6 +77,14 @@ export const meta = {
     if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
     if (typeof this.data.xp !== 'number' || !Number.isFinite(this.data.xp)) this.data.xp = 0;
     if (typeof this.data.level !== 'number' || !Number.isFinite(this.data.level) || this.data.level < 1) this.data.level = 1;
+    // v12 §5: migrate legacy saves without trophy fields
+    if (!Array.isArray(this.data.trophiesEarned)) this.data.trophiesEarned = [];
+    if (!this.data.trophyCounters || typeof this.data.trophyCounters !== 'object') {
+      this.data.trophyCounters = { ...DEFAULT_TROPHY_COUNTERS };
+    } else {
+      // ensure all counter keys exist (forward compat for new trophies)
+      this.data.trophyCounters = { ...DEFAULT_TROPHY_COUNTERS, ...this.data.trophyCounters };
+    }
     // migrate legacy skin id 'default' -> 'classic'
     this.data.skinsOwned = this.data.skinsOwned.map((s) => (s === 'default' ? 'classic' : s));
     if (!this.data.skinsOwned.includes('classic')) this.data.skinsOwned.unshift('classic');
@@ -148,5 +184,33 @@ export const meta = {
       this.data.lastDailyDate = today;
       this.save();
     }
-  }
+  },
+
+  // ── v12 §5: Trophy helpers ─────────────────────────────────────────────────
+
+  /** Mark a trophy as earned (no-op if already earned). Saves. */
+  earnTrophy(id: string) {
+    if (!this.data.trophiesEarned.includes(id)) {
+      this.data.trophiesEarned.push(id);
+      this.save();
+      console.log(`[trophy] EARNED: ${id}`);
+    }
+  },
+
+  /**
+   * Update a lifetime counter.
+   * mode 'max' — keep the highest value ever seen (e.g. best round score).
+   * mode 'sum' — add to lifetime total (e.g. total voids eaten).
+   */
+  updateTrophyCounter(key: keyof TrophyCounters, value: number, mode: 'max' | 'sum') {
+    if (mode === 'max') {
+      if (value > (this.data.trophyCounters[key] ?? 0)) {
+        (this.data.trophyCounters[key] as number) = value;
+        this.save();
+      }
+    } else {
+      (this.data.trophyCounters[key] as number) = (this.data.trophyCounters[key] ?? 0) + value;
+      this.save();
+    }
+  },
 };

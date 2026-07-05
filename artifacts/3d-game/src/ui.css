@@ -716,3 +716,136 @@
   color: #C9A6FF;
   letter-spacing: 0.5px;
 }
+
+/* ── v12 §3: Splash screen ──────────────────────────────────────────────────── */
+.vd-splash { z-index: 80; cursor: pointer; }
+.vd-splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  animation: vd-splash-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.vd-splash-void { animation: vd-void-drop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.1s both; }
+@keyframes vd-void-drop { from { transform: translateY(-80px) scale(0.5); opacity: 0; } to { transform: none; opacity: 1; } }
+.vd-splash-title {
+  font-family: Fredoka, sans-serif;
+  font-weight: 800;
+  font-size: clamp(52px, 16vw, 88px);
+  color: #FFFFFF;
+  letter-spacing: -2px;
+  text-shadow: 0 0 32px rgba(199,125,255,0.8), 0 4px 12px rgba(0,0,0,0.6);
+  animation: vd-slam-in 0.35s cubic-bezier(0.22,1,0.36,1) 0.55s both;
+}
+@keyframes vd-slam-in { from { transform: scale(1.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.vd-splash-tag {
+  font-family: Nunito, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,0.65);
+  animation: vd-fade-up 0.4s ease 0.9s both;
+}
+@keyframes vd-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ── v12 §5: Trophy Room ────────────────────────────────────────────────────── */
+.vd-topbar-title {
+  font-family: Fredoka, sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: #FFD23F;
+  letter-spacing: 1px;
+  flex: 1;
+  text-align: center;
+}
+.vd-trophy-count {
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  min-width: 40px;
+  text-align: right;
+}
+.vd-trophy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 12px 14px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  max-height: calc(100vh - 80px);
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+.vd-trophy-card {
+  background: rgba(42,17,82,0.85);
+  border: 1.5px solid rgba(199,125,255,0.35);
+  border-radius: 14px;
+  padding: 12px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.vd-trophy-card:not(.vd-trophy-card--locked) {
+  border-color: rgba(255,210,63,0.5);
+  background: rgba(42,17,82,1);
+  box-shadow: 0 0 16px rgba(255,210,63,0.15), 0 2px 12px rgba(0,0,0,0.3);
+}
+.vd-trophy-card--locked {
+  opacity: 0.45;
+  filter: grayscale(0.5);
+}
+.vd-trophy-icon { font-size: 28px; line-height: 1; }
+.vd-trophy-name {
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #FFD23F;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+.vd-trophy-desc {
+  font-family: Nunito, sans-serif;
+  font-size: 9.5px;
+  color: rgba(255,255,255,0.6);
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* ── v12 §4: Daily weekday calendar ─────────────────────────────────────────── */
+.vd-week {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 4px 0;
+}
+.vd-week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 36px;
+  padding: 8px 4px 6px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid transparent;
+  transition: all 0.15s ease;
+}
+.vd-week-day--today {
+  background: rgba(255,210,63,0.15);
+  border-color: #FFD23F;
+}
+.vd-week-icon { font-size: 16px; line-height: 1; }
+.vd-week-label {
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 9px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.5px;
+}
+.vd-week-day--today .vd-week-label { color: #FFD23F; }

@@ -21,7 +21,9 @@ export type ObjectKind =
   // v7 §2: playground equipment + school trophy
   | 'sandbox' | 'swingset' | 'slide' | 'seesaw' | 'school'
   // legacy decor (still drawable, used sparingly)
-  | 'mushroom' | 'bush' | 'gazebo';
+  | 'mushroom' | 'bush' | 'gazebo'
+  // v12 §1: downtown objects
+  | 'shop' | 'library' | 'office' | 'skyscraper';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -153,12 +155,12 @@ export const CONFIG = {
   // Too-big collision feedback — §0 fix
   TOOBIG_COOLDOWN: 500,     // ms
 
-  // World — v7 §2: the full town — 4×4 grid, 3200×3200
-  MAP_SIZE: 3200,
-  BLOCK_SIZE: 700,           // 4*700 + 3*120 roads = 3160, margin 20
+  // World — v12 §1: the full town — 5×5 grid, 4000×4000
+  MAP_SIZE: 4000,
+  BLOCK_SIZE: 700,           // 5*700 + 4*100 roads = 3900 + 50*2 margin = 4000
   ROAD_WIDTH: 100,             // v10 §6: narrower roads (was 120)
   SIDEWALK: 44,
-  GRID: 4,
+  GRID: 5,
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
   MAX_RADIUS: 140,           // v7 §1: hard size cap — at cap, absorbs score but don't grow
   DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff
@@ -176,8 +178,8 @@ export const CONFIG = {
   TRAMPOLINE_BOUNCE: 120,                 // px launch for a too-small player
   ICECREAM_JINGLE_RANGE: 320,             // play jingle when player within
 
-  // Population / respawn — v7 §2: full town (550–700)
-  TARGET_POPULATION: 620,
+  // Population / respawn — v12 §1: larger 5×5 world
+  TARGET_POPULATION: 800,
   RESPAWN_MIN: 540,         // trickle small objects if below this
   DENSITY_MULT: 1,          // v5 §7: debug-panel density multiplier
   TRAFFIC_CARS: 12,         // v7 §2: cars cruising the road grid (10–14)
@@ -192,6 +194,9 @@ export const CONFIG = {
 
   // Water tower is a WORLD-EATER-scale prize
   WATERTOWER_EAT_RADIUS: 300,
+  SKYSCRAPER_EAT_RADIUS: 125, // v12 §1: skyscrapers require WORLD ENDER size
+  FINAL_FEAST_MS: 30000,      // v12 §2: last 30s triggers the FINAL FEAST
+  USE_GROUND_TILES: true,     // v12 §6: tile PNG ground textures when present
 
   // Audio master levels — v5 §5 (debug-panel adjustable)
   MUSIC_GAIN: 0.3,
@@ -301,6 +306,11 @@ export const CONFIG = {
     bush:       { tier: 2, minR: 22, maxR: 30 },
     mushroom:   { tier: 1, minR: 10, maxR: 14 },
     gazebo:     { tier: 5, minR: 92, maxR: 110 },
+    // v12 §1: downtown objects
+    shop:       { tier: 3, minR: 38, maxR: 48 },
+    library:    { tier: 4, minR: 62, maxR: 76 },
+    office:     { tier: 5, minR: 88, maxR: 104 },
+    skyscraper: { tier: 6, minR: 115, maxR: 130 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void

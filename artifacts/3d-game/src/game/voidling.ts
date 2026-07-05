@@ -34,15 +34,15 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   if (skin.id === 'ghost') ctx.globalAlpha *= 0.6; // v8 §8: translucent floaty ghost
   ctx.rotate(v.lean);
 
-  // ── Glow: crisp concentric rings (v5 §6 — no radial halo / shadowBlur) ──────
-  const ringCount = 3;
-  const baseA = 0.2 + v.glow * 0.45;
-  ctx.lineWidth = Math.max(1.5, r * 0.06);
+  // ── Glow: crisp concentric rings (v12 §0 — max +10% outward, was +36%) ──────
+  const ringCount = 2;
+  const baseA = 0.14 + v.glow * 0.32;
+  ctx.lineWidth = Math.max(1, r * 0.04);
   for (let i = 1; i <= ringCount; i++) {
-    const wobble = Math.sin(v.t / 260 + i) * r * 0.02 * v.glow;
+    const wobble = Math.sin(v.t / 260 + i) * r * 0.01 * v.glow;
     ctx.strokeStyle = hexA(skin.glowColor, baseA * (1 - (i - 1) / ringCount));
     ctx.beginPath();
-    ctx.arc(0, 0, r + i * (r * 0.12) + wobble, 0, Math.PI * 2);
+    ctx.arc(0, 0, r + i * (r * 0.05) + wobble, 0, Math.PI * 2);
     ctx.stroke();
   }
 

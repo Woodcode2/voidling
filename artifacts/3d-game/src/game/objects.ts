@@ -842,6 +842,100 @@ function drawSchool(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.fillText('SCHOOL', 0, -r * 0.12);
 }
 
+// ── v12 §1: Downtown objects ──────────────────────────────────────────────────
+
+function drawShop(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 0) {
+  const o = ow(r);
+  const awningColors = ['#E85B2C', '#2C89E8', '#E8C72C', '#8C2CE8', '#2CE87D'];
+  const col = pick(awningColors, variant);
+  // building body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.82, -r * 1.15, r * 1.64, r * 1.42, r * 0.08), '#F5E6C8', { outline: o });
+  // striped awning (clipped to awning rect so stripes don't overflow)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-r * 0.82, -r * 0.36, r * 1.64, r * 0.28); ctx.clip();
+  for (let i = -5; i <= 5; i++) {
+    ctx.fillStyle = i % 2 === 0 ? col : '#FFFFFF';
+    ctx.fillRect(-r * 0.82 + i * r * 0.18, -r * 0.36, r * 0.18, r * 0.28);
+  }
+  ctx.restore();
+  ctx.strokeStyle = col; ctx.lineWidth = o;
+  ctx.beginPath(); ctx.rect(-r * 0.82, -r * 0.36, r * 1.64, r * 0.28); ctx.stroke();
+  // door
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.15, -r * 0.05, r * 0.3, r * 0.32, r * 0.04), '#A06040', { outline: o * 0.7 });
+  // windows (two flanking)
+  for (const wx of [-0.55, 0.55]) {
+    sticker(ctx, (c) => roundRectPath(c, r * wx - r * 0.2, -r * 0.88, r * 0.4, r * 0.4, r * 0.04), '#BFEAFF', { outline: o * 0.7, shadow: false });
+  }
+  ctx.fillStyle = col; ctx.font = `bold ${Math.max(5, r * 0.11)}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('SHOP', 0, -r * 1.05);
+}
+
+function drawLibrary(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // main building
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.9, -r * 1.38, r * 1.8, r * 1.65, r * 0.05), '#EDE0C8', { outline: o });
+  // triangular pediment
+  sticker(ctx, (c) => { c.moveTo(-r * 0.9, -r * 1.38); c.lineTo(0, -r * 1.88); c.lineTo(r * 0.9, -r * 1.38); c.closePath(); }, '#C9A96E', { outline: o });
+  // 4 columns
+  for (const cx of [-0.56, -0.18, 0.18, 0.56]) {
+    sticker(ctx, (c) => roundRectPath(c, r * cx - r * 0.07, -r * 1.38, r * 0.14, r * 1.14, r * 0.04), '#F7F0E0', { outline: o * 0.6 });
+  }
+  // steps (2 tiers)
+  for (let i = 0; i < 2; i++) {
+    const sw = r * (1.2 - i * 0.14);
+    ctx.fillStyle = '#D4C4A8'; ctx.strokeStyle = '#B5A888'; ctx.lineWidth = o * 0.6;
+    ctx.fillRect(-sw / 2, -r * 0.26 + i * r * 0.13, sw, r * 0.13);
+    ctx.strokeRect(-sw / 2, -r * 0.26 + i * r * 0.13, sw, r * 0.13);
+  }
+  // door
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.17, -r * 0.26, r * 0.34, r * 0.48, r * 0.05), '#7A5C3B', { outline: o * 0.8 });
+  ctx.fillStyle = '#7A5C3B'; ctx.font = `bold ${Math.max(4, r * 0.09)}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('LIBRARY', 0, -r * 0.72);
+}
+
+function drawOffice(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const cols = ['#4A7A9B', '#6B4A9B', '#4A9B6B', '#9B7A4A'];
+  const col = pick(cols, variant);
+  // glass tower body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.7, -r * 1.82, r * 1.4, r * 2.08, r * 0.06), col, { outline: o });
+  // window grid: 3 cols × 5 rows
+  ctx.fillStyle = 'rgba(200,240,255,0.5)';
+  for (let row = 0; row < 5; row++) for (let c2 = 0; c2 < 3; c2++) {
+    ctx.fillRect(-r * 0.52 + c2 * r * 0.49, -r * 1.7 + row * r * 0.35, r * 0.36, r * 0.26);
+  }
+  // base trim
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.7, -r * 0.26, r * 1.4, r * 0.26, r * 0.04), '#2A5A6A', { outline: o * 0.6 });
+  ctx.fillStyle = '#1A3040'; ctx.fillRect(-r * 0.15, -r * 0.26, r * 0.3, r * 0.26);
+}
+
+function drawSkyscraper(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 0) {
+  const o = ow(r);
+  const cols = ['#5A8AB0', '#7055A8', '#4E968A'];
+  const col = pick(cols, variant);
+  // main tower body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.58, -r * 2.75, r * 1.16, r * 3.0, r * 0.06), col, { outline: o });
+  // window grid: 2 cols × 7 rows
+  ctx.fillStyle = 'rgba(210,250,255,0.48)';
+  for (let row = 0; row < 7; row++) for (let c2 = 0; c2 < 2; c2++) {
+    ctx.fillRect(-r * 0.4 + c2 * r * 0.5, -r * 2.62 + row * r * 0.35, r * 0.34, r * 0.25);
+  }
+  // stepped setbacks (art-deco crown)
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.42, -r * 2.9, r * 0.84, r * 0.22, r * 0.04), '#3A7090', { outline: o * 0.7 });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.28, -r * 3.06, r * 0.56, r * 0.2, r * 0.04), '#2A6080', { outline: o * 0.7 });
+  // antenna + slow blink light
+  ctx.save();
+  ctx.strokeStyle = '#FFD23F'; ctx.lineWidth = Math.max(1.5, r * 0.05); ctx.lineCap = 'round';
+  const sw = Math.sin(t / 1600) * r * 0.018;
+  ctx.beginPath(); ctx.moveTo(sw, -r * 3.06); ctx.lineTo(sw, -r * 3.5); ctx.stroke();
+  ctx.globalAlpha = Math.sin(t / 500) > 0 ? 0.95 : 0.25;
+  ctx.fillStyle = '#FF3D68'; ctx.beginPath(); ctx.arc(sw, -r * 3.5, r * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // lobby base
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.58, -r * 0.24, r * 1.16, r * 0.24, r * 0.04), '#2A5070', { outline: o * 0.6 });
+  ctx.fillStyle = '#1A3040'; ctx.fillRect(-r * 0.16, -r * 0.24, r * 0.32, r * 0.24);
+}
+
 // ── Dispatcher ─────────────────────────────────────────────────────────────
 export interface DrawOpts {
   t?: number;
@@ -900,5 +994,10 @@ export function drawParkObject(
     case 'slide': return drawSlide(ctx, r);
     case 'seesaw': return drawSeesaw(ctx, r, t);
     case 'school': return drawSchool(ctx, r, t);
+    // v12 §1: downtown objects
+    case 'shop': return drawShop(ctx, r, t, v);
+    case 'library': return drawLibrary(ctx, r, t);
+    case 'office': return drawOffice(ctx, r, t, v);
+    case 'skyscraper': return drawSkyscraper(ctx, r, t, v);
   }
 }
