@@ -289,6 +289,8 @@ export class WorldManager {
   playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0, houses: 0, cars: 0, people: 0, beachItems: 0, downtownItems: 0 };
   gnomeTotal = 0;              // v9 §8: gnomes present at round start (fixed — gnomes never respawn)
   gnomeLordPending = false;    // v9 §8: set once the player eats every gnome
+  zooSmashed = false;          // v15 §4: zoo gate smashed (one per round)
+  townhallEaten = false;       // v15 §4: town hall landmark consumed
   private nextId = 0;
   private respawnTimer = 0;
   private rand: () => number = Math.random;
@@ -803,6 +805,17 @@ export class WorldManager {
     if (rand() < 0.4) this.scatter(b, rand, 'car_parked_b', 1);
     this.scatter(b, rand, 'person', 3);
     this.spawnBirds(b, rand, 4); // white seagulls (same bird drawing, beach context)
+  }
+
+  // v15 §4: exact block type at a world position (used for district trophies)
+  blockTypeAt(x: number, y: number): BlockType | null {
+    for (const b of this.blocks) {
+      if (x >= b.x0 && x < b.x0 + CONFIG.BLOCK_SIZE &&
+          y >= b.y0 && y < b.y0 + CONFIG.BLOCK_SIZE) {
+        return b.type;
+      }
+    }
+    return null;
   }
 
   // v13 §1: map a world position to its named district
@@ -1388,6 +1401,12 @@ export class WorldManager {
     if (obj.kind === 'person' || obj.kind === 'soldier') this.playerStats.people++;
     if (BEACH_KINDS.includes(obj.kind)) this.playerStats.beachItems++;
     if (DOWNTOWN_KINDS.includes(obj.kind)) this.playerStats.downtownItems++;
+
+    // v15 §4: district trophies — one-time flags when player eats inside zoo/townhall
+    const blockType = this.blockTypeAt(obj.x, obj.y);
+    if (blockType === 'zoo') this.zooSmashed = true;
+    // v16: civic blocks replaced the v15 townhall block; the watertower is the town hall landmark
+    if (blockType === 'townhall' || (blockType === 'civic' && obj.kind === 'watertower')) this.townhallEaten = true;
 
     // reaction flavor
     if (obj.kind === 'house') {

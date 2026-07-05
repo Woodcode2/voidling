@@ -518,8 +518,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (crown) meta.updateTrophyCounter('totalWins', 1, 'sum');
     if (worldEater) meta.updateTrophyCounter('worldEnder', 1, 'sum');
     if (crown) meta.earnTrophy('first_win');
-    if (worldEater) meta.earnTrophy('world_ender_form');
     if (gnomeLord) meta.earnTrophy('gnome_lord');
+    if (world.zooSmashed) meta.earnTrophy('zoo_break');
+    if (world.townhallEaten) meta.earnTrophy('democracy');
     if (player.score >= 1000) meta.earnTrophy('score_1000');
     if (player.score >= 5000) meta.earnTrophy('score_5000');
     if (player.score >= 10000) meta.earnTrophy('score_10000');
