@@ -5,4 +5,5 @@
 - [VOIDLING v14 Quality Bar](voidling-v14.md) — deferred-growth orbit, CC0 OGG sample loader, pointerrawupdate controls, FxEvent null-guard rule.
 - [VOIDLING v15 The Law+Spells+Zoo](voidling-v15.md) — Growth Law clamp (setRoundElapsed→grow), orbit parity (captureObject/tickCaptures on Void base), 5 spells, ZOO/TOWNHALL, contactScale, debug panel sections.
 - [VOIDLING v16 The City That Makes Sense](voidling-v16.md) — Fixed 5×5 city plan, rubber-band pacing, art-derived contactRadius, news ticker, contracts, vivid spell cards, in-map ocean water.
+- [VOIDLING v16.1 The Render Fix](voidling-v161.md) — orb-normalized sprite draw, paved dressing, real zoo+townhall, zoo gate rule, scoreMult, BUILD_STAMP v16·2.
 - [Vite middleware before base-path rewrite](vite-middleware-before-base-rewrite.md) — custom dev-server middleware must be unshifted and match the base-prefixed URL before Vite's own rewrite runs.

@@ -30,7 +30,13 @@ export type ObjectKind =
   // v16 §1: new civic + downtown sprites
   | 'cafe' | 'hospital' | 'house_c' | 'house_d'
   // v16 §6: The Guard
-  | 'jeep' | 'soldier';
+  | 'jeep' | 'soldier'
+  // v16.1 C: real town hall landmark
+  | 'townhall'
+  // v16.1 D: zoo animals + structures
+  | 'elephant' | 'giraffe' | 'lion'
+  | 'monkey' | 'flamingo' | 'penguin'
+  | 'zoo_gate' | 'zoo_wall' | 'zookeeper';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -69,6 +75,7 @@ export interface KindInfo {
   tier: number;
   minR: number;
   maxR: number;
+  scoreMult?: number;  // v16.1 D: animals worth 2×
 }
 
 export const CONFIG = {
@@ -215,6 +222,7 @@ export const CONFIG = {
   // Water tower is a WORLD-EATER-scale prize
   WATERTOWER_EAT_RADIUS: 300,
   SKYSCRAPER_EAT_RADIUS: 125, // v12 §1: skyscrapers require WORLD ENDER size
+  ZOO_GATE_EAT_RADIUS: 58,    // v16.1 D: zoo gate requires GOBBLER+
   FINAL_FEAST_MS: 30000,      // v12 §2: last 30s triggers the FINAL FEAST
   USE_GROUND_TILES: true,     // v12 §6: tile PNG ground textures when present
 
@@ -358,13 +366,25 @@ export const CONFIG = {
     // v16 §6: The Guard
     jeep:          { tier: 4, minR: 58, maxR: 72 },
     soldier:       { tier: 3, minR: 26, maxR: 32 },
+    // v16.1 C: town hall landmark
+    townhall:      { tier: 5, minR: 104, maxR: 122 },
+    // v16.1 D: zoo animals (2× score) + zoo structures
+    elephant:      { tier: 5, minR: 88, maxR: 108, scoreMult: 2 },
+    giraffe:       { tier: 4, minR: 72, maxR: 88,  scoreMult: 2 },
+    lion:          { tier: 4, minR: 58, maxR: 72,  scoreMult: 2 },
+    monkey:        { tier: 2, minR: 18, maxR: 24,  scoreMult: 2 },
+    flamingo:      { tier: 2, minR: 20, maxR: 26,  scoreMult: 2 },
+    penguin:       { tier: 2, minR: 18, maxR: 22,  scoreMult: 2 },
+    zoo_gate:      { tier: 5, minR: 104, maxR: 122 },
+    zoo_wall:      { tier: 4, minR: 48, maxR: 58 },
+    zookeeper:     { tier: 3, minR: 28, maxR: 34 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void
-  FLEEING_KINDS: ['duck', 'dog', 'person'] as ObjectKind[],
+  FLEEING_KINDS: ['duck', 'dog', 'person', 'monkey', 'flamingo', 'penguin'] as ObjectKind[],
 
   // v14 §2: living kinds that flail while in orbit
-  LIVING_ORBIT_KINDS: ['duck', 'dog', 'person', 'cat', 'squirrel', 'bird', 'crab'] as ObjectKind[],
+  LIVING_ORBIT_KINDS: ['duck', 'dog', 'person', 'cat', 'squirrel', 'bird', 'crab', 'monkey', 'flamingo', 'penguin'] as ObjectKind[],
 
   SKINS: [
     { id: 'classic',   name: 'Classic',   cost: 0,    bodyColor: '#3A1E6B', glowColor: '#B388FF', eyeStyle: 'normal', accessories: [] },

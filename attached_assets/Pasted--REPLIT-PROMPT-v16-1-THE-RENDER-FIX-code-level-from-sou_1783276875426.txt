@@ -1,0 +1,56 @@
+# REPLIT PROMPT — v16.1: THE RENDER FIX (code-level, from source review)
+
+Paste everything below this line into the same Repl, as one message. These instructions come from a direct read of `sprites.ts`, `voidling.ts`, and `world.ts` — apply them exactly; do not reinterpret. Increment BUILD_STAMP to `v16 · 2`.
+
+---
+
+## A — Orb-normalized form/skin sprites (fixes "fish face" + wrong body size)
+
+**A1. `sprites.ts` — extend the alpha scan with an orb-band measurement.**
+Extend `scanAlphaBounds` (or add `scanOrbBand`) to also compute, within the trimmed bounds, the **widest horizontal pixel run scanning rows from 35% to 95% of the trimmed height** (this finds the round body's equator, ignoring flames/ears above it). Store per key:
+- `orbWidthFrac` — that widest run's width / image width
+- `orbCenterYFrac` — that row's y / image height
+Export a map `spriteOrb: Map<string, {w:number; cy:number}>`. Run the scan for **FORM sprites AND SKIN sprites** (skins are currently never scanned — add `scanAlphaBounds(img, id)` + orb scan in the skin loader loop).
+
+**A2. `voidling.ts` — replace the body draw block.**
+Currently:
+```ts
+const d = r * 2.2;
+ctx.drawImage(_activeBody, -d / 2, -d / 2, d, d);
+```
+Replace with orb-normalized drawing: look up `spriteOrb` for the active key (form key when Classic+form sprite, else skin id). Compute `scale = (2 * r) / (orb.w * naturalWidth)` so the sprite's orb width equals the gameplay diameter, then draw the FULL image scaled by `scale`, positioned so the orb-center row sits at y = 0 and the orb's horizontal center at x = 0. Flames/ears extend naturally beyond r; the face (unchanged, drawn after) now lands exactly on the orb. If no orb data exists (scan failed), fall back to the current `r * 2.2` box.
+
+**A3. `voidling.ts` — stop double-painting on form sprites.**
+In `drawVoidling`, when `_activeBody` is a **form sprite** (`skin.id === 'classic' && _formSprite`), skip the entire `drawFormBody(ctx, v)` call — core glow, darken, swirl, cracks, and galaxy are baked into the art. Keep `drawFormLayers` as-is (its ring/debris are outside-body and its flame/galaxy suppressions already work).
+
+**Verify:** as Classic, evolving 1→5: each form is visibly the splash-style creature at correct size, eyes sit on the orb at every level, no grey wash, no doubled flames. Screenshot form 2 next to the splash art — proportions must match.
+
+## B — Downtown stops being beige (world.ts)
+
+**B1. Paved-block ground treatment** in `drawGround`: after the `G.pavement` fill on paved blocks, draw a subtle paving-tile grid (lines every 26px at `rgba(0,0,0,0.045)`), and add a `downtown` case to the tint table: `rgba(120,150,210,0.06)`.
+
+**B2. Dressing on paved blocks** in `buildDressing`: remove the `if ((b as any).paved) continue;` skip. For paved blocks, instead of tufts/fences/hedges, scatter a paved set: 6 drain grates (small dark rounded rects), 4 painted direction arrows (white, 25% alpha), 8 leaf-litter flecks, and 4 concrete planter boxes (rounded rect + green top) per block. Beach blocks keep their sand speckles.
+
+**B3. `fillDowntown` density:** skyscraper chance 0.7 → **1.0** (every downtown block gets one); add `this.scatter(b, rand, 'shop', 2)`; add 2 curbside parked cars per block (`car_parked_a`/`car_parked_b`, placed on the sidewalk band edge, static); cafetables 3 → 4; people 6 → 8.
+
+**B4. Street furniture pass** at the end of `init()`: along the sidewalk ring of every residential and civic block, place a `tree` every ~300px (offset onto the sidewalk band), and give ~30% of block-edge curb segments one parked car (`car_parked_a`/`b`). These are placed once (trees respawn normally; parked cars are INFRA — add both parked-car kinds to `INFRA_KINDS`).
+
+## C — The real town hall (world.ts + config.ts)
+
+In `fillCivic` (civicIdx === 1), replace the `watertower` placement with a **`townhall`** object: add `townhall` to `ObjectKind` + `KIND_INFO` (tier 5, size ≈ school), placed at the block's upper-center. The loader already has `townhall.png` slotted; procedural fallback: cream facade + columns + small clock tower. Update the `townhallEaten` check from `obj.kind === 'watertower'` to `obj.kind === 'townhall'`, and keep the existing water tower on its residential corner untouched.
+
+## D — The real zoo (world.ts + config.ts) — v15 §4 was never built; build it now
+
+- New kinds in `ObjectKind` + `KIND_INFO`: `elephant` (T5), `giraffe` (T4), `lion` (T4), `monkey` (T2, living, hops), `flamingo` (T2, living), `penguin` (T2, living, waddle-hop), `zoo_gate` (T5, static), `zoo_wall` (static, procedural cream stone segments). Animals are worth **2× score** (flag like `golden` scoring or a `scoreMult` on KIND_INFO).
+- `fillZoo`: perimeter `zoo_wall` segments around the block inset (leave one gap at the south-center for the gate), a `zoo_gate` in that gap, pens inside: 1 elephant, 1 giraffe, 1 lion, 3 monkeys, 3 flamingos, 3 penguins, plus 2 zookeepers (person variant with a broom — new person variant index, −5% speed aura on any adjacent void, pure comedy). Keep some trees/benches/visitors.
+- **Gate rule:** the gate (and walls) can only be eaten by a void with `radius >= CONFIG.ZOO_GATE_EAT_RADIUS` (set to the GOBBLER threshold). Smaller voids bounce with a rattle. When the gate is eaten: banner "ZOO BREAK!", `zooSmashed = true` (move the flag here — currently it flips on eating ANYTHING in the zoo block), heavy shake, and the news ticker line fires.
+- Sprite slots `elephant, giraffe, lion, monkey, flamingo, penguin, zoo_gate` are already in the loader list; procedural fallbacks required for all until the art manifest lands.
+
+## Acceptance — verify on a real phone, then report
+
+- Form 1→5 as Classic: correct proportions every level, face on orb, no grey mass; screenshot of form 2 included in the report.
+- Downtown screenshot: paving tiles, tint, grates/arrows/planters, a skyscraper on every downtown block, shops, curbside cars — zero flat beige expanses.
+- Civic row shows an actual town hall building; eating it fires DEMOCRACY DEVOURED.
+- Zoo: walls + gate visible; a MUNCHER bounces off the gate; a GOBBLER smashes it (banner + ticker); animals inside eat at 2×; zookeepers shoo comically.
+- Streets show tree lines and parked cars outside downtown too.
+- BUILD_STAMP reads `v16 · 2`; 60fps; zero console errors across 3 rounds.

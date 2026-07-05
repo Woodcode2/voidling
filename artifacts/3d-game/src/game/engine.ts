@@ -876,6 +876,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         fx.shake(300, 12);
         fx.flash();
         if (ev.text) fx.addText(ev.x, ev.y - 30, ev.text, ev.color || '#FFD23F');
+      } else if (ev.type === 'zoo_break') {
+        // v16.1 D: zoo gate smashed — big celebration
+        fx.shake(400, 18, 30);
+        fx.addRing(ev.x, ev.y, '#8FE36B', 20, 240, 12, 900);
+        banner('ZOO BREAK!', '#8FE36B', 8, { sparkles: true });
       } else if (ev.type === 'finale') {
         triggerFinale(ev.x, ev.y);
       } else if (ev.type === 'evolve') {

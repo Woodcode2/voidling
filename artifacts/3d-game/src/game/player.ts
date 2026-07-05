@@ -33,7 +33,7 @@ export interface OrbitItem {
 }
 
 export interface FxEvent {
-  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve' | 'score' | 'captureStart';
+  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve' | 'score' | 'captureStart' | 'zoo_break';
   x: number;
   y: number;
   text?: string;
@@ -310,7 +310,8 @@ export class Player extends Void {
     if (this.echoActive && (++this.echoCount % 5 === 0)) this.echoPulse = true;
 
     const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1;
-    let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult * this.frenzyMult);
+    const kindScoreMult = CONFIG.KIND_INFO[obj.kind]?.scoreMult ?? 1; // v16.1 D: zoo animals 2×
+    let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult * this.frenzyMult * kindScoreMult);
     if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT;
     if (obj.kind === 'gnome') gain = Math.round(gain * this.gnomeScoreMult);
     if (obj.kind === 'skyscraper') gain *= 3;
