@@ -225,6 +225,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // ── round lifecycle ──
   function start(daily: boolean) {
     audio.init();
+    // v14 §1: async — loads CC0 OGG samples in background; synth fallback until ready
+    audio.loadSamples().catch(() => {});
     isDaily = daily;
     // Reset all per-round flags FIRST, then apply the selected daily mod below
     baseGreed = 1;
@@ -657,7 +659,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       const line = all
         .map((v) => `${v === player ? 'YOU' : (v as Rival).name}: r=${v.radius.toFixed(1)} m=${Math.round(v.mass)} (${v.formName})`)
         .join('  |  ');
-      console.debug('[radii] ' + line);
+      console.log('[radii] ' + line);
     }
 
     // v6 §5: world events
@@ -725,6 +727,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       } else if (ev.type === 'evolve') {
         lastEvoElapsed = roundElapsed; // v10 §5: reset form-badge full-opacity window
         triggerEvolution(ev.x, ev.y, ev.form || 0, ev.text || '');
+      } else if (ev.type === 'captureStart') {
+        // v14 §2: subtle suction ring at the capture point (item beginning its orbit)
+        if (ev.x != null && ev.y != null) {
+          fx.addRing(ev.x, ev.y, ev.color || '#FFFFFF', 0, 28, 2, 200);
+        }
       }
     }
     player.pendingFx.length = 0;

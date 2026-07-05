@@ -11,6 +11,74 @@ export const audio = {
   sfxOn: true,
   musicOn: true,
 
+  // v14 §1: decoded AudioBuffer cache for real CC0 OGG samples
+  _samples: {} as Record<string, AudioBuffer | null>,
+  _samplesLoaded: false,
+
+  // Attempt to decode an OGG into an AudioBuffer.
+  // Returns null on any failure so callers fall back to synth.
+  async _decodeSample(name: string, url: string): Promise<AudioBuffer | null> {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const ab = await r.arrayBuffer();
+      if (!this.ctx) return null;
+      return await this.ctx.decodeAudioData(ab);
+    } catch {
+      return null;
+    }
+  },
+
+  // v14 §1: load all Kenney CC0 OGG samples; run once after init().
+  async loadSamples(): Promise<void> {
+    if (this._samplesLoaded) return;
+    this._samplesLoaded = true; // optimistically prevent re-entry
+    const files: Record<string, string> = {
+      pop_1: '/assets/audio/pop_1.ogg',
+      pop_2: '/assets/audio/pop_2.ogg',
+      pop_3: '/assets/audio/pop_3.ogg',
+      pop_4: '/assets/audio/pop_4.ogg',
+      pop_5: '/assets/audio/pop_5.ogg',
+      thud_big: '/assets/audio/thud_big.ogg',
+      chime_bonus: '/assets/audio/chime_bonus.ogg',
+      fanfare_evolve: '/assets/audio/fanfare_evolve.ogg',
+      chomp_void: '/assets/audio/chomp_void.ogg',
+      ouch: '/assets/audio/ouch.ogg',
+      ui_click: '/assets/audio/ui_click.ogg',
+      ui_confirm: '/assets/audio/ui_confirm.ogg',
+      beep: '/assets/audio/beep.ogg',
+      go: '/assets/audio/go.ogg',
+      horn_event: '/assets/audio/horn_event.ogg',
+    };
+    if (!this.ctx) return;
+    const results = await Promise.allSettled(
+      Object.entries(files).map(async ([k, url]) => {
+        this._samples[k] = await this._decodeSample(k, url);
+        return k;
+      }),
+    );
+    const loaded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - loaded;
+    console.log(`[audio §1] samples loaded=${loaded} fallback-synth=${failed}`);
+  },
+
+  // v14 §1: play a decoded sample via WebAudio with optional playbackRate and volume.
+  // Returns true if the sample was available and scheduled; false → caller should synth.
+  _playSample(name: string, rate = 1, vol = 0.5, when = 0): boolean {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return false;
+    const buf = this._samples[name];
+    if (!buf) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = Math.max(0.05, Math.min(4, rate));
+    const g = this.ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g);
+    g.connect(this.sfxGain);
+    src.start(this.ctx.currentTime + when);
+    return true;
+  },
+
   // pitch-ladder state (climbs 1 semitone per absorb within 1.5s, up to +12)
   _ladder: 0,
   _lastAbsorb: -9999,
@@ -112,8 +180,8 @@ export const audio = {
     src.start(time); src.stop(time + dur + 0.02);
   },
 
-  // ── v8 §5: eat sound v3 — percussive "chest" thump, not a chime ────────────────
-  // transient click + 90Hz sine punch + ladder-carrying pitch-down blip (+ T3+ sub).
+  // ── v14 §1 + v8 §5: eat sound — real OGG sample with pitch-ladder playbackRate,
+  // falls back to percussive synth if the sample isn't loaded yet. ──────────────
   playChomp(tier = 1) {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -122,36 +190,35 @@ export const audio = {
     else this._ladder = 0;
     this._lastAbsorb = ms;
 
-    // 1) 2ms transient click
-    this._noise(now, 0.004, 'highpass', 4000, 0.9, 0.5);
+    // pick sample tier: pop_1 (T1) … pop_5 (T5+)
+    const sampleName = `pop_${Math.min(tier, 5)}`;
+    const rate = Math.pow(2, this._ladder / 12); // pitch-ladder playback rate
+    const vol = tier >= 4 ? 0.7 : 0.52;
+    if (this._playSample(sampleName, rate, vol)) {
+      // T4+: layer the thud_big for weight
+      if (tier >= 4) this._playSample('thud_big', 0.9 + Math.random() * 0.2, 0.38);
+      return; // sample handled it
+    }
 
-    // 2) ~90Hz sine punch, 50ms fast decay
+    // ── synth fallback (unchanged v8 §5) ────────────────────────────────────────
+    this._noise(now, 0.004, 'highpass', 4000, 0.9, 0.5);
     const p = this.ctx.createOscillator(); const pg = this.ctx.createGain();
     p.type = 'sine';
     p.frequency.setValueAtTime(120, now);
     p.frequency.exponentialRampToValueAtTime(80, now + 0.05);
-    pg.gain.setValueAtTime(0.5, now);
-    pg.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    pg.gain.setValueAtTime(0.5, now); pg.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
     p.connect(pg); pg.connect(this.sfxGain); p.start(now); p.stop(now + 0.07);
-
-    // 3) short pitch-down blip carrying the ladder
     const f0 = 620 * Math.pow(2, this._ladder / 12);
     const b = this.ctx.createOscillator(); const bg = this.ctx.createGain();
     b.type = 'triangle';
-    b.frequency.setValueAtTime(f0, now);
-    b.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.06);
-    bg.gain.setValueAtTime(0.12, now);
-    bg.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    b.frequency.setValueAtTime(f0, now); b.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.06);
+    bg.gain.setValueAtTime(0.12, now); bg.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
     b.connect(bg); bg.connect(this.sfxGain); b.start(now); b.stop(now + 0.09);
-
-    // 4) faint sub thump on T3+
     if (tier >= 3) {
       const s = this.ctx.createOscillator(); const sg = this.ctx.createGain();
       s.type = 'sine';
-      s.frequency.setValueAtTime(55, now);
-      s.frequency.exponentialRampToValueAtTime(40, now + 0.14);
-      sg.gain.setValueAtTime(0.28, now);
-      sg.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      s.frequency.setValueAtTime(55, now); s.frequency.exponentialRampToValueAtTime(40, now + 0.14);
+      sg.gain.setValueAtTime(0.28, now); sg.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
       s.connect(sg); sg.connect(this.sfxGain); s.start(now); s.stop(now + 0.18);
     }
   },
@@ -233,17 +300,25 @@ export const audio = {
     this.playTone(520, 'sine', 0.16, 0.05, 0.05);
   },
 
-  // merge / TRIPLE: 3-note chord + upward noise sweep
+  // merge / TRIPLE: v14 §1 — chime sample + synth chord for richness
   playMerge() {
     if (!this.sfxOn || !this.ctx) return;
     const now = this.ctx.currentTime;
-    [523.25, 659.25, 783.99].forEach((f, i) => this.playTone(f, 'triangle', 0.4, 0.14, i * 0.02));
-    this._noise(now, 0.28, 'bandpass', 500, 3, 0.12, 4000);
+    if (!this._playSample('chime_bonus', 1, 0.55)) {
+      // synth fallback
+      [523.25, 659.25, 783.99].forEach((f, i) => this.playTone(f, 'triangle', 0.4, 0.14, i * 0.02));
+      this._noise(now, 0.28, 'bandpass', 500, 3, 0.12, 4000);
+    } else {
+      // keep thin synth harmony on top of the sample
+      [523.25, 783.99].forEach((f, i) => this.playTone(f, 'triangle', 0.35, 0.06, i * 0.02));
+    }
   },
 
-  // getting eaten: descending filtered "wah"
+  // getting eaten: v14 §1 — ouch sample, synth fallback
   playEaten() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    if (this._playSample('ouch', 1, 0.6)) return;
+    // synth fallback (descending filtered wah)
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const filt = this.ctx.createBiquadFilter();
@@ -262,14 +337,19 @@ export const audio = {
 
   playTick() { this.playTone(800, 'square', 0.05, 0.05); },
 
-  // v8 §1: round-start countdown beeps (3/2/1 climb) + the "EAT!" go signal
+  // v14 §1 + v8 §1: countdown beep + EAT! signal — samples with synth fallback
   countBeep(n: number) {
-    const f = n >= 3 ? 440 : n === 2 ? 554 : 659; // A4 → C#5 → E5
+    // pitch-shift the beep sample per count: 3=normal, 2=slight up, 1=higher
+    const rate = n >= 3 ? 1.0 : n === 2 ? 1.19 : 1.41;
+    if (this._playSample('beep', rate, 0.5)) return;
+    // synth fallback
+    const f = n >= 3 ? 440 : n === 2 ? 554 : 659;
     this.playTone(f, 'triangle', 0.16, 0.18);
     this.playTone(f * 2, 'sine', 0.10, 0.06, 0.005);
   },
   eatGo() {
-    // rising triumphant stab + noise transient
+    if (this._playSample('go', 1, 0.65)) return;
+    // synth fallback
     this.playTone(660, 'triangle', 0.20, 0.20);
     this.playTone(990, 'triangle', 0.30, 0.15, 0.02);
     this.playTone(1320, 'sine', 0.34, 0.10, 0.04);
@@ -281,9 +361,11 @@ export const audio = {
     this.playTone(800, 'sine', 0.2, 0.1, 0.1);
   },
 
-  // v8 §5: evolution sting — 400ms riser → boom → 3-chord stab w/ echo → 1s shimmer
+  // v14 §1 + v8 §5: evolution sting — sample boom at the peak, synth riser + stab
   playEvolve() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    // fire the fanfare sample at the boom point (0.4s into the synth riser)
+    this._playSample('fanfare_evolve', 1, 0.65, 0.4);
     const now = this.ctx.currentTime;
     // 1) white-noise riser sweeping up over 400ms
     if (this._noiseBuf) {
@@ -346,9 +428,15 @@ export const audio = {
         this.playTone(587.33, 'square', 0.2, 0.12);
         this.playTone(440, 'square', 0.24, 0.12, 0.18);
         break;
-      default: this.playEvent();
+      default:
+        // v14 §1: real horn sample for any unspecified event id
+        if (!this._playSample('horn_event', 1, 0.55)) this.playEvent();
     }
   },
+
+  // v14 §1: UI click / confirm
+  playClick() { this._playSample('ui_click', 1, 0.45) || this.playTick(); },
+  playConfirm() { this._playSample('ui_confirm', 1, 0.5) || this.playBoon(); },
 
   // v9 §5: TOWN FIGHTS BACK siren layer — a wailing two-tone sweep
   siren() {

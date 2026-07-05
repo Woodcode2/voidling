@@ -191,10 +191,12 @@ export const CONFIG = {
   TRAFFIC_CARS: 12,         // v7 §2: cars cruising the road grid (10–14)
 
   // Absorb / orbit / merge
-  ABSORB_SHRINK_TIME: 190,
-  ORBIT_RADIUS_OFFSET: 26,   // v5 §4: chips sit at playerRadius + 26
-  ORBIT_SPEED: 0.6,          // v5 §4: rad/s (applied as orbitClock/1000 * this)
-  ORBIT_MAX: 6,
+  ABSORB_SHRINK_TIME: 150,       // ms for fly-in phase
+  ORBIT_RADIUS_OFFSET: 30,       // v14 §2: chips sit at playerRadius + 30 (slightly wider for spiral room)
+  ORBIT_SPEED: 1.8,              // v14 §2: rad/s — faster orbit spin for drama (was 0.6)
+  ORBIT_MAX: 8,                  // v14 §2: capacity raised 6→8
+  ORBIT_SPIRAL_DUR: 1800,        // v14 §2: normal spiral duration ms (1.6–2.0s midpoint)
+  ORBIT_SPIRAL_DUR_FAST: 500,    // v14 §2: DEVOURER+ T1/T2 fast orbit ms
   COMBO_DECAY_TIME: 4200,
   EAT_RATIO: 0.9,           // eater.radius must exceed target.size * this to absorb objects
 
@@ -205,7 +207,7 @@ export const CONFIG = {
   USE_GROUND_TILES: true,     // v12 §6: tile PNG ground textures when present
 
   // Audio master levels — v5 §5 (debug-panel adjustable)
-  MUSIC_GAIN: 0.3,
+  MUSIC_GAIN: 0.22,          // v14 §1: lowered (0.3→0.22) so samples sit clearly on top
   SFX_GAIN: 1,
 
   // Rivals
@@ -333,6 +335,9 @@ export const CONFIG = {
 
   // Which kinds run away from a nearby, bigger void
   FLEEING_KINDS: ['duck', 'dog', 'person'] as ObjectKind[],
+
+  // v14 §2: living kinds that flail while in orbit
+  LIVING_ORBIT_KINDS: ['duck', 'dog', 'person', 'cat', 'squirrel', 'bird', 'crab'] as ObjectKind[],
 
   SKINS: [
     { id: 'classic',   name: 'Classic',   cost: 0,    bodyColor: '#3A1E6B', glowColor: '#B388FF', eyeStyle: 'normal', accessories: [] },

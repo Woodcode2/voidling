@@ -115,15 +115,48 @@ function Confetti() {
 
 // ── screens ────────────────────────────────────────────────────────────────────
 // v12 §3: Splash screen — animated voidling drop, shown 1800ms on first mount
+// v14 §4: Splash screen with optional full-bleed splash.png (1.0→1.04 slow zoom).
+// If no splash.png is found the existing starfield + voidling fallback is shown.
 function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
+  const [hasSplash, setHasSplash] = useState(true); // optimistic — hide on error
+  const [zoomed, setZoomed] = useState(false);
+
   useEffect(() => {
+    // Trigger zoom on next paint so the CSS transition actually fires
+    const rf = requestAnimationFrame(() => setZoomed(true));
     const t = window.setTimeout(onDone, 1800);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); cancelAnimationFrame(rf); };
   }, [onDone]);
+
   return (
-    <div className="vd-overlay vd-overlay--solid vd-splash" onClick={onDone} role="button" aria-label="Skip splash">
-      <StarField />
-      <div className="vd-splash-inner">
+    <div
+      className="vd-overlay vd-overlay--solid vd-splash"
+      onClick={onDone}
+      role="button"
+      aria-label="Skip splash"
+      style={{ overflow: 'hidden' }}
+    >
+      {/* Full-bleed cover image with slow-zoom: only shown when splash.png loads */}
+      {hasSplash && (
+        <img
+          src="/assets/splash.png"
+          alt=""
+          aria-hidden="true"
+          onError={() => setHasSplash(false)}
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover',
+            transform: zoomed ? 'scale(1.04)' : 'scale(1.0)',
+            transition: 'transform 2s ease-out',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Fallback starfield when no splash.png */}
+      {!hasSplash && <StarField />}
+
+      <div className="vd-splash-inner" style={{ position: 'relative', zIndex: 2 }}>
         <div className="vd-splash-void">
           <SkinPreview skinId={snap.equippedSkin} size={140} glow={1} />
         </div>
@@ -510,11 +543,29 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
   );
 }
 
-// v6 §13: first-launch (replayable) 3-panel onboarding
+// v14 §4: refreshed onboarding panels — clearer copy, object sprites
 const ONBOARD_PANELS = [
-  { skin: 'classic', title: 'EAT TO GROW', body: 'Swallow anything smaller than you. The more you eat, the bigger you get.' },
-  { skin: 'devil', title: 'DODGE THE BIG ONES', body: 'Bigger voidlings will eat YOU. Keep clear until you outgrow them.' },
-  { skin: 'wizard', title: 'EVOLVE & WIN', body: 'Grow through forms, trigger world events, and top the board before time runs out.' },
+  {
+    skin: 'classic',
+    title: 'EAT',
+    body: 'Everything smaller gets pulled into your orbit. Consume it all and grow.',
+    hint: 'Drag anywhere on screen to move',
+    spriteKind: 'flower',
+  },
+  {
+    skin: 'devil',
+    title: 'DODGE THE BIG ONES',
+    body: "Red rim means run. A bigger voidling will swallow you whole — so get big first.",
+    hint: 'Watch the rim — green = prey, red = danger',
+    spriteKind: 'house',
+  },
+  {
+    skin: 'wizard',
+    title: 'BECOME THE WORLD ENDER',
+    body: 'Chain through five forms, trigger world events, and devour everything before time runs out.',
+    hint: 'Three minutes. Top the board. Go.',
+    spriteKind: 'tree',
+  },
 ];
 
 function Onboarding({ onDone }: { onDone: () => void }) {
@@ -525,9 +576,27 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     <div className="vd-overlay vd-overlay--scrim vd-onboard">
       <button className="vd-onboard-skip" onClick={onDone}>SKIP</button>
       <div className="vd-stack">
-        <div className="vd-hero-void"><SkinPreview key={panel.skin} skinId={panel.skin} size={150} glow={0.7} /></div>
+        <div className="vd-hero-void" style={{ position: 'relative' }}>
+          <SkinPreview key={panel.skin} skinId={panel.skin} size={150} glow={0.7} />
+          {/* sprite icon floating bottom-right of the voidling */}
+          <img
+            src={`/assets/objects/${panel.spriteKind}.png`}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute', bottom: 0, right: 4,
+              width: 52, height: 52, objectFit: 'contain',
+              imageRendering: 'pixelated',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
+            }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
         <h2 className="vd-heading">{panel.title}</h2>
         <p className="vd-onboard-body">{panel.body}</p>
+        <p style={{ color: '#9AAFC8', fontSize: '0.78rem', margin: '0 0 4px', letterSpacing: '0.04em' }}>
+          {panel.hint}
+        </p>
         <div className="vd-dots">
           {ONBOARD_PANELS.map((_, k) => (
             <span key={k} className={'vd-dot' + (k === i ? ' vd-dot--on' : '')} />
