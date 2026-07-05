@@ -1,0 +1,66 @@
+# REPLIT BUILD PROMPT — VOIDLING v14: THE QUALITY BAR
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are raising VOIDLING's sensory quality to commercial standard: real audio, a redesigned absorb mechanic, minimum-latency controls, and sprite-quality onboarding. **Section 0 is blocking — do not proceed past it until its proof is pasted into your report.** Standing rules hold: 60fps, portrait, asset loaders with silent fallbacks, collision from CONFIG sizes only. The 3D-engine question is explicitly out of scope — do not attempt any perspective, isometric, or engine changes.
+
+## 0 — BLOCKING: the size proof
+
+- Run three full rounds in a headless/automated pass or via debug. **Paste the every-10s radius log for all six voids for at least one full round into your report before doing anything else.** If any bot's radius exceeds the player-achievable curve or the countdown assertion (all six radii === 18 at "EAT!") fails, fix the leak first and re-log.
+- **Spawn separation:** at round start, all six voids spawn at least 1.5 screen-widths from each other and from the player. At the size everyone starts, nobody should be visible to anybody. Verify by screenshot at 0:01.
+
+## 1 — Real audio (CC0 samples replace all synth SFX)
+
+- Source professional CC0 audio from **Kenney.nl** (free, public domain, commercially safe — no attribution required). Download and extract from their audio packs (e.g., "Interface Sounds", "Impact Sounds", "Casual Game Sounds", "Digital Audio"): pick clean, juicy samples. Place chosen files in `assets/audio/` with these names:
+  - `pop_1..pop_5.ogg` — small absorb pops (variety pool)
+  - `thud_big.ogg` — T4+ absorb impact
+  - `chime_bonus.ogg` — orbit-match bonus
+  - `fanfare_evolve.ogg` — layered under the existing riser for evolutions
+  - `chomp_void.ogg` — eating a rival
+  - `ouch.ogg` — being eaten
+  - `ui_click.ogg`, `ui_confirm.ogg` — buttons/purchases
+  - `beep.ogg`, `go.ogg` — countdown and EAT!
+  - `horn_event.ogg` — event warnings
+- **Keep the pitch ladder** by playing the pop samples through WebAudio with `playbackRate` stepped per chain (semitone steps, cap +12). Randomize among the 5 pops for texture.
+- Music: keep the layered synth music for now but drop its gain to 0.22 and re-mix so samples sit clearly on top. All samples decode once at boot into buffers; no per-play decoding; total audio payload under 1.5MB (convert/trim as needed).
+- Fallback: if any file is missing, the old synth version of that sound plays. Boot log lists audio assets loaded vs fallback.
+
+## 2 — The Accretion Orbit (absorb redesign — this replaces match-3 gating)
+
+Growth becomes simple and the black-hole fantasy becomes literal:
+
+- **Every captured object enters orbit** at the void's rim, circling for **1.6–2.0 seconds** while spiraling inward, shrinking, and stretching slightly toward the center (gentle spaghettification — cute, not gross). At spiral's end it absorbs: THAT is when growth, score, the chomp animation, the pop, and the +N fire.
+- Orbit capacity 8; if full, the oldest item absorbs instantly to make room. Living things flail while orbiting.
+- At DEVOURER and above, T1–T2 objects use a fast 0.5s micro-orbit so rampage streams keep their popcorn feel.
+- **Matches become automatic bonuses:** whenever 3 same-type objects are in orbit simultaneously, they auto-fuse — TRIPLE burst, bonus growth and score, banner — no player management required. Remove the old chip-ring UI entirely; the orbiting objects themselves are the visual now (they're prettier than icons ever were).
+- Rival chip-theft (v12) becomes orbit-theft: their orbiting items transfer into your orbit.
+- Tune total time-to-growth so overall pacing matches today (the orbit delay must not slow progression — front-load capture rate slightly to compensate). Evolution thresholds unchanged.
+
+## 3 — Controls: minimum-latency pass
+
+- Use `pointerrawupdate` where supported (fall back to `pointermove`), and process **all coalesced events** each frame so no input samples are dropped.
+- Input is applied to the simulation in the same frame it arrives; rendering uses velocity-predicted position (one frame of prediction) so the void feels glued to intent.
+- 2px deadband on the joystick vector to kill micro-jitter; all listeners registered non-passive where preventDefault is needed; verify no scroll/zoom regression.
+- Feel target: side-by-side with any native game, direction changes must feel instant. If anything still feels floaty, reduce smoothing constants until it doesn't, and report the final values.
+
+## 4 — Onboarding + splash at sprite quality
+
+- Rebuild the 3 intro panels using the **loaded sprite assets at full resolution** (equipped skin, devil sprite for danger, world-ender composition for the finale) and update copy for the new mechanic: 1) "EAT — everything smaller gets pulled into your orbit" 2) "DODGE THE BIG ONES — red rim means run" 3) "BECOME THE WORLD ENDER". Panels must look current, not procedural.
+- New splash slot: `assets/ui/splash.png` — when present, the splash screen renders it full-bleed (cover-fit) with the logo and tagline overlaid at the bottom third and a subtle slow zoom (1.0→1.04 over the duration). Tap-to-skip stays. Fallback to the current splash when absent.
+
+## Acceptance criteria — verify on a real phone
+
+- Report contains the pasted radius log; countdown assertion passes; a 0:01 screenshot shows no other void on screen.
+- Eating plays real sampled pops that climb in pitch on chains; a house lands with a real thud; buttons click; countdown beeps and GO hit; boot log lists every audio file loaded. Nothing sounds 8-bit.
+- Captured objects visibly orbit, spiral, stretch, and shrink into the void before growth ticks; three matching items in orbit auto-fuse with a TRIPLE burst; the old chip icons are gone; DEVOURER rampage streams still feel rapid; a stolen orbit transfers on a void chomp.
+- Controls: no dropped input during fast scribbling; direction changes read as instant; final smoothing constants reported.
+- Intro panels render sprite-quality art with the new copy; dropping a splash.png makes the splash cinematic with slow zoom; removing it falls back cleanly.
+- 60fps throughout; zero console errors across 5 rounds.
+
+## Out of scope — hard walls
+
+Any 3D/isometric/engine change (parked pending playtest data), networking, iOS wrap, real payments, new maps/levels (roadmap item, not now), balance curves.
+
+Work strictly in order 0→4. Section 0's log is a gate, not a suggestion.
