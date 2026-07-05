@@ -1175,6 +1175,19 @@ export function drawParkObject(
     // v16 §6: The Guard
     case 'jeep':     return drawJeep(ctx, r, t);
     case 'soldier':  return drawSoldier(ctx, r, t, f);
+    // v16.1 C: town hall landmark
+    case 'townhall': return drawTownHall(ctx, r, t);
+    // v16.1 D: zoo structures
+    case 'zoo_gate': return drawZooGate(ctx, r, t);
+    case 'zoo_wall': return drawZooWall(ctx, r, t);
+    // v16.1 D: zoo animals
+    case 'elephant': return drawElephant(ctx, r, t);
+    case 'giraffe':  return drawGiraffe(ctx, r, t);
+    case 'lion':     return drawLion(ctx, r, t);
+    case 'monkey':   return drawMonkey(ctx, r, t, f);
+    case 'flamingo': return drawFlamingo(ctx, r, t);
+    case 'penguin':  return drawPenguin(ctx, r, t);
+    case 'zookeeper': return drawZookeeper(ctx, r, t, f);
   }
 }
 
@@ -1268,6 +1281,277 @@ function drawSoldier(ctx: CanvasRenderingContext2D, r: number, t: number, fleein
     ctx.restore();
   }
   // eyes
+  dot(ctx, -r * 0.12, -r * 0.54 + bob, r * 0.07, '#1A0B33');
+  dot(ctx, r * 0.12, -r * 0.54 + bob, r * 0.07, '#1A0B33');
+}
+// Temporary file to hold new draw functions for v16.1 — will be appended to objects.ts
+// Town hall, zoo structures, zoo animals
+
+// ── v16.1 C: Town Hall — civic landmark, classical columns + pediment ────────
+function drawTownHall(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // Main building body — cream stone
+  sticker(ctx, (c) => roundRectPath(c, -r, -r * 0.8, r * 2, r * 1.6, r * 0.04), '#F2ECD6', { outline: o });
+  // Pediment (triangular roof)
+  ctx.fillStyle = '#E8DFC8';
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = Math.max(1, o);
+  ctx.beginPath();
+  ctx.moveTo(-r, -r * 0.8); ctx.lineTo(0, -r * 1.4); ctx.lineTo(r, -r * 0.8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // Columns (4 vertical pillars)
+  for (let i = 0; i < 4; i++) {
+    const cx2 = -r * 0.72 + i * r * 0.48;
+    sticker(ctx, (c) => c.rect(cx2 - r * 0.05, -r * 0.78, r * 0.1, r * 1.3), '#EDE4C8', { outline: Math.max(1, o * 0.6), shadow: false });
+  }
+  // Windows (2 arched)
+  for (const sx of [-0.4, 0.4]) {
+    sticker(ctx, (c) => roundRectPath(c, r * sx - r * 0.18, -r * 0.4, r * 0.36, r * 0.52, r * 0.18), '#BFEAFF', { outline: Math.max(1, o * 0.7), shadow: false });
+  }
+  // Entrance door
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.18, r * 0.24, r * 0.36, r * 0.54, r * 0.18), '#8ECBFF', { outline: o, shadow: false });
+  // Flag on pediment
+  ctx.strokeStyle = '#8A7A5A'; ctx.lineWidth = Math.max(1, r * 0.04); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -r * 1.4); ctx.lineTo(0, -r * 1.9); ctx.stroke();
+  sticker(ctx, (c) => { c.moveTo(0, -r * 1.9); c.lineTo(r * 0.3, -r * 1.72); c.lineTo(0, -r * 1.56); c.closePath(); }, '#E23B4E', { outline: 0.5, shadow: false });
+}
+
+// ── v16.1 D: Zoo Gate — arched iron gate, "ZOO" engraved ─────────────────────
+function drawZooGate(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // Two stone pillars
+  for (const sx of [-0.75, 0.75]) {
+    sticker(ctx, (c) => roundRectPath(c, r * sx - r * 0.2, -r * 0.9, r * 0.4, r * 1.7, r * 0.06), '#B0A898', { outline: o });
+    // Pillar cap
+    sticker(ctx, (c) => c.rect(r * sx - r * 0.24, -r * 0.92, r * 0.48, r * 0.14), '#C8BFB0', { outline: o * 0.6, shadow: false });
+    // Pillar ball cap
+    stickerCircle(ctx, r * sx, -r * 1.1, r * 0.18, '#D0C8B8', { outline: o });
+  }
+  // Iron arch bar
+  ctx.strokeStyle = '#3A3030'; ctx.lineWidth = r * 0.12;
+  ctx.beginPath(); ctx.arc(0, -r * 0.2, r * 0.6, Math.PI, 0); ctx.stroke();
+  // Gate bars (6 vertical iron bars)
+  ctx.lineWidth = r * 0.07; ctx.lineCap = 'round';
+  for (let i = -2; i <= 2; i++) {
+    ctx.strokeStyle = i % 2 === 0 ? '#2A2020' : '#3A3030';
+    ctx.beginPath(); ctx.moveTo(r * i * 0.26, -r * 0.82); ctx.lineTo(r * i * 0.26, r * 0.78); ctx.stroke();
+    // spear tips
+    ctx.strokeStyle = '#FFD23F'; ctx.lineWidth = r * 0.05;
+    ctx.beginPath(); ctx.moveTo(r * i * 0.26, -r * 0.82); ctx.lineTo(r * i * 0.26, -r * 0.96); ctx.stroke();
+  }
+  // "ZOO" as three colored blocks (stylised sign)
+  const letters = [[-0.16, '#8FE36B'], [0, '#FFD23F'], [0.16, '#FF9F1C']];
+  for (const [lx, lc] of letters as [number, string][]) {
+    sticker(ctx, (c) => c.rect(r * lx - r * 0.06, -r * 0.05, r * 0.12, r * 0.18), lc, { outline: 0.5, shadow: false });
+  }
+}
+
+// ── v16.1 D: Zoo Wall — concrete wall segment with brick pattern ──────────────
+function drawZooWall(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // Main wall body — wide, squat
+  sticker(ctx, (c) => c.rect(-r, -r * 0.5, r * 2, r * 0.9), '#A8A09A', { outline: o });
+  // Brick joints (horizontal)
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.2;
+  for (const ly of [-0.22, 0.08]) {
+    ctx.beginPath(); ctx.moveTo(-r, r * ly); ctx.lineTo(r, r * ly); ctx.stroke();
+  }
+  // Brick joints (vertical, alternating)
+  for (let row = 0; row < 3; row++) {
+    const offset = row % 2 === 0 ? 0 : r * 0.5;
+    for (let bx = -r + offset; bx < r; bx += r * 1.0) {
+      ctx.beginPath(); ctx.moveTo(bx, -r * 0.5 + row * r * 0.3); ctx.lineTo(bx, -r * 0.5 + (row + 1) * r * 0.3); ctx.stroke();
+    }
+  }
+}
+
+// ── v16.1 D: Elephant ────────────────────────────────────────────────────────
+function drawElephant(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // Ears (big ovals behind body)
+  sticker(ctx, (c) => c.ellipse(-r * 0.68, -r * 0.1, r * 0.48, r * 0.62, -0.3, 0, Math.PI * 2), '#D0C8C0', { outline: o });
+  // Body
+  stickerCircle(ctx, 0, r * 0.1, r * 0.82, '#C0B8B0', { outline: o });
+  // Ear inner (pink)
+  sticker(ctx, (c) => c.ellipse(-r * 0.7, -r * 0.08, r * 0.28, r * 0.4, -0.3, 0, Math.PI * 2), '#E0B8B0', { outline: Math.max(0.5, o * 0.5), shadow: false });
+  // Head
+  stickerCircle(ctx, r * 0.22, -r * 0.56, r * 0.52, '#C0B8B0', { outline: o });
+  // Trunk (curves down)
+  ctx.strokeStyle = '#B0A8A0'; ctx.lineWidth = r * 0.22; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r * 0.52, -r * 0.38); ctx.quadraticCurveTo(r * 0.9, r * 0.1, r * 0.7, r * 0.48); ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = r * 0.06;
+  ctx.beginPath(); ctx.moveTo(r * 0.52, -r * 0.38); ctx.quadraticCurveTo(r * 0.9, r * 0.1, r * 0.7, r * 0.48); ctx.stroke();
+  // Eyes
+  dot(ctx, r * 0.36, -r * 0.7, r * 0.08, '#1A0B33');
+  dot(ctx, r * 0.36, -r * 0.7, r * 0.04, '#FFFFFF');
+  // Legs (4 stubby)
+  for (const [lx, ly] of [[-0.42, 0.82], [-0.14, 0.86], [0.14, 0.86], [0.42, 0.82]] as [number, number][]) {
+    sticker(ctx, (c) => roundRectPath(c, r * lx - r * 0.12, r * ly - r * 0.2, r * 0.24, r * 0.3, r * 0.1), '#B8B0A8', { outline: o, shadow: false });
+  }
+}
+
+// ── v16.1 D: Giraffe ─────────────────────────────────────────────────────────
+function drawGiraffe(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // Legs (4 long)
+  for (const lx of [-0.36, -0.12, 0.12, 0.36]) {
+    sticker(ctx, (c) => c.rect(r * lx - r * 0.08, r * 0.38, r * 0.16, r * 0.62), '#D4AA6A', { outline: o * 0.7, shadow: false });
+  }
+  // Body
+  sticker(ctx, (c) => c.ellipse(0, r * 0.22, r * 0.56, r * 0.36, 0, 0, Math.PI * 2), '#E4BA7A', { outline: o });
+  // Neck
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.12, -r * 0.1); c.lineTo(r * 0.12, -r * 0.1);
+    c.lineTo(r * 0.16, -r * 0.88); c.lineTo(-r * 0.08, -r * 0.88); c.closePath();
+  }, '#E4BA7A', { outline: o, shadow: false });
+  // Head
+  stickerCircle(ctx, 0.05 * r, -r, r * 0.28, '#E4BA7A', { outline: o });
+  // Ossicones (horn nubs)
+  for (const hx of [-0.1, 0.2]) {
+    ctx.fillStyle = '#8A6A3A'; ctx.beginPath(); ctx.ellipse(r * hx, -r * 1.22, r * 0.04, r * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  // Eye
+  dot(ctx, r * 0.12, -r * 1.04, r * 0.07, '#1A0B33');
+  dot(ctx, r * 0.12, -r * 1.04, r * 0.03, '#FFFFFF');
+  // Spots
+  ctx.fillStyle = '#C08040'; ctx.globalAlpha = 0.5;
+  for (const [sx, sy, sr] of [[0, 0.2, 0.14], [-0.3, 0.1, 0.1], [0.3, 0.28, 0.12], [0.06, -0.5, 0.08]] as [number, number, number][]) {
+    ctx.beginPath(); ctx.arc(r * sx, r * sy, r * sr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── v16.1 D: Lion ────────────────────────────────────────────────────────────
+function drawLion(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  // Mane (big circle, dark gold)
+  stickerCircle(ctx, 0, 0, r * 0.88, '#C47830', { outline: o });
+  // Face (lighter circle on top)
+  stickerCircle(ctx, 0, 0, r * 0.64, '#E8A850', { outline: o });
+  // Ears
+  for (const ex of [-0.62, 0.62]) {
+    stickerCircle(ctx, r * ex, -r * 0.62, r * 0.24, '#C47830', { outline: o });
+    stickerCircle(ctx, r * ex, -r * 0.62, r * 0.14, '#E0907A', { outline: 0, shadow: false });
+  }
+  // Eyes
+  for (const ex of [-0.24, 0.24]) {
+    stickerCircle(ctx, r * ex, -r * 0.1, r * 0.12, '#D4AA4A', { outline: o * 0.6 });
+    dot(ctx, r * ex, -r * 0.1, r * 0.06, '#1A0B33');
+  }
+  // Nose
+  sticker(ctx, (c) => c.ellipse(0, r * 0.18, r * 0.1, r * 0.07, 0, 0, Math.PI * 2), '#E87060', { outline: o * 0.6 });
+  // Whiskers
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = r * 0.03; ctx.lineCap = 'round';
+  for (const wy of [0.12, 0.22]) {
+    ctx.beginPath(); ctx.moveTo(-r * 0.18, r * wy); ctx.lineTo(-r * 0.54, r * wy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r * 0.18, r * wy); ctx.lineTo(r * 0.54, r * wy); ctx.stroke();
+  }
+  // Tail tuft
+  stickerCircle(ctx, r * 0.92, r * 0.7, r * 0.2, '#C47830', { outline: o });
+}
+
+// ── v16.1 D: Monkey ───────────────────────────────────────────────────────────
+function drawMonkey(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = false) {
+  const o = ow(r);
+  const bob = Math.sin(t / 340) * r * (fleeing ? 0.1 : 0.04);
+  // Body
+  stickerCircle(ctx, 0, r * 0.22 + bob, r * 0.5, '#8A6040', { outline: o });
+  // Ears
+  for (const ex of [-0.6, 0.6]) {
+    stickerCircle(ctx, r * ex, -r * 0.32 + bob, r * 0.2, '#8A6040', { outline: o });
+    stickerCircle(ctx, r * ex, -r * 0.32 + bob, r * 0.12, '#C89070', { outline: 0, shadow: false });
+  }
+  // Head
+  stickerCircle(ctx, 0, -r * 0.42 + bob, r * 0.42, '#8A6040', { outline: o });
+  // Face patch
+  stickerCircle(ctx, 0, -r * 0.34 + bob, r * 0.28, '#C89070', { outline: 0, shadow: false });
+  // Eyes
+  dot(ctx, -r * 0.14, -r * 0.52 + bob, r * 0.08, '#1A0B33');
+  dot(ctx, r * 0.14, -r * 0.52 + bob, r * 0.08, '#1A0B33');
+  dot(ctx, -r * 0.12, -r * 0.54 + bob, r * 0.03, '#FFFFFF');
+  dot(ctx, r * 0.12, -r * 0.54 + bob, r * 0.03, '#FFFFFF');
+  // Tail (curved)
+  ctx.strokeStyle = '#8A6040'; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r * 0.42, r * 0.6 + bob); ctx.quadraticCurveTo(r * 0.9, r * 0.5 + bob, r * 0.8, r * 0.0 + bob); ctx.stroke();
+  // Arms (long)
+  for (const [ax, ay] of [[-0.7, 0.42], [0.7, 0.42]] as [number, number][]) {
+    ctx.beginPath(); ctx.moveTo(r * (ax > 0 ? 0.42 : -0.42), r * 0.14 + bob); ctx.lineTo(r * ax, r * ay + bob); ctx.stroke();
+  }
+}
+
+// ── v16.1 D: Flamingo ────────────────────────────────────────────────────────
+function drawFlamingo(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const sway = Math.sin(t / 800) * r * 0.04;
+  // Leg (one leg stance)
+  ctx.strokeStyle = '#FF8A78'; ctx.lineWidth = r * 0.08; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(sway, r * 0.68); ctx.lineTo(sway, r * 0.98); ctx.stroke();
+  // Foot
+  ctx.strokeStyle = '#FF7060'; ctx.lineWidth = r * 0.05;
+  for (const a of [-0.4, 0, 0.4]) {
+    ctx.beginPath(); ctx.moveTo(sway, r * 0.98); ctx.lineTo(sway + r * 0.22 * Math.cos(a + 0.5), r * 0.98 + r * 0.14 * Math.sin(a + 0.5)); ctx.stroke();
+  }
+  // Body (oval, tilted)
+  sticker(ctx, (c) => c.ellipse(sway, r * 0.28, r * 0.44, r * 0.28, 0.3, 0, Math.PI * 2), '#FF88C8', { outline: o });
+  // Neck (S-curve, pink)
+  ctx.strokeStyle = '#FF88C8'; ctx.lineWidth = r * 0.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(sway + r * 0.22, r * 0.08); ctx.quadraticCurveTo(sway + r * 0.5, -r * 0.3, sway + r * 0.18, -r * 0.68); ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = r * 0.06;
+  ctx.beginPath(); ctx.moveTo(sway + r * 0.22, r * 0.08); ctx.quadraticCurveTo(sway + r * 0.5, -r * 0.3, sway + r * 0.18, -r * 0.68); ctx.stroke();
+  // Head
+  stickerCircle(ctx, sway + r * 0.18, -r * 0.76, r * 0.22, '#FF88C8', { outline: o });
+  // Beak (bent downward, yellow-tipped)
+  ctx.strokeStyle = '#F0B830'; ctx.lineWidth = r * 0.1;
+  ctx.beginPath(); ctx.moveTo(sway + r * 0.32, -r * 0.72); ctx.quadraticCurveTo(sway + r * 0.58, -r * 0.8, sway + r * 0.52, -r * 0.9); ctx.stroke();
+  ctx.strokeStyle = '#1A1A2A'; ctx.lineWidth = r * 0.05;
+  ctx.beginPath(); ctx.moveTo(sway + r * 0.32, -r * 0.72); ctx.lineTo(sway + r * 0.52, -r * 0.9); ctx.stroke();
+  // Eye
+  dot(ctx, sway + r * 0.26, -r * 0.8, r * 0.07, '#1A0B33');
+}
+
+// ── v16.1 D: Penguin ─────────────────────────────────────────────────────────
+function drawPenguin(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const waddle = Math.sin(t / 380) * r * 0.04;
+  // Body (black back, oval)
+  sticker(ctx, (c) => c.ellipse(waddle, r * 0.08, r * 0.52, r * 0.72, 0, 0, Math.PI * 2), '#1A1A2E', { outline: o });
+  // White belly patch
+  sticker(ctx, (c) => c.ellipse(waddle, r * 0.16, r * 0.3, r * 0.5, 0, 0, Math.PI * 2), '#F5F2F0', { outline: 0, shadow: false });
+  // Head
+  stickerCircle(ctx, waddle, -r * 0.6, r * 0.38, '#1A1A2E', { outline: o });
+  // White face patch
+  sticker(ctx, (c) => c.ellipse(waddle, -r * 0.58, r * 0.22, r * 0.28, 0, 0, Math.PI * 2), '#F5F2F0', { outline: 0, shadow: false });
+  // Eyes
+  for (const ex of [-0.14, 0.14]) {
+    dot(ctx, waddle + r * ex, -r * 0.68, r * 0.08, '#1A0B33');
+    dot(ctx, waddle + r * ex, -r * 0.7, r * 0.03, '#FFFFFF');
+  }
+  // Orange beak
+  sticker(ctx, (c) => c.ellipse(waddle, -r * 0.44, r * 0.1, r * 0.07, 0, 0, Math.PI * 2), '#FF9F1C', { outline: o * 0.6 });
+  // Flippers
+  for (const [fx, fy] of [[-0.58, -0.08], [0.58 + waddle * 2, -0.08]] as [number, number][]) {
+    sticker(ctx, (c) => c.ellipse(r * fx, r * fy, r * 0.14, r * 0.36, fx < 0 ? 0.5 : -0.5, 0, Math.PI * 2), '#1A1A2E', { outline: o * 0.7, shadow: false });
+  }
+  // Feet
+  for (const fx2 of [-0.2, 0.2]) {
+    sticker(ctx, (c) => c.ellipse(waddle + r * fx2, r * 0.8, r * 0.18, r * 0.1, 0, 0, Math.PI * 2), '#FF9F1C', { outline: o * 0.5, shadow: false });
+  }
+}
+
+// ── v16.1 D: Zookeeper — person variant in khaki uniform + bucket hat ────────
+function drawZookeeper(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = false) {
+  const o = ow(r);
+  const bob = Math.sin(t / 300) * r * (fleeing ? 0.1 : 0.04);
+  // Body (khaki uniform)
+  sticker(ctx, (c) => c.ellipse(0, r * 0.22 + bob, r * 0.38, r * 0.46, 0, 0, Math.PI * 2), '#B8A870', { outline: o });
+  // Head
+  stickerCircle(ctx, 0, -r * 0.46 + bob, r * 0.36, '#F4C79B', { outline: o });
+  // Bucket hat (khaki, wider brim)
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.44, -r * 0.76 + bob, r * 0.88, r * 0.22, r * 0.04), '#B8A870', { outline: o, shadow: false });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.34, -r * 1.0 + bob, r * 0.68, r * 0.26, r * 0.08), '#B8A870', { outline: o, shadow: false });
+  // Hat band (dark stripe)
+  ctx.fillStyle = '#7A6A3A';
+  ctx.fillRect(-r * 0.34, -r * 0.76 + bob, r * 0.68, r * 0.06);
+  // Eyes
   dot(ctx, -r * 0.12, -r * 0.54 + bob, r * 0.07, '#1A0B33');
   dot(ctx, r * 0.12, -r * 0.54 + bob, r * 0.07, '#1A0B33');
 }

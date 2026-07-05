@@ -2,7 +2,7 @@
 // Draws a cute jelly black-hole creature centered at (x,y) with a given skin.
 import type { SkinDef } from './config';
 import { drawSkinBack, drawSkinFront, drawSkinBody } from './skins';
-import { skinSprites, layerSprites, formSprites } from './sprites'; // v10 §1 / v16 §4: PNG art when present
+import { skinSprites, layerSprites, formSprites, spriteOrb } from './sprites'; // v10 §1 / v16 §4 / v16.1 A1
 
 export interface VoidlingVisual {
   r: number;
@@ -61,9 +61,22 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   const _formSprite = formSprites.get(_formKey);
   const _activeBody = (skin.id === 'classic' && _formSprite) ? _formSprite : artSprite;
   if (_activeBody) {
-    // Sprite is drawn slightly oversized to include its own outline/glow allowance
-    const d = r * 2.2;
-    ctx.drawImage(_activeBody, -d / 2, -d / 2, d, d);
+    // v16.1 A2: orb-normalized drawing — scale so the orb-band width equals 2*r.
+    // The orb-centre row sits at y=0 so gameplay radius and visual orb align perfectly.
+    const orbKey = (skin.id === 'classic' && _formSprite) ? _formKey : skin.id;
+    const orb = spriteOrb.get(orbKey);
+    if (orb && orb.w > 0) {
+      const scale = (2 * r) / (orb.w * _activeBody.naturalWidth);
+      const iw = _activeBody.naturalWidth * scale;
+      const ih = _activeBody.naturalHeight * scale;
+      const cx = iw / 2;
+      const cy = orb.cy * _activeBody.naturalHeight * scale;
+      ctx.drawImage(_activeBody, -cx, -cy, iw, ih);
+    } else {
+      // Fallback: fixed oversized box (no orb data — sprite not yet scanned or absent)
+      const d = r * 2.2;
+      ctx.drawImage(_activeBody, -d / 2, -d / 2, d, d);
+    }
   } else {
     // Fallback: procedural body (3× supersampled cached sprite)
     const sprite = getBodySprite(skin.bodyColor);
@@ -74,8 +87,10 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   // ── v8 §8: premium surface effects — skipped when art sprite is active (it includes them) ─
   if (!_activeBody) drawSkinBody(ctx, skin, r, v.t);
 
-  // ── v9 §3: evolution BODY morphs painted onto/into the orb (clipped) ─────────
-  drawFormBody(ctx, v);
+  // ── v9 §3: evolution BODY morphs — v16.1 A3: skip when form sprite active (baked in art) ─
+  if (!(_activeBody && skin.id === 'classic' && _formSprite)) {
+    drawFormBody(ctx, v);
+  }
 
   // ── Face (crisp, unsquashed) ────────────────────────────────────────────────
   drawFace(ctx, v);

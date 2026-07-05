@@ -265,7 +265,8 @@ function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
   }
 }
 
-const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab'];
+const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab',
+  'monkey', 'flamingo', 'penguin', 'zookeeper']; // v16.1 D: zoo animals
 
 export class WorldManager {
   objects: WorldObject[] = [];
@@ -280,6 +281,7 @@ export class WorldManager {
   private dressHedges: { x: number; y: number; r: number }[] = [];
   private dressMats: { x: number; y: number }[] = [];
   private dressManholes: { x: number; y: number }[] = [];
+  private dressPaved: { x: number; y: number; kind: 'grate' | 'arrow' | 'leaf' | 'planter'; rot: number; s: number }[] = [];
   size: number;
   totalStartArea = 0;
   eatenArea = 0;
@@ -310,7 +312,8 @@ export class WorldManager {
     const cFrac = spriteContactFrac.get(SPRITE_KEY_MAP[kind] ?? kind);
     const contactRadius = cFrac != null ? 0.90 * baseSize * cFrac : baseSize * 0.85;
     // v16 §2: infra objects placed once per map, never respawn
-    const INFRA_KINDS: ObjectKind[] = ['hydrant', 'mailbox', 'trashcan', 'bench', 'bike', 'scooter'];
+    // v16.1 B4: parked cars are infra too (placed on street furniture pass)
+    const INFRA_KINDS: ObjectKind[] = ['hydrant', 'mailbox', 'trashcan', 'bench', 'bike', 'scooter', 'car_parked_a', 'car_parked_b'];
     const o: WorldObject = {
       id: this.nextId++,
       kind,
@@ -447,6 +450,31 @@ export class WorldManager {
     this.validateDensity(rand);
     // v5 §3: build the ground-dressing layer (drawn under objects)
     this.buildDressing(rand);
+
+    // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
+    const TREE_INSET = CONFIG.SIDEWALK + 16;
+    const TREE_STEP = 300;
+    const STREET_BLOCKS: BlockType[] = ['residential', 'civic'];
+    for (const b2 of this.blocks) {
+      if (!STREET_BLOCKS.includes(b2.type)) continue;
+      // Sidewalk-edge trees every ~300px along all four sides
+      for (let x = b2.x0 + TREE_INSET; x < b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET; x += TREE_STEP) {
+        this.makeObj('tree', x, b2.y0 + TREE_INSET, { infra: true });
+        this.makeObj('tree', x, b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET, { infra: true });
+      }
+      for (let y = b2.y0 + TREE_INSET + TREE_STEP; y < b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET * 1.5; y += TREE_STEP) {
+        this.makeObj('tree', b2.x0 + TREE_INSET, y, { infra: true });
+        this.makeObj('tree', b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, y, { infra: true });
+      }
+      // ~30% chance: parked car on each curb side
+      const carPool: ObjectKind[] = ['car_parked_a', 'car_parked_b'];
+      const innerW = CONFIG.BLOCK_SIZE - TREE_INSET * 2;
+      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET + rand() * innerW, b2.y0 + TREE_INSET, { infra: true });
+      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET + rand() * innerW, b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET, { infra: true });
+      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET, b2.y0 + TREE_INSET + rand() * innerW, { infra: true });
+      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, b2.y0 + TREE_INSET + rand() * innerW, { infra: true });
+    }
+
     // v6 §2: remember the starting count so respawn can top back up to 85%
     this.initialPopulation = this.objects.length;
     this.initialMass = this.totalStartArea; // v8 §3: freeze the % devoured denominator
@@ -484,9 +512,9 @@ export class WorldManager {
   private buildDressing(rand: () => number) {
     this.dressTufts = []; this.dressFence = []; this.dressHedges = [];
     this.dressMats = []; this.dressManholes = [];
+    this.dressPaved = []; // v16.1 B2
     const inset = CONFIG.SIDEWALK;
     for (const b of this.blocks) {
-      if ((b as any).paved) continue;
       const ix = b.x0 + inset, iy = b.y0 + inset;
       const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
       if (b.type === 'beach') {
@@ -500,6 +528,18 @@ export class WorldManager {
           });
         }
         continue; // skip fence / hedge for beach blocks
+      }
+      if ((b as any).paved) {
+        // v16.1 B2: paved block dressing — drain grates, direction arrows, leaf litter, concrete planters
+        for (let i = 0; i < 6; i++)
+          this.dressPaved.push({ x: ix + rand() * iw, y: iy + rand() * ih, kind: 'grate', rot: 0, s: 1 });
+        for (let i = 0; i < 4; i++)
+          this.dressPaved.push({ x: ix + rand() * iw, y: iy + rand() * ih, kind: 'arrow', rot: Math.floor(rand() * 4) * Math.PI / 2, s: 1 });
+        for (let i = 0; i < 8; i++)
+          this.dressPaved.push({ x: ix + rand() * iw, y: iy + rand() * ih, kind: 'leaf', rot: rand() * Math.PI * 2, s: 0.5 + rand() * 0.8 });
+        for (let i = 0; i < 4; i++)
+          this.dressPaved.push({ x: ix + rand() * iw, y: iy + rand() * ih, kind: 'planter', rot: rand() * Math.PI * 0.15, s: 1 });
+        continue;
       }
       // v13 §3: doubled tuft density (60 → 120) for richer-looking non-beach blocks
       for (let i = 0; i < 120; i++) {
@@ -668,11 +708,12 @@ export class WorldManager {
 
   // v12 §1: downtown block — skyscrapers + offices + street life
   // v16 §1: added café buildings for street variety
+  // v16.1 B3: denser skyline + shops + curbside cars
   private fillDowntown(b: Block, rand: () => number) {
     (b as any).paved = true; // no grass tufts; uses asphalt/sidewalk tiling
     const inset = CONFIG.SIDEWALK + 50;
-    // 1 skyscraper per downtown block (70% chance), offset from center
-    if (rand() < 0.7) {
+    // v16.1 B3: every downtown block gets a skyscraper (100%)
+    {
       const sx = b.x0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2);
       const sy = b.y0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2) * 0.5;
       this.makeObj('skyscraper', sx, sy);
@@ -688,15 +729,21 @@ export class WorldManager {
       const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 28);
       this.makeObj('cafe', p.x, p.y);
     }
+    // v16.1 B3: 2 shops per downtown block
+    this.scatter(b, rand, 'shop', 2);
     // street furniture
-    this.scatter(b, rand, 'cafetable', 3);
-    this.scatter(b, rand, 'person', 6);
+    this.scatter(b, rand, 'cafetable', 4);  // v16.1 B3: 3→4
+    this.scatter(b, rand, 'person', 8);     // v16.1 B3: 6→8
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 3);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
+    // v16.1 B3: 2 curbside parked cars
+    this.scatter(b, rand, 'car_parked_a', 1);
+    this.scatter(b, rand, 'car_parked_b', 1);
   }
 
-  // v16 §1: civic block — school+library on index 0, hospital+library on index 1
+  // v16 §1: civic block — school+library on index 0, hospital+townhall on index 1
+  // v16.1 C: civicIdx===1 gets a real townhall landmark instead of watertower
   private fillCivic(b: Block, rand: () => number, civicIdx: number) {
     (b as any).paved = false;
     const cx = b.x0 + CONFIG.BLOCK_SIZE / 2;
@@ -707,10 +754,10 @@ export class WorldManager {
       const libP = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 50);
       this.makeObj('library', libP.x, libP.y);
     } else {
-      // right civic block: hospital + town hall
+      // right civic block: hospital + real town hall landmark
       this.makeObj('hospital', cx, cy);
       const thP = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 60);
-      this.makeObj('watertower', thP.x, thP.y); // town hall landmark (largest civic T5)
+      this.makeObj('townhall', thP.x, thP.y); // v16.1 C: real town hall T5 building
     }
     // shared amenities
     this.scatter(b, rand, 'bench', 3);
@@ -741,33 +788,69 @@ export class WorldManager {
     this.scatter(b, rand, 'mailbox', 2);
   }
 
-  // v15 §4: ZOO compound — animal enclosures, visitors, edibles
+  // v16.1 D: ZOO compound — perimeter walls, gate, animal pens, visitors
   private fillZoo(b: Block, rand: () => number) {
     (b as any).zoo = true;
-    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2, cy = b.y0 + CONFIG.BLOCK_SIZE / 2;
-    // Feature: extra lush green lawn
-    this.scatter(b, rand, 'tree', 6);
-    this.scatter(b, rand, 'flower', 12);
-    this.scatter(b, rand, 'flowerpot', 6);
-    this.scatter(b, rand, 'bench', 4);
-    this.scatter(b, rand, 'person', 5);
-    this.scatter(b, rand, 'dog', 3);
-    this.scatter(b, rand, 'cat', 2);
-    this.scatter(b, rand, 'duck', 4);
-    this.scatter(b, rand, 'squirrel', 3);
-    this.scatter(b, rand, 'gnome', 3);
-    this.scatter(b, rand, 'trashcan', 2, cx, cy);
+    const S = CONFIG.SIDEWALK;
+    const BS = CONFIG.BLOCK_SIZE;
+    const x0 = b.x0 + S, y0 = b.y0 + S;
+    const bw = BS - S * 2, bh = BS - S * 2;
+    const cx = b.x0 + BS / 2, cy = b.y0 + BS / 2;
+
+    // Perimeter zoo walls — place every ~90px, skip south-center gate gap
+    const wallStep = 90;
+    const gateHalfW = 90;  // half-width of the gate gap
+    const southY = y0 + bh;
+    // Top wall row
+    for (let wx = x0; wx <= x0 + bw; wx += wallStep) {
+      this.makeObj('zoo_wall', wx, y0);
+    }
+    // Bottom wall row (gap at cx ± gateHalfW)
+    for (let wx = x0; wx <= x0 + bw; wx += wallStep) {
+      if (wx >= cx - gateHalfW && wx <= cx + gateHalfW) continue;
+      this.makeObj('zoo_wall', wx, southY);
+    }
+    // Left wall
+    for (let wy = y0 + wallStep; wy < y0 + bh; wy += wallStep) {
+      this.makeObj('zoo_wall', x0, wy);
+    }
+    // Right wall
+    for (let wy = y0 + wallStep; wy < y0 + bh; wy += wallStep) {
+      this.makeObj('zoo_wall', x0 + bw, wy);
+    }
+    // Zoo gate at south-center gap
+    this.makeObj('zoo_gate', cx, southY);
+
+    // Large animal pens — one per quadrant (NW, NE, SW)
+    const qx = bw * 0.27, qy = bh * 0.27;
+    this.makeObj('elephant', b.x0 + S + qx, b.y0 + S + qy);
+    this.makeObj('giraffe',  b.x0 + S + bw - qx, b.y0 + S + qy);
+    this.makeObj('lion',     b.x0 + S + qx, b.y0 + S + bh - qy * 1.4);
+
+    // Smaller animal groups
+    for (let i = 0; i < 3; i++) this.makeObj('monkey',   x0 + bw * 0.6 + rand() * bw * 0.3,  y0 + bh * 0.3 + rand() * bh * 0.25);
+    for (let i = 0; i < 3; i++) this.makeObj('flamingo', x0 + bw * 0.1 + rand() * bw * 0.25, y0 + bh * 0.55 + rand() * bh * 0.25);
+    for (let i = 0; i < 3; i++) this.makeObj('penguin',  x0 + bw * 0.5 + rand() * bw * 0.35, y0 + bh * 0.55 + rand() * bh * 0.3);
+
+    // Zookeepers + visitors + green lush scenery
+    this.scatter(b, rand, 'zookeeper', 2);
+    this.scatter(b, rand, 'person', 4);
+    this.scatter(b, rand, 'tree', 5);
+    this.scatter(b, rand, 'flower', 10);
+    this.scatter(b, rand, 'bench', 3);
     this.scatter(b, rand, 'apple', 4);
-    // A small pond in one corner
-    const pondX = b.x0 + CONFIG.BLOCK_SIZE * 0.25, pondY = b.y0 + CONFIG.BLOCK_SIZE * 0.25;
-    const pondR = CONFIG.BLOCK_SIZE * 0.15;
+    this.scatter(b, rand, 'trashcan', 2, cx, cy);
+
+    // Small pond (flamingo watering hole)
+    const pondX = x0 + bw * 0.25, pondY = y0 + bh * 0.65;
+    const pondR = BS * 0.12;
     (b as any).pond = { x: pondX, y: pondY, r: pondR };
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const a = rand() * Math.PI * 2, rr = rand() * pondR * 0.7;
       const o = this.makeObj('duck', pondX + Math.cos(a) * rr, pondY + Math.sin(a) * rr);
       o.homeX = pondX; o.homeY = pondY; o.tether = pondR * 0.8;
     }
-    this.spawnBirds(b, rand, 4);
+    this.spawnBirds(b, rand, 3);
   }
 
   // v15 §4: Town Hall — civic hub, fountain, plaza feel, crowd
@@ -908,6 +991,7 @@ export class WorldManager {
   private canEatByPlayer(player: Player, obj: WorldObject) {
     if (obj.kind === 'watertower') return player.radius >= CONFIG.WATERTOWER_EAT_RADIUS;
     if (obj.kind === 'skyscraper') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
+    if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') return player.radius >= CONFIG.ZOO_GATE_EAT_RADIUS; // v16.1 D
     return player.radius >= obj.size * CONFIG.EAT_RATIO;
   }
 
@@ -1034,6 +1118,7 @@ export class WorldManager {
         if (!r.alive || r.ghost) continue;
         if (obj.kind === 'watertower') continue; // only WORLD-EATER player eats it
         if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
+        if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue; // v16.1 D: GOBBLER+ only
         const dr = dist(obj.x, obj.y, r.x, r.y);
         // v16 §3: use art-derived contactRadius instead of CONFIG.CONTACT_SCALE
         if (dr < r.radius + obj.contactRadius && this.canEat(r.radius, obj.size)) {
@@ -1402,14 +1487,20 @@ export class WorldManager {
     if (BEACH_KINDS.includes(obj.kind)) this.playerStats.beachItems++;
     if (DOWNTOWN_KINDS.includes(obj.kind)) this.playerStats.downtownItems++;
 
-    // v15 §4: district trophies — one-time flags when player eats inside zoo/townhall
+    // v16.1 D: zooSmashed triggers only when the zoo gate is eaten
+    if (obj.kind === 'zoo_gate') this.zooSmashed = true;
+    // v16.1 C: townhallEaten triggers on the townhall landmark object
     const blockType = this.blockTypeAt(obj.x, obj.y);
-    if (blockType === 'zoo') this.zooSmashed = true;
-    // v16: civic blocks replaced the v15 townhall block; the watertower is the town hall landmark
-    if (blockType === 'townhall' || (blockType === 'civic' && obj.kind === 'watertower')) this.townhallEaten = true;
+    if (blockType === 'townhall' || (blockType === 'civic' && obj.kind === 'townhall')) this.townhallEaten = true;
 
     // reaction flavor
-    if (obj.kind === 'house') {
+    if (obj.kind === 'zoo_gate') {
+      // v16.1 D: zoo gate smashed — big celebration shake + ring
+      fx.shake(400, 18, 30);
+      fx.addRing(obj.x, obj.y, '#8FE36B', 20, obj.baseSize * 4, 12, 900);
+      fx.addDebris(obj.x, obj.y, '#8FE36B', 8);
+      fx.addDebris(obj.x, obj.y, '#FFD23F', 4);
+    } else if (obj.kind === 'house') {
       fx.shake(300, 10, 20);
       fx.addDebris(obj.x, obj.y, '#C4736B', 4);
       fx.addDebris(obj.x, obj.y, '#F6E7B0', 2);
@@ -1438,6 +1529,9 @@ export class WorldManager {
 
     if (obj.kind === 'watertower') {
       player.pendingFx.push({ type: 'finale', x: obj.x, y: obj.y });
+    }
+    if (obj.kind === 'zoo_gate') {
+      player.pendingFx.push({ type: 'zoo_break', x: obj.x, y: obj.y }); // v16.1 D: ZOO BREAK! banner
     }
   }
 
@@ -1497,15 +1591,34 @@ export class WorldManager {
       else if (b.type === 'beach') ctx.fillStyle = '#F0DFB8'; // v13 §2: sandy shore floor
       else ctx.fillStyle = G.lawns[(b.gx + b.gy) % G.lawns.length];
       ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
+      // v16.1 B1: paving-tile grid on paved blocks (lines every 26px)
+      if (paved) {
+        const ix = b.x0 + inset, iy = b.y0 + inset;
+        const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
+        ctx.strokeStyle = 'rgba(0,0,0,0.045)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let gx2 = Math.floor(ix / 26) * 26; gx2 <= ix + iw; gx2 += 26) {
+          ctx.moveTo(gx2, iy); ctx.lineTo(gx2, iy + ih);
+        }
+        for (let gy2 = Math.floor(iy / 26) * 26; gy2 <= iy + ih; gy2 += 26) {
+          ctx.moveTo(ix, gy2); ctx.lineTo(ix + iw, gy2);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
       // v6 §8: zone grading — a faint per-district tint so areas read differently
       // v15 §4: ZOO gets lush green tint; TOWNHALL gets warm civic amber
-      const tint = b.type === 'park' ? 'rgba(120,220,140,0.08)'       // slightly richer park
-        : b.type === 'zoo' ? 'rgba(80,210,120,0.11)'                  // v15 §4: lush zoo green
-        : b.type === 'townhall' ? 'rgba(255,195,90,0.08)'             // v15 §4: civic amber
+      // v16.1 B1: downtown gets cool blue-violet tint
+      const tint = b.type === 'park' ? 'rgba(120,220,140,0.08)'
+        : b.type === 'zoo' ? 'rgba(80,210,120,0.11)'
+        : b.type === 'townhall' ? 'rgba(255,195,90,0.08)'
+        : b.type === 'downtown' ? 'rgba(120,150,210,0.06)'  // v16.1 B1
         : b.type === 'plaza' ? 'rgba(255,210,120,0.05)'
         : b.type === 'playground' ? 'rgba(255,150,200,0.05)'
         : b.type === 'school' ? 'rgba(180,140,255,0.07)'
-        : b.type === 'beach' ? 'rgba(255,220,100,0.08)' : null; // v13 §2: warm sandy tint
+        : b.type === 'beach' ? 'rgba(255,220,100,0.08)' : null;
       if (tint) {
         ctx.fillStyle = tint;
         ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
@@ -1664,6 +1777,53 @@ export class WorldManager {
       if (!inView(d.x, d.y)) continue;
       if (d.s * 10 * zoom < 4) continue; // screen px ≈ d.s * 10 * zoom
       this.drawTuft(ctx, d, gust);
+    }
+
+    // v16.1 B2: paved dressing — drain grates, arrows, leaf litter, concrete planters
+    for (const p of this.dressPaved) {
+      if (!inView(p.x, p.y, 30)) continue;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.scale(p.s, p.s);
+      if (p.kind === 'grate') {
+        // Drain grate: dark circle with grid
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1.2;
+        for (let g = -6; g <= 6; g += 4) {
+          ctx.beginPath(); ctx.moveTo(g, -9); ctx.lineTo(g, 9); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-9, g); ctx.lineTo(9, g); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.lineWidth = 1.5; ctx.stroke();
+      } else if (p.kind === 'arrow') {
+        // Painted directional arrow
+        ctx.globalAlpha = 0.1;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(0, -14); ctx.lineTo(6, -4); ctx.lineTo(2, -4);
+        ctx.lineTo(2, 10); ctx.lineTo(-2, 10); ctx.lineTo(-2, -4);
+        ctx.lineTo(-6, -4); ctx.closePath();
+        ctx.fill();
+      } else if (p.kind === 'leaf') {
+        // Leaf litter fleck
+        ctx.globalAlpha = 0.18;
+        const leafColors = ['#B8860B', '#8B6914', '#6B4F1A', '#A07040'];
+        ctx.fillStyle = leafColors[Math.abs(Math.floor(p.x + p.y)) % leafColors.length];
+        ctx.beginPath(); ctx.ellipse(0, 0, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (p.kind === 'planter') {
+        // Concrete planter box
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = '#B0A898';
+        ctx.fillRect(-14, -10, 28, 20);
+        ctx.fillStyle = '#5A8A48';
+        ctx.fillRect(-10, -7, 20, 6);
+        // rim highlight
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+        ctx.strokeRect(-14, -10, 28, 20);
+      }
+      ctx.restore();
     }
   }
 

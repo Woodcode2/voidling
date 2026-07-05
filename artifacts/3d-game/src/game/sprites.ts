@@ -23,6 +23,13 @@ export const spriteBounds: Map<string, SpriteBounds> = new Map();
 // Absent when sprite is not loaded; callers fall back to baseSize * 0.85.
 export const spriteContactFrac: Map<string, number> = new Map();
 
+// v16.1 A1: orb-band metrics — used to orb-normalize sprite drawing.
+// w = widest opaque pixel run / imageWidth in the orb band (rows 35%–95% of trimmed height).
+// cy = image-space y of the orb-band centre row / imageHeight.
+// Absent when sprite not loaded; callers fall back to r*2.2 box.
+export interface SpriteOrb { w: number; cy: number; }
+export const spriteOrb: Map<string, SpriteOrb> = new Map();
+
 function scanAlphaBounds(img: HTMLImageElement, key: string): void {
   try {
     const canvas = document.createElement('canvas');
@@ -62,6 +69,28 @@ function scanAlphaBounds(img: HTMLImageElement, key: string): void {
       // No pixels in bottom third — fall back to full-bounds width
       spriteContactFrac.set(key, (maxX - minX + 1) / W);
     }
+
+    // v16.1 A1: orb-band scan — rows 35%–95% of trimmed height, widest contiguous run
+    const trimH = maxY - minY + 1;
+    const orbY0 = Math.round(minY + trimH * 0.35);
+    const orbY1 = Math.round(minY + trimH * 0.95);
+    let orbWidest = 0, orbWidestCy = (orbY0 + orbY1) / 2;
+    for (let y = orbY0; y <= orbY1; y++) {
+      let rowMin = W, rowMax = -1;
+      for (let x = 0; x < W; x++) {
+        if (data[(y * W + x) * 4 + 3] > 8) {
+          if (x < rowMin) rowMin = x;
+          if (x > rowMax) rowMax = x;
+        }
+      }
+      if (rowMax >= 0) {
+        const span = rowMax - rowMin + 1;
+        if (span > orbWidest) { orbWidest = span; orbWidestCy = y; }
+      }
+    }
+    if (orbWidest > 0) {
+      spriteOrb.set(key, { w: orbWidest / W, cy: orbWidestCy / H });
+    }
   } catch {
     // cross-origin or tainted canvas — skip; caller falls back to full rect
   }
@@ -89,6 +118,10 @@ const OBJECT_IDS = [
   'cafe','hospital','house_c','house_d',
   // v16 §6: guard
   'jeep',
+  // v16.1 C: town hall
+  'townhall',
+  // v16.1 D: zoo
+  'elephant','giraffe','lion','monkey','flamingo','penguin','zoo_gate','zoo_wall',
 ];
 
 // v16 §4: evolution form body sprites (form_1 … form_5)
@@ -126,8 +159,11 @@ export async function preloadSprites(base: string): Promise<void> {
   for (const id of SKIN_IDS) {
     const img = new Image();
     tasks.push(tryLoad(`${base}assets/skins/${id}.png`, img).then((ok) => {
-      if (ok) { skinSprites.set(id, img); skinLoaded.push(id); }
-      else skinFallback.push(id);
+      if (ok) {
+        skinSprites.set(id, img);
+        scanAlphaBounds(img, id); // v16.1 A1: scan orb band for skin sprites too
+        skinLoaded.push(id);
+      } else skinFallback.push(id);
     }));
   }
 
