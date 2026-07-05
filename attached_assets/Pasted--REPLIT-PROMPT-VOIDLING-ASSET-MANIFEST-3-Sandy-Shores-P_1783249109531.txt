@@ -1,0 +1,37 @@
+# REPLIT PROMPT — VOIDLING ASSET MANIFEST 3 (Sandy Shores)
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+Download the following image files and save each one to its exact target path. Same rules as prior manifests. All URLs share this base:
+
+`BASE = https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/`
+
+## assets/objects/
+
+| Save as | File at BASE |
+|---|---|
+| assets/objects/palm.png | hf_20260705_021536_6f3a2243-88ad-4412-af70-ec94fa86fe88.png |
+| assets/objects/umbrella.png | hf_20260705_021544_c05da329-1de8-42cb-8a70-ee714be104bb.png |
+| assets/objects/sandcastle.png | hf_20260705_021555_9b6b1ba9-3b6f-4834-b146-faed048b1314.png |
+| assets/objects/lifeguard.png | hf_20260705_021605_9a299595-86bb-46fe-a1a3-cdd8c2d2eca7.png |
+| assets/objects/surfboard.png | hf_20260705_021613_a4da65b7-6623-40ef-9ee7-282d521a8de8.png |
+| assets/objects/towel.png | hf_20260705_021621_2cb0bfd3-5e29-4a2d-8c31-baff21d87c42.png |
+| assets/objects/crab.png | hf_20260705_021631_363d7272-1bef-4755-a727-7836f624465b.png |
+| assets/objects/seashell.png | hf_20260705_021639_0c7fe192-8dce-4781-a75b-656a12dbd373.png |
+| assets/objects/car_parked_a.png | hf_20260705_021653_931770a7-ca97-43f5-8cac-1dfdd4ade236.png |
+| assets/objects/car_parked_b.png | hf_20260705_021701_5f48e49d-be94-427c-89f1-ccd582b4f700.png |
+
+## assets/ground/
+
+| Save as | File at BASE | Note |
+|---|---|---|
+| assets/ground/sand.png | hf_20260705_021209_d540b592-03d3-4caa-b17c-79258d5c797c.png | full-bleed tile |
+| assets/ground/water.png | hf_20260705_021219_68a02df9-3f0a-45d8-b4f0-39fd7bddd7be.png | full-bleed tile |
+
+## Verify, then report
+
+1. Verify EVERY file exists, is larger than 10KB, and begins with PNG magic bytes (`89 50 4E 47`). Re-download failures; report any 404 verbatim — substitute nothing.
+2. Do not modify game code — the v13 loaders already expect these exact paths; `useGroundTiles` governs sand and water.
+3. Restart, then paste the asset boot log: the 10 new object entries and 2 ground entries should read **loaded**.
