@@ -62,6 +62,9 @@ export interface Snapshot {
   heldSpell: BoonDef | null;
   activeSpell: string | null;
   showHitboxes: boolean;
+  // v16
+  ticker: string | null;
+  contracts: Array<{id: string; name: string; done: boolean; reward: number}>;
 }
 
 export interface GameEngine {
@@ -169,6 +172,40 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let spellFrozenRival: Rival | null = null;
   let spellBubble: { x: number; y: number; r: number } | null = null;
   let showHitboxes = false;
+  // v16 §5: news ticker + contracts
+  let currentTicker: string | null = null;
+  let tickerCd = 0; // ms until next ticker fires
+  let activeContracts: Array<{id: string; name: string; done: boolean; reward: number}> = [];
+  const TICKER_LINES = [
+    '🏙️ City hall reports mild seismic activity in the downtown core',
+    '🍎 Local orchards report bumper crop — apples spotted rolling down Main St',
+    '🐦 Flocks of birds flee rooftops as enormous presence detected nearby',
+    '🚰 Fire dept confirms hydrant on Elm Ave missing — residents puzzled',
+    '🏠 Several homeowners file complaints after house vanishes overnight',
+    '⚡ Traffic cameras offline after ominous shadow passes through grid',
+    '🌊 Coastal observers report strange tide patterns near the beach',
+    '🌳 Parks dept urges calm after trees reportedly "uprooted themselves"',
+    '📰 Eyewitnesses claim to see something enormous eating a school bus',
+    '🛸 Area man insists orb in sky is just weather balloon — film at 11',
+    '🐕 Missing dog reports surge as neighbourhood pets go for "unexpected walks"',
+    '☕ Café owners baffled as tables, chairs vanish mid-morning rush',
+    '🚨 Police ask residents to remain indoors during "ongoing situation"',
+    '🦀 Crab population on SANDY SHORES up 300% — scientists call it "unusual"',
+    '🏗️ Downtown construction halted after crane operator reports unbelievable sight',
+    '🎪 Gnome collectors alarmed as garden ornaments reported missing citywide',
+  ];
+  const CONTRACT_POOL = [
+    { id: 'eat_houses', name: 'Eat 3 houses', reward: 40 },
+    { id: 'eat_cars', name: 'Eat 5 cars', reward: 35 },
+    { id: 'eat_gnomes', name: 'Eat all gnomes', reward: 60 },
+    { id: 'reach_gobbler', name: 'Reach GOBBLER form', reward: 50 },
+    { id: 'eat_beach', name: 'Eat 8 beach items', reward: 45 },
+    { id: 'eat_downtown', name: 'Eat 5 downtown props', reward: 40 },
+    { id: 'eat_people', name: 'Eat 10 people', reward: 30 },
+    { id: 'first_place', name: 'Lead at 1:00 left', reward: 55 },
+  ] as const;
+  // track progress for contract checking
+  const contractProgress: Record<string, number> = {};
 
   // camera state (world-space centre + zoom), smoothed each frame
   let camCX = CONFIG.MAP_SIZE / 2;
@@ -352,6 +389,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     countStep = 0;
     joystick.setEnabled(true);
     resetClock();
+    // v16 §5: news ticker — first line fires 20s in, then every 30s
+    currentTicker = null;
+    tickerCd = 20000;
+    // v16 §5: pick 3 contracts for this round
+    const shuffledContracts = [...CONTRACT_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
+    activeContracts = shuffledContracts.map((c) => ({ ...c, done: false }));
+    for (const k of Object.keys(contractProgress)) delete contractProgress[k];
     track('round_start', { daily });
     notify();
   }
@@ -604,10 +648,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v13 §1: coast slow — applied BEFORE movement so it takes effect this frame
     // (events.update runs after movement; we need the slow for this tick's speed calc)
     {
+      // v16 §1: west column is no longer beach — only check south edge
       const sandD = CONFIG.COAST_SAND_DEPTH, mz = CONFIG.MAP_SIZE;
-      if (player.x < sandD || player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
+      if (player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
       for (const rv of rivals) {
-        if (!rv.ghost && (rv.x < sandD || rv.y > mz - sandD)) rv.eventSlow = Math.min(rv.eventSlow, CONFIG.COAST_WATER_SLOW);
+        if (!rv.ghost && rv.y > mz - sandD) rv.eventSlow = Math.min(rv.eventSlow, CONFIG.COAST_WATER_SLOW);
       }
     }
     player.update(dt);
@@ -620,7 +665,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           others.push({ x: rivals[j].x, y: rivals[j].y, radius: rivals[j].radius });
         }
       }
-      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed });
+      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0 });
     }
 
     // objects (suction + eat + living-world AI)
@@ -676,6 +721,40 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v7 §5: EVENT HORIZON — constant gentle pull aura (≈30% of the echo pulse)
     if (activeSynergies.has('horizon')) {
       world.attractEdibles(player.x, player.y, 210, 40 * (dt / 1000));
+    }
+
+    // v16 §5: news ticker — fire a line every 30s, expire after 6s
+    if (screen === 'game' && roundElapsed > 5000) {
+      tickerCd -= dt;
+      if (tickerCd <= 0) {
+        tickerCd = 28000 + Math.random() * 8000; // 28–36s between lines
+        const line = TICKER_LINES[Math.floor(Math.random() * TICKER_LINES.length)];
+        currentTicker = line;
+        // auto-clear after 6s
+        window.setTimeout(() => { currentTicker = null; notify(); }, 6000);
+        notify();
+      }
+    }
+
+    // v16 §5: contract progress + completion checks
+    if (screen === 'game' && player && world) {
+      const ps = world.playerStats;
+      const checkContract = (id: string, met: boolean) => {
+        const c = activeContracts.find((c) => c.id === id && !c.done);
+        if (c && met) { c.done = true; coinBonus += c.reward; banner(`CONTRACT: ${c.name}! +${c.reward}¢`, '#7BFFED'); notify(); }
+      };
+      checkContract('eat_houses',   ps.houses >= 3);
+      checkContract('eat_cars',     ps.cars >= 5);
+      checkContract('eat_gnomes',   ps.gnomes >= world.gnomeTotal && world.gnomeTotal > 0);
+      checkContract('eat_beach',    ps.beachItems >= 8);
+      checkContract('eat_downtown', ps.downtownItems >= 5);
+      checkContract('eat_people',   ps.people >= 10);
+      checkContract('reach_gobbler', player.formIndex >= 2);
+      // 'first_place': leading during the last 60s window
+      if (timeLeft <= 60000 && timeLeft > 59000 && rivals.length > 0) {
+        const leading = player.score >= Math.max(...rivals.map((r) => r.score)) && player.score > 0;
+        checkContract('first_place', leading);
+      }
     }
 
     // v15 §3: active spell tick
@@ -1800,7 +1879,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       })),
     ] : [];
     return {
-      screen,
+      screen: screen,
       coins: meta.data.coins,
       highScore: meta.data.highScore,
       streak: meta.data.streak,
@@ -1821,6 +1900,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       heldSpell,
       activeSpell,
       showHitboxes,
+      ticker: currentTicker,
+      contracts: [...activeContracts],
     };
   }
 

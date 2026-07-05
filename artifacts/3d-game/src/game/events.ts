@@ -161,9 +161,11 @@ export class EventManager {
     // v13 §1: Sandy Shores coast slow — 20% speed penalty in the sandy edge zone
     const sandD = CONFIG.COAST_SAND_DEPTH;
     const mz = CONFIG.MAP_SIZE;
-    if (player.x < sandD || player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
+    // v16 §1: west column is now residential — only south beach blocks get water slow
+    if (player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
     for (const r of rivals) {
-      if (r.x < sandD || r.y > mz - sandD) r.eventSlow = Math.min(r.eventSlow, CONFIG.COAST_WATER_SLOW);
+      // v16 §1: west column is now residential
+      if (r.y > mz - sandD) r.eventSlow = Math.min(r.eventSlow, CONFIG.COAST_WATER_SLOW);
     }
 
     // v8 §7: two scheduled slots draw from the event pool (~2:05 and ~1:10)

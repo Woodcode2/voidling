@@ -18,6 +18,11 @@
 export interface SpriteBounds { x: number; y: number; w: number; h: number; }
 export const spriteBounds: Map<string, SpriteBounds> = new Map();
 
+// v16 §3: contact-radius fraction — derived from the bottom-third pixel scan.
+// contactFrac × 2 × baseSize × 0.45 gives the world-space contact radius.
+// Absent when sprite is not loaded; callers fall back to baseSize * 0.85.
+export const spriteContactFrac: Map<string, number> = new Map();
+
 function scanAlphaBounds(img: HTMLImageElement, key: string): void {
   try {
     const canvas = document.createElement('canvas');
@@ -39,6 +44,24 @@ function scanAlphaBounds(img: HTMLImageElement, key: string): void {
     }
     if (maxX < 0) return; // fully transparent — leave no entry; callers use full rect
     spriteBounds.set(key, { x: minX / W, y: minY / H, w: (maxX - minX + 1) / W, h: (maxY - minY + 1) / H });
+
+    // v16 §3: scan bottom-third rows for contact width
+    const startY = Math.floor(H * 2 / 3);
+    let bMinX = W, bMaxX = -1;
+    for (let y = startY; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (data[(y * W + x) * 4 + 3] > 8) {
+          if (x < bMinX) bMinX = x;
+          if (x > bMaxX) bMaxX = x;
+        }
+      }
+    }
+    if (bMaxX >= 0) {
+      spriteContactFrac.set(key, (bMaxX - bMinX + 1) / W);
+    } else {
+      // No pixels in bottom third — fall back to full-bounds width
+      spriteContactFrac.set(key, (maxX - minX + 1) / W);
+    }
   } catch {
     // cross-origin or tainted canvas — skip; caller falls back to full rect
   }
@@ -52,6 +75,7 @@ const LAYER_IDS = ['flame-crown', 'galaxy-core'];
 
 // v11: 12 base object types that support PNG art
 // v12 §1: extended with downtown + playground types
+// v16 §1: new civic/downtown sprite slots
 const OBJECT_IDS = [
   'house_a','house_b','tree','bush','gnome','bench',
   'hydrant','mailbox','trashcan','foodcart','fountain','watertower',
@@ -61,6 +85,10 @@ const OBJECT_IDS = [
   'school','gazebo','swingset','slide','pool',
   // v13 §2: beach objects
   'palm','umbrella','sandcastle','lifeguard','surfboard','towel','crab','seashell','kayak',
+  // v16 §1: new civic + downtown
+  'cafe','hospital','house_c','house_d',
+  // v16 §6: guard
+  'jeep',
 ];
 
 // v12 §6: ground texture tile IDs

@@ -1167,5 +1167,107 @@ export function drawParkObject(
     case 'kayak':       return drawKayakObj(ctx, r, t, v);
     case 'car_parked_a': return drawCar(ctx, r, t, 0);
     case 'car_parked_b': return drawCar(ctx, r, t, 2);
+    // v16 §1: new civic + downtown sprites (procedural fallbacks)
+    case 'cafe':     return drawCafe(ctx, r, t);
+    case 'hospital': return drawHospital(ctx, r, t);
+    case 'house_c':  return drawHouse(ctx, r, t, 2);
+    case 'house_d':  return drawHouse(ctx, r, t, 3);
+    // v16 §6: The Guard
+    case 'jeep':     return drawJeep(ctx, r, t);
+    case 'soldier':  return drawSoldier(ctx, r, t, f);
   }
+}
+
+// ── v16 §1: Café — warm storefront with awning and coffee-cup sign ───────────
+function drawCafe(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  // base building
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.9, -r * 0.7, r * 1.8, r * 1.4, r * 0.08), '#F5E6C8', { outline: o });
+  // awning stripes
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.9, -r * 0.55); c.lineTo(r * 0.9, -r * 0.55);
+    c.lineTo(r * 0.9, -r * 0.3); c.lineTo(-r * 0.9, -r * 0.3); c.closePath();
+  }, '#E23B4E', { outline: o, shadow: false });
+  for (let i = 0; i < 3; i++) {
+    const x = -r * 0.6 + i * r * 0.6;
+    ctx.fillStyle = '#F5E6C8';
+    ctx.fillRect(x, -r * 0.55, r * 0.28, r * 0.25);
+  }
+  // windows
+  for (const sx of [-0.5, 0.5]) {
+    sticker(ctx, (c) => roundRectPath(c, r * sx - r * 0.24, -r * 0.12, r * 0.46, r * 0.38, r * 0.05), '#BFEAFF', { outline: o, shadow: false });
+  }
+  // coffee cup sign
+  stickerCircle(ctx, 0, -r * 0.82, r * 0.2, '#6E4226', { outline: o });
+  dot(ctx, 0, -r * 0.94, r * 0.08, '#FFFFFF');
+  // steam waft
+  const bob = Math.sin(t / 400) * r * 0.03;
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = Math.max(1, r * 0.04); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(r * -0.08, -r * 0.94 + bob); ctx.quadraticCurveTo(r * 0.04, -r * 1.05 + bob, 0, -r * 1.15 + bob); ctx.stroke();
+}
+
+// ── v16 §1: Hospital — white civic building with red cross ────────────────────
+function drawHospital(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.9, -r * 0.9, r * 1.8, r * 1.7, r * 0.06), '#F0F6FF', { outline: o });
+  // windows (2 rows)
+  for (let row = 0; row < 2; row++) {
+    for (let col = 0; col < 3; col++) {
+      const wx = -r * 0.6 + col * r * 0.44;
+      const wy = -r * 0.55 + row * r * 0.46;
+      sticker(ctx, (c) => roundRectPath(c, wx, wy, r * 0.34, r * 0.3, r * 0.04), '#BFEAFF', { outline: Math.max(1, o * 0.6), shadow: false });
+    }
+  }
+  // entrance
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.24, r * 0.38, r * 0.48, r * 0.42, r * 0.04), '#8ECBFF', { outline: o, shadow: false });
+  // red cross sign
+  const cr = r * 0.26;
+  ctx.fillStyle = '#E23B4E';
+  ctx.fillRect(-cr * 0.22, -r * 1.0, cr * 0.44, cr);
+  ctx.fillRect(-cr * 0.5, -r * 1.0 + cr * 0.28, cr, cr * 0.44);
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+  ctx.strokeRect(-cr * 0.22, -r * 1.0, cr * 0.44, cr);
+}
+
+// ── v16 §6: Guard — army jeep ─────────────────────────────────────────────────
+function drawJeep(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const roll = t / 500;
+  // wheels
+  for (const wx of [-0.6, 0.55]) {
+    stickerCircle(ctx, r * wx, r * 0.52, r * 0.22, '#2A2A38', { outline: o });
+    ctx.save(); ctx.translate(r * wx, r * 0.52); ctx.rotate(roll);
+    dot(ctx, 0, 0, r * 0.09, '#6E7080'); ctx.restore();
+  }
+  // body
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.88, -r * 0.2, r * 1.76, r * 0.72, r * 0.08), '#5A7A3A', { outline: o });
+  // cab/windshield
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.52, -r * 0.62, r * 0.84, r * 0.44, r * 0.08), '#4A6A2A', { outline: o, shadow: false });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.38, -r * 0.54, r * 0.66, r * 0.3, r * 0.05), '#BFEAFF', { outline: Math.max(1, o * 0.7), shadow: false });
+  // headlight
+  dot(ctx, r * 0.78, -r * 0.05, r * 0.08, '#FFF3B0');
+}
+
+// ── v16 §6: Guard — shield soldier ───────────────────────────────────────────
+function drawSoldier(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = false) {
+  const o = ow(r);
+  // body (green uniform)
+  const bob = Math.sin(t / 280) * r * (fleeing ? 0.08 : 0.03);
+  sticker(ctx, (c) => c.ellipse(0, r * 0.1 + bob, r * 0.42, r * 0.52, 0, 0, Math.PI * 2), '#5A7A3A', { outline: o });
+  // head with helmet
+  stickerCircle(ctx, 0, -r * 0.52 + bob, r * 0.34, '#F4C79B', { outline: o });
+  sticker(ctx, (c) => { c.arc(0, -r * 0.52 + bob, r * 0.36, Math.PI, 0); c.closePath(); }, '#3A5A2A', { outline: o, shadow: false });
+  // round shield (comical braced arms)
+  if (!fleeing) {
+    ctx.save(); ctx.translate(r * 0.42, r * 0.08 + bob);
+    sticker(ctx, (c) => c.arc(0, 0, r * 0.32, 0, Math.PI * 2), '#E8D44D', { outline: o });
+    // cross on shield
+    ctx.fillStyle = '#E23B4E';
+    ctx.fillRect(-r * 0.04, -r * 0.18, r * 0.08, r * 0.36);
+    ctx.fillRect(-r * 0.16, -r * 0.04, r * 0.32, r * 0.08);
+    ctx.restore();
+  }
+  // eyes
+  dot(ctx, -r * 0.12, -r * 0.54 + bob, r * 0.07, '#1A0B33');
+  dot(ctx, r * 0.12, -r * 0.54 + bob, r * 0.07, '#1A0B33');
 }

@@ -4,3 +4,4 @@
 - [VOIDLING v13 Sandy Shores](voidling-v13.md) — beach biome, coastline, 3 new events, bot-eat cooldown, rival rim arcs, district display.
 - [VOIDLING v14 Quality Bar](voidling-v14.md) — deferred-growth orbit, CC0 OGG sample loader, pointerrawupdate controls, FxEvent null-guard rule.
 - [VOIDLING v15 The Law+Spells+Zoo](voidling-v15.md) — Growth Law clamp (setRoundElapsed→grow), orbit parity (captureObject/tickCaptures on Void base), 5 spells, ZOO/TOWNHALL, contactScale, debug panel sections.
+- [VOIDLING v16 The City That Makes Sense](voidling-v16.md) — Fixed 5×5 city plan, rubber-band pacing, art-derived contactRadius, news ticker, contracts, vivid spell cards, in-map ocean water.

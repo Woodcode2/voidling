@@ -26,7 +26,11 @@ export type ObjectKind =
   | 'shop' | 'library' | 'office' | 'skyscraper'
   // v13 §2: Sandy Shores beach objects
   | 'palm' | 'umbrella' | 'sandcastle' | 'surfboard' | 'lifeguard' | 'towel'
-  | 'crab' | 'seashell' | 'kayak' | 'car_parked_a' | 'car_parked_b';
+  | 'crab' | 'seashell' | 'kayak' | 'car_parked_a' | 'car_parked_b'
+  // v16 §1: new civic + downtown sprites
+  | 'cafe' | 'hospital' | 'house_c' | 'house_d'
+  // v16 §6: The Guard
+  | 'jeep' | 'soldier';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -84,8 +88,8 @@ export const CONFIG = {
     { name: 'MUNCHER',     radius: 38 },
     { name: 'GOBBLER',     radius: 58 },
     { name: 'DEVOURER',    radius: 84 },
-    // v13 §0: final threshold raised (125→155) — 5 crowns by 1:00 should be impossible
-    { name: 'WORLD ENDER', radius: 155 },
+    // v16 §0: lowered 155→110 so strong runs reach WORLD ENDER with ~0:45 left (median ~0:20)
+    { name: 'WORLD ENDER', radius: 110 },
   ] as { name: string; radius: number }[],
   FORM_SPEED_BONUS: 0.08,        // +8% move speed per form gained, stacking
   EVO_SLOWMO_MS: 600,
@@ -166,7 +170,7 @@ export const CONFIG = {
   SIDEWALK: 44,
   GRID: 5,
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
-  MAX_RADIUS: 170,           // v13 §0: raised (140→170) to match new WORLD ENDER threshold
+  MAX_RADIUS: 135,           // v16 §0: lowered to match new WORLD ENDER threshold (110)
   DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff
   // v15 §0: The Growth Law — maxRadius(t) = BASE + RATE × secondsElapsed
   GROWTH_LAW_BASE: 18,       // px at t=0 (same as PLAYER_BASE_RADIUS)
@@ -218,8 +222,15 @@ export const CONFIG = {
   MUSIC_GAIN: 0.22,          // v14 §1: lowered (0.3→0.22) so samples sit clearly on top
   SFX_GAIN: 1,
 
+  // v16 §0: rubber-band pacing — 4 bots (5 voids total)
+  // Rank targets as fractions of player score: rank1=115%, rank2=95%, rank3=80%, rank4=60%
+  // ±10% personality noise re-rolled every 20 s
+  PACER_TARGETS: [1.15, 0.95, 0.80, 0.60] as number[],
+  PACER_NOISE: 0.10,
+  PACER_RETARGET_MS: 20000,
+
   // Rivals
-  RIVAL_COUNT: 5,
+  RIVAL_COUNT: 4,
   RIVAL_EAT_RATIO: 1.15,    // eater radius >= 1.15x eaten radius
   GHOST_TIME: 2500,         // invulnerable ms after being eaten
   RESPAWN_MASS_FRAC: 0.65,  // respawn at 65% of mass
@@ -339,6 +350,14 @@ export const CONFIG = {
     kayak:         { tier: 4, minR: 58, maxR: 72 },
     car_parked_a:  { tier: 4, minR: 54, maxR: 66 },
     car_parked_b:  { tier: 4, minR: 54, maxR: 66 },
+    // v16 §1: new civic + downtown sprites
+    cafe:          { tier: 4, minR: 60, maxR: 76 },
+    hospital:      { tier: 5, minR: 100, maxR: 120 },
+    house_c:       { tier: 5, minR: 92, maxR: 116 },
+    house_d:       { tier: 5, minR: 92, maxR: 116 },
+    // v16 §6: The Guard
+    jeep:          { tier: 4, minR: 58, maxR: 72 },
+    soldier:       { tier: 3, minR: 26, maxR: 32 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void

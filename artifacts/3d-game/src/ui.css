@@ -620,6 +620,11 @@
   0%, 100% { box-shadow: 0 4px 24px var(--spell-color, #7BFFED88), 0 0 0 0 var(--spell-color, #7BFFED44); }
   50%       { box-shadow: 0 6px 32px var(--spell-color, #7BFFEDaa), 0 0 0 10px transparent; }
 }
+/* v16 §5: news ticker scroll — 12s left-to-right */
+@keyframes vd-ticker-scroll {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(-200%); }
+}
 .vd-modal {
   position: relative;
   display: flex;
