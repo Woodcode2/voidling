@@ -46,7 +46,7 @@ export interface PlayerStats {
   gnomes: number;   // v9 §8: garden gnomes eaten this round (secret GNOME LORD)
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach';
+type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail
@@ -369,9 +369,10 @@ export class WorldManager {
 
     // v13 §1: 5×5 layout. West column (gx=0) and south row (gy=4) become SANDY SHORES beach.
     // gx∈{2,3} × gy∈{2,3} = DOWNTOWN core (4 blocks).
+    // v15 §4: added ZOO (gx=3,gy=0) and TOWN HALL (gx=4,gy=1)
     const layout: BlockType[] = [
-      'beach',       'residential', 'plaza',       'residential', 'residential',
-      'beach',       'park',        'residential', 'playground',  'residential',
+      'beach',       'residential', 'plaza',       'zoo',         'residential',
+      'beach',       'park',        'residential', 'playground',  'townhall',
       'beach',       'residential', 'downtown',    'downtown',    'residential',
       'beach',       'residential', 'downtown',    'downtown',    'school',
       'beach',       'beach',       'beach',       'beach',       'beach',
@@ -393,6 +394,8 @@ export class WorldManager {
       else if (b.type === 'downtown') this.fillDowntown(b, rand);
       else if (b.type === 'mixed') this.fillMixed(b, rand);
       else if (b.type === 'beach') this.fillBeach(b, rand); // v13 §2
+      else if (b.type === 'zoo') this.fillZoo(b, rand);     // v15 §4
+      else if (b.type === 'townhall') this.fillTownHall(b, rand); // v15 §4
     }
 
     // v12 §1: guarantee T1 edibles around the player spawn (map center = downtown)
@@ -691,6 +694,55 @@ export class WorldManager {
     this.scatter(b, rand, 'mailbox', 2);
   }
 
+  // v15 §4: ZOO compound — animal enclosures, visitors, edibles
+  private fillZoo(b: Block, rand: () => number) {
+    (b as any).zoo = true;
+    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2, cy = b.y0 + CONFIG.BLOCK_SIZE / 2;
+    // Feature: extra lush green lawn
+    this.scatter(b, rand, 'tree', 6);
+    this.scatter(b, rand, 'flower', 12);
+    this.scatter(b, rand, 'flowerpot', 6);
+    this.scatter(b, rand, 'bench', 4);
+    this.scatter(b, rand, 'person', 5);
+    this.scatter(b, rand, 'dog', 3);
+    this.scatter(b, rand, 'cat', 2);
+    this.scatter(b, rand, 'duck', 4);
+    this.scatter(b, rand, 'squirrel', 3);
+    this.scatter(b, rand, 'gnome', 3);
+    this.scatter(b, rand, 'trashcan', 2, cx, cy);
+    this.scatter(b, rand, 'apple', 4);
+    // A small pond in one corner
+    const pondX = b.x0 + CONFIG.BLOCK_SIZE * 0.25, pondY = b.y0 + CONFIG.BLOCK_SIZE * 0.25;
+    const pondR = CONFIG.BLOCK_SIZE * 0.15;
+    (b as any).pond = { x: pondX, y: pondY, r: pondR };
+    for (let i = 0; i < 4; i++) {
+      const a = rand() * Math.PI * 2, rr = rand() * pondR * 0.7;
+      const o = this.makeObj('duck', pondX + Math.cos(a) * rr, pondY + Math.sin(a) * rr);
+      o.homeX = pondX; o.homeY = pondY; o.tether = pondR * 0.8;
+    }
+    this.spawnBirds(b, rand, 4);
+  }
+
+  // v15 §4: Town Hall — civic hub, fountain, plaza feel, crowd
+  private fillTownHall(b: Block, rand: () => number) {
+    (b as any).paved = true;
+    (b as any).townhall = true;
+    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2, cy = b.y0 + CONFIG.BLOCK_SIZE * 0.4;
+    this.makeObj('fountain', cx, cy);
+    this.scatter(b, rand, 'bench', 5);
+    this.scatter(b, rand, 'tree', 4);
+    this.scatter(b, rand, 'person', 8);
+    this.scatter(b, rand, 'flower', 6);
+    this.scatter(b, rand, 'cafetable', 3);
+    this.scatter(b, rand, 'foodcart', 2);
+    this.scatter(b, rand, 'trashcan', 3);
+    this.scatter(b, rand, 'gnome', 2);
+    this.scatter(b, rand, 'scooter', 2);
+    this.scatter(b, rand, 'apple', 3);
+    this.scatter(b, rand, 'icecream', 1);
+    this.spawnBirds(b, rand, 3);
+  }
+
   // v13 §2: Sandy Shores beach blocks — beach objects + sunbathers + crabs
   private fillBeach(b: Block, rand: () => number) {
     this.scatter(b, rand, 'palm', 2);
@@ -922,7 +974,9 @@ export class WorldManager {
         if (obj.kind === 'watertower') continue; // only WORLD-EATER player eats it
         if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
         const dr = dist(obj.x, obj.y, r.x, r.y);
-        if (dr < r.radius + obj.size * 0.4 && this.canEat(r.radius, obj.size)) {
+        // v15 §1: contactScale — use scaled effective size for collision boundary
+        const csR = (CONFIG.CONTACT_SCALE_OVERRIDES as Record<string, number>)[obj.kind] ?? CONFIG.CONTACT_SCALE;
+        if (dr < r.radius + obj.size * csR * 0.4 && this.canEat(r.radius, obj.size)) {
           r.eatObject(obj);
           obj.eaten = true;
           break;
@@ -1367,7 +1421,10 @@ export class WorldManager {
       else ctx.fillStyle = G.lawns[(b.gx + b.gy) % G.lawns.length];
       ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
       // v6 §8: zone grading — a faint per-district tint so areas read differently
-      const tint = b.type === 'park' ? 'rgba(120,220,140,0.06)'
+      // v15 §4: ZOO gets lush green tint; TOWNHALL gets warm civic amber
+      const tint = b.type === 'park' ? 'rgba(120,220,140,0.08)'       // slightly richer park
+        : b.type === 'zoo' ? 'rgba(80,210,120,0.11)'                  // v15 §4: lush zoo green
+        : b.type === 'townhall' ? 'rgba(255,195,90,0.08)'             // v15 §4: civic amber
         : b.type === 'plaza' ? 'rgba(255,210,120,0.05)'
         : b.type === 'playground' ? 'rgba(255,150,200,0.05)'
         : b.type === 'school' ? 'rgba(180,140,255,0.07)'

@@ -57,6 +57,8 @@ export interface BoonDef {
   id: string;
   name: string;
   desc: string;
+  spell?: boolean;   // v15 §3: teal card back when true
+  color?: string;    // v15 §3: spell accent color
 }
 
 export interface KindInfo {
@@ -166,6 +168,9 @@ export const CONFIG = {
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
   MAX_RADIUS: 170,           // v13 §0: raised (140→170) to match new WORLD ENDER threshold
   DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff
+  // v15 §0: The Growth Law — maxRadius(t) = BASE + RATE × secondsElapsed
+  GROWTH_LAW_BASE: 18,       // px at t=0 (same as PLAYER_BASE_RADIUS)
+  GROWTH_LAW_RATE: 0.92,     // px/s — being huge at 0:26 becomes mathematically impossible
 
   // v13 §1: The Last Slice — SW coastline geometry
   COAST_SAND_DEPTH: 75,      // px of sand band on west/south edges inside the map
@@ -199,6 +204,9 @@ export const CONFIG = {
   ORBIT_SPIRAL_DUR_FAST: 500,    // v14 §2: DEVOURER+ T1/T2 fast orbit ms
   COMBO_DECAY_TIME: 4200,
   EAT_RATIO: 0.9,           // eater.radius must exceed target.size * this to absorb objects
+  // v15 §1: Collision truth — object contact radius multipliers
+  CONTACT_SCALE: 0.90,       // global multiplier applied to obj.size during collision checks
+  CONTACT_SCALE_OVERRIDES: { tree: 0.85, house_a: 0.85, house_b: 0.85, skyscraper_a: 0.80, skyscraper_b: 0.80 } as Record<string, number>,
 
   // Water tower is a WORLD-EATER-scale prize
   WATERTOWER_EAT_RADIUS: 300,
@@ -371,6 +379,15 @@ export const CONFIG = {
     { id: 'dash',      name: 'Void Dash',       desc: 'Auto-dash 100px every 6s' },
     { id: 'lucky',     name: 'Lucky Gnome',     desc: 'A golden snack every 10s' },
   ] as BoonDef[],
+
+  // v15 §3: SPELLS — teal card class, mixed into boon picks
+  SPELLS: [
+    { id: 'garlic',     name: 'GARLIC BREATH', desc: '10s: repel + slow nearby rivals',           color: '#5ECC6B' },
+    { id: 'freeze',     name: 'FREEZE POP',     desc: 'Freeze the next void you touch for 2.5s',  color: '#6BE4FF' },
+    { id: 'switcheroo', name: 'SWITCHEROO',     desc: 'Instantly swap with the nearest void',     color: '#C27BFF' },
+    { id: 'puny',       name: 'PUNY BEAM',      desc: 'Zap nearest larger rival: −15% mass',      color: '#FFD23F' },
+    { id: 'bubble',     name: 'BUBBLE TRAP',    desc: 'Drop a bubble that traps the first toucher', color: '#A8D8FF' },
+  ] as { id: string; name: string; desc: string; color: string }[],
 
   // v7 §5: synergies — auto-trigger when BOTH members are active at once.
   SYNERGIES: [

@@ -96,6 +96,64 @@ export const audio = {
   _intense: false,
   _musicForm: 0,          // v8 §5: evolution form → number of active music layers
 
+  // v15 §2: music file infrastructure — loaded OGG tracks for crossfade
+  _musicTracks: [] as (AudioBuffer | null)[],
+  _musicTracksLoaded: false,
+  _activeTrackSrc: null as AudioBufferSourceNode | null,
+  _activeTrackGain: null as GainNode | null,
+
+  // Attempt to load OGG music tracks from assets/music/.
+  // Falls back to the existing synth music if files are absent.
+  async loadMusicTracks(): Promise<void> {
+    if (this._musicTracksLoaded) return;
+    this._musicTracksLoaded = true;
+    if (!this.ctx) this.init();
+    if (!this.ctx) return;
+    const files = ['track_1.ogg', 'track_2.ogg', 'track_3.ogg', 'track_4.ogg'];
+    const results = await Promise.allSettled(
+      files.map(async (f) => {
+        try {
+          const r = await fetch(`/assets/music/${f}`);
+          if (!r.ok) return null;
+          return await this.ctx!.decodeAudioData(await r.arrayBuffer());
+        } catch { return null; }
+      }),
+    );
+    this._musicTracks = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+    const loaded = this._musicTracks.filter(Boolean).length;
+    console.log(`[audio §2] music tracks loaded=${loaded}/4`);
+  },
+
+  // Play a music track with a 2s crossfade to the new source.
+  // Falls back silently if no tracks are available.
+  playMusicFile(idx: number) {
+    if (!this.ctx || !this.musicGain) return;
+    const buf = this._musicTracks[idx % this._musicTracks.length];
+    if (!buf) return; // no file — synth music continues
+    const ctx = this.ctx;
+    // Fade out current track
+    if (this._activeTrackGain) {
+      const g = this._activeTrackGain;
+      g.gain.cancelScheduledValues(ctx.currentTime);
+      g.gain.setValueAtTime(g.gain.value, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0, ctx.currentTime + 2);
+      const src = this._activeTrackSrc;
+      window.setTimeout(() => { try { src?.stop(); } catch { /* ignore */ } }, 2100);
+    }
+    // New track on a fresh gain node
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(this._musicBase, ctx.currentTime + 2);
+    gain.connect(this.musicGain);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(gain);
+    src.start();
+    this._activeTrackSrc = src;
+    this._activeTrackGain = gain;
+  },
+
   get muted() { return !this.sfxOn; },
 
   init() {

@@ -71,7 +71,8 @@ export class Rival extends Void {
   }
 
   update(dt: number, view: WorldView) {
-    this.tickMorph(dt); // v9 §3: advance the body-morph crossfade
+    this.tickMorph(dt);     // v9 §3: advance the body-morph crossfade
+    this.tickCaptures(dt);  // v15 §0: drain the deferred-absorb orbit queue
     const intent = this.controller.think(this, view, dt);
     this.setInput(intent.dirX, intent.dirY, intent.mag);
 
@@ -142,12 +143,13 @@ export class Rival extends Void {
   }
 
   eatObject(obj: WorldObject) {
-    this.score += Math.round(obj.size * 1.3 * (obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1) * (obj.kind === 'drone' ? CONFIG.DRONE_SCORE_MULT : 1));
-    this.absorbObjectMass(obj.size); // v9 §1: shared growth curve + size cap
+    const scoreGain = Math.round(obj.size * 1.3 * (obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1) * (obj.kind === 'drone' ? CONFIG.DRONE_SCORE_MULT : 1));
+    // v15 §0: orbit parity — deferred 1.6–2.0s before growth, identical to player
+    this.captureObject(obj.size, scoreGain);
     this.chompV = 1;
     this.satedTime = CONFIG.BOT_SATED_MS;
     this.timeSinceEat = 0;
-    this.advanceForms();
+    // advanceForms() is called inside tickCaptures when the item finalizes
   }
 
   eatVoid(radius: number) {
@@ -489,7 +491,7 @@ export function makeRivals(): Rival[] {
   const owned = new Set(meta.data.skinsOwned);
   const pool: SkinDef[] = [];
   for (const s of CONFIG.SKINS) {
-    const weight = owned.has(s.id) ? 1 : 3;
+    const weight = owned.has(s.id) ? 1 : 2; // v15 §0: 2× toward unowned (was 3×)
     for (let k = 0; k < weight; k++) pool.push(s);
   }
   const chosen: SkinDef[] = [];

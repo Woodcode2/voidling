@@ -3,3 +3,4 @@
 - [VOIDLING rendering & perf](voidling-rendering.md) — world-space badge/overlay placement; sprite pipeline (skinSprites/layerSprites); score pooling rolling window; orbit-chip clearance rule.
 - [VOIDLING v13 Sandy Shores](voidling-v13.md) — beach biome, coastline, 3 new events, bot-eat cooldown, rival rim arcs, district display.
 - [VOIDLING v14 Quality Bar](voidling-v14.md) — deferred-growth orbit, CC0 OGG sample loader, pointerrawupdate controls, FxEvent null-guard rule.
+- [VOIDLING v15 The Law+Spells+Zoo](voidling-v15.md) — Growth Law clamp (setRoundElapsed→grow), orbit parity (captureObject/tickCaptures on Void base), 5 spells, ZOO/TOWNHALL, contactScale, debug panel sections.

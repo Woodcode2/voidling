@@ -1,6 +1,10 @@
 import { CONFIG, type SkinDef } from './config';
 import { growRadius } from './utils';
 
+// v15 §0: Growth Law — engine sets elapsed each tick so grow() can enforce the ceiling
+let _roundElapsedSec = 0;
+export function setRoundElapsed(ms: number) { _roundElapsedSec = ms / 1000; }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // v9 §1 — ONE VOID CLASS. Fairness by architecture: the player and every bot are
 // instances of this single class and share the EXACT same functions for growth
@@ -60,13 +64,55 @@ export abstract class Void {
   // ── SHARED GROWTH: single diminishing curve + hard size cap (v7 §1 math) ──────
   // Everything that makes a void bigger funnels through here, so no controller can
   // grow faster than another for the same intake.
+  // v15 §0: Growth Law enforced here — maxRadius(t) = GROWTH_LAW_BASE + GROWTH_LAW_RATE × t
   protected grow(addedArea: number) {
-    this.radius = growRadius(
+    const lawCeiling = CONFIG.GROWTH_LAW_BASE + CONFIG.GROWTH_LAW_RATE * _roundElapsedSec;
+    if (this.radius >= lawCeiling) {
+      console.log(`[LAW] clamped ${this.name || 'void'} at t=${_roundElapsedSec.toFixed(1)}`);
+      return; // score is granted by caller; only growth is blocked
+    }
+    // Compute uncapped growth first so we can detect overshoot before clamping
+    const uncapped = growRadius(
       this.radius,
       addedArea * this.underdogGrowth,
       CONFIG.DIMINISH_BASE,
       CONFIG.MAX_RADIUS,
     );
+    if (uncapped > lawCeiling) {
+      console.log(`[LAW] clamped ${this.name || 'void'} at t=${_roundElapsedSec.toFixed(1)}`);
+      this.radius = lawCeiling;
+    } else {
+      this.radius = uncapped;
+    }
+  }
+
+  // v15 §0: orbit parity — deferred absorb queue shared by player and bots
+  // Items sit in the queue for ORBIT_SPIRAL_DUR ± 200ms before growth is applied.
+  protected _captureQueue: Array<{area: number; score: number; timer: number}> = [];
+
+  captureObject(objSize: number, scoreGain: number) {
+    if (this._captureQueue.length >= CONFIG.ORBIT_MAX) {
+      // capacity full: finalize oldest immediately so queue never exceeds cap
+      const oldest = this._captureQueue.shift()!;
+      this.grow(oldest.area);
+      this.score += oldest.score;
+      this.advanceForms();
+    }
+    // jitter duration 1600–2000ms around the nominal spiral dur
+    const dur = CONFIG.ORBIT_SPIRAL_DUR + (Math.random() - 0.5) * 400;
+    this._captureQueue.push({ area: Math.PI * objSize * objSize * 0.5, score: scoreGain, timer: dur });
+  }
+
+  tickCaptures(dt: number) {
+    for (let i = this._captureQueue.length - 1; i >= 0; i--) {
+      this._captureQueue[i].timer -= dt;
+      if (this._captureQueue[i].timer <= 0) {
+        const it = this._captureQueue.splice(i, 1)[0];
+        this.grow(it.area);
+        this.score += it.score;
+        this.advanceForms();
+      }
+    }
   }
 
   // ── SHARED ABSORB RULES: object intake and void intake are area-based ─────────

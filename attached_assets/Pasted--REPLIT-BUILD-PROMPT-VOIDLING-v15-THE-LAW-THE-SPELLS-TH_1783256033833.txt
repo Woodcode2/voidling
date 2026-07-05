@@ -1,0 +1,73 @@
+# REPLIT BUILD PROMPT — VOIDLING v15: THE LAW, THE SPELLS, THE ZOO
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+Work the sections **in order**; Section 0 is a blocking gate with mandatory pasted evidence. Standing rules hold: 60fps, portrait, asset loaders with silent fallbacks, one shared Void class.
+
+## 0 — BLOCKING: end the bot-size bug with a law, parity, and forensics
+
+- **The Growth Law:** inside the ONE shared growth function, clamp every void's radius to `maxRadius(t) = 18 + 0.92 × secondsElapsed` (both constants in CONFIG). Any absorb that would exceed it grants score but no growth, and logs `[LAW] clamped {name} at t={s}`. This applies to player and bots identically — being huge at 0:26 becomes mathematically impossible for anyone.
+- **Orbit parity:** verify bots route through the IDENTICAL capture → accretion-orbit → absorb pipeline as the player, including the 8-item capacity and 1.6–2.0s delay. If bots currently bypass the orbit and absorb instantly, that is the leak — fix by making bot absorbs call the exact same capture function. Cite the call path in your report.
+- **Forensics (paste raw output, mandatory):** run `grep -rn -i "radius\|mass" --include="*.js" --include="*.ts" . | grep -i "bot\|rival\|ai\|npc"` and paste the complete output. Also paste every line where a Void is constructed or its mass/radius is assigned outside the shared class.
+- **Live radii readout:** the `?debug=1` panel gains a RADII section — six rows (name · radius · mass · score) updating twice per second, with a red warning row if anyone exceeds the Law. The player's own eyes are now the log.
+- Bot skins: randomize every round, no two bots alike, weighted 2× toward skins the player doesn't own (premium included, full effects).
+
+## 1 — Collision truth
+
+- Debug panel gains a **SHOW HITBOXES** toggle: draws every object's collision circle and every void's absorb-reach circle as thin overlays.
+- Global `contactScale = 0.90` applied to object collision radii, with a per-type override table in CONFIG seeded with: tree 0.85, house_a/b 0.85, skyscraper_a/b 0.80. All tunable live from the debug panel.
+- Target: brushing a tree makes contact at its visible leaves, not at invisible air.
+
+## 2 — Music infrastructure (tracks arrive separately)
+
+- New loader dir `assets/music/` accepting `track_1.mp3 … track_4.mp3`. Playback via WebAudio with a **2-second crossfade loop** (overlap the tail into the head so loops are seamless regardless of how the track was authored).
+- Debug panel gains a **MUSIC** section: one row per loaded track with ▶ preview, "SET GAME MUSIC", and "SET MENU MUSIC" buttons; choices persist in localStorage.
+- **Menu music:** the chosen menu track plays softly (gain 0.15) on the home screen after the first user gesture; game music (gain 0.22) replaces the synth loop in rounds when set.
+- **Music grows with you:** run game music through a lowpass filter automated by form — 2.2kHz at VOIDLING opening to fully bright at WORLD ENDER; keep the WORLD ENDER synth sub-rumble layered underneath.
+- Until tracks are dropped, the current synth loop remains the fallback everywhere.
+
+## 3 — SPELLS (new card class in the power-up picker)
+
+Teal card backs, drawn icons, mixed into the same 3-card picks. Every spell visibly changes the caster's appearance while armed/active. Bots draw and use them too (FREEZE/BUBBLE when fleeing, PUNY at the leader). All effects respect form floors; all sounds mapped from the existing 16 samples (cite mappings).
+
+| Spell | Effect | Caster's look |
+|---|---|---|
+| GARLIC BREATH | 10s: rival voids within 3 radii are repelled at 40 px/s and slowed 15% | green stink wisps rising |
+| FREEZE POP | next void you touch is frozen solid 2.5s (can't move; can still be eaten if smaller) | icy blue tint + drifting snowflakes |
+| SWITCHEROO | instantly swap positions with the nearest void | purple teleport flash on both, 0.5s dizzy eyes |
+| PUNY BEAM | zap the nearest LARGER void: −15% mass; their eyes go comically tiny for 5s | wizard sparkles orbiting you; a drawn zap bolt fires |
+| BUBBLE TRAP | drop a bubble at your position; first void to touch it is trapped 2s inside (pops with a burst) | you briefly blow a bubble animation |
+
+- One spell held at a time (picking a second replaces the first, with confirmation flash). A small spell icon shows under the score; FREEZE/BUBBLE/SWITCHEROO/PUNY fire on a dedicated round **SPELL button** (72px, bottom-right, only visible while holding a castable spell); GARLIC is instant on pick.
+
+## 4 — The living town
+
+- **THE ZOO:** one large block becomes a walled compound — perimeter walls (T5, cream stone, procedural) with an ornate front gate (sprite slot `assets/objects/zoo_gate.png`, procedural fallback). **The gate is breakable only by GOBBLER or larger:** smaller voids bounce off with a rattle. Breaking it: gate shatters with debris, banner "**ZOO BREAK!**", trophy ZOO BREAK (+150c), and the compound opens. Inside: pens holding **elephant (T5), giraffe (T4), lion (T4), monkeys (T2, hop), flamingos (T2), penguins (T2, waddle-hop)** — sprite slots `elephant, giraffe, lion, monkey, flamingo, penguin` with procedural fallbacks; all animals worth **2× score**; big animals idle-sway, small ones hop as whole-sprite bounces. **Zookeepers** (people variant with a broom) shoo any void inside: −5% speed while adjacent, arms waving — pure comedy, they cannot actually stop you. Animal sounds: reuse samples at shifted rates (elephant = horn_event at 0.5; cite the rest).
+- **TOWN HALL:** the plaza centerpiece becomes a town hall (sprite slot `townhall`, T5) with a tiny mayor out front who shakes a fist as you near. Eating it: callout "**DEMOCRACY DEVOURED!**" + trophy (+150c). Trophy room now counts 20.
+- **Placement sanity:** every T1–T3 type gets a per-block quota and a context anchor (trash cans: max 2/block, curbside or beside houses only; mailboxes: 1 per lot at the curb; flowerpots: porches and shop fronts; apples: under apple trees and picnic areas). Enforced at generation AND respawn — nothing spawns context-free anymore. Add a generation-time validation log of per-type counts.
+- **Lush pass:** deepen lawn greens ~8% toward the splash art's palette, +40% flower beds and garden hedges, street trees +25%. The live town should feel like the splash promised.
+
+## 5 — Quick wins
+
+- Splash duration 4.5s (tap-to-skip unchanged).
+- Guide slots: `assets/ui/guide_1.png / guide_2.png / guide_3.png` — when present, intro panels render them full-bleed with the text overlaid bottom-third; fallback to current panels.
+- Build stamp increments to `v15 · {build}`.
+
+## Acceptance criteria — verify on a real phone
+
+- Report contains: the raw grep output, the orbit-parity call path, and a screenshot/paste of the RADII debug section mid-round. Feed a bot via debug: the Law clamp line appears and its radius stops at the ceiling. Across three rounds, no void exceeds `18 + 0.92t` — ever.
+- HITBOXES toggle draws all circles; a tree's contact happens at its canopy edge.
+- With no music files: synth plays as before. With any `track_N.mp3` present: MUSIC rows appear, previews play, selections persist, menu music starts after first tap, loop has no audible seam, and the filter audibly opens on evolution.
+- Each spell works per its row (test all five), changes the caster's look, and the SPELL button appears only when armed; a bot observably casts a spell.
+- A MUNCHER bounces off the zoo gate; a GOBBLER smashes it with the banner and trophy; animals inside are eatable at 2× with zookeepers comically shooing; eating town hall fires DEMOCRACY DEVOURED.
+- Three rounds: zero context-free clutter (no trash can in the middle of a lawn or road); per-type validation log pasted.
+- Splash runs ~4.5s; dropped guide PNGs replace the intro panels; build stamp reads v15.
+- 60fps with the zoo open and a spell active; zero console errors across 5 rounds.
+
+## Out of scope
+
+3D/engine changes, networking, iOS wrap, real payments, new balance changes beyond the Law.
+
+Order: 0 → 5. Section 0's pasted evidence is the gate.
