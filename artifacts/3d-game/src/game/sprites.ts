@@ -91,6 +91,11 @@ const OBJECT_IDS = [
   'jeep',
 ];
 
+// v16 §4: evolution form body sprites (form_1 … form_5)
+// Classic skin body is replaced per form level when these are present.
+// form_4 / form_5 suppress the procedural flame-crown + galaxy layers.
+const FORM_IDS = ['form_1', 'form_2', 'form_3', 'form_4', 'form_5'];
+
 // v12 §6: ground texture tile IDs
 const GROUND_IDS = ['grass', 'asphalt', 'sidewalk', 'pond'];
 
@@ -98,6 +103,7 @@ export const skinSprites:   Map<string, HTMLImageElement> = new Map();
 export const layerSprites:  Map<string, HTMLImageElement> = new Map();
 export const objectSprites: Map<string, HTMLImageElement> = new Map();
 export const groundSprites: Map<string, HTMLImageElement> = new Map(); // v12 §6
+export const formSprites:   Map<string, HTMLImageElement> = new Map(); // v16 §4
 
 function tryLoad(url: string, img: HTMLImageElement): Promise<boolean> {
   return new Promise((resolve) => {
@@ -134,6 +140,21 @@ export async function preloadSprites(base: string): Promise<void> {
     }));
   }
 
+  // ── v16 §4: evolution form body sprites ──────────────────────────────────
+  const formLoaded: string[] = [], formFallback: string[] = [];
+  for (const id of FORM_IDS) {
+    const img = new Image();
+    tasks.push(tryLoad(`${base}assets/forms/${id}.png`, img).then((ok) => {
+      if (ok) {
+        formSprites.set(id, img);
+        scanAlphaBounds(img, id);
+        formLoaded.push(id);
+      } else {
+        formFallback.push(id);
+      }
+    }));
+  }
+
   // ── world objects (§0: scan alpha bounds after load) ─────────────────────
   for (const id of OBJECT_IDS) {
     const img = new Image();
@@ -166,5 +187,9 @@ export async function preloadSprites(base: string): Promise<void> {
   console.log(
     `[VOIDLING objects] loaded: ${objLoaded.join(', ') || '(none)'}` +
     ` | fallback (procedural): ${objFallback.join(', ')}`,
+  );
+  console.log(
+    `[VOIDLING forms] loaded: ${formLoaded.join(', ') || '(none)'}` +
+    ` | fallback (procedural): ${formFallback.join(', ')}`,
   );
 }

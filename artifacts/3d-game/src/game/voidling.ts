@@ -2,7 +2,7 @@
 // Draws a cute jelly black-hole creature centered at (x,y) with a given skin.
 import type { SkinDef } from './config';
 import { drawSkinBack, drawSkinFront, drawSkinBody } from './skins';
-import { skinSprites, layerSprites } from './sprites'; // v10 §1: PNG art when present
+import { skinSprites, layerSprites, formSprites } from './sprites'; // v10 §1 / v16 §4: PNG art when present
 
 export interface VoidlingVisual {
   r: number;
@@ -56,10 +56,14 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.save();
   ctx.scale(v.wobbleX * v.breathe, v.wobbleY * v.breathe);
   const artSprite = skinSprites.get(skin.id); // v10 §1: PNG art overrides procedural body
-  if (artSprite) {
+  // v16 §4: form sprite replaces Classic skin body at each evolution level
+  const _formKey = `form_${(v.form || 0) + 1}`;
+  const _formSprite = formSprites.get(_formKey);
+  const _activeBody = (skin.id === 'classic' && _formSprite) ? _formSprite : artSprite;
+  if (_activeBody) {
     // Sprite is drawn slightly oversized to include its own outline/glow allowance
     const d = r * 2.2;
-    ctx.drawImage(artSprite, -d / 2, -d / 2, d, d);
+    ctx.drawImage(_activeBody, -d / 2, -d / 2, d, d);
   } else {
     // Fallback: procedural body (3× supersampled cached sprite)
     const sprite = getBodySprite(skin.bodyColor);
@@ -68,7 +72,7 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.restore();
 
   // ── v8 §8: premium surface effects — skipped when art sprite is active (it includes them) ─
-  if (!artSprite) drawSkinBody(ctx, skin, r, v.t);
+  if (!_activeBody) drawSkinBody(ctx, skin, r, v.t);
 
   // ── v9 §3: evolution BODY morphs painted onto/into the orb (clipped) ─────────
   drawFormBody(ctx, v);
@@ -266,7 +270,10 @@ function drawFormLayers(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   }
 
   // DEVOURER (3+): flame crown (turns white-violet at WORLD ENDER)
-  if (form >= 3) {
+  // v16 §4: suppressed when form_4 or form_5 PNG is loaded (crown is baked into the art)
+  const _flameFormKey = `form_${form + 1}`;
+  const _flameFormLoaded = formSprites.has(_flameFormKey) && v.skin.id === 'classic';
+  if (form >= 3 && !_flameFormLoaded) {
     ctx.save();
     ctx.globalAlpha *= form === 3 ? (v.morph ?? 1) : 1;
     drawFlames(ctx, v);
@@ -454,7 +461,9 @@ function drawFormBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   }
 
   // WORLD ENDER (4): internal galaxy — 2 nebula wisps + 6 pinprick stars
-  if (form >= 4) {
+  // v16 §4: suppressed when form_5 PNG is loaded (galaxy baked into the art)
+  const _galaxyFormLoaded = formSprites.has('form_5') && v.skin.id === 'classic';
+  if (form >= 4 && !_galaxyFormLoaded) {
     const a = v.morph ?? 1;
     ctx.save();
     ctx.globalAlpha *= a;
