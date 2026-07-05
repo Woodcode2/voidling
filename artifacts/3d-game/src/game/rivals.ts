@@ -32,6 +32,7 @@ export class Rival extends Void {
   shopSkinName = '';
   // v6 §6: bot brain timers
   satedTime = 0;          // grazes only while > 0 (SATED after a meal)
+  voidSatedMs = 0;        // v13 §0: 10s cooldown after eating another void (bot-on-bot pump prevention)
   timeSinceEat = 0;       // ms since last successful eat (anti-idle)
   idleTimer = 0;          // rolling anti-idle window
   idleAnchorX = 0;        // position at window start
@@ -103,6 +104,7 @@ export class Rival extends Void {
 
     // v6 §6: bot brain timers — sated countdown + anti-idle detection
     if (this.satedTime > 0) this.satedTime -= dt;
+    if (this.voidSatedMs > 0) this.voidSatedMs -= dt; // v13 §0: void-sated cooldown
     this.timeSinceEat += dt;
     this.idleTimer += dt;
     if (this.idleTimer >= CONFIG.BOT_ANTIIDLE_MS) {
@@ -153,6 +155,18 @@ export class Rival extends Void {
     this.absorbVoidMass(radius); // v9 §1: shared growth curve + size cap
     this.chompV = 1;
     this.satedTime = CONFIG.BOT_SATED_MS;
+    this.timeSinceEat = 0;
+    this.advanceForms();
+  }
+
+  // v13 §0: bot-on-bot eat — 25% mass (vs 50% for player-involved), 10s void-sated cooldown
+  eatVoidBotOnBot(radius: number) {
+    this.score += 200;
+    this.absorbVoidMassBotOnBot(radius); // 25% area transfer
+    console.debug(`[bot-chomp] ${this.name} ate void r=${radius.toFixed(1)} → gained 25% area, r=${this.radius.toFixed(1)} (SATED 10s)`);
+    this.chompV = 1;
+    this.satedTime = CONFIG.BOT_SATED_MS;
+    this.voidSatedMs = 10000; // 10s void-sated
     this.timeSinceEat = 0;
     this.advanceForms();
   }

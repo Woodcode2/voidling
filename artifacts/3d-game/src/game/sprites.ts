@@ -59,6 +59,8 @@ const OBJECT_IDS = [
   'shop_a','shop_b','library','office','skyscraper_a','skyscraper_b',
   // v12 §1: additional
   'school','gazebo','swingset','slide','pool',
+  // v13 §2: beach objects
+  'palm','umbrella','sandcastle','lifeguard','surfboard','towel','crab','seashell','kayak',
 ];
 
 // v12 §6: ground texture tile IDs

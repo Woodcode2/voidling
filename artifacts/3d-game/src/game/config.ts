@@ -23,7 +23,10 @@ export type ObjectKind =
   // legacy decor (still drawable, used sparingly)
   | 'mushroom' | 'bush' | 'gazebo'
   // v12 §1: downtown objects
-  | 'shop' | 'library' | 'office' | 'skyscraper';
+  | 'shop' | 'library' | 'office' | 'skyscraper'
+  // v13 §2: Sandy Shores beach objects
+  | 'palm' | 'umbrella' | 'sandcastle' | 'surfboard' | 'lifeguard' | 'towel'
+  | 'crab' | 'seashell' | 'kayak' | 'car_parked_a' | 'car_parked_b';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -76,12 +79,11 @@ export const CONFIG = {
   // ── v6 §3: evolution ladder (radius-driven, forms only go up in a round) ──
   FORMS: [
     { name: 'VOIDLING',    radius: 18 },
-    { name: 'MUNCHER',     radius: 36 },
-    { name: 'GOBBLER',     radius: 54 },
-    { name: 'DEVOURER',    radius: 78 },
-    // v9 §1: final threshold raised (105→125) so the crown/final form stays rare (~top 10%)
-    // v9 §3: final form renamed WORLD EATER → WORLD ENDER
-    { name: 'WORLD ENDER', radius: 125 },
+    { name: 'MUNCHER',     radius: 38 },
+    { name: 'GOBBLER',     radius: 58 },
+    { name: 'DEVOURER',    radius: 84 },
+    // v13 §0: final threshold raised (125→155) — 5 crowns by 1:00 should be impossible
+    { name: 'WORLD ENDER', radius: 155 },
   ] as { name: string; radius: number }[],
   FORM_SPEED_BONUS: 0.08,        // +8% move speed per form gained, stacking
   EVO_SLOWMO_MS: 600,
@@ -162,8 +164,12 @@ export const CONFIG = {
   SIDEWALK: 44,
   GRID: 5,
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
-  MAX_RADIUS: 140,           // v7 §1: hard size cap — at cap, absorbs score but don't grow
+  MAX_RADIUS: 170,           // v13 §0: raised (140→170) to match new WORLD ENDER threshold
   DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff
+
+  // v13 §1: The Last Slice — SW coastline geometry
+  COAST_SAND_DEPTH: 75,      // px of sand band on west/south edges inside the map
+  COAST_WATER_SLOW: 0.8,     // speed multiplier when wading in the coastal sand zone (20% slow)
 
   // Living world speeds (px/s)
   CAR_SPEED: 60, CAR_FLEE_SPEED: 140,
@@ -311,6 +317,18 @@ export const CONFIG = {
     library:    { tier: 4, minR: 62, maxR: 76 },
     office:     { tier: 5, minR: 88, maxR: 104 },
     skyscraper: { tier: 6, minR: 115, maxR: 130 },
+    // v13 §2: Sandy Shores beach objects
+    seashell:      { tier: 1, minR: 10, maxR: 14 },
+    crab:          { tier: 2, minR: 18, maxR: 24 },
+    towel:         { tier: 2, minR: 22, maxR: 28 },
+    sandcastle:    { tier: 2, minR: 20, maxR: 26 },
+    umbrella:      { tier: 3, minR: 30, maxR: 38 },
+    surfboard:     { tier: 3, minR: 34, maxR: 42 },
+    palm:          { tier: 4, minR: 56, maxR: 70 },
+    lifeguard:     { tier: 4, minR: 52, maxR: 64 },
+    kayak:         { tier: 4, minR: 58, maxR: 72 },
+    car_parked_a:  { tier: 4, minR: 54, maxR: 66 },
+    car_parked_b:  { tier: 4, minR: 54, maxR: 66 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void

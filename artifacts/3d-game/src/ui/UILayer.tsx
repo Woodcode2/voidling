@@ -389,7 +389,14 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         <h2 className="vd-heading">{r.crown ? 'CHAMPION!' : `#${r.placement} of ${r.total}`}</h2>
         <div className="vd-big-num">{r.score.toLocaleString()}</div>
         {r.newBest && <span className="vd-badge">NEW BEST!</span>}
-        {r.reachedForm && <div className="vd-reached">Reached: {r.reachedForm}</div>}
+        {r.reachedForm && (
+          <div className="vd-reached">
+            {r.district
+              ? `Ended as ${r.reachedForm} in ${r.district}`
+              : `Reached: ${r.reachedForm}`}
+          </div>
+        )}
+        {r.district && !r.reachedForm && <div className="vd-reached">Finished in {r.district}</div>}
         {r.gnomeLord && <div className="vd-reached">👑 GNOME LORD — ate every gnome!</div>}
         <div style={{ width: '100%', maxWidth: 320, marginTop: 8 }}>
           <div className="vd-stat-row"><span>Placement</span><span>#{r.placement}</span></div>
