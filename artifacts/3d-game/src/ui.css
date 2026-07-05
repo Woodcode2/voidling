@@ -615,6 +615,11 @@
   animation: vd-fade 0.15s ease;
 }
 @keyframes vd-fade { from { opacity: 0; } to { opacity: 1; } }
+/* v15 §3: SPELL button pulse */
+@keyframes vd-spell-pulse {
+  0%, 100% { box-shadow: 0 4px 24px var(--spell-color, #7BFFED88), 0 0 0 0 var(--spell-color, #7BFFED44); }
+  50%       { box-shadow: 0 6px 32px var(--spell-color, #7BFFEDaa), 0 0 0 10px transparent; }
+}
 .vd-modal {
   position: relative;
   display: flex;

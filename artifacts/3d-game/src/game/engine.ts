@@ -3,7 +3,7 @@ import { audio } from './audio';
 import { FXManager, type FloatingText } from './fx';
 import { WorldManager } from './world';
 import { Player } from './player';
-import { Void } from './void';
+import { Void, setRoundElapsed } from './void';
 import { makeRivals, type Rival, type WorldView } from './rivals';
 import { meta } from './meta';
 import { track } from './services';
@@ -57,6 +57,11 @@ export interface Snapshot {
   sfxOn: boolean;
   paused: boolean;
   trophies: { earned: string[]; counters: import('./meta').TrophyCounters }; // v12 §5
+  // v15
+  radii: Array<{name:string; radius:number; mass:number; score:number; overLaw:boolean}>;
+  heldSpell: BoonDef | null;
+  activeSpell: string | null;
+  showHitboxes: boolean;
 }
 
 export interface GameEngine {
@@ -75,6 +80,8 @@ export interface GameEngine {
   toggleMute(): boolean;
   toggleMusic(): boolean;
   toggleSfx(): boolean;
+  castSpell(): void;
+  toggleHitboxes(): boolean;
   destroy(): void;
 }
 
@@ -155,6 +162,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
   let countStep = 0;           // v8 §1: last countdown number beeped
   let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
+  // v15 §3: spell system
+  let heldSpell: BoonDef | null = null;
+  let activeSpell: string | null = null;
+  let spellTimer = 0;
+  let spellFrozenRival: Rival | null = null;
+  let spellBubble: { x: number; y: number; r: number } | null = null;
+  let showHitboxes = false;
 
   // camera state (world-space centre + zoom), smoothed each frame
   let camCX = CONFIG.MAP_SIZE / 2;
@@ -380,6 +394,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   function chooseBoon(id: string) {
     if (screen !== 'boon' || !player) return;
+    // v15 §3: spell picks are held until the player taps the SPELL button
+    if (id.startsWith('spell_')) {
+      const spellId = id.replace('spell_', '');
+      const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
+      if (spellDef) {
+        heldSpell = { id, name: spellDef.name, desc: spellDef.desc, spell: true, color: spellDef.color };
+        boonChoices = [];
+        screen = 'game';
+        joystick.setEnabled(true);
+        resetClock();
+        banner('✨ ' + spellDef.name + ' READY!', '#7BFFED', 3);
+        audio.playBoon();
+        notify();
+      }
+      return;
+    }
     const def = CONFIG.BOONS.find((b) => b.id === id);
     if (!def) return;
     track('boon_pick', { id });
@@ -539,6 +569,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     timeLeft -= dt;
     roundElapsed += dt;
+    setRoundElapsed(roundElapsed); // v15 §0: Growth Law ceiling
 
     // boons expiry + live effects
     for (let i = activeBoons.length - 1; i >= 0; i--) {
@@ -645,6 +676,49 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v7 §5: EVENT HORIZON — constant gentle pull aura (≈30% of the echo pulse)
     if (activeSynergies.has('horizon')) {
       world.attractEdibles(player.x, player.y, 210, 40 * (dt / 1000));
+    }
+
+    // v15 §3: active spell tick
+    if (activeSpell && spellTimer > 0 && player) {
+      spellTimer -= dt;
+      if (spellTimer <= 0) {
+        if (activeSpell === 'freeze') spellFrozenRival = null;
+        if (activeSpell === 'bubble') spellBubble = null;
+        activeSpell = null;
+        notify();
+      }
+      // GARLIC BREATH: repel + slow nearby rivals
+      if (activeSpell === 'garlic') {
+        for (const r of rivals) {
+          if (!r.alive || r.ghost) continue;
+          const d = dist(player.x, player.y, r.x, r.y);
+          if (d < player.radius * 3 + r.radius) {
+            const nx = (r.x - player.x) / (d || 1), ny = (r.y - player.y) / (d || 1);
+            r.vx += nx * 700 * (dt / 1000);
+            r.vy += ny * 700 * (dt / 1000);
+            r.eventSlow = Math.min(r.eventSlow, 0.6);
+          }
+        }
+      }
+      // FREEZE POP: freeze first rival touched
+      if (activeSpell === 'freeze' && !spellFrozenRival) {
+        for (const r of rivals) {
+          if (!r.alive || r.ghost) continue;
+          if (dist(player.x, player.y, r.x, r.y) < player.radius + r.radius) {
+            spellFrozenRival = r; break;
+          }
+        }
+      }
+      if (spellFrozenRival?.alive) spellFrozenRival.eventSlow = 0.01;
+      // BUBBLE TRAP: pin rivals inside bubble
+      if (activeSpell === 'bubble' && spellBubble) {
+        for (const r of rivals) {
+          if (!r.alive || r.ghost) continue;
+          if (dist(r.x, r.y, spellBubble.x, spellBubble.y) < spellBubble.r + r.radius) {
+            r.eventSlow = Math.min(r.eventSlow, 0.05);
+          }
+        }
+      }
     }
 
     // v6 §2: catch-up economy — underdog aura + leader decay
@@ -796,8 +870,26 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v7 §5: draw WITHOUT replacement — retire any power-up already at max level
     const pool = CONFIG.BOONS.filter((b) => (boonRank.get(b.id) || 0) < BOON_MAX_LEVEL);
     boonChoices = [];
-    for (let i = 0; i < 3 && pool.length; i++) {
-      boonChoices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    // v15 §3: one random slot (≈50% of picks) may be a spell card
+    const spellSlot = (CONFIG.SPELLS.length && Math.random() < 0.5) ? Math.floor(Math.random() * 3) : -1;
+    for (let i = 0; i < 3; i++) {
+      if (i === spellSlot) {
+        const sp = CONFIG.SPELLS[Math.floor(Math.random() * CONFIG.SPELLS.length)];
+        boonChoices.push({ id: 'spell_' + sp.id, name: sp.name, desc: sp.desc, spell: true, color: sp.color });
+      } else if (pool.length) {
+        boonChoices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+      }
+    }
+    // v15 §3: bot spell AI — each rival gets a 45% chance at an instant spell effect
+    for (const r of rivals) {
+      if (!r.alive || r.ghost || Math.random() > 0.45) continue;
+      const sp = CONFIG.SPELLS[Math.floor(Math.random() * CONFIG.SPELLS.length)];
+      if (sp.id === 'puny' && player && r.radius > player.radius * 0.7) {
+        player.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, player.radius * 0.85);
+        banner('💫 PUNY BEAM hit you!', '#FF6B6B', 3);
+        console.log(`[spell] bot ${r.name} cast PUNY BEAM on player`);
+      }
+      // other spells (garlic/freeze/bubble/switcheroo) = self-buff, no external effect needed
     }
     audio.playBoon();
     screen = 'boon';
@@ -958,6 +1050,37 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!paused) fx.update(frameDt);
     fx.draw(ctx);
     drawFormBadge(); // v12 §0: form badge after fx (always on top in world space)
+    // v15 §1+§3: hitbox overlay + spell visuals (world-space — ctx transform still active)
+    if (showHitboxes && world && player) {
+      // Object contact circles (contactScale-adjusted radii)
+      ctx.lineWidth = 1.5 / camZoom;
+      for (const obj of world.objects) {
+        if (obj.eaten) continue;
+        const cs = (CONFIG.CONTACT_SCALE_OVERRIDES as Record<string, number>)[obj.kind] ?? CONFIG.CONTACT_SCALE;
+        ctx.strokeStyle = '#00FFAA'; ctx.globalAlpha = 0.55;
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.size * cs, 0, Math.PI * 2); ctx.stroke();
+      }
+      // Law ceiling ring around the player
+      const lawCeil = CONFIG.GROWTH_LAW_BASE + CONFIG.GROWTH_LAW_RATE * (roundElapsed / 1000);
+      ctx.strokeStyle = player.radius > lawCeil ? '#FF4D6D' : '#FFD23F';
+      ctx.globalAlpha = 0.4; ctx.lineWidth = 2 / camZoom;
+      ctx.beginPath(); ctx.arc(player.x, player.y, lawCeil, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // BUBBLE TRAP world-space outline
+    if (spellBubble) {
+      ctx.globalAlpha = 0.35 + 0.15 * Math.sin(clock / 300);
+      ctx.strokeStyle = '#A8D8FF'; ctx.lineWidth = 3 / camZoom;
+      ctx.beginPath(); ctx.arc(spellBubble.x, spellBubble.y, spellBubble.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // GARLIC BREATH aura ring
+    if (activeSpell === 'garlic' && player) {
+      ctx.globalAlpha = 0.15 + 0.1 * Math.sin(clock / 200);
+      ctx.strokeStyle = '#5ECC6B'; ctx.lineWidth = 3 / camZoom;
+      ctx.beginPath(); ctx.arc(player.x, player.y, player.radius * 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
 
     // v13 §4: NIGHTFALL — dark overlay + per-void light radii (screen space)
@@ -1669,6 +1792,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   // ── public API ──
   function buildSnapshot(): Snapshot {
+    const _lawCeiling = CONFIG.GROWTH_LAW_BASE + CONFIG.GROWTH_LAW_RATE * (roundElapsed / 1000);
+    const _radii: Snapshot['radii'] = (player && screen === 'game') ? [
+      { name: player.name || 'YOU', radius: player.radius, mass: Math.round(player.mass), score: player.score, overLaw: player.radius > _lawCeiling },
+      ...rivals.filter((r) => r.alive).map((r) => ({
+        name: r.name, radius: r.radius, mass: Math.round(r.mass), score: r.score, overLaw: r.radius > _lawCeiling,
+      })),
+    ] : [];
     return {
       screen,
       coins: meta.data.coins,
@@ -1687,6 +1817,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       sfxOn: audio.sfxOn,
       paused,
           trophies: { earned: meta.data.trophiesEarned, counters: meta.data.trophyCounters }, // v12 §5
+      radii: _radii,
+      heldSpell,
+      activeSpell,
+      showHitboxes,
     };
   }
 
@@ -1742,6 +1876,56 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     toggleMute() { const m = audio.toggleMute(); notify(); return m; },
     toggleMusic() { const on = audio.toggleMusic(); notify(); return on; },
     toggleSfx() { const on = audio.toggleSfx(); notify(); return on; },
+    castSpell() {
+      if (!heldSpell || !player) return;
+      const spellId = heldSpell.id.replace('spell_', '');
+      activeSpell = spellId;
+      heldSpell = null;
+      switch (spellId) {
+        case 'garlic':  spellTimer = 10000; break;
+        case 'freeze':  spellTimer = 8000; spellFrozenRival = null; break;
+        case 'switcheroo': {
+          let nearest: Rival | null = null, nd = Infinity;
+          for (const r of rivals) {
+            if (!r.alive || r.ghost) continue;
+            const d = dist(player.x, player.y, r.x, r.y);
+            if (d < nd) { nd = d; nearest = r; }
+          }
+          if (nearest) {
+            [player.x, nearest.x] = [nearest.x, player.x];
+            [player.y, nearest.y] = [nearest.y, player.y];
+            player.vx = player.vy = nearest.vx = nearest.vy = 0;
+            banner('🔀 SWITCHEROO!', '#C27BFF', 3);
+          }
+          activeSpell = null; spellTimer = 0; break;
+        }
+        case 'puny': {
+          let target: Rival | null = null, nd = Infinity;
+          for (const r of rivals) {
+            if (!r.alive || r.ghost || r.radius <= player.radius * 0.7) continue;
+            const d = dist(player.x, player.y, r.x, r.y);
+            if (d < nd) { nd = d; target = r; }
+          }
+          if (target) {
+            target.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, target.radius * 0.85);
+            banner('💫 PUNY BEAM!', '#FFD23F', 3);
+            console.log(`[spell] player PUNY BEAM on ${target.name}`);
+          }
+          activeSpell = null; spellTimer = 0; break;
+        }
+        case 'bubble':
+          spellBubble = { x: player.x, y: player.y, r: 90 };
+          spellTimer = 20000; break;
+        default: spellTimer = 5000;
+      }
+      if (activeSpell) {
+        const sp = CONFIG.SPELLS.find((s) => s.id === spellId);
+        banner('✨ ' + (sp?.name ?? spellId.toUpperCase()) + '!', '#7BFFED', 2);
+      }
+      fx.addRing(player.x, player.y, '#7BFFED', player.radius, player.radius + 120, 5, 500);
+      notify();
+    },
+    toggleHitboxes() { showHitboxes = !showHitboxes; notify(); return showHitboxes; },
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);

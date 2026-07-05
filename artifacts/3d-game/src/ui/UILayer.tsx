@@ -5,8 +5,8 @@ import { audio } from '../game/audio';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
-// v14.1 build stamp — increment on every deploy
-const BUILD_STAMP = 'v14.1 · 1';
+// v15 build stamp — increment on every deploy
+const BUILD_STAMP = 'v15 · 1';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -131,7 +131,7 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
     audio.loadSamples().catch(() => {});
     // Trigger zoom on next paint so the CSS transition actually fires
     const rf = requestAnimationFrame(() => setZoomed(true));
-    const t = window.setTimeout(onDone, 1800);
+    const t = window.setTimeout(onDone, 4500); // v15 §5: 4.5s splash
     return () => { clearTimeout(t); cancelAnimationFrame(rf); };
   }, [onDone]);
 
@@ -264,29 +264,110 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
 }
 
 // ── v14.1 Sound-board debug panel (shown when ?debug=1 in URL) ────────────────
-function SoundBoard() {
+function SoundBoard({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const [vols, setVols] = useState<Record<string, number>>(() =>
     Object.fromEntries(audio.SAMPLE_CONFIGS.map((s) => [s.name, s.vol]))
   );
+  // Update RADII display 2×/sec
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(id);
+  }, []);
 
   const play = (name: string, rate: number) => {
-    // Ensure audio context is live before playing
     audio.init();
     audio._playSample(name, rate, vols[name] ?? 0.5);
   };
+
+  const lawCeiling = snap.screen === 'game'
+    ? (snap.radii.length > 0 ? 'tracking' : '—')
+    : '—';
 
   return (
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
       background: 'rgba(10,8,24,0.96)', borderTop: '1px solid #3a3060',
-      padding: '10px 12px 14px', overflowY: 'auto', maxHeight: '55vh',
+      padding: '10px 12px 14px', overflowY: 'auto', maxHeight: '70vh',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ color: '#9AAFC8', fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
-          🔊 SOUNDS DEBUG · {BUILD_STAMP}
+          🎮 DEBUG PANEL · {BUILD_STAMP}
         </span>
         <span style={{ color: '#4a4070', fontSize: 10, fontFamily: 'monospace' }}>?debug=1 to toggle</span>
       </div>
+
+      {/* ── §0 RADII ─────────────────────────────────────── */}
+      <div style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
+        <div style={{ color: '#7BFFED', fontSize: 11, fontFamily: 'monospace', marginBottom: 6, letterSpacing: '0.06em' }}>
+          📐 RADII · law ceiling = {lawCeiling}
+        </div>
+        {snap.radii.length === 0
+          ? <span style={{ color: '#4a4070', fontSize: 11, fontFamily: 'monospace' }}>Start a round to see live data</span>
+          : snap.radii.map((v) => (
+            <div key={v.name} style={{
+              display: 'grid', gridTemplateColumns: '80px 60px 60px 70px', gap: 6,
+              color: v.overLaw ? '#FF6B6B' : '#CBD5E0',
+              fontSize: 12, fontFamily: 'monospace', marginBottom: 3,
+            }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.name}</span>
+              <span>r={v.radius.toFixed(1)}</span>
+              <span>m={v.mass}</span>
+              <span>#{v.score}</span>
+            </div>
+          ))
+        }
+      </div>
+
+      {/* ── §1 HITBOXES ───────────────────────────────────── */}
+      <div style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={snap.showHitboxes}
+            onChange={() => engine.toggleHitboxes()}
+            style={{ accentColor: '#00FFAA', width: 16, height: 16, cursor: 'pointer' }}
+          />
+          <span style={{ color: '#00FFAA', fontSize: 12, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+            🔲 SHOW HITBOXES
+          </span>
+        </label>
+        <span style={{ color: '#4a4070', fontSize: 10, fontFamily: 'monospace' }}>contact_scale=0.90 · overrides: tree/house 0.85 · sky 0.80</span>
+      </div>
+
+      {/* ── §2 MUSIC ─────────────────────────────────────── */}
+      <div style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
+        <div style={{ color: '#FFD23F', fontSize: 11, fontFamily: 'monospace', marginBottom: 6, letterSpacing: '0.06em' }}>🎵 MUSIC</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ color: '#CBD5E0', fontSize: 12, fontFamily: 'monospace', width: 90 }}>MUSIC GAIN</span>
+          <input
+            type="range" min={0} max={0.5} step={0.01}
+            defaultValue={0.22}
+            onChange={(e) => audio.setMusicGain(Number(e.target.value))}
+            style={{ flex: 1, height: 28, accentColor: '#FFD23F', cursor: 'pointer' }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <span style={{ color: '#CBD5E0', fontSize: 12, fontFamily: 'monospace', width: 90 }}>SFX GAIN</span>
+          <input
+            type="range" min={0} max={1} step={0.01}
+            defaultValue={0.5}
+            onChange={(e) => audio.setSfxGain(Number(e.target.value))}
+            style={{ flex: 1, height: 28, accentColor: '#FFD23F', cursor: 'pointer' }}
+          />
+        </div>
+      </div>
+
+      {/* ── §3 SPELL STATE ───────────────────────────────── */}
+      <div style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
+        <div style={{ color: '#C27BFF', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, letterSpacing: '0.06em' }}>✨ SPELL STATE</div>
+        <span style={{ color: '#CBD5E0', fontSize: 12, fontFamily: 'monospace' }}>
+          held: {snap.heldSpell?.name ?? '—'} · active: {snap.activeSpell ?? '—'}
+        </span>
+      </div>
+
+      {/* ── 🔊 SOUNDS ────────────────────────────────────── */}
+      <div style={{ color: '#9AAFC8', fontSize: 11, fontFamily: 'monospace', marginBottom: 6, letterSpacing: '0.06em' }}>🔊 SOUNDS</div>
       <div style={{ display: 'grid', gap: 6 }}>
         {audio.SAMPLE_CONFIGS.map((s) => (
           <div key={s.name} style={{
@@ -539,8 +620,23 @@ function Boon({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         <h2 className="vd-heading">CHOOSE A BOON</h2>
         <p className="vd-sub">Pick a power to keep chomping</p>
         {snap.boonChoices.map((b) => (
-          <button key={b.id} className="vd-boon" onClick={() => engine.chooseBoon(b.id)}>
-            <h3>{b.name}</h3>
+          <button
+            key={b.id}
+            className={`vd-boon${b.spell ? ' vd-boon--spell' : ''}`}
+            onClick={() => engine.chooseBoon(b.id)}
+            style={b.spell ? {
+              borderColor: b.color || '#7BFFED',
+              background: `linear-gradient(135deg, rgba(0,160,180,0.15) 0%, rgba(0,100,140,0.08) 100%)`,
+              boxShadow: `0 0 12px ${b.color || '#7BFFED'}44`,
+            } : undefined}
+          >
+            {b.spell && (
+              <span style={{
+                display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+                color: b.color || '#7BFFED', marginBottom: 3, fontWeight: 700,
+              }}>✨ SPELL · TAP TO HOLD</span>
+            )}
+            <h3 style={b.spell ? { color: b.color || '#7BFFED' } : undefined}>{b.name}</h3>
             <p>{b.desc}</p>
           </button>
         ))}
@@ -592,6 +688,28 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
       {!snap.paused && (
         <button className="vd-pause-pill" onClick={() => engine.togglePause()} aria-label="Pause">
           <PauseIcon />
+        </button>
+      )}
+      {/* v15 §3: SPELL button — 72×72 teal action button, shown when a spell is held */}
+      {snap.heldSpell && !snap.paused && (
+        <button
+          onClick={() => engine.castSpell()}
+          aria-label={`Cast ${snap.heldSpell.name}`}
+          style={{
+            position: 'fixed', bottom: 32, right: 24,
+            width: 72, height: 72, borderRadius: 20,
+            background: snap.heldSpell.color || '#7BFFED',
+            border: '2px solid rgba(255,255,255,0.25)',
+            color: '#0a0818', fontSize: 12, fontWeight: 800,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: `0 4px 24px ${snap.heldSpell.color || '#7BFFED'}66`,
+            letterSpacing: '0.04em', lineHeight: 1.2,
+            animation: 'vd-spell-pulse 1.6s ease-in-out infinite',
+          }}
+        >
+          <span style={{ fontSize: 24 }}>✨</span>
+          <span style={{ fontSize: 9, marginTop: 2 }}>{snap.heldSpell.name.split(' ')[0]}</span>
         </button>
       )}
       {snap.paused && (
@@ -744,7 +862,7 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
     <>
       {screen}
       {showOnboard && <Onboarding onDone={finishOnboard} />}
-      {debugMode && <SoundBoard />}
+      {debugMode && <SoundBoard snap={snap} engine={engine} />}
     </>
   );
 }
