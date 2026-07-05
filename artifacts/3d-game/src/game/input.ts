@@ -1,7 +1,9 @@
-// Relative-drag virtual joystick. Pointer Events only (no touch/mouse duplicates),
-// with pointer capture so a drag can't be lost off the canvas.
-// The voidling is NEVER under the finger: the anchor is wherever the touch starts,
-// and movement is driven by the anchor -> current vector.
+// v14 §3 — Minimum-latency joystick.
+// • Uses `pointerrawupdate` where supported (falls back to `pointermove`) and
+//   processes ALL coalesced events per callback so zero input samples are dropped.
+// • 2 px deadband kills micro-jitter without adding any perceptible lag.
+// • All listeners that call preventDefault are registered { passive: false }.
+// • Velocity prediction is handled in the render path (engine.ts) not here.
 import { CONFIG } from './config';
 import { clamp } from './utils';
 
@@ -15,6 +17,9 @@ export interface JoystickState {
   dirY: number;
   mag: number; // 0..1
 }
+
+// 2px deadband (in canvas CSS pixels): below this the joystick doesn't register
+const DEADBAND = 2;
 
 export function createJoystick(canvas: HTMLCanvasElement) {
   const state: JoystickState = {
@@ -36,6 +41,27 @@ export function createJoystick(canvas: HTMLCanvasElement) {
     pointerId = null;
   }
 
+  function processMove(cx: number, cy: number) {
+    state.curX = cx;
+    state.curY = cy;
+    const dx = cx - state.anchorX;
+    const dy = cy - state.anchorY;
+    const d = Math.hypot(dx, dy);
+    // 2px deadband — ignore micro-jitter without adding lag
+    if (d < DEADBAND) {
+      state.mag = 0;
+      return;
+    }
+    state.mag = clamp(d / CONFIG.JOYSTICK_MAX_DIST, 0, 1);
+    state.dirX = dx / d;
+    state.dirY = dy / d;
+    // if the finger wanders far, let the anchor follow so control stays comfortable
+    if (d > CONFIG.JOYSTICK_MAX_DIST * 1.6) {
+      state.anchorX = cx - state.dirX * CONFIG.JOYSTICK_MAX_DIST * 1.6;
+      state.anchorY = cy - state.dirY * CONFIG.JOYSTICK_MAX_DIST * 1.6;
+    }
+  }
+
   function onDown(e: PointerEvent) {
     if (!enabled) return;
     if (pointerId !== null) return; // one finger controls
@@ -50,24 +76,16 @@ export function createJoystick(canvas: HTMLCanvasElement) {
     state.mag = 0;
   }
 
+  // Process all coalesced events so no input samples are dropped between frames.
+  // This matters on high-refresh-rate screens where multiple move events coalesce.
   function onMove(e: PointerEvent) {
     if (!state.active || e.pointerId !== pointerId) return;
     e.preventDefault();
-    const c = coords(e);
-    state.curX = c.x;
-    state.curY = c.y;
-    const dx = c.x - state.anchorX;
-    const dy = c.y - state.anchorY;
-    const d = Math.hypot(dx, dy);
-    state.mag = clamp(d / CONFIG.JOYSTICK_MAX_DIST, 0, 1);
-    if (d > 0.001) {
-      state.dirX = dx / d;
-      state.dirY = dy / d;
-    }
-    // if the finger wanders far, let the anchor follow so control stays comfortable
-    if (d > CONFIG.JOYSTICK_MAX_DIST * 1.6) {
-      state.anchorX = c.x - state.dirX * CONFIG.JOYSTICK_MAX_DIST * 1.6;
-      state.anchorY = c.y - state.dirY * CONFIG.JOYSTICK_MAX_DIST * 1.6;
+    const r = canvas.getBoundingClientRect();
+    // getCoalescedEvents() is available in all modern browsers; fall back gracefully
+    const events: PointerEvent[] = (e.getCoalescedEvents?.() ?? null) || [e];
+    for (const ev of events) {
+      processMove(ev.clientX - r.left, ev.clientY - r.top);
     }
   }
 
@@ -77,10 +95,23 @@ export function createJoystick(canvas: HTMLCanvasElement) {
     reset();
   }
 
+  // Use pointerrawupdate where available for minimum latency (fires before frame,
+  // before display compositor, no coalescing delay). Fall back to pointermove.
+  const moveEvent = (typeof window !== 'undefined' && 'onpointerrawupdate' in window)
+    ? 'pointerrawupdate'
+    : 'pointermove';
+
   canvas.addEventListener('pointerdown', onDown, { passive: false });
-  canvas.addEventListener('pointermove', onMove, { passive: false });
+  canvas.addEventListener(moveEvent, onMove as EventListener, { passive: false });
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', onUp);
+
+  // Also keep pointermove as backup if using pointerrawupdate (different event)
+  if (moveEvent === 'pointerrawupdate') {
+    canvas.addEventListener('pointermove', onMove, { passive: false });
+  }
+
+  console.log(`[input] using ${moveEvent} + coalesced events, 2px deadband`);
 
   return {
     state,
@@ -90,9 +121,12 @@ export function createJoystick(canvas: HTMLCanvasElement) {
     },
     destroy() {
       canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener(moveEvent, onMove as EventListener);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onUp);
+      if (moveEvent === 'pointerrawupdate') {
+        canvas.removeEventListener('pointermove', onMove);
+      }
     },
   };
 }

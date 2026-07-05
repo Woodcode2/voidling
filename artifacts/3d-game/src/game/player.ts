@@ -1,3 +1,8 @@
+// v14 §2 — Accretion Orbit redesign.
+// Every captured object enters a spiral orbit and only delivers growth/score
+// when the spiral completes (spaghettification → absorption). Score and growth
+// are deferred; combo is bumped at capture so chains still register.
+
 import { CONFIG, type SkinDef, type ObjectKind } from './config';
 import { clamp, lerp } from './utils';
 import { Void } from './void';
@@ -5,31 +10,39 @@ import { drawParkObject } from './objects';
 import { drawVoidling, drawUnderdogTrail, type VoidlingVisual } from './voidling';
 import type { WorldObject } from './world';
 
-interface OrbitItem {
-  kind: WorldObject['kind'];
+// v14 §2: each captured object orbits while spiraling inward; growth/score
+// apply only when spiralT reaches 1 (the moment of absorption).
+export interface OrbitItem {
+  kind: ObjectKind;
   tier: number;
-  iconR: number;          // intake-tween start size only
-  angle: number;          // intake target angle
-  slotA: number;          // live orbit angle (kept when fading out)
-  bob: number;            // per-chip bob phase offset
-  phase: 'in' | 'orbit' | 'out';
-  inT: number;
-  outT: number;
+  objSize: number;        // stored for deferred grow — absorbObjectMass(objSize)
+  gain: number;           // pre-computed score (deferred until finalize)
+  iconR: number;          // display radius, starts big, shrinks toward center
+  angle: number;          // current orbital angle (rad), advances over time
+  bob: number;            // phase offset for living-thing flail
+  phase: 'in' | 'spiral' | 'out';
+  inT: number;            // 0→1 fly-in tween
+  spiralT: number;        // 0→1 spiral progress (1 = absorbed, finalize fires)
+  spiralDur: number;      // total spiral duration ms
+  baseOrbitR: number;     // orbit radius at spiral start (set when 'in' → 'spiral')
   fromX: number;
   fromY: number;
+  live: boolean;          // living kind → flail while orbiting
+  finalized: boolean;     // growth/score already applied (set at spiralT>=1)
+  golden: boolean;
 }
 
 export interface FxEvent {
-  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve' | 'score';
+  type: 'absorb' | 'merge' | 'eatRival' | 'chomp' | 'finale' | 'evolve' | 'score' | 'captureStart';
   x: number;
   y: number;
   text?: string;
   color?: string;
   big?: boolean;
   kind?: ObjectKind;
-  form?: number;    // v6 §3: form index reached (for 'evolve')
-  tier?: number;    // v8 §5: object tier (for the eat sound's T3+ sub thump)
-  amount?: number;  // v10 §3: score points for pooled +N text
+  form?: number;
+  tier?: number;
+  amount?: number;
 }
 
 export class Player extends Void {
@@ -39,38 +52,34 @@ export class Player extends Void {
   combo = 0;
   comboTimer = 0;
 
-  cheekPuff = 0;        // 400ms after eating T3+
-  dizzy = 0;            // 1s after being chomped
-  lick = 0;             // 800ms after a TRIPLE
+  cheekPuff = 0;
+  dizzy = 0;
+  lick = 0;
 
   orbit: OrbitItem[] = [];
   pendingFx: FxEvent[] = [];
 
   // boons
-  gnomeScoreMult = 1;   // v12 §4: GNOME DAY daily mod — 5× gnome score
+  gnomeScoreMult = 1;
   magnetMultiplier = 1;
   speedMultiplier = 1;
   twinMerge = false;
   tremorActive = false;
   greedMultiplier = 1;
-  frenzyMult = 1;          // v8 §7: FRENZY MINUTE score ×1.25
-  // v7 §5: new power-up effect state
-  tremorFactor = 0.85;   // TENDERIZER shrink-per-touch (Lvl I 15%, Lvl II 25%)
-  twinBonus = 1;         // DOUBLE STOMACH II: +50% merge bonus
-  echoActive = false;    // ECHO BITE held
-  echoCount = 0;         // absorbs counted toward the next pulse
-  echoPulse = false;     // set on every 5th absorb; engine fires the shockwave
-  shieldCharge = false;  // BUBBLE SHIELD: one chomp-block available
-  shieldPopped = false;  // set when the shield eats a chomp; engine consumes it
-  dashActive = false;    // VOID DASH held (engine runs the 6s auto-dash)
-  luckyActive = false;   // LUCKY GNOME held (engine spawns goldens)
-  tremorLogCd = 0;       // throttle for the TENDERIZER debug log
+  frenzyMult = 1;
+  tremorFactor = 0.85;
+  twinBonus = 1;
+  echoActive = false;
+  echoCount = 0;
+  echoPulse = false;
+  shieldCharge = false;
+  shieldPopped = false;
+  dashActive = false;
+  luckyActive = false;
+  tremorLogCd = 0;
 
-  // identity (skin + form state + underdog + eventSlow live on the shared Void base)
   name = 'You';
-
-  // state
-  tooBigCd = 0;                      // ms cooldown on "too big" feedback
+  tooBigCd = 0;
 
   // animation
   private blinkTimer = 2000;
@@ -146,11 +155,9 @@ export class Player extends Void {
   }
 
   update(dt: number) {
-    this.tickMorph(dt); // v9 §3: advance the body-morph crossfade
+    this.tickMorph(dt);
     const dtSec = dt / 1000;
 
-    // ── velocity: accel toward joystick vector, decel to stop on release (px/s) ──
-    // v6 §3: each form gained grants +8% move speed, stacking.
     const formSpeed = 1 + this.formIndex * CONFIG.FORM_SPEED_BONUS;
     const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedMultiplier * this.sizeSpeedFactor() * formSpeed * this.underdogSpeed * this.eventSlow;
     const tvx = this.inputActive ? this.inDirX * this.inMag * maxSpeed : 0;
@@ -171,7 +178,6 @@ export class Player extends Void {
     this.x += this.vx * dtSec;
     this.y += this.vy * dtSec;
 
-    // v6 §7: soft-bounce boundary — nudge back in and reflect a little energy
     const m = CONFIG.MAP_SIZE;
     if (this.x < this.radius) { this.x = this.radius; this.vx = Math.abs(this.vx) * 0.4; }
     else if (this.x > m - this.radius) { this.x = m - this.radius; this.vx = -Math.abs(this.vx) * 0.4; }
@@ -180,7 +186,7 @@ export class Player extends Void {
 
     if (this.ghostTime > 0) this.ghostTime -= dt;
     if (this.tooBigCd > 0) this.tooBigCd -= dt;
-    if (this.tremorLogCd > 0) this.tremorLogCd -= dt; // v7 §5: throttle tremor log
+    if (this.tremorLogCd > 0) this.tremorLogCd -= dt;
 
     // combo decay
     if (this.comboTimer > 0) {
@@ -188,7 +194,7 @@ export class Player extends Void {
       if (this.comboTimer <= 0) this.combo = 0;
     }
 
-    // ── animation ──
+    // animation
     this.orbitClock += dt;
     this.breathePhase += dt;
     this.wobblePhase += dt * 0.009;
@@ -211,11 +217,9 @@ export class Player extends Void {
       this.blinkVal = Math.max(0, this.blinkVal - dt / 70);
     }
 
-    // mouth: open near food
     this.mouthOpen = lerp(this.mouthOpen, this.approach, Math.min(1, dt * 0.02));
     if (this.chomp > 0) this.chomp = Math.max(0, this.chomp - dt / 240);
 
-    // v6 §9: expression timers (cheek puff 400ms, dizzy 1s, tongue-lick 800ms)
     if (this.cheekPuff > 0) this.cheekPuff = Math.max(0, this.cheekPuff - dt / 400);
     if (this.dizzy > 0) this.dizzy = Math.max(0, this.dizzy - dt / 1000);
     if (this.lick > 0) this.lick = Math.max(0, this.lick - dt / 800);
@@ -231,21 +235,49 @@ export class Player extends Void {
     this.lookX = lerp(this.lookX, tx, Math.min(1, dt * 0.012));
     this.lookY = lerp(this.lookY, ty, Math.min(1, dt * 0.012));
 
-    // orbit item intake tween + overflow fade-out
+    // v14 §2: advance orbit items — fly-in → spiral → absorb
+    this.tickOrbit(dt);
+  }
+
+  // v14 §2: advance all orbit item phases
+  private tickOrbit(dt: number) {
     for (let i = this.orbit.length - 1; i >= 0; i--) {
       const it = this.orbit[i];
+      if (it.phase === 'out') {
+        it.inT += dt / 180; // reuse inT as fade-out progress
+        if (it.inT >= 1) { this.orbit.splice(i, 1); }
+        continue;
+      }
       if (it.phase === 'in') {
         it.inT += dt / CONFIG.ABSORB_SHRINK_TIME;
-        if (it.inT >= 1) it.phase = 'orbit';
-      } else if (it.phase === 'out') {
-        it.outT += dt / 220;
-        if (it.outT >= 1) this.orbit.splice(i, 1);
+        if (it.inT >= 1) {
+          it.inT = 1;
+          it.phase = 'spiral';
+          it.baseOrbitR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET;
+        }
+        continue;
+      }
+      if (it.phase === 'spiral') {
+        it.spiralT = Math.min(1, it.spiralT + dt / it.spiralDur);
+        // angular velocity increases as the orbit shrinks (conserve angular momentum feel)
+        const eased = Math.pow(it.spiralT, 0.6);
+        const orbitR = it.baseOrbitR * (1 - eased);
+        const angVel = CONFIG.ORBIT_SPEED * (orbitR < 4 ? 8 : it.baseOrbitR / Math.max(4, orbitR));
+        it.angle += (angVel * dt) / 1000;
+        if (!it.finalized && it.spiralT >= 1) {
+          this.finalizeOrbitItem(it);
+        }
       }
     }
-    // v5 §4: enforce the 6-chip cap after intake transitions (oldest fades out)
-    while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {
-      const idx = this.orbit.findIndex((o) => o.phase === 'orbit');
-      if (idx >= 0) this.orbit[idx].phase = 'out'; else break;
+
+    // auto-fuse check after all ticks
+    this.checkAutoFuse();
+
+    // remove fully-finalized spiral items
+    for (let i = this.orbit.length - 1; i >= 0; i--) {
+      if (this.orbit[i].phase === 'spiral' && this.orbit[i].finalized && this.orbit[i].spiralT >= 1) {
+        this.orbit.splice(i, 1);
+      }
     }
   }
 
@@ -254,89 +286,156 @@ export class Player extends Void {
     this.comboTimer = CONFIG.COMBO_DECAY_TIME;
   }
 
-  // Absorb a park object -> orbit ring + score + growth
+  // v14 §2: called when spiralT>=1 — NOW apply growth, score, and fire FX
+  private finalizeOrbitItem(it: OrbitItem) {
+    it.finalized = true;
+    this.absorbObjectMass(it.objSize);
+    this.score += it.gain;
+    if (it.tier >= 3) this.cheekPuff = 1;
+    this.chomp = 1;
+    this.checkEvolution();
+
+    // fire the actual pop/score FX at the void center (item has spiraled to center)
+    this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: it.kind, tier: it.tier });
+    this.pendingFx.push({
+      type: 'score', x: this.x, y: this.y - this.radius - 20,
+      amount: it.gain, color: CONFIG.COLORS.tierTint[it.tier - 1] || '#FFFFFF', tier: it.tier,
+    });
+    this.pendingFx.push({ type: 'absorb', x: this.x, y: this.y, color: CONFIG.COLORS.tierTint[it.tier - 1] });
+  }
+
+  // v14 §2: capture object → enters orbit, growth/score deferred
   absorbObject(obj: WorldObject): number {
     this.bumpCombo();
-    this.chomp = 1;
-    // v7 §5: ECHO BITE — every 5th absorb queues a shockwave pulse (engine fires it)
     if (this.echoActive && (++this.echoCount % 5 === 0)) this.echoPulse = true;
-    const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1; // v6 §2
+
+    const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1;
     let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult * this.frenzyMult);
-    if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT;       // v7 §3: drone worth 2×
-    if (obj.kind === 'gnome') gain = Math.round(gain * this.gnomeScoreMult); // v12 §4: GNOME DAY
-    if (obj.kind === 'skyscraper') gain *= 3;                         // v12 §1: 3× house-level score
-    this.score += gain;
-    this.absorbObjectMass(obj.size); // v9 §1: shared growth curve + size cap
-    if (obj.tier >= 3) this.cheekPuff = 1; // v6 §9: cheek puff on T3+
-    this.checkEvolution();
+    if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT;
+    if (obj.kind === 'gnome') gain = Math.round(gain * this.gnomeScoreMult);
+    if (obj.kind === 'skyscraper') gain *= 3;
+    // Note: score is NOT added yet — deferred to finalizeOrbitItem
+
+    const live = (CONFIG.LIVING_ORBIT_KINDS as string[]).includes(obj.kind);
+
+    // v14 §2: spiral duration — DEVOURER+ T1/T2 use fast orbit
+    const isFast = this.formIndex >= CONFIG.DEVOURER_FORM_INDEX && obj.tier <= 2;
+    const spiralDur = isFast ? CONFIG.ORBIT_SPIRAL_DUR_FAST
+      : CONFIG.ORBIT_SPIRAL_DUR + (Math.random() - 0.5) * 400; // ±200ms jitter
+
+    // capacity check: if at 8, instantly finalize the oldest spiral item to make room
+    const active = this.orbit.filter((o) => o.phase !== 'out');
+    if (active.length >= CONFIG.ORBIT_MAX) {
+      const oldest = active.find((o) => o.phase === 'spiral' && !o.finalized);
+      if (oldest) { oldest.spiralT = 1; this.finalizeOrbitItem(oldest); }
+    }
 
     this.orbit.push({
       kind: obj.kind,
       tier: obj.tier,
-      iconR: clamp(obj.size * 0.5, 14, 30),
+      objSize: obj.size,
+      gain,
+      iconR: clamp(obj.size * 0.5, 12, 28),
       angle: Math.random() * Math.PI * 2,
-      slotA: 0,
       bob: Math.random() * Math.PI * 2,
       phase: 'in',
       inT: 0,
-      outT: 0,
+      spiralT: 0,
+      spiralDur,
+      baseOrbitR: this.radius + CONFIG.ORBIT_RADIUS_OFFSET,
       fromX: obj.x,
       fromY: obj.y,
+      live,
+      finalized: false,
+      golden: obj.golden ?? false,
     });
-    this.pendingFx.push({ type: 'absorb', x: obj.x, y: obj.y, color: CONFIG.COLORS.tierTint[obj.tier - 1] });
-    this.pendingFx.push({ type: 'chomp', x: this.x, y: this.y, kind: obj.kind, tier: obj.tier });
-    // v10 §3: floating +N score — pooled by engine within 150ms window
-    this.pendingFx.push({ type: 'score', x: obj.x, y: obj.y - obj.size, amount: gain,
-      color: CONFIG.COLORS.tierTint[obj.tier - 1] || '#FFFFFF', tier: obj.tier });
 
-    // v5 §4: cap at 6 — the oldest fades out on overflow
-    while (this.orbit.filter((o) => o.phase === 'orbit').length > CONFIG.ORBIT_MAX) {
-      const idx = this.orbit.findIndex((o) => o.phase === 'orbit');
-      if (idx >= 0) this.orbit[idx].phase = 'out'; else break;
-    }
+    // capture-start spark at object position (subtle suction flash)
+    this.pendingFx.push({ type: 'captureStart', x: obj.x, y: obj.y, color: CONFIG.COLORS.tierTint[obj.tier - 1] });
 
-    this.checkMerge();
-    return gain;
+    return gain; // returned so caller knows the pending gain (for display)
   }
 
-  private checkMerge() {
+  // v14 §2: auto-fuse — 3 same-kind items simultaneously in spiral → TRIPLE
+  private checkAutoFuse() {
     const need = this.twinMerge ? 2 : 3;
-    const byTier = new Map<number, OrbitItem[]>();
+    // count live, non-finalized spiral items by kind
+    const byKind = new Map<ObjectKind, OrbitItem[]>();
     for (const it of this.orbit) {
-      if (it.phase !== 'orbit') continue;
-      const arr = byTier.get(it.tier) || [];
+      if (it.phase !== 'spiral' || it.finalized) continue;
+      const arr = byKind.get(it.kind) || [];
       arr.push(it);
-      byTier.set(it.tier, arr);
+      byKind.set(it.kind, arr);
     }
-    for (const [tier, arr] of byTier) {
+    for (const [, arr] of byKind) {
       if (arr.length >= need) {
         const merge = arr.slice(0, need);
-        this.orbit = this.orbit.filter((o) => !merge.includes(o));
+        // finalize merged items (apply their individual growth/score)
+        for (const it of merge) {
+          it.spiralT = 1;
+          it.finalized = true;
+          this.absorbObjectMass(it.objSize);
+          this.score += it.gain;
+          this.checkEvolution();
+        }
+        // remove merged items from orbit
+        const mergeSet = new Set(merge);
+        this.orbit = this.orbit.filter((o) => !mergeSet.has(o));
+        // bonus mass + score for the triple
+        const tier = merge[0].tier;
         const bonus = Math.round(tier * 120 * this.comboMult * this.greedMultiplier * this.twinBonus * this.frenzyMult);
         this.score += bonus;
-        this.absorbMergeMass(260 * tier); // v9 §1: shared growth curve
+        this.absorbMergeMass(260 * tier);
         this.bumpCombo();
-        this.lick = 1; // v6 §9: tongue-lick grin after a TRIPLE
-        this.pendingFx.push({ type: 'merge', x: this.x, y: this.y, text: `TRIPLE! +${bonus}`, color: '#FFD23F', big: true });
+        this.lick = 1;
+        this.cheekPuff = 1;
         this.checkEvolution();
+        this.pendingFx.push({
+          type: 'merge', x: this.x, y: this.y,
+          text: `TRIPLE! +${bonus}`, color: '#FFD23F', big: true,
+        });
+        return; // process one merge per frame to avoid cascades
       }
     }
   }
 
-  // Eating a rival voidling — v12 §2: optional score steal from the eaten rival
+  // v14 §2: add orbit items from an eaten rival (orbit-theft visual)
+  // Spawns 2-3 small orbit items directly into the player's orbit as a reward flourish.
+  absorbRivalOrbit(rivalRadius: number) {
+    const count = Math.min(3, Math.max(1, Math.round(rivalRadius / 30)));
+    const kinds: ObjectKind[] = ['apple', 'flower', 'mailbox', 'duck', 'gnome'];
+    for (let k = 0; k < count; k++) {
+      const kind = kinds[k % kinds.length];
+      const tier = k === 0 ? 2 : 1;
+      const active = this.orbit.filter((o) => o.phase !== 'out');
+      if (active.length >= CONFIG.ORBIT_MAX) break;
+      this.orbit.push({
+        kind, tier, objSize: 14, gain: 0, // no extra score — bonus already given via eatRival
+        iconR: 14, angle: Math.random() * Math.PI * 2, bob: Math.random() * Math.PI * 2,
+        phase: 'spiral', inT: 1, spiralT: 0,
+        spiralDur: 800, // fast exit since they're bonus
+        baseOrbitR: this.radius + CONFIG.ORBIT_RADIUS_OFFSET + k * 12,
+        fromX: this.x, fromY: this.y,
+        live: false, finalized: false, golden: false,
+      });
+    }
+  }
+
+  // Eating a rival voidling
   eatRival(rivalRadius: number, stolen = 0) {
     const bonus = Math.round(500 * Math.max(1, this.comboMult));
     this.score += bonus + stolen;
-    this.absorbVoidMass(rivalRadius); // v9 §1: shared growth curve + size cap
+    this.absorbVoidMass(rivalRadius);
     this.bumpCombo();
     this.chomp = 1;
     this.cheekPuff = 1;
     const label = stolen > 0 ? `DEVOURED +${bonus} STOLE +${stolen}` : `DEVOURED +${bonus}`;
     this.pendingFx.push({ type: 'eatRival', x: this.x, y: this.y, text: label, color: '#FFD23F', big: true });
     this.checkEvolution();
+    // v14 §2: orbit-theft visual — rival's items scatter into our orbit
+    this.absorbRivalOrbit(rivalRadius);
   }
 
-  // v6 §3: promote through the shared form ladder; forms only go up within a round.
   private checkEvolution() {
     this.advanceForms((formIndex) => {
       this.pendingFx.push({
@@ -346,13 +445,12 @@ export class Player extends Void {
     });
   }
 
-  // Player got eaten -> lose mass, ghost, keep playing
   getEaten() {
-    // v6 §3: being chomped can't drop you below a form you've already reached
     this.shrinkOnEaten();
     this.ghostTime = CONFIG.GHOST_TIME;
     this.combo = 0;
-    this.dizzy = 1; // v6 §9: dizzy swirl eyes for 1s
+    this.dizzy = 1;
+    // clear orbit on death — items are lost
     this.orbit = [];
     this.vx = this.vy = 0;
   }
@@ -390,7 +488,6 @@ export class Player extends Void {
     this.drawOrbit(ctx, rx, ry, t);
 
     if (this.ghost) {
-      // 40% opacity + dashed outline ring, plus a soft flicker
       ctx.save();
       ctx.globalAlpha = 0.4;
       drawVoidling(ctx, rx, ry, this.visual(t));
@@ -410,91 +507,86 @@ export class Player extends Void {
     }
   }
 
+  // v14 §2: Accretion Orbit visual — items spiral in with spaghettification
   private drawOrbit(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number) {
-    // v5 §4: white circular chips on a faint dashed orbit at playerRadius+26
-    const CHIP_R = 11;                  // 22px chip
-    const ICON_R = CHIP_R * 0.7;        // icon fills 70%
-    const orbitR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET;
-    const orbiting = this.orbit.filter((o) => o.phase === 'orbit');
-    const outs = this.orbit.filter((o) => o.phase === 'out');
-
-    // faint dashed orbit path
-    if (orbiting.length + outs.length > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 6]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // tiers one short of a merge -> gold telegraph
-    const need = this.twinMerge ? 2 : 3;
-    const tierCount = new Map<number, number>();
-    for (const o of orbiting) tierCount.set(o.tier, (tierCount.get(o.tier) || 0) + 1);
-    const telegraph = new Set<number>();
-    for (const [tier, n] of tierCount) if (n >= need - 1) telegraph.add(tier);
-
-    const spin = (this.orbitClock / 1000) * CONFIG.ORBIT_SPEED; // rad (0.6 rad/s)
-
-    const drawChip = (it: OrbitItem, a: number, alpha: number, rr: number) => {
-      const ox = cx + Math.cos(a) * rr;
-      const oy = cy + Math.sin(a) * rr;
-      ctx.save();
-      ctx.translate(ox, oy);
-      ctx.globalAlpha = alpha;
-      const accent = CONFIG.COLORS.tierTint[it.tier - 1] || '#FFFFFF';
-      if (telegraph.has(it.tier) && it.phase === 'orbit') {
-        const pulse = 0.5 + Math.sin(t / 140) * 0.5;
+    for (const it of this.orbit) {
+      if (it.phase === 'in') {
+        this.drawFlyIn(ctx, it, cx, cy, t);
+      } else if (it.phase === 'spiral') {
+        this.drawSpiral(ctx, it, cx, cy, t);
+      } else if (it.phase === 'out') {
+        // fade-out items drift outward
+        const a = it.angle;
+        const r = it.baseOrbitR + it.inT * 24;
+        const ox = cx + Math.cos(a) * r;
+        const oy = cy + Math.sin(a) * r;
         ctx.save();
-        ctx.globalAlpha = alpha * (0.3 + pulse * 0.4);
-        ctx.fillStyle = '#FFD23F';
-        ctx.beginPath();
-        ctx.arc(0, 0, CHIP_R + 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.translate(ox, oy);
+        ctx.globalAlpha = Math.max(0, 1 - it.inT);
+        drawParkObject(ctx, it.kind, it.iconR * (1 - it.inT * 0.5), { t });
         ctx.restore();
       }
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(0, 0, CHIP_R, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, CHIP_R - 1, 0, Math.PI * 2);
-      ctx.stroke();
-      drawParkObject(ctx, it.kind, ICON_R, { t });
-      ctx.restore();
-    };
-
-    orbiting.forEach((it, i) => {
-      const a = spin + (i / orbiting.length) * Math.PI * 2;
-      it.slotA = a;
-      const twin = telegraph.has(it.tier);
-      const bob = Math.sin(t / 300 + it.bob) * 2;               // ±2px bob
-      const drift = twin ? Math.sin(t / 200 + i) * 3 : 0;        // gold drift
-      drawChip(it, a, 1, orbitR + bob + drift);
-    });
-
-    // fading overflow chips drift outward
-    for (const it of outs) drawChip(it, it.slotA, 1 - it.outT, orbitR + it.outT * 18);
-
-    // intake tween (flying into the ring)
-    for (const it of this.orbit) {
-      if (it.phase !== 'in') continue;
-      const e = it.inT;
-      const tx = cx + Math.cos(it.angle) * orbitR;
-      const ty = cy + Math.sin(it.angle) * orbitR;
-      const px = lerp(it.fromX, tx, e);
-      const py = lerp(it.fromY, ty, e);
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.globalAlpha = 0.5 + e * 0.5;
-      drawParkObject(ctx, it.kind, lerp(it.iconR * 1.6, ICON_R, e), { t });
-      ctx.restore();
     }
+  }
+
+  // Fly-in phase: arc from capture position to orbit ring
+  private drawFlyIn(ctx: CanvasRenderingContext2D, it: OrbitItem, cx: number, cy: number, t: number) {
+    const e = it.inT;
+    const targetR = this.radius + CONFIG.ORBIT_RADIUS_OFFSET;
+    const tx = cx + Math.cos(it.angle) * targetR;
+    const ty = cy + Math.sin(it.angle) * targetR;
+    const px = lerp(it.fromX, tx, e * e); // ease-in
+    const py = lerp(it.fromY, ty, e * e);
+    const scale = lerp(1.3, 1.0, e);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.globalAlpha = 0.5 + e * 0.5;
+    ctx.scale(scale, scale);
+    drawParkObject(ctx, it.kind, it.iconR, { t });
+    ctx.restore();
+  }
+
+  // Spiral phase: orbit while shrinking toward center with spaghettification + living-thing flail
+  private drawSpiral(ctx: CanvasRenderingContext2D, it: OrbitItem, cx: number, cy: number, t: number) {
+    const eased = Math.pow(it.spiralT, 0.6);
+    const orbitR = it.baseOrbitR * (1 - eased);
+    const iconR = it.iconR * (1 - Math.pow(it.spiralT, 0.5));
+    if (iconR < 1.5) return; // too small to draw
+
+    const a = it.angle;
+    const ox = cx + Math.cos(a) * orbitR;
+    const oy = cy + Math.sin(a) * orbitR;
+
+    // spaghettification: stretch radially toward center as spiralT increases
+    const spaghettiStretch = 1 + it.spiralT * 1.6;  // stretch along radial axis
+    const spaghettiSqueeze = 1 - it.spiralT * 0.55; // squeeze tangentially
+    // radial direction (toward center)
+    const radAngle = Math.atan2(oy - cy, ox - cx); // angle from center to item
+
+    // flail for living things
+    let flailX = 0, flailY = 0, flailRot = 0;
+    if (it.live) {
+      const flailAmt = Math.sin(t / 80 + it.bob) * (4 + it.spiralT * 8);
+      const flailAmt2 = Math.cos(t / 60 + it.bob * 1.3) * 3;
+      // flail perpendicular to radial direction
+      flailX = Math.cos(a + Math.PI / 2) * flailAmt;
+      flailY = Math.sin(a + Math.PI / 2) * flailAmt;
+      flailRot = Math.sin(t / 90 + it.bob) * 0.6;
+    }
+
+    ctx.save();
+    ctx.translate(ox + flailX, oy + flailY);
+    ctx.rotate(radAngle + flailRot); // face the pull direction
+    ctx.scale(spaghettiStretch * (it.golden ? 1.15 : 1), spaghettiSqueeze);
+    ctx.globalAlpha = it.finalized ? 0 : 1;
+
+    // gold tint for golden objects
+    if (it.golden) {
+      ctx.shadowColor = '#FFD23F';
+      ctx.shadowBlur = 8;
+    }
+
+    drawParkObject(ctx, it.kind, iconR, { t });
+    ctx.restore();
   }
 }
