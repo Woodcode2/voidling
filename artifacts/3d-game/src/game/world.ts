@@ -46,7 +46,7 @@ export interface PlayerStats {
   gnomes: number;   // v9 §8: garden gnomes eaten this round (secret GNOME LORD)
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed';
+type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail
@@ -133,14 +133,113 @@ function drawTornRim(ctx: CanvasRenderingContext2D, view: View, S: number, t: nu
     ctx.restore();
   };
 
-  if (view.y < 0 && view.y + view.h > 0)      // top edge (y = 0)
+  if (view.y < 0 && view.y + view.h > 0)      // top edge (y = 0) — torn earth
     edge((x) => [x, jag(x)], (x) => [x, 0], vx0, vx1);
-  if (view.y < S && view.y + view.h > S)      // bottom edge (y = S)
-    edge((x) => [x, S - jag(x)], (x) => [x, S], vx0, vx1);
-  if (view.x < 0 && view.x + view.w > 0)      // left edge (x = 0)
-    edge((y) => [jag(y), y], (y) => [0, y], vy0, vy1);
-  if (view.x < S && view.x + view.w > S)      // right edge (x = S)
+  // v13 §1: south/west edges are now COASTLINE — no torn earth here
+  // if (view.y < S && view.y + view.h > S)   // bottom edge — now ocean coast
+  // if (view.x < 0 && view.x + view.w > 0)  // left edge — now ocean coast
+  if (view.x < S && view.x + view.w > S)      // right edge (x = S) — torn earth
     edge((y) => [S - jag(y), y], (y) => [S, y], vy0, vy1);
+}
+
+// v13 §1: SANDY SHORES — coastline replacing the south and west torn-earth rims.
+// Ocean water + animated shore foam + waterfall-into-space streaks.
+function drawCoast(ctx: CanvasRenderingContext2D, view: View, S: number, t: number) {
+  const WATER = 100;   // ocean band width outside the map
+  const bg = CONFIG.COLORS.uiBg;
+
+  // ── WEST COAST (x = 0, ocean to the left) ──────────────────────────────────
+  if (view.x < 0 && view.x + view.w > -WATER - 60) {
+    const wx0 = Math.max(view.x, -WATER - 60);
+    // hide the harsh uiBg gap with a space-like darkening so coast blends into space
+    ctx.fillStyle = bg;
+    ctx.fillRect(wx0, view.y, -wx0, view.h);
+    // ocean gradient
+    const grd = ctx.createLinearGradient(-WATER, 0, 0, 0);
+    grd.addColorStop(0, 'rgba(20,100,180,0.0)');
+    grd.addColorStop(0.5, 'rgba(35,150,215,0.65)');
+    grd.addColorStop(1, 'rgba(55,175,235,0.82)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(wx0, view.y, -wx0, view.h);
+    // shore foam
+    const fG = ctx.createLinearGradient(-20, 0, 0, 0);
+    fG.addColorStop(0, 'rgba(255,255,255,0)');
+    fG.addColorStop(1, 'rgba(255,255,255,0.32)');
+    ctx.fillStyle = fG;
+    ctx.fillRect(-20, view.y, 20, view.h);
+    // horizontal ripple lines
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([10, 18]);
+    for (let y = Math.floor(view.y / 52) * 52; y < view.y + view.h; y += 52) {
+      const off = Math.sin(t / 850 + y * 0.009) * 8;
+      ctx.beginPath();
+      ctx.moveTo(wx0, y + off);
+      ctx.quadraticCurveTo(wx0 * 0.5, y + off + 6, -2, y + off);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // waterfall: animated vertical streaks past the water band
+    ctx.globalAlpha = 0.38;
+    for (let i = 0; i < 10; i++) {
+      const bx = -WATER - 18 - i * 8;
+      if (bx > view.x + view.w || bx < view.x - 20) continue;
+      const spd = 160 + (i % 3) * 65;
+      const len = 28 + (i % 4) * 18;
+      const period = 110;
+      for (let y = view.y; y < view.y + view.h; y += period) {
+        const phase = ((t * spd / 1000) + y + i * 43) % period;
+        ctx.fillStyle = `rgba(90,180,235,${0.25 + 0.15 * (i % 2)})`;
+        ctx.fillRect(bx, y + phase, 2, len);
+      }
+    }
+    ctx.restore();
+  }
+
+  // ── SOUTH COAST (y = S, ocean below) ───────────────────────────────────────
+  if (view.y + view.h > S && view.y < S + WATER + 60) {
+    const wy1 = Math.min(view.y + view.h, S + WATER + 60);
+    ctx.fillStyle = bg;
+    ctx.fillRect(view.x, S, view.w, wy1 - S);
+    const grd = ctx.createLinearGradient(0, S, 0, S + WATER);
+    grd.addColorStop(0, 'rgba(55,175,235,0.82)');
+    grd.addColorStop(0.5, 'rgba(35,150,215,0.65)');
+    grd.addColorStop(1, 'rgba(20,100,180,0.0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(view.x, S, view.w, wy1 - S);
+    const fG = ctx.createLinearGradient(0, S, 0, S + 20);
+    fG.addColorStop(0, 'rgba(255,255,255,0.32)');
+    fG.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = fG;
+    ctx.fillRect(view.x, S, view.w, 20);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([10, 18]);
+    for (let x = Math.floor(view.x / 52) * 52; x < view.x + view.w; x += 52) {
+      const off = Math.sin(t / 850 + x * 0.009) * 8;
+      ctx.beginPath();
+      ctx.moveTo(x + off, S + 2);
+      ctx.quadraticCurveTo(x + off + 6, S + WATER * 0.5, x + off, wy1);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.38;
+    for (let i = 0; i < 10; i++) {
+      const by = S + WATER + 18 + i * 8;
+      if (by > view.y + view.h + 20 || by < view.y) continue;
+      const spd = 160 + (i % 3) * 65;
+      const len = 28 + (i % 4) * 18;
+      const period = 110;
+      for (let x = view.x; x < view.x + view.w; x += period) {
+        const phase = ((t * spd / 1000) + x + i * 43) % period;
+        ctx.fillStyle = `rgba(90,180,235,${0.25 + 0.15 * (i % 2)})`;
+        ctx.fillRect(x + phase, by, len, 2);
+      }
+    }
+    ctx.restore();
+  }
 }
 
 // v9 §4: a torn-loose ground chunk floating in space — grass clod, fence bit or flowerpot.
@@ -172,7 +271,7 @@ function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
   }
 }
 
-const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower'];
+const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab'];
 
 export class WorldManager {
   objects: WorldObject[] = [];
@@ -268,14 +367,14 @@ export class WorldManager {
       this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
     }
 
-    // v12 §1: 5×5 = 25 blocks. gx∈{2,3} × gy∈{2,3} = DOWNTOWN core (4 blocks).
-    // The water tower sits on the last residential corner.
+    // v13 §1: 5×5 layout. West column (gx=0) and south row (gy=4) become SANDY SHORES beach.
+    // gx∈{2,3} × gy∈{2,3} = DOWNTOWN core (4 blocks).
     const layout: BlockType[] = [
-      'residential', 'residential', 'plaza',       'residential', 'residential',
-      'residential', 'park',        'residential', 'playground',  'residential',
-      'residential', 'residential', 'downtown',    'downtown',    'residential',
-      'residential', 'residential', 'downtown',    'downtown',    'school',
-      'residential', 'mixed',       'residential', 'residential', 'residential',
+      'beach',       'residential', 'plaza',       'residential', 'residential',
+      'beach',       'park',        'residential', 'playground',  'residential',
+      'beach',       'residential', 'downtown',    'downtown',    'residential',
+      'beach',       'residential', 'downtown',    'downtown',    'school',
+      'beach',       'beach',       'beach',       'beach',       'beach',
     ];
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
@@ -293,6 +392,7 @@ export class WorldManager {
       else if (b.type === 'school') this.fillSchool(b, rand);
       else if (b.type === 'downtown') this.fillDowntown(b, rand);
       else if (b.type === 'mixed') this.fillMixed(b, rand);
+      else if (b.type === 'beach') this.fillBeach(b, rand); // v13 §2
     }
 
     // v12 §1: guarantee T1 edibles around the player spawn (map center = downtown)
@@ -374,8 +474,20 @@ export class WorldManager {
       if ((b as any).paved) continue;
       const ix = b.x0 + inset, iy = b.y0 + inset;
       const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
-      // grass tufts / daisies / clover / leaves
-      for (let i = 0; i < 60; i++) {
+      if (b.type === 'beach') {
+        // v13 §3: sandy shores — 80 light sand speckles instead of grass tufts; no fences/hedges
+        for (let i = 0; i < 80; i++) {
+          this.dressTufts.push({
+            x: ix + rand() * iw, y: iy + rand() * ih,
+            type: 4, // 4 = sand speckle (drawn as tiny warm-tan oval)
+            rot: rand() * Math.PI * 2,
+            s: 0.4 + rand() * 0.5, a: 0.12 + rand() * 0.08,
+          });
+        }
+        continue; // skip fence / hedge for beach blocks
+      }
+      // v13 §3: doubled tuft density (60 → 120) for richer-looking non-beach blocks
+      for (let i = 0; i < 120; i++) {
         this.dressTufts.push({
           x: ix + rand() * iw, y: iy + rand() * ih,
           type: Math.floor(rand() * 4), rot: rand() * Math.PI * 2,
@@ -408,6 +520,23 @@ export class WorldManager {
       if (rand() < 0.5) this.dressManholes.push({ x: along, y: c });
       else this.dressManholes.push({ x: c, y: along });
     }
+  }
+
+  // v13 §3: per-block edible density audit (callable any time; warns if under quota)
+  debugDensity(): void {
+    const EDIBLE_TARGET = 18;
+    for (const b of this.blocks) {
+      const edibles = this.objects.filter((o) =>
+        !o.eaten &&
+        o.x >= b.x0 && o.x < b.x0 + CONFIG.BLOCK_SIZE &&
+        o.y >= b.y0 && o.y < b.y0 + CONFIG.BLOCK_SIZE &&
+        CONFIG.KIND_INFO[o.kind]?.tier !== undefined
+      ).length;
+      if (edibles < EDIBLE_TARGET) {
+        console.warn(`[density] block (${b.gx},${b.gy}) type=${b.type}: ${edibles} edibles < target ${EDIBLE_TARGET}`);
+      }
+    }
+    console.log('[density] validation complete');
   }
 
   // ── block interiors (inset by sidewalk) ──
@@ -560,6 +689,59 @@ export class WorldManager {
     this.scatter(b, rand, 'flower', 4);
     this.scatter(b, rand, 'gnome', 1);
     this.scatter(b, rand, 'mailbox', 2);
+  }
+
+  // v13 §2: Sandy Shores beach blocks — beach objects + sunbathers + crabs
+  private fillBeach(b: Block, rand: () => number) {
+    this.scatter(b, rand, 'palm', 2);
+    this.scatter(b, rand, 'umbrella', 3);
+    this.scatter(b, rand, 'sandcastle', 2);
+    this.scatter(b, rand, 'towel', 4);
+    this.scatter(b, rand, 'seashell', 5);
+    this.scatter(b, rand, 'crab', 2);
+    if (rand() < 0.7) this.scatter(b, rand, 'surfboard', 1);
+    if (rand() < 0.5) this.scatter(b, rand, 'kayak', 1);
+    if (rand() < 0.4) this.scatter(b, rand, 'lifeguard', 1);
+    if (rand() < 0.5) this.scatter(b, rand, 'car_parked_a', 1);
+    if (rand() < 0.4) this.scatter(b, rand, 'car_parked_b', 1);
+    this.scatter(b, rand, 'person', 3);
+    this.spawnBirds(b, rand, 4); // white seagulls (same bird drawing, beach context)
+  }
+
+  // v13 §1: map a world position to its named district
+  districtAt(x: number, y: number): string {
+    const blockLabel = (type: BlockType): string => {
+      switch (type) {
+        case 'beach':       return 'SANDY SHORES';
+        case 'downtown':    return 'DOWNTOWN';
+        case 'school':      return 'SCHOOLYARD';
+        case 'playground':  return 'SCHOOLYARD';
+        case 'park':        return 'THE PARK';
+        default:            return 'MAPLE COURT';
+      }
+    };
+    // exact block check
+    for (const b of this.blocks) {
+      if (x >= b.x0 && x < b.x0 + CONFIG.BLOCK_SIZE &&
+          y >= b.y0 && y < b.y0 + CONFIG.BLOCK_SIZE) {
+        return blockLabel(b.type);
+      }
+    }
+    // on a road/sidewalk — find nearest block by centre distance so roads
+    // are attributed to the district they border rather than MAPLE COURT
+    let nearest: Block | null = null;
+    let nearestD = Infinity;
+    const half = CONFIG.BLOCK_SIZE / 2;
+    for (const b of this.blocks) {
+      const bx = b.x0 + half, by = b.y0 + half;
+      const d = Math.hypot(x - bx, y - by);
+      if (d < nearestD) { nearestD = d; nearest = b; }
+    }
+    if (nearest) return blockLabel(nearest.type);
+    // coast zone fallback (only reached outside all blocks AND no nearest found)
+    const sandD = CONFIG.COAST_SAND_DEPTH;
+    if (x < sandD || y > this.size - sandD) return 'SANDY SHORES';
+    return 'MAPLE COURT';
   }
 
   private spawnCar(rand: () => number) {
@@ -1181,13 +1363,15 @@ export class WorldManager {
       const inset = CONFIG.SIDEWALK;
       const paved = (b as any).paved;
       if (paved) ctx.fillStyle = G.pavement;
+      else if (b.type === 'beach') ctx.fillStyle = '#F0DFB8'; // v13 §2: sandy shore floor
       else ctx.fillStyle = G.lawns[(b.gx + b.gy) % G.lawns.length];
       ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
       // v6 §8: zone grading — a faint per-district tint so areas read differently
       const tint = b.type === 'park' ? 'rgba(120,220,140,0.06)'
         : b.type === 'plaza' ? 'rgba(255,210,120,0.05)'
         : b.type === 'playground' ? 'rgba(255,150,200,0.05)'
-        : b.type === 'school' ? 'rgba(180,140,255,0.07)' : null;
+        : b.type === 'school' ? 'rgba(180,140,255,0.07)'
+        : b.type === 'beach' ? 'rgba(255,220,100,0.08)' : null; // v13 §2: warm sandy tint
       if (tint) {
         ctx.fillStyle = tint;
         ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
@@ -1216,8 +1400,10 @@ export class WorldManager {
 
     ctx.restore(); // end ground clip
 
-    // v9 §4: torn-earth rim — irregular bitten edge + undulating accretion glow
+    // v9 §4: torn-earth rim (north + east only; south + west are now coastline)
     drawTornRim(ctx, view, S, t, px, py);
+    // v13 §1: sandy shores — animated ocean on the west and south edges
+    drawCoast(ctx, view, S, t);
 
     // dirt patches (ground decor)
     for (const d of this.dirt) {
@@ -1383,6 +1569,12 @@ export class WorldManager {
         ctx.arc(Math.cos(a) * 3, Math.sin(a) * 3, 2.4, 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (d.type === 4) {
+      // v13 §3: sand speckle — tiny warm-tan ellipse for beach blocks
+      ctx.fillStyle = '#D4AA6A';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 4.5, 2.2, 0.4, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       // fallen leaf
       ctx.fillStyle = '#C87B3A';

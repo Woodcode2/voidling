@@ -1,3 +1,4 @@
 - [VOIDLING architecture](voidling-architecture.md) — React-DOM menus + canvas-only arena, joined by a createGame() engine snapshot/subscribe API that notifies on discrete state changes (never per-frame).
 - [VOIDLING audio + lifecycle](voidling-audio.md) — procedural WebAudio (SFX + music buses, setInterval scheduler); any long-lived scheduler/interval MUST be torn down in engine.destroy() or it leaks on unmount.
 - [VOIDLING rendering & perf](voidling-rendering.md) — world-space badge/overlay placement; sprite pipeline (skinSprites/layerSprites); score pooling rolling window; orbit-chip clearance rule.
+- [VOIDLING v13 Sandy Shores](voidling-v13.md) — beach biome, coastline, 3 new events, bot-eat cooldown, rival rim arcs, district display.

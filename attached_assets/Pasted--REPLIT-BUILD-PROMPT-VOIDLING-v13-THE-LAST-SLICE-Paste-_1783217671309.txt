@@ -1,0 +1,62 @@
+# REPLIT BUILD PROMPT — VOIDLING v13: THE LAST SLICE
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+You are giving VOIDLING's world an identity, finally killing the bot-size bug, and rebuilding world events to matter for everyone. Work sections **in order**; verify every Acceptance Criteria line and confess anything skipped. Standing rules hold: 60fps, portrait, one art style, asset loaders with silent procedural fallbacks, collision from CONFIG sizes only.
+
+## 0 — THE BOT SIZE BUG: final fix, with proof (highest priority)
+
+The evidence: all five bots reach the final form while the player out-scores them 6:1. Mass is entering bots without generating score. The prime suspect is **bot-on-bot cannibalism** — every chomp transfers 50% mass, so bots eating each other all round act as a mass pump into the survivors.
+
+- **Bot-vs-bot chomps transfer only 25% mass** (player-involved chomps keep 50%), and a bot that eats another void is SATED for **10 seconds**.
+- **Countdown assertion:** at the moment "EAT!" fires, assert all six radii === 18 exactly. Log it. If the assertion ever fails, throw loudly in debug — do not paper over it. Audit every bot initialization path for any inherited, seeded, or carried-over mass and delete it.
+- Verify the diminishing-growth multiplier executes inside the ONE shared absorb function for every caller — add a sampled debug log proving bot absorbs pass through it.
+- Re-tune final-form thresholds so that across three test rounds, at most ONE void (any void) reaches the final form before 0:30. Five crowns by 1:00 is a failed tune.
+- **Proof requirement:** your completion report must paste the every-10s radius log for one full round. If any bot's radius curve is unexplainable by visible eating, keep digging.
+- **Size legibility:** any rival void within 1.5 screens shows a subtle rim — green if you can eat it (you're ≥1.15× it), red if it can eat you, none when close in size. Updates live. This is how the player finally *sees* the comeback.
+
+## 1 — World identity: The Last Slice
+
+- **Lore made visible:** this island is the final chunk of an already-devoured planet. The **south and west edges become coastline**: a sand band (60–90px), then a ring of ocean water (80–120px) with gentle animated shore ripples — and at the outer rim the water **pours off the edge in a waterfall into space** (drawn as falling streaks fading into stars, with a soft mist line and 2–3 drifting droplet particles). North and east edges keep the torn-earth rim. The boundary wall sits at the water's outer edge; voids can wade the shallows (20% slow while in water — new tactical terrain).
+- **Districts, laid onto the 5×5:** SANDY SHORES (the 5–6 coastal blocks), DOWNTOWN (center 2×2), SCHOOLYARD (school + playground blocks), THE PARK (pond block), MAPLE COURT (all remaining residential). Crossing into a district fades in its name — small white Fredoka caps, 60% opacity, 1.5s, bottom-third of screen, never stacking with callouts.
+- The results screen and share card mention where you ended: "Finished as DEVOURER in DOWNTOWN."
+
+## 2 — SANDY SHORES biome content
+
+- Beach blocks get sand ground (procedural warm sand `#F0DFB8` until the tile asset lands), scattered: **palm trees** (sway more than regular trees), **beach umbrellas** (T3), **sandcastles** (T2, crumble satisfyingly), **beach towels** (decor), **surfboards** (T3, stuck upright), **lifeguard chair** (T4), **seashells** (T1), **crabs** (T1–2, scuttle sideways, snip animation when fleeing), **beached kayak** (T4). Beachgoers: the people generator adds swimwear variants on sand.
+- Loader slots (procedural fallbacks required now): `palm, umbrella, sandcastle, lifeguard, surfboard, towel, crab, seashell, car_parked_a, car_parked_b` in `assets/objects/`, plus `sand.png` and `water.png` tiles in `assets/ground/` under the same `useGroundTiles` flag.
+- Seagulls: recolor the existing bird flock white-grey on beach blocks; they still fly away.
+
+## 3 — Density that survives the zoom
+
+- Replace the radius-based food rule with a **screen-based rule: at any camera zoom, at least 14 edible objects and 3 mid/large structures are on screen** during normal play. The respawn budget scales with visible area.
+- **Fix the barren-lot bug:** audit 5×5 block generation — the live build renders entire blocks as empty beige. Every residential lot must receive its house + yard set; every block type must fill per its template. Add a post-generation validation pass that counts per-block objects and re-fills any block under quota.
+- **Street furniture fill:** street trees every ~300px along sidewalks, parked cars (static, sprite slots above, procedural until then) along 30% of curb segments, hedges between some lots, benches at bus stops. Big zoom should read as a *full* town.
+- Ground dressing density ×2 across all districts.
+
+## 4 — World events v4: global or nothing
+
+Every event must change how ALL SIX voids play for its duration. Pool of six; draw 2 per round (at ~2:05 and ~1:10), never repeating the previous round's pair. GOLDEN RUSH and SHRINK STORM remain; add:
+
+- **TSUNAMI** — 3s warning (horn + a rising water line on the west edge), then a wave band sweeps west→east across the island over 6s: it pushes every void and loose small object 200px with it (escapable by moving perpendicular), and leaves washed-up loot behind — fish (T2, flopping) and extra shells scattered in its wake for 20s. Bots reposition to harvest the wake.
+- **NIGHTFALL** — 15s of dusk: a darkening overlay with each void carrying a soft light radius (1.2 screens of clear vision, dark beyond), streetlights and shop windows glow, and 8–10 golden fireflies drift the map worth 5× a golden object. Levels the field: size doesn't help you see.
+- **EARTHQUAKE** — 2s rumble warning, then 5s of screen shake during which EVERY structure on the island sheds 2–4 edible debris chunks (T1–T2) around itself — an island-wide feeding frenzy; for 10s after, all structures count one tier smaller for absorb checks ("cracked").
+- **METEOR STRIKE** — a red target ring (radius ~300px) telegraphs for 3s at a location biased toward the current leader's area, then impact: massive shake, any void inside loses 20% mass (form floors respected), and the crater fills with golden debris worth a fortune for 15s. Risk zone becomes gold rush — everyone must choose.
+- Each event gets its own horn, banner, and screen treatment; bots visibly react to all of them (flee the ring, harvest the wake, hunt fireflies).
+
+## Acceptance criteria — verify on a real phone
+
+- Countdown assertion passes and is logged; the pasted full-round radius log shows no unexplained bot growth; across three rounds at most one crown appears before 0:30; a bot visibly becomes smaller than the player (green rim) at least once across those rounds.
+- The southwest coast shows sand, animated water, and the waterfall-into-space rim; wading water slows any void 20%; district names fade in on entry; results mention the district.
+- Beach blocks contain palms, umbrellas, sandcastles, crabs that scuttle, and swimwear people; seagulls fly off white.
+- At maximum zoom as the final form, every frame still shows 14+ edibles and 3+ structures; zero barren blocks exist (validation pass log included in report); streets show tree lines and parked cars.
+- Each of TSUNAMI, NIGHTFALL, EARTHQUAKE, and METEOR STRIKE observably changes bot behavior and forces a player decision; the tsunami visibly pushes you; nightfall visibly limits vision; the quake rains debris from every building on screen; standing in the meteor ring costs mass and looting the crater pays.
+- 60fps during a tsunami at full population; zero console errors across 5 rounds.
+
+## Out of scope — do not touch
+
+Networking, iOS wrap, real payments, trophies/daily systems from v12 (keep working), the asset pipeline plumbing.
+
+Work strictly in order 0→4, then self-audit against the acceptance list and report deviations explicitly — including the radius log.

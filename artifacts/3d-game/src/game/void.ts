@@ -72,6 +72,8 @@ export abstract class Void {
   // ── SHARED ABSORB RULES: object intake and void intake are area-based ─────────
   absorbObjectMass(objSize: number) { this.grow(Math.PI * objSize * objSize * 0.5); }
   absorbVoidMass(otherRadius: number) { this.grow(Math.PI * otherRadius * otherRadius * 0.5); }
+  // v13 §0: bot-on-bot eats transfer only 25% mass (vs 50% for player-involved chomps)
+  absorbVoidMassBotOnBot(otherRadius: number) { this.grow(Math.PI * otherRadius * otherRadius * 0.25); }
   // flat merge growth (a TRIPLE) still runs through the shared curve
   absorbMergeMass(area: number) { this.grow(area); }
 

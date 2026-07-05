@@ -34,6 +34,7 @@ export interface ResultData {
   xpInLevel: number;
   xpNext: number;
   leveledTo: number | null;   // top level reached this round, or null
+  district?: string;          // v13 §1: district where the player ended up
 }
 
 export interface DailyData { id: string; seed: string; name: string; desc: string; }
@@ -183,6 +184,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // v12 §5: per-round trophy tracking
   let roundTriples = 0;
   let roundRivalEats = 0;
+  // v13 §1: district where the player ended the round
+  let playerDistrict = 'MAPLE COURT';
 
   const fx = new FXManager();
   const joystick = createJoystick(canvas);
@@ -476,6 +479,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const leveledTo = levelsGained.length ? levelsGained[levelsGained.length - 1] : null;
     if (unlocked.includes('kitty')) track('unlock_kitty', { level: 5 });
 
+    // v13 §1: district where the player ended the round
+    const finalDistrict = world ? world.districtAt(player.x, player.y) : 'MAPLE COURT';
+    playerDistrict = finalDistrict;
+
     results = {
       score: player.score, placement, total: board.length, devoured,
       coins, isDaily, crown, highScore: meta.data.highScore, newBest,
@@ -484,6 +491,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       skinTease,
       xpGain, level: meta.data.level, xpInLevel: meta.data.xp,
       xpNext: xpForLevel(meta.data.level), leveledTo,
+      district: finalDistrict,
     };
     track('round_end', { score: player.score, placement, coins });
     audio.stopMusic();
@@ -559,6 +567,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.setInput(joystick.state.dirX, joystick.state.dirY, joystick.state.mag);
     } else {
       player.setInput(0, 0, 0);
+    }
+    // v13 §1: coast slow — applied BEFORE movement so it takes effect this frame
+    // (events.update runs after movement; we need the slow for this tick's speed calc)
+    {
+      const sandD = CONFIG.COAST_SAND_DEPTH, mz = CONFIG.MAP_SIZE;
+      if (player.x < sandD || player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
+      for (const rv of rivals) {
+        if (!rv.ghost && (rv.x < sandD || rv.y > mz - sandD)) rv.eventSlow = Math.min(rv.eventSlow, CONFIG.COAST_WATER_SLOW);
+      }
     }
     player.update(dt);
 
@@ -829,15 +846,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         }
       }
     }
-    // rival vs rival
+    // rival vs rival — v13 §0: 25% mass + 10s void-sated to kill the bot mass-pump
     for (let i = 0; i < rivals.length; i++) {
       for (let j = i + 1; j < rivals.length; j++) {
         const a = rivals[i], b = rivals[j];
         if (a.ghost || b.ghost) continue;
+        // SATED bots cannot initiate another void-eat
+        if (a.voidSatedMs > 0 && b.voidSatedMs > 0) continue;
         const d = dist(a.x, a.y, b.x, b.y);
         if (d > a.radius + b.radius) continue;
-        if (canEatVoid(a.radius, b.radius, d)) { a.eatVoid(b.radius); b.getEaten(player.x, player.y, minDist); }
-        else if (canEatVoid(b.radius, a.radius, d)) { b.eatVoid(a.radius); a.getEaten(player.x, player.y, minDist); }
+        if (canEatVoid(a.radius, b.radius, d) && a.voidSatedMs <= 0) {
+          a.eatVoidBotOnBot(b.radius); // 25% mass, sets a.voidSatedMs = 10000
+          b.getEaten(player.x, player.y, minDist);
+        } else if (canEatVoid(b.radius, a.radius, d) && b.voidSatedMs <= 0) {
+          b.eatVoidBotOnBot(a.radius);
+          a.getEaten(player.x, player.y, minDist);
+        }
       }
     }
   }
@@ -898,6 +922,27 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);
+    // v13 §0: rival rim — green = you can eat them, red = they can eat you
+    if (player && !player.ghost) {
+      const ratio = CONFIG.RIVAL_EAT_RATIO;
+      for (const r of rivals) {
+        if (r.ghost || !r.alive) continue;
+        const screenDist = Math.hypot(r.x - player.x, r.y - player.y) * camZoom;
+        if (screenDist > fw * 1.5) continue;
+        const edible = player.radius >= r.radius * ratio;
+        const danger = r.radius >= player.radius * ratio;
+        if (!edible && !danger) continue;
+        const rimColor = edible ? '#5AFF8A' : '#FF4D6D';
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.radius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = rimColor;
+        ctx.lineWidth = 3 / camZoom;
+        ctx.globalAlpha = 0.75 + 0.25 * Math.sin(clock / 250);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     drawPowerAuras(clock); // v6 §4: auras under the player
     player.draw(ctx, clock, alpha);
     if (gnomeLord) drawGnomeCrown(clock); // v9 §8: secret GNOME LORD crown
@@ -906,6 +951,29 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     fx.draw(ctx);
     drawFormBadge(); // v12 §0: form badge after fx (always on top in world space)
     ctx.restore();
+
+    // v13 §4: NIGHTFALL — dark overlay + per-void light radii (screen space)
+    if (events.nightfallActive && player) {
+      const shake = fx.getShake();
+      const toSX = (wx: number) => (wx - camCX) * camZoom + fw / 2 + shake.x;
+      const toSY = (wy: number) => (wy - camCY) * camZoom + fh / 2 + shake.y;
+      ctx.save();
+      ctx.fillStyle = 'rgba(6,3,18,0.87)';
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.globalCompositeOperation = 'destination-out';
+      const allVoids = [player, ...rivals.filter((r) => r.alive && !r.ghost)];
+      for (const v of allVoids) {
+        const sx = toSX(v.x), sy = toSY(v.y);
+        const lightR = (v.radius + 200) * camZoom;
+        const grd = ctx.createRadialGradient(sx, sy, v.radius * camZoom * 0.25, sx, sy, lightR);
+        grd.addColorStop(0, 'rgba(255,255,255,1)');
+        grd.addColorStop(0.65, 'rgba(255,255,255,0.85)');
+        grd.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(sx, sy, lightR, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
 
     // v6 §8: environment post-processing (grain + vignette), under the HUD
     drawPostFX(clock);
@@ -1543,6 +1611,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (player) {
           fx.addRing(player.x, player.y, '#5AFFA0', player.radius, player.radius + 170, 6, 500);
           fx.addConfetti(player.x, player.y, ['#5AFFA0', '#FFD23F', '#FFFFFF']);
+          // v13 §0: fairness assertion — at EAT! all 6 radii must equal PLAYER_BASE_RADIUS
+          const base = CONFIG.PLAYER_BASE_RADIUS;
+          const allV: (Player | Rival)[] = [player, ...rivals];
+          const bad = allV.filter((v) => Math.abs(v.radius - base) > 0.5);
+          if (bad.length > 0) {
+            console.warn('[v13 §0 ASSERTION FAIL] radii at EAT! differ from base:',
+              bad.map((v) => `${v === player ? 'YOU' : (v as Rival).name}: r=${v.radius.toFixed(2)}`).join(', '));
+          } else {
+            console.log(`[v13 §0 ✓] All ${allV.length} radii = ${base} at EAT!`);
+          }
         }
         resetClock(); // don't let the frozen interval count as catch-up time
       }

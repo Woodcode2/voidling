@@ -943,6 +943,162 @@ export interface DrawOpts {
   variant?: number;
 }
 
+// ── v13 §2: Sandy Shores beach objects ───────────────────────────────────────
+
+function drawSeashell(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  sticker(ctx, (c) => { c.arc(0, r * 0.1, r * 0.75, 0, Math.PI * 2); }, '#F4C98E', { outline: o });
+  ctx.save();
+  ctx.strokeStyle = '#D4954E';
+  ctx.lineWidth = Math.max(1, r * 0.08);
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const sr = r * (0.62 - i * 0.18);
+    ctx.beginPath(); ctx.arc(0, r * 0.1, sr, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
+  }
+  ctx.restore();
+  highlight(ctx, -r * 0.28, -r * 0.32, r * 0.55, 0.35);
+}
+
+function drawCrabObj(ctx: CanvasRenderingContext2D, r: number, t: number, fleeing = false) {
+  const o = ow(r);
+  const scuttle = fleeing ? Math.sin(t / 80) * 0.22 : Math.sin(t / 330) * 0.06;
+  ctx.save();
+  ctx.rotate(scuttle);
+  sticker(ctx, (c) => { c.ellipse(0, 0, r * 0.68, r * 0.48, 0, 0, Math.PI * 2); }, '#E84C25', { outline: o });
+  for (const side of [-1, 1]) {
+    sticker(ctx, (c) => { c.ellipse(side * r * 0.9, -r * 0.1, r * 0.32, r * 0.2, side * 0.5, 0, Math.PI * 2); }, '#E84C25', { outline: o });
+  }
+  dot(ctx, -r * 0.22, -r * 0.2, r * 0.12, '#1A0B20');
+  dot(ctx, r * 0.22, -r * 0.2, r * 0.12, '#1A0B20');
+  highlight(ctx, -r * 0.22, -r * 0.16, r * 0.5, 0.3);
+  ctx.restore();
+}
+
+function drawTowel(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const cols: [string, string][] = [['#FF5A5A','#FFD23F'],['#4DC9FF','#FFFFFF'],['#9B5DE5','#FFD23F'],['#FF9F1C','#2D9CDB']];
+  const [c1, c2] = cols[variant % cols.length];
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.88, -r * 0.62, r * 1.76, r * 1.24, r * 0.12), c1, { outline: o });
+  ctx.save();
+  ctx.beginPath(); roundRectPath(ctx, -r * 0.88, -r * 0.62, r * 1.76, r * 1.24, r * 0.12); ctx.clip();
+  ctx.fillStyle = c2; ctx.globalAlpha = 0.45;
+  for (let i = -3; i <= 3; i += 2) {
+    ctx.fillRect(-r * 0.88 + i * r * 0.3 + r * 0.1, -r * 0.62, r * 0.26, r * 1.24);
+  }
+  ctx.restore();
+}
+
+function drawSandcastle(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  const sand = '#E8C87A', dark = '#C4A055';
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.75, -r * 0.2, r * 1.5, r * 0.88, r * 0.1), sand, { outline: o });
+  for (const tx of [-r * 0.52, 0, r * 0.52]) {
+    sticker(ctx, (c) => roundRectPath(c, tx - r * 0.24, -r * 0.68, r * 0.48, r * 0.52, r * 0.08), sand, { outline: o });
+    for (const dx of [-1, 0, 1]) ctx.fillStyle = dark, ctx.fillRect(tx + dx * r * 0.14 - r * 0.07, -r * 0.74, r * 0.12, r * 0.09);
+  }
+  dot(ctx, -r * 0.52, -r * 0.42, r * 0.09, dark);
+  dot(ctx, r * 0.52, -r * 0.42, r * 0.09, dark);
+  dot(ctx, 0, -r * 0.42, r * 0.09, dark);
+  highlight(ctx, -r * 0.5, -r * 0.5, r * 0.68, 0.2);
+}
+
+function drawUmbrellaObj(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const sway = wind(t) * 0.04;
+  ctx.save();
+  ctx.rotate(sway);
+  ctx.strokeStyle = '#D4A85A'; ctx.lineWidth = Math.max(1.5, r * 0.1); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.lineTo(0, -r * 0.1); ctx.stroke();
+  const colors = ['#FF5A5A','#FFD23F','#FF5A5A','#FFD23F','#FF5A5A','#FFD23F'];
+  for (let i = 0; i < 6; i++) {
+    const a0 = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const a1 = ((i + 1) / 6) * Math.PI * 2 - Math.PI / 2;
+    sticker(ctx, (c) => { c.moveTo(0, -r * 0.1); c.arc(0, -r * 0.1, r * 0.92, a0, a1); c.closePath(); }, colors[i], { outline: ow(r) * 0.6 });
+  }
+  dot(ctx, 0, -r * 0.1, r * 0.11, '#FFFFEE');
+  ctx.restore();
+}
+
+function drawSurfboard(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const boards = ['#FF5A5A','#2BBFFF','#7CFF6B','#FFD23F'];
+  const body = boards[variant % boards.length];
+  ctx.save();
+  ctx.rotate(-Math.PI / 12);
+  sticker(ctx, (c) => {
+    c.moveTo(0, -r * 1.2);
+    c.quadraticCurveTo(r * 0.58, -r * 0.6, r * 0.5, r * 0.4);
+    c.quadraticCurveTo(r * 0.2, r * 1.22, 0, r * 1.28);
+    c.quadraticCurveTo(-r * 0.2, r * 1.22, -r * 0.5, r * 0.4);
+    c.quadraticCurveTo(-r * 0.58, -r * 0.6, 0, -r * 1.2);
+  }, body, { outline: o });
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
+  ctx.fillRect(-r * 0.11, -r * 0.88, r * 0.22, r * 1.75);
+  ctx.restore();
+}
+
+function drawPalmTree(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  const o = ow(r);
+  const sway = wind(t) * 0.08;
+  ctx.save();
+  ctx.strokeStyle = '#C4894A'; ctx.lineWidth = Math.max(3, r * 0.28); ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.85);
+  ctx.quadraticCurveTo(r * 0.3, r * 0.1, r * 0.1 + sway * r * 2, -r * 0.9);
+  ctx.stroke();
+  ctx.restore();
+  const cx = r * 0.1 + sway * r * 2, cy = -r * 0.9;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + sway;
+    const fx = cx + Math.cos(a) * r * 0.85, fy = cy + Math.sin(a) * r * 0.48;
+    sticker(ctx, (c) => {
+      c.moveTo(cx, cy);
+      c.quadraticCurveTo(cx + Math.cos(a) * r * 0.52, cy + Math.sin(a) * r * 0.28, fx, fy);
+      c.quadraticCurveTo(cx + Math.cos(a) * r * 0.56, cy + Math.sin(a) * r * 0.35, cx, cy);
+    }, '#4BB85E', { outline: o * 0.65 });
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    dot(ctx, cx + Math.cos(a) * r * 0.2, cy + Math.sin(a) * r * 0.13, r * 0.09, '#8B6914');
+  }
+}
+
+function drawLifeguardTower(ctx: CanvasRenderingContext2D, r: number, _t: number) {
+  const o = ow(r);
+  ctx.save();
+  ctx.strokeStyle = '#D4A85A'; ctx.lineWidth = Math.max(2, r * 0.12); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-r * 0.38, r); ctx.lineTo(-r * 0.1, -r * 0.4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r * 0.38, r); ctx.lineTo(r * 0.1, -r * 0.4); ctx.stroke();
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.58, -r * 0.5, r * 1.16, r * 0.2, r * 0.09), '#E0C878', { outline: o });
+  sticker(ctx, (c) => roundRectPath(c, -r * 0.4, -r * 0.68, r * 0.8, r * 0.2, r * 0.07), '#FF5A3C', { outline: o });
+  ctx.strokeStyle = '#D4A85A'; ctx.lineWidth = Math.max(1.5, r * 0.07);
+  ctx.beginPath(); ctx.moveTo(r * 0.36, -r * 0.68); ctx.lineTo(r * 0.36, -r * 1.12); ctx.stroke();
+  sticker(ctx, (c) => { c.moveTo(r * 0.36, -r * 1.12); c.lineTo(r * 0.78, -r * 0.98); c.lineTo(r * 0.36, -r * 0.8); c.closePath(); }, '#FF3D68', { outline: o * 0.5 });
+  ctx.restore();
+  dot(ctx, 0, -r * 1.08, r * 0.13, '#FFD23F');
+}
+
+function drawKayakObj(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const o = ow(r);
+  const hullColors = ['#FF5A5A','#2BBFFF','#FFD23F','#7CFF6B'];
+  const hull = hullColors[variant % hullColors.length];
+  ctx.save();
+  ctx.rotate(-Math.PI / 8);
+  sticker(ctx, (c) => {
+    c.moveTo(0, -r * 1.28); c.quadraticCurveTo(r * 0.62, -r * 0.48, r * 0.58, r * 0.1);
+    c.quadraticCurveTo(r * 0.28, r * 1.32, 0, r * 1.38);
+    c.quadraticCurveTo(-r * 0.28, r * 1.32, -r * 0.58, r * 0.1);
+    c.quadraticCurveTo(-r * 0.62, -r * 0.48, 0, -r * 1.28);
+  }, hull, { outline: o });
+  sticker(ctx, (c) => { c.ellipse(0, r * 0.08, r * 0.3, r * 0.46, 0, 0, Math.PI * 2); }, 'rgba(20,8,43,0.55)', { outline: o * 0.7 });
+  ctx.strokeStyle = '#D4A85A'; ctx.lineWidth = Math.max(2, r * 0.1);
+  ctx.beginPath(); ctx.moveTo(-r * 1.02, -r * 0.68); ctx.lineTo(r * 1.02, r * 0.58); ctx.stroke();
+  sticker(ctx, (c) => { c.ellipse(-r * 0.98, -r * 0.63, r * 0.22, r * 0.11, -0.4, 0, Math.PI * 2); }, '#4BA0FF', { outline: o * 0.6 });
+  sticker(ctx, (c) => { c.ellipse(r * 0.98, r * 0.53, r * 0.22, r * 0.11, -0.4, 0, Math.PI * 2); }, '#4BA0FF', { outline: o * 0.6 });
+  ctx.restore();
+}
+
 export function drawParkObject(
   ctx: CanvasRenderingContext2D,
   kind: ObjectKind,
@@ -999,5 +1155,17 @@ export function drawParkObject(
     case 'library': return drawLibrary(ctx, r, t);
     case 'office': return drawOffice(ctx, r, t, v);
     case 'skyscraper': return drawSkyscraper(ctx, r, t, v);
+    // v13 §2: Sandy Shores beach objects
+    case 'seashell':    return drawSeashell(ctx, r, t);
+    case 'crab':        return drawCrabObj(ctx, r, t, f);
+    case 'towel':       return drawTowel(ctx, r, t, v);
+    case 'sandcastle':  return drawSandcastle(ctx, r, t);
+    case 'umbrella':    return drawUmbrellaObj(ctx, r, t);
+    case 'surfboard':   return drawSurfboard(ctx, r, t, v);
+    case 'palm':        return drawPalmTree(ctx, r, t);
+    case 'lifeguard':   return drawLifeguardTower(ctx, r, t);
+    case 'kayak':       return drawKayakObj(ctx, r, t, v);
+    case 'car_parked_a': return drawCar(ctx, r, t, 0);
+    case 'car_parked_b': return drawCar(ctx, r, t, 2);
   }
 }

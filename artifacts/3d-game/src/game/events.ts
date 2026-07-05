@@ -26,8 +26,8 @@ interface Truck { x: number; y: number; until: number; kind: 'fire' | 'police'; 
 interface Meteor { x: number; y: number; vy: number; groundY: number; }
 interface Strike { x: number; y: number; age: number; struck: boolean; } // v9 §5: telegraphed lightning
 
-// v8 §7: the four schedulable events (TOWN FIGHTS BACK stays trigger-based)
-type EventId = 'goldenRush' | 'shrinkStorm' | 'meteor' | 'frenzy';
+// v8 §7: schedulable events — v13 §4 expands pool to 6 (TOWN FIGHTS BACK stays trigger-based)
+type EventId = 'goldenRush' | 'shrinkStorm' | 'meteor' | 'frenzy' | 'tsunami' | 'nightfall';
 
 export class EventManager {
   private warned = new Set<string>();
@@ -54,12 +54,25 @@ export class EventManager {
   private slotA: EventId = 'goldenRush';
   private slotB: EventId = 'shrinkStorm';
   private prevPair = '';                         // no identical pair two rounds running
+  // v13 §4: TSUNAMI
+  private tsunamiX = 0;
+  private tsunamiUntil = 0;
+  private tsunamiActive = false;
+  private tsunamiHitCd: Map<Void, number> = new Map();
+  // v13 §4: NIGHTFALL
+  private nightfallUntil = 0;
+  private nightfallOn = false;
+  // v13 §4: EARTHQUAKE (trigger-based, not scheduled)
+  private earthquakeCd = 48000;
 
   constructor(private deps: EventDeps) {}
 
   get frenzyActive() { return this.frenzyOn; }
-  get stormActive() { return this.storm !== null; }         // v9 §5: engine dims 8% during storm
-  get meteorActive() { return this.meteors.length > 0 || this.meteorUntil > 0; } // warm tint
+  get stormActive() { return this.storm !== null; }
+  get meteorActive() { return this.meteors.length > 0 || this.meteorUntil > 0; }
+  get nightfallActive() { return this.nightfallOn; }        // v13 §4: engine draws dark overlay
+  get tsunamiWaveX() { return this.tsunamiX; }
+  get tsunamiWaveActive() { return this.tsunamiActive; }
 
   reset() {
     this.warned.clear();
@@ -81,12 +94,20 @@ export class EventManager {
     this.meteorTimer = 0;
     this.frenzyUntil = 0;
     this.frenzyOn = false;
+    this.tsunamiX = 0;
+    this.tsunamiUntil = 0;
+    this.tsunamiActive = false;
+    this.tsunamiHitCd.clear();
+    this.nightfallUntil = 0;
+    this.nightfallOn = false;
+    this.earthquakeCd = 48000;
     this.pickEvents();
   }
 
   // v8 §7: draw 2 distinct events; never the identical pair two rounds in a row
+  // v13 §4: pool expanded from 4→6 (tsunami + nightfall added)
   private pickEvents() {
-    const pool: EventId[] = ['goldenRush', 'shrinkStorm', 'meteor', 'frenzy'];
+    const pool: EventId[] = ['goldenRush', 'shrinkStorm', 'meteor', 'frenzy', 'tsunami', 'nightfall'];
     let a: EventId = 'goldenRush', b: EventId = 'shrinkStorm', key = '';
     for (let tries = 0; tries < 24; tries++) {
       const i = Math.floor(Math.random() * pool.length);
@@ -102,19 +123,23 @@ export class EventManager {
 
   private warnFor(id: EventId): string {
     switch (id) {
-      case 'goldenRush': return 'GOLDEN RUSH INCOMING';
+      case 'goldenRush':  return 'GOLDEN RUSH INCOMING';
       case 'shrinkStorm': return 'SHRINK STORM INCOMING';
-      case 'meteor': return 'METEOR SHOWER INCOMING';
-      case 'frenzy': return 'FRENZY MINUTE INCOMING';
+      case 'meteor':      return 'METEOR SHOWER INCOMING';
+      case 'frenzy':      return 'FRENZY MINUTE INCOMING';
+      case 'tsunami':     return 'TSUNAMI INCOMING — MOVE EAST!';
+      case 'nightfall':   return 'DARKNESS FALLS INCOMING';
     }
   }
 
   private fireEvent(id: EventId, timeLeft: number) {
     switch (id) {
-      case 'goldenRush': return this.startGoldenRush(timeLeft);
+      case 'goldenRush':  return this.startGoldenRush(timeLeft);
       case 'shrinkStorm': return this.startStorm(timeLeft);
-      case 'meteor': return this.startMeteor(timeLeft);
-      case 'frenzy': return this.startFrenzy(timeLeft);
+      case 'meteor':      return this.startMeteor(timeLeft);
+      case 'frenzy':      return this.startFrenzy(timeLeft);
+      case 'tsunami':     return this.startTsunami(timeLeft);
+      case 'nightfall':   return this.startNightfall(timeLeft);
     }
   }
 
@@ -132,6 +157,14 @@ export class EventManager {
     // reset per-frame event state on every void
     player.eventSlow = 1;
     for (const r of rivals) { r.eventSlow = 1; r.eventFlee = null; }
+
+    // v13 §1: Sandy Shores coast slow — 20% speed penalty in the sandy edge zone
+    const sandD = CONFIG.COAST_SAND_DEPTH;
+    const mz = CONFIG.MAP_SIZE;
+    if (player.x < sandD || player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
+    for (const r of rivals) {
+      if (r.x < sandD || r.y > mz - sandD) r.eventSlow = Math.min(r.eventSlow, CONFIG.COAST_WATER_SLOW);
+    }
 
     // v8 §7: two scheduled slots draw from the event pool (~2:05 and ~1:10)
     this.schedule('slotA', CONFIG.GOLDEN_RUSH_TIME, timeLeft, this.warnFor(this.slotA), () => this.fireEvent(this.slotA, timeLeft));
@@ -151,6 +184,16 @@ export class EventManager {
     // FRENZY MINUTE window (engine reads frenzyActive for ×1.25 + double streaks)
     this.frenzyOn = this.frenzyUntil > 0 && timeLeft > this.frenzyUntil;
     if (this.frenzyUntil > 0 && timeLeft <= this.frenzyUntil) this.frenzyUntil = 0;
+
+    // v13 §4: new events
+    this.updateTsunami(dt, timeLeft);
+    this.nightfallOn = this.nightfallUntil > 0 && timeLeft > this.nightfallUntil;
+    if (this.nightfallUntil > 0 && timeLeft <= this.nightfallUntil) this.nightfallUntil = 0;
+    this.earthquakeCd -= dt;
+    if (this.earthquakeCd <= 0 && timeLeft > 20000) {
+      this.earthquakeCd = 38000 + Math.random() * 15000;
+      this.startEarthquake();
+    }
 
     // TOWN FIGHTS BACK: whenever a WORLD EATER exists and no trucks are out
     this.truckCd -= dt;
@@ -250,6 +293,73 @@ export class EventManager {
     this.frenzyUntil = timeLeft - 15000;
     this.deps.banner('FRENZY MINUTE! ×1.25', '#FF9F45', 5);
     audio.eventHorn('frenzy');
+  }
+
+  // v13 §4: TSUNAMI — a wave band sweeps west→east; voids caught slow 60% + lose mass every 800ms
+  private startTsunami(timeLeft: number) {
+    this.tsunamiX = -120;
+    this.tsunamiUntil = timeLeft - 20000;
+    this.tsunamiActive = true;
+    this.tsunamiHitCd.clear();
+    this.deps.banner('TSUNAMI! MOVE EAST!', '#2BBFFF', 5);
+    audio.eventHorn('shrinkStorm');
+  }
+
+  private updateTsunami(dt: number, timeLeft: number) {
+    if (!this.tsunamiActive) return;
+    if (timeLeft <= this.tsunamiUntil || this.tsunamiX > CONFIG.MAP_SIZE + 300) {
+      this.tsunamiActive = false;
+      this.tsunamiHitCd.clear();
+      return;
+    }
+    this.tsunamiX += 195 * (dt / 1000);
+    const waveHW = 72;
+    const player = this.deps.getPlayer();
+    const rivals = this.deps.getRivals();
+    for (const v of ([player, ...rivals] as Void[])) {
+      const dx = v.x - this.tsunamiX;
+      if (Math.abs(dx) < waveHW + v.radius) {
+        v.eventSlow = Math.min(v.eventSlow, 0.38); // ~62% slow
+        const cd = this.tsunamiHitCd.get(v) ?? 0;
+        if (cd <= 0) {
+          const floor = this.floorOf(v);
+          v.radius = Math.max(floor, v.radius * 0.92); // −8% mass on each wave pulse
+          this.tsunamiHitCd.set(v, 800);
+          this.deps.fx.addRing(v.x, v.y, '#2BBFFF', v.radius, v.radius + 38, 4, 280);
+        }
+        if (v !== player) (v as Rival).eventFlee = { x: CONFIG.MAP_SIZE + 500, y: v.y };
+      }
+    }
+    for (const [v, cd] of this.tsunamiHitCd) {
+      this.tsunamiHitCd.set(v, cd - dt);
+    }
+  }
+
+  // v13 §4: NIGHTFALL — 15s of darkness; engine reads nightfallActive to draw overlay + lights
+  private startNightfall(timeLeft: number) {
+    this.nightfallUntil = timeLeft - 15000;
+    this.nightfallOn = true;
+    this.deps.banner('DARKNESS FALLS!', '#9055FF', 5);
+    audio.eventHorn('shrinkStorm');
+  }
+
+  // v13 §4: EARTHQUAKE (trigger-based cadence) — shake + loot rain
+  private startEarthquake() {
+    this.deps.fx.shake(2200, 22, [30, 45, 60]);
+    this.deps.fx.flash();
+    this.deps.banner('EARTHQUAKE!', '#FF9F1C', 5);
+    audio.eventHorn('meteor');
+    const world = this.deps.getWorld();
+    const player = this.deps.getPlayer();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const rr = 180 + Math.random() * 320;
+      world.dropSnack(
+        clamp(player.x + Math.cos(a) * rr, 50, CONFIG.MAP_SIZE - 50),
+        clamp(player.y + Math.sin(a) * rr, 50, CONFIG.MAP_SIZE - 50),
+        this.deps.fx,
+      );
+    }
   }
 
   private updateStorm(dt: number, timeLeft: number) {
@@ -521,6 +631,38 @@ export class EventManager {
         }
         ctx.restore();
       }
+    }
+
+    // v13 §4: TSUNAMI wave band (world space)
+    if (this.tsunamiActive) {
+      const wx = this.tsunamiX;
+      const S = CONFIG.MAP_SIZE;
+      ctx.save();
+      // wave body gradient
+      const wGrd = ctx.createLinearGradient(wx - 100, 0, wx + 35, 0);
+      wGrd.addColorStop(0, 'rgba(40,160,235,0)');
+      wGrd.addColorStop(0.35, 'rgba(50,170,240,0.62)');
+      wGrd.addColorStop(0.72, 'rgba(120,220,255,0.82)');
+      wGrd.addColorStop(1, 'rgba(200,245,255,0.45)');
+      ctx.fillStyle = wGrd;
+      ctx.fillRect(wx - 100, 0, 135, S);
+      // foam crest line
+      ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+      ctx.lineWidth = 7;
+      ctx.setLineDash([20, 8]);
+      ctx.beginPath(); ctx.moveTo(wx, 0); ctx.lineTo(wx, S); ctx.stroke();
+      ctx.setLineDash([]);
+      // curling wave top
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let y = 0; y < S; y += 55) {
+        const jit = Math.sin(clock * 0.004 + y * 0.012) * 8;
+        ctx.moveTo(wx - 14 + jit, y);
+        ctx.quadraticCurveTo(wx + 2, y + 18, wx + 14, y + 30);
+      }
+      ctx.stroke();
+      ctx.restore();
     }
   }
 }
