@@ -164,9 +164,11 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
       {!hasSplash && <StarField />}
 
       <div className="vd-splash-inner" style={{ position: 'relative', zIndex: 2 }}>
-        <div className="vd-splash-void">
-          <SkinPreview skinId={snap.equippedSkin} size={140} glow={1} />
-        </div>
+        {!hasSplash && (
+          <div className="vd-splash-void">
+            <SkinPreview skinId={snap.equippedSkin} size={140} glow={1} />
+          </div>
+        )}
         <h1 className="vd-splash-title">VOIDLING</h1>
         <p className="vd-splash-tag">EAT. GROW. DEVOUR.</p>
       </div>
@@ -193,7 +195,8 @@ const TROPHY_DEFS = [
   { id: 'daily_player',      icon: '📅', name: 'Daily Regular',   desc: 'Play a Daily Bite.' },
   { id: 'daily_winner',      icon: '🗓️', name: 'Daily Champ',     desc: 'Win a Daily Bite.' },
   { id: 'gnome_lord',        icon: '🧙', name: 'Gnome Lord',      desc: 'Eat every gnome in a round.' },
-  { id: 'world_ender_form',  icon: '💎', name: 'WORLD ENDER',     desc: 'Reach the final form.' },
+  { id: 'zoo_break',         icon: '🦁', name: 'Zoo Break',       desc: 'Smash the zoo gate.' },
+  { id: 'democracy',         icon: '🏛️', name: 'Democracy Devoured', desc: 'Eat the town hall.' },
 ];
 
 function TrophyRoom({ snap, onClose }: { snap: Snapshot; onClose: () => void }) {
@@ -730,9 +733,9 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
       {/* v16 §5: round contracts — live-ticking chips at top-left under the score */}
       {!snap.paused && snap.contracts && snap.contracts.length > 0 && (
         <div style={{
-          position: 'fixed', top: 56, left: 10,
+          position: 'fixed', top: 252, left: 10,
           display: 'flex', flexDirection: 'column', gap: 4,
-          pointerEvents: 'none', zIndex: 80,
+          pointerEvents: 'none', zIndex: 40,
         }}>
           {snap.contracts.map((c) => (
             <div key={c.id} style={{
