@@ -30,34 +30,37 @@ export const audio = {
   },
 
   // v14 §1: load all Kenney CC0 OGG samples; run once after init().
+  // Call on first user gesture so AudioContext is live before decoding.
   async loadSamples(): Promise<void> {
     if (this._samplesLoaded) return;
     this._samplesLoaded = true; // optimistically prevent re-entry
-    const files: Record<string, string> = {
-      pop_1: '/assets/audio/pop_1.ogg',
-      pop_2: '/assets/audio/pop_2.ogg',
-      pop_3: '/assets/audio/pop_3.ogg',
-      pop_4: '/assets/audio/pop_4.ogg',
-      pop_5: '/assets/audio/pop_5.ogg',
-      thud_big: '/assets/audio/thud_big.ogg',
-      chime_bonus: '/assets/audio/chime_bonus.ogg',
-      fanfare_evolve: '/assets/audio/fanfare_evolve.ogg',
-      chomp_void: '/assets/audio/chomp_void.ogg',
-      ouch: '/assets/audio/ouch.ogg',
-      ui_click: '/assets/audio/ui_click.ogg',
-      ui_confirm: '/assets/audio/ui_confirm.ogg',
-      beep: '/assets/audio/beep.ogg',
-      go: '/assets/audio/go.ogg',
-      horn_event: '/assets/audio/horn_event.ogg',
-    };
+    if (!this.ctx) this.init(); // ensure context exists
     if (!this.ctx) return;
+    const files: Record<string, string> = {
+      pop_1:          '/assets/audio/pop_1.ogg',
+      pop_2:          '/assets/audio/pop_2.ogg',
+      pop_3:          '/assets/audio/pop_3.ogg',
+      pop_4:          '/assets/audio/pop_4.ogg',
+      pop_5:          '/assets/audio/pop_5.ogg',
+      thud_big:       '/assets/audio/thud_big.ogg',
+      chime_bonus:    '/assets/audio/chime_bonus.ogg',
+      fanfare_evolve: '/assets/audio/fanfare_evolve.ogg',
+      chomp_void:     '/assets/audio/chomp_void.ogg',
+      ouch:           '/assets/audio/ouch.ogg',
+      ui_click:       '/assets/audio/ui_click.ogg',
+      ui_confirm:     '/assets/audio/ui_confirm.ogg',
+      beep:           '/assets/audio/beep.ogg',
+      go:             '/assets/audio/go.ogg',
+      horn_event:     '/assets/audio/horn_event.ogg',
+      capture_tick:   '/assets/audio/capture_tick.ogg',
+    };
     const results = await Promise.allSettled(
       Object.entries(files).map(async ([k, url]) => {
         this._samples[k] = await this._decodeSample(k, url);
         return k;
       }),
     );
-    const loaded = results.filter((r) => r.status === 'fulfilled').length;
+    const loaded = results.filter((r) => r.status === 'fulfilled' && this._samples[(r as PromiseFulfilledResult<string>).value]).length;
     const failed = results.length - loaded;
     console.log(`[audio §1] samples loaded=${loaded} fallback-synth=${failed}`);
   },
@@ -195,8 +198,8 @@ export const audio = {
     const rate = Math.pow(2, this._ladder / 12); // pitch-ladder playback rate
     const vol = tier >= 4 ? 0.7 : 0.52;
     if (this._playSample(sampleName, rate, vol)) {
-      // T4+: layer the thud_big for weight
-      if (tier >= 4) this._playSample('thud_big', 0.9 + Math.random() * 0.2, 0.38);
+      // T4+: layer the thud_big for weight — fixed rate 0.55 per manifest
+      if (tier >= 4) this._playSample('thud_big', 0.55, 0.38);
       return; // sample handled it
     }
 
@@ -317,7 +320,7 @@ export const audio = {
   // getting eaten: v14 §1 — ouch sample, synth fallback
   playEaten() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
-    if (this._playSample('ouch', 1, 0.6)) return;
+    if (this._playSample('ouch', 0.85, 0.6)) return;
     // synth fallback (descending filtered wah)
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -437,6 +440,34 @@ export const audio = {
   // v14 §1: UI click / confirm
   playClick() { this._playSample('ui_click', 1, 0.45) || this.playTick(); },
   playConfirm() { this._playSample('ui_confirm', 1, 0.5) || this.playBoon(); },
+
+  // v14 §1: orbit capture tick — quiet hi-tick on each object entering the spiral
+  playCaptureTick() { this._playSample('capture_tick', 1, 0.15); },
+
+  // v14 §1: rival eat — chomp_void sample at 0.9, fall back to playMerge synth
+  playChompVoid() {
+    if (!this._playSample('chomp_void', 0.9, 0.65)) this.playMerge();
+  },
+
+  // v14 §1: full sample config table — used by the sound-board debug panel
+  SAMPLE_CONFIGS: [
+    { name: 'pop_1',          rate: 1,    vol: 0.52 },
+    { name: 'pop_2',          rate: 1,    vol: 0.52 },
+    { name: 'pop_3',          rate: 1,    vol: 0.52 },
+    { name: 'pop_4',          rate: 1,    vol: 0.52 },
+    { name: 'pop_5',          rate: 1,    vol: 0.7  },
+    { name: 'thud_big',       rate: 0.55, vol: 0.38 },
+    { name: 'chime_bonus',    rate: 1,    vol: 0.55 },
+    { name: 'fanfare_evolve', rate: 1,    vol: 0.65 },
+    { name: 'chomp_void',     rate: 0.9,  vol: 0.65 },
+    { name: 'ouch',           rate: 0.85, vol: 0.6  },
+    { name: 'ui_click',       rate: 1,    vol: 0.45 },
+    { name: 'ui_confirm',     rate: 1,    vol: 0.5  },
+    { name: 'beep',           rate: 1,    vol: 0.5  },
+    { name: 'go',             rate: 1,    vol: 0.65 },
+    { name: 'horn_event',     rate: 1,    vol: 0.55 },
+    { name: 'capture_tick',   rate: 1,    vol: 0.15 },
+  ] as { name: string; rate: number; vol: number }[],
 
   // v9 §5: TOWN FIGHTS BACK siren layer — a wailing two-tone sweep
   siren() {

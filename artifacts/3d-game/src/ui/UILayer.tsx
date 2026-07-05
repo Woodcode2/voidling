@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { CONFIG } from '../game/config';
 import type { GameEngine, Snapshot } from '../game/engine';
+import { audio } from '../game/audio';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
+
+// v14.1 build stamp — increment on every deploy
+const BUILD_STAMP = 'v14.1 · 1';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -122,6 +126,9 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
   const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
+    // v14.1: prime the AudioContext on first user-visible frame (counts as a gesture on iOS)
+    audio.init();
+    audio.loadSamples().catch(() => {});
     // Trigger zoom on next paint so the CSS transition actually fires
     const rf = requestAnimationFrame(() => setZoomed(true));
     const t = window.setTimeout(onDone, 1800);
@@ -245,6 +252,69 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openShop()}>SHOP</button>
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={onTrophies}>🏆</button>
         </div>
+      </div>
+      {/* v14.1: permanent build stamp — bottom-right, 10px */}
+      <span style={{
+        position: 'absolute', bottom: 6, right: 10,
+        fontSize: 10, color: 'rgba(255,255,255,0.28)',
+        fontFamily: 'monospace', pointerEvents: 'none', userSelect: 'none',
+      }}>{BUILD_STAMP}</span>
+    </div>
+  );
+}
+
+// ── v14.1 Sound-board debug panel (shown when ?debug=1 in URL) ────────────────
+function SoundBoard() {
+  const [vols, setVols] = useState<Record<string, number>>(() =>
+    Object.fromEntries(audio.SAMPLE_CONFIGS.map((s) => [s.name, s.vol]))
+  );
+
+  const play = (name: string, rate: number) => {
+    // Ensure audio context is live before playing
+    audio.init();
+    audio._playSample(name, rate, vols[name] ?? 0.5);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+      background: 'rgba(10,8,24,0.96)', borderTop: '1px solid #3a3060',
+      padding: '10px 12px 14px', overflowY: 'auto', maxHeight: '55vh',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ color: '#9AAFC8', fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+          🔊 SOUNDS DEBUG · {BUILD_STAMP}
+        </span>
+        <span style={{ color: '#4a4070', fontSize: 10, fontFamily: 'monospace' }}>?debug=1 to toggle</span>
+      </div>
+      <div style={{ display: 'grid', gap: 6 }}>
+        {audio.SAMPLE_CONFIGS.map((s) => (
+          <div key={s.name} style={{
+            display: 'grid', gridTemplateColumns: '130px 48px 1fr', alignItems: 'center', gap: 8,
+            background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px',
+          }}>
+            <span style={{ color: '#CBD5E0', fontSize: 13, fontFamily: 'monospace' }}>{s.name}</span>
+            <button
+              onClick={() => play(s.name, s.rate)}
+              style={{
+                background: '#4F3FD1', border: 'none', borderRadius: 6, color: '#fff',
+                fontSize: 18, padding: '6px 10px', cursor: 'pointer', lineHeight: 1,
+              }}
+              aria-label={`Play ${s.name}`}
+            >▶</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="range" min={0} max={1} step={0.01}
+                value={vols[s.name] ?? s.vol}
+                onChange={(e) => setVols((prev) => ({ ...prev, [s.name]: Number(e.target.value) }))}
+                style={{ flex: 1, height: 28, accentColor: '#7C3AED', cursor: 'pointer' }}
+              />
+              <span style={{ color: '#9AAFC8', fontSize: 11, fontFamily: 'monospace', width: 34, textAlign: 'right' }}>
+                {((vols[s.name] ?? s.vol) * 100).toFixed(0)}%
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -618,6 +688,8 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
   const [showSplash, setShowSplash] = useState(true);
   // v12 §5: trophy room local state
   const [showTrophies, setShowTrophies] = useState(false);
+  // v14.1: debug sound-board — enabled by ?debug=1 in the URL
+  const debugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
   // v9 §7: onboarding fires on the FIRST PLAY tap (before the first countdown),
   // never on home load. When it finishes we start the game. The "?" replays it
@@ -638,6 +710,9 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
   };
 
   const handlePlay = () => {
+    // v14.1: first user gesture — ensure AudioContext is live and samples are decoding
+    audio.init();
+    audio.loadSamples().catch(() => {});
     let seen = true;
     try { seen = localStorage.getItem(ONBOARD_KEY) === '1'; } catch { /* ignore */ }
     if (!seen) { afterOnboard.current = () => engine.start(false); setShowOnboard(true); }
@@ -669,6 +744,7 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
     <>
       {screen}
       {showOnboard && <Onboarding onDone={finishOnboard} />}
+      {debugMode && <SoundBoard />}
     </>
   );
 }

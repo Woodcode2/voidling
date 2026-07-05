@@ -4,7 +4,7 @@
 // filenames, so a changed asset has a new URL). Self-healing: skipWaiting +
 // clients.claim + old-cache purge means a previously stuck browser recovers on
 // its own instead of serving a stale app shell forever.
-const CACHE_NAME = 'voidling-v2';
+const CACHE_NAME = 'voidling-v14-1';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
