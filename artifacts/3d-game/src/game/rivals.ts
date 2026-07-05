@@ -6,7 +6,7 @@ import { drawVoidling, drawUnderdogTrail } from './voidling';
 import type { WorldObject } from './world';
 
 export interface VoidView { x: number; y: number; radius: number; }
-export interface WorldView { objects: WorldObject[]; voids: VoidView[]; map: number; elapsed: number; }
+export interface WorldView { objects: WorldObject[]; voids: VoidView[]; map: number; elapsed: number; playerScore: number; }
 
 export interface Intent { dirX: number; dirY: number; mag: number; }
 
@@ -479,6 +479,49 @@ export class BotController implements RivalController {
   }
 }
 
+// v16 §0: Rubber-band pacing controller — wraps BotController and throttles
+// captures when the bot is too far ahead of its rank-based target score.
+// Bots still visibly hunt, flee, and cast spells; only absorb frequency is
+// reduced (via movement-speed damping) when comfortably ahead.
+class PacingController implements RivalController {
+  kind = 'bot';
+  private inner: BotController;
+  private readonly baseFrac: number;   // e.g. 1.15 for rank-0 bot
+  private noise = 0;
+  private noiseTimer = 0;
+
+  constructor(inner: BotController, rankFrac: number) {
+    this.inner = inner;
+    this.baseFrac = rankFrac;
+    this.noise = (Math.random() * 2 - 1) * CONFIG.PACER_NOISE;
+    this.noiseTimer = CONFIG.PACER_RETARGET_MS * Math.random(); // stagger first re-roll
+  }
+
+  think(rival: Rival, view: WorldView, dt: number): Intent {
+    // Re-roll ±10% noise every 20 s
+    this.noiseTimer -= dt;
+    if (this.noiseTimer <= 0) {
+      this.noiseTimer = CONFIG.PACER_RETARGET_MS;
+      this.noise = (Math.random() * 2 - 1) * CONFIG.PACER_NOISE;
+    }
+    const intent = this.inner.think(rival, view, dt);
+    // Only throttle after the first 15 s (warmup) and only when grazing objects
+    if (view.elapsed < 15000 || this.inner.state === 'FLEE' || this.inner.state === 'HUNT') {
+      return intent;
+    }
+    const target = view.playerScore * (this.baseFrac + this.noise);
+    if (rival.score > target * 1.08) {
+      // Too far ahead — drift at 30% effort so the player can catch up visibly
+      return { ...intent, mag: intent.mag * 0.30 };
+    }
+    if (rival.score < target * 0.75) {
+      // Behind target — allowed to push slightly faster than normal
+      return { ...intent, mag: Math.min(1, intent.mag * 1.15) };
+    }
+    return intent;
+  }
+}
+
 export function makeRivals(): Rival[] {
   const names = shuffle(CONFIG.BOT_NAMES).slice(0, CONFIG.RIVAL_COUNT);
   const countries = shuffle(CONFIG.BOT_COUNTRIES).slice(0, CONFIG.RIVAL_COUNT);
@@ -486,12 +529,11 @@ export function makeRivals(): Rival[] {
   const arches = shuffle(ARCHETYPES);
 
   // v7 §8: bots wear real SHOP skins (accessories render automatically), drawn
-  // without replacement and weighted 3× toward skins the player does NOT own —
-  // a moving billboard for the store.
+  // without replacement and weighted 2× toward skins the player does NOT own.
   const owned = new Set(meta.data.skinsOwned);
   const pool: SkinDef[] = [];
   for (const s of CONFIG.SKINS) {
-    const weight = owned.has(s.id) ? 1 : 2; // v15 §0: 2× toward unowned (was 3×)
+    const weight = owned.has(s.id) ? 1 : 2;
     for (let k = 0; k < weight; k++) pool.push(s);
   }
   const chosen: SkinDef[] = [];
@@ -502,15 +544,20 @@ export function makeRivals(): Rival[] {
     for (let k = pool.length - 1; k >= 0; k--) if (pool[k].id === s.id) pool.splice(k, 1);
   }
 
+  // v16 §0: rank targets [115%, 95%, 80%, 60%] shuffled so personality stays random
+  const pacerTargets = shuffle([...CONFIG.PACER_TARGETS]);
+
   const rivals: Rival[] = [];
   for (let i = 0; i < CONFIG.RIVAL_COUNT; i++) {
     const base = chosen[i % Math.max(1, chosen.length)] || CONFIG.SKINS[0];
-    const skin: SkinDef = { ...base, id: `bot_${i}_${base.id}` }; // unique id, same look
+    const skin: SkinDef = { ...base, id: `bot_${i}_${base.id}` };
     const reaction = 180 + Math.random() * 260;
     const bias = 0.7 + Math.random() * 0.8;
     const speedScale = 0.9 + Math.random() * 0.2;
     const arch = arches[i % arches.length];
-    const r = new Rival(names[i], countries[i], skin, new BotController(reaction, bias, arch), speedScale);
+    const inner = new BotController(reaction, bias, arch);
+    const pacer = new PacingController(inner, pacerTargets[i % pacerTargets.length]);
+    const r = new Rival(names[i], countries[i], skin, pacer, speedScale);
     r.wearsUnownedSkin = !owned.has(base.id);
     r.shopSkinId = base.id;
     r.shopSkinName = base.name;

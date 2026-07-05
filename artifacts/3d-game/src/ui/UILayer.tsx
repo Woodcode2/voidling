@@ -5,8 +5,8 @@ import { audio } from '../game/audio';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
-// v15 build stamp — increment on every deploy
-const BUILD_STAMP = 'v15 · 1';
+// v16 build stamp — increment on every deploy
+const BUILD_STAMP = 'v16 · 1';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -625,19 +625,23 @@ function Boon({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
             className={`vd-boon${b.spell ? ' vd-boon--spell' : ''}`}
             onClick={() => engine.chooseBoon(b.id)}
             style={b.spell ? {
+              // v16 §7: vivid fully-opaque teal/violet solid fill (no longer translucent gradient)
               borderColor: b.color || '#7BFFED',
-              background: `linear-gradient(135deg, rgba(0,160,180,0.15) 0%, rgba(0,100,140,0.08) 100%)`,
-              boxShadow: `0 0 12px ${b.color || '#7BFFED'}44`,
+              background: b.color
+                ? `linear-gradient(135deg, ${b.color}DD 0%, ${b.color}AA 100%)`
+                : 'linear-gradient(135deg, #007A8C 0%, #00526A 100%)',
+              boxShadow: `0 0 18px ${b.color || '#7BFFED'}88, 0 4px 16px rgba(0,0,0,0.45)`,
+              color: '#ffffff',
             } : undefined}
           >
             {b.spell && (
               <span style={{
-                display: 'block', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
-                color: b.color || '#7BFFED', marginBottom: 3, fontWeight: 700,
+                display: 'block', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
+                color: '#ffffff', marginBottom: 3, fontWeight: 800, opacity: 0.9,
               }}>✨ SPELL · TAP TO HOLD</span>
             )}
-            <h3 style={b.spell ? { color: b.color || '#7BFFED' } : undefined}>{b.name}</h3>
-            <p>{b.desc}</p>
+            <h3 style={b.spell ? { color: '#ffffff', textShadow: '0 1px 4px rgba(0,0,0,0.4)' } : undefined}>{b.name}</h3>
+            <p style={b.spell ? { color: 'rgba(255,255,255,0.88)' } : undefined}>{b.desc}</p>
           </button>
         ))}
       </div>
@@ -681,6 +685,39 @@ function Daily({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   );
 }
 
+// v16 §5: news ticker — slim animated bar that scrolls across the bottom during play
+function NewsTicker({ line }: { line: string }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0,
+      height: 28,
+      background: 'rgba(10,8,24,0.88)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
+      display: 'flex', alignItems: 'center',
+      overflow: 'hidden',
+      zIndex: 90,
+      pointerEvents: 'none',
+    }}>
+      {/* Label badge */}
+      <div style={{
+        flexShrink: 0, paddingLeft: 8, paddingRight: 6, marginRight: 8,
+        fontSize: 8, fontWeight: 800, letterSpacing: '0.12em',
+        color: '#FFD23F', textTransform: 'uppercase', whiteSpace: 'nowrap',
+        borderRight: '1px solid rgba(255,215,63,0.25)',
+      }}>📰 BREAKING</div>
+      {/* Scrolling text */}
+      <div style={{
+        flex: 1, overflow: 'hidden',
+        fontSize: 10, color: 'rgba(255,255,255,0.88)', fontWeight: 600,
+        letterSpacing: '0.04em', whiteSpace: 'nowrap',
+        animation: 'vd-ticker-scroll 12s linear forwards',
+      }}>
+        {line}
+      </div>
+    </div>
+  );
+}
+
 function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   return (
     <div className="vd-game-ui">
@@ -690,13 +727,37 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           <PauseIcon />
         </button>
       )}
+      {/* v16 §5: round contracts — live-ticking chips at top-left under the score */}
+      {!snap.paused && snap.contracts && snap.contracts.length > 0 && (
+        <div style={{
+          position: 'fixed', top: 56, left: 10,
+          display: 'flex', flexDirection: 'column', gap: 4,
+          pointerEvents: 'none', zIndex: 80,
+        }}>
+          {snap.contracts.map((c) => (
+            <div key={c.id} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: c.done ? 'rgba(123,255,237,0.18)' : 'rgba(10,8,24,0.72)',
+              border: `1px solid ${c.done ? '#7BFFED' : 'rgba(255,255,255,0.12)'}`,
+              borderRadius: 8, padding: '3px 7px',
+              fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+              color: c.done ? '#7BFFED' : 'rgba(255,255,255,0.65)',
+              transition: 'all 0.3s',
+            }}>
+              <span>{c.done ? '✓' : '○'}</span>
+              <span style={{ textDecoration: c.done ? 'line-through' : 'none' }}>{c.name}</span>
+              <span style={{ opacity: 0.6, marginLeft: 2 }}>+{c.reward}¢</span>
+            </div>
+          ))}
+        </div>
+      )}
       {/* v15 §3: SPELL button — 72×72 teal action button, shown when a spell is held */}
       {snap.heldSpell && !snap.paused && (
         <button
           onClick={() => engine.castSpell()}
           aria-label={`Cast ${snap.heldSpell.name}`}
           style={{
-            position: 'fixed', bottom: 32, right: 24,
+            position: 'fixed', bottom: snap.ticker ? 36 : 32, right: 24,
             width: 72, height: 72, borderRadius: 20,
             background: snap.heldSpell.color || '#7BFFED',
             border: '2px solid rgba(255,255,255,0.25)',
@@ -712,6 +773,8 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           <span style={{ fontSize: 9, marginTop: 2 }}>{snap.heldSpell.name.split(' ')[0]}</span>
         </button>
       )}
+      {/* v16 §5: news ticker */}
+      {snap.ticker && !snap.paused && <NewsTicker line={snap.ticker} />}
       {snap.paused && (
         <div className="vd-overlay vd-overlay--dim vd-pause-overlay">
           <div className="vd-sheet">

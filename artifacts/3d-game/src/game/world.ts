@@ -1,7 +1,7 @@
 import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
-import { objectSprites, spriteBounds } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds
+import { objectSprites, spriteBounds, spriteContactFrac } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac
 import { audio } from './audio';
 import type { FXManager } from './fx';
 import type { Player } from './player';
@@ -37,6 +37,8 @@ export interface WorldObject {
   alertT: number;        // "!" bubble timer (people)
   golden: boolean;       // v6 §2: golden object — 3× mass/score
   arrive: number;        // v8 §2: ms of pop-in scale-up remaining (0 = settled)
+  contactRadius: number; // v16 §3: art-derived contact radius (bottom-third scan)
+  infra: boolean;        // v16 §2: infra objects never respawn (hydrant/mailbox/trashcan)
 }
 
 export interface PlayerStats {
@@ -44,9 +46,15 @@ export interface PlayerStats {
   ducks: number;
   maxTier: number;
   gnomes: number;   // v9 §8: garden gnomes eaten this round (secret GNOME LORD)
+  // v16 §5: contract progress counters
+  houses: number;
+  cars: number;
+  people: number;
+  beachItems: number;
+  downtownItems: number;
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall';
+type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail
@@ -142,60 +150,46 @@ function drawTornRim(ctx: CanvasRenderingContext2D, view: View, S: number, t: nu
     edge((y) => [S - jag(y), y], (y) => [S, y], vy0, vy1);
 }
 
-// v13 §1: SANDY SHORES — coastline replacing the south and west torn-earth rims.
-// Ocean water + animated shore foam + waterfall-into-space streaks.
+// v13 §1: SANDY SHORES — coastline replacing the south torn-earth rim.
+// v16 §1/§7: ocean water now visible INSIDE the map on the bottom beach row (gy=4).
+// The south map edge (y=S) is the beach; water is visible from S-IN_WATER to S.
 function drawCoast(ctx: CanvasRenderingContext2D, view: View, S: number, t: number) {
   const WATER = 100;   // ocean band width outside the map
+  const IN_WATER = 90; // pixels of in-map water visible inside the bottom beach row
   const bg = CONFIG.COLORS.uiBg;
 
-  // ── WEST COAST (x = 0, ocean to the left) ──────────────────────────────────
-  if (view.x < 0 && view.x + view.w > -WATER - 60) {
-    const wx0 = Math.max(view.x, -WATER - 60);
-    // hide the harsh uiBg gap with a space-like darkening so coast blends into space
-    ctx.fillStyle = bg;
-    ctx.fillRect(wx0, view.y, -wx0, view.h);
-    // ocean gradient
-    const grd = ctx.createLinearGradient(-WATER, 0, 0, 0);
-    grd.addColorStop(0, 'rgba(20,100,180,0.0)');
-    grd.addColorStop(0.5, 'rgba(35,150,215,0.65)');
-    grd.addColorStop(1, 'rgba(55,175,235,0.82)');
+  // ── IN-MAP WATER (inside south beach blocks, top portion of the water band) ─
+  const inWaterY = S - IN_WATER;
+  if (view.y + view.h > inWaterY && view.y < S) {
+    const grd = ctx.createLinearGradient(0, inWaterY, 0, S);
+    grd.addColorStop(0, 'rgba(35,130,210,0.0)');
+    grd.addColorStop(0.5, 'rgba(45,160,220,0.45)');
+    grd.addColorStop(1, 'rgba(60,185,240,0.75)');
     ctx.fillStyle = grd;
-    ctx.fillRect(wx0, view.y, -wx0, view.h);
-    // shore foam
-    const fG = ctx.createLinearGradient(-20, 0, 0, 0);
+    ctx.fillRect(view.x, inWaterY, view.w, S - inWaterY);
+    // foam line at the shore
+    const fG = ctx.createLinearGradient(0, S - 22, 0, S);
     fG.addColorStop(0, 'rgba(255,255,255,0)');
-    fG.addColorStop(1, 'rgba(255,255,255,0.32)');
+    fG.addColorStop(1, 'rgba(255,255,255,0.28)');
     ctx.fillStyle = fG;
-    ctx.fillRect(-20, view.y, 20, view.h);
-    // horizontal ripple lines
+    ctx.fillRect(view.x, S - 22, view.w, 22);
+    // animated ripples
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([10, 18]);
-    for (let y = Math.floor(view.y / 52) * 52; y < view.y + view.h; y += 52) {
-      const off = Math.sin(t / 850 + y * 0.009) * 8;
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([8, 16]);
+    for (let x = Math.floor(view.x / 50) * 50; x < view.x + view.w; x += 50) {
+      const off = Math.sin(t / 900 + x * 0.011) * 6;
       ctx.beginPath();
-      ctx.moveTo(wx0, y + off);
-      ctx.quadraticCurveTo(wx0 * 0.5, y + off + 6, -2, y + off);
+      ctx.moveTo(x + off, inWaterY + IN_WATER * 0.3);
+      ctx.lineTo(x + off + 28, inWaterY + IN_WATER * 0.3);
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    // waterfall: animated vertical streaks past the water band
-    ctx.globalAlpha = 0.38;
-    for (let i = 0; i < 10; i++) {
-      const bx = -WATER - 18 - i * 8;
-      if (bx > view.x + view.w || bx < view.x - 20) continue;
-      const spd = 160 + (i % 3) * 65;
-      const len = 28 + (i % 4) * 18;
-      const period = 110;
-      for (let y = view.y; y < view.y + view.h; y += period) {
-        const phase = ((t * spd / 1000) + y + i * 43) % period;
-        ctx.fillStyle = `rgba(90,180,235,${0.25 + 0.15 * (i % 2)})`;
-        ctx.fillRect(bx, y + phase, 2, len);
-      }
-    }
     ctx.restore();
   }
+
+  // ── WEST COAST: removed in v16 §1 (west column is now residential) ──────────
 
   // ── SOUTH COAST (y = S, ocean below) ───────────────────────────────────────
   if (view.y + view.h > S && view.y < S + WATER + 60) {
@@ -292,7 +286,7 @@ export class WorldManager {
   initialMass = 0;         // v8 §3: frozen starting edible mass (% devoured denom)
   private rampageCd = 0;   // v8 §3: DEVOURER+ instant-pop cadence (≤10/s)
   initialPopulation = 0;   // v6 §2: baseline count for the 85% respawn target
-  playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0 };
+  playerStats: PlayerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0, houses: 0, cars: 0, people: 0, beachItems: 0, downtownItems: 0 };
   gnomeTotal = 0;              // v9 §8: gnomes present at round start (fixed — gnomes never respawn)
   gnomeLordPending = false;    // v9 §8: set once the player eats every gnome
   private nextId = 0;
@@ -306,6 +300,15 @@ export class WorldManager {
   private makeObj(kind: ObjectKind, x: number, y: number, opts: Partial<WorldObject> = {}): WorldObject {
     const info = CONFIG.KIND_INFO[kind];
     const baseSize = info.minR + this.rand() * (info.maxR - info.minR);
+    // v16 §3: art-derived contact radius — 0.90 × baseSize × bottom-third width fraction
+    // Resolve variant-backed sprite keys (house→house_a, shop→shop_a, skyscraper→skyscraper_a)
+    const SPRITE_KEY_MAP: Partial<Record<ObjectKind, string>> = {
+      house: 'house_a', shop: 'shop_a', skyscraper: 'skyscraper_a',
+    };
+    const cFrac = spriteContactFrac.get(SPRITE_KEY_MAP[kind] ?? kind);
+    const contactRadius = cFrac != null ? 0.90 * baseSize * cFrac : baseSize * 0.85;
+    // v16 §2: infra objects placed once per map, never respawn
+    const INFRA_KINDS: ObjectKind[] = ['hydrant', 'mailbox', 'trashcan', 'bench', 'bike', 'scooter'];
     const o: WorldObject = {
       id: this.nextId++,
       kind,
@@ -332,6 +335,8 @@ export class WorldManager {
       alertT: 0,
       golden: false,
       arrive: 0,
+      contactRadius,
+      infra: INFRA_KINDS.includes(kind),
       ...opts,
     };
     this.objects.push(o);
@@ -348,7 +353,7 @@ export class WorldManager {
     this.totalStartArea = 0;
     this.nextId = 0;
     this.respawnTimer = 0;
-    this.playerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0 };
+    this.playerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0, houses: 0, cars: 0, people: 0, beachItems: 0, downtownItems: 0 };
     this.gnomeTotal = 0;
     this.gnomeLordPending = false;
     const rand = prng(hashString(seedStr));
@@ -367,15 +372,18 @@ export class WorldManager {
       this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
     }
 
-    // v13 §1: 5×5 layout. West column (gx=0) and south row (gy=4) become SANDY SHORES beach.
-    // gx∈{2,3} × gy∈{2,3} = DOWNTOWN core (4 blocks).
-    // v15 §4: added ZOO (gx=3,gy=0) and TOWN HALL (gx=4,gy=1)
+    // v16 §1: Fixed 5×5 city plan (R=residential, V=civic, D=downtown, P=park, Z=zoo, C=coast)
+    // gy=0:  R R V V R
+    // gy=1:  R R D D R
+    // gy=2:  P Z D D R
+    // gy=3:  R R D R R
+    // gy=4:  C C C C C  (coast / beach — southern edge only, no west column)
     const layout: BlockType[] = [
-      'beach',       'residential', 'plaza',       'zoo',         'residential',
-      'beach',       'park',        'residential', 'playground',  'townhall',
-      'beach',       'residential', 'downtown',    'downtown',    'residential',
-      'beach',       'residential', 'downtown',    'downtown',    'school',
-      'beach',       'beach',       'beach',       'beach',       'beach',
+      'residential', 'residential', 'civic',       'civic',       'residential',   // gy=0
+      'residential', 'residential', 'downtown',    'downtown',    'residential',   // gy=1
+      'park',        'zoo',         'downtown',    'downtown',    'residential',   // gy=2
+      'residential', 'residential', 'downtown',    'residential', 'residential',   // gy=3
+      'beach',       'beach',       'beach',       'beach',       'beach',         // gy=4 (coast)
     ];
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
@@ -385,6 +393,7 @@ export class WorldManager {
     }
 
     const spawnX = this.size / 2, spawnY = this.size / 2;
+    let civicIndex = 0; // v16 §1: track which civic block (0=left/north, 1=right/south)
     for (const b of this.blocks) {
       if (b.type === 'residential') this.fillResidential(b, rand);
       else if (b.type === 'park') this.fillPark(b, rand, spawnX, spawnY);
@@ -396,6 +405,7 @@ export class WorldManager {
       else if (b.type === 'beach') this.fillBeach(b, rand); // v13 §2
       else if (b.type === 'zoo') this.fillZoo(b, rand);     // v15 §4
       else if (b.type === 'townhall') this.fillTownHall(b, rand); // v15 §4
+      else if (b.type === 'civic') this.fillCivic(b, rand, civicIndex++); // v16 §1
     }
 
     // v12 §1: guarantee T1 edibles around the player spawn (map center = downtown)
@@ -559,13 +569,18 @@ export class WorldManager {
   }
 
   private fillResidential(b: Block, rand: () => number) {
-    this.scatter(b, rand, 'house', 2);
+    // v16 §1: four house variants — pick two distinct ones per block
+    const housePool: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
+    const ha = housePool[Math.floor(rand() * housePool.length)];
+    const hb = housePool[Math.floor(rand() * housePool.length)];
+    this.scatter(b, rand, ha, 1);
+    this.scatter(b, rand, hb, 1);
     this.scatter(b, rand, 'shed', 1);
     this.scatter(b, rand, 'tree', 3);
     this.scatter(b, rand, 'mailbox', 2);
     this.scatter(b, rand, 'hydrant', 1);
-    this.scatter(b, rand, 'trashcan', 3);
-    this.scatter(b, rand, 'bike', 2);
+    this.scatter(b, rand, 'trashcan', 2); // v16 §2: max 2 trash per building
+    this.scatter(b, rand, 'bike', 1);
     this.scatter(b, rand, 'birdbath', 1);
     this.scatter(b, rand, 'flower', 6);
     this.scatter(b, rand, 'flowerpot', 4);
@@ -575,7 +590,6 @@ export class WorldManager {
     // v7 §3: neighborhood critters + props
     this.scatter(b, rand, 'cat', 1);
     this.scatter(b, rand, 'squirrel', 1);
-    this.scatter(b, rand, 'scooter', 1);
     if (rand() < 0.6) this.scatter(b, rand, 'bbq', 1);
     if (rand() < 0.4) this.scatter(b, rand, 'mower', 1);
     if (rand() < 0.7) this.spawnBirds(b, rand, 3);
@@ -651,6 +665,7 @@ export class WorldManager {
   }
 
   // v12 §1: downtown block — skyscrapers + offices + street life
+  // v16 §1: added café buildings for street variety
   private fillDowntown(b: Block, rand: () => number) {
     (b as any).paved = true; // no grass tufts; uses asphalt/sidewalk tiling
     const inset = CONFIG.SIDEWALK + 50;
@@ -666,12 +681,42 @@ export class WorldManager {
       const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 36);
       this.makeObj('office', p.x, p.y);
     }
+    // v16 §1: 1 café per downtown block (~80% chance)
+    if (rand() < 0.8) {
+      const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 28);
+      this.makeObj('cafe', p.x, p.y);
+    }
     // street furniture
     this.scatter(b, rand, 'cafetable', 3);
     this.scatter(b, rand, 'person', 6);
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 3);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
+  }
+
+  // v16 §1: civic block — school+library on index 0, hospital+library on index 1
+  private fillCivic(b: Block, rand: () => number, civicIdx: number) {
+    (b as any).paved = false;
+    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2;
+    const cy = b.y0 + CONFIG.BLOCK_SIZE * 0.38;
+    if (civicIdx === 0) {
+      // left civic block: school + library
+      this.makeObj('school', cx - CONFIG.BLOCK_SIZE * 0.18, cy);
+      const libP = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 50);
+      this.makeObj('library', libP.x, libP.y);
+    } else {
+      // right civic block: hospital + town hall
+      this.makeObj('hospital', cx, cy);
+      const thP = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 60);
+      this.makeObj('watertower', thP.x, thP.y); // town hall landmark (largest civic T5)
+    }
+    // shared amenities
+    this.scatter(b, rand, 'bench', 3);
+    this.scatter(b, rand, 'tree', 4);
+    this.scatter(b, rand, 'flower', 6);
+    this.scatter(b, rand, 'person', 4);
+    this.scatter(b, rand, 'flowerpot', 3);
+    this.scatter(b, rand, 'trashcan', 1);
   }
 
   // v12 §1: mixed block — shops + library + regular housing
@@ -769,6 +814,9 @@ export class WorldManager {
         case 'school':      return 'SCHOOLYARD';
         case 'playground':  return 'SCHOOLYARD';
         case 'park':        return 'THE PARK';
+        case 'zoo':         return 'ZOO';
+        case 'townhall':    return 'TOWN HALL';
+        case 'civic':       return 'CIVIC DISTRICT';
         default:            return 'MAPLE COURT';
       }
     };
@@ -974,9 +1022,8 @@ export class WorldManager {
         if (obj.kind === 'watertower') continue; // only WORLD-EATER player eats it
         if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
         const dr = dist(obj.x, obj.y, r.x, r.y);
-        // v15 §1: contactScale — use scaled effective size for collision boundary
-        const csR = (CONFIG.CONTACT_SCALE_OVERRIDES as Record<string, number>)[obj.kind] ?? CONFIG.CONTACT_SCALE;
-        if (dr < r.radius + obj.size * csR * 0.4 && this.canEat(r.radius, obj.size)) {
+        // v16 §3: use art-derived contactRadius instead of CONFIG.CONTACT_SCALE
+        if (dr < r.radius + obj.contactRadius && this.canEat(r.radius, obj.size)) {
           r.eatObject(obj);
           obj.eaten = true;
           break;
@@ -1032,9 +1079,10 @@ export class WorldManager {
       if (rp) { const o = this.makeObj('apple', rp.x, rp.y); o.arrive = 200; this.spawnPuff(rp.x, rp.y, fx); }
       return;
     }
-    // v9 §8: gnomes deliberately omitted — they never respawn so GNOME LORD stays achievable
-    const kinds: ObjectKind[] = ['flower', 'flowerpot', 'apple', 'mailbox', 'hydrant', 'trashcan'];
-    const zones = this.blocks.filter((b) => b.type === 'residential' || b.type === 'park' || b.type === 'plaza' || b.type === 'downtown' || b.type === 'mixed');
+    // v9 §8: gnomes never respawn so GNOME LORD stays achievable
+    // v16 §2: INFRA objects (mailbox/hydrant/trashcan/bench/bike/scooter) placed once, never respawn
+    const kinds: ObjectKind[] = ['flower', 'flowerpot', 'apple', 'duck', 'seashell', 'crab'];
+    const zones = this.blocks.filter((b) => b.type === 'residential' || b.type === 'park' || b.type === 'plaza' || b.type === 'downtown' || b.type === 'mixed' || b.type === 'civic');
     if (!zones.length) return;
     let bx = 0, by = 0, bestScore = -Infinity;
     for (let i = 0; i < 12; i++) {
@@ -1330,6 +1378,16 @@ export class WorldManager {
         this.gnomeLordPending = true;
       }
     }
+    // v16 §5: contract progress counters
+    const HOUSE_KINDS: ObjectKind[] = ['house', 'house_c', 'house_d'];
+    const CAR_KINDS: ObjectKind[] = ['car', 'car_parked_a', 'car_parked_b', 'schoolbus', 'jeep'];
+    const BEACH_KINDS: ObjectKind[] = ['palm', 'umbrella', 'sandcastle', 'surfboard', 'lifeguard', 'towel', 'crab', 'seashell', 'kayak'];
+    const DOWNTOWN_KINDS: ObjectKind[] = ['shop', 'office', 'skyscraper', 'cafe', 'library'];
+    if (HOUSE_KINDS.includes(obj.kind)) this.playerStats.houses++;
+    if (CAR_KINDS.includes(obj.kind)) this.playerStats.cars++;
+    if (obj.kind === 'person' || obj.kind === 'soldier') this.playerStats.people++;
+    if (BEACH_KINDS.includes(obj.kind)) this.playerStats.beachItems++;
+    if (DOWNTOWN_KINDS.includes(obj.kind)) this.playerStats.downtownItems++;
 
     // reaction flavor
     if (obj.kind === 'house') {

@@ -1,0 +1,86 @@
+# REPLIT BUILD PROMPT — VOIDLING v16: A CITY THAT MAKES SENSE
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+Work sections **in order**; verify every Acceptance Criteria line and confess anything skipped. Standing rules hold: 60fps, portrait, asset loaders with silent fallbacks, the Growth Law stays.
+
+## 0 — Beatable rivals (rubber-band pacing)
+
+- **Bot count drops to 4** (five voids total).
+- Bots keep all behavior/personality systems, but their effective eat success is governed by a **pacing controller**: each bot's target score tracks the PLAYER's score by rank — the top rival targets ~115%, second ~95%, third ~80%, fourth ~60% — with ±10% personality noise re-rolled every 20s and rank targets reshuffled each round. Implement by throttling bot capture attempts (skip/delay absorbs when ahead of target; boost focus when behind). It must never look scripted: bots still visibly hunt, flee, cast spells, and react to events.
+- The Growth Law stays as the absolute ceiling; the pacer works beneath it.
+- **WORLD ENDER retune:** lower the final threshold and boost T4+ growth so a strong run reaches WORLD ENDER with ~1:00–0:45 remaining and a median run by ~0:20. Verify across three test rounds and report the times.
+
+## 1 — THE CITY PLAN (hand-authored macro layout — the generator follows this map, no freestyling)
+
+Replace random district assignment with this fixed 5×5 plan (C=coast/beach, D=downtown, V=civic row, R=residential, P=park, Z=zoo):
+
+```
+R R V V R
+R R D D R
+P Z D D R
+R R D R R
+C C C C C
+```
+
+- **Coast (bottom row, contiguous):** sand band the full width, then an **ocean water strip that actually renders** (animated ripples, wade = 20% slow), then the waterfall-into-space rim. Beach content lives here: palms, umbrellas, towels, sandcastles, crabs, shells, lifeguard chair, swimwear people. One tide pool decal (reuse pond.png at 60% scale).
+- **Downtown (center 2×2 + one D):** skyscrapers, office, shops, **cafés** (new sprite slot `cafe`), café tables, heavy foot traffic, both parked-car sprites lining curbs, bus route.
+- **Civic row (two V blocks, adjacent):** town hall, **school** (verify the existing school sprite actually places here), **hospital** (new sprite slot `hospital`), and library standing together on one street with a small lawn each. This is the "real town" block.
+- **Residential:** dense — each lot gets a house from a 4-variant pool (`house_a/b` + new `house_c/house_d`), yard set, driveway, street trees. No half-empty lots.
+- **Park + Zoo:** unchanged systems, placed per the map.
+- District name fade-ins, results text, and the density rules all keep working against the new plan.
+
+## 2 — Infrastructure realism (the 100-hydrant field becomes impossible)
+
+- Split all objects into **INFRASTRUCTURE** (hydrants, mailboxes, trash cans, benches, streetlights, stop signs, bikes, scooters) and **CONSUMABLES** (apples, flowers, flowerpots, shells, snacks, golden items, fish).
+- Infrastructure is placed ONCE at generation with real-world logic: hydrant 1 per block corner, mailbox exactly 1 per house at its curb, trash 1–2 beside each house/shop, benches at bus stops and parks only. **Infrastructure never respawns.**
+- The respawn system draws exclusively from consumables, still context-anchored (apples near trees/picnics, shells on sand, snacks near cafés). Post-generation validation logs per-type counts per block; report the log.
+
+## 3 — Contact radius derived from art (collision saga, final)
+
+- Delete per-type contactScale config. For every sprite object, compute contact radius automatically at load: **0.45 × the trimmed sprite's width measured across its bottom third** (the base band). Tall sprites (trees, towers, buildings) thus collide at their trunk/base footprint, not their canopy. Procedural objects keep their drawn footprint.
+- Keep the SHOW HITBOXES toggle. Acceptance: a void slips between a tree's canopy edge and a neighboring object where visible daylight exists.
+
+## 4 — Form identity (per-form body sprites, splash-derived)
+
+- New loader dir `assets/forms/`: `form_1.png … form_5.png` (VOIDLING → WORLD ENDER). When present, the **Classic skin's body** renders the current form's sprite (live eyes/mouth/blush still drawn on top; squash/breathe/wobble applied to the sprite). Purchased skins keep their own body + the existing form layers.
+- When `form_4.png`/`form_5.png` are present, their baked-in flames REPLACE the separate flame-crown layer for the Classic line (suppress the layer to avoid doubling).
+- Transformation moments unchanged, but the body-morph crossfade now blends between form sprites — level 1→2 must be visibly a different creature.
+
+## 5 — A town with a voice
+
+- **Speech bubbles:** small comic bubbles above people, 2.5s, max 2 on screen, kid-safe pools — Ambient: "I just paid off my mortgage!", "Beautiful day!", "Is that... a hole?", "I love this town.", "Fresh air!". Panic (fleeing): "MY LAWN!", "Not like this!", "Tell my gnomes I love them!", "RUN!". Café queue: "I'm gonna be late for work!", "One latte please!", "This line is forever." Cafés and food carts get 2–4 people standing in line. Fix the people variety generator — the live build spawns identical blue shirts; assert outfit distribution in the report.
+- **NEWS TICKER:** a slim scrolling bar directly under the timer, one line at a time, triggered by world state: round start "BREAKING: The last slice of Earth reports a strange visitor…", first house eaten "Mayor urges calm.", GOBBLER "Officials: 'It's getting bigger.'", zoo break "ZOO BREAK — one (1) flamingo unaccounted for.", town hall "DEMOCRACY DEVOURED. Interim mayor: a gnome.", 15% devoured "Mayor declares state of emergency!", WORLD ENDER "THE GUARD IS EN ROUTE.", events get their own lines. Write ~20 lines, kid-safe and funny.
+- **Round stakes card:** after the countdown's "3-2-1" and before "EAT!", a 1.2s full-width card: "THE LAST SLICE STANDS." / "TIME TO EAT." with the round's contracts listed beneath (below).
+- **ROUND CONTRACTS:** every round draws 3 mini-objectives from a pool (eat 3 houses · break the zoo · reach GOBBLER before 1:30 · eat 15 beach items · chomp a rival · devour 10% · eat the water tower · survive unchomped). Shown on the stakes card and as small checklist chips under the leaderboard that tick live with a chime; each pays 30–60 coins on the results screen.
+
+## 6 — THE GUARD (escalation, kid-safe)
+
+- Triggered when any void reaches WORLD ENDER or the map passes 20% devoured: news line fires, then **2 army jeeps** (new sprite slot `jeep`) drive in carrying **soldiers** — a people variant with green uniform, helmet, and a round shield — who form a short shield line that bonks and slows (−10%) any void pushing through, arms comically braced. No weapons. Jeeps are T4 vehicles; soldiers flee like people once their line breaks. Eating a jeep: "REQUISITIONED!" callout.
+
+## 7 — Fixes from live build
+
+- **Splash layering:** the splash renders as an exclusive top layer — the home screen (and its idle voidling) must not mount or draw beneath/through it. Verify no orb photobombs the art.
+- **Spell cards** in the picker: replace the translucent dark style with a vivid filled teal/violet card + white text + sparkle icon. They currently read as disabled.
+- Ocean water on the coast must be visibly present per section 1 (it is currently missing entirely).
+- Verify all 16 spell/boon effects and the SPELL button still work post-refactor.
+
+## Acceptance criteria — verify on a real phone
+
+- Four rivals; across three rounds the player can observably catch and pass the leader, and at least one round is lead-swapped in the final 30s; report WORLD ENDER arrival times (~median 0:20 remaining).
+- One continuous beach with visible animated ocean along the entire south edge; downtown reads as a city core; school+hospital+town hall+library stand together on the civic row; residential blocks are dense with 4 house variants.
+- Post-gen validation log pasted: exactly 1 mailbox per house, ≤2 trash per building, hydrants at corners only; play to 0:15 — no infrastructure clusters ever appear; consumables keep flowing.
+- Hitboxes ON: tree collision hugs the trunk base; no invisible pushback anywhere; the config table is gone (cite the derivation code).
+- With form sprites dropped: level 1→2 is a visibly different creature; DEVOURER/WORLD ENDER show baked flames with no doubled crown; skins still render their own bodies.
+- People speak (ambient, panic, café queue), outfits vary, cafés have lines; the ticker fires on round start, zoo break, and 15% devoured; the stakes card shows 3 contracts; completing one ticks its chip and pays out at results.
+- The Guard arrives on trigger with jeeps + shield soldiers; eating a jeep fires REQUISITIONED.
+- Splash shows no home-screen orb; spell cards look vivid and selectable; all spells fire.
+- 60fps; zero console errors across 5 rounds.
+
+## Out of scope
+
+3D/engine changes, networking, iOS wrap, real payments, the debug panel (keep all sections working).
+
+Order: 0 → 7. Report deviations explicitly, with the pacing times, validation log, and outfit distribution included.
