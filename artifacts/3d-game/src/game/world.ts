@@ -1,7 +1,7 @@
 import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
-import { objectSprites } from './sprites'; // v11: world-object PNG art
+import { objectSprites, spriteBounds } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds
 import { audio } from './audio';
 import type { FXManager } from './fx';
 import type { Player } from './player';
@@ -46,7 +46,7 @@ export interface PlayerStats {
   gnomes: number;   // v9 §8: garden gnomes eaten this round (secret GNOME LORD)
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school';
+type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail
@@ -268,13 +268,14 @@ export class WorldManager {
       this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
     }
 
-    // v7 §2: 4×4 = 16 blocks — 12 residential, 1 park, 1 playground, 1 plaza,
-    // 1 school. The water tower sits on a residential corner lot (placed below).
+    // v12 §1: 5×5 = 25 blocks. gx∈{2,3} × gy∈{2,3} = DOWNTOWN core (4 blocks).
+    // The water tower sits on the last residential corner.
     const layout: BlockType[] = [
-      'residential', 'residential', 'plaza',       'residential',
-      'residential', 'park',        'playground',  'residential',
-      'residential', 'school',      'residential', 'residential',
-      'residential', 'residential', 'residential', 'residential',
+      'residential', 'residential', 'plaza',       'residential', 'residential',
+      'residential', 'park',        'residential', 'playground',  'residential',
+      'residential', 'residential', 'downtown',    'downtown',    'residential',
+      'residential', 'residential', 'downtown',    'downtown',    'school',
+      'residential', 'mixed',       'residential', 'residential', 'residential',
     ];
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
@@ -290,6 +291,16 @@ export class WorldManager {
       else if (b.type === 'plaza') this.fillPlaza(b, rand);
       else if (b.type === 'playground') this.fillPlayground(b, rand);
       else if (b.type === 'school') this.fillSchool(b, rand);
+      else if (b.type === 'downtown') this.fillDowntown(b, rand);
+      else if (b.type === 'mixed') this.fillMixed(b, rand);
+    }
+
+    // v12 §1: guarantee T1 edibles around the player spawn (map center = downtown)
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2, rr = 65 + rand() * 80;
+      this.makeObj(pick(['flower', 'apple', 'flowerpot'] as ObjectKind[], rand),
+        clamp(spawnX + Math.cos(a) * rr, MARGIN + 10, this.size - MARGIN - 10),
+        clamp(spawnY + Math.sin(a) * rr, MARGIN + 10, this.size - MARGIN - 10));
     }
 
     // v7 §2: water tower on a residential corner lot (the last residential block)
@@ -507,6 +518,50 @@ export class WorldManager {
     this.scatter(b, rand, 'trashcan', 2, cx, cy);
   }
 
+  // v12 §1: downtown block — skyscrapers + offices + street life
+  private fillDowntown(b: Block, rand: () => number) {
+    (b as any).paved = true; // no grass tufts; uses asphalt/sidewalk tiling
+    const inset = CONFIG.SIDEWALK + 50;
+    // 1 skyscraper per downtown block (70% chance), offset from center
+    if (rand() < 0.7) {
+      const sx = b.x0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2);
+      const sy = b.y0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2) * 0.5;
+      this.makeObj('skyscraper', sx, sy);
+    }
+    // 1–2 office buildings per block
+    const n = 1 + Math.floor(rand() * 2);
+    for (let i = 0; i < n; i++) {
+      const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 36);
+      this.makeObj('office', p.x, p.y);
+    }
+    // street furniture
+    this.scatter(b, rand, 'cafetable', 3);
+    this.scatter(b, rand, 'person', 6);
+    this.scatter(b, rand, 'bench', 2);
+    this.scatter(b, rand, 'flower', 3);
+    this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
+  }
+
+  // v12 §1: mixed block — shops + library + regular housing
+  private fillMixed(b: Block, rand: () => number) {
+    const shopCount = 1 + Math.floor(rand() * 2);
+    for (let i = 0; i < shopCount; i++) {
+      const p = this.pointInBlock(b, rand);
+      this.makeObj('shop', p.x, p.y);
+    }
+    if (rand() < 0.6) {
+      const p = this.pointInBlock(b, rand);
+      this.makeObj('library', p.x, p.y);
+    }
+    this.scatter(b, rand, 'house', 1);
+    this.scatter(b, rand, 'bench', 2);
+    this.scatter(b, rand, 'person', 4);
+    this.scatter(b, rand, 'cafetable', 2);
+    this.scatter(b, rand, 'flower', 4);
+    this.scatter(b, rand, 'gnome', 1);
+    this.scatter(b, rand, 'mailbox', 2);
+  }
+
   private spawnCar(rand: () => number) {
     const horizontal = rand() < 0.5;
     const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
@@ -557,6 +612,7 @@ export class WorldManager {
 
   private canEatByPlayer(player: Player, obj: WorldObject) {
     if (obj.kind === 'watertower') return player.radius >= CONFIG.WATERTOWER_EAT_RADIUS;
+    if (obj.kind === 'skyscraper') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
     return player.radius >= obj.size * CONFIG.EAT_RATIO;
   }
 
@@ -682,6 +738,7 @@ export class WorldManager {
       for (const r of rivals) {
         if (!r.alive || r.ghost) continue;
         if (obj.kind === 'watertower') continue; // only WORLD-EATER player eats it
+        if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
         const dr = dist(obj.x, obj.y, r.x, r.y);
         if (dr < r.radius + obj.size * 0.4 && this.canEat(r.radius, obj.size)) {
           r.eatObject(obj);
@@ -741,7 +798,7 @@ export class WorldManager {
     }
     // v9 §8: gnomes deliberately omitted — they never respawn so GNOME LORD stays achievable
     const kinds: ObjectKind[] = ['flower', 'flowerpot', 'apple', 'mailbox', 'hydrant', 'trashcan'];
-    const zones = this.blocks.filter((b) => b.type === 'residential' || b.type === 'park' || b.type === 'plaza');
+    const zones = this.blocks.filter((b) => b.type === 'residential' || b.type === 'park' || b.type === 'plaza' || b.type === 'downtown' || b.type === 'mixed');
     if (!zones.length) return;
     let bx = 0, by = 0, bestScore = -Infinity;
     for (let i = 0; i < 12; i++) {
@@ -1043,6 +1100,14 @@ export class WorldManager {
       fx.shake(300, 10, 20);
       fx.addDebris(obj.x, obj.y, '#C4736B', 4);
       fx.addDebris(obj.x, obj.y, '#F6E7B0', 2);
+    } else if (obj.kind === 'skyscraper') {
+      // v12 §1: skyscraper collapse — 3 shake pulses, debris shower, twin rings
+      fx.shake(130, 18, [0, 160, 320]);
+      fx.addDebris(obj.x, obj.y, '#5A8AB0', 8);
+      fx.addDebris(obj.x, obj.y, '#BFEAFF', 5);
+      fx.addDebris(obj.x, obj.y, '#1A3040', 4);
+      fx.addRing(obj.x, obj.y, '#5AC8FF', 18, obj.baseSize * 3.2, 8, 750);
+      fx.addRing(obj.x, obj.y, '#FFD23F', 10, obj.baseSize * 2, 5, 500);
     } else if (obj.kind === 'person') {
       fx.addCrumbs(obj.x, obj.y - obj.baseSize * 0.4, '#FF6FB0', 4); // hat pops off
     } else {
@@ -1411,19 +1476,20 @@ export class WorldManager {
           ctx.restore();
         }
 
+        // v12 §0: use tight alpha-bounding-box so transparent padding never inflates visuals
+        const bn = spriteBounds.get(spriteKey!) ?? { x: 0, y: 0, w: 1, h: 1 };
+        const imgW = objSprite.naturalWidth, imgH = objSprite.naturalHeight;
+        const sx = bn.x * imgW, sy = bn.y * imgH, sw = bn.w * imgW, sh = bn.h * imgH;
+
         if (obj.captured) {
-          // During tumble: draw centered so it spins around its visual centre
-          ctx.drawImage(objSprite, -r, -r, r * 2, r * 2);
+          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
         } else if (obj.kind === 'tree' || obj.kind === 'bush') {
-          // Foliage: bottom-anchored + ±2° global wind sway around ground point
           const sway = wind(t) * (2 * Math.PI / 180);
-          ctx.save();
-          ctx.rotate(sway);
-          ctx.drawImage(objSprite, -r, -r * 2, r * 2, r * 2);
+          ctx.save(); ctx.rotate(sway);
+          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r * 2, r * 2, r * 2);
           ctx.restore();
         } else {
-          // All others: bottom-anchored (base = obj.y, sprite extends 2r upward)
-          ctx.drawImage(objSprite, -r, -r * 2, r * 2, r * 2);
+          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r * 2, r * 2, r * 2);
         }
       } else {
         drawParkObject(ctx, obj.kind, obj.size, { t, fleeing: obj.fleeing, variant: obj.variant });

@@ -4,6 +4,12 @@ import type { GameEngine, Snapshot } from '../game/engine';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
+// v12 §3: weekday names for the streak calendar
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MOD_ICONS: Record<string, string> = {
+  zoom: '💨', gnome: '🧙', golden: '✨', tiny: '🔬', merge: '⚡', frenzy: '🔥', double: '2×',
+};
+
 // ── little inline icons (no image assets) ──────────────────────────────────────
 function CoinIcon({ size = 18 }: { size?: number }) {
   return (
@@ -108,7 +114,75 @@ function Confetti() {
 }
 
 // ── screens ────────────────────────────────────────────────────────────────────
-function Home({ snap, engine, onHelp, onPlay }: { snap: Snapshot; engine: GameEngine; onHelp: () => void; onPlay: () => void }) {
+// v12 §3: Splash screen — animated voidling drop, shown 1800ms on first mount
+function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
+  useEffect(() => {
+    const t = window.setTimeout(onDone, 1800);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div className="vd-overlay vd-overlay--solid vd-splash" onClick={onDone} role="button" aria-label="Skip splash">
+      <StarField />
+      <div className="vd-splash-inner">
+        <div className="vd-splash-void">
+          <SkinPreview skinId={snap.equippedSkin} size={140} glow={1} />
+        </div>
+        <h1 className="vd-splash-title">VOIDLING</h1>
+        <p className="vd-splash-tag">EAT. GROW. DEVOUR.</p>
+      </div>
+    </div>
+  );
+}
+
+// v12 §5: Trophy Room — 18 trophy definitions + earned/locked grid
+const TROPHY_DEFS = [
+  { id: 'first_win',         icon: '👑', name: 'Champion',        desc: 'Win your first round.' },
+  { id: 'score_1000',        icon: '🌟', name: 'Rising Star',     desc: 'Score 1,000 in a round.' },
+  { id: 'score_5000',        icon: '💫', name: 'Superstar',       desc: 'Score 5,000 in a round.' },
+  { id: 'score_10000',       icon: '🏆', name: 'Legend',          desc: 'Score 10,000 in a round.' },
+  { id: 'form_bite',         icon: '😋', name: 'First Bite',      desc: 'Evolve past NIBBLE.' },
+  { id: 'form_devourer',     icon: '🦷', name: 'Devourer',        desc: 'Reach the DEVOURER form.' },
+  { id: 'form_world_ender',  icon: '🌌', name: 'World Ender',     desc: 'Reach the WORLD ENDER form.' },
+  { id: 'devoured_50pct',    icon: '🗺️', name: 'Half the Town',   desc: 'Devour 50% of the world.' },
+  { id: 'devoured_100pct',   icon: '💀', name: 'Town Gone',       desc: 'Devour 100% of the world.' },
+  { id: 'duck_5',            icon: '🦆', name: 'Duck Collector',  desc: 'Eat 5 ducks in one round.' },
+  { id: 'combo_10',          icon: '⚡', name: 'Chain Chomp',     desc: 'Reach a 10-bite combo.' },
+  { id: 'triple_combo',      icon: '🔱', name: 'Triple Threat',   desc: 'Land 3 TRIPLE combos in a round.' },
+  { id: 'void_eater',        icon: '💥', name: 'Void Eater',      desc: 'Devour a rival voidling.' },
+  { id: 'void_destroyer',    icon: '☄️', name: 'Void Destroyer',  desc: 'Devour 5 rivals in rounds.' },
+  { id: 'daily_player',      icon: '📅', name: 'Daily Regular',   desc: 'Play a Daily Bite.' },
+  { id: 'daily_winner',      icon: '🗓️', name: 'Daily Champ',     desc: 'Win a Daily Bite.' },
+  { id: 'gnome_lord',        icon: '🧙', name: 'Gnome Lord',      desc: 'Eat every gnome in a round.' },
+  { id: 'world_ender_form',  icon: '💎', name: 'WORLD ENDER',     desc: 'Reach the final form.' },
+];
+
+function TrophyRoom({ snap, onClose }: { snap: Snapshot; onClose: () => void }) {
+  const earned = snap.trophies?.earned ?? [];
+  return (
+    <div className="vd-overlay vd-overlay--solid">
+      <StarField />
+      <div className="vd-topbar">
+        <button className="vd-icon-btn" onClick={onClose} aria-label="Close"><BackIcon /></button>
+        <span className="vd-topbar-title">TROPHY ROOM</span>
+        <span className="vd-trophy-count">{earned.length}/{TROPHY_DEFS.length}</span>
+      </div>
+      <div className="vd-trophy-grid">
+        {TROPHY_DEFS.map((t) => {
+          const has = earned.includes(t.id);
+          return (
+            <div key={t.id} className={`vd-trophy-card${has ? '' : ' vd-trophy-card--locked'}`}>
+              <div className="vd-trophy-icon">{has ? t.icon : '🔒'}</div>
+              <div className="vd-trophy-name">{has ? t.name : '???'}</div>
+              {has && <div className="vd-trophy-desc">{t.desc}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; engine: GameEngine; onHelp: () => void; onPlay: () => void; onTrophies: () => void }) {
   return (
     <div className="vd-overlay vd-overlay--solid">
       <StarField />
@@ -136,6 +210,7 @@ function Home({ snap, engine, onHelp, onPlay }: { snap: Snapshot; engine: GameEn
         <div className="vd-row">
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openDaily()}>DAILY BITE</button>
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openShop()}>SHOP</button>
+          <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={onTrophies}>🏆</button>
         </div>
       </div>
     </div>
@@ -364,8 +439,11 @@ function Boon({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   );
 }
 
+// v12 §4: Daily Bite v2 — weekday calendar + mod icon
+const DAILY_MOD_IDS = ['zoom', 'gnome', 'golden', 'tiny', 'merge', 'frenzy', 'double'];
 function Daily({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const d = snap.daily;
+  const today = new Date().getDay(); // 0=Sun
   return (
     <div className="vd-overlay vd-overlay--solid">
       <StarField />
@@ -375,9 +453,20 @@ function Daily({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
       </div>
       <div className="vd-stack">
         <h2 className="vd-heading">DAILY BITE</h2>
-        <p className="vd-sub">Streak: {snap.streak} day{snap.streak === 1 ? '' : 's'}</p>
+        <p className="vd-sub">Streak: {snap.streak} day{snap.streak === 1 ? '' : 's'} 🔥</p>
+        {/* v12 §4: 7-day week calendar */}
+        <div className="vd-week">
+          {WEEKDAYS.map((day, i) => (
+            <div key={i} className={`vd-week-day${i === today ? ' vd-week-day--today' : ''}`}>
+              <span className="vd-week-icon">{MOD_ICONS[DAILY_MOD_IDS[i]] ?? '?'}</span>
+              <span className="vd-week-label">{day}</span>
+            </div>
+          ))}
+        </div>
         <div className="vd-card" style={{ width: '100%', maxWidth: 360, padding: 22 }}>
-          <div className="vd-skin-name" style={{ fontSize: 24, color: '#FFD23F' }}>{d?.name}</div>
+          <div className="vd-skin-name" style={{ fontSize: 24, color: '#FFD23F' }}>
+            {MOD_ICONS[d?.id ?? ''] ?? ''} {d?.name}
+          </div>
           <p className="vd-sub" style={{ opacity: 0.95 }}>{d?.desc}</p>
         </div>
         <button className="vd-btn vd-btn--play" onClick={() => engine.start(true)}>PLAY</button>
@@ -449,6 +538,11 @@ const ONBOARD_KEY = 'vd_onboarded';
 
 export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const [showOnboard, setShowOnboard] = useState(false);
+  // v12 §3: splash screen — shown once on first mount, cleared at 1800ms or on tap
+  const [showSplash, setShowSplash] = useState(true);
+  // v12 §5: trophy room local state
+  const [showTrophies, setShowTrophies] = useState(false);
+
   // v9 §7: onboarding fires on the FIRST PLAY tap (before the first countdown),
   // never on home load. When it finishes we start the game. The "?" replays it
   // without auto-starting. This ref carries the action to run after the intro.
@@ -474,9 +568,19 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
     else engine.start(false);
   };
 
+  // v12 §3: show splash before any other screen on first mount
+  if (showSplash) {
+    return <Splash snap={snap} onDone={() => setShowSplash(false)} />;
+  }
+
+  // v12 §5: trophy room overlays everything
+  if (showTrophies) {
+    return <TrophyRoom snap={snap} onClose={() => setShowTrophies(false)} />;
+  }
+
   let screen: React.ReactNode = null;
   switch (snap.screen) {
-    case 'home': screen = <Home snap={snap} engine={engine} onHelp={() => setShowOnboard(true)} onPlay={handlePlay} />; break;
+    case 'home': screen = <Home snap={snap} engine={engine} onHelp={() => setShowOnboard(true)} onPlay={handlePlay} onTrophies={() => setShowTrophies(true)} />; break;
     case 'shop': screen = <Shop snap={snap} engine={engine} />; break;
     case 'results': screen = <Results snap={snap} engine={engine} />; break;
     case 'boon': screen = <Boon snap={snap} engine={engine} />; break;

@@ -47,6 +47,7 @@ export class Player extends Void {
   pendingFx: FxEvent[] = [];
 
   // boons
+  gnomeScoreMult = 1;   // v12 §4: GNOME DAY daily mod — 5× gnome score
   magnetMultiplier = 1;
   speedMultiplier = 1;
   twinMerge = false;
@@ -106,6 +107,7 @@ export class Player extends Void {
     this.lick = 0;
     this.orbit = [];
     this.pendingFx = [];
+    this.gnomeScoreMult = 1;
     this.magnetMultiplier = 1;
     this.speedMultiplier = 1;
     this.twinMerge = false;
@@ -260,7 +262,9 @@ export class Player extends Void {
     if (this.echoActive && (++this.echoCount % 5 === 0)) this.echoPulse = true;
     const goldMult = obj.golden ? CONFIG.GOLDEN_SCORE_MULT : 1; // v6 §2
     let gain = Math.round(obj.size * 1.6 * this.comboMult * this.greedMultiplier * goldMult * this.frenzyMult);
-    if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT; // v7 §3: drone worth 2×
+    if (obj.kind === 'drone') gain *= CONFIG.DRONE_SCORE_MULT;       // v7 §3: drone worth 2×
+    if (obj.kind === 'gnome') gain = Math.round(gain * this.gnomeScoreMult); // v12 §4: GNOME DAY
+    if (obj.kind === 'skyscraper') gain *= 3;                         // v12 §1: 3× house-level score
     this.score += gain;
     this.absorbObjectMass(obj.size); // v9 §1: shared growth curve + size cap
     if (obj.tier >= 3) this.cheekPuff = 1; // v6 §9: cheek puff on T3+
@@ -319,15 +323,16 @@ export class Player extends Void {
     }
   }
 
-  // Eating a rival voidling
-  eatRival(rivalRadius: number) {
+  // Eating a rival voidling — v12 §2: optional score steal from the eaten rival
+  eatRival(rivalRadius: number, stolen = 0) {
     const bonus = Math.round(500 * Math.max(1, this.comboMult));
-    this.score += bonus;
+    this.score += bonus + stolen;
     this.absorbVoidMass(rivalRadius); // v9 §1: shared growth curve + size cap
     this.bumpCombo();
     this.chomp = 1;
     this.cheekPuff = 1;
-    this.pendingFx.push({ type: 'eatRival', x: this.x, y: this.y, text: `DEVOURED +${bonus}`, color: '#FFD23F', big: true });
+    const label = stolen > 0 ? `DEVOURED +${bonus} STOLE +${stolen}` : `DEVOURED +${bonus}`;
+    this.pendingFx.push({ type: 'eatRival', x: this.x, y: this.y, text: label, color: '#FFD23F', big: true });
     this.checkEvolution();
   }
 
