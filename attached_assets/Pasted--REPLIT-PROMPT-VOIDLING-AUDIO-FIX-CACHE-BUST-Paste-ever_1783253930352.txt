@@ -1,0 +1,30 @@
+# REPLIT PROMPT — VOIDLING AUDIO FIX + CACHE BUST
+
+Paste everything below this line into the same Repl, as one message.
+
+---
+
+The previous audio manifest was only partially executed: Step 1's listing was pasted, but the files were never re-verified, `capture_tick.ogg` was never downloaded, the playback rules were not confirmed applied, and the "boot log" provided was an expectation, not an observation. Complete it now, plus fix the update-delivery problem. Do all four sections; the proof section is mandatory.
+
+## 1 — Finish the audio manifest for real
+
+- Download `https://gamesounds.xyz/Kenney%27s%20Sound%20Pack/Interface%20Sounds/tick_002.ogg` → `assets/audio/capture_tick.ogg`. Verify OggS magic bytes.
+- Apply and confirm every playback rule from the manifest in code (cite file/line in your report): pops randomized among pop_1–5 with the semitone `playbackRate` ladder capped at +12; **thud_big at rate 0.55**; chomp_void at 0.9; ouch at 0.85; capture_tick at gain 0.15 on orbit entry; the full starting mix table wired to debug sliders.
+- Audio init hardening: create/resume the AudioContext and decode all 16 buffers on the **first user gesture** (splash tap or PLAY), and log the real line: `[audio §1] samples loaded=16 fallback-synth=0`.
+
+## 2 — Service-worker cache bust + visible build stamp
+
+- The PWA service worker is very likely serving stale bundles to returning phones. Bump the cache name to a versioned string (e.g., `voidling-v14-1`), add `self.skipWaiting()` on install and `clients.claim()` on activate, and delete all old caches on activate. New code must reach a returning phone on the next full page open without manual cache clearing.
+- Add a **build stamp**: a tiny 10px label in the bottom-right of the home screen reading `v14.1 · {build}` where build is a constant you increment on every deploy from now on. This is how we verify which build a phone is actually running, forever.
+
+## 3 — Sound board (permanent debug tool)
+
+- Add a **SOUNDS** section to the `?debug=1` panel: one row per sample (all 16), each with a ▶ tap-to-play button and its gain slider. Tapping plays that sample at its configured rate and gain exactly as the game would.
+- This is a playtest tool for choosing sounds by ear — make the rows big enough for small fingers.
+
+## 4 — Proof (mandatory, no forecasts)
+
+- Paste the fresh `ls -la assets/audio/` showing 16 files, with `capture_tick.ogg` timestamped today.
+- Start an actual round in a real browser session and paste the **observed** console line `[audio §1] samples loaded=16 fallback-synth=0` — copied from the console, not predicted.
+- Paste the new service worker cache name and the build stamp value now live.
+- Cite the code locations where the pitch ladder and the thud rate 0.55 are applied.

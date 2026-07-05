@@ -717,7 +717,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         meta.updateTrophyCounter('totalTriples', 1, 'sum');
       } else if (ev.type === 'eatRival') {
         roundRivalEats++; // v12 §5: track rival eats for trophy
-        audio.playMerge();
+        audio.playChompVoid(); // v14 §1: chomp_void at 0.9, falls back to playMerge synth
         fx.addConfetti(ev.x, ev.y, CONFIG.COLORS.pops);
         fx.shake(300, 12);
         fx.flash();
@@ -732,6 +732,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (ev.x != null && ev.y != null) {
           fx.addRing(ev.x, ev.y, ev.color || '#FFFFFF', 0, 28, 2, 200);
         }
+        audio.playCaptureTick(); // v14 §1: quiet hi-tick per orbit capture
       }
     }
     player.pendingFx.length = 0;
