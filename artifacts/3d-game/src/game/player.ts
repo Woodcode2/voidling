@@ -135,6 +135,7 @@ export class Player extends Void {
     this.tremorLogCd = 0;
     this.ghostTime = 0;
     this.tooBigCd = 0;
+    this.hearts = 3; // v16.2 §3
     this.skin = skin;
     this.mouthOpen = 0;
     this.chomp = 0;

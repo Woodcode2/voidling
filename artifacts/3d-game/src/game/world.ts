@@ -39,6 +39,8 @@ export interface WorldObject {
   arrive: number;        // v8 §2: ms of pop-in scale-up remaining (0 = settled)
   contactRadius: number; // v16 §3: art-derived contact radius (bottom-third scan)
   infra: boolean;        // v16 §2: infra objects never respawn (hydrant/mailbox/trashcan)
+  bubbleText: string | null; // v16.2 §1: speech bubble text (null = no bubble)
+  bubbleLife: number;    // ms remaining for the speech bubble
 }
 
 export interface PlayerStats {
@@ -296,6 +298,8 @@ export class WorldManager {
   private nextId = 0;
   private respawnTimer = 0;
   private rand: () => number = Math.random;
+  planName = 'METRO';          // v16.2 §6: current city plan name
+  openingBeatPersonId = -1;    // v16.2 §1: person who says "Huh… is that a void?"
 
   constructor(size: number) {
     this.size = size;
@@ -342,6 +346,8 @@ export class WorldManager {
       arrive: 0,
       contactRadius,
       infra: INFRA_KINDS.includes(kind),
+      bubbleText: null,
+      bubbleLife: 0,
       ...opts,
     };
     this.objects.push(o);
@@ -377,19 +383,39 @@ export class WorldManager {
       this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
     }
 
-    // v16 §1: Fixed 5×5 city plan (R=residential, V=civic, D=downtown, P=park, Z=zoo, C=coast)
-    // gy=0:  R R V V R
-    // gy=1:  R R D D R
-    // gy=2:  P Z D D R
-    // gy=3:  R R D R R
-    // gy=4:  C C C C C  (coast / beach — southern edge only, no west column)
-    const layout: BlockType[] = [
-      'residential', 'residential', 'civic',       'civic',       'residential',   // gy=0
-      'residential', 'residential', 'downtown',    'downtown',    'residential',   // gy=1
-      'park',        'zoo',         'downtown',    'downtown',    'residential',   // gy=2
-      'residential', 'residential', 'downtown',    'residential', 'residential',   // gy=3
-      'beach',       'beach',       'beach',       'beach',       'beach',         // gy=4 (coast)
+    // v16.2 §6: Three rotating 6×6 city plans (R=residential, V=civic, D=downtown, P=park, Z=zoo, C=coast/beach)
+    // Plan A = METRO: dense downtown core + civic towers, coast on south
+    const PLAN_A: BlockType[] = [
+      'residential', 'residential', 'civic',       'civic',       'residential', 'residential', // gy=0
+      'residential', 'downtown',    'downtown',    'downtown',    'downtown',    'residential', // gy=1
+      'park',        'downtown',    'downtown',    'downtown',    'downtown',    'residential', // gy=2
+      'zoo',         'downtown',    'downtown',    'downtown',    'downtown',    'residential', // gy=3
+      'residential', 'residential', 'civic',       'residential', 'residential', 'residential', // gy=4
+      'beach',       'beach',       'beach',       'beach',       'beach',       'beach',       // gy=5
     ];
+    // Plan B = SUBURBIA: low-density ring, compact downtown quad
+    const PLAN_B: BlockType[] = [
+      'residential', 'residential', 'residential', 'civic',       'residential', 'residential', // gy=0
+      'residential', 'residential', 'residential', 'residential', 'residential', 'residential', // gy=1
+      'park',        'residential', 'downtown',    'downtown',    'residential', 'residential', // gy=2
+      'zoo',         'residential', 'downtown',    'downtown',    'civic',       'residential', // gy=3
+      'residential', 'residential', 'residential', 'residential', 'residential', 'residential', // gy=4
+      'beach',       'beach',       'residential', 'residential', 'beach',       'beach',       // gy=5
+    ];
+    // Plan C = SEASIDE: coast wraps north edge, inland downtown
+    const PLAN_C: BlockType[] = [
+      'beach',       'beach',       'beach',       'beach',       'beach',       'beach',       // gy=0 north coast
+      'beach',       'residential', 'residential', 'civic',       'residential', 'beach',       // gy=1
+      'residential', 'residential', 'downtown',    'downtown',    'residential', 'residential', // gy=2
+      'zoo',         'residential', 'downtown',    'downtown',    'residential', 'park',        // gy=3
+      'residential', 'residential', 'civic',       'residential', 'residential', 'residential', // gy=4
+      'residential', 'residential', 'residential', 'residential', 'residential', 'residential', // gy=5
+    ];
+    const PLANS = [PLAN_A, PLAN_B, PLAN_C];
+    const dayOfYear = Math.floor(Date.now() / 86400000); // stable per UTC day
+    const planIdx = dayOfYear % 3;
+    this.planName = CONFIG.PLAN_NAMES[planIdx] ?? 'METRO';
+    const layout = PLANS[planIdx];
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
         const type = layout[gy * CONFIG.GRID + gx];
@@ -398,7 +424,7 @@ export class WorldManager {
     }
 
     const spawnX = this.size / 2, spawnY = this.size / 2;
-    let civicIndex = 0; // v16 §1: track which civic block (0=left/north, 1=right/south)
+    let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
       if (b.type === 'residential') this.fillResidential(b, rand);
       else if (b.type === 'park') this.fillPark(b, rand, spawnX, spawnY);
@@ -407,10 +433,10 @@ export class WorldManager {
       else if (b.type === 'school') this.fillSchool(b, rand);
       else if (b.type === 'downtown') this.fillDowntown(b, rand);
       else if (b.type === 'mixed') this.fillMixed(b, rand);
-      else if (b.type === 'beach') this.fillBeach(b, rand); // v13 §2
-      else if (b.type === 'zoo') this.fillZoo(b, rand);     // v15 §4
-      else if (b.type === 'townhall') this.fillTownHall(b, rand); // v15 §4
-      else if (b.type === 'civic') this.fillCivic(b, rand, civicIndex++); // v16 §1
+      else if (b.type === 'beach') this.fillBeach(b, rand);
+      else if (b.type === 'zoo') this.fillZoo(b, rand);
+      else if (b.type === 'townhall') this.fillTownHall(b, rand);
+      else if (b.type === 'civic') this.fillCivic(b, rand, Math.min(civicIndex++, 1)); // v16.2 §6
     }
 
     // v12 §1: guarantee T1 edibles around the player spawn (map center = downtown)
@@ -419,6 +445,16 @@ export class WorldManager {
       this.makeObj(pick(['flower', 'apple', 'flowerpot'] as ObjectKind[], rand),
         clamp(spawnX + Math.cos(a) * rr, MARGIN + 10, this.size - MARGIN - 10),
         clamp(spawnY + Math.sin(a) * rr, MARGIN + 10, this.size - MARGIN - 10));
+    }
+
+    // v16.2 §1: opening beat — two people near spawn for "Huh… is that a void?" (at t=2s)
+    {
+      const bx = clamp(spawnX + 95, MARGIN + 10, this.size - MARGIN - 10);
+      const by = clamp(spawnY + 35, MARGIN + 10, this.size - MARGIN - 10);
+      const beatPerson = this.makeObj('person', bx, by);
+      this.makeObj('person', clamp(spawnX + 115, MARGIN + 10, this.size - MARGIN - 10),
+        clamp(spawnY - 25, MARGIN + 10, this.size - MARGIN - 10));
+      this.openingBeatPersonId = beatPerson.id;
     }
 
     // v7 §2: water tower on a residential corner lot (the last residential block)
@@ -1013,6 +1049,8 @@ export class WorldManager {
       if (obj.arrive > 0) obj.arrive = Math.max(0, obj.arrive - dt); // v8 §2 pop-in
       if (obj.alertT > 0) obj.alertT -= dt;
       if (obj.honkCd > 0 && !obj.living) obj.honkCd -= dt; // v7 §3: prop cooldowns (jingle)
+      // v16.2 §1: speech bubble life tick
+      if (obj.bubbleLife > 0) { obj.bubbleLife -= dt; if (obj.bubbleLife <= 0) { obj.bubbleLife = 0; obj.bubbleText = null; } }
 
       const canPlayerEat = this.canEatByPlayer(player, obj);
       const dp = dist(obj.x, obj.y, player.x, player.y);
@@ -1225,6 +1263,12 @@ export class WorldManager {
       return { x, y };
     }
     return null;
+  }
+
+  // v16.2 §1: set a speech bubble on an object by id
+  setBubble(objId: number, text: string, lifeMs: number) {
+    const o = this.objects.find((o) => o.id === objId && !o.eaten);
+    if (o) { o.bubbleText = text; o.bubbleLife = lifeMs; }
   }
 
   // v8 §2: a small dust puff so arrivals read as "popping in"
@@ -1990,6 +2034,30 @@ export class WorldManager {
         ctx.font = 'bold 22px Fredoka, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('!', obj.x, obj.y - obj.size - 6);
+        ctx.restore();
+      }
+      // v16.2 §1: speech bubble — NPC says something
+      if (obj.bubbleText && obj.bubbleLife > 0) {
+        const lifeNorm = clamp(obj.bubbleLife / 4500, 0, 1);
+        const alpha = lifeNorm > 0.88 ? (1 - lifeNorm) / 0.12 : lifeNorm < 0.18 ? lifeNorm / 0.18 : 1;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        const fontSize = Math.max(10, Math.min(14, obj.size * 0.85));
+        ctx.font = `600 ${fontSize}px Nunito, sans-serif`;
+        ctx.textAlign = 'center';
+        const txtW = ctx.measureText(obj.bubbleText).width;
+        const pad = 6, bw = txtW + pad * 2, bh = fontSize + pad * 2;
+        const bx = obj.x - bw / 2, by = obj.y - obj.size - bh - 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.94)';
+        ctx.beginPath();
+        if ((ctx as any).roundRect) (ctx as any).roundRect(bx, by, bw, bh, 6);
+        else ctx.rect(bx, by, bw, bh);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(obj.x - 4, by + bh); ctx.lineTo(obj.x, by + bh + 7); ctx.lineTo(obj.x + 4, by + bh);
+        ctx.fill();
+        ctx.fillStyle = '#1a1040';
+        ctx.fillText(obj.bubbleText, obj.x, by + bh - pad + 1);
         ctx.restore();
       }
     }

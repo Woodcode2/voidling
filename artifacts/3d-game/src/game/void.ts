@@ -36,6 +36,9 @@ export abstract class Void {
   // per-frame event effect (firetruck water / storm), reset each frame by events
   eventSlow = 1;
 
+  // v16.2 §3: hearts system — 3 at round start; 0 = FINAL HEART state
+  hearts = 3;
+
   // identity
   skin: SkinDef;
   name = '';
