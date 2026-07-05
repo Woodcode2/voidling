@@ -1,7 +1,7 @@
 import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
-import { objectSprites, spriteBounds, spriteContactFrac } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac
+import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
 import type { FXManager } from './fx';
 import type { Player } from './player';
@@ -58,8 +58,10 @@ export interface PlayerStats {
 
 type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic';
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
-interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; }
-interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail
+interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; rot: number; drawScale: number; }
+interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail (fallback)
+// v16.2 §5: one decal-based fissure stamp per dropCrack() call
+interface FissureDecal { x: number; y: number; rot: number; scale: number; size: number; idx: 0|1; life: number; maxLife: number; }
 
 const MARGIN = (CONFIG.MAP_SIZE - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
 const STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
@@ -274,7 +276,8 @@ export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
   dirt: DirtPatch[] = [];
-  fissures: Fissure[] = [];   // v9 §3: WORLD ENDER cracked-reality trail (violet, not brown)
+  fissures: Fissure[] = [];         // v9 §3: WORLD ENDER cracked-reality trail (violet, not brown)
+  fissureDecals: FissureDecal[] = []; // v16.2 §5: decal stamps (used when fx PNGs loaded)
   // v9 §4: torn-loose ground chunks drifting in the space beyond the rim
   private spaceChunks: { bx: number; by: number; ox: number; oy: number; ang: number; spin: number; type: number; s: number }[] = [];
   // v5 §3 — precomputed ground-dressing (low-contrast, non-colliding)
@@ -360,6 +363,7 @@ export class WorldManager {
     this.blocks = [];
     this.dirt = [];
     this.fissures = [];
+    this.fissureDecals = [];
     this.eatenArea = 0;
     this.totalStartArea = 0;
     this.nextId = 0;
@@ -1186,6 +1190,11 @@ export class WorldManager {
       this.fissures[i].life -= dt;
       if (this.fissures[i].life <= 0) this.fissures.splice(i, 1);
     }
+    // v16.2 §5: fissure decal stamps fade
+    for (let i = this.fissureDecals.length - 1; i >= 0; i--) {
+      this.fissureDecals[i].life -= dt;
+      if (this.fissureDecals[i].life <= 0) this.fissureDecals.splice(i, 1);
+    }
 
     // v8 §2: deficit-scaled respawn toward ≥90% of the starting population —
     // 4/s normally, ramping to 8/s once the world drops below 80%.
@@ -1279,7 +1288,19 @@ export class WorldManager {
   // v9 §3: WORLD ENDER's path leaves jagged violet fissure segments (cracked
   // reality, never brown) — 2–3 branching lines per step, fading over 8s.
   dropCrack(x: number, y: number, radius: number) {
-    const lines = 2 + Math.floor(this.rand() * 2); // 2–3 branching cracks
+    // v16.2 §5: push a decal stamp per crack event (drawn via multiply blend when image loaded)
+    this.fissureDecals.push({
+      x, y,
+      rot: this.rand() * Math.PI * 2,
+      scale: 0.7 + this.rand() * 0.6,
+      size: radius * 2.5,
+      idx: this.rand() < 0.5 ? 0 : 1,
+      life: 8000, maxLife: 8000,
+    });
+    if (this.fissureDecals.length > 90) this.fissureDecals.splice(0, this.fissureDecals.length - 90);
+
+    // Keep procedural polylines as fallback (only rendered when fx PNGs not loaded)
+    const lines = 2 + Math.floor(this.rand() * 2);
     for (let i = 0; i < lines; i++) {
       const ang = this.rand() * Math.PI * 2;
       const len = radius * (0.5 + this.rand() * 0.6);
@@ -1563,10 +1584,11 @@ export class WorldManager {
     }
     fx.addRing(obj.x, obj.y, '#FFFFFF', obj.baseSize * 0.6, 220, 3, 300);
 
-    // v8 §3: every T3+ object eaten leaves a persistent scar for the whole round
+    // v8 §3 + v16.2 §5: every T3+ object eaten leaves a persistent scar for the whole round
     if (obj.tier >= 3) {
       const r = obj.baseSize * (obj.kind === 'house' ? 0.9 : 0.55);
-      this.dirt.push({ x: obj.x, y: obj.y, r, life: 1e9, maxLife: 1e9 });
+      this.dirt.push({ x: obj.x, y: obj.y, r, life: 1e9, maxLife: 1e9,
+        rot: this.rand() * Math.PI * 2, drawScale: 0.7 + this.rand() * 0.6 });
     }
 
     player.absorbObject(obj);
@@ -1696,31 +1718,61 @@ export class WorldManager {
     // v13 §1: sandy shores — animated ocean on the west and south edges
     drawCoast(ctx, view, S, t);
 
-    // dirt patches (ground decor)
+    // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
+    const scarImg = fxDecals.get('scar');
     for (const d of this.dirt) {
       const a = clamp(d.life / d.maxLife, 0, 1) * 0.6;
+      if (a < 0.01) continue;
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.fillStyle = G.dirt;
-      ctx.beginPath();
-      ctx.ellipse(d.x, d.y, d.r, d.r * 0.7, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (scarImg) {
+        const s = d.r * (d.drawScale ?? 1) * 3.2; // world-space draw size
+        ctx.translate(d.x, d.y);
+        ctx.rotate(d.rot ?? 0);
+        ctx.drawImage(scarImg, -s / 2, -s / 2, s, s);
+      } else {
+        ctx.fillStyle = G.dirt;
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y, d.r, d.r * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
 
-    // v9 §3: WORLD ENDER fissure trail — dark cracks with glowing violet edges
-    for (const f of this.fissures) {
-      const a = clamp(f.life / f.maxLife, 0, 1);
-      ctx.save();
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.beginPath();
-      for (let k = 0; k < f.pts.length; k++) {
-        const [px, py] = f.pts[k];
-        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    // v9 §3 + v16.2 §5: fissure trail — multiply-blend decal when loaded, else violet polyline
+    const fissA = fxDecals.get('fissure_a'), fissB = fxDecals.get('fissure_b');
+    if (fissA && fissB) {
+      // decal path: one stamp per FissureDecal entry, white bg → invisible via multiply
+      for (const fd of this.fissureDecals) {
+        const lifeNorm = clamp(fd.life / fd.maxLife, 0, 1);
+        const alpha = lifeNorm * 0.85;
+        if (alpha < 0.01) continue;
+        const img = fd.idx === 0 ? fissA : fissB;
+        const s = fd.size * fd.scale;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.translate(fd.x, fd.y);
+        ctx.rotate(fd.rot);
+        ctx.drawImage(img, -s / 2, -s / 2, s, s);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
       }
-      ctx.globalAlpha = a * 0.9; ctx.strokeStyle = '#2A1650'; ctx.lineWidth = 5; ctx.stroke();
-      ctx.globalAlpha = a * 0.7; ctx.strokeStyle = '#9D6BFF'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.restore();
+    } else {
+      // fallback: procedural violet polylines
+      for (const f of this.fissures) {
+        const a = clamp(f.life / f.maxLife, 0, 1);
+        ctx.save();
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (let k = 0; k < f.pts.length; k++) {
+          const [px, py] = f.pts[k];
+          if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.globalAlpha = a * 0.9; ctx.strokeStyle = '#2A1650'; ctx.lineWidth = 5; ctx.stroke();
+        ctx.globalAlpha = a * 0.7; ctx.strokeStyle = '#9D6BFF'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 

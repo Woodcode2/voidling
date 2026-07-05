@@ -17,6 +17,8 @@
 // the trimmed content into their logical draw rect.
 export interface SpriteBounds { x: number; y: number; w: number; h: number; }
 export const spriteBounds: Map<string, SpriteBounds> = new Map();
+// v16.2 §5: fx decals — fissure_a, fissure_b, scar (no alpha-bounds scan, full-frame)
+export const fxDecals: Map<string, HTMLImageElement> = new Map();
 
 // v16 §3: contact-radius fraction — derived from the bottom-third pixel scan.
 // contactFrac × 2 × baseSize × 0.45 gives the world-space contact radius.
@@ -214,6 +216,17 @@ export async function preloadSprites(base: string): Promise<void> {
     }));
   }
 
+  // ── v16.2 §5: fx decals — fissure_a, fissure_b, scar (no alpha-bounds scan) ─
+  const fxLoaded: string[] = [], fxFailed: string[] = [];
+  const FX_IDS = ['fissure_a', 'fissure_b', 'scar'];
+  for (const id of FX_IDS) {
+    const img = new Image();
+    tasks.push(tryLoad(`${base}assets/fx/${id}.png`, img).then((ok) => {
+      if (ok) { fxDecals.set(id, img); fxLoaded.push(id); }
+      else fxFailed.push(id);
+    }));
+  }
+
   await Promise.all(tasks);
 
   console.log(
@@ -227,5 +240,9 @@ export async function preloadSprites(base: string): Promise<void> {
   console.log(
     `[VOIDLING forms] loaded: ${formLoaded.join(', ') || '(none)'}` +
     ` | fallback (procedural): ${formFallback.join(', ')}`,
+  );
+  console.log(
+    `[VOIDLING fx] loaded: ${fxLoaded.join(', ') || '(none)'}` +
+    ` | fallback: ${fxFailed.join(', ')}`,
   );
 }

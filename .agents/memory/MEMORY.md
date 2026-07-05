@@ -8,3 +8,4 @@
 - [VOIDLING v16.1 The Render Fix](voidling-v161.md) — orb-normalized sprite draw, paved dressing, real zoo+townhall, zoo gate rule, scoreMult, BUILD_STAMP v16·2.
 - [VOIDLING v16.2 Pressure & Personality](voidling-v162.md) — bot cap, speech bubbles, hearts escalation, boon signatures, event tickers, 6×6 rotating plans, BUILD_STAMP v16·3.
 - [Vite middleware before base-path rewrite](vite-middleware-before-base-rewrite.md) — custom dev-server middleware must be unshifted and match the base-prefixed URL before Vite's own rewrite runs.
+- [VOIDLING fx decals](voidling-fx-decals.md) — fissure (multiply blend, white BG) + scar (normal) decal pipeline; skip alpha-bounds scan for assets/fx/.
