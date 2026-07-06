@@ -1,0 +1,50 @@
+# VOIDLING Quality Pack (Repair)
+
+Run this now. Previous patches reported their verification steps as passed, but live gameplay screenshots show three real failures. This patch repairs them and this time every fix must be PROVEN, not claimed. Read the relevant code before changing anything.
+
+The three confirmed failures:
+1. The match still starts far too zoomed in with a blurry ground, so the Fix Pack camera magnification clamp is not actually being enforced.
+2. Sprite sheet slicing is broken: some sprites are cut in half (the fire truck renders as half a truck), some contain white chunks or fragments of neighboring stickers (the GOBBLER evolution has a white block attached, the cyclist has stray fragments above it), and stray specks float near some characters.
+3. NPCs ignore terrain: people walk on the river, the cyclist rides on grass, cars drive off roads. The game only knows island versus space and has no concept of water, road, sand or grass.
+
+## Do not touch
+Predation, threat rings, rival AI, defense waves, powers, banners, speech bubbles, vignette logic, quests, scoring. Only the systems named below.
+
+## Fix 1: Enforce the camera clamp for real
+- Find out why the clamp is not applying at match start. At load, compute the ground magnification: screen pixels drawn per source image pixel at the current zoom. Enforce that this value never exceeds 2.5, including at t=0.
+- Log it: print "GROUND MAGNIFICATION AT START: X" to the console every match. X must be 2.5 or lower.
+- If the starting view then feels too far away, the correct lever is more prop density near the spawn, never zooming past the clamp.
+
+## Fix 2: Rebuild the sprite extraction pipeline (rerun on EVERY sheet)
+Replace fixed-grid slicing with component extraction. Exact algorithm:
+1. Background removal: flood fill with a color tolerance around hex 1E1338, seeded from points every 32 pixels along all four borders of the sheet. This removes all background connected to the border and safely preserves dark purple pixels inside white sticker outlines.
+2. Find connected components of the remaining opaque pixels.
+3. Discard components smaller than 0.2 percent of the sheet area (kills stray specks).
+4. Merge components whose bounding boxes are within 8 pixels of each other (rejoins fragments like kite strings and hat tips).
+5. Assign each merged cluster to the nearest expected grid cell center for that sheet (2x2, 3x3, or 1x3 as documented per sheet). If two clusters map to the same cell, merge them. If a cell ends up empty, log a warning naming the sheet and cell.
+6. The final sprite is the tight bounding box crop of its cluster. A sprite must never be cut by a grid line again.
+- Rerun this on every sheet in the project: evolution forms, both people sheets, vehicles, beach and park, military, vignette scenes, playground, drifting space objects.
+- Because crops change size, do not inherit pixel dimensions: set each sprite's world size from the prop catalog target size, not from its crop.
+- Build a review page: loading the game with ?debug=sprites renders every extracted sprite on a checkerboard background with its sheet name and cell index, so cutout quality can be verified by eye in seconds.
+
+## Fix 3: Terrain map and placement rules
+- Build a terrain classification grid from the island image at the same resolution as the walkable mask. Classify each cell by dominant color: WATER (blue and teal hues, includes the river and lagoon), SAND (warm golden tones), ROAD (low saturation grays), GRASS (greens, includes park and forest floor), PAVEMENT (warm cream tones). Anything ambiguous defaults to PAVEMENT.
+- Build a review overlay: ?debug=terrain tints each class a distinct color (blue, yellow, dark gray, green, tan) at 40 percent opacity.
+- Placement and movement rules:
+  - Vehicles spawn on ROAD and drive only along ROAD cells.
+  - The cyclist rides only on ROAD and PAVEMENT.
+  - Pedestrians never spawn on or wander into WATER. They may cross roads. Their wander logic samples ahead and turns away from forbidden terrain.
+  - The rowboat spawns only on WATER. The fisherman spawns on SAND adjacent to WATER. Beach props (umbrella, towel, sandcastle, cooler) spawn only on SAND. Palm trees on SAND or adjacent GRASS.
+  - Picnic table, playground pieces and park vignettes on GRASS. Buildings and houses never on ROAD or WATER.
+  - The player is unaffected and can move anywhere on the island; drifting decorations stay in space only.
+- Re-place all current spawn tables and vignettes through these rules.
+
+## Verify before finishing: proof required, do not skip
+1. Open ?debug=sprites and inspect every sprite: none cut, no white chunks, no neighbor fragments, no floating specks. Report the sprite count extracted per sheet and any empty-cell warnings.
+2. Open ?debug=terrain: the river and lagoon are blue, roads gray, beach yellow, park green. Report anything misclassified.
+3. Start a match and copy the exact GROUND MAGNIFICATION AT START log line into your report. It must be 2.5 or lower and the ground must look crisp.
+4. Watch the game for 2 full minutes: zero NPCs in water, all cars on roads, cyclist on roads or pavement.
+5. Evolve to MUNCHER and GOBBLER: both sprites are clean with no white blocks.
+6. Frame rate holds on mobile.
+
+In your final report include: the magnification number, per-sheet sprite counts, and a list of every file changed.

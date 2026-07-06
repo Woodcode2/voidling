@@ -3,7 +3,7 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
-import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable } from './islandMap'; // Phase 2
+import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -702,7 +702,12 @@ export class WorldManager {
 
   private scatter(b: Block, rand: () => number, kind: ObjectKind, n: number, avoidX?: number, avoidY?: number) {
     for (let i = 0; i < n; i++) {
-      const p = this.pointInBlock(b, rand);
+      // Try up to 4 times to find a non-water placement
+      let p = this.pointInBlock(b, rand);
+      for (let attempt = 0; attempt < 3 && getTerrainAt(p.x, p.y) === TERRAIN.WATER; attempt++) {
+        p = this.pointInBlock(b, rand);
+      }
+      if (getTerrainAt(p.x, p.y) === TERRAIN.WATER) continue; // skip if still in water
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const o = this.makeObj(kind, p.x, p.y);
       if (kind === 'person' || (kind as string).startsWith('person_')) { o.tether = 90; }
@@ -740,7 +745,12 @@ export class WorldManager {
       : zone === 'park'        ? WorldManager.PARK_PEOPLE
       : WorldManager.ALL_PEOPLE;
     for (let i = 0; i < n; i++) {
-      const p = this.pointInBlock(b, rand);
+      // Retry up to 4 times to avoid placing pedestrians on water
+      let p = this.pointInBlock(b, rand);
+      for (let attempt = 0; attempt < 3 && getTerrainAt(p.x, p.y) === TERRAIN.WATER; attempt++) {
+        p = this.pointInBlock(b, rand);
+      }
+      if (getTerrainAt(p.x, p.y) === TERRAIN.WATER) continue; // still water — skip
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const kind = pool[Math.floor(rand() * pool.length)];
       const o = this.makeObj(kind, p.x, p.y);
@@ -1730,6 +1740,16 @@ export class WorldManager {
       }
       obj.vx = Math.cos(obj.wanderAngle) * speed;
       obj.vy = Math.sin(obj.wanderAngle) * speed;
+    }
+    // Terrain avoidance: turn pedestrians away from water before integrating
+    if (!obj.fleeing && obj.living) {
+      const nx = obj.x + obj.vx * dtSec;
+      const ny = obj.y + obj.vy * dtSec;
+      if (getTerrainAt(nx, ny) === TERRAIN.WATER) {
+        obj.wanderAngle += Math.PI + (Math.random() - 0.5) * 0.8; // reverse + wobble
+        obj.vx = Math.cos(obj.wanderAngle) * speed;
+        obj.vy = Math.sin(obj.wanderAngle) * speed;
+      }
     }
     this.integrateWander(obj, dtSec);
   }
