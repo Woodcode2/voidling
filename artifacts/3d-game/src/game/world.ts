@@ -41,6 +41,7 @@ export interface WorldObject {
   infra: boolean;        // v16 §2: infra objects never respawn (hydrant/mailbox/trashcan)
   bubbleText: string | null; // v16.2 §1: speech bubble text (null = no bubble)
   bubbleLife: number;    // ms remaining for the speech bubble
+  shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
 }
 
 export interface PlayerStats {
@@ -1032,6 +1033,7 @@ export class WorldManager {
     if (obj.kind === 'watertower') return player.radius >= CONFIG.WATERTOWER_EAT_RADIUS;
     if (obj.kind === 'skyscraper') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
     if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') return player.radius >= CONFIG.ZOO_GATE_EAT_RADIUS; // v16.1 D
+    if (obj.tier === 0) return true; // Feel Patch §2: tier-0 bits always edible
     return player.radius >= obj.size * CONFIG.EAT_RATIO;
   }
 
@@ -1055,6 +1057,9 @@ export class WorldManager {
       if (obj.honkCd > 0 && !obj.living) obj.honkCd -= dt; // v7 §3: prop cooldowns (jingle)
       // v16.2 §1: speech bubble life tick
       if (obj.bubbleLife > 0) { obj.bubbleLife -= dt; if (obj.bubbleLife <= 0) { obj.bubbleLife = 0; obj.bubbleText = null; } }
+
+      // Feel Patch §1: tick prop-shake timer
+      if (obj.shakeT && obj.shakeT > 0) obj.shakeT = Math.max(0, obj.shakeT - dt);
 
       const canPlayerEat = this.canEatByPlayer(player, obj);
       const dp = dist(obj.x, obj.y, player.x, player.y);
@@ -1082,8 +1087,10 @@ export class WorldManager {
         obj.captured = true;
         const nx = (player.x - obj.x) / (dp || 1);
         const ny = (player.y - obj.y) / (dp || 1);
-        obj.vx += nx * CONFIG.SUCTION_ACCEL * dtSec;
-        obj.vy += ny * CONFIG.SUCTION_ACCEL * dtSec;
+        // Feel Patch §3: proximity-weighted acceleration — 3× stronger at body edge vs outer rim
+        const proximityFactor = 1 + 2 * Math.max(0, 1 - (dp - player.radius) / (reach - player.radius + 1));
+        obj.vx += nx * CONFIG.SUCTION_ACCEL * proximityFactor * dtSec;
+        obj.vy += ny * CONFIG.SUCTION_ACCEL * proximityFactor * dtSec;
         const sp = Math.hypot(obj.vx, obj.vy);
         if (sp > CONFIG.SUCTION_MAX_SPEED) {
           obj.vx = (obj.vx / sp) * CONFIG.SUCTION_MAX_SPEED;
@@ -1114,14 +1121,15 @@ export class WorldManager {
       // ── living-world AI ──
       if (obj.living) this.stepLiving(obj, dt, dtSec, voids, player, fx);
 
-      // ── non-edible collision (too big): push out + slide + feedback ──
-      // recompute distance/normal AFTER living AI has moved the object this frame
+      // ── Feel Patch §1: non-edible collision — player slides through, prop shakes ──
+      // Only the map boundary stays hard. Trampoline keeps its special launch.
       const cdx = player.x - obj.x, cdy = player.y - obj.y;
       const cd = Math.hypot(cdx, cdy) || 1;
-      if (!player.ghost && !canPlayerEat && cd < player.radius + obj.size) {
+      const blockingNow = !player.ghost && !canPlayerEat && cd < player.radius + obj.size;
+      if (blockingNow) {
         const nx = cdx / cd;
         const ny = cdy / cd;
-        // v7 §3: trampoline launches a too-small player 120px the opposite way
+        // v7 §3: trampoline still launches the player
         if (obj.kind === 'trampoline' && player.tooBigCd <= 0) {
           const bn = CONFIG.TRAMPOLINE_BOUNCE;
           player.x += nx * bn; player.y += ny * bn;
@@ -1131,28 +1139,23 @@ export class WorldManager {
           player.tooBigCd = CONFIG.TOOBIG_COOLDOWN;
           continue;
         }
-        const overlap = (player.radius + obj.size) - cd;
-        player.x += nx * overlap;
-        player.y += ny * overlap;
-        // kill inward velocity component so the player slides along the surface
-        const vn = player.vx * nx + player.vy * ny;
-        if (vn < 0) { player.vx -= vn * nx; player.vy -= vn * ny; }
-        if (player.tooBigCd <= 0) {
-          fx.shake(180, 7, 15);
-          fx.addRing(obj.x, obj.y, '#FF6B6B', obj.size * 0.9, 220, 4, 340);
-          player.tooBigCd = CONFIG.TOOBIG_COOLDOWN;
-        }
+        // One-shot shake on contact ENTRY (shakeT === undefined means armed/ready)
+        if (obj.shakeT === undefined) obj.shakeT = 100;
         if (player.tremorActive) {
           // v7 §5: level-aware shrink (Lvl I 15%/touch, Lvl II 25%/touch)
           obj.baseSize *= player.tremorFactor; obj.size = obj.baseSize;
           if (player.tremorLogCd <= 0) {
             console.log(`[boon] TENDERIZER shrank ${obj.kind} → ${obj.size.toFixed(1)}`);
-            player.tremorLogCd = 500; // throttle to avoid 60fps log spam
+            player.tremorLogCd = 500;
           }
         }
-      } else if (canPlayerEat && cd < nearestEdibleD) {
-        nearestEdibleD = cd;
-        nearestEdible = obj;
+      } else {
+        // Not currently blocking: re-arm shake for the next contact entry
+        if (obj.shakeT !== undefined && obj.shakeT <= 0) obj.shakeT = undefined;
+        if (canPlayerEat && cd < nearestEdibleD) {
+          nearestEdibleD = cd;
+          nearestEdible = obj;
+        }
       }
 
       // ── rival interaction (pop on contact) ──
@@ -1168,6 +1171,41 @@ export class WorldManager {
           obj.eaten = true;
           break;
         }
+      }
+    }
+
+    // ── Feel Patch §3: rival vacuum — pull edible objects toward nearest rival ────
+    // Iterate objects (not rivals) so each object is accelerated by at most ONE rival
+    // per frame. No position integration here — objects drift over frames and are
+    // consumed by the main-loop contact check (lines above).
+    for (const obj of this.objects) {
+      if (obj.eaten || obj.captured) continue;
+      if (obj.kind === 'watertower' || obj.kind === 'skyscraper') continue;
+      if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue;
+      // find nearest rival within vacuum range that can eat this object
+      let nearestRival: Rival | null = null;
+      let nearestDr = Infinity;
+      for (const r of rivals) {
+        if (!r.alive || r.ghost) continue;
+        if (obj.tier !== 0 && !this.canEat(r.radius, obj.size)) continue;
+        const dr = dist(obj.x, obj.y, r.x, r.y);
+        const rReach = r.radius * CONFIG.CAPTURE_RADIUS_MULT;
+        if (dr < rReach + obj.size * 0.5 && dr < nearestDr) {
+          nearestDr = dr;
+          nearestRival = r;
+        }
+      }
+      if (!nearestRival) continue;
+      const rReach = nearestRival.radius * CONFIG.CAPTURE_RADIUS_MULT;
+      const rnx = (nearestRival.x - obj.x) / (nearestDr || 1);
+      const rny = (nearestRival.y - obj.y) / (nearestDr || 1);
+      const pf = 1 + 2 * Math.max(0, 1 - (nearestDr - nearestRival.radius) / (rReach - nearestRival.radius + 1));
+      obj.vx += rnx * CONFIG.SUCTION_ACCEL * pf * dtSec;
+      obj.vy += rny * CONFIG.SUCTION_ACCEL * pf * dtSec;
+      const sp = Math.hypot(obj.vx, obj.vy);
+      if (sp > CONFIG.SUCTION_MAX_SPEED) {
+        obj.vx = (obj.vx / sp) * CONFIG.SUCTION_MAX_SPEED;
+        obj.vy = (obj.vy / sp) * CONFIG.SUCTION_MAX_SPEED;
       }
     }
 
@@ -1565,8 +1603,8 @@ export class WorldManager {
       fx.addRing(obj.x, obj.y, '#8FE36B', 20, obj.baseSize * 4, 12, 900);
       fx.addDebris(obj.x, obj.y, '#8FE36B', 8);
       fx.addDebris(obj.x, obj.y, '#FFD23F', 4);
-    } else if (obj.kind === 'house') {
-      fx.shake(300, 10, 20);
+    } else if (obj.kind === 'house' || obj.kind === 'house_c' || obj.kind === 'house_d') {
+      fx.shake(120, 2, 3); // Feel Patch §6: light shake on house eat (was 300ms/10px)
       fx.addDebris(obj.x, obj.y, '#C4736B', 4);
       fx.addDebris(obj.x, obj.y, '#F6E7B0', 2);
     } else if (obj.kind === 'skyscraper') {
@@ -1584,6 +1622,12 @@ export class WorldManager {
     }
     fx.addRing(obj.x, obj.y, '#FFFFFF', obj.baseSize * 0.6, 220, 3, 300);
 
+    // Feel Patch §2: T2+ eats scatter 2 debris bits
+    if (obj.tier >= 2 && obj.kind !== 'bit') {
+      const count = obj.tier >= 4 ? 3 : 2;
+      for (let b = 0; b < count; b++) this.spawnBit(obj.x, obj.y, obj.variant ?? b);
+    }
+
     // v8 §3 + v16.2 §5: every T3+ object eaten leaves a persistent scar for the whole round
     if (obj.tier >= 3) {
       const r = obj.baseSize * (obj.kind === 'house' ? 0.9 : 0.55);
@@ -1599,6 +1643,51 @@ export class WorldManager {
     if (obj.kind === 'zoo_gate') {
       player.pendingFx.push({ type: 'zoo_break', x: obj.x, y: obj.y }); // v16.1 D: ZOO BREAK! banner
     }
+  }
+
+  // Feel Patch §2: spawn a debris bit at (x,y) with a random scatter impulse
+  private spawnBit(x: number, y: number, variant: number) {
+    const r = 4 + Math.random() * 3;
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 25 + Math.random() * 55;
+    const bit: WorldObject = {
+      id: this.nextId++,
+      kind: 'bit',
+      tier: 0,
+      x: x + Math.cos(ang) * (r + 6),
+      y: y + Math.sin(ang) * (r + 6),
+      baseSize: r,
+      size: r,
+      variant: Math.abs(variant) % 6,
+      eaten: false,
+      wobble: Math.random() * Math.PI * 2,
+      fleeing: false,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      living: false,
+      homeX: x,
+      homeY: y,
+      wanderAngle: ang,
+      tether: 0,
+      roadAxis: 'h',
+      roadDir: 1,
+      honkCd: 0,
+      captured: false,
+      captureScale: 1,
+      captureRot: 0,
+      shadowX: 0,
+      shadowY: 0,
+      alertT: 0,
+      golden: false,
+      arrive: 0,
+      contactRadius: r * 0.85,
+      infra: false,
+      bubbleText: null,
+      bubbleLife: 0,
+      shakeT: 0,
+    };
+    this.objects.push(bit);
+    // Note: NOT added to totalStartArea — bits are ephemeral debris, not population
   }
 
   // v9 §4: draw the drifting torn-loose ground chunks out in space
@@ -2019,7 +2108,9 @@ export class WorldManager {
         ctx.restore();
       }
       ctx.save();
-      ctx.translate(obj.x, obj.y);
+      // Feel Patch §1: prop-shake offset — object wiggles horizontally while shakeT > 0
+      const shk = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
+      ctx.translate(obj.x + shk, obj.y);
       if (obj.captured) {
         ctx.rotate(obj.captureRot);
       } else {
