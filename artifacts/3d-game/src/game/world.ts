@@ -3,7 +3,7 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
-import { drawSpaceBg, drawIsland, drawDriftObjects } from './islandMap'; // Phase 2
+import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable } from './islandMap'; // Phase 2
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -1281,6 +1281,7 @@ export class WorldManager {
         if (d < nearVoid) nearVoid = d;
       }
       if (!voidClear) continue;
+      if (!isWalkable(pt.x, pt.y)) continue; // Fix 3: never spawn in space
       let near = Infinity;
       for (const o of this.objects) {
         if (o.eaten) continue;
@@ -1311,6 +1312,14 @@ export class WorldManager {
       return { x, y };
     }
     return null;
+  }
+
+  // Fix 3: remove ALL off-island initial objects (props, living, infra) once mask is loaded.
+  // engine.ts calls this once after loadIslandAssets() resolves.
+  filterNonWalkable() {
+    const before = this.objects.length;
+    this.objects = this.objects.filter((o) => isWalkable(o.x, o.y));
+    console.log(`[world] filterNonWalkable: ${before} → ${this.objects.length} objects`);
   }
 
   // v16.2 §1: set a speech bubble on an object by id
@@ -1472,8 +1481,19 @@ export class WorldManager {
     const fleeSpeed = this.moverFleeSpeed(obj);
 
     if (threat) {
+      const wasFleeing = obj.fleeing;
       obj.fleeing = true;
-      if (obj.kind === 'person' && obj.alertT <= 0) obj.alertT = 900;
+      if (obj.kind === 'person') {
+        if (obj.alertT <= 0) obj.alertT = 900;
+        // Fix 7: 1-in-3 panicking peds pop a speech bubble when they first start fleeing
+        if (!wasFleeing && !obj.bubbleText && this.rand() < 0.33) {
+          const PANIC = ['MY LAWN!', 'RUN!!', 'Is that a grape?!', 'NOT THE BEACH!',
+            'I just waxed that car!', 'WHAT IS THAT?!', 'HELP!!', 'My petunias!!',
+            'Call the mayor!!', 'It ate my lunch!!'];
+          obj.bubbleText = PANIC[Math.floor(this.rand() * PANIC.length)];
+          obj.bubbleLife = 1500;
+        }
+      }
       const a = Math.atan2(obj.y - threat.y, obj.x - threat.x);
       obj.vx = Math.cos(a) * fleeSpeed;
       obj.vy = Math.sin(a) * fleeSpeed;
@@ -1718,6 +1738,7 @@ export class WorldManager {
     this.drawSpaceChunks(ctx, view, t);
     drawDriftObjects(ctx);
     drawIsland(ctx); // transparent-bg island painting covers the world rect
+    drawGrainOverlay(ctx, view); // Fix 1: view-bounded 128px speckle tile at 10% opacity
 
     // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
     const scarImg = fxDecals.get('scar');
@@ -1760,18 +1781,28 @@ export class WorldManager {
         ctx.restore();
       }
     } else {
-      // fallback: procedural violet polylines
+      // Fix 5: smooth dark violet void fill — no black scribbles
       for (const f of this.fissures) {
         const a = clamp(f.life / f.maxLife, 0, 1);
+        if (a < 0.01) continue;
         ctx.save();
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         ctx.beginPath();
         for (let k = 0; k < f.pts.length; k++) {
-          const [px, py] = f.pts[k];
-          if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          const [fpx, fpy] = f.pts[k];
+          if (k === 0) ctx.moveTo(fpx, fpy); else ctx.lineTo(fpx, fpy);
         }
-        ctx.globalAlpha = a * 0.9; ctx.strokeStyle = '#2A1650'; ctx.lineWidth = 5; ctx.stroke();
-        ctx.globalAlpha = a * 0.7; ctx.strokeStyle = '#9D6BFF'; ctx.lineWidth = 2; ctx.stroke();
+        // Purple edge glow
+        ctx.globalAlpha = a * 0.5;
+        ctx.shadowColor = '#7B3FE4'; ctx.shadowBlur = 18;
+        ctx.strokeStyle = '#7B3FE4'; ctx.lineWidth = 20; ctx.stroke();
+        // Dark violet void fill
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = a * 0.9;
+        ctx.strokeStyle = '#1A0840'; ctx.lineWidth = 10; ctx.stroke();
+        // Bright inner seam
+        ctx.globalAlpha = a * 0.55;
+        ctx.strokeStyle = '#C27BFF'; ctx.lineWidth = 2; ctx.stroke();
         ctx.restore();
       }
     }

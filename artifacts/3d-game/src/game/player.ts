@@ -4,6 +4,7 @@
 // are deferred; combo is bumped at capture so chains still register.
 
 import { CONFIG, type SkinDef, type ObjectKind } from './config';
+import { islandState } from './islandMap';
 import { clamp, lerp } from './utils';
 import { Void } from './void';
 import { drawParkObject } from './objects';
@@ -538,6 +539,28 @@ export class Player extends Void {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
 
+    // Fix 5: always-on white sticker outline + soft violet glow halo
+    {
+      const vizR = this.radius * this.eatPopScale;
+      ctx.save();
+      // Violet glow halo — slightly larger than the body, 30% opacity
+      ctx.globalAlpha = this.ghost ? 0.12 : 0.30;
+      const glowGrd = ctx.createRadialGradient(rx, ry, vizR * 0.5, rx, ry, vizR * 1.7);
+      glowGrd.addColorStop(0, 'rgba(155, 100, 255, 0.7)');
+      glowGrd.addColorStop(1, 'rgba(100, 50, 200, 0)');
+      ctx.fillStyle = glowGrd;
+      ctx.beginPath();
+      ctx.arc(rx, ry, vizR * 1.7, 0, Math.PI * 2);
+      ctx.fill();
+      // White sticker outline — drawn as filled white circle slightly larger than body
+      ctx.globalAlpha = this.ghost ? 0.25 : 1.0;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(rx, ry, vizR + 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Phase 2 §2: fall animation — shrink + spin + fade into the void
     if (this.fallState === 'falling') {
       const progress = 1 - Math.max(0, this.fallTimer) / 1000; // 0→1
@@ -556,7 +579,28 @@ export class Player extends Void {
 
     this.drawOrbit(ctx, rx, ry, t);
 
-    if (this.ghost) {
+    // Fix 6: use evolution sheet sprites for MUNCHER through WORLD ENDER
+    const formSprite = this.formIndex >= 1 ? islandState.formSprites[this.formIndex - 1] : null;
+    if (formSprite) {
+      const r = this.radius * this.eatPopScale;
+      const size = r * 2.4;
+      ctx.save();
+      if (this.ghost) ctx.globalAlpha = 0.4;
+      ctx.drawImage(formSprite, rx - size / 2, ry - size / 2, size, size);
+      ctx.restore();
+      if (this.ghost) {
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -(t / 40) % 14;
+        ctx.beginPath();
+        ctx.arc(rx, ry, this.radius + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (this.ghost) {
       ctx.save();
       ctx.globalAlpha = 0.4;
       drawVoidling(ctx, rx, ry, this.visual(t));

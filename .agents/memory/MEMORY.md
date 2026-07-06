@@ -11,3 +11,4 @@
 - [VOIDLING fx decals](voidling-fx-decals.md) — fissure (multiply blend, white BG) + scar (normal) decal pipeline; skip alpha-bounds scan for assets/fx/.
 - [VOIDLING v17 Feel Patch](voidling-v17.md) — no-blocking props (shakeT one-shot on undefined), bits (tier 0, spawnBit skips totalStartArea), vacuum (object-outer loop, velocity-only), score-floor growth (clamp-first fix), camera (radius×22.22), eat-pop (visual-only scale).
 - [VOIDLING v18 World Update](voidling-v18.md) — floating island (islandMap.ts), 2.5× map scale, space parallax, ledge falloff hearts, drift objects, islandState Uint8Array typing quirk.
+- [VOIDLING v18·1 Phase 3a Fix Pack](voidling-v18-1.md) — PROC/DRAW 2048/4096, zoom cap, view-bounded grain, evolution sprites, no coast slow, sticker outline, fissure void fill, banner ticker, filterNonWalkable (no exemptions).

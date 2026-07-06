@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v16 · 3';
+const BUILD_STAMP = 'v18 · 1';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -766,7 +766,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           onClick={() => engine.castSpell()}
           aria-label={`Cast ${snap.heldSpell.name}`}
           style={{
-            position: 'fixed', bottom: snap.ticker ? 36 : 32, right: 24,
+            position: 'fixed', bottom: 32, right: 24,
             width: 72, height: 72, borderRadius: 20,
             background: snap.heldSpell.color || '#7BFFED',
             border: '2px solid rgba(255,255,255,0.25)',
@@ -782,8 +782,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           <span style={{ fontSize: 9, marginTop: 2 }}>{snap.heldSpell.name.split(' ')[0]}</span>
         </button>
       )}
-      {/* v16 §5: news ticker */}
-      {snap.ticker && !snap.paused && <NewsTicker line={snap.ticker} />}
+      {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
       {snap.paused && (
         <div className="vd-overlay vd-overlay--dim vd-pause-overlay">
           <div className="vd-sheet">

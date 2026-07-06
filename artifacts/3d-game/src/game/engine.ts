@@ -10,7 +10,7 @@ import { track } from './services';
 import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
-import { loadIslandAssets, updateDrift, isWalkable, islandState } from './islandMap'; // Phase 2
+import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, ISLAND_SRC_W } from './islandMap'; // Phase 2
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -63,8 +63,7 @@ export interface Snapshot {
   heldSpell: BoonDef | null;
   activeSpell: string | null;
   showHitboxes: boolean;
-  // v16
-  ticker: string | null;
+  // v16 (ticker removed in Fix 7 — events route to banner pill)
   contracts: Array<{id: string; name: string; done: boolean; reward: number}>;
   // v16.2
   hearts?: number;   // player hearts remaining (0 = FINAL HEART state)
@@ -176,6 +175,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let spellFrozenRival: Rival | null = null;
   let spellBubble: { x: number; y: number; r: number } | null = null;
   let showHitboxes = false;
+  // Fix 2: ?debug=mask tints non-walkable cells red for mask verification
+  const debugMask = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mask';
   // v16 §5: news ticker + contracts
   let currentTicker: string | null = null;
   let tickerCd = 0; // ms until next ticker fires
@@ -198,12 +199,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     '🏗️ Downtown construction halted after crane operator reports unbelievable sight',
     '🎪 Gnome collectors alarmed as garden ornaments reported missing citywide',
   ];
-  // v16.2 §1: queue an event-driven ticker line immediately (overrides random cadence)
-  function queueTicker(line: string, durationMs = 6500) {
-    currentTicker = line;
-    tickerCd = Math.max(tickerCd, 25000); // reset random timer so event line isn't immediately overridden
-    window.setTimeout(() => { if (currentTicker === line) { currentTicker = null; notify(); } }, durationMs);
-    notify();
+  // Fix 7: route ticker lines to the banner pill (news ticker removed from UI)
+  function queueTicker(line: string, _durationMs = 6500) {
+    banner(line, '#9AAFC8', 2);
   }
 
   const CONTRACT_POOL = [
@@ -259,7 +257,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   const fx = new FXManager();
   // Phase 2: load island assets once at engine creation (async, fallback-safe)
-  loadIslandAssets(import.meta.env.BASE_URL).catch(() => {});
+  // Fix 3: once mask is ready, remove any initial props that landed in space
+  loadIslandAssets(import.meta.env.BASE_URL).then(() => {
+    if (world) world.filterNonWalkable();
+  }).catch(() => {});
 
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
@@ -407,7 +408,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
       CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
     );
-    camZoom = fh / startView;
+    camZoom = Math.min(fh / startView, 2.5 * ISLAND_SRC_W / CONFIG.MAP_SIZE);
 
     audio.startMusic();
 
@@ -680,16 +681,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     } else {
       player.setInput(0, 0, 0);
     }
-    // v13 §1: coast slow — applied BEFORE movement so it takes effect this frame
-    // (events.update runs after movement; we need the slow for this tick's speed calc)
-    {
-      // v16 §1: west column is no longer beach — only check south edge
-      const sandD = CONFIG.COAST_SAND_DEPTH, mz = CONFIG.MAP_SIZE;
-      if (player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
-      for (const rv of rivals) {
-        if (!rv.ghost && rv.y > mz - sandD) rv.eventSlow = Math.min(rv.eventSlow, CONFIG.COAST_WATER_SLOW);
-      }
-    }
+    // Fix 4: coast water slow removed — island world has no coastal slow zone
     player.update(dt);
 
     // Phase 2 §2: ledge falloff — detect when player walks off the island
@@ -819,16 +811,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       world.attractEdibles(player.x, player.y, 210, 40 * (dt / 1000));
     }
 
-    // v16 §5: news ticker — fire a line every 30s, expire after 6s
+    // Fix 7: news ticker routed to banner every 45s (garbled scroll removed)
     if (screen === 'game' && roundElapsed > 5000) {
       tickerCd -= dt;
       if (tickerCd <= 0) {
-        tickerCd = 28000 + Math.random() * 8000; // 28–36s between lines
+        tickerCd = 40000 + Math.random() * 10000;
         const line = TICKER_LINES[Math.floor(Math.random() * TICKER_LINES.length)];
-        currentTicker = line;
-        // auto-clear after 6s
-        window.setTimeout(() => { currentTicker = null; notify(); }, 6000);
-        notify();
+        banner(line, '#9AAFC8', 1);
       }
     }
 
@@ -1179,7 +1168,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // viewHeight = radius * 22.22 keeps apparent diameter = 2r/viewHeight * fh ≈ 9% fh.
     // Min 350px (prevents hyper-zoom at spawn); max 3.5× screen height (sprites stay readable).
     const viewHeight = clamp(player.radius * 22.22, 350, fh * 6); // Phase 2: wider zoom for big island
-    const targetZoom = fh / viewHeight;
+    // Fix 1: never magnify the island image beyond 2.5× its source pixel size → sharp ground
+    const MAX_ISLAND_ZOOM = 2.5 * ISLAND_SRC_W / CONFIG.MAP_SIZE;
+    const targetZoom = Math.min(fh / viewHeight, MAX_ISLAND_ZOOM);
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
 
     // ── camera: follow with lookahead, NO dead zone (v5 §1) ──
@@ -1214,6 +1205,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     world.drawGround(ctx, view, clock, camCX, camCY);
     // Phase 2: skip legacy grid dressing (crosswalks/manholes) once island is loaded
     if (!islandState.ready) world.drawDressing(ctx, view, clock, camZoom);
+    // Fix 2: debug mask overlay — load with ?debug=mask to verify walkable coverage
+    if (debugMask) drawDebugMask(ctx);
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);
@@ -2122,7 +2115,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       heldSpell,
       activeSpell,
       showHitboxes,
-      ticker: currentTicker,
       contracts: [...activeContracts],
       hearts: player?.hearts,    // v16.2 §3
       planName: world?.planName, // v16.2 §6
