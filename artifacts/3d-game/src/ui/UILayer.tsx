@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v18 · 1';
+const BUILD_STAMP = 'v18 · 2';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -760,28 +760,46 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           ))}
         </div>
       )}
-      {/* v15 §3: SPELL button — 72×72 teal action button, shown when a spell is held */}
-      {snap.heldSpell && !snap.paused && (
-        <button
-          onClick={() => engine.castSpell()}
-          aria-label={`Cast ${snap.heldSpell.name}`}
-          style={{
-            position: 'fixed', bottom: 32, right: 24,
-            width: 72, height: 72, borderRadius: 20,
-            background: snap.heldSpell.color || '#7BFFED',
-            border: '2px solid rgba(255,255,255,0.25)',
-            color: '#0a0818', fontSize: 12, fontWeight: 800,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: `0 4px 24px ${snap.heldSpell.color || '#7BFFED'}66`,
-            letterSpacing: '0.04em', lineHeight: 1.2,
-            animation: 'vd-spell-pulse 1.6s ease-in-out infinite',
-          }}
-        >
-          <span style={{ fontSize: 24 }}>✨</span>
-          <span style={{ fontSize: 9, marginTop: 2 }}>{snap.heldSpell.name.split(' ')[0]}</span>
-        </button>
-      )}
+      {/* War Pack §3: POWER button — held = ready to cast, active = radial sweep countdown */}
+      {(snap.heldSpell || snap.activeSpell) && !snap.paused && (() => {
+        const POWER_ICONS: Record<string, string> = { event_horizon: '🌀', wormhole: '⚡', time_warp: '⏱', singularity: '⚫' };
+        const POWER_COLORS: Record<string, string> = {
+          event_horizon: '#9B5DE5', wormhole: '#00BBF9', time_warp: '#2D9CDB', singularity: '#F15BB5',
+        };
+        const isHeld = !!snap.heldSpell;
+        const rawId = isHeld
+          ? snap.heldSpell!.id.replace('spell_', '')
+          : (snap.activeSpell ?? '');
+        const powerColor = POWER_COLORS[rawId] ?? (isHeld ? (snap.heldSpell!.color ?? '#7BFFED') : '#7BFFED');
+        const icon = POWER_ICONS[rawId] ?? '✨';
+        const labelText = (isHeld ? snap.heldSpell!.name : rawId.replace(/_/g, ' ').toUpperCase()).split(' ')[0];
+        const sweepDeg = (snap.spellTimerMax > 0 && !isHeld)
+          ? (snap.spellTimer / snap.spellTimerMax) * 360 : 0;
+        return (
+          <button
+            onClick={isHeld ? () => engine.castSpell() : undefined}
+            aria-label={isHeld ? `Cast ${rawId}` : `${rawId} active`}
+            style={{
+              position: 'fixed', bottom: 32, right: 24,
+              width: 72, height: 72, borderRadius: 20,
+              background: isHeld
+                ? powerColor
+                : `conic-gradient(${powerColor}CC ${sweepDeg.toFixed(1)}deg, rgba(10,8,24,0.82) ${sweepDeg.toFixed(1)}deg)`,
+              border: `2px solid ${powerColor}99`,
+              color: isHeld ? '#0a0818' : powerColor,
+              fontSize: 12, fontWeight: 800,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: isHeld ? 'pointer' : 'default',
+              boxShadow: `0 4px 24px ${powerColor}66`,
+              letterSpacing: '0.04em', lineHeight: 1.2,
+              animation: isHeld ? 'vd-spell-pulse 1.6s ease-in-out infinite' : 'none',
+            }}
+          >
+            <span style={{ fontSize: 24 }}>{icon}</span>
+            <span style={{ fontSize: 9, marginTop: 2 }}>{labelText}</span>
+          </button>
+        );
+      })()}
       {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
       {snap.paused && (
         <div className="vd-overlay vd-overlay--dim vd-pause-overlay">

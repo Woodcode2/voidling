@@ -1,0 +1,63 @@
+# VOIDLING War Pack (Phase 3b)
+
+Run this AFTER the Fix Pack has been completed. You are adding the competitive core to VOIDLING, a canvas-based HTML5 top-down arcade game: voids that eat each other, a city that fights back, and powers with real feedback. Read the relevant code before changing anything and keep changes minimal.
+
+## Do not touch
+- The Fix Pack systems: camera magnification clamp, walkable mask, zone spawning, no-slowdown rule, player glow, banner and speech bubbles
+- Quest logic and point values, match flow, scoring for props
+
+## Step 0: Download these three assets into the project as local static files
+Process each the same way as previous sheets: flood-fill the dark violet background to transparent, slice by grid, trim each cell to its bounding box.
+1. People sheet (3x3 grid), save as people_sheet.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_020156_a26ba600-73b0-4f55-84fd-521708977c98.png
+Cells left to right, top to bottom: businessman, jogger, kid with balloon, granny, fisherman, sunbather on towel, lifeguard, dog walker with dog, construction worker.
+2. Vehicles sheet (3x2 grid), save as vehicles_sheet.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_020205_d65df63d-a83d-4b7c-9d5c-9be86cf14458.png
+Cells: taxi, police car, school bus, fire truck, convertible, army jeep.
+3. Beach and park sheet (3x3 grid), save as beachpark_sheet.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_020214_0daff083-1c10-465e-9859-be3492226cae.png
+Cells: beach umbrella, beach towel, sandcastle, cooler, palm tree, rowboat, picnic table, kite, ice cream cart.
+
+## Change 1: Register the new art
+- People: add all nine to the pedestrian pool with zone bias. Sunbather spawns lying on beach towels, fisherman at the beach waterline, lifeguard on the beach, construction worker downtown, dog walker in suburbs and park, the rest mixed. Same edibility tier as existing people.
+- Vehicles: taxi, school bus, fire truck and convertible join downtown traffic and parked cars. Bus and fire truck are one edibility tier above sedans. Police car and army jeep are RESERVED for the defense waves below, not general traffic.
+- Beach and park props: umbrella, towel, sandcastle, cooler, rowboat and kite go to the beach spawn table; picnic table and ice cream cart to the park; palm trees line the beach and are the same tier as trees. Sensible small-to-mid edibility tiers.
+
+## Change 2: Void predation (the agar core)
+- A void can eat another void when its radius is at least 1.3x the target's radius. On contact where that holds, the bigger void eats the smaller.
+- Rival size MUST follow the exact same radius-from-score curve as the player. Verify a rival with half the player's score is clearly smaller on screen.
+- Player eats a rival: the rival loses half its score, the player gains that amount, big banner (YOU DEVOURED BEX!), chunky eat pop and screen shake. The rival respawns after 5 seconds at its reduced score, at a spot far from the player.
+- A rival eats the player: the player loses 1 heart and 25 percent of score, respawns near island center with 3 seconds of invulnerability, banner shows who got you. Last heart triggers the normal game over.
+- Grace period: no predation by anyone during the first 30 seconds of the match.
+- Threat rings: from the player's perspective, any void currently big enough to eat you shows a thin red ring; any void you can eat shows a thin gold ring. Update live as sizes change.
+- Rival AI: each rival continuously weighs three drives: farm the nearest rich food zone, chase any void it can eat within a hunt radius, flee any void that can eat it within a flee radius. In the final 60 seconds, or when props run thin, hunt aggression rises sharply and fleeing gets less cautious. Rivals hunt each other too, not just the player. Kills between rivals fire trash talk banners.
+
+## Change 3: The city fights back (escalating defense)
+Defense waves scale with percent devoured and announce themselves with banners.
+- From 5 percent devoured: POLICE respond (banner: THE POLICE ARE HERE). 3 to 5 police cars converge on the player and fire slow pellet shots.
+- From 20 percent: THE ARMY ARRIVES. Army jeeps join, faster movers, quicker pellets, waves of 4 to 6.
+- From 35 percent: FULL DEPLOYMENT. Large mixed convoys of jeeps and police keep spawning at the map edges and converging.
+- Pellet hits NEVER cost hearts and NEVER slow the player: a hit breaks the combo back to x1 and costs a small flat 20 points, with a brief red flash on the player. Hearts are only lost to predation and falling off the island.
+- Defense units are edible: police cars and jeeps at roughly the same radius tier as cars. Eating one gives triple normal car points and a satisfying shake. Units too big to eat pass under the player per the no-block rule.
+
+## Change 4: Powers overhaul with real feedback
+Remove the garlic power entirely. Power pickups spawn on the island (use the existing pickup flow: collect one, it fills the single power button bottom right, tap to use, one use per pickup). Four powers, equal spawn odds:
+- EVENT HORIZON (purple): for 6 seconds vacuum radius is 2.5x and pull speed is doubled. Visual: pulsing purple rings expand from the player, food visibly streams in.
+- WORMHOLE (cyan): instant dash about 4 body lengths in the movement direction with a warp streak and afterimage, plus half a second of invulnerability. The escape tool.
+- TIME WARP (blue): for 5 seconds everything except the player moves at 40 percent speed. Soft blue tint at the screen edges while active.
+- SINGULARITY (magenta): drops a mini black hole at the player's position for 4 seconds that drags every edible prop nearby into it, then pops and awards everything it swallowed with a burst.
+Feedback requirements for every power: the button shows the power's icon and color when loaded, flashes on tap, and shows a radial sweep for the active duration; the player gets a colored ring while a power is active; a short name pop (EVENT HORIZON!) appears above the player on activation. It must be impossible to activate a power and not notice what it did.
+
+## Verify before finishing (play in the preview, do not skip)
+1. A rival at half your score is visibly smaller; rings show red on bigger voids and gold on smaller ones.
+2. Eat a smaller rival: banner fires, you gain their lost score, they respawn smaller after 5 seconds far away.
+3. Get eaten by a bigger rival: lose 1 heart and a quarter of score, respawn with brief invulnerability.
+4. No predation happens in the first 30 seconds.
+5. In the last 60 seconds rivals visibly hunt: chases happen on screen without player involvement.
+6. At 5 percent devoured the police banner and wave arrive; at 20 percent jeeps; pellet hits break combo and flash red but never slow the player or cost hearts.
+7. Eat a police car at sufficient size for triple points.
+8. Each of the four powers activates with button flash, radial sweep, colored ring, and name pop, and its effect is obvious in gameplay.
+9. New sprites appear in their zones: fisherman and sunbathers on the beach, palm trees along the sand, taxi and bus downtown, picnic table in the park.
+10. Frame rate holds on mobile during a full deployment wave plus a power active.
+
+When done, report what you changed file by file and confirm each of the 10 verification steps passed.

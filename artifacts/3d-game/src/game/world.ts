@@ -43,6 +43,8 @@ export interface WorldObject {
   bubbleText: string | null; // v16.2 §1: speech bubble text (null = no bubble)
   bubbleLife: number;    // ms remaining for the speech bubble
   shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
+  defense?: boolean;     // War Pack §2: defense unit converging on player
+  pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
 }
 
 export interface PlayerStats {
@@ -271,8 +273,14 @@ function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
   }
 }
 
-const LIVING_KINDS: ObjectKind[] = ['car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab',
-  'monkey', 'flamingo', 'penguin', 'zookeeper']; // v16.1 D: zoo animals
+const LIVING_KINDS: ObjectKind[] = [
+  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab',
+  'monkey', 'flamingo', 'penguin', 'zookeeper',
+  // War Pack §1: new pedestrian kinds + defense/traffic vehicles
+  'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
+  'person_sun', 'person_guard', 'person_dog', 'person_const',
+  'taxi', 'police_car', 'school_bus', 'fire_truck', 'convertible', 'army_jeep',
+];
 
 export class WorldManager {
   objects: WorldObject[] = [];
@@ -509,7 +517,8 @@ export class WorldManager {
         this.makeObj('tree', b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, y, { infra: true });
       }
       // ~30% chance: parked car on each curb side
-      const carPool: ObjectKind[] = ['car_parked_a', 'car_parked_b'];
+      // War Pack §1: richer parked-car variety
+      const carPool: ObjectKind[] = ['car_parked_a', 'car_parked_b', 'taxi', 'convertible'];
       const innerW = CONFIG.BLOCK_SIZE - TREE_INSET * 2;
       if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET + rand() * innerW, b2.y0 + TREE_INSET, { infra: true });
       if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET + rand() * innerW, b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET, { infra: true });
@@ -647,9 +656,43 @@ export class WorldManager {
       const p = this.pointInBlock(b, rand);
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const o = this.makeObj(kind, p.x, p.y);
-      if (kind === 'person') { o.tether = 90; }
+      if (kind === 'person' || (kind as string).startsWith('person_')) { o.tether = 90; }
       if (kind === 'dog') { o.tether = 160; }
     }
+  }
+
+  // War Pack §1: zone-biased person scatter — uses new diverse pedestrian sprites
+  private static readonly BEACH_PEOPLE: ObjectKind[] = ['person_fish', 'person_sun', 'person_guard', 'person_jog'];
+  private static readonly DOWNTOWN_PEOPLE: ObjectKind[] = ['person_biz', 'person_const', 'person_jog', 'person_kid'];
+  private static readonly RESIDENTIAL_PEOPLE: ObjectKind[] = ['person_granny', 'person_kid', 'person_dog', 'person_jog'];
+  private static readonly PARK_PEOPLE: ObjectKind[] = ['person_jog', 'person_kid', 'person_dog', 'person_granny'];
+  private static readonly ALL_PEOPLE: ObjectKind[] = [
+    'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
+    'person_sun', 'person_guard', 'person_dog', 'person_const',
+  ];
+
+  private scatterPeople(b: Block, rand: () => number, zone: 'beach'|'downtown'|'residential'|'park'|'any', n: number, avoidX?: number, avoidY?: number) {
+    const pool = zone === 'beach' ? WorldManager.BEACH_PEOPLE
+      : zone === 'downtown'    ? WorldManager.DOWNTOWN_PEOPLE
+      : zone === 'residential' ? WorldManager.RESIDENTIAL_PEOPLE
+      : zone === 'park'        ? WorldManager.PARK_PEOPLE
+      : WorldManager.ALL_PEOPLE;
+    for (let i = 0; i < n; i++) {
+      const p = this.pointInBlock(b, rand);
+      if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
+      const kind = pool[Math.floor(rand() * pool.length)];
+      const o = this.makeObj(kind, p.x, p.y);
+      o.tether = 90;
+    }
+  }
+
+  /** War Pack §2: spawn a defense unit (police_car / army_jeep) at world position. */
+  spawnDefenseUnit(kind: ObjectKind, x: number, y: number): WorldObject {
+    const o = this.makeObj(kind, x, y);
+    o.defense = true;
+    o.living = true;
+    o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 1000;
+    return o;
   }
 
   private fillResidential(b: Block, rand: () => number) {
@@ -669,7 +712,7 @@ export class WorldManager {
     this.scatter(b, rand, 'flower', 6);
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'gnome', 3);
-    this.scatter(b, rand, 'person', 2);
+    this.scatterPeople(b, rand, 'residential', 2);
     this.scatter(b, rand, 'dog', 1);
     // v7 §3: neighborhood critters + props
     this.scatter(b, rand, 'cat', 1);
@@ -698,6 +741,9 @@ export class WorldManager {
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'dog', 2);
     this.scatter(b, rand, 'squirrel', 2);
+    this.scatterPeople(b, rand, 'park', 3);          // War Pack §1: park visitors
+    if (rand() < 0.5) this.scatter(b, rand, 'picnic_table', 1);
+    if (rand() < 0.4) this.scatter(b, rand, 'icecream_cart', 1);
     this.spawnBirds(b, rand, 3);
     this.spawnBirds(b, rand, 3);
     // guarantee small edibles right around the player spawn
@@ -711,7 +757,7 @@ export class WorldManager {
     (b as any).paved = true;
     this.scatter(b, rand, 'foodcart', 3);
     this.scatter(b, rand, 'cafetable', 5);
-    this.scatter(b, rand, 'person', 6);
+    this.scatterPeople(b, rand, 'any', 6);
     this.scatter(b, rand, 'trashcan', 3);
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 4);
@@ -731,7 +777,7 @@ export class WorldManager {
     this.scatter(b, rand, 'slide', 1);
     this.scatter(b, rand, 'seesaw', 1);
     this.scatter(b, rand, 'flower', 8);
-    this.scatter(b, rand, 'person', 3);
+    this.scatterPeople(b, rand, 'park', 3);
     this.scatter(b, rand, 'dog', 1);
   }
 
@@ -743,7 +789,7 @@ export class WorldManager {
     this.scatter(b, rand, 'hoop', 1, cx, cy);
     this.scatter(b, rand, 'bench', 3, cx, cy);
     this.scatter(b, rand, 'tree', 3, cx, cy);
-    this.scatter(b, rand, 'person', 4, cx, cy);
+    this.scatterPeople(b, rand, 'any', 4, cx, cy);
     this.scatter(b, rand, 'flower', 6, cx, cy);
     this.scatter(b, rand, 'trashcan', 2, cx, cy);
   }
@@ -775,7 +821,7 @@ export class WorldManager {
     this.scatter(b, rand, 'shop', 2);
     // street furniture
     this.scatter(b, rand, 'cafetable', 4);  // v16.1 B3: 3→4
-    this.scatter(b, rand, 'person', 8);     // v16.1 B3: 6→8
+    this.scatterPeople(b, rand, 'downtown', 8); // War Pack §1: diverse downtown crowd
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 3);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
@@ -805,7 +851,7 @@ export class WorldManager {
     this.scatter(b, rand, 'bench', 3);
     this.scatter(b, rand, 'tree', 4);
     this.scatter(b, rand, 'flower', 6);
-    this.scatter(b, rand, 'person', 4);
+    this.scatterPeople(b, rand, 'any', 4);
     this.scatter(b, rand, 'flowerpot', 3);
     this.scatter(b, rand, 'trashcan', 1);
   }
@@ -823,7 +869,7 @@ export class WorldManager {
     }
     this.scatter(b, rand, 'house', 1);
     this.scatter(b, rand, 'bench', 2);
-    this.scatter(b, rand, 'person', 4);
+    this.scatterPeople(b, rand, 'any', 4);
     this.scatter(b, rand, 'cafetable', 2);
     this.scatter(b, rand, 'flower', 4);
     this.scatter(b, rand, 'gnome', 1);
@@ -876,7 +922,7 @@ export class WorldManager {
 
     // Zookeepers + visitors + green lush scenery
     this.scatter(b, rand, 'zookeeper', 2);
-    this.scatter(b, rand, 'person', 4);
+    this.scatterPeople(b, rand, 'any', 4);
     this.scatter(b, rand, 'tree', 5);
     this.scatter(b, rand, 'flower', 10);
     this.scatter(b, rand, 'bench', 3);
@@ -903,7 +949,7 @@ export class WorldManager {
     this.makeObj('fountain', cx, cy);
     this.scatter(b, rand, 'bench', 5);
     this.scatter(b, rand, 'tree', 4);
-    this.scatter(b, rand, 'person', 8);
+    this.scatterPeople(b, rand, 'any', 8);
     this.scatter(b, rand, 'flower', 6);
     this.scatter(b, rand, 'cafetable', 3);
     this.scatter(b, rand, 'foodcart', 2);
@@ -928,7 +974,10 @@ export class WorldManager {
     if (rand() < 0.4) this.scatter(b, rand, 'lifeguard', 1);
     if (rand() < 0.5) this.scatter(b, rand, 'car_parked_a', 1);
     if (rand() < 0.4) this.scatter(b, rand, 'car_parked_b', 1);
-    this.scatter(b, rand, 'person', 3);
+    this.scatterPeople(b, rand, 'beach', 3);
+    if (rand() < 0.55) this.scatter(b, rand, 'cooler', 1);
+    if (rand() < 0.45) this.scatter(b, rand, 'kite_prop', 1);
+    if (rand() < 0.35) this.scatter(b, rand, 'rowboat', 1);
     this.spawnBirds(b, rand, 4); // white seagulls (same bird drawing, beach context)
   }
 
@@ -989,7 +1038,10 @@ export class WorldManager {
     const along = MARGIN + rand() * (this.size - MARGIN * 2);
     const x = horizontal ? along : center + lane;
     const y = horizontal ? center + lane : along;
-    const o = this.makeObj('car', x, y);
+    // War Pack §1: diverse traffic pool (fire_truck + school_bus are larger → use tier 4/5 sizes)
+    const TRAFFIC_POOL: ObjectKind[] = ['car', 'car', 'car', 'taxi', 'convertible', 'fire_truck', 'school_bus'];
+    const trafficKind = TRAFFIC_POOL[Math.floor(rand() * TRAFFIC_POOL.length)];
+    const o = this.makeObj(trafficKind, x, y);
     o.roadAxis = horizontal ? 'h' : 'v';
     o.homeX = center + lane; o.homeY = center + lane; // fixed cross-axis coord
     o.roadDir = rand() < 0.5 ? 1 : -1;
@@ -1090,8 +1142,8 @@ export class WorldManager {
         const ny = (player.y - obj.y) / (dp || 1);
         // Feel Patch §3: proximity-weighted acceleration — 3× stronger at body edge vs outer rim
         const proximityFactor = 1 + 2 * Math.max(0, 1 - (dp - player.radius) / (reach - player.radius + 1));
-        obj.vx += nx * CONFIG.SUCTION_ACCEL * proximityFactor * dtSec;
-        obj.vy += ny * CONFIG.SUCTION_ACCEL * proximityFactor * dtSec;
+        obj.vx += nx * CONFIG.SUCTION_ACCEL * proximityFactor * player.suctionMult * dtSec;
+        obj.vy += ny * CONFIG.SUCTION_ACCEL * proximityFactor * player.suctionMult * dtSec;
         const sp = Math.hypot(obj.vx, obj.vy);
         if (sp > CONFIG.SUCTION_MAX_SPEED) {
           obj.vx = (obj.vx / sp) * CONFIG.SUCTION_MAX_SPEED;
@@ -1119,8 +1171,8 @@ export class WorldManager {
       // restore size if not captured
       if (!obj.captured && obj.size !== obj.baseSize) obj.size = obj.baseSize;
 
-      // ── living-world AI ──
-      if (obj.living) this.stepLiving(obj, dt, dtSec, voids, player, fx);
+      // ── living-world AI (skip defense units — engine.ts steers them) ──
+      if (obj.living && !obj.defense) this.stepLiving(obj, dt, dtSec, voids, player, fx);
 
       // ── Feel Patch §1: non-edible collision — player slides through, prop shakes ──
       // Only the map boundary stays hard. Trampoline keeps its special launch.
@@ -1602,12 +1654,18 @@ export class WorldManager {
     }
     // v16 §5: contract progress counters
     const HOUSE_KINDS: ObjectKind[] = ['house', 'house_c', 'house_d'];
-    const CAR_KINDS: ObjectKind[] = ['car', 'car_parked_a', 'car_parked_b', 'schoolbus', 'jeep'];
+    const CAR_KINDS: ObjectKind[] = ['car', 'car_parked_a', 'car_parked_b', 'schoolbus', 'jeep',
+      'taxi', 'police_car', 'school_bus', 'fire_truck', 'convertible', 'army_jeep'];
     const BEACH_KINDS: ObjectKind[] = ['palm', 'umbrella', 'sandcastle', 'surfboard', 'lifeguard', 'towel', 'crab', 'seashell', 'kayak'];
     const DOWNTOWN_KINDS: ObjectKind[] = ['shop', 'office', 'skyscraper', 'cafe', 'library'];
+    const PEOPLE_KINDS: ObjectKind[] = [
+      'person', 'soldier', 'zookeeper',
+      'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
+      'person_sun', 'person_guard', 'person_dog', 'person_const',
+    ];
     if (HOUSE_KINDS.includes(obj.kind)) this.playerStats.houses++;
     if (CAR_KINDS.includes(obj.kind)) this.playerStats.cars++;
-    if (obj.kind === 'person' || obj.kind === 'soldier') this.playerStats.people++;
+    if (PEOPLE_KINDS.includes(obj.kind)) this.playerStats.people++;
     if (BEACH_KINDS.includes(obj.kind)) this.playerStats.beachItems++;
     if (DOWNTOWN_KINDS.includes(obj.kind)) this.playerStats.downtownItems++;
 
@@ -2094,7 +2152,9 @@ export class WorldManager {
 
         // v12 §0: use tight alpha-bounding-box so transparent padding never inflates visuals
         const bn = spriteBounds.get(spriteKey!) ?? { x: 0, y: 0, w: 1, h: 1 };
-        const imgW = objSprite.naturalWidth, imgH = objSprite.naturalHeight;
+        // War Pack: handle both HTMLImageElement (naturalWidth) and HTMLCanvasElement (width)
+        const imgW = objSprite instanceof HTMLImageElement ? objSprite.naturalWidth : objSprite.width;
+        const imgH = objSprite instanceof HTMLImageElement ? objSprite.naturalHeight : objSprite.height;
         const sx = bn.x * imgW, sy = bn.y * imgH, sw = bn.w * imgW, sh = bn.h * imgH;
 
         if (obj.captured) {

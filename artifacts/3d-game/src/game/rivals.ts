@@ -306,6 +306,8 @@ export class BotController implements RivalController {
   }
 
   private aggressionFrom(elapsed: number) {
+    // War Pack §2: spike to max aggression in final 60s
+    if (elapsed >= CONFIG.GAME_DURATION * 1000 - 60000) return 1.0;
     return clamp((elapsed - CONFIG.AGGRO_START_MS) / (CONFIG.AGGRO_FULL_MS - CONFIG.AGGRO_START_MS), 0, 1);
   }
 

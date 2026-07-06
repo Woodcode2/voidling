@@ -136,7 +136,8 @@ const GROUND_IDS = ['grass', 'asphalt', 'sidewalk', 'pond'];
 
 export const skinSprites:   Map<string, HTMLImageElement> = new Map();
 export const layerSprites:  Map<string, HTMLImageElement> = new Map();
-export const objectSprites: Map<string, HTMLImageElement> = new Map();
+// War Pack: accept HTMLCanvasElement for sheet-sliced sprites alongside preloaded HTMLImageElement
+export const objectSprites: Map<string, HTMLImageElement | HTMLCanvasElement> = new Map();
 export const groundSprites: Map<string, HTMLImageElement> = new Map(); // v12 §6
 export const formSprites:   Map<string, HTMLImageElement> = new Map(); // v16 §4
 
