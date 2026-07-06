@@ -1,4 +1,4 @@
-// islandMap.ts — Phase 2: floating island world
+// islandMap.ts — Phase 2: floating island world. Phase 3a: sharpness + evolution sprites.
 // Handles image processing, 128×128 walkable mask, space parallax, drift objects.
 
 import { CONFIG } from './config';
@@ -6,6 +6,9 @@ import { clamp } from './utils';
 
 const MASK_W = 128;
 const MASK_H = 128;
+
+/** Display canvas size — determines camera zoom cap: max zoom = 2.5 × (ISLAND_SRC_W / MAP_SIZE) */
+export const ISLAND_SRC_W = 4096;
 
 // Background violet of the raw island_map.png — #1E1338
 const BG_R = 0x1E, BG_G = 0x13, BG_B = 0x38;
@@ -31,7 +34,6 @@ function floodFillEdges(data: Uint8ClampedArray, w: number, h: number): void {
     }
   };
 
-  // Seed all four edges
   for (let x = 0; x < w; x++) { tryAdd(x); tryAdd((h - 1) * w + x); }
   for (let y = 0; y < h; y++) { tryAdd(y * w); tryAdd(y * w + w - 1); }
 
@@ -49,13 +51,12 @@ function floodFillEdges(data: Uint8ClampedArray, w: number, h: number): void {
 /** Keep only the largest connected blob of opaque pixels; clear all others */
 function keepLargest(data: Uint8ClampedArray, w: number, h: number): void {
   const total = w * h;
-  const label = new Int32Array(total).fill(-1); // region label per pixel
+  const label = new Int32Array(total).fill(-1);
   const sizes: number[] = [];
   let labelIdx = 0;
 
   for (let i = 0; i < total; i++) {
     if (label[i] >= 0 || data[i * 4 + 3] === 0) continue;
-    // BFS to label this region
     const regionLabel = labelIdx++;
     let size = 0;
     const q: number[] = [i];
@@ -74,13 +75,11 @@ function keepLargest(data: Uint8ClampedArray, w: number, h: number): void {
     sizes[regionLabel] = size;
   }
 
-  // Find largest
   let best = -1, bestSize = 0;
   for (let l = 0; l < sizes.length; l++) {
     if (sizes[l] > bestSize) { bestSize = sizes[l]; best = l; }
   }
 
-  // Clear all non-largest regions
   for (let i = 0; i < total; i++) {
     if (label[i] >= 0 && label[i] !== best) data[i * 4 + 3] = 0;
   }
@@ -105,56 +104,71 @@ interface DriftObject {
   size: number;
 }
 
-export const islandState: {
-  ready: boolean;
-  walkableMask: Uint8Array;   // non-generic: accepts ArrayBuffer and ArrayBufferLike alike
-  islandCanvas: HTMLCanvasElement | null;
-  spaceBgImg: HTMLImageElement | null;
-  driftSprites: HTMLCanvasElement[];
-  driftObjects: DriftObject[];
-  nextDriftMs: number;
-} = {
-  ready: false,
-  walkableMask: new Uint8Array(MASK_W * MASK_H), // 1 = walkable (on island)
-  islandCanvas: null,
-  spaceBgImg: null,
-  driftSprites: [],
-  driftObjects: [],
-  nextDriftMs: 25000 + Math.random() * 15000, // first drift 25-40s in
-};
+// ── Procedural grain texture ──────────────────────────────────────────────────
 
-// ── Image processing ──────────────────────────────────────────────────────────
+function generateGrainCanvas(): HTMLCanvasElement {
+  const SIZE = 128;
+  const c = document.createElement('canvas');
+  c.width = SIZE; c.height = SIZE;
+  const ctx = c.getContext('2d')!;
+  const id = ctx.createImageData(SIZE, SIZE);
+  const d = id.data;
+  for (let i = 0; i < SIZE * SIZE; i++) {
+    const v = Math.random() < 0.35 ? Math.floor(Math.random() * 70 + 170) : 110;
+    const r = i * 4;
+    d[r] = Math.round(v * 0.82); d[r+1] = Math.round(v * 0.70); d[r+2] = v; d[r+3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+  return c;
+}
 
-function processIsland(img: HTMLImageElement): { canvas: HTMLCanvasElement; mask: Uint8Array } {
-  // Work at 1024 for fast pixel ops
-  const PROC = 1024;
+// ── Evolution sheet processing ────────────────────────────────────────────────
+
+/** Trim a canvas to its opaque pixel bounding box */
+function trimCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const ctx = src.getContext('2d')!;
+  const w = src.width, h = src.height;
+  const data = ctx.getImageData(0, 0, w, h).data;
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < minX) return src;
+  const out = document.createElement('canvas');
+  out.width = maxX - minX + 2; out.height = maxY - minY + 2;
+  out.getContext('2d')!.drawImage(src, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+
+/**
+ * Process evolution_sheet.png: flood-fill BG transparent, slice 4 cells left→right,
+ * trim each to its opaque bounding box.
+ * Cells: MUNCHER, GOBBLER, DEVOURER, WORLD ENDER
+ */
+function processEvolutionSheet(img: HTMLImageElement): HTMLCanvasElement[] {
+  const COLS = 4;
   const tmp = document.createElement('canvas');
-  tmp.width = PROC; tmp.height = PROC;
+  tmp.width = img.width; tmp.height = img.height;
   const tc = tmp.getContext('2d')!;
-  tc.drawImage(img, 0, 0, PROC, PROC);
-  const id = tc.getImageData(0, 0, PROC, PROC);
-  floodFillEdges(id.data, PROC, PROC);
-  keepLargest(id.data, PROC, PROC);
+  tc.drawImage(img, 0, 0);
+  const id = tc.getImageData(0, 0, img.width, img.height);
+  floodFillEdges(id.data, img.width, img.height);
   tc.putImageData(id, 0, 0);
 
-  // Render display canvas at 1536 (mobile-friendly, still crisp)
-  const DRAW = 1536;
-  const display = document.createElement('canvas');
-  display.width = DRAW; display.height = DRAW;
-  display.getContext('2d')!.drawImage(tmp, 0, 0, DRAW, DRAW);
-
-  // Build 128×128 walkable mask
-  const mc = document.createElement('canvas');
-  mc.width = MASK_W; mc.height = MASK_H;
-  mc.getContext('2d')!.drawImage(tmp, 0, 0, MASK_W, MASK_H);
-  const mid = mc.getContext('2d')!.getImageData(0, 0, MASK_W, MASK_H);
-  const maskBuf = new ArrayBuffer(MASK_W * MASK_H);
-  const mask = new Uint8Array(maskBuf) as Uint8Array<ArrayBuffer>;
-  for (let i = 0; i < MASK_W * MASK_H; i++) {
-    mask[i] = mid.data[i * 4 + 3] > 64 ? 1 : 0;
+  const cw = (img.width / COLS) | 0, ch = img.height;
+  const sprites: HTMLCanvasElement[] = [];
+  for (let col = 0; col < COLS; col++) {
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    c.getContext('2d')!.drawImage(tmp, col * cw, 0, cw, ch, 0, 0, cw, ch);
+    sprites.push(trimCanvas(c));
   }
-
-  return { canvas: display, mask };
+  return sprites;
 }
 
 function processDriftSheet(img: HTMLImageElement): HTMLCanvasElement[] {
@@ -180,18 +194,82 @@ function processDriftSheet(img: HTMLImageElement): HTMLCanvasElement[] {
   return sprites;
 }
 
+export const islandState: {
+  ready: boolean;
+  walkableMask: Uint8Array;   // non-generic: accepts ArrayBuffer and ArrayBufferLike alike
+  islandCanvas: HTMLCanvasElement | null;
+  spaceBgImg: HTMLImageElement | null;
+  driftSprites: HTMLCanvasElement[];
+  driftObjects: DriftObject[];
+  nextDriftMs: number;
+  srcW: number;               // display canvas px — used for zoom-cap math
+  grainCanvas: HTMLCanvasElement | null;  // 128×128 procedural speckle tile
+  formSprites: HTMLCanvasElement[];       // [MUNCHER, GOBBLER, DEVOURER, WORLD ENDER]
+} = {
+  ready: false,
+  walkableMask: new Uint8Array(MASK_W * MASK_H),
+  islandCanvas: null,
+  spaceBgImg: null,
+  driftSprites: [],
+  driftObjects: [],
+  nextDriftMs: 25000 + Math.random() * 15000,
+  srcW: ISLAND_SRC_W,
+  grainCanvas: null,
+  formSprites: [],
+};
+
+// ── Image processing ──────────────────────────────────────────────────────────
+
+function processIsland(img: HTMLImageElement): { canvas: HTMLCanvasElement; mask: Uint8Array } {
+  // Process at 2048 — fast pixel ops, preserves detail for the 4096 display canvas
+  const PROC = 2048;
+  const tmp = document.createElement('canvas');
+  tmp.width = PROC; tmp.height = PROC;
+  const tc = tmp.getContext('2d')!;
+  tc.drawImage(img, 0, 0, PROC, PROC);
+  const id = tc.getImageData(0, 0, PROC, PROC);
+  floodFillEdges(id.data, PROC, PROC);
+  keepLargest(id.data, PROC, PROC);
+  tc.putImageData(id, 0, 0);
+
+  // 4096 display canvas → max zoom = 2.5 × (4096/12000) ≈ 0.853, giving ~30px player at start
+  const DRAW = ISLAND_SRC_W;
+  const display = document.createElement('canvas');
+  display.width = DRAW; display.height = DRAW;
+  display.getContext('2d')!.drawImage(tmp, 0, 0, DRAW, DRAW);
+
+  // 128×128 walkable mask from processed result (alpha > 64 → walkable)
+  const mc = document.createElement('canvas');
+  mc.width = MASK_W; mc.height = MASK_H;
+  mc.getContext('2d')!.drawImage(tmp, 0, 0, MASK_W, MASK_H);
+  const mid = mc.getContext('2d')!.getImageData(0, 0, MASK_W, MASK_H);
+  const maskBuf = new ArrayBuffer(MASK_W * MASK_H);
+  const mask = new Uint8Array(maskBuf) as Uint8Array<ArrayBuffer>;
+  for (let i = 0; i < MASK_W * MASK_H; i++) {
+    mask[i] = mid.data[i * 4 + 3] > 64 ? 1 : 0;
+  }
+
+  return { canvas: display, mask };
+}
+
 export async function loadIslandAssets(base: string): Promise<void> {
   try {
-    const [islandImg, spaceImg, driftImg] = await Promise.all([
+    const [islandImg, spaceImg, driftImg, evoImg] = await Promise.all([
       loadImg(`${base}assets/island_map.png`),
       loadImg(`${base}assets/space_bg.png`),
       loadImg(`${base}assets/drift_sheet.png`),
+      loadImg(`${base}assets/evolution_sheet.png`).catch(() => null as unknown as HTMLImageElement),
     ]);
     const { canvas, mask } = processIsland(islandImg);
     islandState.islandCanvas = canvas;
     islandState.walkableMask = mask;
     islandState.spaceBgImg = spaceImg;
     islandState.driftSprites = processDriftSheet(driftImg);
+    islandState.grainCanvas = generateGrainCanvas();
+    if (evoImg) {
+      islandState.formSprites = processEvolutionSheet(evoImg);
+      console.log('[island] evolution sprites:', islandState.formSprites.length);
+    }
     islandState.ready = true;
     console.log('[island] assets ready ✓  mask walkable:', mask.reduce((a, b) => a + b, 0), 'of', mask.length, 'cells');
   } catch (e) {
@@ -206,7 +284,7 @@ export async function loadIslandAssets(base: string): Promise<void> {
  * Falls back to true while assets are loading so nothing breaks at boot.
  */
 export function isWalkable(worldX: number, worldY: number): boolean {
-  if (!islandState.ready) return true; // safe during load
+  if (!islandState.ready) return true;
   const mx = clamp((worldX / CONFIG.MAP_SIZE) * MASK_W | 0, 0, MASK_W - 1);
   const my = clamp((worldY / CONFIG.MAP_SIZE) * MASK_H | 0, 0, MASK_H - 1);
   return islandState.walkableMask[my * MASK_W + mx] > 0;
@@ -262,21 +340,17 @@ export function drawSpaceBg(
   camY: number,
 ): void {
   if (!islandState.spaceBgImg || !islandState.ready) {
-    // Fallback: solid dark violet + procedural stars (existing drawStars handles it)
     ctx.fillStyle = CONFIG.COLORS.uiBg;
     ctx.fillRect(view.x, view.y, view.w, view.h);
     return;
   }
   const img = islandState.spaceBgImg;
   const tw = img.width, th = img.height;
-  // Parallax offset: 0.25× camera means bg moves at quarter speed
   const ox = ((camX * 0.25) % tw + tw) % tw;
   const oy = ((camY * 0.25) % th + th) % th;
-  // Compute first tile origin so we tile to cover the whole view
   const x0 = view.x - ((view.x + ox) % tw + tw) % tw;
   const y0 = view.y - ((view.y + oy) % th + th) % th;
   ctx.save();
-  // No alpha: space bg is fully opaque
   for (let ty = y0; ty < view.y + view.h + th; ty += th) {
     for (let tx = x0; tx < view.x + view.w + tw; tx += tw) {
       ctx.drawImage(img, tx, ty);
@@ -291,6 +365,36 @@ export function drawIsland(ctx: CanvasRenderingContext2D): void {
   ctx.drawImage(islandState.islandCanvas, 0, 0, CONFIG.MAP_SIZE, CONFIG.MAP_SIZE);
 }
 
+/**
+ * Procedural 128px speckle/grain tile at 10% opacity — view-bounded.
+ * Clipped to the camera rectangle so we only emit ~100 drawImage calls, not 8k+.
+ */
+export function drawGrainOverlay(
+  ctx: CanvasRenderingContext2D,
+  view: { x: number; y: number; w: number; h: number },
+): void {
+  if (!islandState.grainCanvas || !islandState.ready) return;
+  const g = islandState.grainCanvas;
+  const tw = g.width, th = g.height;
+  const S = CONFIG.MAP_SIZE;
+  // clamp to visible world area
+  const left  = Math.max(0, view.x);
+  const top   = Math.max(0, view.y);
+  const right  = Math.min(S, view.x + view.w);
+  const bottom = Math.min(S, view.y + view.h);
+  if (right <= left || bottom <= top) return;
+  ctx.save();
+  ctx.globalAlpha = 0.10;
+  const x0 = Math.floor(left / tw) * tw;
+  const y0 = Math.floor(top  / th) * th;
+  for (let ty = y0; ty < bottom; ty += th) {
+    for (let tx = x0; tx < right; tx += tw) {
+      ctx.drawImage(g, tx, ty);
+    }
+  }
+  ctx.restore();
+}
+
 /** Drifting space objects — above space bg, below island */
 export function drawDriftObjects(ctx: CanvasRenderingContext2D): void {
   for (const d of islandState.driftObjects) {
@@ -302,4 +406,24 @@ export function drawDriftObjects(ctx: CanvasRenderingContext2D): void {
     ctx.drawImage(sprite, -d.size / 2, -d.size / 2, d.size, d.size);
     ctx.restore();
   }
+}
+
+/**
+ * Debug overlay: tints all non-walkable cells red at 40% opacity.
+ * Activate by loading the game with ?debug=mask in the URL.
+ */
+export function drawDebugMask(ctx: CanvasRenderingContext2D): void {
+  if (!islandState.ready) return;
+  const S = CONFIG.MAP_SIZE;
+  const cw = S / MASK_W, ch = S / MASK_H;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+  for (let my = 0; my < MASK_H; my++) {
+    for (let mx = 0; mx < MASK_W; mx++) {
+      if (!islandState.walkableMask[my * MASK_W + mx]) {
+        ctx.fillRect(mx * cw, my * ch, cw, ch);
+      }
+    }
+  }
+  ctx.restore();
 }
