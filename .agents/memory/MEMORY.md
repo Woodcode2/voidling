@@ -10,3 +10,4 @@
 - [Vite middleware before base-path rewrite](vite-middleware-before-base-rewrite.md) — custom dev-server middleware must be unshifted and match the base-prefixed URL before Vite's own rewrite runs.
 - [VOIDLING fx decals](voidling-fx-decals.md) — fissure (multiply blend, white BG) + scar (normal) decal pipeline; skip alpha-bounds scan for assets/fx/.
 - [VOIDLING v17 Feel Patch](voidling-v17.md) — no-blocking props (shakeT one-shot on undefined), bits (tier 0, spawnBit skips totalStartArea), vacuum (object-outer loop, velocity-only), score-floor growth (clamp-first fix), camera (radius×22.22), eat-pop (visual-only scale).
+- [VOIDLING v18 World Update](voidling-v18.md) — floating island (islandMap.ts), 2.5× map scale, space parallax, ledge falloff hearts, drift objects, islandState Uint8Array typing quirk.

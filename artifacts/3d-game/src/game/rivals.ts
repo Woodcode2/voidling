@@ -1,4 +1,5 @@
 import { CONFIG, type SkinDef } from './config';
+import { isWalkable } from './islandMap'; // Phase 2: island-edge avoidance
 import { meta } from './meta';
 import { clamp, lerp, dist } from './utils';
 import { Void } from './void';
@@ -405,6 +406,7 @@ export class BotController implements RivalController {
   }
 
   // v6 §6: blend in a repulsion vector when within BOT_WALL_MARGIN of an edge.
+  // Phase 2: also avoids island edge by sampling ahead of current travel direction.
   private avoidWalls(rival: Rival, intent: Intent): Intent {
     const m = CONFIG.MAP_SIZE;
     const marg = CONFIG.BOT_WALL_MARGIN;
@@ -413,6 +415,18 @@ export class BotController implements RivalController {
     if (rival.x > m - marg) rx -= (marg - (m - rival.x)) / marg;
     if (rival.y < marg) ry += (marg - rival.y) / marg;
     if (rival.y > m - marg) ry -= (marg - (m - rival.y)) / marg;
+
+    // Phase 2: sample 350px ahead in direction of travel; if off-island, push toward center
+    const aheadX = rival.x + intent.dirX * 350;
+    const aheadY = rival.y + intent.dirY * 350;
+    if (!isWalkable(aheadX, aheadY) || !isWalkable(rival.x, rival.y)) {
+      const cx = m / 2, cy = m / 2;
+      const ddx = cx - rival.x, ddy = cy - rival.y;
+      const dd = Math.hypot(ddx, ddy) || 1;
+      rx += (ddx / dd) * 1.8;
+      ry += (ddy / dd) * 1.8;
+    }
+
     if (rx === 0 && ry === 0) return intent;
     let dx = intent.dirX * intent.mag + rx * CONFIG.BOT_WALL_FORCE;
     let dy = intent.dirY * intent.mag + ry * CONFIG.BOT_WALL_FORCE;

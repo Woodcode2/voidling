@@ -83,6 +83,12 @@ export class Player extends Void {
   // Feel Patch §6: eat-pop scale — 1.06× on absorb, decays to 1.0 over ~200ms
   eatPopScale = 1.0;
 
+  // Phase 2 §2: ledge falloff state
+  fallState: 'none' | 'falling' = 'none';
+  fallTimer = 0;    // ms remaining in fall animation (1000 → 0)
+  fallRot = 0;      // accumulated spin angle (rad)
+  fallAlpha = 1.0;  // opacity during fall
+
   // animation
   private blinkTimer = 2000;
   private blinkVal = 0;
@@ -142,6 +148,11 @@ export class Player extends Void {
     this.skin = skin;
     this.mouthOpen = 0;
     this.chomp = 0;
+    // Phase 2 §2: reset fall state on respawn/restart
+    this.fallState = 'none';
+    this.fallTimer = 0;
+    this.fallRot = 0;
+    this.fallAlpha = 1.0;
   }
 
   get comboMult() { return 1 + Math.min(this.combo, 25) * 0.1; }
@@ -160,6 +171,19 @@ export class Player extends Void {
 
   update(dt: number) {
     this.tickMorph(dt);
+
+    // Phase 2 §2: ledge-fall animation — freeze all movement while falling
+    if (this.fallState === 'falling') {
+      this.fallTimer -= dt;
+      this.fallRot += dt * 0.007; // ~7 rad/sec spin
+      this.fallAlpha = Math.max(0, this.fallTimer / 1000);
+      if (this.ghostTime > 0) this.ghostTime -= dt;
+      if (this.tooBigCd > 0) this.tooBigCd -= dt;
+      if (this.tremorLogCd > 0) this.tremorLogCd -= dt;
+      if (this.comboTimer > 0) { this.comboTimer -= dt; if (this.comboTimer <= 0) this.combo = 0; }
+      return; // skip all movement and physics
+    }
+
     const dtSec = dt / 1000;
 
     const formSpeed = 1 + this.formIndex * CONFIG.FORM_SPEED_BONUS;
@@ -488,9 +512,45 @@ export class Player extends Void {
     };
   }
 
+  // Phase 2 §2: initiate ledge fall (engine.ts detects off-island, calls this)
+  startFall() {
+    if (this.fallState !== 'none') return;
+    this.fallState = 'falling';
+    this.fallTimer = 1000; // 1 second fall animation
+    this.fallRot = 0;
+    this.fallAlpha = 1.0;
+    this.vx = 0; this.vy = 0; // freeze velocity on fall start
+  }
+
+  // Phase 2 §2: engine.ts calls this after heart deduction to respawn on island
+  respawnFromFall(x: number, y: number) {
+    this.x = this.prevX = x;
+    this.y = this.prevY = y;
+    this.vx = 0; this.vy = 0;
+    this.fallState = 'none';
+    this.fallTimer = 0;
+    this.fallAlpha = 1.0;
+    this.fallRot = 0;
+    this.ghostTime = 2000; // 2s invulnerability on respawn
+  }
+
   draw(ctx: CanvasRenderingContext2D, t: number, alpha: number) {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
+
+    // Phase 2 §2: fall animation — shrink + spin + fade into the void
+    if (this.fallState === 'falling') {
+      const progress = 1 - Math.max(0, this.fallTimer) / 1000; // 0→1
+      const sc = Math.max(0.04, 1 - progress * 0.96); // shrinks to 4%
+      ctx.save();
+      ctx.globalAlpha = this.fallAlpha;
+      ctx.translate(rx, ry);
+      ctx.rotate(this.fallRot);
+      ctx.scale(sc, sc);
+      drawVoidling(ctx, 0, 0, this.visual(t));
+      ctx.restore();
+      return;
+    }
 
     if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
 

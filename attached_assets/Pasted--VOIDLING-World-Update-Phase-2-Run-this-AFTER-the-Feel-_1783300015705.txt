@@ -1,0 +1,55 @@
+# VOIDLING World Update (Phase 2)
+
+Run this AFTER the Feel Patch prompt has been completed. You are updating VOIDLING, a canvas-based HTML5 top-down arcade game. This is a surgical update that replaces the map with a hand-painted floating island, adds a space layer beneath it, and makes the island edge a real gameplay hazard. Read the relevant code before changing anything and keep changes minimal.
+
+## Do not touch
+- UI layout: leaderboard, quest list, timer, stage bar, pause button
+- Quest logic, point values, AI rival personalities and dialogue
+- Prop sprite art and the existing prop catalog
+- The Phase 1 systems (vacuum, continuous growth, camera zoom, no-block collision), except constants that must scale with the bigger world
+
+## Step 0: Download these three assets into the project as local static files
+Do not hotlink them at runtime. Download once, commit them to the repo.
+1. Island map, save as island_map.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_004954_1a7c575f-386a-46cf-8fd1-d050f0d8ad1d.png
+2. Space background, save as space_bg.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_005003_9d35e1cd-8a79-44ff-9ea0-c019c1e668c2.png
+3. Drifting objects sticker sheet, save as drift_sheet.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_005320_13a14a38-3b76-4148-8ae3-94d6ef12d92b.png
+
+## Change 1: Island map becomes the world
+- Process island_map.png once (at build time or first load): flood-fill from the four corners, turning the dark violet space region (pixels near hex 1E1338, use a generous threshold) fully transparent. Then keep only the largest connected opaque region and clear everything else, which removes any small stars baked in around the island. The result is the island with its white outline on transparency.
+- Render this as the single world ground layer. Scale it so the island spans roughly 2.5x the current map's larger dimension. Remove the old tile ground entirely.
+- Build a walkable mask from the opaque pixels (a sampled grid around 128x128 is fine). Opaque = island = walkable. Transparent = space.
+
+## Change 2: Ledge falloff (player hazard)
+- Each frame, sample the player's center against the walkable mask. If the player moves into space: trigger a fall. The void shrinks, spins, and fades over about 1 second with a small puff, plus a light screen shake.
+- Falling costs 1 heart and respawns the player near the island center after about 1.5 seconds with 2 seconds of invulnerability. Score is kept. If that was the last heart, run the normal game-over flow.
+- AI rivals must NEVER fall: their steering treats space as blocked and they turn away from the rim.
+
+## Change 3: Space layer underneath
+- Render space_bg.png as a parallax layer behind and below the island, tiled to cover the view, scrolling at about 0.25x camera movement. It is visible beyond the island rim and increasingly at high zoom-out.
+- Re-tune the camera max zoom clamp for the bigger world so a WORLD ENDER sized player sees the island clearly floating in space.
+
+## Change 4: Drifting space objects
+- Process drift_sheet.png once: flood-fill the solid dark violet background to transparent, slice the 3x2 grid into 6 cells, and trim each cell to its opaque bounding box. That yields 6 sprites: satellite, astronaut, cow, pizza, space duck, ice cream truck.
+- Every 20 to 40 seconds, spawn one random object drifting slowly across the space region outside the island with a gentle rotation, despawning off screen. Purely decorative, no collision, drawn above the space layer and below the island.
+
+## Change 5: Districts and spawning
+- Identify the island's five zones by looking at the map image: downtown core, suburbs, beach, forest, park. Define each as an approximate polygon or circle set in one config object.
+- Spawn existing props per zone with fitting mixes: forest is dense with trees, suburbs get houses, gnomes, mailboxes, downtown gets buildings, cars, people, park gets trees, benches, flowers, beach gets whatever fitting props already exist (people, benches, umbrellas if available). Do not create new prop art.
+- Scale total spawn counts up with the bigger map so density feels like the current game, not emptier.
+
+## Performance guardrail
+If the map texture plus mask hurts mobile frame rate or load time, you may downscale the island image to 1536 or slice it into quadrants for rendering. Test in a mobile-sized viewport.
+
+## Verify before finishing (play in the preview, do not skip)
+1. The island renders as one clean painted world, no tile seams, all five zones visible, waterfall at the rim.
+2. Walk off the edge: the fall animation plays, one heart is lost, respawn near center with brief invulnerability, score preserved.
+3. Rivals approach the rim and turn away, never falling.
+4. Space parallaxes behind the rim and a drifting object (cow, pizza, etc.) floats by within the first minute with clean transparent edges, no violet box.
+5. Forest is dense, suburbs have houses, downtown feels like downtown, and overall prop density matches the old game.
+6. All Phase 1 mechanics still work on the new map: vacuum, smooth growth, camera zoom, sliding past too-big props.
+7. Frame rate holds up on mobile in the densest zone and near the rim.
+
+When done, report what you changed file by file and confirm each of the 7 verification steps passed.
