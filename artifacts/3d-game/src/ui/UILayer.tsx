@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v18 · 4';
+const BUILD_STAMP = 'v19 · 0';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -143,18 +143,19 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
       aria-label="Skip splash"
       style={{ overflow: 'hidden' }}
     >
-      {/* Full-bleed cover image with slow-zoom: only shown when splash.png loads */}
+      {/* Phase 4 §7: island_map.png now lives only on the title screen (blurred behind logo) */}
       {hasSplash && (
         <img
-          src="/assets/splash.png"
+          src="/assets/island_map.png"
           alt=""
           aria-hidden="true"
           onError={() => setHasSplash(false)}
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
             objectFit: 'cover',
-            transform: zoomed ? 'scale(1.04)' : 'scale(1.0)',
-            transition: 'transform 2s ease-out',
+            filter: 'blur(5px) brightness(0.62)',
+            transform: zoomed ? 'scale(1.05)' : 'scale(1.0)',
+            transition: 'transform 2.5s ease-out',
             pointerEvents: 'none',
           }}
         />
@@ -777,7 +778,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           ? (snap.spellTimer / snap.spellTimerMax) * 360 : 0;
         return (
           <button
-            onClick={isHeld ? () => engine.castSpell() : undefined}
+            onPointerDown={isHeld ? (e) => { e.preventDefault(); console.log('POWER ACTIVATED: ' + rawId); engine.castSpell(); } : undefined}
             aria-label={isHeld ? `Cast ${rawId}` : `${rawId} active`}
             style={{
               position: 'fixed', bottom: 32, right: 24,
@@ -793,6 +794,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
               boxShadow: `0 4px 24px ${powerColor}66`,
               letterSpacing: '0.04em', lineHeight: 1.2,
               animation: isHeld ? 'vd-spell-pulse 1.6s ease-in-out infinite' : 'none',
+              touchAction: 'manipulation',
             }}
           >
             <span style={{ fontSize: 24 }}>{icon}</span>

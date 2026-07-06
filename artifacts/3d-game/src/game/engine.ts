@@ -427,9 +427,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
       CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
     );
-    camZoom = Math.min(fh / startView, 2.5 * ISLAND_SRC_W / CONFIG.MAP_SIZE);
-    // Fix 1 verification: ground magnification = screen pixels drawn per source pixel
-    console.log(`GROUND MAGNIFICATION AT START: ${(camZoom * CONFIG.MAP_SIZE / ISLAND_SRC_W).toFixed(3)}  (target ≤ 2.5)`);
+    // Phase 4 §5: no zoom cap — vector ground is crisp at any magnification.
+    camZoom = fh / startView;
 
     audio.startMusic();
     // War Pack §1: load sprite sheets (fire-and-forget; resolves within the first round)
@@ -1377,13 +1376,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const px = player.prevX + (player.x - player.prevX) * alpha;
     const py = player.prevY + (player.y - player.prevY) * alpha;
 
-    // ── camera: Feel Patch §5 — radius-proportional zoom (player ~9% of screen height) ──
-    // viewHeight = radius * 22.22 keeps apparent diameter = 2r/viewHeight * fh ≈ 9% fh.
-    // Min 350px (prevents hyper-zoom at spawn); max 3.5× screen height (sprites stay readable).
-    const viewHeight = clamp(player.radius * 22.22, 350, fh * 6); // Phase 2: wider zoom for big island
-    // Fix 1: never magnify the island image beyond 2.5× its source pixel size → sharp ground
-    const MAX_ISLAND_ZOOM = 2.5 * ISLAND_SRC_W / CONFIG.MAP_SIZE;
-    const targetZoom = Math.min(fh / viewHeight, MAX_ISLAND_ZOOM);
+    // ── camera: Phase 4 §5 — radius-proportional zoom, NO zoom cap (vector ground is always crisp) ──
+    // viewHeight = radius * 28.57 → diameter / fh ≈ 7% (player ~7% of screen height at spawn)
+    const viewHeight = clamp(player.radius * 28.57, 350, fh * 6);
+    const targetZoom = fh / viewHeight;
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
 
     // ── camera: follow with lookahead, NO dead zone (v5 §1) ──
@@ -1414,10 +1410,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.scale(camZoom, camZoom);
     ctx.translate(-camCX, -camCY);
 
-    // Phase 2: pass camera centre for correct 0.25× parallax (not raw player pos)
-    world.drawGround(ctx, view, clock, camCX, camCY);
-    // Phase 2: skip legacy grid dressing (crosswalks/manholes) once island is loaded
-    if (!islandState.ready) world.drawDressing(ctx, view, clock, camZoom);
+    // Phase 4: pass camZoom for vector ground cache invalidation
+    world.drawGround(ctx, view, clock, camCX, camCY, camZoom);
+    world.drawDressing(ctx, view, clock, camZoom);
     // Debug overlays (world-space, drawn before objects)
     if (debugMask)    drawDebugMask(ctx);
     if (debugTerrain) drawDebugTerrain(ctx);

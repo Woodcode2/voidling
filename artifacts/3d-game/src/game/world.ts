@@ -3,7 +3,8 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
-import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2
+import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
+import { HOUSE_LOTS } from './mapData'; // Phase 4 §4: lot-based house placement
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -550,6 +551,17 @@ export class WorldManager {
     // Life Pack §3: vignette scenes
     this.initVignettes(rand);
 
+    // Phase 4 §4: place one house per HOUSE_LOT — street-facing, 30–38 total.
+    // Replaces random house scatter in fillResidential for a real suburb layout.
+    {
+      const housePool: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
+      for (const lot of HOUSE_LOTS) {
+        const kind = housePool[Math.floor(rand() * housePool.length)];
+        this.makeObj(kind, lot.x, lot.y);
+      }
+      console.log('[world] Phase 4 house lots placed:', HOUSE_LOTS.length);
+    }
+
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
     const TREE_STEP = 300;
@@ -851,12 +863,8 @@ export class WorldManager {
   }
 
   private fillResidential(b: Block, rand: () => number) {
-    // v16 §1: four house variants — pick two distinct ones per block
-    const housePool: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
-    const ha = housePool[Math.floor(rand() * housePool.length)];
-    const hb = housePool[Math.floor(rand() * housePool.length)];
-    this.scatter(b, rand, ha, 1);
-    this.scatter(b, rand, hb, 1);
+    // Phase 4 §4: houses now placed on HOUSE_LOTS (street-aligned, lot-based).
+    // Random block-scatter houses removed; shed + accessories kept.
     this.scatter(b, rand, 'shed', 1);
     this.scatter(b, rand, 'tree', 3);
     this.scatter(b, rand, 'mailbox', 2);
@@ -1804,6 +1812,40 @@ export class WorldManager {
       obj.fleeing = false;
     }
 
+    // Phase 4 §4: junction turning — cars can turn at road intersections.
+    // Uses wanderAngle (unused for cars) as a per-junction cooldown to prevent rapid oscillation.
+    if (!obj.fleeing) {
+      const TURN_ZONE = 55; // px radius from junction center
+      for (const rc of ROAD_CENTERS) {
+        if (obj.roadAxis === 'h') {
+          // Horizontal car — can turn onto vertical road at x=rc
+          if (Math.abs(obj.x - rc) < TURN_ZONE && obj.wanderAngle <= 0) {
+            if (Math.random() < 0.022) { // ~22% per junction crossing
+              obj.roadAxis = 'v';
+              obj.homeX = rc;
+              obj.x = rc; // snap to road center
+              obj.roadDir = Math.random() < 0.5 ? 1 : -1;
+              obj.wanderAngle = 3.5; // 3.5s cooldown before next turn
+              break;
+            }
+          }
+        } else {
+          // Vertical car — can turn onto horizontal road at y=rc
+          if (Math.abs(obj.y - rc) < TURN_ZONE && obj.wanderAngle <= 0) {
+            if (Math.random() < 0.022) {
+              obj.roadAxis = 'h';
+              obj.homeY = rc;
+              obj.y = rc; // snap to road center
+              obj.roadDir = Math.random() < 0.5 ? 1 : -1;
+              obj.wanderAngle = 3.5;
+              break;
+            }
+          }
+        }
+      }
+      if (obj.wanderAngle > 0) obj.wanderAngle -= dtSec;
+    }
+
     if (obj.roadAxis === 'h') {
       obj.x += obj.roadDir * speed * dtSec;
       obj.y = obj.homeY;
@@ -1984,7 +2026,7 @@ export class WorldManager {
   }
 
   // ── ground + decor (drawn before objects, under the world transform) ──
-  drawGround(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t = 0, px = 0, py = 0) {
+  drawGround(ctx: CanvasRenderingContext2D, view: { x: number; y: number; w: number; h: number }, t = 0, px = 0, py = 0, camZoom = 0.15) {
     const G = CONFIG.COLORS.ground;
     const S = this.size;
 
@@ -1994,8 +2036,7 @@ export class WorldManager {
     drawStars(ctx, view); // procedural star overlay adds depth on top of space bg
     this.drawSpaceChunks(ctx, view, t);
     drawDriftObjects(ctx);
-    drawIsland(ctx); // transparent-bg island painting covers the world rect
-    drawGrainOverlay(ctx, view); // Fix 1: view-bounded 128px speckle tile at 10% opacity
+    drawIsland(ctx, t, camZoom); // Phase 4: vector ground (clock + zoom for waterfall anim + cache)
 
     // Life Pack §2: sports field ground decals (above island, below all props)
     for (const fd of this.fieldDecals) {
