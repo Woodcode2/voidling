@@ -45,6 +45,15 @@ export interface WorldObject {
   shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
   defense?: boolean;     // War Pack §2: defense unit converging on player
   pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
+  // Life Pack §3: vignette system
+  vignetteData?: {
+    id: string;
+    ambientText: string;
+    panicText: string;
+    eatenBanner: string;
+    ambientCd: number;   // ms until next ambient bubble may fire
+    panicked: boolean;   // true once panic bubble has fired (don't repeat)
+  };
 }
 
 export interface PlayerStats {
@@ -66,6 +75,28 @@ interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: nu
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail (fallback)
 // v16.2 §5: one decal-based fissure stamp per dropCrack() call
 interface FissureDecal { x: number; y: number; rot: number; scale: number; size: number; idx: 0|1; life: number; maxLife: number; }
+// Life Pack §2: sports field ground decal
+interface FieldDecal { kind: ObjectKind; cx: number; cy: number; halfW: number; halfH: number; }
+// Life Pack §3: vignette scene config
+interface VignetteConfig {
+  kind: ObjectKind;
+  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'any';
+  ambientText: string; panicText: string; eatenBanner: string; always: boolean;
+  supportProps?: ObjectKind[]; supportPeds?: ObjectKind[];
+}
+const VIGNETTE_CONFIGS: VignetteConfig[] = [
+  { kind: 'vig_proposal',  zone: 'park',        always: false, ambientText: 'Will you marr...', panicText: 'NOT NOW, I\'M MID PROPOSAL!', eatenBanner: '💍 ROMANCE: DEVOURED' },
+  { kind: 'vig_soccer',    zone: 'park',         always: true,  ambientText: 'GOOOAL!',          panicText: 'REF!! TIME OUT!!',           eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
+  { kind: 'vig_wedding',   zone: 'park',         always: false, ambientText: 'I do!',            panicText: 'SAVE THE CAKE!',             eatenBanner: '💒 WEDDING: CONSUMED' },
+  { kind: 'vig_couple',    zone: 'park',         always: false, ambientText: 'Fifty years, dear.', panicText: 'NOT LIKE THIS, HAROLD!',   eatenBanner: '👴 OLD COUPLE: DEVOURED' },
+  { kind: 'vig_busker',    zone: 'downtown',     always: false, ambientText: '🎵',               panicText: "EVERYONE'S A CRITIC!!",      eatenBanner: '🎸 BUSKER: SILENCED' },
+  { kind: 'vig_painter',   zone: 'park',         always: false, ambientText: 'The light is perfect.', panicText: 'MY MASTERPIECE!',      eatenBanner: '🎨 MASTERPIECE: DEVOURED' },
+  { kind: 'vig_selfie',    zone: 'park',         always: false, ambientText: 'Say cheese!',      panicText: 'WAIT, ONE MORE!',            eatenBanner: '📸 SELFIE MOMENT: EATEN' },
+  { kind: 'vig_kite',      zone: 'any',          always: false, ambientText: 'Wheee!',           panicText: 'MY KITE!!',                  eatenBanner: '🪁 KITE: GONE WITH THE VOID' },
+  { kind: 'vig_gardener',  zone: 'residential',  always: false, ambientText: 'Just watered those.', panicText: 'I JUST WATERED THOSE!', eatenBanner: '🌷 GARDEN: DEVOURED' },
+  // PLAYGROUND: anchor = pg_swing with cluster of equipment + kids
+  { kind: 'pg_swing', zone: 'park', always: true, ambientText: 'Wheee!', panicText: 'NOT THE SLIDE!', eatenBanner: '🛝 PLAYGROUND: DEVOURED', supportProps: ['pg_slide','pg_seesaw','pg_sandbox','pg_merrygoround'], supportPeds: ['person_mom','person_kid','person_kid'] },
+];
 
 const MARGIN = (CONFIG.MAP_SIZE - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
 const STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
@@ -280,6 +311,14 @@ const LIVING_KINDS: ObjectKind[] = [
   'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
   'person_sun', 'person_guard', 'person_dog', 'person_const',
   'taxi', 'police_car', 'school_bus', 'fire_truck', 'convertible', 'army_jeep',
+  // Life Pack §1: people2 — detailed pedestrians
+  'person_mom', 'person_dad', 'skateboarder', 'cyclist', 'waiter',
+  'icecream_vendor', 'person_jog2', 'person_elderly', 'tourist',
+  // Life Pack §3: vignette anchors behave like living NPCs
+  'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple', 'vig_busker',
+  'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
+  // Life Pack §4: military (defense system)
+  'tank', 'attack_heli', 'armored_humvee', 'missile_truck',
 ];
 
 export class WorldManager {
@@ -313,6 +352,10 @@ export class WorldManager {
   private rand: () => number = Math.random;
   planName = 'METRO';          // v16.2 §6: current city plan name
   openingBeatPersonId = -1;    // v16.2 §1: person who says "Huh… is that a void?"
+  // Life Pack §2: sports field decals (rendered in drawGround, not in objects[])
+  fieldDecals: FieldDecal[] = [];
+  // Life Pack §3: vignette eaten banners — read and cleared by engine.ts each tick
+  eatenVignetteBanners: string[] = [];
 
   constructor(size: number) {
     this.size = size;
@@ -381,6 +424,8 @@ export class WorldManager {
     this.playerStats = { count: 0, ducks: 0, maxTier: 0, gnomes: 0, houses: 0, cars: 0, people: 0, beachItems: 0, downtownItems: 0 };
     this.gnomeTotal = 0;
     this.gnomeLordPending = false;
+    this.fieldDecals = [];
+    this.eatenVignetteBanners = [];
     const rand = prng(hashString(seedStr));
     this.rand = rand;
 
@@ -500,6 +545,10 @@ export class WorldManager {
     this.validateDensity(rand);
     // v5 §3: build the ground-dressing layer (drawn under objects)
     this.buildDressing(rand);
+    // Life Pack §2: sports field decals
+    this.initSportsFields(rand);
+    // Life Pack §3: vignette scenes
+    this.initVignettes(rand);
 
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
@@ -661,14 +710,27 @@ export class WorldManager {
     }
   }
 
-  // War Pack §1: zone-biased person scatter — uses new diverse pedestrian sprites
-  private static readonly BEACH_PEOPLE: ObjectKind[] = ['person_fish', 'person_sun', 'person_guard', 'person_jog'];
-  private static readonly DOWNTOWN_PEOPLE: ObjectKind[] = ['person_biz', 'person_const', 'person_jog', 'person_kid'];
-  private static readonly RESIDENTIAL_PEOPLE: ObjectKind[] = ['person_granny', 'person_kid', 'person_dog', 'person_jog'];
-  private static readonly PARK_PEOPLE: ObjectKind[] = ['person_jog', 'person_kid', 'person_dog', 'person_granny'];
+  // Life Pack §1 + War Pack §1: zone-biased person scatter — detailed pedestrian sprites only (stick-figure 'person' retired)
+  private static readonly BEACH_PEOPLE: ObjectKind[] = [
+    'person_fish', 'person_sun', 'person_guard', 'person_jog', 'person_jog2', 'icecream_vendor', 'tourist',
+  ];
+  private static readonly DOWNTOWN_PEOPLE: ObjectKind[] = [
+    'person_biz', 'person_const', 'person_jog', 'skateboarder', 'waiter', 'tourist', 'cyclist',
+  ];
+  private static readonly RESIDENTIAL_PEOPLE: ObjectKind[] = [
+    'person_granny', 'person_elderly', 'person_mom', 'person_dad', 'person_dog',
+    'person_kid', 'person_jog', 'cyclist',
+  ];
+  private static readonly PARK_PEOPLE: ObjectKind[] = [
+    'person_jog', 'person_jog2', 'person_kid', 'person_elderly', 'person_mom', 'person_dad',
+    'icecream_vendor', 'cyclist', 'tourist',
+  ];
   private static readonly ALL_PEOPLE: ObjectKind[] = [
     'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
     'person_sun', 'person_guard', 'person_dog', 'person_const',
+    // Life Pack §1: people2
+    'person_mom', 'person_dad', 'skateboarder', 'cyclist', 'waiter',
+    'icecream_vendor', 'person_jog2', 'person_elderly', 'tourist',
   ];
 
   private scatterPeople(b: Block, rand: () => number, zone: 'beach'|'downtown'|'residential'|'park'|'any', n: number, avoidX?: number, avoidY?: number) {
@@ -693,6 +755,89 @@ export class WorldManager {
     o.living = true;
     o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 1000;
     return o;
+  }
+
+  // Life Pack §2: place sports field ground decals in their zones
+  private initSportsFields(rand: () => number) {
+    const parkBlocks = this.blocks.filter(b => b.type === 'park');
+    const downtownBlocks = this.blocks.filter(b => b.type === 'downtown');
+    const resBlocks = this.blocks.filter(b => b.type === 'residential');
+    const cx = (b: Block) => b.x0 + CONFIG.BLOCK_SIZE / 2;
+    const cy = (b: Block) => b.y0 + CONFIG.BLOCK_SIZE / 2;
+
+    if (parkBlocks.length) {
+      const pb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
+      this.fieldDecals.push({ kind: 'field_soccer', cx: cx(pb), cy: cy(pb), halfW: 200, halfH: 130 });
+    }
+    if (downtownBlocks.length) {
+      const db = downtownBlocks[Math.floor(rand() * downtownBlocks.length)];
+      // Place basketball court offset toward edge of block
+      this.fieldDecals.push({ kind: 'field_basketball', cx: db.x0 + CONFIG.BLOCK_SIZE * 0.75, cy: cy(db), halfW: 140, halfH: 80 });
+    }
+    if (resBlocks.length) {
+      const rb = resBlocks[Math.floor(rand() * resBlocks.length)];
+      this.fieldDecals.push({ kind: 'field_tennis', cx: cx(rb), cy: rb.y0 + CONFIG.BLOCK_SIZE * 0.7, halfW: 130, halfH: 70 });
+    }
+  }
+
+  // Life Pack §3: place vignette scenes across the map (7-10 per match)
+  private initVignettes(rand: () => number) {
+    const getBlocks = (zone: VignetteConfig['zone']) =>
+      zone === 'any' ? this.blocks
+      : this.blocks.filter(b =>
+          zone === 'park' ? b.type === 'park'
+        : zone === 'downtown' ? b.type === 'downtown'
+        : zone === 'residential' ? b.type === 'residential'
+        : zone === 'beach' ? b.type === 'beach'
+        : true
+      );
+
+    // Soccer field block for soccer vignette placement
+    const soccerField = this.fieldDecals.find(f => f.kind === 'field_soccer');
+
+    const alwaysVigs = VIGNETTE_CONFIGS.filter(vc => vc.always);
+    const optionalVigs = VIGNETTE_CONFIGS.filter(vc => !vc.always);
+    const target = 7 + Math.floor(rand() * 4); // 7–10 total
+    const optional = optionalVigs
+      .map(v => ({ v, sort: rand() }))
+      .sort((a, b) => a.sort - b.sort)
+      .slice(0, target - alwaysVigs.length)
+      .map(x => x.v);
+    const chosen = [...alwaysVigs, ...optional];
+
+    for (const vc of chosen) {
+      const blocks = getBlocks(vc.zone);
+      if (!blocks.length) continue;
+      const b = blocks[Math.floor(rand() * blocks.length)];
+
+      // Soccer vignette anchors on the soccer field decal if available
+      let ax = b.x0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
+      let ay = b.y0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
+      if (vc.kind === 'vig_soccer' && soccerField) {
+        ax = soccerField.cx + (rand() - 0.5) * soccerField.halfW * 0.8;
+        ay = soccerField.cy + (rand() - 0.5) * soccerField.halfH * 0.8;
+      }
+
+      const anchor = this.makeObj(vc.kind, ax, ay);
+      anchor.tether = 60;
+      anchor.vignetteData = {
+        id: vc.kind, ambientText: vc.ambientText, panicText: vc.panicText,
+        eatenBanner: vc.eatenBanner, ambientCd: 3000 + rand() * 4000, panicked: false,
+      };
+
+      // Supporting props scattered within 200px of anchor
+      const PROP_SPREAD = 160;
+      for (const pk of (vc.supportProps ?? [])) {
+        const ox = ax + (rand() - 0.5) * PROP_SPREAD, oy = ay + (rand() - 0.5) * PROP_SPREAD;
+        this.makeObj(pk, ox, oy);
+      }
+      // Supporting peds
+      for (const pk of (vc.supportPeds ?? [])) {
+        const ox = ax + (rand() - 0.5) * PROP_SPREAD, oy = ay + (rand() - 0.5) * PROP_SPREAD;
+        const o = this.makeObj(pk, ox, oy);
+        o.tether = 80;
+      }
+    }
   }
 
   private fillResidential(b: Block, rand: () => number) {
@@ -1101,6 +1246,31 @@ export class WorldManager {
     const voids = [player, ...rivals];
     let nearestEdibleD = Infinity;
     let nearestEdible: WorldObject | null = null;
+
+    // Life Pack §3: vignette ambient/panic bubbles (separate pass before main loop)
+    {
+      let activeBubbles = this.objects.filter(o => !o.eaten && o.bubbleLife > 0).length;
+      for (const obj of this.objects) {
+        if (obj.eaten || !obj.vignetteData) continue;
+        const vd = obj.vignetteData;
+        const dp = dist(obj.x, obj.y, player.x, player.y);
+        // Panic bubble fires once when player enters close range
+        if (!vd.panicked && dp < player.radius + obj.size + 200) {
+          vd.panicked = true;
+          if (!obj.bubbleText && activeBubbles < 4) {
+            obj.bubbleText = vd.panicText; obj.bubbleLife = 5000; activeBubbles++;
+          }
+        }
+        // Ambient bubble fires periodically when player is within 2000 world px
+        if (!vd.panicked && dp < 2000) {
+          vd.ambientCd -= dt;
+          if (vd.ambientCd <= 0 && !obj.bubbleText && activeBubbles < 4) {
+            obj.bubbleText = vd.ambientText; obj.bubbleLife = 4000;
+            vd.ambientCd = 8000 + Math.random() * 4000; activeBubbles++;
+          }
+        }
+      }
+    }
 
     for (const obj of this.objects) {
       if (obj.eaten) continue;
@@ -1662,6 +1832,12 @@ export class WorldManager {
       'person', 'soldier', 'zookeeper',
       'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
       'person_sun', 'person_guard', 'person_dog', 'person_const',
+      // Life Pack §1: people2
+      'person_mom', 'person_dad', 'skateboarder', 'cyclist', 'waiter',
+      'icecream_vendor', 'person_jog2', 'person_elderly', 'tourist',
+      // Life Pack §3: vignette anchors count as people for contracts
+      'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple', 'vig_busker',
+      'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
     ];
     if (HOUSE_KINDS.includes(obj.kind)) this.playerStats.houses++;
     if (CAR_KINDS.includes(obj.kind)) this.playerStats.cars++;
@@ -1674,6 +1850,9 @@ export class WorldManager {
     // v16.1 C: townhallEaten triggers on the townhall landmark object
     const blockType = this.blockTypeAt(obj.x, obj.y);
     if (blockType === 'townhall' || (blockType === 'civic' && obj.kind === 'townhall')) this.townhallEaten = true;
+
+    // Life Pack §3: vignette eaten banner (scoreMult=2 already in KIND_INFO for 2× pts)
+    if (obj.vignetteData) this.eatenVignetteBanners.push(obj.vignetteData.eatenBanner);
 
     // reaction flavor
     if (obj.kind === 'zoo_gate') {
@@ -1797,6 +1976,18 @@ export class WorldManager {
     drawDriftObjects(ctx);
     drawIsland(ctx); // transparent-bg island painting covers the world rect
     drawGrainOverlay(ctx, view); // Fix 1: view-bounded 128px speckle tile at 10% opacity
+
+    // Life Pack §2: sports field ground decals (above island, below all props)
+    for (const fd of this.fieldDecals) {
+      const sprite = (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).get(fd.kind);
+      if (!sprite) continue;
+      const imgW = sprite instanceof HTMLImageElement ? sprite.naturalWidth : sprite.width;
+      const imgH = sprite instanceof HTMLImageElement ? sprite.naturalHeight : sprite.height;
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(sprite, 0, 0, imgW, imgH, fd.cx - fd.halfW, fd.cy - fd.halfH, fd.halfW * 2, fd.halfH * 2);
+      ctx.restore();
+    }
 
     // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
     const scarImg = fxDecals.get('scar');

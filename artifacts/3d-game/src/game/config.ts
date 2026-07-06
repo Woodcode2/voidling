@@ -45,7 +45,20 @@ export type ObjectKind =
   // War Pack §1: new traffic + defense vehicles
   | 'taxi' | 'police_car' | 'school_bus' | 'fire_truck' | 'convertible' | 'army_jeep'
   // War Pack §1: new beach/park props
-  | 'cooler' | 'rowboat' | 'picnic_table' | 'kite_prop' | 'icecream_cart';
+  | 'cooler' | 'rowboat' | 'picnic_table' | 'kite_prop' | 'icecream_cart'
+  // Life Pack §1: people2 sheet (9 new detailed pedestrians)
+  | 'person_mom' | 'person_dad' | 'skateboarder' | 'cyclist' | 'waiter'
+  | 'icecream_vendor' | 'person_jog2' | 'person_elderly' | 'tourist'
+  // Life Pack §3: vignette anchors (from vignettes_sheet 3×3, row-major)
+  | 'vig_proposal' | 'vig_soccer' | 'vig_wedding' | 'vig_couple' | 'vig_busker'
+  | 'vig_painter' | 'vig_selfie' | 'vig_kite' | 'vig_gardener'
+  // Life Pack §3: playground props (from playground_sheet 3×3)
+  | 'pg_swing' | 'pg_slide' | 'pg_seesaw' | 'pg_sandbox' | 'pg_soccergoal'
+  | 'pg_soccerball' | 'pg_hoop' | 'pg_trampoline' | 'pg_merrygoround'
+  // Life Pack §4: military units (from military_sheet 2×2)
+  | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
+  // Life Pack §2: sports fields (ground decals — not edible world objects)
+  | 'field_soccer' | 'field_basketball' | 'field_tennis';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -268,16 +281,20 @@ export const CONFIG = {
   HUNT_MIN_AGGRO: 0.5,      // HUNT (targeting voids) needs at least this
   RIVAL_SPAWN_SCREENS: 1.5, // bigger-than-player rivals spawn this many screens away
 
-  // War Pack §2: defense wave thresholds (% of world devoured)
+  // War Pack §2 + Life Pack §4: defense wave thresholds (% of world devoured)
   DEFENSE_POLICE_THRESH: 5,    // % devoured → police cars deploy
-  DEFENSE_ARMY_THRESH: 20,     // % devoured → army jeeps join
-  DEFENSE_FULL_THRESH: 35,     // % devoured → continuous mixed assault
-  DEFENSE_MAX_UNITS: 12,       // cap on active defense units
+  DEFENSE_ARMY_THRESH: 20,     // % devoured → army jeeps + humvees join
+  DEFENSE_FULL_THRESH: 35,     // % devoured → TANKS ROLL IN (+ missile trucks)
+  DEFENSE_HELI_THRESH: 50,     // % devoured → AIR SUPPORT INBOUND (helicopters)
+  DEFENSE_MAX_UNITS: 12,       // cap on active defense units (perf guard)
   DEFENSE_UNIT_SPEED: 190,     // px/s base speed toward player
+  DEFENSE_TANK_SPEED: 70,      // px/s — tanks are heavy, move slowly
   DEFENSE_PELLET_SPEED: 220,   // px/s projectile speed
   DEFENSE_PELLET_COST: 20,     // score lost per pellet hit (no heart loss)
   DEFENSE_PELLET_CD: 2200,     // ms between pellets per unit
   DEFENSE_WAVE_CD: 18000,      // ms between wave reinforcements
+  DEFENSE_SHELL_WARN_MS: 1000, // ms landing-circle visible before impact
+  DEFENSE_SHELL_COST_PCT: 0.05,// 5% of score per shell/rocket hit
 
   COLORS: {
     // ── UI: Electric Pop ──
@@ -433,6 +450,45 @@ export const CONFIG = {
     picnic_table:  { tier: 3, minR: 38, maxR: 48 },
     kite_prop:     { tier: 2, minR: 22, maxR: 28 },
     icecream_cart: { tier: 3, minR: 36, maxR: 46 },
+    // Life Pack §1: people2 — 1.2× bigger than old stick figures so art detail reads
+    person_mom:      { tier: 3, minR: 34, maxR: 42 },   // stroller = larger footprint
+    person_dad:      { tier: 3, minR: 34, maxR: 42 },
+    skateboarder:    { tier: 3, minR: 32, maxR: 40 },
+    cyclist:         { tier: 3, minR: 38, maxR: 48 },   // with bike
+    waiter:          { tier: 3, minR: 32, maxR: 40 },
+    icecream_vendor: { tier: 3, minR: 36, maxR: 46 },
+    person_jog2:     { tier: 3, minR: 32, maxR: 40 },
+    person_elderly:  { tier: 3, minR: 30, maxR: 38 },
+    tourist:         { tier: 3, minR: 32, maxR: 40 },
+    // Life Pack §3: vignette anchors — T3, 2× score, flee when player approaches
+    vig_proposal:    { tier: 3, minR: 36, maxR: 46, scoreMult: 2 },
+    vig_soccer:      { tier: 3, minR: 38, maxR: 48, scoreMult: 2 },
+    vig_wedding:     { tier: 3, minR: 38, maxR: 48, scoreMult: 2 },
+    vig_couple:      { tier: 3, minR: 34, maxR: 42, scoreMult: 2 },
+    vig_busker:      { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
+    vig_painter:     { tier: 3, minR: 32, maxR: 40, scoreMult: 2 },
+    vig_selfie:      { tier: 3, minR: 34, maxR: 42, scoreMult: 2 },
+    vig_kite:        { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
+    vig_gardener:    { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
+    // Life Pack §3: playground equipment props
+    pg_swing:        { tier: 4, minR: 52, maxR: 62 },
+    pg_slide:        { tier: 4, minR: 48, maxR: 58 },
+    pg_seesaw:       { tier: 3, minR: 38, maxR: 46 },
+    pg_sandbox:      { tier: 3, minR: 36, maxR: 44 },
+    pg_soccergoal:   { tier: 4, minR: 54, maxR: 66 },
+    pg_soccerball:   { tier: 1, minR: 10, maxR: 14 },
+    pg_hoop:         { tier: 4, minR: 46, maxR: 56 },
+    pg_trampoline:   { tier: 4, minR: 44, maxR: 54 },
+    pg_merrygoround: { tier: 4, minR: 50, maxR: 60 },
+    // Life Pack §4: military units — building-tier, big score
+    tank:            { tier: 5, minR: 96, maxR: 116, scoreMult: 5 },  // 5× car
+    attack_heli:     { tier: 5, minR: 82, maxR: 100, scoreMult: 5 },
+    armored_humvee:  { tier: 4, minR: 62, maxR: 78,  scoreMult: 3 },
+    missile_truck:   { tier: 4, minR: 64, maxR: 80,  scoreMult: 3 },
+    // Life Pack §2: fields (ground decals — never edible)
+    field_soccer:     { tier: 0, minR: 260, maxR: 260 },
+    field_basketball: { tier: 0, minR: 200, maxR: 200 },
+    field_tennis:     { tier: 0, minR: 200, maxR: 200 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void
@@ -440,6 +496,12 @@ export const CONFIG = {
     'duck', 'dog', 'person',
     'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
     'person_sun', 'person_guard', 'person_dog', 'person_const',
+    // Life Pack §1: people2
+    'person_mom', 'person_dad', 'skateboarder', 'cyclist', 'waiter',
+    'icecream_vendor', 'person_jog2', 'person_elderly', 'tourist',
+    // Life Pack §3: vignette anchors also flee
+    'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple', 'vig_busker',
+    'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
     'monkey', 'flamingo', 'penguin',
   ] as ObjectKind[],
 
@@ -448,6 +510,12 @@ export const CONFIG = {
     'duck', 'dog', 'person',
     'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
     'person_sun', 'person_guard', 'person_dog', 'person_const',
+    // Life Pack §1: people2
+    'person_mom', 'person_dad', 'skateboarder', 'cyclist', 'waiter',
+    'icecream_vendor', 'person_jog2', 'person_elderly', 'tourist',
+    // Life Pack §3: vignette anchors
+    'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple', 'vig_busker',
+    'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
     'cat', 'squirrel', 'bird', 'crab', 'monkey', 'flamingo', 'penguin',
   ] as ObjectKind[],
 

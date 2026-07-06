@@ -1,0 +1,64 @@
+# VOIDLING Life Pack (Phase 3c)
+
+Run this AFTER the War Pack has been completed. You are filling VOIDLING's island with believable, funny life and finishing the military escalation. Read the relevant code before changing anything and keep changes minimal.
+
+## Do not touch
+- War Pack systems: predation, threat rings, rival AI, defense wave framework, powers
+- Fix Pack systems: camera clamp, walkable mask, no-slowdown rule, banner and speech bubbles
+- Quest logic and point values, match flow
+
+## Step 0: Download these five assets into the project as local static files
+Process each the same way as previous sheets: flood-fill the dark violet background to transparent, slice by grid, trim each cell to its bounding box.
+1. military_sheet.png (2x2 grid): tank, attack helicopter, armored humvee, missile launcher truck.
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_021401_a7aeb68c-d2e3-4b1e-b165-64d9eb129e8d.png
+2. people2_sheet.png (3x3 grid): soccer mom with stroller, dad with toddler on shoulders, skateboarder, cyclist, waiter with tray, ice cream vendor, jogger with headphones, elderly man with tiny dog, tourist with camera.
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_021409_9a0aacd4-a607-447b-95d0-6df66a6bd0f7.png
+3. vignettes_sheet.png (3x3 grid): proposing couple, kids chasing soccer ball, bride and groom, old couple on bench, painter at easel, busker with guitar, selfie friends, kid with kite, gardener watering flowers.
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_021418_7f042d5b-4ddc-479f-9068-40d01f9e8fb0.png
+4. playground_sheet.png (3x3 grid): swing set, slide, seesaw, sandbox, soccer goal, soccer ball, basketball hoop, trampoline, merry-go-round.
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_021426_09cf51e4-1233-4a07-84d5-a451769422a9.png
+5. fields_sheet.png (1 row of 3): soccer field, basketball court, tennis court.
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_021437_ad8e4f39-69bf-40ac-b9bd-56ed5da5b930.png
+
+## Change 1: Upgrade the population
+- Retire the old stick-figure pedestrians from all spawn tables. The pedestrian pool is now the nine characters from the previous people sheet plus the nine from people2_sheet.png.
+- Render pedestrians about 1.2x their old size so the added detail reads.
+- Zone bias: soccer mom, dad with toddler and kids favor playground and suburbs; skateboarder, waiter and tourist favor downtown; cyclist favors roads and park; ice cream vendor favors beach and park; jogger goes everywhere; elderly man favors suburbs and park.
+- Same edibility tier and panic behavior as before, including flee, exclamation marks and speech bubbles.
+
+## Change 2: Sports fields (ground decals)
+- Place the three fields as ground decals rendered above the island image and below all props: the soccer field large in the park zone, the basketball court at the downtown edge, the tennis court in the suburbs. Decals never block movement and are not edible; they are ground art. All must sit fully on walkable land.
+
+## Change 3: Vignette system (little scenes with jokes)
+A vignette is a placed scene: one anchor sticker from vignettes_sheet.png, optional supporting props, and a bubble script. Build a small config-driven system with these entries:
+- PROPOSAL: proposing couple placed under a large tree in the park. Ambient bubble: WILL YOU MARR... Panic: NOT NOW, I'M MID PROPOSAL. Eaten banner: ROMANCE: DEVOURED.
+- SOCCER GAME: kids-chasing-ball anchor placed ON the soccer field decal plus two soccer goals and a soccer ball from playground_sheet.png and 2 to 3 spectator peds. Ambient: GOOOAL! Panic: REF!! TIME OUT!!
+- PLAYGROUND: swing set, slide, seesaw, sandbox and merry-go-round clustered in the park or suburbs with the soccer mom and 2 kids nearby. Ambient: Wheee! Panic: NOT THE SLIDE!
+- WEDDING: bride and groom near a flower patch on the beach or in the park. Ambient: I do! Panic: SAVE THE CAKE!
+- OLD COUPLE: bench scene in the park. Ambient: Fifty years, dear. Panic: NOT LIKE THIS, HAROLD!
+- BUSKER: downtown sidewalk. Ambient: a music note bubble. Panic: EVERYONE'S A CRITIC!!
+- PAINTER: at the island rim facing space. Ambient: The light is perfect. Panic: MY MASTERPIECE!
+- SELFIE FRIENDS: near the waterfall or rim. Panic: WAIT, ONE MORE!
+- KITE KID: in the meadow. Panic: MY KITE!!
+- GARDENER: at a suburb flowerbed. Panic: I JUST WATERED THOSE.
+Mechanics: place 7 to 10 vignettes per match at their sensible spots (soccer game and playground always spawn, the rest random). Ambient bubbles fire occasionally when the player is within about two screen widths, with a per-vignette cooldown. Panic bubbles fire when the player closes in. Eating a vignette anchor awards double normal people points plus its eaten banner. Vignette props count toward percent devoured. Cap visible bubbles at 4 at once.
+
+## Change 4: Tier 4 military (finish the escalation)
+Swap the police car and jeep art in the defense waves for their proper roles and extend the ladder. All army rules from the War Pack still hold: hits break combo and cost a few points, never hearts, never slowdowns, everything edible at the right tier for big points.
+- From 35 percent devoured: TANKS ROLL IN (banner). 2 to 3 tanks, slow movers, lobbing shells that show a visible landing circle for 1 second before impact so they can be dodged. Shell hit costs 5 percent of score and breaks combo. Tanks are edible at the building tier, worth 5x car points.
+- From 50 percent devoured: AIR SUPPORT INBOUND (banner). 1 to 2 attack helicopters hover above the player casting a small moving shadow, firing pellet bursts. They cannot be touched normally, but at WORLD ENDER size any helicopter inside the vacuum radius gets dragged down and eaten with a big shake. Even the sky is not safe.
+- Humvees and missile trucks join tier 3 and 4 convoys; the missile truck fires one slow rocket at a time with a dodge indicator like the tank shell.
+- Cap simultaneous defense units at 12 for performance.
+
+## Verify before finishing (play in the preview, do not skip)
+1. No stick-figure pedestrians remain; new detailed people appear in their right zones.
+2. The soccer field decal sits in the park with the soccer game vignette on it: kids, goals, ball, spectators.
+3. Approach the proposal under a tree: ambient bubble fires; eat it and the ROMANCE: DEVOURED banner shows with double points.
+4. At least 7 vignettes exist in a match, all on walkable land, and no more than 4 bubbles show at once.
+5. At 35 percent devoured tanks arrive with a banner; shells show a landing circle, can be dodged, cost no hearts and never slow the player.
+6. At 50 percent a helicopter arrives with a banner, hovers with a shadow, and at WORLD ENDER size it can be vacuumed down and eaten.
+7. Eat a tank at building tier for 5x car points.
+8. Fields and vignettes count toward percent devoured (fields excluded, vignette props included) and everything respects the island mask.
+9. Frame rate holds on mobile with full deployment, helicopters, vignettes and bubbles active.
+
+When done, report what you changed file by file and confirm each of the 9 verification steps passed.

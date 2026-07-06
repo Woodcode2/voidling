@@ -1,21 +1,26 @@
 /**
- * wardSprites.ts — War Pack §1 sprite loader
+ * wardSprites.ts — War Pack §1 + Life Pack sprite loader
  *
- * Slices three sprite sheets at runtime and injects the results into the
+ * Slices all runtime sprite sheets and injects the results into the
  * objectSprites / spriteBounds / spriteContactFrac / spriteOrb maps so
  * the existing draw pipeline picks them up automatically.
  *
- * Sheet layouts (all cells equal size):
- *   people_sheet.png    3 cols × 3 rows  (9 person kinds)
- *   vehicles_sheet.png  3 cols × 2 rows  (6 vehicle kinds)
- *   beachpark_sheet.png 3 cols × 3 rows  (5 beach/park props + 4 spare)
+ * Sheet layouts (all cells equal size, row-major order):
+ *   people_sheet.png      3 cols × 3 rows  (9 person kinds — War Pack)
+ *   vehicles_sheet.png    3 cols × 2 rows  (6 vehicle kinds — War Pack)
+ *   beachpark_sheet.png   3 cols × 3 rows  (5 beach/park props — War Pack)
+ *   military_sheet.png    2 cols × 2 rows  (4 military units — Life Pack)
+ *   people2_sheet.png     3 cols × 3 rows  (9 detailed pedestrians — Life Pack)
+ *   vignettes_sheet.png   3 cols × 3 rows  (9 vignette anchors — Life Pack)
+ *   playground_sheet.png  3 cols × 3 rows  (9 playground props — Life Pack)
+ *   fields_sheet.png      3 cols × 1 row   (3 sports-field decals — Life Pack)
  */
 
 import { objectSprites, spriteBounds, spriteContactFrac, spriteOrb } from './sprites';
 import type { ObjectKind } from './config';
 
 // ── Kind assignments per sheet cell (row-major order) ──────────────────────
-const PEOPLE_KINDS: ObjectKind[] = [
+export const PEOPLE_KINDS: ObjectKind[] = [
   'person_biz', 'person_jog', 'person_kid',
   'person_granny', 'person_fish', 'person_sun',
   'person_guard', 'person_dog', 'person_const',
@@ -32,7 +37,32 @@ const BEACHPARK_KINDS: (ObjectKind | null)[] = [
   null, null, null,
 ];
 
-export { PEOPLE_KINDS };
+export const MILITARY_KINDS: ObjectKind[] = [
+  'tank', 'attack_heli',
+  'armored_humvee', 'missile_truck',
+];
+
+export const PEOPLE2_KINDS: ObjectKind[] = [
+  'person_mom', 'person_dad', 'skateboarder',
+  'cyclist', 'waiter', 'icecream_vendor',
+  'person_jog2', 'person_elderly', 'tourist',
+];
+
+export const VIGNETTE_KINDS: ObjectKind[] = [
+  'vig_proposal', 'vig_soccer', 'vig_wedding',
+  'vig_couple', 'vig_painter', 'vig_busker',
+  'vig_selfie', 'vig_kite', 'vig_gardener',
+];
+
+export const PLAYGROUND_KINDS: ObjectKind[] = [
+  'pg_swing', 'pg_slide', 'pg_seesaw',
+  'pg_sandbox', 'pg_soccergoal', 'pg_soccerball',
+  'pg_hoop', 'pg_trampoline', 'pg_merrygoround',
+];
+
+export const FIELD_KINDS: ObjectKind[] = [
+  'field_soccer', 'field_basketball', 'field_tennis',
+];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -40,15 +70,59 @@ function loadImg(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);   // graceful fail — game renders procedurally
+    img.onerror = () => resolve(null); // graceful fail — game renders procedurally
     img.crossOrigin = 'anonymous';
     img.src = src;
   });
 }
 
 /**
- * Slice a sheet image into `cols × rows` canvases, stripping near-white
- * backgrounds (BG-removal via flood-fill from the four corners).
+ * Adaptive background removal: samples the top-left corner pixel as the
+ * reference "background" colour, then flood-fills from all four corners
+ * removing pixels within a colour-distance threshold.
+ * Works for white BG (old sheets) and dark-violet BG (new Life-Pack sheets).
+ */
+function stripBackground(g: CanvasRenderingContext2D, w: number, h: number) {
+  const data = g.getImageData(0, 0, w, h);
+  const px = data.data;
+  const visited = new Uint8Array(w * h);
+
+  // Reference colour: the top-left corner pixel
+  const refR = px[0], refG = px[1], refB = px[2], refA = px[3];
+  if (refA < 8) return; // already transparent — nothing to strip
+
+  // Threshold: Euclidean distance in RGB space (squared)
+  const THRESH_SQ = 2500; // ~50 units — wide enough for anti-aliased bg fringe
+
+  const isBackground = (i: number) => {
+    const a = px[i + 3];
+    if (a < 8) return true;
+    const dr = px[i] - refR, dg = px[i + 1] - refG, db = px[i + 2] - refB;
+    return dr * dr + dg * dg + db * db < THRESH_SQ;
+  };
+
+  const queue: number[] = [];
+  const seed = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const idx = y * w + x;
+    if (!visited[idx] && isBackground(idx * 4)) {
+      visited[idx] = 1; queue.push(x, y);
+    }
+  };
+  seed(0, 0); seed(w - 1, 0); seed(0, h - 1); seed(w - 1, h - 1);
+
+  while (queue.length) {
+    const y = queue.pop()!;
+    const x = queue.pop()!;
+    px[(y * w + x) * 4 + 3] = 0;
+    seed(x - 1, y); seed(x + 1, y); seed(x, y - 1); seed(x, y + 1);
+  }
+  g.putImageData(data, 0, 0);
+}
+
+/**
+ * Slice a sheet image into `cols × rows` canvases, stripping the background
+ * (auto-detects white or dark-violet via corner-sampling).
  */
 function sliceSheet(
   sheet: HTMLImageElement,
@@ -61,60 +135,20 @@ function sliceSheet(
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const src = document.createElement('canvas');
-      src.width = cellW; src.height = cellH;
-      const g = src.getContext('2d')!;
+      const cvs = document.createElement('canvas');
+      cvs.width = cellW; cvs.height = cellH;
+      const g = cvs.getContext('2d')!;
       g.drawImage(sheet, col * cellW, row * cellH, cellW, cellH, 0, 0, cellW, cellH);
-
-      // Flood-fill BG removal from four corners if near-white
       stripBackground(g, cellW, cellH);
-
-      result.push(src);
+      result.push(cvs);
     }
   }
   return result;
 }
 
-/** Flood-fill from the four corners; pixels with RGB all > 220 are made transparent. */
-function stripBackground(g: CanvasRenderingContext2D, w: number, h: number) {
-  const data = g.getImageData(0, 0, w, h);
-  const px = data.data;
-  const visited = new Uint8Array(w * h);
-
-  const isNearWhite = (i: number) =>
-    px[i] > 220 && px[i + 1] > 220 && px[i + 2] > 220;
-
-  const queue: number[] = [];
-  const seed = (x: number, y: number) => {
-    const i = (y * w + x) * 4;
-    if (!visited[y * w + x] && isNearWhite(i)) {
-      visited[y * w + x] = 1;
-      queue.push(x, y);
-    }
-  };
-  seed(0, 0); seed(w - 1, 0); seed(0, h - 1); seed(w - 1, h - 1);
-
-  while (queue.length) {
-    const y = queue.pop()!;
-    const x = queue.pop()!;
-    const i = (y * w + x) * 4;
-    px[i + 3] = 0;
-    for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
-      const ni = (ny * w + nx) * 4;
-      if (!visited[ny * w + nx] && isNearWhite(ni)) {
-        visited[ny * w + nx] = 1;
-        queue.push(nx, ny);
-      }
-    }
-  }
-  g.putImageData(data, 0, 0);
-}
-
 /**
  * Scan a canvas sprite to fill spriteBounds, spriteContactFrac, spriteOrb.
- * Mirrors the logic in sprites.ts scanAlphaBounds / orb-band scan.
+ * Mirrors the pipeline in sprites.ts scanAlphaBounds.
  */
 function scanCanvasBounds(cvs: HTMLCanvasElement, key: string) {
   const g = cvs.getContext('2d');
@@ -150,23 +184,26 @@ function scanCanvasBounds(cvs: HTMLCanvasElement, key: string) {
       }
     }
   }
-  if (bMaxX >= 0) {
-    spriteContactFrac.set(key, (bMaxX - bMinX + 1) / W);
-  }
+  if (bMaxX >= 0) spriteContactFrac.set(key, (bMaxX - bMinX + 1) / W);
 
-  // Orb-band: rows 35%–95% of trimmed height → widest opaque run
+  // Orb-band: rows 35%–95% of trimmed height → widest opaque run + centroid
   const trimH = maxY - minY + 1;
   const orbY0 = minY + Math.floor(trimH * 0.35);
   const orbY1 = minY + Math.floor(trimH * 0.95);
   let orbMinX = W, orbMaxX = -1, orbCySum = 0, orbCyCount = 0;
   for (let y = orbY0; y <= orbY1 && y < H; y++) {
+    let rowMin = W, rowMax = -1;
     for (let x = 0; x < W; x++) {
       if (data[(y * W + x) * 4 + 3] > 8) {
-        if (x < orbMinX) orbMinX = x;
-        if (x > orbMaxX) orbMaxX = x;
+        if (x < rowMin) rowMin = x;
+        if (x > rowMax) rowMax = x;
       }
     }
-    if (orbMaxX >= 0) { orbCySum += y; orbCyCount++; }
+    if (rowMax >= 0) {
+      if (rowMin < orbMinX) orbMinX = rowMin;
+      if (rowMax > orbMaxX) orbMaxX = rowMax;
+      orbCySum += y; orbCyCount++;
+    }
   }
   if (orbMaxX >= 0 && orbCyCount > 0) {
     spriteOrb.set(key, { w: (orbMaxX - orbMinX + 1) / W, cy: (orbCySum / orbCyCount) / H });
@@ -181,32 +218,51 @@ export async function loadWardAssets(base: string): Promise<void> {
   if (_loaded) return;
   _loaded = true;
 
-  // Normalise base (ensure trailing slash)
   const b = base.endsWith('/') ? base : base + '/';
 
-  const [peopleImg, vehiclesImg, beachparkImg] = await Promise.all([
+  const [
+    peopleImg, vehiclesImg, beachparkImg,
+    militaryImg, people2Img, vignetteImg, playgroundImg, fieldsImg,
+  ] = await Promise.all([
     loadImg(`${b}assets/people_sheet.png`),
     loadImg(`${b}assets/vehicles_sheet.png`),
     loadImg(`${b}assets/beachpark_sheet.png`),
+    loadImg(`${b}assets/military_sheet.png`),
+    loadImg(`${b}assets/people2_sheet.png`),
+    loadImg(`${b}assets/vignettes_sheet.png`),
+    loadImg(`${b}assets/playground_sheet.png`),
+    loadImg(`${b}assets/fields_sheet.png`),
   ]);
 
   const inject = (kinds: (ObjectKind | null)[], canvases: HTMLCanvasElement[]) => {
     kinds.forEach((kind, idx) => {
       if (!kind || idx >= canvases.length) return;
       const cvs = canvases[idx];
-      // Cast needed because objectSprites was widened in sprites.ts
       (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(kind, cvs);
       scanCanvasBounds(cvs, kind);
     });
   };
 
-  if (peopleImg)    inject(PEOPLE_KINDS,   sliceSheet(peopleImg, 3, 3));
-  if (vehiclesImg)  inject(VEHICLE_KINDS,  sliceSheet(vehiclesImg, 3, 2));
+  // War Pack sheets
+  if (peopleImg)    inject(PEOPLE_KINDS,    sliceSheet(peopleImg, 3, 3));
+  if (vehiclesImg)  inject(VEHICLE_KINDS,   sliceSheet(vehiclesImg, 3, 2));
   if (beachparkImg) inject(BEACHPARK_KINDS, sliceSheet(beachparkImg, 3, 3));
 
-  console.log('[wardSprites] War Pack sprites loaded:', [
-    peopleImg ? '9 people' : 'people MISSING',
-    vehiclesImg ? '6 vehicles' : 'vehicles MISSING',
-    beachparkImg ? 'beach/park props' : 'beachpark MISSING',
+  // Life Pack sheets
+  if (militaryImg)    inject(MILITARY_KINDS,   sliceSheet(militaryImg, 2, 2));
+  if (people2Img)     inject(PEOPLE2_KINDS,    sliceSheet(people2Img, 3, 3));
+  if (vignetteImg)    inject(VIGNETTE_KINDS,   sliceSheet(vignetteImg, 3, 3));
+  if (playgroundImg)  inject(PLAYGROUND_KINDS, sliceSheet(playgroundImg, 3, 3));
+  if (fieldsImg)      inject(FIELD_KINDS,      sliceSheet(fieldsImg, 3, 1));
+
+  console.log('[wardSprites] Life Pack sprites loaded:', [
+    peopleImg    ? '9 people'         : 'people MISSING',
+    vehiclesImg  ? '6 vehicles'       : 'vehicles MISSING',
+    beachparkImg ? 'beach/park'       : 'beachpark MISSING',
+    militaryImg  ? '4 military'       : 'military MISSING',
+    people2Img   ? '9 people2'        : 'people2 MISSING',
+    vignetteImg  ? '9 vignettes'      : 'vignettes MISSING',
+    playgroundImg? '9 playground'     : 'playground MISSING',
+    fieldsImg    ? '3 fields'         : 'fields MISSING',
   ].join(', '));
 }

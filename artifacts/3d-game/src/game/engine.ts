@@ -178,9 +178,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let spellTimerMax = 0;          // War Pack §3: full duration for radial sweep HUD
   let showHitboxes = false;
   // War Pack §2: defense wave state
-  let defensePhase = 0;           // 0=none 1=police 2=army 3=full assault
+  let defensePhase = 0;           // 0=none 1=police 2=army 3=tanks 4=helis
   let defenseSpawnCd = 0;         // ms until next wave reinforcement
   const defensePellets: Array<{x:number;y:number;vx:number;vy:number;life:number}> = [];
+  // Life Pack §4: tank shells + missile-truck rockets (show landing circle before impact)
+  const defenseShells: Array<{tx:number;ty:number;warnT:number;warnMax:number;rocket:boolean}> = [];
   // War Pack §3: SINGULARITY black hole
   let singularity: {x:number;y:number;timer:number;score:number}|null = null;
   // War Pack §2: ms of red pellet-hit overlay remaining
@@ -397,7 +399,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     crackTimer = 0;
     // War Pack: reset power + defense state each round
     heldSpell = null; activeSpell = null; spellTimer = 0; spellTimerMax = 0;
-    defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0;
+    defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0; defenseShells.length = 0;
     singularity = null; pelletHitFlash = 0;
     finalFeastFired = false;
     finalFeastActive = false;
@@ -744,6 +746,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // objects (suction + eat + living-world AI)
     world.update(twDt, player, rivals, fx);
+    // Life Pack §3: flush vignette eaten banners
+    for (const msg of world.eatenVignetteBanners) banner(msg, '#FFD23F', 3);
+    world.eatenVignetteBanners.length = 0;
     updateDrift(twDt); // Phase 2: advance space drift objects
 
     // War Pack §2: defense wave system
@@ -761,33 +766,105 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
       if (defensePhase < 3 && pctDev >= CONFIG.DEFENSE_FULL_THRESH) {
         defensePhase = 3; defenseSpawnCd = 0;
-        banner('⚠️ FULL ASSAULT — Emergency defense protocol!', '#FF4D6D', 6, { pulse: true });
+        banner('🚀 TANKS ROLL IN — Military armor deployed!', '#FF4D6D', 6, { pulse: true });
+        queueTicker('🚀 Emergency: Heavy armored vehicles converging on void entity!');
+      }
+      if (defensePhase < 4 && pctDev >= CONFIG.DEFENSE_HELI_THRESH) {
+        defensePhase = 4; defenseSpawnCd = 0;
+        banner('🚁 AIR SUPPORT INBOUND — Nothing can stop this now!', '#FF4D6D', 7, { pulse: true });
+        queueTicker('🚁 Emergency: Combat helicopters deployed — void entity out of reach!');
       }
       if (defensePhase >= 1) {
         defenseSpawnCd -= dt;
         if (defenseSpawnCd <= 0) {
           defenseSpawnCd = CONFIG.DEFENSE_WAVE_CD;
-          spawnDefenseWave(Math.min(defensePhase, 3) as 1|2|3);
+          spawnDefenseWave(Math.min(defensePhase, 4) as 1|2|3|4);
         }
       }
-      // Steer defense units + fire pellets (TIME_WARP slows defense systems too)
+      // Steer defense units + fire pellets/shells (TIME_WARP slows defense systems too)
       for (const o of world.objects) {
         if (!o.defense || o.eaten) continue;
         const dx = player.x - o.x, dy = player.y - o.y;
         const d = Math.hypot(dx, dy) || 1;
-        if (d < 2000) {
-          const spd = o.kind === 'army_jeep' ? CONFIG.DEFENSE_UNIT_SPEED * 1.3 : CONFIG.DEFENSE_UNIT_SPEED;
-          o.vx = (dx / d) * spd; o.vy = (dy / d) * spd;
+        if (o.kind === 'attack_heli') {
+          // Helicopters hover: float 200px above player (in 2D world-space: track Y-200)
+          const hoverX = player.x - 200, hoverY = player.y - 200;
+          const hdx = hoverX - o.x, hdy = hoverY - o.y;
+          const hd = Math.hypot(hdx, hdy) || 1;
+          if (hd > 60) { o.vx = (hdx / hd) * CONFIG.DEFENSE_UNIT_SPEED * 0.9; o.vy = (hdy / hd) * CONFIG.DEFENSE_UNIT_SPEED * 0.9; }
+          else { o.vx *= 0.88; o.vy *= 0.88; }
+          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          // Helis fire pellet bursts
+          o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD * 0.7) - twDt;
+          if (o.pelletCd <= 0 && d < 1200) {
+            o.pelletCd = CONFIG.DEFENSE_PELLET_CD * 0.7 + Math.random() * 600;
+            for (let b = 0; b < 3; b++) {
+              const spread = (b - 1) * 0.2 + (Math.random() - 0.5) * 0.15;
+              const a = Math.atan2(player.y - o.y, player.x - o.x) + spread;
+              defensePellets.push({ x: o.x, y: o.y,
+                vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED * 1.1, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED * 1.1, life: 3200 });
+            }
+          }
+          // Helicopters skip normal suction — handled separately below
+        } else if (o.kind === 'tank') {
+          // Tanks: slow, fire shells with 1s landing-circle warning
+          if (d < 2200) { o.vx = (dx / d) * CONFIG.DEFENSE_TANK_SPEED; o.vy = (dy / d) * CONFIG.DEFENSE_TANK_SPEED; }
+          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.pelletCd = (o.pelletCd ?? 3000) - twDt;
+          if (o.pelletCd <= 0 && d < 1600) {
+            o.pelletCd = 3000 + Math.random() * 1500;
+            defenseShells.push({ tx: player.x + (Math.random()-0.5)*80, ty: player.y + (Math.random()-0.5)*80,
+              warnT: CONFIG.DEFENSE_SHELL_WARN_MS, warnMax: CONFIG.DEFENSE_SHELL_WARN_MS, rocket: false });
+          }
+        } else if (o.kind === 'missile_truck') {
+          // Missile trucks: medium speed, slower rockets
+          if (d < 2000) { o.vx = (dx / d) * CONFIG.DEFENSE_UNIT_SPEED * 1.1; o.vy = (dy / d) * CONFIG.DEFENSE_UNIT_SPEED * 1.1; }
+          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.pelletCd = (o.pelletCd ?? 2400) - twDt;
+          if (o.pelletCd <= 0 && d < 1800) {
+            o.pelletCd = 2400 + Math.random() * 1200;
+            defenseShells.push({ tx: player.x + (Math.random()-0.5)*60, ty: player.y + (Math.random()-0.5)*60,
+              warnT: CONFIG.DEFENSE_SHELL_WARN_MS * 1.3, warnMax: CONFIG.DEFENSE_SHELL_WARN_MS * 1.3, rocket: true });
+          }
+        } else {
+          // Police / army_jeep / armored_humvee: standard pellets
+          if (d < 2000) {
+            const spd = o.kind === 'army_jeep' ? CONFIG.DEFENSE_UNIT_SPEED * 1.3
+                      : o.kind === 'armored_humvee' ? CONFIG.DEFENSE_UNIT_SPEED * 0.9
+                      : CONFIG.DEFENSE_UNIT_SPEED;
+            o.vx = (dx / d) * spd; o.vy = (dy / d) * spd;
+          }
+          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD) - twDt;
+          if (o.pelletCd <= 0 && d < 1400) {
+            o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 800;
+            const spread = (Math.random() - 0.5) * 0.45;
+            const a = Math.atan2(player.y - o.y, player.x - o.x) + spread;
+            defensePellets.push({ x: o.x, y: o.y,
+              vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED, life: 3200 });
+          }
         }
-        o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-        o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-        o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD) - twDt;
-        if (o.pelletCd <= 0 && d < 1400) {
-          o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 800;
-          const spread = (Math.random() - 0.5) * 0.45;
-          const a = Math.atan2(player.y - o.y, player.x - o.x) + spread;
-          defensePellets.push({ x: o.x, y: o.y,
-            vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED, life: 3200 });
+      }
+      // Life Pack §4: WORLD ENDER vacuum eats helicopters
+      if (player.formIndex >= CONFIG.FORMS.length - 1) {
+        const vacuumR = player.radius * player.magnetMultiplier * CONFIG.CAPTURE_RADIUS_MULT;
+        for (const o of world.objects) {
+          if (o.eaten || !o.defense || o.kind !== 'attack_heli') continue;
+          const hd = dist(o.x, o.y, player.x, player.y);
+          if (hd < vacuumR) {
+            o.eaten = true;
+            world.eatenArea += Math.PI * o.baseSize * o.baseSize;
+            const heliInfo = CONFIG.KIND_INFO['attack_heli'];
+            const hpts = Math.round((heliInfo?.scoreMult ?? 5) * (heliInfo?.minR ?? 54) ** 2 / 100);
+            player.score += hpts;
+            fx.shake(400, 18); fx.flash();
+            fx.addRing(o.x, o.y, '#FF4D6D', 5, 150, 8, 600);
+            banner('🚁 Helicopter dragged down and consumed!', '#F15BB5', 4);
+          }
         }
       }
       // Update & hit-test pellets (motion slowed by TIME_WARP; flash uses full dt)
@@ -802,6 +879,23 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           pelletHitFlash = 300;
           audio.playEaten();
           banner(`🚔 Pellet hit! -${CONFIG.DEFENSE_PELLET_COST} pts`, '#FF9F1C', 2);
+        }
+      }
+      // Life Pack §4: tank/rocket shell countdown + impact
+      for (let si = defenseShells.length - 1; si >= 0; si--) {
+        const s = defenseShells[si];
+        s.warnT -= twDt;
+        if (s.warnT <= 0) {
+          defenseShells.splice(si, 1);
+          if (!player.ghost && dist(s.tx, s.ty, player.x, player.y) < player.radius * 0.75) {
+            const cost = Math.floor(player.score * CONFIG.DEFENSE_SHELL_COST_PCT);
+            player.score = Math.max(0, player.score - cost);
+            player.combo = 0; player.comboTimer = 0;
+            pelletHitFlash = 500;
+            audio.playEaten();
+            if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost} pts`, '#FF4D6D', 2);
+          }
+          fx.addConfetti(s.tx, s.ty, ['#FF4D6D', '#FF9F1C'], 12);
         }
       }
       if (pelletHitFlash > 0) pelletHitFlash -= dt;
@@ -1153,12 +1247,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     return bigR >= smallR * CONFIG.RIVAL_EAT_RATIO && d <= bigR - smallR * 0.15;
   }
 
-  // War Pack §2: spawn a wave of defense units from map edges
-  function spawnDefenseWave(phase: 1|2|3) {
+  // Life Pack §4 + War Pack §2: spawn a wave of defense units from map edges
+  function spawnDefenseWave(phase: 1|2|3|4) {
     if (!world) return;
     const existing = world.objects.filter(o => o.defense && !o.eaten).length;
     if (existing >= CONFIG.DEFENSE_MAX_UNITS) return;
-    const count = Math.min(phase === 3 ? 5 : phase === 2 ? 4 : 3, CONFIG.DEFENSE_MAX_UNITS - existing);
+    const count = Math.min(phase >= 3 ? 5 : phase === 2 ? 4 : 3, CONFIG.DEFENSE_MAX_UNITS - existing);
     const S = CONFIG.MAP_SIZE;
     for (let i = 0; i < count; i++) {
       const edge = Math.floor(Math.random() * 4);
@@ -1167,7 +1261,19 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       else if (edge === 1) { x = S - 60; y = Math.random() * S; }
       else if (edge === 2) { x = Math.random() * S; y = S - 60; }
       else                 { x = 60; y = Math.random() * S; }
-      const kind: ObjectKind = (phase >= 2 && Math.random() < 0.55) ? 'army_jeep' : 'police_car';
+      let kind: ObjectKind;
+      if (phase >= 4) {
+        // Phase 4: helis (1–2 per wave) plus some tanks
+        kind = (i < 2) ? 'attack_heli' : (Math.random() < 0.5 ? 'tank' : 'missile_truck');
+      } else if (phase === 3) {
+        // Phase 3: tanks + missile trucks
+        kind = Math.random() < 0.6 ? 'tank' : 'missile_truck';
+      } else if (phase === 2) {
+        // Phase 2: army_jeep + armored_humvee
+        kind = Math.random() < 0.55 ? 'army_jeep' : 'armored_humvee';
+      } else {
+        kind = 'police_car';
+      }
       world.spawnDefenseUnit(kind, x, y);
     }
   }
@@ -1408,6 +1514,34 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.beginPath(); ctx.arc(p.x, p.y, 7 / camZoom, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
       ctx.restore();
+    }
+    // Life Pack §4: tank/rocket shell landing-circle warning (world space)
+    for (const s of defenseShells) {
+      const warnFrac = clamp(s.warnT / s.warnMax, 0, 1);
+      const cRadius = s.rocket ? 44 : 62;
+      ctx.save();
+      ctx.globalAlpha = 0.7 - 0.45 * warnFrac;
+      ctx.strokeStyle = s.rocket ? '#FF9F1C' : '#FF4D6D';
+      ctx.lineWidth = (3 + (1 - warnFrac) * 2) / camZoom;
+      ctx.shadowColor = s.rocket ? '#FF9F1C' : '#FF4D6D'; ctx.shadowBlur = 8 / camZoom;
+      ctx.beginPath();
+      ctx.arc(s.tx, s.ty, cRadius * (0.5 + 0.5 * warnFrac) / camZoom * camZoom, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+    // Life Pack §4: helicopter shadow ellipse (world space, below the unit)
+    if (world) {
+      for (const o of world.objects) {
+        if (o.eaten || !o.defense || o.kind !== 'attack_heli') continue;
+        ctx.save();
+        ctx.globalAlpha = 0.22 + 0.08 * Math.sin(clock / 400);
+        ctx.fillStyle = '#1a0830';
+        ctx.beginPath();
+        ctx.ellipse(o.x, o.y + o.size * 0.3, o.size * 1.1, o.size * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
     ctx.restore();
 
