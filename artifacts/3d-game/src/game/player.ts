@@ -64,6 +64,7 @@ export class Player extends Void {
   gnomeScoreMult = 1;
   magnetMultiplier = 1;
   speedMultiplier = 1;
+  suctionMult = 1;     // War Pack §3: EVENT_HORIZON doubles suction acceleration
   twinMerge = false;
   tremorActive = false;
   greedMultiplier = 1;
@@ -128,6 +129,7 @@ export class Player extends Void {
     this.gnomeScoreMult = 1;
     this.magnetMultiplier = 1;
     this.speedMultiplier = 1;
+    this.suctionMult = 1; // War Pack §3
     this.twinMerge = false;
     this.tremorActive = false;
     this.greedMultiplier = 1;

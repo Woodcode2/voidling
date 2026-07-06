@@ -12,3 +12,4 @@
 - [VOIDLING v17 Feel Patch](voidling-v17.md) — no-blocking props (shakeT one-shot on undefined), bits (tier 0, spawnBit skips totalStartArea), vacuum (object-outer loop, velocity-only), score-floor growth (clamp-first fix), camera (radius×22.22), eat-pop (visual-only scale).
 - [VOIDLING v18 World Update](voidling-v18.md) — floating island (islandMap.ts), 2.5× map scale, space parallax, ledge falloff hearts, drift objects, islandState Uint8Array typing quirk.
 - [VOIDLING v18·1 Phase 3a Fix Pack](voidling-v18-1.md) — PROC/DRAW 2048/4096, zoom cap, view-bounded grain, evolution sprites, no coast slow, sticker outline, fissure void fill, banner ticker, filterNonWalkable (no exemptions).
+- [VOIDLING v18·2 War Pack](voidling-v18-2.md) — sheet-sliced sprites (wardSprites.ts), 9 person kinds + 6 vehicles + 5 props, predation overhaul (1.3×, 30s grace, 50% steal), defense waves (police/army), 4 new powers (EVENT_HORIZON/WORMHOLE/TIME_WARP/SINGULARITY).

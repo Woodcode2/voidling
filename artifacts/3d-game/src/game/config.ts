@@ -38,7 +38,14 @@ export type ObjectKind =
   | 'monkey' | 'flamingo' | 'penguin'
   | 'zoo_gate' | 'zoo_wall' | 'zookeeper'
   // Feel Patch: debris bit (tier 0, always edible)
-  | 'bit';
+  | 'bit'
+  // War Pack §1: diverse pedestrians (replace old stick-figure 'person' in spawns)
+  | 'person_biz' | 'person_jog' | 'person_kid' | 'person_granny' | 'person_fish'
+  | 'person_sun' | 'person_guard' | 'person_dog' | 'person_const'
+  // War Pack §1: new traffic + defense vehicles
+  | 'taxi' | 'police_car' | 'school_bus' | 'fire_truck' | 'convertible' | 'army_jeep'
+  // War Pack §1: new beach/park props
+  | 'cooler' | 'rowboat' | 'picnic_table' | 'kite_prop' | 'icecream_cart';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -251,7 +258,7 @@ export const CONFIG = {
 
   // Rivals
   RIVAL_COUNT: 4,
-  RIVAL_EAT_RATIO: 1.15,    // eater radius >= 1.15x eaten radius
+  RIVAL_EAT_RATIO: 1.3,     // War Pack: eater radius >= 1.3× eaten radius (was 1.15)
   GHOST_TIME: 2500,         // invulnerable ms after being eaten
   RESPAWN_MASS_FRAC: 0.65,  // respawn at 65% of mass
 
@@ -260,6 +267,17 @@ export const CONFIG = {
   AGGRO_FULL_MS: 45000,     // 1.0 aggression at/after this
   HUNT_MIN_AGGRO: 0.5,      // HUNT (targeting voids) needs at least this
   RIVAL_SPAWN_SCREENS: 1.5, // bigger-than-player rivals spawn this many screens away
+
+  // War Pack §2: defense wave thresholds (% of world devoured)
+  DEFENSE_POLICE_THRESH: 5,    // % devoured → police cars deploy
+  DEFENSE_ARMY_THRESH: 20,     // % devoured → army jeeps join
+  DEFENSE_FULL_THRESH: 35,     // % devoured → continuous mixed assault
+  DEFENSE_MAX_UNITS: 12,       // cap on active defense units
+  DEFENSE_UNIT_SPEED: 190,     // px/s base speed toward player
+  DEFENSE_PELLET_SPEED: 220,   // px/s projectile speed
+  DEFENSE_PELLET_COST: 20,     // score lost per pellet hit (no heart loss)
+  DEFENSE_PELLET_CD: 2200,     // ms between pellets per unit
+  DEFENSE_WAVE_CD: 18000,      // ms between wave reinforcements
 
   COLORS: {
     // ── UI: Electric Pop ──
@@ -392,13 +410,46 @@ export const CONFIG = {
     zookeeper:     { tier: 3, minR: 28, maxR: 34 },
     // Feel Patch: debris bits — tier 0, always edible at any radius
     bit:           { tier: 0, minR: 4, maxR: 7 },
+    // War Pack §1: people (T3 — same tier as old 'person', smaller for kid)
+    person_biz:    { tier: 3, minR: 28, maxR: 34 },
+    person_jog:    { tier: 3, minR: 28, maxR: 34 },
+    person_kid:    { tier: 2, minR: 20, maxR: 26 },
+    person_granny: { tier: 3, minR: 28, maxR: 34 },
+    person_fish:   { tier: 3, minR: 28, maxR: 34 },
+    person_sun:    { tier: 3, minR: 30, maxR: 38 },
+    person_guard:  { tier: 3, minR: 28, maxR: 34 },
+    person_dog:    { tier: 3, minR: 32, maxR: 40 },
+    person_const:  { tier: 3, minR: 28, maxR: 34 },
+    // War Pack §1: vehicles
+    taxi:          { tier: 4, minR: 54, maxR: 66 },
+    police_car:    { tier: 4, minR: 54, maxR: 66, scoreMult: 3 },
+    school_bus:    { tier: 5, minR: 78, maxR: 90 },
+    fire_truck:    { tier: 5, minR: 80, maxR: 96, scoreMult: 2 },
+    convertible:   { tier: 4, minR: 50, maxR: 62 },
+    army_jeep:     { tier: 4, minR: 58, maxR: 72, scoreMult: 3 },
+    // War Pack §1: beach/park props
+    cooler:        { tier: 2, minR: 18, maxR: 24 },
+    rowboat:       { tier: 4, minR: 58, maxR: 72 },
+    picnic_table:  { tier: 3, minR: 38, maxR: 48 },
+    kite_prop:     { tier: 2, minR: 22, maxR: 28 },
+    icecream_cart: { tier: 3, minR: 36, maxR: 46 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void
-  FLEEING_KINDS: ['duck', 'dog', 'person', 'monkey', 'flamingo', 'penguin'] as ObjectKind[],
+  FLEEING_KINDS: [
+    'duck', 'dog', 'person',
+    'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
+    'person_sun', 'person_guard', 'person_dog', 'person_const',
+    'monkey', 'flamingo', 'penguin',
+  ] as ObjectKind[],
 
   // v14 §2: living kinds that flail while in orbit
-  LIVING_ORBIT_KINDS: ['duck', 'dog', 'person', 'cat', 'squirrel', 'bird', 'crab', 'monkey', 'flamingo', 'penguin'] as ObjectKind[],
+  LIVING_ORBIT_KINDS: [
+    'duck', 'dog', 'person',
+    'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
+    'person_sun', 'person_guard', 'person_dog', 'person_const',
+    'cat', 'squirrel', 'bird', 'crab', 'monkey', 'flamingo', 'penguin',
+  ] as ObjectKind[],
 
   SKINS: [
     { id: 'classic',   name: 'Classic',   cost: 0,    bodyColor: '#3A1E6B', glowColor: '#B388FF', eyeStyle: 'normal', accessories: [] },
@@ -433,13 +484,12 @@ export const CONFIG = {
     { id: 'lucky',     name: 'Lucky Gnome',     desc: 'A golden snack every 10s' },
   ] as BoonDef[],
 
-  // v15 §3: SPELLS — teal card class, mixed into boon picks
+  // War Pack §3: POWERS — replaces old spells (garlic/freeze/switcheroo/puny/bubble)
   SPELLS: [
-    { id: 'garlic',     name: 'GARLIC BREATH', desc: '10s: repel + slow nearby rivals',           color: '#5ECC6B' },
-    { id: 'freeze',     name: 'FREEZE POP',     desc: 'Freeze the next void you touch for 2.5s',  color: '#6BE4FF' },
-    { id: 'switcheroo', name: 'SWITCHEROO',     desc: 'Instantly swap with the nearest void',     color: '#C27BFF' },
-    { id: 'puny',       name: 'PUNY BEAM',      desc: 'Zap nearest larger rival: −15% mass',      color: '#FFD23F' },
-    { id: 'bubble',     name: 'BUBBLE TRAP',    desc: 'Drop a bubble that traps the first toucher', color: '#A8D8FF' },
+    { id: 'event_horizon', name: 'EVENT HORIZON', desc: '6s: vacuum 2.5× + pull speed 2×',              color: '#9B5DE5' },
+    { id: 'wormhole',      name: 'WORMHOLE',      desc: 'Dash 4 body-lengths + 0.5s invulnerability',   color: '#00BBF9' },
+    { id: 'time_warp',     name: 'TIME WARP',     desc: '5s: all rivals + props move at 40% speed',     color: '#2D9CDB' },
+    { id: 'singularity',   name: 'SINGULARITY',   desc: '4s black hole — sucks props in, pops with burst', color: '#F15BB5' },
   ] as { id: string; name: string; desc: string; color: string }[],
 
   // v7 §5: synergies — auto-trigger when BOTH members are active at once.

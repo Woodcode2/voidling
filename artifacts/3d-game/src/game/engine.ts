@@ -1,4 +1,4 @@
-import { CONFIG, type BoonDef, type SkinDef } from './config';
+import { CONFIG, type BoonDef, type SkinDef, type ObjectKind } from './config';
 import { audio } from './audio';
 import { FXManager, type FloatingText } from './fx';
 import { WorldManager } from './world';
@@ -11,6 +11,7 @@ import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, ISLAND_SRC_W } from './islandMap'; // Phase 2
+import { loadWardAssets } from './wardSprites'; // War Pack §1
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -62,6 +63,8 @@ export interface Snapshot {
   radii: Array<{name:string; radius:number; mass:number; score:number; overLaw:boolean}>;
   heldSpell: BoonDef | null;
   activeSpell: string | null;
+  spellTimer: number;     // War Pack §3: ms remaining for active power (0 = none)
+  spellTimerMax: number;  // War Pack §3: full power duration (for conic-gradient sweep)
   showHitboxes: boolean;
   // v16 (ticker removed in Fix 7 — events route to banner pill)
   contracts: Array<{id: string; name: string; done: boolean; reward: number}>;
@@ -168,13 +171,20 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
   let countStep = 0;           // v8 §1: last countdown number beeped
   let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
-  // v15 §3: spell system
+  // v15 §3 → War Pack §3: power system
   let heldSpell: BoonDef | null = null;
   let activeSpell: string | null = null;
   let spellTimer = 0;
-  let spellFrozenRival: Rival | null = null;
-  let spellBubble: { x: number; y: number; r: number } | null = null;
+  let spellTimerMax = 0;          // War Pack §3: full duration for radial sweep HUD
   let showHitboxes = false;
+  // War Pack §2: defense wave state
+  let defensePhase = 0;           // 0=none 1=police 2=army 3=full assault
+  let defenseSpawnCd = 0;         // ms until next wave reinforcement
+  const defensePellets: Array<{x:number;y:number;vx:number;vy:number;life:number}> = [];
+  // War Pack §3: SINGULARITY black hole
+  let singularity: {x:number;y:number;timer:number;score:number}|null = null;
+  // War Pack §2: ms of red pellet-hit overlay remaining
+  let pelletHitFlash = 0;
   // Fix 2: ?debug=mask tints non-walkable cells red for mask verification
   const debugMask = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mask';
   // v16 §5: news ticker + contracts
@@ -385,6 +395,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     countdown = 0;
     countStep = 0;
     crackTimer = 0;
+    // War Pack: reset power + defense state each round
+    heldSpell = null; activeSpell = null; spellTimer = 0; spellTimerMax = 0;
+    defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0;
+    singularity = null; pelletHitFlash = 0;
     finalFeastFired = false;
     finalFeastActive = false;
     openingBeatDone = false;
@@ -411,6 +425,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     camZoom = Math.min(fh / startView, 2.5 * ISLAND_SRC_W / CONFIG.MAP_SIZE);
 
     audio.startMusic();
+    // War Pack §1: load sprite sheets (fire-and-forget; resolves within the first round)
+    void loadWardAssets(import.meta.env.BASE_URL);
 
     results = null;
     screen = 'game';
@@ -662,6 +678,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const mL = boonLevel('magnet'), oL = boonLevel('overdrive');
     const gL = boonLevel('greed'), tL = boonLevel('tremor'), twL = boonLevel('twin');
 
+    player.suctionMult = 1;  // War Pack §3: reset each tick; EVENT_HORIZON overrides below
     player.magnetMultiplier = 1 + (mL ? (mL >= 2 ? 0.7 : 0.4) : 0); // GRAVITY GLUTTON: +40%/+70% reach
     // v12 §4: compose daily ZOOM ZOOM with boon ZOOMIES so neither overwrites the other
     player.speedMultiplier  = dailyZoomies * (1 + (oL ? (oL >= 2 ? 0.4 : 0.25) : 0));
@@ -711,6 +728,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
 
+    // War Pack §3: TIME WARP — rivals + world move at 40% speed, player runs full dt
+    const twDt = (activeSpell === 'time_warp' && spellTimer > 0) ? dt * 0.4 : dt;
+
     // rivals
     for (let i = 0; i < rivals.length; i++) {
       const others: WorldView['voids'] = [{ x: player.x, y: player.y, radius: player.ghost ? 0.001 : player.radius }];
@@ -719,12 +739,103 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           others.push({ x: rivals[j].x, y: rivals[j].y, radius: rivals[j].radius });
         }
       }
-      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0, playerRadius: player?.radius ?? CONFIG.PLAYER_BASE_RADIUS });
+      rivals[i].update(twDt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0, playerRadius: player?.radius ?? CONFIG.PLAYER_BASE_RADIUS });
     }
 
     // objects (suction + eat + living-world AI)
-    world.update(dt, player, rivals, fx);
-    updateDrift(dt); // Phase 2: advance space drift objects
+    world.update(twDt, player, rivals, fx);
+    updateDrift(twDt); // Phase 2: advance space drift objects
+
+    // War Pack §2: defense wave system
+    if (world && player && world.initialMass > 0) {
+      const pctDev = world.eatenArea / world.initialMass * 100;
+      if (defensePhase < 1 && pctDev >= CONFIG.DEFENSE_POLICE_THRESH) {
+        defensePhase = 1; defenseSpawnCd = 0;
+        banner('🚔 Police response to your rampage!', '#FF9F1C', 4, { pulse: true });
+        queueTicker('🚔 Law enforcement deploying to contain the void entity!');
+      }
+      if (defensePhase < 2 && pctDev >= CONFIG.DEFENSE_ARMY_THRESH) {
+        defensePhase = 2; defenseSpawnCd = 0;
+        banner('🪖 ARMY MOBILIZED — Military response incoming!', '#FF4D6D', 5, { pulse: true });
+        queueTicker('🪖 Emergency: National Guard and military units scrambled!');
+      }
+      if (defensePhase < 3 && pctDev >= CONFIG.DEFENSE_FULL_THRESH) {
+        defensePhase = 3; defenseSpawnCd = 0;
+        banner('⚠️ FULL ASSAULT — Emergency defense protocol!', '#FF4D6D', 6, { pulse: true });
+      }
+      if (defensePhase >= 1) {
+        defenseSpawnCd -= dt;
+        if (defenseSpawnCd <= 0) {
+          defenseSpawnCd = CONFIG.DEFENSE_WAVE_CD;
+          spawnDefenseWave(Math.min(defensePhase, 3) as 1|2|3);
+        }
+      }
+      // Steer defense units + fire pellets (TIME_WARP slows defense systems too)
+      for (const o of world.objects) {
+        if (!o.defense || o.eaten) continue;
+        const dx = player.x - o.x, dy = player.y - o.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < 2000) {
+          const spd = o.kind === 'army_jeep' ? CONFIG.DEFENSE_UNIT_SPEED * 1.3 : CONFIG.DEFENSE_UNIT_SPEED;
+          o.vx = (dx / d) * spd; o.vy = (dy / d) * spd;
+        }
+        o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+        o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+        o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD) - twDt;
+        if (o.pelletCd <= 0 && d < 1400) {
+          o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 800;
+          const spread = (Math.random() - 0.5) * 0.45;
+          const a = Math.atan2(player.y - o.y, player.x - o.x) + spread;
+          defensePellets.push({ x: o.x, y: o.y,
+            vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED, life: 3200 });
+        }
+      }
+      // Update & hit-test pellets (motion slowed by TIME_WARP; flash uses full dt)
+      for (let pi = defensePellets.length - 1; pi >= 0; pi--) {
+        const p = defensePellets[pi];
+        p.x += p.vx * (twDt / 1000); p.y += p.vy * (twDt / 1000); p.life -= twDt;
+        if (p.life <= 0) { defensePellets.splice(pi, 1); continue; }
+        if (!player.ghost && dist(p.x, p.y, player.x, player.y) < player.radius * 0.88) {
+          defensePellets.splice(pi, 1);
+          player.combo = 0; player.comboTimer = 0;
+          player.score = Math.max(0, player.score - CONFIG.DEFENSE_PELLET_COST);
+          pelletHitFlash = 300;
+          audio.playEaten();
+          banner(`🚔 Pellet hit! -${CONFIG.DEFENSE_PELLET_COST} pts`, '#FF9F1C', 2);
+        }
+      }
+      if (pelletHitFlash > 0) pelletHitFlash -= dt;
+    }
+    // War Pack §3: SINGULARITY black hole update
+    if (singularity && world && player) {
+      singularity.timer -= dt;
+      spellTimer = singularity.timer; // keep HUD radial sweep in sync
+      for (const o of world.objects) {
+        if (o.eaten || o.defense) continue;
+        const sdx = singularity.x - o.x, sdy = singularity.y - o.y;
+        const sd = Math.hypot(sdx, sdy) || 1;
+        if (sd < 700) {
+          const pullF = Math.min(1, 600 / sd) * (dt / 1000) * 1400;
+          o.vx += (sdx / sd) * pullF; o.vy += (sdy / sd) * pullF;
+        }
+        if (sd < 90 && !o.eaten) {
+          o.eaten = true;
+          world.eatenArea += Math.PI * o.baseSize * o.baseSize;
+          singularity.score += Math.max(1, (CONFIG.KIND_INFO[o.kind]?.tier ?? 1) * 5);
+        }
+      }
+      if (singularity.timer <= 0) {
+        if (singularity.score > 0) {
+          player.score += singularity.score;
+          fx.addConfetti(singularity.x, singularity.y, CONFIG.COLORS.pops, 30);
+          fx.addRing(singularity.x, singularity.y, '#F15BB5', 10, 400, 8, 600);
+          fx.shake(300, 10);
+          banner(`⚫ SINGULARITY popped! +${singularity.score}`, '#F15BB5', 3);
+        }
+        singularity = null; activeSpell = null; spellTimer = 0; spellTimerMax = 0;
+        notify();
+      }
+    }
 
     // v8 §3: WORLD EATER carves a cracked-ground trail while it roams
     if (player.formIndex >= CONFIG.FORMS.length - 1) {
@@ -842,46 +953,18 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
 
-    // v15 §3: active spell tick
-    if (activeSpell && spellTimer > 0 && player) {
+    // War Pack §3: active power tick
+    if (activeSpell && spellTimer > 0 && player && activeSpell !== 'singularity') {
       spellTimer -= dt;
       if (spellTimer <= 0) {
-        if (activeSpell === 'freeze') spellFrozenRival = null;
-        if (activeSpell === 'bubble') spellBubble = null;
-        activeSpell = null;
+        if (activeSpell === 'event_horizon') player.suctionMult = 1;
+        activeSpell = null; spellTimerMax = 0;
         notify();
       }
-      // GARLIC BREATH: repel + slow nearby rivals
-      if (activeSpell === 'garlic') {
-        for (const r of rivals) {
-          if (!r.alive || r.ghost) continue;
-          const d = dist(player.x, player.y, r.x, r.y);
-          if (d < player.radius * 3 + r.radius) {
-            const nx = (r.x - player.x) / (d || 1), ny = (r.y - player.y) / (d || 1);
-            r.vx += nx * 700 * (dt / 1000);
-            r.vy += ny * 700 * (dt / 1000);
-            r.eventSlow = Math.min(r.eventSlow, 0.6);
-          }
-        }
-      }
-      // FREEZE POP: freeze first rival touched
-      if (activeSpell === 'freeze' && !spellFrozenRival) {
-        for (const r of rivals) {
-          if (!r.alive || r.ghost) continue;
-          if (dist(player.x, player.y, r.x, r.y) < player.radius + r.radius) {
-            spellFrozenRival = r; break;
-          }
-        }
-      }
-      if (spellFrozenRival?.alive) spellFrozenRival.eventSlow = 0.01;
-      // BUBBLE TRAP: pin rivals inside bubble
-      if (activeSpell === 'bubble' && spellBubble) {
-        for (const r of rivals) {
-          if (!r.alive || r.ghost) continue;
-          if (dist(r.x, r.y, spellBubble.x, spellBubble.y) < spellBubble.r + r.radius) {
-            r.eventSlow = Math.min(r.eventSlow, 0.05);
-          }
-        }
+      // EVENT HORIZON: 2.5× vacuum reach + 2× suction pull
+      if (activeSpell === 'event_horizon') {
+        player.magnetMultiplier = Math.max(player.magnetMultiplier, 2.5);
+        player.suctionMult = 2;
       }
     }
 
@@ -1070,8 +1153,29 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     return bigR >= smallR * CONFIG.RIVAL_EAT_RATIO && d <= bigR - smallR * 0.15;
   }
 
+  // War Pack §2: spawn a wave of defense units from map edges
+  function spawnDefenseWave(phase: 1|2|3) {
+    if (!world) return;
+    const existing = world.objects.filter(o => o.defense && !o.eaten).length;
+    if (existing >= CONFIG.DEFENSE_MAX_UNITS) return;
+    const count = Math.min(phase === 3 ? 5 : phase === 2 ? 4 : 3, CONFIG.DEFENSE_MAX_UNITS - existing);
+    const S = CONFIG.MAP_SIZE;
+    for (let i = 0; i < count; i++) {
+      const edge = Math.floor(Math.random() * 4);
+      let x: number, y: number;
+      if (edge === 0)      { x = Math.random() * S; y = 60; }
+      else if (edge === 1) { x = S - 60; y = Math.random() * S; }
+      else if (edge === 2) { x = Math.random() * S; y = S - 60; }
+      else                 { x = 60; y = Math.random() * S; }
+      const kind: ObjectKind = (phase >= 2 && Math.random() < 0.55) ? 'army_jeep' : 'police_car';
+      world.spawnDefenseUnit(kind, x, y);
+    }
+  }
+
   function resolveVoids() {
     if (!player) return;
+    // War Pack §2: 30s grace period — no void predation in the opening scramble
+    if (roundElapsed < 30000) return;
     // bigger rivals respawn at least 1.5 screen-widths away from the player
     const minDist = (1.5 * fw) / Math.max(0.05, camZoom);
     // player vs rivals
@@ -1084,19 +1188,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           const rr = r.radius;
           fx.addConfetti(r.x, r.y, CONFIG.COLORS.pops);
           fx.shake(280, 12); fx.flash();
-          // v16.2 §3: escalating steal based on rival's hearts; FINAL HEART doubles player's steal
-          r.hearts = Math.max(0, r.hearts - 1);
-          const rivalStealMap: Record<number, number> = { 2: 0.25, 1: 0.35, 0: 0.50 };
-          const baseStealFrac = rivalStealMap[r.hearts] ?? 0.25;
-          // FINAL FEAST cap: 0.5; FINAL HEART (player.hearts===0): double the base steal
-          const stealFrac = finalFeastActive ? Math.max(baseStealFrac, 0.5) : (player.hearts === 0 ? Math.min(0.75, baseStealFrac * 2) : baseStealFrac);
-          const stolen = Math.floor(r.score * stealFrac);
+          // War Pack §2: rival loses half its score, player gains that amount
+          const stolen = Math.floor(r.score * 0.5);
           r.score = Math.max(0, r.score - stolen);
           meta.updateTrophyCounter('totalVoidsEaten', 1, 'sum');
           player.eatRival(rr, stolen);
           r.getEaten(player.x, player.y, minDist);
           banner(`You devoured ${r.name}!`, '#FFD23F');
-          if (stolen > 0) banner(`Stole ${stolen} score!`, '#FF9F5A', 3);
+          if (stolen > 0) banner(`Stole ${stolen} pts!`, '#FF9F5A', 3);
         } else if (canEatVoid(r.radius, player.radius, d)) {
           if (player.shieldCharge) {
             // v7 §5: BUBBLE SHIELD blocks this chomp, pops with a burst, then is gone
@@ -1116,9 +1215,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             // Steal % is determined by hearts BEFORE this chomp: 3hp→25%, 2hp→35%, 1hp→50%
             const preHp = player.hearts;
             player.hearts = Math.max(0, player.hearts - 1);
-            const hpStealMap: Record<number, number> = { 3: 0.25, 2: 0.35, 1: 0.50, 0: 0.50 };
-            const heartStealFrac = hpStealMap[preHp] ?? 0.25;
-            const heartScoreLost = Math.floor(player.score * heartStealFrac);
+            const heartScoreLost = Math.floor(player.score * 0.25); // War Pack §2: flat 25% steal
             player.score = Math.max(0, player.score - heartScoreLost);
             player.getEaten();
             r.eatVoid(pr);
@@ -1143,9 +1240,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (canEatVoid(a.radius, b.radius, d) && a.voidSatedMs <= 0) {
           a.eatVoidBotOnBot(b.radius); // 25% mass, sets a.voidSatedMs = 10000
           b.getEaten(player.x, player.y, minDist);
+          // War Pack §2: rival-on-rival trash-talk banner
+          const TRASH_TALK = [`${a.name} obliterated ${b.name}!`, `${a.name} consumed ${b.name}! No mercy!`, `${a.name} devours the competition! 🔥`];
+          banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
         } else if (canEatVoid(b.radius, a.radius, d) && b.voidSatedMs <= 0) {
           b.eatVoidBotOnBot(a.radius);
           a.getEaten(player.x, player.y, minDist);
+          const TRASH_TALK = [`${b.name} obliterated ${a.name}!`, `${b.name} consumed ${a.name}! No mercy!`, `${b.name} devours the competition! 🔥`];
+          banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
         }
       }
     }
@@ -1216,11 +1318,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       for (const r of rivals) {
         if (r.ghost || !r.alive) continue;
         const screenDist = Math.hypot(r.x - player.x, r.y - player.y) * camZoom;
-        if (screenDist > fw * 1.5) continue;
+        if (screenDist > fw * 2.0) continue; // War Pack: widen detection to 2 screen widths
         const edible = player.radius >= r.radius * ratio;
         const danger = r.radius >= player.radius * ratio;
         if (!edible && !danger) continue;
-        const rimColor = edible ? '#5AFF8A' : '#FF4D6D';
+        const rimColor = edible ? '#FFD23F' : '#FF4D6D'; // War Pack: gold=edible (was green)
         ctx.save();
         ctx.beginPath();
         ctx.arc(r.x, r.y, r.radius + 4, 0, Math.PI * 2);
@@ -1233,6 +1335,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     drawPowerAuras(clock); // v6 §4: auras under the player
     player.draw(ctx, clock, alpha);
+    // War Pack §3: colored power ring while active (world space)
+    if (activeSpell && (spellTimer > 0 || activeSpell === 'singularity') && player) {
+      const sp = CONFIG.SPELLS.find(s => s.id === activeSpell);
+      if (sp?.color) {
+        const t = Math.sin(clock / 200);
+        ctx.save();
+        ctx.globalAlpha = 0.55 + 0.2 * t;
+        ctx.strokeStyle = sp.color;
+        ctx.lineWidth = 3.5 / camZoom;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius + 12 + 4 * Math.abs(t), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     if (gnomeLord) drawGnomeCrown(clock); // v9 §8: secret GNOME LORD crown
 
     if (!paused) fx.update(frameDt);
@@ -1255,21 +1372,58 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.beginPath(); ctx.arc(player.x, player.y, lawCeil, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    // BUBBLE TRAP world-space outline
-    if (spellBubble) {
-      ctx.globalAlpha = 0.35 + 0.15 * Math.sin(clock / 300);
-      ctx.strokeStyle = '#A8D8FF'; ctx.lineWidth = 3 / camZoom;
-      ctx.beginPath(); ctx.arc(spellBubble.x, spellBubble.y, spellBubble.r, 0, Math.PI * 2); ctx.stroke();
+    // War Pack §3: SINGULARITY black hole visual (world space)
+    if (singularity) {
+      const pulse = 0.5 + 0.5 * Math.sin(clock / 130);
+      const coreR = 60 + 10 * pulse;
+      const grd = ctx.createRadialGradient(singularity.x, singularity.y, 0, singularity.x, singularity.y, coreR * 3.5);
+      grd.addColorStop(0, '#000000');
+      grd.addColorStop(0.38, '#F15BB5');
+      grd.addColorStop(1, 'rgba(241,91,181,0)');
+      ctx.save();
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(singularity.x, singularity.y, coreR * 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.65;
+      ctx.strokeStyle = '#F15BB5'; ctx.lineWidth = 2.5 / camZoom;
+      ctx.beginPath();
+      ctx.arc(singularity.x, singularity.y, coreR * 2.8, clock / 900, clock / 900 + Math.PI * 1.5);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // War Pack §3: EVENT HORIZON vacuum-zone ring (world space)
+    if (activeSpell === 'event_horizon' && player) {
+      ctx.globalAlpha = 0.11 + 0.07 * Math.sin(clock / 180);
+      ctx.strokeStyle = '#9B5DE5'; ctx.lineWidth = 3 / camZoom;
+      ctx.beginPath(); ctx.arc(player.x, player.y, player.radius * 2.5, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    // GARLIC BREATH aura ring
-    if (activeSpell === 'garlic' && player) {
-      ctx.globalAlpha = 0.15 + 0.1 * Math.sin(clock / 200);
-      ctx.strokeStyle = '#5ECC6B'; ctx.lineWidth = 3 / camZoom;
-      ctx.beginPath(); ctx.arc(player.x, player.y, player.radius * 3, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
+    // War Pack §2: defense pellets (world space)
+    for (const p of defensePellets) {
+      ctx.save();
+      const fadeFrac = Math.min(1, p.life / 2500);
+      ctx.globalAlpha = fadeFrac * 0.92;
+      ctx.fillStyle = '#FFDD44';
+      ctx.shadowColor = '#FF8800'; ctx.shadowBlur = 10 / camZoom;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 7 / camZoom, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
     }
     ctx.restore();
+
+    // War Pack §3: TIME WARP blue-edge vignette (screen space)
+    if (activeSpell === 'time_warp' && spellTimer > 0 && spellTimerMax > 0) {
+      const frac = spellTimer / spellTimerMax;
+      const grd = ctx.createRadialGradient(fw/2, fh/2, Math.min(fw,fh)*0.2, fw/2, fh/2, Math.max(fw,fh)*0.85);
+      grd.addColorStop(0, 'rgba(0,0,0,0)');
+      grd.addColorStop(1, `rgba(0,100,220,${(frac * 0.28).toFixed(3)})`);
+      ctx.fillStyle = grd; ctx.fillRect(0, 0, fw, fh);
+    }
+    // War Pack §2: pellet hit flash red overlay (screen space)
+    if (pelletHitFlash > 0) {
+      ctx.fillStyle = `rgba(255,60,0,${Math.min(0.38, pelletHitFlash / 700 * 0.38).toFixed(3)})`;
+      ctx.fillRect(0, 0, fw, fh);
+    }
 
     // v13 §4: NIGHTFALL — dark overlay + per-void light radii (screen space)
     if (events.nightfallActive && player) {
@@ -2114,6 +2268,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       radii: _radii,
       heldSpell,
       activeSpell,
+      spellTimer,          // War Pack §3
+      spellTimerMax,       // War Pack §3
       showHitboxes,
       contracts: [...activeContracts],
       hearts: player?.hearts,    // v16.2 §3
@@ -2176,50 +2332,43 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     castSpell() {
       if (!heldSpell || !player) return;
       const spellId = heldSpell.id.replace('spell_', '');
+      const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
+      const spellColor = spellDef?.color ?? '#7BFFED';
       activeSpell = spellId;
       heldSpell = null;
       switch (spellId) {
-        case 'garlic':  spellTimer = 10000; break;
-        case 'freeze':  spellTimer = 8000; spellFrozenRival = null; break;
-        case 'switcheroo': {
-          let nearest: Rival | null = null, nd = Infinity;
-          for (const r of rivals) {
-            if (!r.alive || r.ghost) continue;
-            const d = dist(player.x, player.y, r.x, r.y);
-            if (d < nd) { nd = d; nearest = r; }
-          }
-          if (nearest) {
-            [player.x, nearest.x] = [nearest.x, player.x];
-            [player.y, nearest.y] = [nearest.y, player.y];
-            player.vx = player.vy = nearest.vx = nearest.vy = 0;
-            banner('🔀 SWITCHEROO!', '#C27BFF', 3);
-          }
-          activeSpell = null; spellTimer = 0; break;
+        // War Pack §3 — four new powers replace old five spells
+        case 'event_horizon':
+          spellTimer = 6000; spellTimerMax = 6000;
+          break;
+        case 'wormhole': {
+          // Instant dash: 4 body-lengths + 0.5s ghost invulnerability
+          const mag = Math.hypot(player.vx, player.vy);
+          const ddx = mag > 0.1 ? player.vx / mag : 0;
+          const ddy = mag > 0.1 ? player.vy / mag : -1;
+          const dashDist = player.radius * 8;
+          player.x = clamp(player.x + ddx * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
+          player.y = clamp(player.y + ddy * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
+          player.vx = ddx * 220; player.vy = ddy * 220;
+          player.ghostTime = 500;
+          fx.addRing(player.x, player.y, spellColor, 5, player.radius * 4, 5, 400);
+          banner(`⚡ WORMHOLE!`, spellColor, 3);
+          activeSpell = null; spellTimer = 0; spellTimerMax = 0;
+          break;
         }
-        case 'puny': {
-          let target: Rival | null = null, nd = Infinity;
-          for (const r of rivals) {
-            if (!r.alive || r.ghost || r.radius <= player.radius * 0.7) continue;
-            const d = dist(player.x, player.y, r.x, r.y);
-            if (d < nd) { nd = d; target = r; }
-          }
-          if (target) {
-            target.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, target.radius * 0.85);
-            banner('💫 PUNY BEAM!', '#FFD23F', 3);
-            console.log(`[spell] player PUNY BEAM on ${target.name}`);
-          }
-          activeSpell = null; spellTimer = 0; break;
-        }
-        case 'bubble':
-          spellBubble = { x: player.x, y: player.y, r: 90 };
-          spellTimer = 20000; break;
-        default: spellTimer = 5000;
+        case 'time_warp':
+          spellTimer = 5000; spellTimerMax = 5000;
+          break;
+        case 'singularity':
+          singularity = { x: player.x, y: player.y, timer: 4000, score: 0 };
+          spellTimer = 4000; spellTimerMax = 4000;
+          break;
+        default: spellTimer = 5000; spellTimerMax = 5000;
       }
       if (activeSpell) {
-        const sp = CONFIG.SPELLS.find((s) => s.id === spellId);
-        banner('✨ ' + (sp?.name ?? spellId.toUpperCase()) + '!', '#7BFFED', 2);
+        banner(`${spellDef?.name ?? spellId.toUpperCase()}!`, spellColor, 2);
       }
-      fx.addRing(player.x, player.y, '#7BFFED', player.radius, player.radius + 120, 5, 500);
+      fx.addRing(player.x, player.y, spellColor, player.radius, player.radius + 120, 5, 500);
       notify();
     },
     toggleHitboxes() { showHitboxes = !showHitboxes; notify(); return showHitboxes; },
