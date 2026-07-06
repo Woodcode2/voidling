@@ -1,0 +1,57 @@
+# VOIDLING Fix Pack (Phase 3a)
+
+Run this AFTER the Feel Patch and World Update prompts. You are fixing bugs and polish issues in VOIDLING, a canvas-based HTML5 top-down arcade game. This is a surgical patch. Read the relevant code before changing anything and keep changes minimal.
+
+## Do not touch
+- Quest logic and point values, AI rival personalities, scoring
+- The Phase 1 systems (vacuum, continuous growth, no-block collision) except the camera rule change below
+- UI layout other than the banner and ticker changes listed below
+
+## Step 0: Download this asset into the project as a local static file
+Evolution sheet, save as evolution_sheet.png:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260706_020147_51987884-cd35-4317-a1b9-42220c177362.png
+
+## Fix 1: Ground sharpness (highest priority)
+Root cause: the single 2048px island image is being magnified far beyond its source resolution early in the match, producing blur.
+- Replace the constant player-screen-size camera rule with a magnification clamp: the island image must never be drawn at more than 2.5x its source pixels. Compute the zoom limit from the image size and world scale and clamp the camera there.
+- Consequence: at match start the player will be small on screen, roughly 30 to 45 px. This is intended. It is the agar feel: tiny creature, huge world. Keep the smooth zoom-out as the player grows, and never let the player exceed about 10 percent of screen height.
+- Add a fine detail layer: procedurally generate a small repeating speckle and grain texture (about 128px tile) in code and tile it across the island in world space at 8 to 15 percent opacity, so close-up ground has crisp texture at any zoom.
+
+## Fix 2: The island mask must actually work
+Currently broken: the player can walk in open space and props spawn in space, so the Phase 2 mask and falloff are not functioning.
+- Rebuild it: after the flood-fill transparency step, build a walkable grid of about 128x128 from the opaque pixels. Walkable = island, everything else = space.
+- Add a debug mode: loading the game with ?debug=mask tints all non-walkable area red at 40 percent opacity so the mask can be verified visually.
+- The player crossing into non-walkable space triggers the fall every time: tumble animation, lose 1 heart, respawn near island center, 2 seconds invulnerability. AI rivals steer away from the rim and never fall.
+
+## Fix 3: Prop placement, density, and zone life
+- Every prop spawn must sample the walkable mask. Nothing spawns in space, ever. Drifting space decorations (satellite, cow, pizza, etc.) are a separate spawner that spawns ONLY in space. Verify the two are not mixed up.
+- Raise total prop density 3 to 4x and use zone spawn tables: suburbs get 10 or more houses with lawns, gnomes and mailboxes; the beach gets sunbathers lying on towels, fishermen at the waterline, umbrellas and benches; the forest is dense with trees; downtown gets crowds of people, parked cars and buildings; the park gets benches, flower pots and picnicking people. Use existing sprites for now; new variety art arrives in the next patch.
+
+## Fix 4: Nothing slows the player
+- Remove every speed reduction caused by contact or overlap with props, people, army or police units, or anything else. Player speed changes only through future explicit powers.
+- Units too big to eat pass under or beside the player per the Phase 1 no-block rule. Verify: with enemy units hovering on the player, movement speed is identical to open ground.
+
+## Fix 5: Player readability in the dark
+- Give the player an always-on thick white sticker outline at every stage plus a soft violet glow halo slightly larger than the body at about 30 percent opacity, so the void reads clearly over dark space and voidified ground.
+- Restyle eaten ground: replace the scratchy black crack tendrils with a smooth dark violet void fill containing tiny star specks and a soft purple edge glow, with a clean rounded boundary.
+
+## Fix 6: New evolution art
+- Process evolution_sheet.png once: flood-fill the dark violet background to transparent, slice into 4 cells left to right, trim each to its bounding box. These are the new forms for MUNCHER, GOBBLER, DEVOURER and WORLD ENDER. Keep the current stage 1 VOIDLING sprite.
+- Scale each form to the player's current radius. If the existing flame crown overlay layers well on the new World Ender, keep it; otherwise the baked-in flames are enough.
+
+## Fix 7: Comedy and fear
+- Remove the bottom news ticker entirely (it renders garbled). Replace it with an event banner that slides in directly under the timer: a large rounded pill with bold text, visible about 2.5 seconds, used for stage-ups, quest completions, overtakes, and rival trash talk lines.
+- Pedestrians within a panic radius of the player flee with an exclamation mark, and roughly 1 in 3 panicking peds pops a short speech bubble above their head for about 1.5 seconds. Seed lines like: MY LAWN!, RUN!!, Is that a grape?!, NOT THE BEACH!, I just waxed that car!
+
+## Verify before finishing (play in the preview, do not skip)
+1. Match start: ground looks crisp with no mush, player is about 30 to 45 px, world feels huge.
+2. Load with ?debug=mask: red covers exactly the space region and none of the island.
+3. Run hard at the rim repeatedly: the fall triggers every time, walking in space is impossible, rivals turn away at the rim.
+4. Zero props in space; beach shows sunbathers and fishermen; suburbs show 10 or more houses; forest is dense.
+5. With army or police units hovering on the player, speed is unchanged.
+6. Near dark areas the player pops with outline and glow; eaten ground is smooth violet with star specks, no black scribbles.
+7. Evolution forms show the new big-eyed hungry faces with no tall forehead; World Ender has the galaxy body.
+8. A banner fires on stage-up, and a pedestrian speech bubble appears within 30 seconds of rampaging.
+9. Frame rate holds on mobile at the new density.
+
+When done, report what you changed file by file and confirm each of the 9 verification steps passed.
