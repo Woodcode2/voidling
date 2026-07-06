@@ -3,6 +3,7 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
+import { drawSpaceBg, drawIsland, drawDriftObjects } from './islandMap'; // Phase 2
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -1710,102 +1711,13 @@ export class WorldManager {
     const G = CONFIG.COLORS.ground;
     const S = this.size;
 
-    // v6 §7: space beyond the world — starfield behind everything
-    ctx.fillStyle = CONFIG.COLORS.uiBg;
-    ctx.fillRect(view.x, view.y, view.w, view.h);
-    drawStars(ctx, view);
-    // v9 §4: floating ground-chunks torn loose, drifting in the deep space beyond the rim
+    // Phase 2 §3: hand-painted floating island replaces tile grid
+    // Layer order: space bg → space chunks → drift objects → island painting
+    drawSpaceBg(ctx, view, px, py);
+    drawStars(ctx, view); // procedural star overlay adds depth on top of space bg
     this.drawSpaceChunks(ctx, view, t);
-
-    // ground clipped to the map rect so it can dissolve into space at the edge
-    ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, S, S); ctx.clip();
-
-    // grass base
-    ctx.fillStyle = G.lawns[0];
-    ctx.fillRect(view.x, view.y, view.w, view.h);
-
-    // roads (asphalt bands spanning the whole map)
-    ctx.fillStyle = G.asphalt;
-    for (const c of ROAD_CENTERS) {
-      ctx.fillRect(view.x, c - CONFIG.ROAD_WIDTH / 2, view.w, CONFIG.ROAD_WIDTH); // horizontal
-      ctx.fillRect(c - CONFIG.ROAD_WIDTH / 2, view.y, CONFIG.ROAD_WIDTH, view.h); // vertical
-    }
-
-    // blocks: sidewalk band + inner surface
-    for (const b of this.blocks) {
-      if (b.x0 + CONFIG.BLOCK_SIZE < view.x || b.x0 > view.x + view.w) continue;
-      if (b.y0 + CONFIG.BLOCK_SIZE < view.y || b.y0 > view.y + view.h) continue;
-      // sidewalk
-      ctx.fillStyle = G.sidewalk;
-      ctx.fillRect(b.x0, b.y0, CONFIG.BLOCK_SIZE, CONFIG.BLOCK_SIZE);
-      // inner surface
-      const inset = CONFIG.SIDEWALK;
-      const paved = (b as any).paved;
-      if (paved) ctx.fillStyle = G.pavement;
-      else if (b.type === 'beach') ctx.fillStyle = '#F0DFB8'; // v13 §2: sandy shore floor
-      else ctx.fillStyle = G.lawns[(b.gx + b.gy) % G.lawns.length];
-      ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
-      // v16.1 B1: paving-tile grid on paved blocks (lines every 26px)
-      if (paved) {
-        const ix = b.x0 + inset, iy = b.y0 + inset;
-        const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
-        ctx.save();
-        ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
-        ctx.strokeStyle = 'rgba(0,0,0,0.045)'; ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let gx2 = Math.floor(ix / 26) * 26; gx2 <= ix + iw; gx2 += 26) {
-          ctx.moveTo(gx2, iy); ctx.lineTo(gx2, iy + ih);
-        }
-        for (let gy2 = Math.floor(iy / 26) * 26; gy2 <= iy + ih; gy2 += 26) {
-          ctx.moveTo(ix, gy2); ctx.lineTo(ix + iw, gy2);
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
-      // v6 §8: zone grading — a faint per-district tint so areas read differently
-      // v15 §4: ZOO gets lush green tint; TOWNHALL gets warm civic amber
-      // v16.1 B1: downtown gets cool blue-violet tint
-      const tint = b.type === 'park' ? 'rgba(120,220,140,0.08)'
-        : b.type === 'zoo' ? 'rgba(80,210,120,0.11)'
-        : b.type === 'townhall' ? 'rgba(255,195,90,0.08)'
-        : b.type === 'downtown' ? 'rgba(120,150,210,0.06)'  // v16.1 B1
-        : b.type === 'plaza' ? 'rgba(255,210,120,0.05)'
-        : b.type === 'playground' ? 'rgba(255,150,200,0.05)'
-        : b.type === 'school' ? 'rgba(180,140,255,0.07)'
-        : b.type === 'beach' ? 'rgba(255,220,100,0.08)' : null;
-      if (tint) {
-        ctx.fillStyle = tint;
-        ctx.fillRect(b.x0 + inset, b.y0 + inset, CONFIG.BLOCK_SIZE - inset * 2, CONFIG.BLOCK_SIZE - inset * 2);
-      }
-      // pond
-      const pond = (b as any).pond;
-      if (pond) {
-        ctx.fillStyle = G.pondEdge;
-        ctx.beginPath(); ctx.ellipse(pond.x, pond.y, pond.r + 8, pond.r * 0.8 + 8, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = G.pond;
-        ctx.beginPath(); ctx.ellipse(pond.x, pond.y, pond.r, pond.r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // road dashed centre lines (40% white)
-    ctx.strokeStyle = G.lane;
-    ctx.lineWidth = 4;
-    ctx.setLineDash([26, 22]);
-    ctx.beginPath();
-    for (const c of ROAD_CENTERS) {
-      ctx.moveTo(view.x, c); ctx.lineTo(view.x + view.w, c);
-      ctx.moveTo(c, view.y); ctx.lineTo(c, view.y + view.h);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.restore(); // end ground clip
-
-    // v9 §4: torn-earth rim (north + east only; south + west are now coastline)
-    drawTornRim(ctx, view, S, t, px, py);
-    // v13 §1: sandy shores — animated ocean on the west and south edges
-    drawCoast(ctx, view, S, t);
+    drawDriftObjects(ctx);
+    drawIsland(ctx); // transparent-bg island painting covers the world rect
 
     // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
     const scarImg = fxDecals.get('scar');

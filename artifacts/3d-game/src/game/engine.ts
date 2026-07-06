@@ -10,6 +10,7 @@ import { track } from './services';
 import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
+import { loadIslandAssets, updateDrift, isWalkable, islandState } from './islandMap'; // Phase 2
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -257,6 +258,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let playerDistrict = 'MAPLE COURT';
 
   const fx = new FXManager();
+  // Phase 2: load island assets once at engine creation (async, fallback-safe)
+  loadIslandAssets(import.meta.env.BASE_URL).catch(() => {});
+
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
   const events = new EventManager({
@@ -688,6 +692,33 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     player.update(dt);
 
+    // Phase 2 §2: ledge falloff — detect when player walks off the island
+    if (!player.ghost && player.fallState === 'none') {
+      if (!isWalkable(player.x, player.y)) {
+        player.startFall();
+        fx.shake(200, 6);
+      }
+    }
+    // Fall animation complete → deduct heart or end run
+    if (player.fallState === 'falling' && player.fallTimer <= 0) {
+      const preHp = player.hearts;
+      if (preHp <= 0) {
+        // Already on FINAL HEART — this fall ends the run
+        player.respawnFromFall(CONFIG.MAP_SIZE / 2, CONFIG.MAP_SIZE / 2); // clear fall state
+        banner('💀 The void has fallen into the void!', '#FF4D6D', 5, { pulse: true });
+        endRound();
+      } else {
+        player.hearts = Math.max(0, player.hearts - 1);
+        const cx = CONFIG.MAP_SIZE / 2, cy = CONFIG.MAP_SIZE / 2;
+        player.respawnFromFall(cx, cy);
+        const msg = player.hearts === 0
+          ? 'Fell off the island! 💀 FINAL HEART — one more fall ends the run!'
+          : `Fell off the island! ${player.hearts}♥ left`;
+        banner(msg, '#FF6B6B', 3, { pulse: true });
+        if (player.hearts === 0) queueTicker('⚠️ FINAL HEART remaining — one more fall ends everything!');
+      }
+    }
+
     // rivals
     for (let i = 0; i < rivals.length; i++) {
       const others: WorldView['voids'] = [{ x: player.x, y: player.y, radius: player.ghost ? 0.001 : player.radius }];
@@ -701,6 +732,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // objects (suction + eat + living-world AI)
     world.update(dt, player, rivals, fx);
+    updateDrift(dt); // Phase 2: advance space drift objects
 
     // v8 §3: WORLD EATER carves a cracked-ground trail while it roams
     if (player.formIndex >= CONFIG.FORMS.length - 1) {
@@ -1146,7 +1178,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // ── camera: Feel Patch §5 — radius-proportional zoom (player ~9% of screen height) ──
     // viewHeight = radius * 22.22 keeps apparent diameter = 2r/viewHeight * fh ≈ 9% fh.
     // Min 350px (prevents hyper-zoom at spawn); max 3.5× screen height (sprites stay readable).
-    const viewHeight = clamp(player.radius * 22.22, 350, fh * 3.5);
+    const viewHeight = clamp(player.radius * 22.22, 350, fh * 6); // Phase 2: wider zoom for big island
     const targetZoom = fh / viewHeight;
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
 
@@ -1178,8 +1210,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ctx.scale(camZoom, camZoom);
     ctx.translate(-camCX, -camCY);
 
-    world.drawGround(ctx, view, clock, player?.x ?? camCX, player?.y ?? camCY);
-    world.drawDressing(ctx, view, clock, camZoom);
+    // Phase 2: pass camera centre for correct 0.25× parallax (not raw player pos)
+    world.drawGround(ctx, view, clock, camCX, camCY);
+    // Phase 2: skip legacy grid dressing (crosswalks/manholes) once island is loaded
+    if (!islandState.ready) world.drawDressing(ctx, view, clock, camZoom);
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);

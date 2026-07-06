@@ -134,7 +134,7 @@ export const CONFIG = {
   BOT_ANTIIDLE_MS: 4000,         // window to check for being stuck
   BOT_ANTIIDLE_DIST: 80,         // moved less than this in the window → retarget
   BOT_NOEAT_MS: 6000,            // no eat for this long → retarget
-  BOT_WALL_MARGIN: 150,          // start steering away within this of an edge
+  BOT_WALL_MARGIN: 400,          // start steering away within this of an edge
   BOT_WALL_FORCE: 1.2,           // repulsion strength near walls
   BOT_PERCEPTION: 850,           // v9 §2: bots only sense within ~1.5 screen-widths (no global map knowledge)
   BOT_AIM_ERROR_DEG: 15,         // v9 §2: ±aim error, re-corrected every 300–600ms
@@ -181,11 +181,11 @@ export const CONFIG = {
   GUARD_BLOCKADE_LINES: 2,
   GUARD_SECOND_WAVE_DELAY: 45000, // ms after first blockade eaten
 
-  // World — v16.2 §6: the full city — 6×6 grid, 4800×4800
-  MAP_SIZE: 4800,
-  BLOCK_SIZE: 700,           // 6*700 + 5*100 roads = 4700 + 50*2 margin = 4800
-  ROAD_WIDTH: 100,
-  SIDEWALK: 44,
+  // World — Phase 2: floating island — 12000×12000 world (2.5× old map)
+  MAP_SIZE: 12000,
+  BLOCK_SIZE: 1600,          // 6*1600 + 5*200 roads = 9600+1000 = 10600; margin 700 each side
+  ROAD_WIDTH: 200,
+  SIDEWALK: 100,
   GRID: 6,
   PLAN_NAMES: ['METRO', 'SUBURBIA', 'SEASIDE'] as string[], // v16.2 §6: rotating city plans
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
@@ -213,10 +213,10 @@ export const CONFIG = {
   ICECREAM_JINGLE_RANGE: 320,             // play jingle when player within
 
   // Population / respawn — v12 §1: larger 5×5 world
-  TARGET_POPULATION: 800,
-  RESPAWN_MIN: 540,         // trickle small objects if below this
+  TARGET_POPULATION: 2000,
+  RESPAWN_MIN: 1200,        // trickle small objects if below this
   DENSITY_MULT: 1,          // v5 §7: debug-panel density multiplier
-  TRAFFIC_CARS: 12,         // v7 §2: cars cruising the road grid (10–14)
+  TRAFFIC_CARS: 24,         // v7 §2: cars cruising the road grid (Phase 2: 24)
 
   // Absorb / orbit / merge
   ABSORB_SHRINK_TIME: 150,       // ms for fly-in phase
