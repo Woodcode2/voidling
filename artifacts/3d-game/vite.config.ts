@@ -28,6 +28,42 @@ if (!basePath) {
   );
 }
 
+// ── review.txt — served as plain text before Vite's SPA catch-all ────────────
+// Vite's HTML-fallback middleware swallows anything it doesn't recognise as a
+// static asset, including files in public/.  Unshifting our own handler first
+// (same technique as sourceBrowserPlugin) ensures the exact URL returns the
+// raw text file regardless of the SPA catch-all order.
+function reviewTxtPlugin(basePath: string): Plugin {
+  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  const filePath = path.resolve(import.meta.dirname, 'public', 'review.txt');
+  return {
+    name: 'review-txt',
+    configureServer(server) {
+      server.middlewares.stack.unshift({
+        route: '',
+        handle: (req, res, next) => {
+          const pathname = req.url?.split(/[?#]/, 1)[0] ?? '';
+          // Match /review.txt, /<any-prefix>/review.txt (e.g. /3d-game/review.txt).
+          // BASE_PATH may be "/" so computing from base would collapse to the
+          // same string — just match by suffix instead.
+          if (!pathname.endsWith('/review.txt')) {
+            return next();
+          }
+          if (!fs.existsSync(filePath)) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.end('review.txt not found');
+            return;
+          }
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.end(fs.readFileSync(filePath, 'utf-8'));
+        },
+      });
+    },
+  };
+}
+
 // ── read-only source browser for the dev server ───────────────────────────────
 // Routes:
 //   <base>/source          → HTML listing of every file under src/
@@ -202,6 +238,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    reviewTxtPlugin(basePath),
     sourceBrowserPlugin(basePath),
     ...(process.env.NODE_ENV !== 'production' &&
     process.env.REPL_ID !== undefined
