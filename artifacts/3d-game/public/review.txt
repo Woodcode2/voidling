@@ -1,0 +1,1203 @@
+=== mapData.ts ===
+
+// mapData.ts — Phase 4: vector island geometry in world coordinates.
+// Single source of truth for island shape, zones, roads, river, and terrain.
+// All coordinates are in the 12000×12000 world space (MAP_SIZE = 12000).
+
+import { CONFIG } from './config';
+
+const S = CONFIG.MAP_SIZE; // 12000
+
+// ─── Grid constants (mirror world.ts so everything stays in sync) ─────────────
+const BLOCK  = CONFIG.BLOCK_SIZE;   // 1600
+const ROAD_W = CONFIG.ROAD_WIDTH;   // 200
+const STRIDE = BLOCK + ROAD_W;      // 1800
+const MARGIN = (S - (CONFIG.GRID * BLOCK + (CONFIG.GRID - 1) * ROAD_W)) / 2; // 700
+
+// Road center positions (identical to world.ts ROAD_CENTERS)
+export const ROAD_CENTERS: number[] = [];
+for (let i = 0; i < CONFIG.GRID - 1; i++) {
+  ROAD_CENTERS.push(MARGIN + BLOCK + ROAD_W / 2 + i * STRIDE);
+}
+// [2400, 4200, 6000, 7800, 9600]
+
+// Block left/top edges
+const bx0 = (gx: number) => MARGIN + gx * STRIDE;  // left edge of block gx
+const by0 = (gy: number) => MARGIN + gy * STRIDE;  // top edge of block gy
+const bx1 = (gx: number) => bx0(gx) + BLOCK;       // right edge
+const by1 = (gy: number) => by0(gy) + BLOCK;       // bottom edge
+
+// ─── Island polygon control points (world space) ──────────────────────────────
+// Smooth closed curve through 14 points defines the island boundary.
+// Rendered as quadratic bezier (midpoint method) for perfectly crisp edges.
+export const ISLAND_CTRL: [number, number][] = [
+  [ 980, 3200],  //  0: west, upper
+  [ 580, 5900],  //  1: far west, center
+  [1000, 8900],  //  2: west, lower
+  [2100, 10950], //  3: southwest (beach corner)
+  [4500, 11550], //  4: south, west-center
+  [6600, 11650], //  5: south, center (deepest)
+  [8300, 11350], //  6: south-east beach
+  [9800, 10150], //  7: southeast — WATERFALL exit
+  [11400, 8700], //  8: east, lower
+  [11550, 6200], //  9: far east, center
+  [11050, 3750], // 10: east, upper
+  [ 9350,  400], // 11: northeast (forest corner)
+  [ 6000,  150], // 12: north, center
+  [ 2600,  500], // 13: northwest
+];
+
+export const WATERFALL_IDX = 7;   // index of WATERFALL exit in ISLAND_CTRL
+export const WATERFALL_PT = ISLAND_CTRL[WATERFALL_IDX];
+
+// ─── Zone rectangles ─────────────────────────────────────────────────────────
+// Used for terrain classification (fill priority: WATER > ROAD > SAND > FOREST > PARK > DOWNTOWN > MEADOW)
+
+// DOWNTOWN: blocks gx=1–4, gy=1–3 (center-east quadrant)
+export const ZONE_DOWNTOWN_R = [bx0(1), by0(1), bx1(4), by1(3)] as const;
+
+// PARK: block gx=0, gy=2 (center-west)
+export const ZONE_PARK_R = [bx0(0), by0(2), bx1(0), by1(2)] as const;
+
+// FOREST: blocks gx=4–5, gy=0 (northeast)
+export const ZONE_FOREST_R = [bx0(4), by0(0), bx1(5), by1(0)] as const;
+
+// BEACH: gy=5 row (south strip)
+export const ZONE_BEACH_R = [bx0(0), by0(5), bx1(5), by1(5)] as const;
+
+// LAGOON: ellipse within beach zone
+export const LAGOON_CX = bx0(1) + BLOCK * 0.65;  // ~3025
+export const LAGOON_CY = by0(5) + BLOCK * 0.52;  // ~11132
+export const LAGOON_RX = BLOCK * 0.52;            // ~832
+export const LAGOON_RY = BLOCK * 0.38;            // ~608
+
+// ─── River path (world space polyline) ───────────────────────────────────────
+export const RIVER_HALF_W = 90; // half-width of river channel
+
+// Pond source in the park
+export const POND_CX = bx0(0) + BLOCK * 0.68; // ~1788
+export const POND_CY = by0(2) + BLOCK * 0.65; // ~5740
+export const POND_R  = BLOCK * 0.19;           // ~304
+
+export const RIVER_PATH: [number, number][] = [
+  [POND_CX, POND_CY],                             // 0: park pond
+  [bx0(1) + BLOCK * 0.15, by0(2) + BLOCK * 0.88],// 1: meander east
+  [bx0(2) + BLOCK * 0.05, by0(3) + BLOCK * 0.25],// 2: turn southeast
+  [bx0(3) - ROAD_W * 0.4, by0(3) + BLOCK * 0.65],// 3: south
+  [bx0(3) + BLOCK * 0.5,  by0(4) + BLOCK * 0.35],// 4: southeast meander
+  [bx0(4) + BLOCK * 0.45, by0(4) + BLOCK * 0.82],// 5: toward beach
+  [WATERFALL_PT[0] - 200, WATERFALL_PT[1] - 400], // 6: approach waterfall
+  [WATERFALL_PT[0], WATERFALL_PT[1]],              // 7: waterfall exit
+];
+
+// ─── Road network ────────────────────────────────────────────────────────────
+// Used by terrain query + visual renderer + junction-turning AI
+
+export interface RoadSeg { cx: number; cy: number; axis: 'h' | 'v'; len0: number; len1: number; }
+
+export const ROAD_SEGS: RoadSeg[] = [];
+for (const rc of ROAD_CENTERS) {
+  // Horizontal road at y=rc spanning x = MARGIN to S-MARGIN
+  ROAD_SEGS.push({ cx: S / 2, cy: rc, axis: 'h', len0: MARGIN, len1: S - MARGIN });
+  // Vertical road at x=rc spanning y = MARGIN to S-MARGIN
+  ROAD_SEGS.push({ cx: rc, cy: S / 2, axis: 'v', len0: MARGIN, len1: S - MARGIN });
+}
+
+// Junctions (every intersection of a horizontal + vertical road)
+export interface Junction { x: number; y: number; }
+export const JUNCTIONS: Junction[] = [];
+for (const rx of ROAD_CENTERS) {
+  for (const ry of ROAD_CENTERS) {
+    JUNCTIONS.push({ x: rx, y: ry });
+  }
+}
+
+// ─── House lots ───────────────────────────────────────────────────────────────
+// Placed along suburb road edges, alternating sides, 30–40 total.
+// Each lot has a world position and a facing angle (toward the street).
+
+export interface HouseLot {
+  x: number;
+  y: number;
+  facingAngle: number; // radians
+}
+
+function generateHouseLots(): HouseLot[] {
+  const lots: HouseLot[] = [];
+  const OFFSET = ROAD_W / 2 + 260; // distance from road center to house center
+  const STEP   = 520;               // gap between adjacent lot centers
+  const DTN_X0 = ROAD_CENTERS[0];   // x=2400 — left edge of downtown
+  const DTN_X1 = ROAD_CENTERS[3];   // x=7800 — right edge of downtown
+  const DTN_Y0 = ROAD_CENTERS[0];   // y=2400 — top of downtown
+  const DTN_Y1 = ROAD_CENTERS[2];   // y=6000 — bottom of downtown core
+
+  // Build validation polygon once — direct call avoids the lazy _islandPoly TDZ
+  // at module-init time (let variables aren't initialized until their declaration line).
+  const validPoly = buildIslandPolyApprox(100);
+
+  // Helper: add lot if inside island, not in downtown, not on a road
+  const add = (x: number, y: number, angle: number) => {
+    if (x < MARGIN + 100 || x > S - MARGIN - 100 || y < MARGIN + 100 || y > S - MARGIN - 100) return;
+    // Avoid downtown interior
+    if (x > DTN_X0 + 100 && x < DTN_X1 - 100 && y > DTN_Y0 + 100 && y < DTN_Y1 - 100) return;
+    // Validate: must be inside the island polygon and not on a road
+    if (!pointInPoly(validPoly, x, y)) return;
+    if (isOnRoad(x, y)) return;
+    lots.push({ x, y, facingAngle: angle });
+  };
+
+  // ─ North road (y=2400): lots on NORTH side (residential gy=0)
+  const northRoadY = ROAD_CENTERS[0];
+  for (let x = MARGIN + STEP * 0.7; x < S - MARGIN - STEP; x += STEP) {
+    add(x, northRoadY - OFFSET, Math.PI / 2); // facing south (toward road)
+  }
+
+  // ─ South of downtown road (y=6000): lots on SOUTH side (residential gy=3-4)
+  const southRoadY = ROAD_CENTERS[2];
+  for (let x = MARGIN + STEP * 0.4; x < S - MARGIN - STEP; x += STEP) {
+    add(x, southRoadY + OFFSET, -Math.PI / 2); // facing north
+  }
+
+  // ─ Pre-beach road (y=9600): lots on NORTH side (residential gy=4)
+  const beachRoadY = ROAD_CENTERS[4];
+  for (let x = MARGIN + STEP; x < S - MARGIN - STEP; x += STEP) {
+    add(x, beachRoadY - OFFSET, Math.PI / 2);
+  }
+
+  // ─ West road (x=2400): lots on WEST side (residential gx=0)
+  const westRoadX = ROAD_CENTERS[0];
+  for (let y = MARGIN + STEP * 1.5; y < southRoadY - 200; y += STEP) {
+    add(westRoadX - OFFSET, y, 0); // facing east (toward road)
+  }
+
+  // ─ East road (x=9600): lots on EAST side (residential gx=5)
+  const eastRoadX = ROAD_CENTERS[4];
+  for (let y = MARGIN + STEP; y < southRoadY - 200; y += STEP) {
+    add(eastRoadX + OFFSET, y, Math.PI); // facing west
+  }
+
+  return lots.slice(0, 38); // cap at 38 lots
+}
+
+export const HOUSE_LOTS: HouseLot[] = generateHouseLots();
+
+// ─── Geometry helpers ────────────────────────────────────────────────────────
+
+/** Evaluate the smooth island polygon as a series of midpoint-quadratic bezier segments.
+ *  Returns an array of [x,y] points on the curve (for hit testing). */
+export function buildIslandPolyApprox(steps = 120): [number, number][] {
+  const pts = ISLAND_CTRL;
+  const n = pts.length;
+  const result: [number, number][] = [];
+
+  // Midpoint-based quadratic bezier for each segment
+  for (let i = 0; i < n; i++) {
+    const cp = pts[i];
+    const prev = pts[(i + n - 1) % n];
+    const next = pts[(i + 1) % n];
+    const mx0: [number, number] = [(prev[0] + cp[0]) / 2, (prev[1] + cp[1]) / 2];
+    const mx1: [number, number] = [(cp[0] + next[0]) / 2, (cp[1] + next[1]) / 2];
+    // Subdivide the quadratic bezier from mx0 → cp → mx1 into `steps/n` line segments
+    const segs = Math.max(2, Math.round(steps / n));
+    for (let k = 0; k < segs; k++) {
+      const t = k / segs;
+      const mt = 1 - t;
+      const x = mt * mt * mx0[0] + 2 * mt * t * cp[0] + t * t * mx1[0];
+      const y = mt * mt * mx0[1] + 2 * mt * t * cp[1] + t * t * mx1[1];
+      result.push([x, y]);
+    }
+  }
+  return result;
+}
+
+let _islandPoly: [number, number][] | null = null;
+function getIslandPoly(): [number, number][] {
+  if (!_islandPoly) _islandPoly = buildIslandPolyApprox(180);
+  return _islandPoly;
+}
+
+/** Point-in-polygon test using ray casting (for the approximate polygon). */
+function pointInPoly(poly: [number, number][], px: number, py: number): boolean {
+  let inside = false;
+  const n = poly.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** True if the world point is inside the island. */
+export function isInsideIsland(wx: number, wy: number): boolean {
+  return pointInPoly(getIslandPoly(), wx, wy);
+}
+
+/** True if point is inside the lagoon ellipse. */
+export function isInLagoon(wx: number, wy: number): boolean {
+  const dx = (wx - LAGOON_CX) / LAGOON_RX;
+  const dy = (wy - LAGOON_CY) / LAGOON_RY;
+  return dx * dx + dy * dy < 1;
+}
+
+/** True if point is within the river channel (polyline + pond). */
+export function isInRiver(wx: number, wy: number): boolean {
+  if (Math.hypot(wx - POND_CX, wy - POND_CY) < POND_R) return true;
+  const hw = RIVER_HALF_W;
+  for (let i = 0; i < RIVER_PATH.length - 1; i++) {
+    if (distToSeg(wx, wy, RIVER_PATH[i], RIVER_PATH[i + 1]) < hw) return true;
+  }
+  return false;
+}
+
+function distToSeg(px: number, py: number, a: [number, number], b: [number, number]): number {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - a[0], py - a[1]);
+  let t = ((px - a[0]) * dx + (py - a[1]) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+}
+
+/** True if point is on a road (within half road-width of any road center line). */
+export function isOnRoad(wx: number, wy: number): boolean {
+  const hw = ROAD_W / 2;
+  for (const rc of ROAD_CENTERS) {
+    // Horizontal road at y=rc
+    if (Math.abs(wy - rc) < hw && wx >= MARGIN && wx <= S - MARGIN) return true;
+    // Vertical road at x=rc
+    if (Math.abs(wx - rc) < hw && wy >= MARGIN && wy <= S - MARGIN) return true;
+  }
+  return false;
+}
+
+/** Point in axis-aligned rectangle [x0, y0, x1, y1]. */
+function inRect(wx: number, wy: number, r: readonly [number, number, number, number]): boolean {
+  return wx >= r[0] && wx <= r[2] && wy >= r[1] && wy <= r[3];
+}
+
+// ─── Terrain constants (identical to existing TERRAIN in islandMap.ts) ────────
+export const TERRAIN = {
+  SPACE:    0,
+  WATER:    1,
+  SAND:     2,
+  ROAD:     3,
+  GRASS:    4,
+  PAVEMENT: 5,
+} as const;
+export type TerrainClass = (typeof TERRAIN)[keyof typeof TERRAIN];
+
+/**
+ * Geometry-based terrain classification.
+ * Priority: SPACE > WATER > ROAD > SAND > FOREST/PARK/GRASS > DOWNTOWN/PAVEMENT > MEADOW/GRASS
+ */
+export function terrainAtGeom(wx: number, wy: number): TerrainClass {
+  if (!isInsideIsland(wx, wy)) return TERRAIN.SPACE;
+  if (isInLagoon(wx, wy) || isInRiver(wx, wy)) return TERRAIN.WATER;
+  if (isOnRoad(wx, wy)) return TERRAIN.ROAD;
+  if (inRect(wx, wy, ZONE_BEACH_R)) return TERRAIN.SAND;
+  if (inRect(wx, wy, ZONE_FOREST_R) || inRect(wx, wy, ZONE_PARK_R)) return TERRAIN.GRASS;
+  if (inRect(wx, wy, ZONE_DOWNTOWN_R)) return TERRAIN.PAVEMENT;
+  return TERRAIN.GRASS; // default: meadow
+}
+
+// ─── 192×192 baked terrain lookup grid ───────────────────────────────────────
+// Baked at startup for cheap per-frame queries via getTerrainAt().
+
+export const GRID_W = 192;
+export const GRID_H = 192;
+const CELL_W = S / GRID_W;
+const CELL_H = S / GRID_H;
+
+export let _terrainGrid: Uint8Array | null = null;
+let _walkableGrid: Uint8Array | null = null;
+
+/** Direct read-only access to the baked terrain grid (for debug overlays). */
+export function getRawTerrainGrid(): Uint8Array | null { return _terrainGrid; }
+
+export function bakeTerrainGrid(): void {
+  _terrainGrid  = new Uint8Array(GRID_W * GRID_H);
+  _walkableGrid = new Uint8Array(GRID_W * GRID_H);
+  const counts = [0, 0, 0, 0, 0, 0];
+  for (let gy = 0; gy < GRID_H; gy++) {
+    for (let gx = 0; gx < GRID_W; gx++) {
+      const wx = (gx + 0.5) * CELL_W;
+      const wy = (gy + 0.5) * CELL_H;
+      const t = terrainAtGeom(wx, wy);
+      _terrainGrid[gy * GRID_W + gx] = t;
+      _walkableGrid[gy * GRID_W + gx] = t !== TERRAIN.SPACE ? 1 : 0;
+      counts[t]++;
+    }
+  }
+  console.log(
+    '[mapData] terrain grid baked — SPACE:', counts[0], 'WATER:', counts[1],
+    'SAND:', counts[2], 'ROAD:', counts[3], 'GRASS:', counts[4], 'PAVEMENT:', counts[5],
+  );
+}
+
+/** Cheap grid-based terrain lookup (O(1)). */
+export function getTerrainGrid(wx: number, wy: number): TerrainClass {
+  if (!_terrainGrid) return terrainAtGeom(wx, wy); // fallback during startup
+  const gx = Math.max(0, Math.min(GRID_W - 1, (wx / S * GRID_W) | 0));
+  const gy = Math.max(0, Math.min(GRID_H - 1, (wy / S * GRID_H) | 0));
+  return _terrainGrid[gy * GRID_W + gx] as TerrainClass;
+}
+
+/** True when world point is on walkable island ground. */
+export function isWalkableGrid(wx: number, wy: number): boolean {
+  if (!_walkableGrid) return isInsideIsland(wx, wy);
+  const gx = Math.max(0, Math.min(GRID_W - 1, (wx / S * GRID_W) | 0));
+  const gy = Math.max(0, Math.min(GRID_H - 1, (wy / S * GRID_H) | 0));
+  return _walkableGrid[gy * GRID_W + gx] > 0;
+}
+
+
+=== drawMap.ts ===
+
+// drawMap.ts — Phase 4: vector ground renderer.
+// Draws the island and all zones as crisp canvas paths at any zoom.
+// Replaces the painted island_map.png in the gameplay path entirely.
+
+import {
+  ISLAND_CTRL, WATERFALL_IDX,
+  ZONE_DOWNTOWN_R, ZONE_PARK_R, ZONE_FOREST_R, ZONE_BEACH_R,
+  LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY,
+  RIVER_PATH, RIVER_HALF_W, POND_CX, POND_CY, POND_R,
+  ROAD_CENTERS,
+} from './mapData';
+import { CONFIG } from './config';
+
+const S = CONFIG.MAP_SIZE;
+
+// Ground color palette (from spec)
+const COL = {
+  meadow:   '#A8CD9F',
+  park:     '#B7DBA8',
+  forest:   '#8FBF88',
+  sand:     '#F2DFA7',
+  pavement: '#EAE4D6',
+  road:     '#939CAB',
+  rimWhite: '#FFFFFF',
+  cliff:    '#6B5B73',
+  waterS:   '#7FD4E8',
+  waterD:   '#5BB8D4',
+  roadDash: 'rgba(255,255,255,0.72)',
+};
+
+// ─── Smooth island path helper ────────────────────────────────────────────────
+
+/** Trace the island boundary as a smooth closed path on ctx (no stroke/fill). */
+export function tracIslandPath(ctx: CanvasRenderingContext2D): void {
+  const pts = ISLAND_CTRL;
+  const n   = pts.length;
+  ctx.beginPath();
+  const mx0 = [(pts[n - 1][0] + pts[0][0]) / 2, (pts[n - 1][1] + pts[0][1]) / 2];
+  ctx.moveTo(mx0[0], mx0[1]);
+  for (let i = 0; i < n; i++) {
+    const cp   = pts[i];
+    const next = pts[(i + 1) % n];
+    const mx   = (cp[0] + next[0]) / 2;
+    const my   = (cp[1] + next[1]) / 2;
+    ctx.quadraticCurveTo(cp[0], cp[1], mx, my);
+  }
+  ctx.closePath();
+}
+
+// ─── Ground renderer (no offscreen cache — drawn directly into world-space ctx) ───
+// Drawing only the visible viewport region via the camera transform clip means
+// per-frame cost is low even without a cache. A 12000×12000 offscreen canvas
+// would consume ~576 MB raw and could OOM on mobile, so we draw directly.
+
+/** Draw the full ground layer into ctx (world-space camera transform must be applied).
+ *  @param camZoom — accepted for API compatibility, not used for caching.
+ */
+export function drawVectorGround(
+  ctx: CanvasRenderingContext2D,
+  clock: number,
+  camZoom: number,   // eslint-disable-line @typescript-eslint/no-unused-vars
+  forceRebuild = false,  // eslint-disable-line @typescript-eslint/no-unused-vars
+): void {
+  _buildGroundCache(ctx);
+
+  // Animated waterfall (not cached — needs clock)
+  const wpx = ISLAND_CTRL[WATERFALL_IDX][0];
+  const wpy = ISLAND_CTRL[WATERFALL_IDX][1];
+  _drawWaterfall(ctx, wpx, wpy, clock);
+}
+
+function _buildGroundCache(cc: CanvasRenderingContext2D): void {
+  // ─ 1. Island base fill ─────────────────────────────────────────────────────
+  tracIslandPath(cc);
+  cc.fillStyle = COL.meadow;
+  cc.fill();
+
+  // ─ 2. Zone fills (clipped to island) ──────────────────────────────────────
+  _fillZone(cc, ZONE_PARK_R,     COL.park);
+  _fillZone(cc, ZONE_FOREST_R,   COL.forest);
+  _fillZone(cc, ZONE_BEACH_R,    COL.sand);
+  _fillZone(cc, ZONE_DOWNTOWN_R, COL.pavement);
+
+  // ─ 3. River ───────────────────────────────────────────────────────────────
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+
+  // Pond (source)
+  const pgrd = cc.createRadialGradient(POND_CX, POND_CY, POND_R * 0.3, POND_CX, POND_CY, POND_R);
+  pgrd.addColorStop(0, COL.waterD);
+  pgrd.addColorStop(1, COL.waterS);
+  cc.fillStyle = pgrd;
+  cc.beginPath();
+  cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+  cc.fill();
+
+  // River channel (outer = shallow, inner = deep)
+  cc.lineCap = 'round'; cc.lineJoin = 'round';
+  _riverStroke(cc, RIVER_HALF_W * 2, COL.waterS);
+  _riverStroke(cc, RIVER_HALF_W * 1.1, COL.waterD);
+
+  cc.restore();
+
+  // ─ 4. Lagoon ──────────────────────────────────────────────────────────────
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  const lgrd = cc.createRadialGradient(
+    LAGOON_CX, LAGOON_CY, LAGOON_RX * 0.2,
+    LAGOON_CX, LAGOON_CY, LAGOON_RX,
+  );
+  lgrd.addColorStop(0, COL.waterD);
+  lgrd.addColorStop(1, COL.waterS);
+  cc.fillStyle = lgrd;
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+  cc.fill();
+  // Lagoon shore hint
+  cc.strokeStyle = 'rgba(255,255,255,0.25)'; cc.lineWidth = 20;
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.restore();
+
+  // ─ 5. Roads ───────────────────────────────────────────────────────────────
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+
+  const ROAD_W = CONFIG.ROAD_WIDTH;
+  const MARGIN = (S - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * ROAD_W)) / 2;
+
+  // Road fills
+  cc.fillStyle = COL.road;
+  for (const rc of ROAD_CENTERS) {
+    // Horizontal road
+    cc.fillRect(MARGIN, rc - ROAD_W / 2, S - MARGIN * 2, ROAD_W);
+    // Vertical road
+    cc.fillRect(rc - ROAD_W / 2, MARGIN, ROAD_W, S - MARGIN * 2);
+  }
+
+  // White centerline dashes
+  cc.strokeStyle = COL.roadDash;
+  cc.lineWidth   = 10;
+  cc.setLineDash([90, 90]);
+  cc.lineCap = 'butt';
+  for (const rc of ROAD_CENTERS) {
+    // Horizontal
+    cc.beginPath(); cc.moveTo(MARGIN, rc); cc.lineTo(S - MARGIN, rc); cc.stroke();
+    // Vertical
+    cc.beginPath(); cc.moveTo(rc, MARGIN); cc.lineTo(rc, S - MARGIN); cc.stroke();
+  }
+  cc.setLineDash([]);
+
+  // Road curb edges (lighter inner edges)
+  cc.strokeStyle = 'rgba(255,255,255,0.18)';
+  cc.lineWidth   = 6;
+  cc.lineCap = 'butt';
+  for (const rc of ROAD_CENTERS) {
+    const hw = ROAD_W / 2;
+    cc.beginPath(); cc.moveTo(MARGIN, rc - hw); cc.lineTo(S - MARGIN, rc - hw); cc.stroke();
+    cc.beginPath(); cc.moveTo(MARGIN, rc + hw); cc.lineTo(S - MARGIN, rc + hw); cc.stroke();
+    cc.beginPath(); cc.moveTo(rc - hw, MARGIN); cc.lineTo(rc - hw, S - MARGIN); cc.stroke();
+    cc.beginPath(); cc.moveTo(rc + hw, MARGIN); cc.lineTo(rc + hw, S - MARGIN); cc.stroke();
+  }
+
+  // Crosswalk stripes at each junction
+  cc.fillStyle = 'rgba(255,255,255,0.32)';
+  for (const rx of ROAD_CENTERS) {
+    for (const ry of ROAD_CENTERS) {
+      const hw = ROAD_W / 2;
+      const stripeW = 14; const stripeGap = 24;
+      // North & South approaches
+      for (let i = 0; i < 4; i++) {
+        const sx = rx - hw + 8 + i * stripeGap;
+        cc.fillRect(sx, ry - hw - 30, stripeW, 26);
+        cc.fillRect(sx, ry + hw + 4,  stripeW, 26);
+      }
+      // East & West approaches
+      for (let i = 0; i < 4; i++) {
+        const sy = ry - hw + 8 + i * stripeGap;
+        cc.fillRect(rx - hw - 30, sy, 26, stripeW);
+        cc.fillRect(rx + hw + 4,  sy, 26, stripeW);
+      }
+    }
+  }
+
+  cc.restore();
+
+  // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
+  cc.save();
+  tracIslandPath(cc);
+  // Outer cliff glow
+  cc.strokeStyle = COL.cliff;
+  cc.lineWidth   = 200;
+  cc.globalAlpha = 0.55;
+  cc.stroke();
+  // Mid cliff band
+  cc.strokeStyle = '#4A3A55';
+  cc.lineWidth   = 120;
+  cc.globalAlpha = 0.6;
+  cc.stroke();
+  // White sticker rim
+  cc.strokeStyle = COL.rimWhite;
+  cc.lineWidth   = 60;
+  cc.globalAlpha = 0.92;
+  cc.lineJoin = 'round';
+  cc.stroke();
+  cc.restore();
+
+  // ─ 7. Waterfall platform hint (static part; animated part drawn each frame) ─
+  const wpx = ISLAND_CTRL[WATERFALL_IDX][0];
+  const wpy = ISLAND_CTRL[WATERFALL_IDX][1];
+  cc.save();
+  const wGrd = cc.createLinearGradient(wpx - 120, wpy - 80, wpx + 120, wpy + 280);
+  wGrd.addColorStop(0, 'rgba(91,184,212,0.85)');
+  wGrd.addColorStop(0.7, 'rgba(127,212,232,0.4)');
+  wGrd.addColorStop(1, 'rgba(127,212,232,0)');
+  cc.fillStyle = wGrd;
+  cc.beginPath();
+  cc.ellipse(wpx, wpy + 80, 110, 320, -0.3, 0, Math.PI * 2);
+  cc.fill();
+  cc.restore();
+}
+
+function _fillZone(
+  cc: CanvasRenderingContext2D,
+  r: readonly [number, number, number, number],
+  color: string,
+): void {
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  cc.fillStyle = color;
+  cc.fillRect(r[0], r[1], r[2] - r[0], r[3] - r[1]);
+  cc.restore();
+}
+
+function _riverStroke(cc: CanvasRenderingContext2D, lw: number, color: string): void {
+  cc.strokeStyle = color;
+  cc.lineWidth   = lw;
+  cc.beginPath();
+  for (let i = 0; i < RIVER_PATH.length; i++) {
+    const [rx, ry] = RIVER_PATH[i];
+    i === 0 ? cc.moveTo(rx, ry) : cc.lineTo(rx, ry);
+  }
+  cc.stroke();
+}
+
+function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, clock: number): void {
+  ctx.save();
+  ctx.translate(wx, wy);
+  // Animated foam dots falling outward from island rim
+  for (let i = 0; i < 7; i++) {
+    const phase = ((clock / 500 + i * 0.7) % 1);
+    const fy    = -60 + phase * 380;
+    const fx    = Math.sin(clock / 350 + i * 1.3) * 32;
+    ctx.globalAlpha = 0.75 * (1 - phase * 0.8);
+    ctx.fillStyle   = '#DCEEFF';
+    ctx.beginPath();
+    ctx.arc(fx, fy, 9 + (1 - phase) * 14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ─── Debug terrain overlay ───────────────────────────────────────────────────
+import { GRID_W, GRID_H, getRawTerrainGrid } from './mapData';
+
+/** Debug overlay: tints each terrain cell with a semi-transparent color.
+ *  Activate with ?debug=terrain in the URL. */
+export function drawDebugTerrainVec(ctx: CanvasRenderingContext2D): void {
+  const grid = getRawTerrainGrid();
+  if (!grid) return;
+  const cw = S / GRID_W;
+  const ch = S / GRID_H;
+  const COLORS = [
+    '',                           // 0 SPACE — skip
+    'rgba(30,80,255,0.5)',        // 1 WATER — blue
+    'rgba(255,210,20,0.45)',      // 2 SAND — yellow
+    'rgba(50,50,50,0.5)',         // 3 ROAD — dark
+    'rgba(30,180,40,0.45)',       // 4 GRASS — green
+    'rgba(200,165,110,0.4)',      // 5 PAVEMENT — tan
+  ];
+  ctx.save();
+  for (let gy = 0; gy < GRID_H; gy++) {
+    for (let gx = 0; gx < GRID_W; gx++) {
+      const t = grid[gy * GRID_W + gx];
+      if (!COLORS[t]) continue;
+      ctx.fillStyle = COLORS[t];
+      ctx.fillRect(gx * cw, gy * ch, cw, ch);
+    }
+  }
+  ctx.restore();
+}
+
+
+=== islandMap.ts (terrain query API) ===
+
+// islandMap.ts — Phase 4: geometry-based island. Space parallax, drift, evolution sprites kept.
+// Image processing (processIsland, floodFill, pixel classifier) fully removed.
+// All terrain queries delegate to mapData.ts geometry + baked grid.
+
+import { CONFIG } from './config';
+import { extractComponents } from './spriteExtract';
+import {
+  bakeTerrainGrid,
+  isWalkableGrid,
+  getTerrainGrid,
+  TERRAIN,
+  type TerrainClass,
+} from './mapData';
+import { drawVectorGround } from './drawMap';
+
+export { TERRAIN, type TerrainClass };
+
+// ── ISLAND_SRC_W kept for backward-compat; zoom clamp removed in engine.ts ───
+export const ISLAND_SRC_W = 2048;
+
+// ── Drift objects (decorative, float in space outside the island) ─────────────
+
+interface DriftObject {
+  x: number; y: number;
+  vx: number; vy: number;
+  rot: number; rotSpeed: number;
+  spriteIdx: number;
+  size: number;
+}
+
+// ── Evolution sheet processing ────────────────────────────────────────────────
+
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload  = () => res(img);
+    img.onerror = () => rej(new Error(`Failed to load ${src}`));
+    img.src = src;
+  });
+}
+
+/** Process evolution_sheet.png: component extraction (4 cells left->right). */
+function processEvolutionSheet(img: HTMLImageElement): HTMLCanvasElement[] {
+  return extractComponents(img, 4, 1, 'evolution_sheet');
+}
+
+/** Process drift_sheet.png: component extraction (3x2 grid). */
+function processDriftSheet(img: HTMLImageElement): HTMLCanvasElement[] {
+  return extractComponents(img, 3, 2, 'drift_sheet');
+}
+
+// ── Island state ──────────────────────────────────────────────────────────────
+// No more walkableMask/terrainGrid/islandCanvas — those are geometry now.
+
+export const islandState: {
+  ready: boolean;
+  spaceBgImg: HTMLImageElement | null;
+  driftSprites: HTMLCanvasElement[];
+  driftObjects: DriftObject[];
+  nextDriftMs: number;
+  formSprites: HTMLCanvasElement[];
+} = {
+  ready: false,
+  spaceBgImg: null,
+  driftSprites: [],
+  driftObjects: [],
+  nextDriftMs: 25000 + Math.random() * 15000,
+  formSprites: [],
+};
+
+// ── Asset loading ─────────────────────────────────────────────────────────────
+
+export async function loadIslandAssets(base: string): Promise<void> {
+  try {
+    // Phase 4: island_map.png no longer loaded for gameplay — vector ground only.
+    const [spaceImg, driftImg, evoImg] = await Promise.all([
+      loadImg(`${base}assets/space_bg.png`),
+      loadImg(`${base}assets/drift_sheet.png`),
+      loadImg(`${base}assets/evolution_sheet.png`).catch(() => null as unknown as HTMLImageElement),
+    ]);
+
+    islandState.spaceBgImg   = spaceImg;
+    islandState.driftSprites = processDriftSheet(driftImg);
+    if (evoImg) {
+      islandState.formSprites = processEvolutionSheet(evoImg);
+      console.log('[island] evolution sprites:', islandState.formSprites.length);
+    }
+
+    // Bake the 192x192 geometry terrain grid (O(192^2) point-in-polygon calls at startup)
+    bakeTerrainGrid();
+
+    islandState.ready = true;
+    console.log('[island] Phase 4 vector island ready');
+  } catch (e) {
+    console.warn('[island] asset load failed — fallback active', e);
+    // Still bake the terrain grid so gameplay doesn't hang
+    bakeTerrainGrid();
+    islandState.ready = true;
+  }
+}
+
+// ── Terrain API (delegates to geometry grid) ──────────────────────────────────
+
+/**
+ * Returns true when worldX/Y is on walkable island ground.
+ * Falls back to true while assets are loading so nothing breaks at boot.
+ */
+export function isWalkable(worldX: number, worldY: number): boolean {
+  return isWalkableGrid(worldX, worldY);
+}
+
+/**
+ * Returns the terrain class for a world-space position.
+ * Falls back to PAVEMENT while grid is loading.
+ */
+export function getTerrainAt(worldX: number, worldY: number): TerrainClass {
+  return getTerrainGrid(worldX, worldY);
+}
+
+// ── Drawing API ───────────────────────────────────────────────────────────────
+
+/** Space background — tiled, parallaxed at 0.25x camera movement */
+export function drawSpaceBg(
+  ctx: CanvasRenderingContext2D,
+  view: { x: number; y: number; w: number; h: number },
+  camX: number,
+  camY: number,
+): void {
+  if (!islandState.spaceBgImg) {
+    ctx.fillStyle = CONFIG.COLORS.uiBg;
+    ctx.fillRect(view.x, view.y, view.w, view.h);
+    return;
+  }
+  const img = islandState.spaceBgImg;
+  const tw = img.width, th = img.height;
+  const ox = ((camX * 0.25) % tw + tw) % tw;
+  const oy = ((camY * 0.25) % th + th) % th;
+  const x0 = view.x - ((view.x + ox) % tw + tw) % tw;
+  const y0 = view.y - ((view.y + oy) % th + th) % th;
+  ctx.save();
+  for (let ty = y0; ty < view.y + view.h + th; ty += th) {
+    for (let tx = x0; tx < view.x + view.w + tw; tx += tw) {
+      ctx.drawImage(img, tx, ty);
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Phase 4: draws the vector island ground (replaces painted island_map.png).
+ * Called by world.ts drawGround(). Accepts clock + camZoom for waterfall animation
+ * and cache invalidation.
+ */
+export function drawIsland(ctx: CanvasRenderingContext2D, clock = 0, camZoom = 0.15): void {
+  drawVectorGround(ctx, clock, camZoom);
+}
+
+/** No-op: grain overlay removed in Phase 4 (vector ground has flat fills). */
+export function drawGrainOverlay(
+  _ctx: CanvasRenderingContext2D,
+  _view: { x: number; y: number; w: number; h: number },
+): void {
+  // intentionally empty — retained for backward-compat import
+}
+
+/** Drifting space objects — above space bg, below island */
+export function drawDriftObjects(ctx: CanvasRenderingContext2D): void {
+  for (const d of islandState.driftObjects) {
+    const sprite = islandState.driftSprites[d.spriteIdx];
+    if (!sprite) continue;
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.rot);
+    ctx.drawImage(sprite, -d.size / 2, -d.size / 2, d.size, d.size);
+    ctx.restore();
+  }
+}
+
+// ── Drift object lifecycle ────────────────────────────────────────────────────
+
+function spawnDrift(): void {
+  if (islandState.driftSprites.length === 0) return;
+  const S = CONFIG.MAP_SIZE;
+  const side = (Math.random() * 4) | 0;
+  const spd = 20 + Math.random() * 30;
+  const margin = Math.max(1000, S * 0.1);
+  let x = 0, y = 0, vx = 0, vy = 0;
+  if (side === 0) { x = -600; y = margin + Math.random() * (S - margin * 2); vx = spd; vy = (Math.random() - 0.5) * spd * 0.2; }
+  else if (side === 1) { x = S + 600; y = margin + Math.random() * (S - margin * 2); vx = -spd; vy = (Math.random() - 0.5) * spd * 0.2; }
+  else if (side === 2) { y = -600; x = margin + Math.random() * (S - margin * 2); vy = spd; vx = (Math.random() - 0.5) * spd * 0.2; }
+  else { y = S + 600; x = margin + Math.random() * (S - margin * 2); vy = -spd; vx = (Math.random() - 0.5) * spd * 0.2; }
+
+  islandState.driftObjects.push({
+    x, y, vx, vy,
+    rot: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.3,
+    spriteIdx: (Math.random() * islandState.driftSprites.length) | 0,
+    size: 100 + Math.random() * 80,
+  });
+}
+
+export function updateDrift(dt: number): void {
+  if (!islandState.ready) return;
+  const S = CONFIG.MAP_SIZE;
+  const dtSec = dt / 1000;
+  islandState.driftObjects = islandState.driftObjects.filter((d) => {
+    d.x += d.vx * dtSec;
+    d.y += d.vy * dtSec;
+    d.rot += d.rotSpeed * dtSec;
+    return d.x > -2500 && d.x < S + 2500 && d.y > -2500 && d.y < S + 2500;
+  });
+  islandState.nextDriftMs -= dt;
+  if (islandState.nextDriftMs <= 0) {
+    islandState.nextDriftMs = 20000 + Math.random() * 20000;
+    spawnDrift();
+  }
+}
+
+// ── Debug overlays ────────────────────────────────────────────────────────────
+
+import { drawDebugTerrainVec } from './drawMap';
+import { GRID_W, GRID_H, isInsideIsland } from './mapData';
+
+/**
+ * Debug overlay: tints terrain cells with semi-transparent colour per type.
+ * Activate with ?debug=terrain in the URL.
+ */
+export function drawDebugTerrain(ctx: CanvasRenderingContext2D): void {
+  drawDebugTerrainVec(ctx);
+}
+
+/**
+ * Debug overlay: tints all non-walkable cells red at 40% opacity.
+ * Activate with ?debug=mask in the URL.
+ */
+export function drawDebugMask(ctx: CanvasRenderingContext2D): void {
+  const S = CONFIG.MAP_SIZE;
+  const cw = S / GRID_W, ch = S / GRID_H;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+  for (let gy = 0; gy < GRID_H; gy++) {
+    for (let gx = 0; gx < GRID_W; gx++) {
+      const wx = (gx + 0.5) * cw, wy = (gy + 0.5) * ch;
+      if (!isInsideIsland(wx, wy)) {
+        ctx.fillRect(gx * cw, gy * ch, cw, ch);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+
+=== world.ts (prop and vehicle spawn and placement) ===
+
+// ── HOUSE_LOTS placement in init() ────────────────────────────────────────────
+// (from world.ts, called once per round inside init())
+
+    // Phase 4 §4: place one house per HOUSE_LOT — street-facing, 30–38 total.
+    // Replaces random house scatter in fillResidential for a real suburb layout.
+    {
+      const housePool: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
+      for (const lot of HOUSE_LOTS) {
+        const kind = housePool[Math.floor(rand() * housePool.length)];
+        this.makeObj(kind, lot.x, lot.y);
+      }
+      console.log('[world] Phase 4 house lots placed:', HOUSE_LOTS.length);
+    }
+
+// ── fillResidential ───────────────────────────────────────────────────────────
+
+  private fillResidential(b: Block, rand: () => number) {
+    // Phase 4 §4: houses now placed on HOUSE_LOTS (street-aligned, lot-based).
+    // Random block-scatter houses removed; shed + accessories kept.
+    this.scatter(b, rand, 'shed', 1);
+    this.scatter(b, rand, 'tree', 3);
+    this.scatter(b, rand, 'mailbox', 2);
+    this.scatter(b, rand, 'hydrant', 1);
+    this.scatter(b, rand, 'trashcan', 2);
+    this.scatter(b, rand, 'bike', 1);
+    this.scatter(b, rand, 'birdbath', 1);
+    this.scatter(b, rand, 'flower', 6);
+    this.scatter(b, rand, 'flowerpot', 4);
+    this.scatter(b, rand, 'gnome', 3);
+    this.scatterPeople(b, rand, 'residential', 2);
+    this.scatter(b, rand, 'dog', 1);
+    this.scatter(b, rand, 'cat', 1);
+    this.scatter(b, rand, 'squirrel', 1);
+    if (rand() < 0.6) this.scatter(b, rand, 'bbq', 1);
+    if (rand() < 0.4) this.scatter(b, rand, 'mower', 1);
+    if (rand() < 0.7) this.spawnBirds(b, rand, 3);
+  }
+
+// ── fillDowntown ──────────────────────────────────────────────────────────────
+
+  private fillDowntown(b: Block, rand: () => number) {
+    (b as any).paved = true;
+    const inset = CONFIG.SIDEWALK + 50;
+    // every downtown block gets a skyscraper (100%)
+    {
+      const sx = b.x0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2);
+      const sy = b.y0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2) * 0.5;
+      this.makeObj('skyscraper', sx, sy);
+    }
+    // 1–2 office buildings per block
+    const n = 1 + Math.floor(rand() * 2);
+    for (let i = 0; i < n; i++) {
+      const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 36);
+      this.makeObj('office', p.x, p.y);
+    }
+    // 1 cafe per downtown block (~80% chance)
+    if (rand() < 0.8) {
+      const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 28);
+      this.makeObj('cafe', p.x, p.y);
+    }
+    // 2 shops per downtown block
+    this.scatter(b, rand, 'shop', 2);
+    // street furniture
+    this.scatter(b, rand, 'cafetable', 4);
+    this.scatterPeople(b, rand, 'downtown', 8);
+    this.scatter(b, rand, 'bench', 2);
+    this.scatter(b, rand, 'flower', 3);
+    this.scatter(b, rand, 'apple', 2);
+  }
+
+// ── spawnCar ──────────────────────────────────────────────────────────────────
+
+  private spawnCar(rand: () => number) {
+    const horizontal = rand() < 0.5;
+    const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
+    const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
+    const along = MARGIN + rand() * (this.size - MARGIN * 2);
+    const x = horizontal ? along : center + lane;
+    const y = horizontal ? center + lane : along;
+    const TRAFFIC_POOL: ObjectKind[] = ['car', 'car', 'car', 'taxi', 'convertible', 'fire_truck', 'school_bus'];
+    const trafficKind = TRAFFIC_POOL[Math.floor(rand() * TRAFFIC_POOL.length)];
+    const o = this.makeObj(trafficKind, x, y);
+    o.roadAxis = horizontal ? 'h' : 'v';
+    o.homeX = center + lane; o.homeY = center + lane;
+    o.roadDir = rand() < 0.5 ? 1 : -1;
+  }
+
+// ── spawnDrone ────────────────────────────────────────────────────────────────
+
+  private spawnDrone(rand: () => number) {
+    const x = MARGIN + rand() * (this.size - MARGIN * 2);
+    const y = MARGIN + rand() * (this.size - MARGIN * 2);
+    const o = this.makeObj('drone', x, y);
+    o.homeX = MARGIN + rand() * (this.size - MARGIN * 2);
+    o.homeY = MARGIN + rand() * (this.size - MARGIN * 2);
+    o.tether = 99999;
+  }
+
+// ── spawnBus ──────────────────────────────────────────────────────────────────
+
+  private spawnBus(rand: () => number) {
+    const horizontal = rand() < 0.5;
+    const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
+    const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
+    const along = MARGIN + rand() * (this.size - MARGIN * 2);
+    const o = this.makeObj('schoolbus', horizontal ? along : center + lane, horizontal ? center + lane : along);
+    o.roadAxis = horizontal ? 'h' : 'v';
+    o.homeX = center + lane; o.homeY = center + lane;
+    o.roadDir = rand() < 0.5 ? 1 : -1;
+  }
+
+// ── stepCar (per-frame movement + junction turning) ───────────────────────────
+
+  private stepCar(obj: WorldObject, dtSec: number, player: Player) {
+    const dp = dist(obj.x, obj.y, player.x, player.y);
+    const playerBigger = this.canEat(player.radius, obj.size);
+    let speed = obj.kind === 'schoolbus' ? CONFIG.BUS_SPEED : CONFIG.CAR_SPEED;
+
+    if (obj.honkCd > 0) obj.honkCd -= dtSec * 1000;
+    if (!playerBigger && dp < 240 && obj.honkCd <= 0 && !player.ghost) {
+      audio.playHonk();
+      obj.honkCd = 2200;
+    } else if (player.formIndex >= CONFIG.DEVOURER_FORM_INDEX && dp < player.radius * 4 && obj.honkCd <= 0 && !player.ghost) {
+      audio.carAlarm();
+      obj.honkCd = 2600;
+    }
+    if (playerBigger && dp < 300 && !player.ghost) {
+      speed = CONFIG.CAR_FLEE_SPEED;
+      obj.fleeing = true;
+      if (obj.roadAxis === 'h') obj.roadDir = player.x > obj.x ? -1 : 1;
+      else obj.roadDir = player.y > obj.y ? -1 : 1;
+    } else {
+      obj.fleeing = false;
+    }
+
+    // Phase 4 §4: junction turning — cars can turn at road intersections.
+    // Uses wanderAngle (unused for cars) as a per-junction cooldown to prevent rapid oscillation.
+    if (!obj.fleeing) {
+      const TURN_ZONE = 55; // px radius from junction center
+      for (const rc of ROAD_CENTERS) {
+        if (obj.roadAxis === 'h') {
+          // Horizontal car — can turn onto vertical road at x=rc
+          if (Math.abs(obj.x - rc) < TURN_ZONE && obj.wanderAngle <= 0) {
+            if (Math.random() < 0.022) { // ~22% per junction crossing
+              obj.roadAxis = 'v';
+              obj.homeX = rc;
+              obj.x = rc; // snap to road center
+              obj.roadDir = Math.random() < 0.5 ? 1 : -1;
+              obj.wanderAngle = 3.5; // 3.5s cooldown before next turn
+              break;
+            }
+          }
+        } else {
+          // Vertical car — can turn onto horizontal road at y=rc
+          if (Math.abs(obj.y - rc) < TURN_ZONE && obj.wanderAngle <= 0) {
+            if (Math.random() < 0.022) {
+              obj.roadAxis = 'h';
+              obj.homeY = rc;
+              obj.y = rc; // snap to road center
+              obj.roadDir = Math.random() < 0.5 ? 1 : -1;
+              obj.wanderAngle = 3.5;
+              break;
+            }
+          }
+        }
+      }
+      if (obj.wanderAngle > 0) obj.wanderAngle -= dtSec;
+    }
+
+    if (obj.roadAxis === 'h') {
+      obj.x += obj.roadDir * speed * dtSec;
+      obj.y = obj.homeY;
+      if (obj.x < MARGIN) { obj.x = MARGIN; obj.roadDir = 1; }
+      else if (obj.x > this.size - MARGIN) { obj.x = this.size - MARGIN; obj.roadDir = -1; }
+    } else {
+      obj.y += obj.roadDir * speed * dtSec;
+      obj.x = obj.homeX;
+      if (obj.y < MARGIN) { obj.y = MARGIN; obj.roadDir = 1; }
+      else if (obj.y > this.size - MARGIN) { obj.y = this.size - MARGIN; obj.roadDir = -1; }
+    }
+  }
+
+
+=== engine.ts (camera) ===
+
+// ── Camera state (module-level, from engine.ts) ───────────────────────────────
+
+  // camera state (world-space centre + zoom), smoothed each frame
+  let camCX = CONFIG.MAP_SIZE / 2;
+  let camCY = CONFIG.MAP_SIZE / 2;
+  let camZoom = 0.5;
+  let camLookX = 0, camLookY = 0;   // smoothed velocity lookahead
+
+// ── Camera initialisation on round start (from startGame()) ──────────────────
+
+    camCX = player.x;
+    camCY = player.y;
+    camLookX = camLookY = 0;
+    const startView = clamp(
+      CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
+      CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
+    );
+    // Phase 4 §5: no zoom cap — vector ground is crisp at any magnification.
+    camZoom = fh / startView;
+
+// ── Per-frame camera update (from renderFrame()) ──────────────────────────────
+
+    // interpolated player position for smooth sub-tick rendering
+    const px = player.prevX + (player.x - player.prevX) * alpha;
+    const py = player.prevY + (player.y - player.prevY) * alpha;
+
+    // ── camera: Phase 4 §5 — radius-proportional zoom, NO zoom cap (vector ground is always crisp) ──
+    // viewHeight = radius * 28.57 → diameter / fh ≈ 7% (player ~7% of screen height at spawn)
+    const viewHeight = clamp(player.radius * 28.57, 350, fh * 6);
+    const targetZoom = fh / viewHeight;
+    camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
+
+    // ── camera: follow with lookahead, NO dead zone ──
+    const pspd = Math.hypot(player.vx, player.vy);
+    const lax = pspd > 0.0001 ? (player.vx / pspd) * CONFIG.CAM_LOOKAHEAD : 0;
+    const lay = pspd > 0.0001 ? (player.vy / pspd) * CONFIG.CAM_LOOKAHEAD : 0;
+    camLookX = lerp(camLookX, lax, CONFIG.CAM_LOOKAHEAD_LERP);
+    camLookY = lerp(camLookY, lay, CONFIG.CAM_LOOKAHEAD_LERP);
+    camCX = lerp(camCX, px + camLookX, CONFIG.CAM_POS_LERP);
+    camCY = lerp(camCY, py + camLookY, CONFIG.CAM_POS_LERP);
+
+    const shake = fx.getShake();
+    const viewW = fw / camZoom, viewH = fh / camZoom;
+    const view = { x: camCX - viewW / 2, y: camCY - viewH / 2, w: viewW, h: viewH };
+
+// ── World transform applied to canvas context ─────────────────────────────────
+
+    ctx.save();
+    // WORLD EATER — constant 1px screen rumble while moving at max form
+    let rmbX = 0, rmbY = 0;
+    if (player && player.formIndex >= CONFIG.FORMS.length - 1 && Math.hypot(player.vx, player.vy) > 20) {
+      rmbX = (Math.random() - 0.5) * 2; rmbY = (Math.random() - 0.5) * 2;
+    }
+    ctx.translate(fw / 2 + shake.x + rmbX, fh / 2 + shake.y + rmbY);
+    ctx.scale(camZoom, camZoom);
+    ctx.translate(-camCX, -camCY);
+
+    // Phase 4: pass camZoom for vector ground cache invalidation
+    world.drawGround(ctx, view, clock, camCX, camCY, camZoom);
+    world.drawDressing(ctx, view, clock, camZoom);
+
+
+=== UILayer.tsx (power button input handling) ===
+
+      {/* War Pack §3: POWER button — held = ready to cast, active = radial sweep countdown */}
+      {(snap.heldSpell || snap.activeSpell) && !snap.paused && (() => {
+        const POWER_ICONS: Record<string, string> = { event_horizon: '🌀', wormhole: '⚡', time_warp: '⏱', singularity: '⚫' };
+        const POWER_COLORS: Record<string, string> = {
+          event_horizon: '#9B5DE5', wormhole: '#00BBF9', time_warp: '#2D9CDB', singularity: '#F15BB5',
+        };
+        const isHeld = !!snap.heldSpell;
+        const rawId = isHeld
+          ? snap.heldSpell!.id.replace('spell_', '')
+          : (snap.activeSpell ?? '');
+        const powerColor = POWER_COLORS[rawId] ?? (isHeld ? (snap.heldSpell!.color ?? '#7BFFED') : '#7BFFED');
+        const icon = POWER_ICONS[rawId] ?? '✨';
+        const labelText = (isHeld ? snap.heldSpell!.name : rawId.replace(/_/g, ' ').toUpperCase()).split(' ')[0];
+        const sweepDeg = (snap.spellTimerMax > 0 && !isHeld)
+          ? (snap.spellTimer / snap.spellTimerMax) * 360 : 0;
+        return (
+          <button
+            onPointerDown={isHeld ? (e) => { e.preventDefault(); console.log('POWER ACTIVATED: ' + rawId); engine.castSpell(); } : undefined}
+            aria-label={isHeld ? `Cast ${rawId}` : `${rawId} active`}
+            style={{
+              position: 'fixed', bottom: 32, right: 24,
+              width: 72, height: 72, borderRadius: 20,
+              background: isHeld
+                ? powerColor
+                : `conic-gradient(${powerColor}CC ${sweepDeg.toFixed(1)}deg, rgba(10,8,24,0.82) ${sweepDeg.toFixed(1)}deg)`,
+              border: `2px solid ${powerColor}99`,
+              color: isHeld ? '#0a0818' : powerColor,
+              fontSize: 12, fontWeight: 800,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: isHeld ? 'pointer' : 'default',
+              boxShadow: `0 4px 24px ${powerColor}66`,
+              letterSpacing: '0.04em', lineHeight: 1.2,
+              animation: isHeld ? 'vd-spell-pulse 1.6s ease-in-out infinite' : 'none',
+              touchAction: 'manipulation',
+            }}
+          >
+            <span style={{ fontSize: 24 }}>{icon}</span>
+            <span style={{ fontSize: 9, marginTop: 2 }}>{labelText}</span>
+          </button>
+        );
+      })()}
