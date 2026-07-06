@@ -1,0 +1,61 @@
+# VOIDLING Vector Rebuild (Phase 4)
+
+This is a foundational rebuild of the ground layer. The painted island image approach cannot stay sharp at gameplay zoom and forces the game to guess terrain by sampling pixel colors, which is why placement keeps failing. You are replacing the image ground with a data-defined island rendered as crisp vector shapes, and replacing pixel guessing with exact geometry queries. All gameplay systems survive: eating, vacuum, growth, evolution sprites, predation, threat rings, defense waves, vignettes, banners, bubbles, quests, scoring.
+
+Read the existing code carefully first. Implement in the exact stage order below and test each stage in the preview before moving to the next.
+
+## Stage 1: The map becomes data
+Create one map definition module containing, in world coordinates:
+- ISLAND: an organic rounded polygon (12 to 16 control points, rendered as smooth curves). This is the single source of truth for where land exists.
+- ZONES: polygons inside the island: DOWNTOWN (center-east, includes a circular plaza), SUBURBS (a broad band across the west and north), PARK (center-west), FOREST (northeast), BEACH (a sand strip along the south coast) with a LAGOON blob polygon in it.
+- RIVER: a path with width, starting at a small pond in the park, winding southeast, and exiting through the island rim at a WATERFALL point.
+- ROADS: a network of polylines with width: one ring road, a spoke into downtown ending at the plaza roundabout, and 2 to 3 looping suburb streets. Store the network as a graph so vehicles can follow it and turn at junctions.
+- HOUSE LOTS: generated along suburb streets: a lot point every 1.5 house-widths, alternating sides of the street, each with an orientation facing the street. Target 30 to 40 lots.
+Ground colors (flat fills, keep the established palette): meadow green A8CD9F, park green B7DBA8, forest green 8FBF88, sand F2DFA7, downtown pavement EAE4D6, road gray 939CAB with white dashed centerlines, water 7FD4E8 with a deeper 5BB8D4 core, rim sticker white, cliff band 6B5B73.
+
+## Stage 2: Vector ground renderer
+Draw the ground every frame in world space, in this order: space parallax layer (keep the existing space_bg image and drifting objects), island base fill, zone fills, lagoon and river (deeper core plus lighter edge line), roads (gray fill plus white dashes), then the island rim: a thick white sticker stroke around the island polygon with a cliff-colored outer stroke fading to space, and at the WATERFALL point a simple layered blue spill with white foam dots falling toward space. Everything is canvas paths, so it is perfectly crisp at every zoom level.
+If drawing paths every frame costs frame rate on mobile, cache the ground to an offscreen canvas at screen resolution and re-render it only when zoom changes by more than 5 percent. Measure before optimizing.
+
+## Stage 3: Exact terrain queries
+- Implement terrainAt(point) using geometry, priority order: SPACE (outside island polygon), WATER (inside lagoon or within river width), ROAD (within road width of any road polyline), SAND, FOREST, PARK, DOWNTOWN, default MEADOW.
+- At load, bake a 192x192 lookup grid from these functions for cheap per-frame queries.
+- Falloff now uses the island polygon exactly. Rivals steer using the same queries and never fall.
+- Delete the old pixel color classification and image-derived mask code entirely once this works. Dead code paths cause regressions.
+- Keep two debug views: ?debug=terrain tints each terrain class a distinct color, and ?debug=sprites stays as is.
+
+## Stage 4: Repopulate the island properly
+- Houses: one house sprite per lot, correctly oriented, 30 to 40 total. Suburbs must finally look like suburbs. Gnomes, mailboxes and flowerbeds scatter between lots.
+- Vehicles: cars spawn on the road graph and drive along it, slowing into turns at junctions. Taxis and buses favor downtown, convertibles the ring road. Police and army stay reserved for defense waves (they may leave roads when converging on the player).
+- Water: the rowboat drifts on the lagoon. The fisherman stands on sand at the lagoon edge. Sunbathers, umbrellas, towels, sandcastles and the cooler spawn on SAND only. Palm trees along the beach.
+- Park and forest: soccer field and basketball court decals on PARK grass with the soccer game and playground vignettes on them; forest densely packed with trees; tennis court at the suburb edge.
+- All vignettes re-placed through terrain queries. Pedestrian wander uses terrainAt and never enters WATER or SPACE.
+- Overall density should feel like a living town: when in doubt, add more, and scale rival and prop counts so the leaderboard race stays competitive.
+
+## Stage 5: Restore the good camera
+- The 2.5x ground magnification clamp existed only because of the image ground. Remove it.
+- Set the starting zoom so the player is about 7 percent of screen height, and keep the smooth zoom-out with growth from the Feel Patch. Verify the ground is perfectly crisp at maximum zoom-in and maximum zoom-out, which it now will be by construction.
+
+## Stage 6: Fix the powers button on touch
+- The power button currently does nothing when tapped on mobile. Switch its handling to pointer events (pointerdown) with touch-action manipulation on the element, and make sure the game canvas does not swallow the tap.
+- On every activation log POWER ACTIVATED: name to the console, flash the button, show the radial duration sweep, the colored ring on the player, and the name pop. Test by simulating touch input, not mouse clicks.
+
+## Stage 7: Retire the painted island with honor
+- Use the existing island_map.png as the title screen background art (blurred slightly behind the logo is fine). Remove it and all its processing from the gameplay path.
+
+## Do not touch
+Predation rules, threat rings, rival AI drives, defense wave tiers, vacuum, growth curve, evolution sprites, quest logic, scoring, banners, speech bubbles.
+
+## Verify before finishing: proof required, do not skip
+1. Zoom fully in and fully out: the ground is crisp everywhere, zero blur, dashes and rim clean.
+2. ?debug=terrain shows sane zones: river and lagoon blue, roads gray, beach yellow, forest dark green.
+3. Count the houses and report the number. It must be 30 or more, all facing their streets.
+4. Watch 2 minutes: every car stays on roads and turns at junctions, no pedestrian in water or space, boat on the lagoon, fisherman at the shore.
+5. Run at the rim: falloff triggers exactly at the white line, respawn works, rivals never fall.
+6. Simulate touch on the power button after collecting a pickup: the console logs the activation and the effect is visible. Report the log line.
+7. The soccer game, playground, and proposal vignettes are present and on sensible ground.
+8. Title screen shows the painted island art; gameplay never loads it.
+9. Frame rate holds on a mobile-sized viewport at full density with a defense wave active.
+10. The old mask, color-classification, and image-ground code is deleted. Report the files removed.
+
+In your final report: the house count, the power activation log line, the files deleted, and every file changed.
