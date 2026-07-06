@@ -14,3 +14,4 @@
 - [VOIDLING v18·1 Phase 3a Fix Pack](voidling-v18-1.md) — PROC/DRAW 2048/4096, zoom cap, view-bounded grain, evolution sprites, no coast slow, sticker outline, fissure void fill, banner ticker, filterNonWalkable (no exemptions).
 - [VOIDLING v18·2 War Pack](voidling-v18-2.md) — sheet-sliced sprites (wardSprites.ts), 9 person kinds + 6 vehicles + 5 props, predation overhaul (1.3×, 30s grace, 50% steal), defense waves (police/army), 4 new powers (EVENT_HORIZON/WORMHOLE/TIME_WARP/SINGULARITY).
 - [VOIDLING v18·3 Life Pack](voidling-v18-3.md) — people2 (9 new peds), sports field decals (not in objects[]), vignette system (bubble cap 4, panic once, eatenBanners flush), tier-4 tanks+helis (shells with landing circle, heli hover+pellet burst, WORLD ENDER vacuum).
+- [VOIDLING v18·4 Quality Pack](voidling-v184.md) — ISLAND_SRC_W=2048 zoom cap fix, component sprite extraction (spriteExtract.ts), terrain grid + NPC water avoidance.

@@ -3,16 +3,59 @@
 
 import { CONFIG } from './config';
 import { clamp } from './utils';
+import { extractComponents } from './spriteExtract';
 
 const MASK_W = 128;
 const MASK_H = 128;
 
-/** Display canvas size — determines camera zoom cap: max zoom = 2.5 × (ISLAND_SRC_W / MAP_SIZE) */
-export const ISLAND_SRC_W = 4096;
+/**
+ * Effective source-image detail resolution (island_map.png is 2048×2048).
+ * Used for the zoom cap: max zoom = 2.5 × (ISLAND_SRC_W / MAP_SIZE) = 0.427.
+ * The display canvas is still rendered at 4096 for smooth sub-pixel sampling.
+ */
+export const ISLAND_SRC_W = 2048;
 
 // Background violet of the raw island_map.png — #1E1338
 const BG_R = 0x1E, BG_G = 0x13, BG_B = 0x38;
 const BG_THRESHOLD = 65; // generous colour-distance to catch anti-aliased fringe
+
+// ── Terrain classification ────────────────────────────────────────────────────
+
+export const TERRAIN = {
+  SPACE:     0, // outside island entirely
+  WATER:     1, // river / lagoon / ocean (blue-teal pixels)
+  SAND:      2, // beach (warm golden)
+  ROAD:      3, // road surface (low-saturation gray)
+  GRASS:     4, // park / forest floor (green)
+  PAVEMENT:  5, // default — paths, plazas, building lots
+} as const;
+export type TerrainClass = (typeof TERRAIN)[keyof typeof TERRAIN];
+
+/** Classify a pixel's terrain from its RGB values. */
+function classifyTerrain(r: number, g: number, b: number, a: number): TerrainClass {
+  if (a < 20) return TERRAIN.SPACE;
+  const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+  const bright  = (r + g + b) / 3;
+
+  // WATER: blue or teal strongly dominant
+  if (b > r + 35 && (b >= g - 25 || g > r + 20)) return TERRAIN.WATER;
+  if (g > r + 30 && b > r + 30)                   return TERRAIN.WATER; // teal variant
+
+  if (chroma < 28) {
+    // Achromatic: ROAD (dark) or PAVEMENT (light)
+    return bright > 155 ? TERRAIN.PAVEMENT : TERRAIN.ROAD;
+  }
+
+  // GRASS: green dominant
+  if (g > r + 20 && g > b + 20) return TERRAIN.GRASS;
+
+  // SAND: warm golden (R+G high, B lower, bright)
+  if (r >= g && g > b + 20 && r - b > 35 && bright > 130) return TERRAIN.SAND;
+
+  if (bright < 80) return TERRAIN.ROAD; // very dark areas are road-ish
+
+  return TERRAIN.PAVEMENT; // default
+}
 
 function colorDist(r: number, g: number, b: number): number {
   const dr = r - BG_R, dg = g - BG_G, db = b - BG_B;
@@ -146,68 +189,34 @@ function trimCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /**
- * Process evolution_sheet.png: flood-fill BG transparent, slice 4 cells left→right,
- * trim each to its opaque bounding box.
+ * Process evolution_sheet.png: component extraction (4 cells left→right).
  * Cells: MUNCHER, GOBBLER, DEVOURER, WORLD ENDER
  */
 function processEvolutionSheet(img: HTMLImageElement): HTMLCanvasElement[] {
-  const COLS = 4;
-  const tmp = document.createElement('canvas');
-  tmp.width = img.width; tmp.height = img.height;
-  const tc = tmp.getContext('2d')!;
-  tc.drawImage(img, 0, 0);
-  const id = tc.getImageData(0, 0, img.width, img.height);
-  floodFillEdges(id.data, img.width, img.height);
-  tc.putImageData(id, 0, 0);
-
-  const cw = (img.width / COLS) | 0, ch = img.height;
-  const sprites: HTMLCanvasElement[] = [];
-  for (let col = 0; col < COLS; col++) {
-    const c = document.createElement('canvas');
-    c.width = cw; c.height = ch;
-    c.getContext('2d')!.drawImage(tmp, col * cw, 0, cw, ch, 0, 0, cw, ch);
-    sprites.push(trimCanvas(c));
-  }
-  return sprites;
+  return extractComponents(img, 4, 1, 'evolution_sheet');
 }
 
+/** Process drift_sheet.png: component extraction (3×2 grid). */
 function processDriftSheet(img: HTMLImageElement): HTMLCanvasElement[] {
-  const COLS = 3, ROWS = 2;
-  const tmp = document.createElement('canvas');
-  tmp.width = img.width; tmp.height = img.height;
-  const tc = tmp.getContext('2d')!;
-  tc.drawImage(img, 0, 0);
-  const id = tc.getImageData(0, 0, img.width, img.height);
-  floodFillEdges(id.data, img.width, img.height);
-  tc.putImageData(id, 0, 0);
-
-  const cw = (img.width / COLS) | 0, ch = (img.height / ROWS) | 0;
-  const sprites: HTMLCanvasElement[] = [];
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      const c = document.createElement('canvas');
-      c.width = cw; c.height = ch;
-      c.getContext('2d')!.drawImage(tmp, col * cw, row * ch, cw, ch, 0, 0, cw, ch);
-      sprites.push(c);
-    }
-  }
-  return sprites;
+  return extractComponents(img, 3, 2, 'drift_sheet');
 }
 
 export const islandState: {
   ready: boolean;
   walkableMask: Uint8Array;   // non-generic: accepts ArrayBuffer and ArrayBufferLike alike
+  terrainGrid: Uint8Array;    // 128×128 — TerrainClass per cell (SPACE/WATER/SAND/ROAD/GRASS/PAVEMENT)
   islandCanvas: HTMLCanvasElement | null;
   spaceBgImg: HTMLImageElement | null;
   driftSprites: HTMLCanvasElement[];
   driftObjects: DriftObject[];
   nextDriftMs: number;
-  srcW: number;               // display canvas px — used for zoom-cap math
+  srcW: number;               // effective source detail res — used for zoom-cap math
   grainCanvas: HTMLCanvasElement | null;  // 128×128 procedural speckle tile
   formSprites: HTMLCanvasElement[];       // [MUNCHER, GOBBLER, DEVOURER, WORLD ENDER]
 } = {
   ready: false,
   walkableMask: new Uint8Array(MASK_W * MASK_H),
+  terrainGrid:  new Uint8Array(MASK_W * MASK_H),
   islandCanvas: null,
   spaceBgImg: null,
   driftSprites: [],
@@ -220,8 +229,10 @@ export const islandState: {
 
 // ── Image processing ──────────────────────────────────────────────────────────
 
-function processIsland(img: HTMLImageElement): { canvas: HTMLCanvasElement; mask: Uint8Array } {
-  // Process at 2048 — fast pixel ops, preserves detail for the 4096 display canvas
+function processIsland(
+  img: HTMLImageElement,
+): { canvas: HTMLCanvasElement; mask: Uint8Array; terrain: Uint8Array } {
+  // Process at 2048 — fast pixel ops, matches source image resolution
   const PROC = 2048;
   const tmp = document.createElement('canvas');
   tmp.width = PROC; tmp.height = PROC;
@@ -232,8 +243,9 @@ function processIsland(img: HTMLImageElement): { canvas: HTMLCanvasElement; mask
   keepLargest(id.data, PROC, PROC);
   tc.putImageData(id, 0, 0);
 
-  // 4096 display canvas → max zoom = 2.5 × (4096/12000) ≈ 0.853, giving ~30px player at start
-  const DRAW = ISLAND_SRC_W;
+  // Display canvas: 4096×4096 — 2× bilinear upscale for smooth sub-pixel sampling.
+  // Zoom cap uses ISLAND_SRC_W=2048 (source resolution), not 4096, for correct magnification.
+  const DRAW = 4096;
   const display = document.createElement('canvas');
   display.width = DRAW; display.height = DRAW;
   display.getContext('2d')!.drawImage(tmp, 0, 0, DRAW, DRAW);
@@ -241,15 +253,27 @@ function processIsland(img: HTMLImageElement): { canvas: HTMLCanvasElement; mask
   // 128×128 walkable mask from processed result (alpha > 64 → walkable)
   const mc = document.createElement('canvas');
   mc.width = MASK_W; mc.height = MASK_H;
-  mc.getContext('2d')!.drawImage(tmp, 0, 0, MASK_W, MASK_H);
-  const mid = mc.getContext('2d')!.getImageData(0, 0, MASK_W, MASK_H);
+  const mcCtx = mc.getContext('2d')!;
+  mcCtx.drawImage(tmp, 0, 0, MASK_W, MASK_H);
+  const mid = mcCtx.getImageData(0, 0, MASK_W, MASK_H);
   const maskBuf = new ArrayBuffer(MASK_W * MASK_H);
   const mask = new Uint8Array(maskBuf) as Uint8Array<ArrayBuffer>;
+  const terrain = new Uint8Array(MASK_W * MASK_H);
   for (let i = 0; i < MASK_W * MASK_H; i++) {
-    mask[i] = mid.data[i * 4 + 3] > 64 ? 1 : 0;
+    const r = mid.data[i*4], g = mid.data[i*4+1], b = mid.data[i*4+2], a = mid.data[i*4+3];
+    mask[i] = a > 64 ? 1 : 0;
+    terrain[i] = classifyTerrain(r, g, b, a);
   }
 
-  return { canvas: display, mask };
+  // Debug: log terrain breakdown for spot-checking
+  const counts = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < terrain.length; i++) counts[terrain[i]]++;
+  console.log(
+    '[island] terrain cells — SPACE:', counts[0], 'WATER:', counts[1],
+    'SAND:', counts[2], 'ROAD:', counts[3], 'GRASS:', counts[4], 'PAVEMENT:', counts[5],
+  );
+
+  return { canvas: display, mask, terrain };
 }
 
 export async function loadIslandAssets(base: string): Promise<void> {
@@ -260,9 +284,10 @@ export async function loadIslandAssets(base: string): Promise<void> {
       loadImg(`${base}assets/drift_sheet.png`),
       loadImg(`${base}assets/evolution_sheet.png`).catch(() => null as unknown as HTMLImageElement),
     ]);
-    const { canvas, mask } = processIsland(islandImg);
+    const { canvas, mask, terrain } = processIsland(islandImg);
     islandState.islandCanvas = canvas;
     islandState.walkableMask = mask;
+    islandState.terrainGrid  = terrain;
     islandState.spaceBgImg = spaceImg;
     islandState.driftSprites = processDriftSheet(driftImg);
     islandState.grainCanvas = generateGrainCanvas();
@@ -288,6 +313,46 @@ export function isWalkable(worldX: number, worldY: number): boolean {
   const mx = clamp((worldX / CONFIG.MAP_SIZE) * MASK_W | 0, 0, MASK_W - 1);
   const my = clamp((worldY / CONFIG.MAP_SIZE) * MASK_H | 0, 0, MASK_H - 1);
   return islandState.walkableMask[my * MASK_W + mx] > 0;
+}
+
+/**
+ * Returns the terrain class for a world-space position.
+ * Falls back to PAVEMENT while assets are loading.
+ */
+export function getTerrainAt(worldX: number, worldY: number): TerrainClass {
+  if (!islandState.ready) return TERRAIN.PAVEMENT;
+  const mx = clamp((worldX / CONFIG.MAP_SIZE) * MASK_W | 0, 0, MASK_W - 1);
+  const my = clamp((worldY / CONFIG.MAP_SIZE) * MASK_H | 0, 0, MASK_H - 1);
+  return islandState.terrainGrid[my * MASK_W + mx] as TerrainClass;
+}
+
+/**
+ * Debug overlay: tints terrain cells with semi-transparent colour per type.
+ * Activate by loading the game with ?debug=terrain in the URL.
+ * SPACE=skip, WATER=blue, SAND=yellow, ROAD=dark-gray, GRASS=green, PAVEMENT=tan.
+ */
+export function drawDebugTerrain(ctx: CanvasRenderingContext2D): void {
+  if (!islandState.ready) return;
+  const S = CONFIG.MAP_SIZE;
+  const cw = S / MASK_W, ch = S / MASK_H;
+  const COLORS = [
+    '',                          // 0 SPACE — skip
+    'rgba(30,80,255,0.45)',      // 1 WATER
+    'rgba(255,210,20,0.40)',     // 2 SAND
+    'rgba(50,50,50,0.45)',       // 3 ROAD
+    'rgba(30,180,40,0.40)',      // 4 GRASS
+    'rgba(200,165,110,0.35)',    // 5 PAVEMENT
+  ];
+  ctx.save();
+  for (let my = 0; my < MASK_H; my++) {
+    for (let mx = 0; mx < MASK_W; mx++) {
+      const t = islandState.terrainGrid[my * MASK_W + mx];
+      if (!COLORS[t]) continue;
+      ctx.fillStyle = COLORS[t];
+      ctx.fillRect(mx * cw, my * ch, cw, ch);
+    }
+  }
+  ctx.restore();
 }
 
 // ── Drift object lifecycle ────────────────────────────────────────────────────

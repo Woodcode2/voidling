@@ -10,7 +10,8 @@ import { track } from './services';
 import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
-import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, ISLAND_SRC_W } from './islandMap'; // Phase 2
+import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
+import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
@@ -188,7 +189,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // War Pack §2: ms of red pellet-hit overlay remaining
   let pelletHitFlash = 0;
   // Fix 2: ?debug=mask tints non-walkable cells red for mask verification
-  const debugMask = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mask';
+  const debugMask     = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mask';
+  const debugTerrain  = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'terrain';
+  const debugSprites  = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'sprites';
   // v16 §5: news ticker + contracts
   let currentTicker: string | null = null;
   let tickerCd = 0; // ms until next ticker fires
@@ -425,6 +428,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       CONFIG.CAM_VIEW_BASE, CONFIG.CAM_VIEW_MAX,
     );
     camZoom = Math.min(fh / startView, 2.5 * ISLAND_SRC_W / CONFIG.MAP_SIZE);
+    // Fix 1 verification: ground magnification = screen pixels drawn per source pixel
+    console.log(`GROUND MAGNIFICATION AT START: ${(camZoom * CONFIG.MAP_SIZE / ISLAND_SRC_W).toFixed(3)}  (target ≤ 2.5)`);
 
     audio.startMusic();
     // War Pack §1: load sprite sheets (fire-and-forget; resolves within the first round)
@@ -1413,8 +1418,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     world.drawGround(ctx, view, clock, camCX, camCY);
     // Phase 2: skip legacy grid dressing (crosswalks/manholes) once island is loaded
     if (!islandState.ready) world.drawDressing(ctx, view, clock, camZoom);
-    // Fix 2: debug mask overlay — load with ?debug=mask to verify walkable coverage
-    if (debugMask) drawDebugMask(ctx);
+    // Debug overlays (world-space, drawn before objects)
+    if (debugMask)    drawDebugMask(ctx);
+    if (debugTerrain) drawDebugTerrain(ctx);
     world.draw(ctx, clock, view);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     for (const r of rivals) r.draw(ctx, clock, alpha);
@@ -1544,6 +1550,50 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
     ctx.restore();
+
+    // ?debug=sprites — screen-space checkerboard review of every extracted sprite
+    if (debugSprites && extractionLog.length > 0) {
+      const PAD = 10, CELL = 68, LABEL_H = 14;
+      let sx = PAD, sy = PAD;
+      ctx.save();
+      for (const rec of extractionLog) {
+        // Sheet label
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(sx - 2, sy, 240, LABEL_H + 1);
+        ctx.fillStyle = '#FFD23F';
+        ctx.font = `bold ${LABEL_H - 2}px monospace`;
+        ctx.textBaseline = 'top';
+        ctx.fillText(`${rec.sheet} (${rec.sprites.length}/${rec.cols * rec.rows})`, sx, sy + 1);
+        sy += LABEL_H + 2;
+
+        for (let i = 0; i < rec.sprites.length; i++) {
+          const cellX = sx + (i % rec.cols) * (CELL + 3);
+          const cellY = sy + Math.floor(i / rec.cols) * (CELL + 3);
+          if (cellY + CELL > fh) { sx += rec.cols * (CELL + 3) + 10; sy = PAD; continue; }
+          // Checkerboard background
+          for (let ty = 0; ty < CELL; ty += 8) {
+            for (let tx = 0; tx < CELL; tx += 8) {
+              ctx.fillStyle = ((tx + ty) / 8) % 2 === 0 ? '#555' : '#888';
+              ctx.fillRect(cellX + tx, cellY + ty, 8, 8);
+            }
+          }
+          const sp = rec.sprites[i];
+          if (sp.width > 1) {
+            const sc = Math.min(CELL / sp.width, CELL / sp.height);
+            ctx.drawImage(sp, cellX + (CELL - sp.width * sc) / 2, cellY + (CELL - sp.height * sc) / 2, sp.width * sc, sp.height * sc);
+          }
+          // Cell index label
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(cellX, cellY + CELL - 10, 18, 10);
+          ctx.fillStyle = '#fff';
+          ctx.font = '8px monospace';
+          ctx.fillText(String(i), cellX + 2, cellY + CELL - 2);
+        }
+        sy += Math.ceil(rec.sprites.length / rec.cols) * (CELL + 3) + 14;
+        if (sy > fh - 80) { sx += rec.cols * (CELL + 3) + 14; sy = PAD; }
+      }
+      ctx.restore();
+    }
 
     // War Pack §3: TIME WARP blue-edge vignette (screen space)
     if (activeSpell === 'time_warp' && spellTimer > 0 && spellTimerMax > 0) {

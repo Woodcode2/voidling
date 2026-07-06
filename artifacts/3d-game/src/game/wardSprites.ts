@@ -18,6 +18,7 @@
 
 import { objectSprites, spriteBounds, spriteContactFrac, spriteOrb } from './sprites';
 import type { ObjectKind } from './config';
+import { extractComponents } from './spriteExtract';
 
 // ── Kind assignments per sheet cell (row-major order) ──────────────────────
 export const PEOPLE_KINDS: ObjectKind[] = [
@@ -76,75 +77,9 @@ function loadImg(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/**
- * Adaptive background removal: samples the top-left corner pixel as the
- * reference "background" colour, then flood-fills from all four corners
- * removing pixels within a colour-distance threshold.
- * Works for white BG (old sheets) and dark-violet BG (new Life-Pack sheets).
- */
-function stripBackground(g: CanvasRenderingContext2D, w: number, h: number) {
-  const data = g.getImageData(0, 0, w, h);
-  const px = data.data;
-  const visited = new Uint8Array(w * h);
-
-  // Reference colour: the top-left corner pixel
-  const refR = px[0], refG = px[1], refB = px[2], refA = px[3];
-  if (refA < 8) return; // already transparent — nothing to strip
-
-  // Threshold: Euclidean distance in RGB space (squared)
-  const THRESH_SQ = 2500; // ~50 units — wide enough for anti-aliased bg fringe
-
-  const isBackground = (i: number) => {
-    const a = px[i + 3];
-    if (a < 8) return true;
-    const dr = px[i] - refR, dg = px[i + 1] - refG, db = px[i + 2] - refB;
-    return dr * dr + dg * dg + db * db < THRESH_SQ;
-  };
-
-  const queue: number[] = [];
-  const seed = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= w || y >= h) return;
-    const idx = y * w + x;
-    if (!visited[idx] && isBackground(idx * 4)) {
-      visited[idx] = 1; queue.push(x, y);
-    }
-  };
-  seed(0, 0); seed(w - 1, 0); seed(0, h - 1); seed(w - 1, h - 1);
-
-  while (queue.length) {
-    const y = queue.pop()!;
-    const x = queue.pop()!;
-    px[(y * w + x) * 4 + 3] = 0;
-    seed(x - 1, y); seed(x + 1, y); seed(x, y - 1); seed(x, y + 1);
-  }
-  g.putImageData(data, 0, 0);
-}
-
-/**
- * Slice a sheet image into `cols × rows` canvases, stripping the background
- * (auto-detects white or dark-violet via corner-sampling).
- */
-function sliceSheet(
-  sheet: HTMLImageElement,
-  cols: number,
-  rows: number,
-): HTMLCanvasElement[] {
-  const cellW = Math.floor(sheet.naturalWidth / cols);
-  const cellH = Math.floor(sheet.naturalHeight / rows);
-  const result: HTMLCanvasElement[] = [];
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const cvs = document.createElement('canvas');
-      cvs.width = cellW; cvs.height = cellH;
-      const g = cvs.getContext('2d')!;
-      g.drawImage(sheet, col * cellW, row * cellH, cellW, cellH, 0, 0, cellW, cellH);
-      stripBackground(g, cellW, cellH);
-      result.push(cvs);
-    }
-  }
-  return result;
-}
+// stripBackground and sliceSheet replaced by extractComponents (spriteExtract.ts).
+// The new pipeline uses connected-component analysis: BG flood-fill → component labelling
+// → discard specks → merge fragments → assign to nearest grid cell → tight-bbox crop.
 
 /**
  * Scan a canvas sprite to fill spriteBounds, spriteContactFrac, spriteOrb.
@@ -243,17 +178,17 @@ export async function loadWardAssets(base: string): Promise<void> {
     });
   };
 
-  // War Pack sheets
-  if (peopleImg)    inject(PEOPLE_KINDS,    sliceSheet(peopleImg, 3, 3));
-  if (vehiclesImg)  inject(VEHICLE_KINDS,   sliceSheet(vehiclesImg, 3, 2));
-  if (beachparkImg) inject(BEACHPARK_KINDS, sliceSheet(beachparkImg, 3, 3));
+  // War Pack sheets — component-extraction (replaces fixed-grid slicing)
+  if (peopleImg)    inject(PEOPLE_KINDS,    extractComponents(peopleImg,    3, 3, 'people_sheet'));
+  if (vehiclesImg)  inject(VEHICLE_KINDS,   extractComponents(vehiclesImg,  3, 2, 'vehicles_sheet'));
+  if (beachparkImg) inject(BEACHPARK_KINDS, extractComponents(beachparkImg, 3, 3, 'beachpark_sheet'));
 
   // Life Pack sheets
-  if (militaryImg)    inject(MILITARY_KINDS,   sliceSheet(militaryImg, 2, 2));
-  if (people2Img)     inject(PEOPLE2_KINDS,    sliceSheet(people2Img, 3, 3));
-  if (vignetteImg)    inject(VIGNETTE_KINDS,   sliceSheet(vignetteImg, 3, 3));
-  if (playgroundImg)  inject(PLAYGROUND_KINDS, sliceSheet(playgroundImg, 3, 3));
-  if (fieldsImg)      inject(FIELD_KINDS,      sliceSheet(fieldsImg, 3, 1));
+  if (militaryImg)    inject(MILITARY_KINDS,   extractComponents(militaryImg,    2, 2, 'military_sheet'));
+  if (people2Img)     inject(PEOPLE2_KINDS,    extractComponents(people2Img,     3, 3, 'people2_sheet'));
+  if (vignetteImg)    inject(VIGNETTE_KINDS,   extractComponents(vignetteImg,    3, 3, 'vignettes_sheet'));
+  if (playgroundImg)  inject(PLAYGROUND_KINDS, extractComponents(playgroundImg,  3, 3, 'playground_sheet'));
+  if (fieldsImg)      inject(FIELD_KINDS,      extractComponents(fieldsImg,      3, 1, 'fields_sheet'));
 
   console.log('[wardSprites] Life Pack sprites loaded:', [
     peopleImg    ? '9 people'         : 'people MISSING',
