@@ -9,3 +9,4 @@
 - [VOIDLING v16.2 Pressure & Personality](voidling-v162.md) — bot cap, speech bubbles, hearts escalation, boon signatures, event tickers, 6×6 rotating plans, BUILD_STAMP v16·3.
 - [Vite middleware before base-path rewrite](vite-middleware-before-base-rewrite.md) — custom dev-server middleware must be unshifted and match the base-prefixed URL before Vite's own rewrite runs.
 - [VOIDLING fx decals](voidling-fx-decals.md) — fissure (multiply blend, white BG) + scar (normal) decal pipeline; skip alpha-bounds scan for assets/fx/.
+- [VOIDLING v17 Feel Patch](voidling-v17.md) — no-blocking props (shakeT one-shot on undefined), bits (tier 0, spawnBit skips totalStartArea), vacuum (object-outer loop, velocity-only), score-floor growth (clamp-first fix), camera (radius×22.22), eat-pop (visual-only scale).

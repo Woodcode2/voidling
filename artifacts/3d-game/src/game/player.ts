@@ -80,6 +80,8 @@ export class Player extends Void {
 
   name = 'You';
   tooBigCd = 0;
+  // Feel Patch §6: eat-pop scale — 1.06× on absorb, decays to 1.0 over ~200ms
+  eatPopScale = 1.0;
 
   // animation
   private blinkTimer = 2000;
@@ -135,6 +137,7 @@ export class Player extends Void {
     this.tremorLogCd = 0;
     this.ghostTime = 0;
     this.tooBigCd = 0;
+    this.eatPopScale = 1.0;
     this.hearts = 3; // v16.2 §3
     this.skin = skin;
     this.mouthOpen = 0;
@@ -224,6 +227,8 @@ export class Player extends Void {
     if (this.cheekPuff > 0) this.cheekPuff = Math.max(0, this.cheekPuff - dt / 400);
     if (this.dizzy > 0) this.dizzy = Math.max(0, this.dizzy - dt / 1000);
     if (this.lick > 0) this.lick = Math.max(0, this.lick - dt / 800);
+    // Feel Patch §6: decay eat-pop scale back to 1 over ~200ms
+    if (this.eatPopScale > 1) this.eatPopScale = Math.max(1, this.eatPopScale - dt * 0.0003);
 
     // look direction
     let tx = dx, ty = dy;
@@ -292,6 +297,8 @@ export class Player extends Void {
     it.finalized = true;
     this.absorbObjectMass(it.objSize);
     this.score += it.gain;
+    this.applyScoreRadius(); // Feel Patch §4: score floor applied on every absorb
+    this.eatPopScale = 1.06; // Feel Patch §6: scale pop on eat
     if (it.tier >= 3) this.cheekPuff = 1;
     this.chomp = 1;
     this.checkEvolution();
@@ -459,7 +466,7 @@ export class Player extends Void {
 
   private visual(t: number): VoidlingVisual {
     return {
-      r: this.radius,
+      r: this.radius * this.eatPopScale, // Feel Patch §6: pop scale applied to visual only
       skin: this.skin,
       t,
       lookX: clamp(this.lookX, -1, 1),

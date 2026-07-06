@@ -36,7 +36,9 @@ export type ObjectKind =
   // v16.1 D: zoo animals + structures
   | 'elephant' | 'giraffe' | 'lion'
   | 'monkey' | 'flamingo' | 'penguin'
-  | 'zoo_gate' | 'zoo_wall' | 'zookeeper';
+  | 'zoo_gate' | 'zoo_wall' | 'zookeeper'
+  // Feel Patch: debris bit (tier 0, always edible)
+  | 'bit';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -161,8 +163,8 @@ export const CONFIG = {
   CAM_LOOKAHEAD: 70,           // px lead in normalized velocity direction
   CAM_LOOKAHEAD_LERP: 0.08,
 
-  // Suction physics — v4 §2
-  CAPTURE_RADIUS_MULT: 1.35,
+  // Suction physics — v4 §2 / Feel Patch: wider vacuum radius
+  CAPTURE_RADIUS_MULT: 1.6,
   ABSORB_RADIUS_MULT: 0.75,
   SUCTION_MAX_SPEED: 600,   // px/s
   SUCTION_ACCEL: 2800,      // px/s²
@@ -388,6 +390,8 @@ export const CONFIG = {
     zoo_gate:      { tier: 5, minR: 104, maxR: 122 },
     zoo_wall:      { tier: 4, minR: 48, maxR: 58 },
     zookeeper:     { tier: 3, minR: 28, maxR: 34 },
+    // Feel Patch: debris bits — tier 0, always edible at any radius
+    bit:           { tier: 0, minR: 4, maxR: 7 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void

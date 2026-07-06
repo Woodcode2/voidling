@@ -1143,13 +1143,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const px = player.prevX + (player.x - player.prevX) * alpha;
     const py = player.prevY + (player.y - player.prevY) * alpha;
 
-    // ── camera: zoom OUT as the player grows (v5 §1 / v10 §4: WORLD ENDER extends to 2200) ──
-    const isWorldEnder = player.formIndex >= CONFIG.FORMS.length - 1;
-    const viewMax = isWorldEnder ? 2200 : CONFIG.CAM_VIEW_MAX;
-    const viewHeight = clamp(
-      CONFIG.CAM_VIEW_BASE + (player.radius - CONFIG.PLAYER_BASE_RADIUS) * CONFIG.CAM_VIEW_GROWTH,
-      CONFIG.CAM_VIEW_BASE, viewMax,
-    );
+    // ── camera: Feel Patch §5 — radius-proportional zoom (player ~9% of screen height) ──
+    // viewHeight = radius * 22.22 keeps apparent diameter = 2r/viewHeight * fh ≈ 9% fh.
+    // Min 350px (prevents hyper-zoom at spawn); max 3.5× screen height (sprites stay readable).
+    const viewHeight = clamp(player.radius * 22.22, 350, fh * 3.5);
     const targetZoom = fh / viewHeight;
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
 

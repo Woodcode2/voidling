@@ -1,0 +1,55 @@
+# VOIDLING Feel Patch (Phase 1)
+
+You are updating VOIDLING, a canvas-based HTML5 top-down arcade game: eat props, grow, outscore AI rival bots in a 5-minute match. This is a surgical gameplay-feel patch. Read the relevant code before changing anything, keep changes minimal, and do not refactor unrelated systems.
+
+## Do not touch
+- UI layout: leaderboard, quest list, timer, stage progress bar, news ticker, pause button
+- Art assets, sprite loading, map layout and tiles
+- Match flow, quest logic, point values, AI rival personalities and dialogue
+- Anything not listed in the changes below
+
+## Change 1: Remove blocking collision with props
+Check the root cause first: prop collision radii are likely derived from full sprite bounds including the white sticker outline, which makes the blocking zone far larger than the visible object.
+- The player must never be physically blocked by any eatable-category prop (trees, houses, cars, benches, buildings, people, gnomes, etc.). If something is too big to eat, the void slides past or under it with zero collision response. No bouncing, no getting stuck between two trees.
+- The only remaining hard collision is the map boundary.
+- When the player touches a prop that is too big to eat, give light feedback: the prop does a small 100ms shake in place. No knockback on the player.
+- Apply the exact same rules to AI rivals.
+
+## Change 2: Fix bits
+- Bits (the small debris crumbs) are edible at ANY player size. No size gate ever. Treat them as tier 0.
+- Scale bit sprites down to roughly 40 to 50 percent of current visual size.
+- Bits never block movement.
+
+## Change 3: Vacuum pull
+- Any object the player is currently big enough to eat gets pulled toward the player when it enters a vacuum radius of about 1.6x the player's body radius, measured from center.
+- Pull accelerates with proximity; near the body edge, pulled objects should move at 2 to 3x player speed. Consume on body overlap.
+- Applies to bits, apples, flowers, people, and every other currently-edible object. For larger edible props like cars and houses, use a weaker pull plus a quick shrink-into-the-void animation so it reads correctly.
+- AI rivals get the same vacuum.
+- Target feel: brushing near food collects it. Eating should never require pixel-precise steering.
+
+## Change 4: Continuous growth, stages become milestones
+- Player radius grows smoothly with score. Target curve: about 1.6x spawn radius at 1,000 points, 2.5x at 5,000, 3.5x at 15,000, 5x at 50,000. Use a sqrt or 0.4 power curve and tune constants to hit those targets. Never snap size at a stage change.
+- Eat tiers are gated by current radius, not by stage. Keep the existing tier ordering (bits and flowers, then apples and people, then benches, gnomes, mailboxes, then cars and trees, then houses, then large buildings) and map each tier to a radius threshold so unlock pacing feels similar to today.
+- Stages (VOIDLING, MUNCHER, GOBBLER, WORLD ENDER) become cosmetic milestones that fire when the player crosses the matching radius threshold. Keep the existing stage-up banner. Layer visuals that stack: MUNCHER adds a soft purple aura pulse, GOBBLER adds the orbit ring, WORLD ENDER adds the violet flame crown.
+- AI rivals use the same growth curve and thresholds.
+
+## Change 5: Camera zoom-out
+- Camera zoom scales inversely with player radius so the player stays roughly constant on screen, around 9 percent of screen height. The world visibly shrinks around you as you grow.
+- Smooth zoom changes over about 1 second. Clamp max zoom-out at 3.5x so sprites stay readable.
+- It is fine and even desirable that the map edge and the space beyond it become visible at high zoom.
+- HUD stays screen-space and is unaffected by zoom.
+
+## Change 6: Eat feedback, kept subtle
+- On eat: a quick 1.06x scale pop on the player and 2 to 3 crumb particles.
+- On eating a house or building: a light screen shake, 2 to 3px for about 120ms.
+
+## Verify before finishing (play in the preview, do not skip)
+1. At spawn size, walk straight into a tree and into a house: you slide past with no bounce and no stutter, and you can pass between two adjacent trees.
+2. Bits are eaten instantly at spawn size and get vacuumed in from about 1.5 body radii away.
+3. At around 1,000 points: the void is visibly larger, the camera has pulled out, and people and apples fly into you as you pass near them.
+4. Crossing into MUNCHER: banner fires, aura appears, no size snap, growth stays smooth.
+5. At WORLD ENDER: flame crown appears on top of ring and aura, buildings are edible, camera is near max zoom, and the map edge with space beyond is visible.
+6. AI rivals still eat, grow, hit stages, and rank correctly on the leaderboard.
+7. Frame rate holds up on mobile with the vacuum active in the densest downtown area.
+
+When done, report what you changed file by file and confirm each of the 7 verification steps passed.

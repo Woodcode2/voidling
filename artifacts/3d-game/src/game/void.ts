@@ -116,6 +116,24 @@ export abstract class Void {
         this.advanceForms();
       }
     }
+    this.applyScoreRadius();
+  }
+
+  // Feel Patch §4: score-driven radius floor — radius = BASE * (1 + (score/2600)^0.57)
+  // Targets: 1k→1.6×, 5k→2.5×, 15k→3.5×, 50k→5×.  Stages remain cosmetic milestones.
+  scoreToRadius(score: number): number {
+    if (score <= 0) return CONFIG.PLAYER_BASE_RADIUS;
+    return CONFIG.PLAYER_BASE_RADIUS * (1 + Math.pow(score / 2600, 0.57));
+  }
+
+  protected applyScoreRadius() {
+    if (this.score <= 0) return;
+    const target = this.scoreToRadius(this.score);
+    const lawCeiling = CONFIG.GROWTH_LAW_BASE + CONFIG.GROWTH_LAW_RATE * (_roundElapsedSec || 0);
+    const cap = Math.min(lawCeiling, CONFIG.MAX_RADIUS);
+    // Clamp target to ceiling FIRST, then use as a floor — so radius never stalls below cap
+    const clamped = Math.min(target, cap);
+    if (clamped > this.radius) this.radius = clamped;
   }
 
   // ── SHARED ABSORB RULES: object intake and void intake are area-based ─────────

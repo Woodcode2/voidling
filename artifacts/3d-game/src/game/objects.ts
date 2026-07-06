@@ -1188,6 +1188,8 @@ export function drawParkObject(
     case 'flamingo': return drawFlamingo(ctx, r, t);
     case 'penguin':  return drawPenguin(ctx, r, t);
     case 'zookeeper': return drawZookeeper(ctx, r, t, f);
+    // Feel Patch: debris bit
+    case 'bit': return drawBit(ctx, r, t, v);
   }
 }
 
@@ -1506,6 +1508,15 @@ function drawFlamingo(ctx: CanvasRenderingContext2D, r: number, t: number) {
   ctx.beginPath(); ctx.moveTo(sway + r * 0.32, -r * 0.72); ctx.lineTo(sway + r * 0.52, -r * 0.9); ctx.stroke();
   // Eye
   dot(ctx, sway + r * 0.26, -r * 0.8, r * 0.07, '#1A0B33');
+}
+
+// ── Feel Patch: Bit — tiny sparkly debris crumb, always edible ───────────────
+function drawBit(ctx: CanvasRenderingContext2D, r: number, _t: number, variant = 0) {
+  const colors = ['#FF6FB0', '#FFD23F', '#8ECBFF', '#7EE8A2', '#C9A6FF', '#FF9F1C'];
+  const col = colors[Math.abs(variant) % colors.length];
+  const o = Math.max(0.8, r * 0.18);
+  stickerCircle(ctx, 0, 0, r * 0.82, col, { outline: o });
+  dot(ctx, -r * 0.2, -r * 0.25, r * 0.3, 'rgba(255,255,255,0.52)');
 }
 
 // ── v16.1 D: Penguin ─────────────────────────────────────────────────────────
