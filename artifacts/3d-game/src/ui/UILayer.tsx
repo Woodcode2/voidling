@@ -228,7 +228,7 @@ function TrophyRoom({ snap, onClose }: { snap: Snapshot; onClose: () => void }) 
 
 function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; engine: GameEngine; onHelp: () => void; onPlay: () => void; onTrophies: () => void }) {
   return (
-    <div className="vd-overlay vd-overlay--solid">
+    <div className="vd-overlay vd-overlay--solid" onPointerDown={() => engine.unlockAudio()}>
       <StarField />
       <div className="vd-topbar">
         <Coins n={snap.coins} />
@@ -731,11 +731,16 @@ function NewsTicker({ line }: { line: string }) {
 function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   return (
     <div className="vd-game-ui">
-      {/* single 40px pause pill, top-right — no floating buttons over the arena */}
+      {/* pause + sound pills, top-right */}
       {!snap.paused && (
-        <button className="vd-pause-pill" onClick={() => engine.togglePause()} aria-label="Pause">
-          <PauseIcon />
-        </button>
+        <div className="vd-hud-pills">
+          <button className="vd-pause-pill" onClick={() => engine.togglePause()} aria-label="Pause">
+            <PauseIcon />
+          </button>
+          <button className="vd-pause-pill" onClick={() => engine.toggleMute()} aria-label="Toggle sound">
+            <SoundIcon muted={snap.muted} />
+          </button>
+        </div>
       )}
       {/* v16 §5: round contracts — live-ticking chips at top-left under the score */}
       {!snap.paused && snap.contracts && snap.contracts.length > 0 && (

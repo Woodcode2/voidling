@@ -1,0 +1,45 @@
+# VOIDLING Sound Pack (Phase 6)
+
+The game is silent. This patch adds a complete audio layer with ZERO audio files: every effect is synthesized with the Web Audio API, and the music is generative, built with Tone.js (npm install tone). Read the code first and wire audio through one central module so events stay clean.
+
+## Architecture
+- One audio module with a single entry point: audio.play(eventName, params). All game systems call this, nothing creates its own audio nodes.
+- CRITICAL iOS RULE: mobile Safari blocks audio until a user gesture. Create and resume the AudioContext (and Tone.start()) inside the first pointerdown on the title screen. Also resume the context on visibilitychange when returning to the tab. If audio is not unlocked by that first tap, nothing else in this patch matters.
+- Mixing: master gain with music bus (0.35) and SFX bus (0.7). Cap concurrent SFX at 8, drop the oldest. Duck the music bus by 20 percent for 300ms on big events (evolution, eating a rival, falloff).
+- Mute button next to the pause button, persists via localStorage.
+
+## SFX recipes (synthesize exactly, then tune by ear)
+1. EAT SMALL: sine oscillator gliding 400 to 700 Hz over 60ms, attack 1ms, decay 90ms, plus a tiny noise click. Pitch scales up with the current combo step (base times 1 + 0.06 per step, capped at +50 percent) with random detune of plus or minus 5 percent, so feeding frenzies rise musically instead of machine-gunning.
+2. EAT BIG (house, building, tank): lowpass-filtered noise burst (cutoff 300 Hz, 150ms) layered with an 80 Hz sine thump.
+3. GULP: a quick 200 to 90 Hz sine drop, 90ms, synced to the chomp squash animation.
+4. EVOLUTION STING: three ascending plucked notes (C5, E5, G5, then C6) plus a rising white-noise shimmer sweep, about 700ms.
+5. VACUUM HUM: a soft looping filtered noise whoosh that fades in only while items are actively being pulled, and out when not.
+6. POWERS, each distinct: WORMHOLE a square-wave zap dropping 1200 to 300 Hz in 120ms. TIME WARP: while active, sweep the MUSIC bus lowpass cutoff down to 400 Hz so the whole world sounds slowed, restore on end. EVENT HORIZON: three deep pulsing 100 Hz sine throbs. SINGULARITY: a rising filtered-noise swell over 500ms into a deep 60 Hz pop.
+7. FALLOFF: a sine glide from 900 down to 200 Hz over 700ms (slide whistle) followed by a soft distant noise poof.
+8. PREDATION: eating a rival is EAT BIG plus the evolution shimmer; being eaten is a heavy 120 Hz thud plus a two-note descending womp, plus heart-loss duck.
+9. PELLET HIT: soft 200 Hz thud plus a short downward blip for the combo break.
+10. UI AND EVENTS: small whoosh when a banner slides in, a tiny blip when a speech bubble pops, 2 kHz 20ms tick each second during the final 10 seconds, a short fanfare arpeggio on a first-place finish and a low womp otherwise, soft click on button taps.
+11. PED PANIC: an occasional tiny cartoon squeak (short sine chirp 800 to 1200 Hz), rare and capped at 1 per second total.
+
+## Adaptive music (Tone.js)
+- Key of A minor, about 110 BPM, spooky-cute, quiet and simple by design.
+- Five stacked layers that NEVER stop, only fade in as the player evolves: VOIDLING: soft pad plus a sparse pluck melody. MUNCHER: add a simple bass line. GOBBLER: add light drums (kick, snare, closed hats). DEVOURER: add a running arpeggio. WORLD ENDER: add a lead line and busier hats.
+- Crossfade each layer in over 2 seconds at the moment of evolution so the music grows with the void.
+- DANGER LAYER: a tense pulsing low string pad that fades in whenever a void that can eat the player is within about 1.5 screen widths, and fades out when safe.
+- FINAL 30 SECONDS: raise intensity (open the hats, add a subtle riser into the final tick sequence).
+- Keep the loop musically simple and repetitive on purpose: it is a bed, not a song. Dispose or reuse nodes properly, no leaks across matches.
+
+## Do not touch
+All gameplay systems. This patch only adds the audio module, the mute button, and one-line audio.play calls at existing event sites.
+
+## Verify before finishing: proof required, do not skip
+1. Test in a mobile Safari sized environment: confirm the exact gesture that unlocks audio (report it) and that the first eat after the title tap is audible.
+2. Chain 10 quick eats: the pop pitch audibly climbs with the combo. Report the pitch cap behavior.
+3. Evolve twice: report the layer names active at each stage and confirm the 2 second crossfade.
+4. Trigger each of the four powers and confirm its distinct sound, including the music filter sweep during TIME WARP and its clean restore.
+5. Fall off the island: slide whistle then poof, with the music duck.
+6. Get hunted by a bigger rival: the danger layer fades in, then out when safe.
+7. Toggle mute, reload the page: the setting persists.
+8. Play a full match: no audio glitches, no runaway node count (report node count at match end), frame rate unaffected.
+
+Final report: the unlock gesture, layer names per stage, the node count line, and every file changed.

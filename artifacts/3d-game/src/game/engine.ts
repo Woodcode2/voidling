@@ -92,6 +92,7 @@ export interface GameEngine {
   toggleSfx(): boolean;
   castSpell(): void;
   toggleHitboxes(): boolean;
+  unlockAudio(): void;
   destroy(): void;
 }
 
@@ -718,6 +719,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!player.ghost && player.fallState === 'none') {
       if (!isWalkable(player.x, player.y)) {
         player.startFall();
+        audio.playFalloff(); // Sound Pack §7: slide-whistle + poof
         fx.shake(200, 6);
       }
     }
@@ -1063,6 +1065,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       spellTimer -= dt;
       if (spellTimer <= 0) {
         if (activeSpell === 'event_horizon') player.suctionMult = 1;
+        if (activeSpell === 'time_warp') audio.stopTimeWarpFilter(); // Sound Pack §6
         activeSpell = null; spellTimerMax = 0;
         notify();
       }
@@ -1144,6 +1147,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       } else if (ev.type === 'eatRival') {
         roundRivalEats++; // v12 §5: track rival eats for trophy
         audio.playChompVoid(); // v14 §1: chomp_void at 0.9, falls back to playMerge synth
+        audio.playPredationEat(); // Sound Pack §8: EAT BIG + shimmer
         fx.addConfetti(ev.x, ev.y, CONFIG.COLORS.pops);
         fx.shake(300, 12);
         fx.flash();
@@ -1187,6 +1191,35 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     maxCombo = Math.max(maxCombo, player.combo);
     audio.setMusicIntensity(player.combo); // v5 §5: combo ≥ 2 brightens the loop
+
+    // Sound Pack §8: danger layer — biggest rival that can eat us within 1.5 screen widths
+    {
+      const screenW = fw / Math.max(0.05, camZoom);
+      const dangerThresh = screenW * 1.5;
+      let closestD = Infinity;
+      for (const r of rivals) {
+        if (!r.alive || r.ghost || r.radius <= player.radius * 1.08) continue;
+        const d = Math.hypot(r.x - player.x, r.y - player.y);
+        if (d < dangerThresh && d < closestD) closestD = d;
+      }
+      audio.updateDanger(closestD < Infinity ? closestD / dangerThresh : 1);
+    }
+
+    // Sound Pack §11: final-10s tick — fire exactly once per integer second during countdown
+    if (timeLeft <= 10000 && timeLeft > 0) {
+      const thisSec = Math.ceil(timeLeft / 1000);
+      audio.playFinalTick(thisSec);
+    }
+
+    // Sound Pack §5: vacuum hum — active while any object is within suction reach
+    if (player && world) {
+      const p = player; // capture for closure — TypeScript narrows but closures lose the guard
+      const reach = p.radius * CONFIG.CAPTURE_RADIUS_MULT * p.magnetMultiplier;
+      const vacActive = world.objects.some(
+        (o) => !o.eaten && Math.hypot(o.x - p.x, o.y - p.y) < reach,
+      );
+      audio.setVacuumActive(vacActive);
+    }
 
     // v6 §1: power-up picks at 2:30 / 1:40 / 0:50 remaining
     for (const th of CONFIG.BOON_PICK_TIMES) {
@@ -2420,6 +2453,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     } else if (!raf) {
       resetClock();
       raf = requestAnimationFrame(frame);
+      audio.init(); // resume AudioContext after tab returns to foreground
     }
   }
   document.addEventListener('visibilitychange', onVisibility);
@@ -2526,8 +2560,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         // War Pack §3 — four new powers replace old five spells
         case 'event_horizon':
           spellTimer = 6000; spellTimerMax = 6000;
+          audio.playEventHorizon(); // Sound Pack §6
           break;
         case 'wormhole': {
+          audio.playWormhole(); // Sound Pack §6
           // Instant dash: 4 body-lengths + 0.5s ghost invulnerability
           const mag = Math.hypot(player.vx, player.vy);
           const ddx = mag > 0.1 ? player.vx / mag : 0;
@@ -2544,10 +2580,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         }
         case 'time_warp':
           spellTimer = 5000; spellTimerMax = 5000;
+          audio.startTimeWarpFilter(); // Sound Pack §6: sweep music lowpass to 400 Hz
           break;
         case 'singularity':
           singularity = { x: player.x, y: player.y, timer: 4000, score: 0 };
           spellTimer = 4000; spellTimerMax = 4000;
+          audio.playSingularity(); // Sound Pack §6
           break;
         default: spellTimer = 5000; spellTimerMax = 5000;
       }
@@ -2558,6 +2596,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       notify();
     },
     toggleHitboxes() { showHitboxes = !showHitboxes; notify(); return showHitboxes; },
+    // Sound Pack Phase 6: iOS unlock — call on first pointerdown on the title screen
+    unlockAudio() {
+      audio.init();
+      import('tone').then((T) => T.start()).catch(() => {/* ignore */});
+    },
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
