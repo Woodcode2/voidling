@@ -1597,9 +1597,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // Debug overlays (world-space, drawn before objects)
     if (debugMask)    drawDebugMask(ctx);
     if (debugTerrain) drawDebugTerrain(ctx);
-    world.draw(ctx, clock, view);
+    drawPowerAuras(clock); // v6 §4: auras on the ground beneath the actors (moved for 2.5D)
+    // Dense City §3: draw objects + voids in one foot-Y-sorted painter's pass so
+    // buildings nearer the camera correctly occlude the void body.
+    const drawActors: { footY: number; draw: () => void }[] = [];
+    for (const r of rivals) drawActors.push({ footY: r.y + r.radius, draw: () => r.draw(ctx, clock, alpha) });
+    const pl = player;
+    if (pl) drawActors.push({ footY: pl.y + pl.radius, draw: () => pl.draw(ctx, clock, alpha) });
+    world.draw(ctx, clock, view, drawActors);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
-    for (const r of rivals) r.draw(ctx, clock, alpha);
     // v13 §0: rival rim — green = you can eat them, red = they can eat you
     if (player && !player.ghost) {
       const ratio = CONFIG.RIVAL_EAT_RATIO;
@@ -1621,8 +1627,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         ctx.restore();
       }
     }
-    drawPowerAuras(clock); // v6 §4: auras under the player
-    player.draw(ctx, clock, alpha);
+    // (drawPowerAuras + player/rival bodies now handled above in the interleaved pass)
     // War Pack §3: colored power ring while active (world space)
     if (activeSpell && (spellTimer > 0 || activeSpell === 'singularity') && player) {
       const sp = CONFIG.SPELLS.find(s => s.id === activeSpell);
@@ -2541,6 +2546,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let acc = 0;
   let clock = 0;
   let raf = 0;
+  // Dense City §3: lightweight FPS sampler (capped log count) for perf proof
+  let fpsAcc = 0, fpsN = 0, fpsLogs = 0;
   function resetClock() { last = performance.now(); acc = 0; }
 
   function frame(now: number) {
@@ -2550,6 +2557,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (delta > CONFIG.MAX_DT) delta = CONFIG.MAX_DT; // clamp
     if (delta < 0) delta = 0;
     clock += delta;
+
+    // Dense City §3: sample FPS a few times per match (perf proof)
+    fpsAcc += delta; fpsN++;
+    if (screen === 'game' && !paused && fpsAcc >= 2000) {
+      if (fpsLogs < 5) {
+        console.log(`PERF fps=${(fpsN * 1000 / fpsAcc).toFixed(1)} objects=${world ? world.objects.length : 0}`);
+        fpsLogs++;
+      }
+      fpsAcc = 0; fpsN = 0;
+    }
 
     if (screen === 'game' && !paused && countdown > 0) {
       // v8 §1: frozen pre-round — count down in real time, nobody moves or scores

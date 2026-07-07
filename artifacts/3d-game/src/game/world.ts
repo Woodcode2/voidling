@@ -4,7 +4,7 @@ import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
-import { HOUSE_LOTS, isOnIsland } from './mapData'; // Phase 4 §4: lot-based house placement; Alive Pack §A: island guard
+import { isOnIsland, isInsideIsland } from './mapData'; // Dense City: runtime per-block lot generation + island polygon gating
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -72,7 +72,9 @@ export interface PlayerStats {
 }
 
 type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic';
-interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; }
+// Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
+interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; }
+interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; rot: number; drawScale: number; }
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail (fallback)
 // v16.2 §5: one decal-based fissure stamp per dropCrack() call
@@ -326,6 +328,8 @@ const LIVING_KINDS: ObjectKind[] = [
 export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
+  private houseLots: StructureLot[] = [];   // Dense City: suburb house footprints
+  private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   dirt: DirtPatch[] = [];
   fissures: Fissure[] = [];         // v9 §3: WORLD ENDER cracked-reality trail (violet, not brown)
   fissureDecals: FissureDecal[] = []; // v16.2 §5: decal stamps (used when fx PNGs loaded)
@@ -485,6 +489,9 @@ export class WorldManager {
       }
     }
 
+    // Dense City: pre-compute per-block house + building lots (island + road gated, no overlaps)
+    this.generateLots(rand);
+
     const spawnX = this.size / 2, spawnY = this.size / 2;
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
@@ -562,15 +569,12 @@ export class WorldManager {
     // Life Pack §3: vignette scenes
     this.initVignettes(rand);
 
-    // Phase 4 §4: place one house per HOUSE_LOT — street-facing, 30–38 total.
-    // Replaces random house scatter in fillResidential for a real suburb layout.
+    // Dense City §1: place the pre-generated suburb house lots (dense, per-block).
     {
-      const housePool: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
-      for (const lot of HOUSE_LOTS) {
-        const kind = housePool[Math.floor(rand() * housePool.length)];
-        this.makeObj(kind, lot.x, lot.y);
+      for (const lot of this.houseLots) {
+        this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
       }
-      console.log('[world] Phase 4 house lots placed:', HOUSE_LOTS.length);
+      console.log('[world] Dense City suburb house lots placed:', this.houseLots.length);
     }
 
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
@@ -618,6 +622,29 @@ export class WorldManager {
         this.objects = this.objects.filter((o) => isWalkable(o.x, o.y));
       }
       console.log(`SPAWN AUDIT: ${offIsland.length} entities off-island (removed)`);
+    }
+
+    // ── Dense City §4: placement audit (must read zero for the last three) ──
+    {
+      const suburbN = this.houseLots.length;
+      const downtownN = this.structureLots.length - suburbN;
+      const S = this.structureLots;
+      let overlaps = 0;
+      for (let i = 0; i < S.length; i++) {
+        for (let j = i + 1; j < S.length; j++) {
+          const a = S[i], c = S[j], md = a.fpR + c.fpR;
+          if ((a.x - c.x) ** 2 + (a.y - c.y) ** 2 < md * md) overlaps++;
+        }
+      }
+      let onRoads = 0;
+      for (const l of S) if (!this.roadClear(l.x, l.y, l.fpR)) onRoads++;
+      let offIsland2 = 0;
+      for (const o of this.objects) if (!o.eaten && !isInsideIsland(o.x, o.y)) offIsland2++;
+      console.log(`SUBURB LOTS: ${suburbN}`);
+      console.log(`DOWNTOWN LOTS: ${downtownN}`);
+      console.log(`BUILDING OVERLAPS: ${overlaps}`);
+      console.log(`BUILDINGS ON ROADS: ${onRoads}`);
+      console.log(`OFF-ISLAND ENTITIES: ${offIsland2}`);
     }
 
     // v6 §2: remember the starting count so respawn can top back up to 85%
@@ -1004,38 +1031,125 @@ export class WorldManager {
     this.scatter(b, rand, 'trashcan', 2, cx, cy);
   }
 
-  // v12 §1: downtown block — skyscrapers + offices + street life
-  // v16 §1: added café buildings for street variety
-  // v16.1 B3: denser skyline + shops + curbside cars
+  // ── Dense City helpers ────────────────────────────────────────────────
+  // Footprint fraction of an object's radius used for spacing / overlap / road tests.
+  private static readonly FP_FRAC = 0.55;
+
+  // True when a footprint of radius fpR centred at (x,y) clears every road band.
+  private roadClear(x: number, y: number, fpR: number): boolean {
+    const hw = CONFIG.ROAD_WIDTH / 2 + fpR;
+    for (const rc of ROAD_CENTERS) {
+      if (Math.abs(y - rc) < hw && x >= MARGIN && x <= this.size - MARGIN) return false;
+      if (Math.abs(x - rc) < hw && y >= MARGIN && y <= this.size - MARGIN) return false;
+    }
+    return true;
+  }
+
+  // True when a footprint of radius fpR at (x,y) overlaps none of the given lots.
+  private lotFree(x: number, y: number, fpR: number, existing: StructureLot[]): boolean {
+    for (const l of existing) {
+      const md = fpR + l.fpR;
+      if ((x - l.x) ** 2 + (y - l.y) ** 2 < md * md) return false;
+    }
+    return true;
+  }
+
+  // Dense City: generate suburb house lots (dense grid per residential block) and
+  // downtown building lots (grid per downtown block, tallest nearest the plaza).
+  // Every lot is island-gated, road-cleared, and non-overlapping so the Stage-4
+  // audits read zero. Runs after this.blocks is assigned, before the fill loop.
+  private generateLots(rand: () => number): void {
+    this.houseLots = [];
+    this.structureLots = [];
+    for (const b of this.blocks) b.buildingLots = undefined;
+    const B = CONFIG.BLOCK_SIZE;
+    const FP = WorldManager.FP_FRAC;
+    const rSize = (k: ObjectKind) => {
+      const info = CONFIG.KIND_INFO[k];
+      return info.minR + rand() * (info.maxR - info.minR);
+    };
+
+    // ── Stage 1: dense suburbs — packed grid per residential block ──
+    const HOUSE_POOL: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
+    const H_STEP = 400;                       // packed rows with small yards (≈12 lots/block)
+    const H_INSET = CONFIG.SIDEWALK + 70;     // keep first row off the sidewalk
+    for (const b of this.blocks) {
+      if (b.type !== 'residential') continue;
+      let row = 0;
+      for (let yy = b.y0 + H_INSET; yy <= b.y0 + B - H_INSET; yy += H_STEP, row++) {
+        // stagger alternate rows by half a step for an organic, denser read
+        const xStart = b.x0 + H_INSET + (row % 2 ? H_STEP * 0.5 : 0);
+        for (let xx = xStart; xx <= b.x0 + B - H_INSET; xx += H_STEP) {
+          const jx = xx + (rand() - 0.5) * 42;
+          const jy = yy + (rand() - 0.5) * 42;
+          const kind = HOUSE_POOL[Math.floor(rand() * HOUSE_POOL.length)];
+          const size = rSize(kind);
+          const fpR = size * FP;
+          if (!isInsideIsland(jx, jy)) continue;
+          if (!isOnIsland(jx, jy, Math.round(fpR))) continue;
+          if (!this.roadClear(jx, jy, fpR)) continue;
+          if (!this.lotFree(jx, jy, fpR, this.structureLots)) continue;
+          const lot: StructureLot = { x: jx, y: jy, size, fpR, kind };
+          this.houseLots.push(lot);
+          this.structureLots.push(lot);
+        }
+      }
+    }
+
+    // ── Stage 2: packed downtown — grid of building lots per downtown block ──
+    // Gather every candidate cell across all on-island downtown blocks, rank by
+    // distance to the central plaza, then assign tallest→nearest, shortest→edge.
+    const DT_STEP = 540;
+    const DT_INSET = CONFIG.SIDEWALK + 110;
+    const cells: { x: number; y: number; block: Block; d2: number }[] = [];
+    const px = this.size / 2, py = this.size / 2;
+    for (const b of this.blocks) {
+      if (b.type !== 'downtown') continue;
+      const bCx = b.x0 + B / 2, bCy = b.y0 + B / 2;
+      if (!isOnIsland(bCx, bCy, 0)) continue; // mirror the fill-loop block guard
+      for (let yy = b.y0 + DT_INSET; yy <= b.y0 + B - DT_INSET; yy += DT_STEP) {
+        for (let xx = b.x0 + DT_INSET; xx <= b.x0 + B - DT_INSET; xx += DT_STEP) {
+          cells.push({ x: xx, y: yy, block: b, d2: (xx - px) ** 2 + (yy - py) ** 2 });
+        }
+      }
+    }
+    cells.sort((a, c) => a.d2 - c.d2);
+    const n = Math.max(1, cells.length - 1);
+    const kindForRank = (i: number): ObjectKind => {
+      const f = i / n; // 0 = plaza-adjacent (tallest), 1 = zone edge (shortest)
+      if (f < 0.30) return 'skyscraper';
+      if (f < 0.60) return 'office';
+      if (f < 0.82) return 'cafe';
+      return 'shop';
+    };
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      const kind = kindForRank(i);
+      const size = rSize(kind);
+      const fpR = size * FP;
+      if (!isInsideIsland(c.x, c.y)) continue;
+      if (!isOnIsland(c.x, c.y, Math.round(fpR))) continue;
+      if (!this.roadClear(c.x, c.y, fpR)) continue;
+      if (!this.lotFree(c.x, c.y, fpR, this.structureLots)) continue;
+      const lot: StructureLot = { x: c.x, y: c.y, size, fpR, kind };
+      (c.block.buildingLots ??= []).push(lot);
+      this.structureLots.push(lot);
+    }
+  }
+
+  // v12 §1: downtown block — data-driven building lots (Dense City) + street life
   private fillDowntown(b: Block, rand: () => number) {
     (b as any).paved = true; // no grass tufts; uses asphalt/sidewalk tiling
-    const inset = CONFIG.SIDEWALK + 50;
-    // v16.1 B3: every downtown block gets a skyscraper (100%)
-    {
-      const sx = b.x0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2);
-      const sy = b.y0 + inset + rand() * (CONFIG.BLOCK_SIZE - inset * 2) * 0.5;
-      this.makeObj('skyscraper', sx, sy);
+    // Dense City: place the pre-generated, non-overlapping building lots for this block
+    for (const lot of b.buildingLots ?? []) {
+      this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
     }
-    // 1–2 office buildings per block
-    const n = 1 + Math.floor(rand() * 2);
-    for (let i = 0; i < n; i++) {
-      const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 36);
-      this.makeObj('office', p.x, p.y);
-    }
-    // v16 §1: 1 café per downtown block (~80% chance)
-    if (rand() < 0.8) {
-      const p = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 28);
-      this.makeObj('cafe', p.x, p.y);
-    }
-    // v16.1 B3: 2 shops per downtown block
-    this.scatter(b, rand, 'shop', 2);
-    // street furniture
-    this.scatter(b, rand, 'cafetable', 4);  // v16.1 B3: 3→4
+    // street furniture (props are exempt from the structure-overlap audit)
+    this.scatter(b, rand, 'cafetable', 4);
     this.scatterPeople(b, rand, 'downtown', 8); // War Pack §1: diverse downtown crowd
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 3);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
-    // v16.1 B3: 2 curbside parked cars
     this.scatter(b, rand, 'car_parked_a', 1);
     this.scatter(b, rand, 'car_parked_b', 1);
   }
@@ -2407,8 +2521,13 @@ export class WorldManager {
     ctx.restore();
   }
 
-  // ── objects (y-sorted) ──
-  draw(ctx: CanvasRenderingContext2D, t: number, view: { x: number; y: number; w: number; h: number }) {
+  // ── objects (y-sorted) ── Dense City §3: optional void actors interleave by foot-Y
+  draw(
+    ctx: CanvasRenderingContext2D,
+    t: number,
+    view: { x: number; y: number; w: number; h: number },
+    actors?: { footY: number; draw: () => void }[],
+  ) {
     const visible = this.objects.filter((o) =>
       !o.eaten &&
       o.x + o.size >= view.x && o.x - o.size <= view.x + view.w &&
@@ -2430,7 +2549,7 @@ export class WorldManager {
       ctx.restore();
     }
 
-    for (const obj of visible) {
+    const drawOne = (obj: WorldObject) => {
       // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)
       if (obj.golden) {
         ctx.save();
@@ -2562,6 +2681,19 @@ export class WorldManager {
         ctx.fillText(obj.bubbleText, obj.x, by + bh - pad + 1);
         ctx.restore();
       }
+    };
+
+    // Dense City §3: interleave the void actors (player + rivals) into the
+    // painter's-order pass by foot-Y, so nearer buildings occlude the void body.
+    if (actors && actors.length) {
+      type Entry = { y: number; obj?: WorldObject; act?: () => void };
+      const merged: Entry[] = [];
+      for (const obj of visible) merged.push({ y: obj.y, obj });
+      for (const a of actors) merged.push({ y: a.footY, act: a.draw });
+      merged.sort((p, q) => p.y - q.y);
+      for (const e of merged) { if (e.obj) drawOne(e.obj); else e.act!(); }
+    } else {
+      for (const obj of visible) drawOne(obj);
     }
   }
 }

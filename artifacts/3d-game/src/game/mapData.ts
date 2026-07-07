@@ -110,74 +110,9 @@ for (const rx of ROAD_CENTERS) {
   }
 }
 
-// ─── House lots ───────────────────────────────────────────────────────────────
-// Placed along suburb road edges, alternating sides, 30–40 total.
-// Each lot has a world position and a facing angle (toward the street).
-
-export interface HouseLot {
-  x: number;
-  y: number;
-  facingAngle: number; // radians
-}
-
-function generateHouseLots(): HouseLot[] {
-  const lots: HouseLot[] = [];
-  const OFFSET = ROAD_W / 2 + 260; // distance from road center to house center
-  const STEP   = 520;               // gap between adjacent lot centers
-  const DTN_X0 = ROAD_CENTERS[0];   // x=2400 — left edge of downtown
-  const DTN_X1 = ROAD_CENTERS[3];   // x=7800 — right edge of downtown
-  const DTN_Y0 = ROAD_CENTERS[0];   // y=2400 — top of downtown
-  const DTN_Y1 = ROAD_CENTERS[2];   // y=6000 — bottom of downtown core
-
-  // Build validation polygon once — direct call avoids the lazy _islandPoly TDZ
-  // at module-init time (let variables aren't initialized until their declaration line).
-  const validPoly = buildIslandPolyApprox(100);
-
-  // Helper: add lot if inside island, not in downtown, not on a road
-  const add = (x: number, y: number, angle: number) => {
-    if (x < MARGIN + 100 || x > S - MARGIN - 100 || y < MARGIN + 100 || y > S - MARGIN - 100) return;
-    // Avoid downtown interior
-    if (x > DTN_X0 + 100 && x < DTN_X1 - 100 && y > DTN_Y0 + 100 && y < DTN_Y1 - 100) return;
-    // Validate: must be inside the island polygon and not on a road
-    if (!pointInPoly(validPoly, x, y)) return;
-    if (isOnRoad(x, y)) return;
-    lots.push({ x, y, facingAngle: angle });
-  };
-
-  // ─ North road (y=2400): lots on NORTH side (residential gy=0)
-  const northRoadY = ROAD_CENTERS[0];
-  for (let x = MARGIN + STEP * 0.7; x < S - MARGIN - STEP; x += STEP) {
-    add(x, northRoadY - OFFSET, Math.PI / 2); // facing south (toward road)
-  }
-
-  // ─ South of downtown road (y=6000): lots on SOUTH side (residential gy=3-4)
-  const southRoadY = ROAD_CENTERS[2];
-  for (let x = MARGIN + STEP * 0.4; x < S - MARGIN - STEP; x += STEP) {
-    add(x, southRoadY + OFFSET, -Math.PI / 2); // facing north
-  }
-
-  // ─ Pre-beach road (y=9600): lots on NORTH side (residential gy=4)
-  const beachRoadY = ROAD_CENTERS[4];
-  for (let x = MARGIN + STEP; x < S - MARGIN - STEP; x += STEP) {
-    add(x, beachRoadY - OFFSET, Math.PI / 2);
-  }
-
-  // ─ West road (x=2400): lots on WEST side (residential gx=0)
-  const westRoadX = ROAD_CENTERS[0];
-  for (let y = MARGIN + STEP * 1.5; y < southRoadY - 200; y += STEP) {
-    add(westRoadX - OFFSET, y, 0); // facing east (toward road)
-  }
-
-  // ─ East road (x=9600): lots on EAST side (residential gx=5)
-  const eastRoadX = ROAD_CENTERS[4];
-  for (let y = MARGIN + STEP; y < southRoadY - 200; y += STEP) {
-    add(eastRoadX + OFFSET, y, Math.PI); // facing west
-  }
-
-  return lots.slice(0, 38); // cap at 38 lots
-}
-
-export const HOUSE_LOTS: HouseLot[] = generateHouseLots();
+// Dense City: house & building lots are generated at runtime per-block in
+// world.ts (generateLots), which knows each day's block types. The old static
+// road-frontage HOUSE_LOTS generator was removed as dead code.
 
 // ─── Geometry helpers ────────────────────────────────────────────────────────
 
