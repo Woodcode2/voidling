@@ -158,15 +158,7 @@ export class EventManager {
     player.eventSlow = 1;
     for (const r of rivals) { r.eventSlow = 1; r.eventFlee = null; }
 
-    // v13 §1: Sandy Shores coast slow — 20% speed penalty in the sandy edge zone
-    const sandD = CONFIG.COAST_SAND_DEPTH;
-    const mz = CONFIG.MAP_SIZE;
-    // v16 §1: west column is now residential — only south beach blocks get water slow
-    if (player.y > mz - sandD) player.eventSlow = Math.min(player.eventSlow, CONFIG.COAST_WATER_SLOW);
-    for (const r of rivals) {
-      // v16 §1: west column is now residential
-      if (r.y > mz - sandD) r.eventSlow = Math.min(r.eventSlow, CONFIG.COAST_WATER_SLOW);
-    }
+    // Phase 7b §5: coast water slow removed — only TIME WARP may slow the player
 
     // v8 §7: two scheduled slots draw from the event pool (~2:05 and ~1:10)
     this.schedule('slotA', CONFIG.GOLDEN_RUSH_TIME, timeLeft, this.warnFor(this.slotA), () => this.fireEvent(this.slotA, timeLeft));
@@ -474,8 +466,7 @@ export class EventManager {
 
       if (d > 200) { t.x += Math.cos(a) * sp; t.y += Math.sin(a) * sp; }
       if (d < 300) {
-        // 25% slow + a slight knockback pushing the target away from the spray
-        target.eventSlow = Math.min(target.eventSlow, 1 - CONFIG.FIRETRUCK_SLOW);
+        // Phase 7b §5: no speed slow from firetruck spray (only TIME WARP slows)
         const kb = 26 * (dt / 1000);
         target.x -= Math.cos(a) * kb;
         target.y -= Math.sin(a) * kb;

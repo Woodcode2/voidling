@@ -19,3 +19,4 @@
 - [VOIDLING Character Pack Phase 7a](voidling-character-pack-7a.md) — procedural voids (gradient+swirl+specks), auto-cast spells, 22% dusk nightfall, TAP TO START splash, guide rewrite, spawn feast ×14, duck isOnIsland guards.
 - [VOIDLING Alive Pack (Phase 5)](voidling-alive-pack.md) — isOnIsland guard (excludes water+rim), SPAWN AUDIT tripwire, car cliff check, drone island waypoints, body-language (chomp squash, bob, sparkle, sway, shimmer).
 - [VOIDLING Sound Pack Phase 6](voidling-sound-pack-phase6.md) — Tone.js adaptive music (5 layers, A minor 110BPM) + new SFX; dual-bus architecture; danger layer timer pattern; toggleMute silences all.
+- [VOIDLING Phase 7b World+War](voidling-v19-7b.md) — Agar death (dropStage), endRound idempotency guard, feeding frenzy ×3 respawn, heli missile+searchlight, tank shockwave, news banner, no-slow fix, rival VOIDLING respawn.

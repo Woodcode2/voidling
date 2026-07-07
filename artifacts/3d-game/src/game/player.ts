@@ -78,6 +78,7 @@ export class Player extends Void {
   shieldPopped = false;
   dashActive = false;
   luckyActive = false;
+  empDisabled = 0; // Phase 7b §5: EMP van disables vacuum for 3s
   tremorLogCd = 0;
 
   name = 'You';
@@ -152,7 +153,7 @@ export class Player extends Void {
     this.ghostTime = 0;
     this.tooBigCd = 0;
     this.eatPopScale = 1.0;
-    this.hearts = 3; // v16.2 §3
+    this.empDisabled = 0; // Phase 7b §4: hearts removed; reset EMP timer
     this.skin = skin;
     this.mouthOpen = 0;
     this.chomp = 0;

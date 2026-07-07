@@ -1,0 +1,66 @@
+# VOIDLING World and War Pack (Phase 7b)
+
+Run this AFTER the Character Pack. Two missions: make the island feel like a real, dense, funny city, and make the endgame a war with real stakes. Read the code first, keep changes surgical, prove everything.
+
+## Step 0: Download this asset as a local static file
+Civic buildings sheet (3x3 grid), save as civic_sheet.png, and slice it with the component-extraction pipeline:
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260707_110656_2fe38bb3-472a-475d-b415-33b5c664efe8.png
+Cells left to right, top to bottom: glass skyscraper, brick skyscraper, office midrise, hospital, school, town hall, corner cafe, water park slide, kiddie pool.
+
+## Part 1: A city that makes sense (placement quality)
+Buildings currently overlap roads and float in gaps. Fix placement with hard rules:
+1. Every building has a footprint rectangle. Footprints never overlap each other and never intersect a road. Buildings align parallel to their nearest road with a consistent setback of at least 60 world units from the road edge.
+2. DOWNTOWN: pack each block with 2 to 4 large buildings. Skyscrapers cluster near the plaza, offices around them, cafes on corners. The TOWN HALL faces the plaza directly. The HOSPITAL sits on a main road. Sidewalk-scale gaps between buildings get crowds, benches, and flower pots, not emptiness.
+3. SUBURBS: houses line both sides of every suburb street with uniform setback and spacing, each facing its street. Target 40 or more houses. Gnomes, mailboxes, and flowerbeds fill the yards between.
+4. The SCHOOL sits where suburbs meet the park, with the playground vignette beside it. The WATER PARK (slide plus kiddie pool plus umbrellas, towels, sunbathers, and a small crowd) sits where the park meets the beach.
+5. Edibility tiers: skyscrapers are top tier (WORLD ENDER), hospital, school, and town hall one tier below, cafe at house tier, slide and pool at car tier. All count toward percent devoured.
+6. NEW RECEIPTS in the audit: report BUILDING OVERLAPS: 0 and BUILDINGS ON ROADS: 0 at match start, alongside the existing SPAWN AUDIT.
+
+## Part 2: Density and life everywhere
+1. Raise people density hard, biased by zone: commuter groups of 4 to 6 walking downtown sidewalks, picnics in the park, crowds at the water park and beach, kids near the school. Keep off-screen entities cheap.
+2. RUSH HOUR: once per match a banner announces it and a dense commuter stream flows through downtown for 20 seconds. A feast if you are there.
+3. NEW VIGNETTE, school trip: a teacher leading a line of kids across a crosswalk, ambient bubble Stay in line!, panic bubble FIELD TRIP CANCELLED!!
+4. More ambient bubbles downtown in the dry-office register: Late for work!, Coffee first., I emailed you about this.
+
+## Part 3: The news system
+A compact secondary banner slides in under the main banner slot every 25 to 40 seconds, prefixed NEWS:, with headlines that escalate with percent devoured. Seed pool, four per tier, and extend in the same dry escalating-panic voice:
+- Under 3 percent: Mayor declares National Badminton Day. Local gnome wins bake-off. City council debates bench comfort. Pigeon elected honorary citizen.
+- 3 to 10 percent: Residents report a large purple concern. Mayor: it is probably nothing. Sinkhole experts baffled, also missing. Hotline established, immediately eaten.
+- 10 to 20 percent: MAYOR DENIES VOID FROM HELICOPTER. Property values plummet into actual void. School replaces fire drill with void drill.
+- Over 20 percent: GENERAL: WE TRIED BULLETS. Badminton Day cancelled. MAYOR: PLEASE. IT ATE MY HOUSE. PLEASE.
+
+## Part 4: Agar death rules (stakes)
+Remove the hearts system entirely, including the HUD hearts. Size is life now.
+1. Eaten by a bigger void: you drop one full evolution stage. Score resets to the midpoint of the previous stage band, radius follows, a burst effect plays, the eater gains the score you lost, and you get 3 seconds of invulnerability. Banner names who got you.
+2. Eaten while VOIDLING or MUNCHER: the run is over. Game over screen shows who devoured you and your final placement, with a restart button.
+3. Rivals eliminated the same way respawn after 8 seconds as VOIDLING so the match stays populated. Player elimination is final.
+4. Falling off the island: drop one stage plus the existing tumble and slide whistle. At the bottom stage a fall costs 15 percent of score instead of ending the run. Falling should sting, not kill.
+5. Keep the 30 second predation grace period at match start.
+
+## Part 5: An army with real weapons (and the slow bug dies)
+The player reported being slowed by defense units again. Find every remaining speed modifier from contact or proximity and delete it. Nothing slows the player except TIME WARP slowing everyone else. Then give the waves teeth:
+1. TANKS: shells with the 1 second landing circle, dodgeable, 4 percent score chip on hit, and a shockwave ring on impact that scatters nearby small props.
+2. HELICOPTER: a visible searchlight cone that tracks the player; every 6 seconds it fires a missile with a red warning line shown 0.8 seconds before impact, 4 percent score chip, and a scorch decal.
+3. NEW, EMP VAN (use the missile launcher truck sprite): charges up with a visible blue glow, then emits a blue ring that disables the player's vacuum for 3 seconds. The vacuum ring visibly greys out and fizzles. Counterplay is eating the van first. No damage, pure disruption.
+4. Police and jeeps keep pellet volleys: 1 percent score chip plus combo break. No weapon ever slows movement or drops a stage.
+5. All units stay edible at their tiers for big points, wave cap stays at 12.
+
+## Part 6: Feeding frenzy (the last 60 seconds)
+At 60 seconds remaining: FEEDING FRENZY banner, small food rains back into cleared areas at triple respawn rate, predation score transfer doubles, rival aggression maxes, and the music intensity flag pins to maximum. The final minute should be the loudest, most dangerous, highest-scoring stretch of the match.
+
+## Do not touch
+Procedural void rendering and face animation, instant-cast powers, splash screen, tutorial cards, audio engine, sprite extraction pipeline.
+
+## Verify before finishing: proof required, do not skip
+1. Paste the SPAWN AUDIT, BUILDING OVERLAPS, and BUILDINGS ON ROADS lines from two match starts, all zeros.
+2. Report the house count (40 or more) and the downtown building count.
+3. Walk downtown: packed blocks, town hall on the plaza, hospital on a main road, crowds in the gaps. Walk the suburbs: aligned rows facing their streets. Find the school by the park and the water park at the beach with its crowd.
+4. Get eaten while big: you drop exactly one stage with the burst and banner. Get eaten as MUNCHER: game over screen with the eater's name. Confirm a rival eaten small respawns 8 seconds later.
+5. Fall off at bottom stage: score penalty, run continues.
+6. Stand in a full defense wave for 10 seconds: movement speed identical to open ground. Paste the measurement or log you used to confirm.
+7. Trigger each weapon: shell circle and shockwave, helicopter searchlight and warning-line missile, EMP van ring with the vacuum visibly disabled for 3 seconds then restored.
+8. Two NEWS headlines appear in one match and escalate in tier with percent devoured.
+9. FEEDING FRENZY fires at 60 seconds with food rain and doubled predation transfer.
+10. Frame rate holds at maximum chaos: frenzy, full wave, rush hour crowd.
+
+Final report: all audit lines, the house and building counts, the no-slow evidence, and every file changed.

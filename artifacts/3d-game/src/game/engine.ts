@@ -30,6 +30,7 @@ export interface ResultData {
   reachedIndex: number;
   worldEater: boolean;
   gnomeLord?: boolean;    // v9 §8: secret — ate every gnome in one round
+  killedBy?: string;      // Phase 7b §4: name of the void that eliminated the player
   skinTease?: { botName: string; skinName: string; skinId: string } | null; // v7 §8
   // v7 §11: player-level meta
   xpGain: number;
@@ -69,8 +70,8 @@ export interface Snapshot {
   showHitboxes: boolean;
   // v16 (ticker removed in Fix 7 — events route to banner pill)
   contracts: Array<{id: string; name: string; done: boolean; reward: number}>;
-  // v16.2
-  hearts?: number;   // player hearts remaining (0 = FINAL HEART state)
+  // Phase 7b
+  killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
 }
 
@@ -186,6 +187,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const defensePellets: Array<{x:number;y:number;vx:number;vy:number;life:number}> = [];
   // Life Pack §4: tank shells + missile-truck rockets (show landing circle before impact)
   const defenseShells: Array<{tx:number;ty:number;warnT:number;warnMax:number;rocket:boolean}> = [];
+  // Phase 7b §5: heli missile — 0.8s red-line warning then impact (4% score chip)
+  const heliMissiles: Array<{tx:number;ty:number;fromX:number;fromY:number;warnT:number}> = [];
   // War Pack §3: SINGULARITY black hole
   let singularity: {x:number;y:number;timer:number;score:number}|null = null;
   // War Pack §2: ms of red pellet-hit overlay remaining
@@ -216,6 +219,38 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     '🏗️ Downtown construction halted after crane operator reports unbelievable sight',
     '🎪 Gnome collectors alarmed as garden ornaments reported missing citywide',
   ];
+  // Phase 7b §3: secondary news banner — 4 tiers keyed by % of city devoured
+  const NEWS_TIER: string[][] = [
+    [ // tier 0: < 3%
+      'NEWS: Mayor declares National Badminton Day',
+      'NEWS: Local gnome wins citywide bake-off',
+      'NEWS: City council debates bench comfort standards',
+      'NEWS: Pigeon elected honorary citizen by unanimous vote',
+      'NEWS: Community garden reports suspicious shadow but no losses',
+    ],
+    [ // tier 1: 3–10%
+      'NEWS: Residents report a large purple concern downtown',
+      'NEWS: Mayor: "It is probably nothing." Press conference cancelled',
+      'NEWS: Sinkhole experts baffled — and also missing',
+      'NEWS: Citywide hotline established; immediately eaten',
+      'NEWS: Real-estate prices fall amid "unexplained absences"',
+    ],
+    [ // tier 2: 10–20%
+      'NEWS: MAYOR DENIES VOID FROM HELICOPTER',
+      'NEWS: Property values plummet into actual void',
+      'NEWS: School replaces fire drill with void drill',
+      'NEWS: Downtown "slightly less tall" this morning, residents confirm',
+      'NEWS: Area scientists confirm: something is very, very wrong',
+    ],
+    [ // tier 3: > 20%
+      'NEWS: GENERAL: WE TRIED BULLETS.',
+      'NEWS: Badminton Day cancelled. City too void.',
+      'NEWS: MAYOR: PLEASE. IT ATE MY HOUSE. PLEASE.',
+      'NEWS: Scientists confirm city is measurably smaller. "Not great," says scientist.',
+      'NEWS: Live coverage suspended. Camera also gone.',
+    ],
+  ];
+
   // Fix 7: route ticker lines to the banner pill (news ticker removed from UI)
   function queueTicker(line: string, _durationMs = 6500) {
     banner(line, '#9AAFC8', 2);
@@ -254,6 +289,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // v12 §2: FINAL FEAST state
   let finalFeastFired = false;
   let finalFeastActive = false;
+  // Phase 7b §6: FEEDING FRENZY — triggers at 60 s remaining
+  let feedingFrenzyFired = false;
+  let feedingFrenzyActive = false;
+  // Phase 7b §4: killer name for game-over banner / results
+  let killedBy = '';
+  // Phase 7b §3: secondary news banner
+  let newsText = '';
+  let newsAlpha = 0;
+  let newsTimer = 0;
+  let newsCd = 12000; // first news at ~12 s so it doesn't clash with opening beat
   // v16.2 §1: event-based ticker gate flags (prevent repeat fires per round)
   let openingBeatDone = false;
   let roundStartTickerDone = false; // separate gate for the 3s round-start line
@@ -413,8 +458,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     heldSpell = null; activeSpell = null; queuedSpell = null; spellTimer = 0; spellTimerMax = 0;
     defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0; defenseShells.length = 0;
     singularity = null; pelletHitFlash = 0;
-    finalFeastFired = false;
-    finalFeastActive = false;
+    finalFeastFired = false; finalFeastActive = false;
+    feedingFrenzyFired = false; feedingFrenzyActive = false;
+    killedBy = ''; roundEnded = false;
+    newsText = ''; newsAlpha = 0; newsTimer = 0; newsCd = 12000;
+    defenseShells.length = 0; heliMissiles.length = 0;
     openingBeatDone = false;
     roundStartTickerDone = false;
     firstHouseTickerDone = false;
@@ -551,8 +599,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     notify();
   }
 
+  let roundEnded = false; // Phase 7b: idempotency guard — endRound() must only fire once per round
   function endRound() {
     if (!player || !world) return;
+    if (roundEnded) return; // guard against duplicate calls (e.g. timer expires while death timeout pending)
+    roundEnded = true;
     joystick.setEnabled(false);
 
     const board = [player, ...rivals].sort((a, b) => b.score - a.score);
@@ -629,7 +680,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       score: player.score, placement, total: board.length, devoured,
       coins, isDaily, crown, highScore: meta.data.highScore, newBest,
       reachedForm: player.formName, reachedIndex: player.formIndex, worldEater,
-      gnomeLord,
+      gnomeLord, killedBy: killedBy || undefined,
       skinTease,
       xpGain, level: meta.data.level, xpInLevel: meta.data.xp,
       xpNext: xpForLevel(meta.data.level), leveledTo,
@@ -729,23 +780,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         fx.shake(200, 6);
       }
     }
-    // Fall animation complete → deduct heart or end run
+    // Phase 7b §4: fall → drop one stage (at VOIDLING: −15% score sting, run continues)
     if (player.fallState === 'falling' && player.fallTimer <= 0) {
-      const preHp = player.hearts;
-      if (preHp <= 0) {
-        // Already on FINAL HEART — this fall ends the run
-        player.respawnFromFall(CONFIG.MAP_SIZE / 2, CONFIG.MAP_SIZE / 2); // clear fall state
-        banner('💀 The void has fallen into the void!', '#FF4D6D', 5, { pulse: true });
-        endRound();
-      } else {
-        player.hearts = Math.max(0, player.hearts - 1);
-        const cx = CONFIG.MAP_SIZE / 2, cy = CONFIG.MAP_SIZE / 2;
+      const cx = CONFIG.MAP_SIZE / 2, cy = CONFIG.MAP_SIZE / 2;
+      if (player.formIndex <= 0) {
+        // VOIDLING can't drop further — 15% score penalty instead
+        player.score = Math.max(0, Math.floor(player.score * 0.85));
         player.respawnFromFall(cx, cy);
-        const msg = player.hearts === 0
-          ? 'Fell off the island! 💀 FINAL HEART — one more fall ends the run!'
-          : `Fell off the island! ${player.hearts}♥ left`;
-        banner(msg, '#FF6B6B', 3, { pulse: true });
-        if (player.hearts === 0) queueTicker('⚠️ FINAL HEART remaining — one more fall ends everything!');
+        banner('Fell off the island! −15% score 😵', '#FF6B6B', 3, { pulse: true });
+      } else {
+        const fromName = player.formName;
+        player.dropStage();
+        player.respawnFromFall(cx, cy);
+        player.ghostTime = Math.max(player.ghostTime, 3000);
+        fx.addRing(cx, cy, '#FF6B6B', 0, player.radius * 3, 8, 600);
+        banner(`Fell off! ↓ ${fromName} → ${player.formName} — 3s shield`, '#FF6B6B', 3, { pulse: true });
       }
     }
 
@@ -764,6 +813,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
 
     // objects (suction + eat + living-world AI)
+    world.respawnMult = feedingFrenzyActive ? 3 : finalFeastActive ? 2 : 1; // Phase 7b §6
     world.update(twDt, player, rivals, fx);
     // Life Pack §3: flush vignette eaten banners
     for (const msg of world.eatenVignetteBanners) banner(msg, '#FFD23F', 3);
@@ -824,6 +874,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               defensePellets.push({ x: o.x, y: o.y,
                 vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED * 1.1, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED * 1.1, life: 3200 });
             }
+          }
+          // Phase 7b §5: heli missile — fires every 6–8 s with 0.8 s red warning line
+          o.missileCd = (o.missileCd ?? (6000 + Math.random() * 2000)) - twDt;
+          if ((o.missileCd ?? 1) <= 0 && d < 1400) {
+            o.missileCd = 6000 + Math.random() * 2000;
+            heliMissiles.push({ tx: player.x + (Math.random()-0.5)*40, ty: player.y + (Math.random()-0.5)*40, fromX: o.x, fromY: o.y, warnT: 800 });
           }
           // Helicopters skip normal suction — handled separately below
         } else if (o.kind === 'tank') {
@@ -915,6 +971,39 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost} pts`, '#FF4D6D', 2);
           }
           fx.addConfetti(s.tx, s.ty, ['#FF4D6D', '#FF9F1C'], 12);
+          // Phase 7b §5: tank shell shockwave — scatter nearby small props outward
+          if (!s.rocket && world) {
+            for (const o of world.objects) {
+              if (o.eaten || o.defense || o.tier > 2) continue;
+              const od = dist(o.x, o.y, s.tx, s.ty);
+              if (od < 220 && od > 0) {
+                const sAng = Math.atan2(o.y - s.ty, o.x - s.tx);
+                const force = (220 - od) * 0.85;
+                o.x = clamp(o.x + Math.cos(sAng) * force, 20, CONFIG.MAP_SIZE - 20);
+                o.y = clamp(o.y + Math.sin(sAng) * force, 20, CONFIG.MAP_SIZE - 20);
+              }
+            }
+            fx.addRing(s.tx, s.ty, '#FF9F1C', 0, 220, 6, 500);
+          }
+        }
+      }
+      // Phase 7b §5: heli missiles — update countdown + 4% score chip on impact
+      for (let mi = heliMissiles.length - 1; mi >= 0; mi--) {
+        const m = heliMissiles[mi];
+        m.warnT -= twDt;
+        if (m.warnT <= 0) {
+          heliMissiles.splice(mi, 1);
+          if (!player.ghost && dist(m.tx, m.ty, player.x, player.y) < player.radius * 0.9) {
+            const cost = Math.floor(player.score * 0.04);
+            player.score = Math.max(0, player.score - cost);
+            player.combo = 0; player.comboTimer = 0;
+            pelletHitFlash = 500;
+            audio.playEaten();
+            if (cost > 0) banner(`🚁 Missile hit! -${cost} pts`, '#FF4D6D', 2);
+          }
+          fx.addConfetti(m.tx, m.ty, ['#FF2020', '#FF8800'], 10);
+          fx.addRing(m.tx, m.ty, '#FF2020', 0, 90, 4, 360);
+          world?.dropCrack(m.tx, m.ty, 26);
         }
       }
       if (pelletHitFlash > 0) pelletHitFlash -= dt;
@@ -964,6 +1053,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       goldenTimer -= dt;
       const gi = dailyGoldenInterval >= 0 ? dailyGoldenInterval : CONFIG.GOLDEN_INTERVAL;
       if (goldenTimer <= 0) { goldenTimer = gi; world.spawnGolden(player); }
+    }
+
+    // Phase 7b §6: FEEDING FRENZY — triggers at 60 s remaining
+    if (!feedingFrenzyFired && timeLeft <= 60000 && timeLeft > 0) {
+      feedingFrenzyFired = true;
+      feedingFrenzyActive = true;
+      banner('🦑 FEEDING FRENZY! 60 SECONDS!', '#FF3B8A', 8, { pulse: true });
+      queueTicker('🦑 FEEDING FRENZY — double predation score, max aggression, last-minute chaos!');
     }
 
     // v12 §2: FINAL FEAST — triggers at 30s remaining
@@ -1042,6 +1139,24 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         tickerCd = 40000 + Math.random() * 10000;
         const line = TICKER_LINES[Math.floor(Math.random() * TICKER_LINES.length)];
         banner(line, '#9AAFC8', 1);
+      }
+    }
+
+    // Phase 7b §3: secondary news banner — escalates with % devoured
+    if (screen === 'game' && roundElapsed > 8000 && world) {
+      newsCd -= dt;
+      if (newsTimer > 0) {
+        newsTimer -= dt;
+        if (newsTimer < 700) newsAlpha = Math.max(0, newsTimer / 700);
+      }
+      if (newsCd <= 0 && newsTimer <= 0) {
+        newsCd = 25000 + Math.random() * 15000;
+        const devPct = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
+        const newsTier = devPct >= 20 ? 3 : devPct >= 10 ? 2 : devPct >= 3 ? 1 : 0;
+        const pool = NEWS_TIER[newsTier];
+        newsText = pool[Math.floor(Math.random() * pool.length)];
+        newsAlpha = 1;
+        newsTimer = 5500;
       }
     }
 
@@ -1348,11 +1463,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           fx.addConfetti(r.x, r.y, CONFIG.COLORS.pops);
           fx.shake(280, 12); fx.flash();
           // War Pack §2: rival loses half its score, player gains that amount
-          const stolen = Math.floor(r.score * 0.5);
+          // Phase 7b §6: feeding frenzy / final feast → steal 100% of score
+          const stolen = Math.floor(r.score * (feedingFrenzyActive || finalFeastActive ? 1.0 : 0.5));
           r.score = Math.max(0, r.score - stolen);
           meta.updateTrophyCounter('totalVoidsEaten', 1, 'sum');
           player.eatRival(rr, stolen);
           r.getEaten(player.x, player.y, minDist);
+          // Phase 7b §4: rival respawns as VOIDLING after 8 s
+          r.formIndex = 0;
+          r.radius = CONFIG.FORMS[0].radius;
+          r.score = 0;
+          r.ghostTime = 8000;
           banner(`You devoured ${r.name}!`, '#FFD23F');
           if (stolen > 0) banner(`Stole ${stolen} pts!`, '#FF9F5A', 3);
         } else if (canEatVoid(r.radius, player.radius, d)) {
@@ -1369,20 +1490,28 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           } else {
             const pr = player.radius;
             fx.shake(360, 16); fx.flash();
-            audio.playEaten(); // v5 §5: descending wah when you get eaten
-            // v16.2 §3: hearts system — escalating score steal per chomp
-            // Steal % is determined by hearts BEFORE this chomp: 3hp→25%, 2hp→35%, 1hp→50%
-            const preHp = player.hearts;
-            player.hearts = Math.max(0, player.hearts - 1);
-            const heartScoreLost = Math.floor(player.score * 0.25); // War Pack §2: flat 25% steal
-            player.score = Math.max(0, player.score - heartScoreLost);
-            player.getEaten();
-            r.eatVoid(pr);
-            const heartLoseMsg = player.hearts === 0
-              ? `${r.name} devoured you! FINAL HEART — your steals are now doubled!`
-              : `${r.name} devoured you! -${heartScoreLost} score · ${player.hearts}♥ left`;
-            banner(heartLoseMsg, '#FF6B6B');
-            if (preHp > 0 && player.hearts === 0) queueTicker('💀 The void is wounded! No hearts remain — steals are now doubled!');
+            audio.playEaten();
+            // Phase 7b §4: Agar-style death — eaten at VOIDLING/MUNCHER = game over, else drop one stage
+            if (player.formIndex <= 1) {
+              // Eaten at lowest two forms → game over
+              player.combo = 0; player.orbit = []; player.vx = player.vy = 0;
+              player.ghostTime = 5000; // prevent double-eat during death animation
+              r.eatVoid(pr);
+              killedBy = r.name;
+              banner(`${r.name} DEVOURED YOU 💀`, '#FF4D6D', 8, { pulse: true });
+              queueTicker(`💀 The void was consumed by ${r.name}! The city breathes again… briefly.`);
+              window.setTimeout(() => endRound(), 2200);
+            } else {
+              // Higher forms: drop one evolution stage, eater gains lost score
+              const scoreBefore = player.score;
+              player.dropStage();
+              const scoreLost = scoreBefore - player.score;
+              r.score += Math.floor(scoreLost * (feedingFrenzyActive || finalFeastActive ? 2 : 1));
+              player.combo = 0; player.dizzy = 1; player.orbit = [];
+              r.eatVoid(pr);
+              fx.addRing(player.x, player.y, '#FF6B6B', 0, pr * 3, 8, 700);
+              banner(`${r.name} devoured you! ↓ Dropped to ${player.formName}! 3s shield`, '#FF6B6B', 4, { pulse: true });
+            }
           }
         }
       }
@@ -1399,12 +1528,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (canEatVoid(a.radius, b.radius, d) && a.voidSatedMs <= 0) {
           a.eatVoidBotOnBot(b.radius); // 25% mass, sets a.voidSatedMs = 10000
           b.getEaten(player.x, player.y, minDist);
-          // War Pack §2: rival-on-rival trash-talk banner
+          // Phase 7b §4: eaten rival respawns as VOIDLING after 8s
+          b.formIndex = 0; b.radius = CONFIG.FORMS[0].radius; b.score = 0; b.ghostTime = 8000;
           const TRASH_TALK = [`${a.name} obliterated ${b.name}!`, `${a.name} consumed ${b.name}! No mercy!`, `${a.name} devours the competition! 🔥`];
           banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
         } else if (canEatVoid(b.radius, a.radius, d) && b.voidSatedMs <= 0) {
           b.eatVoidBotOnBot(a.radius);
           a.getEaten(player.x, player.y, minDist);
+          // Phase 7b §4: eaten rival respawns as VOIDLING after 8s
+          a.formIndex = 0; a.radius = CONFIG.FORMS[0].radius; a.score = 0; a.ghostTime = 8000;
           const TRASH_TALK = [`${b.name} obliterated ${a.name}!`, `${b.name} consumed ${a.name}! No mercy!`, `${b.name} devours the competition! 🔥`];
           banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
         }
@@ -1591,6 +1723,46 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         ctx.ellipse(o.x, o.y + o.size * 0.3, o.size * 1.1, o.size * 0.45, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+        // Phase 7b §5: heli searchlight cone (world space)
+        if (player && !player.ghost) {
+          const cAng = Math.atan2(player.y - o.y, player.x - o.x);
+          const cLen = dist(o.x, o.y, player.x, player.y);
+          const cW = Math.min(cLen * 0.28, 180);
+          ctx.save();
+          ctx.globalAlpha = 0.06 + 0.03 * Math.sin(clock / 700);
+          const cGrd = ctx.createLinearGradient(o.x, o.y, player.x, player.y);
+          cGrd.addColorStop(0, 'rgba(255,255,200,0)');
+          cGrd.addColorStop(1, 'rgba(255,255,180,0.8)');
+          ctx.fillStyle = cGrd;
+          ctx.beginPath();
+          ctx.moveTo(o.x, o.y);
+          ctx.lineTo(player.x + Math.cos(cAng + Math.PI / 2) * cW, player.y + Math.sin(cAng + Math.PI / 2) * cW);
+          ctx.lineTo(player.x + Math.cos(cAng - Math.PI / 2) * cW, player.y + Math.sin(cAng - Math.PI / 2) * cW);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+    // Phase 7b §5: heli missile warning lines (world space, before impact)
+    for (const m of heliMissiles) {
+      if (m.warnT > 60) {
+        const prog = 1 - m.warnT / 800;
+        ctx.save();
+        ctx.globalAlpha = 0.55 + Math.sin(prog * Math.PI * 10) * 0.3;
+        ctx.strokeStyle = '#FF2020';
+        ctx.lineWidth = (2 + prog * 2) / camZoom;
+        ctx.shadowColor = '#FF4444'; ctx.shadowBlur = 6 / camZoom;
+        ctx.setLineDash([8 / camZoom, 5 / camZoom]);
+        ctx.beginPath();
+        ctx.moveTo(m.fromX, m.fromY);
+        ctx.lineTo(m.tx, m.ty);
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.setLineDash([]);
+        ctx.lineWidth = 1.5 / camZoom;
+        ctx.globalAlpha = 0.65;
+        ctx.beginPath(); ctx.arc(m.tx, m.ty, 22 / camZoom, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
       }
     }
     ctx.restore();
@@ -1740,27 +1912,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillText(`${dv.toFixed(0)}% DEVOURED`, scoreRight, player.combo > 1 ? 78 : 56);
     }
 
-    // v16.2 §3: heart pips under score (3 hearts, grey when lost)
-    {
-      const hBase = (player.combo > 1 ? 90 : 68);
-      const hs = 7; // heart half-size
-      for (let h = 0; h < 3; h++) {
-        const filled = h < player.hearts;
-        const hx = scoreRight - (2 - h) * 20;
-        const hy = hBase;
-        ctx.save();
-        ctx.globalAlpha = filled ? 0.92 : 0.28;
-        ctx.fillStyle = filled ? '#FF4466' : '#774466';
-        ctx.beginPath();
-        ctx.moveTo(hx, hy + hs * 0.3);
-        ctx.bezierCurveTo(hx, hy, hx - hs, hy, hx - hs, hy + hs * 0.35);
-        ctx.bezierCurveTo(hx - hs, hy + hs * 0.75, hx, hy + hs * 1.05, hx, hy + hs * 1.25);
-        ctx.bezierCurveTo(hx, hy + hs * 1.05, hx + hs, hy + hs * 0.75, hx + hs, hy + hs * 0.35);
-        ctx.bezierCurveTo(hx + hs, hy, hx, hy, hx, hy + hs * 0.3);
-        ctx.fill();
-        ctx.restore();
-      }
-    }
+    // Phase 7b §4: heart pips removed — hearts system replaced by Agar-style stage drop
 
     // leaderboard (top left, dark backdrop, dropped below the timer so it never
     // overlaps the centred timer/bar at narrow widths e.g. 375px)
@@ -1853,13 +2005,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       if (callout.t >= total) callout = null;
     }
     ctx.textBaseline = 'alphabetic';
-    // v16.2 §3: FINAL HEART — pulsing red vignette when hearts = 0
-    if (player && player.hearts <= 0) {
-      const fp = 0.42 + Math.sin(roundElapsed / 240) * 0.28;
-      const vg = ctx.createRadialGradient(fw / 2, fh / 2, Math.min(fw, fh) * 0.22, fw / 2, fh / 2, Math.min(fw, fh) * 0.76);
-      vg.addColorStop(0, 'rgba(180,0,0,0)');
-      vg.addColorStop(1, `rgba(180,0,0,${fp * 0.45})`);
-      ctx.save(); ctx.fillStyle = vg; ctx.fillRect(0, 0, fw, fh); ctx.restore();
+    // Phase 7b §4: FINAL HEART vignette removed — hearts system replaced by Agar-style stage drop
+    // Phase 7b §3: secondary news banner — slides in below the main callout
+    if (newsAlpha > 0.02 && newsText) {
+      ctx.save();
+      ctx.globalAlpha = newsAlpha * 0.9;
+      ctx.font = '600 13px Fredoka, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const nw = ctx.measureText(newsText).width + 28;
+      const nh = 24;
+      const ny = callout ? fh * 0.34 : fh * 0.22;
+      ctx.fillStyle = 'rgba(18,10,55,0.82)';
+      roundRectFill(ctx, fw / 2 - nw / 2, ny - nh / 2, nw, nh, 6);
+      ctx.fillStyle = '#8BBAD0';
+      ctx.fillText(newsText, fw / 2, ny);
+      ctx.restore();
     }
 
     // v8 §7: FRENZY MINUTE — warm glow along the screen edges
@@ -2486,7 +2647,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       spellTimerMax,       // War Pack §3
       showHitboxes,
       contracts: [...activeContracts],
-      hearts: player?.hearts,    // v16.2 §3
+      killedBy: killedBy || undefined, // Phase 7b §4: who ate the player
       planName: world?.planName, // v16.2 §6
     };
   }
