@@ -1026,6 +1026,17 @@ export const audio = {
       dangerLfo.start();
       this._toneDisposables.push(dangerLfo);
 
+      // Hard-reset the Transport before starting — it is a global singleton that
+      // persists across rounds.  Without this a second start() can arrive with
+      // a timestamp ≤ the previous one and throw
+      // "Start time must be strictly greater than previous start time".
+      try {
+        const tr = T.getTransport();
+        tr.cancel(0);   // wipe every scheduled event from t=0
+        tr.stop();      // put Transport back to "stopped"
+        tr.position = 0;
+      } catch { /* ignore */ }
+
       T.getTransport().start('+0.1');
       this._toneReady = true;
     } catch {
