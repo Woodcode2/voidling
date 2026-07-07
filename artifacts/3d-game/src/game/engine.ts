@@ -364,8 +364,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     for (let i = 0; i < rivals.length; i++) {
       const a = (i / rivals.length) * Math.PI * 2;
       const rr = CONFIG.MAP_SIZE * 0.32;
-      // v5 §1: everyone starts at the same base radius — no seeded size spread
-      rivals[i].spawn(c + Math.cos(a) * rr, c + Math.sin(a) * rr, CONFIG.PLAYER_BASE_RADIUS);
+      // Alive Pack §A: walk spawn inward until it lands on the island
+      let spawnX = c + Math.cos(a) * rr;
+      let spawnY = c + Math.sin(a) * rr;
+      for (let si = 0; si < 24 && !isWalkable(spawnX, spawnY); si++) {
+        const scale = 1 - (si + 1) * 0.042;
+        spawnX = c + Math.cos(a) * rr * scale;
+        spawnY = c + Math.sin(a) * rr * scale;
+      }
+      rivals[i].spawn(spawnX, spawnY, CONFIG.PLAYER_BASE_RADIUS);
     }
     // v8 §1: keep every void off a food cluster at spawn so no bot pops a pile
     // of objects on the first frame (the "bots have 100+ in 2s" bug).

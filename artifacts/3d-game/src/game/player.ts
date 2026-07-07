@@ -8,7 +8,7 @@ import { islandState } from './islandMap';
 import { clamp, lerp } from './utils';
 import { Void } from './void';
 import { drawParkObject } from './objects';
-import { drawVoidling, drawUnderdogTrail, type VoidlingVisual } from './voidling';
+import { drawVoidling, drawUnderdogTrail, drawSparkleTrail, type VoidlingVisual } from './voidling';
 import type { WorldObject } from './world';
 
 // v14 §2: each captured object orbits while spiraling inward; growth/score
@@ -101,6 +101,9 @@ export class Player extends Void {
   private wobbleX = 1; private wobbleY = 1;
   private breathePhase = 0;
   private orbitClock = 0;
+  // Alive Pack §4–5: move-bob vertical offset + eat-chomp squash timer
+  private bobOffset = 0;
+  private chompSquashT = 0; // ms remaining (starts at 80, drives wobbleY squash to 0.85)
 
   // per-frame hints set by the world
   approach = 0;
@@ -232,12 +235,19 @@ export class Player extends Void {
 
     const spd = Math.hypot(this.vx, this.vy);
     const maxSpd = CONFIG.MOVE_MAX_SPEED;
-    const stretch = clamp(spd / maxSpd, 0, 1) * 0.14;
+    // Alive Pack §2: squash & stretch — 7% max (was 14%)
+    const stretch = clamp(spd / maxSpd, 0, 1) * 0.07;
     const dx = spd > 0.0001 ? this.vx / spd : 0;
     const dy = spd > 0.0001 ? this.vy / spd : 0;
     const jiggle = Math.sin(this.wobblePhase) * 0.03;
     this.wobbleX = 1 + stretch * Math.abs(dx) - stretch * Math.abs(dy) + jiggle;
     this.wobbleY = 1 + stretch * Math.abs(dy) - stretch * Math.abs(dx) - jiggle;
+
+    // Alive Pack §4: move bob — vertical bounce synced to speed
+    this.bobOffset = spd > 22 ? Math.sin(this.breathePhase * 0.006) * this.radius * 0.026 : 0;
+
+    // Alive Pack §5: eat-chomp squash — 0.85 vertical for 80ms
+    if (this.chompSquashT > 0) this.chompSquashT = Math.max(0, this.chompSquashT - dt);
 
     // blink
     this.blinkTimer -= dt;
@@ -328,6 +338,7 @@ export class Player extends Void {
     this.eatPopScale = 1.06; // Feel Patch §6: scale pop on eat
     if (it.tier >= 3) this.cheekPuff = 1;
     this.chomp = 1;
+    this.chompSquashT = 80; // Alive Pack §5: eat-chomp vertical squash for 80 ms
     this.checkEvolution();
 
     // fire the actual pop/score FX at the void center (item has spiraled to center)
@@ -464,6 +475,7 @@ export class Player extends Void {
     this.absorbVoidMass(rivalRadius);
     this.bumpCombo();
     this.chomp = 1;
+    this.chompSquashT = 80; // Alive Pack §5
     this.cheekPuff = 1;
     const label = stolen > 0 ? `DEVOURED +${bonus} STOLE +${stolen}` : `DEVOURED +${bonus}`;
     this.pendingFx.push({ type: 'eatRival', x: this.x, y: this.y, text: label, color: '#FFD23F', big: true });
@@ -492,6 +504,8 @@ export class Player extends Void {
   }
 
   private visual(t: number): VoidlingVisual {
+    // Alive Pack §5: eat-chomp squash — 0.85 at peak, springs back to 1.0 over 80 ms
+    const chompSquash = this.chompSquashT > 0 ? lerp(1.0, 0.85, this.chompSquashT / 80) : 1.0;
     return {
       r: this.radius * this.eatPopScale, // Feel Patch §6: pop scale applied to visual only
       skin: this.skin,
@@ -502,7 +516,7 @@ export class Player extends Void {
       chomp: this.chomp,
       blink: this.blinkVal,
       wobbleX: this.wobbleX,
-      wobbleY: this.wobbleY,
+      wobbleY: this.wobbleY * chompSquash,
       lean: clamp(this.vx / CONFIG.MOVE_MAX_SPEED, -1, 1) * 0.14,
       glow: clamp(this.combo / 16, 0, 1),
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
@@ -578,6 +592,8 @@ export class Player extends Void {
     }
 
     if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
+    // Alive Pack §7: trailing sparkle for GOBBLER+ (form ≥ 2)
+    if (this.formIndex >= 2) drawSparkleTrail(ctx, rx, ry, this.vx, this.vy, this.radius, t);
 
     this.drawOrbit(ctx, rx, ry, t);
 
@@ -618,7 +634,8 @@ export class Player extends Void {
       ctx.stroke();
       ctx.restore();
     } else {
-      drawVoidling(ctx, rx, ry, this.visual(t));
+      // Alive Pack §4: apply move-bob vertical offset
+      drawVoidling(ctx, rx, ry + this.bobOffset, this.visual(t));
     }
   }
 

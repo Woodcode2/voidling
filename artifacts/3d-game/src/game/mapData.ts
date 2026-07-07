@@ -350,3 +350,21 @@ export function isWalkableGrid(wx: number, wy: number): boolean {
   const gy = Math.max(0, Math.min(GRID_H - 1, (wy / S * GRID_H) | 0));
   return _walkableGrid[gy * GRID_W + gx] > 0;
 }
+
+/**
+ * Alive Pack §A: True if wx,wy is dry land inside the island with at least `inset`
+ * world-unit clearance from the rim — prevents props from spawning on water or the cliff.
+ * Excludes SPACE (off-island), WATER (lagoon/river), and ROAD (optional: callers pass
+ * inset=0 for road-based spawns like spawnCar).  Uses ≤6 grid lookups (O(1)).
+ * Falls back gracefully before the terrain grid is baked.
+ */
+export function isOnIsland(wx: number, wy: number, inset = 150): boolean {
+  if (!isWalkableGrid(wx, wy)) return false;
+  // Exclude water bodies (lagoon, river, pond) — isWalkableGrid treats these as walkable
+  if (getTerrainGrid(wx, wy) === TERRAIN.WATER) return false;
+  // Cardinal neighbor checks at `inset` distance approximate an inward rim clearance
+  return isWalkableGrid(wx + inset, wy) &&
+         isWalkableGrid(wx - inset, wy) &&
+         isWalkableGrid(wx, wy + inset) &&
+         isWalkableGrid(wx, wy - inset);
+}
