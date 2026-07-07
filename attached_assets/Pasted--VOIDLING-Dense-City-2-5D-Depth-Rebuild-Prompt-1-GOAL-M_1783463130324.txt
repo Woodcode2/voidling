@@ -1,0 +1,76 @@
+# VOIDLING: Dense City + 2.5D Depth (Rebuild Prompt 1)
+
+## GOAL
+Make the city read as genuinely packed, and give structures real 2.5D depth so nearer things overlap farther things. Use the art that ALREADY exists in the project. This prompt changes lot COUNT, lot PLACEMENT, sprite ANCHOR, and DRAW ORDER only. Nothing else.
+
+## DO NOT TOUCH (leave fully intact)
+- No new art, no new image files, no changes to which image any structure uses. Keep every current sprite and shape exactly as-is.
+- No gameplay changes: eating, vacuum pull, growth, evolution, predation, threat rings, defense waves, vignettes, banners, speech bubbles, quests, scoring, powers, sound, timer. All untouched.
+- Do not change the void creature rendering.
+- Do not change the ground fills, road colors, river, or waterfall visuals.
+- Do not change the camera.
+- Do not add or change any consume/eat animation. That is a later prompt.
+
+If you cannot make a change without touching something on this list, STOP and report it instead of guessing.
+
+---
+
+## STAGE 0: Read and report first (no edits yet)
+Read `mapData.ts`, `world.ts`, and `drawMap.ts`. Then report, in plain text, before editing anything:
+1. The exact function or code block that generates HOUSE LOTS, and the current target count / spacing value.
+2. The exact functions that place structures (expected `fillResidential` and `fillDowntown`, but report the real names) and how each one currently picks a position.
+3. Where structures are drawn each frame, and whether there is already a single per-frame list of drawable entities or whether buildings, houses, props, cars, and the void are drawn in separate passes.
+4. Confirm the name of the ISLAND polygon, the SUBURBS zone polygon, the DOWNTOWN zone polygon, and the ROADS network as they actually appear in `mapData.ts`.
+
+Paste that report. Then proceed.
+
+---
+
+## STAGE 1: Denser suburbs (mapData.ts)
+In the HOUSE LOT generator:
+- Tighten spacing so lots sit roughly every 1.0 to 1.1 house-widths along each suburb street, alternating sides, each lot still oriented to face its street.
+- Fill the full SUBURBS zone band, not just the street frontage: after the street-frontage lots, add a second and third row set back behind the first where the zone polygon still contains them, so blocks feel filled in rather than a single line of houses.
+- Every lot must pass two gates: inside the SUBURBS zone polygon AND inside the ISLAND polygon. Reject any lot that also falls within road width of a road (houses do not sit on streets).
+- Target 120 or more suburb house lots. Report the actual number generated. If it comes out under 90, the spacing or the zone fill is wrong; fix it before moving on.
+
+## STAGE 2: Packed downtown (mapData.ts + world.ts)
+Add a downtown building-lot generator:
+- Lay a block grid across the DOWNTOWN zone polygon. For each grid cell fully inside the zone and clear of road width, create one building lot at the cell center with a small consistent setback from the surrounding roads.
+- Assign structure choice from the EXISTING downtown/civic sprite set only: the tallest existing buildings go to lots nearest the central plaza, shorter buildings toward the zone edge. Do not invent new building types.
+- No two building footprints may overlap. No footprint may cross a road.
+- Target 16 or more downtown building lots. Report the actual number.
+- Point the existing downtown fill function at this lot list so downtown is placed from data, the same way suburbs are.
+
+## STAGE 3: 2.5D depth (drawMap.ts)
+This is the core change. Draw the world in this order every frame:
+1. Ground layers first, exactly as they are now: space parallax, island base, zone fills, river and lagoon, roads, rim, waterfall.
+2. Then draw ALL ground-standing things (downtown buildings, houses, props, people, cars, and the void) from a SINGLE combined list, sorted by world-Y ascending, so the thing with the greater world-Y (lower on the map, nearer the camera) is drawn LAST and therefore on top. This painter's-order y-sort is what creates the depth.
+- Anchor every structure sprite by its BOTTOM-CENTER at its lot's world position, not its top-left, so it visually sits on the ground and sorts correctly by its base.
+- Do not change which image each thing uses. Only change anchor and sort order.
+
+Performance: structures are static until eaten, so if drawing 120+ sprites per frame drops the frame rate on mobile, render the static structures once to an offscreen layer (already y-sorted among themselves) and re-composite that layer only when a structure is added or removed, while dynamic entities (void, cars, people) y-sort live each frame. Measure the frame rate before and after and report it. Do not pre-optimize if the frame rate is already fine.
+
+## STAGE 4: Audits (must all read zero except the counts)
+Run these once per match start and print to console:
+- `SUBURB LOTS: <n>` and `DOWNTOWN LOTS: <m>`
+- `BUILDING OVERLAPS: <count>` = number of structure pairs whose footprints intersect. MUST be 0.
+- `BUILDINGS ON ROADS: <count>` = number of structure footprints intersecting any road width. MUST be 0.
+- `OFF-ISLAND ENTITIES: <count>` = anything drawn or spawned outside the ISLAND polygon except intentional space decorations. MUST be 0. If this is above 0, the old square-grid spawn path is still leaking. Route all structure placement through the ISLAND-gated lot lists and delete the leaking path.
+
+---
+
+## PROOF REQUIRED (do not claim done without this)
+Paste, as real console output from an actual run, not a description:
+1. The `SUBURB LOTS`, `DOWNTOWN LOTS`, `BUILDING OVERLAPS`, `BUILDINGS ON ROADS`, and `OFF-ISLAND ENTITIES` lines.
+2. The measured frame rate before and after Stage 3.
+3. One line describing what happens on screen when a tall downtown building sits between the camera and the void: the void should be drawn behind it when the void's base is higher on the map, and in front of it when the void's base is lower. Confirm this is what you see.
+
+If any audit is nonzero, or you did not run it, say so plainly. Do not mark this prompt complete.
+
+---
+
+## HOW MAT VERIFIES (do this after the Agent reports)
+- Open the preview. The suburbs should now look like a filled neighborhood, not a thin line of houses.
+- Downtown should look like a packed core, buildings clustered near the plaza.
+- Move the void behind a tall building and watch it get overlapped, then in front of it. That overlap is the 2.5D depth working.
+- Append `?debug=terrain` and confirm nothing draws out in space.
