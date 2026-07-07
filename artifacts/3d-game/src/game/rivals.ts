@@ -3,7 +3,7 @@ import { isWalkable } from './islandMap'; // Phase 2: island-edge avoidance
 import { meta } from './meta';
 import { clamp, lerp, dist } from './utils';
 import { Void } from './void';
-import { drawVoidling, drawUnderdogTrail } from './voidling';
+import { drawVoidling, drawUnderdogTrail, drawSparkleTrail } from './voidling';
 import type { WorldObject } from './world';
 
 export interface VoidView { x: number; y: number; radius: number; }
@@ -45,10 +45,12 @@ export class Rival extends Void {
   private blinkVal = 0;
   private mouth = 0;
   private chompV = 0;
+  private chompSquashT = 0; // Alive Pack §5: eat-chomp squash timer (ms)
   private lookX = 0; private lookY = 0;
   private wobblePhase = Math.random() * 10;
   private wobbleX = 1; private wobbleY = 1;
   private breathePhase = Math.random() * 1000;
+  private bobOffset = 0; // Alive Pack §4: move bob
 
   constructor(name: string, country: string, skin: SkinDef, controller: RivalController, speedScale = 1) {
     super(skin);
@@ -127,7 +129,12 @@ export class Rival extends Void {
     this.breathePhase += dt;
     this.wobblePhase += dt * 0.009;
     const spd = Math.hypot(this.vx, this.vy);
-    const stretch = clamp(spd / CONFIG.MOVE_MAX_SPEED, 0, 1) * 0.13;
+    // Alive Pack §2: squash & stretch — 7% max (was 13%)
+    const stretch = clamp(spd / CONFIG.MOVE_MAX_SPEED, 0, 1) * 0.07;
+    // Alive Pack §4: move bob
+    this.bobOffset = spd > 22 ? Math.sin(this.breathePhase * 0.006) * this.radius * 0.026 : 0;
+    // Alive Pack §5: decay chomp squash
+    if (this.chompSquashT > 0) this.chompSquashT = Math.max(0, this.chompSquashT - dt);
     const dx = spd > 0.0001 ? this.vx / spd : 0;
     const dy = spd > 0.0001 ? this.vy / spd : 0;
     const j = Math.sin(this.wobblePhase) * 0.03;
@@ -152,6 +159,7 @@ export class Rival extends Void {
     // v15 §0: orbit parity — deferred 1.6–2.0s before growth, identical to player
     this.captureObject(obj.size, scoreGain);
     this.chompV = 1;
+    this.chompSquashT = 80; // Alive Pack §5: eat-chomp squash
     this.satedTime = CONFIG.BOT_SATED_MS;
     this.timeSinceEat = 0;
     // advanceForms() is called inside tickCaptures when the item finalizes
@@ -184,13 +192,15 @@ export class Rival extends Void {
     const m = CONFIG.MAP_SIZE;
     // v6 §3: being chomped can't demote below a form already reached
     this.shrinkOnEaten();
+    // Alive Pack §A: retry until the respawn point is both far enough and on the island
     let nx = 200 + Math.random() * (m - 400);
     let ny = 200 + Math.random() * (m - 400);
-    if (avoidX !== undefined && avoidY !== undefined && minDist > 0) {
-      for (let i = 0; i < 20 && dist(nx, ny, avoidX, avoidY) < minDist; i++) {
-        nx = 200 + Math.random() * (m - 400);
-        ny = 200 + Math.random() * (m - 400);
-      }
+    const needsDist = avoidX !== undefined && avoidY !== undefined && minDist > 0;
+    for (let i = 0; i < 30; i++) {
+      const farEnough = !needsDist || dist(nx, ny, avoidX!, avoidY!) >= minDist;
+      if (farEnough && isWalkable(nx, ny)) break;
+      nx = 200 + Math.random() * (m - 400);
+      ny = 200 + Math.random() * (m - 400);
     }
     this.x = this.prevX = nx;
     this.y = this.prevY = ny;
@@ -202,7 +212,11 @@ export class Rival extends Void {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
     if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
-    drawVoidling(ctx, rx, ry, {
+    // Alive Pack §7: trailing sparkle for GOBBLER+ rivals (form ≥ 2)
+    if (this.formIndex >= 2) drawSparkleTrail(ctx, rx, ry, this.vx, this.vy, this.radius, t);
+    // Alive Pack §5: eat-chomp squash — starts at 0.85, springs to 1.0 over 80 ms
+    const chompSquash = this.chompSquashT > 0 ? 1.0 - 0.15 * (this.chompSquashT / 80) : 1.0;
+    drawVoidling(ctx, rx, ry + this.bobOffset, {
       r: this.radius,
       skin: this.skin,
       t,
@@ -212,8 +226,8 @@ export class Rival extends Void {
       chomp: this.chompV,
       blink: this.blinkVal,
       wobbleX: this.wobbleX,
-      wobbleY: this.wobbleY,
-      lean: clamp(this.vx / CONFIG.MOVE_MAX_SPEED, -1, 1) * 0.12,
+      wobbleY: this.wobbleY * chompSquash,
+      lean: clamp(this.vx / CONFIG.MOVE_MAX_SPEED, -1, 1) * 0.14, // Alive Pack §1: 8° lean
       glow: 0.15,
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,

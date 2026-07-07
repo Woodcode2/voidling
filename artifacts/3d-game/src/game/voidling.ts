@@ -568,3 +568,31 @@ function hexA(hex: string, a: number) {
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r},${g},${b},${a})`;
 }
+
+// ── Alive Pack §7: trailing sparkle — 3 tiny orbs drift behind GOBBLER+ voids ──
+const SPARKLE_COLORS = ['#FFD23F', '#FFFFFF', '#C8A2FF'];
+export function drawSparkleTrail(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  vx: number, vy: number,
+  r: number,
+  t: number,
+) {
+  const sp = Math.hypot(vx, vy);
+  if (sp < 25) return; // only while actually moving
+  const ux = vx / sp, uy = vy / sp;
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    const trail  = r * (0.55 + i * 0.38);          // distance behind center
+    const perp   = Math.sin(t / 220 + i * 2.1) * r * 0.18; // lateral sway
+    const sx = x - ux * trail - uy * perp;
+    const sy = y - uy * trail + ux * perp;
+    const sz = Math.max(1.5, r * (0.055 - i * 0.011));
+    ctx.globalAlpha = (0.65 - i * 0.2) * (0.5 + 0.5 * Math.abs(Math.sin(t / 290 + i * 1.7)));
+    ctx.fillStyle = SPARKLE_COLORS[i];
+    ctx.beginPath();
+    ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}

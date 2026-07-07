@@ -4,7 +4,7 @@ import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
-import { HOUSE_LOTS } from './mapData'; // Phase 4 §4: lot-based house placement
+import { HOUSE_LOTS, isOnIsland } from './mapData'; // Phase 4 §4: lot-based house placement; Alive Pack §A: island guard
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -486,6 +486,12 @@ export class WorldManager {
     const spawnX = this.size / 2, spawnY = this.size / 2;
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
+      // Alive Pack §A: skip blocks whose center falls outside the island polygon.
+      // Blocks that straddle the rim still run their fill — per-item isOnIsland
+      // checks inside scatter/scatterPeople catch individual out-of-bound placements.
+      const bCx = b.x0 + CONFIG.BLOCK_SIZE / 2;
+      const bCy = b.y0 + CONFIG.BLOCK_SIZE / 2;
+      if (!isOnIsland(bCx, bCy, 0)) continue; // inset=0: block center must be at least on the island
       if (b.type === 'residential') this.fillResidential(b, rand);
       else if (b.type === 'park') this.fillPark(b, rand, spawnX, spawnY);
       else if (b.type === 'plaza') this.fillPlaza(b, rand);
@@ -522,7 +528,9 @@ export class WorldManager {
     const wtBlock = resBlocks[resBlocks.length - 1];
     if (wtBlock) {
       const inset = CONFIG.SIDEWALK + 90;
-      this.makeObj('watertower', wtBlock.x0 + CONFIG.BLOCK_SIZE - inset, wtBlock.y0 + inset);
+      const wtX = wtBlock.x0 + CONFIG.BLOCK_SIZE - inset;
+      const wtY = wtBlock.y0 + inset;
+      if (isOnIsland(wtX, wtY)) this.makeObj('watertower', wtX, wtY);
     }
 
     // v7 §2: living cars cruising the road grid (10–14)
@@ -539,6 +547,7 @@ export class WorldManager {
       const p = this.pointInBlock(b, rand);
       const kind = pick(['flower', 'flowerpot', 'gnome', 'apple'] as ObjectKind[], rand);
       if (dist(p.x, p.y, spawnX, spawnY) < 70) continue;
+      if (!isOnIsland(p.x, p.y)) continue; // Alive Pack §A: skip off-island trickle
       this.makeObj(kind, p.x, p.y);
     }
 
@@ -570,21 +579,43 @@ export class WorldManager {
       if (!STREET_BLOCKS.includes(b2.type)) continue;
       // Sidewalk-edge trees every ~300px along all four sides
       for (let x = b2.x0 + TREE_INSET; x < b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET; x += TREE_STEP) {
-        this.makeObj('tree', x, b2.y0 + TREE_INSET, { infra: true });
-        this.makeObj('tree', x, b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET, { infra: true });
+        const ty1 = b2.y0 + TREE_INSET;
+        const ty2 = b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET;
+        if (isOnIsland(x, ty1)) this.makeObj('tree', x, ty1, { infra: true });
+        if (isOnIsland(x, ty2)) this.makeObj('tree', x, ty2, { infra: true });
       }
       for (let y = b2.y0 + TREE_INSET + TREE_STEP; y < b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET * 1.5; y += TREE_STEP) {
-        this.makeObj('tree', b2.x0 + TREE_INSET, y, { infra: true });
-        this.makeObj('tree', b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, y, { infra: true });
+        const tx1 = b2.x0 + TREE_INSET;
+        const tx2 = b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET;
+        if (isOnIsland(tx1, y)) this.makeObj('tree', tx1, y, { infra: true });
+        if (isOnIsland(tx2, y)) this.makeObj('tree', tx2, y, { infra: true });
       }
-      // ~30% chance: parked car on each curb side
-      // War Pack §1: richer parked-car variety
+      // ~30% chance: parked car on each curb side (Alive Pack §A: island-guarded)
       const carPool: ObjectKind[] = ['car_parked_a', 'car_parked_b', 'taxi', 'convertible'];
       const innerW = CONFIG.BLOCK_SIZE - TREE_INSET * 2;
-      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET + rand() * innerW, b2.y0 + TREE_INSET, { infra: true });
-      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET + rand() * innerW, b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET, { infra: true });
-      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + TREE_INSET, b2.y0 + TREE_INSET + rand() * innerW, { infra: true });
-      if (rand() < 0.3) this.makeObj(pick(carPool, rand), b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, b2.y0 + TREE_INSET + rand() * innerW, { infra: true });
+      const cp1x = b2.x0 + TREE_INSET + rand() * innerW, cp1y = b2.y0 + TREE_INSET;
+      const cp2x = b2.x0 + TREE_INSET + rand() * innerW, cp2y = b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET;
+      const cp3x = b2.x0 + TREE_INSET,                   cp3y = b2.y0 + TREE_INSET + rand() * innerW;
+      const cp4x = b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, cp4y = b2.y0 + TREE_INSET + rand() * innerW;
+      if (rand() < 0.3 && isOnIsland(cp1x, cp1y)) this.makeObj(pick(carPool, rand), cp1x, cp1y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp2x, cp2y)) this.makeObj(pick(carPool, rand), cp2x, cp2y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp3x, cp3y)) this.makeObj(pick(carPool, rand), cp3x, cp3y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp4x, cp4y)) this.makeObj(pick(carPool, rand), cp4x, cp4y, { infra: true });
+    }
+
+    // ── Alive Pack §A · SPAWN AUDIT tripwire ────────────────────────────────
+    // Every entity must be on walkable island terrain. Any survivor of the
+    // per-spawn guards above is removed here and logged. The count MUST be 0
+    // before shipping — any non-zero means a spawn path still needs a guard.
+    {
+      const offIsland = this.objects.filter((o) => !isWalkable(o.x, o.y));
+      if (offIsland.length > 0) {
+        for (const o of offIsland) {
+          console.warn(`[SPAWN AUDIT] off-island: ${o.kind} @ (${o.x.toFixed(0)}, ${o.y.toFixed(0)})`);
+        }
+        this.objects = this.objects.filter((o) => isWalkable(o.x, o.y));
+      }
+      console.log(`SPAWN AUDIT: ${offIsland.length} entities off-island (removed)`);
     }
 
     // v6 §2: remember the starting count so respawn can top back up to 85%
@@ -604,6 +635,8 @@ export class WorldManager {
         // v10 §6: skip grid cells whose centre sits on the asphalt band
         const onRoad = ROAD_CENTERS.some((c) => Math.abs(cx - c) < hw || Math.abs(cy - c) < hw);
         if (onRoad) continue;
+        // Alive Pack §A: skip cells that are off the island
+        if (!isOnIsland(cx, cy)) continue;
         let has = false;
         for (const o of this.objects) {
           if (o.eaten || o.kind === 'watertower') continue;
@@ -714,12 +747,12 @@ export class WorldManager {
 
   private scatter(b: Block, rand: () => number, kind: ObjectKind, n: number, avoidX?: number, avoidY?: number) {
     for (let i = 0; i < n; i++) {
-      // Try up to 4 times to find a non-water placement
+      // Alive Pack §A: try up to 5 times to land on the island (covers water + cliff rim)
       let p = this.pointInBlock(b, rand);
-      for (let attempt = 0; attempt < 3 && getTerrainAt(p.x, p.y) === TERRAIN.WATER; attempt++) {
+      for (let attempt = 0; attempt < 4 && !isOnIsland(p.x, p.y); attempt++) {
         p = this.pointInBlock(b, rand);
       }
-      if (getTerrainAt(p.x, p.y) === TERRAIN.WATER) continue; // skip if still in water
+      if (!isOnIsland(p.x, p.y)) continue; // still off-island — skip this item
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const o = this.makeObj(kind, p.x, p.y);
       if (kind === 'person' || (kind as string).startsWith('person_')) { o.tether = 90; }
@@ -757,12 +790,12 @@ export class WorldManager {
       : zone === 'park'        ? WorldManager.PARK_PEOPLE
       : WorldManager.ALL_PEOPLE;
     for (let i = 0; i < n; i++) {
-      // Retry up to 4 times to avoid placing pedestrians on water
+      // Alive Pack §A: retry until on-island (covers water + cliff rim)
       let p = this.pointInBlock(b, rand);
-      for (let attempt = 0; attempt < 3 && getTerrainAt(p.x, p.y) === TERRAIN.WATER; attempt++) {
+      for (let attempt = 0; attempt < 4 && !isOnIsland(p.x, p.y); attempt++) {
         p = this.pointInBlock(b, rand);
       }
-      if (getTerrainAt(p.x, p.y) === TERRAIN.WATER) continue; // still water — skip
+      if (!isOnIsland(p.x, p.y)) continue; // still off-island — skip
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const kind = pool[Math.floor(rand() * pool.length)];
       const o = this.makeObj(kind, p.x, p.y);
@@ -839,6 +872,12 @@ export class WorldManager {
         ax = soccerField.cx + (rand() - 0.5) * soccerField.halfW * 0.8;
         ay = soccerField.cy + (rand() - 0.5) * soccerField.halfH * 0.8;
       }
+      // Alive Pack §A: retry vignette anchor until on-island
+      for (let vigAtt = 0; vigAtt < 4 && !isOnIsland(ax, ay); vigAtt++) {
+        ax = b.x0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
+        ay = b.y0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
+      }
+      if (!isOnIsland(ax, ay)) continue; // skip vignette entirely if no valid anchor
 
       const anchor = this.makeObj(vc.kind, ax, ay);
       anchor.tether = 60;
@@ -1195,19 +1234,23 @@ export class WorldManager {
   }
 
   private spawnCar(rand: () => number) {
-    const horizontal = rand() < 0.5;
-    const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
-    const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
-    const along = MARGIN + rand() * (this.size - MARGIN * 2);
-    const x = horizontal ? along : center + lane;
-    const y = horizontal ? center + lane : along;
-    // War Pack §1: diverse traffic pool (fire_truck + school_bus are larger → use tier 4/5 sizes)
-    const TRAFFIC_POOL: ObjectKind[] = ['car', 'car', 'car', 'taxi', 'convertible', 'fire_truck', 'school_bus'];
-    const trafficKind = TRAFFIC_POOL[Math.floor(rand() * TRAFFIC_POOL.length)];
-    const o = this.makeObj(trafficKind, x, y);
-    o.roadAxis = horizontal ? 'h' : 'v';
-    o.homeX = center + lane; o.homeY = center + lane; // fixed cross-axis coord
-    o.roadDir = rand() < 0.5 ? 1 : -1;
+    // Alive Pack §A: retry up to 6 times to land on the island road grid
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const horizontal = rand() < 0.5;
+      const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
+      const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
+      const along = MARGIN + rand() * (this.size - MARGIN * 2);
+      const x = horizontal ? along : center + lane;
+      const y = horizontal ? center + lane : along;
+      if (!isOnIsland(x, y, 0)) continue; // skip off-island road position
+      const TRAFFIC_POOL: ObjectKind[] = ['car', 'car', 'car', 'taxi', 'convertible', 'fire_truck', 'school_bus'];
+      const trafficKind = TRAFFIC_POOL[Math.floor(rand() * TRAFFIC_POOL.length)];
+      const o = this.makeObj(trafficKind, x, y);
+      o.roadAxis = horizontal ? 'h' : 'v';
+      o.homeX = center + lane; o.homeY = center + lane;
+      o.roadDir = rand() < 0.5 ? 1 : -1;
+      return;
+    }
   }
 
   // v7 §3: a startled flock — three birds clustered so they scatter together
@@ -1219,26 +1262,42 @@ export class WorldManager {
     }
   }
 
-  // v7 §3: delivery drone — spawns anywhere, roams to a first waypoint
+  // v7 §3: delivery drone — spawns anywhere on the island, roams to a first waypoint
   private spawnDrone(rand: () => number) {
-    const x = MARGIN + rand() * (this.size - MARGIN * 2);
-    const y = MARGIN + rand() * (this.size - MARGIN * 2);
+    let x = MARGIN + rand() * (this.size - MARGIN * 2);
+    let y = MARGIN + rand() * (this.size - MARGIN * 2);
+    for (let att = 0; att < 6 && !isOnIsland(x, y); att++) {
+      x = MARGIN + rand() * (this.size - MARGIN * 2);
+      y = MARGIN + rand() * (this.size - MARGIN * 2);
+    }
+    if (!isOnIsland(x, y)) return; // give up if no valid position
     const o = this.makeObj('drone', x, y);
-    o.homeX = MARGIN + rand() * (this.size - MARGIN * 2);
-    o.homeY = MARGIN + rand() * (this.size - MARGIN * 2);
+    let hx = MARGIN + rand() * (this.size - MARGIN * 2);
+    let hy = MARGIN + rand() * (this.size - MARGIN * 2);
+    for (let att = 0; att < 6 && !isOnIsland(hx, hy); att++) {
+      hx = MARGIN + rand() * (this.size - MARGIN * 2);
+      hy = MARGIN + rand() * (this.size - MARGIN * 2);
+    }
+    o.homeX = hx; o.homeY = hy;
     o.tether = 99999;
   }
 
   // v7 §3: school bus — big vehicle on the road grid (drives like a car)
   private spawnBus(rand: () => number) {
-    const horizontal = rand() < 0.5;
-    const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
-    const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
-    const along = MARGIN + rand() * (this.size - MARGIN * 2);
-    const o = this.makeObj('schoolbus', horizontal ? along : center + lane, horizontal ? center + lane : along);
-    o.roadAxis = horizontal ? 'h' : 'v';
-    o.homeX = center + lane; o.homeY = center + lane;
-    o.roadDir = rand() < 0.5 ? 1 : -1;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const horizontal = rand() < 0.5;
+      const center = ROAD_CENTERS[Math.floor(rand() * ROAD_CENTERS.length)];
+      const lane = (rand() < 0.5 ? 1 : -1) * CONFIG.ROAD_WIDTH * 0.22;
+      const along = MARGIN + rand() * (this.size - MARGIN * 2);
+      const x = horizontal ? along : center + lane;
+      const y = horizontal ? center + lane : along;
+      if (!isOnIsland(x, y, 0)) continue;
+      const o = this.makeObj('schoolbus', x, y);
+      o.roadAxis = horizontal ? 'h' : 'v';
+      o.homeX = center + lane; o.homeY = center + lane;
+      o.roadDir = rand() < 0.5 ? 1 : -1;
+      return;
+    }
   }
 
   get remaining() {
@@ -1632,7 +1691,8 @@ export class WorldManager {
       for (let i = 0; i < 24; i++) {
         const nx = MARGIN + this.rand() * (m - MARGIN * 2);
         const ny = MARGIN + this.rand() * (m - MARGIN * 2);
-        if (!voids.some((v) => dist(nx, ny, v.x, v.y) < v.radius * 2 + o.size)) {
+        // Alive Pack §A: relocated objects must also be on the island
+        if (isWalkable(nx, ny) && !voids.some((v) => dist(nx, ny, v.x, v.y) < v.radius * 2 + o.size)) {
           o.x = nx; o.y = ny; break;
         }
       }
@@ -1706,8 +1766,15 @@ export class WorldManager {
     // v7 §3: delivery drone flies a path — roams waypoints across the whole map
     if (obj.kind === 'drone' && !threat) {
       if (dist(obj.x, obj.y, obj.homeX, obj.homeY) < 90) {
-        obj.homeX = MARGIN + Math.random() * (this.size - MARGIN * 2);
-        obj.homeY = MARGIN + Math.random() * (this.size - MARGIN * 2);
+        // Alive Pack §A: pick a new waypoint that is on the island
+        let nhx = MARGIN + Math.random() * (this.size - MARGIN * 2);
+        let nhy = MARGIN + Math.random() * (this.size - MARGIN * 2);
+        for (let wi = 0; wi < 6 && !isWalkable(nhx, nhy); wi++) {
+          nhx = MARGIN + Math.random() * (this.size - MARGIN * 2);
+          nhy = MARGIN + Math.random() * (this.size - MARGIN * 2);
+        }
+        obj.homeX = nhx;
+        obj.homeY = nhy;
       }
       const a = Math.atan2(obj.homeY - obj.y, obj.homeX - obj.x);
       obj.vx = Math.cos(a) * CONFIG.DRONE_SPEED;
@@ -1847,12 +1914,17 @@ export class WorldManager {
     }
 
     if (obj.roadAxis === 'h') {
-      obj.x += obj.roadDir * speed * dtSec;
+      const nx = obj.x + obj.roadDir * speed * dtSec;
+      // Alive Pack §A: reverse at the island rim (cliff edge), not just the map rect
+      if (!isWalkable(nx, obj.y)) { obj.roadDir *= -1; }
+      else { obj.x = nx; }
       obj.y = obj.homeY;
       if (obj.x < MARGIN) { obj.x = MARGIN; obj.roadDir = 1; }
       else if (obj.x > this.size - MARGIN) { obj.x = this.size - MARGIN; obj.roadDir = -1; }
     } else {
-      obj.y += obj.roadDir * speed * dtSec;
+      const ny = obj.y + obj.roadDir * speed * dtSec;
+      if (!isWalkable(obj.x, ny)) { obj.roadDir *= -1; }
+      else { obj.y = ny; }
       obj.x = obj.homeX;
       if (obj.y < MARGIN) { obj.y = MARGIN; obj.roadDir = 1; }
       else if (obj.y > this.size - MARGIN) { obj.y = this.size - MARGIN; obj.roadDir = -1; }
@@ -2363,12 +2435,25 @@ export class WorldManager {
       ctx.save();
       // Feel Patch §1: prop-shake offset — object wiggles horizontally while shakeT > 0
       const shk = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
-      ctx.translate(obj.x + shk, obj.y);
+      // Alive Pack §9: pedestrian bob while walking, rapid shake while panicking
+      const isPed = (obj.kind as string).startsWith('person') ||
+        ['skateboarder', 'cyclist', 'tourist', 'waiter', 'icecream_vendor'].includes(obj.kind as string);
+      const pedBob = isPed && !obj.captured
+        ? (obj.fleeing
+          ? Math.sin(t / 72 + obj.wobble) * 2.8   // rapid shake when panicking
+          : Math.sin(t / 380 + obj.wobble) * 1.6)  // gentle bob while walking
+        : 0;
+      ctx.translate(obj.x + shk, obj.y + pedBob);
       if (obj.captured) {
         ctx.rotate(obj.captureRot);
       } else {
         const tilt = obj.fleeing ? Math.sin(obj.wobble * 3) * 0.16 : Math.sin(obj.wobble) * 0.04;
-        ctx.rotate(tilt);
+        // Alive Pack §11: vacuum wobble — dragged objects wobble in the pull direction
+        const spd = Math.hypot(obj.vx, obj.vy);
+        const vacWobble = (!obj.captured && spd > 12)
+          ? Math.sin(t / 78 + obj.wobble) * 0.14 * Math.min(1, spd / 80)
+          : 0;
+        ctx.rotate(tilt + vacWobble);
       }
       if (obj.arrive > 0) {
         // v8 §2: 200ms scale-up bounce (easeOutBack overshoot) on arrival
@@ -2412,7 +2497,8 @@ export class WorldManager {
         if (obj.captured) {
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
         } else if (obj.kind === 'tree' || obj.kind === 'bush') {
-          const sway = wind(t) * (2 * Math.PI / 180);
+          // Alive Pack §8: individual ±1.5° sway using per-object wobble as phase
+          const sway = Math.sin(t / 2200 + obj.wobble) * (1.5 * Math.PI / 180);
           ctx.save(); ctx.rotate(sway);
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r * 2, r * 2, r * 2);
           ctx.restore();

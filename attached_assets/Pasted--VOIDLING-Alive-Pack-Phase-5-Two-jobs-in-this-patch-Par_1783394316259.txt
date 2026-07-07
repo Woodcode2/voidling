@@ -1,0 +1,52 @@
+# VOIDLING Alive Pack (Phase 5)
+
+Two jobs in this patch. Part A kills a structural bug: the old square grid world still exists underneath the new island and is spawning things into space. Part B gives the void and the world motion so nothing feels like a static sticker. Read the code first, keep changes surgical.
+
+## Part A: The island is the only world
+
+Diagnosis, confirmed in the code: mapData.ts was written to mirror the old world.ts grid (full 12000x12000 world, GRID x GRID blocks, ROAD_CENTERS spanning the whole rectangle). The spawning and road systems still operate on that full rectangle, and the island polygon only affects drawing. Result: props spawn in space and grid roads run off the cliff.
+
+The fix is one invariant applied everywhere: NOTHING exists outside the island polygon.
+
+1. Define isOnIsland(point, inset) using the island polygon, where inset shrinks the boundary inward (default inset 150 world units so things do not spawn on the very rim).
+2. Blocks: any grid block whose center fails isOnIsland is removed from every fill routine (fillResidential, fillDowntown, and all others). Blocks that straddle the rim only place items at positions that individually pass isOnIsland.
+3. Roads: clip every road segment to the island polygon. A road that meets the rim ends at the cliff edge with a short rounded stub, it never draws past the rim. Vehicle paths use only the clipped network, and cars turn back or despawn at dead ends instead of driving into space.
+4. Every spawn of every category (props, people, vignettes, fields, houses, pickups, defense units, rivals) passes through one shared spawn function that enforces isOnIsland plus the terrain rules. Delete or reroute any spawn call that bypasses it.
+5. Drifting space decorations are the single exception: they must fail isOnIsland (space only).
+6. THE TRIPWIRE, not optional: at every match start, after world generation, iterate every spawned entity and test it. Print exactly one line: SPAWN AUDIT: X entities off-island (removed). Any offender is logged with its type and deleted. X must be 0 in the final build; if it is not, find the spawn path that produced it and fix it, do not rely on the removal.
+
+## Part B: Bring the void to life (no new art needed, transforms only)
+
+Player and rival voids get a shared body-language system layered on their existing sprites:
+1. Lean: the sprite tilts up to 8 degrees into its movement direction, easing back upright when stopping.
+2. Squash and stretch: on acceleration, stretch along the movement axis and squash across it, subtle, 6 to 8 percent, spring back with a slight overshoot.
+3. Idle breathing: when still, a slow 2 percent scale pulse, about 2 seconds per breath.
+4. Move bob: while moving, a tiny vertical bounce synced to speed, like a happy hop.
+5. Eat chomp: on every eat, a quick vertical squash to 0.85 for 80ms on top of the existing pop, so he visibly gulps.
+6. Blink: define per-evolution eye positions in a small config by inspecting the sprite files, and periodically draw eyelids (dark ellipses matching the body tone) over the eyes for 120ms every 3 to 6 seconds. If eye positions prove unreliable for a form, skip blink for that form and note it, ship everything else.
+7. From GOBBLER up, a faint trailing sparkle of 2 to 3 tiny stars behind the void while moving.
+
+The world reacts too, cheap and capped to on-screen entities only:
+8. Trees and large props sway individually, plus or minus 1.5 degrees on a slow sine with randomized phase.
+9. Pedestrians bob slightly as they walk; panicking pedestrians shake quickly.
+10. The lagoon and river get a slowly drifting lighter shimmer band. Keep the existing waterfall animation.
+11. Props inside the vacuum pull wobble as they are dragged, selling the suction.
+
+Performance guardrail: transforms and simple draws only, no per-frame filters or shadows, animate only what is on screen, and verify frame rate on a mobile viewport at full density.
+
+## Also verify (carried issue)
+The power button: collect a pickup, simulate a touch tap, confirm the POWER ACTIVATED log fires and the effect is visible. Report the log line.
+
+## Do not touch
+Predation, threat rings, defense wave tiers, vacuum and growth curves, quests, scoring, banners, bubbles, vignette logic, evolution sprites.
+
+## Verify before finishing: proof required, do not skip
+1. Paste the SPAWN AUDIT line from three consecutive match starts. All three must read 0.
+2. Fly the rim as a big void: no prop, house, person, or road pixel exists past the white rim line anywhere, and roads end in clean stubs at the cliff.
+3. Drifting decorations still appear in space only.
+4. The void visibly leans into turns, stretches when accelerating, breathes when idle, gulps on eats, and blinks (report any form where blink was skipped).
+5. Trees sway, walking people bob, vacuumed props wobble.
+6. Power button: paste the POWER ACTIVATED log line.
+7. Frame rate holds on a mobile viewport at full density with animations on.
+
+Final report: the three audit lines, the power log line, any blink skips, and every file changed.

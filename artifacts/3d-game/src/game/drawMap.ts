@@ -67,6 +67,9 @@ export function drawVectorGround(
   const wpx = ISLAND_CTRL[WATERFALL_IDX][0];
   const wpy = ISLAND_CTRL[WATERFALL_IDX][1];
   _drawWaterfall(ctx, wpx, wpy, clock);
+
+  // Alive Pack §10: slowly drifting shimmer bands on water bodies
+  _drawWaterShimmer(ctx, clock);
 }
 
 function _buildGroundCache(cc: CanvasRenderingContext2D): void {
@@ -263,6 +266,45 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ─── Alive Pack §10: animated water shimmer ─────────────────────────────────
+
+function _drawWaterShimmer(ctx: CanvasRenderingContext2D, clock: number): void {
+  ctx.save();
+  tracIslandPath(ctx);
+  ctx.clip();
+
+  // Lagoon: a single soft highlight drifts in a slow ellipse
+  const lagPhase = clock / 3400;
+  const shimX = LAGOON_CX + Math.cos(lagPhase) * LAGOON_RX * 0.32;
+  const shimY = LAGOON_CY + Math.sin(lagPhase * 0.73) * LAGOON_RY * 0.38;
+  const lagGrd = ctx.createRadialGradient(shimX, shimY, 0, shimX, shimY, LAGOON_RX * 0.58);
+  lagGrd.addColorStop(0, 'rgba(255,255,255,0.17)');
+  lagGrd.addColorStop(0.6, 'rgba(255,255,255,0.06)');
+  lagGrd.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = lagGrd;
+  ctx.beginPath();
+  ctx.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // River: a shimmer band travels downstream (looping 0→1 along path)
+  const rPhase = (clock / 2200) % 1;
+  const nSeg = RIVER_PATH.length - 1;
+  for (let i = 0; i < nSeg; i++) {
+    const segT = i / nSeg;
+    // Band travels: render only a 0.25-wide window that moves with rPhase
+    const delta = ((segT - rPhase + 1) % 1);
+    if (delta > 0.28) continue;
+    const alpha = 0.11 * (1 - delta / 0.28);
+    const [rx, ry] = RIVER_PATH[i];
+    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry, RIVER_HALF_W * 0.75, RIVER_HALF_W * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 
