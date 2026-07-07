@@ -1,8 +1,8 @@
 // Shared voidling renderer — used by the player AND every rival bot.
 // Draws a cute jelly black-hole creature centered at (x,y) with a given skin.
 import type { SkinDef } from './config';
-import { drawSkinBack, drawSkinFront, drawSkinBody } from './skins';
-import { skinSprites, layerSprites, formSprites, spriteOrb } from './sprites'; // v10 §1 / v16 §4 / v16.1 A1
+import { drawSkinBack, drawSkinFront } from './skins';
+import { layerSprites } from './sprites'; // Phase 7a: layerSprites kept for flame-crown + galaxy-core accessories
 
 export interface VoidlingVisual {
   r: number;
@@ -19,6 +19,7 @@ export interface VoidlingVisual {
   glow: number;           // combo glow 0..1
   breathe: number;        // idle breathing scale (~1)
   ghost?: boolean;        // translucent respawn state
+  nearFood?: boolean;     // Phase 7a: food inside vacuum radius → pupils dilate 15%
   form?: number;          // v6 §3: evolution form index (0..4) → stacked visual layers
   morph?: number;         // v9 §3: 0..1 crossfade of the newest form's body morph
   cheekPuff?: number;     // v6 §9: 0..1, puffed cheeks after eating T3+
@@ -52,45 +53,14 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   // ── Back accessories ────────────────────────────────────────────────────────
   drawSkinBack(ctx, skin, r, v.t);
 
-  // ── Body (jelly squash + breathing) ─────────────────────────────────────────
+  // ── Phase 7a §1: procedural body — crisp gradient orb, no sprite cutouts ────
   ctx.save();
   ctx.scale(v.wobbleX * v.breathe, v.wobbleY * v.breathe);
-  const artSprite = skinSprites.get(skin.id); // v10 §1: PNG art overrides procedural body
-  // v16 §4: form sprite replaces Classic skin body at each evolution level
-  const _formKey = `form_${(v.form || 0) + 1}`;
-  const _formSprite = formSprites.get(_formKey);
-  const _activeBody = (skin.id === 'classic' && _formSprite) ? _formSprite : artSprite;
-  if (_activeBody) {
-    // v16.1 A2: orb-normalized drawing — scale so the orb-band width equals 2*r.
-    // The orb-centre row sits at y=0 so gameplay radius and visual orb align perfectly.
-    const orbKey = (skin.id === 'classic' && _formSprite) ? _formKey : skin.id;
-    const orb = spriteOrb.get(orbKey);
-    if (orb && orb.w > 0) {
-      const scale = (2 * r) / (orb.w * _activeBody.naturalWidth);
-      const iw = _activeBody.naturalWidth * scale;
-      const ih = _activeBody.naturalHeight * scale;
-      const cx = iw / 2;
-      const cy = orb.cy * _activeBody.naturalHeight * scale;
-      ctx.drawImage(_activeBody, -cx, -cy, iw, ih);
-    } else {
-      // Fallback: fixed oversized box (no orb data — sprite not yet scanned or absent)
-      const d = r * 2.2;
-      ctx.drawImage(_activeBody, -d / 2, -d / 2, d, d);
-    }
-  } else {
-    // Fallback: procedural body (3× supersampled cached sprite)
-    const sprite = getBodySprite(skin.bodyColor);
-    ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
-  }
+  drawProceduralBody(ctx, v);
   ctx.restore();
 
-  // ── v8 §8: premium surface effects — skipped when art sprite is active (it includes them) ─
-  if (!_activeBody) drawSkinBody(ctx, skin, r, v.t);
-
-  // ── v9 §3: evolution BODY morphs — v16.1 A3: skip when form sprite active (baked in art) ─
-  if (!(_activeBody && skin.id === 'classic' && _formSprite)) {
-    drawFormBody(ctx, v);
-  }
+  // ── v9 §3: evolution body morphs (always procedural in Phase 7a) ──────────
+  drawFormBody(ctx, v);
 
   // ── Face (crisp, unsquashed) ────────────────────────────────────────────────
   drawFace(ctx, v);
@@ -154,7 +124,7 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     } else if (v.blink < 0.7) {
       const form = v.form || 0;
       const grow = form >= 1 ? 1.15 : 1;      // v9 §3: MUNCHER+ pupils grow 15%
-      const pr = eyeRX * 0.56 * grow;
+      const pr = eyeRX * 0.56 * grow * (v.nearFood ? 1.15 : 1); // dilate 15% when food in vacuum
       const px = v.lookX * eyeRX * 0.42;
       const py = v.lookY * eyeRY * 0.42;
       const ender = form >= 4, devour = form >= 3;
@@ -252,6 +222,21 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.beginPath();
     ctx.ellipse(0, my + mh * 0.45, mw * 0.7, mh * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
+    // tiny drawn fangs at GOBBLER+ (form >= 2)
+    if ((v.form || 0) >= 2) {
+      const fw = mw * 0.28, fh = mh * 0.58;
+      const ftop = my - mh * 0.78;
+      ctx.fillStyle = '#FFFFFF';
+      for (const sf of [-1, 1]) {
+        const fcx = sf * mw * 0.36;
+        ctx.beginPath();
+        ctx.moveTo(fcx - fw / 2, ftop);
+        ctx.lineTo(fcx + fw / 2, ftop);
+        ctx.lineTo(fcx, ftop + fh);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
   }
 }
 
@@ -284,11 +269,8 @@ function drawFormLayers(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.restore();
   }
 
-  // DEVOURER (3+): flame crown (turns white-violet at WORLD ENDER)
-  // v16 §4: suppressed when form_4 or form_5 PNG is loaded (crown is baked into the art)
-  const _flameFormKey = `form_${form + 1}`;
-  const _flameFormLoaded = formSprites.has(_flameFormKey) && v.skin.id === 'classic';
-  if (form >= 3 && !_flameFormLoaded) {
+  // DEVOURER (3+): flame crown (turns white-violet at WORLD ENDER) — always procedural
+  if (form >= 3) {
     ctx.save();
     ctx.globalAlpha *= form === 3 ? (v.morph ?? 1) : 1;
     drawFlames(ctx, v);
@@ -475,10 +457,8 @@ function drawFormBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.restore();
   }
 
-  // WORLD ENDER (4): internal galaxy — 2 nebula wisps + 6 pinprick stars
-  // v16 §4: suppressed when form_5 PNG is loaded (galaxy baked into the art)
-  const _galaxyFormLoaded = formSprites.has('form_5') && v.skin.id === 'classic';
-  if (form >= 4 && !_galaxyFormLoaded) {
+  // WORLD ENDER (4): internal galaxy — 2 nebula wisps + 6 pinprick stars (always procedural)
+  if (form >= 4) {
     const a = v.morph ?? 1;
     ctx.save();
     ctx.globalAlpha *= a;
@@ -530,36 +510,70 @@ export function drawUnderdogTrail(ctx: CanvasRenderingContext2D, x: number, y: n
   ctx.restore();
 }
 
-// v6 §9: cache the flat body (orb + crescent + highlight) as a supersampled
-// sprite per body colour, so the hot per-frame path is one drawImage per void.
-const SPRITE_R0 = 90;   // logical body radius the sprite is authored at
-const SPRITE_SS = 3;    // 3× supersample for crisp scaling
-const bodyCache = new Map<string, HTMLCanvasElement>();
+// Phase 7a §1: procedural orb body — deep-purple radial gradient + rotating swirl arcs +
+// star specks. No PNG sprites, no white haloes, scales to any radius perfectly.
+function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
+  const { r, t } = v;
+  const form = v.form || 0;
+  const swirl = t * 0.00005; // 0.05 rad/s slow rotation (t is ms clock)
 
-function getBodySprite(color: string): HTMLCanvasElement {
-  const cached = bodyCache.get(color);
-  if (cached) return cached;
-  const R = SPRITE_R0 * SPRITE_SS;
-  const size = Math.ceil(R * 2 + 4);
-  const c = document.createElement('canvas');
-  c.width = size; c.height = size;
-  const g = c.getContext('2d')!;
-  g.translate(size / 2, size / 2);
-  // main orb
-  g.fillStyle = color;
-  g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.fill();
-  // bottom darker crescent, clipped to the body
-  g.save();
-  g.beginPath(); g.arc(0, 0, R, 0, Math.PI * 2); g.clip();
-  g.globalAlpha = 0.22; g.fillStyle = '#000000';
-  g.beginPath(); g.ellipse(0, R * 0.55, R * 1.05, R * 0.85, 0, 0, Math.PI * 2); g.fill();
-  g.restore();
-  // top-left highlight
-  g.globalAlpha = 0.26; g.fillStyle = '#FFFFFF';
-  g.beginPath(); g.ellipse(-R * 0.34, -R * 0.4, R * 0.32, R * 0.2, -0.6, 0, Math.PI * 2); g.fill();
-  g.globalAlpha = 1;
-  bodyCache.set(color, c);
-  return c;
+  // ── Gradient fill, clipped to the orb circle ──────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  const grd = ctx.createRadialGradient(r * -0.2, r * -0.2, r * 0.06, 0, 0, r);
+  grd.addColorStop(0,   '#2A1745');
+  grd.addColorStop(0.55, '#3B2165');
+  grd.addColorStop(1,   '#4C3585');
+  ctx.fillStyle = grd;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+
+  // ── Swirl arcs: 2 at base, 3 at GOBBLER+; brighter at higher forms ────────
+  const swirlCount = form >= 2 ? 3 : 2;
+  const swirlAlpha = Math.min(0.55, 0.07 + form * 0.06);
+  ctx.lineWidth = Math.max(1.5, r * 0.052);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = `rgba(200,170,255,${swirlAlpha})`;
+  for (let i = 0; i < swirlCount; i++) {
+    const a0 = swirl + (i / swirlCount) * Math.PI * 2;
+    ctx.beginPath();
+    for (let k = 0; k <= 44; k++) {
+      const tt = k / 44;
+      const ang = a0 + tt * Math.PI * 1.9;
+      const rad = tt * r * 0.88;
+      const px = Math.cos(ang) * rad, py = Math.sin(ang) * rad;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+
+  // ── Star specks — MUNCHER+ (form ≥ 1); more at higher stages ─────────────
+  if (form >= 1) {
+    const specks = 5 + form * 3;
+    const phi = 2.399; // golden angle for even distribution
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = 0; i < specks; i++) {
+      const a = swirl * 0.65 + i * phi;
+      const rad = ((i * 53) % 80) / 80 * r * 0.8;
+      const tw = 0.25 + 0.75 * Math.abs(Math.sin(t / 700 + i));
+      ctx.globalAlpha = 0.6 * tw;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * rad, Math.sin(a) * rad, Math.max(0.7, r * 0.018), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore(); // end circle clip
+
+  // ── White outline — drawn stroke is crisp at every size ──────────────────
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = Math.max(3, r * 0.08);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 function hexA(hex: string, a: number) {

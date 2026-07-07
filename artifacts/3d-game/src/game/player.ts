@@ -84,6 +84,8 @@ export class Player extends Void {
   tooBigCd = 0;
   // Feel Patch §6: eat-pop scale — 1.06× on absorb, decays to 1.0 over ~200ms
   eatPopScale = 1.0;
+  // Phase 7a: true while any edible object is inside the vacuum radius (pupil dilation)
+  nearFood = false;
 
   // Phase 2 §2: ledge falloff state
   fallState: 'none' | 'falling' = 'none';
@@ -521,6 +523,7 @@ export class Player extends Void {
       glow: clamp(this.combo / 16, 0, 1),
       breathe: 1 + Math.sin(this.breathePhase * 0.002) * 0.02,
       ghost: this.ghost,
+      nearFood: this.nearFood,
       form: this.formIndex,
       morph: this.morph,
       cheekPuff: this.cheekPuff,
@@ -597,28 +600,8 @@ export class Player extends Void {
 
     this.drawOrbit(ctx, rx, ry, t);
 
-    // Fix 6: use evolution sheet sprites for MUNCHER through WORLD ENDER
-    const formSprite = this.formIndex >= 1 ? islandState.formSprites[this.formIndex - 1] : null;
-    if (formSprite) {
-      const r = this.radius * this.eatPopScale;
-      const size = r * 2.4;
-      ctx.save();
-      if (this.ghost) ctx.globalAlpha = 0.4;
-      ctx.drawImage(formSprite, rx - size / 2, ry - size / 2, size, size);
-      ctx.restore();
-      if (this.ghost) {
-        ctx.save();
-        ctx.globalAlpha = 0.7;
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([8, 6]);
-        ctx.lineDashOffset = -(t / 40) % 14;
-        ctx.beginPath();
-        ctx.arc(rx, ry, this.radius + 5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-    } else if (this.ghost) {
+    // Phase 7a §1: always draw via drawVoidling (procedural body — no sprite cutouts)
+    if (this.ghost) {
       ctx.save();
       ctx.globalAlpha = 0.4;
       drawVoidling(ctx, rx, ry, this.visual(t));

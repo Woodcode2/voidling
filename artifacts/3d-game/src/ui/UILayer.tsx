@@ -138,9 +138,14 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
   return (
     <div
       className="vd-overlay vd-overlay--solid vd-splash"
-      onClick={onDone}
+      onClick={() => {
+        audio.init();
+        audio.loadSamples().catch(() => {});
+        import('tone').then((T) => T.start()).catch(() => {});
+        onDone();
+      }}
       role="button"
-      aria-label="Skip splash"
+      aria-label="Tap to start"
       style={{ overflow: 'hidden' }}
     >
       {/* Phase 4 §7: island_map.png now lives only on the title screen (blurred behind logo) */}
@@ -172,6 +177,11 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
         )}
         <h1 className="vd-splash-title">VOIDLING</h1>
         <p className="vd-splash-tag">EAT. GROW. DEVOUR.</p>
+        <p style={{
+          marginTop: 28, fontSize: '0.95rem', letterSpacing: '0.14em',
+          color: 'rgba(255,255,255,0.72)', fontWeight: 700, textTransform: 'uppercase',
+          animation: 'vd-pulse 1.8s ease-in-out infinite',
+        }}>TAP TO START</p>
       </div>
     </div>
   );
@@ -766,45 +776,26 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           ))}
         </div>
       )}
-      {/* War Pack §3: POWER button — held = ready to cast, active = radial sweep countdown */}
-      {(snap.heldSpell || snap.activeSpell) && !snap.paused && (() => {
+      {/* Phase 7a §2: power button removed — spells auto-cast on pickup */}
+      {snap.activeSpell && !snap.paused && (() => {
         const POWER_ICONS: Record<string, string> = { event_horizon: '🌀', wormhole: '⚡', time_warp: '⏱', singularity: '⚫' };
         const POWER_COLORS: Record<string, string> = {
           event_horizon: '#9B5DE5', wormhole: '#00BBF9', time_warp: '#2D9CDB', singularity: '#F15BB5',
         };
-        const isHeld = !!snap.heldSpell;
-        const rawId = isHeld
-          ? snap.heldSpell!.id.replace('spell_', '')
-          : (snap.activeSpell ?? '');
-        const powerColor = POWER_COLORS[rawId] ?? (isHeld ? (snap.heldSpell!.color ?? '#7BFFED') : '#7BFFED');
-        const icon = POWER_ICONS[rawId] ?? '✨';
-        const labelText = (isHeld ? snap.heldSpell!.name : rawId.replace(/_/g, ' ').toUpperCase()).split(' ')[0];
-        const sweepDeg = (snap.spellTimerMax > 0 && !isHeld)
-          ? (snap.spellTimer / snap.spellTimerMax) * 360 : 0;
+        const rawId = snap.activeSpell;
+        const powerColor = POWER_COLORS[rawId] ?? '#7BFFED';
+        const sweepDeg = snap.spellTimerMax > 0 ? (snap.spellTimer / snap.spellTimerMax) * 360 : 0;
         return (
-          <button
-            onPointerDown={isHeld ? (e) => { e.preventDefault(); console.log('POWER ACTIVATED: ' + rawId); engine.castSpell(); } : undefined}
-            aria-label={isHeld ? `Cast ${rawId}` : `${rawId} active`}
-            style={{
-              position: 'fixed', bottom: 32, right: 24,
-              width: 72, height: 72, borderRadius: 20,
-              background: isHeld
-                ? powerColor
-                : `conic-gradient(${powerColor}CC ${sweepDeg.toFixed(1)}deg, rgba(10,8,24,0.82) ${sweepDeg.toFixed(1)}deg)`,
-              border: `2px solid ${powerColor}99`,
-              color: isHeld ? '#0a0818' : powerColor,
-              fontSize: 12, fontWeight: 800,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: isHeld ? 'pointer' : 'default',
-              boxShadow: `0 4px 24px ${powerColor}66`,
-              letterSpacing: '0.04em', lineHeight: 1.2,
-              animation: isHeld ? 'vd-spell-pulse 1.6s ease-in-out infinite' : 'none',
-              touchAction: 'manipulation',
-            }}
-          >
-            <span style={{ fontSize: 24 }}>{icon}</span>
-            <span style={{ fontSize: 9, marginTop: 2 }}>{labelText}</span>
-          </button>
+          <div aria-label={`${rawId} active`} style={{
+            position: 'fixed', bottom: 32, right: 24,
+            width: 56, height: 56, borderRadius: 16,
+            background: `conic-gradient(${powerColor}CC ${sweepDeg.toFixed(1)}deg, rgba(10,8,24,0.55) ${sweepDeg.toFixed(1)}deg)`,
+            border: `2px solid ${powerColor}66`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, pointerEvents: 'none',
+          }}>
+            {POWER_ICONS[rawId] ?? '✨'}
+          </div>
         );
       })()}
       {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
@@ -827,27 +818,27 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
   );
 }
 
-// v14 §4: refreshed onboarding panels — clearer copy, object sprites
+// Phase 7a §5: rewritten guide cards matching new mechanics
 const ONBOARD_PANELS = [
   {
     skin: 'classic',
-    title: 'EAT',
-    body: 'Everything smaller gets pulled into your orbit. Consume it all and grow.',
-    hint: 'Drag anywhere on screen to move',
+    title: 'DRAG TO MOVE',
+    body: 'Drag anywhere on screen to move. Eat anything smaller than you.',
+    hint: 'Everything edible gets pulled into your orbit automatically',
     spriteKind: 'flower',
   },
   {
     skin: 'devil',
-    title: 'DODGE THE BIG ONES',
-    body: "Red rim means run. A bigger voidling will swallow you whole — so get big first.",
-    hint: 'Watch the rim — green = prey, red = danger',
+    title: 'GROW TO EVOLVE',
+    body: 'Eat enough to evolve through five forms. Gold ring = you can eat it. Red ring = RUN.',
+    hint: 'Watch the rim color — green means safe, red means danger',
     spriteKind: 'house',
   },
   {
     skin: 'wizard',
-    title: 'BECOME THE WORLD ENDER',
-    body: 'Chain through five forms, trigger world events, and devour everything before time runs out.',
-    hint: 'Three minutes. Top the board. Go.',
+    title: 'POWERS ARE AUTOMATIC',
+    body: "Don't fall off the island. Grab a power pickup and it fires on its own — no button needed.",
+    hint: 'Stay on the island. Grab every power you see.',
     spriteKind: 'tree',
   },
 ];

@@ -176,6 +176,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // v15 §3 → War Pack §3: power system
   let heldSpell: BoonDef | null = null;
   let activeSpell: string | null = null;
+  let queuedSpell: string | null = null; // Phase 7a §2: queued auto-cast while a spell is active
   let spellTimer = 0;
   let spellTimerMax = 0;          // War Pack §3: full duration for radial sweep HUD
   let showHitboxes = false;
@@ -409,7 +410,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     countStep = 0;
     crackTimer = 0;
     // War Pack: reset power + defense state each round
-    heldSpell = null; activeSpell = null; spellTimer = 0; spellTimerMax = 0;
+    heldSpell = null; activeSpell = null; queuedSpell = null; spellTimer = 0; spellTimerMax = 0;
     defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0; defenseShells.length = 0;
     singularity = null; pelletHitFlash = 0;
     finalFeastFired = false;
@@ -497,18 +498,23 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   function chooseBoon(id: string) {
     if (screen !== 'boon' || !player) return;
-    // v15 §3: spell picks are held until the player taps the SPELL button
+    // Phase 7a §2: spell pickups auto-cast after a 0.6s charge sparkle (no tap button)
     if (id.startsWith('spell_')) {
       const spellId = id.replace('spell_', '');
       const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
       if (spellDef) {
-        heldSpell = { id, name: spellDef.name, desc: spellDef.desc, spell: true, color: spellDef.color };
         boonChoices = [];
         screen = 'game';
         joystick.setEnabled(true);
         resetClock();
-        banner('✨ ' + spellDef.name + ' READY!', '#7BFFED', 3);
+        banner('✨ ' + spellDef.name + ' CHARGING!', spellDef.color ?? '#7BFFED', 1);
         audio.playBoon();
+        if (player) fx.addRing(player.x, player.y, spellDef.color ?? '#7BFFED', 0, player.radius * 2.5, 8, 700);
+        window.setTimeout(() => {
+          if (!player) return;
+          if (activeSpell) { queuedSpell = spellId; notify(); return; } // queue if busy
+          _executeCast(spellId);
+        }, 600);
         notify();
       }
       return;
@@ -1067,6 +1073,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (activeSpell === 'event_horizon') player.suctionMult = 1;
         if (activeSpell === 'time_warp') audio.stopTimeWarpFilter(); // Sound Pack §6
         activeSpell = null; spellTimerMax = 0;
+        // Phase 7a §2: drain queued spell
+        if (queuedSpell && player) { const qs = queuedSpell; queuedSpell = null; _executeCast(qs); }
         notify();
       }
       // EVENT HORIZON: 2.5× vacuum reach + 2× suction pull
@@ -1219,6 +1227,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         (o) => !o.eaten && Math.hypot(o.x - p.x, o.y - p.y) < reach,
       );
       audio.setVacuumActive(vacActive);
+      player.nearFood = vacActive; // Phase 7a: pupil dilation when food in vacuum
     }
 
     // v6 §1: power-up picks at 2:30 / 1:40 / 0:50 remaining
@@ -1644,26 +1653,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillRect(0, 0, fw, fh);
     }
 
-    // v13 §4: NIGHTFALL — dark overlay + per-void light radii (screen space)
-    if (events.nightfallActive && player) {
-      const shake = fx.getShake();
-      const toSX = (wx: number) => (wx - camCX) * camZoom + fw / 2 + shake.x;
-      const toSY = (wy: number) => (wy - camCY) * camZoom + fh / 2 + shake.y;
+    // Phase 7a §3: NIGHTFALL — stylised dusk tint capped at 22% (gameplay always readable)
+    if (events.nightfallActive) {
       ctx.save();
-      ctx.fillStyle = 'rgba(6,3,18,0.87)';
+      ctx.fillStyle = 'rgba(18,10,55,0.22)';
       ctx.fillRect(0, 0, fw, fh);
-      ctx.globalCompositeOperation = 'destination-out';
-      const allVoids = [player, ...rivals.filter((r) => r.alive && !r.ghost)];
-      for (const v of allVoids) {
-        const sx = toSX(v.x), sy = toSY(v.y);
-        const lightR = (v.radius + 200) * camZoom;
-        const grd = ctx.createRadialGradient(sx, sy, v.radius * camZoom * 0.25, sx, sy, lightR);
-        grd.addColorStop(0, 'rgba(255,255,255,1)');
-        grd.addColorStop(0.65, 'rgba(255,255,255,0.85)');
-        grd.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = grd;
-        ctx.beginPath(); ctx.arc(sx, sy, lightR, 0, Math.PI * 2); ctx.fill();
-      }
       ctx.restore();
     }
 
@@ -2497,6 +2491,50 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     };
   }
 
+  // Phase 7a §2: internal spell executor — called by auto-cast timer and legacy castSpell()
+  function _executeCast(spellId: string) {
+    if (!player) return;
+    const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
+    const spellColor = spellDef?.color ?? '#7BFFED';
+    activeSpell = spellId;
+    heldSpell = null;
+    console.log('POWER ACTIVATED: ' + spellId);
+    switch (spellId) {
+      case 'event_horizon':
+        spellTimer = 6000; spellTimerMax = 6000;
+        audio.playEventHorizon();
+        break;
+      case 'wormhole': {
+        audio.playWormhole();
+        const mag = Math.hypot(player.vx, player.vy);
+        const ddx = mag > 0.1 ? player.vx / mag : 0;
+        const ddy = mag > 0.1 ? player.vy / mag : -1;
+        const dashDist = player.radius * 8;
+        player.x = clamp(player.x + ddx * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
+        player.y = clamp(player.y + ddy * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
+        player.vx = ddx * 220; player.vy = ddy * 220;
+        player.ghostTime = 500;
+        fx.addRing(player.x, player.y, spellColor, 5, player.radius * 4, 5, 400);
+        banner(`⚡ WORMHOLE!`, spellColor, 3);
+        activeSpell = null; spellTimer = 0; spellTimerMax = 0;
+        break;
+      }
+      case 'time_warp':
+        spellTimer = 5000; spellTimerMax = 5000;
+        audio.startTimeWarpFilter();
+        break;
+      case 'singularity':
+        singularity = { x: player.x, y: player.y, timer: 4000, score: 0 };
+        spellTimer = 4000; spellTimerMax = 4000;
+        audio.playSingularity();
+        break;
+      default: spellTimer = 5000; spellTimerMax = 5000;
+    }
+    if (activeSpell) banner(`${spellDef?.name ?? spellId.toUpperCase()}!`, spellColor, 2);
+    fx.addRing(player.x, player.y, spellColor, player.radius, player.radius + 120, 5, 500);
+    notify();
+  }
+
   return {
     getSnapshot: buildSnapshot,
     subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); },
@@ -2537,7 +2575,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       screen = 'dailyIntro';
       notify();
     },
-    goHome() { screen = 'home'; paused = false; audio.stopMusic(); joystick.setEnabled(false); notify(); },
+    goHome() { screen = 'home'; paused = false; queuedSpell = null; audio.stopMusic(); joystick.setEnabled(false); notify(); },
     togglePause() {
       if (screen !== 'game') return;
       paused = !paused;
@@ -2550,50 +2588,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     toggleMusic() { const on = audio.toggleMusic(); notify(); return on; },
     toggleSfx() { const on = audio.toggleSfx(); notify(); return on; },
     castSpell() {
+      // Phase 7a §2: power button removed — auto-cast fires from pickup timer.
+      // castSpell() is kept for API compatibility; fires heldSpell if still set.
       if (!heldSpell || !player) return;
       const spellId = heldSpell.id.replace('spell_', '');
-      const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
-      const spellColor = spellDef?.color ?? '#7BFFED';
-      activeSpell = spellId;
       heldSpell = null;
-      switch (spellId) {
-        // War Pack §3 — four new powers replace old five spells
-        case 'event_horizon':
-          spellTimer = 6000; spellTimerMax = 6000;
-          audio.playEventHorizon(); // Sound Pack §6
-          break;
-        case 'wormhole': {
-          audio.playWormhole(); // Sound Pack §6
-          // Instant dash: 4 body-lengths + 0.5s ghost invulnerability
-          const mag = Math.hypot(player.vx, player.vy);
-          const ddx = mag > 0.1 ? player.vx / mag : 0;
-          const ddy = mag > 0.1 ? player.vy / mag : -1;
-          const dashDist = player.radius * 8;
-          player.x = clamp(player.x + ddx * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
-          player.y = clamp(player.y + ddy * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
-          player.vx = ddx * 220; player.vy = ddy * 220;
-          player.ghostTime = 500;
-          fx.addRing(player.x, player.y, spellColor, 5, player.radius * 4, 5, 400);
-          banner(`⚡ WORMHOLE!`, spellColor, 3);
-          activeSpell = null; spellTimer = 0; spellTimerMax = 0;
-          break;
-        }
-        case 'time_warp':
-          spellTimer = 5000; spellTimerMax = 5000;
-          audio.startTimeWarpFilter(); // Sound Pack §6: sweep music lowpass to 400 Hz
-          break;
-        case 'singularity':
-          singularity = { x: player.x, y: player.y, timer: 4000, score: 0 };
-          spellTimer = 4000; spellTimerMax = 4000;
-          audio.playSingularity(); // Sound Pack §6
-          break;
-        default: spellTimer = 5000; spellTimerMax = 5000;
-      }
-      if (activeSpell) {
-        banner(`${spellDef?.name ?? spellId.toUpperCase()}!`, spellColor, 2);
-      }
-      fx.addRing(player.x, player.y, spellColor, player.radius, player.radius + 120, 5, 500);
-      notify();
+      _executeCast(spellId);
     },
     toggleHitboxes() { showHitboxes = !showHitboxes; notify(); return showHitboxes; },
     // Sound Pack Phase 6: iOS unlock — call on first pointerdown on the title screen

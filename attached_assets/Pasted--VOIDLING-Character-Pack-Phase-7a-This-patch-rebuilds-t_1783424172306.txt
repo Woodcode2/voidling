@@ -1,0 +1,54 @@
+# VOIDLING Character Pack (Phase 7a)
+
+This patch rebuilds the void characters as living, code-drawn creatures, pivots powers to instant-cast, and fixes four regressions. Read the code first, keep changes surgical, prove everything.
+
+## Part 1: Procedural voids (player AND all rivals, no more sprite cutouts)
+Delete the sprite-sheet rendering path for void characters and draw them in code so there is never a white halo or cutout edge again, and so faces can animate. Render each void as layers, scaled to its radius r:
+1. BODY: a circle filled with a radial gradient, deep purple core 2A1745 to 4C3585 at the edge, with 2 to 3 lighter curved swirl arcs and tiny star specks drawn inside, clipped to the circle, rotating slowly (about 0.05 radians per second). The swirl gets more visible at higher stages.
+2. OUTLINE: a white stroke around the body, width max(3 screen px, 8 percent of r). A drawn stroke is crisp at every size.
+3. EYES: two white ellipses (about 28 percent of r) with dark pupils and a small highlight dot. Pupils look toward the current movement direction, and snap toward the nearest edible object inside the vacuum radius. Pupils dilate about 15 percent when food is inside the vacuum.
+4. MOUTH: a small smile arc by default. It opens into a rounded ellipse (about 30 percent of r) for 150ms on every eat and stays slightly open while food is streaming in. From GOBBLER up the smile shows two tiny drawn fangs.
+5. BLUSH: two soft pink circles. BLINK: eyelid arcs over the eyes for 120ms every 3 to 6 seconds (trivial now that eyes are drawn).
+6. STAGE LOOKS: VOIDLING plain and glossy with big innocent eyes. MUNCHER adds star specks. GOBBLER adds visible swirl and fangs. DEVOURER adds the orbit ring. WORLD ENDER: full bright swirl, huge expressive eyes, and keep the existing purple flame crown overlay on top.
+7. Rivals render through the exact same system with their existing name tags and threat rings. Keep all Alive Pack body language (lean, squash and stretch, breathing, bob, gulp) applied to the whole drawn group.
+
+## Part 2: Powers pivot to instant-cast
+The tap button has failed twice on mobile. Remove it entirely.
+1. Delete the power button UI and all its input code.
+2. Collecting a power pickup now auto-casts it: a 0.6 second charge sparkle on the player, then the effect fires with the existing name pop, colored ring, and sound.
+3. If a power is already active, one pickup may queue and fires when the current effect ends. Log POWER ACTIVATED: name on every cast.
+
+## Part 3: Fix the darkness event
+The town-fights-back darkness currently blacks out the screen. Readability always wins. Replace the blackout with a stylized dusk: a blue-purple tint capped at 25 percent darkening, warm glowing window rectangles on buildings, and soft streetlight pools along downtown roads while it lasts. If that proves too fiddly, remove the darkness visual entirely and keep only the banner and defense wave. Never render the game unreadable.
+
+## Part 4: Restore the splash screen
+The title screen is gone; the game boots straight into the map. Restore it: island_map.png as the background with a slow gentle zoom, the VOIDLING logo, the line EAT. GROW. DEVOUR., and TAP TO START. That first tap is also the audio unlock, so wire Tone.start and the AudioContext resume to it.
+
+## Part 5: Rewrite the starting guide
+The current guide describes old mechanics. Replace it with three quick cards shown before the first match (skippable, and skipped automatically after first play):
+1. Drag to move. Eat anything smaller than you.
+2. Grow to evolve. Gold ring means food. Red ring means RUN.
+3. Do not fall off the island. Powers fire automatically when you grab them.
+Also guarantee a feast at spawn: a ring of 12 to 15 bits and flowers around the player's spawn point so the first three seconds always feel great.
+
+## Part 6: Kill the space leaks for good
+Boxes, road dashes, and small critters (ducks, crabs) still appear in space.
+1. Road and grid DRAWING must be clipped: no road segment, dash, corner decoration, or block marker renders outside the island polygon. Clip per segment, not per road.
+2. Extend the SPAWN AUDIT to every world entity category including ambient critters and decorations, not just the main prop tables. The only allowed off-island entities are the drifting space decorations.
+3. Paste three consecutive SPAWN AUDIT lines in your report; all must be 0.
+
+## Do not touch
+Predation and growth rules (changing next patch), defense waves, vignettes, quests, scoring, banners, bubbles, music and SFX.
+
+## Verify before finishing: proof required, do not skip
+1. Screenshot-level check at every stage: no white halo or cutout edge on any void, player or rival.
+2. The void's pupils follow movement, snap to nearby food, and it blinks; the mouth opens on every eat.
+3. Grab each of the four power pickups: each auto-casts with its visuals and sound; paste one POWER ACTIVATED log line; confirm zero power buttons remain in the UI.
+4. Trigger the town-fights-back event: the screen dims at most 25 percent and gameplay stays fully readable.
+5. Boot the game fresh: splash screen shows with art, logo, and TAP TO START, and audio works immediately after that tap.
+6. First-ever match shows the three new cards and the spawn feast; second match skips the cards.
+7. Fly the whole rim as a big void: zero dashes, boxes, roads, or critters in space anywhere.
+8. Paste the three SPAWN AUDIT lines, all reading 0.
+9. Frame rate holds on a mobile viewport.
+
+Final report: the audit lines, the power log line, and every file changed.

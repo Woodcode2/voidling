@@ -932,7 +932,9 @@ export class WorldManager {
     (b as any).pond = { x: pondX, y: pondY, r: pondR };
     for (let i = 0; i < 6; i++) {
       const a = rand() * Math.PI * 2, rr = rand() * pondR * 0.7;
-      const o = this.makeObj('duck', pondX + Math.cos(a) * rr, pondY + Math.sin(a) * rr);
+      const dx = pondX + Math.cos(a) * rr, dy = pondY + Math.sin(a) * rr;
+      if (!isOnIsland(dx, dy)) continue; // Phase 7a §6: skip ducks spawning off-island
+      const o = this.makeObj('duck', dx, dy);
       o.homeX = pondX; o.homeY = pondY; o.tether = pondR * 0.85;
     }
     this.scatter(b, rand, 'fountain', 1, spawnX, spawnY);
@@ -948,10 +950,14 @@ export class WorldManager {
     if (rand() < 0.4) this.scatter(b, rand, 'icecream_cart', 1);
     this.spawnBirds(b, rand, 3);
     this.spawnBirds(b, rand, 3);
-    // guarantee small edibles right around the player spawn
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2, rr = 60 + rand() * 70;
-      this.makeObj(pick(['flower', 'apple', 'flowerpot'] as ObjectKind[], rand), spawnX + Math.cos(a) * rr, spawnY + Math.sin(a) * rr);
+    // Phase 7a §5: spawn feast — 14 bits + flowers in rings so first 3 seconds feel great
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const rr = 65 + (i % 3) * 45; // inner / mid / outer rings
+      const ox = spawnX + Math.cos(a) * rr;
+      const oy = spawnY + Math.sin(a) * rr;
+      const kind = pick(['flower', 'apple', 'flowerpot', 'seashell'] as ObjectKind[], rand);
+      if (isOnIsland(ox, oy)) this.makeObj(kind, ox, oy);
     }
   }
 
@@ -1137,7 +1143,9 @@ export class WorldManager {
     (b as any).pond = { x: pondX, y: pondY, r: pondR };
     for (let i = 0; i < 3; i++) {
       const a = rand() * Math.PI * 2, rr = rand() * pondR * 0.7;
-      const o = this.makeObj('duck', pondX + Math.cos(a) * rr, pondY + Math.sin(a) * rr);
+      const dx = pondX + Math.cos(a) * rr, dy = pondY + Math.sin(a) * rr;
+      if (!isOnIsland(dx, dy)) continue; // Phase 7a §6: skip ducks spawning off-island
+      const o = this.makeObj('duck', dx, dy);
       o.homeX = pondX; o.homeY = pondY; o.tether = pondR * 0.8;
     }
     this.spawnBirds(b, rand, 3);
