@@ -46,6 +46,7 @@ export interface WorldObject {
   shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
   defense?: boolean;     // War Pack §2: defense unit converging on player
   pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
+  missileCd?: number;    // Phase 7b §5: heli missile cooldown timer
   // Life Pack §3: vignette system
   vignetteData?: {
     id: string;
@@ -350,6 +351,7 @@ export class WorldManager {
   townhallEaten = false;       // v15 §4: town hall landmark consumed
   private nextId = 0;
   private respawnTimer = 0;
+  respawnMult = 1; // Phase 7b §6: engine sets to 3 during FEEDING FRENZY
   private rand: () => number = Math.random;
   planName = 'METRO';          // v16.2 §6: current city plan name
   openingBeatPersonId = -1;    // v16.2 §1: person who says "Huh… is that a void?"
@@ -1557,7 +1559,8 @@ export class WorldManager {
       const rem = this.remaining;
       if (rem < target) {
         const frac = rem / Math.max(1, this.initialPopulation);
-        const rate = frac >= 0.80 ? 4 : lerp(4, 8, clamp((0.80 - frac) / 0.20, 0, 1));
+        const baseRate = frac >= 0.80 ? 4 : lerp(4, 8, clamp((0.80 - frac) / 0.20, 0, 1));
+        const rate = baseRate * this.respawnMult; // Phase 7b §6: ×3 during FEEDING FRENZY
         this.respawnTimer = 1000 / rate;
         this.spawnRespawn(player, voids, fx);
       } else {

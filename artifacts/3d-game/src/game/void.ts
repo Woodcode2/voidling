@@ -36,8 +36,8 @@ export abstract class Void {
   // per-frame event effect (firetruck water / storm), reset each frame by events
   eventSlow = 1;
 
-  // v16.2 §3: hearts system — 3 at round start; 0 = FINAL HEART state
-  hearts = 3;
+  // Phase 7b §4: hearts system removed — field kept at 0 for backwards-compat
+  hearts = 0;
 
   // identity
   skin: SkinDef;
@@ -154,6 +154,31 @@ export abstract class Void {
       this.morphTime = CONFIG.EVO_MORPH_MS; // v9 §3: kick off the body morph crossfade
       onEvolve?.(this.formIndex);
     }
+  }
+
+  // Phase 7b §4: Agar-style death — drop one evolution stage on being eaten / falling.
+  // Reduces formIndex by 1, sets radius to mid-point of the new form's band, resets
+  // score to the floor that corresponds to that radius, then grants 3 s of ghost.
+  dropStage(): number {
+    const fromForm = this.formIndex;
+    if (fromForm <= 0) return 0;
+    this.formIndex = fromForm - 1;
+    // radius = midpoint between the two form threshold radii
+    const lo = CONFIG.FORMS[this.formIndex].radius;
+    const hi = CONFIG.FORMS[fromForm].radius;
+    const midR = (lo + hi) / 2;
+    this.radius = midR;
+    // score floor: invert applyScoreRadius formula  radius = BASE*(1+(score/2600)^0.57)
+    // → score = 2600 * ((midR/BASE − 1)^(1/0.57))
+    const base = CONFIG.PLAYER_BASE_RADIUS;
+    const ratio = Math.max(0, midR / base - 1);
+    const invScore = ratio > 0 ? Math.floor(2600 * Math.pow(ratio, 1 / 0.57)) : 0;
+    this.score = Math.min(this.score, Math.floor(invScore * 0.92));
+    // 3s ghost, trigger morph, halt movement
+    this.ghostTime = 3000;
+    this.morphTime = CONFIG.EVO_MORPH_MS;
+    this.vx = 0; this.vy = 0;
+    return fromForm; // callers use this to form banner messages
   }
 
   // ── SHARED LEADER DECAY: above DEVOURER the leader slowly bleeds mass, but

@@ -602,6 +602,11 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         )}
         {r.district && !r.reachedForm && <div className="vd-reached">Finished in {r.district}</div>}
         {r.gnomeLord && <div className="vd-reached">👑 GNOME LORD — ate every gnome!</div>}
+        {r.killedBy && (
+          <div className="vd-reached" style={{ color: '#FF7070' }}>
+            💀 Devoured by {r.killedBy}
+          </div>
+        )}
         <div style={{ width: '100%', maxWidth: 320, marginTop: 8 }}>
           <div className="vd-stat-row"><span>Placement</span><span>#{r.placement}</span></div>
           <div className="vd-stat-row"><span>Devoured</span><span>{r.devoured.toFixed(0)}%</span></div>
