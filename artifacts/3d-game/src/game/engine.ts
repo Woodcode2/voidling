@@ -306,6 +306,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let zooBreakTickerDone = false;
   let townhallTickerDone = false;
   let devoured15Done = false;
+  // Feedback Juice §2: gold milestone banners — fire once per match (reset in start())
+  let milestoneForms: boolean[] = [];          // per evolution form index
+  const milestonePctFired = new Set<number>(); // 25/50/75/100 % devoured
   // v12 §4: daily mod effect flags (reset in start())
   let dailyFrenzyWindow = 1200;    // ms window for eat streaks (FRENZY FRIDAY → 2400)
   let dailyGoldenInterval = -1;   // -1 = use CONFIG.GOLDEN_INTERVAL; override for GOLDEN HOUR
@@ -469,12 +472,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     zooBreakTickerDone = false;
     townhallTickerDone = false;
     devoured15Done = false;
+    milestoneForms = [];              // Feedback Juice §2
+    milestonePctFired.clear();        // Feedback Juice §2
     roundTriples = 0;
     roundRivalEats = 0;
     events.reset();
     fx.particles.length = 0;
     fx.texts.length = 0;
     fx.rings.length = 0;
+    fx.clearCoins(); // Feedback Juice §3: no coin carryover between rounds
 
     // v5 §1: spawn already correctly framed (no zoom-in animation)
     camCX = player.x;
@@ -721,7 +727,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     audio.duckMusic();
     // v8 §5: the new form's music layer drops in on the sting's boom (~400ms)
     window.setTimeout(() => audio.setMusicForm(form), 400);
-    banner('EVOLVED → ' + name, '#C77DFF');
+    // Feedback Juice §2: gold milestone banner on each new evolution stage (once
+    // per match); a re-evolution after falling keeps the purple flavor banner.
+    if (!milestoneForms[form]) {
+      milestoneForms[form] = true;
+      banner(name, '#FFD23F', 3, { sparkles: true });
+    } else {
+      banner('EVOLVED → ' + name, '#C77DFF');
+    }
     // v16.2 §1: voice ticker on milestone evolutions
     if (form === 2) { // GOBBLER
       queueTicker('🚨 Traffic cameras detect enormous mass entering the downtown core!');
@@ -1101,6 +1114,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         devoured15Done = true;
         queueTicker('📉 Scientists confirm city is 15% smaller than yesterday');
       }
+      // Feedback Juice §2: quarter-city gold milestone banners (once each per match)
+      if (world.initialMass > 0) {
+        const dpct = (world.eatenArea / world.initialMass) * 100;
+        const MS: [number, string][] = [[25, '25% DEVOURED'], [50, 'HALF THE CITY GONE'], [75, '75% DEVOURED'], [100, 'CITY DEVOURED']];
+        for (const [thr, msg] of MS) {
+          if (dpct >= thr && !milestonePctFired.has(thr)) {
+            milestonePctFired.add(thr);
+            banner(msg, '#FFD23F', 3, { sparkles: true });
+          }
+        }
+      }
     }
 
     // v7 §5: LUCKY GNOME — a golden object every 10s (GOLD RUSH synergy → 7s)
@@ -1235,6 +1259,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       if (ev.type === 'absorb') {
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
       } else if (ev.type === 'score') {
+        // Feedback Juice §3: cosmetic coin burst at the score point (display only)
+        fx.addCoinBurst(ev.x, ev.y, ev.amount || 0);
         // v10 §3: pool absorb points — rolling 150ms window; each merge resets the clock
         if (lastScoreText && lastScoreText.life > 0 && roundElapsed - lastScoreMs < 150) {
           const prev = parseInt(lastScoreText.text.replace('+', '')) || 0;

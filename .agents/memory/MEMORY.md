@@ -21,3 +21,4 @@
 - [VOIDLING Sound Pack Phase 6](voidling-sound-pack-phase6.md) — Tone.js adaptive music (5 layers, A minor 110BPM) + new SFX; dual-bus architecture; danger layer timer pattern; toggleMute silences all.
 - [VOIDLING Phase 7b World+War](voidling-v19-7b.md) — Agar death (dropStage), endRound idempotency guard, feeding frenzy ×3 respawn, heli missile+searchlight, tank shockwave, news banner, no-slow fix, rival VOIDLING respawn.
 - [VOIDLING Dense City + 2.5D Depth](voidling-dense-city.md) — zoning is per-block (rotating 6×6 plans, not polygons); runtime generateLots; void joins objects in one foot-Y painter's pass; audits read 0 by construction.
+- [VOIDLING Feedback Juice](voidling-feedback-juice.md) — display-only swallow ghosts (pooled, foot-Y pass), gold milestone banners, coin bursts; never mutate state/audits; pooled FX must reset in start() + no per-frame filter in draw.
