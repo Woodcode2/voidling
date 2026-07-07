@@ -103,6 +103,7 @@ export const audio = {
   _dangerVol: null as any,     // Tone.Volume for the danger layer
   _masterFilt: null as any,    // Tone.Filter swept to 400 Hz during TIME WARP
   _toneDisposables: [] as any[], // everything to dispose on stopMusic
+  _musicGen: 0,                // incremented each startMusic(); stale _startToneMusic() invocations bail on mismatch
 
   // Vacuum hum: looping bandpass noise while suction pulls objects
   _vacuumSrcNode: null as AudioBufferSourceNode | null,
@@ -620,21 +621,23 @@ export const audio = {
     this._musicForm = 0;
     this._step = 0;
     this._nextStepTime = this.ctx.currentTime + 0.1;
+    this._musicGen = (this._musicGen + 1) | 0; // invalidate any pending _startToneMusic from a previous round
     // Start the legacy scheduler immediately so music is audible with zero delay,
     // then swap to Tone.js once the async import resolves.
     this._musicTimer = window.setInterval(() => this._musicScheduler(), 25);
-    void this._startToneMusic();
+    void this._startToneMusic(this._musicGen);
   },
   stopMusic() {
     this._musicPlaying = false;
     this._musicPaused = false;
+    this._musicGen = (this._musicGen + 1) | 0; // invalidate any in-flight _startToneMusic
     if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
     // Dispose Tone.js resources
     try {
       if (this._toneModule) {
         const T = this._toneModule;
+        T.getTransport().cancel(); // cancel scheduled events BEFORE stop so the stop event isn't immediately cancelled
         T.getTransport().stop();
-        T.getTransport().cancel();
         for (const node of this._toneDisposables) { try { node.dispose(); } catch { /* ignore */ } }
       }
     } catch { /* ignore */ }
@@ -824,11 +827,12 @@ export const audio = {
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // Dynamically imported Tone.js: A minor, 110 BPM, 5 stacked layers + danger
-  async _startToneMusic() {
+  async _startToneMusic(gen: number) {
     try {
       const T = await import('tone');
       this._toneModule = T;
-      if (!this._musicPlaying) return; // stopped before import resolved
+      // Bail if a newer round has started or music was stopped while we awaited the import
+      if (!this._musicPlaying || gen !== this._musicGen) return;
 
       // Kill legacy scheduler — Tone.js takes over
       if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
