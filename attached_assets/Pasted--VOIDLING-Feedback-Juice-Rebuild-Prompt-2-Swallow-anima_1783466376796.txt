@@ -1,0 +1,63 @@
+# VOIDLING: Feedback Juice (Rebuild Prompt 2)
+Swallow animation, milestone banners, coin bursts. All three are COSMETIC layers on top of the existing game. Zero gameplay or balance change.
+
+## GOAL
+Make eating feel physical, make progress feel earned, and make points feel rewarding. Do this by adding three cosmetic feedback layers. Do not change any game logic.
+
+## DO NOT TOUCH (leave fully intact)
+- Eat logic, eat radius, vacuum pull, growth amounts, evolution thresholds, predation, scoring math, spawning, lot density, and all Stage-4 audits from the previous prompt.
+- Camera, ground fills, roads, river, waterfall.
+- No new art and no new image files. Reuse existing sprites and existing UI only.
+- Do not change the void body rendering.
+- The three new layers are DISPLAY ONLY. They must not change what happens in the game, only what the player sees. If a change would alter game state, score, or balance, STOP and report it instead of proceeding.
+
+---
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text, before editing:
+1. The eat/consume handler: where a structure is removed from the world, and where the void's growth and score are applied. Give the real function names.
+2. Whether a banner or toast system already exists (the project has match banners and speech bubbles). If yes, how to trigger one. We will reuse it.
+3. How the void's current evolution stage and score are stored and read.
+4. Sprite scale spot check: do all building and vehicle sprites currently render at correct relative scale, or is anything oversized (for example the car)? Answer yes or no and name any oversized sprite.
+
+Paste that report, then proceed.
+
+---
+
+## STAGE 1: Swallow animation (cosmetic ghost)
+- Leave the eat handler's logic exactly as-is. It still removes the structure, grows the void, and adds score at the exact moment it does now. Balance stays identical.
+- At the moment a structure is consumed, spawn a cosmetic "swallow ghost": a copy of that structure's current sprite, placed at its last world position, added to the same foot-Y-sorted draw pass so depth stays correct.
+- Over about 0.30 to 0.45 seconds, ease the ghost: scale toward zero, move its position toward the void's center, add a small rotation and a downward sink offset so it looks pulled into the void, and fade alpha to zero near the end. Then delete the ghost.
+- Use a pool and a cap (for example 40 concurrent ghosts). Heavy eating must never allocate per frame. If the cap is hit, skip the ghost rather than drop frames.
+- The ghost has no collision, no eat, no score, and never appears in any audit count. It is display only.
+
+## STAGE 2: Milestone banners (gold, flies across the top)
+- Fire a gold banner that eases in across the upper screen, holds about one second, and eases out, when the void crosses a milestone:
+  - Each evolution stage up: VOIDLING to MUNCHER to GOBBLER to DEVOURER to WORLD ENDER.
+  - Each 25 percent of the city devoured: 25, 50, 75, 100.
+- If a banner system already exists, reuse it with a gold style. If not, add a lightweight one.
+- Short readable text. Examples: "MUNCHER" on a stage up, "HALF THE CITY GONE" at 50 percent, "CITY DEVOURED" at 100 percent.
+- Fire each milestone once per match. Never pause the game or block input.
+
+## STAGE 3: Coin bursts on points
+- When the void earns points from eating, spawn small cosmetic coin or plus-number particles at the eaten thing that pop upward and fade over about 0.5 seconds. A bigger eat spawns a slightly bigger burst.
+- Pooled and capped like the ghosts. Cosmetic only. It must not change the real score value, which the eat handler already applied.
+- If a visible cents or coin counter exists in the HUD, a few coins may fly toward it before fading. If not, they pop and fade in place.
+
+## STAGE 4: Proof (no regression, real receipts)
+Run a live match and paste the actual console output, not a description:
+- OFF-ISLAND ENTITIES, BUILDING OVERLAPS, and BUILDINGS ON ROADS must all still read 0. The cosmetic layers must not add to these counts.
+- Frame rate during heavy eating (so the ghost and coin pools are under load). Report the number. It should stay in the same band as before (about 40 to 51). A hard drop means the pooling or cap is wrong.
+- Confirm there are no new console errors.
+- One line each describing what you see: a building pulled into the void, a milestone banner firing, coins popping on a big eat.
+- Report your Stage 0 sprite-scale answer: is the car and everything else correctly sized.
+
+If anything regressed, or you did not run the audits, say so plainly. Do not mark this prompt complete.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Eat a building and watch it get pulled into the void instead of blinking out.
+- Grow a stage and watch the gold banner fly across.
+- Eat a cluster fast and watch coins pop.
+- Confirm the car looks normal sized. If it is still tower sized, tell Claude and it goes in the next fix.

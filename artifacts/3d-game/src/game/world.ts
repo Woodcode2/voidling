@@ -76,6 +76,19 @@ type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'd
 interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; }
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; rot: number; drawScale: number; }
+// Feedback Juice §1: cosmetic "swallow ghost" — a copy of an eaten structure's
+// sprite that eases into the void. DISPLAY ONLY: no collision, score, or audit.
+interface SwallowGhost {
+  active: boolean;
+  kind: ObjectKind;
+  spriteKey: string | null; // resolved objectSprites key (null → procedural draw)
+  x0: number; y0: number;   // spawn (last world) position
+  x: number; y: number;     // current eased position
+  cx: number; cy: number;   // void-center target
+  size: number;             // sprite radius at spawn
+  rot: number;              // accumulated rotation
+  t: number; dur: number;   // elapsed / total ms (0.30–0.45s)
+}
 interface Fissure { pts: number[][]; life: number; maxLife: number; } // v9 §3: violet crack trail (fallback)
 // v16.2 §5: one decal-based fissure stamp per dropCrack() call
 interface FissureDecal { x: number; y: number; rot: number; scale: number; size: number; idx: 0|1; life: number; maxLife: number; }
@@ -330,6 +343,12 @@ export class WorldManager {
   blocks: Block[] = [];
   private houseLots: StructureLot[] = [];   // Dense City: suburb house footprints
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
+  // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
+  // heavy eating never allocates per frame; a full pool skips the ghost.
+  private swallowGhosts: SwallowGhost[] = Array.from({ length: 40 }, () => ({
+    active: false, kind: 'bush' as ObjectKind, spriteKey: null,
+    x0: 0, y0: 0, x: 0, y: 0, cx: 0, cy: 0, size: 0, rot: 0, t: 0, dur: 0,
+  }));
   dirt: DirtPatch[] = [];
   fissures: Fissure[] = [];         // v9 §3: WORLD ENDER cracked-reality trail (violet, not brown)
   fissureDecals: FissureDecal[] = []; // v16.2 §5: decal stamps (used when fx PNGs loaded)
@@ -491,6 +510,7 @@ export class WorldManager {
 
     // Dense City: pre-compute per-block house + building lots (island + road gated, no overlaps)
     this.generateLots(rand);
+    for (const g of this.swallowGhosts) g.active = false; // Feedback Juice §1: clear pool
 
     const spawnX = this.size / 2, spawnY = this.size / 2;
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
@@ -1442,6 +1462,16 @@ export class WorldManager {
 
   update(dt: number, player: Player, rivals: Rival[], fx: FXManager) {
     const dtSec = dt / 1000;
+    // Feedback Juice §1: advance cosmetic swallow ghosts (display only)
+    for (const g of this.swallowGhosts) {
+      if (!g.active) continue;
+      g.t += dt;
+      if (g.t >= g.dur) { g.active = false; continue; }
+      const e = (g.t / g.dur) ** 2;               // ease-in toward the void center
+      g.x = g.x0 + (g.cx - g.x0) * e;
+      g.y = g.y0 + (g.cy - g.y0) * e;
+      g.rot += dt * 0.0025;                        // gentle spin
+    }
     if (this.rampageCd > 0) this.rampageCd -= dt; // v8 §3
     const pForm = player.formIndex;               // v8 §3: fear/rampage scale with form
     const voids = [player, ...rivals];
@@ -2161,12 +2191,66 @@ export class WorldManager {
 
     player.absorbObject(obj);
 
+    // Feedback Juice §1: cosmetic swallow ghost pulled into the void (display only)
+    if (obj.kind !== 'bit') this.spawnSwallowGhost(obj, player.x, player.y);
+
     if (obj.kind === 'watertower') {
       player.pendingFx.push({ type: 'finale', x: obj.x, y: obj.y });
     }
     if (obj.kind === 'zoo_gate') {
       player.pendingFx.push({ type: 'zoo_break', x: obj.x, y: obj.y }); // v16.1 D: ZOO BREAK! banner
     }
+  }
+
+  // Feedback Juice §1: spawn a cosmetic swallow ghost at the eaten object's spot.
+  // Copies the object's CURRENT sprite; eases into the void over 0.30–0.45s.
+  private spawnSwallowGhost(obj: WorldObject, cx: number, cy: number) {
+    let g: SwallowGhost | undefined;
+    for (const s of this.swallowGhosts) { if (!s.active) { g = s; break; } }
+    if (!g) return; // cap hit — skip rather than allocate / drop frames
+    // resolve sprite key the same way drawOne does
+    let spriteKey: string | null;
+    if (obj.kind === 'house') {
+      const hc = obj.id % 3;
+      spriteKey = hc === 0 ? 'house_a' : hc === 1 ? 'house_b' : null;
+    } else {
+      spriteKey = obj.kind;
+    }
+    g.active = true;
+    g.kind = obj.kind;
+    g.spriteKey = spriteKey && objectSprites.has(spriteKey) ? spriteKey : null;
+    g.x0 = g.x = obj.x;
+    g.y0 = g.y = obj.y;
+    g.cx = cx; g.cy = cy;
+    g.size = obj.baseSize;
+    g.rot = 0;
+    g.t = 0;
+    g.dur = 300 + Math.random() * 150; // 0.30–0.45s
+  }
+
+  // Feedback Juice §1: draw a swallow ghost — scale→0, sink, spin, fade near end.
+  private drawSwallowGhost(ctx: CanvasRenderingContext2D, g: SwallowGhost, t: number) {
+    const p = g.t / g.dur;                 // 0→1
+    const scale = 1 - p;                    // scale toward zero
+    if (scale < 0.02) return;
+    const alpha = p < 0.6 ? 1 : Math.max(0, 1 - (p - 0.6) / 0.4); // fade near the end
+    const sink = p * g.size * 0.5;          // downward sink (pulled into the void)
+    const r = g.size;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(g.x, g.y + sink);
+    ctx.rotate(g.rot);
+    ctx.scale(scale, scale);
+    if (g.spriteKey) {
+      const sprite = objectSprites.get(g.spriteKey)!;
+      const bn = spriteBounds.get(g.spriteKey) ?? { x: 0, y: 0, w: 1, h: 1 };
+      const imgW = sprite instanceof HTMLImageElement ? sprite.naturalWidth : sprite.width;
+      const imgH = sprite instanceof HTMLImageElement ? sprite.naturalHeight : sprite.height;
+      ctx.drawImage(sprite, bn.x * imgW, bn.y * imgH, bn.w * imgW, bn.h * imgH, -r, -r * 2, r * 2, r * 2);
+    } else {
+      drawParkObject(ctx, g.kind, r, { t });
+    }
+    ctx.restore();
   }
 
   // Feel Patch §2: spawn a debris bit at (x,y) with a random scatter impulse
@@ -2683,15 +2767,23 @@ export class WorldManager {
       }
     };
 
-    // Dense City §3: interleave the void actors (player + rivals) into the
-    // painter's-order pass by foot-Y, so nearer buildings occlude the void body.
-    if (actors && actors.length) {
-      type Entry = { y: number; obj?: WorldObject; act?: () => void };
+    // Dense City §3 + Feedback Juice §1: interleave void actors (player + rivals)
+    // AND cosmetic swallow ghosts into the painter's-order pass by foot-Y, so
+    // nearer buildings occlude the void body and ghosts stay depth-correct.
+    let hasGhosts = false;
+    for (const g of this.swallowGhosts) { if (g.active) { hasGhosts = true; break; } }
+    if ((actors && actors.length) || hasGhosts) {
+      type Entry = { y: number; obj?: WorldObject; act?: () => void; ghost?: SwallowGhost };
       const merged: Entry[] = [];
       for (const obj of visible) merged.push({ y: obj.y, obj });
-      for (const a of actors) merged.push({ y: a.footY, act: a.draw });
+      if (actors) for (const a of actors) merged.push({ y: a.footY, act: a.draw });
+      for (const g of this.swallowGhosts) { if (g.active) merged.push({ y: g.y, ghost: g }); }
       merged.sort((p, q) => p.y - q.y);
-      for (const e of merged) { if (e.obj) drawOne(e.obj); else e.act!(); }
+      for (const e of merged) {
+        if (e.obj) drawOne(e.obj);
+        else if (e.ghost) this.drawSwallowGhost(ctx, e.ghost, t);
+        else e.act!();
+      }
     } else {
       for (const obj of visible) drawOne(obj);
     }

@@ -35,13 +35,42 @@ export interface Ring {
   width: number;
 }
 
+// Feedback Juice §3: cosmetic coin particle (pooled, display only)
+interface Coin { active: boolean; x: number; y: number; vx: number; vy: number; life: number; maxLife: number; size: number; }
+
 export class FXManager {
   particles: Particle[] = [];
   texts: FloatingText[] = [];
   rings: Ring[] = [];
+  // Feedback Juice §3: preallocated coin pool (cap 120) — never allocates per frame
+  private coins: Coin[] = Array.from({ length: 120 }, () => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, size: 0 }));
   shakeTime = 0;
   shakeMagnitude = 0;
   flashTime = 0;
+
+  // Feedback Juice §3: deactivate all pooled coins (called on match start so
+  // no coins carry over visually between rounds).
+  clearCoins() { for (const c of this.coins) c.active = false; }
+
+  // Feedback Juice §3: pop a small cosmetic coin burst on a scored eat. Bigger
+  // eats spawn a slightly bigger burst. Pure display — no score/game effect.
+  addCoinBurst(x: number, y: number, amount: number) {
+    const n = Math.min(10, 3 + Math.floor((amount || 0) / 40));
+    let spawned = 0;
+    for (const c of this.coins) {
+      if (spawned >= n) break;
+      if (c.active) continue;
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 1.2; // mostly upward
+      const spd = 60 + Math.random() * 100;
+      c.active = true;
+      c.x = x; c.y = y;
+      c.vx = Math.cos(ang) * spd;
+      c.vy = Math.sin(ang) * spd;
+      c.life = c.maxLife = 500;
+      c.size = 5 + Math.random() * 3;
+      spawned++;
+    }
+  }
 
   update(dt: number) {
     const dtSec = dt / 1000;
@@ -67,6 +96,16 @@ export class FXManager {
       r.r += r.vr * dtSec;
       r.life -= dt;
       if (r.life <= 0) this.rings.splice(i, 1);
+    }
+
+    // Feedback Juice §3: coins pop up and arc back down, then fade out
+    for (const c of this.coins) {
+      if (!c.active) continue;
+      c.x += c.vx * dtSec;
+      c.y += c.vy * dtSec;
+      c.vy += 320 * dtSec; // gravity
+      c.life -= dt;
+      if (c.life <= 0) c.active = false;
     }
 
     if (this.shakeTime > 0) this.shakeTime -= dt;
@@ -112,6 +151,21 @@ export class FXManager {
         ctx.lineTo(-p.size, p.size);
         ctx.fill();
       }
+      ctx.restore();
+    }
+
+    // Feedback Juice §3: coins — gold discs with a shine, fading as they fall
+    for (const c of this.coins) {
+      if (!c.active) continue;
+      const a = Math.max(0, c.life / c.maxLife);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#FFD23F';
+      ctx.strokeStyle = '#B8860B';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath(); ctx.arc(c.x - c.size * 0.3, c.y - c.size * 0.3, c.size * 0.3, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
 
