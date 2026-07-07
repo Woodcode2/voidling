@@ -1334,6 +1334,7 @@ export class WorldManager {
         // Panic bubble fires once when player enters close range
         if (!vd.panicked && dp < player.radius + obj.size + 200) {
           vd.panicked = true;
+          audio.playPedPanic(); // Sound Pack §9: cartoon squeak when ped panics
           if (!obj.bubbleText && activeBubbles < 4) {
             obj.bubbleText = vd.panicText; obj.bubbleLife = 5000; activeBubbles++;
           }
@@ -1356,7 +1357,13 @@ export class WorldManager {
       if (obj.alertT > 0) obj.alertT -= dt;
       if (obj.honkCd > 0 && !obj.living) obj.honkCd -= dt; // v7 §3: prop cooldowns (jingle)
       // v16.2 §1: speech bubble life tick
-      if (obj.bubbleLife > 0) { obj.bubbleLife -= dt; if (obj.bubbleLife <= 0) { obj.bubbleLife = 0; obj.bubbleText = null; } }
+      if (obj.bubbleLife > 0) {
+        obj.bubbleLife -= dt;
+        if (obj.bubbleLife <= 0) {
+          obj.bubbleLife = 0; obj.bubbleText = null;
+          audio.playBubblePop(); // Sound Pack §10: tiny pop when bubble expires
+        }
+      }
 
       // Feel Patch §1: tick prop-shake timer
       if (obj.shakeT && obj.shakeT > 0) obj.shakeT = Math.max(0, obj.shakeT - dt);

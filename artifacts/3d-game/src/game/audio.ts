@@ -96,6 +96,28 @@ export const audio = {
   _intense: false,
   _musicForm: 0,          // v8 §5: evolution form → number of active music layers
 
+  // ── Sound Pack Phase 6: Tone.js adaptive music ──────────────────────────────
+  _toneReady: false,
+  _toneModule: null as any,    // lazily imported 'tone' module
+  _toneVols: [] as any[],      // Tone.Volume per layer (0–4), faded in on evolve
+  _dangerVol: null as any,     // Tone.Volume for the danger layer
+  _masterFilt: null as any,    // Tone.Filter swept to 400 Hz during TIME WARP
+  _toneDisposables: [] as any[], // everything to dispose on stopMusic
+
+  // Vacuum hum: looping bandpass noise while suction pulls objects
+  _vacuumSrcNode: null as AudioBufferSourceNode | null,
+  _vacuumGainNode: null as GainNode | null,
+  _vacuumRunning: false,
+
+  // Ped-panic squeak — rate-limited to 1 per second
+  _lastPedPanicMs: -9999,
+
+  // Final-10s: tick tracker so we fire exactly once per integer second
+  _lastFinalTickSec: -1,
+
+  // Danger layer: single cancellable mute timer to prevent per-frame accumulation
+  _dangerMuteTimer: null as number | null,
+
   // v15 §2: music file infrastructure — loaded OGG tracks for crossfade
   _musicTracks: [] as (AudioBuffer | null)[],
   _musicTracksLoaded: false,
@@ -191,7 +213,18 @@ export const audio = {
   },
 
   // ── toggles ──────────────────────────────────────────────────────────────────
-  toggleMute() { return !this.toggleSfx(); }, // legacy: returns "muted"
+  // "Mute all" — silences both SFX and music (Tone.js + raw WebAudio bus)
+  toggleMute() {
+    const sfxOn = this.toggleSfx();
+    // Keep music in sync with the global mute button
+    this.musicOn = sfxOn;
+    localStorage.setItem('voidling_music', String(this.musicOn));
+    this._applyMusicGain();
+    if (this._toneModule) {
+      this._toneModule.getDestination().mute = !this.musicOn;
+    }
+    return !sfxOn; // returns true when muted
+  },
   toggleSfx() {
     this.sfxOn = !this.sfxOn;
     localStorage.setItem('voidling_sfx', String(this.sfxOn));
@@ -201,6 +234,12 @@ export const audio = {
     this.musicOn = !this.musicOn;
     localStorage.setItem('voidling_music', String(this.musicOn));
     this._applyMusicGain();
+    // Sync Tone.js destination mute (Sound Pack Phase 6)
+    if (this._toneModule) {
+      const dest = this._toneModule.getDestination();
+      dest.mute = !this.musicOn;
+      if (this.musicOn) dest.volume.rampTo(-8, 0.1);
+    }
     return this.musicOn;
   },
 
@@ -344,9 +383,6 @@ export const audio = {
     o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.22);
     this._noise(now, 0.1, 'lowpass', 800, 0.7, 0.25);
   },
-
-  // v8 §5: the music grows with the player — set the active layer count
-  setMusicForm(f: number) { this._musicForm = Math.max(0, f | 0); },
 
   // v7 §3: ice-cream cart jingle
   playJingle() {
@@ -575,7 +611,7 @@ export const audio = {
     [523.25, 659.25, 783.99].forEach((f, i) => this.playTone(f, 'triangle', 0.5, 0.1, i * 0.05));
   },
 
-  // ── procedural background music (v6 §10: 96 BPM marimba, C major, 8-bar loop) ──
+  // ── procedural background music — Sound Pack Phase 6: Tone.js engine ──────────
   startMusic() {
     this.init();
     if (!this.ctx || this._musicPlaying) return;
@@ -584,26 +620,63 @@ export const audio = {
     this._musicForm = 0;
     this._step = 0;
     this._nextStepTime = this.ctx.currentTime + 0.1;
+    // Start the legacy scheduler immediately so music is audible with zero delay,
+    // then swap to Tone.js once the async import resolves.
     this._musicTimer = window.setInterval(() => this._musicScheduler(), 25);
+    void this._startToneMusic();
   },
   stopMusic() {
     this._musicPlaying = false;
     this._musicPaused = false;
     if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
+    // Dispose Tone.js resources
+    try {
+      if (this._toneModule) {
+        const T = this._toneModule;
+        T.getTransport().stop();
+        T.getTransport().cancel();
+        for (const node of this._toneDisposables) { try { node.dispose(); } catch { /* ignore */ } }
+      }
+    } catch { /* ignore */ }
+    this._toneDisposables.length = 0;
+    this._toneVols.length = 0;
+    this._dangerVol = null;
+    this._masterFilt = null;
+    this._toneReady = false;
+    this.stopVacuumHum();
+    this._lastFinalTickSec = -1;
   },
   pauseMusic() {
     if (!this._musicPlaying || this._musicPaused) return;
     this._musicPaused = true;
     if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
+    if (this._toneReady && this._toneModule) this._toneModule.getTransport().pause();
   },
   resumeMusic() {
-    if (!this._musicPlaying || !this._musicPaused || !this.ctx) return;
+    if (!this._musicPlaying || !this._musicPaused) return;
     this._musicPaused = false;
-    this._nextStepTime = this.ctx.currentTime + 0.05;
-    this._musicTimer = window.setInterval(() => this._musicScheduler(), 25);
+    if (this._toneReady && this._toneModule) {
+      this._toneModule.getTransport().start();
+    } else if (this.ctx) {
+      this._nextStepTime = this.ctx.currentTime + 0.05;
+      this._musicTimer = window.setInterval(() => this._musicScheduler(), 25);
+    }
   },
 
   setMusicIntensity(combo: number) { this._intense = combo >= 2; },
+
+  setMusicForm(f: number) {
+    this._musicForm = Math.max(0, f | 0);
+    if (this._toneReady && this._toneVols.length) {
+      // Fade each newly-unlocked layer in over 2 seconds
+      const TARGET_DB = [-6, -9, -11, -14, -14];
+      for (let i = 0; i <= this._musicForm && i < this._toneVols.length; i++) {
+        const vol = this._toneVols[i];
+        vol.mute = false;
+        vol.volume.rampTo(TARGET_DB[i] ?? -14, 2);
+      }
+    }
+  },
 
   duckMusic() {
     if (!this.ctx || !this.musicGain || !this.musicOn) return;
@@ -613,6 +686,17 @@ export const audio = {
     g.setValueAtTime(g.value, now);
     g.linearRampToValueAtTime(0.2, now + 0.05);
     g.linearRampToValueAtTime(this._musicBase, now + 0.45);
+    // Also duck the Tone.js bus
+    if (this._toneReady && this._toneModule && this.musicOn) {
+      const dest = this._toneModule.getDestination();
+      const cur = dest.volume.value;
+      dest.volume.rampTo(cur - 3.5, 0.06);
+      window.setTimeout(() => {
+        if (this._musicPlaying && this._toneModule) {
+          this._toneModule.getDestination().volume.rampTo(-8, 0.4);
+        }
+      }, 300);
+    }
   },
 
   _musicScheduler() {
@@ -733,5 +817,446 @@ export const audio = {
     g.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
     src.connect(filt); filt.connect(g); g.connect(this.musicGain);
     src.start(time); src.stop(time + 0.05);
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  //  Sound Pack Phase 6 — Tone.js adaptive music + new SFX
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  // Dynamically imported Tone.js: A minor, 110 BPM, 5 stacked layers + danger
+  async _startToneMusic() {
+    try {
+      const T = await import('tone');
+      this._toneModule = T;
+      if (!this._musicPlaying) return; // stopped before import resolved
+
+      // Kill legacy scheduler — Tone.js takes over
+      if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
+
+      T.getTransport().bpm.value = 110;
+      T.getTransport().loop = true;
+      T.getTransport().loopStart = 0;
+      T.getTransport().loopEnd = '8m'; // 8-bar loop ≈ 43.6 s
+
+      // Master lowpass filter (TIME WARP sweeps this to 400 Hz)
+      const masterFilt = new T.Filter(20000, 'lowpass');
+      masterFilt.toDestination();
+      this._masterFilt = masterFilt;
+      this._toneDisposables.push(masterFilt);
+
+      // Tone.js master volume + mute
+      T.getDestination().volume.value = this.musicOn ? -8 : -60;
+      T.getDestination().mute = !this.musicOn;
+
+      // Per-layer Volume nodes (layer 0 active, rest muted until evolve)
+      const LAYER_START_DB = [-6, -60, -60, -60, -60];
+      this._toneVols = LAYER_START_DB.map((db, i) => {
+        const v = new T.Volume(db);
+        if (i > 0) v.mute = true;
+        v.connect(masterFilt);
+        this._toneDisposables.push(v);
+        return v;
+      });
+
+      // Danger layer (starts muted)
+      const dangerVol = new T.Volume(-60);
+      dangerVol.mute = true;
+      dangerVol.connect(masterFilt);
+      this._dangerVol = dangerVol;
+      this._toneDisposables.push(dangerVol);
+
+      // Am chord progression: Am | Am | Dm | Em (each = 2 bars)
+      const CHORDS: string[][] = [
+        ['A3', 'C4', 'E4'], ['A3', 'C4', 'E4'],
+        ['D3', 'F3', 'A3'], ['E3', 'G3', 'B3'],
+      ];
+
+      // ── LAYER 0: pad + sparse pluck (VOIDLING) ────────────────────────────────
+      const padSynth = new T.PolySynth(T.Synth, {
+        oscillator: { type: 'triangle' as OscillatorType },
+        envelope: { attack: 0.9, decay: 0.2, sustain: 0.85, release: 4.0 },
+        volume: -15,
+      }).connect(this._toneVols[0]);
+      this._toneDisposables.push(padSynth);
+
+      let chordIdx = 0;
+      const padSeq = new T.Sequence((time) => {
+        if (!this._musicPlaying) return;
+        padSynth.releaseAll(time);
+        padSynth.triggerAttack(CHORDS[chordIdx % 4], time, 0.4);
+        chordIdx++;
+      }, [1], '2m');
+      padSeq.start(0);
+      this._toneDisposables.push(padSeq);
+
+      const pluckSynth = new T.PolySynth(T.Synth, {
+        oscillator: { type: 'sine' as OscillatorType },
+        envelope: { attack: 0.01, decay: 0.55, sustain: 0.04, release: 0.7 },
+        volume: -19,
+      }).connect(this._toneVols[0]);
+      this._toneDisposables.push(pluckSynth);
+
+      const PLUCK_PAT: (string | null)[] = [
+        'A4', null, null, null, 'E4', null, null, null,
+        'G4', null, null, null, 'C5', null, null, null,
+      ];
+      const pluckSeq = new T.Sequence((time, note) => {
+        if (!this._musicPlaying || !note) return;
+        pluckSynth.triggerAttackRelease(note as string, '8n', time, 0.3);
+      }, PLUCK_PAT, '8n');
+      pluckSeq.start(0);
+      this._toneDisposables.push(pluckSeq);
+
+      // ── LAYER 1: bass line (MUNCHER) ─────────────────────────────────────────
+      const bassSynth = new T.Synth({
+        oscillator: { type: 'triangle' as OscillatorType },
+        envelope: { attack: 0.04, decay: 0.45, sustain: 0.55, release: 0.4 },
+        volume: -12,
+      }).connect(this._toneVols[1]);
+      this._toneDisposables.push(bassSynth);
+
+      const BASS_PAT: (string | null)[] = [
+        'A1', null, 'E2', null, 'D2', null, 'A2', null,
+        'A1', null, 'E2', null, 'E2', null, 'B1', null,
+      ];
+      const bassSeq = new T.Sequence((time, note) => {
+        if (!this._musicPlaying || !note) return;
+        bassSynth.triggerAttackRelease(note as string, '4n', time, 0.65);
+      }, BASS_PAT, '4n');
+      bassSeq.start(0);
+      this._toneDisposables.push(bassSeq);
+
+      // ── LAYER 2: drums — kick, snare, closed hats (GOBBLER) ─────────────────
+      const kickSynth = new T.MembraneSynth({
+        pitchDecay: 0.055, octaves: 4.5, volume: -5,
+        envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.08 },
+      }).connect(this._toneVols[2]);
+      this._toneDisposables.push(kickSynth);
+
+      const snareSynth = new T.NoiseSynth({
+        noise: { type: 'white' as 'white' }, volume: -16,
+        envelope: { attack: 0.001, decay: 0.19, sustain: 0, release: 0.04 },
+      }).connect(this._toneVols[2]);
+      this._toneDisposables.push(snareSynth);
+
+      const hatSynth = new T.NoiseSynth({
+        noise: { type: 'white' as 'white' }, volume: -23,
+        envelope: { attack: 0.001, decay: 0.038, sustain: 0, release: 0.01 },
+      }).connect(this._toneVols[2]);
+      this._toneDisposables.push(hatSynth);
+
+      const DRUM_PAT = ['kh', 'h', 'sh', 'h', 'kh', 'h', 'sh', 'h'];
+      const drumSeq = new T.Sequence((time, beat) => {
+        if (!this._musicPlaying || !beat) return;
+        const b = beat as string;
+        if (b.includes('k')) kickSynth.triggerAttackRelease('C1', '8n', time, 0.85);
+        if (b.includes('s')) snareSynth.triggerAttackRelease('8n', time, 0.7);
+        if (b.includes('h')) hatSynth.triggerAttackRelease('16n', time, this._intense ? 1 : 0.55);
+      }, DRUM_PAT, '4n');
+      drumSeq.start(0);
+      this._toneDisposables.push(drumSeq);
+
+      // ── LAYER 3: running arpeggio (DEVOURER) ─────────────────────────────────
+      const arpSynth = new T.Synth({
+        oscillator: { type: 'sine' as OscillatorType },
+        envelope: { attack: 0.005, decay: 0.16, sustain: 0.12, release: 0.2 },
+        volume: -20,
+      }).connect(this._toneVols[3]);
+      this._toneDisposables.push(arpSynth);
+
+      const ARP_PAT: string[] = [
+        'A4', 'C5', 'E5', 'A5', 'G5', 'E5', 'C5', 'A4',
+        'A4', 'D5', 'F5', 'A5', 'G5', 'F5', 'D5', 'A4',
+      ];
+      const arpSeq = new T.Sequence((time, note) => {
+        if (!this._musicPlaying || !note) return;
+        arpSynth.triggerAttackRelease(note as string, '16n', time, 0.72);
+      }, ARP_PAT, '16n');
+      arpSeq.start(0);
+      this._toneDisposables.push(arpSeq);
+
+      // ── LAYER 4: lead line + open hats (WORLD ENDER) ─────────────────────────
+      const leadSynth = new T.Synth({
+        oscillator: { type: 'triangle' as OscillatorType },
+        envelope: { attack: 0.04, decay: 0.45, sustain: 0.52, release: 0.85 },
+        volume: -17,
+      }).connect(this._toneVols[4]);
+      this._toneDisposables.push(leadSynth);
+
+      const LEAD_PAT: (string | null)[] = [
+        null, 'A4', null, 'G4', null, 'F4', null, 'E4',
+        null, 'D4', null, 'C4', null, 'A3', 'C4', 'E4',
+      ];
+      const leadSeq = new T.Sequence((time, note) => {
+        if (!this._musicPlaying || !note) return;
+        leadSynth.triggerAttackRelease(note as string, '4n', time, 0.75);
+      }, LEAD_PAT, '8n');
+      leadSeq.start(0);
+      this._toneDisposables.push(leadSeq);
+
+      const openHatSynth = new T.NoiseSynth({
+        noise: { type: 'white' as 'white' }, volume: -21,
+        envelope: { attack: 0.001, decay: 0.26, sustain: 0, release: 0.16 },
+      }).connect(this._toneVols[4]);
+      this._toneDisposables.push(openHatSynth);
+
+      const OPEN_HAT_PAT = [false, false, true, false, false, false, true, false];
+      const openHatSeq = new T.Sequence((time, v) => {
+        if (!this._musicPlaying || !v) return;
+        openHatSynth.triggerAttackRelease('8n', time, 0.78);
+      }, OPEN_HAT_PAT, '4n');
+      openHatSeq.start(0);
+      this._toneDisposables.push(openHatSeq);
+
+      // ── DANGER LAYER: tense pulsing low string pad ───────────────────────────
+      const dangerSynth = new T.PolySynth(T.Synth, {
+        oscillator: { type: 'sawtooth' as OscillatorType },
+        envelope: { attack: 1.4, decay: 0.1, sustain: 0.9, release: 3.0 },
+        volume: -22,
+      }).connect(dangerVol);
+      this._toneDisposables.push(dangerSynth);
+      dangerSynth.triggerAttack(['A1', 'E2'], '+0.15', 0.5);
+
+      const dangerLfo = new T.LFO({ frequency: 0.5, min: -26, max: -14, type: 'sine' as 'sine' });
+      dangerLfo.connect(dangerVol.volume);
+      dangerLfo.start();
+      this._toneDisposables.push(dangerLfo);
+
+      T.getTransport().start('+0.1');
+      this._toneReady = true;
+    } catch {
+      // Tone.js failed to load — legacy scheduler is already running as fallback
+    }
+  },
+
+  // ── Sound Pack §3: GULP ── tiny sine drop synced to chomp squash ─────────────
+  playGulp() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(200, now);
+    o.frequency.exponentialRampToValueAtTime(90, now + 0.09);
+    g.gain.setValueAtTime(0.22, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.11);
+  },
+
+  // ── Sound Pack §7: FALLOFF ── slide-whistle glide + soft poof ───────────────
+  playFalloff() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    // Slide whistle: 900 → 200 Hz sine over 700 ms
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(900, now);
+    o.frequency.exponentialRampToValueAtTime(200, now + 0.7);
+    g.gain.setValueAtTime(0.18, now);
+    g.gain.linearRampToValueAtTime(0.05, now + 0.68);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.72);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.74);
+    // Soft poof at the bottom
+    this._noise(now + 0.65, 0.28, 'lowpass', 600, 0.8, 0.09);
+    this.duckMusic();
+  },
+
+  // ── Sound Pack §6: WORMHOLE ── square-wave zap 1200→300 Hz, 120 ms ──────────
+  playWormhole() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(1200, now);
+    o.frequency.exponentialRampToValueAtTime(300, now + 0.12);
+    g.gain.setValueAtTime(0.18, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.15);
+    this._noise(now, 0.08, 'highpass', 2000, 1, 0.1);
+  },
+
+  // ── Sound Pack §6: EVENT HORIZON ── three deep 100 Hz sine throbs ───────────
+  playEventHorizon() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    for (let i = 0; i < 3; i++) {
+      const t = this.ctx.currentTime + i * 0.22;
+      const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+      o.type = 'sine'; o.frequency.value = 100;
+      g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.2);
+    }
+  },
+
+  // ── Sound Pack §6: SINGULARITY ── rising filtered-noise swell + 60 Hz pop ───
+  playSingularity() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this._noise(now, 0.5, 'bandpass', 200, 1.5, 0.12, 4000); // rising swell
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 60;
+    g.gain.setValueAtTime(0.001, now + 0.48);
+    g.gain.linearRampToValueAtTime(0.45, now + 0.5);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
+    o.connect(g); g.connect(this.sfxGain); o.start(now + 0.48); o.stop(now + 0.7);
+  },
+
+  // ── Sound Pack §6: TIME WARP ── sweep music master filter to/from 400 Hz ────
+  startTimeWarpFilter() {
+    if (!this._toneReady || !this._masterFilt) return;
+    this._masterFilt.frequency.rampTo(400, 0.6);
+  },
+  stopTimeWarpFilter() {
+    if (!this._toneReady || !this._masterFilt) return;
+    this._masterFilt.frequency.rampTo(20000, 0.8);
+  },
+
+  // ── Sound Pack §8: PREDATION — eating a rival ───────────────────────────────
+  playPredationEat() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    // Deep boom: EAT BIG
+    this._noise(now, 0.15, 'lowpass', 300, 0.8, 0.25);
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 80;
+    g.gain.setValueAtTime(0.35, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.17);
+    // Shimmer tail
+    if (this._noiseBuf) this._noise(now + 0.1, 0.5, 'highpass', 5000, 1, 0.04);
+  },
+
+  // ── Sound Pack §8: PREDATION — being eaten by a rival ───────────────────────
+  playPredationEaten() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    // Heavy 120 Hz thud
+    const o1 = this.ctx.createOscillator(); const g1 = this.ctx.createGain();
+    o1.type = 'sine'; o1.frequency.value = 120;
+    g1.gain.setValueAtTime(0.5, now); g1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o1.connect(g1); g1.connect(this.sfxGain); o1.start(now); o1.stop(now + 0.2);
+    // Two-note descending womp
+    ([300, 180] as const).forEach((freq, i) => {
+      const t = now + 0.12 + i * 0.18;
+      const o = this.ctx!.createOscillator(); const g = this.ctx!.createGain();
+      o.type = 'sawtooth'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      o.connect(g); g.connect(this.sfxGain!); o.start(t); o.stop(t + 0.18);
+    });
+    this.duckMusic();
+  },
+
+  // ── Sound Pack §10: SPEECH BUBBLE POP ── tiny blip when bubble expires ──────
+  playBubblePop() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(800, now);
+    o.frequency.exponentialRampToValueAtTime(1600, now + 0.025);
+    g.gain.setValueAtTime(0.06, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.04);
+  },
+
+  // ── Sound Pack §11: FINAL-10s TICK ── 2 kHz square, dedup per integer second ─
+  playFinalTick(sec: number) {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    if (sec === this._lastFinalTickSec) return;
+    this._lastFinalTickSec = sec;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'square'; o.frequency.value = 2000;
+    g.gain.setValueAtTime(0.08, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.025);
+  },
+
+  // ── Sound Pack §9: PED PANIC ── cartoon squeak 800→1200 Hz, cap 1/sec ───────
+  playPedPanic() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const nowMs = this.ctx.currentTime * 1000;
+    if (nowMs - this._lastPedPanicMs < 1000) return;
+    this._lastPedPanicMs = nowMs;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(800, now);
+    o.frequency.exponentialRampToValueAtTime(1200, now + 0.06);
+    g.gain.setValueAtTime(0.1, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.08);
+  },
+
+  // ── Sound Pack §5: VACUUM HUM ── looping bandpass noise while suction active ─
+  startVacuumHum() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain || this._vacuumRunning || !this._noiseBuf) return;
+    this._vacuumRunning = true;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuf; src.loop = true;
+    const filt = this.ctx.createBiquadFilter();
+    filt.type = 'bandpass'; filt.frequency.value = 420; filt.Q.value = 1.6;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.09, this.ctx.currentTime + 0.25);
+    src.connect(filt); filt.connect(g); g.connect(this.sfxGain);
+    src.start();
+    this._vacuumSrcNode = src;
+    this._vacuumGainNode = g;
+  },
+  stopVacuumHum() {
+    if (!this._vacuumRunning || !this.ctx || !this._vacuumGainNode || !this._vacuumSrcNode) return;
+    this._vacuumRunning = false;
+    const g = this._vacuumGainNode; const src = this._vacuumSrcNode;
+    this._vacuumGainNode = null; this._vacuumSrcNode = null;
+    g.gain.cancelScheduledValues(this.ctx.currentTime);
+    g.gain.setValueAtTime(g.gain.value, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.0001, this.ctx.currentTime + 0.35);
+    const stopped = this.ctx;
+    window.setTimeout(() => { try { src.stop(); } catch { /* ignore */ } }, 400);
+    void stopped; // keep reference live
+  },
+
+  // Convenience toggle called from engine.ts each simulate tick
+  setVacuumActive(active: boolean) {
+    if (active && !this._vacuumRunning) this.startVacuumHum();
+    else if (!active && this._vacuumRunning) this.stopVacuumHum();
+  },
+
+  // ── Sound Pack §8: DANGER LAYER ── fade tense pad in when big rival is close ─
+  updateDanger(relDist: number) {
+    // relDist: 0 = maxDanger (rival very close), 1 = safe (beyond 1.5 screen widths)
+    if (!this._toneReady || !this._dangerVol) return;
+    const safe = relDist >= 1;
+    if (!safe) {
+      // Cancel any pending safe-out timer so we don't force-mute an active layer
+      if (this._dangerMuteTimer !== null) { clearTimeout(this._dangerMuteTimer); this._dangerMuteTimer = null; }
+      this._dangerVol.mute = false;
+      // Lerp volume toward target (called every tick — rampTo is idempotent in Tone.js)
+      const targetDb = -14 + relDist * 16; // -14 dB at closest → -6 dB at half-range
+      this._dangerVol.volume.rampTo(targetDb, 1.5);
+    } else if (!this._dangerVol.mute && this._dangerMuteTimer === null) {
+      // Safe zone: begin fade-out + schedule a single mute (guard prevents re-queuing each tick)
+      this._dangerVol.volume.rampTo(-60, 2.0);
+      this._dangerMuteTimer = window.setTimeout(() => {
+        if (this._dangerVol) this._dangerVol.mute = true;
+        this._dangerMuteTimer = null;
+      }, 2300);
+    }
+  },
+
+  // ── Unified play() entry point ── optional convenience wrapper ───────────────
+  play(event: string, params: Record<string, unknown> = {}) {
+    switch (event) {
+      case 'eat_small':       this.playChomp((params.tier as number) || 1); break;
+      case 'gulp':            this.playGulp(); break;
+      case 'evolve':          this.playEvolve(); break;
+      case 'falloff':         this.playFalloff(); break;
+      case 'wormhole':        this.playWormhole(); break;
+      case 'event_horizon':   this.playEventHorizon(); break;
+      case 'singularity':     this.playSingularity(); break;
+      case 'predation_eat':   this.playPredationEat(); break;
+      case 'predation_eaten': this.playPredationEaten(); break;
+      case 'bubble_pop':      this.playBubblePop(); break;
+      case 'ped_panic':       this.playPedPanic(); break;
+      case 'banner':          this.whoosh(); break;
+      case 'click':           this.playClick(); break;
+      case 'win':             this.playWin(); break;
+      default: break;
+    }
   },
 };

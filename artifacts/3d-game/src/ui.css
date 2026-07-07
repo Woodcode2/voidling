@@ -286,6 +286,22 @@
 
 .vd-shop-list { width: 100%; overflow-y: auto; }
 
+/* Sound Pack Phase 6: pill container — pause + sound side by side */
+.vd-hud-pills {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  pointer-events: auto;
+}
+.vd-hud-pills .vd-pause-pill {
+  position: static; /* override absolute when inside the container */
+  top: unset;
+  right: unset;
+}
+
 /* single pause pill (top-right) — replaces the old floating sound/close buttons */
 .vd-pause-pill {
   position: absolute;
