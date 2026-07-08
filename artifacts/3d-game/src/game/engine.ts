@@ -68,10 +68,6 @@ export interface Snapshot {
   trophies: { earned: string[]; counters: import('./meta').TrophyCounters }; // v12 §5
   // v15
   radii: Array<{name:string; radius:number; mass:number; score:number; overLaw:boolean}>;
-  heldSpell: BoonDef | null;
-  activeSpell: string | null;
-  spellTimer: number;     // War Pack §3: ms remaining for active power (0 = none)
-  spellTimerMax: number;  // War Pack §3: full power duration (for conic-gradient sweep)
   showHitboxes: boolean;
   // v16 (ticker removed in Fix 7 — events route to banner pill)
   contracts: Array<{id: string; name: string; done: boolean; reward: number}>;
@@ -97,7 +93,6 @@ export interface GameEngine {
   toggleMute(): boolean;
   toggleMusic(): boolean;
   toggleSfx(): boolean;
-  castSpell(): void;
   toggleHitboxes(): boolean;
   unlockAudio(): void;
   destroy(): void;
@@ -181,12 +176,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let countStep = 0;           // v8 §1: last countdown number beeped
   let matchStartSeq = 0;        // Rebuild Prompt 10: increments once per real match start (never on boon/resume)
   let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
-  // v15 §3 → War Pack §3: power system
-  let heldSpell: BoonDef | null = null;
-  let activeSpell: string | null = null;
-  let queuedSpell: string | null = null; // Phase 7a §2: queued auto-cast while a spell is active
-  let spellTimer = 0;
-  let spellTimerMax = 0;          // War Pack §3: full duration for radial sweep HUD
   let showHitboxes = false;
   // War Pack §2: defense wave state
   let defensePhase = 0;           // 0=none 1=police 2=army 3=tanks 4=helis
@@ -196,8 +185,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const defenseShells: Array<{tx:number;ty:number;warnT:number;warnMax:number;rocket:boolean}> = [];
   // Phase 7b §5: heli missile — 0.8s red-line warning then impact (4% score chip)
   const heliMissiles: Array<{tx:number;ty:number;fromX:number;fromY:number;warnT:number}> = [];
-  // War Pack §3: SINGULARITY black hole
-  let singularity: {x:number;y:number;timer:number;score:number}|null = null;
   // War Pack §2: ms of red pellet-hit overlay remaining
   let pelletHitFlash = 0;
   // Fix 2: ?debug=mask tints non-walkable cells red for mask verification
@@ -468,10 +455,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     countdown = 0;
     countStep = 0;
     crackTimer = 0;
-    // War Pack: reset power + defense state each round
-    heldSpell = null; activeSpell = null; queuedSpell = null; spellTimer = 0; spellTimerMax = 0;
+    // War Pack: reset defense state each round
     defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0; defenseShells.length = 0;
-    singularity = null; pelletHitFlash = 0;
+    pelletHitFlash = 0;
     finalFeastFired = false; finalFeastActive = false;
     feedingFrenzyFired = false; feedingFrenzyActive = false;
     killedBy = ''; roundEnded = false;
@@ -568,27 +554,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   function chooseBoon(id: string) {
     if (screen !== 'boon' || !player) return;
-    // Phase 7a §2: spell pickups auto-cast after a 0.6s charge sparkle (no tap button)
-    if (id.startsWith('spell_')) {
-      const spellId = id.replace('spell_', '');
-      const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
-      if (spellDef) {
-        boonChoices = [];
-        screen = 'game';
-        joystick.setEnabled(true);
-        resetClock();
-        banner('✨ ' + spellDef.name + ' CHARGING!', spellDef.color ?? '#7BFFED', 1);
-        audio.playBoon();
-        if (player) fx.addRing(player.x, player.y, spellDef.color ?? '#7BFFED', 0, player.radius * 2.5, 8, 700);
-        window.setTimeout(() => {
-          if (!player) return;
-          if (activeSpell) { queuedSpell = spellId; notify(); return; } // queue if busy
-          _executeCast(spellId);
-        }, 600);
-        notify();
-      }
-      return;
-    }
     const def = CONFIG.BOONS.find((b) => b.id === id);
     if (!def) return;
     track('boon_pick', { id });
@@ -628,7 +593,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     roundEnded = true;
     joystick.setEnabled(false);
 
-    const board = [player, ...rivals].sort((a, b) => b.score - a.score);
+    // Death Rules Pivot: eliminated rivals are out of the match — they must not
+    // occupy a placement slot or affect the crown/placement calculation.
+    const board = [player, ...rivals.filter((r) => r.alive)].sort((a, b) => b.score - a.score);
     const placement = board.findIndex((e) => e === player) + 1;
     const crown = placement === 1;
     const worldEater = player.formIndex >= CONFIG.FORMS.length - 1;
@@ -828,26 +795,26 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
 
     // War Pack §3: TIME WARP — rivals + world move at 40% speed, player runs full dt
-    const twDt = (activeSpell === 'time_warp' && spellTimer > 0) ? dt * 0.4 : dt;
 
-    // rivals
+    // rivals — Death Rules Pivot: eliminated (non-alive) rivals no longer tick
     for (let i = 0; i < rivals.length; i++) {
+      if (!rivals[i].alive) continue;
       const others: WorldView['voids'] = [{ x: player.x, y: player.y, radius: player.ghost ? 0.001 : player.radius }];
       for (let j = 0; j < rivals.length; j++) {
         if (j !== i && rivals[j].alive && !rivals[j].ghost) {
           others.push({ x: rivals[j].x, y: rivals[j].y, radius: rivals[j].radius });
         }
       }
-      rivals[i].update(twDt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0, playerRadius: player?.radius ?? CONFIG.PLAYER_BASE_RADIUS });
+      rivals[i].update(dt, { objects: world.objects, voids: others, map: CONFIG.MAP_SIZE, elapsed: roundElapsed, playerScore: player?.score ?? 0, playerRadius: player?.radius ?? CONFIG.PLAYER_BASE_RADIUS });
     }
 
     // objects (suction + eat + living-world AI)
     world.respawnMult = feedingFrenzyActive ? 3 : finalFeastActive ? 2 : 1; // Phase 7b §6
-    world.update(twDt, player, rivals, fx);
+    world.update(dt, player, rivals, fx);
     // Life Pack §3: flush vignette eaten banners
     for (const msg of world.eatenVignetteBanners) banner(msg, '#FFD23F', 3);
     world.eatenVignetteBanners.length = 0;
-    updateDrift(twDt); // Phase 2: advance space drift objects
+    updateDrift(dt); // Phase 2: advance space drift objects
 
     // War Pack §2: defense wave system
     if (world && player && world.initialMass > 0) {
@@ -891,10 +858,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           const hd = Math.hypot(hdx, hdy) || 1;
           if (hd > 60) { o.vx = (hdx / hd) * CONFIG.DEFENSE_UNIT_SPEED * 0.9; o.vy = (hdy / hd) * CONFIG.DEFENSE_UNIT_SPEED * 0.9; }
           else { o.vx *= 0.88; o.vy *= 0.88; }
-          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
           // Helis fire pellet bursts
-          o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD * 0.7) - twDt;
+          o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD * 0.7) - dt;
           if (o.pelletCd <= 0 && d < 1200) {
             o.pelletCd = CONFIG.DEFENSE_PELLET_CD * 0.7 + Math.random() * 600;
             for (let b = 0; b < 3; b++) {
@@ -905,7 +872,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             }
           }
           // Phase 7b §5: heli missile — fires every 6–8 s with 0.8 s red warning line
-          o.missileCd = (o.missileCd ?? (6000 + Math.random() * 2000)) - twDt;
+          o.missileCd = (o.missileCd ?? (6000 + Math.random() * 2000)) - dt;
           if ((o.missileCd ?? 1) <= 0 && d < 1400) {
             o.missileCd = 6000 + Math.random() * 2000;
             heliMissiles.push({ tx: player.x + (Math.random()-0.5)*40, ty: player.y + (Math.random()-0.5)*40, fromX: o.x, fromY: o.y, warnT: 800 });
@@ -914,9 +881,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         } else if (o.kind === 'tank') {
           // Tanks: slow, fire shells with 1s landing-circle warning
           if (d < 2200) { o.vx = (dx / d) * CONFIG.DEFENSE_TANK_SPEED; o.vy = (dy / d) * CONFIG.DEFENSE_TANK_SPEED; }
-          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.pelletCd = (o.pelletCd ?? 3000) - twDt;
+          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.pelletCd = (o.pelletCd ?? 3000) - dt;
           if (o.pelletCd <= 0 && d < 1600) {
             o.pelletCd = 3000 + Math.random() * 1500;
             defenseShells.push({ tx: player.x + (Math.random()-0.5)*80, ty: player.y + (Math.random()-0.5)*80,
@@ -925,9 +892,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         } else if (o.kind === 'missile_truck') {
           // Missile trucks: medium speed, slower rockets
           if (d < 2000) { o.vx = (dx / d) * CONFIG.DEFENSE_UNIT_SPEED * 1.1; o.vy = (dy / d) * CONFIG.DEFENSE_UNIT_SPEED * 1.1; }
-          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.pelletCd = (o.pelletCd ?? 2400) - twDt;
+          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.pelletCd = (o.pelletCd ?? 2400) - dt;
           if (o.pelletCd <= 0 && d < 1800) {
             o.pelletCd = 2400 + Math.random() * 1200;
             defenseShells.push({ tx: player.x + (Math.random()-0.5)*60, ty: player.y + (Math.random()-0.5)*60,
@@ -941,9 +908,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
                       : CONFIG.DEFENSE_UNIT_SPEED;
             o.vx = (dx / d) * spd; o.vy = (dy / d) * spd;
           }
-          o.x = clamp(o.x + o.vx * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (twDt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD) - twDt;
+          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD) - dt;
           if (o.pelletCd <= 0 && d < 1400) {
             o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 800;
             const spread = (Math.random() - 0.5) * 0.45;
@@ -974,7 +941,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       // Update & hit-test pellets (motion slowed by TIME_WARP; flash uses full dt)
       for (let pi = defensePellets.length - 1; pi >= 0; pi--) {
         const p = defensePellets[pi];
-        p.x += p.vx * (twDt / 1000); p.y += p.vy * (twDt / 1000); p.life -= twDt;
+        p.x += p.vx * (dt / 1000); p.y += p.vy * (dt / 1000); p.life -= dt;
         if (p.life <= 0) { defensePellets.splice(pi, 1); continue; }
         if (!player.ghost && dist(p.x, p.y, player.x, player.y) < player.radius * 0.88) {
           defensePellets.splice(pi, 1);
@@ -988,7 +955,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       // Life Pack §4: tank/rocket shell countdown + impact
       for (let si = defenseShells.length - 1; si >= 0; si--) {
         const s = defenseShells[si];
-        s.warnT -= twDt;
+        s.warnT -= dt;
         if (s.warnT <= 0) {
           defenseShells.splice(si, 1);
           if (!player.ghost && dist(s.tx, s.ty, player.x, player.y) < player.radius * 0.75) {
@@ -1019,7 +986,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       // Phase 7b §5: heli missiles — update countdown + 4% score chip on impact
       for (let mi = heliMissiles.length - 1; mi >= 0; mi--) {
         const m = heliMissiles[mi];
-        m.warnT -= twDt;
+        m.warnT -= dt;
         if (m.warnT <= 0) {
           heliMissiles.splice(mi, 1);
           if (!player.ghost && dist(m.tx, m.ty, player.x, player.y) < player.radius * 0.9) {
@@ -1036,36 +1003,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         }
       }
       if (pelletHitFlash > 0) pelletHitFlash -= dt;
-    }
-    // War Pack §3: SINGULARITY black hole update
-    if (singularity && world && player) {
-      singularity.timer -= dt;
-      spellTimer = singularity.timer; // keep HUD radial sweep in sync
-      for (const o of world.objects) {
-        if (o.eaten || o.defense) continue;
-        const sdx = singularity.x - o.x, sdy = singularity.y - o.y;
-        const sd = Math.hypot(sdx, sdy) || 1;
-        if (sd < 700) {
-          const pullF = Math.min(1, 600 / sd) * (dt / 1000) * 1400;
-          o.vx += (sdx / sd) * pullF; o.vy += (sdy / sd) * pullF;
-        }
-        if (sd < 90 && !o.eaten) {
-          o.eaten = true;
-          if (!o.scenery) world.eatenArea += Math.PI * o.baseSize * o.baseSize;
-          singularity.score += Math.max(1, (CONFIG.KIND_INFO[o.kind]?.tier ?? 1) * 5);
-        }
-      }
-      if (singularity.timer <= 0) {
-        if (singularity.score > 0) {
-          player.score += singularity.score;
-          fx.addConfetti(singularity.x, singularity.y, CONFIG.COLORS.pops, 30);
-          fx.addRing(singularity.x, singularity.y, '#F15BB5', 10, 400, 8, 600);
-          fx.shake(300, 10);
-          banner(`⚫ SINGULARITY popped! +${singularity.score}`, '#F15BB5', 3);
-        }
-        singularity = null; activeSpell = null; spellTimer = 0; spellTimerMax = 0;
-        notify();
-      }
     }
 
     // v8 §3: WORLD EATER carves a cracked-ground trail while it roams
@@ -1216,26 +1153,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       checkContract('reach_gobbler', player.formIndex >= 2);
       // 'first_place': leading during the last 60s window
       if (timeLeft <= 60000 && timeLeft > 59000 && rivals.length > 0) {
-        const leading = player.score >= Math.max(...rivals.map((r) => r.score)) && player.score > 0;
+        const activeScores = rivals.filter((r) => r.alive).map((r) => r.score);
+        const leading = player.score >= (activeScores.length ? Math.max(...activeScores) : 0) && player.score > 0;
         checkContract('first_place', leading);
-      }
-    }
-
-    // War Pack §3: active power tick
-    if (activeSpell && spellTimer > 0 && player && activeSpell !== 'singularity') {
-      spellTimer -= dt;
-      if (spellTimer <= 0) {
-        if (activeSpell === 'event_horizon') player.suctionMult = 1;
-        if (activeSpell === 'time_warp') audio.stopTimeWarpFilter(); // Sound Pack §6
-        activeSpell = null; spellTimerMax = 0;
-        // Phase 7a §2: drain queued spell
-        if (queuedSpell && player) { const qs = queuedSpell; queuedSpell = null; _executeCast(qs); }
-        notify();
-      }
-      // EVENT HORIZON: 2.5× vacuum reach + 2× suction pull
-      if (activeSpell === 'event_horizon') {
-        player.magnetMultiplier = Math.max(player.magnetMultiplier, 2.5);
-        player.suctionMult = 2;
       }
     }
 
@@ -1344,7 +1264,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     // identity-aware rank with no per-frame allocation/sort: strict-overtake semantics
     let rank = 1;
-    for (const r of rivals) if (r.score > player.score) rank++;
+    for (const r of rivals) if (r.alive && r.score > player.score) rank++;
     if (rank < prevRank && prevRank !== 99) {
       if (rank === 1 && !saidFirst) { saidFirst = true; banner("YOU'RE #1!", '#FFD23F', 5); }
       else if (rank <= 3 && !saidTop3) { saidTop3 = true; banner('TOP 3!', '#8AE6FF', 3); }
@@ -1407,7 +1327,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const dtSec = dt / 1000;
     // v9 §1: player + all bots are Void instances — the SAME setUnderdog()/
     // applyLeaderDecay() run for everyone, so no controller can be treated specially.
-    const standings: Void[] = [player, ...rivals].sort((a, b) => b.score - a.score);
+    // Death Rules Pivot: eliminated rivals are out of the match — they must not
+    // occupy a standings slot, count toward leader decay, or receive underdog aid.
+    const standings: Void[] = [player, ...rivals.filter((r) => r.alive)].sort((a, b) => b.score - a.score);
     for (let i = 0; i < standings.length; i++) standings[i].setUnderdog(i >= 4); // 5th place onward
     const leader = standings[0];
     const shed = leader.applyLeaderDecay(dtSec);
@@ -1426,26 +1348,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v7 §5: draw WITHOUT replacement — retire any power-up already at max level
     const pool = CONFIG.BOONS.filter((b) => (boonRank.get(b.id) || 0) < BOON_MAX_LEVEL);
     boonChoices = [];
-    // v15 §3: one random slot (≈50% of picks) may be a spell card
-    const spellSlot = (CONFIG.SPELLS.length && Math.random() < 0.5) ? Math.floor(Math.random() * 3) : -1;
     for (let i = 0; i < 3; i++) {
-      if (i === spellSlot) {
-        const sp = CONFIG.SPELLS[Math.floor(Math.random() * CONFIG.SPELLS.length)];
-        boonChoices.push({ id: 'spell_' + sp.id, name: sp.name, desc: sp.desc, spell: true, color: sp.color });
-      } else if (pool.length) {
+      if (pool.length) {
         boonChoices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
       }
-    }
-    // v15 §3: bot spell AI — each rival gets a 45% chance at an instant spell effect
-    for (const r of rivals) {
-      if (!r.alive || r.ghost || Math.random() > 0.45) continue;
-      const sp = CONFIG.SPELLS[Math.floor(Math.random() * CONFIG.SPELLS.length)];
-      if (sp.id === 'puny' && player && r.radius > player.radius * 0.7) {
-        player.radius = Math.max(CONFIG.PLAYER_BASE_RADIUS, player.radius * 0.85);
-        banner('💫 PUNY BEAM hit you!', '#FF6B6B', 3);
-        console.log(`[spell] bot ${r.name} cast PUNY BEAM on player`);
-      }
-      // other spells (garlic/freeze/bubble/switcheroo) = self-buff, no external effect needed
     }
     audio.playBoon();
     screen = 'boon';
@@ -1488,6 +1394,28 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
   }
 
+  // Death Rules Pivot: relocate the player after an eaten-and-dropped-stage
+  // event, mirroring rivals.getEaten() so drop-stage behaves like a real
+  // respawn on both sides rather than leaving the player sitting in the
+  // eater's mouth. Picks a random walkable point at least `minDist` from the
+  // eater, retrying a bounded number of times like the rival respawn logic.
+  function respawnPlayerAfterEaten(avoidX: number, avoidY: number, minDist: number) {
+    if (!player) return;
+    const m = CONFIG.MAP_SIZE;
+    let nx = 200 + Math.random() * (m - 400);
+    let ny = 200 + Math.random() * (m - 400);
+    for (let i = 0; i < 30; i++) {
+      const farEnough = dist(nx, ny, avoidX, avoidY) >= minDist;
+      if (farEnough && isWalkable(nx, ny)) break;
+      nx = 200 + Math.random() * (m - 400);
+      ny = 200 + Math.random() * (m - 400);
+    }
+    player.x = player.prevX = nx;
+    player.y = player.prevY = ny;
+    player.vx = player.vy = 0;
+    // dropStage() already granted 3s ghost — respawn shouldn't shorten it.
+  }
+
   function resolveVoids() {
     if (!player) return;
     // War Pack §2: 30s grace period — no void predation in the opening scramble
@@ -1510,13 +1438,18 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           r.score = Math.max(0, r.score - stolen);
           meta.updateTrophyCounter('totalVoidsEaten', 1, 'sum');
           player.eatRival(rr, stolen);
-          r.getEaten(player.x, player.y, minDist);
-          // Phase 7b §4: rival respawns as VOIDLING after 8 s
-          r.formIndex = 0;
-          r.radius = CONFIG.FORMS[0].radius;
-          r.score = 0;
-          r.ghostTime = 8000;
-          banner(`You devoured ${r.name}!`, '#FFD23F');
+          // Death Rules Pivot: rivals live by the same rules as the player —
+          // drop one stage when eaten, true elimination only at the smallest stage.
+          if (r.formIndex <= 0) {
+            r.alive = false;
+            r.vx = 0; r.vy = 0;
+            banner(`💀 ${r.name} ELIMINATED!`, '#FF4D6D', 4, { pulse: true });
+            queueTicker(`💀 ${r.name} was devoured for good! One less mouth in the city.`);
+          } else {
+            r.getEaten(player.x, player.y, minDist);
+            r.dropStage();
+            banner(`You devoured ${r.name}! ↓ Dropped to ${r.formName}`, '#FFD23F');
+          }
           if (stolen > 0) banner(`Stole ${stolen} pts!`, '#FF9F5A', 3);
         } else if (canEatVoid(r.radius, player.radius, d)) {
           if (player.shieldCharge) {
@@ -1533,9 +1466,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             const pr = player.radius;
             fx.shake(360, 16); fx.flash();
             audio.playEaten();
-            // Phase 7b §4: Agar-style death — eaten at VOIDLING/MUNCHER = game over, else drop one stage
-            if (player.formIndex <= 1) {
-              // Eaten at lowest two forms → game over
+            // Death Rules Pivot: eaten while at the smallest stage (VOIDLING) = game over, else drop one stage
+            if (player.formIndex <= 0) {
+              // Eaten at the smallest form → game over
               player.combo = 0; player.orbit = []; player.vx = player.vy = 0;
               player.ghostTime = 5000; // prevent double-eat during death animation
               r.eatVoid(pr);
@@ -1544,14 +1477,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               queueTicker(`💀 The void was consumed by ${r.name}! The city breathes again… briefly.`);
               window.setTimeout(() => endRound(), 2200);
             } else {
-              // Higher forms: drop one evolution stage, eater gains lost score
+              // Higher forms: drop one evolution stage, respawn elsewhere, eater gains lost score
               const scoreBefore = player.score;
+              const eatenAtX = player.x, eatenAtY = player.y;
               player.dropStage();
               const scoreLost = scoreBefore - player.score;
               r.score += Math.floor(scoreLost * (feedingFrenzyActive || finalFeastActive ? 2 : 1));
               player.combo = 0; player.dizzy = 1; player.orbit = [];
               r.eatVoid(pr);
-              fx.addRing(player.x, player.y, '#FF6B6B', 0, pr * 3, 8, 700);
+              respawnPlayerAfterEaten(r.x, r.y, minDist);
+              fx.addRing(eatenAtX, eatenAtY, '#FF6B6B', 0, pr * 3, 8, 700);
               banner(`${r.name} devoured you! ↓ Dropped to ${player.formName}! 3s shield`, '#FF6B6B', 4, { pulse: true });
             }
           }
@@ -1562,25 +1497,36 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     for (let i = 0; i < rivals.length; i++) {
       for (let j = i + 1; j < rivals.length; j++) {
         const a = rivals[i], b = rivals[j];
-        if (a.ghost || b.ghost) continue;
+        if (!a.alive || !b.alive || a.ghost || b.ghost) continue;
         // SATED bots cannot initiate another void-eat
         if (a.voidSatedMs > 0 && b.voidSatedMs > 0) continue;
         const d = dist(a.x, a.y, b.x, b.y);
         if (d > a.radius + b.radius) continue;
         if (canEatVoid(a.radius, b.radius, d) && a.voidSatedMs <= 0) {
           a.eatVoidBotOnBot(b.radius); // 25% mass, sets a.voidSatedMs = 10000
-          b.getEaten(player.x, player.y, minDist);
-          // Phase 7b §4: eaten rival respawns as VOIDLING after 8s
-          b.formIndex = 0; b.radius = CONFIG.FORMS[0].radius; b.score = 0; b.ghostTime = 8000;
-          const TRASH_TALK = [`${a.name} obliterated ${b.name}!`, `${a.name} consumed ${b.name}! No mercy!`, `${a.name} devours the competition! 🔥`];
-          banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
+          // Death Rules Pivot: drop one stage, or true elimination at the smallest stage.
+          if (b.formIndex <= 0) {
+            b.alive = false;
+            b.vx = 0; b.vy = 0;
+            banner(`💀 ${b.name} ELIMINATED by ${a.name}!`, '#FF4D6D', 4, { pulse: true });
+          } else {
+            b.getEaten(player.x, player.y, minDist);
+            b.dropStage();
+            const TRASH_TALK = [`${a.name} obliterated ${b.name}!`, `${a.name} consumed ${b.name}! No mercy!`, `${a.name} devours the competition! 🔥`];
+            banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
+          }
         } else if (canEatVoid(b.radius, a.radius, d) && b.voidSatedMs <= 0) {
           b.eatVoidBotOnBot(a.radius);
-          a.getEaten(player.x, player.y, minDist);
-          // Phase 7b §4: eaten rival respawns as VOIDLING after 8s
-          a.formIndex = 0; a.radius = CONFIG.FORMS[0].radius; a.score = 0; a.ghostTime = 8000;
-          const TRASH_TALK = [`${b.name} obliterated ${a.name}!`, `${b.name} consumed ${a.name}! No mercy!`, `${b.name} devours the competition! 🔥`];
-          banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
+          if (a.formIndex <= 0) {
+            a.alive = false;
+            a.vx = 0; a.vy = 0;
+            banner(`💀 ${a.name} ELIMINATED by ${b.name}!`, '#FF4D6D', 4, { pulse: true });
+          } else {
+            a.getEaten(player.x, player.y, minDist);
+            a.dropStage();
+            const TRASH_TALK = [`${b.name} obliterated ${a.name}!`, `${b.name} consumed ${a.name}! No mercy!`, `${b.name} devours the competition! 🔥`];
+            banner(TRASH_TALK[Math.floor(Math.random() * TRASH_TALK.length)], '#FF9F5A', 2);
+          }
         }
       }
     }
@@ -1643,7 +1589,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // Dense City §3: draw objects + voids in one foot-Y-sorted painter's pass so
     // buildings nearer the camera correctly occlude the void body.
     const drawActors: { footY: number; draw: () => void }[] = [];
-    for (const r of rivals) drawActors.push({ footY: r.y + r.radius, draw: () => r.draw(ctx, clock, alpha) });
+    for (const r of rivals) if (r.alive) drawActors.push({ footY: r.y + r.radius, draw: () => r.draw(ctx, clock, alpha) });
     const pl = player;
     if (pl) drawActors.push({ footY: pl.y + pl.radius, draw: () => pl.draw(ctx, clock, alpha) });
     world.draw(ctx, clock, view, drawActors);
@@ -1670,27 +1616,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
     // (drawPowerAuras + player/rival bodies now handled above in the interleaved pass)
-    // War Pack §3: colored power ring while active (world space)
-    if (activeSpell && (spellTimer > 0 || activeSpell === 'singularity') && player) {
-      const sp = CONFIG.SPELLS.find(s => s.id === activeSpell);
-      if (sp?.color) {
-        const t = Math.sin(clock / 200);
-        ctx.save();
-        ctx.globalAlpha = 0.55 + 0.2 * t;
-        ctx.strokeStyle = sp.color;
-        ctx.lineWidth = 3.5 / camZoom;
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, player.radius + 12 + 4 * Math.abs(t), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
     if (gnomeLord) drawGnomeCrown(clock); // v9 §8: secret GNOME LORD crown
 
     if (!paused) fx.update(frameDt);
     fx.draw(ctx);
     drawFormBadge(); // v12 §0: form badge after fx (always on top in world space)
-    // v15 §1+§3: hitbox overlay + spell visuals (world-space — ctx transform still active)
+    // v15 §1: hitbox overlay (world-space — ctx transform still active)
     if (showHitboxes && world && player) {
       // Object contact circles (contactScale-adjusted radii)
       ctx.lineWidth = 1.5 / camZoom;
@@ -1705,32 +1636,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.strokeStyle = player.radius > lawCeil ? '#FF4D6D' : '#FFD23F';
       ctx.globalAlpha = 0.4; ctx.lineWidth = 2 / camZoom;
       ctx.beginPath(); ctx.arc(player.x, player.y, lawCeil, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-    // War Pack §3: SINGULARITY black hole visual (world space)
-    if (singularity) {
-      const pulse = 0.5 + 0.5 * Math.sin(clock / 130);
-      const coreR = 60 + 10 * pulse;
-      const grd = ctx.createRadialGradient(singularity.x, singularity.y, 0, singularity.x, singularity.y, coreR * 3.5);
-      grd.addColorStop(0, '#000000');
-      grd.addColorStop(0.38, '#F15BB5');
-      grd.addColorStop(1, 'rgba(241,91,181,0)');
-      ctx.save();
-      ctx.globalAlpha = 0.88;
-      ctx.fillStyle = grd;
-      ctx.beginPath(); ctx.arc(singularity.x, singularity.y, coreR * 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.65;
-      ctx.strokeStyle = '#F15BB5'; ctx.lineWidth = 2.5 / camZoom;
-      ctx.beginPath();
-      ctx.arc(singularity.x, singularity.y, coreR * 2.8, clock / 900, clock / 900 + Math.PI * 1.5);
-      ctx.stroke();
-      ctx.restore();
-    }
-    // War Pack §3: EVENT HORIZON vacuum-zone ring (world space)
-    if (activeSpell === 'event_horizon' && player) {
-      ctx.globalAlpha = 0.11 + 0.07 * Math.sin(clock / 180);
-      ctx.strokeStyle = '#9B5DE5'; ctx.lineWidth = 3 / camZoom;
-      ctx.beginPath(); ctx.arc(player.x, player.y, player.radius * 2.5, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     // War Pack §2: defense pellets (world space)
@@ -1873,14 +1778,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.restore();
     }
 
-    // War Pack §3: TIME WARP blue-edge vignette (screen space)
-    if (activeSpell === 'time_warp' && spellTimer > 0 && spellTimerMax > 0) {
-      const frac = spellTimer / spellTimerMax;
-      const grd = ctx.createRadialGradient(fw/2, fh/2, Math.min(fw,fh)*0.2, fw/2, fh/2, Math.max(fw,fh)*0.85);
-      grd.addColorStop(0, 'rgba(0,0,0,0)');
-      grd.addColorStop(1, `rgba(0,100,220,${(frac * 0.28).toFixed(3)})`);
-      ctx.fillStyle = grd; ctx.fillRect(0, 0, fw, fh);
-    }
     // War Pack §2: pellet hit flash red overlay (screen space)
     if (pelletHitFlash > 0) {
       ctx.fillStyle = `rgba(255,60,0,${Math.min(0.38, pelletHitFlash / 700 * 0.38).toFixed(3)})`;
@@ -1981,9 +1878,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v9 §1: crowns render ONLY for voids currently in the final (WORLD ENDER) form
     const finalForm = CONFIG.FORMS.length - 1;
     const board = [
-      { name: 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm },
-      ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm })),
-    ].sort((a, b) => b.score - a.score);
+      { name: 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm, out: false },
+      ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm, out: !r.alive })),
+    ].sort((a, b) => (a.out !== b.out ? (a.out ? 1 : -1) : b.score - a.score));
     const LB_X = 8, LB_W = 150, LB_TOP = 84, ROW = 20;
     const lbH = board.length * ROW + 12;
     ctx.fillStyle = 'rgba(20,8,43,0.55)';
@@ -2004,16 +1901,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '700 12px Nunito, sans-serif';
       ctx.fillText(`${i + 1}`, LB_X + 8, y);
-      ctx.fillStyle = e.color;
+      ctx.fillStyle = e.out ? 'rgba(255,255,255,0.35)' : e.color;
       ctx.beginPath(); ctx.arc(LB_X + 26, y - 4, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = e.me ? '#FFD23F' : '#FFFFFF';
+      ctx.fillStyle = e.out ? 'rgba(255,255,255,0.4)' : (e.me ? '#FFD23F' : '#FFFFFF');
       ctx.font = (e.me ? '700 ' : '600 ') + '12px Nunito, sans-serif';
       const nm = e.name.length > 9 ? e.name.slice(0, 8) + '…' : e.name;
       ctx.fillText(nm, LB_X + 38, y);
       // v9 §1: crown only voids currently at the final form on the leaderboard
-      if (e.final) drawMiniCrown(LB_X + 42 + ctx.measureText(nm).width, y - 8);
+      if (e.final && !e.out) drawMiniCrown(LB_X + 42 + ctx.measureText(nm).width, y - 8);
       ctx.textAlign = 'right';
-      ctx.fillText(String(e.score), LB_X + LB_W - 8, y);
+      // Death Rules Pivot: eliminated rivals show "OUT" instead of a frozen score
+      ctx.fillText(e.out ? 'OUT' : String(e.score), LB_X + LB_W - 8, y);
       ctx.textAlign = 'left';
     }
     ctx.restore();
@@ -2691,6 +2589,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
   document.addEventListener('visibilitychange', onVisibility);
 
+
   // ── public API ──
   function buildSnapshot(): Snapshot {
     const _lawCeiling = CONFIG.GROWTH_LAW_BASE + CONFIG.GROWTH_LAW_RATE * (roundElapsed / 1000);
@@ -2719,60 +2618,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       paused,
           trophies: { earned: meta.data.trophiesEarned, counters: meta.data.trophyCounters }, // v12 §5
       radii: _radii,
-      heldSpell,
-      activeSpell,
-      spellTimer,          // War Pack §3
-      spellTimerMax,       // War Pack §3
       showHitboxes,
       contracts: [...activeContracts],
       killedBy: killedBy || undefined, // Phase 7b §4: who ate the player
       planName: world?.planName, // v16.2 §6
       matchStartSeq, // Rebuild Prompt 10
     };
-  }
-
-  // Phase 7a §2: internal spell executor — called by auto-cast timer and legacy castSpell()
-  function _executeCast(spellId: string) {
-    if (!player) return;
-    const spellDef = CONFIG.SPELLS.find((s) => s.id === spellId);
-    const spellColor = spellDef?.color ?? '#7BFFED';
-    activeSpell = spellId;
-    heldSpell = null;
-    console.log('POWER ACTIVATED: ' + spellId);
-    switch (spellId) {
-      case 'event_horizon':
-        spellTimer = 6000; spellTimerMax = 6000;
-        audio.playEventHorizon();
-        break;
-      case 'wormhole': {
-        audio.playWormhole();
-        const mag = Math.hypot(player.vx, player.vy);
-        const ddx = mag > 0.1 ? player.vx / mag : 0;
-        const ddy = mag > 0.1 ? player.vy / mag : -1;
-        const dashDist = player.radius * 8;
-        player.x = clamp(player.x + ddx * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
-        player.y = clamp(player.y + ddy * dashDist, player.radius + 10, CONFIG.MAP_SIZE - player.radius - 10);
-        player.vx = ddx * 220; player.vy = ddy * 220;
-        player.ghostTime = 500;
-        fx.addRing(player.x, player.y, spellColor, 5, player.radius * 4, 5, 400);
-        banner(`⚡ WORMHOLE!`, spellColor, 3);
-        activeSpell = null; spellTimer = 0; spellTimerMax = 0;
-        break;
-      }
-      case 'time_warp':
-        spellTimer = 5000; spellTimerMax = 5000;
-        audio.startTimeWarpFilter();
-        break;
-      case 'singularity':
-        singularity = { x: player.x, y: player.y, timer: 4000, score: 0 };
-        spellTimer = 4000; spellTimerMax = 4000;
-        audio.playSingularity();
-        break;
-      default: spellTimer = 5000; spellTimerMax = 5000;
-    }
-    if (activeSpell) banner(`${spellDef?.name ?? spellId.toUpperCase()}!`, spellColor, 2);
-    fx.addRing(player.x, player.y, spellColor, player.radius, player.radius + 120, 5, 500);
-    notify();
   }
 
   return {
@@ -2815,7 +2666,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       screen = 'dailyIntro';
       notify();
     },
-    goHome() { screen = 'home'; paused = false; queuedSpell = null; audio.stopMusic(); joystick.setEnabled(false); notify(); },
+    goHome() { screen = 'home'; paused = false; audio.stopMusic(); joystick.setEnabled(false); notify(); },
     togglePause() {
       if (screen !== 'game') return;
       paused = !paused;
@@ -2827,14 +2678,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     toggleMute() { const m = audio.toggleMute(); notify(); return m; },
     toggleMusic() { const on = audio.toggleMusic(); notify(); return on; },
     toggleSfx() { const on = audio.toggleSfx(); notify(); return on; },
-    castSpell() {
-      // Phase 7a §2: power button removed — auto-cast fires from pickup timer.
-      // castSpell() is kept for API compatibility; fires heldSpell if still set.
-      if (!heldSpell || !player) return;
-      const spellId = heldSpell.id.replace('spell_', '');
-      heldSpell = null;
-      _executeCast(spellId);
-    },
     toggleHitboxes() { showHitboxes = !showHitboxes; notify(); return showHitboxes; },
     // Sound Pack Phase 6: iOS unlock — call on first pointerdown on the title screen
     unlockAudio() {

@@ -1576,7 +1576,9 @@ export class WorldManager {
     }
     if (this.rampageCd > 0) this.rampageCd -= dt; // v8 §3
     const pForm = player.formIndex;               // v8 §3: fear/rampage scale with form
-    const voids = [player, ...rivals];
+    // Death Rules Pivot: eliminated rivals are out of the match — they must not
+    // still act as a frozen "threat" that spooks wildlife/NPCs or blocks spawns.
+    const voids = [player, ...rivals.filter((r) => r.alive)];
     let nearestEdibleD = Infinity;
     let nearestEdible: WorldObject | null = null;
 
