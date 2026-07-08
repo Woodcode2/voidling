@@ -20,12 +20,14 @@ const COL = {
   forest:   '#8FBF88',
   sand:     '#F2DFA7',
   pavement: '#EAE4D6',
-  road:     '#939CAB',
+  road:     '#9B9285',   // Prompt 8: warm clay-asphalt (was stark cool grey #939CAB)
   rimWhite: '#FFFFFF',
   cliff:    '#6B5B73',
   waterS:   '#7FD4E8',
   waterD:   '#5BB8D4',
-  roadDash: 'rgba(255,255,255,0.72)',
+  riverMid: '#8FC6D4',   // Prompt 8: soft clay-blue river band
+  riverDeep:'#69A9C2',   // Prompt 8: deeper river core
+  roadDash: 'rgba(243,236,218,0.5)', // Prompt 8: muted warm off-white lane paint
 };
 
 // ─── Smooth island path helper ────────────────────────────────────────────────
@@ -141,24 +143,30 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _fillZoneRich(cc, ZONE_BEACH_R,    COL.sand,     true);
   _fillZoneRich(cc, ZONE_DOWNTOWN_R, COL.pavement, true);
 
-  // ─ 3. River ───────────────────────────────────────────────────────────────
+  // ─ 3. River (Prompt 8: soft-edged 2.5D band in clay blues) ─────────────────
   cc.save();
   tracIslandPath(cc);
   cc.clip();
 
   // Pond (source)
   const pgrd = cc.createRadialGradient(POND_CX, POND_CY, POND_R * 0.3, POND_CX, POND_CY, POND_R);
-  pgrd.addColorStop(0, COL.waterD);
-  pgrd.addColorStop(1, COL.waterS);
+  pgrd.addColorStop(0, COL.riverDeep);
+  pgrd.addColorStop(1, COL.riverMid);
   cc.fillStyle = pgrd;
   cc.beginPath();
   cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
   cc.fill();
 
-  // River channel (outer = shallow, inner = deep)
+  // River channel — a wide feathered bank blurs the water into the shore, then a
+  // soft clay-blue band and a slightly deeper core (no more hard cyan edge).
   cc.lineCap = 'round'; cc.lineJoin = 'round';
-  _riverStroke(cc, RIVER_HALF_W * 2, COL.waterS);
-  _riverStroke(cc, RIVER_HALF_W * 1.1, COL.waterD);
+  cc.save();
+  cc.filter = 'blur(9px)';
+  _riverStroke(cc, RIVER_HALF_W * 2.5, 'rgba(150,206,222,0.5)');
+  cc.filter = 'none';
+  cc.restore();
+  _riverStroke(cc, RIVER_HALF_W * 2,    COL.riverMid);
+  _riverStroke(cc, RIVER_HALF_W * 1.05, COL.riverDeep);
 
   cc.restore();
 
@@ -183,65 +191,96 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.stroke();
   cc.restore();
 
-  // ─ 5. Roads ───────────────────────────────────────────────────────────────
+  // ─ 5. Roads (Prompt 8: baked into the clay terrain — warm asphalt, a soft
+  //      shoulder that recesses the edge into the grass/sand, gentle lane paint) ─
   cc.save();
   tracIslandPath(cc);
   cc.clip();
 
   const ROAD_W = CONFIG.ROAD_WIDTH;
   const MARGIN = (S - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * ROAD_W)) / 2;
+  const hw = ROAD_W / 2;
 
-  // Road fills
-  cc.fillStyle = COL.road;
+  // Every road rect once (horizontal + vertical bands).
+  const roadRects: [number, number, number, number][] = [];
   for (const rc of ROAD_CENTERS) {
-    // Horizontal road
-    cc.fillRect(MARGIN, rc - ROAD_W / 2, S - MARGIN * 2, ROAD_W);
-    // Vertical road
-    cc.fillRect(rc - ROAD_W / 2, MARGIN, ROAD_W, S - MARGIN * 2);
+    roadRects.push([MARGIN, rc - hw, S - MARGIN * 2, ROAD_W]);
+    roadRects.push([rc - hw, MARGIN, ROAD_W, S - MARGIN * 2]);
   }
 
-  // White centerline dashes
+  // (a) Soft shoulder / recess shadow: a blurred warm-dark halo slightly wider
+  //     than the road, so the edge reads as gently sunk into the terrain rather
+  //     than a hard sticker line where grey meets grass.
+  cc.save();
+  cc.filter = 'blur(13px)';
+  cc.fillStyle = 'rgba(96,84,72,0.42)';
+  for (const [x, y, w, h] of roadRects) cc.fillRect(x - 5, y - 5, w + 10, h + 10);
+  cc.filter = 'none';
+  cc.restore();
+
+  // (b) Asphalt surface: warm clay tone, very slightly blurred at the edge so it
+  //     blends into the shoulder instead of ending on a crisp rectangle.
+  cc.save();
+  cc.filter = 'blur(2.5px)';
+  cc.fillStyle = COL.road;
+  for (const [x, y, w, h] of roadRects) cc.fillRect(x, y, w, h);
+  cc.filter = 'none';
+  cc.restore();
+
+  // (c) Subtle baked mottling so the asphalt isn't a dead-flat fill (clipped to
+  //     the union of all road rects; costs nothing after baking).
+  cc.save();
+  cc.beginPath();
+  for (const [x, y, w, h] of roadRects) cc.rect(x, y, w, h);
+  cc.clip();
+  let rseed = 90721;
+  const rrnd = () => { rseed = (rseed * 1103515245 + 12345) & 0x7fffffff; return rseed / 0x7fffffff; };
+  for (let i = 0; i < 1500; i++) {
+    const mx = rrnd() * S, my = rrnd() * S, mr = 6 + rrnd() * 16;
+    cc.fillStyle = rrnd() > 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(42,32,26,0.055)';
+    cc.beginPath();
+    cc.ellipse(mx, my, mr, mr * 0.7, 0, 0, Math.PI * 2);
+    cc.fill();
+  }
+  cc.restore();
+
+  // (d) Soft, rounded lane dashes — muted warm paint; round caps read as pills,
+  //     not the old hard white rectangles.
   cc.strokeStyle = COL.roadDash;
-  cc.lineWidth   = 10;
-  cc.setLineDash([90, 90]);
-  cc.lineCap = 'butt';
+  cc.lineWidth   = 9;
+  cc.setLineDash([46, 78]);
+  cc.lineCap = 'round';
   for (const rc of ROAD_CENTERS) {
-    // Horizontal
-    cc.beginPath(); cc.moveTo(MARGIN, rc); cc.lineTo(S - MARGIN, rc); cc.stroke();
-    // Vertical
-    cc.beginPath(); cc.moveTo(rc, MARGIN); cc.lineTo(rc, S - MARGIN); cc.stroke();
+    cc.beginPath(); cc.moveTo(MARGIN + 40, rc); cc.lineTo(S - MARGIN - 40, rc); cc.stroke();
+    cc.beginPath(); cc.moveTo(rc, MARGIN + 40); cc.lineTo(rc, S - MARGIN - 40); cc.stroke();
   }
   cc.setLineDash([]);
-
-  // Road curb edges (lighter inner edges)
-  cc.strokeStyle = 'rgba(255,255,255,0.18)';
-  cc.lineWidth   = 6;
   cc.lineCap = 'butt';
+
+  // (e) Faint warm curb highlight — a soft lip along the edge, not a hard white line.
+  cc.strokeStyle = 'rgba(247,240,224,0.10)';
+  cc.lineWidth   = 5;
   for (const rc of ROAD_CENTERS) {
-    const hw = ROAD_W / 2;
     cc.beginPath(); cc.moveTo(MARGIN, rc - hw); cc.lineTo(S - MARGIN, rc - hw); cc.stroke();
     cc.beginPath(); cc.moveTo(MARGIN, rc + hw); cc.lineTo(S - MARGIN, rc + hw); cc.stroke();
     cc.beginPath(); cc.moveTo(rc - hw, MARGIN); cc.lineTo(rc - hw, S - MARGIN); cc.stroke();
     cc.beginPath(); cc.moveTo(rc + hw, MARGIN); cc.lineTo(rc + hw, S - MARGIN); cc.stroke();
   }
 
-  // Crosswalk stripes at each junction
-  cc.fillStyle = 'rgba(255,255,255,0.32)';
+  // (f) Soft crosswalk stripes at each junction — muted warm paint, rounded.
+  cc.fillStyle = 'rgba(243,236,218,0.24)';
   for (const rx of ROAD_CENTERS) {
     for (const ry of ROAD_CENTERS) {
-      const hw = ROAD_W / 2;
-      const stripeW = 14; const stripeGap = 24;
-      // North & South approaches
+      const stripeW = 14, stripeGap = 24, rad = 6;
       for (let i = 0; i < 4; i++) {
         const sx = rx - hw + 8 + i * stripeGap;
-        cc.fillRect(sx, ry - hw - 30, stripeW, 26);
-        cc.fillRect(sx, ry + hw + 4,  stripeW, 26);
+        _roundRect(cc, sx, ry - hw - 30, stripeW, 26, rad);
+        _roundRect(cc, sx, ry + hw + 4,  stripeW, 26, rad);
       }
-      // East & West approaches
       for (let i = 0; i < 4; i++) {
         const sy = ry - hw + 8 + i * stripeGap;
-        cc.fillRect(rx - hw - 30, sy, 26, stripeW);
-        cc.fillRect(rx + hw + 4,  sy, 26, stripeW);
+        _roundRect(cc, rx - hw - 30, sy, 26, stripeW, rad);
+        _roundRect(cc, rx + hw + 4,  sy, 26, stripeW, rad);
       }
     }
   }
@@ -302,6 +341,19 @@ function _shade(hex: string, amt: number): string {
 const _lighten = (hex: string, a: number) => _shade(hex, a);
 const _darken  = (hex: string, a: number) => _shade(hex, -a);
 
+/** Fill a rounded rectangle (used for softened crosswalk stripes). */
+function _roundRect(cc: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  cc.beginPath();
+  cc.moveTo(x + rr, y);
+  cc.arcTo(x + w, y,     x + w, y + h, rr);
+  cc.arcTo(x + w, y + h, x,     y + h, rr);
+  cc.arcTo(x,     y + h, x,     y,     rr);
+  cc.arcTo(x,     y,     x + w, y,     rr);
+  cc.closePath();
+  cc.fill();
+}
+
 /** Fill a zone with a top-left→bottom-right gradient and feathered (blurred) edges. */
 function _fillZoneRich(
   cc: CanvasRenderingContext2D,
@@ -352,6 +404,32 @@ function _riverStroke(cc: CanvasRenderingContext2D, lw: number, color: string): 
     i === 0 ? cc.moveTo(rx, ry) : cc.lineTo(rx, ry);
   }
   cc.stroke();
+}
+
+// Prompt 8: precomputed cumulative arc-length of the (static) river polyline so
+// the live highlight bands scroll at an even speed from the pond to the waterfall.
+const _riverLen: number[] = (() => {
+  const acc = [0];
+  for (let i = 1; i < RIVER_PATH.length; i++) {
+    const [ax, ay] = RIVER_PATH[i - 1];
+    const [bx, by] = RIVER_PATH[i];
+    acc.push(acc[i - 1] + Math.hypot(bx - ax, by - ay));
+  }
+  return acc;
+})();
+const _riverTotal = _riverLen[_riverLen.length - 1] || 1;
+
+/** Point + flow direction at arc-length fraction t∈[0,1] along the river. */
+function _riverPointAt(t: number): { x: number; y: number; a: number } {
+  const target = t * _riverTotal;
+  let i = 1;
+  while (i < _riverLen.length && _riverLen[i] < target) i++;
+  if (i >= _riverLen.length) i = _riverLen.length - 1;
+  const seg = _riverLen[i] - _riverLen[i - 1] || 1;
+  const f = (target - _riverLen[i - 1]) / seg;
+  const [ax, ay] = RIVER_PATH[i - 1];
+  const [bx, by] = RIVER_PATH[i];
+  return { x: ax + (bx - ax) * f, y: ay + (by - ay) * f, a: Math.atan2(by - ay, bx - ax) };
 }
 
 // ─── Prompt 6 §3: animated waterfall (scrolling flow + glow + pooled mist) ───
@@ -454,21 +532,30 @@ function _drawWaterShimmer(ctx: CanvasRenderingContext2D, clock: number): void {
   ctx.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // River: a shimmer band travels downstream (looping 0→1 along path)
-  const rPhase = (clock / 2200) % 1;
-  const nSeg = RIVER_PATH.length - 1;
-  for (let i = 0; i < nSeg; i++) {
-    const segT = i / nSeg;
-    // Band travels: render only a 0.25-wide window that moves with rPhase
-    const delta = ((segT - rPhase + 1) % 1);
-    if (delta > 0.28) continue;
-    const alpha = 0.11 * (1 - delta / 0.28);
-    const [rx, ry] = RIVER_PATH[i];
-    ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+  // River (Prompt 8): two soft highlight bands scroll downstream toward the
+  // waterfall — the same cheap scrolling-band trick as the waterfall, but each
+  // band follows the river's path and lies across its width to read as flow.
+  ctx.globalCompositeOperation = 'lighter';
+  for (let b = 0; b < 2; b++) {
+    const t = ((clock / 5200) + b * 0.5) % 1;
+    const p = _riverPointAt(t);
+    // Fade in at the source and out as the band meets the waterfall.
+    const edgeFade = Math.min(1, Math.min(t, 1 - t) / 0.12);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.a);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, RIVER_HALF_W * 1.05);
+    g.addColorStop(0,   `rgba(232,249,255,${(0.22 * edgeFade).toFixed(3)})`);
+    g.addColorStop(0.6, `rgba(190,232,244,${(0.09 * edgeFade).toFixed(3)})`);
+    g.addColorStop(1,   'rgba(190,232,244,0)');
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.ellipse(rx, ry, RIVER_HALF_W * 0.75, RIVER_HALF_W * 0.42, 0, 0, Math.PI * 2);
+    // x-radius = thin along flow, y-radius = spans the width → a crossing band
+    ctx.ellipse(0, 0, RIVER_HALF_W * 0.5, RIVER_HALF_W * 1.0, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
   }
+  ctx.globalCompositeOperation = 'source-over';
 
   ctx.restore();
 }
