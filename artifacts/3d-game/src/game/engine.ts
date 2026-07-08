@@ -12,7 +12,7 @@ import { createJoystick } from './input';
 import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
 import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
-import { resetGroundCache, resetWaterfallState, loadGroundTextures } from './drawMap'; // Prompt 6 §1/§3 lifecycle
+import { resetGroundCache, resetWaterfallState, loadGroundTextures, exportGroundBuffer, drawVectorGround } from './drawMap'; // Prompt 6 §1/§3 lifecycle
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
@@ -95,6 +95,9 @@ export interface GameEngine {
   toggleSfx(): boolean;
   toggleHitboxes(): boolean;
   unlockAudio(): void;
+  /** Stage 13 §1: render a 2000×2000 PNG of the island with all static objects.
+   *  Returns a data URL string, or null if the world hasn't initialised yet. */
+  capturePhoto(): string | null;
   destroy(): void;
 }
 
@@ -322,6 +325,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (world) world.filterNonWalkable();
   }).catch(() => {});
 
+  // Stage 13 §6: pre-load all clay sheets and ground textures at createGame() time
+  // so the pools are populated before the first match start (no sticker fallback frames).
+  const base = import.meta.env.BASE_URL;
+  void loadGroundTextures(base);
+  void loadWardAssets(base);
+  void loadClayCity(base);
+  void loadClayLife(base);
+  void loadClayScenery(base);
+  void loadClayFood(base);
+
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
   const events = new EventManager({
@@ -491,13 +504,6 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     camZoom = fh / startView;
 
     audio.startMusic();
-    // War Pack §1: load sprite sheets (fire-and-forget; resolves within the first round)
-    void loadWardAssets(import.meta.env.BASE_URL);
-    void loadClayCity(import.meta.env.BASE_URL); // Prompt 3: clay building + house art swap
-    void loadGroundTextures(import.meta.env.BASE_URL); // Map Rebuild: tex_* pattern fills
-    void loadClayLife(import.meta.env.BASE_URL); // Prompt 4: clay people + vehicle art swap
-    void loadClayScenery(import.meta.env.BASE_URL); // Prompt 5: clay scenery scatter
-    void loadClayFood(import.meta.env.BASE_URL); // Prompt 9: clay food + street-furniture art swap
 
     results = null;
     screen = 'game';
@@ -2685,6 +2691,36 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       audio.init();
       import('tone').then((T) => T.start()).catch(() => {/* ignore */});
     },
+
+    // Stage 13 §1: photo-mode capture — renders a 2000×2000 PNG of the island.
+    // Uses drawVectorGround() so the ground buffer is always built, even if the
+    // first frame hasn't run yet (robust to the "no buffer" race condition).
+    capturePhoto(): string | null {
+      if (!world) return null;
+      const PHOTO_SIZE = 2000;
+      const oc = document.createElement('canvas');
+      oc.width = oc.height = PHOTO_SIZE;
+      const oct = oc.getContext('2d');
+      if (!oct) return null;
+
+      // Ocean background (visible around island edges)
+      oct.fillStyle = '#4A8FA8';
+      oct.fillRect(0, 0, PHOTO_SIZE, PHOTO_SIZE);
+
+      // Draw ground in world-space coordinates scaled to photo size.
+      // drawVectorGround builds _groundBuf on demand if not already cached.
+      const scale = PHOTO_SIZE / CONFIG.MAP_SIZE;
+      oct.save();
+      oct.scale(scale, scale);
+      drawVectorGround(oct, 0, scale, false);
+      oct.restore();
+
+      // Draw static world objects on top of the ground layer.
+      world.drawPhotoLayer(oct, scale);
+
+      return oc.toDataURL('image/png');
+    },
+
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
