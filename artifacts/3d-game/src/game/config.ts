@@ -89,8 +89,6 @@ export interface BoonDef {
   id: string;
   name: string;
   desc: string;
-  spell?: boolean;   // v15 §3: teal card back when true
-  color?: string;    // v15 §3: spell accent color
 }
 
 export interface KindInfo {
@@ -272,7 +270,7 @@ export const CONFIG = {
   // Rivals
   RIVAL_COUNT: 4,
   RIVAL_EAT_RATIO: 1.3,     // War Pack: eater radius >= 1.3× eaten radius (was 1.15)
-  GHOST_TIME: 2500,         // invulnerable ms after being eaten
+  GHOST_TIME: 3000,         // invulnerable ms after being eaten (Death Rules Pivot: ~3s after ANY respawn)
   RESPAWN_MASS_FRAC: 0.65,  // respawn at 65% of mass
 
   // Bot aggression curve — §7 fix
@@ -552,13 +550,8 @@ export const CONFIG = {
     { id: 'lucky',     name: 'Lucky Gnome',     desc: 'A golden snack every 10s' },
   ] as BoonDef[],
 
-  // War Pack §3: POWERS — replaces old spells (garlic/freeze/switcheroo/puny/bubble)
-  SPELLS: [
-    { id: 'event_horizon', name: 'EVENT HORIZON', desc: '6s: vacuum 2.5× + pull speed 2×',              color: '#9B5DE5' },
-    { id: 'wormhole',      name: 'WORMHOLE',      desc: 'Dash 4 body-lengths + 0.5s invulnerability',   color: '#00BBF9' },
-    { id: 'time_warp',     name: 'TIME WARP',     desc: '5s: all rivals + props move at 40% speed',     color: '#2D9CDB' },
-    { id: 'singularity',   name: 'SINGULARITY',   desc: '4s black hole — sucks props in, pops with burst', color: '#F15BB5' },
-  ] as { id: string; name: string; desc: string; color: string }[],
+  // Death Rules Pivot (Rebuild Prompt 11): the four powers (EVENT HORIZON, WORMHOLE,
+  // TIME WARP, SINGULARITY) have been removed entirely — pure eat-and-react loop.
 
   // v7 §5: synergies — auto-trigger when BOTH members are active at once.
   SYNERGIES: [

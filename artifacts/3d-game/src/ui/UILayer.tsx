@@ -382,14 +382,6 @@ function SoundBoard({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         </div>
       </div>
 
-      {/* ── §3 SPELL STATE ───────────────────────────────── */}
-      <div style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}>
-        <div style={{ color: '#C27BFF', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, letterSpacing: '0.06em' }}>✨ SPELL STATE</div>
-        <span style={{ color: '#CBD5E0', fontSize: 12, fontFamily: 'monospace' }}>
-          held: {snap.heldSpell?.name ?? '—'} · active: {snap.activeSpell ?? '—'}
-        </span>
-      </div>
-
       {/* ── 🔊 SOUNDS ────────────────────────────────────── */}
       <div style={{ color: '#9AAFC8', fontSize: 11, fontFamily: 'monospace', marginBottom: 6, letterSpacing: '0.06em' }}>🔊 SOUNDS</div>
       <div style={{ display: 'grid', gap: 6 }}>
@@ -651,26 +643,11 @@ function Boon({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         {snap.boonChoices.map((b) => (
           <button
             key={b.id}
-            className={`vd-boon${b.spell ? ' vd-boon--spell' : ''}`}
+            className="vd-boon"
             onClick={() => engine.chooseBoon(b.id)}
-            style={b.spell ? {
-              // v16 §7: vivid fully-opaque teal/violet solid fill (no longer translucent gradient)
-              borderColor: b.color || '#7BFFED',
-              background: b.color
-                ? `linear-gradient(135deg, ${b.color}DD 0%, ${b.color}AA 100%)`
-                : 'linear-gradient(135deg, #007A8C 0%, #00526A 100%)',
-              boxShadow: `0 0 18px ${b.color || '#7BFFED'}88, 0 4px 16px rgba(0,0,0,0.45)`,
-              color: '#ffffff',
-            } : undefined}
           >
-            {b.spell && (
-              <span style={{
-                display: 'block', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase',
-                color: '#ffffff', marginBottom: 3, fontWeight: 800, opacity: 0.9,
-              }}>✨ SPELL · TAP TO HOLD</span>
-            )}
-            <h3 style={b.spell ? { color: '#ffffff', textShadow: '0 1px 4px rgba(0,0,0,0.4)' } : undefined}>{b.name}</h3>
-            <p style={b.spell ? { color: 'rgba(255,255,255,0.88)' } : undefined}>{b.desc}</p>
+            <h3>{b.name}</h3>
+            <p>{b.desc}</p>
           </button>
         ))}
       </div>
@@ -821,28 +798,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           ))}
         </div>
       )}
-      {/* Phase 7a §2: power button removed — spells auto-cast on pickup */}
-      {snap.activeSpell && !snap.paused && (() => {
-        const POWER_ICONS: Record<string, string> = { event_horizon: '🌀', wormhole: '⚡', time_warp: '⏱', singularity: '⚫' };
-        const POWER_COLORS: Record<string, string> = {
-          event_horizon: '#9B5DE5', wormhole: '#00BBF9', time_warp: '#2D9CDB', singularity: '#F15BB5',
-        };
-        const rawId = snap.activeSpell;
-        const powerColor = POWER_COLORS[rawId] ?? '#7BFFED';
-        const sweepDeg = snap.spellTimerMax > 0 ? (snap.spellTimer / snap.spellTimerMax) * 360 : 0;
-        return (
-          <div aria-label={`${rawId} active`} style={{
-            position: 'fixed', bottom: 32, right: 24,
-            width: 56, height: 56, borderRadius: 16,
-            background: `conic-gradient(${powerColor}CC ${sweepDeg.toFixed(1)}deg, rgba(10,8,24,0.55) ${sweepDeg.toFixed(1)}deg)`,
-            border: `2px solid ${powerColor}66`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, pointerEvents: 'none',
-          }}>
-            {POWER_ICONS[rawId] ?? '✨'}
-          </div>
-        );
-      })()}
+      {/* Death Rules Pivot: powers removed entirely — no active-power HUD badge */}
       {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
       {snap.paused && (
         <div className="vd-overlay vd-overlay--dim vd-pause-overlay">

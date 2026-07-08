@@ -1075,55 +1075,6 @@ export const audio = {
     this.duckMusic();
   },
 
-  // ── Sound Pack §6: WORMHOLE ── square-wave zap 1200→300 Hz, 120 ms ──────────
-  playWormhole() {
-    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
-    const now = this.ctx.currentTime;
-    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
-    o.type = 'square';
-    o.frequency.setValueAtTime(1200, now);
-    o.frequency.exponentialRampToValueAtTime(300, now + 0.12);
-    g.gain.setValueAtTime(0.18, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.15);
-    this._noise(now, 0.08, 'highpass', 2000, 1, 0.1);
-  },
-
-  // ── Sound Pack §6: EVENT HORIZON ── three deep 100 Hz sine throbs ───────────
-  playEventHorizon() {
-    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
-    for (let i = 0; i < 3; i++) {
-      const t = this.ctx.currentTime + i * 0.22;
-      const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
-      o.type = 'sine'; o.frequency.value = 100;
-      g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.2);
-    }
-  },
-
-  // ── Sound Pack §6: SINGULARITY ── rising filtered-noise swell + 60 Hz pop ───
-  playSingularity() {
-    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
-    const now = this.ctx.currentTime;
-    this._noise(now, 0.5, 'bandpass', 200, 1.5, 0.12, 4000); // rising swell
-    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
-    o.type = 'sine'; o.frequency.value = 60;
-    g.gain.setValueAtTime(0.001, now + 0.48);
-    g.gain.linearRampToValueAtTime(0.45, now + 0.5);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
-    o.connect(g); g.connect(this.sfxGain); o.start(now + 0.48); o.stop(now + 0.7);
-  },
-
-  // ── Sound Pack §6: TIME WARP ── sweep music master filter to/from 400 Hz ────
-  startTimeWarpFilter() {
-    if (!this._toneReady || !this._masterFilt) return;
-    this._masterFilt.frequency.rampTo(400, 0.6);
-  },
-  stopTimeWarpFilter() {
-    if (!this._toneReady || !this._masterFilt) return;
-    this._masterFilt.frequency.rampTo(20000, 0.8);
-  },
-
   // ── Sound Pack §8: PREDATION — eating a rival ───────────────────────────────
   playPredationEat() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
@@ -1261,9 +1212,6 @@ export const audio = {
       case 'gulp':            this.playGulp(); break;
       case 'evolve':          this.playEvolve(); break;
       case 'falloff':         this.playFalloff(); break;
-      case 'wormhole':        this.playWormhole(); break;
-      case 'event_horizon':   this.playEventHorizon(); break;
-      case 'singularity':     this.playSingularity(); break;
       case 'predation_eat':   this.playPredationEat(); break;
       case 'predation_eaten': this.playPredationEaten(); break;
       case 'bubble_pop':      this.playBubblePop(); break;

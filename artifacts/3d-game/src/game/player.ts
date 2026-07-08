@@ -552,7 +552,8 @@ export class Player extends Void {
     this.fallTimer = 0;
     this.fallAlpha = 1.0;
     this.fallRot = 0;
-    this.ghostTime = 2000; // 2s invulnerability on respawn
+    // Death Rules Pivot: ~3s invulnerability after ANY respawn, matching dropStage()
+    this.ghostTime = 3000;
   }
 
   draw(ctx: CanvasRenderingContext2D, t: number, alpha: number) {

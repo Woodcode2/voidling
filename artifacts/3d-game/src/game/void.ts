@@ -36,9 +36,6 @@ export abstract class Void {
   // per-frame event effect (firetruck water / storm), reset each frame by events
   eventSlow = 1;
 
-  // Phase 7b §4: hearts system removed — field kept at 0 for backwards-compat
-  hearts = 0;
-
   // identity
   skin: SkinDef;
   name = '';
