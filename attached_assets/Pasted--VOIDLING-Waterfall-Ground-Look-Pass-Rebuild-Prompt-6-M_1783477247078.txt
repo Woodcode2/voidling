@@ -1,0 +1,56 @@
+# VOIDLING: Waterfall + Ground Look Pass (Rebuild Prompt 6)
+Make the island surface look as good as the clay props sitting on it, animate the waterfall, and stop redrawing the static ground every frame. This pass should look richer AND run the same or faster, because the ground gets cached.
+
+## GOAL
+Three things: cache the static ground to an offscreen buffer so it is drawn once instead of every frame, enrich that ground so it is not dead flat under the clay props, and animate the waterfall so it flows and glows like the splash. Plus a debug frame-rate overlay so we can finally read FPS on a phone.
+
+## DO NOT TOUCH (leave fully intact)
+- All entities and their placement: buildings, houses, people, vehicles, scenery. Do not move or restyle any of them.
+- Gameplay, the percent-devoured win math, scoring, eating, camera, and the void body.
+- The Prompt 1 through 5 work. This pass only changes how the GROUND and the WATERFALL are drawn, and adds a debug overlay.
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. How `drawMap.ts` currently draws the ground each frame: zones, roads, river, rim, waterfall. List the draw calls and their order.
+2. Whether any offscreen or cached rendering already exists for the ground, or if all of it is redrawn from scratch every frame.
+3. Exactly where the waterfall is drawn, so we can pull it out into its own animated layer.
+Paste that, then proceed.
+
+## STAGE 1: Cache the static ground to an offscreen buffer
+- Draw the static ground (zones, roads, river, lagoon, rim) ONCE to an offscreen canvas at match start, and redraw that buffer only on a resize or a new match, not every frame.
+- Each frame, blit the cached buffer instead of re-running all the ground draw calls. Then draw the animated waterfall (Stage 3) and the existing foot-Y-sorted entities on top, in that order.
+- Keep the waterfall OUT of the cached buffer, since it animates.
+- If ground caching already exists, reuse it and just extend it with Stage 2. If not, add it.
+
+## STAGE 2: Enrich the ground (baked into the cached buffer, so zero per-frame cost)
+Inside the cached render only, lift the flat fills so the ground reads as a surface, not paper:
+- A subtle gradient across each zone instead of one flat color, slightly brighter toward the light direction already used elsewhere (top-left).
+- A light, tasteful grass texture on the green, park, and forest zones. Keep it soft and low contrast, not noisy. If you use a noise or pattern, bake it into the buffer, never compute it per pixel per frame.
+- Soft feathered transitions where two zones meet, so edges are not hard lines.
+- Keep sand and downtown pavement understated. The goal is depth and warmth, not busy.
+All of this lives in the cached buffer, so it costs nothing at run time.
+
+## STAGE 3: Animate the waterfall (a cheap live layer over the ground)
+- Replace the current static waterfall with an animated one: bands of light that scroll downward to read as flowing water, a soft blue-white glow along the falls, and a small mist or foam effect at the base where it meets space.
+- Keep it cheap: the falls are a small region. Scroll a repeating gradient or stripe pattern by an offset each frame, draw a soft glow shape behind it, and cap any mist particles with a small reusable pool.
+- It should look like the glowing waterfall in the splash art: bright, alive, pouring off the island edge into space.
+
+## STAGE 4: Debug FPS overlay
+- Behind a `?debug=fps` flag, show a small overlay with current frames per second and the live object count. This is how Mat reads performance on his own phone. Keep the overlay itself near-zero cost.
+
+## STAGE 5: Proof (real receipts, and the number I keep asking for)
+Paste actual output:
+- Frame rate BEFORE and AFTER the ground cache on desktop, so we see what the cache bought.
+- Frame rate on a PHONE using `?debug=fps` if you can run one, with the object count. This is the reading that actually matters.
+- Confirm the ground now shows gradient and texture and soft zone edges, not flat fills.
+- Confirm the waterfall now flows downward and glows.
+- All audits still 0: OFF-ISLAND ENTITIES, BUILDING OVERLAPS, BUILDINGS ON ROADS, SCENERY OFF-ISLAND, SCENERY ON ROADS, SCENERY ON BUILDINGS. No new console errors.
+
+If the ground cache did not improve or hold frame rate, say so with the numbers. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview on your phone with `?debug=fps` and read the frame rate. Tell Claude that number.
+- Watch the waterfall. It should pour and glow, not sit still.
+- Look at the grass and zones. There should be some depth and texture now, not flat color.

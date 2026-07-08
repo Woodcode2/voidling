@@ -12,6 +12,7 @@ import { createJoystick } from './input';
 import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
 import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
+import { resetGroundCache, resetWaterfallState } from './drawMap'; // Prompt 6 §1/§3 lifecycle
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
@@ -200,6 +201,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const debugMask     = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mask';
   const debugTerrain  = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'terrain';
   const debugSprites  = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'sprites';
+  const debugFps      = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'fps';
   // v16 §5: news ticker + contracts
   let currentTicker: string | null = null;
   let tickerCd = 0; // ms until next ticker fires
@@ -396,6 +398,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     world = new WorldManager(CONFIG.MAP_SIZE);
     world.init(seed);
+    // Prompt 6 §1/§3: honour the cache/waterfall lifecycle contract at match start.
+    resetGroundCache();
+    resetWaterfallState();
 
     const skin = skinById(meta.data.equippedSkin);
     const c = CONFIG.MAP_SIZE / 2;
@@ -1804,6 +1809,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     ctx.restore();
 
+    // ?debug=fps — tiny top-right overlay: frames per second + live object count
+    if (debugFps) {
+      const txt = `FPS ${fpsSmooth.toFixed(0)}  OBJ ${world ? world.objects.length : 0}`;
+      ctx.save();
+      ctx.font = 'bold 14px monospace';
+      ctx.textBaseline = 'middle';
+      const w = ctx.measureText(txt).width + 18;
+      const bx = fw - w - 8;
+      ctx.fillStyle = 'rgba(0,0,0,0.62)';
+      ctx.fillRect(bx, 8, w, 24);
+      ctx.fillStyle = fpsSmooth < 30 ? '#FF6B6B' : fpsSmooth < 50 ? '#FFD23F' : '#5AFFA0';
+      ctx.fillText(txt, bx + 9, 21);
+      ctx.restore();
+    }
+
     // ?debug=sprites — screen-space checkerboard review of every extracted sprite
     if (debugSprites && extractionLog.length > 0) {
       const PAD = 10, CELL = 68, LABEL_H = 14;
@@ -2580,6 +2600,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let raf = 0;
   // Dense City §3: lightweight FPS sampler (capped log count) for perf proof
   let fpsAcc = 0, fpsN = 0, fpsLogs = 0;
+  let fpsSmooth = 0; // Prompt 6 §4: smoothed FPS for the ?debug=fps overlay
   function resetClock() { last = performance.now(); acc = 0; }
 
   function frame(now: number) {
@@ -2589,6 +2610,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (delta > CONFIG.MAX_DT) delta = CONFIG.MAX_DT; // clamp
     if (delta < 0) delta = 0;
     clock += delta;
+
+    // Prompt 6 §4: smoothed instantaneous FPS (near-zero cost)
+    if (delta > 0) fpsSmooth = fpsSmooth ? fpsSmooth * 0.9 + (1000 / delta) * 0.1 : 1000 / delta;
 
     // Dense City §3: sample FPS a few times per match (perf proof)
     fpsAcc += delta; fpsN++;

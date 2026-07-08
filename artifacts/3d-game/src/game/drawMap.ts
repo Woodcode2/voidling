@@ -47,23 +47,67 @@ export function tracIslandPath(ctx: CanvasRenderingContext2D): void {
   ctx.closePath();
 }
 
-// ─── Ground renderer (no offscreen cache — drawn directly into world-space ctx) ───
-// Drawing only the visible viewport region via the camera transform clip means
-// per-frame cost is low even without a cache. A 12000×12000 offscreen canvas
-// would consume ~576 MB raw and could OOM on mobile, so we draw directly.
+// ─── Ground renderer with an offscreen cache (Prompt 6 §1) ───────────────────
+// The static ground (zones, roads, river, lagoon, rim + §2 enrichment) is
+// rasterised ONCE into a world-space offscreen buffer and blitted each frame,
+// instead of re-running ~1,600 path/fill/stroke ops per frame. The buffer is
+// capped to BUF_MAX per side so its area stays under the iOS canvas limit
+// (~16.7M px); a full 12000² buffer would be 576MB, but a scaled one is ~52MB.
+// Only the animated waterfall + water shimmer are drawn live on top.
 
-/** Draw the full ground layer into ctx (world-space camera transform must be applied).
- *  @param camZoom — accepted for API compatibility, not used for caching.
- */
+const BUF_MAX = 3600;                 // capped buffer side (world 12000 → 0.30 scale)
+const BUF_SCALE = BUF_MAX / S;
+let _groundBuf: HTMLCanvasElement | null = null;
+
+// Debug: ?nocache=1 bypasses the buffer and repaints the static ground every
+// frame — used to measure the before/after value the cache buys (Prompt 6 §5).
+const _noCache = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('nocache') === '1';
+
+/** Force the ground buffer to rebuild on the next draw (new match / resize).
+ *  Map geometry is static, so this is rarely needed, but honours the §1 contract. */
+export function resetGroundCache(): void { _groundBuf = null; }
+
+function _ensureGroundBuffer(): HTMLCanvasElement {
+  if (_groundBuf) return _groundBuf;
+  const buf = document.createElement('canvas');
+  buf.width  = Math.round(S * BUF_SCALE);
+  buf.height = Math.round(S * BUF_SCALE);
+  const bc = buf.getContext('2d')!;
+  bc.save();
+  bc.scale(BUF_SCALE, BUF_SCALE);     // draw in world coords, downscaled into the buffer
+  _paintStaticGround(bc);
+  bc.restore();
+  _groundBuf = buf;
+  return buf;
+}
+
+/** Draw the full ground layer into ctx (world-space camera transform must be applied). */
 export function drawVectorGround(
   ctx: CanvasRenderingContext2D,
   clock: number,
   camZoom: number,   // eslint-disable-line @typescript-eslint/no-unused-vars
-  forceRebuild = false,  // eslint-disable-line @typescript-eslint/no-unused-vars
+  forceRebuild = false,
 ): void {
-  _buildGroundCache(ctx);
+  if (_noCache) {
+    // Debug A/B: repaint the full static ground every frame (uncached cost).
+    ctx.save();
+    _paintStaticGround(ctx);
+    ctx.restore();
+  } else {
+    if (forceRebuild) _groundBuf = null;
+    const buf = _ensureGroundBuffer();
+    // Blit the cached static ground: one drawImage vs. ~1,600 ops/frame.
+    const prevSmooth = ctx.imageSmoothingEnabled;
+    const prevQual   = ctx.imageSmoothingQuality;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(buf, 0, 0, buf.width, buf.height, 0, 0, S, S);
+    ctx.imageSmoothingEnabled = prevSmooth;
+    ctx.imageSmoothingQuality = prevQual;
+  }
 
-  // Animated waterfall (not cached — needs clock)
+  // Animated waterfall (live — needs clock)
   const wpx = ISLAND_CTRL[WATERFALL_IDX][0];
   const wpy = ISLAND_CTRL[WATERFALL_IDX][1];
   _drawWaterfall(ctx, wpx, wpy, clock);
@@ -72,17 +116,30 @@ export function drawVectorGround(
   _drawWaterShimmer(ctx, clock);
 }
 
-function _buildGroundCache(cc: CanvasRenderingContext2D): void {
-  // ─ 1. Island base fill ─────────────────────────────────────────────────────
+function _paintStaticGround(cc: CanvasRenderingContext2D): void {
+  // ─ 1. Island base fill — meadow with a soft top-left light gradient ─────────
   tracIslandPath(cc);
-  cc.fillStyle = COL.meadow;
-  cc.fill();
+  cc.save();
+  cc.clip();
+  const baseGrd = cc.createLinearGradient(0, 0, S, S);
+  baseGrd.addColorStop(0,    _lighten(COL.meadow, 0.11));
+  baseGrd.addColorStop(0.55, COL.meadow);
+  baseGrd.addColorStop(1,    _darken(COL.meadow, 0.07));
+  cc.fillStyle = baseGrd;
+  cc.fillRect(0, 0, S, S);
+  cc.restore();
 
-  // ─ 2. Zone fills (clipped to island) ──────────────────────────────────────
-  _fillZone(cc, ZONE_PARK_R,     COL.park);
-  _fillZone(cc, ZONE_FOREST_R,   COL.forest);
-  _fillZone(cc, ZONE_BEACH_R,    COL.sand);
-  _fillZone(cc, ZONE_DOWNTOWN_R, COL.pavement);
+  // ─ 2. Zone fills — gradient + feathered edges (Prompt 6 §2) ────────────────
+  _fillZoneRich(cc, ZONE_PARK_R,     COL.park);
+  _fillZoneRich(cc, ZONE_FOREST_R,   COL.forest);
+  _fillZoneRich(cc, ZONE_BEACH_R,    COL.sand,     true);
+  _fillZoneRich(cc, ZONE_DOWNTOWN_R, COL.pavement, true);
+
+  // ─ 2b. Soft baked grass texture over the green surface (low-contrast) ──────
+  _bakeGrassTexture(cc);
+  // Keep sand + downtown understated: restore their clean fills over any specks.
+  _fillZoneRich(cc, ZONE_BEACH_R,    COL.sand,     true);
+  _fillZoneRich(cc, ZONE_DOWNTOWN_R, COL.pavement, true);
 
   // ─ 3. River ───────────────────────────────────────────────────────────────
   cc.save();
@@ -227,16 +284,62 @@ function _buildGroundCache(cc: CanvasRenderingContext2D): void {
   cc.restore();
 }
 
-function _fillZone(
+// ─── Prompt 6 §2 enrichment helpers (all baked once into the ground buffer) ──
+
+/** Shade a #RRGGBB toward white (amt>0) or black (amt<0). */
+function _shade(hex: string, amt: number): string {
+  const h = hex.replace('#', '');
+  let r = parseInt(h.slice(0, 2), 16);
+  let g = parseInt(h.slice(2, 4), 16);
+  let b = parseInt(h.slice(4, 6), 16);
+  const t = amt < 0 ? 0 : 255;
+  const p = Math.abs(amt);
+  r = Math.round(r + (t - r) * p);
+  g = Math.round(g + (t - g) * p);
+  b = Math.round(b + (t - b) * p);
+  return `rgb(${r},${g},${b})`;
+}
+const _lighten = (hex: string, a: number) => _shade(hex, a);
+const _darken  = (hex: string, a: number) => _shade(hex, -a);
+
+/** Fill a zone with a top-left→bottom-right gradient and feathered (blurred) edges. */
+function _fillZoneRich(
   cc: CanvasRenderingContext2D,
   r: readonly [number, number, number, number],
   color: string,
+  understated = false,
 ): void {
   cc.save();
   tracIslandPath(cc);
   cc.clip();
-  cc.fillStyle = color;
-  cc.fillRect(r[0], r[1], r[2] - r[0], r[3] - r[1]);
+  const grd = cc.createLinearGradient(r[0], r[1], r[2], r[3]);
+  grd.addColorStop(0, _lighten(color, understated ? 0.05 : 0.10));
+  grd.addColorStop(1, _darken(color,  understated ? 0.03 : 0.06));
+  cc.fillStyle = grd;
+  // Blur softens the rectangle edges → feathered transitions into the meadow.
+  cc.filter = understated ? 'blur(28px)' : 'blur(46px)';
+  cc.fillRect(r[0] - 24, r[1] - 24, (r[2] - r[0]) + 48, (r[3] - r[1]) + 48);
+  cc.filter = 'none';
+  cc.restore();
+}
+
+/** Bake a soft, low-contrast grass speckle over the whole island (seeded). */
+function _bakeGrassTexture(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  let seed = 1337;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const N = 5200;
+  for (let i = 0; i < N; i++) {
+    const x = rnd() * S;
+    const y = rnd() * S;
+    const rr = 9 + rnd() * 26;
+    cc.fillStyle = rnd() > 0.5 ? 'rgba(255,255,255,0.040)' : 'rgba(38,66,34,0.048)';
+    cc.beginPath();
+    cc.ellipse(x, y, rr, rr * 0.68, 0, 0, Math.PI * 2);
+    cc.fill();
+  }
   cc.restore();
 }
 
@@ -251,21 +354,83 @@ function _riverStroke(cc: CanvasRenderingContext2D, lw: number, color: string): 
   cc.stroke();
 }
 
+// ─── Prompt 6 §3: animated waterfall (scrolling flow + glow + pooled mist) ───
+interface Mist { x: number; y: number; vy: number; life: number; max: number; r: number; }
+const _mist: Mist[] = [];
+let _wfLast = 0;
+
+/** Clear transient waterfall state (mist pool + clock ref) between rounds. */
+export function resetWaterfallState(): void { _mist.length = 0; _wfLast = 0; }
+
 function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, clock: number): void {
+  const dt = Math.min(100, Math.max(0, clock - _wfLast));
+  _wfLast = clock;
+
   ctx.save();
   ctx.translate(wx, wy);
-  // Animated foam dots falling outward from island rim
-  for (let i = 0; i < 7; i++) {
-    const phase = ((clock / 500 + i * 0.7) % 1);
-    const fy    = -60 + phase * 380;
-    const fx    = Math.sin(clock / 350 + i * 1.3) * 32;
-    ctx.globalAlpha = 0.75 * (1 - phase * 0.8);
-    ctx.fillStyle   = '#DCEEFF';
+
+  // 1. soft blue-white glow behind the falls
+  const glow = ctx.createRadialGradient(0, 90, 18, 0, 90, 250);
+  glow.addColorStop(0,   'rgba(190,235,255,0.55)');
+  glow.addColorStop(0.5, 'rgba(127,212,232,0.26)');
+  glow.addColorStop(1,   'rgba(127,212,232,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(0, 100, 135, 300, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. flowing water column: clip a tapering falls region, scroll bright bands down
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(-96, -50); ctx.lineTo(96, -50);
+  ctx.lineTo(70, 360);  ctx.lineTo(-70, 360);
+  ctx.closePath();
+  ctx.clip();
+  const colGrd = ctx.createLinearGradient(0, -50, 0, 360);
+  colGrd.addColorStop(0, '#93E2F3');
+  colGrd.addColorStop(1, '#4FA6CB');
+  ctx.fillStyle = colGrd;
+  ctx.fillRect(-96, -50, 192, 410);
+
+  const bandH = 72;
+  const off = (clock / 260) % bandH;         // scroll offset → downward flow
+  ctx.globalCompositeOperation = 'lighter';
+  for (let y = -50 - bandH + off; y < 360; y += bandH) {
+    const g = ctx.createLinearGradient(0, y, 0, y + bandH);
+    g.addColorStop(0,   'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.34)');
+    g.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-96, y, 192, bandH);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+
+  // 3. mist / foam at the base — small reusable pool (capped at 26)
+  for (let i = _mist.length - 1; i >= 0; i--) {
+    const m = _mist[i];
+    m.life += dt;
+    if (m.life >= m.max) { _mist.splice(i, 1); continue; }
+    m.y += (m.vy * dt) / 1000;
+    const p = m.life / m.max;
+    ctx.globalAlpha = 0.42 * (1 - p);
+    ctx.fillStyle = '#E9F6FF';
     ctx.beginPath();
-    ctx.arc(fx, fy, 9 + (1 - phase) * 14, 0, Math.PI * 2);
+    ctx.arc(m.x + Math.sin((m.life + i * 90) / 260) * 10, m.y, m.r + p * 10, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  if (_mist.length < 26) {
+    _mist.push({
+      x: (Math.random() - 0.5) * 130,
+      y: 320 + Math.random() * 26,
+      vy: -14 - Math.random() * 22,       // foam puffs drift up and fade
+      life: 0,
+      max: 650 + Math.random() * 500,
+      r: 8 + Math.random() * 14,
+    });
+  }
+
   ctx.restore();
 }
 
