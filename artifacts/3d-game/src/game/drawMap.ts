@@ -71,6 +71,47 @@ const _noCache = typeof window !== 'undefined'
  *  Map geometry is static, so this is rarely needed, but honours the §1 contract. */
 export function resetGroundCache(): void { _groundBuf = null; }
 
+// ─── Texture tiles (async — each 2048² PNG downscaled to a small repeat tile) ─
+// Tile sizes in world units; pre-scaling to BUF_SCALE pixels gives a
+// reasonable repeat frequency without PatternTransform (iOS compat).
+const _TEX_TILE_W: Record<string, number> = {
+  grass: 280, sand: 360, forest: 240, water: 320, street: 180, sidewalk: 120,
+};
+const _texTiles = new Map<string, HTMLCanvasElement>();
+let _texLoadStarted = false; // idempotency guard — tiles are app-lifetime singletons
+
+export function loadGroundTextures(base: string): void {
+  if (_texLoadStarted) return; // already loading or loaded — don't re-decode
+  _texLoadStarted = true;
+  const b = base.endsWith('/') ? base : base + '/';
+  const keys = Object.keys(_TEX_TILE_W);
+  let pending = keys.length;
+  for (const key of keys) {
+    const img = new Image();
+    img.onload = () => {
+      const px = Math.max(8, Math.round(_TEX_TILE_W[key] * BUF_SCALE));
+      const c  = document.createElement('canvas');
+      c.width  = c.height = px;
+      c.getContext('2d')!.drawImage(img, 0, 0, px, px);
+      _texTiles.set(key, c);
+      if (--pending <= 0) { _groundBuf = null; }
+    };
+    img.onerror = () => { if (--pending <= 0) { _groundBuf = null; } };
+    img.src = `${b}assets/tex_${key}.png`;
+  }
+}
+
+// ─── Per-match lot data (yards baked into the ground cache once per match) ────
+interface GroundLot { x: number; y: number; fpR: number; }
+let _groundLots: GroundLot[] = [];
+
+/** Store suburb house-lot geometry so the next cache build can paint yards.
+ *  Call right after generateLots() finishes. */
+export function setMatchLots(lots: ReadonlyArray<{ x: number; y: number; fpR: number }>): void {
+  _groundLots = lots.map((l) => ({ x: l.x, y: l.y, fpR: l.fpR }));
+  _groundBuf  = null;
+}
+
 function _ensureGroundBuffer(): HTMLCanvasElement {
   if (_groundBuf) return _groundBuf;
   const buf = document.createElement('canvas');
@@ -144,6 +185,32 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _fillZoneRich(cc, ZONE_BEACH_R,    COL.sand,     true);
   _fillZoneRich(cc, ZONE_DOWNTOWN_R, COL.pavement, true);
 
+  // ─ 2c. Texture tile overlays (skipped gracefully if textures haven't loaded) ─
+  {
+    // Grass: island-wide at low alpha — beaches and downtown restored on top
+    const gt = _texTiles.get('grass');
+    if (gt) {
+      const gp = cc.createPattern(gt, 'repeat');
+      if (gp) {
+        cc.save(); tracIslandPath(cc); cc.clip();
+        cc.fillStyle = gp; cc.globalAlpha = 0.16;
+        cc.fillRect(0, 0, S, S); cc.restore();
+      }
+    }
+    // Forest zone gets a denser forest-texture overlay
+    _texFill(cc, 'forest',   0.26,
+      ZONE_FOREST_R[0], ZONE_FOREST_R[1], ZONE_FOREST_R[2], ZONE_FOREST_R[3]);
+    // Sand texture under the beach zone
+    _texFill(cc, 'sand',     0.22,
+      ZONE_BEACH_R[0],  ZONE_BEACH_R[1],  ZONE_BEACH_R[2],  ZONE_BEACH_R[3]);
+    // Sidewalk paving over downtown zone (plaza tile)
+    _texFill(cc, 'sidewalk', 0.12,
+      ZONE_DOWNTOWN_R[0], ZONE_DOWNTOWN_R[1], ZONE_DOWNTOWN_R[2], ZONE_DOWNTOWN_R[3]);
+  }
+
+  // ─ 2d. Mowing-stripe tint — very faint alternating bands over island grass ──
+  _paintMowingStripes(cc);
+
   // ─ 3. River (Prompt 8: soft-edged 2.5D band in clay blues) ─────────────────
   cc.save();
   tracIslandPath(cc);
@@ -169,6 +236,27 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _riverStroke(cc, RIVER_HALF_W * 2,    COL.riverMid);
   _riverStroke(cc, RIVER_HALF_W * 1.05, COL.riverDeep);
 
+  // Water texture on river channel (stroke the path with a pattern fill)
+  {
+    const wt = _texTiles.get('water');
+    if (wt) {
+      const wp = cc.createPattern(wt, 'repeat');
+      if (wp) {
+        cc.strokeStyle = wp;
+        cc.globalAlpha = 0.16;
+        cc.lineWidth   = RIVER_HALF_W * 1.8;
+        cc.lineCap = 'round'; cc.lineJoin = 'round';
+        cc.beginPath();
+        for (let i = 0; i < RIVER_PATH.length; i++) {
+          const [rx, ry] = RIVER_PATH[i];
+          i === 0 ? cc.moveTo(rx, ry) : cc.lineTo(rx, ry);
+        }
+        cc.stroke();
+        cc.globalAlpha = 1;
+      }
+    }
+  }
+
   cc.restore();
 
   // ─ 4. Lagoon ──────────────────────────────────────────────────────────────
@@ -190,6 +278,22 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.beginPath();
   cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
   cc.stroke();
+  // Water texture on lagoon
+  {
+    const wt = _texTiles.get('water');
+    if (wt) {
+      const wp = cc.createPattern(wt, 'repeat');
+      if (wp) {
+        cc.save();
+        cc.globalAlpha = 0.18;
+        cc.fillStyle = wp;
+        cc.beginPath();
+        cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+        cc.fill();
+        cc.restore();
+      }
+    }
+  }
   cc.restore();
 
   // ─ 5. Roads (Prompt 8: baked into the clay terrain — warm asphalt, a soft
@@ -245,6 +349,45 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   }
   cc.restore();
 
+  // (c.5) Street texture overlay on road surface
+  {
+    const st = _texTiles.get('street');
+    if (st) {
+      const sp = cc.createPattern(st, 'repeat');
+      if (sp) {
+        cc.save();
+        cc.beginPath();
+        for (const [x, y, w, h] of roadRects) cc.rect(x, y, w, h);
+        cc.clip();
+        cc.fillStyle = sp; cc.globalAlpha = 0.18;
+        cc.fillRect(MARGIN, MARGIN, S - MARGIN * 2, S - MARGIN * 2);
+        cc.restore();
+      }
+    }
+  }
+
+  // (c.6) Sidewalk strips — textured paving BOTH sides of every road ──────────
+  {
+    const SW  = 28; // sidewalk strip width in world units
+    const swt = _texTiles.get('sidewalk');
+    const swPat = swt ? cc.createPattern(swt, 'repeat') : null;
+    cc.save();
+    tracIslandPath(cc); cc.clip();
+    if (swPat) { cc.fillStyle = swPat; cc.globalAlpha = 0.62; }
+    else        { cc.fillStyle = COL.pavement; cc.globalAlpha = 0.55; }
+    for (const rc of ROAD_CENTERS) {
+      const x0 = MARGIN, x1 = S - MARGIN, y0 = MARGIN, y1 = S - MARGIN;
+      // Both sides of horizontal road
+      cc.fillRect(x0, rc - hw - SW, x1 - x0, SW);
+      cc.fillRect(x0, rc + hw,      x1 - x0, SW);
+      // Both sides of vertical road
+      cc.fillRect(rc - hw - SW, y0, SW, y1 - y0);
+      cc.fillRect(rc + hw,      y0, SW, y1 - y0);
+    }
+    cc.globalAlpha = 1;
+    cc.restore();
+  }
+
   // (d) Soft, rounded lane dashes — muted warm paint; round caps read as pills,
   //     not the old hard white rectangles.
   cc.strokeStyle = COL.roadDash;
@@ -287,6 +430,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   }
 
   cc.restore();
+
+  // ─ 5.5. House yards, driveways, and flowerbeds (baked from match lot data) ──
+  _paintYards(cc);
 
   // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
   cc.save();
@@ -597,6 +743,107 @@ export function drawDebugTerrainVec(ctx: CanvasRenderingContext2D): void {
     }
   }
   ctx.restore();
+}
+
+// ─── Texture + yard helpers (baked once into the static ground cache) ─────────
+
+/** Fill a rect with a repeating texture tile at the given alpha, clipped to [x0,y0,x1,y1]. */
+function _texFill(
+  cc: CanvasRenderingContext2D, key: string, alpha: number,
+  x0: number, y0: number, x1: number, y1: number,
+): void {
+  const tile = _texTiles.get(key);
+  if (!tile) return;
+  const pat = cc.createPattern(tile, 'repeat');
+  if (!pat) return;
+  cc.save();
+  cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
+  cc.fillStyle = pat; cc.globalAlpha = alpha;
+  cc.fillRect(x0, y0, x1 - x0, y1 - y0);
+  cc.globalAlpha = 1;
+  cc.restore();
+}
+
+/** Faint alternating E–W mowing-stripe bands over the island grass. */
+function _paintMowingStripes(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const STRIPE = 160;
+  for (let y = 0; y < S; y += STRIPE) {
+    cc.fillStyle = (Math.floor(y / STRIPE) % 2 === 0)
+      ? 'rgba(38,62,22,0.044)' : 'rgba(255,255,255,0.030)';
+    cc.fillRect(0, y, S, STRIPE);
+  }
+  cc.restore();
+}
+
+/** Yard fills, picket fences, driveways, and flowerbed accents for every suburb lot. */
+function _paintYards(cc: CanvasRenderingContext2D): void {
+  if (_groundLots.length === 0) return;
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+
+  const grassPat = _texTiles.has('grass')
+    ? cc.createPattern(_texTiles.get('grass')!, 'repeat') : null;
+  const swPat    = _texTiles.has('sidewalk')
+    ? cc.createPattern(_texTiles.get('sidewalk')!, 'repeat') : null;
+
+  let yseed = 7411;
+  const yrnd = () => { yseed = (yseed * 1103515245 + 12345) & 0x7fffffff; return yseed / 0x7fffffff; };
+
+  for (const lot of _groundLots) {
+    const hs = lot.fpR * 1.55;
+    const x0 = lot.x - hs, y0 = lot.y - hs, w = hs * 2, h = hs * 2;
+    const v1 = yrnd(), v2 = yrnd(), v3 = yrnd();
+
+    // ── Lawn: grass texture + per-yard tint ────────────────────────────────────
+    if (grassPat) {
+      cc.save();
+      cc.beginPath(); cc.rect(x0, y0, w, h); cc.clip();
+      cc.fillStyle = grassPat; cc.globalAlpha = 0.30;
+      cc.fillRect(x0, y0, w, h);
+      cc.restore();
+    }
+    cc.fillStyle  = v1 > 0.5 ? '#B8D98A' : '#9DCC78';
+    cc.globalAlpha = 0.12 + v2 * 0.06;
+    cc.fillRect(x0, y0, w, h);
+
+    // ── Picket fence ───────────────────────────────────────────────────────────
+    cc.globalAlpha = 1;
+    cc.strokeStyle = 'rgba(160,120,80,0.44)';
+    cc.lineWidth   = 3;
+    cc.strokeRect(x0 + 1.5, y0 + 1.5, w - 3, h - 3);
+
+    // ── Driveway (south-facing paved strip) ────────────────────────────────────
+    const dwW = Math.max(10, lot.fpR * 0.28);
+    const dwH = hs * 0.60;
+    const dwX = lot.x - dwW, dwY = lot.y + lot.fpR * 0.8;
+    if (swPat) {
+      cc.save();
+      cc.beginPath(); cc.rect(dwX, dwY, dwW * 2, dwH); cc.clip();
+      cc.fillStyle = swPat; cc.globalAlpha = 0.55;
+      cc.fillRect(dwX, dwY, dwW * 2, dwH);
+      cc.restore();
+    } else {
+      cc.fillStyle = COL.pavement; cc.globalAlpha = 0.45;
+      cc.fillRect(dwX, dwY, dwW * 2, dwH);
+    }
+
+    // ── Flowerbed accent (front corner) ────────────────────────────────────────
+    const fbX = x0 + w * 0.18 + v3 * w * 0.10;
+    const fbY = lot.y + lot.fpR * 0.55 + v1 * lot.fpR * 0.22;
+    cc.globalAlpha = 1;
+    cc.fillStyle   = 'rgba(230,115,150,0.45)';
+    cc.beginPath();
+    cc.ellipse(fbX, fbY, lot.fpR * 0.32, lot.fpR * 0.20, 0.3, 0, Math.PI * 2);
+    cc.fill();
+    cc.fillStyle   = 'rgba(75,155,75,0.38)';
+    cc.beginPath();
+    cc.ellipse(fbX + lot.fpR * 0.14, fbY - lot.fpR * 0.08, lot.fpR * 0.24, lot.fpR * 0.15, -0.3, 0, Math.PI * 2);
+    cc.fill();
+  }
+
+  cc.restore();
 }
 
 // ─── Reserved-zone ground art (baked once into the static ground cache) ────────

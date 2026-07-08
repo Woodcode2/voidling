@@ -1,49 +1,58 @@
 ---
 name: VOIDLING Map Rebuild (Prompt 12)
-description: Single fixed island plan, new block types, reserved zones, two suburb districts, and ground-art helpers.
+description: Fixed plan NEW EARTH, reserved zones, ground texture system, yards/sidewalks baked into ground cache.
 ---
 
-## Fixed plan
-`FIXED_PLAN` in `world.ts` replaces the rotating PLAN_A/B/C + dayOfYear selection. `planName` is hardcoded to `'NEW EARTH'`.
+## Fixed Plan
+`FIXED_PLAN` in `world.ts` — single 6×6 plan named `'NEW EARTH'` replacing rotating A/B/C plans. Block types include `'forest' | 'airport' | 'military'` in addition to previous types. Zones exported from `mapData.ts`: `ZONE_ZOO_R`, `ZONE_AIRPORT_R`, `ZONE_MILITARY_R`, `ZONE_FOREST_R`, `ZONE_DOWNTOWN_R`, `ZONE_BEACH_R`.
 
-## New block types added to BlockType
-`'forest' | 'airport' | 'military'`
+## Ground Texture System (Stage 3)
+`drawMap.ts` exports:
+- `loadGroundTextures(base)` — loads 6 tex_*.png files (grass/sand/forest/water/street/sidewalk), downscales each to a small tile canvas keyed by world-unit tile size, then nulls `_groundBuf`. Has an `_texLoadStarted` idempotency guard — safe to call multiple times per app lifecycle (called from engine.ts at init time once).
+- `setMatchLots(lots)` — stores lot geometry in `_groundLots`, nulls `_groundBuf`. Called from `world.ts` right after `generateLots()`. Lot interface: `{x, y, fpR}`.
 
-- `forest` → `fillForest`: trees, bush, flowers, birds. No buildings.
-- `airport` + `military`: **no entity fill at all** — ground art only, baked in `drawMap.ts`.
-- `zoo` → `fillZoo`: now empty/reserved body. Animals + structures come next prompt.
+`_paintStaticGround` additions (baked into the 3600×3600 off-screen buffer at BUF_SCALE=0.30):
+- **§2c** — Texture overlays: grass island-wide (α=0.16), forest over ZONE_FOREST_R (α=0.26), sand over ZONE_BEACH_R (α=0.22), sidewalk paving over ZONE_DOWNTOWN_R (α=0.12)
+- **§2d** — Mowing stripes: 160-wu alternating dark/light bands clipped to island path
+- **§3** (river) — water texture stroked along RIVER_PATH at lineWidth=RIVER_HALF_W×1.8, α=0.16
+- **§4** (lagoon) — water texture filled in lagoon ellipse, α=0.18
+- **§5 c.5** — Street texture filled over all road rects, α=0.18
+- **§5 c.6** — Sidewalk strips: SW=28wu strips on BOTH sides of every ROAD_CENTERS entry (H and V), clipped to island. Uses sidewalk pattern if loaded, else COL.pavement fallback.
+- **§5.5** — `_paintYards(cc)`: for each lot, draws grass-texture + tint lawn fill, picket fence stroke, south-facing driveway (sidewalk texture or pavement fallback), pink+green flowerbed ellipses
 
-## Reserved zones in mapData.ts
-```
-ZONE_ZOO_R     = [bx0(4), by0(0), bx1(4), by1(0)]  // [7900, 700, 9500, 2300]
-ZONE_AIRPORT_R = [bx0(4), by0(4), bx1(4), by1(4)]  // [7900, 7900, 9500, 9500]
-ZONE_MILITARY_R= [bx0(5), by0(2), bx1(5), by1(2)]  // [9700, 4300, 11300, 5900]
-```
+Helper functions added to `drawMap.ts`:
+- `_texFill(cc, key, alpha, x0, y0, x1, y1)` — clips to rect, fills with named texture tile
+- `_paintMowingStripes(cc)` — alternating bands over island
+- `_paintYards(cc)` — pre-creates grassPat+swPat once, then iterates _groundLots
 
-These must be excluded from scatterScenery. Guards are inline bounds checks inside the `tryPlace` loop.
+## Contact Shadow (Stage 3)
+`world.ts` `drawOne()` — single hard ellipse replaced by 3 concentric ellipses:
+- Outer (rgba 0,0,0,0.10) at r×1.05 × r×0.32
+- Mid   (rgba 0,0,0,0.14) at r×0.80 × r×0.24
+- Core  (rgba 0,0,0,0.20) at r×0.55 × r×0.16
 
-## Two suburb districts via generateLots
-Inside the residential fill loop, HOUSE_POOL is selected per-block by column:
-- `gx < 3` → `COZY_POOL` (`house`, `house_c`) → resolves to `clayHouseCottageKeys` (rows 2–3 of houses_clay2_sheet.png)
-- `gx >= 3` → `FANCY_POOL` (`house_d`) → resolves to `clayHouseFancyKeys` (rows 0–1 of houses_clay2_sheet.png)
+## Live Receipts (Stage 5)
+From Playwright run:
+- SUBURB LOTS: 148 (target ≥120 ✓)
+- DOWNTOWN LOTS: 96 (target ≥16 ✓)
+- BUILDING OVERLAPS: 0 ✓
+- BUILDINGS ON ROADS: 0 ✓
+- OFF-ISLAND ENTITIES: 0 ✓ (SPAWN AUDIT removed 1 library → 0 remaining)
+- SCENERY COUNT: 106
+- SCENERY OFF-ISLAND: 0 ✓
+- SCENERY ON ROADS: 0 ✓
+- SCENERY ON BUILDINGS: 0 ✓
+- [clayCity] NEW EARTH art — skyscrapers=4 fancy=8 cottage=8 houses_sheet=ok downtown_sheet=ok ✓
+- [clayFood] cutouts=12/12 ✓
+- FPS: 54.3 at 2527 objects (in-game, §debug overlay shows 36-39 FPS in residential view)
 
-`structureSpriteKey` routes accordingly — `house`/`house_c` → cottage, `house_d` → fancy.
+## Visual Receipts (Stage 5)
+- Road surface: textured (non-flat), crosswalks and lane dashes visible ✓
+- Sidewalk strips: lighter strips bordering roads visible in gameplay screenshots ✓
+- Yards (residential): faint yard rectangles, driveway strips, flowerbed accents confirmed by Playwright tester in residential screenshot ✓
+- Grass texture: confirmed visible in residential view ✓
+- Mowing stripes: confirmed by Playwright tester ✓
+- Contact shadows: soft multi-layer ellipse clearly visible under all objects ✓
+- Cars moving on roads: confirmed (car mid-turn seen in screenshot) ✓
 
-## Clay sheets
-`houses_clay2_sheet.png` (4×4=16), `downtown_clay2_sheet.png` (4×3=12). Loaded in `clayCity.ts`.
-Exported pools: `clayHouseCottageKeys`, `clayHouseFancyKeys`, `claySkyscraperKeys`.
-Old `buildings_clay_sheet.png` + `houses_clay_sheet.png` references are dead — new pools replace them.
-
-## Ground art helpers in drawMap.ts
-`_paintAirportRunway`, `_paintMilitaryPad`, `_paintZooLayout` — called from `_paintStaticGround` section 8, inside island clip.
-
-## fillPark feast spawn fix
-Feast items now scatter within the park block (b.x0/y0 bounds), not at global spawnX/spawnY, because under the fixed plan the park block is NOT at the map center any more.
-
-## v12 §1 ring spawn reduction
-Reduced from 8 items at rr=65–145 to 3 items at rr=140–200 (breathing room rule: keep 108px clear of spawn center).
-
-## Forest block off-island
-gx=5, gy=0 center (10500, 1500) is outside the island polygon → `fillForest` is skipped by the island check (no entities placed there). ZONE_FOREST_R still covers it for terrain color. The zoo block gx=4, gy=0 (8700, 1500) is inside and gets the empty fillZoo.
-
-**Why:** zoo block center passes isOnIsland but forest block doesn't — it's fine; forest scenery items at gx=5,gy=0 fail the isOnIsland(x,y,120) check naturally.
+**Why:** Stage 3 items were entirely unimplemented after Prompt 12 Stage 2 — ground textures were present as PNG files but never wired into drawMap.ts. Stage 3 wires all six tex_* files into the baked ground buffer.

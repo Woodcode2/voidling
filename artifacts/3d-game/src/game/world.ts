@@ -18,6 +18,7 @@ import {
 import {
   clayFoodKeys, clayAppleVarietyKeys, CLAY_FOOD_CELL,
 } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
+import { setMatchLots } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -600,6 +601,8 @@ export class WorldManager {
       }
       console.log('[world] Dense City suburb house lots placed:', this.houseLots.length);
     }
+    // Map Rebuild: export lot geometry to drawMap so the ground cache bakes yards/driveways.
+    setMatchLots(this.houseLots);
 
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
@@ -2797,10 +2800,20 @@ export class WorldManager {
         // Drop shadow only for grounded objects — captured objects have the v10 §3
         // planted shadow at obj.shadowX/Y; drawing one here would rotate with the tumble.
         if (!obj.captured) {
+          // Prompt 12 Stage 3: soft procedural contact shadow — three concentric
+          // ellipses fading outward give a radial AO that reads as ground contact.
           ctx.save();
-          ctx.fillStyle = CONFIG.COLORS.shadow;
+          ctx.fillStyle = 'rgba(0,0,0,0.10)'; // outer halo
           ctx.beginPath();
-          ctx.ellipse(2, 3, r * 0.7, r * 0.22, 0, 0, Math.PI * 2);
+          ctx.ellipse(1, 4, r * 1.05, r * 0.32, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.14)'; // mid ring
+          ctx.beginPath();
+          ctx.ellipse(1.5, 3.5, r * 0.80, r * 0.24, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.20)'; // core
+          ctx.beginPath();
+          ctx.ellipse(2, 3, r * 0.55, r * 0.16, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
