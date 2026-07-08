@@ -2794,11 +2794,18 @@ export class WorldManager {
       ctx.translate(obj.x + shk, obj.y + pedBob);
       if (obj.captured) {
         ctx.rotate(obj.captureRot);
-      } else {
+      } else if (obj.living) {
+        // Prompt 7 Stage 1: idle tilt + vacuum wobble are body-language reserved for
+        // things MEANT to move — people, animals, and vehicles are all LIVING_KINDS.
+        // Buildings, houses, and scenery (living === false) must hold perfectly still;
+        // their only motion is the swallow animation while captured (handled above).
+        // Root cause of the "drift": obj.wobble is advanced every frame (see the
+        // per-frame `obj.wobble += dt * 0.004` in update), so Math.sin(obj.wobble)
+        // was a continuous ±2.3° oscillation applied to static structures too.
         const tilt = obj.fleeing ? Math.sin(obj.wobble * 3) * 0.16 : Math.sin(obj.wobble) * 0.04;
         // Alive Pack §11: vacuum wobble — dragged objects wobble in the pull direction
         const spd = Math.hypot(obj.vx, obj.vy);
-        const vacWobble = (!obj.captured && spd > 12)
+        const vacWobble = (spd > 12)
           ? Math.sin(t / 78 + obj.wobble) * 0.14 * Math.min(1, spd / 80)
           : 0;
         ctx.rotate(tilt + vacWobble);
@@ -2855,13 +2862,9 @@ export class WorldManager {
           ctx.rotate(rot);
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
           ctx.restore();
-        } else if (obj.kind === 'tree' || obj.kind === 'bush') {
-          // Alive Pack §8: individual ±1.5° sway using per-object wobble as phase
-          const sway = Math.sin(t / 2200 + obj.wobble) * (1.5 * Math.PI / 180);
-          ctx.save(); ctx.rotate(sway);
-          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r * 2, r * 2, r * 2);
-          ctx.restore();
         } else {
+          // Prompt 7 Stage 1: trees & bushes are scenery — the ±1.5° idle wind sway
+          // was removed so they draw perfectly still like every other structure.
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r * 2, r * 2, r * 2);
         }
       } else {

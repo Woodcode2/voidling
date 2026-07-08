@@ -1,0 +1,44 @@
+# VOIDLING: Stabilize the World (Rebuild Prompt 7)
+Three render defects are making the world look glitchy: buildings drift back and forth, some structures float above the ground, and the void has a white halo around it. Fix only these three. Diagnose the cause of each before changing anything.
+
+## GOAL
+A world that holds still. Buildings and structures are static, everything sits flush on the ground, and the void has no white ring. Nothing else changes.
+
+## DO NOT TOUCH (leave fully intact)
+- All gameplay, scoring, eating, placement counts, spawners, art, and the Prompt 1 through 6 work.
+- Camera, ground, roads, river, waterfall, the win math.
+- Do not swap any art or add anything. This is bug repair only.
+
+## STAGE 0: Diagnose first and report the ROOT CAUSE of each (no fixes yet)
+This is the most important stage. Do not fix anything until you have reported the actual cause of all three:
+1. Buildings and structures appear to drift or oscillate back and forth in place. Find what applies per-frame motion to static structures. Is an idle bob or body-language animation wrongly applied to buildings? Is the depth sort recomputing positions and causing jitter? Is a position value being recalculated each frame? Report the exact cause.
+2. Some structures and props render floating above the ground instead of sitting on it. Find the ground-anchor or height calculation for structures. Report why some sit high.
+3. There is a white ring or halo drawn around the void body. Find where it is drawn. Report the draw call.
+Paste all three root causes, then proceed.
+
+## STAGE 1: Buildings and structures hold still
+- Remove whatever is causing static structures to drift or oscillate. Buildings, houses, and scenery must not move on their own. The only motion a structure ever has is the swallow animation at the moment it is eaten, nothing else.
+- If an idle animation layer is being applied to structures by mistake, scope it so it only applies to the things meant to move (people, vehicles), never to buildings, houses, or scenery.
+
+## STAGE 2: Everything sits on the ground
+- Every structure and prop anchors bottom-center at ground level, sitting flush on the surface. Nothing floats above it. Fix the anchor or height calc found in Stage 0 so the whole set sits correctly.
+
+## STAGE 3: Remove the white void halo
+- Remove the white ring drawn around the void. If you want to keep the void readable against the ground, use a soft dark contact shadow beneath it, never a white outline or glow.
+
+## STAGE 4: Proof (real receipts)
+Run a live match and report:
+- The three root causes from Stage 0, and exactly what you changed for each.
+- Watch the board for ten seconds with the void still: confirm no building, house, or scenery item drifts or oscillates.
+- Confirm nothing floats above the ground.
+- Confirm the void has no white ring.
+- All audits still 0. Frame rate still in band. No new console errors.
+
+If you could not find a root cause, say so instead of guessing at a fix. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview and hold still. Buildings should be dead static, no back-and-forth.
+- Everything should sit on the ground, nothing hovering.
+- The void should have no white halo around it.

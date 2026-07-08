@@ -12,7 +12,12 @@ function ow(r: number) {
 // deterministic palette pick
 // v8 §4: one global wind oscillator (~6s period, −1..1) so the whole world
 // breathes together — every organic sway reads from this same value.
-export function wind(t: number) { return Math.sin(t * (Math.PI * 2 / 6000)); }
+// Prompt 7 Stage 1: scenery must not move on its own. wind() previously drove an
+// ambient sway on trees/bushes/flowers/flowerpots/palms/umbrellas (procedural
+// fallback path) and on grass tufts (world.ts) — all scenery. It now returns 0 so
+// none of that oscillates; the only motion a structure ever has is the swallow
+// animation while it is being eaten.
+export function wind(_t: number) { return 0; }
 
 function pick<T>(arr: T[], variant: number) {
   return arr[Math.abs(variant) % arr.length];
@@ -43,7 +48,7 @@ function drawApple(ctx: CanvasRenderingContext2D, r: number, _t: number) {
 function drawFlower(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 0) {
   const o = ow(r);
   const petal = pick(['#FF6FB0', '#FFD23F', '#8ECBFF', '#FF8A5C', '#C9A6FF'], variant);
-  const sway = wind(t) * 0.18 + Math.sin(t / 700 + variant) * 0.03; // v8 §4 wind lean + tiny bob
+  const sway = 0; // Prompt 7 Stage 1: flowers are scenery — no wind lean / bob
   ctx.save();
   ctx.rotate(sway);
   for (let i = 0; i < 6; i++) {
@@ -252,7 +257,7 @@ function drawCar(ctx: CanvasRenderingContext2D, r: number, t: number, variant = 
 }
 
 function drawTree(ctx: CanvasRenderingContext2D, r: number, t: number) {
-  const sway = wind(t) * r * 0.06 + Math.sin(t / 1100) * r * 0.01; // v8 §4 unified wind sway
+  const sway = 0; // Prompt 7 Stage 1: trees are scenery — no wind sway / bob
   const green = '#33B463';
   // v5 §6: trunk + canopy share ONE silhouette (drawn back-to-front for fills)
   silhouette(ctx, [
@@ -376,7 +381,7 @@ function drawFlowerpot(ctx: CanvasRenderingContext2D, r: number, t: number, vari
   }, '#C86B3C', { outline: o });
   sticker(ctx, (c) => roundRectPath(c, -r * 0.62, -r * 0.02, r * 1.24, r * 0.24, r * 0.08), '#E07C46', { outline: o, shadow: false });
   // little bloom
-  const sway = wind(t) * 0.14 + Math.sin(t / 700 + variant) * 0.03; // v8 §4 wind
+  const sway = 0; // Prompt 7 Stage 1: flowerpots are scenery — no wind lean / bob
   ctx.save();
   ctx.translate(0, -r * 0.2);
   ctx.rotate(sway);

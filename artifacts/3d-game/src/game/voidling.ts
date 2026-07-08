@@ -568,9 +568,11 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
 
   ctx.restore(); // end circle clip
 
-  // ── White outline — drawn stroke is crisp at every size ──────────────────
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = Math.max(3, r * 0.08);
+  // ── Prompt 7 Stage 3: soft DARK rim (was a bright white outline — the reported
+  // "white halo" around the void). A subtle dark edge keeps the orb crisp against
+  // the ground with no white ring; grounding comes from the dark contact shadow.
+  ctx.strokeStyle = 'rgba(16, 8, 30, 0.55)';
+  ctx.lineWidth = Math.max(2, r * 0.05);
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
