@@ -1,0 +1,75 @@
+# VOIDLING: New Earth (Rebuild Prompt 12)
+This is the map rebuild. The rotating daily block plans are replaced by ONE fixed, hand-authored island built to match the attached reference image. Real terrain textures replace flat color fills. New flat-bottomed building art replaces the yard-based sprites. This is the biggest prompt of the rebuild: go stage by stage, and prove each stage.
+
+IMPORTANT: a reference image of the target island is attached to this message. It is the spec for layout, density, and feel. You will compare your result against it at the end and report the gaps honestly.
+
+## DO NOT TOUCH (leave fully intact)
+- Gameplay rules: eating, growth, evolution, the death rules (drop a stage, out at smallest, 3s grace), scoring, the percent-devoured win math, the 5-minute timer.
+- The clay pools and the extraction cutter. The splash screen and match intro. The void body rendering. The camera.
+- The waterfall renderer. The river must END at the existing waterfall exit coordinate so the falls keep working. Do not rebuild the falls.
+
+---
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. How the rotating daily block plans generate the world today: where block types are assigned, how the road graph is built, and every spawner that reads block or zone data.
+2. How the road graph feeds car pathing and junction turning.
+3. Where the waterfall exit coordinate is defined.
+4. How scenery, food, people, and vehicle spawners currently choose their areas.
+Paste all four, then proceed.
+
+## STAGE 1: Pull the assets (8 files)
+Download into the asset folder. Try URL fetch first. If blocked, stop and tell me.
+- houses_clay2_sheet.png (flat-bottomed houses, replaces the yard-based house cutouts):
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_180153_b1361828-34b7-40c8-a4e7-51e71d1f7a28.png
+- downtown_clay2_sheet.png (flat-bottomed downtown and civic buildings):
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_180208_4a9c9ca5-b537-488d-af50-6a525854b0e1.png
+- tex_grass.png: https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_181209_12723f6b-b773-4f8d-ab17-daf76a8c4c88.png
+- tex_sand.png: https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_181220_20e413f8-6721-4739-8cbd-427295eaeab6.png
+- tex_forest.png: https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_181229_004e791e-41ec-433a-99cf-4194ca7d482d.png
+- tex_water.png: https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_181239_56ce1ee9-c9d3-430f-840c-375ac22a0d39.png
+- tex_street.png: https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_181250_f0a1e924-eaf9-408a-ad97-9efb336a04c8.png
+- tex_sidewalk.png: https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_181300_20f85501-659f-4d55-98aa-bb6dddf4314b.png
+Run the two building sheets through the existing cutter (expect about 12 cutouts each) and report the counts. The six textures are pattern fills, not cutouts: do not cut them.
+
+## STAGE 2: The fixed island (replaces the rotating plans)
+Delete the rotating daily plan system and author ONE fixed district layout, matching the attached reference:
+- A central PLAZA with the downtown core packed around it: towers wall to wall along the block faces, gaps between adjacent downtown buildings no more than a quarter of a building width, tallest towers nearest the plaza, civic buildings (hospital, school, town hall) in the core.
+- TWO suburb districts: a cozy district using the small cottages, and a fancier district using the bigger homes. Tight residential blocks of roughly 4 lots by 2 rows on a small road grid. 120 or more house lots total.
+- A PARK district beside downtown for the park props.
+- A FOREST district toward the river side, containing a reserved ZOO clearing: paint its paths and enclosure outlines into the ground now, leave it unpopulated (inhabitants come next prompt).
+- A BEACH band along one island edge for the beach props.
+- A reserved AIRPORT strip: paint a runway with markings and an apron into the ground now, leave it unpopulated.
+- A small reserved MILITARY pad, unpopulated for now.
+- The RIVER enters from the forest side, curves past the park, and ends at the EXISTING waterfall exit coordinate.
+Scale rule: keep MAP_SIZE and the void's scale unchanged. Tune road spacing and block pitch for density, so the island reads packed like the reference, not sparse.
+
+## STAGE 3: Bake the ground (into the existing cached ground buffer)
+Pattern-fill the surfaces: tex_grass everywhere green, tex_forest under the forest, tex_sand on the beach, tex_street on all roads, tex_sidewalk as sidewalks along BOTH sides of every road, tex_water in the river channel and lagoon (the existing scrolling highlights stay on top).
+Then bake the detail over the textures: lane dashes and crosswalks, curbs, a fenced yard rectangle around every house lot (fence lines plus a slightly different lawn tint per yard), a driveway from each house to its street, flowerbeds, subtle mowing-stripe tint bands over the grass, plaza paving from the sidewalk tile at a larger scale, zoo paths and enclosure outlines, runway markings.
+Texture scale: start around one tile per 2 to 3 house widths and adjust until the grain reads at gameplay zoom. Mirror-tile (flip alternate tiles) to hide any seams. All of this bakes once into the cached buffer: zero per-frame cost.
+
+## STAGE 4: Re-target the world
+- Structures use the new flat-bottom cutouts, anchored bottom-center on their lots, in the existing foot-Y-sorted pass. The new sheets carry NO shadows, so draw a soft procedural contact shadow under every structure. Retire the old yard-based cutouts from use.
+- Scenery scatter re-runs against the new zones: forest fill in the forest, park props in the park, beach props on the sand, greenery across the island, same gating and caps as before.
+- Food, people, and vehicle spawners read the new districts. The new road graph must produce working junctions so cars drive and turn exactly as before.
+- Spawn breathing room: at match start, no more than 5 food items within about 3 void-widths of the player spawn. The feast belongs out in the world, not piled on the player.
+
+## STAGE 5: Proof (real receipts, then the honest comparison)
+Run a live match and paste actual output:
+1. Cutout counts for the two new building sheets.
+2. SUBURB LOTS (must be 120+) and DOWNTOWN LOTS (must be 16+).
+3. All audits 0: BUILDING OVERLAPS, BUILDINGS ON ROADS, OFF-ISLAND ENTITIES, SCENERY OFF-ISLAND, SCENERY ON ROADS, SCENERY ON BUILDINGS.
+4. Viewport density: pick 5 random on-land points at default gameplay zoom and count structures plus props visible at each. Every point must show 6 or more. Report the 5 counts.
+5. Cars observed driving and turning on the new road graph. The river observed flowing into the falls.
+6. Rotating plan code fully removed (grep and report it unreferenced).
+7. Frame rate in the usual band. No new console errors.
+8. THE HONEST COMPARISON: put a zoomed-out screenshot of the new island next to the attached reference image and list, in plain words, the top 3 remaining visual gaps. Do not claim it matches. Name what is still off.
+If any receipt fails, say so plainly and stop. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- ATTACH THE REFERENCE IMAGE to this prompt when you paste it, so the Agent builds against the picture.
+- Open the preview and walk the void from downtown to the suburbs to the beach to the forest. Districts should read like the reference: packed core, fenced yards, sidewalks everywhere, textured ground, water that looks like water, a painted runway and zoo waiting for tenants.
+- Read the Agent's top-3-gaps list and check it against what you see. That list is the to-do for the polish pass.

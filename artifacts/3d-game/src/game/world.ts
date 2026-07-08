@@ -2,14 +2,15 @@ import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
-import { clayHouseKeys, claySkyscraperKeys } from './clayCity'; // Prompt 3: clay art swap draw keys
+import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
 } from './clayLife'; // Prompt 4: clay people + vehicle art swap draw keys
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
 import { isOnIsland, isInsideIsland, terrainAtGeom, TERRAIN as GTERRAIN,
-  ZONE_FOREST_R, ZONE_PARK_R, ZONE_BEACH_R } from './mapData'; // Dense City: runtime per-block lot generation + island polygon gating
+  ZONE_FOREST_R, ZONE_PARK_R, ZONE_BEACH_R,
+  ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R } from './mapData'; // Map Rebuild: runtime per-block lot generation + island polygon gating
 import {
   loadClayScenery, SCENERY_FOREST, SCENERY_GREEN, SCENERY_PARK, SCENERY_BEACH,
   clayTreeKeys, clayBushKeys, clayFlowerKeys, type SceneryDef,
@@ -85,7 +86,7 @@ export interface PlayerStats {
   downtownItems: number;
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic';
+type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic' | 'forest' | 'airport' | 'military';
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
 interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; }
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
@@ -487,42 +488,22 @@ export class WorldManager {
       this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
     }
 
-    // v16.2 §6: Three rotating 6×6 city plans (R=residential, V=civic, D=downtown, P=park, Z=zoo, C=coast/beach)
-    // Plan A = METRO: dense downtown core + civic towers, coast on south
-    const PLAN_A: BlockType[] = [
-      'residential', 'residential', 'civic',       'civic',       'residential', 'residential', // gy=0
-      'residential', 'downtown',    'downtown',    'downtown',    'downtown',    'residential', // gy=1
-      'park',        'downtown',    'downtown',    'downtown',    'downtown',    'residential', // gy=2
-      'zoo',         'downtown',    'downtown',    'downtown',    'downtown',    'residential', // gy=3
-      'residential', 'residential', 'civic',       'residential', 'residential', 'residential', // gy=4
-      'beach',       'beach',       'beach',       'beach',       'beach',       'beach',       // gy=5
+    // Map Rebuild: single fixed island plan — NEW EARTH
+    // Central packed downtown (gx=1–4, gy=1–3), park west (gx=0 gy=2),
+    // two suburb districts (cozy NW / fancier SE), forest + zoo NE corner,
+    // civic flanks, military east, airport SE, beach south.
+    const FIXED_PLAN: BlockType[] = [
+      'residential', 'residential', 'residential', 'residential', 'zoo',         'forest',      // gy=0: north — forest + reserved zoo clearing NE
+      'civic',       'downtown',    'downtown',    'downtown',    'downtown',    'civic',        // gy=1: school/library W, hospital/townhall E
+      'park',        'downtown',    'downtown',    'downtown',    'downtown',    'military',     // gy=2: park W (river pond), restricted pad E
+      'residential', 'downtown',    'downtown',    'downtown',    'residential', 'residential',  // gy=3: downtown core continues
+      'residential', 'residential', 'residential', 'residential', 'airport',    'residential',  // gy=4: airstrip gx=4, suburbs around
+      'beach',       'beach',       'beach',       'beach',       'beach',       'beach',        // gy=5: sandy shores
     ];
-    // Plan B = SUBURBIA: low-density ring, compact downtown quad
-    const PLAN_B: BlockType[] = [
-      'residential', 'residential', 'residential', 'civic',       'residential', 'residential', // gy=0
-      'residential', 'residential', 'residential', 'residential', 'residential', 'residential', // gy=1
-      'park',        'residential', 'downtown',    'downtown',    'residential', 'residential', // gy=2
-      'zoo',         'residential', 'downtown',    'downtown',    'civic',       'residential', // gy=3
-      'residential', 'residential', 'residential', 'residential', 'residential', 'residential', // gy=4
-      'beach',       'beach',       'residential', 'residential', 'beach',       'beach',       // gy=5
-    ];
-    // Plan C = SEASIDE: coast wraps north edge, inland downtown
-    const PLAN_C: BlockType[] = [
-      'beach',       'beach',       'beach',       'beach',       'beach',       'beach',       // gy=0 north coast
-      'beach',       'residential', 'residential', 'civic',       'residential', 'beach',       // gy=1
-      'residential', 'residential', 'downtown',    'downtown',    'residential', 'residential', // gy=2
-      'zoo',         'residential', 'downtown',    'downtown',    'residential', 'park',        // gy=3
-      'residential', 'residential', 'civic',       'residential', 'residential', 'residential', // gy=4
-      'residential', 'residential', 'residential', 'residential', 'residential', 'residential', // gy=5
-    ];
-    const PLANS = [PLAN_A, PLAN_B, PLAN_C];
-    const dayOfYear = Math.floor(Date.now() / 86400000); // stable per UTC day
-    const planIdx = dayOfYear % 3;
-    this.planName = CONFIG.PLAN_NAMES[planIdx] ?? 'METRO';
-    const layout = PLANS[planIdx];
+    this.planName = 'NEW EARTH';
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
-        const type = layout[gy * CONFIG.GRID + gx];
+        const type = FIXED_PLAN[gy * CONFIG.GRID + gx];
         this.blocks.push({ gx, gy, type, x0: MARGIN + gx * STRIDE, y0: MARGIN + gy * STRIDE });
       }
     }
@@ -550,13 +531,17 @@ export class WorldManager {
       else if (b.type === 'beach') this.fillBeach(b, rand);
       else if (b.type === 'zoo') this.fillZoo(b, rand);
       else if (b.type === 'townhall') this.fillTownHall(b, rand);
-      else if (b.type === 'civic') this.fillCivic(b, rand, Math.min(civicIndex++, 1)); // v16.2 §6
+      else if (b.type === 'civic') this.fillCivic(b, rand, Math.min(civicIndex++, 1));
+      else if (b.type === 'forest') this.fillForest(b, rand);
+      // 'airport' and 'military': ground art only (painted in drawMap.ts), no entity spawn
     }
 
-    // v12 §1: guarantee T1 edibles around the player spawn (map center = downtown)
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2, rr = 65 + rand() * 80;
-      this.makeObj(pick(['flower', 'apple', 'flowerpot'] as ObjectKind[], rand),
+    // Map Rebuild §1: guarantee a few T1 edibles near player spawn, but keep the
+    // immediate area (≤3 void-widths ≈ 108px) clear. Spawn at rr=140–200 instead of
+    // 65–145 so the count within 108px stays ≤ 3 (spawn breathing-room rule).
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2, rr = 140 + rand() * 60;
+      this.makeObj(pick(['flower', 'apple'] as ObjectKind[], rand),
         clamp(spawnX + Math.cos(a) * rr, MARGIN + 10, this.size - MARGIN - 10),
         clamp(spawnY + Math.sin(a) * rr, MARGIN + 10, this.size - MARGIN - 10));
     }
@@ -734,6 +719,10 @@ export class WorldManager {
         const R = def.rMin + rand() * (def.rMax - def.rMin);
         const x = zone[0] + rand() * (zone[2] - zone[0]);
         const y = zone[1] + rand() * (zone[3] - zone[1]);
+        // Map Rebuild: exclude reserved zones from all scenery scatter
+        if (x >= ZONE_ZOO_R[0]     && x <= ZONE_ZOO_R[2]     && y >= ZONE_ZOO_R[1]     && y <= ZONE_ZOO_R[3])     continue;
+        if (x >= ZONE_AIRPORT_R[0]  && x <= ZONE_AIRPORT_R[2]  && y >= ZONE_AIRPORT_R[1]  && y <= ZONE_AIRPORT_R[3])  continue;
+        if (x >= ZONE_MILITARY_R[0] && x <= ZONE_MILITARY_R[2] && y >= ZONE_MILITARY_R[1] && y <= ZONE_MILITARY_R[3]) continue;
         if (!isOnIsland(x, y, 120)) continue;
         const terr = terrainAtGeom(x, y);
         if (sand) {
@@ -1100,14 +1089,15 @@ export class WorldManager {
     if (rand() < 0.4) this.scatter(b, rand, 'icecream_cart', 1);
     this.spawnBirds(b, rand, 3);
     this.spawnBirds(b, rand, 3);
-    // Phase 7a §5: spawn feast — 14 bits + flowers in rings so first 3 seconds feel great
+    // Map Rebuild: park is no longer at the player spawn — scatter the opening feast
+    // WITHIN the park block itself rather than around the global spawn point.
     for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2;
-      const rr = 65 + (i % 3) * 45; // inner / mid / outer rings
-      const ox = spawnX + Math.cos(a) * rr;
-      const oy = spawnY + Math.sin(a) * rr;
-      const kind = pick(['flower', 'apple', 'flowerpot', 'seashell'] as ObjectKind[], rand);
-      if (isOnIsland(ox, oy)) this.makeObj(kind, ox, oy);
+      const px = b.x0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
+      const py = b.y0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
+      if (!isOnIsland(px, py)) continue;
+      if (!this.roadClear(px, py, 15)) continue;
+      const kind = pick(['flower', 'apple', 'flowerpot'] as ObjectKind[], rand);
+      this.makeObj(kind, px, py);
     }
   }
 
@@ -1191,11 +1181,17 @@ export class WorldManager {
     };
 
     // ── Stage 1: dense suburbs — packed grid per residential block ──
-    const HOUSE_POOL: ObjectKind[] = ['house', 'house', 'house_c', 'house_d'];
+    // Map Rebuild: two suburb districts by block column.
+    //   gx < 3  (NW / left):  cozy cottages — clay_house2 rows 2–3
+    //   gx ≥ 3  (SE / right): fancier homes — clay_house2 rows 0–1
+    // Sprite resolution is handled in structureSpriteKey via kind mapping.
+    const COZY_POOL:  ObjectKind[] = ['house', 'house', 'house', 'house_c'];
+    const FANCY_POOL: ObjectKind[] = ['house_d', 'house_d', 'house_c', 'house'];
     const H_STEP = 400;                       // packed rows with small yards (≈12 lots/block)
     const H_INSET = CONFIG.SIDEWALK + 70;     // keep first row off the sidewalk
     for (const b of this.blocks) {
       if (b.type !== 'residential') continue;
+      const HOUSE_POOL = b.gx < 3 ? COZY_POOL : FANCY_POOL;
       let row = 0;
       for (let yy = b.y0 + H_INSET; yy <= b.y0 + B - H_INSET; yy += H_STEP, row++) {
         // stagger alternate rows by half a step for an organic, denser read
@@ -1321,71 +1317,19 @@ export class WorldManager {
     this.scatter(b, rand, 'mailbox', 2);
   }
 
-  // v16.1 D: ZOO compound — perimeter walls, gate, animal pens, visitors
-  private fillZoo(b: Block, rand: () => number) {
+  // Map Rebuild: ZOO block is reserved — animals, walls, and gate are added in a
+  // future update. Ground paths and enclosure outlines are baked into drawMap.ts.
+  private fillZoo(b: Block, _rand: () => number) {
     (b as any).zoo = true;
-    const S = CONFIG.SIDEWALK;
-    const BS = CONFIG.BLOCK_SIZE;
-    const x0 = b.x0 + S, y0 = b.y0 + S;
-    const bw = BS - S * 2, bh = BS - S * 2;
-    const cx = b.x0 + BS / 2, cy = b.y0 + BS / 2;
+    // Reserved — inhabitants come next prompt.
+  }
 
-    // Perimeter zoo walls — place every ~90px, skip south-center gate gap
-    const wallStep = 90;
-    const gateHalfW = 90;  // half-width of the gate gap
-    const southY = y0 + bh;
-    // Top wall row
-    for (let wx = x0; wx <= x0 + bw; wx += wallStep) {
-      this.makeObj('zoo_wall', wx, y0);
-    }
-    // Bottom wall row (gap at cx ± gateHalfW)
-    for (let wx = x0; wx <= x0 + bw; wx += wallStep) {
-      if (wx >= cx - gateHalfW && wx <= cx + gateHalfW) continue;
-      this.makeObj('zoo_wall', wx, southY);
-    }
-    // Left wall
-    for (let wy = y0 + wallStep; wy < y0 + bh; wy += wallStep) {
-      this.makeObj('zoo_wall', x0, wy);
-    }
-    // Right wall
-    for (let wy = y0 + wallStep; wy < y0 + bh; wy += wallStep) {
-      this.makeObj('zoo_wall', x0 + bw, wy);
-    }
-    // Zoo gate at south-center gap
-    this.makeObj('zoo_gate', cx, southY);
-
-    // Large animal pens — one per quadrant (NW, NE, SW)
-    const qx = bw * 0.27, qy = bh * 0.27;
-    this.makeObj('elephant', b.x0 + S + qx, b.y0 + S + qy);
-    this.makeObj('giraffe',  b.x0 + S + bw - qx, b.y0 + S + qy);
-    this.makeObj('lion',     b.x0 + S + qx, b.y0 + S + bh - qy * 1.4);
-
-    // Smaller animal groups
-    for (let i = 0; i < 3; i++) this.makeObj('monkey',   x0 + bw * 0.6 + rand() * bw * 0.3,  y0 + bh * 0.3 + rand() * bh * 0.25);
-    for (let i = 0; i < 3; i++) this.makeObj('flamingo', x0 + bw * 0.1 + rand() * bw * 0.25, y0 + bh * 0.55 + rand() * bh * 0.25);
-    for (let i = 0; i < 3; i++) this.makeObj('penguin',  x0 + bw * 0.5 + rand() * bw * 0.35, y0 + bh * 0.55 + rand() * bh * 0.3);
-
-    // Zookeepers + visitors + green lush scenery
-    this.scatter(b, rand, 'zookeeper', 2);
-    this.scatterPeople(b, rand, 'any', 4);
-    this.scatter(b, rand, 'tree', 5);
-    this.scatter(b, rand, 'flower', 10);
-    this.scatter(b, rand, 'bench', 3);
-    this.scatter(b, rand, 'apple', 4);
-    this.scatter(b, rand, 'trashcan', 2, cx, cy);
-
-    // Small pond (flamingo watering hole)
-    const pondX = x0 + bw * 0.25, pondY = y0 + bh * 0.65;
-    const pondR = BS * 0.12;
-    (b as any).pond = { x: pondX, y: pondY, r: pondR };
-    for (let i = 0; i < 3; i++) {
-      const a = rand() * Math.PI * 2, rr = rand() * pondR * 0.7;
-      const dx = pondX + Math.cos(a) * rr, dy = pondY + Math.sin(a) * rr;
-      if (!isOnIsland(dx, dy)) continue; // Phase 7a §6: skip ducks spawning off-island
-      const o = this.makeObj('duck', dx, dy);
-      o.homeX = pondX; o.homeY = pondY; o.tether = pondR * 0.8;
-    }
-    this.spawnBirds(b, rand, 3);
+  // Map Rebuild: FOREST block — dense trees and undergrowth, no buildings.
+  private fillForest(b: Block, rand: () => number) {
+    this.scatter(b, rand, 'tree',   14);
+    this.scatter(b, rand, 'bush',    8);
+    this.scatter(b, rand, 'flower',  4);
+    this.spawnBirds(b, rand, 4);
   }
 
   // v15 §4: Town Hall — civic hub, fountain, plaza feel, crowd
@@ -1443,7 +1387,10 @@ export class WorldManager {
   districtAt(x: number, y: number): string {
     const blockLabel = (type: BlockType): string => {
       switch (type) {
-        case 'beach':       return 'SANDY SHORES';
+        case 'forest':   return 'THE FOREST';
+      case 'airport':  return 'AIRSTRIP ALPHA';
+      case 'military': return 'RESTRICTED ZONE';
+      case 'beach':       return 'SANDY SHORES';
         case 'downtown':    return 'DOWNTOWN';
         case 'school':      return 'SCHOOLYARD';
         case 'playground':  return 'SCHOOLYARD';
@@ -2314,10 +2261,18 @@ export class WorldManager {
   private structureSpriteKey(kind: ObjectKind, id: number, sceneryKey?: string): string | null {
     // Prompt 5: scenery carries its own explicit clay draw key.
     if (sceneryKey) return sceneryKey;
-    if (kind === 'house' || kind === 'house_c' || kind === 'house_d') {
+    // Map Rebuild: cozy district ('house','house_c') → cottage sprites (rows 2-3);
+    // fancy district ('house_d') → townhouse/villa sprites (rows 0-1).
+    if (kind === 'house' || kind === 'house_c') {
+      if (clayHouseCottageKeys.length) return clayHouseCottageKeys[id % clayHouseCottageKeys.length];
       if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
       const hc = id % 3;
       return hc === 0 ? 'house_a' : hc === 1 ? 'house_b' : null;
+    }
+    if (kind === 'house_d') {
+      if (clayHouseFancyKeys.length) return clayHouseFancyKeys[id % clayHouseFancyKeys.length];
+      if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
+      return null;
     }
     if (kind === 'skyscraper' && claySkyscraperKeys.length) {
       return claySkyscraperKeys[id % claySkyscraperKeys.length];
