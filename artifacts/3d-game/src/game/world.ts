@@ -2,6 +2,7 @@ import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
+import { clayHouseKeys, claySkyscraperKeys } from './clayCity'; // Prompt 3: clay art swap draw keys
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
 import { isOnIsland, isInsideIsland } from './mapData'; // Dense City: runtime per-block lot generation + island polygon gating
@@ -2202,6 +2203,22 @@ export class WorldManager {
     }
   }
 
+  // Prompt 3: resolve the objectSprites draw key for a grounded structure,
+  // honouring the clay-art variety pools. Houses draw from the random clay pool
+  // (legacy house_a/house_b/procedural when the clay sheet is absent); skyscraper
+  // lots draw from the 3-tower clay pool. Everything else uses its kind key.
+  private structureSpriteKey(kind: ObjectKind, id: number): string | null {
+    if (kind === 'house' || kind === 'house_c' || kind === 'house_d') {
+      if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
+      const hc = id % 3;
+      return hc === 0 ? 'house_a' : hc === 1 ? 'house_b' : null;
+    }
+    if (kind === 'skyscraper' && claySkyscraperKeys.length) {
+      return claySkyscraperKeys[id % claySkyscraperKeys.length];
+    }
+    return kind;
+  }
+
   // Feedback Juice §1: spawn a cosmetic swallow ghost at the eaten object's spot.
   // Copies the object's CURRENT sprite; eases into the void over 0.30–0.45s.
   private spawnSwallowGhost(obj: WorldObject, cx: number, cy: number) {
@@ -2209,13 +2226,7 @@ export class WorldManager {
     for (const s of this.swallowGhosts) { if (!s.active) { g = s; break; } }
     if (!g) return; // cap hit — skip rather than allocate / drop frames
     // resolve sprite key the same way drawOne does
-    let spriteKey: string | null;
-    if (obj.kind === 'house') {
-      const hc = obj.id % 3;
-      spriteKey = hc === 0 ? 'house_a' : hc === 1 ? 'house_b' : null;
-    } else {
-      spriteKey = obj.kind;
-    }
+    const spriteKey = this.structureSpriteKey(obj.kind, obj.id);
     g.active = true;
     g.kind = obj.kind;
     g.spriteKey = spriteKey && objectSprites.has(spriteKey) ? spriteKey : null;
@@ -2685,15 +2696,9 @@ export class WorldManager {
       }
       // v11: PNG sprite replaces procedural drawing when present
       const r = obj.size;
-      let spriteKey: string | null = null;
-      if (obj.kind === 'house') {
-        // Use obj.id (not variant) for the A/B/procedural split so that color variant
-        // is fully available to procedural houses regardless of sprite loading state.
-        const houseChoice = obj.id % 3; // 0 → house_a, 1 → house_b, 2 → procedural
-        spriteKey = houseChoice === 0 ? 'house_a' : houseChoice === 1 ? 'house_b' : null;
-      } else {
-        spriteKey = obj.kind; // matches objectSprites keys (tree, bush, gnome …)
-      }
+      // Prompt 3: clay-art variety pools (houses + skyscraper towers), with
+      // legacy house_a/house_b/procedural fallback baked into the resolver.
+      const spriteKey: string | null = this.structureSpriteKey(obj.kind, obj.id);
       const objSprite = spriteKey ? objectSprites.get(spriteKey) : undefined;
 
       if (objSprite) {
