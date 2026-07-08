@@ -78,6 +78,7 @@ export interface Snapshot {
   // Phase 7b
   killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
+  matchStartSeq: number; // Rebuild Prompt 10: increments once per real match start (drives the welcome/coaching intro)
 }
 
 export interface GameEngine {
@@ -178,6 +179,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
   let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
   let countStep = 0;           // v8 §1: last countdown number beeped
+  let matchStartSeq = 0;        // Rebuild Prompt 10: increments once per real match start (never on boon/resume)
   let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
   // v15 §3 → War Pack §3: power system
   let heldSpell: BoonDef | null = null;
@@ -512,6 +514,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     results = null;
     screen = 'game';
+    matchStartSeq++; // Rebuild Prompt 10: fires the welcome/coaching intro exactly once per real match start
     countdown = CONFIG.COUNTDOWN_MS; // v8 §1: freeze everyone through "3..2..1"
     countStep = 0;
     joystick.setEnabled(true);
@@ -2724,6 +2727,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       contracts: [...activeContracts],
       killedBy: killedBy || undefined, // Phase 7b §4: who ate the player
       planName: world?.planName, // v16.2 §6
+      matchStartSeq, // Rebuild Prompt 10
     };
   }
 
