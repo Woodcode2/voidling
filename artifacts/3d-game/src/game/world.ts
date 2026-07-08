@@ -3,6 +3,9 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject, wind } from './objects';
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { clayHouseKeys, claySkyscraperKeys } from './clayCity'; // Prompt 3: clay art swap draw keys
+import {
+  clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
+} from './clayLife'; // Prompt 4: clay people + vehicle art swap draw keys
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
 import { isOnIsland, isInsideIsland } from './mapData'; // Dense City: runtime per-block lot generation + island polygon gating
@@ -338,6 +341,10 @@ const LIVING_KINDS: ObjectKind[] = [
   // Life Pack §4: military (defense system)
   'tank', 'attack_heli', 'armored_humvee', 'missile_truck',
 ];
+
+// Prompt 4: O(1) membership for clay-art draw-key remapping (see clayLife.ts).
+const CLAY_PERSON_KIND_SET = new Set<ObjectKind>(CLAY_PERSON_KINDS);
+const CLAY_VEHICLE_KIND_SET = new Set<ObjectKind>(CLAY_VEHICLE_KINDS);
 
 export class WorldManager {
   objects: WorldObject[] = [];
@@ -2216,6 +2223,15 @@ export class WorldManager {
     if (kind === 'skyscraper' && claySkyscraperKeys.length) {
       return claySkyscraperKeys[id % claySkyscraperKeys.length];
     }
+    // Prompt 4: clay people + vehicle variety pools (visual only; contact radius
+    // stays keyed off the unchanged kind). Falls back to the kind sprite when the
+    // clay sheet is absent.
+    if (clayPeopleKeys.length && CLAY_PERSON_KIND_SET.has(kind)) {
+      return clayPeopleKeys[id % clayPeopleKeys.length];
+    }
+    if (clayVehicleKeys.length && CLAY_VEHICLE_KIND_SET.has(kind)) {
+      return clayVehicleKeys[id % clayVehicleKeys.length];
+    }
     return kind;
   }
 
@@ -2722,6 +2738,23 @@ export class WorldManager {
 
         if (obj.captured) {
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
+        } else if (spriteKey && spriteKey.startsWith('clay_vehicle')) {
+          // Prompt 4: rotate the clay vehicle to face its direction of travel.
+          // Heading: car/schoolbus drive via roadAxis+roadDir (no vx/vy); the
+          // wandering traffic kinds carry vx/vy. Sheet art points up (north), so
+          // rotate by atan2(dy,dx)+π/2. Draw centred (the cutout is centre-padded)
+          // so it spins about its middle rather than orbiting its foot.
+          let dx = 0, dy = 0;
+          if (obj.kind === 'car' || obj.kind === 'schoolbus') {
+            if (obj.roadAxis === 'h') dx = obj.roadDir; else dy = obj.roadDir;
+          } else { dx = obj.vx; dy = obj.vy; }
+          const rot = (Math.abs(dx) + Math.abs(dy) > 0.001)
+            ? Math.atan2(dy, dx) + Math.PI / 2 : 0;
+          ctx.save();
+          ctx.translate(0, -r);        // move origin to the sprite's centre
+          ctx.rotate(rot);
+          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
+          ctx.restore();
         } else if (obj.kind === 'tree' || obj.kind === 'bush') {
           // Alive Pack §8: individual ±1.5° sway using per-object wobble as phase
           const sway = Math.sin(t / 2200 + obj.wobble) * (1.5 * Math.PI / 180);
