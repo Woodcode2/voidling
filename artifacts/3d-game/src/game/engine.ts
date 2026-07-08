@@ -12,7 +12,7 @@ import { createJoystick } from './input';
 import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
 import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
-import { resetGroundCache, resetWaterfallState } from './drawMap'; // Prompt 6 §1/§3 lifecycle
+import { resetGroundCache, resetWaterfallState, loadGroundTextures } from './drawMap'; // Prompt 6 §1/§3 lifecycle
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
@@ -494,6 +494,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // War Pack §1: load sprite sheets (fire-and-forget; resolves within the first round)
     void loadWardAssets(import.meta.env.BASE_URL);
     void loadClayCity(import.meta.env.BASE_URL); // Prompt 3: clay building + house art swap
+    void loadGroundTextures(import.meta.env.BASE_URL); // Map Rebuild: tex_* pattern fills
     void loadClayLife(import.meta.env.BASE_URL); // Prompt 4: clay people + vehicle art swap
     void loadClayScenery(import.meta.env.BASE_URL); // Prompt 5: clay scenery scatter
     void loadClayFood(import.meta.env.BASE_URL); // Prompt 9: clay food + street-furniture art swap
