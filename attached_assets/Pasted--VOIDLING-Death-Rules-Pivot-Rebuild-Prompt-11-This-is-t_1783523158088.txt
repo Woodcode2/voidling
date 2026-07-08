@@ -1,0 +1,65 @@
+# VOIDLING: Death Rules Pivot (Rebuild Prompt 11)
+This is the core-loop rewrite. Hearts are gone. Size is life. The four player powers are gone. Pure eat-and-react. This prompt changes what the game IS, so the proof section is the heaviest yet. Take it slow, stage by stage.
+
+## THE NEW RULES (the whole spec in six lines)
+1. There are no hearts and no health. Your size IS your life.
+2. If a bigger void eats you, you drop one evolution stage and respawn smaller. Your score keeps a hit but you keep playing.
+3. If you are eaten while at the SMALLEST stage (VOIDLING), you are out. Game over screen with your final score.
+4. Falling off the island edge at the smallest stage is NOT death: it is a score penalty and a respawn, so a clumsy slip never ends a run, only a rival can.
+5. After any respawn, you get a short grace window (about 3 seconds, reuse the existing 30s new-match grace concept but shorter) where rivals cannot eat you, so you are never chain-killed on spawn.
+6. Rival AI voids follow the same rules: eaten by a bigger void drops them a stage, eaten at smallest removes them from the match.
+
+## DO NOT TOUCH (leave fully intact)
+- All the clay art, the roads and river, the splash and intro, the depth sort, placement, density, audits.
+- Eating the WORLD (buildings, cars, people, food): values, growth, and the percent-devoured win math all stay identical. Only void-vs-void consequences and the powers change.
+- Camera and controls.
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. The current hearts/health system: where hearts are stored, gained, lost, and what currently happens when a void is eaten by a bigger void.
+2. The four powers: where they are defined, triggered (instant-cast on pickup), and every UI element tied to them, including pickups spawned in the world.
+3. The current game-over path: what can end a run today, and what screen shows.
+4. The existing grace-window implementation from match start.
+5. How rival AI voids currently die or lose, if at all.
+Paste all five, then proceed.
+
+## STAGE 1: Remove the powers completely
+- Remove the four powers: their pickups from the world, their instant-cast triggers, their effects, and every HUD element tied to them.
+- Power pickups stop spawning. If pickup spawn slots exist in the world data, empty them rather than leaving broken references.
+- The HUD gets simpler. Do not redesign it here, just cleanly remove the power elements.
+
+## STAGE 2: Remove hearts, wire size-as-life
+- Remove the hearts system: storage, UI, gain and loss logic.
+- Implement rules 2, 3, and 4 for the PLAYER exactly as written above: eaten by bigger drops one stage and respawns smaller with a score hit, eaten at smallest is game over, edge fall at smallest is score penalty plus respawn, never death.
+- Implement rule 5: about a 3 second no-eat grace after every respawn, with a subtle visual cue (the existing ghost-mode dashed outline in dark violet is fine) so the player knows they are briefly safe.
+
+## STAGE 3: Rivals live by the same rules
+- Rival voids drop a stage when eaten by a bigger void, and are removed from the match when eaten at smallest.
+- When a rival is fully eliminated, announce it with the existing banner system (for example "LUNA WAS DEVOURED"). If the player eliminates them, make the reward feel worth it using the existing predation transfer.
+- The leaderboard reflects eliminations: an eliminated rival stops scoring and is marked out.
+
+## STAGE 4: The game-over and the win still work
+- Eaten at smallest: game-over screen with final score, using the existing end-screen if one exists.
+- The 5-minute timer win and percent-devoured math are unchanged. Confirm a match still ends normally by timer.
+
+## STAGE 5: Proof (heaviest yet, all of it live, none of it self-certified)
+Play real matches and report each of these as observed events, with the console or on-screen evidence:
+1. Player at a mid stage gets eaten by a bigger rival: confirm stage drops by one, respawn smaller, score hit applied, 3s grace visible, no game over.
+2. Player at SMALLEST stage gets eaten: confirm game over screen with final score.
+3. Player at smallest falls off the edge: confirm score penalty and respawn, NOT game over.
+4. A rival gets eaten at smallest by another void: confirm it is removed, the banner announces it, and the leaderboard marks it out.
+5. Confirm zero power pickups spawn in a full match, and the power HUD is gone.
+6. Confirm hearts are fully gone from HUD and code paths (grep for the heart state and report it unreferenced).
+7. Confirm a match still ends by timer with the normal results screen, and percent-devoured still moves only from buildings and houses.
+8. All spatial audits still 0. Frame rate in band. No new console errors.
+If any one of the eight was not directly observed, say which and stop. Do not mark this complete on partial evidence.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Get eaten mid-size on purpose: you should shrink a stage and keep playing, briefly un-eatable.
+- Get eaten at the smallest size: game over, final score.
+- Fall off the edge while small: penalty and respawn, not death.
+- Eliminate the smallest rival: banner should call it out.
+- No power pickups anywhere, no hearts anywhere.
+This is the biggest gameplay change of the rebuild. If ANYTHING feels off, screenshot it and stop. Do not stack more prompts on top of a broken core loop.
