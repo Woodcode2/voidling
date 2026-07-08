@@ -1,0 +1,63 @@
+# VOIDLING: Art Swap, People + Vehicles (Rebuild Prompt 4)
+Swap the flat people and cars for the new clay sheets, and fix the stiff car movement. The cutter is already proven on the building and house sheets, so this is a faster swap with one real addition: vehicles rotate to face their direction of travel.
+
+## GOAL
+Replace the ambient people sprites and the vehicle sprites with cutouts from two new clay sheets, mapped into the existing spawners, and make each vehicle point where it is driving. Keep all movement logic, spawn logic, and gameplay exactly as they are.
+
+## DO NOT TOUCH (leave fully intact)
+- Car pathing, junction turning, spawn rates, and people spawn logic. Only the sprite and the vehicle's facing angle change.
+- The Prompt 3 building and house swap, the Prompt 1 depth work, and the Prompt 2 juice layers. Reuse them, do not rewrite them.
+- Gameplay: eating, vacuum, growth, evolution, predation, scoring, lot density, audits.
+- Camera, ground, roads, river, waterfall, void body rendering.
+- Use the SAME injection approach `clayCity.ts` already uses: set only the visual `spriteBounds`, never `spriteContactFrac`, so eat-contact radius stays unchanged for people and cars too.
+
+---
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. The ambient people spawner and how a person sprite is currently chosen and drawn. Note if a body-language or bob animation layer is already applied to people (it should be reused, not replaced).
+2. The vehicle spawner (cars, and bus if separate) and, importantly, whether the vehicle sprite is currently drawn rotated to its heading or always drawn in a fixed orientation. This is the cause of the stiff car movement.
+3. The extraction entry used by `clayCity.ts` so we reuse the same pipeline.
+Paste that, then proceed.
+
+## STAGE 1: Pull the two sheets into the project
+Download these into the asset folder. Try the URL fetch first.
+- People sheet, save as `people_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_003228_a18a098e-f1ac-40f6-92df-f664faee5b10.png
+- Vehicles sheet, save as `vehicles_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_003238_fada3ea7-3305-4048-9663-e92e37d78da5.png
+If a fetch is blocked, stop and tell me.
+
+## STAGE 2: Extract and glance at the cutouts
+- Run both sheets through the same extraction pipeline `clayCity.ts` uses, on the dark violet background (hex 1E1338).
+- People sheet should yield about 12 separate figures. Vehicles sheet should yield about 10 separate vehicles.
+- Report the exact cutout count for each.
+- Quick check on `?debug=sprites`: confirm clean edges, no shadow halos, nothing merged or chopped. The cutter cut these clean before, so this should pass at the default threshold. If it does not, report what you see and stop.
+
+## STAGE 3: Map cutouts to the spawners
+- People: assign the person cutouts across the ambient people spawner for variety. Keep the existing people animation or bob layer applied on top of the new sprite, do not remove it. Draw people bottom-center anchored in the existing foot-Y-sorted pass so a person behind a building is correctly occluded.
+- Vehicles: assign the vehicle cutouts across the car spawner (and the bus to the bus spawn if one exists). Draw them bottom-center anchored in the same foot-Y-sorted pass.
+- Stop using the old people and old vehicle art for these. Leave the old files in place but unreferenced.
+
+## STAGE 4: Vehicles face their direction of travel (fixes the stiff movement)
+- The sheet draws every vehicle pointing straight up, which is heading north. Rotate each vehicle sprite by its current movement heading so it points where it drives along the road and through junction turns.
+- Do not change the car's path or speed. Only rotate the sprite to match the heading the pathing already produces.
+- If a vehicle heading toward the camera looks slightly off when fully rotated, that is acceptable for now and we note it as later polish. The goal here is cars that turn with the road instead of sliding sideways.
+
+## STAGE 5: Proof (real receipts)
+Run a live match and paste actual output:
+- People cutout count and vehicle cutout count.
+- Your one-line verdict on cutout cleanliness.
+- Confirm people and vehicles now render as clay models, correctly sized, grounded, with correct depth against buildings.
+- Confirm vehicles now point in their direction of travel through a turn.
+- OFF-ISLAND ENTITIES, BUILDING OVERLAPS, BUILDINGS ON ROADS: all still 0.
+- Frame rate, still in the same band. No new console errors.
+
+If anything regressed or you did not run the audits, say so plainly. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview. The little people and the cars should be clay models now, not flat stickers.
+- Watch a car take a corner. It should rotate to follow the road, not slide sideways.
+- Append `?debug=sprites` and confirm the people and vehicle cutouts look clean.
