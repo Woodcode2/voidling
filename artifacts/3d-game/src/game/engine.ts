@@ -17,6 +17,7 @@ import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
 import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
+import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -507,6 +508,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     void loadClayCity(import.meta.env.BASE_URL); // Prompt 3: clay building + house art swap
     void loadClayLife(import.meta.env.BASE_URL); // Prompt 4: clay people + vehicle art swap
     void loadClayScenery(import.meta.env.BASE_URL); // Prompt 5: clay scenery scatter
+    void loadClayFood(import.meta.env.BASE_URL); // Prompt 9: clay food + street-furniture art swap
 
     results = null;
     screen = 'game';
