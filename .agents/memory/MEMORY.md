@@ -22,3 +22,4 @@
 - [VOIDLING Phase 7b World+War](voidling-v19-7b.md) — Agar death (dropStage), endRound idempotency guard, feeding frenzy ×3 respawn, heli missile+searchlight, tank shockwave, news banner, no-slow fix, rival VOIDLING respawn.
 - [VOIDLING Dense City + 2.5D Depth](voidling-dense-city.md) — zoning is per-block (rotating 6×6 plans, not polygons); runtime generateLots; void joins objects in one foot-Y painter's pass; audits read 0 by construction.
 - [VOIDLING Feedback Juice](voidling-feedback-juice.md) — display-only swallow ghosts (pooled, foot-Y pass), gold milestone banners, coin bursts; never mutate state/audits; pooled FX must reset in start() + no per-frame filter in draw.
+- [VOIDLING clay art swap](voidling-clay-art-swap.md) — image-only sprite override: pad non-square cutouts to square+foot-anchor+bounds{0,0,1,1} for the fixed 2r×2r draw; set spriteBounds only (never spriteContactFrac) to keep gameplay; clay sheets cut clean at default threshold.

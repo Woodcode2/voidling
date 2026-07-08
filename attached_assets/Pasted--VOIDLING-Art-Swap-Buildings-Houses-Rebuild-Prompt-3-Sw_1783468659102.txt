@@ -1,0 +1,68 @@
+# VOIDLING: Art Swap, Buildings + Houses (Rebuild Prompt 3)
+Swap the flat sticker buildings and houses for the new clay-render sheets. This is the test of whether the clay style cuts clean through the existing pipeline. Prove the cutouts before shipping.
+
+## GOAL
+Replace the current downtown building sprites and suburban house sprites with cutouts extracted from two new sheets. Keep every placement, lot, and gameplay behavior exactly as it is. Only the images change.
+
+## READ THIS FIRST (important context)
+These two sheets are a NEW art style: soft clay-toy 3D render, NO thick white outlines, with a small soft contact shadow under each object. The existing cutout pipeline was built for the old flat sticker art that had hard white outlines. Soft edges and shadows are exactly where a flood-fill cutter can fail: it can leave a dark halo, eat into the object, or merge two close objects into one cutout. So do not assume the cutter works unchanged. Extract, then SHOW the cutouts, then judge them.
+
+## DO NOT TOUCH (leave fully intact)
+- Lot generation, lot density, and where structures are placed. Buildings and houses keep their current positions.
+- All gameplay: eating, vacuum, growth, evolution, predation, scoring, spawning, audits.
+- The Prompt 1 depth work (bottom-center anchor, foot-Y-sort) and the Prompt 2 juice layers. Reuse them, do not rewrite them.
+- Camera, ground fills, roads, river, waterfall, and the void body rendering.
+
+---
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. The entry point of the component-extraction pipeline (flood-fill background to transparent, connected components, merge fragments, trim to bounding box). Name the function and where sheets get registered.
+2. How downtown building sprites and suburban house sprites are currently chosen and assigned to their lots.
+Paste that, then proceed.
+
+## STAGE 1: Pull the two sheets into the project
+Download these two images into the project asset folder. Try the URL fetch first.
+- Buildings sheet, save as `buildings_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260707_221414_7450d851-263a-4a1f-92ea-ce5c0c044ae1.png
+- Houses sheet, save as `houses_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260707_221423_6397e9db-34b3-44f8-ac29-13b26e66cb09.png
+If a URL fetch is blocked, stop and tell me, and I will have the files added manually.
+
+## STAGE 2: Extract and PROVE the cutouts (this is the real test)
+- Run both sheets through the existing extraction pipeline on the solid dark violet background (hex 1E1338).
+- The buildings sheet should yield about 10 separate cutouts: a glass skyscraper, a pastel skyscraper, an art-deco tower with an antenna, a mid-rise office block, a hospital, a school, a town hall with a clock, a corner cafe, a low apartment block, and a plaza fountain.
+- The houses sheet should yield about 12 separate house cutouts of varying size and roof color.
+- Report the exact cutout COUNT for each sheet.
+- Then load the game and view the cutouts on the checkerboard using `?debug=sprites`. In plain words, judge them:
+  - Are edges clean, or is there a dark shadow halo around objects?
+  - Did any two objects merge into a single cutout?
+  - Was any object chopped or missing a piece?
+- If the cutouts are clean, continue. If they are dirty, STOP and report exactly which failure you see (halos, merges, or chops). You may then tune the cutter's transparency threshold and add a small edge trim to remove shadow fringe, and report precisely what you changed. Do not ship dirty cutouts.
+
+## STAGE 3: Map cutouts to slots
+- Downtown lots: reuse the existing height ranking. The tallest cutouts (the two skyscrapers, the art-deco tower) go to lots nearest the plaza, mid-height (office, hospital, school, town hall, apartment) fill the middle, and the cafe and fountain sit toward the edges or the plaza center as fits.
+- House lots: assign house cutouts at random across residential lots for variety, keeping the small position offset and slight rotation already in place so packed blocks do not look like a perfect grid.
+- Stop using the old civic sheet and old house art for these structures. Leave the old files in the project but unreferenced. Do not delete anything else.
+
+## STAGE 4: Render the swap
+- Draw the new cutouts anchored BOTTOM-CENTER at each lot, inside the existing foot-Y-sorted pass from Prompt 1. Do not add a new draw path. Reuse the one that already exists.
+- Match cutout on-screen size to the current building and house footprint sizes so nothing is oversized. If a cutout comes in too large or too small, scale it to the lot footprint, do not change the lot.
+
+## STAGE 5: Proof (real receipts)
+Run a live match and paste actual output, not a description:
+- Buildings cutout count and houses cutout count.
+- Your plain-word verdict on cutout cleanliness from Stage 2.
+- OFF-ISLAND ENTITIES, BUILDING OVERLAPS, BUILDINGS ON ROADS: all still 0.
+- Frame rate, still in the same band as before (about 40 to 51).
+- No new console errors.
+- Confirm the new clay buildings and houses now render in place of the flat sticker art, correctly sized, sitting on the ground with correct depth.
+
+If cutouts are dirty and you could not clean them, say so plainly and stop. That is a useful result, not a failure. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview. Downtown and the suburbs should now be the clay-render buildings and houses, not the flat stickers.
+- Append `?debug=sprites` and look at the cutouts on the checkerboard. Clean edges, no dark halos, nothing merged or chopped.
+- If the cutouts look ragged or haloed, tell Claude. That means we either tune the cutter or flatten the sheets, and it is better to learn it now on two sheets than on twelve.

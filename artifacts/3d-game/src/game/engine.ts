@@ -13,6 +13,7 @@ import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
 import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
 import { loadWardAssets } from './wardSprites'; // War Pack §1
+import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -496,6 +497,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     audio.startMusic();
     // War Pack §1: load sprite sheets (fire-and-forget; resolves within the first round)
     void loadWardAssets(import.meta.env.BASE_URL);
+    void loadClayCity(import.meta.env.BASE_URL); // Prompt 3: clay building + house art swap
 
     results = null;
     screen = 'game';
