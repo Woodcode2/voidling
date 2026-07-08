@@ -1,0 +1,53 @@
+# VOIDLING: Kill the 2D Holdouts (Rebuild Prompt 9)
+The game is still running two art systems at once: old flat 2D stickers spawning alongside the new clay art. This prompt ends that. Audit every old sheet still being drawn, wire in the clay food, and route or disable every old 2D spawner so nothing but clay renders.
+
+## GOAL
+Only clay art appears in the game. The old 2D food (apples, flowers, snails, gnomes) becomes clay, and every leftover old 2D spawner, including the old 2D people, is routed to clay or turned off.
+
+## DO NOT TOUCH (leave fully intact)
+- Gameplay balance, scoring, the percent-devoured win math. Food stays bonus food, out of the win math.
+- The clay swaps already done: buildings, houses, clay people, vehicles, scenery. The Prompt 8 roads and river.
+- Camera. Use the same injection pattern as `clayCity.ts` / `clayLife.ts` / `clayScenery.ts`: `spriteBounds` only, never `spriteContactFrac`.
+
+## STAGE 0: Full 2D audit first (no edits yet) — this is the core of the prompt
+Do not change anything until you have reported all of this:
+1. List EVERY image sheet the game loads. For each, mark it as either an OLD flat 2D sticker sheet or a NEW clay sheet (clayCity, clayLife, clayScenery, and the food sheet added below).
+2. For every OLD 2D sheet, list every spawner and every draw call that still references it. This is the old world that is still running.
+3. Report exactly how food items (apples, flowers, snails, gnomes) are spawned right now and which sheet they draw from.
+4. Report every code path that spawns people, and which of them still draw old 2D people versus the clay people from `clayLife`.
+Paste this full inventory. It is the map for the rest of the prompt.
+
+## STAGE 1: Pull in the clay food sheet
+Download into the asset folder, save as `food_clay_sheet.png`. Try URL fetch first.
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_112628_a8c72dcd-a3c6-4dab-ba0c-390b56f77891.png
+If blocked, stop and tell me.
+
+## STAGE 2: Extract and glance
+- Run it through the same cutter. Expected about 12 cutouts: apple, cherries, potted flower, snail, gnome, gold coin, gem crystal, cupcake, mushroom, fire hydrant, mailbox, trash bin.
+- Report the exact cutout count and confirm clean edges on `?debug=sprites`. If dirty, report and stop.
+
+## STAGE 3: Wire clay food
+- Route the food-item spawner to the clay food pool. Map the existing food to its clay match: apple to clay apple, flower to clay flower, snail to clay snail, gnome to clay gnome. Use the extra cutouts (coin, gem, cupcake, mushroom, hydrant, mailbox, bin) as additional clay collectibles for variety.
+- Draw all food bottom-center anchored in the existing foot-Y-sorted pass.
+- Food value and behavior unchanged. It stays out of the percent-devoured win math.
+
+## STAGE 4: Kill every old 2D holdout (using the Stage 0 inventory)
+- For each old 2D sheet in the inventory: if it is food or people that now has a clay equivalent, point its spawner at the clay pool and stop drawing the old sheet.
+- Route ALL people spawn paths to the clay people pool, including any spawn-time or feast path that image testing showed still using old 2D people.
+- Any remaining old 2D spawner producing stray stickers with no clay equivalent gets disabled.
+- Leave the old sheet files on disk but fully unreferenced by any draw call.
+
+## STAGE 5: Prove no 2D remains (real receipts)
+- Grep the codebase and confirm no old 2D sticker sheet is referenced by any live draw call anymore. List which sheets are now unreferenced.
+- Run a live match, including the spawn moment, and confirm every food item, every person, and everything on screen is clay. No flat stickers anywhere.
+- Clay food cutout count.
+- Percent-devoured unchanged: eat a building, confirm it moves; eat a clay apple, confirm it gives bonus points but does not move the percent. State both.
+- All audits still 0. Frame rate in band. No new console errors.
+
+If any old 2D sheet is still drawn, or you skipped the audit, say so plainly and stop. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview, including the spawn moment. Every food item and every person should be clay now. No flat flowers, apples, snails, or 2D sticker people anywhere.
+- Note: the spawn is still going to feel crowded. Thinning the items around your spawn to promote exploration is the next phase, not this one.
