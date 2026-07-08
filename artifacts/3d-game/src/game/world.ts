@@ -14,6 +14,9 @@ import {
   loadClayScenery, SCENERY_FOREST, SCENERY_GREEN, SCENERY_PARK, SCENERY_BEACH,
   clayTreeKeys, clayBushKeys, clayFlowerKeys, type SceneryDef,
 } from './clayScenery'; // Prompt 5: clay scenery scatter (nature/park/beach)
+import {
+  clayFoodKeys, clayAppleVarietyKeys, CLAY_FOOD_CELL,
+} from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -2332,6 +2335,15 @@ export class WorldManager {
     if (kind === 'tree' && clayTreeKeys.length) return clayTreeKeys[id % clayTreeKeys.length];
     if (kind === 'bush' && clayBushKeys.length) return clayBushKeys[id % clayBushKeys.length];
     if (kind === 'flower' && clayFlowerKeys.length) return clayFlowerKeys[id % clayFlowerKeys.length];
+    // Prompt 9: bonus food + street furniture render from the clay food pool
+    // (visual only; contact radius + win-math exclusion stay keyed off the kind).
+    if (clayFoodKeys.length) {
+      if (kind === 'apple' && clayAppleVarietyKeys.length) {
+        return clayAppleVarietyKeys[id % clayAppleVarietyKeys.length];
+      }
+      const cell = CLAY_FOOD_CELL[kind];
+      if (cell !== undefined && clayFoodKeys[cell]) return clayFoodKeys[cell];
+    }
     return kind;
   }
 
