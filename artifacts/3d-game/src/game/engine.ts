@@ -15,6 +15,7 @@ import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
+import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -500,6 +501,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     void loadWardAssets(import.meta.env.BASE_URL);
     void loadClayCity(import.meta.env.BASE_URL); // Prompt 3: clay building + house art swap
     void loadClayLife(import.meta.env.BASE_URL); // Prompt 4: clay people + vehicle art swap
+    void loadClayScenery(import.meta.env.BASE_URL); // Prompt 5: clay scenery scatter
 
     results = null;
     screen = 'game';
@@ -949,7 +951,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           const hd = dist(o.x, o.y, player.x, player.y);
           if (hd < vacuumR) {
             o.eaten = true;
-            world.eatenArea += Math.PI * o.baseSize * o.baseSize;
+            if (!o.scenery) world.eatenArea += Math.PI * o.baseSize * o.baseSize;
             const heliInfo = CONFIG.KIND_INFO['attack_heli'];
             const hpts = Math.round((heliInfo?.scoreMult ?? 5) * (heliInfo?.minR ?? 54) ** 2 / 100);
             player.score += hpts;
@@ -1039,7 +1041,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         }
         if (sd < 90 && !o.eaten) {
           o.eaten = true;
-          world.eatenArea += Math.PI * o.baseSize * o.baseSize;
+          if (!o.scenery) world.eatenArea += Math.PI * o.baseSize * o.baseSize;
           singularity.score += Math.max(1, (CONFIG.KIND_INFO[o.kind]?.tier ?? 1) * 5);
         }
       }

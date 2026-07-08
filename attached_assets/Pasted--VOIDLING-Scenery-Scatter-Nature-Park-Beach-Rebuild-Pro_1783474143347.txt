@@ -1,0 +1,78 @@
+# VOIDLING: Scenery Scatter, Nature + Park + Beach (Rebuild Prompt 5)
+Fill the empty green and beach zones with clay scenery, scattered organically instead of placed on lots. This is the wave that closes the gap to the splash's lush island.
+
+## ONE DESIGN CALL I MADE (flip it if you disagree)
+Scenery is wired as EATABLE bonus food, using the exact same system the game already uses to let the void eat people and cars. Reason: if a tree were pure decoration, the void rolling over it and nothing happening would look broken. Making scenery devourable is consistent with "devour everything" and reuses code that already exists. Two safeguards: scenery does NOT count toward the percent-of-city-devoured win math (that stays tied to buildings and houses), and it uses the visual-bounds-only injection so eat-contact radius is size-correct. If you would rather scenery be pure non-eatable decoration for now, say the word and I flip Stage 4.
+
+## GOAL
+Scatter the nature, park, and beach cutouts across the forest, park, and beach zones so the island reads as lush and alive, drawn in the existing depth pass, eatable as low-value bonus food, with zero change to game balance.
+
+## DO NOT TOUCH (leave fully intact)
+- The percent-of-city-devoured / win calculation. Scenery must never be added to it.
+- The eatable balance for people and cars, their values, spawn rates.
+- The Prompt 3 building/house swap, the Prompt 4 people/vehicle swap, the Prompt 1 depth pass, the Prompt 2 juice.
+- Lot generation and building/house placement. Scenery is separate and must not move a single building.
+- Camera, roads, river, waterfall, void body rendering.
+- Use the same injection approach as `clayCity.ts` and `clayLife.ts`: set only `spriteBounds`, never `spriteContactFrac`.
+
+---
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. The existing eatable prop system: how people and cars are registered as eatable, what value they give, and confirm whether or not they count toward the percent-devoured win math. We will copy this exact pattern for scenery and keep scenery out of the win math.
+2. The forest, park, and beach zone definitions in `mapData.ts`, and the sand or lagoon areas.
+3. Whether any vegetation (vector trees or old tree sprites) currently renders in the forest or park. If yes, we replace it with the clay scenery, not stack on top of it.
+4. The extraction entry used by `clayCity.ts` / `clayLife.ts` so we reuse the same cutter.
+Paste that, then proceed.
+
+## STAGE 1: Pull the three sheets into the project
+Download into the asset folder. Try URL fetch first.
+- Nature, save as `nature_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_012133_b4e5603c-227c-41fb-a1bb-818118fb9ee7.png
+- Park, save as `park_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_012142_f78b6758-6d15-4c85-a43b-dfe4acb3b3f1.png
+- Beach, save as `beach_clay_sheet.png`:
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_012151_3d1b97ca-cabd-4a25-a18d-b92c60803697.png
+If a fetch is blocked, stop and tell me.
+
+## STAGE 2: Extract and glance
+- Run all three through the same cutter. Expected: nature about 12, park about 12, beach about 11.
+- Report the exact cutout count per sheet.
+- Quick `?debug=sprites` check: clean edges, no halos, no merges, no chops. If dirty, report and stop.
+
+## STAGE 3: Scatter placement (this is the new pattern, prove it)
+Create a new `clayScenery.ts` mirroring the others. Place scenery by SCATTER, not on lots:
+- Nature: fill the forest zone densely with trees, bushes, rocks, logs, so it reads as a real forest. Sprinkle a lighter mix of trees, bushes, and flowers across the park and any general green/meadow areas so the whole island feels planted, not bare.
+- Park: place the park props (playground slide, swing set, gazebo, benches, picnic table, soccer goal, pond, see-saw, ice cream cart, fountain, lamp, planter) spread across the park zone with breathing room between them.
+- Beach: place the beach props (umbrella, towel, lifeguard tower, palm tree, rowboat, beach ball, sandcastle, surfboard, kiddie pool, pier, deck chairs) across the sand near the shore.
+Gating rules, every placement must pass all of them:
+- Inside the ISLAND polygon, AND inside its target zone.
+- Not within road width of any road.
+- Not on a building or house footprint, keep a small clearance.
+- Not overlapping another scenery item, enforce a minimum spacing.
+- Not in the river, lagoon, or open water. Beach items stay on sand.
+Density caps (report the actual counts placed): forest trees and shrubs up to about 60, scattered greenery elsewhere up to about 50, park props about 12 to 18, beach props about 12 to 18. If frame rate drops hard, lower the caps and report it.
+
+## STAGE 4: Wire scenery as eatable bonus food
+- Register each scenery item using the SAME eatable pattern people and cars use, with a low bonus value (at or below the smallest existing eatable prop).
+- Scenery must NOT be added to the percent-of-city-devoured win math.
+- Visual-bounds-only injection: set `spriteBounds`, never `spriteContactFrac`.
+- Draw all scenery bottom-center anchored in the existing foot-Y-sorted pass so depth against buildings, people, and the void is correct.
+(If pure decoration was chosen instead, skip the eatable registration and make scenery non-collidable, still drawn in the depth pass.)
+
+## STAGE 5: Proof (real receipts)
+Run a live match and paste actual output:
+- Cutout counts for the three sheets, and the actual scenery counts placed per zone.
+- New audits, all must read 0: SCENERY OFF-ISLAND, SCENERY ON ROADS, SCENERY ON BUILDINGS.
+- The Prompt 1 audits still 0: BUILDING OVERLAPS, BUILDINGS ON ROADS, OFF-ISLAND ENTITIES.
+- Balance check: eat a building and confirm the percent-devoured moves the same as before. Eat a tree and confirm it gives bonus points but does NOT move the percent-devoured. State both results.
+- Frame rate, and whether it stayed in the same band. No new console errors.
+
+If any audit is nonzero, or balance shifted, say so plainly and stop. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview. The forest should look like a forest, the park should have playground and benches and a soccer goal, the beach should have umbrellas and a lifeguard tower. The whole island should feel planted, not bare.
+- Roll the void over a tree and a beach umbrella. They should get eaten like a car does.
+- Append `?debug=terrain` and confirm no scenery is floating out in space or sitting on a road.

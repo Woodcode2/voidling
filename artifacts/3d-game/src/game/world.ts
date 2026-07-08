@@ -8,7 +8,12 @@ import {
 } from './clayLife'; // Prompt 4: clay people + vehicle art swap draw keys
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
-import { isOnIsland, isInsideIsland } from './mapData'; // Dense City: runtime per-block lot generation + island polygon gating
+import { isOnIsland, isInsideIsland, terrainAtGeom, TERRAIN as GTERRAIN,
+  ZONE_FOREST_R, ZONE_PARK_R, ZONE_BEACH_R } from './mapData'; // Dense City: runtime per-block lot generation + island polygon gating
+import {
+  loadClayScenery, SCENERY_FOREST, SCENERY_GREEN, SCENERY_PARK, SCENERY_BEACH,
+  clayTreeKeys, clayBushKeys, clayFlowerKeys, type SceneryDef,
+} from './clayScenery'; // Prompt 5: clay scenery scatter (nature/park/beach)
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -47,6 +52,8 @@ export interface WorldObject {
   infra: boolean;        // v16 §2: infra objects never respawn (hydrant/mailbox/trashcan)
   bubbleText: string | null; // v16.2 §1: speech bubble text (null = no bubble)
   bubbleLife: number;    // ms remaining for the speech bubble
+  scenery?: boolean;     // Prompt 5: clay scenery — eatable bonus, excluded from win math + respawn
+  sceneryKey?: string;   // Prompt 5: explicit clay draw key (overrides kind sprite)
   shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
   defense?: boolean;     // War Pack §2: defense unit converging on player
   pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
@@ -441,7 +448,8 @@ export class WorldManager {
       ...opts,
     };
     this.objects.push(o);
-    this.totalStartArea += Math.PI * o.baseSize * o.baseSize;
+    // Prompt 5: scenery is bonus food — never part of the % devoured denominator.
+    if (!o.scenery) this.totalStartArea += Math.PI * o.baseSize * o.baseSize;
     return o;
   }
 
@@ -637,6 +645,9 @@ export class WorldManager {
       if (rand() < 0.3 && isOnIsland(cp4x, cp4y)) this.makeObj(pick(carPool, rand), cp4x, cp4y, { infra: true });
     }
 
+    // Prompt 5: scatter clay scenery (eatable bonus food, excluded from win math).
+    this.scatterScenery(rand);
+
     // ── Alive Pack §A · SPAWN AUDIT tripwire ────────────────────────────────
     // Every entity must be on walkable island terrain. Any survivor of the
     // per-spawn guards above is removed here and logged. The count MUST be 0
@@ -675,11 +686,90 @@ export class WorldManager {
       console.log(`OFF-ISLAND ENTITIES: ${offIsland2}`);
     }
 
+    // ── Prompt 5: scenery placement audit (all three MUST read zero) ──
+    {
+      const sc = this.objects.filter((o) => o.scenery);
+      let offIsland = 0, onRoads = 0, onBuildings = 0;
+      for (const o of sc) {
+        if (!isWalkable(o.x, o.y) || !isInsideIsland(o.x, o.y)) offIsland++;
+        if (!this.roadClear(o.x, o.y, o.baseSize)) onRoads++;
+        for (const l of this.structureLots) {
+          const md = l.fpR + o.baseSize;
+          if ((l.x - o.x) ** 2 + (l.y - o.y) ** 2 < md * md) { onBuildings++; break; }
+        }
+      }
+      console.log(`SCENERY COUNT: ${sc.length}`);
+      console.log(`SCENERY OFF-ISLAND: ${offIsland}`);
+      console.log(`SCENERY ON ROADS: ${onRoads}`);
+      console.log(`SCENERY ON BUILDINGS: ${onBuildings}`);
+    }
+
     // v6 §2: remember the starting count so respawn can top back up to 85%
-    this.initialPopulation = this.objects.length;
+    // Prompt 5: scenery excluded so it never inflates the respawn target.
+    this.initialPopulation = this.objects.filter((o) => !o.scenery).length;
     this.initialMass = this.totalStartArea; // v8 §3: freeze the % devoured denominator
     // v9 §8: freeze the gnome count — gnomes never respawn, so eating them all is a real feat
     this.gnomeTotal = this.objects.filter((o) => o.kind === 'gnome').length;
+  }
+
+  // Rebuild Prompt 5: scatter clay scenery as EATABLE bonus food. Every item is
+  // flagged `scenery` so it is excluded from the win math (numerator+denominator)
+  // and the respawn population — zero balance impact. Injection is visual-bounds
+  // only; here we set a size-correct baseSize/contactRadius per cutout.
+  private scatterScenery(rand: () => number) {
+    const placed: { x: number; y: number; r: number }[] = [];
+    const S = this.size;
+
+    const tryPlace = (
+      zone: readonly number[],
+      defs: SceneryDef[],
+      sand: boolean,
+    ): boolean => {
+      if (defs.length === 0) return false;
+      for (let t = 0; t < 14; t++) {
+        const def = defs[Math.floor(rand() * defs.length)];
+        const R = def.rMin + rand() * (def.rMax - def.rMin);
+        const x = zone[0] + rand() * (zone[2] - zone[0]);
+        const y = zone[1] + rand() * (zone[3] - zone[1]);
+        if (!isOnIsland(x, y, 120)) continue;
+        const terr = terrainAtGeom(x, y);
+        if (sand) {
+          if (terr !== GTERRAIN.SAND) continue;
+        } else if (terr === GTERRAIN.SAND || terr === GTERRAIN.WATER
+          || terr === GTERRAIN.SPACE || terr === GTERRAIN.ROAD) {
+          continue;
+        }
+        if (!this.roadClear(x, y, R)) continue;
+        let blocked = false;
+        for (const l of this.structureLots) {
+          const md = l.fpR + R + 12;
+          if ((l.x - x) ** 2 + (l.y - y) ** 2 < md * md) { blocked = true; break; }
+        }
+        if (blocked) continue;
+        for (const p of placed) {
+          const md = p.r + R + 16;
+          if ((p.x - x) ** 2 + (p.y - y) ** 2 < md * md) { blocked = true; break; }
+        }
+        if (blocked) continue;
+        this.makeObj('apple', x, y, {
+          scenery: true, sceneryKey: def.key,
+          baseSize: R, size: R, contactRadius: R * 0.85,
+          tier: def.tier, living: false, infra: false,
+        });
+        placed.push({ x, y, r: R });
+        return true;
+      }
+      return false;
+    };
+
+    let forest = 0, park = 0, beach = 0, green = 0;
+    for (let i = 0; i < 60; i++) if (tryPlace(ZONE_FOREST_R, SCENERY_FOREST, false)) forest++;
+    for (let i = 0; i < 16; i++) if (tryPlace(ZONE_PARK_R, SCENERY_PARK, false)) park++;
+    for (let i = 0; i < 18; i++) if (tryPlace(ZONE_BEACH_R, SCENERY_BEACH, true)) beach++;
+    const whole = [0, 0, S, S] as const;
+    for (let i = 0; i < 60; i++) if (tryPlace(whole, SCENERY_GREEN, false)) green++;
+
+    console.log(`SCENERY PLACED: forest=${forest} park=${park} beach=${beach} greenery=${green} total=${forest + park + beach + green}`);
   }
 
   // v5 §3 — guarantee edible coverage across the whole map
@@ -1453,7 +1543,8 @@ export class WorldManager {
   }
 
   get remaining() {
-    return this.objects.filter((o) => !o.eaten).length;
+    // Prompt 5: scenery is excluded from the respawn population so it can't shift balance.
+    return this.objects.filter((o) => !o.eaten && !o.scenery).length;
   }
 
   private canEatByPlayer(player: Player, obj: WorldObject) {
@@ -2115,7 +2206,8 @@ export class WorldManager {
 
   private consumeByPlayer(obj: WorldObject, player: Player, fx: FXManager) {
     obj.eaten = true;
-    this.eatenArea += Math.PI * obj.baseSize * obj.baseSize;
+    // Prompt 5: scenery is bonus food — never part of the % devoured numerator.
+    if (!obj.scenery) this.eatenArea += Math.PI * obj.baseSize * obj.baseSize;
     this.playerStats.count++;
     if (obj.kind === 'duck') this.playerStats.ducks++;
     this.playerStats.maxTier = Math.max(this.playerStats.maxTier, obj.tier);
@@ -2214,7 +2306,9 @@ export class WorldManager {
   // honouring the clay-art variety pools. Houses draw from the random clay pool
   // (legacy house_a/house_b/procedural when the clay sheet is absent); skyscraper
   // lots draw from the 3-tower clay pool. Everything else uses its kind key.
-  private structureSpriteKey(kind: ObjectKind, id: number): string | null {
+  private structureSpriteKey(kind: ObjectKind, id: number, sceneryKey?: string): string | null {
+    // Prompt 5: scenery carries its own explicit clay draw key.
+    if (sceneryKey) return sceneryKey;
     if (kind === 'house' || kind === 'house_c' || kind === 'house_d') {
       if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
       const hc = id % 3;
@@ -2232,6 +2326,12 @@ export class WorldManager {
     if (clayVehicleKeys.length && CLAY_VEHICLE_KIND_SET.has(kind)) {
       return clayVehicleKeys[id % clayVehicleKeys.length];
     }
+    // Prompt 5: replace (not stack) — existing vegetation renders from the clay
+    // nature pool too, so the whole world reads as clay. Draw-only; contact
+    // radius stays keyed off the unchanged kind.
+    if (kind === 'tree' && clayTreeKeys.length) return clayTreeKeys[id % clayTreeKeys.length];
+    if (kind === 'bush' && clayBushKeys.length) return clayBushKeys[id % clayBushKeys.length];
+    if (kind === 'flower' && clayFlowerKeys.length) return clayFlowerKeys[id % clayFlowerKeys.length];
     return kind;
   }
 
@@ -2242,7 +2342,7 @@ export class WorldManager {
     for (const s of this.swallowGhosts) { if (!s.active) { g = s; break; } }
     if (!g) return; // cap hit — skip rather than allocate / drop frames
     // resolve sprite key the same way drawOne does
-    const spriteKey = this.structureSpriteKey(obj.kind, obj.id);
+    const spriteKey = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
     g.active = true;
     g.kind = obj.kind;
     g.spriteKey = spriteKey && objectSprites.has(spriteKey) ? spriteKey : null;
@@ -2714,7 +2814,7 @@ export class WorldManager {
       const r = obj.size;
       // Prompt 3: clay-art variety pools (houses + skyscraper towers), with
       // legacy house_a/house_b/procedural fallback baked into the resolver.
-      const spriteKey: string | null = this.structureSpriteKey(obj.kind, obj.id);
+      const spriteKey: string | null = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
       const objSprite = spriteKey ? objectSprites.get(spriteKey) : undefined;
 
       if (objSprite) {
