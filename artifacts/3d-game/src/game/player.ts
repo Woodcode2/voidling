@@ -559,11 +559,13 @@ export class Player extends Void {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
 
-    // Fix 5: always-on white sticker outline + soft violet glow halo
+    // Prompt 7 Stage 3: the void's grounding/readability is a soft VIOLET glow plus
+    // a soft DARK contact shadow beneath it. The old bright-white sticker ring
+    // (filled white circle at vizR + 5) was the reported "white halo" — removed.
     {
       const vizR = this.radius * this.eatPopScale;
       ctx.save();
-      // Violet glow halo — slightly larger than the body, 30% opacity
+      // Violet glow — subtle aura, not white
       ctx.globalAlpha = this.ghost ? 0.12 : 0.30;
       const glowGrd = ctx.createRadialGradient(rx, ry, vizR * 0.5, rx, ry, vizR * 1.7);
       glowGrd.addColorStop(0, 'rgba(155, 100, 255, 0.7)');
@@ -572,11 +574,11 @@ export class Player extends Void {
       ctx.beginPath();
       ctx.arc(rx, ry, vizR * 1.7, 0, Math.PI * 2);
       ctx.fill();
-      // White sticker outline — drawn as filled white circle slightly larger than body
-      ctx.globalAlpha = this.ghost ? 0.25 : 1.0;
-      ctx.fillStyle = '#FFFFFF';
+      // Soft dark contact shadow beneath — grounds the void without any white ring
+      ctx.globalAlpha = this.ghost ? 0.10 : 0.24;
+      ctx.fillStyle = '#140a23';
       ctx.beginPath();
-      ctx.arc(rx, ry, vizR + 5, 0, Math.PI * 2);
+      ctx.ellipse(rx, ry + vizR * 0.6, vizR * 0.98, vizR * 0.42, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -609,7 +611,9 @@ export class Player extends Void {
       ctx.restore();
       ctx.save();
       ctx.globalAlpha = 0.7;
-      ctx.strokeStyle = '#FFFFFF';
+      // Prompt 7 Stage 3: ghost outline recoloured from white to a soft dark violet
+      // so the invuln state stays readable without a white ring around the void.
+      ctx.strokeStyle = 'rgba(70, 40, 110, 0.65)';
       ctx.lineWidth = 2.5;
       ctx.setLineDash([8, 6]);
       ctx.lineDashOffset = -(t / 40) % 14;
