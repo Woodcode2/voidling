@@ -70,12 +70,16 @@ const _noCache = typeof window !== 'undefined'
 /** Force the ground buffer to rebuild on the next draw (new match / resize).
  *  Map geometry is static, so this is rarely needed, but honours the §1 contract. */
 export function resetGroundCache(): void { _groundBuf = null; }
+/** Returns the baked ground-buffer canvas, or null if not yet rendered.
+ *  Used by the photo-mode capture path (Stage 13 §1). */
+export function exportGroundBuffer(): HTMLCanvasElement | null { return _groundBuf; }
 
 // ─── Texture tiles (async — each 2048² PNG downscaled to a small repeat tile) ─
 // Tile sizes in world units; pre-scaling to BUF_SCALE pixels gives a
 // reasonable repeat frequency without PatternTransform (iOS compat).
+// Larger tiles = less busy grain at full opacity (Stage 13 §2).
 const _TEX_TILE_W: Record<string, number> = {
-  grass: 280, sand: 360, forest: 240, water: 320, street: 180, sidewalk: 120,
+  grass: 420, sand: 520, forest: 360, water: 480, street: 260, sidewalk: 180,
 };
 const _texTiles = new Map<string, HTMLCanvasElement>();
 let _texLoadStarted = false; // idempotency guard — tiles are app-lifetime singletons
@@ -161,54 +165,42 @@ export function drawVectorGround(
 }
 
 function _paintStaticGround(cc: CanvasRenderingContext2D): void {
-  // ─ 1. Island base fill — meadow with a soft top-left light gradient ─────────
-  tracIslandPath(cc);
-  cc.save();
-  cc.clip();
-  const baseGrd = cc.createLinearGradient(0, 0, S, S);
-  baseGrd.addColorStop(0,    _lighten(COL.meadow, 0.11));
-  baseGrd.addColorStop(0.55, COL.meadow);
-  baseGrd.addColorStop(1,    _darken(COL.meadow, 0.07));
-  cc.fillStyle = baseGrd;
-  cc.fillRect(0, 0, S, S);
-  cc.restore();
-
-  // ─ 2. Zone fills — gradient + feathered edges (Prompt 6 §2) ────────────────
-  _fillZoneRich(cc, ZONE_PARK_R,     COL.park);
-  _fillZoneRich(cc, ZONE_FOREST_R,   COL.forest);
-  _fillZoneRich(cc, ZONE_BEACH_R,    COL.sand,     true);
-  _fillZoneRich(cc, ZONE_DOWNTOWN_R, COL.pavement, true);
-
-  // ─ 2b. Soft baked grass texture over the green surface (low-contrast) ──────
-  _bakeGrassTexture(cc);
-  // Keep sand + downtown understated: restore their clean fills over any specks.
-  _fillZoneRich(cc, ZONE_BEACH_R,    COL.sand,     true);
-  _fillZoneRich(cc, ZONE_DOWNTOWN_R, COL.pavement, true);
-
-  // ─ 2c. Texture tile overlays (skipped gracefully if textures haven't loaded) ─
+  // ─ 1. Island base — tex_grass at FULL opacity; atmosphere gradient on top ────
+  //      Stage 13 §2: texture IS the surface, not an overlay.
   {
-    // Grass: island-wide at low alpha — beaches and downtown restored on top
+    cc.save(); tracIslandPath(cc); cc.clip();
     const gt = _texTiles.get('grass');
     if (gt) {
       const gp = cc.createPattern(gt, 'repeat');
-      if (gp) {
-        cc.save(); tracIslandPath(cc); cc.clip();
-        cc.fillStyle = gp; cc.globalAlpha = 0.16;
-        cc.fillRect(0, 0, S, S); cc.restore();
-      }
+      if (gp) { cc.fillStyle = gp; cc.fillRect(0, 0, S, S); }
+    } else {
+      // Fallback until texture loads
+      const bgrd = cc.createLinearGradient(0, 0, S, S);
+      bgrd.addColorStop(0,    _lighten(COL.meadow, 0.11));
+      bgrd.addColorStop(0.55, COL.meadow);
+      bgrd.addColorStop(1,    _darken(COL.meadow, 0.07));
+      cc.fillStyle = bgrd; cc.fillRect(0, 0, S, S);
     }
-    // Forest zone gets a denser forest-texture overlay
-    _texFill(cc, 'forest',   0.26,
-      ZONE_FOREST_R[0], ZONE_FOREST_R[1], ZONE_FOREST_R[2], ZONE_FOREST_R[3]);
-    // Sand texture under the beach zone
-    _texFill(cc, 'sand',     0.22,
-      ZONE_BEACH_R[0],  ZONE_BEACH_R[1],  ZONE_BEACH_R[2],  ZONE_BEACH_R[3]);
-    // Sidewalk paving over downtown zone (plaza tile)
-    _texFill(cc, 'sidewalk', 0.12,
-      ZONE_DOWNTOWN_R[0], ZONE_DOWNTOWN_R[1], ZONE_DOWNTOWN_R[2], ZONE_DOWNTOWN_R[3]);
+    // Lighting atmosphere on top (always)
+    const atmo = cc.createLinearGradient(0, 0, S, S);
+    atmo.addColorStop(0, 'rgba(255,255,255,0.07)');
+    atmo.addColorStop(1, 'rgba(0,0,0,0.06)');
+    cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
+    cc.restore();
   }
 
-  // ─ 2d. Mowing-stripe tint — very faint alternating bands over island grass ──
+  // ─ 2. Zone fills — texture at FULL opacity; light atmosphere tint on top ─────
+  //      Each distinct surface now reads as its own material.
+  _texZone(cc, 'forest',   ZONE_FOREST_R,   COL.forest);
+  _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
+  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, COL.pavement, true);
+  // Park uses the grass base — add colour-identity tint on top.
+  _fillZoneRich(cc, ZONE_PARK_R, COL.park);
+
+  // ─ 2b. Procedural speckle — only baked when tex_grass hasn't loaded yet ──────
+  if (!_texTiles.has('grass')) _bakeGrassTexture(cc);
+
+  // ─ 2c. Mowing-stripe tint — faint alternating bands on the grass surface ─────
   _paintMowingStripes(cc);
 
   // ─ 3. River (Prompt 8: soft-edged 2.5D band in clay blues) ─────────────────
@@ -225,26 +217,23 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
   cc.fill();
 
-  // River channel — a wide feathered bank blurs the water into the shore, then a
-  // soft clay-blue band and a slightly deeper core (no more hard cyan edge).
+  // Stage 13 §3: River channel — bank edges first (darker halo), then
+  // tex_water at FULL opacity, then a depth overlay.
   cc.lineCap = 'round'; cc.lineJoin = 'round';
   cc.save();
-  cc.filter = 'blur(9px)';
-  _riverStroke(cc, RIVER_HALF_W * 2.5, 'rgba(150,206,222,0.5)');
+  cc.filter = 'blur(10px)';
+  _riverStroke(cc, RIVER_HALF_W * 3.0, 'rgba(30,70,100,0.55)');
   cc.filter = 'none';
   cc.restore();
-  _riverStroke(cc, RIVER_HALF_W * 2,    COL.riverMid);
-  _riverStroke(cc, RIVER_HALF_W * 1.05, COL.riverDeep);
 
-  // Water texture on river channel (stroke the path with a pattern fill)
   {
     const wt = _texTiles.get('water');
     if (wt) {
+      // Full-opacity water texture as the primary river surface.
       const wp = cc.createPattern(wt, 'repeat');
       if (wp) {
-        cc.strokeStyle = wp;
-        cc.globalAlpha = 0.16;
-        cc.lineWidth   = RIVER_HALF_W * 1.8;
+        cc.strokeStyle = wp; cc.globalAlpha = 1.0;
+        cc.lineWidth = RIVER_HALF_W * 2.2;
         cc.lineCap = 'round'; cc.lineJoin = 'round';
         cc.beginPath();
         for (let i = 0; i < RIVER_PATH.length; i++) {
@@ -254,45 +243,62 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
         cc.stroke();
         cc.globalAlpha = 1;
       }
+    } else {
+      // Fallback: clay-blue fills until texture loads.
+      _riverStroke(cc, RIVER_HALF_W * 2,    COL.riverMid);
+      _riverStroke(cc, RIVER_HALF_W * 1.05, COL.riverDeep);
     }
   }
+  // Depth overlay — darker core tint on top of whatever surface is showing.
+  _riverStroke(cc, RIVER_HALF_W * 0.8, 'rgba(25,85,130,0.28)');
 
   cc.restore();
 
-  // ─ 4. Lagoon ──────────────────────────────────────────────────────────────
+  // ─ 4. Lagoon — tex_water at FULL opacity; depth overlay + bank edge ───────
   cc.save();
-  tracIslandPath(cc);
-  cc.clip();
-  const lgrd = cc.createRadialGradient(
-    LAGOON_CX, LAGOON_CY, LAGOON_RX * 0.2,
-    LAGOON_CX, LAGOON_CY, LAGOON_RX,
-  );
-  lgrd.addColorStop(0, COL.waterD);
-  lgrd.addColorStop(1, COL.waterS);
-  cc.fillStyle = lgrd;
-  cc.beginPath();
-  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
-  cc.fill();
-  // Lagoon shore hint
-  cc.strokeStyle = 'rgba(255,255,255,0.25)'; cc.lineWidth = 20;
-  cc.beginPath();
-  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
-  cc.stroke();
-  // Water texture on lagoon
+  tracIslandPath(cc); cc.clip();
   {
     const wt = _texTiles.get('water');
     if (wt) {
       const wp = cc.createPattern(wt, 'repeat');
       if (wp) {
-        cc.save();
-        cc.globalAlpha = 0.18;
-        cc.fillStyle = wp;
+        cc.fillStyle = wp; cc.globalAlpha = 1.0;
         cc.beginPath();
         cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
         cc.fill();
-        cc.restore();
+        cc.globalAlpha = 1;
       }
+    } else {
+      const lgrd = cc.createRadialGradient(
+        LAGOON_CX, LAGOON_CY, LAGOON_RX * 0.2,
+        LAGOON_CX, LAGOON_CY, LAGOON_RX,
+      );
+      lgrd.addColorStop(0, COL.waterD);
+      lgrd.addColorStop(1, COL.waterS);
+      cc.fillStyle = lgrd;
+      cc.beginPath();
+      cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+      cc.fill();
     }
+    // Depth overlay: darker core atop the texture.
+    cc.fillStyle = 'rgba(25,85,130,0.25)';
+    cc.beginPath();
+    cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX * 0.55, LAGOON_RY * 0.55, 0, 0, Math.PI * 2);
+    cc.fill();
+    // Bank-edge shadow ring.
+    cc.save();
+    cc.filter = 'blur(12px)';
+    cc.strokeStyle = 'rgba(30,70,100,0.45)'; cc.lineWidth = 30;
+    cc.beginPath();
+    cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+    cc.stroke();
+    cc.filter = 'none';
+    cc.restore();
+    // Shore highlight ring.
+    cc.strokeStyle = 'rgba(255,255,255,0.22)'; cc.lineWidth = 14;
+    cc.beginPath();
+    cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+    cc.stroke();
   }
   cc.restore();
 
@@ -323,33 +329,8 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.filter = 'none';
   cc.restore();
 
-  // (b) Asphalt surface: warm clay tone, very slightly blurred at the edge so it
-  //     blends into the shoulder instead of ending on a crisp rectangle.
-  cc.save();
-  cc.filter = 'blur(2.5px)';
-  cc.fillStyle = COL.road;
-  for (const [x, y, w, h] of roadRects) cc.fillRect(x, y, w, h);
-  cc.filter = 'none';
-  cc.restore();
-
-  // (c) Subtle baked mottling so the asphalt isn't a dead-flat fill (clipped to
-  //     the union of all road rects; costs nothing after baking).
-  cc.save();
-  cc.beginPath();
-  for (const [x, y, w, h] of roadRects) cc.rect(x, y, w, h);
-  cc.clip();
-  let rseed = 90721;
-  const rrnd = () => { rseed = (rseed * 1103515245 + 12345) & 0x7fffffff; return rseed / 0x7fffffff; };
-  for (let i = 0; i < 1500; i++) {
-    const mx = rrnd() * S, my = rrnd() * S, mr = 6 + rrnd() * 16;
-    cc.fillStyle = rrnd() > 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(42,32,26,0.055)';
-    cc.beginPath();
-    cc.ellipse(mx, my, mr, mr * 0.7, 0, 0, Math.PI * 2);
-    cc.fill();
-  }
-  cc.restore();
-
-  // (c.5) Street texture overlay on road surface
+  // (b) Road surface — tex_street at FULL opacity; solid-asphalt fallback.
+  //     Stage 13 §2: the texture IS the road material, not an overlay tint.
   {
     const st = _texTiles.get('street');
     if (st) {
@@ -359,22 +340,49 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
         cc.beginPath();
         for (const [x, y, w, h] of roadRects) cc.rect(x, y, w, h);
         cc.clip();
-        cc.fillStyle = sp; cc.globalAlpha = 0.18;
+        cc.fillStyle = sp;
         cc.fillRect(MARGIN, MARGIN, S - MARGIN * 2, S - MARGIN * 2);
         cc.restore();
       }
+    } else {
+      // Fallback: blurred solid asphalt until texture loads.
+      cc.save();
+      cc.filter = 'blur(2.5px)';
+      cc.fillStyle = COL.road;
+      for (const [x, y, w, h] of roadRects) cc.fillRect(x, y, w, h);
+      cc.filter = 'none';
+      cc.restore();
     }
   }
 
-  // (c.6) Sidewalk strips — textured paving BOTH sides of every road ──────────
+  // (c) Mottling — quieter when the texture already provides grain.
+  cc.save();
+  cc.beginPath();
+  for (const [x, y, w, h] of roadRects) cc.rect(x, y, w, h);
+  cc.clip();
+  let rseed = 90721;
+  const rrnd = () => { rseed = (rseed * 1103515245 + 12345) & 0x7fffffff; return rseed / 0x7fffffff; };
+  const mottleA = _texTiles.has('street') ? 0.35 : 1.0;
+  for (let i = 0; i < 1500; i++) {
+    const mx = rrnd() * S, my = rrnd() * S, mr = 6 + rrnd() * 16;
+    cc.fillStyle = rrnd() > 0.5
+      ? `rgba(255,255,255,${(0.025 * mottleA).toFixed(4)})`
+      : `rgba(42,32,26,${(0.055 * mottleA).toFixed(4)})`;
+    cc.beginPath();
+    cc.ellipse(mx, my, mr, mr * 0.7, 0, 0, Math.PI * 2);
+    cc.fill();
+  }
+  cc.restore();
+
+  // (c.6) Sidewalk strips — tex_sidewalk at FULL opacity both sides of every road.
   {
     const SW  = 28; // sidewalk strip width in world units
     const swt = _texTiles.get('sidewalk');
     const swPat = swt ? cc.createPattern(swt, 'repeat') : null;
     cc.save();
     tracIslandPath(cc); cc.clip();
-    if (swPat) { cc.fillStyle = swPat; cc.globalAlpha = 0.62; }
-    else        { cc.fillStyle = COL.pavement; cc.globalAlpha = 0.55; }
+    if (swPat) { cc.fillStyle = swPat; cc.globalAlpha = 1.0; }
+    else        { cc.fillStyle = COL.pavement; cc.globalAlpha = 0.88; }
     for (const rc of ROAD_CENTERS) {
       const x0 = MARGIN, x1 = S - MARGIN, y0 = MARGIN, y1 = S - MARGIN;
       // Both sides of horizontal road
@@ -762,6 +770,47 @@ function _texFill(
   cc.fillRect(x0, y0, x1 - x0, y1 - y0);
   cc.globalAlpha = 1;
   cc.restore();
+}
+
+/** Fill a zone rect with a texture tile at FULL opacity, then apply a light
+ *  atmosphere gradient on top so the material still has directional lighting.
+ *  Falls back to _fillZoneRich (gradient only) when the texture hasn't loaded. */
+function _texZone(
+  cc: CanvasRenderingContext2D,
+  key: string,
+  rect: readonly [number, number, number, number],
+  fallback: string,
+  understated = false,
+): void {
+  const [x0, y0, x1, y1] = rect;
+  const tile = _texTiles.get(key);
+  if (tile) {
+    const pat = cc.createPattern(tile, 'repeat');
+    if (pat) {
+      // Base: texture at full opacity, clipped to the zone rect.
+      cc.save();
+      tracIslandPath(cc); cc.clip();
+      cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
+      cc.fillStyle = pat;
+      cc.fillRect(x0, y0, x1 - x0, y1 - y0);
+      cc.restore();
+    }
+    // Atmosphere overlay: light blurred gradient so the material has depth.
+    cc.save();
+    tracIslandPath(cc); cc.clip();
+    cc.filter = understated ? 'blur(28px)' : 'blur(46px)';
+    const grd = cc.createLinearGradient(x0, y0, x1, y1);
+    grd.addColorStop(0, _lighten(fallback, understated ? 0.05 : 0.10));
+    grd.addColorStop(1, _darken(fallback,  understated ? 0.03 : 0.06));
+    cc.fillStyle = grd;
+    cc.globalAlpha = 0.20;
+    cc.fillRect(x0 - 24, y0 - 24, (x1 - x0) + 48, (y1 - y0) + 48);
+    cc.filter = 'none'; cc.globalAlpha = 1;
+    cc.restore();
+  } else {
+    // Fallback: original feathered gradient fill (until texture loads).
+    _fillZoneRich(cc, rect, fallback, understated);
+  }
 }
 
 /** Faint alternating E–W mowing-stripe bands over the island grass. */

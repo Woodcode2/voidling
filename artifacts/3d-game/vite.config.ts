@@ -33,6 +33,56 @@ if (!basePath) {
 // static asset, including files in public/.  Unshifting our own handler first
 // (same technique as sourceBrowserPlugin) ensures the exact URL returns the
 // raw text file regardless of the SPA catch-all order.
+// ── /map.png — serves the last island photo POSTed by the photo-mode client ──
+// Usage in dev:
+//   1. Open ?debug=photo — client posts the PNG to /api/map-png automatically.
+//   2. GET /map.png returns it.
+function mapPngPlugin(basePath: string): Plugin {
+  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  let _pngBuf: Buffer | null = null;
+  return {
+    name: 'map-png',
+    configureServer(server) {
+      server.middlewares.stack.unshift({
+        route: '',
+        handle: (req, res, next) => {
+          const pathname = (req.url ?? '').split(/[?#]/, 1)[0];
+
+          // POST <base>/api/map-png → store PNG in memory
+          if (pathname === `${base}/api/map-png` && req.method === 'POST') {
+            const chunks: Buffer[] = [];
+            req.on('data', (c: Buffer) => chunks.push(c));
+            req.on('end', () => {
+              _pngBuf = Buffer.concat(chunks);
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'text/plain');
+              res.end('stored');
+            });
+            return;
+          }
+
+          // GET <base>/map.png → serve stored PNG
+          if (pathname === `${base}/map.png` && req.method === 'GET') {
+            if (!_pngBuf) {
+              res.statusCode = 404;
+              res.setHeader('Content-Type', 'text/plain');
+              res.end('No photo yet — open ?debug=photo first.');
+              return;
+            }
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Content-Disposition', 'attachment; filename="map.png"');
+            res.end(_pngBuf);
+            return;
+          }
+
+          next();
+        },
+      });
+    },
+  };
+}
+
 function reviewTxtPlugin(basePath: string): Plugin {
   const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
   const filePath = path.resolve(import.meta.dirname, 'public', 'review.txt');
@@ -240,6 +290,7 @@ export default defineConfig({
     runtimeErrorOverlay(),
     reviewTxtPlugin(basePath),
     sourceBrowserPlugin(basePath),
+    mapPngPlugin(basePath),
     ...(process.env.NODE_ENV !== 'production' &&
     process.env.REPL_ID !== undefined
       ? [

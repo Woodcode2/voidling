@@ -1207,6 +1207,10 @@ export class WorldManager {
           const fpR = size * FP;
           if (!isInsideIsland(jx, jy)) continue;
           if (!isOnIsland(jx, jy, Math.round(fpR))) continue;
+          // Stage 13 §3 (footprint-aware): reject if center OR any cardinal edge touches water.
+          if ([[0,0],[fpR,0],[-fpR,0],[0,fpR],[0,-fpR]].some(
+            ([ox,oy]) => terrainAtGeom(jx+ox*0.85, jy+oy*0.85) === GTERRAIN.WATER,
+          )) continue;
           if (!this.roadClear(jx, jy, fpR)) continue;
           if (!this.lotFree(jx, jy, fpR, this.structureLots)) continue;
           const lot: StructureLot = { x: jx, y: jy, size, fpR, kind };
@@ -1249,12 +1253,21 @@ export class WorldManager {
       const fpR = size * FP;
       if (!isInsideIsland(c.x, c.y)) continue;
       if (!isOnIsland(c.x, c.y, Math.round(fpR))) continue;
+      // Stage 13 §3 (footprint-aware): reject if center or cardinal edges touch water.
+      if ([[0,0],[fpR,0],[-fpR,0],[0,fpR],[0,-fpR]].some(
+        ([ox,oy]) => terrainAtGeom(c.x+ox*0.85, c.y+oy*0.85) === GTERRAIN.WATER,
+      )) continue;
       if (!this.roadClear(c.x, c.y, fpR)) continue;
       if (!this.lotFree(c.x, c.y, fpR, this.structureLots)) continue;
       const lot: StructureLot = { x: c.x, y: c.y, size, fpR, kind };
       (c.block.buildingLots ??= []).push(lot);
       this.structureLots.push(lot);
     }
+    // Stage 13 §3: RIVER OVERLAPS audit — must read 0 after the WATER guards above.
+    const riverOverlaps = [...this.houseLots, ...this.structureLots].filter(
+      l => terrainAtGeom(l.x, l.y) === GTERRAIN.WATER,
+    ).length;
+    console.log('[audit] RIVER OVERLAPS:', riverOverlaps);
   }
 
   // v12 §1: downtown block — data-driven building lots (Dense City) + street life
@@ -2269,8 +2282,7 @@ export class WorldManager {
     if (kind === 'house' || kind === 'house_c') {
       if (clayHouseCottageKeys.length) return clayHouseCottageKeys[id % clayHouseCottageKeys.length];
       if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
-      const hc = id % 3;
-      return hc === 0 ? 'house_a' : hc === 1 ? 'house_b' : null;
+      return null; // Stage 13 §6: no legacy sticker fallback — procedural draws instead
     }
     if (kind === 'house_d') {
       if (clayHouseFancyKeys.length) return clayHouseFancyKeys[id % clayHouseFancyKeys.length];
@@ -2800,20 +2812,12 @@ export class WorldManager {
         // Drop shadow only for grounded objects — captured objects have the v10 §3
         // planted shadow at obj.shadowX/Y; drawing one here would rotate with the tumble.
         if (!obj.captured) {
-          // Prompt 12 Stage 3: soft procedural contact shadow — three concentric
-          // ellipses fading outward give a radial AO that reads as ground contact.
+          // Prompt 13 §4: ONE soft shadow ellipse — slightly narrower than the
+          // sprite base, centered directly under the foot with minimal downward offset.
           ctx.save();
-          ctx.fillStyle = 'rgba(0,0,0,0.10)'; // outer halo
+          ctx.fillStyle = 'rgba(0,0,0,0.26)';
           ctx.beginPath();
-          ctx.ellipse(1, 4, r * 1.05, r * 0.32, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = 'rgba(0,0,0,0.14)'; // mid ring
-          ctx.beginPath();
-          ctx.ellipse(1.5, 3.5, r * 0.80, r * 0.24, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = 'rgba(0,0,0,0.20)'; // core
-          ctx.beginPath();
-          ctx.ellipse(2, 3, r * 0.55, r * 0.16, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 5, r * 0.82, r * 0.24, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -2828,19 +2832,17 @@ export class WorldManager {
         if (obj.captured) {
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
         } else if (spriteKey && spriteKey.startsWith('clay_vehicle')) {
-          // Prompt 4: rotate the clay vehicle to face its direction of travel.
-          // Heading: car/schoolbus drive via roadAxis+roadDir (no vx/vy); the
-          // wandering traffic kinds carry vx/vy. Sheet art points up (north), so
-          // rotate by atan2(dy,dx)+π/2. Draw centred (the cutout is centre-padded)
-          // so it spins about its middle rather than orbiting its foot.
+          // Prompt 13 §5: rotate vehicle to face its direction of travel.
+          // Sheet art is centre-padded (east-facing by convention), so
+          // atan2(dy,dx) with no offset is correct. pivot at foot (no pre-translate)
+          // so the car sits flat on the road, centred on its contact point.
           let dx = 0, dy = 0;
           if (obj.kind === 'car' || obj.kind === 'schoolbus') {
             if (obj.roadAxis === 'h') dx = obj.roadDir; else dy = obj.roadDir;
           } else { dx = obj.vx; dy = obj.vy; }
           const rot = (Math.abs(dx) + Math.abs(dy) > 0.001)
-            ? Math.atan2(dy, dx) + Math.PI / 2 : 0;
+            ? Math.atan2(dy, dx) : 0;
           ctx.save();
-          ctx.translate(0, -r);        // move origin to the sprite's centre
           ctx.rotate(rot);
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
           ctx.restore();
@@ -2909,6 +2911,34 @@ export class WorldManager {
       }
     } else {
       for (const obj of visible) drawOne(obj);
+    }
+  }
+
+  // Stage 13 §1: render only the static (non-living, non-eaten) world objects
+  // onto an offscreen photo canvas at the given world→pixel scale.
+  drawPhotoLayer(ctx: CanvasRenderingContext2D, scale: number): void {
+    const statics = this.objects.filter(o => !o.living && !o.eaten && !o.captured);
+    statics.sort((a, b) => a.y - b.y); // painter's algorithm (foot-Y order)
+    for (const obj of statics) {
+      const r  = obj.size * scale;
+      const sx = obj.x   * scale;
+      const sy = obj.y   * scale;
+      const spriteKey = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
+      const spr = spriteKey ? objectSprites.get(spriteKey) : undefined;
+      ctx.save();
+      ctx.translate(sx, sy);
+      if (spr) {
+        ctx.drawImage(spr, -r, -r * 2, r * 2, r * 2);
+      } else {
+        // Procedural colour-blob placeholder when sprite not yet loaded.
+        ctx.fillStyle = '#8BC87A';
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.ellipse(0, -r, r * 0.55, r * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
     }
   }
 }

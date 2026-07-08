@@ -1,0 +1,56 @@
+# VOIDLING: Ground Truth (Rebuild Prompt 13)
+New Earth's code shipped but the screen disagrees. This prompt does two things: builds a full-island PHOTO MODE so every visual claim from now on is proven with one image, and fixes six specific visual defects. No new features beyond the photo mode.
+
+A reference image of the target island is attached. You will compare your photo against it at the end.
+
+## DO NOT TOUCH (leave fully intact)
+- Gameplay: eating, growth, the death rules, scoring, win math, timer, spawON rates.
+- The clay pools and cutter, the splash screen and intro, the void body rendering, the camera, the waterfall renderer.
+
+## STAGE 0: Diagnose first, report root causes (no fixes yet)
+1. List the current alpha value used for each of the six texture fills (grass, forest, sand, street, sidewalk, water).
+2. Explain how a house lot was able to sit on the river channel (what placement check is missing).
+3. Trace the car heading rotation for all four cardinal directions and name which come out wrong on screen.
+4. Report the structure contact shadow sizes and offsets, and the anchor math for the flat-bottom cutouts (is there a pad-to-square offset pushing the visual base above the shadow?).
+5. Report exactly what renders during the first seconds of a match before the clay bitmaps finish injecting (the fallback path).
+Paste all five, then proceed.
+
+## STAGE 1: Photo mode (build this FIRST)
+- Add `?debug=photo`: render the ENTIRE island once to an offscreen canvas (the cached ground buffer plus every placed structure and scenery item, foot-Y-sorted, no HUD, no moving entities), downscale to about 2000px wide, display it full screen, and also serve the same image at a `/map.png` route so it can be saved.
+- This is the receipt camera. It gets used at the end of this prompt and every visual prompt after it.
+
+## STAGE 2: Surfaces at full strength
+- The six textures become the actual surface, not a tint. Draw each tile fill at FULL opacity as the base layer of its region: grass across the island green, forest floor in the forest, sand on the beach, street on every road, sidewalk paving on the sidewalk strips and plaza, water in the river and lagoon.
+- Mowing stripes, zone tints, and lighting gradients move ON TOP of the textures as light overlays, not underneath.
+- Target check: stand the void in an empty grass field; the ground should visibly be the grass material, not flat green with a whisper of noise. If a tile's grain is too loud at full strength, scale the tile LARGER rather than fading it back down.
+
+## STAGE 3: Water and the river
+- Fill the river channel and lagoon with tex_water at full opacity, add a soft darker bank edge along both sides, keep the existing scrolling highlights on top.
+- No lot, structure, or scenery item may intersect the river channel or lagoon. Add a new audit, RIVER OVERLAPS, which must read 0, and relocate any current offender.
+
+## STAGE 4: Plant the buildings
+- Replace the oversized offset shadow stack with ONE soft ellipse per structure, slightly narrower than the sprite's base, centered directly under the base with minimal offset.
+- Verify the flat-bottom cutouts anchor with their true bottom edge at the lot point. If a pad-to-square step is offsetting the visual base, correct it. Houses must look planted in their yards, not hovering over them.
+
+## STAGE 5: Cars point where they drive
+- Fix the heading rotation so every vehicle's nose points its direction of travel for all four cardinal directions and through turns. Drive one car each direction and confirm each on screen.
+
+## STAGE 6: No 2D frame, ever
+- The match countdown must not begin until the clay pools report loaded. Preload during the splash and menu, and hold the countdown a beat if needed.
+- Remove or replace the old 2D fallback art for food and people so the fallback path can never draw a sticker. The first visible frame of gameplay must be fully clay.
+
+## STAGE 7: Proof (one image is the headline)
+1. The five Stage 0 root causes, and what you changed for each.
+2. THE PHOTO: run `?debug=photo` and put it next to the attached reference image. In one honest paragraph, name the top 3 remaining gaps. Do not claim a match.
+3. RIVER OVERLAPS: 0, plus every prior audit still 0.
+4. Cars observed correct in all four directions.
+5. A cold start observed with zero 2D frames.
+6. FPS in the usual band, no new console errors.
+Tell Mat to open `?debug=photo` himself and save the image.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image to this prompt when you paste it.
+- When the Agent finishes: open the game with `?debug=photo`, save the island portrait, and send it to Claude. That one image is the verdict.
+- Then play 60 seconds: houses planted, cars nose-first, river made of water, and not a single 2D frame at the start.
