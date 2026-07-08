@@ -1,0 +1,44 @@
+# VOIDLING: Terrain Surface, 2.5D Roads + River (Rebuild Prompt 8)
+The roads read as flat 2D stickers pasted on top of the clay world, and the river looks off. Make both look like they belong in the clay island. Roads bake into the cached ground; the river gets a simple flowing look.
+
+## GOAL
+Roads that sit in the terrain like part of the clay world instead of a flat grey sticker, and a clean 2.5D river that reads as flowing toward the waterfall. No new art, this is all rendering.
+
+## DO NOT TOUCH (leave fully intact)
+- Gameplay, entities, placement, spawners, scoring, the win math.
+- The waterfall (it works). The river should connect into it cleanly, but do not rebuild the waterfall.
+- Camera, and the Prompt 1 through 7 work.
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. How roads are currently drawn, and whether they are already baked into the Prompt 6 cached ground buffer or drawn separately.
+2. How the river is currently drawn, and how it connects to the waterfall at the rim.
+3. Confirm the cached-ground structure so we bake the road and static river changes into it.
+Paste that, then proceed.
+
+## STAGE 1: Roads become part of the clay world (baked into the cached ground)
+- Recolor roads from the stark flat grey to a warmer, softer clay-asphalt tone that sits in the game's palette.
+- Soften the lane markings: less harsh white, slightly muted, gently rounded dashes rather than hard rectangles.
+- Add a subtle edge treatment so roads read as slightly recessed into the terrain, not a flat sticker on top: a soft shoulder or gentle shadow along the road edges, and a soft blend where a road meets the grass or sand instead of a hard line.
+- Bake all of this into the cached ground buffer so it costs nothing per frame.
+
+## STAGE 2: River becomes a simple 2.5D flowing band
+- Simplify the river into a clean 2.5D water band in soft clay blues with soft edges, not a harsh flat blue shape.
+- Add a couple of soft highlight bands or ripples that scroll slowly along the river's direction to fake the flow, the same cheap technique as the waterfall's scrolling bands. This is the only animated part, kept as a small live layer over the cached ground.
+- Keep the river connecting cleanly into the existing waterfall at the rim.
+
+## STAGE 3: Proof (real receipts)
+Run a live match and report:
+- Confirm roads now read as part of the clay terrain, warmer and soft-edged, no longer a flat grey sticker.
+- Confirm the river is a clean flowing band with moving highlights that connects into the waterfall.
+- Frame rate still in band. The river highlights are the only new per-frame cost, so it should barely move. Report the number.
+- All audits still 0. No new console errors.
+
+If the ground cache made this hard, say so with specifics. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Open the preview. The streets should look like they belong in the clay world now, not pasted on.
+- The river should read as flowing and feed into the waterfall.
+- Nothing else should have changed.
