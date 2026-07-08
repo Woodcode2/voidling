@@ -123,66 +123,70 @@ function Confetti() {
 // If no splash.png is found the existing starfield + voidling fallback is shown.
 function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
   const [hasSplash, setHasSplash] = useState(true); // optimistic — hide on error
-  const [zoomed, setZoomed] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
 
   useEffect(() => {
     // v14.1: prime the AudioContext on first user-visible frame (counts as a gesture on iOS)
     audio.init();
     audio.loadSamples().catch(() => {});
-    // Trigger zoom on next paint so the CSS transition actually fires
-    const rf = requestAnimationFrame(() => setZoomed(true));
-    const t = window.setTimeout(onDone, 4500); // v15 §5: 4.5s splash
-    return () => { clearTimeout(t); cancelAnimationFrame(rf); };
+    // Rebuild Prompt 10: show splash art 4s, then fade smoothly (500ms) into the menu.
+    const t = window.setTimeout(() => setFadingOut(true), 4000);
+    const t2 = window.setTimeout(onDone, 4500);
+    return () => { clearTimeout(t); clearTimeout(t2); };
   }, [onDone]);
+
+  const skip = () => {
+    audio.init();
+    audio.loadSamples().catch(() => {});
+    import('tone').then((T) => T.start()).catch(() => {});
+    onDone(); // Prompt 10 §Stage1: tap-to-skip advances immediately, no fade wait
+  };
 
   return (
     <div
       className="vd-overlay vd-overlay--solid vd-splash"
-      onClick={() => {
-        audio.init();
-        audio.loadSamples().catch(() => {});
-        import('tone').then((T) => T.start()).catch(() => {});
-        onDone();
-      }}
+      onClick={skip}
       role="button"
-      aria-label="Tap to start"
-      style={{ overflow: 'hidden' }}
+      aria-label="Tap to skip"
+      style={{
+        overflow: 'hidden',
+        opacity: fadingOut ? 0 : 1,
+        transition: 'opacity 500ms ease',
+      }}
     >
-      {/* Phase 4 §7: island_map.png now lives only on the title screen (blurred behind logo) */}
+      {/* Rebuild Prompt 10: dedicated splash art, scaled to cover with no distortion */}
       {hasSplash && (
         <img
-          src="/assets/island_map.png"
+          src="/assets/splash_screen.jpg"
           alt=""
           aria-hidden="true"
           onError={() => setHasSplash(false)}
           style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover',
-            filter: 'blur(5px) brightness(0.62)',
-            transform: zoomed ? 'scale(1.05)' : 'scale(1.0)',
-            transition: 'transform 2.5s ease-out',
+            objectFit: 'cover', objectPosition: 'center',
             pointerEvents: 'none',
           }}
         />
       )}
 
-      {/* Fallback starfield when no splash.png */}
-      {!hasSplash && <StarField />}
-
-      <div className="vd-splash-inner" style={{ position: 'relative', zIndex: 2 }}>
-        {!hasSplash && (
-          <div className="vd-splash-void">
-            <SkinPreview skinId={snap.equippedSkin} size={140} glow={1} />
+      {/* Fallback starfield when splash art fails to load */}
+      {!hasSplash && (
+        <>
+          <StarField />
+          <div className="vd-splash-inner" style={{ position: 'relative', zIndex: 2 }}>
+            <div className="vd-splash-void">
+              <SkinPreview skinId={snap.equippedSkin} size={140} glow={1} />
+            </div>
+            <h1 className="vd-splash-title">VOIDLING</h1>
+            <p className="vd-splash-tag">EAT. GROW. DEVOUR.</p>
+            <p style={{
+              marginTop: 28, fontSize: '0.95rem', letterSpacing: '0.14em',
+              color: 'rgba(255,255,255,0.72)', fontWeight: 700, textTransform: 'uppercase',
+              animation: 'vd-pulse 1.8s ease-in-out infinite',
+            }}>TAP TO START</p>
           </div>
-        )}
-        <h1 className="vd-splash-title">VOIDLING</h1>
-        <p className="vd-splash-tag">EAT. GROW. DEVOUR.</p>
-        <p style={{
-          marginTop: 28, fontSize: '0.95rem', letterSpacing: '0.14em',
-          color: 'rgba(255,255,255,0.72)', fontWeight: 700, textTransform: 'uppercase',
-          animation: 'vd-pulse 1.8s ease-in-out infinite',
-        }}>TAP TO START</p>
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -743,6 +747,42 @@ function NewsTicker({ line }: { line: string }) {
   );
 }
 
+// Rebuild Prompt 10 §Stage2: brief centered intro at match start — welcome line, then a
+// coaching line — each fades in and out on its own, never blocks input (pointer-events: none).
+// Both lines are mounted together and timed purely via CSS animation-delay (not React state/
+// setTimeout swaps): match start can coincide with heavy asset-decode work (sprite sheets load
+// right as the round begins), and a busy main thread can coalesce back-to-back setTimeout
+// callbacks into a single paint, skipping a phase entirely. A CSS timeline can't be skipped
+// that way — the browser always shows whatever keyframe % corresponds to real elapsed time.
+function MatchIntro({ visible }: { visible: boolean }) {
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    // Safety-net unmount well after both lines have finished fading (harmless if delayed —
+    // both are already invisible by then).
+    const t = window.setTimeout(() => setDone(true), 10000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (done) return null;
+
+  return (
+    <div
+      className="vd-match-intro"
+      aria-hidden="true"
+      style={{ visibility: visible ? 'visible' : 'hidden' }}
+    >
+      <div className="vd-match-intro-text vd-intro-welcome">
+        <div className="vd-intro-line1">Welcome to New Earth</div>
+        <div className="vd-intro-line2">It's time to eat.</div>
+      </div>
+      <div className="vd-match-intro-text vd-intro-coach">
+        Eat smaller things to grow and feed your void.
+      </div>
+    </div>
+  );
+}
+
 function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   return (
     <div className="vd-game-ui">
@@ -901,6 +941,19 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
   // v14.1: debug sound-board — enabled by ?debug=1 in the URL
   const debugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
+  // Rebuild Prompt 10 §Stage2: fires the welcome/coaching intro exactly once per real
+  // match start (engine.start()), never on boon-pick/resume transitions that also
+  // touch snap.screen. Lives at this top level so it survives internal screen swaps.
+  const lastMatchSeq = useRef(-1);
+  const [introSeq, setIntroSeq] = useState<number | null>(null);
+  useEffect(() => {
+    if (snap.matchStartSeq !== lastMatchSeq.current) {
+      const first = lastMatchSeq.current === -1;
+      lastMatchSeq.current = snap.matchStartSeq;
+      if (!first) setIntroSeq(snap.matchStartSeq);
+    }
+  }, [snap.matchStartSeq]);
+
   // v9 §7: onboarding fires on the FIRST PLAY tap (before the first countdown),
   // never on home load. When it finishes we start the game. The "?" replays it
   // without auto-starting. This ref carries the action to run after the intro.
@@ -953,6 +1006,7 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
   return (
     <>
       {screen}
+      {introSeq === snap.matchStartSeq && <MatchIntro key={introSeq} visible={snap.screen === 'game'} />}
       {showOnboard && <Onboarding onDone={finishOnboard} />}
       {debugMode && <SoundBoard snap={snap} engine={engine} />}
     </>

@@ -1,0 +1,40 @@
+# VOIDLING: Opening Sequence (Rebuild Prompt 10)
+Give the game a real opening. The splash art on app load for 4 seconds, then a warm "Welcome to New Earth" when a match starts. This is presentation only, no gameplay changes.
+
+## GOAL
+On app load, show the splash art for 4 seconds, then the menu. When a match starts, show a brief "Welcome to New Earth, it's time to eat" and a short coaching line. All of it light, skippable, and non-blocking.
+
+## DO NOT TOUCH (leave fully intact)
+- Gameplay, entities, placement, the clay swaps, the Prompt 8 roads and river, scoring, win math, camera.
+- This prompt adds a load-time splash and match-start text only. Nothing else changes.
+
+## STAGE 0: Read and report first (no edits yet)
+Report, in plain text:
+1. The app boot flow: what shows first on load, and whether there is a title or menu screen before a match.
+2. Where a match actually begins, so we hook the welcome text to that moment.
+Paste that, then proceed.
+
+## STAGE 1: Splash on app load
+- Download the splash image, save as `splash_screen.png`. Try URL fetch first.
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260707_215244_110ce7cd-e1b8-4509-b054-ec6db31431d0.png
+- On app load, before the menu or title, show this image full-screen, scaled to cover and centered with no distortion, for 4 seconds, then fade smoothly into the existing menu or title screen.
+- Add tap-to-skip so a tap advances past it immediately.
+- If a URL fetch is blocked, stop and tell me.
+
+## STAGE 2: Welcome text at match start
+- When a match begins, show a brief centered intro that fades in and out without pausing the game: first line "Welcome to New Earth", second line "It's time to eat."
+- A couple of seconds later, a short coaching line fades in and out: "Eat smaller things to grow and feed your void."
+- Style both to match the game's look, keep them brief, skippable, and never blocking input.
+
+## STAGE 3: Proof (real receipts)
+- Confirm the splash shows for 4 seconds on load, then fades to the menu, and that tap-to-skip works.
+- Confirm the welcome and coaching text appear at match start and fade out on their own without blocking play.
+- No gameplay or audit changes. Frame rate fine. No new console errors.
+
+If the boot flow made this hard, say so with specifics. Do not self-certify.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Reload the app. Your splash art should fill the screen for 4 seconds, then fade to the menu. A tap should skip it.
+- Start a match. You should see "Welcome to New Earth, it's time to eat," then the coaching line, both fading on their own.

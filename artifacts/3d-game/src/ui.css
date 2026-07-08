@@ -776,6 +776,58 @@
 }
 @keyframes vd-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
+/* ── Rebuild Prompt 10 §Stage2: match-start welcome/coaching intro ────────────── */
+/* Both lines are mounted together, stacked in the same spot, and timed purely via
+   animation-delay so the browser's compositor — not React/JS timers — owns the
+   schedule. This survives main-thread jank from asset loading right at match start. */
+.vd-match-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none; /* never blocks joystick/taps underneath */
+}
+.vd-match-intro-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  font-family: Fredoka, sans-serif;
+  color: #FFFFFF;
+  text-shadow: 0 0 24px rgba(199,125,255,0.7), 0 3px 10px rgba(0,0,0,0.7);
+  opacity: 0;
+}
+.vd-intro-welcome { animation: vd-intro-fadeinout 3.2s ease 0s both; }
+.vd-intro-coach { animation: vd-intro-fadeinout 5.4s ease 3.6s both; }
+@keyframes vd-intro-fadeinout {
+  0%   { opacity: 0; transform: translateY(6px); }
+  14%  { opacity: 1; transform: none; }
+  80%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+.vd-intro-line1 {
+  font-weight: 800;
+  font-size: clamp(28px, 7vw, 42px);
+  letter-spacing: -0.5px;
+}
+.vd-intro-line2 {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: clamp(18px, 4.5vw, 24px);
+  color: rgba(255,255,255,0.88);
+}
+/* Typography-only — deliberately a second rule alongside the .vd-intro-welcome/.vd-intro-coach
+   animation-delay declarations above; do not merge/dedupe, they target different concerns. */
+.vd-intro-coach {
+  font-weight: 700;
+  font-size: clamp(16px, 4vw, 21px);
+  color: #C9A6FF;
+  max-width: 520px;
+}
+
 /* ── v12 §5: Trophy Room ────────────────────────────────────────────────────── */
 .vd-topbar-title {
   font-family: Fredoka, sans-serif;
