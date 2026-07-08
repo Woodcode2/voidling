@@ -5,6 +5,7 @@
 import {
   ISLAND_CTRL, WATERFALL_IDX,
   ZONE_DOWNTOWN_R, ZONE_PARK_R, ZONE_FOREST_R, ZONE_BEACH_R,
+  ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R,
   LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY,
   RIVER_PATH, RIVER_HALF_W, POND_CX, POND_CY, POND_R,
   ROAD_CENTERS,
@@ -321,6 +322,15 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.ellipse(wpx, wpy + 80, 110, 320, -0.3, 0, Math.PI * 2);
   cc.fill();
   cc.restore();
+
+  // ─ 8. Reserved zones — baked ground art for airport, military pad, zoo ─────
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  _paintAirportRunway(cc);
+  _paintMilitaryPad(cc);
+  _paintZooLayout(cc);
+  cc.restore();
 }
 
 // ─── Prompt 6 §2 enrichment helpers (all baked once into the ground buffer) ──
@@ -568,8 +578,7 @@ import { GRID_W, GRID_H, getRawTerrainGrid } from './mapData';
 export function drawDebugTerrainVec(ctx: CanvasRenderingContext2D): void {
   const grid = getRawTerrainGrid();
   if (!grid) return;
-  const cw = S / GRID_W;
-  const ch = S / GRID_H;
+  const cw = S / GRID_W; const ch = S / GRID_H;
   const COLORS = [
     '',                           // 0 SPACE — skip
     'rgba(30,80,255,0.5)',        // 1 WATER — blue
@@ -588,4 +597,192 @@ export function drawDebugTerrainVec(ctx: CanvasRenderingContext2D): void {
     }
   }
   ctx.restore();
+}
+
+// ─── Reserved-zone ground art (baked once into the static ground cache) ────────
+
+/** Airport runway — N/S tarmac strip with threshold markings, taxiway, apron. */
+function _paintAirportRunway(cc: CanvasRenderingContext2D): void {
+  const [zx0, zy0, zx1, zy1] = ZONE_AIRPORT_R;
+  const bx = (zx0 + zx1) / 2;
+  const by = (zy0 + zy1) / 2;
+
+  cc.save();
+
+  // ── Tarmac base (N–S) ──────────────────────────────────────────────────────
+  const rw = 210, rl = 1120;
+  const rx = bx - rw / 2, ry = by - rl / 2;
+  cc.fillStyle = '#6B6059';
+  cc.fillRect(rx, ry, rw, rl);
+
+  // ── Center-line dashes ────────────────────────────────────────────────────
+  cc.strokeStyle = 'rgba(243,236,218,0.55)';
+  cc.lineWidth = 8;
+  cc.setLineDash([50, 42]);
+  cc.lineCap = 'round';
+  cc.beginPath();
+  cc.moveTo(bx, ry + 20);
+  cc.lineTo(bx, ry + rl - 20);
+  cc.stroke();
+  cc.setLineDash([]);
+  cc.lineCap = 'butt';
+
+  // ── Threshold stripes (top + bottom) ─────────────────────────────────────
+  cc.fillStyle = 'rgba(243,236,218,0.50)';
+  for (let i = -2; i <= 2; i++) {
+    const tx = bx + i * 28;
+    cc.fillRect(tx - 8, ry + 28,       14, 68);  // top threshold
+    cc.fillRect(tx - 8, ry + rl - 96,  14, 68);  // bottom threshold
+  }
+
+  // ── Runway number hints (faint rects suggesting numerals) ─────────────────
+  // "27" suggestion (top end) — two simple blocks
+  cc.fillStyle = 'rgba(243,236,218,0.22)';
+  cc.fillRect(bx - 28, ry + 108, 18, 38);
+  cc.fillRect(bx + 8,  ry + 108, 18, 38);
+
+  // ── Taxiway apron (west side) ─────────────────────────────────────────────
+  cc.fillStyle = '#7A716A';
+  cc.fillRect(rx - 200, by - 130, 205, 220);
+
+  // ── Taxiway guide dashes ──────────────────────────────────────────────────
+  cc.strokeStyle = 'rgba(243,236,218,0.28)';
+  cc.lineWidth = 5;
+  cc.setLineDash([18, 18]);
+  cc.beginPath();
+  cc.moveTo(rx - 200, by - 20);
+  cc.lineTo(rx - 2, by - 20);
+  cc.stroke();
+  cc.setLineDash([]);
+
+  // ── Perimeter fence hint ──────────────────────────────────────────────────
+  cc.strokeStyle = 'rgba(110,95,80,0.28)';
+  cc.lineWidth = 7;
+  const fw = zx1 - zx0 - 60, fh = zy1 - zy0 - 60;
+  cc.strokeRect(bx - fw / 2, by - fh / 2, fw, fh);
+
+  cc.restore();
+}
+
+/** Military helipad — concrete square + H marking + perimeter fence hint. */
+function _paintMilitaryPad(cc: CanvasRenderingContext2D): void {
+  const [zx0, zy0, zx1, zy1] = ZONE_MILITARY_R;
+  const bx = (zx0 + zx1) / 2;
+  const by = (zy0 + zy1) / 2;
+
+  cc.save();
+
+  // ── Concrete pad ──────────────────────────────────────────────────────────
+  const padS = 420;
+  cc.fillStyle = '#B4ADA6';
+  cc.fillRect(bx - padS / 2, by - padS / 2, padS, padS);
+
+  // ── Mottling ──────────────────────────────────────────────────────────────
+  let pseed = 9901;
+  const prnd = () => { pseed = (pseed * 1103515245 + 12345) & 0x7fffffff; return pseed / 0x7fffffff; };
+  cc.save();
+  cc.beginPath();
+  cc.rect(bx - padS / 2, by - padS / 2, padS, padS);
+  cc.clip();
+  for (let i = 0; i < 220; i++) {
+    const mx = bx - padS / 2 + prnd() * padS;
+    const my = by - padS / 2 + prnd() * padS;
+    cc.fillStyle = prnd() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(40,32,26,0.05)';
+    cc.beginPath();
+    cc.ellipse(mx, my, 8 + prnd() * 14, 6 + prnd() * 10, 0, 0, Math.PI * 2);
+    cc.fill();
+  }
+  cc.restore();
+
+  // ── Helipad circle ────────────────────────────────────────────────────────
+  cc.strokeStyle = 'rgba(55,48,42,0.48)';
+  cc.lineWidth = 14;
+  cc.beginPath();
+  cc.arc(bx, by, 145, 0, Math.PI * 2);
+  cc.stroke();
+
+  // ── H marking ─────────────────────────────────────────────────────────────
+  cc.strokeStyle = 'rgba(55,48,42,0.55)';
+  cc.lineWidth = 22;
+  cc.lineCap = 'round';
+  cc.beginPath();
+  cc.moveTo(bx - 58, by - 72); cc.lineTo(bx - 58, by + 72);
+  cc.moveTo(bx + 58, by - 72); cc.lineTo(bx + 58, by + 72);
+  cc.moveTo(bx - 58, by);      cc.lineTo(bx + 58, by);
+  cc.stroke();
+  cc.lineCap = 'butt';
+
+  // ── Perimeter fence hint ──────────────────────────────────────────────────
+  cc.strokeStyle = 'rgba(110,95,80,0.25)';
+  cc.lineWidth = 8;
+  const fw = zx1 - zx0 - 70, fh = zy1 - zy0 - 70;
+  cc.strokeRect(bx - fw / 2, by - fh / 2, fw, fh);
+
+  cc.restore();
+}
+
+/** Zoo clearing — sandy paths, enclosure outlines, flamingo pond. */
+function _paintZooLayout(cc: CanvasRenderingContext2D): void {
+  const [zx0, zy0, zx1, zy1] = ZONE_ZOO_R;
+  const bx = (zx0 + zx1) / 2;
+  const by = (zy0 + zy1) / 2;
+  const bw = zx1 - zx0;
+  const bh = zy1 - zy0;
+  const ins = 100;
+
+  const PATH_COL = '#CFC0A0';
+
+  cc.save();
+
+  // ── Main entrance path (south-center) ─────────────────────────────────────
+  cc.fillStyle = PATH_COL;
+  cc.fillRect(bx - 55, zy1 - ins - 300, 110, 300);
+
+  // ── Central E–W spine path ────────────────────────────────────────────────
+  cc.fillRect(zx0 + ins, by - 45, bw - ins * 2, 90);
+
+  // ── Three enclosure pens (top half) ───────────────────────────────────────
+  const penW = Math.floor((bw - ins * 2 - 80) / 3);
+  for (let col = 0; col < 3; col++) {
+    const px = zx0 + ins + col * (penW + 40);
+    const py = zy0 + ins;
+    const ph = bh / 2 - ins - 20;
+    // Pen floor fill (light sandy)
+    cc.fillStyle = 'rgba(212,198,168,0.38)';
+    cc.fillRect(px, py, penW, ph);
+    // Pen border
+    cc.strokeStyle = 'rgba(120,95,68,0.50)';
+    cc.lineWidth = 9;
+    cc.strokeRect(px, py, penW, ph);
+    // Internal path strip between pens
+    if (col < 2) {
+      cc.fillStyle = PATH_COL;
+      cc.fillRect(px + penW, py, 40, ph);
+    }
+  }
+
+  // ── Flamingo pond (bottom-left) ────────────────────────────────────────────
+  const pondX = zx0 + ins + 220, pondY = by + 140;
+  cc.fillStyle = COL.waterS;
+  cc.save();
+  cc.globalAlpha = 0.75;
+  cc.beginPath();
+  cc.ellipse(pondX, pondY, 130, 88, 0, 0, Math.PI * 2);
+  cc.fill();
+  cc.strokeStyle = 'rgba(255,255,255,0.30)';
+  cc.lineWidth = 12;
+  cc.beginPath();
+  cc.ellipse(pondX, pondY, 130, 88, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.restore();
+
+  // ── Info sign marker dots ──────────────────────────────────────────────────
+  cc.fillStyle = 'rgba(120,95,68,0.38)';
+  for (let i = 0; i < 3; i++) {
+    cc.beginPath();
+    cc.arc(zx0 + ins + i * Math.floor((bw - ins * 2) / 3) + 90, by - 20, 20, 0, Math.PI * 2);
+    cc.fill();
+  }
+
+  cc.restore();
 }

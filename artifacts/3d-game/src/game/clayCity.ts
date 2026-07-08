@@ -1,18 +1,23 @@
 /**
- * clayCity.ts — Rebuild Prompt 3: clay-render building + house art swap.
+ * clayCity.ts — Map Rebuild: clay-render building + house art swap.
  *
- * Runs the two clay sheets through the SAME connected-component extraction
- * pipeline (spriteExtract.ts) used by every other sheet, then injects the
- * cutouts into objectSprites under the existing building/house draw keys.
+ * Loads two new clay sprite sheets and injects cutouts into objectSprites so
+ * the existing draw pipeline picks them up automatically.
+ *
+ * Sheet layouts:
+ *   houses_clay2_sheet.png    4 cols × 4 rows  (16 house cutouts)
+ *     rows 0–1 (cells  0– 7): fancier townhouses / villas   → clayHouseFancyKeys
+ *     rows 2–3 (cells  8–15): cozy cottages / bungalows     → clayHouseCottageKeys
+ *   downtown_clay2_sheet.png  4 cols × 3 rows  (12 building cutouts)
+ *     row 0 (cells 0–3): tall towers                        → claySkyscraperKeys
+ *     row 1 (cells 4–7): glass office, brown office, hospital, school
+ *     row 2 (cells 8–11): clocktower/townhall, cafe, apartment, small civic
  *
  * Gameplay safety: injection sets ONLY spriteBounds (visual crop). It never
- * touches spriteContactFrac, so eat-contact radius (derived in makeObj) is
- * unchanged. Placement, lots, scoring, audits are all untouched — images only.
+ * touches spriteContactFrac, so eat-contact radius is unchanged.
  *
- * Aspect safety: the world draw path maps a sprite's bounds into a fixed
- * 2r×2r square. Tall clay towers would squish, so each tight cutout is padded
- * into a SQUARE canvas, object anchored bottom-centre, and bounds set to full.
- * Square→square renders undistorted and foot-anchored with no new draw path.
+ * Aspect safety: every tight cutout is padded into a square canvas,
+ * object anchored bottom-centre, and bounds set to full {0,0,1,1}.
  */
 
 import { extractComponents } from './spriteExtract';
@@ -20,6 +25,14 @@ import { objectSprites, spriteBounds } from './sprites';
 
 // Exported pools read by world.ts draw resolution (empty → legacy fallback).
 export const claySkyscraperKeys: string[] = [];
+
+/** Rows 0–1 of houses_clay2_sheet: fancier homes, bigger silhouettes. */
+export const clayHouseFancyKeys: string[] = [];
+
+/** Rows 2–3 of houses_clay2_sheet: cozy cottages / bungalows. */
+export const clayHouseCottageKeys: string[] = [];
+
+/** All 16 house cutouts merged — backward-compat fallback. */
 export const clayHouseKeys: string[] = [];
 
 function loadImg(src: string): Promise<HTMLImageElement | null> {
@@ -54,47 +67,54 @@ export async function loadClayCity(base: string): Promise<void> {
   _loaded = true;
   const b = base.endsWith('/') ? base : base + '/';
 
-  const [buildingsImg, housesImg] = await Promise.all([
-    loadImg(`${b}assets/buildings_clay_sheet.png`),
-    loadImg(`${b}assets/houses_clay_sheet.png`),
+  const [housesImg, downtownImg] = await Promise.all([
+    loadImg(`${b}assets/houses_clay2_sheet.png`),
+    loadImg(`${b}assets/downtown_clay2_sheet.png`),
   ]);
 
-  if (buildingsImg) {
-    // 4 cols × 3 rows, row-major. Cell → kind (see Stage 0 layout analysis):
-    //  0 glass sky   1 purple sky   2 art-deco tower   3 green mid-rise
-    //  4 school      5 (empty)      6 town hall        7 hospital
-    //  8 pink civic  9 cafe        10 apartment       11 fountain
-    const cells = extractComponents(buildingsImg, 4, 3, 'buildings_clay_sheet');
+  if (housesImg) {
+    // 4 cols × 4 rows → 16 cutouts
+    const cells = extractComponents(housesImg, 4, 4, 'houses_clay2_sheet');
+    cells.forEach((cvs, i) => {
+      if (cvs.width <= 1) return;
+      const key = `clay_house2_${i}`;
+      injectVisual(key, cvs);
+      if (i < 8)  clayHouseFancyKeys.push(key);   // rows 0–1: fancy/townhouse
+      else        clayHouseCottageKeys.push(key);  // rows 2–3: cozy/cottage
+      clayHouseKeys.push(key);
+    });
+  }
+
+  if (downtownImg) {
+    // 4 cols × 3 rows → 12 cutouts
+    const cells = extractComponents(downtownImg, 4, 3, 'downtown_clay2_sheet');
     const ok = (i: number) => cells[i] && cells[i].width > 1;
 
-    // Tallest towers → skyscraper lots (plaza-nearest). 3-way variant pool.
-    for (const i of [0, 1, 2]) {
+    // Row 0 (cells 0–3): tall towers → skyscraper pool
+    for (const i of [0, 1, 2, 3]) {
       if (!ok(i)) continue;
       const key = i === 0 ? 'skyscraper' : `skyscraper_v${i}`;
       injectVisual(key, cells[i]);
       claySkyscraperKeys.push(key);
     }
-    const map: [number, string][] = [
-      [3, 'office'], [4, 'school'], [6, 'townhall'], [7, 'hospital'],
-      [8, 'library'], [9, 'cafe'], [10, 'shop'], [11, 'fountain'],
-    ];
-    for (const [i, key] of map) if (ok(i)) injectVisual(key, cells[i]);
-  }
 
-  if (housesImg) {
-    // 4 cols × 4 rows. Collect every non-empty cutout as a random-assignment pool.
-    const cells = extractComponents(housesImg, 4, 4, 'houses_clay_sheet');
-    cells.forEach((cvs, i) => {
-      if (cvs.width <= 1) return;
-      const key = `clay_house_${i}`;
-      injectVisual(key, cvs);
-      clayHouseKeys.push(key);
-    });
+    // Row 1 (cells 4–7): mid-rise commercial / civic
+    const row1Map: [number, string][] = [
+      [4, 'office'], [5, 'shop'], [6, 'hospital'], [7, 'school'],
+    ];
+    for (const [i, key] of row1Map) if (ok(i)) injectVisual(key, cells[i]);
+
+    // Row 2 (cells 8–11): civic / small commercial
+    const row2Map: [number, string][] = [
+      [8, 'townhall'], [9, 'cafe'], [10, 'library'], [11, 'fountain'],
+    ];
+    for (const [i, key] of row2Map) if (ok(i)) injectVisual(key, cells[i]);
   }
 
   console.log(
-    `[clayCity] clay art swap — skyscrapers=${claySkyscraperKeys.length} ` +
-    `houses=${clayHouseKeys.length} buildings=${buildingsImg ? 'ok' : 'MISSING'} ` +
-    `houses_sheet=${housesImg ? 'ok' : 'MISSING'}`,
+    `[clayCity] NEW EARTH art — skyscrapers=${claySkyscraperKeys.length} ` +
+    `fancy=${clayHouseFancyKeys.length} cottage=${clayHouseCottageKeys.length} ` +
+    `houses_sheet=${housesImg ? 'ok' : 'MISSING'} ` +
+    `downtown_sheet=${downtownImg ? 'ok' : 'MISSING'}`,
   );
 }

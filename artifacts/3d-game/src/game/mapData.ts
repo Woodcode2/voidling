@@ -63,6 +63,15 @@ export const ZONE_FOREST_R = [bx0(4), by0(0), bx1(5), by1(0)] as const;
 // BEACH: gy=5 row (south strip)
 export const ZONE_BEACH_R = [bx0(0), by0(5), bx1(5), by1(5)] as const;
 
+// ZOO: block gx=4, gy=0 (reserved — painted in ground cache, unpopulated until next update)
+export const ZONE_ZOO_R = [bx0(4), by0(0), bx1(4), by1(0)] as const;
+
+// AIRPORT: block gx=4, gy=4 (reserved — runway painted in ground cache, no entities)
+export const ZONE_AIRPORT_R = [bx0(4), by0(4), bx1(4), by1(4)] as const;
+
+// MILITARY: block gx=5, gy=2 (reserved — pad painted in ground cache, no entities)
+export const ZONE_MILITARY_R = [bx0(5), by0(2), bx1(5), by1(2)] as const;
+
 // LAGOON: ellipse within beach zone
 export const LAGOON_CX = bx0(1) + BLOCK * 0.65;  // ~3025
 export const LAGOON_CY = by0(5) + BLOCK * 0.52;  // ~11132
