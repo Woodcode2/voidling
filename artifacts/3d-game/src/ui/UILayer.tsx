@@ -7,6 +7,8 @@ import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
 const BUILD_STAMP = 'v19 · 0';
+// Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
+const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -890,12 +892,20 @@ const ONBOARD_KEY = 'vd_onboarded';
 
 export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const [showOnboard, setShowOnboard] = useState(false);
-  // v12 §3: splash screen — shown once on first mount, cleared at 1800ms or on tap
-  const [showSplash, setShowSplash] = useState(true);
+  // v12 §3: splash screen — shown once on first mount, cleared at 1800ms or on tap.
+  // ?debug=autostart skips it so proof screenshots see the running game immediately.
+  const [showSplash, setShowSplash] = useState(!_DEBUG_AUTOSTART);
   // v12 §5: trophy room local state
   const [showTrophies, setShowTrophies] = useState(false);
   // v14.1: debug sound-board — enabled by ?debug=1 in the URL
   const debugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+  // Prompt 19 Stage 0: ?debug=lineup — canvas renders the sprite lineup full-screen; suppress all React UI overlays.
+  const debugLineup = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'lineup';
+  // Prompt 19 Stage 7: ?debug=autostart — immediately starts a match (bypasses splash+home).
+  useEffect(() => {
+    if (_DEBUG_AUTOSTART) { engine.start(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Rebuild Prompt 10 §Stage2: fires the welcome/coaching intro exactly once per real
   // match start (engine.start()), never on boon-pick/resume transitions that also
@@ -937,6 +947,9 @@ export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }
     if (!seen) { afterOnboard.current = () => engine.start(false); setShowOnboard(true); }
     else engine.start(false);
   };
+
+  // Prompt 19 Stage 0: ?debug=lineup — suppress all React UI so canvas lineup is fully visible.
+  if (debugLineup) return null;
 
   // v12 §3: show splash before any other screen on first mount
   if (showSplash) {

@@ -399,7 +399,7 @@ export const CONFIG = {
     shop:       { tier: 3, minR: 38, maxR: 48 },
     library:    { tier: 4, minR: 62, maxR: 76 },
     office:     { tier: 5, minR: 95, maxR: 118 },   // Prompt 14: bigger mid-ring buildings
-    skyscraper: { tier: 6, minR: 125, maxR: 150 },  // Prompt 14: bigger to fill tighter DT cells
+    skyscraper: { tier: 6, minR: 185, maxR: 215 },  // Prompt 19: calibrated to ≈6–7× person (was 4.4×)
     // v13 §2: Sandy Shores beach objects
     seashell:      { tier: 1, minR: 10, maxR: 14 },
     crab:          { tier: 2, minR: 18, maxR: 24 },
@@ -423,7 +423,7 @@ export const CONFIG = {
     // v16.1 C: town hall landmark
     townhall:      { tier: 5, minR: 104, maxR: 122 },
     // v16.1 D: zoo animals (2× score) + zoo structures
-    elephant:      { tier: 5, minR: 88, maxR: 108, scoreMult: 2 },
+    elephant:      { tier: 5, minR: 62, maxR: 74,  scoreMult: 2 },  // Prompt 19: calibrated to ≈2.2× person (was 3.2×)
     giraffe:       { tier: 4, minR: 72, maxR: 88,  scoreMult: 2 },
     lion:          { tier: 4, minR: 58, maxR: 72,  scoreMult: 2 },
     monkey:        { tier: 2, minR: 18, maxR: 24,  scoreMult: 2 },

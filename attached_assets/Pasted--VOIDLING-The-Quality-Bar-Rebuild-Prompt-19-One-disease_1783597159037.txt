@@ -1,0 +1,56 @@
+# VOIDLING: The Quality Bar (Rebuild Prompt 19)
+One disease is causing the giant cars, people bigger than houses, gliding yoga men, waddling vehicles, and pancake shadows: cutouts were mapped to kinds but never CALIBRATED to a common scale or classified by pose. This prompt builds the calibration room, normalizes everything in it, and fixes the water. It also changes the rules of reporting.
+
+## NEW STANDING RULE (applies to this and every future prompt)
+A completion report without its required screenshots is INVALID. Mat will reject it unread. The screenshots are the report.
+
+## DO NOT TOUCH (leave fully intact)
+- The district grid, lots, textures, road width, the Stage 1 mapping table from Prompt 18 (extend it, never rebuild it).
+- Gameplay, death rules, scoring, win math, spawn rates, wave behavior.
+
+## STAGE 0: Build the lineup room FIRST
+- `?debug=lineup`: a scrollable screen rendering EVERY cutout currently in use (all clay pools, all categories), each at its exact in-game render scale, in a labeled grid grouped by category (people, vehicles, houses, downtown, scenery, park, beach, food, zoo, airport, military).
+- In the first row, render the references side by side at true scale: one person, one car, one house, one skyscraper, and the player void at stage 1.
+- Screenshot the full lineup. This screenshot is the master receipt for this prompt and the verification room for every art change after it.
+
+## STAGE 1: Scale calibration (the core fix)
+- Render scale for every cutout must derive from its pixel dimensions so the drawn size equals the kind's intended world size regardless of which sheet it came from: scale = kind world size / cutout pixel height, computed per cutout at load.
+- Then sanity-check the kind world sizes themselves against these ratios in the lineup: a person about 1.0 unit of height, a car about 1.8, a house about 3.2, a skyscraper 6 to 8, a gnome about 0.5, an elephant about 2.2, a penguin about 0.6. Adjust KIND_INFO outliers until the lineup row reads like a believable toy set.
+- Receipt: the lineup screenshot after calibration, where nothing is absurd next to its neighbors.
+
+## STAGE 2: Pose classification (no more haunted yoga)
+- Hand-tag the people cutouts: WALKERS (standing, walking, jogging, dog walker, elderly with cane, skateboarder) and SITTERS (the cross-legged sitter, any crouching or seated figure).
+- SITTERS never enter the walker or wander pools. They spawn only as static seated life: on plaza benches, at cafe tables, on beach towels. If no seat is available, they do not spawn.
+- Receipt: sixty seconds of observation with zero seated poses in motion, stated plainly.
+
+## STAGE 3: Motion dignity
+- Vehicles never wobble or tilt. Remove the living body-language wobble from all vehicle kinds; their only motion is heading rotation and travel. Parked cars are perfectly still.
+- People keep the walk bob at roughly half the current amplitude so it reads as walking, not waddling.
+- Receipt: one line each, observed.
+
+## STAGE 4: Shadows that fit
+- Per-object shadow: width about 0.85 of the sprite's base width, height proportional, alpha lighter for small objects. A gnome gets a gnome shadow, a tower gets a tower shadow. No more people standing on pancakes.
+
+## STAGE 5: Water worth looking at
+- Narrow the river by about a third.
+- Make the water texture actually visible at street zoom: scale the water tile down within the channel until the material reads.
+- Soften the scrolling highlights: thinner bands, lower alpha, slower drift. They should suggest flow, not draw stripes.
+- The pond: a proper pond, not a flat ellipse over the river. Soft bank ring, water-texture fill, two or three small lily pads (simple procedural circles are fine). Same treatment for the lagoon. Remove the large translucent ellipse that currently overlaps the river.
+- Receipt: one screenshot standing at the riverbank.
+
+## STAGE 6: The last decal
+- Retire the 2D soccer-pitch decal sprite. Bake sports fields as painted line markings directly on the grass in the cached ground, subtle white lines. If clay goals exist, keep them as props; if not, lines alone are fine.
+- Also close the critter gap from Prompt 18: the cat still draws as a sticker. Route every critter through the procedural blob or a clay stand-in, and grep the old critter sprites unreferenced.
+
+## STAGE 7: Proof (screenshots or the report is invalid)
+1. THE LINEUP screenshot, post-calibration.
+2. Five gameplay screenshots at fixed locations: the spawn point, the plaza fountain, a suburb street, the riverbank, the downtown core. Attached, not described.
+3. The Stage 2 and Stage 3 observation lines.
+4. All audits 0, FPS in the usual band, no new console errors.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image when you paste this, standing rule.
+- If the report arrives without the lineup and the five screenshots, reply exactly: "Report rejected, attach the screenshots." Do not verify anything else until they arrive.
+- Forward the screenshots to Claude before you play. Claude clears the round first; your play session confirms feel, not existence.
