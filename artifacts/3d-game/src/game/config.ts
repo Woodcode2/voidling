@@ -389,8 +389,8 @@ export const CONFIG = {
     // v12 §1: downtown objects
     shop:       { tier: 3, minR: 38, maxR: 48 },
     library:    { tier: 4, minR: 62, maxR: 76 },
-    office:     { tier: 5, minR: 88, maxR: 104 },
-    skyscraper: { tier: 6, minR: 115, maxR: 130 },
+    office:     { tier: 5, minR: 95, maxR: 118 },   // Prompt 14: bigger mid-ring buildings
+    skyscraper: { tier: 6, minR: 125, maxR: 150 },  // Prompt 14: bigger to fill tighter DT cells
     // v13 §2: Sandy Shores beach objects
     seashell:      { tier: 1, minR: 10, maxR: 14 },
     crab:          { tier: 2, minR: 18, maxR: 24 },

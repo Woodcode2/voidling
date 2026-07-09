@@ -1,6 +1,6 @@
 import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
-import { drawParkObject, wind } from './objects';
+import { drawParkObject } from './objects'; // wind removed — tuft system deleted in Prompt 14
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import {
@@ -222,91 +222,7 @@ function drawTornRim(ctx: CanvasRenderingContext2D, view: View, S: number, t: nu
     edge((y) => [S - jag(y), y], (y) => [S, y], vy0, vy1);
 }
 
-// v13 §1: SANDY SHORES — coastline replacing the south torn-earth rim.
-// v16 §1/§7: ocean water now visible INSIDE the map on the bottom beach row (gy=4).
-// The south map edge (y=S) is the beach; water is visible from S-IN_WATER to S.
-function drawCoast(ctx: CanvasRenderingContext2D, view: View, S: number, t: number) {
-  const WATER = 100;   // ocean band width outside the map
-  const IN_WATER = 90; // pixels of in-map water visible inside the bottom beach row
-  const bg = CONFIG.COLORS.uiBg;
-
-  // ── IN-MAP WATER (inside south beach blocks, top portion of the water band) ─
-  const inWaterY = S - IN_WATER;
-  if (view.y + view.h > inWaterY && view.y < S) {
-    const grd = ctx.createLinearGradient(0, inWaterY, 0, S);
-    grd.addColorStop(0, 'rgba(35,130,210,0.0)');
-    grd.addColorStop(0.5, 'rgba(45,160,220,0.45)');
-    grd.addColorStop(1, 'rgba(60,185,240,0.75)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(view.x, inWaterY, view.w, S - inWaterY);
-    // foam line at the shore
-    const fG = ctx.createLinearGradient(0, S - 22, 0, S);
-    fG.addColorStop(0, 'rgba(255,255,255,0)');
-    fG.addColorStop(1, 'rgba(255,255,255,0.28)');
-    ctx.fillStyle = fG;
-    ctx.fillRect(view.x, S - 22, view.w, 22);
-    // animated ripples
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-    ctx.lineWidth = 1.4;
-    ctx.setLineDash([8, 16]);
-    for (let x = Math.floor(view.x / 50) * 50; x < view.x + view.w; x += 50) {
-      const off = Math.sin(t / 900 + x * 0.011) * 6;
-      ctx.beginPath();
-      ctx.moveTo(x + off, inWaterY + IN_WATER * 0.3);
-      ctx.lineTo(x + off + 28, inWaterY + IN_WATER * 0.3);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-    ctx.restore();
-  }
-
-  // ── WEST COAST: removed in v16 §1 (west column is now residential) ──────────
-
-  // ── SOUTH COAST (y = S, ocean below) ───────────────────────────────────────
-  if (view.y + view.h > S && view.y < S + WATER + 60) {
-    const wy1 = Math.min(view.y + view.h, S + WATER + 60);
-    ctx.fillStyle = bg;
-    ctx.fillRect(view.x, S, view.w, wy1 - S);
-    const grd = ctx.createLinearGradient(0, S, 0, S + WATER);
-    grd.addColorStop(0, 'rgba(55,175,235,0.82)');
-    grd.addColorStop(0.5, 'rgba(35,150,215,0.65)');
-    grd.addColorStop(1, 'rgba(20,100,180,0.0)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(view.x, S, view.w, wy1 - S);
-    const fG = ctx.createLinearGradient(0, S, 0, S + 20);
-    fG.addColorStop(0, 'rgba(255,255,255,0.32)');
-    fG.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = fG;
-    ctx.fillRect(view.x, S, view.w, 20);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([10, 18]);
-    for (let x = Math.floor(view.x / 52) * 52; x < view.x + view.w; x += 52) {
-      const off = Math.sin(t / 850 + x * 0.009) * 8;
-      ctx.beginPath();
-      ctx.moveTo(x + off, S + 2);
-      ctx.quadraticCurveTo(x + off + 6, S + WATER * 0.5, x + off, wy1);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 0.38;
-    for (let i = 0; i < 10; i++) {
-      const by = S + WATER + 18 + i * 8;
-      if (by > view.y + view.h + 20 || by < view.y) continue;
-      const spd = 160 + (i % 3) * 65;
-      const len = 28 + (i % 4) * 18;
-      const period = 110;
-      for (let x = view.x; x < view.x + view.w; x += period) {
-        const phase = ((t * spd / 1000) + x + i * 43) % period;
-        ctx.fillStyle = `rgba(90,180,235,${0.25 + 0.15 * (i % 2)})`;
-        ctx.fillRect(x + phase, by, len, 2);
-      }
-    }
-    ctx.restore();
-  }
-}
+// Prompt 14 Stage 3: drawCoast deleted — island floats in space; rim + space bg own every edge.
 
 // v9 §4: a torn-loose ground chunk floating in space — grass clod, fence bit or flowerpot.
 function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
@@ -375,9 +291,7 @@ export class WorldManager {
   // v9 §4: torn-loose ground chunks drifting in the space beyond the rim
   private spaceChunks: { bx: number; by: number; ox: number; oy: number; ang: number; spin: number; type: number; s: number }[] = [];
   // v5 §3 — precomputed ground-dressing (low-contrast, non-colliding)
-  private dressTufts: { x: number; y: number; type: number; rot: number; s: number; a: number }[] = [];
-  private dressFence: { x: number; y: number; v: boolean }[] = [];
-  private dressHedges: { x: number; y: number; r: number }[] = [];
+  // Prompt 14 Stage 3: dressTufts, dressFence, dressHedges removed — textures own the surface.
   private dressMats: { x: number; y: number }[] = [];
   private dressManholes: { x: number; y: number }[] = [];
   private dressPaved: { x: number; y: number; kind: 'grate' | 'arrow' | 'leaf' | 'planter'; rot: number; s: number }[] = [];
@@ -797,25 +711,13 @@ export class WorldManager {
 
   // v5 §3 — precompute deterministic dressing so it never flickers frame-to-frame
   private buildDressing(rand: () => number) {
-    this.dressTufts = []; this.dressFence = []; this.dressHedges = [];
     this.dressMats = []; this.dressManholes = [];
     this.dressPaved = []; // v16.1 B2
     const inset = CONFIG.SIDEWALK;
     for (const b of this.blocks) {
       const ix = b.x0 + inset, iy = b.y0 + inset;
       const iw = CONFIG.BLOCK_SIZE - inset * 2, ih = CONFIG.BLOCK_SIZE - inset * 2;
-      if (b.type === 'beach') {
-        // v13 §3: sandy shores — 80 light sand speckles instead of grass tufts; no fences/hedges
-        for (let i = 0; i < 80; i++) {
-          this.dressTufts.push({
-            x: ix + rand() * iw, y: iy + rand() * ih,
-            type: 4, // 4 = sand speckle (drawn as tiny warm-tan oval)
-            rot: rand() * Math.PI * 2,
-            s: 0.4 + rand() * 0.5, a: 0.12 + rand() * 0.08,
-          });
-        }
-        continue; // skip fence / hedge for beach blocks
-      }
+      if (b.type === 'beach') continue; // Prompt 14 Stage 3: sand speckles removed — tex_sand owns surface
       if ((b as any).paved) {
         // v16.1 B2: paved block dressing — drain grates, direction arrows, leaf litter, concrete planters
         for (let i = 0; i < 6; i++)
@@ -828,30 +730,8 @@ export class WorldManager {
           this.dressPaved.push({ x: ix + rand() * iw, y: iy + rand() * ih, kind: 'planter', rot: rand() * Math.PI * 0.15, s: 1 });
         continue;
       }
-      // v13 §3: doubled tuft density (60 → 120) for richer-looking non-beach blocks
-      for (let i = 0; i < 120; i++) {
-        this.dressTufts.push({
-          x: ix + rand() * iw, y: iy + rand() * ih,
-          type: Math.floor(rand() * 4), rot: rand() * Math.PI * 2,
-          s: 0.7 + rand() * 0.8, a: 0.2 + rand() * 0.1,
-        });
-      }
-      if (b.type === 'residential') {
-        const step = 18;
-        for (let x = ix; x <= ix + iw; x += step) {
-          this.dressFence.push({ x, y: iy, v: false });
-          this.dressFence.push({ x, y: iy + ih, v: false });
-        }
-        for (let y = iy; y <= iy + ih; y += step) {
-          this.dressFence.push({ x: ix, y, v: true });
-          this.dressFence.push({ x: ix + iw, y, v: true });
-        }
-        const hr = 34;
-        this.dressHedges.push({ x: ix + hr, y: iy + hr, r: hr });
-        this.dressHedges.push({ x: ix + iw - hr, y: iy + hr, r: hr });
-        this.dressHedges.push({ x: ix + hr, y: iy + ih - hr, r: hr });
-        this.dressHedges.push({ x: ix + iw - hr, y: iy + ih - hr, r: hr });
-      }
+      // Prompt 14 Stage 3: grass tufts removed — tex_grass at full opacity owns the surface.
+      // Prompt 14 Stage 3: picket fences + corner hedges removed — baked per-lot yards own fencing.
     }
     for (const o of this.objects) {
       if (o.kind === 'house') this.dressMats.push({ x: o.x, y: o.y + o.size * 0.55 });
@@ -1190,7 +1070,7 @@ export class WorldManager {
     // Sprite resolution is handled in structureSpriteKey via kind mapping.
     const COZY_POOL:  ObjectKind[] = ['house', 'house', 'house', 'house_c'];
     const FANCY_POOL: ObjectKind[] = ['house_d', 'house_d', 'house_c', 'house'];
-    const H_STEP = 400;                       // packed rows with small yards (≈12 lots/block)
+    const H_STEP = 280;                       // Prompt 14: dense packing — gap ≤ 0.5× house width
     const H_INSET = CONFIG.SIDEWALK + 70;     // keep first row off the sidewalk
     for (const b of this.blocks) {
       if (b.type !== 'residential') continue;
@@ -1223,7 +1103,7 @@ export class WorldManager {
     // ── Stage 2: packed downtown — grid of building lots per downtown block ──
     // Gather every candidate cell across all on-island downtown blocks, rank by
     // distance to the central plaza, then assign tallest→nearest, shortest→edge.
-    const DT_STEP = 540;
+    const DT_STEP = 360;  // Prompt 14: tight tower grid — gap ≤ 0.3× building width at plaza core
     const DT_INSET = CONFIG.SIDEWALK + 110;
     const cells: { x: number; y: number; block: Block; d2: number }[] = [];
     const px = this.size / 2, py = this.size / 2;
@@ -1241,9 +1121,10 @@ export class WorldManager {
     const n = Math.max(1, cells.length - 1);
     const kindForRank = (i: number): ObjectKind => {
       const f = i / n; // 0 = plaza-adjacent (tallest), 1 = zone edge (shortest)
-      if (f < 0.30) return 'skyscraper';
-      if (f < 0.60) return 'office';
-      if (f < 0.82) return 'cafe';
+      // Prompt 14: ~45% towers at core, ~35% offices mid-ring, shop/cafe outermost band only.
+      if (f < 0.45) return 'skyscraper';
+      if (f < 0.80) return 'office';
+      if (f < 0.92) return 'cafe';
       return 'shop';
     };
     for (let i = 0; i < cells.length; i++) {
@@ -2571,24 +2452,7 @@ export class WorldManager {
       ctx.beginPath(); ctx.arc(m.x, m.y, 8, 0, Math.PI * 2); ctx.stroke();
     }
 
-    // cream picket fences
-    for (const f of this.dressFence) {
-      if (!inView(f.x, f.y)) continue;
-      ctx.fillStyle = 'rgba(251,239,214,0.55)';
-      if (f.v) ctx.fillRect(f.x - 6, f.y - 2, 12, 4);
-      else ctx.fillRect(f.x - 2, f.y - 7, 4, 14);
-    }
-
-    // corner hedges (low-contrast green blobs)
-    for (const h of this.dressHedges) {
-      if (!inView(h.x, h.y, h.r)) continue;
-      ctx.save();
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = '#2C9A56';
-      roundRect(ctx, h.x - h.r, h.y - h.r * 0.7, h.r * 2, h.r * 1.4, 12);
-      ctx.fill();
-      ctx.restore();
-    }
+    // Prompt 14 Stage 3: picket fence + corner hedge draw loops removed.
 
     // welcome mats + stepping stones at house doors
     for (const m of this.dressMats) {
@@ -2607,14 +2471,7 @@ export class WorldManager {
       ctx.restore();
     }
 
-    // grass tufts / daisies / clover / leaves
-    // v10 §4: skip tufts that would render below ~4px on screen (max-zoom perf cull)
-    const gust = wind(t); // v8 §4: shared wind so tufts lean with the world
-    for (const d of this.dressTufts) {
-      if (!inView(d.x, d.y)) continue;
-      if (d.s * 10 * zoom < 4) continue; // screen px ≈ d.s * 10 * zoom
-      this.drawTuft(ctx, d, gust);
-    }
+    // Prompt 14 Stage 3: grass tuft + sand speckle draw loop removed — textures own the surface.
 
     // v16.1 B2: paved dressing — drain grates, arrows, leaf litter, concrete planters
     for (const p of this.dressPaved) {
@@ -2662,58 +2519,6 @@ export class WorldManager {
       }
       ctx.restore();
     }
-  }
-
-  private drawTuft(ctx: CanvasRenderingContext2D, d: { x: number; y: number; type: number; rot: number; s: number; a: number }, gust = 0) {
-    ctx.save();
-    ctx.translate(d.x, d.y);
-    ctx.rotate(d.rot + gust * (d.type === 0 ? 0.22 : 0.08)); // blades lean most
-    ctx.scale(d.s, d.s);
-    ctx.globalAlpha = d.a;
-    if (d.type === 0) {
-      // tuft: three blades
-      ctx.strokeStyle = '#2F8F4E';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      for (const dx of [-3, 0, 3]) {
-        ctx.beginPath();
-        ctx.moveTo(dx, 4);
-        ctx.quadraticCurveTo(dx * 1.4, -3, dx * 1.8, -8);
-        ctx.stroke();
-      }
-    } else if (d.type === 1) {
-      // daisy
-      ctx.fillStyle = '#FFFFFF';
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.ellipse(Math.cos(a) * 4, Math.sin(a) * 4, 2.4, 1.4, a, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.fillStyle = '#FFD23F';
-      ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
-    } else if (d.type === 2) {
-      // clover: three dots
-      ctx.fillStyle = '#3AA35C';
-      for (const a of [0, 2.09, 4.18]) {
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * 3, Math.sin(a) * 3, 2.4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else if (d.type === 4) {
-      // v13 §3: sand speckle — tiny warm-tan ellipse for beach blocks
-      ctx.fillStyle = '#D4AA6A';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 4.5, 2.2, 0.4, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // fallen leaf
-      ctx.fillStyle = '#C87B3A';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 5, 2.6, 0.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
   }
 
   // ── objects (y-sorted) ── Dense City §3: optional void actors interleave by foot-Y
@@ -2832,16 +2637,16 @@ export class WorldManager {
         if (obj.captured) {
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
         } else if (spriteKey && spriteKey.startsWith('clay_vehicle')) {
-          // Prompt 13 §5: rotate vehicle to face its direction of travel.
-          // Sheet art is centre-padded (east-facing by convention), so
-          // atan2(dy,dx) with no offset is correct. pivot at foot (no pre-translate)
-          // so the car sits flat on the road, centred on its contact point.
+          // Prompt 14 §4: rotate vehicle to face its direction of travel.
+          // Sheet art faces UP (not east), so +π/2 offset is needed.
+          // Pivot is at foot centre (no pre-translate) — car sits flat on the road.
           let dx = 0, dy = 0;
           if (obj.kind === 'car' || obj.kind === 'schoolbus') {
             if (obj.roadAxis === 'h') dx = obj.roadDir; else dy = obj.roadDir;
           } else { dx = obj.vx; dy = obj.vy; }
+          // Prompt 14 Stage 4: sheet art faces UP not east — quarter-turn offset restored.
           const rot = (Math.abs(dx) + Math.abs(dy) > 0.001)
-            ? Math.atan2(dy, dx) : 0;
+            ? Math.atan2(dy, dx) + Math.PI / 2 : 0;
           ctx.save();
           ctx.rotate(rot);
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
