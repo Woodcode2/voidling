@@ -65,7 +65,9 @@ export type ObjectKind =
   // Life Pack §4: military units (now clay toy army from Prompt 16)
   | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
   // Life Pack §2: sports fields (ground decals — not edible world objects)
-  | 'field_soccer' | 'field_basketball' | 'field_tennis';
+  | 'field_soccer' | 'field_basketball' | 'field_tennis'
+  // Prompt 18 Stage 4: street furniture (clay-mapped props)
+  | 'streetlamp' | 'bus_stop';
 
 export type AccessoryType =
   | 'tricorn' | 'eyepatch' | 'earring'       // pirate
@@ -209,7 +211,7 @@ export const CONFIG = {
   // World — Phase 2: floating island — 12000×12000 world (2.5× old map)
   MAP_SIZE: 12000,
   BLOCK_SIZE: 1600,          // 6*1600 + 5*200 roads = 9600+1000 = 10600; margin 700 each side
-  ROAD_WIDTH: 200,
+  ROAD_WIDTH: 110,  // Prompt 18 Stage 3: reduced from 200 (~45% narrower roads)
   SIDEWALK: 100,
   GRID: 6,
   PLAN_NAMES: ['METRO', 'SUBURBIA', 'SEASIDE'] as string[], // v16.2 §6: rotating city plans
@@ -511,6 +513,9 @@ export const CONFIG = {
     field_soccer:     { tier: 0, minR: 260, maxR: 260 },
     field_basketball: { tier: 0, minR: 200, maxR: 200 },
     field_tennis:     { tier: 0, minR: 200, maxR: 200 },
+    // Prompt 18 Stage 4: street furniture (clay-mapped, eatable infra)
+    streetlamp:  { tier: 2, minR: 14, maxR: 18 },
+    bus_stop:    { tier: 3, minR: 32, maxR: 40 },
   } as Record<ObjectKind, KindInfo>,
 
   // Which kinds run away from a nearby, bigger void
