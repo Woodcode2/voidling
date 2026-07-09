@@ -285,6 +285,13 @@ const LIVING_KINDS: ObjectKind[] = [
 // Prompt 4: O(1) membership for clay-art draw-key remapping (see clayLife.ts).
 const CLAY_PERSON_KIND_SET = new Set<ObjectKind>(CLAY_PERSON_KINDS);
 const CLAY_VEHICLE_KIND_SET = new Set<ObjectKind>(CLAY_VEHICLE_KINDS);
+// Prompt 20 Stage 4: vignette kinds that draw from the clay people pool and may
+// therefore land on a sitter sprite cell (8 or 11). Hoisted as a module-level
+// constant so makeObj does not allocate a new Set on every object creation.
+const VIGNETTE_SITTER_KINDS: Set<ObjectKind> = new Set([
+  'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple',
+  'vig_busker', 'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
+] as ObjectKind[]);
 
 export class WorldManager {
   objects: WorldObject[] = [];
@@ -387,6 +394,19 @@ export class WorldManager {
         o.sitter = true;
         o.living = false; // prevents wander/flee AI path
         o.tether = 0;     // never pulled from home
+      }
+    }
+    // Prompt 20 Stage 4: vignette anchors (vig_*) draw from the clay people pool
+    // just like regular clay persons do, so they can also render as a seated pose
+    // (cell 8 or 11). If a vignette entity lands on a sitter cell, mark it static —
+    // a seated vig walking is the gliding-seated-man bug reported in Stage 0.
+    // VIGNETTE_SITTER_KINDS is a module-level constant (not re-created per call).
+    if (VIGNETTE_SITTER_KINDS.has(kind) && !o.sitter) {
+      const clayIdx = o.id % (clayPeopleKeys.length || 12);
+      if (SITTER_CLAY_INDICES.has(clayIdx)) {
+        o.sitter = true;
+        o.living = false;
+        o.tether = 0;
       }
     }
     // Prompt 5: scenery is bonus food — never part of the % devoured denominator.
@@ -2073,7 +2093,17 @@ export class WorldManager {
   }
 
   private stepLiving(obj: WorldObject, dt: number, dtSec: number, voids: { x: number; y: number; radius: number; ghost: boolean }[], player: Player, fx: FXManager) {
-    if (obj.kind === 'car' || obj.kind === 'schoolbus') return this.stepCar(obj, dtSec, player);
+    // Prompt 20 Stage 3: all traffic-pool vehicle kinds follow the road network,
+    // not free-wander. Previously only 'car' and 'schoolbus' used stepCar; taxi,
+    // convertible, fire_truck, and school_bus fell through to stepWander and roamed
+    // freely off roads. All are spawned by spawnCar() with roadAxis/homeX/homeY set.
+    // Guard: infra=true objects are parked-car dressing (taxi/convertible parked at
+    // curbs) — they must NOT enter traffic AI or they start driving from their lot.
+    if (!obj.infra && (obj.kind === 'car' || obj.kind === 'schoolbus' ||
+        obj.kind === 'taxi' || obj.kind === 'convertible' ||
+        obj.kind === 'fire_truck' || obj.kind === 'school_bus')) {
+      return this.stepCar(obj, dtSec, player);
+    }
 
     // nearest bigger threat
     const skittish = obj.kind === 'bird' || obj.kind === 'cat' || obj.kind === 'squirrel';
@@ -2670,7 +2700,7 @@ export class WorldManager {
     drawStars(ctx, view); // procedural star overlay adds depth on top of space bg
     this.drawSpaceChunks(ctx, view, t);
     drawDriftObjects(ctx);
-    drawIsland(ctx, t, camZoom); // Phase 4: vector ground (clock + zoom for waterfall anim + cache)
+    drawIsland(ctx, t, camZoom, view); // Phase 4: vector ground; Prompt 20: pass view for live-clip path
 
     // Life Pack §2 + Prompt 19 Stage 6: sports field lines are baked into the
     // static ground cache by drawMap._paintStaticGround via setMatchSportsFields.
@@ -2965,18 +2995,30 @@ export class WorldManager {
       const objSprite = spriteKey ? objectSprites.get(spriteKey) : undefined;
 
       if (objSprite) {
+        // Prompt 20 Stage 4: couple visual scale — hoisted here so both shadow and
+        // sprite draw use the same multiplier, keeping them visually consistent.
+        const coupleScale = obj.kind === 'vig_couple' ? 1.3 : 1.0;
+
         // Drop shadow only for grounded objects — captured objects have the v10 §3
         // planted shadow at obj.shadowX/Y; drawing one here would rotate with the tumble.
         if (!obj.captured) {
           // Prompt 19 Stage 4: shadow width scaled by sprite aspect ratio so
           // a wide car casts a wide shadow and a thin gnome casts a narrow one.
+          // Prompt 20 Stage 2: for tall, narrow sprites (aspect < 0.8 — skyscrapers,
+          // towers, watertowers) the original formula produced a pinhole shadow that
+          // made the building look airborne. New formula uses the sprite's actual
+          // visual footprint width (aspect × 2r / 2) as the floor.
           const shadowAsr = spriteAspect.get(spriteKey!) ?? 1;
-          const shadowW = r * 0.85 * Math.min(shadowAsr * 1.1, 1.7);
+          const formulaW = r * 0.85 * Math.min(shadowAsr * 1.1, 1.7);
+          const footprintW = r * Math.min(shadowAsr + 0.3, 1.1); // visual base half-width × 2
+          const shadowW = Math.max(formulaW, footprintW) * coupleScale; // scale with visual
+          const shadowH = (shadowAsr < 0.8 ? r * 0.14 : r * 0.22) * coupleScale;
+          const shadowYOff = shadowAsr < 0.8 ? 2 : 5;            // hugs the base of towers
           const shadowAlpha = Math.max(0.13, 0.26 - r * 0.0008);
           ctx.save();
           ctx.fillStyle = `rgba(0,0,0,${shadowAlpha.toFixed(3)})`;
           ctx.beginPath();
-          ctx.ellipse(0, 5, shadowW, r * 0.22, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, shadowYOff, shadowW, shadowH, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -3019,7 +3061,8 @@ export class WorldManager {
           // Prompt 19 Stage 1: aspect-ratio-correct foot-anchored draw
           // dH = 2r (height unchanged), dW = 2r * aspect (width preserves ratio)
           const fasr = spriteAspect.get(spriteKey!) ?? 1;
-          const fdH = r * 2, fdW = fdH * fasr;
+          // coupleScale is hoisted above the shadow block — see Prompt 20 Stage 4 comment.
+          const fdH = r * 2 * coupleScale, fdW = fdH * fasr;
           ctx.drawImage(objSprite, sx, sy, sw, sh, -(fdW / 2), -fdH, fdW, fdH);
         }
       } else {

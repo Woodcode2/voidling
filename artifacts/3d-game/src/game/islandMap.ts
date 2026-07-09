@@ -151,8 +151,15 @@ export function drawSpaceBg(
  * Called by world.ts drawGround(). Accepts clock + camZoom for waterfall animation
  * and cache invalidation.
  */
-export function drawIsland(ctx: CanvasRenderingContext2D, clock = 0, camZoom = 0.15): void {
-  drawVectorGround(ctx, clock, camZoom);
+// Prompt 20 Stage 1: thread the world-space view rect so drawVectorGround can
+// switch to a live viewport-clipped path at street zoom (crisp ground tiles).
+export function drawIsland(
+  ctx: CanvasRenderingContext2D,
+  clock = 0,
+  camZoom = 0.15,
+  view?: { x: number; y: number; w: number; h: number },
+): void {
+  drawVectorGround(ctx, clock, camZoom, false, view);
 }
 
 /** No-op: grain overlay removed in Phase 4 (vector ground has flat fills). */

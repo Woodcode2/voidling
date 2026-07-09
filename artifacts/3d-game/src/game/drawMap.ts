@@ -145,16 +145,34 @@ function _ensureGroundBuffer(): HTMLCanvasElement {
   return buf;
 }
 
+// Prompt 20 Stage 1: when the camera is zoomed in enough for ground blur to be
+// visible, draw the static ground live into the world-space ctx clipped to the
+// visible viewport instead of blitting the low-resolution cached buffer.
+// Threshold chosen so the cached buffer is still used at overview zoom (camZoom
+// < LIVE_ZOOM_MIN) where 0.30 px/wu is adequate; at street zoom the live path
+// gives full screen-native resolution. PAD prevents seams during pan.
+const LIVE_ZOOM_MIN = 0.8;  // px/world-unit — above this, live path activates
+const LIVE_PAD = 250;        // world units of overdraw beyond visible viewport
+
 /** Draw the full ground layer into ctx (world-space camera transform must be applied). */
 export function drawVectorGround(
   ctx: CanvasRenderingContext2D,
   clock: number,
-  camZoom: number,   // eslint-disable-line @typescript-eslint/no-unused-vars
+  camZoom: number,
   forceRebuild = false,
+  view?: { x: number; y: number; w: number; h: number },
 ): void {
-  if (_noCache) {
-    // Debug A/B: repaint the full static ground every frame (uncached cost).
+  if (_noCache || (view && camZoom >= LIVE_ZOOM_MIN)) {
+    // Prompt 20 Stage 1: Live per-frame render clipped to the visible region.
+    // GPU clips all fills to the viewport rect so overdraw is negligible;
+    // the resulting ground is at full screen resolution — no stretching.
     ctx.save();
+    if (view) {
+      ctx.beginPath();
+      ctx.rect(view.x - LIVE_PAD, view.y - LIVE_PAD,
+               view.w + LIVE_PAD * 2, view.h + LIVE_PAD * 2);
+      ctx.clip();
+    }
     _paintStaticGround(ctx);
     ctx.restore();
   } else {

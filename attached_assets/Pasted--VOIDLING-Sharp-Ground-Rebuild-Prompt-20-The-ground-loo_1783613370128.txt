@@ -1,0 +1,49 @@
+# VOIDLING: Sharp Ground (Rebuild Prompt 20)
+The ground looks foggy because the entire 12000-unit island is baked into one 3600px buffer, about 0.3 pixels per world unit, then magnified roughly 4x at street zoom. The ground is a stretched thumbnail while sprites draw crisp from source. This prompt fixes the resolution at the root, plus four eyesores: floating towers, drifting cars, the still-gliding seated man, and the undersized couple.
+
+## STANDING RULE
+A completion report without its screenshots is invalid.
+
+## DO NOT TOUCH (leave fully intact)
+- The textures, the mapping table, the calibration from Prompt 19, the district grid, lots, gameplay, death rules, scoring, win math.
+
+## STAGE 0: Read and report first (no edits yet)
+1. Confirm the ground buffer dimensions versus MAP_SIZE and state the resulting pixels per world unit, and where the buffer is blitted each frame.
+2. The shadow parameters currently used for tall structures (skyscrapers, towers), size and offset.
+3. How free-wander vehicles pick their headings and positions, and which vehicle kinds wander versus drive the road network.
+4. Whether the Prompt 19 pose classification (sitters excluded from walkers) was ever implemented. Answer honestly; the seated figure is still observed gliding in gameplay.
+Paste all four, then proceed.
+
+## STAGE 1: Sharp ground (the core fix)
+- Replace the stretched full-map blit with resolution-correct rendering of the VISIBLE region. Preferred approach: each frame, draw only the on-screen patch of ground live at screen resolution through the existing vector-plus-pattern pipeline (zone fills, textures, roads, sidewalks, yards, markings). One screenful of fills is cheap; measure it.
+- If live per-frame drawing drops FPS out of the usual band, fall back to a chunked cache: split the island into tiles of roughly 768 world units, render each tile at about 1.5 pixels per world unit on demand, keep the most recent 12 to 16 tiles, and blit the visible ones. Report which approach you shipped and why.
+- The waterfall and river highlight animation keep working exactly as they do now.
+- Receipt: two screenshots of the SAME street spot, before and after. Lane dashes, fence lines, and texture grain must be crisp at street zoom in the after shot. Plus the FPS number under the new path.
+
+## STAGE 2: Towers touch the ground
+- Tall structures get their shadow directly under the base: width no more than the sprite base, centered, minimal offset. Verify the bottom-center anchor for tall cutouts so the visual base sits on the shadow.
+- Receipt: one screenshot of a skyscraper base at street zoom, planted.
+
+## STAGE 3: Cars drive like cars
+- No moving vehicle may leave the road network. Free-wander vehicle kinds either drive the road graph like traffic does, or stop moving and become parked.
+- Parked cars sit only on driveways or road edges, axis-aligned to their road, never on crosswalks or in the middle of intersections.
+- Receipt: thirty seconds observed at an intersection, described in two lines, plus one screenshot.
+
+## STAGE 4: Finish what 19 skipped
+- Pose classification, for real this time: seated and crouching people cutouts never enter the walker or wander pools. They spawn only seated at benches, cafe tables, or beach towels, or not at all.
+- The couple cutout (person_7) renders undersized; scale it up about 1.3x so each figure reads person-height next to a single person.
+- Receipt: sixty seconds observed with zero seated poses in motion, stated plainly, and the couple visible at correct size in one screenshot or the lineup.
+
+## STAGE 5: Proof
+1. The before/after ground screenshots and the FPS number.
+2. The skyscraper, intersection, and couple screenshots.
+3. The Stage 0 honest answer about the pose work.
+4. All audits 0, no new console errors.
+Screenshots attached as images or the report is invalid.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image when you paste this, standing rule.
+- If the report has no images: "Report rejected, attach the screenshots."
+- Forward the images to Claude. Then play one minute at street level: the ground should finally be as sharp as the houses sitting on it.
