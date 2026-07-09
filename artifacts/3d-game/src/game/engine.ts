@@ -12,12 +12,15 @@ import { createJoystick } from './input';
 import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
 import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
-import { resetGroundCache, resetWaterfallState, loadGroundTextures, exportGroundBuffer, drawVectorGround } from './drawMap'; // Prompt 6 §1/§3 lifecycle
+import { resetGroundCache, resetWaterfallState, loadGroundTextures, exportGroundBuffer, drawVectorGround, setMatchLots } from './drawMap'; // Prompt 6 §1/§3 lifecycle
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
 import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
 import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
+import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
+import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
+import { loadClayMilitary } from './clayMilitary'; // Prompt 16: clay toy army
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -334,6 +337,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   void loadClayLife(base);
   void loadClayScenery(base);
   void loadClayFood(base);
+  void loadClayZoo(base);
+  void loadClayAirport(base);
+  void loadClayMilitary(base);
 
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
@@ -2693,10 +2699,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     },
 
     // Stage 13 §1: photo-mode capture — renders a 2000×2000 PNG of the island.
-    // Uses drawVectorGround() so the ground buffer is always built, even if the
-    // first frame hasn't run yet (robust to the "no buffer" race condition).
+    // Rebuild Prompt 16 Stage 0: capturePhoto must always show a populated island,
+    // so we build a fresh WorldManager and run the full init pipeline (lots, fill,
+    // scenery, zoo, airport, military) before rendering. The existing round-world is
+    // left untouched.
     capturePhoto(): string | null {
-      if (!world) return null;
       const PHOTO_SIZE = 2000;
       const oc = document.createElement('canvas');
       oc.width = oc.height = PHOTO_SIZE;
@@ -2710,6 +2717,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       oct.fillStyle = bgGrad;
       oct.fillRect(0, 0, PHOTO_SIZE, PHOTO_SIZE);
 
+      // Build a throwaway, fully-populated world for the photo.
+      const liveWorld = world;
+      const photoWorld = new WorldManager(CONFIG.MAP_SIZE);
+      photoWorld.init('photo_' + Math.floor(Math.random() * 1e9));
+      setMatchLots(photoWorld.houseLots);
+      resetGroundCache();
+
       // Draw ground: drawVectorGround blits the cached world-space ground buffer.
       // The buffer draws at world scale (0..MAP_SIZE), so apply the pixel scale first.
       const scale = PHOTO_SIZE / CONFIG.MAP_SIZE;
@@ -2719,7 +2733,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       oct.restore();
 
       // Draw every static structure foot-Y-sorted with proper clay spriteBounds.
-      world.drawPhotoLayer(oct, scale);
+      photoWorld.drawPhotoLayer(oct, scale);
+
+      // Restore the live match's ground lots so the photo capture has no side effects
+      // on the running round. If no round is active, the ground cache does not matter.
+      if (liveWorld) setMatchLots(liveWorld.houseLots);
 
       return oc.toDataURL('image/png');
     },

@@ -1,0 +1,54 @@
+# VOIDLING: Population (Rebuild Prompt 16)
+The world's bones passed the photo test. This prompt gives the reserved zones their tenants: zoo animals in their pens, an airport with planes, and the toy army replacing the last of the old 2D military art. It also completes the photo camera so it finally shows buildings.
+
+## DO NOT TOUCH (leave fully intact)
+- The district grid, river path, plaza, textures, density constants, yards, sidewalks. The map is done. Do not move a single lot.
+- Gameplay, death rules, scoring, win math, defense wave BEHAVIOR (timing, difficulty, escalation stay identical; only the art changes).
+- Clay pools and cutter, splash, camera controls, waterfall.
+- Same injection rule as every clay swap: spriteBounds only, never spriteContactFrac.
+
+## STAGE 0: Finish the camera (small, do it first)
+- `?debug=photo` still captures an unpopulated world because structures spawn at match start. Fix: capturePhoto must run the full world initialization (the same fill a match start performs: structures, scenery, zoo, airport, military idle units) before rendering, so the photo always shows the populated island no matter when it is opened.
+- Verify: take a photo and confirm houses and towers are visible in it. If they are not, stop and report why.
+
+## STAGE 1: Pull the three sheets
+Download into the asset folder. Try URL fetch first; if blocked, stop and tell me.
+- Zoo animals, save as `zoo_clay_sheet.png` (about 12 cutouts: lion, elephant, giraffe, monkey, penguin, bear, zebra, flamingo, tortoise, hippo, panda, seal):
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_183215_2ac64e67-1781-4cfb-b09d-efc17e0c3a80.png
+- Airport set, save as `airport_clay_sheet.png` (about 8 cutouts: terminal, control tower, hangar, blue plane, peach plane, baggage cart, windsock, fuel truck):
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_183229_6c40e928-f234-4c3b-a698-ce88c5d70506.png
+- Toy army, save as `military_clay_sheet.png` (about 7 cutouts: tank, helicopter, jeep, rocket truck, radar van, two soldiers):
+  https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260708_183254_17ec959c-24f9-4a8e-b160-1d76441f3b96.png
+Run all three through the existing cutter and report exact cutout counts. Note: the vehicle-style cutouts (planes, tank, jeep, trucks, van, helicopter) follow the same convention as the car sheet: art faces UP, rotate by heading plus a quarter turn when they move.
+
+## STAGE 2: The zoo lives
+- Place the animals in the zoo block: penned animals inside their painted enclosure outlines (a few per pen, mixed species), flamingos and the seal at the flamingo pond, the tortoise and a monkey wandering the zoo paths.
+- Animals get a gentle idle wander constrained to their pen rectangle (reuse the people wander with a bounds clamp). Path animals wander the zoo block only.
+- Animals are eatable exactly like people: same registration pattern, modest bonus values scaled by size (penguin small, elephant big), excluded from the percent-devoured win math.
+- New audit: ZOO OFF-BLOCK: count of animals outside the zoo block. Must be 0.
+
+## STAGE 3: The airport opens
+- On the airport block: terminal, control tower, and hangar as structures on the apron (foot-anchored, contact shadow, in the depth-sorted pass, counted by the building audits). Two planes parked on the apron beside the runway, plus the fuel truck, baggage cart, and windsock as props.
+- Planes and airport props are eatable under the existing size gating (a plane should require a big void, same rule that governs large objects today). Excluded from win math like all bonus food.
+- Nothing taxis or flies yet. Parked life only; motion is later polish.
+
+## STAGE 4: The toy army (final 2D extermination)
+- Point every military and defense-wave spawner at the clay army pool: tank, helicopter, jeep, rocket truck, radar van, soldiers. Wave timing, counts, difficulty, and behavior stay exactly as they are; only the sprites change.
+- Idle units stage at the military pad between waves if the current system supports idle placement; if it does not, skip idle staging rather than inventing new behavior.
+- The old military sheet goes unreferenced. Grep and report it, same as the other retired sheets.
+
+## STAGE 5: Proof
+1. Cutout counts for all three sheets.
+2. THE PHOTO, now with buildings, animals in pens, planes on the apron. Save it and describe the top 3 gaps against the attached reference in one honest paragraph.
+3. ZOO OFF-BLOCK: 0, plus every existing audit still 0.
+4. Grep line showing the old military sheet is no longer referenced by any draw call.
+5. One defense wave observed with clay units, behavior unchanged.
+6. FPS in the usual band, no new console errors.
+Tell Mat to open `?debug=photo` and send the image, then visit the zoo and the airport in a live match.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image when you paste this.
+- When done: `?debug=photo`, save, send to Claude. First photo ever with the full populated island.
+- Then play: walk to the zoo and eat a penguin, visit the airport and size up a plane, and survive a defense wave to see the toy army in clay.
