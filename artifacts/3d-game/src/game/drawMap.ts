@@ -365,6 +365,18 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     cc.beginPath();
     cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
     cc.stroke();
+    // Two lily pads — Prompt 19 Stage 5: same treatment as the pond.
+    for (const [ddx, ddy] of [[-0.30, -0.28], [0.38, 0.20]]) {
+      const lx = LAGOON_CX + ddx * LAGOON_RX;
+      const ly = LAGOON_CY + ddy * LAGOON_RY;
+      const lr = Math.min(LAGOON_RX, LAGOON_RY) * 0.09;
+      cc.fillStyle = '#4D7B40';
+      cc.beginPath(); cc.arc(lx, ly, lr, 0, Math.PI * 2); cc.fill();
+      cc.fillStyle = '#3a7ab8'; // fixed water-notch colour (not a palette token)
+      cc.beginPath(); cc.moveTo(lx, ly); cc.arc(lx, ly, lr * 0.72, -0.24, 0.24); cc.closePath(); cc.fill();
+      cc.strokeStyle = 'rgba(255,255,255,0.22)'; cc.lineWidth = 1.5;
+      cc.beginPath(); cc.arc(lx, ly, lr, 0, Math.PI * 2); cc.stroke();
+    }
   }
   cc.restore();
 

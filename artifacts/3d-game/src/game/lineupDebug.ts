@@ -66,7 +66,7 @@ function buildRows(): LineupRow[] {
   if (claySkyscraperKeys.length > 0) {
     rows.push({
       label: 'SKYSCRAPERS / DOWNTOWN',
-      items: claySkyscraperKeys.map((k) => ({ key: k, r: 135 })),
+      items: claySkyscraperKeys.map((k) => ({ key: k, r: 200 })),
     });
   }
   if (SCENERY_FOREST.length > 0) {
@@ -172,7 +172,7 @@ export function drawLineup(
       { label: 'person',     r: 32,  key: clayPeopleKeys[0] ?? null },
       { label: 'car',        r: 55,  key: clayVehicleKeys[0] ?? null },
       { label: 'house',      r: 100, key: clayHouseCottageKeys[0] ?? clayHouseKeys[0] ?? null },
-      { label: 'skyscraper', r: 135, key: claySkyscraperKeys[0] ?? null },
+      { label: 'skyscraper', r: 200, key: claySkyscraperKeys[0] ?? null },
     ];
 
     let rx = 80;
