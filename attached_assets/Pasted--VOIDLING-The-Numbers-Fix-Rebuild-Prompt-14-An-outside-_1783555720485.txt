@@ -1,0 +1,51 @@
+# VOIDLING: The Numbers Fix (Rebuild Prompt 14)
+An outside code review of drawMap.ts and world.ts found the exact constants making the city sparse, plus three old systems still drawing on top of the new island. This prompt is pure surgery: retune spacing numbers, delete the dead systems, fix the car rotation, and prove it with before-and-after island photos. No new features.
+
+## DO NOT TOUCH (leave fully intact)
+- Gameplay, death rules, scoring, win math, spawn breathing room.
+- The texture pipeline from Prompt 13 (loadGroundTextures, _texZone, the full-opacity fills). It is correct. Do not re-tune alphas.
+- The clay pools, splash, camera, waterfall, void rendering.
+
+## STAGE 0: Capture BEFORE, then report (no fixes yet)
+1. Run `?debug=photo` and save the current island image. This is the BEFORE.
+2. Report the current values of: H_STEP, DT_STEP, the kindForRank share thresholds, the sidewalk strip width SW, and KIND_INFO sizes (minR/maxR) for house, house_c, house_d, skyscraper, office.
+3. Confirm whether these are still active: the block-perimeter picket fences and corner hedges in buildDressing, the grass tufts (120 per block), and drawCoast (the south ocean band and in-map shore water).
+Paste all of it, then proceed.
+
+## STAGE 1: Suburb density (outcome-tuned, not guessed)
+- Reduce H_STEP until the average edge-to-edge gap between neighboring houses is at most 0.6 of a house width. Expect landing somewhere around 260 to 320, but tune to the ratio, not the number. Keep the existing jitter and stagger.
+- All placement audits must stay at 0 (overlaps, on-roads, off-island, river).
+- Lot count will rise well past 148. Report the new SUBURB LOTS number.
+
+## STAGE 2: Downtown that reads downtown
+- Reduce DT_STEP until near-plaza towers stand with gaps of at most 0.3 of a building width. Expect around 320 to 400, tune to the ratio.
+- Fix the rank shares in kindForRank: about 45 percent skyscraper, about 35 percent office, and shop/cafe only in the outermost band near the zone edges. The core must be towers, not snack bars.
+- If buildings need to be bigger to fill their cells, raise their KIND_INFO sizes modestly rather than spreading them out.
+- Widen the sidewalk strips from 28 to about 60 world units so they actually read at gameplay zoom.
+- Audits stay 0. Report the new DOWNTOWN LOTS number and the share breakdown.
+
+## STAGE 3: Delete the three zombie systems (grep proof each)
+1. Remove the old block-perimeter picket fences and corner hedges from buildDressing and their draw calls. The baked per-lot yards from Prompt 13 own fencing now. Two fence systems at once is visual mud.
+2. Remove the procedural grass tufts and the beach sand speckles from the dressing layer. The full-opacity grass and sand textures own the ground surface now.
+3. Remove drawCoast entirely: the south ocean band, the in-map shore water, the foam, the ripples. This island floats in space; the island rim and the space background own every edge. Also remove any remaining torn-rim drawing on edges the island polygon already owns.
+For each of the three, paste a grep line showing the removed function or data is no longer referenced by any draw call.
+
+## STAGE 4: Cars point where they drive (one line)
+- The clay vehicle sheet art faces UP, not east. The convention claim in the last change was wrong. Keep the center-pivot fix, restore the quarter turn: rotate by atan2(dy, dx) + Math.PI / 2.
+- Observe one vehicle driving in each of the four cardinal directions and confirm the nose leads in all four.
+
+## STAGE 5: Proof
+1. Run `?debug=photo` again and save the AFTER image. Put BEFORE and AFTER side by side and describe the density change honestly in two sentences.
+2. New SUBURB LOTS and DOWNTOWN LOTS counts, plus the downtown share breakdown.
+3. All audits 0: BUILDING OVERLAPS, BUILDINGS ON ROADS, OFF-ISLAND ENTITIES, RIVER OVERLAPS, and the three scenery audits.
+4. The three grep lines from Stage 3.
+5. Cars confirmed in four directions.
+6. FPS in the usual band (deleting the tufts and coast should help, report the number), no new console errors.
+Tell Mat to open `?debug=photo` and send the AFTER image onward.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image to this prompt when you paste it.
+- When done: open `?debug=photo`, save the island portrait, send it to Claude. The before/after pair is the whole verdict.
+- Then play 60 seconds: packed streets of houses, a tower core downtown, visible sidewalks, cars nose-first, no ocean at the south edge.

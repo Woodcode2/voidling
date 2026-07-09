@@ -376,7 +376,7 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
 
   // (c.6) Sidewalk strips — tex_sidewalk at FULL opacity both sides of every road.
   {
-    const SW  = 28; // sidewalk strip width in world units
+    const SW  = 60; // Prompt 14: wider sidewalks — visible at gameplay zoom (was 28)
     const swt = _texTiles.get('sidewalk');
     const swPat = swt ? cc.createPattern(swt, 'repeat') : null;
     cc.save();
