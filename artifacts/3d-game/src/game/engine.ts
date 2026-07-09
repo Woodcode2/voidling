@@ -274,8 +274,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const contractProgress: Record<string, number> = {};
 
   // camera state (world-space centre + zoom), smoothed each frame
-  let camCX = CONFIG.MAP_SIZE / 2;
-  let camCY = CONFIG.MAP_SIZE / 2;
+  // ?cam=X,Y overrides initial camera position for QA screenshots
+  const _camParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('cam') : null;
+  const _camParts = _camParam ? _camParam.split(',').map(Number) : null;
+  let camCX = (_camParts && _camParts.length === 2 && !isNaN(_camParts[0])) ? _camParts[0] : CONFIG.MAP_SIZE / 2;
+  let camCY = (_camParts && _camParts.length === 2 && !isNaN(_camParts[1])) ? _camParts[1] : CONFIG.MAP_SIZE / 2;
   let camZoom = 0.5;
   let camLookX = 0, camLookY = 0;   // v5 §1: smoothed velocity lookahead
 
