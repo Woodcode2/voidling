@@ -1,0 +1,55 @@
+# VOIDLING: Void Identity (Rebuild Prompt 17)
+Every evolution stage gets a real look, built in code, no sprites. The sticker fire dies. Rivals telegraph their threat by sight. Plus one final, different attempt at the island camera, with a stop-loss.
+
+## DO NOT TOUCH (leave fully intact)
+- Eat-contact radii and all gameplay: the new visuals are cosmetic overlays only. Nothing here may change hitboxes, speeds, growth, death rules, scoring, or win math.
+- The void's face system: eye tracking, blinking, and chomp stay exactly as they are. We are dressing the body, not replacing the character.
+- The map, textures, lots, spawners, clay pools.
+
+## STAGE 0: The camera, final attempt (different architecture, with a stop-loss)
+The last three photo attempts failed the same way: each built a separate photo-world and a separate render path, and that parallel path never inherits the live game's sprite wiring. Do not build a fourth parallel path.
+- New approach: capture the LIVE match. When `?debug=photo` is active and a match is running (or one tap on a small camera button in that mode), take ONE frame: temporarily set the camera transform to fit the whole island, render that single frame through the EXACT same draw code the live game uses every frame, write it to an offscreen canvas, restore the camera, offer the save. No fresh WorldManager, no photo-only layer.
+- Verify by taking the photo mid-match and confirming houses and towers are visible in it.
+- STOP-LOSS: if this approach also fails to show structures, remove the photo feature entirely, report that it was removed, and we verify visuals by gameplay screenshots from now on. Do not spend further effort on it.
+
+## STAGE 1: Read and report first (no edits yet)
+1. Where the void body is drawn and where stage/evolution level is read at draw time.
+2. Where the 2D flame effect for late stages is drawn.
+3. Whether cosmetic overlays (the bunny ears, devil tail, similar sticker decorations) are drawn on the void, and where.
+4. The particle or pool system available from the juice work, if present.
+Paste, then proceed.
+
+## STAGE 2: Stage identities (player void, all procedural, pooled, capped)
+Layer these on the existing body. Each stage keeps everything from the stage before and adds:
+- VOIDLING (1): the clean cute body as-is, soft purple rim light, an occasional single sparkle. Innocent.
+- MUNCHER (2): two or three tiny star specks slowly orbiting the body. Body tone a touch deeper.
+- GOBBLER (3): a visible orbit of five or six star specks, occasional purple ember wisps rising off the body, and a slow dark swirl rotating inside the body.
+- DEVOURER (4): two counter-rotating orbit rings, constant gentle embers, a faint dark halo just outside the body like space bending, denser starfield in the mouth, eyes a touch narrower.
+- WORLD ENDER (5): the showpiece. A thin bright accretion ring around the body like a tilted ellipse, a soft radial ground-darkening beneath the void so the world itself seems to dim around it, orbiting spark debris, a constant ember corona where the old sticker fire used to be, and a slow galaxy swirl inside the body.
+- All particles come from pools with hard caps. If frame rate dips under load, thin the particle counts, never the frame rate.
+
+## STAGE 3: Stage-up moment
+- On every evolution: a quick radial shockwave ring, a star burst, and a small body scale pop, about a third of a second, from the existing pools. Growth should feel like an event.
+
+## STAGE 4: Rivals wear the same identity
+- Rival voids get the identical stage system, hue-shifted toward each rival's color. A DEVOURER rival must read as dangerous from across the screen by aura alone, before the threat ring even fires.
+
+## STAGE 5: Kill the stickers
+- Remove the 2D flame sticker effect entirely.
+- Remove the sticker cosmetics from the void body (bunny ears, devil tail, and kin). They fight the new identity. A proper cosmetics system returns later in the shop pass; nothing 2D rides on the void until then.
+- Grep both as unreferenced by any draw call and report the lines.
+
+## STAGE 6: Proof
+1. Camera verdict from Stage 0: photo with buildings, or feature removed. One or the other, stated plainly.
+2. One gameplay screenshot per stage, VOIDLING through WORLD ENDER (force stages through the QA hooks used for the death-rules testing), each described in one line.
+3. The two grep lines from Stage 5.
+4. FPS during WORLD ENDER with rivals on screen, in the usual band, and the particle caps you chose.
+5. Confirm eat-contact radii unchanged (spriteContactFrac untouched) and no console errors.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image when you paste this, standing rule.
+- Play one match to WORLD ENDER. Your void should feel like a different creature at every stage, and the final stage should feel like the end of a world without a single sticker on it.
+- Meet a big rival and check you can read the danger from its aura alone.
+- If the camera survived Stage 0: take the mid-match island photo and send it. If it was retired, a normal gameplay screenshot of WORLD ENDER is the receipt instead.
