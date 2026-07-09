@@ -22,7 +22,7 @@
  */
 
 import { extractComponents } from './spriteExtract';
-import { objectSprites, spriteBounds } from './sprites';
+import { objectSprites, spriteBounds, spriteAspect } from './sprites';
 import type { ObjectKind } from './config';
 
 // Each existing scattered food / street-furniture kind → its clay cutout cell.
@@ -65,9 +65,10 @@ function toSquareFoot(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /** Inject a clay cutout under a draw key — visual bounds only, no contact frac. */
-function injectVisual(key: string, sq: HTMLCanvasElement): void {
+function injectVisual(key: string, sq: HTMLCanvasElement, aspect: number): void {
   (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(key, sq);
   spriteBounds.set(key, { x: 0, y: 0, w: 1, h: 1 });
+  spriteAspect.set(key, aspect);
 }
 
 let _loaded = false;
@@ -88,8 +89,9 @@ export async function loadClayFood(base: string): Promise<void> {
   let n = 0;
   cells.forEach((cvs, i) => {
     if (cvs.width <= 1) return;
+    const aspect = cvs.width / cvs.height;
     const key = `clay_food_${i}`;
-    injectVisual(key, toSquareFoot(cvs));
+    injectVisual(key, toSquareFoot(cvs), aspect);
     clayFoodKeys[i] = key;
     n++;
   });

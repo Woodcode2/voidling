@@ -1,11 +1,12 @@
 import { CONFIG, type ObjectKind } from './config';
 import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject } from './objects'; // wind removed — tuft system deleted in Prompt 14
-import { objectSprites, spriteBounds, spriteContactFrac, fxDecals } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals
+import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
-} from './clayLife'; // Prompt 4: clay people + vehicle art swap draw keys
+  SITTER_CLAY_INDICES,
+} from './clayLife'; // Prompt 4: clay people + vehicle art swap draw keys; Prompt 19: sitter indices
 import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
 import { isOnIsland, isInsideIsland, terrainAtGeom, TERRAIN as GTERRAIN,
@@ -21,7 +22,7 @@ import {
 import { clayZooKeys, ZOO_KINDS } from './clayZoo'; // Prompt 16: clay zoo animal keys
 import { clayAirportKeys, AIRPORT_KINDS } from './clayAirport'; // Prompt 16: clay airport keys
 import { clayMilitaryKeys, MILITARY_KINDS } from './clayMilitary'; // Prompt 16: clay toy army keys
-import { setMatchLots } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards
+import { setMatchLots, setMatchSportsFields } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -77,6 +78,8 @@ export interface WorldObject {
   };
   // Rebuild Prompt 16: optional wander/clamp rectangle for zoo animals etc.
   pen?: { x0: number; y0: number; x1: number; y1: number };
+  // Prompt 19 Stage 2: seated/static clay person — never wanders or flees.
+  sitter?: boolean;
 }
 
 export interface PlayerStats {
@@ -376,6 +379,16 @@ export class WorldManager {
       ...opts,
     };
     this.objects.push(o);
+    // Prompt 19 Stage 2: seated clay people are permanently static (no wander/flee).
+    // Clay key assignment is id % sheet-size; SITTER_CLAY_INDICES tags which cells are seated.
+    if (CLAY_PERSON_KINDS.includes(kind) && !o.sitter) {
+      const clayIdx = o.id % (clayPeopleKeys.length || 12);
+      if (SITTER_CLAY_INDICES.has(clayIdx)) {
+        o.sitter = true;
+        o.living = false; // prevents wander/flee AI path
+        o.tether = 0;     // never pulled from home
+      }
+    }
     // Prompt 5: scenery is bonus food — never part of the % devoured denominator.
     if (!o.scenery) this.totalStartArea += Math.PI * o.baseSize * o.baseSize;
     return o;
@@ -904,6 +917,8 @@ export class WorldManager {
       const rb = resBlocks[Math.floor(rand() * resBlocks.length)];
       this.fieldDecals.push({ kind: 'field_tennis', cx: cx(rb), cy: rb.y0 + CONFIG.BLOCK_SIZE * 0.7, halfW: 130, halfH: 70 });
     }
+    // Prompt 19 Stage 6: pass field positions to drawMap so lines are baked into ground cache.
+    setMatchSportsFields(this.fieldDecals);
   }
 
   // Life Pack §3: place vignette scenes across the map (7-10 per match)
@@ -2657,17 +2672,9 @@ export class WorldManager {
     drawDriftObjects(ctx);
     drawIsland(ctx, t, camZoom); // Phase 4: vector ground (clock + zoom for waterfall anim + cache)
 
-    // Life Pack §2: sports field ground decals (above island, below all props)
-    for (const fd of this.fieldDecals) {
-      const sprite = (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).get(fd.kind);
-      if (!sprite) continue;
-      const imgW = sprite instanceof HTMLImageElement ? sprite.naturalWidth : sprite.width;
-      const imgH = sprite instanceof HTMLImageElement ? sprite.naturalHeight : sprite.height;
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      ctx.drawImage(sprite, 0, 0, imgW, imgH, fd.cx - fd.halfW, fd.cy - fd.halfH, fd.halfW * 2, fd.halfH * 2);
-      ctx.restore();
-    }
+    // Life Pack §2 + Prompt 19 Stage 6: sports field lines are baked into the
+    // static ground cache by drawMap._paintStaticGround via setMatchSportsFields.
+    // The old sprite-sticker draw path is retired — no field_soccer image required.
 
     // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
     const scarImg = fxDecals.get('scar');
@@ -2908,6 +2915,12 @@ export class WorldManager {
         }
         ctx.restore();
       }
+      // Prompt 19 Stage 1/3: resolve sprite key early so the vehicle-wobble-skip
+      // check can reference it before ctx.translate/rotate are called.
+      const spriteKey: string | null = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
+      // v11: PNG sprite replaces procedural drawing when present
+      const r = obj.size;
+
       ctx.save();
       // Feel Patch §1: prop-shake offset — object wiggles horizontally while shakeT > 0
       const shk = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
@@ -2917,7 +2930,7 @@ export class WorldManager {
       const pedBob = isPed && !obj.captured
         ? (obj.fleeing
           ? Math.sin(t / 72 + obj.wobble) * 2.8   // rapid shake when panicking
-          : Math.sin(t / 380 + obj.wobble) * 1.6)  // gentle bob while walking
+          : Math.sin(t / 380 + obj.wobble) * 0.8)  // Prompt 19 Stage 3: halved walk bob (1.6→0.8)
         : 0;
       ctx.translate(obj.x + shk, obj.y + pedBob);
       if (obj.captured) {
@@ -2925,18 +2938,21 @@ export class WorldManager {
       } else if (obj.living) {
         // Prompt 7 Stage 1: idle tilt + vacuum wobble are body-language reserved for
         // things MEANT to move — people, animals, and vehicles are all LIVING_KINDS.
-        // Buildings, houses, and scenery (living === false) must hold perfectly still;
-        // their only motion is the swallow animation while captured (handled above).
-        // Root cause of the "drift": obj.wobble is advanced every frame (see the
-        // per-frame `obj.wobble += dt * 0.004` in update), so Math.sin(obj.wobble)
-        // was a continuous ±2.3° oscillation applied to static structures too.
-        const tilt = obj.fleeing ? Math.sin(obj.wobble * 3) * 0.16 : Math.sin(obj.wobble) * 0.04;
-        // Alive Pack §11: vacuum wobble — dragged objects wobble in the pull direction
-        const spd = Math.hypot(obj.vx, obj.vy);
-        const vacWobble = (spd > 12)
-          ? Math.sin(t / 78 + obj.wobble) * 0.14 * Math.min(1, spd / 80)
-          : 0;
-        ctx.rotate(tilt + vacWobble);
+        // Buildings, houses, and scenery (living === false) must hold perfectly still.
+        // Prompt 19 Stage 3: vehicles never tilt — only people/animals get body-language.
+        const isVehicleSprite = spriteKey &&
+          (spriteKey.startsWith('clay_vehicle') ||
+           spriteKey.startsWith('clay_airport') ||
+           spriteKey.startsWith('clay_military'));
+        if (!isVehicleSprite) {
+          const tilt = obj.fleeing ? Math.sin(obj.wobble * 3) * 0.16 : Math.sin(obj.wobble) * 0.04;
+          // Alive Pack §11: vacuum wobble — dragged objects wobble in the pull direction
+          const spd = Math.hypot(obj.vx, obj.vy);
+          const vacWobble = (spd > 12)
+            ? Math.sin(t / 78 + obj.wobble) * 0.14 * Math.min(1, spd / 80)
+            : 0;
+          ctx.rotate(tilt + vacWobble);
+        }
       }
       if (obj.arrive > 0) {
         // v8 §2: 200ms scale-up bounce (easeOutBack overshoot) on arrival
@@ -2945,23 +2961,22 @@ export class WorldManager {
         const s = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
         ctx.scale(s, s);
       }
-      // v11: PNG sprite replaces procedural drawing when present
-      const r = obj.size;
-      // Prompt 3: clay-art variety pools (houses + skyscraper towers), with
-      // legacy house_a/house_b/procedural fallback baked into the resolver.
-      const spriteKey: string | null = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
+
       const objSprite = spriteKey ? objectSprites.get(spriteKey) : undefined;
 
       if (objSprite) {
         // Drop shadow only for grounded objects — captured objects have the v10 §3
         // planted shadow at obj.shadowX/Y; drawing one here would rotate with the tumble.
         if (!obj.captured) {
-          // Prompt 13 §4: ONE soft shadow ellipse — slightly narrower than the
-          // sprite base, centered directly under the foot with minimal downward offset.
+          // Prompt 19 Stage 4: shadow width scaled by sprite aspect ratio so
+          // a wide car casts a wide shadow and a thin gnome casts a narrow one.
+          const shadowAsr = spriteAspect.get(spriteKey!) ?? 1;
+          const shadowW = r * 0.85 * Math.min(shadowAsr * 1.1, 1.7);
+          const shadowAlpha = Math.max(0.13, 0.26 - r * 0.0008);
           ctx.save();
-          ctx.fillStyle = 'rgba(0,0,0,0.26)';
+          ctx.fillStyle = `rgba(0,0,0,${shadowAlpha.toFixed(3)})`;
           ctx.beginPath();
-          ctx.ellipse(0, 5, r * 0.82, r * 0.24, 0, 0, Math.PI * 2);
+          ctx.ellipse(0, 5, shadowW, r * 0.22, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         }
@@ -2993,12 +3008,19 @@ export class WorldManager {
             ? Math.atan2(dy, dx) + Math.PI / 2 : 0;
           ctx.save();
           ctx.rotate(rot);
-          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
+          // Prompt 19 Stage 1: aspect-ratio-correct vehicle draw (wide cars don't squash)
+          const vasr = spriteAspect.get(spriteKey!) ?? 1;
+          const vdH = r * 2, vdW = vdH * vasr;
+          ctx.drawImage(objSprite, sx, sy, sw, sh, -(vdW / 2), -(vdH / 2), vdW, vdH);
           ctx.restore();
         } else {
           // Prompt 7 Stage 1: trees & bushes are scenery — the ±1.5° idle wind sway
           // was removed so they draw perfectly still like every other structure.
-          ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r * 2, r * 2, r * 2);
+          // Prompt 19 Stage 1: aspect-ratio-correct foot-anchored draw
+          // dH = 2r (height unchanged), dW = 2r * aspect (width preserves ratio)
+          const fasr = spriteAspect.get(spriteKey!) ?? 1;
+          const fdH = r * 2, fdW = fdH * fasr;
+          ctx.drawImage(objSprite, sx, sy, sw, sh, -(fdW / 2), -fdH, fdW, fdH);
         }
       } else {
         drawParkObject(ctx, obj.kind, obj.size, { t, fleeing: obj.fleeing, variant: obj.variant });

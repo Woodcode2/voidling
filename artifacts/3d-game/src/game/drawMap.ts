@@ -79,7 +79,9 @@ export function exportGroundBuffer(): HTMLCanvasElement | null { return _groundB
 // reasonable repeat frequency without PatternTransform (iOS compat).
 // Larger tiles = less busy grain at full opacity (Stage 13 §2).
 const _TEX_TILE_W: Record<string, number> = {
-  grass: 420, sand: 520, forest: 360, water: 480, street: 260, sidewalk: 180,
+  // Prompt 19 Stage 5: water tile narrowed from 480→200 so texture is
+  // visible at the zoom levels used by the narrowed river (RIVER_HALF_W=62).
+  grass: 420, sand: 520, forest: 360, water: 200, street: 260, sidewalk: 180,
 };
 const _texTiles = new Map<string, HTMLCanvasElement>();
 let _texLoadStarted = false; // idempotency guard — tiles are app-lifetime singletons
@@ -114,6 +116,19 @@ let _groundLots: GroundLot[] = [];
 export function setMatchLots(lots: ReadonlyArray<{ x: number; y: number; fpR: number }>): void {
   _groundLots = lots.map((l) => ({ x: l.x, y: l.y, fpR: l.fpR }));
   _groundBuf  = null;
+}
+
+// ─── Per-match sports field data (Prompt 19 Stage 6: baked field lines) ──────
+interface GroundField { kind: string; cx: number; cy: number; halfW: number; halfH: number; }
+let _matchSportsFields: GroundField[] = [];
+
+/** Pass sports field decal positions so the next cache build paints field lines.
+ *  Call right after initSportsFields() completes. */
+export function setMatchSportsFields(
+  fields: ReadonlyArray<{ kind: string; cx: number; cy: number; halfW: number; halfH: number }>,
+): void {
+  _matchSportsFields = fields.map((f) => ({ ...f }));
+  _groundBuf = null;
 }
 
 function _ensureGroundBuffer(): HTMLCanvasElement {
@@ -210,14 +225,63 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   tracIslandPath(cc);
   cc.clip();
 
-  // Pond (source)
-  const pgrd = cc.createRadialGradient(POND_CX, POND_CY, POND_R * 0.3, POND_CX, POND_CY, POND_R);
-  pgrd.addColorStop(0, COL.riverDeep);
-  pgrd.addColorStop(1, COL.riverMid);
-  cc.fillStyle = pgrd;
+  // Pond (source) — Prompt 19 Stage 5: soft bank ring + water texture + lily pads
+  // Blurred bank ring (soft depth edge)
+  cc.save();
+  cc.filter = 'blur(14px)';
+  cc.strokeStyle = 'rgba(30,70,100,0.48)';
+  cc.lineWidth = 24;
   cc.beginPath();
   cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.filter = 'none';
+  cc.restore();
+  // Water fill (texture if loaded, gradient fallback)
+  {
+    const wt = _texTiles.get('water');
+    if (wt) {
+      const wp = cc.createPattern(wt, 'repeat');
+      if (wp) {
+        cc.save();
+        cc.beginPath();
+        cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+        cc.clip();
+        cc.fillStyle = wp; cc.globalAlpha = 1.0;
+        cc.fillRect(POND_CX - POND_R, POND_CY - POND_R, POND_R * 2, POND_R * 2);
+        cc.globalAlpha = 1;
+        cc.restore();
+      }
+    } else {
+      const pgrd = cc.createRadialGradient(POND_CX, POND_CY, POND_R * 0.3, POND_CX, POND_CY, POND_R);
+      pgrd.addColorStop(0, COL.riverDeep);
+      pgrd.addColorStop(1, COL.riverMid);
+      cc.fillStyle = pgrd;
+      cc.beginPath();
+      cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+      cc.fill();
+    }
+  }
+  // Depth overlay (darker core)
+  cc.fillStyle = 'rgba(25,85,130,0.20)';
+  cc.beginPath();
+  cc.ellipse(POND_CX, POND_CY, POND_R * 0.52, POND_R * 0.85 * 0.52, 0, 0, Math.PI * 2);
   cc.fill();
+  // Shore highlight
+  cc.strokeStyle = 'rgba(255,255,255,0.24)'; cc.lineWidth = 9;
+  cc.beginPath();
+  cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+  cc.stroke();
+  // Three lily pads (procedural circles with a notch gap)
+  for (const [ddx, ddy] of [[-0.28, -0.22], [0.35, 0.14], [0.10, -0.40]]) {
+    const lx = POND_CX + ddx * POND_R, ly = POND_CY + ddy * POND_R * 0.85;
+    const lr = POND_R * 0.13;
+    cc.fillStyle = '#4D7B40';
+    cc.beginPath(); cc.arc(lx, ly, lr, 0, Math.PI * 2); cc.fill();
+    cc.fillStyle = '#3a7ab8'; // fixed pond-water notch colour (not a palette token that may shift)
+    cc.beginPath(); cc.moveTo(lx, ly); cc.arc(lx, ly, lr * 0.72, -0.24, 0.24); cc.closePath(); cc.fill();
+    cc.strokeStyle = 'rgba(255,255,255,0.22)'; cc.lineWidth = 1.5;
+    cc.beginPath(); cc.arc(lx, ly, lr, 0, Math.PI * 2); cc.stroke();
+  }
 
   // Stage 13 §3: River channel — bank edges first (darker halo), then
   // tex_water at FULL opacity, then a depth overlay.
@@ -487,6 +551,71 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _paintMilitaryPad(cc);
   _paintZooLayout(cc);
   cc.restore();
+
+  // ─ 9. Sports field lines — painted markings baked into cache (Prompt 19 §6) ─
+  if (_matchSportsFields.length > 0) {
+    cc.save();
+    tracIslandPath(cc); cc.clip();
+    for (const fd of _matchSportsFields) {
+      cc.save();
+      cc.translate(fd.cx, fd.cy);
+      if (fd.kind === 'field_soccer')      _paintSoccerField(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_basketball') _paintBasketballCourt(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_tennis')     _paintTennisCourt(cc, fd.halfW, fd.halfH);
+      cc.restore();
+    }
+    cc.restore();
+  }
+}
+
+// ─── Prompt 19 §6: sports field marking painters ─────────────────────────────
+
+/** Soccer field: white-on-grass markings, centred at (0,0). */
+function _paintSoccerField(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(60,140,50,0.38)';
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(255,255,255,0.76)';
+  cc.lineWidth = 4; cc.setLineDash([]);
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  cc.beginPath(); cc.moveTo(0, -hh); cc.lineTo(0, hh); cc.stroke(); // centre line
+  cc.beginPath(); cc.arc(0, 0, hh * 0.32, 0, Math.PI * 2); cc.stroke(); // centre circle
+  const pb = hw * 0.30, ph = hh * 0.55;
+  cc.strokeRect(-hw, -ph, pb, ph * 2);             // left penalty box
+  cc.strokeRect(hw - pb, -ph, pb, ph * 2);          // right penalty box
+  cc.strokeStyle = 'rgba(255,255,255,0.50)';
+  const gw = 10, gh = hh * 0.28;
+  cc.strokeRect(-hw - gw, -gh, gw, gh * 2);         // left goal
+  cc.strokeRect(hw, -gh, gw, gh * 2);               // right goal
+}
+
+/** Basketball court: orange-ish surface with white markings. */
+function _paintBasketballCourt(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(185,125,65,0.42)';
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(255,255,255,0.73)';
+  cc.lineWidth = 4; cc.setLineDash([]);
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  cc.beginPath(); cc.moveTo(0, -hh); cc.lineTo(0, hh); cc.stroke();
+  cc.beginPath(); cc.arc(0, 0, hh * 0.28, 0, Math.PI * 2); cc.stroke();
+  const kw = hw * 0.38, kh = hh * 0.55;
+  cc.strokeRect(-hw, -kh / 2, kw, kh);
+  cc.strokeRect(hw - kw, -kh / 2, kw, kh);
+  cc.beginPath(); cc.arc(-hw + kw * 0.4, 0, hh * 0.80, -Math.PI * 0.5, Math.PI * 0.5); cc.stroke();
+  cc.beginPath(); cc.arc( hw - kw * 0.4, 0, hh * 0.80,  Math.PI * 0.5, Math.PI * 1.5); cc.stroke();
+}
+
+/** Tennis court: clay-red surface with white markings. */
+function _paintTennisCourt(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(185,100,50,0.40)';
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(255,255,255,0.73)';
+  cc.lineWidth = 3.5; cc.setLineDash([]);
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  cc.beginPath(); cc.moveTo(-hw, 0); cc.lineTo(hw, 0); cc.stroke(); // net line
+  const sl = hw * 0.80, sd = hh * 0.46;
+  cc.strokeRect(-sl, 0, sl * 2, sd);
+  cc.strokeRect(-sl, -sd, sl * 2, sd);
+  cc.beginPath(); cc.moveTo(0, -sd); cc.lineTo(0, sd); cc.stroke();
 }
 
 // ─── Prompt 6 §2 enrichment helpers (all baked once into the ground buffer) ──
@@ -698,12 +827,11 @@ function _drawWaterShimmer(ctx: CanvasRenderingContext2D, clock: number): void {
   ctx.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // River (Prompt 8): two soft highlight bands scroll downstream toward the
-  // waterfall — the same cheap scrolling-band trick as the waterfall, but each
-  // band follows the river's path and lies across its width to read as flow.
+  // River (Prompt 8 + Prompt 19 Stage 5): softer shimmer bands scroll downstream.
+  // Speed slowed (5200→8500 ms/cycle), alpha halved (0.22→0.11, 0.09→0.045).
   ctx.globalCompositeOperation = 'lighter';
   for (let b = 0; b < 2; b++) {
-    const t = ((clock / 5200) + b * 0.5) % 1;
+    const t = ((clock / 8500) + b * 0.5) % 1;
     const p = _riverPointAt(t);
     // Fade in at the source and out as the band meets the waterfall.
     const edgeFade = Math.min(1, Math.min(t, 1 - t) / 0.12);
@@ -711,8 +839,8 @@ function _drawWaterShimmer(ctx: CanvasRenderingContext2D, clock: number): void {
     ctx.translate(p.x, p.y);
     ctx.rotate(p.a);
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, RIVER_HALF_W * 1.05);
-    g.addColorStop(0,   `rgba(232,249,255,${(0.22 * edgeFade).toFixed(3)})`);
-    g.addColorStop(0.6, `rgba(190,232,244,${(0.09 * edgeFade).toFixed(3)})`);
+    g.addColorStop(0,   `rgba(232,249,255,${(0.11 * edgeFade).toFixed(3)})`);
+    g.addColorStop(0.6, `rgba(190,232,244,${(0.045 * edgeFade).toFixed(3)})`);
     g.addColorStop(1,   'rgba(190,232,244,0)');
     ctx.fillStyle = g;
     ctx.beginPath();

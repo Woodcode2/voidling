@@ -15,7 +15,7 @@
  */
 
 import { extractComponents } from './spriteExtract';
-import { objectSprites, spriteBounds } from './sprites';
+import { objectSprites, spriteBounds, spriteAspect } from './sprites';
 import type { ObjectKind } from './config';
 
 // Row-major layout (4 cols × 3 rows = 12 cells) matching the sheet art.
@@ -48,9 +48,10 @@ function toSquareFoot(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /** Inject a clay cutout under a draw key — visual bounds only, no contact frac. */
-function injectVisual(key: string, sq: HTMLCanvasElement): void {
+function injectVisual(key: string, sq: HTMLCanvasElement, aspect: number): void {
   (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(key, sq);
   spriteBounds.set(key, { x: 0, y: 0, w: 1, h: 1 });
+  spriteAspect.set(key, aspect);
 }
 
 let _loaded = false;
@@ -71,8 +72,9 @@ export async function loadClayZoo(base: string): Promise<void> {
   let n = 0;
   cells.forEach((cvs, i) => {
     if (cvs.width <= 1) return;
+    const aspect = cvs.width / cvs.height;
     const key = `clay_zoo_${i}`;
-    injectVisual(key, toSquareFoot(cvs));
+    injectVisual(key, toSquareFoot(cvs), aspect);
     clayZooKeys[i] = key;
     n++;
   });
