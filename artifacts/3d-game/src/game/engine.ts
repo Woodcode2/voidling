@@ -21,6 +21,7 @@ import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furni
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
 import { loadClayMilitary } from './clayMilitary'; // Prompt 16: clay toy army
+import { drawLineup, lineupScroll } from './lineupDebug'; // Prompt 19 Stage 0: ?debug=lineup
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
 
@@ -198,6 +199,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const debugTerrain  = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'terrain';
   const debugSprites  = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'sprites';
   const debugFps      = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'fps';
+  // Prompt 19 Stage 0: ?debug=lineup — scrollable sprite-calibration overlay
+  const debugLineup   = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'lineup';
   // v16 §5: news ticker + contracts
   let currentTicker: string | null = null;
   let tickerCd = 0; // ms until next ticker fires
@@ -367,6 +370,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
   window.addEventListener('resize', resize);
   resize();
+  // Prompt 19 Stage 0: wheel scroll for ?debug=lineup
+  if (debugLineup) {
+    window.addEventListener('wheel', (e) => lineupScroll(e.deltaY), { passive: true });
+  }
 
   // v8 §6: everything routes through the callout queue so nothing overlaps/stacks
   function banner(text: string, color = '#FFFFFF', priority = 1, opts: { sparkles?: boolean; pulse?: boolean } = {}) {
@@ -1548,6 +1555,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // ── render ──
   function render(alpha: number, clock: number, frameDt: number) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Prompt 19 Stage 0: lineup debug overlay (replaces game render)
+    if (debugLineup) {
+      drawLineup(ctx, fw, fh);
+      return;
+    }
 
     if (!world || !player || screen === 'home' || screen === 'shop' || screen === 'dailyIntro') {
       ctx.fillStyle = CONFIG.COLORS.uiBg;

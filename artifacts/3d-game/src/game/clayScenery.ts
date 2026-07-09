@@ -18,7 +18,7 @@
  */
 
 import { extractComponents } from './spriteExtract';
-import { objectSprites, spriteBounds } from './sprites';
+import { objectSprites, spriteBounds, spriteAspect } from './sprites';
 
 /** One placeable scenery cutout: its draw key + world-size range + eat tier. */
 export interface SceneryDef {
@@ -140,9 +140,12 @@ function toSquareFoot(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /** Inject a clay cutout under a draw key — visual bounds only, no contact frac. */
-function injectVisual(key: string, sq: HTMLCanvasElement): void {
+function injectVisual(key: string, cvs: HTMLCanvasElement): void {
+  const aspect = cvs.width / cvs.height;
+  const sq = toSquareFoot(cvs);
   (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(key, sq);
   spriteBounds.set(key, { x: 0, y: 0, w: 1, h: 1 });
+  spriteAspect.set(key, aspect);
 }
 
 let _loaded = false;
@@ -164,7 +167,7 @@ export async function loadClayScenery(base: string): Promise<void> {
     const cells = extractComponents(natureImg, 4, 4, 'nature_clay_sheet');
     cells.forEach((cvs, i) => {
       if (cvs.width <= 1 || !NATURE_META[i]) return;
-      injectVisual(`clay_nature_${i}`, toSquareFoot(cvs));
+      injectVisual(`clay_nature_${i}`, cvs);
       natureN++;
     });
   }
@@ -173,7 +176,7 @@ export async function loadClayScenery(base: string): Promise<void> {
     const cells = extractComponents(parkImg, 4, 4, 'park_clay_sheet');
     cells.forEach((cvs, i) => {
       if (cvs.width <= 1 || !PARK_META[i]) return;
-      injectVisual(`clay_park_${i}`, toSquareFoot(cvs));
+      injectVisual(`clay_park_${i}`, cvs);
       parkN++;
     });
   }
@@ -182,7 +185,7 @@ export async function loadClayScenery(base: string): Promise<void> {
     const cells = extractComponents(beachImg, 3, 4, 'beach_clay_sheet');
     cells.forEach((cvs, i) => {
       if (cvs.width <= 1 || !BEACH_META[i]) return;
-      injectVisual(`clay_beach_${i}`, toSquareFoot(cvs));
+      injectVisual(`clay_beach_${i}`, cvs);
       beachN++;
     });
   }

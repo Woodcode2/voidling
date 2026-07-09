@@ -32,6 +32,13 @@ export const spriteContactFrac: Map<string, number> = new Map();
 export interface SpriteOrb { w: number; cy: number; }
 export const spriteOrb: Map<string, SpriteOrb> = new Map();
 
+// Prompt 19 Stage 1: tight-content aspect ratio (width/height of the extracted
+// cutout BEFORE square-padding). Used in drawOne to render each sprite at its
+// correct aspect ratio instead of always squashing into a 2r×2r square.
+// A person (tall/thin) gets aspect < 1; a car (wide/short) gets aspect > 1.
+// Absent = 1 (square fallback).
+export const spriteAspect: Map<string, number> = new Map();
+
 function scanAlphaBounds(img: HTMLImageElement, key: string): void {
   try {
     const canvas = document.createElement('canvas');

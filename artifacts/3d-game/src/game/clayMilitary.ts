@@ -15,7 +15,7 @@
  */
 
 import { extractComponents } from './spriteExtract';
-import { objectSprites, spriteBounds } from './sprites';
+import { objectSprites, spriteBounds, spriteAspect } from './sprites';
 import type { ObjectKind } from './config';
 
 // Row-major layout (3 cols × 2 rows = 6 cells) matching the sheet art.
@@ -63,9 +63,10 @@ function toSquareCenter(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /** Inject a clay cutout under a draw key — visual bounds only, no contact frac. */
-function injectVisual(key: string, sq: HTMLCanvasElement): void {
+function injectVisual(key: string, sq: HTMLCanvasElement, aspect: number): void {
   (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(key, sq);
   spriteBounds.set(key, { x: 0, y: 0, w: 1, h: 1 });
+  spriteAspect.set(key, aspect);
 }
 
 let _loaded = false;
@@ -86,8 +87,9 @@ export async function loadClayMilitary(base: string): Promise<void> {
   let n = 0;
   cells.forEach((cvs, i) => {
     if (cvs.width <= 1) return;
+    const aspect = cvs.width / cvs.height;
     const key = `clay_military_${i}`;
-    injectVisual(key, VEHICLE_INDICES.has(i) ? toSquareCenter(cvs) : toSquareFoot(cvs));
+    injectVisual(key, VEHICLE_INDICES.has(i) ? toSquareCenter(cvs) : toSquareFoot(cvs), aspect);
     clayMilitaryKeys[i] = key;
     n++;
   });

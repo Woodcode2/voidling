@@ -20,8 +20,16 @@
  */
 
 import { extractComponents } from './spriteExtract';
-import { objectSprites, spriteBounds } from './sprites';
+import { objectSprites, spriteBounds, spriteAspect } from './sprites';
 import type { ObjectKind } from './config';
+
+// Prompt 19 Stage 2: hand-tagged sitter indices in the 4×3 people sheet.
+// Indices 8 and 11 (row 2 of 4) correspond to cross-legged / seated figures.
+// SITTERS never enter the walk/wander pool — they spawn only as static seated life.
+export const SITTER_CLAY_INDICES = new Set<number>([8, 11]);
+
+// Keys that resolve to sitter poses (populated after sheet loads).
+export const sitterClayKeys: string[] = [];
 
 // Ambient pedestrian kinds remapped onto the clay-person pool (variety by id).
 // Vignette anchors (multi-figure scene art) and special NPCs are intentionally
@@ -73,10 +81,12 @@ function toSquareCenter(src: HTMLCanvasElement): HTMLCanvasElement {
   return c;
 }
 
-/** Inject a clay cutout under a draw key — visual bounds only, no contact frac. */
-function injectVisual(key: string, sq: HTMLCanvasElement): void {
+/** Inject a clay cutout under a draw key — visual bounds only, no contact frac.
+ *  aspect = tight pixel width / tight pixel height (before square-padding). */
+function injectVisual(key: string, sq: HTMLCanvasElement, aspect: number): void {
   (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(key, sq);
   spriteBounds.set(key, { x: 0, y: 0, w: 1, h: 1 });
+  spriteAspect.set(key, aspect);
 }
 
 let _loaded = false;
@@ -96,9 +106,11 @@ export async function loadClayLife(base: string): Promise<void> {
     const cells = extractComponents(peopleImg, 4, 3, 'people_clay_sheet');
     cells.forEach((cvs, i) => {
       if (cvs.width <= 1) return;
+      const aspect = cvs.width / cvs.height;
       const key = `clay_person_${i}`;
-      injectVisual(key, toSquareFoot(cvs));
+      injectVisual(key, toSquareFoot(cvs), aspect);
       clayPeopleKeys.push(key);
+      if (SITTER_CLAY_INDICES.has(i)) sitterClayKeys.push(key);
     });
   }
 
@@ -107,8 +119,9 @@ export async function loadClayLife(base: string): Promise<void> {
     const cells = extractComponents(vehiclesImg, 5, 3, 'vehicles_clay_sheet');
     cells.forEach((cvs, i) => {
       if (cvs.width <= 1) return;
+      const aspect = cvs.width / cvs.height;
       const key = `clay_vehicle_${i}`;
-      injectVisual(key, toSquareCenter(cvs));
+      injectVisual(key, toSquareCenter(cvs), aspect);
       clayVehicleKeys.push(key);
     });
   }

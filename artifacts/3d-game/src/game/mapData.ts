@@ -79,7 +79,7 @@ export const LAGOON_RX = BLOCK * 0.52;            // ~832
 export const LAGOON_RY = BLOCK * 0.38;            // ~608
 
 // ─── River path (world space polyline) ───────────────────────────────────────
-export const RIVER_HALF_W = 90; // half-width of river channel
+export const RIVER_HALF_W = 62; // half-width of river channel (Prompt 19 Stage 5: narrowed ~1/3)
 
 // Pond source in the park (gx=4, gy=2)  [Prompt 15: park moved to east side]
 export const POND_CX = bx0(4) + BLOCK * 0.50; // ~8700 — park-block center-x

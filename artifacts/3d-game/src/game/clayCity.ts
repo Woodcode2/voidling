@@ -21,7 +21,7 @@
  */
 
 import { extractComponents } from './spriteExtract';
-import { objectSprites, spriteBounds } from './sprites';
+import { objectSprites, spriteBounds, spriteAspect } from './sprites';
 
 // Exported pools read by world.ts draw resolution (empty → legacy fallback).
 export const claySkyscraperKeys: string[] = [];
@@ -55,9 +55,11 @@ function toSquareFootAnchored(src: HTMLCanvasElement): HTMLCanvasElement {
 
 /** Inject a clay cutout under a draw key — visual bounds only, no contact frac. */
 function injectVisual(key: string, cutout: HTMLCanvasElement): void {
+  const aspect = cutout.width / cutout.height;
   const sq = toSquareFootAnchored(cutout);
   (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).set(key, sq);
   spriteBounds.set(key, { x: 0, y: 0, w: 1, h: 1 });
+  spriteAspect.set(key, aspect);
 }
 
 let _loaded = false;
