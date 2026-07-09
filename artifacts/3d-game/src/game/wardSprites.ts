@@ -9,7 +9,6 @@
  *   people_sheet.png      3 cols × 3 rows  (9 person kinds — War Pack)
  *   vehicles_sheet.png    3 cols × 2 rows  (6 vehicle kinds — War Pack)
  *   beachpark_sheet.png   3 cols × 3 rows  (5 beach/park props — War Pack)
- *   military_sheet.png    2 cols × 2 rows  (4 military units — Life Pack)
  *   people2_sheet.png     3 cols × 3 rows  (9 detailed pedestrians — Life Pack)
  *   vignettes_sheet.png   3 cols × 3 rows  (9 vignette anchors — Life Pack)
  *   playground_sheet.png  3 cols × 3 rows  (9 playground props — Life Pack)
@@ -157,12 +156,11 @@ export async function loadWardAssets(base: string): Promise<void> {
 
   const [
     peopleImg, vehiclesImg, beachparkImg,
-    militaryImg, people2Img, vignetteImg, playgroundImg, fieldsImg,
+    people2Img, vignetteImg, playgroundImg, fieldsImg,
   ] = await Promise.all([
     loadImg(`${b}assets/people_sheet.png`),
     loadImg(`${b}assets/vehicles_sheet.png`),
     loadImg(`${b}assets/beachpark_sheet.png`),
-    loadImg(`${b}assets/military_sheet.png`),
     loadImg(`${b}assets/people2_sheet.png`),
     loadImg(`${b}assets/vignettes_sheet.png`),
     loadImg(`${b}assets/playground_sheet.png`),
@@ -183,8 +181,7 @@ export async function loadWardAssets(base: string): Promise<void> {
   if (vehiclesImg)  inject(VEHICLE_KINDS,   extractComponents(vehiclesImg,  3, 2, 'vehicles_sheet'));
   if (beachparkImg) inject(BEACHPARK_KINDS, extractComponents(beachparkImg, 3, 3, 'beachpark_sheet'));
 
-  // Life Pack sheets
-  if (militaryImg)    inject(MILITARY_KINDS,   extractComponents(militaryImg,    2, 2, 'military_sheet'));
+  // Life Pack sheets (military art is now handled by Rebuild Prompt 16 clayMilitary.ts)
   if (people2Img)     inject(PEOPLE2_KINDS,    extractComponents(people2Img,     3, 3, 'people2_sheet'));
   if (vignetteImg)    inject(VIGNETTE_KINDS,   extractComponents(vignetteImg,    3, 3, 'vignettes_sheet'));
   if (playgroundImg)  inject(PLAYGROUND_KINDS, extractComponents(playgroundImg,  3, 3, 'playground_sheet'));
@@ -194,7 +191,6 @@ export async function loadWardAssets(base: string): Promise<void> {
     peopleImg    ? '9 people'         : 'people MISSING',
     vehiclesImg  ? '6 vehicles'       : 'vehicles MISSING',
     beachparkImg ? 'beach/park'       : 'beachpark MISSING',
-    militaryImg  ? '4 military'       : 'military MISSING',
     people2Img   ? '9 people2'        : 'people2 MISSING',
     vignetteImg  ? '9 vignettes'      : 'vignettes MISSING',
     playgroundImg? '9 playground'     : 'playground MISSING',

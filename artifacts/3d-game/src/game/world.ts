@@ -18,6 +18,9 @@ import {
 import {
   clayFoodKeys, clayAppleVarietyKeys, CLAY_FOOD_CELL,
 } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
+import { clayZooKeys, ZOO_KINDS } from './clayZoo'; // Prompt 16: clay zoo animal keys
+import { clayAirportKeys, AIRPORT_KINDS } from './clayAirport'; // Prompt 16: clay airport keys
+import { clayMilitaryKeys, MILITARY_KINDS } from './clayMilitary'; // Prompt 16: clay toy army keys
 import { setMatchLots } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards
 import type { FXManager } from './fx';
 import type { Player } from './player';
@@ -72,6 +75,8 @@ export interface WorldObject {
     ambientCd: number;   // ms until next ambient bubble may fire
     panicked: boolean;   // true once panic bubble has fired (don't repeat)
   };
+  // Rebuild Prompt 16: optional wander/clamp rectangle for zoo animals etc.
+  pen?: { x0: number; y0: number; x1: number; y1: number };
 }
 
 export interface PlayerStats {
@@ -269,6 +274,9 @@ const LIVING_KINDS: ObjectKind[] = [
   'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
   // Life Pack §4: military (defense system)
   'tank', 'attack_heli', 'armored_humvee', 'missile_truck',
+  // Rebuild Prompt 16: zoo animals + toy army additions
+  'bear', 'zebra', 'tortoise', 'hippo', 'panda', 'seal', 'lion', 'elephant', 'giraffe',
+  'radar_van',
 ];
 
 // Prompt 4: O(1) membership for clay-art draw-key remapping (see clayLife.ts).
@@ -278,7 +286,7 @@ const CLAY_VEHICLE_KIND_SET = new Set<ObjectKind>(CLAY_VEHICLE_KINDS);
 export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
-  private houseLots: StructureLot[] = [];   // Dense City: suburb house footprints
+  houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
   // heavy eating never allocates per frame; a full pool skips the ghost.
@@ -445,10 +453,11 @@ export class WorldManager {
       else if (b.type === 'mixed') this.fillMixed(b, rand);
       else if (b.type === 'beach') this.fillBeach(b, rand);
       else if (b.type === 'zoo') this.fillZoo(b, rand);
+      else if (b.type === 'airport') this.fillAirport(b, rand);
+      else if (b.type === 'military') this.fillMilitary(b, rand);
       else if (b.type === 'townhall') this.fillTownHall(b, rand);
       else if (b.type === 'civic') this.fillCivic(b, rand, Math.min(civicIndex++, 1));
       else if (b.type === 'forest') this.fillForest(b, rand);
-      // 'airport' and 'military': ground art only (painted in drawMap.ts), no entity spawn
     }
 
     // Map Rebuild §1: guarantee a few T1 edibles near player spawn, but keep the
@@ -607,6 +616,16 @@ export class WorldManager {
       console.log(`SCENERY OFF-ISLAND: ${offIsland}`);
       console.log(`SCENERY ON ROADS: ${onRoads}`);
       console.log(`SCENERY ON BUILDINGS: ${onBuildings}`);
+    }
+
+    // Rebuild Prompt 16: ZOO OFF-BLOCK audit — all zoo animals must be inside the
+    // painted zoo zone. Any non-zero count means pen bounds are leaking.
+    {
+      const [zx0, zy0, zx1, zy1] = ZONE_ZOO_R;
+      const zooOff = this.objects.filter(
+        (o) => ZOO_KINDS.includes(o.kind) && (o.x < zx0 || o.x > zx1 || o.y < zy0 || o.y > zy1),
+      ).length;
+      console.log(`ZOO OFF-BLOCK: ${zooOff}`);
     }
 
     // v6 §2: remember the starting count so respawn can top back up to 85%
@@ -1231,11 +1250,131 @@ export class WorldManager {
     this.scatter(b, rand, 'mailbox', 2);
   }
 
-  // Map Rebuild: ZOO block is reserved — animals, walls, and gate are added in a
-  // future update. Ground paths and enclosure outlines are baked into drawMap.ts.
-  private fillZoo(b: Block, _rand: () => number) {
+  // Rebuild Prompt 16: the zoo lives — penned animals, flamingo pond, path wanderers.
+  private fillZoo(b: Block, rand: () => number) {
     (b as any).zoo = true;
-    // Reserved — inhabitants come next prompt.
+    const [zx0, zy0, zx1, zy1] = ZONE_ZOO_R;
+    const bx = (zx0 + zx1) / 2;
+    const by = (zy0 + zy1) / 2;
+    const bw = zx1 - zx0;
+    const bh = zy1 - zy0;
+    const ins = 100;
+    const penW = Math.floor((bw - ins * 2 - 80) / 3);
+    const ph = bh / 2 - ins - 20;
+
+    // 3 top-half pens, 2-3 mixed-species animals each, wandering inside their pen.
+    const PEN_ANIMALS: ObjectKind[] = ['lion', 'elephant', 'giraffe', 'bear', 'zebra', 'hippo', 'panda', 'monkey', 'tortoise', 'penguin', 'flamingo', 'seal'];
+    for (let col = 0; col < 3; col++) {
+      const px = zx0 + ins + col * (penW + 40);
+      const py = zy0 + ins;
+      const pen: WorldObject['pen'] = { x0: px, y0: py, x1: px + penW, y1: py + ph };
+      const count = 2 + Math.floor(rand() * 2); // 2–3 animals per pen
+      for (let i = 0; i < count; i++) {
+        const cx = pen.x0 + 20 + rand() * (pen.x1 - pen.x0 - 40);
+        const cy = pen.y0 + 20 + rand() * (pen.y1 - pen.y0 - 40);
+        if (!isOnIsland(cx, cy)) continue;
+        const kind = pick(PEN_ANIMALS, rand);
+        const o = this.makeObj(kind, cx, cy);
+        o.homeX = (pen.x0 + pen.x1) / 2;
+        o.homeY = (pen.y0 + pen.y1) / 2;
+        o.tether = Math.min(penW, ph) * 0.45;
+        o.pen = pen;
+      }
+    }
+
+    // Flamingo pond (bottom-left) — flamingos + seal.
+    const pondX = zx0 + ins + 220;
+    const pondY = by + 140;
+    for (let i = 0; i < 4; i++) {
+      const a = rand() * Math.PI * 2;
+      const rr = rand() * 90;
+      const cx = pondX + Math.cos(a) * rr;
+      const cy = pondY + Math.sin(a) * rr * 0.68;
+      if (!isOnIsland(cx, cy)) continue;
+      const kind = i < 2 ? 'flamingo' : 'seal';
+      const o = this.makeObj(kind, cx, cy);
+      o.homeX = pondX; o.homeY = pondY;
+      o.tether = 90 + rand() * 40;
+      o.pen = { x0: pondX - 120, y0: pondY - 80, x1: pondX + 120, y1: pondY + 80 };
+    }
+
+    // Path wanderers: tortoise and monkey wander the zoo block (on paths).
+    const pathBounds: WorldObject['pen'] = { x0: zx0 + ins, y0: zy0 + ins, x1: zx1 - ins, y1: zy1 - ins };
+    for (const kind of ['tortoise', 'monkey'] as ObjectKind[]) {
+      for (let i = 0; i < 2; i++) {
+        const cx = pathBounds.x0 + rand() * (pathBounds.x1 - pathBounds.x0);
+        const cy = pathBounds.y0 + rand() * (pathBounds.y1 - pathBounds.y0);
+        if (!isOnIsland(cx, cy)) continue;
+        const o = this.makeObj(kind, cx, cy);
+        o.homeX = cx; o.homeY = cy;
+        o.tether = 160 + rand() * 80;
+        o.pen = pathBounds;
+      }
+    }
+
+  }
+
+  // Rebuild Prompt 16: the airport opens — terminal, control tower, hangar, planes, props.
+  private fillAirport(b: Block, rand: () => number) {
+    (b as any).paved = true;
+    const [zx0, zy0, zx1, zy1] = ZONE_AIRPORT_R;
+    const bx = (zx0 + zx1) / 2;
+    const by = (zy0 + zy1) / 2;
+
+    // Apron is the west-side taxiway: roughly [bx-200, by-130] to [bx-2, by+90].
+    const apronX = bx - 160; // center of apron area
+    const apronY = by - 50;
+    const structures: ObjectKind[] = ['terminal', 'control_tower', 'hangar'];
+    for (let i = 0; i < structures.length; i++) {
+      const cx = apronX + (i - 1) * 110;
+      const cy = apronY + rand() * 40;
+      if (isOnIsland(cx, cy)) this.makeObj(structures[i], cx, cy);
+    }
+
+    // Two planes parked beside the runway (east of apron, on the runway/taxiway edge).
+    for (let i = 0; i < 2; i++) {
+      const cx = bx + 40 + rand() * 40;
+      const cy = by - 220 + i * 440;
+      if (isOnIsland(cx, cy)) {
+        const kind = i === 0 ? 'plane_blue' : 'plane_peach';
+        const o = this.makeObj(kind, cx, cy);
+        o.vx = 0; o.vy = 0; // parked
+      }
+    }
+
+    // Airport props on the apron.
+    const props: ObjectKind[] = ['fuel_truck', 'baggage_cart', 'windsock'];
+    for (const kind of props) {
+      const cx = apronX + (rand() - 0.5) * 180;
+      const cy = apronY + 120 + rand() * 80;
+      if (isOnIsland(cx, cy)) this.makeObj(kind, cx, cy);
+    }
+  }
+
+  // Rebuild Prompt 16: the toy army stages idle units at the military pad.
+  private fillMilitary(b: Block, rand: () => number) {
+    (b as any).paved = true;
+    const [zx0, zy0, zx1, zy1] = ZONE_MILITARY_R;
+    const bx = (zx0 + zx1) / 2;
+    const by = (zy0 + zy1) / 2;
+    const padS = 420;
+    const padX0 = bx - padS / 2;
+    const padY0 = by - padS / 2;
+
+    // Idle staging: one of each clay unit type, kept within the concrete pad.
+    // These are NOT defense-flagged — they are decorative staging only; defense
+    // waves spawn separately and still obey the same timing/counts as before.
+    const units: ObjectKind[] = ['tank', 'attack_heli', 'army_jeep', 'missile_truck', 'radar_van', 'soldier'];
+    for (const kind of units) {
+      let placed = false;
+      for (let t = 0; t < 10 && !placed; t++) {
+        const cx = padX0 + 50 + rand() * (padS - 100);
+        const cy = padY0 + 50 + rand() * (padS - 100);
+        if (!isOnIsland(cx, cy)) continue;
+        this.makeObj(kind, cx, cy);
+        placed = true;
+      }
+    }
   }
 
   // Map Rebuild: FOREST block — noticeably denser than park greenery.  [Prompt 15: counts raised]
@@ -1980,6 +2119,11 @@ export class WorldManager {
   private integrateWander(obj: WorldObject, dtSec: number) {
     obj.x = clamp(obj.x + obj.vx * dtSec, obj.size, this.size - obj.size);
     obj.y = clamp(obj.y + obj.vy * dtSec, obj.size, this.size - obj.size);
+    // Rebuild Prompt 16: hard clamp to an optional pen/bounds rectangle.
+    if (obj.pen) {
+      obj.x = clamp(obj.x, obj.pen.x0 + obj.size, obj.pen.x1 - obj.size);
+      obj.y = clamp(obj.y, obj.pen.y0 + obj.size, obj.pen.y1 - obj.size);
+    }
   }
 
   private stepCar(obj: WorldObject, dtSec: number, player: Player) {
@@ -2213,6 +2357,24 @@ export class WorldManager {
       }
       const cell = CLAY_FOOD_CELL[kind];
       if (cell !== undefined && clayFoodKeys[cell]) return clayFoodKeys[cell];
+    }
+    // Prompt 16: zoo animals render from the clay zoo pool.
+    if (clayZooKeys.length) {
+      const idx = ZOO_KINDS.indexOf(kind);
+      if (idx >= 0 && clayZooKeys[idx]) return clayZooKeys[idx];
+    }
+    // Prompt 16: airport set renders from the clay airport pool.
+    if (clayAirportKeys.length) {
+      const idx = AIRPORT_KINDS.indexOf(kind);
+      if (idx >= 0 && clayAirportKeys[idx]) return clayAirportKeys[idx];
+    }
+    // Prompt 16: toy army (defense units) render from the clay military pool.
+    if (clayMilitaryKeys.length) {
+      const idx = MILITARY_KINDS.indexOf(kind);
+      if (idx >= 0 && clayMilitaryKeys[idx]) return clayMilitaryKeys[idx];
+      // Map the legacy armored_humvee phase-2 spawn onto the radar_van clay cutout
+      // so every defense-wave kind is covered by the new clay army pool.
+      if (kind === 'armored_humvee' && clayMilitaryKeys[4]) return clayMilitaryKeys[4];
     }
     return kind;
   }
@@ -2653,10 +2815,15 @@ export class WorldManager {
 
         if (obj.captured) {
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
-        } else if (spriteKey && spriteKey.startsWith('clay_vehicle')) {
-          // Prompt 14 §4: rotate vehicle to face its direction of travel.
+        } else if (
+          spriteKey &&
+          (spriteKey.startsWith('clay_vehicle') ||
+           spriteKey.startsWith('clay_airport') ||
+           spriteKey.startsWith('clay_military'))
+        ) {
+          // Prompt 14 §4 + Prompt 16: rotate vehicle-style sprites to face direction of travel.
           // Sheet art faces UP (not east), so +π/2 offset is needed.
-          // Pivot is at foot centre (no pre-translate) — car sits flat on the road.
+          // Pivot is at foot centre (no pre-translate) — vehicle sits flat on the ground.
           let dx = 0, dy = 0;
           if (obj.kind === 'car' || obj.kind === 'schoolbus') {
             if (obj.roadAxis === 'h') dx = obj.roadDir; else dy = obj.roadDir;

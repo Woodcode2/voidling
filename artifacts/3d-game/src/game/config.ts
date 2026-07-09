@@ -31,12 +31,19 @@ export type ObjectKind =
   | 'cafe' | 'hospital' | 'house_c' | 'house_d'
   // v16 §6: The Guard
   | 'jeep' | 'soldier'
+  // Rebuild Prompt 16: airport set
+  | 'terminal' | 'control_tower' | 'hangar' | 'plane_blue' | 'plane_peach'
+  | 'baggage_cart' | 'windsock' | 'fuel_truck'
+  // Rebuild Prompt 16: toy army
+  | 'radar_van'
   // v16.1 C: real town hall landmark
   | 'townhall'
   // v16.1 D: zoo animals + structures
   | 'elephant' | 'giraffe' | 'lion'
   | 'monkey' | 'flamingo' | 'penguin'
   | 'zoo_gate' | 'zoo_wall' | 'zookeeper'
+  // Rebuild Prompt 16: additional zoo animals
+  | 'bear' | 'zebra' | 'tortoise' | 'hippo' | 'panda' | 'seal'
   // Feel Patch: debris bit (tier 0, always edible)
   | 'bit'
   // War Pack §1: diverse pedestrians (replace old stick-figure 'person' in spawns)
@@ -55,7 +62,7 @@ export type ObjectKind =
   // Life Pack §3: playground props (from playground_sheet 3×3)
   | 'pg_swing' | 'pg_slide' | 'pg_seesaw' | 'pg_sandbox' | 'pg_soccergoal'
   | 'pg_soccerball' | 'pg_hoop' | 'pg_trampoline' | 'pg_merrygoround'
-  // Life Pack §4: military units (from military_sheet 2×2)
+  // Life Pack §4: military units (now clay toy army from Prompt 16)
   | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
   // Life Pack §2: sports fields (ground decals — not edible world objects)
   | 'field_soccer' | 'field_basketball' | 'field_tennis';
@@ -420,9 +427,26 @@ export const CONFIG = {
     monkey:        { tier: 2, minR: 18, maxR: 24,  scoreMult: 2 },
     flamingo:      { tier: 2, minR: 20, maxR: 26,  scoreMult: 2 },
     penguin:       { tier: 2, minR: 18, maxR: 22,  scoreMult: 2 },
+    bear:          { tier: 4, minR: 64, maxR: 80,  scoreMult: 2 },
+    zebra:         { tier: 4, minR: 58, maxR: 72,  scoreMult: 2 },
+    tortoise:      { tier: 2, minR: 22, maxR: 28,  scoreMult: 2 },
+    hippo:         { tier: 5, minR: 78, maxR: 96,  scoreMult: 2 },
+    panda:         { tier: 3, minR: 36, maxR: 46,  scoreMult: 2 },
+    seal:          { tier: 2, minR: 24, maxR: 30,  scoreMult: 2 },
     zoo_gate:      { tier: 5, minR: 104, maxR: 122 },
     zoo_wall:      { tier: 4, minR: 48, maxR: 58 },
     zookeeper:     { tier: 3, minR: 28, maxR: 34 },
+    // Rebuild Prompt 16: airport set (props are eatable bonus food, excluded from win math)
+    terminal:      { tier: 5, minR: 96, maxR: 116 },
+    control_tower: { tier: 5, minR: 92, maxR: 112 },
+    hangar:        { tier: 5, minR: 100, maxR: 120 },
+    plane_blue:    { tier: 5, minR: 88, maxR: 108 },
+    plane_peach:   { tier: 5, minR: 86, maxR: 106 },
+    baggage_cart:  { tier: 3, minR: 32, maxR: 42 },
+    windsock:      { tier: 2, minR: 18, maxR: 24 },
+    fuel_truck:    { tier: 4, minR: 56, maxR: 70 },
+    // Rebuild Prompt 16: toy army additions
+    radar_van:     { tier: 4, minR: 60, maxR: 76, scoreMult: 3 },
     // Feel Patch: debris bits — tier 0, always edible at any radius
     bit:           { tier: 0, minR: 4, maxR: 7 },
     // War Pack §1: people (T3 — same tier as old 'person', smaller for kid)
@@ -501,6 +525,8 @@ export const CONFIG = {
     'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple', 'vig_busker',
     'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
     'monkey', 'flamingo', 'penguin',
+    // Rebuild Prompt 16: zoo animals also flee from bigger voids
+    'bear', 'zebra', 'tortoise', 'hippo', 'panda', 'seal', 'lion', 'elephant', 'giraffe',
   ] as ObjectKind[],
 
   // v14 §2: living kinds that flail while in orbit

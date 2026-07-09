@@ -1,0 +1,44 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "RPhIEJ72EJvpTNV-2deh6"
+uri = "file://artifacts/3d-game/public/assets/zoo_clay_sheet.png"
+type = "image"
+title = "Zoo Clay Sheet"
+
+[[outputs]]
+id = "wCU8JeyRWLtU4EwzKNyzN"
+uri = "file://artifacts/3d-game/public/assets/airport_clay_sheet.png"
+type = "image"
+title = "Airport Clay Sheet"
+
+[[outputs]]
+id = "Rh8YYgKTK-Y1rVI7u54Wr"
+uri = "file://artifacts/3d-game/public/assets/military_clay_sheet.png"
+type = "image"
+title = "Military Clay Sheet"
+
+[[outputs]]
+id = "LH964jh8C3VbgPFPP-8ax"
+uri = "file://artifacts/3d-game/public/assets/previews/zoo_small.png"
+type = "image"
+title = "Zoo Clay Sheet Preview"
+
+[[outputs]]
+id = "h4nNGBn-wimcFMIDbpWIC"
+uri = "file://artifacts/3d-game/public/assets/previews/airport_small.png"
+type = "image"
+title = "Airport Clay Sheet Preview"
+
+[[outputs]]
+id = "VwuK4mA7RXicoMVIeKdaN"
+uri = "file://artifacts/3d-game/public/assets/previews/military_small.png"
+type = "image"
+title = "Military Clay Sheet Preview"
+
+[[outputs]]
+id = "W_T71RRyorFxxUq8_QsQ3"
+uri = "file://screenshots/voidling_population_photo_v2.jpg"
+type = "image"
+title = "VOIDLING Population Photo"
