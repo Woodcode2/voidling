@@ -182,9 +182,11 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
       cc.fillStyle = bgrd; cc.fillRect(0, 0, S, S);
     }
     // Lighting atmosphere on top (always)
+    // Prompt 15 Stage 5: richer green tint to match reference vibrancy.
     const atmo = cc.createLinearGradient(0, 0, S, S);
-    atmo.addColorStop(0, 'rgba(255,255,255,0.07)');
-    atmo.addColorStop(1, 'rgba(0,0,0,0.06)');
+    atmo.addColorStop(0,   'rgba(20,70,10,0.12)');
+    atmo.addColorStop(0.5, 'rgba(0,0,0,0.04)');
+    atmo.addColorStop(1,   'rgba(0,0,0,0.09)');
     cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
     cc.restore();
   }
@@ -819,8 +821,9 @@ function _paintMowingStripes(cc: CanvasRenderingContext2D): void {
   tracIslandPath(cc); cc.clip();
   const STRIPE = 160;
   for (let y = 0; y < S; y += STRIPE) {
+    // Prompt 15 Stage 5: halved alpha so stripes don't wash out the green.
     cc.fillStyle = (Math.floor(y / STRIPE) % 2 === 0)
-      ? 'rgba(38,62,22,0.044)' : 'rgba(255,255,255,0.030)';
+      ? 'rgba(38,62,22,0.022)' : 'rgba(255,255,255,0.015)';
     cc.fillRect(0, y, S, STRIPE);
   }
   cc.restore();

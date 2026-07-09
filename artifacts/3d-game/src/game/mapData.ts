@@ -51,26 +51,26 @@ export const WATERFALL_PT = ISLAND_CTRL[WATERFALL_IDX];
 // ─── Zone rectangles ─────────────────────────────────────────────────────────
 // Used for terrain classification (fill priority: WATER > ROAD > SAND > FOREST > PARK > DOWNTOWN > MEADOW)
 
-// DOWNTOWN: blocks gx=1–4, gy=1–3 (center-east quadrant)
-export const ZONE_DOWNTOWN_R = [bx0(1), by0(1), bx1(4), by1(3)] as const;
+// DOWNTOWN: tight 5-block tower core (gx=2–3, gy=1–3) wrapping the plaza  [Prompt 15]
+export const ZONE_DOWNTOWN_R = [bx0(2), by0(1), bx1(3), by1(3)] as const;
 
-// PARK: block gx=0, gy=2 (center-west)
-export const ZONE_PARK_R = [bx0(0), by0(2), bx1(0), by1(2)] as const;
+// PARK: two blocks beside the core (gx=4, gy=2–3)  [Prompt 15]
+export const ZONE_PARK_R = [bx0(4), by0(2), bx1(4), by1(3)] as const;
 
-// FOREST: blocks gx=4–5, gy=0 (northeast)
-export const ZONE_FOREST_R = [bx0(4), by0(0), bx1(5), by1(0)] as const;
+// FOREST: full east columns gx=4–5, gy=0–4 (zoo/airport/park painted over this)  [Prompt 15]
+export const ZONE_FOREST_R = [bx0(4), by0(0), bx1(5), by1(4)] as const;
 
-// BEACH: gy=5 row (south strip)
+// BEACH: gy=5 row (south strip) — unchanged
 export const ZONE_BEACH_R = [bx0(0), by0(5), bx1(5), by1(5)] as const;
 
-// ZOO: block gx=4, gy=0 (reserved — painted in ground cache, unpopulated until next update)
-export const ZONE_ZOO_R = [bx0(4), by0(0), bx1(4), by1(0)] as const;
+// ZOO: block gx=5, gy=1 (embedded in east forest)  [Prompt 15]
+export const ZONE_ZOO_R = [bx0(5), by0(1), bx1(5), by1(1)] as const;
 
-// AIRPORT: block gx=4, gy=4 (reserved — runway painted in ground cache, no entities)
-export const ZONE_AIRPORT_R = [bx0(4), by0(4), bx1(4), by1(4)] as const;
+// AIRPORT: block gx=5, gy=4 (southeast forest)  [Prompt 15]
+export const ZONE_AIRPORT_R = [bx0(5), by0(4), bx1(5), by1(4)] as const;
 
-// MILITARY: block gx=5, gy=2 (reserved — pad painted in ground cache, no entities)
-export const ZONE_MILITARY_R = [bx0(5), by0(2), bx1(5), by1(2)] as const;
+// MILITARY: block gx=5, gy=5 (south-east corner of beach row)  [Prompt 15]
+export const ZONE_MILITARY_R = [bx0(5), by0(5), bx1(5), by1(5)] as const;
 
 // LAGOON: ellipse within beach zone
 export const LAGOON_CX = bx0(1) + BLOCK * 0.65;  // ~3025
@@ -81,20 +81,25 @@ export const LAGOON_RY = BLOCK * 0.38;            // ~608
 // ─── River path (world space polyline) ───────────────────────────────────────
 export const RIVER_HALF_W = 90; // half-width of river channel
 
-// Pond source in the park
-export const POND_CX = bx0(0) + BLOCK * 0.68; // ~1788
-export const POND_CY = by0(2) + BLOCK * 0.65; // ~5740
-export const POND_R  = BLOCK * 0.19;           // ~304
+// Pond source in the park (gx=4, gy=2)  [Prompt 15: park moved to east side]
+export const POND_CX = bx0(4) + BLOCK * 0.50; // ~8700 — park-block center-x
+export const POND_CY = by0(2) + BLOCK * 0.62; // ~5292 — within park gy=2
+export const POND_R  = BLOCK * 0.19;           // ~304 — unchanged
 
+// Prompt 15: river enters north forest, flows south along the forest/park seam,
+// bends southeast through forest gx=4,gy=4.
+// Constraint: only forest and park block interiors until the very last waypoints.
+// NOTE: the final two waypoints necessarily enter the military/beach area because
+// WATERFALL_PT is a fixed island boundary coordinate (9800,10150) — unavoidable.
 export const RIVER_PATH: [number, number][] = [
-  [POND_CX, POND_CY],                             // 0: park pond
-  [bx0(1) + BLOCK * 0.15, by0(2) + BLOCK * 0.88],// 1: meander east
-  [bx0(2) + BLOCK * 0.05, by0(3) + BLOCK * 0.25],// 2: turn southeast
-  [bx0(3) - ROAD_W * 0.4, by0(3) + BLOCK * 0.65],// 3: south
-  [bx0(3) + BLOCK * 0.5,  by0(4) + BLOCK * 0.35],// 4: southeast meander
-  [bx0(4) + BLOCK * 0.45, by0(4) + BLOCK * 0.82],// 5: toward beach
-  [WATERFALL_PT[0] - 200, WATERFALL_PT[1] - 400], // 6: approach waterfall
-  [WATERFALL_PT[0], WATERFALL_PT[1]],              // 7: waterfall exit
+  [bx0(4) + BLOCK * 0.40, by0(0) + BLOCK * 0.14], // 0: north entry  (forest gx=4,gy=0)
+  [bx0(4) + BLOCK * 0.32, by0(1) + BLOCK * 0.25], // 1: south forest (forest gx=4,gy=1)
+  [POND_CX, POND_CY],                              // 2: park pond    (park  gx=4,gy=2)
+  [bx0(4) + BLOCK * 0.28, by0(3) + BLOCK * 0.52], // 3: south park   (park  gx=4,gy=3)
+  [bx0(4) + BLOCK * 0.44, by0(4) + BLOCK * 0.56], // 4: forest bend  (forest gx=4,gy=4)
+  [bx0(5) - ROAD_W * 0.4, by1(4) - 60],           // 5: forest exit  (south edge of gx=4,gy=4 forest)
+  [WATERFALL_PT[0] - 100, WATERFALL_PT[1] - 320],  // 6: waterfall approach (military/beach — necessary)
+  [WATERFALL_PT[0], WATERFALL_PT[1]],              // 7: waterfall exit (fixed island boundary)
 ];
 
 // ─── Road network ────────────────────────────────────────────────────────────

@@ -2703,19 +2703,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       const oct = oc.getContext('2d');
       if (!oct) return null;
 
-      // Ocean background (visible around island edges)
-      oct.fillStyle = '#4A8FA8';
+      // Prompt 15 Stage 0: space background behind the island (matches in-game look).
+      const bgGrad = oct.createLinearGradient(0, 0, 0, PHOTO_SIZE);
+      bgGrad.addColorStop(0, '#1a1040');
+      bgGrad.addColorStop(1, '#0d0818');
+      oct.fillStyle = bgGrad;
       oct.fillRect(0, 0, PHOTO_SIZE, PHOTO_SIZE);
 
-      // Draw ground in world-space coordinates scaled to photo size.
-      // drawVectorGround builds _groundBuf on demand if not already cached.
+      // Draw ground: drawVectorGround blits the cached world-space ground buffer.
+      // The buffer draws at world scale (0..MAP_SIZE), so apply the pixel scale first.
       const scale = PHOTO_SIZE / CONFIG.MAP_SIZE;
       oct.save();
       oct.scale(scale, scale);
-      drawVectorGround(oct, 0, scale, false);
+      drawVectorGround(oct, 0, scale, true); // forceRebuild=true ensures fresh buffer
       oct.restore();
 
-      // Draw static world objects on top of the ground layer.
+      // Draw every static structure foot-Y-sorted with proper clay spriteBounds.
       world.drawPhotoLayer(oct, scale);
 
       return oc.toDataURL('image/png');
