@@ -1,0 +1,54 @@
+# VOIDLING: The Composition Fix (Rebuild Prompt 15)
+The island photo revealed the real problem: the district map is an even quilt, not a composed island. Downtown is smeared across the middle band, there is no plaza, no forest mass, and the river cuts diagonally through the city. This prompt replaces the district grid with a literal hand-authored layout, re-routes the river, and fixes the photo mode so it becomes a true receipt. The reference image is attached; the new grid below is transcribed from it.
+
+## DO NOT TOUCH (leave fully intact)
+- The texture pipeline and full-opacity fills from Prompt 13.
+- The density constants from Prompt 14: H_STEP 280, DT_STEP 360, the rank shares, SW 60, the car rotation. They are correct; they were just painted on the wrong canvas.
+- Gameplay, death rules, scoring, win math, clay pools, splash, camera, the waterfall renderer and its existing exit coordinate.
+
+## STAGE 0: Fix the camera first (photo mode must tell the truth)
+- `?debug=photo` currently captures the ground layer only. Fix it to composite the full scene: the space background behind the island, the cached ground, then EVERY placed structure and scenery item drawn foot-Y-sorted at their real positions with their real sprites. No HUD, no moving entities.
+- Capture a BEFORE image of the current island with structures visible. Save it.
+
+## STAGE 1: The new district grid (transcribe, do not interpret)
+Replace the current FIXED_PLAN with exactly this 6x6 layout. Rows run north to south, columns west to east. Map these names onto the existing block-type enum, adding PLAZA as a new type if it does not exist:
+
+Row 1: cozy, cozy, cozy, cozy, forest, forest
+Row 2: cozy, cozy, downtown, downtown, forest, zoo
+Row 3: fancy, fancy, downtown, PLAZA, park, forest
+Row 4: fancy, fancy, downtown, downtown, park, forest
+Row 5: cozy, cozy, fancy, fancy, forest, airport
+Row 6: beach, beach, beach, beach, beach, military
+
+That is: suburbs massed on the west half (cozy cottages north and south, fancy homes in the middle west), a tight 5-block downtown core wrapped around one PLAZA block, two park blocks beside the core, a forest mass owning the east side with the zoo embedded in it, the airport at the southeast, the beach along the whole south edge, the military pad at the south corner.
+
+## STAGE 2: The plaza (the heart of the island)
+- The PLAZA block gets no building lots. Bake its ground as plaza paving (the sidewalk tile at larger scale) with a decorative border.
+- Place at its center: the fountain from the park set as the centerpiece, ringed by benches, streetlamps, and planter boxes from the park props, with a few trees at the corners.
+- The five downtown blocks around it keep their tower lots from Prompt 14, tallest ranks facing the plaza.
+
+## STAGE 3: The river (along the seam, never through the city)
+- Re-author the river path: enter at the north rim where forest meets the city (around the column 4 to 5 seam), flow south along the seam between the downtown/park blocks and the forest, past the park blocks, then bend southeast across the forest to the EXISTING waterfall exit coordinate.
+- The river may only touch forest blocks, park blocks, and the green seams between blocks. It must never cross a suburb, downtown, plaza, or beach block interior.
+- RIVER OVERLAPS audit must stay 0. Relocate any lot the new path touches.
+
+## STAGE 4: The forest is a forest
+- Forest blocks get the forest-floor texture (verify the zone-to-texture mapping actually paints it; the photo showed plain green) and a dense tree fill from the scenery scatter, noticeably denser than park greenery, with the existing caps raised for forest blocks if needed to read as a mass.
+- The zoo block keeps its pens and paths, framed by the forest around it.
+
+## STAGE 5: Tone (small, two dials)
+- The island reads pale and washed in the photo. Reduce the mowing-stripe overlay alpha by about half, and deepen the grass atmosphere tint slightly so the green reads closer to the reference's richness. Do not touch the texture fills themselves.
+
+## STAGE 6: Proof
+1. Run `?debug=photo` and save the AFTER image, now with structures composited. Put BEFORE, AFTER, and the attached reference side by side. In one honest paragraph: does the composition now rhyme with the reference, and what are the top 3 remaining gaps?
+2. SUBURB LOTS and DOWNTOWN LOTS counts (downtown count will drop since the core shrank to 5 blocks; that is correct and expected, density within the core is what matters).
+3. All audits 0, including RIVER OVERLAPS.
+4. FPS in the usual band, no new console errors.
+Tell Mat to open `?debug=photo` and send the AFTER image onward. That image is the verdict.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image to this prompt when you paste it.
+- When done: open `?debug=photo`, save, send to Claude. This time the photo should show the buildings too.
+- What to look for in one glance: houses massed on the left, a tower core wrapped around a real plaza, green parks beside it, a thick forest on the right with the zoo inside, beach along the bottom, and the river running the seam into the falls.

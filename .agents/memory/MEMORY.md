@@ -34,3 +34,4 @@
 - [VOIDLING Map Rebuild (Prompt 12)](voidling-map-rebuild.md) — fixed plan NEW EARTH, ground texture system (6 tex_* tiles baked via loadGroundTextures/setMatchLots), sidewalks+yards+driveways+flowerbeds in _paintStaticGround, 3-layer contact shadow. All 9 audit lines at 0.
 - [VOIDLING Prompt 13 Visual Quality](voidling-v19-prompt13.md) — full-opacity surfaces (_texZone), footprint-aware water lots, east-facing car heading, single shadow, clay preload at createGame, capturePhoto robustness rule.
 - [VOIDLING Prompt 14 Numbers Fix](voidling-v19-prompt14.md) — H_STEP 280, DT_STEP 360, kindForRank 45/35/12/8, SW=60, zombie systems deleted (coast/tufts/fence/hedge), car rot +π/2 restored.
+- [VOIDLING Prompt 15 Composition Fix](voidling-v19-prompt15.md) — cozy/fancy BlockTypes, new 6×6 plan, fountain plaza, river re-routed via forest/park seam, expanded forest zone, photo-mode spriteBounds fix.

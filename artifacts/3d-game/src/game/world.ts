@@ -87,7 +87,8 @@ export interface PlayerStats {
   downtownItems: number;
 }
 
-type BlockType = 'residential' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic' | 'forest' | 'airport' | 'military';
+// 'cozy' and 'fancy' are sub-variants of residential (different house pools).  [Prompt 15]
+type BlockType = 'residential' | 'cozy' | 'fancy' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic' | 'forest' | 'airport' | 'military';
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
 interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; }
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
@@ -403,19 +404,18 @@ export class WorldManager {
       this.spaceChunks.push({ bx: cx, by: cy, ox, oy, ang: rand() * Math.PI * 2, spin: (rand() - 0.5) * 0.0005, type: Math.floor(rand() * 3), s: 14 + rand() * 16 });
     }
 
-    // Map Rebuild: single fixed island plan — NEW EARTH
-    // Central packed downtown (gx=1–4, gy=1–3), park west (gx=0 gy=2),
-    // two suburb districts (cozy NW / fancier SE), forest + zoo NE corner,
-    // civic flanks, military east, airport SE, beach south.
+    // Prompt 15: COMPOSITION FIX — clearer district hierarchy.
+    // Cozy suburbs NW/W/SW, fancy uptown SW quadrant, tight downtown core center,
+    // central plaza (gx=3,gy=2), park + forest east, zoo + airport + military far east.
     const FIXED_PLAN: BlockType[] = [
-      'residential', 'residential', 'residential', 'residential', 'zoo',         'forest',      // gy=0: north — forest + reserved zoo clearing NE
-      'civic',       'downtown',    'downtown',    'downtown',    'downtown',    'civic',        // gy=1: school/library W, hospital/townhall E
-      'park',        'downtown',    'downtown',    'downtown',    'downtown',    'military',     // gy=2: park W (river pond), restricted pad E
-      'residential', 'downtown',    'downtown',    'downtown',    'residential', 'residential',  // gy=3: downtown core continues
-      'residential', 'residential', 'residential', 'residential', 'airport',    'residential',  // gy=4: airstrip gx=4, suburbs around
-      'beach',       'beach',       'beach',       'beach',       'beach',       'beach',        // gy=5: sandy shores
+      'cozy',  'cozy',  'cozy',     'cozy',     'forest',  'forest',   // gy=0: north suburbs + east forest
+      'cozy',  'cozy',  'downtown', 'downtown', 'forest',  'zoo',      // gy=1: suburb W, towers C, forest+zoo E
+      'fancy', 'fancy', 'downtown', 'plaza',    'park',    'forest',   // gy=2: uptown W, plaza hub, park+forest E
+      'fancy', 'fancy', 'downtown', 'downtown', 'park',    'forest',   // gy=3: uptown W, towers C, park+forest E
+      'cozy',  'cozy',  'fancy',    'fancy',    'forest',  'airport',  // gy=4: suburbs + uptown + forest + airstrip
+      'beach', 'beach', 'beach',    'beach',    'beach',   'military', // gy=5: sandy shores + military corner
     ];
-    this.planName = 'NEW EARTH';
+    this.planName = 'COMPOSITION FIX';
     for (let gy = 0; gy < CONFIG.GRID; gy++) {
       for (let gx = 0; gx < CONFIG.GRID; gx++) {
         const type = FIXED_PLAN[gy * CONFIG.GRID + gx];
@@ -436,7 +436,7 @@ export class WorldManager {
       const bCx = b.x0 + CONFIG.BLOCK_SIZE / 2;
       const bCy = b.y0 + CONFIG.BLOCK_SIZE / 2;
       if (!isOnIsland(bCx, bCy, 0)) continue; // inset=0: block center must be at least on the island
-      if (b.type === 'residential') this.fillResidential(b, rand);
+      if (b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy') this.fillResidential(b, rand);
       else if (b.type === 'park') this.fillPark(b, rand, spawnX, spawnY);
       else if (b.type === 'plaza') this.fillPlaza(b, rand);
       else if (b.type === 'playground') this.fillPlayground(b, rand);
@@ -471,8 +471,8 @@ export class WorldManager {
       this.openingBeatPersonId = beatPerson.id;
     }
 
-    // v7 §2: water tower on a residential corner lot (the last residential block)
-    const resBlocks = this.blocks.filter((b) => b.type === 'residential');
+    // v7 §2: water tower on a residential corner lot (the last residential-class block)
+    const resBlocks = this.blocks.filter((b) => b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy');
     const wtBlock = resBlocks[resBlocks.length - 1];
     if (wtBlock) {
       const inset = CONFIG.SIDEWALK + 90;
@@ -521,7 +521,7 @@ export class WorldManager {
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
     const TREE_STEP = 300;
-    const STREET_BLOCKS: BlockType[] = ['residential', 'civic'];
+    const STREET_BLOCKS: BlockType[] = ['residential', 'cozy', 'fancy', 'civic'];
     for (const b2 of this.blocks) {
       if (!STREET_BLOCKS.includes(b2.type)) continue;
       // Sidewalk-edge trees every ~300px along all four sides
@@ -838,7 +838,7 @@ export class WorldManager {
   private initSportsFields(rand: () => number) {
     const parkBlocks = this.blocks.filter(b => b.type === 'park');
     const downtownBlocks = this.blocks.filter(b => b.type === 'downtown');
-    const resBlocks = this.blocks.filter(b => b.type === 'residential');
+    const resBlocks = this.blocks.filter(b => b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy');
     const cx = (b: Block) => b.x0 + CONFIG.BLOCK_SIZE / 2;
     const cy = (b: Block) => b.y0 + CONFIG.BLOCK_SIZE / 2;
 
@@ -864,7 +864,7 @@ export class WorldManager {
       : this.blocks.filter(b =>
           zone === 'park' ? b.type === 'park'
         : zone === 'downtown' ? b.type === 'downtown'
-        : zone === 'residential' ? b.type === 'residential'
+        : zone === 'residential' ? (b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy')
         : zone === 'beach' ? b.type === 'beach'
         : true
       );
@@ -984,17 +984,33 @@ export class WorldManager {
     }
   }
 
+  // Prompt 15 Stage 2: fountain-centred plaza — the heart of the island.
   private fillPlaza(b: Block, rand: () => number) {
     (b as any).paved = true;
-    this.scatter(b, rand, 'foodcart', 3);
-    this.scatter(b, rand, 'cafetable', 5);
-    this.scatterPeople(b, rand, 'any', 6);
-    this.scatter(b, rand, 'trashcan', 3);
-    this.scatter(b, rand, 'bench', 2);
-    this.scatter(b, rand, 'flower', 4);
-    this.scatter(b, rand, 'gnome', 2);
-    this.scatter(b, rand, 'icecream', 1);
-    this.scatter(b, rand, 'scooter', 2);
+    // Fountain at the exact block centre.
+    const cx = b.x0 + CONFIG.BLOCK_SIZE / 2;
+    const cy = b.y0 + CONFIG.BLOCK_SIZE / 2;
+    this.makeObj('fountain', cx, cy);
+    // Four benches ringing the fountain.
+    const RING_R = CONFIG.BLOCK_SIZE * 0.25;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const bx = cx + Math.cos(a) * RING_R, by = cy + Math.sin(a) * RING_R;
+      if (isOnIsland(bx, by)) this.makeObj('bench', bx, by);
+    }
+    // Corner trees at the four quadrants of the block.
+    const CORNER_R = CONFIG.BLOCK_SIZE * 0.40;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      const tx = cx + Math.cos(a) * CORNER_R, ty = cy + Math.sin(a) * CORNER_R;
+      if (isOnIsland(tx, ty)) this.makeObj('tree', tx, ty);
+    }
+    this.scatter(b, rand, 'flower',    6);
+    this.scatter(b, rand, 'flowerpot', 4);
+    this.scatter(b, rand, 'cafetable', 3);
+    this.scatter(b, rand, 'foodcart',  1);
+    this.scatter(b, rand, 'apple',     2);
+    this.scatterPeople(b, rand, 'park', 5);
   }
 
   // v7 §2/§3: playground park — equipment + trampoline (bounce) + hoop, plus greenery.
@@ -1073,8 +1089,9 @@ export class WorldManager {
     const H_STEP = 280;                       // Prompt 14: dense packing — gap ≤ 0.5× house width
     const H_INSET = CONFIG.SIDEWALK + 70;     // keep first row off the sidewalk
     for (const b of this.blocks) {
-      if (b.type !== 'residential') continue;
-      const HOUSE_POOL = b.gx < 3 ? COZY_POOL : FANCY_POOL;
+      if (b.type !== 'residential' && b.type !== 'cozy' && b.type !== 'fancy') continue;
+      // Prompt 15: cozy/fancy types determine pool directly; legacy 'residential' → cozy.
+      const HOUSE_POOL = b.type === 'fancy' ? FANCY_POOL : COZY_POOL;
       let row = 0;
       for (let yy = b.y0 + H_INSET; yy <= b.y0 + B - H_INSET; yy += H_STEP, row++) {
         // stagger alternate rows by half a step for an organic, denser read
@@ -1221,12 +1238,12 @@ export class WorldManager {
     // Reserved — inhabitants come next prompt.
   }
 
-  // Map Rebuild: FOREST block — dense trees and undergrowth, no buildings.
+  // Map Rebuild: FOREST block — noticeably denser than park greenery.  [Prompt 15: counts raised]
   private fillForest(b: Block, rand: () => number) {
-    this.scatter(b, rand, 'tree',   14);
-    this.scatter(b, rand, 'bush',    8);
-    this.scatter(b, rand, 'flower',  4);
-    this.spawnBirds(b, rand, 4);
+    this.scatter(b, rand, 'tree',   22);
+    this.scatter(b, rand, 'bush',   12);
+    this.scatter(b, rand, 'flower',  3);
+    this.spawnBirds(b, rand, 3);
   }
 
   // v15 §4: Town Hall — civic hub, fountain, plaza feel, crowd
@@ -2722,20 +2739,30 @@ export class WorldManager {
   // Stage 13 §1: render only the static (non-living, non-eaten) world objects
   // onto an offscreen photo canvas at the given world→pixel scale.
   drawPhotoLayer(ctx: CanvasRenderingContext2D, scale: number): void {
+    // Prompt 15 Stage 0: foot-Y-sorted composite of every static object using the
+    // same sprite + spriteBounds logic as the main game draw loop.
     const statics = this.objects.filter(o => !o.living && !o.eaten && !o.captured);
-    statics.sort((a, b) => a.y - b.y); // painter's algorithm (foot-Y order)
+    statics.sort((a, b) => (a.y + a.size * 0.5) - (b.y + b.size * 0.5));
     for (const obj of statics) {
       const r  = obj.size * scale;
       const sx = obj.x   * scale;
       const sy = obj.y   * scale;
       const spriteKey = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
-      const spr = spriteKey ? objectSprites.get(spriteKey) : undefined;
+      const spr = spriteKey
+        ? (objectSprites as Map<string, HTMLImageElement | HTMLCanvasElement>).get(spriteKey)
+        : undefined;
       ctx.save();
       ctx.translate(sx, sy);
       if (spr) {
-        ctx.drawImage(spr, -r, -r * 2, r * 2, r * 2);
+        const bn = spriteBounds.get(spriteKey!) ?? { x: 0, y: 0, w: 1, h: 1 };
+        const imgW = spr instanceof HTMLImageElement ? spr.naturalWidth  : spr.width;
+        const imgH = spr instanceof HTMLImageElement ? spr.naturalHeight : spr.height;
+        ctx.drawImage(spr,
+          bn.x * imgW, bn.y * imgH, bn.w * imgW, bn.h * imgH, // source rect
+          -r, -r * 2, r * 2, r * 2,                           // dest: foot at origin, extends up
+        );
       } else {
-        // Procedural colour-blob placeholder when sprite not yet loaded.
+        // Procedural blob when sprite not yet decoded.
         ctx.fillStyle = '#8BC87A';
         ctx.globalAlpha = 0.7;
         ctx.beginPath();
