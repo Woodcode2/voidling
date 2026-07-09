@@ -38,3 +38,4 @@
 - [VOIDLING Prompt 15 Composition Fix](voidling-v19-prompt15.md) — cozy/fancy BlockTypes, new 6×6 plan, fountain plaza, river re-routed via forest/park seam, expanded forest zone, photo-mode spriteBounds fix.
 - [VOIDLING Prompt 16 Population Rebuild](voidling-v19-prompt16.md) — zoo/airport/military clay sheets; photo mode builds throwaway world and restores live lots; military sheet is 3x2, not 4x2.
 - [VOIDLING Prompt 19 Quality Bar](voidling-prompt19.md) — lineup debug, aspect-correct draws (spriteKey hoisted before ctx.save), vehicle no-wobble, half pedBob, narrower river+softer shimmer, pond lily pads (fixed #3a7ab8 notch), baked sports field lines.
+- [VOIDLING Stage Personality](voidling-personality-stages.md) — per-stage body hue (_STAGE_BODY/SWIRL), blush suppress, bob amplitude, voice lines + bubble, evolution color flash.

@@ -247,7 +247,9 @@ export class Player extends Void {
     this.wobbleY = 1 + stretch * Math.abs(dy) - stretch * Math.abs(dx) - jiggle;
 
     // Alive Pack §4: move bob — vertical bounce synced to speed
-    this.bobOffset = spd > 22 ? Math.sin(this.breathePhase * 0.006) * this.radius * 0.026 : 0;
+    // Task #4: stage personality — eager bounce at low forms, heavy sway at high forms
+    const _BOB_AMP = [0.034, 0.040, 0.028, 0.018, 0.010];
+    this.bobOffset = spd > 22 ? Math.sin(this.breathePhase * 0.006) * this.radius * _BOB_AMP[Math.min(this.formIndex, 4)] : 0;
 
     // Alive Pack §5: eat-chomp squash — 0.85 vertical for 80ms
     if (this.chompSquashT > 0) this.chompSquashT = Math.max(0, this.chompSquashT - dt);

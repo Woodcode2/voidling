@@ -289,6 +289,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let grainPattern: CanvasPattern | null = null;
   let decayLogAccum = 0;   // v7 §1: throttle for the leader-decay debug log
   let radiiLogAccum = 0;   // v9 §1: 10s cadence for the fairness radius/mass proof log
+  // Task #4: stage voice — player void speaks periodically with stage-appropriate lines
+  const _VOID_VOICE: string[][] = [
+    ['…',           'what is this?',    'hungry…',           'so small…'          ], // VOIDLING
+    ['nom.',         'more!',            'gimme gimme',        'tasty!'             ], // MUNCHER
+    ['too easy.',    "who's next?",      'heh.',               'getting BIG'        ], // GOBBLER
+    ['inevitable.',  "don't run.",       '…all of it.',        'nothing stops me.'  ], // DEVOURER
+    ['all shall end.', '…',             'consume.',           'i see everything.'  ], // WORLD ENDER
+  ];
+  let _voidVoiceTimer = 18000;            // first line fires ~18 s into the round
+  let _playerBubbleText: string | null = null;
+  let _playerBubbleLife = 0;              // ms remaining
+  // Task #4: evolution color flash — brief screen tint in the new stage's hue
+  const _STAGE_FLASH = ['#4535A0', '#7838A0', '#9C2090', '#841445', '#181055'];
+  let _evolveFlashT = 0;
+  let _evolveFlashColor = '#4535A0';
 
   // daily modifier round flags
   let baseGreed = 1;
@@ -490,6 +505,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     finalFeastFired = false; finalFeastActive = false;
     feedingFrenzyFired = false; feedingFrenzyActive = false;
     killedBy = ''; roundEnded = false;
+    // Task #4: reset stage-voice + flash state for new round
+    _voidVoiceTimer = 18000; _playerBubbleText = null; _playerBubbleLife = 0; _evolveFlashT = 0;
     newsText = ''; newsAlpha = 0; newsTimer = 0; newsCd = 12000;
     defenseShells.length = 0; heliMissiles.length = 0;
     openingBeatDone = false;
@@ -741,6 +758,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     } else {
       banner('EVOLVED → ' + name, '#C77DFF');
     }
+    // Task #4: stage identity flash — brief screen tint in the new stage's hue
+    _evolveFlashColor = _STAGE_FLASH[Math.min(form, 4)];
+    _evolveFlashT = 450;
     // v16.2 §1: voice ticker on milestone evolutions
     if (form === 2) { // GOBBLER
       queueTicker('🚨 Traffic cameras detect enormous mass entering the downtown core!');
@@ -1064,6 +1084,18 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!openingBeatDone && roundElapsed >= 2000 && world) {
       openingBeatDone = true;
       world.setBubble(world.openingBeatPersonId, 'Huh… is that a void?', 4500);
+    }
+
+    // Task #4: stage voice — player void speaks in-character on a 22–40 s cadence
+    if (player && timeLeft > 0) {
+      if (_playerBubbleLife > 0) _playerBubbleLife -= dt;
+      _voidVoiceTimer -= dt;
+      if (_voidVoiceTimer <= 0) {
+        const pool = _VOID_VOICE[clamp(player.formIndex, 0, 4)];
+        _playerBubbleText = pool[Math.floor(Math.random() * pool.length)];
+        _playerBubbleLife = 2800;
+        _voidVoiceTimer = 22000 + Math.random() * 18000;
+      }
     }
 
     // v16.2 §1: round-start ticker fires once at 3s (dedicated gate)
@@ -1655,6 +1687,42 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!paused) fx.update(frameDt);
     fx.draw(ctx);
     drawFormBadge(); // v12 §0: form badge after fx (always on top in world space)
+
+    // Task #4: player void stage-voice bubble (world space, above the void)
+    if (player && _playerBubbleText && _playerBubbleLife > 0) {
+      const lifeRatio = _playerBubbleLife / 2800;
+      const fa = lifeRatio > 0.88 ? (1 - lifeRatio) / 0.12 : lifeRatio < 0.14 ? lifeRatio / 0.14 : 1;
+      if (fa > 0.02) {
+        const bx = player.x;
+        const by = player.y - player.radius * 2.0;
+        ctx.save();
+        ctx.globalAlpha = fa * 0.93;
+        const fsize = Math.max(10, Math.min(20, player.radius * 0.48));
+        ctx.font = `bold ${fsize}px sans-serif`;
+        const tw = ctx.measureText(_playerBubbleText).width;
+        const pad = fsize * 0.52;
+        const bw = tw + pad * 2, bh = fsize + pad * 1.5;
+        // bubble body
+        ctx.fillStyle = 'rgba(255,255,255,0.93)';
+        ctx.beginPath();
+        ctx.rect(bx - bw / 2, by - bh, bw, bh);
+        ctx.fill();
+        // tail pointer
+        ctx.beginPath();
+        ctx.moveTo(bx - fsize * 0.22, by);
+        ctx.lineTo(bx, by + fsize * 0.6);
+        ctx.lineTo(bx + fsize * 0.22, by);
+        ctx.fill();
+        // text
+        ctx.globalAlpha = fa * 0.97;
+        ctx.fillStyle = '#1A0B33';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(_playerBubbleText, bx, by - bh / 2);
+        ctx.restore();
+      }
+    }
+
     // v15 §1: hitbox overlay (world-space — ctx transform still active)
     if (showHitboxes && world && player) {
       // Object contact circles (contactScale-adjusted radii)
@@ -1752,6 +1820,19 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
     }
     ctx.restore();
+
+    // Task #4: evolution color flash (screen space — full-viewport tint on stage-up)
+    if (_evolveFlashT > 0) {
+      _evolveFlashT = Math.max(0, _evolveFlashT - frameDt);
+      const fa = Math.pow(_evolveFlashT / 450, 1.8) * 0.42;
+      if (fa > 0.004) {
+        ctx.save();
+        ctx.globalAlpha = fa;
+        ctx.fillStyle = _evolveFlashColor;
+        ctx.fillRect(0, 0, fw, fh);
+        ctx.restore();
+      }
+    }
 
     // ?debug=fps — tiny top-right overlay: frames per second + live object count
     if (debugFps) {
