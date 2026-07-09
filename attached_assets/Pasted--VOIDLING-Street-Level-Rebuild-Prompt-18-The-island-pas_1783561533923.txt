@@ -1,0 +1,49 @@
+# VOIDLING: Street Level (Rebuild Prompt 18)
+The island passes the aerial test and fails the sidewalk test. This prompt fixes the game at the altitude it is actually played: kill the last sticker props at the mapping level, make the plaza a plaza, bring the roads down to human scale, furnish the streets, and widen the early camera. The headline receipt is the one that finally matters: what one screenful contains.
+
+## DO NOT TOUCH (leave fully intact)
+- The district grid, river, zones, textures, yards, house and downtown lots, density constants from Prompt 14.
+- Gameplay, death rules, scoring, win math, spawn breathing room, defense waves.
+- Clay pools and cutter, splash, waterfall.
+
+## STAGE 0: Read and report first (no edits yet)
+1. Current ROAD_WIDTH and the camera zoom value per evolution stage.
+2. What fillPlaza currently places, at what radii.
+3. THE MAPPING TABLE: list every ObjectKind whose sprite key still resolves to a legacy sticker sheet (the plaza fountain and the beach umbrella are two known offenders; find them all: benches, playground pieces, sports gear, vignette props, whatever remains).
+Paste all three, then proceed.
+
+## STAGE 1: The one true mapping (stickers become impossible)
+- Build a single global mapping at the sprite-key resolution level: every legacy object kind resolves to its clay cutout (fountain to the clay park fountain, umbrella to the clay beach umbrella, bench to the clay bench, and so on for every kind found in Stage 0). Kinds with no clay equivalent map to the closest clay stand-in or stop spawning; report which you chose for each.
+- This mapping applies to EVERY code path: plaza fill, scatter, vignettes, quests, waves. No fill function can ever resurrect a sticker again.
+- Grep receipt: list every retired sticker sheet and show it unreferenced by any draw call.
+
+## STAGE 2: A plaza worth eating
+- Rebuild fillPlaza tight: the fountain centerpiece with benches, lamps, planters, and cafe tables clustered within about 0.12 of the block size, flowerbeds and visitors filling the ring around that, a few trees at the corners. Standing at the fountain, one phone screen should be full of plaza life.
+- All of it clay through the Stage 1 mapping, all eatable per existing prop rules, out of the win math.
+
+## STAGE 3: Roads at human scale
+- Reduce ROAD_WIDTH by roughly 40 to 50 percent. Report the before and after values.
+- Keep sidewalk strips at 60; they will now read proportionally stronger.
+- Regenerate lots against the new road width and rerun every audit: BUILDING OVERLAPS, BUILDINGS ON ROADS, OFF-ISLAND ENTITIES, RIVER OVERLAPS, the scenery audits, ZOO OFF-BLOCK. All must read 0.
+
+## STAGE 4: Street furniture
+- Along sidewalks, from the clay pools: streetlamps, hydrants, mailboxes, benches, and parked cars spaced tastefully; bus stops near the downtown core. Modest caps, foot-sorted, eatable per existing rules.
+- Target: standing anywhere on a road, one screenful shows at least four props or entities beyond the road itself.
+
+## STAGE 5: The early camera
+- Widen the camera at the first two evolution stages by about 20 to 25 percent so a screenful shows a neighborhood, not a road. Report the old and new zoom values. Later stages unchanged.
+
+## STAGE 6: Proof (the receipt that matters)
+1. THE SCREENFUL COUNT: five random on-land points at real stage-1 gameplay zoom. For each, a screenshot and the count of visible structures plus props. Every point must show 6 or more. Paste the five counts. This receipt was skipped once before; it is the whole point now. Do not substitute a description for the counts.
+2. One screenshot standing at the plaza fountain: it should be full.
+3. The Stage 1 grep lines retiring the sticker sheets.
+4. All audits 0, ROAD_WIDTH before and after, camera zooms before and after.
+5. FPS in the usual band, no new console errors.
+
+---
+
+## HOW MAT VERIFIES (after the Agent reports)
+- Attach the reference island image when you paste this, standing rule.
+- Then play 60 seconds at street level, which is the test that has been failing: spawn, walk one block in any direction, and count what you can see. If a screenful is still empty anywhere, screenshot that exact spot.
+- Visit the plaza. It should be worth eating.
+- Run Prompt 17 (Void Identity) AFTER this one.

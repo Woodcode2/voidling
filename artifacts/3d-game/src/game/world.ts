@@ -342,7 +342,7 @@ export class WorldManager {
     const contactRadius = cFrac != null ? 0.90 * baseSize * cFrac : baseSize * 0.85;
     // v16 §2: infra objects placed once per map, never respawn
     // v16.1 B4: parked cars are infra too (placed on street furniture pass)
-    const INFRA_KINDS: ObjectKind[] = ['hydrant', 'mailbox', 'trashcan', 'bench', 'bike', 'scooter', 'car_parked_a', 'car_parked_b'];
+    const INFRA_KINDS: ObjectKind[] = ['hydrant', 'mailbox', 'trashcan', 'bench', 'bike', 'scooter', 'car_parked_a', 'car_parked_b', 'streetlamp', 'bus_stop'];
     const o: WorldObject = {
       id: this.nextId++,
       kind,
@@ -557,6 +557,36 @@ export class WorldManager {
       if (rand() < 0.3 && isOnIsland(cp2x, cp2y)) this.makeObj(pick(carPool, rand), cp2x, cp2y, { infra: true });
       if (rand() < 0.3 && isOnIsland(cp3x, cp3y)) this.makeObj(pick(carPool, rand), cp3x, cp3y, { infra: true });
       if (rand() < 0.3 && isOnIsland(cp4x, cp4y)) this.makeObj(pick(carPool, rand), cp4x, cp4y, { infra: true });
+    }
+
+    // ── Prompt 18 Stage 4: streetlamps + bus stops on all block types ─────────
+    // Sidewalk-edge streetlamps every ~380px along N/S edges; E/W at offset.
+    // Bus stops in downtown blocks (1 per block face) for urban density.
+    const LAMP_INSET = CONFIG.SIDEWALK + 12;
+    const LAMP_STEP  = 380;
+    const DT_FACE_CHANCE = 0.6; // probability of placing a bus stop on the N face
+    for (const b2 of this.blocks) {
+      if (b2.type === 'forest' || b2.type === 'beach' || b2.type === 'military') continue;
+      // N and S edges (lamp at LAMP_INSET, spaced LAMP_STEP)
+      for (let x = b2.x0 + LAMP_INSET + LAMP_STEP * 0.5; x < b2.x0 + CONFIG.BLOCK_SIZE - LAMP_INSET; x += LAMP_STEP) {
+        const yn = b2.y0 + LAMP_INSET;
+        const ys = b2.y0 + CONFIG.BLOCK_SIZE - LAMP_INSET;
+        if (isOnIsland(x, yn)) this.makeObj('streetlamp', x, yn, { infra: true });
+        if (isOnIsland(x, ys)) this.makeObj('streetlamp', x, ys, { infra: true });
+      }
+      // E and W edges (offset by 1.5 steps so lamps alternate with the N/S row)
+      for (let y = b2.y0 + LAMP_INSET + LAMP_STEP * 1.5; y < b2.y0 + CONFIG.BLOCK_SIZE - LAMP_INSET * 1.5; y += LAMP_STEP) {
+        const xw = b2.x0 + LAMP_INSET;
+        const xe = b2.x0 + CONFIG.BLOCK_SIZE - LAMP_INSET;
+        if (isOnIsland(xw, y)) this.makeObj('streetlamp', xw, y, { infra: true });
+        if (isOnIsland(xe, y)) this.makeObj('streetlamp', xe, y, { infra: true });
+      }
+      // Downtown: bus stop on the north face (eatable, infra)
+      if (b2.type === 'downtown' && rand() < DT_FACE_CHANCE) {
+        const bsx = b2.x0 + LAMP_INSET + rand() * (CONFIG.BLOCK_SIZE - LAMP_INSET * 2);
+        const bsy = b2.y0 + LAMP_INSET;
+        if (isOnIsland(bsx, bsy)) this.makeObj('bus_stop', bsx, bsy, { infra: true });
+      }
     }
 
     // Prompt 5: scatter clay scenery (eatable bonus food, excluded from win math).
@@ -1005,31 +1035,70 @@ export class WorldManager {
 
   // Prompt 15 Stage 2: fountain-centred plaza — the heart of the island.
   private fillPlaza(b: Block, rand: () => number) {
+    // Prompt 18 Stage 2: dense plaza rebuild — tight core cluster, lamps, cafe ring, visitors.
     (b as any).paved = true;
-    // Fountain at the exact block centre.
     const cx = b.x0 + CONFIG.BLOCK_SIZE / 2;
     const cy = b.y0 + CONFIG.BLOCK_SIZE / 2;
+    const B = CONFIG.BLOCK_SIZE; // 1600
+
+    // ── Centrepiece fountain ─────────────────────────────────────────────────
     this.makeObj('fountain', cx, cy);
-    // Four benches ringing the fountain.
-    const RING_R = CONFIG.BLOCK_SIZE * 0.25;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      const bx = cx + Math.cos(a) * RING_R, by = cy + Math.sin(a) * RING_R;
+
+    // ── Tight bench ring (R ≈ 144px = 0.09×B) — 6 benches ──────────────────
+    const BENCH_R = B * 0.09;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+      const bx = cx + Math.cos(a) * BENCH_R, by = cy + Math.sin(a) * BENCH_R;
       if (isOnIsland(bx, by)) this.makeObj('bench', bx, by);
     }
-    // Corner trees at the four quadrants of the block.
-    const CORNER_R = CONFIG.BLOCK_SIZE * 0.40;
+
+    // ── Streetlamps in the ring gaps (R ≈ 192px = 0.12×B) — 4 lamps ────────
+    const LAMP_R = B * 0.12;
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2;
+      const lx = cx + Math.cos(a) * LAMP_R, ly = cy + Math.sin(a) * LAMP_R;
+      if (isOnIsland(lx, ly)) this.makeObj('streetlamp', lx, ly);
+    }
+
+    // ── Café tables ringing the lamp circle (R ≈ 224px = 0.14×B) — 5 tables ─
+    const CAFE_R = B * 0.14;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + Math.PI / 5;
+      const fx = cx + Math.cos(a) * CAFE_R, fy = cy + Math.sin(a) * CAFE_R;
+      if (isOnIsland(fx, fy)) this.makeObj('cafetable', fx, fy);
+    }
+
+    // ── Flowerpot scatter in the core zone (R 80–240px) ─────────────────────
+    for (let i = 0; i < 8; i++) {
+      const a = rand() * Math.PI * 2;
+      const r = B * 0.05 + rand() * B * 0.10;
+      const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+      if (isOnIsland(px, py)) this.makeObj('flowerpot', px, py);
+    }
+
+    // ── Food carts at the core perimeter (R ≈ 0.18×B) — 2 carts ────────────
+    const CART_R = B * 0.18;
+    for (let i = 0; i < 2; i++) {
+      const a = Math.PI / 4 + i * Math.PI;
+      const fx = cx + Math.cos(a) * CART_R, fy = cy + Math.sin(a) * CART_R;
+      if (isOnIsland(fx, fy)) this.makeObj('foodcart', fx, fy);
+    }
+
+    // ── Flower bed ring (mid annulus R = 0.20–0.36×B) ───────────────────────
+    this.scatter(b, rand, 'flower', 12);
+    this.scatter(b, rand, 'apple',  6);
+
+    // ── Corner trees (R ≈ 0.38×B = 608px) ───────────────────────────────────
+    const CORNER_R = B * 0.38;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       const tx = cx + Math.cos(a) * CORNER_R, ty = cy + Math.sin(a) * CORNER_R;
       if (isOnIsland(tx, ty)) this.makeObj('tree', tx, ty);
     }
-    this.scatter(b, rand, 'flower',    6);
-    this.scatter(b, rand, 'flowerpot', 4);
-    this.scatter(b, rand, 'cafetable', 3);
-    this.scatter(b, rand, 'foodcart',  1);
-    this.scatter(b, rand, 'apple',     2);
-    this.scatterPeople(b, rand, 'park', 5);
+
+    // ── Visitors (park strollers + general mix) ───────────────────────────────
+    this.scatterPeople(b, rand, 'park',  10);
+    this.scatterPeople(b, rand, 'any',    4);
   }
 
   // v7 §2/§3: playground park — equipment + trampoline (bounce) + hoop, plus greenery.
@@ -2375,6 +2444,97 @@ export class WorldManager {
       // Map the legacy armored_humvee phase-2 spawn onto the radar_van clay cutout
       // so every defense-wave kind is covered by the new clay army pool.
       if (kind === 'armored_humvee' && clayMilitaryKeys[4]) return clayMilitaryKeys[4];
+    }
+    // ── Prompt 18 Stage 1: universal clay mapping ─────────────────────────────
+    // Every legacy sticker kind that used to fall through to `return kind`
+    // (drawing from beachpark/civic/playground/vignettes sheets) now resolves
+    // to the nearest clay_park_* or clay_beach_* key instead.
+    //
+    // Clay park sheet index (4×4, clay_park_0..15):
+    //  0=slide  1=swingset  2=gazebo  3=bench  4=picnic-table  5=soccer-goal
+    //  6=pond  7=lamp  8=picnic-table-2  9=soccer-goal-2  10=pond-2
+    //  11=lamp-2  12=planter  13=seesaw  14=ice-cream-cart  15=fountain
+    //
+    // Clay beach sheet index (3×4, clay_beach_0..11):
+    //  0=umbrella  1=towel  2=lifeguard-tower  3=palms  4=rowboat  5=beach-ball
+    //  6=sandcastle-sm  7=sandcastle-lg  8=surfboard  9=kiddie-pool  10=pier  11=deck-chairs
+    switch (kind) {
+      // ── Park props → clay_park_* ─────────────────────────────────────────
+      case 'bench':        return 'clay_park_3';
+      case 'fountain':     return 'clay_park_15';
+      case 'cafetable':    return 'clay_park_4';
+      case 'foodcart':     return 'clay_park_14';
+      case 'icecream_cart':return 'clay_park_14';
+      case 'icecream':     return 'clay_park_14';
+      case 'birdbath':     return 'clay_park_12';  // planter stand-in
+      case 'shed':         return 'clay_park_2';   // gazebo stand-in (closest enclosed structure)
+      case 'gazebo':       return 'clay_park_2';
+      case 'watertower':   return 'clay_park_2';   // gazebo stand-in (tallest park structure)
+      case 'slide':        return 'clay_park_0';
+      case 'swingset':     return 'clay_park_1';
+      case 'trampoline':   return 'clay_park_1';   // swing stand-in (closest bouncy thing)
+      case 'hoop':         return 'clay_park_5';   // soccer goal stand-in
+      case 'seesaw':       return 'clay_park_13';
+      case 'sandbox':      return 'clay_park_12';  // planter stand-in
+      case 'picnic_table': return 'clay_park_8';
+      case 'bbq':          return 'clay_park_4';   // picnic table stand-in
+      case 'mower':        return 'clay_park_12';  // planter stand-in
+      case 'bike':         return 'clay_park_12';  // planter stand-in; no clay bike
+      case 'scooter':      return 'clay_park_12';  // planter stand-in; no clay scooter
+      case 'drone':        return 'clay_park_7';   // lamp stand-in (small aerial prop)
+      case 'streetlamp':   return 'clay_park_7';   // Stage 4 street furniture
+      case 'bus_stop':     return 'clay_park_11';  // lamp-2 stand-in
+      // ── Playground equipment → clay_park_* ──────────────────────────────
+      case 'pg_swing':        return 'clay_park_1';
+      case 'pg_slide':        return 'clay_park_0';
+      case 'pg_seesaw':       return 'clay_park_13';
+      case 'pg_sandbox':      return 'clay_park_12';
+      case 'pg_soccergoal':   return 'clay_park_5';
+      case 'pg_soccerball':   return 'clay_park_12'; // small planter stand-in
+      case 'pg_hoop':         return 'clay_park_5';
+      case 'pg_trampoline':   return 'clay_park_1';
+      case 'pg_merrygoround': return 'clay_park_11'; // lamp-2 round structure stand-in
+      // ── Beach props → clay_beach_* ──────────────────────────────────────
+      case 'umbrella':   return 'clay_beach_0';
+      case 'towel':      return 'clay_beach_1';
+      case 'lifeguard':  return 'clay_beach_2';
+      case 'surfboard':  return 'clay_beach_8';
+      case 'sandcastle': return 'clay_beach_6';
+      case 'crab':       return 'clay_beach_5';   // beach ball stand-in (small critter)
+      case 'seashell':   return 'clay_beach_5';   // beach ball stand-in
+      case 'kayak':      return 'clay_beach_4';   // rowboat stand-in
+      case 'rowboat':    return 'clay_beach_4';
+      case 'cooler':     return 'clay_beach_11';  // deck chairs stand-in
+      case 'kite_prop':  return 'clay_beach_5';   // beach ball stand-in (light, colourful)
+      // ── Beach palm → clay_beach_3 (palm cutout on beach sheet) ─────────────
+      case 'palm': return 'clay_beach_3';
+      // ── Vehicles: car_parked_a/b and civilian jeep → clay vehicle pool ──────
+      // Fallback to clay_park_12 (planter) if the sheet hasn't loaded yet.
+      case 'car_parked_a':
+      case 'car_parked_b':
+      case 'jeep':
+        return clayVehicleKeys.length ? clayVehicleKeys[id % clayVehicleKeys.length] : 'clay_park_12';
+      // ── Critters: no clay cutout — draw procedurally (coloured blobs, still eatable) ──
+      case 'dog':
+      case 'cat':
+      case 'duck':
+      case 'squirrel':
+      case 'bird':
+        return null;
+      // ── Vignette anchors → clay people pool; fallback to clay_park_4 ────────
+      case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':
+      case 'vig_busker':   case 'vig_painter': case 'vig_selfie':  case 'vig_kite':
+      case 'vig_gardener':
+        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_4';
+      // ── Zoo structures (not animals — they're covered by ZOO_KINDS above) ────
+      case 'zoo_gate':  return 'clay_park_2';   // gazebo stand-in for arched gate
+      case 'zoo_wall':  return 'clay_park_12';  // planter stand-in
+      case 'zookeeper':
+        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_3';
+      // ── Non-defense soldier (static, not clay-army) → people pool ────────────
+      case 'soldier':
+        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_3';
+      default: break;
     }
     return kind;
   }

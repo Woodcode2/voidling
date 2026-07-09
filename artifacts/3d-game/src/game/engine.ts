@@ -1559,8 +1559,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const py = player.prevY + (player.y - player.prevY) * alpha;
 
     // ── camera: Phase 4 §5 — radius-proportional zoom, NO zoom cap (vector ground is always crisp) ──
-    // viewHeight = radius * 28.57 → diameter / fh ≈ 7% (player ~7% of screen height at spawn)
-    const viewHeight = clamp(player.radius * 28.57, 350, fh * 6);
+    // Prompt 18 Stage 5: widen the view by ~22% at stages 1–2 (radius < MUNCHER threshold)
+    // so the early city reads at street level.  Stages 3+ are unchanged (mult = 28.57).
+    // The CAM_ZOOM_LERP smooths the transition as the player crosses r=50.
+    // OLD: fh / clamp(r*28.57, 350, fh*6)  →  Stage 1 zoom≈1.40, Stage 2 zoom≈0.66
+    // NEW: fh / clamp(r*35.00, 350, fh*6)  →  Stage 1 zoom≈1.14, Stage 2 zoom≈0.54 (22% wider)
+    const zoomMult = player.radius < 50 ? 35.0 : 28.57;
+    const viewHeight = clamp(player.radius * zoomMult, 350, fh * 6);
     const targetZoom = fh / viewHeight;
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
 
