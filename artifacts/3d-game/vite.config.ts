@@ -6,27 +6,11 @@ import { defineConfig, type Plugin } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    'PORT environment variable is required but was not provided.',
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    'BASE_PATH environment variable is required but was not provided.',
-  );
-}
+// PORT and BASE_PATH are provided by Replit's dev environment. On any other
+// host (Vercel, local) they are absent, so we default instead of throwing:
+// port only matters for the dev server, and the deployed site lives at '/'.
+const port = Number(process.env.PORT ?? 3000) || 3000;
+const basePath = process.env.BASE_PATH ?? '/';
 
 // ── review.txt — served as plain text before Vite's SPA catch-all ────────────
 // Vite's HTML-fallback middleware swallows anything it doesn't recognise as a
@@ -319,7 +303,7 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, 'dist/public'),
+    outDir: path.resolve(import.meta.dirname, 'dist'),
     emptyOutDir: true,
   },
   server: {
