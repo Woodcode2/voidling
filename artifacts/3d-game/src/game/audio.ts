@@ -180,6 +180,7 @@ export const audio = {
   get muted() { return !this.sfxOn; },
 
   init() {
+    try {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.sfxGain = this.ctx.createGain();
@@ -207,6 +208,7 @@ export const audio = {
       if (legacy !== null) this.sfxOn = legacy !== 'true';
     }
     this._applyMusicGain();
+    } catch { /* AudioContext blocked before user gesture on some mobile browsers — fail silently */ }
   },
 
   _applyMusicGain() {
