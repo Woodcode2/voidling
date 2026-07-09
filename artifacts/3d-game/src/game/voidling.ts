@@ -83,7 +83,10 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
 
   // blush cheeks (v6 §9: swell with cheek puff)
   const puff = v.cheekPuff || 0;
-  const blushA = (skin.extraBlush ? 0.5 : 0.22) + v.chomp * 0.3 + puff * 0.4;
+  // Task #4: personality — DEVOURER+ is cold (no blush), GOBBLER is too tough (half blush)
+  const _formForBlush = v.form || 0;
+  const _blushMult = _formForBlush >= 3 ? 0 : _formForBlush >= 2 ? 0.45 : 1;
+  const blushA = ((skin.extraBlush ? 0.5 : 0.22) + v.chomp * 0.3 + puff * 0.4) * _blushMult;
   ctx.save();
   ctx.globalAlpha = Math.min(1, blushA);
   ctx.fillStyle = '#FF7DA8';
@@ -510,6 +513,25 @@ export function drawUnderdogTrail(ctx: CanvasRenderingContext2D, x: number, y: n
   ctx.restore();
 }
 
+// Task #4: stage-unique body palettes — each form gets a distinct hue so players
+// feel a real transformation, not just size growth.
+// [inner-highlight, mid-body, outer-rim]
+const _STAGE_BODY: [string, string, string][] = [
+  ['#1A1040', '#2D1B68', '#4535A0'], // 0 VOIDLING  — soft indigo  (shy, curious)
+  ['#28104A', '#4B1E78', '#7A38A0'], // 1 MUNCHER   — warm plum    (hungry, eager)
+  ['#28083A', '#601060', '#9C2090'], // 2 GOBBLER   — hot magenta  (cocky, bold)
+  ['#1E0418', '#4C0828', '#841445'], // 3 DEVOURER  — deep crimson (cold, menacing)
+  ['#040212', '#0C0630', '#181055'], // 4 WORLD ENDER — abyss      (vast, detached)
+];
+// Swirl hue shifts to match the body — RGBA prefix (alpha appended at draw time)
+const _STAGE_SWIRL = [
+  'rgba(180,155,255,', // indigo-lavender
+  'rgba(220,140,255,', // pink-lavender
+  'rgba(255,120,220,', // hot pink
+  'rgba(255,110,160,', // blood rose
+  'rgba(200,220,255,', // cold starlight
+];
+
 // Phase 7a §1: procedural orb body — deep-purple radial gradient + rotating swirl arcs +
 // star specks. No PNG sprites, no white haloes, scales to any radius perfectly.
 function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
@@ -523,10 +545,12 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
+  // Task #4: per-stage gradient colors
+  const [c0, c1, c2] = _STAGE_BODY[Math.min(form, 4)];
   const grd = ctx.createRadialGradient(r * -0.2, r * -0.2, r * 0.06, 0, 0, r);
-  grd.addColorStop(0,   '#2A1745');
-  grd.addColorStop(0.55, '#3B2165');
-  grd.addColorStop(1,   '#4C3585');
+  grd.addColorStop(0,    c0);
+  grd.addColorStop(0.55, c1);
+  grd.addColorStop(1,    c2);
   ctx.fillStyle = grd;
   ctx.fillRect(-r, -r, r * 2, r * 2);
 
@@ -535,7 +559,8 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   const swirlAlpha = Math.min(0.55, 0.07 + form * 0.06);
   ctx.lineWidth = Math.max(1.5, r * 0.052);
   ctx.lineCap = 'round';
-  ctx.strokeStyle = `rgba(200,170,255,${swirlAlpha})`;
+  // Task #4: swirl hue follows stage identity
+  ctx.strokeStyle = `${_STAGE_SWIRL[Math.min(form, 4)]}${swirlAlpha})`;
   for (let i = 0; i < swirlCount; i++) {
     const a0 = swirl + (i / swirlCount) * Math.PI * 2;
     ctx.beginPath();
