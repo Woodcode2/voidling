@@ -16,19 +16,20 @@ const S = CONFIG.MAP_SIZE;
 
 // Ground color palette (from spec)
 const COL = {
-  meadow:   '#A8CD9F',
-  park:     '#B7DBA8',
-  forest:   '#8FBF88',
-  sand:     '#F2DFA7',
-  pavement: '#EAE4D6',
-  road:     '#9B9285',   // Prompt 8: warm clay-asphalt (was stark cool grey #939CAB)
-  rimWhite: '#FFFFFF',
-  cliff:    '#6B5B73',
-  waterS:   '#7FD4E8',
-  waterD:   '#5BB8D4',
-  riverMid: '#8FC6D4',   // Prompt 8: soft clay-blue river band
-  riverDeep:'#69A9C2',   // Prompt 8: deeper river core
-  roadDash: 'rgba(243,236,218,0.5)', // Prompt 8: muted warm off-white lane paint
+  meadow:    '#A8CD9F',
+  park:      '#B7DBA8',
+  forest:    '#8FBF88',
+  sand:      '#F2DFA7',
+  pavement:  '#EAE4D6',
+  road:      '#9B9285',    // Prompt 8: warm clay-asphalt (was stark cool grey #939CAB)
+  plazaDark: '#7A6B58',    // Issue 5: rich warm stone for downtown/plaza paving base
+  rimWhite:  '#FFFFFF',
+  cliff:     '#6B5B73',
+  waterS:    '#7FD4E8',
+  waterD:    '#5BB8D4',
+  riverMid:  '#8FC6D4',    // Prompt 8: soft clay-blue river band
+  riverDeep: '#69A9C2',    // Prompt 8: deeper river core
+  roadDash:  'rgba(243,236,218,0.5)', // Prompt 8: muted warm off-white lane paint
 };
 
 // ─── Smooth island path helper ────────────────────────────────────────────────
@@ -228,9 +229,27 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   //      Each distinct surface now reads as its own material.
   _texZone(cc, 'forest',   ZONE_FOREST_R,   COL.forest);
   _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
-  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, COL.pavement, true);
+  // Issue 5 Fix 2a: rich warm stone for downtown/plaza — street texture, not pale sidewalk.
+  _texZone(cc, 'street', ZONE_DOWNTOWN_R, COL.plazaDark, true);
+  // Warm-dark atmosphere overlay so downtown reads as dense dark streets.
+  {
+    cc.save();
+    tracIslandPath(cc); cc.clip();
+    const [_dx0, _dy0, _dx1, _dy1] = ZONE_DOWNTOWN_R;
+    cc.beginPath(); cc.rect(_dx0, _dy0, _dx1 - _dx0, _dy1 - _dy0); cc.clip();
+    const _dtGrd = cc.createLinearGradient(_dx0, _dy0, _dx1, _dy1);
+    _dtGrd.addColorStop(0,   'rgba(48,36,24,0.20)');
+    _dtGrd.addColorStop(0.5, 'rgba(38,28,18,0.16)');
+    _dtGrd.addColorStop(1,   'rgba(52,40,28,0.22)');
+    cc.fillStyle = _dtGrd;
+    cc.fillRect(_dx0, _dy0, _dx1 - _dx0, _dy1 - _dy0);
+    cc.restore();
+  }
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
+
+  // Issue 5 Fix 2b: warm golden lamplight pools baked into downtown + plaza ground.
+  _paintWarmGlow(cc);
 
   // ─ 2b. Procedural speckle — only baked when tex_grass hasn't loaded yet ──────
   if (!_texTiles.has('grass')) _bakeGrassTexture(cc);
@@ -987,6 +1006,45 @@ function _paintMowingStripes(cc: CanvasRenderingContext2D): void {
   cc.restore();
 }
 
+/** Issue 5 Fix 2b: soft warm-golden lamplight pools in downtown + plaza, baked once.
+ *  Uses additive ('lighter') blend at very low alpha — glow, not a color wash. */
+function _paintWarmGlow(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  cc.globalCompositeOperation = 'lighter';
+
+  const [dx0, dy0, dx1, dy1] = ZONE_DOWNTOWN_R;
+  const dw = dx1 - dx0, dh = dy1 - dy0;
+  // Plaza block sits at ~76% E, ~50% vertically within ZONE_DOWNTOWN_R (gx=3, gy=2).
+  const plazaCx = dx0 + dw * 0.76;
+  const plazaCy = dy0 + dh * 0.50;
+
+  // Warm-golden glow pools: [x, y, radius, alpha]
+  const POOLS: [number, number, number, number][] = [
+    [plazaCx,             plazaCy,             320, 0.040], // plaza fountain — brightest
+    [dx0 + dw * 0.28,    dy0 + dh * 0.22,     220, 0.028], // NW tower cluster
+    [dx0 + dw * 0.58,    dy0 + dh * 0.18,     190, 0.024], // NE tower edge
+    [dx0 + dw * 0.20,    dy0 + dh * 0.55,     200, 0.026], // W mid block
+    [dx0 + dw * 0.50,    dy0 + dh * 0.52,     180, 0.022], // central street lamp
+    [dx0 + dw * 0.80,    dy0 + dh * 0.70,     200, 0.026], // SE plaza side
+    [dx0 + dw * 0.42,    dy0 + dh * 0.82,     210, 0.028], // S downtown lamp
+    [dx0 + dw * 0.18,    dy0 + dh * 0.88,     170, 0.020], // SW corner lamp
+  ];
+
+  for (const [px, py, pr, pa] of POOLS) {
+    const g = cc.createRadialGradient(px, py, 0, px, py, pr);
+    g.addColorStop(0,    `rgba(255,210,80,${pa})`);
+    g.addColorStop(0.45, `rgba(255,185,55,${(pa * 0.52).toFixed(4)})`);
+    g.addColorStop(1,    'rgba(240,155,30,0)');
+    cc.fillStyle = g;
+    cc.beginPath(); cc.arc(px, py, pr, 0, Math.PI * 2); cc.fill();
+  }
+
+  cc.globalCompositeOperation = 'source-over';
+  cc.restore();
+}
+
 /** Yard fills, picket fences, driveways, and flowerbed accents for every suburb lot. */
 function _paintYards(cc: CanvasRenderingContext2D): void {
   if (_groundLots.length === 0) return;
@@ -1005,6 +1063,8 @@ function _paintYards(cc: CanvasRenderingContext2D): void {
     const hs = lot.fpR * 1.55;
     const x0 = lot.x - hs, y0 = lot.y - hs, w = hs * 2, h = hs * 2;
     const v1 = yrnd(), v2 = yrnd(), v3 = yrnd();
+    // Driveway half-width — needed by both the fence gate and the driveway strip below.
+    const dwW = Math.max(10, lot.fpR * 0.28);
 
     // ── Lawn: grass texture + per-yard tint ────────────────────────────────────
     if (grassPat) {
@@ -1018,14 +1078,64 @@ function _paintYards(cc: CanvasRenderingContext2D): void {
     cc.globalAlpha = 0.12 + v2 * 0.06;
     cc.fillRect(x0, y0, w, h);
 
-    // ── Picket fence ───────────────────────────────────────────────────────────
-    cc.globalAlpha = 1;
-    cc.strokeStyle = 'rgba(160,120,80,0.44)';
-    cc.lineWidth   = 3;
-    cc.strokeRect(x0 + 1.5, y0 + 1.5, w - 3, h - 3);
+    // ── Segmented picket fence — Issue 5 Fix 3 ────────────────────────────────
+    // Replaces the old dense strokeRect with larger spaced sections + corner posts
+    // and a driveway gate opening on the south side.
+    {
+      const SEG  = 100; // world-unit length of each fence section
+      const GAP  = 36;  // gap between sections
+      const STEP = SEG + GAP;
+      const POST = 3.5; // corner post radius (world units)
+      const fx0 = x0 + 1.5, fy0 = y0 + 1.5, fw = w - 3, fh = h - 3;
+      // Gate opening: spans the driveway plus half a segment so the gap is obvious
+      const gateHalf = dwW + SEG * 0.52;
+
+      cc.globalAlpha = 1;
+      cc.strokeStyle = 'rgba(160,120,80,0.44)';
+      cc.fillStyle   = 'rgba(160,120,80,0.58)';
+      cc.lineWidth   = 3;
+
+      // Corner posts
+      const corners: [number, number][] = [
+        [fx0,      fy0],
+        [fx0 + fw, fy0],
+        [fx0 + fw, fy0 + fh],
+        [fx0,      fy0 + fh],
+      ];
+      for (const [cpx, cpy] of corners) {
+        cc.beginPath(); cc.arc(cpx, cpy, POST, 0, Math.PI * 2); cc.fill();
+      }
+
+      // Draw fence sections along one side (parametric; skip segments near gateCx on south).
+      const drawSide = (
+        ax: number, ay: number, bx: number, by: number,
+        gateCx: number | null,
+      ) => {
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < POST * 2) return;
+        const ux = (bx - ax) / len, uy = (by - ay) / len;
+        let t = POST + GAP * 0.4;
+        const end = len - POST;
+        while (t < end) {
+          const tEnd = Math.min(t + SEG, end);
+          const sx = ax + ux * t,    sy = ay + uy * t;
+          const ex = ax + ux * tEnd, ey = ay + uy * tEnd;
+          if (gateCx !== null) {
+            const midX = (sx + ex) / 2;
+            if (Math.abs(midX - gateCx) < gateHalf) { t += STEP; continue; }
+          }
+          cc.beginPath(); cc.moveTo(sx, sy); cc.lineTo(ex, ey); cc.stroke();
+          t += STEP;
+        }
+      };
+
+      drawSide(fx0,      fy0,      fx0 + fw, fy0,      null);   // N side
+      drawSide(fx0 + fw, fy0,      fx0 + fw, fy0 + fh, null);   // E side
+      drawSide(fx0 + fw, fy0 + fh, fx0,      fy0 + fh, lot.x);  // S side (gate)
+      drawSide(fx0,      fy0 + fh, fx0,      fy0,      null);   // W side
+    }
 
     // ── Driveway (south-facing paved strip) ────────────────────────────────────
-    const dwW = Math.max(10, lot.fpR * 0.28);
     const dwH = hs * 0.60;
     const dwX = lot.x - dwW, dwY = lot.y + lot.fpR * 0.8;
     if (swPat) {

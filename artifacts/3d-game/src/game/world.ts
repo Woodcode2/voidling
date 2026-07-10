@@ -468,7 +468,13 @@ export class WorldManager {
     this.generateLots(rand);
     for (const g of this.swallowGhosts) g.active = false; // Feedback Juice §1: clear pool
 
-    const spawnX = this.size / 2, spawnY = this.size / 2;
+    // Spawn in the center of the first 'cozy' suburb block that lies on the island
+    // (falls back to map center if none qualify — should never happen with FIXED_PLAN).
+    const _cozySpawn = this.blocks.find(b =>
+      b.type === 'cozy' && isOnIsland(b.x0 + CONFIG.BLOCK_SIZE / 2, b.y0 + CONFIG.BLOCK_SIZE / 2, 0));
+    const spawnX = _cozySpawn ? _cozySpawn.x0 + CONFIG.BLOCK_SIZE / 2 : this.size / 2;
+    const spawnY = _cozySpawn ? _cozySpawn.y0 + CONFIG.BLOCK_SIZE / 2 : this.size / 2;
+    console.log(`[world] spawn block type=${_cozySpawn?.type ?? 'fallback'} @ (${spawnX.toFixed(0)}, ${spawnY.toFixed(0)})`);
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
       // Alive Pack §A: skip blocks whose center falls outside the island polygon.
