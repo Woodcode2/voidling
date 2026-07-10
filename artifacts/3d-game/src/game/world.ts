@@ -315,6 +315,7 @@ export class WorldManager {
   private dressManholes: { x: number; y: number }[] = [];
   private dressPaved: { x: number; y: number; kind: 'grate' | 'arrow' | 'leaf' | 'planter'; rot: number; s: number }[] = [];
   size: number;
+  spawnPoint: { x: number; y: number } = { x: 0, y: 0 };
   totalStartArea = 0;
   eatenArea = 0;
   initialMass = 0;         // v8 §3: frozen starting edible mass (% devoured denom)
@@ -468,7 +469,29 @@ export class WorldManager {
     this.generateLots(rand);
     for (const g of this.swallowGhosts) g.active = false; // Feedback Juice §1: clear pool
 
-    const spawnX = this.size / 2, spawnY = this.size / 2;
+    // Spawn in an interior cozy block, scanning for maximum clearance from building footprints
+    const _sb = this.blocks.find(b =>
+      b.type === 'cozy' && b.gx > 0 && b.gy > 0 &&
+      isOnIsland(b.x0 + CONFIG.BLOCK_SIZE / 2, b.y0 + CONFIG.BLOCK_SIZE / 2));
+    const [spawnX, spawnY] = (() => {
+      if (!_sb) return [this.size / 2, this.size / 2];
+      const lots = this.houseLots.filter(l =>
+        l.x >= _sb.x0 && l.x < _sb.x0 + CONFIG.BLOCK_SIZE &&
+        l.y >= _sb.y0 && l.y < _sb.y0 + CONFIG.BLOCK_SIZE);
+      // sample 7×7 grid covering inner sidewalk edge zone and house-dense interior
+      const offsets = [50, 270, 530, 800, 1070, 1330, 1550];
+      let bx = _sb.x0 + CONFIG.BLOCK_SIZE / 2, by = _sb.y0 + CONFIG.BLOCK_SIZE / 2, bd = 0;
+      for (const ox of offsets) for (const oy of offsets) {
+        const cx = _sb.x0 + ox, cy = _sb.y0 + oy;
+        if (!isOnIsland(cx, cy)) continue;
+        const d = lots.length > 0
+          ? Math.min(...lots.map(l => Math.hypot(l.x - cx, l.y - cy) - l.fpR))
+          : Infinity;
+        if (d > bd) { bd = d; bx = cx; by = cy; }
+      }
+      return [bx, by];
+    })();
+    this.spawnPoint = { x: spawnX, y: spawnY };
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
       // Alive Pack §A: skip blocks whose center falls outside the island polygon.
