@@ -21,6 +21,8 @@ import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furni
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
 import { loadClayMilitary } from './clayMilitary'; // Prompt 16: clay toy army
+import { loadClayFences } from './clayFences'; // Issue 2: clay fence sprites
+import { loadClayCreatures } from './clayCreatures'; // Issue 2: clay critter sprites
 import { drawLineup, lineupScroll } from './lineupDebug'; // Prompt 19 Stage 0: ?debug=lineup
 
 export type Screen = 'home' | 'game' | 'boon' | 'results' | 'shop' | 'dailyIntro';
@@ -361,6 +363,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   void loadClayZoo(base);
   void loadClayAirport(base);
   void loadClayMilitary(base);
+  void loadClayFences(base);
+  void loadClayCreatures(base);
 
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)

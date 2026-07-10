@@ -23,6 +23,8 @@ import { clayZooKeys, ZOO_KINDS } from './clayZoo'; // Prompt 16: clay zoo anima
 import { clayAirportKeys, AIRPORT_KINDS } from './clayAirport'; // Prompt 16: clay airport keys
 import { clayMilitaryKeys, MILITARY_KINDS } from './clayMilitary'; // Prompt 16: clay toy army keys
 import { setMatchLots, setMatchSportsFields } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
+import { FENCE_COZY_STYLES, FENCE_FANCY_STYLES, FENCE_PLANTER_KEY, type FenceStyle } from './clayFences'; // Issue 2: clay fence sprites for lot perimeters
+import { clayCritterKey } from './clayCreatures'; // Issue 2: clay critter sprites replacing procedural blobs
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -559,6 +561,8 @@ export class WorldManager {
     }
     // Map Rebuild: export lot geometry to drawMap so the ground cache bakes yards/driveways.
     setMatchLots(this.houseLots);
+    // Issue 2: place clay fence sprites along each lot perimeter (replaces painted fence line).
+    this.placeFences();
 
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
@@ -761,6 +765,131 @@ export class WorldManager {
     for (let i = 0; i < 60; i++) if (tryPlace(whole, SCENERY_GREEN, false)) green++;
 
     console.log(`SCENERY PLACED: forest=${forest} park=${park} beach=${beach} greenery=${green} total=${forest + park + beach + green}`);
+  }
+
+  // Issue 2: place clay fence sprites around every suburb house lot perimeter,
+  // replacing the flat painted fence line that was baked into the ground cache.
+  // Uses a local LCG so this never touches the main this.rand() sequence.
+  // Objects are pushed directly (bypassing makeObj's this.rand() calls) and
+  // tagged scenery+infra: eatable, excluded from win math, never respawn.
+  private placeFences() {
+    let fseed = 91234;
+    const frnd = () => {
+      fseed = (fseed * 1103515245 + 12345) & 0x7fffffff;
+      return fseed / 0x7fffffff;
+    };
+
+    const FENCE_R   = 13;  // half-height in world units (~0.4× person r=32)
+    const SEG_STEP  = 52;  // target world-unit spacing between run centres
+    const CORNER_R  = 14;  // corner piece slightly larger
+    const GATE_R    = 12;
+    const PLANTER_R = 11;
+
+    // Inline push — bypasses makeObj to avoid spending this.rand() calls.
+    const pushPiece = (x: number, y: number, key: string, r: number) => {
+      if (!isInsideIsland(x, y)) return;
+      this.objects.push({
+        id: this.nextId++,
+        kind: 'apple',
+        tier: 1,
+        x, y,
+        baseSize: r, size: r,
+        variant: 0,
+        eaten: false,
+        wobble: 0,
+        fleeing: false,
+        vx: 0, vy: 0,
+        living: false,
+        homeX: x, homeY: y,
+        wanderAngle: 0,
+        tether: 0,
+        roadAxis: 'h',
+        roadDir: 1,
+        honkCd: 0,
+        captured: false,
+        captureScale: 1,
+        captureRot: 0,
+        shadowX: 0, shadowY: 0,
+        alertT: 0,
+        golden: false,
+        arrive: 0,
+        contactRadius: r * 0.5,
+        infra: true,
+        bubbleText: null,
+        bubbleLife: 0,
+        scenery: true,
+        sceneryKey: key,
+      });
+    };
+
+    let totalFences = 0;
+
+    for (const lot of this.houseLots) {
+      const bt = this.blockTypeAt(lot.x, lot.y);
+      if (bt !== 'cozy' && bt !== 'fancy' && bt !== 'residential') continue;
+
+      const isFancy = bt === 'fancy';
+      const styles = isFancy ? FENCE_FANCY_STYLES : FENCE_COZY_STYLES;
+      const style: FenceStyle = styles[Math.floor(frnd() * styles.length)];
+      const pickRun = () => style.run[Math.floor(frnd() * style.run.length)];
+
+      const hs = lot.fpR * 1.55;
+      const x0 = lot.x - hs, y0 = lot.y - hs;
+      const x1 = lot.x + hs, y1 = lot.y + hs;
+      const sideLen = hs * 2;
+
+      // Driveway gate half-width (matches drawMap driveway)
+      const gateHW = Math.max(12, lot.fpR * 0.28) * 2.0;
+
+      // How many run segments fit per side (at least 1)
+      const numRuns = Math.max(1, Math.round(sideLen / SEG_STEP));
+      const actualStep = sideLen / (numRuns + 1); // even distribution
+
+      // ── Corners ──────────────────────────────────────────────────────────────
+      pushPiece(x0, y0, style.corner, CORNER_R);
+      pushPiece(x1, y0, style.corner, CORNER_R);
+      pushPiece(x0, y1, style.corner, CORNER_R);
+      pushPiece(x1, y1, style.corner, CORNER_R);
+
+      // ── North side runs (y = y0) ──────────────────────────────────────────
+      for (let i = 1; i <= numRuns; i++) {
+        pushPiece(x0 + i * actualStep, y0, pickRun(), FENCE_R);
+      }
+
+      // ── South side runs (y = y1) — gate opening at driveway centre ───────
+      for (let i = 1; i <= numRuns; i++) {
+        const rx = x0 + i * actualStep;
+        if (Math.abs(rx - lot.x) < gateHW) {
+          // Gate or gap at driveway
+          if (style.gate) pushPiece(rx, y1, style.gate, GATE_R);
+        } else {
+          pushPiece(rx, y1, pickRun(), FENCE_R);
+        }
+      }
+
+      // ── West side runs (x = x0) ───────────────────────────────────────────
+      for (let i = 1; i <= numRuns; i++) {
+        pushPiece(x0, y0 + i * actualStep, pickRun(), FENCE_R);
+      }
+
+      // ── East side runs (x = x1) ───────────────────────────────────────────
+      for (let i = 1; i <= numRuns; i++) {
+        pushPiece(x1, y0 + i * actualStep, pickRun(), FENCE_R);
+      }
+
+      // ── Planter accent (fancy only, ~60% chance) ──────────────────────────
+      if (isFancy && frnd() < 0.6) {
+        const px = lot.x + (frnd() - 0.5) * hs * 0.7;
+        const py = y1 - PLANTER_R * 0.5;
+        if (Math.abs(px - lot.x) > gateHW + 8) {
+          pushPiece(px, py, FENCE_PLANTER_KEY, PLANTER_R);
+        }
+      }
+
+      totalFences++;
+    }
+
+    console.log(`[placeFences] fenced lots=${totalFences} total fence objects=${this.objects.filter(o => o.sceneryKey?.startsWith('clay_fence')).length}`);
   }
 
   // v5 §3 — guarantee edible coverage across the whole map
@@ -2559,13 +2688,15 @@ export class WorldManager {
       case 'car_parked_b':
       case 'jeep':
         return clayVehicleKeys.length ? clayVehicleKeys[id % clayVehicleKeys.length] : 'clay_park_12';
-      // ── Critters: no clay cutout — draw procedurally (coloured blobs, still eatable) ──
+      // ── Critters: clay cutouts from critters_clay_sheet (Issue 2) ───────────
       case 'dog':
       case 'cat':
       case 'duck':
       case 'squirrel':
-      case 'bird':
-        return null;
+      case 'bird': {
+        const ck = clayCritterKey(kind, id);
+        return ck ?? null;
+      }
       // ── Vignette anchors → clay people pool; fallback to clay_park_4 ────────
       case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':
       case 'vig_busker':   case 'vig_painter': case 'vig_selfie':  case 'vig_kite':
