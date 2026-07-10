@@ -17,6 +17,8 @@ import { clayZooKeys } from './clayZoo';
 import { clayFoodKeys } from './clayFood';
 import { clayAirportKeys } from './clayAirport';
 import { clayMilitaryKeys } from './clayMilitary';
+import { clayFenceKeys } from './clayFences';
+import { clayCritterKeys } from './clayCreatures';
 
 // Scroll state (accumulated wheel delta, clamped ≥ 0).
 let _scrollY = 0;
@@ -113,6 +115,20 @@ function buildRows(): LineupRow[] {
     rows.push({
       label: 'MILITARY (clay_military_0..5)',
       items: milFilled.map((k) => ({ key: k, r: 70 })),
+    });
+  }
+  const fenceFilled = clayFenceKeys.filter(Boolean) as string[];
+  if (fenceFilled.length > 0) {
+    rows.push({
+      label: 'FENCES (clay_fence_0..11)',
+      items: fenceFilled.map((k) => ({ key: k, r: 20 })),
+    });
+  }
+  const critterFilled = clayCritterKeys.filter(Boolean) as string[];
+  if (critterFilled.length > 0) {
+    rows.push({
+      label: 'CRITTERS (clay_critter_0..11)',
+      items: critterFilled.map((k) => ({ key: k, r: 22 })),
     });
   }
 
