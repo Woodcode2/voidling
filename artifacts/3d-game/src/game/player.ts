@@ -626,7 +626,7 @@ export class Player extends Void {
       ctx.arc(rx, ry, this.radius + 5, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-} else {
+    } else {
       // Alive Pack §4: apply move-bob vertical offset
       // Batch 1: sky-fall arrival — the body drops in from above, a shadow
       // grows on the street, dust puffs on landing. Purely visual.
@@ -635,6 +635,7 @@ export class Player extends Void {
       drawVoidling(ctx, rx, ry + this.bobOffset - drop, this.visual(t));
       arrival.drawFX(ctx, rx, ry, this.r);
     }
+  }
 
   // v14 §2: Accretion Orbit visual — items spiral in with spaghettification
   private drawOrbit(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number) {
