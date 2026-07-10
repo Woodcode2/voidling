@@ -22,7 +22,7 @@ import {
 import { clayZooKeys, ZOO_KINDS } from './clayZoo'; // Prompt 16: clay zoo animal keys
 import { clayAirportKeys, AIRPORT_KINDS } from './clayAirport'; // Prompt 16: clay airport keys
 import { clayMilitaryKeys, MILITARY_KINDS } from './clayMilitary'; // Prompt 16: clay toy army keys
-import { setMatchLots, setMatchSportsFields } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
+import { setMatchLots, setMatchSportsFields, setMatchLamps } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines; FIX §7: warm-glow lamp positions
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -331,6 +331,7 @@ export class WorldManager {
   private rand: () => number = Math.random;
   planName = 'METRO';          // v16.2 §6: current city plan name
   openingBeatPersonId = -1;    // v16.2 §1: person who says "Huh… is that a void?"
+  spawnPoint: { x: number; y: number } = { x: CONFIG.MAP_SIZE / 2, y: CONFIG.MAP_SIZE / 2 }; // FIX §7: suburb spawn (set in init)
   // Life Pack §2: sports field decals (rendered in drawGround, not in objects[])
   fieldDecals: FieldDecal[] = [];
   // Life Pack §3: vignette eaten banners — read and cleared by engine.ts each tick
@@ -468,7 +469,19 @@ export class WorldManager {
     this.generateLots(rand);
     for (const g of this.swallowGhosts) g.active = false; // Feedback Juice §1: clear pool
 
-    const spawnX = this.size / 2, spawnY = this.size / 2;
+    // FIX §7: spawn in an interior cozy block (not the plaza/center) — pick the first
+    // cozy block with gx>0 && gy>0 whose center is confirmed on the island.
+    let spawnX = this.size / 2, spawnY = this.size / 2;
+    {
+      const cozy = this.blocks.filter(b => b.type === 'cozy' && b.gx > 0 && b.gy > 0);
+      for (const sb of cozy) {
+        const cx = sb.x0 + CONFIG.BLOCK_SIZE / 2;
+        const cy = sb.y0 + CONFIG.BLOCK_SIZE / 2;
+        if (isOnIsland(cx, cy)) { spawnX = cx; spawnY = cy; break; }
+      }
+    }
+    this.spawnPoint = { x: spawnX, y: spawnY };
+    console.log(`[world] spawnPoint cozy @ (${spawnX.toFixed(0)},${spawnY.toFixed(0)})`);
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
       // Alive Pack §A: skip blocks whose center falls outside the island polygon.
@@ -621,6 +634,8 @@ export class WorldManager {
         if (isOnIsland(bsx, bsy)) this.makeObj('bus_stop', bsx, bsy, { infra: true });
       }
     }
+    // FIX §7: pass all streetlamp positions to drawMap so the ground cache can bake warm-glow pools
+    setMatchLamps(this.objects.filter(o => o.kind === 'streetlamp').map(o => ({ x: o.x, y: o.y })));
 
     // Prompt 5: scatter clay scenery (eatable bonus food, excluded from win math).
     this.scatterScenery(rand);
