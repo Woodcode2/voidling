@@ -9,6 +9,7 @@ import { clamp, lerp } from './utils';
 import { Void } from './void';
 import { drawParkObject } from './objects';
 import { drawVoidling, drawUnderdogTrail, drawSparkleTrail, type VoidlingVisual } from './voidling';
+import { arrival } from './arrival';
 import type { WorldObject } from './world';
 
 // v14 §2: each captured object orbits while spiraling inward; growth/score
@@ -120,6 +121,7 @@ export class Player extends Void {
     this.x = this.prevX = x;
     this.y = this.prevY = y;
     this.vx = this.vy = 0;
+    arrival.begin();
     this.inDirX = this.inDirY = this.inMag = 0;
     this.inputActive = false;
     this.radius = CONFIG.PLAYER_BASE_RADIUS;
@@ -624,11 +626,15 @@ export class Player extends Void {
       ctx.arc(rx, ry, this.radius + 5, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-    } else {
+} else {
       // Alive Pack §4: apply move-bob vertical offset
-      drawVoidling(ctx, rx, ry + this.bobOffset, this.visual(t));
+      // Batch 1: sky-fall arrival — the body drops in from above, a shadow
+      // grows on the street, dust puffs on landing. Purely visual.
+      const drop = arrival.offsetY(this.r);
+      if (drop > 0.5) arrival.drawShadow(ctx, rx, ry, this.r);
+      drawVoidling(ctx, rx, ry + this.bobOffset - drop, this.visual(t));
+      arrival.drawFX(ctx, rx, ry, this.r);
     }
-  }
 
   // v14 §2: Accretion Orbit visual — items spiral in with spaghettification
   private drawOrbit(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number) {
