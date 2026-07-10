@@ -14,14 +14,14 @@ import { CONFIG } from './config';
 
 const S = CONFIG.MAP_SIZE;
 
-// Ground color palette (from spec)
+// Ground color palette — FIX §7: richer/warmer (reversed from muted)
 const COL = {
-  meadow:   '#A8CD9F',
-  park:     '#B7DBA8',
-  forest:   '#8FBF88',
-  sand:     '#F2DFA7',
-  pavement: '#EAE4D6',
-  road:     '#9B9285',   // Prompt 8: warm clay-asphalt (was stark cool grey #939CAB)
+  meadow:   '#8CC87E',   // was #A8CD9F → deeper, more saturated warm green
+  park:     '#9ED48E',   // was #B7DBA8 → richer park green
+  forest:   '#6AA862',   // was #8FBF88 → deeper forest
+  sand:     '#EDD07A',   // was #F2DFA7 → richer warmer sand
+  pavement: '#E0D8C0',   // was #EAE4D6 → warmer
+  road:     '#9B9285',   // Prompt 8: warm clay-asphalt
   rimWhite: '#FFFFFF',
   cliff:    '#6B5B73',
   waterS:   '#7FD4E8',
@@ -131,6 +131,16 @@ export function setMatchSportsFields(
   _groundBuf = null;
 }
 
+// ─── Per-match streetlamp positions for warm-glow pass (FIX §7) ──────────────
+let _glowLamps: { x: number; y: number }[] = [];
+
+/** Store streetlamp world positions so the next ground-cache build bakes warm-glow pools.
+ *  Called from world.ts after the lamp placement pass. */
+export function setMatchLamps(lamps: ReadonlyArray<{ x: number; y: number }>): void {
+  _glowLamps = lamps.map(l => ({ x: l.x, y: l.y }));
+  _groundBuf = null;
+}
+
 function _ensureGroundBuffer(): HTMLCanvasElement {
   if (_groundBuf) return _groundBuf;
   const buf = document.createElement('canvas');
@@ -214,12 +224,11 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
       bgrd.addColorStop(1,    _darken(COL.meadow, 0.07));
       cc.fillStyle = bgrd; cc.fillRect(0, 0, S, S);
     }
-    // Lighting atmosphere on top (always)
-    // Prompt 15 Stage 5: richer green tint to match reference vibrancy.
+    // Lighting atmosphere on top — FIX §7: warm golden-amber (was gray/dark muting)
     const atmo = cc.createLinearGradient(0, 0, S, S);
-    atmo.addColorStop(0,   'rgba(20,70,10,0.12)');
-    atmo.addColorStop(0.5, 'rgba(0,0,0,0.04)');
-    atmo.addColorStop(1,   'rgba(0,0,0,0.09)');
+    atmo.addColorStop(0,   'rgba(255,200,100,0.10)');
+    atmo.addColorStop(0.5, 'rgba(240,165,55,0.05)');
+    atmo.addColorStop(1,   'rgba(200,130,50,0.08)');
     cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
     cc.restore();
   }
@@ -596,6 +605,66 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     }
     cc.restore();
   }
+
+  // ─ 10. Warm-glow pass — additive light pools baked into ground cache (FIX §7) ─
+  _paintWarmGlow(cc);
+}
+
+// ─── FIX §7: warm-glow pass (baked once into ground cache, zero per-frame cost) ─
+
+/** Paint additive warm-light pools around streetlamps, downtown block bases,
+ *  and the plaza center. Alpha values are high enough to read at gameplay zoom. */
+function _paintWarmGlow(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  cc.globalCompositeOperation = 'lighter';
+
+  // ── Per-lamp warm pools ──────────────────────────────────────────────────────
+  const LAMP_R = 400;
+  for (const lamp of _glowLamps) {
+    const grd = cc.createRadialGradient(lamp.x, lamp.y, 0, lamp.x, lamp.y, LAMP_R);
+    grd.addColorStop(0,    'rgba(255,205,120,0.18)');
+    grd.addColorStop(0.40, 'rgba(255,185,80,0.08)');
+    grd.addColorStop(1,    'rgba(255,160,50,0)');
+    cc.fillStyle = grd;
+    cc.fillRect(lamp.x - LAMP_R, lamp.y - LAMP_R, LAMP_R * 2, LAMP_R * 2);
+  }
+
+  // ── Downtown block bases (deterministic from block grid) ─────────────────────
+  const MGLOW = (S - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
+  const SGLOW = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
+  const DT_BLOCKS = [
+    { gx: 2, gy: 1 }, { gx: 3, gy: 1 },
+    { gx: 2, gy: 2 },
+    { gx: 2, gy: 3 }, { gx: 3, gy: 3 },
+  ];
+  const DT_GLOW_R = 1000;
+  for (const b of DT_BLOCKS) {
+    const bx = MGLOW + b.gx * SGLOW + CONFIG.BLOCK_SIZE / 2;
+    const by = MGLOW + b.gy * SGLOW + CONFIG.BLOCK_SIZE * 0.80;
+    const grd = cc.createRadialGradient(bx, by, 0, bx, by, DT_GLOW_R);
+    grd.addColorStop(0,    'rgba(255,200,110,0.15)');
+    grd.addColorStop(0.35, 'rgba(255,175,75,0.07)');
+    grd.addColorStop(1,    'rgba(255,150,50,0)');
+    cc.fillStyle = grd;
+    cc.fillRect(bx - DT_GLOW_R, by - DT_GLOW_R, DT_GLOW_R * 2, DT_GLOW_R * 2);
+  }
+
+  // ── Plaza center (gx=3,gy=2) — brightest glow ────────────────────────────────
+  const plazaX = MGLOW + 3 * SGLOW + CONFIG.BLOCK_SIZE / 2;
+  const plazaY = MGLOW + 2 * SGLOW + CONFIG.BLOCK_SIZE / 2;
+  const PLAZA_R = 1300;
+  const plazaGrd = cc.createRadialGradient(plazaX, plazaY, 0, plazaX, plazaY, PLAZA_R);
+  plazaGrd.addColorStop(0,    'rgba(255,225,150,0.32)');
+  plazaGrd.addColorStop(0.20, 'rgba(255,210,120,0.20)');
+  plazaGrd.addColorStop(0.50, 'rgba(255,185,80,0.09)');
+  plazaGrd.addColorStop(1,    'rgba(255,160,50,0)');
+  cc.fillStyle = plazaGrd;
+  cc.fillRect(plazaX - PLAZA_R, plazaY - PLAZA_R, PLAZA_R * 2, PLAZA_R * 2);
+
+  cc.globalCompositeOperation = 'source-over';
+  cc.restore();
 }
 
 // ─── Prompt 19 §6: sports field marking painters ─────────────────────────────

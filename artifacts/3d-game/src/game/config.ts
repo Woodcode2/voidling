@@ -314,20 +314,20 @@ export const CONFIG = {
     secondaryBtnEdge: '#C79A12',
     secondaryText: '#14082B',
 
-    // ── Ground: muted so it recedes (nothing more contrasty than smallest edible) ──
+    // ── Ground: warm lush city at dusk (FIX §7: reversed from muted) ──
     ground: {
       asphalt: '#8A93A6',
       asphaltEdge: '#7C8598',
       sidewalk: '#D8D3C8',
       sidewalkSeam: 'rgba(0,0,0,0.06)',
       lane: 'rgba(255,255,255,0.4)',
-      lawns: ['#8FCDA0', '#7FC494', '#98D3A8'],
-      pavement: '#E4DECF',
+      lawns: ['#62BF84', '#52AF72', '#74CB90'],  // deeper saturated grass greens, slight warm
+      pavement: '#DDD8C2',                        // warmer pavement
       pavementSeam: 'rgba(0,0,0,0.05)',
       pond: '#2D9CDB',          // v10 §2: vivid palette match
       pondEdge: '#FFFFFF',
-      driveway: '#C9C4B8',
-      dirt: '#B79A6B',
+      driveway: '#C4BEB0',
+      dirt: '#C29050',          // richer, warmer sand/dirt
     },
 
     // Sticker style
