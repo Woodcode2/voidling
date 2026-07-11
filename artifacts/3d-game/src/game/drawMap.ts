@@ -377,6 +377,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.filter = 'none';
   cc.restore();
 
+  // Stage D: cool stone bank edging — solid rim peeking out from under the water
+  _riverStroke(cc, RIVER_HALF_W * 2.2 + 16, '#8B94A6');
+
   {
     const wt = _texTiles.get('water');
     if (wt) {
@@ -402,6 +405,21 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   }
   // Depth overlay — darker core tint on top of whatever surface is showing.
   _riverStroke(cc, RIVER_HALF_W * 0.8, 'rgba(25,85,130,0.28)');
+
+  // Stage D: static foam streaks along the flow (the live shimmer animates on top)
+  cc.save();
+  cc.setLineDash([18, 46]);
+  cc.lineCap = 'round';
+  cc.strokeStyle = 'rgba(255,255,255,0.30)';
+  cc.lineWidth = RIVER_HALF_W * 0.45;
+  cc.beginPath();
+  for (let i = 0; i < RIVER_PATH.length; i++) {
+    const [rx, ry] = RIVER_PATH[i];
+    i === 0 ? cc.moveTo(rx, ry) : cc.lineTo(rx, ry);
+  }
+  cc.stroke();
+  cc.setLineDash([]);
+  cc.restore();
 
   cc.restore();
 
@@ -953,13 +971,13 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
   ctx.translate(wx, wy);
 
   // 1. soft blue-white glow behind the falls
-  const glow = ctx.createRadialGradient(0, 90, 18, 0, 90, 250);
+  const glow = ctx.createRadialGradient(0, 90, 18, 0, 90, 330); // Stage D: bigger presence
   glow.addColorStop(0,   'rgba(190,235,255,0.55)');
   glow.addColorStop(0.5, 'rgba(127,212,232,0.26)');
   glow.addColorStop(1,   'rgba(127,212,232,0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(0, 100, 135, 300, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 100, 170, 340, 0, 0, Math.PI * 2); // Stage D: wider glow
   ctx.fill();
 
   // 2. flowing water column: clip a tapering falls region, scroll bright bands down
@@ -1003,7 +1021,7 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  if (_mist.length < 26) {
+  if (_mist.length < 36) { // Stage D: denser mist pool
     _mist.push({
       x: (Math.random() - 0.5) * 130,
       y: 320 + Math.random() * 26,
