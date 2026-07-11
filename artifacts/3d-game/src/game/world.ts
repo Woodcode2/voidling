@@ -3,6 +3,7 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject } from './objects'; // wind removed — tuft system deleted in Prompt 14
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
+import { cityBuildingKeys, cityLandmarkKeys, zooPropKeys, streetPropKeys } from './cityAssets'; // Structural Rebuild: new city art pools
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
   SITTER_CLAY_INDICES,
@@ -733,7 +734,7 @@ export class WorldManager {
       let offIsland2 = 0;
       for (const o of this.objects) if (!o.eaten && !isInsideIsland(o.x, o.y)) offIsland2++;
       console.log(`SUBURB LOTS: ${suburbN}`);
-      console.log(`DOWNTOWN LOTS: ${downtownN}`);
+      console.log(`DOWNTOWN LOTS: ${downtownN} (landmarks: ${S.filter(l => l.kind === 'landmark').length})`);
       console.log(`BUILDING OVERLAPS: ${overlaps}`);
       console.log(`BUILDINGS ON ROADS: ${onRoads}`);
       console.log(`OFF-ISLAND ENTITIES: ${offIsland2}`);
@@ -1340,6 +1341,21 @@ export class WorldManager {
     // distance to the central plaza, then assign tallest→nearest, shortest→edge.
     const DT_STEP = 248;  // canyon-tight tower grid (6×6 cells/block) — street-wall feel
     const DT_INSET = CONFIG.SIDEWALK + 80;
+
+    // Structural Rebuild: one LANDMARK per downtown block, placed FIRST at the
+    // block centre so the tower grid packs around it (lotFree rejects overlap).
+    // These are the marquee trophy eats — city hall, stadium, ferris wheel...
+    for (const b of this.blocks) {
+      if (b.type !== 'downtown') continue;
+      const lx = b.x0 + B / 2, ly = b.y0 + B / 2;
+      if (!isOnIsland(lx, ly, 0)) continue;
+      const size = rSize('landmark');
+      const fpR = size * FP;
+      if (!this.roadClear(lx, ly, fpR) || !railClear(lx, ly, fpR)) continue;
+      const lot: StructureLot = { x: lx, y: ly, size, fpR, kind: 'landmark' };
+      (b.buildingLots ??= []).push(lot);
+      this.structureLots.push(lot);
+    }
     const cells: { x: number; y: number; block: Block; d2: number }[] = [];
     const px = this.size / 2, py = this.size / 2;
     for (const b of this.blocks) {
@@ -1403,6 +1419,42 @@ export class WorldManager {
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
     this.scatter(b, rand, 'car_parked_a', 1);
     this.scatter(b, rand, 'car_parked_b', 1);
+
+    // NEW street art (street_props_sheet): engineered sidewalk furniture on
+    // the block perimeter — bus shelter, kiosk, hot dog stand, planters,
+    // phone booth, street clock. Placed on the sidewalk band, clear of lots.
+    if (streetPropKeys.length >= 12) {
+      const B = CONFIG.BLOCK_SIZE;
+      const band = CONFIG.SIDEWALK * 0.55; // inset from block edge → on the pavement
+      const wants: Array<[string, number]> = [
+        [streetPropKeys[0], 42],  // bus shelter
+        [streetPropKeys[1], 38],  // kiosk / newsstand
+        [streetPropKeys[4], 34],  // hot dog stand
+        [streetPropKeys[6], 24],  // planter
+        [streetPropKeys[8], 30],  // phone booth
+        [streetPropKeys[11], 30], // street clock
+      ];
+      for (let i = 0; i < wants.length; i++) {
+        const [key, R] = wants[i];
+        // walk the perimeter: pick an edge + position from the prop index so
+        // furniture spreads around the block deterministically per block seed
+        const t = (i + rand() * 0.8) / wants.length;
+        const per = t * 4;
+        const edge = Math.floor(per) % 4;
+        const f = 0.15 + (per - Math.floor(per)) * 0.7;
+        let x: number, y: number;
+        if (edge === 0) { x = b.x0 + f * B; y = b.y0 + band; }
+        else if (edge === 1) { x = b.x0 + B - band; y = b.y0 + f * B; }
+        else if (edge === 2) { x = b.x0 + f * B; y = b.y0 + B - band; }
+        else { x = b.x0 + band; y = b.y0 + f * B; }
+        let blocked = false;
+        for (const lot of b.buildingLots ?? []) {
+          const md = lot.fpR + R + 10;
+          if ((lot.x - x) ** 2 + (lot.y - y) ** 2 < md * md) { blocked = true; break; }
+        }
+        if (!blocked) this.placeSceneryProp(key, x, y, R);
+      }
+    }
   }
 
   // v16 §1: civic block — school+library on index 0, hospital+townhall on index 1
@@ -1515,6 +1567,40 @@ export class WorldManager {
 
     // Zoo VISITORS — a zoo without people made 0 sense
     this.scatterPeople(b, rand, 'any', 6);
+
+    // NEW zoo art (zoo_props_sheet): habitat features inside pens + a real
+    // visitor plaza at the entrance. Without these the zoo read as random
+    // animals on grass — "makes 0 sense".
+    if (zooPropKeys.length >= 12) {
+      // One habitat feature per pen (rock formation / watering hole / log pile)
+      const habitat = [zooPropKeys[3], zooPropKeys[5], zooPropKeys[6]];
+      for (let col = 0; col < 3; col++) {
+        const px = zx0 + ins + col * (penW + 40) + penW / 2;
+        const py = zy0 + ins + ph * 0.5;
+        this.placeSceneryProp(habitat[col], px, py, 46 + rand() * 10);
+      }
+      // Stone-rimmed pond under the flamingos (drawn first, animals wade on it)
+      this.placeSceneryProp(zooPropKeys[4], pondX, pondY + 30, 78, 1);
+      // Entrance plaza (south edge, mid-block): ticket booth, popcorn cart,
+      // hedges and info signs along the visitor spine.
+      const ex = bx, ey = zy1 - 130;
+      this.placeSceneryProp(zooPropKeys[7], ex - 150, ey, 44);        // ticket booth
+      this.placeSceneryProp(zooPropKeys[11], ex + 130, ey - 30, 36);  // popcorn cart
+      this.placeSceneryProp(zooPropKeys[9], ex - 320, ey + 10, 30);   // hedge
+      this.placeSceneryProp(zooPropKeys[9], ex + 300, ey + 10, 30);   // hedge
+      this.placeSceneryProp(zooPropKeys[8], ex - 60, by + 40, 26);    // info sign
+      this.placeSceneryProp(zooPropKeys[8], ex + 220, by - 120, 26);  // info sign
+    }
+  }
+
+  /** Place a static sprite prop (new city/zoo/street art) as eatable scenery. */
+  private placeSceneryProp(key: string, x: number, y: number, R: number, tier = 2) {
+    if (!isOnIsland(x, y, 20)) return;
+    this.makeObj('apple', x, y, {
+      scenery: true, sceneryKey: key,
+      baseSize: R, size: R, contactRadius: R * 0.85,
+      tier, living: false, infra: false,
+    });
   }
 
   // Rebuild Prompt 16: the airport opens — terminal, control tower, hangar, planes, props.
@@ -1847,7 +1933,7 @@ export class WorldManager {
   private canEatByPlayer(player: Player, obj: WorldObject) {
     if (obj.kind === 'watertower') return player.radius >= CONFIG.WATERTOWER_EAT_RADIUS;
     if (obj.kind === 'train') return player.radius >= CONFIG.TRAIN_EAT_RADIUS; // WORLD-ENDER prey
-    if (obj.kind === 'skyscraper') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
+    if (obj.kind === 'skyscraper' || obj.kind === 'landmark') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
     if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') return player.radius >= CONFIG.ZOO_GATE_EAT_RADIUS; // v16.1 D
     if (obj.tier === 0) return true; // Feel Patch §2: tier-0 bits always edible
     return player.radius >= obj.size * CONFIG.EAT_RATIO;
@@ -2022,7 +2108,7 @@ export class WorldManager {
       for (const r of rivals) {
         if (!r.alive || r.ghost) continue;
         if (obj.kind === 'watertower' || obj.kind === 'train') continue; // only the player eats these
-        if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
+        if (obj.kind === 'skyscraper' || obj.kind === 'landmark') continue; // only WORLD ENDER player eats these
         if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue; // v16.1 D: GOBBLER+ only
         const dr = dist(obj.x, obj.y, r.x, r.y);
         // v16 §3: use art-derived contactRadius instead of CONFIG.CONTACT_SCALE
@@ -2040,7 +2126,7 @@ export class WorldManager {
     // consumed by the main-loop contact check (lines above).
     for (const obj of this.objects) {
       if (obj.eaten || obj.captured) continue;
-      if (obj.kind === 'watertower' || obj.kind === 'skyscraper' || obj.kind === 'train') continue;
+      if (obj.kind === 'watertower' || obj.kind === 'skyscraper' || obj.kind === 'train' || obj.kind === 'landmark') continue;
       if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue;
       // find nearest rival within vacuum range that can eat this object
       let nearestRival: Rival | null = null;
@@ -2618,7 +2704,8 @@ export class WorldManager {
       fx.shake(120, 2, 3); // Feel Patch §6: light shake on house eat (was 300ms/10px)
       fx.addDebris(obj.x, obj.y, '#C4736B', 4);
       fx.addDebris(obj.x, obj.y, '#F6E7B0', 2);
-    } else if (obj.kind === 'skyscraper') {
+    } else if (obj.kind === 'skyscraper' || obj.kind === 'landmark') {
+      if (obj.kind === 'landmark') this.eatenVignetteBanners.push('🏛️ CITY LANDMARK: DEVOURED');
       // v12 §1: skyscraper collapse — 3 shake pulses, debris shower, twin rings
       fx.shake(130, 18, [0, 160, 320]);
       fx.addDebris(obj.x, obj.y, '#5A8AB0', 8);
@@ -2687,8 +2774,14 @@ export class WorldManager {
       if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
       return null;
     }
-    if (kind === 'skyscraper' && claySkyscraperKeys.length) {
-      return claySkyscraperKeys[id % claySkyscraperKeys.length];
+    // Structural Rebuild: downtown resolves to the NEW wide city buildings —
+    // the 4 needle-skyscraper era is over. Offices share the pool (varied city).
+    if (kind === 'skyscraper' || kind === 'office') {
+      if (cityBuildingKeys.length) return cityBuildingKeys[id % cityBuildingKeys.length];
+      if (kind === 'skyscraper' && claySkyscraperKeys.length) return claySkyscraperKeys[id % claySkyscraperKeys.length];
+    }
+    if (kind === 'landmark') {
+      return cityLandmarkKeys.length ? cityLandmarkKeys[id % cityLandmarkKeys.length] : null;
     }
     // Prompt 4: clay people + vehicle variety pools (visual only; contact radius
     // stays keyed off the unchanged kind). Falls back to the kind sprite when the

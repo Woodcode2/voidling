@@ -67,7 +67,7 @@ export type ObjectKind =
   // Life Pack §2: sports fields (ground decals — not edible world objects)
   | 'field_soccer' | 'field_basketball' | 'field_tennis'
   | 'field_volleyball' | 'field_campsite' | 'field_beachclub'
-  | 'beachball' | 'deckchair' | 'tent' | 'campfire'
+  | 'beachball' | 'deckchair' | 'tent' | 'campfire' | 'landmark'
   // Prompt 18 Stage 4: street furniture (clay-mapped props)
   | 'streetlamp' | 'bus_stop';
 
@@ -387,6 +387,7 @@ export const CONFIG = {
     // Landmark
     watertower: { tier: 6, minR: 150, maxR: 150 },
     train:      { tier: 5, minR: 66,  maxR: 80, scoreMult: 4 }, // Structural Build: express train
+    landmark:   { tier: 5, minR: 150, maxR: 185, scoreMult: 5 }, // Structural Rebuild: marquee city trophies
 
     // v7 §3: new objects
     squirrel:   { tier: 1, minR: 12, maxR: 15 },
@@ -411,9 +412,9 @@ export const CONFIG = {
     mushroom:   { tier: 1, minR: 10, maxR: 14 },
     gazebo:     { tier: 5, minR: 92, maxR: 110 },
     // v12 §1: downtown objects
-    shop:       { tier: 3, minR: 38, maxR: 48 },
+    shop:       { tier: 3, minR: 50, maxR: 64 },
     library:    { tier: 4, minR: 62, maxR: 76 },
-    office:     { tier: 5, minR: 95, maxR: 118 },   // Prompt 14: bigger mid-ring buildings
+    office:     { tier: 5, minR: 130, maxR: 155 },  // Structural Rebuild: wide mid-rise city art needs real bulk
     skyscraper: { tier: 6, minR: 185, maxR: 215 },  // Prompt 19: calibrated to ≈6–7× person (was 4.4×)
     // v13 §2: Sandy Shores beach objects
     seashell:      { tier: 1, minR: 10, maxR: 14 },
@@ -428,7 +429,7 @@ export const CONFIG = {
     car_parked_a:  { tier: 4, minR: 54, maxR: 66 },
     car_parked_b:  { tier: 4, minR: 54, maxR: 66 },
     // v16 §1: new civic + downtown sprites
-    cafe:          { tier: 4, minR: 60, maxR: 76 },
+    cafe:          { tier: 4, minR: 72, maxR: 90 },
     hospital:      { tier: 5, minR: 100, maxR: 120 },
     house_c:       { tier: 5, minR: 92, maxR: 116 },
     house_d:       { tier: 5, minR: 92, maxR: 116 },

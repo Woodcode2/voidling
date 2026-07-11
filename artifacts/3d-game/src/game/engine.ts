@@ -17,6 +17,7 @@ import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
 import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
+import { loadCityAssets } from './cityAssets'; // Structural Rebuild: new city art
 import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
@@ -382,6 +383,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   void loadClayCity(base);
   void loadClayLife(base);
   void loadClayScenery(base);
+  void loadCityAssets(base); // Structural Rebuild: new wide buildings + landmarks + zoo/street props
   void loadClayFood(base);
   void loadClayZoo(base);
   void loadClayAirport(base);
