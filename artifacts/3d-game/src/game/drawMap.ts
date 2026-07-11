@@ -615,6 +615,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _paintRailTracks(cc);
   _paintBridges(cc);
 
+  // ─ 5.8. Structural Build: mountain ridge along the east rim ────────────────
+  _paintMountainRidge(cc);
+
   // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
   cc.save();
   tracIslandPath(cc);
@@ -669,6 +672,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
       if (fd.kind === 'field_soccer')      _paintSoccerField(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_basketball') _paintBasketballCourt(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_tennis')     _paintTennisCourt(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_volleyball') _paintVolleyballCourt(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_campsite')   _paintCampsiteClearing(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_beachclub')  _paintBeachClubDeck(cc, fd.halfW, fd.halfH);
       cc.restore();
     }
     cc.restore();
@@ -723,6 +729,103 @@ function _paintTennisCourt(cc: CanvasRenderingContext2D, hw: number, hh: number)
   cc.strokeRect(-sl, 0, sl * 2, sd);
   cc.strokeRect(-sl, -sd, sl * 2, sd);
   cc.beginPath(); cc.moveTo(0, -sd); cc.lineTo(0, sd); cc.stroke();
+}
+
+/** Mountain ridge hugging the island's east rim (over the forest's east edge,
+ *  under the cliff/rim strokes). Two silhouette layers + snow caps — cool slate,
+ *  no browns, <40 primitives (live-path safe). Closed east of the rim; the
+ *  island clip trims the overhang. x kept ≥ 11150 so the zoo art never overlaps. */
+function _paintMountainRidge(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+
+  // back layer — hazy distant peaks (kept INSIDE the island curve; starts south
+  // of the zoo band so the zoo art never overlaps)
+  const back: [number, number][] = [
+    [11080, 4400], [11000, 4800], [11220, 5300], [11120, 5750], [11400, 6200],
+    [11250, 6700], [11330, 7150], [11170, 7600], [11240, 8050], [11080, 8400],
+  ];
+  cc.fillStyle = 'rgba(148,158,186,0.72)';
+  cc.beginPath();
+  cc.moveTo(11900, 4400);
+  for (const [x, y] of back) cc.lineTo(x, y);
+  cc.lineTo(11900, 8400);
+  cc.closePath(); cc.fill();
+
+  // front layer — bold slate ridge, gradient dark toward the base
+  const front: [number, number][] = [
+    [11000, 4600], [11080, 5050], [10960, 5450], [11200, 5950], [11120, 6400],
+    [11300, 6850], [11160, 7300], [11230, 7750], [11060, 8200],
+  ];
+  const grd = cc.createLinearGradient(10950, 0, 11550, 0);
+  grd.addColorStop(0, '#66708A');
+  grd.addColorStop(1, '#4E576B');
+  cc.fillStyle = grd;
+  cc.beginPath();
+  cc.moveTo(11900, 4600);
+  for (const [x, y] of front) cc.lineTo(x, y);
+  cc.lineTo(11900, 8200);
+  cc.closePath(); cc.fill();
+
+  // snow caps on the tallest front apexes (the westernmost zigzag points)
+  cc.fillStyle = 'rgba(250,252,255,0.95)';
+  for (const [px, py] of [[11000, 4600], [10960, 5450], [11120, 6400], [11160, 7300], [11060, 8200]] as const) {
+    cc.beginPath();
+    cc.moveTo(px - 12, py + 46);
+    cc.lineTo(px + 6, py + 6);
+    cc.lineTo(px + 52, py + 40);
+    cc.quadraticCurveTo(px + 26, py + 62, px - 12, py + 46);
+    cc.closePath(); cc.fill();
+  }
+  // spine highlight
+  cc.strokeStyle = 'rgba(255,255,255,0.45)';
+  cc.lineWidth = 5; cc.lineJoin = 'round';
+  cc.beginPath();
+  front.forEach(([x, y], i) => (i === 0 ? cc.moveTo(x, y) : cc.lineTo(x, y)));
+  cc.stroke();
+  cc.restore();
+}
+
+/** Beach volleyball court: raked-sand surface + white lines + net posts. */
+function _paintVolleyballCourt(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(250,232,190,0.55)';                 // raked bright sand
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(255,255,255,0.85)';
+  cc.lineWidth = 4; cc.setLineDash([]);
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  // net across the middle + posts
+  cc.beginPath(); cc.moveTo(0, -hh - 12); cc.lineTo(0, hh + 12); cc.stroke();
+  cc.setLineDash([3, 6]); cc.lineWidth = 8;
+  cc.beginPath(); cc.moveTo(0, -hh - 10); cc.lineTo(0, hh + 10); cc.stroke();
+  cc.setLineDash([]);
+  cc.fillStyle = '#4A5568';
+  cc.beginPath(); cc.arc(0, -hh - 14, 6, 0, Math.PI * 2); cc.fill();
+  cc.beginPath(); cc.arc(0, hh + 14, 6, 0, Math.PI * 2); cc.fill();
+}
+
+/** Forest campsite clearing: soft moss-light ellipse + trodden inner path ring. */
+function _paintCampsiteClearing(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(168,200,140,0.5)';                  // sunlit moss clearing
+  cc.beginPath(); cc.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2); cc.fill();
+  cc.strokeStyle = 'rgba(210,225,190,0.55)';
+  cc.lineWidth = 10; cc.setLineDash([14, 18]); cc.lineCap = 'round';
+  cc.beginPath(); cc.ellipse(0, 0, hw * 0.62, hh * 0.62, 0, 0, Math.PI * 2); cc.stroke();
+  cc.setLineDash([]); cc.lineCap = 'butt';
+}
+
+/** Cabana-club deck: whitewashed plank platform with a cool blue runner. */
+function _paintBeachClubDeck(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(226,232,240,0.78)';                 // whitewashed deck
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(150,160,178,0.55)';               // plank seams
+  cc.lineWidth = 2.5;
+  for (let y = -hh + 14; y < hh; y += 18) {
+    cc.beginPath(); cc.moveTo(-hw + 4, y); cc.lineTo(hw - 4, y); cc.stroke();
+  }
+  cc.strokeStyle = 'rgba(255,255,255,0.9)'; cc.lineWidth = 4;
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  cc.fillStyle = 'rgba(95,168,224,0.5)';                   // pool-blue runner
+  cc.fillRect(-hw * 0.2, -hh, hw * 0.4, hh * 2);
 }
 
 // ─── Prompt 6 §2 enrichment helpers (all baked once into the ground buffer) ──

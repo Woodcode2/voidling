@@ -124,7 +124,8 @@ interface FieldDecal { kind: ObjectKind; cx: number; cy: number; halfW: number; 
 // Life Pack §3: vignette scene config
 interface VignetteConfig {
   kind: ObjectKind;
-  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'any';
+  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'forest' | 'any';
+  decal?: ObjectKind; // anchor the scene onto this baked ground decal when present
   ambientText: string | string[]; panicText: string | string[]; eatenBanner: string; always: boolean;
   supportProps?: ObjectKind[]; supportPeds?: ObjectKind[];
 }
@@ -133,7 +134,7 @@ const VIGNETTE_CONFIGS: VignetteConfig[] = [
     ambientText: ['Will you marr...', 'I have a whole speech prepared—', 'she said YES!!'],
     panicText:   ["NOT NOW, I'M MID PROPOSAL!", "THE RING! WHERE'S THE RING?!", 'we can elope RIGHT NOW'],
     eatenBanner: '💍 ROMANCE: DEVOURED' },
-  { kind: 'vig_soccer',    zone: 'park',         always: true,
+  { kind: 'vig_soccer',    zone: 'park',         always: true,  decal: 'field_soccer',
     ambientText: ['GOOOAL!', 'DEFENSE!! DEFENSE!!', 'ref, that was SO offside'],
     panicText:   ['REF!! TIME OUT!!', 'MATCH ABANDONED!!', 'it ate the REF?!'],
     eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
@@ -165,6 +166,24 @@ const VIGNETTE_CONFIGS: VignetteConfig[] = [
     ambientText: ['Just watered those.', 'prize tomatoes, these'],
     panicText:   ['I JUST WATERED THOSE!', 'TAKE THE HOA INSTEAD!'],
     eatenBanner: '🌷 GARDEN: DEVOURED' },
+  // Structural Build: beach volleyball — anchored onto the court decal
+  { kind: 'person_sun', zone: 'beach', always: true, decal: 'field_volleyball',
+    ambientText: ['SPIKE IT!!', 'set! set! SET!', 'point beach team!!'],
+    panicText:   ['sand in my EVERYTHING!!', 'GAME. OVER.', 'serve THAT, void!!'],
+    eatenBanner: '🏐 VOLLEYBALL MATCH: DEVOURED',
+    supportProps: ['beachball', 'towel', 'towel'], supportPeds: ['person_kid', 'tourist', 'person_sun'] },
+  // Structural Build: cabana club — deck decal + loungers + drinks
+  { kind: 'icecream_vendor', zone: 'beach', always: true, decal: 'field_beachclub',
+    ambientText: ['cabana vibes 🍹', 'the club is OPEN', 'towel service, anyone?'],
+    panicText:   ['NOT the cabana!!', 'happy hour is CANCELLED', 'save the smoothies!!'],
+    eatenBanner: '🍹 CABANA CLUB: CONSUMED',
+    supportProps: ['umbrella', 'deckchair', 'deckchair', 'cooler', 'towel'], supportPeds: ['person_sun', 'waiter'] },
+  // Structural Build: forest campsite — clearing decal + tents + fire
+  { kind: 'tourist', zone: 'forest', always: true, decal: 'field_campsite',
+    ambientText: ["s'mores?!", 'nature is HEALING', 'one more ghost story'],
+    panicText:   ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!'],
+    eatenBanner: '⛺ CAMPSITE: DEVOURED',
+    supportProps: ['tent', 'tent', 'campfire', 'picnic_table'], supportPeds: ['tourist', 'person_fish'] },
   // PLAYGROUND: anchor = pg_swing with cluster of equipment + kids
   { kind: 'pg_swing', zone: 'park', always: true,
     ambientText: ['Wheee!', 'higher!! HIGHER!!'],
@@ -994,6 +1013,19 @@ export class WorldManager {
       const rb = resBlocks[Math.floor(rand() * resBlocks.length)];
       this.fieldDecals.push({ kind: 'field_tennis', cx: cx(rb), cy: rb.y0 + CONFIG.BLOCK_SIZE * 0.7, halfW: 130, halfH: 70 });
     }
+    // Structural Build: beach volleyball court + cabana-club deck + forest campsite
+    const beachBlocks = this.blocks.filter(b => b.type === 'beach' && isOnIsland(cx(b), cy(b), 0));
+    if (beachBlocks.length) {
+      const vb = beachBlocks[Math.floor(rand() * beachBlocks.length)];
+      this.fieldDecals.push({ kind: 'field_volleyball', cx: cx(vb), cy: vb.y0 + CONFIG.BLOCK_SIZE * 0.42, halfW: 150, halfH: 82 });
+      const cb = beachBlocks[Math.floor(rand() * beachBlocks.length)];
+      this.fieldDecals.push({ kind: 'field_beachclub', cx: cb.x0 + CONFIG.BLOCK_SIZE * 0.28, cy: cb.y0 + CONFIG.BLOCK_SIZE * 0.68, halfW: 130, halfH: 95 });
+    }
+    const forestBlocks = this.blocks.filter(b => b.type === 'forest' && isOnIsland(cx(b), cy(b), 0));
+    if (forestBlocks.length) {
+      const fb = forestBlocks[Math.floor(rand() * forestBlocks.length)];
+      this.fieldDecals.push({ kind: 'field_campsite', cx: cx(fb), cy: cy(fb), halfW: 140, halfH: 110 });
+    }
     // Prompt 19 Stage 6: pass field positions to drawMap so lines are baked into ground cache.
     setMatchSportsFields(this.fieldDecals);
   }
@@ -1007,11 +1039,9 @@ export class WorldManager {
         : zone === 'downtown' ? b.type === 'downtown'
         : zone === 'residential' ? (b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy')
         : zone === 'beach' ? b.type === 'beach'
+        : zone === 'forest' ? b.type === 'forest'
         : true
       );
-
-    // Soccer field block for soccer vignette placement
-    const soccerField = this.fieldDecals.find(f => f.kind === 'field_soccer');
 
     const alwaysVigs = VIGNETTE_CONFIGS.filter(vc => vc.always);
     const optionalVigs = VIGNETTE_CONFIGS.filter(vc => !vc.always);
@@ -1031,9 +1061,12 @@ export class WorldManager {
       // Soccer vignette anchors on the soccer field decal if available
       let ax = b.x0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
       let ay = b.y0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
-      if (vc.kind === 'vig_soccer' && soccerField) {
-        ax = soccerField.cx + (rand() - 0.5) * soccerField.halfW * 0.8;
-        ay = soccerField.cy + (rand() - 0.5) * soccerField.halfH * 0.8;
+      // Structural Build: scenes with a baked decal anchor onto it (soccer field,
+      // volleyball court, cabana deck, campsite clearing).
+      const dec = vc.decal ? this.fieldDecals.find(f => f.kind === vc.decal) : undefined;
+      if (dec) {
+        ax = dec.cx + (rand() - 0.5) * dec.halfW * 0.8;
+        ay = dec.cy + (rand() - 0.5) * dec.halfH * 0.8;
       }
       // Alive Pack §A: retry vignette anchor until on-island
       for (let vigAtt = 0; vigAtt < 4 && !isOnIsland(ax, ay); vigAtt++) {
@@ -2762,6 +2795,9 @@ export class WorldManager {
       case 'car_parked_b':
       case 'jeep':
         return clayVehicleKeys.length ? clayVehicleKeys[id % clayVehicleKeys.length] : 'clay_park_12';
+      // ── Structural Build: beach-fun props → existing clay cutouts ──────────
+      case 'beachball': return 'clay_beach_5';
+      case 'deckchair': return 'clay_beach_11';
       // ── Critters: no clay cutout — draw procedurally (coloured blobs, still eatable) ──
       case 'dog':
       case 'cat':
@@ -2769,6 +2805,8 @@ export class WorldManager {
       case 'squirrel':
       case 'bird':
       case 'train': // Structural Build: bespoke multi-segment procedural draw
+      case 'tent':      // Structural Build: procedural camp props
+      case 'campfire':
         return null;
       // ── Vignette anchors → clay people pool; fallback to clay_park_4 ────────
       case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':

@@ -66,6 +66,8 @@ export type ObjectKind =
   | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
   // Life Pack §2: sports fields (ground decals — not edible world objects)
   | 'field_soccer' | 'field_basketball' | 'field_tennis'
+  | 'field_volleyball' | 'field_campsite' | 'field_beachclub'
+  | 'beachball' | 'deckchair' | 'tent' | 'campfire'
   // Prompt 18 Stage 4: street furniture (clay-mapped props)
   | 'streetlamp' | 'bus_stop';
 
@@ -526,6 +528,13 @@ export const CONFIG = {
     field_soccer:     { tier: 0, minR: 260, maxR: 260 },
     field_basketball: { tier: 0, minR: 200, maxR: 200 },
     field_tennis:     { tier: 0, minR: 200, maxR: 200 },
+    field_volleyball: { tier: 0, minR: 180, maxR: 180 },   // Structural Build: beach court decal
+    field_campsite:   { tier: 0, minR: 190, maxR: 190 },   // forest clearing decal
+    field_beachclub:  { tier: 0, minR: 170, maxR: 170 },   // cabana deck decal
+    beachball:        { tier: 1, minR: 13, maxR: 18 },     // Structural Build: beach fun props
+    deckchair:        { tier: 3, minR: 30, maxR: 40 },
+    tent:             { tier: 3, minR: 40, maxR: 52 },
+    campfire:         { tier: 2, minR: 20, maxR: 26 },
     // Prompt 18 Stage 4: street furniture (clay-mapped, eatable infra)
     streetlamp:  { tier: 2, minR: 14, maxR: 18 },
     bus_stop:    { tier: 3, minR: 32, maxR: 40 },
