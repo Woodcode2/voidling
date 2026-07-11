@@ -558,6 +558,63 @@
 }
 .vd-btn--pulse:active:not(:disabled) { animation: none; }
 
+/* ── Premium home polish (overrides above; kept in one block for review) ─────── */
+/* Deeper space background with a warm nebula bloom behind the hero. */
+.vd-overlay--solid {
+  background:
+    radial-gradient(70% 48% at 50% 16%, rgba(157, 120, 255, 0.30) 0%, rgba(157,120,255,0) 60%),
+    radial-gradient(115% 85% at 50% -6%, #3B1568 0%, rgba(42,17,82,0) 60%),
+    radial-gradient(95% 75% at 50% 112%, #4A1270 0%, rgba(58,16,96,0) 55%),
+    #0D0520;
+}
+
+/* Title: warmer glow + crisper depth. */
+.vd-title {
+  letter-spacing: 3px;
+  filter:
+    drop-shadow(0 2px 0 rgba(0, 0, 0, 0.42))
+    drop-shadow(0 0 30px rgba(255, 96, 134, 0.42));
+}
+
+/* Soft glowing halo behind the floating hero void. */
+.vd-hero-void { position: relative; }
+.vd-hero-void::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(157, 120, 255, 0.55) 0%, rgba(157, 120, 255, 0) 68%);
+  z-index: -1;
+  animation: vd-halo 3.4s ease-in-out infinite;
+}
+@keyframes vd-halo {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.1); }
+}
+
+/* PLAY: rich vertical gradient, inner sheen, and a coloured outer glow. */
+.vd-btn--play {
+  background: linear-gradient(180deg, #FF6E8D 0%, #FF3D68 52%, #EF2A56 100%);
+  box-shadow:
+    0 7px 0 #B81E44,
+    0 14px 26px rgba(255, 61, 104, 0.42),
+    inset 0 2px 0 rgba(255, 255, 255, 0.42);
+  border-radius: 22px;
+}
+.vd-btn--play:active:not(:disabled) {
+  transform: translateY(5px);
+  box-shadow:
+    0 2px 0 #B81E44,
+    0 4px 12px rgba(255, 61, 104, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Secondary buttons: gentle gradient + top sheen so they read as moulded, not flat. */
+.vd-btn--secondary {
+  background: linear-gradient(180deg, #FFDC63 0%, #FFC22E 100%);
+  box-shadow: 0 6px 0 #C79A12, inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+
 /* shooting stars */
 .vd-shooting {
   position: absolute;

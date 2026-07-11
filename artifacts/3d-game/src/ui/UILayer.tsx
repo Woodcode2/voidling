@@ -154,6 +154,11 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
         overflow: 'hidden',
         opacity: fadingOut ? 0 : 1,
         transition: 'opacity 500ms ease',
+        // While fading out the splash is nearly invisible but was still eating
+        // taps meant for the PLAY button underneath — the intermittent
+        // "tapped PLAY and nothing happened" bug. Let taps pass through once
+        // the fade begins so the first tap always reaches the menu.
+        pointerEvents: fadingOut ? 'none' : 'auto',
       }}
     >
       {/* Rebuild Prompt 10: dedicated splash art, scaled to cover with no distortion */}
