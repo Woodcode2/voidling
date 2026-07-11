@@ -399,6 +399,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   }
   cc.restore();
 
+  // ─ 4b. Biome detail — forest underbrush, manicured park, real beach shoreline ─
+  _paintBiomeDetail(cc);
+
   // ─ 5. Roads (Prompt 8: baked into the clay terrain — warm asphalt, a soft
   //      shoulder that recesses the edge into the grass/sand, gentle lane paint) ─
   cc.save();
@@ -972,6 +975,94 @@ function _texZone(
     // Fallback: original feathered gradient fill (until texture loads).
     _fillZoneRich(cc, rect, fallback, understated);
   }
+}
+
+/** Biome-identity ground detail: makes forest / park / beach unmistakable.
+ *  Seeded so it bakes identically every build. Drawn on top of the zone
+ *  textures and water, but under the roads. */
+function _paintBiomeDetail(cc: CanvasRenderingContext2D): void {
+  let seed = 90210;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+
+  // ── FOREST: dappled canopy shade + scattered underbrush ferns ──────────────
+  {
+    const [x0, y0, x1, y1] = ZONE_FOREST_R;
+    cc.save();
+    cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
+    // soft canopy shadow pools → the forest floor reads shaded, not sunlit
+    for (let i = 0; i < 340; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      const r = 40 + rnd() * 90;
+      cc.fillStyle = 'rgba(18,40,20,0.055)';
+      cc.beginPath(); cc.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); cc.fill();
+    }
+    // low ferns / underbrush tufts
+    for (let i = 0; i < 260; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      const r = 7 + rnd() * 13;
+      cc.fillStyle = rnd() > 0.5 ? 'rgba(44,84,38,0.50)' : 'rgba(72,112,52,0.42)';
+      cc.beginPath(); cc.ellipse(x, y, r, r * 0.66, rnd() * 3, 0, Math.PI * 2); cc.fill();
+    }
+    cc.restore();
+  }
+
+  // ── PARK: manicured mowing stripes + a few flowerbeds ──────────────────────
+  {
+    const [x0, y0, x1, y1] = ZONE_PARK_R;
+    cc.save();
+    cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
+    const STR = 88;
+    for (let y = y0; y < y1; y += STR) {
+      cc.fillStyle = (Math.floor((y - y0) / STR) % 2 === 0)
+        ? 'rgba(255,255,255,0.055)' : 'rgba(28,72,20,0.055)';
+      cc.fillRect(x0, y, x1 - x0, STR);
+    }
+    for (let i = 0; i < 7; i++) {
+      const x = x0 + 120 + rnd() * (x1 - x0 - 240), y = y0 + 120 + rnd() * (y1 - y0 - 240);
+      cc.fillStyle = 'rgba(232,116,150,0.40)';
+      cc.beginPath(); cc.ellipse(x, y, 28, 17, rnd() * 3, 0, Math.PI * 2); cc.fill();
+      cc.fillStyle = 'rgba(242,202,84,0.40)';
+      cc.beginPath(); cc.ellipse(x + 15, y - 7, 19, 12, 0, 0, Math.PI * 2); cc.fill();
+    }
+    cc.restore();
+  }
+
+  // ── BEACH → GRASS: sand creeping up into the grass along the shore edge ─────
+  {
+    const [x0, yTop, x1] = ZONE_BEACH_R;
+    for (let i = 0; i < 1000; i++) {
+      const x = x0 + rnd() * (x1 - x0);
+      const up = rnd() * rnd() * 190;                 // biased toward the edge
+      const y = yTop - up;
+      const a = 0.42 * (1 - up / 190);
+      const r = 8 + rnd() * 16;
+      cc.fillStyle = `rgba(232,212,164,${a.toFixed(3)})`;
+      cc.beginPath(); cc.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2); cc.fill();
+    }
+  }
+  cc.restore();
+
+  // ── BEACH: wet-sand ring + foam at the lagoon shoreline (on top of water) ───
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  cc.save();
+  cc.filter = 'blur(11px)';
+  cc.strokeStyle = 'rgba(150,120,78,0.5)'; cc.lineWidth = 48;
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 34, LAGOON_RY + 30, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.filter = 'none';
+  cc.restore();
+  cc.strokeStyle = 'rgba(255,255,255,0.55)'; cc.lineWidth = 6;
+  cc.setLineDash([28, 24]); cc.lineCap = 'round';
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 10, LAGOON_RY + 10, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.setLineDash([]); cc.lineCap = 'butt';
+  cc.restore();
 }
 
 /** Faint alternating E–W mowing-stripe bands over the island grass. */
