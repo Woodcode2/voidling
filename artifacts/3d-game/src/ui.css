@@ -306,8 +306,8 @@
   letter-spacing: 0.06em;
   text-align: center;
   padding: 0 6px;
-  background: radial-gradient(circle at 50% 36%, #C6A2FF 0%, #7A3FF0 60%, #45199B 100%);
-  box-shadow: 0 6px 18px rgba(122, 63, 240, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 50% 34%, var(--pc, #C6A2FF) 0%, #6A2FD8 58%, #3C1590 100%);
+  box-shadow: 0 6px 18px rgba(122, 63, 240, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.4);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transition: transform 0.08s ease, filter 0.15s ease;
@@ -318,7 +318,7 @@
   position: absolute;
   inset: -5px;
   border-radius: 50%;
-  background: conic-gradient(#E4C4FF calc(var(--cd, 1) * 360deg), rgba(255, 255, 255, 0.14) 0);
+  background: conic-gradient(var(--pc, #E4C4FF) calc(var(--cd, 1) * 360deg), rgba(255, 255, 255, 0.14) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
           mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
   z-index: -1;

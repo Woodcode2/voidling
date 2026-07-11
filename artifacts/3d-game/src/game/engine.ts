@@ -79,7 +79,7 @@ export interface Snapshot {
   killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
   matchStartSeq: number; // Rebuild Prompt 10: increments once per real match start (drives the welcome/coaching intro)
-  power?: { name: string; ready: boolean; cdFrac: number; form: number }; // signature void power HUD state
+  power?: { name: string; ready: boolean; cdFrac: number; form: number; color: string }; // signature void power HUD state
 }
 
 export interface GameEngine {
@@ -141,12 +141,14 @@ const BOON_MAX_LEVEL = 2;
 // consume   = radius inside which eligible objects are instantly devoured
 // crushBig  = also swallow oversized structures past the normal size gate
 // cd        = cooldown (ms); shake = screen-shake magnitude
+// Each form's signature power is a DISTINCT move (kind), not the same ring
+// rescaled. `kind` drives the behaviour + FX branch in usePower().
 const VOID_POWERS = [
-  { name: 'PULL',        pull: 90,  pullRange: 340,  consume: 78,  crushBig: false, cd: 5000,  shake: 6,  color: '#9D78FF' },
-  { name: 'VORTEX',      pull: 130, pullRange: 470,  consume: 140, crushBig: false, cd: 6000,  shake: 10, color: '#A585FF' },
-  { name: 'IMPLOSION',   pull: 185, pullRange: 640,  consume: 250, crushBig: false, cd: 7000,  shake: 14, color: '#B98CFF' },
-  { name: 'SINGULARITY', pull: 250, pullRange: 850,  consume: 390, crushBig: true,  cd: 8500,  shake: 19, color: '#C9A0FF' },
-  { name: 'COLLAPSE',    pull: 330, pullRange: 1150, consume: 580, crushBig: true,  cd: 10000, shake: 27, color: '#E4C4FF' },
+  { name: 'PULL',        kind: 'tug',         pull: 95,  pullRange: 360,  consume: 82,  crushBig: false, cd: 4500,  shake: 6,  color: '#9D78FF' },
+  { name: 'VORTEX',      kind: 'vortex',      pull: 140, pullRange: 520,  consume: 150, crushBig: false, cd: 5500,  shake: 10, color: '#B48CFF' },
+  { name: 'SHOCKWAVE',   kind: 'shockwave',   pull: 0,   pullRange: 0,    consume: 300, crushBig: false, cd: 6500,  shake: 16, color: '#D98CFF' },
+  { name: 'SINGULARITY', kind: 'singularity', pull: 300, pullRange: 900,  consume: 430, crushBig: true,  cd: 8000,  shake: 20, color: '#C9A0FF' },
+  { name: 'COLLAPSE',    kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: true,  cd: 10000, shake: 30, color: '#E4C4FF' },
 ] as const;
 
 function skinById(id: string): SkinDef {
@@ -430,6 +432,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.formIndex = n;
       player.radius = CONFIG.FORMS[n].radius + 1;
       player.morphTime = 0;
+      countdown = 0; // skip any lingering pre-round countdown so powers can fire
       console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
     }
   }
@@ -617,7 +620,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} 100px`);
   }
 
-  // ── Signature VOID POWER — fire the current form's gravity ability ──────────
+  // ── Signature VOID POWER — each form fires a DISTINCT move (kind) ───────────
   function usePower() {
     if (screen !== 'game' || paused || !player || !world || countdown > 0) return;
     if (powerCd > 0) return;
@@ -628,35 +631,83 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const rScale = 1 + player.radius / 240;
     const consumeR = p.consume * rScale;
     const pullR = p.pullRange * rScale;
+    const px = player.x, py = player.y;
 
     const eaten = world.voidPowerBlast(player, pullR, consumeR, p.pull, p.crushBig, fx);
 
-    // ── juice: collapse ring, inner flash ring, rim inhale, shake, flash ──
-    fx.addRing(player.x, player.y, p.color, consumeR * 1.15, player.radius * 0.4, 8, 460);
-    fx.addRing(player.x, player.y, '#FFFFFF', consumeR * 0.75, player.radius * 0.3, 4, 340);
-    const rim = p.crushBig ? 26 : 16;
-    for (let i = 0; i < rim; i++) {
-      const a = (i / rim) * Math.PI * 2;
-      fx.addRing(player.x + Math.cos(a) * consumeR, player.y + Math.sin(a) * consumeR, p.color, 7, 2, 2, 300);
-    }
-    fx.shake(240, p.shake, [0, 110]);
-    if (p.crushBig) fx.flash();
-
-    // High forms physically shove rivals out of the collapse zone.
-    if (p.crushBig) {
+    // Shove rivals out of the zone (used by the outward/heavy powers).
+    const knockRivals = (radius: number, strength: number) => {
       for (const r of rivals) {
         if (!r.alive || r.ghost) continue;
-        const d = dist(r.x, r.y, player.x, player.y);
-        if (d > 1 && d < consumeR + r.radius) {
-          const k = (consumeR + r.radius - d) * 0.7;
-          r.x += ((r.x - player.x) / d) * k;
-          r.y += ((r.y - player.y) / d) * k;
+        const d = dist(r.x, r.y, px, py);
+        if (d > 1 && d < radius + r.radius) {
+          const k = (radius + r.radius - d) * strength;
+          r.x += ((r.x - px) / d) * k;
+          r.y += ((r.y - py) / d) * k;
         }
+      }
+    };
+
+    // ── per-kind FX identity — no two powers look alike ──────────────────────
+    switch (p.kind) {
+      case 'tug': { // snappy inward slurp
+        fx.addRing(px, py, p.color, consumeR * 1.1, player.radius * 0.5, 5, 300);
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2 + roundElapsed * 0.002;
+          fx.addRing(px + Math.cos(a) * consumeR, py + Math.sin(a) * consumeR, p.color, 6, 1, 2, 260);
+        }
+        fx.shake(150, p.shake, 20);
+        break;
+      }
+      case 'vortex': { // swirling vacuum — nested spiral rings + sparkle
+        for (let i = 0; i < 3; i++) {
+          fx.addRing(px, py, p.color, consumeR * (1.15 - i * 0.25), player.radius * 0.4, 5, 420 + i * 60);
+        }
+        fx.addConfetti(px, py, ['#B48CFF', '#E0C4FF', '#FFFFFF'], 12);
+        fx.shake(220, p.shake, [0, 90]);
+        break;
+      }
+      case 'shockwave': { // OUTWARD blast — expanding ring + debris + knockback
+        fx.addRing(px, py, '#FFFFFF', player.radius * 0.6, consumeR * 1.9, 9, 520);
+        fx.addRing(px, py, p.color, player.radius * 0.4, consumeR * 1.6, 6, 460);
+        fx.addDebris(px, py, '#D98CFF', 10);
+        fx.addDebris(px, py, '#FFFFFF', 6);
+        fx.shake(320, p.shake, [0, 120]);
+        knockRivals(consumeR * 1.2, 0.9);
+        break;
+      }
+      case 'singularity': { // gravity well — brief slow-mo, dark warp + bright core
+        slowmo = Math.max(slowmo, 360);
+        fx.flash();
+        fx.addRing(px, py, p.color, consumeR * 1.3, player.radius * 0.3, 10, 560);
+        fx.addRing(px, py, '#FFFFFF', consumeR * 0.6, player.radius * 0.2, 5, 420);
+        for (let i = 0; i < 20; i++) {
+          const a = (i / 20) * Math.PI * 2;
+          fx.addRing(px + Math.cos(a) * consumeR, py + Math.sin(a) * consumeR, p.color, 8, 2, 3, 340);
+        }
+        fx.shake(420, p.shake, [0, 120, 260]);
+        knockRivals(consumeR, 0.7);
+        break;
+      }
+      case 'collapse': { // the climax — slow-mo + full flash + massive shockwave
+        slowmo = Math.max(slowmo, 600);
+        fx.flash();
+        fx.addRing(px, py, '#FFFFFF', player.radius, consumeR * 2.0, 14, 800);
+        fx.addRing(px, py, p.color, player.radius * 0.6, consumeR * 1.6, 10, 700);
+        fx.addRing(px, py, '#FFD9A0', player.radius * 0.3, consumeR * 1.2, 6, 600);
+        fx.addConfetti(px, py, CONFIG.COLORS.pops, 28);
+        fx.addDebris(px, py, '#E4C4FF', 12);
+        fx.shake(560, p.shake, [0, 120, 260, 420]);
+        knockRivals(consumeR * 1.3, 1.0);
+        break;
       }
     }
 
+    // Surface the payoff (previously only console.log'd).
+    if (eaten > 0) fx.addText(px, py - player.radius - 22, `${eaten} DEVOURED`, p.color, 22);
+
     banner(`${p.name}!`, p.color, 3, { pulse: true });
-    audio.playBoon();
+    audio.playPower(p.kind);
     console.log(`[power] ${p.name} (form ${player.formIndex}) consumed ${eaten}`);
   }
 
@@ -2867,7 +2918,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       matchStartSeq, // Rebuild Prompt 10
       power: (player && screen === 'game') ? (() => {
         const idx = Math.min(player.formIndex, VOID_POWERS.length - 1);
-        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx };
+        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
       })() : undefined,
     };
   }

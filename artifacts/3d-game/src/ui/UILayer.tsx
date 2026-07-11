@@ -813,7 +813,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           onClick={() => engine.usePower()}
           disabled={!snap.power.ready}
           aria-label={`Use power: ${snap.power.name}`}
-          style={{ ['--cd' as string]: String(snap.power.cdFrac) }}
+          style={{ ['--cd' as string]: String(snap.power.cdFrac), ['--pc' as string]: snap.power.color }}
         >
           <span className="vd-power-name">{snap.power.name}</span>
         </button>
