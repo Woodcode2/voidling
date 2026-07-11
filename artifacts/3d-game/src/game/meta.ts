@@ -21,6 +21,8 @@ export interface GameMeta {
   equippedSkin: string;
   streak: number;
   lastDailyDate: string;
+  lastWinDate: string;   // Economy: first-win-of-the-day 2× tracking
+  lastPlayDate: string;  // Economy: daily-bite bonus tracking
   highScore: number;
   removeAds: boolean;
   missions: { id: string; progress: number; completed: boolean }[];
@@ -44,6 +46,8 @@ const DEFAULT_META: GameMeta = {
   equippedSkin: 'classic',
   streak: 0,
   lastDailyDate: '',
+  lastWinDate: '',
+  lastPlayDate: '',
   highScore: 0,
   removeAds: false,
   missions: [],
@@ -75,6 +79,8 @@ export const meta = {
     if (!Array.isArray(this.data.missions)) this.data.missions = [];
     if (typeof this.data.equippedSkin !== 'string') this.data.equippedSkin = 'classic';
     if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
+    if (typeof this.data.lastWinDate !== 'string') this.data.lastWinDate = '';
+    if (typeof this.data.lastPlayDate !== 'string') this.data.lastPlayDate = '';
     if (typeof this.data.xp !== 'number' || !Number.isFinite(this.data.xp)) this.data.xp = 0;
     if (typeof this.data.level !== 'number' || !Number.isFinite(this.data.level) || this.data.level < 1) this.data.level = 1;
     // v12 §5: migrate legacy saves without trophy fields
@@ -184,6 +190,28 @@ export const meta = {
       this.data.lastDailyDate = today;
       this.save();
     }
+  },
+
+  // ── Economy: daily bonuses (LoL model) ─────────────────────────────────────
+
+  /** True until the player's first crowned win today (2× payout hook). */
+  isFirstWinOfDay(): boolean {
+    return this.data.lastWinDate !== new Date().toDateString();
+  },
+
+  recordWin() {
+    this.data.lastWinDate = new Date().toDateString();
+    this.save();
+  },
+
+  /** True until the first finished match today (daily-bite bonus hook). */
+  isFirstPlayOfDay(): boolean {
+    return this.data.lastPlayDate !== new Date().toDateString();
+  },
+
+  recordPlay() {
+    this.data.lastPlayDate = new Date().toDateString();
+    this.save();
   },
 
   // ── v12 §5: Trophy helpers ─────────────────────────────────────────────────

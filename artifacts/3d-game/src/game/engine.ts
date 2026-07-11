@@ -36,6 +36,8 @@ export interface ResultData {
   crown: boolean;
   highScore: number;
   newBest: boolean;
+  firstWin: boolean;   // Economy: first crowned win today — payout was doubled
+  dailyBite: number;   // Economy: daily-bite bonus included in coins (0 if not first match)
   reachedForm: string;    // v6 §3: highest evolution form reached
   reachedIndex: number;
   worldEater: boolean;
@@ -286,15 +288,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     banner(line, '#9AAFC8', 2);
   }
 
+  // Economy: contract rewards calibrated so 3 completions add ~35-50¢ inside
+  // the 50-150¢ per-match band (LoL model — skins are earned over many games).
   const CONTRACT_POOL = [
-    { id: 'eat_houses', name: 'Eat 3 houses', reward: 40 },
-    { id: 'eat_cars', name: 'Eat 5 cars', reward: 35 },
-    { id: 'eat_gnomes', name: 'Eat all gnomes', reward: 60 },
-    { id: 'reach_gobbler', name: 'Reach GOBBLER form', reward: 50 },
-    { id: 'eat_beach', name: 'Eat 8 beach items', reward: 45 },
-    { id: 'eat_downtown', name: 'Eat 5 downtown props', reward: 40 },
-    { id: 'eat_people', name: 'Eat 10 people', reward: 30 },
-    { id: 'first_place', name: 'Lead at 1:00 left', reward: 55 },
+    { id: 'eat_houses', name: 'Eat 3 houses', reward: 12 },
+    { id: 'eat_cars', name: 'Eat 5 cars', reward: 10 },
+    { id: 'eat_gnomes', name: 'Eat all gnomes', reward: 20 },
+    { id: 'reach_gobbler', name: 'Reach GOBBLER form', reward: 15 },
+    { id: 'eat_beach', name: 'Eat 8 beach items', reward: 14 },
+    { id: 'eat_downtown', name: 'Eat 5 downtown props', reward: 12 },
+    { id: 'eat_people', name: 'Eat 10 people', reward: 10 },
+    { id: 'first_place', name: 'Lead at 1:00 left', reward: 18 },
   ] as const;
   // track progress for contract checking
   const contractProgress: Record<string, number> = {};
@@ -438,6 +442,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.morphTime = 0;
       countdown = 0; // skip any lingering pre-round countdown so powers can fire
       console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
+    }
+    // Dev-only: 9 fast-forwards the clock to verify round-end flow + payouts.
+    if (debugForms && player && e.code === 'Digit9') {
+      timeLeft = Math.min(timeLeft, 1200);
+      console.log('[debug] clock fast-forwarded to 1.2s');
     }
     // Dev-only: 0 teleports next to the express train for visual inspection.
     if (debugForms && player && world && e.code === 'Digit0') {
@@ -815,12 +824,24 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const placement = board.findIndex((e) => e === player) + 1;
     const crown = placement === 1;
     const worldEater = player.formIndex >= CONFIG.FORMS.length - 1;
-    if (worldEater) evoCoinBonus = 200; // v6 §3: reaching WORLD EATER awards 200 coins
+    if (worldEater) evoCoinBonus = 20; // Economy: WORLD ENDER pays a bonus inside the 50-150 band
     const devoured = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
-    const coins = Math.floor((player.score / CONFIG.COINS_PER_SCORE + (crown ? 60 : 0)) * coinMult) + coinBonus + evoCoinBonus;
+    // Economy (LoL model): every finished match pays 50-150¢ scaling with
+    // performance — base 50, up to +60 from score, +25 crown, +20 evolution,
+    // plus contract/secret payouts accrued in coinBonus. First crowned win of
+    // the day DOUBLES the payout; first match of the day adds a bite bonus.
+    const perfPay = Math.min(60, Math.floor(player.score / 120));
+    const raw = 50 + perfPay + (crown ? 25 : 0) + evoCoinBonus + coinBonus;
+    let coins = Math.min(150, Math.floor(raw * coinMult));
+    const firstWin = crown && meta.isFirstWinOfDay();
+    if (firstWin) coins *= 2;
+    const dailyBite = meta.isFirstPlayOfDay() ? 25 : 0;
+    coins += dailyBite;
     const newBest = player.score > meta.data.highScore;
 
     meta.addCoins(coins);
+    if (crown) meta.recordWin();
+    meta.recordPlay();
     if (newBest) { meta.data.highScore = player.score; meta.save(); }
     if (isDaily) meta.recordDaily();
 
@@ -884,6 +905,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     results = {
       score: player.score, placement, total: board.length, devoured,
       coins, isDaily, crown, highScore: meta.data.highScore, newBest,
+      firstWin, dailyBite,
       reachedForm: player.formName, reachedIndex: player.formIndex, worldEater,
       gnomeLord, killedBy: killedBy || undefined,
       skinTease,
@@ -909,7 +931,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     fx.addRing(x, y, '#FFD23F', 20, 900, 8, 900);
     banner('YOU ATE THE WATER TOWER', '#FFD23F');
     // single source of truth: accrue here, granted once via endRound's coin total
-    coinBonus += 500;
+    coinBonus += 40; // Economy: calibrated to the 50-150¢ match band
     audio.playMerge();
   }
 
@@ -1437,8 +1459,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v9 §8: secret — the moment the last gnome is eaten, crown the GNOME LORD
     if (world.gnomeLordPending && !gnomeLord) {
       gnomeLord = true;
-      coinBonus += 150;
-      banner('GNOME LORD! +150', '#8FE36B', 5, { sparkles: true });
+      coinBonus += 30; // Economy: calibrated to the 50-150¢ match band
+      banner('GNOME LORD! +30¢', '#8FE36B', 5, { sparkles: true });
       audio.playWin();
     }
     // v8 §7: FRENZY MINUTE — ×1.25 score (double streaks handled in the chomp loop)

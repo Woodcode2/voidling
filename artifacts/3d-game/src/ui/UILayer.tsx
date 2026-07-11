@@ -79,13 +79,13 @@ function Coins({ n }: { n: number }) {
   );
 }
 
-// v6 §12: rarity tier derived from a skin's price
+// Economy: rarity tier derived from a skin's coin price (500/1500/4000);
+// money-only skins are LEGENDARY and never appear in the coin list.
 function rarityOf(cost: number): { key: string; label: string } {
   if (cost <= 0) return { key: 'starter', label: 'STARTER' };
-  if (cost <= 700) return { key: 'common', label: 'COMMON' };
-  if (cost <= 900) return { key: 'rare', label: 'RARE' };
-  if (cost <= 1100) return { key: 'epic', label: 'EPIC' };
-  return { key: 'legendary', label: 'LEGENDARY' };
+  if (cost <= 500) return { key: 'common', label: 'COMMON' };
+  if (cost <= 1500) return { key: 'rare', label: 'RARE' };
+  return { key: 'epic', label: 'EPIC' };
 }
 
 // v6 §12: short-lived confetti burst (pure CSS pieces)
@@ -497,8 +497,8 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           })}
         </div>
 
-        {/* v7 §9: PREMIUM cash-skin row (mock IAP) */}
-        <h3 className="vd-shop-subhead">PREMIUM</h3>
+        {/* Economy: LEGENDARY cash-skin row (mock IAP — money only, never coins) */}
+        <h3 className="vd-shop-subhead">LEGENDARY</h3>
         <div className="vd-grid">
           {CONFIG.SKINS.filter((s) => s.premium).map((skin) => {
             const owned = snap.ownedSkins.includes(skin.id);
@@ -509,7 +509,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
                 className={'vd-card vd-card--btn vd-rar--premium' + (equipped ? ' vd-card--equipped' : '') + (!owned ? ' vd-card--locked' : '')}
                 onClick={() => { if (owned) { engine.equipSkin(skin.id); } else { engine.iapView(skin.id); setIap(skin.id); } }}
               >
-                <span className="vd-rarity vd-rarity--premium">PREMIUM</span>
+                <span className="vd-rarity vd-rarity--premium">LEGENDARY</span>
                 <div className="vd-skinwrap"><SkinPreview skinId={skin.id} size={92} glow={0.4} /></div>
                 <div className="vd-skin-name">{skin.name}</div>
                 {equipped ? (
@@ -533,7 +533,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           <div className="vd-modal-scrim" onClick={() => setIap(null)}>
             <div className="vd-modal vd-rar--premium" onClick={(e) => e.stopPropagation()}>
               <button className="vd-modal-close" onClick={() => setIap(null)} aria-label="Close"><CloseIcon /></button>
-              <span className="vd-rarity vd-rarity--premium">PREMIUM</span>
+              <span className="vd-rarity vd-rarity--premium">LEGENDARY</span>
               <div className="vd-modal-void"><SkinPreview skinId={s.id} size={168} glow={0.7} /></div>
               <h3 className="vd-modal-name">{s.name}</h3>
               <p className="vd-sub">Unlock instantly + 100 bonus coins</p>
@@ -614,6 +614,8 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           <div className="vd-stat-row"><span>Placement</span><span>#{r.placement}</span></div>
           <div className="vd-stat-row"><span>Devoured</span><span>{r.devoured.toFixed(0)}%</span></div>
           <div className="vd-stat-row"><span>Coins earned</span><span>+{r.coins}</span></div>
+          {r.firstWin && <div className="vd-stat-row" style={{ color: '#FFD23F' }}><span>FIRST WIN OF THE DAY</span><span>×2!</span></div>}
+          {r.dailyBite > 0 && <div className="vd-stat-row" style={{ color: '#7BFFED' }}><span>Daily bite bonus</span><span>+{r.dailyBite}</span></div>}
           {r.isDaily && <div className="vd-stat-row"><span>Daily streak</span><span>{snap.streak}🔥</span></div>}
         </div>
         {/* v7 §11: XP bar + level-up flourish */}

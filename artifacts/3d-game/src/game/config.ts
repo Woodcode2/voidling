@@ -572,14 +572,17 @@ export const CONFIG = {
   ] as ObjectKind[],
 
   SKINS: [
+    // Economy: LoL model — grind coins for skins (common 500 / rare 1500 /
+    // epic 4000); legendary skins below are money-only. ~60-90m of play per
+    // rare at 50-150c a match feels earned without being a wall.
     { id: 'classic',   name: 'Classic',   cost: 0,    bodyColor: '#3A1E6B', glowColor: '#B388FF', eyeStyle: 'normal', accessories: [] },
-    { id: 'pirate',    name: 'Pirate',    cost: 800,  bodyColor: '#2C2C36', glowColor: '#8A8AA0', eyeStyle: 'normal', accessories: ['tricorn', 'eyepatch', 'earring'] },
-    { id: 'princess',  name: 'Princess',  cost: 800,  bodyColor: '#FF7FC1', glowColor: '#FFC2E2', eyeStyle: 'lashes', extraBlush: true, accessories: ['tiara', 'sparkleTrail'] },
-    { id: 'astronaut', name: 'Astronaut', cost: 1000, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
-    { id: 'ninja',     name: 'Ninja',     cost: 800,  bodyColor: '#2A2A38', glowColor: '#5E6E8C', eyeStyle: 'angled', accessories: ['headband'] },
-    { id: 'wizard',    name: 'Wizard',    cost: 1000, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
-    { id: 'kitty',     name: 'Kitty',     cost: 600,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
-    { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
+    { id: 'kitty',     name: 'Kitty',     cost: 500,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
+    { id: 'ninja',     name: 'Ninja',     cost: 500,  bodyColor: '#2A2A38', glowColor: '#5E6E8C', eyeStyle: 'angled', accessories: ['headband'] },
+    { id: 'pirate',    name: 'Pirate',    cost: 1500, bodyColor: '#2C2C36', glowColor: '#8A8AA0', eyeStyle: 'normal', accessories: ['tricorn', 'eyepatch', 'earring'] },
+    { id: 'princess',  name: 'Princess',  cost: 1500, bodyColor: '#FF7FC1', glowColor: '#FFC2E2', eyeStyle: 'lashes', extraBlush: true, accessories: ['tiara', 'sparkleTrail'] },
+    { id: 'wizard',    name: 'Wizard',    cost: 1500, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
+    { id: 'astronaut', name: 'Astronaut', cost: 4000, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
+    { id: 'devil',     name: 'Devil',     cost: 4000, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
     // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
     { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#0D0821', glowColor: '#B98CFF', eyeStyle: 'normal', accessories: [] },
     { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#14090A', glowColor: '#FF7A2B', eyeStyle: 'angry', eyeGlow: '#FF6A00', accessories: [] },
