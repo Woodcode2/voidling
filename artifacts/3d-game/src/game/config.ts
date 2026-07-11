@@ -594,6 +594,25 @@ export const CONFIG = {
   // Rival identity pools
   BOT_NAMES: ['Kai', 'Luna', 'Maks', 'Ava', 'Rin', 'Zoe', 'Leo', 'Mia', 'Yuki', 'Bex', 'Nova', 'Oda', 'Pia', 'Rex', 'Sol', 'Tao'],
   BOT_COUNTRIES: ['JP', 'BR', 'PL', 'US', 'KR', 'DE', 'FR', 'GB', 'IN', 'MX', 'CA', 'ES', 'IT', 'SE', 'NG', 'AU'],
+
+  // ── Family arc ─────────────────────────────────────────────────────────────
+  // The other voids are the player's FAMILY, not national rivals. They notice
+  // the feast and sky-fall in one at a time over the match. Relation label shows
+  // on their nameplate; each arrives with a bark.
+  FAMILY_RELATIONS: ['lil bro', 'big sis', 'cousin', 'mom', 'dad', 'twin', 'auntie', 'uncle'],
+  FAMILY_BARKS: [
+    'room for one more?',
+    'you started without me?!',
+    'save some city for me!',
+    'ooh, snacks!',
+    'family feast!!',
+    'no fair, I want in!',
+    'is that… a whole city?',
+    'scoot over, sib.',
+  ],
+  // ms-elapsed at which each successive family member drops in (index = arrival
+  // order). You begin (almost) alone; the sky fills as the city panics.
+  FAMILY_ARRIVAL_MS: [5000, 38000, 82000, 132000],
   BOT_COLORS: [
     { body: '#FF3D68', glow: '#FF9BB5' },
     { body: '#2D9CDB', glow: '#9AD2F5' },

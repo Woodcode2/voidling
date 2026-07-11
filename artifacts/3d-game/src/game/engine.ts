@@ -205,6 +205,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let matchStartSeq = 0;        // Rebuild Prompt 10: increments once per real match start (never on boon/resume)
   let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
   let showHitboxes = false;
+  // Family arc: staggered sky-fall arrival schedule (built each round in start())
+  let familyArrivals: { index: number; atMs: number; done: boolean }[] = [];
   // War Pack §2: defense wave state
   let defensePhase = 0;           // 0=none 1=police 2=army 3=tanks 4=helis
   let defenseSpawnCd = 0;         // ms until next wave reinforcement
@@ -484,24 +486,19 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
 
     rivals = makeRivals();
-    for (let i = 0; i < rivals.length; i++) {
-      const a = (i / rivals.length) * Math.PI * 2;
-      const rr = CONFIG.MAP_SIZE * 0.32;
-      // Alive Pack §A: walk spawn inward until it lands on the island
-      let spawnX = c + Math.cos(a) * rr;
-      let spawnY = c + Math.sin(a) * rr;
-      for (let si = 0; si < 24 && !isWalkable(spawnX, spawnY); si++) {
-        const scale = 1 - (si + 1) * 0.042;
-        spawnX = c + Math.cos(a) * rr * scale;
-        spawnY = c + Math.sin(a) * rr * scale;
-      }
-      rivals[i].spawn(spawnX, spawnY, CONFIG.PLAYER_BASE_RADIUS);
-    }
-    // v8 §1: keep every void off a food cluster at spawn so no bot pops a pile
-    // of objects on the first frame (the "bots have 100+ in 2s" bug).
+    // Family arc: rivals are the player's FAMILY and no longer all exist at t=0.
+    // They sky-fall in one at a time per FAMILY_ARRIVAL_MS — the void gets noticed,
+    // the city panics, and kin drop from the sky to join the feast. Landing spots
+    // are chosen live (near the player) when each arrival fires.
+    familyArrivals = rivals.map((_, i) => ({
+      index: i,
+      atMs: CONFIG.FAMILY_ARRIVAL_MS[i] ?? (30000 + i * 40000),
+      done: false,
+    }));
+    // v8 §1: only the player occupies the map at spawn now — keep them off a food
+    // cluster so no one pops a pile of objects on the first frame.
     world.clearSpawnFootprint([
       { x: player.x, y: player.y, radius: player.radius },
-      ...rivals.map((r) => ({ x: r.x, y: r.y, radius: r.radius })),
     ]);
 
     timeLeft = duration;
@@ -649,6 +646,39 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     banner(`${p.name}!`, p.color, 3, { pulse: true });
     audio.playBoon();
     console.log(`[power] ${p.name} (form ${player.formIndex}) consumed ${eaten}`);
+  }
+
+  // ── Family arc: sky-fall a family member into the match ─────────────────────
+  function spawnFamilyMember(index: number) {
+    if (!player || !world) return;
+    const r = rivals[index];
+    if (!r || r.arrived) return;
+    // Choose a landing spot a moderate distance from the player, on the island,
+    // so kin drop into the action but never right on top of the player.
+    const baseA = Math.random() * Math.PI * 2;
+    const reach = CONFIG.MAP_SIZE * 0.16;
+    let sx = player.x, sy = player.y, found = false;
+    for (let k = 0; k < 44; k++) {
+      const a = baseA + k * 1.7;
+      const rr = reach * (0.7 + (k % 5) * 0.12);
+      sx = clamp(player.x + Math.cos(a) * rr, 220, CONFIG.MAP_SIZE - 220);
+      sy = clamp(player.y + Math.sin(a) * rr, 220, CONFIG.MAP_SIZE - 220);
+      if (isWalkable(sx, sy)) { found = true; break; }
+    }
+    if (!found) { sx = CONFIG.MAP_SIZE / 2; sy = CONFIG.MAP_SIZE / 2; }
+    const bark = CONFIG.FAMILY_BARKS[Math.floor(Math.random() * CONFIG.FAMILY_BARKS.length)];
+    r.beginArrival(sx, sy, CONFIG.PLAYER_BASE_RADIUS, bark);
+    banner(`👾 ${r.name} the ${r.relation} joins the feast!`, r.skin.glowColor, 3, { sparkles: true });
+    audio.playBoon();
+    console.log(`[family] ${r.name} (${r.relation}) arrived @${Math.round(roundElapsed)}ms`);
+  }
+
+  function checkFamilyArrivals() {
+    for (const fa of familyArrivals) {
+      if (fa.done || roundElapsed < fa.atMs) continue;
+      fa.done = true;
+      spawnFamilyMember(fa.index);
+    }
   }
 
   // v7 §5: light up / retire synergies as their member power-ups come and go
@@ -850,6 +880,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     timeLeft -= dt;
     roundElapsed += dt;
     setRoundElapsed(roundElapsed); // v15 §0: Growth Law ceiling
+
+    // Family arc: drop in kin on schedule
+    checkFamilyArrivals();
 
     // boons expiry + live effects
     for (let i = activeBoons.length - 1; i >= 0; i--) {
@@ -2074,7 +2107,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const finalForm = CONFIG.FORMS.length - 1;
     const board = [
       { name: 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm, out: false },
-      ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm, out: !r.alive })),
+      // Family arc: only kin who have actually dropped in appear. Not-yet-arrived
+      // family are hidden (not "OUT"); the board fills as they join the feast.
+      ...rivals.filter((r) => r.arrived).map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm, out: !r.alive })),
     ].sort((a, b) => (a.out !== b.out ? (a.out ? 1 : -1) : b.score - a.score));
     const LB_X = 8, LB_W = 150, LB_TOP = 84, ROW = 20;
     const lbH = board.length * ROW + 12;
