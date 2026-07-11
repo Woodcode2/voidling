@@ -1164,6 +1164,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           player.combo = 0; player.comboTimer = 0;
           player.score = Math.max(0, player.score - CONFIG.DEFENSE_PELLET_COST);
           pelletHitFlash = 300;
+          // The city can actually push you around: pellets physically stagger the void.
+          const pm = Math.hypot(p.vx, p.vy) || 1;
+          player.x = clamp(player.x + (p.vx / pm) * 26, player.radius, CONFIG.MAP_SIZE - player.radius);
+          player.y = clamp(player.y + (p.vy / pm) * 26, player.radius, CONFIG.MAP_SIZE - player.radius);
+          fx.shake(140, 4, 15);
           audio.playEaten();
           banner(`🚔 Pellet hit! -${CONFIG.DEFENSE_PELLET_COST} pts`, '#FF9F1C', 2);
         }
@@ -1179,6 +1184,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             player.score = Math.max(0, player.score - cost);
             player.combo = 0; player.comboTimer = 0;
             pelletHitFlash = 500;
+            // Direct artillery hit: real knockback + momentum kill — the army HURTS.
+            const bd = Math.max(1, dist(s.tx, s.ty, player.x, player.y));
+            const bax = (player.x - s.tx) / bd, bay = (player.y - s.ty) / bd;
+            player.x = clamp(player.x + bax * 90, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.y = clamp(player.y + bay * 90, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.vx = 0; player.vy = 0;
+            fx.shake(300, 12, [0, 90]);
             audio.playEaten();
             if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost} pts`, '#FF4D6D', 2);
           }
@@ -1210,6 +1222,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             player.score = Math.max(0, player.score - cost);
             player.combo = 0; player.comboTimer = 0;
             pelletHitFlash = 500;
+            // Missile knockback — the air force means business.
+            const md = Math.max(1, dist(m.tx, m.ty, player.x, player.y));
+            player.x = clamp(player.x + ((player.x - m.tx) / md) * 70, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.y = clamp(player.y + ((player.y - m.ty) / md) * 70, player.radius, CONFIG.MAP_SIZE - player.radius);
+            fx.shake(240, 9, [0, 80]);
             audio.playEaten();
             if (cost > 0) banner(`🚁 Missile hit! -${cost} pts`, '#FF4D6D', 2);
           }
@@ -1344,7 +1361,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (screen === 'game' && roundElapsed > 5000) {
       tickerCd -= dt;
       if (tickerCd <= 0) {
-        tickerCd = 40000 + Math.random() * 10000;
+        tickerCd = 26000 + Math.random() * 8000; // faster news cadence — the feed should pop
         const line = TICKER_LINES[Math.floor(Math.random() * TICKER_LINES.length)];
         banner(line, '#9AAFC8', 1);
       }

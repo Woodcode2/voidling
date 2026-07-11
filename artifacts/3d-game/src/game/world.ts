@@ -70,8 +70,8 @@ export interface WorldObject {
   // Life Pack §3: vignette system
   vignetteData?: {
     id: string;
-    ambientText: string;
-    panicText: string;
+    ambientText: string | string[]; // single line or a pool (picked per fire)
+    panicText: string | string[];
     eatenBanner: string;
     ambientCd: number;   // ms until next ambient bubble may fire
     panicked: boolean;   // true once panic bubble has fired (don't repeat)
@@ -123,22 +123,57 @@ interface FieldDecal { kind: ObjectKind; cx: number; cy: number; halfW: number; 
 interface VignetteConfig {
   kind: ObjectKind;
   zone: 'park' | 'downtown' | 'residential' | 'beach' | 'any';
-  ambientText: string; panicText: string; eatenBanner: string; always: boolean;
+  ambientText: string | string[]; panicText: string | string[]; eatenBanner: string; always: boolean;
   supportProps?: ObjectKind[]; supportPeds?: ObjectKind[];
 }
 const VIGNETTE_CONFIGS: VignetteConfig[] = [
-  { kind: 'vig_proposal',  zone: 'park',        always: false, ambientText: 'Will you marr...', panicText: 'NOT NOW, I\'M MID PROPOSAL!', eatenBanner: '💍 ROMANCE: DEVOURED' },
-  { kind: 'vig_soccer',    zone: 'park',         always: true,  ambientText: 'GOOOAL!',          panicText: 'REF!! TIME OUT!!',           eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
-  { kind: 'vig_wedding',   zone: 'park',         always: false, ambientText: 'I do!',            panicText: 'SAVE THE CAKE!',             eatenBanner: '💒 WEDDING: CONSUMED' },
-  { kind: 'vig_couple',    zone: 'park',         always: false, ambientText: 'Fifty years, dear.', panicText: 'NOT LIKE THIS, HAROLD!',   eatenBanner: '👴 OLD COUPLE: DEVOURED' },
-  { kind: 'vig_busker',    zone: 'downtown',     always: false, ambientText: '🎵',               panicText: "EVERYONE'S A CRITIC!!",      eatenBanner: '🎸 BUSKER: SILENCED' },
-  { kind: 'vig_painter',   zone: 'park',         always: false, ambientText: 'The light is perfect.', panicText: 'MY MASTERPIECE!',      eatenBanner: '🎨 MASTERPIECE: DEVOURED' },
-  { kind: 'vig_selfie',    zone: 'park',         always: false, ambientText: 'Say cheese!',      panicText: 'WAIT, ONE MORE!',            eatenBanner: '📸 SELFIE MOMENT: EATEN' },
-  { kind: 'vig_kite',      zone: 'any',          always: false, ambientText: 'Wheee!',           panicText: 'MY KITE!!',                  eatenBanner: '🪁 KITE: GONE WITH THE VOID' },
-  { kind: 'vig_gardener',  zone: 'residential',  always: false, ambientText: 'Just watered those.', panicText: 'I JUST WATERED THOSE!', eatenBanner: '🌷 GARDEN: DEVOURED' },
+  { kind: 'vig_proposal',  zone: 'park',        always: false,
+    ambientText: ['Will you marr...', 'I have a whole speech prepared—', 'she said YES!!'],
+    panicText:   ["NOT NOW, I'M MID PROPOSAL!", "THE RING! WHERE'S THE RING?!", 'we can elope RIGHT NOW'],
+    eatenBanner: '💍 ROMANCE: DEVOURED' },
+  { kind: 'vig_soccer',    zone: 'park',         always: true,
+    ambientText: ['GOOOAL!', 'DEFENSE!! DEFENSE!!', 'ref, that was SO offside'],
+    panicText:   ['REF!! TIME OUT!!', 'MATCH ABANDONED!!', 'it ate the REF?!'],
+    eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
+  { kind: 'vig_wedding',   zone: 'park',         always: false,
+    ambientText: ['I do!', 'best day EVER 🥂', 'speeches in five!'],
+    panicText:   ['maybe this is a sign...', 'SAVE THE CAKE!', 'the DJ already fled!!'],
+    eatenBanner: '💒 WEDDING: CONSUMED' },
+  { kind: 'vig_couple',    zone: 'park',         always: false,
+    ambientText: ['Fifty years, dear.', 'remember our first date?'],
+    panicText:   ['NOT LIKE THIS, HAROLD!', 'HAROLD, THE COUPONS!!'],
+    eatenBanner: '👴 OLD COUPLE: DEVOURED' },
+  { kind: 'vig_busker',    zone: 'downtown',     always: false,
+    ambientText: ['🎵', 'tips appreciated!'],
+    panicText:   ["EVERYONE'S A CRITIC!!", 'I take REQUESTS, not THIS'],
+    eatenBanner: '🎸 BUSKER: SILENCED' },
+  { kind: 'vig_painter',   zone: 'park',         always: false,
+    ambientText: ['The light is perfect.', 'almost... done...'],
+    panicText:   ['MY MASTERPIECE!', 'fine!! abstract art it is!!'],
+    eatenBanner: '🎨 MASTERPIECE: DEVOURED' },
+  { kind: 'vig_selfie',    zone: 'park',         always: false,
+    ambientText: ['Say cheese!', 'ok one more, for real'],
+    panicText:   ['WAIT, ONE MORE!', 'this is SO going viral'],
+    eatenBanner: '📸 SELFIE MOMENT: EATEN' },
+  { kind: 'vig_kite',      zone: 'any',          always: false,
+    ambientText: ['Wheee!', 'look how high!!'],
+    panicText:   ['MY KITE!!', 'LET GO OF THE STRING, TIMMY'],
+    eatenBanner: '🪁 KITE: GONE WITH THE VOID' },
+  { kind: 'vig_gardener',  zone: 'residential',  always: false,
+    ambientText: ['Just watered those.', 'prize tomatoes, these'],
+    panicText:   ['I JUST WATERED THOSE!', 'TAKE THE HOA INSTEAD!'],
+    eatenBanner: '🌷 GARDEN: DEVOURED' },
   // PLAYGROUND: anchor = pg_swing with cluster of equipment + kids
-  { kind: 'pg_swing', zone: 'park', always: true, ambientText: 'Wheee!', panicText: 'NOT THE SLIDE!', eatenBanner: '🛝 PLAYGROUND: DEVOURED', supportProps: ['pg_slide','pg_seesaw','pg_sandbox','pg_merrygoround'], supportPeds: ['person_mom','person_kid','person_kid'] },
+  { kind: 'pg_swing', zone: 'park', always: true,
+    ambientText: ['Wheee!', 'higher!! HIGHER!!'],
+    panicText:   ['NOT THE SLIDE!', 'EVERYONE OFF THE SWINGS!!'],
+    eatenBanner: '🛝 PLAYGROUND: DEVOURED', supportProps: ['pg_slide','pg_seesaw','pg_sandbox','pg_merrygoround'], supportPeds: ['person_mom','person_kid','person_kid'] },
 ];
+
+/** Pick one line from a string-or-pool (vignette/panic dialogue). */
+function pickLine(t: string | string[], rand: () => number): string {
+  return Array.isArray(t) ? t[Math.floor(rand() * t.length)] : t;
+}
 
 const MARGIN = (CONFIG.MAP_SIZE - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
 const STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
@@ -1712,14 +1747,14 @@ export class WorldManager {
           vd.panicked = true;
           audio.playPedPanic(); // Sound Pack §9: cartoon squeak when ped panics
           if (!obj.bubbleText && activeBubbles < 4) {
-            obj.bubbleText = vd.panicText; obj.bubbleLife = 5000; activeBubbles++;
+            obj.bubbleText = pickLine(vd.panicText, this.rand); obj.bubbleLife = 5000; activeBubbles++;
           }
         }
         // Ambient bubble fires periodically when player is within 2000 world px
         if (!vd.panicked && dp < 2000) {
           vd.ambientCd -= dt;
           if (vd.ambientCd <= 0 && !obj.bubbleText && activeBubbles < 4) {
-            obj.bubbleText = vd.ambientText; obj.bubbleLife = 4000;
+            obj.bubbleText = pickLine(vd.ambientText, this.rand); obj.bubbleLife = 4000;
             vd.ambientCd = 8000 + Math.random() * 4000; activeBubbles++;
           }
         }
@@ -1925,7 +1960,9 @@ export class WorldManager {
       const rem = this.remaining;
       if (rem < target) {
         const frac = rem / Math.max(1, this.initialPopulation);
-        const baseRate = frac >= 0.80 ? 4 : lerp(4, 8, clamp((0.80 - frac) / 0.20, 0, 1));
+        // Refill fast enough that the map never feels empty: at heavy depletion
+        // (e.g. after a COLLAPSE) the city pours back in at up to 18 objects/s.
+        const baseRate = frac >= 0.80 ? 6 : lerp(6, 18, clamp((0.80 - frac) / 0.35, 0, 1));
         const rate = baseRate * this.respawnMult; // Phase 7b §6: ×3 during FEEDING FRENZY
         this.respawnTimer = 1000 / rate;
         this.spawnRespawn(player, voids, fx);
@@ -2209,13 +2246,21 @@ export class WorldManager {
     if (threat) {
       const wasFleeing = obj.fleeing;
       obj.fleeing = true;
-      if (obj.kind === 'person') {
+      // Panic bubbles: was gated to kind === 'person', but plain 'person' is
+      // retired — every real pedestrian is person_* / skateboarder / etc., so
+      // bubbles almost never fired and the crowd read as mute. Fixed + funnier.
+      const isPed = obj.kind.startsWith('person') ||
+        ['skateboarder', 'cyclist', 'waiter', 'icecream_vendor', 'tourist', 'zookeeper', 'soldier'].includes(obj.kind);
+      if (isPed) {
         if (obj.alertT <= 0) obj.alertT = 900;
-        // Fix 7: 1-in-3 panicking peds pop a speech bubble when they first start fleeing
-        if (!wasFleeing && !obj.bubbleText && this.rand() < 0.33) {
+        // 1-in-2 panicking peds pop a speech bubble when they first start fleeing
+        if (!wasFleeing && !obj.bubbleText && this.rand() < 0.5) {
           const PANIC = ['MY LAWN!', 'RUN!!', 'Is that a grape?!', 'NOT THE BEACH!',
             'I just waxed that car!', 'WHAT IS THAT?!', 'HELP!!', 'My petunias!!',
-            'Call the mayor!!', 'It ate my lunch!!'];
+            'Call the mayor!!', 'It ate my lunch!!', 'my latte!!', 'nope nope nope nope',
+            'it\'s not even trash day!!', 'tell my wife I love h—', '5 stars. very scary.',
+            'I KNEW this town was cursed!!', 'the gym was THAT way anyway',
+            'not my emotional support gnome!!'];
           obj.bubbleText = PANIC[Math.floor(this.rand() * PANIC.length)];
           obj.bubbleLife = 1500;
         }

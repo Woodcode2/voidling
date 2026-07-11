@@ -613,6 +613,21 @@ export const CONFIG = {
   // ms-elapsed at which each successive family member drops in (index = arrival
   // order). You begin (almost) alone; the sky fills as the city panics.
   FAMILY_ARRIVAL_MS: [5000, 38000, 82000, 132000],
+  // Ongoing mid-match banter — the family is HAVING FUN devouring together.
+  FAMILY_BANTER: [
+    'nom nom nom nom',
+    'this city SLAPS',
+    'mom look, no hands!',
+    'race you to the zoo!',
+    'I ate a whole BUS!',
+    'family feast!!!',
+    'save room for downtown!',
+    'who ate my snack pile?!',
+    'growing up so fast 🥲',
+    'last one to the beach is a snack!',
+    'do I have car in my teeth?',
+    'grandma would be proud',
+  ],
   BOT_COLORS: [
     { body: '#FF3D68', glow: '#FF9BB5' },
     { body: '#2D9CDB', glow: '#9AD2F5' },

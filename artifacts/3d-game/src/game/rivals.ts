@@ -30,8 +30,10 @@ export class Rival extends Void {
   // Family-arrival state
   arrived = false;                // has this family member dropped in yet?
   arrivalE = 0;                   // ms elapsed since the sky-fall began
-  barkText = '';                  // one-liner shown briefly on arrival
-  private barkWindow = 3400;      // ms the bark bubble lingers
+  // Speech bubble (arrival bark + ongoing family banter)
+  bubbleText = '';
+  bubbleT = 0;                    // ms remaining on the current bubble
+  private banterCd = 14000 + Math.random() * 10000; // ms until next fun line
 
   // v9 §1: radius/score/formIndex/ghostTime/underdog*/eventSlow/skin/name are on Void
   eventFlee: { x: number; y: number } | null = null; // v7 §4: hazard to run from
@@ -84,7 +86,8 @@ export class Rival extends Void {
     this.spawn(x, y, radius);
     this.arrived = true;
     this.arrivalE = 0;
-    this.barkText = bark;
+    this.bubbleText = bark;
+    this.bubbleT = 3400;
     this.ghostTime = ARRIVAL_TOTAL_MS; // invulnerable while falling in
   }
 
@@ -96,6 +99,20 @@ export class Rival extends Void {
     if (!this.arrived) return; // dormant until the arrival schedule drops them in
     if (this.arrivalE < ARRIVAL_TOTAL_MS) this.arrivalE += dt;
     const airborne = this.arrivalE < ARRIVAL_FALL_MS; // still falling — no AI, no drift
+
+    // Family banter — the kin are having FUN devouring together, and say so.
+    if (this.bubbleT > 0) this.bubbleT -= dt;
+    if (!airborne) {
+      this.banterCd -= dt;
+      if (this.banterCd <= 0) {
+        this.banterCd = 16000 + Math.random() * 14000;
+        if (this.bubbleT <= 0) {
+          const pool = CONFIG.FAMILY_BANTER;
+          this.bubbleText = pool[Math.floor(Math.random() * pool.length)];
+          this.bubbleT = 3000;
+        }
+      }
+    }
 
     this.tickMorph(dt);     // v9 §3: advance the body-morph crossfade
     this.tickCaptures(dt);  // v15 §0: drain the deferred-absorb orbit queue
@@ -269,7 +286,7 @@ export class Rival extends Void {
     });
     arrivalDrawFX(ctx, rx, ry, this.radius, e);
     this.drawTag(ctx, rx, ry - drop);
-    if (this.arrived && this.arrivalE < this.barkWindow && this.barkText) {
+    if (this.bubbleT > 0 && this.bubbleText) {
       this.drawBark(ctx, rx, ry - drop - this.radius - 34);
     }
   }
@@ -291,15 +308,15 @@ export class Rival extends Void {
     ctx.restore();
   }
 
-  /** Speech bubble shown for a few seconds when a family member arrives. */
+  /** Speech bubble — arrival bark + ongoing family banter (fades in the last 500ms). */
   private drawBark(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
-    const fade = clamp(1 - (this.arrivalE - (this.barkWindow - 500)) / 500, 0, 1);
+    const fade = clamp(this.bubbleT / 500, 0, 1);
     ctx.save();
     ctx.globalAlpha = fade;
     ctx.font = '700 13px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const w = ctx.measureText(this.barkText).width + 20;
+    const w = ctx.measureText(this.bubbleText).width + 20;
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
     roundRect(ctx, cx - w / 2, cy - 12, w, 24, 12);
     ctx.fill();
@@ -311,7 +328,7 @@ export class Rival extends Void {
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = '#2A1445';
-    ctx.fillText(this.barkText, cx, cy);
+    ctx.fillText(this.bubbleText, cx, cy);
     ctx.restore();
   }
 }
