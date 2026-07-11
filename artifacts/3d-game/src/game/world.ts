@@ -1256,8 +1256,8 @@ export class WorldManager {
     // ── Stage 2: packed downtown — grid of building lots per downtown block ──
     // Gather every candidate cell across all on-island downtown blocks, rank by
     // distance to the central plaza, then assign tallest→nearest, shortest→edge.
-    const DT_STEP = 360;  // Prompt 14: tight tower grid — gap ≤ 0.3× building width at plaza core
-    const DT_INSET = CONFIG.SIDEWALK + 110;
+    const DT_STEP = 288;  // tighter tower grid (5×5 cells/block vs 4×4) → a denser skyline
+    const DT_INSET = CONFIG.SIDEWALK + 80;
     const cells: { x: number; y: number; block: Block; d2: number }[] = [];
     const px = this.size / 2, py = this.size / 2;
     for (const b of this.blocks) {
@@ -1274,10 +1274,11 @@ export class WorldManager {
     const n = Math.max(1, cells.length - 1);
     const kindForRank = (i: number): ObjectKind => {
       const f = i / n; // 0 = plaza-adjacent (tallest), 1 = zone edge (shortest)
-      // Prompt 14: ~45% towers at core, ~35% offices mid-ring, shop/cafe outermost band only.
-      if (f < 0.45) return 'skyscraper';
-      if (f < 0.80) return 'office';
-      if (f < 0.92) return 'cafe';
+      // Denser skyline: towers fill the core+mid, offices out to the edge, only a
+      // thin outer band of cafe/shop — so downtown edges no longer read as empty lots.
+      if (f < 0.55) return 'skyscraper';
+      if (f < 0.90) return 'office';
+      if (f < 0.97) return 'cafe';
       return 'shop';
     };
     for (let i = 0; i < cells.length; i++) {
