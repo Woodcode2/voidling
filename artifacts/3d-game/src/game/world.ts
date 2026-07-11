@@ -2061,6 +2061,31 @@ export class WorldManager {
     }
   }
 
+  /** Signature "void power" blast: yank every edible within `pullRange` sharply
+   *  inward, then instantly devour everything inside `consumeRange` that the
+   *  player is allowed to eat. At high forms `crushBig` lets it swallow oversized
+   *  structures (skyscrapers, water towers) that the size-gate would normally
+   *  block — the WORLD-ENDER "collapse" fantasy. Returns the count consumed so
+   *  the caller can scale its feedback. */
+  voidPowerBlast(player: Player, pullRange: number, consumeRange: number, pull: number, crushBig: boolean, fx: FXManager): number {
+    // 1) hard inward pull across the whole reach
+    this.attractEdibles(player.x, player.y, pullRange, pull);
+    // 2) instant devour inside the consume radius. Snapshot first: consumeByPlayer
+    //    mutates object state, so iterate a stable list.
+    let eaten = 0;
+    for (const o of this.objects) {
+      if (o.eaten) continue;
+      if (dist(o.x, o.y, player.x, player.y) > consumeRange + o.size) continue;
+      // zoo_wall is never edible (structural boundary); everything else is fair
+      // game when crushBig, otherwise honour the normal size gate.
+      const eligible = crushBig ? o.kind !== 'zoo_wall' : this.canEatByPlayer(player, o);
+      if (!eligible) continue;
+      this.consumeByPlayer(o, player, fx);
+      eaten++;
+    }
+    return eaten;
+  }
+
   // v8 §1: nudge any edibles off the round-start footprint of every void so a
   // rival never begins the round sitting inside a cluster (which let bots pop a
   // dozen objects in the first frame and hit 100+ score instantly). Relocates

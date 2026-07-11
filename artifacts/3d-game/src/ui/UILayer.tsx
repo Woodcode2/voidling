@@ -805,7 +805,19 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           ))}
         </div>
       )}
-      {/* Death Rules Pivot: powers removed entirely — no active-power HUD badge */}
+      {/* Signature VOID POWER — on-screen button (also fires on Space/E). The
+          conic ring sweeps as the cooldown recharges; greyed while charging. */}
+      {!snap.paused && snap.power && (
+        <button
+          className={`vd-power-btn${snap.power.ready ? ' vd-power-btn--ready' : ''}`}
+          onClick={() => engine.usePower()}
+          disabled={!snap.power.ready}
+          aria-label={`Use power: ${snap.power.name}`}
+          style={{ ['--cd' as string]: String(snap.power.cdFrac) }}
+        >
+          <span className="vd-power-name">{snap.power.name}</span>
+        </button>
+      )}
       {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
       {snap.paused && (
         <div className="vd-overlay vd-overlay--dim vd-pause-overlay">

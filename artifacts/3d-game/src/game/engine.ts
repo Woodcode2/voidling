@@ -79,6 +79,7 @@ export interface Snapshot {
   killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
   matchStartSeq: number; // Rebuild Prompt 10: increments once per real match start (drives the welcome/coaching intro)
+  power?: { name: string; ready: boolean; cdFrac: number; form: number }; // signature void power HUD state
 }
 
 export interface GameEngine {
@@ -99,6 +100,8 @@ export interface GameEngine {
   toggleSfx(): boolean;
   toggleHitboxes(): boolean;
   unlockAudio(): void;
+  /** Fire the current form's signature void power (Space key / on-screen button). */
+  usePower(): void;
   /** Stage 13 §1: render a 2000×2000 PNG of the island with all static objects.
    *  Returns a data URL string, or null if the world hasn't initialised yet. */
   capturePhoto(): string | null;
@@ -128,6 +131,23 @@ const BOON_DURATION: Record<string, number> = {
 
 // v7 §5: max power-up level (picking a dupe once → Level II, then it's retired)
 const BOON_MAX_LEVEL = 2;
+
+// ── Signature VOID POWER — one active ability, escalating with evolution form ──
+// Bound to Space (desktop) and the on-screen power button (mobile). Not random,
+// not a boon: it is *the* power fantasy, and it grows more apocalyptic as the
+// void evolves — gravity pull → vortex → implosion → singularity → collapse.
+// pull      = per-activation inward yank strength on edibles
+// pullRange = radius over which edibles are dragged in
+// consume   = radius inside which eligible objects are instantly devoured
+// crushBig  = also swallow oversized structures past the normal size gate
+// cd        = cooldown (ms); shake = screen-shake magnitude
+const VOID_POWERS = [
+  { name: 'PULL',        pull: 90,  pullRange: 340,  consume: 78,  crushBig: false, cd: 5000,  shake: 6,  color: '#9D78FF' },
+  { name: 'VORTEX',      pull: 130, pullRange: 470,  consume: 140, crushBig: false, cd: 6000,  shake: 10, color: '#A585FF' },
+  { name: 'IMPLOSION',   pull: 185, pullRange: 640,  consume: 250, crushBig: false, cd: 7000,  shake: 14, color: '#B98CFF' },
+  { name: 'SINGULARITY', pull: 250, pullRange: 850,  consume: 390, crushBig: true,  cd: 8500,  shake: 19, color: '#C9A0FF' },
+  { name: 'COLLAPSE',    pull: 330, pullRange: 1150, consume: 580, crushBig: true,  cd: 10000, shake: 27, color: '#E4C4FF' },
+] as const;
 
 function skinById(id: string): SkinDef {
   return CONFIG.SKINS.find((s) => s.id === id) || CONFIG.SKINS[0];
@@ -179,6 +199,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let goldenTimer = 0;          // v6 §2: golden-object spawn cadence (from 2:45)
   let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
+  let powerCd = 0;             // Signature VOID POWER cooldown remaining (ms)
   let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
   let countStep = 0;           // v8 §1: last countdown number beeped
   let matchStartSeq = 0;        // Rebuild Prompt 10: increments once per real match start (never on boon/resume)
@@ -393,6 +414,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     window.addEventListener('wheel', (e) => lineupScroll(e.deltaY), { passive: true });
   }
 
+  // Signature VOID POWER — Space (or E) fires the current form's ability.
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.repeat) return;
+    if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); usePower(); }
+  }
+  window.addEventListener('keydown', onKeyDown);
+
   // v8 §6: everything routes through the callout queue so nothing overlaps/stacks
   function banner(text: string, color = '#FFFFFF', priority = 1, opts: { sparkles?: boolean; pulse?: boolean } = {}) {
     if (callout?.text === text || calloutQueue.some((c) => c.text === text)) return; // dedupe
@@ -578,6 +606,49 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     player.x = clamp(player.x + dx * 100, player.radius, CONFIG.MAP_SIZE - player.radius);
     player.y = clamp(player.y + dy * 100, player.radius, CONFIG.MAP_SIZE - player.radius);
     console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} 100px`);
+  }
+
+  // ── Signature VOID POWER — fire the current form's gravity ability ──────────
+  function usePower() {
+    if (screen !== 'game' || paused || !player || !world || countdown > 0) return;
+    if (powerCd > 0) return;
+    const p = VOID_POWERS[Math.min(player.formIndex, VOID_POWERS.length - 1)];
+    powerCd = p.cd;
+
+    // Reach scales with the void's own radius so it feels bigger as you grow.
+    const rScale = 1 + player.radius / 240;
+    const consumeR = p.consume * rScale;
+    const pullR = p.pullRange * rScale;
+
+    const eaten = world.voidPowerBlast(player, pullR, consumeR, p.pull, p.crushBig, fx);
+
+    // ── juice: collapse ring, inner flash ring, rim inhale, shake, flash ──
+    fx.addRing(player.x, player.y, p.color, consumeR * 1.15, player.radius * 0.4, 8, 460);
+    fx.addRing(player.x, player.y, '#FFFFFF', consumeR * 0.75, player.radius * 0.3, 4, 340);
+    const rim = p.crushBig ? 26 : 16;
+    for (let i = 0; i < rim; i++) {
+      const a = (i / rim) * Math.PI * 2;
+      fx.addRing(player.x + Math.cos(a) * consumeR, player.y + Math.sin(a) * consumeR, p.color, 7, 2, 2, 300);
+    }
+    fx.shake(240, p.shake, [0, 110]);
+    if (p.crushBig) fx.flash();
+
+    // High forms physically shove rivals out of the collapse zone.
+    if (p.crushBig) {
+      for (const r of rivals) {
+        if (!r.alive || r.ghost) continue;
+        const d = dist(r.x, r.y, player.x, player.y);
+        if (d > 1 && d < consumeR + r.radius) {
+          const k = (consumeR + r.radius - d) * 0.7;
+          r.x += ((r.x - player.x) / d) * k;
+          r.y += ((r.y - player.y) / d) * k;
+        }
+      }
+    }
+
+    banner(`${p.name}!`, p.color, 3, { pulse: true });
+    audio.playBoon();
+    console.log(`[power] ${p.name} (form ${player.formIndex}) consumed ${eaten}`);
   }
 
   // v7 §5: light up / retire synergies as their member power-ups come and go
@@ -1157,6 +1228,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       dashTimer -= dt;
       if (dashTimer <= 0) { dashTimer = 6000; performDash(); }
     } else dashTimer = 0;
+
+    // Signature VOID POWER cooldown tick
+    if (powerCd > 0) powerCd = Math.max(0, powerCd - dt);
 
     // v7 §5: ECHO BITE shockwave (every 5th absorb) pulls nearby edibles inward
     if (player.echoPulse) {
@@ -2744,6 +2818,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       killedBy: killedBy || undefined, // Phase 7b §4: who ate the player
       planName: world?.planName, // v16.2 §6
       matchStartSeq, // Rebuild Prompt 10
+      power: (player && screen === 'game') ? (() => {
+        const idx = Math.min(player.formIndex, VOID_POWERS.length - 1);
+        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx };
+      })() : undefined,
     };
   }
 
@@ -2806,6 +2884,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       import('tone').then((T) => T.start()).catch(() => {/* ignore */});
     },
 
+    usePower() { usePower(); },
+
     // Stage 13 §1: photo-mode capture — renders a 2000×2000 PNG of the island.
     // Rebuild Prompt 16 Stage 0: capturePhoto must always show a populated island,
     // so we build a fresh WorldManager and run the full init pipeline (lots, fill,
@@ -2853,6 +2933,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('visibilitychange', onVisibility);
       audio.stopMusic(); // prevent the music scheduler interval from leaking on unmount
       joystick.destroy();

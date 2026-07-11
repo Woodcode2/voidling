@@ -284,6 +284,55 @@
   pointer-events: auto;
 }
 
+/* ── Signature VOID POWER button (bottom-right action button) ────────────────── */
+.vd-power-btn {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(30px + env(safe-area-inset-bottom));
+  width: 94px;
+  height: 94px;
+  border: none;
+  border-radius: 50%;
+  z-index: 46;
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: Fredoka, sans-serif;
+  font-weight: 800;
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 0 6px;
+  background: radial-gradient(circle at 50% 36%, #C6A2FF 0%, #7A3FF0 60%, #45199B 100%);
+  box-shadow: 0 6px 18px rgba(122, 63, 240, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+/* cooldown sweep: a conic ring around the button, filled by --cd (0..1) */
+.vd-power-btn::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: conic-gradient(#E4C4FF calc(var(--cd, 1) * 360deg), rgba(255, 255, 255, 0.14) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+  z-index: -1;
+}
+.vd-power-btn:active { transform: scale(0.9); }
+.vd-power-btn:disabled { cursor: default; filter: grayscale(0.65) brightness(0.62); }
+/* gentle ready-pulse so the player notices it's chargeable */
+.vd-power-btn--ready { animation: vd-power-ready 1.6s ease-in-out infinite; }
+@keyframes vd-power-ready {
+  0%, 100% { box-shadow: 0 6px 18px rgba(122, 63, 240, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.35); }
+  50%      { box-shadow: 0 6px 26px rgba(180, 130, 255, 0.85), inset 0 2px 0 rgba(255, 255, 255, 0.45); }
+}
+.vd-power-name { line-height: 1; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+
 .vd-shop-list { width: 100%; overflow-y: auto; }
 
 /* Sound Pack Phase 6: pill container — pause + sound side by side */
