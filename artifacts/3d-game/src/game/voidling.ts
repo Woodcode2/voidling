@@ -49,7 +49,7 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
   // ── WORLD ENDER: the ground itself dims beneath the void ──────────────────
   // Drawn before lean-rotation so the pool hugs the ground, not the body tilt.
   if ((v.form || 0) >= 4) {
-    const a = (v.morph ?? 1) * 0.26;
+    const a = (v.morph ?? 1) * 0.34;
     const g = ctx.createRadialGradient(0, r * 0.25, r * 0.4, 0, r * 0.25, r * 2.5);
     g.addColorStop(0, `rgba(6,2,16,${a})`);
     g.addColorStop(0.7, `rgba(6,2,16,${a * 0.5})`);
@@ -311,7 +311,7 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     const a = form === 2 ? morph : 1;
     // faint ring path so the orbit reads as a structure
     ctx.save();
-    ctx.globalAlpha *= a * 0.22;
+    ctx.globalAlpha *= a * 0.30;
     ctx.strokeStyle = hexA(v.skin.glowColor, 1);
     ctx.lineWidth = Math.max(1, r * 0.025);
     ctx.beginPath();
@@ -350,7 +350,7 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.save();
     ctx.globalAlpha *= a;
     const g = ctx.createRadialGradient(0, 0, r * 1.02, 0, 0, r * 1.45);
-    g.addColorStop(0, 'rgba(8,3,20,0.34)');
+    g.addColorStop(0, 'rgba(8,3,20,0.46)');
     g.addColorStop(0.55, 'rgba(8,3,20,0.16)');
     g.addColorStop(1, 'rgba(8,3,20,0)');
     ctx.fillStyle = g;
@@ -361,7 +361,7 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.restore();
     // the counter-ring itself
     ctx.save();
-    ctx.globalAlpha *= a * 0.28;
+    ctx.globalAlpha *= a * 0.36;
     ctx.strokeStyle = hexA('#B98CFF', 1);
     ctx.lineWidth = Math.max(1, r * 0.022);
     ctx.beginPath();
@@ -393,7 +393,7 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
       const bx = Math.cos(ang) * r * 0.99, by = Math.sin(ang) * r * 0.99;
       const tx = Math.cos(ang + flick) * (r + len), ty = Math.sin(ang + flick) * (r + len);
       ctx.save();
-      ctx.globalAlpha *= a * 0.85;
+      ctx.globalAlpha *= a;
       teardrop(ctx, bx, by, tx, ty, nx, ny, r * 0.075, '#C9A8FF');
       const itx = bx + (tx - bx) * 0.6, ity = by + (ty - by) * 0.6;
       teardrop(ctx, bx, by, itx, ity, nx, ny, r * 0.04, '#FFFFFF');
@@ -406,13 +406,13 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.rotate(prec);
     ctx.globalAlpha *= a;
     // outer warm band
-    ctx.strokeStyle = hexA('#FFB36B', 0.55);
-    ctx.lineWidth = Math.max(2, r * 0.075);
+    ctx.strokeStyle = hexA('#FFB36B', 0.85);
+    ctx.lineWidth = Math.max(3, r * 0.105);
     ctx.beginPath();
     ctx.ellipse(0, 0, r * 1.72, r * 0.52, 0, 0, Math.PI * 2);
     ctx.stroke();
     // bright white core line
-    ctx.strokeStyle = hexA('#FFFFFF', 0.75);
+    ctx.strokeStyle = hexA('#FFFFFF', 0.95);
     ctx.lineWidth = Math.max(1, r * 0.028);
     ctx.beginPath();
     ctx.ellipse(0, 0, r * 1.72, r * 0.52, 0, 0, Math.PI * 2);

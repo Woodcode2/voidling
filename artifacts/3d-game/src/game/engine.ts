@@ -437,9 +437,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     resetWaterfallState();
 
     const skin = skinById(meta.data.equippedSkin);
-    const c = CONFIG.MAP_SIZE / 2;
+    // Batch 1.5: spawn at the world's cozy-street spawn point, not map centre.
+    const _sp = (world as any)?.spawnPoint ?? { x: 0, y: 0 };
+    const c = _sp.x > 0 ? _sp.x : CONFIG.MAP_SIZE / 2;
+    const cY = _sp.y > 0 ? _sp.y : CONFIG.MAP_SIZE / 2;
     if (!player) player = new Player(skin);
-    player.reset(c, c, skin);
+    player.reset(c, cY, skin);
     player.radius = startRadius;
     // v12 §4: daily mod post-player-init effects
     if (daily && dailyData) {
@@ -821,7 +824,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     // Phase 7b §4: fall → drop one stage (at VOIDLING: −15% score sting, run continues)
     if (player.fallState === 'falling' && player.fallTimer <= 0) {
-      const cx = CONFIG.MAP_SIZE / 2, cy = CONFIG.MAP_SIZE / 2;
+      // Batch 1.5: fall-off respawn returns to the cozy-street spawn point.
+      const _rp = (world as any)?.spawnPoint ?? { x: 0, y: 0 };
+      const cx = _rp.x > 0 ? _rp.x : CONFIG.MAP_SIZE / 2;
+      const cy = _rp.y > 0 ? _rp.y : CONFIG.MAP_SIZE / 2;
       if (player.formIndex <= 0) {
         // VOIDLING can't drop further — 15% score penalty instead
         player.score = Math.max(0, Math.floor(player.score * 0.85));

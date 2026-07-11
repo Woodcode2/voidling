@@ -217,9 +217,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     // Lighting atmosphere on top (always)
     // Prompt 15 Stage 5: richer green tint to match reference vibrancy.
     const atmo = cc.createLinearGradient(0, 0, S, S);
-    atmo.addColorStop(0,   'rgba(20,70,10,0.12)');
-    atmo.addColorStop(0.5, 'rgba(0,0,0,0.04)');
-    atmo.addColorStop(1,   'rgba(0,0,0,0.09)');
+    atmo.addColorStop(0,   'rgba(255,196,110,0.10)'); // Batch 1.5: warm golden light
+    atmo.addColorStop(0.5, 'rgba(255,170,90,0.04)');
+    atmo.addColorStop(1,   'rgba(210,120,60,0.08)');
     cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
     cc.restore();
   }
@@ -228,7 +228,8 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   //      Each distinct surface now reads as its own material.
   _texZone(cc, 'forest',   ZONE_FOREST_R,   COL.forest);
   _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
-  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, COL.pavement, true);
+  // Batch 1.5: downtown floors in warm dark stone — dense streets, not pale plaza.
+  _texZone(cc, 'street', ZONE_DOWNTOWN_R, '#6E6156', true);
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
 

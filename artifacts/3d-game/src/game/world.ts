@@ -296,6 +296,7 @@ const VIGNETTE_SITTER_KINDS: Set<ObjectKind> = new Set([
 export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
+  spawnPoint = { x: 0, y: 0 };  // Batch 1.5: engine spawns/respawns the player here
   houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
@@ -468,7 +469,19 @@ export class WorldManager {
     this.generateLots(rand);
     for (const g of this.swallowGhosts) g.active = false; // Feedback Juice §1: clear pool
 
-    const spawnX = this.size / 2, spawnY = this.size / 2;
+    // Batch 1.5: spawn on a cozy suburb street NEAREST the map centre — a real
+    // neighbourhood with houses on screen, never the centre road junction.
+    // The point sits on the block's inner-west sidewalk strip: house lots are
+    // inset well past x0+90, so this is always clear of structures.
+    const _cc = this.size / 2;
+    const _cozyBlocks = this.blocks.filter((b) => b.type === 'cozy');
+    _cozyBlocks.sort((a, b) =>
+      Math.hypot(a.x0 + CONFIG.BLOCK_SIZE / 2 - _cc, a.y0 + CONFIG.BLOCK_SIZE / 2 - _cc) -
+      Math.hypot(b.x0 + CONFIG.BLOCK_SIZE / 2 - _cc, b.y0 + CONFIG.BLOCK_SIZE / 2 - _cc));
+    const _sb = _cozyBlocks[0];
+    const spawnX = _sb ? _sb.x0 + 90 : _cc;
+    const spawnY = _sb ? _sb.y0 + CONFIG.BLOCK_SIZE / 2 : _cc;
+    this.spawnPoint = { x: spawnX, y: spawnY };
     let civicIndex = 0; // track civic blocks (cap at 1 so extra civics reuse the second pattern)
     for (const b of this.blocks) {
       // Alive Pack §A: skip blocks whose center falls outside the island polygon.
@@ -3011,10 +3024,11 @@ export class WorldManager {
           const shadowAsr = spriteAspect.get(spriteKey!) ?? 1;
           const formulaW = r * 0.85 * Math.min(shadowAsr * 1.1, 1.7);
           const footprintW = r * Math.min(shadowAsr + 0.3, 1.1); // visual base half-width × 2
-          const shadowW = Math.max(formulaW, footprintW) * coupleScale; // scale with visual
-          const shadowH = (shadowAsr < 0.8 ? r * 0.14 : r * 0.22) * coupleScale;
-          const shadowYOff = shadowAsr < 0.8 ? 2 : 5;            // hugs the base of towers
-          const shadowAlpha = Math.max(0.13, 0.26 - r * 0.0008);
+          // Batch 1.5: tighter, closer, lighter shadows — planted, not hovering.
+          const shadowW = Math.max(formulaW, footprintW) * coupleScale * 0.86;
+          const shadowH = (shadowAsr < 0.8 ? r * 0.11 : r * 0.15) * coupleScale;
+          const shadowYOff = shadowAsr < 0.8 ? 2 : 3;
+          const shadowAlpha = Math.max(0.10, 0.20 - r * 0.0008);
           ctx.save();
           ctx.fillStyle = `rgba(0,0,0,${shadowAlpha.toFixed(3)})`;
           ctx.beginPath();
@@ -3060,7 +3074,11 @@ export class WorldManager {
           // was removed so they draw perfectly still like every other structure.
           // Prompt 19 Stage 1: aspect-ratio-correct foot-anchored draw
           // dH = 2r (height unchanged), dW = 2r * aspect (width preserves ratio)
-          const fasr = spriteAspect.get(spriteKey!) ?? 1;
+          const fasrRaw = spriteAspect.get(spriteKey!) ?? 1;
+          // Batch 1.5: pencil-tower fix — large structures never draw thinner
+          // than 0.46× their height. Small props (lamps, people, gnomes) keep
+          // their native aspect untouched.
+          const fasr = (r > 90 && fasrRaw < 0.46) ? 0.46 : fasrRaw;
           // coupleScale is hoisted above the shadow block — see Prompt 20 Stage 4 comment.
           const fdH = r * 2 * coupleScale, fdW = fdH * fasr;
           ctx.drawImage(objSprite, sx, sy, sw, sh, -(fdW / 2), -fdH, fdW, fdH);
