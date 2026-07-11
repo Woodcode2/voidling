@@ -803,7 +803,10 @@ export class WorldManager {
         if (sand) {
           if (terr !== GTERRAIN.SAND) continue;
         } else if (terr === GTERRAIN.SAND || terr === GTERRAIN.WATER
-          || terr === GTERRAIN.SPACE || terr === GTERRAIN.ROAD) {
+          || terr === GTERRAIN.SPACE || terr === GTERRAIN.ROAD
+          || terr === GTERRAIN.PAVEMENT) {
+          // PAVEMENT excluded: park scenery (picnic tables, bushes) was leaking
+          // into downtown between the towers — pure nonsense in a city core.
           continue;
         }
         if (!this.roadClear(x, y, R)) continue;
@@ -1391,11 +1394,12 @@ export class WorldManager {
     for (const lot of b.buildingLots ?? []) {
       this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
     }
-    // street furniture (props are exempt from the structure-overlap audit)
-    this.scatter(b, rand, 'cafetable', 4);
+    // street furniture — URBAN props only (benches/flowers between towers read
+    // as nonsense; keep the core feeling like a city, not a park)
+    this.scatter(b, rand, 'cafetable', 3);
     this.scatterPeople(b, rand, 'downtown', 13); // War Pack §1: diverse downtown crowd
-    this.scatter(b, rand, 'bench', 2);
-    this.scatter(b, rand, 'flower', 3);
+    this.scatter(b, rand, 'streetlamp', 2);
+    this.scatter(b, rand, 'foodcart', 1);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
     this.scatter(b, rand, 'car_parked_a', 1);
     this.scatter(b, rand, 'car_parked_b', 1);
@@ -1509,6 +1513,8 @@ export class WorldManager {
       }
     }
 
+    // Zoo VISITORS — a zoo without people made 0 sense
+    this.scatterPeople(b, rand, 'any', 6);
   }
 
   // Rebuild Prompt 16: the airport opens — terminal, control tower, hangar, planes, props.

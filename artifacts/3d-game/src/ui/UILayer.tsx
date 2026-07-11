@@ -839,26 +839,31 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
 }
 
 // Phase 7a §5: rewritten guide cards matching new mechanics
+// The guide walks the EVOLUTION JOURNEY — each panel's hero void is a further
+// form, so new players see what they'll become (not the old plain orb 3x).
 const ONBOARD_PANELS = [
   {
     skin: 'classic',
+    form: 0,
     title: 'DRAG TO MOVE',
     body: 'Drag anywhere on screen to move. Eat anything smaller than you.',
     hint: 'Everything edible gets pulled into your orbit automatically',
     spriteKind: 'flower',
   },
   {
-    skin: 'devil',
-    title: 'GROW TO EVOLVE',
-    body: 'Eat enough to evolve through five forms. Gold ring = you can eat it. Red ring = RUN.',
-    hint: 'Watch the rim color — green means safe, red means danger',
+    skin: 'classic',
+    form: 2,
+    title: 'EAT. GROW. EVOLVE.',
+    body: 'Grow through five forms — from tiny VOIDLING to WORLD ENDER. Bigger you = bigger bites.',
+    hint: 'Houses, cars, whole skyscrapers… eventually the train.',
     spriteKind: 'house',
   },
   {
-    skin: 'wizard',
-    title: 'POWERS ARE AUTOMATIC',
-    body: "Don't fall off the island. Grab a power pickup and it fires on its own — no button needed.",
-    hint: 'Stay on the island. Grab every power you see.',
+    skin: 'classic',
+    form: 4,
+    title: 'UNLEASH YOUR POWER',
+    body: 'Tap the glowing power button to fire your form’s signature move — from PULL all the way to the world-ending COLLAPSE.',
+    hint: 'Your family will join the feast. The city WILL fight back.',
     spriteKind: 'tree',
   },
 ];
@@ -872,7 +877,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
       <button className="vd-onboard-skip" onClick={onDone}>SKIP</button>
       <div className="vd-stack">
         <div className="vd-hero-void" style={{ position: 'relative' }}>
-          <SkinPreview key={panel.skin} skinId={panel.skin} size={150} glow={0.7} />
+          <SkinPreview key={i} skinId={panel.skin} size={160} glow={0.85} form={panel.form} />
           {/* sprite icon floating bottom-right of the voidling */}
           <img
             src={`/assets/objects/${panel.spriteKind}.png`}

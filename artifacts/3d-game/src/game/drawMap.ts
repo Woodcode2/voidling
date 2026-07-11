@@ -1575,15 +1575,38 @@ function _paintZooLayout(cc: CanvasRenderingContext2D): void {
     // Pen floor fill (light sandy)
     cc.fillStyle = 'rgba(212,198,168,0.38)';
     cc.fillRect(px, py, penW, ph);
-    // Pen border
-    cc.strokeStyle = 'rgba(120,95,68,0.50)';
-    cc.lineWidth = 9;
+    // REAL fences (user: 'the zoo makes 0 sense' — pens were an invisible
+    // faint stroke). Crisp white post-and-rail enclosures:
+    cc.strokeStyle = 'rgba(250,250,255,0.92)';   // top rail
+    cc.lineWidth = 6;
     cc.strokeRect(px, py, penW, ph);
+    cc.strokeStyle = 'rgba(160,168,182,0.85)';   // inner rail shadow
+    cc.lineWidth = 3;
+    cc.strokeRect(px + 5, py + 5, penW - 10, ph - 10);
+    // posts — one dashed round-cap stroke = evenly spaced fence posts
+    cc.strokeStyle = 'rgba(230,234,242,0.95)';
+    cc.lineWidth = 12; cc.lineCap = 'round'; cc.setLineDash([1, 64]);
+    cc.strokeRect(px, py, penW, ph);
+    cc.setLineDash([]); cc.lineCap = 'butt';
     // Internal path strip between pens
     if (col < 2) {
       cc.fillStyle = PATH_COL;
       cc.fillRect(px + penW, py, 40, ph);
     }
+  }
+
+  // ── Entrance arch (south-center): two posts + banner over the entry path ────
+  {
+    const ex = bx, ey = zy1 - ins - 6;
+    cc.fillStyle = '#E4586B';
+    cc.fillRect(ex - 70, ey - 90, 16, 90);
+    cc.fillRect(ex + 54, ey - 90, 16, 90);
+    cc.fillRect(ex - 78, ey - 112, 156, 28);
+    cc.fillStyle = '#FFFFFF';
+    cc.font = '700 22px Nunito, sans-serif';
+    cc.textAlign = 'center'; cc.textBaseline = 'middle';
+    cc.fillText('ZOO', ex, ey - 98);
+    cc.textAlign = 'left'; cc.textBaseline = 'alphabetic';
   }
 
   // ── Flamingo pond (bottom-left) ────────────────────────────────────────────
