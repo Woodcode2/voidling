@@ -1019,12 +1019,6 @@ function _paintYards(cc: CanvasRenderingContext2D): void {
     cc.globalAlpha = 0.12 + v2 * 0.06;
     cc.fillRect(x0, y0, w, h);
 
-    // ── Picket fence ───────────────────────────────────────────────────────────
-    cc.globalAlpha = 1;
-    cc.strokeStyle = 'rgba(160,120,80,0.44)';
-    cc.lineWidth   = 3;
-    cc.strokeRect(x0 + 1.5, y0 + 1.5, w - 3, h - 3);
-
     // ── Driveway (south-facing paved strip) ────────────────────────────────────
     const dwW = Math.max(10, lot.fpR * 0.28);
     const dwH = hs * 0.60;
