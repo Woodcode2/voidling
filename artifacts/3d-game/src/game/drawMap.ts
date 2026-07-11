@@ -69,7 +69,7 @@ const _noCache = typeof window !== 'undefined'
 
 /** Force the ground buffer to rebuild on the next draw (new match / resize).
  *  Map geometry is static, so this is rarely needed, but honours the §1 contract. */
-export function resetGroundCache(): void { _groundBuf = null; }
+export function resetGroundCache(): void { _groundBuf = null; _invalidateViewCache(); }
 /** Returns the baked ground-buffer canvas, or null if not yet rendered.
  *  Used by the photo-mode capture path (Stage 13 §1). */
 export function exportGroundBuffer(): HTMLCanvasElement | null { return _groundBuf; }
@@ -100,9 +100,9 @@ export function loadGroundTextures(base: string): void {
       c.width  = c.height = px;
       c.getContext('2d')!.drawImage(img, 0, 0, px, px);
       _texTiles.set(key, c);
-      if (--pending <= 0) { _groundBuf = null; }
+      if (--pending <= 0) { _groundBuf = null; _invalidateViewCache(); }
     };
-    img.onerror = () => { if (--pending <= 0) { _groundBuf = null; } };
+    img.onerror = () => { if (--pending <= 0) { _groundBuf = null; _invalidateViewCache(); } };
     img.src = `${b}assets/tex_${key}.png`;
   }
 }
@@ -116,6 +116,7 @@ let _groundLots: GroundLot[] = [];
 export function setMatchLots(lots: ReadonlyArray<{ x: number; y: number; fpR: number }>): void {
   _groundLots = lots.map((l) => ({ x: l.x, y: l.y, fpR: l.fpR }));
   _groundBuf  = null;
+  _invalidateViewCache();
 }
 
 // ─── Structural Build: residential block rects → internal-lane painting ───────
@@ -127,6 +128,7 @@ let _groundBlocks: GroundBlock[] = [];
 export function setMatchBlocks(blocks: ReadonlyArray<GroundBlock>): void {
   _groundBlocks = blocks.map((b) => ({ ...b }));
   _groundBuf = null;
+  _invalidateViewCache();
 }
 
 // Grid constants mirrored from world.ts/mapData.ts (all derive from CONFIG).
@@ -193,6 +195,7 @@ export function setMatchSportsFields(
 ): void {
   _matchSportsFields = fields.map((f) => ({ ...f }));
   _groundBuf = null;
+  _invalidateViewCache();
 }
 
 function _ensureGroundBuffer(): HTMLCanvasElement {
@@ -209,14 +212,51 @@ function _ensureGroundBuffer(): HTMLCanvasElement {
   return buf;
 }
 
-// Prompt 20 Stage 1: when the camera is zoomed in enough for ground blur to be
-// visible, draw the static ground live into the world-space ctx clipped to the
-// visible viewport instead of blitting the low-resolution cached buffer.
-// Threshold chosen so the cached buffer is still used at overview zoom (camZoom
-// < LIVE_ZOOM_MIN) where 0.30 px/wu is adequate; at street zoom the live path
-// gives full screen-native resolution. PAD prevents seams during pan.
-const LIVE_ZOOM_MIN = 0.8;  // px/world-unit — above this, live path activates
-const LIVE_PAD = 250;        // world units of overdraw beyond visible viewport
+// Perf overhaul (mobile): the old "live path" re-ran the ENTIRE static ground
+// paint — blur filters, thousand-element loops and all — EVERY FRAME at street
+// zoom. That was the frame-rate killer. Replaced with a VIEW CACHE: the visible
+// region (+45% pad) is painted ONCE into an offscreen canvas at native zoom and
+// blitted each frame; it only repaints when the camera nears the cached edge or
+// the zoom changes materially (~every couple of seconds while moving).
+const LIVE_ZOOM_MIN = 0.8;   // px/world-unit — below this the overview buffer is sharp enough
+const VC_PAD_FRAC = 0.45;    // extra viewport fraction cached on each side
+const VC_MAX_SIDE = 4096;    // iOS-safe canvas cap
+
+let _viewCache: HTMLCanvasElement | null = null;
+let _vc = { x: 0, y: 0, w: 0, h: 0, zoom: 0, valid: false }; // cached world rect + zoom
+
+/** Invalidate the street-zoom view cache (called whenever bake data changes). */
+function _invalidateViewCache(): void { _vc.valid = false; }
+
+function _ensureViewCache(view: { x: number; y: number; w: number; h: number }, camZoom: number): void {
+  const padX = view.w * VC_PAD_FRAC, padY = view.h * VC_PAD_FRAC;
+  const needRepaint =
+    !_vc.valid ||
+    Math.abs(camZoom - _vc.zoom) / _vc.zoom > 0.10 ||
+    view.x < _vc.x + padX * 0.25 || view.y < _vc.y + padY * 0.25 ||
+    view.x + view.w > _vc.x + _vc.w - padX * 0.25 ||
+    view.y + view.h > _vc.y + _vc.h - padY * 0.25;
+  if (!needRepaint) return;
+
+  const wx = Math.max(0, view.x - padX), wy = Math.max(0, view.y - padY);
+  const ww = Math.min(S - wx, view.w + padX * 2), wh = Math.min(S - wy, view.h + padY * 2);
+  const pw = Math.min(VC_MAX_SIDE, Math.ceil(ww * camZoom));
+  const ph = Math.min(VC_MAX_SIDE, Math.ceil(wh * camZoom));
+  if (!_viewCache) _viewCache = document.createElement('canvas');
+  if (_viewCache.width !== pw || _viewCache.height !== ph) {
+    _viewCache.width = pw; _viewCache.height = ph;
+  }
+  const vcc = _viewCache.getContext('2d')!;
+  vcc.setTransform(1, 0, 0, 1, 0, 0);
+  vcc.clearRect(0, 0, pw, ph);
+  vcc.setTransform(pw / ww, 0, 0, ph / wh, -wx * (pw / ww), -wy * (ph / wh));
+  vcc.beginPath(); vcc.rect(wx, wy, ww, wh); vcc.clip();
+  const t0 = performance.now();
+  _paintStaticGround(vcc);
+  const ms = performance.now() - t0;
+  if (ms > 34) console.debug(`[ground] view-cache repaint ${ms.toFixed(1)}ms`);
+  _vc = { x: wx, y: wy, w: ww, h: wh, zoom: camZoom, valid: true };
+}
 
 /** Draw the full ground layer into ctx (world-space camera transform must be applied). */
 export function drawVectorGround(
@@ -226,21 +266,20 @@ export function drawVectorGround(
   forceRebuild = false,
   view?: { x: number; y: number; w: number; h: number },
 ): void {
-  if (_noCache || (view && camZoom >= LIVE_ZOOM_MIN)) {
-    // Prompt 20 Stage 1: Live per-frame render clipped to the visible region.
-    // GPU clips all fills to the viewport rect so overdraw is negligible;
-    // the resulting ground is at full screen resolution — no stretching.
+  if (forceRebuild) { _groundBuf = null; _vc.valid = false; }
+  if (!_noCache && view && camZoom >= LIVE_ZOOM_MIN) {
+    // Street zoom: blit the padded view cache (repaints only when needed).
+    _ensureViewCache(view, camZoom);
+    ctx.drawImage(_viewCache!, _vc.x, _vc.y, _vc.w, _vc.h);
+  } else if (_noCache && view) {
+    // ?nocache=1 debug path: paint live every frame (perf comparison baseline)
     ctx.save();
-    if (view) {
-      ctx.beginPath();
-      ctx.rect(view.x - LIVE_PAD, view.y - LIVE_PAD,
-               view.w + LIVE_PAD * 2, view.h + LIVE_PAD * 2);
-      ctx.clip();
-    }
+    ctx.beginPath();
+    ctx.rect(view.x - 250, view.y - 250, view.w + 500, view.h + 500);
+    ctx.clip();
     _paintStaticGround(ctx);
     ctx.restore();
   } else {
-    if (forceRebuild) _groundBuf = null;
     const buf = _ensureGroundBuffer();
     // Blit the cached static ground: one drawImage vs. ~1,600 ops/frame.
     const prevSmooth = ctx.imageSmoothingEnabled;
@@ -313,13 +352,17 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // Pond (source) — Prompt 19 Stage 5: soft bank ring + water texture + lily pads
   // Blurred bank ring (soft depth edge)
   cc.save();
-  cc.filter = 'blur(14px)';
-  cc.strokeStyle = 'rgba(30,70,100,0.48)';
-  cc.lineWidth = 24;
+  // perf: blur filter removed — stacked soft strokes read the same on mobile
+  cc.strokeStyle = 'rgba(30,70,100,0.30)';
+  cc.lineWidth = 40;
   cc.beginPath();
   cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
   cc.stroke();
-  cc.filter = 'none';
+  cc.strokeStyle = 'rgba(30,70,100,0.26)';
+  cc.lineWidth = 22;
+  cc.beginPath();
+  cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+  cc.stroke();
   cc.restore();
   // Water fill (texture if loaded, gradient fallback)
   {
@@ -371,11 +414,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // Stage 13 §3: River channel — bank edges first (darker halo), then
   // tex_water at FULL opacity, then a depth overlay.
   cc.lineCap = 'round'; cc.lineJoin = 'round';
-  cc.save();
-  cc.filter = 'blur(10px)';
-  _riverStroke(cc, RIVER_HALF_W * 3.0, 'rgba(30,70,100,0.55)');
-  cc.filter = 'none';
-  cc.restore();
+  // perf: blur removed — two stacked bank strokes
+  _riverStroke(cc, RIVER_HALF_W * 3.2, 'rgba(30,70,100,0.22)');
+  _riverStroke(cc, RIVER_HALF_W * 2.7, 'rgba(30,70,100,0.34)');
 
   // Stage D: cool stone bank edging — solid rim peeking out from under the water
   _riverStroke(cc, RIVER_HALF_W * 2.2 + 16, '#8B94A6');
@@ -455,14 +496,15 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX * 0.55, LAGOON_RY * 0.55, 0, 0, Math.PI * 2);
     cc.fill();
     // Bank-edge shadow ring.
-    cc.save();
-    cc.filter = 'blur(12px)';
-    cc.strokeStyle = 'rgba(30,70,100,0.45)'; cc.lineWidth = 30;
+    // perf: blur removed — stacked bank strokes
+    cc.strokeStyle = 'rgba(30,70,100,0.20)'; cc.lineWidth = 46;
     cc.beginPath();
     cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
     cc.stroke();
-    cc.filter = 'none';
-    cc.restore();
+    cc.strokeStyle = 'rgba(30,70,100,0.30)'; cc.lineWidth = 26;
+    cc.beginPath();
+    cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+    cc.stroke();
     // Shore highlight ring.
     cc.strokeStyle = 'rgba(255,255,255,0.22)'; cc.lineWidth = 14;
     cc.beginPath();
@@ -506,12 +548,11 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // (a) Soft shoulder / recess shadow: a blurred warm-dark halo slightly wider
   //     than the road, so the edge reads as gently sunk into the terrain rather
   //     than a hard sticker line where grey meets grass.
-  cc.save();
-  cc.filter = 'blur(13px)';
-  cc.fillStyle = 'rgba(48,54,66,0.38)';
+  // perf: blur removed — two plain shoulder fills
+  cc.fillStyle = 'rgba(48,54,66,0.14)';
+  for (const [x, y, w, h] of roadRects) cc.fillRect(x - 12, y - 12, w + 24, h + 24);
+  cc.fillStyle = 'rgba(48,54,66,0.24)';
   for (const [x, y, w, h] of roadRects) cc.fillRect(x - 5, y - 5, w + 10, h + 10);
-  cc.filter = 'none';
-  cc.restore();
 
   // (b) Road surface — tex_street at FULL opacity; solid-asphalt fallback.
   //     Stage 13 §2: the texture IS the road material, not an overlay tint.
@@ -531,7 +572,6 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     } else {
       // Fallback: blurred solid asphalt until texture loads.
       cc.save();
-      cc.filter = 'blur(2.5px)';
       cc.fillStyle = COL.road;
       for (const [x, y, w, h] of roadRects) cc.fillRect(x, y, w, h);
       cc.filter = 'none';
@@ -546,8 +586,10 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.clip();
   let rseed = 90721;
   const rrnd = () => { rseed = (rseed * 1103515245 + 12345) & 0x7fffffff; return rseed / 0x7fffffff; };
-  const mottleA = _texTiles.has('street') ? 0.35 : 1.0;
-  for (let i = 0; i < 1500; i++) {
+  // perf: mottling only needed for the flat fallback — the asphalt texture
+  // already carries aggregate variation. 1500 ellipses/frame was a mobile killer.
+  const mottleA = _texTiles.has('street') ? 0 : 1.0;
+  for (let i = 0; i < (mottleA ? 500 : 0); i++) {
     const mx = rrnd() * S, my = rrnd() * S, mr = 6 + rrnd() * 16;
     cc.fillStyle = rrnd() > 0.5
       ? `rgba(255,255,255,${(0.025 * mottleA).toFixed(4)})`
@@ -891,10 +933,8 @@ function _fillZoneRich(
   grd.addColorStop(0, _lighten(color, understated ? 0.05 : 0.10));
   grd.addColorStop(1, _darken(color,  understated ? 0.03 : 0.06));
   cc.fillStyle = grd;
-  // Blur softens the rectangle edges → feathered transitions into the meadow.
-  cc.filter = understated ? 'blur(28px)' : 'blur(46px)';
+  // perf: blur removed — plain fill (zone textures + biome detail mask the edges)
   cc.fillRect(r[0] - 24, r[1] - 24, (r[2] - r[0]) + 48, (r[3] - r[1]) + 48);
-  cc.filter = 'none';
   cc.restore();
 }
 
@@ -1156,14 +1196,14 @@ function _texZone(
     // Atmosphere overlay: light blurred gradient so the material has depth.
     cc.save();
     tracIslandPath(cc); cc.clip();
-    cc.filter = understated ? 'blur(28px)' : 'blur(46px)';
+    // perf: blur removed — plain low-alpha atmosphere tint
     const grd = cc.createLinearGradient(x0, y0, x1, y1);
     grd.addColorStop(0, _lighten(fallback, understated ? 0.05 : 0.10));
     grd.addColorStop(1, _darken(fallback,  understated ? 0.03 : 0.06));
     cc.fillStyle = grd;
     cc.globalAlpha = 0.20;
     cc.fillRect(x0 - 24, y0 - 24, (x1 - x0) + 48, (y1 - y0) + 48);
-    cc.filter = 'none'; cc.globalAlpha = 1;
+    cc.globalAlpha = 1;
     cc.restore();
   } else {
     // Fallback: original feathered gradient fill (until texture loads).
@@ -1187,14 +1227,14 @@ function _paintBiomeDetail(cc: CanvasRenderingContext2D): void {
     cc.save();
     cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
     // soft canopy shadow pools → the forest floor reads shaded, not sunlit
-    for (let i = 0; i < 340; i++) {
+    for (let i = 0; i < 200; i++) {
       const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
       const r = 40 + rnd() * 90;
       cc.fillStyle = 'rgba(18,40,20,0.055)';
       cc.beginPath(); cc.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); cc.fill();
     }
     // low ferns / underbrush tufts
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 160; i++) {
       const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
       const r = 7 + rnd() * 13;
       cc.fillStyle = rnd() > 0.5 ? 'rgba(44,84,38,0.50)' : 'rgba(72,112,52,0.42)';
@@ -1227,7 +1267,7 @@ function _paintBiomeDetail(cc: CanvasRenderingContext2D): void {
   // ── BEACH → GRASS: sand creeping up into the grass along the shore edge ─────
   {
     const [x0, yTop, x1] = ZONE_BEACH_R;
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 380; i++) {
       const x = x0 + rnd() * (x1 - x0);
       const up = rnd() * rnd() * 190;                 // biased toward the edge
       const y = yTop - up;
@@ -1242,14 +1282,15 @@ function _paintBiomeDetail(cc: CanvasRenderingContext2D): void {
   // ── BEACH: wet-sand ring + foam at the lagoon shoreline (on top of water) ───
   cc.save();
   tracIslandPath(cc); cc.clip();
-  cc.save();
-  cc.filter = 'blur(11px)';
-  cc.strokeStyle = 'rgba(150,120,78,0.5)'; cc.lineWidth = 48;
+  // perf: blur removed — two stacked wet-sand strokes
+  cc.strokeStyle = 'rgba(150,120,78,0.24)'; cc.lineWidth = 62;
   cc.beginPath();
   cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 34, LAGOON_RY + 30, 0, 0, Math.PI * 2);
   cc.stroke();
-  cc.filter = 'none';
-  cc.restore();
+  cc.strokeStyle = 'rgba(150,120,78,0.34)'; cc.lineWidth = 34;
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 34, LAGOON_RY + 30, 0, 0, Math.PI * 2);
+  cc.stroke();
   cc.strokeStyle = 'rgba(255,255,255,0.55)'; cc.lineWidth = 6;
   cc.setLineDash([28, 24]); cc.lineCap = 'round';
   cc.beginPath();

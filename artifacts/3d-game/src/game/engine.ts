@@ -403,7 +403,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // ── canvas sizing (DPR capped at 3) ──
   let dpr = 1, fw = 0, fh = 0;
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    // Perf: cap DPR at 2 — a 3x iPhone renders 2.25x the pixels of 2x for a
+    // visual difference nobody sees at gameplay zoom. This alone is a huge win.
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
     fw = window.innerWidth;
     fh = window.innerHeight;
     canvas.width = Math.max(1, Math.floor(fw * dpr));
