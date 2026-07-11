@@ -70,13 +70,17 @@ def grass():
         (0.85,(150, 194, 108)),
         (1.0, (176, 212, 132)),  # warm sunlit tips
     ])
-    # fine blade stipple
+    # crisp grass-blade detail: mid clumps + fine high-frequency grain
     blades = hi(21, scale=2.4)
-    col += (blades[...,None] * np.array([10, 16, 6])) * 1.2
+    fine   = hi(23, scale=4.2)   # finer, blade-scale grain
+    col += (blades[...,None] * np.array([12, 20, 8])) * 1.3
+    col += (fine[...,None]   * np.array([9, 15, 6]))  * 1.4
+    # a faint short-stroke bias so grain reads as blades, not noise
+    col[..., 1] += np.clip(fine, 0, 1) * 10
     # sparse warm dandelion/clover flecks
     rng=_rng(31); spot = rng.random((SIZE,SIZE))
-    flower = spot > 0.9975
-    col[flower] = np.array([232, 224, 150])
+    col[spot > 0.9975] = np.array([232, 224, 150])
+    col[(spot > 0.985) & (spot <= 0.9975)] += np.array([0, 14, 0])  # brighter clover tufts
     save(col, "tex_grass")
 
 # ---------------- FOREST FLOOR ----------------

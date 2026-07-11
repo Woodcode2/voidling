@@ -1033,7 +1033,7 @@ export class WorldManager {
     this.scatter(b, rand, 'flower', 6);
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'gnome', 3);
-    this.scatterPeople(b, rand, 'residential', 2);
+    this.scatterPeople(b, rand, 'residential', 4);
     this.scatter(b, rand, 'dog', 1);
     // v7 §3: neighborhood critters + props
     this.scatter(b, rand, 'cat', 1);
@@ -1064,7 +1064,7 @@ export class WorldManager {
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'dog', 2);
     this.scatter(b, rand, 'squirrel', 2);
-    this.scatterPeople(b, rand, 'park', 3);          // War Pack §1: park visitors
+    this.scatterPeople(b, rand, 'park', 6);          // War Pack §1: park visitors
     if (rand() < 0.5) this.scatter(b, rand, 'picnic_table', 1);
     if (rand() < 0.4) this.scatter(b, rand, 'icecream_cart', 1);
     this.spawnBirds(b, rand, 3);
@@ -1314,7 +1314,7 @@ export class WorldManager {
     }
     // street furniture (props are exempt from the structure-overlap audit)
     this.scatter(b, rand, 'cafetable', 4);
-    this.scatterPeople(b, rand, 'downtown', 8); // War Pack §1: diverse downtown crowd
+    this.scatterPeople(b, rand, 'downtown', 13); // War Pack §1: diverse downtown crowd
     this.scatter(b, rand, 'bench', 2);
     this.scatter(b, rand, 'flower', 3);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
@@ -1536,7 +1536,7 @@ export class WorldManager {
     if (rand() < 0.4) this.scatter(b, rand, 'lifeguard', 1);
     if (rand() < 0.5) this.scatter(b, rand, 'car_parked_a', 1);
     if (rand() < 0.4) this.scatter(b, rand, 'car_parked_b', 1);
-    this.scatterPeople(b, rand, 'beach', 3);
+    this.scatterPeople(b, rand, 'beach', 6);
     if (rand() < 0.55) this.scatter(b, rand, 'cooler', 1);
     if (rand() < 0.45) this.scatter(b, rand, 'kite_prop', 1);
     if (rand() < 0.35) this.scatter(b, rand, 'rowboat', 1);

@@ -243,7 +243,7 @@ export const CONFIG = {
   TARGET_POPULATION: 2000,
   RESPAWN_MIN: 1200,        // trickle small objects if below this
   DENSITY_MULT: 1,          // v5 §7: debug-panel density multiplier
-  TRAFFIC_CARS: 24,         // v7 §2: cars cruising the road grid (Phase 2: 24)
+  TRAFFIC_CARS: 34,         // v7 §2: cars cruising the road grid (busier streets)
 
   // Absorb / orbit / merge
   ABSORB_SHRINK_TIME: 150,       // ms for fly-in phase
