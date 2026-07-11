@@ -16,7 +16,7 @@ export type ObjectKind =
   // Landmark
   | 'watertower'
   // v7 §3: new objects with personality
-  | 'cat' | 'squirrel' | 'bird' | 'trampoline' | 'drone' | 'schoolbus'
+  | 'cat' | 'squirrel' | 'bird' | 'trampoline' | 'drone' | 'schoolbus' | 'train'
   | 'bbq' | 'mower' | 'hoop' | 'icecream' | 'scooter'
   // v7 §2: playground equipment + school trophy
   | 'sandbox' | 'swingset' | 'slide' | 'seesaw' | 'school'
@@ -267,6 +267,11 @@ export const CONFIG = {
   // Water tower is a WORLD-EATER-scale prize
   WATERTOWER_EAT_RADIUS: 300,
   SKYSCRAPER_EAT_RADIUS: 125, // v12 §1: skyscrapers require WORLD ENDER size
+  // Structural Build: the downtown express train (rail loop food, WORLD-ENDER prey)
+  TRAIN_SPEED: 120,        // wu/s → ~1 lap per 2.5 min
+  TRAIN_CAR_GAP: 150,      // arc-length spacing loco → car
+  TRAIN_EAT_RADIUS: 110,   // matches FORMS[4] WORLD ENDER threshold
+  TRAIN_RESPAWN_MS: 30000,
   ZOO_GATE_EAT_RADIUS: 58,    // v16.1 D: zoo gate requires GOBBLER+
   FINAL_FEAST_MS: 30000,      // v12 §2: last 30s triggers the FINAL FEAST
   USE_GROUND_TILES: true,     // v12 §6: tile PNG ground textures when present
@@ -379,6 +384,8 @@ export const CONFIG = {
     house:      { tier: 5, minR: 92, maxR: 116 },
     // Landmark
     watertower: { tier: 6, minR: 150, maxR: 150 },
+    train:      { tier: 5, minR: 66,  maxR: 80, scoreMult: 4 }, // Structural Build: express train
+
     // v7 §3: new objects
     squirrel:   { tier: 1, minR: 12, maxR: 15 },
     bird:       { tier: 1, minR: 10, maxR: 13 },

@@ -8,7 +8,7 @@ import {
   ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R,
   LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY,
   RIVER_PATH, RIVER_HALF_W, POND_CX, POND_CY, POND_R,
-  ROAD_CENTERS,
+  ROAD_CENTERS, RAIL_PATH, BRIDGES,
 } from './mapData';
 import { CONFIG } from './config';
 
@@ -611,6 +611,10 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // ─ 5.6. Structural Build: internal lanes + connected driveways + front paths ─
   _paintNeighborhoodLanes(cc);
 
+  // ─ 5.7. Structural Build: rail loop around downtown + bridges over the river ─
+  _paintRailTracks(cc);
+  _paintBridges(cc);
+
   // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
   cc.save();
   tracIslandPath(cc);
@@ -1131,6 +1135,66 @@ function _paintBiomeDetail(cc: CanvasRenderingContext2D): void {
   cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 10, LAGOON_RY + 10, 0, 0, Math.PI * 2);
   cc.stroke();
   cc.setLineDash([]); cc.lineCap = 'butt';
+  cc.restore();
+}
+
+/** Baked rail loop around downtown: ballast bed + ties (one dashed stroke) +
+ *  two crisp parallel rails via the nested-stroke trick (stroke steel wide,
+ *  then re-stroke ballast narrower to leave twin rails). Live-path safe:
+ *  6 strokes of an 8-point closed path, no filters. */
+function _paintRailTracks(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const trace = () => {
+    cc.beginPath();
+    RAIL_PATH.forEach(([x, y], i) => (i === 0 ? cc.moveTo(x, y) : cc.lineTo(x, y)));
+    cc.closePath();
+  };
+  cc.lineJoin = 'round'; cc.lineCap = 'butt';
+  // 1. ballast bed — cool slate, distinct from asphalt + sidewalk
+  trace(); cc.strokeStyle = '#9AA3B2'; cc.lineWidth = 34; cc.stroke();
+  // 2. ties — ONE dashed stroke spanning the gauge
+  trace(); cc.strokeStyle = '#6E7686'; cc.lineWidth = 26;
+  cc.setLineDash([7, 24]); cc.stroke(); cc.setLineDash([]);
+  // 3. rails: steel stroke, then ballast-colored inner stroke erases the middle
+  trace(); cc.strokeStyle = '#DCE3EE'; cc.lineWidth = 18; cc.stroke();
+  trace(); cc.strokeStyle = '#9AA3B2'; cc.lineWidth = 11; cc.stroke();
+  cc.restore();
+}
+
+/** Baked bridge decks + side rails where roads cross the river (computed in
+ *  mapData.BRIDGES). Drawn after roads so decks read continuous over water. */
+function _paintBridges(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const span = RIVER_HALF_W * 2.2 + 46;   // deck length across the water
+  const deckW = CONFIG.ROAD_WIDTH + 18;   // slightly wider than the road band
+  for (const b of BRIDGES) {
+    cc.save();
+    cc.translate(b.x, b.y);
+    if (b.axis === 'v') cc.rotate(Math.PI / 2);
+    // soft shadow under both deck edges
+    cc.fillStyle = 'rgba(20,30,50,0.25)';
+    cc.fillRect(-span / 2, -deckW / 2 - 5, span, 5);
+    cc.fillRect(-span / 2, deckW / 2, span, 5);
+    // deck — lighter cool concrete so the crossing reads
+    cc.fillStyle = '#7C8494';
+    cc.fillRect(-span / 2, -deckW / 2, span, deckW);
+    // lane line continues across
+    cc.strokeStyle = 'rgba(255,255,255,0.8)'; cc.lineWidth = 7;
+    cc.setLineDash([26, 26]);
+    cc.beginPath(); cc.moveTo(-span / 2, 0); cc.lineTo(span / 2, 0); cc.stroke();
+    cc.setLineDash([]);
+    // side rails — crisp white with post dots
+    cc.strokeStyle = 'rgba(240,246,255,0.95)'; cc.lineWidth = 6;
+    cc.beginPath(); cc.moveTo(-span / 2, -deckW / 2 - 8); cc.lineTo(span / 2, -deckW / 2 - 8); cc.stroke();
+    cc.beginPath(); cc.moveTo(-span / 2, deckW / 2 + 8); cc.lineTo(span / 2, deckW / 2 + 8); cc.stroke();
+    cc.lineWidth = 10; cc.setLineDash([3, 34]); cc.lineCap = 'round';
+    cc.beginPath(); cc.moveTo(-span / 2, -deckW / 2 - 8); cc.lineTo(span / 2, -deckW / 2 - 8); cc.stroke();
+    cc.beginPath(); cc.moveTo(-span / 2, deckW / 2 + 8); cc.lineTo(span / 2, deckW / 2 + 8); cc.stroke();
+    cc.setLineDash([]); cc.lineCap = 'butt';
+    cc.restore();
+  }
   cc.restore();
 }
 

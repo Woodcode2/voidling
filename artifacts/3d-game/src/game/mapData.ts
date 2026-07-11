@@ -128,6 +128,85 @@ for (const rx of ROAD_CENTERS) {
 // world.ts (generateLots), which knows each day's block types. The old static
 // road-frontage HOUSE_LOTS generator was removed as dead code.
 
+// ─── Structural Build: RAIL LOOP around downtown ──────────────────────────────
+// A closed clockwise loop hugging the roads that bound the downtown district,
+// offset RAIL_OFF from the road CENTER so the ballast sits on clear grass just
+// outside the sidewalk band (road half 55 + sidewalk 60 → track center at 160).
+export const RAIL_OFF = 160;
+const RW = ROAD_CENTERS[1] - RAIL_OFF; // west leg x
+const RE = ROAD_CENTERS[3] + RAIL_OFF; // east leg x
+const RN = ROAD_CENTERS[0] - RAIL_OFF; // north leg y
+const RS = ROAD_CENTERS[3] + RAIL_OFF; // south leg y
+const RC_CUT = 110;                    // 45° corner cuts
+/** Closed loop; segment i runs RAIL_PATH[i] → RAIL_PATH[(i+1)%n]. */
+export const RAIL_PATH: [number, number][] = [
+  [RW + RC_CUT, RN], [RE - RC_CUT, RN],   // north leg
+  [RE, RN + RC_CUT], [RE, RS - RC_CUT],   // east leg
+  [RE - RC_CUT, RS], [RW + RC_CUT, RS],   // south leg
+  [RW, RS - RC_CUT], [RW, RN + RC_CUT],   // west leg
+];
+
+// Cumulative arc length INCLUDING the closing segment (loop wraps).
+const _railAcc: number[] = (() => {
+  const acc = [0];
+  for (let i = 1; i <= RAIL_PATH.length; i++) {
+    const [ax, ay] = RAIL_PATH[i - 1];
+    const [bx, by] = RAIL_PATH[i % RAIL_PATH.length];
+    acc.push(acc[i - 1] + Math.hypot(bx - ax, by - ay));
+  }
+  return acc;
+})();
+export const RAIL_TOTAL = _railAcc[_railAcc.length - 1];
+
+/** Point + tangent angle at loop fraction t∈[0,1) (wraps). */
+export function railPointAt(t: number): { x: number; y: number; a: number } {
+  const target = (((t % 1) + 1) % 1) * RAIL_TOTAL;
+  let i = 1;
+  while (i < _railAcc.length && _railAcc[i] < target) i++;
+  const seg = _railAcc[i] - _railAcc[i - 1] || 1;
+  const f = (target - _railAcc[i - 1]) / seg;
+  const [ax, ay] = RAIL_PATH[i - 1];
+  const [bx, by] = RAIL_PATH[i % RAIL_PATH.length];
+  return { x: ax + (bx - ax) * f, y: ay + (by - ay) * f, a: Math.atan2(by - ay, bx - ax) };
+}
+
+/** True when (x,y) with footprint r keeps clear of all four rail legs.
+ *  Used by generateLots so houses never straddle the tracks. */
+export function railClear(x: number, y: number, r: number): boolean {
+  const pad = r + 20;
+  if (y > RN - pad && y < RS + pad) {
+    if (Math.abs(x - RW) < pad) return false;
+    if (Math.abs(x - RE) < pad) return false;
+  }
+  if (x > RW - pad && x < RE + pad) {
+    if (Math.abs(y - RN) < pad) return false;
+    if (Math.abs(y - RS) < pad) return false;
+  }
+  return true;
+}
+
+// ─── Structural Build: BRIDGES where roads cross the river ───────────────────
+// Computed from the shared constants (never hardcode — ROAD_WIDTH has changed
+// before and stale numbers bite).
+export const BRIDGES: { x: number; y: number; axis: 'h' | 'v' }[] = (() => {
+  const out: { x: number; y: number; axis: 'h' | 'v' }[] = [];
+  for (const rc of ROAD_CENTERS) {
+    for (let i = 1; i < RIVER_PATH.length; i++) {
+      const [ax, ay] = RIVER_PATH[i - 1];
+      const [bx, by] = RIVER_PATH[i];
+      if ((ay - rc) * (by - rc) < 0) {           // horizontal road y=rc
+        const f = (rc - ay) / (by - ay);
+        out.push({ x: ax + (bx - ax) * f, y: rc, axis: 'h' });
+      }
+      if ((ax - rc) * (bx - rc) < 0) {           // vertical road x=rc
+        const f = (rc - ax) / (bx - ax);
+        out.push({ x: rc, y: ay + (by - ay) * f, axis: 'v' });
+      }
+    }
+  }
+  return out;
+})();
+
 // ─── Geometry helpers ────────────────────────────────────────────────────────
 
 /** Evaluate the smooth island polygon as a series of midpoint-quadratic bezier segments.

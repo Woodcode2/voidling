@@ -11,7 +11,8 @@ import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
 import { isOnIsland, isInsideIsland, terrainAtGeom, TERRAIN as GTERRAIN,
   ZONE_FOREST_R, ZONE_PARK_R, ZONE_BEACH_R,
-  ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R } from './mapData'; // Map Rebuild: runtime per-block lot generation + island polygon gating
+  ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R,
+  railPointAt, RAIL_TOTAL, railClear } from './mapData'; // Map Rebuild + Structural Build (rail loop)
 import {
   loadClayScenery, SCENERY_FOREST, SCENERY_GREEN, SCENERY_PARK, SCENERY_BEACH,
   clayTreeKeys, clayBushKeys, clayFlowerKeys, type SceneryDef,
@@ -67,6 +68,7 @@ export interface WorldObject {
   defense?: boolean;     // War Pack §2: defense unit converging on player
   pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
   missileCd?: number;    // Phase 7b §5: heli missile cooldown timer
+  trainT?: number;       // Structural Build: rail-loop arc fraction ∈[0,1) for the train
   // Life Pack §3: vignette system
   vignetteData?: {
     id: string;
@@ -298,7 +300,7 @@ function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
 }
 
 const LIVING_KINDS: ObjectKind[] = [
-  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab',
+  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'train', 'mower', 'crab',
   'monkey', 'flamingo', 'penguin', 'zookeeper',
   // War Pack §1: new pedestrian kinds + defense/traffic vehicles
   'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
@@ -332,6 +334,7 @@ export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
   spawnPoint = { x: 0, y: 0 };  // Batch 1.5: engine spawns/respawns the player here
+  private trainRespawnT = 0;    // Structural Build: ms until the eaten express respawns
   houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
@@ -577,6 +580,7 @@ export class WorldManager {
     this.spawnDrone(rand);
     this.spawnDrone(rand);
     this.spawnBus(rand);
+    this.spawnTrain(); // Structural Build: the downtown express
 
     // trickle up to a healthy population with scattered small edibles
     const target = Math.round(CONFIG.TARGET_POPULATION * CONFIG.DENSITY_MULT);
@@ -1286,6 +1290,7 @@ export class WorldManager {
             ([ox,oy]) => terrainAtGeom(jx+ox*0.85, jy+oy*0.85) === GTERRAIN.WATER,
           )) continue;
           if (!this.roadClear(jx, jy, fpR)) continue;
+          if (!railClear(jx, jy, fpR)) continue; // Structural Build: keep houses off the rail loop
           if (!this.lotFree(jx, jy, fpR, this.structureLots)) continue;
           const lot: StructureLot = { x: jx, y: jy, size, fpR, kind };
           this.houseLots.push(lot);
@@ -1297,7 +1302,7 @@ export class WorldManager {
     // ── Stage 2: packed downtown — grid of building lots per downtown block ──
     // Gather every candidate cell across all on-island downtown blocks, rank by
     // distance to the central plaza, then assign tallest→nearest, shortest→edge.
-    const DT_STEP = 288;  // tighter tower grid (5×5 cells/block vs 4×4) → a denser skyline
+    const DT_STEP = 248;  // canyon-tight tower grid (6×6 cells/block) — street-wall feel
     const DT_INSET = CONFIG.SIDEWALK + 80;
     const cells: { x: number; y: number; block: Block; d2: number }[] = [];
     const px = this.size / 2, py = this.size / 2;
@@ -1315,11 +1320,11 @@ export class WorldManager {
     const n = Math.max(1, cells.length - 1);
     const kindForRank = (i: number): ObjectKind => {
       const f = i / n; // 0 = plaza-adjacent (tallest), 1 = zone edge (shortest)
-      // Denser skyline: towers fill the core+mid, offices out to the edge, only a
-      // thin outer band of cafe/shop — so downtown edges no longer read as empty lots.
-      if (f < 0.55) return 'skyscraper';
-      if (f < 0.90) return 'office';
-      if (f < 0.97) return 'cafe';
+      // Canyon skyline: towers dominate through the mid ring, offices to the edge,
+      // only a sliver of cafe/shop — downtown reads as continuous street walls.
+      if (f < 0.62) return 'skyscraper';
+      if (f < 0.93) return 'office';
+      if (f < 0.975) return 'cafe';
       return 'shop';
     };
     for (let i = 0; i < cells.length; i++) {
@@ -1704,6 +1709,97 @@ export class WorldManager {
     }
   }
 
+  // Structural Build: the downtown express — one parametric object following the
+  // rail loop; loco + 3 cars are drawn from its arc position. WORLD-ENDER prey.
+  spawnTrain() {
+    const p = railPointAt(0);
+    const o = this.makeObj('train', p.x, p.y, {});
+    o.trainT = 0;
+    o.scenery = true;   // bonus food: excluded from devour % and respawn population
+    o.tether = 0;
+    o.wanderAngle = p.a; // reused as heading for the draw pass
+  }
+
+  private stepTrain(obj: WorldObject, dtSec: number) {
+    obj.trainT = ((obj.trainT ?? 0) + (CONFIG.TRAIN_SPEED * dtSec) / RAIL_TOTAL) % 1;
+    const p = railPointAt(obj.trainT);
+    obj.vx = (p.x - obj.x) / Math.max(dtSec, 1e-4); // keeps vacuum-wobble math sane
+    obj.vy = (p.y - obj.y) / Math.max(dtSec, 1e-4);
+    obj.x = obj.homeX = p.x;
+    obj.y = obj.homeY = p.y;
+    obj.wanderAngle = p.a;
+  }
+
+  /** Cute clay express — loco + 3 cars drawn at arc offsets behind the lead. */
+  private drawTrain(ctx: CanvasRenderingContext2D, obj: WorldObject, t: number) {
+    if (obj.captured) {
+      // crumpled single loco while being sucked into the void
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
+      ctx.rotate(obj.captureRot);
+      const s = Math.max(0.2, obj.size / 73);
+      ctx.scale(s, s);
+      this.drawTrainSegment(ctx, 0, t);
+      ctx.restore();
+      return;
+    }
+    for (let k = 3; k >= 0; k--) {                 // rear cars first
+      const tk = ((obj.trainT ?? 0) - k * (CONFIG.TRAIN_CAR_GAP / RAIL_TOTAL) + 1) % 1;
+      const p = railPointAt(tk);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';          // planted contact shadow
+      ctx.beginPath(); ctx.ellipse(0, 6, 62, 16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(p.a);                             // local +x = travel direction
+      this.drawTrainSegment(ctx, k, t);
+      ctx.restore();
+    }
+  }
+
+  /** One clay train segment centered at origin, +x forward. k=0 loco, 1-3 cars. */
+  private drawTrainSegment(ctx: CanvasRenderingContext2D, k: number, t: number) {
+    const loco = k === 0;
+    const W = loco ? 116 : 104, H = loco ? 54 : 50;
+    const body = loco ? '#E4586B' : k % 2 === 1 ? '#5FA8E0' : '#F2B84B';
+    // wheels
+    ctx.fillStyle = '#2E333D';
+    for (const wx of [-W * 0.32, 0, W * 0.32]) {
+      ctx.beginPath(); ctx.arc(wx, H * 0.42, 7, 0, Math.PI * 2); ctx.fill();
+    }
+    // chassis strip
+    ctx.fillStyle = '#3E4652';
+    roundRect(ctx, -W / 2, H * 0.18, W, H * 0.22, 4); ctx.fill();
+    // body
+    ctx.fillStyle = body;
+    roundRect(ctx, -W / 2, -H / 2, W, H * 0.72, 10); ctx.fill();
+    // sticker outline (matches game style)
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+    roundRect(ctx, -W / 2, -H / 2, W, H * 0.72, 10); ctx.stroke();
+    if (loco) {
+      // cab window + boiler band + stack + cowcatcher
+      ctx.fillStyle = '#EAF4FF';
+      roundRect(ctx, -W * 0.36, -H * 0.36, W * 0.24, H * 0.34, 5); ctx.fill();
+      ctx.fillStyle = '#8B93A3';
+      roundRect(ctx, W * 0.02, -H * 0.30, W * 0.34, H * 0.5, 8); ctx.fill();
+      ctx.fillStyle = '#3E4652';
+      ctx.beginPath(); ctx.arc(W * 0.30, -H * 0.42, 8, 0, Math.PI * 2); ctx.fill();
+      // puffing steam (animated)
+      const puff = (t / 300) % 3;
+      ctx.fillStyle = `rgba(240,246,255,${(0.55 - puff * 0.16).toFixed(2)})`;
+      ctx.beginPath(); ctx.arc(W * 0.30 + puff * 8, -H * 0.55 - puff * 10, 6 + puff * 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6B7484';
+      ctx.beginPath();
+      ctx.moveTo(W / 2, -H * 0.1); ctx.lineTo(W / 2 + 14, H * 0.34); ctx.lineTo(W / 2, H * 0.34);
+      ctx.closePath(); ctx.fill();
+    } else {
+      // passenger windows
+      ctx.fillStyle = '#EAF4FF';
+      for (const wx of [-W * 0.28, 0, W * 0.28]) {
+        roundRect(ctx, wx - 9, -H * 0.32, 18, H * 0.3, 4); ctx.fill();
+      }
+    }
+  }
+
   get remaining() {
     // Prompt 5: scenery is excluded from the respawn population so it can't shift balance.
     return this.objects.filter((o) => !o.eaten && !o.scenery).length;
@@ -1711,6 +1807,7 @@ export class WorldManager {
 
   private canEatByPlayer(player: Player, obj: WorldObject) {
     if (obj.kind === 'watertower') return player.radius >= CONFIG.WATERTOWER_EAT_RADIUS;
+    if (obj.kind === 'train') return player.radius >= CONFIG.TRAIN_EAT_RADIUS; // WORLD-ENDER prey
     if (obj.kind === 'skyscraper') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
     if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') return player.radius >= CONFIG.ZOO_GATE_EAT_RADIUS; // v16.1 D
     if (obj.tier === 0) return true; // Feel Patch §2: tier-0 bits always edible
@@ -1885,7 +1982,7 @@ export class WorldManager {
       // ── rival interaction (pop on contact) ──
       for (const r of rivals) {
         if (!r.alive || r.ghost) continue;
-        if (obj.kind === 'watertower') continue; // only WORLD-EATER player eats it
+        if (obj.kind === 'watertower' || obj.kind === 'train') continue; // only the player eats these
         if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
         if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue; // v16.1 D: GOBBLER+ only
         const dr = dist(obj.x, obj.y, r.x, r.y);
@@ -1904,7 +2001,7 @@ export class WorldManager {
     // consumed by the main-loop contact check (lines above).
     for (const obj of this.objects) {
       if (obj.eaten || obj.captured) continue;
-      if (obj.kind === 'watertower' || obj.kind === 'skyscraper') continue;
+      if (obj.kind === 'watertower' || obj.kind === 'skyscraper' || obj.kind === 'train') continue;
       if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue;
       // find nearest rival within vacuum range that can eat this object
       let nearestRival: Rival | null = null;
@@ -1960,6 +2057,11 @@ export class WorldManager {
 
     // v8 §2: deficit-scaled respawn toward ≥90% of the starting population —
     // 4/s normally, ramping to 8/s once the world drops below 80%.
+    // Structural Build: express respawns a while after being devoured
+    if (this.trainRespawnT > 0) {
+      this.trainRespawnT -= dt;
+      if (this.trainRespawnT <= 0) this.spawnTrain();
+    }
     this.respawnTimer -= dt;
     if (this.respawnTimer <= 0) {
       const target = Math.round(this.initialPopulation * CONFIG.RESPAWN_TARGET_FRAC);
@@ -2175,6 +2277,8 @@ export class WorldManager {
   }
 
   private stepLiving(obj: WorldObject, dt: number, dtSec: number, voids: { x: number; y: number; radius: number; ghost: boolean }[], player: Player, fx: FXManager) {
+    // Structural Build: the express follows the rail loop — no flee, no wander.
+    if (obj.kind === 'train') return this.stepTrain(obj, dtSec);
     // Prompt 20 Stage 3: all traffic-pool vehicle kinds follow the road network,
     // not free-wander. Previously only 'car' and 'schoolbus' used stepCar; taxi,
     // convertible, fire_truck, and school_bus fell through to stepWander and roamed
@@ -2483,6 +2587,15 @@ export class WorldManager {
       fx.addDebris(obj.x, obj.y, '#1A3040', 4);
       fx.addRing(obj.x, obj.y, '#5AC8FF', 18, obj.baseSize * 3.2, 8, 750);
       fx.addRing(obj.x, obj.y, '#FFD23F', 10, obj.baseSize * 2, 5, 500);
+    } else if (obj.kind === 'train') {
+      // Structural Build: devouring the express is a marquee moment
+      fx.shake(320, 16, [0, 140, 280]);
+      fx.addDebris(obj.x, obj.y, '#E4586B', 8);
+      fx.addDebris(obj.x, obj.y, '#5FA8E0', 6);
+      fx.addDebris(obj.x, obj.y, '#DCE3EE', 6);
+      fx.addRing(obj.x, obj.y, '#DCE3EE', 20, obj.baseSize * 4, 10, 800);
+      this.eatenVignetteBanners.push('🚆 EXPRESS LINE: DEVOURED');
+      this.trainRespawnT = CONFIG.TRAIN_RESPAWN_MS;
     } else if (obj.kind === 'person') {
       fx.addCrumbs(obj.x, obj.y - obj.baseSize * 0.4, '#FF6FB0', 4); // hat pops off
     } else {
@@ -2655,6 +2768,7 @@ export class WorldManager {
       case 'duck':
       case 'squirrel':
       case 'bird':
+      case 'train': // Structural Build: bespoke multi-segment procedural draw
         return null;
       // ── Vignette anchors → clay people pool; fallback to clay_park_4 ────────
       case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':
@@ -2992,11 +3106,13 @@ export class WorldManager {
     view: { x: number; y: number; w: number; h: number },
     actors?: { footY: number; draw: () => void }[],
   ) {
-    const visible = this.objects.filter((o) =>
-      !o.eaten &&
-      o.x + o.size >= view.x && o.x - o.size <= view.x + view.w &&
-      o.y + o.size >= view.y && o.y - o.size <= view.y + view.h
-    );
+    const visible = this.objects.filter((o) => {
+      // Structural Build: the train spans ~3 car-gaps behind its lead point
+      const pad = o.kind === 'train' ? 540 : o.size;
+      return !o.eaten &&
+        o.x + pad >= view.x && o.x - pad <= view.x + view.w &&
+        o.y + pad >= view.y && o.y - pad <= view.y + view.h;
+    });
     visible.sort((a, b) => a.y - b.y);
 
     // v10 §3: ground shadows for captured objects — stay planted as object lifts toward void
@@ -3014,6 +3130,8 @@ export class WorldManager {
     }
 
     const drawOne = (obj: WorldObject) => {
+      // Structural Build: the express draws its own multi-segment body
+      if (obj.kind === 'train') { this.drawTrain(ctx, obj, t); return; }
       // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)
       if (obj.golden) {
         ctx.save();

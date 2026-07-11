@@ -435,6 +435,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       countdown = 0; // skip any lingering pre-round countdown so powers can fire
       console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
     }
+    // Dev-only: 0 teleports next to the express train for visual inspection.
+    if (debugForms && player && world && e.code === 'Digit0') {
+      const tr = world.objects.find((o) => o.kind === 'train' && !o.eaten);
+      if (tr) { player.x = player.prevX = tr.x + 160; player.y = player.prevY = tr.y + 160; console.log('[debug] teleported to train'); }
+    }
   }
   window.addEventListener('keydown', onKeyDown);
 
