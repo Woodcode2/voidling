@@ -22,7 +22,7 @@ import {
 import { clayZooKeys, ZOO_KINDS } from './clayZoo'; // Prompt 16: clay zoo animal keys
 import { clayAirportKeys, AIRPORT_KINDS } from './clayAirport'; // Prompt 16: clay airport keys
 import { clayMilitaryKeys, MILITARY_KINDS } from './clayMilitary'; // Prompt 16: clay toy army keys
-import { setMatchLots, setMatchSportsFields } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
+import { setMatchLots, setMatchSportsFields, setMatchBlocks } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -607,6 +607,11 @@ export class WorldManager {
     }
     // Map Rebuild: export lot geometry to drawMap so the ground cache bakes yards/driveways.
     setMatchLots(this.houseLots);
+    // Structural Build: residential block rects → ground cache paints internal
+    // lanes between house rows (the "engineered neighborhood" read).
+    setMatchBlocks(this.blocks
+      .filter((b) => b.type === 'cozy' || b.type === 'fancy' || b.type === 'residential')
+      .map((b) => ({ x0: b.x0, y0: b.y0, type: b.type === 'fancy' ? 'fancy' as const : 'cozy' as const })));
 
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
@@ -1257,8 +1262,9 @@ export class WorldManager {
     // Sprite resolution is handled in structureSpriteKey via kind mapping.
     const COZY_POOL:  ObjectKind[] = ['house', 'house', 'house', 'house_c'];
     const FANCY_POOL: ObjectKind[] = ['house_d', 'house_d', 'house_c', 'house'];
-    const H_STEP = 280;                       // Prompt 14: dense packing — gap ≤ 0.5× house width
-    const H_INSET = CONFIG.SIDEWALK + 70;     // keep first row off the sidewalk
+    // Row grid shared with the ground painter (internal lanes bake between rows)
+    const H_STEP = CONFIG.LOT_ROW_STEP;
+    const H_INSET = CONFIG.LOT_ROW_INSET;
     for (const b of this.blocks) {
       if (b.type !== 'residential' && b.type !== 'cozy' && b.type !== 'fancy') continue;
       // Prompt 15: cozy/fancy types determine pool directly; legacy 'residential' → cozy.

@@ -118,6 +118,70 @@ export function setMatchLots(lots: ReadonlyArray<{ x: number; y: number; fpR: nu
   _groundBuf  = null;
 }
 
+// ─── Structural Build: residential block rects → internal-lane painting ───────
+export interface GroundBlock { x0: number; y0: number; type: 'cozy' | 'fancy'; }
+let _groundBlocks: GroundBlock[] = [];
+
+/** Residential block rects so the ground cache can paint internal lanes.
+ *  Call right after setMatchLots(). */
+export function setMatchBlocks(blocks: ReadonlyArray<GroundBlock>): void {
+  _groundBlocks = blocks.map((b) => ({ ...b }));
+  _groundBuf = null;
+}
+
+// Grid constants mirrored from world.ts/mapData.ts (all derive from CONFIG).
+const G_STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
+const G_MARGIN = (S - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
+
+/** Centerline y of the internal lane just SOUTH of a lot's house row. */
+function _laneYForLot(lot: GroundLot): number {
+  const gy = Math.floor((lot.y - G_MARGIN) / G_STRIDE);
+  const y0 = G_MARGIN + gy * G_STRIDE;
+  const row = Math.max(0, Math.min(4, Math.round((lot.y - y0 - CONFIG.LOT_ROW_INSET) / CONFIG.LOT_ROW_STEP)));
+  return y0 + CONFIG.LOT_ROW_INSET + row * CONFIG.LOT_ROW_STEP + CONFIG.LANE_OFFSET;
+}
+
+/** Internal neighborhood lanes + connected driveways + front-path stepping
+ *  stones — the "engineered suburb" read. Cheap flat fills only (live-path safe). */
+function _paintNeighborhoodLanes(cc: CanvasRenderingContext2D): void {
+  if (_groundBlocks.length === 0) return;
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const B = CONFIG.BLOCK_SIZE, LW = CONFIG.LANE_W;
+
+  // (a) Lanes: 5 per block (one below each house row, incl. a last-row lane)
+  for (const b of _groundBlocks) {
+    for (let k = 0; k <= 4; k++) {
+      const ly = b.y0 + CONFIG.LOT_ROW_INSET + k * CONFIG.LOT_ROW_STEP + CONFIG.LANE_OFFSET;
+      cc.fillStyle = 'rgba(203,209,220,0.88)';           // cool light concrete
+      cc.fillRect(b.x0 + 60, ly - LW / 2, B - 120, LW);
+      cc.strokeStyle = 'rgba(122,132,150,0.30)';         // expansion-seam dashes
+      cc.lineWidth = 3; cc.setLineDash([4, 90]);
+      cc.beginPath(); cc.moveTo(b.x0 + 60, ly); cc.lineTo(b.x0 + B - 60, ly); cc.stroke();
+      cc.setLineDash([]);
+    }
+  }
+  // (b) Driveways: house foot → the lane below it
+  cc.fillStyle = 'rgba(214,219,228,0.85)';
+  for (const lot of _groundLots) {
+    const dwW = Math.max(12, lot.fpR * 0.30);
+    const dwTop = lot.y + lot.fpR * 0.8;
+    const dwBot = _laneYForLot(lot) - CONFIG.LANE_W / 2;
+    if (dwBot > dwTop + 4) cc.fillRect(lot.x - dwW, dwTop, dwW * 2, dwBot - dwTop + 6);
+  }
+  // (c) Front paths: round-cap dot dashes = stepping stones to the door
+  cc.strokeStyle = 'rgba(228,232,240,0.80)';
+  cc.lineWidth = 11; cc.lineCap = 'round'; cc.setLineDash([1, 20]);
+  for (const lot of _groundLots) {
+    cc.beginPath();
+    cc.moveTo(lot.x + lot.fpR * 0.70, lot.y + lot.fpR * 0.45);
+    cc.lineTo(lot.x + lot.fpR * 0.30, lot.y + lot.fpR * 0.95);
+    cc.stroke();
+  }
+  cc.setLineDash([]); cc.lineCap = 'butt';
+  cc.restore();
+}
+
 // ─── Per-match sports field data (Prompt 19 Stage 6: baked field lines) ──────
 interface GroundField { kind: string; cx: number; cy: number; halfW: number; halfH: number; }
 let _matchSportsFields: GroundField[] = [];
@@ -543,6 +607,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
 
   // ─ 5.5. House yards, driveways, and flowerbeds (baked from match lot data) ──
   _paintYards(cc);
+
+  // ─ 5.6. Structural Build: internal lanes + connected driveways + front paths ─
+  _paintNeighborhoodLanes(cc);
 
   // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
   cc.save();
@@ -1112,20 +1179,7 @@ function _paintYards(cc: CanvasRenderingContext2D): void {
     cc.globalAlpha = 0.12 + v2 * 0.06;
     cc.fillRect(x0, y0, w, h);
 
-    // ── Driveway (south-facing paved strip) ────────────────────────────────────
-    const dwW = Math.max(10, lot.fpR * 0.28);
-    const dwH = hs * 0.60;
-    const dwX = lot.x - dwW, dwY = lot.y + lot.fpR * 0.8;
-    if (swPat) {
-      cc.save();
-      cc.beginPath(); cc.rect(dwX, dwY, dwW * 2, dwH); cc.clip();
-      cc.fillStyle = swPat; cc.globalAlpha = 0.55;
-      cc.fillRect(dwX, dwY, dwW * 2, dwH);
-      cc.restore();
-    } else {
-      cc.fillStyle = COL.pavement; cc.globalAlpha = 0.45;
-      cc.fillRect(dwX, dwY, dwW * 2, dwH);
-    }
+    // (driveways now painted by _paintNeighborhoodLanes — connected to lanes)
 
     // ── Flowerbed accent (front corner) ────────────────────────────────────────
     const fbX = x0 + w * 0.18 + v3 * w * 0.10;

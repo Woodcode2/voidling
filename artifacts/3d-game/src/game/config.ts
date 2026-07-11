@@ -210,9 +210,15 @@ export const CONFIG = {
 
   // World — Phase 2: floating island — 12000×12000 world (2.5× old map)
   MAP_SIZE: 12000,
-  BLOCK_SIZE: 1600,          // 6*1600 + 5*200 roads = 9600+1000 = 10600; margin 700 each side
+  BLOCK_SIZE: 1600,          // 6*1600 + 5*110 roads = 10150; margin 925 each side
   ROAD_WIDTH: 110,  // Prompt 18 Stage 3: reduced from 200 (~45% narrower roads)
   SIDEWALK: 100,
+  // House-lot row grid (shared by world-gen AND the ground painter so internal
+  // lanes/driveways bake in exactly the right places between house rows).
+  LOT_ROW_INSET: 170,  // = SIDEWALK + 70 — first row offset from block edge
+  LOT_ROW_STEP: 280,   // row/column spacing between lots
+  LANE_OFFSET: 140,    // internal lane centerline = rowY + this (midway between rows)
+  LANE_W: 56,          // internal lane width
   GRID: 6,
   PLAN_NAMES: ['METRO', 'SUBURBIA', 'SEASIDE'] as string[], // v16.2 §6: rotating city plans
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
