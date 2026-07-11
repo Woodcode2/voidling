@@ -20,15 +20,15 @@ const COL = {
   park:     '#B7DBA8',
   forest:   '#8FBF88',
   sand:     '#F2DFA7',
-  pavement: '#EAE4D6',
-  road:     '#9B9285',   // Prompt 8: warm clay-asphalt (was stark cool grey #939CAB)
+  pavement: '#E8E8EA',
+  road:     '#5C6270',   // crisp cool asphalt (de-browned — brown muted the whole map)
   rimWhite: '#FFFFFF',
   cliff:    '#6B5B73',
   waterS:   '#7FD4E8',
   waterD:   '#5BB8D4',
   riverMid: '#8FC6D4',   // Prompt 8: soft clay-blue river band
   riverDeep:'#69A9C2',   // Prompt 8: deeper river core
-  roadDash: 'rgba(243,236,218,0.5)', // Prompt 8: muted warm off-white lane paint
+  roadDash: 'rgba(255,255,255,0.8)', // crisp white lane paint
 };
 
 // ─── Smooth island path helper ────────────────────────────────────────────────
@@ -216,10 +216,12 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     }
     // Lighting atmosphere on top (always)
     // Prompt 15 Stage 5: richer green tint to match reference vibrancy.
+    // Crisp fresh daylight — the old orange-brown wash muted every colour on
+    // the map. A whisper of cool sky light keeps depth without the mud.
     const atmo = cc.createLinearGradient(0, 0, S, S);
-    atmo.addColorStop(0,   'rgba(255,196,110,0.10)'); // Batch 1.5: warm golden light
-    atmo.addColorStop(0.5, 'rgba(255,170,90,0.04)');
-    atmo.addColorStop(1,   'rgba(210,120,60,0.08)');
+    atmo.addColorStop(0,   'rgba(255,250,235,0.05)');
+    atmo.addColorStop(0.5, 'rgba(235,245,255,0.03)');
+    atmo.addColorStop(1,   'rgba(200,225,255,0.05)');
     cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
     cc.restore();
   }
@@ -228,8 +230,8 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   //      Each distinct surface now reads as its own material.
   _texZone(cc, 'forest',   ZONE_FOREST_R,   COL.forest);
   _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
-  // Batch 1.5: downtown floors in warm dark stone — dense streets, not pale plaza.
-  _texZone(cc, 'street', ZONE_DOWNTOWN_R, '#6E6156', true);
+  // Downtown floors in crisp cool slate — a real city core, not brown mud.
+  _texZone(cc, 'street', ZONE_DOWNTOWN_R, '#5E6676', true);
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
 
@@ -424,7 +426,7 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   //     than a hard sticker line where grey meets grass.
   cc.save();
   cc.filter = 'blur(13px)';
-  cc.fillStyle = 'rgba(96,84,72,0.42)';
+  cc.fillStyle = 'rgba(48,54,66,0.38)';
   for (const [x, y, w, h] of roadRects) cc.fillRect(x - 5, y - 5, w + 10, h + 10);
   cc.filter = 'none';
   cc.restore();

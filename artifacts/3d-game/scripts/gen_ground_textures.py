@@ -147,34 +147,28 @@ def water():
     col += spark[...,None]*np.array([40,50,55])
     save(col, "tex_water")
 
-# ---------------- STREET (downtown paving stone) ----------------
+# ---------------- STREET (crisp cool asphalt — de-browned) ----------------
 def street():
-    # seamless paving grid: divide tile into an even NxN of cobbles
-    N = 12
-    cell = SIZE//N
-    yy, xx = np.mgrid[0:SIZE, 0:SIZE]
-    gx = (xx % cell); gy = (yy % cell)
-    # rounded-square cobble mask via distance to cell center
-    cxp = cell/2; cyp = cell/2
-    d = np.maximum(np.abs(gx-cxp), np.abs(gy-cyp))/(cell/2)
-    grout = np.clip((d-0.86)/0.14, 0, 1)   # 0 inside cobble, 1 in grout
-    # per-cobble color variation (seamless: index by cell id, wraps)
-    ci = ((yy//cell)*N + (xx//cell))
-    rng=_rng(71); tint = rng.random(N*N)
-    tintmap = tint[ci % (N*N)]
-    base = ramp(tintmap, [
-        (0.0,(96, 88, 80)),
-        (0.5,(118, 108, 96)),
-        (1.0,(140, 128, 112)),
+    # large soft patch variation (worn/repaved areas)
+    patch = tileable_noise(SIZE, 2.5, 71, lowcut=0.004)
+    fine  = tileable_noise(SIZE, 1.7, 72)
+    n = 0.6*patch + 0.4*fine
+    n = (n - n.min())/(n.max() - n.min())
+    col = ramp(n, [
+        (0.0, (54, 59, 70)),    # deep cool asphalt
+        (0.5, (66, 72, 84)),
+        (0.8, (78, 84, 97)),
+        (1.0, (92, 98, 112)),   # lighter worn patches
     ])
-    # aggregate speckle within stones
-    agg = hi(72, scale=3.2)
-    base += agg[...,None]*np.array([10,9,8])
-    # subtle dome shading per cobble (brighter center)
-    dome = (1-d)[...,None]*np.array([10,9,8])*0.6
-    base += dome
-    grout_col = np.array([58, 52, 48])
-    col = base*(1-grout[...,None]) + grout_col*grout[...,None]
+    # fine aggregate sparkle (tiny light stones in the tarmac)
+    agg = hi(73, scale=3.4)
+    col += agg[...,None]*np.array([9, 9, 10])
+    rng=_rng(74); s = rng.random((SIZE,SIZE))
+    glint = s > 0.998
+    col[glint] = np.array([150, 156, 170])
+    # occasional darker tar-seam speckle
+    tar = s < 0.0015
+    col[tar] = np.array([40, 44, 54])
     save(col, "tex_street")
 
 # ---------------- SIDEWALK (concrete slabs) ----------------

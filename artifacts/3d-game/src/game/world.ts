@@ -2745,24 +2745,22 @@ export class WorldManager {
     // static ground cache by drawMap._paintStaticGround via setMatchSportsFields.
     // The old sprite-sticker draw path is retired — no field_soccer image required.
 
-    // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
-    const scarImg = fxDecals.get('scar');
+    // Devour scars — VOID scars, not brown dirt: a dark violet pool with a faint
+    // luminous rim, so eaten ground reads as "reality bitten by the void" and the
+    // map stays crisp instead of muddying with brown blobs.
     for (const d of this.dirt) {
-      const a = clamp(d.life / d.maxLife, 0, 1) * 0.6;
+      const a = clamp(d.life / d.maxLife, 0, 1) * 0.5;
       if (a < 0.01) continue;
       ctx.save();
       ctx.globalAlpha = a;
-      if (scarImg) {
-        const s = d.r * (d.drawScale ?? 1) * 3.2; // world-space draw size
-        ctx.translate(d.x, d.y);
-        ctx.rotate(d.rot ?? 0);
-        ctx.drawImage(scarImg, -s / 2, -s / 2, s, s);
-      } else {
-        ctx.fillStyle = G.dirt;
-        ctx.beginPath();
-        ctx.ellipse(d.x, d.y, d.r, d.r * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.rot ?? 0);
+      const rx = d.r, ry = d.r * 0.7;
+      ctx.fillStyle = 'rgba(26,16,54,0.85)';
+      ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(150,110,255,0.35)';
+      ctx.lineWidth = Math.max(1.5, d.r * 0.08);
+      ctx.beginPath(); ctx.ellipse(0, 0, rx * 0.96, ry * 0.96, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
 

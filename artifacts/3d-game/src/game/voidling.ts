@@ -254,21 +254,8 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.beginPath();
     ctx.ellipse(0, my + mh * 0.45, mw * 0.7, mh * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
-    // tiny drawn fangs at GOBBLER+ (form >= 2)
-    if ((v.form || 0) >= 2) {
-      const fw = mw * 0.28, fh = mh * 0.58;
-      const ftop = my - mh * 0.78;
-      ctx.fillStyle = '#FFFFFF';
-      for (const sf of [-1, 1]) {
-        const fcx = sf * mw * 0.36;
-        ctx.beginPath();
-        ctx.moveTo(fcx - fw / 2, ftop);
-        ctx.lineTo(fcx + fw / 2, ftop);
-        ctx.lineTo(fcx, ftop + fh);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
+    // (fangs removed — they read as generic-monster and clashed with the
+    // cute-cosmic identity; menace comes from scale + the accretion disk)
   }
 }
 
