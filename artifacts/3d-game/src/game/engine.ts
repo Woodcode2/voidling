@@ -416,10 +416,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     window.addEventListener('wheel', (e) => lineupScroll(e.deltaY), { passive: true });
   }
 
+  // Dev-only: force the player's evolution form with number keys 1–5 so every
+  // form + power can be inspected without grinding a full match. Gated behind
+  // any ?debug= param, so it's inert in production.
+  const debugForms = typeof window !== 'undefined' && !!new URLSearchParams(window.location.search).get('debug');
+
   // Signature VOID POWER — Space (or E) fires the current form's ability.
   function onKeyDown(e: KeyboardEvent) {
     if (e.repeat) return;
-    if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); usePower(); }
+    if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); usePower(); return; }
+    if (debugForms && player && /^Digit[1-5]$/.test(e.code)) {
+      const n = Number(e.code.slice(5)) - 1;
+      player.formIndex = n;
+      player.radius = CONFIG.FORMS[n].radius + 1;
+      player.morphTime = 0;
+      console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
+    }
   }
   window.addEventListener('keydown', onKeyDown);
 
