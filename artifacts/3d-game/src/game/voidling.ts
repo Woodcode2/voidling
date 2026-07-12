@@ -533,11 +533,14 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // per-stage gradient colors
+  // per-stage gradient colors — hole.io read: the CENTRE is the deepest point
+  // (near-black abyss) and the rim is the lit edge, so the body reads as a
+  // pit INTO the ground instead of a ball sitting on it.
   const [c0, c1, c2] = _STAGE_BODY[Math.min(form, 4)];
-  const grd = ctx.createRadialGradient(r * -0.2, r * -0.2, r * 0.06, 0, 0, r);
-  grd.addColorStop(0,    c0);
-  grd.addColorStop(0.55, c1);
+  const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  grd.addColorStop(0,    '#060310'); // the abyss
+  grd.addColorStop(0.40, c0);
+  grd.addColorStop(0.76, c1);
   grd.addColorStop(1,    c2);
   ctx.fillStyle = grd;
   ctx.fillRect(-r, -r, r * 2, r * 2);

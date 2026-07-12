@@ -4,7 +4,7 @@ import { drawParkObject } from './objects'; // wind removed — tuft system dele
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import { cityBuildingKeys, cityLandmarkKeys, zooPropKeys, streetPropKeys } from './cityAssets'; // Structural Rebuild: new city art pools
-import { drawBuilding3D, makeBuildingSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
+import { drawBuilding3D, makeBuildingSpec, makeHouseSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
   SITTER_CLAY_INDICES,
@@ -627,7 +627,16 @@ export class WorldManager {
     // Dense City §1: place the pre-generated suburb house lots (dense, per-block).
     {
       for (const lot of this.houseLots) {
-        this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+        if (lot.bldg) {
+          this.makeObj(lot.kind, lot.x, lot.y, {
+            size: lot.size, baseSize: lot.size,
+            bldg: lot.bldg,
+            sceneryKey: ensureBuildingSprite(lot.bldg),
+            contactRadius: Math.max(lot.bldg.w, lot.bldg.d) * 0.95,
+          });
+        } else {
+          this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+        }
       }
       console.log('[world] Dense City suburb house lots placed:', this.houseLots.length);
     }
@@ -1351,7 +1360,12 @@ export class WorldManager {
           if (!this.roadClear(jx, jy, fpR)) continue;
           if (!railClear(jx, jy, fpR)) continue; // Structural Build: keep houses off the rail loop
           if (!this.lotFree(jx, jy, fpR, this.structureLots)) continue;
-          const lot: StructureLot = { x: jx, y: jy, size, fpR, kind };
+          // hole.io rebuild: houses are pitched-roof extruded boxes now —
+          // one visual language across the whole island.
+          const lot: StructureLot = {
+            x: jx, y: jy, size, fpR, kind,
+            bldg: makeHouseSpec(size, Math.floor(rand() * 0x7fffffff)),
+          };
           this.houseLots.push(lot);
           this.structureLots.push(lot);
         }
