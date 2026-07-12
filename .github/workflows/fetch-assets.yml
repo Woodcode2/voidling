@@ -5,6 +5,10 @@ name: fetch-assets
 # dest dir and remaining lines are URLs (one per line).
 on:
   push:
+    # never on main — merging a manifest change to main must not re-run the
+    # fetch there (it committed duplicate candidate files directly to main)
+    branches-ignore:
+      - main
     paths:
       - '.github/asset-manifest.txt'
 
