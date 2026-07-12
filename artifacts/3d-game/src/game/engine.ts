@@ -60,6 +60,8 @@ export interface ResultData {
   trophiesEarned: number;     // trophies unlocked this round
   trophyBounty: number;       // coin bounty paid for them
   solo: boolean;              // SOLO RUN round (graded on % devoured)
+  firstFeast: boolean;        // Second-session hook: welcome bonus not yet claimed
+  dailyReady: boolean;        // Second-session hook: Daily Bite still unplayed today
 }
 
 export interface DailyData { id: string; seed: string; name: string; desc: string; }
@@ -108,6 +110,8 @@ export interface GameEngine {
   iapPurchase(id: string): void;         // v7 §9: mock IAP confirmed
   openShop(): void;
   openDaily(): void;
+  /** Second-session hook: claim the one-time FIRST FEAST welcome bonus. Returns coins granted (0 if already claimed). */
+  claimFirstFeast(): number;
   goHome(): void;
   togglePause(): void;
   toggleMute(): boolean;
@@ -359,6 +363,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let feedingFrenzyActive = false;
   // Phase 7b §4: killer name for game-over banner / results
   let killedBy = '';
+  // First-timer march: knockout moment — a 2.6s overlay that explains the death
+  // (who ate you, what it cost, that you reform) instead of a silent teleport.
+  let knockout: { t: number; total: number; by: string; note: string } | null = null;
+  // Revenge bounty: your killer gets marked for 20s — eating them pays extra.
+  let revengeName = '';
+  let revengeUntil = 0;
   // Phase 7b §3: secondary news banner
   let newsText = '';
   let newsAlpha = 0;
@@ -478,6 +488,22 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.x = player.prevX = 5145;
       player.y = player.prevY = 3435;
       console.log('[debug] teleported to downtown core');
+    }
+    // Dev-only: 6 simulates being devoured (knockout overlay + revenge bounty QA).
+    if (debugForms && player && e.code === 'Digit6') {
+      const r = rivals.find((v) => v.alive);
+      if (r) {
+        const stolen = Math.floor(player.score * 0.4);
+        player.score = Math.max(0, player.score - stolen);
+        r.score += stolen;
+        player.combo = 0; player.orbit = []; player.dizzy = 1;
+        fx.shake(360, 16); fx.flash();
+        audio.playEaten();
+        respawnPlayerAfterEaten(r.x, r.y, 900);
+        knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
+        revengeName = r.name; revengeUntil = roundElapsed + 20000;
+        console.log(`[debug] simulated knockout by ${r.name}`);
+      }
     }
     // Dev-only: 9 fast-forwards the clock to verify round-end flow + payouts.
     if (debugForms && player && e.code === 'Digit9') {
@@ -605,6 +631,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     feedingFrenzyFired = false; feedingFrenzyActive = false;
     killedBy = ''; roundEnded = false;
+    knockout = null; revengeName = ''; revengeUntil = 0;
     // Task #4: reset stage-voice + flash state for new round
     _voidVoiceTimer = 18000; _playerBubbleText = null; _playerBubbleLife = 0; _evolveFlashT = 0;
     newsText = ''; newsAlpha = 0; newsTimer = 0; newsCd = 12000;
@@ -971,6 +998,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       starsGained, stars: meta.data.stars, rankName: meta.rank().name,
       trophiesEarned: trophyHaul.count, trophyBounty: trophyHaul.bounty,
       solo: isSolo,
+      firstFeast: !meta.data.firstFeastClaimed,
+      dailyReady: meta.data.lastDailyDate !== new Date().toDateString(),
     };
     track('round_end', { score: player.score, placement, coins });
     audio.stopMusic();
@@ -1040,6 +1069,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     timeLeft -= dt;
     roundElapsed += dt;
     setRoundElapsed(roundElapsed); // v15 §0: Growth Law ceiling
+    if (knockout) {
+      knockout.t += dt;
+      if (knockout.t >= knockout.total) knockout = null;
+    }
 
     // Family arc: drop in kin on schedule
     checkFamilyArrivals();
@@ -1827,7 +1860,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             r.dropStage();
             banner(`You devoured ${r.name}! ↓ Dropped to ${r.formName}`, '#FFD23F');
           }
-          if (stolen > 0) banner(`Stole ${stolen} pts!`, '#FF9F5A', 3);
+          if (r.name === revengeName && roundElapsed < revengeUntil) {
+            // Revenge bounty: pay extra for eating your killer inside 20s
+            const revBonus = Math.max(75, Math.floor(stolen * 0.5));
+            player.score += revBonus;
+            revengeName = ''; revengeUntil = 0;
+            fx.addConfetti(player.x, player.y, ['#FFD23F', '#FF9F5A', '#FFFFFF']);
+            banner(`⚡ REVENGE! +${revBonus}`, '#FFD23F', 7, { sparkles: true, pulse: true });
+          } else if (stolen > 0) banner(`Stole ${stolen} pts!`, '#FF9F5A', 3);
         } else if (canEatVoid(r.radius, player.radius, d)) {
           if (player.shieldCharge) {
             // v7 §5: BUBBLE SHIELD blocks this chomp, pops with a burst, then is gone
@@ -1855,7 +1895,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               killedBy = r.name;
               respawnPlayerAfterEaten(r.x, r.y, minDist);
               fx.addRing(player.x, player.y, '#FF6B6B', 0, pr * 3, 8, 700);
-              banner(`${r.name} DEVOURED YOU 💀 −${stolen} pts`, '#FF4D6D', 8, { pulse: true });
+              knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
+              revengeName = r.name; revengeUntil = roundElapsed + 20000;
               queueTicker(`💀 ${r.name} swallowed the void whole! It's... reforming?!`);
             } else {
               // Higher forms: drop one evolution stage, respawn elsewhere, eater gains lost score
@@ -1868,7 +1909,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               r.eatVoid(pr);
               respawnPlayerAfterEaten(r.x, r.y, minDist);
               fx.addRing(eatenAtX, eatenAtY, '#FF6B6B', 0, pr * 3, 8, 700);
-              banner(`${r.name} devoured you! ↓ Dropped to ${player.formName}! 3s shield`, '#FF6B6B', 4, { pulse: true });
+              knockout = { t: 0, total: 2600, by: r.name, note: `↓ Dropped to ${player.formName}` };
+              revengeName = r.name; revengeUntil = roundElapsed + 20000;
             }
           }
         }
@@ -2070,6 +2112,29 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.globalAlpha = 0.4; ctx.lineWidth = 2 / camZoom;
       ctx.beginPath(); ctx.arc(player.x, player.y, lawCeil, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
+    }
+    // First-timer march: revenge bounty marker — gold dashed ring + tag over
+    // your killer for the 20s bounty window (world space).
+    if (revengeName && roundElapsed < revengeUntil) {
+      const rr = rivals.find((v) => v.name === revengeName && v.alive);
+      if (rr) {
+        ctx.save();
+        const pulse = 1 + Math.sin(roundElapsed / 180) * 0.06;
+        ctx.strokeStyle = '#FFD23F';
+        ctx.lineWidth = 3 / camZoom;
+        ctx.setLineDash([10 / camZoom, 7 / camZoom]);
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath(); ctx.arc(rr.x, rr.y, (rr.radius + 14) * pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = `800 ${Math.round(13 / camZoom)}px Fredoka, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 4 / camZoom; ctx.strokeStyle = 'rgba(20,8,43,0.8)';
+        const ty = rr.y - rr.radius - 22 / camZoom;
+        ctx.strokeText('⚡ REVENGE BOUNTY', rr.x, ty);
+        ctx.fillStyle = '#FFD23F';
+        ctx.fillText('⚡ REVENGE BOUNTY', rr.x, ty);
+        ctx.restore();
+      }
     }
     // War Pack §2: defense pellets (world space)
     for (const p of defensePellets) {
@@ -2419,6 +2484,37 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
       ctx.restore();
       if (callout.t >= total) callout = null;
+    }
+    // First-timer march: knockout overlay — dark vignette + who/what/why so a
+    // death reads as a dramatic beat, not a disorienting teleport.
+    if (knockout) {
+      const kp = knockout.t / knockout.total;
+      const ka = kp < 0.08 ? kp / 0.08 : kp > 0.82 ? (1 - kp) / 0.18 : 1;
+      ctx.save();
+      ctx.globalAlpha = clamp(ka, 0, 1) * 0.55;
+      const vg = ctx.createRadialGradient(fw / 2, fh / 2, fh * 0.22, fw / 2, fh / 2, fh * 0.75);
+      vg.addColorStop(0, 'rgba(20,4,16,0)');
+      vg.addColorStop(1, 'rgba(20,4,16,0.95)');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, fw, fh);
+      ctx.globalAlpha = clamp(ka, 0, 1);
+      ctx.textAlign = 'center';
+      // dark panel behind the text — quest chips + light pavement made bare
+      // stroked text unreadable in QA
+      const ky = fh * 0.44;
+      const panelW = Math.min(fw - 32, 356), panelH = 108;
+      ctx.fillStyle = 'rgba(16,6,30,0.86)';
+      roundRectFill(ctx, fw / 2 - panelW / 2, ky - 44, panelW, panelH, 18);
+      ctx.font = '800 30px Fredoka, sans-serif';
+      ctx.fillStyle = '#FF4D6D';
+      ctx.fillText('💀 DEVOURED', fw / 2, ky);
+      ctx.font = '700 18px Fredoka, sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(`by ${knockout.by}  ·  ${knockout.note}`, fw / 2, ky + 27);
+      ctx.font = '700 14px Fredoka, sans-serif';
+      ctx.fillStyle = '#FFD23F';
+      ctx.fillText(`you reform smaller — eat ${knockout.by} back for a bounty ⚡`, fw / 2, ky + 51);
+      ctx.restore();
     }
     ctx.textBaseline = 'alphabetic';
     // Phase 7b §4: FINAL HEART vignette removed — hearts system replaced by Agar-style stage drop
@@ -3123,6 +3219,16 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       notify();
     },
     openShop() { screen = 'shop'; notify(); },
+    claimFirstFeast() {
+      if (meta.data.firstFeastClaimed) return 0;
+      const BONUS = 150;
+      meta.data.firstFeastClaimed = true;
+      meta.addCoins(BONUS); // addCoins persists via save()
+      if (results) results.firstFeast = false;
+      audio.playClick();
+      notify();
+      return BONUS;
+    },
     openDaily() {
       const today = new Date().toDateString();
       // v12 §4: daily mod determined by day-of-week (0=Sun…6=Sat)

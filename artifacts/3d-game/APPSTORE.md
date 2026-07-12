@@ -19,6 +19,10 @@ game; Capacitor wraps it in a native shell.
   platform generated in `ios/` (SwiftPM, no CocoaPods needed), portrait-only,
   status bar hidden, haptics + status-bar plugins installed.
 
+- **Audio** — 30 layered WAV SFX (`public/assets/audio/`) + 3 intensity-tiered
+  music tracks (`public/assets/music/track_1..3.mp3`, chill → groove → epic,
+  crossfading on evolution). Synth engine remains as offline fallback.
+
 ## Build & submit (on a Mac with Xcode 15+)
 
 ```bash

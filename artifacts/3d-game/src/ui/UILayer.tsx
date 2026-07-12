@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v28 · firsttimer';
+const BUILD_STAMP = 'v29 · knockout';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -648,6 +648,8 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
 
 function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const r = snap.results;
+  // Second-session hook: FIRST FEAST claim animation state
+  const [feastClaimed, setFeastClaimed] = useState(0);
   if (!r) return null;
   return (
     <div className="vd-overlay vd-overlay--scrim">
@@ -701,7 +703,22 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
             <span className="vd-tease-name">{r.skinTease.botName}</span> flexed the <b>{r.skinTease.skinName}</b> skin — grab it in the Shop!
           </div>
         )}
+        {(r.firstFeast || feastClaimed > 0) && (
+          <button
+            className="vd-btn vd-btn--secondary"
+            style={{ whiteSpace: 'nowrap' }}
+            disabled={feastClaimed > 0}
+            onClick={() => setFeastClaimed(engine.claimFirstFeast())}
+          >
+            {feastClaimed > 0 ? `✓ +${feastClaimed}¢ CLAIMED` : '🎉 FIRST FEAST · claim 150¢'}
+          </button>
+        )}
         <button className="vd-btn vd-btn--play" onClick={() => engine.start(r.isDaily, r.solo)}>PLAY AGAIN</button>
+        {r.dailyReady && !r.isDaily && (
+          <button className="vd-btn vd-btn--secondary vd-btn--sm" style={{ whiteSpace: 'nowrap' }} onClick={() => engine.openDaily()}>
+            🍩 DAILY BITE ready · bonus coins
+          </button>
+        )}
         <button className="vd-btn vd-btn--ghost" onClick={() => engine.goHome()}>HOME</button>
       </div>
     </div>
