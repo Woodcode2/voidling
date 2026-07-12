@@ -338,6 +338,8 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, '#DADDE2', true);
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
+  // Zoo floors in warm SAVANNA — its own biome identity, not forest-dark.
+  _fillZoneRich(cc, ZONE_ZOO_R, '#D8CC96');
 
   // ─ 2b. Procedural speckle — only baked when tex_grass hasn't loaded yet ──────
   if (!_texTiles.has('grass')) _bakeGrassTexture(cc);

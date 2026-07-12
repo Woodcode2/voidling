@@ -105,6 +105,21 @@ type BlockType = 'residential' | 'cozy' | 'fancy' | 'park' | 'plaza' | 'playgrou
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
 interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; bldg?: BuildingSpec; }
 
+// Final de-clay: every clay cutout with a procedural twin redirects to it —
+// one table catches every placement path (kind cases, scenery keys, pools).
+const SPRITE_REDIRECT: Record<string, string> = {
+  clay_beach_0: 'p3d2_umbrella',  clay_beach_1: 'p3d2_towel',
+  clay_beach_2: 'p3d2_lifeguard', clay_beach_3: 'p3d_palm',
+  clay_beach_4: 'p3d2_rowboat',   clay_beach_6: 'p3d2_sandcastle',
+  clay_beach_7: 'p3d2_sandcastle', clay_beach_8: 'p3d2_surfboard',
+  clay_beach_11: 'p3d2_deckchair',
+  clay_park_0: 'p3d2_slide',      clay_park_1: 'p3d2_swing',
+  clay_park_2: 'p3d2_gazebo',     clay_park_3: 'p3d2_bench',
+  clay_park_4: 'p3d2_picnic',     clay_park_7: 'p3d2_streetlamp',
+  clay_park_8: 'p3d2_picnic',     clay_park_11: 'p3d2_streetlamp',
+  clay_park_13: 'p3d2_seesaw',    clay_park_15: 'p3d2_fountain',
+};
+
 // Overnight: per-biome ambient chatter — each biome SOUNDS like its own place.
 type Biome = 'downtown' | 'beach' | 'forest' | 'park' | 'suburb' | 'zoo' | 'other';
 const AMBIENT_BY_BIOME: Record<Biome, string[]> = {
@@ -750,10 +765,10 @@ export class WorldManager {
       const cp2x = b2.x0 + TREE_INSET + rand() * innerW, cp2y = b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET;
       const cp3x = b2.x0 + TREE_INSET,                   cp3y = b2.y0 + TREE_INSET + rand() * innerW;
       const cp4x = b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET, cp4y = b2.y0 + TREE_INSET + rand() * innerW;
-      if (rand() < 0.3 && isOnIsland(cp1x, cp1y)) this.makeObj(pick(carPool, rand), cp1x, cp1y, { infra: true });
-      if (rand() < 0.3 && isOnIsland(cp2x, cp2y)) this.makeObj(pick(carPool, rand), cp2x, cp2y, { infra: true });
-      if (rand() < 0.3 && isOnIsland(cp3x, cp3y)) this.makeObj(pick(carPool, rand), cp3x, cp3y, { infra: true });
-      if (rand() < 0.3 && isOnIsland(cp4x, cp4y)) this.makeObj(pick(carPool, rand), cp4x, cp4y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp1x, cp1y) && this.clearOfLots(cp1x, cp1y, 14)) this.makeObj(pick(carPool, rand), cp1x, cp1y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp2x, cp2y) && this.clearOfLots(cp2x, cp2y, 14)) this.makeObj(pick(carPool, rand), cp2x, cp2y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp3x, cp3y) && this.clearOfLots(cp3x, cp3y, 14)) this.makeObj(pick(carPool, rand), cp3x, cp3y, { infra: true });
+      if (rand() < 0.3 && isOnIsland(cp4x, cp4y) && this.clearOfLots(cp4x, cp4y, 14)) this.makeObj(pick(carPool, rand), cp4x, cp4y, { infra: true });
     }
 
     // ── Prompt 18 Stage 4: streetlamps + bus stops on all block types ─────────
@@ -3054,6 +3069,11 @@ export class WorldManager {
   // (legacy house_a/house_b/procedural when the clay sheet is absent); skyscraper
   // lots draw from the 3-tower clay pool. Everything else uses its kind key.
   private structureSpriteKey(kind: ObjectKind, id: number, sceneryKey?: string): string | null {
+    const k = this.structureSpriteKeyRaw(kind, id, sceneryKey);
+    return k ? (SPRITE_REDIRECT[k] ?? k) : k;
+  }
+
+  private structureSpriteKeyRaw(kind: ObjectKind, id: number, sceneryKey?: string): string | null {
     // Prompt 5: scenery carries its own explicit clay draw key.
     if (sceneryKey) return sceneryKey;
     // Map Rebuild: cozy district ('house','house_c') → cottage sprites (rows 2-3);
@@ -3123,13 +3143,21 @@ export class WorldManager {
       const idx = AIRPORT_KINDS.indexOf(kind);
       if (idx >= 0 && clayAirportKeys[idx]) return clayAirportKeys[idx];
     }
+    // Final de-clay: the toy army is procedural now.
+    switch (kind) {
+      case 'tank':            return 'p3d2_tank';
+      case 'attack_heli':     return 'p3d2_heli';
+      case 'missile_truck':   return 'p3d2_missile_truck';
+      case 'radar_van':       return 'p3d2_radar_van';
+      case 'army_jeep':       return 'p3d2_jeep';
+      case 'armored_humvee':  return 'p3d2_humvee';
+      case 'police_car':      return 'p3d_police';
+      default: break;
+    }
     // Prompt 16: toy army (defense units) render from the clay military pool.
     if (clayMilitaryKeys.length) {
       const idx = MILITARY_KINDS.indexOf(kind);
       if (idx >= 0 && clayMilitaryKeys[idx]) return clayMilitaryKeys[idx];
-      // Map the legacy armored_humvee phase-2 spawn onto the radar_van clay cutout
-      // so every defense-wave kind is covered by the new clay army pool.
-      if (kind === 'armored_humvee' && clayMilitaryKeys[4]) return clayMilitaryKeys[4];
     }
     // ── Prompt 18 Stage 1: universal clay mapping ─────────────────────────────
     // Every legacy sticker kind that used to fall through to `return kind`

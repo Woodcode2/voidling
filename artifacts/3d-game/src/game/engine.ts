@@ -20,6 +20,7 @@ import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatt
 import { loadCityAssets } from './cityAssets'; // Structural Rebuild: new city art
 import { initProps3d } from './props3d'; // hole.io rebuild: procedural life layer (people/vehicles/trees)
 import { initAnimals3d } from './animals3d'; // Skins round: procedural animals (zoo + critters)
+import { initProps3d2 } from './props3d2'; // Final de-clay: military + beach + park props
 import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
@@ -396,6 +397,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   const base = import.meta.env.BASE_URL;
   initProps3d(); // synchronous canvas generation — ready before the first frame
   initAnimals3d();
+  initProps3d2();
   let assetsLoaded = false;
   const _allAssets = Promise.all([
     loadGroundTextures(base),

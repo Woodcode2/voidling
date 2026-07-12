@@ -274,6 +274,26 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   const morph = v.morph ?? 1;
   const col = _STAGE_SWIRL[Math.min(form, 4)]; // rgba prefix for the stage hue
 
+  // ── THE COMPANION SPARK — the void's tiny loyal star, present at EVERY
+  //    form. It grows and brightens as you evolve: instant silhouette
+  //    identity for the default skin (it's part of the character, so every
+  //    cosmetic keeps it too).
+  {
+    const ca = t / 1100 + 1.2;
+    const cr2 = r * 1.22;
+    const sx2 = Math.cos(ca) * cr2, sy2 = Math.sin(ca) * cr2 * 0.82;
+    const sz = r * (0.07 + form * 0.014);
+    const tw = 0.75 + 0.25 * Math.sin(t / 240);
+    ctx.save();
+    const g0 = ctx.createRadialGradient(sx2, sy2, 0, sx2, sy2, sz * 3);
+    g0.addColorStop(0, `rgba(255,240,200,${(0.5 * tw).toFixed(2)})`);
+    g0.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = g0;
+    ctx.beginPath(); ctx.arc(sx2, sy2, sz * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    drawStar(ctx, sx2, sy2, Math.max(1.5, sz), tw);
+  }
+
   // Each form shows ONE clean signature (replaced, not stacked) so the void
   // reads as a bold hero at every stage instead of a pile of particles.
 
@@ -563,6 +583,21 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.fillStyle = grd;
   ctx.fillRect(-r, -r, r * 2, r * 2);
 
+  // ── Stage nebulae — two soft hue clouds drifting inside the orb (form 1+),
+  //    giving the interior cosmic depth beyond a flat gradient ───────────────
+  if (form >= 1) {
+    const NEB = ['rgba(120,80,220,', 'rgba(255,110,220,'];
+    for (let i = 0; i < 2; i++) {
+      const a = t / (5200 + i * 1700) + i * 2.6;
+      const nx2 = Math.cos(a) * r * 0.42, ny2 = Math.sin(a) * r * 0.38;
+      const gN = ctx.createRadialGradient(nx2, ny2, 0, nx2, ny2, r * 0.55);
+      gN.addColorStop(0, NEB[i] + (0.10 + form * 0.03).toFixed(2) + ')');
+      gN.addColorStop(1, NEB[i] + '0)');
+      ctx.fillStyle = gN;
+      ctx.fillRect(-r, -r, r * 2, r * 2);
+    }
+  }
+
   // ── Swirl arcs: 2 at base, 3 at GOBBLER+; brighter at higher forms ────────
   const swirlCount = form >= 2 ? 3 : 2;
   const swirlAlpha = Math.min(0.55, 0.07 + form * 0.06);
@@ -620,6 +655,14 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.arc(0, 0, r * 0.985, 0, Math.PI * 2);
     ctx.stroke();
   }
+
+  // Crisp white hairline — the "logo edge". Makes the silhouette read as a
+  // designed mark on any background (the default-skin identity fix).
+  ctx.strokeStyle = 'rgba(255,255,255,0.38)';
+  ctx.lineWidth = Math.max(1, r * 0.014);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.012, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 function hexA(hex: string, a: number) {
