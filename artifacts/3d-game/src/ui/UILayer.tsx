@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v27 · appstore';
+const BUILD_STAMP = 'v28 · firsttimer';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -333,13 +333,13 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
         )}
         <button className="vd-btn vd-btn--play vd-btn--pulse" onClick={onPlay}>PLAY</button>
-        <button className="vd-btn vd-btn--secondary" style={{ marginTop: 2 }} onClick={() => engine.start(false, true)}>
-          SOLO RUN <span style={{ opacity: 0.75, fontSize: '0.8em' }}>· devour the whole city</span>
+        <button className="vd-btn vd-btn--secondary" style={{ marginTop: 2, whiteSpace: 'nowrap' }} onClick={() => engine.start(false, true)}>
+          SOLO RUN <span style={{ opacity: 0.75, fontSize: '0.78em' }}>· eat the city</span>
         </button>
         <div className="vd-row">
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openDaily()}>DAILY BITE</button>
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openShop()}>SHOP</button>
-          <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={onTrophies}>🏆</button>
+          <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={onTrophies}>🏆 TROPHIES</button>
         </div>
       </div>
       {/* v14.1: permanent build stamp — bottom-right, 10px */}
@@ -675,7 +675,7 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
         )}
         <div style={{ width: '100%', maxWidth: 320, marginTop: 8 }}>
           <div className="vd-stat-row"><span>Placement</span><span>#{r.placement}</span></div>
-          <div className="vd-stat-row"><span>Devoured</span><span>{r.devoured.toFixed(0)}%</span></div>
+          <div className="vd-stat-row"><span>Devoured</span><span>{r.devoured < 10 ? r.devoured.toFixed(1) : r.devoured.toFixed(0)}%</span></div>
           <div className="vd-stat-row"><span>Coins earned</span><span>+{r.coins}</span></div>
           {r.firstWin && <div className="vd-stat-row" style={{ color: '#FFD23F' }}><span>FIRST WIN OF THE DAY</span><span>×2!</span></div>}
           {r.dailyBite > 0 && <div className="vd-stat-row" style={{ color: '#7BFFED' }}><span>Daily bite bonus</span><span>+{r.dailyBite}</span></div>}

@@ -125,10 +125,13 @@ export const CONFIG = {
   // ── v6 §3: evolution ladder (radius-driven, forms only go up in a round) ──
   FORMS: [
     { name: 'VOIDLING',    radius: 18 },
-    { name: 'MUNCHER',     radius: 38 },
-    { name: 'GOBBLER',     radius: 58 },
-    { name: 'DEVOURER',    radius: 84 },
-    // v16 §0: lowered 155→110 so strong runs reach WORLD ENDER with ~0:45 left (median ~0:20)
+    // First-timer audit: thresholds front-loaded (38/58/84 → 32/50/78) — a fresh
+    // player's first playtest reached MUNCHER only at the final whistle, so the
+    // whole evolution fantasy was invisible in match one. First evo now lands
+    // ~40s in for an average run; WORLD ENDER stays a strong-run prize.
+    { name: 'MUNCHER',     radius: 32 },
+    { name: 'GOBBLER',     radius: 50 },
+    { name: 'DEVOURER',    radius: 78 },
     { name: 'WORLD ENDER', radius: 110 },
   ] as { name: string; radius: number }[],
   FORM_SPEED_BONUS: 0.08,        // +8% move speed per form gained, stacking

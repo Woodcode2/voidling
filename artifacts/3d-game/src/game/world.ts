@@ -2677,7 +2677,7 @@ export class WorldManager {
         const nx = MARGIN + this.rand() * (m - MARGIN * 2);
         const ny = MARGIN + this.rand() * (m - MARGIN * 2);
         // Alive Pack §A: relocated objects must also be on the island
-        if (isWalkable(nx, ny) && !voids.some((v) => dist(nx, ny, v.x, v.y) < v.radius * 2 + o.size)) {
+        if (isWalkable(nx, ny) && this.clearOfLots(nx, ny) && !voids.some((v) => dist(nx, ny, v.x, v.y) < v.radius * 2 + o.size)) {
           o.x = nx; o.y = ny; break;
         }
       }
@@ -2697,10 +2697,11 @@ export class WorldManager {
     const m = CONFIG.MAP_SIZE;
     let x = MARGIN + this.rand() * (m - MARGIN * 2);
     let y = MARGIN + this.rand() * (m - MARGIN * 2);
-    for (let i = 0; i < 10; i++) {
+    // First-timer audit: goldens landed on rooftops — require island + off-lot.
+    for (let i = 0; i < 24; i++) {
       x = MARGIN + this.rand() * (m - MARGIN * 2);
       y = MARGIN + this.rand() * (m - MARGIN * 2);
-      if (dist(x, y, player.x, player.y) > 320) break;
+      if (dist(x, y, player.x, player.y) > 320 && isOnIsland(x, y) && this.clearOfLots(x, y)) break;
     }
     const info = CONFIG.KIND_INFO['apple'];
     const base = (info.minR + this.rand() * (info.maxR - info.minR)) * Math.sqrt(CONFIG.GOLDEN_MASS_MULT);
@@ -2820,11 +2821,13 @@ export class WorldManager {
       obj.vx = Math.cos(obj.wanderAngle) * speed;
       obj.vy = Math.sin(obj.wanderAngle) * speed;
     }
-    // Terrain avoidance: turn pedestrians away from water before integrating
+    // Terrain avoidance: turn pedestrians away from water AND building lots
+    // before integrating. First-timer audit: wandering critters were climbing
+    // onto rooftops (snail-on-roof with the eat ring around it).
     if (!obj.fleeing && obj.living) {
       const nx = obj.x + obj.vx * dtSec;
       const ny = obj.y + obj.vy * dtSec;
-      if (getTerrainAt(nx, ny) === TERRAIN.WATER) {
+      if (getTerrainAt(nx, ny) === TERRAIN.WATER || !this.clearOfLots(nx, ny, 6)) {
         obj.wanderAngle += Math.PI + (Math.random() - 0.5) * 0.8; // reverse + wobble
         obj.vx = Math.cos(obj.wanderAngle) * speed;
         obj.vy = Math.sin(obj.wanderAngle) * speed;

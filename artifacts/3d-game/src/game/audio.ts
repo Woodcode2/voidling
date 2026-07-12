@@ -140,15 +140,19 @@ export const audio = {
   _musicTracksLoaded: false,
   _activeTrackSrc: null as AudioBufferSourceNode | null,
   _activeTrackGain: null as GainNode | null,
+  // First-timer audit: file-based music mode — real tracks replace the Tone.js
+  // synth once decoded. _fileIdx tracks the current intensity tier (0/1/2).
+  _fileMode: false,
+  _fileIdx: -1,
 
-  // Attempt to load OGG music tracks from assets/music/.
+  // Attempt to load music tracks from assets/music/ (3 intensity tiers).
   // Falls back to the existing synth music if files are absent.
   async loadMusicTracks(): Promise<void> {
     if (this._musicTracksLoaded) return;
     this._musicTracksLoaded = true;
     if (!this.ctx) this.init();
     if (!this.ctx) return;
-    const files = ['track_1.ogg', 'track_2.ogg', 'track_3.ogg', 'track_4.ogg'];
+    const files = ['track_1.mp3', 'track_2.mp3', 'track_3.mp3'];
     const results = await Promise.allSettled(
       files.map(async (f) => {
         try {
@@ -160,7 +164,7 @@ export const audio = {
     );
     this._musicTracks = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
     const loaded = this._musicTracks.filter(Boolean).length;
-    console.log(`[audio §2] music tracks loaded=${loaded}/4`);
+    console.log(`[audio §2] music tracks loaded=${loaded}/3`);
   },
 
   // Play a music track with a 2s crossfade to the new source.
@@ -182,7 +186,9 @@ export const audio = {
     // New track on a fresh gain node
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(this._musicBase, ctx.currentTime + 2);
+    // Ramp to 1 (unity): the shared musicGain bus already applies MUSIC_GAIN —
+    // ramping to _musicBase here double-attenuated the track (base²).
+    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 2);
     gain.connect(this.musicGain);
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -694,12 +700,59 @@ export const audio = {
     // then swap to Tone.js once the async import resolves.
     this._musicTimer = window.setInterval(() => this._musicScheduler(), 25);
     void this._startToneMusic(this._musicGen);
+    // First-timer audit: real music tracks take over from the synth once decoded
+    // (2s crossfade). Synth remains the fallback when files are missing.
+    const gen = this._musicGen;
+    void this.loadMusicTracks().then(() => {
+      if (!this._musicPlaying || this._musicGen !== gen) return;
+      if (!this._musicTracks.some(Boolean)) return;
+      this._fileMode = true;
+      this._fileIdx = this._fileIdxFor(this._musicForm);
+      this.playMusicFile(this._fileIdx);
+      this._disposeSynth();
+    });
+  },
+
+  // Intensity tier for a form: 0-1 chill, 2-3 groove, 4+ epic.
+  _fileIdxFor(form: number): number {
+    return form >= 4 ? 2 : form >= 2 ? 1 : 0;
+  },
+
+  // Tear down the synth/Tone engines (used when file music takes over mid-round).
+  _disposeSynth() {
+    this._musicGen = (this._musicGen + 1) | 0; // cancel any in-flight _startToneMusic
+    if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
+    try {
+      if (this._toneModule) {
+        const T = this._toneModule;
+        T.getTransport().cancel();
+        T.getTransport().stop();
+        for (const node of this._toneDisposables) { try { node.dispose(); } catch { /* ignore */ } }
+      }
+    } catch { /* ignore */ }
+    this._toneDisposables.length = 0;
+    this._toneVols.length = 0;
+    this._dangerVol = null;
+    this._masterFilt = null;
+    this._toneReady = false;
   },
   stopMusic() {
     this._musicPlaying = false;
     this._musicPaused = false;
     this._musicGen = (this._musicGen + 1) | 0; // invalidate any in-flight _startToneMusic
     if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
+    // File mode: fade out + stop the active track
+    if (this._activeTrackGain && this.ctx) {
+      const g = this._activeTrackGain, src = this._activeTrackSrc;
+      g.gain.cancelScheduledValues(this.ctx.currentTime);
+      g.gain.setValueAtTime(g.gain.value, this.ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+      window.setTimeout(() => { try { src?.stop(); } catch { /* ignore */ } }, 700);
+      this._activeTrackSrc = null;
+      this._activeTrackGain = null;
+    }
+    this._fileMode = false;
+    this._fileIdx = -1;
     // Dispose Tone.js resources
     try {
       if (this._toneModule) {
@@ -722,10 +775,26 @@ export const audio = {
     this._musicPaused = true;
     if (this._musicTimer !== null) { clearInterval(this._musicTimer); this._musicTimer = null; }
     if (this._toneReady && this._toneModule) this._toneModule.getTransport().pause();
+    // File mode: duck the track to silence while paused (keeps position simple)
+    if (this._fileMode && this._activeTrackGain && this.ctx) {
+      const g = this._activeTrackGain.gain;
+      g.cancelScheduledValues(this.ctx.currentTime);
+      g.setValueAtTime(g.value, this.ctx.currentTime);
+      g.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+    }
   },
   resumeMusic() {
     if (!this._musicPlaying || !this._musicPaused) return;
     this._musicPaused = false;
+    if (this._fileMode) {
+      if (this._activeTrackGain && this.ctx) {
+        const g = this._activeTrackGain.gain;
+        g.cancelScheduledValues(this.ctx.currentTime);
+        g.setValueAtTime(g.value, this.ctx.currentTime);
+        g.linearRampToValueAtTime(1, this.ctx.currentTime + 0.4);
+      }
+      return;
+    }
     if (this._toneReady && this._toneModule) {
       this._toneModule.getTransport().start();
     } else if (this.ctx) {
@@ -738,6 +807,15 @@ export const audio = {
 
   setMusicForm(f: number) {
     this._musicForm = Math.max(0, f | 0);
+    // File mode: evolution bumps switch the whole track (2s crossfade)
+    if (this._fileMode) {
+      const idx = this._fileIdxFor(this._musicForm);
+      if (idx !== this._fileIdx) {
+        this._fileIdx = idx;
+        this.playMusicFile(idx);
+      }
+      return;
+    }
     if (this._toneReady && this._toneVols.length) {
       // Fade each newly-unlocked layer in over 2 seconds
       const TARGET_DB = [-6, -9, -11, -14, -14];

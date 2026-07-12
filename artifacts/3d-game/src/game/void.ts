@@ -71,10 +71,14 @@ export abstract class Void {
       console.log(`[LAW] clamped ${this.name || 'void'} at t=${_roundElapsedSec.toFixed(1)}`);
       return; // score is granted by caller; only growth is blocked
     }
+    // First-timer audit: rookie surge — small voids grow noticeably faster so the
+    // first evolution lands inside the first minute of an average first match.
+    // Applies to every void (player + bots) so the shared curve stays fair.
+    const rookie = this.radius < 34 ? 1.6 : this.radius < 50 ? 1.3 : 1;
     // Compute uncapped growth first so we can detect overshoot before clamping
     const uncapped = growRadius(
       this.radius,
-      addedArea * this.underdogGrowth,
+      addedArea * this.underdogGrowth * rookie,
       CONFIG.DIMINISH_BASE,
       CONFIG.MAX_RADIUS,
     );

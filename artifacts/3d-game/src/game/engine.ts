@@ -648,8 +648,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v16 §5: news ticker — first line fires 20s in, then every 30s
     currentTicker = null;
     tickerCd = 20000;
-    // v16 §5: pick 3 contracts for this round
-    const shuffledContracts = [...CONTRACT_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
+    // v16 §5: pick 3 contracts for this round.
+    // First-timer audit: a brand-new player (no best score yet) gets the three
+    // universal starters — biome quests like "Eat 8 beach items" read as
+    // impossible when you spawn nowhere near a beach.
+    const firstEver = meta.data.highScore <= 0;
+    const shuffledContracts = firstEver
+      ? CONTRACT_POOL.filter((c) => ['eat_people', 'eat_cars', 'reach_gobbler'].includes(c.id))
+      : [...CONTRACT_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
     activeContracts = shuffledContracts.map((c) => ({ ...c, done: false }));
     for (const k of Object.keys(contractProgress)) delete contractProgress[k];
     track('round_start', { daily });
@@ -2291,24 +2297,27 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ibx += 40;
     }
 
-    // score + combo (top right) — v5 §6: keep clear of the 40px pause pill.
-    // pill right edge = 12px inset + 40px wide; score right edge sits 8px left of it.
-    const scoreRight = fw - (12 + 40 + 8);
+    // score + combo (top right) — keep clear of BOTH 40px pills (pause + mute,
+    // 8px gap, 12px inset): 12 + 40 + 8 + 40 + 8 = 108.
+    const scoreRight = fw - 108;
     ctx.textAlign = 'right';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '700 26px Fredoka, sans-serif';
     ctx.fillText(String(player.score), scoreRight, 34);
+    // First-timer audit: combo + devoured dropped BELOW the pills/time bar
+    // (y80/98) — at 390px width they used to sit on the yellow time bar.
     if (player.combo > 1) {
       ctx.fillStyle = '#FFD23F';
       ctx.font = '700 18px Fredoka, sans-serif';
-      ctx.fillText(`COMBO ×${player.comboMult.toFixed(1)}`, scoreRight, 58);
+      ctx.fillText(`COMBO ×${player.comboMult.toFixed(1)}`, fw - 12, 80);
     }
-    // v8 §3: running "% OF TOWN DEVOURED" under the score
+    // v8 §3: running "% OF TOWN DEVOURED" under the score. One decimal below 10%
+    // so early progress never reads as a stuck "0%".
     if (world) {
       const dv = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
       ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.font = '700 14px Fredoka, sans-serif';
-      ctx.fillText(`${dv.toFixed(0)}% DEVOURED`, scoreRight, player.combo > 1 ? 78 : 56);
+      ctx.fillText(`${dv < 10 ? dv.toFixed(1) : dv.toFixed(0)}% DEVOURED`, fw - 12, player.combo > 1 ? 98 : 80);
     }
 
     // Phase 7b §4: heart pips removed — hearts system replaced by Agar-style stage drop
@@ -2388,6 +2397,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.translate(fw / 2 + dx, cy);
       ctx.scale(scale, scale);
       ctx.font = '800 35px Fredoka, sans-serif'; // v9 §5: banners 30% bigger
+      // First-timer audit: long callouts ("TOWN FIGHTS BACK vs YOU") overflowed
+      // narrow phones — shrink to fit inside the frame with 24px side margins.
+      const calloutW = ctx.measureText(callout.text).width;
+      const maxW = (fw - 48) / Math.max(scale, 0.001);
+      if (calloutW > maxW) ctx.scale(maxW / calloutW, maxW / calloutW);
       ctx.lineWidth = 8;
       ctx.strokeStyle = 'rgba(20,8,43,0.7)';
       ctx.strokeText(callout.text, 0, 0);
@@ -2462,8 +2476,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const forms = CONFIG.FORMS;
     const fi = player.formIndex;
     const SAFE_B = 26;                                   // reserve for home indicator
-    const pillW = Math.min(260, fw * 0.68), pillH = 22;
-    const pillX = fw / 2 - pillW / 2, pillY = fh - SAFE_B - pillH;
+    // First-timer audit: bottom-LEFT aligned — centered, the pill's right end
+    // (the next-form label) hid under the collapse/PULL button on phones.
+    const pillW = Math.min(240, fw - 172), pillH = 22;
+    const pillX = 12, pillY = fh - SAFE_B - pillH;
     ctx.textAlign = 'center';
     if (fi < forms.length - 1) {
       const cur = forms[fi].radius, next = forms[fi + 1].radius;
@@ -2500,7 +2516,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.fillStyle = '#FFD23F';
       ctx.font = '800 14px Fredoka, sans-serif';
       ctx.textBaseline = 'middle';
-      ctx.fillText('★ WORLD ENDER ★', fw / 2, pillY + pillH / 2 + 1);
+      ctx.fillText('★ WORLD ENDER ★', pillX + pillW / 2, pillY + pillH / 2 + 1);
       ctx.textBaseline = 'alphabetic';
       ctx.restore();
     }
