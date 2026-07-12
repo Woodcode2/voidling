@@ -23,9 +23,17 @@ jobs:
           i=0
           tail -n +2 .github/asset-manifest.txt | while read -r u; do
             [ -z "$u" ] && continue
+            case "$u" in \#*) continue ;; esac
             i=$((i+1))
             ext="${u##*.}"; ext="${ext%%\?*}"
             curl -fsSL "$u" -o "$dest/candidate-$i.$ext"
+          done
+          # m4a/AAC doesn't decode in open-source Chromium builds — transcode to
+          # universally-supported MP3 and drop the original.
+          for f in "$dest"/candidate-*.m4a; do
+            [ -e "$f" ] || continue
+            ffmpeg -y -loglevel error -i "$f" -codec:a libmp3lame -b:a 160k "${f%.m4a}.mp3"
+            rm "$f"
           done
           ls -la "$dest"
       - name: Commit
