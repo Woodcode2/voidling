@@ -5,8 +5,9 @@ game; Capacitor wraps it in a native shell.
 
 ## What's already done
 
-- **App icon** — `public/icon-1024.png` (rendered from the game's own void,
-  galaxy swirl + orbit ring). Already installed at
+- **App icon** — `public/icon-1024.png`: top-charts-style 3D scene — the void
+  (eyes + blush on the rim, galaxy pit) devouring a skyscraper at a city
+  intersection. Alternate takes in `store/candidates/`. Already installed at
   `ios/App/App/Assets.xcassets/AppIcon.appiconset/` and wired into the web app
   (`favicon.png`, `apple-touch-icon.png`, `icon-192/512.png`, `manifest.json`).
 - **Launch screen** — cosmic splash (2732×2732) in
