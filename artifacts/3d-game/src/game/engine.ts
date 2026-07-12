@@ -59,6 +59,7 @@ export interface ResultData {
   rankName: string;           // current rank (BRONZE..MASTER)
   trophiesEarned: number;     // trophies unlocked this round
   trophyBounty: number;       // coin bounty paid for them
+  solo: boolean;              // SOLO RUN round (graded on % devoured)
 }
 
 export interface DailyData { id: string; seed: string; name: string; desc: string; }
@@ -99,7 +100,7 @@ export interface Snapshot {
 export interface GameEngine {
   getSnapshot(): Snapshot;
   subscribe(cb: () => void): () => void;
-  start(daily: boolean): void;
+  start(daily: boolean, solo?: boolean): void;
   chooseBoon(id: string): void;
   buySkin(id: string): { ok: boolean; reason?: string };
   equipSkin(id: string): void;
@@ -180,6 +181,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let rivals: Rival[] = [];
   let timeLeft = 0;
   let isDaily = false;
+  let isSolo = false; // SOLO RUN: no family, 2:30, graded on % devoured
   let dailyData: DailyData | null = null;
   let boonChoices: BoonDef[] = [];
   let results: ResultData | null = null;
@@ -498,11 +500,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
 
   // ── round lifecycle ──
-  function start(daily: boolean) {
+  function start(daily: boolean, solo = false) {
     audio.init();
     // v14 §1: async — loads CC0 OGG samples in background; synth fallback until ready
     audio.loadSamples().catch(() => {});
     isDaily = daily;
+    isSolo = solo;
     // Reset all per-round flags FIRST, then apply the selected daily mod below
     baseGreed = 1;
     coinMult = 1;
@@ -511,7 +514,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     dailyZoomies = 1;
     dailyAllTiny = false;
     let startRadius = CONFIG.PLAYER_BASE_RADIUS;
-    let duration = CONFIG.GAME_DURATION * 1000;
+    let duration = (isSolo ? 150 : CONFIG.GAME_DURATION) * 1000; // solo = a tight 2:30 route-mastery run
 
     let seed = 'run_' + Math.floor(Math.random() * 1e9);
     if (daily && dailyData) {
@@ -557,11 +560,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // They sky-fall in one at a time per FAMILY_ARRIVAL_MS — the void gets noticed,
     // the city panics, and kin drop from the sky to join the feast. Landing spots
     // are chosen live (near the player) when each arrival fires.
-    familyArrivals = rivals.map((_, i) => ({
+    familyArrivals = isSolo ? [] : rivals.map((_, i) => ({
       index: i,
       atMs: CONFIG.FAMILY_ARRIVAL_MS[i] ?? (30000 + i * 40000),
       done: false,
     }));
+    if (isSolo) rivals = []; // SOLO RUN: the city is all yours
     // v8 §1: only the player occupies the map at spawn now — keep them off a food
     // cluster so no one pops a pile of objects on the first frame.
     world.clearSpawnFootprint([
@@ -859,7 +863,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // occupy a placement slot or affect the crown/placement calculation.
     const board = [player, ...rivals.filter((r) => r.alive)].sort((a, b) => b.score - a.score);
     const placement = board.findIndex((e) => e === player) + 1;
-    const crown = placement === 1;
+    const crown = !isSolo && placement === 1; // solo has no opponents — no crown cheese
     const worldEater = player.formIndex >= CONFIG.FORMS.length - 1;
     if (worldEater) evoCoinBonus = 20; // Economy: WORLD ENDER pays a bonus inside the 50-150 band
     const devoured = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
@@ -917,8 +921,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (isDaily && crown) meta.earnTrophy('daily_winner');
     finalFeastFired = false; finalFeastActive = false;
 
-    // Retention (hole.io ladder): placement stars + trophy bounties
-    const starsGained = meta.addStars(placement);
+    // Retention (hole.io ladder): placement stars + trophy bounties.
+    // SOLO RUN grades on % devoured instead of placement.
+    const soloStars = isSolo
+      ? (devoured >= 35 ? 20 : devoured >= 20 ? 10 : devoured >= 10 ? 5 : devoured >= 5 ? 2 : 1)
+      : 0;
+    const starsGained = isSolo ? (meta.data.stars += soloStars, meta.save(), soloStars) : meta.addStars(placement);
     const trophyHaul = meta.drainRecentTrophies();
     if (trophyHaul.count > 0) track('trophy_bounty', trophyHaul);
 
@@ -956,6 +964,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       district: finalDistrict,
       starsGained, stars: meta.data.stars, rankName: meta.rank().name,
       trophiesEarned: trophyHaul.count, trophyBounty: trophyHaul.bounty,
+      solo: isSolo,
     };
     track('round_end', { score: player.score, placement, coins });
     audio.stopMusic();

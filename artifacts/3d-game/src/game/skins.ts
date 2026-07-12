@@ -172,6 +172,98 @@ export function drawLegendaryBack(ctx: CanvasRenderingContext2D, skin: SkinDef, 
       ctx.restore();
       break;
     }
+    // ── mid-tier charms: coin skins earn a signature too (smaller than legendary) ──
+    case 'kitty': {
+      const a = t / 1400;
+      const hx = Math.cos(a) * r * 1.28, hy = Math.sin(a) * r * 1.0;
+      const tw = 0.5 + 0.5 * Math.abs(Math.sin(t / 400));
+      ctx.save();
+      ctx.globalAlpha = tw;
+      ctx.fillStyle = '#FF7DA8';
+      ctx.beginPath(); // little heart
+      ctx.arc(hx - r * 0.045, hy - r * 0.02, r * 0.055, 0, Math.PI * 2);
+      ctx.arc(hx + r * 0.045, hy - r * 0.02, r * 0.055, 0, Math.PI * 2);
+      ctx.moveTo(hx - r * 0.095, hy);
+      ctx.lineTo(hx, hy + r * 0.11);
+      ctx.lineTo(hx + r * 0.095, hy);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'ninja': {
+      // dash afterimages trailing the body
+      ctx.save();
+      for (let i = 1; i <= 2; i++) {
+        const wob = Math.sin(t / 260) * r * 0.1;
+        ctx.globalAlpha = 0.12 / i;
+        ctx.fillStyle = '#5E6E8C';
+        ctx.beginPath();
+        ctx.arc(-i * r * 0.34 + wob, 0, r * (1 - i * 0.08), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
+    case 'wizard': {
+      // three orbiting arcane sparks
+      for (let i = 0; i < 3; i++) {
+        const a = t / 1200 + (i / 3) * Math.PI * 2;
+        const tw = 0.5 + 0.5 * Math.abs(Math.sin(t / 320 + i * 2));
+        ctx.save();
+        ctx.globalAlpha = tw;
+        drawStar(ctx, Math.cos(a) * r * 1.25, Math.sin(a) * r * 0.95, r * 0.07, '#C9A6FF');
+        ctx.restore();
+      }
+      break;
+    }
+    case 'pirate': {
+      // gold doubloons glinting past
+      for (let i = 0; i < 2; i++) {
+        const cyc = ((t / 2600 + i * 0.5) % 1);
+        const a = i * 2.6 + 0.8;
+        ctx.save();
+        ctx.globalAlpha = Math.sin(cyc * Math.PI) * 0.9;
+        ctx.fillStyle = '#FFD23F';
+        ctx.strokeStyle = '#C79A12';
+        ctx.lineWidth = Math.max(1, r * 0.02);
+        const gx = Math.cos(a) * r * 1.3, gy = Math.sin(a) * r * 1.0 - cyc * r * 0.5;
+        ctx.beginPath(); ctx.arc(gx, gy, r * 0.07, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+      break;
+    }
+    case 'astronaut': {
+      // a tiny satellite orbits with a blinking beacon
+      const a = t / 2000;
+      const sx3 = Math.cos(a) * r * 1.35, sy3 = Math.sin(a) * r * 1.05;
+      ctx.save();
+      ctx.fillStyle = '#C9CCD6';
+      ctx.fillRect(sx3 - r * 0.05, sy3 - r * 0.03, r * 0.1, r * 0.06);
+      ctx.fillStyle = '#5E7FA6';
+      ctx.fillRect(sx3 - r * 0.12, sy3 - r * 0.02, r * 0.05, r * 0.04);
+      ctx.fillRect(sx3 + r * 0.07, sy3 - r * 0.02, r * 0.05, r * 0.04);
+      if (Math.sin(t / 250) > 0.4) {
+        ctx.fillStyle = '#FF3D68';
+        ctx.beginPath(); ctx.arc(sx3, sy3 - r * 0.05, r * 0.02, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
+    case 'devil': {
+      // smoldering dark embers rising
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const cyc = ((t / 1700 + i * 0.37) % 1);
+        const a = (i * 2.399) % (Math.PI * 2);
+        const ex = Math.cos(a) * r * 0.9 + Math.sin(t / 600 + i) * r * 0.05;
+        const ey = Math.sin(a) * r * 0.45 + r * 0.4 - cyc * r * 1.3;
+        ctx.globalAlpha = (1 - cyc) * 0.7;
+        ctx.fillStyle = i % 2 ? '#8A1E1E' : '#FF4D4D';
+        ctx.beginPath(); ctx.arc(ex, ey, Math.max(1.2, r * 0.035 * (1 - cyc)), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
     case 'ghost': {
       // trailing spectral echoes
       ctx.save();

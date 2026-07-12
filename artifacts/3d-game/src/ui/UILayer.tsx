@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v25 · iconic';
+const BUILD_STAMP = 'v26 · solorun';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 
@@ -309,6 +309,9 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
         )}
         <button className="vd-btn vd-btn--play vd-btn--pulse" onClick={onPlay}>PLAY</button>
+        <button className="vd-btn vd-btn--secondary" style={{ marginTop: 2 }} onClick={() => engine.start(false, true)}>
+          SOLO RUN <span style={{ opacity: 0.75, fontSize: '0.8em' }}>· devour the whole city</span>
+        </button>
         <div className="vd-row">
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openDaily()}>DAILY BITE</button>
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={() => engine.openShop()}>SHOP</button>
@@ -626,7 +629,10 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
     <div className="vd-overlay vd-overlay--scrim">
       <div className="vd-stack">
         {r.crown ? <CrownIcon size={76} /> : null}
-        <h2 className="vd-heading">{r.crown ? 'CHAMPION!' : `#${r.placement} of ${r.total}`}</h2>
+        <h2 className="vd-heading">
+          {r.solo ? `${r.devoured.toFixed(0)}% DEVOURED` : r.crown ? 'CHAMPION!' : `#${r.placement} of ${r.total}`}
+        </h2>
+        {r.solo && <p className="vd-sub">SOLO RUN — eat the whole city</p>}
         <div className="vd-big-num">{r.score.toLocaleString()}</div>
         {r.newBest && <span className="vd-badge">NEW BEST!</span>}
         {r.reachedForm && (
@@ -671,7 +677,7 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
             <span className="vd-tease-name">{r.skinTease.botName}</span> flexed the <b>{r.skinTease.skinName}</b> skin — grab it in the Shop!
           </div>
         )}
-        <button className="vd-btn vd-btn--play" onClick={() => engine.start(r.isDaily)}>PLAY AGAIN</button>
+        <button className="vd-btn vd-btn--play" onClick={() => engine.start(r.isDaily, r.solo)}>PLAY AGAIN</button>
         <button className="vd-btn vd-btn--ghost" onClick={() => engine.goHome()}>HOME</button>
       </div>
     </div>
