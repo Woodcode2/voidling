@@ -1,18 +1,12 @@
 name: fetch-assets
 # Utility: download externally generated art (e.g. AI icon candidates) into the
 # repo, since the dev container's egress proxy blocks the asset CDN.
+# Usage: push a .github/asset-manifest.txt whose first line is the repo-relative
+# dest dir and remaining lines are URLs (one per line).
 on:
-  workflow_dispatch:
-    inputs:
-      urls:
-        description: 'Whitespace-separated list of image URLs to download'
-        required: true
-        type: string
-      dest:
-        description: 'Directory (repo-relative) to save into'
-        required: true
-        default: 'artifacts/3d-game/store/candidates'
-        type: string
+  push:
+    paths:
+      - '.github/asset-manifest.txt'
 
 permissions:
   contents: write
@@ -24,18 +18,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download assets
         run: |
-          mkdir -p "${{ inputs.dest }}"
+          dest=$(head -n1 .github/asset-manifest.txt)
+          mkdir -p "$dest"
           i=0
-          for u in ${{ inputs.urls }}; do
+          tail -n +2 .github/asset-manifest.txt | while read -r u; do
+            [ -z "$u" ] && continue
             i=$((i+1))
             ext="${u##*.}"; ext="${ext%%\?*}"
-            curl -fsSL "$u" -o "${{ inputs.dest }}/candidate-$i.$ext"
+            curl -fsSL "$u" -o "$dest/candidate-$i.$ext"
           done
-          ls -la "${{ inputs.dest }}"
+          ls -la "$dest"
       - name: Commit
         run: |
+          dest=$(head -n1 .github/asset-manifest.txt)
           git config user.name "voidling-assets-bot"
           git config user.email "actions@github.com"
-          git add "${{ inputs.dest }}"
+          git add "$dest"
           git commit -m "assets: fetch icon candidates" || echo "nothing to commit"
           git push

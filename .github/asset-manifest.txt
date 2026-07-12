@@ -1,0 +1,5 @@
+artifacts/3d-game/store/candidates
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114151_f75e4eda-86cc-4975-b96b-ff715ba49cda.png
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114152_0d973ba8-f2e8-4f39-8fa3-38ddc2fbf8d0.png
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114152_ac4bf32b-937d-4d5a-b578-867d8f1c26df.png
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114152_1f56608d-3871-449d-b502-729574404d66.png
