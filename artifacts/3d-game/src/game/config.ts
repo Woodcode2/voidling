@@ -206,8 +206,16 @@ export const CONFIG = {
   // Too-big collision feedback — §0 fix
   TOOBIG_COOLDOWN: 500,     // ms
 
-  // v16.2 §0: bot radius cap — a bot's radius may never exceed player × this factor
-  BOT_RADIUS_CAP_FRAC: 1.55,  // Overnight: was 1.25 — BELOW the 1.3 eat ratio, so rivals could NEVER eat you. Danger is real now.
+  // Late-game pass: bot size cap now RAMPS with player radius instead of a flat
+  // factor. Below RAMP_LO (DEVOURER) bots may be up to 1.55× you (full danger —
+  // they can out-size and eat you, since 1.55 > RIVAL_EAT_RATIO 1.3). As you
+  // grow toward RAMP_HI the cap falls to 0.75× so your family shrinks BELOW you
+  // and you can finally devour them. The 1.3 eat line is crossed at player r≈104
+  // (just before WORLD ENDER), so danger stays real right up to the top form.
+  BOT_CAP_FRAC_MAX: 1.55,
+  BOT_CAP_FRAC_MIN: 0.75,
+  BOT_CAP_RAMP_LO: 78,   // DEVOURER radius — below this, full-danger bots
+  BOT_CAP_RAMP_HI: 160,  // by here your family is capped well under you
 
   // v16.2 §2: The Guard blockade constants
   GUARD_JEEP_COUNT: 4,
@@ -229,11 +237,18 @@ export const CONFIG = {
   GRID: 6,
   PLAN_NAMES: ['METRO', 'SUBURBIA', 'SEASIDE'] as string[], // v16.2 §6: rotating city plans
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
-  MAX_RADIUS: 135,           // v16 §0: lowered to match new WORLD ENDER threshold (110)
+  // Late-game pass: raised 135→240 so a dominant player becomes genuinely
+  // MASSIVE at the top (paired with the camera zoom-in below so this doesn't
+  // widen the view). Non-binding until the final seconds — the Growth Law
+  // ceiling below is the real cap and only reaches ~238 at the 210s whistle.
+  MAX_RADIUS: 240,
   DIMINISH_BASE: 18,         // v7 §1: reference radius for (base/current)^0.5 growth falloff
   // v15 §0: The Growth Law — maxRadius(t) = BASE + RATE × secondsElapsed
   GROWTH_LAW_BASE: 18,       // px at t=0 (same as PLAYER_BASE_RADIUS)
-  GROWTH_LAW_RATE: 0.92,     // px/s — being huge at 0:26 becomes mathematically impossible
+  // Late-game pass: 0.92→1.05 so the ceiling reaches ~238 at the whistle,
+  // letting a strong run actually reach the new 240 cap (per-second delta is
+  // still tiny early, so anti-snowball pacing is preserved).
+  GROWTH_LAW_RATE: 1.05,
 
   // v13 §1: The Last Slice — SW coastline geometry
   COAST_SAND_DEPTH: 75,      // px of sand band on west/south edges inside the map

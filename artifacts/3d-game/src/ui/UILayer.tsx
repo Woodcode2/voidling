@@ -7,7 +7,7 @@ import { SkinPreview } from './SkinPreview';
 import { weeklyBoard } from '../game/leaderboard';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v33 · machine';
+const BUILD_STAMP = 'v34 · lategame';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -968,15 +968,18 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
       {/* Signature VOID POWER — on-screen button (also fires on Space/E). The
           conic ring sweeps as the cooldown recharges; greyed while charging. */}
       {!snap.paused && snap.power && (
-        <button
-          className={`vd-power-btn${snap.power.ready ? ' vd-power-btn--ready' : ''}`}
-          onClick={() => engine.usePower()}
-          disabled={!snap.power.ready}
-          aria-label={`Use power: ${snap.power.name}`}
-          style={{ ['--cd' as string]: String(snap.power.cdFrac), ['--pc' as string]: snap.power.color }}
-        >
-          <span className="vd-power-name">{snap.power.name}</span>
-        </button>
+        <>
+          <button
+            className={`vd-power-btn${snap.power.ready ? ' vd-power-btn--ready' : ''}`}
+            onClick={() => engine.usePower()}
+            disabled={!snap.power.ready}
+            aria-label={`Use ${snap.power.verb}: ${snap.power.hint}`}
+            style={{ ['--cd' as string]: String(snap.power.cdFrac), ['--pc' as string]: snap.power.color }}
+          >
+            <span className="vd-power-name">{snap.power.verb}</span>
+          </button>
+          {snap.power.ready && <span className="vd-power-hint">{snap.power.hint}</span>}
+        </>
       )}
       {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
       {snap.paused && (
@@ -1028,8 +1031,8 @@ const ONBOARD_PANELS = [
     skin: 'classic',
     form: 4,
     title: 'UNLEASH YOUR POWER',
-    body: 'Tap the glowing power button to fire your form’s signature move — from PULL all the way to the world-ending COLLAPSE.',
-    hint: 'Your family will join the feast. The city WILL fight back.',
+    body: 'Your POWER button is a cooldown blast — not the same as normal eating. It sucks in and devours everything around you, and at CRUSH & COLLAPSE it eats things TOO BIG to swallow normally: skyscrapers, the train… even your own family.',
+    hint: 'The bigger you grow, the wider the blast. Save it for what you can’t eat any other way.',
     spriteKind: 'tree',
   },
 ];

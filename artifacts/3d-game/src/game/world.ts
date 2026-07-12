@@ -4,7 +4,7 @@ import { drawParkObject } from './objects'; // wind removed — tuft system dele
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import { cityBuildingKeys, cityLandmarkKeys, zooPropKeys, streetPropKeys } from './cityAssets'; // Structural Rebuild: new city art pools
-import { drawBuilding3D, makeBuildingSpec, makeHouseSpec, makeCivicSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
+import { drawBuilding3D, makeBuildingSpec, makeHouseSpec, makeCivicSpec, ensureBuildingSprite, buildingRoofColor, LIFT, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
   SITTER_CLAY_INDICES,
@@ -55,6 +55,7 @@ export interface WorldObject {
   captured: boolean;
   captureScale: number;
   captureRot: number;
+  lodTier?: number;      // Late-game pass: last LOD tier (hysteresis vs zoom dither)
   shadowX: number;       // v10 §3: ground-shadow anchor (set on first capture frame)
   shadowY: number;
   alertT: number;        // "!" bubble timer (people)
@@ -3624,13 +3625,37 @@ export class WorldManager {
     t: number,
     view: { x: number; y: number; w: number; h: number },
     actors?: { footY: number; draw: () => void }[],
+    camZoom?: number,
+    vel?: { x: number; y: number },
   ) {
+    // Late-game pass: height-aware, zoom-gated, velocity-biased cull to kill
+    // building pop-in. The up/down/side extents use the ACTUAL projected 2.5D
+    // footprint (tall towers lean up-screen by h*LIFT), so a building enters
+    // visible[] before its silhouette reaches the frame edge — no pop-in. The
+    // generous BASE_PAD + directional LEAD margins only apply at street zoom
+    // (camZoom ≥ 0.8); zoomed out they shrink so the wider net never bloats the
+    // already-heavy far view (the LOD tiers below keep any extras cheap).
+    const street = (camZoom ?? 1) >= 0.8;
+    const BASE_PAD = street ? 96 : 32;
+    const LEAD = street ? 260 : 0;
+    const vx = vel?.x ?? 0, vy = vel?.y ?? 0, vl = Math.hypot(vx, vy);
+    const bx = vl > 1e-3 ? (vx / vl) * LEAD : 0, by = vl > 1e-3 ? (vy / vl) * LEAD : 0;
+    const L = view.x - BASE_PAD + Math.min(0, bx), R = view.x + view.w + BASE_PAD + Math.max(0, bx);
+    const T = view.y - BASE_PAD + Math.min(0, by), B = view.y + view.h + BASE_PAD + Math.max(0, by);
     const visible = this.objects.filter((o) => {
+      if (o.eaten) return false;
       // Structural Build: the train spans ~3 car-gaps behind its lead point
-      const pad = o.kind === 'train' ? 540 : o.size;
-      return !o.eaten &&
-        o.x + pad >= view.x && o.x - pad <= view.x + view.w &&
-        o.y + pad >= view.y && o.y - pad <= view.y + view.h;
+      if (o.kind === 'train') {
+        const p = 540;
+        return o.x + p >= L && o.x - p <= R && o.y + p >= T && o.y - p <= B;
+      }
+      // Foot-anchored sprites (trees, landmarks, people) draw UP ~2× their
+      // radius from the foot point, so the up-extent must be ~2.2× size or tall
+      // art pops in at the top edge; buildings use their projected 2.5D height.
+      const up = o.bldg ? o.bldg.h * LIFT + o.bldg.d + o.size : o.size * 2.2;
+      const down = o.bldg ? o.bldg.d + o.size : o.size;
+      const side = o.bldg ? o.bldg.w + o.bldg.d : o.size;
+      return o.x + side >= L && o.x - side <= R && o.y + down >= T && o.y - up <= B;
     });
     // hole.io rebuild: box buildings sort by their SOUTH edge (visual base),
     // everything else by its foot point as before.
@@ -3658,15 +3683,56 @@ export class WorldManager {
     // hundreds of objects). drawOne now mutates transform freely and resets with
     // a single setTransform to this snapshot — zero save/restore in the hot path.
     const baseTf = ctx.getTransform();
+    // Late-game pass: device-px per world-unit (= dpr × camZoom). Drives the LOD
+    // tier thresholds so far/small objects skip expensive detail.
+    const scaleA = baseTf.a;
 
     const drawOne = (obj: WorldObject) => {
       // Structural Build: the express draws its own multi-segment body
       if (obj.kind === 'train') { this.drawTrain(ctx, obj, t); return; }
       // hole.io rebuild: live pseudo-3D box draw for uncaptured buildings.
       // Captured ones fall through to the flat-sprite tumble path below.
+      // Late-game pass: LEVEL OF DETAIL. drawBuilding3D is the frame's most
+      // expensive op (2 clips + 2 transforms + 3-4 drawImages + shadow poly per
+      // building). When a building is small on screen (zoomed out at DEVOURER/
+      // WORLD ENDER), that detail is invisible — so draw a single flat sprite,
+      // or a colored dot when truly tiny. onPx = projected screen height.
       if (obj.bldg && !obj.captured) {
         const shk3 = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
-        drawBuilding3D(ctx, obj.bldg, obj.x + shk3, obj.y, camCX, camCY);
+        const b = obj.bldg;
+        const onPx = (b.h * LIFT + b.d) * scaleA;
+        // hysteresis: only switch tiers when crossing the band by ±3px so the
+        // camera's lerped micro-zoom can't make a building flicker between tiers
+        const prev = obj.lodTier ?? 2;
+        let tier: number;
+        // Full pseudo-3D (2 clips + 2 face blits + shadow poly) while the
+        // building is a meaningful size on screen — the cull+zoom already cut
+        // object count 20×, so keeping near/mid buildings 3D is cheap on GPU and
+        // looks best. Only genuinely small FAR buildings drop to the flat baked
+        // sprite (1 drawImage, indistinguishable at that size); tiny ones a dot.
+        if (onPx >= 52 + (prev < 2 ? 4 : 0)) tier = 2;        // full pseudo-3D
+        else if (onPx >= 16 + (prev < 1 ? 3 : prev > 1 ? -3 : 0)) tier = 1; // flat sprite
+        else tier = 0;                                        // dot
+        obj.lodTier = tier;
+        if (tier === 2) {
+          drawBuilding3D(ctx, b, obj.x + shk3, obj.y, camCX, camCY);
+        } else if (tier === 1) {
+          const key = ensureBuildingSprite(b);
+          const spr = objectSprites.get(key);
+          if (spr) {
+            const iw = spr instanceof HTMLImageElement ? spr.naturalWidth : spr.width;
+            const ih = spr instanceof HTMLImageElement ? spr.naturalHeight : spr.height;
+            const dh = (b.h * LIFT + b.d) * 1.0, dw = dh * (iw / ih);
+            // foot-anchored: base of the flat sprite sits at the south edge
+            ctx.drawImage(spr, obj.x + shk3 - dw / 2, obj.y + b.d - dh, dw, dh);
+          } else {
+            drawBuilding3D(ctx, b, obj.x + shk3, obj.y, camCX, camCY);
+          }
+        } else {
+          // far dot — a filled roof-color rect roughly the building footprint
+          ctx.fillStyle = buildingRoofColor(b);
+          ctx.fillRect(obj.x - b.w, obj.y - b.d, b.w * 2, b.d * 2);
+        }
         return;
       }
       // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)
@@ -3693,6 +3759,19 @@ export class WorldManager {
       const spriteKey: string | null = this.structureSpriteKey(obj.kind, obj.id, obj.sceneryKey);
       // v11: PNG sprite replaces procedural drawing when present
       const r = obj.size;
+
+      // Late-game pass: far-LOD for props. onHalfPx = the prop's on-screen
+      // half-height. Under ~1.6px it is a speck — draw a 1px dot and skip the
+      // whole translate/rotate/sprite/shadow path. Between there and ~4px, keep
+      // the sprite but drop its shadow (invisible at that size, ~1000 fills/frame
+      // saved when zoomed out). Living things always draw fully (they animate).
+      const onHalfPx = r * scaleA;
+      const skipShadow = onHalfPx < 4;
+      if (!obj.captured && !obj.living && !obj.golden && onHalfPx < 1.6) {
+        ctx.fillStyle = 'rgba(40,44,60,0.5)';
+        ctx.fillRect(obj.x - 1, obj.y - 1, 2, 2);
+        return;
+      }
 
       // Feel Patch §1: prop-shake offset — object wiggles horizontally while shakeT > 0
       const shk = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
@@ -3740,7 +3819,9 @@ export class WorldManager {
 
         // Drop shadow only for grounded objects — captured objects have the v10 §3
         // planted shadow at obj.shadowX/Y; drawing one here would rotate with the tumble.
-        if (!obj.captured) {
+        // Late-game pass: skipShadow drops the ellipse fill for props too small
+        // on screen for it to read (the biggest per-frame saving when zoomed out).
+        if (!obj.captured && !skipShadow) {
           // Prompt 19 Stage 4: shadow width scaled by sprite aspect ratio so
           // a wide car casts a wide shadow and a thin gnome casts a narrow one.
           // Prompt 20 Stage 2: for tall, narrow sprites (aspect < 0.8 — skyscrapers,
@@ -3821,7 +3902,10 @@ export class WorldManager {
       // Overnight fix ("hard to see the chat bubbles"): bubbles were sized in
       // WORLD units so they shrank with camera zoom. Now sized inversely to
       // the current zoom → constant, readable size on SCREEN at any form.
-      if (obj.bubbleText && obj.bubbleLife > 0) {
+      // Late-game pass: skip speech bubbles for NPCs that are small on screen
+      // (zoomed out at DEVOURER/WORLD ENDER) — the bubble is unreadable there
+      // and ctx.measureText per bubble was ~166ms/frame of the zoom-out cost.
+      if (obj.bubbleText && obj.bubbleLife > 0 && onHalfPx >= 9) {
         const lifeNorm = clamp(obj.bubbleLife / 4500, 0, 1);
         const alpha = lifeNorm > 0.88 ? (1 - lifeNorm) / 0.12 : lifeNorm < 0.18 ? lifeNorm / 0.18 : 1;
         ctx.save();

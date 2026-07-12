@@ -169,8 +169,12 @@ export class Player extends Void {
   get comboMult() { return 1 + Math.min(this.combo, 25) * 0.1; }
 
   private sizeSpeedFactor() {
+    // Late-game pass: the old formula SLOWED the void to 0.72× when huge, which
+    // — combined with the wide camera — made WORLD ENDER feel like crawling.
+    // Now big = fast: never below 1.0, up to 1.30 (above the bot 1.15 ceiling so
+    // you can chase down fleeing family). The camera zoom-in carries the rest.
     const grown = this.radius / CONFIG.PLAYER_BASE_RADIUS;
-    return clamp(1.05 - grown * 0.05, 0.72, 1.05);
+    return clamp(1.0 + (grown - 1) * 0.03, 1.0, 1.30);
   }
 
   setInput(dirX: number, dirY: number, mag: number) {

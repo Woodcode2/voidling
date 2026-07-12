@@ -264,7 +264,12 @@ let _viewCache: HTMLCanvasElement | null = null;
 let _vc = { x: 0, y: 0, w: 0, h: 0, zoom: 0, valid: false }; // cached world rect + zoom
 
 /** Invalidate the street-zoom view cache (called whenever bake data changes). */
-function _invalidateViewCache(): void { _vc.valid = false; }
+// Late-game pass: pre-downscaled ground mips, keyed by 0.05 zoom bucket. The
+// far zoom-out blit re-resampled the full 3600² buffer with high smoothing
+// every frame; now we resample ONCE per zoom bucket into a small canvas and
+// blit that with cheap smoothing. Cleared whenever the ground bake changes.
+const _groundMips = new Map<number, HTMLCanvasElement>();
+function _invalidateViewCache(): void { _vc.valid = false; _groundMips.clear(); }
 
 function _ensureViewCache(view: { x: number; y: number; w: number; h: number }, camZoom: number): void {
   const padX = view.w * VC_PAD_FRAC, padY = view.h * VC_PAD_FRAC;
@@ -319,12 +324,49 @@ export function drawVectorGround(
     ctx.restore();
   } else {
     const buf = _ensureGroundBuffer();
-    // Blit the cached static ground: one drawImage vs. ~1,600 ops/frame.
+    // Late-game pass: blit a per-zoom mip instead of high-resampling the full
+    // 3600² buffer every frame. Target pixel size = the map's on-screen extent
+    // (S × camZoom), so the mip is ~1:1 with what's drawn; when that would be
+    // as large as the source buffer (zoomed in), just blit the buffer directly.
+    const targetPx = Math.min(4096, Math.max(64, Math.ceil(S * camZoom)));
     const prevSmooth = ctx.imageSmoothingEnabled;
     const prevQual   = ctx.imageSmoothingQuality;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(buf, 0, 0, buf.width, buf.height, 0, 0, S, S);
+    // Late-game pass: blit ONLY the visible sub-rectangle of the ground, not the
+    // whole 12000×12000 map. The old full-map quad forced the renderer to
+    // transform/sample the entire island every frame even though a sliver is on
+    // screen — pure wasted fill on GPU and software alike. Clamp to the map so
+    // the source rect stays in-bounds; the cosmic backdrop covers any margin.
+    const vv = view ?? { x: 0, y: 0, w: S, h: S };
+    const vx = Math.max(0, vv.x), vy = Math.max(0, vv.y);
+    const vr = Math.min(S, vv.x + vv.w), vb = Math.min(S, vv.y + vv.h);
+    const vw = Math.max(0, vr - vx), vh = Math.max(0, vb - vy);
+    if (vw > 0 && vh > 0) {
+      if (targetPx >= buf.width * 0.95) {
+        // zoomed in enough that a mip wouldn't be smaller — sub-rect of buffer
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
+        const sc = buf.width / S;
+        ctx.drawImage(buf, vx * sc, vy * sc, vw * sc, vh * sc, vx, vy, vw, vh);
+      } else {
+        const bucket = Math.max(0.05, Math.round(camZoom / 0.05) * 0.05);
+        let mip = _groundMips.get(bucket);
+        if (!mip) {
+          const px = Math.min(4096, Math.max(64, Math.ceil(S * bucket)));
+          mip = document.createElement('canvas');
+          mip.width = mip.height = px;
+          const mc = mip.getContext('2d')!;
+          mc.imageSmoothingEnabled = true;
+          mc.imageSmoothingQuality = 'high'; // pay high quality ONCE per bucket
+          mc.drawImage(buf, 0, 0, buf.width, buf.height, 0, 0, px, px);
+          if (_groundMips.size > 8) _groundMips.delete(_groundMips.keys().next().value as number);
+          _groundMips.set(bucket, mip);
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'low'; // cheap per-frame blit of the small mip
+        const sc = mip.width / S;
+        ctx.drawImage(mip, vx * sc, vy * sc, vw * sc, vh * sc, vx, vy, vw, vh);
+      }
+    }
     ctx.imageSmoothingEnabled = prevSmooth;
     ctx.imageSmoothingQuality = prevQual;
   }

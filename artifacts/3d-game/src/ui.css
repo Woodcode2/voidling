@@ -1143,3 +1143,23 @@
   .vd-neb, .vd-shooting-star, .vd-title, .vd-hero-void, .vd-hero-void::after,
   .vd-hero-orbit, .vd-stack > * { animation: none !important; }
 }
+
+/* Late-game pass: one-line effect hint under the power button so the crushBig
+   forms ('eat things too big') are finally visible. Non-interactive, no layout
+   shift (it's fixed above the button). */
+.vd-power-hint {
+  position: fixed;
+  right: calc(6px + env(safe-area-inset-right));
+  bottom: calc(128px + env(safe-area-inset-bottom));
+  width: 122px;
+  z-index: 46;
+  pointer-events: none;
+  text-align: center;
+  font-family: Nunito, sans-serif;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #EDE6FF;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.85), 0 0 8px rgba(120,80,220,0.6);
+}
+@media (prefers-reduced-motion: reduce) { .vd-power-hint { transition: none; } }

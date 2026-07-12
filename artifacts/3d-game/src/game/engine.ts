@@ -102,7 +102,7 @@ export interface Snapshot {
   killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
   matchStartSeq: number; // Rebuild Prompt 10: increments once per real match start (drives the welcome/coaching intro)
-  power?: { name: string; ready: boolean; cdFrac: number; form: number; color: string }; // signature void power HUD state
+  power?: { name: string; verb: string; hint: string; ready: boolean; cdFrac: number; form: number; color: string }; // signature void power HUD state
 }
 
 export interface GameEngine {
@@ -169,12 +169,18 @@ const BOON_MAX_LEVEL = 2;
 // cd        = cooldown (ms); shake = screen-shake magnitude
 // Each form's signature power is a DISTINCT move (kind), not the same ring
 // rescaled. `kind` drives the behaviour + FX branch in usePower().
+// Late-game pass: each power now carries a verb (button label), a one-line hint
+// (what it actually does — the crushBig forms EAT things too big to swallow),
+// and a `reach` multiple of the void's own radius. The blast radius is the max
+// of the flat `consume` and radius×reach, so it always engulfs a meaningful
+// ring around the void even at WORLD ENDER (where a flat radius looked like
+// nothing against the huge body).
 const VOID_POWERS = [
-  { name: 'PULL',        kind: 'tug',         pull: 95,  pullRange: 360,  consume: 82,  crushBig: false, cd: 4500,  shake: 6,  color: '#9D78FF' },
-  { name: 'VORTEX',      kind: 'vortex',      pull: 140, pullRange: 520,  consume: 150, crushBig: false, cd: 5500,  shake: 10, color: '#B48CFF' },
-  { name: 'SHOCKWAVE',   kind: 'shockwave',   pull: 0,   pullRange: 0,    consume: 300, crushBig: false, cd: 6500,  shake: 16, color: '#D98CFF' },
-  { name: 'SINGULARITY', kind: 'singularity', pull: 300, pullRange: 900,  consume: 430, crushBig: true,  cd: 8000,  shake: 20, color: '#C9A0FF' },
-  { name: 'COLLAPSE',    kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: true,  cd: 10000, shake: 30, color: '#E4C4FF' },
+  { name: 'PULL',        verb: 'PULL',     hint: 'Yank snacks into your maw',        reach: 2.6, kind: 'tug',         pull: 95,  pullRange: 360,  consume: 82,  crushBig: false, cd: 4500,  shake: 6,  color: '#9D78FF' },
+  { name: 'VORTEX',      verb: 'VORTEX',   hint: 'Swirl everything nearby in',        reach: 3.2, kind: 'vortex',      pull: 140, pullRange: 520,  consume: 150, crushBig: false, cd: 5500,  shake: 10, color: '#B48CFF' },
+  { name: 'SHOCKWAVE',   verb: 'BLAST',    hint: 'Shove rivals, clear a huge ring',   reach: 4.2, kind: 'shockwave',   pull: 0,   pullRange: 0,    consume: 300, crushBig: false, cd: 6500,  shake: 16, color: '#D98CFF' },
+  { name: 'SINGULARITY', verb: 'CRUSH',    hint: 'Devour things too BIG to eat',      reach: 5.4, kind: 'singularity', pull: 300, pullRange: 900,  consume: 430, crushBig: true,  cd: 8000,  shake: 20, color: '#C9A0FF' },
+  { name: 'COLLAPSE',    verb: 'COLLAPSE', hint: 'Swallow the city — no size limit',  reach: 6.8, kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: true,  cd: 10000, shake: 30, color: '#E4C4FF' },
 ] as const;
 
 function skinById(id: string): SkinDef {
@@ -745,9 +751,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     haptics.power();
 
     // Reach scales with the void's own radius so it feels bigger as you grow.
+    // Late-game pass: floored by the old formula (early forms unchanged), but
+    // once the void is huge the radius×reach term dominates so the blast always
+    // engulfs a real ring around the body instead of looking like nothing.
+    // (240 stays a literal — do NOT tie it to MAX_RADIUS or retuning the cap
+    // would silently change every power.)
     const rScale = 1 + player.radius / 240;
-    const consumeR = p.consume * rScale;
-    const pullR = p.pullRange * rScale;
+    const consumeR = Math.max(p.consume * rScale, player.radius * p.reach);
+    const pullR = Math.max(p.pullRange * rScale, consumeR * 1.7);
     const px = player.x, py = player.y;
 
     const eaten = world.voidPowerBlast(player, pullR, consumeR, p.pull, p.crushBig, fx);
@@ -2072,9 +2083,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // NEW: fh / clamp(r*35.00, 350, fh*6)  →  Stage 1 zoom≈1.14, Stage 2 zoom≈0.54 (22% wider)
     // Overnight+: DEVOURER/WORLD ENDER pull the camera OUT (+15%/+32%) so the
     // top forms read as massive over the city instead of cramped in frame.
+    // Late-game pass: the old ladder pulled the camera OUT hardest at the top
+    // (37.7), making the void ~5% of screen height and quadrupling the visible
+    // object count (the root of the WORLD ENDER lag AND the "tiny/slow" feel).
+    // Now the top forms zoom IN — paired with MAX_RADIUS 240 so at r≈238 the
+    // view still covers ~13% of the map (perf parity) while the void reads as
+    // hole.io-massive and relative motion feels fast.
     const zoomMult = player.radius < 50 ? 35.0
-      : player.formIndex >= 4 ? 37.7
-      : player.formIndex >= 3 ? 32.9
+      : player.formIndex >= 4 ? 13.5
+      : player.formIndex >= 3 ? 18.0
       : 28.57;
     const viewHeight = clamp(player.radius * zoomMult, 350, fh * 6);
     const targetZoom = fh / viewHeight;
@@ -2121,7 +2138,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     for (const r of rivals) if (r.alive) drawActors.push({ footY: r.y + r.radius, draw: () => r.draw(ctx, clock, alpha) });
     const pl = player;
     if (pl) drawActors.push({ footY: pl.y + pl.radius, draw: () => pl.draw(ctx, clock, alpha) });
-    world.draw(ctx, clock, view, drawActors);
+    world.draw(ctx, clock, view, drawActors, camZoom, player ? { x: player.vx, y: player.vy } : undefined);
     events.draw(ctx, clock); // v6 §5: storm cloud + firetrucks (world space)
     // v13 §0: rival rim — green = you can eat them, red = they can eat you
     if (player && !player.ghost) {
@@ -3289,7 +3306,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       matchStartSeq, // Rebuild Prompt 10
       power: (player && screen === 'game') ? (() => {
         const idx = Math.min(player.formIndex, VOID_POWERS.length - 1);
-        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0 && countdown <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
+        return { name: VOID_POWERS[idx].name, verb: VOID_POWERS[idx].verb, hint: VOID_POWERS[idx].hint, ready: powerCd <= 0 && countdown <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
       })() : undefined,
     };
   }

@@ -77,7 +77,7 @@ const STYLES: Style[] = [
 // per unit distance from camera centre. LIFT ≈ 1 gives hole.io's strong
 // camera tilt: facades read at full height, roofs stay foreshortened slabs
 // (parcel depth in the top-down map IS the apparent, foreshortened depth).
-const LIFT = 1.0;
+export const LIFT = 1.0;   // exported: world.ts cull uses it for the up-extent
 const LEAN = 0.0003;
 
 // Consistent sun: every building casts a crisp SE shadow scaled by height.
@@ -432,6 +432,11 @@ export function makeCivicSpec(kind: ObjectKind, size: number, seed: number): Bui
  * Per-frame extruded draw. ctx must be in WORLD space (no translate applied
  * for this object). (bx, by) is the building centre, (cx, cy) the camera.
  */
+/** Roof color for a building's style — used by the far-LOD dot draw. */
+export function buildingRoofColor(spec: BuildingSpec): string {
+  return STYLES[spec.style % STYLES.length].roof;
+}
+
 export function drawBuilding3D(
   ctx: CanvasRenderingContext2D,
   spec: BuildingSpec,

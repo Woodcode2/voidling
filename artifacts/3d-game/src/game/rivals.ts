@@ -117,16 +117,22 @@ export class Rival extends Void {
 
     this.tickMorph(dt);     // v9 §3: advance the body-morph crossfade
     this.tickCaptures(dt);  // v15 §0: drain the deferred-absorb orbit queue
-    // v16.2 §0: bot radius cap — never more than player × 1.25; absorbs beyond still score them
-    if (view.playerRadius > 0 && this.radius > view.playerRadius * CONFIG.BOT_RADIUS_CAP_FRAC) {
-      this.radius = view.playerRadius * CONFIG.BOT_RADIUS_CAP_FRAC;
+    // Late-game pass: bot radius cap RAMPS with player size (config comment).
+    // Below RAMP_LO bots may be 1.55× you (full danger); by RAMP_HI they're
+    // capped at 0.75× so your family becomes edible at the top.
+    if (view.playerRadius > 0) {
+      const capT = clamp((view.playerRadius - CONFIG.BOT_CAP_RAMP_LO) / (CONFIG.BOT_CAP_RAMP_HI - CONFIG.BOT_CAP_RAMP_LO), 0, 1);
+      const frac = CONFIG.BOT_CAP_FRAC_MAX + (CONFIG.BOT_CAP_FRAC_MIN - CONFIG.BOT_CAP_FRAC_MAX) * capT;
+      if (this.radius > view.playerRadius * frac) this.radius = view.playerRadius * frac;
     }
     const intent = airborne ? { dirX: 0, dirY: 0, mag: 0 } : this.controller.think(this, view, dt);
     this.setInput(intent.dirX, intent.dirY, intent.mag);
 
     const dtSec = dt / 1000;
     const grown = this.radius / CONFIG.PLAYER_BASE_RADIUS;
-    const sizeFactor = clamp(1.05 - grown * 0.05, 0.7, 1.05);
+    // Late-game pass: big=fast (no penalty), ceiling 1.15 — BELOW the player's
+    // 1.30 so a WORLD ENDER can run down fleeing family.
+    const sizeFactor = clamp(1.0 + (grown - 1) * 0.03, 1.0, 1.15);
     // v6 §2/§3: form speed bonus (+8% each, stacking) + underdog boost
     const formSpeed = 1 + this.formIndex * CONFIG.FORM_SPEED_BONUS;
     const maxSpeed = CONFIG.MOVE_MAX_SPEED * this.speedScale * sizeFactor * 0.95 * formSpeed * this.underdogSpeed * this.eventSlow;
