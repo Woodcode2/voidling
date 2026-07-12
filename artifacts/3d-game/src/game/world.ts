@@ -105,6 +105,11 @@ type BlockType = 'residential' | 'cozy' | 'fancy' | 'park' | 'plaza' | 'playgrou
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
 interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; bldg?: BuildingSpec; }
 
+// Final pass (mover audit): the rotate-to-face-travel gate matched only the OLD
+// clay_* sprite keys — after the de-clay migration every vehicle resolved to a
+// p3d_*/p3d2_* key and the whole fleet drove SIDEWAYS. One regex, both gates.
+const VEHICLE_SPRITE_RE = /^(clay_(vehicle|airport|military)|p3d_(taxi|veh_|firetruck|schoolbus|police|ambulance)|p3d2_(tank|heli|jeep|humvee|missile_truck|radar_van))/;
+
 // Final de-clay: every clay cutout with a procedural twin redirects to it —
 // one table catches every placement path (kind cases, scenery keys, pools).
 const SPRITE_REDIRECT: Record<string, string> = {
@@ -1964,7 +1969,10 @@ export class WorldManager {
         const cx = padX0 + 50 + rand() * (padS - 100);
         const cy = padY0 + 50 + rand() * (padS - 100);
         if (!isOnIsland(cx, cy)) continue;
-        this.makeObj(kind, cx, cy);
+        const u = this.makeObj(kind, cx, cy);
+        // Final pass (mover audit): staged units are decorative — without this
+        // they fell into the pedestrian wander path and "walked" off the pad.
+        if (kind !== 'soldier') u.living = false;
         placed = true;
       }
     }
@@ -2089,7 +2097,9 @@ export class WorldManager {
       const o = this.makeObj(trafficKind, x, y);
       o.roadAxis = horizontal ? 'h' : 'v';
       o.homeX = center + lane; o.homeY = center + lane;
-      o.roadDir = rand() < 0.5 ? 1 : -1;
+      // Final pass (mover audit): right-hand traffic — direction follows the
+      // lane side so same-lane cars never drive head-on into each other.
+      o.roadDir = (horizontal ? (lane > 0 ? -1 : 1) : (lane > 0 ? 1 : -1));
       return;
     }
   }
@@ -2136,7 +2146,8 @@ export class WorldManager {
       const o = this.makeObj('schoolbus', x, y);
       o.roadAxis = horizontal ? 'h' : 'v';
       o.homeX = center + lane; o.homeY = center + lane;
-      o.roadDir = rand() < 0.5 ? 1 : -1;
+      // Final pass (mover audit): right-hand traffic (matches spawnCar)
+      o.roadDir = (horizontal ? (lane > 0 ? -1 : 1) : (lane > 0 ? 1 : -1));
       return;
     }
   }
@@ -3701,10 +3712,7 @@ export class WorldManager {
         // things MEANT to move — people, animals, and vehicles are all LIVING_KINDS.
         // Buildings, houses, and scenery (living === false) must hold perfectly still.
         // Prompt 19 Stage 3: vehicles never tilt — only people/animals get body-language.
-        const isVehicleSprite = spriteKey &&
-          (spriteKey.startsWith('clay_vehicle') ||
-           spriteKey.startsWith('clay_airport') ||
-           spriteKey.startsWith('clay_military'));
+        const isVehicleSprite = spriteKey && VEHICLE_SPRITE_RE.test(spriteKey);
         if (!isVehicleSprite) {
           const tilt = obj.fleeing ? Math.sin(obj.wobble * 3) * 0.16 : Math.sin(obj.wobble) * 0.04;
           // Alive Pack §11: vacuum wobble — dragged objects wobble in the pull direction
@@ -3763,12 +3771,7 @@ export class WorldManager {
 
         if (obj.captured) {
           ctx.drawImage(objSprite, sx, sy, sw, sh, -r, -r, r * 2, r * 2);
-        } else if (
-          spriteKey &&
-          (spriteKey.startsWith('clay_vehicle') ||
-           spriteKey.startsWith('clay_airport') ||
-           spriteKey.startsWith('clay_military'))
-        ) {
+        } else if (spriteKey && VEHICLE_SPRITE_RE.test(spriteKey)) {
           // Prompt 14 §4 + Prompt 16: rotate vehicle-style sprites to face direction of travel.
           // Sheet art faces UP (not east), so +π/2 offset is needed.
           // Pivot is at foot centre (no pre-translate) — vehicle sits flat on the ground.

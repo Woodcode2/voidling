@@ -763,9 +763,23 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // ─ 5.8. Structural Build: mountain ridge along the east rim ────────────────
   _paintMountainRidge(cc);
 
-  // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
+  // ─ 6. Island rim: cosmic halo + cliff band + white sticker ────────────────
+  // Edge-quality pass: the island floats in REAL space now — a wide violet
+  // energy halo bleeds outward under the cliff bands so the edge reads like a
+  // floating world, not a paper cutout on a flat backdrop.
   cc.save();
   tracIslandPath(cc);
+  cc.lineJoin = 'round';
+  // Far cosmic halo (soft, wide)
+  cc.strokeStyle = '#7B4FE0';
+  cc.lineWidth   = 380;
+  cc.globalAlpha = 0.20;
+  cc.stroke();
+  // Near halo (brighter)
+  cc.strokeStyle = '#A87BFF';
+  cc.lineWidth   = 210;
+  cc.globalAlpha = 0.26;
+  cc.stroke();
   // Outer cliff glow
   cc.strokeStyle = COL.cliff;
   cc.lineWidth   = 200;
@@ -780,7 +794,16 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.strokeStyle = COL.rimWhite;
   cc.lineWidth   = 60;
   cc.globalAlpha = 0.92;
-  cc.lineJoin = 'round';
+  cc.stroke();
+  cc.restore();
+  // Inner edge shade — grounds the rim with soft depth just inside the coast
+  cc.save();
+  tracIslandPath(cc);
+  cc.clip();
+  tracIslandPath(cc);
+  cc.strokeStyle = '#2E2140';
+  cc.lineWidth   = 150;
+  cc.globalAlpha = 0.14;
   cc.stroke();
   cc.restore();
 

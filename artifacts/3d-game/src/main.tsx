@@ -2,6 +2,15 @@ import { createRoot } from 'react-dom/client';
 
 import App from './App';
 
+// Final pass (investor audit): brand fonts BUNDLED — the Google Fonts CDN link
+// silently failed in the packaged iOS shell / offline, dropping the whole type
+// identity to system sans-serif.
+import '@fontsource/fredoka/400.css';
+import '@fontsource/fredoka/600.css';
+import '@fontsource/fredoka/700.css';
+import '@fontsource/nunito/400.css';
+import '@fontsource/nunito/600.css';
+import '@fontsource/nunito/700.css';
 import './index.css';
 import './ui.css';
 

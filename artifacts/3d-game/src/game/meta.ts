@@ -110,7 +110,9 @@ export const meta = {
   },
 
   save() {
-    localStorage.setItem('voidling_meta_v1', JSON.stringify(this.data));
+    try {
+      localStorage.setItem('voidling_meta_v1', JSON.stringify(this.data));
+    } catch { /* storage unavailable (private mode / quota) — play session-only */ }
   },
 
   addCoins(amount: number) {
@@ -209,7 +211,7 @@ export const meta = {
   },
 
   /** Current rank from lifetime stars. */
-  rank(): { name: string; tier: number; next: number | null } {
+  rank(): { name: string; tier: number; next: number | null; nextName: string | null } {
     const LADDER: [string, number][] = [
       ['BRONZE', 0], ['SILVER', 60], ['GOLD', 160],
       ['DIAMOND', 320], ['PLATINUM', 560], ['MASTER', 900],
@@ -220,6 +222,7 @@ export const meta = {
       name: LADDER[tier][0],
       tier,
       next: tier + 1 < LADDER.length ? LADDER[tier + 1][1] : null,
+      nextName: tier + 1 < LADDER.length ? LADDER[tier + 1][0] : null,
     };
   },
 

@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v30 · pop';
+const BUILD_STAMP = 'v31 · final pass';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -255,7 +255,7 @@ const TROPHY_DEFS = [
   { id: 'score_1000',        icon: '🌟', name: 'Rising Star',     desc: 'Score 1,000 in a round.' },
   { id: 'score_5000',        icon: '💫', name: 'Superstar',       desc: 'Score 5,000 in a round.' },
   { id: 'score_10000',       icon: '🏆', name: 'Legend',          desc: 'Score 10,000 in a round.' },
-  { id: 'form_bite',         icon: '😋', name: 'First Bite',      desc: 'Evolve past NIBBLE.' },
+  { id: 'form_bite',         icon: '😋', name: 'First Bite',      desc: 'Reach the MUNCHER form.' },
   { id: 'form_devourer',     icon: '🦷', name: 'Devourer',        desc: 'Reach the DEVOURER form.' },
   { id: 'form_world_ender',  icon: '🌌', name: 'World Ender',     desc: 'Reach the WORLD ENDER form.' },
   { id: 'devoured_50pct',    icon: '🗺️', name: 'Half the Town',   desc: 'Devour 50% of the world.' },
@@ -328,6 +328,9 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
         <div className="vd-namepill" style={{ marginTop: 6, fontSize: '0.82rem' }}>
           <span style={{ color: '#FFD23F', fontWeight: 800 }}>★ {snap.stars}</span>
           <span style={{ marginLeft: 8, letterSpacing: '0.12em', color: '#CFC6FF', fontWeight: 800 }}>{snap.rankName}</span>
+          {snap.rankNext && (
+            <span style={{ marginLeft: 8, opacity: 0.65, fontSize: '0.85em' }}>· {snap.rankNext.need} ★ to {snap.rankNext.name}</span>
+          )}
         </div>
         {snap.highScore > 0 && (
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
@@ -852,6 +855,8 @@ function MatchIntro({ visible }: { visible: boolean }) {
 }
 
 function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
+  // Final pass (investor audit): QUIT ROUND forfeits the whole match — two-tap confirm.
+  const [quitArmed, setQuitArmed] = useState(false);
   return (
     <div className="vd-game-ui">
       {/* pause + sound pills, top-right */}
@@ -914,7 +919,13 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
             <button className="vd-btn vd-btn--secondary" onClick={() => engine.toggleSfx()}>
               {snap.sfxOn ? 'SFX: ON' : 'SFX: OFF'}
             </button>
-            <button className="vd-btn vd-btn--ghost" onClick={() => engine.goHome()}>QUIT ROUND</button>
+            <button
+              className="vd-btn vd-btn--ghost"
+              style={quitArmed ? { color: '#FF4D6D' } : undefined}
+              onClick={() => { if (quitArmed) { setQuitArmed(false); engine.goHome(); } else setQuitArmed(true); }}
+            >
+              {quitArmed ? 'TAP AGAIN — forfeits coins & stars' : 'QUIT ROUND'}
+            </button>
           </div>
         </div>
       )}

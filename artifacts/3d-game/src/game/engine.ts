@@ -7,6 +7,7 @@ import { Void, setRoundElapsed } from './void';
 import { makeRivals, type Rival, type WorldView } from './rivals';
 import { meta } from './meta';
 import { track } from './services';
+import { haptics } from './haptics';
 import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
@@ -72,6 +73,7 @@ export interface Snapshot {
   coins: number;
   stars: number;        // Retention: lifetime placement stars
   rankName: string;     // Retention: current rank name
+  rankNext: { name: string; need: number } | null; // Final pass: next rank goalpost
   highScore: number;
   streak: number;
   equippedSkin: string;
@@ -489,6 +491,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.y = player.prevY = 3435;
       console.log('[debug] teleported to downtown core');
     }
+    // Dev-only: minus teleports to the west coast (island edge / space QA).
+    if (debugForms && player && e.code === 'Minus') {
+      player.x = player.prevX = 900;
+      player.y = player.prevY = 6000;
+      console.log('[debug] teleported to west coast');
+    }
     // Dev-only: 6 simulates being devoured (knockout overlay + revenge bounty QA).
     if (debugForms && player && e.code === 'Digit6') {
       const r = rivals.find((v) => v.alive);
@@ -500,7 +508,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         fx.shake(360, 16); fx.flash();
         audio.playEaten();
         respawnPlayerAfterEaten(r.x, r.y, 900);
-        knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
+        haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
         revengeName = r.name; revengeUntil = roundElapsed + 20000;
         console.log(`[debug] simulated knockout by ${r.name}`);
       }
@@ -716,6 +724,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (powerCd > 0) return;
     const p = VOID_POWERS[Math.min(player.formIndex, VOID_POWERS.length - 1)];
     powerCd = p.cd;
+    haptics.power();
 
     // Reach scales with the void's own radius so it feels bigger as you grow.
     const rScale = 1 + player.radius / 240;
@@ -905,8 +914,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // plus contract/secret payouts accrued in coinBonus. First crowned win of
     // the day DOUBLES the payout; first match of the day adds a bite bonus.
     const perfPay = Math.min(60, Math.floor(player.score / 120));
-    const raw = 50 + perfPay + (crown ? 25 : 0) + evoCoinBonus + coinBonus;
-    let coins = Math.min(150, Math.floor(raw * coinMult));
+    // Final pass (investor audit): the flat 150 cap silently VOIDED contract
+    // banners ("+12c CONTRACT!") on good runs — base pay is capped at 150,
+    // contract/secret payouts now always land on top (themselves capped at 60).
+    const raw = 50 + perfPay + (crown ? 25 : 0) + evoCoinBonus;
+    let coins = Math.min(150, Math.floor(raw * coinMult)) + Math.min(60, coinBonus);
     const firstWin = crown && meta.isFirstWinOfDay();
     if (firstWin) coins *= 2;
     const dailyBite = meta.isFirstPlayOfDay() ? 25 : 0;
@@ -956,8 +968,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // Retention (hole.io ladder): placement stars + trophy bounties.
     // SOLO RUN grades on % devoured instead of placement.
+    // Final pass (investor audit): solo has no opponents — halve its star
+    // payout so the ranked ladder can't be farmed in an uncontested mode.
     const soloStars = isSolo
-      ? (devoured >= 35 ? 20 : devoured >= 20 ? 10 : devoured >= 10 ? 5 : devoured >= 5 ? 2 : 1)
+      ? (devoured >= 35 ? 8 : devoured >= 20 ? 5 : devoured >= 10 ? 2 : 1)
       : 0;
     const starsGained = isSolo ? (meta.data.stars += soloStars, meta.save(), soloStars) : meta.addStars(placement);
     const trophyHaul = meta.drainRecentTrophies();
@@ -1025,6 +1039,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   // v6 §3: the transformation moment — slow-mo, shockwave, title card, fanfare
   function triggerEvolution(x: number, y: number, form: number, name: string) {
+    haptics.evolve();
     slowmo = CONFIG.EVO_SLOWMO_MS;
     fx.flash();
     fx.shake(500, 14, [30, 40, 60]);
@@ -1602,6 +1617,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         }
       } else if (ev.type === 'chomp') {
         audio.playChomp(ev.tier || 1);
+        haptics.eat();
         if (ev.kind) audio.playSignature(ev.kind);
         // v10 §3: T4+ objects land with a deep 2px camera punch
         if ((ev.tier || 0) >= 4) fx.shake(80, 2, 0);
@@ -1895,7 +1911,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               killedBy = r.name;
               respawnPlayerAfterEaten(r.x, r.y, minDist);
               fx.addRing(player.x, player.y, '#FF6B6B', 0, pr * 3, 8, 700);
-              knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
+              haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
               revengeName = r.name; revengeUntil = roundElapsed + 20000;
               queueTicker(`💀 ${r.name} swallowed the void whole! It's... reforming?!`);
             } else {
@@ -1909,7 +1925,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               r.eatVoid(pr);
               respawnPlayerAfterEaten(r.x, r.y, minDist);
               fx.addRing(eatenAtX, eatenAtY, '#FF6B6B', 0, pr * 3, 8, 700);
-              knockout = { t: 0, total: 2600, by: r.name, note: `↓ Dropped to ${player.formName}` };
+              haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: `↓ Dropped to ${player.formName}` };
               revengeName = r.name; revengeUntil = roundElapsed + 20000;
             }
           }
@@ -1956,6 +1972,58 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
 
   // ── render ──
+  // Space-quality pass: the void floats in REAL space now — deep nebula
+  // gradient + four color clouds + ~170 deterministic stars, baked once per
+  // canvas size into an offscreen buffer (zero per-frame cost beyond a blit).
+  let spaceBuf: HTMLCanvasElement | null = null;
+  function drawSpaceBackdrop() {
+    const pw = Math.round(fw * dpr), ph = Math.round(fh * dpr);
+    if (!spaceBuf || spaceBuf.width !== pw || spaceBuf.height !== ph) {
+      spaceBuf = document.createElement('canvas');
+      spaceBuf.width = pw; spaceBuf.height = ph;
+      const c = spaceBuf.getContext('2d')!;
+      const g = c.createRadialGradient(pw * 0.5, ph * 0.42, Math.min(pw, ph) * 0.12, pw * 0.5, ph * 0.5, Math.max(pw, ph) * 0.78);
+      g.addColorStop(0, '#241549');
+      g.addColorStop(0.55, '#150B31');
+      g.addColorStop(1, '#090520');
+      c.fillStyle = g;
+      c.fillRect(0, 0, pw, ph);
+      const blobs: [number, number, string, number][] = [
+        [0.20, 0.22, '#6D3FB8', 0.15], [0.80, 0.15, '#B84FA8', 0.10],
+        [0.72, 0.82, '#3F5FB8', 0.10], [0.15, 0.80, '#8C4FD8', 0.11],
+      ];
+      for (const [bx, by, col, a] of blobs) {
+        const r = Math.max(pw, ph) * 0.36;
+        const bg = c.createRadialGradient(pw * bx, ph * by, 0, pw * bx, ph * by, r);
+        bg.addColorStop(0, col);
+        bg.addColorStop(1, 'rgba(10,6,32,0)');
+        c.globalAlpha = a;
+        c.fillStyle = bg;
+        c.fillRect(0, 0, pw, ph);
+      }
+      c.globalAlpha = 1;
+      // deterministic starfield (golden-angle scatter — no clumping, no RNG)
+      for (let i = 0; i < 170; i++) {
+        const sx = ((i * 137.508) % 97) / 97 * pw;
+        const sy = ((i * 61.803) % 89) / 89 * ph;
+        const big = i % 11 === 0;
+        const rr = (big ? 1.7 : 0.9) * dpr * (0.7 + ((i * 7) % 5) * 0.15);
+        c.globalAlpha = 0.25 + ((i * 13) % 7) * 0.09;
+        c.fillStyle = i % 5 === 0 ? '#FFE9A8' : i % 3 === 0 ? '#CFC6FF' : '#FFFFFF';
+        c.beginPath(); c.arc(sx, sy, rr, 0, Math.PI * 2); c.fill();
+        if (big) {
+          c.globalAlpha *= 0.45;
+          c.beginPath(); c.arc(sx, sy, rr * 2.6, 0, Math.PI * 2); c.fill();
+        }
+      }
+      c.globalAlpha = 1;
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(spaceBuf, 0, 0);
+    ctx.restore();
+  }
+
   function render(alpha: number, clock: number, frameDt: number) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -2003,9 +2071,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const viewW = fw / camZoom, viewH = fh / camZoom;
     const view = { x: camCX - viewW / 2, y: camCY - viewH / 2, w: viewW, h: viewH };
 
-    // background outside the map
-    ctx.fillStyle = CONFIG.COLORS.uiBg;
-    ctx.fillRect(0, 0, fw, fh);
+    // background outside the map — cached cosmic backdrop (nebulae + stars)
+    // instead of the old flat fill. Rebuilt only on resize; one blit per frame.
+    drawSpaceBackdrop();
 
     // ── world transform: ground → objects (y-sorted) → voidlings → fx ──
     ctx.save();
@@ -3146,10 +3214,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (document.hidden) {
       cancelAnimationFrame(raf);
       raf = 0;
+      // Final pass (investor audit): music kept playing over a frozen game —
+      // the interval-driven schedulers don't stop with the rAF loop.
+      audio.pauseMusic();
     } else if (!raf) {
       resetClock();
       raf = requestAnimationFrame(frame);
       audio.init(); // resume AudioContext after tab returns to foreground
+      if (screen === 'game' && !paused) audio.resumeMusic();
     }
   }
   document.addEventListener('visibilitychange', onVisibility);
@@ -3170,6 +3242,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       coins: meta.data.coins,
       stars: meta.data.stars,
       rankName: meta.rank().name,
+      rankNext: (() => { const rk = meta.rank(); return rk.next != null ? { name: rk.nextName!, need: Math.max(0, rk.next - meta.data.stars) } : null; })(),
       highScore: meta.data.highScore,
       streak: meta.data.streak,
       equippedSkin: meta.data.equippedSkin,
@@ -3193,7 +3266,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       matchStartSeq, // Rebuild Prompt 10
       power: (player && screen === 'game') ? (() => {
         const idx = Math.min(player.formIndex, VOID_POWERS.length - 1);
-        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
+        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0 && countdown <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
       })() : undefined,
     };
   }

@@ -621,8 +621,8 @@ export const CONFIG = {
     { id: 'dense',     name: 'DENSE CORE',     desc: 'Immune to knockback and artillery stagger' },
   ] as BoonDef[],
 
-  // Death Rules Pivot (Rebuild Prompt 11): the four powers (EVENT HORIZON, WORMHOLE,
-  // TIME WARP, SINGULARITY) have been removed entirely — pure eat-and-react loop.
+  // Signature VOID POWERS (PULL -> COLLAPSE) live in engine.ts VOID_POWERS —
+  // one per form, cooldown-gated. (The old timed pickup powers were removed.)
 
   // v7 §5: synergies — auto-trigger when BOTH members are active at once.
   SYNERGIES: [
