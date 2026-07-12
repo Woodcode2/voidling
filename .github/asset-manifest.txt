@@ -1,5 +1,5 @@
-artifacts/3d-game/store/candidates
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114151_f75e4eda-86cc-4975-b96b-ff715ba49cda.png
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114152_0d973ba8-f2e8-4f39-8fa3-38ddc2fbf8d0.png
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114152_ac4bf32b-937d-4d5a-b578-867d8f1c26df.png
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_114152_1f56608d-3871-449d-b502-729574404d66.png
+artifacts/3d-game/store/candidates-v3
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_449c7ad5-0df2-4f17-9d02-5459f0ba8f2e.png
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_3bbad8f3-36c4-41cf-b147-d2abfcee8712.png
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_3c2acb18-8ea0-403c-a652-e37988d7419b.png
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_5dd1fecc-9d00-4602-8e17-be2f588adf4e.png
