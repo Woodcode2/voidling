@@ -308,23 +308,30 @@ export class Rival extends Void {
     ctx.restore();
   }
 
-  /** Speech bubble — arrival bark + ongoing family banter (fades in the last 500ms). */
+  /** Speech bubble — arrival bark + ongoing family banter (fades in the last 500ms).
+   *  Sized inversely to camera zoom so it reads at constant SCREEN size. */
   private drawBark(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
     const fade = clamp(this.bubbleT / 500, 0, 1);
     ctx.save();
     ctx.globalAlpha = fade;
-    ctx.font = '700 13px Nunito, sans-serif';
+    const zm = ctx.getTransform().a / Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
+    const fs = clamp(15 / Math.max(0.2, zm), 13, 34);
+    ctx.font = `800 ${fs.toFixed(1)}px Nunito, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const w = ctx.measureText(this.bubbleText).width + 20;
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    roundRect(ctx, cx - w / 2, cy - 12, w, 24, 12);
+    const w = ctx.measureText(this.bubbleText).width + fs * 1.4;
+    const h = fs * 1.8;
+    ctx.fillStyle = 'rgba(255,255,255,0.97)';
+    ctx.strokeStyle = 'rgba(26,16,64,0.30)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, cx - w / 2, cy - h / 2, w, h, h * 0.45);
     ctx.fill();
+    ctx.stroke();
     // little tail
     ctx.beginPath();
-    ctx.moveTo(cx - 5, cy + 11);
-    ctx.lineTo(cx + 5, cy + 11);
-    ctx.lineTo(cx, cy + 19);
+    ctx.moveTo(cx - fs * 0.35, cy + h / 2 - 1);
+    ctx.lineTo(cx + fs * 0.35, cy + h / 2 - 1);
+    ctx.lineTo(cx, cy + h / 2 + fs * 0.55);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = '#2A1445';

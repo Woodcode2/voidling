@@ -527,6 +527,20 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   const form = v.form || 0;
   const swirl = t * 0.00005; // 0.05 rad/s slow rotation (t is ms clock)
 
+  // Universal ground-contrast (user: "hard to see in some areas"): a dark
+  // pit-AO ring makes the void pop on light ground, and the luminous rim
+  // stroke below handles dark ground — readable on any surface.
+  {
+    const ao = ctx.createRadialGradient(0, 0, r * 0.92, 0, 0, r * 1.36);
+    ao.addColorStop(0, 'rgba(14,8,34,0.44)');
+    ao.addColorStop(0.5, 'rgba(14,8,34,0.16)');
+    ao.addColorStop(1, 'rgba(14,8,34,0)');
+    ctx.fillStyle = ao;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.36, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // ── Gradient fill, clipped to the orb circle ──────────────────────────────
   ctx.save();
   ctx.beginPath();
@@ -592,10 +606,11 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
 
-  // High forms gain a luminous event-horizon rim-light so the silhouette reads
-  // as a glowing cosmic body rather than a dark hole.
-  if (form >= 3) {
-    ctx.strokeStyle = hexA(_STAGE_BODY[Math.min(form, 4)][2], form >= 4 ? 0.85 : 0.5);
+  // Luminous event-horizon rim-light at EVERY form (stronger as you evolve) —
+  // paired with the pit-AO ring above, the silhouette reads on any ground.
+  {
+    const rimA = form >= 4 ? 0.85 : form >= 3 ? 0.55 : 0.38;
+    ctx.strokeStyle = hexA(_STAGE_BODY[Math.min(form, 4)][2], rimA);
     ctx.lineWidth = Math.max(1.5, r * 0.03);
     ctx.beginPath();
     ctx.arc(0, 0, r * 0.985, 0, Math.PI * 2);

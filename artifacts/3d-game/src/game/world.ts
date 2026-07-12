@@ -104,6 +104,43 @@ export interface PlayerStats {
 type BlockType = 'residential' | 'cozy' | 'fancy' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic' | 'forest' | 'airport' | 'military';
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
 interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; bldg?: BuildingSpec; }
+
+// Overnight: per-biome ambient chatter — each biome SOUNDS like its own place.
+type Biome = 'downtown' | 'beach' | 'forest' | 'park' | 'suburb' | 'zoo' | 'other';
+const AMBIENT_BY_BIOME: Record<Biome, string[]> = {
+  downtown: ['this commute is BRUTAL', 'coffee first. apocalypse later.', 'rent here is criminal',
+    'late for a meeting I hate', 'great, road work AGAIN', 'the pigeons own this town',
+    'my startup will fix this', 'anyone else hear rumbling?'],
+  beach: ['sunscreen me. NOW.', "tide's perfect today", 'sandcastle of my DREAMS',
+    'volleyball later?', 'crab looked at me funny', 'lost my flip flop again',
+    '5 more minutes of sun', 'the cooler stays with ME'],
+  forest: ["s'mores tonight!!", '10,000 steps babyyy', 'that birdsong tho',
+    'pine smells like FREEDOM', 'bear spray? check.', 'trail mix is 90% chocolate',
+    'nature is healing', 'is this poison ivy??'],
+  park: ['picnic weather!!', 'duck stole my sandwich', 'frisbee anyone?',
+    'grass so soft here', "kite's really cooking today", 'best pond in town',
+    'dog watching > everything'],
+  suburb: ["lawn's looking GREAT", 'book club at 6!!', 'smell that? barbecue.',
+    'new gnome day!!', 'property values RISING', 'did you see the HOA email?',
+    'sprinklers at dawn. bliss.', 'my hedge. my rules.'],
+  zoo: ['the penguins!! LOOK!!', 'monkey waved at me!!', 'churros + zebras = day made',
+    'do NOT tap the glass', 'flamingos are so extra', 'gift shop first, animals second'],
+  other: ['nice day out!', 'lovely weather!', 'what a town, huh?', 'good vibes today'],
+};
+const PANIC_BY_BIOME: Record<Biome, string[]> = {
+  downtown: ['MY STARTUP!!', 'the espresso machine!!', 'not my parking spot!!',
+    "I KNEW I should've WFH!!", 'taxi. TAXI!!', 'the quarterly report!!!'],
+  beach: ['NOT THE BEACH!', 'my flip flops!!', 'abandon towel!!',
+    'the cooler!! SAVE THE COOLER!!', 'sharks were fine, but THIS?!'],
+  forest: ['BEAR!! no— WORSE!!', 'my tent!!', 'leave the marshmallows!!',
+    'RUN, DALE!!', 'nature is CANCELLED'],
+  park: ['MY PICNIC!!', 'protect the ducks!!', "frisbee's GONE!!", 'not the flowers!!'],
+  suburb: ['MY LAWN!', 'my petunias!!', 'not my emotional support gnome!!',
+    'the HOA will hear about this!!', 'my mortgage!!!', "I just waxed that car!"],
+  zoo: ['the animals!! FREE THEM!!', 'zebra, RUN!!', 'not the gift shop!!', 'WHO OPENED THE PENS?!'],
+  other: ['RUN!!', 'WHAT IS THAT?!', 'HELP!!', 'nope nope nope nope', '5 stars. very scary.',
+    "tell my wife I love h—", 'I KNEW this town was cursed!!'],
+};
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; rot: number; drawScale: number; }
 // Feedback Juice §1: cosmetic "swallow ghost" — a copy of an eaten structure's
@@ -322,7 +359,7 @@ function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
 }
 
 const LIVING_KINDS: ObjectKind[] = [
-  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'train', 'mower', 'crab',
+  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'train', 'crab',
   'monkey', 'flamingo', 'penguin', 'zookeeper',
   // War Pack §1: new pedestrian kinds + defense/traffic vehicles
   'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
@@ -361,6 +398,7 @@ export class WorldManager {
     'house', 'house_c', 'house_d', 'shop', 'cafe', 'office', 'skyscraper',
     'school', 'library', 'hospital', 'townhall',
   ]); // hole.io rebuild: structure kinds that always render as extruded boxes
+  private chatterCd = 4000;         // Overnight: biome ambient-chatter timer
   houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
@@ -956,14 +994,24 @@ export class WorldManager {
     return { x: b.x0 + inset + rand() * s, y: b.y0 + inset + rand() * s };
   }
 
+  /** Overnight fix ("trees on top of houses"): true when (x,y) keeps `pad`
+   *  clearance from every placed structure lot. Scatters retry on failure. */
+  private clearOfLots(x: number, y: number, pad = 26): boolean {
+    for (const l of this.structureLots) {
+      const md = l.fpR + pad;
+      if ((l.x - x) ** 2 + (l.y - y) ** 2 < md * md) return false;
+    }
+    return true;
+  }
+
   private scatter(b: Block, rand: () => number, kind: ObjectKind, n: number, avoidX?: number, avoidY?: number) {
     for (let i = 0; i < n; i++) {
       // Alive Pack §A: try up to 5 times to land on the island (covers water + cliff rim)
       let p = this.pointInBlock(b, rand);
-      for (let attempt = 0; attempt < 4 && !isOnIsland(p.x, p.y); attempt++) {
+      for (let attempt = 0; attempt < 7 && (!isOnIsland(p.x, p.y) || !this.clearOfLots(p.x, p.y)); attempt++) {
         p = this.pointInBlock(b, rand);
       }
-      if (!isOnIsland(p.x, p.y)) continue; // still off-island — skip this item
+      if (!isOnIsland(p.x, p.y) || !this.clearOfLots(p.x, p.y)) continue; // no clean spot — skip
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const o = this.makeObj(kind, p.x, p.y);
       if (kind === 'person' || (kind as string).startsWith('person_')) { o.tether = 90; }
@@ -1003,10 +1051,10 @@ export class WorldManager {
     for (let i = 0; i < n; i++) {
       // Alive Pack §A: retry until on-island (covers water + cliff rim)
       let p = this.pointInBlock(b, rand);
-      for (let attempt = 0; attempt < 4 && !isOnIsland(p.x, p.y); attempt++) {
+      for (let attempt = 0; attempt < 7 && (!isOnIsland(p.x, p.y) || !this.clearOfLots(p.x, p.y)); attempt++) {
         p = this.pointInBlock(b, rand);
       }
-      if (!isOnIsland(p.x, p.y)) continue; // still off-island — skip
+      if (!isOnIsland(p.x, p.y) || !this.clearOfLots(p.x, p.y)) continue; // no clean spot — skip
       if (avoidX !== undefined && avoidY !== undefined && dist(p.x, p.y, avoidX, avoidY) < 120) continue;
       const kind = pool[Math.floor(rand() * pool.length)];
       const o = this.makeObj(kind, p.x, p.y);
@@ -1119,12 +1167,13 @@ export class WorldManager {
         ax = dec.cx + (rand() - 0.5) * dec.halfW * 0.8;
         ay = dec.cy + (rand() - 0.5) * dec.halfH * 0.8;
       }
-      // Alive Pack §A: retry vignette anchor until on-island
-      for (let vigAtt = 0; vigAtt < 4 && !isOnIsland(ax, ay); vigAtt++) {
+      // Alive Pack §A + Overnight: retry anchor until on-island AND clear of
+      // buildings (a wedding inside a house footprint read as chaos)
+      for (let vigAtt = 0; vigAtt < 8 && (!isOnIsland(ax, ay) || !this.clearOfLots(ax, ay, 90)); vigAtt++) {
         ax = b.x0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
         ay = b.y0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
       }
-      if (!isOnIsland(ax, ay)) continue; // skip vignette entirely if no valid anchor
+      if (!isOnIsland(ax, ay) || !this.clearOfLots(ax, ay, 90)) continue; // no clean stage — skip scene
 
       const anchor = this.makeObj(vc.kind, ax, ay);
       anchor.tether = 60;
@@ -1137,11 +1186,13 @@ export class WorldManager {
       const PROP_SPREAD = 160;
       for (const pk of (vc.supportProps ?? [])) {
         const ox = ax + (rand() - 0.5) * PROP_SPREAD, oy = ay + (rand() - 0.5) * PROP_SPREAD;
+        if (!isOnIsland(ox, oy) || !this.clearOfLots(ox, oy)) continue;
         this.makeObj(pk, ox, oy);
       }
       // Supporting peds
       for (const pk of (vc.supportPeds ?? [])) {
         const ox = ax + (rand() - 0.5) * PROP_SPREAD, oy = ay + (rand() - 0.5) * PROP_SPREAD;
+        if (!isOnIsland(ox, oy)) continue;
         const o = this.makeObj(pk, ox, oy);
         o.tether = 80;
       }
@@ -1167,7 +1218,7 @@ export class WorldManager {
     this.scatter(b, rand, 'cat', 1);
     this.scatter(b, rand, 'squirrel', 1);
     if (rand() < 0.6) this.scatter(b, rand, 'bbq', 1);
-    if (rand() < 0.4) this.scatter(b, rand, 'mower', 1);
+    if (rand() < 0.4) this.scatter(b, rand, 'bush', 1);
     if (rand() < 0.7) this.spawnBirds(b, rand, 3);
   }
 
@@ -1317,6 +1368,23 @@ export class WorldManager {
       if (Math.abs(x - rc) < hw && y >= MARGIN && y <= this.size - MARGIN) return false;
     }
     return true;
+  }
+
+  /** Which biome a world point sits in (block-type based; beach/zoo by zone rect). */
+  biomeAt(x: number, y: number): Biome {
+    for (const b of this.blocks) {
+      if (x < b.x0 || y < b.y0 || x >= b.x0 + CONFIG.BLOCK_SIZE || y >= b.y0 + CONFIG.BLOCK_SIZE) continue;
+      switch (b.type) {
+        case 'downtown': case 'plaza': case 'civic': case 'mixed': return 'downtown';
+        case 'beach': return 'beach';
+        case 'forest': return 'forest';
+        case 'park': return 'park';
+        case 'zoo': return 'zoo';
+        case 'cozy': case 'fancy': case 'residential': return 'suburb';
+        default: return 'other';
+      }
+    }
+    return 'other';
   }
 
   // True when a footprint of radius fpR at (x,y) overlaps none of the given lots.
@@ -1680,6 +1748,7 @@ export class WorldManager {
   /** Place a static sprite prop (new city/zoo/street art) as eatable scenery. */
   private placeSceneryProp(key: string, x: number, y: number, R: number, tier = 2) {
     if (!isOnIsland(x, y, 20)) return;
+    if (!this.clearOfLots(x, y, R * 0.5)) return; // never on top of a building
     this.makeObj('apple', x, y, {
       scenery: true, sceneryKey: key,
       baseSize: R, size: R, contactRadius: R * 0.85,
@@ -2046,6 +2115,30 @@ export class WorldManager {
     const voids = [player, ...rivals.filter((r) => r.alive)];
     let nearestEdibleD = Infinity;
     let nearestEdible: WorldObject | null = null;
+
+    // Overnight: BIOME CHATTER — ordinary pedestrians now talk about where
+    // they ARE (beach talk on the beach, commuter gripes downtown...), so
+    // every biome sounds like its own place, not just looks like one.
+    {
+      this.chatterCd -= dt;
+      if (this.chatterCd <= 0) {
+        this.chatterCd = 2400 + this.rand() * 1800;
+        const bubblesNow = this.objects.filter(o => !o.eaten && o.bubbleLife > 0).length;
+        if (bubblesNow < 4) {
+          // pick a nearby, calm, bubble-free pedestrian
+          const cands = this.objects.filter(o =>
+            !o.eaten && !o.fleeing && !o.bubbleText && !o.vignetteData &&
+            (o.kind.startsWith('person') || ['tourist', 'waiter', 'skateboarder', 'cyclist', 'zookeeper'].includes(o.kind)) &&
+            dist(o.x, o.y, player.x, player.y) < 1500);
+          if (cands.length) {
+            const o = cands[Math.floor(this.rand() * cands.length)];
+            const pool = AMBIENT_BY_BIOME[this.biomeAt(o.x, o.y)] ?? AMBIENT_BY_BIOME.other;
+            o.bubbleText = pool[Math.floor(this.rand() * pool.length)];
+            o.bubbleLife = 3500;
+          }
+        }
+      }
+    }
 
     // Life Pack §3: vignette ambient/panic bubbles (separate pass before main loop)
     {
@@ -2574,14 +2667,13 @@ export class WorldManager {
         if (obj.alertT <= 0) obj.alertT = 900;
         // 1-in-2 panicking peds pop a speech bubble when they first start fleeing
         if (!wasFleeing && !obj.bubbleText && this.rand() < 0.5) {
-          const PANIC = ['MY LAWN!', 'RUN!!', 'Is that a grape?!', 'NOT THE BEACH!',
-            'I just waxed that car!', 'WHAT IS THAT?!', 'HELP!!', 'My petunias!!',
-            'Call the mayor!!', 'It ate my lunch!!', 'my latte!!', 'nope nope nope nope',
-            'it\'s not even trash day!!', 'tell my wife I love h—', '5 stars. very scary.',
-            'I KNEW this town was cursed!!', 'the gym was THAT way anyway',
-            'not my emotional support gnome!!'];
-          obj.bubbleText = PANIC[Math.floor(this.rand() * PANIC.length)];
-          obj.bubbleLife = 1500;
+          // Overnight: panic lines are BIOME-FLAVORED (beach panic on the
+          // beach, HOA panic in the suburbs) with generic spice mixed in.
+          const pool = this.rand() < 0.7
+            ? (PANIC_BY_BIOME[this.biomeAt(obj.x, obj.y)] ?? PANIC_BY_BIOME.other)
+            : PANIC_BY_BIOME.other;
+          obj.bubbleText = pool[Math.floor(this.rand() * pool.length)];
+          obj.bubbleLife = 2600;
         }
       }
       const a = Math.atan2(obj.y - threat.y, obj.x - threat.x);
@@ -3535,28 +3627,36 @@ export class WorldManager {
         ctx.fillText('!', obj.x, obj.y - obj.size - 6);
         ctx.restore();
       }
-      // v16.2 §1: speech bubble — NPC says something
+      // v16.2 §1: speech bubble — NPC says something.
+      // Overnight fix ("hard to see the chat bubbles"): bubbles were sized in
+      // WORLD units so they shrank with camera zoom. Now sized inversely to
+      // the current zoom → constant, readable size on SCREEN at any form.
       if (obj.bubbleText && obj.bubbleLife > 0) {
         const lifeNorm = clamp(obj.bubbleLife / 4500, 0, 1);
         const alpha = lifeNorm > 0.88 ? (1 - lifeNorm) / 0.12 : lifeNorm < 0.18 ? lifeNorm / 0.18 : 1;
         ctx.save();
         ctx.globalAlpha = alpha;
-        const fontSize = Math.max(10, Math.min(14, obj.size * 0.85));
-        ctx.font = `600 ${fontSize}px Nunito, sans-serif`;
+        const zm = ctx.getTransform().a / Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
+        const fontSize = clamp(15 / Math.max(0.2, zm), 13, 34);
+        ctx.font = `800 ${fontSize.toFixed(1)}px Nunito, sans-serif`;
         ctx.textAlign = 'center';
         const txtW = ctx.measureText(obj.bubbleText).width;
-        const pad = 6, bw = txtW + pad * 2, bh = fontSize + pad * 2;
+        const pad = fontSize * 0.5, bw = txtW + pad * 2, bh = fontSize + pad * 1.6;
         const bx = obj.x - bw / 2, by = obj.y - obj.size - bh - 10;
-        ctx.fillStyle = 'rgba(255,255,255,0.94)';
+        ctx.fillStyle = 'rgba(255,255,255,0.97)';
+        ctx.strokeStyle = 'rgba(26,16,64,0.30)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        if ((ctx as any).roundRect) (ctx as any).roundRect(bx, by, bw, bh, 6);
+        if ((ctx as any).roundRect) (ctx as any).roundRect(bx, by, bw, bh, bh * 0.4);
         else ctx.rect(bx, by, bw, bh);
         ctx.fill();
+        ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(obj.x - 4, by + bh); ctx.lineTo(obj.x, by + bh + 7); ctx.lineTo(obj.x + 4, by + bh);
+        ctx.moveTo(obj.x - fontSize * 0.35, by + bh); ctx.lineTo(obj.x, by + bh + fontSize * 0.55); ctx.lineTo(obj.x + fontSize * 0.35, by + bh);
+        ctx.fillStyle = 'rgba(255,255,255,0.97)';
         ctx.fill();
         ctx.fillStyle = '#1a1040';
-        ctx.fillText(obj.bubbleText, obj.x, by + bh - pad + 1);
+        ctx.fillText(obj.bubbleText, obj.x, by + bh - pad * 0.9);
         ctx.restore();
       }
     };

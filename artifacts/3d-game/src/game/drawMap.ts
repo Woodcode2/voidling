@@ -646,6 +646,35 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     cc.beginPath(); cc.moveTo(rc + hw, MARGIN); cc.lineTo(rc + hw, S - MARGIN); cc.stroke();
   }
 
+  // (e.5) Cul-de-sac turnarounds — roads used to just STOP at the island
+  // margin ("roads end to nowhere"). Every road end now finishes in a
+  // proper engineered turning circle with a small planted island.
+  {
+    const st2 = _texTiles.get('street');
+    const pat = st2 ? cc.createPattern(st2, 'repeat') : null;
+    const R = ROAD_W * 0.95;
+    for (const rc of ROAD_CENTERS) {
+      const ends: [number, number][] = [
+        [MARGIN + 6, rc], [S - MARGIN - 6, rc],   // horizontal road ends
+        [rc, MARGIN + 6], [rc, S - MARGIN - 6],   // vertical road ends
+      ];
+      for (const [ex, ey] of ends) {
+        // asphalt circle
+        cc.fillStyle = (pat as CanvasPattern) ?? COL.road;
+        cc.beginPath(); cc.arc(ex, ey, R, 0, Math.PI * 2); cc.fill();
+        // curb ring
+        cc.strokeStyle = 'rgba(232,232,236,0.85)';
+        cc.lineWidth = 7;
+        cc.beginPath(); cc.arc(ex, ey, R - 3, 0, Math.PI * 2); cc.stroke();
+        // planted centre island
+        cc.fillStyle = COL.pavement;
+        cc.beginPath(); cc.arc(ex, ey, R * 0.34, 0, Math.PI * 2); cc.fill();
+        cc.fillStyle = COL.meadow;
+        cc.beginPath(); cc.arc(ex, ey, R * 0.26, 0, Math.PI * 2); cc.fill();
+      }
+    }
+  }
+
   // (f) Crosswalk stripes at each junction — BOLD white zebra bars like
   // hole.io's streets (they were nearly invisible at 0.24 alpha).
   cc.fillStyle = 'rgba(255,255,255,0.72)';

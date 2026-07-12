@@ -1,7 +1,7 @@
 import { CONFIG, type BoonDef, type SkinDef, type ObjectKind } from './config';
 import { audio } from './audio';
 import { FXManager, type FloatingText } from './fx';
-import { WorldManager } from './world';
+import { WorldManager, type WorldObject } from './world';
 import { Player } from './player';
 import { Void, setRoundElapsed } from './void';
 import { makeRivals, type Rival, type WorldView } from './rivals';
@@ -1110,6 +1110,21 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           spawnDefenseWave(Math.min(defensePhase, 4) as 1|2|3|4);
         }
       }
+      // Overnight fix: ground defense units respect terrain — if the straight
+      // line crosses water/rim they slide along the open axis instead of
+      // driving across the river ("cars walking on water").
+      const defenseWalkSlide = (o: WorldObject, dtMs: number) => {
+        const step = dtMs / 1000;
+        const nx = clamp(o.x + o.vx * step, 30, CONFIG.MAP_SIZE - 30);
+        const ny = clamp(o.y + o.vy * step, 30, CONFIG.MAP_SIZE - 30);
+        if (isWalkable(nx, ny)) { o.x = nx; o.y = ny; return; }
+        if (isWalkable(nx, o.y)) { o.x = nx; return; }   // slide horizontally
+        if (isWalkable(o.x, ny)) { o.y = ny; return; }   // slide vertically
+        // fully blocked: sidestep perpendicular to the target direction
+        const px2 = clamp(o.x - o.vy * step, 30, CONFIG.MAP_SIZE - 30);
+        const py2 = clamp(o.y + o.vx * step, 30, CONFIG.MAP_SIZE - 30);
+        if (isWalkable(px2, py2)) { o.x = px2; o.y = py2; }
+      };
       // Steer defense units + fire pellets/shells (TIME_WARP slows defense systems too)
       for (const o of world.objects) {
         if (!o.defense || o.eaten) continue;
@@ -1145,8 +1160,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         } else if (o.kind === 'tank') {
           // Tanks: slow, fire shells with 1s landing-circle warning
           if (d < 2200) { o.vx = (dx / d) * CONFIG.DEFENSE_TANK_SPEED; o.vy = (dy / d) * CONFIG.DEFENSE_TANK_SPEED; }
-          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          defenseWalkSlide(o, dt);
           o.pelletCd = (o.pelletCd ?? 3000) - dt;
           if (o.pelletCd <= 0 && d < 1600) {
             o.pelletCd = 3000 + Math.random() * 1500;
@@ -1156,8 +1170,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         } else if (o.kind === 'missile_truck') {
           // Missile trucks: medium speed, slower rockets
           if (d < 2000) { o.vx = (dx / d) * CONFIG.DEFENSE_UNIT_SPEED * 1.1; o.vy = (dy / d) * CONFIG.DEFENSE_UNIT_SPEED * 1.1; }
-          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          defenseWalkSlide(o, dt);
           o.pelletCd = (o.pelletCd ?? 2400) - dt;
           if (o.pelletCd <= 0 && d < 1800) {
             o.pelletCd = 2400 + Math.random() * 1200;
@@ -1172,8 +1185,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
                       : CONFIG.DEFENSE_UNIT_SPEED;
             o.vx = (dx / d) * spd; o.vy = (dy / d) * spd;
           }
-          o.x = clamp(o.x + o.vx * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
-          o.y = clamp(o.y + o.vy * (dt / 1000), 30, CONFIG.MAP_SIZE - 30);
+          defenseWalkSlide(o, dt);
           o.pelletCd = (o.pelletCd ?? CONFIG.DEFENSE_PELLET_CD) - dt;
           if (o.pelletCd <= 0 && d < 1400) {
             o.pelletCd = CONFIG.DEFENSE_PELLET_CD + Math.random() * 800;
