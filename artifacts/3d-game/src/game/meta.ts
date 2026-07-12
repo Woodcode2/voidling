@@ -23,6 +23,7 @@ export interface GameMeta {
   lastDailyDate: string;
   lastWinDate: string;   // Economy: first-win-of-the-day 2× tracking
   lastPlayDate: string;  // Economy: daily-bite bonus tracking
+  stars: number;         // Retention: placement stars (hole.io ladder)
   highScore: number;
   removeAds: boolean;
   missions: { id: string; progress: number; completed: boolean }[];
@@ -48,6 +49,7 @@ const DEFAULT_META: GameMeta = {
   lastDailyDate: '',
   lastWinDate: '',
   lastPlayDate: '',
+  stars: 0,
   highScore: 0,
   removeAds: false,
   missions: [],
@@ -81,6 +83,7 @@ export const meta = {
     if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
     if (typeof this.data.lastWinDate !== 'string') this.data.lastWinDate = '';
     if (typeof this.data.lastPlayDate !== 'string') this.data.lastPlayDate = '';
+    if (typeof this.data.stars !== 'number' || !Number.isFinite(this.data.stars)) this.data.stars = 0;
     if (typeof this.data.xp !== 'number' || !Number.isFinite(this.data.xp)) this.data.xp = 0;
     if (typeof this.data.level !== 'number' || !Number.isFinite(this.data.level) || this.data.level < 1) this.data.level = 1;
     // v12 §5: migrate legacy saves without trophy fields
@@ -192,6 +195,31 @@ export const meta = {
     }
   },
 
+  // ── Retention: placement stars + rank ladder (hole.io model) ───────────────
+
+  /** Stars by final placement: 1st=20, 2nd=10, 3rd=5, 4th=2, else 1. */
+  addStars(placement: number): number {
+    const gain = placement === 1 ? 20 : placement === 2 ? 10 : placement === 3 ? 5 : placement === 4 ? 2 : 1;
+    this.data.stars += gain;
+    this.save();
+    return gain;
+  },
+
+  /** Current rank from lifetime stars. */
+  rank(): { name: string; tier: number; next: number | null } {
+    const LADDER: [string, number][] = [
+      ['BRONZE', 0], ['SILVER', 60], ['GOLD', 160],
+      ['DIAMOND', 320], ['PLATINUM', 560], ['MASTER', 900],
+    ];
+    let tier = 0;
+    for (let i = 0; i < LADDER.length; i++) if (this.data.stars >= LADDER[i][1]) tier = i;
+    return {
+      name: LADDER[tier][0],
+      tier,
+      next: tier + 1 < LADDER.length ? LADDER[tier + 1][1] : null,
+    };
+  },
+
   // ── Economy: daily bonuses (LoL model) ─────────────────────────────────────
 
   /** True until the player's first crowned win today (2× payout hook). */
@@ -216,13 +244,31 @@ export const meta = {
 
   // ── v12 §5: Trophy helpers ─────────────────────────────────────────────────
 
-  /** Mark a trophy as earned (no-op if already earned). Saves. */
+  /** Transient: trophies earned since last drain (engine reads for results). */
+  recentTrophies: [] as string[],
+
+  /** Mark a trophy as earned (no-op if already earned). Grants a one-time
+   *  coin BOUNTY (retention: concrete goals pay out). Saves. */
   earnTrophy(id: string) {
     if (!this.data.trophiesEarned.includes(id)) {
       this.data.trophiesEarned.push(id);
+      const BIG = new Set(['devoured_100pct', 'score_10000', 'form_world_ender', 'void_destroyer', 'daily_winner']);
+      const bounty = BIG.has(id) ? 500 : 250;
+      this.data.coins += bounty;
+      this.recentTrophies.push(id);
       this.save();
-      console.log(`[trophy] EARNED: ${id}`);
+      console.log(`[trophy] EARNED: ${id} (+${bounty}¢)`);
     }
+  },
+
+  /** Drain the transient earned-this-round list; returns total bounty paid. */
+  drainRecentTrophies(): { count: number; bounty: number } {
+    const BIG = new Set(['devoured_100pct', 'score_10000', 'form_world_ender', 'void_destroyer', 'daily_winner']);
+    let bounty = 0;
+    for (const id of this.recentTrophies) bounty += BIG.has(id) ? 500 : 250;
+    const count = this.recentTrophies.length;
+    this.recentTrophies = [];
+    return { count, bounty };
   },
 
   /**

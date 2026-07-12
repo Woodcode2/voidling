@@ -1183,6 +1183,27 @@ function _drawWaterShimmer(ctx: CanvasRenderingContext2D, clock: number): void {
     ctx.fill();
     ctx.restore();
   }
+
+  // Overnight+: FLOW STREAKS — 12 small white slivers racing downstream along
+  // the channel. This is what makes the river read as MOVING water at a
+  // glance (the wide bands above are too soft to carry flow direction).
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 12; i++) {
+    const t = ((clock / 6200) + i / 12 + (i % 3) * 0.011) % 1;
+    const p = _riverPointAt(t);
+    const edgeFade = Math.min(1, Math.min(t, 1 - t) / 0.08);
+    const lane = ((i * 2654435761) % 100) / 100 - 0.5; // stable cross-channel lane
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.a);
+    ctx.strokeStyle = `rgba(255,255,255,${(0.34 * edgeFade).toFixed(3)})`;
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(-26, lane * RIVER_HALF_W * 1.3);
+    ctx.lineTo(26, lane * RIVER_HALF_W * 1.3);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.globalCompositeOperation = 'source-over';
 
   ctx.restore();

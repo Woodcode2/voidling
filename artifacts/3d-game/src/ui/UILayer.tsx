@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v22 · overnight';
+const BUILD_STAMP = 'v23 · tipin';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 
@@ -301,6 +301,10 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
         )}
         {/* v7 §11: player level badge + name pill */}
         <div className="vd-namepill"><span className="vd-lvbadge">Lv{snap.level}</span> You</div>
+        <div className="vd-namepill" style={{ marginTop: 6, fontSize: '0.82rem' }}>
+          <span style={{ color: '#FFD23F', fontWeight: 800 }}>★ {snap.stars}</span>
+          <span style={{ marginLeft: 8, letterSpacing: '0.12em', color: '#CFC6FF', fontWeight: 800 }}>{snap.rankName}</span>
+        </div>
         {snap.highScore > 0 && (
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
         )}
@@ -643,6 +647,8 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           <div className="vd-stat-row"><span>Coins earned</span><span>+{r.coins}</span></div>
           {r.firstWin && <div className="vd-stat-row" style={{ color: '#FFD23F' }}><span>FIRST WIN OF THE DAY</span><span>×2!</span></div>}
           {r.dailyBite > 0 && <div className="vd-stat-row" style={{ color: '#7BFFED' }}><span>Daily bite bonus</span><span>+{r.dailyBite}</span></div>}
+          <div className="vd-stat-row" style={{ color: '#FFD23F' }}><span>Rank stars</span><span>+{r.starsGained} ★ ({r.stars} · {r.rankName})</span></div>
+          {r.trophiesEarned > 0 && <div className="vd-stat-row" style={{ color: '#8FE36B' }}><span>🏆 {r.trophiesEarned} new troph{r.trophiesEarned === 1 ? 'y' : 'ies'}</span><span>+{r.trophyBounty}¢</span></div>}
           {r.isDaily && <div className="vd-stat-row"><span>Daily streak</span><span>{snap.streak}🔥</span></div>}
         </div>
         {/* v7 §11: XP bar + level-up flourish */}

@@ -2325,8 +2325,18 @@ export class WorldManager {
         obj.x += obj.vx * dtSec;
         obj.y += obj.vy * dtSec;
         obj.captureScale = clamp(dp / (player.radius + obj.size), 0.2, 1);
-        // v10 §3: increased spin — 180-360° during capture. Living things flail faster.
-        obj.captureRot += dt * (obj.living ? 0.08 : 0.028);
+        if (obj.living) {
+          // living things flail as they're pulled in
+          obj.captureRot += dt * 0.08;
+        } else {
+          // hole.io TIP-IN: structures pivot at their base and FALL toward
+          // the hole with accelerating lean — the signature eating feel —
+          // instead of the old uniform pinwheel spin.
+          const tipDir = nx >= 0 ? 1 : -1;
+          const tipT = clamp(1 - obj.captureScale, 0, 1);
+          const target = tipDir * (0.12 + Math.pow(tipT, 1.5) * 1.8);
+          obj.captureRot += (target - obj.captureRot) * Math.min(1, dt * 0.014);
+        }
         obj.size = obj.baseSize * obj.captureScale;
         if (dp < player.radius * CONFIG.ABSORB_RADIUS_MULT) {
           this.consumeByPlayer(obj, player, fx);
@@ -2335,9 +2345,10 @@ export class WorldManager {
         // still captured -> skip normal AI, but rivals can't grab a captured object
         continue;
       } else if (obj.captured) {
-        // escaped the well -> skid and restore size
+        // escaped the well -> skid and restore size (and stand back upright)
         obj.captured = false;
         obj.captureScale = 1;
+        obj.captureRot = 0;
         obj.size = obj.baseSize;
       }
 

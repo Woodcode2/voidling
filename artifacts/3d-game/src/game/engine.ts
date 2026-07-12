@@ -52,6 +52,11 @@ export interface ResultData {
   xpNext: number;
   leveledTo: number | null;   // top level reached this round, or null
   district?: string;          // v13 §1: district where the player ended up
+  starsGained: number;        // Retention: placement stars this round
+  stars: number;              // lifetime stars
+  rankName: string;           // current rank (BRONZE..MASTER)
+  trophiesEarned: number;     // trophies unlocked this round
+  trophyBounty: number;       // coin bounty paid for them
 }
 
 export interface DailyData { id: string; seed: string; name: string; desc: string; }
@@ -60,6 +65,8 @@ export interface Snapshot {
   screen: Screen;
   assetsReady: boolean; // hole.io rebuild: splash gates on the clay sheets
   coins: number;
+  stars: number;        // Retention: lifetime placement stars
+  rankName: string;     // Retention: current rank name
   highScore: number;
   streak: number;
   equippedSkin: string;
@@ -581,6 +588,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     defensePhase = 0; defenseSpawnCd = 0; defensePellets.length = 0; defenseShells.length = 0;
     pelletHitFlash = 0;
     finalFeastFired = false; finalFeastActive = false;
+
     feedingFrenzyFired = false; feedingFrenzyActive = false;
     killedBy = ''; roundEnded = false;
     // Task #4: reset stage-voice + flash state for new round
@@ -899,6 +907,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (isDaily && crown) meta.earnTrophy('daily_winner');
     finalFeastFired = false; finalFeastActive = false;
 
+    // Retention (hole.io ladder): placement stars + trophy bounties
+    const starsGained = meta.addStars(placement);
+    const trophyHaul = meta.drainRecentTrophies();
+    if (trophyHaul.count > 0) track('trophy_bounty', trophyHaul);
+
     // v7 §8: if a bot in the top 3 is showing off a skin the player doesn't own,
     // surface it on the results screen as a soft nudge toward the shop.
     let skinTease: ResultData['skinTease'] = null;
@@ -931,6 +944,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       xpGain, level: meta.data.level, xpInLevel: meta.data.xp,
       xpNext: xpForLevel(meta.data.level), leveledTo,
       district: finalDistrict,
+      starsGained, stars: meta.data.stars, rankName: meta.rank().name,
+      trophiesEarned: trophyHaul.count, trophyBounty: trophyHaul.bounty,
     };
     track('round_end', { score: player.score, placement, coins });
     audio.stopMusic();
@@ -1898,7 +1913,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // The CAM_ZOOM_LERP smooths the transition as the player crosses r=50.
     // OLD: fh / clamp(r*28.57, 350, fh*6)  →  Stage 1 zoom≈1.40, Stage 2 zoom≈0.66
     // NEW: fh / clamp(r*35.00, 350, fh*6)  →  Stage 1 zoom≈1.14, Stage 2 zoom≈0.54 (22% wider)
-    const zoomMult = player.radius < 50 ? 35.0 : 28.57;
+    // Overnight+: DEVOURER/WORLD ENDER pull the camera OUT (+15%/+32%) so the
+    // top forms read as massive over the city instead of cramped in frame.
+    const zoomMult = player.radius < 50 ? 35.0
+      : player.formIndex >= 4 ? 37.7
+      : player.formIndex >= 3 ? 32.9
+      : 28.57;
     const viewHeight = clamp(player.radius * zoomMult, 350, fh * 6);
     const targetZoom = fh / viewHeight;
     camZoom = lerp(camZoom, targetZoom, CONFIG.CAM_ZOOM_LERP);
@@ -3006,6 +3026,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       screen: screen,
       assetsReady: assetsLoaded,
       coins: meta.data.coins,
+      stars: meta.data.stars,
+      rankName: meta.rank().name,
       highScore: meta.data.highScore,
       streak: meta.data.streak,
       equippedSkin: meta.data.equippedSkin,
