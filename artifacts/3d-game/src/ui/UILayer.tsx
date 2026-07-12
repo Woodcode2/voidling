@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v19 · 0';
+const BUILD_STAMP = 'v20 · holeio';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 
@@ -125,23 +125,40 @@ function Confetti() {
 // If no splash.png is found the existing starfield + voidling fallback is shown.
 function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
   const [hasSplash, setHasSplash] = useState(true); // optimistic — hide on error
-  const [fadingOut, setFadingOut] = useState(false);
+  const [artHoldDone, setArtHoldDone] = useState(false); // 4s splash-art hold elapsed
+  const [skipped, setSkipped] = useState(false);
+
+  // hole.io rebuild: the splash GATES on the clay sheets — the game must never
+  // open on procedural box-people that pop into real art seconds later.
+  const waiting = !snap.assetsReady;
+  const fadingOut = artHoldDone && !skipped && !waiting;
 
   useEffect(() => {
     // v14.1: prime the AudioContext on first user-visible frame (counts as a gesture on iOS)
     audio.init();
     audio.loadSamples().catch(() => {});
     // Rebuild Prompt 10: show splash art 4s, then fade smoothly (500ms) into the menu.
-    const t = window.setTimeout(() => setFadingOut(true), 4000);
-    const t2 = window.setTimeout(onDone, 4500);
-    return () => { clearTimeout(t); clearTimeout(t2); };
-  }, [onDone]);
+    const t = window.setTimeout(() => setArtHoldDone(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // timer path: fade 500ms then advance (only once assets are in)
+  useEffect(() => {
+    if (!fadingOut) return;
+    const t = window.setTimeout(onDone, 500);
+    return () => clearTimeout(t);
+  }, [fadingOut, onDone]);
+
+  // tap-to-skip path: advance immediately once assets are in
+  useEffect(() => {
+    if (skipped && !waiting) onDone();
+  }, [skipped, waiting, onDone]);
 
   const skip = () => {
     audio.init();
     audio.loadSamples().catch(() => {});
     import('tone').then((T) => T.start()).catch(() => {});
-    onDone(); // Prompt 10 §Stage1: tap-to-skip advances immediately, no fade wait
+    setSkipped(true); // Prompt 10 §Stage1: advances as soon as assets allow
   };
 
   return (
@@ -174,6 +191,16 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
             pointerEvents: 'none',
           }}
         />
+      )}
+
+      {/* loading pill — only shows if the player is ready before the assets */}
+      {(artHoldDone || skipped) && waiting && (
+        <div style={{
+          position: 'absolute', bottom: 48, left: '50%', transform: 'translateX(-50%)',
+          padding: '10px 22px', borderRadius: 999, background: 'rgba(10,8,24,0.72)',
+          color: '#CFC6FF', fontWeight: 800, letterSpacing: '0.18em', fontSize: '0.85rem',
+          animation: 'vd-pulse 1.2s ease-in-out infinite', zIndex: 3, pointerEvents: 'none',
+        }}>LOADING…</div>
       )}
 
       {/* Fallback starfield when splash art fails to load */}

@@ -57,6 +57,7 @@ export interface DailyData { id: string; seed: string; name: string; desc: strin
 
 export interface Snapshot {
   screen: Screen;
+  assetsReady: boolean; // hole.io rebuild: splash gates on the clay sheets
   coins: number;
   highScore: number;
   streak: number;
@@ -381,17 +382,25 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   // Stage 13 §6: pre-load all clay sheets and ground textures at createGame() time
   // so the pools are populated before the first match start (no sticker fallback frames).
+  // hole.io rebuild: the splash screen now GATES on assetsLoaded — the game
+  // must never start with procedural box-people that pop into clay art later.
   const base = import.meta.env.BASE_URL;
-  void loadGroundTextures(base);
-  void loadWardAssets(base);
-  void loadClayCity(base);
-  void loadClayLife(base);
-  void loadClayScenery(base);
-  void loadCityAssets(base); // Structural Rebuild: new wide buildings + landmarks + zoo/street props
-  void loadClayFood(base);
-  void loadClayZoo(base);
-  void loadClayAirport(base);
-  void loadClayMilitary(base);
+  let assetsLoaded = false;
+  const _allAssets = Promise.all([
+    loadGroundTextures(base),
+    loadWardAssets(base),
+    loadClayCity(base),
+    loadClayLife(base),
+    loadClayScenery(base),
+    loadCityAssets(base), // Structural Rebuild: new wide buildings + landmarks + zoo/street props
+    loadClayFood(base),
+    loadClayZoo(base),
+    loadClayAirport(base),
+    loadClayMilitary(base),
+  ]).catch(() => {});
+  // never hard-block the game on a stuck request — 10s ceiling
+  void Promise.race([_allAssets, new Promise((r) => setTimeout(r, 10000))])
+    .then(() => { assetsLoaded = true; notify(); });
 
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
@@ -442,6 +451,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.morphTime = 0;
       countdown = 0; // skip any lingering pre-round countdown so powers can fire
       console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
+    }
+    // Dev-only: 8 teleports to a downtown tower block (hole.io rebuild checks).
+    if (debugForms && player && e.code === 'Digit8') {
+      player.x = player.prevX = 5145;
+      player.y = player.prevY = 3435;
+      console.log('[debug] teleported to downtown core');
     }
     // Dev-only: 9 fast-forwards the clock to verify round-end flow + payouts.
     if (debugForms && player && e.code === 'Digit9') {
@@ -2942,6 +2957,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ] : [];
     return {
       screen: screen,
+      assetsReady: assetsLoaded,
       coins: meta.data.coins,
       highScore: meta.data.highScore,
       streak: meta.data.streak,

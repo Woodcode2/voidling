@@ -4,6 +4,7 @@ import { drawParkObject } from './objects'; // wind removed — tuft system dele
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import { cityBuildingKeys, cityLandmarkKeys, zooPropKeys, streetPropKeys } from './cityAssets'; // Structural Rebuild: new city art pools
+import { drawBuilding3D, makeBuildingSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
   SITTER_CLAY_INDICES,
@@ -65,6 +66,7 @@ export interface WorldObject {
   bubbleLife: number;    // ms remaining for the speech bubble
   scenery?: boolean;     // Prompt 5: clay scenery — eatable bonus, excluded from win math + respawn
   sceneryKey?: string;   // Prompt 5: explicit clay draw key (overrides kind sprite)
+  bldg?: BuildingSpec;   // hole.io rebuild: extruded box building (live pseudo-3D draw)
   shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
   defense?: boolean;     // War Pack §2: defense unit converging on player
   pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
@@ -101,7 +103,7 @@ export interface PlayerStats {
 // 'cozy' and 'fancy' are sub-variants of residential (different house pools).  [Prompt 15]
 type BlockType = 'residential' | 'cozy' | 'fancy' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic' | 'forest' | 'airport' | 'military';
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
-interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; }
+interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; bldg?: BuildingSpec; }
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; rot: number; drawScale: number; }
 // Feedback Juice §1: cosmetic "swallow ghost" — a copy of an eaten structure's
@@ -1004,31 +1006,51 @@ export class WorldManager {
     const cx = (b: Block) => b.x0 + CONFIG.BLOCK_SIZE / 2;
     const cy = (b: Block) => b.y0 + CONFIG.BLOCK_SIZE / 2;
 
+    // "Why is there a soccer field in the river" — every decal spot must be
+    // DRY across its whole rect (park blocks contain the pond/river). Jitter
+    // around the preferred spot until a dry position is found; skip if none.
+    const drySpot = (fx: number, fy: number, hw: number, hh: number): { x: number; y: number } | null => {
+      for (let att = 0; att < 12; att++) {
+        const sx = fx + (att ? (rand() - 0.5) * 420 : 0);
+        const sy = fy + (att ? (rand() - 0.5) * 420 : 0);
+        if (!isOnIsland(sx, sy, Math.round(Math.max(hw, hh)))) continue;
+        const wet = [[0, 0], [hw + 40, hh + 40], [-hw - 40, hh + 40], [hw + 40, -hh - 40], [-hw - 40, -hh - 40],
+          [hw + 40, 0], [-hw - 40, 0], [0, hh + 40], [0, -hh - 40]].some(
+          ([ox, oy]) => terrainAtGeom(sx + ox, sy + oy) === GTERRAIN.WATER,
+        );
+        if (!wet) return { x: sx, y: sy };
+      }
+      return null;
+    };
+    const place = (kind: FieldDecal['kind'], fx: number, fy: number, hw: number, hh: number) => {
+      const p = drySpot(fx, fy, hw, hh);
+      if (p) this.fieldDecals.push({ kind, cx: p.x, cy: p.y, halfW: hw, halfH: hh });
+    };
+
     if (parkBlocks.length) {
       const pb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_soccer', cx: cx(pb), cy: cy(pb), halfW: 200, halfH: 130 });
+      place('field_soccer', cx(pb), cy(pb), 200, 130);
     }
     if (downtownBlocks.length) {
       const db = downtownBlocks[Math.floor(rand() * downtownBlocks.length)];
-      // Place basketball court offset toward edge of block
-      this.fieldDecals.push({ kind: 'field_basketball', cx: db.x0 + CONFIG.BLOCK_SIZE * 0.75, cy: cy(db), halfW: 140, halfH: 80 });
+      place('field_basketball', db.x0 + CONFIG.BLOCK_SIZE * 0.75, cy(db), 140, 80);
     }
     if (resBlocks.length) {
       const rb = resBlocks[Math.floor(rand() * resBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_tennis', cx: cx(rb), cy: rb.y0 + CONFIG.BLOCK_SIZE * 0.7, halfW: 130, halfH: 70 });
+      place('field_tennis', cx(rb), rb.y0 + CONFIG.BLOCK_SIZE * 0.7, 130, 70);
     }
     // Structural Build: beach volleyball court + cabana-club deck + forest campsite
     const beachBlocks = this.blocks.filter(b => b.type === 'beach' && isOnIsland(cx(b), cy(b), 0));
     if (beachBlocks.length) {
       const vb = beachBlocks[Math.floor(rand() * beachBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_volleyball', cx: cx(vb), cy: vb.y0 + CONFIG.BLOCK_SIZE * 0.42, halfW: 150, halfH: 82 });
+      place('field_volleyball', cx(vb), vb.y0 + CONFIG.BLOCK_SIZE * 0.42, 150, 82);
       const cb = beachBlocks[Math.floor(rand() * beachBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_beachclub', cx: cb.x0 + CONFIG.BLOCK_SIZE * 0.28, cy: cb.y0 + CONFIG.BLOCK_SIZE * 0.68, halfW: 130, halfH: 95 });
+      place('field_beachclub', cb.x0 + CONFIG.BLOCK_SIZE * 0.28, cb.y0 + CONFIG.BLOCK_SIZE * 0.68, 130, 95);
     }
     const forestBlocks = this.blocks.filter(b => b.type === 'forest' && isOnIsland(cx(b), cy(b), 0));
     if (forestBlocks.length) {
       const fb = forestBlocks[Math.floor(rand() * forestBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_campsite', cx: cx(fb), cy: cy(fb), halfW: 140, halfH: 110 });
+      place('field_campsite', cx(fb), cy(fb), 140, 110);
     }
     // Prompt 19 Stage 6: pass field positions to drawMap so lines are baked into ground cache.
     setMatchSportsFields(this.fieldDecals);
@@ -1339,9 +1361,6 @@ export class WorldManager {
     // ── Stage 2: packed downtown — grid of building lots per downtown block ──
     // Gather every candidate cell across all on-island downtown blocks, rank by
     // distance to the central plaza, then assign tallest→nearest, shortest→edge.
-    const DT_STEP = 248;  // canyon-tight tower grid (6×6 cells/block) — street-wall feel
-    const DT_INSET = CONFIG.SIDEWALK + 80;
-
     // Structural Rebuild: one LANDMARK per downtown block, placed FIRST at the
     // block centre so the tower grid packs around it (lotFree rejects overlap).
     // These are the marquee trophy eats — city hall, stadium, ferris wheel...
@@ -1356,43 +1375,64 @@ export class WorldManager {
       (b.buildingLots ??= []).push(lot);
       this.structureLots.push(lot);
     }
-    const cells: { x: number; y: number; block: Block; d2: number }[] = [];
+    // ── hole.io rebuild: street-facing PARCELS, not a crammed cell grid ──
+    // Each downtown block gets three west-east building rows (north edge /
+    // centre / south edge). Buildings are extruded boxes with varied widths
+    // and real gaps between them, fronts on the sidewalk line — the hole.io
+    // block structure. Heights/kinds still rank by distance to the plaza.
     const px = this.size / 2, py = this.size / 2;
+    interface Parcel { x: number; y: number; hw: number; hd: number; block: Block; d2: number }
+    const parcels: Parcel[] = [];
     for (const b of this.blocks) {
       if (b.type !== 'downtown') continue;
       const bCx = b.x0 + B / 2, bCy = b.y0 + B / 2;
       if (!isOnIsland(bCx, bCy, 0)) continue; // mirror the fill-loop block guard
-      for (let yy = b.y0 + DT_INSET; yy <= b.y0 + B - DT_INSET; yy += DT_STEP) {
-        for (let xx = b.x0 + DT_INSET; xx <= b.x0 + B - DT_INSET; xx += DT_STEP) {
-          cells.push({ x: xx, y: yy, block: b, d2: (xx - px) ** 2 + (yy - py) ** 2 });
+      const lm = (b.buildingLots ?? []).find(l => l.kind === 'landmark');
+      const rowYs = [
+        b.y0 + CONFIG.SIDEWALK + 150,      // north row (front on north street)
+        b.y0 + B / 2,                      // centre row (alleys either side)
+        b.y0 + B - CONFIG.SIDEWALK - 150,  // south row (front on south street)
+      ];
+      for (const ry of rowYs) {
+        let cursor = b.x0 + CONFIG.SIDEWALK + 30;
+        const endX = b.x0 + B - CONFIG.SIDEWALK - 30;
+        while (cursor < endX - 170) {
+          const hw = 85 + rand() * 65;  // half-width 85-150
+          // depth is the APPARENT (camera-foreshortened) roof depth — shallow
+          // slabs, like hole.io viewed at its tilt. Facades carry the height.
+          const hd = 58 + rand() * 24;  // half-depth 58-82
+          const cx = cursor + hw;
+          if (cx + hw > endX) break;
+          cursor = cx + hw + 26 + rand() * 44; // gap 26-70 between fronts
+          // landmark plaza: keep parcels clear of the marquee building
+          if (lm) {
+            const md = lm.fpR + Math.max(hw, hd) + 60;
+            if ((lm.x - cx) ** 2 + (lm.y - ry) ** 2 < md * md) continue;
+          }
+          if ([[0, 0], [hw, 0], [-hw, 0], [0, hd], [0, -hd]].some(
+            ([ox, oy]) => terrainAtGeom(cx + ox, ry + oy) === GTERRAIN.WATER,
+          )) continue;
+          if (!isOnIsland(cx, ry, Math.round(Math.max(hw, hd)))) continue;
+          if (!railClear(cx, ry, Math.max(hw, hd))) continue;
+          parcels.push({ x: cx, y: ry, hw, hd, block: b, d2: (cx - px) ** 2 + (ry - py) ** 2 });
         }
       }
     }
-    cells.sort((a, c) => a.d2 - c.d2);
-    const n = Math.max(1, cells.length - 1);
+    parcels.sort((a, c) => a.d2 - c.d2);
+    const n = Math.max(1, parcels.length - 1);
     const kindForRank = (i: number): ObjectKind => {
       const f = i / n; // 0 = plaza-adjacent (tallest), 1 = zone edge (shortest)
-      // Canyon skyline: towers dominate through the mid ring, offices to the edge,
-      // only a sliver of cafe/shop — downtown reads as continuous street walls.
-      if (f < 0.62) return 'skyscraper';
-      if (f < 0.93) return 'office';
-      if (f < 0.975) return 'cafe';
+      if (f < 0.45) return 'skyscraper';
+      if (f < 0.82) return 'office';
+      if (f < 0.93) return 'cafe';
       return 'shop';
     };
-    for (let i = 0; i < cells.length; i++) {
-      const c = cells[i];
+    for (let i = 0; i < parcels.length; i++) {
+      const c = parcels[i];
       const kind = kindForRank(i);
-      const size = rSize(kind);
-      const fpR = size * FP;
-      if (!isInsideIsland(c.x, c.y)) continue;
-      if (!isOnIsland(c.x, c.y, Math.round(fpR))) continue;
-      // Stage 13 §3 (footprint-aware): reject if center or cardinal edges touch water.
-      if ([[0,0],[fpR,0],[-fpR,0],[0,fpR],[0,-fpR]].some(
-        ([ox,oy]) => terrainAtGeom(c.x+ox*0.85, c.y+oy*0.85) === GTERRAIN.WATER,
-      )) continue;
-      if (!this.roadClear(c.x, c.y, fpR)) continue;
-      if (!this.lotFree(c.x, c.y, fpR, this.structureLots)) continue;
-      const lot: StructureLot = { x: c.x, y: c.y, size, fpR, kind };
+      const spec = makeBuildingSpec(kind, c.hw, c.hd, i / n, Math.floor(rand() * 0x7fffffff));
+      const size = Math.max(c.hw, c.hd) * 1.1; // gameplay radius ≈ footprint half-extent
+      const lot: StructureLot = { x: c.x, y: c.y, size, fpR: Math.max(c.hw, c.hd), kind, bldg: spec };
       (c.block.buildingLots ??= []).push(lot);
       this.structureLots.push(lot);
     }
@@ -1408,7 +1448,18 @@ export class WorldManager {
     (b as any).paved = true; // no grass tufts; uses asphalt/sidewalk tiling
     // Dense City: place the pre-generated, non-overlapping building lots for this block
     for (const lot of b.buildingLots ?? []) {
-      this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+      if (lot.bldg) {
+        // hole.io rebuild: box building — live pseudo-3D draw; the flat
+        // composite sprite backs the capture/tumble/swallow-ghost path.
+        this.makeObj(lot.kind, lot.x, lot.y, {
+          size: lot.size, baseSize: lot.size,
+          bldg: lot.bldg,
+          sceneryKey: ensureBuildingSprite(lot.bldg),
+          contactRadius: Math.max(lot.bldg.w, lot.bldg.d) * 0.95,
+        });
+      } else {
+        this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+      }
     }
     // street furniture — URBAN props only (benches/flowers between towers read
     // as nonsense; keep the core feeling like a city, not a park)
@@ -1584,6 +1635,9 @@ export class WorldManager {
       // Entrance plaza (south edge, mid-block): ticket booth, popcorn cart,
       // hedges and info signs along the visitor spine.
       const ex = bx, ey = zy1 - 130;
+      // The real red entrance ARCH spans the visitor path (replaces the flat
+      // painted rectangles that read as "rough")
+      this.placeSceneryProp(zooPropKeys[0], bx, zy1 - ins - 6, 92, 3);
       this.placeSceneryProp(zooPropKeys[7], ex - 150, ey, 44);        // ticket booth
       this.placeSceneryProp(zooPropKeys[11], ex + 130, ey - 30, 36);  // popcorn cart
       this.placeSceneryProp(zooPropKeys[9], ex - 320, ey + 10, 30);   // hedge
@@ -3250,7 +3304,9 @@ export class WorldManager {
         o.x + pad >= view.x && o.x - pad <= view.x + view.w &&
         o.y + pad >= view.y && o.y - pad <= view.y + view.h;
     });
-    visible.sort((a, b) => a.y - b.y);
+    // hole.io rebuild: box buildings sort by their SOUTH edge (visual base),
+    // everything else by its foot point as before.
+    visible.sort((a, b) => (a.y + (a.bldg?.d ?? 0)) - (b.y + (b.bldg?.d ?? 0)));
 
     // v10 §3: ground shadows for captured objects — stay planted as object lifts toward void
     for (const obj of visible) {
@@ -3266,9 +3322,20 @@ export class WorldManager {
       ctx.restore();
     }
 
+    // hole.io rebuild: camera centre drives the extruded-building parallax
+    const camCX = view.x + view.w / 2;
+    const camCY = view.y + view.h / 2;
+
     const drawOne = (obj: WorldObject) => {
       // Structural Build: the express draws its own multi-segment body
       if (obj.kind === 'train') { this.drawTrain(ctx, obj, t); return; }
+      // hole.io rebuild: live pseudo-3D box draw for uncaptured buildings.
+      // Captured ones fall through to the flat-sprite tumble path below.
+      if (obj.bldg && !obj.captured) {
+        const shk3 = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
+        drawBuilding3D(ctx, obj.bldg, obj.x + shk3, obj.y, camCX, camCY);
+        return;
+      }
       // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)
       if (obj.golden) {
         ctx.save();

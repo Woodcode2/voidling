@@ -333,8 +333,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   //      Each distinct surface now reads as its own material.
   _texZone(cc, 'forest',   ZONE_FOREST_R,   COL.forest);
   _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
-  // Downtown floors in crisp cool slate — a real city core, not brown mud.
-  _texZone(cc, 'street', ZONE_DOWNTOWN_R, '#5E6676', true);
+  // hole.io rebuild: downtown floors in LIGHT concrete (like hole.io's pale
+  // city ground) so the extruded buildings and dark roads pop against it.
+  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, '#DADDE2', true);
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
 
@@ -645,8 +646,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     cc.beginPath(); cc.moveTo(rc + hw, MARGIN); cc.lineTo(rc + hw, S - MARGIN); cc.stroke();
   }
 
-  // (f) Soft crosswalk stripes at each junction — muted warm paint, rounded.
-  cc.fillStyle = 'rgba(243,236,218,0.24)';
+  // (f) Crosswalk stripes at each junction — BOLD white zebra bars like
+  // hole.io's streets (they were nearly invisible at 0.24 alpha).
+  cc.fillStyle = 'rgba(255,255,255,0.72)';
   for (const rx of ROAD_CENTERS) {
     for (const ry of ROAD_CENTERS) {
       const stripeW = 14, stripeGap = 24, rad = 6;
@@ -1595,19 +1597,8 @@ function _paintZooLayout(cc: CanvasRenderingContext2D): void {
     }
   }
 
-  // ── Entrance arch (south-center): two posts + banner over the entry path ────
-  {
-    const ex = bx, ey = zy1 - ins - 6;
-    cc.fillStyle = '#E4586B';
-    cc.fillRect(ex - 70, ey - 90, 16, 90);
-    cc.fillRect(ex + 54, ey - 90, 16, 90);
-    cc.fillRect(ex - 78, ey - 112, 156, 28);
-    cc.fillStyle = '#FFFFFF';
-    cc.font = '700 22px Nunito, sans-serif';
-    cc.textAlign = 'center'; cc.textBaseline = 'middle';
-    cc.fillText('ZOO', ex, ey - 98);
-    cc.textAlign = 'left'; cc.textBaseline = 'alphabetic';
-  }
+  // Entrance arch: now a real clay sprite (zoo_prop_0) placed by fillZoo —
+  // the old painted flat rectangles read as "rough".
 
   // ── Flamingo pond (bottom-left) ────────────────────────────────────────────
   const pondX = zx0 + ins + 220, pondY = by + 140;
