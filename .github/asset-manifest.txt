@@ -1,5 +1,4 @@
-artifacts/3d-game/store/candidates-v3
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_449c7ad5-0df2-4f17-9d02-5459f0ba8f2e.png
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_3bbad8f3-36c4-41cf-b147-d2abfcee8712.png
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_3c2acb18-8ea0-403c-a652-e37988d7419b.png
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_122138_5dd1fecc-9d00-4602-8e17-be2f588adf4e.png
+artifacts/3d-game/public/assets/music
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_153339_ebc9638c-5120-4a25-9c56-49ffb9e6dc6e.m4a
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_153353_8a489bbd-bed1-4740-abe2-9efa2cdb1ab2.m4a
+https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_153356_54d0fa40-0e5c-451f-aac8-ae855e557a50.m4a
