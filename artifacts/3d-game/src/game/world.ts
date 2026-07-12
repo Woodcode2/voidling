@@ -164,7 +164,7 @@ interface FieldDecal { kind: ObjectKind; cx: number; cy: number; halfW: number; 
 // Life Pack §3: vignette scene config
 interface VignetteConfig {
   kind: ObjectKind;
-  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'forest' | 'any';
+  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'forest' | 'civic' | 'any';
   decal?: ObjectKind; // anchor the scene onto this baked ground decal when present
   ambientText: string | string[]; panicText: string | string[]; eatenBanner: string; always: boolean;
   supportProps?: ObjectKind[]; supportPeds?: ObjectKind[];
@@ -206,6 +206,23 @@ const VIGNETTE_CONFIGS: VignetteConfig[] = [
     ambientText: ['Just watered those.', 'prize tomatoes, these'],
     panicText:   ['I JUST WATERED THOSE!', 'TAKE THE HOA INSTEAD!'],
     eatenBanner: '🌷 GARDEN: DEVOURED' },
+  // ── Overnight events: the island is BUSY ──
+  { kind: 'vig_golf',    zone: 'park',  always: true, decal: 'field_golf',
+    ambientText: ['FORE!!', 'reading the green…', 'gimme putt. probably.', 'best round of my LIFE'],
+    panicText:   ['MULLIGAN!!', 'play it where it LIES!! RUN!!', 'the 19th hole. NOW.'],
+    eatenBanner: '⛳ GOLF GAME: SWALLOWED', supportPeds: ['person_dad', 'person_biz'] },
+  { kind: 'vig_mayor',   zone: 'civic', always: true,
+    ambientText: ['re-elect me and the void LEAVES!', 'we are DEFINITELY handling it', 'the budget is… fine!!', 'cut the ribbon. quickly.'],
+    panicText:   ['EVACUATE! WOMEN, CHILDREN, MAYORS FIRST!', "this is my opponent's fault!!", 'I RESIGN!!!'],
+    eatenBanner: '🏛️ THE MAYOR: TERM ENDED EARLY', supportPeds: ['person_biz', 'person_granny', 'person_mom', 'person_dad', 'tourist'] },
+  { kind: 'vig_school',  zone: 'civic', always: true,
+    ambientText: ['the void ate my homework!!', 'field trip CANCELLED?!', 'pop quiz. everyone run.', 'recess FOREVER!!'],
+    panicText:   ['SNOW DAY RULES APPLY!!', 'single file, SPRINTING!!', 'the hamster!! save Nibbles!!'],
+    eatenBanner: '🎒 CLASS: DISMISSED FOREVER', supportPeds: ['person_kid', 'person_kid', 'person_kid', 'person_mom'] },
+  { kind: 'vig_yoga',    zone: 'park',  always: false,
+    ambientText: ['namaste~', 'downward void… I mean dog', 'breathe innnnn', 'find your center'],
+    panicText:   ['NAMASTAY AWAY!!', 'corpse pose was a MISTAKE', 'find your center. ELSEWHERE.'],
+    eatenBanner: '🧘 YOGA CLASS: ABSORBED', supportPeds: ['person_jog', 'person_mom', 'person_elderly'] },
   // Structural Build: beach volleyball — anchored onto the court decal
   { kind: 'person_sun', zone: 'beach', always: true, decal: 'field_volleyball',
     ambientText: ['SPIKE IT!!', 'set! set! SET!', 'point beach team!!'],
@@ -371,6 +388,7 @@ const LIVING_KINDS: ObjectKind[] = [
   // Life Pack §3: vignette anchors behave like living NPCs
   'vig_proposal', 'vig_soccer', 'vig_wedding', 'vig_couple', 'vig_busker',
   'vig_painter', 'vig_selfie', 'vig_kite', 'vig_gardener',
+  'vig_golf', 'vig_mayor', 'vig_school', 'vig_yoga', 'runner',
   // Life Pack §4: military (defense system)
   'tank', 'attack_heli', 'armored_humvee', 'missile_truck',
   // Rebuild Prompt 16: zoo animals + toy army additions
@@ -399,6 +417,8 @@ export class WorldManager {
     'school', 'library', 'hospital', 'townhall',
   ]); // hole.io rebuild: structure kinds that always render as extruded boxes
   private chatterCd = 4000;         // Overnight: biome ambient-chatter timer
+  private townhallPos: { x: number; y: number } | null = null; // Overnight: mayor stage
+  private schoolPos: { x: number; y: number } | null = null;   // Overnight: school yard
   houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
@@ -666,6 +686,7 @@ export class WorldManager {
       const kind = pick(['flower', 'flowerpot', 'gnome', 'apple'] as ObjectKind[], rand);
       if (dist(p.x, p.y, spawnX, spawnY) < 70) continue;
       if (!isOnIsland(p.x, p.y)) continue; // Alive Pack §A: skip off-island trickle
+      if (!this.clearOfLots(p.x, p.y)) continue; // Overnight: never on a building
       this.makeObj(kind, p.x, p.y);
     }
 
@@ -675,6 +696,7 @@ export class WorldManager {
     this.buildDressing(rand);
     // Life Pack §2: sports field decals
     this.initSportsFields(rand);
+    this.spawnMarathon(rand);
     // Life Pack §3: vignette scenes
     this.initVignettes(rand);
 
@@ -712,14 +734,14 @@ export class WorldManager {
       for (let x = b2.x0 + TREE_INSET; x < b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET; x += TREE_STEP) {
         const ty1 = b2.y0 + TREE_INSET;
         const ty2 = b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET;
-        if (isOnIsland(x, ty1)) this.makeObj('tree', x, ty1, { infra: true });
-        if (isOnIsland(x, ty2)) this.makeObj('tree', x, ty2, { infra: true });
+        if (isOnIsland(x, ty1) && this.clearOfLots(x, ty1, 12)) this.makeObj('tree', x, ty1, { infra: true });
+        if (isOnIsland(x, ty2) && this.clearOfLots(x, ty2, 12)) this.makeObj('tree', x, ty2, { infra: true });
       }
       for (let y = b2.y0 + TREE_INSET + TREE_STEP; y < b2.y0 + CONFIG.BLOCK_SIZE - TREE_INSET * 1.5; y += TREE_STEP) {
         const tx1 = b2.x0 + TREE_INSET;
         const tx2 = b2.x0 + CONFIG.BLOCK_SIZE - TREE_INSET;
-        if (isOnIsland(tx1, y)) this.makeObj('tree', tx1, y, { infra: true });
-        if (isOnIsland(tx2, y)) this.makeObj('tree', tx2, y, { infra: true });
+        if (isOnIsland(tx1, y) && this.clearOfLots(tx1, y, 12)) this.makeObj('tree', tx1, y, { infra: true });
+        if (isOnIsland(tx2, y) && this.clearOfLots(tx2, y, 12)) this.makeObj('tree', tx2, y, { infra: true });
       }
       // ~30% chance: parked car on each curb side (Alive Pack §A: island-guarded)
       const carPool: ObjectKind[] = ['car_parked_a', 'car_parked_b', 'taxi', 'convertible'];
@@ -800,6 +822,35 @@ export class WorldManager {
       for (const o of this.objects) if (!o.eaten && !isInsideIsland(o.x, o.y)) offIsland2++;
       console.log(`SUBURB LOTS: ${suburbN}`);
       console.log(`DOWNTOWN LOTS: ${downtownN} (landmarks: ${S.filter(l => l.kind === 'landmark').length})`);
+
+      // Overnight: WORLD AUDIT — the automated "agent that runs around
+      // verifying everything". Any nonzero count is a placement regression.
+      {
+        const STRUCT = new Set(['house', 'house_c', 'house_d', 'shop', 'cafe', 'office',
+          'skyscraper', 'school', 'library', 'hospital', 'townhall', 'landmark']);
+        let propsOnBuildings = 0;
+        const examples: string[] = [];
+        for (const o of this.objects) {
+          if (o.eaten || STRUCT.has(o.kind) || o.kind === 'train' || o.kind === 'bird' || o.kind === 'drone') continue;
+          for (const l of S) {
+            if ((l.x - o.x) ** 2 + (l.y - o.y) ** 2 < (l.fpR * 0.85) ** 2) {
+              propsOnBuildings++;
+              if (examples.length < 5) examples.push(`${o.kind}@(${Math.round(o.x)},${Math.round(o.y)}) on ${l.kind}`);
+              break;
+            }
+          }
+        }
+        const ROAD_KINDS = new Set(['car', 'taxi', 'schoolbus', 'school_bus', 'convertible', 'fire_truck', 'runner']);
+        let vehiclesOffRoad = 0;
+        for (const o of this.objects) {
+          if (o.eaten || !ROAD_KINDS.has(o.kind) || o.infra) continue;
+          const onH = ROAD_CENTERS.some((rc) => Math.abs(o.y - rc) < CONFIG.ROAD_WIDTH);
+          const onV = ROAD_CENTERS.some((rc) => Math.abs(o.x - rc) < CONFIG.ROAD_WIDTH);
+          if (!onH && !onV) vehiclesOffRoad++;
+        }
+        console.log(`[audit] PROPS ON BUILDINGS: ${propsOnBuildings}${examples.length ? ' — ' + examples.join('; ') : ''}`);
+        console.log(`[audit] VEHICLES OFF-ROAD AT SPAWN: ${vehiclesOffRoad}`);
+      }
       console.log(`BUILDING OVERLAPS: ${overlaps}`);
       console.log(`BUILDINGS ON ROADS: ${onRoads}`);
       console.log(`OFF-ISLAND ENTITIES: ${offIsland2}`);
@@ -926,11 +977,16 @@ export class WorldManager {
           if (dist(o.x, o.y, cx, cy) <= R) { has = true; break; }
         }
         if (!has) {
-          this.makeObj(
-            pick(patch, rand),
-            clamp(cx, MARGIN + 20, this.size - MARGIN - 20),
-            clamp(cy, MARGIN + 20, this.size - MARGIN - 20),
-          );
+          // Overnight: probe for a lot-clear spot in the cell before patching
+          let px2 = clamp(cx, MARGIN + 20, this.size - MARGIN - 20);
+          let py2 = clamp(cy, MARGIN + 20, this.size - MARGIN - 20);
+          let ok = this.clearOfLots(px2, py2);
+          for (let att = 0; att < 6 && !ok; att++) {
+            px2 = clamp(cx + (rand() - 0.5) * 240, MARGIN + 20, this.size - MARGIN - 20);
+            py2 = clamp(cy + (rand() - 0.5) * 240, MARGIN + 20, this.size - MARGIN - 20);
+            ok = this.clearOfLots(px2, py2) && isOnIsland(px2, py2);
+          }
+          if (ok) this.makeObj(pick(patch, rand), px2, py2);
         }
       }
     }
@@ -1072,6 +1128,36 @@ export class WorldManager {
   }
 
   // Life Pack §2: place sports field ground decals in their zones
+  /** Overnight: THE MARATHON — a pack of runners endlessly looping the middle
+   *  road with spectators cheering from the sidewalk. Runners keep running
+   *  even while fleeing (faster). The island's silliest recurring event. */
+  private spawnMarathon(rand: () => number) {
+    const rc = ROAD_CENTERS[2]; // centre horizontal road
+    const startX = 2200 + rand() * 800;
+    const RUNNER_LINES = ['PB PACE!!', 'mile 12… of 3', 'who put a VOID on the route?!',
+      'CARDIO SAVES LIVES!!', 'water station where!!', 'my playlist just peaked!!'];
+    for (let i = 0; i < 8; i++) {
+      const x = startX + i * (90 + rand() * 60);
+      const y = rc + (rand() - 0.5) * 40;
+      if (!isOnIsland(x, y)) continue;
+      const o = this.makeObj('runner', x, y);
+      o.roadAxis = 'h';
+      o.roadDir = 1;
+      o.sceneryKey = `p3d_person_${(i * 3 + 1) % 8}`;
+      if (rand() < 0.4) { o.bubbleText = RUNNER_LINES[i % RUNNER_LINES.length]; o.bubbleLife = 3500; }
+    }
+    // spectators on the sidewalk cheering
+    const CHEER = ['GO GO GO!!', "you're ALL winners!!", 'my knees hurt watching', 'FREE HIGH FIVES!!'];
+    for (let i = 0; i < 4; i++) {
+      const sx = startX + 200 + i * 180;
+      const sy = rc + (i % 2 ? 1 : -1) * (CONFIG.ROAD_WIDTH / 2 + 34);
+      if (!isOnIsland(sx, sy)) continue;
+      const o = this.makeObj(i % 2 ? 'person_mom' : 'person_kid', sx, sy);
+      o.tether = 40;
+      o.bubbleText = CHEER[i]; o.bubbleLife = 4200 + i * 800;
+    }
+  }
+
   private initSportsFields(rand: () => number) {
     const parkBlocks = this.blocks.filter(b => b.type === 'park');
     const downtownBlocks = this.blocks.filter(b => b.type === 'downtown');
@@ -1103,6 +1189,8 @@ export class WorldManager {
     if (parkBlocks.length) {
       const pb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
       place('field_soccer', cx(pb), cy(pb), 200, 130);
+      const gb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
+      place('field_golf', gb.x0 + CONFIG.BLOCK_SIZE * 0.3, gb.y0 + CONFIG.BLOCK_SIZE * 0.32, 160, 120);
     }
     if (downtownBlocks.length) {
       const db = downtownBlocks[Math.floor(rand() * downtownBlocks.length)];
@@ -1139,6 +1227,7 @@ export class WorldManager {
         : zone === 'residential' ? (b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy')
         : zone === 'beach' ? b.type === 'beach'
         : zone === 'forest' ? b.type === 'forest'
+        : zone === 'civic' ? (b.type === 'civic' || b.type === 'townhall')
         : true
       );
 
@@ -1167,6 +1256,13 @@ export class WorldManager {
         ax = dec.cx + (rand() - 0.5) * dec.halfW * 0.8;
         ay = dec.cy + (rand() - 0.5) * dec.halfH * 0.8;
       }
+      // Overnight: civic scenes stage at their real buildings — the mayor
+      // speaks on the town-hall steps, students crowd the school yard.
+      if (vc.kind === 'vig_mayor' && this.townhallPos) {
+        ax = this.townhallPos.x + 40; ay = this.townhallPos.y + 190;
+      } else if (vc.kind === 'vig_school' && this.schoolPos) {
+        ax = this.schoolPos.x + 60; ay = this.schoolPos.y + 200;
+      }
       // Alive Pack §A + Overnight: retry anchor until on-island AND clear of
       // buildings (a wedding inside a house footprint read as chaos)
       for (let vigAtt = 0; vigAtt < 8 && (!isOnIsland(ax, ay) || !this.clearOfLots(ax, ay, 90)); vigAtt++) {
@@ -1192,7 +1288,7 @@ export class WorldManager {
       // Supporting peds
       for (const pk of (vc.supportPeds ?? [])) {
         const ox = ax + (rand() - 0.5) * PROP_SPREAD, oy = ay + (rand() - 0.5) * PROP_SPREAD;
-        if (!isOnIsland(ox, oy)) continue;
+        if (!isOnIsland(ox, oy) || !this.clearOfLots(ox, oy, 8)) continue;
         const o = this.makeObj(pk, ox, oy);
         o.tether = 80;
       }
@@ -1320,7 +1416,7 @@ export class WorldManager {
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       const tx = cx + Math.cos(a) * CORNER_R, ty = cy + Math.sin(a) * CORNER_R;
-      if (isOnIsland(tx, ty)) this.makeObj('tree', tx, ty);
+      if (isOnIsland(tx, ty) && this.clearOfLots(tx, ty, 12)) this.makeObj('tree', tx, ty);
     }
 
     // ── Visitors (park strollers + general mix) ───────────────────────────────
@@ -1402,6 +1498,8 @@ export class WorldManager {
   // audits read zero. Runs after this.blocks is assigned, before the fill loop.
   private generateLots(rand: () => number): void {
     this.houseLots = [];
+    this.townhallPos = null;
+    this.schoolPos = null;
     this.structureLots = [];
     for (const b of this.blocks) b.buildingLots = undefined;
     const B = CONFIG.BLOCK_SIZE;
@@ -1615,6 +1713,7 @@ export class WorldManager {
     if (civicIdx === 0) {
       // left civic block: school + library
       this.makeObj('school', cx - CONFIG.BLOCK_SIZE * 0.18, cy);
+      this.schoolPos = { x: cx - CONFIG.BLOCK_SIZE * 0.18, y: cy }; // Overnight: students anchor here
       const libP = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 50);
       this.makeObj('library', libP.x, libP.y);
     } else {
@@ -1622,6 +1721,7 @@ export class WorldManager {
       this.makeObj('hospital', cx, cy);
       const thP = this.pointInBlock(b, rand, CONFIG.SIDEWALK + 60);
       this.makeObj('townhall', thP.x, thP.y); // v16.1 C: real town hall T5 building
+      this.townhallPos = { x: thP.x, y: thP.y }; // Overnight: mayor speech anchors here
     }
     // shared amenities
     this.scatter(b, rand, 'bench', 3);
@@ -1821,10 +1921,13 @@ export class WorldManager {
 
   // Map Rebuild: FOREST block — noticeably denser than park greenery.  [Prompt 15: counts raised]
   private fillForest(b: Block, rand: () => number) {
-    this.scatter(b, rand, 'tree',   22);
-    this.scatter(b, rand, 'bush',   12);
-    this.scatter(b, rand, 'flower',  3);
-    this.spawnBirds(b, rand, 3);
+    // Overnight: forest is a real WOODS — dense canopy, undergrowth, wildlife
+    this.scatter(b, rand, 'tree',   34);
+    this.scatter(b, rand, 'bush',   16);
+    this.scatter(b, rand, 'flower',  4);
+    this.scatter(b, rand, 'squirrel', 2);
+    this.scatter(b, rand, 'bird', 1);
+    this.spawnBirds(b, rand, 4);
   }
 
   // v15 §4: Town Hall — civic hub, fountain, plaza feel, crowd
@@ -2738,7 +2841,11 @@ export class WorldManager {
   private stepCar(obj: WorldObject, dtSec: number, player: Player) {
     const dp = dist(obj.x, obj.y, player.x, player.y);
     const playerBigger = this.canEat(player.radius, obj.size);
-    let speed = obj.kind === 'schoolbus' ? CONFIG.BUS_SPEED : CONFIG.CAR_SPEED;
+    let speed = obj.kind === 'schoolbus' ? CONFIG.BUS_SPEED
+      : obj.kind === 'runner' ? 74   // marathon pace — they NEVER stop running
+      : CONFIG.CAR_SPEED;
+    // Overnight gag: threatened runners just... run faster. Cardio saves lives.
+    if (obj.kind === 'runner' && playerBigger && dp < 420) speed *= 1.7;
 
     if (obj.honkCd > 0) obj.honkCd -= dtSec * 1000;
     if (!playerBigger && dp < 240 && obj.honkCd <= 0 && !player.ghost) {
@@ -3100,7 +3207,8 @@ export class WorldManager {
       // ── Vignette anchors → clay people pool; fallback to clay_park_4 ────────
       case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':
       case 'vig_busker':   case 'vig_painter': case 'vig_selfie':  case 'vig_kite':
-      case 'vig_gardener':
+      case 'vig_gardener': case 'vig_golf':    case 'vig_mayor':   case 'vig_school':
+      case 'vig_yoga':
         return `p3d_person_${id % 8}`; // hole.io rebuild: procedural minifigs
       // ── Zoo structures (not animals — they're covered by ZOO_KINDS above) ────
       case 'zoo_gate':  return 'clay_park_2';   // gazebo stand-in for arched gate

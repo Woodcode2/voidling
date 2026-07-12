@@ -812,7 +812,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       banner('+15 SECONDS', '#FFD23F');
       console.log('[boon] BORROWED TIME +15s');
     } else {
-      const dur = BOON_DURATION[id] || 16000;
+      // Overnight: MUTATIONS are permanent for the round — evolution-path
+      // identity, not a 16-second buff (the stale-boon complaint).
+      const dur = 9e9;
       const existing = activeBoons.find((b) => b.id === id);
       if (existing) { existing.remaining = dur; existing.level = rank; }
       else activeBoons.push({ id, name: def.name, remaining: dur, duration: dur, level: rank });
@@ -970,6 +972,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (!milestoneForms[form]) {
       milestoneForms[form] = true;
       banner(name, '#FFD23F', 3, { sparkles: true });
+      // Overnight: evolving is when you MUTATE — the pick screen opens right
+      // after the evolution fanfare lands (replaces the old timed boons).
+      if (form >= 1) {
+        window.setTimeout(() => {
+          if (!roundEnded && screen === 'game') openBoonPick();
+        }, 1400);
+      }
     } else {
       banner('EVOLVED → ' + name, '#C77DFF');
     }
@@ -1226,8 +1235,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           pelletHitFlash = 300;
           // The city can actually push you around: pellets physically stagger the void.
           const pm = Math.hypot(p.vx, p.vy) || 1;
-          player.x = clamp(player.x + (p.vx / pm) * 26, player.radius, CONFIG.MAP_SIZE - player.radius);
-          player.y = clamp(player.y + (p.vy / pm) * 26, player.radius, CONFIG.MAP_SIZE - player.radius);
+          const kb1 = hasBoon('dense') ? 0 : 26; // DENSE CORE: no stagger
+          player.x = clamp(player.x + (p.vx / pm) * kb1, player.radius, CONFIG.MAP_SIZE - player.radius);
+          player.y = clamp(player.y + (p.vy / pm) * kb1, player.radius, CONFIG.MAP_SIZE - player.radius);
           fx.shake(140, 4, 15);
           audio.playEaten();
           banner(`🚔 Pellet hit! -${CONFIG.DEFENSE_PELLET_COST} pts`, '#FF9F1C', 2);
@@ -1247,9 +1257,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             // Direct artillery hit: real knockback + momentum kill — the army HURTS.
             const bd = Math.max(1, dist(s.tx, s.ty, player.x, player.y));
             const bax = (player.x - s.tx) / bd, bay = (player.y - s.ty) / bd;
-            player.x = clamp(player.x + bax * 90, player.radius, CONFIG.MAP_SIZE - player.radius);
-            player.y = clamp(player.y + bay * 90, player.radius, CONFIG.MAP_SIZE - player.radius);
-            player.vx = 0; player.vy = 0;
+            const kb2 = hasBoon('dense') ? 0 : 90; // DENSE CORE: shrug off artillery
+            player.x = clamp(player.x + bax * kb2, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.y = clamp(player.y + bay * kb2, player.radius, CONFIG.MAP_SIZE - player.radius);
+            if (!hasBoon('dense')) { player.vx = 0; player.vy = 0; }
             fx.shake(300, 12, [0, 90]);
             audio.playEaten();
             if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost} pts`, '#FF4D6D', 2);
@@ -1284,8 +1295,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             pelletHitFlash = 500;
             // Missile knockback — the air force means business.
             const md = Math.max(1, dist(m.tx, m.ty, player.x, player.y));
-            player.x = clamp(player.x + ((player.x - m.tx) / md) * 70, player.radius, CONFIG.MAP_SIZE - player.radius);
-            player.y = clamp(player.y + ((player.y - m.ty) / md) * 70, player.radius, CONFIG.MAP_SIZE - player.radius);
+            const kb3 = hasBoon('dense') ? 0 : 70; // DENSE CORE
+            player.x = clamp(player.x + ((player.x - m.tx) / md) * kb3, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.y = clamp(player.y + ((player.y - m.ty) / md) * kb3, player.radius, CONFIG.MAP_SIZE - player.radius);
             fx.shake(240, 9, [0, 80]);
             audio.playEaten();
             if (cost > 0) banner(`🚁 Missile hit! -${cost} pts`, '#FF4D6D', 2);
@@ -1469,6 +1481,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // v6 §2: catch-up economy — underdog aura + leader decay
     applyCatchUp(dt);
+    updateThreats(dt);
 
     // v9 §1: fairness proof — every 10s log all six radii + masses. If bots
     // consistently out-size the player, the shared-Void refactor is incomplete.
@@ -1615,16 +1628,27 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.nearFood = vacActive; // Phase 7a: pupil dilation when food in vacuum
     }
 
-    // v6 §1: power-up picks at 2:30 / 1:40 / 0:50 remaining
-    for (const th of CONFIG.BOON_PICK_TIMES) {
-      if (!boonUsed.has(th) && timeLeft <= th && timeLeft > 500) {
-        boonUsed.add(th);
-        openBoonPick();
-        return;
+    if (timeLeft <= 0) { timeLeft = 0; endRound(); }
+  }
+
+  // Overnight: DANGER TELEGRAPH — flag every rival currently big enough to
+  // eat the player; rivals.draw shows a pulsing red threat ring, and the
+  // first time a threat closes in you get one warning banner.
+  let threatWarnCd = 0;
+  function updateThreats(dt: number) {
+    if (!player) return;
+    threatWarnCd -= dt;
+    for (const r of rivals) {
+      const was = r.threatToPlayer;
+      const d = dist(r.x, r.y, player.x, player.y);
+      r.threatToPlayer = r.alive && !r.ghost &&
+        r.radius >= player.radius * CONFIG.RIVAL_EAT_RATIO && d < 1400;
+      if (r.threatToPlayer && !was && d < 1000 && threatWarnCd <= 0) {
+        threatWarnCd = 9000;
+        banner(`⚠️ ${r.name} CAN EAT YOU — RUN!`, '#FF4D6D', 5, { pulse: true });
+        audio.playEaten();
       }
     }
-
-    if (timeLeft <= 0) { timeLeft = 0; endRound(); }
   }
 
   // v6 §2: standings-driven catch-up. 5th/6th place get a silent underdog aura
@@ -1656,7 +1680,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v7 §5: draw WITHOUT replacement — retire any power-up already at max level
     const pool = CONFIG.BOONS.filter((b) => (boonRank.get(b.id) || 0) < BOON_MAX_LEVEL);
     boonChoices = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       if (pool.length) {
         boonChoices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
       }
@@ -1667,8 +1691,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     notify();
   }
 
-  function canEatVoid(bigR: number, smallR: number, d: number) {
-    return bigR >= smallR * CONFIG.RIVAL_EAT_RATIO && d <= bigR - smallR * 0.15;
+  function canEatVoid(bigR: number, smallR: number, d: number, ratio = CONFIG.RIVAL_EAT_RATIO) {
+    return bigR >= smallR * ratio && d <= bigR - smallR * 0.15;
   }
 
   // Life Pack §4 + War Pack §2: spawn a wave of defense units from map edges
@@ -1736,7 +1760,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (!r.alive || r.ghost) continue;
         const d = dist(player.x, player.y, r.x, r.y);
         if (d > player.radius + r.radius) continue;
-        if (canEatVoid(player.radius, r.radius, d)) {
+        if (canEatVoid(player.radius, r.radius, d, hasBoon('predator') ? 1.18 : CONFIG.RIVAL_EAT_RATIO)) {
           const rr = r.radius;
           fx.addConfetti(r.x, r.y, CONFIG.COLORS.pops);
           fx.shake(280, 12); fx.flash();
@@ -1774,16 +1798,20 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             const pr = player.radius;
             fx.shake(360, 16); fx.flash();
             audio.playEaten();
-            // Death Rules Pivot: eaten while at the smallest stage (VOIDLING) = game over, else drop one stage
+            // Overnight (hole.io death rules): being devoured never ends the
+            // match — you're knocked out, lose a big score chunk to the eater,
+            // and respawn small. The threat is real; the run continues.
             if (player.formIndex <= 0) {
-              // Eaten at the smallest form → game over
-              player.combo = 0; player.orbit = []; player.vx = player.vy = 0;
-              player.ghostTime = 5000; // prevent double-eat during death animation
+              const stolen = Math.floor(player.score * 0.4);
+              player.score = Math.max(0, player.score - stolen);
+              r.score += stolen;
+              player.combo = 0; player.orbit = []; player.dizzy = 1;
               r.eatVoid(pr);
               killedBy = r.name;
-              banner(`${r.name} DEVOURED YOU 💀`, '#FF4D6D', 8, { pulse: true });
-              queueTicker(`💀 The void was consumed by ${r.name}! The city breathes again… briefly.`);
-              window.setTimeout(() => endRound(), 2200);
+              respawnPlayerAfterEaten(r.x, r.y, minDist);
+              fx.addRing(player.x, player.y, '#FF6B6B', 0, pr * 3, 8, 700);
+              banner(`${r.name} DEVOURED YOU 💀 −${stolen} pts`, '#FF4D6D', 8, { pulse: true });
+              queueTicker(`💀 ${r.name} swallowed the void whole! It's... reforming?!`);
             } else {
               // Higher forms: drop one evolution stage, respawn elsewhere, eater gains lost score
               const scoreBefore = player.score;

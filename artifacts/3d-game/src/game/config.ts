@@ -59,6 +59,7 @@ export type ObjectKind =
   // Life Pack §3: vignette anchors (from vignettes_sheet 3×3, row-major)
   | 'vig_proposal' | 'vig_soccer' | 'vig_wedding' | 'vig_couple' | 'vig_busker'
   | 'vig_painter' | 'vig_selfie' | 'vig_kite' | 'vig_gardener'
+  | 'vig_golf' | 'vig_mayor' | 'vig_school' | 'vig_yoga' | 'runner'
   // Life Pack §3: playground props (from playground_sheet 3×3)
   | 'pg_swing' | 'pg_slide' | 'pg_seesaw' | 'pg_sandbox' | 'pg_soccergoal'
   | 'pg_soccerball' | 'pg_hoop' | 'pg_trampoline' | 'pg_merrygoround'
@@ -66,7 +67,7 @@ export type ObjectKind =
   | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
   // Life Pack §2: sports fields (ground decals — not edible world objects)
   | 'field_soccer' | 'field_basketball' | 'field_tennis'
-  | 'field_volleyball' | 'field_campsite' | 'field_beachclub'
+  | 'field_volleyball' | 'field_campsite' | 'field_beachclub' | 'field_golf'
   | 'beachball' | 'deckchair' | 'tent' | 'campfire' | 'landmark'
   // Prompt 18 Stage 4: street furniture (clay-mapped props)
   | 'streetlamp' | 'bus_stop';
@@ -202,7 +203,7 @@ export const CONFIG = {
   TOOBIG_COOLDOWN: 500,     // ms
 
   // v16.2 §0: bot radius cap — a bot's radius may never exceed player × this factor
-  BOT_RADIUS_CAP_FRAC: 1.25,
+  BOT_RADIUS_CAP_FRAC: 1.55,  // Overnight: was 1.25 — BELOW the 1.3 eat ratio, so rivals could NEVER eat you. Danger is real now.
 
   // v16.2 §2: The Guard blockade constants
   GUARD_JEEP_COUNT: 4,
@@ -510,6 +511,12 @@ export const CONFIG = {
     vig_selfie:      { tier: 3, minR: 34, maxR: 42, scoreMult: 2 },
     vig_kite:        { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
     vig_gardener:    { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
+    // Overnight events: golf / mayor speech / school / yoga + marathon runners
+    vig_golf:        { tier: 3, minR: 32, maxR: 40, scoreMult: 2 },
+    vig_mayor:       { tier: 3, minR: 34, maxR: 42, scoreMult: 3 },
+    vig_school:      { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
+    vig_yoga:        { tier: 3, minR: 30, maxR: 38, scoreMult: 2 },
+    runner:          { tier: 2, minR: 16, maxR: 19, scoreMult: 2 },
     // Life Pack §3: playground equipment props
     pg_swing:        { tier: 4, minR: 52, maxR: 62 },
     pg_slide:        { tier: 4, minR: 48, maxR: 58 },
@@ -532,6 +539,7 @@ export const CONFIG = {
     field_volleyball: { tier: 0, minR: 180, maxR: 180 },   // Structural Build: beach court decal
     field_campsite:   { tier: 0, minR: 190, maxR: 190 },   // forest clearing decal
     field_beachclub:  { tier: 0, minR: 170, maxR: 170 },   // cabana deck decal
+    field_golf:       { tier: 0, minR: 160, maxR: 160 },   // putting green decal
     beachball:        { tier: 1, minR: 13, maxR: 18 },     // Structural Build: beach fun props
     deckchair:        { tier: 3, minR: 30, maxR: 40 },
     tent:             { tier: 3, minR: 40, maxR: 52 },
@@ -593,18 +601,20 @@ export const CONFIG = {
   ] as SkinDef[],
 
   // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)
+  // Overnight: MUTATIONS — permanent evolution-path picks offered when you
+  // evolve (replaces the timed "boon" screens the playtest called stale).
   BOONS: [
-    { id: 'magnet',    name: 'Gravity Glutton', desc: 'Absorb reach +40%' },
-    { id: 'overdrive', name: 'Zoomies',         desc: 'Move speed +25%' },
-    { id: 'twin',      name: 'Double Stomach',  desc: 'Merges need only 2' },
-    { id: 'time',      name: 'Borrowed Time',   desc: '+15 seconds, instantly' },
-    { id: 'tremor',    name: 'Tenderizer',      desc: 'Touch shrinks big things' },
-    { id: 'greed',     name: 'Midas Mouth',     desc: 'All score ×1.5' },
-    // v7 §5: four new power-ups
-    { id: 'echo',      name: 'Echo Bite',       desc: 'Every 5th bite pulls snacks in' },
-    { id: 'shield',    name: 'Bubble Shield',   desc: 'Blocks one chomp, then pops' },
-    { id: 'dash',      name: 'Void Dash',       desc: 'Auto-dash 100px every 6s' },
-    { id: 'lucky',     name: 'Lucky Gnome',     desc: 'A golden snack every 10s' },
+    { id: 'magnet',    name: 'EVENT HORIZON',  desc: 'Your pull reaches 40% further' },
+    { id: 'overdrive', name: 'FRENZY GLANDS',  desc: 'Move 25% faster. Forever.' },
+    { id: 'twin',      name: 'TWIN STOMACHS',  desc: 'Merges need only 2 pieces' },
+    { id: 'tremor',    name: 'TREMOR MAW',     desc: 'Your touch shrinks big things' },
+    { id: 'greed',     name: 'MIDAS GULLET',   desc: 'All score ×1.5' },
+    { id: 'echo',      name: 'ECHO BITE',      desc: 'Every 5th bite pulls snacks in' },
+    { id: 'shield',    name: 'SECOND SKIN',    desc: 'Survive one devouring, then it molts' },
+    { id: 'dash',      name: 'BLINK STEP',     desc: 'Auto-dash every 6s' },
+    { id: 'lucky',     name: 'GOLDEN HUNGER',  desc: 'A golden snack every 10s' },
+    { id: 'predator',  name: 'PREDATOR JAW',   desc: 'Devour family at just 1.18× their size' },
+    { id: 'dense',     name: 'DENSE CORE',     desc: 'Immune to knockback and artillery stagger' },
   ] as BoonDef[],
 
   // Death Rules Pivot (Rebuild Prompt 11): the four powers (EVENT HORIZON, WORMHOLE,

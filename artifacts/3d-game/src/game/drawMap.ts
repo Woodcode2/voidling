@@ -766,10 +766,45 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
       else if (fd.kind === 'field_volleyball') _paintVolleyballCourt(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_campsite')   _paintCampsiteClearing(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_beachclub')  _paintBeachClubDeck(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_golf')       _paintGolfGreen(cc, fd.halfW, fd.halfH);
       cc.restore();
     }
     cc.restore();
   }
+}
+
+// Overnight: putting green — manicured green, fringe ring, flag, sand bunker.
+function _paintGolfGreen(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  // fringe (lighter rough ring)
+  cc.fillStyle = '#9FCB8F';
+  cc.beginPath(); cc.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2); cc.fill();
+  // manicured green
+  cc.fillStyle = '#7FBE6E';
+  cc.beginPath(); cc.ellipse(0, 0, hw * 0.78, hh * 0.76, 0, 0, Math.PI * 2); cc.fill();
+  // mow stripes
+  cc.strokeStyle = 'rgba(255,255,255,0.10)';
+  cc.lineWidth = 10;
+  for (let i = -2; i <= 2; i++) {
+    cc.beginPath(); cc.moveTo(-hw * 0.7, i * hh * 0.28); cc.lineTo(hw * 0.7, i * hh * 0.28); cc.stroke();
+  }
+  // sand bunker
+  cc.fillStyle = '#F2DFA7';
+  cc.beginPath(); cc.ellipse(-hw * 0.45, hh * 0.4, hw * 0.24, hh * 0.18, 0.3, 0, Math.PI * 2); cc.fill();
+  cc.strokeStyle = 'rgba(120,100,60,0.25)';
+  cc.lineWidth = 3;
+  cc.beginPath(); cc.ellipse(-hw * 0.45, hh * 0.4, hw * 0.24, hh * 0.18, 0.3, 0, Math.PI * 2); cc.stroke();
+  // hole + flag
+  cc.fillStyle = '#2E3A2C';
+  cc.beginPath(); cc.arc(hw * 0.22, -hh * 0.1, 7, 0, Math.PI * 2); cc.fill();
+  cc.strokeStyle = '#F4F6F8';
+  cc.lineWidth = 4;
+  cc.beginPath(); cc.moveTo(hw * 0.22, -hh * 0.1); cc.lineTo(hw * 0.22, -hh * 0.1 - 64); cc.stroke();
+  cc.fillStyle = '#E8453C';
+  cc.beginPath();
+  cc.moveTo(hw * 0.22, -hh * 0.1 - 64);
+  cc.lineTo(hw * 0.22 + 34, -hh * 0.1 - 52);
+  cc.lineTo(hw * 0.22, -hh * 0.1 - 40);
+  cc.closePath(); cc.fill();
 }
 
 // ─── Prompt 19 §6: sports field marking painters ─────────────────────────────

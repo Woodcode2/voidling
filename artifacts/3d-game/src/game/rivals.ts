@@ -33,6 +33,7 @@ export class Rival extends Void {
   // Speech bubble (arrival bark + ongoing family banter)
   bubbleText = '';
   bubbleT = 0;                    // ms remaining on the current bubble
+  threatToPlayer = false;         // Overnight: engine flags rivals big enough to eat the player
   private banterCd = 14000 + Math.random() * 10000; // ms until next fun line
 
   // v9 §1: radius/score/formIndex/ghostTime/underdog*/eventSlow/skin/name are on Void
@@ -264,6 +265,25 @@ export class Rival extends Void {
       // Alive Pack §7: trailing sparkle for GOBBLER+ rivals (form ≥ 2)
       if (this.formIndex >= 2) drawSparkleTrail(ctx, rx, ry, this.vx, this.vy, this.radius, t);
     }
+    // Overnight: DANGER RING — a pulsing red halo under any rival currently
+    // big enough to devour the player. You always see death coming.
+    if (this.threatToPlayer && !airborne && !this.ghost) {
+      const pulse = 0.55 + Math.sin(t / 160) * 0.25;
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,60,80,${pulse.toFixed(2)})`;
+      ctx.lineWidth = Math.max(3, this.radius * 0.07);
+      ctx.beginPath();
+      ctx.arc(rx, ry, this.radius * 1.18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([14, 10]);
+      ctx.strokeStyle = `rgba(255,120,130,${(pulse * 0.7).toFixed(2)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(rx, ry, this.radius * 1.3, t / 900, t / 900 + Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Alive Pack §5: eat-chomp squash — starts at 0.85, springs to 1.0 over 80 ms
     const chompSquash = this.chompSquashT > 0 ? 1.0 - 0.15 * (this.chompSquashT / 80) : 1.0;
     drawVoidling(ctx, rx, ry + this.bobOffset - drop, {

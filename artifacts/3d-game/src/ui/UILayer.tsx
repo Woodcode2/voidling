@@ -674,8 +674,8 @@ function Boon({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   return (
     <div className="vd-overlay vd-overlay--scrim">
       <div className="vd-stack">
-        <h2 className="vd-heading">CHOOSE A BOON</h2>
-        <p className="vd-sub">Pick a power to keep chomping</p>
+        <h2 className="vd-heading">MUTATE</h2>
+        <p className="vd-sub">Evolution unlocked — choose your path. Permanent.</p>
         {snap.boonChoices.map((b) => (
           <button
             key={b.id}
