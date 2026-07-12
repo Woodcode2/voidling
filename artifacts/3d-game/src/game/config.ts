@@ -94,6 +94,7 @@ export interface SkinDef {
   accessories: AccessoryType[];
   premium?: boolean;    // v7 §9: real-money skin (mock IAP)
   priceUSD?: number;    // v7 §9: display price for premium skins
+  fx?: string;          // Skins overhaul: one-line effect tagline (shop copy)
   eyeGlow?: string;     // v9 §6: glowing eye color (lava, dragon)
 }
 
@@ -592,12 +593,12 @@ export const CONFIG = {
     { id: 'astronaut', name: 'Astronaut', cost: 4000, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
     { id: 'devil',     name: 'Devil',     cost: 4000, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
     // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
-    { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#0D0821', glowColor: '#B98CFF', eyeStyle: 'normal', accessories: [] },
-    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#14090A', glowColor: '#FF7A2B', eyeStyle: 'angry', eyeGlow: '#FF6A00', accessories: [] },
-    { id: 'ghost',     name: 'Ghost',     cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#EAF2FF', glowColor: '#7FDBFF', eyeStyle: 'normal', accessories: [] },
-    { id: 'midas',     name: 'King Midas', cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#FFD447', glowColor: '#FFD23F', eyeStyle: 'normal', accessories: ['tiara'] },
-    { id: 'disco',     name: 'Disco',     cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#3A3A55', glowColor: '#FF5AF0', eyeStyle: 'normal', accessories: [] },
-    { id: 'dragon',    name: 'Dragon',    cost: 0, premium: true, priceUSD: 3.99, bodyColor: '#1DB954', glowColor: '#7CFF6B', eyeStyle: 'angry', eyeGlow: '#FFB000', accessories: [] },
+    { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#0D0821', glowColor: '#B98CFF', eyeStyle: 'normal', accessories: [], fx: 'Living starfield body · orbiting star trail · nebula halo' },
+    { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#14090A', glowColor: '#FF7A2B', eyeStyle: 'angry', eyeGlow: '#FF6A00', accessories: [], fx: 'Molten crack body · rising embers · pulsing heat ring' },
+    { id: 'ghost',     name: 'Ghost',     cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#EAF2FF', glowColor: '#7FDBFF', eyeStyle: 'normal', accessories: [], fx: 'Translucent spectre · trailing echo wisps' },
+    { id: 'midas',     name: 'King Midas', cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#FFD447', glowColor: '#FFD23F', eyeStyle: 'normal', accessories: ['tiara'], fx: 'Molten gold sheen · travelling glint · radiant crown rays' },
+    { id: 'disco',     name: 'Disco',     cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#3A3A55', glowColor: '#FF5AF0', eyeStyle: 'normal', accessories: [], fx: 'Hue-cycling mirrorball body · rotating light beams' },
+    { id: 'dragon',    name: 'Dragon',    cost: 0, premium: true, priceUSD: 3.99, bodyColor: '#1DB954', glowColor: '#7CFF6B', eyeStyle: 'angry', eyeGlow: '#FFB000', accessories: [], fx: 'Emerald scale armour · rim flames · breathing ember glow' },
   ] as SkinDef[],
 
   // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)

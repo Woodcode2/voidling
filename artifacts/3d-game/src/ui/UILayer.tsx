@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v23 · tipin';
+const BUILD_STAMP = 'v24 · legendary';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 
@@ -541,6 +541,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
                 onClick={() => { if (owned) { engine.equipSkin(skin.id); } else { engine.iapView(skin.id); setIap(skin.id); } }}
               >
                 <span className="vd-rarity vd-rarity--premium">LEGENDARY</span>
+                {skin.fx && <p style={{ fontSize: '0.72rem', color: '#E8D9A0', margin: '4px 8px 0', lineHeight: 1.35, fontWeight: 700 }}>{skin.fx}</p>}
                 <div className="vd-skinwrap"><SkinPreview skinId={skin.id} size={92} glow={0.4} /></div>
                 <div className="vd-skin-name">{skin.name}</div>
                 {equipped ? (
@@ -567,6 +568,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
               <span className="vd-rarity vd-rarity--premium">LEGENDARY</span>
               <div className="vd-modal-void"><SkinPreview skinId={s.id} size={168} glow={0.7} /></div>
               <h3 className="vd-modal-name">{s.name}</h3>
+              {s.fx && <p style={{ fontSize: '0.82rem', color: '#E8D9A0', margin: '2px 12px 6px', lineHeight: 1.4, fontWeight: 700 }}>{s.fx}</p>}
               <p className="vd-sub">Unlock instantly + 100 bonus coins</p>
               <button
                 className="vd-btn vd-btn--play"

@@ -14,7 +14,7 @@
 // The newest stage's additions fade in over v.morph so every stage-up pops.
 // Everything is procedural — zero sprite dependencies.
 import type { SkinDef } from './config';
-import { drawSkinBack, drawSkinFront } from './skins';
+import { drawSkinBack, drawSkinFront, drawSkinBodyFX } from './skins';
 
 export interface VoidlingVisual {
   r: number;
@@ -88,6 +88,10 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
 
   // ── Stage interior: core glow, nebula, galaxy (inside the orb) ─────────────
   drawStageInterior(ctx, v);
+
+  // ── Legendary skin interior FX (galaxy starfield, magma cracks, gold sheen,
+  //    disco facets, dragon scales) — clipped inside the orb, over the stage body
+  drawSkinBodyFX(ctx, skin, r, v.t);
 
   // ── Face (crisp, unsquashed) ────────────────────────────────────────────────
   drawFace(ctx, v);

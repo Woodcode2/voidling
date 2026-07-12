@@ -10,6 +10,7 @@ function has(skin: SkinDef, a: AccessoryType) {
 
 // ── BACK (behind body) ───────────────────────────────────────────────────────
 export function drawSkinBack(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number) {
+  drawLegendaryBack(ctx, skin, r, t); // wicked money-skin aura/trails
   // v8 §8: GHOST — a wavering scalloped tail trailing below the body
   if (skin.id === 'ghost') {
     const wig = Math.sin(t / 320) * r * 0.14;
@@ -56,6 +57,281 @@ export function drawSkinBack(ctx: CanvasRenderingContext2D, skin: SkinDef, r: nu
     }, '#C42A2A', { outline: 2, shadow: false });
     ctx.restore();
   }
+}
+
+// ── LEGENDARY BACK FX — wicked aura/trail effects behind the body ───────────
+// Money skins must LOOK like money: each legendary gets a signature particle
+// system, all t-driven procedural canvas (no assets, scales to any radius).
+export function drawLegendaryBack(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number) {
+  switch (skin.id) {
+    case 'lava': {
+      // rising EMBERS + pulsing heat rim
+      ctx.save();
+      for (let i = 0; i < 9; i++) {
+        const cycle = ((t / 1400 + i * 0.31) % 1);
+        const a = (i * 2.399) % (Math.PI * 2);
+        const dist0 = r * (0.75 + ((i * 37) % 40) / 100);
+        const ex = Math.cos(a) * dist0 + Math.sin(t / 500 + i) * r * 0.06;
+        const ey = Math.sin(a) * dist0 * 0.5 + r * 0.5 - cycle * r * 1.7;
+        ctx.globalAlpha = (1 - cycle) * 0.85;
+        ctx.fillStyle = i % 3 ? '#FF8A3C' : '#FFD23F';
+        ctx.beginPath();
+        ctx.arc(ex, ey, Math.max(1.4, r * 0.045 * (1 - cycle)), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      const pulse = 0.5 + Math.sin(t / 300) * 0.2;
+      ctx.strokeStyle = `rgba(255,110,30,${pulse.toFixed(2)})`;
+      ctx.lineWidth = Math.max(2, r * 0.07);
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.06, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case 'galaxy': {
+      // orbiting STAR TRAIL + nebula ring
+      ctx.save();
+      for (let i = 0; i < 10; i++) {
+        const a = t / 1600 + (i / 10) * Math.PI * 2;
+        const rr2 = r * (1.18 + Math.sin(t / 900 + i * 1.7) * 0.12);
+        const tw = 0.3 + 0.7 * Math.abs(Math.sin(t / 420 + i * 2.1));
+        ctx.globalAlpha = tw;
+        drawStar(ctx, Math.cos(a) * rr2, Math.sin(a) * rr2 * 0.9, r * (0.05 + (i % 3) * 0.02), i % 2 ? '#B9CFFF' : '#F2C6FF');
+      }
+      ctx.globalAlpha = 0.5;
+      const neb = ctx.createRadialGradient(0, 0, r * 0.95, 0, 0, r * 1.5);
+      neb.addColorStop(0, 'rgba(120,80,220,0)');
+      neb.addColorStop(0.5, 'rgba(150,90,255,0.30)');
+      neb.addColorStop(0.75, 'rgba(255,110,220,0.16)');
+      neb.addColorStop(1, 'rgba(120,80,220,0)');
+      ctx.fillStyle = neb;
+      ctx.beginPath(); ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'disco': {
+      // 3 rotating LIGHT BEAMS + floor colour dots
+      ctx.save();
+      const COLS = ['rgba(255,90,240,', 'rgba(90,200,255,', 'rgba(255,210,63,'];
+      for (let i = 0; i < 3; i++) {
+        const a = t / 700 + (i / 3) * Math.PI * 2;
+        const g = ctx.createLinearGradient(0, 0, Math.cos(a) * r * 2.4, Math.sin(a) * r * 2.4);
+        g.addColorStop(0, COLS[i] + '0.34)');
+        g.addColorStop(1, COLS[i] + '0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r * 2.4, a - 0.16, a + 0.16);
+        ctx.closePath();
+        ctx.fill();
+      }
+      for (let i = 0; i < 8; i++) {
+        const a = -t / 900 + i * 0.785;
+        ctx.fillStyle = COLS[i % 3] + '0.5)';
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * r * 1.5, Math.sin(a) * r * 1.15, r * 0.05, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
+    case 'dragon': {
+      // flame tongues licking the rim + drifting smoke
+      ctx.save();
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + Math.sin(t / 600 + i) * 0.15;
+        const flick = 0.6 + Math.abs(Math.sin(t / 170 + i * 2.4)) * 0.6;
+        const bx = Math.cos(a) * r * 1.02, by = Math.sin(a) * r * 1.02;
+        const tx2 = Math.cos(a) * r * (1.02 + 0.3 * flick), ty2 = Math.sin(a) * r * (1.02 + 0.3 * flick);
+        const g = ctx.createLinearGradient(bx, by, tx2, ty2);
+        g.addColorStop(0, 'rgba(124,255,107,0.55)');
+        g.addColorStop(1, 'rgba(30,185,84,0)');
+        ctx.strokeStyle = g;
+        ctx.lineWidth = Math.max(2.5, r * 0.09);
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx2, ty2); ctx.stroke();
+      }
+      ctx.restore();
+      break;
+    }
+    case 'midas': {
+      // radiant golden rays, slowly rotating
+      ctx.save();
+      ctx.globalAlpha = 0.4 + Math.sin(t / 800) * 0.12;
+      for (let i = 0; i < 6; i++) {
+        const a = t / 2600 + (i / 6) * Math.PI * 2;
+        const g = ctx.createLinearGradient(0, 0, Math.cos(a) * r * 1.9, Math.sin(a) * r * 1.9);
+        g.addColorStop(0, 'rgba(255,210,63,0.5)');
+        g.addColorStop(1, 'rgba(255,210,63,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r * 1.9, a - 0.09, a + 0.09);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
+    case 'ghost': {
+      // trailing spectral echoes
+      ctx.save();
+      for (let i = 1; i <= 3; i++) {
+        const drift = Math.sin(t / 480 + i * 1.8) * r * 0.14;
+        ctx.globalAlpha = 0.16 / i;
+        ctx.fillStyle = '#CFE6FF';
+        ctx.beginPath();
+        ctx.arc(-i * r * 0.22 + drift, i * r * 0.1, r * (1 - i * 0.13), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
+  }
+}
+
+// ── LEGENDARY BODY FX — painted INSIDE the orb, over the stage body ─────────
+// Clipped to the body circle; ~0.5 alpha so form escalation still reads.
+export function drawSkinBodyFX(ctx: CanvasRenderingContext2D, skin: SkinDef, r: number, t: number) {
+  const id = skin.id;
+  if (!['galaxy', 'lava', 'midas', 'disco', 'dragon'].includes(id)) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.98, 0, Math.PI * 2);
+  ctx.clip();
+  if (id === 'galaxy') {
+    // deep-space tint + two parallax star layers + spiral wisp
+    ctx.fillStyle = 'rgba(10,6,40,0.55)';
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    for (let layer = 0; layer < 2; layer++) {
+      const n = layer ? 14 : 9;
+      const spd = layer ? 2600 : 1500;
+      ctx.fillStyle = layer ? 'rgba(220,230,255,0.9)' : 'rgba(255,205,255,0.8)';
+      for (let i = 0; i < n; i++) {
+        const a = t / spd + i * 2.399;
+        const rad = ((i * 53 + layer * 29) % 88) / 100 * r;
+        const tw = 0.4 + 0.6 * Math.abs(Math.sin(t / 300 + i * 1.3));
+        ctx.globalAlpha = tw;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * rad, Math.sin(a) * rad, Math.max(0.8, r * (layer ? 0.018 : 0.03)), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = 'rgba(190,140,255,0.6)';
+    ctx.lineWidth = Math.max(1.5, r * 0.05);
+    ctx.beginPath();
+    for (let k = 0; k <= 40; k++) {
+      const tt = k / 40;
+      const ang = t / 3000 + tt * Math.PI * 2.2;
+      const rad = tt * r * 0.85;
+      const px = Math.cos(ang) * rad, py = Math.sin(ang) * rad * 0.8;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  } else if (id === 'lava') {
+    // cooled crust + glowing magma crack network + molten core
+    ctx.fillStyle = 'rgba(24,8,8,0.6)';
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    const core = ctx.createRadialGradient(0, r * 0.15, 0, 0, r * 0.15, r * 0.75);
+    core.addColorStop(0, 'rgba(255,140,40,0.55)');
+    core.addColorStop(1, 'rgba(255,140,40,0)');
+    ctx.fillStyle = core;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    const pulse = 0.65 + Math.sin(t / 260) * 0.3;
+    ctx.strokeStyle = `rgba(255,122,43,${pulse.toFixed(2)})`;
+    ctx.lineWidth = Math.max(1.5, r * 0.045);
+    ctx.lineCap = 'round';
+    // deterministic jagged cracks radiating from sub-centres
+    for (let c = 0; c < 4; c++) {
+      const baseA = c * 1.7 + 0.4;
+      let px = Math.cos(baseA) * r * 0.2, py = Math.sin(baseA) * r * 0.2;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      for (let seg = 1; seg <= 4; seg++) {
+        const ja = baseA + Math.sin(c * 7 + seg * 3.1) * 0.55;
+        px += Math.cos(ja) * r * 0.22; py += Math.sin(ja) * r * 0.22;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = `rgba(255,210,63,${(pulse * 0.5).toFixed(2)})`;
+    ctx.lineWidth = Math.max(0.8, r * 0.018);
+    for (let c = 0; c < 4; c++) {
+      const baseA = c * 1.7 + 0.4;
+      let px = Math.cos(baseA) * r * 0.2, py = Math.sin(baseA) * r * 0.2;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      for (let seg = 1; seg <= 4; seg++) {
+        const ja = baseA + Math.sin(c * 7 + seg * 3.1) * 0.55;
+        px += Math.cos(ja) * r * 0.22; py += Math.sin(ja) * r * 0.22;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+  } else if (id === 'midas') {
+    // molten gold sheen + travelling specular glint band
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r * 1.2);
+    g.addColorStop(0, 'rgba(255,232,140,0.75)');
+    g.addColorStop(0.55, 'rgba(230,175,45,0.55)');
+    g.addColorStop(1, 'rgba(160,110,20,0.6)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    const gx = ((t / 1300) % 2 - 0.5) * 2 * r * 1.4;
+    const glint = ctx.createLinearGradient(gx - r * 0.4, -r, gx + r * 0.4, r);
+    glint.addColorStop(0, 'rgba(255,255,255,0)');
+    glint.addColorStop(0.5, 'rgba(255,255,240,0.55)');
+    glint.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glint;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    for (let i = 0; i < 4; i++) {
+      const a = t / 700 + i * 1.57;
+      const tw = Math.abs(Math.sin(t / 350 + i * 2));
+      ctx.globalAlpha = tw * 0.9;
+      drawStar(ctx, Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.5, r * 0.07, '#FFFFFF');
+    }
+  } else if (id === 'disco') {
+    // hue-cycling sheen + mirrorball facet grid
+    const hue = (t / 30) % 360;
+    ctx.fillStyle = `hsla(${hue.toFixed(0)}, 85%, 62%, 0.30)`;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = Math.max(0.8, r * 0.02);
+    const step = r * 0.34;
+    const off = (t / 40) % step;
+    for (let gx2 = -r - step + off; gx2 < r + step; gx2 += step) {
+      ctx.beginPath(); ctx.moveTo(gx2, -r); ctx.lineTo(gx2 + r * 0.5, r); ctx.stroke();
+    }
+    for (let gy2 = -r - step + off; gy2 < r + step; gy2 += step) {
+      ctx.beginPath(); ctx.moveTo(-r, gy2); ctx.lineTo(r, gy2 + r * 0.3); ctx.stroke();
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = t / 500 + i * 2.1;
+      const tw = Math.abs(Math.sin(t / 260 + i * 1.4));
+      ctx.globalAlpha = tw;
+      drawStar(ctx, Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.45, r * 0.08, '#FFFFFF');
+    }
+  } else if (id === 'dragon') {
+    // emerald scale rows (overlapping arcs), breathing glow
+    ctx.fillStyle = 'rgba(10,60,30,0.45)';
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.strokeStyle = 'rgba(124,255,107,0.4)';
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    const rowH = r * 0.3;
+    for (let row = -3; row <= 3; row++) {
+      const y = row * rowH + ((t / 900) % rowH);
+      const shift = (row % 2) * rowH * 0.75;
+      for (let cx2 = -r - rowH + shift; cx2 < r + rowH; cx2 += rowH * 1.5) {
+        ctx.beginPath();
+        ctx.arc(cx2, y, rowH * 0.75, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+      }
+    }
+    const breathe = 0.25 + Math.abs(Math.sin(t / 700)) * 0.25;
+    const g2 = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.8);
+    g2.addColorStop(0, `rgba(124,255,107,${breathe.toFixed(2)})`);
+    g2.addColorStop(1, 'rgba(124,255,107,0)');
+    ctx.fillStyle = g2;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+  }
+  ctx.restore();
 }
 
 // ── FRONT (over body + face) ─────────────────────────────────────────────────

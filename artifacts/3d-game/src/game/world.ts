@@ -3115,11 +3115,9 @@ export class WorldManager {
       const cell = CLAY_FOOD_CELL[kind];
       if (cell !== undefined && clayFoodKeys[cell]) return clayFoodKeys[cell];
     }
-    // Prompt 16: zoo animals render from the clay zoo pool.
-    if (clayZooKeys.length) {
-      const idx = ZOO_KINDS.indexOf(kind);
-      if (idx >= 0 && clayZooKeys[idx]) return clayZooKeys[idx];
-    }
+    // Skins round: zoo animals are procedural now (animals3d) — no more
+    // photographic clay cutouts wobbling around the pens.
+    if (ZOO_KINDS.includes(kind)) return `a3d_${kind}`;
     // Prompt 16: airport set renders from the clay airport pool.
     if (clayAirportKeys.length) {
       const idx = AIRPORT_KINDS.indexOf(kind);
@@ -3206,11 +3204,12 @@ export class WorldManager {
       case 'beachball': return 'clay_beach_5';
       case 'deckchair': return 'clay_beach_11';
       // ── Critters: no clay cutout — draw procedurally (coloured blobs, still eatable) ──
-      case 'dog':
-      case 'cat':
-      case 'duck':
-      case 'squirrel':
-      case 'bird':
+      case 'dog':      return 'a3d_dog';
+      case 'cat':      return 'a3d_cat';
+      case 'duck':     return 'a3d_duck';
+      case 'squirrel': return 'a3d_squirrel';
+      case 'bird':     return 'a3d_bird';
+      case 'crab':     return 'a3d_crab';
       case 'train': // Structural Build: bespoke multi-segment procedural draw
       case 'tent':      // Structural Build: procedural camp props
       case 'campfire':

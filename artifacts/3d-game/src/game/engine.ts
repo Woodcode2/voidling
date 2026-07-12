@@ -19,6 +19,7 @@ import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle ar
 import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
 import { loadCityAssets } from './cityAssets'; // Structural Rebuild: new city art
 import { initProps3d } from './props3d'; // hole.io rebuild: procedural life layer (people/vehicles/trees)
+import { initAnimals3d } from './animals3d'; // Skins round: procedural animals (zoo + critters)
 import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
@@ -394,6 +395,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // must never start with procedural box-people that pop into clay art later.
   const base = import.meta.env.BASE_URL;
   initProps3d(); // synchronous canvas generation — ready before the first frame
+  initAnimals3d();
   let assetsLoaded = false;
   const _allAssets = Promise.all([
     loadGroundTextures(base),
@@ -460,6 +462,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       player.morphTime = 0;
       countdown = 0; // skip any lingering pre-round countdown so powers can fire
       console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
+    }
+    // Dev-only: 7 teleports to the zoo (animals3d checks).
+    if (debugForms && player && e.code === 'Digit7') {
+      player.x = player.prevX = 9800;
+      player.y = player.prevY = 3600;
+      console.log('[debug] teleported to zoo');
     }
     // Dev-only: 8 teleports to a downtown tower block (hole.io rebuild checks).
     if (debugForms && player && e.code === 'Digit8') {
