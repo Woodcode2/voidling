@@ -110,9 +110,10 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
 
   // blush cheeks (swell with cheek puff)
   const puff = v.cheekPuff || 0;
-  // Personality — DEVOURER+ is cold (no blush), GOBBLER is too tough (half blush)
+  // Keep the cute cheeks at EVERY form (dialed back a touch at the top so the
+  // cosmic forms still read powerful) — the blush is the strongest "alive" cue.
   const _formForBlush = v.form || 0;
-  const _blushMult = _formForBlush >= 3 ? 0 : _formForBlush >= 2 ? 0.45 : 1;
+  const _blushMult = _formForBlush >= 4 ? 0.55 : _formForBlush >= 3 ? 0.65 : _formForBlush >= 2 ? 0.82 : 1;
   const blushA = ((skin.extraBlush ? 0.5 : 0.22) + v.chomp * 0.3 + puff * 0.4) * _blushMult;
   ctx.save();
   ctx.globalAlpha = Math.min(1, blushA);
@@ -157,42 +158,43 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
       const pr = eyeRX * 0.56 * grow * (v.nearFood ? 1.15 : 1); // dilate 15% when food in vacuum
       const px = v.lookX * eyeRX * 0.42;
       const py = v.lookY * eyeRY * 0.42;
-      const ender = form >= 4, devour = form >= 3;
+      const cosmic = form >= 3; // DEVOURER+ gain glowing cosmic eyes — still readable
       // premium skins with glowing eyes (lava, dragon) cast a warm halo
-      if (v.skin.eyeGlow && !devour) {
+      if (v.skin.eyeGlow) {
         const pulse = 0.4 + Math.sin(v.t / 300) * 0.25;
         ctx.fillStyle = hexA(v.skin.eyeGlow, pulse);
         ctx.beginPath();
         ctx.ellipse(px, py, pr * 1.9, pr * 1.9 * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
         ctx.fill();
       }
-      // DEVOURER eyes glow violet-white; WORLD ENDER eyes blaze white
-      if (devour) {
-        ctx.fillStyle = hexA(ender ? '#FFFFFF' : '#B466FF', 0.5);
+      // cosmic iris — a soft luminous ring BEHIND a dark, readable pupil
+      if (cosmic) {
+        const irisCol = form >= 4 ? '#C4A8FF' : '#9B6BFF';
+        const pulse = 0.45 + Math.sin(v.t / 320) * 0.2;
+        ctx.fillStyle = hexA(irisCol, pulse);
         ctx.beginPath();
-        ctx.ellipse(px, py, pr * 1.7, pr * 1.7 * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
+        ctx.ellipse(px, py, pr * 1.55, pr * 1.55 * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.fillStyle = ender ? '#FFFFFF' : devour ? '#E6D2FF' : '#1A0B33';
+      // pupil — ALWAYS dark & readable (never white-on-white)
+      ctx.fillStyle = '#160A30';
       ctx.beginPath();
       ctx.ellipse(px, py, pr, pr * (eyeRY / eyeRX), 0, 0, Math.PI * 2);
       ctx.fill();
-      if (ender) {
-        // lens-flare cross blazing across the eye
-        ctx.strokeStyle = hexA('#FFFFFF', 0.9);
-        ctx.lineWidth = Math.max(1, pr * 0.28);
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(px - pr * 1.8, py); ctx.lineTo(px + pr * 1.8, py);
-        ctx.moveTo(px, py - pr * 1.8); ctx.lineTo(px, py + pr * 1.8);
-        ctx.stroke();
-      } else {
-        // moving eye sparkle
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(px - pr * 0.3, py - pr * 0.35, pr * 0.34, 0, Math.PI * 2);
-        ctx.fill();
+      // tiny starfield glints inside the pupil at high forms (cute-cosmic)
+      if (cosmic) {
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        for (const [gx, gy, gs] of [[0.28, 0.18, 0.13], [-0.22, -0.26, 0.10]] as const) {
+          ctx.beginPath();
+          ctx.arc(px + gx * pr, py + gy * pr, pr * gs, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
+      // moving eye sparkle — the friendly catchlight, kept at ALL forms
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(px - pr * 0.32, py - pr * 0.36, pr * 0.36, 0, Math.PI * 2);
+      ctx.fill();
     }
     // eyelid line when nearly closed
     if (v.blink >= 0.6) {
@@ -252,21 +254,8 @@ function drawFace(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     ctx.beginPath();
     ctx.ellipse(0, my + mh * 0.45, mw * 0.7, mh * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
-    // tiny drawn fangs at GOBBLER+ (form >= 2)
-    if ((v.form || 0) >= 2) {
-      const fw = mw * 0.28, fh = mh * 0.58;
-      const ftop = my - mh * 0.78;
-      ctx.fillStyle = '#FFFFFF';
-      for (const sf of [-1, 1]) {
-        const fcx = sf * mw * 0.36;
-        ctx.beginPath();
-        ctx.moveTo(fcx - fw / 2, ftop);
-        ctx.lineTo(fcx + fw / 2, ftop);
-        ctx.lineTo(fcx, ftop + fh);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
+    // (fangs removed — they read as generic-monster and clashed with the
+    // cute-cosmic identity; menace comes from scale + the accretion disk)
   }
 }
 
@@ -279,13 +268,17 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   const { r, t } = v;
   const form = v.form || 0;
   const morph = v.morph ?? 1;
+  const col = _STAGE_SWIRL[Math.min(form, 4)]; // rgba prefix for the stage hue
+
+  // Each form shows ONE clean signature (replaced, not stacked) so the void
+  // reads as a bold hero at every stage instead of a pile of particles.
 
   // ── VOIDLING (0): one shy sparkle that wanders by occasionally ─────────────
   if (form === 0) {
-    const cycle = (t / 5200) % 1;              // long, lazy period
-    if (cycle < 0.32) {                        // visible ~1/3 of the time
-      const p = cycle / 0.32;                  // 0..1 across the pass
-      const fade = Math.sin(p * Math.PI);      // in-and-out
+    const cycle = (t / 5200) % 1;
+    if (cycle < 0.32) {
+      const p = cycle / 0.32;
+      const fade = Math.sin(p * Math.PI);
       const ang = t / 1900;
       const rad = r * 1.35;
       drawStar(ctx, Math.cos(ang) * rad, Math.sin(ang) * rad * 0.6, Math.max(1.2, r * 0.06), fade * 0.85);
@@ -293,137 +286,100 @@ function drawStageAura(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
     return;
   }
 
-  // ── MUNCHER (1+): three tiny stars begin to orbit ──────────────────────────
-  const ring1R = r * 1.3;
-  const spin1 = t / 1600;
-  {
-    const a = form === 1 ? morph : 1;
-    const n = 3;
-    for (let i = 0; i < n; i++) {
-      const ang = spin1 + (i / n) * Math.PI * 2;
+  // ── MUNCHER (1): three tidy orbiting stars ─────────────────────────────────
+  if (form === 1) {
+    const ring = r * 1.32, spin = t / 1600;
+    for (let i = 0; i < 3; i++) {
+      const ang = spin + (i / 3) * Math.PI * 2;
       const tw = 0.55 + 0.45 * Math.abs(Math.sin(t / 340 + i * 2.1));
-      drawStar(ctx, Math.cos(ang) * ring1R, Math.sin(ang) * ring1R * 0.92, Math.max(1.1, r * 0.05), a * tw);
+      drawStar(ctx, Math.cos(ang) * ring, Math.sin(ang) * ring * 0.92, Math.max(1.1, r * 0.055), morph * tw);
     }
+    return;
   }
 
-  // ── GOBBLER (2+): the orbit becomes a visible star-RING + rising embers ────
-  if (form >= 2) {
-    const a = form === 2 ? morph : 1;
-    // faint ring path so the orbit reads as a structure
+  // ── GOBBLER (2): a glowing orbit ring + a handful of bright motes ──────────
+  if (form === 2) {
+    const ring = r * 1.34, spin = t / 1500;
     ctx.save();
-    ctx.globalAlpha *= a * 0.30;
-    ctx.strokeStyle = hexA(v.skin.glowColor, 1);
-    ctx.lineWidth = Math.max(1, r * 0.025);
+    ctx.globalAlpha *= morph * 0.42;
+    ctx.strokeStyle = `${col}0.85)`;
+    ctx.lineWidth = Math.max(1.2, r * 0.03);
     ctx.beginPath();
-    ctx.ellipse(0, 0, ring1R, ring1R * 0.92, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, ring, ring * 0.9, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    // three more stars fill the ring (six total on ring 1)
-    for (let i = 0; i < 3; i++) {
-      const ang = spin1 + ((i + 0.5) / 3) * Math.PI * 2;
-      const tw = 0.5 + 0.5 * Math.abs(Math.sin(t / 300 + i * 1.7 + 4));
-      drawStar(ctx, Math.cos(ang) * ring1R, Math.sin(ang) * ring1R * 0.92, Math.max(1, r * 0.042), a * tw);
+    for (let i = 0; i < 6; i++) {
+      const ang = spin + (i / 6) * Math.PI * 2;
+      const tw = 0.5 + 0.5 * Math.abs(Math.sin(t / 300 + i * 1.7));
+      drawStar(ctx, Math.cos(ang) * ring, Math.sin(ang) * ring * 0.9, Math.max(1, r * 0.05), morph * tw);
     }
-    // rising ember wisps — three small warm motes drifting up off the body
-    for (let i = 0; i < 3; i++) {
-      const cyc = ((t / (1400 + i * 260)) + i * 0.37) % 1;
-      const ex = Math.sin(i * 2.4 + t / 900) * r * 0.55;
-      const ey = r * 0.2 - cyc * r * 1.15;
-      const fade = (1 - cyc) * 0.55 * a;
-      ctx.save();
-      ctx.globalAlpha *= Math.max(0, fade);
-      ctx.fillStyle = i % 2 === 0 ? '#C9A2FF' : '#FFB4E0';
-      ctx.beginPath();
-      ctx.arc(ex, ey, Math.max(0.8, r * 0.035 * (1 - cyc * 0.5)), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
+    return;
   }
 
-  // ── DEVOURER (3+): a SECOND ring counter-rotates + space bends around it ───
-  if (form >= 3) {
-    const a = form === 3 ? morph : 1;
-    const ring2R = r * 1.55;
-    const spin2 = -t / 2100; // opposite direction — unmistakably alive
-    // space-bend halo: a soft dark annulus just outside the body, like light
-    // being pulled in (replaces the old cracks entirely)
+  // ── DEVOURER (3): an elegant tilted accretion ring + soft space-warp halo ──
+  if (form === 3) {
     ctx.save();
-    ctx.globalAlpha *= a;
-    const g = ctx.createRadialGradient(0, 0, r * 1.02, 0, 0, r * 1.45);
-    g.addColorStop(0, 'rgba(8,3,20,0.46)');
-    g.addColorStop(0.55, 'rgba(8,3,20,0.16)');
-    g.addColorStop(1, 'rgba(8,3,20,0)');
+    ctx.globalAlpha *= morph;
+    const g = ctx.createRadialGradient(0, 0, r * 1.0, 0, 0, r * 1.62);
+    g.addColorStop(0, `${col}0.30)`);
+    g.addColorStop(0.5, `${col}0.10)`);
+    g.addColorStop(1, `${col}0)`);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(0, 0, r * 1.45, 0, Math.PI * 2);
-    ctx.arc(0, 0, r * 1.0, 0, Math.PI * 2, true);
+    ctx.arc(0, 0, r * 1.62, 0, Math.PI * 2);
+    ctx.arc(0, 0, r * 0.98, 0, Math.PI * 2, true);
     ctx.fill();
     ctx.restore();
-    // the counter-ring itself
-    ctx.save();
-    ctx.globalAlpha *= a * 0.36;
-    ctx.strokeStyle = hexA('#B98CFF', 1);
-    ctx.lineWidth = Math.max(1, r * 0.022);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, ring2R, ring2R * 0.88, 0.35, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    for (let i = 0; i < 5; i++) {
-      const ang = spin2 + (i / 5) * Math.PI * 2;
-      const tw = 0.5 + 0.5 * Math.abs(Math.sin(t / 260 + i * 2.6));
-      // ring 2 is tilted 0.35 rad — rotate the star positions to match
-      const px = Math.cos(ang) * ring2R, py = Math.sin(ang) * ring2R * 0.88;
-      const rx = px * Math.cos(0.35) - py * Math.sin(0.35);
-      const ry = px * Math.sin(0.35) + py * Math.cos(0.35);
-      drawStar(ctx, rx, ry, Math.max(1, r * 0.045), a * tw);
-    }
+    _accretionRing(ctx, v, r * 1.5, r * 0.46, 0.4, morph, false);
+    return;
   }
 
-  // ── WORLD ENDER (4): the ACCRETION RING + ember corona ─────────────────────
+  // ── WORLD ENDER (4): the finale — a luminous halo + a bold precessing
+  //    accretion disk. Big, bright, readable: a proper "ends worlds" silhouette.
   if (form >= 4) {
-    const a = morph;
-    // ember corona — short two-tone licks all around the rim (the flame crown,
-    // reborn as a full-circle cosmic corona)
-    const licks = 10;
-    for (let i = 0; i < licks; i++) {
-      const ang = (i / licks) * Math.PI * 2 + Math.sin(t / 700) * 0.05;
-      const flick = Math.sin(t / 150 + i * 1.9) * 0.08;
-      const len = r * (0.16 + Math.abs(Math.sin(t / 210 + i * 1.3)) * 0.14);
-      const nx = -Math.sin(ang), ny = Math.cos(ang);
-      const bx = Math.cos(ang) * r * 0.99, by = Math.sin(ang) * r * 0.99;
-      const tx = Math.cos(ang + flick) * (r + len), ty = Math.sin(ang + flick) * (r + len);
-      ctx.save();
-      ctx.globalAlpha *= a;
-      teardrop(ctx, bx, by, tx, ty, nx, ny, r * 0.075, '#C9A8FF');
-      const itx = bx + (tx - bx) * 0.6, ity = by + (ty - by) * 0.6;
-      teardrop(ctx, bx, by, itx, ity, nx, ny, r * 0.04, '#FFFFFF');
-      ctx.restore();
-    }
-    // the accretion ring — a bright tilted ellipse slowly precessing, the
-    // unmistakable signature of a thing that ends worlds
-    const prec = 0.5 + Math.sin(t / 4200) * 0.12;
+    // soft luminous halo bathing the void in its own light
     ctx.save();
-    ctx.rotate(prec);
-    ctx.globalAlpha *= a;
-    // outer warm band
-    ctx.strokeStyle = hexA('#FFB36B', 0.85);
-    ctx.lineWidth = Math.max(3, r * 0.105);
+    ctx.globalAlpha *= morph;
+    const halo = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.55);
+    halo.addColorStop(0, 'rgba(190,160,255,0)');
+    halo.addColorStop(0.42, 'rgba(190,150,255,0.34)');
+    halo.addColorStop(1, 'rgba(120,80,220,0)');
+    ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.72, r * 0.52, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    // bright white core line
-    ctx.strokeStyle = hexA('#FFFFFF', 0.95);
-    ctx.lineWidth = Math.max(1, r * 0.028);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.72, r * 0.52, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    // a few bright motes travelling the ring
-    for (let i = 0; i < 4; i++) {
-      const ang = t / 900 + (i / 4) * Math.PI * 2;
-      drawStar(ctx, Math.cos(ang) * r * 1.72, Math.sin(ang) * r * 0.52, Math.max(1.2, r * 0.05), a * 0.9);
-    }
+    ctx.arc(0, 0, r * 1.55, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
+    // the grand accretion disk — precessing, warm-cored, unmistakable
+    const prec = 0.5 + Math.sin(t / 4200) * 0.12;
+    _accretionRing(ctx, v, r * 1.82, r * 0.56, prec, morph, true);
   }
+}
+
+// A tilted, precessing accretion ring with a bright core line + travelling
+// motes. Shared by DEVOURER (elegant) and WORLD ENDER (grand/bright).
+function _accretionRing(
+  ctx: CanvasRenderingContext2D, v: VoidlingVisual,
+  rx: number, ry: number, tilt: number, a: number, grand: boolean,
+) {
+  const { r, t } = v;
+  ctx.save();
+  ctx.rotate(tilt);
+  ctx.globalAlpha *= a;
+  // outer luminous band (warm for the grand disk, amethyst for devourer)
+  ctx.strokeStyle = grand ? 'rgba(255,196,150,0.9)' : 'rgba(200,150,255,0.7)';
+  ctx.lineWidth = Math.max(3, r * (grand ? 0.12 : 0.07));
+  ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+  // bright white core line
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = Math.max(1, r * 0.03);
+  ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+  // travelling bright motes
+  const n = grand ? 5 : 3;
+  for (let i = 0; i < n; i++) {
+    const ang = t / 900 + (i / n) * Math.PI * 2;
+    drawStar(ctx, Math.cos(ang) * rx, Math.sin(ang) * ry, Math.max(1.2, r * 0.05), 0.9);
+  }
+  ctx.restore();
 }
 
 // A tiny four-point twinkle star.
@@ -445,19 +401,6 @@ function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, s: number
   ctx.restore();
 }
 
-// Pointed teardrop with slightly concave sides (kept from the proven flame code
-// — now powering the WORLD ENDER's corona).
-function teardrop(ctx: CanvasRenderingContext2D, bx: number, by: number, tx: number, ty: number, nx: number, ny: number, w: number, color: string) {
-  const ctrlX = bx * 0.35 + tx * 0.65;  // on the flame axis, 65% toward tip
-  const ctrlY = by * 0.35 + ty * 0.65;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(bx + nx * w, by + ny * w);
-  ctx.quadraticCurveTo(ctrlX, ctrlY, tx, ty);
-  ctx.quadraticCurveTo(ctrlX, ctrlY, bx - nx * w, by - ny * w);
-  ctx.closePath();
-  ctx.fill();
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // STAGE INTERIOR — what lives INSIDE the orb (clipped). Core glow, a drifting
@@ -470,75 +413,71 @@ function drawStageInterior(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.save();
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip();
 
-  // MUNCHER (1+): soft inner core glow (stacked discs, no radial halo)
-  {
-    const a = (form === 1 ? (v.morph ?? 1) : 1) * (0.28 + 0.12 * Math.sin(t / 500));
+  // MUNCHER (1): soft inner core glow
+  if (form === 1) {
+    const a = (v.morph ?? 1) * (0.30 + 0.12 * Math.sin(t / 500));
     ctx.save();
     ctx.globalAlpha *= Math.max(0, a);
-    for (let k = 3; k >= 1; k--) {
-      ctx.fillStyle = hexA(v.skin.glowColor, 0.22);
-      ctx.beginPath(); ctx.arc(0, 0, r * 0.16 * k, 0, Math.PI * 2); ctx.fill();
-    }
+    ctx.fillStyle = hexA(v.skin.glowColor, 0.22);
+    for (let k = 3; k >= 1; k--) { ctx.beginPath(); ctx.arc(0, 0, r * 0.16 * k, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
   }
 
-  // GOBBLER (2+): deepen one shade + a slow drifting nebula wisp
-  if (form >= 2) {
-    const a = form === 2 ? (v.morph ?? 1) : 1;
-    ctx.save();
-    ctx.globalAlpha *= a * 0.16;
-    ctx.fillStyle = '#000000';
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.globalAlpha *= a * 0.24;
-    ctx.fillStyle = '#B478E8';
-    ctx.rotate(t / 3600);
-    ctx.beginPath();
-    ctx.ellipse(r * 0.25, -r * 0.1, r * 0.5, r * 0.22, 0.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // DEVOURER (3+): a second, colder nebula counter-drifts + denser inner dusk
-  if (form >= 3) {
-    const a = form === 3 ? (v.morph ?? 1) : 1;
-    ctx.save();
-    ctx.globalAlpha *= a * 0.2;
-    ctx.fillStyle = '#5AC8FF';
-    ctx.rotate(-t / 4400 + 2.1);
-    ctx.beginPath();
-    ctx.ellipse(r * 0.2, r * 0.05, r * 0.46, r * 0.18, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // WORLD ENDER (4): the full internal galaxy — dark heart, twin nebulae, stars
-  if (form >= 4) {
+  // GOBBLER (2): a slow drifting nebula wisp (in-family violet)
+  if (form === 2) {
     const a = v.morph ?? 1;
     ctx.save();
-    ctx.globalAlpha *= a;
-    ctx.fillStyle = hexA('#0D0821', 0.55);
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    const drift = t / 2400;
-    const wisps: [string, number][] = [['#FF3CAC', drift], ['#2BD2FF', drift + Math.PI]];
-    for (const [col, ph] of wisps) {
+    ctx.globalAlpha *= a * 0.30;
+    ctx.fillStyle = '#C77CFF';
+    ctx.rotate(t / 3600);
+    ctx.beginPath(); ctx.ellipse(r * 0.22, -r * 0.1, r * 0.55, r * 0.24, 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // DEVOURER (3): twin drifting nebulae (warm + cool, kept in family)
+  if (form === 3) {
+    const a = v.morph ?? 1;
+    const neb: [string, number, number][] = [['#B072FF', t / 3600, 1], ['#7AA2FF', -t / 4400 + 2.1, 0.9]];
+    for (const [c, ph, sc] of neb) {
       ctx.save();
-      ctx.globalAlpha *= 0.4;
-      ctx.fillStyle = col;
+      ctx.globalAlpha *= a * 0.26;
+      ctx.fillStyle = c;
+      ctx.rotate(ph);
+      ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 0.5 * sc, r * 0.2 * sc, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // WORLD ENDER (4): churning galaxy + a BRIGHT singularity core so the void
+  // glows from within — the luminous heart of a thing that ends worlds.
+  if (form >= 4) {
+    const a = v.morph ?? 1;
+    const drift = t / 2400;
+    const wisps: [string, number][] = [['#C77CFF', drift], ['#7AC2FF', drift + Math.PI]];
+    for (const [c, ph] of wisps) {
+      ctx.save();
+      ctx.globalAlpha *= a * 0.34;
+      ctx.fillStyle = c;
       ctx.rotate(ph);
       ctx.beginPath(); ctx.ellipse(r * 0.2, 0, r * 0.55, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
     ctx.fillStyle = '#FFFFFF';
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const ang = i * 2.3 + t / 3000;
-      const rad = ((i * 53) % 100) / 100 * r * 0.8;
+      const rad = ((i * 53) % 100) / 100 * r * 0.82;
       const tw = 0.4 + 0.6 * Math.abs(Math.sin(t / 300 + i));
       ctx.globalAlpha = a * tw;
       ctx.beginPath(); ctx.arc(Math.cos(ang) * rad, Math.sin(ang) * rad, Math.max(0.8, r * 0.02), 0, Math.PI * 2); ctx.fill();
     }
-    ctx.restore();
+    // luminous singularity core (pulsing bright heart)
+    ctx.globalAlpha = a * (0.7 + 0.3 * Math.sin(t / 380));
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.5);
+    core.addColorStop(0, 'rgba(255,255,255,0.95)');
+    core.addColorStop(0.35, 'rgba(222,186,255,0.6)');
+    core.addColorStop(1, 'rgba(150,90,255,0)');
+    ctx.fillStyle = core;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, Math.PI * 2); ctx.fill();
   }
 
   ctx.restore(); // end body clip
@@ -563,20 +502,22 @@ export function drawUnderdogTrail(ctx: CanvasRenderingContext2D, x: number, y: n
 // Stage-unique body palettes — each form gets a distinct hue so players
 // feel a real transformation, not just size growth.
 // [inner-highlight, mid-body, outer-rim]
+// Dark core → lit rim (the black-hole look). Saturation & rim-luminosity
+// ESCALATE toward a majestic climax instead of collapsing to near-black.
 const _STAGE_BODY: [string, string, string][] = [
-  ['#1A1040', '#2D1B68', '#4535A0'], // 0 VOIDLING  — soft indigo  (shy, curious)
-  ['#28104A', '#4B1E78', '#7A38A0'], // 1 MUNCHER   — warm plum    (hungry, eager)
-  ['#28083A', '#601060', '#9C2090'], // 2 GOBBLER   — hot magenta  (cocky, bold)
-  ['#1E0418', '#4C0828', '#841445'], // 3 DEVOURER  — deep crimson (cold, menacing)
-  ['#040212', '#0C0630', '#181055'], // 4 WORLD ENDER — abyss      (vast, detached)
+  ['#1A1040', '#2D1B68', '#4535A0'], // 0 VOIDLING    — soft indigo (curious)
+  ['#241056', '#40208A', '#6A3AC8'], // 1 MUNCHER     — brighter violet (eager)
+  ['#2A0A66', '#5A1CB0', '#9A44F0'], // 2 GOBBLER     — royal magenta (bold)
+  ['#28065C', '#5A1CC0', '#B268FF'], // 3 DEVOURER    — radiant amethyst (powerful)
+  ['#0E0636', '#241468', '#7A4FE0'], // 4 WORLD ENDER — deep core, luminous violet rim (event horizon)
 ];
-// Swirl hue shifts to match the body — RGBA prefix (alpha appended at draw time)
+// Swirl hue stays in a coherent violet family and brightens with the stage.
 const _STAGE_SWIRL = [
   'rgba(180,155,255,', // indigo-lavender
-  'rgba(220,140,255,', // pink-lavender
-  'rgba(255,120,220,', // hot pink
-  'rgba(255,110,160,', // blood rose
-  'rgba(200,220,255,', // cold starlight
+  'rgba(205,150,255,', // violet
+  'rgba(230,140,255,', // royal magenta
+  'rgba(215,150,255,', // amethyst
+  'rgba(205,180,255,', // luminous cosmic
 ];
 
 // Procedural orb body — deep-purple radial gradient + rotating swirl arcs +
@@ -592,11 +533,14 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // per-stage gradient colors
+  // per-stage gradient colors — hole.io read: the CENTRE is the deepest point
+  // (near-black abyss) and the rim is the lit edge, so the body reads as a
+  // pit INTO the ground instead of a ball sitting on it.
   const [c0, c1, c2] = _STAGE_BODY[Math.min(form, 4)];
-  const grd = ctx.createRadialGradient(r * -0.2, r * -0.2, r * 0.06, 0, 0, r);
-  grd.addColorStop(0,    c0);
-  grd.addColorStop(0.55, c1);
+  const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  grd.addColorStop(0,    '#060310'); // the abyss
+  grd.addColorStop(0.40, c0);
+  grd.addColorStop(0.76, c1);
   grd.addColorStop(1,    c2);
   ctx.fillStyle = grd;
   ctx.fillRect(-r, -r, r * 2, r * 2);
@@ -647,6 +591,16 @@ function drawProceduralBody(ctx: CanvasRenderingContext2D, v: VoidlingVisual) {
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
+
+  // High forms gain a luminous event-horizon rim-light so the silhouette reads
+  // as a glowing cosmic body rather than a dark hole.
+  if (form >= 3) {
+    ctx.strokeStyle = hexA(_STAGE_BODY[Math.min(form, 4)][2], form >= 4 ? 0.85 : 0.5);
+    ctx.lineWidth = Math.max(1.5, r * 0.03);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.985, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 function hexA(hex: string, a: number) {

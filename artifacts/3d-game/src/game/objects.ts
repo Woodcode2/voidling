@@ -23,6 +23,66 @@ function pick<T>(arr: T[], variant: number) {
   return arr[Math.abs(variant) % arr.length];
 }
 
+// ── Structural Build: campsite props (procedural — no clay cutouts exist) ─────
+function drawTent(ctx: CanvasRenderingContext2D, r: number, _t: number, v: number) {
+  const o = ow(r);
+  const col = pick(['#E4586B', '#2DB5A5', '#5FA8E0', '#F2B84B'], v);
+  // main triangle body
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.95, r * 0.6);
+    c.lineTo(0, -r * 0.85);
+    c.lineTo(r * 0.95, r * 0.6);
+    c.closePath();
+  }, col, { outline: o });
+  // door flap (darker inner triangle)
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.34, r * 0.6);
+    c.lineTo(0, -r * 0.28);
+    c.lineTo(r * 0.34, r * 0.6);
+    c.closePath();
+  }, 'rgba(20,16,40,0.82)', { outline: 0, shadow: false });
+  // ridge highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = Math.max(1.5, r * 0.07);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.85);
+  ctx.lineTo(0, -r * 0.55);
+  ctx.stroke();
+}
+
+function drawCampfire(ctx: CanvasRenderingContext2D, r: number, t: number) {
+  // warm flickering glow
+  const flick = 0.85 + Math.sin(t / 120) * 0.1 + Math.sin(t / 47) * 0.05;
+  const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.7);
+  glow.addColorStop(0, `rgba(255,180,80,${(0.4 * flick).toFixed(2)})`);
+  glow.addColorStop(1, 'rgba(255,140,60,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.7, 0, Math.PI * 2); ctx.fill();
+  // stone fire ring (cool grey — no browns)
+  ctx.fillStyle = '#9AA3B2';
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.ellipse(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.5 + r * 0.25, r * 0.2, r * 0.14, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // flames — two teardrop layers, flickering
+  const fh = r * (0.9 + Math.sin(t / 90) * 0.12);
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.42, r * 0.25);
+    c.quadraticCurveTo(-r * 0.5, -fh * 0.4, 0, -fh);
+    c.quadraticCurveTo(r * 0.5, -fh * 0.4, r * 0.42, r * 0.25);
+    c.closePath();
+  }, '#FF9F43', { outline: 0, shadow: false });
+  sticker(ctx, (c) => {
+    c.moveTo(-r * 0.22, r * 0.22);
+    c.quadraticCurveTo(-r * 0.26, -fh * 0.25, 0, -fh * 0.62);
+    c.quadraticCurveTo(r * 0.26, -fh * 0.25, r * 0.22, r * 0.22);
+    c.closePath();
+  }, '#FFD23F', { outline: 0, shadow: false });
+}
+
 // ── T1 ───────────────────────────────────────────────────────────────────────
 function drawApple(ctx: CanvasRenderingContext2D, r: number, _t: number) {
   const o = ow(r);
@@ -1115,6 +1175,8 @@ export function drawParkObject(
   const f = opts.fleeing ?? false;
   switch (kind) {
     case 'apple': return drawApple(ctx, r, t);
+    case 'tent': return drawTent(ctx, r, t, v);       // Structural Build: campsite
+    case 'campfire': return drawCampfire(ctx, r, t);  // Structural Build: campsite
     case 'flower': return drawFlower(ctx, r, t, v);
     case 'mushroom': return drawMushroom(ctx, r, t);
     case 'duck': return drawDuck(ctx, r, t, f);

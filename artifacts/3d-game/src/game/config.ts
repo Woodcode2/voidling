@@ -16,7 +16,7 @@ export type ObjectKind =
   // Landmark
   | 'watertower'
   // v7 §3: new objects with personality
-  | 'cat' | 'squirrel' | 'bird' | 'trampoline' | 'drone' | 'schoolbus'
+  | 'cat' | 'squirrel' | 'bird' | 'trampoline' | 'drone' | 'schoolbus' | 'train'
   | 'bbq' | 'mower' | 'hoop' | 'icecream' | 'scooter'
   // v7 §2: playground equipment + school trophy
   | 'sandbox' | 'swingset' | 'slide' | 'seesaw' | 'school'
@@ -66,6 +66,8 @@ export type ObjectKind =
   | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
   // Life Pack §2: sports fields (ground decals — not edible world objects)
   | 'field_soccer' | 'field_basketball' | 'field_tennis'
+  | 'field_volleyball' | 'field_campsite' | 'field_beachclub'
+  | 'beachball' | 'deckchair' | 'tent' | 'campfire' | 'landmark'
   // Prompt 18 Stage 4: street furniture (clay-mapped props)
   | 'streetlamp' | 'bus_stop';
 
@@ -210,9 +212,15 @@ export const CONFIG = {
 
   // World — Phase 2: floating island — 12000×12000 world (2.5× old map)
   MAP_SIZE: 12000,
-  BLOCK_SIZE: 1600,          // 6*1600 + 5*200 roads = 9600+1000 = 10600; margin 700 each side
+  BLOCK_SIZE: 1600,          // 6*1600 + 5*110 roads = 10150; margin 925 each side
   ROAD_WIDTH: 110,  // Prompt 18 Stage 3: reduced from 200 (~45% narrower roads)
   SIDEWALK: 100,
+  // House-lot row grid (shared by world-gen AND the ground painter so internal
+  // lanes/driveways bake in exactly the right places between house rows).
+  LOT_ROW_INSET: 170,  // = SIDEWALK + 70 — first row offset from block edge
+  LOT_ROW_STEP: 280,   // row/column spacing between lots
+  LANE_OFFSET: 140,    // internal lane centerline = rowY + this (midway between rows)
+  LANE_W: 56,          // internal lane width
   GRID: 6,
   PLAN_NAMES: ['METRO', 'SUBURBIA', 'SEASIDE'] as string[], // v16.2 §6: rotating city plans
   PLAYER_BASE_RADIUS: 18,    // v7 §1: everyone (player + all bots) starts here, identical
@@ -243,7 +251,7 @@ export const CONFIG = {
   TARGET_POPULATION: 2000,
   RESPAWN_MIN: 1200,        // trickle small objects if below this
   DENSITY_MULT: 1,          // v5 §7: debug-panel density multiplier
-  TRAFFIC_CARS: 24,         // v7 §2: cars cruising the road grid (Phase 2: 24)
+  TRAFFIC_CARS: 34,         // v7 §2: cars cruising the road grid (busier streets)
 
   // Absorb / orbit / merge
   ABSORB_SHRINK_TIME: 150,       // ms for fly-in phase
@@ -261,6 +269,11 @@ export const CONFIG = {
   // Water tower is a WORLD-EATER-scale prize
   WATERTOWER_EAT_RADIUS: 300,
   SKYSCRAPER_EAT_RADIUS: 125, // v12 §1: skyscrapers require WORLD ENDER size
+  // Structural Build: the downtown express train (rail loop food, WORLD-ENDER prey)
+  TRAIN_SPEED: 120,        // wu/s → ~1 lap per 2.5 min
+  TRAIN_CAR_GAP: 150,      // arc-length spacing loco → car
+  TRAIN_EAT_RADIUS: 110,   // matches FORMS[4] WORLD ENDER threshold
+  TRAIN_RESPAWN_MS: 30000,
   ZOO_GATE_EAT_RADIUS: 58,    // v16.1 D: zoo gate requires GOBBLER+
   FINAL_FEAST_MS: 30000,      // v12 §2: last 30s triggers the FINAL FEAST
   USE_GROUND_TILES: true,     // v12 §6: tile PNG ground textures when present
@@ -373,6 +386,9 @@ export const CONFIG = {
     house:      { tier: 5, minR: 92, maxR: 116 },
     // Landmark
     watertower: { tier: 6, minR: 150, maxR: 150 },
+    train:      { tier: 5, minR: 66,  maxR: 80, scoreMult: 4 }, // Structural Build: express train
+    landmark:   { tier: 5, minR: 150, maxR: 185, scoreMult: 5 }, // Structural Rebuild: marquee city trophies
+
     // v7 §3: new objects
     squirrel:   { tier: 1, minR: 12, maxR: 15 },
     bird:       { tier: 1, minR: 10, maxR: 13 },
@@ -396,9 +412,9 @@ export const CONFIG = {
     mushroom:   { tier: 1, minR: 10, maxR: 14 },
     gazebo:     { tier: 5, minR: 92, maxR: 110 },
     // v12 §1: downtown objects
-    shop:       { tier: 3, minR: 38, maxR: 48 },
+    shop:       { tier: 3, minR: 50, maxR: 64 },
     library:    { tier: 4, minR: 62, maxR: 76 },
-    office:     { tier: 5, minR: 95, maxR: 118 },   // Prompt 14: bigger mid-ring buildings
+    office:     { tier: 5, minR: 130, maxR: 155 },  // Structural Rebuild: wide mid-rise city art needs real bulk
     skyscraper: { tier: 6, minR: 185, maxR: 215 },  // Prompt 19: calibrated to ≈6–7× person (was 4.4×)
     // v13 §2: Sandy Shores beach objects
     seashell:      { tier: 1, minR: 10, maxR: 14 },
@@ -413,7 +429,7 @@ export const CONFIG = {
     car_parked_a:  { tier: 4, minR: 54, maxR: 66 },
     car_parked_b:  { tier: 4, minR: 54, maxR: 66 },
     // v16 §1: new civic + downtown sprites
-    cafe:          { tier: 4, minR: 60, maxR: 76 },
+    cafe:          { tier: 4, minR: 72, maxR: 90 },
     hospital:      { tier: 5, minR: 100, maxR: 120 },
     house_c:       { tier: 5, minR: 92, maxR: 116 },
     house_d:       { tier: 5, minR: 92, maxR: 116 },
@@ -513,6 +529,13 @@ export const CONFIG = {
     field_soccer:     { tier: 0, minR: 260, maxR: 260 },
     field_basketball: { tier: 0, minR: 200, maxR: 200 },
     field_tennis:     { tier: 0, minR: 200, maxR: 200 },
+    field_volleyball: { tier: 0, minR: 180, maxR: 180 },   // Structural Build: beach court decal
+    field_campsite:   { tier: 0, minR: 190, maxR: 190 },   // forest clearing decal
+    field_beachclub:  { tier: 0, minR: 170, maxR: 170 },   // cabana deck decal
+    beachball:        { tier: 1, minR: 13, maxR: 18 },     // Structural Build: beach fun props
+    deckchair:        { tier: 3, minR: 30, maxR: 40 },
+    tent:             { tier: 3, minR: 40, maxR: 52 },
+    campfire:         { tier: 2, minR: 20, maxR: 26 },
     // Prompt 18 Stage 4: street furniture (clay-mapped, eatable infra)
     streetlamp:  { tier: 2, minR: 14, maxR: 18 },
     bus_stop:    { tier: 3, minR: 32, maxR: 40 },
@@ -549,14 +572,17 @@ export const CONFIG = {
   ] as ObjectKind[],
 
   SKINS: [
+    // Economy: LoL model — grind coins for skins (common 500 / rare 1500 /
+    // epic 4000); legendary skins below are money-only. ~60-90m of play per
+    // rare at 50-150c a match feels earned without being a wall.
     { id: 'classic',   name: 'Classic',   cost: 0,    bodyColor: '#3A1E6B', glowColor: '#B388FF', eyeStyle: 'normal', accessories: [] },
-    { id: 'pirate',    name: 'Pirate',    cost: 800,  bodyColor: '#2C2C36', glowColor: '#8A8AA0', eyeStyle: 'normal', accessories: ['tricorn', 'eyepatch', 'earring'] },
-    { id: 'princess',  name: 'Princess',  cost: 800,  bodyColor: '#FF7FC1', glowColor: '#FFC2E2', eyeStyle: 'lashes', extraBlush: true, accessories: ['tiara', 'sparkleTrail'] },
-    { id: 'astronaut', name: 'Astronaut', cost: 1000, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
-    { id: 'ninja',     name: 'Ninja',     cost: 800,  bodyColor: '#2A2A38', glowColor: '#5E6E8C', eyeStyle: 'angled', accessories: ['headband'] },
-    { id: 'wizard',    name: 'Wizard',    cost: 1000, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
-    { id: 'kitty',     name: 'Kitty',     cost: 600,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
-    { id: 'devil',     name: 'Devil',     cost: 1200, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
+    { id: 'kitty',     name: 'Kitty',     cost: 500,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
+    { id: 'ninja',     name: 'Ninja',     cost: 500,  bodyColor: '#2A2A38', glowColor: '#5E6E8C', eyeStyle: 'angled', accessories: ['headband'] },
+    { id: 'pirate',    name: 'Pirate',    cost: 1500, bodyColor: '#2C2C36', glowColor: '#8A8AA0', eyeStyle: 'normal', accessories: ['tricorn', 'eyepatch', 'earring'] },
+    { id: 'princess',  name: 'Princess',  cost: 1500, bodyColor: '#FF7FC1', glowColor: '#FFC2E2', eyeStyle: 'lashes', extraBlush: true, accessories: ['tiara', 'sparkleTrail'] },
+    { id: 'wizard',    name: 'Wizard',    cost: 1500, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
+    { id: 'astronaut', name: 'Astronaut', cost: 4000, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
+    { id: 'devil',     name: 'Devil',     cost: 4000, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
     // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
     { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#0D0821', glowColor: '#B98CFF', eyeStyle: 'normal', accessories: [] },
     { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#14090A', glowColor: '#FF7A2B', eyeStyle: 'angry', eyeGlow: '#FF6A00', accessories: [] },
@@ -594,6 +620,40 @@ export const CONFIG = {
   // Rival identity pools
   BOT_NAMES: ['Kai', 'Luna', 'Maks', 'Ava', 'Rin', 'Zoe', 'Leo', 'Mia', 'Yuki', 'Bex', 'Nova', 'Oda', 'Pia', 'Rex', 'Sol', 'Tao'],
   BOT_COUNTRIES: ['JP', 'BR', 'PL', 'US', 'KR', 'DE', 'FR', 'GB', 'IN', 'MX', 'CA', 'ES', 'IT', 'SE', 'NG', 'AU'],
+
+  // ── Family arc ─────────────────────────────────────────────────────────────
+  // The other voids are the player's FAMILY, not national rivals. They notice
+  // the feast and sky-fall in one at a time over the match. Relation label shows
+  // on their nameplate; each arrives with a bark.
+  FAMILY_RELATIONS: ['lil bro', 'big sis', 'cousin', 'mom', 'dad', 'twin', 'auntie', 'uncle'],
+  FAMILY_BARKS: [
+    'room for one more?',
+    'you started without me?!',
+    'save some city for me!',
+    'ooh, snacks!',
+    'family feast!!',
+    'no fair, I want in!',
+    'is that… a whole city?',
+    'scoot over, sib.',
+  ],
+  // ms-elapsed at which each successive family member drops in (index = arrival
+  // order). You begin (almost) alone; the sky fills as the city panics.
+  FAMILY_ARRIVAL_MS: [5000, 38000, 82000, 132000],
+  // Ongoing mid-match banter — the family is HAVING FUN devouring together.
+  FAMILY_BANTER: [
+    'nom nom nom nom',
+    'this city SLAPS',
+    'mom look, no hands!',
+    'race you to the zoo!',
+    'I ate a whole BUS!',
+    'family feast!!!',
+    'save room for downtown!',
+    'who ate my snack pile?!',
+    'growing up so fast 🥲',
+    'last one to the beach is a snack!',
+    'do I have car in my teeth?',
+    'grandma would be proud',
+  ],
   BOT_COLORS: [
     { body: '#FF3D68', glow: '#FF9BB5' },
     { body: '#2D9CDB', glow: '#9AD2F5' },

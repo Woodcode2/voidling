@@ -17,6 +17,8 @@ import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
 import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
+import { loadCityAssets } from './cityAssets'; // Structural Rebuild: new city art
+import { initProps3d } from './props3d'; // hole.io rebuild: procedural life layer (people/vehicles/trees)
 import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
@@ -35,6 +37,8 @@ export interface ResultData {
   crown: boolean;
   highScore: number;
   newBest: boolean;
+  firstWin: boolean;   // Economy: first crowned win today — payout was doubled
+  dailyBite: number;   // Economy: daily-bite bonus included in coins (0 if not first match)
   reachedForm: string;    // v6 §3: highest evolution form reached
   reachedIndex: number;
   worldEater: boolean;
@@ -54,6 +58,7 @@ export interface DailyData { id: string; seed: string; name: string; desc: strin
 
 export interface Snapshot {
   screen: Screen;
+  assetsReady: boolean; // hole.io rebuild: splash gates on the clay sheets
   coins: number;
   highScore: number;
   streak: number;
@@ -79,6 +84,7 @@ export interface Snapshot {
   killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
   matchStartSeq: number; // Rebuild Prompt 10: increments once per real match start (drives the welcome/coaching intro)
+  power?: { name: string; ready: boolean; cdFrac: number; form: number; color: string }; // signature void power HUD state
 }
 
 export interface GameEngine {
@@ -99,6 +105,8 @@ export interface GameEngine {
   toggleSfx(): boolean;
   toggleHitboxes(): boolean;
   unlockAudio(): void;
+  /** Fire the current form's signature void power (Space key / on-screen button). */
+  usePower(): void;
   /** Stage 13 §1: render a 2000×2000 PNG of the island with all static objects.
    *  Returns a data URL string, or null if the world hasn't initialised yet. */
   capturePhoto(): string | null;
@@ -128,6 +136,25 @@ const BOON_DURATION: Record<string, number> = {
 
 // v7 §5: max power-up level (picking a dupe once → Level II, then it's retired)
 const BOON_MAX_LEVEL = 2;
+
+// ── Signature VOID POWER — one active ability, escalating with evolution form ──
+// Bound to Space (desktop) and the on-screen power button (mobile). Not random,
+// not a boon: it is *the* power fantasy, and it grows more apocalyptic as the
+// void evolves — gravity pull → vortex → implosion → singularity → collapse.
+// pull      = per-activation inward yank strength on edibles
+// pullRange = radius over which edibles are dragged in
+// consume   = radius inside which eligible objects are instantly devoured
+// crushBig  = also swallow oversized structures past the normal size gate
+// cd        = cooldown (ms); shake = screen-shake magnitude
+// Each form's signature power is a DISTINCT move (kind), not the same ring
+// rescaled. `kind` drives the behaviour + FX branch in usePower().
+const VOID_POWERS = [
+  { name: 'PULL',        kind: 'tug',         pull: 95,  pullRange: 360,  consume: 82,  crushBig: false, cd: 4500,  shake: 6,  color: '#9D78FF' },
+  { name: 'VORTEX',      kind: 'vortex',      pull: 140, pullRange: 520,  consume: 150, crushBig: false, cd: 5500,  shake: 10, color: '#B48CFF' },
+  { name: 'SHOCKWAVE',   kind: 'shockwave',   pull: 0,   pullRange: 0,    consume: 300, crushBig: false, cd: 6500,  shake: 16, color: '#D98CFF' },
+  { name: 'SINGULARITY', kind: 'singularity', pull: 300, pullRange: 900,  consume: 430, crushBig: true,  cd: 8000,  shake: 20, color: '#C9A0FF' },
+  { name: 'COLLAPSE',    kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: true,  cd: 10000, shake: 30, color: '#E4C4FF' },
+] as const;
 
 function skinById(id: string): SkinDef {
   return CONFIG.SKINS.find((s) => s.id === id) || CONFIG.SKINS[0];
@@ -179,11 +206,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let goldenTimer = 0;          // v6 §2: golden-object spawn cadence (from 2:45)
   let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
+  let powerCd = 0;             // Signature VOID POWER cooldown remaining (ms)
   let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
   let countStep = 0;           // v8 §1: last countdown number beeped
   let matchStartSeq = 0;        // Rebuild Prompt 10: increments once per real match start (never on boon/resume)
   let crackTimer = 0;          // v8 §3: WORLD EATER cracked-trail cadence
   let showHitboxes = false;
+  // Family arc: staggered sky-fall arrival schedule (built each round in start())
+  let familyArrivals: { index: number; atMs: number; done: boolean }[] = [];
   // War Pack §2: defense wave state
   let defensePhase = 0;           // 0=none 1=police 2=army 3=tanks 4=helis
   let defenseSpawnCd = 0;         // ms until next wave reinforcement
@@ -260,15 +290,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     banner(line, '#9AAFC8', 2);
   }
 
+  // Economy: contract rewards calibrated so 3 completions add ~35-50¢ inside
+  // the 50-150¢ per-match band (LoL model — skins are earned over many games).
   const CONTRACT_POOL = [
-    { id: 'eat_houses', name: 'Eat 3 houses', reward: 40 },
-    { id: 'eat_cars', name: 'Eat 5 cars', reward: 35 },
-    { id: 'eat_gnomes', name: 'Eat all gnomes', reward: 60 },
-    { id: 'reach_gobbler', name: 'Reach GOBBLER form', reward: 50 },
-    { id: 'eat_beach', name: 'Eat 8 beach items', reward: 45 },
-    { id: 'eat_downtown', name: 'Eat 5 downtown props', reward: 40 },
-    { id: 'eat_people', name: 'Eat 10 people', reward: 30 },
-    { id: 'first_place', name: 'Lead at 1:00 left', reward: 55 },
+    { id: 'eat_houses', name: 'Eat 3 houses', reward: 12 },
+    { id: 'eat_cars', name: 'Eat 5 cars', reward: 10 },
+    { id: 'eat_gnomes', name: 'Eat all gnomes', reward: 20 },
+    { id: 'reach_gobbler', name: 'Reach GOBBLER form', reward: 15 },
+    { id: 'eat_beach', name: 'Eat 8 beach items', reward: 14 },
+    { id: 'eat_downtown', name: 'Eat 5 downtown props', reward: 12 },
+    { id: 'eat_people', name: 'Eat 10 people', reward: 10 },
+    { id: 'first_place', name: 'Lead at 1:00 left', reward: 18 },
   ] as const;
   // track progress for contract checking
   const contractProgress: Record<string, number> = {};
@@ -351,16 +383,26 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   // Stage 13 §6: pre-load all clay sheets and ground textures at createGame() time
   // so the pools are populated before the first match start (no sticker fallback frames).
+  // hole.io rebuild: the splash screen now GATES on assetsLoaded — the game
+  // must never start with procedural box-people that pop into clay art later.
   const base = import.meta.env.BASE_URL;
-  void loadGroundTextures(base);
-  void loadWardAssets(base);
-  void loadClayCity(base);
-  void loadClayLife(base);
-  void loadClayScenery(base);
-  void loadClayFood(base);
-  void loadClayZoo(base);
-  void loadClayAirport(base);
-  void loadClayMilitary(base);
+  initProps3d(); // synchronous canvas generation — ready before the first frame
+  let assetsLoaded = false;
+  const _allAssets = Promise.all([
+    loadGroundTextures(base),
+    loadWardAssets(base),
+    loadClayCity(base),
+    loadClayLife(base),
+    loadClayScenery(base),
+    loadCityAssets(base), // Structural Rebuild: new wide buildings + landmarks + zoo/street props
+    loadClayFood(base),
+    loadClayZoo(base),
+    loadClayAirport(base),
+    loadClayMilitary(base),
+  ]).catch(() => {});
+  // never hard-block the game on a stuck request — 10s ceiling
+  void Promise.race([_allAssets, new Promise((r) => setTimeout(r, 10000))])
+    .then(() => { assetsLoaded = true; notify(); });
 
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
@@ -378,7 +420,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // ── canvas sizing (DPR capped at 3) ──
   let dpr = 1, fw = 0, fh = 0;
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    // Perf: cap DPR at 2 — a 3x iPhone renders 2.25x the pixels of 2x for a
+    // visual difference nobody sees at gameplay zoom. This alone is a huge win.
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
     fw = window.innerWidth;
     fh = window.innerHeight;
     canvas.width = Math.max(1, Math.floor(fw * dpr));
@@ -392,6 +436,42 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   if (debugLineup) {
     window.addEventListener('wheel', (e) => lineupScroll(e.deltaY), { passive: true });
   }
+
+  // Dev-only: force the player's evolution form with number keys 1–5 so every
+  // form + power can be inspected without grinding a full match. Gated behind
+  // any ?debug= param, so it's inert in production.
+  const debugForms = typeof window !== 'undefined' && !!new URLSearchParams(window.location.search).get('debug');
+
+  // Signature VOID POWER — Space (or E) fires the current form's ability.
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.repeat) return;
+    if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); usePower(); return; }
+    if (debugForms && player && /^Digit[1-5]$/.test(e.code)) {
+      const n = Number(e.code.slice(5)) - 1;
+      player.formIndex = n;
+      player.radius = CONFIG.FORMS[n].radius + 1;
+      player.morphTime = 0;
+      countdown = 0; // skip any lingering pre-round countdown so powers can fire
+      console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
+    }
+    // Dev-only: 8 teleports to a downtown tower block (hole.io rebuild checks).
+    if (debugForms && player && e.code === 'Digit8') {
+      player.x = player.prevX = 5145;
+      player.y = player.prevY = 3435;
+      console.log('[debug] teleported to downtown core');
+    }
+    // Dev-only: 9 fast-forwards the clock to verify round-end flow + payouts.
+    if (debugForms && player && e.code === 'Digit9') {
+      timeLeft = Math.min(timeLeft, 1200);
+      console.log('[debug] clock fast-forwarded to 1.2s');
+    }
+    // Dev-only: 0 teleports next to the express train for visual inspection.
+    if (debugForms && player && world && e.code === 'Digit0') {
+      const tr = world.objects.find((o) => o.kind === 'train' && !o.eaten);
+      if (tr) { player.x = player.prevX = tr.x + 160; player.y = player.prevY = tr.y + 160; console.log('[debug] teleported to train'); }
+    }
+  }
+  window.addEventListener('keydown', onKeyDown);
 
   // v8 §6: everything routes through the callout queue so nothing overlaps/stacks
   function banner(text: string, color = '#FFFFFF', priority = 1, opts: { sparkles?: boolean; pulse?: boolean } = {}) {
@@ -456,24 +536,19 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
 
     rivals = makeRivals();
-    for (let i = 0; i < rivals.length; i++) {
-      const a = (i / rivals.length) * Math.PI * 2;
-      const rr = CONFIG.MAP_SIZE * 0.32;
-      // Alive Pack §A: walk spawn inward until it lands on the island
-      let spawnX = c + Math.cos(a) * rr;
-      let spawnY = c + Math.sin(a) * rr;
-      for (let si = 0; si < 24 && !isWalkable(spawnX, spawnY); si++) {
-        const scale = 1 - (si + 1) * 0.042;
-        spawnX = c + Math.cos(a) * rr * scale;
-        spawnY = c + Math.sin(a) * rr * scale;
-      }
-      rivals[i].spawn(spawnX, spawnY, CONFIG.PLAYER_BASE_RADIUS);
-    }
-    // v8 §1: keep every void off a food cluster at spawn so no bot pops a pile
-    // of objects on the first frame (the "bots have 100+ in 2s" bug).
+    // Family arc: rivals are the player's FAMILY and no longer all exist at t=0.
+    // They sky-fall in one at a time per FAMILY_ARRIVAL_MS — the void gets noticed,
+    // the city panics, and kin drop from the sky to join the feast. Landing spots
+    // are chosen live (near the player) when each arrival fires.
+    familyArrivals = rivals.map((_, i) => ({
+      index: i,
+      atMs: CONFIG.FAMILY_ARRIVAL_MS[i] ?? (30000 + i * 40000),
+      done: false,
+    }));
+    // v8 §1: only the player occupies the map at spawn now — keep them off a food
+    // cluster so no one pops a pile of objects on the first frame.
     world.clearSpawnFootprint([
       { x: player.x, y: player.y, radius: player.radius },
-      ...rivals.map((r) => ({ x: r.x, y: r.y, radius: r.radius })),
     ]);
 
     timeLeft = duration;
@@ -580,6 +655,130 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} 100px`);
   }
 
+  // ── Signature VOID POWER — each form fires a DISTINCT move (kind) ───────────
+  function usePower() {
+    if (screen !== 'game' || paused || !player || !world || countdown > 0) return;
+    if (powerCd > 0) return;
+    const p = VOID_POWERS[Math.min(player.formIndex, VOID_POWERS.length - 1)];
+    powerCd = p.cd;
+
+    // Reach scales with the void's own radius so it feels bigger as you grow.
+    const rScale = 1 + player.radius / 240;
+    const consumeR = p.consume * rScale;
+    const pullR = p.pullRange * rScale;
+    const px = player.x, py = player.y;
+
+    const eaten = world.voidPowerBlast(player, pullR, consumeR, p.pull, p.crushBig, fx);
+
+    // Shove rivals out of the zone (used by the outward/heavy powers).
+    const knockRivals = (radius: number, strength: number) => {
+      for (const r of rivals) {
+        if (!r.alive || r.ghost) continue;
+        const d = dist(r.x, r.y, px, py);
+        if (d > 1 && d < radius + r.radius) {
+          const k = (radius + r.radius - d) * strength;
+          r.x += ((r.x - px) / d) * k;
+          r.y += ((r.y - py) / d) * k;
+        }
+      }
+    };
+
+    // ── per-kind FX identity — no two powers look alike ──────────────────────
+    switch (p.kind) {
+      case 'tug': { // snappy inward slurp
+        fx.addRing(px, py, p.color, consumeR * 1.1, player.radius * 0.5, 5, 300);
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2 + roundElapsed * 0.002;
+          fx.addRing(px + Math.cos(a) * consumeR, py + Math.sin(a) * consumeR, p.color, 6, 1, 2, 260);
+        }
+        fx.shake(150, p.shake, 20);
+        break;
+      }
+      case 'vortex': { // swirling vacuum — nested spiral rings + sparkle
+        for (let i = 0; i < 3; i++) {
+          fx.addRing(px, py, p.color, consumeR * (1.15 - i * 0.25), player.radius * 0.4, 5, 420 + i * 60);
+        }
+        fx.addConfetti(px, py, ['#B48CFF', '#E0C4FF', '#FFFFFF'], 12);
+        fx.shake(220, p.shake, [0, 90]);
+        break;
+      }
+      case 'shockwave': { // OUTWARD blast — expanding ring + debris + knockback
+        fx.addRing(px, py, '#FFFFFF', player.radius * 0.6, consumeR * 1.9, 9, 520);
+        fx.addRing(px, py, p.color, player.radius * 0.4, consumeR * 1.6, 6, 460);
+        fx.addDebris(px, py, '#D98CFF', 10);
+        fx.addDebris(px, py, '#FFFFFF', 6);
+        fx.shake(320, p.shake, [0, 120]);
+        knockRivals(consumeR * 1.2, 0.9);
+        break;
+      }
+      case 'singularity': { // gravity well — brief slow-mo, dark warp + bright core
+        slowmo = Math.max(slowmo, 360);
+        fx.flash();
+        fx.addRing(px, py, p.color, consumeR * 1.3, player.radius * 0.3, 10, 560);
+        fx.addRing(px, py, '#FFFFFF', consumeR * 0.6, player.radius * 0.2, 5, 420);
+        for (let i = 0; i < 20; i++) {
+          const a = (i / 20) * Math.PI * 2;
+          fx.addRing(px + Math.cos(a) * consumeR, py + Math.sin(a) * consumeR, p.color, 8, 2, 3, 340);
+        }
+        fx.shake(420, p.shake, [0, 120, 260]);
+        knockRivals(consumeR, 0.7);
+        break;
+      }
+      case 'collapse': { // the climax — slow-mo + full flash + massive shockwave
+        slowmo = Math.max(slowmo, 600);
+        fx.flash();
+        fx.addRing(px, py, '#FFFFFF', player.radius, consumeR * 2.0, 14, 800);
+        fx.addRing(px, py, p.color, player.radius * 0.6, consumeR * 1.6, 10, 700);
+        fx.addRing(px, py, '#FFD9A0', player.radius * 0.3, consumeR * 1.2, 6, 600);
+        fx.addConfetti(px, py, CONFIG.COLORS.pops, 28);
+        fx.addDebris(px, py, '#E4C4FF', 12);
+        fx.shake(560, p.shake, [0, 120, 260, 420]);
+        knockRivals(consumeR * 1.3, 1.0);
+        break;
+      }
+    }
+
+    // Surface the payoff (previously only console.log'd).
+    if (eaten > 0) fx.addText(px, py - player.radius - 22, `${eaten} DEVOURED`, p.color, 22);
+
+    banner(`${p.name}!`, p.color, 3, { pulse: true });
+    audio.playPower(p.kind);
+    console.log(`[power] ${p.name} (form ${player.formIndex}) consumed ${eaten}`);
+  }
+
+  // ── Family arc: sky-fall a family member into the match ─────────────────────
+  function spawnFamilyMember(index: number) {
+    if (!player || !world) return;
+    const r = rivals[index];
+    if (!r || r.arrived) return;
+    // Choose a landing spot a moderate distance from the player, on the island,
+    // so kin drop into the action but never right on top of the player.
+    const baseA = Math.random() * Math.PI * 2;
+    const reach = CONFIG.MAP_SIZE * 0.16;
+    let sx = player.x, sy = player.y, found = false;
+    for (let k = 0; k < 44; k++) {
+      const a = baseA + k * 1.7;
+      const rr = reach * (0.7 + (k % 5) * 0.12);
+      sx = clamp(player.x + Math.cos(a) * rr, 220, CONFIG.MAP_SIZE - 220);
+      sy = clamp(player.y + Math.sin(a) * rr, 220, CONFIG.MAP_SIZE - 220);
+      if (isWalkable(sx, sy)) { found = true; break; }
+    }
+    if (!found) { sx = CONFIG.MAP_SIZE / 2; sy = CONFIG.MAP_SIZE / 2; }
+    const bark = CONFIG.FAMILY_BARKS[Math.floor(Math.random() * CONFIG.FAMILY_BARKS.length)];
+    r.beginArrival(sx, sy, CONFIG.PLAYER_BASE_RADIUS, bark);
+    banner(`👾 ${r.name} the ${r.relation} joins the feast!`, r.skin.glowColor, 3, { sparkles: true });
+    audio.playBoon();
+    console.log(`[family] ${r.name} (${r.relation}) arrived @${Math.round(roundElapsed)}ms`);
+  }
+
+  function checkFamilyArrivals() {
+    for (const fa of familyArrivals) {
+      if (fa.done || roundElapsed < fa.atMs) continue;
+      fa.done = true;
+      spawnFamilyMember(fa.index);
+    }
+  }
+
   // v7 §5: light up / retire synergies as their member power-ups come and go
   function checkSynergies() {
     for (const syn of CONFIG.SYNERGIES) {
@@ -642,12 +841,24 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const placement = board.findIndex((e) => e === player) + 1;
     const crown = placement === 1;
     const worldEater = player.formIndex >= CONFIG.FORMS.length - 1;
-    if (worldEater) evoCoinBonus = 200; // v6 §3: reaching WORLD EATER awards 200 coins
+    if (worldEater) evoCoinBonus = 20; // Economy: WORLD ENDER pays a bonus inside the 50-150 band
     const devoured = world.initialMass > 0 ? (world.eatenArea / world.initialMass) * 100 : 0;
-    const coins = Math.floor((player.score / CONFIG.COINS_PER_SCORE + (crown ? 60 : 0)) * coinMult) + coinBonus + evoCoinBonus;
+    // Economy (LoL model): every finished match pays 50-150¢ scaling with
+    // performance — base 50, up to +60 from score, +25 crown, +20 evolution,
+    // plus contract/secret payouts accrued in coinBonus. First crowned win of
+    // the day DOUBLES the payout; first match of the day adds a bite bonus.
+    const perfPay = Math.min(60, Math.floor(player.score / 120));
+    const raw = 50 + perfPay + (crown ? 25 : 0) + evoCoinBonus + coinBonus;
+    let coins = Math.min(150, Math.floor(raw * coinMult));
+    const firstWin = crown && meta.isFirstWinOfDay();
+    if (firstWin) coins *= 2;
+    const dailyBite = meta.isFirstPlayOfDay() ? 25 : 0;
+    coins += dailyBite;
     const newBest = player.score > meta.data.highScore;
 
     meta.addCoins(coins);
+    if (crown) meta.recordWin();
+    meta.recordPlay();
     if (newBest) { meta.data.highScore = player.score; meta.save(); }
     if (isDaily) meta.recordDaily();
 
@@ -711,6 +922,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     results = {
       score: player.score, placement, total: board.length, devoured,
       coins, isDaily, crown, highScore: meta.data.highScore, newBest,
+      firstWin, dailyBite,
       reachedForm: player.formName, reachedIndex: player.formIndex, worldEater,
       gnomeLord, killedBy: killedBy || undefined,
       skinTease,
@@ -736,7 +948,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     fx.addRing(x, y, '#FFD23F', 20, 900, 8, 900);
     banner('YOU ATE THE WATER TOWER', '#FFD23F');
     // single source of truth: accrue here, granted once via endRound's coin total
-    coinBonus += 500;
+    coinBonus += 40; // Economy: calibrated to the 50-150¢ match band
     audio.playMerge();
   }
 
@@ -779,6 +991,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     timeLeft -= dt;
     roundElapsed += dt;
     setRoundElapsed(roundElapsed); // v15 §0: Growth Law ceiling
+
+    // Family arc: drop in kin on schedule
+    checkFamilyArrivals();
 
     // boons expiry + live effects
     for (let i = activeBoons.length - 1; i >= 0; i--) {
@@ -997,6 +1212,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           player.combo = 0; player.comboTimer = 0;
           player.score = Math.max(0, player.score - CONFIG.DEFENSE_PELLET_COST);
           pelletHitFlash = 300;
+          // The city can actually push you around: pellets physically stagger the void.
+          const pm = Math.hypot(p.vx, p.vy) || 1;
+          player.x = clamp(player.x + (p.vx / pm) * 26, player.radius, CONFIG.MAP_SIZE - player.radius);
+          player.y = clamp(player.y + (p.vy / pm) * 26, player.radius, CONFIG.MAP_SIZE - player.radius);
+          fx.shake(140, 4, 15);
           audio.playEaten();
           banner(`🚔 Pellet hit! -${CONFIG.DEFENSE_PELLET_COST} pts`, '#FF9F1C', 2);
         }
@@ -1012,6 +1232,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             player.score = Math.max(0, player.score - cost);
             player.combo = 0; player.comboTimer = 0;
             pelletHitFlash = 500;
+            // Direct artillery hit: real knockback + momentum kill — the army HURTS.
+            const bd = Math.max(1, dist(s.tx, s.ty, player.x, player.y));
+            const bax = (player.x - s.tx) / bd, bay = (player.y - s.ty) / bd;
+            player.x = clamp(player.x + bax * 90, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.y = clamp(player.y + bay * 90, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.vx = 0; player.vy = 0;
+            fx.shake(300, 12, [0, 90]);
             audio.playEaten();
             if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost} pts`, '#FF4D6D', 2);
           }
@@ -1043,6 +1270,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             player.score = Math.max(0, player.score - cost);
             player.combo = 0; player.comboTimer = 0;
             pelletHitFlash = 500;
+            // Missile knockback — the air force means business.
+            const md = Math.max(1, dist(m.tx, m.ty, player.x, player.y));
+            player.x = clamp(player.x + ((player.x - m.tx) / md) * 70, player.radius, CONFIG.MAP_SIZE - player.radius);
+            player.y = clamp(player.y + ((player.y - m.ty) / md) * 70, player.radius, CONFIG.MAP_SIZE - player.radius);
+            fx.shake(240, 9, [0, 80]);
             audio.playEaten();
             if (cost > 0) banner(`🚁 Missile hit! -${cost} pts`, '#FF4D6D', 2);
           }
@@ -1158,6 +1390,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       if (dashTimer <= 0) { dashTimer = 6000; performDash(); }
     } else dashTimer = 0;
 
+    // Signature VOID POWER cooldown tick
+    if (powerCd > 0) powerCd = Math.max(0, powerCd - dt);
+
     // v7 §5: ECHO BITE shockwave (every 5th absorb) pulls nearby edibles inward
     if (player.echoPulse) {
       player.echoPulse = false;
@@ -1174,7 +1409,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (screen === 'game' && roundElapsed > 5000) {
       tickerCd -= dt;
       if (tickerCd <= 0) {
-        tickerCd = 40000 + Math.random() * 10000;
+        tickerCd = 26000 + Math.random() * 8000; // faster news cadence — the feed should pop
         const line = TICKER_LINES[Math.floor(Math.random() * TICKER_LINES.length)];
         banner(line, '#9AAFC8', 1);
       }
@@ -1241,8 +1476,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v9 §8: secret — the moment the last gnome is eaten, crown the GNOME LORD
     if (world.gnomeLordPending && !gnomeLord) {
       gnomeLord = true;
-      coinBonus += 150;
-      banner('GNOME LORD! +150', '#8FE36B', 5, { sparkles: true });
+      coinBonus += 30; // Economy: calibrated to the 50-150¢ match band
+      banner('GNOME LORD! +30¢', '#8FE36B', 5, { sparkles: true });
       audio.playWin();
     }
     // v8 §7: FRENZY MINUTE — ×1.25 score (double streaks handled in the chomp loop)
@@ -2000,7 +2235,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const finalForm = CONFIG.FORMS.length - 1;
     const board = [
       { name: 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm, out: false },
-      ...rivals.map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm, out: !r.alive })),
+      // Family arc: only kin who have actually dropped in appear. Not-yet-arrived
+      // family are hidden (not "OUT"); the board fills as they join the feast.
+      ...rivals.filter((r) => r.arrived).map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm, out: !r.alive })),
     ].sort((a, b) => (a.out !== b.out ? (a.out ? 1 : -1) : b.score - a.score));
     const LB_X = 8, LB_W = 150, LB_TOP = 84, ROW = 20;
     const lbH = board.length * ROW + 12;
@@ -2722,6 +2959,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     ] : [];
     return {
       screen: screen,
+      assetsReady: assetsLoaded,
       coins: meta.data.coins,
       highScore: meta.data.highScore,
       streak: meta.data.streak,
@@ -2744,6 +2982,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       killedBy: killedBy || undefined, // Phase 7b §4: who ate the player
       planName: world?.planName, // v16.2 §6
       matchStartSeq, // Rebuild Prompt 10
+      power: (player && screen === 'game') ? (() => {
+        const idx = Math.min(player.formIndex, VOID_POWERS.length - 1);
+        return { name: VOID_POWERS[idx].name, ready: powerCd <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
+      })() : undefined,
     };
   }
 
@@ -2806,6 +3048,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       import('tone').then((T) => T.start()).catch(() => {/* ignore */});
     },
 
+    usePower() { usePower(); },
+
     // Stage 13 §1: photo-mode capture — renders a 2000×2000 PNG of the island.
     // Rebuild Prompt 16 Stage 0: capturePhoto must always show a populated island,
     // so we build a fresh WorldManager and run the full init pipeline (lots, fill,
@@ -2853,6 +3097,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('visibilitychange', onVisibility);
       audio.stopMusic(); // prevent the music scheduler interval from leaking on unmount
       joystick.destroy();

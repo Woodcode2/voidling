@@ -8,7 +8,7 @@ import {
   ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R,
   LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY,
   RIVER_PATH, RIVER_HALF_W, POND_CX, POND_CY, POND_R,
-  ROAD_CENTERS,
+  ROAD_CENTERS, RAIL_PATH, BRIDGES,
 } from './mapData';
 import { CONFIG } from './config';
 
@@ -20,15 +20,15 @@ const COL = {
   park:     '#B7DBA8',
   forest:   '#8FBF88',
   sand:     '#F2DFA7',
-  pavement: '#EAE4D6',
-  road:     '#9B9285',   // Prompt 8: warm clay-asphalt (was stark cool grey #939CAB)
+  pavement: '#E8E8EA',
+  road:     '#5C6270',   // crisp cool asphalt (de-browned — brown muted the whole map)
   rimWhite: '#FFFFFF',
   cliff:    '#6B5B73',
   waterS:   '#7FD4E8',
   waterD:   '#5BB8D4',
   riverMid: '#8FC6D4',   // Prompt 8: soft clay-blue river band
   riverDeep:'#69A9C2',   // Prompt 8: deeper river core
-  roadDash: 'rgba(243,236,218,0.5)', // Prompt 8: muted warm off-white lane paint
+  roadDash: 'rgba(255,255,255,0.8)', // crisp white lane paint
 };
 
 // ─── Smooth island path helper ────────────────────────────────────────────────
@@ -69,7 +69,7 @@ const _noCache = typeof window !== 'undefined'
 
 /** Force the ground buffer to rebuild on the next draw (new match / resize).
  *  Map geometry is static, so this is rarely needed, but honours the §1 contract. */
-export function resetGroundCache(): void { _groundBuf = null; }
+export function resetGroundCache(): void { _groundBuf = null; _invalidateViewCache(); }
 /** Returns the baked ground-buffer canvas, or null if not yet rendered.
  *  Used by the photo-mode capture path (Stage 13 §1). */
 export function exportGroundBuffer(): HTMLCanvasElement | null { return _groundBuf; }
@@ -100,9 +100,9 @@ export function loadGroundTextures(base: string): void {
       c.width  = c.height = px;
       c.getContext('2d')!.drawImage(img, 0, 0, px, px);
       _texTiles.set(key, c);
-      if (--pending <= 0) { _groundBuf = null; }
+      if (--pending <= 0) { _groundBuf = null; _invalidateViewCache(); }
     };
-    img.onerror = () => { if (--pending <= 0) { _groundBuf = null; } };
+    img.onerror = () => { if (--pending <= 0) { _groundBuf = null; _invalidateViewCache(); } };
     img.src = `${b}assets/tex_${key}.png`;
   }
 }
@@ -116,6 +116,72 @@ let _groundLots: GroundLot[] = [];
 export function setMatchLots(lots: ReadonlyArray<{ x: number; y: number; fpR: number }>): void {
   _groundLots = lots.map((l) => ({ x: l.x, y: l.y, fpR: l.fpR }));
   _groundBuf  = null;
+  _invalidateViewCache();
+}
+
+// ─── Structural Build: residential block rects → internal-lane painting ───────
+export interface GroundBlock { x0: number; y0: number; type: 'cozy' | 'fancy'; }
+let _groundBlocks: GroundBlock[] = [];
+
+/** Residential block rects so the ground cache can paint internal lanes.
+ *  Call right after setMatchLots(). */
+export function setMatchBlocks(blocks: ReadonlyArray<GroundBlock>): void {
+  _groundBlocks = blocks.map((b) => ({ ...b }));
+  _groundBuf = null;
+  _invalidateViewCache();
+}
+
+// Grid constants mirrored from world.ts/mapData.ts (all derive from CONFIG).
+const G_STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
+const G_MARGIN = (S - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
+
+/** Centerline y of the internal lane just SOUTH of a lot's house row. */
+function _laneYForLot(lot: GroundLot): number {
+  const gy = Math.floor((lot.y - G_MARGIN) / G_STRIDE);
+  const y0 = G_MARGIN + gy * G_STRIDE;
+  const row = Math.max(0, Math.min(4, Math.round((lot.y - y0 - CONFIG.LOT_ROW_INSET) / CONFIG.LOT_ROW_STEP)));
+  return y0 + CONFIG.LOT_ROW_INSET + row * CONFIG.LOT_ROW_STEP + CONFIG.LANE_OFFSET;
+}
+
+/** Internal neighborhood lanes + connected driveways + front-path stepping
+ *  stones — the "engineered suburb" read. Cheap flat fills only (live-path safe). */
+function _paintNeighborhoodLanes(cc: CanvasRenderingContext2D): void {
+  if (_groundBlocks.length === 0) return;
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const B = CONFIG.BLOCK_SIZE, LW = CONFIG.LANE_W;
+
+  // (a) Lanes: 5 per block (one below each house row, incl. a last-row lane)
+  for (const b of _groundBlocks) {
+    for (let k = 0; k <= 4; k++) {
+      const ly = b.y0 + CONFIG.LOT_ROW_INSET + k * CONFIG.LOT_ROW_STEP + CONFIG.LANE_OFFSET;
+      cc.fillStyle = 'rgba(203,209,220,0.88)';           // cool light concrete
+      cc.fillRect(b.x0 + 60, ly - LW / 2, B - 120, LW);
+      cc.strokeStyle = 'rgba(122,132,150,0.30)';         // expansion-seam dashes
+      cc.lineWidth = 3; cc.setLineDash([4, 90]);
+      cc.beginPath(); cc.moveTo(b.x0 + 60, ly); cc.lineTo(b.x0 + B - 60, ly); cc.stroke();
+      cc.setLineDash([]);
+    }
+  }
+  // (b) Driveways: house foot → the lane below it
+  cc.fillStyle = 'rgba(214,219,228,0.85)';
+  for (const lot of _groundLots) {
+    const dwW = Math.max(12, lot.fpR * 0.30);
+    const dwTop = lot.y + lot.fpR * 0.8;
+    const dwBot = _laneYForLot(lot) - CONFIG.LANE_W / 2;
+    if (dwBot > dwTop + 4) cc.fillRect(lot.x - dwW, dwTop, dwW * 2, dwBot - dwTop + 6);
+  }
+  // (c) Front paths: round-cap dot dashes = stepping stones to the door
+  cc.strokeStyle = 'rgba(228,232,240,0.80)';
+  cc.lineWidth = 11; cc.lineCap = 'round'; cc.setLineDash([1, 20]);
+  for (const lot of _groundLots) {
+    cc.beginPath();
+    cc.moveTo(lot.x + lot.fpR * 0.70, lot.y + lot.fpR * 0.45);
+    cc.lineTo(lot.x + lot.fpR * 0.30, lot.y + lot.fpR * 0.95);
+    cc.stroke();
+  }
+  cc.setLineDash([]); cc.lineCap = 'butt';
+  cc.restore();
 }
 
 // ─── Per-match sports field data (Prompt 19 Stage 6: baked field lines) ──────
@@ -129,6 +195,7 @@ export function setMatchSportsFields(
 ): void {
   _matchSportsFields = fields.map((f) => ({ ...f }));
   _groundBuf = null;
+  _invalidateViewCache();
 }
 
 function _ensureGroundBuffer(): HTMLCanvasElement {
@@ -145,14 +212,51 @@ function _ensureGroundBuffer(): HTMLCanvasElement {
   return buf;
 }
 
-// Prompt 20 Stage 1: when the camera is zoomed in enough for ground blur to be
-// visible, draw the static ground live into the world-space ctx clipped to the
-// visible viewport instead of blitting the low-resolution cached buffer.
-// Threshold chosen so the cached buffer is still used at overview zoom (camZoom
-// < LIVE_ZOOM_MIN) where 0.30 px/wu is adequate; at street zoom the live path
-// gives full screen-native resolution. PAD prevents seams during pan.
-const LIVE_ZOOM_MIN = 0.8;  // px/world-unit — above this, live path activates
-const LIVE_PAD = 250;        // world units of overdraw beyond visible viewport
+// Perf overhaul (mobile): the old "live path" re-ran the ENTIRE static ground
+// paint — blur filters, thousand-element loops and all — EVERY FRAME at street
+// zoom. That was the frame-rate killer. Replaced with a VIEW CACHE: the visible
+// region (+45% pad) is painted ONCE into an offscreen canvas at native zoom and
+// blitted each frame; it only repaints when the camera nears the cached edge or
+// the zoom changes materially (~every couple of seconds while moving).
+const LIVE_ZOOM_MIN = 0.8;   // px/world-unit — below this the overview buffer is sharp enough
+const VC_PAD_FRAC = 0.45;    // extra viewport fraction cached on each side
+const VC_MAX_SIDE = 4096;    // iOS-safe canvas cap
+
+let _viewCache: HTMLCanvasElement | null = null;
+let _vc = { x: 0, y: 0, w: 0, h: 0, zoom: 0, valid: false }; // cached world rect + zoom
+
+/** Invalidate the street-zoom view cache (called whenever bake data changes). */
+function _invalidateViewCache(): void { _vc.valid = false; }
+
+function _ensureViewCache(view: { x: number; y: number; w: number; h: number }, camZoom: number): void {
+  const padX = view.w * VC_PAD_FRAC, padY = view.h * VC_PAD_FRAC;
+  const needRepaint =
+    !_vc.valid ||
+    Math.abs(camZoom - _vc.zoom) / _vc.zoom > 0.10 ||
+    view.x < _vc.x + padX * 0.25 || view.y < _vc.y + padY * 0.25 ||
+    view.x + view.w > _vc.x + _vc.w - padX * 0.25 ||
+    view.y + view.h > _vc.y + _vc.h - padY * 0.25;
+  if (!needRepaint) return;
+
+  const wx = Math.max(0, view.x - padX), wy = Math.max(0, view.y - padY);
+  const ww = Math.min(S - wx, view.w + padX * 2), wh = Math.min(S - wy, view.h + padY * 2);
+  const pw = Math.min(VC_MAX_SIDE, Math.ceil(ww * camZoom));
+  const ph = Math.min(VC_MAX_SIDE, Math.ceil(wh * camZoom));
+  if (!_viewCache) _viewCache = document.createElement('canvas');
+  if (_viewCache.width !== pw || _viewCache.height !== ph) {
+    _viewCache.width = pw; _viewCache.height = ph;
+  }
+  const vcc = _viewCache.getContext('2d')!;
+  vcc.setTransform(1, 0, 0, 1, 0, 0);
+  vcc.clearRect(0, 0, pw, ph);
+  vcc.setTransform(pw / ww, 0, 0, ph / wh, -wx * (pw / ww), -wy * (ph / wh));
+  vcc.beginPath(); vcc.rect(wx, wy, ww, wh); vcc.clip();
+  const t0 = performance.now();
+  _paintStaticGround(vcc);
+  const ms = performance.now() - t0;
+  if (ms > 34) console.debug(`[ground] view-cache repaint ${ms.toFixed(1)}ms`);
+  _vc = { x: wx, y: wy, w: ww, h: wh, zoom: camZoom, valid: true };
+}
 
 /** Draw the full ground layer into ctx (world-space camera transform must be applied). */
 export function drawVectorGround(
@@ -162,21 +266,20 @@ export function drawVectorGround(
   forceRebuild = false,
   view?: { x: number; y: number; w: number; h: number },
 ): void {
-  if (_noCache || (view && camZoom >= LIVE_ZOOM_MIN)) {
-    // Prompt 20 Stage 1: Live per-frame render clipped to the visible region.
-    // GPU clips all fills to the viewport rect so overdraw is negligible;
-    // the resulting ground is at full screen resolution — no stretching.
+  if (forceRebuild) { _groundBuf = null; _vc.valid = false; }
+  if (!_noCache && view && camZoom >= LIVE_ZOOM_MIN) {
+    // Street zoom: blit the padded view cache (repaints only when needed).
+    _ensureViewCache(view, camZoom);
+    ctx.drawImage(_viewCache!, _vc.x, _vc.y, _vc.w, _vc.h);
+  } else if (_noCache && view) {
+    // ?nocache=1 debug path: paint live every frame (perf comparison baseline)
     ctx.save();
-    if (view) {
-      ctx.beginPath();
-      ctx.rect(view.x - LIVE_PAD, view.y - LIVE_PAD,
-               view.w + LIVE_PAD * 2, view.h + LIVE_PAD * 2);
-      ctx.clip();
-    }
+    ctx.beginPath();
+    ctx.rect(view.x - 250, view.y - 250, view.w + 500, view.h + 500);
+    ctx.clip();
     _paintStaticGround(ctx);
     ctx.restore();
   } else {
-    if (forceRebuild) _groundBuf = null;
     const buf = _ensureGroundBuffer();
     // Blit the cached static ground: one drawImage vs. ~1,600 ops/frame.
     const prevSmooth = ctx.imageSmoothingEnabled;
@@ -216,10 +319,12 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     }
     // Lighting atmosphere on top (always)
     // Prompt 15 Stage 5: richer green tint to match reference vibrancy.
+    // Crisp fresh daylight — the old orange-brown wash muted every colour on
+    // the map. A whisper of cool sky light keeps depth without the mud.
     const atmo = cc.createLinearGradient(0, 0, S, S);
-    atmo.addColorStop(0,   'rgba(255,196,110,0.10)'); // Batch 1.5: warm golden light
-    atmo.addColorStop(0.5, 'rgba(255,170,90,0.04)');
-    atmo.addColorStop(1,   'rgba(210,120,60,0.08)');
+    atmo.addColorStop(0,   'rgba(255,250,235,0.05)');
+    atmo.addColorStop(0.5, 'rgba(235,245,255,0.03)');
+    atmo.addColorStop(1,   'rgba(200,225,255,0.05)');
     cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
     cc.restore();
   }
@@ -228,8 +333,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   //      Each distinct surface now reads as its own material.
   _texZone(cc, 'forest',   ZONE_FOREST_R,   COL.forest);
   _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
-  // Batch 1.5: downtown floors in warm dark stone — dense streets, not pale plaza.
-  _texZone(cc, 'street', ZONE_DOWNTOWN_R, '#6E6156', true);
+  // hole.io rebuild: downtown floors in LIGHT concrete (like hole.io's pale
+  // city ground) so the extruded buildings and dark roads pop against it.
+  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, '#DADDE2', true);
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
 
@@ -247,13 +353,17 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // Pond (source) — Prompt 19 Stage 5: soft bank ring + water texture + lily pads
   // Blurred bank ring (soft depth edge)
   cc.save();
-  cc.filter = 'blur(14px)';
-  cc.strokeStyle = 'rgba(30,70,100,0.48)';
-  cc.lineWidth = 24;
+  // perf: blur filter removed — stacked soft strokes read the same on mobile
+  cc.strokeStyle = 'rgba(30,70,100,0.30)';
+  cc.lineWidth = 40;
   cc.beginPath();
   cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
   cc.stroke();
-  cc.filter = 'none';
+  cc.strokeStyle = 'rgba(30,70,100,0.26)';
+  cc.lineWidth = 22;
+  cc.beginPath();
+  cc.ellipse(POND_CX, POND_CY, POND_R, POND_R * 0.85, 0, 0, Math.PI * 2);
+  cc.stroke();
   cc.restore();
   // Water fill (texture if loaded, gradient fallback)
   {
@@ -305,11 +415,12 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // Stage 13 §3: River channel — bank edges first (darker halo), then
   // tex_water at FULL opacity, then a depth overlay.
   cc.lineCap = 'round'; cc.lineJoin = 'round';
-  cc.save();
-  cc.filter = 'blur(10px)';
-  _riverStroke(cc, RIVER_HALF_W * 3.0, 'rgba(30,70,100,0.55)');
-  cc.filter = 'none';
-  cc.restore();
+  // perf: blur removed — two stacked bank strokes
+  _riverStroke(cc, RIVER_HALF_W * 3.2, 'rgba(30,70,100,0.22)');
+  _riverStroke(cc, RIVER_HALF_W * 2.7, 'rgba(30,70,100,0.34)');
+
+  // Stage D: cool stone bank edging — solid rim peeking out from under the water
+  _riverStroke(cc, RIVER_HALF_W * 2.2 + 16, '#8B94A6');
 
   {
     const wt = _texTiles.get('water');
@@ -336,6 +447,21 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   }
   // Depth overlay — darker core tint on top of whatever surface is showing.
   _riverStroke(cc, RIVER_HALF_W * 0.8, 'rgba(25,85,130,0.28)');
+
+  // Stage D: static foam streaks along the flow (the live shimmer animates on top)
+  cc.save();
+  cc.setLineDash([18, 46]);
+  cc.lineCap = 'round';
+  cc.strokeStyle = 'rgba(255,255,255,0.30)';
+  cc.lineWidth = RIVER_HALF_W * 0.45;
+  cc.beginPath();
+  for (let i = 0; i < RIVER_PATH.length; i++) {
+    const [rx, ry] = RIVER_PATH[i];
+    i === 0 ? cc.moveTo(rx, ry) : cc.lineTo(rx, ry);
+  }
+  cc.stroke();
+  cc.setLineDash([]);
+  cc.restore();
 
   cc.restore();
 
@@ -371,14 +497,15 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX * 0.55, LAGOON_RY * 0.55, 0, 0, Math.PI * 2);
     cc.fill();
     // Bank-edge shadow ring.
-    cc.save();
-    cc.filter = 'blur(12px)';
-    cc.strokeStyle = 'rgba(30,70,100,0.45)'; cc.lineWidth = 30;
+    // perf: blur removed — stacked bank strokes
+    cc.strokeStyle = 'rgba(30,70,100,0.20)'; cc.lineWidth = 46;
     cc.beginPath();
     cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
     cc.stroke();
-    cc.filter = 'none';
-    cc.restore();
+    cc.strokeStyle = 'rgba(30,70,100,0.30)'; cc.lineWidth = 26;
+    cc.beginPath();
+    cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX, LAGOON_RY, 0, 0, Math.PI * 2);
+    cc.stroke();
     // Shore highlight ring.
     cc.strokeStyle = 'rgba(255,255,255,0.22)'; cc.lineWidth = 14;
     cc.beginPath();
@@ -398,6 +525,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     }
   }
   cc.restore();
+
+  // ─ 4b. Biome detail — forest underbrush, manicured park, real beach shoreline ─
+  _paintBiomeDetail(cc);
 
   // ─ 5. Roads (Prompt 8: baked into the clay terrain — warm asphalt, a soft
   //      shoulder that recesses the edge into the grass/sand, gentle lane paint) ─
@@ -419,12 +549,11 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   // (a) Soft shoulder / recess shadow: a blurred warm-dark halo slightly wider
   //     than the road, so the edge reads as gently sunk into the terrain rather
   //     than a hard sticker line where grey meets grass.
-  cc.save();
-  cc.filter = 'blur(13px)';
-  cc.fillStyle = 'rgba(96,84,72,0.42)';
+  // perf: blur removed — two plain shoulder fills
+  cc.fillStyle = 'rgba(48,54,66,0.14)';
+  for (const [x, y, w, h] of roadRects) cc.fillRect(x - 12, y - 12, w + 24, h + 24);
+  cc.fillStyle = 'rgba(48,54,66,0.24)';
   for (const [x, y, w, h] of roadRects) cc.fillRect(x - 5, y - 5, w + 10, h + 10);
-  cc.filter = 'none';
-  cc.restore();
 
   // (b) Road surface — tex_street at FULL opacity; solid-asphalt fallback.
   //     Stage 13 §2: the texture IS the road material, not an overlay tint.
@@ -444,7 +573,6 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     } else {
       // Fallback: blurred solid asphalt until texture loads.
       cc.save();
-      cc.filter = 'blur(2.5px)';
       cc.fillStyle = COL.road;
       for (const [x, y, w, h] of roadRects) cc.fillRect(x, y, w, h);
       cc.filter = 'none';
@@ -459,8 +587,10 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   cc.clip();
   let rseed = 90721;
   const rrnd = () => { rseed = (rseed * 1103515245 + 12345) & 0x7fffffff; return rseed / 0x7fffffff; };
-  const mottleA = _texTiles.has('street') ? 0.35 : 1.0;
-  for (let i = 0; i < 1500; i++) {
+  // perf: mottling only needed for the flat fallback — the asphalt texture
+  // already carries aggregate variation. 1500 ellipses/frame was a mobile killer.
+  const mottleA = _texTiles.has('street') ? 0 : 1.0;
+  for (let i = 0; i < (mottleA ? 500 : 0); i++) {
     const mx = rrnd() * S, my = rrnd() * S, mr = 6 + rrnd() * 16;
     cc.fillStyle = rrnd() > 0.5
       ? `rgba(255,255,255,${(0.025 * mottleA).toFixed(4)})`
@@ -516,8 +646,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     cc.beginPath(); cc.moveTo(rc + hw, MARGIN); cc.lineTo(rc + hw, S - MARGIN); cc.stroke();
   }
 
-  // (f) Soft crosswalk stripes at each junction — muted warm paint, rounded.
-  cc.fillStyle = 'rgba(243,236,218,0.24)';
+  // (f) Crosswalk stripes at each junction — BOLD white zebra bars like
+  // hole.io's streets (they were nearly invisible at 0.24 alpha).
+  cc.fillStyle = 'rgba(255,255,255,0.72)';
   for (const rx of ROAD_CENTERS) {
     for (const ry of ROAD_CENTERS) {
       const stripeW = 14, stripeGap = 24, rad = 6;
@@ -538,6 +669,16 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
 
   // ─ 5.5. House yards, driveways, and flowerbeds (baked from match lot data) ──
   _paintYards(cc);
+
+  // ─ 5.6. Structural Build: internal lanes + connected driveways + front paths ─
+  _paintNeighborhoodLanes(cc);
+
+  // ─ 5.7. Structural Build: rail loop around downtown + bridges over the river ─
+  _paintRailTracks(cc);
+  _paintBridges(cc);
+
+  // ─ 5.8. Structural Build: mountain ridge along the east rim ────────────────
+  _paintMountainRidge(cc);
 
   // ─ 6. Island rim: white sticker + cliff band ──────────────────────────────
   cc.save();
@@ -593,6 +734,9 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
       if (fd.kind === 'field_soccer')      _paintSoccerField(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_basketball') _paintBasketballCourt(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_tennis')     _paintTennisCourt(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_volleyball') _paintVolleyballCourt(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_campsite')   _paintCampsiteClearing(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_beachclub')  _paintBeachClubDeck(cc, fd.halfW, fd.halfH);
       cc.restore();
     }
     cc.restore();
@@ -649,6 +793,103 @@ function _paintTennisCourt(cc: CanvasRenderingContext2D, hw: number, hh: number)
   cc.beginPath(); cc.moveTo(0, -sd); cc.lineTo(0, sd); cc.stroke();
 }
 
+/** Mountain ridge hugging the island's east rim (over the forest's east edge,
+ *  under the cliff/rim strokes). Two silhouette layers + snow caps — cool slate,
+ *  no browns, <40 primitives (live-path safe). Closed east of the rim; the
+ *  island clip trims the overhang. x kept ≥ 11150 so the zoo art never overlaps. */
+function _paintMountainRidge(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+
+  // back layer — hazy distant peaks (kept INSIDE the island curve; starts south
+  // of the zoo band so the zoo art never overlaps)
+  const back: [number, number][] = [
+    [11080, 4400], [11000, 4800], [11220, 5300], [11120, 5750], [11400, 6200],
+    [11250, 6700], [11330, 7150], [11170, 7600], [11240, 8050], [11080, 8400],
+  ];
+  cc.fillStyle = 'rgba(148,158,186,0.72)';
+  cc.beginPath();
+  cc.moveTo(11900, 4400);
+  for (const [x, y] of back) cc.lineTo(x, y);
+  cc.lineTo(11900, 8400);
+  cc.closePath(); cc.fill();
+
+  // front layer — bold slate ridge, gradient dark toward the base
+  const front: [number, number][] = [
+    [11000, 4600], [11080, 5050], [10960, 5450], [11200, 5950], [11120, 6400],
+    [11300, 6850], [11160, 7300], [11230, 7750], [11060, 8200],
+  ];
+  const grd = cc.createLinearGradient(10950, 0, 11550, 0);
+  grd.addColorStop(0, '#66708A');
+  grd.addColorStop(1, '#4E576B');
+  cc.fillStyle = grd;
+  cc.beginPath();
+  cc.moveTo(11900, 4600);
+  for (const [x, y] of front) cc.lineTo(x, y);
+  cc.lineTo(11900, 8200);
+  cc.closePath(); cc.fill();
+
+  // snow caps on the tallest front apexes (the westernmost zigzag points)
+  cc.fillStyle = 'rgba(250,252,255,0.95)';
+  for (const [px, py] of [[11000, 4600], [10960, 5450], [11120, 6400], [11160, 7300], [11060, 8200]] as const) {
+    cc.beginPath();
+    cc.moveTo(px - 12, py + 46);
+    cc.lineTo(px + 6, py + 6);
+    cc.lineTo(px + 52, py + 40);
+    cc.quadraticCurveTo(px + 26, py + 62, px - 12, py + 46);
+    cc.closePath(); cc.fill();
+  }
+  // spine highlight
+  cc.strokeStyle = 'rgba(255,255,255,0.45)';
+  cc.lineWidth = 5; cc.lineJoin = 'round';
+  cc.beginPath();
+  front.forEach(([x, y], i) => (i === 0 ? cc.moveTo(x, y) : cc.lineTo(x, y)));
+  cc.stroke();
+  cc.restore();
+}
+
+/** Beach volleyball court: raked-sand surface + white lines + net posts. */
+function _paintVolleyballCourt(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(250,232,190,0.55)';                 // raked bright sand
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(255,255,255,0.85)';
+  cc.lineWidth = 4; cc.setLineDash([]);
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  // net across the middle + posts
+  cc.beginPath(); cc.moveTo(0, -hh - 12); cc.lineTo(0, hh + 12); cc.stroke();
+  cc.setLineDash([3, 6]); cc.lineWidth = 8;
+  cc.beginPath(); cc.moveTo(0, -hh - 10); cc.lineTo(0, hh + 10); cc.stroke();
+  cc.setLineDash([]);
+  cc.fillStyle = '#4A5568';
+  cc.beginPath(); cc.arc(0, -hh - 14, 6, 0, Math.PI * 2); cc.fill();
+  cc.beginPath(); cc.arc(0, hh + 14, 6, 0, Math.PI * 2); cc.fill();
+}
+
+/** Forest campsite clearing: soft moss-light ellipse + trodden inner path ring. */
+function _paintCampsiteClearing(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(168,200,140,0.5)';                  // sunlit moss clearing
+  cc.beginPath(); cc.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2); cc.fill();
+  cc.strokeStyle = 'rgba(210,225,190,0.55)';
+  cc.lineWidth = 10; cc.setLineDash([14, 18]); cc.lineCap = 'round';
+  cc.beginPath(); cc.ellipse(0, 0, hw * 0.62, hh * 0.62, 0, 0, Math.PI * 2); cc.stroke();
+  cc.setLineDash([]); cc.lineCap = 'butt';
+}
+
+/** Cabana-club deck: whitewashed plank platform with a cool blue runner. */
+function _paintBeachClubDeck(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  cc.fillStyle = 'rgba(226,232,240,0.78)';                 // whitewashed deck
+  cc.fillRect(-hw, -hh, hw * 2, hh * 2);
+  cc.strokeStyle = 'rgba(150,160,178,0.55)';               // plank seams
+  cc.lineWidth = 2.5;
+  for (let y = -hh + 14; y < hh; y += 18) {
+    cc.beginPath(); cc.moveTo(-hw + 4, y); cc.lineTo(hw - 4, y); cc.stroke();
+  }
+  cc.strokeStyle = 'rgba(255,255,255,0.9)'; cc.lineWidth = 4;
+  cc.strokeRect(-hw, -hh, hw * 2, hh * 2);
+  cc.fillStyle = 'rgba(95,168,224,0.5)';                   // pool-blue runner
+  cc.fillRect(-hw * 0.2, -hh, hw * 0.4, hh * 2);
+}
+
 // ─── Prompt 6 §2 enrichment helpers (all baked once into the ground buffer) ──
 
 /** Shade a #RRGGBB toward white (amt>0) or black (amt<0). */
@@ -694,10 +935,8 @@ function _fillZoneRich(
   grd.addColorStop(0, _lighten(color, understated ? 0.05 : 0.10));
   grd.addColorStop(1, _darken(color,  understated ? 0.03 : 0.06));
   cc.fillStyle = grd;
-  // Blur softens the rectangle edges → feathered transitions into the meadow.
-  cc.filter = understated ? 'blur(28px)' : 'blur(46px)';
+  // perf: blur removed — plain fill (zone textures + biome detail mask the edges)
   cc.fillRect(r[0] - 24, r[1] - 24, (r[2] - r[0]) + 48, (r[3] - r[1]) + 48);
-  cc.filter = 'none';
   cc.restore();
 }
 
@@ -774,13 +1013,13 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
   ctx.translate(wx, wy);
 
   // 1. soft blue-white glow behind the falls
-  const glow = ctx.createRadialGradient(0, 90, 18, 0, 90, 250);
+  const glow = ctx.createRadialGradient(0, 90, 18, 0, 90, 330); // Stage D: bigger presence
   glow.addColorStop(0,   'rgba(190,235,255,0.55)');
   glow.addColorStop(0.5, 'rgba(127,212,232,0.26)');
   glow.addColorStop(1,   'rgba(127,212,232,0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.ellipse(0, 100, 135, 300, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 100, 170, 340, 0, 0, Math.PI * 2); // Stage D: wider glow
   ctx.fill();
 
   // 2. flowing water column: clip a tapering falls region, scroll bright bands down
@@ -824,7 +1063,7 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  if (_mist.length < 26) {
+  if (_mist.length < 36) { // Stage D: denser mist pool
     _mist.push({
       x: (Math.random() - 0.5) * 130,
       y: 320 + Math.random() * 26,
@@ -959,19 +1198,168 @@ function _texZone(
     // Atmosphere overlay: light blurred gradient so the material has depth.
     cc.save();
     tracIslandPath(cc); cc.clip();
-    cc.filter = understated ? 'blur(28px)' : 'blur(46px)';
+    // perf: blur removed — plain low-alpha atmosphere tint
     const grd = cc.createLinearGradient(x0, y0, x1, y1);
     grd.addColorStop(0, _lighten(fallback, understated ? 0.05 : 0.10));
     grd.addColorStop(1, _darken(fallback,  understated ? 0.03 : 0.06));
     cc.fillStyle = grd;
     cc.globalAlpha = 0.20;
     cc.fillRect(x0 - 24, y0 - 24, (x1 - x0) + 48, (y1 - y0) + 48);
-    cc.filter = 'none'; cc.globalAlpha = 1;
+    cc.globalAlpha = 1;
     cc.restore();
   } else {
     // Fallback: original feathered gradient fill (until texture loads).
     _fillZoneRich(cc, rect, fallback, understated);
   }
+}
+
+/** Biome-identity ground detail: makes forest / park / beach unmistakable.
+ *  Seeded so it bakes identically every build. Drawn on top of the zone
+ *  textures and water, but under the roads. */
+function _paintBiomeDetail(cc: CanvasRenderingContext2D): void {
+  let seed = 90210;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+
+  // ── FOREST: dappled canopy shade + scattered underbrush ferns ──────────────
+  {
+    const [x0, y0, x1, y1] = ZONE_FOREST_R;
+    cc.save();
+    cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
+    // soft canopy shadow pools → the forest floor reads shaded, not sunlit
+    for (let i = 0; i < 200; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      const r = 40 + rnd() * 90;
+      cc.fillStyle = 'rgba(18,40,20,0.055)';
+      cc.beginPath(); cc.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); cc.fill();
+    }
+    // low ferns / underbrush tufts
+    for (let i = 0; i < 160; i++) {
+      const x = x0 + rnd() * (x1 - x0), y = y0 + rnd() * (y1 - y0);
+      const r = 7 + rnd() * 13;
+      cc.fillStyle = rnd() > 0.5 ? 'rgba(44,84,38,0.50)' : 'rgba(72,112,52,0.42)';
+      cc.beginPath(); cc.ellipse(x, y, r, r * 0.66, rnd() * 3, 0, Math.PI * 2); cc.fill();
+    }
+    cc.restore();
+  }
+
+  // ── PARK: manicured mowing stripes + a few flowerbeds ──────────────────────
+  {
+    const [x0, y0, x1, y1] = ZONE_PARK_R;
+    cc.save();
+    cc.beginPath(); cc.rect(x0, y0, x1 - x0, y1 - y0); cc.clip();
+    const STR = 88;
+    for (let y = y0; y < y1; y += STR) {
+      cc.fillStyle = (Math.floor((y - y0) / STR) % 2 === 0)
+        ? 'rgba(255,255,255,0.055)' : 'rgba(28,72,20,0.055)';
+      cc.fillRect(x0, y, x1 - x0, STR);
+    }
+    for (let i = 0; i < 7; i++) {
+      const x = x0 + 120 + rnd() * (x1 - x0 - 240), y = y0 + 120 + rnd() * (y1 - y0 - 240);
+      cc.fillStyle = 'rgba(232,116,150,0.40)';
+      cc.beginPath(); cc.ellipse(x, y, 28, 17, rnd() * 3, 0, Math.PI * 2); cc.fill();
+      cc.fillStyle = 'rgba(242,202,84,0.40)';
+      cc.beginPath(); cc.ellipse(x + 15, y - 7, 19, 12, 0, 0, Math.PI * 2); cc.fill();
+    }
+    cc.restore();
+  }
+
+  // ── BEACH → GRASS: sand creeping up into the grass along the shore edge ─────
+  {
+    const [x0, yTop, x1] = ZONE_BEACH_R;
+    for (let i = 0; i < 380; i++) {
+      const x = x0 + rnd() * (x1 - x0);
+      const up = rnd() * rnd() * 190;                 // biased toward the edge
+      const y = yTop - up;
+      const a = 0.42 * (1 - up / 190);
+      const r = 8 + rnd() * 16;
+      cc.fillStyle = `rgba(232,212,164,${a.toFixed(3)})`;
+      cc.beginPath(); cc.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2); cc.fill();
+    }
+  }
+  cc.restore();
+
+  // ── BEACH: wet-sand ring + foam at the lagoon shoreline (on top of water) ───
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  // perf: blur removed — two stacked wet-sand strokes
+  cc.strokeStyle = 'rgba(150,120,78,0.24)'; cc.lineWidth = 62;
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 34, LAGOON_RY + 30, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.strokeStyle = 'rgba(150,120,78,0.34)'; cc.lineWidth = 34;
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 34, LAGOON_RY + 30, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.strokeStyle = 'rgba(255,255,255,0.55)'; cc.lineWidth = 6;
+  cc.setLineDash([28, 24]); cc.lineCap = 'round';
+  cc.beginPath();
+  cc.ellipse(LAGOON_CX, LAGOON_CY, LAGOON_RX + 10, LAGOON_RY + 10, 0, 0, Math.PI * 2);
+  cc.stroke();
+  cc.setLineDash([]); cc.lineCap = 'butt';
+  cc.restore();
+}
+
+/** Baked rail loop around downtown: ballast bed + ties (one dashed stroke) +
+ *  two crisp parallel rails via the nested-stroke trick (stroke steel wide,
+ *  then re-stroke ballast narrower to leave twin rails). Live-path safe:
+ *  6 strokes of an 8-point closed path, no filters. */
+function _paintRailTracks(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const trace = () => {
+    cc.beginPath();
+    RAIL_PATH.forEach(([x, y], i) => (i === 0 ? cc.moveTo(x, y) : cc.lineTo(x, y)));
+    cc.closePath();
+  };
+  cc.lineJoin = 'round'; cc.lineCap = 'butt';
+  // 1. ballast bed — cool slate, distinct from asphalt + sidewalk
+  trace(); cc.strokeStyle = '#9AA3B2'; cc.lineWidth = 34; cc.stroke();
+  // 2. ties — ONE dashed stroke spanning the gauge
+  trace(); cc.strokeStyle = '#6E7686'; cc.lineWidth = 26;
+  cc.setLineDash([7, 24]); cc.stroke(); cc.setLineDash([]);
+  // 3. rails: steel stroke, then ballast-colored inner stroke erases the middle
+  trace(); cc.strokeStyle = '#DCE3EE'; cc.lineWidth = 18; cc.stroke();
+  trace(); cc.strokeStyle = '#9AA3B2'; cc.lineWidth = 11; cc.stroke();
+  cc.restore();
+}
+
+/** Baked bridge decks + side rails where roads cross the river (computed in
+ *  mapData.BRIDGES). Drawn after roads so decks read continuous over water. */
+function _paintBridges(cc: CanvasRenderingContext2D): void {
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  const span = RIVER_HALF_W * 2.2 + 46;   // deck length across the water
+  const deckW = CONFIG.ROAD_WIDTH + 18;   // slightly wider than the road band
+  for (const b of BRIDGES) {
+    cc.save();
+    cc.translate(b.x, b.y);
+    if (b.axis === 'v') cc.rotate(Math.PI / 2);
+    // soft shadow under both deck edges
+    cc.fillStyle = 'rgba(20,30,50,0.25)';
+    cc.fillRect(-span / 2, -deckW / 2 - 5, span, 5);
+    cc.fillRect(-span / 2, deckW / 2, span, 5);
+    // deck — lighter cool concrete so the crossing reads
+    cc.fillStyle = '#7C8494';
+    cc.fillRect(-span / 2, -deckW / 2, span, deckW);
+    // lane line continues across
+    cc.strokeStyle = 'rgba(255,255,255,0.8)'; cc.lineWidth = 7;
+    cc.setLineDash([26, 26]);
+    cc.beginPath(); cc.moveTo(-span / 2, 0); cc.lineTo(span / 2, 0); cc.stroke();
+    cc.setLineDash([]);
+    // side rails — crisp white with post dots
+    cc.strokeStyle = 'rgba(240,246,255,0.95)'; cc.lineWidth = 6;
+    cc.beginPath(); cc.moveTo(-span / 2, -deckW / 2 - 8); cc.lineTo(span / 2, -deckW / 2 - 8); cc.stroke();
+    cc.beginPath(); cc.moveTo(-span / 2, deckW / 2 + 8); cc.lineTo(span / 2, deckW / 2 + 8); cc.stroke();
+    cc.lineWidth = 10; cc.setLineDash([3, 34]); cc.lineCap = 'round';
+    cc.beginPath(); cc.moveTo(-span / 2, -deckW / 2 - 8); cc.lineTo(span / 2, -deckW / 2 - 8); cc.stroke();
+    cc.beginPath(); cc.moveTo(-span / 2, deckW / 2 + 8); cc.lineTo(span / 2, deckW / 2 + 8); cc.stroke();
+    cc.setLineDash([]); cc.lineCap = 'butt';
+    cc.restore();
+  }
+  cc.restore();
 }
 
 /** Faint alternating E–W mowing-stripe bands over the island grass. */
@@ -1019,26 +1407,7 @@ function _paintYards(cc: CanvasRenderingContext2D): void {
     cc.globalAlpha = 0.12 + v2 * 0.06;
     cc.fillRect(x0, y0, w, h);
 
-    // ── Picket fence ───────────────────────────────────────────────────────────
-    cc.globalAlpha = 1;
-    cc.strokeStyle = 'rgba(160,120,80,0.44)';
-    cc.lineWidth   = 3;
-    cc.strokeRect(x0 + 1.5, y0 + 1.5, w - 3, h - 3);
-
-    // ── Driveway (south-facing paved strip) ────────────────────────────────────
-    const dwW = Math.max(10, lot.fpR * 0.28);
-    const dwH = hs * 0.60;
-    const dwX = lot.x - dwW, dwY = lot.y + lot.fpR * 0.8;
-    if (swPat) {
-      cc.save();
-      cc.beginPath(); cc.rect(dwX, dwY, dwW * 2, dwH); cc.clip();
-      cc.fillStyle = swPat; cc.globalAlpha = 0.55;
-      cc.fillRect(dwX, dwY, dwW * 2, dwH);
-      cc.restore();
-    } else {
-      cc.fillStyle = COL.pavement; cc.globalAlpha = 0.45;
-      cc.fillRect(dwX, dwY, dwW * 2, dwH);
-    }
+    // (driveways now painted by _paintNeighborhoodLanes — connected to lanes)
 
     // ── Flowerbed accent (front corner) ────────────────────────────────────────
     const fbX = x0 + w * 0.18 + v3 * w * 0.10;
@@ -1208,16 +1577,28 @@ function _paintZooLayout(cc: CanvasRenderingContext2D): void {
     // Pen floor fill (light sandy)
     cc.fillStyle = 'rgba(212,198,168,0.38)';
     cc.fillRect(px, py, penW, ph);
-    // Pen border
-    cc.strokeStyle = 'rgba(120,95,68,0.50)';
-    cc.lineWidth = 9;
+    // REAL fences (user: 'the zoo makes 0 sense' — pens were an invisible
+    // faint stroke). Crisp white post-and-rail enclosures:
+    cc.strokeStyle = 'rgba(250,250,255,0.92)';   // top rail
+    cc.lineWidth = 6;
     cc.strokeRect(px, py, penW, ph);
+    cc.strokeStyle = 'rgba(160,168,182,0.85)';   // inner rail shadow
+    cc.lineWidth = 3;
+    cc.strokeRect(px + 5, py + 5, penW - 10, ph - 10);
+    // posts — one dashed round-cap stroke = evenly spaced fence posts
+    cc.strokeStyle = 'rgba(230,234,242,0.95)';
+    cc.lineWidth = 12; cc.lineCap = 'round'; cc.setLineDash([1, 64]);
+    cc.strokeRect(px, py, penW, ph);
+    cc.setLineDash([]); cc.lineCap = 'butt';
     // Internal path strip between pens
     if (col < 2) {
       cc.fillStyle = PATH_COL;
       cc.fillRect(px + penW, py, 40, ph);
     }
   }
+
+  // Entrance arch: now a real clay sprite (zoo_prop_0) placed by fillZoo —
+  // the old painted flat rectangles read as "rough".
 
   // ── Flamingo pond (bottom-left) ────────────────────────────────────────────
   const pondX = zx0 + ins + 220, pondY = by + 140;

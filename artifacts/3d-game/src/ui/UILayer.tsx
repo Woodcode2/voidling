@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v19 · 0';
+const BUILD_STAMP = 'v21 · declay';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 
@@ -79,13 +79,13 @@ function Coins({ n }: { n: number }) {
   );
 }
 
-// v6 §12: rarity tier derived from a skin's price
+// Economy: rarity tier derived from a skin's coin price (500/1500/4000);
+// money-only skins are LEGENDARY and never appear in the coin list.
 function rarityOf(cost: number): { key: string; label: string } {
   if (cost <= 0) return { key: 'starter', label: 'STARTER' };
-  if (cost <= 700) return { key: 'common', label: 'COMMON' };
-  if (cost <= 900) return { key: 'rare', label: 'RARE' };
-  if (cost <= 1100) return { key: 'epic', label: 'EPIC' };
-  return { key: 'legendary', label: 'LEGENDARY' };
+  if (cost <= 500) return { key: 'common', label: 'COMMON' };
+  if (cost <= 1500) return { key: 'rare', label: 'RARE' };
+  return { key: 'epic', label: 'EPIC' };
 }
 
 // v6 §12: short-lived confetti burst (pure CSS pieces)
@@ -125,23 +125,40 @@ function Confetti() {
 // If no splash.png is found the existing starfield + voidling fallback is shown.
 function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
   const [hasSplash, setHasSplash] = useState(true); // optimistic — hide on error
-  const [fadingOut, setFadingOut] = useState(false);
+  const [artHoldDone, setArtHoldDone] = useState(false); // 4s splash-art hold elapsed
+  const [skipped, setSkipped] = useState(false);
+
+  // hole.io rebuild: the splash GATES on the clay sheets — the game must never
+  // open on procedural box-people that pop into real art seconds later.
+  const waiting = !snap.assetsReady;
+  const fadingOut = artHoldDone && !skipped && !waiting;
 
   useEffect(() => {
     // v14.1: prime the AudioContext on first user-visible frame (counts as a gesture on iOS)
     audio.init();
     audio.loadSamples().catch(() => {});
     // Rebuild Prompt 10: show splash art 4s, then fade smoothly (500ms) into the menu.
-    const t = window.setTimeout(() => setFadingOut(true), 4000);
-    const t2 = window.setTimeout(onDone, 4500);
-    return () => { clearTimeout(t); clearTimeout(t2); };
-  }, [onDone]);
+    const t = window.setTimeout(() => setArtHoldDone(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // timer path: fade 500ms then advance (only once assets are in)
+  useEffect(() => {
+    if (!fadingOut) return;
+    const t = window.setTimeout(onDone, 500);
+    return () => clearTimeout(t);
+  }, [fadingOut, onDone]);
+
+  // tap-to-skip path: advance immediately once assets are in
+  useEffect(() => {
+    if (skipped && !waiting) onDone();
+  }, [skipped, waiting, onDone]);
 
   const skip = () => {
     audio.init();
     audio.loadSamples().catch(() => {});
     import('tone').then((T) => T.start()).catch(() => {});
-    onDone(); // Prompt 10 §Stage1: tap-to-skip advances immediately, no fade wait
+    setSkipped(true); // Prompt 10 §Stage1: advances as soon as assets allow
   };
 
   return (
@@ -154,6 +171,11 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
         overflow: 'hidden',
         opacity: fadingOut ? 0 : 1,
         transition: 'opacity 500ms ease',
+        // While fading out the splash is nearly invisible but was still eating
+        // taps meant for the PLAY button underneath — the intermittent
+        // "tapped PLAY and nothing happened" bug. Let taps pass through once
+        // the fade begins so the first tap always reaches the menu.
+        pointerEvents: fadingOut ? 'none' : 'auto',
       }}
     >
       {/* Rebuild Prompt 10: dedicated splash art, scaled to cover with no distortion */}
@@ -169,6 +191,16 @@ function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
             pointerEvents: 'none',
           }}
         />
+      )}
+
+      {/* loading pill — only shows if the player is ready before the assets */}
+      {(artHoldDone || skipped) && waiting && (
+        <div style={{
+          position: 'absolute', bottom: 48, left: '50%', transform: 'translateX(-50%)',
+          padding: '10px 22px', borderRadius: 999, background: 'rgba(10,8,24,0.72)',
+          color: '#CFC6FF', fontWeight: 800, letterSpacing: '0.18em', fontSize: '0.85rem',
+          animation: 'vd-pulse 1.2s ease-in-out infinite', zIndex: 3, pointerEvents: 'none',
+        }}>LOADING…</div>
       )}
 
       {/* Fallback starfield when splash art fails to load */}
@@ -492,8 +524,8 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           })}
         </div>
 
-        {/* v7 §9: PREMIUM cash-skin row (mock IAP) */}
-        <h3 className="vd-shop-subhead">PREMIUM</h3>
+        {/* Economy: LEGENDARY cash-skin row (mock IAP — money only, never coins) */}
+        <h3 className="vd-shop-subhead">LEGENDARY</h3>
         <div className="vd-grid">
           {CONFIG.SKINS.filter((s) => s.premium).map((skin) => {
             const owned = snap.ownedSkins.includes(skin.id);
@@ -504,7 +536,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
                 className={'vd-card vd-card--btn vd-rar--premium' + (equipped ? ' vd-card--equipped' : '') + (!owned ? ' vd-card--locked' : '')}
                 onClick={() => { if (owned) { engine.equipSkin(skin.id); } else { engine.iapView(skin.id); setIap(skin.id); } }}
               >
-                <span className="vd-rarity vd-rarity--premium">PREMIUM</span>
+                <span className="vd-rarity vd-rarity--premium">LEGENDARY</span>
                 <div className="vd-skinwrap"><SkinPreview skinId={skin.id} size={92} glow={0.4} /></div>
                 <div className="vd-skin-name">{skin.name}</div>
                 {equipped ? (
@@ -528,7 +560,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           <div className="vd-modal-scrim" onClick={() => setIap(null)}>
             <div className="vd-modal vd-rar--premium" onClick={(e) => e.stopPropagation()}>
               <button className="vd-modal-close" onClick={() => setIap(null)} aria-label="Close"><CloseIcon /></button>
-              <span className="vd-rarity vd-rarity--premium">PREMIUM</span>
+              <span className="vd-rarity vd-rarity--premium">LEGENDARY</span>
               <div className="vd-modal-void"><SkinPreview skinId={s.id} size={168} glow={0.7} /></div>
               <h3 className="vd-modal-name">{s.name}</h3>
               <p className="vd-sub">Unlock instantly + 100 bonus coins</p>
@@ -609,6 +641,8 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           <div className="vd-stat-row"><span>Placement</span><span>#{r.placement}</span></div>
           <div className="vd-stat-row"><span>Devoured</span><span>{r.devoured.toFixed(0)}%</span></div>
           <div className="vd-stat-row"><span>Coins earned</span><span>+{r.coins}</span></div>
+          {r.firstWin && <div className="vd-stat-row" style={{ color: '#FFD23F' }}><span>FIRST WIN OF THE DAY</span><span>×2!</span></div>}
+          {r.dailyBite > 0 && <div className="vd-stat-row" style={{ color: '#7BFFED' }}><span>Daily bite bonus</span><span>+{r.dailyBite}</span></div>}
           {r.isDaily && <div className="vd-stat-row"><span>Daily streak</span><span>{snap.streak}🔥</span></div>}
         </div>
         {/* v7 §11: XP bar + level-up flourish */}
@@ -800,7 +834,19 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
           ))}
         </div>
       )}
-      {/* Death Rules Pivot: powers removed entirely — no active-power HUD badge */}
+      {/* Signature VOID POWER — on-screen button (also fires on Space/E). The
+          conic ring sweeps as the cooldown recharges; greyed while charging. */}
+      {!snap.paused && snap.power && (
+        <button
+          className={`vd-power-btn${snap.power.ready ? ' vd-power-btn--ready' : ''}`}
+          onClick={() => engine.usePower()}
+          disabled={!snap.power.ready}
+          aria-label={`Use power: ${snap.power.name}`}
+          style={{ ['--cd' as string]: String(snap.power.cdFrac), ['--pc' as string]: snap.power.color }}
+        >
+          <span className="vd-power-name">{snap.power.name}</span>
+        </button>
+      )}
       {/* Fix 7: news ticker removed (garbled scroll) — events routed to banner pill */}
       {snap.paused && (
         <div className="vd-overlay vd-overlay--dim vd-pause-overlay">
@@ -822,26 +868,31 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
 }
 
 // Phase 7a §5: rewritten guide cards matching new mechanics
+// The guide walks the EVOLUTION JOURNEY — each panel's hero void is a further
+// form, so new players see what they'll become (not the old plain orb 3x).
 const ONBOARD_PANELS = [
   {
     skin: 'classic',
+    form: 0,
     title: 'DRAG TO MOVE',
     body: 'Drag anywhere on screen to move. Eat anything smaller than you.',
     hint: 'Everything edible gets pulled into your orbit automatically',
     spriteKind: 'flower',
   },
   {
-    skin: 'devil',
-    title: 'GROW TO EVOLVE',
-    body: 'Eat enough to evolve through five forms. Gold ring = you can eat it. Red ring = RUN.',
-    hint: 'Watch the rim color — green means safe, red means danger',
+    skin: 'classic',
+    form: 2,
+    title: 'EAT. GROW. EVOLVE.',
+    body: 'Grow through five forms — from tiny VOIDLING to WORLD ENDER. Bigger you = bigger bites.',
+    hint: 'Houses, cars, whole skyscrapers… eventually the train.',
     spriteKind: 'house',
   },
   {
-    skin: 'wizard',
-    title: 'POWERS ARE AUTOMATIC',
-    body: "Don't fall off the island. Grab a power pickup and it fires on its own — no button needed.",
-    hint: 'Stay on the island. Grab every power you see.',
+    skin: 'classic',
+    form: 4,
+    title: 'UNLEASH YOUR POWER',
+    body: 'Tap the glowing power button to fire your form’s signature move — from PULL all the way to the world-ending COLLAPSE.',
+    hint: 'Your family will join the feast. The city WILL fight back.',
     spriteKind: 'tree',
   },
 ];
@@ -855,7 +906,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
       <button className="vd-onboard-skip" onClick={onDone}>SKIP</button>
       <div className="vd-stack">
         <div className="vd-hero-void" style={{ position: 'relative' }}>
-          <SkinPreview key={panel.skin} skinId={panel.skin} size={150} glow={0.7} />
+          <SkinPreview key={i} skinId={panel.skin} size={160} glow={0.85} form={panel.form} />
           {/* sprite icon floating bottom-right of the voidling */}
           <img
             src={`/assets/objects/${panel.spriteKind}.png`}

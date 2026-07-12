@@ -461,6 +461,40 @@ export const audio = {
     this.playTone(800, 'sine', 0.2, 0.1, 0.1);
   },
 
+  // Distinct sting per signature VOID POWER — so each form's move sounds unique.
+  playPower(kind: string) {
+    if (!this.sfxOn) return;
+    switch (kind) {
+      case 'tug': // snappy rising slurp
+        this.playTone(480, 'sine', 0.10, 0.09);
+        this.playTone(780, 'sine', 0.10, 0.07, 0.06);
+        break;
+      case 'vortex': // swirling ascending shimmer
+        this.playTone(340, 'triangle', 0.18, 0.08);
+        this.playTone(620, 'sine', 0.16, 0.06, 0.05);
+        this.playTone(920, 'sine', 0.12, 0.05, 0.12);
+        break;
+      case 'shockwave': // punchy outward blast
+        this.playTone(150, 'sawtooth', 0.16, 0.11);
+        this.playTone(90, 'sawtooth', 0.22, 0.09, 0.02);
+        if (this.ctx) this._noise(this.ctx.currentTime, 0.16, 'highpass', 1200, 1, 0.22);
+        break;
+      case 'singularity': // deep gravity rumble
+        this.playTone(92, 'sawtooth', 0.5, 0.11);
+        this.playTone(58, 'sine', 0.6, 0.09, 0.04);
+        this.playTone(300, 'triangle', 0.3, 0.05, 0.1);
+        break;
+      case 'collapse': // apocalyptic boom + fanfare
+        this._playSample('fanfare_evolve', 0.72, 0.5, 0);
+        this.playTone(70, 'sawtooth', 0.7, 0.13);
+        this.playTone(46, 'sine', 0.9, 0.1, 0.05);
+        if (this.ctx) this._noise(this.ctx.currentTime, 0.4, 'lowpass', 800, 1, 0.3);
+        break;
+      default:
+        this.playBoon();
+    }
+  },
+
   // v14 §1 + v8 §5: evolution sting — sample boom at the peak, synth riser + stab
   playEvolve() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;

@@ -3,6 +3,8 @@ import { prng, dist, hashString, clamp, lerp } from './utils';
 import { drawParkObject } from './objects'; // wind removed — tuft system deleted in Prompt 14
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
+import { cityBuildingKeys, cityLandmarkKeys, zooPropKeys, streetPropKeys } from './cityAssets'; // Structural Rebuild: new city art pools
+import { drawBuilding3D, makeBuildingSpec, makeHouseSpec, makeCivicSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
   SITTER_CLAY_INDICES,
@@ -11,7 +13,8 @@ import { audio } from './audio';
 import { drawSpaceBg, drawIsland, drawDriftObjects, drawGrainOverlay, isWalkable, getTerrainAt, TERRAIN } from './islandMap'; // Phase 2→4
 import { isOnIsland, isInsideIsland, terrainAtGeom, TERRAIN as GTERRAIN,
   ZONE_FOREST_R, ZONE_PARK_R, ZONE_BEACH_R,
-  ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R } from './mapData'; // Map Rebuild: runtime per-block lot generation + island polygon gating
+  ZONE_ZOO_R, ZONE_AIRPORT_R, ZONE_MILITARY_R,
+  railPointAt, RAIL_TOTAL, railClear } from './mapData'; // Map Rebuild + Structural Build (rail loop)
 import {
   loadClayScenery, SCENERY_FOREST, SCENERY_GREEN, SCENERY_PARK, SCENERY_BEACH,
   clayTreeKeys, clayBushKeys, clayFlowerKeys, type SceneryDef,
@@ -22,7 +25,7 @@ import {
 import { clayZooKeys, ZOO_KINDS } from './clayZoo'; // Prompt 16: clay zoo animal keys
 import { clayAirportKeys, AIRPORT_KINDS } from './clayAirport'; // Prompt 16: clay airport keys
 import { clayMilitaryKeys, MILITARY_KINDS } from './clayMilitary'; // Prompt 16: clay toy army keys
-import { setMatchLots, setMatchSportsFields } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
+import { setMatchLots, setMatchSportsFields, setMatchBlocks } from './drawMap'; // Map Rebuild: export lot geometry so ground cache bakes yards; Prompt 19 §6: sports field lines
 import type { FXManager } from './fx';
 import type { Player } from './player';
 import type { Rival } from './rivals';
@@ -63,15 +66,17 @@ export interface WorldObject {
   bubbleLife: number;    // ms remaining for the speech bubble
   scenery?: boolean;     // Prompt 5: clay scenery — eatable bonus, excluded from win math + respawn
   sceneryKey?: string;   // Prompt 5: explicit clay draw key (overrides kind sprite)
+  bldg?: BuildingSpec;   // hole.io rebuild: extruded box building (live pseudo-3D draw)
   shakeT?: number;       // Feel Patch §1: ms of prop-shake remaining (set on blocked contact)
   defense?: boolean;     // War Pack §2: defense unit converging on player
   pelletCd?: number;     // War Pack §2: ms until next pellet fired by this unit
   missileCd?: number;    // Phase 7b §5: heli missile cooldown timer
+  trainT?: number;       // Structural Build: rail-loop arc fraction ∈[0,1) for the train
   // Life Pack §3: vignette system
   vignetteData?: {
     id: string;
-    ambientText: string;
-    panicText: string;
+    ambientText: string | string[]; // single line or a pool (picked per fire)
+    panicText: string | string[];
     eatenBanner: string;
     ambientCd: number;   // ms until next ambient bubble may fire
     panicked: boolean;   // true once panic bubble has fired (don't repeat)
@@ -98,7 +103,7 @@ export interface PlayerStats {
 // 'cozy' and 'fancy' are sub-variants of residential (different house pools).  [Prompt 15]
 type BlockType = 'residential' | 'cozy' | 'fancy' | 'park' | 'plaza' | 'playground' | 'school' | 'downtown' | 'mixed' | 'beach' | 'zoo' | 'townhall' | 'civic' | 'forest' | 'airport' | 'military';
 // Dense City: a placed building/house footprint (used for placement, draw sort, and audits)
-interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; }
+interface StructureLot { x: number; y: number; size: number; fpR: number; kind: ObjectKind; bldg?: BuildingSpec; }
 interface Block { gx: number; gy: number; type: BlockType; x0: number; y0: number; buildingLots?: StructureLot[]; }
 interface DirtPatch { x: number; y: number; r: number; life: number; maxLife: number; rot: number; drawScale: number; }
 // Feedback Juice §1: cosmetic "swallow ghost" — a copy of an eaten structure's
@@ -122,23 +127,77 @@ interface FieldDecal { kind: ObjectKind; cx: number; cy: number; halfW: number; 
 // Life Pack §3: vignette scene config
 interface VignetteConfig {
   kind: ObjectKind;
-  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'any';
-  ambientText: string; panicText: string; eatenBanner: string; always: boolean;
+  zone: 'park' | 'downtown' | 'residential' | 'beach' | 'forest' | 'any';
+  decal?: ObjectKind; // anchor the scene onto this baked ground decal when present
+  ambientText: string | string[]; panicText: string | string[]; eatenBanner: string; always: boolean;
   supportProps?: ObjectKind[]; supportPeds?: ObjectKind[];
 }
 const VIGNETTE_CONFIGS: VignetteConfig[] = [
-  { kind: 'vig_proposal',  zone: 'park',        always: false, ambientText: 'Will you marr...', panicText: 'NOT NOW, I\'M MID PROPOSAL!', eatenBanner: '💍 ROMANCE: DEVOURED' },
-  { kind: 'vig_soccer',    zone: 'park',         always: true,  ambientText: 'GOOOAL!',          panicText: 'REF!! TIME OUT!!',           eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
-  { kind: 'vig_wedding',   zone: 'park',         always: false, ambientText: 'I do!',            panicText: 'SAVE THE CAKE!',             eatenBanner: '💒 WEDDING: CONSUMED' },
-  { kind: 'vig_couple',    zone: 'park',         always: false, ambientText: 'Fifty years, dear.', panicText: 'NOT LIKE THIS, HAROLD!',   eatenBanner: '👴 OLD COUPLE: DEVOURED' },
-  { kind: 'vig_busker',    zone: 'downtown',     always: false, ambientText: '🎵',               panicText: "EVERYONE'S A CRITIC!!",      eatenBanner: '🎸 BUSKER: SILENCED' },
-  { kind: 'vig_painter',   zone: 'park',         always: false, ambientText: 'The light is perfect.', panicText: 'MY MASTERPIECE!',      eatenBanner: '🎨 MASTERPIECE: DEVOURED' },
-  { kind: 'vig_selfie',    zone: 'park',         always: false, ambientText: 'Say cheese!',      panicText: 'WAIT, ONE MORE!',            eatenBanner: '📸 SELFIE MOMENT: EATEN' },
-  { kind: 'vig_kite',      zone: 'any',          always: false, ambientText: 'Wheee!',           panicText: 'MY KITE!!',                  eatenBanner: '🪁 KITE: GONE WITH THE VOID' },
-  { kind: 'vig_gardener',  zone: 'residential',  always: false, ambientText: 'Just watered those.', panicText: 'I JUST WATERED THOSE!', eatenBanner: '🌷 GARDEN: DEVOURED' },
+  { kind: 'vig_proposal',  zone: 'park',        always: false,
+    ambientText: ['Will you marr...', 'I have a whole speech prepared—', 'she said YES!!'],
+    panicText:   ["NOT NOW, I'M MID PROPOSAL!", "THE RING! WHERE'S THE RING?!", 'we can elope RIGHT NOW'],
+    eatenBanner: '💍 ROMANCE: DEVOURED' },
+  { kind: 'vig_soccer',    zone: 'park',         always: true,  decal: 'field_soccer',
+    ambientText: ['GOOOAL!', 'DEFENSE!! DEFENSE!!', 'ref, that was SO offside'],
+    panicText:   ['REF!! TIME OUT!!', 'MATCH ABANDONED!!', 'it ate the REF?!'],
+    eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
+  { kind: 'vig_wedding',   zone: 'park',         always: false,
+    ambientText: ['I do!', 'best day EVER 🥂', 'speeches in five!'],
+    panicText:   ['maybe this is a sign...', 'SAVE THE CAKE!', 'the DJ already fled!!'],
+    eatenBanner: '💒 WEDDING: CONSUMED' },
+  { kind: 'vig_couple',    zone: 'park',         always: false,
+    ambientText: ['Fifty years, dear.', 'remember our first date?'],
+    panicText:   ['NOT LIKE THIS, HAROLD!', 'HAROLD, THE COUPONS!!'],
+    eatenBanner: '👴 OLD COUPLE: DEVOURED' },
+  { kind: 'vig_busker',    zone: 'downtown',     always: false,
+    ambientText: ['🎵', 'tips appreciated!'],
+    panicText:   ["EVERYONE'S A CRITIC!!", 'I take REQUESTS, not THIS'],
+    eatenBanner: '🎸 BUSKER: SILENCED' },
+  { kind: 'vig_painter',   zone: 'park',         always: false,
+    ambientText: ['The light is perfect.', 'almost... done...'],
+    panicText:   ['MY MASTERPIECE!', 'fine!! abstract art it is!!'],
+    eatenBanner: '🎨 MASTERPIECE: DEVOURED' },
+  { kind: 'vig_selfie',    zone: 'park',         always: false,
+    ambientText: ['Say cheese!', 'ok one more, for real'],
+    panicText:   ['WAIT, ONE MORE!', 'this is SO going viral'],
+    eatenBanner: '📸 SELFIE MOMENT: EATEN' },
+  { kind: 'vig_kite',      zone: 'any',          always: false,
+    ambientText: ['Wheee!', 'look how high!!'],
+    panicText:   ['MY KITE!!', 'LET GO OF THE STRING, TIMMY'],
+    eatenBanner: '🪁 KITE: GONE WITH THE VOID' },
+  { kind: 'vig_gardener',  zone: 'residential',  always: false,
+    ambientText: ['Just watered those.', 'prize tomatoes, these'],
+    panicText:   ['I JUST WATERED THOSE!', 'TAKE THE HOA INSTEAD!'],
+    eatenBanner: '🌷 GARDEN: DEVOURED' },
+  // Structural Build: beach volleyball — anchored onto the court decal
+  { kind: 'person_sun', zone: 'beach', always: true, decal: 'field_volleyball',
+    ambientText: ['SPIKE IT!!', 'set! set! SET!', 'point beach team!!'],
+    panicText:   ['sand in my EVERYTHING!!', 'GAME. OVER.', 'serve THAT, void!!'],
+    eatenBanner: '🏐 VOLLEYBALL MATCH: DEVOURED',
+    supportProps: ['beachball', 'towel', 'towel'], supportPeds: ['person_kid', 'tourist', 'person_sun'] },
+  // Structural Build: cabana club — deck decal + loungers + drinks
+  { kind: 'icecream_vendor', zone: 'beach', always: true, decal: 'field_beachclub',
+    ambientText: ['cabana vibes 🍹', 'the club is OPEN', 'towel service, anyone?'],
+    panicText:   ['NOT the cabana!!', 'happy hour is CANCELLED', 'save the smoothies!!'],
+    eatenBanner: '🍹 CABANA CLUB: CONSUMED',
+    supportProps: ['umbrella', 'deckchair', 'deckchair', 'cooler', 'towel'], supportPeds: ['person_sun', 'waiter'] },
+  // Structural Build: forest campsite — clearing decal + tents + fire
+  { kind: 'tourist', zone: 'forest', always: true, decal: 'field_campsite',
+    ambientText: ["s'mores?!", 'nature is HEALING', 'one more ghost story'],
+    panicText:   ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!'],
+    eatenBanner: '⛺ CAMPSITE: DEVOURED',
+    supportProps: ['tent', 'tent', 'campfire', 'picnic_table'], supportPeds: ['tourist', 'person_fish'] },
   // PLAYGROUND: anchor = pg_swing with cluster of equipment + kids
-  { kind: 'pg_swing', zone: 'park', always: true, ambientText: 'Wheee!', panicText: 'NOT THE SLIDE!', eatenBanner: '🛝 PLAYGROUND: DEVOURED', supportProps: ['pg_slide','pg_seesaw','pg_sandbox','pg_merrygoround'], supportPeds: ['person_mom','person_kid','person_kid'] },
+  { kind: 'pg_swing', zone: 'park', always: true,
+    ambientText: ['Wheee!', 'higher!! HIGHER!!'],
+    panicText:   ['NOT THE SLIDE!', 'EVERYONE OFF THE SWINGS!!'],
+    eatenBanner: '🛝 PLAYGROUND: DEVOURED', supportProps: ['pg_slide','pg_seesaw','pg_sandbox','pg_merrygoround'], supportPeds: ['person_mom','person_kid','person_kid'] },
 ];
+
+/** Pick one line from a string-or-pool (vignette/panic dialogue). */
+function pickLine(t: string | string[], rand: () => number): string {
+  return Array.isArray(t) ? t[Math.floor(rand() * t.length)] : t;
+}
 
 const MARGIN = (CONFIG.MAP_SIZE - (CONFIG.GRID * CONFIG.BLOCK_SIZE + (CONFIG.GRID - 1) * CONFIG.ROAD_WIDTH)) / 2;
 const STRIDE = CONFIG.BLOCK_SIZE + CONFIG.ROAD_WIDTH;
@@ -263,7 +322,7 @@ function drawChunk(ctx: CanvasRenderingContext2D, type: number, s: number) {
 }
 
 const LIVING_KINDS: ObjectKind[] = [
-  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'mower', 'crab',
+  'car', 'person', 'duck', 'dog', 'bird', 'cat', 'squirrel', 'drone', 'schoolbus', 'train', 'mower', 'crab',
   'monkey', 'flamingo', 'penguin', 'zookeeper',
   // War Pack §1: new pedestrian kinds + defense/traffic vehicles
   'person_biz', 'person_jog', 'person_kid', 'person_granny', 'person_fish',
@@ -297,6 +356,11 @@ export class WorldManager {
   objects: WorldObject[] = [];
   blocks: Block[] = [];
   spawnPoint = { x: 0, y: 0 };  // Batch 1.5: engine spawns/respawns the player here
+  private trainRespawnT = 0;    // Structural Build: ms until the eaten express respawns
+  private static readonly AUTO_BOX_KINDS = new Set<ObjectKind>([
+    'house', 'house_c', 'house_d', 'shop', 'cafe', 'office', 'skyscraper',
+    'school', 'library', 'hospital', 'townhall',
+  ]); // hole.io rebuild: structure kinds that always render as extruded boxes
   houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
@@ -386,6 +450,18 @@ export class WorldManager {
       bubbleLife: 0,
       ...opts,
     };
+    // hole.io rebuild: ANY structure kind spawned without an explicit parcel
+    // spec still renders as an extruded box — no clay-building path remains.
+    if (!o.bldg && !o.sceneryKey && WorldManager.AUTO_BOX_KINDS.has(kind)) {
+      const spec = (kind === 'house' || kind === 'house_c' || kind === 'house_d')
+        ? makeHouseSpec(o.baseSize, (o.id * 2654435761) >>> 0)
+        : (kind === 'school' || kind === 'library' || kind === 'hospital' || kind === 'townhall')
+          ? makeCivicSpec(kind, o.baseSize, o.id)
+          : makeBuildingSpec(kind, o.baseSize * 1.02, o.baseSize * 0.6, 0.8, (o.id * 40503) >>> 0);
+      o.bldg = spec;
+      o.sceneryKey = ensureBuildingSprite(spec);
+      o.contactRadius = Math.max(spec.w, spec.d) * 0.95;
+    }
     this.objects.push(o);
     // Prompt 19 Stage 2: seated clay people are permanently static (no wander/flee).
     // Clay key assignment is id % sheet-size; SITTER_CLAY_INDICES tags which cells are seated.
@@ -542,6 +618,7 @@ export class WorldManager {
     this.spawnDrone(rand);
     this.spawnDrone(rand);
     this.spawnBus(rand);
+    this.spawnTrain(); // Structural Build: the downtown express
 
     // trickle up to a healthy population with scattered small edibles
     const target = Math.round(CONFIG.TARGET_POPULATION * CONFIG.DENSITY_MULT);
@@ -566,12 +643,26 @@ export class WorldManager {
     // Dense City §1: place the pre-generated suburb house lots (dense, per-block).
     {
       for (const lot of this.houseLots) {
-        this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+        if (lot.bldg) {
+          this.makeObj(lot.kind, lot.x, lot.y, {
+            size: lot.size, baseSize: lot.size,
+            bldg: lot.bldg,
+            sceneryKey: ensureBuildingSprite(lot.bldg),
+            contactRadius: Math.max(lot.bldg.w, lot.bldg.d) * 0.95,
+          });
+        } else {
+          this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+        }
       }
       console.log('[world] Dense City suburb house lots placed:', this.houseLots.length);
     }
     // Map Rebuild: export lot geometry to drawMap so the ground cache bakes yards/driveways.
     setMatchLots(this.houseLots);
+    // Structural Build: residential block rects → ground cache paints internal
+    // lanes between house rows (the "engineered neighborhood" read).
+    setMatchBlocks(this.blocks
+      .filter((b) => b.type === 'cozy' || b.type === 'fancy' || b.type === 'residential')
+      .map((b) => ({ x0: b.x0, y0: b.y0, type: b.type === 'fancy' ? 'fancy' as const : 'cozy' as const })));
 
     // v16.1 B4: street furniture pass — sidewalk trees + curbside parked cars on residential/civic
     const TREE_INSET = CONFIG.SIDEWALK + 16;
@@ -670,7 +761,7 @@ export class WorldManager {
       let offIsland2 = 0;
       for (const o of this.objects) if (!o.eaten && !isInsideIsland(o.x, o.y)) offIsland2++;
       console.log(`SUBURB LOTS: ${suburbN}`);
-      console.log(`DOWNTOWN LOTS: ${downtownN}`);
+      console.log(`DOWNTOWN LOTS: ${downtownN} (landmarks: ${S.filter(l => l.kind === 'landmark').length})`);
       console.log(`BUILDING OVERLAPS: ${overlaps}`);
       console.log(`BUILDINGS ON ROADS: ${onRoads}`);
       console.log(`OFF-ISLAND ENTITIES: ${offIsland2}`);
@@ -740,7 +831,10 @@ export class WorldManager {
         if (sand) {
           if (terr !== GTERRAIN.SAND) continue;
         } else if (terr === GTERRAIN.SAND || terr === GTERRAIN.WATER
-          || terr === GTERRAIN.SPACE || terr === GTERRAIN.ROAD) {
+          || terr === GTERRAIN.SPACE || terr === GTERRAIN.ROAD
+          || terr === GTERRAIN.PAVEMENT) {
+          // PAVEMENT excluded: park scenery (picnic tables, bushes) was leaking
+          // into downtown between the towers — pure nonsense in a city core.
           continue;
         }
         if (!this.roadClear(x, y, R)) continue;
@@ -937,18 +1031,51 @@ export class WorldManager {
     const cx = (b: Block) => b.x0 + CONFIG.BLOCK_SIZE / 2;
     const cy = (b: Block) => b.y0 + CONFIG.BLOCK_SIZE / 2;
 
+    // "Why is there a soccer field in the river" — every decal spot must be
+    // DRY across its whole rect (park blocks contain the pond/river). Jitter
+    // around the preferred spot until a dry position is found; skip if none.
+    const drySpot = (fx: number, fy: number, hw: number, hh: number): { x: number; y: number } | null => {
+      for (let att = 0; att < 12; att++) {
+        const sx = fx + (att ? (rand() - 0.5) * 420 : 0);
+        const sy = fy + (att ? (rand() - 0.5) * 420 : 0);
+        if (!isOnIsland(sx, sy, Math.round(Math.max(hw, hh)))) continue;
+        const wet = [[0, 0], [hw + 40, hh + 40], [-hw - 40, hh + 40], [hw + 40, -hh - 40], [-hw - 40, -hh - 40],
+          [hw + 40, 0], [-hw - 40, 0], [0, hh + 40], [0, -hh - 40]].some(
+          ([ox, oy]) => terrainAtGeom(sx + ox, sy + oy) === GTERRAIN.WATER,
+        );
+        if (!wet) return { x: sx, y: sy };
+      }
+      return null;
+    };
+    const place = (kind: FieldDecal['kind'], fx: number, fy: number, hw: number, hh: number) => {
+      const p = drySpot(fx, fy, hw, hh);
+      if (p) this.fieldDecals.push({ kind, cx: p.x, cy: p.y, halfW: hw, halfH: hh });
+    };
+
     if (parkBlocks.length) {
       const pb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_soccer', cx: cx(pb), cy: cy(pb), halfW: 200, halfH: 130 });
+      place('field_soccer', cx(pb), cy(pb), 200, 130);
     }
     if (downtownBlocks.length) {
       const db = downtownBlocks[Math.floor(rand() * downtownBlocks.length)];
-      // Place basketball court offset toward edge of block
-      this.fieldDecals.push({ kind: 'field_basketball', cx: db.x0 + CONFIG.BLOCK_SIZE * 0.75, cy: cy(db), halfW: 140, halfH: 80 });
+      place('field_basketball', db.x0 + CONFIG.BLOCK_SIZE * 0.75, cy(db), 140, 80);
     }
     if (resBlocks.length) {
       const rb = resBlocks[Math.floor(rand() * resBlocks.length)];
-      this.fieldDecals.push({ kind: 'field_tennis', cx: cx(rb), cy: rb.y0 + CONFIG.BLOCK_SIZE * 0.7, halfW: 130, halfH: 70 });
+      place('field_tennis', cx(rb), rb.y0 + CONFIG.BLOCK_SIZE * 0.7, 130, 70);
+    }
+    // Structural Build: beach volleyball court + cabana-club deck + forest campsite
+    const beachBlocks = this.blocks.filter(b => b.type === 'beach' && isOnIsland(cx(b), cy(b), 0));
+    if (beachBlocks.length) {
+      const vb = beachBlocks[Math.floor(rand() * beachBlocks.length)];
+      place('field_volleyball', cx(vb), vb.y0 + CONFIG.BLOCK_SIZE * 0.42, 150, 82);
+      const cb = beachBlocks[Math.floor(rand() * beachBlocks.length)];
+      place('field_beachclub', cb.x0 + CONFIG.BLOCK_SIZE * 0.28, cb.y0 + CONFIG.BLOCK_SIZE * 0.68, 130, 95);
+    }
+    const forestBlocks = this.blocks.filter(b => b.type === 'forest' && isOnIsland(cx(b), cy(b), 0));
+    if (forestBlocks.length) {
+      const fb = forestBlocks[Math.floor(rand() * forestBlocks.length)];
+      place('field_campsite', cx(fb), cy(fb), 140, 110);
     }
     // Prompt 19 Stage 6: pass field positions to drawMap so lines are baked into ground cache.
     setMatchSportsFields(this.fieldDecals);
@@ -963,11 +1090,9 @@ export class WorldManager {
         : zone === 'downtown' ? b.type === 'downtown'
         : zone === 'residential' ? (b.type === 'residential' || b.type === 'cozy' || b.type === 'fancy')
         : zone === 'beach' ? b.type === 'beach'
+        : zone === 'forest' ? b.type === 'forest'
         : true
       );
-
-    // Soccer field block for soccer vignette placement
-    const soccerField = this.fieldDecals.find(f => f.kind === 'field_soccer');
 
     const alwaysVigs = VIGNETTE_CONFIGS.filter(vc => vc.always);
     const optionalVigs = VIGNETTE_CONFIGS.filter(vc => !vc.always);
@@ -987,9 +1112,12 @@ export class WorldManager {
       // Soccer vignette anchors on the soccer field decal if available
       let ax = b.x0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
       let ay = b.y0 + CONFIG.SIDEWALK + rand() * (CONFIG.BLOCK_SIZE - CONFIG.SIDEWALK * 2);
-      if (vc.kind === 'vig_soccer' && soccerField) {
-        ax = soccerField.cx + (rand() - 0.5) * soccerField.halfW * 0.8;
-        ay = soccerField.cy + (rand() - 0.5) * soccerField.halfH * 0.8;
+      // Structural Build: scenes with a baked decal anchor onto it (soccer field,
+      // volleyball court, cabana deck, campsite clearing).
+      const dec = vc.decal ? this.fieldDecals.find(f => f.kind === vc.decal) : undefined;
+      if (dec) {
+        ax = dec.cx + (rand() - 0.5) * dec.halfW * 0.8;
+        ay = dec.cy + (rand() - 0.5) * dec.halfH * 0.8;
       }
       // Alive Pack §A: retry vignette anchor until on-island
       for (let vigAtt = 0; vigAtt < 4 && !isOnIsland(ax, ay); vigAtt++) {
@@ -1033,7 +1161,7 @@ export class WorldManager {
     this.scatter(b, rand, 'flower', 6);
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'gnome', 3);
-    this.scatterPeople(b, rand, 'residential', 2);
+    this.scatterPeople(b, rand, 'residential', 4);
     this.scatter(b, rand, 'dog', 1);
     // v7 §3: neighborhood critters + props
     this.scatter(b, rand, 'cat', 1);
@@ -1064,7 +1192,7 @@ export class WorldManager {
     this.scatter(b, rand, 'flowerpot', 4);
     this.scatter(b, rand, 'dog', 2);
     this.scatter(b, rand, 'squirrel', 2);
-    this.scatterPeople(b, rand, 'park', 3);          // War Pack §1: park visitors
+    this.scatterPeople(b, rand, 'park', 6);          // War Pack §1: park visitors
     if (rand() < 0.5) this.scatter(b, rand, 'picnic_table', 1);
     if (rand() < 0.4) this.scatter(b, rand, 'icecream_cart', 1);
     this.spawnBirds(b, rand, 3);
@@ -1222,8 +1350,9 @@ export class WorldManager {
     // Sprite resolution is handled in structureSpriteKey via kind mapping.
     const COZY_POOL:  ObjectKind[] = ['house', 'house', 'house', 'house_c'];
     const FANCY_POOL: ObjectKind[] = ['house_d', 'house_d', 'house_c', 'house'];
-    const H_STEP = 280;                       // Prompt 14: dense packing — gap ≤ 0.5× house width
-    const H_INSET = CONFIG.SIDEWALK + 70;     // keep first row off the sidewalk
+    // Row grid shared with the ground painter (internal lanes bake between rows)
+    const H_STEP = CONFIG.LOT_ROW_STEP;
+    const H_INSET = CONFIG.LOT_ROW_INSET;
     for (const b of this.blocks) {
       if (b.type !== 'residential' && b.type !== 'cozy' && b.type !== 'fancy') continue;
       // Prompt 15: cozy/fancy types determine pool directly; legacy 'residential' → cozy.
@@ -1245,8 +1374,14 @@ export class WorldManager {
             ([ox,oy]) => terrainAtGeom(jx+ox*0.85, jy+oy*0.85) === GTERRAIN.WATER,
           )) continue;
           if (!this.roadClear(jx, jy, fpR)) continue;
+          if (!railClear(jx, jy, fpR)) continue; // Structural Build: keep houses off the rail loop
           if (!this.lotFree(jx, jy, fpR, this.structureLots)) continue;
-          const lot: StructureLot = { x: jx, y: jy, size, fpR, kind };
+          // hole.io rebuild: houses are pitched-roof extruded boxes now —
+          // one visual language across the whole island.
+          const lot: StructureLot = {
+            x: jx, y: jy, size, fpR, kind,
+            bldg: makeHouseSpec(size, Math.floor(rand() * 0x7fffffff)),
+          };
           this.houseLots.push(lot);
           this.structureLots.push(lot);
         }
@@ -1256,44 +1391,78 @@ export class WorldManager {
     // ── Stage 2: packed downtown — grid of building lots per downtown block ──
     // Gather every candidate cell across all on-island downtown blocks, rank by
     // distance to the central plaza, then assign tallest→nearest, shortest→edge.
-    const DT_STEP = 360;  // Prompt 14: tight tower grid — gap ≤ 0.3× building width at plaza core
-    const DT_INSET = CONFIG.SIDEWALK + 110;
-    const cells: { x: number; y: number; block: Block; d2: number }[] = [];
+    // Structural Rebuild: one LANDMARK per downtown block, placed FIRST at the
+    // block centre so the tower grid packs around it (lotFree rejects overlap).
+    // These are the marquee trophy eats — city hall, stadium, ferris wheel...
+    for (const b of this.blocks) {
+      if (b.type !== 'downtown') continue;
+      const lx = b.x0 + B / 2, ly = b.y0 + B / 2;
+      if (!isOnIsland(lx, ly, 0)) continue;
+      const size = rSize('landmark');
+      const fpR = size * FP;
+      if (!this.roadClear(lx, ly, fpR) || !railClear(lx, ly, fpR)) continue;
+      const lot: StructureLot = { x: lx, y: ly, size, fpR, kind: 'landmark' };
+      (b.buildingLots ??= []).push(lot);
+      this.structureLots.push(lot);
+    }
+    // ── hole.io rebuild: street-facing PARCELS, not a crammed cell grid ──
+    // Each downtown block gets three west-east building rows (north edge /
+    // centre / south edge). Buildings are extruded boxes with varied widths
+    // and real gaps between them, fronts on the sidewalk line — the hole.io
+    // block structure. Heights/kinds still rank by distance to the plaza.
     const px = this.size / 2, py = this.size / 2;
+    interface Parcel { x: number; y: number; hw: number; hd: number; block: Block; d2: number }
+    const parcels: Parcel[] = [];
     for (const b of this.blocks) {
       if (b.type !== 'downtown') continue;
       const bCx = b.x0 + B / 2, bCy = b.y0 + B / 2;
       if (!isOnIsland(bCx, bCy, 0)) continue; // mirror the fill-loop block guard
-      for (let yy = b.y0 + DT_INSET; yy <= b.y0 + B - DT_INSET; yy += DT_STEP) {
-        for (let xx = b.x0 + DT_INSET; xx <= b.x0 + B - DT_INSET; xx += DT_STEP) {
-          cells.push({ x: xx, y: yy, block: b, d2: (xx - px) ** 2 + (yy - py) ** 2 });
+      const lm = (b.buildingLots ?? []).find(l => l.kind === 'landmark');
+      const rowYs = [
+        b.y0 + CONFIG.SIDEWALK + 150,      // north row (front on north street)
+        b.y0 + B / 2,                      // centre row (alleys either side)
+        b.y0 + B - CONFIG.SIDEWALK - 150,  // south row (front on south street)
+      ];
+      for (const ry of rowYs) {
+        let cursor = b.x0 + CONFIG.SIDEWALK + 30;
+        const endX = b.x0 + B - CONFIG.SIDEWALK - 30;
+        while (cursor < endX - 170) {
+          const hw = 85 + rand() * 65;  // half-width 85-150
+          // depth is the APPARENT (camera-foreshortened) roof depth — shallow
+          // slabs, like hole.io viewed at its tilt. Facades carry the height.
+          const hd = 58 + rand() * 24;  // half-depth 58-82
+          const cx = cursor + hw;
+          if (cx + hw > endX) break;
+          cursor = cx + hw + 26 + rand() * 44; // gap 26-70 between fronts
+          // landmark plaza: keep parcels clear of the marquee building
+          if (lm) {
+            const md = lm.fpR + Math.max(hw, hd) + 60;
+            if ((lm.x - cx) ** 2 + (lm.y - ry) ** 2 < md * md) continue;
+          }
+          if ([[0, 0], [hw, 0], [-hw, 0], [0, hd], [0, -hd]].some(
+            ([ox, oy]) => terrainAtGeom(cx + ox, ry + oy) === GTERRAIN.WATER,
+          )) continue;
+          if (!isOnIsland(cx, ry, Math.round(Math.max(hw, hd)))) continue;
+          if (!railClear(cx, ry, Math.max(hw, hd))) continue;
+          parcels.push({ x: cx, y: ry, hw, hd, block: b, d2: (cx - px) ** 2 + (ry - py) ** 2 });
         }
       }
     }
-    cells.sort((a, c) => a.d2 - c.d2);
-    const n = Math.max(1, cells.length - 1);
+    parcels.sort((a, c) => a.d2 - c.d2);
+    const n = Math.max(1, parcels.length - 1);
     const kindForRank = (i: number): ObjectKind => {
       const f = i / n; // 0 = plaza-adjacent (tallest), 1 = zone edge (shortest)
-      // Prompt 14: ~45% towers at core, ~35% offices mid-ring, shop/cafe outermost band only.
       if (f < 0.45) return 'skyscraper';
-      if (f < 0.80) return 'office';
-      if (f < 0.92) return 'cafe';
+      if (f < 0.82) return 'office';
+      if (f < 0.93) return 'cafe';
       return 'shop';
     };
-    for (let i = 0; i < cells.length; i++) {
-      const c = cells[i];
+    for (let i = 0; i < parcels.length; i++) {
+      const c = parcels[i];
       const kind = kindForRank(i);
-      const size = rSize(kind);
-      const fpR = size * FP;
-      if (!isInsideIsland(c.x, c.y)) continue;
-      if (!isOnIsland(c.x, c.y, Math.round(fpR))) continue;
-      // Stage 13 §3 (footprint-aware): reject if center or cardinal edges touch water.
-      if ([[0,0],[fpR,0],[-fpR,0],[0,fpR],[0,-fpR]].some(
-        ([ox,oy]) => terrainAtGeom(c.x+ox*0.85, c.y+oy*0.85) === GTERRAIN.WATER,
-      )) continue;
-      if (!this.roadClear(c.x, c.y, fpR)) continue;
-      if (!this.lotFree(c.x, c.y, fpR, this.structureLots)) continue;
-      const lot: StructureLot = { x: c.x, y: c.y, size, fpR, kind };
+      const spec = makeBuildingSpec(kind, c.hw, c.hd, i / n, Math.floor(rand() * 0x7fffffff));
+      const size = Math.max(c.hw, c.hd) * 1.1; // gameplay radius ≈ footprint half-extent
+      const lot: StructureLot = { x: c.x, y: c.y, size, fpR: Math.max(c.hw, c.hd), kind, bldg: spec };
       (c.block.buildingLots ??= []).push(lot);
       this.structureLots.push(lot);
     }
@@ -1309,16 +1478,64 @@ export class WorldManager {
     (b as any).paved = true; // no grass tufts; uses asphalt/sidewalk tiling
     // Dense City: place the pre-generated, non-overlapping building lots for this block
     for (const lot of b.buildingLots ?? []) {
-      this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+      if (lot.bldg) {
+        // hole.io rebuild: box building — live pseudo-3D draw; the flat
+        // composite sprite backs the capture/tumble/swallow-ghost path.
+        this.makeObj(lot.kind, lot.x, lot.y, {
+          size: lot.size, baseSize: lot.size,
+          bldg: lot.bldg,
+          sceneryKey: ensureBuildingSprite(lot.bldg),
+          contactRadius: Math.max(lot.bldg.w, lot.bldg.d) * 0.95,
+        });
+      } else {
+        this.makeObj(lot.kind, lot.x, lot.y, { size: lot.size, baseSize: lot.size });
+      }
     }
-    // street furniture (props are exempt from the structure-overlap audit)
-    this.scatter(b, rand, 'cafetable', 4);
-    this.scatterPeople(b, rand, 'downtown', 8); // War Pack §1: diverse downtown crowd
-    this.scatter(b, rand, 'bench', 2);
-    this.scatter(b, rand, 'flower', 3);
+    // street furniture — URBAN props only (benches/flowers between towers read
+    // as nonsense; keep the core feeling like a city, not a park)
+    this.scatter(b, rand, 'cafetable', 3);
+    this.scatterPeople(b, rand, 'downtown', 13); // War Pack §1: diverse downtown crowd
+    this.scatter(b, rand, 'streetlamp', 2);
+    this.scatter(b, rand, 'foodcart', 1);
     this.scatter(b, rand, 'apple', 2);   // T1 for early-game eating
     this.scatter(b, rand, 'car_parked_a', 1);
     this.scatter(b, rand, 'car_parked_b', 1);
+
+    // NEW street art (street_props_sheet): engineered sidewalk furniture on
+    // the block perimeter — bus shelter, kiosk, hot dog stand, planters,
+    // phone booth, street clock. Placed on the sidewalk band, clear of lots.
+    if (streetPropKeys.length >= 12) {
+      const B = CONFIG.BLOCK_SIZE;
+      const band = CONFIG.SIDEWALK * 0.55; // inset from block edge → on the pavement
+      const wants: Array<[string, number]> = [
+        [streetPropKeys[0], 42],  // bus shelter
+        [streetPropKeys[1], 38],  // kiosk / newsstand
+        [streetPropKeys[4], 34],  // hot dog stand
+        [streetPropKeys[6], 24],  // planter
+        [streetPropKeys[8], 30],  // phone booth
+        [streetPropKeys[11], 30], // street clock
+      ];
+      for (let i = 0; i < wants.length; i++) {
+        const [key, R] = wants[i];
+        // walk the perimeter: pick an edge + position from the prop index so
+        // furniture spreads around the block deterministically per block seed
+        const t = (i + rand() * 0.8) / wants.length;
+        const per = t * 4;
+        const edge = Math.floor(per) % 4;
+        const f = 0.15 + (per - Math.floor(per)) * 0.7;
+        let x: number, y: number;
+        if (edge === 0) { x = b.x0 + f * B; y = b.y0 + band; }
+        else if (edge === 1) { x = b.x0 + B - band; y = b.y0 + f * B; }
+        else if (edge === 2) { x = b.x0 + f * B; y = b.y0 + B - band; }
+        else { x = b.x0 + band; y = b.y0 + f * B; }
+        let blocked = false;
+        for (const lot of b.buildingLots ?? []) {
+          const md = lot.fpR + R + 10;
+          if ((lot.x - x) ** 2 + (lot.y - y) ** 2 < md * md) { blocked = true; break; }
+        }
+        if (!blocked) this.placeSceneryProp(key, x, y, R);
+      }
+    }
   }
 
   // v16 §1: civic block — school+library on index 0, hospital+townhall on index 1
@@ -1429,6 +1646,45 @@ export class WorldManager {
       }
     }
 
+    // Zoo VISITORS — a zoo without people made 0 sense
+    this.scatterPeople(b, rand, 'any', 6);
+
+    // NEW zoo art (zoo_props_sheet): habitat features inside pens + a real
+    // visitor plaza at the entrance. Without these the zoo read as random
+    // animals on grass — "makes 0 sense".
+    if (zooPropKeys.length >= 12) {
+      // One habitat feature per pen (rock formation / watering hole / log pile)
+      const habitat = [zooPropKeys[3], zooPropKeys[5], zooPropKeys[6]];
+      for (let col = 0; col < 3; col++) {
+        const px = zx0 + ins + col * (penW + 40) + penW / 2;
+        const py = zy0 + ins + ph * 0.5;
+        this.placeSceneryProp(habitat[col], px, py, 46 + rand() * 10);
+      }
+      // Stone-rimmed pond under the flamingos (drawn first, animals wade on it)
+      this.placeSceneryProp(zooPropKeys[4], pondX, pondY + 30, 78, 1);
+      // Entrance plaza (south edge, mid-block): ticket booth, popcorn cart,
+      // hedges and info signs along the visitor spine.
+      const ex = bx, ey = zy1 - 130;
+      // The real red entrance ARCH spans the visitor path (replaces the flat
+      // painted rectangles that read as "rough")
+      this.placeSceneryProp(zooPropKeys[0], bx, zy1 - ins - 6, 92, 3);
+      this.placeSceneryProp(zooPropKeys[7], ex - 150, ey, 44);        // ticket booth
+      this.placeSceneryProp(zooPropKeys[11], ex + 130, ey - 30, 36);  // popcorn cart
+      this.placeSceneryProp(zooPropKeys[9], ex - 320, ey + 10, 30);   // hedge
+      this.placeSceneryProp(zooPropKeys[9], ex + 300, ey + 10, 30);   // hedge
+      this.placeSceneryProp(zooPropKeys[8], ex - 60, by + 40, 26);    // info sign
+      this.placeSceneryProp(zooPropKeys[8], ex + 220, by - 120, 26);  // info sign
+    }
+  }
+
+  /** Place a static sprite prop (new city/zoo/street art) as eatable scenery. */
+  private placeSceneryProp(key: string, x: number, y: number, R: number, tier = 2) {
+    if (!isOnIsland(x, y, 20)) return;
+    this.makeObj('apple', x, y, {
+      scenery: true, sceneryKey: key,
+      baseSize: R, size: R, contactRadius: R * 0.85,
+      tier, living: false, infra: false,
+    });
   }
 
   // Rebuild Prompt 16: the airport opens — terminal, control tower, hangar, planes, props.
@@ -1535,7 +1791,7 @@ export class WorldManager {
     if (rand() < 0.4) this.scatter(b, rand, 'lifeguard', 1);
     if (rand() < 0.5) this.scatter(b, rand, 'car_parked_a', 1);
     if (rand() < 0.4) this.scatter(b, rand, 'car_parked_b', 1);
-    this.scatterPeople(b, rand, 'beach', 3);
+    this.scatterPeople(b, rand, 'beach', 6);
     if (rand() < 0.55) this.scatter(b, rand, 'cooler', 1);
     if (rand() < 0.45) this.scatter(b, rand, 'kite_prop', 1);
     if (rand() < 0.35) this.scatter(b, rand, 'rowboat', 1);
@@ -1662,6 +1918,97 @@ export class WorldManager {
     }
   }
 
+  // Structural Build: the downtown express — one parametric object following the
+  // rail loop; loco + 3 cars are drawn from its arc position. WORLD-ENDER prey.
+  spawnTrain() {
+    const p = railPointAt(0);
+    const o = this.makeObj('train', p.x, p.y, {});
+    o.trainT = 0;
+    o.scenery = true;   // bonus food: excluded from devour % and respawn population
+    o.tether = 0;
+    o.wanderAngle = p.a; // reused as heading for the draw pass
+  }
+
+  private stepTrain(obj: WorldObject, dtSec: number) {
+    obj.trainT = ((obj.trainT ?? 0) + (CONFIG.TRAIN_SPEED * dtSec) / RAIL_TOTAL) % 1;
+    const p = railPointAt(obj.trainT);
+    obj.vx = (p.x - obj.x) / Math.max(dtSec, 1e-4); // keeps vacuum-wobble math sane
+    obj.vy = (p.y - obj.y) / Math.max(dtSec, 1e-4);
+    obj.x = obj.homeX = p.x;
+    obj.y = obj.homeY = p.y;
+    obj.wanderAngle = p.a;
+  }
+
+  /** Cute clay express — loco + 3 cars drawn at arc offsets behind the lead. */
+  private drawTrain(ctx: CanvasRenderingContext2D, obj: WorldObject, t: number) {
+    if (obj.captured) {
+      // crumpled single loco while being sucked into the void
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
+      ctx.rotate(obj.captureRot);
+      const s = Math.max(0.2, obj.size / 73);
+      ctx.scale(s, s);
+      this.drawTrainSegment(ctx, 0, t);
+      ctx.restore();
+      return;
+    }
+    for (let k = 3; k >= 0; k--) {                 // rear cars first
+      const tk = ((obj.trainT ?? 0) - k * (CONFIG.TRAIN_CAR_GAP / RAIL_TOTAL) + 1) % 1;
+      const p = railPointAt(tk);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';          // planted contact shadow
+      ctx.beginPath(); ctx.ellipse(0, 6, 62, 16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(p.a);                             // local +x = travel direction
+      this.drawTrainSegment(ctx, k, t);
+      ctx.restore();
+    }
+  }
+
+  /** One clay train segment centered at origin, +x forward. k=0 loco, 1-3 cars. */
+  private drawTrainSegment(ctx: CanvasRenderingContext2D, k: number, t: number) {
+    const loco = k === 0;
+    const W = loco ? 116 : 104, H = loco ? 54 : 50;
+    const body = loco ? '#E4586B' : k % 2 === 1 ? '#5FA8E0' : '#F2B84B';
+    // wheels
+    ctx.fillStyle = '#2E333D';
+    for (const wx of [-W * 0.32, 0, W * 0.32]) {
+      ctx.beginPath(); ctx.arc(wx, H * 0.42, 7, 0, Math.PI * 2); ctx.fill();
+    }
+    // chassis strip
+    ctx.fillStyle = '#3E4652';
+    roundRect(ctx, -W / 2, H * 0.18, W, H * 0.22, 4); ctx.fill();
+    // body
+    ctx.fillStyle = body;
+    roundRect(ctx, -W / 2, -H / 2, W, H * 0.72, 10); ctx.fill();
+    // sticker outline (matches game style)
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+    roundRect(ctx, -W / 2, -H / 2, W, H * 0.72, 10); ctx.stroke();
+    if (loco) {
+      // cab window + boiler band + stack + cowcatcher
+      ctx.fillStyle = '#EAF4FF';
+      roundRect(ctx, -W * 0.36, -H * 0.36, W * 0.24, H * 0.34, 5); ctx.fill();
+      ctx.fillStyle = '#8B93A3';
+      roundRect(ctx, W * 0.02, -H * 0.30, W * 0.34, H * 0.5, 8); ctx.fill();
+      ctx.fillStyle = '#3E4652';
+      ctx.beginPath(); ctx.arc(W * 0.30, -H * 0.42, 8, 0, Math.PI * 2); ctx.fill();
+      // puffing steam (animated)
+      const puff = (t / 300) % 3;
+      ctx.fillStyle = `rgba(240,246,255,${(0.55 - puff * 0.16).toFixed(2)})`;
+      ctx.beginPath(); ctx.arc(W * 0.30 + puff * 8, -H * 0.55 - puff * 10, 6 + puff * 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6B7484';
+      ctx.beginPath();
+      ctx.moveTo(W / 2, -H * 0.1); ctx.lineTo(W / 2 + 14, H * 0.34); ctx.lineTo(W / 2, H * 0.34);
+      ctx.closePath(); ctx.fill();
+    } else {
+      // passenger windows
+      ctx.fillStyle = '#EAF4FF';
+      for (const wx of [-W * 0.28, 0, W * 0.28]) {
+        roundRect(ctx, wx - 9, -H * 0.32, 18, H * 0.3, 4); ctx.fill();
+      }
+    }
+  }
+
   get remaining() {
     // Prompt 5: scenery is excluded from the respawn population so it can't shift balance.
     return this.objects.filter((o) => !o.eaten && !o.scenery).length;
@@ -1669,7 +2016,8 @@ export class WorldManager {
 
   private canEatByPlayer(player: Player, obj: WorldObject) {
     if (obj.kind === 'watertower') return player.radius >= CONFIG.WATERTOWER_EAT_RADIUS;
-    if (obj.kind === 'skyscraper') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
+    if (obj.kind === 'train') return player.radius >= CONFIG.TRAIN_EAT_RADIUS; // WORLD-ENDER prey
+    if (obj.kind === 'skyscraper' || obj.kind === 'landmark') return player.radius >= CONFIG.SKYSCRAPER_EAT_RADIUS; // v12 §1
     if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') return player.radius >= CONFIG.ZOO_GATE_EAT_RADIUS; // v16.1 D
     if (obj.tier === 0) return true; // Feel Patch §2: tier-0 bits always edible
     return player.radius >= obj.size * CONFIG.EAT_RATIO;
@@ -1711,14 +2059,14 @@ export class WorldManager {
           vd.panicked = true;
           audio.playPedPanic(); // Sound Pack §9: cartoon squeak when ped panics
           if (!obj.bubbleText && activeBubbles < 4) {
-            obj.bubbleText = vd.panicText; obj.bubbleLife = 5000; activeBubbles++;
+            obj.bubbleText = pickLine(vd.panicText, this.rand); obj.bubbleLife = 5000; activeBubbles++;
           }
         }
         // Ambient bubble fires periodically when player is within 2000 world px
         if (!vd.panicked && dp < 2000) {
           vd.ambientCd -= dt;
           if (vd.ambientCd <= 0 && !obj.bubbleText && activeBubbles < 4) {
-            obj.bubbleText = vd.ambientText; obj.bubbleLife = 4000;
+            obj.bubbleText = pickLine(vd.ambientText, this.rand); obj.bubbleLife = 4000;
             vd.ambientCd = 8000 + Math.random() * 4000; activeBubbles++;
           }
         }
@@ -1843,8 +2191,8 @@ export class WorldManager {
       // ── rival interaction (pop on contact) ──
       for (const r of rivals) {
         if (!r.alive || r.ghost) continue;
-        if (obj.kind === 'watertower') continue; // only WORLD-EATER player eats it
-        if (obj.kind === 'skyscraper') continue; // v12 §1: only WORLD ENDER player eats it
+        if (obj.kind === 'watertower' || obj.kind === 'train') continue; // only the player eats these
+        if (obj.kind === 'skyscraper' || obj.kind === 'landmark') continue; // only WORLD ENDER player eats these
         if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue; // v16.1 D: GOBBLER+ only
         const dr = dist(obj.x, obj.y, r.x, r.y);
         // v16 §3: use art-derived contactRadius instead of CONFIG.CONTACT_SCALE
@@ -1862,7 +2210,7 @@ export class WorldManager {
     // consumed by the main-loop contact check (lines above).
     for (const obj of this.objects) {
       if (obj.eaten || obj.captured) continue;
-      if (obj.kind === 'watertower' || obj.kind === 'skyscraper') continue;
+      if (obj.kind === 'watertower' || obj.kind === 'skyscraper' || obj.kind === 'train' || obj.kind === 'landmark') continue;
       if (obj.kind === 'zoo_gate' || obj.kind === 'zoo_wall') continue;
       // find nearest rival within vacuum range that can eat this object
       let nearestRival: Rival | null = null;
@@ -1918,13 +2266,20 @@ export class WorldManager {
 
     // v8 §2: deficit-scaled respawn toward ≥90% of the starting population —
     // 4/s normally, ramping to 8/s once the world drops below 80%.
+    // Structural Build: express respawns a while after being devoured
+    if (this.trainRespawnT > 0) {
+      this.trainRespawnT -= dt;
+      if (this.trainRespawnT <= 0) this.spawnTrain();
+    }
     this.respawnTimer -= dt;
     if (this.respawnTimer <= 0) {
       const target = Math.round(this.initialPopulation * CONFIG.RESPAWN_TARGET_FRAC);
       const rem = this.remaining;
       if (rem < target) {
         const frac = rem / Math.max(1, this.initialPopulation);
-        const baseRate = frac >= 0.80 ? 4 : lerp(4, 8, clamp((0.80 - frac) / 0.20, 0, 1));
+        // Refill fast enough that the map never feels empty: at heavy depletion
+        // (e.g. after a COLLAPSE) the city pours back in at up to 18 objects/s.
+        const baseRate = frac >= 0.80 ? 6 : lerp(6, 18, clamp((0.80 - frac) / 0.35, 0, 1));
         const rate = baseRate * this.respawnMult; // Phase 7b §6: ×3 during FEEDING FRENZY
         this.respawnTimer = 1000 / rate;
         this.spawnRespawn(player, voids, fx);
@@ -2061,6 +2416,31 @@ export class WorldManager {
     }
   }
 
+  /** Signature "void power" blast: yank every edible within `pullRange` sharply
+   *  inward, then instantly devour everything inside `consumeRange` that the
+   *  player is allowed to eat. At high forms `crushBig` lets it swallow oversized
+   *  structures (skyscrapers, water towers) that the size-gate would normally
+   *  block — the WORLD-ENDER "collapse" fantasy. Returns the count consumed so
+   *  the caller can scale its feedback. */
+  voidPowerBlast(player: Player, pullRange: number, consumeRange: number, pull: number, crushBig: boolean, fx: FXManager): number {
+    // 1) hard inward pull across the whole reach
+    this.attractEdibles(player.x, player.y, pullRange, pull);
+    // 2) instant devour inside the consume radius. Snapshot first: consumeByPlayer
+    //    mutates object state, so iterate a stable list.
+    let eaten = 0;
+    for (const o of this.objects) {
+      if (o.eaten) continue;
+      if (dist(o.x, o.y, player.x, player.y) > consumeRange + o.size) continue;
+      // zoo_wall is never edible (structural boundary); everything else is fair
+      // game when crushBig, otherwise honour the normal size gate.
+      const eligible = crushBig ? o.kind !== 'zoo_wall' : this.canEatByPlayer(player, o);
+      if (!eligible) continue;
+      this.consumeByPlayer(o, player, fx);
+      eaten++;
+    }
+    return eaten;
+  }
+
   // v8 §1: nudge any edibles off the round-start footprint of every void so a
   // rival never begins the round sitting inside a cluster (which let bots pop a
   // dozen objects in the first frame and hit 100+ score instantly). Relocates
@@ -2106,6 +2486,8 @@ export class WorldManager {
   }
 
   private stepLiving(obj: WorldObject, dt: number, dtSec: number, voids: { x: number; y: number; radius: number; ghost: boolean }[], player: Player, fx: FXManager) {
+    // Structural Build: the express follows the rail loop — no flee, no wander.
+    if (obj.kind === 'train') return this.stepTrain(obj, dtSec);
     // Prompt 20 Stage 3: all traffic-pool vehicle kinds follow the road network,
     // not free-wander. Previously only 'car' and 'schoolbus' used stepCar; taxi,
     // convertible, fire_truck, and school_bus fell through to stepWander and roamed
@@ -2183,13 +2565,21 @@ export class WorldManager {
     if (threat) {
       const wasFleeing = obj.fleeing;
       obj.fleeing = true;
-      if (obj.kind === 'person') {
+      // Panic bubbles: was gated to kind === 'person', but plain 'person' is
+      // retired — every real pedestrian is person_* / skateboarder / etc., so
+      // bubbles almost never fired and the crowd read as mute. Fixed + funnier.
+      const isPed = obj.kind.startsWith('person') ||
+        ['skateboarder', 'cyclist', 'waiter', 'icecream_vendor', 'tourist', 'zookeeper', 'soldier'].includes(obj.kind);
+      if (isPed) {
         if (obj.alertT <= 0) obj.alertT = 900;
-        // Fix 7: 1-in-3 panicking peds pop a speech bubble when they first start fleeing
-        if (!wasFleeing && !obj.bubbleText && this.rand() < 0.33) {
+        // 1-in-2 panicking peds pop a speech bubble when they first start fleeing
+        if (!wasFleeing && !obj.bubbleText && this.rand() < 0.5) {
           const PANIC = ['MY LAWN!', 'RUN!!', 'Is that a grape?!', 'NOT THE BEACH!',
             'I just waxed that car!', 'WHAT IS THAT?!', 'HELP!!', 'My petunias!!',
-            'Call the mayor!!', 'It ate my lunch!!'];
+            'Call the mayor!!', 'It ate my lunch!!', 'my latte!!', 'nope nope nope nope',
+            'it\'s not even trash day!!', 'tell my wife I love h—', '5 stars. very scary.',
+            'I KNEW this town was cursed!!', 'the gym was THAT way anyway',
+            'not my emotional support gnome!!'];
           obj.bubbleText = PANIC[Math.floor(this.rand() * PANIC.length)];
           obj.bubbleLife = 1500;
         }
@@ -2398,7 +2788,8 @@ export class WorldManager {
       fx.shake(120, 2, 3); // Feel Patch §6: light shake on house eat (was 300ms/10px)
       fx.addDebris(obj.x, obj.y, '#C4736B', 4);
       fx.addDebris(obj.x, obj.y, '#F6E7B0', 2);
-    } else if (obj.kind === 'skyscraper') {
+    } else if (obj.kind === 'skyscraper' || obj.kind === 'landmark') {
+      if (obj.kind === 'landmark') this.eatenVignetteBanners.push('🏛️ CITY LANDMARK: DEVOURED');
       // v12 §1: skyscraper collapse — 3 shake pulses, debris shower, twin rings
       fx.shake(130, 18, [0, 160, 320]);
       fx.addDebris(obj.x, obj.y, '#5A8AB0', 8);
@@ -2406,6 +2797,15 @@ export class WorldManager {
       fx.addDebris(obj.x, obj.y, '#1A3040', 4);
       fx.addRing(obj.x, obj.y, '#5AC8FF', 18, obj.baseSize * 3.2, 8, 750);
       fx.addRing(obj.x, obj.y, '#FFD23F', 10, obj.baseSize * 2, 5, 500);
+    } else if (obj.kind === 'train') {
+      // Structural Build: devouring the express is a marquee moment
+      fx.shake(320, 16, [0, 140, 280]);
+      fx.addDebris(obj.x, obj.y, '#E4586B', 8);
+      fx.addDebris(obj.x, obj.y, '#5FA8E0', 6);
+      fx.addDebris(obj.x, obj.y, '#DCE3EE', 6);
+      fx.addRing(obj.x, obj.y, '#DCE3EE', 20, obj.baseSize * 4, 10, 800);
+      this.eatenVignetteBanners.push('🚆 EXPRESS LINE: DEVOURED');
+      this.trainRespawnT = CONFIG.TRAIN_RESPAWN_MS;
     } else if (obj.kind === 'person') {
       fx.addCrumbs(obj.x, obj.y - obj.baseSize * 0.4, '#FF6FB0', 4); // hat pops off
     } else {
@@ -2458,23 +2858,43 @@ export class WorldManager {
       if (clayHouseKeys.length) return clayHouseKeys[id % clayHouseKeys.length];
       return null;
     }
-    if (kind === 'skyscraper' && claySkyscraperKeys.length) {
-      return claySkyscraperKeys[id % claySkyscraperKeys.length];
+    // Structural Rebuild: downtown resolves to the NEW wide city buildings —
+    // the 4 needle-skyscraper era is over. Offices share the pool (varied city).
+    if (kind === 'skyscraper' || kind === 'office') {
+      if (cityBuildingKeys.length) return cityBuildingKeys[id % cityBuildingKeys.length];
+      if (kind === 'skyscraper' && claySkyscraperKeys.length) return claySkyscraperKeys[id % claySkyscraperKeys.length];
     }
-    // Prompt 4: clay people + vehicle variety pools (visual only; contact radius
-    // stays keyed off the unchanged kind). Falls back to the kind sprite when the
-    // clay sheet is absent.
-    if (clayPeopleKeys.length && CLAY_PERSON_KIND_SET.has(kind)) {
-      return clayPeopleKeys[id % clayPeopleKeys.length];
+    if (kind === 'landmark') {
+      return cityLandmarkKeys.length ? cityLandmarkKeys[id % cityLandmarkKeys.length] : null;
     }
-    if (clayVehicleKeys.length && CLAY_VEHICLE_KIND_SET.has(kind)) {
-      return clayVehicleKeys[id % clayVehicleKeys.length];
+    // hole.io rebuild: the LIFE LAYER is procedural now (props3d) — crisp
+    // flat-shaded minifigs, vehicles, and vegetation in the same language as
+    // the extruded buildings. Visual only; contact radius stays kind-keyed.
+    if (CLAY_PERSON_KIND_SET.has(kind)) {
+      // stable special outfits, everyday palette for the rest
+      switch (kind) {
+        case 'waiter':          return 'p3d_person_8';
+        case 'icecream_vendor': return 'p3d_person_9';
+        case 'person_guard':    return 'p3d_person_10';
+        case 'person_const':    return 'p3d_person_11';
+        default:                return `p3d_person_${id % 8}`;
+      }
     }
-    // Prompt 5: replace (not stack) — existing vegetation renders from the clay
-    // nature pool too, so the whole world reads as clay. Draw-only; contact
-    // radius stays keyed off the unchanged kind.
-    if (kind === 'tree' && clayTreeKeys.length) return clayTreeKeys[id % clayTreeKeys.length];
-    if (kind === 'bush' && clayBushKeys.length) return clayBushKeys[id % clayBushKeys.length];
+    if (kind === 'soldier' || kind === 'zookeeper') return 'p3d_person_10';
+    if (CLAY_VEHICLE_KIND_SET.has(kind)) {
+      switch (kind) {
+        case 'taxi':        return 'p3d_taxi';
+        case 'fire_truck':  return 'p3d_firetruck';
+        case 'schoolbus':
+        case 'school_bus':  return 'p3d_schoolbus';
+        default:            return `p3d_veh_${id % 5}`;
+      }
+    }
+    if (kind === 'tree') {
+      const TREES = ['p3d_tree_0', 'p3d_tree_1', 'p3d_tree_2', 'p3d_tree_3', 'p3d_pine_0', 'p3d_pine_1'];
+      return TREES[id % TREES.length];
+    }
+    if (kind === 'bush') return `p3d_bush_${id % 2}`;
     if (kind === 'flower' && clayFlowerKeys.length) return clayFlowerKeys[id % clayFlowerKeys.length];
     // Prompt 9: bonus food + street furniture render from the clay food pool
     // (visual only; contact radius + win-math exclusion stay keyed off the kind).
@@ -2527,7 +2947,7 @@ export class WorldManager {
       case 'birdbath':     return 'clay_park_12';  // planter stand-in
       case 'shed':         return 'clay_park_2';   // gazebo stand-in (closest enclosed structure)
       case 'gazebo':       return 'clay_park_2';
-      case 'watertower':   return 'clay_park_2';   // gazebo stand-in (tallest park structure)
+      case 'watertower':   return 'p3d_watertower'; // hole.io rebuild: real procedural tower
       case 'slide':        return 'clay_park_0';
       case 'swingset':     return 'clay_park_1';
       case 'trampoline':   return 'clay_park_1';   // swing stand-in (closest bouncy thing)
@@ -2565,33 +2985,35 @@ export class WorldManager {
       case 'cooler':     return 'clay_beach_11';  // deck chairs stand-in
       case 'kite_prop':  return 'clay_beach_5';   // beach ball stand-in (light, colourful)
       // ── Beach palm → clay_beach_3 (palm cutout on beach sheet) ─────────────
-      case 'palm': return 'clay_beach_3';
+      case 'palm': return 'p3d_palm'; // hole.io rebuild: procedural palm
       // ── Vehicles: car_parked_a/b and civilian jeep → clay vehicle pool ──────
       // Fallback to clay_park_12 (planter) if the sheet hasn't loaded yet.
       case 'car_parked_a':
       case 'car_parked_b':
       case 'jeep':
-        return clayVehicleKeys.length ? clayVehicleKeys[id % clayVehicleKeys.length] : 'clay_park_12';
+        return `p3d_veh_${id % 5}`; // hole.io rebuild: procedural traffic
+      // ── Structural Build: beach-fun props → existing clay cutouts ──────────
+      case 'beachball': return 'clay_beach_5';
+      case 'deckchair': return 'clay_beach_11';
       // ── Critters: no clay cutout — draw procedurally (coloured blobs, still eatable) ──
       case 'dog':
       case 'cat':
       case 'duck':
       case 'squirrel':
       case 'bird':
+      case 'train': // Structural Build: bespoke multi-segment procedural draw
+      case 'tent':      // Structural Build: procedural camp props
+      case 'campfire':
         return null;
       // ── Vignette anchors → clay people pool; fallback to clay_park_4 ────────
       case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':
       case 'vig_busker':   case 'vig_painter': case 'vig_selfie':  case 'vig_kite':
       case 'vig_gardener':
-        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_4';
+        return `p3d_person_${id % 8}`; // hole.io rebuild: procedural minifigs
       // ── Zoo structures (not animals — they're covered by ZOO_KINDS above) ────
       case 'zoo_gate':  return 'clay_park_2';   // gazebo stand-in for arched gate
       case 'zoo_wall':  return 'clay_park_12';  // planter stand-in
-      case 'zookeeper':
-        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_3';
       // ── Non-defense soldier (static, not clay-army) → people pool ────────────
-      case 'soldier':
-        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_3';
       default: break;
     }
     return kind;
@@ -2719,24 +3141,22 @@ export class WorldManager {
     // static ground cache by drawMap._paintStaticGround via setMatchSportsFields.
     // The old sprite-sticker draw path is retired — no field_soccer image required.
 
-    // v8 §3 + v16.2 §5: dirt/scar patches — use scar decal when loaded, else procedural ellipse
-    const scarImg = fxDecals.get('scar');
+    // Devour scars — VOID scars, not brown dirt: a dark violet pool with a faint
+    // luminous rim, so eaten ground reads as "reality bitten by the void" and the
+    // map stays crisp instead of muddying with brown blobs.
     for (const d of this.dirt) {
-      const a = clamp(d.life / d.maxLife, 0, 1) * 0.6;
+      const a = clamp(d.life / d.maxLife, 0, 1) * 0.5;
       if (a < 0.01) continue;
       ctx.save();
       ctx.globalAlpha = a;
-      if (scarImg) {
-        const s = d.r * (d.drawScale ?? 1) * 3.2; // world-space draw size
-        ctx.translate(d.x, d.y);
-        ctx.rotate(d.rot ?? 0);
-        ctx.drawImage(scarImg, -s / 2, -s / 2, s, s);
-      } else {
-        ctx.fillStyle = G.dirt;
-        ctx.beginPath();
-        ctx.ellipse(d.x, d.y, d.r, d.r * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.rot ?? 0);
+      const rx = d.r, ry = d.r * 0.7;
+      ctx.fillStyle = 'rgba(26,16,54,0.85)';
+      ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(150,110,255,0.35)';
+      ctx.lineWidth = Math.max(1.5, d.r * 0.08);
+      ctx.beginPath(); ctx.ellipse(0, 0, rx * 0.96, ry * 0.96, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
 
@@ -2917,12 +3337,16 @@ export class WorldManager {
     view: { x: number; y: number; w: number; h: number },
     actors?: { footY: number; draw: () => void }[],
   ) {
-    const visible = this.objects.filter((o) =>
-      !o.eaten &&
-      o.x + o.size >= view.x && o.x - o.size <= view.x + view.w &&
-      o.y + o.size >= view.y && o.y - o.size <= view.y + view.h
-    );
-    visible.sort((a, b) => a.y - b.y);
+    const visible = this.objects.filter((o) => {
+      // Structural Build: the train spans ~3 car-gaps behind its lead point
+      const pad = o.kind === 'train' ? 540 : o.size;
+      return !o.eaten &&
+        o.x + pad >= view.x && o.x - pad <= view.x + view.w &&
+        o.y + pad >= view.y && o.y - pad <= view.y + view.h;
+    });
+    // hole.io rebuild: box buildings sort by their SOUTH edge (visual base),
+    // everything else by its foot point as before.
+    visible.sort((a, b) => (a.y + (a.bldg?.d ?? 0)) - (b.y + (b.bldg?.d ?? 0)));
 
     // v10 §3: ground shadows for captured objects — stay planted as object lifts toward void
     for (const obj of visible) {
@@ -2938,7 +3362,20 @@ export class WorldManager {
       ctx.restore();
     }
 
+    // hole.io rebuild: camera centre drives the extruded-building parallax
+    const camCX = view.x + view.w / 2;
+    const camCY = view.y + view.h / 2;
+
     const drawOne = (obj: WorldObject) => {
+      // Structural Build: the express draws its own multi-segment body
+      if (obj.kind === 'train') { this.drawTrain(ctx, obj, t); return; }
+      // hole.io rebuild: live pseudo-3D box draw for uncaptured buildings.
+      // Captured ones fall through to the flat-sprite tumble path below.
+      if (obj.bldg && !obj.captured) {
+        const shk3 = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
+        drawBuilding3D(ctx, obj.bldg, obj.x + shk3, obj.y, camCX, camCY);
+        return;
+      }
       // v6 §2: golden object aura — gold ring + orbiting sparkles (no blur)
       if (obj.golden) {
         ctx.save();

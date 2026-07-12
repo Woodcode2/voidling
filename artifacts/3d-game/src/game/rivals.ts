@@ -4,6 +4,7 @@ import { meta } from './meta';
 import { clamp, lerp, dist } from './utils';
 import { Void } from './void';
 import { drawVoidling, drawUnderdogTrail, drawSparkleTrail } from './voidling';
+import { arrivalOffsetY, arrivalDrawShadow, arrivalDrawFX, ARRIVAL_FALL_MS, ARRIVAL_TOTAL_MS } from './arrival';
 import type { WorldObject } from './world';
 
 export interface VoidView { x: number; y: number; radius: number; }
@@ -19,11 +20,20 @@ export interface RivalController {
 
 export class Rival extends Void {
   private inDirX = 0; private inDirY = 0; private inMag = 0;
-  alive = true;
+  // Family arc: created dormant (off-map), flipped alive when they sky-fall in.
+  alive = false;
 
-  country: string;
+  relation: string;               // kin label shown on the nameplate (e.g. "lil bro")
   controller: RivalController;
   speedScale: number;
+
+  // Family-arrival state
+  arrived = false;                // has this family member dropped in yet?
+  arrivalE = 0;                   // ms elapsed since the sky-fall began
+  // Speech bubble (arrival bark + ongoing family banter)
+  bubbleText = '';
+  bubbleT = 0;                    // ms remaining on the current bubble
+  private banterCd = 14000 + Math.random() * 10000; // ms until next fun line
 
   // v9 §1: radius/score/formIndex/ghostTime/underdog*/eventSlow/skin/name are on Void
   eventFlee: { x: number; y: number } | null = null; // v7 §4: hazard to run from
@@ -52,10 +62,10 @@ export class Rival extends Void {
   private breathePhase = Math.random() * 1000;
   private bobOffset = 0; // Alive Pack §4: move bob
 
-  constructor(name: string, country: string, skin: SkinDef, controller: RivalController, speedScale = 1) {
+  constructor(name: string, relation: string, skin: SkinDef, controller: RivalController, speedScale = 1) {
     super(skin);
     this.name = name;
-    this.country = country;
+    this.relation = relation;
     this.controller = controller;
     this.speedScale = speedScale;
   }
@@ -69,18 +79,48 @@ export class Rival extends Void {
     this.alive = true;
   }
 
+  /** Family arc: drop this member into the match with a sky-fall + bark. Called
+   *  by the engine when the arrival schedule fires. Ghosts them for the fall so
+   *  they can't be eaten mid-air. */
+  beginArrival(x: number, y: number, radius: number, bark: string) {
+    this.spawn(x, y, radius);
+    this.arrived = true;
+    this.arrivalE = 0;
+    this.bubbleText = bark;
+    this.bubbleT = 3400;
+    this.ghostTime = ARRIVAL_TOTAL_MS; // invulnerable while falling in
+  }
+
   setInput(dirX: number, dirY: number, mag: number) {
     this.inDirX = dirX; this.inDirY = dirY; this.inMag = mag;
   }
 
   update(dt: number, view: WorldView) {
+    if (!this.arrived) return; // dormant until the arrival schedule drops them in
+    if (this.arrivalE < ARRIVAL_TOTAL_MS) this.arrivalE += dt;
+    const airborne = this.arrivalE < ARRIVAL_FALL_MS; // still falling — no AI, no drift
+
+    // Family banter — the kin are having FUN devouring together, and say so.
+    if (this.bubbleT > 0) this.bubbleT -= dt;
+    if (!airborne) {
+      this.banterCd -= dt;
+      if (this.banterCd <= 0) {
+        this.banterCd = 16000 + Math.random() * 14000;
+        if (this.bubbleT <= 0) {
+          const pool = CONFIG.FAMILY_BANTER;
+          this.bubbleText = pool[Math.floor(Math.random() * pool.length)];
+          this.bubbleT = 3000;
+        }
+      }
+    }
+
     this.tickMorph(dt);     // v9 §3: advance the body-morph crossfade
     this.tickCaptures(dt);  // v15 §0: drain the deferred-absorb orbit queue
     // v16.2 §0: bot radius cap — never more than player × 1.25; absorbs beyond still score them
     if (view.playerRadius > 0 && this.radius > view.playerRadius * CONFIG.BOT_RADIUS_CAP_FRAC) {
       this.radius = view.playerRadius * CONFIG.BOT_RADIUS_CAP_FRAC;
     }
-    const intent = this.controller.think(this, view, dt);
+    const intent = airborne ? { dirX: 0, dirY: 0, mag: 0 } : this.controller.think(this, view, dt);
     this.setInput(intent.dirX, intent.dirY, intent.mag);
 
     const dtSec = dt / 1000;
@@ -211,12 +251,22 @@ export class Rival extends Void {
   draw(ctx: CanvasRenderingContext2D, t: number, alpha: number) {
     const rx = lerp(this.prevX, this.x, alpha);
     const ry = lerp(this.prevY, this.y, alpha);
-    if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
-    // Alive Pack §7: trailing sparkle for GOBBLER+ rivals (form ≥ 2)
-    if (this.formIndex >= 2) drawSparkleTrail(ctx, rx, ry, this.vx, this.vy, this.radius, t);
+
+    // Family arc: sky-fall on arrival — the body drops in with a growing ground
+    // shadow, then a dust ring + pebbles on touchdown (shared with the player's).
+    const e = this.arrived ? this.arrivalE : 1e9;
+    const drop = arrivalOffsetY(e, this.radius);
+    const airborne = drop > 0.5;
+    if (airborne) arrivalDrawShadow(ctx, rx, ry, this.radius, e);
+
+    if (!airborne) {
+      if (this.underdog && !this.ghost) drawUnderdogTrail(ctx, rx, ry, this.vx, this.vy, this.radius);
+      // Alive Pack §7: trailing sparkle for GOBBLER+ rivals (form ≥ 2)
+      if (this.formIndex >= 2) drawSparkleTrail(ctx, rx, ry, this.vx, this.vy, this.radius, t);
+    }
     // Alive Pack §5: eat-chomp squash — starts at 0.85, springs to 1.0 over 80 ms
     const chompSquash = this.chompSquashT > 0 ? 1.0 - 0.15 * (this.chompSquashT / 80) : 1.0;
-    drawVoidling(ctx, rx, ry + this.bobOffset, {
+    drawVoidling(ctx, rx, ry + this.bobOffset - drop, {
       r: this.radius,
       skin: this.skin,
       t,
@@ -234,11 +284,15 @@ export class Rival extends Void {
       form: this.formIndex,
       morph: this.morph,
     });
-    this.drawTag(ctx, rx, ry);
+    arrivalDrawFX(ctx, rx, ry, this.radius, e);
+    this.drawTag(ctx, rx, ry - drop);
+    if (this.bubbleT > 0 && this.bubbleText) {
+      this.drawBark(ctx, rx, ry - drop - this.radius - 34);
+    }
   }
 
   private drawTag(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
-    const label = `${this.name} · ${this.country}`;
+    const label = `${this.name} · ${this.relation}`;
     ctx.save();
     ctx.font = '600 13px Nunito, sans-serif';
     ctx.textAlign = 'center';
@@ -251,6 +305,30 @@ export class Rival extends Void {
     ctx.fill();
     ctx.fillStyle = this.skin.glowColor;
     ctx.fillText(label, cx, y);
+    ctx.restore();
+  }
+
+  /** Speech bubble — arrival bark + ongoing family banter (fades in the last 500ms). */
+  private drawBark(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+    const fade = clamp(this.bubbleT / 500, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.font = '700 13px Nunito, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(this.bubbleText).width + 20;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    roundRect(ctx, cx - w / 2, cy - 12, w, 24, 12);
+    ctx.fill();
+    // little tail
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy + 11);
+    ctx.lineTo(cx + 5, cy + 11);
+    ctx.lineTo(cx, cy + 19);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#2A1445';
+    ctx.fillText(this.bubbleText, cx, cy);
     ctx.restore();
   }
 }
@@ -558,7 +636,7 @@ class PacingController implements RivalController {
 
 export function makeRivals(): Rival[] {
   const names = shuffle(CONFIG.BOT_NAMES).slice(0, CONFIG.RIVAL_COUNT);
-  const countries = shuffle(CONFIG.BOT_COUNTRIES).slice(0, CONFIG.RIVAL_COUNT);
+  const relations = shuffle(CONFIG.FAMILY_RELATIONS).slice(0, CONFIG.RIVAL_COUNT);
   // v9 §2: one archetype per bot, shuffled so name↔personality randomize each round
   const arches = shuffle(ARCHETYPES);
 
@@ -591,7 +669,7 @@ export function makeRivals(): Rival[] {
     const arch = arches[i % arches.length];
     const inner = new BotController(reaction, bias, arch);
     const pacer = new PacingController(inner, pacerTargets[i % pacerTargets.length]);
-    const r = new Rival(names[i], countries[i], skin, pacer, speedScale);
+    const r = new Rival(names[i], relations[i % relations.length], skin, pacer, speedScale);
     r.wearsUnownedSkin = !owned.has(base.id);
     r.shopSkinId = base.id;
     r.shopSkinName = base.name;

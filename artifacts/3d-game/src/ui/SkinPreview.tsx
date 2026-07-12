@@ -4,7 +4,7 @@ import { drawVoidling } from '../game/voidling';
 
 // A small self-animating canvas that renders a voidling wearing a given skin.
 // Reuses the exact in-game renderer so shop previews match gameplay.
-export function SkinPreview({ skinId, size, glow = 0.5 }: { skinId: string; size: number; glow?: number }) {
+export function SkinPreview({ skinId, size, glow = 0.5, form = 0 }: { skinId: string; size: number; glow?: number; form?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -69,11 +69,13 @@ export function SkinPreview({ skinId, size, glow = 0.5 }: { skinId: string; size
         lean: Math.sin(t / 1300) * 0.05,
         glow,
         breathe: 1 + Math.sin(t / 900) * 0.02,
+        form,
+        morph: 1,
       });
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [skinId, size, glow]);
+  }, [skinId, size, glow, form]);
 
   return <canvas ref={ref} style={{ width: size, height: size }} />;
 }

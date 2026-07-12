@@ -630,10 +630,10 @@ export class Player extends Void {
       // Alive Pack §4: apply move-bob vertical offset
       // Batch 1: sky-fall arrival — the body drops in from above, a shadow
       // grows on the street, dust puffs on landing. Purely visual.
-      const drop = arrival.offsetY(this.r);
-      if (drop > 0.5) arrival.drawShadow(ctx, rx, ry, this.r);
+      const drop = arrival.offsetY(this.radius);
+      if (drop > 0.5) arrival.drawShadow(ctx, rx, ry, this.radius);
       drawVoidling(ctx, rx, ry + this.bobOffset - drop, this.visual(t));
-      arrival.drawFX(ctx, rx, ry, this.r);
+      arrival.drawFX(ctx, rx, ry, this.radius);
     }
   }
 

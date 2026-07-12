@@ -12,14 +12,25 @@
  * Used by wardSprites.ts (ward sheets) and islandMap.ts (evolution + drift sheets).
  */
 
-// Dark-violet BG colour shared by every sprite sheet: #1E1338
-const BG_R = 0x1E, BG_G = 0x13, BG_B = 0x38;
-const BG_THRESH_SQ = 58 * 58; // squared Euclidean distance threshold
-
 interface BBox { minX: number; minY: number; maxX: number; maxY: number; size: number; }
 
-/** BFS flood-fill from border seeds (every pixel + every 32px interval on all four edges). */
+/** BFS flood-fill from border seeds (every pixel + every 32px interval on all four edges).
+ *  The BG colour is sampled from the border (median), so both the dark-violet
+ *  clay sheets (#1E1338) and the white-background city sheets key correctly.
+ *  Light backgrounds get a tighter threshold so white objects (fences, marble
+ *  facades) aren't flood-eaten; only the near-flat paper white is removed. */
 function removeBg(px: Uint8ClampedArray, W: number, H: number): void {
+  // Sample the median border colour as the BG reference
+  const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+  const sample = (i: number) => { rs.push(px[i*4]); gs.push(px[i*4+1]); bs.push(px[i*4+2]); };
+  for (let x = 0; x < W; x += 4) { sample(x); sample((H-1)*W + x); }
+  for (let y = 0; y < H; y += 4) { sample(y*W); sample(y*W + W-1); }
+  const med = (a: number[]) => a.sort((p, q) => p - q)[a.length >> 1];
+  const BG_R = med(rs), BG_G = med(gs), BG_B = med(bs);
+  const lum = 0.299 * BG_R + 0.587 * BG_G + 0.114 * BG_B;
+  const T = lum > 140 ? 28 : 58; // light sheets: tight key; dark sheets: legacy 58
+  const BG_THRESH_SQ = T * T;
+
   const visited = new Uint8Array(W * H);
   const q: number[] = [];
   let qh = 0;
@@ -80,8 +91,11 @@ function findComponents(px: Uint8ClampedArray, W: number, H: number): BBox[] {
   return boxes;
 }
 
-/** Iteratively merge bboxes whose Chebyshev gap is ≤ 8px (rejoins fragments). */
-function mergeBBoxes(boxes: BBox[]): BBox[] {
+/** Iteratively merge bboxes whose Chebyshev gap is ≤ 8px (rejoins fragments).
+ *  Guarded by a centre-distance cap (~½ grid cell) so tightly-packed sheets
+ *  don't chain-merge neighbouring sprites into one giant cluster — same-cell
+ *  fragments still union later during grid assignment regardless. */
+function mergeBBoxes(boxes: BBox[], maxCX: number, maxCY: number): BBox[] {
   let changed = true;
   while (changed) {
     changed = false;
@@ -90,7 +104,9 @@ function mergeBBoxes(boxes: BBox[]): BBox[] {
         const a = boxes[i], b = boxes[j];
         const xGap = Math.max(0, a.minX - b.maxX, b.minX - a.maxX);
         const yGap = Math.max(0, a.minY - b.maxY, b.minY - a.maxY);
-        if (xGap <= 8 && yGap <= 8) {
+        const cdx = Math.abs((a.minX + a.maxX) - (b.minX + b.maxX)) / 2;
+        const cdy = Math.abs((a.minY + a.maxY) - (b.minY + b.maxY)) / 2;
+        if (xGap <= 8 && yGap <= 8 && cdx <= maxCX && cdy <= maxCY) {
           a.minX = Math.min(a.minX, b.minX); a.maxX = Math.max(a.maxX, b.maxX);
           a.minY = Math.min(a.minY, b.minY); a.maxY = Math.max(a.maxY, b.maxY);
           a.size += b.size;
@@ -133,6 +149,22 @@ export function extractComponents(
 
   // Step 1: remove background
   removeBg(px, W, H);
+
+  // Step 1b: erase cell-divider grid lines. Some sheets draw thin grey
+  // separators between cells; they survive keying and weld every sprite that
+  // touches them into one sheet-wide lattice. A column/row whose opaque
+  // coverage spans ≥88% of the sheet can only be a divider — clear it.
+  // Sprites crossing a cleared 2-3px line are rejoined by the 8px merge.
+  for (let x = 0; x < W; x++) {
+    let n = 0;
+    for (let y = 0; y < H; y++) if (px[(y * W + x) * 4 + 3] >= 8) n++;
+    if (n > H * 0.88) for (let y = 0; y < H; y++) px[(y * W + x) * 4 + 3] = 0;
+  }
+  for (let y = 0; y < H; y++) {
+    let n = 0;
+    for (let x = 0; x < W; x++) if (px[(y * W + x) * 4 + 3] >= 8) n++;
+    if (n > W * 0.88) for (let x = 0; x < W; x++) px[(y * W + x) * 4 + 3] = 0;
+  }
   g.putImageData(data, 0, 0);
 
   // Step 2: find components
@@ -142,11 +174,11 @@ export function extractComponents(
   const minSize = W * H * 0.002;
   comps = comps.filter(c => c.size >= minSize);
 
-  // Step 4: merge nearby
-  comps = mergeBBoxes(comps);
+  // Step 4: merge nearby (centre-capped to ~½ cell so neighbours can't chain)
+  const cellW = W / cols, cellH = H / rows;
+  comps = mergeBBoxes(comps, cellW * 0.55, cellH * 0.55);
 
   // Step 5: assign to nearest grid cell
-  const cellW = W / cols, cellH = H / rows;
   const assigned: (BBox | null)[] = new Array(cols * rows).fill(null);
 
   for (const comp of comps) {
