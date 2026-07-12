@@ -6,9 +6,11 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v26 · solorun';
+const BUILD_STAMP = 'v27 · appstore';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
+// Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
+const _DEBUG_ICON = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'icon';
 
 // v12 §3: weekday names for the streak calendar
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -123,6 +125,28 @@ function Confetti() {
 // v12 §3: Splash screen — animated voidling drop, shown 1800ms on first mount
 // v14 §4: Splash screen with optional full-bleed splash.png (1.0→1.04 slow zoom).
 // If no splash.png is found the existing starfield + voidling fallback is shown.
+function IconFactory() {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(circle at 32% 28%, #3A2470 0%, #1D1145 52%, #0C0724 100%)',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.9 }}>
+        {Array.from({ length: 26 }, (_, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            left: `${(i * 137.5) % 100}%`, top: `${(i * 61.8) % 100}%`,
+            width: i % 4 === 0 ? 5 : 2.5, height: i % 4 === 0 ? 5 : 2.5,
+            borderRadius: '50%', background: i % 3 ? '#CFC6FF' : '#FFE9A8',
+            opacity: 0.35 + (i % 5) * 0.13,
+          }} />
+        ))}
+      </div>
+      <SkinPreview skinId="classic" size={620} glow={0.9} form={2} />
+    </div>
+  );
+}
+
 function Splash({ snap, onDone }: { snap: Snapshot; onDone: () => void }) {
   const [hasSplash, setHasSplash] = useState(true); // optimistic — hide on error
   const [artHoldDone, setArtHoldDone] = useState(false); // 4s splash-art hold elapsed
@@ -956,6 +980,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
 const ONBOARD_KEY = 'vd_onboarded';
 
 export function UILayer({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
+  if (_DEBUG_ICON) return <IconFactory />;
   const [showOnboard, setShowOnboard] = useState(false);
   // v12 §3: splash screen — shown once on first mount, cleared at 1800ms or on tap.
   // ?debug=autostart skips it so proof screenshots see the running game immediately.

@@ -53,6 +53,22 @@ export const audio = {
       go:             '/assets/audio/go.ogg',
       horn_event:     '/assets/audio/horn_event.ogg',
       capture_tick:   '/assets/audio/capture_tick.ogg',
+      // Sound Pass: premium organic set (layered synthesis + Schroeder reverb,
+      // generated offline — no beeps, no 8-bit)
+      gulp_1:         '/assets/audio/gulp_1.wav',
+      gulp_2:         '/assets/audio/gulp_2.wav',
+      gulp_3:         '/assets/audio/gulp_3.wav',
+      gulp_4:         '/assets/audio/gulp_4.wav',
+      gulp_5:         '/assets/audio/gulp_5.wav',
+      evolve_epic:    '/assets/audio/evolve_epic.wav',
+      power_deep:     '/assets/audio/power_deep.wav',
+      power_blast:    '/assets/audio/power_blast.wav',
+      win_warm:       '/assets/audio/win_warm.wav',
+      mutate_choice:  '/assets/audio/mutate_choice.wav',
+      tick_soft:      '/assets/audio/tick_soft.wav',
+      ui_tap:         '/assets/audio/ui_tap.wav',
+      threat_sting:   '/assets/audio/threat_sting.wav',
+      eaten_deep:     '/assets/audio/eaten_deep.wav',
     };
     const results = await Promise.allSettled(
       Object.entries(files).map(async ([k, url]) => {
@@ -293,8 +309,8 @@ export const audio = {
     else this._ladder = 0;
     this._lastAbsorb = ms;
 
-    // pick sample tier: pop_1 (T1) … pop_5 (T5+)
-    const sampleName = `pop_${Math.min(tier, 5)}`;
+    // Sound Pass: wet vacuum GULPS replace the arcade pops
+    const sampleName = `gulp_${Math.min(tier, 5)}`;
     const rate = Math.pow(2, this._ladder / 12); // pitch-ladder playback rate
     const vol = tier >= 4 ? 0.7 : 0.52;
     if (this._playSample(sampleName, rate, vol)) {
@@ -417,6 +433,7 @@ export const audio = {
   // getting eaten: v14 §1 — ouch sample, synth fallback
   playEaten() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    if (this._playSample('eaten_deep', 1, 0.65)) return; // Sound Pass: dark dive
     if (this._playSample('ouch', 0.85, 0.6)) return;
     // synth fallback (descending filtered wah)
     const now = this.ctx.currentTime;
@@ -441,7 +458,7 @@ export const audio = {
   countBeep(n: number) {
     // pitch-shift the beep sample per count: 3=normal, 2=slight up, 1=higher
     const rate = n >= 3 ? 1.0 : n === 2 ? 1.19 : 1.41;
-    if (this._playSample('beep', rate, 0.5)) return;
+    if (this._playSample('tick_soft', rate, 0.6)) return; // Sound Pass: woodblock, not beep
     // synth fallback
     const f = n >= 3 ? 440 : n === 2 ? 554 : 659;
     this.playTone(f, 'triangle', 0.16, 0.18);
@@ -456,6 +473,12 @@ export const audio = {
     if (this.ctx) this._noise(this.ctx.currentTime, 0.06, 'highpass', 2000, 1, 0.16);
   },
 
+  // Sound Pass: dark double-pulse when a rival becomes big enough to eat you
+  playThreat() {
+    if (!this.sfxOn || !this.ctx) return;
+    this._playSample('threat_sting', 1, 0.7);
+  },
+
   playBoon() {
     this.playTone(600, 'sine', 0.1, 0.1);
     this.playTone(800, 'sine', 0.2, 0.1, 0.1);
@@ -464,6 +487,13 @@ export const audio = {
   // Distinct sting per signature VOID POWER — so each form's move sounds unique.
   playPower(kind: string) {
     if (!this.sfxOn) return;
+    // Sound Pass: produced whoosh/impact layers under each power's synth sting
+    if (kind === 'shockwave' || kind === 'singularity' || kind === 'collapse') {
+      this._playSample('power_blast', kind === 'collapse' ? 0.85 : 1, 0.7);
+    } else {
+      this._playSample('power_deep', 1, 0.6);
+    }
+    if (this._playSample('mutate_choice', 1, 0.6)) return; // Sound Pass: mysterious swell
     switch (kind) {
       case 'tug': // snappy rising slurp
         this.playTone(480, 'sine', 0.10, 0.09);
@@ -498,6 +528,7 @@ export const audio = {
   // v14 §1 + v8 §5: evolution sting — sample boom at the peak, synth riser + stab
   playEvolve() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    if (this._playSample('evolve_epic', 1, 0.75)) { this.duckMusic(); return; } // Sound Pass: riser→impact→shimmer
     // fire the fanfare sample at the boom point (0.4s into the synth riser)
     this._playSample('fanfare_evolve', 1, 0.65, 0.4);
     const now = this.ctx.currentTime;
@@ -569,7 +600,7 @@ export const audio = {
   },
 
   // v14 §1: UI click / confirm
-  playClick() { this._playSample('ui_click', 1, 0.45) || this.playTick(); },
+  playClick() { this._playSample('ui_tap', 1, 0.5) || this._playSample('ui_click', 1, 0.45) || this.playTick(); },
   playConfirm() { this._playSample('ui_confirm', 1, 0.5) || this.playBoon(); },
 
   // v14 §1: orbit capture tick — quiet hi-tick on each object entering the spiral
@@ -632,6 +663,7 @@ export const audio = {
   // v6 §10: win — a short crowd-cheer swell (filtered noise)
   playWin() {
     if (!this.sfxOn || !this.ctx || !this._noiseBuf || !this.sfxGain) return;
+    if (this._playSample('win_warm', 1, 0.7)) return; // Sound Pass: warm felt swell
     const now = this.ctx.currentTime;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuf; src.loop = true;
