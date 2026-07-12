@@ -29,6 +29,8 @@ export interface GameMeta {
   missions: { id: string; progress: number; completed: boolean }[];
   firstTime: boolean;
   firstFeastClaimed: boolean; // Second-session hook: one-time welcome bonus
+  weeklyBest: number;   // Machine round: best score this ISO week (Top Voids board)
+  weeklyKey: string;    // ISO week the weeklyBest belongs to
   xp: number;    // v7 §11: XP within the current level
   level: number; // v7 §11: player meta level (starts at 1)
   // v12 §5: trophies
@@ -56,6 +58,8 @@ const DEFAULT_META: GameMeta = {
   missions: [],
   firstTime: true,
   firstFeastClaimed: false,
+  weeklyBest: 0,
+  weeklyKey: '',
   xp: 0,
   level: 1,
   trophiesEarned: [],
@@ -84,6 +88,8 @@ export const meta = {
     if (typeof this.data.equippedSkin !== 'string') this.data.equippedSkin = 'classic';
     if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
     if (typeof this.data.firstFeastClaimed !== 'boolean') this.data.firstFeastClaimed = false;
+    if (typeof this.data.weeklyBest !== 'number' || !Number.isFinite(this.data.weeklyBest)) this.data.weeklyBest = 0;
+    if (typeof this.data.weeklyKey !== 'string') this.data.weeklyKey = '';
     if (typeof this.data.lastWinDate !== 'string') this.data.lastWinDate = '';
     if (typeof this.data.lastPlayDate !== 'string') this.data.lastPlayDate = '';
     if (typeof this.data.stars !== 'number' || !Number.isFinite(this.data.stars)) this.data.stars = 0;

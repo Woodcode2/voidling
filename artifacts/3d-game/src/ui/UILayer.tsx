@@ -4,9 +4,10 @@ import type { GameEngine, Snapshot } from '../game/engine';
 import { audio } from '../game/audio';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
+import { weeklyBoard } from '../game/leaderboard';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v32 · incredible';
+const BUILD_STAMP = 'v33 · machine';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -299,6 +300,8 @@ function TrophyRoom({ snap, onClose }: { snap: Snapshot; onClose: () => void }) 
 }
 
 function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; engine: GameEngine; onHelp: () => void; onPlay: () => void; onTrophies: () => void }) {
+  // Machine round: weekly TOP VOIDS board modal
+  const [showBoard, setShowBoard] = useState(false);
   return (
     <div className="vd-overlay vd-overlay--solid" onPointerDown={() => engine.unlockAudio()}>
       <StarField />
@@ -340,6 +343,10 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
             <span style={{ marginLeft: 8, opacity: 0.65, fontSize: '0.85em' }}>· {snap.rankNext.need} ★ to {snap.rankNext.name}</span>
           )}
         </div>
+        <button className="vd-namepill" style={{ marginTop: 6, fontSize: '0.82rem', border: 'none', cursor: 'pointer' }} onClick={() => setShowBoard(true)}>
+          🌍 TOP VOIDS <span style={{ color: '#FFD23F', fontWeight: 800, marginLeft: 6 }}>#{snap.weeklyRank}</span>
+          <span style={{ opacity: 0.6, marginLeft: 6 }}>this week ›</span>
+        </button>
         {snap.highScore > 0 && (
           <div className="vd-plaque"><span className="vd-plaque-label">BEST</span> {snap.highScore.toLocaleString()}</div>
         )}
@@ -353,6 +360,51 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
           <button className="vd-btn vd-btn--secondary vd-btn--sm" onClick={onTrophies}>🏆 TROPHIES</button>
         </div>
       </div>
+      {showBoard && (() => {
+        const b = weeklyBoard();
+        const top = b.rows.slice(0, 10);
+        const mine = b.rows.find((r) => r.me)!;
+        return (
+          <div className="vd-modal-scrim" onClick={() => setShowBoard(false)}>
+            <div className="vd-modal" style={{ maxWidth: 360, width: '92%' }} onClick={(e) => e.stopPropagation()}>
+              <button className="vd-modal-close" onClick={() => setShowBoard(false)} aria-label="Close"><CloseIcon /></button>
+              <h3 className="vd-modal-name" style={{ marginTop: 4 }}>🌍 TOP VOIDS</h3>
+              <p className="vd-sub" style={{ marginBottom: 10 }}>weekly ladder · resets in {b.daysLeft} day{b.daysLeft === 1 ? '' : 's'}</p>
+              <div style={{ width: '100%', maxHeight: '46vh', overflowY: 'auto' }}>
+                {top.map((r) => (
+                  <div key={r.rank} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                    borderRadius: 12, marginBottom: 3, fontWeight: 700, fontSize: '0.95rem',
+                    background: r.me ? 'rgba(255,210,63,0.18)' : r.rank <= 3 ? 'rgba(255,255,255,0.07)' : 'transparent',
+                    color: r.me ? '#FFD23F' : '#fff',
+                  }}>
+                    <span style={{ width: 30, textAlign: 'right', opacity: 0.85 }}>{r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span>
+                    <span style={{ width: 24 }}>{r.flag}</span>
+                    <span style={{ flex: 1, textAlign: 'left' }}>{r.name}</span>
+                    <span>{r.score.toLocaleString()}</span>
+                  </div>
+                ))}
+                {mine.rank > 10 && (
+                  <>
+                    <div style={{ opacity: 0.4, padding: 2 }}>···</div>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px',
+                      borderRadius: 12, fontWeight: 800, fontSize: '0.95rem',
+                      background: 'rgba(255,210,63,0.18)', color: '#FFD23F',
+                    }}>
+                      <span style={{ width: 30, textAlign: 'right' }}>{mine.rank}</span>
+                      <span style={{ width: 24 }}>⭐</span>
+                      <span style={{ flex: 1, textAlign: 'left' }}>You</span>
+                      <span>{mine.score.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              <p className="vd-fineprint" style={{ marginTop: 8 }}>beat your best in a family match to climb</p>
+            </div>
+          </div>
+        );
+      })()}
       {/* v14.1: permanent build stamp — bottom-right, 10px */}
       <span style={{
         position: 'absolute', bottom: 6, right: 10,
@@ -566,7 +618,7 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
           })}
         </div>
 
-        {/* Economy: LEGENDARY cash-skin row (mock IAP — money only, never coins) */}
+        {/* Economy: LEGENDARY cash-skin row (StoreKit on iOS, sandbox on web) */}
         <h3 className="vd-shop-subhead">LEGENDARY</h3>
         <div className="vd-grid">
           {CONFIG.SKINS.filter((s) => s.premium).map((skin) => {
@@ -593,9 +645,16 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
             );
           })}
         </div>
+        <button
+          className="vd-btn vd-btn--ghost vd-btn--sm"
+          style={{ marginTop: 10, opacity: 0.8 }}
+          onClick={() => { engine.iapRestore(); showToast('Restoring purchases…'); }}
+        >
+          RESTORE PURCHASES
+        </button>
       </div>
 
-      {/* v7 §9: mock IAP modal */}
+      {/* StoreKit IAP modal (sandbox on web) */}
       {iap && (() => {
         const s = CONFIG.SKINS.find((x) => x.id === iap);
         if (!s) return null;
@@ -610,11 +669,15 @@ function Shop({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
               <p className="vd-sub">Unlock instantly + 100 bonus coins</p>
               <button
                 className="vd-btn vd-btn--play"
-                onClick={() => { engine.iapPurchase(s.id); setConfetti((c) => c + 1); showToast(`${s.name} unlocked!`); setIap(null); }}
+                onClick={() => { engine.iapPurchase(s.id); setConfetti((c) => c + 1); showToast('Purchasing…'); setIap(null); }}
               >
                 ${s.priceUSD?.toFixed(2)} · BUY
               </button>
-              <p className="vd-fineprint">Mock purchase — no real charge.</p>
+              <p className="vd-fineprint">
+                {(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
+                  ? 'One-time purchase. Restores on any device.'
+                  : 'Web demo — sandbox purchase, no charge.'}
+              </p>
             </div>
           </div>
         );

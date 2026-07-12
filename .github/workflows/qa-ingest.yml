@@ -1,0 +1,25 @@
+name: qa-ingest
+# One-shot QA: the dev container's proxy blocks supabase.co, so the analytics
+# ingest endpoint is verified from a runner with open egress. Triggers only
+# when this file itself changes.
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - '.github/workflows/qa-ingest.yml'
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST a QA event to ingest-events
+        run: |
+          KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6a3p1eHd5a2Fqem9pY3V4aGljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDE1MTksImV4cCI6MjA4NjMxNzUxOX0.8RmY1xXqd4bOlhKNAPF5N4GVchbkZ0O8hwtJbJ7LhKs'
+          code=$(curl -sS -o /tmp/resp.txt -w '%{http_code}' -X POST \
+            'https://uzkzuxwykajzoicuxhic.supabase.co/functions/v1/ingest-events' \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $KEY" -H "apikey: $KEY" \
+            -d '{"user_id":"u_ci_qa","session_id":"s_ci_qa","app_version":"v33","platform":"ci","events":[{"event":"qa_ping","ts":1783900000000,"props":{"ok":true}}]}')
+          cat /tmp/resp.txt; echo; echo "HTTP $code"
+          test "$code" = "200"

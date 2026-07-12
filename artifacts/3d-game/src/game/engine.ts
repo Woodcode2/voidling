@@ -8,6 +8,9 @@ import { makeRivals, type Rival, type WorldView } from './rivals';
 import { meta } from './meta';
 import { track } from './services';
 import { haptics } from './haptics';
+import { initIAP, purchase as iapBuy, restorePurchases } from './iap';
+import { requestNotifPermissionOnce, scheduleDailyReminder } from './notifications';
+import { submitWeeklyScore, weeklyBoard } from './leaderboard';
 import { formatTime, dist, clamp, lerp, xpForLevel } from './utils';
 import { createJoystick } from './input';
 import { EventManager } from './events';
@@ -74,6 +77,7 @@ export interface Snapshot {
   stars: number;        // Retention: lifetime placement stars
   rankName: string;     // Retention: current rank name
   rankNext: { name: string; need: number } | null; // Final pass: next rank goalpost
+  weeklyRank: number;   // Machine round: position on this week's Top Voids board
   highScore: number;
   streak: number;
   equippedSkin: string;
@@ -109,7 +113,8 @@ export interface GameEngine {
   buySkin(id: string): { ok: boolean; reason?: string };
   equipSkin(id: string): void;
   iapView(id: string): void;             // v7 §9: mock IAP modal opened
-  iapPurchase(id: string): void;         // v7 §9: mock IAP confirmed
+  iapPurchase(id: string): void;         // real StoreKit on iOS, sandbox on web
+  iapRestore(): void;                    // App Store requirement: restore purchases
   openShop(): void;
   openDaily(): void;
   /** Second-session hook: claim the one-time FIRST FEAST welcome bonus. Returns coins granted (0 if already claimed). */
@@ -465,6 +470,19 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // Dev-only: force the player's evolution form with number keys 1–5 so every
   // form + power can be inspected without grinding a full match. Gated behind
   // any ?debug= param, so it's inert in production.
+  // Machine round: StoreKit init — grants (and restores) premium skins.
+  initIAP((ownedSkins) => {
+    let changed = false;
+    for (const sk of ownedSkins) {
+      if (!meta.data.skinsOwned.includes(sk)) {
+        meta.unlockSkin(sk);
+        meta.addCoins(100); // goodwill bonus on first unlock
+        changed = true;
+      }
+    }
+    if (changed) notify();
+  });
+
   const debugForms = typeof window !== 'undefined' && !!new URLSearchParams(window.location.search).get('debug');
 
   // Signature VOID POWER — Space (or E) fires the current form's ability.
@@ -508,7 +526,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         fx.shake(360, 16); fx.flash();
         audio.playEaten();
         respawnPlayerAfterEaten(r.x, r.y, 900);
-        haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
+        track('knockout', { t: Math.round(roundElapsed / 1000), form: player.formIndex }); haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
         revengeName = r.name; revengeUntil = roundElapsed + 20000;
         console.log(`[debug] simulated knockout by ${r.name}`);
       }
@@ -693,7 +711,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       : [...CONTRACT_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
     activeContracts = shuffledContracts.map((c) => ({ ...c, done: false }));
     for (const k of Object.keys(contractProgress)) delete contractProgress[k];
-    track('round_start', { daily });
+    track('round_start', { daily, solo: isSolo, plays_scored: meta.data.highScore > 0 ? 1 : 0 });
     notify();
   }
 
@@ -1015,7 +1033,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       firstFeast: !meta.data.firstFeastClaimed,
       dailyReady: meta.data.lastDailyDate !== new Date().toDateString(),
     };
-    track('round_end', { score: player.score, placement, coins });
+    track('round_end', { score: player.score, placement, coins, devoured: Math.round(devoured * 10) / 10, form: player.formIndex, solo: isSolo, killed_by: killedBy || null, stars: meta.data.stars });
+    void requestNotifPermissionOnce().then(() => scheduleDailyReminder());
+    if (!isSolo) submitWeeklyScore(player.score); // Top Voids weekly ladder (competitive mode only)
     audio.stopMusic();
     if (crown || worldEater) audio.playWin(); else audio.playMerge();
     screen = 'results';
@@ -1040,6 +1060,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // v6 §3: the transformation moment — slow-mo, shockwave, title card, fanfare
   function triggerEvolution(x: number, y: number, form: number, name: string) {
     haptics.evolve();
+    track('evolve', { form, name, t: Math.round(roundElapsed / 1000) });
     slowmo = CONFIG.EVO_SLOWMO_MS;
     fx.flash();
     fx.shake(500, 14, [30, 40, 60]);
@@ -1911,7 +1932,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               killedBy = r.name;
               respawnPlayerAfterEaten(r.x, r.y, minDist);
               fx.addRing(player.x, player.y, '#FF6B6B', 0, pr * 3, 8, 700);
-              haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
+              track('knockout', { t: Math.round(roundElapsed / 1000), form: player.formIndex }); haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: stolen > 0 ? `−${stolen} pts` : 'nothing lost!' };
               revengeName = r.name; revengeUntil = roundElapsed + 20000;
               queueTicker(`💀 ${r.name} swallowed the void whole! It's... reforming?!`);
             } else {
@@ -1925,7 +1946,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               r.eatVoid(pr);
               respawnPlayerAfterEaten(r.x, r.y, minDist);
               fx.addRing(eatenAtX, eatenAtY, '#FF6B6B', 0, pr * 3, 8, 700);
-              haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: `↓ Dropped to ${player.formName}` };
+              track('knockout', { t: Math.round(roundElapsed / 1000), form: player.formIndex }); haptics.knockout(); knockout = { t: 0, total: 2600, by: r.name, note: `↓ Dropped to ${player.formName}` };
               revengeName = r.name; revengeUntil = roundElapsed + 20000;
             }
           }
@@ -3243,6 +3264,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       coins: meta.data.coins,
       stars: meta.data.stars,
       rankName: meta.rank().name,
+      weeklyRank: weeklyBoard().myRank,
       rankNext: (() => { const rk = meta.rank(); return rk.next != null ? { name: rk.nextName!, need: Math.max(0, rk.next - meta.data.stars) } : null; })(),
       highScore: meta.data.highScore,
       streak: meta.data.streak,
@@ -3290,25 +3312,27 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     },
     iapView(id) { track('iap_view', { id }); },
     iapPurchase(id) {
-      // v7 §9: MOCK ONLY — no real payment. Unlock + equip the premium skin and
-      // grant a +100 coin goodwill bonus.
+      // Machine round: REAL StoreKit purchase on iOS (cordova-plugin-purchase);
+      // sandbox mock on web. Unlock is granted by the ownership callback below
+      // (also covers restores), so a purchase that never completes never unlocks.
       track('iap_click', { id });
-      meta.unlockSkin(id);
-      meta.equipSkin(id);
-      meta.addCoins(100);
-      notify();
+      void iapBuy(id).then((ok) => {
+        if (!ok) { banner('Purchase did not complete', '#FF9F5A', 4); notify(); }
+      });
     },
+    iapRestore() { void restorePurchases(); },
     equipSkin(id) {
       meta.equipSkin(id);
       if (player && screen !== 'game') player.skin = skinById(id);
       notify();
     },
-    openShop() { screen = 'shop'; notify(); },
+    openShop() { screen = 'shop'; track('shop_view', { coins: meta.data.coins }); notify(); },
     claimFirstFeast() {
       if (meta.data.firstFeastClaimed) return 0;
       const BONUS = 150;
       meta.data.firstFeastClaimed = true;
       meta.addCoins(BONUS); // addCoins persists via save()
+      track('first_feast_claim', {});
       if (results) results.firstFeast = false;
       audio.playClick();
       notify();

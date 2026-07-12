@@ -1,0 +1,38 @@
+name: transcode-preview
+# Machine round: turn the Playwright-recorded webm into an App Store preview —
+# 1080x1920 H.264 30fps with the game's groove track as the audio bed
+# (Apple requires an audio track; the dev container has no ffmpeg).
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'artifacts/3d-game/store/preview-raw.webm'
+
+permissions:
+  contents: write
+
+jobs:
+  transcode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Transcode
+        run: |
+          cd artifacts/3d-game/store
+          ffmpeg -y -ss 2 -t 30 -i preview-raw.webm -i ../public/assets/music/track_2.mp3 \
+            -map 0:v -map 1:a \
+            -vf "scale=1080:1920:flags=lanczos,fps=30" \
+            -c:v libx264 -profile:v high -pix_fmt yuv420p -b:v 9M \
+            -c:a aac -b:a 128k -af "afade=t=out:st=27:d=3" \
+            -shortest -movflags +faststart preview.mp4
+          ls -la preview.mp4
+      - name: Commit
+        run: |
+          git config user.name "voidling-assets-bot"
+          git config user.email "actions@github.com"
+          git add artifacts/3d-game/store/preview.mp4
+          git commit -m "assets: App Store preview video (1080x1920 H.264)" || echo "nothing to commit"
+          git push

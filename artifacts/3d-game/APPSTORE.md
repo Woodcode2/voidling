@@ -23,6 +23,40 @@ game; Capacitor wraps it in a native shell.
   music tracks (`public/assets/music/track_1..3.mp3`, chill → groove → epic,
   crossfading on evolution). Synth engine remains as offline fallback.
 
+- **Preview video** — `store/preview.mp4` (1080x1920 H.264, 30s, music bed),
+  auto-transcoded by CI from `store/preview-raw.webm`. Upload to the App
+  Preview slot above the screenshots.
+- **Analytics** — live funnel pipeline: batched client (`src/game/analytics.ts`)
+  → Supabase edge function `ingest-events` → `vd_events` table (project
+  `uzkzuxwykajzoicuxhic`). Key events: first_open, day_open, round_start,
+  round_end, evolve, knockout, shop_view, purchase_intent/complete. Query
+  funnels in the Supabase SQL editor.
+- **Notifications** — Daily Bite reminder at 18:30 next-day, scheduled after
+  each session (`src/game/notifications.ts`). Permission is requested after
+  the FIRST finished match, never at boot.
+- **Weekly ladder** — TOP VOIDS board (menu pill), seeded per ISO week,
+  player climbs with their best family-match score of the week.
+
+## In-App Purchases (App Store Connect setup)
+
+The client uses cordova-plugin-purchase (StoreKit) with product ids
+`com.voidling.skin.<id>` — create these as **Non-Consumable** IAPs in
+App Store Connect with matching ids:
+
+| Product id | Skin | Suggested tier |
+|---|---|---|
+| com.voidling.skin.lava | Lava | Tier 2 ($1.99) |
+| com.voidling.skin.ghost | Ghost | Tier 2 ($1.99) |
+| com.voidling.skin.galaxy | Galaxy | Tier 3 ($2.99) |
+| com.voidling.skin.midas | King Midas | Tier 3 ($2.99) |
+| com.voidling.skin.disco | Disco | Tier 3 ($2.99) |
+| com.voidling.skin.dragon | Dragon | Tier 4 ($3.99) |
+
+Purchases unlock via the ownership callback (also fires on RESTORE PURCHASES
+in the shop, an App Review requirement). On web the same flow runs in a
+sandbox mock so it stays testable. Test with a Sandbox Apple ID before
+submission.
+
 ## Build & submit (on a Mac with Xcode 15+)
 
 ```bash

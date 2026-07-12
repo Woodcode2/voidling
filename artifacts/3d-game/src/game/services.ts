@@ -1,6 +1,9 @@
+import { logEvent } from './analytics';
+
+// Machine round: track() now feeds the REAL analytics pipeline (Supabase edge
+// ingest, batched). The local ring buffer is kept for offline debugging.
 export const track = (event: string, props: any = {}) => {
-  console.log(`[Analytics] ${event}`, props);
-  // Stub for actual tracking
+  logEvent(event, props);
   let queue: unknown[] = [];
   try {
     const raw = JSON.parse(localStorage.getItem('voidling_events') || '[]');
