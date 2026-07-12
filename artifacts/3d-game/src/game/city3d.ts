@@ -29,6 +29,7 @@ export interface BuildingSpec {
   seed: number;   // deterministic window/detail variation
   storefront: boolean;         // ground-floor awning + door band (shops/cafes)
   roof: 'flat' | 'pitched';    // downtown slab vs suburb house
+  deco?: 'helipad' | 'cross';  // civic roof marking (hospital / clinic)
 }
 
 // ── Palette: crisp hole.io-inspired facades (no browns) ─────────────────────
@@ -115,7 +116,7 @@ function faceKey(spec: BuildingSpec, side: boolean): string {
   const floors = Math.max(1, Math.round(spec.h / 46));
   const wWU = side ? spec.d * 2 : spec.w * 2;
   const cols = Math.max(1, Math.round(wWU / 52));
-  return `${spec.style}|${cols}|${floors}|${spec.storefront && !side ? 1 : 0}|${spec.roof === 'pitched' ? 'p' : 'f'}|${spec.seed % 4}`;
+  return `${spec.style}|${cols}|${floors}|${spec.storefront && !side ? 1 : 0}|${spec.roof === 'pitched' ? 'p' : 'f'}|${spec.deco ?? '-'}|${spec.seed % 4}`;
 }
 
 /** Framed window: white frame rect + glass inset. */
@@ -385,8 +386,46 @@ function roofTexture(spec: BuildingSpec): HTMLCanvasElement {
     g.fillStyle = 'rgba(255,255,255,0.35)';
     g.fillRect(Math.round(bx), Math.round(by), Math.max(6, W * 0.12), 2);
   }
+  // 6. civic roof marking — hole.io reference DNA: the helipad tower
+  if (spec.deco === 'helipad') {
+    const hx = W * 0.5, hy = H * 0.5, hr = Math.min(W, H) * 0.34;
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.beginPath(); g.arc(hx, hy, hr, 0, Math.PI * 2); g.fill();
+    g.fillStyle = st.roof;
+    g.beginPath(); g.arc(hx, hy, hr - 3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    const hw2 = hr * 0.4, hh2 = hr * 0.55, bar = Math.max(2, hr * 0.16);
+    g.fillRect(hx - hw2, hy - hh2, bar, hh2 * 2);
+    g.fillRect(hx + hw2 - bar, hy - hh2, bar, hh2 * 2);
+    g.fillRect(hx - hw2, hy - bar / 2, hw2 * 2, bar);
+  } else if (spec.deco === 'cross') {
+    const hx = W * 0.5, hy = H * 0.5, cr = Math.min(W, H) * 0.30;
+    g.fillStyle = '#FFFFFF';
+    g.beginPath(); g.arc(hx, hy, cr + 4, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#E8453C';
+    const bar = cr * 0.6;
+    g.fillRect(hx - bar / 2, hy - cr, bar, cr * 2);
+    g.fillRect(hx - cr, hy - bar / 2, cr * 2, bar);
+  }
   _roofCache.set(key, cvs);
   return cvs;
+}
+
+/** Civic buildings: distinctive extruded boxes (school/library/hospital/townhall). */
+export function makeCivicSpec(kind: ObjectKind, size: number, seed: number): BuildingSpec {
+  const base = { seed, storefront: false, roof: 'flat' as const };
+  switch (kind) {
+    case 'hospital':
+      return { ...base, w: size * 1.15, d: size * 0.62, h: 210, style: 3, deco: 'cross' };
+    case 'school':
+      return { ...base, w: size * 1.3, d: size * 0.6, h: 115, style: 2 };
+    case 'library':
+      return { ...base, w: size * 1.05, d: size * 0.58, h: 100, style: 3 };
+    case 'townhall':
+      return { ...base, w: size * 1.2, d: size * 0.62, h: 170, style: 3, deco: 'helipad' };
+    default:
+      return { ...base, w: size, d: size * 0.6, h: 120, style: 1 };
+  }
 }
 
 /**

@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v20 · holeio';
+const BUILD_STAMP = 'v21 · declay';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 

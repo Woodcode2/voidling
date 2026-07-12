@@ -18,6 +18,7 @@ import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house ar
 import { loadClayLife } from './clayLife'; // Prompt 4: clay people + vehicle art swap
 import { loadClayScenery } from './clayScenery'; // Prompt 5: clay scenery scatter
 import { loadCityAssets } from './cityAssets'; // Structural Rebuild: new city art
+import { initProps3d } from './props3d'; // hole.io rebuild: procedural life layer (people/vehicles/trees)
 import { loadClayFood } from './clayFood'; // Prompt 9: clay food + street-furniture art swap
 import { loadClayZoo } from './clayZoo'; // Prompt 16: clay zoo animals
 import { loadClayAirport } from './clayAirport'; // Prompt 16: clay airport set
@@ -385,6 +386,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // hole.io rebuild: the splash screen now GATES on assetsLoaded — the game
   // must never start with procedural box-people that pop into clay art later.
   const base = import.meta.env.BASE_URL;
+  initProps3d(); // synchronous canvas generation — ready before the first frame
   let assetsLoaded = false;
   const _allAssets = Promise.all([
     loadGroundTextures(base),

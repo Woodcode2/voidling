@@ -4,7 +4,7 @@ import { drawParkObject } from './objects'; // wind removed — tuft system dele
 import { objectSprites, spriteBounds, spriteContactFrac, fxDecals, spriteAspect } from './sprites'; // v11: world-object PNG art; v12 §0: alpha bounds; v16 §3: contact frac; v16.2 §5: fx decals; Prompt 19: aspect map
 import { clayHouseKeys, claySkyscraperKeys, clayHouseFancyKeys, clayHouseCottageKeys } from './clayCity'; // Map Rebuild: clay art swap draw keys (cottage + fancy pools)
 import { cityBuildingKeys, cityLandmarkKeys, zooPropKeys, streetPropKeys } from './cityAssets'; // Structural Rebuild: new city art pools
-import { drawBuilding3D, makeBuildingSpec, makeHouseSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
+import { drawBuilding3D, makeBuildingSpec, makeHouseSpec, makeCivicSpec, ensureBuildingSprite, type BuildingSpec } from './city3d'; // hole.io rebuild: pseudo-3D extruded buildings
 import {
   clayPeopleKeys, clayVehicleKeys, CLAY_PERSON_KINDS, CLAY_VEHICLE_KINDS,
   SITTER_CLAY_INDICES,
@@ -357,6 +357,10 @@ export class WorldManager {
   blocks: Block[] = [];
   spawnPoint = { x: 0, y: 0 };  // Batch 1.5: engine spawns/respawns the player here
   private trainRespawnT = 0;    // Structural Build: ms until the eaten express respawns
+  private static readonly AUTO_BOX_KINDS = new Set<ObjectKind>([
+    'house', 'house_c', 'house_d', 'shop', 'cafe', 'office', 'skyscraper',
+    'school', 'library', 'hospital', 'townhall',
+  ]); // hole.io rebuild: structure kinds that always render as extruded boxes
   houseLots: StructureLot[] = [];   // Dense City: suburb house footprints (public so photo mode can reuse them)
   private structureLots: StructureLot[] = []; // Dense City: houses + downtown buildings (for audit)
   // Feedback Juice §1: fixed-size swallow-ghost pool (cap 40). Preallocated so
@@ -446,6 +450,18 @@ export class WorldManager {
       bubbleLife: 0,
       ...opts,
     };
+    // hole.io rebuild: ANY structure kind spawned without an explicit parcel
+    // spec still renders as an extruded box — no clay-building path remains.
+    if (!o.bldg && !o.sceneryKey && WorldManager.AUTO_BOX_KINDS.has(kind)) {
+      const spec = (kind === 'house' || kind === 'house_c' || kind === 'house_d')
+        ? makeHouseSpec(o.baseSize, (o.id * 2654435761) >>> 0)
+        : (kind === 'school' || kind === 'library' || kind === 'hospital' || kind === 'townhall')
+          ? makeCivicSpec(kind, o.baseSize, o.id)
+          : makeBuildingSpec(kind, o.baseSize * 1.02, o.baseSize * 0.6, 0.8, (o.id * 40503) >>> 0);
+      o.bldg = spec;
+      o.sceneryKey = ensureBuildingSprite(spec);
+      o.contactRadius = Math.max(spec.w, spec.d) * 0.95;
+    }
     this.objects.push(o);
     // Prompt 19 Stage 2: seated clay people are permanently static (no wander/flee).
     // Clay key assignment is id % sheet-size; SITTER_CLAY_INDICES tags which cells are seated.
@@ -2851,20 +2867,34 @@ export class WorldManager {
     if (kind === 'landmark') {
       return cityLandmarkKeys.length ? cityLandmarkKeys[id % cityLandmarkKeys.length] : null;
     }
-    // Prompt 4: clay people + vehicle variety pools (visual only; contact radius
-    // stays keyed off the unchanged kind). Falls back to the kind sprite when the
-    // clay sheet is absent.
-    if (clayPeopleKeys.length && CLAY_PERSON_KIND_SET.has(kind)) {
-      return clayPeopleKeys[id % clayPeopleKeys.length];
+    // hole.io rebuild: the LIFE LAYER is procedural now (props3d) — crisp
+    // flat-shaded minifigs, vehicles, and vegetation in the same language as
+    // the extruded buildings. Visual only; contact radius stays kind-keyed.
+    if (CLAY_PERSON_KIND_SET.has(kind)) {
+      // stable special outfits, everyday palette for the rest
+      switch (kind) {
+        case 'waiter':          return 'p3d_person_8';
+        case 'icecream_vendor': return 'p3d_person_9';
+        case 'person_guard':    return 'p3d_person_10';
+        case 'person_const':    return 'p3d_person_11';
+        default:                return `p3d_person_${id % 8}`;
+      }
     }
-    if (clayVehicleKeys.length && CLAY_VEHICLE_KIND_SET.has(kind)) {
-      return clayVehicleKeys[id % clayVehicleKeys.length];
+    if (kind === 'soldier' || kind === 'zookeeper') return 'p3d_person_10';
+    if (CLAY_VEHICLE_KIND_SET.has(kind)) {
+      switch (kind) {
+        case 'taxi':        return 'p3d_taxi';
+        case 'fire_truck':  return 'p3d_firetruck';
+        case 'schoolbus':
+        case 'school_bus':  return 'p3d_schoolbus';
+        default:            return `p3d_veh_${id % 5}`;
+      }
     }
-    // Prompt 5: replace (not stack) — existing vegetation renders from the clay
-    // nature pool too, so the whole world reads as clay. Draw-only; contact
-    // radius stays keyed off the unchanged kind.
-    if (kind === 'tree' && clayTreeKeys.length) return clayTreeKeys[id % clayTreeKeys.length];
-    if (kind === 'bush' && clayBushKeys.length) return clayBushKeys[id % clayBushKeys.length];
+    if (kind === 'tree') {
+      const TREES = ['p3d_tree_0', 'p3d_tree_1', 'p3d_tree_2', 'p3d_tree_3', 'p3d_pine_0', 'p3d_pine_1'];
+      return TREES[id % TREES.length];
+    }
+    if (kind === 'bush') return `p3d_bush_${id % 2}`;
     if (kind === 'flower' && clayFlowerKeys.length) return clayFlowerKeys[id % clayFlowerKeys.length];
     // Prompt 9: bonus food + street furniture render from the clay food pool
     // (visual only; contact radius + win-math exclusion stay keyed off the kind).
@@ -2917,7 +2947,7 @@ export class WorldManager {
       case 'birdbath':     return 'clay_park_12';  // planter stand-in
       case 'shed':         return 'clay_park_2';   // gazebo stand-in (closest enclosed structure)
       case 'gazebo':       return 'clay_park_2';
-      case 'watertower':   return 'clay_park_2';   // gazebo stand-in (tallest park structure)
+      case 'watertower':   return 'p3d_watertower'; // hole.io rebuild: real procedural tower
       case 'slide':        return 'clay_park_0';
       case 'swingset':     return 'clay_park_1';
       case 'trampoline':   return 'clay_park_1';   // swing stand-in (closest bouncy thing)
@@ -2955,13 +2985,13 @@ export class WorldManager {
       case 'cooler':     return 'clay_beach_11';  // deck chairs stand-in
       case 'kite_prop':  return 'clay_beach_5';   // beach ball stand-in (light, colourful)
       // ── Beach palm → clay_beach_3 (palm cutout on beach sheet) ─────────────
-      case 'palm': return 'clay_beach_3';
+      case 'palm': return 'p3d_palm'; // hole.io rebuild: procedural palm
       // ── Vehicles: car_parked_a/b and civilian jeep → clay vehicle pool ──────
       // Fallback to clay_park_12 (planter) if the sheet hasn't loaded yet.
       case 'car_parked_a':
       case 'car_parked_b':
       case 'jeep':
-        return clayVehicleKeys.length ? clayVehicleKeys[id % clayVehicleKeys.length] : 'clay_park_12';
+        return `p3d_veh_${id % 5}`; // hole.io rebuild: procedural traffic
       // ── Structural Build: beach-fun props → existing clay cutouts ──────────
       case 'beachball': return 'clay_beach_5';
       case 'deckchair': return 'clay_beach_11';
@@ -2979,15 +3009,11 @@ export class WorldManager {
       case 'vig_proposal': case 'vig_soccer': case 'vig_wedding': case 'vig_couple':
       case 'vig_busker':   case 'vig_painter': case 'vig_selfie':  case 'vig_kite':
       case 'vig_gardener':
-        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_4';
+        return `p3d_person_${id % 8}`; // hole.io rebuild: procedural minifigs
       // ── Zoo structures (not animals — they're covered by ZOO_KINDS above) ────
       case 'zoo_gate':  return 'clay_park_2';   // gazebo stand-in for arched gate
       case 'zoo_wall':  return 'clay_park_12';  // planter stand-in
-      case 'zookeeper':
-        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_3';
       // ── Non-defense soldier (static, not clay-army) → people pool ────────────
-      case 'soldier':
-        return clayPeopleKeys.length ? clayPeopleKeys[id % clayPeopleKeys.length] : 'clay_park_3';
       default: break;
     }
     return kind;
