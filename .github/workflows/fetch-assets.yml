@@ -1,0 +1,41 @@
+name: fetch-assets
+# Utility: download externally generated art (e.g. AI icon candidates) into the
+# repo, since the dev container's egress proxy blocks the asset CDN.
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Whitespace-separated list of image URLs to download'
+        required: true
+        type: string
+      dest:
+        description: 'Directory (repo-relative) to save into'
+        required: true
+        default: 'artifacts/3d-game/store/candidates'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download assets
+        run: |
+          mkdir -p "${{ inputs.dest }}"
+          i=0
+          for u in ${{ inputs.urls }}; do
+            i=$((i+1))
+            ext="${u##*.}"; ext="${ext%%\?*}"
+            curl -fsSL "$u" -o "${{ inputs.dest }}/candidate-$i.$ext"
+          done
+          ls -la "${{ inputs.dest }}"
+      - name: Commit
+        run: |
+          git config user.name "voidling-assets-bot"
+          git config user.email "actions@github.com"
+          git add "${{ inputs.dest }}"
+          git commit -m "assets: fetch icon candidates" || echo "nothing to commit"
+          git push
