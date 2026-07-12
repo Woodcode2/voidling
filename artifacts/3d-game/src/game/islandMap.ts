@@ -55,6 +55,7 @@ function processDriftSheet(img: HTMLImageElement): HTMLCanvasElement[] {
 export const islandState: {
   ready: boolean;
   spaceBgImg: HTMLImageElement | null;
+  spaceFeatures: HTMLCanvasElement[]; // Space-crisp pass: soft-masked unique features
   driftSprites: HTMLCanvasElement[];
   driftObjects: DriftObject[];
   nextDriftMs: number;
@@ -62,6 +63,7 @@ export const islandState: {
 } = {
   ready: false,
   spaceBgImg: null,
+  spaceFeatures: [],
   driftSprites: [],
   driftObjects: [],
   nextDriftMs: 25000 + Math.random() * 15000,
@@ -80,6 +82,15 @@ export async function loadIslandAssets(base: string): Promise<void> {
     ]);
 
     islandState.spaceBgImg   = spaceImg;
+    // Space-crisp pass: the 1024px tile repeated in an obvious grid. Slice its
+    // hero elements (galaxy / planet / comet / nebula wisp) into radially-faded
+    // feature stamps that get scattered uniquely instead of tiled.
+    islandState.spaceFeatures = [
+      makeSpaceFeature(spaceImg, 333, 269, 400), // spiral galaxy
+      makeSpaceFeature(spaceImg, 824, 845, 230), // ringed planet
+      makeSpaceFeature(spaceImg, 793, 307, 190), // comet
+      makeSpaceFeature(spaceImg, 250, 780, 320), // nebula wisps
+    ];
     islandState.driftSprites = processDriftSheet(driftImg);
     if (evoImg) {
       islandState.formSprites = processEvolutionSheet(evoImg);
@@ -126,24 +137,64 @@ export function drawSpaceBg(
   camX: number,
   camY: number,
 ): void {
-  if (!islandState.spaceBgImg) {
-    ctx.fillStyle = CONFIG.COLORS.uiBg;
-    ctx.fillRect(view.x, view.y, view.w, view.h);
-    return;
-  }
-  const img = islandState.spaceBgImg;
-  const tw = img.width, th = img.height;
-  const ox = ((camX * 0.25) % tw + tw) % tw;
-  const oy = ((camY * 0.25) % th + th) % th;
-  const x0 = view.x - ((view.x + ox) % tw + tw) % tw;
-  const y0 = view.y - ((view.y + oy) % th + th) % th;
+  const feats = islandState.spaceFeatures;
+  if (!feats.length) return; // engine's cosmic backdrop already covers the frame
+
+  // Space-crisp pass: deterministic sparse scatter on a coarse jittered grid —
+  // every instance gets its own rotation/scale/alpha so nothing reads as a
+  // repeat. Features are world-anchored (parallax with the ground) and drawn
+  // only at <=1.15x source scale so they stay crisp.
+  const CELL = 1500;
+  const gx0 = Math.floor(view.x / CELL) - 1, gx1 = Math.floor((view.x + view.w) / CELL) + 1;
+  const gy0 = Math.floor(view.y / CELL) - 1, gy1 = Math.floor((view.y + view.h) / CELL) + 1;
+  void camX; void camY;
   ctx.save();
-  for (let ty = y0; ty < view.y + view.h + th; ty += th) {
-    for (let tx = x0; tx < view.x + view.w + tw; tx += tw) {
-      ctx.drawImage(img, tx, ty);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  for (let gy = gy0; gy <= gy1; gy++) {
+    for (let gx = gx0; gx <= gx1; gx++) {
+      const h = (Math.imul(gx, 73856093) ^ Math.imul(gy, 19349663)) >>> 0;
+      if (h % 100 < 26) continue; // sparse — deep space needs breathing room
+      const jx = (((h >>> 3) % 1000) / 1000 - 0.5) * 0.7;
+      const jy = (((h >>> 13) % 1000) / 1000 - 0.5) * 0.7;
+      const cx = (gx + 0.5 + jx) * CELL, cy = (gy + 0.5 + jy) * CELL;
+      if (isWalkable(cx, cy)) continue; // never on the island itself
+      // weighted pick: nebula wisps dominate (they carry the richness),
+      // hero features (galaxy/planet/comet) stay rare so they never repeat nearby
+      const pick = (h >>> 5) % 8;
+      const fi = pick < 4 ? 3 : pick < 6 ? 0 : pick === 6 ? 1 : 2;
+      const f = feats[fi];
+      // wisps are soft clouds — they can upscale freely and carry the ambience;
+      // hero features stay <=1.25x so the art never blurs
+      const sc = (fi === 3 ? 1.3 : 0.65) + (((h >>> 7) % 100) / 100) * (fi === 3 ? 1.2 : 0.6);
+      const rot = ((h >>> 17) % 628) / 100;
+      const a = 0.55 + (((h >>> 21) % 40) / 100);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
+      ctx.scale(sc, sc);
+      ctx.globalAlpha = a;
+      ctx.drawImage(f, -f.width / 2, -f.height / 2);
+      ctx.restore();
     }
   }
   ctx.restore();
+}
+
+/** Crop a circular region of the space tile with a radial alpha fade. */
+function makeSpaceFeature(img: HTMLImageElement, cx: number, cy: number, r: number): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = c.height = r * 2;
+  const g = c.getContext('2d')!;
+  g.drawImage(img, cx - r, cy - r, r * 2, r * 2, 0, 0, r * 2, r * 2);
+  const m = g.createRadialGradient(r, r, r * 0.42, r, r, r);
+  m.addColorStop(0, 'rgba(0,0,0,1)');
+  m.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalCompositeOperation = 'destination-in';
+  g.fillStyle = m;
+  g.fillRect(0, 0, r * 2, r * 2);
+  g.globalCompositeOperation = 'source-over';
+  return c;
 }
 
 /**

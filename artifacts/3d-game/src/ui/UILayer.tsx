@@ -6,7 +6,7 @@ import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v31 · final pass';
+const BUILD_STAMP = 'v32 · incredible';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -302,6 +302,13 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
   return (
     <div className="vd-overlay vd-overlay--solid" onPointerDown={() => engine.unlockAudio()}>
       <StarField />
+      {/* Menu glow-up: drifting nebula clouds + a shooting star — first impression pass */}
+      <div className="vd-menu-nebula" aria-hidden="true">
+        <span className="vd-neb vd-neb-a" />
+        <span className="vd-neb vd-neb-b" />
+        <span className="vd-neb vd-neb-c" />
+        <span className="vd-shooting-star" />
+      </div>
       <div className="vd-topbar">
         <Coins n={snap.coins} />
         <div className="vd-topbar-right">
@@ -313,7 +320,8 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
       </div>
       <div className="vd-stack">
         <div className="vd-hero-void">
-          <SkinPreview skinId={snap.equippedSkin} size={196} glow={0.8} />
+          <span className="vd-hero-orbit" aria-hidden="true" />
+          <SkinPreview skinId={snap.equippedSkin} size={220} glow={0.95} />
         </div>
         <h1 className="vd-title">VOIDLING</h1>
         <p className="vd-tagline">{CONFIG.HOME_TAGLINE}</p>

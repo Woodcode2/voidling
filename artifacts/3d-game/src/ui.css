@@ -1035,3 +1035,111 @@
   letter-spacing: 0.5px;
 }
 .vd-week-day--today .vd-week-label { color: #FFD23F; }
+
+/* ── Menu glow-up: first-impression pass ─────────────────────────────────────
+   Drifting nebula clouds, title shimmer, breathing hero glow, orbiting spark,
+   and a periodic shooting star. All CSS — zero JS cost. */
+.vd-menu-nebula { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.vd-neb {
+  position: absolute;
+  width: 72vmax; height: 72vmax;
+  border-radius: 50%;
+  filter: blur(2px);
+  opacity: 0.5;
+}
+.vd-neb-a {
+  left: -30vmax; top: -26vmax;
+  background: radial-gradient(circle, rgba(124,63,216,0.34) 0%, rgba(124,63,216,0) 62%);
+  animation: vd-neb-drift 26s ease-in-out infinite;
+}
+.vd-neb-b {
+  right: -34vmax; top: 6vmax;
+  background: radial-gradient(circle, rgba(199,80,196,0.26) 0%, rgba(199,80,196,0) 60%);
+  animation: vd-neb-drift 34s ease-in-out infinite reverse;
+}
+.vd-neb-c {
+  left: -12vmax; bottom: -38vmax;
+  background: radial-gradient(circle, rgba(64,120,220,0.24) 0%, rgba(64,120,220,0) 60%);
+  animation: vd-neb-drift 30s ease-in-out 8s infinite;
+}
+@keyframes vd-neb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6vmax, 4vmax) scale(1.12); }
+}
+.vd-shooting-star {
+  position: absolute;
+  top: 12%; left: -12%;
+  width: 130px; height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, #FFFFFF 70%, #BFE7FF 100%);
+  transform: rotate(16deg);
+  opacity: 0;
+  animation: vd-shoot 7.5s ease-in 3s infinite;
+}
+@keyframes vd-shoot {
+  0%   { opacity: 0; transform: translate(0, 0) rotate(16deg); }
+  4%   { opacity: 0.9; }
+  11%  { opacity: 0; transform: translate(130vw, 38vw) rotate(16deg); }
+  100% { opacity: 0; }
+}
+/* title: living gradient shimmer + gentle glow pulse */
+.vd-title {
+  background: linear-gradient(100deg, #FFE27A 0%, #FF3D68 42%, #FF7AD9 58%, #FFE27A 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: vd-title-shimmer 5.5s ease-in-out infinite;
+}
+@keyframes vd-title-shimmer {
+  0%, 100% { background-position: 0% 50%; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.35)); }
+  50% { background-position: 100% 50%; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.35)) drop-shadow(0 0 18px rgba(255,120,180,0.45)); }
+}
+/* hero: breathing glow halo + orbiting spark */
+.vd-hero-void::after {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(156,120,255,0.34) 0%, rgba(156,120,255,0) 66%);
+  z-index: -1;
+  animation: vd-hero-breathe 3.4s ease-in-out infinite;
+}
+@keyframes vd-hero-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
+.vd-hero-orbit {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 7px; height: 7px;
+  margin: -3.5px;
+  border-radius: 50%;
+  background: #FFF6C8;
+  box-shadow: 0 0 10px 3px rgba(255,240,180,0.75);
+  animation: vd-hero-orbit 6s linear infinite;
+  pointer-events: none;
+}
+@keyframes vd-hero-orbit {
+  0%   { transform: rotate(0deg)   translateX(128px) scale(1); }
+  50%  { transform: rotate(180deg) translateX(128px) scale(0.6); }
+  100% { transform: rotate(360deg) translateX(128px) scale(1); }
+}
+/* staggered entrance for the menu stack */
+.vd-stack > * { animation: vd-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.vd-stack > *:nth-child(1) { animation-delay: 0.02s; }
+.vd-stack > *:nth-child(2) { animation-delay: 0.08s; }
+.vd-stack > *:nth-child(3) { animation-delay: 0.14s; }
+.vd-stack > *:nth-child(4) { animation-delay: 0.20s; }
+.vd-stack > *:nth-child(5) { animation-delay: 0.26s; }
+.vd-stack > *:nth-child(6) { animation-delay: 0.32s; }
+.vd-stack > *:nth-child(7) { animation-delay: 0.38s; }
+.vd-stack > *:nth-child(8) { animation-delay: 0.44s; }
+.vd-stack > *:nth-child(9) { animation-delay: 0.50s; }
+@keyframes vd-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vd-neb, .vd-shooting-star, .vd-title, .vd-hero-void, .vd-hero-void::after,
+  .vd-hero-orbit, .vd-stack > * { animation: none !important; }
+}

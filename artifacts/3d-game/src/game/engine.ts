@@ -1989,8 +1989,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       c.fillStyle = g;
       c.fillRect(0, 0, pw, ph);
       const blobs: [number, number, string, number][] = [
-        [0.20, 0.22, '#6D3FB8', 0.15], [0.80, 0.15, '#B84FA8', 0.10],
-        [0.72, 0.82, '#3F5FB8', 0.10], [0.15, 0.80, '#8C4FD8', 0.11],
+        [0.20, 0.22, '#6D3FB8', 0.22], [0.80, 0.15, '#B84FA8', 0.15],
+        [0.72, 0.82, '#3F5FB8', 0.16], [0.15, 0.80, '#8C4FD8', 0.17],
+        [0.50, 0.50, '#2E9E9E', 0.08],
       ];
       for (const [bx, by, col, a] of blobs) {
         const r = Math.max(pw, ph) * 0.36;
