@@ -1647,6 +1647,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         threatWarnCd = 9000;
         banner(`⚠️ ${r.name} CAN EAT YOU — RUN!`, '#FF4D6D', 5, { pulse: true });
         audio.playEaten();
+        // the family gets HUNGRY — hunt bark on the predator
+        const HUNT = ['come here, lil snack!!', 'you look... DELICIOUS', 'family dinner time!!',
+          "it's not personal. it's LUNCH.", 'tag. you are FOOD.'];
+        r.bubbleText = HUNT[Math.floor(Math.random() * HUNT.length)];
+        r.bubbleT = 3000;
       }
     }
   }
