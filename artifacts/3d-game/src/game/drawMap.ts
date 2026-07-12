@@ -16,12 +16,14 @@ const S = CONFIG.MAP_SIZE;
 
 // Ground color palette (from spec)
 const COL = {
-  meadow:   '#A8CD9F',
-  park:     '#B7DBA8',
-  forest:   '#8FBF88',
-  sand:     '#F2DFA7',
-  pavement: '#E8E8EA',
-  road:     '#5C6270',   // crisp cool asphalt (de-browned — brown muted the whole map)
+  // Color pop pass: livelier greens + lighter cool asphalt (hole.io reads
+  // light lavender-gray streets so the dark void pops against them).
+  meadow:   '#9BD489',
+  park:     '#A9E293',
+  forest:   '#83CB77',
+  sand:     '#F6E3A4',
+  pavement: '#EFEFF4',
+  road:     '#767E9A',
   rimWhite: '#FFFFFF',
   cliff:    '#6B5B73',
   waterS:   '#7FD4E8',
@@ -86,6 +88,19 @@ const _TEX_TILE_W: Record<string, number> = {
 const _texTiles = new Map<string, HTMLCanvasElement>();
 let _texLoadStarted = false; // idempotency guard — tiles are app-lifetime singletons
 
+// Color pop pass: per-tile grade baked in at load (zero runtime cost).
+// self = self-overlay strength (contrast+saturation), screen = lift blacks
+// toward a hue (roads were near-black; hole.io reads light+cool), tint =
+// soft-light color wash. Composite ops only — no ctx.filter (Safari-safe).
+const _TEX_GRADE: Record<string, { self?: number; screen?: string; tint?: string; tintA?: number }> = {
+  grass:    { self: 0.45, tint: '#63C94E', tintA: 0.30 },
+  forest:   { self: 0.40, tint: '#3FA24E', tintA: 0.28 },
+  sand:     { self: 0.30, tint: '#FFD87A', tintA: 0.22 },
+  street:   { self: 0.18, screen: '#3E4460' },
+  sidewalk: { self: 0.15, screen: '#26262E' },
+  water:    { self: 0.30 },
+};
+
 export function loadGroundTextures(base: string): void {
   if (_texLoadStarted) return; // already loading or loaded — don't re-decode
   _texLoadStarted = true;
@@ -98,7 +113,30 @@ export function loadGroundTextures(base: string): void {
       const px = Math.max(8, Math.round(_TEX_TILE_W[key] * BUF_SCALE));
       const c  = document.createElement('canvas');
       c.width  = c.height = px;
-      c.getContext('2d')!.drawImage(img, 0, 0, px, px);
+      const tcx = c.getContext('2d')!;
+      tcx.drawImage(img, 0, 0, px, px);
+      const grade = _TEX_GRADE[key];
+      if (grade) {
+        if (grade.screen) {
+          tcx.globalCompositeOperation = 'screen';
+          tcx.fillStyle = grade.screen;
+          tcx.fillRect(0, 0, px, px);
+        }
+        if (grade.self) {
+          tcx.globalCompositeOperation = 'overlay';
+          tcx.globalAlpha = grade.self;
+          tcx.drawImage(c, 0, 0);
+          tcx.globalAlpha = 1;
+        }
+        if (grade.tint) {
+          tcx.globalCompositeOperation = 'soft-light';
+          tcx.globalAlpha = grade.tintA ?? 0.3;
+          tcx.fillStyle = grade.tint;
+          tcx.fillRect(0, 0, px, px);
+          tcx.globalAlpha = 1;
+        }
+        tcx.globalCompositeOperation = 'source-over';
+      }
       _texTiles.set(key, c);
       if (--pending <= 0) { _groundBuf = null; _invalidateViewCache(); }
     };
@@ -335,7 +373,21 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
   _texZone(cc, 'sand',     ZONE_BEACH_R,    COL.sand,     true);
   // hole.io rebuild: downtown floors in LIGHT concrete (like hole.io's pale
   // city ground) so the extruded buildings and dark roads pop against it.
-  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, '#DADDE2', true);
+  // Color pop pass: downtown plaza reads cool lavender (icon-matched) instead
+  // of bleached monotone gray — the dark void pops harder against it.
+  _texZone(cc, 'sidewalk', ZONE_DOWNTOWN_R, '#B9BCDA');
+  {
+    // direct lavender wash over the plaza tile — the 0.20-alpha atmosphere
+    // gradient alone was invisible against the near-white sidewalk texture
+    const [dx0, dy0, dx1, dy1] = ZONE_DOWNTOWN_R;
+    cc.save();
+    tracIslandPath(cc); cc.clip();
+    cc.fillStyle = '#AAAECE';
+    cc.globalAlpha = 0.34;
+    cc.fillRect(dx0, dy0, dx1 - dx0, dy1 - dy0);
+    cc.globalAlpha = 1;
+    cc.restore();
+  }
   // Park uses the grass base — add colour-identity tint on top.
   _fillZoneRich(cc, ZONE_PARK_R, COL.park);
   // Zoo floors in warm SAVANNA — its own biome identity, not forest-dark.

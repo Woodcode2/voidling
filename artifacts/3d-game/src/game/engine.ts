@@ -129,7 +129,7 @@ export interface GameEngine {
 
 interface ActiveBoon { id: string; name: string; remaining: number; duration: number; level: number; }
 // v8 §6: one managed callout component — stamped center-top, one at a time, priority ordered
-interface Callout { text: string; color: string; priority: number; sparkles: boolean; pulse: boolean; }
+interface Callout { text: string; color: string; priority: number; sparkles: boolean; pulse: boolean; fitScale?: number; }
 
 // v12 §4: 7 weekday-specific daily modifiers (index = Date.getDay(), 0=Sun..6=Sat)
 const DAILY_MODS = [
@@ -2463,10 +2463,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       ctx.scale(scale, scale);
       ctx.font = '800 35px Fredoka, sans-serif'; // v9 §5: banners 30% bigger
       // First-timer audit: long callouts ("TOWN FIGHTS BACK vs YOU") overflowed
-      // narrow phones — shrink to fit inside the frame with 24px side margins.
-      const calloutW = ctx.measureText(callout.text).width;
-      const maxW = (fw - 48) / Math.max(scale, 0.001);
-      if (calloutW > maxW) ctx.scale(maxW / calloutW, maxW / calloutW);
+      // narrow phones — shrink to fit inside the frame (28px margins + pulse
+      // headroom). Perf pass: measured ONCE per callout, not per frame.
+      if (callout.fitScale === undefined) {
+        const calloutW = ctx.measureText(callout.text).width;
+        callout.fitScale = Math.min(1, (fw - 56) / Math.max(calloutW, 1));
+      }
+      if (callout.fitScale < 1) ctx.scale(callout.fitScale, callout.fitScale);
       ctx.lineWidth = 8;
       ctx.strokeStyle = 'rgba(20,8,43,0.7)';
       ctx.strokeText(callout.text, 0, 0);
@@ -3067,6 +3070,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     if (delta > CONFIG.MAX_DT) delta = CONFIG.MAX_DT; // clamp
     if (delta < 0) delta = 0;
     clock += delta;
+    const cpuT0 = debugForms ? performance.now() : 0;
 
     // Prompt 6 §4: smoothed instantaneous FPS (near-zero cost)
     if (delta > 0) fpsSmooth = fpsSmooth ? fpsSmooth * 0.9 + (1000 / delta) * 0.1 : 1000 / delta;
@@ -3126,6 +3130,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     }
     const alpha = screen === 'game' ? clamp(acc / CONFIG.FIXED_DT, 0, 1) : 1;
     render(alpha, clock, delta);
+    // Perf pass: whole-frame CPU time (sim+render, excludes vsync wait) exposed
+    // as window.__cpu under any ?debug= flag so automation can read real cost.
+    if (debugForms) {
+      const w = window as unknown as { __cpu?: number[] };
+      (w.__cpu ??= []).push(performance.now() - cpuT0);
+      if (w.__cpu!.length > 4000) w.__cpu!.splice(0, 2000);
+    }
   }
   raf = requestAnimationFrame(frame);
 

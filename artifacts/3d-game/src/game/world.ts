@@ -903,6 +903,7 @@ export class WorldManager {
     // Prompt 5: scenery excluded so it never inflates the respawn target.
     this.initialPopulation = this.objects.filter((o) => !o.scenery).length;
     this.initialMass = this.totalStartArea; // v8 §3: freeze the % devoured denominator
+    this.buildLotGrid(); // Perf pass: O(1) lot lookups for per-frame mover avoidance
     // v9 §8: freeze the gnome count — gnomes never respawn, so eating them all is a real feat
     this.gnomeTotal = this.objects.filter((o) => o.kind === 'gnome').length;
   }
@@ -1073,6 +1074,41 @@ export class WorldManager {
       if ((l.x - x) ** 2 + (l.y - y) ** 2 < md * md) return false;
     }
     return true;
+  }
+
+  // Perf pass: per-frame mover avoidance can't afford the O(lots) scan above —
+  // profiling showed clearOfLots at ~0.6ms/frame. A coarse boolean grid (48px
+  // cells, ~10px pad baked in) makes the hot check O(1). Conservative: a cell
+  // touching any lot circle counts as blocked; movers just pick a new heading.
+  private lotGrid: Uint8Array | null = null;
+  private lotGridCell = 48;
+  private lotGridW = 0;
+
+  private buildLotGrid(): void {
+    const cell = this.lotGridCell;
+    const w = Math.ceil(this.size / cell);
+    this.lotGridW = w;
+    const g = new Uint8Array(w * w);
+    for (const l of this.structureLots) {
+      const r = l.fpR + 10;
+      const x0 = Math.max(0, Math.floor((l.x - r) / cell)), x1 = Math.min(w - 1, Math.floor((l.x + r) / cell));
+      const y0 = Math.max(0, Math.floor((l.y - r) / cell)), y1 = Math.min(w - 1, Math.floor((l.y + r) / cell));
+      for (let gy = y0; gy <= y1; gy++) {
+        for (let gx = x0; gx <= x1; gx++) {
+          const nx = clamp(l.x, gx * cell, (gx + 1) * cell);
+          const ny = clamp(l.y, gy * cell, (gy + 1) * cell);
+          if ((nx - l.x) ** 2 + (ny - l.y) ** 2 <= r * r) g[gy * w + gx] = 1;
+        }
+      }
+    }
+    this.lotGrid = g;
+  }
+
+  private clearOfLotsFast(x: number, y: number): boolean {
+    if (!this.lotGrid) return this.clearOfLots(x, y, 6);
+    const gx = (x / this.lotGridCell) | 0, gy = (y / this.lotGridCell) | 0;
+    if (gx < 0 || gy < 0 || gx >= this.lotGridW || gy >= this.lotGridW) return true;
+    return this.lotGrid[gy * this.lotGridW + gx] === 0;
   }
 
   private scatter(b: Block, rand: () => number, kind: ObjectKind, n: number, avoidX?: number, avoidY?: number) {
@@ -2827,7 +2863,7 @@ export class WorldManager {
     if (!obj.fleeing && obj.living) {
       const nx = obj.x + obj.vx * dtSec;
       const ny = obj.y + obj.vy * dtSec;
-      if (getTerrainAt(nx, ny) === TERRAIN.WATER || !this.clearOfLots(nx, ny, 6)) {
+      if (getTerrainAt(nx, ny) === TERRAIN.WATER || !this.clearOfLotsFast(nx, ny)) {
         obj.wanderAngle += Math.PI + (Math.random() - 0.5) * 0.8; // reverse + wobble
         obj.vx = Math.cos(obj.wanderAngle) * speed;
         obj.vy = Math.sin(obj.wanderAngle) * speed;
@@ -3607,6 +3643,11 @@ export class WorldManager {
     const camCX = view.x + view.w / 2;
     const camCY = view.y + view.h / 2;
 
+    // Perf pass: profiling showed ctx.save() dominating frame cost (2-3 pairs ×
+    // hundreds of objects). drawOne now mutates transform freely and resets with
+    // a single setTransform to this snapshot — zero save/restore in the hot path.
+    const baseTf = ctx.getTransform();
+
     const drawOne = (obj: WorldObject) => {
       // Structural Build: the express draws its own multi-segment body
       if (obj.kind === 'train') { this.drawTrain(ctx, obj, t); return; }
@@ -3642,7 +3683,6 @@ export class WorldManager {
       // v11: PNG sprite replaces procedural drawing when present
       const r = obj.size;
 
-      ctx.save();
       // Feel Patch §1: prop-shake offset — object wiggles horizontally while shakeT > 0
       const shk = obj.shakeT ? Math.sin(obj.shakeT * 1.8) * (obj.shakeT / 100) * 4 : 0;
       // Alive Pack §9: pedestrian bob while walking, rapid shake while panicking
@@ -3707,12 +3747,11 @@ export class WorldManager {
           const shadowH = (shadowAsr < 0.8 ? r * 0.11 : r * 0.15) * coupleScale;
           const shadowYOff = shadowAsr < 0.8 ? 2 : 3;
           const shadowAlpha = Math.max(0.10, 0.20 - r * 0.0008);
-          ctx.save();
+          // Perf pass: no save/restore — only fillStyle + path are touched.
           ctx.fillStyle = `rgba(0,0,0,${shadowAlpha.toFixed(3)})`;
           ctx.beginPath();
           ctx.ellipse(0, shadowYOff, shadowW, shadowH, 0, 0, Math.PI * 2);
           ctx.fill();
-          ctx.restore();
         }
 
         // v12 §0: use tight alpha-bounding-box so transparent padding never inflates visuals
@@ -3740,13 +3779,12 @@ export class WorldManager {
           // Prompt 14 Stage 4: sheet art faces UP not east — quarter-turn offset restored.
           const rot = (Math.abs(dx) + Math.abs(dy) > 0.001)
             ? Math.atan2(dy, dx) + Math.PI / 2 : 0;
-          ctx.save();
+          // Perf pass: no save/restore — end-of-object setTransform resets rotation.
           ctx.rotate(rot);
           // Prompt 19 Stage 1: aspect-ratio-correct vehicle draw (wide cars don't squash)
           const vasr = spriteAspect.get(spriteKey!) ?? 1;
           const vdH = r * 2, vdW = vdH * vasr;
           ctx.drawImage(objSprite, sx, sy, sw, sh, -(vdW / 2), -(vdH / 2), vdW, vdH);
-          ctx.restore();
         } else {
           // Prompt 7 Stage 1: trees & bushes are scenery — the ±1.5° idle wind sway
           // was removed so they draw perfectly still like every other structure.
@@ -3764,7 +3802,7 @@ export class WorldManager {
       } else {
         drawParkObject(ctx, obj.kind, obj.size, { t, fleeing: obj.fleeing, variant: obj.variant });
       }
-      ctx.restore();
+      ctx.setTransform(baseTf); // Perf pass: single transform reset replaces save/restore
 
       // "!" alert bubble over fleeing people
       if (obj.alertT > 0 && obj.kind === 'person') {
