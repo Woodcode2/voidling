@@ -685,6 +685,42 @@ export const audio = {
     this.duckMusic();
   },
 
+  // ── Military rework: sample-based firing / impact / crunch (was silent on
+  // fire, and a generic "ouch" on hit; all raw-synth 8-bit before). ──
+
+  // A unit fires. kind: 'pellet' (pop rattle) | 'shell' (tank boom) | 'rocket' (whoosh-thunk).
+  playGunfire(kind: 'pellet' | 'shell' | 'rocket') {
+    if (!this.sfxOn || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (kind === 'pellet') {
+      this._playSample('pop_' + (2 + Math.floor(Math.random() * 3)), 1.35, 0.28);
+      this._noise(now, 0.03, 'highpass', 3000, 0.7, 0.12);
+    } else if (kind === 'shell') {
+      this._playSample('power_blast', 1.2, 0.4);
+      this._playSample('thud_big', 0.9, 0.34);
+    } else { // rocket
+      this.whoosh();
+      this._playSample('thud_big', 1.0, 0.3, 0.04);
+    }
+  },
+
+  // A projectile bonks the void — a metallic CLANK (it bounces off), not an "ouch".
+  playMetalClank() {
+    if (!this.sfxOn || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (!this._playSample('thud_big', 1.6, 0.4)) this.playTone(320, 'triangle', 0.06, 0.1);
+    this._noise(now, 0.05, 'bandpass', 2600, 3, 0.16); // metallic ring
+  },
+
+  // Eating a military unit — a big satisfying metal CRUNCH (the reward payoff).
+  playMilitaryCrunch(big = false) {
+    if (!this.sfxOn || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    this._playSample('thud_big', big ? 0.5 : 0.7, big ? 0.7 : 0.55);
+    this._playSample('chomp_void', 0.8, 0.5);
+    this._noise(now, big ? 0.14 : 0.08, 'lowpass', 900, 0.8, big ? 0.4 : 0.28); // crushing metal
+  },
+
   // Meter READY — bright ascending "ding-DING" so kids know they can fire.
   powerReady() {
     if (!this.sfxOn) return;

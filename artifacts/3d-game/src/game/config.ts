@@ -322,10 +322,13 @@ export const CONFIG = {
   RIVAL_SPAWN_SCREENS: 1.5, // bigger-than-player rivals spawn this many screens away
 
   // War Pack §2 + Life Pack §4: defense wave thresholds (% of world devoured)
-  DEFENSE_POLICE_THRESH: 5,    // % devoured → police cars deploy
-  DEFENSE_ARMY_THRESH: 20,     // % devoured → army jeeps + humvees join
-  DEFENSE_FULL_THRESH: 35,     // % devoured → TANKS ROLL IN (+ missile trucks)
-  DEFENSE_HELI_THRESH: 50,     // % devoured → AIR SUPPORT INBOUND (helicopters)
+  // Rework: thresholds lowered so the escalation actually happens in a 3:30
+  // run (matches rarely pass ~25% devoured, so tanks/helis at 35/50 never
+  // appeared) — now police→army→tanks→air support all show up as you grow.
+  DEFENSE_POLICE_THRESH: 3,    // % devoured → police cars deploy
+  DEFENSE_ARMY_THRESH: 10,     // % devoured → army jeeps + humvees join
+  DEFENSE_FULL_THRESH: 18,     // % devoured → TANKS ROLL IN (+ missile trucks)
+  DEFENSE_HELI_THRESH: 28,     // % devoured → AIR SUPPORT INBOUND (helicopters)
   DEFENSE_MAX_UNITS: 12,       // cap on active defense units (perf guard)
   DEFENSE_UNIT_SPEED: 190,     // px/s base speed toward player
   DEFENSE_TANK_SPEED: 70,      // px/s — tanks are heavy, move slowly
@@ -620,21 +623,20 @@ export const CONFIG = {
     { id: 'dragon',    name: 'Dragon',    cost: 0, premium: true, priceUSD: 3.99, bodyColor: '#1DB954', glowColor: '#7CFF6B', eyeStyle: 'angry', eyeGlow: '#FFB000', accessories: [], fx: 'Emerald scale armour · rim flames · breathing ember glow' },
   ] as SkinDef[],
 
-  // v6 §4: renamed POWER-UPS (ids unchanged so effect logic still keys off them)
-  // Overnight: MUTATIONS — permanent evolution-path picks offered when you
-  // evolve (replaces the timed "boon" screens the playtest called stale).
+  // VOID UPGRADES — permanent picks offered each time you grow. ids unchanged
+  // (effect logic keys off them); names/descs are kid-clear and each has a
+  // visible on-void effect. TWIN STOMACHS was cut (playtest: useless).
   BOONS: [
-    { id: 'magnet',    name: 'EVENT HORIZON',  desc: 'Your pull reaches 40% further' },
-    { id: 'overdrive', name: 'FRENZY GLANDS',  desc: 'Move 25% faster. Forever.' },
-    { id: 'twin',      name: 'TWIN STOMACHS',  desc: 'Merges need only 2 pieces' },
-    { id: 'tremor',    name: 'TREMOR MAW',     desc: 'Your touch shrinks big things' },
-    { id: 'greed',     name: 'GILDED STRIDE',  desc: 'Move 12% faster (20% at max)' },
-    { id: 'echo',      name: 'ECHO BITE',      desc: 'Every 5th bite pulls snacks in' },
-    { id: 'shield',    name: 'SECOND SKIN',    desc: 'Survive one devouring, then it molts' },
-    { id: 'dash',      name: 'BLINK STEP',     desc: 'Auto-dash every 6s' },
-    { id: 'lucky',     name: 'GOLDEN HUNGER',  desc: 'A golden snack every 10s' },
-    { id: 'predator',  name: 'PREDATOR JAW',   desc: 'Devour family at just 1.18× their size' },
-    { id: 'dense',     name: 'DENSE CORE',     desc: 'Immune to knockback and artillery stagger' },
+    { id: 'magnet',    name: 'SUPER SUCK',    desc: 'Pull food in from way farther away' },
+    { id: 'overdrive', name: 'ZOOMIES',       desc: 'Zoom around 25% faster — forever' },
+    { id: 'tremor',    name: 'SHRINK TOUCH',  desc: 'Your touch shrinks big things down to size' },
+    { id: 'greed',     name: 'SPEEDY BOOTS',  desc: 'A little extra zoom, forever' },
+    { id: 'echo',      name: 'BOOM BITE',     desc: 'Every 5th bite yanks nearby food into you' },
+    { id: 'shield',    name: 'EXTRA LIFE',    desc: 'Survive being eaten once' },
+    { id: 'dash',      name: 'ROCKET DASH',   desc: 'Auto-blast forward every few seconds' },
+    { id: 'lucky',     name: 'TREAT TROVE',   desc: 'A shiny golden treat keeps popping up' },
+    { id: 'predator',  name: 'BIG APPETITE',  desc: 'Gobble up rival voids way more easily' },
+    { id: 'dense',     name: 'TOUGH SKIN',    desc: 'Nothing can push you around' },
   ] as BoonDef[],
 
   // Signature VOID POWERS (PULL -> COLLAPSE) live in engine.ts VOID_POWERS —

@@ -186,6 +186,10 @@ const VOID_POWERS = [
   { name: 'COLLAPSE',    verb: 'COLLAPSE', hint: 'Swallow the whole screen',          reach: 6.8, kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: false, cost: 0.92, shake: 30, color: '#E4C4FF' },
 ] as const;
 
+// Military rework: eating one of these is a big satisfying crunch payoff.
+const MILITARY_BIG = new Set(['tank', 'attack_heli', 'missile_truck']);
+const MILITARY_SMALL = new Set(['police_car', 'army_jeep', 'armored_humvee', 'soldier', 'radar_van']);
+
 function skinById(id: string): SkinDef {
   return CONFIG.SKINS.find((s) => s.id === id) || CONFIG.SKINS[0];
 }
@@ -220,6 +224,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let saidTop3 = false;     // TOP 3! fired
   let eatStreak = 0;        // absorbs chained within 1.2s
   let lastEatMs = 0;
+  let lastMilCrunchMs = -9999; // military rework: throttle the crunch banner
   let evoTitle: { name: string; life: number; max: number } | null = null; // v6 §3 title card
   let powerStamp: { name: string; color: string; life: number; max: number } | null = null; // v6 §4
   let maxCombo = 0;
@@ -1420,12 +1425,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
               defensePellets.push({ x: o.x, y: o.y,
                 vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED * 1.1, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED * 1.1, life: 3200 });
             }
+            audio.playGunfire('pellet');
           }
           // Phase 7b §5: heli missile — fires every 6–8 s with 0.8 s red warning line
           o.missileCd = (o.missileCd ?? (6000 + Math.random() * 2000)) - dt;
           if ((o.missileCd ?? 1) <= 0 && d < 1400) {
             o.missileCd = 6000 + Math.random() * 2000;
             heliMissiles.push({ tx: player.x + (Math.random()-0.5)*40, ty: player.y + (Math.random()-0.5)*40, fromX: o.x, fromY: o.y, warnT: 800 });
+            audio.playGunfire('rocket');
           }
           // Helicopters skip normal suction — handled separately below
         } else if (o.kind === 'tank') {
@@ -1437,6 +1444,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             o.pelletCd = 3000 + Math.random() * 1500;
             defenseShells.push({ tx: player.x + (Math.random()-0.5)*80, ty: player.y + (Math.random()-0.5)*80,
               warnT: CONFIG.DEFENSE_SHELL_WARN_MS, warnMax: CONFIG.DEFENSE_SHELL_WARN_MS, rocket: false });
+            audio.playGunfire('shell');
           }
         } else if (o.kind === 'missile_truck') {
           // Missile trucks: medium speed, slower rockets
@@ -1447,6 +1455,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             o.pelletCd = 2400 + Math.random() * 1200;
             defenseShells.push({ tx: player.x + (Math.random()-0.5)*60, ty: player.y + (Math.random()-0.5)*60,
               warnT: CONFIG.DEFENSE_SHELL_WARN_MS * 1.3, warnMax: CONFIG.DEFENSE_SHELL_WARN_MS * 1.3, rocket: true });
+            audio.playGunfire('rocket');
           }
         } else {
           // Police / army_jeep / armored_humvee: standard pellets
@@ -1464,6 +1473,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             const a = Math.atan2(player.y - o.y, player.x - o.x) + spread;
             defensePellets.push({ x: o.x, y: o.y,
               vx: Math.cos(a) * CONFIG.DEFENSE_PELLET_SPEED, vy: Math.sin(a) * CONFIG.DEFENSE_PELLET_SPEED, life: 3200 });
+            audio.playGunfire('pellet');
           }
         }
       }
@@ -1501,8 +1511,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           player.x = clamp(player.x + (p.vx / pm) * kb1, player.radius, CONFIG.MAP_SIZE - player.radius);
           player.y = clamp(player.y + (p.vy / pm) * kb1, player.radius, CONFIG.MAP_SIZE - player.radius);
           fx.shake(140, 4, 15);
-          audio.playEaten();
-          banner(`🚔 Pellet hit! -${CONFIG.DEFENSE_PELLET_COST} pts`, '#FF9F1C', 2);
+          audio.playMetalClank(); // bounces off — not an "ouch"
+          banner(`🚔 Bonk! -${CONFIG.DEFENSE_PELLET_COST}`, '#FF9F1C', 2);
         }
       }
       // Life Pack §4: tank/rocket shell countdown + impact
@@ -1524,8 +1534,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             player.y = clamp(player.y + bay * kb2, player.radius, CONFIG.MAP_SIZE - player.radius);
             if (!hasBoon('dense')) { player.vx = 0; player.vy = 0; }
             fx.shake(300, 12, [0, 90]);
-            audio.playEaten();
-            if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost} pts`, '#FF4D6D', 2);
+            audio.playMetalClank();
+            if (cost > 0) banner(`💥 ${s.rocket ? 'Rocket' : 'Tank shell'}! -${cost}`, '#FF4D6D', 2);
           }
           fx.addConfetti(s.tx, s.ty, ['#FF4D6D', '#FF9F1C'], 12);
           // Phase 7b §5: tank shell shockwave — scatter nearby small props outward
@@ -1561,8 +1571,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
             player.x = clamp(player.x + ((player.x - m.tx) / md) * kb3, player.radius, CONFIG.MAP_SIZE - player.radius);
             player.y = clamp(player.y + ((player.y - m.ty) / md) * kb3, player.radius, CONFIG.MAP_SIZE - player.radius);
             fx.shake(240, 9, [0, 80]);
-            audio.playEaten();
-            if (cost > 0) banner(`🚁 Missile hit! -${cost} pts`, '#FF4D6D', 2);
+            audio.playMetalClank();
+            if (cost > 0) banner(`🚁 Missile! -${cost}`, '#FF4D6D', 2);
           }
           fx.addConfetti(m.tx, m.ty, ['#FF2020', '#FF8800'], 10);
           fx.addRing(m.tx, m.ty, '#FF2020', 0, 90, 4, 360);
@@ -1813,15 +1823,32 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           lastScoreMs = roundElapsed;
         }
       } else if (ev.type === 'chomp') {
+        const milBig = ev.kind ? MILITARY_BIG.has(ev.kind) : false;
+        const isMil = milBig || (ev.kind ? MILITARY_SMALL.has(ev.kind) : false);
         if (!powerSwallow) {
-          audio.playChomp(ev.tier || 1);
-          if (ev.kind) audio.playSignature(ev.kind);
+          if (isMil) audio.playMilitaryCrunch(milBig); // metal CRUNCH reward, not a nibble
+          else { audio.playChomp(ev.tier || 1); if (ev.kind) audio.playSignature(ev.kind); }
         }
         haptics.eat();
         // v10 §3: T4+ objects land with a deep 2px camera punch
         if ((ev.tier || 0) >= 4) fx.shake(80, 2, 0);
         // v12 §1: skyscraper topple banner
         if (ev.kind === 'skyscraper') banner('SKYSCRAPER TOPPLED!', '#5AC8FF', 7, { sparkles: true });
+        // Military rework: eating a unit that was shooting at you is a PAYOFF —
+        // chunky crunch + debris + a throttled banner so it never spams.
+        if (isMil) {
+          fx.shake(milBig ? 300 : 150, milBig ? 16 : 8, milBig ? [0, 90] : 20);
+          fx.addRing(ev.x, ev.y, '#FFE7B0', milBig ? 8 : 5, milBig ? 190 : 110, milBig ? 8 : 5, milBig ? 520 : 340);
+          fx.addDebris(ev.x, ev.y, '#CFC4E0', milBig ? 10 : 5);
+          if (milBig) fx.flash();
+          haptics.knockout();
+          if (roundElapsed - lastMilCrunchMs > 550) {
+            lastMilCrunchMs = roundElapsed;
+            const label = ev.kind === 'tank' ? '🪖 TANK CRUNCHED!' : ev.kind === 'attack_heli' ? '🚁 CHOPPER DOWN!'
+              : ev.kind === 'missile_truck' ? '🚀 TRUCK SMASHED!' : ev.kind === 'police_car' ? '🚔 BUSTED!' : '💥 SMASHED!';
+            banner(label, '#FFD23F', milBig ? 4 : 2, milBig ? { pulse: true } : undefined);
+          }
+        }
         // v8 §6: eat-streak ladder; v12 §4: FRENZY FRIDAY doubles window
         const inc = events.frenzyActive ? 2 : 1;
         const prevStreak = (roundElapsed - lastEatMs < dailyFrenzyWindow) ? eatStreak : 0;
@@ -3174,6 +3201,31 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         const trmPh = (clock % 900) / 900;
         ctx.globalAlpha = (1 - trmPh) * 0.4; ctx.strokeStyle = '#FF7A00'; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(px, py, pr + trmPh * 35, 0, Math.PI * 2); ctx.stroke();
+      } else if (b.id === 'predator') {
+        // BIG APPETITE — a menacing ring of little fangs pointing inward
+        const fangPulse = 1 + Math.sin(clock / 240) * 0.03;
+        const rr = (pr + 12) * fangPulse;
+        ctx.globalAlpha = 0.7; ctx.fillStyle = '#FF4D6D';
+        for (let s = 0; s < 12; s++) {
+          const a = (clock / 900 + s * Math.PI / 6) % (Math.PI * 2);
+          const bx = px + Math.cos(a) * rr, by = py + Math.sin(a) * rr;
+          const ix = px + Math.cos(a) * (rr - 8), iy = py + Math.sin(a) * (rr - 8);
+          const perp = a + Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(bx + Math.cos(perp) * 3, by + Math.sin(perp) * 3);
+          ctx.lineTo(bx - Math.cos(perp) * 3, by - Math.sin(perp) * 3);
+          ctx.lineTo(ix, iy);
+          ctx.closePath(); ctx.fill();
+        }
+      } else if (b.id === 'dense') {
+        // TOUGH SKIN — a chunky armored steel ring (bold + segmented rivets)
+        ctx.globalAlpha = 0.55; ctx.strokeStyle = '#9FB0C8'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.arc(px, py, pr + 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 0.8; ctx.fillStyle = '#D6E0EE';
+        for (let s = 0; s < 8; s++) {
+          const a = (s * Math.PI / 4) + clock / 2200;
+          ctx.beginPath(); ctx.arc(px + Math.cos(a) * (pr + 8), py + Math.sin(a) * (pr + 8), 2.4, 0, Math.PI * 2); ctx.fill();
+        }
       }
       ctx.restore();
       i++;
