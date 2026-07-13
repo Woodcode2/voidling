@@ -1790,6 +1790,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     for (const ev of player.pendingFx) if (ev.type === 'chomp') chompCount++;
     const powerSwallow = chompCount >= 6;
     if (powerSwallow) audio.playPowerSwallow();
+    // Playtest: COLLAPSE (and other mass-eats) refilled the meter that fired
+    // them — you could chain the finale. Cap how much the meter can gain in a
+    // single frame so a power's own swarm can't recharge it.
+    const hungerFrameStart = hunger;
     for (const ev of player.pendingFx) {
       if (ev.type === 'absorb') {
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
@@ -1858,10 +1862,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         if (ev.x != null && ev.y != null) {
           fx.addRing(ev.x, ev.y, ev.color || '#FFFFFF', 0, 28, 2, 200);
         }
-        audio.playCaptureTick(); // v14 §1: quiet hi-tick per orbit capture
+        // Playtest: the per-capture "coin tick" was a brutal machine-gun during
+        // fast/mass eating — removed. The chomp gulp already covers each bite.
       }
     }
     player.pendingFx.length = 0;
+    // cap this frame's meter gain (see hungerFrameStart) — normal eating never
+    // hits it; a power's mass-eat does, so the finale can't recharge itself.
+    hunger = Math.min(hunger, hungerFrameStart + 0.20);
 
     // v8 §6: personal-best + leaderboard-position callouts
     if (!bestBeaten && storedBest > 0 && player.score > storedBest) {
@@ -3180,10 +3188,26 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     c.width = Math.max(1, Math.floor(fw));
     c.height = Math.max(1, Math.floor(fh));
     const g = c.getContext('2d')!;
+    // Graphics pass: a real (but gentle) vignette pulls the eye in — the old
+    // 0.03 was invisible and left the frame flat/uniform (a dated tell).
     const grd = g.createRadialGradient(fw / 2, fh / 2, Math.min(fw, fh) * 0.34, fw / 2, fh / 2, Math.max(fw, fh) * 0.72);
     grd.addColorStop(0, 'rgba(0,0,0,0)');
-    grd.addColorStop(1, 'rgba(10,4,24,0.03)'); // v10 §2: barely-there vignette (was 0.45)
+    grd.addColorStop(1, 'rgba(12,6,28,0.20)');
     g.fillStyle = grd;
+    g.fillRect(0, 0, fw, fh);
+    // Baked color grade (single blit, zero per-frame cost): a warm high-left
+    // keylight + a cool bottom wash so the layers read as one lit scene.
+    const key = g.createRadialGradient(fw * 0.35, fh * 0.30, 0, fw * 0.35, fh * 0.30, Math.max(fw, fh) * 0.75);
+    key.addColorStop(0, 'rgba(255,240,205,0.10)');
+    key.addColorStop(1, 'rgba(255,240,205,0)');
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = key;
+    g.fillRect(0, 0, fw, fh);
+    g.globalCompositeOperation = 'source-over';
+    const cool = g.createLinearGradient(0, 0, 0, fh);
+    cool.addColorStop(0, 'rgba(30,40,80,0)');
+    cool.addColorStop(1, 'rgba(30,40,80,0.06)');
+    g.fillStyle = cool;
     g.fillRect(0, 0, fw, fh);
     vignetteCanvas = c; vignetteW = fw; vignetteH = fh;
     return c;

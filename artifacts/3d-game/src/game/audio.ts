@@ -222,6 +222,13 @@ export const audio = {
       const data = buf.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
       this._noiseBuf = buf;
+      // Playtest: sound died after switching apps and back. iOS/mobile browsers
+      // SUSPEND the AudioContext when backgrounded and don't auto-resume —
+      // re-arm it whenever we return to the foreground (or the user taps).
+      const resume = () => { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) resume(); });
+      window.addEventListener('focus', resume);
+      window.addEventListener('pointerdown', resume);
     }
     // resume if the browser suspended us before the first gesture
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
@@ -756,9 +763,11 @@ export const audio = {
       case 'frenzy': // fast triple stab
         [659.25, 659.25, 880].forEach((f, i) => this.playTone(f, 'square', 0.14, 0.1, i * 0.09));
         break;
-      case 'town': // urgent alarm two-tone
-        this.playTone(587.33, 'square', 0.2, 0.12);
-        this.playTone(440, 'square', 0.24, 0.12, 0.18);
+      case 'town': // urgent alarm — real horn sample (was a harsh 8-bit square two-tone)
+        if (!this._playSample('horn_event', 0.9, 0.5)) {
+          this.playTone(587.33, 'triangle', 0.2, 0.09);
+          this.playTone(440, 'triangle', 0.24, 0.09, 0.18);
+        }
         break;
       default:
         // v14 §1: real horn sample for any unspecified event id
@@ -798,19 +807,22 @@ export const audio = {
     { name: 'capture_tick',   rate: 1,    vol: 0.15 },
   ] as { name: string; rate: number; vol: number }[],
 
-  // v9 §5: TOWN FIGHTS BACK siren layer — a wailing two-tone sweep
+  // v9 §5: TOWN FIGHTS BACK siren — a softer wail, filtered so the repeating
+  // loop reads as a distant siren rather than a harsh 8-bit sawtooth buzz.
   siren() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
     const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(650, now);
-    o.frequency.linearRampToValueAtTime(950, now + 0.4);
-    o.frequency.linearRampToValueAtTime(650, now + 0.8);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.7;
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(620, now);
+    o.frequency.linearRampToValueAtTime(880, now + 0.4);
+    o.frequency.linearRampToValueAtTime(620, now + 0.8);
     g.gain.setValueAtTime(0.0001, now);
-    g.gain.linearRampToValueAtTime(0.06, now + 0.1);
+    g.gain.linearRampToValueAtTime(0.035, now + 0.12);
     g.gain.linearRampToValueAtTime(0.0001, now + 0.85);
-    o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.9);
+    o.connect(lp); lp.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.9);
   },
 
   // v9 §5: SHRINK STORM lightning — a sharp thunder crack

@@ -62,10 +62,13 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
 
   ctx.rotate(v.lean);
 
-  // ── Glow: crisp concentric rings (combo heat) ──────────────────────────────
+  // ── Glow: concentric rings (combo heat) — drawn ADDITIVELY so the void reads
+  // as genuinely emissive light against the dark ground, not a flat outline.
   const ringCount = 2;
   const baseA = 0.14 + v.glow * 0.32;
   ctx.lineWidth = Math.max(1, r * 0.04);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = 1; i <= ringCount; i++) {
     const wobble = Math.sin(v.t / 260 + i) * r * 0.01 * v.glow;
     ctx.strokeStyle = hexA(skin.glowColor, baseA * (1 - (i - 1) / ringCount));
@@ -73,6 +76,7 @@ export function drawVoidling(ctx: CanvasRenderingContext2D, x: number, y: number
     ctx.arc(0, 0, r + i * (r * 0.05) + wobble, 0, Math.PI * 2);
     ctx.stroke();
   }
+  ctx.restore();
 
   // ── Stage aura: orbit stars / rings / halo / accretion / corona (behind body)
   drawStageAura(ctx, v);

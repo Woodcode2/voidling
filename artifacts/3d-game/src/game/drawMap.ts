@@ -401,10 +401,13 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
     // Prompt 15 Stage 5: richer green tint to match reference vibrancy.
     // Crisp fresh daylight — the old orange-brown wash muted every colour on
     // the map. A whisper of cool sky light keeps depth without the mud.
+    // Graphics pass: a stronger directional key — warm sun in the NW corner,
+    // cool sky in the SE — so the map reads as lit from one direction instead
+    // of evenly flat (baked into the ground buffer → free per frame).
     const atmo = cc.createLinearGradient(0, 0, S, S);
-    atmo.addColorStop(0,   'rgba(255,250,235,0.05)');
+    atmo.addColorStop(0,   'rgba(255,247,225,0.10)');
     atmo.addColorStop(0.5, 'rgba(235,245,255,0.03)');
-    atmo.addColorStop(1,   'rgba(200,225,255,0.05)');
+    atmo.addColorStop(1,   'rgba(200,220,255,0.08)');
     cc.fillStyle = atmo; cc.fillRect(0, 0, S, S);
     cc.restore();
   }
@@ -804,6 +807,21 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
 
   // ─ 5.8. Structural Build: mountain ridge along the east rim ────────────────
   _paintMountainRidge(cc);
+
+  // ─ 5.9. Coastal shallows + surf foam (Playtest: the south/outer coast met the
+  // void with a hard cut and read as "rough" — the lagoon/river had shorelines
+  // but the ocean edge had none). Clip to the island and re-stroke the whole
+  // outline so a teal shelf + white foam line hug the inner coast everywhere.
+  cc.save();
+  tracIslandPath(cc); cc.clip();
+  cc.lineJoin = 'round';
+  // wide enough to read INSIDE the 60px white rim: the shelf reaches ~110px inland
+  tracIslandPath(cc); cc.strokeStyle = 'rgba(127,212,232,0.40)'; cc.lineWidth = 230; cc.stroke(); // shallow shelf
+  tracIslandPath(cc); cc.strokeStyle = 'rgba(91,184,212,0.42)';  cc.lineWidth = 130; cc.stroke(); // deeper shelf
+  cc.setLineDash([34, 28]); cc.lineCap = 'round';
+  tracIslandPath(cc); cc.strokeStyle = 'rgba(255,255,255,0.6)';  cc.lineWidth = 14;  cc.stroke(); // foam line
+  cc.setLineDash([]);
+  cc.restore();
 
   // ─ 6. Island rim: cosmic halo + cliff band + white sticker ────────────────
   // Edge-quality pass: the island floats in REAL space now — a wide violet
