@@ -16,19 +16,26 @@
 .vd-overlay {
   position: fixed;
   inset: 0;
+  /* Mobile-fit: track the *small* (always-visible) viewport on iOS so the menu
+     never sits under the Safari/WKWebView toolbar and never needs scrolling. */
+  height: 100svh;
   z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 18px;
-  padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  padding: calc(16px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
   color: #fff;
   font-family: Nunito, system-ui, sans-serif;
   text-align: center;
+  /* Tall screens (Results, Shop) may still scroll WITHIN the visible viewport;
+     the Home menu opts out of scrolling via .vd-home below. */
   overflow-y: auto;
   overflow-x: hidden;
 }
+/* Mobile-fit: the Home menu must FIT any iPhone with no scroll. */
+.vd-home { overflow: hidden; }
 
 .vd-overlay--solid {
   background:
@@ -1163,3 +1170,29 @@
   text-shadow: 0 1px 3px rgba(0,0,0,0.85), 0 0 8px rgba(120,80,220,0.6);
 }
 @media (prefers-reduced-motion: reduce) { .vd-power-hint { transition: none; } }
+
+/* ── Mobile-fit: shrink the Home menu so it fits any iPhone with NO scroll ──
+   Scoped to .vd-home so Shop/Results/Trophies (which may scroll) are untouched.
+   The hero canvas is sized via inline style on SkinPreview; overriding the
+   canvas box shrinks the real layout footprint (not just a transform). */
+@media (max-height: 740px) {
+  .vd-home { gap: 10px; }
+  .vd-home .vd-stack { gap: 9px; }
+  .vd-home .vd-title { font-size: clamp(38px, 12vw, 60px); }
+  .vd-home .vd-hero-void canvas { width: 150px !important; height: 150px !important; }
+  .vd-home .vd-btn { min-height: 52px; font-size: 20px; }
+  .vd-home .vd-btn--play { font-size: 23px; min-height: 56px; }
+  .vd-home .vd-btn--sm { min-height: 48px; }
+  .vd-home .vd-namepill { margin-top: 2px; }
+  .vd-home .vd-plaque { padding: 5px 16px; font-size: 17px; }
+  .vd-home .vd-row { gap: 10px; }
+}
+@media (max-height: 670px) {
+  .vd-home .vd-stack { gap: 6px; }
+  .vd-home .vd-hero-void canvas { width: 116px !important; height: 116px !important; }
+  .vd-home .vd-title { font-size: clamp(34px, 11vw, 48px); }
+  .vd-home .vd-tagline { font-size: 12px; letter-spacing: 2px; }
+  .vd-home .vd-btn { min-height: 48px; font-size: 18px; }
+  .vd-home .vd-btn--play { min-height: 52px; font-size: 21px; }
+  .vd-home .vd-btn--sm { min-height: 44px; font-size: 16px; }
+}

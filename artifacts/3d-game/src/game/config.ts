@@ -67,7 +67,7 @@ export type ObjectKind =
   | 'tank' | 'attack_heli' | 'armored_humvee' | 'missile_truck'
   // Life Pack §2: sports fields (ground decals — not edible world objects)
   | 'field_soccer' | 'field_basketball' | 'field_tennis'
-  | 'field_volleyball' | 'field_campsite' | 'field_beachclub' | 'field_golf'
+  | 'field_volleyball' | 'field_campsite' | 'field_beachclub' | 'field_golf' | 'field_wedding'
   | 'beachball' | 'deckchair' | 'tent' | 'campfire' | 'landmark'
   // Prompt 18 Stage 4: street furniture (clay-mapped props)
   | 'streetlamp' | 'bus_stop';
@@ -559,6 +559,7 @@ export const CONFIG = {
     field_campsite:   { tier: 0, minR: 190, maxR: 190 },   // forest clearing decal
     field_beachclub:  { tier: 0, minR: 170, maxR: 170 },   // cabana deck decal
     field_golf:       { tier: 0, minR: 160, maxR: 160 },   // putting green decal
+    field_wedding:    { tier: 0, minR: 150, maxR: 150 },   // Playtest: wedding arch + aisle decal
     beachball:        { tier: 1, minR: 13, maxR: 18 },     // Structural Build: beach fun props
     deckchair:        { tier: 3, minR: 30, maxR: 40 },
     tent:             { tier: 3, minR: 40, maxR: 52 },
@@ -599,17 +600,17 @@ export const CONFIG = {
   ] as ObjectKind[],
 
   SKINS: [
-    // Economy: LoL model — grind coins for skins (common 500 / rare 1500 /
-    // epic 4000); legendary skins below are money-only. ~60-90m of play per
-    // rare at 50-150c a match feels earned without being a wall.
+    // Economy: Riot-style progressive curve — common 500 (~3 matches) /
+    // rare 3000 (~14 matches) / epic 6500 (~40 matches); legendary skins below
+    // are money-only. First tier stays easy, higher tiers steepen sharply.
     { id: 'classic',   name: 'Classic',   cost: 0,    bodyColor: '#3A1E6B', glowColor: '#B388FF', eyeStyle: 'normal', accessories: [] },
     { id: 'kitty',     name: 'Kitty',     cost: 500,  bodyColor: '#FFAE73', glowColor: '#FFD9B8', eyeStyle: 'normal', accessories: ['catEars', 'whiskers', 'catMouth'] },
     { id: 'ninja',     name: 'Ninja',     cost: 500,  bodyColor: '#2A2A38', glowColor: '#5E6E8C', eyeStyle: 'angled', accessories: ['headband'] },
-    { id: 'pirate',    name: 'Pirate',    cost: 1500, bodyColor: '#2C2C36', glowColor: '#8A8AA0', eyeStyle: 'normal', accessories: ['tricorn', 'eyepatch', 'earring'] },
-    { id: 'princess',  name: 'Princess',  cost: 1500, bodyColor: '#FF7FC1', glowColor: '#FFC2E2', eyeStyle: 'lashes', extraBlush: true, accessories: ['tiara', 'sparkleTrail'] },
-    { id: 'wizard',    name: 'Wizard',    cost: 1500, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
-    { id: 'astronaut', name: 'Astronaut', cost: 4000, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
-    { id: 'devil',     name: 'Devil',     cost: 4000, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
+    { id: 'pirate',    name: 'Pirate',    cost: 3000, bodyColor: '#2C2C36', glowColor: '#8A8AA0', eyeStyle: 'normal', accessories: ['tricorn', 'eyepatch', 'earring'] },
+    { id: 'princess',  name: 'Princess',  cost: 3000, bodyColor: '#FF7FC1', glowColor: '#FFC2E2', eyeStyle: 'lashes', extraBlush: true, accessories: ['tiara', 'sparkleTrail'] },
+    { id: 'wizard',    name: 'Wizard',    cost: 3000, bodyColor: '#5B3AA6', glowColor: '#C9A6FF', eyeStyle: 'normal', accessories: ['wizardHat', 'beard'] },
+    { id: 'astronaut', name: 'Astronaut', cost: 6500, bodyColor: '#E9EDF6', glowColor: '#AFC6FF', eyeStyle: 'normal', accessories: ['helmet', 'badge'] },
+    { id: 'devil',     name: 'Devil',     cost: 6500, bodyColor: '#E63946', glowColor: '#FF6B6B', eyeStyle: 'angry', accessories: ['horns', 'devilTail', 'devilBrow'] },
     // v7 §9: PREMIUM cash skins (mock IAP — no real payments)
     { id: 'galaxy',    name: 'Galaxy',    cost: 0, premium: true, priceUSD: 2.99, bodyColor: '#0D0821', glowColor: '#B98CFF', eyeStyle: 'normal', accessories: [], fx: 'Living starfield body · orbiting star trail · nebula halo' },
     { id: 'lava',      name: 'Lava',      cost: 0, premium: true, priceUSD: 1.99, bodyColor: '#14090A', glowColor: '#FF7A2B', eyeStyle: 'angry', eyeGlow: '#FF6A00', accessories: [], fx: 'Molten crack body · rising embers · pulsing heat ring' },
@@ -627,7 +628,7 @@ export const CONFIG = {
     { id: 'overdrive', name: 'FRENZY GLANDS',  desc: 'Move 25% faster. Forever.' },
     { id: 'twin',      name: 'TWIN STOMACHS',  desc: 'Merges need only 2 pieces' },
     { id: 'tremor',    name: 'TREMOR MAW',     desc: 'Your touch shrinks big things' },
-    { id: 'greed',     name: 'MIDAS GULLET',   desc: 'All score ×1.5' },
+    { id: 'greed',     name: 'GILDED STRIDE',  desc: 'Move 12% faster (20% at max)' },
     { id: 'echo',      name: 'ECHO BITE',      desc: 'Every 5th bite pulls snacks in' },
     { id: 'shield',    name: 'SECOND SKIN',    desc: 'Survive one devouring, then it molts' },
     { id: 'dash',      name: 'BLINK STEP',     desc: 'Auto-dash every 6s' },

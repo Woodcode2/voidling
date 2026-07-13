@@ -7,7 +7,7 @@ import { SkinPreview } from './SkinPreview';
 import { weeklyBoard } from '../game/leaderboard';
 
 // v16.2 build stamp — increment on every deploy
-const BUILD_STAMP = 'v34 · lategame';
+const BUILD_STAMP = 'v35 · polish';
 // Prompt 19 Stage 7: ?debug=autostart — module-scope so it can be used in useState initializer.
 const _DEBUG_AUTOSTART = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'autostart';
 // Icon factory: ?debug=icon renders the hero void on a cosmic tile for App Store icon capture.
@@ -303,7 +303,7 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
   // Machine round: weekly TOP VOIDS board modal
   const [showBoard, setShowBoard] = useState(false);
   return (
-    <div className="vd-overlay vd-overlay--solid" onPointerDown={() => engine.unlockAudio()}>
+    <div className="vd-overlay vd-overlay--solid vd-home" onPointerDown={() => engine.unlockAudio()}>
       <StarField />
       {/* Menu glow-up: drifting nebula clouds + a shooting star — first impression pass */}
       <div className="vd-menu-nebula" aria-hidden="true">

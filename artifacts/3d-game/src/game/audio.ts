@@ -83,7 +83,7 @@ export const audio = {
 
   // v14 §1: play a decoded sample via WebAudio with optional playbackRate and volume.
   // Returns true if the sample was available and scheduled; false → caller should synth.
-  _playSample(name: string, rate = 1, vol = 0.5, when = 0): boolean {
+  _playSample(name: string, rate = 1, vol = 0.5, when = 0, onEnded?: () => void): boolean {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return false;
     const buf = this._samples[name];
     if (!buf) return false;
@@ -94,6 +94,7 @@ export const audio = {
     g.gain.value = vol;
     src.connect(g);
     g.connect(this.sfxGain);
+    if (onEnded) src.onended = onEnded;
     src.start(this.ctx.currentTime + when);
     return true;
   },
@@ -101,6 +102,10 @@ export const audio = {
   // pitch-ladder state (climbs 1 semitone per absorb within 1.5s, up to +12)
   _ladder: 0,
   _lastAbsorb: -9999,
+  // Playtest: a bell per eaten item became a wall of noise during mass-eats
+  // (esp. COLLAPSE). Throttle chomps to a sane rate and cap concurrent voices.
+  _lastChompMs: -9999,
+  _chompVoices: 0,
 
   // music scheduler state
   _musicBase: CONFIG.MUSIC_GAIN,
@@ -315,11 +320,20 @@ export const audio = {
     else this._ladder = 0;
     this._lastAbsorb = ms;
 
+    // Throttle: no more than ~11 chomps/sec, and never stack past 4 live voices.
+    // Big tiers (4+) always ring through — those are the satisfying ones.
+    if (tier < 4) {
+      if (ms - this._lastChompMs < 90) return;
+      if (this._chompVoices >= 4) return;
+    }
+    this._lastChompMs = ms;
+
     // Sound Pass: wet vacuum GULPS replace the arcade pops
     const sampleName = `gulp_${Math.min(tier, 5)}`;
     const rate = Math.pow(2, this._ladder / 12); // pitch-ladder playback rate
     const vol = tier >= 4 ? 0.7 : 0.52;
-    if (this._playSample(sampleName, rate, vol)) {
+    if (this._playSample(sampleName, rate, vol, 0, () => { this._chompVoices = Math.max(0, this._chompVoices - 1); })) {
+      this._chompVoices++;
       // T4+: layer the thud_big for weight — fixed rate 0.55 per manifest
       if (tier >= 4) this._playSample('thud_big', 0.55, 0.38);
       return; // sample handled it
@@ -346,6 +360,26 @@ export const audio = {
       sg.gain.setValueAtTime(0.28, now); sg.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
       s.connect(sg); sg.connect(this.sfxGain); s.start(now); s.stop(now + 0.18);
     }
+  },
+
+  // Playtest: mass-eat bursts (COLLAPSE, big vortex) sounded like static.
+  // Replace the swarm of tiny chomps with ONE deep, weighty swallow.
+  playPowerSwallow() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    this._ladder = 0; // reset pitch-ladder so the next single chomp starts low
+    const now = this.ctx.currentTime;
+    if (this._playSample('gulp_5', 0.6, 0.7)) {
+      this._playSample('thud_big', 0.5, 0.5);
+      return;
+    }
+    // synth fallback — a big descending sine gulp + low thud
+    const o = this.ctx.createOscillator(); const og = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(140, now);
+    o.frequency.exponentialRampToValueAtTime(46, now + 0.28);
+    og.gain.setValueAtTime(0.6, now); og.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    o.connect(og); og.connect(this.sfxGain); o.start(now); o.stop(now + 0.34);
+    this._noise(now, 0.05, 'lowpass', 320, 0.7, 0.4);
   },
 
   // Layer C — per-family flavour, layered under the gulp-pop

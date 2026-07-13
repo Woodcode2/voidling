@@ -949,7 +949,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const raw = 50 + perfPay + (crown ? 25 : 0) + evoCoinBonus;
     let coins = Math.min(150, Math.floor(raw * coinMult)) + Math.min(60, coinBonus);
     const firstWin = crown && meta.isFirstWinOfDay();
-    if (firstWin) coins *= 2;
+    if (firstWin) coins += 50; // flat first-win-of-day bonus (was ×2, which stacked on top of the cap + dailyBite)
     const dailyBite = meta.isFirstPlayOfDay() ? 25 : 0;
     coins += dailyBite;
     const newBest = player.score > meta.data.highScore;
@@ -1138,13 +1138,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     player.suctionMult = 1;  // War Pack §3: reset each tick; EVENT_HORIZON overrides below
     player.magnetMultiplier = 1 + (mL ? (mL >= 2 ? 0.7 : 0.4) : 0); // GRAVITY GLUTTON: +40%/+70% reach
     // v12 §4: compose daily ZOOM ZOOM with boon ZOOMIES so neither overwrites the other
-    player.speedMultiplier  = dailyZoomies * (1 + (oL ? (oL >= 2 ? 0.4 : 0.25) : 0));
+    player.speedMultiplier  = dailyZoomies * (1 + (oL ? (oL >= 2 ? 0.4 : 0.25) : 0)) * (1 + (gL ? (gL >= 2 ? 0.2 : 0.12) : 0)); // + GILDED STRIDE speed
     // v12 §4: compose daily MEGA MERGE with boon DOUBLE STOMACH
     player.twinMerge = hasBoon('twin') || (isDaily && dailyData?.id === 'merge');
     player.twinBonus = twL >= 2 ? 1.5 : 1;                          // DOUBLE STOMACH II: +50% merge bonus
     player.tremorActive = hasBoon('tremor');                        // TENDERIZER
     player.tremorFactor = tL >= 2 ? 0.75 : 0.85;                    // 25% / 15% shrink per touch
-    player.greedMultiplier = baseGreed * (gL ? (gL >= 2 ? 2 : 1.5) : 1); // MIDAS MOUTH: ×1.5 / ×2
+    player.greedMultiplier = baseGreed; // greed no longer inflates score — GILDED STRIDE gives speed instead
     player.echoActive = hasBoon('echo');                            // ECHO BITE (pulse fired in absorbObject)
     player.dashActive = hasBoon('dash');                            // VOID DASH (auto-dash below)
     player.luckyActive = hasBoon('lucky');                          // LUCKY GNOME (golden rain below)
@@ -1632,6 +1632,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     resolveVoids();
 
     // drain player fx
+    // Playtest: mass-eat bursts (COLLAPSE, big vortex) rang a bell per item —
+    // a wall of noise. If this frame swallowed a swarm, play ONE deep power
+    // swallow instead of dozens of overlapping chomps.
+    let chompCount = 0;
+    for (const ev of player.pendingFx) if (ev.type === 'chomp') chompCount++;
+    const powerSwallow = chompCount >= 6;
+    if (powerSwallow) audio.playPowerSwallow();
     for (const ev of player.pendingFx) {
       if (ev.type === 'absorb') {
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
@@ -1648,9 +1655,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           lastScoreMs = roundElapsed;
         }
       } else if (ev.type === 'chomp') {
-        audio.playChomp(ev.tier || 1);
+        if (!powerSwallow) {
+          audio.playChomp(ev.tier || 1);
+          if (ev.kind) audio.playSignature(ev.kind);
+        }
         haptics.eat();
-        if (ev.kind) audio.playSignature(ev.kind);
         // v10 §3: T4+ objects land with a deep 2px camera punch
         if ((ev.tier || 0) >= 4) fx.shake(80, 2, 0);
         // v12 §1: skyscraper topple banner
@@ -2631,17 +2640,24 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // Phase 7b §3: secondary news banner — slides in below the main callout
     if (newsAlpha > 0.02 && newsText) {
       ctx.save();
-      ctx.globalAlpha = newsAlpha * 0.9;
-      ctx.font = '600 13px Fredoka, sans-serif';
+      ctx.globalAlpha = newsAlpha;
+      ctx.font = '700 15px Fredoka, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const nw = ctx.measureText(newsText).width + 28;
-      const nh = 24;
+      const nw = ctx.measureText(newsText).width + 34;
+      const nh = 28;
       const ny = callout ? fh * 0.34 : fh * 0.22;
-      ctx.fillStyle = 'rgba(18,10,55,0.82)';
-      roundRectFill(ctx, fw / 2 - nw / 2, ny - nh / 2, nw, nh, 6);
-      ctx.fillStyle = '#8BBAD0';
-      ctx.fillText(newsText, fw / 2, ny);
+      // Playtest: news was muted/hard to read — gold-edged pill + bright text,
+      // and auto-shrink so long headlines never bleed past the screen edges.
+      const fit = Math.min(1, (fw - 24) / nw);
+      ctx.translate(fw / 2, ny);
+      if (fit < 1) ctx.scale(fit, fit);
+      ctx.fillStyle = 'rgba(255,215,63,0.30)';
+      roundRectFill(ctx, -nw / 2 - 2, -nh / 2 - 2, nw + 4, nh + 4, 9);
+      ctx.fillStyle = 'rgba(10,6,34,0.92)';
+      roundRectFill(ctx, -nw / 2, -nh / 2, nw, nh, 7);
+      ctx.fillStyle = '#F2F6FF';
+      ctx.fillText(newsText, 0, 1);
       ctx.restore();
     }
 
@@ -2871,9 +2887,14 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       }
       ctx.globalAlpha = 1;
     } else if (id === 'greed') {
-      ctx.beginPath(); ctx.arc(0, 0, s * 0.5, 0, Math.PI * 2); ctx.stroke();
-      ctx.font = `700 ${Math.round(s * 0.85)}px Fredoka, sans-serif`;
-      ctx.fillText('$', 0, s * 0.04);
+      // GILDED STRIDE — forward speed chevrons
+      for (let c = -1; c <= 1; c++) {
+        ctx.beginPath();
+        ctx.moveTo(c * s * 0.42 - s * 0.18, -s * 0.4);
+        ctx.lineTo(c * s * 0.42 + s * 0.22, 0);
+        ctx.lineTo(c * s * 0.42 - s * 0.18, s * 0.4);
+        ctx.stroke();
+      }
     } else if (id === 'time') {
       ctx.beginPath(); ctx.arc(0, 0, s * 0.5, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath();
@@ -2940,14 +2961,17 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
           }
         }
       } else if (b.id === 'greed') {
-        // gold coin sparkles orbiting the void
-        for (let s = 0; s < 5; s++) {
-          const a = (clock / 550 + s * Math.PI * 2 / 5) % (Math.PI * 2);
-          const rr = pr + 16; const sx = px + Math.cos(a) * rr, sy = py + Math.sin(a) * rr;
-          ctx.globalAlpha = 0.65; ctx.fillStyle = '#FFD23F';
-          ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2); ctx.fill();
-          ctx.globalAlpha = 0.35; ctx.fillStyle = '#FFEB8A';
-          ctx.beginPath(); ctx.arc(sx + 1, sy - 1, 1.5, 0, Math.PI * 2); ctx.fill();
+        // GILDED STRIDE — golden speed streaks trailing behind motion
+        const sp = Math.hypot(player.vx, player.vy);
+        if (sp > 0.05) {
+          const ang = Math.atan2(-player.vy, -player.vx);
+          for (let s = 0; s < 4; s++) {
+            ctx.globalAlpha = 0.30 - s * 0.06; ctx.strokeStyle = '#FFD23F'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(px, py);
+            ctx.lineTo(px + Math.cos(ang + (s - 1.5) * 0.16) * (pr + 24 + s * 9), py + Math.sin(ang + (s - 1.5) * 0.16) * (pr + 24 + s * 9));
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
         }
       } else if (b.id === 'echo') {
         // faint expanding ring every 2.5s

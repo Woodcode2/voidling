@@ -265,7 +265,7 @@ export const meta = {
     if (!this.data.trophiesEarned.includes(id)) {
       this.data.trophiesEarned.push(id);
       const BIG = new Set(['devoured_100pct', 'score_10000', 'form_world_ender', 'void_destroyer', 'daily_winner']);
-      const bounty = BIG.has(id) ? 500 : 250;
+      const bounty = BIG.has(id) ? 100 : 50;
       this.data.coins += bounty;
       this.recentTrophies.push(id);
       this.save();
@@ -277,7 +277,7 @@ export const meta = {
   drainRecentTrophies(): { count: number; bounty: number } {
     const BIG = new Set(['devoured_100pct', 'score_10000', 'form_world_ender', 'void_destroyer', 'daily_winner']);
     let bounty = 0;
-    for (const id of this.recentTrophies) bounty += BIG.has(id) ? 500 : 250;
+    for (const id of this.recentTrophies) bounty += BIG.has(id) ? 100 : 50;
     const count = this.recentTrophies.length;
     this.recentTrophies = [];
     return { count, bounty };

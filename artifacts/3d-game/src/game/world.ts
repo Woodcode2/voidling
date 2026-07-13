@@ -194,15 +194,18 @@ const VIGNETTE_CONFIGS: VignetteConfig[] = [
   { kind: 'vig_proposal',  zone: 'park',        always: false,
     ambientText: ['Will you marr...', 'I have a whole speech prepared—', 'she said YES!!'],
     panicText:   ["NOT NOW, I'M MID PROPOSAL!", "THE RING! WHERE'S THE RING?!", 'we can elope RIGHT NOW'],
-    eatenBanner: '💍 ROMANCE: DEVOURED' },
+    eatenBanner: '💍 ROMANCE: DEVOURED',
+    supportProps: ['flowerpot', 'flowerpot'], supportPeds: ['person_mom', 'tourist', 'person_elderly'] },
   { kind: 'vig_soccer',    zone: 'park',         always: true,  decal: 'field_soccer',
     ambientText: ['GOOOAL!', 'DEFENSE!! DEFENSE!!', 'ref, that was SO offside'],
     panicText:   ['REF!! TIME OUT!!', 'MATCH ABANDONED!!', 'it ate the REF?!'],
     eatenBanner: '⚽ SOCCER MATCH: ABSORBED', supportProps: ['pg_soccergoal','pg_soccergoal','pg_soccerball'], supportPeds: ['person_kid','person_kid','tourist'] },
-  { kind: 'vig_wedding',   zone: 'park',         always: false,
+  { kind: 'vig_wedding',   zone: 'park',         always: true,  decal: 'field_wedding',
     ambientText: ['I do!', 'best day EVER 🥂', 'speeches in five!'],
     panicText:   ['maybe this is a sign...', 'SAVE THE CAKE!', 'the DJ already fled!!'],
-    eatenBanner: '💒 WEDDING: CONSUMED' },
+    eatenBanner: '💒 WEDDING: CONSUMED',
+    supportProps: ['flowerpot', 'flowerpot', 'picnic_table'],
+    supportPeds: ['person_mom', 'person_dad', 'person_granny', 'person_elderly', 'tourist', 'person_kid'] },
   { kind: 'vig_couple',    zone: 'park',         always: false,
     ambientText: ['Fifty years, dear.', 'remember our first date?'],
     panicText:   ['NOT LIKE THIS, HAROLD!', 'HAROLD, THE COUPONS!!'],
@@ -1248,6 +1251,9 @@ export class WorldManager {
       place('field_soccer', cx(pb), cy(pb), 200, 130);
       const gb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
       place('field_golf', gb.x0 + CONFIG.BLOCK_SIZE * 0.3, gb.y0 + CONFIG.BLOCK_SIZE * 0.32, 160, 120);
+      // Playtest: a real wedding scene — arch + aisle decal for the wedding vignette to anchor onto
+      const wb = parkBlocks[Math.floor(rand() * parkBlocks.length)];
+      place('field_wedding', wb.x0 + CONFIG.BLOCK_SIZE * 0.62, wb.y0 + CONFIG.BLOCK_SIZE * 0.66, 120, 100);
     }
     if (downtownBlocks.length) {
       const db = downtownBlocks[Math.floor(rand() * downtownBlocks.length)];
@@ -1290,11 +1296,15 @@ export class WorldManager {
 
     const alwaysVigs = VIGNETTE_CONFIGS.filter(vc => vc.always);
     const optionalVigs = VIGNETTE_CONFIGS.filter(vc => !vc.always);
-    const target = 7 + Math.floor(rand() * 4); // 7–10 total
+    const target = 12 + Math.floor(rand() * 3); // 12–14 total (always ~9 + 3–5 optionals)
+    // Playtest: the old `slice(0, target - alwaysCount)` went NEGATIVE and
+    // silently dropped/duplicated optionals, so ~69% of matches had no romance
+    // events at all. Clamp to a real optional count so the world always feels busy.
+    const optCount = Math.max(2, target - alwaysVigs.length);
     const optional = optionalVigs
       .map(v => ({ v, sort: rand() }))
       .sort((a, b) => a.sort - b.sort)
-      .slice(0, target - alwaysVigs.length)
+      .slice(0, optCount)
       .map(x => x.v);
     const chosen = [...alwaysVigs, ...optional];
 
@@ -3896,6 +3906,21 @@ export class WorldManager {
         ctx.font = 'bold 22px Fredoka, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('!', obj.x, obj.y - obj.size - 6);
+        ctx.restore();
+      }
+      // Playtest ("I never see the events!"): every scripted scene now flies a
+      // bobbing emoji beacon so events read as EVENTS from a distance — always
+      // visible (not gated behind the 4-bubble speech budget), keyed off the
+      // scene's eaten-banner emoji so it stays in sync. One fillText, no measure.
+      if (obj.vignetteData && onHalfPx >= 6) {
+        const icon = obj.vignetteData.eatenBanner.split(' ')[0];
+        const bob = Math.sin(t / 420 + obj.x * 0.01) * 4;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '20px Fredoka, sans-serif';
+        ctx.shadowColor = 'rgba(10,6,34,0.55)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(icon, obj.x, obj.y - obj.size - 16 + bob);
         ctx.restore();
       }
       // v16.2 §1: speech bubble — NPC says something.

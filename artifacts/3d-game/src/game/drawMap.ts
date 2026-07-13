@@ -886,6 +886,7 @@ function _paintStaticGround(cc: CanvasRenderingContext2D): void {
       else if (fd.kind === 'field_campsite')   _paintCampsiteClearing(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_beachclub')  _paintBeachClubDeck(cc, fd.halfW, fd.halfH);
       else if (fd.kind === 'field_golf')       _paintGolfGreen(cc, fd.halfW, fd.halfH);
+      else if (fd.kind === 'field_wedding')    _paintWeddingArch(cc, fd.halfW, fd.halfH);
       cc.restore();
     }
     cc.restore();
@@ -944,6 +945,50 @@ function _paintSoccerField(cc: CanvasRenderingContext2D, hw: number, hh: number)
   const gw = 10, gh = hh * 0.28;
   cc.strokeRect(-hw - gw, -gh, gw, gh * 2);         // left goal
   cc.strokeRect(hw, -gh, gw, gh * 2);               // right goal
+}
+
+/** Playtest ("I never see the weddings!"): a proper wedding scene baked into
+ *  the ground — white aisle runner, rows of guest chairs, and a flowered arch
+ *  at the altar end. Cheap strokes/fills only (bakes into the static ground). */
+function _paintWeddingArch(cc: CanvasRenderingContext2D, hw: number, hh: number): void {
+  // soft lawn platform
+  cc.fillStyle = 'rgba(120,200,150,0.20)';
+  cc.beginPath(); cc.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2); cc.fill();
+  // white aisle runner down the middle (altar at the top, -hh)
+  const aw = hw * 0.26;
+  const aisle = cc.createLinearGradient(0, -hh, 0, hh);
+  aisle.addColorStop(0, 'rgba(255,255,255,0.85)');
+  aisle.addColorStop(1, 'rgba(255,255,255,0.55)');
+  cc.fillStyle = aisle;
+  cc.fillRect(-aw, -hh * 0.86, aw * 2, hh * 1.72);
+  // rows of guest chairs — small slate dashes flanking the aisle
+  cc.fillStyle = 'rgba(70,84,120,0.7)';
+  for (let row = 0; row < 5; row++) {
+    const ry = -hh * 0.55 + row * (hh * 1.1 / 5);
+    for (let s = 0; s < 3; s++) {
+      const gx = aw + hw * 0.14 + s * hw * 0.19;
+      cc.fillRect(-gx - 8, ry, 8, 6);   // left bank
+      cc.fillRect(gx, ry, 8, 6);         // right bank
+    }
+  }
+  // flowered arch at the altar end
+  const ay = -hh * 0.78, arw = aw * 1.5;
+  cc.strokeStyle = 'rgba(236,236,244,0.92)';
+  cc.lineWidth = 6; cc.setLineDash([]);
+  cc.beginPath();
+  cc.moveTo(-arw, ay + hh * 0.34);
+  cc.lineTo(-arw, ay);
+  cc.quadraticCurveTo(0, ay - hh * 0.28, arw, ay);
+  cc.lineTo(arw, ay + hh * 0.34);
+  cc.stroke();
+  // pink blooms dotted along the arch + aisle edges
+  cc.fillStyle = 'rgba(255,145,200,0.9)';
+  const blooms: [number, number][] = [
+    [-arw, ay], [-arw * 0.5, ay - hh * 0.22], [0, ay - hh * 0.28],
+    [arw * 0.5, ay - hh * 0.22], [arw, ay],
+    [-aw, hh * 0.1], [aw, hh * 0.1], [-aw, hh * 0.55], [aw, hh * 0.55],
+  ];
+  for (const [bx, by] of blooms) { cc.beginPath(); cc.arc(bx, by, 5, 0, Math.PI * 2); cc.fill(); }
 }
 
 /** Basketball court: orange-ish surface with white markings. */
@@ -1205,23 +1250,25 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
   ctx.ellipse(0, 100, 170, 340, 0, 0, Math.PI * 2); // Stage D: wider glow
   ctx.fill();
 
-  // 2. flowing water column: clip a tapering falls region, scroll bright bands down
+  // 2. flowing water column: clip a tapering falls region that spills PAST the
+  // island edge and fades to nothing — reads as water pouring off into the void.
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(-96, -50); ctx.lineTo(96, -50);
-  ctx.lineTo(70, 360);  ctx.lineTo(-70, 360);
+  ctx.lineTo(58, 470);  ctx.lineTo(-58, 470);   // Playtest: extend + narrow so it plunges off the edge
   ctx.closePath();
   ctx.clip();
-  const colGrd = ctx.createLinearGradient(0, -50, 0, 360);
-  colGrd.addColorStop(0, '#93E2F3');
-  colGrd.addColorStop(1, '#4FA6CB');
+  const colGrd = ctx.createLinearGradient(0, -50, 0, 470);
+  colGrd.addColorStop(0,    '#93E2F3');
+  colGrd.addColorStop(0.62, '#4FA6CB');
+  colGrd.addColorStop(1,    'rgba(79,166,203,0)');  // fade out at the lip of the world
   ctx.fillStyle = colGrd;
-  ctx.fillRect(-96, -50, 192, 410);
+  ctx.fillRect(-96, -50, 192, 520);
 
   const bandH = 72;
   const off = (clock / 260) % bandH;         // scroll offset → downward flow
   ctx.globalCompositeOperation = 'lighter';
-  for (let y = -50 - bandH + off; y < 360; y += bandH) {
+  for (let y = -50 - bandH + off; y < 470; y += bandH) {
     const g = ctx.createLinearGradient(0, y, 0, y + bandH);
     g.addColorStop(0,   'rgba(255,255,255,0)');
     g.addColorStop(0.5, 'rgba(255,255,255,0.34)');
@@ -1229,8 +1276,36 @@ function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, c
     ctx.fillStyle = g;
     ctx.fillRect(-96, y, 192, bandH);
   }
+
+  // discrete falling streaks — bright ropes of water accelerating downward,
+  // fading as they near the edge so the fall dissolves into spray.
+  const STREAKS = 9;
+  const fallH = 150;
+  for (let s = 0; s < STREAKS; s++) {
+    const sx = -78 + (s / (STREAKS - 1)) * 156;
+    const cyc = ((clock / 620) + s * 0.137) % 1;    // 0→1 travel down the falls
+    const sy = -50 + cyc * (470 + fallH) - fallH;
+    const drift = sx * 0.16 * cyc;                  // streaks pinch inward as they fall
+    const edgeFade = Math.min(1, (470 - sy) / 160); // fade over the lower third
+    const g = ctx.createLinearGradient(0, sy, 0, sy + fallH);
+    g.addColorStop(0,   'rgba(233,246,255,0)');
+    g.addColorStop(0.5, `rgba(233,246,255,${0.5 * Math.max(0, edgeFade)})`);
+    g.addColorStop(1,   'rgba(233,246,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(sx - drift - 2.5, sy, 5, fallH);
+  }
   ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
+
+  // 2b. spray pool where the falls hits the sea below the lip — a soft bright wash
+  const spray = ctx.createRadialGradient(0, 300, 8, 0, 300, 150);
+  spray.addColorStop(0,   'rgba(233,246,255,0.34)');
+  spray.addColorStop(0.6, 'rgba(190,235,255,0.14)');
+  spray.addColorStop(1,   'rgba(190,235,255,0)');
+  ctx.fillStyle = spray;
+  ctx.beginPath();
+  ctx.ellipse(0, 300, 120, 60, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // 3. mist / foam at the base — small reusable pool (capped at 26)
   for (let i = _mist.length - 1; i >= 0; i--) {
