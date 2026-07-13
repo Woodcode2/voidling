@@ -28,7 +28,8 @@ function removeBg(px: Uint8ClampedArray, W: number, H: number): void {
   const med = (a: number[]) => a.sort((p, q) => p - q)[a.length >> 1];
   const BG_R = med(rs), BG_G = med(gs), BG_B = med(bs);
   const lum = 0.299 * BG_R + 0.587 * BG_G + 0.114 * BG_B;
-  const T = lum > 140 ? 28 : 58; // light sheets: tight key; dark sheets: legacy 58
+  const lightSheet = lum > 140;
+  const T = lightSheet ? 28 : 58; // light sheets: tight key; dark sheets: legacy 58
   const BG_THRESH_SQ = T * T;
 
   const visited = new Uint8Array(W * H);
@@ -60,6 +61,26 @@ function removeBg(px: Uint8ClampedArray, W: number, H: number): void {
     if (x < W - 1) seed(i + 1);
     if (y > 0)     seed(i - W);
     if (y < H - 1) seed(i + W);
+  }
+
+  // Bug fix (white-box halo): on white sheets the flood fill can leave a 1-2px
+  // near-white RIM where anti-aliased/noisy background pixels drifted past the
+  // key threshold. Erode any near-white pixel touching the transparent region
+  // (2 passes ≈ 2px). Interior white (fences, marble) is untouched — only rim
+  // pixels adjacent to transparency clear, so no object gets flood-eaten.
+  if (lightSheet) {
+    const N = W * H;
+    for (let pass = 0; pass < 2; pass++) {
+      const toClear: number[] = [];
+      for (let i = 0; i < N; i++) {
+        if (px[i * 4 + 3] < 8) continue;
+        if (px[i*4] < 232 || px[i*4+1] < 232 || px[i*4+2] < 232) continue; // near-white only
+        const x = i % W, y = (i / W) | 0;
+        const clear = (j: number) => j >= 0 && j < N && px[j*4+3] < 8;
+        if ((x > 0 && clear(i-1)) || (x < W-1 && clear(i+1)) || (y > 0 && clear(i-W)) || (y < H-1 && clear(i+W))) toClear.push(i);
+      }
+      for (const i of toClear) px[i*4+3] = 0;
+    }
   }
 }
 
