@@ -305,6 +305,13 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist'),
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, 'index.html'),
+        // Standalone Three.js 3D prototype — separate page, does not touch the game.
+        prototype3d: path.resolve(import.meta.dirname, 'prototype3d.html'),
+      },
+    },
   },
   server: {
     port,
