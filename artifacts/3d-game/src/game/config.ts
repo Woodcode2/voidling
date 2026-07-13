@@ -627,7 +627,7 @@ export const CONFIG = {
   // (effect logic keys off them); names/descs are kid-clear and each has a
   // visible on-void effect. TWIN STOMACHS was cut (playtest: useless).
   BOONS: [
-    { id: 'magnet',    name: 'SUPER SUCK',    desc: 'Pull food in from way farther away' },
+    { id: 'magnet',    name: 'MEGA MAGNET',   desc: 'Pull food in from way farther away' },
     { id: 'overdrive', name: 'ZOOMIES',       desc: 'Zoom around 25% faster — forever' },
     { id: 'tremor',    name: 'SHRINK TOUCH',  desc: 'Your touch shrinks big things down to size' },
     { id: 'greed',     name: 'SPEEDY BOOTS',  desc: 'A little extra zoom, forever' },

@@ -148,6 +148,42 @@ export const objectSprites: Map<string, HTMLImageElement | HTMLCanvasElement> = 
 export const groundSprites: Map<string, HTMLImageElement> = new Map(); // v12 §6
 export const formSprites:   Map<string, HTMLImageElement> = new Map(); // v16 §4
 
+// Center-anchored (vehicle) bakes — must NOT be cropped, or they'd shift
+// vertically (mirror of world.ts VEHICLE_SPRITE_RE).
+const CENTER_ANCHORED_RE = /^(clay_(vehicle|airport|military)|p3d_(taxi|veh_|firetruck|schoolbus|police|ambulance)|p3d2_(tank|heli|jeep|humvee|missile_truck|radar_van))/;
+
+/**
+ * Playtest ("some items float above their shadow"): procedural/clay bakes are
+ * foot-anchored to their CANVAS bottom, so any empty rows at the bottom of the
+ * maker canvas leave the sprite hovering above the contact shadow (drawn at
+ * y=0). Crop those empty bottom rows so the feet sit on the ground. Only touches
+ * foot-anchored baked CANVASES with untight {0,0,1,1} bounds — PNGs (already
+ * tight via scanAlphaBounds) and center-anchored vehicles are left alone. Width
+ * and horizontal placement are unchanged. Idempotent.
+ */
+export function groundBakedSprites(): void {
+  for (const [key, spr] of objectSprites) {
+    if (!(spr instanceof HTMLCanvasElement)) continue;   // baked canvases only
+    if (CENTER_ANCHORED_RE.test(key)) continue;          // vehicles are center-anchored
+    const b = spriteBounds.get(key);
+    if (b && (b.y !== 0 || b.h !== 1)) continue;          // already tight (PNG path) — skip
+    const W = spr.width, H = spr.height;
+    const g = spr.getContext('2d');
+    if (!g || W === 0 || H === 0) continue;
+    let data: Uint8ClampedArray;
+    try { data = g.getImageData(0, 0, W, H).data; } catch { continue; }
+    let maxY = -1;
+    for (let y = H - 1; y >= 0 && maxY < 0; y--) {
+      for (let x = 0; x < W; x++) { if (data[(y * W + x) * 4 + 3] > 8) { maxY = y; break; } }
+    }
+    if (maxY < 0 || maxY >= H - 2) continue;              // transparent or already grounded (<2px gap)
+    const c = document.createElement('canvas');
+    c.width = W; c.height = maxY + 1;
+    c.getContext('2d')!.drawImage(spr, 0, 0);             // copies rows 0..maxY, clips empty bottom
+    objectSprites.set(key, c);
+  }
+}
+
 function tryLoad(url: string, img: HTMLImageElement): Promise<boolean> {
   return new Promise((resolve) => {
     img.onload  = () => resolve(true);

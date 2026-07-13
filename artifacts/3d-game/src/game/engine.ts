@@ -16,6 +16,7 @@ import { createJoystick } from './input';
 import { EventManager } from './events';
 import { loadIslandAssets, updateDrift, isWalkable, islandState, drawDebugMask, drawDebugTerrain, ISLAND_SRC_W } from './islandMap'; // Phase 2
 import { extractionLog } from './spriteExtract'; // ?debug=sprites overlay
+import { groundBakedSprites } from './sprites'; // Playtest: crop floating-sprite bottom padding
 import { resetGroundCache, resetWaterfallState, loadGroundTextures, exportGroundBuffer, drawVectorGround, setMatchLots } from './drawMap'; // Prompt 6 §1/§3 lifecycle
 import { loadWardAssets } from './wardSprites'; // War Pack §1
 import { loadClayCity } from './clayCity'; // Prompt 3: clay building + house art swap
@@ -438,6 +439,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   initProps3d(); // synchronous canvas generation — ready before the first frame
   initAnimals3d();
   initProps3d2();
+  groundBakedSprites(); // ground the synchronous procedural bakes (people/props/animals)
   let assetsLoaded = false;
   const _allAssets = Promise.all([
     loadGroundTextures(base),
@@ -453,7 +455,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   ]).catch(() => {});
   // never hard-block the game on a stuck request — 10s ceiling
   void Promise.race([_allAssets, new Promise((r) => setTimeout(r, 10000))])
-    .then(() => { assetsLoaded = true; notify(); });
+    .then(() => { groundBakedSprites(); assetsLoaded = true; notify(); }); // ground the clay/city bakes too
 
   const joystick = createJoystick(canvas);
   // v6 §5: world events (golden rush, shrink storm, town fights back)
