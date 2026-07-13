@@ -1,10 +1,50 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CONFIG } from '../game/config';
 import type { GameEngine, Snapshot } from '../game/engine';
 import { audio } from '../game/audio';
 import { StarField } from './StarField';
 import { SkinPreview } from './SkinPreview';
 import { weeklyBoard } from '../game/leaderboard';
+
+// Mobile-fit: guarantee a full-screen menu/overlay panel FITS any device with no
+// scroll. Measures the in-flow content vs the available height (after safe-area
+// padding + sibling bars) and `zoom`s the stack down to fit — reflowing layout
+// so flex centering stays correct. Never enlarges; floors at 0.5 (then the
+// overlay's `safe center` + scroll takes over for absurdly tall content).
+function useFitScale<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+    let raf = 0;
+    const fit = () => {
+      (el.style as unknown as { zoom: string }).zoom = '1';
+      const cs = getComputedStyle(parent);
+      const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      let siblings = 0;
+      for (const child of Array.from(parent.children)) {
+        if (child === el) continue;
+        const pos = getComputedStyle(child).position;
+        if (pos === 'absolute' || pos === 'fixed') continue; // decorations don't take space
+        siblings += (child as HTMLElement).offsetHeight;
+      }
+      const gap = parseFloat(cs.rowGap || '0') || 0;
+      const gaps = gap * Math.max(0, parent.children.length - 1);
+      const avail = parent.clientHeight - padY - siblings - gaps;
+      const need = el.scrollHeight;
+      const z = need > avail && avail > 0 ? Math.max(0.5, avail / need) : 1;
+      (el.style as unknown as { zoom: string }).zoom = String(z);
+    };
+    const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit); };
+    fit();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(parent); ro.observe(el);
+    window.addEventListener('resize', schedule);
+    return () => { ro.disconnect(); window.removeEventListener('resize', schedule); cancelAnimationFrame(raf); };
+  }, []); // mount once per screen; ResizeObserver handles dynamic content/font reflow
+  return ref;
+}
 
 // v16.2 build stamp — increment on every deploy
 const BUILD_STAMP = 'v35 · polish';
@@ -302,6 +342,7 @@ function TrophyRoom({ snap, onClose }: { snap: Snapshot; onClose: () => void }) 
 function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; engine: GameEngine; onHelp: () => void; onPlay: () => void; onTrophies: () => void }) {
   // Machine round: weekly TOP VOIDS board modal
   const [showBoard, setShowBoard] = useState(false);
+  const fitRef = useFitScale<HTMLDivElement>();
   return (
     <div className="vd-overlay vd-overlay--solid vd-home" onPointerDown={() => engine.unlockAudio()}>
       <StarField />
@@ -321,7 +362,7 @@ function Home({ snap, engine, onHelp, onPlay, onTrophies }: { snap: Snapshot; en
           </button>
         </div>
       </div>
-      <div className="vd-stack">
+      <div className="vd-stack" ref={fitRef}>
         <div className="vd-hero-void">
           <span className="vd-hero-orbit" aria-hidden="true" />
           <SkinPreview skinId={snap.equippedSkin} size={220} glow={0.95} />
@@ -724,10 +765,11 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
   const r = snap.results;
   // Second-session hook: FIRST FEAST claim animation state
   const [feastClaimed, setFeastClaimed] = useState(0);
+  const fitRef = useFitScale<HTMLDivElement>();
   if (!r) return null;
   return (
     <div className="vd-overlay vd-overlay--scrim">
-      <div className="vd-stack">
+      <div className="vd-stack" ref={fitRef}>
         {r.crown ? <CrownIcon size={76} /> : null}
         <h2 className="vd-heading">
           {r.solo ? `${r.devoured.toFixed(0)}% DEVOURED` : r.crown ? 'CHAMPION!' : `#${r.placement} of ${r.total}`}
@@ -800,9 +842,10 @@ function Results({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
 }
 
 function Boon({ snap, engine }: { snap: Snapshot; engine: GameEngine }) {
+  const fitRef = useFitScale<HTMLDivElement>();
   return (
     <div className="vd-overlay vd-overlay--scrim">
-      <div className="vd-stack">
+      <div className="vd-stack" ref={fitRef}>
         <h2 className="vd-heading">VOID UPGRADE</h2>
         <p className="vd-sub">You grew! Pick an upgrade — it lasts the whole match.</p>
         {snap.boonChoices.map((b) => (

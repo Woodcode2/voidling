@@ -23,7 +23,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Mobile-fit: `safe center` centres when content fits but falls back to
+     top-aligned (never clips the start) when it overflows — so the scroll-safety
+     net under useFitScale can always reach every button. */
+  justify-content: safe center;
   gap: 18px;
   padding: calc(16px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
   color: #fff;
