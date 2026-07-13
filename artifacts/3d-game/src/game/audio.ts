@@ -565,6 +565,133 @@ export const audio = {
     }
   },
 
+  // ── Powers overhaul: each signature power gets its OWN voice (the old
+  // playPower() early-returns after 'mutate_choice', so every power sounded
+  // identical). Distinct sonic gestures: rising-inhale (gulp/singularity/
+  // collapse) vs downward-blast (shockwave) vs self-propelled (rocket). ──
+
+  // GULP power — snappy 3-part wet slurp, up-pitched so it never fatigues on spam.
+  playGulpPower(tier = 0) {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this._noise(now, 0.09, 'bandpass', 500, 0.8, 0.12, 1800); // rising reach-out inhale
+    if (!this._playSample(`gulp_${Math.min(2 + tier, 5)}`, 1.18 - tier * 0.12, 0.45 + tier * 0.08, 0.03)) {
+      // synth fallback — fast descending glug
+      const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(300 - tier * 40, now); o.frequency.exponentialRampToValueAtTime(90, now + 0.13);
+      g.gain.setValueAtTime(0.4, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      o.connect(g); g.connect(this.sfxGain); o.start(now); o.stop(now + 0.15);
+    }
+    if (tier >= 2) this._playSample('thud_big', 0.7, 0.28, 0.05);
+    this._ladder = 0; // next passive nibble restarts its pitch-ladder low
+  },
+
+  // ROCKET BITE — whoosh + doppler swoop + jet + pop-rattle + landing bite.
+  playRocket() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this.whoosh(); // launch rush
+    // doppler swoop — sawtooth sweeping up (playTone can't ramp)
+    const sw = this.ctx.createOscillator(); const sg = this.ctx.createGain();
+    sw.type = 'sawtooth';
+    sw.frequency.setValueAtTime(180, now); sw.frequency.exponentialRampToValueAtTime(900, now + 0.16);
+    sg.gain.setValueAtTime(0.11, now); sg.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    sw.connect(sg); sg.connect(this.sfxGain); sw.start(now); sw.stop(now + 0.2);
+    this._noise(now, 0.22, 'bandpass', 1200, 0.6, 0.16, 4000); // jet thrust body
+    for (let i = 0; i < 4; i++) this._playSample('pop_' + (1 + i), 1.10 + i * 0.06, 0.3, i * 0.035); // pop-rattle down the lane
+    // landing bite at +0.14s
+    if (!this._playSample('gulp_5', 0.9, 0.6, 0.14)) {
+      const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(140, now + 0.14); o.frequency.exponentialRampToValueAtTime(50, now + 0.42);
+      g.gain.setValueAtTime(0.5, now + 0.14); g.gain.exponentialRampToValueAtTime(0.001, now + 0.44);
+      o.connect(g); g.connect(this.sfxGain); o.start(now + 0.14); o.stop(now + 0.46);
+    }
+    this._playSample('thud_big', 0.7, 0.4, 0.14);
+  },
+
+  // SHOCKWAVE — short, dark, DOWNWARD-swept concussive punch (mirror of the pulls).
+  playShockwave(toppled = 0) {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this._playSample('power_blast', 1.0, 0.75);
+    this._playSample('thud_big', 0.7, 0.6);
+    // sub drop 120→38Hz
+    const sub = this.ctx.createOscillator(); const subg = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(120, now); sub.frequency.exponentialRampToValueAtTime(38, now + 0.2);
+    subg.gain.setValueAtTime(0.5, now); subg.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    sub.connect(subg); subg.connect(this.sfxGain); sub.start(now); sub.stop(now + 0.24);
+    this._noise(now, 0.22, 'highpass', 5000, 0.7, 0.3, 600); // downward air-slam "pshOOM"
+    if (toppled > 0) {
+      this._noise(now, 0.45, 'lowpass', 400, 0.8, 0.22);
+      this._playSample('thud_big', 0.5, 0.35, 0.06);
+      this._playSample('thud_big', 0.45, 0.30, 0.16);
+      this.duckMusic();
+    }
+  },
+
+  // SINGULARITY — swept-up inhale into a deep power_deep + sub crunch. No fanfare.
+  playSingularity() {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    this._noise(now, 0.16, 'bandpass', 400, 0.9, 0.14, 2600); // inhale (sweeps up)
+    this._playSample('power_deep', 0.8, 0.72);                // deep crunch body
+    this._playSample('thud_big', 0.45, 0.62);                 // floor-shaking sub
+    this._noise(now + 0.03, 0.09, 'lowpass', 520, 0.7, 0.5);  // bone-crunch grit
+    this.duckMusic();
+  },
+
+  // COLLAPSE — split into inhale (build) and boom (gulp+slam+fanfare) so audio
+  // stays locked to the sim-time visual under heavy slow-mo.
+  playCollapse(phase: 'inhale' | 'boom') {
+    if (!this.sfxOn || !this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    if (phase === 'inhale') {
+      if (this._noiseBuf) {
+        const src = this.ctx.createBufferSource(); src.buffer = this._noiseBuf; src.loop = true;
+        const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass';
+        filt.frequency.setValueAtTime(220, now); filt.frequency.exponentialRampToValueAtTime(7000, now + 0.5);
+        filt.Q.value = 1.2;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.03, now); g.gain.exponentialRampToValueAtTime(0.22, now + 0.5);
+        src.connect(filt); filt.connect(g); g.connect(this.sfxGain); src.start(now); src.stop(now + 0.52);
+      }
+      const sub = this.ctx.createOscillator(); const subg = this.ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(45, now); sub.frequency.exponentialRampToValueAtTime(150, now + 0.5);
+      subg.gain.setValueAtTime(0.0001, now); subg.gain.exponentialRampToValueAtTime(0.18, now + 0.5);
+      sub.connect(subg); subg.connect(this.sfxGain); sub.start(now); sub.stop(now + 0.54);
+      return;
+    }
+    // boom
+    this.playPowerSwallow();
+    this._playSample('power_blast', 0.68, 0.9);
+    this._playSample('thud_big', 0.40, 0.60);
+    this.playTone(40, 'sine', 1.0, 0.14);
+    this.playTone(31, 'sine', 1.2, 0.10, 0.02);
+    this._noise(now, 0.5, 'lowpass', 480, 1, 0.34);
+    this._playSample('fanfare_evolve', 0.70, 0.40, 0.20);
+    this._playSample('chime_bonus', 0.80, 0.30, 0.22);
+    this._noise(now + 0.2, 0.9, 'highpass', 6500, 1, 0.05);
+    this.duckMusic();
+  },
+
+  // Meter READY — bright ascending "ding-DING" so kids know they can fire.
+  powerReady() {
+    if (!this.sfxOn) return;
+    if (this._playSample('chime_bonus', 1.5, 0.35)) return;
+    this.playTone(880, 'triangle', 0.09, 0.06);
+    this.playTone(1320, 'sine', 0.12, 0.05, 0.07);
+  },
+
+  // Meter DENY — soft low thunk on a mistap while charging (non-punishing).
+  powerDeny() {
+    if (!this.sfxOn || !this.ctx) return;
+    this.playTone(150, 'sine', 0.07, 0.045);
+  },
+
   // v14 §1 + v8 §5: evolution sting — sample boom at the peak, synth riser + stab
   playEvolve() {
     if (!this.sfxOn || !this.ctx || !this.sfxGain) return;

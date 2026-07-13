@@ -966,7 +966,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
         </div>
       )}
       {/* Signature VOID POWER — on-screen button (also fires on Space/E). The
-          conic ring sweeps as the cooldown recharges; greyed while charging. */}
+          conic ring FILLS as you eat; greyed while charging, pulses + pops at ready. */}
       {!snap.paused && snap.power && (
         <>
           <button
@@ -974,7 +974,7 @@ function GameControls({ snap, engine }: { snap: Snapshot; engine: GameEngine }) 
             onClick={() => engine.usePower()}
             disabled={!snap.power.ready}
             aria-label={`Use ${snap.power.verb}: ${snap.power.hint}`}
-            style={{ ['--cd' as string]: String(snap.power.cdFrac), ['--pc' as string]: snap.power.color }}
+            style={{ ['--cd' as string]: String(snap.power.fill), ['--pc' as string]: snap.power.color }}
           >
             <span className="vd-power-name">{snap.power.verb}</span>
           </button>

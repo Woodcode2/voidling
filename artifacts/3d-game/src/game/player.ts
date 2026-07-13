@@ -69,6 +69,7 @@ export class Player extends Void {
   twinMerge = false;
   tremorActive = false;
   greedMultiplier = 1;
+  aimX = 1; aimY = 0; // Powers: last non-zero steering dir — where tap-fired powers aim
   frenzyMult = 1;
   tremorFactor = 0.85;
   twinBonus = 1;
@@ -220,6 +221,11 @@ export class Player extends Void {
     this.prevY = this.y;
     this.x += this.vx * dtSec;
     this.y += this.vy * dtSec;
+
+    // Powers: remember last real heading so a tap while momentarily stopped
+    // still fires toward where you were steering.
+    const aimSpd = Math.hypot(this.vx, this.vy);
+    if (aimSpd >= 1) { this.aimX = this.vx / aimSpd; this.aimY = this.vy / aimSpd; }
 
     const m = CONFIG.MAP_SIZE;
     if (this.x < this.radius) { this.x = this.radius; this.vx = Math.abs(this.vx) * 0.4; }

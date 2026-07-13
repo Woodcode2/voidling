@@ -35,6 +35,10 @@ export interface Ring {
   width: number;
 }
 
+// Powers §juice: a tapering light-streak (rocket smear across the screen) —
+// rings/particles can't draw a line, so this is its own primitive.
+interface Streak { x0: number; y0: number; x1: number; y1: number; color: string; width: number; life: number; maxLife: number; }
+
 // Feedback Juice §3: cosmetic coin particle (pooled, display only)
 interface Coin { active: boolean; x: number; y: number; vx: number; vy: number; life: number; maxLife: number; size: number; }
 
@@ -42,11 +46,14 @@ export class FXManager {
   particles: Particle[] = [];
   texts: FloatingText[] = [];
   rings: Ring[] = [];
+  streaks: Streak[] = [];
   // Feedback Juice §3: preallocated coin pool (cap 120) — never allocates per frame
   private coins: Coin[] = Array.from({ length: 120 }, () => ({ active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, size: 0 }));
   shakeTime = 0;
   shakeMagnitude = 0;
   flashTime = 0;
+  flashMax = 150;             // Powers §juice: flash() can hold longer/brighter for COLLAPSE
+  flashColor = '255,255,255';
 
   // Feedback Juice §3: deactivate all pooled coins (called on match start so
   // no coins carry over visually between rounds).
@@ -98,6 +105,11 @@ export class FXManager {
       if (r.life <= 0) this.rings.splice(i, 1);
     }
 
+    for (let i = this.streaks.length - 1; i >= 0; i--) {
+      this.streaks[i].life -= dt;
+      if (this.streaks[i].life <= 0) this.streaks.splice(i, 1);
+    }
+
     // Feedback Juice §3: coins pop up and arc back down, then fade out
     for (const c of this.coins) {
       if (!c.active) continue;
@@ -116,6 +128,7 @@ export class FXManager {
   draw(ctx: CanvasRenderingContext2D) {
     // rings
     for (const r of this.rings) {
+      if (r.r <= 0) continue; // contracting shells cross zero — ctx.arc throws on negative r
       const a = Math.max(0, r.life / r.maxLife);
       ctx.save();
       ctx.globalAlpha = a;
@@ -123,6 +136,21 @@ export class FXManager {
       ctx.lineWidth = r.width;
       ctx.beginPath();
       ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // streaks (rocket smear) — tapering light-lines, drawn under particles
+    for (const s of this.streaks) {
+      const a = Math.max(0, s.life / s.maxLife);
+      ctx.save();
+      ctx.globalAlpha = a * 0.6;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = Math.max(0.5, s.width * a);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(s.x0, s.y0);
+      ctx.lineTo(s.x1, s.y1);
       ctx.stroke();
       ctx.restore();
     }
@@ -187,11 +215,14 @@ export class FXManager {
     ctx.globalAlpha = 1;
   }
 
-  // Full-screen white flash (screen space).
+  // Full-screen white flash (screen space). Longer flashes (>200ms, e.g. the
+  // COLLAPSE white-out) clip to full white then fade; the default 150ms pop is
+  // byte-identical for existing no-arg callers.
   drawFlash(ctx: CanvasRenderingContext2D, width: number, height: number) {
     if (this.flashTime > 0) {
-      const alpha = this.flashTime / 150;
-      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      const peak = this.flashMax > 200 ? 1.5 : 1;
+      const alpha = Math.min(1, (this.flashTime / this.flashMax) * peak);
+      ctx.fillStyle = `rgba(${this.flashColor}, ${alpha})`;
       ctx.fillRect(0, 0, width, height);
     }
   }
@@ -220,6 +251,69 @@ export class FXManager {
         spin: (Math.random() - 0.5) * 0.01,
         gravity: 0,
         shape: 'tri',
+      });
+    }
+  }
+
+  // Powers §juice: a tapering light-streak (rocket smear). One stroke, cheap.
+  addStreak(x0: number, y0: number, x1: number, y1: number, color: string, width = 10, life = 260) {
+    this.streaks.push({ x0, y0, x1, y1, color, width, life, maxLife: life });
+  }
+
+  // Powers §juice: particles spawned on a ring around (sx,sy) that CONVERGE on
+  // (tx,ty) — the "matter caves into the void" read. Everything else flies out.
+  addImplode(sx: number, sy: number, tx: number, ty: number, color: string, count = 16, ringR = 14, life = 340) {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.3;
+      const rr = ringR * (0.55 + Math.random() * 0.45);
+      const px = sx + Math.cos(a) * rr, py = sy + Math.sin(a) * rr;
+      const L = life * (0.7 + Math.random() * 0.3);
+      this.particles.push({
+        x: px, y: py,
+        vx: (tx - px) / L, vy: (ty - py) / L,   // arrive at the target in ~L ms
+        life: L, maxLife: L, color,
+        size: 2 + Math.random() * 3,
+        angle: 0, spin: (Math.random() - 0.5) * 0.03, gravity: 0,
+        shape: Math.random() < 0.5 ? 'crumb' : 'chunk',
+      });
+    }
+  }
+
+  // Powers §juice: directional CONE of crumbs on the far arc that rocket back
+  // into the mouth — the GULP "yank the crowd in" read. Cone, not a ring.
+  addGulpStreaks(mx: number, my: number, dx: number, dy: number, reach: number, halfAngle: number, color: string, count = 14) {
+    const base = Math.atan2(dy, dx);
+    for (let i = 0; i < count; i++) {
+      const a = base + (Math.random() - 0.5) * 2 * halfAngle;
+      const r = reach * (0.45 + Math.random() * 0.55);
+      const sx = mx + Math.cos(a) * r, sy = my + Math.sin(a) * r;
+      const ux = mx - sx, uy = my - sy;
+      const ul = Math.hypot(ux, uy) || 1;
+      const speed = 0.9 + Math.random() * 0.7;
+      this.particles.push({
+        x: sx, y: sy,
+        vx: (ux / ul) * speed, vy: (uy / ul) * speed,
+        life: (ul / speed) * 0.85, maxLife: (ul / speed) * 0.85, color, // dies at 0.85 of the trip → looks absorbed
+        size: 3 + Math.random() * 3,
+        angle: a, spin: 0, gravity: 0,
+        shape: 'crumb',
+      });
+    }
+  }
+
+  // Powers §juice: chunks fired evenly RADIAL-OUTWARD (addDebris is upward-only)
+  // — the SHOCKWAVE "erupts outward" read.
+  addBlastChunks(x: number, y: number, color: string, count = 16, speed = 0.5) {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.3;
+      const spd = speed * (0.6 + Math.random() * 0.8);
+      this.particles.push({
+        x, y,
+        vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+        life: 500 + Math.random() * 400, maxLife: 900, color,
+        size: 5 + Math.random() * 6,
+        angle: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.03,
+        gravity: 0.0011, shape: 'chunk',
       });
     }
   }
@@ -289,7 +383,9 @@ export class FXManager {
     if (vibrate && navigator.vibrate) navigator.vibrate(vibrate);
   }
 
-  flash() {
-    this.flashTime = 150;
+  flash(ms = 150, rgb = '255,255,255') {
+    this.flashTime = ms;
+    this.flashMax = ms;
+    this.flashColor = rgb;
   }
 }

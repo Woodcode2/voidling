@@ -2721,6 +2721,90 @@ export class WorldManager {
     return eaten;
   }
 
+  // Powers overhaul — GULP: a directional CONE of gravity in the steering dir.
+  // Pass 1 yanks everything inside the cone toward the mouth (weighted by how
+  // on-axis it is); pass 2 devours whatever now sits inside the consume zone.
+  // The directional cone is the only genuinely-new bit (voidPowerBlast/
+  // attractEdibles are both symmetric circles).
+  gulpCone(player: Player, dirX: number, dirY: number, reach: number, coneCos: number, pull: number, consumeRange: number, fx: FXManager): number {
+    const px = player.x, py = player.y;
+    // pass 1 — weighted inward yank inside the cone
+    for (const o of this.objects) {
+      if (o.eaten) continue;
+      const ddx = o.x - px, ddy = o.y - py;
+      const d = Math.hypot(ddx, ddy);
+      if (d < 1 || d > reach) continue;
+      const axis = (ddx / d) * dirX + (ddy / d) * dirY; // cos of angle to aim
+      if (axis < coneCos) continue;
+      const angW = (axis - coneCos) / (1 - coneCos);    // 0 at cone edge, 1 on-axis
+      const k = pull * (1 - d / reach) * (0.4 + 0.6 * angW);
+      o.x -= (ddx / d) * k; o.y -= (ddy / d) * k;
+    }
+    // pass 2 — devour inside the mouth (GULP honours the size gate)
+    let eaten = 0;
+    for (const o of this.objects) {
+      if (o.eaten) continue;
+      if (dist(o.x, o.y, px, py) > consumeRange + o.size) continue;
+      if (!this.canEatByPlayer(player, o)) continue;
+      this.consumeByPlayer(o, player, fx);
+      eaten++;
+    }
+    return eaten;
+  }
+
+  // Powers overhaul — SHOCKWAVE: shove everything OUTWARD, and topple big
+  // structures you can't swallow into edible rubble. Returns counts.
+  shockwaveTopple(player: Player, pushR: number, force: number, fx: FXManager): { shoved: number; toppled: number } {
+    const px = player.x, py = player.y;
+    const STRUCT = new Set(['house', 'house_c', 'house_d', 'shop', 'cafe', 'office', 'skyscraper', 'school', 'library', 'hospital', 'townhall', 'landmark', 'watertower']);
+    const m = CONFIG.MAP_SIZE;
+    let shoved = 0, toppled = 0;
+    for (const o of this.objects) {
+      if (o.eaten || o.kind === 'zoo_wall') continue;
+      const d = dist(o.x, o.y, px, py);
+      if (d <= 1 || d > pushR + o.size) continue;
+      const nx = (o.x - px) / d, ny = (o.y - py) / d;
+      const ease = Math.pow(Math.max(0, Math.min(1, 1 - d / pushR)), 2); // front-loaded punch
+      const bigStruct = !this.canEatByPlayer(player, o) && (STRUCT.has(o.kind) || o.tier >= 5);
+      if (bigStruct) {
+        // TOPPLE → the rubble bits ARE the reward you roll over and eat
+        const n = Math.max(4, Math.min(10, Math.round(o.baseSize / 18)));
+        for (let b = 0; b < n; b++) this.spawnBit(o.x, o.y, o.variant ?? b);
+        this.dirt.push({ x: o.x, y: o.y, r: o.baseSize * 0.9, life: 1e9, maxLife: 1e9,
+          rot: this.rand() * Math.PI * 2, drawScale: 0.7 + this.rand() * 0.6 });
+        o.eaten = true;
+        fx.addDebris(o.x, o.y, '#CFC4E0', 10); fx.addDebris(o.x, o.y, '#FFFFFF', 4);
+        fx.addRing(o.x, o.y, '#FFE7B0', o.baseSize * 0.5, 160, 4, 360);
+        toppled++;
+      } else {
+        o.x = Math.max(o.size, Math.min(m - o.size, o.x + nx * force * ease));
+        o.y = Math.max(o.size, Math.min(m - o.size, o.y + ny * force * ease));
+        o.vx += nx * force * 7 * ease; o.vy += ny * force * 7 * ease;
+        o.fleeing = true; o.shakeT = 120;
+        shoved++;
+      }
+    }
+    return { shoved, toppled };
+  }
+
+  // Powers overhaul — SINGULARITY: the biggest eligible STRUCTURE in reach
+  // (crushBig semantics — ignore the size gate, skip the zoo boundary).
+  largestInReach(player: Player, range: number): WorldObject | null {
+    let best: WorldObject | null = null;
+    for (const o of this.objects) {
+      if (o.eaten || o.kind === 'zoo_wall') continue;
+      if (dist(o.x, o.y, player.x, player.y) > range + o.size) continue;
+      if (!best || o.baseSize > best.baseSize) best = o;
+    }
+    return best;
+  }
+
+  // Powers overhaul — SINGULARITY: crush one target whole (fires the existing
+  // skyscraper/train debris + swallow-ghost inside consumeByPlayer). Returns gain.
+  crushTarget(player: Player, obj: WorldObject, fx: FXManager): number {
+    return this.consumeByPlayer(obj, player, fx);
+  }
+
   // v8 §1: nudge any edibles off the round-start footprint of every void so a
   // rival never begins the round sitting inside a cluster (which let bots pop a
   // dozen objects in the first frame and hit 100+ score instantly). Relocates
@@ -3017,7 +3101,7 @@ export class WorldManager {
     this.makeObj(pick(['flower', 'flowerpot', 'apple', 'mailbox', 'hydrant'] as ObjectKind[], this.rand), x, y); // v9 §8: no gnomes on respawn
   }
 
-  private consumeByPlayer(obj: WorldObject, player: Player, fx: FXManager) {
+  private consumeByPlayer(obj: WorldObject, player: Player, fx: FXManager): number {
     obj.eaten = true;
     // Prompt 5: scenery is bonus food — never part of the % devoured numerator.
     if (!obj.scenery) this.eatenArea += Math.PI * obj.baseSize * obj.baseSize;
@@ -3112,7 +3196,7 @@ export class WorldManager {
         rot: this.rand() * Math.PI * 2, drawScale: 0.7 + this.rand() * 0.6 });
     }
 
-    player.absorbObject(obj);
+    const gain = player.absorbObject(obj);
 
     // Feedback Juice §1: cosmetic swallow ghost pulled into the void (display only)
     if (obj.kind !== 'bit') this.spawnSwallowGhost(obj, player.x, player.y);
@@ -3123,6 +3207,7 @@ export class WorldManager {
     if (obj.kind === 'zoo_gate') {
       player.pendingFx.push({ type: 'zoo_break', x: obj.x, y: obj.y }); // v16.1 D: ZOO BREAK! banner
     }
+    return gain;
   }
 
   // Prompt 3: resolve the objectSprites draw key for a grounded structure,

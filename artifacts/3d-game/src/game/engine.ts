@@ -102,7 +102,7 @@ export interface Snapshot {
   killedBy?: string; // name of the void that eliminated the player (if eaten)
   planName?: string; // today's city plan name
   matchStartSeq: number; // Rebuild Prompt 10: increments once per real match start (drives the welcome/coaching intro)
-  power?: { name: string; verb: string; hint: string; ready: boolean; cdFrac: number; form: number; color: string }; // signature void power HUD state
+  power?: { name: string; verb: string; hint: string; ready: boolean; fill: number; hunger: number; cost: number; form: number; color: string }; // signature void power HUD state (fill = charge toward this form's cost)
 }
 
 export interface GameEngine {
@@ -175,12 +175,15 @@ const BOON_MAX_LEVEL = 2;
 // of the flat `consume` and radius×reach, so it always engulfs a meaningful
 // ring around the void even at WORLD ENDER (where a flat radius looked like
 // nothing against the huge body).
+// Powers overhaul — five DISTINCT verbs (reach / dash / push / execute / erase),
+// tap-to-fire aimed by steering, charged by a hunger meter (cost = fraction of
+// the bar). Escalation is strictly monotonic: cost, shake, slow-mo all climb.
 const VOID_POWERS = [
-  { name: 'PULL',        verb: 'PULL',     hint: 'Yank snacks into your maw',        reach: 2.6, kind: 'tug',         pull: 95,  pullRange: 360,  consume: 82,  crushBig: false, cd: 4500,  shake: 6,  color: '#9D78FF' },
-  { name: 'VORTEX',      verb: 'VORTEX',   hint: 'Swirl everything nearby in',        reach: 3.2, kind: 'vortex',      pull: 140, pullRange: 520,  consume: 150, crushBig: false, cd: 5500,  shake: 10, color: '#B48CFF' },
-  { name: 'SHOCKWAVE',   verb: 'BLAST',    hint: 'Shove rivals, clear a huge ring',   reach: 4.2, kind: 'shockwave',   pull: 0,   pullRange: 0,    consume: 300, crushBig: false, cd: 6500,  shake: 16, color: '#D98CFF' },
-  { name: 'SINGULARITY', verb: 'CRUSH',    hint: 'Devour things too BIG to eat',      reach: 5.4, kind: 'singularity', pull: 300, pullRange: 900,  consume: 430, crushBig: true,  cd: 8000,  shake: 20, color: '#C9A0FF' },
-  { name: 'COLLAPSE',    verb: 'COLLAPSE', hint: 'Swallow the city — no size limit',  reach: 6.8, kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: true,  cd: 10000, shake: 30, color: '#E4C4FF' },
+  { name: 'GULP',        verb: 'GULP',     hint: 'Yank a crowd into your maw',        reach: 3.4, kind: 'gulp',        pull: 260, pullRange: 360,  consume: 88,  crushBig: false, cost: 0.14, shake: 4,  color: '#C9A0FF' },
+  { name: 'ROCKET BITE', verb: 'BITE',     hint: 'Rocket through a streak of food',   reach: 3.0, kind: 'rocket',      pull: 70,  pullRange: 0,    consume: 150, crushBig: false, cost: 0.30, shake: 10, color: '#FF8A3D' },
+  { name: 'SHOCKWAVE',   verb: 'BLAST',    hint: 'Blast rivals back, topple towers',  reach: 4.2, kind: 'shockwave',   pull: 0,   pullRange: 0,    consume: 300, crushBig: false, cost: 0.45, shake: 22, color: '#D98CFF' },
+  { name: 'SINGULARITY', verb: 'CRUSH',    hint: 'Crush the biggest thing whole',     reach: 5.4, kind: 'singularity', pull: 300, pullRange: 900,  consume: 430, crushBig: true,  cost: 0.60, shake: 26, color: '#C9A0FF' },
+  { name: 'COLLAPSE',    verb: 'COLLAPSE', hint: 'Swallow the whole screen',          reach: 6.8, kind: 'collapse',    pull: 380, pullRange: 1300, consume: 640, crushBig: false, cost: 0.92, shake: 30, color: '#E4C4FF' },
 ] as const;
 
 function skinById(id: string): SkinDef {
@@ -235,6 +238,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   let luckyTimer = 0;           // v7 §5: LUCKY GNOME golden-rain cadence
   let dashTimer = 0;            // v7 §5: VOID DASH 6s auto-dash cadence
   let powerCd = 0;             // Signature VOID POWER cooldown remaining (ms)
+  // Powers overhaul — hunger meter replaces the cooldown: fills as you eat,
+  // spent on fire. powerLock is a short anti-double-tap debounce.
+  let hunger = 0;             // 0..1 charge; fires when hunger >= power.cost
+  let powerLock = 0;          // ms input debounce after a fire
+  let wasReady = false;       // edge-detect for the READY cue
+  let collapseBoom = 0;       // COLLAPSE two-phase: sim-ms until the boom fires
+  let collapseCtx: { ex: number; ey: number; consumeR: number; pullR: number; R: number } | null = null;
   let countdown = 0;            // v8 §1: ms of frozen pre-round "3..2..1" remaining
   let countStep = 0;           // v8 §1: last countdown number beeped
   let matchStartSeq = 0;        // Rebuild Prompt 10: increments once per real match start (never on boon/resume)
@@ -503,6 +513,11 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       countdown = 0; // skip any lingering pre-round countdown so powers can fire
       console.log(`[debug] forced form ${n} (${CONFIG.FORMS[n].name})`);
     }
+    // Dev-only: H fills the hunger meter so any power can be fired for QA.
+    if (debugForms && player && e.code === 'KeyH') {
+      hunger = 1;
+      console.log('[debug] hunger meter filled');
+    }
     // Dev-only: 7 teleports to the zoo (animals3d checks).
     if (debugForms && player && e.code === 'Digit7') {
       player.x = player.prevX = 9800;
@@ -640,6 +655,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     storedBest = meta.data.highScore; bestBeaten = false;
     prevRank = 99; saidFirst = false; saidTop3 = false;
     eatStreak = 0; lastEatMs = 0;
+    hunger = 0; powerLock = 0; wasReady = false; collapseBoom = 0; collapseCtx = null;
     evoTitle = null;
     powerStamp = null;
     maxCombo = 0;
@@ -743,100 +759,214 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} 100px`);
   }
 
-  // ── Signature VOID POWER — each form fires a DISTINCT move (kind) ───────────
+  // Shove rivals outward from a point (used by the push/heavy powers).
+  function knockRivals(cx: number, cy: number, radius: number, strength: number) {
+    for (const r of rivals) {
+      if (!r.alive || r.ghost) continue;
+      const d = dist(r.x, r.y, cx, cy);
+      if (d > 1 && d < radius + r.radius) {
+        const k = (radius + r.radius - d) * strength;
+        r.x += ((r.x - cx) / d) * k;
+        r.y += ((r.y - cy) / d) * k;
+      }
+    }
+  }
+
+  // Meter READY edge — announce on the button AND on the void (kids watch their
+  // character, not the corner).
+  function fireReadyCue() {
+    if (!player) return;
+    const p = VOID_POWERS[Math.min(player.formIndex, VOID_POWERS.length - 1)];
+    audio.powerReady();
+    haptics.ready();
+    fx.addRing(player.x, player.y, p.color, player.radius * 1.05, 90, 4, 420);
+    fx.addText(player.x, player.y - player.radius - 30, 'TAP!', p.color, 18);
+  }
+
+  // COLLAPSE phase 2 — fires ~300 sim-ms after the inhale, once the shells have
+  // converged. Sim-time (not setTimeout) so it stays locked to the slow-mo.
+  function fireCollapseBoom() {
+    if (!collapseCtx || !world || !player) { collapseCtx = null; return; }
+    const { ex, ey, consumeR, R } = collapseCtx;
+    fx.flash(440);
+    fx.shake(600, 30, [0, 130, 260, 420, 600]);
+    const eaten = world.voidPowerBlast(player, consumeR * 1.15, consumeR, 900, true, fx);
+    // rivals caught in the collapse get flung hard; the whole screen imploding is the payoff
+    for (const r of rivals) {
+      if (!r.alive || r.ghost) continue;
+      const d = dist(r.x, r.y, ex, ey);
+      if (d < consumeR + r.radius) {
+        const nx = d > 1 ? (r.x - ex) / d : 1, ny = d > 1 ? (r.y - ey) / d : 0;
+        r.vx += nx * 18; r.vy += ny * 18; r.x += nx * 40; r.y += ny * 40;
+      }
+    }
+    knockRivals(ex, ey, consumeR * 1.3, 1.1);
+    fx.addRing(ex, ey, '#FFFFFF', R, consumeR * 2.4, 16, 820);
+    fx.addRing(ex, ey, '#E4C4FF', R * 0.6, consumeR * 1.8, 11, 720);
+    fx.addRing(ex, ey, '#FFD9A0', R * 0.3, consumeR * 1.2, 7, 620);
+    fx.addDebris(ex, ey, '#E4C4FF', 16); fx.addDebris(ex, ey, '#FFFFFF', 10);
+    fx.addConfetti(ex, ey, CONFIG.COLORS.pops, 34);
+    fx.addCoinBurst(ex, ey, 600);
+    fx.addText(ex, ey - R - 46, 'CITY DEVOURED', '#E4C4FF', 46);
+    banner('CITY DEVOURED!', '#E4C4FF', 3.5, { pulse: true });
+    haptics.knockout();
+    audio.playCollapse('boom');
+    console.log(`[power] COLLAPSE boom consumed ${eaten}`);
+    collapseCtx = null;
+  }
+
+  // ── Signature VOID POWER — each form fires a DISTINCT verb, tap-to-fire,
+  // aimed by steering, gated by the hunger meter ─────────────────────────────
   function usePower() {
     if (screen !== 'game' || paused || !player || !world || countdown > 0) return;
-    if (powerCd > 0) return;
+    if (powerLock > 0) return;
     const p = VOID_POWERS[Math.min(player.formIndex, VOID_POWERS.length - 1)];
-    powerCd = p.cd;
-    haptics.power();
+    if (hunger < p.cost) { // not charged — soft deny, keep eating
+      audio.powerDeny();
+      fx.addRing(player.x, player.y, p.color, player.radius * 0.9, 40, 2, 220);
+      return;
+    }
+    hunger = Math.max(0, hunger - p.cost); // carryover, not zeroed
+    powerLock = 350; wasReady = false;
+    if (player.formIndex >= 1) haptics.power(); // GULP uses lighter haptics inside its case
 
-    // Reach scales with the void's own radius so it feels bigger as you grow.
-    // Late-game pass: floored by the old formula (early forms unchanged), but
-    // once the void is huge the radius×reach term dominates so the blast always
-    // engulfs a real ring around the body instead of looking like nothing.
-    // (240 stays a literal — do NOT tie it to MAX_RADIUS or retuning the cap
-    // would silently change every power.)
     const rScale = 1 + player.radius / 240;
     const consumeR = Math.max(p.consume * rScale, player.radius * p.reach);
     const pullR = Math.max(p.pullRange * rScale, consumeR * 1.7);
     const px = player.x, py = player.y;
+    // aim = last steering direction (persisted on the player)
+    let dirX = player.aimX, dirY = player.aimY;
+    const amag = Math.hypot(dirX, dirY) || 1; dirX /= amag; dirY /= amag;
+    let eaten = 0;
 
-    const eaten = world.voidPowerBlast(player, pullR, consumeR, p.pull, p.crushBig, fx);
-
-    // Shove rivals out of the zone (used by the outward/heavy powers).
-    const knockRivals = (radius: number, strength: number) => {
-      for (const r of rivals) {
-        if (!r.alive || r.ghost) continue;
-        const d = dist(r.x, r.y, px, py);
-        if (d > 1 && d < radius + r.radius) {
-          const k = (radius + r.radius - d) * strength;
-          r.x += ((r.x - px) / d) * k;
-          r.y += ((r.y - py) / d) * k;
-        }
-      }
-    };
-
-    // ── per-kind FX identity — no two powers look alike ──────────────────────
     switch (p.kind) {
-      case 'tug': { // snappy inward slurp
-        fx.addRing(px, py, p.color, consumeR * 1.1, player.radius * 0.5, 5, 300);
-        for (let i = 0; i < 10; i++) {
-          const a = (i / 10) * Math.PI * 2 + roundElapsed * 0.002;
-          fx.addRing(px + Math.cos(a) * consumeR, py + Math.sin(a) * consumeR, p.color, 6, 1, 2, 260);
+      case 'gulp': { // reach out and YANK a cone of the world into your mouth
+        const reach = Math.max(320 * rScale, player.radius * 3.4);
+        const gConsumeR = Math.max(88 * rScale, player.radius * 2.2);
+        eaten = world.gulpCone(player, dirX, dirY, reach, 0.788, 260, gConsumeR, fx);
+        const tier = eaten >= 6 ? 3 : eaten >= 4 ? 2 : eaten >= 2 ? 1 : 0;
+        fx.addGulpStreaks(px, py, dirX, dirY, reach, 0.663, '#C9A0FF', 14);
+        fx.addRing(px + dirX * gConsumeR * 0.8, py + dirY * gConsumeR * 0.8, '#B48CFF', 6, 220, 3, 240);
+        fx.addRing(px, py, '#E9DBFF', gConsumeR * 1.25, -(gConsumeR * 1.6), 5, 220); // maw cinches shut
+        fx.addCrumbs(px, py, '#C9A0FF', 6); fx.addCrumbs(px, py, '#FFFFFF', 3);
+        if (eaten >= 5) { fx.shake(140, 7, [0, 20, 12]); fx.addConfetti(px, py, ['#C9A0FF', '#E9DBFF', '#FFFFFF'], 10); haptics.power(); }
+        else { fx.shake(90, 4, 18); haptics.eat(); }
+        if (eaten >= 6) { slowmo = Math.max(slowmo, 90); banner('BIG GULP!', '#B48CFF', 1.5, { pulse: true }); }
+        audio.playGulpPower(tier);
+        break;
+      }
+      case 'rocket': { // COMET — blast across the screen eating a streak
+        const dashDist = Math.max(300, Math.min(560, 300 + player.radius * 2.2));
+        const biteR = Math.max(p.consume * rScale, player.radius * p.reach);
+        const K = Math.max(6, Math.ceil(dashDist / (biteR * 0.6)));
+        const px0 = px, py0 = py;
+        fx.addRing(px0, py0, '#FFFFFF', player.radius * 0.5, player.radius * 2, 5, 220);
+        fx.addRing(px0, py0, '#FF8A3D', player.radius * 0.5, player.radius * 4, 6, 280);
+        fx.addDebris(px0, py0, '#C9A0FF', 6);
+        fx.shake(90, 5, 12);
+        for (let i = 1; i <= K; i++) {
+          const t = i / K;
+          player.x = clamp(px0 + dirX * dashDist * t, player.radius, CONFIG.MAP_SIZE - player.radius);
+          player.y = clamp(py0 + dirY * dashDist * t, player.radius, CONFIG.MAP_SIZE - player.radius);
+          eaten += world.voidPowerBlast(player, biteR * 1.3, biteR, p.pull, false, fx);
         }
-        fx.shake(150, p.shake, 20);
-        break;
-      }
-      case 'vortex': { // swirling vacuum — nested spiral rings + sparkle
-        for (let i = 0; i < 3; i++) {
-          fx.addRing(px, py, p.color, consumeR * (1.15 - i * 0.25), player.radius * 0.4, 5, 420 + i * 60);
+        const px1 = player.x, py1 = player.y;
+        fx.addStreak(px0, py0, px1, py1, '#FF8A3D', player.radius * 2.4, 300);
+        fx.addStreak(px0, py0, px1, py1, '#FFFFFF', player.radius * 1.2, 220);
+        for (let i = 1; i <= 6; i++) {
+          const t = i / 7, sx = px0 + dirX * dashDist * t, sy = py0 + dirY * dashDist * t;
+          fx.addRing(sx, sy, '#B84DFF', player.radius * 0.4, player.radius * 0.15, player.radius * 0.9, 250 - i * 12);
         }
-        fx.addConfetti(px, py, ['#B48CFF', '#E0C4FF', '#FFFFFF'], 12);
-        fx.shake(220, p.shake, [0, 90]);
+        fx.addRing(px1, py1, '#FFFFFF', player.radius * 0.6, player.radius * 3.5, 7, 360);
+        fx.addRing(px1, py1, '#FF8A3D', player.radius * 0.4, player.radius * 2.6, 5, 300);
+        fx.addDebris(px1, py1, '#FFD23F', 8); fx.addDebris(px1, py1, '#FFFFFF', 4);
+        fx.shake(180, 10, [0, 60]);
+        slowmo = Math.max(slowmo, 90);
+        if (eaten > 0) fx.addText(px1, py1 - player.radius - 22, `${eaten} DEVOURED`, '#FF8A3D', 22);
+        if (eaten >= 4) fx.addText(px1, py1 - player.radius - 50, `x${eaten}`, '#FFD23F', 34);
+        banner('ROCKET BITE!', '#FF8A3D', 3, { pulse: true });
+        haptics.knockout();
+        audio.playRocket();
         break;
       }
-      case 'shockwave': { // OUTWARD blast — expanding ring + debris + knockback
-        fx.addRing(px, py, '#FFFFFF', player.radius * 0.6, consumeR * 1.9, 9, 520);
-        fx.addRing(px, py, p.color, player.radius * 0.4, consumeR * 1.6, 6, 460);
-        fx.addDebris(px, py, '#D98CFF', 10);
-        fx.addDebris(px, py, '#FFFFFF', 6);
-        fx.shake(320, p.shake, [0, 120]);
-        knockRivals(consumeR * 1.2, 0.9);
-        break;
-      }
-      case 'singularity': { // gravity well — brief slow-mo, dark warp + bright core
-        slowmo = Math.max(slowmo, 360);
+      case 'shockwave': { // PUSH — blast outward, topple towers, fling rivals
+        const pushR = consumeR * 1.35;
+        eaten = world.voidPowerBlast(player, pullR, consumeR, 0, false, fx); // pull=0 → no yank
+        const { toppled } = world.shockwaveTopple(player, pushR, 34, fx);
+        knockRivals(px, py, pushR, 1.4);
+        for (const r of rivals) { // swim-recoil so they don't instantly close back in
+          if (!r.alive || r.ghost) continue;
+          const d = dist(r.x, r.y, px, py);
+          if (d > 1 && d < pushR + r.radius) { r.vx += ((r.x - px) / d) * 136; r.vy += ((r.y - py) / d) * 136; }
+        }
+        slowmo = Math.max(slowmo, 140);
         fx.flash();
-        fx.addRing(px, py, p.color, consumeR * 1.3, player.radius * 0.3, 10, 560);
-        fx.addRing(px, py, '#FFFFFF', consumeR * 0.6, player.radius * 0.2, 5, 420);
-        for (let i = 0; i < 20; i++) {
-          const a = (i / 20) * Math.PI * 2;
-          fx.addRing(px + Math.cos(a) * consumeR, py + Math.sin(a) * consumeR, p.color, 8, 2, 3, 340);
-        }
-        fx.shake(420, p.shake, [0, 120, 260]);
-        knockRivals(consumeR, 0.7);
+        fx.addRing(px, py, '#FFFFFF', player.radius * 0.7, consumeR * 3.0, 12, 300);
+        fx.addRing(px, py, p.color, player.radius * 0.5, consumeR * 2.6, 8, 380);
+        fx.addRing(px, py, '#FFE7B0', consumeR * 0.9, consumeR * 0.6, 6, 460);
+        fx.addBlastChunks(px, py, p.color, 16, 0.55); fx.addBlastChunks(px, py, '#FFFFFF', 8, 0.7);
+        fx.addConfetti(px, py, ['#D98CFF', '#E4C4FF', '#FFE7B0', '#FFFFFF'], 20);
+        fx.shake(340, Math.min(30, 22 + toppled * 2), [0, 90, 40, 120]);
+        if (eaten > 0) fx.addText(px, py - player.radius - 22, `${eaten} CLEARED`, p.color, 22);
+        if (toppled > 0) fx.addText(px, py - player.radius - 48, `${toppled} TOPPLED!`, '#FFE7B0', 26);
+        banner('SHOCKWAVE!', p.color, 3, { pulse: true });
+        haptics.knockout();
+        audio.playShockwave(toppled);
         break;
       }
-      case 'collapse': { // the climax — slow-mo + full flash + massive shockwave
-        slowmo = Math.max(slowmo, 600);
+      case 'singularity': { // EXECUTE — lock the biggest thing and crush it whole
+        const lockR = consumeR * 1.15;
+        const target = world.largestInReach(player, lockR);
+        if (!target) { // nothing to crush — refund most of the cost, gentle nudge
+          hunger = Math.min(1, hunger + p.cost * 0.75);
+          fx.addRing(px, py, p.color, player.radius * 0.9, 200, 3, 300);
+          banner('NOTHING TO CRUSH', p.color, 1.5);
+          audio.powerDeny();
+          break;
+        }
+        const tx = target.x, ty = target.y;
+        slowmo = Math.max(slowmo, 480);
+        fx.addRing(tx, ty, '#FFFFFF', target.baseSize * 1.45, 40, 3, 200);   // reticle snap
+        fx.addRing(tx, ty, '#C9A0FF', target.baseSize * 1.15, 30, 2, 220);
+        fx.addImplode(tx, ty, px, py, '#C9A0FF', 22, target.baseSize * 0.5, 340);
+        fx.addImplode(tx, ty, px, py, '#FFFFFF', 8, target.baseSize * 0.4, 300);
+        fx.addRing(px, py, '#FFFFFF', player.radius * 0.3, player.radius * 3.0, 6, 360);
         fx.flash();
-        fx.addRing(px, py, '#FFFFFF', player.radius, consumeR * 2.0, 14, 800);
-        fx.addRing(px, py, p.color, player.radius * 0.6, consumeR * 1.6, 10, 700);
-        fx.addRing(px, py, '#FFD9A0', player.radius * 0.3, consumeR * 1.2, 6, 600);
-        fx.addConfetti(px, py, CONFIG.COLORS.pops, 28);
-        fx.addDebris(px, py, '#E4C4FF', 12);
-        fx.shake(560, p.shake, [0, 120, 260, 420]);
-        knockRivals(consumeR * 1.3, 1.0);
+        const gap = dist(px, py, tx, ty); // lunge toward the target
+        if (gap > 1) {
+          player.x = clamp(px + ((tx - px) / gap) * Math.min(60, gap * 0.35), player.radius, CONFIG.MAP_SIZE - player.radius);
+          player.y = clamp(py + ((ty - py) / gap) * Math.min(60, gap * 0.35), player.radius, CONFIG.MAP_SIZE - player.radius);
+        }
+        world.crushTarget(player, target, fx); // fires the skyscraper/train debris + swallow-ghost
+        eaten = 1;
+        fx.shake(460, 26, [0, 30, 90, 150]);
+        fx.addDebris(px, py, '#E4C4FF', 10);
+        fx.addRing(px, py, '#FFFFFF', player.radius * 0.6, consumeR * 1.6, 9, 520);
+        fx.addRing(px, py, '#C9A0FF', player.radius * 0.5, consumeR * 1.3, 6, 460);
+        knockRivals(px, py, consumeR, 0.8);
+        fx.addText(px, py - player.radius - 30, 'CRUSHED!', '#C9A0FF', 34);
+        banner('CRUSH!', '#C9A0FF', 2.5, { pulse: true });
+        haptics.knockout();
+        audio.playSingularity();
+        break;
+      }
+      case 'collapse': { // ERASE — the whole screen caves into your mouth
+        const ex = px + dirX * player.radius * 0.3, ey = py + dirY * player.radius * 0.3;
+        const viewR = 0.5 * Math.hypot(fw, fh) / camZoom; // whole-screen reach, any device
+        collapseCtx = { ex, ey, consumeR: viewR * 0.90, pullR: viewR * 1.05, R: player.radius };
+        slowmo = Math.max(slowmo, 1100);
+        world.attractEdibles(ex, ey, viewR * 1.05, 900); // yank the whole screen in NOW
+        for (let i = 0; i < 5; i++) fx.addRing(ex, ey, i % 2 ? '#E4C4FF' : '#FFFFFF', viewR * (1 - 0.11 * i), -viewR * 2.1, 5 + i, 520);
+        fx.addImplode(ex, ey, ex, ey, '#E4C4FF', 64, viewR * 0.95, 500);
+        fx.addImplode(ex, ey, ex, ey, '#B48CFF', 44, viewR * 0.68, 500);
+        fx.addImplode(ex, ey, ex, ey, '#FFFFFF', 28, viewR * 0.40, 500);
+        fx.shake(260, 9, [0, 25, 40, 25, 55]);
+        banner('COLLAPSE!', '#E4C4FF', 3, { pulse: true });
+        audio.playCollapse('inhale');
+        collapseBoom = 300; // boom fires ~300 sim-ms later
         break;
       }
     }
-
-    // Surface the payoff (previously only console.log'd).
-    if (eaten > 0) fx.addText(px, py - player.radius - 22, `${eaten} DEVOURED`, p.color, 22);
-
-    banner(`${p.name}!`, p.color, 3, { pulse: true });
-    audio.playPower(p.kind);
     console.log(`[power] ${p.name} (form ${player.formIndex}) consumed ${eaten}`);
   }
 
@@ -1537,6 +1667,15 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
     // Signature VOID POWER cooldown tick
     if (powerCd > 0) powerCd = Math.max(0, powerCd - dt);
+    // Powers overhaul — meter debounce, COLLAPSE two-phase timer, READY edge cue
+    if (powerLock > 0) powerLock = Math.max(0, powerLock - dt);
+    if (collapseBoom > 0) { collapseBoom -= dt; if (collapseBoom <= 0) fireCollapseBoom(); }
+    {
+      const rp = VOID_POWERS[Math.min(player.formIndex, VOID_POWERS.length - 1)];
+      const nowReady = hunger >= rp.cost && countdown <= 0;
+      if (nowReady && !wasReady) fireReadyCue();
+      wasReady = nowReady;
+    }
 
     // v7 §5: ECHO BITE shockwave (every 5th absorb) pulls nearby edibles inward
     if (player.echoPulse) {
@@ -1644,6 +1783,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       if (ev.type === 'absorb') {
         fx.addConfetti(ev.x, ev.y, [ev.color || '#FFD23F', '#FFFFFF']);
       } else if (ev.type === 'score') {
+        // Powers overhaul — hunger meter fills as you eat: flat per-bite floor
+        // (predictable "eat ~N → power") + a size bonus so big eats kick the ring.
+        hunger = Math.min(1, hunger + 0.011 + (ev.amount || 0) * 0.00018);
         // Feedback Juice §3: cosmetic coin burst at the score point (display only)
         fx.addCoinBurst(ev.x, ev.y, ev.amount || 0);
         // v10 §3: pool absorb points — rolling 150ms window; each merge resets the clock
@@ -1682,6 +1824,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
         roundTriples++; // v12 §5: track triple combos for trophy
         meta.updateTrophyCounter('totalTriples', 1, 'sum');
       } else if (ev.type === 'eatRival') {
+        hunger = Math.min(1, hunger + 0.15); // eating a sibling is worth ~half a GULP
         roundRivalEats++; // v12 §5: track rival eats for trophy
         audio.playChompVoid(); // v14 §1: chomp_void at 0.9, falls back to playMerge synth
         audio.playPredationEat(); // Sound Pack §8: EAT BIG + shimmer
@@ -3331,7 +3474,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
       matchStartSeq, // Rebuild Prompt 10
       power: (player && screen === 'game') ? (() => {
         const idx = Math.min(player.formIndex, VOID_POWERS.length - 1);
-        return { name: VOID_POWERS[idx].name, verb: VOID_POWERS[idx].verb, hint: VOID_POWERS[idx].hint, ready: powerCd <= 0 && countdown <= 0, cdFrac: clamp(1 - powerCd / VOID_POWERS[idx].cd, 0, 1), form: idx, color: VOID_POWERS[idx].color };
+        const cost = VOID_POWERS[idx].cost;
+        return { name: VOID_POWERS[idx].name, verb: VOID_POWERS[idx].verb, hint: VOID_POWERS[idx].hint, ready: hunger >= cost && countdown <= 0, fill: clamp(hunger / cost, 0, 1), hunger: clamp(hunger, 0, 1), cost, form: idx, color: VOID_POWERS[idx].color };
       })() : undefined,
     };
   }

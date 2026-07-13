@@ -23,4 +23,10 @@ export const haptics = {
   evolve() { impact?.('Medium'); },
   power() { impact?.('Medium'); },
   knockout() { impact?.('Heavy'); },
+  /** Power-meter ready — a light DOUBLE tick, distinct from the single fire buzz. */
+  ready() {
+    if (navigator.vibrate) navigator.vibrate([0, 25, 40, 25]);
+    impact?.('Light');
+    setTimeout(() => impact?.('Light'), 45);
+  },
 };
