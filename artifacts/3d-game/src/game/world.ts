@@ -2706,9 +2706,12 @@ export class WorldManager {
     // 1) hard inward pull across the whole reach
     this.attractEdibles(player.x, player.y, pullRange, pull);
     // 2) instant devour inside the consume radius. Snapshot first: consumeByPlayer
-    //    mutates object state, so iterate a stable list.
+    //    spawns debris 'bit' objects onto this.objects, and a live for-of would
+    //    then re-eat those fresh bits in the same pass (inflating the count +
+    //    destroying the roll-over rubble). Iterate a stable copy.
     let eaten = 0;
-    for (const o of this.objects) {
+    const snapshot = this.objects.slice();
+    for (const o of snapshot) {
       if (o.eaten) continue;
       if (dist(o.x, o.y, player.x, player.y) > consumeRange + o.size) continue;
       // zoo_wall is never edible (structural boundary); everything else is fair
@@ -2740,9 +2743,11 @@ export class WorldManager {
       const k = pull * (1 - d / reach) * (0.4 + 0.6 * angW);
       o.x -= (ddx / d) * k; o.y -= (ddy / d) * k;
     }
-    // pass 2 — devour inside the mouth (GULP honours the size gate)
+    // pass 2 — devour inside the mouth (GULP honours the size gate). Snapshot so
+    // freshly-spawned debris bits aren't re-eaten in the same pass.
     let eaten = 0;
-    for (const o of this.objects) {
+    const snapshot = this.objects.slice();
+    for (const o of snapshot) {
       if (o.eaten) continue;
       if (dist(o.x, o.y, px, py) > consumeRange + o.size) continue;
       if (!this.canEatByPlayer(player, o)) continue;

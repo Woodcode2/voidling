@@ -699,6 +699,8 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     fx.particles.length = 0;
     fx.texts.length = 0;
     fx.rings.length = 0;
+    fx.streaks.length = 0;  // Powers: ROCKET streaks live in their own buffer — clear them too
+    fx.flashTime = 0;       // don't carry a long COLLAPSE white-out into the next match
     fx.clearCoins(); // Feedback Juice §3: no coin carryover between rounds
 
     // v5 §1: spawn already correctly framed (no zoom-in animation)
