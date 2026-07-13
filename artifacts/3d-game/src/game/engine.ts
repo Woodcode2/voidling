@@ -754,18 +754,29 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   // SONIC SNACK synergy (ZOOMIES + VOID DASH) recolours the trail rainbow.
   function performDash() {
     if (!player) return;
-    let dx = player.vx, dy = player.vy;
-    const mag = Math.hypot(dx, dy);
-    if (mag < 1) { dx = 1; dy = 0; } else { dx /= mag; dy /= mag; }
+    // Playtest ("auto-dash doesn't work"): the old flat 100px was invisible once
+    // the void grew huge. Scale the dash with size, leave a bright streak, eat
+    // along the way, and add a whoosh so it's unmistakably a power.
+    let dx = player.aimX, dy = player.aimY; // persisted heading (aim), fallback (1,0)
+    const mag = Math.hypot(dx, dy) || 1; dx /= mag; dy /= mag;
     const rainbow = activeSynergies.has('sonic');
+    const dashDist = Math.max(220, player.radius * 3.2);
+    const x0 = player.x, y0 = player.y;
+    player.x = clamp(player.x + dx * dashDist, player.radius, CONFIG.MAP_SIZE - player.radius);
+    player.y = clamp(player.y + dy * dashDist, player.radius, CONFIG.MAP_SIZE - player.radius);
+    const col = rainbow ? `hsl(${(roundElapsed * 0.4) % 360}, 90%, 66%)` : '#5AFFA0';
+    fx.addStreak(x0, y0, player.x, player.y, col, player.radius * 1.6, 260);
+    fx.addStreak(x0, y0, player.x, player.y, '#FFFFFF', player.radius * 0.7, 200);
     for (let i = 1; i <= 5; i++) {
-      const t = i / 5;
-      const col = rainbow ? `hsl(${(roundElapsed * 0.4 + i * 55) % 360}, 90%, 66%)` : '#5AFFA0';
-      fx.addRing(player.x + dx * 100 * t, player.y + dy * 100 * t, col, player.radius * 0.85, player.radius * 0.85 + 16, 3, 320);
+      const t = i / 6, sx = x0 + dx * dashDist * t, sy = y0 + dy * dashDist * t;
+      fx.addRing(sx, sy, col, player.radius * 0.5, player.radius * 0.2, player.radius * 0.7, 240 - i * 12);
     }
-    player.x = clamp(player.x + dx * 100, player.radius, CONFIG.MAP_SIZE - player.radius);
-    player.y = clamp(player.y + dy * 100, player.radius, CONFIG.MAP_SIZE - player.radius);
-    console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} 100px`);
+    fx.addRing(player.x, player.y, col, player.radius * 0.5, player.radius * 2, 5, 320);
+    if (world) world.voidPowerBlast(player, player.radius * 1.6, player.radius * 1.3, 60, false, fx); // gobble what you dashed into
+    fx.shake(120, 5, 12);
+    audio.whoosh();
+    haptics.power();
+    console.log(`[boon] VOID DASH${rainbow ? ' (SONIC SNACK)' : ''} ${Math.round(dashDist)}px`);
   }
 
   // Shove rivals outward from a point (used by the push/heavy powers).
@@ -2004,10 +2015,12 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   }
 
   function openBoonPick() {
-    // v7 §5: draw WITHOUT replacement — retire any power-up already at max level
-    const pool = CONFIG.BOONS.filter((b) => (boonRank.get(b.id) || 0) < BOON_MAX_LEVEL);
+    // Playtest: offer only upgrades you DON'T already have — every pick is a NEW
+    // distinct power, so you're never offered the same one 2-3 times. 3 choices
+    // for real agency (falls back to whatever's left if the pool runs low).
+    const pool = CONFIG.BOONS.filter((b) => !hasBoon(b.id));
     boonChoices = [];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       if (pool.length) {
         boonChoices.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
       }
