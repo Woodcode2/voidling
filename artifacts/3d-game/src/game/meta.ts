@@ -17,6 +17,7 @@ export interface TrophyCounters {
 
 export interface GameMeta {
   coins: number;
+  playerName: string;    // Game Center alias on iOS; 'You' fallback on web
   skinsOwned: string[];
   equippedSkin: string;
   streak: number;
@@ -46,6 +47,7 @@ const DEFAULT_TROPHY_COUNTERS: TrophyCounters = {
 
 const DEFAULT_META: GameMeta = {
   coins: 0,
+  playerName: 'You',
   skinsOwned: ['classic'],
   equippedSkin: 'classic',
   streak: 0,
@@ -86,6 +88,7 @@ export const meta = {
     if (!Array.isArray(this.data.skinsOwned)) this.data.skinsOwned = [...DEFAULT_META.skinsOwned];
     if (!Array.isArray(this.data.missions)) this.data.missions = [];
     if (typeof this.data.equippedSkin !== 'string') this.data.equippedSkin = 'classic';
+    if (typeof this.data.playerName !== 'string' || !this.data.playerName.trim()) this.data.playerName = 'You';
     if (typeof this.data.coins !== 'number' || !Number.isFinite(this.data.coins)) this.data.coins = 0;
     if (typeof this.data.firstFeastClaimed !== 'boolean') this.data.firstFeastClaimed = false;
     if (typeof this.data.weeklyBest !== 'number' || !Number.isFinite(this.data.weeklyBest)) this.data.weeklyBest = 0;
@@ -119,6 +122,16 @@ export const meta = {
     try {
       localStorage.setItem('voidling_meta_v1', JSON.stringify(this.data));
     } catch { /* storage unavailable (private mode / quota) — play session-only */ }
+  },
+
+  /** Set the display name shown in-match and on the ladder (Game Center alias
+   *  on iOS). Trimmed + length-capped so a long alias can't overflow the HUD. */
+  setPlayerName(name: string) {
+    const clean = (name || '').trim().slice(0, 16);
+    if (clean && clean !== this.data.playerName) {
+      this.data.playerName = clean;
+      this.save();
+    }
   },
 
   addCoins(amount: number) {

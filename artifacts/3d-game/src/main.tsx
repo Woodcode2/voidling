@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
+import { initGameCenter } from './game/gameCenter';
 
 // Final pass (investor audit): brand fonts BUNDLED — the Google Fonts CDN link
 // silently failed in the packaged iOS shell / offline, dropping the whole type
@@ -39,3 +40,7 @@ if (import.meta.env.PROD) {
 }
 
 createRoot(document.getElementById('root')!).render(<App />);
+
+// Game Center sign-in (iOS only; no-ops on web). Pulls the player's real
+// Game Center alias into meta.playerName for the HUD + weekly ladder.
+initGameCenter();

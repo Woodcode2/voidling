@@ -2,6 +2,7 @@
 // Deterministic per ISO week: the same seeded field everywhere, refreshed every
 // Monday. The player climbs it with their best score of the week.
 import { meta } from './meta';
+import { submitWeeklyBest } from './gameCenter';
 
 export interface BoardRow { rank: number; name: string; flag: string; score: number; me: boolean; }
 
@@ -47,6 +48,8 @@ function hashStr(s: string): number {
 export function submitWeeklyScore(score: number): boolean {
   const wk = weekKey();
   if (meta.data.weeklyKey !== wk) { meta.data.weeklyKey = wk; meta.data.weeklyBest = 0; }
+  // Mirror to Game Center on iOS (best-effort; no-ops on web). GC keeps its own max.
+  submitWeeklyBest(score);
   if (score > meta.data.weeklyBest) {
     meta.data.weeklyBest = score;
     meta.save();
@@ -69,9 +72,10 @@ export function weeklyBoard(): { rows: BoardRow[]; myRank: number; daysLeft: num
     const score = Math.round((top * Math.pow(1 - frac, 1.7) + 800 * frac) / 10) * 10 + Math.floor(rand() * 9);
     others.push({ name: namePool[i], flag: FLAGS[Math.floor(rand() * FLAGS.length)], score });
   }
-  const mine = { name: 'You', flag: '⭐', score: meta.data.weeklyBest };
+  const mine = { name: meta.data.playerName, flag: '⭐', score: meta.data.weeklyBest };
   const all = [...others, mine].sort((a, b) => b.score - a.score);
-  const rows: BoardRow[] = all.map((r, i) => ({ rank: i + 1, name: r.name, flag: r.flag, score: r.score, me: r.name === 'You' }));
+  // identity match (not name) so a Game Center alias that collides with a seeded rival still flags correctly
+  const rows: BoardRow[] = all.map((r, i) => ({ rank: i + 1, name: r.name, flag: r.flag, score: r.score, me: r === mine }));
   const myRank = rows.find((r) => r.me)?.rank ?? rows.length;
   return { rows, myRank, daysLeft: daysLeftInWeek() };
 }

@@ -601,6 +601,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const cY = _sp.y > 0 ? _sp.y : CONFIG.MAP_SIZE / 2;
     if (!player) player = new Player(skin);
     player.reset(c, cY, skin);
+    player.name = meta.data.playerName; // Game Center alias on iOS, 'You' on web
     player.radius = startRadius;
     // v12 §4: daily mod post-player-init effects
     if (daily && dailyData) {
@@ -2508,7 +2509,7 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     // v9 §1: crowns render ONLY for voids currently in the final (WORLD ENDER) form
     const finalForm = CONFIG.FORMS.length - 1;
     const board = [
-      { name: 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm, out: false },
+      { name: player.name || 'You', score: player.score, color: player.skin.glowColor, me: true, final: player.formIndex >= finalForm, out: false },
       // Family arc: only kin who have actually dropped in appear. Not-yet-arrived
       // family are hidden (not "OUT"); the board fills as they join the feast.
       ...rivals.filter((r) => r.arrived).map((r) => ({ name: r.name, score: r.score, color: r.skin.bodyColor, me: false, final: r.formIndex >= finalForm, out: !r.alive })),
