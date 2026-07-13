@@ -445,7 +445,12 @@ export function drawBuilding3D(
 ) {
   const { w, d, h } = spec;
   // roof offset: fixed north tilt + radial lean away from camera centre
-  const ox = (bx - cx) * LEAN * h;
+  let ox = (bx - cx) * LEAN * h;
+  // Playtest ("skyscraper looks rough"): near screen centre ox≈0, so tall towers
+  // drew as a FLAT front card with no side face. Force a minimum lean on tall
+  // buildings so they always read as a 3D volume (consistent lean direction).
+  const minOx = h > 200 ? h * 0.05 : 0;
+  if (minOx > 0 && Math.abs(ox) < minOx) ox = ox < 0 ? -minOx : minOx;
   const oy = -h * LIFT + (by - cy) * Math.max(0, LEAN * 0.4) * h;
 
   const x0 = bx - w, x1 = bx + w;

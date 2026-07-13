@@ -3052,9 +3052,13 @@ export class WorldManager {
           if (Math.abs(obj.x - rc) < TURN_ZONE && obj.wanderAngle <= 0) {
             if (Math.random() < 0.022) { // ~22% per junction crossing
               obj.roadAxis = 'v';
-              obj.homeX = rc;
-              obj.x = rc; // snap to road center
               obj.roadDir = Math.random() < 0.5 ? 1 : -1;
+              // Playtest ("cars placed weird"): keep the RIGHT-HAND lane on the
+              // turn instead of snapping to the raw centre (which drove cars down
+              // the middle / head-on). Vertical: lane sign follows roadDir.
+              const lane = obj.roadDir * CONFIG.ROAD_WIDTH * 0.22;
+              obj.homeX = rc + lane;
+              obj.x = rc + lane;
               obj.wanderAngle = 3.5; // 3.5s cooldown before next turn
               break;
             }
@@ -3064,9 +3068,11 @@ export class WorldManager {
           if (Math.abs(obj.y - rc) < TURN_ZONE && obj.wanderAngle <= 0) {
             if (Math.random() < 0.022) {
               obj.roadAxis = 'h';
-              obj.homeY = rc;
-              obj.y = rc; // snap to road center
               obj.roadDir = Math.random() < 0.5 ? 1 : -1;
+              // Horizontal right-hand: lane sign is opposite roadDir (see spawnCar).
+              const lane = -obj.roadDir * CONFIG.ROAD_WIDTH * 0.22;
+              obj.homeY = rc + lane;
+              obj.y = rc + lane;
               obj.wanderAngle = 3.5;
               break;
             }

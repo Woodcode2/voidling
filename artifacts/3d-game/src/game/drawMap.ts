@@ -371,10 +371,10 @@ export function drawVectorGround(
     ctx.imageSmoothingQuality = prevQual;
   }
 
-  // Animated waterfall (live — needs clock)
+  // Animated waterfall (live — needs clock + zoom for level-of-detail)
   const wpx = ISLAND_CTRL[WATERFALL_IDX][0];
   const wpy = ISLAND_CTRL[WATERFALL_IDX][1];
-  _drawWaterfall(ctx, wpx, wpy, clock);
+  _drawWaterfall(ctx, wpx, wpy, clock, camZoom);
 
   // Alive Pack §10: slowly drifting shimmer bands on water bodies
   _drawWaterShimmer(ctx, clock);
@@ -1251,12 +1251,29 @@ let _wfLast = 0;
 /** Clear transient waterfall state (mist pool + clock ref) between rounds. */
 export function resetWaterfallState(): void { _mist.length = 0; _wfLast = 0; }
 
-function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, clock: number): void {
+function _drawWaterfall(ctx: CanvasRenderingContext2D, wx: number, wy: number, clock: number, camZoom = 1): void {
   const dt = Math.min(100, Math.max(0, clock - _wfLast));
   _wfLast = clock;
 
   ctx.save();
   ctx.translate(wx, wy);
+
+  // Zoom LOD (Playtest: the detailed street-scale column collapsed to a hard
+  // bright trapezoid when zoomed out). When the falls are small on screen, drop
+  // the clip column / bands / streaks / mist and draw only a SOFT feathered
+  // water smear — reads as water off the edge, never a hard blue rectangle.
+  if (camZoom < 0.62) {
+    const soft = ctx.createRadialGradient(0, 60, 10, 0, 90, 260);
+    soft.addColorStop(0,   'rgba(160,225,248,0.5)');
+    soft.addColorStop(0.5, 'rgba(110,195,225,0.28)');
+    soft.addColorStop(1,   'rgba(110,195,225,0)');
+    ctx.fillStyle = soft;
+    ctx.beginPath();
+    ctx.ellipse(0, 90, 120, 240, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
 
   // 1. soft blue-white glow behind the falls
   const glow = ctx.createRadialGradient(0, 90, 18, 0, 90, 330); // Stage D: bigger presence
