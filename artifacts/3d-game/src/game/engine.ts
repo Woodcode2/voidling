@@ -790,7 +790,13 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
     const { ex, ey, consumeR, R } = collapseCtx;
     fx.flash(440);
     fx.shake(600, 30, [0, 130, 260, 420, 600]);
+    // Devour at the SNAPSHOTTED epicenter, not the player's live position — the
+    // void may have drifted (or been eaten + respawned far away) during the
+    // slow-mo inhale, and the whole telegraph is drawn at ex,ey.
+    const px0 = player.x, py0 = player.y;
+    player.x = ex; player.y = ey;
     const eaten = world.voidPowerBlast(player, consumeR * 1.15, consumeR, 900, true, fx);
+    player.x = px0; player.y = py0;
     // rivals caught in the collapse get flung hard; the whole screen imploding is the payoff
     for (const r of rivals) {
       if (!r.alive || r.ghost) continue;
@@ -1058,6 +1064,9 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
   function endRound() {
     if (!player || !world) return;
     if (roundEnded) return; // guard against duplicate calls (e.g. timer expires while death timeout pending)
+    // If a COLLAPSE was mid-inhale when the clock ran out, resolve its boom now
+    // so the player isn't charged ~0.92 of the meter for nothing.
+    if (collapseBoom > 0) { collapseBoom = 0; fireCollapseBoom(); }
     roundEnded = true;
     joystick.setEnabled(false);
 
