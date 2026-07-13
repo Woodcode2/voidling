@@ -303,9 +303,11 @@ export const CONFIG = {
   SFX_GAIN: 1,
 
   // v16 §0: rubber-band pacing — 4 bots (5 voids total)
-  // Rank targets as fractions of player score: rank1=115%, rank2=95%, rank3=80%, rank4=60%
-  // ±10% personality noise re-rolled every 20 s
-  PACER_TARGETS: [1.15, 0.95, 0.80, 0.60] as number[],
+  // Playtest ("it should truly be who consumes the most"): the top rival now
+  // genuinely races to BEAT you (135%) and isn't hand-braked, so a rival can
+  // take the crown on merit. Lower ranks fill the field. Kid-safety comes from
+  // the late-game size cap (rivals can out-SCORE you but can't EAT you big).
+  PACER_TARGETS: [1.35, 1.05, 0.85, 0.55] as number[],
   PACER_NOISE: 0.10,
   PACER_RETARGET_MS: 20000,
 

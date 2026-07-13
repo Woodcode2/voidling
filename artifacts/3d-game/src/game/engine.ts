@@ -2090,8 +2090,10 @@ export function createGame(canvas: HTMLCanvasElement): GameEngine {
 
   function resolveVoids() {
     if (!player) return;
-    // War Pack §2: 30s grace period — no void predation in the opening scramble
-    if (roundElapsed < 30000) return;
+    // Playtest (want real danger): 20s grace — no void predation in the opening
+    // scramble, then a hot rival can genuinely threaten (late-game size cap still
+    // protects a dominant player from ever being eaten).
+    if (roundElapsed < 20000) return;
     // bigger rivals respawn at least 1.5 screen-widths away from the player
     const minDist = (1.5 * fw) / Math.max(0.05, camZoom);
     // player vs rivals

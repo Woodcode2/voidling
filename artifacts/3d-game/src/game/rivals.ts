@@ -656,8 +656,12 @@ class PacingController implements RivalController {
     }
     const target = view.playerScore * (this.baseFrac + this.noise);
     if (rival.score > target * 1.08) {
-      // Too far ahead — drift at 30% effort so the player can catch up visibly
-      return { ...intent, mag: intent.mag * 0.30 };
+      // Ahead of its target — ease off, but only gently. A leader-tier rival
+      // (target ≥ 1) is MEANT to beat you, so it barely throttles (a real race);
+      // trailing bots coast more. (Was a hard 0.30 hand-brake that made the
+      // player always win.)
+      const ease = this.baseFrac >= 1.0 ? 0.85 : 0.7;
+      return { ...intent, mag: intent.mag * ease };
     }
     if (rival.score < target * 0.75) {
       // Behind target — allowed to push slightly faster than normal
