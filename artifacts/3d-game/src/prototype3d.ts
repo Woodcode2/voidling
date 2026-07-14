@@ -8,6 +8,7 @@ import { createVoid } from './proto3d/void3d';
 import { createIsland } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
+import { createRivals } from './proto3d/rivals';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -51,6 +52,7 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 const island = createIsland(scene, addEdible);
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
+const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
 
 // soft round sprite for absorb puffs (avoids hard square points)
@@ -113,18 +115,69 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ── loop ─────────────────────────────────────────────────────────────────────
-const sizeEl = document.getElementById('size')!;
+// ── match state + HUD ─────────────────────────────────────────────────────────
+const el = (id: string) => document.getElementById(id)!;
+const timerEl = el('timer'), devEl = el('devoured'), boardEl = el('board'), formEl = el('form');
+const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
+
+const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'WORLD ENDER'];
+const FORM_MIN = [0, 8, 16, 28, 44];   // radius thresholds
+const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
+const PLAYER_COLOR = 0x9a5cff;
+
+const _q = new URLSearchParams(location.search);
+const MATCH_LEN = Number(_q.get('len')) || 210;                // 3:30 (?len=N to shorten)
+const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
+const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
+let matchClock = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
+let initialMass = 0;                   // set once, after the world is built
+let hudCd = 0;
+
 const WANDER_R = 230;
 let wanderT = 0; const wander = new THREE.Vector3(voidState.x, 0, voidState.z);
 const clock = new THREE.Clock();
 const prev = { x: voidState.x, z: voidState.z };
 const tmpV = new THREE.Vector3();
 
+function fmtTime(s: number) { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+
+function refreshHud() {
+  const R = voidling.radius;
+  // leaderboard: player + rivals, ranked by score
+  const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
+    ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
+    .sort((a, b) => b.score - a.score);
+  boardEl.innerHTML = rows.map((r, i) =>
+    `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
+  const consumed = playerScore + rivals.list.reduce((a, r) => a + r.score, 0);
+  devEl.textContent = `${Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100))}% DEVOURED`;
+  formEl.textContent = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m`;
+}
+
+function endMatch() {
+  ended = true;
+  const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
+    ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
+    .sort((a, b) => b.score - a.score);
+  const myRank = rows.findIndex((r) => r.me) + 1;
+  endHd.textContent = myRank === 1 ? 'YOU WIN!' : `#${myRank} PLACE`;
+  endSub.textContent = myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`;
+  endList.innerHTML = rows.map((r, i) =>
+    `<div class="er ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
+  endEl.classList.add('show');
+}
+
 function animate() {
   const dt = Math.min(0.05, clock.getDelta());
   tClock += dt;
   island.update(dt, tClock);
+
+  if (!ended) {
+    matchClock -= dt * clockSpeed;
+    timerEl.textContent = fmtTime(matchClock);
+    if (matchClock <= 30) timerEl.style.color = '#ff8a8a';
+    if (matchClock <= 0) endMatch();
+  }
 
   if (tClock - lastInput > 1.2) {
     wanderT -= dt;
@@ -152,6 +205,7 @@ function animate() {
   const R = voidling.radius;
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
+  rivals.update(dt, tClock, voidState.x, voidState.z, R);
   bubbles.update();
   const cy = voidling.group.position.y;
 
@@ -177,6 +231,7 @@ function animate() {
       e.mesh.userData.eaten = true;
       e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
       voidling.setRadius(Math.min(70, R + e.radius * 0.08));
+      playerScore += e.radius;
       spawnPuff(e.mesh.position.x, cy, e.mesh.position.z, 3);
     } else if (d < R + e.radius * 2.4) {
       const pull = (R + e.radius * 2.4 - d) * 1.4;
@@ -207,10 +262,27 @@ function animate() {
   sun.position.set(voidState.x + sunOff.x, sunOff.y, voidState.z + sunOff.z);
   sun.target.position.set(voidState.x, 0, voidState.z);
 
-  sizeEl.textContent = `${Math.round(R * 1.6)}m`;
+  // evolution: form change on growth (with a flash), plus ring/glow via setStage
+  const ns = stageFor(voidling.radius);
+  if (ns > curStage) {
+    curStage = ns;
+    evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
+    evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+  } else curStage = ns;
+  voidling.setStage(curStage);
+
+  // throttle DOM leaderboard updates (~5/s)
+  hudCd -= dt;
+  if (hudCd <= 0) { hudCd = 0.2; refreshHud(); }
+
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
+// total edible mass on the island — the denominator for "% devoured"
+initialMass = edibles.reduce((a, e) => a + e.radius, 0);
+if (bigStart > 0) voidling.setRadius(bigStart);   // debug: preview a bigger form
+refreshHud();
+
 if (TOPDOWN) { camera.position.set(0, 1120, 0.001); camera.lookAt(0, 0, 0); }
 else {
   camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));

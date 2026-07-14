@@ -6,46 +6,77 @@
     <meta name="theme-color" content="#0d0821">
     <title>VOIDLING · MAPLE ISLE (3D)</title>
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none; }
-      #hud {
-        position: fixed; top: 14px; left: 16px; z-index: 5;
-        font-family: system-ui, sans-serif; color: #fff; pointer-events: none;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none;
+        font-family: system-ui, -apple-system, sans-serif; }
+      #timer {
+        position: fixed; top: 12px; left: 0; right: 0; text-align: center; z-index: 5;
+        color: #fff; font-size: 40px; font-weight: 900; letter-spacing: 1px;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none;
       }
-      #hud .t { font-size: 34px; font-weight: 800; letter-spacing: 0.5px; }
-      #hud .s { font-size: 14px; font-weight: 700; opacity: 0.82; }
-      #tag {
-        position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; z-index: 5;
-        font-family: system-ui, sans-serif; font-size: 12px; font-weight: 700; color: #fff; opacity: 0.5;
-        pointer-events: none;
-      }
-      /* level title card — fades in then out on load */
-      #titlecard {
-        position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; pointer-events: none;
-        font-family: system-ui, sans-serif; text-align: center; color: #fff;
-        animation: cardFade 4.2s ease forwards;
-      }
+      #devoured { position: fixed; top: 60px; left: 0; right: 0; text-align: center; z-index: 5;
+        color: #d8c8ff; font-size: 14px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+      #board { position: fixed; top: 12px; left: 12px; z-index: 5; pointer-events: none;
+        background: rgba(16,8,30,0.55); border-radius: 12px; padding: 8px 10px; backdrop-filter: blur(6px); }
+      #board .row { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 800;
+        color: #fff; padding: 2px 0; }
+      #board .row.me { color: #ffe89a; }
+      #board .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+      #board .nm { flex: 1; min-width: 78px; }
+      #board .sc { font-variant-numeric: tabular-nums; opacity: 0.9; }
+      #form { position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; z-index: 5;
+        color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 2px; opacity: 0.85; pointer-events: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+      /* EVOLVED flash */
+      #evolve { position: fixed; top: 40%; left: 0; right: 0; text-align: center; z-index: 7; pointer-events: none;
+        color: #fff; font-weight: 900; opacity: 0; }
+      #evolve .big { font-size: 46px; letter-spacing: 2px; text-shadow: 0 0 24px rgba(172,108,255,0.9); }
+      #evolve .sm { font-size: 16px; letter-spacing: 4px; color: #c9a6ff; }
+      #evolve.show { animation: ev 1.8s ease forwards; }
+      @keyframes ev { 0%{opacity:0; transform:scale(0.7)} 18%{opacity:1; transform:scale(1.05)} 70%{opacity:1; transform:scale(1)} 100%{opacity:0; transform:scale(1.1)} }
+      /* title card */
+      #titlecard { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; pointer-events: none; text-align: center; color: #fff;
+        animation: cardFade 4.2s ease forwards; }
       #titlecard .lvl { font-size: 15px; font-weight: 800; letter-spacing: 6px; opacity: 0.85; color: #c9a6ff; }
       #titlecard .name { font-size: 62px; font-weight: 900; letter-spacing: 1px; margin-top: 6px;
         text-shadow: 0 4px 24px rgba(123,79,224,0.7), 0 2px 6px rgba(0,0,0,0.5); }
       #titlecard .sub { font-size: 15px; font-weight: 700; opacity: 0.8; margin-top: 10px; letter-spacing: 1px; }
-      @keyframes cardFade {
-        0% { opacity: 0; transform: translateY(10px) scale(0.98); }
-        14% { opacity: 1; transform: translateY(0) scale(1); }
-        72% { opacity: 1; transform: translateY(0) scale(1); }
-        100% { opacity: 0; transform: translateY(-6px) scale(1.02); }
-      }
+      @keyframes cardFade { 0%{opacity:0; transform:translateY(10px) scale(0.98)} 14%{opacity:1; transform:translateY(0) scale(1)} 72%{opacity:1} 100%{opacity:0; transform:translateY(-6px) scale(1.02)} }
+      /* end screen */
+      #end { position: fixed; inset: 0; z-index: 9; display: none; flex-direction: column;
+        align-items: center; justify-content: center; background: rgba(13,8,33,0.82); backdrop-filter: blur(8px);
+        color: #fff; text-align: center; }
+      #end.show { display: flex; }
+      #end .hd { font-size: 44px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; }
+      #end .sub { font-size: 15px; font-weight: 700; opacity: 0.8; letter-spacing: 2px; margin-bottom: 20px; }
+      #end .list { min-width: 260px; }
+      #end .er { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800;
+        padding: 8px 14px; border-radius: 12px; margin: 4px 0; background: rgba(255,255,255,0.06); }
+      #end .er.me { background: rgba(255,232,154,0.16); color: #ffe89a; }
+      #end .er .dot { width: 13px; height: 13px; border-radius: 50%; }
+      #end .er .nm { flex: 1; text-align: left; }
+      #end .er .sc { font-variant-numeric: tabular-nums; }
+      #end .again { margin-top: 22px; font-size: 14px; font-weight: 800; letter-spacing: 2px; color: #c9a6ff; }
     </style>
   </head>
   <body>
+    <div id="timer">3:30</div>
+    <div id="devoured">0% DEVOURED</div>
+    <div id="board"></div>
+    <div id="form">VOIDLING</div>
+    <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="titlecard">
       <div class="lvl">LEVEL 1</div>
       <div class="name">MAPLE&nbsp;ISLE</div>
       <div class="sub">the little void is hungry · eat the island</div>
     </div>
-    <div id="hud"><div class="t" id="size">VOIDLING</div><div class="s">MAPLE ISLE · drag to move · the void eats the world</div></div>
-    <div id="tag">Three.js / WebGL — real camera · real light · real shadows · the cute void, in 3D</div>
+    <div id="end">
+      <div class="hd" id="endHd">TIME!</div>
+      <div class="sub" id="endSub"></div>
+      <div class="list" id="endList"></div>
+      <div class="again">refresh to play again</div>
+    </div>
     <script type="module" src="/src/prototype3d.ts"></script>
   </body>
 </html>

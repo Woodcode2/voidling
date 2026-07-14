@@ -18,6 +18,7 @@ export interface Void3D {
   group: THREE.Group;
   radius: number;
   setRadius(r: number): void;
+  setStage(n: number): void;
   update(dt: number, s: VoidState): void;
 }
 
@@ -168,9 +169,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.28, 1.0);
   face.add(mouth);
 
-  // (No orbiting spark/ring on the base form — that's an evolution-stage flourish.)
+  // ── evolution rings (Saturn-style) — appear only at higher forms ──────────
+  const rings = new THREE.Group();
+  group.add(rings);
+  const ringMats: THREE.MeshBasicMaterial[] = [];
+  for (let i = 0; i < 2; i++) {
+    const rm = new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const rg = new THREE.Mesh(new THREE.TorusGeometry(1.34 + i * 0.16, 0.028, 8, 72), rm);
+    rg.rotation.x = Math.PI / 2 - 0.55 - i * 0.12;  // tilted like an orbit
+    rings.add(rg); ringMats.push(rm);
+  }
 
   let radius = 4;
+  let stage = 0, ringFade = 0;
   let moveAmt = 0, blinkT = 3 + Math.random() * 3, blink = 0;
 
   const api: Void3D = {
@@ -178,8 +189,18 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     get radius() { return radius; },
     set radius(r: number) { radius = r; },
     setRadius(r: number) { radius = r; },
+    setStage(n: number) { stage = n; },
     update(dt, s) {
       bodyMat.uniforms.uTime.value = s.t;
+
+      // evolution rings + glow intensify with the form (rings are a child of the
+      // group, which is positioned below; keep them local + centred on the orb)
+      const targetRing = stage >= 2 ? Math.min(0.7, (stage - 1) * 0.3) : 0;
+      ringFade += (targetRing - ringFade) * Math.min(1, dt * 3);
+      rings.scale.setScalar(radius);
+      rings.rotation.y += dt * 0.5;
+      ringMats.forEach((m, i) => { m.opacity = ringFade * (1 - i * 0.35); });
+      glowMat.uniforms.uIntensity.value = 0.5 + stage * 0.13;
 
       const speed = Math.hypot(s.vx, s.vz);
       moveAmt += (Math.min(1, speed / 40) - moveAmt) * Math.min(1, dt * 6);
