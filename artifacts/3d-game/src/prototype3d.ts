@@ -1,8 +1,9 @@
 // VOIDLING — 3D PROTOTYPE (Three.js / WebGL)
 // A standalone proof-of-concept: an isometric low-poly city with real lighting,
-// real shadows, and a REAL 3D hole that grows and swallows the world. No external
-// assets — every mesh is procedural geometry. This is here to show the visual
-// leap vs the Canvas-2D game; the game logic is unchanged and portable.
+// real shadows, and the star of the show — the cute VOIDLING void sphere: a
+// dark glossy orb with a glowing purple rim, a billboarded smiling face, and a
+// hungry pull that sucks the whole world in and grows. No external assets —
+// every mesh is procedural geometry.
 import * as THREE from 'three';
 
 const PALETTE = {
@@ -17,7 +18,11 @@ const PALETTE = {
   tree: 0x4faa5a,
   trunk: 0x8a6a4a,
   person: [0xff7a5a, 0x5ec8d8, 0xffd23f, 0x8fa9d8, 0xf06fb0, 0x9b7bd8],
-  voidRim: 0x7b4fe0,
+  // brand void
+  voidBody: 0x1b0f36,
+  voidCore: 0x2a1656,
+  voidGlow: 0xb388ff,
+  voidRim: 0x8a5cff,
 };
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
@@ -34,7 +39,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(PALETTE.sky);
 scene.fog = new THREE.Fog(PALETTE.sky, 120, 320);
 
-// Slightly-perspective iso camera (Hole.io look): high, angled, follows the hole.
+// Slightly-perspective iso camera (Hole.io look): high, angled, follows the void.
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 800);
 let camDist = 90;
 const camOffset = new THREE.Vector3(0.62, 0.9, 0.62).normalize();
@@ -73,7 +78,6 @@ scene.add(ground);
 const roadMat = new THREE.MeshStandardMaterial({ color: PALETTE.road, roughness: 1 });
 const lineMat = new THREE.MeshStandardMaterial({ color: PALETTE.roadLine, roughness: 1 });
 for (let i = 0; i <= GRID; i++) {
-  const p = -HALF + i * CELL - ROAD / 2 + CELL / 2 - BLOCK / 2 - ROAD / 2;
   const c = -HALF + i * CELL - ROAD / 2;
   for (const axis of ['h', 'v'] as const) {
     const road = new THREE.Mesh(new THREE.PlaneGeometry(GRID * CELL + 80, ROAD), roadMat);
@@ -90,11 +94,18 @@ for (let i = 0; i <= GRID; i++) {
       scene.add(dash);
     }
   }
-  void p;
 }
 
 // ── world objects (edible) ───────────────────────────────────────────────────
-interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; fall: number; }
+interface Edible {
+  mesh: THREE.Object3D;
+  radius: number;
+  eaten: boolean;
+  t: number;          // absorb progress 0..1
+  orbit: number;      // orbit angle at capture
+  orbitR: number;     // orbit radius at capture
+  spin: THREE.Vector3;
+}
 const edibles: Edible[] = [];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -102,7 +113,7 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 function addEdible(mesh: THREE.Object3D, radius: number) {
   mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(mesh);
-  edibles.push({ mesh, radius, eaten: false, fall: 0 });
+  edibles.push({ mesh, radius, eaten: false, t: 0, orbit: 0, orbitR: 0, spin: new THREE.Vector3() });
 }
 
 function makeBuilding(): THREE.Group {
@@ -210,56 +221,145 @@ for (let i = 0; i < 55; i++) {
   addEdible(p, 2.4);
 }
 
-// ── THE HOLE (the star) ──────────────────────────────────────────────────────
-const hole = new THREE.Group();
-scene.add(hole);
-let holeR = 7;
-const holeState = { x: 0, z: 0 };
+// ── THE VOIDLING (the star) ──────────────────────────────────────────────────
+const voidGroup = new THREE.Group();
+scene.add(voidGroup);
+let voidR = 6;                        // world radius of the void
+const voidState = { x: 0, z: 0 };
+const bob = new THREE.Group();        // holds body + face; we squash/bob this
+voidGroup.add(bob);
 
-// pit: an open black cylinder (inner walls visible = depth) + a dark floor disc
-const PIT_DEPTH = 40;
-const pitWall = new THREE.Mesh(
-  new THREE.CylinderGeometry(1, 1, PIT_DEPTH, 48, 1, true),
-  new THREE.MeshBasicMaterial({ color: 0x05060a, side: THREE.BackSide }),
+// body: a dark glossy orb (deep indigo, near-black), lit so highlights read glossy
+const bodyMat = new THREE.MeshStandardMaterial({
+  color: PALETTE.voidBody,
+  roughness: 0.18,
+  metalness: 0.35,
+  emissive: PALETTE.voidCore,
+  emissiveIntensity: 0.35,
+});
+const body = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 40), bodyMat);
+bob.add(body);
+
+// fresnel rim glow — a slightly larger inverted sphere, additive, so the void
+// edge always halos in brand purple regardless of the sun angle.
+const fresnelMat = new THREE.ShaderMaterial({
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.BackSide,
+  uniforms: {
+    uColor: { value: new THREE.Color(PALETTE.voidGlow) },
+    uPower: { value: 2.6 },
+    uIntensity: { value: 1.15 },
+  },
+  vertexShader: `
+    varying vec3 vN; varying vec3 vView;
+    void main(){
+      vN = normalize(normalMatrix * normal);
+      vec4 mv = modelViewMatrix * vec4(position,1.0);
+      vView = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vN; varying vec3 vView;
+    uniform vec3 uColor; uniform float uPower; uniform float uIntensity;
+    void main(){
+      float f = pow(1.0 - abs(dot(normalize(vN), normalize(vView))), uPower);
+      gl_FragColor = vec4(uColor, f * uIntensity);
+    }
+  `,
+});
+const fresnel = new THREE.Mesh(new THREE.SphereGeometry(1.14, 48, 40), fresnelMat);
+bob.add(fresnel);
+
+// soft ground halo (additive disc) so the void glows onto the world beneath it.
+// Lives in scene-space on the floor (not parented to the lifted/squashed orb).
+const halo = new THREE.Mesh(
+  new THREE.CircleGeometry(1, 48),
+  new THREE.MeshBasicMaterial({ color: PALETTE.voidGlow, transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false }),
 );
-pitWall.position.y = -PIT_DEPTH / 2 + 0.05;
-hole.add(pitWall);
-const pitFloor = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0x05060a }));
-pitFloor.rotation.x = -Math.PI / 2; pitFloor.position.y = -PIT_DEPTH + 0.1; hole.add(pitFloor);
-// black opening disc just above the ground — this is what makes it read as a
-// HOLE (covers the opaque ground inside the rim; things vanish under it).
-const pitTop = new THREE.Mesh(new THREE.CircleGeometry(1, 48),
-  new THREE.MeshBasicMaterial({ color: 0x08060f }));
-pitTop.rotation.x = -Math.PI / 2; pitTop.position.y = 0.06; hole.add(pitTop);
-// a soft dark inner-shadow ring at the lip for depth
-const lip = new THREE.Mesh(new THREE.RingGeometry(0.72, 1, 48),
-  new THREE.MeshBasicMaterial({ color: 0x1a1330, transparent: true, opacity: 0.55 }));
-lip.rotation.x = -Math.PI / 2; lip.position.y = 0.07; hole.add(lip);
-// rim ring (brand blue-purple) + a soft inner shadow disc so the lip reads
-const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.09, 12, 48),
-  new THREE.MeshStandardMaterial({ color: PALETTE.voidRim, roughness: 0.5, emissive: 0x3a1e6b, emissiveIntensity: 0.4 }));
-rim.rotation.x = -Math.PI / 2; rim.position.y = 0.12; hole.add(rim);
-// cute VOIDLING eyes floating just inside the near lip (keeps our identity)
-const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-const pupilMat = new THREE.MeshStandardMaterial({ color: 0x1a1030, roughness: 0.3 });
-const eyeL = new THREE.Group(), eyeR = new THREE.Group();
-for (const [grp, sx] of [[eyeL, -0.32], [eyeR, 0.32]] as const) {
-  const white = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), eyeMat);
-  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), pupilMat);
-  pupil.position.set(0, 0, 0.13); grp.add(white); grp.add(pupil);
-  grp.position.set(sx, 0.35, 0.45); hole.add(grp);
-  void sx;
+halo.rotation.x = -Math.PI / 2;
+halo.position.y = 0.06;
+scene.add(halo);
+
+// contact shadow (dark soft disc, plain — reads as grounding under the orb)
+const contact = new THREE.Mesh(
+  new THREE.CircleGeometry(1, 40),
+  new THREE.MeshBasicMaterial({ color: 0x241a3a, transparent: true, opacity: 0.34, depthWrite: false }),
+);
+contact.rotation.x = -Math.PI / 2;
+contact.position.y = 0.045;
+scene.add(contact);
+
+// cute face — a billboarded group that always faces the camera. Parented to the
+// (uniform-scaled) voidGroup, NOT the squashed bob, so eyes never skew.
+const face = new THREE.Group();
+voidGroup.add(face);
+const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, emissive: 0x8899bb, emissiveIntensity: 0.12 });
+const pupilMat = new THREE.MeshBasicMaterial({ color: 0x140b26 });
+const blushMat = new THREE.MeshBasicMaterial({ color: 0xff85c2, transparent: true, opacity: 0.55 });
+const mouthMat = new THREE.MeshBasicMaterial({ color: 0x140b26 });
+const eyes: THREE.Group[] = [];
+for (const sx of [-0.34, 0.34]) {
+  const eg = new THREE.Group();
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), eyeWhiteMat);
+  white.scale.set(0.86, 1, 0.5);
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), pupilMat);
+  pupil.position.set(sx > 0 ? -0.03 : 0.03, -0.02, 0.2);
+  pupil.scale.set(1, 1, 0.5);
+  const shine = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  shine.position.set((sx > 0 ? -0.03 : 0.03) + 0.05, 0.06, 0.28);
+  eg.add(white); eg.add(pupil); eg.add(shine);
+  eg.position.set(sx, 0.12, 1.02);    // proud of the body surface so never occluded
+  face.add(eg); eyes.push(eg);
+}
+// rosy blush under each eye
+for (const sx of [-0.5, 0.5]) {
+  const b = new THREE.Mesh(new THREE.CircleGeometry(0.15, 16), blushMat);
+  b.position.set(sx, -0.22, 1.0);
+  face.add(b);
+}
+// smiling mouth — a thin torus arc
+const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.045, 10, 24, Math.PI), mouthMat);
+mouth.rotation.z = Math.PI;           // open side down = smile
+mouth.position.set(0, -0.28, 1.02);
+face.add(mouth);
+
+function updateVoidMesh() {
+  // halo + contact live on the floor in scene-space; just track x/z and size.
+  halo.position.set(voidState.x, 0.06, voidState.z);
+  halo.scale.setScalar(voidR * 1.7);
+  contact.position.set(voidState.x, 0.045, voidState.z);
+  contact.scale.setScalar(voidR * 1.05);
 }
 
-function updateHoleMesh() {
-  hole.scale.set(holeR, 1, holeR);
-  // keep eyes/rim proportional-ish (scale group scales children; counter-scale eyes a touch)
-  const es = 1 / Math.max(1, holeR * 0.14);
-  eyeL.scale.setScalar(es); eyeR.scale.setScalar(es);
+// ── absorb particle puff (shared pool) ───────────────────────────────────────
+const PUFF = 90;
+const puffGeo = new THREE.BufferGeometry();
+const puffPos = new Float32Array(PUFF * 3);
+puffGeo.setAttribute('position', new THREE.BufferAttribute(puffPos, 3));
+const puffMat = new THREE.PointsMaterial({ color: PALETTE.voidGlow, size: 1.6, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+const puffPoints = new THREE.Points(puffGeo, puffMat);
+puffPoints.frustumCulled = false;
+scene.add(puffPoints);
+const puffVel: THREE.Vector3[] = [];
+const puffLife: number[] = [];
+for (let i = 0; i < PUFF; i++) { puffVel.push(new THREE.Vector3()); puffLife.push(0); puffPos[i * 3 + 1] = -999; }
+let puffHead = 0;
+function spawnPuff(x: number, y: number, z: number, n: number) {
+  for (let k = 0; k < n; k++) {
+    const i = puffHead; puffHead = (puffHead + 1) % PUFF;
+    puffPos[i * 3] = x; puffPos[i * 3 + 1] = y; puffPos[i * 3 + 2] = z;
+    const a = Math.random() * Math.PI * 2, up = rand(2, 8);
+    puffVel[i].set(Math.cos(a) * rand(3, 9), up, Math.sin(a) * rand(3, 9));
+    puffLife[i] = rand(0.35, 0.7);
+  }
 }
-updateHoleMesh();
 
-// ── input: drag to move the hole; auto-wander when idle ──────────────────────
+updateVoidMesh();
+
+// ── input: drag to move the void; auto-wander when idle ──────────────────────
 const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const target = new THREE.Vector3(0, 0, 0);
@@ -282,6 +382,9 @@ window.addEventListener('resize', () => {
 const sizeEl = document.getElementById('size')!;
 let wanderT = 0; const wander = new THREE.Vector3();
 const clock = new THREE.Clock();
+let moveAmt = 0, blinkT = rand(2, 5), blink = 0;
+const prev = { x: 0, z: 0 };
+const tmpV = new THREE.Vector3();
 
 function animate() {
   const dt = Math.min(0.05, clock.getDelta());
@@ -293,47 +396,118 @@ function animate() {
     if (wanderT <= 0) { wanderT = rand(1.5, 3); wander.set(rand(-HALF * 0.8, HALF * 0.8), 0, rand(-HALF * 0.8, HALF * 0.8)); }
     target.lerp(wander, 0.02);
   }
-  // move hole toward target
-  holeState.x += (target.x - holeState.x) * Math.min(1, dt * 2.4);
-  holeState.z += (target.z - holeState.z) * Math.min(1, dt * 2.4);
-  hole.position.set(holeState.x, 0, holeState.z);
+  // move void toward target
+  voidState.x += (target.x - voidState.x) * Math.min(1, dt * 2.4);
+  voidState.z += (target.z - voidState.z) * Math.min(1, dt * 2.4);
 
-  // eat: pull nearby edibles in, then tumble them down the pit
+  // velocity → lean + squash + face look
+  const vx = (voidState.x - prev.x) / Math.max(1e-4, dt);
+  const vz = (voidState.z - prev.z) / Math.max(1e-4, dt);
+  prev.x = voidState.x; prev.z = voidState.z;
+  const speed = Math.hypot(vx, vz);
+  moveAmt += (Math.min(1, speed / 40) - moveAmt) * Math.min(1, dt * 6);
+
+  updateVoidMesh();
+
+  // squash/stretch: squish vertically a touch while rolling, gentle idle breathe
+  const breathe = Math.sin(tClock * 2.2) * 0.02;
+  const squash = 1 - moveAmt * 0.10 + breathe;
+  const stretch = 1 + moveAmt * 0.12 - breathe;
+  bob.scale.set(voidR * stretch, voidR * squash, voidR * stretch);
+  // lean into travel direction
+  bob.rotation.z = THREE.MathUtils.clamp(-vx / 260, -0.22, 0.22);
+  bob.rotation.x = THREE.MathUtils.clamp(vz / 260, -0.22, 0.22);
+  // position the whole void group; bob height adds a gentle roll-bob
+  voidGroup.position.set(
+    voidState.x,
+    voidR * (0.92 + Math.abs(Math.sin(tClock * 6)) * moveAmt * 0.06),
+    voidState.z,
+  );
+
+  // face billboards toward the camera; centred on the void, scaled with it, so
+  // the eyes/mouth (local z≈1.0) ride the front hemisphere facing the viewer.
+  face.scale.setScalar(voidR);
+  face.position.set(0, voidR * 0.12, 0);
+  face.quaternion.copy(camera.quaternion);
+  // eyes track the travel direction a little (pupils already offset; nudge group)
+  const look = THREE.MathUtils.clamp(vx / 400, -0.06, 0.06);
+  for (const e of eyes) e.position.x = (e.position.x < 0 ? -0.34 : 0.34) + look;
+
+  // blink
+  blinkT -= dt;
+  if (blinkT <= 0 && blink <= 0) { blink = 0.16; blinkT = rand(2.5, 6); }
+  if (blink > 0) {
+    blink -= dt;
+    const openness = Math.abs(blink - 0.08) / 0.08; // 1→0→1 over the blink
+    for (const e of eyes) e.scale.y = Math.max(0.08, openness);
+  } else for (const e of eyes) e.scale.y = 1;
+
+  // eat: capture nearby edibles, then spiral them into the void + puff
   for (const e of edibles) {
     if (e.eaten) {
-      e.fall += dt;
+      e.t += dt * 2.4;
       const p = e.mesh.position;
-      p.x += (holeState.x - p.x) * Math.min(1, dt * 8);
-      p.z += (holeState.z - p.z) * Math.min(1, dt * 8);
-      p.y -= dt * 40;
-      e.mesh.rotation.x += dt * 6; e.mesh.rotation.z += dt * 5;
-      e.mesh.scale.multiplyScalar(1 - dt * 2.2);
-      if (e.fall > 0.9) { scene.remove(e.mesh); e.eaten = false; e.mesh.visible = false; }
+      // spiral inward toward the void centre while lifting to void height
+      e.orbit += dt * 10;
+      const r = e.orbitR * (1 - e.t);
+      const cy = voidGroup.position.y;
+      p.x = voidState.x + Math.cos(e.orbit) * r;
+      p.z = voidState.z + Math.sin(e.orbit) * r;
+      p.y = THREE.MathUtils.lerp(p.y, cy, Math.min(1, dt * 6));
+      e.mesh.rotation.x += e.spin.x * dt; e.mesh.rotation.y += e.spin.y * dt; e.mesh.rotation.z += e.spin.z * dt;
+      e.mesh.scale.multiplyScalar(1 - dt * 3.4);
+      if (e.t >= 1) {
+        spawnPuff(voidState.x, cy, voidState.z, 5);
+        scene.remove(e.mesh); e.eaten = false; e.mesh.visible = false;
+      }
       continue;
     }
     if (!e.mesh.visible) continue;
-    const dx = e.mesh.position.x - holeState.x, dz = e.mesh.position.z - holeState.z;
+    const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
-    if (d < holeR + e.radius * 0.4) {
-      e.eaten = true; e.fall = 0;
-      holeR = Math.min(60, holeR + e.radius * 0.05); // grow
-      updateHoleMesh();
-    } else if (d < holeR + e.radius * 2.2) {
-      // teeter toward the rim before the plunge
-      e.mesh.position.x -= (dx / d) * dt * (holeR + e.radius * 2.2 - d) * 1.2;
-      e.mesh.position.z -= (dz / d) * dt * (holeR + e.radius * 2.2 - d) * 1.2;
+    if (d < voidR + e.radius * 0.5) {
+      // captured
+      e.eaten = true; e.t = 0;
+      e.orbit = Math.atan2(dz, dx);
+      e.orbitR = Math.max(voidR * 0.6, d);
+      e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
+      voidR = Math.min(52, voidR + e.radius * 0.05); // grow
+      // little pop of joy
+      spawnPuff(e.mesh.position.x, voidGroup.position.y, e.mesh.position.z, 3);
+    } else if (d < voidR + e.radius * 2.4) {
+      // hungry pull toward the void before capture
+      const pull = (voidR + e.radius * 2.4 - d) * 1.4;
+      e.mesh.position.x -= (dx / d) * dt * pull;
+      e.mesh.position.z -= (dz / d) * dt * pull;
     }
   }
 
-  // camera follows + eases out as the hole grows
-  camDist += ((70 + holeR * 2.4) - camDist) * dt * 1.5;
-  const camPos = new THREE.Vector3().copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(holeState.x, 0, holeState.z));
-  camera.position.lerp(camPos, Math.min(1, dt * 3));
-  camera.lookAt(holeState.x, 0, holeState.z);
-  sun.target.position.set(holeState.x, 0, holeState.z);
+  // step particles
+  const pa = puffGeo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < PUFF; i++) {
+    if (puffLife[i] > 0) {
+      puffLife[i] -= dt;
+      puffVel[i].y -= dt * 14;
+      puffPos[i * 3] += puffVel[i].x * dt;
+      puffPos[i * 3 + 1] += puffVel[i].y * dt;
+      puffPos[i * 3 + 2] += puffVel[i].z * dt;
+      if (puffLife[i] <= 0) puffPos[i * 3 + 1] = -999;
+    }
+  }
+  pa.needsUpdate = true;
 
-  sizeEl.textContent = `${Math.round(holeR * 1.6)}m`;
+  // camera follows + eases out as the void grows
+  camDist += ((70 + voidR * 2.6) - camDist) * dt * 1.5;
+  tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
+  camera.position.lerp(tmpV, Math.min(1, dt * 3));
+  camera.lookAt(voidState.x, voidR * 0.5, voidState.z);
+  sun.target.position.set(voidState.x, 0, voidState.z);
+
+  sizeEl.textContent = `${Math.round(voidR * 1.6)}m`;
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
+// frame the void on the very first paint (no snap-in from the origin)
+camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
+camera.lookAt(voidState.x, voidR * 0.5, voidState.z);
 animate();
