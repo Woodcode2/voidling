@@ -15,6 +15,11 @@ export interface Rivals {
 const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
 const COLORS = [0x2fd8c0, 0xff6fb0, 0xff9a3a, 0x7ed57a, 0x4d8ff0];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+const EAT_RATIO = 1.11, R_CAP = 60;   // must match the player model
+const growR = (R: number, eR: number) => {
+  const rookie = R < 6 ? 1.7 : R < 14 ? 1.25 : 1;
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.62 * eR * eR * rookie));
+};
 
 function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
   const group = new THREE.Group();
@@ -67,7 +72,7 @@ export function createRivals(
     scene.add(group); scene.add(halo);
     // spread rivals around the island away from the player start
     const ang = (i / count) * Math.PI * 2 + 0.6;
-    rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: 4, group, eyes, halo,
+    rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: 1.3, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0 });
   }
 
@@ -85,7 +90,7 @@ export function createRivals(
           rv.retarget = rand(0.8, 1.6);
           let best: RivalEdible | null = null, bd = Infinity;
           for (const e of edibles) {
-            if (eaten(e.mesh)) continue;
+            if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;   // only hunt what it can eat
             const d = (e.mesh.position.x - rv.x) ** 2 + (e.mesh.position.z - rv.z) ** 2;
             if (d < bd) { bd = d; best = e; }
           }
@@ -98,13 +103,13 @@ export function createRivals(
         const nx = rv.x + (mx / md) * spd, nz = rv.z + (mz / md) * spd;
         if (biomeAt(nx, nz)) { rv.x = nx; rv.z = nz; } else rv.retarget = 0;
 
-        // eat nearby food -> grow + score
+        // eat nearby food (size-gated) -> grow by area + score
         for (const e of edibles) {
-          if (eaten(e.mesh)) continue;
+          if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius) ** 2) {
             e.mesh.userData.eaten = true; e.mesh.visible = false; scene.remove(e.mesh);
-            rv.score += e.radius; rv.r = Math.min(60, rv.r + e.radius * 0.06);
+            rv.score += e.radius; rv.r = growR(rv.r, e.radius);
           }
         }
 

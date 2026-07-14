@@ -103,7 +103,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // ── space backdrop ─────────────────────────────────────────────────────────
   scene.background = new THREE.Color(WORLD.space);
-  scene.fog = new THREE.Fog(WORLD.space, 240, 640);
+  scene.fog = new THREE.Fog(WORLD.space, 420, 1500);   // wide, so big-void pull-back views stay clear
 
   // starfield
   {
@@ -433,6 +433,42 @@ function makeBench(): THREE.Group {
   return g;
 }
 
+// ── tiny "starter food" — what a speck-sized void eats first ──────────────────
+function makeCone(): THREE.Group {
+  const g = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.5, 10), new THREE.MeshStandardMaterial({ color: 0xff7a2a, roughness: 0.7 }));
+  cone.position.y = 0.75; g.add(cone);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.3, 10), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  band.position.y = 0.7; g.add(band);
+  return g;
+}
+function makeHydrant(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0xe23b2e, roughness: 0.6, metalness: 0.2 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 1.2, 8), mat); body.position.y = 0.6; g.add(body);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 6), mat); cap.position.y = 1.2; g.add(cap);
+  for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 6), mat); arm.rotation.z = Math.PI / 2; arm.position.set(s * 0.4, 0.75, 0); g.add(arm); }
+  return g;
+}
+function makeTrash(): THREE.Group {
+  const g = new THREE.Group();
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 1.3, 10), new THREE.MeshStandardMaterial({ color: pick([0x3a7a4a, 0x3a5a8a, 0x555a66]), roughness: 0.8, metalness: 0.2 }));
+  can.position.y = 0.65; g.add(can);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x2a2f38 })); lid.position.y = 1.35; g.add(lid);
+  return g;
+}
+function makeFlowers(): THREE.Group {
+  const g = new THREE.Group();
+  const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), new THREE.MeshStandardMaterial({ color: 0x5db06a, roughness: 0.9, flatShading: true }));
+  bush.position.y = 0.5; bush.scale.y = 0.7; g.add(bush);
+  for (let i = 0; i < 5; i++) {
+    const f = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), new THREE.MeshStandardMaterial({ color: pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]), roughness: 0.6 }));
+    f.position.set(rand(-0.5, 0.5), 0.8, rand(-0.5, 0.5)); g.add(f);
+  }
+  return g;
+}
+const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])();
+
 function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => { mesh.position.set(x3, 0, z3); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
@@ -485,5 +521,26 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const [x, z] = jitter(); place(bunker, x, z, 4);
       }
     }
+
+    // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
+    // walkable block so a speck-sized void always has something to nibble.
+    if (biome !== 'military') {
+      const tinyN = biome === 'forest' ? 4 : 10;
+      for (let t = 0; t < tinyN; t++) { const [x, z] = jitter(); place(makeTinyProp(), x, z, rand(0.6, 0.85)); }
+    }
   }
+
+  // line the road edges with traffic cones — classic hole.io starter snacks
+  const roads3 = ROAD_CENTERS.map((c) => w(c));
+  for (const rc of roads3) {
+    for (let a = -270; a < 270; a += rand(30, 46)) {
+      if (inIslandApprox(a, rc)) place(makeCone(), a, rc + (Math.random() < 0.5 ? 3.4 : -3.4), 0.7);
+      if (inIslandApprox(rc, a)) place(makeCone(), rc + (Math.random() < 0.5 ? 3.4 : -3.4), a, 0.7);
+    }
+  }
+}
+
+// cheap island-membership check (bounding blob) for road-edge scatter
+function inIslandApprox(x3: number, z3: number): boolean {
+  return Math.hypot(x3 / 285, z3 / 300) < 0.96;
 }

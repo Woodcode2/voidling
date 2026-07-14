@@ -23,8 +23,8 @@ renderer.toneMappingExposure = 1.08;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1400);
-let camDist = 82;
+const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1900);
+let camDist = 28;
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
 
@@ -36,8 +36,8 @@ sun.position.copy(sunOff);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 10;
-sun.shadow.camera.far = 320;
-const SH = 120;
+sun.shadow.camera.far = 380;
+const SH = 165;
 sun.shadow.camera.left = -SH; sun.shadow.camera.right = SH;
 sun.shadow.camera.top = SH; sun.shadow.camera.bottom = -SH;
 sun.shadow.bias = -0.0004;
@@ -71,7 +71,7 @@ const puffTex = (() => {
 
 // ── the void ──────────────────────────────────────────────────────────────────
 const voidling = createVoid(scene, camera);
-voidling.setRadius(4);   // start tiny — you're a speck against the island
+voidling.setRadius(0.9);   // start tiny — a speck that can barely eat a cone
 const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
@@ -139,9 +139,22 @@ const aim = { x: 0, z: 1 };            // last travel direction
 let autoFireCd = 3;
 
 const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'WORLD ENDER'];
-const FORM_MIN = [0, 8, 16, 28, 44];   // radius thresholds
+const FORM_MIN = [0, 3, 8, 18, 34];    // radius thresholds (tuned for the tiny start)
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
 const PLAYER_COLOR = 0x9a5cff;
+
+// ── hole.io scale model (ported from the 2D game) ────────────────────────────
+// You start TINY — a speck that can only swallow cones/trash; a person is ~2.5×,
+// a house ~5×, a tower ~9× your size. You can only eat things up to ~your own
+// size (voidR >= targetR·0.9); bigger things just block you. Growth is AREA-based
+// with a "rookie surge" so you swell fast when small and slow when huge.
+const START_R = 0.9;
+export const EAT_RATIO = 1.11;         // eat if target.radius <= R*1.11  (voidR >= targetR*0.9)
+const R_CAP = 60;
+const growRadius = (R: number, eR: number) => {
+  const rookie = R < 6 ? 1.7 : R < 14 ? 1.25 : 1;
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.62 * eR * eR * rookie));
+};
 
 const _q = new URLSearchParams(location.search);
 const MATCH_LEN = Number(_q.get('len')) || 210;                // 3:30 (?len=N to shorten)
@@ -192,9 +205,9 @@ function capture(e: Edible, giveHunger = true) {
   e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx); e.orbitR = Math.max(voidling.radius * 0.6, d);
   e.mesh.userData.eaten = true;
   e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
-  voidling.setRadius(Math.min(70, voidling.radius + e.radius * 0.08));
+  voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
   playerScore += e.radius;
-  if (giveHunger) hunger = Math.min(1, hunger + 0.02);
+  if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
 }
 
@@ -204,7 +217,7 @@ function fireGulp() {
   hunger -= COST.gulp; powerCd = 0.5;
   const R = voidling.radius, reach = R * 8;
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible) continue;
+    if (e.eaten || !e.mesh.visible || e.radius > R * EAT_RATIO) continue;
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz); if (d > reach) continue;
     if ((dx / (d || 1)) * aim.x + (dz / (d || 1)) * aim.z > 0.2) capture(e, false);   // forward cone
@@ -224,7 +237,7 @@ function fireCollapse() {
   hunger -= COST.collapse; powerCd = 1.2;
   const R = voidling.radius, reach = R * 16;
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible) continue;
+    if (e.eaten || !e.mesh.visible || e.radius > R * 2.5) continue;   // COLLAPSE devours even big things
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     if (Math.hypot(dx, dz) < reach) capture(e, false);
   }
@@ -263,8 +276,9 @@ function animate() {
         wanderT = rand(0.9, 1.8);
         // hunt the nearest un-eaten morsel so the demo void keeps feeding + growing
         let best: Edible | null = null, bd = Infinity;
+        const Rh = voidling.radius;
         for (const e of edibles) {
-          if (e.eaten || !e.mesh.visible) continue;
+          if (e.eaten || !e.mesh.visible || e.radius > Rh * EAT_RATIO) continue;   // only hunt what you can eat
           const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
           const d = dx * dx + dz * dz;
           if (d < bd) { bd = d; best = e; }
@@ -313,6 +327,7 @@ function animate() {
       continue;
     }
     if (!e.mesh.visible) continue;
+    if (e.radius > R * EAT_RATIO) continue;   // too big to eat yet — it blocks you
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
     if (d < R + e.radius * 0.5) {
@@ -337,7 +352,7 @@ function animate() {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
-    camDist += ((60 + R * 4.5) - camDist) * dt * 1.6;
+    camDist += ((20 + R * 6.0) - camDist) * dt * 1.6;
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, Math.min(1, dt * 3));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);
