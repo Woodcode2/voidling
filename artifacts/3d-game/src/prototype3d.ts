@@ -67,6 +67,12 @@ const puffTex = (() => {
 const voidling = createVoid(scene, camera);
 voidling.setRadius(4);   // start tiny — you're a speck against the island
 const voidState = { x: island.spawn.x, z: island.spawn.z };
+// debug: jump the void to an event block (?at=plaza|golf|beach|camp)
+{
+  const at = new URLSearchParams(location.search).get('at');
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [213.75, -213.75] };
+  if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
+}
 
 // absorb puffs
 const PUFF = 120;
