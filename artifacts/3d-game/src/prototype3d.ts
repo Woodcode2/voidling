@@ -9,6 +9,8 @@ import { createIsland } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals } from './proto3d/rivals';
+import { createFx } from './proto3d/fx';
+import { createDefense } from './proto3d/defense';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -53,6 +55,8 @@ const island = createIsland(scene, addEdible);
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
+const fx = createFx(scene);
+const defense = createDefense(scene, fx, island.biomeAt);
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
 
 // soft round sprite for absorb puffs (avoids hard square points)
@@ -119,6 +123,20 @@ window.addEventListener('resize', () => {
 const el = (id: string) => document.getElementById(id)!;
 const timerEl = el('timer'), devEl = el('devoured'), boardEl = el('board'), formEl = el('form');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
+const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
+
+function announce(text: string) {
+  bannerEl.textContent = text;
+  bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+}
+
+// ── powers (hunger meter) ────────────────────────────────────────────────────
+let hunger = 0;
+const COST = { gulp: 0.35, rocket: 0.45, collapse: 1.0 };
+let powerCd = 0;                       // shared re-trigger delay
+let dashT = 0; const dashDir = { x: 0, z: 1 };
+const aim = { x: 0, z: 1 };            // last travel direction
+let autoFireCd = 3;
 
 const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'WORLD ENDER'];
 const FORM_MIN = [0, 8, 16, 28, 44];   // radius thresholds
@@ -167,6 +185,59 @@ function endMatch() {
   endEl.classList.add('show');
 }
 
+// devour one edible: spiral it in, grow, score, (optionally) charge hunger
+function capture(e: Edible, giveHunger = true) {
+  const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+  const d = Math.hypot(dx, dz) || 1;
+  e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx); e.orbitR = Math.max(voidling.radius * 0.6, d);
+  e.mesh.userData.eaten = true;
+  e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
+  voidling.setRadius(Math.min(70, voidling.radius + e.radius * 0.08));
+  playerScore += e.radius;
+  if (giveHunger) hunger = Math.min(1, hunger + 0.02);
+  spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
+}
+
+// ── power fire functions ─────────────────────────────────────────────────────
+function fireGulp() {
+  if (hunger < COST.gulp || powerCd > 0) return;
+  hunger -= COST.gulp; powerCd = 0.5;
+  const R = voidling.radius, reach = R * 8;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible) continue;
+    const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+    const d = Math.hypot(dx, dz); if (d > reach) continue;
+    if ((dx / (d || 1)) * aim.x + (dz / (d || 1)) * aim.z > 0.2) capture(e, false);   // forward cone
+  }
+  fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach, 0.5); fx.flash('rgba(155,92,255,0.22)', 0.22);
+  announce('GULP!');
+}
+function fireRocket() {
+  if (hunger < COST.rocket || powerCd > 0) return;
+  hunger -= COST.rocket; powerCd = 0.6;
+  dashT = 0.55; dashDir.x = aim.x; dashDir.z = aim.z;
+  fx.ring(voidState.x, voidState.z, 0xff9f4d, voidling.radius * 4, 0.4);
+  announce('ROCKET BITE!');
+}
+function fireCollapse() {
+  if (hunger < COST.collapse || powerCd > 0) return;
+  hunger -= COST.collapse; powerCd = 1.2;
+  const R = voidling.radius, reach = R * 16;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible) continue;
+    const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+    if (Math.hypot(dx, dz) < reach) capture(e, false);
+  }
+  fx.ring(voidState.x, voidState.z, 0xffffff, reach, 0.85); fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach * 0.65, 0.6);
+  fx.flash('rgba(230,220,255,0.6)', 0.6); fx.shake(6);
+  announce('COLLAPSE!!');
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Digit1') fireGulp();
+  else if (e.code === 'Digit2') fireRocket();
+  else if (e.code === 'Digit3') fireCollapse();
+});
+
 function animate() {
   const dt = Math.min(0.05, clock.getDelta());
   tClock += dt;
@@ -179,28 +250,46 @@ function animate() {
     if (matchClock <= 0) endMatch();
   }
 
-  if (tClock - lastInput > 1.2) {
-    wanderT -= dt;
-    if (wanderT <= 0) {
-      wanderT = rand(0.9, 1.8);
-      // hunt the nearest un-eaten morsel so the demo void keeps feeding + growing
-      let best: Edible | null = null, bd = Infinity;
-      for (const e of edibles) {
-        if (e.eaten || !e.mesh.visible) continue;
-        const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
-        const d = dx * dx + dz * dz;
-        if (d < bd) { bd = d; best = e; }
+  powerCd = Math.max(0, powerCd - dt);
+  if (dashT > 0) {
+    // ROCKET BITE dash — barrel forward, eating in the path
+    dashT -= dt;
+    const nx = voidState.x + dashDir.x * 130 * dt, nz = voidState.z + dashDir.z * 130 * dt;
+    if (island.biomeAt(nx, nz)) { voidState.x = nx; voidState.z = nz; } else dashT = 0;
+  } else {
+    if (tClock - lastInput > 1.2) {
+      wanderT -= dt;
+      if (wanderT <= 0) {
+        wanderT = rand(0.9, 1.8);
+        // hunt the nearest un-eaten morsel so the demo void keeps feeding + growing
+        let best: Edible | null = null, bd = Infinity;
+        for (const e of edibles) {
+          if (e.eaten || !e.mesh.visible) continue;
+          const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+          const d = dx * dx + dz * dz;
+          if (d < bd) { bd = d; best = e; }
+        }
+        if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
+        else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
       }
-      if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
-      else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
+      target.lerp(wander, 0.1);
     }
-    target.lerp(wander, 0.1);
+    voidState.x += (target.x - voidState.x) * Math.min(1, dt * 2.4);
+    voidState.z += (target.z - voidState.z) * Math.min(1, dt * 2.4);
   }
-  voidState.x += (target.x - voidState.x) * Math.min(1, dt * 2.4);
-  voidState.z += (target.z - voidState.z) * Math.min(1, dt * 2.4);
   const vx = (voidState.x - prev.x) / Math.max(1e-4, dt);
   const vz = (voidState.z - prev.z) / Math.max(1e-4, dt);
   prev.x = voidState.x; prev.z = voidState.z;
+  { const sp = Math.hypot(vx, vz); if (sp > 4) { aim.x = vx / sp; aim.z = vz / sp; } }
+
+  // auto-fire powers when charged (demo AI; keys 1/2/3 also work)
+  autoFireCd -= dt;
+  if (!ended && autoFireCd <= 0 && powerCd <= 0) {
+    autoFireCd = rand(2.5, 4.2);
+    if (hunger >= COST.collapse) fireCollapse();
+    else if (hunger >= COST.rocket && Math.random() < 0.5) fireRocket();
+    else if (hunger >= COST.gulp) fireGulp();
+  }
 
   const R = voidling.radius;
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
@@ -227,12 +316,7 @@ function animate() {
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
     if (d < R + e.radius * 0.5) {
-      e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx); e.orbitR = Math.max(R * 0.6, d);
-      e.mesh.userData.eaten = true;
-      e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
-      voidling.setRadius(Math.min(70, R + e.radius * 0.08));
-      playerScore += e.radius;
-      spawnPuff(e.mesh.position.x, cy, e.mesh.position.z, 3);
+      capture(e);
     } else if (d < R + e.radius * 2.4) {
       const pull = (R + e.radius * 2.4 - d) * 1.4;
       e.mesh.position.x -= (dx / d) * dt * pull;
@@ -253,7 +337,7 @@ function animate() {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
-    camDist += ((62 + R * 4.0) - camDist) * dt * 1.5;
+    camDist += ((60 + R * 4.5) - camDist) * dt * 1.6;
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, Math.min(1, dt * 3));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);
@@ -268,13 +352,25 @@ function animate() {
     curStage = ns;
     evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
     evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+    const wave = defense.setPhase(curStage);   // the city escalates with your form
+    if (wave) announce(wave);
   } else curStage = ns;
   voidling.setStage(curStage);
 
+  // the city fights back — apply hits taken / units devoured
+  playerScore += defense.update(dt, voidState.x, voidState.z, R);
+  if (playerScore < 0) playerScore = 0;
+
   // throttle DOM leaderboard updates (~5/s)
   hudCd -= dt;
-  if (hudCd <= 0) { hudCd = 0.2; refreshHud(); }
+  if (hudCd <= 0) {
+    hudCd = 0.2; refreshHud();
+    hungerFill.style.width = `${Math.round(hunger * 100)}%`;
+    hungerEl.classList.toggle('ready', hunger >= COST.gulp);
+  }
 
+  const shakeOff = fx.update(dt);
+  camera.position.add(shakeOff);
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
