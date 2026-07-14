@@ -55,25 +55,34 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       varying vec3 vN; varying vec3 vView; varying vec3 vObj;
       uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
       uniform float uTime;
+      // cheap hash for star specks
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
       void main(){
         // screen-space radius: 0 at disc centre, 1 at the silhouette. This
-        // reproduces the 2D canvas radial gradient (which is radial in screen
-        // space) far better than a raw fresnel term.
+        // reproduces the 2D canvas radial gradient (radial in screen space).
         float d = clamp(dot(normalize(vN), normalize(vView)), 0.0, 1.0);
         float u = sqrt(max(0.0, 1.0 - d * d));
-        // 2D stops, tightened so the orb reads distinctly PURPLE (not black-cored)
-        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.26, u));
-        col = mix(col, uMid, smoothstep(0.24, 0.62, u));
-        col = mix(col, uRim, smoothstep(0.60, 1.0, u));
-        col *= 1.18;   // gentle lift so the violet sings
-        // luminous event-horizon rim-light
-        col += uRim * pow(u, 3.5) * 0.6;
+        // stops tuned for a soft medium-VIOLET orb with a gently dark core
+        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.32, u));
+        col = mix(col, uMid, smoothstep(0.30, 0.64, u));
+        col = mix(col, uRim, smoothstep(0.62, 1.0, u));
+        col *= 1.0;
+        // luminous event-horizon rim-light (gentle)
+        col += uRim * pow(u, 3.8) * 0.3;
         // faint interior galaxy swirl (subtle, alive)
-        float ang = atan(vObj.y, vObj.x) + uTime * 0.35;
+        float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
         float sw = sin(ang * 2.0 + u * 7.0) * 0.5 + 0.5;
-        col += uSwirl * sw * (1.0 - u) * 0.05;
-        // crisp white hairline right at the silhouette (the 2D "logo edge")
-        col = mix(col, vec3(1.0), smoothstep(0.93, 0.995, u) * 0.5);
+        col += uSwirl * sw * (1.0 - u) * 0.06;
+        // ✦ interior star specks — twinkling, concentrated toward the dark core
+        vec2 sc = vObj.xy * 12.0;
+        vec2 cell = floor(sc);
+        float h = hash(cell);
+        if (h > 0.93) {
+          vec2 f = fract(sc) - 0.5;
+          float dot2 = 1.0 - smoothstep(0.0, 0.18, length(f));
+          float tw = 0.4 + 0.6 * sin(uTime * 3.0 + h * 40.0);
+          col += vec3(0.95, 0.9, 1.0) * dot2 * tw * (1.0 - u * 0.55) * 1.1;
+        }
         gl_FragColor = vec4(col, 1.0);
       }
     `,
@@ -89,8 +98,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     side: THREE.BackSide,
     uniforms: {
       uColor: { value: VOID_COL.glow },
-      uPower: { value: 3.2 },        // high power -> hugs the rim like the 2D thin rings
-      uIntensity: { value: 0.85 },
+      uPower: { value: 4.2 },        // very tight -> a thin violet rim, never a white halo
+      uIntensity: { value: 0.5 },
     },
     vertexShader: `
       varying vec3 vN; varying vec3 vView;
@@ -159,14 +168,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.28, 1.0);
   face.add(mouth);
 
-  // ── companion spark: warm-white, orbits at 1.22R, twinkles ────────────────
-  const spark = new THREE.Mesh(
-    new THREE.CircleGeometry(0.07, 12),
-    new THREE.MeshBasicMaterial({ color: VOID.spark, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
-  );
-  group.add(spark);
+  // (No orbiting spark/ring on the base form — that's an evolution-stage flourish.)
 
-  let radius = 6;
+  let radius = 4;
   let moveAmt = 0, blinkT = 3 + Math.random() * 3, blink = 0;
 
   const api: Void3D = {
@@ -211,16 +215,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
 
       // ground halo + contact track the void on the floor
-      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.55);
+      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.5);
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(radius * 1.02);
-
-      // companion spark orbit (elliptical, faster than the void)
-      const sa = s.t * 1.1;
-      const tw = 0.6 + 0.4 * Math.sin(s.t * 4);
-      spark.position.set(Math.cos(sa) * radius * 1.28, radius * (0.1 + Math.sin(sa * 0.7) * 0.5), Math.sin(sa) * radius * 1.28 * 0.7);
-      (spark.material as THREE.MeshBasicMaterial).opacity = 0.85 * tw;
-      spark.scale.setScalar(radius);
-      spark.quaternion.copy(camera.quaternion);
     },
   };
 

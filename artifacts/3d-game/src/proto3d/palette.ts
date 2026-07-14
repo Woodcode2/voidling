@@ -7,14 +7,16 @@ const c = (hex: number) => new THREE.Color(hex);
 
 // ── the void (stage 0 / "classic" default) ──────────────────────────────────
 // The 2D orb is a pit into space: darkest dead-centre, lit violet at the rim.
+// Tuned toward a rich VIOLET purple (the 2D look) rather than blue-indigo.
 export const VOID = {
-  abyss: 0x060310,      // gradient centre — the deepest core
-  bodyInner: 0x1a1040,  // _STAGE_BODY[0][0]
-  bodyMid: 0x2d1b68,    // _STAGE_BODY[0][1]
-  bodyRim: 0x4535a0,    // _STAGE_BODY[0][2] — the lit indigo-violet rim
-  rimLight: 0x4535a0,   // luminous event-horizon rim (α 0.38 in 2D)
-  glow: 0xb388ff,       // additive glow rings (the signature purple)
-  swirl: 0xb49bff,      // faint interior swirl arcs
+  abyss: 0x180b30,      // gradient centre — deep, but not pure black
+  bodyInner: 0x3a1c68,  // inner
+  bodyMid: 0x6a3a9e,    // mid-body — grape purple (more red = less "blue")
+  bodyRim: 0x9d5fd0,    // lit amethyst rim
+  rimLight: 0x9d5fd0,   // luminous event-horizon rim
+  glow: 0xac6cff,       // soft amethyst aura
+  swirl: 0xc9a6ff,      // faint interior swirl arcs
+  star: 0xffffff,       // interior star specks
   pupil: 0x160a30,
   sclera: 0xffffff,
   blush: 0xff7da8,

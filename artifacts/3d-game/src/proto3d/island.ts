@@ -413,6 +413,26 @@ function makePalm(): THREE.Group {
   return grp;
 }
 
+function makeBush(): THREE.Mesh {
+  const b = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.4, 2.1), 0),
+    new THREE.MeshStandardMaterial({ color: pick([0x6cc86e, 0x5db06a, 0x7ed57a]), roughness: 0.95, flatShading: true }));
+  b.position.y = 1; b.scale.y = 0.7; return b;
+}
+function makeMailbox(): THREE.Group {
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.6, 5), new THREE.MeshStandardMaterial({ color: 0x8a6a4a }));
+  post.position.y = 0.8; g.add(post);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 1.1), new THREE.MeshStandardMaterial({ color: pick([0xd85a5a, 0x4d7de8, 0x4db07a]), roughness: 0.6, metalness: 0.2 }));
+  box.position.y = 1.7; g.add(box); return g;
+}
+function makeBench(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 0.9 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(3, 0.3, 1), mat); seat.position.y = 1; g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 0.3), mat); back.position.set(0, 1.6, -0.35); g.add(back);
+  return g;
+}
+
 function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => { mesh.position.set(x3, 0, z3); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
@@ -425,30 +445,34 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     const jitter = () => [cx + rand(-half, half), cz + rand(-half, half)] as const;
 
     if (biome === 'cozy' || biome === 'fancy') {
-      const rows = 3, cols = 3;
+      // neat rows of houses facing the street, each with a yard: bush + mailbox
+      const rows = 4, cols = 3, sc = biome === 'fancy' ? 1.3 : 1;
+      const facing = pick([0, Math.PI]);   // whole block faces one way = designed
       for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
-        const hx = cx - half + (j + 0.5) * (half * 2 / cols) + rand(-2, 2);
-        const hz = cz - half + (i + 0.5) * (half * 2 / rows) + rand(-2, 2);
-        const house = makeHouse();
-        if (biome === 'fancy') house.scale.setScalar(1.25);
-        house.rotation.y = pick([0, Math.PI / 2, Math.PI, -Math.PI / 2]);
-        place(house, hx, hz, biome === 'fancy' ? 4 : 3.2);
+        const hx = cx - half + (j + 0.5) * (half * 2 / cols) + rand(-1.5, 1.5);
+        const hz = cz - half + (i + 0.5) * (half * 2 / rows) + rand(-1.5, 1.5);
+        const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = facing;
+        place(house, hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc);
+        if (Math.random() < 0.7) place(makeBush(), hx + rand(3, 5) * sc, hz + rand(-3, 3), 1.6);
+        if (Math.random() < 0.5) place(makeMailbox(), hx - rand(3, 5) * sc, hz + 4, 1.2);
       }
-      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.2); }
+      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.2); }
     } else if (biome === 'downtown' || biome === 'plaza') {
-      const n = biome === 'plaza' ? 4 : 2 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < n; i++) {
-        const t = makeTower(biome === 'plaza' || Math.random() < 0.5);
-        const [x, z] = jitter(); place(t, x, z, 8);
-      }
+      const n = biome === 'plaza' ? 4 : 3 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) { const t = makeTower(biome === 'plaza' || Math.random() < 0.5); const [x, z] = jitter(); place(t, x, z, 8); }
+      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
     } else if (biome === 'park') {
-      for (let t = 0; t < 7; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.4); }
+      for (let t = 0; t < 9; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.4); }
+      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
+      for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBench(), x, z, 2.4); }
     } else if (biome === 'forest') {
-      for (let t = 0; t < 12; t++) { const [x, z] = jitter(); place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3); }
+      for (let t = 0; t < 20; t++) { const [x, z] = jitter(); place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3); }
+      for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
     } else if (biome === 'beach') {
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makePalm(), x, z, 2.6); }
+      for (let t = 0; t < 6; t++) { const [x, z] = jitter(); place(makePalm(), x, z, 2.6); }
+      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.4); }
     } else if (biome === 'zoo') {
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3); }
+      for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBush(), x, z, 3); }
     } else if (biome === 'airport') {
       const hangar = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 20, 12, 1, false, 0, Math.PI),
         new THREE.MeshStandardMaterial({ color: 0xcfd6e0, roughness: 0.7, flatShading: true }));

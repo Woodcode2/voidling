@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { createVoid } from './proto3d/void3d';
 import { createIsland } from './proto3d/island';
 import { createLife } from './proto3d/life';
+import { createBubbles } from './proto3d/bubbles';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -20,7 +21,7 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1400);
-let camDist = 90;
+let camDist = 82;
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
 
@@ -48,7 +49,8 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 }
 
 const island = createIsland(scene, addEdible);
-const life = createLife(scene, addEdible, island.biomeAt);
+const bubbles = createBubbles(camera);
+const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
 
 // soft round sprite for absorb puffs (avoids hard square points)
@@ -63,7 +65,7 @@ const puffTex = (() => {
 
 // ── the void ──────────────────────────────────────────────────────────────────
 const voidling = createVoid(scene, camera);
-voidling.setRadius(6);
+voidling.setRadius(4);   // start tiny — you're a speck against the island
 const voidState = { x: island.spawn.x, z: island.spawn.z };
 
 // absorb puffs
@@ -133,7 +135,7 @@ function animate() {
       if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
       else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
     }
-    target.lerp(wander, 0.06);
+    target.lerp(wander, 0.1);
   }
   voidState.x += (target.x - voidState.x) * Math.min(1, dt * 2.4);
   voidState.z += (target.z - voidState.z) * Math.min(1, dt * 2.4);
@@ -144,6 +146,7 @@ function animate() {
   const R = voidling.radius;
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
+  bubbles.update();
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
@@ -189,7 +192,7 @@ function animate() {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
-    camDist += ((70 + R * 2.6) - camDist) * dt * 1.5;
+    camDist += ((62 + R * 4.0) - camDist) * dt * 1.5;
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, Math.min(1, dt * 3));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);
