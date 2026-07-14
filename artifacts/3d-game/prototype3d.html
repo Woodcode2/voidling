@@ -3,26 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#8fd3ff">
-    <title>VOIDLING · 3D Prototype</title>
+    <meta name="theme-color" content="#0d0821">
+    <title>VOIDLING · MAPLE ISLE (3D)</title>
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe8ff; touch-action: none; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none; }
       #hud {
         position: fixed; top: 14px; left: 16px; z-index: 5;
-        font-family: system-ui, sans-serif; color: #10334d; pointer-events: none;
-        text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+        font-family: system-ui, sans-serif; color: #fff; pointer-events: none;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
       }
       #hud .t { font-size: 34px; font-weight: 800; letter-spacing: 0.5px; }
-      #hud .s { font-size: 15px; font-weight: 700; opacity: 0.75; }
+      #hud .s { font-size: 14px; font-weight: 700; opacity: 0.82; }
       #tag {
         position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; z-index: 5;
-        font-family: system-ui, sans-serif; font-size: 12px; font-weight: 700; color: #10334d; opacity: 0.6;
+        font-family: system-ui, sans-serif; font-size: 12px; font-weight: 700; color: #fff; opacity: 0.5;
         pointer-events: none;
+      }
+      /* level title card — fades in then out on load */
+      #titlecard {
+        position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; pointer-events: none;
+        font-family: system-ui, sans-serif; text-align: center; color: #fff;
+        animation: cardFade 4.2s ease forwards;
+      }
+      #titlecard .lvl { font-size: 15px; font-weight: 800; letter-spacing: 6px; opacity: 0.85; color: #c9a6ff; }
+      #titlecard .name { font-size: 62px; font-weight: 900; letter-spacing: 1px; margin-top: 6px;
+        text-shadow: 0 4px 24px rgba(123,79,224,0.7), 0 2px 6px rgba(0,0,0,0.5); }
+      #titlecard .sub { font-size: 15px; font-weight: 700; opacity: 0.8; margin-top: 10px; letter-spacing: 1px; }
+      @keyframes cardFade {
+        0% { opacity: 0; transform: translateY(10px) scale(0.98); }
+        14% { opacity: 1; transform: translateY(0) scale(1); }
+        72% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-6px) scale(1.02); }
       }
     </style>
   </head>
   <body>
-    <div id="hud"><div class="t" id="size">VOIDLING</div><div class="s">3D prototype · drag to move · the little void eats the world</div></div>
+    <div id="titlecard">
+      <div class="lvl">LEVEL 1</div>
+      <div class="name">MAPLE&nbsp;ISLE</div>
+      <div class="sub">the little void is hungry · eat the island</div>
+    </div>
+    <div id="hud"><div class="t" id="size">VOIDLING</div><div class="s">MAPLE ISLE · drag to move · the void eats the world</div></div>
     <div id="tag">Three.js / WebGL — real camera · real light · real shadows · the cute void, in 3D</div>
     <script type="module" src="/src/prototype3d.ts"></script>
   </body>
