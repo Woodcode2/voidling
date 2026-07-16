@@ -52,8 +52,10 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
 
   return {
     say(pos, text, kind) {
-      // dedupe: if the same text is already showing near here, skip
-      let slot = slots.find((s) => !s.active);
+      // dedupe: never show the same line twice at once (panicked crowds all
+      // pull from the same pool)
+      if (slots.some((s) => s.active && s.el.textContent === text)) return;
+      const slot = slots.find((s) => !s.active);
       if (!slot) return; // at cap — keep it readable
       slot.active = true;
       slot.pos.copy(pos);

@@ -15,10 +15,12 @@ export interface Rivals {
 const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
 const COLORS = [0x2fd8c0, 0xff6fb0, 0xff9a3a, 0x7ed57a, 0x4d8ff0];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const EAT_RATIO = 1.11, R_CAP = 60;   // must match the player model
+// must match the player model (2D game constants through the 0.05 map scale)
+const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.0525;
 const growR = (R: number, eR: number) => {
-  const rookie = R < 6 ? 1.7 : R < 14 ? 1.25 : 1;
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.62 * eR * eR * rookie));
+  const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;
+  const diminish = Math.sqrt(START_R / Math.max(START_R, R));
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
 function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
@@ -72,7 +74,7 @@ export function createRivals(
     scene.add(group); scene.add(halo);
     // spread rivals around the island away from the player start
     const ang = (i / count) * Math.PI * 2 + 0.6;
-    rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: 1.3, group, eyes, halo,
+    rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0 });
   }
 
@@ -80,7 +82,9 @@ export function createRivals(
   return {
     list: rivals,
     update(dt, _t, px, pz, pr) {
+      const lawCap = START_R + LAW_RATE * _t;   // rivals obey the growth law too
       for (const rv of rivals) {
+        if (rv.r > lawCap) rv.r = lawCap;
         // AI: retarget to nearest food (or flee a much bigger player)
         rv.retarget -= dt;
         const dpx = rv.x - px, dpz = rv.z - pz, dp = Math.hypot(dpx, dpz);

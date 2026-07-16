@@ -94,8 +94,21 @@ function silhouetteWorld(steps = 10): [number, number][] {
   return out;
 }
 
+// module-level silhouette polygon (world coords) + point-in-polygon test, so
+// prop placement and movement respect the actual coastline, not just the grid
+const SIL_POLY = silhouetteWorld(12);
+function insideIslandWorld(wx: number, wy: number): boolean {
+  let inside = false;
+  for (let i = 0, j = SIL_POLY.length - 1; i < SIL_POLY.length; j = i++) {
+    const [xi, yi] = SIL_POLY[i], [xj, yj] = SIL_POLY[j];
+    if ((yi > wy) !== (yj > wy) && wx < ((xj - xi) * (wy - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+export const insideIsland3 = (x3: number, z3: number) => insideIslandWorld(x3 / SCALE + CX, z3 / SCALE + CZ);
+
 export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
-  const silW = silhouetteWorld(12);
+  const silW = SIL_POLY;
   const sil3 = silW.map(([x, y]) => new THREE.Vector2(w(x), w(y)));
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const p of sil3) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.y); maxZ = Math.max(maxZ, p.y); }
@@ -387,6 +400,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // ── biome lookup ───────────────────────────────────────────────────────────
   function biomeAt(x3: number, z3: number): Biome | null {
     const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
+    if (!insideIslandWorld(wx, wy)) return null;   // off the coast = off the island
     const gx = Math.round((wx - BLOCK_ORIGIN - BLOCK_SIZE / 2) / STRIDE);
     const gy = Math.round((wy - BLOCK_ORIGIN - BLOCK_SIZE / 2) / STRIDE);
     if (gx < 0 || gx > 5 || gy < 0 || gy > 5) return null;
@@ -410,17 +424,66 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 // ── prop factories ─────────────────────────────────────────────────────────────
 function makeHouse(): THREE.Group {
   const grp = new THREE.Group();
-  const wWall = rand(5, 7), d = rand(5, 7), h = rand(3.5, 5);
+  const wWall = rand(5.4, 7), d = rand(5.4, 7), h = rand(3.2, 4.2);
+  const wallCol = pick(PROPS.house);
   const walls = new THREE.Mesh(new THREE.BoxGeometry(wWall, h, d),
-    new THREE.MeshStandardMaterial({ color: pick(PROPS.house), roughness: 0.9, flatShading: true }));
+    new THREE.MeshStandardMaterial({ color: wallCol, roughness: 0.9 }));
   walls.position.y = h / 2; grp.add(walls);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(wWall, d) * 0.78, rand(2.4, 3.4), 4),
-    new THREE.MeshStandardMaterial({ color: pick(PROPS.roof), roughness: 0.85, flatShading: true }));
-  roof.position.y = h + 1.3; roof.rotation.y = Math.PI / 4; grp.add(roof);
-  // door
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.2),
-    new THREE.MeshStandardMaterial({ color: 0x6a4a6a, roughness: 0.8 }));
-  door.position.set(0, 0.9, d / 2 + 0.05); grp.add(door);
+  // gabled roof: explicit prism geometry, ridge along the depth axis, with
+  // eaves overhang (reads "house", not "tent")
+  const roofCol = pick(PROPS.roof);
+  const roofH = rand(1.9, 2.5);
+  const rw = wWall * 0.62, rd = d * 0.58;
+  const roofGeo = (() => {
+    const v: number[] = [];
+    const quad = (a: number[], b: number[], c: number[], e: number[]) => { v.push(...a, ...b, ...c, ...a, ...c, ...e); };
+    quad([-rw, 0, -rd], [-rw, 0, rd], [0, roofH, rd], [0, roofH, -rd]);        // left slope
+    quad([rw, 0, rd], [rw, 0, -rd], [0, roofH, -rd], [0, roofH, rd]);          // right slope
+    v.push(-rw, 0, rd, rw, 0, rd, 0, roofH, rd);                              // front gable
+    v.push(rw, 0, -rd, -rw, 0, -rd, 0, roofH, -rd);                           // back gable
+    const gGeo = new THREE.BufferGeometry();
+    gGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(v), 3));
+    gGeo.computeVertexNormals();
+    return gGeo;
+  })();
+  const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: roofCol, roughness: 0.85, flatShading: true }));
+  roof.position.y = h - 0.02;
+  grp.add(roof);
+  // eaves trim under the roofline
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(wWall * 1.08, 0.28, d * 1.08),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+  trim.position.y = h + 0.05; grp.add(trim);
+  // chimney
+  if (Math.random() < 0.65) {
+    const ch = new THREE.Mesh(new THREE.BoxGeometry(0.7, rand(1.6, 2.2), 0.7),
+      new THREE.MeshStandardMaterial({ color: 0xb8776a, roughness: 0.9 }));
+    ch.position.set(wWall * rand(-0.22, 0.22), h + roofH * 0.75, d * 0.18); grp.add(ch);
+  }
+  // door with frame + step
+  const doorG = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.1, 0.12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }));
+  frame.position.y = 1.05;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.8, 0.16), new THREE.MeshStandardMaterial({ color: pick([0x7a4a5e, 0x4a5e7a, 0x5e7a4a, 0x8a5a3a]), roughness: 0.7 }));
+  door.position.set(0, 0.9, 0.03);
+  const step = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 0.7), new THREE.MeshStandardMaterial({ color: 0xd9dbe2, roughness: 0.9 }));
+  step.position.set(0, 0.11, 0.4);
+  doorG.add(frame); doorG.add(door); doorG.add(step);
+  doorG.position.set(wWall * rand(-0.14, 0.14), 0, d / 2 + 0.02); grp.add(doorG);
+  // two front windows with white frames + warm glass
+  const winFrameMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+  const winGlassMat = new THREE.MeshStandardMaterial({ color: 0xffe9b8, roughness: 0.4, emissive: 0xffd98a, emissiveIntensity: 0.25 });
+  for (const sx of [-0.28, 0.28]) {
+    const wf = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.15, 0.1), winFrameMat);
+    wf.position.set(wWall * sx, h * 0.58, d / 2 + 0.02);
+    const wg = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.12), winGlassMat);
+    wg.position.set(wWall * sx, h * 0.58, d / 2 + 0.03);
+    grp.add(wf); grp.add(wg);
+  }
+  // side window
+  const sw = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.05, 1.05), winFrameMat);
+  sw.position.set(wWall / 2 + 0.02, h * 0.58, 0); grp.add(sw);
+  const swg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.78, 0.78), winGlassMat);
+  swg.position.set(wWall / 2 + 0.03, h * 0.58, 0); grp.add(swg);
   return grp;
 }
 function makeTower(tall = false): THREE.Group {
@@ -536,7 +599,10 @@ const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])
 
 function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => { mesh.position.set(x3, 0, z3); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
+  const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
+    if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
+    mesh.position.set(x3, 0, z3); setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
+  };
 
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const biome = PLAN[gy][gx];
@@ -555,6 +621,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = facing;
         place(house, hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc);
         if (Math.random() < 0.7) place(makeBush(), hx + rand(3, 5) * sc, hz + rand(-3, 3), 1.6);
+        // front-yard flower beds flanking the door — every yard has snackable detail
+        if (Math.random() < 0.8) place(makeFlowers(), hx + rand(1.6, 2.6) * sc, hz + 4.2 * sc, 0.7);
+        if (Math.random() < 0.5) place(makeFlowers(), hx - rand(1.6, 2.6) * sc, hz + 4.2 * sc, 0.7);
         if (Math.random() < 0.5) place(makeMailbox(), hx - rand(3, 5) * sc, hz + 4, 1.2);
       }
       for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.2); }
@@ -590,7 +659,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
     // walkable block so a speck-sized void always has something to nibble.
     if (biome !== 'military') {
-      const tinyN = biome === 'forest' ? 4 : 10;
+      const tinyN = biome === 'forest' ? 6 : 16;
       for (let t = 0; t < tinyN; t++) { const [x, z] = jitter(); place(makeTinyProp(), x, z, rand(0.6, 0.85)); }
     }
   }
@@ -599,8 +668,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const roads3 = ROAD_CENTERS.map((c) => w(c));
   for (const rc of roads3) {
     for (let a = -270; a < 270; a += rand(30, 46)) {
-      if (inIslandApprox(a, rc)) place(makeCone(), a, rc + (Math.random() < 0.5 ? 3.4 : -3.4), 0.7);
-      if (inIslandApprox(rc, a)) place(makeCone(), rc + (Math.random() < 0.5 ? 3.4 : -3.4), a, 0.7);
+      if (insideIsland3(a, rc)) place(makeCone(), a, rc + (Math.random() < 0.5 ? 3.4 : -3.4), 0.7);
+      if (insideIsland3(rc, a)) place(makeCone(), rc + (Math.random() < 0.5 ? 3.4 : -3.4), a, 0.7);
     }
   }
 }

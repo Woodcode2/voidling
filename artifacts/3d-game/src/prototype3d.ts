@@ -21,7 +21,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
+renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -31,7 +31,7 @@ const scene = new THREE.Scene();
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.55;
+  scene.environmentIntensity = 0.25;   // specular sheen only — keep colours saturated
 }
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1900);
 let camDist = 28;
@@ -42,8 +42,8 @@ const TOPDOWN = location.search.includes('top');
 // dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
 
 // ── lighting ─────────────────────────────────────────────────────────────────
-scene.add(new THREE.HemisphereLight(0xdfeaff, 0x6a6a90, 0.95));
-const sun = new THREE.DirectionalLight(0xfff2d8, 1.5);
+scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a5a80, 0.72));
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.35);
 const sunOff = new THREE.Vector3(-55, 95, 42);
 sun.position.copy(sunOff);
 sun.castShadow = true;
@@ -90,7 +90,7 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [213.75, -213.75] };
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [213.75, -213.75], cozy: [-128.25, -128.25] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -153,21 +153,24 @@ const aim = { x: 0, z: 1 };            // last travel direction
 let autoFireCd = 3;
 
 const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'WORLD ENDER'];
-const FORM_MIN = [0, 3, 8, 18, 34];    // radius thresholds (tuned for the tiny start)
+// 2D thresholds 18/32/50/78/110 world-px, mapped through the 0.05 world scale
+const FORM_MIN = [0, 1.6, 2.5, 3.9, 5.5];
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
 const PLAYER_COLOR = 0x9a5cff;
 
-// ── hole.io scale model (ported from the 2D game) ────────────────────────────
-// You start TINY — a speck that can only swallow cones/trash; a person is ~2.5×,
-// a house ~5×, a tower ~9× your size. You can only eat things up to ~your own
-// size (voidR >= targetR·0.9); bigger things just block you. Growth is AREA-based
-// with a "rookie surge" so you swell fast when small and slow when huge.
+// ── scale/eat/growth — the 2D game's exact model, through the 0.05 map scale ─
+// Start r=0.9 (2D: 18). Eat if voidR >= targetR·0.9. Growth is area-based with
+// the 2D's diminishing factor sqrt(startR/R) and rookie surge — AND the 2D
+// GROWTH LAW: radius can never exceed startR + rate·seconds. That law is the
+// real pacing: no ballooning off one item, the whole match is a steady climb.
 const START_R = 0.9;
 export const EAT_RATIO = 1.11;         // eat if target.radius <= R*1.11  (voidR >= targetR*0.9)
-const R_CAP = 60;
+const R_CAP = 12;                       // 2D MAX_RADIUS 240 · 0.05
+const LAW_RATE = 0.0525;                // 2D 1.05/s · 0.05 — cap ≈ 11.9 at the 3:30 whistle
 const growRadius = (R: number, eR: number) => {
-  const rookie = R < 6 ? 1.7 : R < 14 ? 1.25 : 1;
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.62 * eR * eR * rookie));
+  const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;   // 2D: <34 → 1.6, <50 → 1.3
+  const diminish = Math.sqrt(START_R / Math.max(START_R, R));
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
 const _q = new URLSearchParams(location.search);
@@ -297,6 +300,11 @@ function animate() {
     timerEl.textContent = fmtTime(matchClock);
     if (matchClock <= 30) timerEl.style.color = '#ff8a8a';
     if (matchClock <= 0) endMatch();
+    // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
+    if (!bigStart) {
+      const lawCap = START_R + LAW_RATE * (MATCH_LEN - matchClock);
+      if (voidling.radius > lawCap) voidling.setRadius(lawCap);
+    }
   }
 
   powerCd = Math.max(0, powerCd - dt);

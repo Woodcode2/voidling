@@ -47,16 +47,32 @@ export interface Life { update(dt: number, t: number, vx: number, vz: number, vR
 // ── mesh factories ─────────────────────────────────────────────────────────────
 function makeCar(): THREE.Group {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(6.2, 2.2, 3),
-    new THREE.MeshStandardMaterial({ color: pick(PROPS.car), roughness: 0.4, metalness: 0.15, flatShading: true }));
-  body.position.y = 1.6; g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.7, 2.6),
-    new THREE.MeshStandardMaterial({ color: PROPS.carGlass, roughness: 0.2, metalness: 0.3 }));
-  cabin.position.set(-0.4, 2.9, 0); g.add(cabin);
+  const col = pick(PROPS.car);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.32, metalness: 0.22 });
+  // lower body with a distinct hood + trunk step (reads "car", not "brick")
+  const body = new THREE.Mesh(new THREE.BoxGeometry(5.6, 1.4, 2.9), bodyMat);
+  body.position.y = 1.25; g.add(body);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 2.7), bodyMat);
+  hood.position.set(2.6, 1.1, 0); g.add(hood);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.35, 2.55),
+    new THREE.MeshStandardMaterial({ color: PROPS.carGlass, roughness: 0.12, metalness: 0.4 }));
+  cabin.position.set(-0.5, 2.55, 0); g.add(cabin);
+  const roofM = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.18, 2.5), bodyMat);
+  roofM.position.set(-0.5, 3.3, 0); g.add(roofM);
+  // headlights + taillights
+  const hl = new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffe9a8, emissiveIntensity: 0.7, roughness: 0.3 });
+  const tl = new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0xd82a2a, emissiveIntensity: 0.55, roughness: 0.3 });
+  for (const sz of [-0.95, 0.95]) {
+    const a = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.5), hl); a.position.set(3.36, 1.2, sz); g.add(a);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.45), tl); b.position.set(-2.82, 1.35, sz); g.add(b);
+  }
   const wheelMat = new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.9 });
-  for (const sx of [-1.9, 1.9]) for (const sz of [-1.4, 1.4]) {
-    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.6, 10), wheelMat);
-    wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.85, sz); g.add(wh);
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xc9cdd6, roughness: 0.4, metalness: 0.5 });
+  for (const sx of [-1.8, 1.9]) for (const sz of [-1.45, 1.45]) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 12), wheelMat);
+    wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.8, sz); g.add(wh);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.54, 8), hubMat);
+    hub.rotation.x = Math.PI / 2; hub.position.set(sx, 0.8, sz); g.add(hub);
   }
   return g;
 }
@@ -162,6 +178,7 @@ export function createLife(
   // ── wanderer (pedestrians, animals, event NPCs) ──────────────────────────
   const tmp = new THREE.Vector3();
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[]) {
+    if (!biomeAt(hx, hz)) return;   // don't spawn anyone off the coastline
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false;
     mesh.position.set(hx, 0, hz); setShadow(mesh); scene.add(mesh); addEdible(mesh, radius);
     const rec = { mesh, biome, panic: 0 };
@@ -197,14 +214,19 @@ export function createLife(
   }
 
   // scatter pedestrians across walkable biomes
-  const pedZones: Biome[] = ['cozy', 'fancy', 'park', 'beach', 'plaza', 'downtown'];
+  const pedZones: Biome[] = ['cozy', 'fancy', 'park', 'beach', 'plaza', 'downtown', 'forest', 'zoo'];
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const b = PLAN_GRID[gy][gx];
     if (!pedZones.includes(b)) continue;
     const [cx, cz] = blockCenter3D(gx, gy);
-    const n = b === 'beach' ? 3 : 2;
+    const n = b === 'beach' || b === 'plaza' ? 6 : b === 'forest' || b === 'zoo' ? 2 : 5;
     for (let i = 0; i < n; i++) {
-      addWanderer(makePerson(), cx + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7), cz + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7), 22, rand(4, 7), 18, 2.4, biomeKey(b));
+      // half the crowd lives mid-block, half strolls near the sidewalk edges
+      const edge = i % 2 === 1;
+      const t = HALF_BLOCK_3D * (edge ? rand(0.88, 0.98) : rand(-0.7, 0.7));
+      const hx = edge && Math.random() < 0.5 ? cx + (Math.random() < 0.5 ? t : -t) : cx + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7);
+      const hz = edge ? cz + (Math.random() < 0.5 ? t : -t) : cz + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7);
+      addWanderer(makePerson(), hx, hz, edge ? 28 : 20, rand(4, 7), 18, 2.4, biomeKey(b));
     }
   }
 

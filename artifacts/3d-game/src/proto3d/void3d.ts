@@ -135,8 +135,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const gr = x.createRadialGradient(128, 128, 30, 128, 128, 128);
     const c = new THREE.Color(VOID.glow);
     const rgb = `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
-    gr.addColorStop(0, `rgba(${rgb},0.5)`);
-    gr.addColorStop(0.45, `rgba(${rgb},0.18)`);
+    gr.addColorStop(0, `rgba(${rgb},0.30)`);
+    gr.addColorStop(0.45, `rgba(${rgb},0.10)`);
     gr.addColorStop(1, `rgba(${rgb},0)`);
     x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
     return new THREE.CanvasTexture(cv);
@@ -146,9 +146,20 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   group.add(bloomSprite);
 
   // ── ground halo (violet) + contact shadow, in scene-floor space ───────────
+  // ground halo: a soft radial-gradient violet stain (NOT a hard bright disc)
+  const haloTex = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const x = cv.getContext('2d')!;
+    const gr = x.createRadialGradient(64, 64, 18, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(122,79,224,0.30)');
+    gr.addColorStop(0.55, 'rgba(122,79,224,0.12)');
+    gr.addColorStop(1, 'rgba(122,79,224,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(cv);
+  })();
   const halo = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
-    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: haloTex, transparent: true, depthWrite: false }),
   );
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.08; scene.add(halo);
   const contact = new THREE.Mesh(
@@ -293,11 +304,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
 
       // ground halo + contact track the void on the floor
-      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.5);
+      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.35);
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(radius * 1.02);
 
       // bloom sprite hugs the orb (pulses gently, swells with the stage)
-      const bs = radius * (2.5 + stage * 0.16) * (1 + Math.sin(s.t * 1.7) * 0.03);
+      const bs = radius * (2.0 + stage * 0.14) * (1 + Math.sin(s.t * 1.7) * 0.03);
       bloomSprite.scale.set(bs, bs, 1);
     },
   };
