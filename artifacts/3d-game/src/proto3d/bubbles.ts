@@ -7,6 +7,7 @@ export type BubbleKind = 'ambient' | 'panic' | 'event';
 
 export interface Bubbles {
   say(pos: THREE.Vector3, text: string, kind: BubbleKind): void;
+  float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
   update(): void;
 }
 
@@ -36,6 +37,19 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
     .vb.event { background: #efe4ff; color: #4a2a80; border-color: #cbb0ff; }
     .vb.event::after { border-top-color: #efe4ff; }
     .vb.show { opacity: 1; }
+    .vf {
+      position: fixed; transform: translate(-50%, -50%); z-index: 6; pointer-events: none;
+      font-family: system-ui, sans-serif; font-weight: 900; font-size: 17px; color: #ff7da8;
+      -webkit-text-stroke: 1px rgba(70,20,50,0.35);
+      text-shadow: 0 2px 6px rgba(0,0,0,0.35); opacity: 0; white-space: nowrap;
+    }
+    .vf.big { font-size: 26px; color: #7ef2a0; letter-spacing: 1px; }
+    .vf.go { animation: vfRise 0.9s ease-out forwards; }
+    @keyframes vfRise {
+      0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
+      18% { opacity: 1; transform: translate(-50%, -70%) scale(1.12); }
+      100% { opacity: 0; transform: translate(-50%, -230%) scale(1); }
+    }
   `;
   document.head.appendChild(style);
 
@@ -46,6 +60,16 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
     document.body.appendChild(el);
     slots.push({ el, pos: new THREE.Vector3(), until: 0, active: false });
   }
+
+  // floater pool (score popups / EAT! flair)
+  const floats: Slot[] = [];
+  for (let i = 0; i < 14; i++) {
+    const el = document.createElement('div');
+    el.className = 'vf';
+    document.body.appendChild(el);
+    floats.push({ el, pos: new THREE.Vector3(), until: 0, active: false });
+  }
+  let fHead = 0;
 
   let clock = 0;
   const v = new THREE.Vector3();
@@ -67,6 +91,14 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
       void slot.el.offsetWidth;
       slot.el.classList.add('show');
     },
+    float(pos, text, big = false) {
+      const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
+      f.active = true; f.pos.copy(pos); f.until = clock + 0.9;
+      f.el.textContent = text;
+      f.el.className = `vf${big ? ' big' : ''}`;
+      void (f.el as HTMLElement).offsetWidth;
+      f.el.classList.add('go');
+    },
     update() {
       clock += 1 / 60;
       const w = window.innerWidth, h = window.innerHeight;
@@ -83,6 +115,14 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
         const y = (-v.y * 0.5 + 0.5) * h;
         s.el.style.left = `${x}px`;
         s.el.style.top = `${y}px`;
+      }
+      for (const f of floats) {
+        if (!f.active) continue;
+        if (clock > f.until) { f.active = false; f.el.classList.remove('go'); continue; }
+        v.copy(f.pos).project(camera);
+        if (v.z > 1) continue;
+        f.el.style.left = `${(v.x * 0.5 + 0.5) * w}px`;
+        f.el.style.top = `${(-v.y * 0.5 + 0.5) * h}px`;
       }
     },
   };

@@ -9,12 +9,12 @@ const c = (hex: number) => new THREE.Color(hex);
 // The 2D orb is a pit into space: darkest dead-centre, lit violet at the rim.
 // Tuned toward a rich VIOLET purple (the 2D look) rather than blue-indigo.
 export const VOID = {
-  abyss: 0x180b30,      // gradient centre — deep, but not pure black
-  bodyInner: 0x3a1c68,  // inner
-  bodyMid: 0x6a3a9e,    // mid-body — grape purple (more red = less "blue")
-  bodyRim: 0x9d5fd0,    // lit amethyst rim
-  rimLight: 0x9d5fd0,   // luminous event-horizon rim
-  glow: 0xac6cff,       // soft amethyst aura
+  abyss: 0x150726,      // gradient centre — deep space core
+  bodyInner: 0x371368,  // inner
+  bodyMid: 0x5c28a2,    // mid-body — saturated grape purple
+  bodyRim: 0x9350e8,    // lit vivid-violet rim (crisp, high contrast vs core)
+  rimLight: 0x9350e8,   // luminous event-horizon rim
+  glow: 0xa864ff,       // saturated amethyst aura
   swirl: 0xc9a6ff,      // faint interior swirl arcs
   star: 0xffffff,       // interior star specks
   pupil: 0x160a30,
@@ -73,7 +73,7 @@ export const PROPS = {
 // ── skins: void identity colour sets (ported from the 2D shop) ───────────────
 export interface Skin { id: string; name: string; abyss: number; inner: number; mid: number; rim: number; glow: number; }
 export const SKINS: Skin[] = [
-  { id: 'classic', name: 'Classic', abyss: 0x180b30, inner: 0x3a1c68, mid: 0x6a3a9e, rim: 0x9d5fd0, glow: 0xac6cff },
+  { id: 'classic', name: 'Classic', abyss: 0x150726, inner: 0x371368, mid: 0x5c28a2, rim: 0x9350e8, glow: 0xa864ff },
   { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
   { id: 'wizard', name: 'Wizard', abyss: 0x1c1038, inner: 0x45308a, mid: 0x6a4ab8, rim: 0xa888e8, glow: 0xc9a6ff },
   { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a },

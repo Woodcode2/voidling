@@ -96,37 +96,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), bodyMat);
   bob.add(body);
 
-  // ── glow shell: tight additive lavender halo (the 2D #B388FF rings) ────────
-  const glowMat = new THREE.ShaderMaterial({
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    side: THREE.BackSide,
-    uniforms: {
-      uColor: { value: VOID_COL.glow },
-      uPower: { value: 4.2 },        // very tight -> a thin violet rim, never a white halo
-      uIntensity: { value: 0.5 },
-    },
-    vertexShader: `
-      varying vec3 vN; varying vec3 vView;
-      void main(){
-        vN = normalize(normalMatrix * normal);
-        vec4 mv = modelViewMatrix * vec4(position,1.0);
-        vView = normalize(-mv.xyz);
-        gl_Position = projectionMatrix * mv;
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vN; varying vec3 vView;
-      uniform vec3 uColor; uniform float uPower; uniform float uIntensity;
-      void main(){
-        float f = pow(1.0 - abs(dot(normalize(vN), normalize(vView))), uPower);
-        gl_FragColor = vec4(uColor, f * uIntensity);
-      }
-    `,
-  });
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(1.08, 48, 36), glowMat);
-  bob.add(glow);
+  // (The old translucent glow SHELL read as a soap-bubble outline around the
+  // orb — killed. The rim light lives in the body shader; ambient glow comes
+  // from the bloom sprite only, so the silhouette stays razor crisp.)
+  const glowMat = { uniforms: { uColor: { value: VOID_COL.glow.clone() }, uIntensity: { value: 0.5 } } };
 
   // bloom sprite: a soft radial glow billboard behind the orb — reads as real
   // bloom on the void without post-processing washing out the sunlit world
@@ -170,13 +143,16 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   for (const sx of [-0.36, 0.36]) {
     const g = new THREE.Group();
     const sclera = new THREE.Group(); sclera.position.z = 1.0;
-    const outline = flat(0.225, 0x231a3d, 0.5); outline.position.z = -0.005;
+    // crisp full-opacity outline ring (not a translucent blur disc)
+    const outline = new THREE.Mesh(new THREE.RingGeometry(0.198, 0.218, 56),
+      new THREE.MeshBasicMaterial({ color: 0x2a1f45, depthWrite: false }));
+    outline.position.z = 0.005;
     const white = flat(0.21, VOID.sclera);
-    sclera.add(outline); sclera.add(white);
+    sclera.add(white); sclera.add(outline);
     const pupilGrp = new THREE.Group(); pupilGrp.position.z = 1.02;
     const pupil = flat(0.118, VOID.pupil);
-    const catch_ = flat(0.046, 0xffffff); catch_.position.set(-0.038, 0.043, 0.01);
-    const catch2 = flat(0.02, 0xffffff); catch2.position.set(0.032, -0.03, 0.01);
+    const catch_ = flat(0.042, 0xffffff); catch_.position.set(-0.036, 0.04, 0.01);
+    const catch2 = flat(0.016, 0xffffff); catch2.position.set(0.03, -0.028, 0.01);
     pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
@@ -202,15 +178,21 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   maw.add(mawDark); maw.add(tongue);
   face.add(maw);
 
-  // ── evolution rings (Saturn-style) — appear only at higher forms ──────────
+  // ── evolution ring — ONE crisp thin ribbon, normal blending so it reads as
+  // a saturated violet band (additive washed to white over bright ground)
   const rings = new THREE.Group();
   group.add(rings);
   const ringMats: THREE.MeshBasicMaterial[] = [];
-  for (let i = 0; i < 2; i++) {
-    const rm = new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const rg = new THREE.Mesh(new THREE.TorusGeometry(1.34 + i * 0.16, 0.028, 8, 72), rm);
-    rg.rotation.x = Math.PI / 2 - 0.55 - i * 0.12;  // tilted like an orbit
+  {
+    const rm = new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const rg = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.016, 8, 96), rm);
+    rg.rotation.x = Math.PI / 2 - 0.5;
     rings.add(rg); ringMats.push(rm);
+    // faint companion band just outside — subtle depth, same crispness
+    const rm2 = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const rg2 = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.008, 8, 96), rm2);
+    rg2.rotation.x = Math.PI / 2 - 0.5;
+    rings.add(rg2); ringMats.push(rm2);
   }
 
   let radius = 4;
@@ -246,12 +228,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
       // evolution rings + glow intensify with the form (rings are a child of the
       // group, which is positioned below; keep them local + centred on the orb)
-      const targetRing = stage >= 2 ? Math.min(0.7, (stage - 1) * 0.3) : 0;
+      const targetRing = stage >= 2 ? Math.min(0.85, 0.45 + (stage - 2) * 0.2) : 0;
       ringFade += (targetRing - ringFade) * Math.min(1, dt * 3);
       rings.scale.setScalar(radius);
-      rings.rotation.y += dt * 0.5;
-      ringMats.forEach((m, i) => { m.opacity = ringFade * (1 - i * 0.35); });
-      glowMat.uniforms.uIntensity.value = 0.5 + stage * 0.13;
+      rings.rotation.y += dt * 0.4;
+      ringMats[0].opacity = ringFade;
+      ringMats[1].opacity = ringFade * 0.4;
 
       const speed = Math.hypot(s.vx, s.vz);
       moveAmt += (Math.min(1, speed / 40) - moveAmt) * Math.min(1, dt * 6);

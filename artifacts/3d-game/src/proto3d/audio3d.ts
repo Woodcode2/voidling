@@ -13,6 +13,7 @@ export interface Audio3D {
   hit(): void;                     // took a shot
   alert(): void;                   // defense wave banner
   bigEat(): void;                  // crunching a building
+  ready(): void;                   // a power just charged
 }
 
 export function createAudio(): Audio3D {
@@ -100,6 +101,10 @@ export function createAudio(): Audio3D {
     alert() {
       tone(660, 660, 0.13, 'square', 0.12);
       tone(880, 880, 0.13, 'square', 0.12, 0.16);
+    },
+    ready() {
+      tone(659.25, 659.25, 0.1, 'sine', 0.18);
+      tone(987.77, 987.77, 0.14, 'sine', 0.16, 0.09);
     },
   };
 }

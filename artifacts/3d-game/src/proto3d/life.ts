@@ -76,14 +76,40 @@ function makeCar(): THREE.Group {
   }
   return g;
 }
+interface Limbs { la: THREE.Object3D; ra: THREE.Object3D; ll: THREE.Object3D; rl: THREE.Object3D; phase: number; }
 function makePerson(colOverride?: number): THREE.Group {
+  // little character with real limbs + a walk cycle — no more stick figures
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.85, 1.7, 3, 8),
-    new THREE.MeshStandardMaterial({ color: colOverride ?? pick(PROPS.person), roughness: 0.85 }));
-  body.position.y = 1.8; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 10),
-    new THREE.MeshStandardMaterial({ color: pick(PROPS.skin), roughness: 0.75 }));
-  head.position.y = 3.3; g.add(head);
+  const shirt = new THREE.MeshStandardMaterial({ color: colOverride ?? pick(PROPS.person), roughness: 0.85 });
+  const pants = new THREE.MeshStandardMaterial({ color: pick([0x3a4a6a, 0x5a4a3a, 0x2a2a34, 0x6a3a4a, 0x3a5a4a]), roughness: 0.9 });
+  const skin = new THREE.MeshStandardMaterial({ color: pick(PROPS.skin), roughness: 0.75 });
+  const hair = new THREE.MeshStandardMaterial({ color: pick([0x2a2024, 0x6a4a2a, 0xd8b46a, 0x8a3a2a, 0x4a4a52, 0xe8e2d8]), roughness: 0.9 });
+  // legs (pivot at hip so they swing)
+  const mkLeg = (sx: number) => {
+    const hip = new THREE.Group(); hip.position.set(sx, 1.15, 0);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.15, 0.4), pants);
+    leg.position.y = -0.57; hip.add(leg); g.add(hip); return hip;
+  };
+  const ll = mkLeg(-0.24), rl = mkLeg(0.24);
+  // torso
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.15, 0.55), shirt);
+  torso.position.y = 1.75; g.add(torso);
+  // arms (pivot at shoulder)
+  const mkArm = (sx: number) => {
+    const sh = new THREE.Group(); sh.position.set(sx, 2.2, 0);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.0, 0.3), shirt);
+    arm.position.y = -0.5; sh.add(arm);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.26), skin);
+    hand.position.y = -1.05; sh.add(hand);
+    g.add(sh); return sh;
+  };
+  const la = mkArm(-0.62), ra = mkArm(0.62);
+  // head + hair cap
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.52, 14, 12), skin);
+  head.position.y = 2.9; g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
+  cap.position.y = 2.98; g.add(cap);
+  g.userData.limbs = { la, ra, ll, rl, phase: Math.random() * 6 } as Limbs;
   return g;
 }
 function makeAnimal(): THREE.Group {
@@ -169,8 +195,14 @@ export function createLife(
         if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 3 && Math.random() < 0.5) {
           const na = st.centre; st.centre = rc; st.axis = st.axis === 'h' ? 'v' : 'h'; st.along = na; st.laneOff = st.dir * LANE * (st.axis === 'h' ? 1 : -1); st.turnCd = 2.5; break;
         }
-        if (st.axis === 'h') { mesh.position.set(st.along, 0, st.centre + st.laneOff); mesh.rotation.y = st.dir > 0 ? Math.PI / 2 : -Math.PI / 2; }
-        else { mesh.position.set(st.centre + st.laneOff, 0, st.along); mesh.rotation.y = st.dir > 0 ? 0 : Math.PI; }
+        if (st.axis === 'h') mesh.position.set(st.along, 0, st.centre + st.laneOff);
+        else mesh.position.set(st.centre + st.laneOff, 0, st.along);
+        // smooth heading — no snap turns at junctions
+        const targetRot = st.axis === 'h' ? (st.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (st.dir > 0 ? 0 : Math.PI);
+        let dr = targetRot - mesh.rotation.y;
+        while (dr > Math.PI) dr -= Math.PI * 2;
+        while (dr < -Math.PI) dr += Math.PI * 2;
+        mesh.rotation.y += dr * Math.min(1, dt * 7);
       },
     });
   }
@@ -208,6 +240,14 @@ export function createLife(
         if (biomeAt(nx, nz)) { mesh.position.x = nx; mesh.position.z = nz; } else ang += Math.PI;
         mesh.rotation.y = -ang + Math.PI / 2;
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
+        // walk cycle: arms + legs swing with travel speed
+        const limbs = mesh.userData.limbs;
+        if (limbs) {
+          limbs.phase += dt * spd * 2.4;
+          const sw = Math.sin(limbs.phase) * 0.55;
+          limbs.ll.rotation.x = sw; limbs.rl.rotation.x = -sw;
+          limbs.la.rotation.x = -sw * 0.8; limbs.ra.rotation.x = sw * 0.8;
+        }
       },
     });
     return rec;
@@ -343,6 +383,53 @@ export function createLife(
       const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
       ball.position.y = 1; decor(ball, x + 3, z + 5, 1.5);
     }, 4, 0xff9f4d);
+
+  // Soccer match in the park (second park block)
+  addEvent(4, 3,
+    ['GOOOAL! ⚽', 'DEFENSE!! DEFENSE!!', 'ref, that was SO offside', 'nutmeg!!'],
+    ['REF!! TIME OUT!!', 'it ate the REF?!', 'match ABANDONED!!'],
+    (x, z) => {
+      // pitch stripes
+      const pitch = new THREE.Mesh(new THREE.PlaneGeometry(30, 20),
+        new THREE.MeshStandardMaterial({ color: 0x6fbe5e, roughness: 0.95 }));
+      pitch.rotation.x = -Math.PI / 2; pitch.position.set(x, 0.06, z); scene.add(pitch);
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 20), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      line.rotation.x = -Math.PI / 2; line.position.set(x, 0.08, z); scene.add(line);
+      // goals
+      for (const gx2 of [-14, 14]) {
+        const goal = new THREE.Group();
+        const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+        for (const oz of [-3, 3]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3, 6), white); p.position.set(0, 1.5, oz); goal.add(p); }
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 6, 6), white);
+        bar.rotation.x = Math.PI / 2; bar.position.y = 3; goal.add(bar);
+        decor(goal, x + gx2, z, 2.6);
+      }
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.4 }));
+      ball.position.y = 0.7; decor(ball, x + rand(-4, 4), z + rand(-3, 3), 1);
+    }, 6, 0xffffff);
+
+  // School at recess (fancy district)
+  addEvent(2, 4,
+    ['recess!! 🎒', 'tag, you\'re it!', 'pop quiz?! nooo', 'the bell! THE BELL!'],
+    ['SNOW DAY!! I mean— VOID DAY!!', 'homework CANCELLED!!', 'RUN, class, RUN!!'],
+    (x, z) => {
+      const school = new THREE.Group();
+      const brick = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 9),
+        new THREE.MeshStandardMaterial({ color: 0xc25a4a, roughness: 0.85 }));
+      brick.position.y = 3; school.add(brick);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.8, 9.4), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 }));
+      trim.position.y = 6.2; school.add(trim);
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 4),
+        new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8, flatShading: true }));
+      bell.position.y = 7.6; school.add(bell);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.7 }));
+      door.position.set(0, 1.6, 4.6); school.add(door);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
+      pole.position.set(9.5, 3.5, 3); school.add(pole);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({ color: 0x9350e8, side: THREE.DoubleSide }));
+      flag.position.set(10.6, 6.4, 3); school.add(flag);
+      decor(school, x, z - 6, 9);
+    }, 5);
 
   // ── ambient chatter throttle ────────────────────────────────────────────────
   let chatCd = 2;

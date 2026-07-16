@@ -70,6 +70,11 @@ const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
 const fx = createFx(scene);
+rivals.onJoin = (name, color, x, z) => {
+  announce(`💜 ${name} joined the feast!`);
+  fx.ring(x, z, color, 22, 0.8);
+  audio.alert();
+};
 const defense = createDefense(scene, fx, island.biomeAt);
 const audio = createAudio();
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
@@ -155,6 +160,8 @@ const el = (id: string) => document.getElementById(id)!;
 const timerEl = el('timer'), devEl = el('devoured'), boardEl = el('board'), formEl = el('form');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
+const formFill = el('formbar').querySelector('.fill') as HTMLElement;
+let prevHunger = 0;
 
 function announce(text: string) {
   bannerEl.textContent = text;
@@ -187,7 +194,9 @@ const LAW_RATE = 0.0525;                // 2D 1.05/s · 0.05 — cap ≈ 11.9 at
 const growRadius = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;   // 2D: <34 → 1.6, <50 → 1.3
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
+  // hot coefficient so constant eating keeps you pressed against the growth
+  // law's cap — that ride-the-cap feel IS the 2D pacing
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.85 * eR * eR * rookie * diminish));
 };
 
 const _q = new URLSearchParams(location.search);
@@ -207,6 +216,43 @@ const fwdTmp = new THREE.Vector3(), rightTmp = new THREE.Vector3();
 
 function fmtTime(s: number) { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
+// ── coin wallet (persisted — the soft-currency for skins) ───────────────────
+let coins = Number(localStorage.getItem('voidCoins') || 0);
+const coinEl = el('coins');
+function addCoins(n: number) {
+  coins += n;
+  localStorage.setItem('voidCoins', String(coins));
+  coinEl.textContent = `🪙 ${coins}`;
+}
+addCoins(0);
+
+// ── quests (the 2D side-goal loop: do X, earn ¢) ─────────────────────────────
+interface Quest { label: string; target: number; count: number; reward: number; test: (r: number) => boolean; done: boolean; }
+const quests: Quest[] = [
+  { label: 'Eat 15 snacks', target: 15, count: 0, reward: 10, test: (r) => r < 1, done: false },
+  { label: 'Eat 8 people-sized', target: 8, count: 0, reward: 10, test: (r) => r >= 1 && r < 3, done: false },
+  { label: 'Reach GOBBLER form', target: 1, count: 0, reward: 15, test: () => false, done: false },
+];
+const questsEl = el('quests');
+function renderQuests() {
+  questsEl.innerHTML = quests.map((q) =>
+    `<div class="q ${q.done ? 'done' : ''}"><span>${q.done ? '✓' : '○'}</span> ${q.label} <b>+${q.reward}¢</b>${q.done ? '' : ` <i>${q.count}/${q.target}</i>`}</div>`).join('');
+}
+function questComplete(q: Quest) {
+  q.done = true; addCoins(q.reward);
+  announce(`QUEST DONE! +${q.reward}¢`);
+  audio.evolve();
+  renderQuests();
+}
+function questProgress(r: number) {
+  for (const q of quests) {
+    if (q.done || !q.test(r)) continue;
+    q.count++;
+    if (q.count >= q.target) questComplete(q); else renderQuests();
+  }
+}
+renderQuests();
+
 function refreshHud() {
   const R = voidling.radius;
   // leaderboard: player + rivals, ranked by score
@@ -215,7 +261,8 @@ function refreshHud() {
     .sort((a, b) => b.score - a.score);
   boardEl.innerHTML = rows.map((r, i) =>
     `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
-  const consumed = playerScore + rivals.list.reduce((a, r) => a + r.score, 0);
+  let consumed = 0;
+  for (const e of edibles) if (e.eaten || !e.mesh.visible) consumed += e.radius;
   devEl.textContent = `${Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100))}% DEVOURED`;
   formEl.textContent = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m`;
 }
@@ -226,15 +273,18 @@ function endMatch() {
     ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   const myRank = rows.findIndex((r) => r.me) + 1;
+  const reward = Math.max(5, Math.round(playerScore / 40)) + (myRank === 1 ? 25 : 0);
+  addCoins(reward);
   endHd.textContent = myRank === 1 ? 'YOU WIN!' : `#${myRank} PLACE`;
-  endSub.textContent = myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`;
+  endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}¢ earned`;
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
 }
 
-// devour one edible: spiral it in, grow, score, (optionally) charge hunger
+// devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0;
+const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
   const d = Math.hypot(dx, dz) || 1;
@@ -242,12 +292,22 @@ function capture(e: Edible, giveHunger = true) {
   e.mesh.userData.eaten = true;
   e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
-  playerScore += e.radius;
+  combo++; comboT = 1.2;
+  const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
+  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult));
+  playerScore += pts;
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
   voidling.chomp();
-  combo++; comboT = 1.2;
-  if (e.radius > voidling.radius * 0.6) audio.bigEat(); else audio.pop(combo);
+  // juice: score floater on the morsel, flair on big bites and hot combos
+  floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
+  const coinVal = e.mesh.userData.coin as number | undefined;
+  if (coinVal) { addCoins(coinVal); bubbles.float(floatPos, `+${coinVal}¢`, true); }
+  else bubbles.float(floatPos, `+${pts}`);
+  if (e.radius > voidling.radius * 0.55) { bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); }
+  else audio.pop(combo);
+  if (combo > 0 && combo % 8 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
+  questProgress(e.radius);
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -313,23 +373,55 @@ pwBtns[0].addEventListener('click', fireGulp);
 pwBtns[1].addEventListener('click', fireRocket);
 pwBtns[2].addEventListener('click', fireCollapse);
 
-// skin swatches — recolour the void live, remembered across sessions
+// skin shop — earn coins in matches, spend them on skins (LoL soft-currency
+// model, same as the 2D shop); owned + equipped persist across sessions
 {
+  const PRICES: Record<string, number> = { classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800 };
   const row = el('skins');
+  const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
   const saved = localStorage.getItem('voidSkin') || 'classic';
+  const badges = new Map<string, HTMLElement>();
+  const refreshLocks = () => {
+    for (const [id, b] of badges) {
+      const lockEl = b.querySelector('.lk') as HTMLElement;
+      if (owned.has(id)) { b.style.opacity = '1'; lockEl.style.display = 'none'; }
+      else { b.style.opacity = '0.55'; lockEl.style.display = 'block'; lockEl.textContent = `${PRICES[id]}¢`; }
+    }
+  };
   for (const s of SKINS) {
     const btn = document.createElement('button');
     btn.title = s.name;
+    btn.style.position = 'relative';
     btn.style.background = `radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+    const lk = document.createElement('span');
+    lk.className = 'lk';
+    lk.style.cssText = 'position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:900;color:#ffe08a;text-shadow:0 1px 2px rgba(0,0,0,0.6);white-space:nowrap;';
+    btn.appendChild(lk);
+    badges.set(s.id, btn);
     btn.addEventListener('click', () => {
+      if (!owned.has(s.id)) {
+        if (coins >= PRICES[s.id]) {
+          addCoins(-PRICES[s.id]);
+          owned.add(s.id);
+          localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+          announce(`${s.name.toUpperCase()} UNLOCKED!`);
+          audio.evolve();
+        } else {
+          announce(`NEED ${PRICES[s.id]}¢ — eat more!`);
+          audio.hit();
+          return;
+        }
+      }
       voidling.setSkin(s);
       localStorage.setItem('voidSkin', s.id);
       row.querySelectorAll('button').forEach((b) => b.classList.remove('sel'));
       btn.classList.add('sel');
+      refreshLocks();
     });
-    if (s.id === saved) { voidling.setSkin(s); btn.classList.add('sel'); }
+    if (s.id === saved && owned.has(s.id)) { voidling.setSkin(s); btn.classList.add('sel'); }
     row.appendChild(btn);
   }
+  refreshLocks();
 }
 
 function animate() {
@@ -346,6 +438,9 @@ function animate() {
     if (!bigStart) {
       const lawCap = START_R + LAW_RATE * (MATCH_LEN - matchClock);
       if (voidling.radius > lawCap) voidling.setRadius(lawCap);
+      // 2D score-floor: strong scoring pulls your radius up toward the cap
+      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)));
+      if (voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
     }
   }
 
@@ -439,15 +534,28 @@ function animate() {
       continue;
     }
     if (!e.mesh.visible) continue;
-    if (e.radius > R * EAT_RATIO) continue;   // too big to eat yet — it blocks you
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
+    if (e.radius > R * EAT_RATIO) {
+      // too big to eat yet — 2D rule: you pass through, it SHAKES (no weird block)
+      if (d < R + e.radius * 0.7 && !(e.mesh.userData.shakeT > 0)) e.mesh.userData.shakeT = 0.45;
+      continue;
+    }
     if (d < R + e.radius * 0.5) {
       capture(e);
     } else if (d < R + e.radius * 2.4) {
       const pull = (R + e.radius * 2.4 - d) * 1.4;
       e.mesh.position.x -= (dx / d) * dt * pull;
       e.mesh.position.z -= (dz / d) * dt * pull;
+    }
+  }
+
+  // decay prop shakes (too-big objects wobble as the void passes through)
+  for (const e of edibles) {
+    const ud = e.mesh.userData;
+    if (ud.shakeT > 0) {
+      ud.shakeT -= dt;
+      e.mesh.rotation.z = ud.shakeT > 0 ? Math.sin(tClock * 42) * 0.05 * (ud.shakeT / 0.45) : 0;
     }
   }
 
@@ -481,6 +589,7 @@ function animate() {
     evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
     audio.evolve();
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);
+    if (curStage >= 2 && !quests[2].done) questComplete(quests[2]);   // GOBBLER quest
     const wave = defense.setPhase(curStage);   // the city escalates with your form
     if (wave) { announce(wave); audio.alert(); }
   } else curStage = ns;
@@ -496,6 +605,11 @@ function animate() {
   if (playerScore < 0) playerScore = 0;
 
   // throttle DOM leaderboard updates (~5/s)
+  // power-ready toast: celebrate the moment a power charges up
+  if (hunger >= COST.gulp && prevHunger < COST.gulp) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'GULP READY!', true); audio.ready(); }
+  if (hunger >= COST.collapse && prevHunger < COST.collapse) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'COLLAPSE READY!!', true); audio.ready(); }
+  prevHunger = hunger;
+
   hudCd -= dt;
   if (hudCd <= 0) {
     hudCd = 0.2; refreshHud();
@@ -504,6 +618,9 @@ function animate() {
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
     pwBtns[1].classList.toggle('off', hunger < COST.rocket || powerCd > 0);
     pwBtns[2].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
+    // form progress toward the next evolution
+    const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
+    formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
   }
 
   const shakeOff = fx.update(dt);

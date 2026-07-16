@@ -10,6 +10,7 @@ export interface Rival { name: string; color: number; score: number; x: number; 
 export interface Rivals {
   list: Rival[];
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number): void;
+  onJoin?: (name: string, color: number, x: number, z: number) => void;
 }
 
 const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
@@ -64,26 +65,36 @@ export function createRivals(
   biomeAt: (x: number, z: number) => Biome | null,
   count = 4,
 ): Rivals {
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
+  const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
 
   for (let i = 0; i < count; i++) {
     const color = COLORS[i % COLORS.length];
     const { group, eyes, halo } = makeRivalMesh(color);
     scene.add(group); scene.add(halo);
+    group.visible = halo.visible = false;   // hidden until they join the feast
     // spread rivals around the island away from the player start
     const ang = (i / count) * Math.PI * 2 + 0.6;
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
-      x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0 });
+      x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
+      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false });
   }
 
   const tmp = new THREE.Vector3();
-  return {
+  const api: Rivals = {
     list: rivals,
     update(dt, _t, px, pz, pr) {
       const lawCap = START_R + LAW_RATE * _t;   // rivals obey the growth law too
       for (const rv of rivals) {
+        if (!rv.joined) {
+          if (_t >= rv.joinAt) {
+            rv.joined = true;
+            rv.group.visible = rv.halo.visible = true;
+            api.onJoin?.(rv.name, rv.color, rv.x, rv.z);
+          } else continue;   // not on the island yet
+        }
         if (rv.r > lawCap) rv.r = lawCap;
         // AI: retarget to nearest food (or flee a much bigger player)
         rv.retarget -= dt;
@@ -113,7 +124,8 @@ export function createRivals(
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius) ** 2) {
             e.mesh.userData.eaten = true; e.mesh.visible = false; scene.remove(e.mesh);
-            rv.score += e.radius; rv.r = growR(rv.r, e.radius);
+            rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
+            rv.r = growR(rv.r, e.radius);
           }
         }
 
@@ -128,4 +140,5 @@ export function createRivals(
       }
     },
   };
+  return api;
 }

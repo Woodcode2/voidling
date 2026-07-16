@@ -212,11 +212,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
   g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx;                     // asphalt
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  // dashed lane lines
-  g.strokeStyle = 'rgba(220,227,238,0.85)'; g.lineWidth = Math.max(2, roadPx * 0.05);
-  g.setLineDash([roadPx * 0.9, roadPx * 0.9]);
-  for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  g.setLineDash([]);
+  // (lane dashes are crisp GEOMETRY now — see the InstancedMesh below)
   // crosswalks: zebra ladders on all four arms of every junction
   g.fillStyle = 'rgba(240,244,252,0.88)';
   for (const cx of ROAD_CENTERS) for (const cyR of ROAD_CENTERS) {
@@ -290,10 +286,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       g.beginPath(); g.moveTo(bx - deckHalf, by); g.lineTo(bx + deckHalf, by); g.stroke();
       g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx;    // deck asphalt
       g.beginPath(); g.moveTo(bx - deckHalf, by); g.lineTo(bx + deckHalf, by); g.stroke();
-      g.strokeStyle = 'rgba(220,227,238,0.85)'; g.lineWidth = Math.max(2, roadPx * 0.05);
-      g.setLineDash([roadPx * 0.9, roadPx * 0.9]);
-      g.beginPath(); g.moveTo(bx - deckHalf, by); g.lineTo(bx + deckHalf, by); g.stroke();
-      g.setLineDash([]);
     }
   }
 
@@ -341,7 +333,30 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
     topGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
-  const top = new THREE.Mesh(topGeo, new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.97 }));
+  // detail-grain overlay: a small tiling noise texture multiplied into the
+  // ground at high frequency — hides bake upscaling so grass/asphalt read as
+  // TEXTURE up close (the 2D game's grass richness), not as blurry paint
+  const detailTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#808080'; x.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 2600; i++) {
+      const v = 96 + Math.floor(Math.random() * 64);
+      x.fillStyle = `rgb(${v},${v},${v})`;
+      x.fillRect(Math.random() * 128, Math.random() * 128, Math.random() < 0.3 ? 2 : 1, Math.random() < 0.5 ? 2 : 1);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  })();
+  const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.97 });
+  groundMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uDetail = { value: detailTex };
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n{ vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb; diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, 0.32); }');
+  };
+  const top = new THREE.Mesh(topGeo, groundMat);
   top.rotation.x = -Math.PI / 2;   // shape XY -> world XZ (shape.y -> world -z)
   top.position.y = 0; top.receiveShadow = true;
   scene.add(top);
@@ -366,6 +381,24 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     // underside cap
     const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x2a2140, roughness: 1 }));
     cap.rotation.x = Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
+  }
+
+  // crisp geometry lane dashes — razor sharp at any zoom (the baked ones blur)
+  {
+    const dashGeo = new THREE.BoxGeometry(2.6, 0.03, 0.34);
+    const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2f5fa });
+    const spots: { x: number; z: number; rot: number }[] = [];
+    for (const c of ROAD_CENTERS.map((v) => w(v))) {
+      for (let a = -292; a < 292; a += 5.6) {
+        if (insideIsland3(a, c)) spots.push({ x: a, z: c, rot: 0 });
+        if (insideIsland3(c, a)) spots.push({ x: c, z: a, rot: Math.PI / 2 });
+      }
+    }
+    const inst = new THREE.InstancedMesh(dashGeo, dashMat, spots.length);
+    const dm = new THREE.Object3D();
+    spots.forEach((s, i) => { dm.position.set(s.x, 0.06, s.z); dm.rotation.y = s.rot; dm.updateMatrix(); inst.setMatrixAt(i, dm.matrix); });
+    inst.instanceMatrix.needsUpdate = true;
+    scene.add(inst);
   }
 
   // ── waterfall at the SE edge (animated) ────────────────────────────────────
@@ -487,32 +520,85 @@ function makeHouse(): THREE.Group {
   swg.position.set(wWall / 2 + 0.03, h * 0.58, 0); grp.add(swg);
   return grp;
 }
+// baked facade texture: crisp lit/unlit window grid on the wall colour — far
+// sharper than box-windows, and one draw call per tower instead of a dozen
+const facadeCache = new Map<string, THREE.CanvasTexture>();
+function facadeTex(wall: number, glassWarm: boolean): THREE.CanvasTexture {
+  const key = `${wall}-${glassWarm}`;
+  const hit = facadeCache.get(key);
+  if (hit) return hit;
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#' + wall.toString(16).padStart(6, '0'); x.fillRect(0, 0, 128, 256);
+  // subtle floor bands
+  x.fillStyle = 'rgba(0,0,0,0.06)';
+  for (let fy = 0; fy < 256; fy += 32) x.fillRect(0, fy + 29, 128, 3);
+  for (let fy = 8; fy < 250; fy += 32) {
+    for (let fx = 10; fx < 118; fx += 30) {
+      const lit = Math.random() < 0.42;
+      x.fillStyle = lit ? (glassWarm ? '#ffe9b0' : '#dff3ff') : '#26314a';
+      x.fillRect(fx, fy, 20, 16);
+      x.fillStyle = 'rgba(255,255,255,0.28)';
+      x.fillRect(fx, fy, 20, 3);   // sky reflection strip
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  facadeCache.set(key, t);
+  return t;
+}
 function makeTower(tall = false): THREE.Group {
   const grp = new THREE.Group();
   const wB = rand(9, 14), d = rand(9, 14), h = tall ? rand(28, 48) : rand(12, 26);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(wB, h, d),
-    new THREE.MeshStandardMaterial({ color: pick(PROPS.tower), roughness: 0.72, flatShading: true }));
-  body.position.y = h / 2; grp.add(body);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(wB * 1.02, 1.4, d * 1.02),
-    new THREE.MeshStandardMaterial({ color: 0x4a5670, roughness: 0.7 }));
-  roof.position.y = h + 0.6; grp.add(roof);
-  const winMat = new THREE.MeshStandardMaterial({ color: PROPS.towerGlass, roughness: 0.35, metalness: 0.15 });
-  const rows = Math.max(1, Math.floor(h / 6));
-  for (let r = 0; r < rows; r++) for (let c = -1; c <= 1; c++) {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3, 0.3), winMat);
-    win.position.set(c * (wB / 3.2), 5 + r * 6, d / 2 + 0.05); grp.add(win);
-    const win2 = win.clone(); win2.position.set(wB / 2 + 0.05, 5 + r * 6, c * (d / 3.2)); win2.rotation.y = Math.PI / 2; grp.add(win2);
+  const wall = pick(PROPS.tower);
+  const tex = facadeTex(wall, Math.random() < 0.6);
+  const side = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x4a5670, roughness: 0.75 });
+  // podium base + tower shaft with facade texture on all four sides
+  const podH = Math.min(4.5, h * 0.22);
+  const pod = new THREE.Mesh(new THREE.BoxGeometry(wB * 1.18, podH, d * 1.18),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(wall).multiplyScalar(0.82), roughness: 0.7 }));
+  pod.position.y = podH / 2; grp.add(pod);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(wB, h, d), [side, side, capMat, capMat, side, side]);
+  body.position.y = podH + h / 2; grp.add(body);
+  // roof parapet + AC units + some spires on tall towers
+  const parapet = new THREE.Mesh(new THREE.BoxGeometry(wB * 1.04, 0.9, d * 1.04), capMat);
+  parapet.position.y = podH + h + 0.35; grp.add(parapet);
+  const ac = new THREE.Mesh(new THREE.BoxGeometry(rand(1.6, 2.6), 1.1, rand(1.6, 2.6)),
+    new THREE.MeshStandardMaterial({ color: 0x9aa3b2, roughness: 0.8 }));
+  ac.position.set(rand(-wB * 0.24, wB * 0.24), podH + h + 1.2, rand(-d * 0.24, d * 0.24)); grp.add(ac);
+  if (tall && Math.random() < 0.5) {
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.3, rand(4, 7), 6),
+      new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5, roughness: 0.4 }));
+    spire.position.y = podH + h + 3.4; grp.add(spire);
+  }
+  // street-level awning strip for shop-front charm
+  if (Math.random() < 0.6) {
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(wB * 0.9, 0.24, 1.5),
+      new THREE.MeshStandardMaterial({ color: pick([0xe8604d, 0x4db07a, 0x4d7de8, 0xf0c050]), roughness: 0.7 }));
+    aw.position.set(0, podH * 0.72, d * 0.62); grp.add(aw);
   }
   return grp;
 }
 function makeTree(): THREE.Group {
+  // clustered two-tone canopy like the 2D tree sprites — reads lush, not "gumdrop"
   const grp = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 3.4, 6),
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.72, 3.2, 7),
     new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1, flatShading: true }));
-  trunk.position.y = 1.7; grp.add(trunk);
-  const f = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(2.6, 3.6), 0),
-    new THREE.MeshStandardMaterial({ color: pick(PROPS.foliage), roughness: 0.9, flatShading: true }));
-  f.position.y = 5.2; grp.add(f);
+  trunk.position.y = 1.6; grp.add(trunk);
+  const base = pick(PROPS.foliage);
+  const dark = new THREE.Color(base).multiplyScalar(0.82).getHex();
+  const light = new THREE.Color(base).multiplyScalar(1.14).getHex();
+  const blob = (r: number, col: number, x: number, y: number, z: number) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.92, flatShading: true }));
+    m.position.set(x, y, z); grp.add(m);
+  };
+  const R0 = rand(2.2, 2.9);
+  blob(R0, dark, 0, 4.6, 0);
+  blob(R0 * 0.72, base, R0 * 0.55, 5.4, R0 * 0.3);
+  blob(R0 * 0.62, light, -R0 * 0.5, 5.6, -R0 * 0.25);
+  blob(R0 * 0.5, base, 0.2, 6.4, 0.2);
   return grp;
 }
 function makePine(): THREE.Group {
@@ -596,6 +682,28 @@ function makeFlowers(): THREE.Group {
   }
   return g;
 }
+function makeCoins(): THREE.Group {
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xf2c94c, roughness: 0.3, metalness: 0.55, emissive: 0xa87614, emissiveIntensity: 0.25 });
+  const n = 2 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < n; i++) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.18, 14), gold);
+    c.position.set(rand(-0.15, 0.15), 0.1 + i * 0.2, rand(-0.15, 0.15));
+    c.rotation.y = rand(0, Math.PI); g.add(c);
+  }
+  g.userData.coin = n;   // wallet value
+  return g;
+}
+function makeLamp(): THREE.Group {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 3.6, 6),
+    new THREE.MeshStandardMaterial({ color: 0x3c4454, roughness: 0.6, metalness: 0.3 }));
+  pole.position.y = 1.8; g.add(pole);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffdf8a, emissiveIntensity: 0.8, roughness: 0.4 }));
+  head.position.y = 3.7; g.add(head);
+  return g;
+}
 const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])();
 
 function populate(scene: THREE.Scene, addEdible: AddEdible) {
@@ -660,17 +768,22 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
     // walkable block so a speck-sized void always has something to nibble.
     if (biome !== 'military') {
-      const tinyN = biome === 'forest' ? 6 : 16;
+      const tinyN = biome === 'forest' ? 8 : 22;
       for (let t = 0; t < tinyN; t++) { const [x, z] = jitter(); place(makeTinyProp(), x, z, rand(0.6, 0.85)); }
+      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(makeCoins(), x, z, 0.55); }
     }
   }
 
-  // line the road edges with traffic cones — classic hole.io starter snacks
+  // line the road edges: cones (starter snacks) + streetlamps on the sidewalks
   const roads3 = ROAD_CENTERS.map((c) => w(c));
   for (const rc of roads3) {
-    for (let a = -270; a < 270; a += rand(30, 46)) {
+    for (let a = -270; a < 270; a += rand(26, 40)) {
       if (insideIsland3(a, rc)) place(makeCone(), a, rc + (Math.random() < 0.5 ? 3.4 : -3.4), 0.7);
       if (insideIsland3(rc, a)) place(makeCone(), rc + (Math.random() < 0.5 ? 3.4 : -3.4), a, 0.7);
+    }
+    for (let a = -280; a < 280; a += 24) {
+      if (insideIsland3(a, rc)) place(makeLamp(), a, rc + (Math.random() < 0.5 ? 4.6 : -4.6), 0.7);
+      if (insideIsland3(rc, a)) place(makeLamp(), rc + (Math.random() < 0.5 ? 4.6 : -4.6), a, 0.7);
     }
   }
 }
