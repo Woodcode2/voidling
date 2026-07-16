@@ -13,6 +13,7 @@ import { createRivals } from './proto3d/rivals';
 import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
+import { SKINS } from './proto3d/palette';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -311,6 +312,25 @@ const pwBtns = [el('pw1'), el('pw2'), el('pw3')];
 pwBtns[0].addEventListener('click', fireGulp);
 pwBtns[1].addEventListener('click', fireRocket);
 pwBtns[2].addEventListener('click', fireCollapse);
+
+// skin swatches — recolour the void live, remembered across sessions
+{
+  const row = el('skins');
+  const saved = localStorage.getItem('voidSkin') || 'classic';
+  for (const s of SKINS) {
+    const btn = document.createElement('button');
+    btn.title = s.name;
+    btn.style.background = `radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+    btn.addEventListener('click', () => {
+      voidling.setSkin(s);
+      localStorage.setItem('voidSkin', s.id);
+      row.querySelectorAll('button').forEach((b) => b.classList.remove('sel'));
+      btn.classList.add('sel');
+    });
+    if (s.id === saved) { voidling.setSkin(s); btn.classList.add('sel'); }
+    row.appendChild(btn);
+  }
+}
 
 function animate() {
   const dt = Math.min(0.05, clock.getDelta());

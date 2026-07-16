@@ -5,7 +5,7 @@
 // not a lit glossy sphere. Face is a billboarded set of crisp flat features,
 // exactly like the 2D canvas draw.
 import * as THREE from 'three';
-import { VOID, VOID_COL } from './palette';
+import { VOID, VOID_COL, type Skin } from './palette';
 
 export interface VoidState {
   t: number;        // seconds clock
@@ -19,6 +19,7 @@ export interface Void3D {
   radius: number;
   setRadius(r: number): void;
   setStage(n: number): void;
+  setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   chomp(): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -129,37 +130,26 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
   // bloom sprite: a soft radial glow billboard behind the orb — reads as real
   // bloom on the void without post-processing washing out the sunlit world
-  const bloomTex = (() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  // (baked WHITE, tinted via material.color — so skins can recolour it live)
+  const softRadialTex = (size: number, a0: number, a1: number, inner: number) => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = size;
     const x = cv.getContext('2d')!;
-    const gr = x.createRadialGradient(128, 128, 30, 128, 128, 128);
-    const c = new THREE.Color(VOID.glow);
-    const rgb = `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
-    gr.addColorStop(0, `rgba(${rgb},0.30)`);
-    gr.addColorStop(0.45, `rgba(${rgb},0.10)`);
-    gr.addColorStop(1, `rgba(${rgb},0)`);
-    x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
+    const gr = x.createRadialGradient(size / 2, size / 2, inner, size / 2, size / 2, size / 2);
+    gr.addColorStop(0, `rgba(255,255,255,${a0})`);
+    gr.addColorStop(0.5, `rgba(255,255,255,${a1})`);
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, size, size);
     return new THREE.CanvasTexture(cv);
-  })();
-  const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bloomTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  };
+  const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: softRadialTex(256, 0.3, 0.1, 30), color: VOID.glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
   bloomSprite.renderOrder = -1;   // behind the body
   group.add(bloomSprite);
 
-  // ── ground halo (violet) + contact shadow, in scene-floor space ───────────
-  // ground halo: a soft radial-gradient violet stain (NOT a hard bright disc)
-  const haloTex = (() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
-    const x = cv.getContext('2d')!;
-    const gr = x.createRadialGradient(64, 64, 18, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(122,79,224,0.30)');
-    gr.addColorStop(0.55, 'rgba(122,79,224,0.12)');
-    gr.addColorStop(1, 'rgba(122,79,224,0)');
-    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
-    return new THREE.CanvasTexture(cv);
-  })();
+  // ── ground halo + contact shadow, in scene-floor space ─────────────────────
+  // ground halo: a soft radial-gradient colour stain (NOT a hard bright disc)
   const halo = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
-    new THREE.MeshBasicMaterial({ map: haloTex, transparent: true, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.3, 0.13, 18), color: 0x7a4fe0, transparent: true, depthWrite: false }),
   );
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.08; scene.add(halo);
   const contact = new THREE.Mesh(
@@ -236,6 +226,17 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     set radius(r: number) { radius = r; },
     setRadius(r: number) { radius = r; },
     setStage(n: number) { stage = n; },
+    setSkin(s: Skin) {
+      bodyMat.uniforms.uAbyss.value.set(s.abyss);
+      bodyMat.uniforms.uInner.value.set(s.inner);
+      bodyMat.uniforms.uMid.value.set(s.mid);
+      bodyMat.uniforms.uRim.value.set(s.rim);
+      bodyMat.uniforms.uSwirl.value.set(s.glow);
+      glowMat.uniforms.uColor.value.set(s.glow);
+      (bloomSprite.material as THREE.SpriteMaterial).color.set(s.glow);
+      (halo.material as THREE.MeshBasicMaterial).color.set(s.glow);
+      ringMats.forEach((m) => m.color.set(s.glow));
+    },
     chomp() { if (mouthT < 0.22) { mouthT = 0.22; mouthMax = 0.55; } },
     animGulp() { mouthT = 0.6; mouthMax = 1; },
     animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; },

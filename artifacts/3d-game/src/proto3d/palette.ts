@@ -70,6 +70,17 @@ export const PROPS = {
   skin: [0xf4c9a0, 0xe0a878, 0xc98a5a, 0xffd9b0],
 };
 
+// ── skins: void identity colour sets (ported from the 2D shop) ───────────────
+export interface Skin { id: string; name: string; abyss: number; inner: number; mid: number; rim: number; glow: number; }
+export const SKINS: Skin[] = [
+  { id: 'classic', name: 'Classic', abyss: 0x180b30, inner: 0x3a1c68, mid: 0x6a3a9e, rim: 0x9d5fd0, glow: 0xac6cff },
+  { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
+  { id: 'wizard', name: 'Wizard', abyss: 0x1c1038, inner: 0x45308a, mid: 0x6a4ab8, rim: 0xa888e8, glow: 0xc9a6ff },
+  { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a },
+  { id: 'toxic', name: 'Toxic', abyss: 0x0e2412, inner: 0x1e5a2a, mid: 0x3a9a4a, rim: 0x7ed57a, glow: 0xa8ff8a },
+  { id: 'ocean', name: 'Ocean', abyss: 0x0a1830, inner: 0x1a4070, mid: 0x2a6ab8, rim: 0x5ec8d8, glow: 0x8ae8ff },
+];
+
 // pre-built THREE.Color instances for the void shader (avoids per-frame alloc)
 export const VOID_COL = {
   abyss: c(VOID.abyss),

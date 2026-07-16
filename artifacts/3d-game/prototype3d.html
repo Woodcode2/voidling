@@ -48,6 +48,11 @@
       #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 6;
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
+      /* skin swatches */
+      #skins { position: fixed; left: 14px; bottom: 18px; z-index: 6; display: flex; gap: 8px; }
+      #skins button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35);
+        cursor: pointer; padding: 0; transition: transform 0.1s, border-color 0.15s; }
+      #skins button.sel { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 10px rgba(255,255,255,0.4); }
       /* touch power buttons */
       #powers { position: fixed; right: 14px; bottom: 18px; z-index: 6; display: flex; flex-direction: column; gap: 9px; }
       #powers button { width: 74px; height: 46px; border-radius: 13px; border: none; cursor: pointer;
@@ -98,6 +103,7 @@
     <div id="hungerlbl">DRAG or WASD to steer · HUNGER fuels powers</div>
     <div id="hunger"><div class="fill"></div></div>
     <div id="joy"></div><div id="joyNub"></div>
+    <div id="skins"></div>
     <div id="powers">
       <button id="pw1"><b>1</b>GULP</button>
       <button id="pw2"><b>2</b>ROCKET</button>
