@@ -4,6 +4,7 @@
 // Void: ./proto3d/void3d · island: ./proto3d/island · palette: ./proto3d/palette
 // Standalone page — the main game bundle is untouched.
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid } from './proto3d/void3d';
 import { createIsland } from './proto3d/island';
 import { createLife } from './proto3d/life';
@@ -11,6 +12,7 @@ import { createBubbles } from './proto3d/bubbles';
 import { createRivals } from './proto3d/rivals';
 import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
+import { createAudio } from './proto3d/audio3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -19,14 +21,25 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.12;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+
+// image-based ambience: gives every PBR material real specular response so
+// surfaces read crisp/dimensional instead of flatly lit (the "2026" lift)
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.55;
+}
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1900);
 let camDist = 28;
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
+
+// (Full-screen bloom washed out the sunlit island — the void's "bloom" is a
+// dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
 
 // ── lighting ─────────────────────────────────────────────────────────────────
 scene.add(new THREE.HemisphereLight(0xdfeaff, 0x6a6a90, 0.95));
@@ -57,6 +70,7 @@ const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
 const fx = createFx(scene);
 const defense = createDefense(scene, fx, island.biomeAt);
+const audio = createAudio();
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
 
 // soft round sprite for absorb puffs (avoids hard square points)
@@ -199,6 +213,7 @@ function endMatch() {
 }
 
 // devour one edible: spiral it in, grow, score, (optionally) charge hunger
+let combo = 0, comboT = 0;
 function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
   const d = Math.hypot(dx, dz) || 1;
@@ -209,6 +224,24 @@ function capture(e: Edible, giveHunger = true) {
   playerScore += e.radius;
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
+  voidling.chomp();
+  combo++; comboT = 1.2;
+  if (e.radius > voidling.radius * 0.6) audio.bigEat(); else audio.pop(combo);
+}
+
+// converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
+function spawnSuck(n: number, reach: number) {
+  const cy = voidling.group.position.y;
+  for (let k = 0; k < n; k++) {
+    const i = puffHead; puffHead = (puffHead + 1) % PUFF;
+    const a = Math.random() * Math.PI * 2, r0 = reach * rand(0.55, 1);
+    puffPos[i * 3] = voidState.x + Math.cos(a) * r0;
+    puffPos[i * 3 + 1] = cy * rand(0.2, 1.4);
+    puffPos[i * 3 + 2] = voidState.z + Math.sin(a) * r0;
+    const inSpd = r0 / rand(0.28, 0.42);
+    puffVel[i].set(-Math.cos(a) * inSpd, (cy - puffPos[i * 3 + 1]) * 2, -Math.sin(a) * inSpd);
+    puffLife[i] = rand(0.25, 0.4);
+  }
 }
 
 // ── power fire functions ─────────────────────────────────────────────────────
@@ -222,6 +255,7 @@ function fireGulp() {
     const d = Math.hypot(dx, dz); if (d > reach) continue;
     if ((dx / (d || 1)) * aim.x + (dz / (d || 1)) * aim.z > 0.2) capture(e, false);   // forward cone
   }
+  voidling.animGulp(); audio.gulp(); spawnSuck(26, reach);
   fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach, 0.5); fx.flash('rgba(155,92,255,0.22)', 0.22);
   announce('GULP!');
 }
@@ -229,6 +263,7 @@ function fireRocket() {
   if (hunger < COST.rocket || powerCd > 0) return;
   hunger -= COST.rocket; powerCd = 0.6;
   dashT = 0.55; dashDir.x = aim.x; dashDir.z = aim.z;
+  voidling.animDash(); audio.rocket();
   fx.ring(voidState.x, voidState.z, 0xff9f4d, voidling.radius * 4, 0.4);
   announce('ROCKET BITE!');
 }
@@ -241,6 +276,7 @@ function fireCollapse() {
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     if (Math.hypot(dx, dz) < reach) capture(e, false);
   }
+  voidling.animCollapse(); audio.collapse(); spawnSuck(60, reach);
   fx.ring(voidState.x, voidState.z, 0xffffff, reach, 0.85); fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach * 0.65, 0.6);
   fx.flash('rgba(230,220,255,0.6)', 0.6); fx.shake(6);
   announce('COLLAPSE!!');
@@ -367,13 +403,20 @@ function animate() {
     curStage = ns;
     evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
     evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+    audio.evolve();
+    fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);
     const wave = defense.setPhase(curStage);   // the city escalates with your form
-    if (wave) announce(wave);
+    if (wave) { announce(wave); audio.alert(); }
   } else curStage = ns;
   voidling.setStage(curStage);
 
+  // combo decays when you stop eating
+  comboT -= dt; if (comboT <= 0) combo = 0;
+
   // the city fights back — apply hits taken / units devoured
-  playerScore += defense.update(dt, voidState.x, voidState.z, R);
+  const defDelta = defense.update(dt, voidState.x, voidState.z, R);
+  if (defDelta < 0) audio.hit();
+  playerScore += defDelta;
   if (playerScore < 0) playerScore = 0;
 
   // throttle DOM leaderboard updates (~5/s)

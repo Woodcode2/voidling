@@ -19,6 +19,10 @@ export interface Void3D {
   radius: number;
   setRadius(r: number): void;
   setStage(n: number): void;
+  chomp(): void;             // quick mouth-open bite (on eat)
+  animGulp(): void;          // big gape + hold (GULP)
+  animDash(): void;          // stretch pulse (ROCKET BITE)
+  animCollapse(): void;      // inhale-shrink then burst (COLLAPSE)
   update(dt: number, s: VoidState): void;
 }
 
@@ -123,6 +127,24 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const glow = new THREE.Mesh(new THREE.SphereGeometry(1.08, 48, 36), glowMat);
   bob.add(glow);
 
+  // bloom sprite: a soft radial glow billboard behind the orb — reads as real
+  // bloom on the void without post-processing washing out the sunlit world
+  const bloomTex = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+    const x = cv.getContext('2d')!;
+    const gr = x.createRadialGradient(128, 128, 30, 128, 128, 128);
+    const c = new THREE.Color(VOID.glow);
+    const rgb = `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
+    gr.addColorStop(0, `rgba(${rgb},0.5)`);
+    gr.addColorStop(0.45, `rgba(${rgb},0.18)`);
+    gr.addColorStop(1, `rgba(${rgb},0)`);
+    x.fillStyle = gr; x.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(cv);
+  })();
+  const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bloomTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  bloomSprite.renderOrder = -1;   // behind the body
+  group.add(bloomSprite);
+
   // ── ground halo (violet) + contact shadow, in scene-floor space ───────────
   const halo = new THREE.Mesh(
     new THREE.CircleGeometry(1, 48),
@@ -139,18 +161,22 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const face = new THREE.Group();
   group.add(face);
   const flat = (r: number, col: number, opacity = 1) =>
-    new THREE.Mesh(new THREE.CircleGeometry(r, 28), new THREE.MeshBasicMaterial({ color: col, transparent: opacity < 1, opacity, depthWrite: false }));
+    new THREE.Mesh(new THREE.CircleGeometry(r, 56), new THREE.MeshBasicMaterial({ color: col, transparent: opacity < 1, opacity, depthWrite: false }));
 
-  // eyes: sclera 0.21R, pupil 0.118R (tracks look), catchlight upper-left
-  interface Eye { g: THREE.Group; sclera: THREE.Mesh; pupilGrp: THREE.Group; }
+  // eyes: dark outline ring + sclera + tracking pupil + catchlight (2D spec)
+  interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; }
   const eyes: Eye[] = [];
   for (const sx of [-0.36, 0.36]) {
     const g = new THREE.Group();
-    const sclera = flat(0.21, VOID.sclera); sclera.position.z = 1.0;
+    const sclera = new THREE.Group(); sclera.position.z = 1.0;
+    const outline = flat(0.225, 0x231a3d, 0.5); outline.position.z = -0.005;
+    const white = flat(0.21, VOID.sclera);
+    sclera.add(outline); sclera.add(white);
     const pupilGrp = new THREE.Group(); pupilGrp.position.z = 1.02;
     const pupil = flat(0.118, VOID.pupil);
-    const catch_ = flat(0.045, 0xffffff); catch_.position.set(-0.038, 0.043, 0.01);
-    pupilGrp.add(pupil); pupilGrp.add(catch_);
+    const catch_ = flat(0.046, 0xffffff); catch_.position.set(-0.038, 0.043, 0.01);
+    const catch2 = flat(0.02, 0xffffff); catch2.position.set(0.032, -0.03, 0.01);
+    pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
     face.add(g); eyes.push({ g, sclera, pupilGrp });
@@ -161,13 +187,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     b.scale.set(1.06, 0.72, 1); b.position.set(sx, -0.2, 0.99);
     face.add(b);
   }
-  // smiling mouth — a torus arc, opening up = grin
+  // smiling mouth — a crisp torus arc; plus an "open" mouth (dark maw + tongue)
+  // that scales in when eating or firing GULP
   const mouth = new THREE.Mesh(
-    new THREE.TorusGeometry(0.22, 0.03, 8, 24, Math.PI),
+    new THREE.TorusGeometry(0.22, 0.034, 12, 48, Math.PI),
     new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }),
   );
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.28, 1.0);
   face.add(mouth);
+  const maw = new THREE.Group(); maw.position.set(0, -0.3, 1.01); maw.scale.setScalar(0.001);
+  const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
+  const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
+  maw.add(mawDark); maw.add(tongue);
+  face.add(maw);
 
   // ── evolution rings (Saturn-style) — appear only at higher forms ──────────
   const rings = new THREE.Group();
@@ -183,6 +215,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let radius = 4;
   let stage = 0, ringFade = 0;
   let moveAmt = 0, blinkT = 3 + Math.random() * 3, blink = 0;
+  let mouthT = 0, mouthMax = 0;    // open-mouth envelope
+  let stretchT = 0;                // rocket stretch pulse
+  let inhaleT = 0;                 // collapse inhale->burst envelope
 
   const api: Void3D = {
     group,
@@ -190,6 +225,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     set radius(r: number) { radius = r; },
     setRadius(r: number) { radius = r; },
     setStage(n: number) { stage = n; },
+    chomp() { if (mouthT < 0.22) { mouthT = 0.22; mouthMax = 0.55; } },
+    animGulp() { mouthT = 0.6; mouthMax = 1; },
+    animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; },
+    animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; },
     update(dt, s) {
       bodyMat.uniforms.uTime.value = s.t;
 
@@ -212,8 +251,20 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
       // stays a cute round orb, never pinched
       const breathe = Math.sin(s.t * 2.2) * 0.016;
-      const stretch = 1 + moveAmt * 0.05 - breathe;
-      const squash = 1 - moveAmt * 0.045 + breathe;
+      let stretch = 1 + moveAmt * 0.05 - breathe;
+      let squash = 1 - moveAmt * 0.045 + breathe;
+      // power envelopes
+      if (stretchT > 0) {           // ROCKET BITE: lunge-stretch pulse
+        stretchT -= dt;
+        const k = Math.sin(Math.max(0, stretchT) / 0.5 * Math.PI) * 0.2;
+        stretch += k; squash -= k * 0.7;
+      }
+      if (inhaleT > 0) {            // COLLAPSE: inhale-shrink, then burst back
+        inhaleT -= dt;
+        const ph = 1 - Math.max(0, inhaleT) / 0.9;
+        const k = ph < 0.62 ? -0.24 * (ph / 0.62) : -0.24 + 0.42 * ((ph - 0.62) / 0.38);
+        stretch += k; squash += k;
+      }
       bob.scale.set(radius * stretch, radius * squash, radius * stretch);
       bob.rotation.z = THREE.MathUtils.clamp(-s.vx / 520, -0.11, 0.11);
       bob.rotation.x = THREE.MathUtils.clamp(s.vz / 520, -0.11, 0.11);
@@ -222,6 +273,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       face.scale.setScalar(radius);
       face.position.set(0, radius * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
+
+      // mouth: maw scales in while open, smile hides
+      if (mouthT > 0) mouthT -= dt;
+      const mo = mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0;
+      maw.scale.setScalar(Math.max(0.001, mo));
+      mouth.visible = mo < 0.25;
 
       // pupil tracking + blink
       blinkT -= dt;
@@ -238,6 +295,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // ground halo + contact track the void on the floor
       halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.5);
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(radius * 1.02);
+
+      // bloom sprite hugs the orb (pulses gently, swells with the stage)
+      const bs = radius * (2.5 + stage * 0.16) * (1 + Math.sin(s.t * 1.7) * 0.03);
+      bloomSprite.scale.set(bs, bs, 1);
     },
   };
 

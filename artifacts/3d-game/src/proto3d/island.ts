@@ -139,7 +139,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   }
 
   // ── baked ground texture ───────────────────────────────────────────────────
-  const TEX = 2048;
+  const TEX = 3072;   // high-res bake so roads/crosswalks stay crisp up close
   const cv = document.createElement('canvas'); cv.width = cv.height = TEX;
   const g = cv.getContext('2d')!;
   const px = (x3: number) => ((x3 - minX) / W3) * TEX;
@@ -182,21 +182,45 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   }
   // forest gets a darker dappling; downtown a plaza tint already via pavement
 
-  // roads
+  // roads — sidewalk band first, asphalt over it, crisp edge lines, dashes
   const roadPx = pxW(ROAD_CENTERS[1]) - pxW(ROAD_CENTERS[1] - 110);
-  g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx; g.lineCap = 'butt';
-  for (const c of ROAD_CENTERS) {
-    g.beginPath(); g.moveTo(pxW(c), 0); g.lineTo(pxW(c), TEX); g.stroke();       // vertical
-    g.beginPath(); g.moveTo(0, pyW(c)); g.lineTo(TEX, pyW(c)); g.stroke();       // horizontal
-  }
+  const roadLine = (c: number, vert: boolean) => {
+    g.beginPath();
+    if (vert) { g.moveTo(pxW(c), 0); g.lineTo(pxW(c), TEX); }
+    else { g.moveTo(0, pyW(c)); g.lineTo(TEX, pyW(c)); }
+    g.stroke();
+  };
+  g.lineCap = 'butt';
+  g.strokeStyle = hex(WORLD.pavement); g.lineWidth = roadPx * 1.6;          // sidewalks
+  for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
+  g.strokeStyle = 'rgba(120,126,150,0.5)'; g.lineWidth = roadPx * 1.62;     // curb shadow edge
+  for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
+  g.strokeStyle = hex(WORLD.pavement); g.lineWidth = roadPx * 1.56;
+  for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
+  g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx;                     // asphalt
+  for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
   // dashed lane lines
   g.strokeStyle = 'rgba(220,227,238,0.85)'; g.lineWidth = Math.max(2, roadPx * 0.05);
   g.setLineDash([roadPx * 0.9, roadPx * 0.9]);
-  for (const c of ROAD_CENTERS) {
-    g.beginPath(); g.moveTo(pxW(c), 0); g.lineTo(pxW(c), TEX); g.stroke();
-    g.beginPath(); g.moveTo(0, pyW(c)); g.lineTo(TEX, pyW(c)); g.stroke();
-  }
+  for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
   g.setLineDash([]);
+  // crosswalks: zebra ladders on all four arms of every junction
+  g.fillStyle = 'rgba(240,244,252,0.88)';
+  for (const cx of ROAD_CENTERS) for (const cyR of ROAD_CENTERS) {
+    const jx = pxW(cx), jy = pyW(cyR), half = roadPx / 2;
+    const crossW = roadPx * 0.34;          // ladder depth (walking direction)
+    const off = half + roadPx * 0.1;       // just outside the junction box
+    const bars = 5, barLen = roadPx * 0.86, step = barLen / bars;
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < bars; k++) {
+        const along = -barLen / 2 + k * step + step * 0.18;
+        // arms of the HORIZONTAL road (walk north-south): bars elongated in x
+        g.fillRect(jx + s * off + (s > 0 ? 0 : -crossW), jy + along, crossW, step * 0.62);
+        // arms of the VERTICAL road (walk east-west): bars elongated in y
+        g.fillRect(jx + along, jy + s * off + (s > 0 ? 0 : -crossW), step * 0.62, crossW);
+      }
+    }
+  }
 
   // train tracks (ballast + twin rails + ties) around downtown
   const railPath = () => {
@@ -229,6 +253,47 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.fillStyle = hex(WORLD.waterDeep);
   g.beginPath(); g.ellipse(pxW(LAGOON.x), pyW(LAGOON.y), (pxW(LAGOON.rx) - pxW(0)) * 0.6, (pyW(LAGOON.ry) - pyW(0)) * 0.6, 0, 0, Math.PI * 2); g.fill();
 
+  // bridge decks — repaint the road over the river at each crossing, with pale
+  // deck edging, so roads read as BRIDGES instead of drowning under the water
+  {
+    // approximate river x at each horizontal road, from the RIVER polyline
+    const riverXAt = (wy: number) => {
+      for (let i = 0; i < RIVER.length - 1; i++) {
+        const [x0, y0] = RIVER[i], [x1, y1] = RIVER[i + 1];
+        if ((wy >= y0 && wy <= y1) || (wy >= y1 && wy <= y0)) {
+          const t = (wy - y0) / ((y1 - y0) || 1);
+          return x0 + t * (x1 - x0);
+        }
+      }
+      return null;
+    };
+    const deckHalf = pxW(230) - pxW(0);
+    g.lineCap = 'butt';
+    for (const c of ROAD_CENTERS) {
+      const rx = riverXAt(c);
+      if (rx == null) continue;
+      const bx = pxW(rx), by = pyW(c);
+      g.strokeStyle = '#cfd4de'; g.lineWidth = roadPx * 1.24;   // deck edging
+      g.beginPath(); g.moveTo(bx - deckHalf, by); g.lineTo(bx + deckHalf, by); g.stroke();
+      g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx;    // deck asphalt
+      g.beginPath(); g.moveTo(bx - deckHalf, by); g.lineTo(bx + deckHalf, by); g.stroke();
+      g.strokeStyle = 'rgba(220,227,238,0.85)'; g.lineWidth = Math.max(2, roadPx * 0.05);
+      g.setLineDash([roadPx * 0.9, roadPx * 0.9]);
+      g.beginPath(); g.moveTo(bx - deckHalf, by); g.lineTo(bx + deckHalf, by); g.stroke();
+      g.setLineDash([]);
+    }
+  }
+
+  // plaza fountain — a civic landmark at the heart of downtown
+  {
+    const fx2 = pxW(6855), fy2 = pyW(5145);
+    const rOuter = pxW(190) - pxW(0);
+    g.fillStyle = hex(WORLD.pavement); g.beginPath(); g.arc(fx2, fy2, rOuter * 1.35, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#c9cdd9'; g.lineWidth = rOuter * 0.12; g.beginPath(); g.arc(fx2, fy2, rOuter, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = hex(WORLD.waterShallow); g.beginPath(); g.arc(fx2, fy2, rOuter * 0.88, 0, Math.PI * 2); g.fill();
+    g.fillStyle = hex(WORLD.foam); g.beginPath(); g.arc(fx2, fy2, rOuter * 0.3, 0, Math.PI * 2); g.fill();
+  }
+
   g.restore(); // end island clip
 
   // coast: sand band + white foam rim, stroked along the silhouette
@@ -243,7 +308,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.closePath(); g.stroke();
 
   const groundTex = new THREE.CanvasTexture(cv);
-  groundTex.anisotropy = 8;
+  groundTex.anisotropy = 16;
   groundTex.colorSpace = THREE.SRGBColorSpace;
 
   // ground plane (flat, cutout by texture alpha? no alpha here — we use the slab
