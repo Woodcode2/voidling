@@ -114,20 +114,36 @@ function spawnPuff(x: number, y: number, z: number, n: number) {
   }
 }
 
-// ── input ──────────────────────────────────────────────────────────────────────
-const raycaster = new THREE.Raycaster();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const target = new THREE.Vector3(voidState.x, 0, voidState.z);
-let dragging = false, lastInput = -9999, tClock = 0;
-function pointerTo(ev: PointerEvent) {
-  const ndc = new THREE.Vector2((ev.clientX / window.innerWidth) * 2 - 1, -(ev.clientY / window.innerHeight) * 2 + 1);
-  raycaster.setFromCamera(ndc, camera);
-  const hit = new THREE.Vector3();
-  if (raycaster.ray.intersectPlane(groundPlane, hit)) { target.copy(hit); lastInput = tClock; }
+// ── input: relative drag joystick (hole.io style) + WASD/arrows ───────────────
+const joyEl = document.getElementById('joy')!, joyNubEl = document.getElementById('joyNub')!;
+const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0 };
+const JOY_R = 64;
+let lastInput = -9999, tClock = 0;
+function joySet(ev: PointerEvent) {
+  const dx = ev.clientX - joy.ax, dy = ev.clientY - joy.ay;
+  const m = Math.hypot(dx, dy);
+  const k = m > JOY_R ? JOY_R / m : 1;
+  joy.dx = (dx * k) / JOY_R; joy.dy = (dy * k) / JOY_R; joy.mag = Math.min(1, m / JOY_R);
+  joyNubEl.style.left = `${joy.ax + dx * k}px`; joyNubEl.style.top = `${joy.ay + dy * k}px`;
+  lastInput = tClock;
 }
-renderer.domElement.addEventListener('pointerdown', (e) => { dragging = true; pointerTo(e); });
-renderer.domElement.addEventListener('pointermove', (e) => { if (dragging) pointerTo(e); });
-window.addEventListener('pointerup', () => { dragging = false; });
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  joy.active = true; joy.id = e.pointerId; joy.ax = e.clientX; joy.ay = e.clientY;
+  joyEl.style.display = joyNubEl.style.display = 'block';
+  joyEl.style.left = `${e.clientX}px`; joyEl.style.top = `${e.clientY}px`;
+  joySet(e);
+});
+window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) joySet(e); });
+const joyEnd = (e: PointerEvent) => {
+  if (joy.active && e.pointerId === joy.id) { joy.active = false; joy.mag = 0; joy.dx = joy.dy = 0; joyEl.style.display = joyNubEl.style.display = 'none'; }
+};
+window.addEventListener('pointerup', joyEnd);
+window.addEventListener('pointercancel', joyEnd);
+
+const keys = new Set<string>();
+const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+window.addEventListener('keydown', (e) => { if (MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; } });
+window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -186,6 +202,7 @@ let wanderT = 0; const wander = new THREE.Vector3(voidState.x, 0, voidState.z);
 const clock = new THREE.Clock();
 const prev = { x: voidState.x, z: voidState.z };
 const tmpV = new THREE.Vector3();
+const fwdTmp = new THREE.Vector3(), rightTmp = new THREE.Vector3();
 
 function fmtTime(s: number) { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
@@ -289,6 +306,11 @@ window.addEventListener('keydown', (e) => {
   else if (e.code === 'Digit2') fireRocket();
   else if (e.code === 'Digit3') fireCollapse();
 });
+// touch power buttons
+const pwBtns = [el('pw1'), el('pw2'), el('pw3')];
+pwBtns[0].addEventListener('click', fireGulp);
+pwBtns[1].addEventListener('click', fireRocket);
+pwBtns[2].addEventListener('click', fireCollapse);
 
 function animate() {
   const dt = Math.min(0.05, clock.getDelta());
@@ -308,32 +330,58 @@ function animate() {
   }
 
   powerCd = Math.max(0, powerCd - dt);
+  // screen-space input: joystick first, else keys
+  let inX = 0, inY = 0;
+  if (joy.active && joy.mag > 0.08) { inX = joy.dx; inY = joy.dy; }
+  else if (keys.size) {
+    if (keys.has('KeyW') || keys.has('ArrowUp')) inY -= 1;
+    if (keys.has('KeyS') || keys.has('ArrowDown')) inY += 1;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) inX -= 1;
+    if (keys.has('KeyD') || keys.has('ArrowRight')) inX += 1;
+    const m = Math.hypot(inX, inY) || 1; inX /= m; inY /= m;
+    if (inX || inY) lastInput = tClock;
+  }
+  const driving = inX !== 0 || inY !== 0;
   if (dashT > 0) {
     // ROCKET BITE dash — barrel forward, eating in the path
     dashT -= dt;
     const nx = voidState.x + dashDir.x * 130 * dt, nz = voidState.z + dashDir.z * 130 * dt;
     if (island.biomeAt(nx, nz)) { voidState.x = nx; voidState.z = nz; } else dashT = 0;
-  } else {
-    if (tClock - lastInput > 1.2) {
-      wanderT -= dt;
-      if (wanderT <= 0) {
-        wanderT = rand(0.9, 1.8);
-        // hunt the nearest un-eaten morsel so the demo void keeps feeding + growing
-        let best: Edible | null = null, bd = Infinity;
-        const Rh = voidling.radius;
-        for (const e of edibles) {
-          if (e.eaten || !e.mesh.visible || e.radius > Rh * EAT_RATIO) continue;   // only hunt what you can eat
-          const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
-          const d = dx * dx + dz * dz;
-          if (d < bd) { bd = d; best = e; }
-        }
-        if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
-        else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
+  } else if (driving) {
+    // camera-relative drive: screen-up = away from camera, screen-right = camera right
+    camera.getWorldDirection(fwdTmp); fwdTmp.y = 0; fwdTmp.normalize();
+    rightTmp.set(1, 0, 0).applyQuaternion(camera.quaternion); rightTmp.y = 0; rightTmp.normalize();
+    const speed = 15 * (1 + curStage * 0.08) * (joy.active ? joy.mag : 1);
+    const wdx = rightTmp.x * inX - fwdTmp.x * inY;
+    const wdz = rightTmp.z * inX - fwdTmp.z * inY;
+    const nx = voidState.x + wdx * speed * dt, nz = voidState.z + wdz * speed * dt;
+    if (island.biomeAt(nx, voidState.z)) voidState.x = nx;   // slide along the coast
+    if (island.biomeAt(voidState.x, nz)) voidState.z = nz;
+  } else if (tClock - lastInput > 4) {
+    // attract mode: after 4s idle the void hunts snacks on its own (also drives
+    // the headless demo/verification harness)
+    wanderT -= dt;
+    if (wanderT <= 0) {
+      wanderT = rand(0.9, 1.8);
+      let best: Edible | null = null, bd = Infinity;
+      const Rh = voidling.radius;
+      for (const e of edibles) {
+        if (e.eaten || !e.mesh.visible || e.radius > Rh * EAT_RATIO) continue;
+        const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+        const d = dx * dx + dz * dz;
+        if (d < bd) { bd = d; best = e; }
       }
-      target.lerp(wander, 0.1);
+      if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
+      else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
     }
-    voidState.x += (target.x - voidState.x) * Math.min(1, dt * 2.4);
-    voidState.z += (target.z - voidState.z) * Math.min(1, dt * 2.4);
+    const ddx = wander.x - voidState.x, ddz = wander.z - voidState.z;
+    const dm = Math.hypot(ddx, ddz);
+    if (dm > 1.5) {
+      const spd = 13 * Math.min(1, dm / 10);
+      const nx = voidState.x + (ddx / dm) * spd * dt, nz = voidState.z + (ddz / dm) * spd * dt;
+      if (island.biomeAt(nx, voidState.z)) voidState.x = nx;
+      if (island.biomeAt(voidState.x, nz)) voidState.z = nz;
+    }
   }
   const vx = (voidState.x - prev.x) / Math.max(1e-4, dt);
   const vz = (voidState.z - prev.z) / Math.max(1e-4, dt);
@@ -433,6 +481,9 @@ function animate() {
     hudCd = 0.2; refreshHud();
     hungerFill.style.width = `${Math.round(hunger * 100)}%`;
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
+    pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
+    pwBtns[1].classList.toggle('off', hunger < COST.rocket || powerCd > 0);
+    pwBtns[2].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
   }
 
   const shakeOff = fx.update(dt);

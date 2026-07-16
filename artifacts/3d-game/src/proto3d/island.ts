@@ -401,9 +401,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   function biomeAt(x3: number, z3: number): Biome | null {
     const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
     if (!insideIslandWorld(wx, wy)) return null;   // off the coast = off the island
-    const gx = Math.round((wx - BLOCK_ORIGIN - BLOCK_SIZE / 2) / STRIDE);
-    const gy = Math.round((wy - BLOCK_ORIGIN - BLOCK_SIZE / 2) / STRIDE);
-    if (gx < 0 || gx > 5 || gy < 0 || gy > 5) return null;
+    // inside the coast, clamp to the nearest block so the whole island is
+    // walkable right up to the waterline (the grid doesn't cover the fringe)
+    const gx = Math.min(5, Math.max(0, Math.round((wx - BLOCK_ORIGIN - BLOCK_SIZE / 2) / STRIDE)));
+    const gy = Math.min(5, Math.max(0, Math.round((wy - BLOCK_ORIGIN - BLOCK_SIZE / 2) / STRIDE)));
     return PLAN[gy][gx];
   }
 
