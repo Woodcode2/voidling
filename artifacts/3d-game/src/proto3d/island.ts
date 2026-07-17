@@ -454,6 +454,24 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     addEdible(grp, 9);
   }, undefined, () => { /* offline dev: no landmark, no error */ });
 
+  // Higgsfield image→3D: a hot-air balloon drifting lazy laps over the island.
+  // Pure ambience — it lives in the sky, well out of the void's reach.
+  let balloon: THREE.Group | null = null;
+  new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/7a82e18d-76c0-4135-8948-b938d1b64762.glb', (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const s = 13 / Math.max(size.y, 0.001);
+    model.scale.setScalar(s);
+    box.setFromObject(model);
+    model.position.y -= (box.min.y + box.max.y) / 2;    // centre on the group
+    const grp = new THREE.Group();
+    grp.add(model);
+    grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+    scene.add(grp);
+    balloon = grp;
+  }, undefined, () => { /* offline dev: empty sky, no error */ });
+
   // ── biome lookup ───────────────────────────────────────────────────────────
   function biomeAt(x3: number, z3: number): Biome | null {
     const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
@@ -475,6 +493,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     update(dt, t) {
       wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1;
       (spray.material as THREE.MeshBasicMaterial).opacity = 0.42 + Math.sin(t * 3) * 0.08;
+      if (balloon) {
+        const a = t * 0.022;   // one lazy lap of the island every ~5 minutes
+        balloon.position.set(Math.cos(a) * 125, 42 + Math.sin(t * 0.4) * 2.2, Math.sin(a) * 125);
+        balloon.rotation.y = -a;
+      }
     },
   };
 }
