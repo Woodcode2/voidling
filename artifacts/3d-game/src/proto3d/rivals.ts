@@ -11,6 +11,8 @@ export interface Rivals {
   list: Rival[];
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number): void;
   onJoin?: (name: string, color: number, x: number, z: number) => void;
+  onRivalEaten?: (name: string, pts: number) => void;    // you swallowed one
+  onPlayerBitten?: (name: string) => void;               // one bit YOU
 }
 
 const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
@@ -47,10 +49,12 @@ function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; 
   // billboarded eyes
   const eyes = new THREE.Group(); group.add(eyes);
   for (const sx of [-0.32, 0.32]) {
-    const white = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false }));
-    white.position.set(sx, 0.08, 1.0);
-    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.11, 16), new THREE.MeshBasicMaterial({ color: 0x140a26, depthWrite: false }));
-    pupil.position.set(sx, 0.08, 1.02);
+    // depthTest off + renderOrder: billboarded circles can never slice into the
+    // body sphere at steep camera angles (the "glitchy half-buried eyes")
+    const white = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false, depthTest: false }));
+    white.position.set(sx, 0.08, 1.0); white.renderOrder = 5;
+    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.11, 16), new THREE.MeshBasicMaterial({ color: 0x140a26, depthWrite: false, depthTest: false }));
+    pupil.position.set(sx, 0.08, 1.02); pupil.renderOrder = 6;
     eyes.add(white); eyes.add(pupil);
   }
   const halo = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -65,7 +69,7 @@ export function createRivals(
   biomeAt: (x: number, z: number) => Biome | null,
   count = 4,
 ): Rivals {
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
@@ -79,7 +83,8 @@ export function createRivals(
     const ang = (i / count) * Math.PI * 2 + 0.6;
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
-      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0 });
+      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
+      vx: 0, vz: 0, biteCd: 0, respawnT: 0 });
   }
 
   const tmp = new THREE.Vector3();
@@ -96,13 +101,26 @@ export function createRivals(
           } else continue;   // not on the island yet
         }
         if (rv.r > lawCap) rv.r = lawCap;
-        // AI: retarget to nearest food (or flee a much bigger player)
+        // knocked out after being devoured: respawn small on the far coast
+        if (rv.respawnT > 0) {
+          rv.respawnT -= dt;
+          if (rv.respawnT <= 0) {
+            const a2 = rand(0, Math.PI * 2);
+            rv.x = Math.cos(a2) * 140; rv.z = Math.sin(a2) * 140;
+            if (!biomeAt(rv.x, rv.z)) { rv.x *= 0.6; rv.z *= 0.6; }
+            rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
+          } else continue;
+        }
+        rv.biteCd = Math.max(0, rv.biteCd - dt);
+        // AI: STICKY targeting — commit to a snack until it's gone/reached,
+        // flee a much bigger player, and contest the player's size directly
         rv.retarget -= dt;
         const dpx = rv.x - px, dpz = rv.z - pz, dp = Math.hypot(dpx, dpz);
         const fleeing = pr > rv.r * 1.15 && dp < pr + 40;
+        const reached = Math.hypot(rv.tx - rv.x, rv.tz - rv.z) < 2.5;
         if (fleeing) { rv.tx = rv.x + dpx; rv.tz = rv.z + dpz; }
-        else if (rv.retarget <= 0) {
-          rv.retarget = rand(0.8, 1.6);
+        else if (rv.retarget <= 0 || reached) {
+          rv.retarget = rand(2.5, 4);
           let best: RivalEdible | null = null, bd = Infinity;
           for (const e of edibles) {
             if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;   // only hunt what it can eat
@@ -110,15 +128,15 @@ export function createRivals(
             if (d < bd) { bd = d; best = e; }
           }
           if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; }
-          else { rv.tx = rand(-200, 200); rv.tz = rand(-200, 200); }
+          else { const a3 = rand(0, Math.PI * 2); rv.tx = Math.cos(a3) * rand(40, 170); rv.tz = Math.sin(a3) * rand(40, 170); }
         }
-        // move toward target — with coast handling. The shoreline is concave,
-        // so a straight line to food can hit water: slide along the coast like
-        // the player does, and if genuinely stuck, give up on that snack and
-        // wander somewhere reachable instead of headbutting the beach forever.
+        // SMOOTHED motion (no more teleporty slides) + coast handling
         const mx = rv.tx - rv.x, mz = rv.tz - rv.z, md = Math.hypot(mx, mz) || 1;
-        const spd = (fleeing ? 34 : 22) * dt;
-        const nx = rv.x + (mx / md) * spd, nz = rv.z + (mz / md) * spd;
+        const spdSec = (fleeing ? 34 : 22) * Math.min(2.1, Math.pow(rv.r / START_R, 0.5));
+        rv.vx += ((mx / md) * spdSec - rv.vx) * Math.min(1, dt * 5);
+        rv.vz += ((mz / md) * spdSec - rv.vz) * Math.min(1, dt * 5);
+        const spd = Math.hypot(rv.vx, rv.vz) * dt;
+        const nx = rv.x + rv.vx * dt, nz = rv.z + rv.vz * dt;
         let movedOk = false;
         if (biomeAt(nx, nz)) { rv.x = nx; rv.z = nz; movedOk = true; }
         else {
@@ -132,6 +150,19 @@ export function createRivals(
           const inland = Math.atan2(-rv.z, -rv.x) + rand(-0.9, 0.9);
           rv.tx = rv.x + Math.cos(inland) * rand(50, 110);
           rv.tz = rv.z + Math.sin(inland) * rand(50, 110);
+        }
+        // ── hole-vs-hole: the danger loop ─────────────────────────────────────
+        if (pr > rv.r * 1.2 && dp < pr * 0.8) {
+          // the player swallows this rival whole — out for 6s, respawns small
+          const pts = Math.round(25 + rv.r * 15);
+          rv.group.visible = rv.halo.visible = false;
+          rv.respawnT = 6; rv.r = START_R; rv.vx = rv.vz = 0;
+          api.onRivalEaten?.(rv.name, pts);
+          continue;
+        }
+        if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0) {
+          rv.biteCd = 9; rv.pulse = 1;
+          api.onPlayerBitten?.(rv.name);
         }
 
         // eat nearby food (size-gated) -> grow by area + score

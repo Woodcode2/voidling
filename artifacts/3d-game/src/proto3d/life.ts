@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
-  railPointAt, type Biome, type AddEdible,
+  railPointAt, insideIsland3, type Biome, type AddEdible,
 } from './island';
 import { glb, vehicleGlb } from './assets3d';
 
@@ -242,8 +242,15 @@ export function createLife(
     const horiz = Math.random() < 0.5;
     const centre = pick(ROAD_CENTERS_3D);
     const dir = Math.random() < 0.5 ? 1 : -1;
+    // spawn on land: an off-island 'along' leaves the car vibrating in the sea
+    let along0 = rand(-230, 230);
+    for (let k = 0; k < 10; k++) {
+      const px0 = horiz ? along0 : centre, pz0 = horiz ? centre : along0;
+      if (biomeAt(px0, pz0)) break;
+      along0 = rand(-150, 150);
+    }
     const st = {
-      axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: rand(-230, 230),
+      axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: along0,
       laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2),
       arc: null as Arc | null, nAxis: 'h' as 'h' | 'v', nCentre: 0, nAlong: 0, nLaneOff: 0,
     };
@@ -282,7 +289,9 @@ export function createLife(
         st.along += st.dir * spd * dt;
         const nx = st.axis === 'h' ? st.along : st.centre + st.laneOff;
         const nz = st.axis === 'h' ? st.centre + st.laneOff : st.along;
-        if (!onRoad(nx, nz)) { st.dir *= -1; st.along += st.dir * spd * dt * 2; }
+        const noseX = st.axis === 'h' ? nx + st.dir * 3.5 : nx;
+        const noseZ = st.axis === 'h' ? nz : nz + st.dir * 3.5;
+        if (!onRoad(nx, nz) || !biomeAt(noseX, noseZ)) { st.dir *= -1; st.along += st.dir * spd * dt * 2; }
         if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 5 && Math.random() < 0.5) {
           // set up a quarter-circle-ish bezier: current pos -> lane corner -> exit on the new lane
           const nAxis = st.axis === 'h' ? 'v' : 'h';
@@ -446,7 +455,7 @@ export function createLife(
   // ── staged VIGNETTE EVENTS ──────────────────────────────────────────────────
   interface Ev { x: number; z: number; ambient: string[]; panic: string[]; cd: number; panicked: number; }
   const events: Ev[] = [];
-  const decor = (mesh: THREE.Object3D, x: number, z: number, r = 3) => { mesh.position.set(x, 0, z); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
+  const decor = (mesh: THREE.Object3D, x: number, z: number, r = 3) => { if (!insideIsland3(x, z)) return; mesh.position.set(x, 0, z); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
 
   function addEvent(gx: number, gy: number, ambient: string[], panic: string[], build: (x: number, z: number) => void, pedN: number, pedCol?: number) {
     const [x, z] = blockCenter3D(gx, gy);
@@ -499,7 +508,7 @@ export function createLife(
     }, 0);
 
   // Campsite in the forest (s'mores)
-  addEvent(5, 0,
+  addEvent(4, 0,
     ['s\'mores?! 🔥', 'nature is HEALING', 'one more ghost story…', 'who packed the bug spray?'],
     ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!'],
     (x, z) => {
@@ -520,7 +529,8 @@ export function createLife(
     (x, z) => {
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf2f4f8 }));
       pole.position.y = 4; const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6), new THREE.MeshStandardMaterial({ color: 0xe8453c, side: THREE.DoubleSide }));
-      flag.position.set(1.5, 7, 0); const grp = new THREE.Group(); grp.add(pole); grp.add(flag); decor(grp, x, z, 3);
+      flag.position.set(1.5, 7, 0); const grp = new THREE.Group(); grp.add(pole); grp.add(flag);
+      decor(grp, x - 15, z - 21, 3);   // on the putting green, west of the river
     }, 3, 0xf0f0f0);
 
   // Beach volleyball

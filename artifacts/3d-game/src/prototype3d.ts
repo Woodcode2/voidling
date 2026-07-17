@@ -14,7 +14,7 @@ import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS } from './proto3d/palette';
-import { buildGallery } from './proto3d/assets3d';
+import { buildGallery, updateLodBias } from './proto3d/assets3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -107,6 +107,19 @@ rivals.onJoin = (name, color, x, z) => {
   fx.ring(x, z, color, 22, 0.8);
   audio.alert();
 };
+// hole-vs-hole danger: rivals are PLAYERS now, not decoration
+rivals.onRivalEaten = (name, pts) => {
+  playerScore += pts;
+  announce(`💀 you DEVOURED ${name}! +${pts}`);
+  audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
+  buzz(60);
+};
+rivals.onPlayerBitten = (name) => {
+  voidling.setRadius(Math.max(START_R, voidling.radius * 0.82));
+  announce(`😱 ${name} took a BITE of you!!`);
+  audio.hit(); fx.shake(3); fx.flash('rgba(255,90,110,0.28)', 0.4);
+  buzz(50);
+};
 const defense = createDefense(scene, fx, island.biomeAt);
 const audio = createAudio();
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
@@ -128,7 +141,7 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [213.75, -213.75], cozy: [-128.25, -128.25] };
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -200,10 +213,25 @@ function announce(text: string) {
   bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
 }
 
+// haptics — hole.io vibrates on every absorb and it's core to the feel.
+// Rate-capped so a feeding frenzy doesn't turn the phone into a massager.
+let buzzGate = 0, hadGesture = false;
+window.addEventListener('pointerdown', () => { hadGesture = true; }, { once: true });
+function buzz(ms: number) {
+  if (!hadGesture || !('vibrate' in navigator)) return;   // browsers require a tap first
+  const now = performance.now();
+  if (ms < 20 && now < buzzGate) return;   // ticks are rate-limited; big hits always land
+  buzzGate = now + 70;
+  try { navigator.vibrate(ms); } catch { /* not supported */ }
+}
+
 // ── powers (hunger meter) ────────────────────────────────────────────────────
 let hunger = 0;
 const COST = { gulp: 0.35, collapse: 1.0 };   // two powers, both readable: suck-in + super-nova
-const DEBUG_HARNESS = location.search.length > 1;   // headless harness runs with ?params
+// the harness needs EXPLICIT debug params — a shared link with ?utm_source=…
+// must never enable auto-fire, menu-skip, or autopilot for a real player
+const _qd = new URLSearchParams(location.search);
+const DEBUG_HARNESS = _qd.has('at') || _qd.has('r') || _qd.has('len') || _qd.has('fast') || _qd.has('demo');
 let powerCd = 0;                       // shared re-trigger delay
 let dashT = 0; const dashDir = { x: 0, z: 1 };
 const aim = { x: 0, z: 1 };            // last travel direction
@@ -233,7 +261,7 @@ const growRadius = (R: number, eR: number) => {
 };
 
 const _q = new URLSearchParams(location.search);
-const MATCH_LEN = Number(_q.get('len')) || 210;                // 3:30 (?len=N to shorten)
+const MATCH_LEN = Number(_q.get('len')) || 180;                // 3:00 — tighter, hole.io-style (?len=N)
 const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
 let matchClock = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
@@ -329,12 +357,20 @@ function showNews() {
   audio.ready();   // a soft chime so headlines register even mid-chomp
 }
 
+let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 function refreshHud() {
   const R = voidling.radius;
   // leaderboard: player + rivals, ranked by score
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
     ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
+  // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
+  const myRank = rows.findIndex((r) => r.me) + 1;
+  if (started && !ended && prevRank > 0 && myRank < prevRank) {
+    announce(`👑 you passed ${rows[myRank]?.name ?? 'a rival'}!`);
+    audio.ready(); buzz(20);
+  }
+  prevRank = myRank;
   boardEl.innerHTML = rows.map((r, i) =>
     `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   let consumed = 0;
@@ -390,11 +426,13 @@ function capture(e: Edible, giveHunger = true) {
   const coinVal = e.mesh.userData.coin as number | undefined;
   if (coinVal) { addCoins(coinVal); bubbles.float(floatPos, `+${coinVal}¢`, true); }
   else bubbles.float(floatPos, `+${pts}`);
-  // CHOMP! is an EVENT, not wallpaper: only on genuinely big bites, max ~1/2s
-  if (e.radius > voidling.radius * 0.8 && tClock > chompCd) {
-    chompCd = tClock + 2.2;
-    bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat();
-  } else audio.pop(combo);
+  // CHOMP! is an EVENT, not wallpaper. The growth law parks the player just
+  // above their staple food size, so the bar is "bigger than YOU" + a long
+  // cooldown — a couple of CHOMPs a match, each one earned.
+  if (e.radius > voidling.radius && tClock > chompCd) {
+    chompCd = tClock + 7;
+    bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
+  } else { audio.pop(combo); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 8 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
   questProgress(e.radius);
 }
@@ -519,8 +557,9 @@ function renderTop() {
     `<div class="tv ${r.me ? 'me' : ''}"><span class="rk">${medals[i] || i + 1}</span><span class="dot2" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm2">${r.name}</span><span class="sc2">${r.score}</span></div>`).join('');
 }
 el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').classList.add('show'); });
-// debug params (?at=, ?r=, ?len=, ?fast) skip the menu so the harness still works
-if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMatch(); }
+// EXPLICIT debug params only skip the menu — arbitrary query strings on shared
+// links (?utm_source=…) must land on the real splash like any player
+if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'); beginMatch(); }
 
 // skin SHOP — earn coins in matches, spend them on skins (LoL soft-currency
 // model, same as the 2D shop); owned + equipped persist across sessions
@@ -611,7 +650,10 @@ function animate() {
     if (matchClock <= 0) endMatch();
     // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
     if (!bigStart) {
-      const lawCap = START_R + LAW_RATE * (MATCH_LEN - matchClock);
+      // hole.io opening: the first 30s run HOT so the first evolution lands
+      // around ~15s and a new player feels growth immediately; then it settles
+      const el2 = MATCH_LEN - matchClock;
+      const lawCap = START_R + 0.022 * Math.min(el2, 30) + LAW_RATE * el2;
       if (voidling.radius > lawCap) voidling.setRadius(lawCap);
       // 2D score-floor: strong scoring pulls your radius up toward the cap
       const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)));
@@ -644,13 +686,16 @@ function animate() {
     if (driving) {
       camera.getWorldDirection(fwdTmp); fwdTmp.y = 0; fwdTmp.normalize();
       rightTmp.set(1, 0, 0).applyQuaternion(camera.quaternion); rightTmp.y = 0; rightTmp.normalize();
-      // speed grows with the void so the SCREEN-relative pace never drags —
-      // the camera pulls back as you grow, so world speed must keep up
-      const speed = 16 * Math.min(3.1, Math.pow(voidling.radius / 0.9, 0.55)) * (joy.active ? Math.pow(joy.mag, 1.4) : 1);
+      // PERCEIVED speed is constant: world speed rides the camera distance, so
+      // a WORLD ENDER crosses its screen exactly as fast as a hatchling does.
+      // Joystick: full speed at ~58% thumb extension (hole.io feel), linear below.
+      const jm = joy.active ? Math.min(1, joy.mag / 0.58) : 1;
+      const speed = Math.min(58, 16 * (camDist / 50)) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
       tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
-    } else if (tClock - lastInput > 4) {
-      // attract mode: the void hunts snacks on its own (drives the demo harness)
+    } else if ((!started || DEBUG_HARNESS) && tClock - lastInput > 4) {
+      // attract mode: menu backdrop + demo harness ONLY — a real match never
+      // self-drives; an idle player's void just sits there being cute
       wanderT -= dt;
       if (wanderT <= 0) {
         wanderT = rand(0.9, 1.8);
@@ -756,8 +801,10 @@ function animate() {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
-    const zoomMult = curStage >= 4 ? 13.5 : curStage >= 3 ? 18 : curStage >= 2 ? 24 : 32;   // 2D bands
-    const targetDist = Math.max(30, (R * zoomMult) / (2 * Math.tan((camera.fov * Math.PI) / 360)));
+    // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
+    // ~20% screen size across a form before the camera catches up, so growth
+    // reads every few seconds instead of only at evolutions
+    const targetDist = Math.min(300, Math.max(30, 52 * Math.pow(R / 0.9, 0.78)));
     camDist += (targetDist - camDist) * Math.min(1, dt * 1.4);
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, Math.min(1, dt * 3));
@@ -778,7 +825,10 @@ function animate() {
     if (curStage >= 2 && !quests[2].done) questComplete(quests[2]);   // GOBBLER quest
     const wave = defense.setPhase(curStage);   // the city escalates with your form
     if (wave) { announce(wave); audio.alert(); }
-  } else curStage = ns;
+    buzz(45);
+  }
+  // NEVER downgrade: the growth-law clamp can pull radius back under a form
+  // threshold the frame after evolving — re-announcing the same form forever
   voidling.setStage(curStage);
 
   // combo decays when you stop eating
@@ -815,6 +865,9 @@ function animate() {
     const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
     formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
   }
+
+  // LOD band tracks the camera so the AI meshes are ALWAYS the ones on screen
+  updateLodBias(camDist);
 
   // adaptive quality: step down fast when fps dips, climb back slowly
   qAccT += dt; qAccN++; qCd -= dt;

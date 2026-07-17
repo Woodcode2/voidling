@@ -299,21 +299,22 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.beginPath();
     g.rect(pxW(gcx - BLOCK_SIZE / 2), pyW(gcy - BLOCK_SIZE / 2), pxW(gcx + BLOCK_SIZE / 2) - pxW(gcx - BLOCK_SIZE / 2), pyW(gcy + BLOCK_SIZE / 2) - pyW(gcy - BLOCK_SIZE / 2));
     g.clip();
-    // fairway: a light sweeping band across the block
-    g.strokeStyle = '#a8de7e'; g.lineWidth = pxW(420) - pxW(0); g.lineCap = 'round';
+    // the river bisects this block near its centre — the course lives entirely
+    // WEST of the water, the pond walk keeps the east (no drowned fairways)
+    g.strokeStyle = '#a8de7e'; g.lineWidth = pxW(340) - pxW(0); g.lineCap = 'round';
     g.beginPath();
-    g.moveTo(pxW(gcx - 620), pyW(gcy + 480));
-    g.quadraticCurveTo(pxW(gcx - 100), pyW(gcy - 120), pxW(gcx + 560), pyW(gcy - 380));
+    g.moveTo(pxW(gcx - 600), pyW(gcy + 500));
+    g.quadraticCurveTo(pxW(gcx - 560), pyW(gcy - 40), pxW(gcx - 300), pyW(gcy - 420));
     g.stroke();
     // putting green + hole ring (matches the flag prop in ./life)
-    g.fillStyle = '#b8ec8a'; g.beginPath(); g.arc(pxW(gcx + 560), pyW(gcy - 380), pxW(200) - pxW(0), 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#8cc961'; g.beginPath(); g.arc(pxW(gcx + 560), pyW(gcy - 380), pxW(24) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#b8ec8a'; g.beginPath(); g.arc(pxW(gcx - 300), pyW(gcy - 420), pxW(180) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#8cc961'; g.beginPath(); g.arc(pxW(gcx - 300), pyW(gcy - 420), pxW(24) - pxW(0), 0, Math.PI * 2); g.fill();
     // tee box
-    g.fillStyle = '#b8ec8a'; g.fillRect(pxW(gcx - 700), pyW(gcy + 420), pxW(160) - pxW(0), pyW(120) - pyW(0));
+    g.fillStyle = '#b8ec8a'; g.fillRect(pxW(gcx - 680), pyW(gcy + 460), pxW(160) - pxW(0), pyW(120) - pyW(0));
     // bunkers
     g.fillStyle = hex(WORLD.sand);
-    g.beginPath(); g.ellipse(pxW(gcx + 250), pyW(gcy - 90), pxW(120) - pxW(0), pyW(80) - pyW(0), 0.5, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.ellipse(pxW(gcx + 420), pyW(gcy - 520), pxW(90) - pxW(0), pyW(65) - pyW(0), -0.4, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(pxW(gcx - 480), pyW(gcy + 60), pxW(110) - pxW(0), pyW(75) - pyW(0), 0.5, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(pxW(gcx - 190), pyW(gcy - 300), pxW(85) - pxW(0), pyW(60) - pyW(0), -0.4, 0, Math.PI * 2); g.fill();
     g.restore();
   }
 
@@ -342,9 +343,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       for (let k = -3; k <= 3; k++) if (k) g.fillRect(-(pxW(50) - pxW(0)), k * (pxW(28) - pxW(0)), pxW(100) - pxW(0), pxW(14) - pxW(0));
       g.restore();
     }
-    // apron pad (parking) in the block's south corner
+    // apron pad (parking) in the DRY south-west quadrant (the NE end of the
+    // block is clipped by the coast — operations all live on solid ground)
     g.fillStyle = '#c3c7d4';
-    g.fillRect(pxW(acx - 180), pyW(acy + 280), pxW(520) - pxW(0), pyW(380) - pyW(0));
+    g.fillRect(pxW(acx - 620), pyW(acy + 180), pxW(520) - pxW(0), pyW(380) - pyW(0));
     g.restore();
   }
 
@@ -540,7 +542,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   waterfall.rotation.y = -outAng + Math.PI / 2;
   scene.add(waterfall);
   // spray glow at base
-  const spray = new THREE.Mesh(new THREE.CircleGeometry(wLen(500), 24),
+  const spray = new THREE.Mesh(new THREE.CircleGeometry(wLen(240), 24),
     new THREE.MeshBasicMaterial({ color: WORLD.foam, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
   spray.rotation.x = -Math.PI / 2; spray.position.set(wfX * 1.05, -22, wfZ * 1.05); scene.add(spray);
 
@@ -851,6 +853,55 @@ function makeLamp(): THREE.Group {
 }
 const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])();
 
+// ── civic/retail stand-ins (offline dev + far LOD) — downtown must NEVER show
+// a gabled suburban house on pavement, and the plaza always has a fountain ────
+function makeShopBox(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(8, 4.5, 6),
+    new THREE.MeshStandardMaterial({ color: pick([0xf6efe2, 0xbfe0cf, 0xeab8cc]), roughness: 0.8 }));
+  body.position.y = 2.25; g.add(body);
+  const parapet = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.5, 6.4),
+    new THREE.MeshStandardMaterial({ color: 0xd8d4de, roughness: 0.8 }));
+  parapet.position.y = 4.6; g.add(parapet);
+  const awning = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.28, 1.7),
+    new THREE.MeshStandardMaterial({ color: pick([0xe8604d, 0x58a8c4, 0x58c470]), roughness: 0.7 }));
+  awning.position.set(0, 3.05, 3.4); awning.rotation.x = 0.35; g.add(awning);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2, 0.2),
+    new THREE.MeshStandardMaterial({ color: 0x2c3a52, roughness: 0.2, metalness: 0.4 }));
+  win.position.set(0, 1.9, 3.02); g.add(win);
+  return g;
+}
+function makeCivicHall(): THREE.Group {
+  const g = new THREE.Group();
+  const cream = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(16, 8, 9), cream);
+  body.position.y = 4; g.add(body);
+  for (const sx of [-5.4, -1.8, 1.8, 5.4]) {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 7, 10), cream);
+    col.position.set(sx, 3.5, 5); g.add(col);
+  }
+  const ped = new THREE.Mesh(new THREE.BoxGeometry(17, 1.4, 10.5), cream);
+  ped.position.y = 8.4; g.add(ped);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(3.4, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x6fa8a0, roughness: 0.5, metalness: 0.2 }));
+  dome.position.y = 9; g.add(dome);
+  return g;
+}
+function makeFountainFB(): THREE.Group {
+  const g = new THREE.Group();
+  const stone = new THREE.MeshStandardMaterial({ color: 0xd8d4de, roughness: 0.7 });
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5, 1.2, 18), stone);
+  basin.position.y = 0.6; g.add(basin);
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.3, 18),
+    new THREE.MeshStandardMaterial({ color: WORLD.waterShallow, roughness: 0.15 }));
+  water.position.y = 1.25; g.add(water);
+  const tier = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.5, 1, 14), stone);
+  tier.position.y = 2; g.add(tier);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.4, 12), stone);
+  top.position.y = 3.2; g.add(top);
+  return g;
+}
+
 function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
@@ -888,13 +939,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const hx = w(lot.x), hz = w(lot.y);
         const fx3 = lot.fx, fz3 = lot.fy;             // toward the street
         const sx3 = -fz3, sz3 = fx3;                  // along the street
-        if (Math.random() < 0.75) {
-          placeGlb(HOUSES[li % 4], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
-            (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, lot.rot);
-        } else {
-          const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = lot.rot;
-          place(house, hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc);
-        }
+        placeGlb(HOUSES[li % 4], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
+          (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, lot.rot);
         // front-yard dressing on the STREET side; mailbox by the driveway
         const dvx = lot.fy !== 0 ? 4.5 : 0, dvz = lot.fx !== 0 ? 4.5 : 0;
         if (Math.random() < 0.8) place(makeFlowers(), hx + fx3 * 4.4 + sx3 * 2, hz + fz3 * 4.4 + sz3 * 2, 0.7);
@@ -909,42 +955,57 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         else place(makeTree(), ix, iz, 3.2);
       }
     } else if (biome === 'downtown') {
-      // street canyon: AI towers anchor each block, procedural facades between —
-      // all inset so no facade ever hangs over the sidewalk
-      const jt = () => [cx + rand(-half * 0.58, half * 0.58), cz + rand(-half * 0.58, half * 0.58)] as const;
-      const n = 4 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < n; i++) {
-        const [x, z] = jt();
-        if (i < 2) placeGlb(i === 0 ? 'tower_glass' : 'tower_deco', x, z, 8, rand(20, 27), () => makeTower(true));
-        else { const t = makeTower(Math.random() < 0.5); place(t, x, z, 8); }
-      }
-      // storefront row: café / grocery with awnings near (not on) the sidewalk
-      placeGlb(Math.random() < 0.5 ? 'cafe' : 'shop', cx + rand(-half * 0.45, half * 0.45), cz + half * 0.68, 6, 8.5, makeHouse, Math.PI);
-      for (let t = 0; t < 3; t++) { const [x, z] = jt(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
+      // DETERMINISTIC street-wall grid (no jitter, no interpenetration):
+      // 4 corner towers form the block's walls, the tall pair alternates by
+      // block parity so the skyline reads composed, not random
+      const tallNW = (gx + gy) % 2 === 0;
+      ([[-0.65, -0.65], [0.65, -0.65], [-0.65, 0.65], [0.65, 0.65]] as const).forEach(([ux, vz], i) => {
+        const x = cx + ux * half, z = cz + vz * half;
+        const diag = (ux < 0) === (vz < 0);
+        if (diag === tallNW) placeGlb(i % 2 ? 'tower_deco' : 'tower_glass', x, z, 8, 22 + ((gx * 7 + gy * 13 + i) % 4) * 3, () => makeTower(true));
+        else { const t = makeTower(false); place(t, x, z, 8); }
+      });
+      // ACTIVE retail edge along the south sidewalk — shop-box stand-ins so a
+      // suburban house never again haunts downtown pavement
+      placeGlb('cafe', cx - half * 0.3, cz + half * 0.68, 6, 8.5, makeShopBox, Math.PI);
+      placeGlb('shop', cx + half * 0.3, cz + half * 0.68, 6, 8.5, makeShopBox, Math.PI);
+      // pocket plaza interior — the empty centre becomes a place
+      for (const [ux, vz] of [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28]] as const)
+        placeGlb('parktree', cx + ux * half, cz + vz * half, 3.2, 7, makeTree);
+      place(makeBench(), cx, cz - 4.5, 2.4);
+      const b2 = makeBench(); b2.rotation.y = Math.PI; place(b2, cx, cz + 4.5, 2.4);
+      placeGlb('icecream', cx, cz, 2.2, 3.4, () => new THREE.Group());
     } else if (biome === 'plaza') {
       // civic square, properly staged: TOWN HALL at the north end, the mayor's
       // stage on its steps (./life), the AI fountain ON the paved circle at the
       // centre, food truck + ice-cream cart at the south corners
-      placeGlb('townhall', cx, cz - half * 0.62, 10, 17, () => makeTower(true), 0);
-      placeGlb('fountain', cx, cz, 4, 6.5);
-      placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.64, 4, 5, undefined, 0.6);
-      placeGlb('icecream', cx + half * 0.64, cz + half * 0.6, 2.2, 3.6, () => new THREE.Group(), -0.5);
-      for (let t = 0; t < 3; t++) {
-        place(Math.random() < 0.5 ? makeTree() : makeBench(), cx + pick([-1, 1]) * rand(half * 0.35, half * 0.55), cz + rand(-half * 0.3, half * 0.5), 2.6);
+      placeGlb('townhall', cx, cz - half * 0.62, 10, 17, makeCivicHall, 0);
+      placeGlb('fountain', cx, cz, 4, 6.5, makeFountainFB);
+      placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.64, 4, 5, undefined, Math.PI / 6);
+      placeGlb('icecream', cx + half * 0.64, cz + half * 0.6, 2.2, 3.6, () => new THREE.Group(), -Math.PI / 6);
+      // colonnades frame the civic axis; benches face the fountain
+      for (const [ux, vz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, -0.15], [0.5, -0.15], [-0.5, 0.2], [0.5, 0.2]] as const)
+        placeGlb('parktree', cx + ux * half, cz + vz * half, 3.2, 7, makeTree);
+      for (const [ux, vz] of [[-0.32, -0.32], [0.32, -0.32], [-0.32, 0.05], [0.32, 0.05]] as const) {
+        const bn = makeBench(); bn.rotation.y = Math.atan2(-(ux), -(vz + 0.1));
+        place(bn, cx + ux * half, cz + vz * half, 2.4);
       }
     } else if (biome === 'park') {
-      placeGlb('gazebo', cx, cz, 5, 8.5);
+      // gazebo lives on the pond-walk (block 4,2 east side); block (4,3) centre
+      // belongs to the soccer pitch — no more landmarks stacked on events
+      if (gy === 2) placeGlb('gazebo', cx + half * 0.5, cz + half * 0.42, 5, 8.5);
       for (let t = 0; t < 9; t++) {
         const [x, z] = jitter();
         if (Math.random() < 0.55) placeGlb('parktree', x, z, 3.4, rand(6.5, 8.5), makeTree);
         else place(makeTree(), x, z, 3.4);
       }
-      if (gy === 2) placeGlb('golfcart', cx + half * 0.6, cz - half * 0.4, 2.6, 3.2, () => new THREE.Group(), rand(0, Math.PI));
+      if (gy === 2) placeGlb('golfcart', cx - half * 0.55, cz + half * 0.4, 2.6, 3.2, () => new THREE.Group(), rand(0, Math.PI));
       for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
       for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBench(), x, z, 2.4); }
     } else if (biome === 'forest') {
+      const jf = () => [cx + rand(-(half - 4), half - 4), cz + rand(-(half - 4), half - 4)] as const;
       for (let t = 0; t < 20; t++) {
-        const [x, z] = jitter();
+        const [x, z] = jf();
         if (Math.random() < 0.45) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
         else place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3);
       }
@@ -975,7 +1036,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // the apron (the runway/taxiway markings are baked into the ground)
       const hangar = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 18, 12, 1, false, 0, Math.PI),
         new THREE.MeshStandardMaterial({ color: 0xcfd6e0, roughness: 0.7, flatShading: true }));
-      hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 2; hangar.position.set(cx + 12, 4.5, cz + 27);
+      hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 4; hangar.position.set(cx - half * 0.55, 4.5, cz + half * 0.6);
       setShadow(hangar); scene.add(hangar); addEdible(hangar, 9);
       { // control tower with a glass cab
         const tw = new THREE.Group();
@@ -988,7 +1049,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.2, 10),
           new THREE.MeshStandardMaterial({ color: 0xd85a5a, roughness: 0.6 }));
         roof.position.y = 15; tw.add(roof);
-        place(tw, cx - 16, cz + 22, 6);
+        place(tw, cx - half * 0.75, cz + half * 0.35, 6);
       }
       { // cute parked plane, nose along the taxi direction
         const pl = new THREE.Group();
@@ -1008,8 +1069,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x20242c }));
           gear.rotation.x = Math.PI / 2; gear.position.set(0.8, 0.55, sz); pl.add(gear);
         }
-        pl.rotation.y = -Math.PI / 4;    // parked facing the runway heading
-        place(pl, cx + 2, cz + 18, 5);
+        pl.rotation.y = -Math.PI / 4;    // parked ON the apron, nose to the runway
+        place(pl, cx - half * 0.35, cz + half * 0.45, 5);
       }
       { // windsock
         const ws = new THREE.Group();
@@ -1017,38 +1078,65 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         pole.position.y = 3.5; ws.add(pole);
         const sock = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.6, 8), new THREE.MeshStandardMaterial({ color: 0xff8a3a, roughness: 0.8 }));
         sock.rotation.z = Math.PI / 2; sock.position.set(1.4, 6.6, 0); ws.add(sock);
-        place(ws, cx - 24, cz - 6, 1.4);
+        place(ws, cx - half * 0.7, cz - half * 0.18, 1.4);
       }
     } else if (biome === 'military') {
-      for (let t = 0; t < 3; t++) {
-        const bunker = new THREE.Mesh(new THREE.BoxGeometry(rand(6, 9), rand(3, 5), rand(6, 9)),
+      // most of this block is ocean — the base is a neat row on the NW land
+      // triangle: three bunkers facing the road, helipad + tank behind
+      for (const ux of [-0.8, -0.5, -0.2]) {
+        const bunker = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 8),
           new THREE.MeshStandardMaterial({ color: 0x6b7050, roughness: 0.95, flatShading: true }));
-        const [x, z] = jitter(); place(bunker, x, z, 4);
+        place(bunker, cx + ux * half, cz - half * 0.8, 4);
       }
-      // a parked AI helicopter on the base pad
-      placeGlb('heli', cx + 10, cz - 10, 5, 5.5, undefined, rand(0, Math.PI * 2));
-      placeGlb('tank', cx - 12, cz + 8, 4, 3.4, undefined, rand(0, Math.PI * 2));
+      placeGlb('heli', cx - half * 0.35, cz - half * 0.5, 5, 5.5, undefined, rand(0, Math.PI * 2));
+      placeGlb('tank', cx - half * 0.65, cz - half * 0.5, 4, 3.4, undefined, Math.PI / 2);
     }
 
     // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
     // walkable block so a speck-sized void always has something to nibble.
     if (biome !== 'military') {
       const tinyN = biome === 'forest' ? 12 : 30;   // denser snack carpet
-      for (let t = 0; t < tinyN; t++) { const [x, z] = jitter(); place(makeTinyProp(), x, z, rand(0.6, 0.85)); }
-      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(makeCoins(), x, z, 0.55); }
+      // exclusion zones: nothing scatters into the fountain ring or the pond
+      const tinyOk = (x: number, z: number) => {
+        if (biome === 'plaza' && Math.hypot(x - cx, z - cz) < 13) return false;
+        if (biome === 'park' && gx === 4 && gy === 2 && Math.hypot(x - cx, z - (cz + 6)) < 17) return false;
+        return true;
+      };
+      const beachy = biome === 'beach';
+      for (let t = 0; t < tinyN; t++) {
+        const [x, z] = jitter();
+        if (!tinyOk(x, z)) continue;
+        place(beachy ? pick([makeCone, makeFlowers])() : makeTinyProp(), x, z, rand(0.6, 0.85));
+      }
+      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); if (tinyOk(x, z)) place(makeCoins(), x, z, 0.55); }
     }
   }
 
   // line the road edges: cones (starter snacks) + streetlamps on the sidewalks
   const roads3 = ROAD_CENTERS.map((c) => w(c));
   for (const rc of roads3) {
-    for (let a = -270; a < 270; a += rand(26, 40)) {
-      if (insideIsland3(a, rc)) place(makeCone(), a, rc + (Math.random() < 0.5 ? 3.4 : -3.4), 0.7);
-      if (insideIsland3(rc, a)) place(makeCone(), rc + (Math.random() < 0.5 ? 3.4 : -3.4), a, 0.7);
+    let ci = 0;
+    for (let a = -270; a < 270; a += 32, ci++) {
+      const side = ci % 2 ? 3.4 : -3.4;   // even alternating comb, no clumps
+      if (insideIsland3(a, rc)) place(makeCone(), a, rc + side, 0.7);
+      if (insideIsland3(rc, a)) place(makeCone(), rc - side, a, 0.7);
     }
-    for (let a = -280; a < 280; a += 24) {
-      if (insideIsland3(a, rc)) place(makeLamp(), a, rc + (Math.random() < 0.5 ? 4.6 : -4.6), 0.7);
-      if (insideIsland3(rc, a)) place(makeLamp(), rc + (Math.random() < 0.5 ? 4.6 : -4.6), a, 0.7);
+    let li = 0;
+    for (let a = -280; a < 280; a += 24, li++) {
+      const side = li % 2 ? 4.6 : -4.6;
+      if (insideIsland3(a, rc)) place(makeLamp(), a, rc + side, 0.7);
+      if (insideIsland3(rc, a)) place(makeLamp(), rc - side, a, 0.7);
+    }
+  }
+
+  // opening snack cluster: a ring of easy food around the spawn junction so a
+  // brand-new player eats 5+ things in the first fifteen seconds (hole.io rule)
+  {
+    const sx0 = w(ROAD_CENTERS[0]), sz0 = w(ROAD_CENTERS[2]);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const r0 = 7 + (i % 3) * 3.5;
+      place(i % 3 === 0 ? makeCoins() : makeTinyProp(), sx0 + Math.cos(a) * r0, sz0 + Math.sin(a) * r0, i % 3 === 0 ? 0.55 : rand(0.6, 0.8));
     }
   }
 

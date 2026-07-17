@@ -72,8 +72,14 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
   function spawn(kind: Kind, n: number, value: number, speed: number, dmg: number) {
     for (let i = 0; i < n; i++) {
       const g = makeUnit(kind); setShadow(g);
-      const ang = rand(0, Math.PI * 2), rad = rand(150, 240);
-      const x = Math.cos(ang) * rad, z = Math.sin(ang) * rad;
+      // ground units must spawn ON the island — never in the ocean (helis fly)
+      let x = 0, z = 0;
+      for (let k = 0; k < 14; k++) {
+        const ang = rand(0, Math.PI * 2), rad = rand(120, 230);
+        x = Math.cos(ang) * rad; z = Math.sin(ang) * rad;
+        if (kind === 'heli' || biomeAt(x, z)) break;
+        if (k === 13) { x *= 0.5; z *= 0.5; }   // deep fallback: well inland
+      }
       const y = kind === 'heli' ? 20 : 0;
       g.position.set(x, y, z); scene.add(g);
       units.push({ g, kind, x, z, y, fireCd: rand(1, 3), value, speed, dmg });
@@ -110,7 +116,12 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
         if (d > stop) {
           const nx = un.x + dx / d * un.speed * dt, nz = un.z + dz / d * un.speed * dt;
           if (un.kind === 'heli' || biomeAt(nx, nz)) { un.x = nx; un.z = nz; }
-          else { un.x += (dz / d) * un.speed * dt * 0.6; un.z += (-dx / d) * un.speed * dt * 0.6; }  // slide around water
+          else {
+            // slide around water — but only onto LAND (the old slide was
+            // unvalidated and marched tanks straight into the sea)
+            const sx = un.x + (dz / d) * un.speed * dt * 0.6, sz = un.z + (-dx / d) * un.speed * dt * 0.6;
+            if (biomeAt(sx, sz)) { un.x = sx; un.z = sz; }
+          }
         }
         un.g.position.set(un.x, un.y, un.z);
         un.g.rotation.y = Math.atan2(-dz, dx);   // nose +X faces the void

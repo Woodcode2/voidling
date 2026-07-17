@@ -52,6 +52,17 @@ export const PACK: Record<string, { url: string; h: number }> = {
 const loader = new GLTFLoader();
 const templates = new Map<string, Promise<THREE.Object3D | null>>();
 
+// LOD registry: switch distances must TRACK the camera. A fixed threshold dies
+// the moment the camera pulls back past it (every AI mesh degraded to its
+// stand-in for the whole match). Instead the game feeds us its camera distance
+// each frame and the hi-detail band rides just beyond it — crisp where the
+// player is looking, cheap at the screen edges and far side of the island.
+const LODS: THREE.LOD[] = [];
+export function updateLodBias(camDist: number) {
+  const d = Math.min(280, camDist * 1.25);
+  for (const l of LODS) if (l.levels.length > 1) l.levels[1].distance = d;
+}
+
 function template(url: string): Promise<THREE.Object3D | null> {
   let p = templates.get(url);
   if (!p) {
@@ -89,6 +100,7 @@ export function glb(
   const placeFallback = () => {
     if (!opts.fallback) return;
     const fb = opts.fallback();
+    if (fb.children.length === 0 && !(fb as THREE.Mesh).isMesh) return;   // never register an INVISIBLE edible
     fb.position.set(x, 0, z);
     if (opts.rotY) fb.rotation.y = opts.rotY;
     fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
@@ -110,6 +122,7 @@ export function glb(
       const lod = new THREE.LOD();
       lod.addLevel(hi, 0);
       lod.addLevel(opts.fallback(), opts.lodDist ?? 110);
+      LODS.push(lod);
       obj = lod;
     } else {
       obj = hi;
@@ -200,6 +213,7 @@ export function vehicleGlb(
     const lod = new THREE.LOD();
     lod.addLevel(wrap, 0);
     lod.addLevel(lo, 95);
+    LODS.push(lod);
     container.add(lod);
   });
 }
