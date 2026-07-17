@@ -157,7 +157,9 @@ export function vehicleGlb(container: THREE.Object3D, name: string, len: number)
     const size = box.getSize(new THREE.Vector3());
     const wrap = new THREE.Group();
     wrap.add(inst);
-    if (size.z > size.x) wrap.rotation.y = Math.PI / 2;   // longest axis → +X
+    // longest axis → +X, then a 180° flip: the generated meshes model their
+    // nose toward -X (verified in the ?assets gallery), the game drives +X
+    wrap.rotation.y = (size.z > size.x ? Math.PI / 2 : 0) + Math.PI;
     wrap.scale.setScalar(len / Math.max(Math.max(size.x, size.z), 1e-4));
     wrap.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     container.clear();
