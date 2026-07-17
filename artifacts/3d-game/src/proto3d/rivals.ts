@@ -17,11 +17,11 @@ const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
 const COLORS = [0x2fd8c0, 0xff6fb0, 0xff9a3a, 0x7ed57a, 0x4d8ff0];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 // must match the player model (2D game constants through the 0.05 map scale)
-const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.030;
+const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.025;
 const growR = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.6 * eR * eR * rookie * diminish));
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
 function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
@@ -65,7 +65,7 @@ export function createRivals(
   biomeAt: (x: number, z: number) => Biome | null,
   count = 4,
 ): Rivals {
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
@@ -79,7 +79,7 @@ export function createRivals(
     const ang = (i / count) * Math.PI * 2 + 0.6;
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
-      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0 });
+      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0 });
   }
 
   const tmp = new THREE.Vector3();
@@ -142,16 +142,20 @@ export function createRivals(
             e.mesh.userData.eaten = true; e.mesh.visible = false; scene.remove(e.mesh);
             rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
             rv.r = growR(rv.r, e.radius);
+            rv.pulse = 1;   // visible gulp — the family EATS, not just exists
           }
         }
 
-        // render
-        rv.group.position.set(rv.x, rv.r * 0.9, rv.z);
-        rv.group.scale.setScalar(rv.r);
+        // render — alive: a little roll-hop while moving, a squash-gulp on eats
+        rv.pulse = Math.max(0, rv.pulse - dt * 3);
+        const hopA = Math.abs(Math.sin(_t * 5 + rv.ph)) * (movedOk ? 0.07 : 0.02);
+        const sq = 1 + rv.pulse * 0.2;
+        rv.group.position.set(rv.x, rv.r * (0.9 + hopA), rv.z);
+        rv.group.scale.set(rv.r / Math.sqrt(sq), rv.r * sq, rv.r / Math.sqrt(sq));
         rv.eyes.quaternion.copy(camera.quaternion);
         // look toward travel dir
         rv.eyes.children.forEach((c) => { c.position.x = (c.position.x < 0 ? -0.32 : 0.32) + THREE.MathUtils.clamp(mx / md * 0.06, -0.06, 0.06); });
-        rv.halo.position.set(rv.x, 0.07, rv.z); rv.halo.scale.setScalar(rv.r * 1.5);
+        rv.halo.position.set(rv.x, 0.14, rv.z); rv.halo.scale.setScalar(rv.r * 1.5);
         void tmp;
       }
     },

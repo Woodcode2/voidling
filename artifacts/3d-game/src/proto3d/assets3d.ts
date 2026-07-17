@@ -161,12 +161,28 @@ export function buildGallery(scene: THREE.Scene) {
 // game's vehicle convention is nose = +X, so the mesh's longest horizontal
 // axis is rotated onto X and scaled to `len` world units. If the GLB never
 // loads, the procedural vehicle simply stays — no empty roads.
-export function vehicleGlb(container: THREE.Object3D, name: string, len: number) {
+export function vehicleGlb(
+  container: THREE.Object3D, name: string, len: number,
+  opts: { tint?: number; keep?: THREE.Object3D[] } = {},
+) {
   const spec = PACK[name];
   if (!spec) return;
   template(spec.url).then((tpl) => {
     if (!tpl) return;
     const inst = tpl.clone(true);
+    // tint: clone materials and multiply (e.g. the police cruiser is the sedan
+    // mesh washed toward blue — one asset, many liveries)
+    if (opts.tint !== undefined) {
+      const t = new THREE.Color(opts.tint);
+      inst.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mesh.material = (Array.isArray(mesh.material) ? mats.map((m) => m.clone()) : mats[0].clone()) as typeof mesh.material;
+        const nm = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of nm) { const mm = m as THREE.MeshStandardMaterial; if (mm.color) mm.color.multiply(t); }
+      });
+    }
     const box = new THREE.Box3().setFromObject(inst);
     const size = box.getSize(new THREE.Vector3());
     const wrap = new THREE.Group();
@@ -177,9 +193,10 @@ export function vehicleGlb(container: THREE.Object3D, name: string, len: number)
     wrap.scale.setScalar(len / Math.max(Math.max(size.x, size.z), 1e-4));
     wrap.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     // LOD: the existing procedural vehicle becomes the far level, the dense AI
-    // mesh only renders near the camera
+    // mesh only renders near the camera. `keep` children (light bars, rotors)
+    // stay on the container itself so they ride both levels.
     const lo = new THREE.Group();
-    for (const c of [...container.children]) lo.add(c);
+    for (const c of [...container.children]) if (!opts.keep?.includes(c)) lo.add(c);
     const lod = new THREE.LOD();
     lod.addLevel(wrap, 0);
     lod.addLevel(lo, 95);

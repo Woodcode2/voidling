@@ -202,7 +202,8 @@ function announce(text: string) {
 
 // ── powers (hunger meter) ────────────────────────────────────────────────────
 let hunger = 0;
-const COST = { gulp: 0.35, rocket: 0.45, collapse: 1.0 };
+const COST = { gulp: 0.35, collapse: 1.0 };   // two powers, both readable: suck-in + super-nova
+const DEBUG_HARNESS = location.search.length > 1;   // headless harness runs with ?params
 let powerCd = 0;                       // shared re-trigger delay
 let dashT = 0; const dashDir = { x: 0, z: 1 };
 const aim = { x: 0, z: 1 };            // last travel direction
@@ -224,11 +225,11 @@ export const EAT_RATIO = 1.11;         // eat if target.radius <= R*1.11  (voidR
 const R_CAP = 12;                       // 2D MAX_RADIUS 240 · 0.05
 // Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHER ~23s,
 // GOBBLER ~53s, DEVOURER ~100s, WORLD ENDER ~153s on a strong run.
-const LAW_RATE = 0.030;
+const LAW_RATE = 0.025;   // evolutions are EARNED — slower clock, same 2D shape
 const growRadius = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;   // 2D: <34 → 1.6, <50 → 1.3
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.6 * eR * eR * rookie * diminish));
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
 const _q = new URLSearchParams(location.search);
@@ -317,12 +318,15 @@ const NEWS_PANIC = [
 const newsEl = el('news');
 let devouredPct = 0, newsCd = 7, lastNews = '';
 function showNews() {
-  const pool = devouredPct < 8 ? NEWS_CALM : devouredPct < 30 ? NEWS_WORRIED : NEWS_PANIC;
+  const tier = devouredPct < 8 ? 0 : devouredPct < 30 ? 1 : 2;
+  const pool = [NEWS_CALM, NEWS_WORRIED, NEWS_PANIC][tier];
   let h = pool[Math.floor(Math.random() * pool.length)];
   if (h === lastNews) h = pool[(pool.indexOf(h) + 1) % pool.length];
   lastNews = h;
-  newsEl.innerHTML = `<i>📰 ISLE NEWS</i>${h}`;
+  newsEl.innerHTML = `<i>${['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier]}</i>${h}`;
+  newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
   newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
+  audio.ready();   // a soft chime so headlines register even mid-chomp
 }
 
 function refreshHud() {
@@ -364,7 +368,7 @@ function endMatch() {
 }
 
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
-let combo = 0, comboT = 0;
+let combo = 0, comboT = 0, chompCd = 0;
 const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
@@ -386,8 +390,11 @@ function capture(e: Edible, giveHunger = true) {
   const coinVal = e.mesh.userData.coin as number | undefined;
   if (coinVal) { addCoins(coinVal); bubbles.float(floatPos, `+${coinVal}¢`, true); }
   else bubbles.float(floatPos, `+${pts}`);
-  if (e.radius > voidling.radius * 0.55) { bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); }
-  else audio.pop(combo);
+  // CHOMP! is an EVENT, not wallpaper: only on genuinely big bites, max ~1/2s
+  if (e.radius > voidling.radius * 0.8 && tClock > chompCd) {
+    chompCd = tClock + 2.2;
+    bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat();
+  } else audio.pop(combo);
   if (combo > 0 && combo % 8 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
   questProgress(e.radius);
 }
@@ -422,14 +429,6 @@ function fireGulp() {
   fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach, 0.5); fx.flash('rgba(155,92,255,0.22)', 0.22);
   announce('GULP!');
 }
-function fireRocket() {
-  if (hunger < COST.rocket || powerCd > 0) return;
-  hunger -= COST.rocket; powerCd = 0.6;
-  dashT = 0.55; dashDir.x = aim.x; dashDir.z = aim.z;
-  voidling.animDash(); audio.rocket();
-  fx.ring(voidState.x, voidState.z, 0xff9f4d, voidling.radius * 4, 0.4);
-  announce('ROCKET BITE!');
-}
 function fireCollapse() {
   if (hunger < COST.collapse || powerCd > 0) return;
   hunger -= COST.collapse; powerCd = 1.2;
@@ -446,14 +445,12 @@ function fireCollapse() {
 }
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Digit1') fireGulp();
-  else if (e.code === 'Digit2') fireRocket();
-  else if (e.code === 'Digit3') fireCollapse();
+  else if (e.code === 'Digit2' || e.code === 'Digit3') fireCollapse();
 });
-// touch power buttons
-const pwBtns = [el('pw1'), el('pw2'), el('pw3')];
+// touch power buttons — two powers, instantly readable
+const pwBtns = [el('pw1'), el('pw3')];
 pwBtns[0].addEventListener('click', fireGulp);
-pwBtns[1].addEventListener('click', fireRocket);
-pwBtns[2].addEventListener('click', fireCollapse);
+pwBtns[1].addEventListener('click', fireCollapse);
 
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
 let started = false, startT = 0;
@@ -647,7 +644,9 @@ function animate() {
     if (driving) {
       camera.getWorldDirection(fwdTmp); fwdTmp.y = 0; fwdTmp.normalize();
       rightTmp.set(1, 0, 0).applyQuaternion(camera.quaternion); rightTmp.y = 0; rightTmp.normalize();
-      const speed = 16 * (1 + curStage * 0.08) * (joy.active ? Math.pow(joy.mag, 1.4) : 1);
+      // speed grows with the void so the SCREEN-relative pace never drags —
+      // the camera pulls back as you grow, so world speed must keep up
+      const speed = 16 * Math.min(3.1, Math.pow(voidling.radius / 0.9, 0.55)) * (joy.active ? Math.pow(joy.mag, 1.4) : 1);
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
       tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
     } else if (tClock - lastInput > 4) {
@@ -682,12 +681,12 @@ function animate() {
   prev.x = voidState.x; prev.z = voidState.z;
   { const sp = Math.hypot(vx, vz); if (sp > 4) { aim.x = vx / sp; aim.z = vz / sp; } }
 
-  // auto-fire powers when charged (demo AI; keys 1/2/3 also work)
+  // powers are PLAYER decisions — auto-fire only exists for the headless demo
+  // harness (debug URLs). In a real match nothing ever blasts on its own.
   autoFireCd -= dt;
-  if (started && !ended && autoFireCd <= 0 && powerCd <= 0) {
+  if (DEBUG_HARNESS && started && !ended && autoFireCd <= 0 && powerCd <= 0) {
     autoFireCd = rand(2.5, 4.2);
     if (hunger >= COST.collapse) fireCollapse();
-    else if (hunger >= COST.rocket && Math.random() < 0.5) fireRocket();
     else if (hunger >= COST.gulp) fireGulp();
   }
 
@@ -811,8 +810,7 @@ function animate() {
     hungerFill.style.width = `${Math.round(hunger * 100)}%`;
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
-    pwBtns[1].classList.toggle('off', hunger < COST.rocket || powerCd > 0);
-    pwBtns[2].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
+    pwBtns[1].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
     // form progress toward the next evolution
     const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
     formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;

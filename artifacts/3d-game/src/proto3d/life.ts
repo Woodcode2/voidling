@@ -229,6 +229,13 @@ export function createLife(
   // 90° from its motion — the "driving on their side" bug.)
   const LANE = 2.6;
   const headingOf = (mvx: number, mvz: number) => Math.atan2(-mvz, mvx);
+  // a car position is legal only ON the painted road network AND on the island —
+  // no more sand cruises to the waterline or corners cut across lawns
+  const onRoad = (x: number, z: number): boolean => {
+    if (!biomeAt(x, z)) return false;
+    for (const rc of ROAD_CENTERS_3D) if (Math.abs(x - rc) < 5.4 || Math.abs(z - rc) < 5.4) return true;
+    return false;
+  };
   interface Arc { p0x: number; p0z: number; p1x: number; p1z: number; p2x: number; p2z: number; u: number; len: number; }
   for (let i = 0; i < 30; i++) {
     const mesh = makeCar();
@@ -254,11 +261,18 @@ export function createLife(
           const w = 1 - a.u;
           const px = w * w * a.p0x + 2 * w * a.u * a.p1x + a.u * a.u * a.p2x;
           const pz = w * w * a.p0z + 2 * w * a.u * a.p1z + a.u * a.u * a.p2z;
+          // a turn that would carry the car off the road network (clipped road
+          // stub near the coast) is cancelled — U-turn instead
+          if (!biomeAt(px, pz)) { st.arc = null; st.dir *= -1; st.turnCd = 2; return; }
           const dxu = 2 * w * (a.p1x - a.p0x) + 2 * a.u * (a.p2x - a.p1x);
           const dzu = 2 * w * (a.p1z - a.p0z) + 2 * a.u * (a.p2z - a.p1z);
           mesh.position.set(px, 0, pz);
           mesh.rotation.y = headingOf(dxu, dzu);
-          if (a.u >= 1) { st.arc = null; st.axis = st.nAxis; st.centre = st.nCentre; st.along = st.nAlong; st.laneOff = st.nLaneOff; }
+          if (a.u >= 1) {
+            st.arc = null; st.axis = st.nAxis; st.centre = st.nCentre; st.along = st.nAlong; st.laneOff = st.nLaneOff;
+            // landed on a clipped road stub? bounce back onto the network
+            if (!onRoad(mesh.position.x, mesh.position.z)) st.dir *= -1;
+          }
           return;
         }
         st.turnCd = Math.max(0, st.turnCd - dt);
@@ -268,7 +282,7 @@ export function createLife(
         st.along += st.dir * spd * dt;
         const nx = st.axis === 'h' ? st.along : st.centre + st.laneOff;
         const nz = st.axis === 'h' ? st.centre + st.laneOff : st.along;
-        if (!biomeAt(nx, nz) && Math.abs(st.along) > 40) { st.dir *= -1; st.along += st.dir * spd * dt * 2; }
+        if (!onRoad(nx, nz)) { st.dir *= -1; st.along += st.dir * spd * dt * 2; }
         if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 5 && Math.random() < 0.5) {
           // set up a quarter-circle-ish bezier: current pos -> lane corner -> exit on the new lane
           const nAxis = st.axis === 'h' ? 'v' : 'h';

@@ -1033,7 +1033,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
     // walkable block so a speck-sized void always has something to nibble.
     if (biome !== 'military') {
-      const tinyN = biome === 'forest' ? 8 : 22;
+      const tinyN = biome === 'forest' ? 12 : 30;   // denser snack carpet
       for (let t = 0; t < tinyN; t++) { const [x, z] = jitter(); place(makeTinyProp(), x, z, rand(0.6, 0.85)); }
       for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(makeCoins(), x, z, 0.55); }
     }

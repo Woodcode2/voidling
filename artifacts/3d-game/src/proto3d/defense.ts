@@ -44,8 +44,12 @@ function makeUnit(kind: Kind): THREE.Group {
     const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 8), wheelMat);
     wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.9, sz); g.add(wh);
   }
-  // tanks upgrade to the AI mesh (no more "literally blocks")
+  // NO BLOCK VEHICLES: every ground unit upgrades to an AI mesh.
+  // tank = the tank; jeep = a smaller tank variant; police = the sedan washed
+  // toward cruiser-blue, keeping its procedural light bar on top.
   if (kind === 'tank') vehicleGlb(g, 'tank', 7);
+  else if (kind === 'jeep') vehicleGlb(g, 'tank', 5.4);
+  else if (kind === 'police') vehicleGlb(g, 'car_sedan', 6.2, { tint: 0x7788dd, keep: g.userData.light ? [g.userData.light] : [] });
   return g;
 }
 

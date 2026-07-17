@@ -36,14 +36,26 @@
       #hunger.ready .fill { box-shadow: 0 0 12px #c9a6ff; }
       #hungerlbl { position: fixed; bottom: 34px; left: 50%; transform: translateX(-50%); z-index: 5;
         font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #d8c8ff; pointer-events: none; opacity: 0.9; }
-      /* MAPLE ISLE NEWS — silly world headlines that turn nervous as you eat */
-      #news { position: fixed; top: 86px; left: 50%; transform: translateX(-50%) translateY(-14px); z-index: 5;
-        max-width: 86vw; background: rgba(16,8,30,0.74); border: 1.5px solid rgba(201,166,255,0.35); border-radius: 12px;
-        padding: 8px 16px; color: #fff; font-size: 13.5px; font-weight: 800; letter-spacing: 0.3px; pointer-events: none;
-        opacity: 0; backdrop-filter: blur(6px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #news i { font-style: normal; color: #ffe08a; font-size: 10.5px; letter-spacing: 1.5px; margin-right: 8px; }
-      #news.show { animation: news 5.4s ease forwards; }
-      @keyframes news { 0%{opacity:0; transform:translateX(-50%) translateY(-14px)} 8%{opacity:1; transform:translateX(-50%) translateY(0)} 84%{opacity:1} 100%{opacity:0} }
+      /* MAPLE ISLE NEWS — headlines that POP, and turn nervous as you eat */
+      #news { position: fixed; top: 84px; left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
+        max-width: 88vw; background: linear-gradient(180deg, rgba(34,16,64,0.95), rgba(18,9,36,0.95));
+        border: 2px solid rgba(201,166,255,0.55); border-radius: 14px;
+        padding: 10px 20px; color: #fff; font-size: 15.5px; font-weight: 900; letter-spacing: 0.3px; pointer-events: none;
+        opacity: 0; box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 18px rgba(154,92,255,0.25);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #news i { font-style: normal; color: #ffe08a; font-size: 11px; letter-spacing: 2px; margin-right: 10px;
+        background: rgba(255,224,138,0.14); border-radius: 7px; padding: 3px 8px; }
+      #news.worried { border-color: rgba(255,208,90,0.65); box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 20px rgba(255,196,60,0.3); }
+      #news.panic { border-color: rgba(255,90,110,0.75); box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 24px rgba(255,60,80,0.4); }
+      #news.panic i { color: #ff8a9a; background: rgba(255,90,110,0.16); }
+      #news.show { animation: news 5.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+      @keyframes news {
+        0% { opacity: 0; transform: translateX(-50%) translateY(-22px) scale(0.85); }
+        9% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.04); }
+        14% { transform: translateX(-50%) translateY(0) scale(1); }
+        84% { opacity: 1; }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.96); }
+      }
       body.menu #news { display: none; }
       #banner { position: fixed; top: 96px; left: 0; right: 0; text-align: center; z-index: 6; pointer-events: none;
         color: #fff; font-size: 24px; font-weight: 900; letter-spacing: 1px; opacity: 0;
@@ -249,8 +261,7 @@
     <div id="joy"></div><div id="joyNub"></div>
     <div id="powers">
       <button id="pw1"><b>1</b>GULP</button>
-      <button id="pw2"><b>2</b>ROCKET</button>
-      <button id="pw3"><b>3</b>COLLAPSE</button>
+      <button id="pw3"><b>2</b>COLLAPSE</button>
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="titlecard">
@@ -306,7 +317,7 @@
       <div class="card">
         <div class="tTitle">DRAG TO MOVE</div>
         <div class="tBody">Drag anywhere to steer your void.<br>Eat anything <b>smaller than you</b> — grow from a speck into a <b>WORLD ENDER</b>.</div>
-        <div class="tBody dim">Eating fills <b>HUNGER</b> — spend it on GULP, ROCKET BITE and COLLAPSE.</div>
+        <div class="tBody dim">Eating fills <b>HUNGER</b> — spend it on <b>GULP</b> (suck in a snack shower) or save up for <b>COLLAPSE</b> (devour everything near you).</div>
         <button id="btnGotIt">LET'S EAT</button>
       </div>
     </div>
