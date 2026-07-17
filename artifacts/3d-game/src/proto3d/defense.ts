@@ -106,7 +106,7 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
           else { un.x += (dz / d) * un.speed * dt * 0.6; un.z += (-dx / d) * un.speed * dt * 0.6; }  // slide around water
         }
         un.g.position.set(un.x, un.y, un.z);
-        un.g.rotation.y = Math.atan2(dx, dz);
+        un.g.rotation.y = Math.atan2(-dz, dx);   // nose +X faces the void
         if (un.g.userData.rotor) un.g.userData.rotor.rotation.y += dt * 40;
         if (un.g.userData.light) (un.g.userData.light.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3 + 0.5 * Math.abs(Math.sin(performance.now() / 200));
         // fire

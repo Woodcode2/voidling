@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
+import { glb, spawnBalloon, setBalloonHook } from './assets3d';
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military';
 
@@ -436,8 +437,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // ── PROPS: populate each block per biome ───────────────────────────────────
   populate(scene, addEdible);
 
-  // Higgsfield image→3D hero landmark: the MAPLE ISLE ferris wheel, at the
-  // plaza's edge. Loads async; the game runs fine before/without it.
+  // Higgsfield image→3D hero landmark: the ferris wheel — moved out of the city
+  // core to a beach BOARDWALK FAIR where a ferris wheel actually belongs.
   new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb', (gltf) => {
     const model = gltf.scene;
     const box = new THREE.Box3().setFromObject(model);
@@ -448,29 +449,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     model.position.y -= box.min.y;                      // feet on the ground
     const grp = new THREE.Group();
     grp.add(model);
-    grp.position.set(w(6855) + 14, 0, w(5145) + 16);   // plaza corner
+    grp.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);   // beach fairground
     grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
     addEdible(grp, 9);
   }, undefined, () => { /* offline dev: no landmark, no error */ });
 
-  // Higgsfield image→3D: a hot-air balloon drifting lazy laps over the island.
-  // Pure ambience — it lives in the sky, well out of the void's reach.
+  // ONE hot-air balloon drifts over the island (the redesigned Higgsfield GLB
+  // is wired via the asset pack in ./assets3d — placed by populate()).
   let balloon: THREE.Group | null = null;
-  new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/7a82e18d-76c0-4135-8948-b938d1b64762.glb', (gltf) => {
-    const model = gltf.scene;
-    const box = new THREE.Box3().setFromObject(model);
-    const size = box.getSize(new THREE.Vector3());
-    const s = 13 / Math.max(size.y, 0.001);
-    model.scale.setScalar(s);
-    box.setFromObject(model);
-    model.position.y -= (box.min.y + box.max.y) / 2;    // centre on the group
-    const grp = new THREE.Group();
-    grp.add(model);
-    grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
-    scene.add(grp);
-    balloon = grp;
-  }, undefined, () => { /* offline dev: empty sky, no error */ });
+  setBalloonHook((grp) => { balloon = grp; });
 
   // ── biome lookup ───────────────────────────────────────────────────────────
   function biomeAt(x3: number, z3: number): Biome | null {
@@ -757,7 +745,12 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
     if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
-    mesh.position.set(x3, 0, z3); setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
+    mesh.position.set(x3, 0, z3);
+    // shadow diet: tiny street props don't cast (hundreds of them; their shadows
+    // are sub-pixel anyway) — a big chunk of the shadow pass for free
+    if (r >= 2.5) setShadow(mesh);
+    else mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
+    scene.add(mesh); addEdible(mesh, r);
   };
 
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
@@ -767,37 +760,99 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     const half = wLen(BLOCK_SIZE / 2) - 6;   // inset so props stay off roads
     const jitter = () => [cx + rand(-half, half), cz + rand(-half, half)] as const;
 
+    // GLB placement helper: skips off-island spots, wires the shadow diet +
+    // procedural fallback so offline dev still shows a full island
+    const placeGlb = (name: string, x3: number, z3: number, r: number, h: number, fallback?: () => THREE.Object3D, rotY?: number) => {
+      if (!insideIsland3(x3, z3)) return;
+      glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback });
+    };
+
     if (biome === 'cozy' || biome === 'fancy') {
-      // neat rows of houses facing the street, each with a yard: bush + mailbox
+      // neat rows of houses facing the street — the AI house set carries the
+      // neighborhood (4 distinct architectures), procedural gables fill in
       const rows = 4, cols = 3, sc = biome === 'fancy' ? 1.3 : 1;
       const facing = pick([0, Math.PI]);   // whole block faces one way = designed
+      const HOUSES = biome === 'fancy'
+        ? ['house_modern', 'house_blue', 'house_craftsman', 'house_pink']
+        : ['house_pink', 'house_craftsman', 'house_blue', 'house_modern'];
       for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
         const hx = cx - half + (j + 0.5) * (half * 2 / cols) + rand(-1.5, 1.5);
         const hz = cz - half + (i + 0.5) * (half * 2 / rows) + rand(-1.5, 1.5);
-        const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = facing;
-        place(house, hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc);
+        if (Math.random() < 0.72) {
+          placeGlb(HOUSES[(i * cols + j) % 4], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
+            (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, facing);
+        } else {
+          const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = facing;
+          place(house, hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc);
+        }
         if (Math.random() < 0.7) place(makeBush(), hx + rand(3, 5) * sc, hz + rand(-3, 3), 1.6);
         // front-yard flower beds flanking the door — every yard has snackable detail
         if (Math.random() < 0.8) place(makeFlowers(), hx + rand(1.6, 2.6) * sc, hz + 4.2 * sc, 0.7);
         if (Math.random() < 0.5) place(makeFlowers(), hx - rand(1.6, 2.6) * sc, hz + 4.2 * sc, 0.7);
         if (Math.random() < 0.5) place(makeMailbox(), hx - rand(3, 5) * sc, hz + 4, 1.2);
       }
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.2); }
-    } else if (biome === 'downtown' || biome === 'plaza') {
-      const n = biome === 'plaza' ? 4 : 3 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < n; i++) { const t = makeTower(biome === 'plaza' || Math.random() < 0.5); const [x, z] = jitter(); place(t, x, z, 8); }
+      for (let t = 0; t < 4; t++) {
+        const [x, z] = jitter();
+        if (Math.random() < 0.5) placeGlb('parktree', x, z, 3.2, rand(6, 8), makeTree);
+        else place(makeTree(), x, z, 3.2);
+      }
+    } else if (biome === 'downtown') {
+      // street canyon: AI towers anchor each block, procedural facades between
+      const n = 4 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) {
+        const [x, z] = jitter();
+        if (i < 2) placeGlb(i === 0 ? 'tower_glass' : 'tower_deco', x, z, 8, rand(20, 27), () => makeTower(true));
+        else { const t = makeTower(Math.random() < 0.5); place(t, x, z, 8); }
+      }
+      // storefront row: café / grocery with awnings at the block edge
+      placeGlb(Math.random() < 0.5 ? 'cafe' : 'shop', cx + rand(-half * 0.5, half * 0.5), cz + half * 0.82, 6, 8.5, undefined, Math.PI);
+      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
+    } else if (biome === 'plaza') {
+      // civic heart: TOWN HALL presiding over the square (the mayor rally in
+      // ./life plays out on its steps), AI fountain, food truck + ice-cream cart
+      placeGlb('townhall', cx, cz - half * 0.45, 10, 17, () => makeTower(true), 0);
+      placeGlb('fountain', cx, cz + half * 0.35, 4, 6.5);
+      placeGlb('foodtruck', cx - half * 0.55, cz + half * 0.6, 4, 5, undefined, 0.6);
+      placeGlb('icecream', cx + half * 0.55, cz + half * 0.55, 2.2, 3.6, undefined, -0.5);
+      for (let i = 0; i < 2; i++) { const t = makeTower(true); const [x, z] = jitter(); place(t, Math.abs(x - cx) < 20 ? x + 30 : x, z, 8); }
       for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
     } else if (biome === 'park') {
-      for (let t = 0; t < 9; t++) { const [x, z] = jitter(); place(makeTree(), x, z, 3.4); }
+      placeGlb('gazebo', cx, cz, 5, 8.5);
+      for (let t = 0; t < 9; t++) {
+        const [x, z] = jitter();
+        if (Math.random() < 0.55) placeGlb('parktree', x, z, 3.4, rand(6.5, 8.5), makeTree);
+        else place(makeTree(), x, z, 3.4);
+      }
+      if (gy === 2) placeGlb('golfcart', cx + half * 0.6, cz - half * 0.4, 2.6, 3.2, undefined, rand(0, Math.PI));
       for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
       for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBench(), x, z, 2.4); }
     } else if (biome === 'forest') {
-      for (let t = 0; t < 20; t++) { const [x, z] = jitter(); place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3); }
+      for (let t = 0; t < 20; t++) {
+        const [x, z] = jitter();
+        if (Math.random() < 0.45) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
+        else place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3);
+      }
+      placeGlb('rocks', cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.5, half * 0.5), 2.4, 2.6, undefined, rand(0, Math.PI * 2));
+      if (gx === 4 && gy === 0) {   // the campsite block gets the AI camp set
+        placeGlb('tent', cx - 10, cz + 4, 2.6, 4.2, undefined, rand(-0.4, 0.4));
+        placeGlb('campfire', cx, cz, 1.4, 1.7);
+      }
       for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
     } else if (biome === 'beach') {
-      for (let t = 0; t < 6; t++) { const [x, z] = jitter(); place(makePalm(), x, z, 2.6); }
+      // the beach CLUB: AI palms, lifeguard tower, umbrella camps, sandcastles
+      for (let t = 0; t < 6; t++) {
+        const [x, z] = jitter();
+        if (Math.random() < 0.7) placeGlb('palm', x, z, 2.6, rand(6.5, 8.5), makePalm, rand(0, Math.PI * 2));
+        else place(makePalm(), x, z, 2.6);
+      }
+      for (let t = 0; t < 2; t++) placeGlb('umbrella', cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.6, half * 0.6), 1.8, 3.2, undefined, rand(0, Math.PI * 2));
+      placeGlb('sandcastle', cx + rand(-half * 0.6, half * 0.6), cz + rand(-half * 0.4, half * 0.6), 1.2, 1.9, undefined, rand(0, Math.PI * 2));
+      if (gx === 1) placeGlb('lifeguard', cx, cz + half * 0.5, 3.4, 7.5, undefined, Math.PI);
+      if (gx === 2) placeGlb('cabana', cx - half * 0.3, cz - half * 0.3, 3, 4.6, undefined, rand(-0.3, 0.3));
+      if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 10, 19);
       for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.4); }
     } else if (biome === 'zoo') {
+      placeGlb('zooarch', cx - half * 0.7, cz, 6, 9, undefined, Math.PI / 2);
       for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBush(), x, z, 3); }
     } else if (biome === 'airport') {
       const hangar = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 20, 12, 1, false, 0, Math.PI),
@@ -833,6 +888,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       if (insideIsland3(rc, a)) place(makeLamp(), rc + (Math.random() < 0.5 ? 4.6 : -4.6), a, 0.7);
     }
   }
+
+  // exactly ONE hot-air balloon in the sky — animated from createIsland's update
+  spawnBalloon(scene);
 }
 
 // cheap island-membership check (bounding blob) for road-edge scatter

@@ -111,29 +111,32 @@
         background: linear-gradient(180deg, #ff5d7e, #ff2450); box-shadow: 0 6px 0 #b8163a, 0 10px 24px rgba(0,0,0,0.4); }
       #btnAgain:active { transform: translateY(3px); box-shadow: 0 3px 0 #b8163a; }
 
-      /* ── start menu: opaque splash art, real front-end ── */
+      /* ── start menu: opaque splash art, real front-end ──
+         logo pinned to the sky, CTAs pinned to the town at the bottom —
+         the hero void's face in the key art stays completely clear. */
       #menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; text-align: center;
+        align-items: center; justify-content: flex-start; text-align: center;
+        padding: 6vh 16px 5vh; box-sizing: border-box;
         background:
-          linear-gradient(180deg, rgba(13,8,33,0.72) 0%, rgba(13,8,33,0.12) 34%, rgba(13,8,33,0.16) 62%, rgba(13,8,33,0.88) 100%),
-          url('/assets/hf/hf_20260717_005236_c5829cb1-650f-401d-8499-1b0da83d3ed8.png') center / cover no-repeat,
+          linear-gradient(180deg, rgba(13,8,33,0.66) 0%, rgba(13,8,33,0.08) 30%, rgba(13,8,33,0.10) 58%, rgba(13,8,33,0.86) 100%),
+          url('/assets/hf/hf_20260717_005236_c5829cb1-650f-401d-8499-1b0da83d3ed8.png') center 32% / cover no-repeat,
           radial-gradient(ellipse at 50% 30%, #2a1454, #0d0821 75%); }
-      #menu .logo { font-size: 84px; font-weight: 900; letter-spacing: 3px; color: #fff;
-        text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); margin-top: -30px; }
-      #menu .tag { font-size: 15px; font-weight: 800; letter-spacing: 7px; color: #d8c2ff; margin-top: 2px;
+      #menu .logo { font-size: clamp(52px, 9vw, 84px); font-weight: 900; letter-spacing: 3px; color: #fff;
+        text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
+      #menu .tag { font-size: clamp(11px, 1.6vw, 15px); font-weight: 800; letter-spacing: 7px; color: #d8c2ff; margin-top: 2px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
-      #menu .spacer { height: 190px; }   /* the key-art hero shows through here */
+      #menu .spacer { flex: 1; }   /* the key-art hero shows through here */
       #menu button { font-family: inherit; cursor: pointer; border: none; color: #fff; }
-      #btnPlay { font-size: 26px; font-weight: 900; letter-spacing: 3px; padding: 18px 84px; border-radius: 20px;
+      #btnPlay { font-size: 24px; font-weight: 900; letter-spacing: 3px; padding: 16px 76px; border-radius: 20px;
         background: linear-gradient(180deg, #ff5d7e, #ff2450); box-shadow: 0 7px 0 #b8163a, 0 14px 30px rgba(0,0,0,0.45); }
       #btnPlay:active { transform: translateY(4px); box-shadow: 0 3px 0 #b8163a; }
       #btnPlay span { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; opacity: 0.85; margin-top: 3px; }
-      .navRow { display: flex; gap: 14px; margin-top: 18px; }
+      .navRow { display: flex; gap: 14px; margin-top: 16px; }
       .navCard { font-size: 12px; font-weight: 900; letter-spacing: 1.5px; padding: 11px 22px; border-radius: 14px;
         background: rgba(30,16,58,0.82); border: 2px solid rgba(201,166,255,0.4); backdrop-filter: blur(4px); }
       .navCard i { display: block; font-style: normal; font-size: 20px; margin-bottom: 3px; }
       .navCard:active { transform: scale(0.96); }
-      #menu .foot { margin-top: 30px; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #cbb8ee;
+      #menu .foot { margin-top: 18px; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #cbb8ee;
         text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
 
       /* ── meta screens (trophies / top voids) ── */

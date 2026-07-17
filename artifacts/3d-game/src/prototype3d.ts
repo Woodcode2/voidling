@@ -14,10 +14,13 @@ import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS } from './proto3d/palette';
+import { buildGallery } from './proto3d/assets3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+// 1.6 is visually indistinguishable at mobile viewing distance but ~35% fewer
+// pixels than 2.0 — the single biggest lag lever on phones.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -38,6 +41,7 @@ const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerH
 let camDist = 50;
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
+const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the GLB pack
 
 // (Full-screen bloom washed out the sunlit island — the void's "bloom" is a
 // dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
@@ -648,7 +652,10 @@ function animate() {
   // camera — the 2D game's zoom-band model: within a form the void keeps a
   // constant (small!) on-screen size; each evolution zooms the world out a
   // step, so growth READS. Start: void ≈ 6% of screen height, hole.io style.
-  if (TOPDOWN) {
+  if (ASSETVIEW) {
+    camera.position.set(0, 640, 92);
+    camera.lookAt(0, 596, 0);
+  } else if (TOPDOWN) {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
@@ -717,7 +724,8 @@ initialMass = edibles.reduce((a, e) => a + e.radius, 0);
 if (bigStart > 0) voidling.setRadius(bigStart);   // debug: preview a bigger form
 refreshHud();
 
-if (TOPDOWN) { camera.position.set(0, 1120, 0.001); camera.lookAt(0, 0, 0); }
+if (ASSETVIEW) { scene.fog = null; buildGallery(scene); camera.position.set(0, 640, 92); camera.lookAt(0, 596, 0); }
+else if (TOPDOWN) { camera.position.set(0, 1120, 0.001); camera.lookAt(0, 0, 0); }
 else {
   camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
   camera.lookAt(voidState.x, voidling.radius * 0.5, voidState.z);

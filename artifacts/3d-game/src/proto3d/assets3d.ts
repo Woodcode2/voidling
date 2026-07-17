@@ -1,0 +1,146 @@
+// The Higgsfield asset pack: every landmark, house, tree and beach toy on the
+// island can be an AI-generated textured GLB. Meshes load async through the
+// same-origin /assets/hf3d rewrite; each named asset is normalized defensively
+// (uniform scale to height 1, centred, feet on the ground) so a generation
+// quirk can never produce a floating or buried prop. When a mesh can't load
+// (offline dev) the caller's procedural fallback is placed instead — the
+// island is never sparse.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+type AddEdible = (mesh: THREE.Object3D, radius: number) => void;
+
+// name → { url (same-origin GLB), h (world-unit height) }
+// URLs are produced by the image→3D pipeline (see scratchpad hf_manifest).
+const DIR = '/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a';
+export const PACK: Record<string, { url: string; h: number }> = {
+  house_pink: { url: `${DIR}/4953e198-a7b0-4604-9ac6-579cc8392fcb.glb`, h: 5.2 },
+  house_blue: { url: `${DIR}/70d62764-352b-4524-9260-4f263e48928b.glb`, h: 5.6 },
+  house_modern: { url: `${DIR}/3bd79c73-43c6-47a9-8620-281d4926df84.glb`, h: 5 },
+  house_craftsman: { url: `${DIR}/40bdfd42-f7a9-4032-9172-663990078e9e.glb`, h: 5.2 },
+  tower_glass: { url: `${DIR}/629e3d55-fe73-4dd6-a0e9-6dec17b2e072.glb`, h: 24 },
+  tower_deco: { url: `${DIR}/34959892-e727-40ba-bdc5-667a10c5b741.glb`, h: 22 },
+  townhall: { url: `${DIR}/ef5fa4e4-968f-4993-a2ee-0c9461671c4e.glb`, h: 17 },
+  school: { url: `${DIR}/464daa25-a487-4aca-b81e-68ff8d33a15f.glb`, h: 11 },
+  cafe: { url: `${DIR}/95e469c0-e8ec-40b9-9f9e-2ccb3d732c1e.glb`, h: 8.5 },
+  shop: { url: `${DIR}/f771c107-f5aa-4162-9f1b-d1751bb4b9db.glb`, h: 8.5 },
+  fountain: { url: `${DIR}/290f6c1c-f762-4b6c-a13f-a9fc5caa5218.glb`, h: 6.5 },
+  icecream: { url: `${DIR}/df76ace5-489f-4c31-beb6-5e72090612c1.glb`, h: 3.6 },
+  palm: { url: `${DIR}/ea798bca-5fbb-4cb0-bb98-45bfbe3ea752.glb`, h: 7.5 },
+  lifeguard: { url: `${DIR}/4e960a6a-63bb-4a68-90a4-979fb40610cd.glb`, h: 7.5 },
+  umbrella: { url: `${DIR}/14ad375d-efd0-4559-8c50-22b2731d6c65.glb`, h: 3.2 },
+  sandcastle: { url: `${DIR}/d09ff62f-dda2-4987-9500-9354ae5124f8.glb`, h: 1.9 },
+  cabana: { url: `${DIR}/d5e1d66b-89aa-48c9-86d2-497097047527.glb`, h: 4.6 },
+  lighthouse: { url: `${DIR}/18c46841-f358-46a8-8c72-d0238f044fb2.glb`, h: 19 },
+  pine: { url: `${DIR}/b20dda53-b332-48e2-8a3f-2438942cf83b.glb`, h: 8.5 },
+  tent: { url: `${DIR}/3d7ea70a-4587-4662-b1b4-f9ab25836e71.glb`, h: 4.2 },
+  campfire: { url: `${DIR}/bbd46ddc-312e-40a9-85bc-dbcc9d9b04dd.glb`, h: 1.7 },
+  gazebo: { url: `${DIR}/2b1ff369-4fd9-4bd2-8def-d125a0065606.glb`, h: 8.5 },
+  golfcart: { url: `${DIR}/1ca1e5ec-22fe-4fd1-93b1-e4881d9d01b6.glb`, h: 3.2 },
+  balloon2: { url: `${DIR}/f25baa8c-1220-40a4-bf67-cebfb6791a00.glb`, h: 13 },
+  zooarch: { url: `${DIR}/730acaba-6caf-452a-9acb-5b41f911601a.glb`, h: 9 },
+  foodtruck: { url: `${DIR}/8dee24fe-6070-4c22-9b96-64f0e2bf5c44.glb`, h: 5 },
+  parktree: { url: `${DIR}/e755b0f3-fe13-4d0b-ada5-c219faa7866f.glb`, h: 7 },
+  rocks: { url: `${DIR}/02ad2c55-a0e3-4d14-8932-537b42ea5c85.glb`, h: 2.6 },
+  stage: { url: `${DIR}/e4f7a55c-a7f3-4408-a6bb-2d5362ecba94.glb`, h: 3.2 },
+};
+
+const loader = new GLTFLoader();
+const templates = new Map<string, Promise<THREE.Object3D | null>>();
+
+function template(url: string): Promise<THREE.Object3D | null> {
+  let p = templates.get(url);
+  if (!p) {
+    p = new Promise((resolve) => {
+      loader.load(url, (gltf) => {
+        const m = gltf.scene;
+        const box = new THREE.Box3().setFromObject(m);
+        const size = box.getSize(new THREE.Vector3());
+        m.scale.setScalar(1 / Math.max(size.y, 1e-4));      // height exactly 1
+        box.setFromObject(m);
+        const c = box.getCenter(new THREE.Vector3());
+        m.position.set(m.position.x - c.x, m.position.y - box.min.y, m.position.z - c.z);
+        resolve(m);
+      }, undefined, () => resolve(null));
+    });
+    templates.set(url, p);
+  }
+  return p;
+}
+
+export interface GlbOpts {
+  rotY?: number;
+  h?: number;                              // override PACK height
+  smallShadow?: boolean;                   // receive-only (tiny props)
+  fallback?: () => THREE.Object3D;         // procedural stand-in if load fails
+  onReady?: (g: THREE.Group) => void;      // hook for animated placements
+}
+
+export function glb(
+  scene: THREE.Scene, addEdible: AddEdible | null, name: string,
+  x: number, z: number, r: number, opts: GlbOpts = {},
+): void {
+  const spec = PACK[name];
+  const placeFallback = () => {
+    if (!opts.fallback) return;
+    const fb = opts.fallback();
+    fb.position.set(x, 0, z);
+    if (opts.rotY) fb.rotation.y = opts.rotY;
+    fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
+    scene.add(fb);
+    addEdible?.(fb, r);
+  };
+  if (!spec) { placeFallback(); return; }
+  template(spec.url).then((tpl) => {
+    if (!tpl) { placeFallback(); return; }
+    const grp = new THREE.Group();
+    grp.add(tpl.clone(true));
+    grp.scale.setScalar(opts.h ?? spec.h);
+    grp.position.set(x, 0, z);
+    if (opts.rotY) grp.rotation.y = opts.rotY;
+    grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
+    scene.add(grp);
+    addEdible?.(grp, r);
+    opts.onReady?.(grp);
+  });
+}
+
+// ?debug=assets — QA gallery: every pack asset on a floating platform with a
+// name label, one screenshot audits the whole set (which meshes need a re-roll)
+export function buildGallery(scene: THREE.Scene) {
+  const names = Object.keys(PACK);
+  const COLS = 6, GAP = 26, Y = 600;
+  const label = (text: string) => {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const x = cv.getContext('2d')!;
+    x.fillStyle = 'rgba(13,8,33,0.85)'; x.fillRect(0, 0, 256, 64);
+    x.fillStyle = '#fff'; x.font = '900 30px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(text, 128, 34);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthWrite: false }));
+    sp.scale.set(10, 2.5, 1);
+    return sp;
+  };
+  names.forEach((name, i) => {
+    const gx = (i % COLS - (COLS - 1) / 2) * GAP;
+    const gz = (Math.floor(i / COLS) - 2) * GAP;
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 0.5, 24),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a5a, roughness: 0.9 }));
+    pad.position.set(gx, Y - 0.25, gz); scene.add(pad);
+    const tag = label(name); tag.position.set(gx, Y + 13, gz); scene.add(tag);
+    template(PACK[name].url).then((tpl) => {
+      if (!tpl) return;
+      const g = new THREE.Group();
+      g.add(tpl.clone(true));
+      g.scale.setScalar(10);          // uniform preview height
+      g.position.set(gx, Y, gz);
+      scene.add(g);
+    });
+  });
+}
+
+// the drifting hot-air balloon needs an animation handle back in island.ts
+let balloonHook: (g: THREE.Group) => void = () => {};
+export const setBalloonHook = (fn: (g: THREE.Group) => void) => { balloonHook = fn; };
+export function spawnBalloon(scene: THREE.Scene) {
+  glb(scene, null, 'balloon2', 0, 0, 0, { h: 13, onReady: (g) => balloonHook(g) });
+}

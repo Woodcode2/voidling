@@ -51,6 +51,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uTime: { value: 0 },
       uTex: { value: whiteTex },      // premium skin texture (AI-generated)
       uTexAmt: { value: 0 },
+      uStars: { value: whiteTex },    // AI starfield living inside the pit
+      uStarAmt: { value: 0 },
+      uStage: { value: 0 },
     },
     vertexShader: `
       varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
@@ -67,6 +70,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
       uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
       uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
+      uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage;
       // cheap hash for star specks
       float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
       void main(){
@@ -85,12 +89,22 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
           vec3 tc = texture2D(uTex, vec2(vUv.x + uTime * 0.012, vUv.y)).rgb;
           col = mix(col, tc * (0.34 + 0.9 * u), uTexAmt);
         }
-        // luminous event-horizon rim-light (gentle)
-        col += uRim * pow(u, 3.8) * 0.3;
+        // ✨ a real galaxy inside: AI starfield drifting slowly through the dark
+        // core, fading toward the lit rim so depth reads as "pit into space"
+        if (uStarAmt > 0.01) {
+          vec3 st = texture2D(uStars, vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003)).rgb;
+          col += st * st * uStarAmt * (1.0 - u) * 0.9;   // st*st: keep only the bright stars, drop the nebula haze
+        }
+        // luminous event-horizon rim-light — intensifies with each evolution
+        col += uRim * pow(u, 3.8) * (0.3 + uStage * 0.05);
         // faint interior galaxy swirl (subtle, alive)
         float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
         float sw = sin(ang * 2.0 + u * 7.0) * 0.5 + 0.5;
-        col += uSwirl * sw * (1.0 - u) * 0.06;
+        col += uSwirl * sw * (1.0 - u) * (0.06 + uStage * 0.015);
+        // glossy toy catchlight (the polished-3D look of the key art)
+        vec3 L = normalize(vec3(-0.45, 0.74, 0.5));
+        float spec = pow(max(dot(normalize(vN), L), 0.0), 30.0);
+        col += vec3(1.0, 0.97, 1.0) * spec * 0.26;
         // ✦ interior star specks — twinkling, concentrated toward the dark core
         vec2 sc = vObj.xy * 12.0;
         vec2 cell = floor(sc);
@@ -107,6 +121,17 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   });
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), bodyMat);
   bob.add(body);
+
+  // the interior starfield (Higgsfield seamless texture) — engages on load,
+  // shader keeps the gradient look until then (offline dev stays clean)
+  {
+    const src = '/assets/hf/hf_20260717_025459_0c14ef07-9609-491e-aa5c-87a80998c65d.png';
+    const t = new THREE.TextureLoader().load(src, () => { bodyMat.uniforms.uStarAmt.value = 1; });
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    texCache.set(src, t);
+    bodyMat.uniforms.uStars.value = t;
+  }
 
   // (The old translucent glow SHELL read as a soap-bubble outline around the
   // orb — killed. The rim light lives in the body shader; ambient glow comes
@@ -206,6 +231,32 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     rg2.rotation.x = Math.PI / 2 - 0.5;
     rings.add(rg2); ringMats.push(rm2);
   }
+  // ✦ orbiting star sparkles riding the evolution ring — they flare on every
+  // evolution and stay twinkling once the ring is earned (stage 2+)
+  const starTex = (() => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const x = cv.getContext('2d')!;
+    x.translate(32, 32); x.fillStyle = '#ffffff';
+    x.beginPath();
+    for (let i = 0; i < 4; i++) {
+      x.moveTo(0, 0); x.quadraticCurveTo(5, -5, 0, -26); x.quadraticCurveTo(-5, -5, 0, 0);
+      x.rotate(Math.PI / 2);
+    }
+    x.fill();
+    return new THREE.CanvasTexture(cv);
+  })();
+  const orbit = new THREE.Group();
+  orbit.rotation.x = Math.PI / 2 - 0.5;   // ride the same tilt as the ring ribbon
+  rings.add(orbit);
+  const orbStars: THREE.Sprite[] = [];
+  for (let i = 0; i < 6; i++) {
+    const sm = new THREE.SpriteMaterial({ map: starTex, color: VOID.glow, transparent: true, opacity: 0, depthWrite: false });
+    const sp = new THREE.Sprite(sm);
+    const a = (i / 6) * Math.PI * 2;
+    sp.position.set(Math.cos(a) * 1.42, Math.sin(a) * 1.42, 0);
+    sp.scale.setScalar(0.16);
+    orbit.add(sp); orbStars.push(sp);
+  }
 
   let radius = 4;
   let stage = 0, ringFade = 0;
@@ -214,6 +265,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
+  let ringBurst = 0;               // ring + star flare on evolve
   let skinHasTex = false;
 
   const api: Void3D = {
@@ -224,6 +276,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     setStage(n: number) {
       if (n > stage) {
         evolveT = 0.7;   // celebratory pop on every evolution
+        ringBurst = 1;   // ring + orbit stars flare outward
+        bodyMat.uniforms.uStage.value = n;
         // each form gets a stronger presence: pupils grow (2D rule), rim/glow
         // intensify; WORLD ENDER becomes a living galaxy (auto nebula wrap)
         const pupilScale = n >= 1 ? 1.15 : 1;
@@ -253,6 +307,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       (bloomSprite.material as THREE.SpriteMaterial).color.set(s.glow);
       (halo.material as THREE.MeshBasicMaterial).color.set(s.glow);
       ringMats.forEach((m) => m.color.set(s.glow));
+      orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       skinHasTex = !!s.tex;
       if (s.tex) {
         let t = texCache.get(s.tex);
@@ -283,10 +338,20 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // group, which is positioned below; keep them local + centred on the orb)
       const targetRing = stage >= 2 ? Math.min(0.85, 0.45 + (stage - 2) * 0.2) : 0;
       ringFade += (targetRing - ringFade) * Math.min(1, dt * 3);
-      rings.scale.setScalar(radius);
+      if (ringBurst > 0) ringBurst = Math.max(0, ringBurst - dt * 1.4);
+      // on evolve the whole ring system flares out and eases back in
+      const flare = 1 + Math.sin(Math.min(1, 1 - ringBurst) * Math.PI) * 0.45;
+      rings.scale.setScalar(radius * flare);
       rings.rotation.y += dt * 0.4;
-      ringMats[0].opacity = ringFade;
-      ringMats[1].opacity = ringFade * 0.4;
+      orbit.rotation.z += dt * 0.55;               // stars process around the band
+      ringMats[0].opacity = Math.min(1, ringFade + ringBurst * 0.9);
+      ringMats[1].opacity = Math.min(1, ringFade * 0.4 + ringBurst * 0.5);
+      const starVis = Math.min(1, ringFade * 1.1 + ringBurst);
+      for (let i = 0; i < orbStars.length; i++) {
+        const tw = 0.55 + 0.45 * Math.sin(s.t * 4 + i * 2.1);
+        (orbStars[i].material as THREE.SpriteMaterial).opacity = starVis * tw;
+        orbStars[i].scale.setScalar(0.16 * (1 + ringBurst * 0.8) * (0.8 + tw * 0.4));
+      }
 
       const speed = Math.hypot(s.vx, s.vz);
       moveAmt += (Math.min(1, speed / 40) - moveAmt) * Math.min(1, dt * 6);

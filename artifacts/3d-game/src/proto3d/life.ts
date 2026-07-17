@@ -10,6 +10,7 @@ import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
   railPointAt, type Biome, type AddEdible,
 } from './island';
+import { glb } from './assets3d';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -19,14 +20,14 @@ export type Say = (pos: THREE.Vector3, text: string, kind: 'ambient' | 'panic' |
 
 // ── biome dialogue (from the 2D AMBIENT_BY_BIOME / PANIC_BY_BIOME pools) ─────────
 const AMBIENT: Record<string, string[]> = {
-  cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'lawn\'s looking crisp', 'new mailbox day!', 'block party friday?'],
-  fancy: ['the help is late again', 'my topiary won an award', 'is that valet parking?', 'darling, how gauche'],
-  downtown: ['this commute is BRUTAL', 'rent here is CRIMINAL', 'need. more. coffee.', 'my startup\'s pre-seed', 'hustle never sleeps'],
-  park: ['lovely day for it', 'the ducks are rowdy', 'picnic o\'clock!', 'jog complete 💪', 'frisbee!'],
-  forest: ['so peaceful out here', 'was that a bird?', 'fresh piney air', 'love this trail'],
-  beach: ['sunscreen me. NOW.', 'crab looked at me funny', 'best beach day EVER', 'wave check! 🌊'],
-  plaza: ['meet me by the fountain', 'downtown\'s buzzing', 'street food time', 'is there a rally?'],
-  zoo: ['the lions look hungry', 'popcorn! 🍿', 'look, flamingos!'],
+  cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'lawn\'s looking crisp', 'new mailbox day!', 'block party friday?', 'who let their dog out again', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'love what you did with the roses'],
+  fancy: ['the help is late again', 'my topiary won an award', 'is that valet parking?', 'darling, how gauche', 'we summer elsewhere, obviously', 'this fountain? imported.', 'the gala is SATURDAY', 'my third chandelier arrives today'],
+  downtown: ['this commute is BRUTAL', 'rent here is CRIMINAL', 'need. more. coffee.', 'my startup\'s pre-seed', 'hustle never sleeps', 'meeting ran LONG', 'quarterly numbers look… fine', 'anyone else smell burning?', 'elevator\'s down AGAIN', 'lunch is a spreadsheet today'],
+  park: ['lovely day for it', 'the ducks are rowdy', 'picnic o\'clock!', 'jog complete 💪', 'frisbee!', 'kite weather!!', '10k steps, easy', 'the gazebo band plays at noon', 'ice cream truck?! where!'],
+  forest: ['so peaceful out here', 'was that a bird?', 'fresh piney air', 'love this trail', 'found the COOLEST rock', 's\'mores tonight!', 'trail mix is 90% chocolate', 'shhh… deer!', 'my boots are soaked'],
+  beach: ['sunscreen me. NOW.', 'crab looked at me funny', 'best beach day EVER', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', 'volleyball later?', 'ice cream then swim then ice cream', 'don\'t feed the seagulls!!', 'SPF one MILLION'],
+  plaza: ['meet me by the fountain', 'downtown\'s buzzing', 'street food time', 'is there a rally?', 'the mayor\'s speaking today!', 'taco truck line is LONG', 'live music by the fountain!', 'market day is the best day'],
+  zoo: ['the lions look hungry', 'popcorn! 🍿', 'look, flamingos!', 'the elephant waved at me!!', 'gift shop. NOW.', 'do NOT tap the glass', 'feeding time!!'],
 };
 const PANIC: Record<string, string[]> = {
   cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!'],
@@ -77,38 +78,89 @@ function makeCar(): THREE.Group {
   return g;
 }
 interface Limbs { la: THREE.Object3D; ra: THREE.Object3D; ll: THREE.Object3D; rl: THREE.Object3D; phase: number; }
-function makePerson(colOverride?: number): THREE.Group {
-  // little character with real limbs + a walk cycle — no more stick figures
+
+// shared material + geometry pools — hundreds of townsfolk, one GPU footprint
+const _matCache = new Map<string, THREE.MeshStandardMaterial>();
+function mat(color: number, roughness = 0.85): THREE.MeshStandardMaterial {
+  const k = `${color}:${roughness}`;
+  let m = _matCache.get(k);
+  if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness }); _matCache.set(k, m); }
+  return m;
+}
+const G = {
+  leg: new THREE.BoxGeometry(0.34, 1.15, 0.4),
+  torso: new THREE.BoxGeometry(0.95, 1.15, 0.55),
+  arm: new THREE.BoxGeometry(0.26, 1.0, 0.3),
+  hand: new THREE.BoxGeometry(0.24, 0.22, 0.26),
+  head: new THREE.SphereGeometry(0.52, 14, 12),
+  cap: new THREE.SphereGeometry(0.55, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+  brim: new THREE.CylinderGeometry(0.85, 0.85, 0.08, 12),
+  beanie: new THREE.SphereGeometry(0.56, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
+  pack: new THREE.BoxGeometry(0.7, 0.85, 0.35),
+};
+
+// what people WEAR is where they ARE — biome dress codes
+const OUTFIT: Record<string, { shirt: number[]; pants: number[]; hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean }> = {
+  beach: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.5 },
+  downtown: { shirt: [0x2e3a55, 0x3d4756, 0x545c6e, 0xffffff, 0xb9c6dd, 0x6e5c7a], pants: [0x232a3a, 0x2f2f38, 0x3a3f4d] },
+  fancy: { shirt: [0x8a5cb8, 0xd8a848, 0xc65a78, 0x4a7a9a, 0xf0ead8], pants: [0x2a2a34, 0x4a3a5a, 0x5a4a3a] },
+  park: { shirt: [0xffffff, 0xe8604d, 0x58c470, 0x4da3ff, 0xffd54f], pants: [0x3a4a6a, 0x2a2a34, 0x58c470], hat: 'cap', hatOdds: 0.45 },
+  forest: { shirt: [0x5a7a4a, 0x8a6a4a, 0xc4693a, 0x7a8a5a], pants: [0x4a4a3a, 0x5a4a3a, 0x3a4a3a], hat: 'beanie', hatOdds: 0.6, pack: true },
+  cozy: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xc65a9a, 0x7a6ae8], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34, 0x6a3a4a, 0x3a5a4a] },
+  zoo: { shirt: [0xf0c050, 0xe8604d, 0x4da3ff, 0xc8b088], pants: [0x3a4a6a, 0x8a7a5a], hat: 'cap', hatOdds: 0.3 },
+  plaza: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xffffff, 0x9a6ae8], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a] },
+};
+
+function makePerson(biome?: string, colOverride?: number): THREE.Group {
+  // little character with real limbs + a walk cycle — dressed for their biome
   const g = new THREE.Group();
-  const shirt = new THREE.MeshStandardMaterial({ color: colOverride ?? pick(PROPS.person), roughness: 0.85 });
-  const pants = new THREE.MeshStandardMaterial({ color: pick([0x3a4a6a, 0x5a4a3a, 0x2a2a34, 0x6a3a4a, 0x3a5a4a]), roughness: 0.9 });
-  const skin = new THREE.MeshStandardMaterial({ color: pick(PROPS.skin), roughness: 0.75 });
-  const hair = new THREE.MeshStandardMaterial({ color: pick([0x2a2024, 0x6a4a2a, 0xd8b46a, 0x8a3a2a, 0x4a4a52, 0xe8e2d8]), roughness: 0.9 });
+  const fit = OUTFIT[biome ?? 'cozy'] ?? OUTFIT.cozy;
+  const shirt = mat(colOverride ?? pick(fit.shirt));
+  const pants = mat(pick(fit.pants), 0.9);
+  const skin = mat(pick(PROPS.skin), 0.75);
+  const hair = mat(pick([0x2a2024, 0x6a4a2a, 0xd8b46a, 0x8a3a2a, 0x4a4a52, 0xe8e2d8]), 0.9);
   // legs (pivot at hip so they swing)
   const mkLeg = (sx: number) => {
     const hip = new THREE.Group(); hip.position.set(sx, 1.15, 0);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.15, 0.4), pants);
+    const leg = new THREE.Mesh(G.leg, pants);
     leg.position.y = -0.57; hip.add(leg); g.add(hip); return hip;
   };
   const ll = mkLeg(-0.24), rl = mkLeg(0.24);
   // torso
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.15, 0.55), shirt);
+  const torso = new THREE.Mesh(G.torso, shirt);
   torso.position.y = 1.75; g.add(torso);
   // arms (pivot at shoulder)
   const mkArm = (sx: number) => {
     const sh = new THREE.Group(); sh.position.set(sx, 2.2, 0);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.0, 0.3), shirt);
+    const arm = new THREE.Mesh(G.arm, shirt);
     arm.position.y = -0.5; sh.add(arm);
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.26), skin);
+    const hand = new THREE.Mesh(G.hand, skin);
     hand.position.y = -1.05; sh.add(hand);
     g.add(sh); return sh;
   };
   const la = mkArm(-0.62), ra = mkArm(0.62);
   // head + hair cap
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.52, 14, 12), skin);
+  const head = new THREE.Mesh(G.head, skin);
   head.position.y = 2.9; g.add(head);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
+  const cap = new THREE.Mesh(G.cap, hair);
   cap.position.y = 2.98; g.add(cap);
+  // biome accessories: sun hats at the beach, caps in the park, beanies + packs on the trail
+  if (fit.hat && Math.random() < (fit.hatOdds ?? 0.4)) {
+    const hatCol = mat(pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]), 0.9);
+    if (fit.hat === 'sun') {
+      const brim = new THREE.Mesh(G.brim, hatCol); brim.position.y = 3.18; g.add(brim);
+      const top = new THREE.Mesh(G.beanie, hatCol); top.position.y = 3.1; g.add(top);
+    } else if (fit.hat === 'cap') {
+      const top = new THREE.Mesh(G.beanie, hatCol); top.position.y = 3.12; g.add(top);
+      const bill = new THREE.Mesh(G.hand, hatCol); bill.scale.set(2.2, 0.35, 1.6); bill.position.set(0, 3.14, 0.55); g.add(bill);
+    } else {
+      const top = new THREE.Mesh(G.beanie, hatCol); top.scale.y = 1.25; top.position.y = 3.05; g.add(top);
+    }
+  }
+  if (fit.pack && Math.random() < 0.7) {
+    const pk = new THREE.Mesh(G.pack, mat(pick([0xc4693a, 0x4a7a9a, 0x8a5cb8]), 0.9));
+    pk.position.set(0, 1.85, -0.48); g.add(pk);
+  }
   g.userData.limbs = { la, ra, ll, rl, phase: Math.random() * 6 } as Limbs;
   return g;
 }
@@ -169,21 +221,44 @@ export function createLife(
   const movers: Mover[] = [];
   const peds: { mesh: THREE.Object3D; biome: string; panic: number }[] = [];
 
-  // ── cars: grid-locked lanes ──────────────────────────────────────────────
+  // ── cars: grid-locked lanes with real arc turns ──────────────────────────
+  // The car model's nose points +X, so heading comes from the velocity vector:
+  // rotY = atan2(-vz, vx). (The old +Z-forward formula had every car rotated
+  // 90° from its motion — the "driving on their side" bug.)
   const LANE = 2.6;
+  const headingOf = (mvx: number, mvz: number) => Math.atan2(-mvz, mvx);
+  interface Arc { p0x: number; p0z: number; p1x: number; p1z: number; p2x: number; p2z: number; u: number; len: number; }
   for (let i = 0; i < 30; i++) {
     const mesh = makeCar();
     const horiz = Math.random() < 0.5;
     const centre = pick(ROAD_CENTERS_3D);
     const dir = Math.random() < 0.5 ? 1 : -1;
-    const st = { axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: rand(-230, 230), laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: 0 };
+    const st = {
+      axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: rand(-230, 230),
+      laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2),
+      arc: null as Arc | null, nAxis: 'h' as 'h' | 'v', nCentre: 0, nAlong: 0, nLaneOff: 0,
+    };
     if (st.axis === 'h') mesh.position.set(st.along, 0, centre + st.laneOff); else mesh.position.set(centre + st.laneOff, 0, st.along);
-    mesh.rotation.y = st.axis === 'h' ? (dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (dir > 0 ? 0 : Math.PI);
+    mesh.rotation.y = st.axis === 'h' ? headingOf(dir, 0) : headingOf(0, dir);
     setShadow(mesh); scene.add(mesh); addEdible(mesh, 4);
     movers.push({
       mesh,
       update(dt, _t, vx, vz, vR) {
         if (eaten(mesh)) return;
+        // mid-turn: follow the bezier so nose and path always agree
+        if (st.arc) {
+          const a = st.arc;
+          a.u = Math.min(1, a.u + (st.speed * dt) / a.len);
+          const w = 1 - a.u;
+          const px = w * w * a.p0x + 2 * w * a.u * a.p1x + a.u * a.u * a.p2x;
+          const pz = w * w * a.p0z + 2 * w * a.u * a.p1z + a.u * a.u * a.p2z;
+          const dxu = 2 * w * (a.p1x - a.p0x) + 2 * a.u * (a.p2x - a.p1x);
+          const dzu = 2 * w * (a.p1z - a.p0z) + 2 * a.u * (a.p2z - a.p1z);
+          mesh.position.set(px, 0, pz);
+          mesh.rotation.y = headingOf(dxu, dzu);
+          if (a.u >= 1) { st.arc = null; st.axis = st.nAxis; st.centre = st.nCentre; st.along = st.nAlong; st.laneOff = st.nLaneOff; }
+          return;
+        }
         st.turnCd = Math.max(0, st.turnCd - dt);
         const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
         let spd = st.speed;
@@ -192,17 +267,27 @@ export function createLife(
         const nx = st.axis === 'h' ? st.along : st.centre + st.laneOff;
         const nz = st.axis === 'h' ? st.centre + st.laneOff : st.along;
         if (!biomeAt(nx, nz) && Math.abs(st.along) > 40) { st.dir *= -1; st.along += st.dir * spd * dt * 2; }
-        if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 3 && Math.random() < 0.5) {
-          const na = st.centre; st.centre = rc; st.axis = st.axis === 'h' ? 'v' : 'h'; st.along = na; st.laneOff = st.dir * LANE * (st.axis === 'h' ? 1 : -1); st.turnCd = 2.5; break;
+        if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 5 && Math.random() < 0.5) {
+          // set up a quarter-circle-ish bezier: current pos -> lane corner -> exit on the new lane
+          const nAxis = st.axis === 'h' ? 'v' : 'h';
+          const nLaneOff = st.dir * LANE * (nAxis === 'h' ? 1 : -1);
+          const nAlong = st.centre + st.dir * 8;             // exit a little past the corner
+          const p1x = st.axis === 'h' ? rc + nLaneOff : st.centre + st.laneOff;
+          const p1z = st.axis === 'h' ? st.centre + st.laneOff : rc + nLaneOff;
+          const p2x = nAxis === 'h' ? nAlong : rc + nLaneOff;
+          const p2z = nAxis === 'h' ? rc + nLaneOff : nAlong;
+          const len = Math.hypot(p1x - mesh.position.x, p1z - mesh.position.z) + Math.hypot(p2x - p1x, p2z - p1z);
+          st.arc = { p0x: mesh.position.x, p0z: mesh.position.z, p1x, p1z, p2x, p2z, u: 0, len: Math.max(4, len) };
+          st.nAxis = nAxis; st.nCentre = rc; st.nAlong = nAlong; st.nLaneOff = nLaneOff; st.turnCd = 3;
+          return;
         }
         if (st.axis === 'h') mesh.position.set(st.along, 0, st.centre + st.laneOff);
         else mesh.position.set(st.centre + st.laneOff, 0, st.along);
-        // smooth heading — no snap turns at junctions
-        const targetRot = st.axis === 'h' ? (st.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (st.dir > 0 ? 0 : Math.PI);
+        const targetRot = st.axis === 'h' ? headingOf(st.dir, 0) : headingOf(0, st.dir);
         let dr = targetRot - mesh.rotation.y;
         while (dr > Math.PI) dr -= Math.PI * 2;
         while (dr < -Math.PI) dr += Math.PI * 2;
-        mesh.rotation.y += dr * Math.min(1, dt * 7);
+        mesh.rotation.y += dr * Math.min(1, dt * 10);
       },
     });
   }
@@ -266,7 +351,7 @@ export function createLife(
       const t = HALF_BLOCK_3D * (edge ? rand(0.88, 0.98) : rand(-0.7, 0.7));
       const hx = edge && Math.random() < 0.5 ? cx + (Math.random() < 0.5 ? t : -t) : cx + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7);
       const hz = edge ? cz + (Math.random() < 0.5 ? t : -t) : cz + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7);
-      addWanderer(makePerson(), hx, hz, edge ? 28 : 20, rand(4, 7), 18, 2.4, biomeKey(b));
+      addWanderer(makePerson(biomeKey(b)), hx, hz, edge ? 28 : 20, rand(4, 7), 18, 2.4, biomeKey(b));
     }
   }
 
@@ -276,10 +361,30 @@ export function createLife(
     for (let i = 0; i < 6; i++) addWanderer(makeAnimal(), zx + rand(-HALF_BLOCK_3D * 0.6, HALF_BLOCK_3D * 0.6), zz + rand(-HALF_BLOCK_3D * 0.6, HALF_BLOCK_3D * 0.6), HALF_BLOCK_3D * 0.55, rand(3, 5), 22, 3, 'zoo');
   }
 
-  // birds: flocks that drift and scatter
-  for (let f = 0; f < 3; f++) {
-    const cx = rand(-180, 180), cz = rand(-180, 180), fly = rand(18, 30);
-    for (let i = 0; i < 4; i++) {
+  // beach sunbathers: flat out on their towels, working on the tan
+  const towelGeo = new THREE.PlaneGeometry(3.6, 5.4);
+  for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    if (PLAN_GRID[gy][gx] !== 'beach') continue;
+    const [bx, bz] = blockCenter3D(gx, gy);
+    for (let i = 0; i < 3; i++) {
+      const tx = bx + rand(-HALF_BLOCK_3D * 0.55, HALF_BLOCK_3D * 0.55);
+      const tz = bz + rand(-HALF_BLOCK_3D * 0.55, HALF_BLOCK_3D * 0.55);
+      if (!biomeAt(tx, tz)) continue;
+      const towel = new THREE.Mesh(towelGeo, mat(pick([0xff6f91, 0x4dd0e1, 0xffd54f, 0x7be8b0]), 0.95));
+      towel.rotation.x = -Math.PI / 2; towel.rotation.z = rand(0, Math.PI * 2);
+      towel.position.set(tx, 0.08, tz); scene.add(towel);
+      const bather = makePerson('beach');
+      bather.rotation.x = -Math.PI / 2;                        // flat on the back
+      bather.rotation.z = towel.rotation.z;
+      bather.position.set(tx, 0.55, tz);
+      setShadow(bather); scene.add(bather); addEdible(bather, 2.4);
+    }
+  }
+
+  // birds: a couple of small flocks, high up and out of the way
+  for (let f = 0; f < 2; f++) {
+    const cx = rand(-180, 180), cz = rand(-180, 180), fly = rand(26, 34);
+    for (let i = 0; i < 3; i++) {
       const mesh = makeBird();
       let ang = rand(0, Math.PI * 2);
       mesh.position.set(cx + rand(-10, 10), fly, cz + rand(-10, 10)); setShadow(mesh); scene.add(mesh); addEdible(mesh, 2);
@@ -317,7 +422,8 @@ export function createLife(
       trainT = (trainT + dt * 0.02) % 1;
       const lead = railPointAt(trainT);
       trainGrp.position.set(lead.x, 0, lead.z);
-      for (let i = 0; i < trainCars.length; i++) { const p = railPointAt(trainT - i * CAR_GAP); trainCars[i].position.set(p.x - lead.x, 0, p.z - lead.z); trainCars[i].rotation.y = p.angle; }
+      // -π/2: rail angle is +Z-forward, the loco model's nose is +X
+      for (let i = 0; i < trainCars.length; i++) { const p = railPointAt(trainT - i * CAR_GAP); trainCars[i].position.set(p.x - lead.x, 0, p.z - lead.z); trainCars[i].rotation.y = p.angle - Math.PI / 2; }
     },
   } as Mover);
 
@@ -328,21 +434,51 @@ export function createLife(
 
   function addEvent(gx: number, gy: number, ambient: string[], panic: string[], build: (x: number, z: number) => void, pedN: number, pedCol?: number) {
     const [x, z] = blockCenter3D(gx, gy);
+    const evBiome = biomeKey(PLAN_GRID[gy][gx]);
     build(x, z);
-    for (let i = 0; i < pedN; i++) addWanderer(makePerson(pedCol), x + rand(-14, 14), z + rand(-14, 14), 16, rand(3, 5), 18, 2.4, 'generic', panic);
+    for (let i = 0; i < pedN; i++) addWanderer(makePerson(evBiome, pedCol), x + rand(-14, 14), z + rand(-14, 14), 16, rand(3, 5), 18, 2.4, 'generic', panic);
     events.push({ x, z, ambient, panic, cd: rand(1, 4), panicked: 0 });
   }
 
-  // Mayor at the plaza (town hall)
+  // Mayor's rally at town hall: mayor up on the stage, crowd gathered in front
   addEvent(3, 2,
-    ['re-elect me, and the void LEAVES!', 'my fellow citizens…', 'VOIDLING is UNDER CONTROL', 'read my lips: no new voids'],
-    ['WOMEN, CHILDREN, MAYORS FIRST!', 'IT HAS MY VOTE— I MEAN—', 'SECURITY! SECUR—'],
+    ['re-elect me, and the void LEAVES!', 'my fellow citizens…', 'VOIDLING is UNDER CONTROL', 'read my lips: no new voids', 'four more years! four more years!', 'boooo! …sorry, continue', 'and ANOTHER thing about potholes—'],
+    ['WOMEN, CHILDREN, MAYORS FIRST!', 'IT HAS MY VOTE— I MEAN—', 'SECURITY! SECUR—', 'the rally is CANCELLED!!'],
     (x, z) => {
-      const podium = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 3), new THREE.MeshStandardMaterial({ color: 0xf0e6d2, roughness: 0.8 }));
-      decor(podium, x, z + 6, 3);
-      const banner = new THREE.Mesh(new THREE.BoxGeometry(9, 3, 0.4), new THREE.MeshStandardMaterial({ color: 0x8a5cff, roughness: 0.6 }));
-      banner.position.y = 7; banner.rotation.y = 0; decor(banner, x, z + 4, 3);
-    }, 4, 0x2a2a44);
+      // AI speech stage (platform + lectern + bunting); simple box stage offline
+      glb(scene, addEdible, 'stage', x, z + 8, 5, {
+        h: 3.2,
+        fallback: () => {
+          const grp = new THREE.Group();
+          const stage = new THREE.Mesh(new THREE.BoxGeometry(10, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0xf0e6d2, roughness: 0.8 }));
+          stage.position.y = 0.8; grp.add(stage);
+          const lectern = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xe8ddc4, roughness: 0.75 }));
+          lectern.position.set(0, 2.7, -1.6); grp.add(lectern);
+          return grp;
+        },
+      });
+      const banner = new THREE.Mesh(new THREE.BoxGeometry(11, 2.6, 0.4), new THREE.MeshStandardMaterial({ color: 0x8a5cff, roughness: 0.6 }));
+      banner.position.y = 6.4; decor(banner, x, z + 10.5, 3);
+      // the mayor: on the stage, one arm working the crowd
+      const mayor = makePerson('downtown', 0x2a2a44);
+      mayor.position.set(x, 1.6, z + 8); setShadow(mayor); scene.add(mayor); addEdible(mayor, 2.4);
+      movers.push({
+        mesh: mayor,
+        update(dt, t) {
+          if (eaten(mayor)) return;
+          const L = mayor.userData.limbs as Limbs;
+          L.ra.rotation.z = -Math.PI * 0.8 + Math.sin(t * 2.6) * 0.3;   // raised, waving
+          L.la.rotation.x = Math.sin(t * 1.4) * 0.25;
+        },
+      });
+      // the crowd: a loose arc facing the stage, milling in place
+      for (let i = 0; i < 7; i++) {
+        const a = Math.PI * (0.15 + 0.7 * (i / 6));
+        const cx2 = x + Math.cos(a) * rand(9, 15), cz2 = z + 8 - Math.sin(a) * rand(8, 13);
+        addWanderer(makePerson('plaza'), cx2, cz2, 3.5, rand(0.6, 1.2), 20, 2.4, 'plaza',
+          ['the SPEECH!! RUN!!', 'democracy is DOOMED!!', 'save the ballot box!!']);
+      }
+    }, 0);
 
   // Campsite in the forest (s'mores)
   addEvent(5, 0,
@@ -413,22 +549,26 @@ export function createLife(
     ['recess!! 🎒', 'tag, you\'re it!', 'pop quiz?! nooo', 'the bell! THE BELL!'],
     ['SNOW DAY!! I mean— VOID DAY!!', 'homework CANCELLED!!', 'RUN, class, RUN!!'],
     (x, z) => {
-      const school = new THREE.Group();
-      const brick = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 9),
-        new THREE.MeshStandardMaterial({ color: 0xc25a4a, roughness: 0.85 }));
-      brick.position.y = 3; school.add(brick);
-      const trim = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.8, 9.4), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 }));
-      trim.position.y = 6.2; school.add(trim);
-      const bell = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 4),
-        new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8, flatShading: true }));
-      bell.position.y = 7.6; school.add(bell);
-      const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.7 }));
-      door.position.set(0, 1.6, 4.6); school.add(door);
+      // AI schoolhouse (bell tower + clock); procedural brick school if offline
+      const buildFallback = () => {
+        const school = new THREE.Group();
+        const brick = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 9),
+          new THREE.MeshStandardMaterial({ color: 0xc25a4a, roughness: 0.85 }));
+        brick.position.y = 3; school.add(brick);
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.8, 9.4), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 }));
+        trim.position.y = 6.2; school.add(trim);
+        const bell = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 4),
+          new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8, flatShading: true }));
+        bell.position.y = 7.6; school.add(bell);
+        const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.7 }));
+        door.position.set(0, 1.6, 4.6); school.add(door);
+        return school;
+      };
+      glb(scene, addEdible, 'school', x, z - 6, 9, { h: 11, fallback: buildFallback });
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
-      pole.position.set(9.5, 3.5, 3); school.add(pole);
+      pole.position.set(x + 9.5, 3.5, z - 3); setShadow(pole); scene.add(pole);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({ color: 0x9350e8, side: THREE.DoubleSide }));
-      flag.position.set(10.6, 6.4, 3); school.add(flag);
-      decor(school, x, z - 6, 9);
+      flag.position.set(x + 10.6, 6.4, z - 3); scene.add(flag);
     }, 5);
 
   // ── ambient chatter throttle ────────────────────────────────────────────────
