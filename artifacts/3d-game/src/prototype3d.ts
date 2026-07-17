@@ -148,7 +148,7 @@ window.addEventListener('pointercancel', joyEnd);
 
 const keys = new Set<string>();
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-window.addEventListener('keydown', (e) => { if (MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; } });
+window.addEventListener('keydown', (e) => { if (started && MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; } });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
@@ -373,55 +373,73 @@ pwBtns[0].addEventListener('click', fireGulp);
 pwBtns[1].addEventListener('click', fireRocket);
 pwBtns[2].addEventListener('click', fireCollapse);
 
-// skin shop — earn coins in matches, spend them on skins (LoL soft-currency
+// ── game shell: start menu → (tutorial) → match → end → play again ──────────
+let started = false, startT = 0;
+const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
+function beginMatch() {
+  started = true; startT = tClock;
+  document.body.classList.remove('menu');
+  menuEl.style.display = 'none';
+  el('titlecard').classList.add('show');
+}
+el('btnPlay').addEventListener('click', () => {
+  menuEl.style.display = 'none';
+  if (!localStorage.getItem('voidTut')) tutEl.classList.add('show');
+  else beginMatch();
+});
+el('btnGotIt').addEventListener('click', () => {
+  localStorage.setItem('voidTut', '1');
+  tutEl.classList.remove('show');
+  beginMatch();
+});
+el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
+el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
+el('btnAgain').addEventListener('click', () => location.reload());
+// debug params (?at=, ?r=, ?len=, ?fast) skip the menu so the harness still works
+if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMatch(); }
+
+// skin SHOP — earn coins in matches, spend them on skins (LoL soft-currency
 // model, same as the 2D shop); owned + equipped persist across sessions
 {
   const PRICES: Record<string, number> = { classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800 };
-  const row = el('skins');
+  const grid = el('shopGrid');
   const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
-  const saved = localStorage.getItem('voidSkin') || 'classic';
-  const badges = new Map<string, HTMLElement>();
-  const refreshLocks = () => {
-    for (const [id, b] of badges) {
-      const lockEl = b.querySelector('.lk') as HTMLElement;
-      if (owned.has(id)) { b.style.opacity = '1'; lockEl.style.display = 'none'; }
-      else { b.style.opacity = '0.55'; lockEl.style.display = 'block'; lockEl.textContent = `${PRICES[id]}¢`; }
+  let equipped = localStorage.getItem('voidSkin') || 'classic';
+  if (!owned.has(equipped)) equipped = 'classic';
+  const cards = new Map<string, HTMLElement>();
+  const refresh = () => {
+    for (const s of SKINS) {
+      const card = cards.get(s.id)!;
+      const pr = card.querySelector('.pr') as HTMLElement;
+      card.classList.toggle('equip', equipped === s.id);
+      card.classList.toggle('locked', !owned.has(s.id));
+      pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
+      pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED' : `🪙 ${PRICES[s.id]}¢`;
     }
   };
   for (const s of SKINS) {
-    const btn = document.createElement('button');
-    btn.title = s.name;
-    btn.style.position = 'relative';
-    btn.style.background = `radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
-    const lk = document.createElement('span');
-    lk.className = 'lk';
-    lk.style.cssText = 'position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:900;color:#ffe08a;text-shadow:0 1px 2px rgba(0,0,0,0.6);white-space:nowrap;';
-    btn.appendChild(lk);
-    badges.set(s.id, btn);
-    btn.addEventListener('click', () => {
+    const card = document.createElement('div');
+    card.className = 'skCard';
+    card.innerHTML = `<div class="orb" style="background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})"></div><div class="nm">${s.name}</div><div class="pr"></div>`;
+    card.addEventListener('click', () => {
       if (!owned.has(s.id)) {
         if (coins >= PRICES[s.id]) {
           addCoins(-PRICES[s.id]);
           owned.add(s.id);
           localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
-          announce(`${s.name.toUpperCase()} UNLOCKED!`);
           audio.evolve();
-        } else {
-          announce(`NEED ${PRICES[s.id]}¢ — eat more!`);
-          audio.hit();
-          return;
-        }
+        } else { audio.hit(); return; }
       }
+      equipped = s.id;
       voidling.setSkin(s);
       localStorage.setItem('voidSkin', s.id);
-      row.querySelectorAll('button').forEach((b) => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      refreshLocks();
+      refresh();
     });
-    if (s.id === saved && owned.has(s.id)) { voidling.setSkin(s); btn.classList.add('sel'); }
-    row.appendChild(btn);
+    cards.set(s.id, card);
+    grid.appendChild(card);
+    if (s.id === equipped) voidling.setSkin(s);
   }
-  refreshLocks();
+  refresh();
 }
 
 function animate() {
@@ -429,7 +447,7 @@ function animate() {
   tClock += dt;
   island.update(dt, tClock);
 
-  if (!ended) {
+  if (started && !ended) {
     matchClock -= dt * clockSpeed;
     timerEl.textContent = fmtTime(matchClock);
     if (matchClock <= 30) timerEl.style.color = '#ff8a8a';
@@ -505,7 +523,7 @@ function animate() {
 
   // auto-fire powers when charged (demo AI; keys 1/2/3 also work)
   autoFireCd -= dt;
-  if (!ended && autoFireCd <= 0 && powerCd <= 0) {
+  if (started && !ended && autoFireCd <= 0 && powerCd <= 0) {
     autoFireCd = rand(2.5, 4.2);
     if (hunger >= COST.collapse) fireCollapse();
     else if (hunger >= COST.rocket && Math.random() < 0.5) fireRocket();
@@ -515,11 +533,12 @@ function animate() {
   const R = voidling.radius;
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
-  rivals.update(dt, tClock, voidState.x, voidState.z, R);
+  rivals.update(dt, started ? tClock - startT : 0, voidState.x, voidState.z, R);   // family joins on MATCH time
   bubbles.update();
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
+    if (!started) break;   // menu attract mode: the world idles, nothing is eaten
     if (e.eaten) {
       e.t += dt * 2.4;
       const p = e.mesh.position;
@@ -599,10 +618,12 @@ function animate() {
   comboT -= dt; if (comboT <= 0) combo = 0;
 
   // the city fights back — apply hits taken / units devoured
-  const defDelta = defense.update(dt, voidState.x, voidState.z, R);
-  if (defDelta < 0) audio.hit();
-  playerScore += defDelta;
-  if (playerScore < 0) playerScore = 0;
+  if (started) {
+    const defDelta = defense.update(dt, voidState.x, voidState.z, R);
+    if (defDelta < 0) audio.hit();
+    playerScore += defDelta;
+    if (playerScore < 0) playerScore = 0;
+  }
 
   // throttle DOM leaderboard updates (~5/s)
   // power-ready toast: celebrate the moment a power charges up
