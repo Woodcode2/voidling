@@ -28,6 +28,7 @@ export interface Void3D {
 }
 
 const RADIUS_SINK = 0.9;   // how much of the orb sits above ground (rest sinks)
+const texCache = new Map<string, THREE.Texture>();   // premium skin textures
 
 export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const group = new THREE.Group();
@@ -38,6 +39,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   group.add(bob);
 
   // ── body: fresnel "pit into space" ────────────────────────────────────────
+  const whiteTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  whiteTex.needsUpdate = true;
   const bodyMat = new THREE.ShaderMaterial({
     uniforms: {
       uAbyss: { value: VOID_COL.abyss },
@@ -46,21 +49,24 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uRim: { value: VOID_COL.bodyRim },
       uSwirl: { value: new THREE.Color(VOID.swirl) },
       uTime: { value: 0 },
+      uTex: { value: whiteTex },      // premium skin texture (AI-generated)
+      uTexAmt: { value: 0 },
     },
     vertexShader: `
-      varying vec3 vN; varying vec3 vView; varying vec3 vObj;
+      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
       void main(){
         vN = normalize(normalMatrix * normal);
         vec4 mv = modelViewMatrix * vec4(position,1.0);
         vView = normalize(-mv.xyz);
         vObj = position;
+        vUv = uv;
         gl_Position = projectionMatrix * mv;
       }
     `,
     fragmentShader: `
-      varying vec3 vN; varying vec3 vView; varying vec3 vObj;
+      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
       uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
-      uniform float uTime;
+      uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
       // cheap hash for star specks
       float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
       void main(){
@@ -73,6 +79,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         col = mix(col, uMid, smoothstep(0.30, 0.64, u));
         col = mix(col, uRim, smoothstep(0.62, 1.0, u));
         col *= 1.0;
+        // premium skin: wrap the AI texture around the orb (slow drift), keep
+        // the darker core + lit rim so it still reads as a VOID
+        if (uTexAmt > 0.01) {
+          vec3 tc = texture2D(uTex, vec2(vUv.x + uTime * 0.012, vUv.y)).rgb;
+          col = mix(col, tc * (0.34 + 0.9 * u), uTexAmt);
+        }
         // luminous event-horizon rim-light (gentle)
         col += uRim * pow(u, 3.8) * 0.3;
         // faint interior galaxy swirl (subtle, alive)
@@ -218,6 +230,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       (bloomSprite.material as THREE.SpriteMaterial).color.set(s.glow);
       (halo.material as THREE.MeshBasicMaterial).color.set(s.glow);
       ringMats.forEach((m) => m.color.set(s.glow));
+      if (s.tex) {
+        let t = texCache.get(s.tex);
+        if (!t) {
+          // only engage the texture once it actually loads (offline/dev keeps
+          // the colour-gradient look instead of a broken white orb)
+          t = new THREE.TextureLoader().load(s.tex,
+            () => { if (bodyMat.uniforms.uTex.value === t) bodyMat.uniforms.uTexAmt.value = 1; });
+          t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+          t.colorSpace = THREE.SRGBColorSpace;
+          texCache.set(s.tex, t);
+        }
+        bodyMat.uniforms.uTex.value = t;
+        bodyMat.uniforms.uTexAmt.value = (t.image ? 1 : 0);
+      } else {
+        bodyMat.uniforms.uTex.value = whiteTex;
+        bodyMat.uniforms.uTexAmt.value = 0;
+      }
     },
     chomp() { if (mouthT < 0.22) { mouthT = 0.22; mouthMax = 0.55; } },
     animGulp() { mouthT = 0.6; mouthMax = 1; },

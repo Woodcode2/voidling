@@ -71,7 +71,8 @@ export const PROPS = {
 };
 
 // ── skins: void identity colour sets (ported from the 2D shop) ───────────────
-export interface Skin { id: string; name: string; abyss: number; inner: number; mid: number; rim: number; glow: number; }
+// `tex` skins wrap an AI-generated texture around the orb (premium tier)
+export interface Skin { id: string; name: string; abyss: number; inner: number; mid: number; rim: number; glow: number; tex?: string; }
 export const SKINS: Skin[] = [
   { id: 'classic', name: 'Classic', abyss: 0x150726, inner: 0x371368, mid: 0x5c28a2, rim: 0x9350e8, glow: 0xa864ff },
   { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
@@ -79,6 +80,10 @@ export const SKINS: Skin[] = [
   { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a },
   { id: 'toxic', name: 'Toxic', abyss: 0x0e2412, inner: 0x1e5a2a, mid: 0x3a9a4a, rim: 0x7ed57a, glow: 0xa8ff8a },
   { id: 'ocean', name: 'Ocean', abyss: 0x0a1830, inner: 0x1a4070, mid: 0x2a6ab8, rim: 0x5ec8d8, glow: 0x8ae8ff },
+  { id: 'nebula', name: 'Nebula', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x8a5cf0, glow: 0xb98cff, tex: '/assets/hf/hf_20260717_005240_697d3ae9-f61f-4f42-8ece-3b2413779221.png' },
+  { id: 'magma', name: 'Magma', abyss: 0x1a0b06, inner: 0x51200a, mid: 0x8a3510, rim: 0xff7a2a, glow: 0xff9a4d, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
+  { id: 'candy', name: 'Candy', abyss: 0x40182a, inner: 0x8a3a5e, mid: 0xd86a9a, rim: 0xffb8d8, glow: 0xffc9e2, tex: '/assets/hf/hf_20260717_005243_b9bfd850-ba19-4200-8b94-c91e7f8554a2.png' },
+  { id: 'aurora', name: 'Aurora', abyss: 0x061a20, inner: 0x0e3a4a, mid: 0x1a6a78, rim: 0x5ee8d8, glow: 0x8affe8, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },
 ];
 
 // pre-built THREE.Color instances for the void shader (avoids per-frame alloc)

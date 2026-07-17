@@ -275,6 +275,14 @@ function endMatch() {
   const myRank = rows.findIndex((r) => r.me) + 1;
   const reward = Math.max(5, Math.round(playerScore / 40)) + (myRank === 1 ? 25 : 0);
   addCoins(reward);
+  // lifetime stats + weekly best
+  stats.matches++;
+  if (myRank === 1) stats.wins++;
+  stats.best = Math.max(stats.best, Math.round(playerScore));
+  stats.bestForm = Math.max(stats.bestForm, curStage);
+  saveStats();
+  const wk = weekKey();
+  localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
   endHd.textContent = myRank === 1 ? 'YOU WIN!' : `#${myRank} PLACE`;
   endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}¢ earned`;
   endList.innerHTML = rows.map((r, i) =>
@@ -299,6 +307,7 @@ function capture(e: Edible, giveHunger = true) {
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
   voidling.chomp();
+  stats.eaten++;
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   const coinVal = e.mesh.userData.coin as number | undefined;
@@ -395,13 +404,58 @@ el('btnGotIt').addEventListener('click', () => {
 el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 el('btnAgain').addEventListener('click', () => location.reload());
+document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
+
+// ── lifetime stats + trophies ────────────────────────────────────────────────
+interface Stats { matches: number; wins: number; best: number; bestForm: number; eaten: number; }
+const stats: Stats = JSON.parse(localStorage.getItem('voidStats') || '{"matches":0,"wins":0,"best":0,"bestForm":0,"eaten":0}');
+const saveStats = () => localStorage.setItem('voidStats', JSON.stringify(stats));
+const TROPHIES = [
+  { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', ok: () => stats.eaten >= 1 },
+  { ic: '😋', nm: 'MUNCHER', ds: 'reach MUNCHER form', ok: () => stats.bestForm >= 1 },
+  { ic: '🌀', nm: 'GOBBLER', ds: 'reach GOBBLER form', ok: () => stats.bestForm >= 2 },
+  { ic: '🕳️', nm: 'DEVOURER', ds: 'reach DEVOURER form', ok: () => stats.bestForm >= 3 },
+  { ic: '🪐', nm: 'WORLD ENDER', ds: 'reach the final form', ok: () => stats.bestForm >= 4 },
+  { ic: '👑', nm: 'Champion', ds: 'win a match', ok: () => stats.wins >= 1 },
+  { ic: '💯', nm: 'Century', ds: 'score 100 in one run', ok: () => stats.best >= 100 },
+  { ic: '🍽️', nm: 'Glutton', ds: 'eat 500 things (lifetime)', ok: () => stats.eaten >= 500 },
+];
+function renderTrophies() {
+  el('statsRow').innerHTML = [
+    { v: stats.matches, l: 'MATCHES' }, { v: stats.wins, l: 'WINS' },
+    { v: stats.best, l: 'BEST SCORE' }, { v: stats.eaten, l: 'THINGS EATEN' },
+  ].map((s) => `<div class="stat"><div class="v">${s.v}</div><div class="l">${s.l}</div></div>`).join('');
+  el('trophyGrid').innerHTML = TROPHIES.map((t) =>
+    `<div class="tr ${t.ok() ? 'got' : ''}"><div class="ic">${t.ic}</div><div class="nm">${t.nm}</div><div class="ds">${t.ds}</div></div>`).join('');
+}
+el('btnTrophies').addEventListener('click', () => { renderTrophies(); el('trophies').classList.add('show'); });
+
+// ── top voids of the week (local weekly board, seeded with the family) ──────
+function weekKey() { const d = new Date(); const on = new Date(d.getFullYear(), 0, 1); return `voidWeek-${d.getFullYear()}-${Math.ceil((((d.getTime() - on.getTime()) / 86400000) + on.getDay() + 1) / 7)}`; }
+function weeklyBoard(): { name: string; score: number; color: number; me?: boolean }[] {
+  const seeded = [
+    { name: 'CHOMPZILLA', score: 1240, color: 0x7ed57a }, { name: 'NOMLET', score: 1105, color: 0xff9a3a },
+    { name: 'GOBBLER', score: 980, color: 0xff6fb0 }, { name: 'GULPY', score: 845, color: 0x4d8ff0 },
+    { name: 'MUNCHER', score: 720, color: 0x2fd8c0 }, { name: 'B1G-B1TE', score: 610, color: 0xd85a5a },
+    { name: 'snackrat', score: 440, color: 0xb98cff },
+  ];
+  const mine = Number(localStorage.getItem(weekKey()) || 0);
+  const rows = [...seeded, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
+  return rows.sort((a, b) => b.score - a.score);
+}
+function renderTop() {
+  const medals = ['🥇', '🥈', '🥉'];
+  el('topList').innerHTML = weeklyBoard().map((r, i) =>
+    `<div class="tv ${r.me ? 'me' : ''}"><span class="rk">${medals[i] || i + 1}</span><span class="dot2" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm2">${r.name}</span><span class="sc2">${r.score}</span></div>`).join('');
+}
+el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').classList.add('show'); });
 // debug params (?at=, ?r=, ?len=, ?fast) skip the menu so the harness still works
 if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMatch(); }
 
 // skin SHOP — earn coins in matches, spend them on skins (LoL soft-currency
 // model, same as the 2D shop); owned + equipped persist across sessions
 {
-  const PRICES: Record<string, number> = { classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800 };
+  const PRICES: Record<string, number> = { classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800, nebula: 800, magma: 1000, candy: 1000, aurora: 1200 };
   const grid = el('shopGrid');
   const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
   let equipped = localStorage.getItem('voidSkin') || 'classic';
@@ -420,7 +474,10 @@ if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMat
   for (const s of SKINS) {
     const card = document.createElement('div');
     card.className = 'skCard';
-    card.innerHTML = `<div class="orb" style="background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})"></div><div class="nm">${s.name}</div><div class="pr"></div>`;
+    const orbBg = s.tex
+      ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
+      : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+    card.innerHTML = `<div class="orb" style="${orbBg}"></div><div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => {
       if (!owned.has(s.id)) {
         if (coins >= PRICES[s.id]) {

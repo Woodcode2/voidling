@@ -307,9 +307,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
+        // The 3D game IS the site now — served at the root URL.
         main: path.resolve(import.meta.dirname, 'index.html'),
-        // Standalone Three.js 3D prototype — separate page, does not touch the game.
-        prototype3d: path.resolve(import.meta.dirname, 'prototype3d.html'),
+        // The original 2D game lives on at /classic.html.
+        classic: path.resolve(import.meta.dirname, 'classic.html'),
       },
     },
   },
