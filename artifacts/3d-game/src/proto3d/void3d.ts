@@ -215,6 +215,57 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   maw.add(mawDark); maw.add(tongue);
   face.add(maw);
 
+  // ── legendary accessories: 3D flair that rides (and squashes with) the orb ──
+  const acc: Record<string, THREE.Group> = {};
+  {
+    const mk = (name: string, build: (g: THREE.Group) => void) => {
+      const g = new THREE.Group(); build(g); g.visible = false;
+      g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+      bob.add(g); acc[name] = g;
+    };
+    mk('unicorn', (g) => {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.72, 10),
+        new THREE.MeshStandardMaterial({ color: 0xffd9f0, roughness: 0.3, metalness: 0.4, emissive: 0xff9ad8, emissiveIntensity: 0.3 }));
+      horn.position.set(0, 1.2, 0.16); horn.rotation.x = 0.24; g.add(horn);
+      const earMat = new THREE.MeshStandardMaterial({ color: 0xf6e8ff, roughness: 0.6 });
+      for (const sx of [-0.44, 0.44]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 8), earMat);
+        ear.position.set(sx, 1.0, 0); ear.rotation.z = -sx * 0.9; g.add(ear);
+      }
+    });
+    mk('dino', (g) => {
+      const m = new THREE.MeshStandardMaterial({ color: 0x2e7a34, roughness: 0.6 });
+      for (let i = 0; i < 4; i++) {
+        const th = 0.16 + i * 0.36;
+        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.36, 6), m);
+        sp.position.set(0, Math.cos(th) * 1.0, -Math.sin(th) * 1.0);
+        sp.rotation.x = -th;
+        sp.scale.setScalar(1 - i * 0.13);
+        g.add(sp);
+      }
+    });
+    mk('wizard', (g) => {
+      const hm = new THREE.MeshStandardMaterial({ color: 0x2a2270, roughness: 0.7 });
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.88, 12), hm);
+      cone.position.set(0.06, 1.34, 0); cone.rotation.z = -0.14; g.add(cone);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.08, 16), hm);
+      brim.position.set(0.03, 0.94, 0); brim.rotation.z = -0.08; g.add(brim);
+      const star = new THREE.Mesh(new THREE.CircleGeometry(0.09, 5),
+        new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide }));
+      star.position.set(0.28, 1.28, 0.3); g.add(star);
+    });
+    mk('king', (g) => {
+      const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.25 });
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.44, 0.22, 12, 1, true), gold);
+      band.position.y = 1.0; g.add(band);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const pt = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 6), gold);
+        pt.position.set(Math.cos(a) * 0.4, 1.16, Math.sin(a) * 0.4); g.add(pt);
+      }
+    });
+  }
+
   // ── evolution ring — ONE crisp thin ribbon, normal blending so it reads as
   // a saturated violet band (additive washed to white over bright ground)
   const rings = new THREE.Group();
@@ -308,6 +359,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       (halo.material as THREE.MeshBasicMaterial).color.set(s.glow);
       ringMats.forEach((m) => m.color.set(s.glow));
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
+      for (const k in acc) acc[k].visible = false;
+      if (s.acc && acc[s.acc]) acc[s.acc].visible = true;
       skinHasTex = !!s.tex;
       if (s.tex) {
         let t = texCache.get(s.tex);

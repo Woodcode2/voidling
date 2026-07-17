@@ -919,7 +919,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         else { const t = makeTower(Math.random() < 0.5); place(t, x, z, 8); }
       }
       // storefront row: café / grocery with awnings near (not on) the sidewalk
-      placeGlb(Math.random() < 0.5 ? 'cafe' : 'shop', cx + rand(-half * 0.45, half * 0.45), cz + half * 0.68, 6, 8.5, undefined, Math.PI);
+      placeGlb(Math.random() < 0.5 ? 'cafe' : 'shop', cx + rand(-half * 0.45, half * 0.45), cz + half * 0.68, 6, 8.5, makeHouse, Math.PI);
       for (let t = 0; t < 3; t++) { const [x, z] = jt(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
     } else if (biome === 'plaza') {
       // civic square, properly staged: TOWN HALL at the north end, the mayor's
@@ -928,7 +928,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       placeGlb('townhall', cx, cz - half * 0.62, 10, 17, () => makeTower(true), 0);
       placeGlb('fountain', cx, cz, 4, 6.5);
       placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.64, 4, 5, undefined, 0.6);
-      placeGlb('icecream', cx + half * 0.64, cz + half * 0.6, 2.2, 3.6, undefined, -0.5);
+      placeGlb('icecream', cx + half * 0.64, cz + half * 0.6, 2.2, 3.6, () => new THREE.Group(), -0.5);
       for (let t = 0; t < 3; t++) {
         place(Math.random() < 0.5 ? makeTree() : makeBench(), cx + pick([-1, 1]) * rand(half * 0.35, half * 0.55), cz + rand(-half * 0.3, half * 0.5), 2.6);
       }
@@ -939,7 +939,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         if (Math.random() < 0.55) placeGlb('parktree', x, z, 3.4, rand(6.5, 8.5), makeTree);
         else place(makeTree(), x, z, 3.4);
       }
-      if (gy === 2) placeGlb('golfcart', cx + half * 0.6, cz - half * 0.4, 2.6, 3.2, undefined, rand(0, Math.PI));
+      if (gy === 2) placeGlb('golfcart', cx + half * 0.6, cz - half * 0.4, 2.6, 3.2, () => new THREE.Group(), rand(0, Math.PI));
       for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
       for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBench(), x, z, 2.4); }
     } else if (biome === 'forest') {
@@ -948,10 +948,10 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         if (Math.random() < 0.45) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
         else place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3);
       }
-      placeGlb('rocks', cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.5, half * 0.5), 2.4, 2.6, undefined, rand(0, Math.PI * 2));
+      placeGlb('rocks', cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.5, half * 0.5), 2.4, 2.6, () => new THREE.Group(), rand(0, Math.PI * 2));
       if (gx === 4 && gy === 0) {   // the campsite block gets the AI camp set
-        placeGlb('tent', cx - 10, cz + 4, 2.6, 4.2, undefined, rand(-0.4, 0.4));
-        placeGlb('campfire', cx, cz, 1.4, 1.7);
+        placeGlb('tent', cx - 10, cz + 4, 2.6, 4.2, () => new THREE.Group(), rand(-0.4, 0.4));
+        placeGlb('campfire', cx, cz, 1.4, 1.7, () => new THREE.Group());
       }
       for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
     } else if (biome === 'beach') {
@@ -961,8 +961,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         if (Math.random() < 0.7) placeGlb('palm', x, z, 2.6, rand(6.5, 8.5), makePalm, rand(0, Math.PI * 2));
         else place(makePalm(), x, z, 2.6);
       }
-      for (let t = 0; t < 2; t++) placeGlb('umbrella', cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.6, half * 0.6), 1.8, 3.2, undefined, rand(0, Math.PI * 2));
-      placeGlb('sandcastle', cx + rand(-half * 0.6, half * 0.6), cz + rand(-half * 0.4, half * 0.6), 1.2, 1.9, undefined, rand(0, Math.PI * 2));
+      for (let t = 0; t < 2; t++) placeGlb('umbrella', cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.6, half * 0.6), 1.8, 3.2, () => new THREE.Group(), rand(0, Math.PI * 2));
+      placeGlb('sandcastle', cx + rand(-half * 0.6, half * 0.6), cz + rand(-half * 0.4, half * 0.6), 1.2, 1.9, () => new THREE.Group(), rand(0, Math.PI * 2));
       if (gx === 1) placeGlb('lifeguard', cx, cz + half * 0.5, 3.4, 7.5, undefined, Math.PI);
       if (gx === 2) placeGlb('cabana', cx - half * 0.3, cz - half * 0.3, 3, 4.6, undefined, rand(-0.3, 0.3));
       if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 10, 19);

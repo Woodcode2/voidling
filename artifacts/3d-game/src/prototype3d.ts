@@ -61,6 +61,34 @@ sun.shadow.camera.top = SH; sun.shadow.camera.bottom = -SH;
 sun.shadow.bias = -0.0004;
 scene.add(sun); scene.add(sun.target);
 
+// ── adaptive quality: hold a smooth frame rate on ANY device ─────────────────
+// samples real fps and walks a quality ladder (pixel ratio → shadow res →
+// shadows off). Climbing back up is slow and rare so it never oscillates.
+const QUALITY = [
+  { pr: 1.6, shadows: true, shSize: 2048 },
+  { pr: 1.35, shadows: true, shSize: 1024 },
+  { pr: 1.15, shadows: true, shSize: 1024 },
+  { pr: 1.0, shadows: false, shSize: 512 },
+];
+let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
+function applyQuality() {
+  const q = QUALITY[qLevel];
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pr));
+  if (renderer.shadowMap.enabled !== q.shadows) {
+    renderer.shadowMap.enabled = q.shadows;
+    sun.castShadow = q.shadows;
+    scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
+    });
+  }
+  if (sun.shadow.mapSize.x !== q.shSize) {
+    sun.shadow.mapSize.set(q.shSize, q.shSize);
+    sun.shadow.map?.dispose();
+    (sun.shadow as { map: unknown }).map = null;
+  }
+}
+
 // ── edibles + island ─────────────────────────────────────────────────────────
 interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; }
 const edibles: Edible[] = [];
@@ -517,18 +545,24 @@ if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMat
       card.classList.toggle('equip', equipped === s.id);
       card.classList.toggle('locked', !owned.has(s.id));
       pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
-      pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED' : `🪙 ${PRICES[s.id]}¢`;
+      pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED'
+        : s.cash ? `💎 $${s.cash.toFixed(2)}` : `🪙 ${PRICES[s.id]}¢`;
     }
   };
-  for (const s of SKINS) {
+  // shop order tells the value story: colours → AI textures → LEGENDARY
+  const SORTED = [...SKINS].sort((a, b) =>
+    (a.cash ? 2 : a.tex ? 1 : 0) - (b.cash ? 2 : b.tex ? 1 : 0));
+  for (const s of SORTED) {
     const card = document.createElement('div');
-    card.className = 'skCard';
-    const orbBg = s.tex
-      ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
-      : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+    card.className = 'skCard' + (s.cash ? ' legend' : s.tex ? ' epic' : '');
+    const orbBg = s.art
+      ? `background: url('${s.art}') center / cover; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
+      : s.tex
+        ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
+        : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
     // every orb wears the FACE — it's the voidling you're buying, not a marble
-    card.innerHTML = `<div class="orb" style="${orbBg}">
-      <svg class="face" viewBox="0 0 100 100">
+    // (legendary card art already has the character drawn in)
+    const faceSvg = s.art ? '' : `<svg class="face" viewBox="0 0 100 100">
         <ellipse cx="34" cy="26" rx="14" ry="9" fill="#ffffff" opacity="0.28" transform="rotate(-24 34 26)"/>
         <circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/>
         <circle cx="40" cy="47" r="6.2" fill="#160a30"/><circle cx="64" cy="47" r="6.2" fill="#160a30"/>
@@ -536,9 +570,18 @@ if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMat
         <ellipse cx="25" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
         <ellipse cx="75" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
         <path d="M41 63 Q50 72 59 63" stroke="#1a0b33" stroke-width="3.6" fill="none" stroke-linecap="round"/>
-      </svg>
-    </div><div class="nm">${s.name}</div><div class="pr"></div>`;
+      </svg>`;
+    const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : s.tex ? '<div class="rib epicRib">EPIC</div>' : '';
+    card.innerHTML = `${ribbon}<div class="orb" style="${orbBg}">${faceSvg}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => {
+      if (s.cash && !owned.has(s.id)) {
+        // real-money tier: IAP ships with the App Store build
+        const pr = card.querySelector('.pr') as HTMLElement;
+        pr.textContent = '✨ APP STORE SOON';
+        audio.ready();
+        setTimeout(refresh, 1600);
+        return;
+      }
       if (!owned.has(s.id)) {
         if (coins >= PRICES[s.id]) {
           addCoins(-PRICES[s.id]);
@@ -773,6 +816,15 @@ function animate() {
     // form progress toward the next evolution
     const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
     formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
+  }
+
+  // adaptive quality: step down fast when fps dips, climb back slowly
+  qAccT += dt; qAccN++; qCd -= dt;
+  if (qCd <= 0 && qAccT > 0) {
+    const avg = qAccN / qAccT; qAccN = 0; qAccT = 0;
+    if (avg < 46 && qLevel < QUALITY.length - 1) { qLevel++; applyQuality(); qCd = 4; }
+    else if (avg > 57 && qLevel > 0) { qLevel--; applyQuality(); qCd = 10; }
+    else qCd = 3;
   }
 
   const shakeOff = fx.update(dt);

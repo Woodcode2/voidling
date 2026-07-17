@@ -65,7 +65,7 @@ export function createRivals(
   biomeAt: (x: number, z: number) => Biome | null,
   count = 4,
 ): Rivals {
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
@@ -79,7 +79,7 @@ export function createRivals(
     const ang = (i / count) * Math.PI * 2 + 0.6;
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
-      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false });
+      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0 });
   }
 
   const tmp = new THREE.Vector3();
@@ -112,11 +112,27 @@ export function createRivals(
           if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; }
           else { rv.tx = rand(-200, 200); rv.tz = rand(-200, 200); }
         }
-        // move toward target (stay on island)
+        // move toward target — with coast handling. The shoreline is concave,
+        // so a straight line to food can hit water: slide along the coast like
+        // the player does, and if genuinely stuck, give up on that snack and
+        // wander somewhere reachable instead of headbutting the beach forever.
         const mx = rv.tx - rv.x, mz = rv.tz - rv.z, md = Math.hypot(mx, mz) || 1;
         const spd = (fleeing ? 34 : 22) * dt;
         const nx = rv.x + (mx / md) * spd, nz = rv.z + (mz / md) * spd;
-        if (biomeAt(nx, nz)) { rv.x = nx; rv.z = nz; } else rv.retarget = 0;
+        let movedOk = false;
+        if (biomeAt(nx, nz)) { rv.x = nx; rv.z = nz; movedOk = true; }
+        else {
+          const sx = -(mz / md), sz = mx / md;   // slide directions along the wall
+          if (biomeAt(rv.x + sx * spd, rv.z + sz * spd)) { rv.x += sx * spd; rv.z += sz * spd; movedOk = true; }
+          else if (biomeAt(rv.x - sx * spd, rv.z - sz * spd)) { rv.x -= sx * spd; rv.z -= sz * spd; movedOk = true; }
+        }
+        rv.stall = movedOk ? Math.max(0, rv.stall - dt * 2) : rv.stall + dt;
+        if (rv.stall > 0.8) {   // pinned in a corner: abandon target, wander inland
+          rv.stall = 0; rv.retarget = rand(1.2, 2.2);
+          const inland = Math.atan2(-rv.z, -rv.x) + rand(-0.9, 0.9);
+          rv.tx = rv.x + Math.cos(inland) * rand(50, 110);
+          rv.tz = rv.z + Math.sin(inland) * rand(50, 110);
+        }
 
         // eat nearby food (size-gated) -> grow by area + score
         for (const e of edibles) {

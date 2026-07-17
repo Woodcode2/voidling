@@ -76,7 +76,8 @@ export interface GlbOpts {
   rotY?: number;
   h?: number;                              // override PACK height
   smallShadow?: boolean;                   // receive-only (tiny props)
-  fallback?: () => THREE.Object3D;         // procedural stand-in if load fails
+  fallback?: () => THREE.Object3D;         // procedural stand-in (offline + far LOD)
+  lodDist?: number;                        // distance where the stand-in takes over
   onReady?: (g: THREE.Group) => void;      // hook for animated placements
 }
 
@@ -97,15 +98,28 @@ export function glb(
   if (!spec) { placeFallback(); return; }
   template(spec.url).then((tpl) => {
     if (!tpl) { placeFallback(); return; }
-    const grp = new THREE.Group();
-    grp.add(tpl.clone(true));
-    grp.scale.setScalar(opts.h ?? spec.h);
-    grp.position.set(x, 0, z);
-    if (opts.rotY) grp.rotation.y = opts.rotY;
-    grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
-    scene.add(grp);
-    addEdible?.(grp, r);
-    opts.onReady?.(grp);
+    const hi = new THREE.Group();
+    hi.add(tpl.clone(true));
+    hi.scale.setScalar(opts.h ?? spec.h);
+    // PERF: generated meshes are dense (30-150k tris each, ~100 instances on
+    // the island). With a procedural fallback available, wrap in an LOD so the
+    // full-detail mesh only renders near the camera and the cheap procedural
+    // stand-in carries the distance — most of the island most of the time.
+    let obj: THREE.Object3D;
+    if (opts.fallback) {
+      const lod = new THREE.LOD();
+      lod.addLevel(hi, 0);
+      lod.addLevel(opts.fallback(), opts.lodDist ?? 110);
+      obj = lod;
+    } else {
+      obj = hi;
+    }
+    obj.position.set(x, 0, z);
+    if (opts.rotY) obj.rotation.y = opts.rotY;
+    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
+    scene.add(obj);
+    addEdible?.(obj, r);
+    opts.onReady?.(obj as THREE.Group);
   });
 }
 
@@ -162,8 +176,14 @@ export function vehicleGlb(container: THREE.Object3D, name: string, len: number)
     wrap.rotation.y = (size.z > size.x ? Math.PI / 2 : 0) + Math.PI;
     wrap.scale.setScalar(len / Math.max(Math.max(size.x, size.z), 1e-4));
     wrap.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    container.clear();
-    container.add(wrap);
+    // LOD: the existing procedural vehicle becomes the far level, the dense AI
+    // mesh only renders near the camera
+    const lo = new THREE.Group();
+    for (const c of [...container.children]) lo.add(c);
+    const lod = new THREE.LOD();
+    lod.addLevel(wrap, 0);
+    lod.addLevel(lo, 95);
+    container.add(lod);
   });
 }
 

@@ -72,8 +72,17 @@ export const PROPS = {
 };
 
 // ── skins: void identity colour sets (ported from the 2D shop) ───────────────
-// `tex` skins wrap an AI-generated texture around the orb (premium tier)
-export interface Skin { id: string; name: string; abyss: number; inner: number; mid: number; rim: number; glow: number; tex?: string; }
+// rarity tiers: colour skins (common, coins) → `tex` AI-texture skins (epic,
+// coins) → `cash` LEGENDARY character skins (AI card art + 3D accessory `acc`,
+// real-money tier — IAP lands with the App Store build)
+export interface Skin {
+  id: string; name: string;
+  abyss: number; inner: number; mid: number; rim: number; glow: number;
+  tex?: string;                                    // epic: AI texture wrap
+  art?: string;                                    // legendary: AI card icon
+  acc?: 'unicorn' | 'dino' | 'wizard' | 'king';    // legendary: 3D accessory
+  cash?: number;                                   // legendary: USD price
+}
 export const SKINS: Skin[] = [
   { id: 'classic', name: 'Classic', abyss: 0x1c0930, inner: 0x431677, mid: 0x7030c0, rim: 0xa562f2, glow: 0xb875ff },
   { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
@@ -91,6 +100,15 @@ export const SKINS: Skin[] = [
   { id: 'cyber', name: 'Cyber', abyss: 0x060d20, inner: 0x102a50, mid: 0x1a4a8a, rim: 0x4de8ff, glow: 0x7bffe8, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
   { id: 'blossom', name: 'Blossom', abyss: 0x38182a, inner: 0x7a3a55, mid: 0xc0688a, rim: 0xffb8cc, glow: 0xffd2e2, tex: '/assets/hf/hf_20260717_131508_1f6ff369-a72a-4d3a-9a37-2261344cde24.png' },
   { id: 'royal', name: 'Royal', abyss: 0x200a38, inner: 0x48207a, mid: 0x7a3ab8, rim: 0xd8a848, glow: 0xffd25a, tex: '/assets/hf/hf_20260717_131509_a28d269a-2130-4f39-9b72-b46f5c3ebbeb.png' },
+  // ✨ LEGENDARY — character skins with 3D accessories, cash tier
+  { id: 'univoid', name: 'Uni-Void', abyss: 0x2a2038, inner: 0x8a7a9a, mid: 0xd8cce8, rim: 0xfff0fa, glow: 0xffc9e8, acc: 'unicorn', cash: 4.99,
+    art: '/assets/hf/hf_20260717_221342_1fed1f77-b19c-416e-9e0d-e84a02a57845.png' },
+  { id: 'rexling', name: 'Rexling', abyss: 0x0e2412, inner: 0x2a6a30, mid: 0x4a9a4a, rim: 0x8ae87a, glow: 0xb8ff8a, acc: 'dino', cash: 4.99,
+    art: '/assets/hf/hf_20260717_221343_789d8089-50d6-4b45-9a6a-12337dc63535.png' },
+  { id: 'archmage', name: 'Archmage', abyss: 0x0c0a2e, inner: 0x241a6a, mid: 0x3a2ab8, rim: 0x7a6af8, glow: 0xa89aff, acc: 'wizard', cash: 6.99,
+    art: '/assets/hf/hf_20260717_221344_d766bd2d-ba32-4cf3-8ed0-fef26f6116b8.png' },
+  { id: 'kingvoid', name: 'King Void', abyss: 0x2a1c06, inner: 0x6a4a10, mid: 0xb8861a, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', cash: 9.99,
+    art: '/assets/hf/hf_20260717_221346_49c57d8f-d589-4a59-9c11-b5d96dbd9bc7.png' },
 ];
 
 // pre-built THREE.Color instances for the void shader (avoids per-frame alloc)

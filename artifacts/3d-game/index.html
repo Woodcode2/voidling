@@ -178,8 +178,9 @@
 
       /* ── shop ── */
       #shop { position: fixed; inset: 0; z-index: 11; display: none; flex-direction: column; align-items: center;
-        background: rgba(13,8,33,0.94); backdrop-filter: blur(8px); padding-top: 26px; }
+        background: rgba(13,8,33,0.94); backdrop-filter: blur(8px); padding-top: 26px; overflow-y: auto; }
       #shop.show { display: flex; }
+      #shopGrid { padding-bottom: 40px; }
       .shopHead { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; }
       #btnBack { font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #c9a6ff;
         background: rgba(122,79,224,0.3); border: 2px solid rgba(201,166,255,0.35); border-radius: 12px;
@@ -196,7 +197,21 @@
       .skCard .nm { font-size: 15px; font-weight: 900; color: #fff; letter-spacing: 1px; }
       .skCard .pr { font-size: 12px; font-weight: 900; margin-top: 5px; color: #ffe08a; }
       .skCard .pr.owned { color: #7ef2a0; }
-      .skCard.locked { opacity: 0.75; }
+      .skCard.locked { opacity: 0.85; }
+      /* rarity tiers — epic purple, LEGENDARY gold with a moving sheen */
+      .skCard { position: relative; overflow: hidden; }
+      .skCard.epic { border-color: rgba(154,106,232,0.55); box-shadow: 0 0 14px rgba(154,106,232,0.14); }
+      .skCard.legend { border-color: rgba(255,210,90,0.7); box-shadow: 0 0 22px rgba(255,210,90,0.22); }
+      .skCard.legend::after { content: ''; position: absolute; top: -60%; left: -70%; width: 55%; height: 220%;
+        transform: rotate(24deg); pointer-events: none;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
+        animation: sheen 3.4s linear infinite; }
+      @keyframes sheen { 0% { left: -70%; } 100% { left: 140%; } }
+      .skCard .rib { position: absolute; top: 12px; right: -30px; transform: rotate(38deg); z-index: 2;
+        background: linear-gradient(90deg, #ffb82a, #ffd25a); color: #3a2a06;
+        font-size: 9px; font-weight: 900; letter-spacing: 1px; padding: 3px 32px; }
+      .skCard .rib.epicRib { background: linear-gradient(90deg, #7a4fe0, #a87bff); color: #fff; }
+      .skCard.legend .pr { color: #ffd25a; }
 
       /* ── first-run tutorial ── */
       #tut { position: fixed; inset: 0; z-index: 12; display: none; align-items: center; justify-content: center;
