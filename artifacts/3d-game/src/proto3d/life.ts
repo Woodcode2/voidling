@@ -10,7 +10,7 @@ import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
   railPointAt, type Biome, type AddEdible,
 } from './island';
-import { glb } from './assets3d';
+import { glb, vehicleGlb } from './assets3d';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -75,6 +75,8 @@ function makeCar(): THREE.Group {
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.54, 8), hubMat);
     hub.rotation.x = Math.PI / 2; hub.position.set(sx, 0.8, sz); g.add(hub);
   }
+  // most of the fleet upgrades itself to the AI cars once the GLBs stream in
+  if (Math.random() < 0.65) vehicleGlb(g, Math.random() < 0.72 ? 'car_sedan' : 'car_taxi', 6.2);
   return g;
 }
 interface Limbs { la: THREE.Object3D; ra: THREE.Object3D; ll: THREE.Object3D; rl: THREE.Object3D; phase: number; }
@@ -445,36 +447,38 @@ export function createLife(
     ['re-elect me, and the void LEAVES!', 'my fellow citizens…', 'VOIDLING is UNDER CONTROL', 'read my lips: no new voids', 'four more years! four more years!', 'boooo! …sorry, continue', 'and ANOTHER thing about potholes—'],
     ['WOMEN, CHILDREN, MAYORS FIRST!', 'IT HAS MY VOTE— I MEAN—', 'SECURITY! SECUR—', 'the rally is CANCELLED!!'],
     (x, z) => {
-      // AI speech stage (platform + lectern + bunting); simple box stage offline
-      glb(scene, addEdible, 'stage', x, z + 8, 5, {
-        h: 3.2,
+      // The rally happens on TOWN HALL's steps (north end of the square), the
+      // stage facing the fountain — nobody is standing in the water anymore.
+      const SZ = z - 12;   // stage line, south of the town hall facade
+      glb(scene, addEdible, 'stage', x, SZ, 5, {
+        h: 3.2, rotY: Math.PI,
         fallback: () => {
           const grp = new THREE.Group();
           const stage = new THREE.Mesh(new THREE.BoxGeometry(10, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0xf0e6d2, roughness: 0.8 }));
           stage.position.y = 0.8; grp.add(stage);
           const lectern = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xe8ddc4, roughness: 0.75 }));
-          lectern.position.set(0, 2.7, -1.6); grp.add(lectern);
+          lectern.position.set(0, 2.7, 1.6); grp.add(lectern);
           return grp;
         },
       });
-      const banner = new THREE.Mesh(new THREE.BoxGeometry(11, 2.6, 0.4), new THREE.MeshStandardMaterial({ color: 0x8a5cff, roughness: 0.6 }));
-      banner.position.y = 6.4; decor(banner, x, z + 10.5, 3);
       // the mayor: on the stage, one arm working the crowd
       const mayor = makePerson('downtown', 0x2a2a44);
-      mayor.position.set(x, 1.6, z + 8); setShadow(mayor); scene.add(mayor); addEdible(mayor, 2.4);
+      mayor.position.set(x, 1.6, SZ); mayor.rotation.y = Math.PI;   // faces the fountain
+      setShadow(mayor); scene.add(mayor); addEdible(mayor, 2.4);
       movers.push({
         mesh: mayor,
         update(dt, t) {
           if (eaten(mayor)) return;
+          mayor.rotation.y = Math.PI;   // keep facing the crowd
           const L = mayor.userData.limbs as Limbs;
           L.ra.rotation.z = -Math.PI * 0.8 + Math.sin(t * 2.6) * 0.3;   // raised, waving
           L.la.rotation.x = Math.sin(t * 1.4) * 0.25;
         },
       });
-      // the crowd: a loose arc facing the stage, milling in place
+      // the crowd: a loose arc between the stage and the fountain
       for (let i = 0; i < 7; i++) {
         const a = Math.PI * (0.15 + 0.7 * (i / 6));
-        const cx2 = x + Math.cos(a) * rand(9, 15), cz2 = z + 8 - Math.sin(a) * rand(8, 13);
+        const cx2 = x + Math.cos(a) * rand(8, 14), cz2 = SZ + 5 + Math.sin(a) * rand(4, 9);
         addWanderer(makePerson('plaza'), cx2, cz2, 3.5, rand(0.6, 1.2), 20, 2.4, 'plaza',
           ['the SPEECH!! RUN!!', 'democracy is DOOMED!!', 'save the ballot box!!']);
       }

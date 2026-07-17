@@ -43,6 +43,8 @@ export const PACK: Record<string, { url: string; h: number }> = {
   parktree: { url: `${DIR}/e755b0f3-fe13-4d0b-ada5-c219faa7866f.glb`, h: 7 },
   rocks: { url: `${DIR}/02ad2c55-a0e3-4d14-8932-537b42ea5c85.glb`, h: 2.6 },
   stage: { url: `${DIR}/e4f7a55c-a7f3-4408-a6bb-2d5362ecba94.glb`, h: 3.2 },
+  car_sedan: { url: `${DIR}/b3d07fca-ccdd-4f41-8dbd-3954958e22c3.glb`, h: 2.6 },
+  heli: { url: `${DIR}/eed92755-71ef-4e6f-a201-128b0c56975a.glb`, h: 5.5 },
 };
 
 const loader = new GLTFLoader();
@@ -135,6 +137,28 @@ export function buildGallery(scene: THREE.Scene) {
       g.position.set(gx, Y, gz);
       scene.add(g);
     });
+  });
+}
+
+// vehicles: swap a mover's procedural mesh for the AI one once it loads. The
+// game's vehicle convention is nose = +X, so the mesh's longest horizontal
+// axis is rotated onto X and scaled to `len` world units. If the GLB never
+// loads, the procedural vehicle simply stays — no empty roads.
+export function vehicleGlb(container: THREE.Object3D, name: string, len: number) {
+  const spec = PACK[name];
+  if (!spec) return;
+  template(spec.url).then((tpl) => {
+    if (!tpl) return;
+    const inst = tpl.clone(true);
+    const box = new THREE.Box3().setFromObject(inst);
+    const size = box.getSize(new THREE.Vector3());
+    const wrap = new THREE.Group();
+    wrap.add(inst);
+    if (size.z > size.x) wrap.rotation.y = Math.PI / 2;   // longest axis → +X
+    wrap.scale.setScalar(len / Math.max(Math.max(size.x, size.z), 1e-4));
+    wrap.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    container.clear();
+    container.add(wrap);
   });
 }
 

@@ -43,6 +43,25 @@ const PLAN: Biome[][] = [
 ];
 const BLOCK_ORIGIN = 925, STRIDE = 1710, BLOCK_SIZE = 1600;
 const blockCenter = (g: number) => BLOCK_ORIGIN + STRIDE * g + BLOCK_SIZE / 2;
+
+// deterministic edge-facing house lots — shared by the ground bake (driveways)
+// and populate() (the houses themselves), so every house faces its road and
+// every driveway actually reaches a house. World coordinates.
+export interface HouseLot { x: number; y: number; rot: number; fx: number; fy: number; }  // f = front dir
+export function houseLots(gx: number, gy: number): HouseLot[] {
+  const cx = blockCenter(gx), cy = blockCenter(gy);
+  const E = BLOCK_SIZE / 2 - 190;          // lot line inset from the block edge
+  const lots: HouseLot[] = [];
+  for (const k of [-1, 0, 1]) {
+    lots.push({ x: cx + k * 470, y: cy - E, rot: Math.PI, fx: 0, fy: -1 });   // north row → north road
+    lots.push({ x: cx + k * 470, y: cy + E, rot: 0, fx: 0, fy: 1 });          // south row → south road
+  }
+  for (const k of [-0.62, 0.62]) {
+    lots.push({ x: cx - E, y: cy + k * 470, rot: -Math.PI / 2, fx: -1, fy: 0 });  // west edge
+    lots.push({ x: cx + E, y: cy + k * 470, rot: Math.PI / 2, fx: 1, fy: 0 });    // east edge
+  }
+  return lots;
+}
 const ROAD_CENTERS = [2580, 4290, 6000, 7710, 9420];
 
 const RIVER: [number, number][] = [
@@ -236,6 +255,97 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         g.fillRect(jx + along, jy + s * off + (s > 0 ? 0 : -crossW), step * 0.62, crossW);
       }
     }
+  }
+
+  // suburbs read DESIGNED: mow-stripes on every lawn block, then a concrete
+  // driveway from each house lot across the sidewalk to its road
+  for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    const b = PLAN[gy][gx];
+    if (b !== 'cozy' && b !== 'fancy') continue;
+    const cxB = blockCenter(gx), cyB = blockCenter(gy);
+    // lawn mow-stripes (very subtle alternating bands)
+    g.save();
+    g.beginPath();
+    g.rect(pxW(cxB - BLOCK_SIZE / 2), pyW(cyB - BLOCK_SIZE / 2), pxW(cxB + BLOCK_SIZE / 2) - pxW(cxB - BLOCK_SIZE / 2), pyW(cyB + BLOCK_SIZE / 2) - pyW(cyB - BLOCK_SIZE / 2));
+    g.clip();
+    g.fillStyle = 'rgba(255,255,255,0.045)';
+    for (let s = 0; s < 8; s += 2) {
+      const y0 = pyW(cyB - BLOCK_SIZE / 2 + (s / 8) * BLOCK_SIZE);
+      const y1 = pyW(cyB - BLOCK_SIZE / 2 + ((s + 1) / 8) * BLOCK_SIZE);
+      g.fillRect(pxW(cxB - BLOCK_SIZE / 2), y0, pxW(cxB + BLOCK_SIZE / 2) - pxW(cxB - BLOCK_SIZE / 2), y1 - y0);
+    }
+    g.restore();
+    // driveways: from the house's front edge, over the sidewalk, to the asphalt
+    const dw = pxW(110) - pxW(0);            // driveway width
+    g.fillStyle = '#d9d5df';
+    for (const lot of houseLots(gx, gy)) {
+      const frontClear = 130;                // house footprint half-depth
+      if (lot.fy !== 0) {
+        const y0 = lot.fy < 0 ? cyB - BLOCK_SIZE / 2 : lot.y + frontClear;
+        const y1 = lot.fy < 0 ? lot.y - frontClear : cyB + BLOCK_SIZE / 2;
+        g.fillRect(pxW(lot.x + 90) - dw / 2, pyW(y0), dw, pyW(y1) - pyW(y0));
+      } else {
+        const x0 = lot.fx < 0 ? cxB - BLOCK_SIZE / 2 : lot.x + frontClear;
+        const x1 = lot.fx < 0 ? lot.x - frontClear : cxB + BLOCK_SIZE / 2;
+        g.fillRect(pxW(x0), pyW(lot.y + 90) - dw / 2, pxW(x1) - pxW(x0), dw);
+      }
+    }
+  }
+
+  // GOLF COURSE — park block (4,2): fairway sweep, putting green, bunkers, tee
+  {
+    const gcx = blockCenter(4), gcy = blockCenter(2);
+    g.save();
+    g.beginPath();
+    g.rect(pxW(gcx - BLOCK_SIZE / 2), pyW(gcy - BLOCK_SIZE / 2), pxW(gcx + BLOCK_SIZE / 2) - pxW(gcx - BLOCK_SIZE / 2), pyW(gcy + BLOCK_SIZE / 2) - pyW(gcy - BLOCK_SIZE / 2));
+    g.clip();
+    // fairway: a light sweeping band across the block
+    g.strokeStyle = '#a8de7e'; g.lineWidth = pxW(420) - pxW(0); g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(pxW(gcx - 620), pyW(gcy + 480));
+    g.quadraticCurveTo(pxW(gcx - 100), pyW(gcy - 120), pxW(gcx + 560), pyW(gcy - 380));
+    g.stroke();
+    // putting green + hole ring (matches the flag prop in ./life)
+    g.fillStyle = '#b8ec8a'; g.beginPath(); g.arc(pxW(gcx + 560), pyW(gcy - 380), pxW(200) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#8cc961'; g.beginPath(); g.arc(pxW(gcx + 560), pyW(gcy - 380), pxW(24) - pxW(0), 0, Math.PI * 2); g.fill();
+    // tee box
+    g.fillStyle = '#b8ec8a'; g.fillRect(pxW(gcx - 700), pyW(gcy + 420), pxW(160) - pxW(0), pyW(120) - pyW(0));
+    // bunkers
+    g.fillStyle = hex(WORLD.sand);
+    g.beginPath(); g.ellipse(pxW(gcx + 250), pyW(gcy - 90), pxW(120) - pxW(0), pyW(80) - pyW(0), 0.5, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(pxW(gcx + 420), pyW(gcy - 520), pxW(90) - pxW(0), pyW(65) - pyW(0), -0.4, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+
+  // AIRPORT — a real little airfield: runway with threshold bars + centerline,
+  // taxiway loop to an apron (control tower + hangar + plane are 3D props)
+  {
+    const acx = blockCenter(5), acy = blockCenter(4);
+    g.save();
+    g.beginPath();
+    g.rect(pxW(acx - BLOCK_SIZE / 2), pyW(acy - BLOCK_SIZE / 2), pxW(acx + BLOCK_SIZE / 2) - pxW(acx - BLOCK_SIZE / 2), pyW(acy + BLOCK_SIZE / 2) - pyW(acy - BLOCK_SIZE / 2));
+    g.clip();
+    // runway diagonal-ish across the block
+    g.strokeStyle = '#5b6070'; g.lineWidth = pxW(240) - pxW(0); g.lineCap = 'butt';
+    g.beginPath(); g.moveTo(pxW(acx - 700), pyW(acy + 520)); g.lineTo(pxW(acx + 700), pyW(acy - 520)); g.stroke();
+    // centerline dashes
+    g.strokeStyle = 'rgba(240,244,252,0.9)'; g.lineWidth = pxW(24) - pxW(0);
+    g.setLineDash([pxW(120) - pxW(0), pxW(90) - pxW(0)]);
+    g.beginPath(); g.moveTo(pxW(acx - 640), pyW(acy + 476)); g.lineTo(pxW(acx + 640), pyW(acy - 476)); g.stroke();
+    g.setLineDash([]);
+    // threshold bars at both ends
+    const ang = Math.atan2(-(pyW(acy - 520) - pyW(acy + 520)), pxW(acx + 700) - pxW(acx - 700));
+    for (const e of [-1, 1]) {
+      const ex = pxW(acx + e * 620), ey = pyW(acy - e * 460);
+      g.save(); g.translate(ex, ey); g.rotate(-ang);
+      g.fillStyle = 'rgba(240,244,252,0.9)';
+      for (let k = -3; k <= 3; k++) if (k) g.fillRect(-(pxW(50) - pxW(0)), k * (pxW(28) - pxW(0)), pxW(100) - pxW(0), pxW(14) - pxW(0));
+      g.restore();
+    }
+    // apron pad (parking) in the block's south corner
+    g.fillStyle = '#c3c7d4';
+    g.fillRect(pxW(acx - 180), pyW(acy + 280), pxW(520) - pxW(0), pyW(380) - pyW(0));
+    g.restore();
   }
 
   // train tracks (ballast + twin rails + ties) around downtown
@@ -768,54 +878,60 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     };
 
     if (biome === 'cozy' || biome === 'fancy') {
-      // neat rows of houses facing the street — the AI house set carries the
-      // neighborhood (4 distinct architectures), procedural gables fill in
-      const rows = 4, cols = 3, sc = biome === 'fancy' ? 1.3 : 1;
-      const facing = pick([0, Math.PI]);   // whole block faces one way = designed
+      // edge-facing lots: every house faces its own road, with a driveway baked
+      // into the ground running from the house to the asphalt (see bake above)
+      const sc = biome === 'fancy' ? 1.3 : 1;
       const HOUSES = biome === 'fancy'
         ? ['house_modern', 'house_blue', 'house_craftsman', 'house_pink']
         : ['house_pink', 'house_craftsman', 'house_blue', 'house_modern'];
-      for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
-        const hx = cx - half + (j + 0.5) * (half * 2 / cols) + rand(-1.5, 1.5);
-        const hz = cz - half + (i + 0.5) * (half * 2 / rows) + rand(-1.5, 1.5);
-        if (Math.random() < 0.72) {
-          placeGlb(HOUSES[(i * cols + j) % 4], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
-            (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, facing);
+      houseLots(gx, gy).forEach((lot, li) => {
+        const hx = w(lot.x), hz = w(lot.y);
+        const fx3 = lot.fx, fz3 = lot.fy;             // toward the street
+        const sx3 = -fz3, sz3 = fx3;                  // along the street
+        if (Math.random() < 0.75) {
+          placeGlb(HOUSES[li % 4], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
+            (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, lot.rot);
         } else {
-          const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = facing;
+          const house = makeHouse(); house.scale.setScalar(sc); house.rotation.y = lot.rot;
           place(house, hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc);
         }
-        if (Math.random() < 0.7) place(makeBush(), hx + rand(3, 5) * sc, hz + rand(-3, 3), 1.6);
-        // front-yard flower beds flanking the door — every yard has snackable detail
-        if (Math.random() < 0.8) place(makeFlowers(), hx + rand(1.6, 2.6) * sc, hz + 4.2 * sc, 0.7);
-        if (Math.random() < 0.5) place(makeFlowers(), hx - rand(1.6, 2.6) * sc, hz + 4.2 * sc, 0.7);
-        if (Math.random() < 0.5) place(makeMailbox(), hx - rand(3, 5) * sc, hz + 4, 1.2);
-      }
+        // front-yard dressing on the STREET side; mailbox by the driveway
+        const dvx = lot.fy !== 0 ? 4.5 : 0, dvz = lot.fx !== 0 ? 4.5 : 0;
+        if (Math.random() < 0.8) place(makeFlowers(), hx + fx3 * 4.4 + sx3 * 2, hz + fz3 * 4.4 + sz3 * 2, 0.7);
+        if (Math.random() < 0.5) place(makeFlowers(), hx + fx3 * 4.4 - sx3 * 2, hz + fz3 * 4.4 - sz3 * 2, 0.7);
+        if (Math.random() < 0.7) place(makeMailbox(), hx + fx3 * 7.6 + dvx + sx3, hz + fz3 * 7.6 + dvz + sz3, 1.2);
+        if (Math.random() < 0.7) place(makeBush(), hx - fx3 * 4.2 + sx3 * rand(3, 5), hz - fz3 * 4.2 + sz3 * rand(3, 5), 1.6);
+      });
+      // the block interior is a small green common
       for (let t = 0; t < 4; t++) {
-        const [x, z] = jitter();
-        if (Math.random() < 0.5) placeGlb('parktree', x, z, 3.2, rand(6, 8), makeTree);
-        else place(makeTree(), x, z, 3.2);
+        const ix = cx + rand(-half * 0.42, half * 0.42), iz = cz + rand(-half * 0.42, half * 0.42);
+        if (Math.random() < 0.5) placeGlb('parktree', ix, iz, 3.2, rand(6, 8), makeTree);
+        else place(makeTree(), ix, iz, 3.2);
       }
     } else if (biome === 'downtown') {
-      // street canyon: AI towers anchor each block, procedural facades between
+      // street canyon: AI towers anchor each block, procedural facades between —
+      // all inset so no facade ever hangs over the sidewalk
+      const jt = () => [cx + rand(-half * 0.58, half * 0.58), cz + rand(-half * 0.58, half * 0.58)] as const;
       const n = 4 + Math.floor(Math.random() * 2);
       for (let i = 0; i < n; i++) {
-        const [x, z] = jitter();
+        const [x, z] = jt();
         if (i < 2) placeGlb(i === 0 ? 'tower_glass' : 'tower_deco', x, z, 8, rand(20, 27), () => makeTower(true));
         else { const t = makeTower(Math.random() < 0.5); place(t, x, z, 8); }
       }
-      // storefront row: café / grocery with awnings at the block edge
-      placeGlb(Math.random() < 0.5 ? 'cafe' : 'shop', cx + rand(-half * 0.5, half * 0.5), cz + half * 0.82, 6, 8.5, undefined, Math.PI);
-      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
+      // storefront row: café / grocery with awnings near (not on) the sidewalk
+      placeGlb(Math.random() < 0.5 ? 'cafe' : 'shop', cx + rand(-half * 0.45, half * 0.45), cz + half * 0.68, 6, 8.5, undefined, Math.PI);
+      for (let t = 0; t < 3; t++) { const [x, z] = jt(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
     } else if (biome === 'plaza') {
-      // civic heart: TOWN HALL presiding over the square (the mayor rally in
-      // ./life plays out on its steps), AI fountain, food truck + ice-cream cart
-      placeGlb('townhall', cx, cz - half * 0.45, 10, 17, () => makeTower(true), 0);
-      placeGlb('fountain', cx, cz + half * 0.35, 4, 6.5);
-      placeGlb('foodtruck', cx - half * 0.55, cz + half * 0.6, 4, 5, undefined, 0.6);
-      placeGlb('icecream', cx + half * 0.55, cz + half * 0.55, 2.2, 3.6, undefined, -0.5);
-      for (let i = 0; i < 2; i++) { const t = makeTower(true); const [x, z] = jitter(); place(t, Math.abs(x - cx) < 20 ? x + 30 : x, z, 8); }
-      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBench(), x, z, 2.6); }
+      // civic square, properly staged: TOWN HALL at the north end, the mayor's
+      // stage on its steps (./life), the AI fountain ON the paved circle at the
+      // centre, food truck + ice-cream cart at the south corners
+      placeGlb('townhall', cx, cz - half * 0.62, 10, 17, () => makeTower(true), 0);
+      placeGlb('fountain', cx, cz, 4, 6.5);
+      placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.64, 4, 5, undefined, 0.6);
+      placeGlb('icecream', cx + half * 0.64, cz + half * 0.6, 2.2, 3.6, undefined, -0.5);
+      for (let t = 0; t < 3; t++) {
+        place(Math.random() < 0.5 ? makeTree() : makeBench(), cx + pick([-1, 1]) * rand(half * 0.35, half * 0.55), cz + rand(-half * 0.3, half * 0.5), 2.6);
+      }
     } else if (biome === 'park') {
       placeGlb('gazebo', cx, cz, 5, 8.5);
       for (let t = 0; t < 9; t++) {
@@ -855,16 +971,63 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       placeGlb('zooarch', cx - half * 0.7, cz, 6, 9, undefined, Math.PI / 2);
       for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBush(), x, z, 3); }
     } else if (biome === 'airport') {
-      const hangar = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 20, 12, 1, false, 0, Math.PI),
+      // a real airfield: hangar + control tower + windsock + parked plane on
+      // the apron (the runway/taxiway markings are baked into the ground)
+      const hangar = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 18, 12, 1, false, 0, Math.PI),
         new THREE.MeshStandardMaterial({ color: 0xcfd6e0, roughness: 0.7, flatShading: true }));
-      hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 2; hangar.position.set(cx, 5, cz);
-      setShadow(hangar); scene.add(hangar); addEdible(hangar, 10);
+      hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 2; hangar.position.set(cx + 12, 4.5, cz + 27);
+      setShadow(hangar); scene.add(hangar); addEdible(hangar, 9);
+      { // control tower with a glass cab
+        const tw = new THREE.Group();
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 12, 10),
+          new THREE.MeshStandardMaterial({ color: 0xe8eaf2, roughness: 0.7 }));
+        col.position.y = 6; tw.add(col);
+        const cab = new THREE.Mesh(new THREE.CylinderGeometry(3, 2.4, 2.6, 10),
+          new THREE.MeshStandardMaterial({ color: 0x9fd8ee, roughness: 0.2, metalness: 0.3 }));
+        cab.position.y = 13.2; tw.add(cab);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.2, 10),
+          new THREE.MeshStandardMaterial({ color: 0xd85a5a, roughness: 0.6 }));
+        roof.position.y = 15; tw.add(roof);
+        place(tw, cx - 16, cz + 22, 6);
+      }
+      { // cute parked plane, nose along the taxi direction
+        const pl = new THREE.Group();
+        const white = new THREE.MeshStandardMaterial({ color: 0xf4f6fa, roughness: 0.4, metalness: 0.1 });
+        const teal = new THREE.MeshStandardMaterial({ color: 0x5ec8d8, roughness: 0.5 });
+        const fus = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 6, 6, 10), white);
+        fus.rotation.z = Math.PI / 2; fus.position.y = 2; pl.add(fus);
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0xbfeaff, roughness: 0.15 }));
+        cockpit.position.set(2.6, 2.6, 0); cockpit.scale.set(1.2, 0.8, 0.9); pl.add(cockpit);
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.3, 11), teal);
+        wing.position.set(0.4, 2.1, 0); pl.add(wing);
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 0.28), teal);
+        tail.position.set(-4.2, 3.4, 0); pl.add(tail);
+        const hstab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.24, 4.2), teal);
+        hstab.position.set(-4.2, 2.6, 0); pl.add(hstab);
+        for (const sz of [-1.4, 1.4]) {
+          const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x20242c }));
+          gear.rotation.x = Math.PI / 2; gear.position.set(0.8, 0.55, sz); pl.add(gear);
+        }
+        pl.rotation.y = -Math.PI / 4;    // parked facing the runway heading
+        place(pl, cx + 2, cz + 18, 5);
+      }
+      { // windsock
+        const ws = new THREE.Group();
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
+        pole.position.y = 3.5; ws.add(pole);
+        const sock = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.6, 8), new THREE.MeshStandardMaterial({ color: 0xff8a3a, roughness: 0.8 }));
+        sock.rotation.z = Math.PI / 2; sock.position.set(1.4, 6.6, 0); ws.add(sock);
+        place(ws, cx - 24, cz - 6, 1.4);
+      }
     } else if (biome === 'military') {
       for (let t = 0; t < 3; t++) {
         const bunker = new THREE.Mesh(new THREE.BoxGeometry(rand(6, 9), rand(3, 5), rand(6, 9)),
           new THREE.MeshStandardMaterial({ color: 0x6b7050, roughness: 0.95, flatShading: true }));
         const [x, z] = jitter(); place(bunker, x, z, 4);
       }
+      // a parked AI helicopter on the base pad
+      placeGlb('heli', cx + 10, cz - 10, 5, 5.5, undefined, rand(0, Math.PI * 2));
+      placeGlb('tank', cx - 12, cz + 8, 4, 3.4, undefined, rand(0, Math.PI * 2));
     }
 
     // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every

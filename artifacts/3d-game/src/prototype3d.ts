@@ -258,6 +258,45 @@ function questProgress(r: number) {
 }
 renderQuests();
 
+// ── MAPLE ISLE NEWS — the island reacts to how much of it still exists ──────
+const NEWS_CALM = [
+  'BREAKING: mayor announces run for a THIRD term',
+  'local cat stuck in tree. again.',
+  'bake sale saturday at town hall!!',
+  'school spelling bee ends in a 14-way tie',
+  'beach boardwalk ferris wheel voted #1 wheel',
+  'duck parade delays traffic downtown',
+  'zoo flamingo count: still eleven',
+  'weather: sunny with a chance of nothing weird',
+];
+const NEWS_WORRIED = [
+  "CITY HALL: void sightings are 'fake news'",
+  "scientists: it's PROBABLY fine",
+  'mayor: DO NOT feed the void',
+  'insurance companies quietly leave the island',
+  'hardware store sells out of locks, tape, courage',
+  'poll: 6 in 10 residents "would rather not be eaten"',
+  'lifeguards now guarding the land too',
+];
+const NEWS_PANIC = [
+  'EVACUATION? mayor says "relax, it\'s fine"',
+  'THE ARMY HAS A PLAN (the plan is honking)',
+  'is this the END? experts say maybe',
+  'void officially upgraded to a weather event',
+  'LAST ONE OFF THE ISLAND TURNS OFF THE SUN',
+  'town hall meeting cancelled. also town hall.',
+];
+const newsEl = el('news');
+let devouredPct = 0, newsCd = 7, lastNews = '';
+function showNews() {
+  const pool = devouredPct < 8 ? NEWS_CALM : devouredPct < 30 ? NEWS_WORRIED : NEWS_PANIC;
+  let h = pool[Math.floor(Math.random() * pool.length)];
+  if (h === lastNews) h = pool[(pool.indexOf(h) + 1) % pool.length];
+  lastNews = h;
+  newsEl.innerHTML = `<i>📰 ISLE NEWS</i>${h}`;
+  newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
+}
+
 function refreshHud() {
   const R = voidling.radius;
   // leaderboard: player + rivals, ranked by score
@@ -268,7 +307,8 @@ function refreshHud() {
     `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   let consumed = 0;
   for (const e of edibles) if (e.eaten || !e.mesh.visible) consumed += e.radius;
-  devEl.textContent = `${Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100))}% DEVOURED`;
+  devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
+  devEl.textContent = `${devouredPct}% DEVOURED`;
   formEl.textContent = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m`;
 }
 
@@ -460,7 +500,11 @@ if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMat
 // skin SHOP — earn coins in matches, spend them on skins (LoL soft-currency
 // model, same as the 2D shop); owned + equipped persist across sessions
 {
-  const PRICES: Record<string, number> = { classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800, nebula: 800, magma: 1000, candy: 1000, aurora: 1200 };
+  const PRICES: Record<string, number> = {
+    classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800,
+    nebula: 800, magma: 1000, candy: 1000, aurora: 1200,
+    honey: 1200, glacier: 1200, sherbet: 1500, cyber: 1500, blossom: 1500, royal: 2000,
+  };
   const grid = el('shopGrid');
   const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
   let equipped = localStorage.getItem('voidSkin') || 'classic';
@@ -482,7 +526,18 @@ if (location.search.length > 1) { localStorage.setItem('voidTut', '1'); beginMat
     const orbBg = s.tex
       ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
       : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
-    card.innerHTML = `<div class="orb" style="${orbBg}"></div><div class="nm">${s.name}</div><div class="pr"></div>`;
+    // every orb wears the FACE — it's the voidling you're buying, not a marble
+    card.innerHTML = `<div class="orb" style="${orbBg}">
+      <svg class="face" viewBox="0 0 100 100">
+        <ellipse cx="34" cy="26" rx="14" ry="9" fill="#ffffff" opacity="0.28" transform="rotate(-24 34 26)"/>
+        <circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/>
+        <circle cx="40" cy="47" r="6.2" fill="#160a30"/><circle cx="64" cy="47" r="6.2" fill="#160a30"/>
+        <circle cx="38" cy="44" r="2.4" fill="#fff"/><circle cx="62" cy="44" r="2.4" fill="#fff"/>
+        <ellipse cx="25" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
+        <ellipse cx="75" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
+        <path d="M41 63 Q50 72 59 63" stroke="#1a0b33" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div><div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => {
       if (!owned.has(s.id)) {
         if (coins >= PRICES[s.id]) {
@@ -700,6 +755,12 @@ function animate() {
   if (hunger >= COST.gulp && prevHunger < COST.gulp) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'GULP READY!', true); audio.ready(); }
   if (hunger >= COST.collapse && prevHunger < COST.collapse) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'COLLAPSE READY!!', true); audio.ready(); }
   prevHunger = hunger;
+
+  // island news: a headline every ~20s, tone tracks the devoured meter
+  if (started && !ended) {
+    newsCd -= dt;
+    if (newsCd <= 0) { newsCd = 17 + Math.random() * 7; showNews(); }
+  }
 
   hudCd -= dt;
   if (hudCd <= 0) {

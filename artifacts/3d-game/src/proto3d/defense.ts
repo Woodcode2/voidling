@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import type { Biome } from './island';
 import type { Fx } from './fx';
+import { vehicleGlb } from './assets3d';
 
 export interface Defense {
   setPhase(n: number): string | null;   // returns a banner if a new wave spawned
@@ -43,6 +44,8 @@ function makeUnit(kind: Kind): THREE.Group {
     const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 8), wheelMat);
     wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.9, sz); g.add(wh);
   }
+  // tanks upgrade to the AI mesh (no more "literally blocks")
+  if (kind === 'tank') vehicleGlb(g, 'tank', 7);
   return g;
 }
 

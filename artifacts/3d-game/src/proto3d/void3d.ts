@@ -336,21 +336,21 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
       // evolution rings + glow intensify with the form (rings are a child of the
       // group, which is positioned below; keep them local + centred on the orb)
-      const targetRing = stage >= 2 ? Math.min(0.85, 0.45 + (stage - 2) * 0.2) : 0;
-      ringFade += (targetRing - ringFade) * Math.min(1, dt * 3);
-      if (ringBurst > 0) ringBurst = Math.max(0, ringBurst - dt * 1.4);
-      // on evolve the whole ring system flares out and eases back in
-      const flare = 1 + Math.sin(Math.min(1, 1 - ringBurst) * Math.PI) * 0.45;
+      // the ring is EVOLVE-MOMENT ONLY — a void doesn't wear jewelry. On each
+      // evolution the ribbon + star sparkles flare out, spin, and fade away.
+      ringFade = 0;
+      if (ringBurst > 0) ringBurst = Math.max(0, ringBurst - dt * 0.55);
+      const flare = 1 + Math.sin(Math.min(1, 1 - ringBurst) * Math.PI) * 0.6;
       rings.scale.setScalar(radius * flare);
-      rings.rotation.y += dt * 0.4;
-      orbit.rotation.z += dt * 0.55;               // stars process around the band
-      ringMats[0].opacity = Math.min(1, ringFade + ringBurst * 0.9);
-      ringMats[1].opacity = Math.min(1, ringFade * 0.4 + ringBurst * 0.5);
-      const starVis = Math.min(1, ringFade * 1.1 + ringBurst);
+      rings.rotation.y += dt * 0.5;
+      orbit.rotation.z += dt * (0.6 + ringBurst * 1.6);
+      const fadeEnv = Math.sin(Math.min(1, 1 - ringBurst) * Math.PI);   // in-out
+      ringMats[0].opacity = ringBurst > 0 ? Math.min(1, fadeEnv * 1.2) : 0;
+      ringMats[1].opacity = ringBurst > 0 ? fadeEnv * 0.5 : 0;
       for (let i = 0; i < orbStars.length; i++) {
         const tw = 0.55 + 0.45 * Math.sin(s.t * 4 + i * 2.1);
-        (orbStars[i].material as THREE.SpriteMaterial).opacity = starVis * tw;
-        orbStars[i].scale.setScalar(0.16 * (1 + ringBurst * 0.8) * (0.8 + tw * 0.4));
+        (orbStars[i].material as THREE.SpriteMaterial).opacity = ringBurst > 0 ? fadeEnv * tw : 0;
+        orbStars[i].scale.setScalar(0.16 * (1 + fadeEnv * 0.9) * (0.8 + tw * 0.4));
       }
 
       const speed = Math.hypot(s.vx, s.vz);

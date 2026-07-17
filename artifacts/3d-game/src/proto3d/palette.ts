@@ -9,13 +9,14 @@ const c = (hex: number) => new THREE.Color(hex);
 // The 2D orb is a pit into space: darkest dead-centre, lit violet at the rim.
 // Tuned toward a rich VIOLET purple (the 2D look) rather than blue-indigo.
 export const VOID = {
-  abyss: 0x150726,      // gradient centre — deep space core
-  bodyInner: 0x371368,  // inner
-  bodyMid: 0x5c28a2,    // mid-body — saturated grape purple
-  bodyRim: 0x9350e8,    // lit vivid-violet rim (crisp, high contrast vs core)
-  rimLight: 0x9350e8,   // luminous event-horizon rim
-  glow: 0xa864ff,       // saturated amethyst aura
-  swirl: 0xc9a6ff,      // faint interior swirl arcs
+  // warmed toward true PURPLE (more red, less indigo) — matches the key art
+  abyss: 0x1c0930,      // gradient centre — deep space core
+  bodyInner: 0x431677,  // inner
+  bodyMid: 0x7030c0,    // mid-body — vivid warm purple
+  bodyRim: 0xa562f2,    // lit warm-violet rim (crisp, high contrast vs core)
+  rimLight: 0xa562f2,   // luminous event-horizon rim
+  glow: 0xb875ff,       // warm amethyst aura
+  swirl: 0xd4b2ff,      // faint interior swirl arcs
   star: 0xffffff,       // interior star specks
   pupil: 0x160a30,
   sclera: 0xffffff,
@@ -74,7 +75,7 @@ export const PROPS = {
 // `tex` skins wrap an AI-generated texture around the orb (premium tier)
 export interface Skin { id: string; name: string; abyss: number; inner: number; mid: number; rim: number; glow: number; tex?: string; }
 export const SKINS: Skin[] = [
-  { id: 'classic', name: 'Classic', abyss: 0x150726, inner: 0x371368, mid: 0x5c28a2, rim: 0x9350e8, glow: 0xa864ff },
+  { id: 'classic', name: 'Classic', abyss: 0x1c0930, inner: 0x431677, mid: 0x7030c0, rim: 0xa562f2, glow: 0xb875ff },
   { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
   { id: 'wizard', name: 'Wizard', abyss: 0x1c1038, inner: 0x45308a, mid: 0x6a4ab8, rim: 0xa888e8, glow: 0xc9a6ff },
   { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a },
@@ -84,6 +85,12 @@ export const SKINS: Skin[] = [
   { id: 'magma', name: 'Magma', abyss: 0x1a0b06, inner: 0x51200a, mid: 0x8a3510, rim: 0xff7a2a, glow: 0xff9a4d, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
   { id: 'candy', name: 'Candy', abyss: 0x40182a, inner: 0x8a3a5e, mid: 0xd86a9a, rim: 0xffb8d8, glow: 0xffc9e2, tex: '/assets/hf/hf_20260717_005243_b9bfd850-ba19-4200-8b94-c91e7f8554a2.png' },
   { id: 'aurora', name: 'Aurora', abyss: 0x061a20, inner: 0x0e3a4a, mid: 0x1a6a78, rim: 0x5ee8d8, glow: 0x8affe8, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },
+  { id: 'honey', name: 'Honey', abyss: 0x2a1606, inner: 0x6a4210, mid: 0xb87f1a, rim: 0xffd25a, glow: 0xffe08a, tex: '/assets/hf/hf_20260717_131501_87fecffb-5637-49ad-87f5-106990a4f100.png' },
+  { id: 'glacier', name: 'Glacier', abyss: 0x0a1c28, inner: 0x1a4a5e, mid: 0x3a8aa8, rim: 0x9fe8ff, glow: 0xc9f2ff, tex: '/assets/hf/hf_20260717_131503_47baaeac-a806-4062-9114-5b37f8279aeb.png' },
+  { id: 'sherbet', name: 'Sherbet', abyss: 0x3a2030, inner: 0x8a4a62, mid: 0xd88aa0, rim: 0xffd2b8, glow: 0xffe2d2, tex: '/assets/hf/hf_20260717_131504_d3840e82-4c2b-4b68-8857-811dfcf85084.png' },
+  { id: 'cyber', name: 'Cyber', abyss: 0x060d20, inner: 0x102a50, mid: 0x1a4a8a, rim: 0x4de8ff, glow: 0x7bffe8, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
+  { id: 'blossom', name: 'Blossom', abyss: 0x38182a, inner: 0x7a3a55, mid: 0xc0688a, rim: 0xffb8cc, glow: 0xffd2e2, tex: '/assets/hf/hf_20260717_131508_1f6ff369-a72a-4d3a-9a37-2261344cde24.png' },
+  { id: 'royal', name: 'Royal', abyss: 0x200a38, inner: 0x48207a, mid: 0x7a3ab8, rim: 0xd8a848, glow: 0xffd25a, tex: '/assets/hf/hf_20260717_131509_a28d269a-2130-4f39-9b72-b46f5c3ebbeb.png' },
 ];
 
 // pre-built THREE.Color instances for the void shader (avoids per-frame alloc)
