@@ -17,11 +17,11 @@ const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
 const COLORS = [0x2fd8c0, 0xff6fb0, 0xff9a3a, 0x7ed57a, 0x4d8ff0];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 // must match the player model (2D game constants through the 0.05 map scale)
-const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.0525;
+const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.030;
 const growR = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.6 * eR * eR * rookie * diminish));
 };
 
 function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {

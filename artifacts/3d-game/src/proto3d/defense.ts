@@ -85,10 +85,10 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
     setPhase(n) {
       if (n <= phase) return null;
       phase = n;
-      if (n === 1) { spawn('police', 3, 6, 30, 3); return '🚔 POLICE RESPONSE'; }
-      if (n === 2) { spawn('jeep', 3, 10, 34, 4); return '🪖 ARMY MOBILIZED'; }
-      if (n === 3) { spawn('tank', 3, 18, 22, 8); return '🚀 TANKS ROLL IN'; }
-      if (n >= 4) { spawn('heli', 3, 24, 40, 6); return '🚁 AIR SUPPORT INBOUND'; }
+      // the city lets a little void be — trouble starts at GOBBLER
+      if (n === 2) { spawn('police', 2, 6, 28, 2); return '🚔 POLICE RESPONSE'; }
+      if (n === 3) { spawn('jeep', 2, 10, 32, 3); spawn('tank', 2, 18, 20, 6); return '🪖 THE ARMY ROLLS IN'; }
+      if (n >= 4) { spawn('heli', 3, 24, 40, 5); return '🚁 AIR SUPPORT INBOUND'; }
       return null;
     },
     update(dt, vx, vz, vR) {
@@ -120,7 +120,8 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
         p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
         const hd = Math.hypot(p.x - vx, p.z - vz);
         if (hd < vR + 1 && Math.abs(p.y - vR * 0.5) < vR) {
-          p.life = 0; p.y = -999; delta -= p.dmg; fx.shake(2.2); fx.flash('rgba(255,60,60,0.35)', 0.35);
+          // a bonk, not a jump-scare: tiny shake, no full-screen red flash
+          p.life = 0; p.y = -999; delta -= p.dmg; fx.shake(0.9);
         }
         if (p.life <= 0) p.y = -999;
         dummy.position.set(p.x, p.y, p.z); dummy.updateMatrix(); pellets.setMatrixAt(i, dummy.matrix);

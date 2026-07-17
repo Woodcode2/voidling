@@ -322,6 +322,20 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Same-origin path for Higgsfield-generated art in dev (mirrors the
+    // vercel.json rewrite in production) — the splash/skins/sky load locally.
+    proxy: {
+      '/assets/hf3d': {
+        target: 'https://d3u0tzju9qaucj.cloudfront.net',
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/assets\/hf3d/, ''),
+      },
+      '/assets/hf': {
+        target: 'https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS',
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/assets\/hf/, ''),
+      },
+    },
   },
   preview: {
     port,

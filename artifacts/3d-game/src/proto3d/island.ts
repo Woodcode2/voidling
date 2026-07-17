@@ -5,6 +5,7 @@
 // towers, trees, palms, landmarks) are placed on top per the FIXED_PLAN biome
 // grid. Moving life is added separately (./life).
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military';
@@ -117,6 +118,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // ── space backdrop ─────────────────────────────────────────────────────────
   scene.background = new THREE.Color(WORLD.space);
   scene.fog = new THREE.Fog(WORLD.space, 420, 1500);   // wide, so big-void pull-back views stay clear
+  // Higgsfield-painted nebula sky — swaps in when it loads (colour fallback stays)
+  new THREE.TextureLoader().load('/assets/hf/hf_20260717_021720_8d012b94-ca33-49d6-9db7-237b607fe3da.png', (skyTex) => {
+    skyTex.colorSpace = THREE.SRGBColorSpace;
+    scene.background = skyTex;
+  });
 
   // starfield
   {
@@ -429,6 +435,24 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // ── PROPS: populate each block per biome ───────────────────────────────────
   populate(scene, addEdible);
+
+  // Higgsfield image→3D hero landmark: the MAPLE ISLE ferris wheel, at the
+  // plaza's edge. Loads async; the game runs fine before/without it.
+  new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb', (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const s = 16 / Math.max(size.y, 0.001);            // ~16u tall landmark
+    model.scale.setScalar(s);
+    box.setFromObject(model);
+    model.position.y -= box.min.y;                      // feet on the ground
+    const grp = new THREE.Group();
+    grp.add(model);
+    grp.position.set(w(6855) + 14, 0, w(5145) + 16);   // plaza corner
+    grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(grp);
+    addEdible(grp, 9);
+  }, undefined, () => { /* offline dev: no landmark, no error */ });
 
   // ── biome lookup ───────────────────────────────────────────────────────────
   function biomeAt(x3: number, z3: number): Biome | null {

@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/assets/hf/:file", "destination": "https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/:file" }
+    { "source": "/assets/hf/:file", "destination": "https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/:file" },
+    { "source": "/assets/hf3d/:dir/:file", "destination": "https://d3u0tzju9qaucj.cloudfront.net/:dir/:file" }
   ]
 }

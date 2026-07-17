@@ -35,7 +35,7 @@ const scene = new THREE.Scene();
   scene.environmentIntensity = 0.25;   // specular sheen only — keep colours saturated
 }
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1900);
-let camDist = 28;
+let camDist = 50;
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
 
@@ -190,13 +190,13 @@ const PLAYER_COLOR = 0x9a5cff;
 const START_R = 0.9;
 export const EAT_RATIO = 1.11;         // eat if target.radius <= R*1.11  (voidR >= targetR*0.9)
 const R_CAP = 12;                       // 2D MAX_RADIUS 240 · 0.05
-const LAW_RATE = 0.0525;                // 2D 1.05/s · 0.05 — cap ≈ 11.9 at the 3:30 whistle
+// Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHER ~23s,
+// GOBBLER ~53s, DEVOURER ~100s, WORLD ENDER ~153s on a strong run.
+const LAW_RATE = 0.030;
 const growRadius = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;   // 2D: <34 → 1.6, <50 → 1.3
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
-  // hot coefficient so constant eating keeps you pressed against the growth
-  // law's cap — that ride-the-cap feel IS the 2D pacing
-  return Math.min(R_CAP, Math.sqrt(R * R + 0.85 * eR * eR * rookie * diminish));
+  return Math.min(R_CAP, Math.sqrt(R * R + 0.6 * eR * eR * rookie * diminish));
 };
 
 const _q = new URLSearchParams(location.search);
@@ -213,6 +213,7 @@ const clock = new THREE.Clock();
 const prev = { x: voidState.x, z: voidState.z };
 const tmpV = new THREE.Vector3();
 const fwdTmp = new THREE.Vector3(), rightTmp = new THREE.Vector3();
+let velX = 0, velZ = 0;   // smoothed velocity — kills the boxy/jerky feel
 
 function fmtTime(s: number) { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
@@ -537,41 +538,42 @@ function animate() {
     dashT -= dt;
     const nx = voidState.x + dashDir.x * 130 * dt, nz = voidState.z + dashDir.z * 130 * dt;
     if (island.biomeAt(nx, nz)) { voidState.x = nx; voidState.z = nz; } else dashT = 0;
-  } else if (driving) {
-    // camera-relative drive: screen-up = away from camera, screen-right = camera right
-    camera.getWorldDirection(fwdTmp); fwdTmp.y = 0; fwdTmp.normalize();
-    rightTmp.set(1, 0, 0).applyQuaternion(camera.quaternion); rightTmp.y = 0; rightTmp.normalize();
-    const speed = 15 * (1 + curStage * 0.08) * (joy.active ? joy.mag : 1);
-    const wdx = rightTmp.x * inX - fwdTmp.x * inY;
-    const wdz = rightTmp.z * inX - fwdTmp.z * inY;
-    const nx = voidState.x + wdx * speed * dt, nz = voidState.z + wdz * speed * dt;
-    if (island.biomeAt(nx, voidState.z)) voidState.x = nx;   // slide along the coast
-    if (island.biomeAt(voidState.x, nz)) voidState.z = nz;
-  } else if (tClock - lastInput > 4) {
-    // attract mode: after 4s idle the void hunts snacks on its own (also drives
-    // the headless demo/verification harness)
-    wanderT -= dt;
-    if (wanderT <= 0) {
-      wanderT = rand(0.9, 1.8);
-      let best: Edible | null = null, bd = Infinity;
-      const Rh = voidling.radius;
-      for (const e of edibles) {
-        if (e.eaten || !e.mesh.visible || e.radius > Rh * EAT_RATIO) continue;
-        const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
-        const d = dx * dx + dz * dz;
-        if (d < bd) { bd = d; best = e; }
+  } else {
+    // target velocity from input (or attract-mode autopilot), then SMOOTH it —
+    // acceleration-based motion so steering feels buttery, never boxy
+    let tvx = 0, tvz = 0;
+    if (driving) {
+      camera.getWorldDirection(fwdTmp); fwdTmp.y = 0; fwdTmp.normalize();
+      rightTmp.set(1, 0, 0).applyQuaternion(camera.quaternion); rightTmp.y = 0; rightTmp.normalize();
+      const speed = 16 * (1 + curStage * 0.08) * (joy.active ? Math.pow(joy.mag, 1.4) : 1);
+      tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
+      tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
+    } else if (tClock - lastInput > 4) {
+      // attract mode: the void hunts snacks on its own (drives the demo harness)
+      wanderT -= dt;
+      if (wanderT <= 0) {
+        wanderT = rand(0.9, 1.8);
+        let best: Edible | null = null, bd = Infinity;
+        const Rh = voidling.radius;
+        for (const e of edibles) {
+          if (e.eaten || !e.mesh.visible || e.radius > Rh * EAT_RATIO) continue;
+          const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+          const d = dx * dx + dz * dz;
+          if (d < bd) { bd = d; best = e; }
+        }
+        if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
+        else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
       }
-      if (best) wander.set(best.mesh.position.x, 0, best.mesh.position.z);
-      else wander.set(rand(-WANDER_R, WANDER_R), 0, rand(-WANDER_R, WANDER_R));
+      const ddx = wander.x - voidState.x, ddz = wander.z - voidState.z;
+      const dm = Math.hypot(ddx, ddz);
+      if (dm > 1.5) { const spd = 14 * Math.min(1, dm / 10); tvx = (ddx / dm) * spd; tvz = (ddz / dm) * spd; }
     }
-    const ddx = wander.x - voidState.x, ddz = wander.z - voidState.z;
-    const dm = Math.hypot(ddx, ddz);
-    if (dm > 1.5) {
-      const spd = 13 * Math.min(1, dm / 10);
-      const nx = voidState.x + (ddx / dm) * spd * dt, nz = voidState.z + (ddz / dm) * spd * dt;
-      if (island.biomeAt(nx, voidState.z)) voidState.x = nx;
-      if (island.biomeAt(voidState.x, nz)) voidState.z = nz;
-    }
+    const k = Math.min(1, dt * (driving ? 7.5 : 4.5));
+    velX += (tvx - velX) * k;
+    velZ += (tvz - velZ) * k;
+    const nx = voidState.x + velX * dt, nz = voidState.z + velZ * dt;
+    if (island.biomeAt(nx, voidState.z)) voidState.x = nx; else velX = 0;   // slide along the coast
+    if (island.biomeAt(voidState.x, nz)) voidState.z = nz; else velZ = 0;
   }
   const vx = (voidState.x - prev.x) / Math.max(1e-4, dt);
   const vz = (voidState.z - prev.z) / Math.max(1e-4, dt);
@@ -643,12 +645,16 @@ function animate() {
   }
   pa.needsUpdate = true;
 
-  // camera
+  // camera — the 2D game's zoom-band model: within a form the void keeps a
+  // constant (small!) on-screen size; each evolution zooms the world out a
+  // step, so growth READS. Start: void ≈ 6% of screen height, hole.io style.
   if (TOPDOWN) {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
-    camDist += ((20 + R * 6.0) - camDist) * dt * 1.6;
+    const zoomMult = curStage >= 4 ? 13.5 : curStage >= 3 ? 18 : curStage >= 2 ? 24 : 32;   // 2D bands
+    const targetDist = Math.max(30, (R * zoomMult) / (2 * Math.tan((camera.fov * Math.PI) / 360)));
+    camDist += (targetDist - camDist) * Math.min(1, dt * 1.4);
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, Math.min(1, dt * 3));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);

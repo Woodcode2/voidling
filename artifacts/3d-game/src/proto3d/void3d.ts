@@ -213,13 +213,36 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let mouthT = 0, mouthMax = 0;    // open-mouth envelope
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
+  let evolveT = 0;                 // evolution celebration pop
+  let skinHasTex = false;
 
   const api: Void3D = {
     group,
     get radius() { return radius; },
     set radius(r: number) { radius = r; },
     setRadius(r: number) { radius = r; },
-    setStage(n: number) { stage = n; },
+    setStage(n: number) {
+      if (n > stage) {
+        evolveT = 0.7;   // celebratory pop on every evolution
+        // each form gets a stronger presence: pupils grow (2D rule), rim/glow
+        // intensify; WORLD ENDER becomes a living galaxy (auto nebula wrap)
+        const pupilScale = n >= 1 ? 1.15 : 1;
+        for (const e of eyes) e.pupilGrp.scale.setScalar(pupilScale);
+        if (n >= 4 && !skinHasTex) {
+          const nebSrc = '/assets/hf/hf_20260717_005240_697d3ae9-f61f-4f42-8ece-3b2413779221.png';
+          let t = texCache.get(nebSrc);
+          if (!t) {
+            t = new THREE.TextureLoader().load(nebSrc, () => { if (stage >= 4 && !skinHasTex) bodyMat.uniforms.uTexAmt.value = 0.55; });
+            t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+            t.colorSpace = THREE.SRGBColorSpace;
+            texCache.set(nebSrc, t);
+          }
+          bodyMat.uniforms.uTex.value = t;
+          if (t.image) bodyMat.uniforms.uTexAmt.value = 0.55;
+        }
+      }
+      stage = n;
+    },
     setSkin(s: Skin) {
       bodyMat.uniforms.uAbyss.value.set(s.abyss);
       bodyMat.uniforms.uInner.value.set(s.inner);
@@ -230,6 +253,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       (bloomSprite.material as THREE.SpriteMaterial).color.set(s.glow);
       (halo.material as THREE.MeshBasicMaterial).color.set(s.glow);
       ringMats.forEach((m) => m.color.set(s.glow));
+      skinHasTex = !!s.tex;
       if (s.tex) {
         let t = texCache.get(s.tex);
         if (!t) {
@@ -286,6 +310,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         inhaleT -= dt;
         const ph = 1 - Math.max(0, inhaleT) / 0.9;
         const k = ph < 0.62 ? -0.24 * (ph / 0.62) : -0.24 + 0.42 * ((ph - 0.62) / 0.38);
+        stretch += k; squash += k;
+      }
+      if (evolveT > 0) {            // EVOLVED! celebratory double-bounce
+        evolveT -= dt;
+        const k = Math.sin(Math.max(0, evolveT) / 0.7 * Math.PI * 2) * 0.16 * (evolveT / 0.7);
         stretch += k; squash += k;
       }
       bob.scale.set(radius * stretch, radius * squash, radius * stretch);
