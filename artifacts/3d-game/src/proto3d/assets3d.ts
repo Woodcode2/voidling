@@ -113,7 +113,7 @@ export function glb(
 // name label, one screenshot audits the whole set (which meshes need a re-roll)
 export function buildGallery(scene: THREE.Scene) {
   const names = Object.keys(PACK);
-  const COLS = 6, GAP = 26, Y = 600;
+  const COLS = 7, GAP = 26, Y = 600;
   const label = (text: string) => {
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
     const x = cv.getContext('2d')!;
@@ -124,9 +124,10 @@ export function buildGallery(scene: THREE.Scene) {
     sp.scale.set(10, 2.5, 1);
     return sp;
   };
+  const rows = Math.ceil(names.length / COLS);
   names.forEach((name, i) => {
     const gx = (i % COLS - (COLS - 1) / 2) * GAP;
-    const gz = (Math.floor(i / COLS) - 2) * GAP;
+    const gz = (Math.floor(i / COLS) - (rows - 1) / 2) * GAP;
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 0.5, 24),
       new THREE.MeshStandardMaterial({ color: 0x3a2a5a, roughness: 0.9 }));
     pad.position.set(gx, Y - 0.25, gz); scene.add(pad);

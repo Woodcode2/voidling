@@ -708,8 +708,8 @@ function animate() {
   // constant (small!) on-screen size; each evolution zooms the world out a
   // step, so growth READS. Start: void ≈ 6% of screen height, hole.io style.
   if (ASSETVIEW) {
-    camera.position.set(0, 640, 92);
-    camera.lookAt(0, 596, 0);
+    camera.position.set(0, 716, 138);
+    camera.lookAt(0, 588, -6);
   } else if (TOPDOWN) {
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
@@ -785,7 +785,7 @@ initialMass = edibles.reduce((a, e) => a + e.radius, 0);
 if (bigStart > 0) voidling.setRadius(bigStart);   // debug: preview a bigger form
 refreshHud();
 
-if (ASSETVIEW) { scene.fog = null; buildGallery(scene); camera.position.set(0, 640, 92); camera.lookAt(0, 596, 0); }
+if (ASSETVIEW) { scene.fog = null; buildGallery(scene); camera.position.set(0, 716, 138); camera.lookAt(0, 588, -6); }
 else if (TOPDOWN) { camera.position.set(0, 1120, 0.001); camera.lookAt(0, 0, 0); }
 else {
   camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
