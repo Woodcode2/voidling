@@ -44,6 +44,8 @@ export const PACK: Record<string, { url: string; h: number }> = {
   rocks: { url: `${DIR}/02ad2c55-a0e3-4d14-8932-537b42ea5c85.glb`, h: 2.6 },
   stage: { url: `${DIR}/e4f7a55c-a7f3-4408-a6bb-2d5362ecba94.glb`, h: 3.2 },
   car_sedan: { url: `${DIR}/b3d07fca-ccdd-4f41-8dbd-3954958e22c3.glb`, h: 2.6 },
+  car_taxi: { url: `${DIR}/4275a986-fe46-463f-a73e-47571f262ac7.glb`, h: 2.6 },
+  tank: { url: `${DIR}/ccb80bfc-fc5d-4352-976b-15b5fc42085a.glb`, h: 3.4 },
   heli: { url: `${DIR}/eed92755-71ef-4e6f-a201-128b0c56975a.glb`, h: 5.5 },
 };
 
