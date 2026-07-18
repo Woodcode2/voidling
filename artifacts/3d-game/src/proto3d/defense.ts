@@ -10,6 +10,7 @@ import { vehicleGlb } from './assets3d';
 export interface Defense {
   setPhase(n: number): string | null;   // returns a banner if a new wave spawned
   update(dt: number, vx: number, vz: number, vR: number): number;   // score delta
+  reset(): void;                        // instant rematch: clear all waves
 }
 
 type Kind = 'police' | 'jeep' | 'tank' | 'heli';
@@ -95,6 +96,11 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
   };
 
   return {
+    reset() {
+      for (const un of units) scene.remove(un.g);
+      units.length = 0; phase = 0;
+      for (let i = 0; i < PELLET; i++) { pst[i].life = 0; pst[i].y = -999; }
+    },
     setPhase(n) {
       if (n <= phase) return null;
       phase = n;

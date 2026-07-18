@@ -82,6 +82,7 @@ export interface Skin {
   art?: string;                                    // legendary: AI card icon
   acc?: 'unicorn' | 'dino' | 'wizard' | 'king';    // legendary: 3D accessory
   cash?: number;                                   // legendary: USD price
+  streak?: number;                                 // unlock by daily play streak
 }
 export const SKINS: Skin[] = [
   { id: 'classic', name: 'Classic', abyss: 0x1c0930, inner: 0x431677, mid: 0x7030c0, rim: 0xa562f2, glow: 0xb875ff },
@@ -100,6 +101,9 @@ export const SKINS: Skin[] = [
   { id: 'cyber', name: 'Cyber', abyss: 0x060d20, inner: 0x102a50, mid: 0x1a4a8a, rim: 0x4de8ff, glow: 0x7bffe8, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
   { id: 'blossom', name: 'Blossom', abyss: 0x38182a, inner: 0x7a3a55, mid: 0xc0688a, rim: 0xffb8cc, glow: 0xffd2e2, tex: '/assets/hf/hf_20260717_131508_1f6ff369-a72a-4d3a-9a37-2261344cde24.png' },
   { id: 'royal', name: 'Royal', abyss: 0x200a38, inner: 0x48207a, mid: 0x7a3ab8, rim: 0xd8a848, glow: 0xffd25a, tex: '/assets/hf/hf_20260717_131509_a28d269a-2130-4f39-9b72-b46f5c3ebbeb.png' },
+  // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
+  { id: 'ember', name: 'Ember', abyss: 0x260a06, inner: 0x6a2410, mid: 0xc4571a, rim: 0xffb054, glow: 0xffcf7a, streak: 2 },
+  { id: 'prism', name: 'Prism', abyss: 0x1a1030, inner: 0x4a2a8a, mid: 0x8a5ac8, rim: 0xe8b8ff, glow: 0xfff0a8, streak: 7 },
   // ✨ LEGENDARY — character skins with 3D accessories, cash tier
   { id: 'univoid', name: 'Uni-Void', abyss: 0x2a2038, inner: 0x8a7a9a, mid: 0xd8cce8, rim: 0xfff0fa, glow: 0xffc9e8, acc: 'unicorn', cash: 4.99,
     art: '/assets/hf/hf_20260717_221342_1fed1f77-b19c-416e-9e0d-e84a02a57845.png' },

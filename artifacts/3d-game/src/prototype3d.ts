@@ -90,11 +90,14 @@ function applyQuality() {
 }
 
 // ── edibles + island ─────────────────────────────────────────────────────────
-interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; }
+interface Edible { mesh: THREE.Object3D; radius: number; eaten: boolean; t: number; orbit: number; orbitR: number; spin: THREE.Vector3; home: THREE.Vector3; homeScale: THREE.Vector3; homeRotY: number; }
 const edibles: Edible[] = [];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 function addEdible(mesh: THREE.Object3D, radius: number) {
-  edibles.push({ mesh, radius, eaten: false, t: 0, orbit: 0, orbitR: 0, spin: new THREE.Vector3() });
+  // remember where everything LIVES — instant rematch restores the island
+  // in-place instead of a full page reload (hole.io's <2s "one more go" loop)
+  edibles.push({ mesh, radius, eaten: false, t: 0, orbit: 0, orbitR: 0, spin: new THREE.Vector3(),
+    home: mesh.position.clone(), homeScale: mesh.scale.clone(), homeRotY: mesh.rotation.y });
 }
 
 const island = createIsland(scene, addEdible);
@@ -264,7 +267,7 @@ const _q = new URLSearchParams(location.search);
 const MATCH_LEN = Number(_q.get('len')) || 180;                // 3:00 — tighter, hole.io-style (?len=N)
 const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
-let matchClock = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
+let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
 let initialMass = 0;                   // set once, after the world is built
 let hudCd = 0;
 
@@ -380,14 +383,56 @@ function refreshHud() {
   formEl.textContent = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m`;
 }
 
+// rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
+let xp = Number(localStorage.getItem('voidXP') || 0);
+let streak = Number(localStorage.getItem('voidStreak') || 0);
+function rankInfo(x: number) {
+  const lvl = Math.min(17, 1 + Math.floor(x / 40));
+  const t = lvl >= 15 ? ['👑', 'MASTER'] : lvl >= 12 ? ['💠', 'PLATINUM'] : lvl >= 9 ? ['💎', 'DIAMOND']
+    : lvl >= 6 ? ['🥇', 'GOLD'] : lvl >= 3 ? ['🥈', 'SILVER'] : ['🥉', 'BRONZE'];
+  return { lvl, ic: t[0], nm: t[1], prog: lvl >= 17 ? 1 : (x % 40) / 40 };
+}
+function renderRank() {
+  const r = rankInfo(xp);
+  el('rankChip').innerHTML = `${r.ic} ${r.nm} · LVL ${r.lvl}<div class="rkBar"><div style="width:${Math.round(r.prog * 100)}%"></div></div>`;
+}
+function bumpStreak() {
+  const today = new Date().toDateString();
+  const last = localStorage.getItem('voidLastDay');
+  if (last === today) return;
+  const yd = new Date(Date.now() - 86400000).toDateString();
+  streak = last === yd ? streak + 1 : 1;
+  localStorage.setItem('voidStreak', String(streak));
+  localStorage.setItem('voidLastDay', today);
+}
 function endMatch() {
   ended = true;
+  audio.stopMusic();
+  bumpStreak();
+  if (soloMode) {
+    // SOLO RUN: the goal is the island itself — beat your best %
+    const best = Number(localStorage.getItem('voidBestPct') || 0);
+    const newBest = devouredPct > best;
+    if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
+    const gain2 = 6 + (newBest ? 8 : 0);
+    xp += gain2; localStorage.setItem('voidXP', String(xp)); renderRank();
+    const reward2 = Math.max(5, Math.round(devouredPct * 1.5));
+    addCoins(reward2);
+    endHd.textContent = `${devouredPct}% DEVOURED`;
+    endSub.textContent = `${newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`} · +${reward2}¢ · +${gain2} XP`;
+    endList.innerHTML = '';
+    endEl.classList.add('show');
+    stats.matches++; saveStats();
+    return;
+  }
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
     ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   const myRank = rows.findIndex((r) => r.me) + 1;
   const reward = Math.max(5, Math.round(playerScore / 40)) + (myRank === 1 ? 25 : 0);
   addCoins(reward);
+  const gain = [20, 10, 5, 2, 1][myRank - 1] ?? 1;
+  xp += gain; localStorage.setItem('voidXP', String(xp)); renderRank();
   // lifetime stats + weekly best
   stats.matches++;
   if (myRank === 1) stats.wins++;
@@ -397,7 +442,7 @@ function endMatch() {
   const wk = weekKey();
   localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
   endHd.textContent = myRank === 1 ? 'YOU WIN!' : `#${myRank} PLACE`;
-  endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}¢ earned`;
+  endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}¢ · +${gain} XP`;
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
@@ -411,7 +456,9 @@ function capture(e: Edible, giveHunger = true) {
   const d = Math.hypot(dx, dz) || 1;
   e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx); e.orbitR = Math.max(voidling.radius * 0.6, d);
   e.mesh.userData.eaten = true;
-  e.spin.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
+  // topple toward the hole (the hole.io fantasy): the tip axis is perpendicular
+  // to the pull direction, so things visibly keel over INTO the void
+  e.spin.set((dz / d) * rand(4.5, 7.5), rand(-1.5, 1.5), (-dx / d) * rand(4.5, 7.5));
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
   combo++; comboT = 1.2;
   const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
@@ -491,18 +538,28 @@ pwBtns[0].addEventListener('click', fireGulp);
 pwBtns[1].addEventListener('click', fireCollapse);
 
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
-let started = false, startT = 0;
+let started = false, startT = 0, soloMode = false;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
-function beginMatch() {
+function beginMatch(solo = false) {
+  soloMode = solo;
+  matchLen = solo ? 120 : MATCH_LEN;
+  matchClock = matchLen;
   started = true; startT = tClock;
   document.body.classList.remove('menu');
   menuEl.style.display = 'none';
+  boardEl.style.display = solo ? 'none' : '';
   el('titlecard').classList.add('show');
+  audio.startMusic(); audio.setMusicStage(0);
 }
 el('btnPlay').addEventListener('click', () => {
   menuEl.style.display = 'none';
   if (!localStorage.getItem('voidTut')) tutEl.classList.add('show');
   else beginMatch();
+});
+el('btnSolo').addEventListener('click', () => {
+  menuEl.style.display = 'none';
+  if (!localStorage.getItem('voidTut')) localStorage.setItem('voidTut', '1');
+  beginMatch(true);
 });
 el('btnGotIt').addEventListener('click', () => {
   localStorage.setItem('voidTut', '1');
@@ -511,7 +568,34 @@ el('btnGotIt').addEventListener('click', () => {
 });
 el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
-el('btnAgain').addEventListener('click', () => location.reload());
+function resetMatch() {
+  // restore every eaten thing to its remembered home — the island regrows in
+  // one frame and the next run starts in under a second
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible || !e.mesh.parent) {
+      e.eaten = false; e.t = 0;
+      e.mesh.userData.eaten = false;
+      e.mesh.visible = true;
+      if (!e.mesh.parent) scene.add(e.mesh);
+      e.mesh.position.copy(e.home);
+      e.mesh.scale.copy(e.homeScale);
+      e.mesh.rotation.set(0, e.homeRotY, 0);
+    }
+  }
+  rivals.reset();
+  defense.reset();
+  curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
+  voidState.x = island.spawn.x; voidState.z = island.spawn.z;
+  velX = 0; velZ = 0; camDist = 50;
+  playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 7;
+  for (const q of quests) { q.done = false; q.count = 0; }
+  renderQuests();
+  ended = false;
+  el('end').classList.remove('show');
+  timerEl.style.color = '';
+  beginMatch(soloMode);
+}
+el('btnAgain').addEventListener('click', resetMatch);
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
 // ── lifetime stats + trophies ────────────────────────────────────────────────
@@ -557,6 +641,23 @@ function renderTop() {
     `<div class="tv ${r.me ? 'me' : ''}"><span class="rk">${medals[i] || i + 1}</span><span class="dot2" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm2">${r.name}</span><span class="sc2">${r.score}</span></div>`).join('');
 }
 el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').classList.add('show'); });
+
+// ── menu gift box: a present every 30 minutes (hole.io's timer-gift retention) ─
+{
+  const giftEl = el('gift');
+  const refreshGift = () => { giftEl.style.display = Date.now() >= Number(localStorage.getItem('voidGiftAt') || 0) ? '' : 'none'; };
+  giftEl.addEventListener('click', () => {
+    const amt = 40 + Math.floor(Math.random() * 81);
+    addCoins(amt);
+    giftEl.textContent = `+${amt}¢!`;
+    audio.evolve(); buzz(40);
+    localStorage.setItem('voidGiftAt', String(Date.now() + 30 * 60 * 1000));
+    setTimeout(() => { giftEl.textContent = '🎁'; refreshGift(); }, 1400);
+  });
+  setInterval(refreshGift, 20000);
+  refreshGift();
+}
+renderRank();
 // EXPLICIT debug params only skip the menu — arbitrary query strings on shared
 // links (?utm_source=…) must land on the real splash like any player
 if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'); beginMatch(); }
@@ -576,13 +677,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   const cards = new Map<string, HTMLElement>();
   const refresh = () => {
     for (const s of SKINS) {
+      // streak skins unlock themselves the moment the streak is long enough
+      if (s.streak && streak >= s.streak && !owned.has(s.id)) {
+        owned.add(s.id);
+        localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+      }
       const card = cards.get(s.id)!;
       const pr = card.querySelector('.pr') as HTMLElement;
       card.classList.toggle('equip', equipped === s.id);
       card.classList.toggle('locked', !owned.has(s.id));
       pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
       pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED'
-        : s.cash ? `💎 $${s.cash.toFixed(2)}` : `🪙 ${PRICES[s.id]}¢`;
+        : s.cash ? `💎 $${s.cash.toFixed(2)}`
+        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `🪙 ${PRICES[s.id]}¢`;
     }
   };
   // shop order tells the value story: colours → AI textures → LEGENDARY
@@ -610,6 +717,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : s.tex ? '<div class="rib epicRib">EPIC</div>' : '';
     card.innerHTML = `${ribbon}<div class="orb" style="${orbBg}">${faceSvg}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => {
+      if (s.streak && !owned.has(s.id)) return;   // earned by coming back, not coins
       if (s.cash && !owned.has(s.id)) {
         // real-money tier: IAP ships with the App Store build
         const pr = card.querySelector('.pr') as HTMLElement;
@@ -652,7 +760,7 @@ function animate() {
     if (!bigStart) {
       // hole.io opening: the first 30s run HOT so the first evolution lands
       // around ~15s and a new player feels growth immediately; then it settles
-      const el2 = MATCH_LEN - matchClock;
+      const el2 = matchLen - matchClock;
       const lawCap = START_R + 0.022 * Math.min(el2, 30) + LAW_RATE * el2;
       if (voidling.radius > lawCap) voidling.setRadius(lawCap);
       // 2D score-floor: strong scoring pulls your radius up toward the cap
@@ -738,7 +846,7 @@ function animate() {
   const R = voidling.radius;
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
-  rivals.update(dt, started ? tClock - startT : 0, voidState.x, voidState.z, R);   // family joins on MATCH time
+  rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R);   // solo: the family never joins
   bubbles.update();
   const cy = voidling.group.position.y;
 
@@ -825,6 +933,7 @@ function animate() {
     if (curStage >= 2 && !quests[2].done) questComplete(quests[2]);   // GOBBLER quest
     const wave = defense.setPhase(curStage);   // the city escalates with your form
     if (wave) { announce(wave); audio.alert(); }
+    audio.setMusicStage(curStage);             // the soundtrack escalates too
     buzz(45);
   }
   // NEVER downgrade: the growth-law clamp can pull radius back under a form

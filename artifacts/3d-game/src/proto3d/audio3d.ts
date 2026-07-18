@@ -14,6 +14,9 @@ export interface Audio3D {
   alert(): void;                   // defense wave banner
   bigEat(): void;                  // crunching a building
   ready(): void;                   // a power just charged
+  startMusic(): void;              // the match loop — tempo + layers ride the stage
+  setMusicStage(n: number): void;
+  stopMusic(): void;
 }
 
 export function createAudio(): Audio3D {
@@ -65,7 +68,75 @@ export function createAudio(): Audio3D {
     src.start(t);
   }
 
+  // ── MUSIC: a soft toy-synth loop that AUDIBLY escalates as the void grows —
+  // hole.io's trick: tempo +8 BPM and one new layer per evolution stage, so the
+  // island "losing" is something you can hear.
+  let musGain: GainNode | null = null;
+  let musTimer: ReturnType<typeof setInterval> | null = null;
+  let musStage = 0, step = 0, nextT = 0;
+  const BASS = [65.41, 65.41, 49.0, 49.0, 55.0, 55.0, 43.65, 49.0];               // C2 C2 G1 G1 A1 A1 F1 G1
+  const MEL = [523.25, 0, 659.25, 783.99, 0, 659.25, 587.33, 0, 523.25, 0, 440, 523.25, 0, 392, 440, 0];
+  const ARP = [1046.5, 1318.5, 1568, 1318.5];
+  function musNote(freq: number, t: number, dur: number, type: OscillatorType, vol: number, glideTo?: number) {
+    const c = ctx; if (!c || !musGain || freq <= 0) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(g); g.connect(musGain);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function musHat(t: number, vol: number) {
+    const c = ctx; if (!c || !musGain) return;
+    const len = Math.floor(c.sampleRate * 0.05);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6000;
+    const g = c.createGain(); g.gain.setValueAtTime(vol, t);
+    src.connect(f); f.connect(g); g.connect(musGain);
+    src.start(t);
+  }
+  function musSchedule() {
+    const c = ensure(); if (!c || !musGain) return;
+    const spb = 60 / (92 + musStage * 8);
+    const s16 = spb / 4;
+    if (nextT < c.currentTime) nextT = c.currentTime + 0.05;
+    while (nextT < c.currentTime + 0.35) {
+      const beat = Math.floor(step / 4) % 8, s = step % 16;
+      if (step % 4 === 0) musNote(BASS[beat], nextT, spb * 0.85, 'sine', 0.15);
+      if (step % 8 === 0) musNote(150, nextT, 0.1, 'sine', 0.2, 50);                  // soft kick
+      if (musStage >= 1 && s % 2 === 0 && MEL[s] > 0) musNote(MEL[s], nextT, s16 * 1.8, 'triangle', 0.075);
+      if (musStage >= 2 && step % 4 === 2) musHat(nextT, 0.05);
+      if (musStage >= 3) musNote(ARP[step % 4], nextT, s16 * 0.9, 'sine', 0.03);
+      nextT += s16; step++;
+    }
+  }
+
   return {
+    startMusic() {
+      const c = ensure(); if (!c || !master) return;
+      if (!musGain) { musGain = c.createGain(); musGain.connect(master); }
+      musGain.gain.cancelScheduledValues(c.currentTime);
+      musGain.gain.setValueAtTime(0.0001, c.currentTime);
+      musGain.gain.exponentialRampToValueAtTime(0.32, c.currentTime + 1.2);
+      step = 0; nextT = c.currentTime + 0.1;
+      if (musTimer) clearInterval(musTimer);
+      musTimer = setInterval(musSchedule, 110);
+    },
+    setMusicStage(n) { musStage = n; },
+    stopMusic() {
+      if (musTimer) { clearInterval(musTimer); musTimer = null; }
+      if (ctx && musGain) {
+        musGain.gain.cancelScheduledValues(ctx.currentTime);
+        musGain.gain.setValueAtTime(musGain.gain.value, ctx.currentTime);
+        musGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+      }
+    },
     pop(combo) {
       const p = Math.min(combo, 14);
       const f = 340 * Math.pow(1.06, p);

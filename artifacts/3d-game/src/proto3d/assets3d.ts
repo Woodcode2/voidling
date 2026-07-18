@@ -83,6 +83,30 @@ function template(url: string): Promise<THREE.Object3D | null> {
   return p;
 }
 
+// soft contact shadow — grounds every prop so nothing reads as "floating on a
+// lawn" (the single cheapest polish win: one shared texture + geometry)
+let _shTex: THREE.CanvasTexture | null = null;
+const _shGeo = new THREE.CircleGeometry(1, 24);
+let _shMat: THREE.MeshBasicMaterial | null = null;
+export function contactShadow(r: number): THREE.Mesh {
+  if (!_shTex) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const x = cv.getContext('2d')!;
+    const gr = x.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(20,14,34,0.55)');
+    gr.addColorStop(0.7, 'rgba(20,14,34,0.22)');
+    gr.addColorStop(1, 'rgba(20,14,34,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+    _shTex = new THREE.CanvasTexture(cv);
+    _shMat = new THREE.MeshBasicMaterial({ map: _shTex, transparent: true, depthWrite: false });
+  }
+  const m = new THREE.Mesh(_shGeo, _shMat!);
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.045;
+  m.scale.setScalar(r * 1.35);
+  return m;
+}
+
 export interface GlbOpts {
   rotY?: number;
   h?: number;                              // override PACK height
@@ -130,6 +154,7 @@ export function glb(
     obj.position.set(x, 0, z);
     if (opts.rotY) obj.rotation.y = opts.rotY;
     obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
+    if (r >= 2.5) obj.add(contactShadow(r));   // grounded, never floating
     scene.add(obj);
     addEdible?.(obj, r);
     opts.onReady?.(obj as THREE.Group);

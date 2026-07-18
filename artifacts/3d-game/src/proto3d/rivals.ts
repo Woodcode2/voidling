@@ -13,6 +13,7 @@ export interface Rivals {
   onJoin?: (name: string, color: number, x: number, z: number) => void;
   onRivalEaten?: (name: string, pts: number) => void;    // you swallowed one
   onPlayerBitten?: (name: string) => void;               // one bit YOU
+  reset(): void;                                         // instant rematch
 }
 
 const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
@@ -90,6 +91,15 @@ export function createRivals(
   const tmp = new THREE.Vector3();
   const api: Rivals = {
     list: rivals,
+    reset() {
+      rivals.forEach((rv, i) => {
+        const ang = (i / rivals.length) * Math.PI * 2 + 0.6;
+        rv.x = Math.cos(ang) * 150; rv.z = Math.sin(ang) * 150;
+        rv.r = START_R; rv.score = 0; rv.vx = 0; rv.vz = 0;
+        rv.joined = false; rv.respawnT = 0; rv.biteCd = 0; rv.stall = 0; rv.pulse = 0;
+        rv.group.visible = rv.halo.visible = false;
+      });
+    },
     update(dt, _t, px, pz, pr) {
       const lawCap = START_R + LAW_RATE * _t;   // rivals obey the growth law too
       for (const rv of rivals) {

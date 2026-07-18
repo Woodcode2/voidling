@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
-import { glb, spawnBalloon, setBalloonHook } from './assets3d';
+import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military';
 
@@ -909,7 +909,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     mesh.position.set(x3, 0, z3);
     // shadow diet: tiny street props don't cast (hundreds of them; their shadows
     // are sub-pixel anyway) — a big chunk of the shadow pass for free
-    if (r >= 2.5) setShadow(mesh);
+    if (r >= 2.5) { setShadow(mesh); mesh.add(contactShadow(r)); }
     else mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
     scene.add(mesh); addEdible(mesh, r);
   };

@@ -325,6 +325,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     set radius(r: number) { radius = r; },
     setRadius(r: number) { radius = r; },
     setStage(n: number) {
+      if (n < stage) {   // instant rematch: shed the late-form dressing
+        for (const e of eyes) e.pupilGrp.scale.setScalar(n >= 1 ? 1.15 : 1);
+        if (!skinHasTex) bodyMat.uniforms.uTexAmt.value = 0;
+        bodyMat.uniforms.uStage.value = n;
+        ringBurst = 0;
+      }
       if (n > stage) {
         evolveT = 0.7;   // celebratory pop on every evolution
         ringBurst = 1;   // ring + orbit stars flare outward
