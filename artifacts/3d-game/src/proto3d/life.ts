@@ -512,9 +512,14 @@ export function createLife(
     ['s\'mores?! 🔥', 'nature is HEALING', 'one more ghost story…', 'who packed the bug spray?'],
     ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!'],
     (x, z) => {
-      for (const [ox, oz, col] of [[-7, 0, 0xe8604d], [7, 3, 0x4db0e8]] as const) {
+      for (const [ox, oz, col] of [[-7, 0, 0xff8a70], [7, 3, 0x6db8e8]] as const) {
+        const grp2 = new THREE.Group();
         const tent = new THREE.Mesh(new THREE.ConeGeometry(4, 5, 4), new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true }));
-        tent.rotation.y = Math.PI / 4; decor(tent, x + ox, z + oz, 3);
+        tent.rotation.y = Math.PI / 4; tent.position.y = 2.5; grp2.add(tent);
+        const flap = new THREE.Mesh(new THREE.CircleGeometry(1.1, 3),
+          new THREE.MeshStandardMaterial({ color: 0x2a2438, roughness: 0.95, side: THREE.DoubleSide }));
+        flap.position.set(0, 1.05, 2.62); flap.rotation.x = -0.42; grp2.add(flap);
+        decor(grp2, x + ox, z + oz, 3);
       }
       const logs = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.8, 8), new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 1 }));
       logs.position.y = 0.4; decor(logs, x, z, 2);
@@ -530,6 +535,7 @@ export function createLife(
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf2f4f8 }));
       pole.position.y = 4; const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6), new THREE.MeshStandardMaterial({ color: 0xe8453c, side: THREE.DoubleSide }));
       flag.position.set(1.5, 7, 0); const grp = new THREE.Group(); grp.add(pole); grp.add(flag);
+      grp.rotation.y = 0.8;   // angled to the play camera — never edge-on invisible
       decor(grp, x - 15, z - 21, 3);   // on the putting green, west of the river
     }, 3, 0xf0f0f0);
 
@@ -539,12 +545,29 @@ export function createLife(
     ['sand in my EVERYTHING!!', 'GAME. OVER.', 'serve THAT, void!!'],
     (x, z) => {
       for (const ox of [-6, 6]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 6), new THREE.MeshStandardMaterial({ color: 0x4a5568 }));
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 0.8 }));
         post.position.y = 3; decor(post, x + ox, z, 2);
       }
-      const net = new THREE.Mesh(new THREE.PlaneGeometry(12, 2.4), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
+      const netTex = (() => {   // a real grid so the net reads over sand
+        const cv2 = document.createElement('canvas'); cv2.width = 96; cv2.height = 24;
+        const x2 = cv2.getContext('2d')!;
+        x2.strokeStyle = 'rgba(255,255,255,0.95)'; x2.lineWidth = 1.4;
+        for (let gx2 = 0; gx2 <= 96; gx2 += 8) { x2.beginPath(); x2.moveTo(gx2, 0); x2.lineTo(gx2, 24); x2.stroke(); }
+        for (let gy2 = 0; gy2 <= 24; gy2 += 8) { x2.beginPath(); x2.moveTo(0, gy2); x2.lineTo(96, gy2); x2.stroke(); }
+        return new THREE.CanvasTexture(cv2);
+      })();
+      const net = new THREE.Mesh(new THREE.PlaneGeometry(12, 2.4),
+        new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
       net.position.set(x, 4.4, z); scene.add(net);
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
+      const ball = new THREE.Group();
+      const bwhite = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.45 }));
+      ball.add(bwhite);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 20),
+        new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.5 }));
+      band.rotation.x = 0.6; ball.add(band);
+      const band2 = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 20),
+        new THREE.MeshStandardMaterial({ color: 0x4da3ff, roughness: 0.5 }));
+      band2.rotation.y = 0.9; ball.add(band2);
       ball.position.y = 1; decor(ball, x + 3, z + 5, 1.5);
     }, 4, 0xff9f4d);
 

@@ -55,10 +55,20 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 10;
 sun.shadow.camera.far = 380;
-const SH = 165;
-sun.shadow.camera.left = -SH; sun.shadow.camera.right = SH;
-sun.shadow.camera.top = SH; sun.shadow.camera.bottom = -SH;
+let shCur = 165;
+sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
+sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
 sun.shadow.bias = -0.0004;
+// the shadow frustum rides the camera: tight box up close = crisp tree
+// shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
+function fitShadow(dist: number) {
+  const target = THREE.MathUtils.clamp(dist * 1.1, 45, 165);
+  if (Math.abs(target - shCur) < 10) return;
+  shCur = target;
+  sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
+  sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
+  sun.shadow.camera.updateProjectionMatrix();
+}
 scene.add(sun); scene.add(sun.target);
 
 // ── adaptive quality: hold a smooth frame rate on ANY device ─────────────────
@@ -206,6 +216,7 @@ window.addEventListener('resize', () => {
 // ── match state + HUD ─────────────────────────────────────────────────────────
 const el = (id: string) => document.getElementById(id)!;
 const timerEl = el('timer'), devEl = el('devoured'), boardEl = el('board'), formEl = el('form');
+const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 const formFill = el('formbar').querySelector('.fill') as HTMLElement;
@@ -538,7 +549,7 @@ pwBtns[0].addEventListener('click', fireGulp);
 pwBtns[1].addEventListener('click', fireCollapse);
 
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
-let started = false, startT = 0, soloMode = false;
+let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
 function beginMatch(solo = false) {
   soloMode = solo;
@@ -549,6 +560,7 @@ function beginMatch(solo = false) {
   menuEl.style.display = 'none';
   boardEl.style.display = solo ? 'none' : '';
   el('titlecard').classList.add('show');
+  titleUntil = tClock + 4.6;
   audio.startMusic(); audio.setMusicStage(0);
 }
 el('btnPlay').addEventListener('click', () => {
@@ -926,8 +938,11 @@ function animate() {
   const ns = stageFor(voidling.radius);
   if (ns > curStage) {
     curStage = ns;
-    evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
-    evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+    // never draw over the MAPLE ISLE title card — one hero message at a time
+    if (tClock > titleUntil) {
+      evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
+      evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
+    }
     audio.evolve();
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);
     if (curStage >= 2 && !quests[2].done) questComplete(quests[2]);   // GOBBLER quest
@@ -963,10 +978,13 @@ function animate() {
     if (newsCd <= 0) { newsCd = 17 + Math.random() * 7; showNews(); }
   }
 
+  // the DRAG-to-steer hint retires itself once the player has been driving
+  if (started && tClock - lastInput < 1 && tClock - startT > 8) hungerLbl.style.opacity = '0';
+
   hudCd -= dt;
   if (hudCd <= 0) {
     hudCd = 0.2; refreshHud();
-    hungerFill.style.width = `${Math.round(hunger * 100)}%`;
+    hungerFill.style.width = `${Math.max(6, Math.round(hunger * 100))}%`;
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
     pwBtns[1].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
@@ -975,8 +993,9 @@ function animate() {
     formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
   }
 
-  // LOD band tracks the camera so the AI meshes are ALWAYS the ones on screen
+  // LOD band + shadow frustum track the camera
   updateLodBias(camDist);
+  fitShadow(camDist);
 
   // adaptive quality: step down fast when fps dips, climb back slowly
   qAccT += dt; qAccN++; qCd -= dt;

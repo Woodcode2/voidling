@@ -198,9 +198,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // base grass
   g.fillStyle = hex(WORLD.meadow); g.fillRect(0, 0, TEX, TEX);
   // subtle grass mottling
-  for (let i = 0; i < 1400; i++) {
-    g.fillStyle = Math.random() < 0.5 ? 'rgba(120,201,78,0.18)' : 'rgba(255,255,255,0.05)';
-    const x = Math.random() * TEX, y = Math.random() * TEX, r = rand(6, 18);
+  for (let i = 0; i < 4000; i++) {
+    g.fillStyle = Math.random() < 0.5 ? 'rgba(120,201,78,0.16)' : 'rgba(255,255,255,0.035)';
+    const x = Math.random() * TEX, y = Math.random() * TEX, r = rand(2, 6);
     g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   }
 
@@ -268,7 +268,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.beginPath();
     g.rect(pxW(cxB - BLOCK_SIZE / 2), pyW(cyB - BLOCK_SIZE / 2), pxW(cxB + BLOCK_SIZE / 2) - pxW(cxB - BLOCK_SIZE / 2), pyW(cyB + BLOCK_SIZE / 2) - pyW(cyB - BLOCK_SIZE / 2));
     g.clip();
-    g.fillStyle = 'rgba(255,255,255,0.045)';
+    g.fillStyle = 'rgba(255,255,255,0.07)';
     for (let s = 0; s < 8; s += 2) {
       const y0 = pyW(cyB - BLOCK_SIZE / 2 + (s / 8) * BLOCK_SIZE);
       const y1 = pyW(cyB - BLOCK_SIZE / 2 + ((s + 1) / 8) * BLOCK_SIZE);
@@ -363,8 +363,12 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.setLineDash([]);
   g.strokeStyle = '#c7ccd6'; g.lineWidth = Math.max(1.5, (pxW(150) - pxW(0)) * 0.09); railPath(); g.stroke(); // rail sheen
 
-  // river
-  g.strokeStyle = hex(WORLD.riverMid); g.lineWidth = (pxW(124) - pxW(0)); g.lineJoin = 'round'; g.lineCap = 'round';
+  // river — dark bank underlay first, then water, then a bright foam edge
+  g.strokeStyle = '#4d8aa0'; g.lineWidth = (pxW(144) - pxW(0)); g.lineJoin = 'round'; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
+  for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
+  g.stroke();
+  g.strokeStyle = hex(WORLD.riverMid); g.lineWidth = (pxW(124) - pxW(0));
   g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
   for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
   g.stroke();
@@ -372,6 +376,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
   for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
   g.stroke();
+  g.strokeStyle = 'rgba(233,246,255,0.35)'; g.lineWidth = (pxW(128) - pxW(0));
+  g.setLineDash([pxW(90) - pxW(0), pxW(150) - pxW(0)]);
+  g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
+  for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
+  g.stroke(); g.setLineDash([]);
   // pond
   g.fillStyle = hex(WORLD.riverMid);
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
@@ -415,7 +424,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.fillStyle = hex(WORLD.pavement); g.beginPath(); g.arc(fx2, fy2, rOuter * 1.35, 0, Math.PI * 2); g.fill();
     g.strokeStyle = '#c9cdd9'; g.lineWidth = rOuter * 0.12; g.beginPath(); g.arc(fx2, fy2, rOuter, 0, Math.PI * 2); g.stroke();
     g.fillStyle = hex(WORLD.waterShallow); g.beginPath(); g.arc(fx2, fy2, rOuter * 0.88, 0, Math.PI * 2); g.fill();
-    g.fillStyle = hex(WORLD.foam); g.beginPath(); g.arc(fx2, fy2, rOuter * 0.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(233,246,255,0.55)'; g.beginPath(); g.arc(fx2, fy2, rOuter * 0.12, 0, Math.PI * 2); g.fill();
   }
 
   g.restore(); // end island clip
@@ -473,7 +482,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     shader.uniforms.uDetail = { value: detailTex };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\n{ vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb; diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, 0.32); }');
+      .replace('#include <map_fragment>', '#include <map_fragment>\n{ vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb; vec3 g2 = texture2D(uDetail, vMapUv * 34.0).rgb; diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, 0.45) * mix(vec3(1.0), g2 * 2.0, 0.18); }');
   };
   const top = new THREE.Mesh(topGeo, groundMat);
   top.rotation.x = -Math.PI / 2;   // shape XY -> world XZ (shape.y -> world -z)
@@ -495,7 +504,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     const wallGeo = new THREE.BufferGeometry();
     wallGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     wallGeo.computeVertexNormals();
-    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide }));
+    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x2a2138, emissiveIntensity: 0.4 }));
     scene.add(wall);
     // underside cap
     const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x2a2140, roughness: 1 }));
@@ -734,8 +743,8 @@ function makeTree(): THREE.Group {
     new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1, flatShading: true }));
   trunk.position.y = 1.6; grp.add(trunk);
   const base = pick(PROPS.foliage);
-  const dark = new THREE.Color(base).multiplyScalar(0.82).getHex();
-  const light = new THREE.Color(base).multiplyScalar(1.14).getHex();
+  const dark = new THREE.Color(base).multiplyScalar(0.7).getHex();
+  const light = new THREE.Color(base).multiplyScalar(1.28).getHex();
   const blob = (r: number, col: number, x: number, y: number, z: number) => {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1),
       new THREE.MeshStandardMaterial({ color: col, roughness: 0.92, flatShading: true }));
@@ -807,16 +816,22 @@ function makeCone(): THREE.Group {
 function makeHydrant(): THREE.Group {
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: 0xe23b2e, roughness: 0.6, metalness: 0.2 });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 1.2, 8), mat); body.position.y = 0.6; g.add(body);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 6), mat); cap.position.y = 1.2; g.add(cap);
-  for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 6), mat); arm.rotation.z = Math.PI / 2; arm.position.set(s * 0.4, 0.75, 0); g.add(arm); }
+  const lite = new THREE.MeshStandardMaterial({ color: 0xf0f2f6, roughness: 0.5, metalness: 0.3 });
+  const flange = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.56, 0.18, 8), mat); flange.position.y = 0.09; g.add(flange);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 1.1, 8), mat); body.position.y = 0.68; g.add(body);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 6), mat); cap.position.y = 1.22; g.add(cap);
+  const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.16, 6), lite); nut.position.y = 1.6; g.add(nut);
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 6), mat); arm.rotation.z = Math.PI / 2; arm.position.set(s * 0.4, 0.78, 0); g.add(arm);
+    const end = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 6), lite); end.rotation.z = Math.PI / 2; end.position.set(s * 0.66, 0.78, 0); g.add(end);
+  }
   return g;
 }
 function makeTrash(): THREE.Group {
   const g = new THREE.Group();
-  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 1.3, 10), new THREE.MeshStandardMaterial({ color: pick([0x3a7a4a, 0x3a5a8a, 0x555a66]), roughness: 0.8, metalness: 0.2 }));
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 1.3, 10), new THREE.MeshStandardMaterial({ color: pick([0x4d9a5e, 0x4d74a8, 0x6b7280]), roughness: 0.8, metalness: 0.2 }));
   can.position.y = 0.65; g.add(can);
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x2a2f38 })); lid.position.y = 1.35; g.add(lid);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x555c68 })); lid.position.y = 1.35; g.add(lid);
   return g;
 }
 function makeFlowers(): THREE.Group {
@@ -852,6 +867,38 @@ function makeLamp(): THREE.Group {
   return g;
 }
 const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])();
+// biome-true snacks — no fire hydrants on the 18th hole, no cones on the sand
+function makeShell(): THREE.Group {
+  const g = new THREE.Group();
+  const sh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: pick([0xffd9e8, 0xfff0d8, 0xe8f0ff]), roughness: 0.55, flatShading: true }));
+  sh.scale.set(1, 0.55, 0.85); g.add(sh);
+  return g;
+}
+function makeMushroom(): THREE.Group {
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.5, 7),
+    new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.8 }));
+  stem.position.y = 0.25; g.add(stem);
+  const capM = new THREE.Mesh(new THREE.SphereGeometry(0.42, 9, 7, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: pick([0xe0483a, 0xd88a3a]), roughness: 0.7, flatShading: true }));
+  capM.position.y = 0.48; capM.scale.y = 0.7; g.add(capM);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 5), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  dot.position.set(0.16, 0.72, 0.14); g.add(dot);
+  return g;
+}
+function makeGolfball(): THREE.Group {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
+  b.position.y = 0.3; g.add(b);
+  return g;
+}
+const tinyFor = (biome: Biome) =>
+  biome === 'beach' ? pick([makeShell, makeShell, makeFlowers, makeCone])()
+  : biome === 'forest' ? pick([makeMushroom, makeMushroom, makeFlowers])()
+  : biome === 'park' ? pick([makeGolfball, makeFlowers, makeFlowers])()
+  : biome === 'zoo' ? pick([makeFlowers, makeShell, makeMushroom])()
+  : makeTinyProp();
 
 // ── civic/retail stand-ins (offline dev + far LOD) — downtown must NEVER show
 // a gabled suburban house on pavement, and the plaza always has a fountain ────
@@ -932,14 +979,16 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // edge-facing lots: every house faces its own road, with a driveway baked
       // into the ground running from the house to the asphalt (see bake above)
       const sc = biome === 'fancy' ? 1.3 : 1;
+      // (house_modern is benched: its baked roof reads as a black hole from
+      // the play camera — three strong architectures beat four with one dud)
       const HOUSES = biome === 'fancy'
-        ? ['house_modern', 'house_blue', 'house_craftsman', 'house_pink']
-        : ['house_pink', 'house_craftsman', 'house_blue', 'house_modern'];
+        ? ['house_blue', 'house_craftsman', 'house_pink']
+        : ['house_pink', 'house_craftsman', 'house_blue'];
       houseLots(gx, gy).forEach((lot, li) => {
         const hx = w(lot.x), hz = w(lot.y);
         const fx3 = lot.fx, fz3 = lot.fy;             // toward the street
         const sx3 = -fz3, sz3 = fx3;                  // along the street
-        placeGlb(HOUSES[li % 4], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
+        placeGlb(HOUSES[li % 3], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
           (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, lot.rot);
         // front-yard dressing on the STREET side; mailbox by the driveway
         const dvx = lot.fy !== 0 ? 4.5 : 0, dvz = lot.fx !== 0 ? 4.5 : 0;
@@ -948,12 +997,15 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         if (Math.random() < 0.7) place(makeMailbox(), hx + fx3 * 7.6 + dvx + sx3, hz + fz3 * 7.6 + dvz + sz3, 1.2);
         if (Math.random() < 0.7) place(makeBush(), hx - fx3 * 4.2 + sx3 * rand(3, 5), hz - fz3 * 4.2 + sz3 * rand(3, 5), 1.6);
       });
-      // the block interior is a small green common
-      for (let t = 0; t < 4; t++) {
+      // the block interior is a real green common — trees, bushes, flower
+      // patches (screenshots showed one giant empty lawn per block)
+      for (let t = 0; t < 6; t++) {
         const ix = cx + rand(-half * 0.42, half * 0.42), iz = cz + rand(-half * 0.42, half * 0.42);
         if (Math.random() < 0.5) placeGlb('parktree', ix, iz, 3.2, rand(6, 8), makeTree);
         else place(makeTree(), ix, iz, 3.2);
       }
+      for (let t = 0; t < 4; t++) place(makeBush(), cx + rand(-half * 0.4, half * 0.4), cz + rand(-half * 0.4, half * 0.4), 1.6);
+      for (let t = 0; t < 3; t++) place(makeFlowers(), cx + rand(-half * 0.38, half * 0.38), cz + rand(-half * 0.38, half * 0.38), 0.7);
     } else if (biome === 'downtown') {
       // DETERMINISTIC street-wall grid (no jitter, no interpenetration):
       // 4 corner towers form the block's walls, the tall pair alternates by
@@ -1102,11 +1154,10 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         if (biome === 'park' && gx === 4 && gy === 2 && Math.hypot(x - cx, z - (cz + 6)) < 17) return false;
         return true;
       };
-      const beachy = biome === 'beach';
       for (let t = 0; t < tinyN; t++) {
         const [x, z] = jitter();
         if (!tinyOk(x, z)) continue;
-        place(beachy ? pick([makeCone, makeFlowers])() : makeTinyProp(), x, z, rand(0.6, 0.85));
+        place(tinyFor(biome), x, z, rand(0.6, 0.85));
       }
       for (let t = 0; t < 3; t++) { const [x, z] = jitter(); if (tinyOk(x, z)) place(makeCoins(), x, z, 0.55); }
     }

@@ -24,18 +24,22 @@
       #board .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
       #board .nm { flex: 1; min-width: 78px; }
       #board .sc { font-variant-numeric: tabular-nums; opacity: 0.9; }
-      #form { position: fixed; bottom: 44px; left: 0; right: 0; text-align: center; z-index: 5;
+      #form { position: fixed; bottom: 58px; left: 0; right: 0; text-align: center; z-index: 5;
         color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 2px; opacity: 0.85; pointer-events: none;
         text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
       /* hunger / power meter */
       #hunger { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
         width: 260px; height: 16px; border-radius: 9px; background: rgba(16,8,30,0.55); overflow: hidden;
+        border: 1.5px solid rgba(255,255,255,0.18);
         box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+      #hunger::before { content: 'HUNGER'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+        font-size: 8px; font-weight: 900; letter-spacing: 1.5px; color: rgba(255,255,255,0.55); z-index: 1; }
       #hunger .fill { height: 100%; width: 0%; border-radius: 9px;
         background: linear-gradient(90deg, #7b4fe0, #c9a6ff); transition: width 0.12s linear; }
       #hunger.ready .fill { box-shadow: 0 0 12px #c9a6ff; }
-      #hungerlbl { position: fixed; bottom: 34px; left: 50%; transform: translateX(-50%); z-index: 5;
-        font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #d8c8ff; pointer-events: none; opacity: 0.9; }
+      #hungerlbl { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 5;
+        font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #efe6ff; pointer-events: none; opacity: 0.95;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.55); transition: opacity 0.8s ease; }
       /* MAPLE ISLE NEWS — headlines that POP, and turn nervous as you eat */
       #news { position: fixed; top: 84px; left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
         max-width: 88vw; background: linear-gradient(180deg, rgba(34,16,64,0.95), rgba(18,9,36,0.95));
@@ -94,10 +98,11 @@
         font-family: inherit; font-size: 11px; font-weight: 900; letter-spacing: 0.5px; color: #fff;
         background: rgba(74,42,128,0.75); box-shadow: 0 2px 8px rgba(0,0,0,0.35); transition: opacity 0.15s, transform 0.08s; }
       #powers button:active { transform: scale(0.94); }
-      #powers button.off { opacity: 0.32; }
+      #powers button.off { opacity: 0.88; filter: saturate(0.35) brightness(0.8); }
+      #powers button.off b { opacity: 0.45; }
       #powers button b { display: block; font-size: 14px; color: #c9a6ff; }
       /* EVOLVED flash */
-      #evolve { position: fixed; top: 40%; left: 0; right: 0; text-align: center; z-index: 7; pointer-events: none;
+      #evolve { position: fixed; top: 24%; left: 0; right: 0; text-align: center; z-index: 7; pointer-events: none;
         color: #fff; font-weight: 900; opacity: 0; }
       #evolve .big { font-size: 46px; letter-spacing: 2px; text-shadow: 0 0 24px rgba(172,108,255,0.9); }
       #evolve .sm { font-size: 16px; letter-spacing: 4px; color: #c9a6ff; }

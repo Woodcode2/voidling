@@ -18,6 +18,7 @@ interface Slot {
   active: boolean;
 }
 
+const BUBBLE_MAX_CAMD = 150;   // whole-island views don't need street gossip
 export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
   // inject styles once
   const style = document.createElement('style');
@@ -76,6 +77,9 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
 
   return {
     say(pos, text, kind) {
+      // whole-island zoom doesn't need street gossip — and full-size bubbles
+      // over a map view read as bugs
+      if (camera.position.distanceTo(pos) > BUBBLE_MAX_CAMD) return;
       // dedupe: never show the same line twice at once (panicked crowds all
       // pull from the same pool)
       if (slots.some((s) => s.active && s.el.textContent === text)) return;
