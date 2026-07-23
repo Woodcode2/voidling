@@ -52,11 +52,48 @@ export const PACK: Record<string, { url: string; h: number }> = {
 const loader = new GLTFLoader();
 const templates = new Map<string, Promise<THREE.Object3D | null>>();
 
+// small screens get small textures: a 2K texture set across 33 meshes decodes
+// to hundreds of MB — past iOS Safari's tab ceiling (the load-screen crash).
+// At gameplay zoom a 512px cap is visually identical on a phone.
+export const IS_MOBILE = typeof matchMedia !== 'undefined' && (matchMedia('(pointer: coarse)').matches || window.innerWidth < 900);
+const TEX_CAP = IS_MOBILE ? 512 : 2048;
+function shrinkTexture(tex: THREE.Texture): void {
+  const img = tex.image as { width?: number; height?: number } | undefined;
+  if (!img || !img.width || !img.height) return;
+  const m = Math.max(img.width, img.height);
+  if (m <= TEX_CAP) return;
+  const k = TEX_CAP / m;
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(img.width * k));
+  cv.height = Math.max(1, Math.round(img.height * k));
+  const g = cv.getContext('2d');
+  if (!g) return;
+  g.drawImage(tex.image as CanvasImageSource, 0, 0, cv.width, cv.height);
+  const src = tex.image as { close?: () => void };
+  tex.image = cv;
+  tex.needsUpdate = true;
+  src.close?.();   // free the full-size ImageBitmap immediately
+}
+function dietMaterials(root: THREE.Object3D): void {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const mm of mats) {
+      const std2 = mm as THREE.MeshStandardMaterial;
+      for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'] as const) {
+        const t = std2[key] as THREE.Texture | null;
+        if (t) shrinkTexture(t);
+      }
+    }
+  });
+}
+
 // mobile-safe loading: GLTF parse allocates large intermediate buffers and
 // decodes textures — 33 in flight at once spikes past iOS Safari's per-tab
 // memory ceiling and kills the page at the loading screen. A small queue
 // keeps peak memory flat; total load time barely changes (network dominates).
-const MAX_PARALLEL = 4;
+const MAX_PARALLEL = IS_MOBILE ? 2 : 4;
 let active = 0;
 const waiting: (() => void)[] = [];
 function slot(): Promise<void> {
@@ -89,6 +126,7 @@ function template(url: string): Promise<THREE.Object3D | null> {
     p = slot().then(() => new Promise<THREE.Object3D | null>((resolve) => {
       loader.load(url, (gltf) => {
         const m = gltf.scene;
+        dietMaterials(m);
         const box = new THREE.Box3().setFromObject(m);
         const size = box.getSize(new THREE.Vector3());
         m.scale.setScalar(1 / Math.max(size.y, 1e-4));      // height exactly 1

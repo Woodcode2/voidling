@@ -731,7 +731,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.closePath(); g.stroke();
 
   const groundTex = new THREE.CanvasTexture(cv);
-  groundTex.anisotropy = 16;
+  groundTex.anisotropy = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 4 : 16;
   groundTex.colorSpace = THREE.SRGBColorSpace;
 
   // ground plane (flat, cutout by texture alpha? no alpha here — we use the slab

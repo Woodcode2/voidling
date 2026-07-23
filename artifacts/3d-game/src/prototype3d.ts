@@ -20,7 +20,14 @@ import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 // 1.6 is visually indistinguishable at mobile viewing distance but ~35% fewer
 // pixels than 2.0 — the single biggest lag lever on phones.
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
+const IS_SMALL_SCREEN = matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? 1.3 : 1.6));
+// if the OS ever reclaims the GPU context, recover with a clean reload instead
+// of a frozen black screen
+renderer.domElement.addEventListener('webglcontextlost', (ev) => {
+  ev.preventDefault();
+  setTimeout(() => location.reload(), 400);
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -83,7 +90,7 @@ const QUALITY = [
 let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
 function applyQuality() {
   const q = QUALITY[qLevel];
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pr));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? Math.min(q.pr, 1.3) : q.pr));
   if (renderer.shadowMap.enabled !== q.shadows) {
     renderer.shadowMap.enabled = q.shadows;
     sun.castShadow = q.shadows;
