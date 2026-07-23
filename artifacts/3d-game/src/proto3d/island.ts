@@ -583,9 +583,14 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
   for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
   g.stroke(); g.setLineDash([]);
-  // pond
+  // pond: sand bank UNDER the water, then water, then a deep centre — one
+  // clean read (the late-stroked ring used to draw OVER the river)
+  g.fillStyle = 'rgba(230,212,148,0.9)';
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 46) - pxW(0), pyW(POND[2] + 46) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = hex(WORLD.riverMid);
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = hex(WORLD.riverDeep);
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] * 0.55) - pxW(0), pyW(POND[2] * 0.55) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   // lagoon
   g.fillStyle = hex(WORLD.waterShallow);
   g.beginPath(); g.ellipse(pxW(LAGOON.x), pyW(LAGOON.y), pxW(LAGOON.rx) - pxW(0), pyW(LAGOON.ry) - pyW(0), 0, 0, Math.PI * 2); g.fill();
@@ -689,12 +694,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.strokeStyle = hex(WORLD.dirtPath); g.lineWidth = pxW(70) - pxW(0); g.lineCap = 'round';
     g.beginPath(); g.moveTo(pxW(ccx - 100), pyW(ccy + 300)); g.quadraticCurveTo(pxW(ccx - 300), pyW(ccy + 600), pxW(ccx - 200), pyW(blockCenter(0) + BLOCK_SIZE / 2)); g.stroke();
   }
-
-  // POND — sandy bank ring + deep centre (was a flat washed-out disc)
-  g.strokeStyle = 'rgba(230,212,148,0.85)'; g.lineWidth = pxW(60) - pxW(0);
-  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 20) - pxW(0), pyW(POND[2] + 20) - pyW(0), 0, 0, Math.PI * 2); g.stroke();
-  g.fillStyle = hex(WORLD.riverDeep);
-  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] * 0.55) - pxW(0), pyW(POND[2] * 0.55) - pyW(0), 0, 0, Math.PI * 2); g.fill();
 
   // BEACH VOLLEYBALL COURT — lined sand court under the net event at (2,5)
   {

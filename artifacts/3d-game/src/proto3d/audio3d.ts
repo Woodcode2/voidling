@@ -170,17 +170,19 @@ export function createAudio(): Audio3D {
       }
     },
     pop(combo, size = 0.9) {
-      // soft water-drop 'bloop' — pitch nudges up with the combo, DEEPENS with
-      // the void's size (a WORLD ENDER bite is felt, not heard), rate-limited
+      // the GULP (hole.io's swallow): a quick two-step downward glide — like a
+      // throat closing — plus a soft airy swallow. Pitch rides the combo,
+      // DEEPENS with the void's size. Hard rate-limit for hoover sprees.
       const c = ensure(); if (!c) return;
       const now = c.currentTime;
-      if (now - lastPop < 0.09) return;
+      if (now - lastPop < 0.1) return;
       lastPop = now;
       const depth = Math.min(1, (size - 0.9) / 9);          // 0 tiny -> 1 huge
-      const f = (190 + Math.min(combo, 20) * 9) * (1 - depth * 0.55);
-      tone(f * 1.6, f * 0.72, 0.12 + depth * 0.08, 'sine', 0.15 + depth * 0.07);
-      noise(0.05, 0.04, 900, 300);
-      if (depth > 0.4) tone(58, 34, 0.16, 'sine', depth * 0.12);   // sub thump
+      const base = (300 + Math.min(combo, 20) * 10) * (1 - depth * 0.5);
+      tone(base, base * 0.55, 0.07, 'sine', 0.16 + depth * 0.05);            // 'gu-'
+      tone(base * 0.6, base * 0.3, 0.12, 'sine', 0.18 + depth * 0.07, 0.055); // '-ulp'
+      noise(0.09, 0.05, 1100, 240, 0.02);                                     // throat air
+      if (depth > 0.4) tone(56, 32, 0.18, 'sine', depth * 0.13, 0.04);        // sub thump
     },
     bigEat() {
       noise(0.22, 0.3, 900, 180);

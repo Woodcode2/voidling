@@ -773,6 +773,12 @@ function resetMatch() {
   beginMatch(soloMode);
 }
 el('btnAgain').addEventListener('click', resetMatch);
+el('btnHome').addEventListener('click', () => {
+  el('end').classList.remove('show');
+  document.body.classList.add('menu');
+  menuEl.style.display = '';
+  renderRank();
+});
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
 // ── lifetime stats + trophies ────────────────────────────────────────────────
