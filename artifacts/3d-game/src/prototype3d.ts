@@ -14,7 +14,7 @@ import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS } from './proto3d/palette';
-import { buildGallery, updateLodBias } from './proto3d/assets3d';
+import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -563,21 +563,54 @@ function beginMatch(solo = false) {
   titleUntil = tClock + 4.6;
   audio.startMusic(); audio.setMusicStage(0);
 }
+// ── asset preloader: menu time is download time; PLAY holds on a branded
+// loading bar until every pack mesh is resident, so a match never starts
+// with stand-in geometry visible (hole.io's load-then-play flow)
+let packReady = false;
+const preloadP = preloadPack((done, total) => {
+  const pct = Math.round((done / total) * 100);
+  el('lBar').style.width = pct + '%';
+  el('lPct').textContent = pct + '%';
+}).then(() => { packReady = true; });
+const LOAD_TIPS = [
+  'tip: eat the little stuff first — cones, hydrants, mailboxes',
+  'tip: cars count as people-sized once you evolve',
+  'tip: GULP pulls everything nearby a size smaller than you',
+  'tip: rival voids can eat YOU — check the leaderboard sizes',
+  'tip: the downtown towers are the biggest meal on the island',
+  'tip: play daily — streak skins unlock at 2 and 7 days',
+];
+function withWorldReady(cb: () => void) {
+  if (packReady) { cb(); return; }
+  const scr = el('loadScr');
+  (scr.querySelector('.lTip') as HTMLElement).textContent = LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)];
+  scr.classList.add('show');
+  // slow networks still get in: cap the wait, fallbacks cover stragglers
+  Promise.race([preloadP, new Promise((r) => setTimeout(r, 12000))]).then(() => {
+    packReady = true;
+    el('lBar').style.width = '100%'; el('lPct').textContent = '100%';
+    setTimeout(() => { scr.classList.remove('show'); cb(); }, 300);
+  });
+}
 el('btnPlay').addEventListener('click', () => {
   menuEl.style.display = 'none';
   if (!localStorage.getItem('voidTut')) tutEl.classList.add('show');
-  else beginMatch();
+  else withWorldReady(() => beginMatch());
 });
 el('btnSolo').addEventListener('click', () => {
   menuEl.style.display = 'none';
   if (!localStorage.getItem('voidTut')) localStorage.setItem('voidTut', '1');
-  beginMatch(true);
+  withWorldReady(() => beginMatch(true));
 });
 el('btnGotIt').addEventListener('click', () => {
   localStorage.setItem('voidTut', '1');
   tutEl.classList.remove('show');
-  beginMatch();
+  withWorldReady(() => beginMatch());
 });
+// locked world teasers wiggle on tap
+document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {
+  c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
+}));
 el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 function resetMatch() {

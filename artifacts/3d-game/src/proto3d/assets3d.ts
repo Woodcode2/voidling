@@ -83,6 +83,25 @@ function template(url: string): Promise<THREE.Object3D | null> {
   return p;
 }
 
+// preloader: attach to (or start) every pack download and report progress.
+// populate() already requests the meshes it uses at boot, so these promises
+// mostly piggyback on in-flight downloads — the menu's loading bar simply
+// guarantees a match never starts with stand-in meshes visible.
+export function preloadPack(onProgress: (done: number, total: number) => void): Promise<void> {
+  const urls = Object.values(PACK).map((p) => p.url);
+  const total = urls.length;
+  let done = 0;
+  return new Promise((resolve) => {
+    for (const u of urls) {
+      template(u).then(() => {
+        done++;
+        onProgress(done, total);
+        if (done === total) resolve();
+      });
+    }
+  });
+}
+
 // soft contact shadow — grounds every prop so nothing reads as "floating on a
 // lawn" (the single cheapest polish win: one shared texture + geometry)
 let _shTex: THREE.CanvasTexture | null = null;

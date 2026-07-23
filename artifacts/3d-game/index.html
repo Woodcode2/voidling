@@ -152,6 +152,29 @@
       #menu .tag { font-size: clamp(11px, 1.6vw, 15px); font-weight: 800; letter-spacing: 7px; color: #d8c2ff; margin-top: 2px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
       #menu .spacer { flex: 1; }   /* the key-art hero shows through here */
+      /* world select — hole.io style map carousel (world 1 live, teasers locked) */
+      #worldRow { display: flex; gap: 10px; justify-content: center; margin: 0 0 12px; }
+      .wCard { width: 96px; padding: 10px 6px 8px; border-radius: 14px; text-align: center; cursor: pointer;
+        background: rgba(28,12,52,0.6); border: 2px solid rgba(168,123,255,0.28); color: #e8dcff;
+        display: flex; flex-direction: column; align-items: center; gap: 2px; user-select: none; }
+      .wCard i { font-size: 26px; font-style: normal; }
+      .wCard b { font-size: 11px; letter-spacing: 0.4px; font-weight: 800; }
+      .wCard span { font-size: 9px; opacity: 0.65; letter-spacing: 1.4px; font-weight: 700; }
+      .wCard.sel { border-color: #ffd23f; background: rgba(123,79,224,0.55); box-shadow: 0 0 18px rgba(184,117,255,0.4); }
+      .wCard.lock { filter: saturate(0.35); opacity: 0.72; }
+      .wCard.shake { animation: wshake 0.4s; }
+      @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+      /* loading screen — PLAY holds here until the asset pack is resident */
+      #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
+        justify-content: center; gap: 13px; background: radial-gradient(circle at 50% 30%, #2a1150, #0d0821 72%); }
+      #loadScr.show { display: flex; }
+      #loadScr .lLogo { font-size: 30px; font-weight: 900; letter-spacing: 3px; color: #fff; text-shadow: 0 0 24px #b875ff; }
+      #loadScr .lName { font-size: 14px; letter-spacing: 6px; color: #ffd23f; font-weight: 800; }
+      .lBarWrap { width: min(340px, 72vw); height: 14px; border-radius: 9px; background: rgba(255,255,255,0.12);
+        border: 2px solid rgba(168,123,255,0.4); overflow: hidden; }
+      #lBar { height: 100%; width: 0%; border-radius: 7px; background: linear-gradient(90deg, #7b4fe0, #b875ff, #ffd23f); transition: width 0.25s; }
+      #lPct { color: #cbb2ff; font-size: 12px; font-weight: 800; letter-spacing: 1px; }
+      #loadScr .lTip { color: #9a86c8; font-size: 11.5px; max-width: 78vw; text-align: center; font-weight: 600; }
       #menu button { font-family: inherit; cursor: pointer; border: none; color: #fff; }
       #btnPlay { font-size: 24px; font-weight: 900; letter-spacing: 3px; padding: 16px 76px; border-radius: 20px;
         background: linear-gradient(180deg, #ff5d7e, #ff2450); box-shadow: 0 7px 0 #b8163a, 0 14px 30px rgba(0,0,0,0.45); }
@@ -297,6 +320,11 @@
       <div class="tag">THE CUTE WORLD ENDER</div>
       <div id="rankChip"></div>
       <div class="spacer"></div>
+      <div id="worldRow">
+        <div class="wCard sel"><i>🏝️</i><b>MAPLE ISLE</b><span>WORLD 1</span></div>
+        <div class="wCard lock"><i>🌆</i><b>NEON CITY</b><span>SOON</span></div>
+        <div class="wCard lock"><i>❄️</i><b>FROST PEAKS</b><span>SOON</span></div>
+      </div>
       <button id="btnPlay">PLAY<span>vs the family · 3:00 · MAPLE ISLE</span></button>
       <button id="btnSolo">SOLO RUN<span>no rivals · 2:00 · devour 100%</span></button>
       <div class="navRow">
@@ -306,6 +334,15 @@
       </div>
       <div class="foot">drag to move · eat everything · become the WORLD ENDER</div>
       <button id="gift" title="free gift!">🎁</button>
+    </div>
+
+    <!-- ── loading screen: PLAY waits here until the asset pack is resident ── -->
+    <div id="loadScr">
+      <div class="lLogo">VOIDLING</div>
+      <div class="lName">MAPLE&nbsp;ISLE</div>
+      <div class="lBarWrap"><div id="lBar"></div></div>
+      <div id="lPct">0%</div>
+      <div class="lTip">tip: eat the little stuff first — cones, hydrants, mailboxes</div>
     </div>
 
     <!-- ── trophies ── -->
