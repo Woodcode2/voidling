@@ -122,8 +122,11 @@ const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
 const fx = createFx(scene);
+const FAMILY_TITLE: Record<string, string> = {
+  MUNCHER: 'Cousin', GOBBLER: 'Uncle', NOMLET: 'Baby', CHOMPZILLA: 'Auntie', GULPY: 'Grandpa',
+};
 rivals.onJoin = (name, color, x, z) => {
-  announce(`💜 ${name} joined the feast!`);
+  announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined the feast!`);
   fx.ring(x, z, color, 22, 0.8);
   audio.alert();
 };
@@ -137,8 +140,13 @@ rivals.onRivalEaten = (name, pts) => {
   playerScore += pts;
   addCoins(15);
   questEvent('rival');
-  if (!moments.firstRival) { moments.firstRival = true; announce('🌀 rival DEVOURED! burp.'); }
-  else announce(`🌀 you DEVOURED ${name}! +${pts}`);
+  announceFam(`🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
+  // real PAYOFF: triple shockwave + coin shower float — eating family is the play
+  fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.2, 0.9);
+  fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3, 0.7);
+  fx.shake(5); fx.flash('rgba(184,117,255,0.35)', 0.5);
+  floatPos.set(voidState.x, voidling.radius + 4, voidState.z);
+  bubbles.float(floatPos, '+15¢ FAMILY FEAST!', true);
   audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
   buzz(60);
 };
@@ -239,6 +247,11 @@ const formFill = el('formbar').querySelector('.fill') as HTMLElement;
 const scFill = () => document.getElementById('scFill');
 let prevHunger = 0;
 
+function announceFam(text: string) {
+  bannerEl.classList.add('fam');
+  announce(text);
+  setTimeout(() => bannerEl.classList.remove('fam'), 2300);
+}
 function announce(text: string) {
   bannerEl.textContent = text;
   bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
@@ -445,8 +458,11 @@ function refreshHud() {
     audio.ready(); buzz(20);
   }
   prevRank = myRank;
-  boardEl.innerHTML = rows.map((r, i) =>
-    `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
+  const shown = rows.filter((r, i) => i < 3 || r.me);   // compact: podium + you
+  boardEl.innerHTML = shown.map((r) => {
+    const i = rows.indexOf(r);
+    return `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`;
+  }).join('');
   let consumed = 0;
   for (const e of edibles) if (e.eaten || !e.mesh.visible) consumed += e.radius;
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
@@ -576,7 +592,7 @@ function capture(e: Edible, giveHunger = true) {
   if (e.radius > voidling.radius && tClock > chompCd) {
     chompCd = tClock + 7;
     bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
-  } else { audio.pop(combo); buzz(e.radius > 2 ? 15 : 8); }
+  } else { audio.pop(combo, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
   // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'army')
   const qk = e.mesh.userData.qk as string | undefined;
@@ -646,7 +662,7 @@ pwBtns[1].addEventListener('click', fireCollapse);
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
-let guideStep = 0, guideT = 0;
+let guideStep = 0, guideT = 0, presenceT = 0;
 const guideEl = () => el('guide');
 function showGuide(text: string, dur = 5) {
   const g = guideEl();
@@ -946,6 +962,14 @@ function animate() {
   if (started && !ended) {
     matchClock -= dt * clockSpeed;
     if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
+    // PRESENCE: a big void is an EVENT — ambient suction sparkles from stage 2,
+    // a low rolling rumble while moving fast from stage 3
+    presenceT -= dt;
+    if (curStage >= 2 && presenceT <= 0) {
+      presenceT = 0.55 - curStage * 0.08;
+      spawnSuck(2 + curStage, voidling.radius * 2.1);
+      if (curStage >= 3 && Math.hypot(velX, velZ) > 14) fx.shake(0.7 + (curStage - 3) * 0.5);
+    }
     timerEl.textContent = fmtTime(matchClock);
     if (matchClock <= 30) {
       timerEl.style.color = '#ff8a8a';
@@ -1079,7 +1103,7 @@ function animate() {
         const pull = (1 - d / reach) * (3.2 + R * 0.55);
         e.mesh.position.x -= (dx / d) * dt * pull;
         e.mesh.position.z -= (dz / d) * dt * pull;
-        e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);   // lean toward the pit
+        if (e.radius < 2.5) e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);   // small things lean in (a leaning HOUSE reads broken)
         e.mesh.userData.drifted = true;
       } else if (e.mesh.userData.drifted) {
         // you moved on without eating it — it springs back to its surveyed home
@@ -1177,7 +1201,7 @@ function animate() {
   // throttle DOM leaderboard updates (~5/s)
   // power-ready toast: celebrate the moment a power charges up
   if (hunger >= COST.gulp && prevHunger < COST.gulp) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'GULP READY!', true); audio.ready(); }
-  if (hunger >= COST.collapse && prevHunger < COST.collapse) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'COLLAPSE READY!!', true); audio.ready(); }
+  if (POWERS_ON && hunger >= COST.collapse && prevHunger < COST.collapse) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'COLLAPSE READY!!', true); audio.ready(); }
   prevHunger = hunger;
 
   // island news: a headline every ~20s, tone tracks the devoured meter

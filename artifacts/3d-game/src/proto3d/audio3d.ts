@@ -5,7 +5,7 @@
 type Ctx = AudioContext;
 
 export interface Audio3D {
-  pop(combo: number): void;        // eat — pitch rises with combo
+  pop(combo: number, size?: number): void;   // eat — pitch rises with combo, deepens with size
   gulp(): void;                    // GULP whoosh
   rocket(): void;                  // ROCKET BITE zip
   collapse(): void;                // COLLAPSE boom
@@ -169,16 +169,18 @@ export function createAudio(): Audio3D {
         musGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
       }
     },
-    pop(combo) {
-      // soft water-drop 'bloop' — pitch nudges up with the combo, hard
-      // rate-limit so a hoover-spree hums instead of rattling
+    pop(combo, size = 0.9) {
+      // soft water-drop 'bloop' — pitch nudges up with the combo, DEEPENS with
+      // the void's size (a WORLD ENDER bite is felt, not heard), rate-limited
       const c = ensure(); if (!c) return;
       const now = c.currentTime;
       if (now - lastPop < 0.09) return;
       lastPop = now;
-      const f = 190 + Math.min(combo, 20) * 9;
-      tone(f * 1.6, f * 0.72, 0.12, 'sine', 0.15);
+      const depth = Math.min(1, (size - 0.9) / 9);          // 0 tiny -> 1 huge
+      const f = (190 + Math.min(combo, 20) * 9) * (1 - depth * 0.55);
+      tone(f * 1.6, f * 0.72, 0.12 + depth * 0.08, 'sine', 0.15 + depth * 0.07);
       noise(0.05, 0.04, 900, 300);
+      if (depth > 0.4) tone(58, 34, 0.16, 'sine', depth * 0.12);   // sub thump
     },
     bigEat() {
       noise(0.22, 0.3, 900, 180);

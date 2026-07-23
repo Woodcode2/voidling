@@ -58,8 +58,8 @@ export function houseLots(gx: number, gy: number): HouseLot[] {
     lots.push({ x: cx + k * 400, y: cy + E, rot: 0, fx: 0, fy: 1 });          // south row → south road
   }
   for (const k of [-1, 0, 1]) {
-    lots.push({ x: cx - E, y: cy + k * 400, rot: -Math.PI / 2, fx: -1, fy: 0 });  // west edge
-    lots.push({ x: cx + E, y: cy + k * 400, rot: Math.PI / 2, fx: 1, fy: 0 });    // east edge
+    lots.push({ x: cx - E, y: cy + k * 330, rot: -Math.PI / 2, fx: -1, fy: 0 });  // west edge
+    lots.push({ x: cx + E, y: cy + k * 330, rot: Math.PI / 2, fx: 1, fy: 0 });    // east edge
   }
   return lots;
 }
