@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
-  railPointAt, insideIsland3, type Biome, type AddEdible,
+  railPointAt, insideIsland3, inLagoon3, type Biome, type AddEdible,
 } from './island';
 import { glb, vehicleGlb } from './assets3d';
 
@@ -232,7 +232,7 @@ export function createLife(
   // a car position is legal only ON the painted road network AND on the island —
   // no more sand cruises to the waterline or corners cut across lawns
   const onRoad = (x: number, z: number): boolean => {
-    if (!biomeAt(x, z)) return false;
+    if (!biomeAt(x, z) || inLagoon3(x, z)) return false;
     for (const rc of ROAD_CENTERS_3D) if (Math.abs(x - rc) < 5.4 || Math.abs(z - rc) < 5.4) return true;
     return false;
   };
@@ -385,7 +385,27 @@ export function createLife(
   // zoo animals: clamped near the pen
   {
     const [zx, zz] = blockCenter3D(5, 1);
-    for (let i = 0; i < 6; i++) addWanderer(makeAnimal(), zx + rand(-HALF_BLOCK_3D * 0.6, HALF_BLOCK_3D * 0.6), zz + rand(-HALF_BLOCK_3D * 0.6, HALF_BLOCK_3D * 0.6), HALF_BLOCK_3D * 0.55, rand(3, 5), 22, 3, 'zoo');
+    // each animal is TETHERED to its pen (matching the baked pen floors):
+    // savanna NW, paddock SW, flamingo lagoon E
+    const PENS: [number, number][] = [[zx - 15, zz - 21.5], [zx - 15, zz + 21.5], [zx + 10, zz]];
+    for (let i = 0; i < 6; i++) {
+      const [pcx, pcz] = PENS[i % 2];   // savanna + paddock get the blob animals
+      addWanderer(makeAnimal(), pcx + rand(-7, 7), pcz + rand(-5, 5), 8, rand(2.5, 4), 22, 3, 'zoo');
+    }
+    for (let i = 0; i < 3; i++) {   // flamingos wade in their lagoon
+      const fl = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff9ec2, roughness: 0.85 }));
+      body.scale.set(1.15, 0.9, 1); body.position.y = 1.5; fl.add(body);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 5), new THREE.MeshStandardMaterial({ color: 0xe86a9a, roughness: 0.9 }));
+      leg.position.y = 0.75; fl.add(leg);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.1, 6), new THREE.MeshStandardMaterial({ color: 0xff9ec2, roughness: 0.85 }));
+      neck.position.set(0.4, 2.4, 0); neck.rotation.z = -0.35; fl.add(neck);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff9ec2, roughness: 0.85 }));
+      head.position.set(0.62, 2.95, 0); fl.add(head);
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 6), new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.7 }));
+      beak.rotation.z = -Math.PI / 2; beak.position.set(0.85, 2.9, 0); fl.add(beak);
+      addWanderer(fl, PENS[2][0] + rand(-6, 6), PENS[2][1] + rand(-6, 6), 8, rand(1.2, 2), 26, 2.2, 'zoo');
+    }
   }
 
   // beach sunbathers: flat out on their towels, working on the tan
@@ -396,7 +416,7 @@ export function createLife(
     for (let i = 0; i < 3; i++) {
       const tx = bx + rand(-HALF_BLOCK_3D * 0.55, HALF_BLOCK_3D * 0.55);
       const tz = bz + rand(-HALF_BLOCK_3D * 0.55, HALF_BLOCK_3D * 0.55);
-      if (!biomeAt(tx, tz)) continue;
+      if (!biomeAt(tx, tz) || inLagoon3(tx, tz, 60)) continue;
       const towel = new THREE.Mesh(towelGeo, mat(pick([0xff6f91, 0x4dd0e1, 0xffd54f, 0x7be8b0]), 0.95));
       towel.rotation.x = -Math.PI / 2; towel.rotation.z = rand(0, Math.PI * 2);
       towel.position.set(tx, 0.08, tz); scene.add(towel);
@@ -406,6 +426,18 @@ export function createLife(
       bather.position.set(tx, 0.55, tz);
       setShadow(bather); scene.add(bather); addEdible(bather, 2.4);
     }
+  }
+
+  // pond ducks — "the ducks are rowdy" is finally TRUE
+  for (let i = 0; i < 4; i++) {
+    const duck = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xf6f2da : 0xffd54f, roughness: 0.9 }));
+    body.scale.set(1.25, 0.85, 1); body.position.y = 0.36; duck.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshStandardMaterial({ color: i % 2 ? 0x7ed57a : 0xf6f2da, roughness: 0.9 }));
+    head.position.set(0.42, 0.78, 0); duck.add(head);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 6), new THREE.MeshStandardMaterial({ color: 0xff9a3a, roughness: 0.8 }));
+    beak.rotation.z = -Math.PI / 2; beak.position.set(0.68, 0.75, 0); duck.add(beak);
+    addWanderer(duck, 128.25 + rand(-9, 9), -33.15 + rand(-9, 9), 11, rand(1.5, 2.5), 20, 1.2, 'park');
   }
 
   // birds: a couple of small flocks, high up and out of the way

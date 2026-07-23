@@ -134,6 +134,17 @@ function insideIslandWorld(wx: number, wy: number): boolean {
   return inside;
 }
 export const insideIsland3 = (x3: number, z3: number) => insideIslandWorld(x3 / SCALE + CX, z3 / SCALE + CZ);
+// lagoon membership (with a margin): roads, props and cars must never wade in
+export function inLagoon3(x3: number, z3: number, margin = 120): boolean {
+  const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
+  const nx = (wx - LAGOON.x) / (LAGOON.rx + margin), ny = (wy - LAGOON.y) / (LAGOON.ry + margin);
+  return nx * nx + ny * ny < 1;
+}
+// coast clearance: is this point at least `d` units from the void edge?
+export function coastClear(x3: number, z3: number, d = 12): boolean {
+  const len = Math.hypot(x3, z3) || 1;
+  return insideIsland3(x3 + (x3 / len) * d, z3 + (z3 / len) * d);
+}
 
 export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   const silW = SIL_POLY;
@@ -581,6 +592,94 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.fillStyle = 'rgba(233,246,255,0.55)'; g.beginPath(); g.arc(fx2, fy2, rOuter * 0.12, 0, Math.PI * 2); g.fill();
   }
 
+
+  // ZOO — visitor path loop + three pens (savanna / paddock / flamingo water)
+  {
+    const zcx = blockCenter(5), zcy = blockCenter(1);
+    g.save(); g.beginPath();
+    g.rect(pxW(zcx - BLOCK_SIZE / 2), pyW(zcy - BLOCK_SIZE / 2), pxW(zcx + BLOCK_SIZE / 2) - pxW(zcx - BLOCK_SIZE / 2), pyW(zcy + BLOCK_SIZE / 2) - pyW(zcy - BLOCK_SIZE / 2));
+    g.clip();
+    g.strokeStyle = hex(WORLD.dirtPath); g.lineWidth = pxW(120) - pxW(0); g.lineJoin = 'round';
+    g.beginPath();
+    g.ellipse(pxW(zcx - 240), pyW(zcy), pxW(430) - pxW(0), pyW(520) - pyW(0), 0, 0, Math.PI * 2);
+    g.stroke();
+    const pen = (px0: number, py0: number, wns: number, hns: number, col: string) => {
+      g.fillStyle = col;
+      g.fillRect(pxW(px0), pyW(py0), pxW(px0 + wns) - pxW(px0), pyW(py0 + hns) - pyW(py0));
+      g.strokeStyle = 'rgba(120,100,60,0.4)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
+      g.strokeRect(pxW(px0), pyW(py0), pxW(px0 + wns) - pxW(px0), pyW(py0 + hns) - pyW(py0));
+    };
+    pen(zcx - 560, zcy - 620, 520, 380, '#e6d494');            // savanna sand
+    pen(zcx - 560, zcy + 240, 520, 380, '#cfe0a8');            // grazing paddock
+    pen(zcx - 20, zcy - 200, 440, 400, hex(WORLD.waterShallow)); // flamingo lagoon
+    g.restore();
+  }
+
+  // MILITARY — fenced compound pad + painted helipad on the NW land triangle
+  {
+    const mcx = blockCenter(5), mcy = blockCenter(5);
+    g.fillStyle = '#7d8268';
+    g.fillRect(pxW(mcx - 780), pyW(mcy - 780), pxW(700) - pxW(0), pyW(420) - pyW(0));
+    g.strokeStyle = 'rgba(255,210,60,0.75)'; g.lineWidth = Math.max(2, pxW(18) - pxW(0));
+    g.strokeRect(pxW(mcx - 780), pyW(mcy - 780), pxW(700) - pxW(0), pyW(420) - pyW(0));
+    // helipad: ring + H
+    const hx2 = pxW(mcx - 250), hy2 = pyW(mcy - 580), hr = pxW(120) - pxW(0);
+    g.strokeStyle = 'rgba(240,244,252,0.9)'; g.lineWidth = hr * 0.16;
+    g.beginPath(); g.arc(hx2, hy2, hr, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = hr * 0.2; g.lineCap = 'butt';
+    g.beginPath(); g.moveTo(hx2 - hr * 0.4, hy2 - hr * 0.45); g.lineTo(hx2 - hr * 0.4, hy2 + hr * 0.45); g.stroke();
+    g.beginPath(); g.moveTo(hx2 + hr * 0.4, hy2 - hr * 0.45); g.lineTo(hx2 + hr * 0.4, hy2 + hr * 0.45); g.stroke();
+    g.beginPath(); g.moveTo(hx2 - hr * 0.4, hy2); g.lineTo(hx2 + hr * 0.4, hy2); g.stroke();
+  }
+
+  // PARK — real soccer pitch paint at block (4,3): boundary, halfway, circle
+  {
+    const scx = blockCenter(4), scy = blockCenter(3);
+    g.fillStyle = '#8fd472';
+    g.fillRect(pxW(scx - 260), pyW(scy - 170), pxW(520) - pxW(0), pyW(340) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = Math.max(1.5, pxW(12) - pxW(0));
+    g.strokeRect(pxW(scx - 240), pyW(scy - 150), pxW(480) - pxW(0), pyW(300) - pyW(0));
+    g.beginPath(); g.moveTo(pxW(scx), pyW(scy - 150)); g.lineTo(pxW(scx), pyW(scy + 150)); g.stroke();
+    g.beginPath(); g.arc(pxW(scx), pyW(scy), pxW(60) - pxW(0), 0, Math.PI * 2); g.stroke();
+    for (const sxg of [-1, 1]) g.strokeRect(pxW(scx + sxg * 240 - (sxg > 0 ? 90 : 0)), pyW(scy - 80), pxW(90) - pxW(0), pyW(160) - pyW(0));
+  }
+
+  // FOREST CAMPSITE — dirt clearing + trail so the camp sits in a real glade
+  {
+    const ccx = blockCenter(4), ccy = blockCenter(0);
+    g.fillStyle = hex(WORLD.dirtPath);
+    g.beginPath(); g.ellipse(pxW(ccx - 100), pyW(ccy + 60), pxW(330) - pxW(0), pyW(260) - pyW(0), 0.3, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = hex(WORLD.dirtPath); g.lineWidth = pxW(70) - pxW(0); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(pxW(ccx - 100), pyW(ccy + 300)); g.quadraticCurveTo(pxW(ccx - 300), pyW(ccy + 600), pxW(ccx - 200), pyW(blockCenter(0) + BLOCK_SIZE / 2)); g.stroke();
+  }
+
+  // POND — sandy bank ring + deep centre (was a flat washed-out disc)
+  g.strokeStyle = 'rgba(230,212,148,0.85)'; g.lineWidth = pxW(60) - pxW(0);
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 20) - pxW(0), pyW(POND[2] + 20) - pyW(0), 0, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = hex(WORLD.riverDeep);
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] * 0.55) - pxW(0), pyW(POND[2] * 0.55) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+
+  // BEACH VOLLEYBALL COURT — lined sand court under the net event at (2,5)
+  {
+    const vcx = blockCenter(2), vcy = blockCenter(5) + 180;
+    g.fillStyle = '#fbeab2';
+    g.fillRect(pxW(vcx - 200), pyW(vcy - 130), pxW(400) - pxW(0), pyW(260) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = Math.max(1.5, pxW(12) - pxW(0));
+    g.strokeRect(pxW(vcx - 180), pyW(vcy - 110), pxW(360) - pxW(0), pyW(220) - pyW(0));
+    g.beginPath(); g.moveTo(pxW(vcx), pyW(vcy - 110)); g.lineTo(pxW(vcx), pyW(vcy + 110)); g.stroke();
+  }
+
+  // AIRPORT — darker apron + yellow taxiway centreline + tie-down squares
+  {
+    const acx = blockCenter(5), acy = blockCenter(4);
+    g.fillStyle = '#b8bcc9';
+    g.fillRect(pxW(acx - 620), pyW(acy + 180), pxW(520) - pxW(0), pyW(380) - pyW(0));
+    g.strokeStyle = 'rgba(255,210,60,0.85)'; g.lineWidth = Math.max(2, pxW(20) - pxW(0));
+    g.beginPath(); g.moveTo(pxW(acx - 360), pyW(acy + 370)); g.lineTo(pxW(acx - 40), pyW(acy + 370)); g.lineTo(pxW(acx + 140), pyW(acy + 150)); g.stroke();
+    g.strokeStyle = 'rgba(240,244,252,0.6)'; g.lineWidth = Math.max(1.5, pxW(10) - pxW(0));
+    for (const tx of [-540, -420, -300]) g.strokeRect(pxW(acx + tx), pyW(acy + 240), pxW(90) - pxW(0), pyW(90) - pyW(0));
+  }
+
   g.restore(); // end island clip
 
   // coast: sand band + white foam rim, stroked along the silhouette
@@ -672,8 +771,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     const spots: { x: number; z: number; rot: number }[] = [];
     for (const c of ROAD_CENTERS.map((v) => w(v))) {
       for (let a = -292; a < 292; a += 5.6) {
-        if (insideIsland3(a, c)) spots.push({ x: a, z: c, rot: 0 });
-        if (insideIsland3(c, a)) spots.push({ x: c, z: a, rot: Math.PI / 2 });
+        if (insideIsland3(a, c) && !inLagoon3(a, c) && coastClear(a, c, 6)) spots.push({ x: a, z: c, rot: 0 });
+        if (insideIsland3(c, a) && !inLagoon3(c, a) && coastClear(c, a, 6)) spots.push({ x: c, z: a, rot: Math.PI / 2 });
       }
     }
     const inst = new THREE.InstancedMesh(dashGeo, dashMat, spots.length);
@@ -701,7 +800,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   );
   // face outward from island centre at the waterfall point
   const outAng = Math.atan2(wfZ, wfX);
-  waterfall.position.set(wfX, -11, wfZ);
+  waterfall.position.set(wfX, -8.5, wfZ);   // lip breaks the cliff rim — visible from above
   waterfall.rotation.y = -outAng + Math.PI / 2;
   scene.add(waterfall);
   // spray glow at base
@@ -728,7 +827,13 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
     addEdible(grp, 9);
-  }, undefined, () => { /* offline dev: no landmark, no error */ });
+  }, undefined, () => {
+    // asset unreachable: the FAIR still exists — procedural wheel stand-in
+    const fb = makeFerrisFB();
+    fb.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);
+    fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(fb); addEdible(fb, 9);
+  });
 
   // ONE hot-air balloon drifts over the island (the redesigned Higgsfield GLB
   // is wired via the asset pack in ./assets3d — placed by populate()).
@@ -1119,11 +1224,20 @@ function makeGolfball(): THREE.Group {
   return g;
 }
 const tinyFor = (biome: Biome) =>
-  biome === 'beach' ? pick([makeShell, makeShell, makeFlowers, makeCone])()
+  biome === 'beach' ? pick([makeShell, makeShell, makeFlowers, makeFlowers])()
   : biome === 'forest' ? pick([makeMushroom, makeMushroom, makeFlowers])()
   : biome === 'park' ? pick([makeGolfball, makeFlowers, makeFlowers])()
   : biome === 'zoo' ? pick([makeFlowers, makeShell, makeMushroom])()
+  : biome === 'airport' ? pick([makeCone, makeLuggage, makeLuggage])()
   : makeTinyProp();
+function makeLuggage(): THREE.Group {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.4), new THREE.MeshStandardMaterial({ color: pick([0xff5a4d, 0x5ec8d8, 0xffd23f, 0xb98cff]), roughness: 0.7 }));
+  b.position.y = 0.3; g.add(b);
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a3f4d }));
+  h.position.y = 0.68; g.add(h);
+  return g;
+}
 
 // ── civic/retail stand-ins (offline dev + far LOD) — downtown must NEVER show
 // a gabled suburban house on pavement, and the plaza always has a fountain ────
@@ -1174,10 +1288,225 @@ function makeFountainFB(): THREE.Group {
   return g;
 }
 
+
+// silhouette sample points (3D) for the coast-dressing pass in populate()
+const SIL3_FRINGE: [number, number][] = SIL_POLY.filter((_, i) => i % 3 === 0)
+  .map(([wx2, wy2]) => [(wx2 - CX) * SCALE, (wy2 - CZ) * SCALE] as [number, number]);
+
+// ── P0 fallback kit: every GLB prop has a real procedural stand-in, so no
+// district is ever sparse while meshes stream (or offline). Cheap primitives,
+// toy-bright colors, correct silhouettes.
+const std = (c: number, r = 0.8) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+function makeUmbrellaFB(): THREE.Group {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6), std(0xf4f6fa));
+  pole.position.y = 1.5; g.add(pole);
+  const top = new THREE.Mesh(new THREE.ConeGeometry(2, 0.9, 10), std(pick([0xff6a5e, 0x5ec8d8, 0xffd23f, 0xf06fb0])));
+  top.position.y = 3; g.add(top);
+  g.rotation.z = rand(-0.12, 0.12);
+  return g;
+}
+function makeSandcastleFB(): THREE.Group {
+  const g = new THREE.Group(); const m = std(0xeed9a0, 0.95);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 1.6), m); base.position.y = 0.45; g.add(base);
+  for (const [sx, sz] of [[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]] as const) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 1.4, 8), m); t.position.set(sx, 0.7, sz); g.add(t);
+    const c = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.5, 8), std(0xffd23f)); c.position.set(sx, 1.62, sz); g.add(c);
+  }
+  return g;
+}
+function makeCabanaFB(): THREE.Group {
+  const g = new THREE.Group(); const col = pick([0xff6a5e, 0x5ec8d8]);
+  for (const [sx, sz] of [[-1.5, -1.2], [1.5, -1.2], [-1.5, 1.2], [1.5, 1.2]] as const) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3, 6), std(0xf4f0e2)); post.position.set(sx, 1.5, sz); g.add(post);
+  }
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.24, 3), std(col)); roof.position.y = 3.1; g.add(roof);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.4, 0.14), std(0xfaf6ea)); back.position.set(0, 1.4, -1.2); g.add(back);
+  return g;
+}
+function makeLifeguardFB(): THREE.Group {
+  const g = new THREE.Group(); const red = std(0xff5a4d), white = std(0xf4f6fa);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 3.6, 6), white); leg.position.set(sx, 1.8, sz); g.add(leg);
+  }
+  const hut = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.8, 2.6), red); hut.position.y = 4.4; g.add(hut);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.3, 1, 4), white); roof.rotation.y = Math.PI / 4; roof.position.y = 5.9; g.add(roof);
+  const ramp = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 3.4), std(0xeecf9a)); ramp.position.set(0, 1.9, 2.4); ramp.rotation.x = 0.85; g.add(ramp);
+  return g;
+}
+function makeLighthouseFB(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.7 - i * 0.16, 1.85 - i * 0.16, 2.6, 12), std(i % 2 ? 0xff5a4d : 0xf6f8fc, 0.7));
+    band.position.y = 1.3 + i * 2.6; g.add(band);
+  }
+  const cab = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 1.6, 10), std(0x2c3a52, 0.4));
+  cab.position.y = 14; g.add(cab);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffd25a, emissiveIntensity: 0.9 }));
+  lamp.position.y = 14; g.add(lamp);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.2, 10), std(0xff5a4d)); cap.position.y = 15.4; g.add(cap);
+  return g;
+}
+function makeGazeboFB(): THREE.Group {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 0.5, 8), std(0xe8e2d2)); base.position.y = 0.25; g.add(base);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 3.4, 6), std(0xf6f2e6));
+    post.position.set(Math.cos(a) * 2.8, 2.2, Math.sin(a) * 2.8); g.add(post);
+  }
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(3.8, 2.2, 8), std(0x6fa8a0)); roof.position.y = 5; g.add(roof);
+  return g;
+}
+function makeGolfcartFB(): THREE.Group {
+  const g = new THREE.Group(); const white = std(0xf4f6fa, 0.5);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 1.4), white); body.position.y = 0.75; g.add(body);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 0.5, 1.2), std(0x5ec8d8)); seat.position.set(-0.3, 1.35, 0); g.add(seat);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.14, 1.4), white); roof.position.y = 2.5; g.add(roof);
+  for (const sx of [-0.9, 0.9]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 5), white); post.position.set(sx, 1.7, 0); g.add(post);
+  }
+  for (const [sx, sz] of [[-0.9, -0.75], [0.9, -0.75], [-0.9, 0.75], [0.9, 0.75]] as const) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.26, 10), std(0x20242c, 0.9));
+    wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.34, sz); g.add(wh);
+  }
+  return g;
+}
+function makeRocksFB(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.6, 1.2), 0), std(pick([0x9aa3b2, 0x8a92a4]), 1));
+    r.position.set(rand(-1, 1), rand(0.3, 0.5), rand(-1, 1)); r.rotation.set(rand(0, 3), rand(0, 3), 0); g.add(r);
+  }
+  return g;
+}
+function makeTentFB(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0, 2.2, 2.6, 4), std(pick([0xff8a70, 0x6db8e8])));
+  body.rotation.y = Math.PI / 4; body.position.y = 1.3; body.scale.z = 1.3; g.add(body);
+  const door = new THREE.Mesh(new THREE.CircleGeometry(0.7, 12, Math.PI, Math.PI), std(0x3a2f4a));
+  door.position.set(0, 0.7, 1.45); g.add(door);
+  return g;
+}
+function makeCampfireFB(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), std(0x9aa3b2, 1));
+    st.position.set(Math.cos(a) * 0.9, 0.2, Math.sin(a) * 0.9); g.add(st);
+  }
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 7), new THREE.MeshStandardMaterial({ color: 0xff9a3a, emissive: 0xff7a2a, emissiveIntensity: 0.8 }));
+  flame.position.y = 0.8; g.add(flame);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.6, 6), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffd25a, emissiveIntensity: 1 }));
+  tip.position.y = 1.35; g.add(tip);
+  return g;
+}
+function makeZooArchFB(): THREE.Group {
+  const g = new THREE.Group(); const stone = std(0xd8c8a0, 0.9);
+  for (const sz of [-3.4, 3.4]) {
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 6.5, 1.2), stone); p2.position.set(0, 3.25, sz); g.add(p2);
+  }
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 8.2), stone); bar.position.y = 6.6; g.add(bar);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.6, 5), std(0x7ed57a)); sign.position.y = 6.6; sign.position.x = 0.6; g.add(sign);
+  return g;
+}
+function makeIcecreamFB(): THREE.Group {
+  const g = new THREE.Group();
+  const cart = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.3, 1.1), std(0xfaf6ea, 0.6)); cart.position.y = 1; g.add(cart);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.34, 1.14), std(0xf06fb0)); stripe.position.y = 1.45; g.add(stripe);
+  const um = new THREE.Mesh(new THREE.ConeGeometry(1.4, 0.6, 10), std(0x5ec8d8)); um.position.y = 3; g.add(um);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 5), std(0xf4f6fa)); pole.position.y = 2.2; g.add(pole);
+  for (const sz of [-0.6, 0.6]) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.16, 10), std(0x20242c, 0.9));
+    wh.rotation.x = Math.PI / 2; wh.position.set(-0.5, 0.32, sz); g.add(wh);
+  }
+  return g;
+}
+function makeFoodtruckFB(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.4, 2), std(0xffd23f, 0.6)); body.position.y = 1.7; g.add(body);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 2), std(0xf4f6fa, 0.5)); cab.position.set(2.6, 1.3, 0); g.add(cab);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1, 0.12), std(0x2c3a52, 0.3)); win.position.set(-0.4, 2, 1.02); g.add(win);
+  const aw = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 1), std(0xff5a4d)); aw.position.set(-0.4, 2.8, 1.4); aw.rotation.x = 0.3; g.add(aw);
+  for (const [sx, sz] of [[-1.6, -1], [1.8, -1], [-1.6, 1], [1.8, 1]] as const) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 10), std(0x20242c, 0.9));
+    wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.5, sz); g.add(wh);
+  }
+  return g;
+}
+function makeFerrisFB(): THREE.Group {
+  const g = new THREE.Group(); const steel = std(0xff8fb8, 0.5);
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(6.5, 0.28, 8, 28), steel); wheel.position.y = 8; g.add(wheel);
+  for (let i = 0; i < 6; i++) {
+    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 13, 6), steel);
+    spoke.position.y = 8; spoke.rotation.z = (i / 6) * Math.PI; g.add(spoke);
+  }
+  const GOND = [0x5ec8d8, 0xffd23f, 0x7ed57a, 0xf06fb0, 0xb98cff, 0xff9a3a];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const gd = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.1), std(GOND[i]));
+    gd.position.set(Math.cos(a) * 6.5, 8 + Math.sin(a) * 6.5 - 0.8, 0); g.add(gd);
+  }
+  for (const sx of [-2.6, 2.6]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 8.6, 8), std(0xf4f6fa));
+    leg.position.set(sx, 4.1, 0); leg.rotation.z = sx > 0 ? -0.3 : 0.3; g.add(leg);
+  }
+  return g;
+}
+function makeHeliFB(): THREE.Group {
+  const g = new THREE.Group(); const olive = std(0x6b7050, 0.85);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(1, 2.6, 6, 10), olive); body.rotation.z = Math.PI / 2; body.position.y = 1.6; g.add(body);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.4, 3.4, 8), olive); tail.rotation.z = Math.PI / 2; tail.position.set(-3, 1.9, 0); g.add(tail);
+  const rotor = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.08, 0.4), std(0x2c3038, 0.6)); rotor.position.y = 3; g.add(rotor);
+  for (const sz of [-0.9, 0.9]) {
+    const skid = new THREE.Mesh(new THREE.BoxGeometry(3, 0.14, 0.16), std(0x3a3f4d)); skid.position.set(0.2, 0.32, sz); g.add(skid);
+  }
+  return g;
+}
+function makeTankFB(): THREE.Group {
+  const g = new THREE.Group(); const olive = std(0x6b7050, 0.9);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 1.1, 2.4), olive); hull.position.y = 0.95; g.add(hull);
+  for (const sz of [-1.1, 1.1]) {
+    const track = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.9, 0.6), std(0x3a3f30, 1)); track.position.set(0, 0.45, sz); g.add(track);
+  }
+  const tur = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.2, 0.8, 10), olive); tur.position.y = 1.9; g.add(tur);
+  const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 2.8, 8), olive); gun.rotation.z = Math.PI / 2; gun.position.set(2, 2, 0); g.add(gun);
+  return g;
+}
+function makeBeachChairFB(): THREE.Group {
+  const g = new THREE.Group(); const col = pick([0x5ec8d8, 0xffd23f, 0xf06fb0]);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1, 0.14, 1.6), std(col)); seat.position.y = 0.5; g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.12), std(col)); back.position.set(0, 1, -0.8); back.rotation.x = -0.4; g.add(back);
+  for (const [sx, sz] of [[-0.42, -0.7], [0.42, -0.7], [-0.42, 0.7], [0.42, 0.7]] as const) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 5), std(0xf4f6fa)); leg.position.set(sx, 0.25, sz); g.add(leg);
+  }
+  return g;
+}
+function makeDuckFB(): THREE.Group {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), std(0xf6f2da, 0.9)); body.scale.set(1.25, 0.85, 1); body.position.y = 0.36; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), std(0xf6f2da, 0.9)); head.position.set(0.42, 0.78, 0); g.add(head);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 6), std(0xff9a3a)); beak.rotation.z = -Math.PI / 2; beak.position.set(0.68, 0.75, 0); g.add(beak);
+  return g;
+}
+function makeFenceRun(len: number, col = 0xf4f0e2): THREE.Group {
+  // low post-and-rail fence along +X, centered
+  const g = new THREE.Group(); const m = std(col, 0.85);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.1), m); rail.position.y = 0.85; g.add(rail);
+  const rail2 = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.1), m); rail2.position.y = 0.45; g.add(rail2);
+  const n = Math.max(2, Math.round(len / 2.4));
+  for (let i = 0; i <= n; i++) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.1, 0.16), m);
+    post.position.set(-len / 2 + (i / n) * len, 0.55, 0); g.add(post);
+  }
+  return g;
+}
+
 function populate(scene: THREE.Scene, addEdible: AddEdible) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
     if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
+    if (inLagoon3(x3, z3, 40)) return;    // …or IN the lagoon
     mesh.position.set(x3, 0, z3);
     // shadow diet: tiny street props don't cast (hundreds of them; their shadows
     // are sub-pixel anyway) — a big chunk of the shadow pass for free
@@ -1224,6 +1553,27 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const pool = lotPool(biome, li, lot);
         if (!pool && li % 3 === 2) { const sh = makeShed(); sh.rotation.y = lot.rot + rand(-0.3, 0.3); place(sh, hx - fx3 * 12, hz - fz3 * 12, 1.8); }
         else if (!pool && Math.random() < 0.6) place(makeBush(), hx - fx3 * 10 + sx3 * rand(-3, 3), hz - fz3 * 10 + sz3 * rand(-3, 3), 1.6);
+        if (biome === 'fancy') {
+          // the rich part of town DRESSES: hedge along the lot line, topiary
+          // pair flanking the walk, gate pillars at the driveway
+          const hedge = makeFenceRun(9, 0x4faa5a);
+          hedge.rotation.y = lot.fy !== 0 ? 0 : Math.PI / 2;
+          place(hedge, hx + fx3 * 9.5 - sx3 * 5.5, hz + fz3 * 9.5 - sz3 * 5.5, 1.4);
+          for (const sSide of [-1, 1]) {
+            const top = new THREE.Group();
+            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1, 6), new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1 }));
+            tr.position.y = 0.5; top.add(tr);
+            const ball = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0x5dbe63, roughness: 0.9, flatShading: true }));
+            ball.position.y = 1.5; top.add(ball);
+            place(top, hx + fx3 * 6.5 + sx3 * (sSide * 2.2 - 1.5), hz + fz3 * 6.5 + sz3 * (sSide * 2.2 - 1.5), 1);
+          }
+          for (const gSide of [-1, 1]) {
+            const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 0.7), new THREE.MeshStandardMaterial({ color: 0xe8e2d2, roughness: 0.8 }));
+            pillar.position.y = 0.75;
+            const gp = new THREE.Group(); gp.add(pillar);
+            place(gp, hx + fx3 * 9.5 + sx3 * (5.5 + gSide * 1.6), hz + fz3 * 9.5 + sz3 * (5.5 + gSide * 1.6), 0.9);
+          }
+        }
       });
       // interior commons: a tighter tree cluster at the centre (backyards now
       // own the mid-band, so greenery reads planted, not scattered)
@@ -1273,7 +1623,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // court dressing: benches + ice-cream cart in the courtyard shade
       place(makeBench(), cx - 7, cz + 8, 2.4);
       const b2 = makeBench(); b2.rotation.y = Math.PI; place(b2, cx + 7, cz + 8, 2.4);
-      placeGlb('icecream', cx - 8, cz - 8, 2.2, 3.4, () => new THREE.Group());
+      placeGlb('icecream', cx - 8, cz - 8, 2.2, 3.4, makeIcecreamFB);
       for (const [ux, vz] of [[-0.4, 0.4], [0.4, -0.4]] as const)
         placeGlb('parktree', cx + ux * half, cz + vz * half, 3.2, 7, makeTree);
     } else if (biome === 'plaza') {
@@ -1286,8 +1636,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // library east — a real town centre, not a lone hall
       placeGlb('school', cx - half * 0.66, cz + half * 0.1, 8, 11, makeCivicHall, Math.PI / 2);
       { const lib = makeCivicHall(); lib.rotation.y = -Math.PI / 2; lib.scale.setScalar(0.75); place(lib, cx + half * 0.68, cz + half * 0.1, 7); }
-      placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.72, 4, 5, undefined, Math.PI / 6);
-      placeGlb('icecream', cx + half * 0.64, cz + half * 0.7, 2.2, 3.6, () => new THREE.Group(), -Math.PI / 6);
+      placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.72, 4, 5, makeFoodtruckFB, Math.PI / 6);
+      placeGlb('icecream', cx + half * 0.64, cz + half * 0.7, 2.2, 3.6, makeIcecreamFB, -Math.PI / 6);
       // flag poles flanking the town-hall steps
       for (const sxc of [-1, 1]) {
         const fp = new THREE.Group();
@@ -1307,26 +1657,38 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     } else if (biome === 'park') {
       // gazebo lives on the pond-walk (block 4,2 east side); block (4,3) centre
       // belongs to the soccer pitch — no more landmarks stacked on events
-      if (gy === 2) placeGlb('gazebo', cx + half * 0.5, cz + half * 0.42, 5, 8.5);
+      if (gy === 2) placeGlb('gazebo', cx + half * 0.5, cz + half * 0.42, 5, 8.5, makeGazeboFB);
+      const onPitch = (x: number, z: number) => gx === 4 && gy === 3 && Math.abs(x - cx) < 16 && Math.abs(z - cz) < 12;
       for (let t = 0; t < 9; t++) {
         const [x, z] = jitter();
+        if (onPitch(x, z)) continue;
         if (Math.random() < 0.55) placeGlb('parktree', x, z, 3.4, rand(6.5, 8.5), makeTree);
         else place(makeTree(), x, z, 3.4);
       }
-      if (gy === 2) placeGlb('golfcart', cx - half * 0.55, cz + half * 0.4, 2.6, 3.2, () => new THREE.Group(), rand(0, Math.PI));
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
-      for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBench(), x, z, 2.4); }
+      if (gy === 2) placeGlb('golfcart', cx - half * 0.55, cz + half * 0.4, 2.6, 3.2, makeGolfcartFB, rand(0, Math.PI));
+      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); if (!onPitch(x, z)) place(makeBush(), x, z, 1.6); }
+      for (let t = 0; t < 2; t++) { const [x, z] = jitter(); if (!onPitch(x, z)) place(makeBench(), x, z, 2.4); }
     } else if (biome === 'forest') {
       const jf = () => [cx + rand(-(half - 4), half - 4), cz + rand(-(half - 4), half - 4)] as const;
-      for (let t = 0; t < 20; t++) {
+      const isCamp = gx === 4 && gy === 0;
+      const inClearing = (x: number, z: number) => isCamp && Math.hypot(x - (cx - 5), z - (cz + 3)) < 15;
+      for (let t = 0; t < 32; t++) {   // a forest, not a parkland
         const [x, z] = jf();
-        if (Math.random() < 0.45) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
+        if (inClearing(x, z)) continue;
+        if (Math.random() < 0.4) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
         else place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3);
       }
-      placeGlb('rocks', cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.5, half * 0.5), 2.4, 2.6, () => new THREE.Group(), rand(0, Math.PI * 2));
+      if (isCamp) for (let i = 0; i < 3; i++) {   // log seats around the fire
+        const a = (i / 3) * Math.PI * 2 + 0.5;
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 1 }));
+        log.rotation.z = Math.PI / 2; log.rotation.y = a; log.position.y = 0.35;
+        const lg = new THREE.Group(); lg.add(log);
+        place(lg, cx + Math.cos(a) * 3.4, cz + Math.sin(a) * 3.4, 1.4);
+      }
+      placeGlb('rocks', cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.5, half * 0.5), 2.4, 2.6, makeRocksFB, rand(0, Math.PI * 2));
       if (gx === 4 && gy === 0) {   // the campsite block gets the AI camp set
-        placeGlb('tent', cx - 10, cz + 4, 2.6, 4.2, () => new THREE.Group(), rand(-0.4, 0.4));
-        placeGlb('campfire', cx, cz, 1.4, 1.7, () => new THREE.Group());
+        placeGlb('tent', cx - 10, cz + 4, 2.6, 4.2, makeTentFB, rand(-0.4, 0.4));
+        placeGlb('campfire', cx, cz, 1.4, 1.7, makeCampfireFB);
       }
       for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
     } else if (biome === 'beach') {
@@ -1341,17 +1703,29 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       for (const ux of [-0.4, 0.4]) { const bn = makeBench(); place(bn, cx + ux * half, cz - half * 1.02, 2.4); }
       // umbrella rows — staggered grid, resort-style
       for (const [ux, vz] of [[-0.55, -0.1], [-0.18, 0.14], [0.18, -0.1], [0.55, 0.14], [-0.36, 0.44], [0.36, 0.44]] as const)
-        placeGlb('umbrella', cx + ux * half, cz + vz * half, 1.8, 3.2, () => new THREE.Group(), rand(0, Math.PI * 2));
-      placeGlb('sandcastle', cx + rand(-half * 0.5, half * 0.5), cz + half * 0.68, 1.2, 1.9, () => new THREE.Group(), rand(0, Math.PI * 2));
-      if (gx === 1) placeGlb('lifeguard', cx, cz + half * 0.55, 3.4, 7.5, undefined, Math.PI);
-      if (gx === 4) placeGlb('lifeguard', cx - half * 0.3, cz + half * 0.5, 3.4, 7.5, undefined, Math.PI);
-      if (gx === 2) placeGlb('cabana', cx - half * 0.62, cz - half * 0.45, 3, 4.6, undefined, rand(-0.3, 0.3));
-      if (gx === 2) placeGlb('cabana', cx + half * 0.62, cz - half * 0.45, 3, 4.6, undefined, rand(-0.3, 0.3));
-      if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 10, 19);
+        placeGlb('umbrella', cx + ux * half, cz + vz * half, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+      placeGlb('sandcastle', cx + rand(-half * 0.5, half * 0.5), cz + half * 0.68, 1.2, 1.9, makeSandcastleFB, rand(0, Math.PI * 2));
+      for (let t = 0; t < 2; t++) { const ch = makeBeachChairFB(); ch.rotation.y = rand(0, Math.PI * 2); place(ch, cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.1, half * 0.5), 1.3); }
+      if (gx === 1) placeGlb('lifeguard', cx, cz + half * 0.55, 3.4, 7.5, makeLifeguardFB, Math.PI);
+      if (gx === 4) placeGlb('lifeguard', cx - half * 0.3, cz + half * 0.5, 3.4, 7.5, makeLifeguardFB, Math.PI);
+      if (gx === 2) placeGlb('cabana', cx - half * 0.62, cz - half * 0.45, 3, 4.6, makeCabanaFB, rand(-0.3, 0.3));
+      if (gx === 2) placeGlb('cabana', cx + half * 0.62, cz - half * 0.45, 3, 4.6, makeCabanaFB, rand(-0.3, 0.3));
+      if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 10, 19, makeLighthouseFB);
       for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.4); }
     } else if (biome === 'zoo') {
-      placeGlb('zooarch', cx - half * 0.7, cz, 6, 9, undefined, Math.PI / 2);
-      for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(Math.random() < 0.5 ? makeTree() : makeBush(), x, z, 3); }
+      placeGlb('zooarch', cx - half * 0.7, cz, 6, 9, makeZooArchFB, Math.PI / 2);
+      // pen fences matching the baked pen floors (savanna / paddock / lagoon)
+      const pens: [number, number, number, number][] = [
+        [cx - 15, cz - 21.5, 26, 19], [cx - 15, cz + 21.5, 26, 19], [cx + 10, cz, 22, 20],
+      ];
+      for (const [pcx, pcz, pw2, pd2] of pens) {
+        if (!insideIsland3(pcx + pw2 / 2, pcz) || !insideIsland3(pcx - pw2 / 2, pcz)) continue;
+        const n2 = makeFenceRun(pw2, 0xc9b28a); n2.position.set(pcx, 0, pcz - pd2 / 2); place(n2, pcx, pcz - pd2 / 2, 1.4);
+        const s2 = makeFenceRun(pw2, 0xc9b28a); place(s2, pcx, pcz + pd2 / 2, 1.4);
+        const w2 = makeFenceRun(pd2, 0xc9b28a); w2.rotation.y = Math.PI / 2; place(w2, pcx - pw2 / 2, pcz, 1.4);
+        const e2 = makeFenceRun(pd2, 0xc9b28a); e2.rotation.y = Math.PI / 2; place(e2, pcx + pw2 / 2, pcz, 1.4);
+      }
+      for (let t = 0; t < 4; t++) place(makeTree(), cx - half * 0.55 + rand(-6, 6), cz + rand(-half * 0.5, half * 0.5), 3);
     } else if (biome === 'airport') {
       // a real airfield: hangar + control tower + windsock + parked plane on
       // the apron (the runway/taxiway markings are baked into the ground)
@@ -1391,7 +1765,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           gear.rotation.x = Math.PI / 2; gear.position.set(0.8, 0.55, sz); pl.add(gear);
         }
         pl.rotation.y = -Math.PI / 4;    // parked ON the apron, nose to the runway
-        place(pl, cx - half * 0.35, cz + half * 0.45, 5);
+        place(pl, cx - half * 0.15, cz + half * 0.3, 5);
       }
       { // windsock
         const ws = new THREE.Group();
@@ -1409,8 +1783,24 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           new THREE.MeshStandardMaterial({ color: 0x6b7050, roughness: 0.95, flatShading: true }));
         place(bunker, cx + ux * half, cz - half * 0.8, 4);
       }
-      placeGlb('heli', cx - half * 0.35, cz - half * 0.5, 5, 5.5, undefined, rand(0, Math.PI * 2));
-      placeGlb('tank', cx - half * 0.65, cz - half * 0.5, 4, 3.4, undefined, Math.PI / 2);
+      // perimeter fence + guard tower around the baked compound pad
+      const fN = makeFenceRun(34, 0x8a8f74); place(fN, cx - half * 0.53, cz - half * 0.96, 1.4);
+      const fS = makeFenceRun(34, 0x8a8f74); place(fS, cx - half * 0.53, cz - half * 0.45, 1.4);
+      const fW = makeFenceRun(20, 0x8a8f74); fW.rotation.y = Math.PI / 2; place(fW, cx - half * 0.96, cz - half * 0.7, 1.4);
+      {
+        const tower = new THREE.Group();
+        for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 5.5, 6), new THREE.MeshStandardMaterial({ color: 0x8a8f74, roughness: 0.9 }));
+          leg.position.set(lx * 1.1, 2.75, lz * 1.1); tower.add(leg);
+        }
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(3, 1.8, 3), new THREE.MeshStandardMaterial({ color: 0x6b7050, roughness: 0.9 }));
+        cab.position.y = 6.4; tower.add(cab);
+        const rf = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1, 4), new THREE.MeshStandardMaterial({ color: 0x5a5f45, roughness: 0.9, flatShading: true }));
+        rf.rotation.y = Math.PI / 4; rf.position.y = 7.8; tower.add(rf);
+        place(tower, cx - half * 0.93, cz - half * 0.95, 4);
+      }
+      placeGlb('heli', cx - half * 0.31, cz - half * 0.72, 5, 5.5, makeHeliFB, rand(0, Math.PI * 2));
+      placeGlb('tank', cx - half * 0.65, cz - half * 0.5, 4, 3.4, makeTankFB, Math.PI / 2);
     }
 
     // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
@@ -1440,14 +1830,14 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     let ci = 0;
     for (let a = -270; a < 270; a += 32, ci++) {
       const side = ci % 2 ? 3.4 : -3.4;   // even alternating comb, no clumps
-      if (insideIsland3(a, rc)) place(makeCone(), a, rc + side, 0.7);
-      if (insideIsland3(rc, a)) place(makeCone(), rc - side, a, 0.7);
+      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
+      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
     }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {
       const side = li % 2 ? 4.6 : -4.6;
-      if (insideIsland3(a, rc)) place(makeLamp(), a, rc + side, 0.7);
-      if (insideIsland3(rc, a)) place(makeLamp(), rc - side, a, 0.7);
+      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeLamp(), a, rc + side, 0.7);
+      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeLamp(), rc - side, a, 0.7);
     }
   }
 
@@ -1460,6 +1850,19 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       const r0 = 7 + (i % 3) * 3.5;
       place(i % 3 === 0 ? makeCoins() : makeTinyProp(), sx0 + Math.cos(a) * r0, sz0 + Math.sin(a) * r0, i % 3 === 0 ? 0.55 : rand(0.6, 0.8));
     }
+  }
+
+  // coast fringe: the band between the grid and the cliff gets DESIGNED —
+  // boulders + wildflowers north, palms south, pines east (walks the actual
+  // silhouette, pulled inland so nothing hangs over the edge)
+  for (let i = 0; i < SIL3_FRINGE.length; i += 3) {
+    const [fx2, fz2] = SIL3_FRINGE[i];
+    const x = fx2 * 0.9, z = fz2 * 0.9;
+    if (!insideIsland3(x, z) || inLagoon3(x, z, 60)) continue;
+    if (z > 150) { if (Math.random() < 0.6) place(makePalm(), x, z, 2.6); else place(makeBush(), x, z, 1.4); }
+    else if (x > 150) place(Math.random() < 0.7 ? makePine() : makeRocksFB(), x, z, Math.random() < 0.7 ? 3 : 2.2);
+    else if (Math.random() < 0.5) place(makeRocksFB(), x, z, 2.2);
+    else place(makeFlowers(), x, z, 0.8);
   }
 
   // exactly ONE hot-air balloon in the sky — animated from createIsland's update
