@@ -482,7 +482,7 @@ export function createLife(
     const grp = new THREE.Group(); scene.add(grp);
     const cars: THREE.Group[] = [];
     for (let i = 0; i < 4; i++) { const c = makeLoco(i === 0); grp.add(c); cars.push(c); }
-    setShadow(grp); addEdible(grp, 8); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
+    setShadow(grp); addEdible(grp, 6.2); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
   }
   buildTrain();
   movers.push({

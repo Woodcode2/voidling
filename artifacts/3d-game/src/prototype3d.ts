@@ -9,7 +9,7 @@ import { createVoid } from './proto3d/void3d';
 import { createIsland } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
-import { createRivals } from './proto3d/rivals';
+import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
@@ -22,6 +22,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 // pixels than 2.0 — the single biggest lag lever on phones.
 const IS_SMALL_SCREEN = matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? 1.3 : 1.6));
+renderer.shadowMap.autoUpdate = false;   // half-rate shadow pass (updated in the frame loop)
+let shadowFrame = 0;
 // if the OS ever reclaims the GPU context, recover with a clean reload instead
 // of a frozen black screen
 renderer.domElement.addEventListener('webglcontextlost', (ev) => {
@@ -32,7 +34,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.08;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -44,7 +46,7 @@ const scene = new THREE.Scene();
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.25;   // specular sheen only — keep colours saturated
 }
-const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1900);
+const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
 let camDist = 50;
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
@@ -54,7 +56,7 @@ const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the
 // dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
 
 // ── lighting ─────────────────────────────────────────────────────────────────
-scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a5a80, 0.62));
+scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a5a80, 0.7));
 const sun = new THREE.DirectionalLight(0xfff2d8, 1.55);
 const sunOff = new THREE.Vector3(-55, 95, 42);
 sun.position.copy(sunOff);
@@ -66,6 +68,8 @@ let shCur = 165;
 sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
 sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
 sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.15;
+const SUN_DAY = new THREE.Color(0xfff2d8), SUN_DUSK = new THREE.Color(0xffc07a);
 // the shadow frustum rides the camera: tight box up close = crisp tree
 // shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
 function fitShadow(dist: number) {
@@ -123,7 +127,7 @@ const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
-  MUNCHER: 'Cousin', GOBBLER: 'Uncle', NOMLET: 'Baby', CHOMPZILLA: 'Auntie', GULPY: 'Grandpa',
+  YIKES: 'Cousin', DAZZLE: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', SNOOZLE: 'Grandpa',
 };
 rivals.onJoin = (name, color, x, z) => {
   announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined the feast!`);
@@ -283,7 +287,7 @@ let autoFireCd = 3;
 
 const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'WORLD ENDER'];
 // 2D thresholds 18/32/50/78/110 world-px, mapped through the 0.05 world scale
-const FORM_MIN = [0, 1.6, 2.5, 3.9, 5.5];
+const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.0];
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
 const PLAYER_COLOR = 0x9a5cff;
 
@@ -456,6 +460,15 @@ function refreshHud() {
   if (started && !ended && prevRank > 0 && myRank < prevRank) {
     announce(`👑 you passed ${rows[myRank]?.name ?? 'a rival'}!`);
     audio.ready(); buzz(20);
+  }
+  if (started && !ended && prevRank > 0 && myRank > prevRank) {
+    // a rival just passed YOU — they get to brag about it
+    const passer = rows[myRank - 2];
+    const rv = passer && !passer.me ? rivals.list.find((r) => r.name === passer.name) : undefined;
+    if (rv && RIVAL_VOICE[rv.name]) {
+      bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)], 'event');
+      rv.pulse = 1;
+    }
   }
   prevRank = myRank;
   const shown = rows.filter((r, i) => i < 3 || r.me);   // compact: podium + you
@@ -663,6 +676,7 @@ pwBtns[1].addEventListener('click', fireCollapse);
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
 let guideStep = 0, guideT = 0, presenceT = 0;
+let introT = 0, outroT = 0;
 const guideEl = () => el('guide');
 function showGuide(text: string, dur = 5) {
   const g = guideEl();
@@ -681,6 +695,7 @@ function beginMatch(solo = false) {
   el('titlecard').classList.add('show');
   titleUntil = tClock + 4.6;
   audio.startMusic(); audio.setMusicStage(0);
+  introT = 2.2;   // orbital reveal: the whole island, then dive to the tiny void
   if (!localStorage.getItem('voidPlayed')) { guideStep = 1; showGuide('<b>DRAG</b> anywhere to move!', 6); }
 }
 // ── asset preloader: menu time is download time; PLAY holds on a branded
@@ -706,7 +721,7 @@ const LOAD_TIPS = [
   'tip: eat a rival and they respawn tiny — and grumpy',
   'tip: the ferris wheel is dessert. save room.',
   'tip: quests pay coins — peek at the list mid-match',
-  'tip: NOMLET cries when eaten. worth it.',
+  'tip: BITSY cries when eaten. worth it.',
 ];
 function withWorldReady(cb: () => void) {
   if (packReady) { cb(); return; }
@@ -768,6 +783,7 @@ function resetMatch() {
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
+  sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.08; outroT = 0;
   el('end').classList.remove('show');
   timerEl.style.color = '';
   beginMatch(soloMode);
@@ -809,9 +825,9 @@ el('btnTrophies').addEventListener('click', () => { renderTrophies(); el('trophi
 function weekKey() { const d = new Date(); const on = new Date(d.getFullYear(), 0, 1); return `voidWeek-${d.getFullYear()}-${Math.ceil((((d.getTime() - on.getTime()) / 86400000) + on.getDay() + 1) / 7)}`; }
 function weeklyBoard(): { name: string; score: number; color: number; me?: boolean }[] {
   const seeded = [
-    { name: 'CHOMPZILLA', score: 3720, color: 0x7ed57a }, { name: 'NOMLET', score: 3315, color: 0xff9a3a },
-    { name: 'GOBBLER', score: 2940, color: 0xff6fb0 }, { name: 'GULPY', score: 2535, color: 0x4d8ff0 },
-    { name: 'MUNCHER', score: 2160, color: 0x2fd8c0 }, { name: 'B1G-B1TE', score: 1830, color: 0xd85a5a },
+    { name: 'CHOMPZILLA', score: 3720, color: 0x7ed57a }, { name: 'BITSY', score: 3315, color: 0xff9a3a },
+    { name: 'DAZZLE', score: 2940, color: 0xff6fb0 }, { name: 'SNOOZLE', score: 2535, color: 0x4d8ff0 },
+    { name: 'YIKES', score: 2160, color: 0x2fd8c0 }, { name: 'B1G-B1TE', score: 1830, color: 0xd85a5a },
     { name: 'snackrat', score: 1320, color: 0xb98cff },
   ];
   const mine = Number(localStorage.getItem(weekKey()) || 0);
@@ -962,11 +978,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
 
 function animate() {
   const dt = Math.min(0.05, clock.getDelta());
+  let dtw = dt;
+  if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
   tClock += dt;
   island.update(dt, tClock);
 
   if (started && !ended) {
-    matchClock -= dt * clockSpeed;
+    matchClock -= dtw * clockSpeed;
     if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
     // PRESENCE: a big void is an EVENT — ambient suction sparkles from stage 2,
     // a low rolling rumble while moving fast from stage 3
@@ -977,11 +995,17 @@ function animate() {
       if (curStage >= 3 && Math.hypot(velX, velZ) > 14) fx.shake(0.7 + (curStage - 3) * 0.5);
     }
     timerEl.textContent = fmtTime(matchClock);
+    if (introT > 0) { velX *= 0.9; velZ *= 0.9; }
     if (matchClock <= 30) {
       timerEl.style.color = '#ff8a8a';
       if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 30 SECONDS — EAT FASTER!!'); }
     }
-    if (matchClock <= 0) endMatch();
+    if (matchClock <= 0 && !ended && outroT <= 0) {
+      outroT = 2.0;   // slow-mo push-in beat before the results panel
+      fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 5, 1);
+      fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3.4, 0.8);
+      audio.evolve();
+    }
     // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
     if (!bigStart) {
       // hole.io opening: the first 30s run HOT so the first evolution lands
@@ -1156,14 +1180,21 @@ function animate() {
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
     // ~20% screen size across a form before the camera catches up, so growth
     // reads every few seconds instead of only at evolutions
-    const targetDist = Math.min(300, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
-    camDist += (targetDist - camDist) * Math.min(1, dt * 1.4);
+    let targetDist = Math.min(300, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
+    if (introT > 0) {
+      introT -= dt;
+      const k2 = Math.max(0, introT / 2.2);
+      camDist = 38 + 262 * k2 * k2;   // ease-in dive from orbit
+      targetDist = camDist;
+    }
+    if (outroT > 0) targetDist *= 0.72;   // end-of-match push-in on the winner moment
+    camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
     // the SIZE chip rides just under the hole (hole.io pattern)
     _chipV.set(voidState.x, 0, voidState.z).project(camera);
     formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
     formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + R * 9 + 30}px`;
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
-    camera.position.lerp(tmpV, Math.min(1, dt * 3));
+    camera.position.lerp(tmpV, 1 - Math.exp(-3.2 * dt));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);
   }
   // sun follows the void so shadows stay crisp near the action
@@ -1182,8 +1213,7 @@ function animate() {
       evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
     }
     audio.evolve();
-    fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);
-    if (curStage >= 2 && !quests[2].done) questComplete(quests[2]);   // GOBBLER quest
+    fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
     const wave = defense.setPhase(curStage);   // the city escalates with your form
     if (wave) { announce(wave); audio.alert(); }
     audio.setMusicStage(curStage);             // the soundtrack escalates too
@@ -1206,7 +1236,7 @@ function animate() {
 
   // throttle DOM leaderboard updates (~5/s)
   // power-ready toast: celebrate the moment a power charges up
-  if (hunger >= COST.gulp && prevHunger < COST.gulp) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'GULP READY!', true); audio.ready(); }
+  if (POWERS_ON && hunger >= COST.gulp && prevHunger < COST.gulp) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'GULP READY!', true); audio.ready(); }
   if (POWERS_ON && hunger >= COST.collapse && prevHunger < COST.collapse) { floatPos.set(voidState.x, R + 3, voidState.z); bubbles.float(floatPos, 'COLLAPSE READY!!', true); audio.ready(); }
   prevHunger = hunger;
 
@@ -1247,6 +1277,12 @@ function animate() {
 
   const shakeOff = fx.update(dt);
   camera.position.add(shakeOff);
+  if (started && !ended && matchClock < 45 && matchClock > -10) {
+    const gk = 1 - Math.max(0, matchClock) / 45;
+    sun.color.lerpColors(SUN_DAY, SUN_DUSK, gk);
+    renderer.toneMappingExposure = 1.08 + gk * 0.08;
+  }
+  if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }

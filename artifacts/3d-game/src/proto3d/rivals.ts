@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Biome } from './island';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
-export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; }
+export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; }
 export interface Rivals {
   list: Rival[];
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number): void;
@@ -17,34 +17,69 @@ export interface Rivals {
   reset(): void;                                         // instant rematch
 }
 
-const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
-// the void family has PERSONALITIES: anxious / show-off / baby / drama queen /
-// sleepy. Short lines (<=26 chars) so bubbles never wrap.
-const RIVAL_VOICE: Record<string, { taunt: string[]; respawn: string[]; eaten: string[] }> = {
-  MUNCHER: {
+const NAMES = ['YIKES', 'DAZZLE', 'BITSY', 'CHOMPZILLA', 'SNOOZLE'];
+// the family: anxious / show-off / baby / drama queen / sleepy. Names ARE the
+// personalities now (YIKES saying "I KNEW this would happen" is the joke).
+// All lines <=26 chars so bubbles never wrap.
+export const RIVAL_VOICE: Record<string, {
+  taunt: string[]; respawn: string[]; eaten: string[];
+  steal: string[]; escape: string[]; bite: string[];
+  nearBig: string[]; nearSmall: string[]; rankUp: string[];
+}> = {
+  YIKES: {
     taunt: ['sorry!! but also: yum!!', 'I ate it?? I ATE IT!', "don't be mad don't be mad", 'oh no. am I winning??', 'was that ok to eat??', 'eek— I mean… NOM!'],
     respawn: ['I KNEW this would happen', 'ow. told you. OW.', 'respawning. nervously.', "is it safe?? it's not."],
     eaten: ['called it.', "it's dark in here??", 'worst. day. EVER.'],
+    steal: ['I was gonna eat that!!', 'that was MY snack!! eep', 'rude!! politely rude!!'],
+    escape: ['MY WHOLE LIFE FLASHED!!', 'too close too close!!', 'never doing that again'],
+    bite: ['SORRY!! it was reflex!!', 'I panicked and CHOMPED', 'oh no I bit someone'],
+    nearBig: ['am I… bigger?? AAAH', 'being big is SCARY', "don't make me use this"],
+    nearSmall: ['NOPE NOPE NOPE NOPE', 'pretend I am a rock', 'walking away quickly!!'],
+    rankUp: ['I passed you?? sorry!!', 'winning is stressful!!', 'how did THAT happen'],
   },
-  GOBBLER: {
-    taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, sparkles'],
+  DAZZLE: {
+    taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, superstar'],
     respawn: ['I meant to do that', 'nobody saw that. good.', 'a fluke. obviously.', 'my glow!! ruined!!'],
     eaten: ["unfair!! I'm the STAR", 'my fans will hear of this', 'rude AND jealous'],
+    steal: ['excuse me?? RESERVED', 'that had MY name on it', 'the AUDACITY. stunning.'],
+    escape: ['TOO SLOW! hehehe', 'you almost touched FAME', 'catch me? adorable.'],
+    bite: ['delicious. obviously.', 'a five-star bite', "don't take it personal"],
+    nearBig: ["aww. you're teeny.", 'love the mini look', 'so small. so brave.'],
+    nearSmall: ["I'm not scared. (I am)", 'my agent said RUN', 'this is bad for my brand'],
+    rankUp: ['outta my way, slowpoke', 'first place suits me', 'and THAT is star power'],
   },
-  NOMLET: {
+  BITSY: {
     taunt: ['nom nom nom hehe', 'I did a WINNING!', 'big bite! BIGGEST bite!', 'dat one was YUMMY', 'me first! ME FIRST!', 'look!! I ate a house!!'],
     respawn: ['owie.', 'I want a do-over!!', 'not fair!! *sniff*', 'nap. then REVENGE.'],
     eaten: ['waaaAAAH!!', "you're a MEANIE", "I'm telling CHOMPZILLA"],
+    steal: ['MINE! dat was MINE!!', 'gimme it BACK!!', "I'm telling SNOOZLE!!"],
+    escape: ["can't catch meee!", 'hehehe too wiggly!', 'nyoom nyoom nyoom!'],
+    bite: ['CHOMP! hehehe', 'you taste like grape', 'oopsie chompsie!'],
+    nearBig: ["I'm da BIG kid now!", 'look how BIG I got!!', 'fear my tiny might!!'],
+    nearSmall: ['eep!! big person!!', 'be nice to babies!!', 'I want my blankie!!'],
+    rankUp: ['I winned past you!!', 'zoom zoom, slowpoke!', 'babies rule!!'],
   },
   CHOMPZILLA: {
     taunt: ['BEHOLD: dinner theater', 'a FEAST worthy of ME', 'the island? MY stage.', 'gasp. magnificent. me.', 'act two: I DEVOUR', "applause. I'll wait."],
     respawn: ['the AUDACITY!!', 'I shall RETURN!! *swish*', 'my villain origin story', 'curtain?? ALREADY??'],
     eaten: ['a TRAGEDY in one act', 'the drama!! the DRAMA!!', 'eaten?! by an AMATEUR?!'],
+    steal: ['STOP!! THIEF!! DRAMA!!', 'my dinner!! MY SCENE!!', 'you DARE upstage me?!'],
+    escape: ['DENIED! crowd goes wild', 'you missed! DRAMATIC!', 'the plot THICKENS!!'],
+    bite: ['a taste of VICTORY!!', 'consider that ACT ONE', 'delicious foreshadowing'],
+    nearBig: ['tremble, tiny snack!!', 'bow before CHOMPZILLA', 'the stage is MINE now'],
+    nearSmall: ["spare me!! I'm FAMOUS", 'not the FACE!!', 'exit!! stage LEFT!!'],
+    rankUp: ['the LEAD is my destiny', 'a STAR is reborn!!', 'weep, understudy!!'],
   },
-  GULPY: {
+  SNOOZLE: {
     taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],
     respawn: ['best nap ever', "wake me when it's safe", 'ugh. mornings.', 'snooze… then chomp'],
     eaten: ['finally, a nap', 'cozy in here, actually', 'zzzzz…'],
+    steal: ['hey… I called dibs… zzz', 'that was my breakfast…', 'rude. *yawns angrily*'],
+    escape: ['phew. back to my nap', 'cardio?? never again', '*escapes sleepily*'],
+    bite: ['mm. midnight snack.', 'sorry. sleep-chomping.', '*bites in his sleep*'],
+    nearBig: ['oh. when did I get big', 'being big is nap-sized', 'huh. tall now.'],
+    nearSmall: ['zzz— AAH okay running', 'five more minutes!!', 'too sleepy to flee…'],
+    rankUp: ['passed you in my sleep', '*overtakes while yawning*', 'zzzoom.'],
   },
 };
 const pickLine = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -58,7 +93,7 @@ const growR = (R: number, eR: number) => {
   return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
-function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
+function makeRivalMesh(color: number, idx = 0): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
   const group = new THREE.Group();
   const col = new THREE.Color(color);
   // tinted fresnel body: dark core -> coloured rim (same idea as the player void)
@@ -89,6 +124,37 @@ function makeRivalMesh(color: number): { group: THREE.Group; eyes: THREE.Group; 
     pupil.position.set(sx, 0.08, 1.02); pupil.renderOrder = 6;
     eyes.add(white); eyes.add(pupil);
   }
+  // personality accessory: sweat drop / star shades / hair curl / crown / nightcap
+  const bmat = (c2: number) => new THREE.MeshBasicMaterial({ color: c2 });
+  if (idx % 5 === 0) {   // YIKES: sweat drop at the temple
+    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.9, depthWrite: false }));
+    drop.scale.set(1, 1.5, 1); drop.position.set(0.5, 0.72, 0.5); group.add(drop);
+  } else if (idx % 5 === 1) {   // DAZZLE: star shades (billboard with the eyes)
+    for (const sx of [-0.32, 0.32]) {
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.15, 16), new THREE.MeshBasicMaterial({ color: 0x140a26, depthTest: false, depthWrite: false }));
+      lens.position.set(sx, 0.1, 1.03); lens.renderOrder = 7; eyes.add(lens);
+    }
+    const bridge = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.03), new THREE.MeshBasicMaterial({ color: 0x140a26, depthTest: false, depthWrite: false }));
+    bridge.position.set(0, 0.12, 1.03); bridge.renderOrder = 7; eyes.add(bridge);
+  } else if (idx % 5 === 2) {   // BITSY: single baby hair curl
+    const curl = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.035, 8, 14, Math.PI * 1.4), bmat(new THREE.Color(color).multiplyScalar(0.7).getHex()));
+    curl.position.set(0, 1.02, 0); curl.rotation.set(0.4, 0, 0.3); group.add(curl);
+  } else if (idx % 5 === 3) {   // CHOMPZILLA: rakishly tilted gold crown
+    const crown = new THREE.Group();
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.13, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd34d, side: THREE.DoubleSide }));
+    crown.add(band);
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI * 2;
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.1, 6), bmat(0xffd34d));
+      spike.position.set(Math.cos(a) * 0.15, 0.11, Math.sin(a) * 0.15); crown.add(spike);
+    }
+    crown.position.set(0.12, 0.96, 0.1); crown.rotation.z = -0.3; group.add(crown);
+  } else {   // SNOOZLE: floppy nightcap + pom-pom
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 12), bmat(0x4d6bff));
+    cap.position.set(0, 1.0, 0); cap.rotation.z = 0.7; group.add(cap);
+    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bmat(0xffffff));
+    pom.position.set(0.42, 1.18, 0); group.add(pom);
+  }
   const halo = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.07;
   return { group, eyes, halo };
@@ -103,14 +169,14 @@ export function createRivals(
 ): Rivals {
   // props the family has eaten, mid shrink-out animation
   const shrinking: THREE.Object3D[] = [];
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
 
   for (let i = 0; i < count; i++) {
     const color = COLORS[i % COLORS.length];
-    const { group, eyes, halo } = makeRivalMesh(color);
+    const { group, eyes, halo } = makeRivalMesh(color, i);
     scene.add(group); scene.add(halo);
     group.visible = halo.visible = false;   // hidden until they join the feast
     // spread rivals around the island away from the player start
@@ -118,7 +184,7 @@ export function createRivals(
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
-      vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10) });
+      vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false });
   }
 
   const tmp = new THREE.Vector3();
@@ -158,8 +224,9 @@ export function createRivals(
           rv.respawnT -= dt;
           if (rv.respawnT <= 0) {
             const a2 = rand(0, Math.PI * 2);
-            rv.x = Math.cos(a2) * 140; rv.z = Math.sin(a2) * 140;
-            if (!biomeAt(rv.x, rv.z)) { rv.x *= 0.6; rv.z *= 0.6; }
+            const rr = rand(45, 80);   // near the player — a grumpy tiny rival re-entering IS a story
+            rv.x = px + Math.cos(a2) * rr; rv.z = pz + Math.sin(a2) * rr;
+            if (!biomeAt(rv.x, rv.z)) { rv.x = Math.cos(a2) * 100; rv.z = Math.sin(a2) * 100; }
             rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn));
           } else continue;
@@ -169,8 +236,27 @@ export function createRivals(
         // AI: STICKY targeting — commit to a snack until it's gone/reached,
         // flee a much bigger player, and contest the player's size directly
         rv.retarget -= dt;
+        // the player STOLE the snack this rival was beelining for — say so
+        if (rv.tgt && eaten(rv.tgt.mesh)) {
+          const sx2 = rv.tgt.mesh.position.x - px, sz2 = rv.tgt.mesh.position.z - pz;
+          if (Math.hypot(sx2, sz2) < pr + 5 && rv.speakCd <= 0) {
+            rv.speakCd = rand(6, 10);
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].steal));
+          }
+          rv.tgt = null;
+        }
         const dpx = rv.x - px, dpz = rv.z - pz, dp = Math.hypot(dpx, dpz);
         const fleeing = pr > rv.r * 1.15 && dp < pr + 40;
+        if (fleeing && dp < pr * 1.05) rv.closeCall = true;   // almost swallowed…
+        if (rv.closeCall && dp > pr * 1.8) {                   // …and wriggled free
+          rv.closeCall = false;
+          if (rv.speakCd <= 0) { rv.speakCd = 8; api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].escape)); }
+        }
+        // drive-by size chirps — every close pass becomes a beat
+        if (rv.speakCd <= 0 && dp < pr + rv.r + 6) {
+          if (rv.r > pr * 1.15) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearBig)); }
+          else if (rv.r < pr * 0.85) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearSmall)); }
+        }
         const reached = Math.hypot(rv.tx - rv.x, rv.tz - rv.z) < 2.5;
         if (fleeing) { rv.tx = rv.x + dpx; rv.tz = rv.z + dpz; }
         else if (rv.retarget <= 0 || reached) {
@@ -181,8 +267,9 @@ export function createRivals(
             const d = (e.mesh.position.x - rv.x) ** 2 + (e.mesh.position.z - rv.z) ** 2;
             if (d < bd) { bd = d; best = e; }
           }
-          if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; }
-          else { const a3 = rand(0, Math.PI * 2); rv.tx = Math.cos(a3) * rand(40, 170); rv.tz = Math.sin(a3) * rand(40, 170); }
+          if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; rv.tgt = best; }
+          else if (rv.name === 'BITSY') { rv.tx = px + rand(-45, 45); rv.tz = pz + rand(-45, 45); rv.tgt = null; }   // the baby follows the player around
+          else { const a3 = rand(0, Math.PI * 2); rv.tx = Math.cos(a3) * rand(40, 170); rv.tz = Math.sin(a3) * rand(40, 170); rv.tgt = null; }
         }
         // SMOOTHED motion (no more teleporty slides) + coast handling
         const mx = rv.tx - rv.x, mz = rv.tz - rv.z, md = Math.hypot(mx, mz) || 1;
@@ -217,6 +304,7 @@ export function createRivals(
         }
         if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0) {
           rv.biteCd = 9; rv.pulse = 1;
+          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].bite));
           api.onPlayerBitten?.(rv.name);
         }
 
@@ -245,7 +333,13 @@ export function createRivals(
         rv.group.scale.set(rv.r / Math.sqrt(sq), rv.r * sq, rv.r / Math.sqrt(sq));
         rv.eyes.quaternion.copy(camera.quaternion);
         // look toward travel dir
-        rv.eyes.children.forEach((c) => { c.position.x = (c.position.x < 0 ? -0.32 : 0.32) + THREE.MathUtils.clamp(mx / md * 0.06, -0.06, 0.06); });
+        const aimX = dp < 30 ? (rv.x - px) / (dp || 1) * -1 : mx / md;   // it SAW you
+        const wide = fleeing ? 1.28 : 1;
+        rv.eyes.children.forEach((c, ci) => {
+          if (ci >= 4) return;   // accessory shades stay put
+          c.position.x = (c.position.x < 0 ? -0.32 : 0.32) + THREE.MathUtils.clamp(aimX * 0.06, -0.06, 0.06);
+          if (ci % 2 === 0) c.scale.setScalar(wide);   // scared stare
+        });
         rv.halo.position.set(rv.x, 0.14, rv.z); rv.halo.scale.setScalar(rv.r * 1.5);
         void tmp;
       }

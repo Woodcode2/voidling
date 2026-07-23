@@ -862,13 +862,13 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     grp.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);   // beach fairground
     grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
-    addEdible(grp, 9);
+    addEdible(grp, 6.4);
   }, undefined, () => {
     // asset unreachable: the FAIR still exists — procedural wheel stand-in
     const fb = makeFerrisFB();
     fb.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);
     fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    scene.add(fb); addEdible(fb, 9);
+    scene.add(fb); addEdible(fb, 6.4);
   });
 
   // ONE hot-air balloon drifts over the island (the redesigned Higgsfield GLB
@@ -1661,7 +1661,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       buildRow(half * 1.0, (o) => [cx - inset, cz + o], -Math.PI / 2, seed + 2);  // west wall
       buildRow(half * 1.0, (o) => [cx + inset, cz + o], Math.PI / 2, seed + 3);   // east wall
       // signature tower rising from the service court
-      placeGlb((gx + gy) % 2 ? 'tower_deco' : 'tower_glass', cx, cz, 8,
+      placeGlb((gx + gy) % 2 ? 'tower_deco' : 'tower_glass', cx, cz, 6.2,
         22 + ((gx * 7 + gy * 13) % 4) * 3, () => makeTower(true));
       // corner retail at the south junctions (the gaps the walls leave open)
       placeGlb('cafe', cx - half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, Math.PI);
@@ -1681,11 +1681,11 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // civic square, properly staged: TOWN HALL at the north end, the mayor's
       // stage on its steps (./life), the AI fountain ON the paved circle at the
       // centre, food truck + ice-cream cart at the south corners
-      placeGlb('townhall', cx, cz - half * 0.62, 10, 17, makeCivicHall, 0);
+      placeGlb('townhall', cx, cz - half * 0.62, 6.5, 17, makeCivicHall, 0);
       placeGlb('fountain', cx, cz, 4, 6.5, makeFountainFB);
       // civic institutions FLANK the square: school west (facing the axis),
       // library east — a real town centre, not a lone hall
-      placeGlb('school', cx - half * 0.66, cz + half * 0.1, 8, 11, makeCivicHall, Math.PI / 2);
+      placeGlb('school', cx - half * 0.66, cz + half * 0.1, 6.4, 11, makeCivicHall, Math.PI / 2);
       { const lib = makeCivicHall(); lib.rotation.y = -Math.PI / 2; lib.scale.setScalar(0.75); place(lib, cx + half * 0.68, cz + half * 0.1, 7); }
       placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.72, 4, 5, makeFoodtruckFB, Math.PI / 6);
       placeGlb('icecream', cx + half * 0.64, cz + half * 0.7, 2.2, 3.6, makeIcecreamFB, -Math.PI / 6);
@@ -1761,7 +1761,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       if (gx === 4) placeGlb('lifeguard', cx - half * 0.3, cz + half * 0.5, 3.4, 7.5, makeLifeguardFB, Math.PI);
       if (gx === 2) placeGlb('cabana', cx - half * 0.62, cz - half * 0.45, 3, 4.6, makeCabanaFB, rand(-0.3, 0.3));
       if (gx === 2) placeGlb('cabana', cx + half * 0.62, cz - half * 0.45, 3, 4.6, makeCabanaFB, rand(-0.3, 0.3));
-      if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 10, 19, makeLighthouseFB);
+      if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 6.5, 19, makeLighthouseFB);
       for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.4); }
     } else if (biome === 'zoo') {
       placeGlb('zooarch', cx - half * 0.7, cz, 6, 9, makeZooArchFB, Math.PI / 2);
@@ -1783,7 +1783,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       const hangar = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 18, 12, 1, false, 0, Math.PI),
         new THREE.MeshStandardMaterial({ color: 0xcfd6e0, roughness: 0.7, flatShading: true }));
       hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 4; hangar.position.set(cx - half * 0.55, 4.5, cz + half * 0.6);
-      setShadow(hangar); scene.add(hangar); addEdible(hangar, 9);
+      setShadow(hangar); scene.add(hangar); addEdible(hangar, 6.4);
       { // control tower with a glass cab
         const tw = new THREE.Group();
         const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 12, 10),
