@@ -52,6 +52,23 @@ export const PACK: Record<string, { url: string; h: number }> = {
 const loader = new GLTFLoader();
 const templates = new Map<string, Promise<THREE.Object3D | null>>();
 
+// mobile-safe loading: GLTF parse allocates large intermediate buffers and
+// decodes textures — 33 in flight at once spikes past iOS Safari's per-tab
+// memory ceiling and kills the page at the loading screen. A small queue
+// keeps peak memory flat; total load time barely changes (network dominates).
+const MAX_PARALLEL = 4;
+let active = 0;
+const waiting: (() => void)[] = [];
+function slot(): Promise<void> {
+  if (active < MAX_PARALLEL) { active++; return Promise.resolve(); }
+  return new Promise((res) => waiting.push(() => { active++; res(); }));
+}
+function release() {
+  active--;
+  const next = waiting.shift();
+  if (next) next();
+}
+
 // LOD registry: switch distances must TRACK the camera. A fixed threshold dies
 // the moment the camera pulls back past it (every AI mesh degraded to its
 // stand-in for the whole match). Instead the game feeds us its camera distance
@@ -66,7 +83,7 @@ export function updateLodBias(camDist: number) {
 function template(url: string): Promise<THREE.Object3D | null> {
   let p = templates.get(url);
   if (!p) {
-    p = new Promise((resolve) => {
+    p = slot().then(() => new Promise<THREE.Object3D | null>((resolve) => {
       loader.load(url, (gltf) => {
         const m = gltf.scene;
         const box = new THREE.Box3().setFromObject(m);
@@ -77,7 +94,7 @@ function template(url: string): Promise<THREE.Object3D | null> {
         m.position.set(m.position.x - c.x, m.position.y - box.min.y, m.position.z - c.z);
         resolve(m);
       }, undefined, () => resolve(null));
-    });
+    })).then((m) => { release(); return m; });
     templates.set(url, p);
   }
   return p;
