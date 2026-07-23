@@ -162,13 +162,7 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75],
-    // TEMP AUDIT SPOTS (revert before commit)
-    zoo: [213.75, -128.25], airport: [213.75, 128.25], military: [213.75, 213.75], park2: [128.25, 42.75],
-    fancy: [-128.25, -42.75], fancy2: [-42.75, 128.25], cozy2: [-213.75, 128.25], beach0: [-213.75, 213.75],
-    lagoon: [-116.25, 215.35], ferris: [46.75, 199.75], waterfall: [178, 192], river: [125, -90],
-    forest: [213.75, -42.75], forest2: [128.25, 128.25], forestN: [213.75, -213.75],
-    coastN: [-42.75, -258], coastW: [-258, -42.75], coastE: [252, -10], coastNW: [-230, -215] };
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
