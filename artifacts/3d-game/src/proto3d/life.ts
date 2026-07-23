@@ -166,25 +166,49 @@ function makePerson(biome?: string, colOverride?: number): THREE.Group {
   g.userData.limbs = { la, ra, ll, rl, phase: Math.random() * 6 } as Limbs;
   return g;
 }
+let animalN = 0;
 function makeAnimal(): THREE.Group {
+  // three readable species so the "lions are LOOSE" bark is true: elephant,
+  // lion, sheep — cycled so every pen mixes
   const g = new THREE.Group();
-  const col = pick([0xf2d06b, 0xe08a5a, 0xdedede, 0x8a8a8a, 0xf0a0c0, 0x6a5a4a]);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 10),
-    new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true }));
+  const kind = animalN++ % 3;
+  const col = kind === 0 ? 0x9aa3b2 : kind === 1 ? 0xf2d06b : 0xf0eee6;
+  const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 10), mat);
   body.scale.set(1.5, 1, 1); body.position.y = 1.6; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8),
-    new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true }));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), mat);
   head.position.set(2, 2.2, 0); g.add(head);
   for (const sx of [-1.2, 1.2]) for (const sz of [-0.8, 0.8]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.4, 6),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 }));
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.4, 6), mat);
     leg.position.set(sx, 0.7, sz); g.add(leg);
+  }
+  if (kind === 0) {   // elephant: trunk + big ear discs
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 1.8, 8), mat);
+    trunk.position.set(2.9, 1.5, 0); trunk.rotation.z = 0.5; g.add(trunk);
+    for (const sz of [-0.95, 0.95]) {
+      const ear = new THREE.Mesh(new THREE.CircleGeometry(0.75, 12), new THREE.MeshStandardMaterial({ color: 0x8a92a4, roughness: 0.9, side: THREE.DoubleSide }));
+      ear.position.set(1.8, 2.6, sz); ear.rotation.y = sz > 0 ? 0.5 : -0.5; g.add(ear);
+    }
+  } else if (kind === 1) {   // lion: mane + tail tuft
+    const mane = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.4, 8, 14), new THREE.MeshStandardMaterial({ color: 0xc9812a, roughness: 0.95, flatShading: true }));
+    mane.position.set(1.7, 2.2, 0); mane.rotation.y = Math.PI / 2; g.add(mane);
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.6, 6), mat);
+    tail.position.set(-2.4, 2, 0); tail.rotation.z = 0.7; g.add(tail);
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc9812a, roughness: 0.95 }));
+    tuft.position.set(-3, 2.6, 0); g.add(tuft);
+  } else {   // sheep: ear cones + tail puff
+    for (const sz of [-0.6, 0.6]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 6), mat);
+      ear.position.set(2.1, 3.1, sz); ear.rotation.z = 0.3; g.add(ear);
+    }
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), mat);
+    tail.position.set(-2.5, 1.9, 0); g.add(tail);
   }
   return g;
 }
 function makeBird(): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: pick([0xffffff, 0x33384a, 0xf0f0f0]), roughness: 0.7, flatShading: true, side: THREE.DoubleSide });
+  const mat = new THREE.MeshStandardMaterial({ color: pick([0xffffff, 0xf0f0f0, 0xe8eef6]), roughness: 0.7, flatShading: true, side: THREE.DoubleSide });
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), mat); g.add(body);
   for (const s of [-1, 1]) {
     const wing = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.2, 4), mat);
@@ -193,21 +217,62 @@ function makeBird(): THREE.Group {
   return g;
 }
 function makeLoco(isLoco: boolean): THREE.Group {
+  // a TOY TRAIN, not colored boxes: boiler + cab + cowcatcher on the loco,
+  // windowed coaches with roofs, skirts and coupling rods
   const g = new THREE.Group();
-  const col = isLoco ? 0x5a3aa0 : pick([0xd85a5a, 0x5ab0d8, 0xf0c050]);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(7, 3.2, 3.4),
-    new THREE.MeshStandardMaterial({ color: col, roughness: 0.55, metalness: 0.2, flatShading: true }));
-  body.position.y = 2.4; g.add(body);
-  if (isLoco) {
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2, 3.2), new THREE.MeshStandardMaterial({ color: 0x3a2470, roughness: 0.5 }));
-    cab.position.set(-1.8, 4.4, 0); g.add(cab);
-    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.4, 8), new THREE.MeshStandardMaterial({ color: 0x2a2440 }));
-    chimney.position.set(2, 4.4, 0); g.add(chimney);
-  }
+  const winGlass = new THREE.MeshStandardMaterial({ color: 0xffe9b8, roughness: 0.4, emissive: 0xffd98a, emissiveIntensity: 0.3 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2440, roughness: 0.7 });
   const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.9 });
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5, roughness: 0.4 });
+  if (isLoco) {
+    const purple = new THREE.MeshStandardMaterial({ color: 0x5a3aa0, roughness: 0.5, metalness: 0.15 });
+    const boiler = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 4.6, 12), purple);
+    boiler.rotation.z = Math.PI / 2; boiler.position.set(1.2, 2.6, 0); g.add(boiler);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(1.5, 12, 10), purple);
+    nose.position.set(3.5, 2.6, 0); g.add(nose);
+    const catcher = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.4, 4), dark);
+    catcher.rotation.y = Math.PI / 4; catcher.rotation.z = -Math.PI / 2; catcher.position.set(4.1, 1.1, 0); g.add(catcher);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.8, 3, 3.2), purple);
+    cab.position.set(-1.6, 3.4, 0); g.add(cab);
+    for (const sz of [-1.62, 1.62]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 0.08), winGlass);
+      win.position.set(-1.6, 3.9, sz); g.add(win);
+    }
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.3, 3.6), dark);
+    roof.position.set(-1.6, 5, 0); g.add(roof);
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 1.5, 10), dark);
+    chimney.position.set(2.2, 4.6, 0); g.add(chimney);
+    const lip = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.35, 0.35, 10), dark);
+    lip.position.set(2.2, 5.4, 0); g.add(lip);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), hubMat);
+    dome.position.set(0.6, 4.2, 0); g.add(dome);
+  } else {
+    const col = pick([0xd85a5a, 0x5ab0d8, 0xf0c050]);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.55, metalness: 0.1 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(6.6, 2.6, 3.2), bodyMat);
+    body.position.y = 2.5; g.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(7, 0.35, 3.5), dark);
+    roof.position.y = 4; g.add(roof);
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.5, 3.4), dark);
+    skirt.position.y = 1.1; g.add(skirt);
+    for (const sz of [-1.62, 1.62]) for (const wx of [-2, 0, 2]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 0.08), winGlass);
+      win.position.set(wx, 2.9, sz); g.add(win);
+    }
+    for (const cx2 of [-3.5, 3.5]) {
+      const coupler = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.6), dark);
+      coupler.position.set(cx2, 1.4, 0); g.add(coupler);
+    }
+  }
   for (const sx of [-2, 0, 2]) for (const sz of [-1.7, 1.7]) {
     const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 10), wheelMat);
     wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.8, sz); g.add(wh);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.54, 8), hubMat);
+    hub.rotation.x = Math.PI / 2; hub.position.set(sx, 0.8, sz); g.add(hub);
+  }
+  for (const sz of [-1.72, 1.72]) {
+    const rod = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.16, 0.12), new THREE.MeshStandardMaterial({ color: 0xd85a5a, roughness: 0.5 }));
+    rod.position.set(0, 0.8, sz); g.add(rod);
   }
   return g;
 }
@@ -476,7 +541,7 @@ export function createLife(
   }
 
   // ── the train ─────────────────────────────────────────────────────────────
-  const CAR_GAP = 0.028;
+  const CAR_GAP = 0.011;   // cars actually COUPLE (was 18u of daylight between them)
   let trainGrp: THREE.Group | null = null, trainCars: THREE.Group[] = [], trainT = 0, respawn = 0;
   function buildTrain() {
     const grp = new THREE.Group(); scene.add(grp);

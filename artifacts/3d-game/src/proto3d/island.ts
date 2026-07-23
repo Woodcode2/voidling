@@ -102,8 +102,8 @@ export const HALF_BLOCK_3D = wLen(BLOCK_SIZE / 2);
 
 // train rail loop around downtown (corner-cut rectangle, world coords)
 const RAIL_PTS: [number, number][] = [
-  [4240, 2420], [7760, 2420], [7870, 2530], [7870, 7760],
-  [7760, 7870], [4240, 7870], [4130, 7760], [4130, 2530],
+  [4240, 2300], [7760, 2300], [7990, 2530], [7990, 7760],
+  [7760, 7990], [4240, 7990], [4010, 7760], [4010, 2530],
 ];
 const railCurve = new THREE.CatmullRomCurve3(
   RAIL_PTS.map(([x, y]) => new THREE.Vector3(w(x), 0, w(y))), true, 'catmullrom', 0.02,
@@ -395,7 +395,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         g.fillRect(pxW(x0), pyW(lot.y + 110) - dw / 2, pxW(x1) - pxW(x0), dw);
       }
       // front walk: stepping-stone dashes from the door to the sidewalk
-      g.fillStyle = 'rgba(233,235,242,0.85)';
+      g.fillStyle = 'rgba(233,235,242,0.45)';
       const steps = 4;
       for (let s = 0; s < steps; s++) {
         const t = frontClear + 40 + s * 90;
@@ -406,7 +406,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       const bx = lot.x - lot.fx * (frontClear + 240), by = lot.y - lot.fy * (frontClear + 240);
       g.fillStyle = 'rgba(126,213,122,0.75)';
       g.fillRect(pxW(bx - 130), pyW(by - 130), pxW(260) - pxW(0), pxW(260) - pxW(0));
-      g.fillStyle = 'rgba(220,216,226,0.65)';   // soft patio slab tucked at the corner
+      g.fillStyle = 'rgba(226,216,206,0.4)';   // soft warm patio slab
       g.fillRect(pxW(bx + 40 * (li % 2 ? 1 : -1) - 55), pyW(by - 55), pxW(110) - pxW(0), pxW(110) - pxW(0));
       // pool (fancy lots, deterministic — matches populate's clutter exclusion)
       const pool = lotPool(b, li, lot);
@@ -493,11 +493,17 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
     g.beginPath(); g.moveTo(pxW(bx0), pyW(bwY0)); g.lineTo(pxW(bx1), pyW(bwY0)); g.stroke();
     g.beginPath(); g.moveTo(pxW(bx0), pyW(bwY1)); g.lineTo(pxW(bx1), pyW(bwY1)); g.stroke();
+    // the promenade YIELDS to the roads that cross it (deck-over-road trick)
+    g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx; g.lineCap = 'butt';
+    for (const rc2 of [2580, 4290, 6000, 7710]) {
+      g.beginPath(); g.moveTo(pxW(rc2), pyW(bwY0 - 20)); g.lineTo(pxW(rc2), pyW(bwY1 + 20)); g.stroke();
+    }
     // towels: bright rounded rects angled on the sand
     const towelCols = ['#ff6a5e', '#4db07a', '#4d7de8', '#f0c050', '#f06fb0', '#5ec8d8'];
     for (let i = 0; i < 34; i++) {
       const twx = 1100 + Math.random() * 7900, twy = 9760 + Math.random() * 900;
       if (!insideIslandWorld(twx, twy)) continue;
+      if ([2580, 4290, 6000, 7710].some((rc2) => Math.abs(twx - rc2) < 180)) continue;   // not on the beach roads
       if (Math.hypot(twx - LAGOON.x, (twy - LAGOON.y) * 1.35) < LAGOON.rx + 160) continue;
       g.save(); g.translate(pxW(twx), pyW(twy)); g.rotate(Math.random() * 0.8 - 0.4);
       g.fillStyle = towelCols[i % towelCols.length];
@@ -565,6 +571,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(95) - pxW(0), pyW(75) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   }
 
+  // pond sand bank — UNDER the river so the channel flows over it
+  g.fillStyle = 'rgba(230,212,148,0.9)';
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 46) - pxW(0), pyW(POND[2] + 46) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   // river — dark bank underlay first, then water, then a bright foam edge
   g.strokeStyle = '#4d8aa0'; g.lineWidth = (pxW(144) - pxW(0)); g.lineJoin = 'round'; g.lineCap = 'round';
   g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
@@ -583,10 +592,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
   for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
   g.stroke(); g.setLineDash([]);
-  // pond: sand bank UNDER the water, then water, then a deep centre — one
-  // clean read (the late-stroked ring used to draw OVER the river)
-  g.fillStyle = 'rgba(230,212,148,0.9)';
-  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 46) - pxW(0), pyW(POND[2] + 46) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = hex(WORLD.riverMid);
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = hex(WORLD.riverDeep);
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] * 0.55) - pxW(0), pyW(POND[2] * 0.55) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+  // pond water + deep centre — over the river so the junction reads as ONE body
   g.fillStyle = hex(WORLD.riverMid);
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = hex(WORLD.riverDeep);
@@ -735,9 +745,13 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // ground plane (flat, cutout by texture alpha? no alpha here — we use the slab
   // shape for the silhouette instead). Use a ShapeGeometry so the coast is real.
+  // the -PI/2 rotation maps shape.y -> world -z, so the outline must be built
+  // MIRRORED (negated y, reversed winding) to match the placement polygon —
+  // otherwise the coast renders flipped about z and props float over the void
   const shape = new THREE.Shape();
-  shape.moveTo(sil3[0].x, sil3[0].y);
-  for (const p of sil3) shape.lineTo(p.x, p.y);
+  const silRev = [...sil3].reverse();
+  shape.moveTo(silRev[0].x, -silRev[0].y);
+  for (const p of silRev) shape.lineTo(p.x, -p.y);
   shape.closePath();
   const topGeo = new THREE.ShapeGeometry(shape);
   // custom UVs from bbox so the baked texture aligns
@@ -786,18 +800,18 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     for (let i = 0; i < n; i++) {
       const a = sil3[i], b = sil3[(i + 1) % n];
       // shape.y -> world -z (matches top rotation)
-      const ax = a.x, az = -a.y, bx = b.x, bz = -b.y;
+      const ax = a.x, az = a.y, bx = b.x, bz = b.y;   // wall follows the (now-mirrored) top
       verts.push(ax, 0, az, bx, 0, bz, ax, -DEPTH, az);
       verts.push(bx, 0, bz, bx, -DEPTH, bz, ax, -DEPTH, az);
     }
     const wallGeo = new THREE.BufferGeometry();
     wallGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     wallGeo.computeVertexNormals();
-    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x2a2138, emissiveIntensity: 0.4 }));
+    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: 0.75 }));
     scene.add(wall);
     // underside cap
-    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x2a2140, roughness: 1 }));
-    cap.rotation.x = Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
+    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x2a2140, roughness: 1, side: THREE.DoubleSide }));
+    cap.rotation.x = -Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
   }
 
   // crisp geometry lane dashes — razor sharp at any zoom (the baked ones blur)
@@ -842,7 +856,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // spray glow at base
   const spray = new THREE.Mesh(new THREE.CircleGeometry(wLen(240), 24),
     new THREE.MeshBasicMaterial({ color: WORLD.foam, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
-  spray.rotation.x = -Math.PI / 2; spray.position.set(wfX * 1.05, -22, wfZ * 1.05); scene.add(spray);
+  spray.scale.setScalar(0.55); (spray.material as THREE.MeshBasicMaterial).opacity = 0.3;
+  spray.rotation.x = -Math.PI / 2; spray.position.set(wfX * 1.05, -26, wfZ * 1.05); scene.add(spray);
 
   // ── PROPS: populate each block per biome ───────────────────────────────────
   populate(scene, addEdible);
@@ -953,6 +968,7 @@ function makeHouse(): THREE.Group {
   const step = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 0.7), new THREE.MeshStandardMaterial({ color: 0xd9dbe2, roughness: 0.9 }));
   step.position.set(0, 0.11, 0.4);
   doorG.add(frame); doorG.add(door); doorG.add(step);
+  doorG.scale.set(1.2, 1.3, 1);   // people are ~3.4u tall — doors must beat them
   doorG.position.set(wWall * rand(-0.14, 0.14), 0, d / 2 + 0.02); grp.add(doorG);
   // two front windows with white frames + warm glass
   const winFrameMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
@@ -1136,16 +1152,28 @@ function makePine(): THREE.Group {
   return grp;
 }
 function makePalm(): THREE.Group {
+  // leaning trunk + 6 drooping fronds on Y-pivots (the old Euler order spun
+  // every frond horizontal — the infamous green pinwheel)
   const grp = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 6, 6),
-    new THREE.MeshStandardMaterial({ color: 0xba9a6a, roughness: 1, flatShading: true }));
-  trunk.position.y = 3; trunk.rotation.z = rand(-0.12, 0.12); grp.add(trunk);
-  const frondMat = new THREE.MeshStandardMaterial({ color: 0x5fbf6a, roughness: 0.85, flatShading: true, side: THREE.DoubleSide });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 6.2, 7),
+    new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 1, flatShading: true }));
+  trunk.position.set(0.3, 3.1, 0); trunk.rotation.z = -0.12; grp.add(trunk);
+  const frondMat = new THREE.MeshStandardMaterial({ color: 0x4faa5a, roughness: 0.9, flatShading: true });
   for (let i = 0; i < 6; i++) {
-    const fr = new THREE.Mesh(new THREE.ConeGeometry(1.1, 4.2, 4), frondMat);
-    fr.position.y = 6; fr.rotation.z = Math.PI / 2.3; fr.rotation.y = (i / 6) * Math.PI * 2;
-    fr.position.x = Math.cos((i / 6) * Math.PI * 2) * 1.6; fr.position.z = Math.sin((i / 6) * Math.PI * 2) * 1.6;
-    grp.add(fr);
+    const pivot = new THREE.Group();
+    pivot.position.set(0.6, 6.1, 0);
+    pivot.rotation.y = (i / 6) * Math.PI * 2;
+    const frond = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), frondMat);
+    frond.scale.set(2.3, 0.22, 0.75);
+    frond.position.x = 1.7;
+    frond.rotation.z = -0.35;   // droop
+    pivot.add(frond);
+    grp.add(pivot);
+  }
+  for (const a of [0.5, 2.6]) {
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 1 }));
+    nut.position.set(0.6 + Math.cos(a) * 0.5, 5.8, Math.sin(a) * 0.5); grp.add(nut);
   }
   return grp;
 }
@@ -1341,6 +1369,7 @@ function makeFountainFB(): THREE.Group {
 
 
 // silhouette sample points (3D) for the coast-dressing pass in populate()
+const ROAD_CENTERS_3D_LOCAL = ROAD_CENTERS.map((c) => (c - CX) * SCALE);
 const SIL3_FRINGE: [number, number][] = SIL_POLY.filter((_, i) => i % 3 === 0)
   .map(([wx2, wy2]) => [(wx2 - CX) * SCALE, (wy2 - CZ) * SCALE] as [number, number]);
 
@@ -1664,8 +1693,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       placeGlb((gx + gy) % 2 ? 'tower_deco' : 'tower_glass', cx, cz, 6.2,
         22 + ((gx * 7 + gy * 13) % 4) * 3, () => makeTower(true));
       // corner retail at the south junctions (the gaps the walls leave open)
-      placeGlb('cafe', cx - half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, Math.PI);
-      placeGlb('shop', cx + half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, Math.PI);
+      placeGlb('cafe', cx - half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, 0);   // face the street, not the courtyard
+      placeGlb('shop', cx + half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, 0);
       // north corner pockets: a street tree + hydrant each
       for (const sxc of [-1, 1]) {
         placeGlb('parktree', cx + sxc * half * 0.87, cz - half * 0.87, 3.2, 7, makeTree);
@@ -1861,7 +1890,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // exclusion zones: nothing scatters into the fountain ring or the pond
       const tinyOk = (x: number, z: number) => {
         if (biome === 'plaza' && Math.hypot(x - cx, z - cz) < 13) return false;
-        if (biome === 'park' && gx === 4 && gy === 2 && Math.hypot(x - cx, z - (cz + 6)) < 17) return false;
+        if (biome === 'park' && gx === 4 && gy === 2 && Math.hypot(x - cx, z - (cz + 6)) < 20) return false;
         // downtown blocks are walled with buildings — snacks live in the court
         if (biome === 'downtown' && Math.max(Math.abs(x - cx), Math.abs(z - cz)) > half * 0.55) return false;
         return true;
@@ -1880,13 +1909,13 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   for (const rc of roads3) {
     let ci = 0;
     for (let a = -270; a < 270; a += 32, ci++) {
-      const side = ci % 2 ? 3.4 : -3.4;   // even alternating comb, no clumps
+      const side = ci % 2 ? 4.9 : -4.9;   // road shoulder — cars never clip them
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
     }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {
-      const side = li % 2 ? 4.6 : -4.6;
+      const side = li % 2 ? 6.8 : -6.8;   // ON the sidewalk, not the asphalt
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeLamp(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeLamp(), rc - side, a, 0.7);
     }
@@ -1955,6 +1984,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     const [fx2, fz2] = SIL3_FRINGE[i];
     const x = fx2 * 0.9, z = fz2 * 0.9;
     if (!insideIsland3(x, z) || inLagoon3(x, z, 60)) continue;
+    if (ROAD_CENTERS_3D_LOCAL.some((rc2) => Math.abs(x - rc2) < 9 || Math.abs(z - rc2) < 9)) continue;   // never on a road
+    if (x > 150 && z > 60) { place(makeRocksFB(), x, z, 2.2); continue; }   // airport/military corner: rocks, not palms
     if (z > 150) { if (Math.random() < 0.6) place(makePalm(), x, z, 2.6); else place(makeBush(), x, z, 1.4); }
     else if (x > 150) place(Math.random() < 0.7 ? makePine() : makeRocksFB(), x, z, Math.random() < 0.7 ? 3 : 2.2);
     else if (Math.random() < 0.5) place(makeRocksFB(), x, z, 2.2);
