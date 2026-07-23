@@ -75,6 +75,17 @@ const RIVER: [number, number][] = [
   [8405, 1149], [8277, 3035], [8565, 5337], [8213, 6887], [8469, 8661], [9431, 9305], [9700, 9830], [9800, 10150],
 ];
 const POND: [number, number, number] = [8565, 5337, 304];
+// river x at a given world y (linear along the polyline) — bridges + banks
+function riverXAtWorld(wy: number): number | null {
+  for (let i = 0; i < RIVER.length - 1; i++) {
+    const [x0, y0] = RIVER[i], [x1, y1] = RIVER[i + 1];
+    if ((wy >= y0 && wy <= y1) || (wy >= y1 && wy <= y0)) {
+      const t = (wy - y0) / ((y1 - y0) || 1);
+      return x0 + t * (x1 - x0);
+    }
+  }
+  return null;
+}
 const LAGOON = { x: 3675, y: 10307, rx: 832, ry: 608 };
 const WATERFALL: [number, number] = [9800, 10150];
 
@@ -307,7 +318,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   {
     const mR = pxW(26) - pxW(0);
     for (const c of ROAD_CENTERS) {
-      for (let a = 1200; a < 10800; a += 640) {
+      for (let a = 1500; a < 10800; a += 2900) {   // occasional — a real street has a manhole here and there, not a polka-dot pattern
         const off = ((a / 640) % 2 ? 1 : -1) * 30;
         for (const [mx, my] of [[a, c + off], [c + off, a]] as const) {
           if (!insideIslandWorld(mx, my)) continue;
@@ -454,6 +465,20 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.strokeRect(pxW(pcx - 100), pyW(4520), pxW(200) - pxW(0), pyW(5145) - pyW(4520));
   }
 
+  // SCHOOLYARD — blacktop + hopscotch beside the school (kids notice schools)
+  {
+    const syx = 6440, syy = 5390;
+    g.fillStyle = '#8d93aa';
+    g.fillRect(pxW(syx - 170), pyW(syy - 130), pxW(340) - pxW(0), pyW(260) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = Math.max(1.2, pxW(10) - pxW(0));
+    // hopscotch ladder
+    for (let k = 0; k < 5; k++) g.strokeRect(pxW(syx - 120), pyW(syy - 100 + k * 42), pxW(44) - pxW(0), pyW(42) - pyW(0));
+    // foursquare
+    g.strokeRect(pxW(syx + 20), pyW(syy - 70), pxW(120) - pxW(0), pyW(120) - pyW(0));
+    g.beginPath(); g.moveTo(pxW(syx + 80), pyW(syy - 70)); g.lineTo(pxW(syx + 80), pyW(syy + 50)); g.stroke();
+    g.beginPath(); g.moveTo(pxW(syx + 20), pyW(syy - 10)); g.lineTo(pxW(syx + 140), pyW(syy - 10)); g.stroke();
+  }
+
   // BEACH BOARDWALK — a continuous plank promenade along the top of the whole
   // beach strip, with scattered bright towels on the sand below it
   {
@@ -527,6 +552,18 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.setLineDash([(pxW(60) - pxW(0)), (pxW(40) - pxW(0))]); railPath(); g.stroke();       // ties
   g.setLineDash([]);
   g.strokeStyle = '#c7ccd6'; g.lineWidth = Math.max(1.5, (pxW(150) - pxW(0)) * 0.09); railPath(); g.stroke(); // rail sheen
+
+  // river SOURCE: a spring pool where the river begins (it used to dead-end
+  // into plain forest grass like a cut hose)
+  {
+    const [sx2, sy2] = RIVER[0];
+    g.fillStyle = '#4d8aa0';
+    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(210) - pxW(0), pyW(170) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = hex(WORLD.riverMid);
+    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(175) - pxW(0), pyW(138) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = hex(WORLD.riverDeep);
+    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(95) - pxW(0), pyW(75) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+  }
 
   // river — dark bank underlay first, then water, then a bright foam edge
   g.strokeStyle = '#4d8aa0'; g.lineWidth = (pxW(144) - pxW(0)); g.lineJoin = 'round'; g.lineCap = 'round';
@@ -1230,6 +1267,21 @@ const tinyFor = (biome: Biome) =>
   : biome === 'zoo' ? pick([makeFlowers, makeShell, makeMushroom])()
   : biome === 'airport' ? pick([makeCone, makeLuggage, makeLuggage])()
   : makeTinyProp();
+function makeReeds(): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const h = rand(0.9, 1.6);
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, h, 4),
+      new THREE.MeshStandardMaterial({ color: pick([0x4faa5a, 0x67b25c, 0x7ec96e]), roughness: 1 }));
+    r.position.set(rand(-0.5, 0.5), h / 2, rand(-0.5, 0.5)); r.rotation.z = rand(-0.15, 0.15); g.add(r);
+    if (i < 2) {
+      const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.24, 3, 6),
+        new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 1 }));
+      tip.position.set(r.position.x, h + 0.1, r.position.z); g.add(tip);
+    }
+  }
+  return g;
+}
 function makeLuggage(): THREE.Group {
   const g = new THREE.Group();
   const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.4), new THREE.MeshStandardMaterial({ color: pick([0xff5a4d, 0x5ec8d8, 0xffd23f, 0xb98cff]), roughness: 0.7 }));
@@ -1850,6 +1902,51 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       const r0 = 7 + (i % 3) * 3.5;
       place(i % 3 === 0 ? makeCoins() : makeTinyProp(), sx0 + Math.cos(a) * r0, sz0 + Math.sin(a) * r0, i % 3 === 0 ? 0.55 : rand(0.6, 0.8));
     }
+  }
+
+  // river banks: rocks + reed tufts along the polyline (offset off the water),
+  // and low white BRIDGE RAILINGS wherever a road crosses the river
+  {
+    const RIVER_W: [number, number][] = [
+      [8405, 1149], [8277, 3035], [8565, 5337], [8213, 6887], [8469, 8661], [9431, 9305],
+    ];
+    for (let i = 0; i < RIVER_W.length - 1; i++) {
+      const [x0, y0] = RIVER_W[i], [x1, y1] = RIVER_W[i + 1];
+      const segLen = Math.hypot(x1 - x0, y1 - y0), steps = Math.floor(segLen / 420);
+      const nx = -(y1 - y0) / segLen, ny = (x1 - x0) / segLen;   // perpendicular
+      for (let k2 = 1; k2 < steps; k2++) {
+        const t = k2 / steps, side = k2 % 2 ? 1 : -1;
+        const bx = w(x0 + (x1 - x0) * t + nx * side * 105), bz = w(y0 + (y1 - y0) * t + ny * side * 105);
+        if (Math.abs((y0 + (y1 - y0) * t) - POND[1]) < 420) continue;   // pond has its own bank
+        place(Math.random() < 0.5 ? makeReeds() : makeRocksFB(), bx, bz, Math.random() < 0.5 ? 0.9 : 1.8);
+      }
+    }
+    for (const rcW of [2580, 4290, 6000, 7710, 9420]) {
+      const rx = riverXAtWorld(rcW);
+      if (rx == null) continue;
+      for (const side of [-1, 1]) {
+        const rail = makeFenceRun(13, 0xf4f6fa);
+        place(rail, w(rx), w(rcW) + side * 4.6, 1.6);
+      }
+    }
+  }
+
+  // plaza market stalls: striped stands along the square's south edge
+  {
+    const pcx = w(6855), pcz = w(5145);
+    const STALL_COLS = [0xff6a5e, 0x4db07a, 0x4d7de8];
+    STALL_COLS.forEach((col, i) => {
+      const st2 = new THREE.Group();
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(3, 1.1, 1.6), new THREE.MeshStandardMaterial({ color: 0xf6f0e2, roughness: 0.85 }));
+      counter.position.y = 0.55; st2.add(counter);
+      for (const sxp of [-1.3, 1.3]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6), new THREE.MeshStandardMaterial({ color: 0xf6f0e2, roughness: 0.85 }));
+        post.position.set(sxp, 1.3, -0.6); st2.add(post);
+      }
+      const awn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 2.2), new THREE.MeshStandardMaterial({ color: col, roughness: 0.75 }));
+      awn.position.set(0, 2.7, 0); awn.rotation.x = 0.14; st2.add(awn);
+      place(st2, pcx - 14 + i * 14, pcz + 27, 2.2);
+    });
   }
 
   // coast fringe: the band between the grid and the cliff gets DESIGNED —
