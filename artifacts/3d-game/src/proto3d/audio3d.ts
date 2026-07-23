@@ -74,20 +74,44 @@ export function createAudio(): Audio3D {
   let musGain: GainNode | null = null;
   let musTimer: ReturnType<typeof setInterval> | null = null;
   let musStage = 0, step = 0, nextT = 0;
+  let lastPop = 0;
+  // warm bus: music -> soft lowpass -> (dry + echo) -> master. The gentle
+  // feedback echo is what turns bare oscillators into something that sounds
+  // PRODUCED instead of 8-bit.
+  function buildMusicBus(c: AudioContext): GainNode {
+    const bus = c.createGain();
+    const warm = c.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 2400; warm.Q.value = 0.4;
+    const dry = c.createGain(); dry.gain.value = 0.85;
+    const delay = c.createDelay(0.6); delay.delayTime.value = 0.31;
+    const fb = c.createGain(); fb.gain.value = 0.32;
+    const wet = c.createGain(); wet.gain.value = 0.24;
+    const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 1600;
+    bus.connect(warm);
+    warm.connect(dry); dry.connect(master!);
+    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
+    delay.connect(fb); fb.connect(delay);
+    return bus;
+  }
   const BASS = [65.41, 65.41, 49.0, 49.0, 55.0, 55.0, 43.65, 49.0];               // C2 C2 G1 G1 A1 A1 F1 G1
   const MEL = [523.25, 0, 659.25, 783.99, 0, 659.25, 587.33, 0, 523.25, 0, 440, 523.25, 0, 392, 440, 0];
   const ARP = [1046.5, 1318.5, 1568, 1318.5];
-  function musNote(freq: number, t: number, dur: number, type: OscillatorType, vol: number, glideTo?: number) {
+  function musNote(freq: number, t: number, dur: number, type: OscillatorType, vol: number, glideTo?: number, soft = false) {
     const c = ctx; if (!c || !musGain || freq <= 0) return;
-    const o = c.createOscillator(), g = c.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(freq, t);
-    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+    const g = c.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.015);
+    g.gain.linearRampToValueAtTime(vol, t + (soft ? 0.06 : 0.015));   // soft = pad-like attack
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-    o.connect(g); g.connect(musGain);
-    o.start(t); o.stop(t + dur + 0.05);
+    g.connect(musGain);
+    // two gently-detuned voices — lush, not chippy
+    for (const cents of soft ? [-6, 6] : [0]) {
+      const o = c.createOscillator();
+      o.type = type;
+      o.detune.value = cents;
+      o.frequency.setValueAtTime(freq, t);
+      if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+      o.connect(g);
+      o.start(t); o.stop(t + dur + 0.05);
+    }
   }
   function musHat(t: number, vol: number) {
     const c = ctx; if (!c || !musGain) return;
@@ -108,11 +132,19 @@ export function createAudio(): Audio3D {
     if (nextT < c.currentTime) nextT = c.currentTime + 0.05;
     while (nextT < c.currentTime + 0.35) {
       const beat = Math.floor(step / 4) % 8, s = step % 16;
-      if (step % 4 === 0) musNote(BASS[beat], nextT, spb * 0.85, 'sine', 0.15);
-      if (step % 8 === 0) musNote(150, nextT, 0.1, 'sine', 0.2, 50);                  // soft kick
-      if (musStage >= 1 && s % 2 === 0 && MEL[s] > 0) musNote(MEL[s], nextT, s16 * 1.8, 'triangle', 0.075);
-      if (musStage >= 2 && step % 4 === 2) musHat(nextT, 0.05);
-      if (musStage >= 3) musNote(ARP[step % 4], nextT, s16 * 0.9, 'sine', 0.03);
+      if (step % 4 === 0) musNote(BASS[beat], nextT, spb * 0.9, 'sine', 0.14);
+      if (step % 8 === 0) musNote(150, nextT, 0.1, 'sine', 0.16, 50);                 // soft kick
+      // warm chord bed every bar — the cozy floor under everything
+      if (step % 16 === 0) {
+        const root = BASS[beat] * 4;
+        musNote(root, nextT, spb * 3.6, 'sine', 0.035, undefined, true);
+        musNote(root * 1.26, nextT, spb * 3.6, 'sine', 0.028, undefined, true);   // ~major third
+        musNote(root * 1.5, nextT, spb * 3.6, 'sine', 0.024, undefined, true);
+      }
+      // melody: unhurried quarter-note pads with detune shimmer
+      if (musStage >= 1 && s % 4 === 0 && MEL[s] > 0) musNote(MEL[s], nextT, s16 * 3.4, 'sine', 0.06, undefined, true);
+      if (musStage >= 2 && step % 8 === 2) musHat(nextT, 0.028);
+      if (musStage >= 3 && step % 2 === 0) musNote(ARP[step % 4], nextT, s16 * 1.4, 'sine', 0.018, undefined, true);
       nextT += s16; step++;
     }
   }
@@ -120,10 +152,10 @@ export function createAudio(): Audio3D {
   return {
     startMusic() {
       const c = ensure(); if (!c || !master) return;
-      if (!musGain) { musGain = c.createGain(); musGain.connect(master); }
+      if (!musGain) musGain = buildMusicBus(c);
       musGain.gain.cancelScheduledValues(c.currentTime);
       musGain.gain.setValueAtTime(0.0001, c.currentTime);
-      musGain.gain.exponentialRampToValueAtTime(0.32, c.currentTime + 1.2);
+      musGain.gain.exponentialRampToValueAtTime(0.26, c.currentTime + 1.2);
       step = 0; nextT = c.currentTime + 0.1;
       if (musTimer) clearInterval(musTimer);
       musTimer = setInterval(musSchedule, 110);
@@ -138,14 +170,19 @@ export function createAudio(): Audio3D {
       }
     },
     pop(combo) {
-      const p = Math.min(combo, 14);
-      const f = 340 * Math.pow(1.06, p);
-      tone(f, f * 1.5, 0.09, 'sine', 0.32);
-      tone(f * 2, f * 2.6, 0.05, 'triangle', 0.1);
+      // soft water-drop 'bloop' — pitch nudges up with the combo, hard
+      // rate-limit so a hoover-spree hums instead of rattling
+      const c = ensure(); if (!c) return;
+      const now = c.currentTime;
+      if (now - lastPop < 0.09) return;
+      lastPop = now;
+      const f = 190 + Math.min(combo, 20) * 9;
+      tone(f * 1.6, f * 0.72, 0.12, 'sine', 0.15);
+      noise(0.05, 0.04, 900, 300);
     },
     bigEat() {
       noise(0.22, 0.3, 900, 180);
-      tone(160, 70, 0.22, 'sine', 0.34);
+      tone(160, 70, 0.24, 'sine', 0.24);
     },
     gulp() {
       noise(0.4, 0.34, 2200, 220);
@@ -156,7 +193,7 @@ export function createAudio(): Audio3D {
       noise(0.45, 0.2, 500, 3200);
     },
     collapse() {
-      tone(120, 34, 0.9, 'sine', 0.5);
+      tone(120, 34, 0.9, 'sine', 0.4);
       noise(0.8, 0.32, 2600, 90);
       tone(60, 46, 1.1, 'triangle', 0.3, 0.05);
     },

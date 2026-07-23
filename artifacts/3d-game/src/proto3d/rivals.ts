@@ -101,6 +101,8 @@ export function createRivals(
   biomeAt: (x: number, z: number) => Biome | null,
   count = 4,
 ): Rivals {
+  // props the family has eaten, mid shrink-out animation
+  const shrinking: THREE.Object3D[] = [];
   interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
@@ -132,6 +134,15 @@ export function createRivals(
       });
     },
     update(dt, _t, px, pz, pr) {
+      // rival-eaten props spiral down and shrink — cause and effect a kid can
+      // SEE (they used to vanish in one frame, reading as a rendering bug)
+      for (let i = shrinking.length - 1; i >= 0; i--) {
+        const m = shrinking[i];
+        m.scale.multiplyScalar(1 - dt * 4.5);
+        m.position.y -= dt * 2.4;
+        m.rotation.y += dt * 5;
+        if (m.scale.x < 0.05) { m.visible = false; scene.remove(m); shrinking.splice(i, 1); }
+      }
       const lawCap = START_R + LAW_RATE * _t;   // rivals obey the growth law too
       for (const rv of rivals) {
         if (!rv.joined) {
@@ -214,7 +225,8 @@ export function createRivals(
           if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius) ** 2) {
-            e.mesh.userData.eaten = true; e.mesh.visible = false; scene.remove(e.mesh);
+            e.mesh.userData.eaten = true;
+            shrinking.push(e.mesh);   // animate out — buildings must never BLINK away
             rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
             rv.r = growR(rv.r, e.radius);
             rv.pulse = 1;   // visible gulp — the family EATS, not just exists

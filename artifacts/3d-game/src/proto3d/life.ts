@@ -274,6 +274,10 @@ export function createLife(
           if (!biomeAt(px, pz)) { st.arc = null; st.dir *= -1; st.turnCd = 2; return; }
           const dxu = 2 * w * (a.p1x - a.p0x) + 2 * a.u * (a.p2x - a.p1x);
           const dzu = 2 * w * (a.p1z - a.p0z) + 2 * a.u * (a.p2z - a.p1z);
+          if (!insideIsland3(px, pz)) {   // arc strayed off the cliff: abort, U-turn
+            st.arc = null; st.dir *= -1;
+            return;
+          }
           mesh.position.set(px, 0, pz);
           mesh.rotation.y = headingOf(dxu, dzu);
           if (a.u >= 1) {
@@ -302,6 +306,9 @@ export function createLife(
           const p1z = st.axis === 'h' ? st.centre + st.laneOff : rc + nLaneOff;
           const p2x = nAxis === 'h' ? nAlong : rc + nLaneOff;
           const p2z = nAxis === 'h' ? rc + nLaneOff : nAlong;
+          // a junction near the coast can sit in open ocean (clipped road) —
+          // never begin a turn whose corner or exit leaves the island
+          if (!biomeAt(p1x, p1z) || !biomeAt(p2x, p2z)) continue;
           const len = Math.hypot(p1x - mesh.position.x, p1z - mesh.position.z) + Math.hypot(p2x - p1x, p2z - p1z);
           st.arc = { p0x: mesh.position.x, p0z: mesh.position.z, p1x, p1z, p2x, p2z, u: 0, len: Math.max(4, len) };
           st.nAxis = nAxis; st.nCentre = rc; st.nAlong = nAlong; st.nLaneOff = nLaneOff; st.turnCd = 3;
@@ -309,6 +316,11 @@ export function createLife(
         }
         if (st.axis === 'h') mesh.position.set(st.along, 0, st.centre + st.laneOff);
         else mesh.position.set(st.centre + st.laneOff, 0, st.along);
+        if (!insideIsland3(mesh.position.x, mesh.position.z)) {
+          // belt-and-braces: a car may NEVER exist over open space
+          st.dir *= -1; st.along += st.dir * 10;
+          if (st.axis === 'h') mesh.position.x = st.along; else mesh.position.z = st.along;
+        }
         const targetRot = st.axis === 'h' ? headingOf(st.dir, 0) : headingOf(0, st.dir);
         let dr = targetRot - mesh.rotation.y;
         while (dr > Math.PI) dr -= Math.PI * 2;

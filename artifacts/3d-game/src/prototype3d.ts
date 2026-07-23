@@ -138,7 +138,7 @@ rivals.onRivalEaten = (name, pts) => {
 rivals.onPlayerBitten = (name) => {
   voidling.setRadius(Math.max(START_R, voidling.radius * 0.82));
   announce(`😱 ${name} took a BITE of you!!`);
-  audio.hit(); fx.shake(3); fx.flash('rgba(255,90,110,0.28)', 0.4);
+  audio.hit(); fx.shake(3); fx.flash('rgba(154,92,255,0.3)', 0.4);
   buzz(50);
 };
 const defense = createDefense(scene, fx, island.biomeAt);
@@ -1055,6 +1055,18 @@ function animate() {
         e.mesh.position.x -= (dx / d) * dt * pull;
         e.mesh.position.z -= (dz / d) * dt * pull;
         e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);   // lean toward the pit
+        e.mesh.userData.drifted = true;
+      } else if (e.mesh.userData.drifted) {
+        // you moved on without eating it — it springs back to its surveyed home
+        // (no more flowers and bins stranded in the middle of the street)
+        const hx2 = e.home.x - e.mesh.position.x, hz2 = e.home.z - e.mesh.position.z;
+        const hd = Math.hypot(hx2, hz2);
+        if (hd < 0.1) { e.mesh.position.x = e.home.x; e.mesh.position.z = e.home.z; e.mesh.rotation.z = 0; e.mesh.userData.drifted = false; }
+        else {
+          const k2 = Math.min(1, dt * 3);
+          e.mesh.position.x += hx2 * k2; e.mesh.position.z += hz2 * k2;
+          e.mesh.rotation.z *= 1 - k2;
+        }
       }
     }
   }
@@ -1127,10 +1139,9 @@ function animate() {
   // the city fights back — apply hits taken / units devoured
   if (started) {
     const defDelta = defense.update(dt, voidState.x, voidState.z, R);
-    if (defDelta < 0) audio.hit();
-    if (defDelta > 0) questEvent('army');   // "delicious irony" daily quest
-    playerScore += defDelta;
-    if (playerScore < 0) playerScore = 0;
+    // a void CANNOT take damage — army fire is fireworks, not a threat.
+    // Only positive deltas (devouring the units themselves) reach the score.
+    if (defDelta > 0) { questEvent('army'); playerScore += defDelta; }
   }
 
   // throttle DOM leaderboard updates (~5/s)
