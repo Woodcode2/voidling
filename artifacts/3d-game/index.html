@@ -27,10 +27,20 @@
       #board .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
       #board .nm { flex: 1; min-width: 78px; }
       #board .sc { font-variant-numeric: tabular-nums; opacity: 0.9; }
-      #form { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
-        color: #fff; font-size: 13.5px; font-weight: 900; letter-spacing: 2px; pointer-events: none;
-        background: rgba(16,8,30,0.72); border: 1.5px solid rgba(201,166,255,0.4); border-radius: 12px;
-        padding: 7px 16px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); backdrop-filter: blur(6px); }
+      /* SIZE chip — rides just under the hole, hole.io style (JS-projected) */
+      #form { position: fixed; left: 50%; top: 60%; transform: translate(-50%, 0); z-index: 5;
+        color: #fff; font-size: 12.5px; font-weight: 900; letter-spacing: 1.4px; pointer-events: none;
+        background: rgba(16,8,30,0.78); border: 1.5px solid rgba(201,166,255,0.45); border-radius: 11px;
+        padding: 5px 13px 7px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); white-space: nowrap; text-align: center; }
+      #form .scBar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); overflow: hidden; margin-top: 3px; }
+      #form #scFill { height: 100%; width: 0%; background: linear-gradient(90deg, #7b4fe0, #c9a6ff); border-radius: 2px; transition: width 0.2s linear; }
+      /* in-game guidance strip — objective-style onboarding (no modal) */
+      #guide { position: fixed; top: 20%; left: 0; right: 0; z-index: 7; text-align: center; pointer-events: none;
+        background: rgba(12,6,24,0.68); color: #fff; font-size: 19px; font-weight: 900; letter-spacing: 0.4px;
+        padding: 14px 5vw; opacity: 0; transform: translateY(-8px); transition: opacity 0.35s, transform 0.35s; }
+      #guide.show { opacity: 1; transform: translateY(0); }
+      #guide b { color: #7ef2a0; }
+      body.menu #guide { display: none; }
       /* hunger / power meter */
       #hunger { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
         width: 260px; height: 16px; border-radius: 9px; background: rgba(16,8,30,0.55); overflow: hidden;
@@ -355,6 +365,7 @@
       <button id="pw3"><b>2</b>COLLAPSE</button>
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
+    <div id="guide"></div>
     <div id="titlecard">
       <div class="lvl">LEVEL 1</div>
       <div class="name">MAPLE&nbsp;ISLE</div>

@@ -54,8 +54,8 @@ const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the
 // dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
 
 // ── lighting ─────────────────────────────────────────────────────────────────
-scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a5a80, 0.72));
-const sun = new THREE.DirectionalLight(0xfff2d8, 1.35);
+scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a5a80, 0.62));
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.55);
 const sunOff = new THREE.Vector3(-55, 95, 42);
 sun.position.copy(sunOff);
 sun.castShadow = true;
@@ -231,10 +231,12 @@ window.addEventListener('resize', () => {
 // ── match state + HUD ─────────────────────────────────────────────────────────
 const el = (id: string) => document.getElementById(id)!;
 const timerEl = el('timer'), devEl = el('devoured'), boardEl = el('board'), formEl = el('form');
+const _chipV = new THREE.Vector3();
 const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 const formFill = el('formbar').querySelector('.fill') as HTMLElement;
+const scFill = () => document.getElementById('scFill');
 let prevHunger = 0;
 
 function announce(text: string) {
@@ -450,7 +452,7 @@ function refreshHud() {
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
   if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
   devEl.textContent = `${devouredPct}% DEVOURED`;
-  formEl.textContent = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m`;
+  formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
 }
 
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
@@ -485,6 +487,7 @@ function bumpStreak() {
 }
 function endMatch() {
   ended = true;
+  localStorage.setItem('voidPlayed', '1');
   audio.stopMusic();
   bumpStreak();
   if (soloMode) {
@@ -561,6 +564,7 @@ function capture(e: Edible, giveHunger = true) {
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
   voidling.chomp();
   stats.eaten++;
+  if (guideStep === 1 && stats.eaten > 2) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   const coinVal = e.mesh.userData.coin as number | undefined;
@@ -642,6 +646,14 @@ pwBtns[1].addEventListener('click', fireCollapse);
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
+let guideStep = 0, guideT = 0;
+const guideEl = () => el('guide');
+function showGuide(text: string, dur = 5) {
+  const g = guideEl();
+  g.innerHTML = text;
+  g.classList.add('show');
+  guideT = dur;
+}
 function beginMatch(solo = false) {
   soloMode = solo;
   matchLen = solo ? 120 : MATCH_LEN;
@@ -653,6 +665,7 @@ function beginMatch(solo = false) {
   el('titlecard').classList.add('show');
   titleUntil = tClock + 4.6;
   audio.startMusic(); audio.setMusicStage(0);
+  if (!localStorage.getItem('voidPlayed')) { guideStep = 1; showGuide('<b>DRAG</b> anywhere to move!', 6); }
 }
 // ── asset preloader: menu time is download time; PLAY holds on a branded
 // loading bar until every pack mesh is resident, so a match never starts
@@ -693,8 +706,7 @@ function withWorldReady(cb: () => void) {
 }
 el('btnPlay').addEventListener('click', () => {
   menuEl.style.display = 'none';
-  if (!localStorage.getItem('voidTut')) tutEl.classList.add('show');
-  else withWorldReady(() => beginMatch());
+  withWorldReady(() => beginMatch());
 });
 el('btnSolo').addEventListener('click', () => {
   menuEl.style.display = 'none';
@@ -702,10 +714,15 @@ el('btnSolo').addEventListener('click', () => {
   withWorldReady(() => beginMatch(true));
 });
 el('btnGotIt').addEventListener('click', () => {
-  localStorage.setItem('voidTut', '1');
   tutEl.classList.remove('show');
   withWorldReady(() => beginMatch());
 });
+// FIRST LAUNCH: no menu — splash straight into the game with in-game guidance
+// (hole.io's onboarding). The menu earns its place from session two.
+if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlayed')) {
+  menuEl.style.display = 'none';
+  withWorldReady(() => beginMatch());
+}
 // locked world teasers wiggle on tap
 document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {
   c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
@@ -928,6 +945,7 @@ function animate() {
 
   if (started && !ended) {
     matchClock -= dt * clockSpeed;
+    if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
     timerEl.textContent = fmtTime(matchClock);
     if (matchClock <= 30) {
       timerEl.style.color = '#ff8a8a';
@@ -1108,8 +1126,12 @@ function animate() {
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
     // ~20% screen size across a form before the camera catches up, so growth
     // reads every few seconds instead of only at evolutions
-    const targetDist = Math.min(300, Math.max(30, 52 * Math.pow(R / 0.9, 0.78)));
+    const targetDist = Math.min(300, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
     camDist += (targetDist - camDist) * Math.min(1, dt * 1.4);
+    // the SIZE chip rides just under the hole (hole.io pattern)
+    _chipV.set(voidState.x, 0, voidState.z).project(camera);
+    formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
+    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + R * 9 + 30}px`;
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, Math.min(1, dt * 3));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);
@@ -1126,6 +1148,7 @@ function animate() {
     if (tClock > titleUntil) {
       evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
       if (curStage >= 3) questEvent('devourer');
+      if (guideStep === 2) { guideStep = 3; showGuide('you <b>EVOLVED</b>! bigger void, bigger meals 🏠', 5); }
       evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
     }
     audio.evolve();
@@ -1176,6 +1199,7 @@ function animate() {
     // form progress toward the next evolution
     const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
     formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
+    { const f2 = scFill(); if (f2) f2.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`; }
   }
 
   // LOD band + shadow frustum track the camera
