@@ -105,9 +105,9 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
       if (n <= phase) return null;
       phase = n;
       // the city lets a little void be — trouble starts at GOBBLER
-      if (n === 2) { spawn('police', 2, 6, 28, 2); return '🚔 POLICE RESPONSE'; }
-      if (n === 3) { spawn('jeep', 2, 10, 32, 3); spawn('tank', 2, 18, 20, 6); return '🪖 THE ARMY ROLLS IN'; }
-      if (n >= 4) { spawn('heli', 3, 24, 40, 5); return '🚁 AIR SUPPORT INBOUND'; }
+      if (n === 2) { spawn('police', 2, 60, 28, 2); return '🚔 POLICE RESPONSE'; }
+      if (n === 3) { spawn('jeep', 2, 80, 32, 3); spawn('tank', 2, 120, 20, 6); return '🪖 THE ARMY ROLLS IN'; }
+      if (n >= 4) { spawn('heli', 3, 150, 40, 5); return '🚁 AIR SUPPORT INBOUND'; }
       return null;
     },
     update(dt, vx, vz, vR) {

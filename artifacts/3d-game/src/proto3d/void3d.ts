@@ -73,6 +73,14 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage;
       // cheap hash for star specks
       float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
+      // value noise for the HD nebula wisps (procedural — crisp at any zoom)
+      float vnoise(vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0)), d2 = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d2, f.x), f.y);
+      }
       void main(){
         // screen-space radius: 0 at disc centre, 1 at the silhouette. This
         // reproduces the 2D canvas radial gradient (radial in screen space).
@@ -95,16 +103,28 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
           vec3 st = texture2D(uStars, vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003)).rgb;
           col += st * st * uStarAmt * (1.0 - u) * 0.9;   // st*st: keep only the bright stars, drop the nebula haze
         }
+        float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
+        // ☁️ HD nebula wisps: two octaves of drifting value noise in the dark
+        // core — the "living galaxy inside" reads at every zoom, no asset needed
+        vec2 np = vObj.xy * 2.6 + vec2(uTime * 0.05, -uTime * 0.03);
+        float neb = vnoise(np) * 0.6 + vnoise(np * 2.3 + 7.7) * 0.4;
+        neb = smoothstep(0.45, 0.85, neb);
+        col += mix(uInner, uSwirl, 0.6) * neb * (1.0 - u) * 0.35;
         // luminous event-horizon rim-light — intensifies with each evolution
         col += uRim * pow(u, 3.8) * (0.3 + uStage * 0.05);
+        // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
+        // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
+        vec3 iri = mix(uRim, vec3(1.0, 0.62, 0.9), 0.5 + 0.5 * sin(ang * 3.0 + uTime * 0.8));
+        col += iri * pow(u, 6.0) * 0.18;
         // faint interior galaxy swirl (subtle, alive)
-        float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
         float sw = sin(ang * 2.0 + u * 7.0) * 0.5 + 0.5;
         col += uSwirl * sw * (1.0 - u) * (0.06 + uStage * 0.015);
-        // glossy toy catchlight (the polished-3D look of the key art)
+        // glossy toy catchlight + soft opposite fill (the key-art polish)
         vec3 L = normalize(vec3(-0.45, 0.74, 0.5));
         float spec = pow(max(dot(normalize(vN), L), 0.0), 30.0);
         col += vec3(1.0, 0.97, 1.0) * spec * 0.26;
+        vec3 L2 = normalize(vec3(0.55, 0.28, 0.55));
+        col += vec3(0.82, 0.76, 1.0) * pow(max(dot(normalize(vN), L2), 0.0), 14.0) * 0.08;
         // ✦ interior star specks — twinkling, concentrated toward the dark core
         vec2 sc = vObj.xy * 12.0;
         vec2 cell = floor(sc);
@@ -115,11 +135,20 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
           float tw = 0.4 + 0.6 * sin(uTime * 3.0 + h * 40.0);
           col += vec3(0.95, 0.9, 1.0) * dot2 * tw * (1.0 - u * 0.55) * 1.1;
         }
+        // second, finer star layer — HD depth (tiny fast twinkles between the big ones)
+        vec2 sc2 = vObj.xy * 26.0 + 3.7;
+        vec2 cell2 = floor(sc2);
+        float h2 = hash(cell2);
+        if (h2 > 0.955) {
+          vec2 f2 = fract(sc2) - 0.5;
+          float dot3 = 1.0 - smoothstep(0.0, 0.28, length(f2));
+          col += vec3(0.9, 0.85, 1.0) * dot3 * (0.5 + 0.5 * sin(uTime * 5.0 + h2 * 60.0)) * (1.0 - u) * 0.55;
+        }
         gl_FragColor = vec4(col, 1.0);
       }
     `,
   });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), bodyMat);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 72), bodyMat);
   bob.add(body);
 
   // the interior starfield (Higgsfield seamless texture) — engages on load,
@@ -164,7 +193,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.08; scene.add(halo);
   const contact = new THREE.Mesh(
     new THREE.CircleGeometry(1, 40),
-    new THREE.MeshBasicMaterial({ color: 0x160a30, transparent: true, opacity: 0.32, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.55, 0.28, 12), color: 0x160a30, transparent: true, opacity: 0.6, depthWrite: false }),
   );
   contact.rotation.x = -Math.PI / 2; contact.position.y = 0.05; scene.add(contact);
 
@@ -187,10 +216,15 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const white = flat(0.21, VOID.sclera);
     sclera.add(white); sclera.add(outline);
     const pupilGrp = new THREE.Group(); pupilGrp.position.z = 1.02;
+    // HD eye: violet iris ring between pupil and sclera (depth without losing
+    // the crisp 2D-cartoon read), then pupil + twin catchlights
+    const iris = new THREE.Mesh(new THREE.RingGeometry(0.112, 0.146, 40),
+      new THREE.MeshBasicMaterial({ color: 0x8a5cf0, transparent: true, opacity: 0.85, depthWrite: false }));
+    iris.position.z = -0.002;
     const pupil = flat(0.118, VOID.pupil);
     const catch_ = flat(0.042, 0xffffff); catch_.position.set(-0.036, 0.04, 0.01);
     const catch2 = flat(0.016, 0xffffff); catch2.position.set(0.03, -0.028, 0.01);
-    pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
+    pupilGrp.add(iris); pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
     face.add(g); eyes.push({ g, sclera, pupilGrp });

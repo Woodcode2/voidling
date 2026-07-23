@@ -8,6 +8,12 @@
   "start_url": ".",
   "icons": [
     {
+      "src": "/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"

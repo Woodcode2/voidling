@@ -13,10 +13,41 @@ export interface Rivals {
   onJoin?: (name: string, color: number, x: number, z: number) => void;
   onRivalEaten?: (name: string, pts: number) => void;    // you swallowed one
   onPlayerBitten?: (name: string) => void;               // one bit YOU
+  onSpeak?: (x: number, z: number, line: string) => void; // personality bubbles
   reset(): void;                                         // instant rematch
 }
 
 const NAMES = ['MUNCHER', 'GOBBLER', 'NOMLET', 'CHOMPZILLA', 'GULPY'];
+// the void family has PERSONALITIES: anxious / show-off / baby / drama queen /
+// sleepy. Short lines (<=26 chars) so bubbles never wrap.
+const RIVAL_VOICE: Record<string, { taunt: string[]; respawn: string[]; eaten: string[] }> = {
+  MUNCHER: {
+    taunt: ['sorry!! but also: yum!!', 'I ate it?? I ATE IT!', "don't be mad don't be mad", 'oh no. am I winning??', 'was that ok to eat??', 'eek— I mean… NOM!'],
+    respawn: ['I KNEW this would happen', 'ow. told you. OW.', 'respawning. nervously.', "is it safe?? it's not."],
+    eaten: ['called it.', "it's dark in here??", 'worst. day. EVER.'],
+  },
+  GOBBLER: {
+    taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, sparkles'],
+    respawn: ['I meant to do that', 'nobody saw that. good.', 'a fluke. obviously.', 'my glow!! ruined!!'],
+    eaten: ["unfair!! I'm the STAR", 'my fans will hear of this', 'rude AND jealous'],
+  },
+  NOMLET: {
+    taunt: ['nom nom nom hehe', 'I did a WINNING!', 'big bite! BIGGEST bite!', 'dat one was YUMMY', 'me first! ME FIRST!', 'look!! I ate a house!!'],
+    respawn: ['owie.', 'I want a do-over!!', 'not fair!! *sniff*', 'nap. then REVENGE.'],
+    eaten: ['waaaAAAH!!', "you're a MEANIE", "I'm telling CHOMPZILLA"],
+  },
+  CHOMPZILLA: {
+    taunt: ['BEHOLD: dinner theater', 'a FEAST worthy of ME', 'the island? MY stage.', 'gasp. magnificent. me.', 'act two: I DEVOUR', "applause. I'll wait."],
+    respawn: ['the AUDACITY!!', 'I shall RETURN!! *swish*', 'my villain origin story', 'curtain?? ALREADY??'],
+    eaten: ['a TRAGEDY in one act', 'the drama!! the DRAMA!!', 'eaten?! by an AMATEUR?!'],
+  },
+  GULPY: {
+    taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],
+    respawn: ['best nap ever', "wake me when it's safe", 'ugh. mornings.', 'snooze… then chomp'],
+    eaten: ['finally, a nap', 'cozy in here, actually', 'zzzzz…'],
+  },
+};
+const pickLine = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 const COLORS = [0x2fd8c0, 0xff6fb0, 0xff9a3a, 0x7ed57a, 0x4d8ff0];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 // must match the player model (2D game constants through the 0.05 map scale)
@@ -70,7 +101,7 @@ export function createRivals(
   biomeAt: (x: number, z: number) => Biome | null,
   count = 4,
 ): Rivals {
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
@@ -85,7 +116,7 @@ export function createRivals(
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
-      vx: 0, vz: 0, biteCd: 0, respawnT: 0 });
+      vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10) });
   }
 
   const tmp = new THREE.Vector3();
@@ -119,9 +150,11 @@ export function createRivals(
             rv.x = Math.cos(a2) * 140; rv.z = Math.sin(a2) * 140;
             if (!biomeAt(rv.x, rv.z)) { rv.x *= 0.6; rv.z *= 0.6; }
             rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn));
           } else continue;
         }
         rv.biteCd = Math.max(0, rv.biteCd - dt);
+        rv.speakCd = Math.max(0, rv.speakCd - dt);
         // AI: STICKY targeting — commit to a snack until it's gone/reached,
         // flee a much bigger player, and contest the player's size directly
         rv.retarget -= dt;
@@ -164,7 +197,8 @@ export function createRivals(
         // ── hole-vs-hole: the danger loop ─────────────────────────────────────
         if (pr > rv.r * 1.2 && dp < pr * 0.8) {
           // the player swallows this rival whole — out for 6s, respawns small
-          const pts = Math.round(25 + rv.r * 15);
+          const pts = Math.round(100 + rv.r * 40);   // eating a hole is the marquee play
+          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten));
           rv.group.visible = rv.halo.visible = false;
           rv.respawnT = 6; rv.r = START_R; rv.vx = rv.vz = 0;
           api.onRivalEaten?.(rv.name, pts);
@@ -184,6 +218,10 @@ export function createRivals(
             rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
             rv.r = growR(rv.r, e.radius);
             rv.pulse = 1;   // visible gulp — the family EATS, not just exists
+            if (e.radius > rv.r * 0.55 && rv.speakCd <= 0) {   // a BIG bite earns a taunt
+              rv.speakCd = rand(9, 16);
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].taunt));
+            }
           }
         }
 

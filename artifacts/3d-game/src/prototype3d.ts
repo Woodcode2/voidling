@@ -120,10 +120,18 @@ rivals.onJoin = (name, color, x, z) => {
   fx.ring(x, z, color, 22, 0.8);
   audio.alert();
 };
+// the family SPEAKS — personality bubbles over rival voids
+const rivalBubblePos = new THREE.Vector3();
+rivals.onSpeak = (x, z, line) => {
+  bubbles.say(rivalBubblePos.set(x, 5, z), line, 'event');
+};
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts) => {
   playerScore += pts;
-  announce(`💀 you DEVOURED ${name}! +${pts}`);
+  addCoins(15);
+  questEvent('rival');
+  if (!moments.firstRival) { moments.firstRival = true; announce('🌀 rival DEVOURED! burp.'); }
+  else announce(`🌀 you DEVOURED ${name}! +${pts}`);
   audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
   buzz(60);
 };
@@ -154,7 +162,13 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75] };
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75],
+    // TEMP AUDIT SPOTS (revert before commit)
+    zoo: [213.75, -128.25], airport: [213.75, 128.25], military: [213.75, 213.75], park2: [128.25, 42.75],
+    fancy: [-128.25, -42.75], fancy2: [-42.75, 128.25], cozy2: [-213.75, 128.25], beach0: [-213.75, 213.75],
+    lagoon: [-116.25, 215.35], ferris: [46.75, 199.75], waterfall: [178, 192], river: [125, -90],
+    forest: [213.75, -42.75], forest2: [128.25, 128.25], forestN: [213.75, -213.75],
+    coastN: [-42.75, -258], coastW: [-258, -42.75], coastE: [252, -10], coastNW: [-230, -215] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -302,13 +316,40 @@ function addCoins(n: number) {
 }
 addCoins(0);
 
-// ── quests (the 2D side-goal loop: do X, earn ¢) ─────────────────────────────
-interface Quest { label: string; target: number; count: number; reward: number; test: (r: number) => boolean; done: boolean; }
-const quests: Quest[] = [
-  { label: 'Eat 15 snacks', target: 15, count: 0, reward: 10, test: (r) => r < 1, done: false },
-  { label: 'Eat 8 people-sized', target: 8, count: 0, reward: 10, test: (r) => r >= 1 && r < 3, done: false },
-  { label: 'Reach GOBBLER form', target: 1, count: 0, reward: 15, test: () => false, done: false },
+// ── DAILY QUESTS: 3 drawn per day (1 easy / 1 medium / 1 hard), progress
+// persists across matches, +25¢ for clearing the board — three stacking
+// come-back-tomorrow hooks with the gift box and streak skins
+interface Quest { id: string; label: string; target: number; count: number; reward: number; kind: string; done: boolean; }
+const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
+  { id: 'snack', label: 'Snack Attack: eat 25 tiny things', target: 25, reward: 15, kind: 'snack' },
+  { id: 'gulp', label: 'Big Gulp: use GULP 3×', target: 3, reward: 15, kind: 'gulp' },
+  { id: 'collapse', label: 'Supernova: use COLLAPSE', target: 1, reward: 20, kind: 'collapse' },
+  { id: 'cars', label: 'Rush Hour: eat 6 cars', target: 6, reward: 20, kind: 'car' },
+  { id: 'combo', label: 'Combo Chef: hit a ×2.0 combo', target: 1, reward: 20, kind: 'combo' },
+  { id: 'evolve', label: 'Evolve to DEVOURER', target: 1, reward: 25, kind: 'devourer' },
+  { id: 'solo', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
+  { id: 'houses', label: 'Home Wrecker: eat 3 houses', target: 3, reward: 25, kind: 'house' },
+  { id: 'rival', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
+  { id: 'army', label: 'Delicious Irony: eat 2 army units', target: 2, reward: 25, kind: 'army' },
 ];
+const EASY_Q = ['snack', 'gulp', 'collapse'], MED_Q = ['cars', 'combo', 'evolve', 'solo'], HARD_Q = ['houses', 'rival', 'army'];
+const quests: Quest[] = (() => {
+  const today = new Date().toDateString();
+  const daySeed = Math.abs(today.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
+  const ids = [EASY_Q[daySeed % EASY_Q.length], MED_Q[daySeed % MED_Q.length], HARD_Q[daySeed % HARD_Q.length]];
+  const saved = localStorage.getItem('voidQuestDay') === today
+    ? JSON.parse(localStorage.getItem('voidQuestState') || '{}') : {};
+  localStorage.setItem('voidQuestDay', today);
+  return ids.map((id) => {
+    const t = QUEST_POOL.find((q) => q.id === id)!;
+    return { ...t, count: saved[id]?.c ?? 0, done: saved[id]?.d ?? false };
+  });
+})();
+function saveQuests() {
+  const s: Record<string, { c: number; d: boolean }> = {};
+  for (const q of quests) s[q.id] = { c: q.count, d: q.done };
+  localStorage.setItem('voidQuestState', JSON.stringify(s));
+}
 const questsEl = el('quests');
 function renderQuests() {
   questsEl.innerHTML = quests.map((q) =>
@@ -318,13 +359,14 @@ function questComplete(q: Quest) {
   q.done = true; addCoins(q.reward);
   announce(`QUEST DONE! +${q.reward}¢`);
   audio.evolve();
-  renderQuests();
+  if (quests.every((x) => x.done)) { addCoins(25); announce('ALL QUESTS CLEAR! +25¢ BONUS'); }
+  renderQuests(); saveQuests();
 }
-function questProgress(r: number) {
+function questEvent(kind: string, n = 1) {
   for (const q of quests) {
-    if (q.done || !q.test(r)) continue;
-    q.count++;
-    if (q.count >= q.target) questComplete(q); else renderQuests();
+    if (q.done || q.kind !== kind) continue;
+    q.count += n;
+    if (q.count >= q.target) questComplete(q); else { renderQuests(); saveQuests(); }
   }
 }
 renderQuests();
@@ -332,30 +374,45 @@ renderQuests();
 // ── MAPLE ISLE NEWS — the island reacts to how much of it still exists ──────
 const NEWS_CALM = [
   'BREAKING: mayor announces run for a THIRD term',
-  'local cat stuck in tree. again.',
-  'bake sale saturday at town hall!!',
+  'local cat stuck in tree again. hang on, Waffles',
+  'zoo flamingo count: still eleven. riveting.',
+  'ferris wheel voted #1 wheel by wheel fans',
   'school spelling bee ends in a 14-way tie',
-  'beach boardwalk ferris wheel voted #1 wheel',
-  'duck parade delays traffic downtown',
-  'zoo flamingo count: still eleven',
-  'weather: sunny with a chance of nothing weird',
+  'golf course mole "not sorry", witnesses say',
+  'airport adds new flight to the OTHER beach',
+  'duck parade delays traffic. mayor: "worth it"',
+  "weather: sunny. tiny purple dot 'probably a bug'",
+  'town hall bake sale: brownies gone in 4 minutes',
+  'beach crab steals sandwich, declines interview',
+  'ISLE NEWS wins award for best news on the isle',
 ];
 const NEWS_WORRIED = [
-  "CITY HALL: void sightings are 'fake news'",
-  "scientists: it's PROBABLY fine",
-  'mayor: DO NOT feed the void',
-  'insurance companies quietly leave the island',
-  'hardware store sells out of locks, tape, courage',
+  'mayor: DO NOT feed the void. it feeds itself',
+  "scientists: it's PROBABLY fine (they are packing)",
+  'zoo animals seen forming an escape committee',
+  'golf course now a golf shortcourse',
+  "airport reports all outgoing flights 'very full'",
   'poll: 6 in 10 residents "would rather not be eaten"',
   'lifeguards now guarding the land too',
+  'school swaps fire drill for VOID drill. kids thrilled',
+  'ferris wheel operator refuses to look down',
+  'hardware store sells out of locks, tape, courage',
+  'mayor unveils anti-void plan: a really big net',
+  "MISSING: 14 mailboxes, 3 cars, the mayor's hat",
 ];
 const NEWS_PANIC = [
-  'EVACUATION? mayor says "relax, it\'s fine"',
   'THE ARMY HAS A PLAN (the plan is honking)',
-  'is this the END? experts say maybe',
-  'void officially upgraded to a weather event',
   'LAST ONE OFF THE ISLAND TURNS OFF THE SUN',
   'town hall meeting cancelled. also town hall.',
+  'ferris wheel now tallest thing left. barely.',
+  'zoo update: the lions are rooting for the void',
+  'mayor spotted rowing away in a paddle boat',
+  'airport gone. planes now simply birds',
+  'golf report: hole in one. the hole is EVERYTHING',
+  'school declares recess FOREVER (for bad reasons)',
+  'void upgraded from weather event to landlord',
+  'ISLE NEWS now broadcasting from a kayak',
+  'beach missing. ocean confused. more at 6, maybe',
 ];
 const newsEl = el('news');
 let devouredPct = 0, newsCd = 7, lastNews = '';
@@ -390,6 +447,7 @@ function refreshHud() {
   let consumed = 0;
   for (const e of edibles) if (e.eaten || !e.mesh.visible) consumed += e.radius;
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
+  if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
   devEl.textContent = `${devouredPct}% DEVOURED`;
   formEl.textContent = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m`;
 }
@@ -397,15 +455,23 @@ function refreshHud() {
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
 let xp = Number(localStorage.getItem('voidXP') || 0);
 let streak = Number(localStorage.getItem('voidStreak') || 0);
+// per-level XP spans: the first levels pop in 1-2 matches, MASTER is a season
+const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250, 300, 400];
 function rankInfo(x: number) {
-  const lvl = Math.min(17, 1 + Math.floor(x / 40));
-  const t = lvl >= 15 ? ['👑', 'MASTER'] : lvl >= 12 ? ['💠', 'PLATINUM'] : lvl >= 9 ? ['💎', 'DIAMOND']
+  let lvl = 1, rem = x, span = XP_SPANS[0];
+  for (const sp of XP_SPANS) {
+    if (rem < sp || lvl >= 17) { span = sp; break; }
+    rem -= sp; lvl++; span = sp;
+  }
+  lvl = Math.min(17, lvl);
+  const t = lvl >= 15 ? ['👑', 'MASTER'] : lvl >= 12 ? ['💎', 'DIAMOND'] : lvl >= 9 ? ['💠', 'PLATINUM']
     : lvl >= 6 ? ['🥇', 'GOLD'] : lvl >= 3 ? ['🥈', 'SILVER'] : ['🥉', 'BRONZE'];
-  return { lvl, ic: t[0], nm: t[1], prog: lvl >= 17 ? 1 : (x % 40) / 40 };
+  return { lvl, ic: t[0], nm: t[1], prog: lvl >= 17 ? 1 : Math.min(1, rem / span) };
 }
 function renderRank() {
   const r = rankInfo(xp);
-  el('rankChip').innerHTML = `${r.ic} ${r.nm} · LVL ${r.lvl}<div class="rkBar"><div style="width:${Math.round(r.prog * 100)}%"></div></div>`;
+  const st = streak >= 2 ? ` · 🔥${streak}` : '';
+  el('rankChip').innerHTML = `${r.ic} ${r.nm} · LVL ${r.lvl}${st}<div class="rkBar"><div style="width:${Math.round(r.prog * 100)}%"></div></div>`;
 }
 function bumpStreak() {
   const today = new Date().toDateString();
@@ -425,10 +491,11 @@ function endMatch() {
     const best = Number(localStorage.getItem('voidBestPct') || 0);
     const newBest = devouredPct > best;
     if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
-    const gain2 = 6 + (newBest ? 8 : 0);
+    const gain2 = 8 + (newBest ? 8 : 0);
     xp += gain2; localStorage.setItem('voidXP', String(xp)); renderRank();
-    const reward2 = Math.max(5, Math.round(devouredPct * 1.5));
+    const reward2 = Math.max(5, Math.min(80, Math.round(devouredPct * 0.8))) + (newBest ? 20 : 0);
     addCoins(reward2);
+    if (devouredPct >= 40) questEvent('solo40');
     endHd.textContent = `${devouredPct}% DEVOURED`;
     endSub.textContent = `${newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`} · +${reward2}¢ · +${gain2} XP`;
     endList.innerHTML = '';
@@ -440,9 +507,15 @@ function endMatch() {
     ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   const myRank = rows.findIndex((r) => r.me) + 1;
-  const reward = Math.max(5, Math.round(playerScore / 40)) + (myRank === 1 ? 25 : 0);
+  // everyone leaves with something; winning is 5x last place, not infinity-x
+  const today = new Date().toDateString();
+  let reward = ([50, 35, 25, 15, 10][myRank - 1] ?? 10) + Math.min(60, Math.floor(playerScore / 50));
+  if (myRank === 1 && localStorage.getItem('voidFirstWinDay') !== today) {
+    localStorage.setItem('voidFirstWinDay', today); reward += 50;
+  }
   addCoins(reward);
-  const gain = [20, 10, 5, 2, 1][myRank - 1] ?? 1;
+  let gain = ([25, 18, 12, 8, 5][myRank - 1] ?? 5) + Math.min(10, Math.floor(playerScore / 400));
+  if (localStorage.getItem('voidFirstMatchDay') !== today) { localStorage.setItem('voidFirstMatchDay', today); gain += 10; }
   xp += gain; localStorage.setItem('voidXP', String(xp)); renderRank();
   // lifetime stats + weekly best
   stats.matches++;
@@ -452,7 +525,10 @@ function endMatch() {
   saveStats();
   const wk = weekKey();
   localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
-  endHd.textContent = myRank === 1 ? 'YOU WIN!' : `#${myRank} PLACE`;
+  const WIN_TITLES = ['ISLAND: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF THE ISLE'];
+  const LOSE_TITLES = ['STILL PECKISH…', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
+  endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
+    : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
   endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}¢ · +${gain} XP`;
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
@@ -461,6 +537,8 @@ function endMatch() {
 
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
+// once-per-match milestone banners (hole.io celebrates the firsts)
+const moments = { firstBuilding: false, firstCar: false, firstRival: false, half: false, last30: false };
 const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
@@ -473,7 +551,10 @@ function capture(e: Edible, giveHunger = true) {
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
   combo++; comboT = 1.2;
   const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
-  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult));
+  // moving prey (people/animals/cars — tagged ptsMult 1.5) beats furniture of
+  // the same size: chasing pays. Everything else stays radius-proportional.
+  const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
+  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult));
   playerScore += pts;
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
@@ -491,8 +572,14 @@ function capture(e: Edible, giveHunger = true) {
     chompCd = tClock + 7;
     bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
   } else { audio.pop(combo); buzz(e.radius > 2 ? 15 : 8); }
-  if (combo > 0 && combo % 8 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
-  questProgress(e.radius);
+  if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
+  // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'army')
+  const qk = e.mesh.userData.qk as string | undefined;
+  if (e.radius < 1) questEvent('snack');
+  if (qk) questEvent(qk);
+  if (comboMult >= 2) questEvent('combo');
+  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); }
+  if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 first car! tastes like vroom'); }
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -524,6 +611,7 @@ function fireGulp() {
   voidling.animGulp(); audio.gulp(); spawnSuck(26, reach);
   fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach, 0.5); fx.flash('rgba(155,92,255,0.22)', 0.22);
   announce('GULP!');
+  questEvent('gulp');
 }
 function fireCollapse() {
   if (hunger < COST.collapse || powerCd > 0) return;
@@ -538,6 +626,7 @@ function fireCollapse() {
   fx.ring(voidState.x, voidState.z, 0xffffff, reach, 0.85); fx.ring(voidState.x, voidState.z, 0xc9a6ff, reach * 0.65, 0.6);
   fx.flash('rgba(230,220,255,0.6)', 0.6); fx.shake(6);
   announce('COLLAPSE!!');
+  questEvent('collapse');
 }
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Digit1') fireGulp();
@@ -579,6 +668,14 @@ const LOAD_TIPS = [
   'tip: rival voids can eat YOU — check the leaderboard sizes',
   'tip: the downtown towers are the biggest meal on the island',
   'tip: play daily — streak skins unlock at 2 and 7 days',
+  "tip: parked cars can't run away. just saying.",
+  'tip: COLLAPSE eats things WAY bigger than you',
+  'tip: bite fast — combos multiply your points',
+  'tip: the beach is full of easy snacks (sorry, towels)',
+  'tip: eat a rival and they respawn tiny — and grumpy',
+  'tip: the ferris wheel is dessert. save room.',
+  'tip: quests pay coins — peek at the list mid-match',
+  'tip: NOMLET cries when eaten. worth it.',
 ];
 function withWorldReady(cb: () => void) {
   if (packReady) { cb(); return; }
@@ -633,7 +730,7 @@ function resetMatch() {
   voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   velX = 0; velZ = 0; camDist = 50;
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 7;
-  for (const q of quests) { q.done = false; q.count = 0; }
+  for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
   el('end').classList.remove('show');
@@ -654,7 +751,7 @@ const TROPHIES = [
   { ic: '🕳️', nm: 'DEVOURER', ds: 'reach DEVOURER form', ok: () => stats.bestForm >= 3 },
   { ic: '🪐', nm: 'WORLD ENDER', ds: 'reach the final form', ok: () => stats.bestForm >= 4 },
   { ic: '👑', nm: 'Champion', ds: 'win a match', ok: () => stats.wins >= 1 },
-  { ic: '💯', nm: 'Century', ds: 'score 100 in one run', ok: () => stats.best >= 100 },
+  { ic: '💯', nm: 'Century', ds: 'score 2,500 in one run', ok: () => stats.best >= 2500 },
   { ic: '🍽️', nm: 'Glutton', ds: 'eat 500 things (lifetime)', ok: () => stats.eaten >= 500 },
 ];
 function renderTrophies() {
@@ -671,10 +768,10 @@ el('btnTrophies').addEventListener('click', () => { renderTrophies(); el('trophi
 function weekKey() { const d = new Date(); const on = new Date(d.getFullYear(), 0, 1); return `voidWeek-${d.getFullYear()}-${Math.ceil((((d.getTime() - on.getTime()) / 86400000) + on.getDay() + 1) / 7)}`; }
 function weeklyBoard(): { name: string; score: number; color: number; me?: boolean }[] {
   const seeded = [
-    { name: 'CHOMPZILLA', score: 1240, color: 0x7ed57a }, { name: 'NOMLET', score: 1105, color: 0xff9a3a },
-    { name: 'GOBBLER', score: 980, color: 0xff6fb0 }, { name: 'GULPY', score: 845, color: 0x4d8ff0 },
-    { name: 'MUNCHER', score: 720, color: 0x2fd8c0 }, { name: 'B1G-B1TE', score: 610, color: 0xd85a5a },
-    { name: 'snackrat', score: 440, color: 0xb98cff },
+    { name: 'CHOMPZILLA', score: 3720, color: 0x7ed57a }, { name: 'NOMLET', score: 3315, color: 0xff9a3a },
+    { name: 'GOBBLER', score: 2940, color: 0xff6fb0 }, { name: 'GULPY', score: 2535, color: 0x4d8ff0 },
+    { name: 'MUNCHER', score: 2160, color: 0x2fd8c0 }, { name: 'B1G-B1TE', score: 1830, color: 0xd85a5a },
+    { name: 'snackrat', score: 1320, color: 0xb98cff },
   ];
   const mine = Number(localStorage.getItem(weekKey()) || 0);
   const rows = [...seeded, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
@@ -692,7 +789,12 @@ el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').class
   const giftEl = el('gift');
   const refreshGift = () => { giftEl.style.display = Date.now() >= Number(localStorage.getItem('voidGiftAt') || 0) ? '' : 'none'; };
   giftEl.addEventListener('click', () => {
-    const amt = 40 + Math.floor(Math.random() * 81);
+    // deterministic ladder (50/75/100), resets daily — a gift, not a slot machine
+    const today = new Date().toDateString();
+    if (localStorage.getItem('voidGiftDay') !== today) { localStorage.setItem('voidGiftDay', today); localStorage.setItem('voidGiftN', '0'); }
+    const n = Math.min(2, Number(localStorage.getItem('voidGiftN') || 0));
+    localStorage.setItem('voidGiftN', String(n + 1));
+    const amt = [50, 75, 100][n];
     addCoins(amt);
     giftEl.textContent = `+${amt}¢!`;
     audio.evolve(); buzz(40);
@@ -711,9 +813,9 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
 // model, same as the 2D shop); owned + equipped persist across sessions
 {
   const PRICES: Record<string, number> = {
-    classic: 0, galaxy: 300, wizard: 300, sunset: 500, toxic: 500, ocean: 800,
-    nebula: 800, magma: 1000, candy: 1000, aurora: 1200,
-    honey: 1200, glacier: 1200, sherbet: 1500, cyber: 1500, blossom: 1500, royal: 2000,
+    classic: 0, galaxy: 150, wizard: 150, sunset: 250, toxic: 250, ocean: 400,
+    nebula: 600, magma: 600, candy: 600, aurora: 750,
+    honey: 750, glacier: 750, sherbet: 900, cyber: 900, blossom: 900, royal: 1500,
   };
   const grid = el('shopGrid');
   const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
@@ -799,7 +901,10 @@ function animate() {
   if (started && !ended) {
     matchClock -= dt * clockSpeed;
     timerEl.textContent = fmtTime(matchClock);
-    if (matchClock <= 30) timerEl.style.color = '#ff8a8a';
+    if (matchClock <= 30) {
+      timerEl.style.color = '#ff8a8a';
+      if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 30 SECONDS — EAT FASTER!!'); }
+    }
     if (matchClock <= 0) endMatch();
     // the 2D GROWTH LAW: radius can never outrun the clock (disabled for ?r= debug)
     if (!bigStart) {
@@ -974,6 +1079,7 @@ function animate() {
     // never draw over the MAPLE ISLE title card — one hero message at a time
     if (tClock > titleUntil) {
       evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
+      if (curStage >= 3) questEvent('devourer');
       evolveEl.classList.remove('show'); void (evolveEl as HTMLElement).offsetWidth; evolveEl.classList.add('show');
     }
     audio.evolve();
@@ -995,6 +1101,7 @@ function animate() {
   if (started) {
     const defDelta = defense.update(dt, voidState.x, voidState.z, R);
     if (defDelta < 0) audio.hit();
+    if (defDelta > 0) questEvent('army');   // "delicious irony" daily quest
     playerScore += defDelta;
     if (playerScore < 0) playerScore = 0;
   }

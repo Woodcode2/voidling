@@ -1078,7 +1078,7 @@ function makeCoins(): THREE.Group {
     c.position.set(rand(-0.15, 0.15), 0.1 + i * 0.2, rand(-0.15, 0.15));
     c.rotation.y = rand(0, Math.PI); g.add(c);
   }
-  g.userData.coin = n;   // wallet value
+  g.userData.coin = 5;   // flat wallet value — every pile visibly pays
   return g;
 }
 function makeLamp(): THREE.Group {

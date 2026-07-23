@@ -20,25 +20,25 @@ export type Say = (pos: THREE.Vector3, text: string, kind: 'ambient' | 'panic' |
 
 // ── biome dialogue (from the 2D AMBIENT_BY_BIOME / PANIC_BY_BIOME pools) ─────────
 const AMBIENT: Record<string, string[]> = {
-  cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'lawn\'s looking crisp', 'new mailbox day!', 'block party friday?', 'who let their dog out again', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'love what you did with the roses'],
-  fancy: ['the help is late again', 'my topiary won an award', 'is that valet parking?', 'darling, how gauche', 'we summer elsewhere, obviously', 'this fountain? imported.', 'the gala is SATURDAY', 'my third chandelier arrives today'],
-  downtown: ['this commute is BRUTAL', 'rent here is CRIMINAL', 'need. more. coffee.', 'my startup\'s pre-seed', 'hustle never sleeps', 'meeting ran LONG', 'quarterly numbers look… fine', 'anyone else smell burning?', 'elevator\'s down AGAIN', 'lunch is a spreadsheet today'],
-  park: ['lovely day for it', 'the ducks are rowdy', 'picnic o\'clock!', 'jog complete 💪', 'frisbee!', 'kite weather!!', '10k steps, easy', 'the gazebo band plays at noon', 'ice cream truck?! where!'],
-  forest: ['so peaceful out here', 'was that a bird?', 'fresh piney air', 'love this trail', 'found the COOLEST rock', 's\'mores tonight!', 'trail mix is 90% chocolate', 'shhh… deer!', 'my boots are soaked'],
-  beach: ['sunscreen me. NOW.', 'crab looked at me funny', 'best beach day EVER', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', 'volleyball later?', 'ice cream then swim then ice cream', 'don\'t feed the seagulls!!', 'SPF one MILLION'],
-  plaza: ['meet me by the fountain', 'downtown\'s buzzing', 'street food time', 'is there a rally?', 'the mayor\'s speaking today!', 'taco truck line is LONG', 'live music by the fountain!', 'market day is the best day'],
-  zoo: ['the lions look hungry', 'popcorn! 🍿', 'look, flamingos!', 'the elephant waved at me!!', 'gift shop. NOW.', 'do NOT tap the glass', 'feeding time!!'],
+  cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
+  fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how gauche', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
+  downtown: ['need. more. coffee.', 'this commute is BRUTAL', 'meeting ran LONG', "elevator's down AGAIN", 'lunch is a spreadsheet today', 'hustle never sleeps', "circle back? I'll circle back", 'my inbox says 4,000', 'sell! no wait— buy!', 'is it friday yet'],
+  park: ['lovely day for it', 'the ducks are rowdy', "picnic o'clock!", 'kite weather!!', 'ice cream truck?! where!', 'the gazebo band plays at noon', '10k steps, easy', 'frisbee!', 'that squirrel took my chips', 'best bench. tell no one'],
+  forest: ['so peaceful out here', 'found the COOLEST rock', "s'mores tonight!", 'trail mix is 90% chocolate', 'shhh… deer!', 'fresh piney air', 'my boots are soaked', 'that birdsong? me. thanks.', 'one with nature right now', 'is moss edible? asking.'],
+  beach: ['sunscreen me. NOW.', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', "don't feed the seagulls!!", 'SPF one MILLION', 'crab looked at me funny', 'ice cream, swim, ice cream', 'nap. then more nap.', 'dude, the ocean is SO wet'],
+  plaza: ['meet me by the fountain', 'taco truck line is LONG', 'market day is the best day', "the mayor's speaking today!", 'live music by the fountain!', 'street food time', 'fountain coin = one wish', 'free samples!! FREE SAMPLES', 'pigeons own this plaza', 'is there a rally?'],
+  zoo: ['the elephant waved at me!!', 'do NOT tap the glass', 'look, flamingos!', 'gift shop. NOW.', 'feeding time!!', 'popcorn! 🍿', 'the lions look hungry', 'penguins: tiny tuxedo guys', 'that monkey has my hat', 'sloth update: still asleep'],
 };
 const PANIC: Record<string, string[]> = {
-  cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!'],
-  fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!'],
-  downtown: ['MY STARTUP!!', 'the WIFI\'S DOWN!!', 'not my oat-milk latte!!'],
-  park: ['grab the frisbee, RUN!!', 'not the PICNIC!!', 'the DUCKS!!'],
-  forest: ['BEAR?! no— WORSE!!', 'ABANDON TRAIL!!'],
-  beach: ['SAVE THE COOLER!!', 'my SANDCASTLE!!', 'not the towels!!'],
-  plaza: ['EVERYONE RUN!!', 'it\'s REAL!!', 'aaaah!!'],
-  zoo: ['WHO OPENED THE PENS?!', 'the lions are LOOSE!!'],
-  generic: ['tell my wife I love h—', 'AAAAH!!', 'RUN FOR IT!!', 'it\'s HUNGRY!!'],
+  cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the HOA form!!'],
+  fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
+  downtown: ['MY STARTUP!!', "the WIFI'S DOWN!!", 'not my oat-milk latte!!', 'OUT OF OFFICE. FOREVER.', 'meeting cancelled, RUN!!', 'this is NOT on my calendar'],
+  park: ['not the PICNIC!!', 'the DUCKS!! SAVE THE DUCKS', 'grab the frisbee, RUN!!', 'abandon the sandwiches!!', 'the gazebo!! NOO!!', 'jog!! FOR REAL this time!!'],
+  forest: ['BEAR?! no— WORSE!!', 'ABANDON TRAIL!!', "save the s'mores!!", 'the trees are LEAVING!!', 'hug a tree GOODBYE!!', 'nature says RUN!!'],
+  beach: ['SAVE THE COOLER!!', 'my SANDCASTLE!!', 'not the towels!!', 'gnarly!! BAD gnarly!!', 'paddle, dude, PADDLE!!', 'even the crabs left!!'],
+  plaza: ['EVERYONE RUN!!', "it's REAL!!", 'save the taco truck!!', 'the fountain!! NOOO!!', 'my churros!!', "this wasn't on the flyer!!"],
+  zoo: ['WHO OPENED THE PENS?!', 'the lions are LOOSE!!', 'the flamingos flew AWAY!!', 'even the sloth is running!!', 'save the gift shop!!', "WE'RE the feeding time!!"],
+  generic: ['AAAAH!!', 'RUN FOR IT!!', "it's HUNGRY!!", 'tell my cat I love her!!', 'nope nope NOPE!!', 'why is it SMILING?!'],
 };
 const biomeKey = (b: Biome): string => (b === 'military' || b === 'airport') ? 'downtown' : b;
 
@@ -256,6 +256,7 @@ export function createLife(
     };
     if (st.axis === 'h') mesh.position.set(st.along, 0, centre + st.laneOff); else mesh.position.set(centre + st.laneOff, 0, st.along);
     mesh.rotation.y = st.axis === 'h' ? headingOf(dir, 0) : headingOf(0, dir);
+    mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car';
     setShadow(mesh); scene.add(mesh); addEdible(mesh, 4);
     movers.push({
       mesh,
@@ -322,6 +323,7 @@ export function createLife(
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[]) {
     if (!biomeAt(hx, hz)) return;   // don't spawn anyone off the coastline
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false;
+    mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.position.set(hx, 0, hz); setShadow(mesh); scene.add(mesh); addEdible(mesh, radius);
     const rec = { mesh, biome, panic: 0 };
     peds.push(rec);
@@ -468,7 +470,7 @@ export function createLife(
   // Mayor's rally at town hall: mayor up on the stage, crowd gathered in front
   addEvent(3, 2,
     ['re-elect me, and the void LEAVES!', 'my fellow citizens…', 'VOIDLING is UNDER CONTROL', 'read my lips: no new voids', 'four more years! four more years!', 'boooo! …sorry, continue', 'and ANOTHER thing about potholes—'],
-    ['WOMEN, CHILDREN, MAYORS FIRST!', 'IT HAS MY VOTE— I MEAN—', 'SECURITY! SECUR—', 'the rally is CANCELLED!!'],
+    ["MAYORS FIRST!! IT'S THE LAW!!", 'IT HAS MY VOTE— I MEAN—', 'SECURITY! SECUR—', 'the rally is CANCELLED!!'],
     (x, z) => {
       // The rally happens on TOWN HALL's steps (north end of the square), the
       // stage facing the fountain — nobody is standing in the water anymore.
@@ -529,7 +531,7 @@ export function createLife(
 
   // Golf on the park
   addEvent(4, 2,
-    ['FORE!! ⛳', 'keep your head down', 'nice putt, Karen', 'that\'s a birdie'],
+    ['FORE!! ⛳', 'keep your head down', 'nice putt, coach', 'that\'s a birdie'],
     ['it ate the GREEN!!', 'MY HANDICAP!!', 'not the 18th hole!!'],
     (x, z) => {
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf2f4f8 }));

@@ -140,10 +140,12 @@ export function glb(
   x: number, z: number, r: number, opts: GlbOpts = {},
 ): void {
   const spec = PACK[name];
+  const qk = name.startsWith('house') ? 'house' : undefined;
   const placeFallback = () => {
     if (!opts.fallback) return;
     const fb = opts.fallback();
     if (fb.children.length === 0 && !(fb as THREE.Mesh).isMesh) return;   // never register an INVISIBLE edible
+    if (qk) fb.userData.qk = qk;
     fb.position.set(x, 0, z);
     if (opts.rotY) fb.rotation.y = opts.rotY;
     fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
@@ -170,6 +172,7 @@ export function glb(
     } else {
       obj = hi;
     }
+    if (qk) obj.userData.qk = qk;
     obj.position.set(x, 0, z);
     if (opts.rotY) obj.rotation.y = opts.rotY;
     obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
