@@ -288,6 +288,44 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide }));
       star.position.set(0.28, 1.28, 0.3); g.add(star);
     });
+    mk('dragon', (g) => {
+      const wingMat = new THREE.MeshStandardMaterial({ color: 0x2a8a9a, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x1a5a6a, emissiveIntensity: 0.3 });
+      for (const sx of [-1, 1]) {
+        const wing = new THREE.Mesh(new THREE.CircleGeometry(0.62, 5, 0, Math.PI * 0.7), wingMat);
+        wing.position.set(sx * 0.82, 0.62, -0.5);
+        wing.rotation.set(0.3, sx * 1.1, sx * 0.9);
+        wing.scale.set(1.5, 1, 1); g.add(wing);
+      }
+      const hornMat = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.35, metalness: 0.4 });
+      for (const sx of [-0.3, 0.3]) {
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 8), hornMat);
+        horn.position.set(sx, 1.08, 0.2); horn.rotation.x = 0.2; horn.rotation.z = -sx; g.add(horn);
+      }
+    });
+    mk('mecha', (g) => {
+      const chrome = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.8, roughness: 0.25 });
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.7, 6), chrome);
+      ant.position.set(0.18, 1.24, 0); g.add(ant);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.4 }));
+      tip.position.set(0.18, 1.62, 0); g.add(tip);
+      for (const sx of [-1, 1]) {   // ear pods
+        const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 10), chrome);
+        pod.rotation.z = Math.PI / 2; pod.position.set(sx * 1.02, 0.12, 0); g.add(pod);
+        const glow2 = new THREE.Mesh(new THREE.CircleGeometry(0.1, 10),
+          new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.2, side: THREE.DoubleSide }));
+        glow2.rotation.y = sx * Math.PI / 2; glow2.position.set(sx * 1.1, 0.12, 0); g.add(glow2);
+      }
+    });
+    mk('ninja', (g) => {
+      const bandMat = new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7 });
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.98, 0.09, 8, 32), bandMat);
+      band.rotation.x = Math.PI / 2 - 0.28; band.position.y = 0.42; g.add(band);
+      for (const sx of [-0.1, 0.14]) {   // flowing tails at the back
+        const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.85), new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7, side: THREE.DoubleSide }));
+        tail.position.set(sx, 0.14, -1.0); tail.rotation.x = 0.5; tail.rotation.z = sx * 2; g.add(tail);
+      }
+    });
     mk('king', (g) => {
       const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.25 });
       const band = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.44, 0.22, 12, 1, true), gold);

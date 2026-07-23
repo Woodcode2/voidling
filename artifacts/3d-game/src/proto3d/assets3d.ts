@@ -76,7 +76,10 @@ function release() {
 // player is looking, cheap at the screen edges and far side of the island.
 const LODS: THREE.LOD[] = [];
 export function updateLodBias(camDist: number) {
-  const d = Math.min(280, camDist * 1.25);
+  // 1.9x keeps the swap boundary beyond the visible frustum edge — the swap
+  // itself is what reads as "houses popping" (meshes are preloaded; it was
+  // never streaming, it was LOD switching in view)
+  const d = Math.min(420, camDist * 1.9);
   for (const l of LODS) if (l.levels.length > 1) l.levels[1].distance = d;
 }
 

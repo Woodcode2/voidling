@@ -13,7 +13,7 @@ import { createRivals } from './proto3d/rivals';
 import { createFx } from './proto3d/fx';
 import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
-import { SKINS } from './proto3d/palette';
+import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
@@ -326,7 +326,7 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   { id: 'rival', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
   { id: 'army', label: 'Delicious Irony: eat 2 army units', target: 2, reward: 25, kind: 'army' },
 ];
-const EASY_Q = ['snack', 'gulp', 'collapse'], MED_Q = ['cars', 'combo', 'evolve', 'solo'], HARD_Q = ['houses', 'rival', 'army'];
+const EASY_Q = ['snack'], MED_Q = ['cars', 'combo', 'evolve', 'solo'], HARD_Q = ['houses', 'rival', 'army'];   // gulp/collapse rejoin when powers return
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   const daySeed = Math.abs(today.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
@@ -592,8 +592,9 @@ function spawnSuck(n: number, reach: number) {
 }
 
 // ── power fire functions ─────────────────────────────────────────────────────
+const POWERS_ON = false;   // carved out for launch — pure drag+eat (hole.io purity)
 function fireGulp() {
-  if (hunger < COST.gulp || powerCd > 0) return;
+  if (!POWERS_ON || hunger < COST.gulp || powerCd > 0) return;
   hunger -= COST.gulp; powerCd = 0.5;
   const R = voidling.radius, reach = R * 8;
   for (const e of edibles) {
@@ -608,7 +609,7 @@ function fireGulp() {
   questEvent('gulp');
 }
 function fireCollapse() {
-  if (hunger < COST.collapse || powerCd > 0) return;
+  if (!POWERS_ON || hunger < COST.collapse || powerCd > 0) return;
   hunger -= COST.collapse; powerCd = 1.2;
   const R = voidling.radius, reach = R * 16;
   for (const e of edibles) {
@@ -658,12 +659,12 @@ const preloadP = preloadPack((done, total) => {
 const LOAD_TIPS = [
   'tip: eat the little stuff first — cones, hydrants, mailboxes',
   'tip: cars count as people-sized once you evolve',
-  'tip: GULP pulls everything nearby a size smaller than you',
+  'tip: get CLOSE — small stuff gets sucked right in',
   'tip: rival voids can eat YOU — check the leaderboard sizes',
   'tip: the downtown towers are the biggest meal on the island',
   'tip: play daily — streak skins unlock at 2 and 7 days',
   "tip: parked cars can't run away. just saying.",
-  'tip: COLLAPSE eats things WAY bigger than you',
+  'tip: buildings topple INTO you. very satisfying.',
   'tip: bite fast — combos multiply your points',
   'tip: the beach is full of easy snacks (sorry, towels)',
   'tip: eat a rival and they respawn tiny — and grumpy',
@@ -702,21 +703,21 @@ el('btnGotIt').addEventListener('click', () => {
 document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {
   c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
 }));
+el('btnWorlds').addEventListener('click', () => el('worlds').classList.add('show'));
 el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 function resetMatch() {
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible || !e.mesh.parent) {
-      e.eaten = false; e.t = 0;
-      e.mesh.userData.eaten = false;
-      e.mesh.visible = true;
-      if (!e.mesh.parent) scene.add(e.mesh);
-      e.mesh.position.copy(e.home);
-      e.mesh.scale.copy(e.homeScale);
-      e.mesh.rotation.set(0, e.homeRotY, 0);
-    }
+    e.eaten = false; e.t = 0;
+    e.mesh.userData.eaten = false;
+    e.mesh.visible = true;
+    if (!e.mesh.parent) scene.add(e.mesh);
+    // magnet drift + topple mean EVERYTHING goes back to its surveyed home
+    e.mesh.position.copy(e.home);
+    e.mesh.scale.copy(e.homeScale);
+    e.mesh.rotation.set(0, e.homeRotY, 0);
   }
   rivals.reset();
   defense.reset();
@@ -836,50 +837,76 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // shop order tells the value story: colours → AI textures → LEGENDARY
   const SORTED = [...SKINS].sort((a, b) =>
     (a.cash ? 2 : a.tex ? 1 : 0) - (b.cash ? 2 : b.tex ? 1 : 0));
+  const orbStyle = (s: Skin) => s.art
+    ? `background: url('${s.art}') center / cover; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
+    : s.tex
+      ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
+      : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+  // every orb wears the FACE — it's the voidling you're buying, not a marble
+  // (legendary card art already has the character drawn in)
+  const FACE_SVG = `<svg class="face" viewBox="0 0 100 100">
+      <ellipse cx="34" cy="26" rx="14" ry="9" fill="#ffffff" opacity="0.28" transform="rotate(-24 34 26)"/>
+      <circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/>
+      <circle cx="40" cy="47" r="6.2" fill="#160a30"/><circle cx="64" cy="47" r="6.2" fill="#160a30"/>
+      <circle cx="38" cy="44" r="2.4" fill="#fff"/><circle cx="62" cy="44" r="2.4" fill="#fff"/>
+      <ellipse cx="25" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
+      <ellipse cx="75" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
+      <path d="M41 63 Q50 72 59 63" stroke="#1a0b33" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  // ── skin PREVIEW: tap a card → meet the skin BIG, then equip/buy from there
+  const prevEl = el('skinPrev'), spAct = el('spAct');
+  let prevSkin: Skin | null = null;
+  const refreshPreview = () => {
+    if (!prevSkin) return;
+    const s = prevSkin;
+    spAct.textContent = equipped === s.id ? '✓ EQUIPPED'
+      : owned.has(s.id) ? 'EQUIP'
+      : s.cash ? `💎 $${s.cash.toFixed(2)} · APP STORE SOON`
+      : s.streak ? `🔥 PLAY ${s.streak} DAYS IN A ROW`
+      : `BUY · 🪙 ${PRICES[s.id]}¢`;
+  };
+  const openPreview = (s: Skin) => {
+    prevSkin = s;
+    const orb = el('spOrb');
+    orb.setAttribute('style', orbStyle(s));
+    orb.innerHTML = s.art ? '' : FACE_SVG;
+    el('spName').textContent = s.name;
+    el('spTier').textContent = s.cash ? 'LEGENDARY' : s.streak ? 'STREAK REWARD' : s.tex ? 'EPIC' : 'CLASSIC LINE';
+    refreshPreview();
+    prevEl.classList.add('show');
+    audio.ready();
+  };
+  el('spClose').addEventListener('click', () => prevEl.classList.remove('show'));
+  prevEl.addEventListener('click', (ev) => { if (ev.target === prevEl) prevEl.classList.remove('show'); });
+  spAct.addEventListener('click', () => {
+    const s = prevSkin;
+    if (!s) return;
+    if (s.streak && !owned.has(s.id)) { audio.hit(); return; }   // earned by coming back
+    if (s.cash && !owned.has(s.id)) {
+      spAct.textContent = '✨ COMING WITH THE APP STORE BUILD';
+      audio.ready();
+      setTimeout(refreshPreview, 1800);
+      return;
+    }
+    if (!owned.has(s.id)) {
+      if (coins >= PRICES[s.id]) {
+        addCoins(-PRICES[s.id]);
+        owned.add(s.id);
+        localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+        audio.evolve();
+      } else { spAct.textContent = `NEED ${PRICES[s.id] - coins}¢ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return; }
+    }
+    equipped = s.id;
+    voidling.setSkin(s);
+    localStorage.setItem('voidSkin', s.id);
+    refresh(); refreshPreview();
+  });
   for (const s of SORTED) {
     const card = document.createElement('div');
     card.className = 'skCard' + (s.cash ? ' legend' : s.tex ? ' epic' : '');
-    const orbBg = s.art
-      ? `background: url('${s.art}') center / cover; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
-      : s.tex
-        ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
-        : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
-    // every orb wears the FACE — it's the voidling you're buying, not a marble
-    // (legendary card art already has the character drawn in)
-    const faceSvg = s.art ? '' : `<svg class="face" viewBox="0 0 100 100">
-        <ellipse cx="34" cy="26" rx="14" ry="9" fill="#ffffff" opacity="0.28" transform="rotate(-24 34 26)"/>
-        <circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/>
-        <circle cx="40" cy="47" r="6.2" fill="#160a30"/><circle cx="64" cy="47" r="6.2" fill="#160a30"/>
-        <circle cx="38" cy="44" r="2.4" fill="#fff"/><circle cx="62" cy="44" r="2.4" fill="#fff"/>
-        <ellipse cx="25" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
-        <ellipse cx="75" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
-        <path d="M41 63 Q50 72 59 63" stroke="#1a0b33" stroke-width="3.6" fill="none" stroke-linecap="round"/>
-      </svg>`;
     const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : s.tex ? '<div class="rib epicRib">EPIC</div>' : '';
-    card.innerHTML = `${ribbon}<div class="orb" style="${orbBg}">${faceSvg}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
-    card.addEventListener('click', () => {
-      if (s.streak && !owned.has(s.id)) return;   // earned by coming back, not coins
-      if (s.cash && !owned.has(s.id)) {
-        // real-money tier: IAP ships with the App Store build
-        const pr = card.querySelector('.pr') as HTMLElement;
-        pr.textContent = '✨ APP STORE SOON';
-        audio.ready();
-        setTimeout(refresh, 1600);
-        return;
-      }
-      if (!owned.has(s.id)) {
-        if (coins >= PRICES[s.id]) {
-          addCoins(-PRICES[s.id]);
-          owned.add(s.id);
-          localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
-          audio.evolve();
-        } else { audio.hit(); return; }
-      }
-      equipped = s.id;
-      voidling.setSkin(s);
-      localStorage.setItem('voidSkin', s.id);
-      refresh();
-    });
+    card.innerHTML = `${ribbon}<div class="orb" style="${orbStyle(s)}">${s.art ? '' : FACE_SVG}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
+    card.addEventListener('click', () => openPreview(s));
     cards.set(s.id, card);
     grid.appendChild(card);
     if (s.id === equipped) voidling.setSkin(s);
@@ -1019,10 +1046,16 @@ function animate() {
     }
     if (d < R + e.radius * 0.5) {
       capture(e);
-    } else if (d < R + e.radius * 2.4) {
-      const pull = (R + e.radius * 2.4 - d) * 1.4;
-      e.mesh.position.x -= (dx / d) * dt * pull;
-      e.mesh.position.z -= (dz / d) * dt * pull;
+    } else {
+      // MAGNET: the void's gravity well scales with its size — anything
+      // edible inside ~1.7R visibly drifts in (hole.io's suction fantasy)
+      const reach = R * 1.7 + e.radius * 2.4;
+      if (d < reach) {
+        const pull = (1 - d / reach) * (3.2 + R * 0.55);
+        e.mesh.position.x -= (dx / d) * dt * pull;
+        e.mesh.position.z -= (dz / d) * dt * pull;
+        e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);   // lean toward the pit
+      }
     }
   }
 
