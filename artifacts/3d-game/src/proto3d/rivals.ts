@@ -204,9 +204,10 @@ export function createRivals(
       // SEE (they used to vanish in one frame, reading as a rendering bug)
       for (let i = shrinking.length - 1; i >= 0; i--) {
         const m = shrinking[i];
-        m.scale.multiplyScalar(1 - dt * 4.5);
-        m.position.y -= dt * 2.4;
-        m.rotation.y += dt * 5;
+        const big = m.userData.qk === 'house' || m.scale.x > 3;
+        m.scale.multiplyScalar(1 - dt * (big ? 6.5 : 4.5));
+        m.position.y -= dt * (big ? 4 : 2.4);
+        if (!big) m.rotation.y += dt * 5;   // spinning HOUSES read as parked-on-road chaos
         if (m.scale.x < 0.05) { m.visible = false; scene.remove(m); shrinking.splice(i, 1); }
       }
       const lawCap = START_R + LAW_RATE * _t;   // rivals obey the growth law too

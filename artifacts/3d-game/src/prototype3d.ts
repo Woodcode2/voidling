@@ -150,7 +150,7 @@ rivals.onRivalEaten = (name, pts) => {
   fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3, 0.7);
   fx.shake(5); fx.flash('rgba(184,117,255,0.35)', 0.5);
   floatPos.set(voidState.x, voidling.radius + 4, voidState.z);
-  bubbles.float(floatPos, '+15¢ FAMILY FEAST!', true);
+  bubbles.float(floatPos, '+15✦ FAMILY FEAST!', true);
   audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
   buzz(60);
 };
@@ -332,12 +332,12 @@ const coinEl = el('coins');
 function addCoins(n: number) {
   coins += n;
   localStorage.setItem('voidCoins', String(coins));
-  coinEl.textContent = `🪙 ${coins}`;
+  coinEl.textContent = `✦ ${coins}`;
 }
 addCoins(0);
 
 // ── DAILY QUESTS: 3 drawn per day (1 easy / 1 medium / 1 hard), progress
-// persists across matches, +25¢ for clearing the board — three stacking
+// persists across matches, +25✦ for clearing the board — three stacking
 // come-back-tomorrow hooks with the gift box and streak skins
 interface Quest { id: string; label: string; target: number; count: number; reward: number; kind: string; done: boolean; }
 const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
@@ -373,13 +373,13 @@ function saveQuests() {
 const questsEl = el('quests');
 function renderQuests() {
   questsEl.innerHTML = quests.map((q) =>
-    `<div class="q ${q.done ? 'done' : ''}"><span>${q.done ? '✓' : '○'}</span> ${q.label} <b>+${q.reward}¢</b>${q.done ? '' : ` <i>${q.count}/${q.target}</i>`}</div>`).join('');
+    `<div class="q ${q.done ? 'done' : ''}"><span>${q.done ? '✓' : '○'}</span> ${q.label} <b>+${q.reward}✦</b>${q.done ? '' : ` <i>${q.count}/${q.target}</i>`}</div>`).join('');
 }
 function questComplete(q: Quest) {
   q.done = true; addCoins(q.reward);
-  announce(`QUEST DONE! +${q.reward}¢`);
+  announce(`QUEST DONE! +${q.reward}✦`);
   audio.evolve();
-  if (quests.every((x) => x.done)) { addCoins(25); announce('ALL QUESTS CLEAR! +25¢ BONUS'); }
+  if (quests.every((x) => x.done)) { addCoins(25); announce('ALL QUESTS CLEAR! +25✦ BONUS'); }
   renderQuests(); saveQuests();
 }
 function questEvent(kind: string, n = 1) {
@@ -530,7 +530,7 @@ function endMatch() {
     addCoins(reward2);
     if (devouredPct >= 40) questEvent('solo40');
     endHd.textContent = `${devouredPct}% DEVOURED`;
-    endSub.textContent = `${newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`} · +${reward2}¢ · +${gain2} XP`;
+    endSub.textContent = `${newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`} · +${reward2}✦ · +${gain2} XP`;
     endList.innerHTML = '';
     endEl.classList.add('show');
     stats.matches++; saveStats();
@@ -562,7 +562,7 @@ function endMatch() {
   const LOSE_TITLES = ['STILL PECKISH…', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
-  endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}¢ · +${gain} XP`;
+  endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}✦ · +${gain} XP`;
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
@@ -597,7 +597,7 @@ function capture(e: Edible, giveHunger = true) {
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   const coinVal = e.mesh.userData.coin as number | undefined;
-  if (coinVal) { addCoins(coinVal); bubbles.float(floatPos, `+${coinVal}¢`, true); }
+  if (coinVal) { addCoins(coinVal); bubbles.float(floatPos, `+${coinVal}✦`, true); }
   else bubbles.float(floatPos, `+${pts}`);
   // CHOMP! is an EVENT, not wallpaper. The growth law parks the player just
   // above their staple food size, so the bar is "bigger than YOU" + a long
@@ -720,7 +720,7 @@ const LOAD_TIPS = [
   'tip: the beach is full of easy snacks (sorry, towels)',
   'tip: eat a rival and they respawn tiny — and grumpy',
   'tip: the ferris wheel is dessert. save room.',
-  'tip: quests pay coins — peek at the list mid-match',
+  'tip: quests pay VOID POINTS — check mid-match',
   'tip: BITSY cries when eaten. worth it.',
 ];
 function withWorldReady(cb: () => void) {
@@ -799,6 +799,15 @@ el('btnHome').addEventListener('click', () => {
   menuEl.style.display = '';
   renderRank();
 });
+// in-game HOME (⌂): abandon the match, back to the menu — next PLAY is fresh
+el('btnQuit').addEventListener('click', () => {
+  if (!started) return;
+  started = false; ended = true;
+  audio.stopMusic();
+  document.body.classList.add('menu');
+  menuEl.style.display = '';
+  renderRank();
+});
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
 // ── lifetime stats + trophies ────────────────────────────────────────────────
@@ -845,8 +854,8 @@ function renderTop() {
 }
 el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').classList.add('show'); });
 
-// ── menu gift box: a present every 30 minutes (hole.io's timer-gift retention) ─
-{
+// ── menu gift box RETIRED — the daily calendar owns login rewards now ──
+if (false) {
   const giftEl = el('gift');
   const refreshGift = () => { giftEl.style.display = Date.now() >= Number(localStorage.getItem('voidGiftAt') || 0) ? '' : 'none'; };
   giftEl.addEventListener('click', () => {
@@ -857,7 +866,7 @@ el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').class
     localStorage.setItem('voidGiftN', String(n + 1));
     const amt = [50, 75, 100][n];
     addCoins(amt);
-    giftEl.textContent = `+${amt}¢!`;
+    giftEl.textContent = `+${amt}✦!`;
     audio.evolve(); buzz(40);
     localStorage.setItem('voidGiftAt', String(Date.now() + 30 * 60 * 1000));
     setTimeout(() => { giftEl.textContent = '🎁'; refreshGift(); }, 1400);
@@ -877,7 +886,7 @@ renderRank();
     const day = last === yd ? Math.min(6, Number(localStorage.getItem('voidDailyDay') || 0) + 1) : 0;
     const modal = el('daily');
     el('dailyGrid').innerHTML = DAILY.map((amt, i) =>
-      `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''}"><b>DAY ${i + 1}</b>🪙 ${amt}¢</div>`).join('');
+      `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''}"><b>DAY ${i + 1}</b>✦ ${amt}✦</div>`).join('');
     (el('dailyClaim') as HTMLButtonElement).onclick = () => {
       addCoins(DAILY[day]);
       localStorage.setItem('voidDailyLast', today);
@@ -919,7 +928,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
       pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED'
         : s.cash ? `💎 $${s.cash.toFixed(2)}`
-        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `🪙 ${PRICES[s.id]}¢`;
+        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}✦`;
     }
   };
   // shop order tells the value story: colours → AI textures → LEGENDARY
@@ -951,7 +960,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       : owned.has(s.id) ? 'EQUIP'
       : s.cash ? `💎 $${s.cash.toFixed(2)} · APP STORE SOON`
       : s.streak ? `🔥 PLAY ${s.streak} DAYS IN A ROW`
-      : `BUY · 🪙 ${PRICES[s.id]}¢`;
+      : `BUY · ✦ ${PRICES[s.id]}✦`;
   };
   const openPreview = (s: Skin) => {
     prevSkin = s;
@@ -982,7 +991,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
         owned.add(s.id);
         localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
         audio.evolve();
-      } else { spAct.textContent = `NEED ${PRICES[s.id] - coins}¢ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return; }
+      } else { spAct.textContent = `NEED ${PRICES[s.id] - coins}✦ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return; }
     }
     equipped = s.id;
     voidling.setSkin(s);

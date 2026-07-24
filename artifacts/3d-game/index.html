@@ -56,15 +56,19 @@
         text-shadow: 0 1px 3px rgba(0,0,0,0.55); transition: opacity 0.8s ease; }
       /* MAPLE ISLE NEWS — headlines that POP, and turn nervous as you eat */
       #news { position: fixed; top: 84px; left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
-        max-width: 88vw; background: linear-gradient(180deg, rgba(34,16,64,0.95), rgba(18,9,36,0.95));
-        border: 2px solid rgba(201,166,255,0.55); border-radius: 14px;
-        padding: 12px 22px; color: #fff; font-size: clamp(14px, 4.2vw, 19px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none;
-        opacity: 0; box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 18px rgba(154,92,255,0.25);
+        background: linear-gradient(180deg, #2c1454, #180a30);
+        border: 2.5px solid #ffd25a; border-radius: 15px; overflow: hidden;
+        padding: 13px 24px; color: #fff; font-size: clamp(15px, 4.4vw, 21px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none;
+        opacity: 0; box-shadow: 0 8px 26px rgba(0,0,0,0.55), 0 0 26px rgba(255,210,90,0.35);
         max-width: 94vw; line-height: 1.35; }
-      #news i { font-style: normal; color: #ffe08a; font-size: 12.5px; letter-spacing: 2px; margin-right: 12px;
-        background: rgba(255,224,138,0.14); border-radius: 7px; padding: 3px 8px; }
-      #news.worried { border-color: rgba(255,208,90,0.65); box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 20px rgba(255,196,60,0.3); }
-      #news.panic { border-color: rgba(255,90,110,0.75); box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 24px rgba(255,60,80,0.4); }
+      #news::after { content: ''; position: absolute; top: -60%; left: -80%; width: 45%; height: 220%;
+        background: linear-gradient(100deg, transparent, rgba(255,255,255,0.22), transparent);
+        transform: rotate(18deg); animation: newsShine 5.6s ease forwards; }
+      @keyframes newsShine { 0%, 12% { left: -80%; } 42% { left: 130%; } 100% { left: 130%; } }
+      #news i { font-style: normal; color: #1a0b33; font-size: 12.5px; letter-spacing: 2px; margin-right: 12px;
+        background: #ffd25a; border-radius: 7px; padding: 3px 9px; }
+      #news.worried { border-color: #ffb054; box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 20px rgba(255,196,60,0.3); }
+      #news.panic { border-color: #ff5a6e; box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 24px rgba(255,60,80,0.4); }
       #news.panic i { color: #ff8a9a; background: rgba(255,90,110,0.16); }
       #news.show { animation: news 5.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
       @keyframes news {
@@ -170,6 +174,9 @@
           url('/assets/hf/hf_20260723_174649_b2a3b133-7831-4a9f-ae6f-cd24e5f1ff81.png') center 38% / cover no-repeat,
           radial-gradient(ellipse at 50% 30%, #2a1454, #0d0821 75%); }
       @media (orientation: portrait) {
+        #menu .spacer { flex: 1.7; }   /* the character's face gets the frame */
+        #menu .navRow { margin-top: 10px; }
+
         #menu { background:
           linear-gradient(180deg, rgba(13,8,33,0.35) 0%, rgba(13,8,33,0.0) 22%, rgba(13,8,33,0.0) 60%, rgba(13,8,33,0.72) 100%),
           url('/assets/hf/hf_20260724_014052_dba266d5-d682-4ed6-93f6-91a1b86299fa.png') center top / cover no-repeat,
@@ -202,6 +209,11 @@
       #worldRow { display: flex; gap: 14px; justify-content: center; margin: 0 0 12px; }
       #worlds .wCard { width: 130px; padding: 18px 10px 14px; }
       #worlds .wCard i { font-size: 40px; }
+      /* in-game home button */
+      #btnQuit { position: fixed; top: 56px; right: 12px; z-index: 6; width: 38px; height: 38px;
+        border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
+        color: #cbb2ff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(6px); }
+      body.menu #btnQuit { display: none; }
       /* daily rewards calendar */
       #daily { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.8); backdrop-filter: blur(6px); }
@@ -287,7 +299,7 @@
       #btnSolo:active { transform: translateY(3px); box-shadow: 0 2px 0 #3a1a80; }
       #btnSolo span { display: block; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; opacity: 0.85; margin-top: 2px; }
       /* gift box: bottom-left present with a wiggle */
-      #gift { position: absolute; left: 14px; bottom: 74px; font-size: 34px; background: rgba(30,16,58,0.85);
+      #gift { display: none !important; position: absolute; left: 14px; bottom: 74px; font-size: 34px; background: rgba(30,16,58,0.85);
         border: 2px solid rgba(255,224,138,0.5); border-radius: 18px; padding: 10px 14px; cursor: pointer;
         animation: giftWiggle 2.4s ease-in-out infinite; box-shadow: 0 0 18px rgba(255,224,138,0.25); }
       @keyframes giftWiggle { 0%, 100% { transform: rotate(0); } 6% { transform: rotate(-8deg); } 12% { transform: rotate(8deg); } 18% { transform: rotate(0); } }
@@ -385,7 +397,7 @@
     <div id="timer">3:00</div>
     <div id="devoured">0% DEVOURED</div>
     <div id="board"></div>
-    <div id="coins">🪙 0</div>
+    <div id="coins">✦ 0</div>
     <div id="quests"></div>
     <div id="form">VOIDLING</div>
     <div id="formbar"><div class="fill"></div></div>
@@ -400,6 +412,7 @@
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="guide"></div>
+    <button id="btnQuit" title="home">⌂</button>
     <div id="titlecard">
       <div class="lvl">LEVEL 1</div>
       <div class="name">MAPLE&nbsp;ISLE</div>

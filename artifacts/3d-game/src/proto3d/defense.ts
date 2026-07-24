@@ -145,7 +145,7 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
         const hd = Math.hypot(p.x - vx, p.z - vz);
         if (hd < vR + 1 && Math.abs(p.y - vR * 0.5) < vR) {
           // a bonk, not a jump-scare: tiny shake, no full-screen red flash
-          p.life = 0; p.y = -999; delta -= p.dmg; fx.shake(0.9);
+          p.life = 0; p.y = -999; delta -= p.dmg;
         }
         if (p.life <= 0) p.y = -999;
         dummy.position.set(p.x, p.y, p.z); dummy.updateMatrix(); pellets.setMatrixAt(i, dummy.matrix);
