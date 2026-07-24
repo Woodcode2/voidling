@@ -171,6 +171,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   new THREE.TextureLoader().load('/assets/hf/hf_20260717_021720_8d012b94-ca33-49d6-9db7-237b607fe3da.png', (skyTex) => {
     skyTex.colorSpace = THREE.SRGBColorSpace;
     scene.background = skyTex;
+    scene.backgroundIntensity = 0.55;   // deep rich nebula, not washed lavender
   });
 
   // starfield

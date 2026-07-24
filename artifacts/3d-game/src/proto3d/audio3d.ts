@@ -71,6 +71,18 @@ export function createAudio(): Audio3D {
   // ── MUSIC: a soft toy-synth loop that AUDIBLY escalates as the void grows —
   // hole.io's trick: tempo +8 BPM and one new layer per evolution stage, so the
   // island "losing" is something you can hear.
+  let musicFile: HTMLAudioElement | null = null;
+  let musicFileOn = false, musicFileBad = false;
+  function startSynth() {
+    const c = ensure(); if (!c || !master) return;
+    if (!musGain) musGain = buildMusicBus(c);
+    musGain.gain.cancelScheduledValues(c.currentTime);
+    musGain.gain.setValueAtTime(0.0001, c.currentTime);
+    musGain.gain.exponentialRampToValueAtTime(0.26, c.currentTime + 1.2);
+    step = 0; nextT = c.currentTime + 0.1;
+    if (musTimer) clearInterval(musTimer);
+    musTimer = setInterval(musSchedule, 110);
+  }
   let musGain: GainNode | null = null;
   let musTimer: ReturnType<typeof setInterval> | null = null;
   let musStage = 0, step = 0, nextT = 0;
@@ -161,17 +173,21 @@ export function createAudio(): Audio3D {
 
   return {
     startMusic() {
-      const c = ensure(); if (!c || !master) return;
-      if (!musGain) musGain = buildMusicBus(c);
-      musGain.gain.cancelScheduledValues(c.currentTime);
-      musGain.gain.setValueAtTime(0.0001, c.currentTime);
-      musGain.gain.exponentialRampToValueAtTime(0.26, c.currentTime + 1.2);
-      step = 0; nextT = c.currentTime + 0.1;
-      if (musTimer) clearInterval(musTimer);
-      musTimer = setInterval(musSchedule, 110);
+      // licensed-track hook: if a real music file ships with the build, prefer
+      // it (loop + gentle volume); the synth score is the fallback
+      if (!musicFileBad) {
+        if (!musicFile) {
+          musicFile = new Audio('/assets/music/theme.mp3');
+          musicFile.loop = true; musicFile.volume = 0.35;
+        }
+        musicFile.play().then(() => { musicFileOn = true; }).catch(() => { musicFileBad = true; startSynth(); });
+        return;
+      }
+      startSynth();
     },
     setMusicStage(n) { musStage = n; },
     stopMusic() {
+      if (musicFileOn && musicFile) { musicFile.pause(); musicFile.currentTime = 0; musicFileOn = false; }
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
       if (ctx && musGain) {
         musGain.gain.cancelScheduledValues(ctx.currentTime);

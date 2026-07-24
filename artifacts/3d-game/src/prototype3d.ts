@@ -937,12 +937,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   const orbStyle = (s: Skin) => s.art
     ? `background: url('${s.art}') center / cover; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
     : s.tex
-      ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), inset 6px 10px 18px rgba(255,255,255,0.18), 0 8px 18px rgba(0,0,0,0.45);`
+      ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.45);`
       : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
   // every orb wears the FACE — it's the voidling you're buying, not a marble
   // (legendary card art already has the character drawn in)
   const FACE_SVG = `<svg class="face" viewBox="0 0 100 100">
-      <ellipse cx="34" cy="26" rx="14" ry="9" fill="#ffffff" opacity="0.28" transform="rotate(-24 34 26)"/>
+      <ellipse cx="34" cy="26" rx="12" ry="7" fill="#ffffff" opacity="0.14" transform="rotate(-24 34 26)"/>
       <circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/>
       <circle cx="40" cy="47" r="6.2" fill="#160a30"/><circle cx="64" cy="47" r="6.2" fill="#160a30"/>
       <circle cx="38" cy="44" r="2.4" fill="#fff"/><circle cx="62" cy="44" r="2.4" fill="#fff"/>
@@ -1164,7 +1164,7 @@ function animate() {
       // MAGNET: the void's gravity well scales with its size — anything
       // edible inside ~1.7R visibly drifts in (hole.io's suction fantasy)
       const reach = R * 1.7 + e.radius * 2.4;
-      if (d < reach) {
+      if (d < reach && e.radius < 2.5) {   // suction is for PROPS — buildings stay founded
         const pull = (1 - d / reach) * (3.2 + R * 0.55);
         e.mesh.position.x -= (dx / d) * dt * pull;
         e.mesh.position.z -= (dz / d) * dt * pull;
