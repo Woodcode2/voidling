@@ -92,8 +92,17 @@ export function createAudio(): Audio3D {
     delay.connect(fb); fb.connect(delay);
     return bus;
   }
-  const BASS = [65.41, 65.41, 49.0, 49.0, 55.0, 55.0, 43.65, 49.0];               // C2 C2 G1 G1 A1 A1 F1 G1
-  const MEL = [523.25, 0, 659.25, 783.99, 0, 659.25, 587.33, 0, 523.25, 0, 440, 523.25, 0, 392, 440, 0];
+  // I–V–vi–IV in C — the four-chord kids' anthem. One chord per bar.
+  const CHORDS = [
+    [261.63, 329.63, 392.0],   // C
+    [392.0, 493.88, 587.33],   // G
+    [440.0, 523.25, 659.25],   // Am
+    [349.23, 440.0, 523.25],   // F
+  ];
+  const CHORD_BASS = [65.41, 49.0, 55.0, 43.65];   // C2 G1 A1 F1
+  // pentatonic hook, one note per beat over 4 bars (0 = rest)
+  const MEL = [523.25, 587.33, 659.25, 783.99, 659.25, 587.33, 523.25, 0,
+    440.0, 523.25, 587.33, 659.25, 587.33, 523.25, 440.0, 392.0];
   const ARP = [1046.5, 1318.5, 1568, 1318.5];
   function musNote(freq: number, t: number, dur: number, type: OscillatorType, vol: number, glideTo?: number, soft = false) {
     const c = ctx; if (!c || !musGain || freq <= 0) return;
@@ -131,20 +140,21 @@ export function createAudio(): Audio3D {
     const s16 = spb / 4;
     if (nextT < c.currentTime) nextT = c.currentTime + 0.05;
     while (nextT < c.currentTime + 0.35) {
-      const beat = Math.floor(step / 4) % 8, s = step % 16;
-      if (step % 4 === 0) musNote(BASS[beat], nextT, spb * 0.9, 'sine', 0.14);
-      if (step % 8 === 0) musNote(150, nextT, 0.1, 'sine', 0.16, 50);                 // soft kick
-      // warm chord bed every bar — the cozy floor under everything
-      if (step % 16 === 0) {
-        const root = BASS[beat] * 4;
-        musNote(root, nextT, spb * 3.6, 'sine', 0.035, undefined, true);
-        musNote(root * 1.26, nextT, spb * 3.6, 'sine', 0.028, undefined, true);   // ~major third
-        musNote(root * 1.5, nextT, spb * 3.6, 'sine', 0.024, undefined, true);
+      const bar = Math.floor(step / 16) % 4, s = step % 16;
+      const beatIdx = Math.floor(step / 4) % 16;   // melody index: one note per beat over 4 bars
+      // bass: root on the one, fifth on the three — walking, not droning
+      if (s === 0) musNote(CHORD_BASS[bar], nextT, spb * 1.7, 'sine', 0.15);
+      if (s === 8) musNote(CHORD_BASS[bar] * 1.5, nextT, spb * 0.9, 'sine', 0.1);
+      if (s === 0 || s === 8) musNote(150, nextT, 0.1, 'sine', 0.15, 50);   // soft kick on 1 & 3
+      // chord pad: full triad, one warm swell per bar
+      if (s === 0) for (const f of CHORDS[bar]) musNote(f, nextT, spb * 3.7, 'sine', 0.026, undefined, true);
+      // kalimba pluck hook: fundamental + soft octave, fast decay (from stage 1)
+      if (musStage >= 1 && s % 4 === 0 && MEL[beatIdx] > 0) {
+        musNote(MEL[beatIdx], nextT, s16 * 2.2, 'triangle', 0.055);
+        musNote(MEL[beatIdx] * 2, nextT, s16 * 1.1, 'sine', 0.022);
       }
-      // melody: unhurried quarter-note pads with detune shimmer
-      if (musStage >= 1 && s % 4 === 0 && MEL[s] > 0) musNote(MEL[s], nextT, s16 * 3.4, 'sine', 0.06, undefined, true);
-      if (musStage >= 2 && step % 8 === 2) musHat(nextT, 0.028);
-      if (musStage >= 3 && step % 2 === 0) musNote(ARP[step % 4], nextT, s16 * 1.4, 'sine', 0.018, undefined, true);
+      if (musStage >= 2 && s % 8 === 4) musHat(nextT, 0.026);
+      if (musStage >= 3 && s % 4 === 2) musNote(ARP[step % 4], nextT, s16 * 1.3, 'sine', 0.016, undefined, true);
       nextT += s16; step++;
     }
   }
@@ -178,11 +188,12 @@ export function createAudio(): Audio3D {
       if (now - lastPop < 0.1) return;
       lastPop = now;
       const depth = Math.min(1, (size - 0.9) / 9);          // 0 tiny -> 1 huge
-      const base = (300 + Math.min(combo, 20) * 10) * (1 - depth * 0.5);
-      tone(base, base * 0.55, 0.07, 'sine', 0.16 + depth * 0.05);            // 'gu-'
-      tone(base * 0.6, base * 0.3, 0.12, 'sine', 0.18 + depth * 0.07, 0.055); // '-ulp'
-      noise(0.09, 0.05, 1100, 240, 0.02);                                     // throat air
-      if (depth > 0.4) tone(56, 32, 0.18, 'sine', depth * 0.13, 0.04);        // sub thump
+      const base = (330 + Math.min(combo, 20) * 8) * (1 - depth * 0.5);
+      // pure rounded swallow: one smooth glide down an octave-and-a-half,
+      // with a soft body underneath — no noise (crackles on phone speakers)
+      tone(base, base * 0.34, 0.16 + depth * 0.06, 'sine', 0.13 + depth * 0.05);
+      tone(base * 0.5, base * 0.22, 0.14, 'triangle', 0.05, 0.03);
+      if (depth > 0.4) tone(54, 32, 0.18, 'sine', depth * 0.12, 0.05);        // sub thump
     },
     bigEat() {
       noise(0.22, 0.3, 900, 180);

@@ -735,14 +735,18 @@ function withWorldReady(cb: () => void) {
     setTimeout(() => { scr.classList.remove('show'); cb(); }, 300);
   });
 }
+function startFresh(solo: boolean) {
+  if (ended || started) { soloMode = solo; resetMatch(); }
+  else beginMatch(solo);
+}
 el('btnPlay').addEventListener('click', () => {
   menuEl.style.display = 'none';
-  withWorldReady(() => beginMatch());
+  withWorldReady(() => startFresh(false));
 });
 el('btnSolo').addEventListener('click', () => {
   menuEl.style.display = 'none';
   if (!localStorage.getItem('voidTut')) localStorage.setItem('voidTut', '1');
-  withWorldReady(() => beginMatch(true));
+  withWorldReady(() => startFresh(true));
 });
 el('btnGotIt').addEventListener('click', () => {
   tutEl.classList.remove('show');
@@ -862,6 +866,28 @@ el('btnTop').addEventListener('click', () => { renderTop(); el('topvoids').class
   refreshGift();
 }
 renderRank();
+// ── daily login rewards — the agar.io calendar: 7 escalating days, resets
+// if you skip a day, shows once per day on the menu
+{
+  const DAILY = [50, 75, 100, 125, 150, 200, 300];
+  const today = new Date().toDateString();
+  const last = localStorage.getItem('voidDailyLast');
+  if (last !== today && menuEl.style.display !== 'none' && !DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW) {
+    const yd = new Date(Date.now() - 86400000).toDateString();
+    const day = last === yd ? Math.min(6, Number(localStorage.getItem('voidDailyDay') || 0) + 1) : 0;
+    const modal = el('daily');
+    el('dailyGrid').innerHTML = DAILY.map((amt, i) =>
+      `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''}"><b>DAY ${i + 1}</b>🪙 ${amt}¢</div>`).join('');
+    (el('dailyClaim') as HTMLButtonElement).onclick = () => {
+      addCoins(DAILY[day]);
+      localStorage.setItem('voidDailyLast', today);
+      localStorage.setItem('voidDailyDay', String(day));
+      modal.classList.remove('show');
+      audio.evolve(); buzz(40);
+    };
+    modal.classList.add('show');
+  }
+}
 // EXPLICIT debug params only skip the menu — arbitrary query strings on shared
 // links (?utm_source=…) must land on the real splash like any player
 if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'); beginMatch(); }

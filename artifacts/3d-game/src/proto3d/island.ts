@@ -102,8 +102,8 @@ export const HALF_BLOCK_3D = wLen(BLOCK_SIZE / 2);
 
 // train rail loop around downtown (corner-cut rectangle, world coords)
 const RAIL_PTS: [number, number][] = [
-  [4240, 2300], [7760, 2300], [7990, 2530], [7990, 7760],
-  [7760, 7990], [4240, 7990], [4010, 7760], [4010, 2530],
+  [4240, 2420], [7760, 2420], [7870, 2530], [7870, 7760],
+  [7760, 7870], [4240, 7870], [4130, 7760], [4130, 2530],
 ];
 const railCurve = new THREE.CatmullRomCurve3(
   RAIL_PTS.map(([x, y]) => new THREE.Vector3(w(x), 0, w(y))), true, 'catmullrom', 0.02,
@@ -553,11 +553,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.closePath();
   };
   g.lineJoin = 'round'; g.lineCap = 'round';
-  g.strokeStyle = '#9a8f7e'; g.lineWidth = pxW(150) - pxW(0); railPath(); g.stroke();   // ballast
-  g.strokeStyle = 'rgba(70,66,60,0.85)'; g.lineWidth = Math.max(2, (pxW(150) - pxW(0)) * 0.12);
+  g.strokeStyle = '#8a8f9c'; g.lineWidth = pxW(104) - pxW(0); railPath(); g.stroke();   // slim gravel ballast (cool gray, not dirt)
+  g.strokeStyle = 'rgba(58,58,66,0.85)'; g.lineWidth = Math.max(2, (pxW(104) - pxW(0)) * 0.14);
   g.setLineDash([(pxW(60) - pxW(0)), (pxW(40) - pxW(0))]); railPath(); g.stroke();       // ties
   g.setLineDash([]);
-  g.strokeStyle = '#c7ccd6'; g.lineWidth = Math.max(1.5, (pxW(150) - pxW(0)) * 0.09); railPath(); g.stroke(); // rail sheen
+  g.strokeStyle = '#c7ccd6'; g.lineWidth = Math.max(1.5, (pxW(104) - pxW(0)) * 0.1); railPath(); g.stroke(); // rail sheen
 
   // river SOURCE: a spring pool where the river begins (it used to dead-end
   // into plain forest grass like a cut hose)
