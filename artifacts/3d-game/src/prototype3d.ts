@@ -148,6 +148,7 @@ rivals.onSpeak = (x, z, line) => {
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts) => {
+  breakingNews(`${name} devoured. family reunion RUINED`);
   playerScore += pts;
   addCoins(15);
   questEvent('rival');
@@ -193,7 +194,7 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -42.75], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75] };
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -30], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -381,7 +382,7 @@ const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve'], 
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   const daySeed = Math.abs(today.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
-  const ids = [EASY_Q[daySeed % EASY_Q.length], MED_Q[daySeed % MED_Q.length], HARD_Q[daySeed % HARD_Q.length]];
+  const ids = [EASY_Q[daySeed % EASY_Q.length], MED_Q[(daySeed >> 2) % MED_Q.length], HARD_Q[(daySeed >> 4) % HARD_Q.length]];   // independent indices — the same seed produced only 3 boards ever
   const saved = localStorage.getItem('voidQuestDay') === today
     ? JSON.parse(localStorage.getItem('voidQuestState') || '{}') : {};
   localStorage.setItem('voidQuestDay', today);
@@ -436,6 +437,15 @@ const NEWS_CALM = [
   'beach crab steals sandwich, declines interview',
   'ISLE NEWS wins award for best news on the isle',
 ];
+const NEWS_CALM_EXTRA = [
+  'Waffles rescued from tree. Waffles returns to tree',
+  'flamingo count hits TWELVE. recount demanded',
+  'duck #4 wins pond race. ducks 1-3 file complaint',
+  'ice cream truck adds 32nd flavor: "vanilla, but louder"',
+  'golf mole digs a 19th hole. golfers furious, impressed',
+  'train conductor waves at everyone. everyone waves back',
+  'local gnome wins "most judgmental" third year running',
+];
 const NEWS_WORRIED = [
   'mayor: DO NOT feed the void. it feeds itself',
   "scientists: it's PROBABLY fine (they are packing)",
@@ -447,6 +457,11 @@ const NEWS_WORRIED = [
   'school swaps fire drill for VOID drill. kids thrilled',
   'ferris wheel operator refuses to look down',
   'hardware store sells out of locks, tape, courage',
+  "mayor: the dot is 'medium-sized at MOST'",
+  'hardware store now also out of ladders, rope, and nope',
+  'zoo sloth finishes evacuating (started tuesday)',
+  'ferris wheel adds seatbelts "for no reason. stop asking"',
+  'army practicing pointing at the sky, nodding gravely',
   'mayor unveils anti-void plan: a really big net',
   "MISSING: 14 mailboxes, 3 cars, the mayor's hat",
 ];
@@ -463,15 +478,34 @@ const NEWS_PANIC = [
   'void upgraded from weather event to landlord',
   'ISLE NEWS now broadcasting from a kayak',
   'beach missing. ocean confused. more at 6, maybe',
+  "mayor's paddle boat now tallest structure on the isle",
+  'flamingo count: zero. they said BYE',
+  "Waffles' tree is gone. Waffles is FINE. Waffles is FURIOUS",
+  'weather: 100% chance of void. bring a jacket anyway',
+  'this just in: AAAAAAAH',
+  'the moon asked if we are ok. we are not',
 ];
 const newsEl = el('news');
-let devouredPct = 0, newsCd = 7, lastNews = '';
+let devouredPct = 0, newsCd = 7;
+// reactive one-shots: big beats the player just caused jump the queue
+const newsQueue: string[] = [];
+function breakingNews(h: string) { newsQueue.push(h); newsCd = Math.min(newsCd, 1.5); }
+const newsSeen: string[] = [];
+function pickHeadline(pool: string[]): string {
+  const fresh = pool.filter((h) => !newsSeen.includes(h));
+  const src = fresh.length ? fresh : pool;
+  const h = src[Math.floor(Math.random() * src.length)];
+  newsSeen.push(h); if (newsSeen.length > 5) newsSeen.shift();
+  return h;
+}
 function showNews() {
-  const tier = devouredPct < 8 ? 0 : devouredPct < 30 ? 1 : 2;
-  const pool = [NEWS_CALM, NEWS_WORRIED, NEWS_PANIC][tier];
-  let h = pool[Math.floor(Math.random() * pool.length)];
-  if (h === lastNews) h = pool[(pool.indexOf(h) + 1) % pool.length];
-  lastNews = h;
+  // tier rides BOTH the meter and the player's form: a WORLD ENDER flattening
+  // downtown must never get "spelling bee ends in a 14-way tie"
+  const formTier = Math.max(0, curStage - 2);
+  const pctTier = devouredPct < 5 ? 0 : devouredPct < 18 ? 1 : 2;
+  const tier = Math.max(pctTier, formTier);
+  const pool = [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
+  const h = newsQueue.shift() ?? pickHeadline(pool);
   newsEl.innerHTML = `<i>${['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier]}</i>${h}`;
   newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
   newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
@@ -677,7 +711,7 @@ function capture(e: Edible, giveHunger = true) {
   if (e.radius < 1) questEvent('snack');
   if (qk) questEvent(qk);
   if (comboMult >= 2) questEvent('combo');
-  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); }
+  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); breakingNews('BREAKING: it ate a HOUSE. a WHOLE house.'); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 first car! tastes like vroom'); }
 }
 
@@ -1412,7 +1446,7 @@ function animate() {
     audio.evolve();
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
     const wave = defense.setPhase(curStage);   // the city escalates with your form
-    if (wave) { announce(wave); audio.alert(); }
+    if (wave) { announce(wave); audio.alert(); breakingNews('army arrives, immediately forms a snack line'); }
     audio.setMusicStage(curStage);             // the soundtrack escalates too
     buzz(45);
   }
@@ -1440,7 +1474,7 @@ function animate() {
   // island news: a headline every ~20s, tone tracks the devoured meter
   if (started && !ended) {
     newsCd -= dt;
-    if (newsCd <= 0) { newsCd = 17 + Math.random() * 7; showNews(); }
+    if (newsCd <= 0) { newsCd = 14 + Math.random() * 6; showNews(); }
   }
 
   // the DRAG-to-steer hint retires itself once the player has been driving

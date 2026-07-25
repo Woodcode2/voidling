@@ -286,6 +286,7 @@ export function createLife(
   say: Say,
 ): Life {
   const movers: Mover[] = [];
+  movers.push({ mesh: new THREE.Object3D(), update(dt) { pingClock += dt; } });   // shared clock for panic contagion
   const peds: { mesh: THREE.Object3D; biome: string; panic: number }[] = [];
 
   // ── cars: grid-locked lanes with real arc turns ──────────────────────────
@@ -438,6 +439,10 @@ export function createLife(
   }
 
   // ── wanderer (pedestrians, animals, event NPCs) ──────────────────────────
+  // panic CONTAGION: a fleeing ped scares nearby strollers, so the void's
+  // approach reads as a crowd wave, not one screamer beside a sunbather
+  const panicPings: { x: number; z: number; t: number }[] = [];
+  let pingClock = 0;
   const tmp = new THREE.Vector3();
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[]) {
     if (!biomeAt(hx, hz)) return;   // don't spawn anyone off the coastline
@@ -465,6 +470,8 @@ export function createLife(
           spd = base * 3.4;
           if (!fled) {
             hop = 0.5;   // hop starts on the flee TRANSITION, not every frame
+            panicPings.push({ x: mesh.position.x, z: mesh.position.z, t: pingClock });
+            if (panicPings.length > 24) panicPings.shift();
             if (Math.random() < 0.5) {
               const pool = panicLines || PANIC[biome] || PANIC.generic;
               tmp.set(mesh.position.x, 5, mesh.position.z);
@@ -478,6 +485,12 @@ export function createLife(
             ang += rand(-1, 1) * dt * 3;
             const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
             if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
+            // contagion: a fresh scream nearby sends this ped scurrying too
+            for (const pg of panicPings) {
+              if (pingClock - pg.t > 1.5) continue;
+              const pdx = mesh.position.x - pg.x, pdz = mesh.position.z - pg.z;
+              if (pdx * pdx + pdz * pdz < 625) { ang = Math.atan2(pdz, pdx); spd = base * 2.4; hop = Math.max(hop, 0.3); break; }
+            }
           }
         }
         // margin test: the step must keep the WHOLE body on land, not just the
@@ -516,7 +529,7 @@ export function createLife(
     const b = PLAN_GRID[gy][gx];
     if (!pedZones.includes(b)) continue;
     const [cx, cz] = blockCenter3D(gx, gy);
-    const n = b === 'beach' || b === 'plaza' ? 6 : b === 'forest' || b === 'zoo' ? 2 : 5;
+    const n = b === 'beach' || b === 'plaza' ? 6 : b === 'forest' ? 2 : b === 'zoo' ? 5 : 5;
     for (let i = 0; i < n; i++) {
       // half the crowd lives mid-block, half strolls near the sidewalk edges
       const edge = i % 2 === 1;
@@ -534,7 +547,7 @@ export function createLife(
     // savanna NW, paddock SW, flamingo lagoon E
     const PENS: [number, number][] = [[zx - 15, zz - 21.5], [zx - 15, zz + 21.5], [zx + 10, zz]];
     for (let i = 0; i < 6; i++) {
-      const [pcx, pcz] = PENS[i % 2];   // savanna + paddock get the blob animals
+      const [pcx, pcz] = PENS[Math.floor(i / 3) % 2];   // species grouped per pen — no lion/sheep roommates
       addWanderer(makeAnimal(), pcx + rand(-7, 7), pcz + rand(-5, 5), 8, rand(2.5, 4), 22, 3, 'zoo');
     }
     for (let i = 0; i < 3; i++) {   // flamingos wade in their lagoon
@@ -575,7 +588,9 @@ export function createLife(
     }
   }
 
-  // pond ducks — "the ducks are rowdy" is finally TRUE
+  // pond ducks — "the ducks are rowdy" is finally TRUE, and they PARADE:
+  // ducks 1-3 tail duck 0 in the classic line
+  const duckLine: THREE.Object3D[] = [];
   for (let i = 0; i < 4; i++) {
     const duck = new THREE.Group();
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xf6f2da : 0xffd54f, roughness: 0.9 }));
@@ -584,7 +599,17 @@ export function createLife(
     head.position.set(0.42, 0.78, 0); duck.add(head);
     const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 6), new THREE.MeshStandardMaterial({ color: 0xff9a3a, roughness: 0.8 }));
     beak.rotation.z = -Math.PI / 2; beak.position.set(0.68, 0.75, 0); duck.add(beak);
-    addWanderer(duck, 128.25 + rand(-9, 9), -33.15 + rand(-9, 9), 11, rand(1.5, 2.5), 20, 1.2, 'park');
+    const rec = addWanderer(duck, 128.25 + rand(-9, 9), -33.15 + rand(-9, 9), 11, rand(1.5, 2.5), 20, 1.2, 'park');
+    if (rec) duckLine.push(rec.mesh);
+    if (i > 0 && duckLine.length === i + 1) {
+      const leader = duckLine[i - 1], me = duckLine[i];
+      movers.push({ mesh: me, update(dt) {
+        if (eaten(me) || eaten(leader)) return;
+        const dx2 = leader.position.x - me.position.x, dz2 = leader.position.z - me.position.z;
+        const d2 = Math.hypot(dx2, dz2);
+        if (d2 > 2.5) { me.position.x += (dx2 / d2) * Math.min(d2 - 2.2, 3.2 * dt * 2); me.position.z += (dz2 / d2) * Math.min(d2 - 2.2, 3.2 * dt * 2); me.rotation.y = -Math.atan2(dz2, dx2) + Math.PI / 2; }
+      } });
+    }
   }
 
   // birds: a couple of small flocks, high up and out of the way
@@ -729,7 +754,7 @@ export function createLife(
     (x, z) => {
       for (const ox of [-6, 6]) {
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 0.8 }));
-        post.position.y = 3; decor(post, x + ox, z, 2);
+        post.position.y = 3; decor(post, x + ox, z + 9, 2);   // baked court sits +9 south of block center
       }
       const netTex = (() => {   // a real grid so the net reads over sand
         const cv2 = document.createElement('canvas'); cv2.width = 96; cv2.height = 24;
@@ -741,7 +766,7 @@ export function createLife(
       })();
       const net = new THREE.Mesh(new THREE.PlaneGeometry(12, 2.4),
         new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-      net.position.set(x, 4.4, z); scene.add(net);
+      net.position.set(x, 4.4, z + 9); scene.add(net);
       const ball = new THREE.Group();
       const bwhite = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.45 }));
       ball.add(bwhite);
@@ -751,7 +776,7 @@ export function createLife(
       const band2 = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 20),
         new THREE.MeshStandardMaterial({ color: 0x4da3ff, roughness: 0.5 }));
       band2.rotation.y = 0.9; ball.add(band2);
-      ball.position.y = 1; decor(ball, x + 3, z + 5, 1.5);
+      ball.position.y = 1; decor(ball, x + 3, z + 14, 1.5);
     }, 4, 0xff9f4d);
 
   // Soccer match in the park (second park block)

@@ -878,8 +878,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // spray glow at base
   const spray = new THREE.Mesh(new THREE.CircleGeometry(wLen(240), 24),
     new THREE.MeshBasicMaterial({ color: WORLD.foam, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
-  spray.scale.setScalar(0.55); (spray.material as THREE.MeshBasicMaterial).opacity = 0.3;
-  spray.rotation.x = -Math.PI / 2; spray.position.set(wfX * 1.05, -26, wfZ * 1.05); scene.add(spray);
+  spray.scale.setScalar(0.32); (spray.material as THREE.MeshBasicMaterial).opacity = 0.2;
+  spray.rotation.x = -Math.PI / 2; spray.position.set(wfX, -22, wfZ); scene.add(spray);   // AT the waterfall foot — not a UFO over the abyss
 
   // ── PROPS: populate each block per biome ───────────────────────────────────
   populate(scene, addEdible);
@@ -1108,6 +1108,20 @@ function makeRowBuilding(wB: number, d: number, h: number): THREE.Group {
   return grp;
 }
 // small garden shed for suburban backyards
+function makeParkedCar(): THREE.Group {
+  const g = new THREE.Group();
+  const col = pick(PROPS.car);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.0, 1.7), new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.15 }));
+  body.position.y = 0.75; g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 1.5), new THREE.MeshStandardMaterial({ color: 0xbfeaff, roughness: 0.15 }));
+  cabin.position.set(-0.2, 1.55, 0); g.add(cabin);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.9 });
+  for (const wx2 of [-1.1, 1.1]) for (const wz2 of [-0.85, 0.85]) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10), wheelMat);
+    wh.rotation.x = Math.PI / 2; wh.position.set(wx2, 0.42, wz2); g.add(wh);
+  }
+  return g;
+}
 function makeShed(): THREE.Group {
   const grp = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2, 2), new THREE.MeshStandardMaterial({ color: pick([0xbfe0cf, 0xd8c8ec, 0xf2c9a0]), roughness: 0.9 }));
@@ -1323,7 +1337,8 @@ function makeGolfball(): THREE.Group {
   return g;
 }
 const tinyFor = (biome: Biome) =>
-  biome === 'beach' ? pick([makeShell, makeShell, makeFlowers, makeFlowers])()
+  biome === 'cozy' || biome === 'fancy' ? pick([makeFlowers, makeFlowers, makeBush, makeMushroom])()
+  : biome === 'beach' ? pick([makeShell, makeShell, makeFlowers, makeFlowers])()
   : biome === 'forest' ? pick([makeMushroom, makeMushroom, makeFlowers])()
   : biome === 'park' ? pick([makeGolfball, makeFlowers, makeFlowers])()
   : biome === 'zoo' ? pick([makeFlowers, makeShell, makeMushroom])()
@@ -1668,6 +1683,12 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const dvx = lot.fy !== 0 ? 5.5 : 0, dvz = lot.fx !== 0 ? 5.5 : 0;
         if (Math.random() < 0.7) place(makeFlowers(), hx + fx3 * 4.4 + sx3 * 2, hz + fz3 * 4.4 + sz3 * 2, 0.7);
         if (Math.random() < 0.7) place(makeMailbox(), hx + fx3 * 7.6 + dvx + sx3, hz + fz3 * 7.6 + dvz + sz3, 1.2);
+        if (li % 2 === 0) {   // every other driveway: a parked car (eatable prey that CAN'T run)
+          const pc = makeParkedCar();
+          pc.rotation.y = lot.rot + Math.PI / 2;
+          pc.userData.qk = 'car'; pc.userData.ptsMult = 1.5;
+          place(pc, hx + fx3 * 6.2 + dvx, hz + fz3 * 6.2 + dvz, 2.8);
+        }
         // backyard: shed on every third lot, hedge bush otherwise (pool lots
         // stay clear — the water is baked into the ground there)
         const pool = lotPool(biome, li, lot);
@@ -1692,7 +1713,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           for (const gSide of [-1, 1]) {
             const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 0.7), new THREE.MeshStandardMaterial({ color: 0xe8e2d2, roughness: 0.8 }));
             pillar.position.y = 0.75;
-            const gp = new THREE.Group(); gp.add(pillar);
+            const finial = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), new THREE.MeshStandardMaterial({ color: 0xd8d0b8, roughness: 0.6 }));
+            finial.position.y = 1.7;
+            const gp = new THREE.Group(); gp.add(pillar); gp.add(finial);
             place(gp, hx + fx3 * 7.0 + sx3 * (5.5 + gSide * 1.6), hz + fz3 * 7.0 + sz3 * (5.5 + gSide * 1.6), 0.9);
           }
         }
@@ -1797,6 +1820,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       for (let t = 0; t < 32; t++) {   // a forest, not a parkland
         const [x, z] = jf();
         if (inClearing(x, z)) continue;
+        if (Math.hypot(x - w(8405), z - w(1149)) < 13) continue;   // the river SPRING pool — no trees in the water
         if (Math.random() < 0.4) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
         else place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3);
       }
@@ -1901,8 +1925,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x20242c }));
           gear.rotation.x = Math.PI / 2; gear.position.set(0.8, 0.55, sz); pl.add(gear);
         }
-        pl.rotation.y = -Math.PI / 4;    // parked ON the apron, nose to the runway
-        place(pl, cx - half * 0.15, cz + half * 0.3, 5);
+        pl.rotation.y = -Math.PI / 4;    // parked ON the apron tie-downs, nose to the runway
+        place(pl, cx - half * 0.5, cz + half * 0.42, 5);
       }
       { // windsock
         const ws = new THREE.Group();
