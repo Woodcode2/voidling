@@ -98,12 +98,18 @@
       #coins { position: fixed; top: 12px; right: 12px; z-index: 5; pointer-events: none;
         background: rgba(16,8,30,0.55); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(6px);
         color: #ffe08a; font-size: 14px; font-weight: 900; }
+      /* daily quests: three icon CHIPS (pre-reader friendly), not sentences */
       #quests { position: fixed; top: 104px; left: 10px; z-index: 5; pointer-events: none;
-        background: rgba(16,8,30,0.5); border-radius: 11px; padding: 7px 10px; backdrop-filter: blur(6px); }
-      #quests .q { font-size: 11.5px; font-weight: 800; color: #e8e2f8; padding: 2px 0; letter-spacing: 0.2px; }
-      #quests .q b { color: #ffe08a; }
-      #quests .q i { color: #b9a8e0; font-style: normal; }
-      #quests .q.done { color: #7ef2a0; opacity: 0.75; }
+        display: flex; gap: 6px; }
+      #quests .q { background: rgba(16,8,30,0.55); border-radius: 11px; padding: 5px 8px 4px;
+        backdrop-filter: blur(6px); text-align: center; min-width: 40px; }
+      #quests .qi { display: block; font-size: 17px; line-height: 1.15; }
+      #quests .qc { display: block; font-size: 9.5px; font-weight: 900; color: #d8c8ff; letter-spacing: 0.5px; }
+      #quests .qb { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); overflow: hidden; margin-top: 3px; }
+      #quests .qb div { height: 100%; background: linear-gradient(90deg, #ffb82a, #ffd25a); border-radius: 2px; }
+      #quests .q.done { opacity: 0.7; }
+      #quests .q.done .qc { color: #7ef2a0; }
+      #quests .q.done .qb div { background: #7ef2a0; width: 100% !important; }
       /* form progress (VOIDLING -> MUNCHER) */
       #formbar { position: fixed; bottom: 62px; left: 50%; transform: translateX(-50%); z-index: 5;
         width: 200px; height: 5px; border-radius: 3px; background: rgba(16,8,30,0.5); overflow: hidden; }
@@ -151,6 +157,7 @@
       #end .sub { font-size: 15px; font-weight: 700; opacity: 0.8; letter-spacing: 2px; margin-bottom: 20px; }
       #end .list { min-width: 260px; }
       #end .er { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800;
+        animation: erIn 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
         padding: 8px 14px; border-radius: 12px; margin: 4px 0; background: rgba(255,255,255,0.06); }
       #end .er.me { background: rgba(255,232,154,0.16); color: #ffe89a; }
       #end .er .dot { width: 13px; height: 13px; border-radius: 50%; }
@@ -160,6 +167,10 @@
         color: #fff; padding: 14px 46px; border: none; border-radius: 16px; cursor: pointer;
         background: linear-gradient(180deg, #ff5d7e, #ff2450); box-shadow: 0 6px 0 #b8163a, 0 10px 24px rgba(0,0,0,0.4); }
       #btnAgain:active { transform: translateY(3px); box-shadow: 0 3px 0 #b8163a; }
+      @keyframes erIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
+      #end .sub .endCnt { color: #ffd23f; font-weight: 900; display: inline-block; min-width: 3.2em; text-align: left; }
+      #end.show #btnAgain { animation: againPulse 1.6s ease-in-out 1.2s infinite; }
+      @keyframes againPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
       #btnHome { margin-top: 12px; font-family: inherit; font-size: 13px; font-weight: 900; letter-spacing: 2px;
         color: #cbb2ff; background: rgba(123,79,224,0.28); border: 2px solid rgba(168,123,255,0.5);
         border-radius: 13px; padding: 10px 34px; cursor: pointer; }
@@ -211,7 +222,7 @@
       #btnWorlds span { color: #cbb2ff; font-size: 10px; letter-spacing: 1.5px; font-weight: 800; }
       #btnWorlds b { color: #ffd23f; font-size: 18px; }
       #worlds #worldRow { justify-content: center; padding-top: 30px; }
-      #worldRow { display: flex; gap: 14px; justify-content: center; margin: 0 0 12px; }
+      #worldRow { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 0 0 12px; max-width: 94vw; }
       #worlds .wCard { width: 130px; padding: 18px 10px 14px; }
       #worlds .wCard i { font-size: 40px; }
       /* in-game home button */
@@ -219,6 +230,8 @@
         border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
         color: #cbb2ff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(6px); }
       body.menu #btnQuit { display: none; }
+      #btnQuit.arm { width: auto; padding: 0 12px; font-size: 12px; font-weight: 900; letter-spacing: 1px;
+        color: #ff8a9a; border-color: rgba(255,90,110,0.65); }
       /* daily rewards calendar */
       #daily { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.8); backdrop-filter: blur(6px); }
@@ -320,7 +333,7 @@
       .stat { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 12px 20px; text-align: center; min-width: 96px; }
       .stat .v { font-size: 24px; font-weight: 900; color: #ffe08a; }
       .stat .l { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #b9a8e0; margin-top: 2px; }
-      #trophyGrid { display: grid; grid-template-columns: repeat(4, 150px); gap: 14px; padding-bottom: 30px; }
+      #trophyGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; padding-bottom: 30px; width: min(660px, 94vw); margin: 0 auto; }
       .tr { background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 16px;
         padding: 16px 10px; text-align: center; }
       .tr.got { border-color: rgba(255,224,138,0.55); box-shadow: 0 0 14px rgba(255,224,138,0.18); }

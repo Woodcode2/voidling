@@ -365,6 +365,13 @@ export function createRivals(
           if (ci % 2 === 0) c.scale.setScalar(wide);   // scared stare
         });
         rv.halo.position.set(rv.x, 0.14, rv.z); rv.halo.scale.setScalar(rv.r * 1.5);
+        // hole.io's danger cue, pre-reader-proof: the ground disc tells the
+        // truth at a glance — green = you can eat them, red = RUN, skin glow
+        // when it's a fair fight
+        const hm = rv.halo.material as THREE.MeshBasicMaterial;
+        if (pr > rv.r * EAT_RATIO) hm.color.setHex(0x54e88a);
+        else if (rv.r > pr * EAT_RATIO) hm.color.setHex(0xff5560);
+        else hm.color.setHex(rv.color);
         void tmp;
       }
     },

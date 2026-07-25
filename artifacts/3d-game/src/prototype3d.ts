@@ -343,20 +343,20 @@ addCoins(0);
 // ── DAILY QUESTS: 3 drawn per day (1 easy / 1 medium / 1 hard), progress
 // persists across matches, +25✦ for clearing the board — three stacking
 // come-back-tomorrow hooks with the gift box and streak skins
-interface Quest { id: string; label: string; target: number; count: number; reward: number; kind: string; done: boolean; }
+interface Quest { id: string; icon: string; label: string; target: number; count: number; reward: number; kind: string; done: boolean; }
 const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
-  { id: 'snack', label: 'Snack Attack: eat 25 tiny things', target: 25, reward: 15, kind: 'snack' },
-  { id: 'gulp', label: 'Big Gulp: use GULP 3×', target: 3, reward: 15, kind: 'gulp' },
-  { id: 'collapse', label: 'Supernova: use COLLAPSE', target: 1, reward: 20, kind: 'collapse' },
-  { id: 'cars', label: 'Rush Hour: eat 6 cars', target: 6, reward: 20, kind: 'car' },
-  { id: 'combo', label: 'Combo Chef: hit a ×2.0 combo', target: 1, reward: 20, kind: 'combo' },
-  { id: 'evolve', label: 'Evolve to DEVOURER', target: 1, reward: 25, kind: 'devourer' },
-  { id: 'solo', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
-  { id: 'houses', label: 'Home Wrecker: eat 3 houses', target: 3, reward: 25, kind: 'house' },
-  { id: 'rival', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
-  { id: 'army', label: 'Delicious Irony: eat 2 army units', target: 2, reward: 25, kind: 'army' },
+  { id: 'snack', icon: '🍩', label: 'Snack Attack: eat 25 tiny things', target: 25, reward: 15, kind: 'snack' },
+  { id: 'gulp', icon: '🌀', label: 'Big Gulp: use GULP 3×', target: 3, reward: 15, kind: 'gulp' },
+  { id: 'collapse', icon: '💥', label: 'Supernova: use COLLAPSE', target: 1, reward: 20, kind: 'collapse' },
+  { id: 'cars', icon: '🚗', label: 'Rush Hour: eat 6 cars', target: 6, reward: 20, kind: 'car' },
+  { id: 'combo', icon: '🔥', label: 'Combo Chef: hit a ×2.0 combo', target: 1, reward: 20, kind: 'combo' },
+  { id: 'evolve', icon: '🕳️', label: 'Evolve to DEVOURER', target: 1, reward: 25, kind: 'devourer' },
+  { id: 'solo', icon: '🏝️', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
+  { id: 'houses', icon: '🏠', label: 'Home Wrecker: eat 3 houses', target: 3, reward: 25, kind: 'house' },
+  { id: 'rival', icon: '😈', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
+  { id: 'army', icon: '🪖', label: 'Delicious Irony: eat 2 army units', target: 2, reward: 25, kind: 'army' },
 ];
-const EASY_Q = ['snack'], MED_Q = ['cars', 'combo', 'evolve', 'solo'], HARD_Q = ['houses', 'rival', 'army'];   // gulp/collapse rejoin when powers return
+const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve', 'solo'], HARD_Q = ['houses', 'rival', 'army'];   // easy rotates daily too — same-quest-every-day reads stale
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   const daySeed = Math.abs(today.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
@@ -376,8 +376,13 @@ function saveQuests() {
 }
 const questsEl = el('quests');
 function renderQuests() {
+  // icon chips, not sentences — a pre-reader can track 🍩 12/25 at a glance,
+  // and the panel stops eating a third of the play screen
   questsEl.innerHTML = quests.map((q) =>
-    `<div class="q ${q.done ? 'done' : ''}"><span>${q.done ? '✓' : '○'}</span> ${q.label} <b>+${q.reward}✦</b>${q.done ? '' : ` <i>${q.count}/${q.target}</i>`}</div>`).join('');
+    `<div class="q ${q.done ? 'done' : ''}" title="${q.label} +${q.reward}✦">` +
+    `<span class="qi">${q.icon}</span>` +
+    (q.done ? '<span class="qc">✓</span>' : `<span class="qc">${q.count}/${q.target}</span>`) +
+    `<div class="qb"><div style="width:${Math.min(100, Math.round((q.count / q.target) * 100))}%"></div></div></div>`).join('');
 }
 function questComplete(q: Quest) {
   q.done = true; addCoins(q.reward);
@@ -480,8 +485,12 @@ function refreshHud() {
     const i = rows.indexOf(r);
     return `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`;
   }).join('');
+  // COUNT-based, not mass-based: summed radius made the meter dead air (an
+  // hour of snacking read 0% because towers own the mass). One prop = one
+  // tick, so a kid sees the number move in the first minute — and Solo's
+  // "devour 100%" honestly means "ate everything".
   let consumed = 0, total = 0;
-  for (const e of edibles) { total += e.radius; if (e.eaten || !e.mesh.visible) consumed += e.radius; }
+  for (const e of edibles) { total++; if (e.eaten || !e.mesh.visible) consumed++; }
   if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
   if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
@@ -519,10 +528,26 @@ function bumpStreak() {
   localStorage.setItem('voidStreak', String(streak));
   localStorage.setItem('voidLastDay', today);
 }
+// the end screen is THE retention moment — the reward has to land as a beat,
+// not a gray sub-line: warm sting, coins visibly counting up, rows sliding in
+function celebrateEnd(coins: number, xpGain: number, lead: string) {
+  endSub.innerHTML = `${lead} · <b class="endCnt">+0✦</b> · +${xpGain} XP`;
+  const b = endSub.querySelector('.endCnt') as HTMLElement;
+  const t0 = performance.now();
+  const tick = () => {
+    if (!ended || !b.isConnected) return;
+    const k = Math.min(1, (performance.now() - t0) / 900);
+    b.textContent = `+${Math.round(coins * (k * (2 - k)))}✦`;   // ease-out count-up
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 function endMatch() {
   ended = true;
   localStorage.setItem('voidPlayed', '1');
   audio.stopMusic();
+  audio.win();
   bumpStreak();
   if (soloMode) {
     // SOLO RUN: the goal is the island itself — beat your best %
@@ -535,7 +560,7 @@ function endMatch() {
     addCoins(reward2);
     if (devouredPct >= 40) questEvent('solo40');
     endHd.textContent = `${devouredPct}% DEVOURED`;
-    endSub.textContent = `${newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`} · +${reward2}✦ · +${gain2} XP`;
+    celebrateEnd(reward2, gain2, newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`);
     endList.innerHTML = '';
     endEl.classList.add('show');
     stats.matches++; saveStats();
@@ -567,9 +592,9 @@ function endMatch() {
   const LOSE_TITLES = ['STILL PECKISH…', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
-  endSub.textContent = (myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`) + ` · +${reward}✦ · +${gain} XP`;
+  celebrateEnd(reward, gain, myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`);
   endList.innerHTML = rows.map((r, i) =>
-    `<div class="er ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
+    `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
 }
 
@@ -604,6 +629,14 @@ function capture(e: Edible, giveHunger = true) {
   }
   voidling.chomp();
   stats.eaten++;
+  // the very first thing a brand-new player ever eats gets a PARTY — the
+  // guaranteed wow inside the first 30 seconds
+  if (!localStorage.getItem('voidFirstNom')) {
+    localStorage.setItem('voidFirstNom', '1');
+    bubbles.float(floatPos.set(e.mesh.position.x, voidling.radius + 3, e.mesh.position.z), 'FIRST NOM! 🎉', true);
+    fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd23f, 7, 0.6);
+    audio.ready(); buzz(25);
+  }
   if (guideStep === 1 && stats.eaten > 2) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
@@ -753,6 +786,9 @@ function startFresh(solo: boolean) {
 }
 el('btnPlay').addEventListener('click', () => {
   menuEl.style.display = 'none';
+  // one-time teach card before the first menu-launched match: it's the only
+  // place the danger loop ("eat the family when bigger, RUN when not") lives
+  if (!localStorage.getItem('voidTut')) { tutEl.classList.add('show'); return; }
   withWorldReady(() => startFresh(false));
 });
 el('btnSolo').addEventListener('click', () => {
@@ -761,8 +797,9 @@ el('btnSolo').addEventListener('click', () => {
   withWorldReady(() => startFresh(true));
 });
 el('btnGotIt').addEventListener('click', () => {
+  localStorage.setItem('voidTut', '1');
   tutEl.classList.remove('show');
-  withWorldReady(() => beginMatch());
+  withWorldReady(() => startFresh(false));
 });
 // FIRST LAUNCH: no menu — splash straight into the game with in-game guidance
 // (hole.io's onboarding). The menu earns its place from session two.
@@ -870,15 +907,29 @@ el('btnHome').addEventListener('click', () => {
   menuEl.style.display = '';
   renderRank();
 });
-// in-game HOME (⌂): abandon the match, back to the menu — next PLAY is fresh
-el('btnQuit').addEventListener('click', () => {
-  if (!started) return;
-  started = false; ended = true;
-  audio.stopMusic();
-  document.body.classList.add('menu');
-  menuEl.style.display = '';
-  renderRank();
-});
+// in-game HOME (⌂): confirm first — a kid's stray tap must not eat the match.
+// Tap once: the button becomes "LEAVE?" for 3 seconds; tap again to confirm.
+{
+  const qBtn = el('btnQuit');
+  let armT = 0;
+  qBtn.addEventListener('click', () => {
+    if (!started) return;
+    if (performance.now() - armT > 3000) {
+      armT = performance.now();
+      qBtn.textContent = 'LEAVE?';
+      qBtn.classList.add('arm');
+      setTimeout(() => { qBtn.textContent = '⌂'; qBtn.classList.remove('arm'); }, 3000);
+      return;
+    }
+    qBtn.textContent = '⌂'; qBtn.classList.remove('arm');
+    saveStats();   // partial progress (things eaten) still counts toward trophies
+    started = false; ended = true;
+    audio.stopMusic();
+    document.body.classList.add('menu');
+    menuEl.style.display = '';
+    renderRank();
+  });
+}
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
 // ── lifetime stats + trophies ────────────────────────────────────────────────
@@ -908,14 +959,19 @@ el('btnTrophies').addEventListener('click', () => { renderTrophies(); el('trophi
 // ── top voids of the week (local weekly board, seeded with the family) ──────
 function weekKey() { const d = new Date(); const on = new Date(d.getFullYear(), 0, 1); return `voidWeek-${d.getFullYear()}-${Math.ceil((((d.getTime() - on.getTime()) / 86400000) + on.getDay() + 1) / 7)}`; }
 function weeklyBoard(): { name: string; score: number; color: number; me?: boolean }[] {
-  const seeded = [
-    { name: 'CHOMPZILLA', score: 3720, color: 0x7ed57a }, { name: 'BITSY', score: 3315, color: 0xff9a3a },
-    { name: 'DAZZLE', score: 2940, color: 0xff6fb0 }, { name: 'SNOOZLE', score: 2535, color: 0x4d8ff0 },
-    { name: 'YIKES', score: 2160, color: 0x2fd8c0 }, { name: 'B1G-B1TE', score: 1830, color: 0xd85a5a },
-    { name: 'snackrat', score: 1320, color: 0xb98cff },
-  ];
+  // the family's weekly scores SCALE to the player: always a couple of rungs
+  // just above your best (chaseable), never a fixed 1830-3720 wall that parks
+  // a new kid at permanent rank 8
   const mine = Number(localStorage.getItem(weekKey()) || 0);
-  const rows = [...seeded, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
+  const anchor = Math.max(220, stats.best, mine);
+  const mul = [1.85, 1.6, 1.38, 1.2, 1.08, 0.86, 0.55];
+  const seeds = [
+    { name: 'CHOMPZILLA', color: 0x7ed57a }, { name: 'BITSY', color: 0xff9a3a },
+    { name: 'DAZZLE', color: 0xff6fb0 }, { name: 'SNOOZLE', color: 0x4d8ff0 },
+    { name: 'YIKES', color: 0x2fd8c0 }, { name: 'B1G-B1TE', color: 0xd85a5a },
+    { name: 'snackrat', color: 0xb98cff },
+  ].map((s, i) => ({ ...s, score: Math.round((anchor * mul[i]) / 5) * 5 }));
+  const rows = [...seeds, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
   return rows.sort((a, b) => b.score - a.score);
 }
 function renderTop() {
@@ -1405,7 +1461,7 @@ function animate() {
   requestAnimationFrame(animate);
 }
 // total edible mass on the island — the denominator for "% devoured"
-initialMass = edibles.reduce((a, e) => a + e.radius, 0);
+initialMass = edibles.length;
 if (bigStart > 0) voidling.setRadius(bigStart);   // debug: preview a bigger form
 refreshHud();
 

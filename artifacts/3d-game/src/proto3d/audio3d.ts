@@ -10,6 +10,7 @@ export interface Audio3D {
   rocket(): void;                  // ROCKET BITE zip
   collapse(): void;                // COLLAPSE boom
   evolve(): void;                  // form-up fanfare
+  win(): void;                     // end-of-match warm sting
   hit(): void;                     // took a shot
   alert(): void;                   // defense wave banner
   bigEat(): void;                  // crunching a building
@@ -66,6 +67,30 @@ export function createAudio(): Audio3D {
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     src.connect(f); f.connect(g); g.connect(master);
     src.start(t);
+  }
+
+  // ── recorded sample kit: the produced audio in /assets/audio. Buffers decode
+  // lazily on first request; until one is resident (or if it 404s) the caller
+  // falls back to the synth voice, so sound never goes silent.
+  const samples = new Map<string, AudioBuffer | 'loading' | 'bad'>();
+  function sample(name: string, vol = 0.5, rate = 1): boolean {
+    const c = ensure(); if (!c || !master) return false;
+    const cur = samples.get(name);
+    if (cur instanceof AudioBuffer) {
+      const src = c.createBufferSource(); src.buffer = cur; src.playbackRate.value = rate;
+      const g = c.createGain(); g.gain.value = vol;
+      src.connect(g); g.connect(master); src.start();
+      return true;
+    }
+    if (!cur) {
+      samples.set(name, 'loading');
+      fetch('/assets/audio/' + name)
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('404'))))
+        .then((b) => c.decodeAudioData(b))
+        .then((buf) => samples.set(name, buf))
+        .catch(() => samples.set(name, 'bad'));
+    }
+    return false;
   }
 
   // ── MUSIC: a soft toy-synth loop that AUDIBLY escalates as the void grows —
@@ -173,6 +198,8 @@ export function createAudio(): Audio3D {
 
   return {
     startMusic() {
+      // prefetch the recorded kit so the very first gulp is the real sample
+      for (const n of ['gulp_1.wav', 'gulp_2.wav', 'gulp_3.wav', 'gulp_4.wav', 'gulp_5.wav', 'eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
       // licensed-track hook: if a real music file ships with the build, prefer
       // it (loop + gentle volume); the synth score is the fallback
       if (!musicFileBad) {
@@ -204,6 +231,13 @@ export function createAudio(): Audio3D {
       if (now - lastPop < 0.1) return;
       lastPop = now;
       const depth = Math.min(1, (size - 0.9) / 9);          // 0 tiny -> 1 huge
+      // recorded gulps first (5 takes, pitch rides size: deeper as you grow);
+      // synth swallow only until the samples decode
+      const take = 1 + ((Math.random() * 5) | 0);
+      if (sample(`gulp_${take}.wav`, 0.4 + depth * 0.25, 1.15 - depth * 0.35)) {
+        if (depth > 0.4) tone(54, 32, 0.18, 'sine', depth * 0.12, 0.05);      // sub thump under big bites
+        return;
+      }
       const base = (330 + Math.min(combo, 20) * 8) * (1 - depth * 0.5);
       // pure rounded swallow: one smooth glide down an octave-and-a-half,
       // with a soft body underneath — no noise (crackles on phone speakers)
@@ -212,6 +246,7 @@ export function createAudio(): Audio3D {
       if (depth > 0.4) tone(54, 32, 0.18, 'sine', depth * 0.12, 0.05);        // sub thump
     },
     bigEat() {
+      if (sample('eaten_deep.wav', 0.55)) return;
       noise(0.22, 0.3, 900, 180);
       tone(160, 70, 0.24, 'sine', 0.24);
     },
@@ -229,9 +264,15 @@ export function createAudio(): Audio3D {
       tone(60, 46, 1.1, 'triangle', 0.3, 0.05);
     },
     evolve() {
+      if (sample('evolve_epic.wav', 0.5)) return;
       const seq = [392, 523.25, 659.25, 783.99]; // G4 C5 E5 G5 — bright major
       seq.forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.22, i * 0.085));
       tone(1567.98, 1567.98, 0.4, 'sine', 0.1, 0.34);
+    },
+    win() {
+      if (sample('win_warm.wav', 0.55)) return;
+      const seq = [523.25, 659.25, 783.99, 1046.5];
+      seq.forEach((f, i) => tone(f, f, 0.3, 'triangle', 0.2, i * 0.12));
     },
     hit() {
       tone(140, 60, 0.16, 'square', 0.16);
