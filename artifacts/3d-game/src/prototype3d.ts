@@ -190,7 +190,7 @@ const PUFF = 120;
 const puffGeo = new THREE.BufferGeometry();
 const puffPos = new Float32Array(PUFF * 3);
 puffGeo.setAttribute('position', new THREE.BufferAttribute(puffPos, 3));
-const puffPoints = new THREE.Points(puffGeo, new THREE.PointsMaterial({ color: 0xc9a6ff, size: 3.2, map: puffTex, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+const puffPoints = new THREE.Points(puffGeo, new THREE.PointsMaterial({ color: 0x9a6ae0, size: 2.1, map: puffTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
 puffPoints.frustumCulled = false; scene.add(puffPoints);
 const puffVel: THREE.Vector3[] = []; const puffLife: number[] = [];
 for (let i = 0; i < PUFF; i++) { puffVel.push(new THREE.Vector3()); puffLife.push(0); puffPos[i * 3 + 1] = -999; }
@@ -1026,8 +1026,7 @@ function animate() {
     presenceT -= dt;
     if (curStage >= 2 && presenceT <= 0) {
       presenceT = 0.55 - curStage * 0.08;
-      spawnSuck(2 + curStage, voidling.radius * 2.1);
-      if (curStage >= 3 && Math.hypot(velX, velZ) > 14) fx.shake(0.7 + (curStage - 3) * 0.5);
+      spawnSuck(1 + curStage, voidling.radius * 1.9);
     }
     timerEl.textContent = fmtTime(matchClock);
     if (introT > 0) { velX *= 0.9; velZ *= 0.9; }

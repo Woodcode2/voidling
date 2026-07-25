@@ -54,7 +54,7 @@ function makeUnit(kind: Kind): THREE.Group {
   return g;
 }
 
-interface Unit { g: THREE.Group; kind: Kind; x: number; z: number; y: number; fireCd: number; value: number; speed: number; dmg: number; }
+interface Unit { g: THREE.Group; kind: Kind; x: number; z: number; y: number; fireCd: number; value: number; speed: number; dmg: number;  dieT?: number; }
 
 export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z: number) => Biome | null): Defense {
   const units: Unit[] = [];
@@ -116,7 +116,14 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
         const un = units[u];
         const dx = vx - un.x, dz = vz - un.z, d = Math.hypot(dx, dz) || 1;
         // devoured by a big void
-        if (d < vR + 3) { scene.remove(un.g); units.splice(u, 1); delta += un.value; fx.ring(vx, vz, 0xffe08a, vR * 1.4, 0.4); continue; }
+        if (un.dieT !== undefined) {   // devoured: shrink-sink out like everything else
+          un.dieT += dt;
+          un.g.scale.multiplyScalar(1 - dt * 6);
+          un.g.position.y -= dt * 3;
+          if (un.dieT > 0.4) { scene.remove(un.g); units.splice(u, 1); }
+          continue;
+        }
+        if (d < vR + 3) { un.dieT = 0; delta += un.value; fx.ring(vx, vz, 0xffe08a, vR * 1.4, 0.4); continue; }
         // approach (helis hover at range; ground units slide on island)
         const stop = un.kind === 'heli' ? 60 : vR + 22;
         if (d > stop) {

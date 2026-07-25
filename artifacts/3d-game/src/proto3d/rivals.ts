@@ -4,6 +4,7 @@
 // fresnel orb + glow + billboarded eyes) with a name and a live score.
 import * as THREE from 'three';
 import type { Biome } from './island';
+import { SKINS } from './palette';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; }
@@ -93,12 +94,12 @@ const growR = (R: number, eR: number) => {
   return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
-function makeRivalMesh(color: number, idx = 0): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
+function makeRivalMesh(color: number, idx = 0, dark = 0x140a26, glowCol = color): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
   const group = new THREE.Group();
   const col = new THREE.Color(color);
   // tinted fresnel body: dark core -> coloured rim (same idea as the player void)
   const bodyMat = new THREE.ShaderMaterial({
-    uniforms: { uCol: { value: col }, uDark: { value: new THREE.Color(0x140a26) } },
+    uniforms: { uCol: { value: col }, uDark: { value: new THREE.Color(dark) } },
     vertexShader: `varying vec3 vN; varying vec3 vV;
       void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }`,
     fragmentShader: `varying vec3 vN; varying vec3 vV; uniform vec3 uCol; uniform vec3 uDark;
@@ -108,7 +109,7 @@ function makeRivalMesh(color: number, idx = 0): { group: THREE.Group; eyes: THRE
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 30), bodyMat); group.add(body);
   const glow = new THREE.Mesh(new THREE.SphereGeometry(1.08, 32, 24), new THREE.ShaderMaterial({
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
-    uniforms: { uCol: { value: col } },
+    uniforms: { uCol: { value: new THREE.Color(glowCol) } },
     vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }`,
     fragmentShader: `varying vec3 vN; varying vec3 vV; uniform vec3 uCol; void main(){ float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),4.); gl_FragColor=vec4(uCol,f*0.55); }`,
   }));
@@ -155,7 +156,7 @@ function makeRivalMesh(color: number, idx = 0): { group: THREE.Group; eyes: THRE
     const pom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bmat(0xffffff));
     pom.position.set(0.42, 1.18, 0); group.add(pom);
   }
-  const halo = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color: glowCol, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.07;
   return { group, eyes, halo };
 }
@@ -175,8 +176,11 @@ export function createRivals(
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
 
   for (let i = 0; i < count; i++) {
-    const color = COLORS[i % COLORS.length];
-    const { group, eyes, halo } = makeRivalMesh(color, i);
+    // the family raids the SKIN CLOSET: each rival wears a random skin every
+    // match (epic + legendary looks included) — leaderboard dot matches
+    const sk = SKINS[Math.floor(Math.random() * SKINS.length)];
+    const color = sk.rim;
+    const { group, eyes, halo } = makeRivalMesh(sk.rim, i, sk.abyss, sk.glow);
     scene.add(group); scene.add(halo);
     group.visible = halo.visible = false;   // hidden until they join the feast
     // spread rivals around the island away from the player start

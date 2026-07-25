@@ -549,8 +549,14 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // train tracks (ballast + twin rails + ties) around downtown
   const railPath = () => {
-    g.beginPath(); g.moveTo(pxW(RAIL_PTS[0][0]), pyW(RAIL_PTS[0][1]));
-    for (const [rx, ry] of RAIL_PTS) g.lineTo(pxW(rx), pyW(ry));
+    // paint the ballast along the SAME catmull curve the train drives —
+    // straight-segment paint let the train cut corners across the grass
+    g.beginPath();
+    for (let t = 0; t <= 96; t++) {
+      const pt = railPointAt(t / 96);
+      const wx = pt.x / SCALE + CX, wy = pt.z / SCALE + CZ;
+      if (t === 0) g.moveTo(pxW(wx), pyW(wy)); else g.lineTo(pxW(wx), pyW(wy));
+    }
     g.closePath();
   };
   g.lineJoin = 'round'; g.lineCap = 'round';

@@ -355,7 +355,15 @@ export function createLife(
         st.turnCd = Math.max(0, st.turnCd - dt);
         const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
         let spd = st.speed;
-        if (Math.hypot(dx, dz) < vR + 26) { spd = st.speed * 2.1; const ac = st.axis === 'h' ? dx : dz; st.dir = ac >= 0 ? 1 : -1; }
+        if (Math.hypot(dx, dz) < vR + 26) {
+          spd = st.speed * 2.1;
+          const ac = st.axis === 'h' ? dx : dz;
+          const wantDir = ac >= 0 ? 1 : -1;
+          const ta = st.along + wantDir * spd * dt * 4;
+          const tx = st.axis === 'h' ? ta : st.centre + st.laneOff;
+          const tz = st.axis === 'h' ? st.centre + st.laneOff : ta;
+          if (onRoad(tx, tz)) st.dir = wantDir;   // never flee INTO a dead end (stub shake)
+        }
         st.along += st.dir * spd * dt;
         const nx = st.axis === 'h' ? st.along : st.centre + st.laneOff;
         const nz = st.axis === 'h' ? st.centre + st.laneOff : st.along;
@@ -425,8 +433,16 @@ export function createLife(
           const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
           if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
         }
-        const nx = mesh.position.x + Math.cos(ang) * spd * dt, nz = mesh.position.z + Math.sin(ang) * spd * dt;
-        if (biomeAt(nx, nz)) { mesh.position.x = nx; mesh.position.z = nz; } else ang += Math.PI;
+        let nx = mesh.position.x + Math.cos(ang) * spd * dt, nz = mesh.position.z + Math.sin(ang) * spd * dt;
+        if (!biomeAt(nx, nz)) {
+          // blocked (coast/water): slide sideways, only reverse as a last resort
+          // — a fleeing ped pinned at the cliff used to vibrate in place
+          for (const alt of [ang + Math.PI / 2, ang - Math.PI / 2, ang + Math.PI]) {
+            const ax2 = mesh.position.x + Math.cos(alt) * spd * dt, az2 = mesh.position.z + Math.sin(alt) * spd * dt;
+            if (biomeAt(ax2, az2)) { ang = alt; nx = ax2; nz = az2; break; }
+          }
+        }
+        if (biomeAt(nx, nz)) { mesh.position.x = nx; mesh.position.z = nz; }
         mesh.rotation.y = -ang + Math.PI / 2;
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
         // walk cycle: arms + legs swing with travel speed
