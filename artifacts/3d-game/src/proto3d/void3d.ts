@@ -14,12 +14,15 @@ export interface VoidState {
   lookX: number; lookY: number; // aim -1..1 for pupil tracking
 }
 
+export type Mood = 'cruise' | 'hungry' | 'frenzy' | 'scared' | 'hurt' | 'smug' | 'sleepy' | 'victory';
+
 export interface Void3D {
   group: THREE.Group;
   radius: number;
   setRadius(r: number): void;
   setStage(n: number): void;
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
+  setMood(m: Mood): void;    // the emotional state machine's current state
   chomp(): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -254,6 +257,56 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   maw.add(mawDark); maw.add(tongue);
   face.add(maw);
 
+  // ── EXPRESSION RIG: brows / sweat / zzz — the mood system's extra parts ────
+  // (flat meshes inside the billboarded face group: cheap, always camera-true)
+  const browMat = new THREE.MeshBasicMaterial({ color: 0x2a1f45, transparent: true, opacity: 0, depthWrite: false });
+  const brows: THREE.Mesh[] = [];
+  for (const sx of [-0.36, 0.36]) {
+    const bw = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.06), browMat);
+    bw.position.set(sx, 0.4, 1.0);
+    face.add(bw); brows.push(bw);
+  }
+  const emoteTex = (txt: string) => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d')!;
+    g.font = '46px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(txt, 32, 36);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  const sweat = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3),
+    new THREE.MeshBasicMaterial({ map: emoteTex('💧'), transparent: true, opacity: 0, depthWrite: false }));
+  sweat.position.set(0.62, 0.52, 1.02); face.add(sweat);
+  const zzz = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42),
+    new THREE.MeshBasicMaterial({ map: emoteTex('💤'), transparent: true, opacity: 0, depthWrite: false }));
+  zzz.position.set(0.55, 0.92, 1.0); face.add(zzz);
+  // remember the blush materials — moods flush and fade the cheeks
+  const blushMats: THREE.MeshBasicMaterial[] = [];
+  face.children.forEach((c) => {
+    const m = (c as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+    if (m && m.color && m.color.getHex() === VOID.blush) blushMats.push(m);
+  });
+
+  // ── MOOD ENGINE: the void ACTS. Targets per mood, lerped so expressions
+  // melt into each other instead of snapping.
+  let mood: Mood = 'cruise';
+  let moodT = 0;
+  let stageBoost = 1;   // pupil boost from evolution stage (was set directly)
+  const mp = { lid: 1, pupil: 1, wide: 1, smile: 1, mouthY: 1, smirk: 0, brow: 0, browAng: 0, browY: 0.4, maw: 0, blush: 0.5, sweat: 0, zzz: 0, bounce: 0 };
+  const MOODS: Record<Mood, Partial<typeof mp>> = {
+    cruise:  {},
+    hungry:  { pupil: 1.28, smile: 1.1, maw: 0.26, brow: 0.85, browAng: 0.12, browY: 0.45, blush: 0.6 },
+    frenzy:  { pupil: 1.35, smile: 1.42, wide: 1.05, blush: 0.85, brow: 0.85, browAng: 0.18, browY: 0.47, maw: 0.12, bounce: 1 },
+    scared:  { wide: 1.16, pupil: 0.55, smile: 0.85, mouthY: -0.65, brow: 1, browAng: -0.5, browY: 0.43, sweat: 1, blush: 0.3 },
+    hurt:    { lid: 0.3, mouthY: -0.8, smile: 0.8, brow: 1, browAng: -0.6, browY: 0.38, sweat: 1, blush: 0.35 },
+    smug:    { lid: 0.55, smile: 1.15, smirk: 0.2, brow: 0.7, browAng: 0.04, browY: 0.33, blush: 0.7 },
+    sleepy:  { lid: 0.35, smile: 0.95, pupil: 0.9, zzz: 1 },
+    victory: { pupil: 1.35, wide: 1.06, smile: 1.5, blush: 0.9, maw: 0.18, brow: 0.85, browAng: 0.2, browY: 0.47, bounce: 1 },
+  };
+  const BASE = { ...mp };
+  // direction-flip anticipation squash
+  let pvx = 0, pvz = 0, flipT = 0;
+
   // ── legendary accessories: 3D flair that rides (and squashes with) the orb ──
   const acc: Record<string, THREE.Group> = {};
   {
@@ -322,9 +375,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     get radius() { return radius; },
     set radius(r: number) { radius = r; },
     setRadius(r: number) { radius = r; },
+    setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     setStage(n: number) {
       if (n < stage) {   // instant rematch: shed the late-form dressing
-        for (const e of eyes) e.pupilGrp.scale.setScalar(n >= 1 ? 1.15 : 1);
+        stageBoost = n >= 1 ? 1.15 : 1;
         if (!skinHasTex) bodyMat.uniforms.uTexAmt.value = 0;
         bodyMat.uniforms.uStage.value = n;
         ringBurst = 0;
@@ -335,8 +389,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         bodyMat.uniforms.uStage.value = n;
         // each form gets a stronger presence: pupils grow (2D rule), rim/glow
         // intensify; WORLD ENDER becomes a living galaxy (auto nebula wrap)
-        const pupilScale = n >= 1 ? 1.15 : 1;
-        for (const e of eyes) e.pupilGrp.scale.setScalar(pupilScale);
+        stageBoost = n >= 1 ? 1.15 : 1;
         if (n >= 4 && !skinHasTex) {
           const nebSrc = '/assets/hf/hf_20260717_005240_697d3ae9-f61f-4f42-8ece-3b2413779221.png';
           let t = texCache.get(nebSrc);
@@ -412,9 +465,15 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
       const speed = Math.hypot(s.vx, s.vz);
       moveAmt += (Math.min(1, speed / 40) - moveAmt) * Math.min(1, dt * 6);
+      // ANTICIPATION: a hard direction flip squashes for a beat before launch
+      const pm = Math.hypot(pvx, pvz);
+      if (speed > 10 && pm > 10 && (s.vx * pvx + s.vz * pvz) / (speed * pm) < -0.25) flipT = 0.14;
+      pvx = s.vx; pvz = s.vz;
+      if (flipT > 0) flipT -= dt;
 
-      // lift so the orb rests partly sunk into the ground; roll-bob while moving
-      const lift = radius * (RADIUS_SINK + Math.abs(Math.sin(s.t * 6)) * moveAmt * 0.05);
+      // lift so the orb rests partly sunk into the ground; roll-bob while
+      // moving — frenzy/victory add a real happy bounce
+      const lift = radius * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3))) * moveAmt * (0.05 + mp.bounce * 0.055));
       group.position.set(s.x, lift, s.z);
 
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
@@ -422,6 +481,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const breathe = Math.sin(s.t * 2.2) * 0.016;
       let stretch = 1 + moveAmt * 0.05 - breathe;
       let squash = 1 - moveAmt * 0.045 + breathe;
+      if (flipT > 0) { stretch *= 0.87; squash *= 1.1; }   // wind-up before the turn
+      if (mood === 'hurt') bob.rotation.y = Math.sin(s.t * 34) * 0.05; else bob.rotation.y *= 1 - Math.min(1, dt * 8);
       // power envelopes
       if (stretchT > 0) {           // ROCKET BITE: lunge-stretch pulse
         stretchT -= dt;
@@ -456,21 +517,46 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
       // mouth: maw scales in while open, smile hides
       if (mouthT > 0) mouthT -= dt;
-      const mo = mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0;
+      const mo = Math.max(mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0, mp.maw);
       maw.scale.setScalar(Math.max(0.001, mo));
       mouth.visible = mo < 0.25;
 
-      // pupil tracking + blink
+      // ── MOOD ENGINE: lerp every expression param toward the mood's targets
+      moodT += dt;
+      {
+        const tgt = { ...BASE, ...MOODS[mood] };
+        const k = Math.min(1, dt * 9);
+        for (const key of Object.keys(mp) as (keyof typeof mp)[]) mp[key] += (tgt[key] - mp[key]) * k;
+      }
+      browMat.opacity = mp.brow;
+      brows[0].rotation.z = mp.browAng; brows[1].rotation.z = -mp.browAng;
+      brows[0].position.y = brows[1].position.y = mp.browY;
+      for (const bm of blushMats) bm.opacity = mp.blush;
+      (sweat.material as THREE.MeshBasicMaterial).opacity = mp.sweat;
+      sweat.position.y = 0.52 + Math.sin(s.t * 9) * 0.045;
+      sweat.scale.setScalar(0.9 + Math.sin(s.t * 9) * 0.1);
+      (zzz.material as THREE.MeshBasicMaterial).opacity = mp.zzz * (0.55 + 0.45 * Math.sin(s.t * 1.6));
+      zzz.position.set(0.55 + Math.sin(s.t * 0.9) * 0.05, 0.92 + Math.sin(s.t * 1.3) * 0.09, 1.0);
+
+      // pupil tracking + blink (sleepy mood = slow drowsy wander)
       blinkT -= dt;
-      if (blinkT <= 0 && blink <= 0) { blink = 0.16; blinkT = 2.5 + Math.random() * 4; }
+      if (blinkT <= 0 && blink <= 0) { blink = 0.16; blinkT = (mood === 'sleepy' ? 1.4 : 2.5) + Math.random() * 4; }
       let open = 1;
       if (blink > 0) { blink -= dt; open = Math.abs(blink - 0.08) / 0.08; }
+      const wanderX = mood === 'sleepy' ? Math.sin(s.t * 0.7) * 0.6 : 0;
+      const wanderY = mood === 'sleepy' ? Math.sin(s.t * 0.47) * 0.3 - 0.25 : 0;
       for (const e of eyes) {
-        e.pupilGrp.position.x = s.lookX * 0.09;
-        e.pupilGrp.position.y = 0.06 + s.lookY * 0.06;
-        const oy = Math.max(0.08, open);
-        e.sclera.scale.y = oy; e.pupilGrp.scale.y = oy;
+        e.pupilGrp.position.x = (s.lookX + wanderX) * 0.09;
+        e.pupilGrp.position.y = 0.06 + (s.lookY + wanderY) * 0.06;
+        const oy = Math.max(0.08, open) * mp.lid;
+        e.sclera.scale.set(mp.wide, Math.max(0.08, oy) * mp.wide, 1);
+        const pk = stageBoost * mp.pupil;
+        e.pupilGrp.scale.set(pk, Math.max(0.08, oy) * pk, 1);
       }
+      // mouth: smile scale + smirk tilt + frown flip (scale.y through ~0 = flat)
+      mouth.scale.set(mp.smile, Math.sign(mp.mouthY || 1) * Math.max(0.06, Math.abs(mp.mouthY)) * mp.smile, 1);
+      mouth.rotation.z = Math.PI + mp.smirk;
+      mouth.position.y = mp.mouthY < 0 ? -0.22 : -0.28;   // frowns ride a touch higher
 
       // ground halo + contact track the void on the floor
       halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.2);

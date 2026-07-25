@@ -12,14 +12,14 @@
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none;
         font-family: 'Fredoka', system-ui, -apple-system, sans-serif; }
       #timer {
-        position: fixed; top: 12px; left: 0; right: 0; text-align: center; z-index: 5;
+        position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 5;
         color: #fff; font-size: clamp(26px, 8vw, 40px); font-weight: 900; letter-spacing: 1px;
         text-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none;
       }
       #devoured { position: fixed; top: 60px; left: 0; right: 0; text-align: center; z-index: 5;
         color: #d8c8ff; font-size: 14px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
         text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-      #board { position: fixed; top: 10px; left: 10px; z-index: 5; pointer-events: none;
+      #board { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
         background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
       #board .row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
         color: #fff; padding: 1px 0; }
@@ -95,7 +95,7 @@
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       /* coins + quests */
-      #coins { position: fixed; top: 12px; right: 12px; z-index: 5; pointer-events: none;
+      #coins { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 5; pointer-events: none;
         background: rgba(16,8,30,0.55); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(6px);
         color: #ffe08a; font-size: 14px; font-weight: 900; }
       /* daily quests: three icon CHIPS (pre-reader friendly), not sentences */
@@ -187,7 +187,7 @@
          the hero void's face in the key art stays completely clear. */
       #menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
         align-items: center; justify-content: flex-start; text-align: center;
-        padding: 6vh 16px 4vh; box-sizing: border-box;
+        padding: calc(6vh + env(safe-area-inset-top, 0px)) 16px calc(4vh + env(safe-area-inset-bottom, 0px)); box-sizing: border-box;
         background:
           radial-gradient(ellipse at 78% 12%, rgba(240,111,176,0.16), transparent 42%),
           radial-gradient(ellipse at 18% 30%, rgba(94,200,216,0.10), transparent 40%),
@@ -233,7 +233,7 @@
       #worlds .wCard { width: 130px; padding: 18px 10px 14px; }
       #worlds .wCard i { font-size: 40px; }
       /* in-game home button */
-      #btnQuit { position: fixed; top: 56px; right: 12px; z-index: 6; width: 38px; height: 38px;
+      #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 38px; height: 38px;
         border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
         color: #cbb2ff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(6px); }
       body.menu #btnQuit { display: none; }
@@ -243,6 +243,7 @@
       #daily { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.8); backdrop-filter: blur(6px); }
       #daily.show { display: flex; }
+      #daily.show .dCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
       #daily .dCard { width: min(360px, 90vw); border-radius: 24px; text-align: center; padding: 26px 18px 22px;
         background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(255,210,90,0.6); box-shadow: 0 0 40px rgba(154,92,255,0.5); }
@@ -261,6 +262,7 @@
       #skinPrev { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.78); backdrop-filter: blur(6px); }
       #skinPrev.show { display: flex; }
+      #skinPrev.show .spCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
       #skinPrev .spCard { position: relative; width: min(340px, 86vw); max-height: 86vh; overflow-y: auto;
         border-radius: 26px; text-align: center;
         background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
@@ -286,6 +288,7 @@
       .wCard.lock { filter: saturate(0.35); opacity: 0.72; }
       .wCard.shake { animation: wshake 0.4s; }
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+      @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
       /* loading screen — PLAY holds here until the asset pack is resident */
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
         justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
@@ -399,6 +402,7 @@
       #tut { position: fixed; inset: 0; z-index: 12; display: none; align-items: center; justify-content: center;
         background: rgba(13,8,33,0.78); }
       #tut.show { display: flex; }
+      #tut.show .card { animation: modalIn 0.26s cubic-bezier(0.2, 1.4, 0.4, 1); }
       #tut .tEmoji { font-size: 44px; margin-bottom: 4px; }
       #tut .card { background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(255,210,90,0.55); border-radius: 22px;

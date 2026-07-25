@@ -10,6 +10,7 @@ export interface Audio3D {
   rocket(): void;                  // ROCKET BITE zip
   collapse(): void;                // COLLAPSE boom
   evolve(): void;                  // form-up fanfare
+  voice(kind: 'happy' | 'yum' | 'scared' | 'hurt' | 'sleepy'): void;   // the void's cute coos
   win(): void;                     // end-of-match warm sting
   hit(): void;                     // took a shot
   alert(): void;                   // defense wave banner
@@ -167,6 +168,7 @@ export function createAudio(): Audio3D {
   let musTimer: ReturnType<typeof setInterval> | null = null;
   let musStage = 0, step = 0, nextT = 0;
   let lastPop = 0;
+  const voiceCd: Record<string, number> = {};
   // warm bus: music -> soft lowpass -> (dry + echo) -> master. The gentle
   // feedback echo is what turns bare oscillators into something that sounds
   // PRODUCED instead of 8-bit.
@@ -330,6 +332,19 @@ export function createAudio(): Audio3D {
       const seq = [392, 523.25, 659.25, 783.99]; // G4 C5 E5 G5 — bright major
       seq.forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.22, i * 0.085));
       tone(1567.98, 1567.98, 0.4, 'sine', 0.1, 0.34);
+    },
+    voice(kind) {
+      // Kirby-class coos: two-note sine chirps, soft and rate-limited so the
+      // void sounds sweet, never chatty
+      const c = ensure(); if (!c) return;
+      const now = c.currentTime;
+      if (now - (voiceCd[kind] ?? -99) < 6) return;
+      voiceCd[kind] = now;
+      if (kind === 'happy') { tone(660, 760, 0.09, 'sine', 0.09); tone(880, 990, 0.13, 'sine', 0.09, 0.1); }
+      else if (kind === 'yum') { tone(330, 300, 0.12, 'sine', 0.08); tone(370, 335, 0.16, 'sine', 0.08, 0.14); }
+      else if (kind === 'scared') { tone(740, 470, 0.2, 'triangle', 0.07); }
+      else if (kind === 'hurt') { tone(430, 250, 0.22, 'sine', 0.09); }
+      else if (kind === 'sleepy') { tone(340, 300, 0.55, 'sine', 0.045); }
     },
     win() {
       if (sample('win_warm.wav', 0.55)) return;

@@ -10,7 +10,7 @@ import '@fontsource/fredoka/400.css';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createVoid } from './proto3d/void3d';
+import { createVoid, type Mood } from './proto3d/void3d';
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3 } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
@@ -154,6 +154,7 @@ rivals.onSpeak = (x, z, line) => {
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts) => {
+  smugUntil = tClock + 2.4; audio.voice('happy');
   breakingNews(`${name} devoured. family reunion RUINED`);
   playerScore += pts;
   addCoins(15);
@@ -168,10 +169,13 @@ rivals.onRivalEaten = (name, pts) => {
   audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
   buzz(60);
 };
+// ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
+let hungryT = -99, hurtUntil = 0, smugUntil = 0, prevMood: Mood = 'cruise';
 let biteMercy = 0;   // global mercy: two big rivals overlapping must not chain-bite
 rivals.onPlayerBitten = (name) => {
   if (tClock < biteMercy) return;
   biteMercy = tClock + 2.5;
+  hurtUntil = tClock + 0.9; audio.voice('hurt');
   // 12% shrink, not 18 — a silent-feeling 18% read as "the game glitched me
   // smaller" to kids; the bite should sting, not punish
   voidling.setRadius(Math.max(START_R, voidling.radius * 0.88));
@@ -699,6 +703,7 @@ function capture(e: Edible, giveHunger = true) {
   // a building-sized bite lands with a ground shockwave + dust — seismic,
   // but deliberately NO camera shake (kids found the shake unpleasant)
   if (e.radius > 2) {
+    audio.voice('yum');
     fx.ring(e.mesh.position.x, e.mesh.position.z, 0xb875ff, e.radius * 3, 0.45);
     spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6);
   }
@@ -1331,6 +1336,30 @@ function animate() {
   }
 
   const R = voidling.radius;
+  // ── resolve the void's mood from live game state ──
+  {
+    let mood: Mood = 'cruise';
+    const R2 = voidling.radius;
+    let scared = false;
+    for (const rv of rivals.list) {
+      if (rv.r > R2 * 1.15 && Math.hypot(rv.x - voidState.x, rv.z - voidState.z) < R2 + rv.r + 16) { scared = true; break; }
+    }
+    if (tClock < hurtUntil) mood = 'hurt';
+    else if (outroT > 0) mood = playerScore >= Math.max(0, ...rivals.list.map((r) => r.score)) ? 'victory' : 'cruise';
+    else if (scared) mood = 'scared';
+    else if (tClock < smugUntil) mood = 'smug';
+    else if (combo >= 5 && comboT > 0) mood = 'frenzy';
+    else if (tClock - hungryT < 0.45) mood = 'hungry';
+    else if (started && !ended && tClock - lastInput > 8) mood = 'sleepy';
+    voidling.setMood(mood);
+    if (mood !== prevMood) {
+      if (mood === 'scared') audio.voice('scared');
+      else if (mood === 'frenzy' || mood === 'victory') audio.voice('happy');
+      else if (mood === 'sleepy') audio.voice('sleepy');
+      prevMood = mood;
+    }
+  }
+
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
   rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R);   // solo: the family never joins
@@ -1381,6 +1410,7 @@ function animate() {
       // drift in (hole.io's suction fantasy). Buildings stay founded; walkers,
       // cars and critters steer themselves and are never magnetized.
       const pull = (1 - d / reach) * (1 - d / reach) * (8 + R * 1.1);   // quadratic: violent at the rim, gentle at reach — reads as GRAVITY
+      if (d < reach * 0.85) hungryT = tClock;   // food in the well: the face gets HUNGRY
       e.mesh.position.x -= (dx / d) * dt * pull;
       e.mesh.position.z -= (dz / d) * dt * pull;
       e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);
