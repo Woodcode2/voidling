@@ -5,6 +5,7 @@
 // towers, trees, palms, landmarks) are placed on top per the FIXED_PLAN biome
 // grid. Moving life is added separately (./life).
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
@@ -1115,17 +1116,13 @@ function makeRowBuilding(wB: number, d: number, h: number): THREE.Group {
 }
 // small garden shed for suburban backyards
 function makeParkedCar(): THREE.Group {
-  const g = new THREE.Group();
-  const col = pick(PROPS.car);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.0, 1.7), new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.15 }));
-  body.position.y = 0.75; g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 1.5), new THREE.MeshStandardMaterial({ color: 0xbfeaff, roughness: 0.15 }));
-  cabin.position.set(-0.2, 1.55, 0); g.add(cabin);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.9 });
-  for (const wx2 of [-1.1, 1.1]) for (const wz2 of [-0.85, 0.85]) {
-    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10), wheelMat);
-    wh.rotation.x = Math.PI / 2; wh.position.set(wx2, 0.42, wz2); g.add(wh);
-  }
+  const parts = [
+    part(new THREE.BoxGeometry(3.4, 1.0, 1.7), pick(PROPS.car), 0, 0.75, 0),
+    part(new THREE.BoxGeometry(1.8, 0.8, 1.5), 0xbfeaff, -0.2, 1.55, 0),
+  ];
+  for (const wx2 of [-1.1, 1.1]) for (const wz2 of [-0.85, 0.85])
+    parts.push(part(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10), 0x20242c, wx2, 0.42, wz2, Math.PI / 2));
+  const g = new THREE.Group(); g.add(mergedProp(parts));
   return g;
 }
 function makeShed(): THREE.Group {
@@ -1169,37 +1166,54 @@ function makeTower(tall = false): THREE.Group {
   }
   return grp;
 }
+// ── MERGED-PROP KIT: draw-call diet. Every small prop used to be 2-9 meshes
+// with its own materials (a hydrant alone was 8 draw calls; downtown measured
+// ~2250 calls/frame). Each factory now bakes its parts into ONE geometry with
+// per-vertex colors, and every prop on the island shares ONE material.
+const PROP_SHARED_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
+const _pc = new THREE.Color();
+function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  if (g !== geo) geo.dispose();
+  g.scale(sx, sy ?? sx, sz ?? sx);
+  if (rx) g.rotateX(rx);
+  if (ry) g.rotateY(ry);
+  if (rz) g.rotateZ(rz);
+  g.translate(x, y, z);
+  _pc.setHex(col);
+  const n = g.getAttribute('position').count;
+  const cols = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { cols[i * 3] = _pc.r; cols[i * 3 + 1] = _pc.g; cols[i * 3 + 2] = _pc.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  return g;
+}
+function mergedProp(parts: THREE.BufferGeometry[]): THREE.Mesh {
+  const merged = mergeGeometries(parts, false)!;
+  parts.forEach((pg) => pg.dispose());
+  return new THREE.Mesh(merged, PROP_SHARED_MAT);
+}
+
 function makeTree(): THREE.Group {
-  // clustered two-tone canopy like the 2D tree sprites — reads lush, not "gumdrop"
-  const grp = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.72, 3.2, 7),
-    new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1, flatShading: true }));
-  trunk.position.y = 1.6; grp.add(trunk);
+  // clustered two-tone canopy like the 2D tree sprites — reads lush, not
+  // "gumdrop". ONE merged mesh, ONE draw call (was 5).
   const base = pick(PROPS.foliage);
   const dark = new THREE.Color(base).multiplyScalar(0.7).getHex();
   const light = new THREE.Color(base).multiplyScalar(1.28).getHex();
-  const blob = (r: number, col: number, x: number, y: number, z: number) => {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.92, flatShading: true }));
-    m.position.set(x, y, z); grp.add(m);
-  };
   const R0 = rand(2.2, 2.9);
-  blob(R0, dark, 0, 4.6, 0);
-  blob(R0 * 0.72, base, R0 * 0.55, 5.4, R0 * 0.3);
-  blob(R0 * 0.62, light, -R0 * 0.5, 5.6, -R0 * 0.25);
-  blob(R0 * 0.5, base, 0.2, 6.4, 0.2);
+  const grp = new THREE.Group();
+  grp.add(mergedProp([
+    part(new THREE.CylinderGeometry(0.5, 0.72, 3.2, 7), PROPS.trunk, 0, 1.6, 0),
+    part(new THREE.IcosahedronGeometry(R0, 1), dark, 0, 4.6, 0),
+    part(new THREE.IcosahedronGeometry(R0 * 0.72, 1), base, R0 * 0.55, 5.4, R0 * 0.3),
+    part(new THREE.IcosahedronGeometry(R0 * 0.62, 1), light, -R0 * 0.5, 5.6, -R0 * 0.25),
+    part(new THREE.IcosahedronGeometry(R0 * 0.5, 1), base, 0.2, 6.4, 0.2),
+  ]));
   return grp;
 }
 function makePine(): THREE.Group {
-  const grp = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 2.4, 6),
-    new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1 }));
-  trunk.position.y = 1.2; grp.add(trunk);
-  const mat = new THREE.MeshStandardMaterial({ color: PROPS.pine, roughness: 0.9, flatShading: true });
-  for (let i = 0; i < 3; i++) {
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 7), mat);
-    cone.position.y = 3 + i * 2.1; grp.add(cone);
-  }
+  const parts = [part(new THREE.CylinderGeometry(0.5, 0.7, 2.4, 6), PROPS.trunk, 0, 1.2, 0)];
+  for (let i = 0; i < 3; i++) parts.push(part(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 7), PROPS.pine, 0, 3 + i * 2.1, 0));
+  const grp = new THREE.Group(); grp.add(mergedProp(parts));
   return grp;
 }
 function makePalm(): THREE.Group {
@@ -1236,57 +1250,59 @@ function makeBush(): THREE.Mesh {
 }
 function makeMailbox(): THREE.Group {
   const g = new THREE.Group();
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.6, 5), new THREE.MeshStandardMaterial({ color: 0x8a6a4a }));
-  post.position.y = 0.8; g.add(post);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 1.1), new THREE.MeshStandardMaterial({ color: pick([0xd85a5a, 0x4d7de8, 0x4db07a]), roughness: 0.6, metalness: 0.2 }));
-  box.position.y = 1.7; g.add(box); return g;
+  g.add(mergedProp([
+    part(new THREE.CylinderGeometry(0.15, 0.15, 1.6, 5), 0x8a6a4a, 0, 0.8, 0),
+    part(new THREE.BoxGeometry(0.6, 0.7, 1.1), pick([0xd85a5a, 0x4d7de8, 0x4db07a]), 0, 1.7, 0),
+  ]));
+  return g;
 }
 function makeBench(): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 0.9 });
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(3, 0.3, 1), mat); seat.position.y = 1; g.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 0.3), mat); back.position.set(0, 1.6, -0.35); g.add(back);
+  g.add(mergedProp([
+    part(new THREE.BoxGeometry(3, 0.3, 1), 0x9a7a5a, 0, 1, 0),
+    part(new THREE.BoxGeometry(3, 1, 0.3), 0x9a7a5a, 0, 1.6, -0.35),
+  ]));
   return g;
 }
 
 // ── tiny "starter food" — what a speck-sized void eats first ──────────────────
 function makeCone(): THREE.Group {
   const g = new THREE.Group();
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.5, 10), new THREE.MeshStandardMaterial({ color: 0xff7a2a, roughness: 0.7 }));
-  cone.position.y = 0.75; g.add(cone);
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.3, 10), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-  band.position.y = 0.7; g.add(band);
+  g.add(mergedProp([
+    part(new THREE.ConeGeometry(0.6, 1.5, 10), 0xff7a2a, 0, 0.75, 0),
+    part(new THREE.CylinderGeometry(0.42, 0.5, 0.3, 10), 0xffffff, 0, 0.7, 0),
+  ]));
   return g;
 }
 function makeHydrant(): THREE.Group {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xe23b2e, roughness: 0.6, metalness: 0.2 });
-  const lite = new THREE.MeshStandardMaterial({ color: 0xf0f2f6, roughness: 0.5, metalness: 0.3 });
-  const flange = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.56, 0.18, 8), mat); flange.position.y = 0.09; g.add(flange);
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 1.1, 8), mat); body.position.y = 0.68; g.add(body);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 6), mat); cap.position.y = 1.22; g.add(cap);
-  const nut = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.16, 6), lite); nut.position.y = 1.6; g.add(nut);
-  for (const s of [-1, 1]) {
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 6), mat); arm.rotation.z = Math.PI / 2; arm.position.set(s * 0.4, 0.78, 0); g.add(arm);
-    const end = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 6), lite); end.rotation.z = Math.PI / 2; end.position.set(s * 0.66, 0.78, 0); g.add(end);
+  // was EIGHT draw calls per hydrant — now one
+  const R = 0xe23b2e, L = 0xf0f2f6;
+  const parts = [
+    part(new THREE.CylinderGeometry(0.52, 0.56, 0.18, 8), R, 0, 0.09, 0),
+    part(new THREE.CylinderGeometry(0.4, 0.45, 1.1, 8), R, 0, 0.68, 0),
+    part(new THREE.SphereGeometry(0.42, 8, 6), R, 0, 1.22, 0),
+    part(new THREE.CylinderGeometry(0.12, 0.14, 0.16, 6), L, 0, 1.6, 0),
+  ];
+  for (const sd of [-1, 1]) {
+    parts.push(part(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 6), R, sd * 0.4, 0.78, 0, 0, 0, Math.PI / 2));
+    parts.push(part(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 6), L, sd * 0.66, 0.78, 0, 0, 0, Math.PI / 2));
   }
+  const g = new THREE.Group(); g.add(mergedProp(parts));
   return g;
 }
 function makeTrash(): THREE.Group {
   const g = new THREE.Group();
-  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 1.3, 10), new THREE.MeshStandardMaterial({ color: pick([0x4d9a5e, 0x4d74a8, 0x6b7280]), roughness: 0.8, metalness: 0.2 }));
-  can.position.y = 0.65; g.add(can);
-  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x555c68 })); lid.position.y = 1.35; g.add(lid);
+  g.add(mergedProp([
+    part(new THREE.CylinderGeometry(0.5, 0.42, 1.3, 10), pick([0x4d9a5e, 0x4d74a8, 0x6b7280]), 0, 0.65, 0),
+    part(new THREE.CylinderGeometry(0.56, 0.56, 0.2, 10), 0x555c68, 0, 1.35, 0),
+  ]));
   return g;
 }
 function makeFlowers(): THREE.Group {
-  const g = new THREE.Group();
-  const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), new THREE.MeshStandardMaterial({ color: 0x5db06a, roughness: 0.9, flatShading: true }));
-  bush.position.y = 0.5; bush.scale.y = 0.7; g.add(bush);
-  for (let i = 0; i < 5; i++) {
-    const f = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 5), new THREE.MeshStandardMaterial({ color: pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]), roughness: 0.6 }));
-    f.position.set(rand(-0.5, 0.5), 0.8, rand(-0.5, 0.5)); g.add(f);
-  }
+  const parts = [part(new THREE.IcosahedronGeometry(0.7, 0), 0x5db06a, 0, 0.5, 0, 0, 0, 0, 1, 0.7, 1)];
+  for (let i = 0; i < 5; i++)
+    parts.push(part(new THREE.SphereGeometry(0.16, 6, 5), pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]), rand(-0.5, 0.5), 0.8, rand(-0.5, 0.5)));
+  const g = new THREE.Group(); g.add(mergedProp(parts));
   return g;
 }
 function makeCoins(): THREE.Group {
@@ -1626,15 +1642,14 @@ function makeDuckFB(): THREE.Group {
   return g;
 }
 function makeFenceRun(len: number, col = 0xf4f0e2): THREE.Group {
-  // low post-and-rail fence along +X, centered
-  const g = new THREE.Group(); const m = std(col, 0.85);
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.1), m); rail.position.y = 0.85; g.add(rail);
-  const rail2 = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.1), m); rail2.position.y = 0.45; g.add(rail2);
+  // low post-and-rail fence along +X, centered — one merged mesh (was 4-9)
+  const parts = [
+    part(new THREE.BoxGeometry(len, 0.12, 0.1), col, 0, 0.85, 0),
+    part(new THREE.BoxGeometry(len, 0.12, 0.1), col, 0, 0.45, 0),
+  ];
   const n = Math.max(2, Math.round(len / 2.4));
-  for (let i = 0; i <= n; i++) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.1, 0.16), m);
-    post.position.set(-len / 2 + (i / n) * len, 0.55, 0); g.add(post);
-  }
+  for (let i = 0; i <= n; i++) parts.push(part(new THREE.BoxGeometry(0.16, 1.1, 0.16), col, -len / 2 + (i / n) * len, 0.55, 0));
+  const g = new THREE.Group(); g.add(mergedProp(parts));
   return g;
 }
 

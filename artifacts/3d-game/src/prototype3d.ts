@@ -133,8 +133,8 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 
 const island = createIsland(scene, addEdible);
 // dev/QA introspection hooks (harmless in prod; no gameplay reads these)
-const _dbg = window as unknown as { __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE };
-_dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE;
+const _dbg = window as unknown as { __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer };
+_dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 5);   // the WHOLE family shows up (full end-board)
