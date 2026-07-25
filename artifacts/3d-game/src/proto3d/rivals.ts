@@ -13,7 +13,7 @@ export interface Rivals {
   list: Rival[];
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number): void;
   onJoin?: (name: string, color: number, x: number, z: number) => void;
-  onRivalEaten?: (name: string, pts: number) => void;    // you swallowed one
+  onRivalEaten?: (name: string, pts: number, x: number, z: number, r: number) => void;    // you swallowed one
   onPlayerBitten?: (name: string) => void;               // one bit YOU
   onSpeak?: (x: number, z: number, line: string) => void; // personality bubbles
   reset(): void;                                         // instant rematch
@@ -27,6 +27,7 @@ export const RIVAL_VOICE: Record<string, {
   taunt: string[]; respawn: string[]; eaten: string[];
   steal: string[]; escape: string[]; bite: string[];
   nearBig: string[]; nearSmall: string[]; rankUp: string[];
+  visit: string[];   // the swing-by-and-say-hi lines (family, not enemies)
 }> = {
   YIKES: {
     taunt: ['sorry!! but also: yum!!', 'I ate it?? I ATE IT!', "don't be mad don't be mad", 'oh no. am I winning??', 'was that ok to eat??', 'eek— I mean… NOM!'],
@@ -38,6 +39,7 @@ export const RIVAL_VOICE: Record<string, {
     nearBig: ['am I… bigger?? AAAH', 'being big is SCARY', "don't make me use this"],
     nearSmall: ['NOPE NOPE NOPE NOPE', 'pretend I am a rock', 'walking away quickly!!'],
     rankUp: ['I passed you?? sorry!!', 'winning is stressful!!', 'how did THAT happen'],
+    visit: ['hi!! just checking on you', 'you look bigger?? EEP', 'stay safe ok?? ok bye!!', 'I brought moral support'],
   },
   DAZZLE: {
     taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, superstar'],
@@ -49,6 +51,7 @@ export const RIVAL_VOICE: Record<string, {
     nearBig: ["aww. you're teeny.", 'love the mini look', 'so small. so brave.'],
     nearSmall: ["I'm not scared. (I am)", 'my agent said RUN', 'this is bad for my brand'],
     rankUp: ['outta my way, slowpoke', 'first place suits me', 'and THAT is star power'],
+    visit: ['came to bless your day', 'you may admire me. go.', 'we are SO photogenic', 'twinning!! sort of.'],
   },
   BITSY: {
     taunt: ['nom nom nom hehe', 'I did a WINNING!', 'big bite! BIGGEST bite!', 'dat one was YUMMY', 'me first! ME FIRST!', 'look!! I ate a house!!'],
@@ -60,6 +63,7 @@ export const RIVAL_VOICE: Record<string, {
     nearBig: ["I'm da BIG kid now!", 'look how BIG I got!!', 'fear my tiny might!!'],
     nearSmall: ['eep!! big person!!', 'be nice to babies!!', 'I want my blankie!!'],
     rankUp: ['I winned past you!!', 'zoom zoom, slowpoke!', 'babies rule!!'],
+    visit: ['HI HI HI HI HI!!', 'watcha eating?? can I??', "tag!! you're it!! hehe", 'I missed you SO much'],
   },
   CHOMPZILLA: {
     taunt: ['BEHOLD: dinner theater', 'a FEAST worthy of ME', 'the island? MY stage.', 'gasp. magnificent. me.', 'act two: I DEVOUR', "applause. I'll wait."],
@@ -71,6 +75,7 @@ export const RIVAL_VOICE: Record<string, {
     nearBig: ['tremble, tiny snack!!', 'bow before CHOMPZILLA', 'the stage is MINE now'],
     nearSmall: ["spare me!! I'm FAMOUS", 'not the FACE!!', 'exit!! stage LEFT!!'],
     rankUp: ['the LEAD is my destiny', 'a STAR is reborn!!', 'weep, understudy!!'],
+    visit: ['a VISIT from greatness', 'we feast TOGETHER, kid', 'the gala is SATURDAY', 'family!! DRAMATIC hug!!'],
   },
   SNOOZLE: {
     taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],
@@ -82,6 +87,7 @@ export const RIVAL_VOICE: Record<string, {
     nearBig: ['oh. when did I get big', 'being big is nap-sized', 'huh. tall now.'],
     nearSmall: ['zzz— AAH okay running', 'five more minutes!!', 'too sleepy to flee…'],
     rankUp: ['passed you in my sleep', '*overtakes while yawning*', 'zzzoom.'],
+    visit: ['strolled by… *yawn* hi', 'nice spot for a nap', 'you grew. neat. zzz', 'grandpa hug… later…'],
   },
 };
 const pickLine = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -210,23 +216,16 @@ export function createRivals(
 ): Rivals {
   // props the family has eaten, mid shrink-out animation
   const shrinking: THREE.Object3D[] = [];
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; visitT: number; visiting: boolean; dyingT: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
 
-  // the family raids the SKIN CLOSET — but only the SHOWCASE shelf: epic
-  // textures and legendary accessory skins, legendaries weighted double so
-  // most matches feature at least two. Unique per rival, reshuffled per boot.
-  const showcase = (() => {
-    const pool = SKINS.filter((s) => s.acc || s.tex);
-    const legend = pool.filter((s) => s.acc);
-    const deck = [...legend, ...legend, ...pool].sort(() => Math.random() - 0.5);
-    const seen = new Set<string>();
-    const out: Skin[] = [];
-    for (const s of deck) if (!seen.has(s.id)) { seen.add(s.id); out.push(s); }
-    return out;
-  })();
+  // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
+  // horn, dino spikes, wizard hat, crown…). Aspirational: every family member
+  // looks like something the player wants to own. Unique per rival, shuffled
+  // per boot so each match features a different line-up.
+  const showcase = (() => SKINS.filter((s) => s.acc).sort(() => Math.random() - 0.5))();
   for (let i = 0; i < count; i++) {
     const sk = showcase[i % showcase.length];
     const color = sk.rim;
@@ -238,7 +237,8 @@ export function createRivals(
     rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
-      vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false });
+      vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
+      visitT: rand(14, 30), visiting: false, dyingT: 0 });
   }
 
   const tmp = new THREE.Vector3();
@@ -254,7 +254,9 @@ export function createRivals(
         rv.x = Math.cos(ang) * 150; rv.z = Math.sin(ang) * 150;
         rv.r = START_R; rv.score = 0; rv.vx = 0; rv.vz = 0;
         rv.joined = false; rv.respawnT = 0; rv.biteCd = 0; rv.stall = 0; rv.pulse = 0;
+        rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
         rv.group.visible = rv.halo.visible = false;
+        rv.group.rotation.y = 0;
       });
     },
     update(dt, _t, px, pz, pr) {
@@ -281,6 +283,24 @@ export function createRivals(
           } else continue;   // not on the island yet
         }
         if (rv.r > lawCap) rv.r = lawCap;
+        // being devoured: a visible SUCK-IN — the rival spirals into the
+        // player's pit, shrinking, before it winks out. Cause and effect a kid
+        // can see (the old instant-hide read as "nothing happened").
+        if (rv.dyingT > 0) {
+          rv.dyingT -= dt;
+          const k = Math.max(0, rv.dyingT) / 0.55;   // 1 → 0 over the gulp
+          rv.x += (px - rv.x) * Math.min(1, dt * 7);
+          rv.z += (pz - rv.z) * Math.min(1, dt * 7);
+          const swirl = (1 - k) * 9;
+          rv.group.position.set(rv.x + Math.cos(swirl) * 1.6 * k, Math.max(0.2, rv.r * k * 0.9), rv.z + Math.sin(swirl) * 1.6 * k);
+          rv.group.scale.setScalar(Math.max(0.05, rv.r * k));
+          rv.group.rotation.y += dt * 10;
+          if (rv.dyingT <= 0) {
+            rv.group.visible = false; rv.group.rotation.y = 0;
+            rv.respawnT = 6; rv.r = START_R; rv.vx = rv.vz = 0;
+          }
+          continue;
+        }
         // knocked out after being devoured: respawn small on the far coast
         if (rv.respawnT > 0) {
           rv.respawnT -= dt;
@@ -308,7 +328,9 @@ export function createRivals(
           rv.tgt = null;
         }
         const dpx = rv.x - px, dpz = rv.z - pz, dp = Math.hypot(dpx, dpz);
-        const fleeing = pr > rv.r * 1.15 && dp < pr + 40;
+        // flee only from REAL danger, and only when it's actually close —
+        // family that bolts the moment you approach never feels like family
+        const fleeing = pr > rv.r * 1.2 && dp < pr + 24;
         if (fleeing && dp < pr * 1.05) rv.closeCall = true;   // almost swallowed…
         if (rv.closeCall && dp > pr * 1.8) {                   // …and wriggled free
           rv.closeCall = false;
@@ -319,9 +341,39 @@ export function createRivals(
           if (rv.r > pr * 1.15) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearBig)); }
           else if (rv.r < pr * 0.85) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearSmall)); }
         }
+        // ── SWING-BY VISITS: every so often a family member breaks off, rolls
+        // over to wherever YOU are, and says something fun on arrival. The
+        // island feels like a family outing, not five strangers grinding.
+        rv.visitT -= dt;
+        if (rv.visiting && fleeing) rv.visiting = false;   // visit's off — you got scary
+        if (!rv.visiting && !fleeing && rv.visitT <= 0 && dp > 45) {
+          rv.visiting = true; rv.tgt = null;
+        }
+        if (rv.visiting) {
+          rv.tx = px; rv.tz = pz;   // chase the moving player, not a stale spot
+          if (dp < pr + rv.r + 9) {   // arrived: deliver the line, hang out beat
+            rv.visiting = false; rv.visitT = rand(26, 44);
+            rv.speakCd = rand(10, 14);
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].visit));
+            rv.retarget = 0;   // pick a snack right away (near the player now)
+          }
+        }
         const reached = Math.hypot(rv.tx - rv.x, rv.tz - rv.z) < 2.5;
-        if (fleeing) { rv.tx = rv.x + dpx; rv.tz = rv.z + dpz; }
-        else if (rv.retarget <= 0 || reached) {
+        if (fleeing) {
+          // flee INLAND-biased: near the coast the escape vector curves back
+          // toward the island centre — no more rivals pinned jittering on the
+          // waterline with nowhere to run
+          let fdx = dpx / (dp || 1), fdz = dpz / (dp || 1);
+          const cd = Math.hypot(rv.x, rv.z);
+          if (cd > 190) {
+            const k2 = Math.min(1, (cd - 190) / 60);
+            fdx = fdx * (1 - k2) - (rv.x / cd) * k2;
+            fdz = fdz * (1 - k2) - (rv.z / cd) * k2;
+            const fm = Math.hypot(fdx, fdz) || 1; fdx /= fm; fdz /= fm;
+          }
+          rv.tx = rv.x + fdx * 60; rv.tz = rv.z + fdz * 60;
+        }
+        else if (!rv.visiting && (rv.retarget <= 0 || reached)) {
           rv.retarget = rand(2.5, 4);
           let best: RivalEdible | null = null, bd = Infinity;
           for (const e of edibles) {
@@ -331,7 +383,14 @@ export function createRivals(
           }
           if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; rv.tgt = best; }
           else if (rv.name === 'BITSY') { rv.tx = px + rand(-45, 45); rv.tz = pz + rand(-45, 45); rv.tgt = null; }   // the baby follows the player around
-          else { const a3 = rand(0, Math.PI * 2); rv.tx = Math.cos(a3) * rand(40, 170); rv.tz = Math.sin(a3) * rand(40, 170); rv.tgt = null; }
+          else {
+            // idle wander orbits the PLAYER's neighborhood (family sticks with
+            // the outing), falling back inland if that spot is off-island
+            const a3 = rand(0, Math.PI * 2), rr2 = rand(35, 110);
+            rv.tx = px + Math.cos(a3) * rr2; rv.tz = pz + Math.sin(a3) * rr2;
+            if (!biomeAt(rv.tx, rv.tz)) { rv.tx = Math.cos(a3) * rand(40, 150); rv.tz = Math.sin(a3) * rand(40, 150); }
+            rv.tgt = null;
+          }
         }
         // SMOOTHED motion (no more teleporty slides) + coast handling
         const mx = rv.tx - rv.x, mz = rv.tz - rv.z, md = Math.hypot(mx, mz) || 1;
@@ -356,12 +415,13 @@ export function createRivals(
         }
         // ── hole-vs-hole: the danger loop ─────────────────────────────────────
         if (pr > rv.r * 1.2 && dp < pr * 0.95) {
-          // the player swallows this rival whole — out for 6s, respawns small
+          // the player swallows this rival whole — kick off the suck-in
+          // spectacle (spiral + shrink above), out for 6s, respawns small
           const pts = Math.round(100 + rv.r * 40);   // eating a hole is the marquee play
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten));
-          rv.group.visible = rv.halo.visible = false;
-          rv.respawnT = 6; rv.r = START_R; rv.vx = rv.vz = 0;
-          api.onRivalEaten?.(rv.name, pts);
+          rv.halo.visible = false;
+          rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null;
+          api.onRivalEaten?.(rv.name, pts, rv.x, rv.z, rv.r);
           continue;
         }
         if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0) {

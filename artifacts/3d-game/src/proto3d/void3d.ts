@@ -57,14 +57,24 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uStars: { value: whiteTex },    // AI starfield living inside the pit
       uStarAmt: { value: 0 },
       uStage: { value: 0 },
+      uWobble: { value: 0 },          // jelly amplitude — spikes on every eat
     },
     vertexShader: `
       varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
+      uniform float uTime; uniform float uWobble;
       void main(){
         vN = normalize(normalMatrix * normal);
-        vec4 mv = modelViewMatrix * vec4(position,1.0);
+        // FLUID BODY: low-frequency jelly waves ride the surface — a faint
+        // liquid idle so the void never sits static, and a big slosh (uWobble)
+        // every time it absorbs something. The blob visibly digests its meals.
+        float wob =
+            sin(position.y * 3.1 + uTime * 5.0)
+          * sin(position.x * 2.6 - uTime * 4.1)
+          + 0.6 * sin((position.x + position.z) * 4.2 + uTime * 6.3);
+        vec3 pos = position * (1.0 + wob * (0.012 + uWobble * 0.06));
+        vec4 mv = modelViewMatrix * vec4(pos,1.0);
         vView = normalize(-mv.xyz);
-        vObj = position;
+        vObj = pos;
         vUv = uv;
         gl_Position = projectionMatrix * mv;
       }
@@ -89,10 +99,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         // reproduces the 2D canvas radial gradient (radial in screen space).
         float d = clamp(dot(normalize(vN), normalize(vView)), 0.0, 1.0);
         float u = sqrt(max(0.0, 1.0 - d * d));
-        // stops tuned for a soft medium-VIOLET orb with a gently dark core
-        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.32, u));
-        col = mix(col, uMid, smoothstep(0.30, 0.64, u));
-        col = mix(col, uRim, smoothstep(0.62, 1.0, u));
+        // stops tuned CUTE: the dark heart is small, the visible disc reads as
+        // a bright plush purple that lifts quickly toward the lit rim
+        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.18, u));
+        col = mix(col, uMid, smoothstep(0.15, 0.52, u));
+        col = mix(col, uRim, smoothstep(0.55, 1.0, u));
         col *= 1.0;
         // premium skin: wrap the AI texture around the orb (slow drift), keep
         // the darker core + lit rim so it still reads as a VOID
@@ -224,15 +235,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const white = flat(0.21, VOID.sclera);
     sclera.add(white); sclera.add(outline);
     const pupilGrp = new THREE.Group(); pupilGrp.position.z = 1.02;
-    // HD eye: violet iris ring between pupil and sclera (depth without losing
-    // the crisp 2D-cartoon read), then pupil + twin catchlights
-    const iris = new THREE.Mesh(new THREE.RingGeometry(0.112, 0.146, 40),
-      new THREE.MeshBasicMaterial({ color: 0x8a5cf0, transparent: true, opacity: 0.85, depthWrite: false }));
-    iris.position.z = -0.002;
-    const pupil = flat(0.118, VOID.pupil);
-    const catch_ = flat(0.042, 0xffffff); catch_.position.set(-0.036, 0.04, 0.01);
-    const catch2 = flat(0.016, 0xffffff); catch2.position.set(0.03, -0.028, 0.01);
-    pupilGrp.add(iris); pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
+    // KEY-ART eye: clean white sclera + big dark pupil + twin catchlights.
+    // (The old violet iris ring read as a hazy glow over the whole eye — cut.)
+    const pupil = flat(0.128, VOID.pupil);
+    const catch_ = flat(0.046, 0xffffff); catch_.position.set(-0.038, 0.042, 0.01);
+    const catch2 = flat(0.018, 0xffffff); catch2.position.set(0.032, -0.03, 0.01);
+    pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
     face.add(g); eyes.push({ g, sclera, pupilGrp });
@@ -246,7 +254,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // smiling mouth — a crisp torus arc; plus an "open" mouth (dark maw + tongue)
   // that scales in when eating or firing GULP
   const mouth = new THREE.Mesh(
-    new THREE.TorusGeometry(0.22, 0.034, 12, 48, Math.PI),
+    new THREE.TorusGeometry(0.23, 0.04, 12, 48, Math.PI),
     new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }),
   );
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.28, 1.0);
@@ -361,6 +369,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   }
 
   let radius = 4;
+  // AAA growth feel: gameplay radius is the TARGET; what you SEE is a spring
+  // chasing it with a slight underdamp — every meal lands as a visible jiggly
+  // swell-and-settle instead of an imperceptible creep. Big jumps (rematch,
+  // debug warp) snap so the spring never animates across half the island.
+  let dispR = 4, dispV = 0;
+  let wobble = 0;   // jelly slosh amplitude (decays after each eat)
   let stage = 0, ringFade = 0;
   let moveAmt = 0, blinkT = 3 + Math.random() * 3, blink = 0;
   let mouthT = 0, mouthMax = 0;    // open-mouth envelope
@@ -385,6 +399,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
       if (n > stage) {
         evolveT = 0.7;   // celebratory pop on every evolution
+        wobble = 1;      // full-body jelly slosh — the form-change feels physical
         ringBurst = 1;   // ring + orbit stars flare outward
         bodyMat.uniforms.uStage.value = n;
         // each form gets a stronger presence: pupils grow (2D rule), rim/glow
@@ -437,12 +452,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         bodyMat.uniforms.uTexAmt.value = 0;
       }
     },
-    chomp() { if (mouthT < 0.22) { mouthT = 0.22; mouthMax = 0.55; } },
-    animGulp() { mouthT = 0.6; mouthMax = 1; },
-    animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; },
-    animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; },
+    chomp() { if (mouthT < 0.22) { mouthT = 0.22; mouthMax = 0.55; } wobble = Math.min(1, wobble + 0.55); },
+    animGulp() { mouthT = 0.6; mouthMax = 1; wobble = 1; },
+    animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); },
+    animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; },
     update(dt, s) {
       bodyMat.uniforms.uTime.value = s.t;
+
+      // ── FLUID GROWTH: the displayed size springs after the gameplay size ──
+      // slightly underdamped, so each absorb visibly swells the blob past its
+      // new size and jiggles back — you SEE the growth land, hole.io-style
+      if (Math.abs(radius - dispR) > Math.max(1.5, radius * 0.5)) { dispR = radius; dispV = 0; }   // warp/rematch: snap
+      dispV += (radius - dispR) * 46 * dt;
+      dispV *= Math.max(0, 1 - 8.5 * dt);
+      dispR = Math.max(0.2, dispR + dispV * dt);
+      // jelly slosh decays after each meal; a faint idle wave always survives
+      wobble = Math.max(0, wobble - dt * 1.7);
+      bodyMat.uniforms.uWobble.value = wobble;
 
       // evolution rings + glow intensify with the form (rings are a child of the
       // group, which is positioned below; keep them local + centred on the orb)
@@ -451,7 +477,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       ringFade = 0;
       if (ringBurst > 0) ringBurst = Math.max(0, ringBurst - dt * 0.55);
       const flare = 1 + Math.sin(Math.min(1, 1 - ringBurst) * Math.PI) * 0.6;
-      rings.scale.setScalar(radius * flare);
+      rings.scale.setScalar(dispR * flare);
       rings.rotation.y += dt * 0.5;
       orbit.rotation.z += dt * (0.6 + ringBurst * 1.6);
       const fadeEnv = Math.sin(Math.min(1, 1 - ringBurst) * Math.PI);   // in-out
@@ -473,7 +499,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
       // lift so the orb rests partly sunk into the ground; roll-bob while
       // moving — frenzy/victory add a real happy bounce
-      const lift = radius * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3))) * moveAmt * (0.05 + mp.bounce * 0.055));
+      const lift = dispR * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3))) * moveAmt * (0.05 + mp.bounce * 0.055));
       group.position.set(s.x, lift, s.z);
 
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
@@ -500,19 +526,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         const k = Math.sin(Math.max(0, evolveT) / 0.7 * Math.PI * 2) * 0.16 * (evolveT / 0.7);
         stretch += k; squash += k;
       }
-      bob.scale.set(radius * stretch, radius * squash, radius * stretch);
+      bob.scale.set(dispR * stretch, dispR * squash, dispR * stretch);
       bob.rotation.z = THREE.MathUtils.clamp(-s.vx / 520, -0.11, 0.11);
       bob.rotation.x = THREE.MathUtils.clamp(s.vz / 520, -0.11, 0.11);
 
       // face: billboard to camera, scale with the void
-      face.scale.setScalar(radius);
-      face.position.set(0, radius * 0.1, 0);
+      face.scale.setScalar(dispR);
+      face.position.set(0, dispR * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
 
       // X-ray ghost ring: depth-test OFF, so when a tower or tree canopy hides
       // the hero, a faint rim still reads through it — you never lose yourself
-      ghost.scale.setScalar(radius);
-      ghost.position.set(0, radius * 0.1, 0);
+      ghost.scale.setScalar(dispR);
+      ghost.position.set(0, dispR * 0.1, 0);
       ghost.quaternion.copy(camera.quaternion);
 
       // mouth: maw scales in while open, smile hides
@@ -559,12 +585,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       mouth.position.y = mp.mouthY < 0 ? -0.22 : -0.28;   // frowns ride a touch higher
 
       // ground halo + contact track the void on the floor
-      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.2);
-      (halo.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(1.15 - radius * 0.07, 0.5, 1);   // no milky puddle at big R
-      contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(radius * 1.02);
+      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(dispR * 1.2);
+      (halo.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(1.15 - dispR * 0.07, 0.5, 1);   // no milky puddle at big R
+      contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.02);
 
       // bloom sprite hugs the orb (pulses gently, swells with the stage)
-      const bs = radius * Math.max(1.5, 2.0 - stage * 0.1) * (1 + Math.sin(s.t * 1.7) * 0.03);
+      const bs = dispR * Math.max(1.5, 2.0 - stage * 0.1) * (1 + Math.sin(s.t * 1.7) * 0.03);
       bloomSprite.scale.set(bs, bs, 1);
     },
   };

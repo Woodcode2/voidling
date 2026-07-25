@@ -52,7 +52,10 @@ const blockCenter = (g: number) => BLOCK_ORIGIN + STRIDE * g + BLOCK_SIZE / 2;
 export interface HouseLot { x: number; y: number; rot: number; fx: number; fy: number; }  // f = front dir
 export function houseLots(gx: number, gy: number): HouseLot[] {
   const cx = blockCenter(gx), cy = blockCenter(gy);
-  const E = BLOCK_SIZE / 2 - 190;          // lot line inset from the block edge
+  // lot line inset from the block edge. 235 (was 190): the asphalt starts 190
+  // world-units past the lot centre, and wide GLB houses at 190 read as
+  // "sitting in the street" — every lot now sits a full car-length back
+  const E = BLOCK_SIZE / 2 - 235;
   const lots: HouseLot[] = [];
   // dense hole.io-style subdivision: four lots per long row, three per side
   for (const k of [-1.5, -0.5, 0.5, 1.5]) {
@@ -1705,10 +1708,17 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         if (Math.random() < 0.7) place(makeFlowers(), hx + fx3 * 4.4 + sx3 * 2, hz + fz3 * 4.4 + sz3 * 2, 0.7);
         if (Math.random() < 0.7) place(makeMailbox(), hx + fx3 * 7.6 + dvx + sx3, hz + fz3 * 7.6 + dvz + sz3, 1.2);
         if (li % 2 === 0) {   // every other driveway: a parked car (eatable prey that CAN'T run)
-          const pc = makeParkedCar();
-          pc.rotation.y = lot.rot + Math.PI / 2;
-          pc.userData.qk = 'car'; pc.userData.ptsMult = 1.5;
-          place(pc, hx + fx3 * 6.2 + dvx, hz + fz3 * 6.2 + dvz, 2.8);
+          // REAL car mesh (same GLB the traffic drives) — the procedural box-car
+          // is only the offline/LOD stand-in now, never the hero prop
+          const carFB = () => {
+            const c2 = makeParkedCar();
+            c2.userData.qk = 'car'; c2.userData.ptsMult = 1.5;
+            return c2;
+          };
+          glb(scene, addEdible, Math.random() < 0.85 ? 'car_sedan' : 'car_taxi',
+            hx + fx3 * 5.6 + dvx, hz + fz3 * 5.6 + dvz, 2.8,
+            { h: 2.6, rotY: lot.rot + Math.PI / 2, fallback: carFB,
+              onReady: (g2) => { g2.userData.qk = 'car'; g2.userData.ptsMult = 1.5; } });
         }
         // backyard: shed on every third lot, hedge bush otherwise (pool lots
         // stay clear — the water is baked into the ground there)

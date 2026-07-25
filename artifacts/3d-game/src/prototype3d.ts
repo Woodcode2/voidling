@@ -155,21 +155,25 @@ rivals.onSpeak = (x, z, line) => {
   bubbles.say(rivalBubblePos.set(x, 5, z), line, 'event');
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
-rivals.onRivalEaten = (name, pts) => {
+rivals.onRivalEaten = (name, pts, rx, rz, rr) => {
   smugUntil = tClock + 2.4; audio.voice('happy');
   breakingNews(`${name} devoured. family reunion RUINED`);
   playerScore += pts;
   addCoins(15);
   questEvent('rival');
   announceFam(`🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
-  // real PAYOFF: triple shockwave + coin shower float — eating family is the play
-  fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.2, 0.9);
+  // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
+  // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
+  voidling.animGulp();
+  fx.ring(rx, rz, 0xffffff, rr * 5 + 8, 0.8);        // where the family member was…
+  fx.ring(rx, rz, 0xffe08a, rr * 3.4 + 6, 0.65);
+  fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.2, 0.9);   // …and where it went
   fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3, 0.7);
-  fx.shake(5); fx.flash('rgba(184,117,255,0.35)', 0.5);
-  floatPos.set(voidState.x, voidling.radius + 4, voidState.z);
-  bubbles.float(floatPos, '+15✦ FAMILY FEAST!', true);
-  audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
-  buzz(60);
+  fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3); fx.flash('rgba(184,117,255,0.35)', 0.6);
+  floatPos.set(rx, rr + 5, rz);
+  bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
+  audio.bigEat();
+  buzz(80);
 };
 // ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
 let hungryT = -99, hurtUntil = 0, smugUntil = 0, prevMood: Mood = 'cruise';

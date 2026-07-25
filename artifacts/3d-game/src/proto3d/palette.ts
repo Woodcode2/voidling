@@ -9,19 +9,21 @@ const c = (hex: number) => new THREE.Color(hex);
 // The 2D orb is a pit into space: darkest dead-centre, lit violet at the rim.
 // Tuned toward a rich VIOLET purple (the 2D look) rather than blue-indigo.
 export const VOID = {
-  // warmed toward true PURPLE (more red, less indigo) — matches the key art
-  abyss: 0x1c0930,      // gradient centre — deep space core
-  bodyInner: 0x431677,  // inner
-  bodyMid: 0x7030c0,    // mid-body — vivid warm purple
-  bodyRim: 0xa562f2,    // lit warm-violet rim (crisp, high contrast vs core)
-  rimLight: 0xa562f2,   // luminous event-horizon rim
+  // warmed toward true PURPLE (more red, less indigo) — matches the key art.
+  // Brightened: the face-on disc must read MEDIUM purple (cute plush toy),
+  // never near-black — the abyss survives only as a small dark heart.
+  abyss: 0x321253,      // gradient centre — deep space heart (small, not the whole face)
+  bodyInner: 0x6128ad,  // inner — clearly purple even in shade
+  bodyMid: 0x8f4ce6,    // mid-body — vivid warm purple
+  bodyRim: 0xb678ff,    // lit warm-violet rim (crisp, high contrast vs core)
+  rimLight: 0xb678ff,   // luminous event-horizon rim
   glow: 0xb875ff,       // warm amethyst aura
   swirl: 0xd4b2ff,      // faint interior swirl arcs
   star: 0xffffff,       // interior star specks
   pupil: 0x160a30,
   sclera: 0xffffff,
   blush: 0xff7da8,
-  mouth: 0x1a0b33,
+  mouth: 0x4a1a68,      // warm dark plum smile — reads friendly, never a black slit
   spark: 0xfff0c8,      // warm-white companion spark
 };
 
@@ -85,7 +87,7 @@ export interface Skin {
   streak?: number;                                 // unlock by daily play streak
 }
 export const SKINS: Skin[] = [
-  { id: 'classic', name: 'Classic', abyss: 0x1c0930, inner: 0x431677, mid: 0x7030c0, rim: 0xa562f2, glow: 0xb875ff },
+  { id: 'classic', name: 'Classic', abyss: 0x321253, inner: 0x6128ad, mid: 0x8f4ce6, rim: 0xb678ff, glow: 0xb875ff },
   { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
   { id: 'wizard', name: 'Violet', abyss: 0x1c1038, inner: 0x45308a, mid: 0x6a4ab8, rim: 0xa888e8, glow: 0xc9a6ff },
   { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a },
