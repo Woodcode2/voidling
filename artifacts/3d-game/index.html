@@ -179,19 +179,31 @@
           radial-gradient(circle, rgba(216,200,255,0.55) 0.5px, transparent 1px);
         background-size: 210px 190px, 120px 140px;
         background-position: 12px 8px, 60px 90px; }
-      #menuOrb { width: min(58vw, 300px); aspect-ratio: 1; margin: 8px auto 4px; position: relative;
-        animation: orbFloat 3.6s ease-in-out infinite; filter: drop-shadow(0 22px 40px rgba(0,0,0,0.5)); }
-      @keyframes orbFloat { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.02); } }
-      @media (orientation: portrait) {
-        #menu .spacer { flex: 0.5; }
+      /* key art on its own feathered layer — the island, waterfall and the
+         void's face melt into the cosmos with no hard photo edges */
+      #menu::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+        background: url('/assets/splash_hero.webp') center 8.5vh / auto 64vh no-repeat; }
+      @media (max-width: 480px) {
+        #menu::after { background-image: url('/assets/splash_hero_sm.webp'); }
       }
+      @media (orientation: landscape) {
+        #menu::after { background-size: auto 88vh; background-position: center 0; }
+      }
+      #menu > * { position: relative; z-index: 1; }
+      @media (orientation: portrait) {
+        #menu .foot { margin-top: 8px; }
+        .navRow { margin-top: 10px; }
+        #btnSolo { margin-top: 9px; }
+        #btnPlay { padding: 14px 64px; }
+      }
+      #menuOrb { display: none; }
       #menu .logo { font-size: clamp(52px, 9vw, 84px); font-weight: 900; letter-spacing: 3px; color: #fff;
         text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
       #menu .tag { font-size: clamp(11px, 1.6vw, 15px); font-weight: 800; letter-spacing: 7px; color: #d8c2ff; margin-top: 2px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
       #menu .spacer { flex: 1; }   /* the key-art hero shows through here */
       /* world select — compact launcher button (hole.io pattern), cards in a modal */
-      #btnWorlds { display: flex; align-items: center; gap: 9px; margin: 0 auto 12px; cursor: pointer;
+      #btnWorlds { display: flex; align-items: center; gap: 9px; margin: 10px auto 0; cursor: pointer;
         background: rgba(28,12,52,0.72); border: 2px solid rgba(255,210,90,0.55); border-radius: 14px;
         color: #fff; font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px;
         padding: 10px 18px; box-shadow: 0 0 16px rgba(184,117,255,0.3); }
@@ -256,8 +268,10 @@
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
       /* loading screen — PLAY holds here until the asset pack is resident */
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
-        justify-content: center; gap: 13px;
-        background: radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
+        justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
+        background:
+          url('/assets/splash_hero_sm.webp') center 4vh / auto 78vh no-repeat,
+          radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
       #loadScr.show { display: flex; }
       #loadScr .lLogo { font-size: 30px; font-weight: 900; letter-spacing: 3px; color: #fff; text-shadow: 0 0 24px #b875ff; }
       #loadScr .lName { font-size: 14px; letter-spacing: 6px; color: #ffd23f; font-weight: 800; }
@@ -416,6 +430,7 @@
       <div class="logo">VOIDLING</div>
       <div class="tag">THE CUTE WORLD ENDER</div>
       <div id="rankChip"></div>
+      <button id="btnWorlds"><i>🏝️</i> MAPLE ISLE <span>WORLD 1 OF 3</span><b>›</b></button>
       <div class="spacer"></div>
       <div id="menuOrb"><svg viewBox="0 0 200 200" width="100%" height="100%">
         <defs>
@@ -437,7 +452,6 @@
         <ellipse cx="140" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
         <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
       </svg></div>
-      <button id="btnWorlds"><i>🏝️</i> MAPLE ISLE <span>WORLD 1 OF 3</span><b>›</b></button>
       <button id="btnPlay">PLAY<span>vs the family · 3:00 · MAPLE ISLE</span></button>
       <button id="btnSolo">SOLO RUN<span>no rivals · 2:00 · devour 100%</span></button>
       <div class="navRow">

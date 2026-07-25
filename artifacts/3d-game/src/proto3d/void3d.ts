@@ -111,7 +111,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         neb = smoothstep(0.45, 0.85, neb);
         col += mix(uInner, uSwirl, 0.6) * neb * (1.0 - u) * 0.35;
         // luminous event-horizon rim-light — intensifies with each evolution
-        col += uRim * pow(u, 3.8) * (0.3 + uStage * 0.05);
+        col += uRim * pow(u, 3.2) * (0.36 + uStage * 0.05);
         // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
         // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
         vec3 iri = mix(uRim, vec3(1.0, 0.62, 0.9), 0.5 + 0.5 * sin(ang * 3.0 + uTime * 0.8));
@@ -183,6 +183,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: softRadialTex(256, 0.3, 0.1, 30), color: VOID.glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
   bloomSprite.renderOrder = -1;   // behind the body
   group.add(bloomSprite);
+  // X-ray ghost ring (see update): only visibly appears where the body is occluded
+  const ghost = new THREE.Mesh(new THREE.RingGeometry(0.96, 1.05, 48),
+    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.22, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+  ghost.renderOrder = 999;
+  group.add(ghost);
 
   // ── ground halo + contact shadow, in scene-floor space ─────────────────────
   // ground halo: a soft radial-gradient colour stain (NOT a hard bright disc)
@@ -345,12 +350,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const ringMats: THREE.MeshBasicMaterial[] = [];
   {
     const rm = new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-    const rg = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.016, 8, 96), rm);
+    const rg = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.03, 8, 96), rm);
     rg.rotation.x = Math.PI / 2 - 0.5;
     rings.add(rg); ringMats.push(rm);
     // faint companion band just outside — subtle depth, same crispness
     const rm2 = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-    const rg2 = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.008, 8, 96), rm2);
+    const rg2 = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.014, 8, 96), rm2);
     rg2.rotation.x = Math.PI / 2 - 0.5;
     rings.add(rg2); ringMats.push(rm2);
   }
@@ -522,6 +527,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       face.position.set(0, radius * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
 
+      // X-ray ghost ring: depth-test OFF, so when a tower or tree canopy hides
+      // the hero, a faint rim still reads through it — you never lose yourself
+      ghost.scale.setScalar(radius);
+      ghost.position.set(0, radius * 0.1, 0);
+      ghost.quaternion.copy(camera.quaternion);
+
       // mouth: maw scales in while open, smile hides
       if (mouthT > 0) mouthT -= dt;
       const mo = mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0;
@@ -545,7 +556,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(radius * 1.02);
 
       // bloom sprite hugs the orb (pulses gently, swells with the stage)
-      const bs = radius * (2.0 + stage * 0.14) * (1 + Math.sin(s.t * 1.7) * 0.03);
+      const bs = radius * Math.max(1.5, 2.0 - stage * 0.1) * (1 + Math.sin(s.t * 1.7) * 0.03);
       bloomSprite.scale.set(bs, bs, 1);
     },
   };

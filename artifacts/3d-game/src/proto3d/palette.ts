@@ -31,15 +31,15 @@ export const WORLD = {
   haloFar: 0x7b4fe0,     // wide violet energy halo off the island edge
   haloNear: 0xa87bff,    // brighter inner violet halo
   rimWhite: 0xffffff,    // island white "sticker" rim + surf foam
-  cliff: 0x6b5b73,       // island cliff band
+  cliff: 0x574a63,       // island cliff band
   // deepened toward the 2D COMPOSITE (flat colour + soft-light grass wash) so
   // the world reads rich, not pastel-washed
-  meadow: 0x82c565,      // base grass
-  park: 0x94d878,        // park grass (brighter)
+  meadow: 0x74c352,      // base grass
+  park: 0x86d766,        // park grass (brighter)
   forest: 0x67b25c,      // forest ground
   sand: 0xf6e3a4,        // beach sand
-  pavement: 0xefeff4,    // plaza / sidewalk
-  road: 0x767e9a,        // asphalt (cool lavender-gray)
+  pavement: 0xe4e4ec,    // plaza / sidewalk
+  road: 0x6b7292,        // asphalt (cool lavender-gray)
   roadLine: 0xdce3ee,    // lane paint
   waterShallow: 0x7fd4e8,
   waterDeep: 0x5bb8d4,

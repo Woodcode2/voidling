@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid } from './proto3d/void3d';
-import { createIsland } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3 } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -56,8 +56,9 @@ const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the
 // dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
 
 // ── lighting ─────────────────────────────────────────────────────────────────
-scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a5a80, 0.7));
-const sun = new THREE.DirectionalLight(0xfff2d8, 1.55);
+const hemi = new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.5);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d8, 1.75);
 const sunOff = new THREE.Vector3(-55, 95, 42);
 sun.position.copy(sunOff);
 sun.castShadow = true;
@@ -70,6 +71,7 @@ sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.15;
 const SUN_DAY = new THREE.Color(0xfff2d8), SUN_DUSK = new THREE.Color(0xffc07a);
+const HEMI_DAY = new THREE.Color(0xdfeaff), HEMI_DUSK = new THREE.Color(0xffd9b0);
 // the shadow frustum rides the camera: tight box up close = crisp tree
 // shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
 function fitShadow(dist: number) {
@@ -117,6 +119,8 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 function addEdible(mesh: THREE.Object3D, radius: number) {
   // remember where everything LIVES — instant rematch restores the island
   // in-place instead of a full page reload (hole.io's <2s "one more go" loop)
+  mesh.userData.eRadius = radius;   // gameplay size, readable by rivals/validators
+  if (radius >= 2.5 && !mesh.userData.mover) mesh.userData.building = true;   // building-class: may NEVER be translated by FX
   edibles.push({ mesh, radius, eaten: false, t: 0, orbit: 0, orbitR: 0, spin: new THREE.Vector3(),
     home: mesh.position.clone(), homeScale: mesh.scale.clone(), homeRotY: mesh.rotation.y });
 }
@@ -592,6 +596,12 @@ function capture(e: Edible, giveHunger = true) {
   playerScore += pts;
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
+  // a building-sized bite lands with a ground shockwave + dust — seismic,
+  // but deliberately NO camera shake (kids found the shake unpleasant)
+  if (e.radius > 2) {
+    fx.ring(e.mesh.position.x, e.mesh.position.z, 0xb875ff, e.radius * 3, 0.45);
+    spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6);
+  }
   voidling.chomp();
   stats.eaten++;
   if (guideStep === 1 && stats.eaten > 2) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
@@ -686,6 +696,7 @@ function showGuide(text: string, dur = 5) {
   guideT = dur;
 }
 function beginMatch(solo = false) {
+  validateWorld();   // covers late async-registered GLB props on every start
   soloMode = solo;
   matchLen = solo ? 120 : MATCH_LEN;
   matchClock = matchLen;
@@ -766,6 +777,62 @@ document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('clic
 el('btnWorlds').addEventListener('click', () => el('worlds').classList.add('show'));
 el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
+// ── world integrity: NOTHING stands on asphalt, ever ─────────────────────────
+// Footprint-aware post-build sweep. Runs at every match start (so props that
+// registered asynchronously from GLB loads are covered too): any prop whose
+// real bounding box overlaps a road lane is pushed to the nearest legal spot
+// beside the road; if no legal spot exists it is retired from the match.
+const ASPHALT_HALF = 2.75;
+const _vBox = new THREE.Box3(); const _vSz = new THREE.Vector3();
+let _validated = false;   // homes are canonical after the first pass — later passes are cheap re-checks of new props
+function validateWorld() {
+  let moved = 0;
+  const cull: number[] = [];
+  for (let i = 0; i < edibles.length; i++) {
+    const e = edibles[i];
+    const ud = e.mesh.userData;
+    if (ud.mover || ud.vChecked) continue;   // movers steer themselves; checked props are settled
+    ud.vChecked = true;
+    _vBox.setFromObject(e.mesh); _vBox.getSize(_vSz);
+    // buildings get a tighter test (0.45) — downtown street walls legitimately
+    // hug the sidewalk and must not be "corrected" away from their block face
+    const f = ud.building ? 0.45 : 0.7;
+    const hx = (Math.min(_vSz.x, 24) / 2) * f, hz = (Math.min(_vSz.z, 24) / 2) * f;
+    let px = e.home.x, pz = e.home.z, dirty = false, dead = false;
+    for (const rc of ROAD_CENTERS_3D) {
+      if (Math.abs(px - rc) < ASPHALT_HALF + hx) {   // straddles a vertical road lane
+        const off = ASPHALT_HALF + hx + 0.4;
+        const side = px >= rc ? 1 : -1;
+        if (insideIsland3(rc + side * off, pz) && !inLagoon3(rc + side * off, pz)) { px = rc + side * off; dirty = true; }
+        else if (insideIsland3(rc - side * off, pz) && !inLagoon3(rc - side * off, pz)) { px = rc - side * off; dirty = true; }
+        else { dead = true; break; }
+      }
+      if (Math.abs(pz - rc) < ASPHALT_HALF + hz) {   // straddles a horizontal road lane
+        const off = ASPHALT_HALF + hz + 0.4;
+        const side = pz >= rc ? 1 : -1;
+        if (insideIsland3(px, rc + side * off) && !inLagoon3(px, rc + side * off)) { pz = rc + side * off; dirty = true; }
+        else if (insideIsland3(px, rc - side * off) && !inLagoon3(px, rc - side * off)) { pz = rc - side * off; dirty = true; }
+        else { dead = true; break; }
+      }
+    }
+    if (dead) { cull.push(i); continue; }
+    if (dirty) {
+      e.home.x = px; e.home.z = pz;
+      e.mesh.position.x = px; e.mesh.position.z = pz;
+      moved++;
+    }
+  }
+  // retire the unfixable entirely — out of the scene AND the mass ledger, so
+  // %devoured stays honest
+  for (let k = cull.length - 1; k >= 0; k--) {
+    const e = edibles[cull[k]];
+    scene.remove(e.mesh);
+    edibles.splice(cull[k], 1);
+  }
+  if ((moved || cull.length) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired`);
+  _validated = true;
+}
+
 function resetMatch() {
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
@@ -777,7 +844,9 @@ function resetMatch() {
     // magnet drift + topple mean EVERYTHING goes back to its surveyed home
     e.mesh.position.copy(e.home);
     e.mesh.scale.copy(e.homeScale);
-    e.mesh.rotation.set(0, e.homeRotY, 0);
+    // sunbathers lie down (rot.x = -π/2) — restoring plain (0, y, 0) stood
+    // every bather up at towel height after a rematch
+    e.mesh.rotation.set(e.mesh.userData.homeRotX ?? 0, e.homeRotY, e.mesh.userData.homeRotZ ?? 0);
   }
   rivals.reset();
   defense.reset();
@@ -789,6 +858,7 @@ function resetMatch() {
   renderQuests();
   ended = false;
   sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.08; outroT = 0;
+  hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0);
   el('end').classList.remove('show');
   timerEl.style.color = '';
   beginMatch(soloMode);
@@ -1150,9 +1220,23 @@ function animate() {
       if (e.t >= 1) { spawnPuff(voidState.x, cy, voidState.z, 6); scene.remove(e.mesh); e.eaten = false; e.mesh.visible = false; }
       continue;
     }
-    if (!e.mesh.visible) continue;
+    if (!e.mesh.visible || e.mesh.userData.eaten) continue;   // a rival owns it — never double-eat
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
+    const reach = R * 1.7 + e.radius * 2.4;
+    const inWell = d < reach && e.radius < 2.5 && !e.mesh.userData.mover && e.radius <= R * EAT_RATIO;
+    // spring-back runs FIRST, unconditionally: if a rival bite shrank us while
+    // this prop was displaced, the old size-gated flow stranded it on the
+    // asphalt forever — displaced props ALWAYS walk home when out of the well
+    if (!inWell && e.mesh.userData.drifted) {
+      const hx2 = e.home.x - e.mesh.position.x, hz2 = e.home.z - e.mesh.position.z;
+      if (Math.hypot(hx2, hz2) < 0.1) { e.mesh.position.x = e.home.x; e.mesh.position.z = e.home.z; e.mesh.rotation.z = 0; e.mesh.userData.drifted = false; }
+      else {
+        const k2 = Math.min(1, dt * 3);
+        e.mesh.position.x += hx2 * k2; e.mesh.position.z += hz2 * k2;
+        e.mesh.rotation.z *= 1 - k2;
+      }
+    }
     if (e.radius > R * EAT_RATIO) {
       // too big to eat yet — 2D rule: you pass through, it SHAKES (no weird block)
       if (d < R + e.radius * 0.7 && !(e.mesh.userData.shakeT > 0)) e.mesh.userData.shakeT = 0.45;
@@ -1160,28 +1244,15 @@ function animate() {
     }
     if (d < R + e.radius * 0.5) {
       capture(e);
-    } else {
-      // MAGNET: the void's gravity well scales with its size — anything
-      // edible inside ~1.7R visibly drifts in (hole.io's suction fantasy)
-      const reach = R * 1.7 + e.radius * 2.4;
-      if (d < reach && e.radius < 2.5) {   // suction is for PROPS — buildings stay founded
-        const pull = (1 - d / reach) * (3.2 + R * 0.55);
-        e.mesh.position.x -= (dx / d) * dt * pull;
-        e.mesh.position.z -= (dz / d) * dt * pull;
-        if (e.radius < 2.5) e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);   // small things lean in (a leaning HOUSE reads broken)
-        e.mesh.userData.drifted = true;
-      } else if (e.mesh.userData.drifted) {
-        // you moved on without eating it — it springs back to its surveyed home
-        // (no more flowers and bins stranded in the middle of the street)
-        const hx2 = e.home.x - e.mesh.position.x, hz2 = e.home.z - e.mesh.position.z;
-        const hd = Math.hypot(hx2, hz2);
-        if (hd < 0.1) { e.mesh.position.x = e.home.x; e.mesh.position.z = e.home.z; e.mesh.rotation.z = 0; e.mesh.userData.drifted = false; }
-        else {
-          const k2 = Math.min(1, dt * 3);
-          e.mesh.position.x += hx2 * k2; e.mesh.position.z += hz2 * k2;
-          e.mesh.rotation.z *= 1 - k2;
-        }
-      }
+    } else if (inWell) {
+      // MAGNET: the void's gravity well scales with its size — small PROPS
+      // drift in (hole.io's suction fantasy). Buildings stay founded; walkers,
+      // cars and critters steer themselves and are never magnetized.
+      const pull = (1 - d / reach) * (3.2 + R * 0.55);
+      e.mesh.position.x -= (dx / d) * dt * pull;
+      e.mesh.position.z -= (dz / d) * dt * pull;
+      e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);
+      e.mesh.userData.drifted = true;
     }
   }
 
@@ -1228,9 +1299,15 @@ function animate() {
     _chipV.set(voidState.x, 0, voidState.z).project(camera);
     formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
     formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + R * 9 + 30}px`;
+    // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
+    // so towers and trees stop hiding the hero
+    const steep = THREE.MathUtils.clamp((R - 2.5) / 5.5, 0, 1);
+    camOffset.set(0.62 + (0.45 - 0.62) * steep, 0.92 + (1.4 - 0.92) * steep, 0.62 + (0.45 - 0.62) * steep).normalize();
     tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
     camera.position.lerp(tmpV, 1 - Math.exp(-3.2 * dt));
     camera.lookAt(voidState.x, R * 0.5, voidState.z);
+    // fog rides the zoom: distance melts into cosmos = instant diorama depth
+    if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }
   // sun follows the void so shadows stay crisp near the action
   sun.position.set(voidState.x + sunOff.x, sunOff.y, voidState.z + sunOff.z);
@@ -1316,6 +1393,12 @@ function animate() {
     const gk = 1 - Math.max(0, matchClock) / 45;
     sun.color.lerpColors(SUN_DAY, SUN_DUSK, gk);
     renderer.toneMappingExposure = 1.08 + gk * 0.08;
+    // full golden hour: warm sky fill drops, nebula dims, windows + lamps
+    // light up across the island — the last 45 seconds LOOK like a finale
+    hemi.color.lerpColors(HEMI_DAY, HEMI_DUSK, gk);
+    hemi.intensity = 0.5 - gk * 0.12;
+    scene.backgroundIntensity = 0.55 - gk * 0.17;
+    island.setDusk(gk);
   }
   if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);

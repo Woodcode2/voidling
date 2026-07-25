@@ -16,6 +16,7 @@ export interface Island {
   spawn: { x: number; z: number };
   biomeAt(x: number, z: number): Biome | null;
   update(dt: number, t: number): void;
+  setDusk(k: number): void;   // 0 = midday, 1 = full golden hour
   W: number;  // 3D world helper (world units -> 3D)
 }
 
@@ -193,8 +194,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
     const grd = g.createRadialGradient(256, 256, 120, 256, 256, 256);
-    grd.addColorStop(0, 'rgba(168,123,255,0.55)');
-    grd.addColorStop(0.55, 'rgba(123,79,224,0.28)');
+    grd.addColorStop(0, 'rgba(168,123,255,0.30)');
+    grd.addColorStop(0.55, 'rgba(123,79,224,0.14)');
     grd.addColorStop(1, 'rgba(123,79,224,0)');
     g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
     const tex = new THREE.CanvasTexture(cv);
@@ -306,7 +307,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     if (b === 'downtown') {
       // asphalt service court behind the street walls
       const ch = BLOCK_SIZE * 0.27;
-      g.fillStyle = '#dcdce6';
+      g.fillStyle = '#d4d4e0';
       g.fillRect(pxW(cxB - ch), pyW(cyB - ch), pxW(cxB + ch) - pxW(cxB - ch), pyW(cyB + ch) - pyW(cyB - ch));
       g.strokeStyle = 'rgba(90,100,130,0.25)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
       g.strokeRect(pxW(cxB - ch), pyW(cyB - ch), pxW(cxB + ch) - pxW(cxB - ch), pyW(cyB + ch) - pyW(cyB - ch));
@@ -323,7 +324,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         const off = ((a / 640) % 2 ? 1 : -1) * 30;
         for (const [mx, my] of [[a, c + off], [c + off, a]] as const) {
           if (!insideIslandWorld(mx, my)) continue;
-          g.fillStyle = 'rgba(50,55,72,0.85)';
+          g.fillStyle = 'rgba(50,55,72,0.7)';
           g.beginPath(); g.arc(pxW(mx), pyW(my), mR, 0, Math.PI * 2); g.fill();
           g.strokeStyle = 'rgba(190,196,214,0.55)'; g.lineWidth = Math.max(1, mR * 0.22);
           g.beginPath(); g.arc(pxW(mx), pyW(my), mR * 0.66, 0, Math.PI * 2); g.stroke();
@@ -334,10 +335,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     // the junction, pointing at it (right-hand traffic)
     const arrow = (wx: number, wy: number, dirX: number, dirY: number) => {
       if (!insideIslandWorld(wx, wy)) return;
-      const axp = pxW(wx), ayp = pyW(wy), u = pxW(16) - pxW(0);
+      const axp = pxW(wx), ayp = pyW(wy), u = pxW(10) - pxW(0);
       const ang = Math.atan2(dirY, dirX);
       g.save(); g.translate(axp, ayp); g.rotate(ang);
-      g.fillStyle = 'rgba(240,244,252,0.85)';
+      g.fillStyle = 'rgba(240,244,252,0.6)';
       g.fillRect(-u * 2.4, -u * 0.5, u * 2.8, u);
       g.beginPath(); g.moveTo(u * 0.4, -u * 1.4); g.lineTo(u * 2.4, 0); g.lineTo(u * 0.4, u * 1.4); g.closePath(); g.fill();
       g.restore();
@@ -380,7 +381,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       const yx = lot.x - (lot.fx !== 0 ? lot.fx * (yd / 2 - frontClear) : 0);
       const yy = lot.y - (lot.fy !== 0 ? lot.fy * (yd / 2 - frontClear) : 0);
       const rw = lot.fy !== 0 ? yw : yd, rh = lot.fy !== 0 ? yd : yw;
-      g.fillStyle = 'rgba(255,255,255,0.10)';
+      g.fillStyle = 'rgba(210,245,170,0.16)';
       g.fillRect(pxW(yx - rw / 2), pyW(yy - rh / 2), pxW(yx + rw / 2) - pxW(yx - rw / 2), pyW(yy + rh / 2) - pyW(yy - rh / 2));
       g.strokeStyle = 'rgba(70,110,60,0.18)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
       g.strokeRect(pxW(yx - rw / 2), pyW(yy - rh / 2), pxW(yx + rw / 2) - pxW(yx - rw / 2), pyW(yy + rh / 2) - pyW(yy - rh / 2));
@@ -407,7 +408,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       const bx = lot.x - lot.fx * (frontClear + 240), by = lot.y - lot.fy * (frontClear + 240);
       g.fillStyle = 'rgba(126,213,122,0.75)';
       g.fillRect(pxW(bx - 130), pyW(by - 130), pxW(260) - pxW(0), pxW(260) - pxW(0));
-      g.fillStyle = 'rgba(226,216,206,0.4)';   // soft warm patio slab
+      g.fillStyle = 'rgba(226,216,206,0.22)';   // soft warm patio slab
       g.fillRect(pxW(bx + 40 * (li % 2 ? 1 : -1) - 55), pyW(by - 55), pxW(110) - pxW(0), pxW(110) - pxW(0));
       // pool (fancy lots, deterministic — matches populate's clutter exclusion)
       const pool = lotPool(b, li, lot);
@@ -456,11 +457,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     for (const s of [-1, 1]) {
       g.fillStyle = hex(WORLD.park);
       g.fillRect(pxW(pcx + s * 330 - 190), pyW(4780), pxW(380) - pxW(0), pyW(5560) - pyW(4780));
-      g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(1.5, pxW(16) - pxW(0));
+      g.strokeStyle = 'rgba(140,165,130,0.5)'; g.lineWidth = Math.max(1.5, pxW(16) - pxW(0));
       g.strokeRect(pxW(pcx + s * 330 - 190), pyW(4780), pxW(380) - pxW(0), pyW(5560) - pyW(4780));
     }
     // ceremonial walkway: town hall → fountain
-    g.fillStyle = '#e6e2ee';
+    g.fillStyle = '#ddd6ea';
     g.fillRect(pxW(pcx - 100), pyW(4520), pxW(200) - pxW(0), pyW(5145) - pyW(4520));
     g.strokeStyle = 'rgba(122,79,224,0.25)'; g.lineWidth = Math.max(1.5, pxW(12) - pxW(0));
     g.strokeRect(pxW(pcx - 100), pyW(4520), pxW(200) - pxW(0), pyW(5145) - pyW(4520));
@@ -499,7 +500,15 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     for (const rc2 of [2580, 4290, 6000, 7710]) {
       g.beginPath(); g.moveTo(pxW(rc2), pyW(bwY0 - 20)); g.lineTo(pxW(rc2), pyW(bwY1 + 20)); g.stroke();
     }
-    // towels: bright rounded rects angled on the sand
+    // sun-baked sand: warm mottling so the strip doesn't read as one flat slab
+    for (let i = 0; i < 1400; i++) {
+      const mx = 1100 + Math.random() * 7900, my = 9700 + Math.random() * 1050;
+      if (!insideIslandWorld(mx, my)) continue;
+      g.fillStyle = i % 3 ? 'rgba(230,200,140,0.22)' : 'rgba(255,255,255,0.07)';
+      const mr = (pxW(10) - pxW(0)) * (0.5 + Math.random());
+      g.beginPath(); g.arc(pxW(mx), pyW(my), mr, 0, Math.PI * 2); g.fill();
+    }
+    // towels: bright rounded rects angled on the sand, each with a sun shadow
     const towelCols = ['#ff6a5e', '#4db07a', '#4d7de8', '#f0c050', '#f06fb0', '#5ec8d8'];
     for (let i = 0; i < 34; i++) {
       const twx = 1100 + Math.random() * 7900, twy = 9760 + Math.random() * 900;
@@ -507,6 +516,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       if ([2580, 4290, 6000, 7710].some((rc2) => Math.abs(twx - rc2) < 180)) continue;   // not on the beach roads
       if (Math.hypot(twx - LAGOON.x, (twy - LAGOON.y) * 1.35) < LAGOON.rx + 160) continue;
       g.save(); g.translate(pxW(twx), pyW(twy)); g.rotate(Math.random() * 0.8 - 0.4);
+      // offset shadow first (sun from NW — matches the 3D sun)
+      g.fillStyle = 'rgba(90,70,40,0.18)';
+      g.fillRect(-(pxW(55) - pxW(0)) + (pxW(14) - pxW(0)), -(pxW(90) - pxW(0)) + (pxW(16) - pxW(0)), pxW(110) - pxW(0), pxW(180) - pxW(0));
       g.fillStyle = towelCols[i % towelCols.length];
       g.fillRect(-(pxW(55) - pxW(0)), -(pxW(90) - pxW(0)), pxW(110) - pxW(0), pxW(180) - pxW(0));
       g.fillStyle = 'rgba(255,255,255,0.55)';
@@ -741,7 +753,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.beginPath(); g.moveTo(px(sil3[0].x), py(sil3[0].y));
   for (const p of sil3) g.lineTo(px(p.x), py(p.y));
   g.closePath(); g.stroke();
-  g.strokeStyle = '#ffffff'; g.lineWidth = TEX * 0.008;
+  g.strokeStyle = '#ffffff'; g.lineWidth = TEX * 0.011;
   g.beginPath(); g.moveTo(px(sil3[0].x), py(sil3[0].y));
   for (const p of sil3) g.lineTo(px(p.x), py(p.y));
   g.closePath(); g.stroke();
@@ -792,7 +804,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     shader.uniforms.uDetail = { value: detailTex };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\n{ vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb; vec3 g2 = texture2D(uDetail, vMapUv * 34.0).rgb; diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, 0.45) * mix(vec3(1.0), g2 * 2.0, 0.18); }');
+      .replace('#include <map_fragment>', '#include <map_fragment>\n{ vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb; vec3 g2 = texture2D(uDetail, vMapUv * 34.0).rgb; diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, 0.45) * mix(vec3(1.0), g2 * 2.0, 0.08); }');
   };
   const top = new THREE.Mesh(topGeo, groundMat);
   top.rotation.x = -Math.PI / 2;   // shape XY -> world XZ (shape.y -> world -z)
@@ -814,10 +826,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     const wallGeo = new THREE.BufferGeometry();
     wallGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     wallGeo.computeVertexNormals();
-    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: 0.75 }));
+    const wall = new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({ color: WORLD.cliff, roughness: 1, flatShading: true, side: THREE.DoubleSide, emissive: 0x3a2a4e, emissiveIntensity: 0.3 }));
     scene.add(wall);
     // underside cap
-    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x2a2140, roughness: 1, side: THREE.DoubleSide }));
+    const cap = new THREE.Mesh(topGeo.clone(), new THREE.MeshStandardMaterial({ color: 0x1c1636, roughness: 1, side: THREE.DoubleSide }));
     cap.rotation.x = -Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
   }
 
@@ -916,6 +928,12 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     spawn,
     biomeAt,
     W: SCALE,
+    setDusk(k) {
+      // golden hour: every streetlamp and house window on the island lights up
+      // (two shared materials — two uniform writes, whole-island payoff)
+      lampHeadMat.emissiveIntensity = 0.8 + k * 1.0;
+      winGlassMatShared.emissiveIntensity = 0.25 + k * 0.75;
+    },
     update(dt, t) {
       wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1;
       (spray.material as THREE.MeshBasicMaterial).opacity = 0.42 + Math.sin(t * 3) * 0.08;
@@ -977,9 +995,9 @@ function makeHouse(): THREE.Group {
   doorG.add(frame); doorG.add(door); doorG.add(step);
   doorG.scale.set(1.2, 1.3, 1);   // people are ~3.4u tall — doors must beat them
   doorG.position.set(wWall * rand(-0.14, 0.14), 0, d / 2 + 0.02); grp.add(doorG);
-  // two front windows with white frames + warm glass
-  const winFrameMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
-  const winGlassMat = new THREE.MeshStandardMaterial({ color: 0xffe9b8, roughness: 0.4, emissive: 0xffd98a, emissiveIntensity: 0.25 });
+  // two front windows with white frames + warm glass (shared: dusk lights them)
+  const winFrameMat = winFrameMatShared;
+  const winGlassMat = winGlassMatShared;
   for (const sx of [-0.28, 0.28]) {
     const wf = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.15, 0.1), winFrameMat);
     wf.position.set(wWall * sx, h * 0.58, d / 2 + 0.02);
@@ -1054,7 +1072,10 @@ function facadeMat(wall: number, warm: boolean): THREE.MeshStandardMaterial {
   if (!m) { m = new THREE.MeshStandardMaterial({ map: facadeTex(wall, warm), roughness: 0.65 }); sideMatCache.set(key, m); }
   return m;
 }
-const capMatShared = new THREE.MeshStandardMaterial({ color: 0x565e74, roughness: 0.8 });
+// roof caps come in a small family of tints — one shared slate cap made the
+// big-void aerial view read as a parking-garage roofscape
+const capMats = [0x565e74, 0x606a85, 0x6e6280, 0x4f5a6e, 0x746a70].map((c2) => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.8 }));
+const capMatShared = capMats[0];
 const acMatShared = new THREE.MeshStandardMaterial({ color: 0x9aa3b2, roughness: 0.8 });
 const tankMatShared = new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.4, roughness: 0.5 });
 const awningMats = [0xe8604d, 0x4db07a, 0x4d7de8, 0xf0c050, 0xf06fb0].map((c2) => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.7 }));
@@ -1064,15 +1085,15 @@ function makeRowBuilding(wB: number, d: number, h: number): THREE.Group {
   const sides = new THREE.Mesh(facadeBoxGeo(wB, h, d), facadeMat(pick(PROPS.tower), Math.random() < 0.5));
   grp.add(sides);
   // roof slab doubles as a parapet lip
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(wB + 0.36, 0.8, d + 0.36), capMatShared);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(wB + 0.36, 0.8, d + 0.36), pick(capMats));
   cap.position.y = h - 0.15; grp.add(cap);
   // roof clutter: AC unit, or a water tower on taller stock
-  if (h > 13 && Math.random() < 0.4) {
+  if (h > 13 && Math.random() < 0.6) {
     const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 2.2, 8), tankMatShared);
     tank.position.set(rand(-wB * 0.2, wB * 0.2), h + 1.7, rand(-d * 0.2, d * 0.2)); grp.add(tank);
     const cone = new THREE.Mesh(new THREE.ConeGeometry(1.35, 0.8, 8), capMatShared);
     cone.position.set(tank.position.x, h + 3.2, tank.position.z); grp.add(cone);
-  } else if (Math.random() < 0.7) {
+  } else if (Math.random() < 0.9) {
     const ac = new THREE.Mesh(new THREE.BoxGeometry(rand(1.2, 2), 0.9, rand(1.2, 2)), acMatShared);
     ac.position.set(rand(-wB * 0.25, wB * 0.25), h + 0.7, rand(-d * 0.25, d * 0.25)); grp.add(ac);
   }
@@ -1098,7 +1119,7 @@ function makeTower(tall = false): THREE.Group {
   const wall = pick(PROPS.tower);
   const tex = facadeTex(wall, Math.random() < 0.6);
   const side = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 });
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x4a5670, roughness: 0.75 });
+  const capMat = pick(capMats);
   // podium base + tower shaft with facade texture on all four sides
   const podH = Math.min(4.5, h * 0.22);
   const pod = new THREE.Mesh(new THREE.BoxGeometry(wB * 1.18, podH, d * 1.18),
@@ -1257,13 +1278,17 @@ function makeCoins(): THREE.Group {
   g.userData.coin = 5;   // flat wallet value — every pile visibly pays
   return g;
 }
+// shared lamp-head material: ONE emissive uniform lights every streetlamp on
+// the island at dusk (see setDusk)
+const winFrameMatShared = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+const winGlassMatShared = new THREE.MeshStandardMaterial({ color: 0xffe9b8, roughness: 0.4, emissive: 0xffd98a, emissiveIntensity: 0.25 });
+const lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x3c4454, roughness: 0.6, metalness: 0.3 });
+const lampHeadMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffdf8a, emissiveIntensity: 0.8, roughness: 0.4 });
 function makeLamp(): THREE.Group {
   const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 3.6, 6),
-    new THREE.MeshStandardMaterial({ color: 0x3c4454, roughness: 0.6, metalness: 0.3 }));
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 3.6, 6), lampPoleMat);
   pole.position.y = 1.8; g.add(pole);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8),
-    new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffdf8a, emissiveIntensity: 0.8, roughness: 0.4 }));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), lampHeadMat);
   head.position.y = 3.7; g.add(head);
   return g;
 }
@@ -1598,7 +1623,12 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // shadow diet: tiny street props don't cast (hundreds of them; their shadows
     // are sub-pixel anyway) — a big chunk of the shadow pass for free
     if (r >= 2.5) { setShadow(mesh); mesh.add(contactShadow(r)); }
-    else mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
+    else {
+      mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
+      // tiny props still get the cheap blob — grounded on EVERY quality tier,
+      // even when the real shadow map is off on weak phones
+      mesh.add(contactShadow(Math.max(0.55, r * 1.1)));
+    }
     scene.add(mesh); addEdible(mesh, r);
   };
 
@@ -1645,7 +1675,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           // pair flanking the walk, gate pillars at the driveway
           const hedge = makeFenceRun(9, 0x4faa5a);
           hedge.rotation.y = lot.fy !== 0 ? 0 : Math.PI / 2;
-          place(hedge, hx + fx3 * 9.5 - sx3 * 5.5, hz + fz3 * 9.5 - sz3 * 5.5, 1.4);
+          // front offset 7.0, NOT 9.5 — lot center +9.5 is the exact asphalt
+          // line, and a hedge on the curb reads as "stuff in the road"
+          place(hedge, hx + fx3 * 7.0 - sx3 * 5.5, hz + fz3 * 7.0 - sz3 * 5.5, 1.4);
           for (const sSide of [-1, 1]) {
             const top = new THREE.Group();
             const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1, 6), new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1 }));
@@ -1658,7 +1690,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
             const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 0.7), new THREE.MeshStandardMaterial({ color: 0xe8e2d2, roughness: 0.8 }));
             pillar.position.y = 0.75;
             const gp = new THREE.Group(); gp.add(pillar);
-            place(gp, hx + fx3 * 9.5 + sx3 * (5.5 + gSide * 1.6), hz + fz3 * 9.5 + sz3 * (5.5 + gSide * 1.6), 0.9);
+            place(gp, hx + fx3 * 7.0 + sx3 * (5.5 + gSide * 1.6), hz + fz3 * 7.0 + sz3 * (5.5 + gSide * 1.6), 0.9);
           }
         }
       });
@@ -1911,18 +1943,24 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
   }
 
-  // line the road edges: cones (starter snacks) + streetlamps on the sidewalks
+  // line the road edges: cones (starter snacks) + streetlamps on the sidewalks.
+  // CRITICAL: each sweep runs the full length of a road and CROSSES the other
+  // four — reject any spot whose along-coordinate falls inside a crossing
+  // road's asphalt, or the prop stands in a traffic lane
   const roads3 = ROAD_CENTERS.map((c) => w(c));
+  const nearCrossRoad = (v: number, m: number) => roads3.some((rc2) => Math.abs(v - rc2) < m);
   for (const rc of roads3) {
     let ci = 0;
     for (let a = -270; a < 270; a += 32, ci++) {
       const side = ci % 2 ? 4.9 : -4.9;   // road shoulder — cars never clip them
+      if (nearCrossRoad(a, 4.5)) continue;
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
     }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {
       const side = li % 2 ? 6.8 : -6.8;   // ON the sidewalk, not the asphalt
+      if (nearCrossRoad(a, 5.2)) continue;
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeLamp(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeLamp(), rc - side, a, 0.7);
     }

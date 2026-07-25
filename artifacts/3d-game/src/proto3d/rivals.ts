@@ -94,6 +94,20 @@ const growR = (R: number, eR: number) => {
   return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
 
+let _rivalGlowTex: THREE.CanvasTexture | null = null;
+function rivalGlowTex(): THREE.CanvasTexture {
+  if (_rivalGlowTex) return _rivalGlowTex;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const g = cv.getContext('2d')!;
+  const grd = g.createRadialGradient(64, 64, 8, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(255,255,255,0.5)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,0.16)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  _rivalGlowTex = new THREE.CanvasTexture(cv);
+  return _rivalGlowTex;
+}
+
 function makeRivalMesh(color: number, idx = 0, dark = 0x140a26, glowCol = color): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
   const group = new THREE.Group();
   const col = new THREE.Color(color);
@@ -107,13 +121,11 @@ function makeRivalMesh(color: number, idx = 0, dark = 0x140a26, glowCol = color)
         vec3 c=mix(uDark, uCol, smoothstep(0.15,0.95,u)); c+=uCol*pow(u,3.5)*0.4; gl_FragColor=vec4(c,1.); }`,
   });
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 30), bodyMat); group.add(body);
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(1.08, 32, 24), new THREE.ShaderMaterial({
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
-    uniforms: { uCol: { value: new THREE.Color(glowCol) } },
-    vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }`,
-    fragmentShader: `varying vec3 vN; varying vec3 vV; uniform vec3 uCol; void main(){ float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),4.); gl_FragColor=vec4(uCol,f*0.55); }`,
-  }));
-  group.add(glow);
+  // tinted bloom sprite — the same treatment as the player hero. (The old
+  // additive back-side shell read as a soap-bubble outline next to the hero.)
+  const bloom = new THREE.Sprite(new THREE.SpriteMaterial({ map: rivalGlowTex(), color: glowCol, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85 }));
+  bloom.scale.set(2.6, 2.6, 1); bloom.renderOrder = -1;
+  group.add(bloom);
   // billboarded eyes
   const eyes = new THREE.Group(); group.add(eyes);
   for (const sx of [-0.32, 0.32]) {
@@ -195,6 +207,10 @@ export function createRivals(
   const api: Rivals = {
     list: rivals,
     reset() {
+      // abandon in-flight eaten-anims: resetMatch restores those props to their
+      // homes — leaving them queued here re-shrank them at match start (a
+      // half-buried spinning house on lot #1 of every rematch)
+      shrinking.length = 0;
       rivals.forEach((rv, i) => {
         const ang = (i / rivals.length) * Math.PI * 2 + 0.6;
         rv.x = Math.cos(ang) * 150; rv.z = Math.sin(ang) * 150;
@@ -208,7 +224,10 @@ export function createRivals(
       // SEE (they used to vanish in one frame, reading as a rendering bug)
       for (let i = shrinking.length - 1; i >= 0; i--) {
         const m = shrinking[i];
-        const big = m.userData.qk === 'house' || m.scale.x > 3;
+        // GLB wrappers keep scale 1 (real scale is on the inner group), so a
+        // scale heuristic misses towers/houses/schools — use the tags: any
+        // building or any tall/large prop sinks with dignity, no spin
+        const big = m.userData.building || m.userData.qk === 'house' || m.scale.x > 3 || (m.userData.eRadius ?? 0) >= 2.5;
         m.scale.multiplyScalar(1 - dt * (big ? 6.5 : 4.5));
         m.position.y -= dt * (big ? 4 : 2.4);
         if (!big) m.rotation.y += dt * 5;   // spinning HOUSES read as parked-on-road chaos

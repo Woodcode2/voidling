@@ -10,7 +10,7 @@ import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
   railPointAt, insideIsland3, inLagoon3, type Biome, type AddEdible,
 } from './island';
-import { glb, vehicleGlb } from './assets3d';
+import { glb, vehicleGlb, contactShadow } from './assets3d';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -302,18 +302,46 @@ export function createLife(
     return false;
   };
   interface Arc { p0x: number; p0z: number; p1x: number; p1z: number; p2x: number; p2z: number; u: number; len: number; }
+  // per-road ON-ISLAND intervals — the single authority for how far a car may
+  // drive down each painted road before the coast clips it. Replaces all the
+  // per-frame probe guesswork that made cars saw-tooth at clipped road stubs.
+  type Span = [number, number];
+  const roadSpans = new Map<string, Span[]>();
+  for (const rc of ROAD_CENTERS_3D) {
+    for (const axis of ['h', 'v'] as const) {
+      const spans: Span[] = [];
+      let s0: number | null = null;
+      for (let a = -280; a <= 282; a += 2) {
+        const px = axis === 'h' ? a : rc, pz = axis === 'h' ? rc : a;
+        const ok = a <= 280 && !!biomeAt(px, pz) && !inLagoon3(px, pz);
+        if (ok && s0 === null) s0 = a;
+        if (!ok && s0 !== null) { if (a - 2 - s0 > 34) spans.push([s0, a - 2]); s0 = null; }
+      }
+      roadSpans.set(axis + rc, spans);
+    }
+  }
+  const EDGE_M = 10;   // cars U-turn this far before the cliff — never overhang
+  const spanFor = (axis: 'h' | 'v', centre: number, along: number): Span | null => {
+    const spans = roadSpans.get(axis + centre);
+    if (!spans || !spans.length) return null;
+    for (const sp of spans) if (along >= sp[0] && along <= sp[1]) return sp;
+    let best = spans[0], bd = Infinity;
+    for (const sp of spans) {
+      const d = Math.min(Math.abs(along - sp[0]), Math.abs(along - sp[1]));
+      if (d < bd) { bd = d; best = sp; }
+    }
+    return best;
+  };
   for (let i = 0; i < 30; i++) {
     const mesh = makeCar();
-    const horiz = Math.random() < 0.5;
-    const centre = pick(ROAD_CENTERS_3D);
+    let horiz = Math.random() < 0.5;
+    let centre = pick(ROAD_CENTERS_3D);
     const dir = Math.random() < 0.5 ? 1 : -1;
-    // spawn on land: an off-island 'along' leaves the car vibrating in the sea
-    let along0 = rand(-230, 230);
-    for (let k = 0; k < 10; k++) {
-      const px0 = horiz ? along0 : centre, pz0 = horiz ? centre : along0;
-      if (biomeAt(px0, pz0)) break;
-      along0 = rand(-150, 150);
-    }
+    // spawn INSIDE a known on-island span — zero retries, zero sea spawns
+    let sp0 = spanFor(horiz ? 'h' : 'v', centre, 0);
+    for (let k = 0; k < 8 && !sp0; k++) { horiz = Math.random() < 0.5; centre = pick(ROAD_CENTERS_3D); sp0 = spanFor(horiz ? 'h' : 'v', centre, 0); }
+    if (!sp0) continue;
+    const along0 = rand(sp0[0] + EDGE_M, sp0[1] - EDGE_M);
     const st = {
       axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: along0,
       laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2), pauseT: 0,
@@ -321,7 +349,8 @@ export function createLife(
     };
     if (st.axis === 'h') mesh.position.set(st.along, 0, centre + st.laneOff); else mesh.position.set(centre + st.laneOff, 0, st.along);
     mesh.rotation.y = st.axis === 'h' ? headingOf(dir, 0) : headingOf(0, dir);
-    mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car';
+    mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car'; mesh.userData.mover = true;
+    mesh.add(contactShadow(2));
     setShadow(mesh); scene.add(mesh); addEdible(mesh, 4);
     movers.push({
       mesh,
@@ -353,28 +382,25 @@ export function createLife(
           return;
         }
         st.turnCd = Math.max(0, st.turnCd - dt);
+        if (st.pauseT && st.pauseT > 0) { st.pauseT -= dt; return; }
+        const sp = spanFor(st.axis, st.centre, st.along);
+        if (!sp) return;
         const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
         let spd = st.speed;
         if (Math.hypot(dx, dz) < vR + 26) {
           spd = st.speed * 2.1;
           const ac = st.axis === 'h' ? dx : dz;
           const wantDir = ac >= 0 ? 1 : -1;
-          const ta = st.along + wantDir * spd * dt * 4;
-          const tx = st.axis === 'h' ? ta : st.centre + st.laneOff;
-          const tz = st.axis === 'h' ? st.centre + st.laneOff : ta;
-          if (onRoad(tx, tz)) st.dir = wantDir;   // never flee INTO a dead end (stub shake)
+          // only flee toward road that actually EXISTS — at least 25u of it —
+          // otherwise hold course (fleeing into a dead end = the stub shake)
+          const runway = wantDir > 0 ? sp[1] - st.along : st.along - sp[0];
+          if (runway > 25) st.dir = wantDir;
         }
         st.along += st.dir * spd * dt;
-        const nx = st.axis === 'h' ? st.along : st.centre + st.laneOff;
-        const nz = st.axis === 'h' ? st.centre + st.laneOff : st.along;
-        const noseX = st.axis === 'h' ? nx + st.dir * 3.5 : nx;
-        const noseZ = st.axis === 'h' ? nz : nz + st.dir * 3.5;
-        if (!onRoad(nx, nz) || !biomeAt(noseX, noseZ)) {
-          // dead end: brake for a beat, then pull away in reverse (the instant
-          // double-step flip read as a teleport)
-          st.pauseT = 0.35; st.dir *= -1;
-        }
-        if (st.pauseT && st.pauseT > 0) { st.pauseT -= dt; return; }
+        // hard interval clamp: brake once at the end of the pavement, then
+        // pull away in reverse — no probes, no oscillation
+        if (st.along > sp[1] - EDGE_M) { st.along = sp[1] - EDGE_M; st.pauseT = 0.35; st.dir = -1; }
+        else if (st.along < sp[0] + EDGE_M) { st.along = sp[0] + EDGE_M; st.pauseT = 0.35; st.dir = 1; }
         if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 5 && Math.random() < 0.5) {
           // set up a quarter-circle-ish bezier: current pos -> lane corner -> exit on the new lane
           const nAxis = st.axis === 'h' ? 'v' : 'h';
@@ -385,8 +411,11 @@ export function createLife(
           const p2x = nAxis === 'h' ? nAlong : rc + nLaneOff;
           const p2z = nAxis === 'h' ? rc + nLaneOff : nAlong;
           // a junction near the coast can sit in open ocean (clipped road) —
-          // never begin a turn whose corner or exit leaves the island
+          // never begin a turn whose corner or exit leaves the island, and the
+          // exit road must have real runway past the corner
           if (!biomeAt(p1x, p1z) || !biomeAt(p2x, p2z)) continue;
+          const esp = spanFor(nAxis, rc, nAlong);
+          if (!esp || nAlong < esp[0] + EDGE_M || nAlong > esp[1] - EDGE_M) continue;
           const len = Math.hypot(p1x - mesh.position.x, p1z - mesh.position.z) + Math.hypot(p2x - p1x, p2z - p1z);
           st.arc = { p0x: mesh.position.x, p0z: mesh.position.z, p1x, p1z, p2x, p2z, u: 0, len: Math.max(4, len) };
           st.nAxis = nAxis; st.nCentre = rc; st.nAlong = nAlong; st.nLaneOff = nLaneOff; st.turnCd = 3;
@@ -412,8 +441,11 @@ export function createLife(
   const tmp = new THREE.Vector3();
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[]) {
     if (!biomeAt(hx, hz)) return;   // don't spawn anyone off the coastline
-    let ang = rand(0, Math.PI * 2), hop = 0, fled = false;
+    let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
+    mesh.userData.mover = true;    // steers itself — the magnet must never grab it
+    const cs = contactShadow(radius * 0.55);   // grounded on every quality tier
+    mesh.add(cs);
     mesh.position.set(hx, 0, hz); setShadow(mesh); scene.add(mesh); addEdible(mesh, radius);
     const rec = { mesh, biome, panic: 0 };
     peds.push(rec);
@@ -424,32 +456,47 @@ export function createLife(
         const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
         const dist = Math.hypot(dx, dz);
         let spd = base;
+        slideT = Math.max(0, slideT - dt);
         if (dist < vR + fear) {
-          ang = Math.atan2(dz, dx); spd = base * 3.4; hop = 0.5;
-          if (!fled && Math.random() < 0.5) {
-            const pool = panicLines || PANIC[biome] || PANIC.generic;
-            tmp.set(mesh.position.x, 5, mesh.position.z);
-            say(tmp, pick(pool), 'panic');
+          // COMMIT to the flee heading: while a coast-slide is active the raw
+          // away-vector must not overwrite it, or the ped ping-pongs at the
+          // cliff (slide inland → re-flee outward → slide → …) = the edge shake
+          if (slideT <= 0) ang = Math.atan2(dz, dx);
+          spd = base * 3.4;
+          if (!fled) {
+            hop = 0.5;   // hop starts on the flee TRANSITION, not every frame
+            if (Math.random() < 0.5) {
+              const pool = panicLines || PANIC[biome] || PANIC.generic;
+              tmp.set(mesh.position.x, 5, mesh.position.z);
+              say(tmp, pick(pool), 'panic');
+            }
           }
           fled = true;
         } else {
           if (dist > vR + fear + 40) fled = false;
-          ang += rand(-1, 1) * dt * 3;
-          const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
-          if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
+          if (slideT <= 0) {
+            ang += rand(-1, 1) * dt * 3;
+            const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
+            if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
+          }
         }
+        // margin test: the step must keep the WHOLE body on land, not just the
+        // center — a ped standing with its center on the cliff lip reads broken
+        const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
         let nx = mesh.position.x + Math.cos(ang) * spd * dt, nz = mesh.position.z + Math.sin(ang) * spd * dt;
-        if (!biomeAt(nx, nz)) {
-          // blocked (coast/water): slide sideways, only reverse as a last resort
-          // — a fleeing ped pinned at the cliff used to vibrate in place
+        if (!stand(nx, nz)) {
+          // blocked (coast/water): slide sideways and COMMIT to it for half a
+          // second, only reverse as a last resort
           for (const alt of [ang + Math.PI / 2, ang - Math.PI / 2, ang + Math.PI]) {
             const ax2 = mesh.position.x + Math.cos(alt) * spd * dt, az2 = mesh.position.z + Math.sin(alt) * spd * dt;
-            if (biomeAt(ax2, az2)) { ang = alt; nx = ax2; nz = az2; break; }
+            if (biomeAt(ax2, az2) && biomeAt(ax2 + Math.cos(alt) * 2, az2 + Math.sin(alt) * 2)) { ang = alt; nx = ax2; nz = az2; slideT = 0.5; break; }
           }
         }
         if (biomeAt(nx, nz)) { mesh.position.x = nx; mesh.position.z = nz; }
+        else if (hop > 0) hop = 0;   // pinned: stop the panic bounce so nothing vibrates in place
         mesh.rotation.y = -ang + Math.PI / 2;
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
+        cs.position.y = 0.045 - mesh.position.y;   // the blob stays ON the ground while its owner hops
         // walk cycle: arms + legs swing with travel speed
         const limbs = mesh.userData.limbs;
         if (limbs) {
@@ -522,6 +569,8 @@ export function createLife(
       bather.rotation.x = -Math.PI / 2;                        // flat on the back
       bather.rotation.z = towel.rotation.z;
       bather.position.set(tx, 0.55, tz);
+      // lying pose is part of "home": rematch restore must not stand them up
+      bather.userData.homeRotX = bather.rotation.x; bather.userData.homeRotZ = bather.rotation.z;
       setShadow(bather); scene.add(bather); addEdible(bather, 2.4);
     }
   }
@@ -544,6 +593,7 @@ export function createLife(
     for (let i = 0; i < 3; i++) {
       const mesh = makeBird();
       let ang = rand(0, Math.PI * 2);
+      mesh.userData.mover = true;
       mesh.position.set(cx + rand(-10, 10), fly, cz + rand(-10, 10)); setShadow(mesh); scene.add(mesh); addEdible(mesh, 2);
       movers.push({
         mesh,
@@ -567,7 +617,8 @@ export function createLife(
   function buildTrain() {
     const grp = new THREE.Group(); scene.add(grp);
     const cars: THREE.Group[] = [];
-    for (let i = 0; i < 4; i++) { const c = makeLoco(i === 0); grp.add(c); cars.push(c); }
+    for (let i = 0; i < 4; i++) { const c = makeLoco(i === 0); c.add(contactShadow(3)); grp.add(c); cars.push(c); }
+    grp.userData.mover = true;
     setShadow(grp); addEdible(grp, 6.2); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
   }
   buildTrain();
