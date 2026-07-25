@@ -353,7 +353,7 @@ export function createRivals(
           rv.tz = rv.z + Math.sin(inland) * rand(50, 110);
         }
         // ── hole-vs-hole: the danger loop ─────────────────────────────────────
-        if (pr > rv.r * 1.2 && dp < pr * 0.8) {
+        if (pr > rv.r * 1.2 && dp < pr * 0.95) {
           // the player swallows this rival whole — out for 6s, respawns small
           const pts = Math.round(100 + rv.r * 40);   // eating a hole is the marquee play
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten));
@@ -372,7 +372,7 @@ export function createRivals(
         for (const e of edibles) {
           if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
-          if (dx * dx + dz * dz < (rv.r + e.radius) ** 2) {
+          if (dx * dx + dz * dz < (rv.r + e.radius * 0.6) ** 2) {
             e.mesh.userData.eaten = true;
             shrinking.push(e.mesh);   // animate out — buildings must never BLINK away
             rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
@@ -405,7 +405,7 @@ export function createRivals(
         // truth at a glance — green = you can eat them, red = RUN, skin glow
         // when it's a fair fight
         const hm = rv.halo.material as THREE.MeshBasicMaterial;
-        if (pr > rv.r * EAT_RATIO) hm.color.setHex(0x54e88a);
+        if (pr > rv.r * 1.2) hm.color.setHex(0x54e88a);
         else if (rv.r > pr * EAT_RATIO) hm.color.setHex(0xff5560);
         else hm.color.setHex(rv.color);
         void tmp;

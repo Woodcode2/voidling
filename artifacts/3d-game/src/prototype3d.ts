@@ -161,7 +161,10 @@ rivals.onRivalEaten = (name, pts) => {
   audio.bigEat(); fx.ring(voidState.x, voidState.z, 0xffe08a, voidling.radius * 3, 0.7);
   buzz(60);
 };
+let biteMercy = 0;   // global mercy: two big rivals overlapping must not chain-bite
 rivals.onPlayerBitten = (name) => {
+  if (tClock < biteMercy) return;
+  biteMercy = tClock + 2.5;
   // 12% shrink, not 18 — a silent-feeling 18% read as "the game glitched me
   // smaller" to kids; the bite should sting, not punish
   voidling.setRadius(Math.max(START_R, voidling.radius * 0.88));
@@ -220,6 +223,15 @@ const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0 };
 const JOY_R = 64;
 let lastInput = -9999, tClock = 0;
 function joySet(ev: PointerEvent) {
+  // RE-ANCHOR (hole.io convention): once the thumb passes the ring, the base
+  // chases the finger — a direction flip is instant relative to the thumb,
+  // never a 2-ring drag back across the glass
+  const m0 = Math.hypot(ev.clientX - joy.ax, ev.clientY - joy.ay);
+  if (m0 > JOY_R) {
+    const g = 1 - JOY_R / m0;
+    joy.ax += (ev.clientX - joy.ax) * g; joy.ay += (ev.clientY - joy.ay) * g;
+    joyEl.style.left = `${joy.ax}px`; joyEl.style.top = `${joy.ay}px`;
+  }
   const dx = ev.clientX - joy.ax, dy = ev.clientY - joy.ay;
   const m = Math.hypot(dx, dy);
   const k = m > JOY_R ? JOY_R / m : 1;
@@ -227,8 +239,11 @@ function joySet(ev: PointerEvent) {
   joyNubEl.style.left = `${joy.ax + dx * k}px`; joyNubEl.style.top = `${joy.ay + dy * k}px`;
   lastInput = tClock;
 }
+renderer.domElement.style.touchAction = 'none';   // stop iOS turning a fast drag into a browser gesture (pointercancel mid-steer)
 renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (joy.active) return;   // a second finger/palm must NEVER steal the anchor mid-drive
   joy.active = true; joy.id = e.pointerId; joy.ax = e.clientX; joy.ay = e.clientY;
+  try { renderer.domElement.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   joyEl.style.display = joyNubEl.style.display = 'block';
   joyEl.style.left = `${e.clientX}px`; joyEl.style.top = `${e.clientY}px`;
   joySet(e);
@@ -244,6 +259,7 @@ const keys = new Set<string>();
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 window.addEventListener('keydown', (e) => { if (started && MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; } });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());   // Cmd-Tab mid-hold must not leave the void driving itself
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -617,7 +633,7 @@ function capture(e: Edible, giveHunger = true) {
   // to the pull direction, so things visibly keel over INTO the void
   e.spin.set((dz / d) * rand(4.5, 7.5), rand(-1.5, 1.5), (-dx / d) * rand(4.5, 7.5));
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
-  combo++; comboT = 1.2;
+  combo++; comboT = 1.6;
   const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
   // moving prey (people/animals/cars — tagged ptsMult 1.5) beats furniture of
   // the same size: chasing pays. Everything else stays radius-proportional.
@@ -1161,7 +1177,7 @@ function animate() {
       spawnSuck(1 + curStage, voidling.radius * 1.9);
     }
     timerEl.textContent = fmtTime(matchClock);
-    if (introT > 0) { velX *= 0.9; velZ *= 0.9; }
+    if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
     if (matchClock <= 30) {
       timerEl.style.color = '#ff8a8a';
       if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 30 SECONDS — EAT FASTER!!'); }
@@ -1213,7 +1229,7 @@ function animate() {
       // PERCEIVED speed is constant: world speed rides the camera distance, so
       // a WORLD ENDER crosses its screen exactly as fast as a hatchling does.
       // Joystick: full speed at ~58% thumb extension (hole.io feel), linear below.
-      const jm = joy.active ? Math.min(1, joy.mag / 0.58) : 1;
+      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.08) / 0.5, 0, 1) : 1;
       const speed = Math.min(58, 16 * (camDist / 50)) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
       tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
@@ -1238,7 +1254,8 @@ function animate() {
       const dm = Math.hypot(ddx, ddz);
       if (dm > 1.5) { const spd = 14 * Math.min(1, dm / 10); tvx = (ddx / dm) * spd; tvz = (ddz / dm) * spd; }
     }
-    const k = Math.min(1, dt * (driving ? 7.5 : 4.5));
+    const wgt = THREE.MathUtils.clamp((voidling.radius - 0.9) / 5.1, 0, 1);
+    const k = Math.min(1, dt * (driving ? 11 - 3.5 * wgt : 4.5));   // 91ms snappy tiny → 133ms weighty huge
     velX += (tvx - velX) * k;
     velZ += (tvz - velZ) * k;
     const nx = voidState.x + velX * dt, nz = voidState.z + velZ * dt;
@@ -1284,7 +1301,7 @@ function animate() {
     if (!e.mesh.visible || e.mesh.userData.eaten) continue;   // a rival owns it — never double-eat
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
-    const reach = R * 1.7 + e.radius * 2.4;
+    const reach = R * 2.0 + e.radius * 2.4;
     const inWell = d < reach && e.radius < 2.5 && !e.mesh.userData.mover && e.radius <= R * EAT_RATIO;
     // spring-back runs FIRST, unconditionally: if a rival bite shrank us while
     // this prop was displaced, the old size-gated flow stranded it on the
@@ -1303,13 +1320,13 @@ function animate() {
       if (d < R + e.radius * 0.7 && !(e.mesh.userData.shakeT > 0)) e.mesh.userData.shakeT = 0.45;
       continue;
     }
-    if (d < R + e.radius * 0.5) {
+    if (d < R + e.radius * 0.7) {
       capture(e);
     } else if (inWell) {
       // MAGNET: the void's gravity well scales with its size — small PROPS
       // drift in (hole.io's suction fantasy). Buildings stay founded; walkers,
       // cars and critters steer themselves and are never magnetized.
-      const pull = (1 - d / reach) * (3.2 + R * 0.55);
+      const pull = (1 - d / reach) * (1 - d / reach) * (8 + R * 1.1);   // quadratic: violent at the rim, gentle at reach — reads as GRAVITY
       e.mesh.position.x -= (dx / d) * dt * pull;
       e.mesh.position.z -= (dz / d) * dt * pull;
       e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);
@@ -1357,17 +1374,23 @@ function animate() {
     }
     if (outroT > 0) targetDist *= 0.72;   // end-of-match push-in on the winner moment
     camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
-    // the SIZE chip rides just under the hole (hole.io pattern)
-    _chipV.set(voidState.x, 0, voidState.z).project(camera);
-    formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
-    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + R * 9 + 30}px`;
     // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
     // so towers and trees stop hiding the hero
     const steep = THREE.MathUtils.clamp((R - 2.5) / 5.5, 0, 1);
     camOffset.set(0.62 + (0.45 - 0.62) * steep, 0.92 + (1.4 - 0.92) * steep, 0.62 + (0.45 - 0.62) * steep).normalize();
-    tmpV.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
-    camera.position.lerp(tmpV, 1 - Math.exp(-3.2 * dt));
-    camera.lookAt(voidState.x, R * 0.5, voidState.z);
+    // LOOKAHEAD: frame the ground AHEAD of travel — a steer-to-eat game gives
+    // the pixels to where you're going, the void rides slightly behind center
+    const lookX = voidState.x + velX * 0.22, lookZ = voidState.z + velZ * 0.22;
+    tmpV.copy(camOffset).multiplyScalar(camDist);
+    tmpV.x += lookX; tmpV.z += lookZ;
+    camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
+    camera.lookAt(lookX, R * 0.5, lookZ);
+    // the SIZE chip rides just under the hole (hole.io pattern) — projected
+    // with THIS frame's camera, or the chip swims against the hole at 30fps
+    camera.updateMatrixWorld();
+    _chipV.set(voidState.x, 0, voidState.z).project(camera);
+    formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
+    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + R * 9 + 30}px`;
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }

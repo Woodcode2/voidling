@@ -899,13 +899,13 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     grp.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);   // beach fairground
     grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
-    addEdible(grp, 6.4);
+    addEdible(grp, 5.6);   // ferris wheel: dessert, not decoration
   }, undefined, () => {
     // asset unreachable: the FAIR still exists — procedural wheel stand-in
     const fb = makeFerrisFB();
     fb.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);
     fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    scene.add(fb); addEdible(fb, 6.4);
+    scene.add(fb); addEdible(fb, 5.6);
   });
 
   // ONE hot-air balloon drifts over the island (the redesigned Higgsfield GLB
@@ -1732,7 +1732,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       buildRow(half * 1.0, (o) => [cx - inset, cz + o], -Math.PI / 2, seed + 2);  // west wall
       buildRow(half * 1.0, (o) => [cx + inset, cz + o], Math.PI / 2, seed + 3);   // east wall
       // signature tower rising from the service court
-      placeGlb((gx + gy) % 2 ? 'tower_deco' : 'tower_glass', cx, cz, 6.2,
+      placeGlb((gx + gy) % 2 ? 'tower_deco' : 'tower_glass', cx, cz, 5.2,
         22 + ((gx * 7 + gy * 13) % 4) * 3, () => makeTower(true));
       // corner retail at the south junctions (the gaps the walls leave open)
       placeGlb('cafe', cx - half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, 0);   // face the street, not the courtyard
@@ -1756,7 +1756,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       placeGlb('fountain', cx, cz, 4, 6.5, makeFountainFB);
       // civic institutions FLANK the square: school west (facing the axis),
       // library east — a real town centre, not a lone hall
-      placeGlb('school', cx - half * 0.66, cz + half * 0.1, 6.4, 11, makeCivicHall, Math.PI / 2);
+      placeGlb('school', cx - half * 0.66, cz + half * 0.1, 5.6, 11, makeCivicHall, Math.PI / 2);
       { const lib = makeCivicHall(); lib.rotation.y = -Math.PI / 2; lib.scale.setScalar(0.75); place(lib, cx + half * 0.68, cz + half * 0.1, 7); }
       placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.72, 4, 5, makeFoodtruckFB, Math.PI / 6);
       placeGlb('icecream', cx + half * 0.64, cz + half * 0.7, 2.2, 3.6, makeIcecreamFB, -Math.PI / 6);
@@ -1869,7 +1869,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         new THREE.MeshStandardMaterial({ color: 0x5ec8d8, roughness: 0.6, side: THREE.DoubleSide }));
       stripe.rotation.z = Math.PI / 2; hangGrp.add(stripe);
       hangGrp.rotation.y = Math.PI / 4; hangGrp.position.set(cx - half * 0.55, 0, cz + half * 0.6);
-      setShadow(hangGrp); scene.add(hangGrp); addEdible(hangGrp, 6.4);
+      setShadow(hangGrp); scene.add(hangGrp); addEdible(hangGrp, 5.6);
       { // control tower with a glass cab
         const tw = new THREE.Group();
         const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 12, 10),

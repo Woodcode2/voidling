@@ -351,7 +351,7 @@ export function createLife(
     mesh.rotation.y = st.axis === 'h' ? headingOf(dir, 0) : headingOf(0, dir);
     mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car'; mesh.userData.mover = true;
     mesh.add(contactShadow(2));
-    setShadow(mesh); scene.add(mesh); addEdible(mesh, 4);
+    setShadow(mesh); scene.add(mesh); addEdible(mesh, 2.8);
     movers.push({
       mesh,
       update(dt, _t, vx, vz, vR) {
@@ -388,7 +388,7 @@ export function createLife(
         const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
         let spd = st.speed;
         if (Math.hypot(dx, dz) < vR + 26) {
-          spd = st.speed * 2.1;
+          spd = Math.min(30, st.speed * 2.1);   // scared, not uncatchable
           const ac = st.axis === 'h' ? dx : dz;
           const wantDir = ac >= 0 ? 1 : -1;
           // only flee toward road that actually EXISTS — at least 25u of it —
@@ -619,7 +619,7 @@ export function createLife(
     const cars: THREE.Group[] = [];
     for (let i = 0; i < 4; i++) { const c = makeLoco(i === 0); c.add(contactShadow(3)); grp.add(c); cars.push(c); }
     grp.userData.mover = true;
-    setShadow(grp); addEdible(grp, 6.2); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
+    setShadow(grp); addEdible(grp, 5.4); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
   }
   buildTrain();
   movers.push({
@@ -798,7 +798,7 @@ export function createLife(
         door.position.set(0, 1.6, 4.6); school.add(door);
         return school;
       };
-      glb(scene, addEdible, 'school', x, z - 6, 9, { h: 11, fallback: buildFallback });
+      glb(scene, addEdible, 'school', x, z - 6, 6.0, { h: 11, fallback: buildFallback });   // r=9 was mathematically uneatable in a 3:00 match
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
       pole.position.set(x + 9.5, 3.5, z - 3); setShadow(pole); scene.add(pole);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({ color: 0x9350e8, side: THREE.DoubleSide }));
