@@ -194,14 +194,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     x.fillStyle = gr; x.fillRect(0, 0, size, size);
     return new THREE.CanvasTexture(cv);
   };
-  const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: softRadialTex(256, 0.18, 0.06, 30), color: VOID.glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-  bloomSprite.renderOrder = -1;   // behind the body
-  group.add(bloomSprite);
-  // X-ray ghost ring (see update): only visibly appears where the body is occluded
-  const ghost = new THREE.Mesh(new THREE.RingGeometry(0.96, 1.05, 48),
-    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));   // additive: faint over bright ground, reads through dark occluders
-  ghost.renderOrder = 999;
-  group.add(ghost);
+  // NO screen-space aura AT ALL: the bloom sprite and the x-ray ghost ring
+  // both read as a "white circle glued around the void" on phone screens —
+  // dimming them wasn't enough, so they're gone. The shader's own rim light
+  // is the only glow; the silhouette is razor crisp against any ground.
 
   // ── contact shadow, in scene-floor space ──────────────────────────────────
   // (The old ground-halo colour disc is GONE — over pale asphalt it read as a
@@ -432,7 +428,6 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       bodyMat.uniforms.uRim.value.set(s.rim);
       bodyMat.uniforms.uSwirl.value.set(s.glow);
       glowMat.uniforms.uColor.value.set(s.glow);
-      (bloomSprite.material as THREE.SpriteMaterial).color.set(s.glow);
       ringMats.forEach((m) => m.color.set(s.glow));
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
@@ -539,12 +534,6 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       face.position.set(0, dispR * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
 
-      // X-ray ghost ring: depth-test OFF, so when a tower or tree canopy hides
-      // the hero, a faint rim still reads through it — you never lose yourself
-      ghost.scale.setScalar(dispR);
-      ghost.position.set(0, dispR * 0.1, 0);
-      ghost.quaternion.copy(camera.quaternion);
-
       // mouth: maw scales in while open, smile hides
       if (mouthT > 0) mouthT -= dt;
       const mo = Math.max(mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0, mp.maw);
@@ -590,10 +579,6 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 
       // contact shadow tracks the void on the floor
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.02);
-
-      // bloom sprite hugs the orb (pulses gently, swells with the stage)
-      const bs = dispR * Math.max(1.5, 2.0 - stage * 0.1) * (1 + Math.sin(s.t * 1.7) * 0.03);
-      bloomSprite.scale.set(bs, bs, 1);
     },
   };
 
