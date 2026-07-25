@@ -185,7 +185,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   group.add(bloomSprite);
   // X-ray ghost ring (see update): only visibly appears where the body is occluded
   const ghost = new THREE.Mesh(new THREE.RingGeometry(0.96, 1.05, 48),
-    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.22, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));   // additive: invisible over bright ground, reads through dark occluders
   ghost.renderOrder = 999;
   group.add(ghost);
 
@@ -473,7 +473,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
 
       // ground halo + contact track the void on the floor
-      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.35);
+      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(radius * 1.2);
+      (halo.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(1.15 - radius * 0.07, 0.5, 1);   // no milky puddle at big R
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(radius * 1.02);
 
       // bloom sprite hugs the orb (pulses gently, swells with the stage)

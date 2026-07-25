@@ -147,8 +147,8 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
   if (sk.acc) group.add(buildAccessory(sk.acc));
   // tinted bloom sprite — the same treatment as the player hero. (The old
   // additive back-side shell read as a soap-bubble outline next to the hero.)
-  const bloom = new THREE.Sprite(new THREE.SpriteMaterial({ map: rivalGlowTex(), color: glowCol, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85 }));
-  bloom.scale.set(2.6, 2.6, 1); bloom.renderOrder = -1;
+  const bloom = new THREE.Sprite(new THREE.SpriteMaterial({ map: rivalGlowTex(), color: glowCol, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.5 }));
+  bloom.scale.set(2.0, 2.0, 1); bloom.renderOrder = -1;
   group.add(bloom);
   // billboarded eyes
   const eyes = new THREE.Group(); group.add(eyes);
@@ -194,7 +194,9 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
     const pom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bmat(0xffffff));
     pom.position.set(0.42, 1.18, 0); group.add(pom);
   }
-  const halo = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color: glowCol, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
+  // danger cue is a crisp OUTLINE ring (normal blending survives any surface),
+  // not an additive disc that washes out over pale pavement
+  const halo = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.42, 40), new THREE.MeshBasicMaterial({ color: glowCol, transparent: true, opacity: 0.85, depthWrite: false }));
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.07;
   return { group, eyes, halo };
 }

@@ -384,9 +384,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       const yx = lot.x - (lot.fx !== 0 ? lot.fx * (yd / 2 - frontClear) : 0);
       const yy = lot.y - (lot.fy !== 0 ? lot.fy * (yd / 2 - frontClear) : 0);
       const rw = lot.fy !== 0 ? yw : yd, rh = lot.fy !== 0 ? yd : yw;
-      g.fillStyle = 'rgba(210,245,170,0.16)';
+      g.fillStyle = 'rgba(210,245,170,0.10)';
       g.fillRect(pxW(yx - rw / 2), pyW(yy - rh / 2), pxW(yx + rw / 2) - pxW(yx - rw / 2), pyW(yy + rh / 2) - pyW(yy - rh / 2));
-      g.strokeStyle = 'rgba(70,110,60,0.18)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
+      g.strokeStyle = 'rgba(70,110,60,0.10)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
       g.strokeRect(pxW(yx - rw / 2), pyW(yy - rh / 2), pxW(yx + rw / 2) - pxW(yx - rw / 2), pyW(yy + rh / 2) - pyW(yy - rh / 2));
       // driveway: from the house's front edge, over the sidewalk, to the asphalt
       g.fillStyle = '#d9d5df';
@@ -409,9 +409,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       }
       // backyard: garden bed + patio square behind the house
       const bx = lot.x - lot.fx * (frontClear + 240), by = lot.y - lot.fy * (frontClear + 240);
-      g.fillStyle = 'rgba(126,213,122,0.75)';
+      g.fillStyle = 'rgba(126,213,122,0.35)';
       g.fillRect(pxW(bx - 130), pyW(by - 130), pxW(260) - pxW(0), pxW(260) - pxW(0));
-      g.fillStyle = 'rgba(226,216,206,0.22)';   // soft warm patio slab
+      g.fillStyle = 'rgba(226,216,206,0.12)';   // soft warm patio slab
       g.fillRect(pxW(bx + 40 * (li % 2 ? 1 : -1) - 55), pyW(by - 55), pxW(110) - pxW(0), pxW(110) - pxW(0));
       // pool (fancy lots, deterministic — matches populate's clutter exclusion)
       const pool = lotPool(b, li, lot);
@@ -932,10 +932,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     biomeAt,
     W: SCALE,
     setDusk(k) {
-      // golden hour: every streetlamp and house window on the island lights up
-      // (two shared materials — two uniform writes, whole-island payoff)
+      // golden hour: every streetlamp, house window and TOWER FACADE lights up
       lampHeadMat.emissiveIntensity = 0.8 + k * 1.0;
       winGlassMatShared.emissiveIntensity = 0.25 + k * 0.75;
+      sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.5; });
     },
     update(dt, t) {
       wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1;
@@ -1072,7 +1072,13 @@ const sideMatCache = new Map<string, THREE.MeshStandardMaterial>();
 function facadeMat(wall: number, warm: boolean): THREE.MeshStandardMaterial {
   const key = `${wall}-${warm}`;
   let m = sideMatCache.get(key);
-  if (!m) { m = new THREE.MeshStandardMaterial({ map: facadeTex(wall, warm), roughness: 0.65 }); sideMatCache.set(key, m); }
+  if (!m) {
+    // emissiveMap = the same facade texture: at dusk the window grid lights up
+    // (intensity driven by setDusk — a thousand lit windows for 8 materials)
+    const tex = facadeTex(wall, warm);
+    m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.65, emissiveMap: tex, emissive: new THREE.Color(0xffdf9a), emissiveIntensity: 0 });
+    sideMatCache.set(key, m);
+  }
   return m;
 }
 // roof caps come in a small family of tints — one shared slate cap made the

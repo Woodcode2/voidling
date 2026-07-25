@@ -84,6 +84,16 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
       // dedupe: never show the same line twice at once (panicked crowds all
       // pull from the same pool)
       if (slots.some((s) => s.active && s.el.textContent === text)) return;
+      // pile-up guard: cap panic chatter, and reject a bubble whose anchor
+      // lands within 60px of one already on screen
+      if (kind === 'panic' && slots.filter((s) => s.active && s.el.classList.contains('panic')).length >= 2) return;
+      v.copy(pos).project(camera);
+      const nx = (v.x * 0.5 + 0.5) * window.innerWidth, ny = (-v.y * 0.5 + 0.5) * window.innerHeight;
+      for (const s of slots) {
+        if (!s.active) continue;
+        const sx = parseFloat(s.el.style.left) || 0, sy = parseFloat(s.el.style.top) || 0;
+        if (Math.hypot(nx - sx, ny - sy) < 60) return;
+      }
       const slot = slots.find((s) => !s.active);
       if (!slot) return; // at cap — keep it readable
       slot.active = true;
@@ -116,7 +126,8 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
         v.copy(s.pos).project(camera);
         if (v.z > 1) { s.el.style.visibility = 'hidden'; continue; }  // behind camera
         s.el.style.visibility = 'visible';
-        const x = (v.x * 0.5 + 0.5) * w;
+        const halfW = s.el.offsetWidth / 2 + 8;
+        const x = Math.min(w - halfW, Math.max(halfW, (v.x * 0.5 + 0.5) * w));
         const y = (-v.y * 0.5 + 0.5) * h;
         s.el.style.left = `${x}px`;
         s.el.style.top = `${y}px`;

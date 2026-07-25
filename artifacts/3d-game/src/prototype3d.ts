@@ -4,6 +4,11 @@
 // Void: ./proto3d/void3d · island: ./proto3d/island · palette: ./proto3d/palette
 // Standalone page — the main game bundle is untouched.
 import * as THREE from 'three';
+// brand type: the shipping page used system-ui while only the retired React
+// entry bundled the brand font — single cheapest "top-10 app" lift
+import '@fontsource/fredoka/400.css';
+import '@fontsource/fredoka/600.css';
+import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid } from './proto3d/void3d';
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3 } from './proto3d/island';
@@ -71,6 +76,7 @@ sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.15;
 const SUN_DAY = new THREE.Color(0xfff2d8), SUN_DUSK = new THREE.Color(0xffc07a);
+let duskK = 0;   // 0 midday -> 1 full golden hour (drives the sun's horizon drop)
 const HEMI_DAY = new THREE.Color(0xdfeaff), HEMI_DUSK = new THREE.Color(0xffd9b0);
 // the shadow frustum rides the camera: tight box up close = crisp tree
 // shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
@@ -585,8 +591,21 @@ function bumpStreak() {
 }
 // the end screen is THE retention moment — the reward has to land as a beat,
 // not a gray sub-line: warm sting, coins visibly counting up, rows sliding in
-function celebrateEnd(coins: number, xpGain: number, lead: string) {
-  endSub.innerHTML = `${lead} · <b class="endCnt">+0✦</b> · +${xpGain} XP`;
+function celebrateEnd(coins: number, xpGain: number, lead: string, won = false) {
+  endSub.innerHTML = `${lead}<br><b class="endCnt">+0✦</b> · +${xpGain} XP`;
+  if (won) {
+    // champion confetti: two dozen falling sparks over the end screen
+    for (let i = 0; i < 24; i++) {
+      const sp = document.createElement('span');
+      sp.className = 'endConf';
+      sp.textContent = i % 3 ? '✦' : '●';
+      sp.style.left = `${Math.random() * 100}%`;
+      sp.style.color = ['#ffd23f', '#b875ff', '#7ef2a0', '#ff7da8'][i % 4];
+      sp.style.animationDelay = `${Math.random() * 0.8}s`;
+      endEl.appendChild(sp);
+      setTimeout(() => sp.remove(), 3200);
+    }
+  }
   const b = endSub.querySelector('.endCnt') as HTMLElement;
   const t0 = performance.now();
   const tick = () => {
@@ -647,9 +666,9 @@ function endMatch() {
   const LOSE_TITLES = ['STILL PECKISH…', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
-  celebrateEnd(reward, gain, myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`);
+  celebrateEnd(reward, gain, myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`, myRank === 1);
   endList.innerHTML = rows.map((r, i) =>
-    `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
+    `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${r.me && i === 0 ? '👑' : i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
 }
 
@@ -661,7 +680,8 @@ const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
   const d = Math.hypot(dx, dz) || 1;
-  e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx); e.orbitR = Math.max(voidling.radius * 0.6, d);
+  e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx);
+  e.orbitR = Math.min(Math.max(voidling.radius * 0.6, d), voidling.radius * 0.9);   // spiral stays INSIDE the rim
   e.mesh.userData.eaten = true;
   // topple toward the hole (the hole.io fantasy): the tip axis is perpendicular
   // to the pull direction, so things visibly keel over INTO the void
@@ -950,7 +970,7 @@ function resetMatch() {
   renderQuests();
   ended = false;
   sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.08; outroT = 0;
-  hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0);
+  hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0); duskK = 0; sun.intensity = 1.75;
   el('end').classList.remove('show');
   timerEl.style.color = '';
   beginMatch(soloMode);
@@ -1326,9 +1346,9 @@ function animate() {
       const r = e.orbitR * (1 - e.t);
       p.x = voidState.x + Math.cos(e.orbit) * r;
       p.z = voidState.z + Math.sin(e.orbit) * r;
-      p.y = THREE.MathUtils.lerp(p.y, cy, Math.min(1, dt * 6));
+      p.y = THREE.MathUtils.lerp(p.y, cy * 0.35, Math.min(1, dt * 6));   // sink INTO the pit, not onto the crown
       e.mesh.rotation.x += e.spin.x * dt; e.mesh.rotation.y += e.spin.y * dt; e.mesh.rotation.z += e.spin.z * dt;
-      e.mesh.scale.multiplyScalar(1 - dt * 3.4);
+      e.mesh.scale.multiplyScalar(1 - dt * 4.5);
       if (e.t >= 1) { spawnPuff(voidState.x, cy, voidState.z, 6); scene.remove(e.mesh); e.eaten = false; e.mesh.visible = false; }
       continue;
     }
@@ -1429,7 +1449,9 @@ function animate() {
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }
   // sun follows the void so shadows stay crisp near the action
-  sun.position.set(voidState.x + sunOff.x, sunOff.y, voidState.z + sunOff.z);
+  // duskK drops the sun toward the horizon in the finale — long golden
+  // shadows are the whole "golden hour" read, and they're free
+  sun.position.set(voidState.x + sunOff.x - duskK * 40, sunOff.y - duskK * 55, voidState.z + sunOff.z);
   sun.target.position.set(voidState.x, 0, voidState.z);
 
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
@@ -1510,13 +1532,15 @@ function animate() {
   camera.position.add(shakeOff);
   if (started && !ended && matchClock < 45 && matchClock > -10) {
     const gk = 1 - Math.max(0, matchClock) / 45;
+    duskK = gk;
     sun.color.lerpColors(SUN_DAY, SUN_DUSK, gk);
+    sun.intensity = 1.75 - gk * 0.3;
     renderer.toneMappingExposure = 1.08 + gk * 0.08;
     // full golden hour: warm sky fill drops, nebula dims, windows + lamps
     // light up across the island — the last 45 seconds LOOK like a finale
     hemi.color.lerpColors(HEMI_DAY, HEMI_DUSK, gk);
-    hemi.intensity = 0.5 - gk * 0.12;
-    scene.backgroundIntensity = 0.55 - gk * 0.17;
+    hemi.intensity = 0.5 - gk * 0.22;
+    scene.backgroundIntensity = 0.55 - gk * 0.3;
     island.setDusk(gk);
   }
   if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
