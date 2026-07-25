@@ -16,9 +16,9 @@
         color: #fff; font-size: clamp(26px, 8vw, 40px); font-weight: 900; letter-spacing: 1px;
         text-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none;
       }
-      #devoured { position: fixed; top: 60px; left: 0; right: 0; text-align: center; z-index: 5;
-        color: #d8c8ff; font-size: 14px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+      #devoured { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 5;
+        color: #efe8ff; font-size: 14px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.75), 0 2px 8px rgba(0,0,0,0.5); }
       #board { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
         background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
       #board .row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
@@ -55,7 +55,7 @@
         font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #efe6ff; pointer-events: none; opacity: 0.95;
         text-shadow: 0 1px 3px rgba(0,0,0,0.55); transition: opacity 0.8s ease; }
       /* MAPLE ISLE NEWS — headlines that POP, and turn nervous as you eat */
-      #news { position: fixed; top: 84px; left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
+      #news { position: fixed; top: calc(84px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
         background: linear-gradient(180deg, #2c1454, #180a30);
         border: 2.5px solid #ffd25a; border-radius: 15px; overflow: hidden;
         padding: 11px 22px 13px; color: #fff; font-size: clamp(14px, 4vw, 19px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none; text-align: center;
@@ -80,7 +80,7 @@
         100% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.96); }
       }
       body.menu #news { display: none; }
-      #banner { position: fixed; top: 96px; left: 0; right: 0; text-align: center; z-index: 6; pointer-events: none;
+      #banner { position: fixed; top: calc(96px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 6; pointer-events: none;
         color: #fff; font-size: 24px; font-weight: 900; letter-spacing: 1px; opacity: 0;
         text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
       #banner.show { animation: bnr 2.2s ease forwards; }
@@ -99,7 +99,7 @@
         background: rgba(16,8,30,0.55); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(6px);
         color: #ffe08a; font-size: 14px; font-weight: 900; }
       /* daily quests: three icon CHIPS (pre-reader friendly), not sentences */
-      #quests { position: fixed; top: 150px; left: 10px; z-index: 5; pointer-events: none;
+      #quests { position: fixed; top: calc(150px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
         display: flex; gap: 6px; }
       #quests .q { background: rgba(16,8,30,0.55); border-radius: 11px; padding: 5px 8px 4px;
         backdrop-filter: blur(6px); text-align: center; min-width: 40px; }
@@ -233,7 +233,7 @@
       #worlds .wCard { width: 130px; padding: 18px 10px 14px; }
       #worlds .wCard i { font-size: 40px; }
       /* in-game home button */
-      #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 38px; height: 38px;
+      #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 44px; height: 44px;
         border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
         color: #cbb2ff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(6px); }
       body.menu #btnQuit { display: none; }
@@ -244,7 +244,7 @@
         background: rgba(10,5,22,0.8); backdrop-filter: blur(6px); }
       #daily.show { display: flex; }
       #daily.show .dCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
-      #daily .dCard { width: min(360px, 90vw); border-radius: 24px; text-align: center; padding: 26px 18px 22px;
+      #daily .dCard { width: min(360px, calc(100vw - 24px)); box-sizing: border-box; border-radius: 24px; text-align: center; padding: 26px 18px 22px;
         background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(255,210,90,0.6); box-shadow: 0 0 40px rgba(154,92,255,0.5); }
       #daily .dTitle { font-size: 22px; font-weight: 900; letter-spacing: 3px; color: #ffd25a; margin-bottom: 14px; }
@@ -256,8 +256,8 @@
       #dailyGrid .dCell.now { border-color: #ffd25a; background: rgba(255,210,90,0.14); color: #ffe08a;
         box-shadow: 0 0 12px rgba(255,210,90,0.35); transform: scale(1.06); }
       #dailyClaim { font-family: inherit; font-size: 17px; font-weight: 900; letter-spacing: 2px; color: #fff;
-        background: linear-gradient(180deg, #ff5f7e, #f43b60); border: none; border-radius: 14px; padding: 13px 44px;
-        cursor: pointer; box-shadow: 0 5px 0 #b82345, 0 8px 18px rgba(0,0,0,0.4); }
+        background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 14px; padding: 13px 44px;
+        cursor: pointer; box-shadow: 0 5px 0 #b8163a, 0 8px 18px rgba(0,0,0,0.4); }
       /* skin preview modal */
       #skinPrev { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.78); backdrop-filter: blur(6px); }
@@ -274,8 +274,8 @@
       #skinPrev .spName { font-size: 26px; font-weight: 900; color: #fff; letter-spacing: 1px; }
       #skinPrev .spTier { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: #ffd25a; margin: 4px 0 16px; }
       #skinPrev #spAct { font-family: inherit; font-size: 16px; font-weight: 900; letter-spacing: 1px; color: #fff;
-        background: linear-gradient(180deg, #ff5f7e, #f43b60); border: none; border-radius: 14px; padding: 13px 34px;
-        cursor: pointer; box-shadow: 0 5px 0 #b82345, 0 8px 18px rgba(0,0,0,0.4); }
+        background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 14px; padding: 13px 34px;
+        cursor: pointer; box-shadow: 0 5px 0 #b8163a, 0 8px 18px rgba(0,0,0,0.4); }
       #skinPrev #spClose { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #cbb2ff;
         font-size: 20px; cursor: pointer; font-family: inherit; }
       .wCard { width: 96px; padding: 10px 6px 8px; border-radius: 14px; text-align: center; cursor: pointer;
@@ -289,6 +289,13 @@
       .wCard.shake { animation: wshake 0.4s; }
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
       @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
+      /* touch feel: every control presses down */
+      #btnWorlds:active, .backBtn:active, #btnBack:active, #btnHome:active, #btnQuit:active, .wCard:active, .skCard:active { transform: scale(0.96); }
+      #dailyClaim:active, #spAct:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
+      #tut .card, #daily .dCard, #skinPrev .spCard { border-radius: 24px; }
+      .tr .nm { text-transform: uppercase; }
+      .backBtn, #btnBack { white-space: nowrap; flex: 0 0 auto; padding-top: 12px; padding-bottom: 12px; }
+      .shopTitle { font-size: clamp(18px, 5.5vw, 26px) !important; letter-spacing: 2px !important; min-width: 0; }
       /* loading screen — PLAY holds here until the asset pack is resident */
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
         justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
@@ -400,11 +407,11 @@
 
       /* ── first-run tutorial ── */
       #tut { position: fixed; inset: 0; z-index: 12; display: none; align-items: center; justify-content: center;
-        background: rgba(13,8,33,0.78); }
+        background: rgba(10,5,22,0.8); backdrop-filter: blur(6px); }
       #tut.show { display: flex; }
       #tut.show .card { animation: modalIn 0.26s cubic-bezier(0.2, 1.4, 0.4, 1); }
       #tut .tEmoji { font-size: 44px; margin-bottom: 4px; }
-      #tut .card { background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
+      #tut .card { max-width: min(420px, 88vw); box-sizing: border-box; background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(255,210,90,0.55); border-radius: 22px;
         box-shadow: 0 0 34px rgba(154,92,255,0.45), 0 18px 44px rgba(0,0,0,0.5);
         padding: 34px 40px; text-align: center; max-width: 420px; }

@@ -1144,17 +1144,20 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
       pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED'
         : s.cash ? `💎 $${s.cash.toFixed(2)}`
-        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}✦`;
+        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}`;
     }
   };
   // shop order tells the value story: colours → AI textures → LEGENDARY
   const SORTED = [...SKINS].sort((a, b) =>
     (a.cash ? 2 : a.tex ? 1 : 0) - (b.cash ? 2 : b.tex ? 1 : 0));
+  // the skin's own gradient always sits UNDER the AI art — a failed CDN load
+  // still shows a branded colored orb, never a bare black hole on a $4.99 card
+  const skinGrad = (s: Skin) => `radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
   const orbStyle = (s: Skin) => s.art
-    ? `background: url('${s.art}') center / cover; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
+    ? `background: url('${s.art}') center / cover, ${skinGrad(s)}; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
     : s.tex
-      ? `background: url('${s.tex}') center / cover; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.45);`
-      : `background: radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+      ? `background: url('${s.tex}') center / cover, ${skinGrad(s)}; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.45);`
+      : `background: ${skinGrad(s)}`;
   // every orb wears the FACE — it's the voidling you're buying, not a marble
   // (legendary card art already has the character drawn in)
   const FACE_SVG = `<svg class="face" viewBox="0 0 100 100">
@@ -1176,7 +1179,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       : owned.has(s.id) ? 'EQUIP'
       : s.cash ? `💎 $${s.cash.toFixed(2)} · APP STORE SOON`
       : s.streak ? `🔥 PLAY ${s.streak} DAYS IN A ROW`
-      : `BUY · ✦ ${PRICES[s.id]}✦`;
+      : `BUY · ✦ ${PRICES[s.id]}`;
   };
   const openPreview = (s: Skin) => {
     prevSkin = s;
