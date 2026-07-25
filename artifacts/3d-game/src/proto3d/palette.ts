@@ -106,20 +106,25 @@ export const SKINS: Skin[] = [
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
   { id: 'ember', name: 'Ember', abyss: 0x260a06, inner: 0x6a2410, mid: 0xc4571a, rim: 0xffb054, glow: 0xffcf7a, streak: 2 },
   { id: 'prism', name: 'Prism', abyss: 0x1a1030, inner: 0x4a2a8a, mid: 0x8a5ac8, rim: 0xe8b8ff, glow: 0xfff0a8, streak: 7 },
-  // ✨ LEGENDARY — character skins with 3D accessories, cash tier
-  { id: 'univoid', name: 'Uni-Void', abyss: 0x2a2038, inner: 0x8a7a9a, mid: 0xd8cce8, rim: 0xfff0fa, glow: 0xffc9e8, acc: 'unicorn', cash: 4.99,
+  // ✨ LEGENDARY — character skins with 3D accessories, cash tier.
+  // Colour stops are tuned to MATCH each skin's shop card art (App Store
+  // advertising accuracy): the in-game orb must read as the same character.
+  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', cash: 4.99,
     art: '/assets/hf/hf_20260717_221342_1fed1f77-b19c-416e-9e0d-e84a02a57845.png' },
-  { id: 'rexling', name: 'Rexling', abyss: 0x0e2412, inner: 0x2a6a30, mid: 0x4a9a4a, rim: 0x8ae87a, glow: 0xb8ff8a, acc: 'dino', cash: 4.99,
+  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', cash: 4.99,
     art: '/assets/hf/hf_20260723_181705_6e91b3cd-72f3-4867-817f-58dbd714d5a9.jpeg' },
-  { id: 'archmage', name: 'Archmage', abyss: 0x0c0a2e, inner: 0x241a6a, mid: 0x3a2ab8, rim: 0x7a6af8, glow: 0xa89aff, acc: 'wizard', cash: 6.99,
+  { id: 'archmage', name: 'Archmage', abyss: 0x0e0c38, inner: 0x2c2088, mid: 0x4635d8, rim: 0x8878ff, glow: 0xb0a4ff, acc: 'wizard', cash: 6.99,
     art: '/assets/hf/hf_20260717_221344_d766bd2d-ba32-4cf3-8ed0-fef26f6116b8.png' },
-  { id: 'kingvoid', name: 'King Void', abyss: 0x2a1c06, inner: 0x6a4a10, mid: 0xb8861a, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', cash: 9.99,
+  // King Void card art: BLACK glossy orb with a purple-nebula heart, wrapped
+  // in a swirling gold-stardust ring — body stays dark, the RIM is the gold
+  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', cash: 9.99,
     art: '/assets/hf/hf_20260717_221346_49c57d8f-d589-4a59-9c11-b5d96dbd9bc7.png' },
-  { id: 'drako', name: 'Drako', abyss: 0x0e1c2a, inner: 0x1e4a5e, mid: 0x2a7a8a, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', cash: 7.99,
+  // Drako card art: teal-blue dragon orb, warm golden glow around the edges
+  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', cash: 7.99,
     art: '/assets/hf/hf_20260723_181409_a7a76db9-9711-48e8-9e0e-4f43188251d0.jpeg' },
-  { id: 'mecha', name: 'Mecha-Void', abyss: 0x10141c, inner: 0x2a3a4a, mid: 0x4a6070, rim: 0x4de8ff, glow: 0x7bffe8, acc: 'mecha', cash: 5.99,
+  { id: 'mecha', name: 'Mecha-Void', abyss: 0x131a24, inner: 0x30485e, mid: 0x5e80a0, rim: 0x4de8ff, glow: 0x7bffe8, acc: 'mecha', cash: 5.99,
     art: '/assets/hf/hf_20260723_181412_8c2d9932-42ce-43ce-8027-299428ce21fc.jpeg' },
-  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x1c1230, mid: 0x2e2048, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', cash: 4.99,
+  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', cash: 4.99,
     art: '/assets/hf/hf_20260723_181414_a23e8298-d3ea-47e4-bba9-d7a468fc88e1.jpeg' },
 ];
 

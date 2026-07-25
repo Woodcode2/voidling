@@ -306,22 +306,51 @@ export function createLife(
     return false;
   };
   interface Arc { p0x: number; p0z: number; p1x: number; p1z: number; p2x: number; p2z: number; u: number; len: number; }
+  interface CarState {
+    axis: 'h' | 'v'; dir: number; centre: number; along: number; laneOff: number;
+    speed: number; turnCd: number; pauseT: number; arc: Arc | null;
+    nAxis: 'h' | 'v'; nCentre: number; nAlong: number; nLaneOff: number;
+  }
+  // CAR-SAFE island test. The old span/turn checks validated only the ROAD
+  // CENTRE point, but a car renders at centre + laneOff (±1.45) with a ±2.8
+  // body — where the coast runs oblique to a road, the centre line was on the
+  // island while the car's actual footprint hung over open space (the
+  // "traffic in orbit" screenshots). This tests a ring around the point so
+  // the whole car body stays clear of the waterline, with margin to spare.
+  const bodyOnIsland = (px: number, pz: number, m: number): boolean => {
+    if (!insideIsland3(px, pz)) return false;
+    const d = m * 0.7071;
+    return insideIsland3(px + m, pz) && insideIsland3(px - m, pz)
+      && insideIsland3(px, pz + m) && insideIsland3(px, pz - m)
+      && insideIsland3(px + d, pz + d) && insideIsland3(px - d, pz + d)
+      && insideIsland3(px + d, pz - d) && insideIsland3(px - d, pz - d);
+  };
+  const CAR_SAFE_M = 3.6;   // lane offset (1.45) + car half-extent (2.8 nose) rounded up
+  const carSafe = (px: number, pz: number): boolean =>
+    !inLagoon3(px, pz) && bodyOnIsland(px, pz, CAR_SAFE_M);
   // per-road ON-ISLAND intervals — the single authority for how far a car may
   // drive down each painted road before the coast clips it. Replaces all the
   // per-frame probe guesswork that made cars saw-tooth at clipped road stubs.
   type Span = [number, number];
   const roadSpans = new Map<string, Span[]>();
+  // flat list of every legal interval on every road — the respawn pool.
+  // Handles multi-interval roads (the island blob clips a road into several
+  // on-island pieces) because each piece is its own entry.
+  const spanList: { axis: 'h' | 'v'; centre: number; sp: Span }[] = [];
   for (const rc of ROAD_CENTERS_3D) {
     for (const axis of ['h', 'v'] as const) {
       const spans: Span[] = [];
       let s0: number | null = null;
       for (let a = -280; a <= 282; a += 2) {
         const px = axis === 'h' ? a : rc, pz = axis === 'h' ? rc : a;
-        const ok = a <= 280 && !!biomeAt(px, pz) && !inLagoon3(px, pz);
+        // carSafe (not the bare centre-line test): a span endpoint is only
+        // valid if a whole car fits there without touching the waterline
+        const ok = a <= 280 && carSafe(px, pz);
         if (ok && s0 === null) s0 = a;
         if (!ok && s0 !== null) { if (a - 2 - s0 > 34) spans.push([s0, a - 2]); s0 = null; }
       }
       roadSpans.set(axis + rc, spans);
+      for (const sp of spans) spanList.push({ axis, centre: rc, sp });
     }
   }
   const EDGE_M = 10;   // cars U-turn this far before the cliff — never overhang
@@ -336,6 +365,31 @@ export function createLife(
     }
     return best;
   };
+  // emergency respawn: drop the car onto a random legal span interior point,
+  // as far from the player as we can find. Used by the per-frame invariant —
+  // whatever upstream math produced an illegal position, the car never stays
+  // there for even one rendered frame.
+  const teleportCar = (st: CarState, mesh: THREE.Object3D, vx: number, vz: number): void => {
+    let bd = -1, bx = 0, bz = 0, bAlong = 0, bSlot: { axis: 'h' | 'v'; centre: number; sp: Span } | null = null;
+    for (let k = 0; k < 24; k++) {
+      const slot = pick(spanList);
+      if (!slot) break;
+      const along = rand(slot.sp[0] + EDGE_M, slot.sp[1] - EDGE_M);
+      const lane = st.dir * LANE * (slot.axis === 'h' ? 1 : -1);
+      const px = slot.axis === 'h' ? along : slot.centre + lane;
+      const pz = slot.axis === 'h' ? slot.centre + lane : along;
+      if (!carSafe(px, pz)) continue;   // double-check the actual lane point
+      const d = Math.hypot(px - vx, pz - vz);
+      if (d > bd) { bd = d; bx = px; bz = pz; bAlong = along; bSlot = slot; }
+      if (d > 120) break;   // far enough — no pop-in next to the player
+    }
+    if (!bSlot) return;   // no legal spot found this frame (never in practice); retry next frame
+    st.axis = bSlot.axis; st.centre = bSlot.centre; st.along = bAlong;
+    st.laneOff = st.dir * LANE * (bSlot.axis === 'h' ? 1 : -1);
+    st.arc = null; st.pauseT = 0; st.turnCd = rand(1, 3);
+    mesh.position.set(bx, 0, bz);
+    mesh.rotation.y = bSlot.axis === 'h' ? headingOf(st.dir, 0) : headingOf(0, st.dir);
+  };
   for (let i = 0; i < 30; i++) {
     const mesh = makeCar();
     let horiz = Math.random() < 0.5;
@@ -346,8 +400,8 @@ export function createLife(
     for (let k = 0; k < 8 && !sp0; k++) { horiz = Math.random() < 0.5; centre = pick(ROAD_CENTERS_3D); sp0 = spanFor(horiz ? 'h' : 'v', centre, 0); }
     if (!sp0) continue;
     const along0 = rand(sp0[0] + EDGE_M, sp0[1] - EDGE_M);
-    const st = {
-      axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: along0,
+    const st: CarState = {
+      axis: horiz ? 'h' : 'v', dir, centre, along: along0,
       laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2), pauseT: 0,
       arc: null as Arc | null, nAxis: 'h' as 'h' | 'v', nCentre: 0, nAlong: 0, nLaneOff: 0,
     };
@@ -356,10 +410,7 @@ export function createLife(
     mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car'; mesh.userData.mover = true;
     mesh.add(contactShadow(2));
     setShadow(mesh); scene.add(mesh); addEdible(mesh, 2.8);
-    movers.push({
-      mesh,
-      update(dt, _t, vx, vz, vR) {
-        if (eaten(mesh)) return;
+    const drive = (dt: number, vx: number, vz: number, vR: number): void => {
         // mid-turn: follow the bezier so nose and path always agree
         if (st.arc) {
           const a = st.arc;
@@ -367,15 +418,13 @@ export function createLife(
           const w = 1 - a.u;
           const px = w * w * a.p0x + 2 * w * a.u * a.p1x + a.u * a.u * a.p2x;
           const pz = w * w * a.p0z + 2 * w * a.u * a.p1z + a.u * a.u * a.p2z;
-          // a turn that would carry the car off the road network (clipped road
-          // stub near the coast) is cancelled — U-turn instead
-          if (!biomeAt(px, pz)) { st.arc = null; st.dir *= -1; st.turnCd = 2; return; }
+          // a turn that would carry the car off the island / into the lagoon
+          // (clipped road stub near the coast) is cancelled BEFORE the position
+          // is applied — U-turn instead. carSafe = whole body clear, not just
+          // the centre point.
+          if (!carSafe(px, pz)) { st.arc = null; st.dir *= -1; st.turnCd = 2; return; }
           const dxu = 2 * w * (a.p1x - a.p0x) + 2 * a.u * (a.p2x - a.p1x);
           const dzu = 2 * w * (a.p1z - a.p0z) + 2 * a.u * (a.p2z - a.p1z);
-          if (!insideIsland3(px, pz)) {   // arc strayed off the cliff: abort, U-turn
-            st.arc = null; st.dir *= -1;
-            return;
-          }
           mesh.position.set(px, 0, pz);
           mesh.rotation.y = headingOf(dxu, dzu);
           if (a.u >= 1) {
@@ -395,9 +444,10 @@ export function createLife(
           spd = Math.min(30, st.speed * 2.1);   // scared, not uncatchable
           const ac = st.axis === 'h' ? dx : dz;
           const wantDir = ac >= 0 ? 1 : -1;
-          // only flee toward road that actually EXISTS — at least 25u of it —
-          // otherwise hold course (fleeing into a dead end = the stub shake)
-          const runway = wantDir > 0 ? sp[1] - st.along : st.along - sp[0];
+          // only flee toward road that actually EXISTS — at least 25u of it
+          // BEYOND the U-turn margin, so panic never pushes a car past the
+          // pavement end — otherwise hold course (dead end = the stub shake)
+          const runway = wantDir > 0 ? sp[1] - EDGE_M - st.along : st.along - (sp[0] + EDGE_M);
           if (runway > 25) st.dir = wantDir;
         }
         st.along += st.dir * spd * dt;
@@ -415,9 +465,13 @@ export function createLife(
           const p2x = nAxis === 'h' ? nAlong : rc + nLaneOff;
           const p2z = nAxis === 'h' ? rc + nLaneOff : nAlong;
           // a junction near the coast can sit in open ocean (clipped road) —
-          // never begin a turn whose corner or exit leaves the island, and the
-          // exit road must have real runway past the corner
-          if (!biomeAt(p1x, p1z) || !biomeAt(p2x, p2z)) continue;
+          // never begin a turn whose corner, midpoint or exit puts any part of
+          // the car off the island, and the exit road must have real runway
+          // past the corner. (carSafe, not biomeAt: the centre point being on
+          // land is not enough for a 5.6u-long car.)
+          const midx = 0.25 * mesh.position.x + 0.5 * p1x + 0.25 * p2x;
+          const midz = 0.25 * mesh.position.z + 0.5 * p1z + 0.25 * p2z;
+          if (!carSafe(p1x, p1z) || !carSafe(p2x, p2z) || !carSafe(midx, midz)) continue;
           const esp = spanFor(nAxis, rc, nAlong);
           if (!esp || nAlong < esp[0] + EDGE_M || nAlong > esp[1] - EDGE_M) continue;
           const len = Math.hypot(p1x - mesh.position.x, p1z - mesh.position.z) + Math.hypot(p2x - p1x, p2z - p1z);
@@ -427,16 +481,25 @@ export function createLife(
         }
         if (st.axis === 'h') mesh.position.set(st.along, 0, st.centre + st.laneOff);
         else mesh.position.set(st.centre + st.laneOff, 0, st.along);
-        if (!insideIsland3(mesh.position.x, mesh.position.z)) {
-          // belt-and-braces: a car may NEVER exist over open space
-          st.dir *= -1; st.along += st.dir * 10;
-          if (st.axis === 'h') mesh.position.x = st.along; else mesh.position.z = st.along;
-        }
         const targetRot = st.axis === 'h' ? headingOf(st.dir, 0) : headingOf(0, st.dir);
         let dr = targetRot - mesh.rotation.y;
         while (dr > Math.PI) dr -= Math.PI * 2;
         while (dr < -Math.PI) dr += Math.PI * 2;
         mesh.rotation.y += dr * Math.min(1, dt * 10);
+    };
+    movers.push({
+      mesh,
+      update(dt, _t, vx, vz, vR) {
+        if (eaten(mesh)) return;
+        drive(dt, vx, vz, vR);
+        // HARD INVARIANT — belt and braces, checked on EVERY code path every
+        // frame after the position is derived: if any part of the car is off
+        // the island (or it waded into the lagoon), it is teleported to a
+        // random legal span far from the player before it can render there.
+        // The old version flipped dir and nudged 10u — which could STILL be
+        // off-island on an oblique coast, leaving the car oscillating in
+        // space forever (the floating-traffic screenshots).
+        if (!carSafe(mesh.position.x, mesh.position.z)) teleportCar(st, mesh, vx, vz);
       },
     });
   }

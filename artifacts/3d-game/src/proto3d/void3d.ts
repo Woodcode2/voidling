@@ -633,6 +633,12 @@ export function buildAccessory(kind: string): THREE.Group {
       const horn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 8), hornMat);
       horn.position.set(sx, 1.08, 0.2); horn.rotation.x = 0.2; horn.rotation.z = -sx; g.add(horn);
     }
+    // lighter teal belly patch (the card art's pale tummy) — a flattened
+    // sphere hugging the lower front of the orb, kept below the mouth
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 16),
+      new THREE.MeshStandardMaterial({ color: 0x7ad8c8, roughness: 0.5, emissive: 0x2a7a6a, emissiveIntensity: 0.25 }));
+    belly.position.set(0, -0.58, 0.72); belly.rotation.x = -0.68;
+    belly.scale.set(1.15, 0.75, 0.4); g.add(belly);
   }
   else if (kind === 'mecha') {
     const chrome = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.8, roughness: 0.25 });
@@ -657,20 +663,40 @@ export function buildAccessory(kind: string): THREE.Group {
       const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.85), new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7, side: THREE.DoubleSide }));
       tail.position.set(sx, 0.14, -1.0); tail.rotation.x = 0.5; tail.rotation.z = sx * 2; g.add(tail);
     }
+    // chunky knot where the band ties — sells "headband", not "red ring"
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), bandMat);
+    knot.scale.set(1, 0.8, 0.8); knot.position.set(0.02, 0.5, -0.92); g.add(knot);
   }
   else if (kind === 'king') {
-    // a crown you can SEE from gameplay zoom — big band, tall points, jewels
+    // matches the King Void card art: gold 5-point crown with PURPLE gems,
+    // worn TILTED, plus a ring of gold stardust sparkles riding the equator
     const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.35 });
+    const crown = new THREE.Group();
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.6, 0.32, 12, 1, true), gold);
-    band.position.y = 0.98; g.add(band);
+    crown.add(band);
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
       const pt = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.38, 6), gold);
-      pt.position.set(Math.cos(a) * 0.54, 1.28, Math.sin(a) * 0.54); g.add(pt);
+      pt.position.set(Math.cos(a) * 0.54, 0.3, Math.sin(a) * 0.54); crown.add(pt);
     }
-    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8),
-      new THREE.MeshStandardMaterial({ color: 0xe83a5a, roughness: 0.2, metalness: 0.3, emissive: 0xa01830, emissiveIntensity: 0.8 }));
-    gem.position.set(0, 0.99, 0.6); g.add(gem);
+    // purple gems on the band (the card art's amethysts)
+    const gemMat = new THREE.MeshStandardMaterial({ color: 0xa04df0, roughness: 0.2, metalness: 0.3, emissive: 0x7a2ad8, emissiveIntensity: 0.9 });
+    for (const a of [-0.55, 0, 0.55]) {
+      const gem = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), gemMat);
+      gem.position.set(Math.sin(a) * 0.6, 0.01, Math.cos(a) * 0.6); crown.add(gem);
+    }
+    crown.position.set(0.14, 0.98, 0); crown.rotation.z = -0.18;   // tilted, like the art
+    g.add(crown);
+    // gold-stardust ring: small emissive sparkles orbiting the equator
+    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffe8a0 });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.4;
+      const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), sparkMat);
+      sp.position.set(Math.cos(a) * 1.15, ((i % 3) - 1) * 0.16 - 0.05, Math.sin(a) * 1.15);
+      sp.rotation.set(a, a * 1.7, 0);
+      sp.scale.setScalar(0.8 + (i % 2) * 0.5);
+      g.add(sp);
+    }
   }
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;

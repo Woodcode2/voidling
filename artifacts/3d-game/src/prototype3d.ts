@@ -134,9 +134,16 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 }
 
 const island = createIsland(scene, addEdible);
-// dev/QA introspection hooks (harmless in prod; no gameplay reads these)
-const _dbg = window as unknown as { __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer };
+// dev/QA introspection hooks (harmless in prod; no gameplay reads these).
+// __edibles + __insideIsland3 + __validateWorld power the placement auditor:
+// a headless sweep measures every edible's REAL world-space bounding box
+// against the road/sidewalk bands and the coastline.
+const _dbg = window as unknown as {
+  __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
+  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
+};
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
+_dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 5);   // the WHOLE family shows up (full end-board)
@@ -821,8 +828,12 @@ function showGuide(text: string, dur = 5) {
   g.classList.add('show');
   guideT = dur;
 }
+let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
   validateWorld();   // covers late async-registered GLB props on every start
+  // GLBs stream in for a while after start — re-sweep twice so props that
+  // finished loading (and finally have real footprints) also get validated
+  _revalQueue = [tClock + 8, tClock + 22];
   soloMode = solo;
   matchLen = solo ? 120 : MATCH_LEN;
   matchClock = matchLen;
@@ -922,23 +933,31 @@ function validateWorld() {
     const e = edibles[i];
     const ud = e.mesh.userData;
     if (ud.mover || ud.vChecked) continue;   // movers steer themselves; checked props are settled
-    ud.vChecked = true;
     _vBox.setFromObject(e.mesh); _vBox.getSize(_vSz);
+    // a GLB wrapper whose model hasn't streamed yet measures ~empty — do NOT
+    // stamp it checked, or the house it becomes is never validated at all
+    // (exactly how oversized houses kept ending up "in the street")
+    if (_vSz.x < 0.05 && _vSz.z < 0.05) continue;
+    ud.vChecked = true;
     // buildings get a tighter test (0.45) — downtown street walls legitimately
-    // hug the sidewalk and must not be "corrected" away from their block face
-    const f = ud.building ? 0.45 : 0.7;
+    // hug the sidewalk and must not be "corrected" away from their block face.
+    // HOUSES are the exception: near-true footprint (0.85) and the no-go band
+    // includes the sidewalk, so a porch can never ride the curb again.
+    const house = ud.qk === 'house';
+    const f = house ? 0.85 : ud.building ? 0.45 : 0.7;
+    const band = house ? ASPHALT_HALF + 1.4 : ASPHALT_HALF;
     const hx = (Math.min(_vSz.x, 24) / 2) * f, hz = (Math.min(_vSz.z, 24) / 2) * f;
     let px = e.home.x, pz = e.home.z, dirty = false, dead = false;
     for (const rc of ROAD_CENTERS_3D) {
-      if (Math.abs(px - rc) < ASPHALT_HALF + hx) {   // straddles a vertical road lane
-        const off = ASPHALT_HALF + hx + 0.4;
+      if (Math.abs(px - rc) < band + hx) {   // straddles a vertical road lane
+        const off = band + hx + 0.4;
         const side = px >= rc ? 1 : -1;
         if (insideIsland3(rc + side * off, pz) && !inLagoon3(rc + side * off, pz)) { px = rc + side * off; dirty = true; }
         else if (insideIsland3(rc - side * off, pz) && !inLagoon3(rc - side * off, pz)) { px = rc - side * off; dirty = true; }
         else { dead = true; break; }
       }
-      if (Math.abs(pz - rc) < ASPHALT_HALF + hz) {   // straddles a horizontal road lane
-        const off = ASPHALT_HALF + hz + 0.4;
+      if (Math.abs(pz - rc) < band + hz) {   // straddles a horizontal road lane
+        const off = band + hz + 0.4;
         const side = pz >= rc ? 1 : -1;
         if (insideIsland3(px, rc + side * off) && !inLagoon3(px, rc + side * off)) { pz = rc + side * off; dirty = true; }
         else if (insideIsland3(px, rc - side * off) && !inLagoon3(px, rc - side * off)) { pz = rc - side * off; dirty = true; }
@@ -1239,6 +1258,7 @@ function animate() {
   let dtw = dt;
   if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
   tClock += dt;
+  if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); }
   island.update(dt, tClock);
 
   if (started && !ended) {

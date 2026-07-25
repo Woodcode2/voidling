@@ -220,6 +220,17 @@ export function glb(
     const hi = new THREE.Group();
     hi.add(tpl.clone(true));
     hi.scale.setScalar(opts.h ?? spec.h);
+    // FOOTPRINT CAP — models are normalized by HEIGHT, so a wide model (a
+    // sprawling house) can blow far past its gameplay radius r and visually
+    // sit on sidewalks/roads no matter how far its lot is set back. If the
+    // visual half-extent exceeds 1.3×r, shrink uniformly to fit. This is the
+    // structural fix behind every "the houses are in the street" report.
+    {
+      const bb = new THREE.Box3().setFromObject(hi);
+      const half = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2;
+      const cap = r * 1.3;
+      if (half > cap) hi.scale.multiplyScalar(cap / half);
+    }
     // PERF: generated meshes are dense (30-150k tris each, ~100 instances on
     // the island). With a procedural fallback available, wrap in an LOD so the
     // full-detail mesh only renders near the camera and the cheap procedural

@@ -1731,8 +1731,11 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
           const hedge = makeFenceRun(9, 0x4faa5a);
           hedge.rotation.y = lot.fy !== 0 ? 0 : Math.PI / 2;
           // front offset 7.0, NOT 9.5 — lot center +9.5 is the exact asphalt
-          // line, and a hedge on the curb reads as "stuff in the road"
-          place(hedge, hx + fx3 * 7.0 - sx3 * 5.5, hz + fz3 * 7.0 - sz3 * 5.5, 1.4);
+          // line, and a hedge on the curb reads as "stuff in the road".
+          // Lateral: OPPOSITE the driveway (-dv). The old -sx3*5.5 landed on
+          // the driveway side for south rows + west edges — the parked car
+          // drove nose-first through its own hedge.
+          place(hedge, hx + fx3 * 7.0 - dvx, hz + fz3 * 7.0 - dvz, 1.4);
           for (const sSide of [-1, 1]) {
             const top = new THREE.Group();
             const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1, 6), new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1 }));
@@ -1747,7 +1750,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
             const finial = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), new THREE.MeshStandardMaterial({ color: 0xd8d0b8, roughness: 0.6 }));
             finial.position.y = 1.7;
             const gp = new THREE.Group(); gp.add(pillar); gp.add(finial);
-            place(gp, hx + fx3 * 7.0 + sx3 * (5.5 + gSide * 1.6), hz + fz3 * 7.0 + sz3 * (5.5 + gSide * 1.6), 0.9);
+            // gate pillars straddle the DRIVEWAY (+dv side, matching the bake)
+            place(gp, hx + fx3 * 7.0 + dvx + (dvx ? gSide * 1.6 : 0), hz + fz3 * 7.0 + dvz + (dvz ? gSide * 1.6 : 0), 0.9);
           }
         }
       });
