@@ -1932,10 +1932,13 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   // brand-new player eats 5+ things in the first fifteen seconds (hole.io rule)
   {
     const sx0 = w(ROAD_CENTERS[0]), sz0 = w(ROAD_CENTERS[2]);
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      const r0 = 7 + (i % 3) * 3.5;
-      place(i % 3 === 0 ? makeCoins() : makeTinyProp(), sx0 + Math.cos(a) * r0, sz0 + Math.sin(a) * r0, i % 3 === 0 ? 0.55 : rand(0.6, 0.8));
+    // snacks live on the four GRASS corners of the junction — never the asphalt
+    let si = 0;
+    for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      for (let k = 0; k < 3; k++, si++) {
+        const x = sx0 + qx * (8 + k * 3.2), z = sz0 + qz * (8 + (2 - k) * 3.2);
+        place(si % 4 === 0 ? makeCoins() : makeTinyProp(), x, z, si % 4 === 0 ? 0.55 : rand(0.6, 0.8));
+      }
     }
   }
 

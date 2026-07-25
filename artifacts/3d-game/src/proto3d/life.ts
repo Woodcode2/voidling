@@ -316,7 +316,7 @@ export function createLife(
     }
     const st = {
       axis: horiz ? 'h' : 'v' as 'h' | 'v', dir, centre, along: along0,
-      laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2),
+      laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2), pauseT: 0,
       arc: null as Arc | null, nAxis: 'h' as 'h' | 'v', nCentre: 0, nAlong: 0, nLaneOff: 0,
     };
     if (st.axis === 'h') mesh.position.set(st.along, 0, centre + st.laneOff); else mesh.position.set(centre + st.laneOff, 0, st.along);
@@ -369,7 +369,12 @@ export function createLife(
         const nz = st.axis === 'h' ? st.centre + st.laneOff : st.along;
         const noseX = st.axis === 'h' ? nx + st.dir * 3.5 : nx;
         const noseZ = st.axis === 'h' ? nz : nz + st.dir * 3.5;
-        if (!onRoad(nx, nz) || !biomeAt(noseX, noseZ)) { st.dir *= -1; st.along += st.dir * spd * dt * 2; }
+        if (!onRoad(nx, nz) || !biomeAt(noseX, noseZ)) {
+          // dead end: brake for a beat, then pull away in reverse (the instant
+          // double-step flip read as a teleport)
+          st.pauseT = 0.35; st.dir *= -1;
+        }
+        if (st.pauseT && st.pauseT > 0) { st.pauseT -= dt; return; }
         if (st.turnCd === 0) for (const rc of ROAD_CENTERS_3D) if (Math.abs(st.along - rc) < 5 && Math.random() < 0.5) {
           // set up a quarter-circle-ish bezier: current pos -> lane corner -> exit on the new lane
           const nAxis = st.axis === 'h' ? 'v' : 'h';

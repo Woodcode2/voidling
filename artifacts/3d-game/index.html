@@ -58,15 +58,16 @@
       #news { position: fixed; top: 84px; left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
         background: linear-gradient(180deg, #2c1454, #180a30);
         border: 2.5px solid #ffd25a; border-radius: 15px; overflow: hidden;
-        padding: 13px 24px; color: #fff; font-size: clamp(15px, 4.4vw, 21px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none;
+        padding: 11px 22px 13px; color: #fff; font-size: clamp(14px, 4vw, 19px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none; text-align: center;
         opacity: 0; box-shadow: 0 8px 26px rgba(0,0,0,0.55), 0 0 26px rgba(255,210,90,0.35);
         max-width: 94vw; line-height: 1.35; }
       #news::after { content: ''; position: absolute; top: -60%; left: -80%; width: 45%; height: 220%;
         background: linear-gradient(100deg, transparent, rgba(255,255,255,0.22), transparent);
         transform: rotate(18deg); animation: newsShine 5.6s ease forwards; }
       @keyframes newsShine { 0%, 12% { left: -80%; } 42% { left: 130%; } 100% { left: 130%; } }
-      #news i { font-style: normal; color: #1a0b33; font-size: 12.5px; letter-spacing: 2px; margin-right: 12px;
-        background: #ffd25a; border-radius: 7px; padding: 3px 9px; }
+      #news i { font-style: normal; color: #1a0b33; font-size: 11.5px; letter-spacing: 2px;
+        display: block; width: max-content; margin: 0 auto 6px;
+        background: #ffd25a; border-radius: 7px; padding: 3px 10px; }
       #news.worried { border-color: #ffb054; box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 20px rgba(255,196,60,0.3); }
       #news.panic { border-color: #ff5a6e; box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 24px rgba(255,60,80,0.4); }
       #news.panic i { color: #ff8a9a; background: rgba(255,90,110,0.16); }
@@ -168,29 +169,21 @@
          the hero void's face in the key art stays completely clear. */
       #menu { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
         align-items: center; justify-content: flex-start; text-align: center;
-        padding: 6vh 16px 5vh; box-sizing: border-box;
+        padding: 6vh 16px 4vh; box-sizing: border-box;
         background:
-          linear-gradient(180deg, rgba(13,8,33,0.42) 0%, rgba(13,8,33,0.0) 26%, rgba(13,8,33,0.0) 62%, rgba(13,8,33,0.72) 100%),
-          url('/assets/hf/hf_20260723_174649_b2a3b133-7831-4a9f-ae6f-cd24e5f1ff81.png') center 38% / cover no-repeat,
-          radial-gradient(ellipse at 50% 30%, #2a1454, #0d0821 75%); }
+          radial-gradient(ellipse at 78% 12%, rgba(240,111,176,0.16), transparent 42%),
+          radial-gradient(ellipse at 18% 30%, rgba(94,200,216,0.10), transparent 40%),
+          radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
+      #menu::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+        background-image: radial-gradient(circle, rgba(255,255,255,0.9) 0.6px, transparent 1.2px),
+          radial-gradient(circle, rgba(216,200,255,0.55) 0.5px, transparent 1px);
+        background-size: 210px 190px, 120px 140px;
+        background-position: 12px 8px, 60px 90px; }
+      #menuOrb { width: min(58vw, 300px); aspect-ratio: 1; margin: 8px auto 4px; position: relative;
+        animation: orbFloat 3.6s ease-in-out infinite; filter: drop-shadow(0 22px 40px rgba(0,0,0,0.5)); }
+      @keyframes orbFloat { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-10px) scale(1.02); } }
       @media (orientation: portrait) {
-        #menu .spacer { flex: 1.7; }   /* the character's face gets the frame */
-        #menu .navRow { margin-top: 10px; }
-
-        #menu { background:
-          linear-gradient(180deg, rgba(13,8,33,0.15) 0%, rgba(13,8,33,0.0) 18%, rgba(13,8,33,0.0) 72%, rgba(13,8,33,0.5) 100%),
-          url('/assets/hf/hf_20260725_081618_506a260b-6ac3-40ee-8493-5f2f87067b0e.png') center top / cover no-repeat,
-          radial-gradient(ellipse at 50% 30%, #2a1454, #0d0821 75%); }
-        #loadScr { background:
-          linear-gradient(180deg, rgba(13,8,33,0.3) 0%, rgba(13,8,33,0.15) 50%, rgba(13,8,33,0.5) 100%),
-          url('/assets/hf/hf_20260725_081618_506a260b-6ac3-40ee-8493-5f2f87067b0e.png') center top / cover no-repeat,
-          radial-gradient(circle at 50% 30%, #2a1150, #0d0821 72%); }
-      }
-      @media (min-width: 900px) {
-        #menu { background:
-          linear-gradient(180deg, rgba(13,8,33,0.42) 0%, rgba(13,8,33,0.0) 26%, rgba(13,8,33,0.0) 62%, rgba(13,8,33,0.72) 100%),
-          url('/assets/hf/hf_20260723_174649_b2a3b133-7831-4a9f-ae6f-cd24e5f1ff81.png') center 38% / cover no-repeat,
-          radial-gradient(ellipse at 50% 30%, #2a1454, #0d0821 75%); }
+        #menu .spacer { flex: 0.5; }
       }
       #menu .logo { font-size: clamp(52px, 9vw, 84px); font-weight: 900; letter-spacing: 3px; color: #fff;
         text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
@@ -263,10 +256,8 @@
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
       /* loading screen — PLAY holds here until the asset pack is resident */
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
-        justify-content: center; gap: 13px; background:
-          linear-gradient(180deg, rgba(13,8,33,0.55) 0%, rgba(13,8,33,0.35) 50%, rgba(13,8,33,0.7) 100%),
-          url('/assets/hf/hf_20260723_174649_b2a3b133-7831-4a9f-ae6f-cd24e5f1ff81.png') center 38% / cover no-repeat,
-          radial-gradient(circle at 50% 30%, #2a1150, #0d0821 72%); }
+        justify-content: center; gap: 13px;
+        background: radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
       #loadScr.show { display: flex; }
       #loadScr .lLogo { font-size: 30px; font-weight: 900; letter-spacing: 3px; color: #fff; text-shadow: 0 0 24px #b875ff; }
       #loadScr .lName { font-size: 14px; letter-spacing: 6px; color: #ffd23f; font-weight: 800; }
@@ -426,6 +417,26 @@
       <div class="tag">THE CUTE WORLD ENDER</div>
       <div id="rankChip"></div>
       <div class="spacer"></div>
+      <div id="menuOrb"><svg viewBox="0 0 200 200" width="100%" height="100%">
+        <defs>
+          <radialGradient id="mvg" cx="38%" cy="32%">
+            <stop offset="0%" stop-color="#a562f2"/><stop offset="34%" stop-color="#7030c0"/>
+            <stop offset="72%" stop-color="#431677"/><stop offset="100%" stop-color="#1c0930"/>
+          </radialGradient>
+          <radialGradient id="mglow" cx="50%" cy="50%">
+            <stop offset="55%" stop-color="rgba(184,117,255,0)"/><stop offset="78%" stop-color="rgba(184,117,255,0.35)"/><stop offset="100%" stop-color="rgba(184,117,255,0)"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="99" fill="url(#mglow)"/>
+        <circle cx="100" cy="100" r="76" fill="url(#mvg)"/>
+        <circle cx="74" cy="66" r="9" fill="#ffffff" opacity="0.35"/>
+        <circle cx="82" cy="92" r="17" fill="#fff"/><circle cx="120" cy="92" r="17" fill="#fff"/>
+        <circle cx="85" cy="95" r="9.5" fill="#160a30"/><circle cx="123" cy="95" r="9.5" fill="#160a30"/>
+        <circle cx="82" cy="90" r="3.6" fill="#fff"/><circle cx="120" cy="90" r="3.6" fill="#fff"/>
+        <ellipse cx="62" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
+        <ellipse cx="140" cy="114" rx="10" ry="6.5" fill="#ff7da8" opacity="0.65"/>
+        <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+      </svg></div>
       <button id="btnWorlds"><i>🏝️</i> MAPLE ISLE <span>WORLD 1 OF 3</span><b>›</b></button>
       <button id="btnPlay">PLAY<span>vs the family · 3:00 · MAPLE ISLE</span></button>
       <button id="btnSolo">SOLO RUN<span>no rivals · 2:00 · devour 100%</span></button>

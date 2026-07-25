@@ -476,8 +476,9 @@ function refreshHud() {
     const i = rows.indexOf(r);
     return `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`;
   }).join('');
-  let consumed = 0;
-  for (const e of edibles) if (e.eaten || !e.mesh.visible) consumed += e.radius;
+  let consumed = 0, total = 0;
+  for (const e of edibles) { total += e.radius; if (e.eaten || !e.mesh.visible) consumed += e.radius; }
+  if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
   if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
   devEl.textContent = `${devouredPct}% DEVOURED`;
