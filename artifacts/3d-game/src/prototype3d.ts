@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 // brand type: the shipping page used system-ui while only the retired React
 // entry bundled the brand font — single cheapest "top-10 app" lift
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import '@fontsource/fredoka/400.css';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
@@ -302,10 +304,17 @@ function announce(text: string) {
 let buzzGate = 0, hadGesture = false;
 window.addEventListener('pointerdown', () => { hadGesture = true; }, { once: true });
 function buzz(ms: number) {
-  if (!hadGesture || !('vibrate' in navigator)) return;   // browsers require a tap first
   const now = performance.now();
   if (ms < 20 && now < buzzGate) return;   // ticks are rate-limited; big hits always land
   buzzGate = now + 70;
+  // iOS Safari/WKWebView never implemented navigator.vibrate — every haptic
+  // beat was silent on the App Store target. Route through Capacitor Haptics
+  // on native; web keeps the vibrate path.
+  if (Capacitor.isNativePlatform()) {
+    void Haptics.impact({ style: ms >= 45 ? ImpactStyle.Heavy : ms >= 25 ? ImpactStyle.Medium : ImpactStyle.Light });
+    return;
+  }
+  if (!hadGesture || !('vibrate' in navigator)) return;   // browsers require a tap first
   try { navigator.vibrate(ms); } catch { /* not supported */ }
 }
 
