@@ -167,15 +167,19 @@ const _shGeo = new THREE.CircleGeometry(1, 24);
 let _shMat: THREE.MeshBasicMaterial | null = null;
 export function contactShadow(r: number): THREE.Mesh {
   if (!_shTex) {
+    // WHITE gradient used as pure alpha; the DARK comes from material.color
+    // (which three color-manages correctly). Baking the dark color into the
+    // canvas left the texture in linear space, and the output transform
+    // brightened every blob into a pale BLUE disc — the "lake in the street".
     const cv = document.createElement('canvas'); cv.width = cv.height = 128;
     const x = cv.getContext('2d')!;
     const gr = x.createRadialGradient(64, 64, 8, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(20,14,34,0.55)');
-    gr.addColorStop(0.7, 'rgba(20,14,34,0.22)');
-    gr.addColorStop(1, 'rgba(20,14,34,0)');
+    gr.addColorStop(0, 'rgba(255,255,255,0.38)');
+    gr.addColorStop(0.7, 'rgba(255,255,255,0.14)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
     x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
     _shTex = new THREE.CanvasTexture(cv);
-    _shMat = new THREE.MeshBasicMaterial({ map: _shTex, transparent: true, depthWrite: false });
+    _shMat = new THREE.MeshBasicMaterial({ map: _shTex, color: 0x14100f, transparent: true, depthWrite: false });
   }
   const m = new THREE.Mesh(_shGeo, _shMat!);
   m.rotation.x = -Math.PI / 2;
@@ -234,7 +238,6 @@ export function glb(
     obj.position.set(x, 0, z);
     if (opts.rotY) obj.rotation.y = opts.rotY;
     obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
-    if (r >= 2.5) obj.add(contactShadow(r));   // grounded, never floating
     scene.add(obj);
     addEdible?.(obj, r);
     opts.onReady?.(obj as THREE.Group);

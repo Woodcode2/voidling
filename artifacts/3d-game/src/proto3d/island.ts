@@ -68,7 +68,10 @@ export function houseLots(gx: number, gy: number): HouseLot[] {
 // blocks give every third street-row lot a pool behind the house
 export function lotPool(biome: Biome, li: number, lot: HouseLot): { x: number; y: number } | null {
   if (biome !== 'fancy' || lot.fy === 0 || li % 3 !== 1) return null;
-  return { x: lot.x + 120, y: lot.y - lot.fy * 300 };
+  // pool sits DIRECTLY behind the house — the old +120 sideways shift pushed
+  // the outermost lots' pools past the block edge into the cross street
+  // (the "small lake in the road" bug)
+  return { x: lot.x, y: lot.y - lot.fy * 300 };
 }
 const ROAD_CENTERS = [2580, 4290, 6000, 7710, 9420];
 
@@ -414,9 +417,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       const pool = lotPool(b, li, lot);
       if (pool) {
         g.fillStyle = '#f2f3f7';
-        g.beginPath(); g.ellipse(pxW(pool.x), pyW(pool.y), pxW(150) - pxW(0), pxW(105) - pxW(0), 0, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(pxW(pool.x), pyW(pool.y), pxW(135) - pxW(0), pxW(95) - pxW(0), 0, 0, Math.PI * 2); g.fill();
         g.fillStyle = hex(WORLD.waterShallow);
-        g.beginPath(); g.ellipse(pxW(pool.x), pyW(pool.y), pxW(122) - pxW(0), pxW(80) - pxW(0), 0, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(pxW(pool.x), pyW(pool.y), pxW(108) - pxW(0), pxW(72) - pxW(0), 0, 0, Math.PI * 2); g.fill();
         g.fillStyle = 'rgba(255,255,255,0.45)';
         g.beginPath(); g.ellipse(pxW(pool.x - 30), pyW(pool.y - 20), pxW(34) - pxW(0), pxW(18) - pxW(0), 0.5, 0, Math.PI * 2); g.fill();
       }
@@ -1622,7 +1625,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     mesh.position.set(x3, 0, z3);
     // shadow diet: tiny street props don't cast (hundreds of them; their shadows
     // are sub-pixel anyway) — a big chunk of the shadow pass for free
-    if (r >= 2.5) { setShadow(mesh); mesh.add(contactShadow(r)); }
+    if (r >= 2.5) setShadow(mesh);   // real sun shadows; blobs are for the small stuff only
     else {
       mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
       // tiny props still get the cheap blob — grounded on EVERY quality tier,
@@ -1848,10 +1851,25 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     } else if (biome === 'airport') {
       // a real airfield: hangar + control tower + windsock + parked plane on
       // the apron (the runway/taxiway markings are baked into the ground)
-      const hangar = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 18, 12, 1, false, 0, Math.PI),
-        new THREE.MeshStandardMaterial({ color: 0xcfd6e0, roughness: 0.7, flatShading: true }));
-      hangar.rotation.z = Math.PI / 2; hangar.rotation.y = Math.PI / 4; hangar.position.set(cx - half * 0.55, 4.5, cz + half * 0.6);
-      setShadow(hangar); scene.add(hangar); addEdible(hangar, 6.4);
+      // Quonset hangar with END WALLS + door + stripe — the old bare white
+      // half-cylinder read as a broken slab at WORLD-ENDER zoom
+      const hangGrp = new THREE.Group();
+      const shellMat = new THREE.MeshStandardMaterial({ color: 0xb9c4d2, roughness: 0.65, flatShading: true });
+      const shell = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.2, 15, 16, 1, true, 0, Math.PI), shellMat);
+      shell.rotation.z = Math.PI / 2; shell.position.y = 0; hangGrp.add(shell);
+      const capMatH = new THREE.MeshStandardMaterial({ color: 0x93a2b4, roughness: 0.7, side: THREE.DoubleSide });
+      for (const sxE of [-7.5, 7.5]) {
+        const capEnd = new THREE.Mesh(new THREE.CircleGeometry(7.2, 16, 0, Math.PI), capMatH);
+        capEnd.rotation.y = Math.PI / 2; capEnd.position.x = sxE; hangGrp.add(capEnd);
+      }
+      const door = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 5.6),
+        new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.85 }));
+      door.rotation.y = Math.PI / 2; door.position.set(7.55, 2.8, 0); hangGrp.add(door);
+      const stripe = new THREE.Mesh(new THREE.CylinderGeometry(7.28, 7.28, 1.6, 16, 1, true, 0, Math.PI),
+        new THREE.MeshStandardMaterial({ color: 0x5ec8d8, roughness: 0.6, side: THREE.DoubleSide }));
+      stripe.rotation.z = Math.PI / 2; hangGrp.add(stripe);
+      hangGrp.rotation.y = Math.PI / 4; hangGrp.position.set(cx - half * 0.55, 0, cz + half * 0.6);
+      setShadow(hangGrp); scene.add(hangGrp); addEdible(hangGrp, 6.4);
       { // control tower with a glass cab
         const tw = new THREE.Group();
         const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 12, 10),

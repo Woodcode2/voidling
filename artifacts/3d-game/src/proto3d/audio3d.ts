@@ -34,7 +34,12 @@ export function createAudio(): Audio3D {
     if (ctx.state === 'suspended') void ctx.resume();
     return ctx;
   }
-  const unlock = () => { ensure(); };
+  const unlock = () => {
+    ensure();
+    // decode the recorded kit on the FIRST gesture — the first gulp of the
+    // first match must already be the real sample, not the synth stand-in
+    for (const n of ['gulp_1.wav', 'gulp_2.wav', 'gulp_3.wav', 'gulp_4.wav', 'gulp_5.wav', 'eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+  };
   window.addEventListener('pointerdown', unlock, { passive: true });
   window.addEventListener('keydown', unlock);
 
@@ -96,8 +101,58 @@ export function createAudio(): Audio3D {
   // ── MUSIC: a soft toy-synth loop that AUDIBLY escalates as the void grows —
   // hole.io's trick: tempo +8 BPM and one new layer per evolution stage, so the
   // island "losing" is something you can hear.
-  let musicFile: HTMLAudioElement | null = null;
-  let musicFileOn = false, musicFileBad = false;
+  // theme playback is WebAudio, not HTMLAudio: an mp3's encoder padding makes
+  // <audio loop> hard-reset audibly at the seam. We decode once and run a
+  // scheduled EQUAL-POWER CROSSFADE loop — each pass fades in over the tail of
+  // the previous one, so the theme never stops or snaps.
+  let themeBuf: AudioBuffer | null = null;
+  let themeBad = false, themeLoading = false, themeWanted = false;
+  let themeGain: GainNode | null = null;
+  let themeTimer: ReturnType<typeof setTimeout> | null = null;
+  let themeSrcs: AudioBufferSourceNode[] = [];
+  const THEME_FADE = 1.6;   // seconds of overlap at the seam
+  function startThemeLoop(c: AudioContext, buf: AudioBuffer) {
+    stopThemeLoop(0);
+    if (!themeGain) { themeGain = c.createGain(); themeGain.connect(master!); }
+    themeGain.gain.cancelScheduledValues(c.currentTime);
+    themeGain.gain.setValueAtTime(0.0001, c.currentTime);
+    themeGain.gain.exponentialRampToValueAtTime(0.4, c.currentTime + 1.2);
+    const period = Math.max(4, buf.duration - THEME_FADE);
+    const playPass = (when: number) => {
+      const src = c.createBufferSource(); src.buffer = buf;
+      const g = c.createGain();
+      // equal-power-ish ramps across the overlap window
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.linearRampToValueAtTime(1, when + THEME_FADE);
+      g.gain.setValueAtTime(1, when + period);
+      g.gain.linearRampToValueAtTime(0.0001, when + buf.duration);
+      src.connect(g); g.connect(themeGain!);
+      src.start(when); src.stop(when + buf.duration + 0.1);
+      themeSrcs.push(src);
+      if (themeSrcs.length > 3) themeSrcs.shift();
+    };
+    let next = c.currentTime + 0.05;
+    playPass(next);
+    const arm = () => {
+      next += period;
+      playPass(next);   // scheduled ahead on the audio clock — sample-accurate
+      themeTimer = setTimeout(arm, Math.max(500, (next - c.currentTime - 2.5) * 1000));
+    };
+    themeTimer = setTimeout(arm, Math.max(500, (period - 2.5) * 1000));
+  }
+  function stopThemeLoop(fade: number) {
+    if (themeTimer) { clearTimeout(themeTimer); themeTimer = null; }
+    if (ctx && themeGain && fade > 0) {
+      themeGain.gain.cancelScheduledValues(ctx.currentTime);
+      themeGain.gain.setValueAtTime(themeGain.gain.value, ctx.currentTime);
+      themeGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + fade);
+      const olds = themeSrcs; themeSrcs = [];
+      setTimeout(() => olds.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } }), fade * 1000 + 60);
+    } else {
+      themeSrcs.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } });
+      themeSrcs = [];
+    }
+  }
   function startSynth() {
     const c = ensure(); if (!c || !master) return;
     if (!musGain) musGain = buildMusicBus(c);
@@ -201,20 +256,27 @@ export function createAudio(): Audio3D {
       // prefetch the recorded kit so the very first gulp is the real sample
       for (const n of ['gulp_1.wav', 'gulp_2.wav', 'gulp_3.wav', 'gulp_4.wav', 'gulp_5.wav', 'eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
       // licensed-track hook: if a real music file ships with the build, prefer
-      // it (loop + gentle volume); the synth score is the fallback
-      if (!musicFileBad) {
-        if (!musicFile) {
-          musicFile = new Audio('/assets/music/theme.mp3');
-          musicFile.loop = true; musicFile.volume = 0.35;
+      // it (gapless crossfade loop); the synth score is the fallback
+      themeWanted = true;
+      const c = ensure();
+      if (c && !themeBad) {
+        if (themeBuf) { startThemeLoop(c, themeBuf); return; }
+        if (!themeLoading) {
+          themeLoading = true;
+          fetch('/assets/music/theme.mp3')
+            .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('404'))))
+            .then((b) => c.decodeAudioData(b))
+            .then((buf) => { themeBuf = buf; if (themeWanted) startThemeLoop(c, buf); })
+            .catch(() => { themeBad = true; if (themeWanted) startSynth(); });
         }
-        musicFile.play().then(() => { musicFileOn = true; }).catch(() => { musicFileBad = true; startSynth(); });
-        return;
+        return;   // theme decoding — it fades in the moment it's ready
       }
       startSynth();
     },
     setMusicStage(n) { musStage = n; },
     stopMusic() {
-      if (musicFileOn && musicFile) { musicFile.pause(); musicFile.currentTime = 0; musicFileOn = false; }
+      themeWanted = false;
+      stopThemeLoop(1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
       if (ctx && musGain) {
         musGain.gain.cancelScheduledValues(ctx.currentTime);

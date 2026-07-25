@@ -77,9 +77,10 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
 
   return {
     say(pos, text, kind) {
-      // whole-island zoom doesn't need street gossip — and full-size bubbles
-      // over a map view read as bugs
-      if (camera.position.distanceTo(pos) > BUBBLE_MAX_CAMD) return;
+      // whole-island zoom doesn't need street gossip — but FAMILY lines
+      // ('event') must survive the big-void camera pull-back, or the rivals go
+      // silent exactly when the drama happens
+      if (camera.position.distanceTo(pos) > (kind === 'event' ? 460 : BUBBLE_MAX_CAMD)) return;
       // dedupe: never show the same line twice at once (panicked crowds all
       // pull from the same pool)
       if (slots.some((s) => s.active && s.el.textContent === text)) return;

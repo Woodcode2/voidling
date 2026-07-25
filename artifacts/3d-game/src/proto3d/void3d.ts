@@ -257,90 +257,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // ── legendary accessories: 3D flair that rides (and squashes with) the orb ──
   const acc: Record<string, THREE.Group> = {};
   {
-    const mk = (name: string, build: (g: THREE.Group) => void) => {
-      const g = new THREE.Group(); build(g); g.visible = false;
-      g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+    for (const name of ['unicorn', 'dino', 'wizard', 'dragon', 'mecha', 'ninja', 'king']) {
+      const g = buildAccessory(name);
+      g.visible = false;
       bob.add(g); acc[name] = g;
-    };
-    mk('unicorn', (g) => {
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.72, 10),
-        new THREE.MeshStandardMaterial({ color: 0xffd9f0, roughness: 0.3, metalness: 0.4, emissive: 0xff9ad8, emissiveIntensity: 0.3 }));
-      horn.position.set(0, 1.2, 0.16); horn.rotation.x = 0.24; g.add(horn);
-      const earMat = new THREE.MeshStandardMaterial({ color: 0xf6e8ff, roughness: 0.6 });
-      for (const sx of [-0.44, 0.44]) {
-        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 8), earMat);
-        ear.position.set(sx, 1.0, 0); ear.rotation.z = -sx * 0.9; g.add(ear);
-      }
-    });
-    mk('dino', (g) => {
-      const m = new THREE.MeshStandardMaterial({ color: 0x2e7a34, roughness: 0.6 });
-      for (let i = 0; i < 4; i++) {
-        const th = 0.16 + i * 0.36;
-        const sp = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.36, 6), m);
-        sp.position.set(0, Math.cos(th) * 1.0, -Math.sin(th) * 1.0);
-        sp.rotation.x = -th;
-        sp.scale.setScalar(1 - i * 0.13);
-        g.add(sp);
-      }
-    });
-    mk('wizard', (g) => {
-      const hm = new THREE.MeshStandardMaterial({ color: 0x2a2270, roughness: 0.7 });
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.88, 12), hm);
-      cone.position.set(0.06, 1.34, 0); cone.rotation.z = -0.14; g.add(cone);
-      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.08, 16), hm);
-      brim.position.set(0.03, 0.94, 0); brim.rotation.z = -0.08; g.add(brim);
-      const star = new THREE.Mesh(new THREE.CircleGeometry(0.09, 5),
-        new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide }));
-      star.position.set(0.28, 1.28, 0.3); g.add(star);
-    });
-    mk('dragon', (g) => {
-      const wingMat = new THREE.MeshStandardMaterial({ color: 0x2a8a9a, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x1a5a6a, emissiveIntensity: 0.3 });
-      for (const sx of [-1, 1]) {
-        const wing = new THREE.Mesh(new THREE.CircleGeometry(0.62, 5, 0, Math.PI * 0.7), wingMat);
-        wing.position.set(sx * 0.82, 0.62, -0.5);
-        wing.rotation.set(0.3, sx * 1.1, sx * 0.9);
-        wing.scale.set(1.5, 1, 1); g.add(wing);
-      }
-      const hornMat = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.35, metalness: 0.4 });
-      for (const sx of [-0.3, 0.3]) {
-        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 8), hornMat);
-        horn.position.set(sx, 1.08, 0.2); horn.rotation.x = 0.2; horn.rotation.z = -sx; g.add(horn);
-      }
-    });
-    mk('mecha', (g) => {
-      const chrome = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.8, roughness: 0.25 });
-      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.7, 6), chrome);
-      ant.position.set(0.18, 1.24, 0); g.add(ant);
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
-        new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.4 }));
-      tip.position.set(0.18, 1.62, 0); g.add(tip);
-      for (const sx of [-1, 1]) {   // ear pods
-        const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 10), chrome);
-        pod.rotation.z = Math.PI / 2; pod.position.set(sx * 1.02, 0.12, 0); g.add(pod);
-        const glow2 = new THREE.Mesh(new THREE.CircleGeometry(0.1, 10),
-          new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.2, side: THREE.DoubleSide }));
-        glow2.rotation.y = sx * Math.PI / 2; glow2.position.set(sx * 1.1, 0.12, 0); g.add(glow2);
-      }
-    });
-    mk('ninja', (g) => {
-      const bandMat = new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7 });
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.98, 0.09, 8, 32), bandMat);
-      band.rotation.x = Math.PI / 2 - 0.28; band.position.y = 0.42; g.add(band);
-      for (const sx of [-0.1, 0.14]) {   // flowing tails at the back
-        const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.85), new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7, side: THREE.DoubleSide }));
-        tail.position.set(sx, 0.14, -1.0); tail.rotation.x = 0.5; tail.rotation.z = sx * 2; g.add(tail);
-      }
-    });
-    mk('king', (g) => {
-      const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.25 });
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.44, 0.22, 12, 1, true), gold);
-      band.position.y = 1.0; g.add(band);
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        const pt = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 6), gold);
-        pt.position.set(Math.cos(a) * 0.4, 1.16, Math.sin(a) * 0.4); g.add(pt);
-      }
-    });
+    }
   }
 
   // ── evolution ring — ONE crisp thin ribbon, normal blending so it reads as
@@ -562,4 +483,91 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   };
 
   return api;
+}
+
+// ── shared legendary-accessory factory: the SAME 3D flair the player wears
+// is worn by rivals in their random skins (unit-orb space, scale with r)
+export function buildAccessory(kind: string): THREE.Group {
+  const g = new THREE.Group();
+  if (kind === 'unicorn') {
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.72, 10),
+      new THREE.MeshStandardMaterial({ color: 0xffd9f0, roughness: 0.3, metalness: 0.4, emissive: 0xff9ad8, emissiveIntensity: 0.3 }));
+    horn.position.set(0, 1.2, 0.16); horn.rotation.x = 0.24; g.add(horn);
+    const earMat = new THREE.MeshStandardMaterial({ color: 0xf6e8ff, roughness: 0.6 });
+    for (const sx of [-0.44, 0.44]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 8), earMat);
+      ear.position.set(sx, 1.0, 0); ear.rotation.z = -sx * 0.9; g.add(ear);
+    }
+  }
+  else if (kind === 'dino') {
+    const m = new THREE.MeshStandardMaterial({ color: 0x2e7a34, roughness: 0.6 });
+    for (let i = 0; i < 4; i++) {
+      const th = 0.16 + i * 0.36;
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.36, 6), m);
+      sp.position.set(0, Math.cos(th) * 1.0, -Math.sin(th) * 1.0);
+      sp.rotation.x = -th;
+      sp.scale.setScalar(1 - i * 0.13);
+      g.add(sp);
+    }
+  }
+  else if (kind === 'wizard') {
+    const hm = new THREE.MeshStandardMaterial({ color: 0x2a2270, roughness: 0.7 });
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.88, 12), hm);
+    cone.position.set(0.06, 1.34, 0); cone.rotation.z = -0.14; g.add(cone);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.08, 16), hm);
+    brim.position.set(0.03, 0.94, 0); brim.rotation.z = -0.08; g.add(brim);
+    const star = new THREE.Mesh(new THREE.CircleGeometry(0.09, 5),
+      new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide }));
+    star.position.set(0.28, 1.28, 0.3); g.add(star);
+  }
+  else if (kind === 'dragon') {
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x2a8a9a, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x1a5a6a, emissiveIntensity: 0.3 });
+    for (const sx of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.CircleGeometry(0.62, 5, 0, Math.PI * 0.7), wingMat);
+      wing.position.set(sx * 0.82, 0.62, -0.5);
+      wing.rotation.set(0.3, sx * 1.1, sx * 0.9);
+      wing.scale.set(1.5, 1, 1); g.add(wing);
+    }
+    const hornMat = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.35, metalness: 0.4 });
+    for (const sx of [-0.3, 0.3]) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 8), hornMat);
+      horn.position.set(sx, 1.08, 0.2); horn.rotation.x = 0.2; horn.rotation.z = -sx; g.add(horn);
+    }
+  }
+  else if (kind === 'mecha') {
+    const chrome = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.8, roughness: 0.25 });
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.7, 6), chrome);
+    ant.position.set(0.18, 1.24, 0); g.add(ant);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.4 }));
+    tip.position.set(0.18, 1.62, 0); g.add(tip);
+    for (const sx of [-1, 1]) {   // ear pods
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 10), chrome);
+      pod.rotation.z = Math.PI / 2; pod.position.set(sx * 1.02, 0.12, 0); g.add(pod);
+      const glow2 = new THREE.Mesh(new THREE.CircleGeometry(0.1, 10),
+        new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.2, side: THREE.DoubleSide }));
+      glow2.rotation.y = sx * Math.PI / 2; glow2.position.set(sx * 1.1, 0.12, 0); g.add(glow2);
+    }
+  }
+  else if (kind === 'ninja') {
+    const bandMat = new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7 });
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.98, 0.09, 8, 32), bandMat);
+    band.rotation.x = Math.PI / 2 - 0.28; band.position.y = 0.42; g.add(band);
+    for (const sx of [-0.1, 0.14]) {   // flowing tails at the back
+      const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.85), new THREE.MeshStandardMaterial({ color: 0xe83a4a, roughness: 0.7, side: THREE.DoubleSide }));
+      tail.position.set(sx, 0.14, -1.0); tail.rotation.x = 0.5; tail.rotation.z = sx * 2; g.add(tail);
+    }
+  }
+  else if (kind === 'king') {
+    const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.25 });
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.44, 0.22, 12, 1, true), gold);
+    band.position.y = 1.0; g.add(band);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const pt = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 6), gold);
+      pt.position.set(Math.cos(a) * 0.4, 1.16, Math.sin(a) * 0.4); g.add(pt);
+    }
+  }
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+  return g;
 }

@@ -4,7 +4,8 @@
 // fresnel orb + glow + billboarded eyes) with a name and a live score.
 import * as THREE from 'three';
 import type { Biome } from './island';
-import { SKINS } from './palette';
+import { SKINS, type Skin } from './palette';
+import { buildAccessory } from './void3d';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; }
@@ -108,19 +109,42 @@ function rivalGlowTex(): THREE.CanvasTexture {
   return _rivalGlowTex;
 }
 
-function makeRivalMesh(color: number, idx = 0, dark = 0x140a26, glowCol = color): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
+const rivalTexCache = new Map<string, THREE.Texture>();
+function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
+  const color = sk.rim, dark = sk.abyss, glowCol = sk.glow;
   const group = new THREE.Group();
   const col = new THREE.Color(color);
-  // tinted fresnel body: dark core -> coloured rim (same idea as the player void)
+  const whiteTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  whiteTex.needsUpdate = true;
+  // tinted fresnel body: dark core -> coloured rim (same idea as the player
+  // void), now with the skin's REAL texture wrap for epic/legendary looks
   const bodyMat = new THREE.ShaderMaterial({
-    uniforms: { uCol: { value: col }, uDark: { value: new THREE.Color(dark) } },
-    vertexShader: `varying vec3 vN; varying vec3 vV;
-      void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }`,
-    fragmentShader: `varying vec3 vN; varying vec3 vV; uniform vec3 uCol; uniform vec3 uDark;
+    uniforms: { uCol: { value: col }, uDark: { value: new THREE.Color(dark) }, uTex: { value: whiteTex as THREE.Texture }, uTexAmt: { value: 0 } },
+    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv;
+      void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); vUv=uv; gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv; uniform vec3 uCol; uniform vec3 uDark; uniform sampler2D uTex; uniform float uTexAmt;
       void main(){ float d=clamp(dot(normalize(vN),normalize(vV)),0.,1.); float u=sqrt(max(0.,1.-d*d));
-        vec3 c=mix(uDark, uCol, smoothstep(0.15,0.95,u)); c+=uCol*pow(u,3.5)*0.4; gl_FragColor=vec4(c,1.); }`,
+        vec3 c=mix(uDark, uCol, smoothstep(0.15,0.95,u));
+        if (uTexAmt > 0.01) { vec3 tc=texture2D(uTex, vUv).rgb; c=mix(c, tc*(0.34+0.9*u), uTexAmt); }
+        c+=uCol*pow(u,3.5)*0.4; gl_FragColor=vec4(c,1.); }`,
   });
+  if (sk.tex) {
+    let t = rivalTexCache.get(sk.tex);
+    if (!t) {
+      t = new THREE.TextureLoader().load(sk.tex, () => { bodyMat.uniforms.uTexAmt.value = 1; });
+      t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      rivalTexCache.set(sk.tex, t);
+    } else bodyMat.uniforms.uTexAmt.value = t.image ? 1 : 0;
+    bodyMat.uniforms.uTex.value = t;
+    if (!bodyMat.uniforms.uTexAmt.value) {
+      const t2 = t;
+      const poll = setInterval(() => { if (t2.image) { bodyMat.uniforms.uTexAmt.value = 1; clearInterval(poll); } }, 500);
+    }
+  }
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 30), bodyMat); group.add(body);
+  // legendary flair: the SAME accessory rig the player's skin wears
+  if (sk.acc) group.add(buildAccessory(sk.acc));
   // tinted bloom sprite — the same treatment as the player hero. (The old
   // additive back-side shell read as a soap-bubble outline next to the hero.)
   const bloom = new THREE.Sprite(new THREE.SpriteMaterial({ map: rivalGlowTex(), color: glowCol, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85 }));
@@ -138,8 +162,10 @@ function makeRivalMesh(color: number, idx = 0, dark = 0x140a26, glowCol = color)
     eyes.add(white); eyes.add(pupil);
   }
   // personality accessory: sweat drop / star shades / hair curl / crown / nightcap
+  // (skipped when a legendary skin brings its own 3D accessory — no double hats)
   const bmat = (c2: number) => new THREE.MeshBasicMaterial({ color: c2 });
-  if (idx % 5 === 0) {   // YIKES: sweat drop at the temple
+  if (sk.acc) { /* legendary accessory IS the look */ }
+  else if (idx % 5 === 0) {   // YIKES: sweat drop at the temple
     const drop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.9, depthWrite: false }));
     drop.scale.set(1, 1.5, 1); drop.position.set(0.5, 0.72, 0.5); group.add(drop);
   } else if (idx % 5 === 1) {   // DAZZLE: star shades (billboard with the eyes)
@@ -187,12 +213,22 @@ export function createRivals(
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
 
+  // the family raids the SKIN CLOSET — but only the SHOWCASE shelf: epic
+  // textures and legendary accessory skins, legendaries weighted double so
+  // most matches feature at least two. Unique per rival, reshuffled per boot.
+  const showcase = (() => {
+    const pool = SKINS.filter((s) => s.acc || s.tex);
+    const legend = pool.filter((s) => s.acc);
+    const deck = [...legend, ...legend, ...pool].sort(() => Math.random() - 0.5);
+    const seen = new Set<string>();
+    const out: Skin[] = [];
+    for (const s of deck) if (!seen.has(s.id)) { seen.add(s.id); out.push(s); }
+    return out;
+  })();
   for (let i = 0; i < count; i++) {
-    // the family raids the SKIN CLOSET: each rival wears a random skin every
-    // match (epic + legendary looks included) — leaderboard dot matches
-    const sk = SKINS[Math.floor(Math.random() * SKINS.length)];
+    const sk = showcase[i % showcase.length];
     const color = sk.rim;
-    const { group, eyes, halo } = makeRivalMesh(sk.rim, i, sk.abyss, sk.glow);
+    const { group, eyes, halo } = makeRivalMesh(sk, i);
     scene.add(group); scene.add(halo);
     group.visible = halo.visible = false;   // hidden until they join the feast
     // spread rivals around the island away from the player start

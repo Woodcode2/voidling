@@ -126,9 +126,12 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 }
 
 const island = createIsland(scene, addEdible);
+// dev/QA introspection hooks (harmless in prod; no gameplay reads these)
+const _dbg = window as unknown as { __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE };
+_dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE;
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
-const rivals = createRivals(scene, camera, edibles, island.biomeAt, 4);
+const rivals = createRivals(scene, camera, edibles, island.biomeAt, 5);   // the WHOLE family shows up (full end-board)
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
   YIKES: 'Cousin', DAZZLE: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', SNOOZLE: 'Grandpa',
@@ -159,9 +162,11 @@ rivals.onRivalEaten = (name, pts) => {
   buzz(60);
 };
 rivals.onPlayerBitten = (name) => {
-  voidling.setRadius(Math.max(START_R, voidling.radius * 0.82));
+  // 12% shrink, not 18 — a silent-feeling 18% read as "the game glitched me
+  // smaller" to kids; the bite should sting, not punish
+  voidling.setRadius(Math.max(START_R, voidling.radius * 0.88));
   announce(`😱 ${name} took a BITE of you!!`);
-  audio.hit(); fx.shake(3); fx.flash('rgba(154,92,255,0.3)', 0.4);
+  audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   buzz(50);
 };
 const defense = createDefense(scene, fx, island.biomeAt);
@@ -356,7 +361,7 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   { id: 'rival', icon: '😈', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
   { id: 'army', icon: '🪖', label: 'Delicious Irony: eat 2 army units', target: 2, reward: 25, kind: 'army' },
 ];
-const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve', 'solo'], HARD_Q = ['houses', 'rival', 'army'];   // easy rotates daily too — same-quest-every-day reads stale
+const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve'], HARD_Q = ['houses', 'rival', 'army'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   const daySeed = Math.abs(today.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
@@ -1336,6 +1341,7 @@ function animate() {
     camera.position.set(0, 716, 138);
     camera.lookAt(0, 588, -6);
   } else if (TOPDOWN) {
+    if (camera.far < 1400) { camera.far = 1400; camera.updateProjectionMatrix(); }   // island sits past the default far plane
     camera.position.set(0, 1120, 0.001);
     camera.lookAt(0, 0, 0);
   } else {
