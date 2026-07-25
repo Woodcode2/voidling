@@ -194,22 +194,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     x.fillStyle = gr; x.fillRect(0, 0, size, size);
     return new THREE.CanvasTexture(cv);
   };
-  const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: softRadialTex(256, 0.3, 0.1, 30), color: VOID.glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  const bloomSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: softRadialTex(256, 0.18, 0.06, 30), color: VOID.glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
   bloomSprite.renderOrder = -1;   // behind the body
   group.add(bloomSprite);
   // X-ray ghost ring (see update): only visibly appears where the body is occluded
   const ghost = new THREE.Mesh(new THREE.RingGeometry(0.96, 1.05, 48),
-    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));   // additive: invisible over bright ground, reads through dark occluders
+    new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));   // additive: faint over bright ground, reads through dark occluders
   ghost.renderOrder = 999;
   group.add(ghost);
 
-  // ── ground halo + contact shadow, in scene-floor space ─────────────────────
-  // ground halo: a soft radial-gradient colour stain (NOT a hard bright disc)
-  const halo = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 48),
-    new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.3, 0.13, 18), color: 0x7a4fe0, transparent: true, depthWrite: false }),
-  );
-  halo.rotation.x = -Math.PI / 2; halo.position.y = 0.08; scene.add(halo);
+  // ── contact shadow, in scene-floor space ──────────────────────────────────
+  // (The old ground-halo colour disc is GONE — over pale asphalt it read as a
+  // rough white circle glued around the hero. The dark contact shadow grounds
+  // him; the bloom sprite carries what little aura remains.)
   const contact = new THREE.Mesh(
     new THREE.CircleGeometry(1, 40),
     new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.55, 0.28, 12), color: 0x160a30, transparent: true, opacity: 0.6, depthWrite: false }),
@@ -251,13 +248,21 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     b.scale.set(1.06, 0.72, 1); b.position.set(sx, -0.2, 0.99);
     face.add(b);
   }
-  // smiling mouth — a crisp torus arc; plus an "open" mouth (dark maw + tongue)
-  // that scales in when eating or firing GULP
-  const mouth = new THREE.Mesh(
-    new THREE.TorusGeometry(0.23, 0.04, 12, 48, Math.PI),
-    new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }),
-  );
-  mouth.rotation.z = Math.PI; mouth.position.set(0, -0.28, 1.0);
+  // smiling mouth — the KEY-ART kawaii open smile: a soft plum half-disc with
+  // a little pink tongue. (The old thin torus arc curled up hard at both ends
+  // — read as a too-wide clown grin.) Plus the big "maw" that scales in when
+  // eating or firing GULP.
+  const mouth = new THREE.Group();
+  {
+    // upper semicircle; the group's PI rotation (below) hangs the dome down
+    const lip = new THREE.Mesh(new THREE.CircleGeometry(0.165, 40, 0, Math.PI),
+      new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }));
+    const tongue = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24),
+      new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
+    tongue.scale.set(1.35, 0.6, 1); tongue.position.set(0, 0.075, 0.004);
+    mouth.add(lip); mouth.add(tongue);
+  }
+  mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
   face.add(mouth);
   const maw = new THREE.Group(); maw.position.set(0, -0.3, 1.01); maw.scale.setScalar(0.001);
   const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
@@ -428,7 +433,6 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       bodyMat.uniforms.uSwirl.value.set(s.glow);
       glowMat.uniforms.uColor.value.set(s.glow);
       (bloomSprite.material as THREE.SpriteMaterial).color.set(s.glow);
-      (halo.material as THREE.MeshBasicMaterial).color.set(s.glow);
       ringMats.forEach((m) => m.color.set(s.glow));
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
@@ -584,9 +588,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       mouth.rotation.z = Math.PI + mp.smirk;
       mouth.position.y = mp.mouthY < 0 ? -0.22 : -0.28;   // frowns ride a touch higher
 
-      // ground halo + contact track the void on the floor
-      halo.position.set(s.x, 0.08, s.z); halo.scale.setScalar(dispR * 1.2);
-      (halo.material as THREE.MeshBasicMaterial).opacity = THREE.MathUtils.clamp(1.15 - dispR * 0.07, 0.5, 1);   // no milky puddle at big R
+      // contact shadow tracks the void on the floor
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.02);
 
       // bloom sprite hugs the orb (pulses gently, swells with the stage)
@@ -672,14 +674,18 @@ export function buildAccessory(kind: string): THREE.Group {
     }
   }
   else if (kind === 'king') {
-    const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.25 });
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.44, 0.22, 12, 1, true), gold);
-    band.position.y = 1.0; g.add(band);
+    // a crown you can SEE from gameplay zoom — big band, tall points, jewels
+    const gold = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.25, metalness: 0.7, emissive: 0x7a5a10, emissiveIntensity: 0.35 });
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.6, 0.32, 12, 1, true), gold);
+    band.position.y = 0.98; g.add(band);
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
-      const pt = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 6), gold);
-      pt.position.set(Math.cos(a) * 0.4, 1.16, Math.sin(a) * 0.4); g.add(pt);
+      const pt = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.38, 6), gold);
+      pt.position.set(Math.cos(a) * 0.54, 1.28, Math.sin(a) * 0.54); g.add(pt);
     }
+    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0xe83a5a, roughness: 0.2, metalness: 0.3, emissive: 0xa01830, emissiveIntensity: 0.8 }));
+    gem.position.set(0, 0.99, 0.6); g.add(gem);
   }
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;

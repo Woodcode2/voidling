@@ -117,22 +117,29 @@ function rivalGlowTex(): THREE.CanvasTexture {
 
 const rivalTexCache = new Map<string, THREE.Texture>();
 function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
-  const color = sk.rim, dark = sk.abyss, glowCol = sk.glow;
+  const color = sk.rim, glowCol = sk.glow;
   const group = new THREE.Group();
-  const col = new THREE.Color(color);
   const whiteTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
   whiteTex.needsUpdate = true;
-  // tinted fresnel body: dark core -> coloured rim (same idea as the player
-  // void), now with the skin's REAL texture wrap for epic/legendary looks
+  // FULL skin gradient body — same 4-stop cute curve as the player hero, so a
+  // legendary rival actually LOOKS like its shop skin (King Void = rich gold
+  // orb, not a black hole with a yellow edge). Small dark heart, lit rim.
   const bodyMat = new THREE.ShaderMaterial({
-    uniforms: { uCol: { value: col }, uDark: { value: new THREE.Color(dark) }, uTex: { value: whiteTex as THREE.Texture }, uTexAmt: { value: 0 } },
+    uniforms: {
+      uAbyss: { value: new THREE.Color(sk.abyss) }, uInner: { value: new THREE.Color(sk.inner) },
+      uMid: { value: new THREE.Color(sk.mid) }, uRim: { value: new THREE.Color(sk.rim) },
+      uTex: { value: whiteTex as THREE.Texture }, uTexAmt: { value: 0 },
+    },
     vertexShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv;
       void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); vUv=uv; gl_Position=projectionMatrix*mv; }`,
-    fragmentShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv; uniform vec3 uCol; uniform vec3 uDark; uniform sampler2D uTex; uniform float uTexAmt;
+    fragmentShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv;
+      uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform sampler2D uTex; uniform float uTexAmt;
       void main(){ float d=clamp(dot(normalize(vN),normalize(vV)),0.,1.); float u=sqrt(max(0.,1.-d*d));
-        vec3 c=mix(uDark, uCol, smoothstep(0.15,0.95,u));
+        vec3 c = mix(uAbyss, uInner, smoothstep(0.0, 0.18, u));
+        c = mix(c, uMid, smoothstep(0.15, 0.52, u));
+        c = mix(c, uRim, smoothstep(0.55, 1.0, u));
         if (uTexAmt > 0.01) { vec3 tc=texture2D(uTex, vUv).rgb; c=mix(c, tc*(0.34+0.9*u), uTexAmt); }
-        c+=uCol*pow(u,3.5)*0.4; gl_FragColor=vec4(c,1.); }`,
+        c+=uRim*pow(u,3.5)*0.4; gl_FragColor=vec4(c,1.); }`,
   });
   if (sk.tex) {
     let t = rivalTexCache.get(sk.tex);
@@ -165,7 +172,24 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
     white.position.set(sx, 0.08, 1.0); white.renderOrder = 5;
     const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.11, 16), new THREE.MeshBasicMaterial({ color: 0x140a26, depthWrite: false, depthTest: false }));
     pupil.position.set(sx, 0.08, 1.02); pupil.renderOrder = 6;
+    // catchlight rides the pupil (child) so it tracks the look direction
+    const glint = new THREE.Mesh(new THREE.CircleGeometry(0.038, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false, depthTest: false }));
+    glint.position.set(-0.032, 0.034, 0.01); glint.renderOrder = 7; pupil.add(glint);
     eyes.add(white); eyes.add(pupil);
+  }
+  // family face, not googly-eye NPC face: blush + a tiny kawaii smile
+  // (added AFTER the 4 tracked eye meshes — the aim loop skips index >= 4)
+  for (const sx of [-0.44, 0.44]) {
+    const blush = new THREE.Mesh(new THREE.CircleGeometry(0.085, 14),
+      new THREE.MeshBasicMaterial({ color: 0xff7da8, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false }));
+    blush.scale.set(1.1, 0.72, 1); blush.position.set(sx, -0.1, 1.0); blush.renderOrder = 5;
+    eyes.add(blush);
+  }
+  {
+    const smile = new THREE.Mesh(new THREE.CircleGeometry(0.095, 24, Math.PI, Math.PI),
+      new THREE.MeshBasicMaterial({ color: 0x2a1040, depthWrite: false, depthTest: false }));
+    smile.position.set(0, -0.16, 1.0); smile.renderOrder = 5;
+    eyes.add(smile);
   }
   // personality accessory: sweat drop / star shades / hair curl / crown / nightcap
   // (skipped when a legendary skin brings its own 3D accessory — no double hats)

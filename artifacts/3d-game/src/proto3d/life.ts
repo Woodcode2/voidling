@@ -293,7 +293,10 @@ export function createLife(
   // The car model's nose points +X, so heading comes from the velocity vector:
   // rotY = atan2(-vz, vx). (The old +Z-forward formula had every car rotated
   // 90° from its motion — the "driving on their side" bug.)
-  const LANE = 2.6;
+  // asphalt half-width is 2.75 — lane centres must sit INSIDE it. 2.6 put the
+  // car centre on the asphalt edge, hanging half of every car over the curb
+  // (the "parked on the sidewalk" screenshots). 1.45 = proper two-lane road.
+  const LANE = 1.45;
   const headingOf = (mvx: number, mvz: number) => Math.atan2(-mvz, mvx);
   // a car position is legal only ON the painted road network AND on the island —
   // no more sand cruises to the waterline or corners cut across lawns
