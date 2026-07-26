@@ -1147,7 +1147,12 @@ function validateWorld() {
     // is retired outright, no matter which placement path put it there. (A raw
     // glb() call bypassing its island guard is how cars ended up in orbit;
     // this makes that class of bug invisible to the player forever.)
-    if (!insideIsland3(px, pz)) { cull.push(i); continue; }
+    // …except things that are MEANT to be on the water. Pirate Bay Resort moors
+    // a superyacht, two galleons, five speedboats and four jet skis in the bay;
+    // without this exemption the off-island cull quietly deleted the entire
+    // fleet a few seconds after the match started.
+    if (!insideIsland3(px, pz) && !ud.afloat) { cull.push(i); continue; }
+    if (ud.afloat) continue;   // moored: no road/coast correction applies
     for (const rc of ROAD_CENTERS_3D) {
       if (Math.abs(px - rc) < band + hx) {   // straddles a vertical road lane
         const off = band + hx + 0.4;

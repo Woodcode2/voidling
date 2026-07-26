@@ -75,7 +75,10 @@ export const PROMENADE: Pt[] = [
 export const TRAIL: Pt[] = [
   [6200, 3500], [5000, 4200], [4000, 5200], [3200, 6200], [2700, 7400], [3400, 8600],
 ];
-export const PROM_HALF = 300;    // boardwalk half-width, world units
+// 300 made a 30-unit-wide boardwalk: fifteen times wider than the player at
+// the start of a match, and still wider than a WORLD ENDER. It dominated every
+// screen in the resort while carrying almost nothing.
+export const PROM_HALF = 175;    // boardwalk half-width, world units
 export const TRAIL_HALF = 130;
 
 // piers running off the promenade into the bay
