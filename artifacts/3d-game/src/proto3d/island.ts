@@ -54,7 +54,7 @@ const MAPLE_PLAN: Biome[][] = [
 const PIRATE_PLAN: Biome[][] = [
   ['cove', 'jungle', 'port', 'port', 'jungle', 'cove'],
   ['jungle', 'resort', 'port', 'market', 'resort', 'jungle'],
-  ['beach', 'resort', 'plaza', 'market', 'resort', 'jungle'],
+  ['beach', 'resort', 'market', 'market', 'resort', 'jungle'],
   ['beach', 'resort', 'party', 'party', 'resort', 'beach'],
   ['beach', 'party', 'party', 'party', 'market', 'beach'],
   ['beach', 'beach', 'beach', 'beach', 'beach', 'cove'],
