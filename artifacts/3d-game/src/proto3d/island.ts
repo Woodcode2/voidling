@@ -415,13 +415,14 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       g.restore();
       // the resort's pools + raked sand
       g.save(); wpath(BAY.smoothPoly(BAY_R('resort').poly, 5)); g.clip();
-      for (const [ox, oy, rr] of [[8900, 4900, 330], [9050, 6300, 290]] as [number, number, number][]) {
+      // pale stone pool DECKS only — the water is real geometry now, and a
+      // painted puddle underneath it just peeked out at the edges
+      for (const [ox, oy, rr] of [[8900, 4900, 470], [9050, 6300, 430]] as [number, number, number][]) {
         g.fillStyle = '#f8efd8';
-        g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr + 90) - pxW(0), pxW(rr * 0.7 + 90) - pxW(0), 0.4, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#3fc9d8';
-        g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr) - pxW(0), pxW(rr * 0.7) - pxW(0), 0.4, 0, Math.PI * 2); g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.4)';
-        g.beginPath(); g.ellipse(pxW(ox - rr * 0.3), pyW(oy - rr * 0.2), pxW(rr * 0.3) - pxW(0), pxW(rr * 0.13) - pxW(0), 0.6, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr) - pxW(0), pxW(rr * 0.72) - pxW(0), 0.62, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(214,190,140,0.35)';
+        g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr) - pxW(0), pxW(rr * 0.72) - pxW(0), 0.62, 0, Math.PI * 2);
+        g.lineWidth = pxW(22) - pxW(0); g.strokeStyle = 'rgba(214,190,140,0.45)'; g.stroke();
       }
       g.strokeStyle = 'rgba(214,190,140,0.4)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
       for (let k = 3300; k < 7400; k += 105) {
@@ -2495,6 +2496,32 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (const p2 of sland(65, 26, undefined, 0.6)) drop(makeCoins(), p2, 0.6);
     for (const p2 of sland(18, 60, undefined, 1.3, NO_TOWN)) drop(makeBarrel(), p2, 1.3);
 
+    // ── THE PIERS ───────────────────────────────────────────────────────────
+    // They were strokes on the ground texture that stopped in flat water with
+    // nothing on them. Each one now gets a real deck: planks, pilings, bollards
+    // and a lamp, built to length and laid along the painted line.
+    for (const [x0, y0, x1, y1] of BAY.PIERS) {
+      const L = Math.hypot(x1 - x0, y1 - y0), a2 = Math.atan2(y1 - y0, x1 - x0);
+      const parts: THREE.BufferGeometry[] = [];
+      const len3 = L * 0.05, half3 = 3.6;
+      parts.push(part(new THREE.BoxGeometry(len3, 0.34, half3 * 2), 0xefe0c2, len3 / 2, 0.5, 0));
+      for (let k = 0; k * 1.4 < len3; k++) {
+        parts.push(part(new THREE.BoxGeometry(0.1, 0.36, half3 * 2), 0xd8c8a4, k * 1.4, 0.69, 0));
+      }
+      for (let k = 0; k * 3.2 < len3; k++) for (const sz of [-half3 + 0.5, half3 - 0.5]) {
+        parts.push(part(new THREE.CylinderGeometry(0.28, 0.3, 2.6, 7), 0xc79350, 0.8 + k * 3.2, -0.6, sz));
+        if (k % 2 === 0) parts.push(part(new THREE.CylinderGeometry(0.3, 0.34, 1.0, 8), 0x2e2634, 0.8 + k * 3.2, 1.1, sz));
+      }
+      parts.push(part(new THREE.CylinderGeometry(0.12, 0.12, 4.4, 6), 0xfdf3de, len3 - 1.2, 2.5, 0));
+      parts.push(part(new THREE.SphereGeometry(0.42, 10, 8), 0xffe6a8, len3 - 1.2, 4.9, 0));
+      const pier = new THREE.Group();
+      pier.add(mergedProp(parts));
+      pier.rotation.y = -a2;
+      pier.position.set(w(x0), 0, w(y0));
+      pier.userData.afloat = true;   // a pier legitimately overhangs the water
+      setShadow(pier); scene.add(pier); addEdible(pier, 4.5);
+    }
+
     // ── ON THE WATER ────────────────────────────────────────────────────────
     // The bay is 23% of the island and used to contain FIVE props. It is also
     // where the port crowd shouts "the superyacht!! START IT!!" about a
@@ -2586,15 +2613,24 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // shacks, so the resort's 22 signature beachfront structures were identical
     // to the poor village's huts
     for (const p2 of spread('resort', 22, 62, 3)) dropGlb('cabana', p2, 3, 4.6, LUXE.makeCabanaLux, rand(-0.3, 0.3));
-    for (const [ox, oy] of [[8900, 4900], [9050, 6300]] as [number, number][]) {
-      for (let k = 0; k < 11; k++) {
-        const a2 = (k / 11) * Math.PI * 2;
-        drop(makeBeachChairFB(), [ox + Math.cos(a2) * 430, oy + Math.sin(a2) * 340], 1.4, a2);
+    // The pools were two ellipses PAINTED on the ground texture, ringed by
+    // eleven loungers at random rotation — and a circle of chairs reads as a
+    // car boot sale from above, not a resort. Real pool geometry, and the
+    // loungers in two straight mirrored rows along the pool's long axis.
+    for (const [ox, oy, ang] of [[8900, 4900, 0.62], [9050, 6300, 0.62]] as [number, number, number][]) {
+      drop(LUXE.makeInfinityPool(), [ox, oy], 5.5, ang);
+      const ux = Math.cos(ang), uy = Math.sin(ang);
+      for (let k = 0; k < 5; k++) {
+        const t = (k - 2) * 175;
+        for (const sgn of [-1, 1]) {
+          const off = sgn * 290;
+          drop(LUXE.makeSunLounger(), [ox + ux * t - uy * off, oy + uy * t + ux * off], 1.4, ang + (sgn > 0 ? 0 : Math.PI));
+        }
       }
-      for (let k = 0; k < 3; k++) {
-        const a2 = (k / 3) * Math.PI * 2 + 0.5;
-        dropGlb('umbrella', [ox + Math.cos(a2) * 300, oy + Math.sin(a2) * 260], 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+      for (const sgn of [-1, 1]) {
+        drop(LUXE.makeParasolLux(), [ox + ux * 300 - uy * sgn * 300, oy + uy * 300 + ux * sgn * 300], 1.8, 0);
       }
+      drop(LUXE.makeDeckBar(), [ox - ux * 420, oy - uy * 420], 2.8, ang + Math.PI);
     }
     for (const p2 of spread('resort', 20, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(7, 9.5), makePalm, rand(0, Math.PI * 2));
     // the resort is a narrow beachfront strip — a numeric sweep found exactly

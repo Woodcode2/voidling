@@ -10,6 +10,7 @@ import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
   railPointAt, insideIsland3, inLagoon3, worldId, type Biome, type AddEdible,
 } from './island';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
 
@@ -200,38 +201,76 @@ function mat(color: number, roughness = 0.85): THREE.MeshStandardMaterial {
   if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness }); _matCache.set(k, m); }
   return m;
 }
-const G = {
-  leg: new THREE.BoxGeometry(0.34, 1.15, 0.4),
-  torso: new THREE.BoxGeometry(0.95, 1.15, 0.55),
-  arm: new THREE.BoxGeometry(0.26, 1.0, 0.3),
-  hand: new THREE.BoxGeometry(0.24, 0.22, 0.26),
-  head: new THREE.SphereGeometry(0.52, 14, 12),
-  cap: new THREE.SphereGeometry(0.55, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
-  brim: new THREE.CylinderGeometry(0.85, 0.85, 0.08, 12),
-  beanie: new THREE.SphereGeometry(0.56, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
-  pack: new THREE.BoxGeometry(0.7, 0.85, 0.35),
-  // ── HEADWEAR + PROPS. Every accessory reuses one of these shared buffers and
-  // one cached material, so a tricorn costs exactly what the old beanie cost:
-  // no per-person geometry, no per-person material, hundreds of people.
-  tri: new THREE.CylinderGeometry(1.0, 1.0, 0.09, 3),   // tricorn brim — a TRIANGLE from above, not a cone
-  crown: new THREE.SphereGeometry(0.5, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5),
-  brimWide: new THREE.CylinderGeometry(1.12, 1.12, 0.07, 12),
-  band: new THREE.CylinderGeometry(0.575, 0.575, 0.12, 12),
-  pill: new THREE.CylinderGeometry(0.42, 0.46, 0.34, 10),
-  toque: new THREE.CylinderGeometry(0.44, 0.4, 0.62, 10),
-  ring: new THREE.TorusGeometry(0.5, 0.07, 6, 12),
-  disc: new THREE.CylinderGeometry(0.42, 0.42, 0.07, 12),
-  blob: new THREE.SphereGeometry(0.12, 8, 6),
-  tube: new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5),
-  glass: new THREE.ConeGeometry(0.17, 0.3, 8),
-  plate: new THREE.BoxGeometry(0.42, 0.06, 0.32),
-  robe: new THREE.BoxGeometry(1.04, 1.85, 0.66),
-  pbody: new THREE.SphereGeometry(0.17, 8, 6),
-  phead: new THREE.SphereGeometry(0.105, 8, 6),
-  ptail: new THREE.ConeGeometry(0.075, 0.34, 5),
+// ══ THE BODY KIT ═════════════════════════════════════════════════════════════
+// A townsperson used to be a STACK OF BOXES: box legs, a box torso, box arms, a
+// sphere head, and one more mesh per accessory — 9 meshes bare, 17 in a tricorn
+// with a parrot. At the play camera (15-40u, looking down) that reads as a brick
+// sliding across the sand, and 200 of them cost ~2400 draw calls.
+//
+// A person is now SIX MERGED MESHES: body, head, two arms, two legs. Each is
+// baked once at build time from the base primitives below with per-vertex
+// colours, so the ENTIRE population shares ONE material and a person costs six
+// draw calls whether they are a naked swimmer or a captain with a parrot, an
+// eyepatch and a cocktail. Only the six pieces that have to animate are separate.
+//
+// Everything the camera cannot see is deleted rather than drawn: limb segments
+// are open-ended tubes (their caps are inside the joint above), the torso barrel
+// has no lid or floor, and nothing below the ankle gets detail the contact
+// shadow does not already imply.
+const PEOPLE_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 });
+
+// base primitives — tessellated ONCE, stripped of indices and UVs, then cloned
+// per part. Cloning two typed arrays is far cheaper than re-tessellating, which
+// matters when 200 people x ~26 parts get baked during level build.
+const nb = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
+  const n = g.toNonIndexed(); g.dispose(); n.deleteAttribute('uv'); return n;
+};
+const B = {
+  sph: nb(new THREE.SphereGeometry(0.5, 8, 6)),           // head
+  sphS: nb(new THREE.SphereGeometry(0.5, 7, 5)),          // shoulders, buns, balls
+  dot: nb(new THREE.SphereGeometry(0.5, 5, 3)),           // hands, freckles of pattern
+  hemi: nb(new THREE.SphereGeometry(0.5, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.56)),
+  tube: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 5, 1, true)),    // open limb segment
+  taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 5, 1, true)),   // open, wider at the BOTTOM
+  drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 8, 1, true)),    // open torso barrel
+  cyl: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 8)),              // capped: hat bands, trays
+  flare: nb(new THREE.CylinderGeometry(0.34, 0.5, 1, 10, 1, true)), // skirts, bobs, robes
+  box: nb(new THREE.BoxGeometry(1, 1, 1)),
+  tri: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 3)),              // tricorn brim: a TRIANGLE from above
+  disc: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 9)),
+  ring: nb(new THREE.TorusGeometry(0.42, 0.13, 4, 9)),              // armbands, rubber rings, necklaces
+  cone: nb(new THREE.ConeGeometry(0.5, 1, 6)),
+};
+type Geo = THREE.BufferGeometry;
+const _pcol = new THREE.Color();
+// clone -> scale -> rotate -> translate -> flood with one vertex colour
+function pc(base: Geo, col: number, x = 0, y = 0, z = 0, sx = 1, sy = sx, sz = sx,
+            rx = 0, ry = 0, rz = 0): Geo {
+  const g = base.clone();
+  g.scale(sx, sy, sz);
+  if (rx) g.rotateX(rx);
+  if (ry) g.rotateY(ry);
+  if (rz) g.rotateZ(rz);
+  g.translate(x, y, z);
+  _pcol.setHex(col);
+  const n = g.getAttribute('position').count;
+  const c = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { c[i * 3] = _pcol.r; c[i * 3 + 1] = _pcol.g; c[i * 3 + 2] = _pcol.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  return g;
+}
+const weld = (parts: Geo[]): THREE.Mesh => {
+  const m = mergeGeometries(parts, false)!;
+  for (const p of parts) p.dispose();
+  return new THREE.Mesh(m, PEOPLE_MAT);
 };
 
 const INK = 0x241f2c, WHITE = 0xf7f4ec, GOLD = 0xe6c35c;
+// a real range, not one tone
+const SKIN = [0xffdcb8, 0xf6c9a0, 0xecb289, 0xd99a6c, 0xc2854f, 0xa4693c, 0x86502e, 0x6a3d22];
+const HAIRC = [0x241d1f, 0x2f2320, 0x4a3226, 0x6a4a2a, 0x8a5a30, 0xb0793a, 0xd8b46a, 0xefdca8,
+  0x8a3a2a, 0xc0562a, 0x55555f, 0x9a9aa4, 0xe8e2d8, 0xf2f0ea];
+const HAIRC_FUN = [0xff4fa0, 0x35d6f0, 0x9a5cf0, 0x4ef0a0, 0xffd23f];
 
 export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel'
   | 'toque' | 'bellhop' | 'flower' | 'cap' | 'beanie';

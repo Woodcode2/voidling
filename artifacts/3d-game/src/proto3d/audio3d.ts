@@ -343,23 +343,31 @@ export function createAudio(): Audio3D {
     o.connect(g); g.connect(dest);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  // Percussion runs through STATIC filters that are built once per destination
-  // bus and left connected, so a shaker hit costs a source + an envelope and
-  // nothing else. Four filters per bus, three buses — not four filters a hit,
-  // eight times a bar, for three and a half minutes.
-  interface FxSet { shaker: BiquadFilterNode; hat: BiquadFilterNode; mallet: BiquadFilterNode; click: BiquadFilterNode }
-  const fxCache = new Map<AudioNode, FxSet>();
-  function fxFor(dest: AudioNode): FxSet | null {
+  // Percussion and any voice with a fixed tone colour runs through STATIC
+  // filters that are built once per destination bus, on demand, and left
+  // connected — so a clap costs a source and an envelope and nothing else.
+  // Not two filters a hit, eight times a bar, for three and a half minutes.
+  const FX_SPEC: Record<string, [BiquadFilterType, number, number]> = {
+    shaker: ['highpass', 6800, 0.7],
+    hat: ['highpass', 8600, 0.7],
+    mallet: ['bandpass', 3400, 1.1],
+    click: ['lowpass', 2200, 0.7],
+    clap: ['bandpass', 1250, 0.9],    // hands, not a snare
+    stomp: ['lowpass', 240, 1.0],     // a boot on a deck
+    lead: ['lowpass', 2800, 3.5],     // the club synth quoting the shanty
+  };
+  const fxCache = new Map<AudioNode, Record<string, BiquadFilterNode>>();
+  function fxFor(dest: AudioNode, key: string): BiquadFilterNode | null {
     const c = ctx; if (!c) return null;
-    let f = fxCache.get(dest);
-    if (!f) {
-      const mk = (type: BiquadFilterType, freq: number, q: number) => {
-        const b = c.createBiquadFilter(); b.type = type; b.frequency.value = freq; b.Q.value = q; b.connect(dest); return b;
-      };
-      f = { shaker: mk('highpass', 6800, 0.7), hat: mk('highpass', 8600, 0.7), mallet: mk('bandpass', 3400, 1.1), click: mk('lowpass', 2200, 0.7) };
-      fxCache.set(dest, f);
+    let m = fxCache.get(dest);
+    if (!m) { m = {}; fxCache.set(dest, m); }
+    let b = m[key];
+    if (!b) {
+      const [type, freq, q] = FX_SPEC[key];
+      b = c.createBiquadFilter(); b.type = type; b.frequency.value = freq; b.Q.value = q;
+      b.connect(dest); m[key] = b;
     }
-    return f;
+    return b;
   }
   // a noise burst straight into a pre-built filter: two nodes, both short-lived
   function nEnv(dest: AudioNode | null, t: number, dur: number, vol: number, attack = 0.003) {
@@ -398,7 +406,7 @@ export function createAudio(): Audio3D {
     o.start(t); o.stop(t + dur + 0.03);
     if (bright > 0.5) {
       dTone(dest, t, dur * 0.3, 'sine', vol * 0.18, freq * 2.76, 0, 0, 0.003);
-      nEnv(fxFor(dest)?.mallet ?? null, t, 0.028, vol * 0.45);
+      nEnv(fxFor(dest, 'mallet'), t, 0.028, vol * 0.45);
     }
   }
   // MARIMBA — wooden and dry: fundamental plus the 4th harmonic (two octaves
@@ -411,10 +419,195 @@ export function createAudio(): Audio3D {
     dTone(dest, t, 0.13, 'sine', vol, 145, 46, 0, 0.004);
   }
   function shaker(dest: AudioNode, t: number, vol: number) {
-    nEnv(fxFor(dest)?.shaker ?? null, t, 0.055, vol);
+    nEnv(fxFor(dest, 'shaker'), t, 0.055, vol);
   }
   function conga(dest: AudioNode, t: number, freq: number, vol: number) {
     dTone(dest, t, 0.16, 'sine', vol, freq, freq * 0.72, 0, 0.004);
+  }
+
+  // ══ THE CREW ══════════════════════════════════════════════════════════════
+  // Everything below is the shanty band. The three melodic instruments each get
+  // a PERMANENT channel (a gain, a tone filter, and for the fiddle a vibrato
+  // LFO) built once with the bus, so a note is only ever an oscillator and an
+  // envelope. The LFOs are shared: a running LFO can be connected to any number
+  // of new oscillators' detune params for free, which is how every fiddle note
+  // gets vibrato without a node per note.
+  let accChan: GainNode | null = null;    // squeezebox -> reedy lowpass -> bus
+  let fidChan: GainNode | null = null;    // fiddle -> body highpass -> bus
+  let fidVib: GainNode | null = null;     // shared bow vibrato, in cents
+  let whChan: GainNode | null = null;     // tin whistle -> soft lowpass -> bus
+  function buildCrew(c: AudioContext, bus: GainNode) {
+    // SQUEEZEBOX: the wheeze is a slow tremolo on the whole channel, exactly
+    // like a bellows breathing. One LFO for every accordion note in the match.
+    accChan = c.createGain(); accChan.gain.value = 1;
+    const accTone = c.createBiquadFilter(); accTone.type = 'lowpass'; accTone.frequency.value = 2500; accTone.Q.value = 0.6;
+    accChan.connect(accTone); accTone.connect(bus);
+    const trem = c.createOscillator(); trem.type = 'sine'; trem.frequency.value = 5.1;
+    const tremG = c.createGain(); tremG.gain.value = 0.14;
+    trem.connect(tremG); tremG.connect(accChan.gain); trem.start();
+    // FIDDLE
+    fidChan = c.createGain(); fidChan.gain.value = 1;
+    const fidTone = c.createBiquadFilter(); fidTone.type = 'highpass'; fidTone.frequency.value = 330; fidTone.Q.value = 0.7;
+    const fidTop = c.createBiquadFilter(); fidTop.type = 'lowpass'; fidTop.frequency.value = 3400; fidTop.Q.value = 0.5;
+    fidChan.connect(fidTone); fidTone.connect(fidTop); fidTop.connect(bus);
+    const vib = c.createOscillator(); vib.type = 'sine'; vib.frequency.value = 5.4;
+    fidVib = c.createGain(); fidVib.gain.value = 17;   // cents
+    vib.connect(fidVib); vib.start();
+    // TIN WHISTLE
+    whChan = c.createGain(); whChan.gain.value = 1;
+    const whTone = c.createBiquadFilter(); whTone.type = 'lowpass'; whTone.frequency.value = 3800; whTone.Q.value = 0.7;
+    whChan.connect(whTone); whTone.connect(bus);
+  }
+  // accordion reed: saw-like with a nasal rolloff. One PeriodicWave, cached,
+  // so a reed note is one oscillator instead of a stack.
+  let reedWave: PeriodicWave | null = null;
+  function reed(c: AudioContext): PeriodicWave {
+    if (!reedWave) {
+      reedWave = c.createPeriodicWave(
+        new Float32Array(10),
+        new Float32Array([0, 1, 0.72, 0.5, 0.34, 0.26, 0.19, 0.14, 0.1, 0.07]),
+      );
+    }
+    return reedWave;
+  }
+  // A single squeezebox note: TWO reeds a musette 14 cents apart. That beating
+  // between them is the entire sound of an accordion — one reed is an organ.
+  function accord(freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || !accChan || freq <= 0) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.018);
+    g.gain.setValueAtTime(vol, t + dur * 0.6);          // bellows hold
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    g.connect(accChan);
+    for (const d of [-14, 14]) {
+      const o = c.createOscillator(); o.setPeriodicWave(reed(c));
+      o.detune.value = d; o.frequency.setValueAtTime(freq, t);
+      o.connect(g); o.start(t); o.stop(t + dur + 0.03);
+    }
+  }
+  // the left hand: the "pah" of the oom-pah-pah. All three tones share one
+  // short envelope, so it's a chop, not a pad.
+  function accChord(chord: number[], t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || !accChan) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    g.connect(accChan);
+    for (const f of chord) {
+      const o = c.createOscillator(); o.setPeriodicWave(reed(c));
+      o.detune.value = Math.random() * 10 - 5;
+      o.frequency.setValueAtTime(f, t);
+      o.connect(g); o.start(t); o.stop(t + dur + 0.03);
+    }
+  }
+  function fiddle(freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || !fidChan || freq <= 0) return;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(freq, t);
+    if (fidVib) fidVib.connect(o.detune);   // shared LFO — no node cost
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.03);      // bowed, not plucked
+    g.gain.setValueAtTime(vol, t + dur * 0.65);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(g); g.connect(fidChan);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function whistle(freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || !whChan || freq <= 0) return;
+    const o = c.createOscillator(); o.type = 'square';
+    o.frequency.setValueAtTime(freq, t);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.025);
+    g.gain.setValueAtTime(vol, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(g); g.connect(whChan);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  // STOMP — a boot on a wooden deck: a fast pitch-dropping sine for the thud
+  // you feel, and a lowpassed noise slap for the wood you hear.
+  function stomp(dest: AudioNode, t: number, vol: number, wood = true) {
+    dTone(dest, t, 0.15, 'sine', vol, 108, 42, 0, 0.004);
+    if (wood) nEnv(fxFor(dest, 'stomp'), t, 0.085, vol * 0.6, 0.002);
+  }
+  // CLAP — baked once into a tiny buffer, because a clap is not one noise
+  // burst: it's three hands not quite together plus the room. Doing that with
+  // live nodes costs six per clap; as a buffer it costs two, and it sounds
+  // better because the 11ms spacing is sample-accurate.
+  let clapBuf: AudioBuffer | null = null;
+  function clapBuffer(c: AudioContext): AudioBuffer {
+    if (!clapBuf || clapBuf.sampleRate !== c.sampleRate) {
+      const len = Math.floor(c.sampleRate * 0.17);
+      const b = c.createBuffer(1, len, c.sampleRate);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const tt = i / c.sampleRate;
+        let a = 0;
+        for (const tp of [0, 0.011, 0.023]) if (tt >= tp && tt < tp + 0.013) a += Math.exp(-(tt - tp) * 420);
+        a += 0.5 * Math.exp(-Math.max(0, tt - 0.023) * 33);   // the room
+        d[i] = (Math.random() * 2 - 1) * a * 0.6;
+      }
+      clapBuf = b;
+    }
+    return clapBuf;
+  }
+  function clap(dest: AudioNode, t: number, vol: number) {
+    const c = ctx; if (!c || vol <= 0) return;
+    const f = fxFor(dest, 'clap'); if (!f) return;
+    const src = c.createBufferSource(); src.buffer = clapBuffer(c);
+    src.playbackRate.value = 0.92 + Math.random() * 0.17;   // never twice the same
+    const g = c.createGain(); g.gain.setValueAtTime(vol, t);
+    src.connect(g); g.connect(f);
+    src.start(t); src.stop(t + 0.22);
+  }
+  // "HEY!" — a saw at chest pitch pushed through two sweeping bandpass
+  // FORMANTS. F1 falling 720->400 and F2 rising 1900->2350 is the /eɪ/
+  // diphthong, and that glide is the whole reason it reads as a word and not
+  // as a buzz. Voices are pitched apart and nudged off the beat by a few
+  // milliseconds each, because a crowd is never together.
+  const HEY_PITCH = [147.0, 185.0, 110.0, 220.0, 165.0, 131.0];
+  function hey(dest: AudioNode, t: number, vol: number, voices: number) {
+    const c = ctx; if (!c) return;
+    const v0 = vol / Math.sqrt(Math.max(1, voices));
+    for (let v = 0; v < voices; v++) {
+      const f0 = HEY_PITCH[v % HEY_PITCH.length] * (1 + (Math.random() * 0.04 - 0.02));
+      const tt = t + (v === 0 ? 0 : Math.random() * 0.04);
+      const dur = 0.28 + Math.random() * 0.07;
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0 * 1.08, tt);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.9, tt + dur);
+      for (const [fc0, fc1, q, lvl] of [[720, 400, 5, 1], [1900, 2350, 9, 0.5]] as number[][]) {
+        const b = c.createBiquadFilter(); b.type = 'bandpass'; b.Q.value = q;
+        b.frequency.setValueAtTime(fc0, tt);
+        b.frequency.exponentialRampToValueAtTime(fc1, tt + dur * 0.8);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, tt);
+        g.gain.linearRampToValueAtTime(v0 * lvl, tt + 0.022);
+        g.gain.setValueAtTime(v0 * lvl, tt + dur * 0.5);
+        g.gain.exponentialRampToValueAtTime(0.0006, tt + dur);
+        o.connect(b); b.connect(g); g.connect(dest);
+      }
+      o.start(tt); o.stop(tt + dur + 0.05);
+    }
+    nEnv(fxFor(dest, 'hat'), t, 0.1, v0 * 0.22, 0.012);   // the breath in front of it
+  }
+  // the club lead — a fat detuned saw pair, used only to quote the shanty hook
+  function leadSyn(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || freq <= 0) return;
+    const f = fxFor(dest, 'lead'); if (!f) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    g.connect(f);
+    for (const d of [-11, 11]) {
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.detune.value = d; o.frequency.setValueAtTime(freq, t);
+      o.connect(g); o.start(t); o.stop(t + dur + 0.03);
+    }
   }
   // the off-beat SKANK: all three chord tones share one fast envelope, which is
   // what makes it a stab and not a pad. One gain, three oscillators.
@@ -441,49 +634,60 @@ export function createAudio(): Audio3D {
     dTone(dest, t, dur * 0.8, 'sine', vol * 0.55, freq / 2, 0, 0, 0.02);
   }
 
-  // ── the tropical bus ──────────────────────────────────────────────────────
-  // Brighter and airier than Maple's: a higher lowpass (pans need their top
-  // end) and a longer, wetter delay so the pans wash into the bay.
-  const PIR_VOL = 0.27;
+  // ── the band's bus ────────────────────────────────────────────────────────
+  // A tavern, not a lagoon: less delay than a tropical mix wants (a wash would
+  // smear the oom-pah and kill the stomp) but enough to put the band in a room.
+  const PIR_VOL = 0.25;
   let pirBus: GainNode | null = null;
   let ambGain: GainNode | null = null;
   let pirTimer: ReturnType<typeof setInterval> | null = null;
   let pirRunning = false;
   let pirStep = 0, pirNextT = 0, ambNextT = 0;
   let pirDelay: DelayNode | null = null, pirDelayStage = -1;
-  function buildTropicalBus(c: AudioContext): GainNode {
+  function buildBandBus(c: AudioContext): GainNode {
     const bus = c.createGain(); bus.gain.value = 0.0001;
-    const warm = c.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 4600; warm.Q.value = 0.4;
-    const dry = c.createGain(); dry.gain.value = 0.88;
-    const delay = c.createDelay(1.0); delay.delayTime.value = 0.45;   // dotted 8th at 100bpm
+    const warm = c.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 4800; warm.Q.value = 0.4;
+    const dry = c.createGain(); dry.gain.value = 0.92;
+    const delay = c.createDelay(1.0); delay.delayTime.value = 0.37;   // two eighths at 108
     pirDelay = delay;
-    const fb = c.createGain(); fb.gain.value = 0.3;
-    const wet = c.createGain(); wet.gain.value = 0.22;
-    const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 2600;
+    const fb = c.createGain(); fb.gain.value = 0.2;
+    const wet = c.createGain(); wet.gain.value = 0.15;
+    const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 2400;
     bus.connect(warm);
     warm.connect(dry); dry.connect(master!);
     warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
     delay.connect(fb); fb.connect(delay);
+    buildCrew(c, bus);
     return bus;
   }
 
-  // ── the score: I – vi – IV – V in F major, the sunniest four bars there are
-  const P_CHORD = [
-    [349.23, 440.00, 523.25],   // F  (F4 A4 C5)
-    [349.23, 440.00, 587.33],   // Dm (F4 A4 D5)
-    [349.23, 466.16, 587.33],   // Bb (F4 Bb4 D5)
-    [329.63, 392.00, 523.25],   // C  (E4 G4 C5)
+  // ══ THE SHANTY ════════════════════════════════════════════════════════════
+  // 6/8 — twelve steps a bar, two dotted-quarter pulses, which is the lilt that
+  // makes a shanty walk instead of march. D minor resolving through a big
+  // bright F major on bar three: i - VII - III - VII. Minor bones, major grin,
+  // and it turns around forever. Deliberately the SAME seven notes the steel
+  // pans were already using (D minor and F major are the same scale), so the
+  // resort band's tropical topping sits on the crew's shanty without a single
+  // wrong note. That's the joke of the level made literal.
+  const S_CHORD = [
+    [293.66, 349.23, 440.00],   // Dm  (D4 F4 A4)
+    [261.63, 329.63, 392.00],   // C   (C4 E4 G4)
+    [261.63, 349.23, 440.00],   // F   (C4 F4 A4)  ← the bright one
+    [261.63, 329.63, 392.00],   // C
   ];
-  const P_BASS = [87.31, 146.83, 116.54, 130.81];   // F2 D3 Bb2 C3
-  // steel-pan hook, one note per beat across the 4 bars (0 = rest, and the
-  // rests matter — a tune that never breathes stops being a tune)
-  const P_MEL = [523.25, 587.33, 698.46, 587.33,
-    523.25, 440.00, 523.25, 0,
-    587.33, 698.46, 783.99, 698.46,
-    587.33, 523.25, 440.00, 0];
-  // marimba counter-line, two notes a bar, sitting an octave under the pans
-  const P_CNTR = [[349.23, 440.00], [293.66, 349.23], [349.23, 466.16], [329.63, 392.00]];
-  const P_BELL = [880.00, 1046.50, 1174.66];
+  const S_BASS = [146.83, 130.81, 174.61, 130.81];   // D3 C3 F3 C3 — the "oom"
+  const S_FIFTH = [220.00, 196.00, 261.63, 196.00];  // A3 G3 C4 G3
+  // THE HOOK. Four bars, six eighths each, call / answer / call / BIGGER
+  // answer. Bars 0 and 2 are IDENTICAL and that is the entire point: a shanty
+  // is a thing a crowd can join in with on the second pass. Being tasteful and
+  // varied here would be the mistake. 0 = rest — the rests are where a kid
+  // breathes in before shouting the next bit.
+  const S_HOOK = [
+    [293.66, 293.66, 293.66, 349.23, 440.00, 440.00],   // D D D  F A A   call
+    [523.25, 523.25, 440.00, 392.00, 0, 0],             // C C A  G . .   answer
+    [293.66, 293.66, 293.66, 349.23, 440.00, 440.00],   // D D D  F A A   call again
+    [523.25, 587.33, 659.25, 783.99, 659.25, 0],        // C D E  G E .   the big one
+  ];
 
   // ── place layers ──────────────────────────────────────────────────────────
   type ZoneId = 'party' | 'port' | 'jungle' | 'beach';
@@ -631,66 +835,105 @@ export function createAudio(): Audio3D {
   function pirSchedule() {
     const c = ensure(); if (!c || !pirBus) return;
     const st = Math.max(0, Math.min(3, musStage));
-    const spb = 60 / (100 + st * 5);
-    const s16 = spb / 4;
+    const spd = 60 / (108 + st * 6);   // seconds per dotted-quarter PULSE (two a bar)
+    const e8 = spd / 3;                // one eighth
+    const s12 = spd / 6;               // one step: twelve to the bar
     const now = c.currentTime;
-    // keep the echo a dotted eighth as the tempo climbs — glided, not jumped,
-    // so it slurs like tape instead of clicking. Four times a match, no alloc.
+    // keep the echo two eighths as the tempo climbs — glided, not jumped, so it
+    // slurs like tape instead of clicking. Four times a match, no allocation.
     if (pirDelay && st !== pirDelayStage) {
       pirDelayStage = st;
-      pirDelay.delayTime.setTargetAtTime(spb * 0.75, now, 0.35);
+      pirDelay.delayTime.setTargetAtTime(e8 * 2, now, 0.35);
     }
     if (pirNextT < now) pirNextT = now + 0.05;
     while (pirNextT < now + 0.35) {
       const t = pirNextT;
-      const bar = (pirStep >> 4) & 3, s = pirStep & 15;
-      const beat = (pirStep >> 2) & 15;   // melody index: one note per beat, 4 bars
-      const ch = P_CHORD[bar];
-      // On the dance floor the bed is ducked to half and the floor brings its
-      // own kit — so the bed's percussion is DROPPED rather than buried. Fewer
-      // voices AND a cleaner mix from the same decision.
+      const barN = Math.floor(pirStep / 12);
+      const bar = barN & 3;          // where we are in the 4-bar tune
+      const ph = barN & 7;           // where we are in the 8-bar phrase
+      const s = pirStep % 12;
+      const e = s >> 1, onE = (s & 1) === 0;   // eighth index 0..5
+      const ch = S_CHORD[bar];
+      const note = S_HOOK[bar][e];
+      // On the dance floor the bed ducks to half and the floor brings its own
+      // kit — so the band's percussion and melody are DROPPED rather than
+      // buried, leaving bass and squeezebox chords bleeding through the door.
+      // Fewer voices AND a cleaner mix out of the same decision.
       const floor = zoneLive('party', t);
 
-      // BASS — root on the one, a lazy push on the "and of 3". That push is
-      // the whole tropical feel; a bass on every beat would read as marching.
-      if (s === 0) pBass(pirBus, t, P_BASS[bar], spb * 1.5, 0.17);
-      if (s === 10) pBass(pirBus, t, P_BASS[bar], spb * 0.55, 0.12);
-      if (st >= 2 && s === 6) pBass(pirBus, t, P_BASS[bar] * 1.5, spb * 0.4, 0.08);
-      // soft kick on 1 and 3 — a heartbeat, not a club
-      if (!floor && (s === 0 || s === 8)) pKick(pirBus, t, 0.15);
-      // PAD: one warm swell a bar. This is the "expensive" in the brief —
-      // the resort's air conditioning, basically.
-      if (s === 0) for (const f of ch) dTone(pirBus, t, spb * 3.6, 'sine', 0.024, f, 0, 0, 0.09);
-      // SKANK: the off-beat chord stab, every "and"
-      if ((s & 3) === 2) skank(pirBus, t, ch, 0.05 + st * 0.008, s16 * 1.3);
-      // SHAKER: off-beats only until stage 2, then straight 8ths with accents
-      if (!floor && (st >= 2 ? (s & 1) === 0 : (s & 3) === 2)) shaker(pirBus, t, (s & 3) === 2 ? 0.032 : 0.016);
-      // STEEL PAN HOOK — the tune arrives with the first evolution
-      if (st >= 1 && (s & 3) === 0 && P_MEL[beat] > 0) pan(pirBus, P_MEL[beat], t, s16 * 3, 0.07);
-      // MARIMBA counter-line answers the pans in the gaps
-      if (st >= 2 && (s === 6 || s === 14)) marimba(pirBus, P_CNTR[bar][s === 6 ? 0 : 1], t, s16 * 2, 0.04);
-      // CONGAS + a bright bell turnaround: stage 3 is BUSIER, never darker
-      if (st >= 3) {
-        if (!floor && s === 7) conga(pirBus, t, 310, 0.07);
-        if (!floor && s === 11) conga(pirBus, t, 205, 0.08);
-        if (!floor && s === 15) conga(pirBus, t, 380, 0.06);
-        if (bar === 3 && s === 12) P_BELL.forEach((f, i) => pan(pirBus!, f, t + i * s16 * 0.5, 0.5, 0.05, 0.6));
+      // ── THE ENGINE: oom-pah-pah, oom-pah-pah ───────────────────────────────
+      // Bass on the two pulses, squeezebox chops on the four eighths between.
+      // This one pattern is what makes it a shanty and not a chord bed.
+      if (e === 0 && onE) pBass(pirBus, t, S_BASS[bar], e8 * 1.7, 0.17);
+      if (e === 3 && onE) pBass(pirBus, t, S_FIFTH[bar], e8 * 1.4, 0.12);
+      if (st >= 2 && e === 5 && onE) pBass(pirBus, t, S_BASS[bar], e8 * 0.7, 0.08);
+      if (onE && (e === 1 || e === 2 || e === 4 || e === 5)) accChord(ch, t, e8 * 0.85, 0.05);
+
+      // ── STOMP AND CLAP: the rowdy floor ───────────────────────────────────
+      if (!floor && onE) {
+        if (e === 0) stomp(pirBus, t, 0.24);
+        if (e === 3) stomp(pirBus, t, 0.2);
+        if (st >= 3 && (e === 2 || e === 5)) stomp(pirBus, t, 0.09, false);   // ghost boots
+        if (e === 3) clap(pirBus, t, 0.15);
+        if (st >= 1 && e === 5) clap(pirBus, t, 0.11);
+        if (st >= 2 && e === 1) clap(pirBus, t, 0.09);
+      }
+      // stage 3 claps land BETWEEN the eighths too — the room speeding up
+      if (!floor && st >= 3 && !onE && (s === 7 || s === 11)) clap(pirBus, t, 0.055);
+      if (!floor && st >= 3 && !onE) shaker(pirBus, t, 0.013);
+
+      // ── THE HOOK ──────────────────────────────────────────────────────────
+      if (!floor && onE && note > 0) {
+        accord(note, t, e8 * 0.92, 0.1);                              // squeezebox, always
+        if (st >= 1) fiddle(note * 2, t, e8 * 0.95, 0.04);            // fiddle doubles it up
+        if (st >= 3 && (e === 0 || e === 3)) whistle(note * 2, t, e8 * 1.5, 0.028);
       }
 
-      // ── DANCE COVE: the floor's own beat, mixed into the party zone bus ───
+      // ── THE RESORT BAND'S TOPPING ─────────────────────────────────────────
+      // Steel pan and marimba are demoted to colour: they answer the hook on
+      // the off-beats instead of being the tune. Pirate-themed LUXURY resort —
+      // shanty bones, tropical garnish.
+      if (!floor && st >= 2 && onE) {
+        if (e === 2) pan(pirBus, ch[2] * 2, t, e8 * 1.8, 0.04);
+        if (e === 5) pan(pirBus, ch[1] * 2, t, e8 * 1.4, 0.033);
+      }
+      if (!floor && st >= 3 && (s === 5 || s === 11)) marimba(pirBus, ch[0] * 2, t, e8 * 0.9, 0.028);
+
+      // ── "HEY!" ────────────────────────────────────────────────────────────
+      // On the downbeat of the 8-bar phrase. One voice at stage 0, a whole
+      // crew by stage 3, and from stage 2 they shout twice as often. This is
+      // the cheapest thing in the file and the thing that makes it FUN.
+      if (!floor && s === 0) {
+        if (ph === 0) hey(pirBus, t, 0.22, 1 + st);
+        else if (st >= 2 && ph === 4) hey(pirBus, t, 0.18, 1 + st);
+      }
+      if (!floor && st >= 3 && ph === 7 && s === 10) hey(pirBus, t, 0.13, 2);   // pickup shout
+
+      // ── DANCE COVE: straight electronic 4/4, scheduled a bar at a time ────
+      // A shanty does not belong in a nightclub. The club's beat is laid out
+      // in real seconds off the bar downbeat, so it stays a straight four
+      // while the band around it is in six — and the two lock because the
+      // house kick sits exactly on the shanty's dotted-quarter pulse.
       if (floor) {
         const pg = zones.party!.g;
-        const pf = fxFor(pg);
-        if ((s & 3) === 0) { pKick(pg, t, 0.3); nEnv(pf?.click ?? null, t, 0.014, 0.09); }
-        if ((s & 3) === 2) {
-          skank(pg, t, [ch[0] * 2, ch[1] * 2, ch[2] * 2], 0.055, s16 * 1.5);   // filtered stab
-          nEnv(pf?.hat ?? null, t, 0.06, 0.05);                                // open hat
-        } else if ((s & 1) === 0) nEnv(pf?.hat ?? null, t, 0.03, 0.02);        // closed hat
-        if (s === 4 || s === 12) pBass(pg, t, P_BASS[bar], s16 * 1.4, 0.1);
-        if (bar === 3 && s === 14) nHit(pg, t, 1.1, 0.09, 'bandpass', 1100, 0.5, 1800, 0.25);   // crowd woo
+        if (s === 0) {
+          for (let k = 0; k < 2; k++) {
+            const b0 = t + k * spd;
+            pKick(pg, b0, 0.3); nEnv(fxFor(pg, 'click'), b0, 0.014, 0.09);
+            skank(pg, b0 + spd * 0.5, [ch[0] * 2, ch[1] * 2, ch[2] * 2], 0.055, spd * 0.34);
+            nEnv(fxFor(pg, 'hat'), b0 + spd * 0.5, 0.06, 0.05);
+            nEnv(fxFor(pg, 'hat'), b0 + spd * 0.25, 0.03, 0.02);
+            nEnv(fxFor(pg, 'hat'), b0 + spd * 0.75, 0.03, 0.02);
+            pBass(pg, b0 + spd * 0.5, S_BASS[bar], spd * 0.4, 0.1);
+          }
+        }
+        // DJ Coconut quotes the shanty once per 8-bar loop, so the island has
+        // exactly one tune however you're hearing it
+        if (onE && ph >= 6 && note > 0) leadSyn(pg, note * 2, t, e8 * 0.9, 0.05);
+        if (ph === 5 && s === 10) nHit(pg, t, 1.1, 0.09, 'bandpass', 1100, 0.5, 1800, 0.25);   // crowd woo
       }
 
-      pirNextT += s16; pirStep++;
+      pirNextT += s12; pirStep++;
     }
     ambience(c);
   }
