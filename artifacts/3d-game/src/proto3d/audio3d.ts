@@ -680,6 +680,12 @@ export function createAudio(): Audio3D {
       dTone(master, t, 0.75, 'triangle', vol * v, 466.16 * m, 466.16 * m * 1.06, 0, 0.03);
     }
   }
+  function mapleEvolve() {
+    if (sample('evolve_epic.wav', 0.5)) return;
+    const seq = [392, 523.25, 659.25, 783.99]; // G4 C5 E5 G5 — bright major
+    seq.forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.22, i * 0.085));
+    tone(1567.98, 1567.98, 0.4, 'sine', 0.1, 0.34);
+  }
   function pirateEvolve() {
     const c = ensure(); if (!c || !master) return;
     const t = c.currentTime;
@@ -691,6 +697,10 @@ export function createAudio(): Audio3D {
 
   return {
     startMusic() {
+      // PIRATE BAY RESORT has its own score — and deliberately does NOT pick up
+      // /assets/music/theme.mp3, which is Maple's track. Its bed is synthesised
+      // end to end so the resort always sounds like the resort.
+      if (isPirate()) { startTropical(); return; }
       // prefetch the recorded kit so the very first gulp is the real sample
       for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
       // licensed-track hook: if a real music file ships with the build, prefer
@@ -721,7 +731,40 @@ export function createAudio(): Audio3D {
       }
     },
     isMuted() { return muted; },
+    // The player's current district, safe to call every frame — unchanged
+    // values cost one comparison and nothing else.
+    setZone(zone) {
+      const id = normZone(zone);
+      if (id === curZone) return;
+      curZone = id;
+      // NEVER call ensure() here: setZone can fire before the first gesture and
+      // creating the context then would trip the autoplay policy. If there is
+      // no context yet the choice is simply remembered for startTropical().
+      if (!ctx || !isPirate()) return;
+      applyZones();
+    },
+    // The authored match beats. Maple keeps the fanfare it always had; the
+    // resort answers with the pans, and DANCE PARTY gets the full horn.
+    matchBeat(kind) {
+      const c = ensure(); if (!c || !master) return;
+      if (!isPirate()) { mapleEvolve(); return; }
+      const t = c.currentTime;
+      const k = String(kind).toLowerCase();
+      if (k.includes('dance') || k.includes('party')) {
+        airhorn(t, 0.16);
+        cheer(t + 0.12, 0.8);
+        panRun(t + 0.5, [523.25, 587.33, 698.46, 880.00], 0.09, 0.14, 0.5);
+      } else if (k.includes('treasure') || k.includes('feast')) {
+        panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00], 0.08, 0.15, 0.6);
+        pan(master, 1046.5, t + 0.44, 1.2, 0.1);
+        nHit(master, t + 0.38, 0.6, 0.05, 'highpass', 5200, 0.7, 9500, 0.14);
+      } else {
+        panRun(t, [523.25, 659.25, 783.99], 0.1, 0.14, 0.55);   // happy hour: a bright toast
+        marimba(master, 1046.5, t + 0.32, 0.7, 0.08);
+      }
+    },
     stopMusic() {
+      stopTropical(1.2);
       themeWanted = false;
       stopThemeLoop(1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
@@ -781,10 +824,9 @@ export function createAudio(): Audio3D {
       tone(60, 46, 1.1, 'triangle', 0.3, 0.05);
     },
     evolve() {
-      if (sample('evolve_epic.wav', 0.5)) return;
-      const seq = [392, 523.25, 659.25, 783.99]; // G4 C5 E5 G5 — bright major
-      seq.forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.22, i * 0.085));
-      tone(1567.98, 1567.98, 0.4, 'sine', 0.1, 0.34);
+      // the resort answers in steel pans instead — same beat, different island
+      if (isPirate()) { pirateEvolve(); return; }
+      mapleEvolve();
     },
     voice(kind) {
       // Kirby-class coos: two-note sine chirps, soft and rate-limited so the
@@ -800,6 +842,17 @@ export function createAudio(): Audio3D {
       else if (kind === 'sleepy') { tone(340, 300, 0.55, 'sine', 0.045); }
     },
     win() {
+      if (isPirate()) {
+        // closing party: a pan run up the F major triad, a shaker roll and the
+        // crowd. The match ends on a beach, not a scoreboard.
+        const c = ensure(); if (!c || !master) return;
+        const t = c.currentTime;
+        panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00, 1046.5], 0.11, 0.15, 0.7);
+        pan(master, 1396.91, t + 0.68, 1.4, 0.09);
+        nHit(master, t, 0.9, 0.045, 'highpass', 5000, 0.7, 9500, 0.5);
+        cheer(t + 0.25, 0.9);
+        return;
+      }
       if (sample('win_warm.wav', 0.55)) return;
       const seq = [523.25, 659.25, 783.99, 1046.5];
       seq.forEach((f, i) => tone(f, f, 0.3, 'triangle', 0.2, i * 0.12));
@@ -809,10 +862,29 @@ export function createAudio(): Audio3D {
       noise(0.12, 0.18, 700, 200);
     },
     alert() {
+      if (isPirate()) {
+        // a friendly two-tone boat horn, a major third apart. Announcing a
+        // guest at the resort, not a warning — the squares stay on Maple.
+        const c = ensure(); if (!c || !master) return;
+        const t = c.currentTime;
+        for (const [f, off] of [[261.63, 0], [329.63, 0.17]] as [number, number][]) {
+          dTone(master, t + off, 0.34, 'triangle', 0.13, f, 0, 0, 0.03);
+          dTone(master, t + off, 0.3, 'sine', 0.07, f * 2, 0, 0, 0.03);
+        }
+        return;
+      }
       tone(660, 660, 0.13, 'square', 0.12);
       tone(880, 880, 0.13, 'square', 0.12, 0.16);
     },
     ready() {
+      if (isPirate()) {
+        // the poolside bar chime: two marimba notes, a fifth apart
+        const c = ensure(); if (!c || !master) return;
+        const t = c.currentTime;
+        marimba(master, 880.00, t, 0.5, 0.13);
+        marimba(master, 1318.51, t + 0.09, 0.6, 0.11);
+        return;
+      }
       tone(659.25, 659.25, 0.1, 'sine', 0.18);
       tone(987.77, 987.77, 0.14, 'sine', 0.16, 0.09);
     },
