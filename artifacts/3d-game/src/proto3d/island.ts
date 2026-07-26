@@ -401,8 +401,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       const pr = BAY.BAY_REGIONS.find((r) => r.id === 'party')!;
       g.save(); wpath(BAY.smoothPoly(pr.poly, 5)); g.clip();
       const cell = 175;
-      for (let iy = 0; iy < 14; iy++) for (let ix = 0; ix < 16; ix++) {
-        const x = 6150 + ix * cell, y = 10050 + iy * cell;
+      for (let iy = 0; iy < 16; iy++) for (let ix = 0; ix < 18; ix++) {
+        const x = 5950 + ix * cell, y = 9900 + iy * cell;
         g.fillStyle = (ix + iy) % 2 === 0 ? 'rgba(255,120,200,0.62)' : 'rgba(90,200,255,0.5)';
         g.fillRect(pxW(x), pyW(y), pxW(cell) - pxW(0), pxW(cell) - pxW(0));
       }
@@ -1742,23 +1742,69 @@ function makeTikiBar(): THREE.Group {
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 function makeSpeakerStack(): THREE.Group {
+  // From above, the old version was a black rectangle: the cones faced +Z and
+  // the top-down camera never saw them. It now has a flight-case silhouette —
+  // pale corner bracing, a gold grille, a lit VU strip and a stage light on
+  // top — so it reads as PA gear from the one angle the player actually uses.
+  const CASE = 0x2a2038, TRIM = 0xe8e2f2, GOLD = 0xf0c050;
   const parts = [
-    part(new THREE.BoxGeometry(2.6, 3.4, 2.2), 0x241a2e, 0, 1.7, 0),
-    part(new THREE.BoxGeometry(2.6, 2.4, 2.2), 0x2e2238, 0, 4.6, 0),
-    part(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 14), 0x4a3a58, 0, 1.4, 1.12, Math.PI / 2),
-    part(new THREE.CylinderGeometry(0.62, 0.62, 0.3, 12), 0x4a3a58, 0, 4.9, 1.12, Math.PI / 2),
-    part(new THREE.CylinderGeometry(0.3, 0.3, 0.3, 10), 0xff5d7e, 0, 3.0, 1.12, Math.PI / 2),
+    part(new THREE.BoxGeometry(3.0, 0.4, 2.6), 0x1a1424, 0, 0.2, 0),            // riser
+    part(new THREE.BoxGeometry(2.7, 3.4, 2.3), CASE, 0, 2.1, 0),                 // sub
+    part(new THREE.BoxGeometry(2.5, 2.6, 2.1), CASE, 0, 5.1, 0),                 // mid
+    part(new THREE.BoxGeometry(2.2, 1.5, 1.9), CASE, 0, 7.15, 0),                // horn box
   ];
+  // corner bracing on every vertical edge — the thing that says "flight case"
+  for (const sx of [-1.3, 1.3]) for (const sz of [-1.1, 1.1]) {
+    parts.push(part(new THREE.BoxGeometry(0.22, 6.3, 0.22), TRIM, sx, 3.6, sz));
+  }
+  for (const y of [0.45, 3.82, 6.4, 7.9]) parts.push(part(new THREE.BoxGeometry(2.85, 0.2, 2.45), TRIM, 0, y, 0));
+  // grilles read from above as gold discs on the box TOP faces, not the front
+  parts.push(part(new THREE.CylinderGeometry(0.8, 0.8, 0.16, 16), GOLD, 0, 3.88, 0));
+  parts.push(part(new THREE.CylinderGeometry(0.62, 0.62, 0.16, 14), GOLD, 0, 6.46, 0));
+  // and again on the front face for the low camera
+  parts.push(part(new THREE.CylinderGeometry(0.85, 0.85, 0.22, 16), GOLD, 0, 2.1, 1.2, Math.PI / 2));
+  parts.push(part(new THREE.CylinderGeometry(0.6, 0.6, 0.22, 14), GOLD, 0, 5.1, 1.1, Math.PI / 2));
+  // VU strip: four lit blocks up the side
+  for (let i = 0; i < 4; i++) {
+    parts.push(part(new THREE.BoxGeometry(0.16, 0.34, 0.5), [0x4ef0a0, 0x9af04e, 0xffd23f, 0xff2fa0][i], 1.4, 4.6 + i * 0.5, 0.7));
+  }
+  // a par-can on top, angled at the floor
+  parts.push(part(new THREE.CylinderGeometry(0.34, 0.46, 0.9, 10), 0x1a1424, 0, 8.3, 0.35, -0.7));
+  parts.push(part(new THREE.CircleGeometry(0.44, 12), 0x9af0ff, 0, 8.05, 0.9, -0.7));
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 function makeMarketStall(): THREE.Group {
-  const awn = pick([0xff5d7e, 0x4de8ff, 0xffd23f, 0x7ef2a0]);
+  // A flat awning slab reads as a coloured rectangle from above. A SCALLOPED
+  // striped canopy with a valance reads as a market stall — and the stripes
+  // are the only part of it the top-down camera can see, so they carry it.
+  const A = pick([0xff5d7e, 0x4de8ff, 0xffd23f, 0x7ef2a0, 0xff8ac0, 0xa07ef0]);
   const parts = [
-    part(new THREE.BoxGeometry(5, 1.2, 2.6), 0xc79350, 0, 1.5, 0),
-    part(new THREE.BoxGeometry(5.6, 0.3, 3.4), awn, 0, 3.6, 0.2, -0.24),
+    part(new THREE.BoxGeometry(5, 1.2, 2.6), 0xc79350, 0, 1.5, 0),           // counter
+    part(new THREE.BoxGeometry(5.3, 0.22, 2.9), 0xe8c07a, 0, 2.2, 0),        // counter top
   ];
-  for (const sx of [-2.2, 2.2]) for (const sz of [-1.1, 1.1]) parts.push(part(new THREE.CylinderGeometry(0.14, 0.14, 3.4, 6), 0x8a6132, sx, 1.7, sz));
-  for (let i = 0; i < 4; i++) parts.push(part(new THREE.SphereGeometry(0.34, 8, 6), [0xff8a3a, 0xffd23f, 0xff5d7e, 0x7ef2a0][i], -1.6 + i * 1.05, 2.3, 0.4));
+  for (const sx of [-2.2, 2.2]) for (const sz of [-1.1, 1.1]) {
+    parts.push(part(new THREE.CylinderGeometry(0.13, 0.13, 4.0, 6), 0x8a6132, sx, 2.0, sz));
+  }
+  // striped canopy: alternating slats, tilted forward
+  for (let i = 0; i < 7; i++) {
+    parts.push(part(new THREE.BoxGeometry(0.8, 0.18, 3.5), i % 2 ? A : 0xfdf3de, -2.4 + i * 0.8, 3.9, 0.2, -0.22));
+  }
+  // scalloped valance along the front lip
+  for (let i = 0; i < 7; i++) {
+    parts.push(part(new THREE.SphereGeometry(0.34, 8, 6, 0, Math.PI), i % 2 ? A : 0xfdf3de,
+      -2.4 + i * 0.8, 3.5, 1.85, Math.PI / 2));
+  }
+  // goods: fruit crates and hanging lanterns, not four loose spheres
+  for (let i = 0; i < 3; i++) {
+    parts.push(part(new THREE.BoxGeometry(1.15, 0.5, 0.95), 0xb5804a, -1.5 + i * 1.5, 2.5, 0.35));
+    for (let k = 0; k < 3; k++) {
+      parts.push(part(new THREE.SphereGeometry(0.24, 8, 6), [0xff8a3a, 0xffd23f, 0xff5d7e, 0x7ef2a0, 0xff6fb0][(i + k) % 5],
+        -1.85 + i * 1.5 + k * 0.35, 2.86, 0.35));
+    }
+  }
+  for (const sx of [-1.8, 1.8]) parts.push(part(new THREE.SphereGeometry(0.3, 8, 6), 0xffd23f, sx, 3.3, -1.25));
+  // a chalkboard price sign leaning on the end
+  parts.push(part(new THREE.BoxGeometry(0.1, 1.3, 0.95), 0x2e2a38, 2.65, 0.65, 0.4, 0, 0, 0.16));
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 function makeChest(): THREE.Group {

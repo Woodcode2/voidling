@@ -138,7 +138,7 @@ export function makeGalleon(): THREE.Group {
   const sideHB = (x: number) => hbAt(x, 2.30, 2.60, 0.70, 1.28) * 0.94;
 
   // ── gun ports with cannon muzzles poking out
-  for (const gx of [-6, -1, 4]) for (const sz of [-1, 1]) {
+  for (const gx of [-5.5, 1.5]) for (const sz of [-1, 1]) {
     const z = sz * sideHB(gx);
     p.push(part(new THREE.BoxGeometry(1.0, 0.86, 0.26), CHAR, gx, 3.35, z));
     p.push(part(new THREE.CylinderGeometry(0.19, 0.24, 0.9, 8), 0x3a3f46, gx, 3.35, z + sz * 0.42, Math.PI / 2));
@@ -150,24 +150,22 @@ export function makeGalleon(): THREE.Group {
   p.push(part(new THREE.BoxGeometry(1.16, 0.26, 5.9), GOLD, -14.75, 4.05, 0));
   for (const wy of [3.25, 4.85]) for (const wz of [-1.75, 0, 1.75])
     p.push(part(new THREE.BoxGeometry(0.3, 1.0, 1.05), AQUA, -15.3, wy, wz));
-  for (const wz of [-2.6, -0.85, 0.85, 2.6])
+  for (const wz of [-2.6, 2.6])
     p.push(part(new THREE.BoxGeometry(0.34, 3.2, 0.2), GOLD, -15.3, 4.05, wz));
 
   // ── stern castle: two raised tiers with the great cabin under them
   p.push(part(new THREE.BoxGeometry(8.0, 2.2, 5.6), NAVY, -10.5, 7.36, 0));
   p.push(part(new THREE.BoxGeometry(8.2, 0.24, 5.8), GOLD, -10.5, 8.5, 0));
   p.push(part(new THREE.BoxGeometry(7.9, 0.26, 5.5), 0xe8c07a, -10.5, 8.7, 0));
-  for (const sz of [-1, 1]) for (const wx of [-13.0, -11.2, -9.4, -7.6])
+  for (const sz of [-1, 1]) for (const wx of [-12.6, -10.5, -8.4])
     p.push(part(new THREE.BoxGeometry(1.0, 0.9, 0.24), AQUA, wx, 7.4, sz * 2.82));
   p.push(part(new THREE.BoxGeometry(5.0, 1.8, 4.8), NAVY, -12.2, 9.7, 0));
   p.push(part(new THREE.BoxGeometry(5.3, 0.24, 5.1), GOLD, -12.2, 10.7, 0));
   p.push(part(new THREE.BoxGeometry(5.0, 0.24, 4.7), 0xe8c07a, -12.2, 10.9, 0));
-  for (const wz of [-1.15, 1.15]) p.push(part(new THREE.BoxGeometry(0.3, 0.9, 0.95), AQUA, -14.8, 9.8, wz));
   // stern lantern on a gilt bracket, plus quarter lanterns
   p.push(part(new THREE.CylinderGeometry(0.09, 0.09, 1.1, 5), GOLD, -14.9, 11.4, 0));
   p.push(part(new THREE.SphereGeometry(0.46, 9, 7), GOLD_B, -14.9, 12.2, 0));
   p.push(part(new THREE.ConeGeometry(0.34, 0.42, 6), GOLD, -14.9, 12.7, 0));
-  for (const sz of [-1, 1]) p.push(part(new THREE.SphereGeometry(0.28, 8, 6), GOLD_B, -6.6, 9.1, sz * 2.4));
 
   // ── forecastle
   p.push(part(new THREE.BoxGeometry(4.6, 1.6, 2.8), NAVY, 10.2, 7.06, 0));
@@ -214,7 +212,7 @@ export function makeGalleon(): THREE.Group {
   p.push(part(new THREE.BoxGeometry(0.22, 0.22, 5.6), WOOD, -1.0, 24.2, 0));
   p.push(part(new THREE.CylinderGeometry(0.3, 0.3, 5.0, 8), CREAM, -1.0, 23.9, 0, Math.PI / 2));  // furled
   p.push(part(new THREE.BoxGeometry(0.28, 0.28, 10.4), WOOD, 7.0, 12.6, 0));
-  sailPanel(p, S5, 7.0, 9.9, 0, 9.0, 5.4, 0.8);
+  sailPanel(p, S3, 7.0, 9.9, 0, 9.0, 5.4, 0.8);
   p.push(part(new THREE.BoxGeometry(0.24, 0.24, 7.4), WOOD, 7.0, 18.4, 0));
   sailPanel(p, S3, 7.0, 16.4, 0, 6.6, 4.0, 0.6);
   p.push(part(new THREE.BoxGeometry(0.24, 0.24, 7.4), WOOD, -9.0, 15.4, 0));
@@ -222,12 +220,12 @@ export function makeGalleon(): THREE.Group {
   p.push(part(new THREE.CylinderGeometry(0.26, 0.26, 4.6, 8), CREAM, -9.0, 19.4, 0, Math.PI / 2));  // furled
 
   // ── RIGGING: the thing that actually sells a ship
-  const SH: [number, number, number, number][] = [
-    // mast x, masthead y, anchor x offset spread, anchor deck y
-    [-1.0, 18.2, 2.6, DECK], [7.0, 16.2, 1.9, DECK], [-9.0, 17.4, 1.5, 8.95],
+  const SH: [number, number, number, number, number[]][] = [
+    // mast x, masthead y, anchor x spread, anchor deck y, shroud offsets per side
+    [-1.0, 18.2, 2.6, DECK, [-1, 0, 1]], [7.0, 16.2, 1.9, DECK, [-1, 1]], [-9.0, 17.4, 1.5, 8.95, [-1, 1]],
   ];
-  for (const [mx, my, spread, ay] of SH) {
-    for (const sz of [-1, 1]) for (const k of [-1, 0, 1]) {
+  for (const [mx, my, spread, ay, ks] of SH) {
+    for (const sz of [-1, 1]) for (const k of ks) {
       const ax = mx + k * spread;
       p.push(rope([mx, my, 0], [ax, ay, sz * Math.max(1.4, railHB(ax) - 0.25)], 0x6f5a3e, 0.055));
     }
@@ -239,13 +237,13 @@ export function makeGalleon(): THREE.Group {
   for (const sz of [-1, 1]) p.push(rope([-1.0, 25.4, 0], [-14.0, 6.4, sz * 1.9], 0x6f5a3e, 0.05));
 
   // ── colours flying: jolly roger at the main truck, ensign at the stern
-  flagWave(p, CHAR, -1.35, 24.5, 0, 3.0, 1.7, 4, 0.24);
+  flagWave(p, CHAR, -1.35, 24.5, 0, 2.7, 1.7, 3, 0.24);
   p.push(part(new THREE.SphereGeometry(0.3, 9, 7), IVORY, -2.05, 24.6, 0.06));
   for (const ez of [-0.14, 0.14]) p.push(part(new THREE.BoxGeometry(0.14, 0.14, 0.12), CHAR, -2.22, 24.72, ez));
   p.push(part(new THREE.BoxGeometry(0.5, 0.12, 0.12), IVORY, -2.02, 24.16, 0, 0, 0, 0.4));
   p.push(part(new THREE.ConeGeometry(0.42, 3.0, 3), RED, 5.6, 22.2, 0, 0, 0, Math.PI / 2, 1, 1, 0.12));
-  p.push(part(new THREE.CylinderGeometry(0.09, 0.11, 3.4, 6), WOOD, -15.4, 7.6, 0, 0, 0, 0.34));
-  flagWave(p, CORAL, -16.3, 8.9, 0, 2.2, 1.2, 3, 0.18);
+  p.push(part(new THREE.CylinderGeometry(0.09, 0.11, 3.0, 6), WOOD, -15.3, 7.4, 0, 0, 0, 0.3));
+  flagWave(p, CORAL, -15.9, 8.5, 0, 1.5, 1.1, 2, 0.16);
 
   // ── ship's wheel, binnacle and companionway on the quarterdeck
   p.push(part(new THREE.BoxGeometry(0.5, 1.0, 0.5), TEAK, -7.2, 9.35, 0));
@@ -255,13 +253,13 @@ export function makeGalleon(): THREE.Group {
   p.push(part(new THREE.BoxGeometry(1.2, 0.7, 1.2), TEAK, -5.4, 9.2, 0));
   p.push(part(new THREE.SphereGeometry(0.3, 8, 6), GOLD_B, -5.4, 9.7, 0));
   // a couple of gilt scroll flourishes on the wale
-  for (const sz of [-1, 1]) for (const fx of [-11.5, 11.0])
-    p.push(part(new THREE.TorusGeometry(0.4, 0.11, 5, 10), GOLD_B, fx, 4.6, sz * (railHB(fx) - 0.1), Math.PI / 2));
+  for (const sz of [-1, 1])
+    p.push(part(new THREE.TorusGeometry(0.4, 0.11, 5, 10), GOLD_B, -11.5, 4.6, sz * (railHB(-11.5) - 0.1), Math.PI / 2));
   return finish(p);
 }
 
 // ══ HERO 2 ═══════════════════════════════════════════════════════════════
-/** SEA WITCH: a gleaming billionaire's superyacht, ~30 long, ~13 tall. */
+/** SEA WITCH: a gleaming billionaire's superyacht, ~30 long, ~14 tall. */
 export function makeSuperYacht(): THREE.Group {
   const p: G[] = [];
   const HL = 14.0;
@@ -320,8 +318,8 @@ export function makeSuperYacht(): THREE.Group {
   for (let i = 0; i < 5; i++) p.push(part(new THREE.SphereGeometry(0.2, 7, 6), 0xa8ecf4,
     -11.0 + Math.cos(i * 1.3) * 0.8, 4.36, Math.sin(i * 1.3) * 0.8));
   p.push(part(new THREE.TorusGeometry(1.72, 0.09, 5, 16), GOLD, -11.0, 4.3, 0, Math.PI / 2));
-  loungerParts(p, -8.3, 3.42, -1.5, 1, NAVY);
-  loungerParts(p, -8.3, 3.42, 1.5, 1, NAVY);
+  loungerParts(p, -8.3, 3.5, -1.5, 1, NAVY);
+  loungerParts(p, -8.3, 3.5, 1.5, 1, NAVY);
 
   // gold rails and stanchions round the sheer
   for (const sz of [-1, 1]) {
@@ -368,7 +366,7 @@ export function makeInfinityPool(): THREE.Group {
   return finish(p);
 }
 
-/** Draped four-poster beach cabana with tied curtains, ~6.5 square, 6 tall. */
+/** Draped four-poster beach cabana with tied curtains, ~7 square, 7 tall. */
 export function makeCabanaLux(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(6.4, 0.4, 6.4), 0xe8dcc0, 0, 0.2, 0),
@@ -402,7 +400,7 @@ export function makeCabanaLux(): THREE.Group {
   return finish(p);
 }
 
-/** Open spa pagoda with massage beds and hanging lanterns, ~12 wide, 9 tall. */
+/** Open spa pagoda with massage beds and hanging lanterns, ~13 wide, 10 tall. */
 export function makeSpaPavilion(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(5.6, 6.0, 0.8, 8), MARBLE, 0, 0.4, 0),
@@ -450,7 +448,7 @@ export function makeSpaPavilion(): THREE.Group {
   return finish(p);
 }
 
-/** Stacked coupe pyramid on a gold plinth, ~2.6 wide, 3.2 tall. */
+/** Stacked coupe pyramid on a gold plinth, ~3 wide, 2.8 tall. */
 export function makeChampagneTower(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(1.3, 1.5, 0.9, 12), MARBLE, 0, 0.45, 0),
@@ -475,7 +473,7 @@ export function makeChampagneTower(): THREE.Group {
   return finish(p);
 }
 
-/** Valet podium with a key board and a red carpet, ~7 × 3. */
+/** Valet podium with a key board and a red carpet, ~7.5 × 3.5. */
 export function makeValetStand(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(6.4, 0.1, 2.3), RED, 1.4, 0.05, 0),
@@ -488,7 +486,6 @@ export function makeValetStand(): THREE.Group {
   ];
   // key board on two posts
   for (const sz of [-0.8, 0.8]) p.push(part(new THREE.CylinderGeometry(0.07, 0.08, 2.2, 6), GOLD, -2.6, 1.1, sz));
-  p.push(part(new THREE.BoxGeometry(0.12, 1.5, 1.9), NAVY, -2.6, 2.2, 0));
   p.push(part(new THREE.BoxGeometry(0.16, 1.62, 2.02), GOLD, -2.66, 2.2, 0));
   p.push(part(new THREE.BoxGeometry(0.12, 1.5, 1.9), NAVY, -2.6, 2.2, 0));
   for (let i = 0; i < 8; i++)
@@ -554,7 +551,7 @@ export function makeSpeedboat(): THREE.Group {
   return finish(p);
 }
 
-/** Marked circular helipad, ~13 across. */
+/** Marked circular helipad, ~13 across (12.6 pad plus a windsock). */
 export function makeHelipad(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(6.0, 6.3, 0.4, 24), 0x3a4450, 0, 0.2, 0),
@@ -655,7 +652,7 @@ export function makePalmLux(): THREE.Group {
   return finish(p);
 }
 
-/** Marble mermaid fountain, ~9 across, 6 tall. */
+/** Marble mermaid fountain, ~9 across, ~7.7 tall. */
 export function makeStatueFountain(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(4.2, 4.5, 1.2, 16), MARBLE, 0, 0.6, 0),
@@ -687,7 +684,7 @@ export function makeStatueFountain(): THREE.Group {
   return finish(p);
 }
 
-/** Brass bellhop cart piled with monogrammed cases, ~3.4 long. */
+/** Brass bellhop cart piled with monogrammed cases, ~2.8 long, 2.6 tall. */
 export function makeLuggageCart(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(2.8, 0.16, 1.5), TEAK, 0, 0.4, 0),
@@ -726,25 +723,25 @@ export function makeDeckBar(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(11, 0.24, 8), TURQ, 0, 0.12, 0),
     part(new THREE.BoxGeometry(11.4, 0.34, 8.4), IVORY, 0, 0.1, 0),
-    part(new THREE.CylinderGeometry(3.2, 3.4, 1.5, 14, 1, false, 0, Math.PI), TEAK, -0.6, 0.75, 0, 0, -Math.PI / 2),
-    part(new THREE.CylinderGeometry(3.7, 3.7, 0.26, 14, 1, false, 0, Math.PI), 0xe8c07a, -0.6, 1.6, 0, 0, -Math.PI / 2),
-    part(new THREE.CylinderGeometry(3.75, 3.75, 0.1, 14, 1, false, 0, Math.PI), GOLD, -0.6, 1.75, 0, 0, -Math.PI / 2),
-    part(new THREE.BoxGeometry(0.4, 2.2, 5.4), IVORY, -2.6, 1.1, 0),
-    part(new THREE.BoxGeometry(0.5, 0.16, 5.0), TEAK, -2.35, 1.6, 0),
+    part(new THREE.CylinderGeometry(3.2, 3.4, 1.5, 16), TEAK, -0.6, 0.75, 0),
+    part(new THREE.CylinderGeometry(3.7, 3.7, 0.26, 16), 0xe8c07a, -0.6, 1.6, 0),
+    part(new THREE.TorusGeometry(3.72, 0.09, 5, 20), GOLD, -0.6, 1.72, 0, Math.PI / 2),
+    part(new THREE.BoxGeometry(0.4, 2.4, 5.4), IVORY, -4.5, 1.2, 0),
+    part(new THREE.BoxGeometry(0.5, 0.16, 5.0), TEAK, -4.25, 1.7, 0),
   ];
   for (let i = 0; i < 7; i++)
     p.push(part(new THREE.CylinderGeometry(0.14, 0.16, 0.6, 7), [CORAL, GOLD_B, TURQ, PALM, BLUSH, 0xff8a3a, IVORY][i],
-      -2.35, 1.98, -1.9 + i * 0.63));
-  // thatch-and-canvas roof on two posts
-  for (const sx of [-2.4, 1.6]) for (const sz of [-2.8, 2.8])
-    p.push(part(new THREE.CylinderGeometry(0.14, 0.16, 3.2, 7), IVORY, sx, 1.6, sz));
-  p.push(part(new THREE.ConeGeometry(4.6, 1.7, 8), CORAL, -0.6, 4.0, 0));
-  p.push(part(new THREE.CylinderGeometry(4.2, 4.2, 0.16, 8), IVORY, -0.6, 3.2, 0));
-  p.push(part(new THREE.SphereGeometry(0.3, 8, 6), GOLD_B, -0.6, 4.9, 0));
+      -4.25, 2.08, -1.9 + i * 0.63));
+  // thatch-and-canvas roof on four posts, clear of the bar drum
+  for (const sx of [-4.2, 3.2]) for (const sz of [-2.7, 2.7])
+    p.push(part(new THREE.CylinderGeometry(0.14, 0.16, 3.4, 7), IVORY, sx, 1.7, sz));
+  p.push(part(new THREE.CylinderGeometry(4.2, 4.2, 0.16, 8), IVORY, -0.6, 3.3, 0));
+  p.push(part(new THREE.ConeGeometry(4.7, 1.7, 8), CORAL, -0.6, 4.2, 0));
+  p.push(part(new THREE.SphereGeometry(0.3, 8, 6), GOLD_B, -0.6, 5.1, 0));
   // stools set on the arc, sunk to the knees in the water
   for (let i = 0; i < 5; i++) {
-    const a = -1.15 + (i / 4) * 2.3;
-    const sx = -0.6 + Math.cos(a) * 4.5, sz = Math.sin(a) * 4.5;
+    const a = -1.0 + (i / 4) * 2.0;
+    const sx = -0.6 + Math.cos(a) * 4.4, sz = Math.sin(a) * 4.4;
     p.push(part(new THREE.CylinderGeometry(0.3, 0.24, 1.1, 9), TEAK, sx, 0.55, sz));
     p.push(part(new THREE.CylinderGeometry(0.42, 0.42, 0.22, 10), pick([CORAL, TURQ, BLUSH]), sx, 1.18, sz));
     p.push(part(new THREE.TorusGeometry(0.42, 0.05, 5, 10), GOLD, sx, 1.28, sz, Math.PI / 2));
@@ -783,7 +780,7 @@ export function makeGolfBuggyLux(): THREE.Group {
   return finish(p);
 }
 
-/** Stone fire table ringed with cushions, ~7.5 across. */
+/** Stone fire table ringed with cushions, ~8 across. */
 export function makeFireTable(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(2.4, 2.6, 0.7, 12), SLATE, 0, 0.35, 0),
@@ -828,9 +825,16 @@ export function makeSignpost(): THREE.Group {
     [4.0, 0.0, CORAL], [3.35, 2.3, IVORY], [2.7, -1.5, TURQ], [2.05, 3.6, GOLD_B], [1.4, 1.0, NAVY],
   ];
   for (const [by, ba, col] of BOARDS) {
-    p.push(part(new THREE.BoxGeometry(2.0, 0.46, 0.14), col, Math.cos(ba) * 0.85, by, -Math.sin(ba) * 0.85, 0, ba));
-    p.push(part(new THREE.ConeGeometry(0.33, 0.5, 3), col, Math.cos(ba) * 1.85, by, -Math.sin(ba) * 1.85, 0, ba, -Math.PI / 2, 1, 1, 0.28));
-    p.push(part(new THREE.BoxGeometry(1.5, 0.1, 0.05), col === IVORY ? NAVY : IVORY, Math.cos(ba) * 0.85, by, -Math.sin(ba) * 0.85 - 0.09, 0, ba));
+    const dx = Math.cos(ba), dz = -Math.sin(ba);           // board direction
+    const nx = Math.sin(ba), nz = Math.cos(ba);            // board face normal
+    p.push(part(new THREE.BoxGeometry(2.0, 0.46, 0.14), col, dx * 0.85, by, dz * 0.85, 0, ba));
+    // the arrow tip must be pre-rotated: part() applies rz LAST, which would
+    // point every tip at +X regardless of the board's bearing
+    const tip = new THREE.ConeGeometry(0.33, 0.5, 3);
+    tip.rotateZ(-Math.PI / 2);
+    p.push(part(tip, col, dx * 1.9, by, dz * 1.9, 0, ba, 0, 1, 1, 0.28));
+    p.push(part(new THREE.BoxGeometry(1.5, 0.1, 0.05), col === IVORY ? NAVY : IVORY,
+      dx * 0.85 + nx * 0.09, by, dz * 0.85 + nz * 0.09, 0, ba));
   }
   return finish(p);
 }
@@ -871,7 +875,7 @@ export function makeTreasureDisplay(): THREE.Group {
   return finish(p);
 }
 
-/** Beach lookout styled as a mast, ~11 tall. */
+/** Beach lookout styled as a mast, ~13 tall, 5 across at the nest. */
 export function makeCrowsNestTower(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(2.5, 2.8, 0.5, 10), 0xe8dcc0, 0, 0.25, 0),
@@ -905,7 +909,7 @@ export function makeCrowsNestTower(): THREE.Group {
 
 // ── six more of my own, for people with more money than shame ─────────────
 
-/** Gold gullwing supercar, doors up on the valet forecourt, ~5.6 long. */
+/** Gold gullwing supercar, doors up on the valet forecourt, ~6 long. */
 export function makeGullwingSupercar(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(4.6, 0.6, 2.1), GOLD_B, -0.2, 0.72, 0),
@@ -962,7 +966,7 @@ export function makeCaviarBar(): THREE.Group {
   return finish(p);
 }
 
-/** Gilded concierge parrot on a perch, ~1.8 tall. */
+/** Gilded concierge parrot on a perch, ~2.7 tall. */
 export function makeParrotPerch(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(0.5, 0.62, 0.22, 12), MARBLE, 0, 0.11, 0),
@@ -1012,7 +1016,7 @@ export function makeCigarLounge(): THREE.Group {
   return finish(p);
 }
 
-/** Tiered rum-punch fountain with a skull finial, ~2.8 wide. */
+/** Tiered rum-punch fountain with a skull finial, ~3.6 wide, 3.7 tall. */
 export function makeGrogFountain(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(1.2, 1.45, 0.8, 12), TEAK, 0, 0.4, 0),
@@ -1055,9 +1059,11 @@ export function makeMapPavilion(): THREE.Group {
   p.push(part(new THREE.CylinderGeometry(0.35, 0.55, 0.9, 8), TEAK, 0, 1.0, 0));
   p.push(part(new THREE.CylinderGeometry(2.0, 2.0, 0.2, 8), TEAK, 0, 1.55, 0));
   p.push(part(new THREE.CylinderGeometry(1.85, 1.85, 0.08, 8), 0xf6e6c0, 0, 1.69, 0));
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i++) {                              // compass rose
     const a = (i / 4) * Math.PI * 2;
-    p.push(part(new THREE.ConeGeometry(0.16, 0.9, 3), GOLD, Math.cos(a) * 0.45, 1.74, Math.sin(a) * 0.45, 0, -a, -Math.PI / 2, 1, 1, 0.5));
+    const pt = new THREE.ConeGeometry(0.16, 0.9, 3);
+    pt.rotateZ(-Math.PI / 2);                                // pre-rotate: see makeSignpost
+    p.push(part(pt, GOLD, Math.cos(a) * 0.45, 1.74, Math.sin(a) * 0.45, 0, -a, 0, 1, 1, 0.5));
   }
   for (const [rx, rz] of [[-1.1, 0.5], [-0.3, 1.0], [0.6, 0.8], [1.1, 0.0]] as [number, number][])
     p.push(part(new THREE.BoxGeometry(0.55, 0.05, 0.09), RED, rx, 1.75, rz, 0, rnd(-1, 1)));
@@ -1072,7 +1078,7 @@ export function makeMapPavilion(): THREE.Group {
   return finish(p);
 }
 
-/** Polished gold anchor monument on a marble plinth, ~7 tall. */
+/** Polished gold anchor monument on a marble plinth, ~8 tall. */
 export function makeAnchorMonument(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(3.6, 0.5, 3.6), MARBLE, 0, 0.25, 0),
@@ -1082,13 +1088,14 @@ export function makeAnchorMonument(): THREE.Group {
     part(new THREE.CylinderGeometry(0.3, 0.3, 5.0, 10), GOLD_B, 0, 4.5, 0),
     part(new THREE.BoxGeometry(0.34, 0.34, 3.4), GOLD_B, 0, 6.4, 0),
     part(new THREE.TorusGeometry(0.45, 0.12, 6, 12), GOLD_B, 0, 7.3, 0),
-    part(new THREE.TorusGeometry(1.55, 0.32, 6, 14, Math.PI), GOLD_B, 0, 2.6, 0, 0, 0, Math.PI),
+    // the crown: a half-torus flipped so the U opens upward, clear of the plinth
+    part(new THREE.TorusGeometry(1.55, 0.32, 6, 14, Math.PI), GOLD_B, 0, 3.7, 0, 0, 0, Math.PI),
   ];
   for (const sx of [-1, 1]) {
-    p.push(part(new THREE.ConeGeometry(0.55, 1.3, 4), GOLD_B, sx * 1.55, 3.1, 0, 0, 0, -sx * 0.5));
+    p.push(part(new THREE.ConeGeometry(0.55, 1.3, 4), GOLD_B, sx * 1.55, 4.2, 0, 0, 0, -sx * 0.5));
     p.push(part(new THREE.SphereGeometry(0.22, 8, 6), GOLD_B, sx * 1.7, 6.4, 0));
   }
-  for (let i = 0; i < 3; i++) p.push(part(new THREE.TorusGeometry(0.42, 0.09, 5, 12), CREAM, 0, 3.8 + i * 0.35, 0, Math.PI / 2 + 0.12));
+  for (let i = 0; i < 3; i++) p.push(part(new THREE.TorusGeometry(0.42, 0.09, 5, 12), CREAM, 0, 5.1 + i * 0.35, 0, Math.PI / 2 + 0.12));
   for (const sx of [-1.3, 1.3]) for (const sz of [-1.3, 1.3])
     p.push(part(new THREE.CylinderGeometry(0.16, 0.2, 0.3, 8), 0xfff0b8, sx, 0.15, sz));
   return finish(p);
@@ -1121,7 +1128,7 @@ export function makeGiftKiosk(): THREE.Group {
 
 // ══ SMALL DRESSING PROPS — cheap, scattered in the hundreds ══════════════
 
-/** Gold ice bucket with a magnum, ~1 across. */
+/** Gold ice bucket with a magnum, ~1 across, 1.9 tall. */
 export function makeChampagneBucket(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(0.44, 0.32, 0.72, 10), GOLD_B, 0, 0.36, 0),
@@ -1175,7 +1182,7 @@ export function makeParasolLux(): THREE.Group {
   return finish(p);
 }
 
-/** A coconut with a straw and a paper umbrella, ~0.7 tall. */
+/** A coconut with a straw and a paper umbrella, ~1 tall. */
 export function makeCoconutDrink(): THREE.Group {
   const p: G[] = [
     part(new THREE.SphereGeometry(0.3, 10, 8), 0x6b4a34, 0, 0.28, 0, 0, 0, 0, 1, 0.95, 1),
@@ -1189,7 +1196,7 @@ export function makeCoconutDrink(): THREE.Group {
   return finish(p);
 }
 
-/** Gold rope bollard with a draped rope, ~1.4 tall. */
+/** Gold rope bollard with a draped rope, ~1.7 tall, rope reaching ~2 along +X. */
 export function makeRopeBollard(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(0.3, 0.38, 0.16, 10), MARBLE, 0, 0.08, 0),
@@ -1222,7 +1229,7 @@ export function makeDeckChest(): THREE.Group {
   return finish(p);
 }
 
-/** Clipped topiary in an urn, ~1.8 tall. */
+/** Clipped topiary in an urn, ~2.1 tall. */
 export function makePotPlant(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(0.42, 0.3, 0.72, 10), IVORY, 0, 0.36, 0),
@@ -1247,9 +1254,9 @@ export const LUXE_KIT: { name: string; make: () => THREE.Group; r: number; distr
   { name: 'galleon', make: makeGalleon, r: 9.0, district: ['port', 'cove'] },
   { name: 'superYacht', make: makeSuperYacht, r: 8.0, district: ['port', 'resort'] },
   { name: 'yachtClub', make: makeYachtClub, r: 7.5, district: ['port', 'resort'] },
-  { name: 'spaPavilion', make: makeSpaPavilion, r: 5.0, district: ['resort', 'jungle'] },
+  { name: 'spaPavilion', make: makeSpaPavilion, r: 5.5, district: ['resort', 'jungle'] },
   { name: 'infinityPool', make: makeInfinityPool, r: 5.5, district: ['resort', 'party'] },
-  { name: 'helipad', make: makeHelipad, r: 5.0, district: ['resort', 'port'] },
+  { name: 'helipad', make: makeHelipad, r: 6.0, district: ['resort', 'port'] },
   { name: 'crowsNestTower', make: makeCrowsNestTower, r: 2.6, district: ['beach', 'cove', 'port'] },
   { name: 'statueFountain', make: makeStatueFountain, r: 4.2, district: ['resort', 'market'] },
   { name: 'deckBar', make: makeDeckBar, r: 4.8, district: ['party', 'resort'] },
@@ -1262,14 +1269,14 @@ export const LUXE_KIT: { name: string; make: () => THREE.Group; r: number; distr
   { name: 'treasureDisplay', make: makeTreasureDisplay, r: 2.2, district: ['market', 'resort'] },
   { name: 'fireTable', make: makeFireTable, r: 3.6, district: ['beach', 'party', 'cove'] },
   { name: 'valetStand', make: makeValetStand, r: 3.2, district: ['resort', 'market'] },
-  { name: 'champagneTower', make: makeChampagneTower, r: 1.3, district: ['party', 'resort'] },
-  { name: 'grogFountain', make: makeGrogFountain, r: 1.4, district: ['party', 'market'] },
+  { name: 'champagneTower', make: makeChampagneTower, r: 1.5, district: ['party', 'resort'] },
+  { name: 'grogFountain', make: makeGrogFountain, r: 1.7, district: ['party', 'market'] },
   // ── vehicles and watercraft
   { name: 'speedboat', make: makeSpeedboat, r: 3.6, district: ['port', 'cove'] },
   { name: 'jetSki', make: makeJetSki, r: 1.8, district: ['cove', 'beach', 'port'] },
   { name: 'golfBuggyLux', make: makeGolfBuggyLux, r: 2.2, district: ['resort', 'market', 'jungle'] },
   { name: 'gullwingSupercar', make: makeGullwingSupercar, r: 2.8, district: ['resort', 'market'] },
-  { name: 'luggageCart', make: makeLuggageCart, r: 1.7, district: ['resort', 'port', 'market'] },
+  { name: 'luggageCart', make: makeLuggageCart, r: 1.4, district: ['resort', 'port', 'market'] },
   // ── planting and dressing
   { name: 'palmLux', make: makePalmLux, r: 1.8, district: ['resort', 'beach', 'jungle', 'market'] },
   { name: 'signpost', make: makeSignpost, r: 1.7, district: ['beach', 'jungle', 'resort', 'market'] },

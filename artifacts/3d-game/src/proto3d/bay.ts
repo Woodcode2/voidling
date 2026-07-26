@@ -28,8 +28,8 @@ export const BAY_LAND: Pt[] = [
 // of implying the mouth on its own.
 export const BAY_WATER: Pt[] = [
   [7400, 3400], [8100, 4100], [8500, 5000], [8600, 6000], [8300, 7000],
-  [7700, 7900], [6900, 8500], [6300, 9100], [6900, 9500], [7550, 9820],
-  [7900, 10100], [6600, 10050], [5600, 9550], [5100, 8700], [5100, 7600],
+  [7700, 7900], [6900, 8500], [6350, 8950], [6900, 9350], [7450, 9600],
+  [7150, 9800], [6300, 9720], [5500, 9350], [5100, 8700], [5100, 7600],
   [5500, 6400], [6000, 5200], [6600, 4200],
 ];
 
@@ -50,8 +50,11 @@ export const BAY_REGIONS: BayRegion[] = [
     poly: [[8300, 3500], [9400, 4300], [9600, 5900], [9300, 7200], [8500, 7100], [8500, 5600], [8200, 4400]] },
   // measured: the first siting put the dance floor 97% in the water. It now
   // sits on the broad southern shore inside the hook, where there IS land.
+  // …and it needs DEPTH, not a ribbon: the game spawns the player here, and a
+  // district one prop deep meant half the opening screen was open space. The
+  // bay's south lobe was pulled back to make room.
   { id: 'party', name: 'DANCE COVE', density: 1.3,
-    poly: [[6500, 10150], [7700, 10280], [8600, 10400], [8450, 10760], [7100, 10820], [6200, 10520]] },
+    poly: [[6250, 10000], [7500, 10100], [8600, 10380], [8450, 10760], [7100, 10820], [6050, 10470]] },
   // likewise pulled inside the west coast (was 72% out at sea)
   { id: 'beach', name: 'SUNSET BEACH', density: 0.9,
     poly: [[2850, 7650], [3550, 8500], [4450, 9200], [5400, 9700], [5150, 10050], [4150, 9600], [3200, 8700], [2680, 7900]] },
