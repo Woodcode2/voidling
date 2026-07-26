@@ -424,6 +424,13 @@
       .tr.got .ic { filter: none; }
       .tr .nm { font-size: 12.5px; font-weight: 900; color: #fff; margin-top: 6px; }
       .tr .ds { font-size: 10px; font-weight: 700; color: #b9a8e0; margin-top: 3px; }
+      /* live progress on every locked trophy — "812 / 5000" beats a grey box */
+      .tr .trBar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.12);
+        overflow: hidden; margin: 8px 6px 4px; }
+      .tr .trBar div { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #7b4fe0, #c9a6ff); }
+      .tr .trCnt { font-size: 10px; font-weight: 900; color: #cbb2ff; font-variant-numeric: tabular-nums; }
+      .tr.got .trDone { font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #7ef2a0; margin-top: 8px; }
+      #trophyCount { font-size: 13px; font-weight: 900; letter-spacing: 2px; color: #ffd25a; margin-bottom: 14px; }
       #topList { width: 340px; padding-bottom: 30px; }
       .tv { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.06); border-radius: 13px;
         padding: 10px 16px; margin-bottom: 8px; color: #fff; font-weight: 800; }
@@ -625,6 +632,7 @@
         <div class="shopTitle">TROPHIES</div>
       </div>
       <div id="statsRow"></div>
+      <div id="trophyCount"></div>
       <div id="trophyGrid"></div>
     </div>
 

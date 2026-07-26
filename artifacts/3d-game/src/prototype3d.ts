@@ -141,9 +141,11 @@ const island = createIsland(scene, addEdible);
 const _dbg = window as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
+  __news: () => void;
 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
+_dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
   const bs = document.createElement('div');
@@ -178,6 +180,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr) => {
   playerScore += pts;
   addCoins(15);
   questEvent('rival');
+  stats.rivals = (stats.rivals ?? 0) + 1; saveStats();
   announceFam(`🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
@@ -474,6 +477,52 @@ function questEvent(kind: string, n = 1) {
 renderQuests();
 
 // ── MAPLE ISLE NEWS — the island reacts to how much of it still exists ──────
+// ── LIVE STATE the newsroom reports on ─────────────────────────────────────
+let lastMeal = 'a traffic cone';
+let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
+// the match's authored spine — fires on elapsed seconds, resets every run
+const BEATS = [
+  { at: 32, dur: 15, mult: 2, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
+    banner: '🍩 DONUT RUSH! everything is worth DOUBLE!', news: 'DONUT RUSH declared. bakery furious' },
+  { at: 95, dur: 18, mult: 2, fired: false, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
+    banner: '🚨 EVACUATION! the whole isle is RUNNING!', news: 'EVACUATION ORDER: everybody out, politely' },
+  { at: 150, dur: 30, mult: 3, fired: false, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
+    banner: '🎆 FINAL FEAST! everything is TRIPLE!', news: 'FINAL FEAST begins. bring a bib' },
+];
+const MEAL_NAME: Record<string, string> = {
+  house: 'a whole HOUSE', car: 'a parked car', army: 'an army truck',
+};
+const mealBySize = (r: number) =>
+  r > 5 ? 'an entire BUILDING' : r > 2.5 ? 'something big' : r > 1.2 ? 'a mailbox' : 'a snack';
+const DISTRICT: Record<string, string> = {
+  cozy: 'MAPLE HEIGHTS', fancy: 'FANCY HILLS', downtown: 'DOWNTOWN', plaza: 'THE PLAZA',
+  park: 'THE PARK', forest: 'PINE WOODS', zoo: 'THE ZOO', beach: 'SUNNY BEACH',
+  airport: 'THE AIRPORT', military: 'THE ARMY BASE',
+};
+// TEMPLATED headlines: a tiny pool × live variables = copy that never repeats
+// AND is always about the player. This is what killed the "generic ticker"
+// feel — every one of these is a mirror of the run in progress.
+const NEWS_LIVE_CALM = [
+  'void sighted in {D}. residents wave, unsure why',
+  'it ate {M}. nobody saw anything. everybody saw',
+  '{L} spotted eating. authorities say "same"',
+  'a {F} is loose in {D}. mayor: "a small one"',
+  'local poll: is the dot getting bigger? {P}% say yes',
+];
+const NEWS_LIVE_WORRIED = [
+  '{D} EVACUATING — the {F} is coming',
+  'it just ate {M}. that was somebody\'s {M}!',
+  '{P}% of the isle is GONE. mayor requests a nap',
+  '{L} now in the lead. this is somehow worse',
+  'do NOT go to {D}. that is where the {F} is',
+];
+const NEWS_LIVE_PANIC = [
+  '{D} IS GONE. it was nice. it was RIGHT THERE',
+  '{P}% DEVOURED. the other {R}% is nervous',
+  'the {F} ate {M}. it is still hungry',
+  '{S} SECONDS LEFT. run. politely. RUN',
+  '{L} leads the feast. we root for nobody now',
+];
 const NEWS_CALM = [
   'BREAKING: mayor announces run for a THIRD term',
   'local cat stuck in tree again. hang on, Waffles',
@@ -549,6 +598,24 @@ function pickHeadline(pool: string[]): string {
   newsSeen.push(h); if (newsSeen.length > 5) newsSeen.shift();
   return h;
 }
+// fill a template from the live match. Every variable is real state, so the
+// newsroom is literally narrating the player's run back to them.
+function fillHeadline(t: string): string {
+  const b = island.biomeAt(voidState.x, voidState.z);
+  const leader = [{ n: 'YOU', s: playerScore }, ...rivals.list.map((r) => ({ n: r.name, s: r.score }))]
+    .sort((a2, b2) => b2.s - a2.s)[0];
+  // one rounded value drives BOTH percentages — "1% devoured, the other 100%
+  // is nervous" was the newsroom failing arithmetic in front of children
+  const pct = Math.min(99, Math.max(1, Math.round(devouredPct)));
+  return t
+    .replace('{D}', DISTRICT[b ?? 'cozy'] ?? 'THE ISLE')
+    .replace(/\{M\}/g, lastMeal)
+    .replace('{F}', FORMS[curStage])
+    .replace('{L}', leader.n === 'YOU' ? 'the little void' : leader.n)
+    .replace('{P}', String(pct))
+    .replace('{R}', String(100 - pct))
+    .replace('{S}', String(Math.max(1, Math.ceil(matchClock))));
+}
 function showNews() {
   // tier rides BOTH the meter and the player's form: a WORLD ENDER flattening
   // downtown must never get "spelling bee ends in a 14-way tie"
@@ -556,7 +623,14 @@ function showNews() {
   const pctTier = devouredPct < 5 ? 0 : devouredPct < 18 ? 1 : 2;
   const tier = Math.max(pctTier, formTier);
   const pool = [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
-  const h = newsQueue.shift() ?? pickHeadline(pool);
+  // a countdown headline only makes sense near the end — "179 SECONDS LEFT"
+  // is not a panic, it's a weather report
+  const live = [NEWS_LIVE_CALM, NEWS_LIVE_WORRIED, NEWS_LIVE_PANIC][tier]
+    .filter((t) => !t.includes('{S}') || matchClock <= 70);
+  // 55% of headlines are now LIVE — filled from the actual run
+  const body = newsQueue.shift()
+    ?? (live.length && Math.random() < 0.55 ? fillHeadline(pickHeadline(live)) : pickHeadline(pool));
+  const h = body;
   newsEl.innerHTML = `<i>${['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier]}</i>${h}`;
   newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
   newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
@@ -733,12 +807,15 @@ function capture(e: Edible, giveHunger = true) {
   e.spin.set((dz / d) * rand(4.5, 7.5), rand(-1.5, 1.5), (-dx / d) * rand(4.5, 7.5));
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
   combo++; comboT = 1.6;
+  if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
   const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
   // moving prey (people/animals/cars — tagged ptsMult 1.5) beats furniture of
   // the same size: chasing pays. Everything else stays radius-proportional.
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
-  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult));
+  const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * feverMult));
   playerScore += pts;
+  // remember the last meal so the news can report on it BY NAME
+  lastMeal = MEAL_NAME[(e.mesh.userData.qk as string) ?? ''] ?? mealBySize(e.radius);
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
   // a building-sized bite lands with a ground shockwave + dust — seismic,
@@ -852,6 +929,8 @@ function showGuide(text: string, dur = 5) {
 let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
   validateWorld();   // covers late async-registered GLB props on every start
+  for (const bt of BEATS) bt.fired = false;
+  feverMult = 1; feverT = 0;
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
@@ -1072,26 +1151,46 @@ el('btnHome').addEventListener('click', () => {
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
 // ── lifetime stats + trophies ────────────────────────────────────────────────
-interface Stats { matches: number; wins: number; best: number; bestForm: number; eaten: number; }
+interface Stats { matches: number; wins: number; best: number; bestForm: number; eaten: number; rivals?: number; combo?: number; }
 const stats: Stats = JSON.parse(localStorage.getItem('voidStats') || '{"matches":0,"wins":0,"best":0,"bestForm":0,"eaten":0}');
+stats.rivals ??= 0; stats.combo ??= 0;
 const saveStats = () => localStorage.setItem('voidStats', JSON.stringify(stats));
-const TROPHIES = [
-  { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', ok: () => stats.eaten >= 1 },
-  { ic: '😋', nm: 'MUNCHER', ds: 'reach MUNCHER form', ok: () => stats.bestForm >= 1 },
-  { ic: '🌀', nm: 'GOBBLER', ds: 'reach GOBBLER form', ok: () => stats.bestForm >= 2 },
-  { ic: '🕳️', nm: 'DEVOURER', ds: 'reach DEVOURER form', ok: () => stats.bestForm >= 3 },
-  { ic: '🪐', nm: 'WORLD ENDER', ds: 'reach the final form', ok: () => stats.bestForm >= 4 },
-  { ic: '👑', nm: 'Champion', ds: 'win a match', ok: () => stats.wins >= 1 },
-  { ic: '💯', nm: 'Century', ds: 'score 2,500 in one run', ok: () => stats.best >= 2500 },
-  { ic: '🍽️', nm: 'Glutton', ds: 'eat 500 things (lifetime)', ok: () => stats.eaten >= 500 },
+// Trophies span DIFFERENT axes (forms, wins, scores, appetite, the family,
+// combos, loyalty) and every one carries live progress — a kid can see
+// "812 / 5000" and keep chasing instead of staring at a grey square.
+const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: number }[] = [
+  { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', cur: () => stats.eaten, max: 1 },
+  { ic: '😋', nm: 'Muncher', ds: 'reach MUNCHER form', cur: () => stats.bestForm, max: 1 },
+  { ic: '🌀', nm: 'Gobbler', ds: 'reach GOBBLER form', cur: () => stats.bestForm, max: 2 },
+  { ic: '🕳️', nm: 'Devourer', ds: 'reach DEVOURER form', cur: () => stats.bestForm, max: 3 },
+  { ic: '🪐', nm: 'World Ender', ds: 'reach the final form', cur: () => stats.bestForm, max: 4 },
+  { ic: '👑', nm: 'Champion', ds: 'win a match', cur: () => stats.wins, max: 1 },
+  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10 },
+  { ic: '💯', nm: 'Century', ds: 'score 2,500 in a run', cur: () => stats.best, max: 2500 },
+  { ic: '🚀', nm: 'High Roller', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000 },
+  { ic: '🍽️', nm: 'Glutton', ds: 'eat 500 things', cur: () => stats.eaten, max: 500 },
+  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000 },
+  { ic: '😈', nm: 'Void Eats Void', ds: 'devour a family member', cur: () => stats.rivals ?? 0, max: 1 },
+  { ic: '🍴', nm: 'Family Feast', ds: 'devour 10 family', cur: () => stats.rivals ?? 0, max: 10 },
+  { ic: '🔥', nm: 'Combo King', ds: 'hit a x2.5 combo', cur: () => stats.combo ?? 0, max: 25 },
+  { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25 },
 ];
 function renderTrophies() {
   el('statsRow').innerHTML = [
     { v: stats.matches, l: 'MATCHES' }, { v: stats.wins, l: 'WINS' },
     { v: stats.best, l: 'BEST SCORE' }, { v: stats.eaten, l: 'THINGS EATEN' },
   ].map((s) => `<div class="stat"><div class="v">${s.v}</div><div class="l">${s.l}</div></div>`).join('');
-  el('trophyGrid').innerHTML = TROPHIES.map((t) =>
-    `<div class="tr ${t.ok() ? 'got' : ''}"><div class="ic">${t.ic}</div><div class="nm">${t.nm}</div><div class="ds">${t.ds}</div></div>`).join('');
+  const got = TROPHIES.filter((t) => t.cur() >= t.max).length;
+  el('trophyGrid').innerHTML = TROPHIES.map((t) => {
+    const c = t.cur(), done = c >= t.max;
+    const pct = Math.min(100, Math.round((c / t.max) * 100));
+    return `<div class="tr ${done ? 'got' : ''}"><div class="ic">${t.ic}</div>` +
+      `<div class="nm">${t.nm}</div><div class="ds">${t.ds}</div>` +
+      (done ? '<div class="trDone">✓ EARNED</div>'
+        : `<div class="trBar"><div style="width:${pct}%"></div></div><div class="trCnt">${Math.min(c, t.max)} / ${t.max}</div>`) +
+      '</div>';
+  }).join('');
+  el('trophyCount').textContent = `${got} / ${TROPHIES.length} EARNED`;
 }
 el('btnTrophies').addEventListener('click', () => { renderTrophies(); el('trophies').classList.add('show'); });
 
@@ -1101,7 +1200,9 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
   // the family's weekly scores SCALE to the player: always a couple of rungs
   // just above your best (chaseable), never a fixed 1830-3720 wall that parks
   // a new kid at permanent rank 8
-  const mine = Number(localStorage.getItem(weekKey()) || 0);
+  // honesty: a player whose trophy screen says BEST 31,240 must never be
+  // shown as "You — 0" here. No weekly score yet? fall back to the real best.
+  const mine = Number(localStorage.getItem(weekKey()) || 0) || stats.best;
   const anchor = Math.max(220, stats.best, mine);
   const mul = [1.85, 1.6, 1.38, 1.2, 1.08, 0.86, 0.55];
   const seeds = [
@@ -1363,6 +1464,29 @@ function animate() {
       spawnSuck(1 + curStage, voidling.radius * 1.9);
     }
     timerEl.textContent = fmtTime(matchClock);
+    // ── AUTHORED MATCH BEATS ────────────────────────────────────────────────
+    // A 3-minute match needs a RHYTHM, not just ambience. Three scheduled
+    // events with real scoring stakes give every run the same shape, so a kid
+    // learns to anticipate them ("the donut rush is coming!") — which is what
+    // turns one play into ten.
+    {
+      const el3 = matchLen - matchClock;
+      for (const bt of BEATS) {
+        if (!bt.fired && el3 >= bt.at) {
+          bt.fired = true;
+          feverMult = bt.mult; feverT = bt.dur;
+          announce(bt.banner);
+          breakingNews(bt.news);
+          audio.evolve(); buzz(35);
+          fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
+          fx.flash(bt.flash, 0.35);
+        }
+      }
+      if (feverT > 0) {
+        feverT -= dt;
+        if (feverT <= 0) { feverMult = 1; announce('…rush over. keep eating!'); }
+      }
+    }
     if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
     if (matchClock <= 30) {
       timerEl.style.color = '#ff8a8a';
