@@ -20,6 +20,13 @@ export type Say = (pos: THREE.Vector3, text: string, kind: 'ambient' | 'panic' |
 
 // ── biome dialogue (from the 2D AMBIENT_BY_BIOME / PANIC_BY_BIOME pools) ─────────
 const AMBIENT: Record<string, string[]> = {
+  // ── PIRATE BAY: holidaymakers, dock hands, dancers and market traders
+  port: ['mind the gangplank!', 'she sails at sunset', 'that crate is DEFINITELY rum', 'seagull stole my lunch AGAIN', 'tide\'s coming in, matey', 'who parked a galleon here', 'cargo says "fragile". it is not', 'salt in my boots. always.'],
+  resort: ['two more days of THIS', 'the swim-up bar is unreal', 'sunscreen? never heard of her', 'my lounger. MY lounger.', 'is that a free smoothie??', 'towel on the chair = MINE', 'I could live here honestly', 'spa at four, snacks at five'],
+  party: ['THIS SONG!! THIS ONE!!', 'my hips have opinions', 'conga line in 5!!', 'DJ said one more hour!!', 'I am dancing. do not stop me.', 'is the floor supposed to glow', 'someone hydrate me', 'best. holiday. EVER.'],
+  market: ['fresh mango! FRESH MANGO!', 'that parrot insulted me', 'half price! for you: full price', 'genuine treasure! probably!', 'I bought a hat. no regrets.', 'three coconuts for a doubloon', 'my stall, my rules', 'the fruit here is UNREAL'],
+  jungle: ['I heard a monkey. I think.', 'this trail is very... trail', 'bug spray was a good call', 'is that a waterfall??', 'left at the big rock, right?', 'nature! so much of it!', 'something just moved', 'my phone has no bars. bliss.'],
+  cove: ['there\'s treasure here. FACT.', 'that wreck is CENTURIES old', 'a crab took my sandal', 'X marks... somewhere', 'rock pools! so many crabs!', 'I found a doubloon! (a bottlecap)', 'the tide sounds so nice', 'shipwreck selfie time'],
   cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
   fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how gauche', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
   downtown: ['need. more. coffee.', 'this commute is BRUTAL', 'meeting ran LONG', "elevator's down AGAIN", 'lunch is a spreadsheet today', 'hustle never sleeps', "circle back? I'll circle back", 'my inbox says 4,000', 'sell! no wait— buy!', 'is it friday yet'],
@@ -30,6 +37,12 @@ const AMBIENT: Record<string, string[]> = {
   zoo: ['the elephant waved at me!!', 'do NOT tap the glass', 'look, flamingos!', 'gift shop. NOW.', 'feeding time!!', 'popcorn! 🍿', 'the lions look hungry', 'penguins: tiny tuxedo guys', 'that monkey has my hat', 'sloth update: still asleep'],
 };
 const PANIC: Record<string, string[]> = {
+  port: ['ABANDON DOCK!!', 'save the RUM!!', 'not my CARGO!!', 'to the boats!! ALL of them!!', 'it ate the pier!!'],
+  resort: ['MY LOUNGER!!', 'not the swim-up bar!!', 'my HOLIDAY!!', 'I paid for ALL-INCLUSIVE!!', 'grab the sunscreen and RUN!!'],
+  party: ['THE MUSIC STOPPED!!', 'not the DANCE FLOOR!!', 'conga line — THIS WAY!!', 'DJ RUN!! DJ RUUUN!!', 'it ate the speakers!!'],
+  market: ['MY MANGOES!!', 'the parrot saw everything!!', 'closing early!! VERY early!!', 'not my STALL!!', 'take the coconuts!!'],
+  jungle: ['INTO THE TREES!!', 'that is NOT a monkey!!', 'follow the trail!! ANY trail!!', 'it ate the waterfall!!'],
+  cove: ['it took the TREASURE!!', 'crabs, scatter!!', 'not the shipwreck!!', 'to the rock pools!!'],
   cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the HOA form!!'],
   fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
   downtown: ['MY STARTUP!!', "the WIFI'S DOWN!!", 'not my oat-milk latte!!', 'OUT OF OFFICE. FOREVER.', 'meeting cancelled, RUN!!', 'this is NOT on my calendar'],
@@ -103,6 +116,13 @@ const G = {
 
 // what people WEAR is where they ARE — biome dress codes
 const OUTFIT: Record<string, { shirt: number[]; pants: number[]; hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean }> = {
+  // PIRATE BAY: everyone is on holiday, so everyone is in colour
+  port: { shirt: [0xe8604d, 0x4d9de8, 0xf0e6d2, 0x2e5a7a], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34], hat: 'cap', hatOdds: 0.6 },
+  resort: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.7 },
+  party: { shirt: [0xff2fa0, 0x7bffe8, 0xffe066, 0xb875ff, 0xff5d7e], pants: [0x2a1240, 0x4a2a8a, 0x1a3a5a], hat: 'sun', hatOdds: 0.25 },
+  market: { shirt: [0xff8a3a, 0xffd23f, 0x7ef2a0, 0xff5d7e, 0xf0e6d2], pants: [0x5a4a3a, 0x3a4a6a, 0x6a3a4a], hat: 'sun', hatOdds: 0.45 },
+  jungle: { shirt: [0x5a7a4a, 0x8a9a5a, 0xc4a03a, 0x7a8a5a], pants: [0x4a4a3a, 0x5a5a3a], hat: 'cap', hatOdds: 0.65, pack: true },
+  cove: { shirt: [0x4dd0e1, 0xffd54f, 0xff8a5c, 0xffffff], pants: [0x2ab8d8, 0xffb347, 0x3a4a6a], hat: 'sun', hatOdds: 0.5 },
   beach: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.5 },
   downtown: { shirt: [0x2e3a55, 0x3d4756, 0x545c6e, 0xffffff, 0xb9c6dd, 0x6e5c7a], pants: [0x232a3a, 0x2f2f38, 0x3a3f4d] },
   fancy: { shirt: [0x8a5cb8, 0xd8a848, 0xc65a78, 0x4a7a9a, 0xf0ead8], pants: [0x2a2a34, 0x4a3a5a, 0x5a4a3a] },
@@ -167,6 +187,42 @@ function makePerson(biome?: string, colOverride?: number): THREE.Group {
   return g;
 }
 let animalN = 0;
+function makeParrot(): THREE.Group {
+  // a fat tropical parrot: scarlet body, gold head, teal wings, big beak
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 10), mat(0xe8342a, 0.75));
+  body.scale.set(1, 1.2, 0.9); body.position.y = 0.7; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), mat(0xffd23f, 0.7));
+  head.position.set(0, 1.24, 0.06); g.add(head);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.3, 6), mat(0x2e2a2a, 0.5));
+  beak.rotation.x = Math.PI / 2 + 0.5; beak.position.set(0, 1.18, 0.32); g.add(beak);
+  for (const sx of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mat(0x2fb8d8, 0.8));
+    wing.scale.set(0.5, 1.1, 0.8); wing.position.set(sx * 0.42, 0.74, 0); g.add(wing);
+  }
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.72, 5), mat(0x2fd8a0, 0.8));
+  tail.rotation.x = -0.5; tail.position.set(0, 0.42, -0.5); g.add(tail);
+  return g;
+}
+function makeCrab(): THREE.Group {
+  // a wide orange crab with raised claws and stalk eyes
+  const g = new THREE.Group();
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8), mat(0xff6a3a, 0.7));
+  shell.scale.set(1.35, 0.6, 1); shell.position.y = 0.34; g.add(shell);
+  for (const sx of [-1, 1]) {
+    const claw = new THREE.Mesh(new THREE.SphereGeometry(0.19, 8, 6), mat(0xff8a4a, 0.7));
+    claw.scale.set(1.2, 0.8, 0.7); claw.position.set(sx * 0.66, 0.42, 0.3); g.add(claw);
+    for (let k = 0; k < 3; k++) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.34, 5), mat(0xe8542a, 0.8));
+      leg.rotation.z = sx * 0.9; leg.position.set(sx * 0.46, 0.16, -0.16 - k * 0.16); g.add(leg);
+    }
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.22, 5), mat(0xff8a4a, 0.7));
+    stalk.position.set(sx * 0.14, 0.66, 0.16); g.add(stalk);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat(0x1a1420, 0.4));
+    eye.position.set(sx * 0.14, 0.78, 0.16); g.add(eye);
+  }
+  return g;
+}
 function makeAnimal(): THREE.Group {
   // three readable species so the "lions are LOOSE" bark is true: elephant,
   // lion, sheep — cycled so every pen mixes
@@ -578,7 +634,23 @@ export function createLife(
         cs.position.y = 0.045 - mesh.position.y;   // the blob stays ON the ground while its owner hops
         // walk cycle: arms + legs swing with travel speed
         const limbs = mesh.userData.limbs;
-        if (limbs) {
+        const dnc = mesh.userData.dancer as { t: number; spin: number } | undefined;
+        if (dnc && hop <= 0) {
+          // ── DANCING: everyone on the floor is on the SAME beat (a shared
+          // clock), arms up, hips swinging, bobbing on the downbeat. Offset
+          // per dancer so it reads as a crowd, not a chorus line of clones.
+          dnc.t += dt;
+          const beat = dnc.t * 4.4;
+          mesh.position.y = Math.abs(Math.sin(beat)) * 0.34;
+          mesh.rotation.y += dt * dnc.spin * 1.1;
+          if (limbs) {
+            const up = 2.3 + Math.sin(beat * 2) * 0.5;      // hands in the air
+            limbs.la.rotation.x = -up; limbs.ra.rotation.x = -up + Math.sin(beat) * 0.5;
+            limbs.la.rotation.z = 0.35; limbs.ra.rotation.z = -0.35;
+            const st = Math.sin(beat) * 0.4;
+            limbs.ll.rotation.x = st; limbs.rl.rotation.x = -st;
+          }
+        } else if (limbs) {
           limbs.phase += dt * spd * 2.4;
           const sw = Math.sin(limbs.phase) * 0.55;
           limbs.ll.rotation.x = sw; limbs.rl.rotation.x = -sw;
@@ -590,12 +662,15 @@ export function createLife(
   }
 
   // scatter pedestrians across walkable biomes
-  const pedZones: Biome[] = ['cozy', 'fancy', 'park', 'beach', 'plaza', 'downtown', 'forest', 'zoo'];
+  const pedZones: Biome[] = ['cozy', 'fancy', 'park', 'beach', 'plaza', 'downtown', 'forest', 'zoo',
+    // PIRATE BAY is a RESORT — it should feel busier than a suburb
+    'port', 'resort', 'party', 'market', 'jungle', 'cove'];
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const b = PLAN_GRID[gy][gx];
     if (!pedZones.includes(b)) continue;
     const [cx, cz] = blockCenter3D(gx, gy);
-    const n = b === 'beach' || b === 'plaza' ? 6 : b === 'forest' ? 2 : b === 'zoo' ? 5 : 5;
+    const n = b === 'party' ? 10 : b === 'market' || b === 'resort' ? 8
+      : b === 'beach' || b === 'plaza' ? 6 : b === 'forest' || b === 'jungle' ? 2 : b === 'zoo' ? 5 : 5;
     for (let i = 0; i < n; i++) {
       // half the crowd lives mid-block, half strolls near the sidewalk edges
       const edge = i % 2 === 1;
@@ -732,11 +807,49 @@ export function createLife(
   const decor = (mesh: THREE.Object3D, x: number, z: number, r = 3) => { if (!insideIsland3(x, z)) return; mesh.position.set(x, 0, z); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
 
   function addEvent(gx: number, gy: number, ambient: string[], panic: string[], build: (x: number, z: number) => void, pedN: number, pedCol?: number) {
+    // Maple Isle's staged vignettes (the mayor's rally, the farmers market,
+    // the ball game) are that island's fiction. Running them at a pirate
+    // resort put "MY STARTUP!!" and "no new voids" on the dance floor.
+    if (worldId() === 'pirate') return;
     const [x, z] = blockCenter3D(gx, gy);
     const evBiome = biomeKey(PLAN_GRID[gy][gx]);
     build(x, z);
     for (let i = 0; i < pedN; i++) addWanderer(makePerson(evBiome, pedCol), x + rand(-14, 14), z + rand(-14, 14), 16, rand(3, 5), 18, 2.4, 'generic', panic);
     events.push({ x, z, ambient, panic, cd: rand(1, 4), panicked: 0 });
+  }
+
+
+  // ══ PIRATE BAY vignettes ═══════════════════════════════════════════════
+  // Three staged scenes with their own crowds and their own voices, so the
+  // resort has beats the way Maple Isle has its rally and its ball game.
+  if (worldId() === 'pirate') {
+    const addPB = (gx: number, gy: number, amb: string[], pan: string[], n: number, col?: number) => {
+      const [x, z] = blockCenter3D(gx, gy);
+      for (let i = 0; i < n; i++) {
+        const p2 = makePerson('party', col);
+        p2.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
+        addWanderer(p2, x + rand(-16, 16), z + rand(-16, 16), 3, rand(0.3, 0.8), 24, 2.4, 'generic', pan);
+      }
+      events.push({ x, z, ambient: amb, panic: pan, cd: rand(1, 4), panicked: 0 });
+    };
+    // THE DJ SET — the biggest crowd on the island, all on the same beat
+    addPB(2, 4,
+      ['DJ COCONUT! DJ COCONUT!', 'DROP IT!! DROP THE THING!!', 'my legs have given up. still dancing.',
+        'this is the BEST song', 'one more!! ONE MORE!!', 'I love everyone here'],
+      ['THE DJ IS GONE!!', 'save the SPEAKERS!!', 'conga OUT!! conga OUT!!', 'the beat has DROPPED. us.'],
+      9, 0xff2fa0);
+    // THE MARKET HAGGLE — traders and a very rude parrot
+    addPB(3, 1,
+      ['final price! FINAL price!', 'the parrot called me a name', 'mango so good it is illegal',
+        'genuine pirate gold, probably', 'two for one! one for two!'],
+      ['MY MANGOES!! MY LIFE!!', 'take the stall!! LEAVE the stall!!', 'the parrot KNEW'],
+      6, 0xffd23f);
+    // THE TREASURE DIG — everyone convinced X marks right here
+    addPB(0, 0,
+      ['X marks... hang on', 'I felt something! it was a crab', 'DIG! we are SO close!',
+        'my metal detector loves bottlecaps', 'the map is upside down, isn\'t it'],
+      ['LEAVE THE TREASURE!!', 'the crabs were a WARNING', 'RUN! bring the shovel!!'],
+      5, 0xffb054);
   }
 
   // Mayor's rally at town hall: mayor up on the stage, crowd gathered in front
@@ -874,7 +987,7 @@ export function createLife(
     ['recess!! 🎒', 'tag, you\'re it!', 'pop quiz?! nooo', 'the bell! THE BELL!'],
     ['SNOW DAY!! I mean— VOID DAY!!', 'homework CANCELLED!!', 'RUN, class, RUN!!'],
     (x, z) => {
-      // AI schoolhouse (bell tower + clock); procedural brick school if offline
+      // AI schoolhouse (bell tower + clock);      // a procedural brick school if offline
       const buildFallback = () => {
         const school = new THREE.Group();
         const brick = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 9),

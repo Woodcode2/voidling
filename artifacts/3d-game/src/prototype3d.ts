@@ -505,7 +505,7 @@ renderQuests();
 let lastMeal = 'a traffic cone';
 let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
 // the match's authored spine — fires on elapsed seconds, resets every run
-const BEATS = [
+const MAPLE_BEATS = [
   { at: 32, dur: 15, mult: 2, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
     banner: '🍩 DONUT RUSH! everything is worth DOUBLE!', news: 'DONUT RUSH declared. bakery furious' },
   { at: 95, dur: 18, mult: 2, fired: false, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
@@ -513,6 +513,16 @@ const BEATS = [
   { at: 150, dur: 30, mult: 3, fired: false, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
     banner: '🎆 FINAL FEAST! everything is TRIPLE!', news: 'FINAL FEAST begins. bring a bib' },
 ];
+// PIRATE BAY runs the same three-beat spine, themed to the resort
+const PIRATE_BEATS: typeof MAPLE_BEATS = [
+  { at: 32, dur: 15, mult: 2, fired: false, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
+    banner: '🍹 HAPPY HOUR! everything is worth DOUBLE!', news: 'HAPPY HOUR declared. bar is delighted' },
+  { at: 95, dur: 18, mult: 2, fired: false, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
+    banner: '🪩 DANCE PARTY! the whole bay is MOVING!', news: 'DJ Coconut drops the big one. floor shakes' },
+  { at: 150, dur: 30, mult: 3, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
+    banner: '🏴‍☠️ TREASURE FEAST! everything is TRIPLE!', news: 'TREASURE FEAST! grab a doubloon and a fork' },
+];
+const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = {
   house: 'a whole HOUSE', car: 'a parked car', army: 'an army truck',
 };
@@ -564,6 +574,61 @@ const NEWS_LIVE_PANIC = [
   'the {F} ate {M}. it is still hungry',
   '{S} SECONDS LEFT. run. politely. RUN',
   '{L} leads the feast. we root for nobody now',
+];
+// ══ PIRATE BAY newsroom — the resort manager is this world's mayor, and he
+// is having a WEEK. Same denial-to-collapse arc, different beach.
+const PB_LIVE_CALM = [
+  'manager: "the purple thing is a PROMOTION"',
+  'guest review of {D}: five stars, one void',
+  'it ate {M}. front desk calls it "turndown service"',
+  'manager insists {D} is "themed, not doomed"',
+  'lost property: {M}. found property: nothing',
+];
+const PB_LIVE_WORRIED = [
+  '{D} EVACUATING - a {F} is at the buffet',
+  'manager rebrands the void as "an infinity pool"',
+  '{P}% of the resort gone. still no refunds',
+  '{L} leads the buffet. staff applaud nervously',
+  'do NOT book {D}. that is where the {F} is',
+];
+const PB_LIVE_PANIC = [
+  '{D} IS GONE. the towels were RESERVED',
+  '{P}% DEVOURED. the other {R}% is at the bar',
+  'the {F} ate {M}. it is asking about dessert',
+  '{S} SECONDS LEFT. conga to the boats!!',
+  'manager: "ok it is a void." manager sails away',
+];
+const PB_CALM = [
+  'BAY RADIO: DJ Coconut spinning til sunrise',
+  'parrot escapes market, files for management',
+  'crab crowned "employee of the month" again',
+  'buffet restocked. buffet immediately unstocked',
+  'lost: one flip-flop. found: eleven flip-flops',
+  'the swim-up bar has a swim-up bar now',
+  'shipwreck tour sells out. ship still wrecked',
+  'limbo record broken. so was the limbo pole',
+  'sunscreen shortage. everyone is "fine, honestly"',
+  'dance floor reaches legal maximum boogie',
+];
+const PB_WORRIED = [
+  'manager: DO NOT feed the guest in aisle three',
+  'lifeguards now guarding the LAND. and the bar.',
+  'conga line rerouted around "the situation"',
+  'DJ switches to a tense playlist',
+  'the parrot has started screaming coordinates',
+  'crabs seen leaving in an orderly single file',
+  'happy hour extended. nervously.',
+  'staff meeting held entirely at a sprint',
+];
+const PB_PANIC = [
+  'THE BUFFET IS GONE. ALL OF IT.',
+  'DJ plays one final banger. respect.',
+  'the parrot was RIGHT. the parrot was always right',
+  'crabs have taken the last boat',
+  'BAY RADIO broadcasting from a pool float',
+  'manager last seen doing the limbo, away',
+  'the dance floor danced its last dance',
+  'resort rated 1 star: "was eaten, otherwise lovely"',
 ];
 const NEWS_CALM = [
   'BREAKING: mayor announces run for a THIRD term',
@@ -667,16 +732,20 @@ function showNews() {
   const formTier = Math.max(0, curStage - 2);
   const pctTier = devouredPct < 5 ? 0 : devouredPct < 18 ? 1 : 2;
   const tier = Math.max(pctTier, formTier);
-  const pool = [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
+  const PB = pickedWorld === 'pirate';
+  const pool = PB
+    ? [PB_CALM, PB_WORRIED, PB_PANIC][tier]
+    : [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
   // a countdown headline only makes sense near the end — "179 SECONDS LEFT"
   // is not a panic, it's a weather report
-  const live = [NEWS_LIVE_CALM, NEWS_LIVE_WORRIED, NEWS_LIVE_PANIC][tier]
+  const live = (PB ? [PB_LIVE_CALM, PB_LIVE_WORRIED, PB_LIVE_PANIC]
+    : [NEWS_LIVE_CALM, NEWS_LIVE_WORRIED, NEWS_LIVE_PANIC])[tier]
     .filter((t) => !t.includes('{S}') || matchClock <= 70);
   // 55% of headlines are now LIVE — filled from the actual run
   const body = newsQueue.shift()
     ?? (live.length && Math.random() < 0.55 ? fillHeadline(pickHeadline(live)) : pickHeadline(pool));
   const h = body;
-  const brand = pickedWorld === 'pirate'
+  const brand = PB
     ? ['🏴‍☠️ BAY RADIO', '⚠️ BAY RADIO', '🚨 ALL HANDS'][tier]
     : ['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier];
   newsEl.innerHTML = `<i>${brand}</i>${h}`;

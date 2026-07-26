@@ -1434,6 +1434,33 @@ function makeCannon(): THREE.Group {
   for (const sx of [-0.8, 0.8]) parts.push(part(new THREE.CylinderGeometry(0.55, 0.55, 0.24, 12), 0x4a3a2a, sx, 0.55, 0.85, 0, 0, Math.PI / 2));
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
+function makeGalleon(): THREE.Group {
+  // THE landmark of Pirate Bay: a three-mast galleon moored at the pier head,
+  // black sails, gold trim, a skull flag and a lantern at the stern.
+  const g = new THREE.Group();
+  const hull = [
+    part(new THREE.CylinderGeometry(3.2, 2.2, 15, 12, 1, false, 0, Math.PI), 0x6a4526, 0, 2.2, 0, Math.PI / 2, 0, Math.PI / 2),
+    part(new THREE.BoxGeometry(15, 0.5, 5.6), 0xa8814f, 0, 3.4, 0),           // deck
+    part(new THREE.BoxGeometry(4.6, 2.6, 5.2), 0x8a5a2a, -5.2, 4.7, 0),       // stern castle
+    part(new THREE.BoxGeometry(3.2, 1.8, 4.6), 0x8a5a2a, 5.6, 4.3, 0),        // forecastle
+    part(new THREE.BoxGeometry(15.4, 0.42, 0.42), 0xffd23f, 0, 3.9, 2.8),     // gold rail
+    part(new THREE.BoxGeometry(15.4, 0.42, 0.42), 0xffd23f, 0, 3.9, -2.8),
+    part(new THREE.ConeGeometry(1.1, 4.2, 8), 0x6a4526, 8.6, 3.2, 0, 0, 0, -Math.PI / 2 + 0.35),   // bowsprit
+  ];
+  // three masts with black sails
+  for (const [mx, h, sw] of [[-4.2, 11, 5], [0.4, 14, 6.4], [4.8, 10, 4.4]] as [number, number, number][]) {
+    hull.push(part(new THREE.CylinderGeometry(0.32, 0.4, h, 8), 0x8a6132, mx, 3.4 + h / 2, 0));
+    hull.push(part(new THREE.BoxGeometry(0.28, 0.28, sw + 1.6), 0x6a4526, mx, 3.4 + h * 0.78, 0));
+    hull.push(part(new THREE.BoxGeometry(0.3, h * 0.42, sw), 0x2a2430, mx, 3.4 + h * 0.56, 0));   // sail
+    hull.push(part(new THREE.BoxGeometry(0.3, h * 0.3, sw * 0.78), 0x342e3c, mx, 3.4 + h * 0.24, 0));
+  }
+  // skull flag + stern lantern
+  hull.push(part(new THREE.BoxGeometry(0.16, 1.1, 1.8), 0x1a1620, 0.4, 16.4, 0.9));
+  hull.push(part(new THREE.SphereGeometry(0.34, 8, 6), 0xf2ecd8, 0.4, 16.5, 0.9));
+  hull.push(part(new THREE.SphereGeometry(0.42, 8, 6), 0xffd23f, -7.2, 6.4, 0));
+  g.add(mergedProp(hull));
+  return g;
+}
 function makeThatchHut(): THREE.Group {
   const wall = pick([0xf0e0c0, 0xe8d4a8, 0xf6ecd2]);
   const parts = [
@@ -2146,6 +2173,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     } else if (biome === 'port') {
       // ── THE PORT: the galleon at the pier head, cargo everywhere, cannons
       placeGlb('lighthouse', cx - half * 0.7, cz - half * 0.6, 6.5, 19, makeLighthouseFB);
+      { const sh = makeGalleon(); sh.rotation.y = rand(-0.12, 0.12); place(sh, cx, cz + half * 0.62, 7.5); }
       for (const px2 of [-0.5, 0, 0.5]) {   // crates + barrels down each pier
         for (let k = 0; k < 4; k++) {
           const z2 = cz - half * 0.5 + k * (half * 0.45);
