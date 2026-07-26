@@ -68,9 +68,15 @@ export const BAY_REGIONS: BayRegion[] = [
 
 // THE PROMENADE — one curving boardwalk hugging the bay's inner shore, and
 // THE TRAIL — a dirt spur into the wild west side. These replace the grid.
+// It has to REACH things. The first run started 60 units short of the fort and
+// stopped 38 short of Dance Cove's nearest corner — which is where the match
+// begins — so the island's only path missed the spawn district at one end and
+// the old town at the other, and the shuttle buggies ping-ponged between two
+// patches of bare sand.
 export const PROMENADE: Pt[] = [
-  [6600, 1900], [7300, 2900], [7900, 3900], [8600, 4900], [8800, 6100],
-  [8500, 7300], [7900, 8300], [7100, 9000], [6300, 9600], [5500, 9900],
+  [5600, 1750], [6600, 1900], [7300, 2900], [7900, 3900], [8600, 4900], [8800, 6100],
+  [8500, 7300], [7900, 8300], [7100, 9000], [6300, 9600], [5800, 10100], [6500, 10450],
+  [7400, 10600],
 ];
 export const TRAIL: Pt[] = [
   [6200, 3500], [5000, 4200], [4000, 5200], [3200, 6200], [2700, 7400], [3400, 8600],

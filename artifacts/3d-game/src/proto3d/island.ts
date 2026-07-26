@@ -2463,6 +2463,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // in something else. avoid = districts this prop has no business in: the
     // island-wide shoreline scatter was dropping grey rocks and beach loungers
     // onto the nightclub and the port boardwalk.
+    // the built-up districts. Beach clutter and wild scrub both belong out of
+    // them — the grove and bush passes carried no exclusion at all, so boulders
+    // and palm trees were growing on the lit dance floor.
     const NO_TOWN: BAY.BayBiome[] = ['party', 'port', 'resort', 'market', 'oldtown'];
     const sland = (n: number, clear = 45, band?: [number, number], sep?: number, avoid?: BAY.BayBiome[]) =>
       BAY.scatterLand(n, Math.random, clear, band, { sep, avoid });
@@ -2477,14 +2480,14 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
 
     // palm GROVES (clumps, not an even dusting — from above a clump reads as
     // a place, a dusting reads as noise)
-    for (const [gx2, gy2] of sland(17, 240)) {
+    for (const [gx2, gy2] of sland(17, 240, undefined, undefined, NO_TOWN)) {
       for (const p2 of grove(gx2, gy2, 4 + Math.floor(Math.random() * 5), 420, 55))
         dropGlb('palm', p2, 2.6, rand(6.5, 10.5), makePalm, rand(0, Math.PI * 2));
     }
     // dune grass and scrub, thickest just inland of the surf
-    for (const p2 of sland(190, 26, undefined, 0.9)) drop(makeReeds(), p2, 0.9, rand(0, Math.PI * 2));
-    for (const p2 of sland(110, 34, undefined, 1.6)) drop(makeBush(), p2, 1.6);
-    for (const p2 of sland(95, 30, undefined, 0.7)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of sland(190, 26, undefined, 0.9, NO_TOWN)) drop(makeReeds(), p2, 0.9, rand(0, Math.PI * 2));
+    for (const p2 of sland(110, 34, undefined, 1.6, NO_TOWN)) drop(makeBush(), p2, 1.6);
+    for (const p2 of sland(95, 30, undefined, 0.7, ['party', 'port'])) drop(makeFlowers(), p2, 0.7);
     // the SHORELINE band: shells, driftwood rocks, and things the tide left
     for (const p2 of sland(130, 20, [40, 420], 0.5, NO_TOWN)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
     for (const p2 of sland(58, 34, [60, 520], 2.4, NO_TOWN)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
@@ -2493,7 +2496,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (const p2 of sland(40, 34, [90, 700], 1.4, NO_TOWN)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
     for (const p2 of sland(9, 120, [120, 700], 2.6, NO_TOWN)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
     // doubloons in the sand — treasure is the island's whole fiction
-    for (const p2 of sland(65, 26, undefined, 0.6)) drop(makeCoins(), p2, 0.6);
+    for (const p2 of sland(65, 26, undefined, 0.6, ['resort'])) drop(makeCoins(), p2, 0.6);
     for (const p2 of sland(18, 60, undefined, 1.3, NO_TOWN)) drop(makeBarrel(), p2, 1.3);
 
     // ── THE PIERS ───────────────────────────────────────────────────────────
@@ -2555,39 +2558,62 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
 
     // ── THE RESORT AXIS ─────────────────────────────────────────────────────
-    // One straight, mirrored line from the boardwalk out to the yacht, with the
-    // hotel's cream-and-teal repeated down its whole length. This is what
-    // "expensive" looks like from a top-down camera: arrival, symmetry and
-    // repetition. Before this the resort was 246 randomly-scattered props,
-    // one building and two painted puddles.
-    const AX: [number, number] = [8560, 3980];        // arch, on the boardwalk
-    const AXV: [number, number] = [0.62, 0.78];       // unit vector toward the bay
-    const along = (t: number, off = 0): [number, number] =>
-      [AX[0] + AXV[0] * t - AXV[1] * off, AX[1] + AXV[1] * t + AXV[0] * off];
-    const axAng = Math.atan2(AXV[1], AXV[0]);
-    drop(makeArrivalArch(), AX, 5, axAng);
-    drop(LUXE.makeValetStand(), along(-260, -260), 2.2, axAng);
-    drop(LUXE.makeGullwingSupercar(), along(-300, 300), 2.4, axAng + 0.3);
-    drop(LUXE.makeStatueFountain(), along(430), 3, 0);
-    drop(LUXE.makeInfinityPool(), along(1000), 5.5, axAng);
-    drop(LUXE.makeChampagneTower(), along(1000, -330), 1.8, 0);
-    drop(LUXE.makeCaviarBar(), along(1000, 330), 2.4, axAng);
-    // mirrored rows of loungers and parasols down the axis — symmetry reads as
-    // expensive; a circle of randomly-rotated chairs reads as a car boot sale
-    for (let i = 0; i < 8; i++) {
-      const t = 620 + i * 175;
+    // Arrival: off the boardwalk, under the arch, inland past the fountain to
+    // the pool, mirrored either side, with the hotel's cream-and-teal repeated
+    // down its whole length. Symmetry and repetition is what reads as expensive
+    // from a top-down camera.
+    //
+    // The first version ran on a hand-guessed heading 56 degrees off the one it
+    // claimed, and a measured audit found 27 of its 55 props sitting off the
+    // coastline — where place() drops them on the floor without a word, so half
+    // the avenue silently did not exist. It is now built from MEASURED
+    // geometry: the resort is a strip about 890 world units deep between the
+    // boardwalk's clearance and the outer coast, so the axis is SHORT and
+    // perpendicular to the shore rather than long and diagonal. Every site is
+    // asserted before anything is placed, and rejections are counted out loud.
+    const AP = BAY.pathPointAt(BAY.PROMENADE, 0.45);
+    const AN: [number, number] = [0.99, -0.16];    // inland normal, measured
+    const AT: [number, number] = [-AN[1], AN[0]];  // across the axis
+    const site = (d: number, off = 0): [number, number] =>
+      [AP.x + AN[0] * d + AT[0] * off, AP.y + AN[1] * d + AT[1] * off];
+    const axAng = Math.atan2(AN[1], AN[0]);
+    // Facing helpers. A prop's forward axis is part of its geometry, and the two
+    // seat families here disagree: makeBeachChairFB looks down +Z, the luxe
+    // loungers down +X. Mirroring a row by adding PI to the heading — what the
+    // first version did — turns half an avenue round to face backwards. Mirror
+    // the POSITION, never the heading.
+    const faceZ = (fx: number, fz: number) => Math.atan2(fx, fz);
+    const faceX = (fx: number, fz: number) => Math.atan2(-fz, fx);
+    let axFail = 0;
+    const axDrop = (mesh: THREE.Object3D, d: number, off: number, r: number, rotY: number) => {
+      const p2 = site(d, off);
+      if (!BAY.bayPlaceable(p2[0], p2[1], Math.max(25, r * 10))) { axFail++; return; }
+      drop(mesh, p2, r, rotY);
+    };
+    axDrop(makeArrivalArch(), 285, 0, 5, axAng);
+    axDrop(LUXE.makeValetStand(), 300, -300, 2.2, axAng);
+    axDrop(LUXE.makeGullwingSupercar(), 300, 300, 2.4, axAng + 0.3);
+    axDrop(LUXE.makeStatueFountain(), 470, 0, 3, 0);
+    axDrop(LUXE.makeInfinityPool(), 690, 0, 5.5, axAng);
+    axDrop(LUXE.makeChampagneTower(), 690, -300, 1.8, 0);
+    axDrop(LUXE.makeCaviarBar(), 690, 300, 2.4, axAng + Math.PI);
+    // both sides face IN toward the axis, so the avenue reads as one room
+    // rather than two rows of chairs with their backs to each other
+    for (let i = 0; i < 6; i++) {
+      const d = 400 + i * 105;
       for (const sgn of [-1, 1]) {
-        drop(LUXE.makeSunLounger(), along(t, sgn * 480), 1.4, axAng + (sgn > 0 ? 0 : Math.PI));
-        if (i % 2 === 0) drop(LUXE.makeParasolLux(), along(t + 60, sgn * 610), 1.8, 0);
-        if (i % 3 === 1) drop(LUXE.makePotPlant(), along(t, sgn * 300), 0.9, 0);
+        axDrop(LUXE.makeSunLounger(), d, sgn * 215, 1.4, faceX(-sgn * AT[0], -sgn * AT[1]));
+        if (i % 2 === 0) axDrop(LUXE.makeParasolLux(), d + 40, sgn * 310, 1.8, 0);
+        if (i % 3 === 1) axDrop(LUXE.makePotPlant(), d, sgn * 130, 0.9, 0);
       }
     }
-    for (let i = 0; i < 9; i++) {   // the flag avenue: one motif, repeated
-      const t = 180 + i * 190;
-      for (const sgn of [-1, 1]) drop(LUXE.makePalmLux(), along(t, sgn * 700), 2.6, 0);
+    for (let i = 0; i < 6; i++) {   // the palm avenue: one motif, repeated
+      const d = 330 + i * 110;
+      for (const sgn of [-1, 1]) axDrop(LUXE.makePalmLux(), d, sgn * 400, 2.6, 0);
     }
+    if (axFail) console.warn('[pirate] resort axis: ' + axFail + ' sites rejected');
 
-    // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
+    // ── THE DOCKS: the galleon at the pier head    // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
     for (const p2 of spread('port', 34, 40)) drop(Math.random() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
@@ -2624,7 +2650,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const t = (k - 2) * 175;
         for (const sgn of [-1, 1]) {
           const off = sgn * 290;
-          drop(LUXE.makeSunLounger(), [ox + ux * t - uy * off, oy + uy * t + ux * off], 1.4, ang + (sgn > 0 ? 0 : Math.PI));
+          // face the POOL, not the mirror of the other side's heading
+          drop(LUXE.makeSunLounger(), [ox + ux * t - uy * off, oy + uy * t + ux * off], 1.4, faceX(sgn * uy, -sgn * ux));
         }
       }
       for (const sgn of [-1, 1]) {
@@ -2745,7 +2772,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (let i = 0; i < 12; i++) {
       const t = i / 11, bx = 3050 + t * 2100, by = 8100 + t * 1500;
       drop(LUXE.makeParasolLux(), [bx, by], 1.8, 0);
-      if (i % 2 === 0) drop(LUXE.makeSunLounger(), [bx + 130, by - 110], 1.4, 0.62);
+      // 0.62 is the TIDELINE's own bearing, so every lounger looked along the
+      // beach instead of out at the water
+      if (i % 2 === 0) drop(LUXE.makeSunLounger(), [bx + 130, by - 110], 1.4, faceX(0.58, 0.81));
     }
 
     // ── WAYPOINTS IN THE WILD ────────────────────────────────────────────
@@ -2755,7 +2784,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     landmark(LUXE.makeAnchorMonument(), [2450, 4200], 3, -0.6, 100);  // west coast marker
     landmark(LUXE.makeMapPavilion(), [5330, 6890], 4, 1.1, 120);      // between bazaar and beach
     landmark(LUXE.makeFireTable(), [5120, 8600], 2.4, 0, 90);
-    for (const p2 of sland(9, 90, undefined, 1.6)) drop(LUXE.makeSignpost(), p2, 1.6, rand(0, Math.PI * 2));
+    // a signpost at a RANDOM bearing is not wayfinding. Point them at the resort.
+    for (const p2 of sland(9, 90, undefined, 1.6)) drop(LUXE.makeSignpost(), p2, 1.6, faceZ(8700 - p2[0], 5800 - p2[1]));
 
     // ── THE PROMENADE: torches and benches down its whole length
     for (let t = 0.015; t < 0.99; t += 0.02) {

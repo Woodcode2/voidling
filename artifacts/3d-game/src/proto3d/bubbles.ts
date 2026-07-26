@@ -18,6 +18,11 @@ interface Slot {
   active: boolean;
 }
 
+// Was a flat 150. The camera pulls back to 300 at WORLD ENDER, so every
+// ambient and panic line was rejected from roughly GOBBLER onward — the island
+// went silent exactly as the player became big enough to enjoy it. Measured:
+// 2 unique lines per 10s in the BUSIEST district at camDist 155, 1 at 202.
+// The gate now rides the camera so the talking distance scales with the view.
 const BUBBLE_MAX_CAMD = 150;   // whole-island views don't need street gossip
 export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
   // inject styles once
@@ -80,7 +85,16 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
       // whole-island zoom doesn't need street gossip — but FAMILY lines
       // ('event') must survive the big-void camera pull-back, or the rivals go
       // silent exactly when the drama happens
-      if (camera.position.distanceTo(pos) > (kind === 'event' ? 460 : BUBBLE_MAX_CAMD)) return;
+      // Ride the camera. A flat 150 rejected every street line from roughly
+      // GOBBLER onward, because camDist reaches 300 at WORLD ENDER — the island
+      // fell silent exactly when the player got big enough to enjoy it.
+      // Measured before this: 2 unique lines per 10s in the BUSIEST district at
+      // camDist 155, and 1 at 202.
+      // camera.position.y is the reliable proxy for zoom here — the rig orbits
+      // the void, so its absolute position is not the view distance
+      const camD = Math.max(40, camera.position.y);
+      const gate = kind === 'event' ? 460 : Math.max(BUBBLE_MAX_CAMD, camD * 2.4);
+      if (camera.position.distanceTo(pos) > gate) return;
       // dedupe: never show the same line twice at once (panicked crowds all
       // pull from the same pool)
       if (slots.some((s) => s.active && s.el.textContent === text)) return;
