@@ -258,12 +258,17 @@ const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0 };
 const JOY_R = 64;
 let lastInput = -9999, tClock = 0;
 function joySet(ev: PointerEvent) {
-  // RE-ANCHOR (hole.io convention): once the thumb passes the ring, the base
-  // chases the finger — a direction flip is instant relative to the thumb,
-  // never a 2-ring drag back across the glass
+  // RE-ANCHOR (hole.io convention) with an OVERSHOOT ZONE: the base only
+  // chases the finger once it's pulled well past the ring (1.7×). The old
+  // tight follow parked the rim exactly under the thumb, so every micro-
+  // wiggle dipped below full deflection — speed stuttered and steering felt
+  // like it "needed progressively more movement". Now the thumb rests
+  // comfortably past the rim at full speed; big pulls and direction flips
+  // still drag the base along, so a flip never needs a 2-ring swipe back.
+  const FOLLOW = JOY_R * 1.7;
   const m0 = Math.hypot(ev.clientX - joy.ax, ev.clientY - joy.ay);
-  if (m0 > JOY_R) {
-    const g = 1 - JOY_R / m0;
+  if (m0 > FOLLOW) {
+    const g = 1 - FOLLOW / m0;
     joy.ax += (ev.clientX - joy.ax) * g; joy.ay += (ev.clientY - joy.ay) * g;
     joyEl.style.left = `${joy.ax}px`; joyEl.style.top = `${joy.ay}px`;
   }
@@ -422,13 +427,17 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
 const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve'], HARD_Q = ['houses', 'rival', 'army'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
-  const daySeed = Math.abs(today.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
-  const ids = [EASY_Q[daySeed % EASY_Q.length], MED_Q[(daySeed >> 2) % MED_Q.length], HARD_Q[(daySeed >> 4) % HARD_Q.length]];   // independent indices — the same seed produced only 3 boards ever
+  // uint32 hash (imul + >>>0). The old float reduce blew past 2^53, and the
+  // >> coercion could go NEGATIVE — array[-1] = undefined = a day where every
+  // kid's quest chips read "undefined 0/undefined" (first hit: Jul 26 2026)
+  let daySeed = 7;
+  for (const c of today) daySeed = (Math.imul(daySeed, 31) + c.charCodeAt(0)) >>> 0;
+  const ids = [EASY_Q[daySeed % EASY_Q.length], MED_Q[(daySeed >>> 2) % MED_Q.length], HARD_Q[(daySeed >>> 4) % HARD_Q.length]];   // independent indices — the same seed produced only 3 boards ever
   const saved = localStorage.getItem('voidQuestDay') === today
     ? JSON.parse(localStorage.getItem('voidQuestState') || '{}') : {};
   localStorage.setItem('voidQuestDay', today);
   return ids.map((id) => {
-    const t = QUEST_POOL.find((q) => q.id === id)!;
+    const t = QUEST_POOL.find((q) => q.id === id) ?? QUEST_POOL[0];   // belt-and-braces: never render an undefined chip
     return { ...t, count: saved[id]?.c ?? 0, done: saved[id]?.d ?? false };
   });
 })();

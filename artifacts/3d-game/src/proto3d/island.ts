@@ -780,13 +780,21 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   for (const p of silRev) shape.lineTo(p.x, -p.y);
   shape.closePath();
   const topGeo = new THREE.ShapeGeometry(shape);
-  // custom UVs from bbox so the baked texture aligns
+  // custom UVs from bbox so the baked texture aligns.
+  // ⚠️ THE 8-UNIT STREET SHIFT LIVED HERE. shape.y = -z3 (the shape is built
+  // mirrored for the -π/2 rotation), and the canvas texture is flipY. The old
+  // v = (posY - minZ)/H3 only aligns when maxZ === -minZ — but the island
+  // silhouette is asymmetric (minZ -288.85, maxZ +280.63), so EVERY baked
+  // feature rendered 8.23 units off in z: painted asphalt sat a road-width
+  // south of where cars actually drive ("street lines on the grass", "houses
+  // in the street" — the paint was wrong, never the objects). Correct v maps
+  // z3=maxZ → 0 (canvas bottom, flipY) and z3=minZ → 1: v = (maxZ + posY)/H3.
   {
     const pos = topGeo.attributes.position;
     const uv = new Float32Array(pos.count * 2);
     for (let i = 0; i < pos.count; i++) {
       uv[i * 2] = (pos.getX(i) - minX) / W3;
-      uv[i * 2 + 1] = (pos.getY(i) - minZ) / H3;
+      uv[i * 2 + 1] = (maxZ + pos.getY(i)) / H3;
     }
     topGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
