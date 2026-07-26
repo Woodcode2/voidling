@@ -443,31 +443,42 @@ export function createAudio(): Audio3D {
   // envelope. The LFOs are shared: a running LFO can be connected to any number
   // of new oscillators' detune params for free, which is how every fiddle note
   // gets vibrato without a node per note.
-  let accChan: GainNode | null = null;    // squeezebox -> reedy lowpass -> bus
-  let fidChan: GainNode | null = null;    // fiddle -> body highpass -> bus
-  let fidVib: GainNode | null = null;     // shared bow vibrato, in cents
-  let whChan: GainNode | null = null;     // tin whistle -> soft lowpass -> bus
-  function buildCrew(c: AudioContext, bus: GainNode) {
+  // A crew is built PER DESTINATION and cached, the same way the percussion
+  // filters are. There are two in practice: one on the band bus for the score,
+  // and one straight on master for the one-shots. That second one matters —
+  // win() fires immediately after stopMusic(), so a fanfare routed through the
+  // music bus would fade out underneath itself, and evolve() can be triggered
+  // from the shop before a match has ever started the bus at all.
+  interface Crew { acc: GainNode; fid: GainNode; vib: GainNode; wh: GainNode }
+  const crews = new Map<AudioNode, Crew>();
+  function crewFor(dest: AudioNode): Crew | null {
+    const c = ctx; if (!c) return null;
+    let k = crews.get(dest);
+    if (k) return k;
     // SQUEEZEBOX: the wheeze is a slow tremolo on the whole channel, exactly
     // like a bellows breathing. One LFO for every accordion note in the match.
-    accChan = c.createGain(); accChan.gain.value = 1;
+    const acc = c.createGain(); acc.gain.value = 1;
     const accTone = c.createBiquadFilter(); accTone.type = 'lowpass'; accTone.frequency.value = 2500; accTone.Q.value = 0.6;
-    accChan.connect(accTone); accTone.connect(bus);
+    acc.connect(accTone); accTone.connect(dest);
     const trem = c.createOscillator(); trem.type = 'sine'; trem.frequency.value = 5.1;
     const tremG = c.createGain(); tremG.gain.value = 0.14;
-    trem.connect(tremG); tremG.connect(accChan.gain); trem.start();
-    // FIDDLE
-    fidChan = c.createGain(); fidChan.gain.value = 1;
+    trem.connect(tremG); tremG.connect(acc.gain); trem.start();
+    // FIDDLE — body resonance top and bottom, plus a shared bow vibrato that
+    // every future fiddle note connects to for free
+    const fid = c.createGain(); fid.gain.value = 1;
     const fidTone = c.createBiquadFilter(); fidTone.type = 'highpass'; fidTone.frequency.value = 330; fidTone.Q.value = 0.7;
     const fidTop = c.createBiquadFilter(); fidTop.type = 'lowpass'; fidTop.frequency.value = 3400; fidTop.Q.value = 0.5;
-    fidChan.connect(fidTone); fidTone.connect(fidTop); fidTop.connect(bus);
-    const vib = c.createOscillator(); vib.type = 'sine'; vib.frequency.value = 5.4;
-    fidVib = c.createGain(); fidVib.gain.value = 17;   // cents
-    vib.connect(fidVib); vib.start();
+    fid.connect(fidTone); fidTone.connect(fidTop); fidTop.connect(dest);
+    const vibO = c.createOscillator(); vibO.type = 'sine'; vibO.frequency.value = 5.4;
+    const vib = c.createGain(); vib.gain.value = 17;   // cents
+    vibO.connect(vib); vibO.start();
     // TIN WHISTLE
-    whChan = c.createGain(); whChan.gain.value = 1;
+    const wh = c.createGain(); wh.gain.value = 1;
     const whTone = c.createBiquadFilter(); whTone.type = 'lowpass'; whTone.frequency.value = 3800; whTone.Q.value = 0.7;
-    whChan.connect(whTone); whTone.connect(bus);
+    wh.connect(whTone); whTone.connect(dest);
+    k = { acc, fid, vib, wh };
+    crews.set(dest, k);
+    return k;
   }
   // accordion reed: saw-like with a nasal rolloff. One PeriodicWave, cached,
   // so a reed note is one oscillator instead of a stack.
@@ -483,14 +494,14 @@ export function createAudio(): Audio3D {
   }
   // A single squeezebox note: TWO reeds a musette 14 cents apart. That beating
   // between them is the entire sound of an accordion — one reed is an organ.
-  function accord(freq: number, t: number, dur: number, vol: number) {
-    const c = ctx; if (!c || !accChan || freq <= 0) return;
+  function accord(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; const k = crewFor(dest); if (!c || !k || freq <= 0) return;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + 0.018);
     g.gain.setValueAtTime(vol, t + dur * 0.6);          // bellows hold
     g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
-    g.connect(accChan);
+    g.connect(k.acc);
     for (const d of [-14, 14]) {
       const o = c.createOscillator(); o.setPeriodicWave(reed(c));
       o.detune.value = d; o.frequency.setValueAtTime(freq, t);
@@ -499,13 +510,13 @@ export function createAudio(): Audio3D {
   }
   // the left hand: the "pah" of the oom-pah-pah. All three tones share one
   // short envelope, so it's a chop, not a pad.
-  function accChord(chord: number[], t: number, dur: number, vol: number) {
-    const c = ctx; if (!c || !accChan) return;
+  function accChord(dest: AudioNode, chord: number[], t: number, dur: number, vol: number) {
+    const c = ctx; const k = crewFor(dest); if (!c || !k) return;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
-    g.connect(accChan);
+    g.connect(k.acc);
     for (const f of chord) {
       const o = c.createOscillator(); o.setPeriodicWave(reed(c));
       o.detune.value = Math.random() * 10 - 5;
@@ -513,21 +524,21 @@ export function createAudio(): Audio3D {
       o.connect(g); o.start(t); o.stop(t + dur + 0.03);
     }
   }
-  function fiddle(freq: number, t: number, dur: number, vol: number) {
-    const c = ctx; if (!c || !fidChan || freq <= 0) return;
+  function fiddle(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; const k = crewFor(dest); if (!c || !k || freq <= 0) return;
     const o = c.createOscillator(); o.type = 'sawtooth';
     o.frequency.setValueAtTime(freq, t);
-    if (fidVib) fidVib.connect(o.detune);   // shared LFO — no node cost
+    k.vib.connect(o.detune);   // shared LFO — no node cost
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + 0.03);      // bowed, not plucked
     g.gain.setValueAtTime(vol, t + dur * 0.65);
     g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
-    o.connect(g); g.connect(fidChan);
+    o.connect(g); g.connect(k.fid);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  function whistle(freq: number, t: number, dur: number, vol: number) {
-    const c = ctx; if (!c || !whChan || freq <= 0) return;
+  function whistle(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; const k = crewFor(dest); if (!c || !k || freq <= 0) return;
     const o = c.createOscillator(); o.type = 'square';
     o.frequency.setValueAtTime(freq, t);
     const g = c.createGain();
@@ -535,7 +546,7 @@ export function createAudio(): Audio3D {
     g.gain.linearRampToValueAtTime(vol, t + 0.025);
     g.gain.setValueAtTime(vol, t + dur * 0.7);
     g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
-    o.connect(g); g.connect(whChan);
+    o.connect(g); g.connect(k.wh);
     o.start(t); o.stop(t + dur + 0.03);
   }
   // STOMP — a boot on a wooden deck: a fast pitch-dropping sine for the thud
@@ -648,7 +659,15 @@ export function createAudio(): Audio3D {
   // ── the band's bus ────────────────────────────────────────────────────────
   // A tavern, not a lagoon: less delay than a tropical mix wants (a wash would
   // smear the oom-pah and kill the stomp) but enough to put the band in a room.
-  const PIR_VOL = 0.25;
+  //
+  // The bus level is LOWER than the first draft's, and on purpose. A shanty
+  // stacks far more sustained content than a lounge loop did — bass, four
+  // chord chops a bar and a melody all sounding at once where the tropical bed
+  // had a bass and a pad — so the same bus gain came out roughly twice as loud
+  // as MAPLE ISLE's. Switching worlds should not be a jump scare. This lands
+  // the band a few dB above Maple, which is the right relationship for the
+  // rowdier of the two, and leaves plenty of headroom for the one-shots.
+  const PIR_VOL = 0.19;
   let pirBus: GainNode | null = null;
   let ambGain: GainNode | null = null;
   let pirTimer: ReturnType<typeof setInterval> | null = null;
@@ -668,7 +687,6 @@ export function createAudio(): Audio3D {
     warm.connect(dry); dry.connect(master!);
     warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
     delay.connect(fb); fb.connect(delay);
-    buildCrew(c, bus);
     return bus;
   }
 
@@ -712,12 +730,13 @@ export function createAudio(): Audio3D {
   // ── place layers ──────────────────────────────────────────────────────────
   type ZoneId = 'party' | 'port' | 'jungle' | 'beach';
   interface ZoneLayer { g: GainNode; vol: number; on: boolean; until: number }
-  // Levels are set RELATIVE TO THE BED, which runs at PIR_VOL (0.27) — that is
-  // the whole mix decision. The dance floor is allowed to be roughly twice the
-  // bed's bass; every other district is a fifth of it, i.e. something you'd
+  // Levels are set RELATIVE TO THE BED (PIR_VOL) — that is the whole mix
+  // decision, and they were rescaled with it. The dance floor is allowed to be
+  // roughly twice the band's bass, because you're standing in front of the
+  // speaker wall; every other district is a fifth of it, i.e. something you'd
   // only notice if you stopped and listened. Phone speakers are small and the
-  // music is the star.
-  const ZONE_VOL: Record<ZoneId, number> = { party: 0.34, port: 0.16, jungle: 0.16, beach: 0.16 };
+  // tune is the star.
+  const ZONE_VOL: Record<ZoneId, number> = { party: 0.26, port: 0.12, jungle: 0.12, beach: 0.12 };
   const ZONE_FADE = 0.6;
   const zones: Partial<Record<ZoneId, ZoneLayer>> = {};
   let curZone: ZoneId | null = null;
@@ -891,7 +910,7 @@ export function createAudio(): Audio3D {
       // bass lands on the house kick (both sit on the pulse) and the remaining
       // chops read as a three-against-two shimmer instead of mud
       if (onE && (floor ? (e === 2 || e === 5) : (e === 1 || e === 2 || e === 4 || e === 5))) {
-        accChord(ch, t, e8 * 0.85, 0.05);
+        accChord(pirBus, ch, t, e8 * 0.85, 0.05);
       }
 
       // ── STOMP AND CLAP: the rowdy floor ───────────────────────────────────
@@ -909,7 +928,7 @@ export function createAudio(): Audio3D {
 
       // ── THE HOOK ──────────────────────────────────────────────────────────
       if (!floor && onE && note > 0) {
-        accord(note, t, e8 * 0.92, 0.1);   // squeezebox has the tune from bar one
+        accord(pirBus, note, t, e8 * 0.92, 0.1);   // squeezebox has the tune from bar one
         // The fiddle joins on the ANSWER bars first (1 and 3), so the arrival
         // of stage 1 sounds like a second player picking the tune up mid-verse
         // — call on the box alone, answer in octaves. From stage 2 it's on the
@@ -919,9 +938,9 @@ export function createAudio(): Audio3D {
         // which is a squeak, not a lift. A real fiddler picks the octave that
         // keeps the line in one register; so does this one.
         if (st >= 2 || (st >= 1 && (bar & 1) === 1)) {
-          fiddle(note * ((bar & 1) === 0 ? 2 : 1), t, e8 * 0.95, 0.04);
+          fiddle(pirBus, note * ((bar & 1) === 0 ? 2 : 1), t, e8 * 0.95, 0.04);
         }
-        if (st >= 3 && (e === 0 || e === 3)) whistle(note * 2, t, e8 * 1.5, 0.026);
+        if (st >= 3 && (e === 0 || e === 3)) whistle(pirBus, note * 2, t, e8 * 1.5, 0.026);
       }
 
       // ── THE RESORT BAND'S TOPPING ─────────────────────────────────────────
@@ -977,7 +996,7 @@ export function createAudio(): Audio3D {
     if (!pirBus) pirBus = buildBandBus(c);
     if (!ambGain) { ambGain = c.createGain(); ambGain.gain.value = 0.0001; ambGain.connect(master); }
     pirRunning = true;
-    ramp(ambGain.gain, 0.45, c.currentTime, 1.6);
+    ramp(ambGain.gain, 0.34, c.currentTime, 1.6);
     pirStep = 0; pirNextT = c.currentTime + 0.12; ambNextT = 0;
     // the match opens on a 1.5s swell, not a switch flick; after this every
     // zone change rides the shorter 0.6s crossfade
@@ -1038,7 +1057,7 @@ export function createAudio(): Audio3D {
     // the whole level's identity in six tenths of a second
     hey(master, t, 0.2, 2);
     bandHit(t, 0.22);
-    accord(587.33, t + 0.02, 0.3, 0.11); accord(698.46, t + 0.16, 0.42, 0.11);
+    accord(master, 587.33, t + 0.02, 0.3, 0.11); accord(master, 698.46, t + 0.16, 0.42, 0.11);
     panRun(t + 0.14, [523.25, 698.46, 880.00], 0.085, 0.15, 0.5);
     if (curZone === 'party') cheer(t + 0.1, 0.55);
   }
@@ -1054,21 +1073,21 @@ export function createAudio(): Audio3D {
     const climb = [293.66, 349.23, 440.00, 523.25, 587.33];   // D F A C D
     climb.forEach((f, i) => {
       const tt = t + 0.1 + i * 0.1;
-      accord(f, tt, 0.16, 0.1);
-      fiddle(f * 2, tt, 0.16, 0.05);
+      accord(master!, f, tt, 0.16, 0.1);
+      fiddle(master!, f * 2, tt, 0.16, 0.05);
       if (i % 2 === 0) bandHit(tt, 0.13);
     });
     // V: A major (A C# E) — the one accidental in the whole score, and it's
     // there because a raised third is what makes a cadence feel like ARRIVING
     const land = t + 0.62;
-    accChord([440.00, 554.37, 659.25], land, 0.3, 0.09);
+    accChord(master, [440.00, 554.37, 659.25], land, 0.3, 0.09);
     bandHit(land, 0.24);
     // i: D minor, everybody in
     const home = t + 0.92;
-    accChord([293.66, 349.23, 440.00], home, 0.9, 0.11);
+    accChord(master, [293.66, 349.23, 440.00], home, 0.9, 0.11);
     pBass(master, home, 146.83, 0.9, 0.18);
-    fiddle(587.33, home, 0.85, 0.06);
-    whistle(1174.66, home + 0.04, 0.8, 0.035);
+    fiddle(master, 587.33, home, 0.85, 0.06);
+    whistle(master, 1174.66, home + 0.04, 0.8, 0.035);
     panRun(home, [587.33, 880.00, 1174.66], 0.1, 0.14, 0.8);
     bandHit(home, 0.3);
     hey(master, home + 0.06, 0.24, 4);
@@ -1080,8 +1099,8 @@ export function createAudio(): Audio3D {
   let bigEatCount = 0;
   function yoHo(t: number) {
     if (!master) return;
-    accChord([293.66, 349.23, 440.00], t, 0.42, 0.075);
-    accord(220.00, t + 0.02, 0.5, 0.07);
+    accChord(master, [293.66, 349.23, 440.00], t, 0.42, 0.075);
+    accord(master, 220.00, t + 0.02, 0.5, 0.07);
     nEnv(fxFor(master, 'shaker'), t, 0.3, 0.02, 0.1);   // bellows air
   }
 
@@ -1152,7 +1171,7 @@ export function createAudio(): Audio3D {
         // happy hour: the crew raises a glass — a shout, a stomp, a toast
         hey(master, t, 0.18, 3);
         bandHit(t, 0.2);
-        accChord([293.66, 349.23, 440.00], t + 0.04, 0.5, 0.09);
+        accChord(master, [293.66, 349.23, 440.00], t + 0.04, 0.5, 0.09);
         panRun(t + 0.2, [523.25, 659.25, 783.99], 0.1, 0.14, 0.55);
       }
     },
@@ -1249,14 +1268,14 @@ export function createAudio(): Audio3D {
         const out = [523.25, 587.33, 659.25, 783.99];   // the "big one", bar 3
         out.forEach((f, i) => {
           const tt = t + i * 0.13;
-          accord(f, tt, 0.2, 0.11);
-          fiddle(f * 2, tt, 0.2, 0.05);
+          accord(master!, f, tt, 0.2, 0.11);
+          fiddle(master!, f * 2, tt, 0.2, 0.05);
           bandHit(tt, i === 0 ? 0.22 : 0.14);
         });
         const home = t + 0.58;
-        accChord([293.66, 349.23, 440.00], home, 1.1, 0.11);
+        accChord(master, [293.66, 349.23, 440.00], home, 1.1, 0.11);
         pBass(master, home, 146.83, 1.0, 0.18);
-        whistle(1174.66, home, 0.9, 0.035);
+        whistle(master, 1174.66, home, 0.9, 0.035);
         panRun(home, [587.33, 880.00, 1174.66], 0.12, 0.14, 0.9);
         bandHit(home, 0.28);
         hey(master, home, 0.24, 4);

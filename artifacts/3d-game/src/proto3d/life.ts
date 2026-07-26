@@ -233,7 +233,9 @@ const B = {
   sph: nb(new THREE.SphereGeometry(0.5, 8, 6)),           // head
   sphS: nb(new THREE.SphereGeometry(0.5, 7, 5)),          // shoulders, buns, balls
   dot: nb(new THREE.SphereGeometry(0.5, 5, 3)),           // hands, freckles of pattern
-  hemi: nb(new THREE.SphereGeometry(0.5, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.56)),
+  // 8 segments AROUND (the top-down circle has to stay round), only 3 down the
+  // profile — nobody ever sees a hair dome edge-on
+  hemi: nb(new THREE.SphereGeometry(0.5, 8, 3, 0, Math.PI * 2, 0, Math.PI * 0.56)),
   tube: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 5, 1, true)),    // open limb segment
   taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 5, 1, true)),   // open, wider at the BOTTOM
   drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 8, 1, true)),    // open torso barrel
@@ -247,15 +249,19 @@ const B = {
 };
 type Geo = THREE.BufferGeometry;
 const _pcol = new THREE.Color();
-// clone -> scale -> rotate -> translate -> flood with one vertex colour
+const _m4 = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pe = new THREE.Euler();
+const _pv = new THREE.Vector3(), _ps = new THREE.Vector3();
+// clone -> ONE composed scale/rotate/translate -> flood with a vertex colour.
+// Composing the matrix instead of calling scale()/rotateX()/translate() in
+// sequence is three passes over the vertex buffer saved, and this runs ~5,500
+// times while the level builds.
 function pc(base: Geo, col: number, x = 0, y = 0, z = 0, sx = 1, sy = sx, sz = sx,
             rx = 0, ry = 0, rz = 0): Geo {
   const g = base.clone();
-  g.scale(sx, sy, sz);
-  if (rx) g.rotateX(rx);
-  if (ry) g.rotateY(ry);
-  if (rz) g.rotateZ(rz);
-  g.translate(x, y, z);
+  _pe.set(rx, ry, rz, 'ZYX');            // matches rotateX -> rotateY -> rotateZ
+  _pq.setFromEuler(_pe);
+  _pv.set(x, y, z); _ps.set(sx, sy, sz);
+  g.applyMatrix4(_m4.compose(_pv, _pq, _ps));
   _pcol.setHex(col);
   const n = g.getAttribute('position').count;
   const c = new Float32Array(n * 3);
@@ -326,8 +332,8 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
     out.push(pc(B.box, 0x63d6f0, 0, 0.06, 0.44, 0.62, 0.26, 0.20));
     out.push(pc(B.tube, 0xffd23f, 0.44, 0.30, 0.14, 0.09, 0.70, 0.09, 0, 0, -0.2));
   } else if (kind === 'toque') {
-    out.push(pc(B.cyl, WHITE, 0, 0.42, 0, 0.90, 0.62, 0.90));
-    out.push(pc(B.sphS, WHITE, 0, 0.76, 0, 0.78));
+    out.push(pc(B.cyl, WHITE, 0, 0.36, 0, 0.90, 0.54, 0.90));
+    out.push(pc(B.sphS, WHITE, 0, 0.64, 0, 0.72));
   } else if (kind === 'bellhop') {
     out.push(pc(B.cyl, col, 0, 0.30, 0, 0.92, 0.34, 0.92));
     out.push(pc(B.cyl, GOLD, 0, 0.15, 0, 0.96, 0.10, 0.96));
@@ -367,25 +373,27 @@ function hairParts(out: Geo[], style: Hair, col: number): void {
     out.push(pc(B.taper, col, sx, -0.30, -0.12, 0.20, 0.68, 0.20));
 }
 
-// ARM PIVOT space: origin at the shoulder, hand around y -1.06.
-function propParts(out: Geo[], kind: Prop): void {
+// ARM PIVOT space: origin at the shoulder, hand around y -1.01*s. Everything is
+// expressed in units of the arm length `s`, so a child's cocktail ends up in a
+// child's hand at a child's scale.
+function propParts(out: Geo[], kind: Prop, s: number): void {
   if (kind === 'cocktail') {
-    out.push(pc(B.cone, 0xdff6ff, 0, -1.30, 0.16, 0.34, 0.30, 0.34, Math.PI));
-    out.push(pc(B.dot, 0xff8a3a, 0, -1.16, 0.16, 0.18));
+    out.push(pc(B.cone, 0xdff6ff, 0, -1.23 * s, 0.18 * s, 0.34 * s, 0.30 * s, 0.34 * s, Math.PI));
+    out.push(pc(B.dot, 0xff8a3a, 0, -1.09 * s, 0.18 * s, 0.18 * s));
   } else if (kind === 'clipboard') {
-    out.push(pc(B.box, 0xb9793f, 0.02, -1.18, 0.30, 0.44, 0.05, 0.40, -0.7));
-    out.push(pc(B.box, WHITE, 0.02, -1.13, 0.33, 0.36, 0.03, 0.32, -0.7));
+    out.push(pc(B.box, 0xb9793f, 0.02, -1.12 * s, 0.32 * s, 0.44 * s, 0.05 * s, 0.40 * s, -0.7));
+    out.push(pc(B.box, WHITE, 0.02, -1.07 * s, 0.35 * s, 0.36 * s, 0.03 * s, 0.32 * s, -0.7));
   } else if (kind === 'tray') {
-    out.push(pc(B.disc, 0xd8d2c2, 0.06, -1.06, 0.34, 0.52, 0.06, 0.52));
-    out.push(pc(B.cone, 0xffd54f, 0.06, -0.94, 0.34, 0.20, 0.22, 0.20, Math.PI));
+    out.push(pc(B.disc, 0xd8d2c2, 0.06 * s, -1.00 * s, 0.36 * s, 0.52 * s, 0.06 * s, 0.52 * s));
+    out.push(pc(B.cone, 0xffd54f, 0.06 * s, -0.88 * s, 0.36 * s, 0.20 * s, 0.22 * s, 0.20 * s, Math.PI));
   } else if (kind === 'ball') {
-    out.push(pc(B.sphS, pick([0xff5d7e, 0x2fd8e8, 0xffd23f]), 0.10, -1.22, 0.34, 0.62));
+    out.push(pc(B.sphS, pick([0xff5d7e, 0x2fd8e8, 0xffd23f]), 0.10 * s, -1.16 * s, 0.36 * s, 0.62 * s));
   } else if (kind === 'detector') {
-    out.push(pc(B.tube, 0x8a8f9c, 0, -1.50, 0.34, 0.08, 1.35, 0.08, 0.5));
-    out.push(pc(B.disc, 0x3a3f4d, 0, -2.06, 0.66, 0.40, 0.05, 0.40));
+    out.push(pc(B.tube, 0x8a8f9c, 0, -1.42 * s, 0.36 * s, 0.08 * s, 1.35 * s, 0.08 * s, 0.5));
+    out.push(pc(B.disc, 0x3a3f4d, 0, -1.95 * s, 0.66 * s, 0.40 * s, 0.05 * s, 0.40 * s));
   } else {   // selfie stick
-    out.push(pc(B.tube, 0xc8cdd8, 0, -1.42, 0.50, 0.07, 1.50, 0.07, 0.85));
-    out.push(pc(B.box, INK, 0, -0.93, 1.07, 0.16, 0.22, 0.05, 1.2));
+    out.push(pc(B.tube, 0xc8cdd8, 0, -1.34 * s, 0.52 * s, 0.07 * s, 1.50 * s, 0.07 * s, 0.85));
+    out.push(pc(B.box, INK, 0, -0.86 * s, 1.09 * s, 0.16 * s, 0.22 * s, 0.05 * s, 1.2));
   }
 }
 
@@ -535,13 +543,13 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   } else if (wear === 'uniform') {
     bp.push(pc(B.box, accent, 0, 1.02 * th, 0.10 * gr, 0.66, 0.12, 0.48));          // collar band
   }
-  if (o?.necklace) bp.push(pc(B.ring, GOLD, 0, 1.02 * th, 0.02, 0.58, 0.58, 0.58, Math.PI / 2));
+  if (o?.necklace) bp.push(pc(B.ring, GOLD, 0, 1.07 * th, 0.03, 0.60, 0.60, 0.60, Math.PI / 2));
   if (o?.lanyard) {
     bp.push(pc(B.box, 0x2fb8a8, 0, 0.86 * th, 0.30 * gr, 0.07, 0.40 * th, 0.09));
     bp.push(pc(B.box, WHITE, 0, 0.60 * th, 0.32 * gr, 0.26, 0.30, 0.05));
   }
   if (o?.floatRing)                                                                // instantly reads as CHILD from above
-    bp.push(pc(B.ring, pick([0xff8a3a, 0xff5d7e, 0x35d6f0]), 0, 0.30 * th, 0, 3.0, 3.0, 3.0, Math.PI / 2));
+    bp.push(pc(B.ring, pick([0xff8a3a, 0xff5d7e, 0x35d6f0]), 0, 0.34 * th, 0, 2.3, 2.3, 2.3, Math.PI / 2));
   if (o?.rucksack || (fit.pack && Math.random() < 0.7))
     bp.push(pc(B.box, pick([0xc4693a, 0x4a7a9a, 0x8a5cb8]), 0, 0.62 * th, -0.40 * gr, 0.62, 0.62 * th, 0.28));
   if (o?.parrot) parrotParts(bp, Math.random() < 0.5 ? -1 : 1, th);
@@ -550,23 +558,23 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
 
   // ── ARMS ── one merged mesh each: tapered upper, a forearm bent forward at
   // the elbow, and a hand. Hands are what make a walk cycle read.
-  const armX = 0.52 * gr;
+  const armX = 0.52 * gr, A = bd.armL;
   const arms: THREE.Group[] = [];
+  const upCol = fullArm || sleeved ? shirt : skin;
+  const loCol = fullArm ? shirt : skin;
   for (const sx of [-armX, armX]) {
     const p: Geo[] = [];
-    const upCol = fullArm ? shirt : sleeved ? shirt : skin;
-    const loCol = fullArm ? shirt : skin;
-    p.push(pc(B.taper, upCol, 0, -0.255 * bd.armL, 0, 0.24 * gr, 0.52 * bd.armL, 0.24 * gr, Math.PI));
-    p.push(pc(B.taper, loCol, 0, -0.745 * bd.armL, 0.055 * bd.armL, 0.20 * gr, 0.50 * bd.armL, 0.20 * gr, Math.PI + 0.2));
-    p.push(pc(B.dot, skin, 0, -1.00 * bd.armL, 0.12 * bd.armL, 0.26));
-    if (o?.armbands) p.push(pc(B.ring, 0xff8a3a, 0, -0.34 * bd.armL, 0, 0.62, 0.62, 0.62, Math.PI / 2));
+    p.push(pc(B.taper, upCol, 0, -0.255 * A, 0, 0.24 * gr, 0.55 * A, 0.24 * gr, Math.PI));
+    // the forearm is tipped forward at the elbow — a dead-straight prism from
+    // shoulder to fingertip is the other half of the "moving block" tell
+    p.push(pc(B.taper, loCol, 0, -0.755 * A, 0.055 * A, 0.20 * gr, 0.52 * A, 0.20 * gr, Math.PI + 0.2));
+    p.push(pc(B.dot, skin, 0, -1.01 * A, 0.115 * A, 0.26 * gr));
+    if (o?.armbands) p.push(pc(B.ring, 0xff8a3a, 0, -0.34 * A, 0, 0.60, 0.60, 0.60, Math.PI / 2));
+    // the held prop welds INTO the right arm: a waiter's tray is not an extra
+    // draw call, it is extra triangles on a mesh that already exists
+    if (o?.prop && sx > 0) propParts(p, o.prop, A);
     const sh = new THREE.Group(); sh.position.set(sx, bd.shY, 0);
     sh.add(weld(p)); g.add(sh); arms.push(sh);
-  }
-  // the right hand carries the prop, welded straight into the arm
-  if (o?.prop) {
-    const p: Geo[] = []; propParts(p, o.prop);
-    arms[1].add(weld(p));
   }
 
   // ── HEAD ── one merged mesh: skull, hair, hat, face. This is the surface the
