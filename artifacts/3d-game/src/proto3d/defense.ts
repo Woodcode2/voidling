@@ -3,7 +3,7 @@
 // shots (screen shake + a score chip on hit); a big-enough void devours them for
 // points ("delicious irony"). Returns a running score delta to the host.
 import * as THREE from 'three';
-import type { Biome } from './island';
+import { worldId, type Biome } from './island';
 import type { Fx } from './fx';
 import { vehicleGlb } from './assets3d';
 
@@ -104,10 +104,13 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
     setPhase(n) {
       if (n <= phase) return null;
       phase = n;
-      // the city lets a little void be — trouble starts at GOBBLER
-      if (n === 2) { spawn('police', 2, 60, 28, 2); return '🚔 POLICE RESPONSE'; }
-      if (n === 3) { spawn('jeep', 2, 80, 32, 3); spawn('tank', 2, 120, 20, 6); return '🪖 THE ARMY ROLLS IN'; }
-      if (n >= 4) { spawn('heli', 3, 150, 40, 5); return '🚁 AIR SUPPORT INBOUND'; }
+      // the city lets a little void be — trouble starts at GOBBLER.
+      // Pirate Bay has no army: the same escalation, told as resort security,
+      // then the harbour watch, then the coastguard.
+      const PB = worldId() === 'pirate';
+      if (n === 2) { spawn('police', 2, 60, 28, 2); return PB ? '🛎️ RESORT SECURITY!' : '🚔 POLICE RESPONSE'; }
+      if (n === 3) { spawn('jeep', 2, 80, 32, 3); spawn('tank', 2, 120, 20, 6); return PB ? '🏴‍☠️ THE HARBOUR WATCH!' : '🪖 THE ARMY ROLLS IN'; }
+      if (n >= 4) { spawn('heli', 3, 150, 40, 5); return PB ? '🚁 COASTGUARD INBOUND!' : '🚁 AIR SUPPORT INBOUND'; }
       return null;
     },
     update(dt, vx, vz, vR) {

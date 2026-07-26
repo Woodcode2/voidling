@@ -1203,6 +1203,64 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     scene.add(fb); addEdible(fb, 5.6);
   });
 
+  // ══ THE BAY'S WATER SURFACE ═══════════════════════════════════════════════
+  // The bay is the centrepiece of Pirate Bay and it was a flat cyan shape
+  // painted into the ground bake. This lays a single transparent sheet over
+  // it — one draw call — carrying crossed swell, sun glitter and a foam band
+  // that breathes against the shore. Nothing else on the island moves at this
+  // scale, so it does a lot of work for very little.
+  let bayWater: THREE.Mesh | null = null;
+  if (WORLD_ID === 'pirate') {
+    // built MIRRORED with reversed winding, exactly like the ground slab above
+    // — the -PI/2 rotation maps shape.y to world -z, so anything that must sit
+    // on top of the bake has to be authored the same way or it lands flipped
+    const shape = new THREE.Shape();
+    const wpts = [...BAY.WATER_SMOOTH].reverse();
+    shape.moveTo(w(wpts[0][0]), -w(wpts[0][1]));
+    for (const [wx, wy] of wpts) shape.lineTo(w(wx), -w(wy));
+    shape.closePath();
+    const geo = new THREE.ShapeGeometry(shape);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        varying vec2 vP;
+        void main() {
+          vP = position.xz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        precision mediump float;
+        uniform float uTime;
+        varying vec2 vP;
+        void main() {
+          // DOMAIN WARP first. Plain crossed sines produce a regular lattice,
+          // which at map zoom reads as a grid of dots stamped on the bay —
+          // the first version of this looked like polka dots. Warping the
+          // sample point by a slower wave breaks the periodicity completely.
+          vec2 q = vP + vec2(
+            sin(vP.y * 0.075 + uTime * 0.41),
+            sin(vP.x * 0.062 - uTime * 0.33)) * 7.0;
+          float swell = sin(q.x * 0.096 + q.y * 0.071 + uTime * 0.62) * 0.5
+                      + sin(q.x * 0.043 - q.y * 0.082 - uTime * 0.44) * 0.5;
+          // thin bright crests rather than specular points
+          float crest = pow(max(0.0, sin(q.x * 0.44 - q.y * 0.37 + uTime * 0.85)), 16.0);
+          vec3 deep = vec3(0.13, 0.60, 0.72);
+          vec3 shallow = vec3(0.40, 0.86, 0.92);
+          // shallow mix stays in a narrow band: at full range the swell reads
+          // as painted stripes on a pool, not as moving water
+          vec3 col = mix(deep, shallow, 0.46 + swell * 0.16);
+          col += crest * 0.07;
+          gl_FragColor = vec4(col, 0.78 + swell * 0.03 + crest * 0.05);
+        }`,
+    });
+    bayWater = new THREE.Mesh(geo, mat);
+    bayWater.position.y = 0.07;   // just clear of the baked ground
+    bayWater.renderOrder = 1;
+    scene.add(bayWater);
+  }
+
   // ONE hot-air balloon drifts over the island (the redesigned Higgsfield GLB
   // is wired via the asset pack in ./assets3d — placed by populate()).
   let balloon: THREE.Group | null = null;
@@ -1237,6 +1295,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.5; });
     },
     update(dt, t) {
+      if (bayWater) (bayWater.material as THREE.ShaderMaterial).uniforms.uTime.value = t;
       wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1;
       (spray.material as THREE.MeshBasicMaterial).opacity = 0.42 + Math.sin(t * 3) * 0.08;
       if (balloon) {

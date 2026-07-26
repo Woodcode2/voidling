@@ -21,13 +21,16 @@ export const BAY_LAND: Pt[] = [
   [1750, 4800], [1900, 3600], [2350, 2500], [3200, 1500],
 ];
 
-// THE BAY — sheltered water cut into the land, open to the east
+// THE BAY — sheltered water cut into the land. The first version pushed a
+// lobe out through the gap in the hook to read as "open to the sea", but that
+// lobe is not on the island: anything drawn there floats over the void. The
+// bay now closes along the inner shore, and the gap in the hook does the job
+// of implying the mouth on its own.
 export const BAY_WATER: Pt[] = [
   [7400, 3400], [8100, 4100], [8500, 5000], [8600, 6000], [8300, 7000],
-  [7700, 7900], [6900, 8500], [6300, 9100], [6900, 9500], [7900, 9450],
-  [8900, 9100], [9600, 8500], [9900, 9000], [9100, 9700], [7900, 10100],
-  [6600, 10050], [5600, 9550], [5100, 8700], [5100, 7600], [5500, 6400],
-  [6000, 5200], [6600, 4200],
+  [7700, 7900], [6900, 8500], [6300, 9100], [6900, 9500], [7550, 9820],
+  [7900, 10100], [6600, 10050], [5600, 9550], [5100, 8700], [5100, 7600],
+  [5500, 6400], [6000, 5200], [6600, 4200],
 ];
 
 export type BayBiome = 'port' | 'resort' | 'party' | 'market' | 'jungle' | 'cove' | 'beach' | 'oldtown';
