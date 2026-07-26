@@ -334,7 +334,7 @@ function propOn(ra: THREE.Object3D, kind: Prop): void {
     const stick = new THREE.Mesh(G.tube, mat(0xc8cdd8, 0.4));
     stick.scale.y = 1.5; stick.rotation.x = 0.85; stick.position.set(0, -1.42, 0.5); ra.add(stick);
     const phone = new THREE.Mesh(G.plate, mat(INK, 0.35));
-    phone.scale.set(0.75, 1, 1.3); phone.rotation.x = 1.2; phone.position.set(0, -1.9, 1.02); ra.add(phone);
+    phone.scale.set(0.75, 1, 1.3); phone.rotation.x = 1.2; phone.position.set(0, -0.93, 1.07); ra.add(phone);
   }
 }
 
@@ -418,8 +418,10 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     ep.scale.set(0.95, 0.85, 0.34); ep.position.set(-0.18, 0.11, 0.45); hd.add(ep);
   }
   if (o?.headphones) {
+    // squashed so the bottom of the hoop tucks inside the skull — a headband,
+    // not a halo
     const arc = new THREE.Mesh(G.ring, mat(INK, 0.4));
-    arc.scale.set(1.16, 1.16, 1); arc.position.y = 0.05; hd.add(arc);
+    arc.scale.set(1.16, 0.86, 1); arc.position.y = 0.06; hd.add(arc);
     for (const sx of [-1, 1]) {
       const cup = new THREE.Mesh(G.blob, mat(pick([0xff2fa0, 0x2fd8e8, 0xffd23f]), 0.5));
       cup.scale.set(1.1, 1.6, 1.4); cup.position.set(sx * 0.55, 0.02, 0); hd.add(cup);
@@ -431,7 +433,7 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   }
   if (o?.necklace) {
     const nk = new THREE.Mesh(G.ring, mat(GOLD, 0.3));
-    nk.rotation.x = Math.PI / 2; nk.scale.setScalar(0.62); nk.position.y = 2.36; g.add(nk);
+    nk.rotation.x = Math.PI / 2; nk.scale.setScalar(0.62); nk.position.y = 2.3; g.add(nk);
   }
   if (o?.lanyard) {
     const strap = new THREE.Mesh(G.plate, mat(0x2fb8a8, 0.9));

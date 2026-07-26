@@ -1043,7 +1043,12 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   }   // ← end of the Maple-only ground detail (roads, blocks, districts)
 
   const groundTex = new THREE.CanvasTexture(cv);
-  groundTex.anisotropy = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 4 : 16;
+  // 16 on phones too. At 4, ground receding from the camera turned to mush —
+  // the boardwalk planks and lane lines at the top of the screen were the
+  // "it's blurry when you start" report. Anisotropic filtering is cheap on any
+  // GPU shipped this decade and this is the single largest-area surface in the
+  // game, so it is the last place to economise.
+  groundTex.anisotropy = 16;
   groundTex.colorSpace = THREE.SRGBColorSpace;
 
   // ground plane (flat, cutout by texture alpha? no alpha here — we use the slab
