@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import type { Biome } from './island';
 import { SKINS, type Skin } from './palette';
-import { buildAccessory } from './void3d';
+import { buildAccessory, makeVoidBody, applySkinToBody } from './void3d';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; }
@@ -116,31 +116,18 @@ function rivalGlowTex(): THREE.CanvasTexture {
 }
 
 const rivalTexCache = new Map<string, THREE.Texture>();
+// every rival body material, so the shared shader's clock + jelly can be
+// driven once per frame (the wobble is what makes them feel ALIVE)
+const rivalMats: THREE.ShaderMaterial[] = [];
 function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh } {
   const color = sk.rim, glowCol = sk.glow;
   const group = new THREE.Group();
-  const whiteTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
-  whiteTex.needsUpdate = true;
-  // FULL skin gradient body — same 4-stop cute curve as the player hero, so a
-  // legendary rival actually LOOKS like its shop skin (King Void = rich gold
-  // orb, not a black hole with a yellow edge). Small dark heart, lit rim.
-  const bodyMat = new THREE.ShaderMaterial({
-    uniforms: {
-      uAbyss: { value: new THREE.Color(sk.abyss) }, uInner: { value: new THREE.Color(sk.inner) },
-      uMid: { value: new THREE.Color(sk.mid) }, uRim: { value: new THREE.Color(sk.rim) },
-      uTex: { value: whiteTex as THREE.Texture }, uTexAmt: { value: 0 },
-    },
-    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv;
-      void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.); vV=normalize(-mv.xyz); vUv=uv; gl_Position=projectionMatrix*mv; }`,
-    fragmentShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv;
-      uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform sampler2D uTex; uniform float uTexAmt;
-      void main(){ float d=clamp(dot(normalize(vN),normalize(vV)),0.,1.); float u=sqrt(max(0.,1.-d*d));
-        vec3 c = mix(uAbyss, uInner, smoothstep(0.0, 0.18, u));
-        c = mix(c, uMid, smoothstep(0.15, 0.52, u));
-        c = mix(c, uRim, smoothstep(0.55, 1.0, u));
-        if (uTexAmt > 0.01) { vec3 tc=texture2D(uTex, vUv).rgb; c=mix(c, tc*(0.34+0.9*u), uTexAmt); }
-        c+=uRim*pow(u,3.5)*0.4; gl_FragColor=vec4(c,1.); }`,
-  });
+  // THE SAME BODY THE HERO WEARS — jelly wobble, four-stop fresnel, character
+  // sheen and the hide pattern. The old two-stop tint is why the family read
+  // as flat blue stickers sitting next to a living orb.
+  const bodyMat = makeVoidBody();
+  applySkinToBody(bodyMat, sk);
+  rivalMats.push(bodyMat);
   if (sk.tex) {
     let t = rivalTexCache.get(sk.tex);
     if (!t) {
@@ -302,6 +289,14 @@ export function createRivals(
       });
     },
     update(dt, _t, px, pz, pr) {
+      // drive the SHARED void shader for every family body: the clock runs the
+      // jelly idle + nebula drift, and each rival's wobble decays after its
+      // own bites — they slosh when they swallow, exactly like the hero
+      for (let i = 0; i < rivalMats.length; i++) {
+        const u = rivalMats[i].uniforms;
+        u.uTime.value = _t;
+        u.uWobble.value = Math.max(0, (u.uWobble.value as number) - dt * 1.7);
+      }
       // rival-eaten props spiral down and shrink — cause and effect a kid can
       // SEE (they used to vanish in one frame, reading as a rendering bug)
       for (let i = shrinking.length - 1; i >= 0; i--) {
@@ -493,6 +488,8 @@ export function createRivals(
             rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
             rv.r = growR(rv.r, e.radius);
             rv.pulse = 1;   // visible gulp — the family EATS, not just exists
+            const bm = (rv.group.children[0] as THREE.Mesh)?.material as THREE.ShaderMaterial | undefined;
+            if (bm?.uniforms?.uWobble) bm.uniforms.uWobble.value = Math.min(1, (bm.uniforms.uWobble.value as number) + 0.6);
             if (e.radius > rv.r * 0.55 && rv.speakCd <= 0) {   // a BIG bite earns a taunt
               rv.speakCd = rand(9, 16);
               api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].taunt));

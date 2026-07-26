@@ -585,44 +585,65 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.setLineDash([]);
   g.strokeStyle = '#c7ccd6'; g.lineWidth = Math.max(1.5, (pxW(104) - pxW(0)) * 0.1); railPath(); g.stroke(); // rail sheen
 
-  // river SOURCE: a spring pool where the river begins (it used to dead-end
-  // into plain forest grass like a cut hose)
+  // ── RIVER, drawn as a real waterway ────────────────────────────────────
+  // It used to be straight lineTo segments with round caps, so short spans
+  // rendered as hard-edged PILLS and every bend was a visible kink. Now the
+  // channel follows a smoothed midpoint-quadratic curve (the same technique
+  // as the coastline), and the banks are layered wide-to-narrow with soft
+  // alpha so the water fades into the land instead of stamping onto it.
+  const riverPath = () => {
+    g.beginPath();
+    const P = RIVER;
+    g.moveTo(pxW(P[0][0]), pyW(P[0][1]));
+    for (let i = 1; i < P.length - 1; i++) {
+      const mx = (P[i][0] + P[i + 1][0]) / 2, my = (P[i][1] + P[i + 1][1]) / 2;
+      g.quadraticCurveTo(pxW(P[i][0]), pyW(P[i][1]), pxW(mx), pyW(my));
+    }
+    const L = P[P.length - 1];
+    g.lineTo(pxW(L[0]), pyW(L[1]));
+  };
+  const riverStroke = (col: string, w: number) => {
+    g.strokeStyle = col; g.lineWidth = pxW(w) - pxW(0);
+    riverPath(); g.stroke();
+  };
+  g.lineJoin = 'round'; g.lineCap = 'round';
+
+  // spring source: three offset lobes, so the head of the river reads as a
+  // pool seeping out of the forest rather than a stamped ellipse
   {
     const [sx2, sy2] = RIVER[0];
-    g.fillStyle = '#4d8aa0';
-    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(210) - pxW(0), pyW(170) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    for (const [ox, oy, rr, col] of [
+      [0, 0, 215, 'rgba(77,138,160,0.55)'], [-70, 40, 165, 'rgba(77,138,160,0.75)'],
+      [60, -30, 150, 'rgba(77,138,160,0.75)'],
+    ] as [number, number, number, string][]) {
+      g.fillStyle = col;
+      g.beginPath(); g.ellipse(pxW(sx2 + ox), pyW(sy2 + oy), pxW(rr) - pxW(0), pyW(rr * 0.8) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    }
     g.fillStyle = hex(WORLD.riverMid);
-    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(175) - pxW(0), pyW(138) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(150) - pxW(0), pyW(120) - pyW(0), 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = hex(WORLD.riverDeep);
-    g.beginPath(); g.ellipse(pxW(sx2), pyW(sy2), pxW(95) - pxW(0), pyW(75) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(pxW(sx2 - 10), pyW(sy2 + 8), pxW(82) - pxW(0), pyW(64) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   }
 
   // pond sand bank — UNDER the river so the channel flows over it
   g.fillStyle = 'rgba(230,212,148,0.9)';
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 46) - pxW(0), pyW(POND[2] + 46) - pyW(0), 0, 0, Math.PI * 2); g.fill();
-  // river — dark bank underlay first, then water, then a bright foam edge
-  g.strokeStyle = '#4d8aa0'; g.lineWidth = (pxW(144) - pxW(0)); g.lineJoin = 'round'; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
-  for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
-  g.stroke();
-  g.strokeStyle = hex(WORLD.riverMid); g.lineWidth = (pxW(124) - pxW(0));
-  g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
-  for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
-  g.stroke();
-  g.strokeStyle = hex(WORLD.riverDeep); g.lineWidth = (pxW(62) - pxW(0));
-  g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
-  for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
-  g.stroke();
-  g.strokeStyle = 'rgba(233,246,255,0.35)'; g.lineWidth = (pxW(128) - pxW(0));
-  g.setLineDash([pxW(90) - pxW(0), pxW(150) - pxW(0)]);
-  g.beginPath(); g.moveTo(pxW(RIVER[0][0]), pyW(RIVER[0][1]));
-  for (const [rx, ry] of RIVER) g.lineTo(pxW(rx), pyW(ry));
-  g.stroke(); g.setLineDash([]);
-  g.fillStyle = hex(WORLD.riverMid);
-  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = hex(WORLD.riverDeep);
-  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] * 0.55) - pxW(0), pyW(POND[2] * 0.55) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+
+  // banks: wide + translucent first so the edge dissolves, then the channel
+  riverStroke('rgba(120,170,150,0.30)', 196);    // damp grass fringe
+  riverStroke('rgba(214,206,166,0.45)', 168);    // wet sand shoulder
+  riverStroke('rgba(77,138,160,0.85)', 140);     // shallow bank
+  riverStroke(hex(WORLD.riverMid), 118);         // water
+  riverStroke(hex(WORLD.riverDeep), 58);         // deep channel
+  // foam sparkle: narrow and broken, riding the middle (was 128 wide — nearly
+  // the whole river, which washed the colour straight out of it)
+  g.strokeStyle = 'rgba(233,246,255,0.30)'; g.lineWidth = pxW(30) - pxW(0);
+  g.setLineDash([pxW(70) - pxW(0), pxW(210) - pxW(0)]);
+  riverPath(); g.stroke(); g.setLineDash([]);
+
   // pond water + deep centre — over the river so the junction reads as ONE body
+  g.fillStyle = 'rgba(77,138,160,0.8)';
+  g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2] + 22) - pxW(0), pyW(POND[2] + 22) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = hex(WORLD.riverMid);
   g.beginPath(); g.ellipse(pxW(POND[0]), pyW(POND[1]), pxW(POND[2]) - pxW(0), pyW(POND[2]) - pyW(0), 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = hex(WORLD.riverDeep);

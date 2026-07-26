@@ -31,6 +31,190 @@ export interface Void3D {
 }
 
 const RADIUS_SINK = 0.9;   // how much of the orb sits above ground (rest sinks)
+
+// ── ONE BODY FOR EVERY VOID ────────────────────────────────────────────────
+// The player and the family now render with the SAME material: the jelly
+// wobble, the four-stop fresnel, the character sheen and the hide pattern.
+// Rivals used to get a cut-down two-stop shader, which is exactly why they
+// read as flat stickers next to the hero.
+export function makeVoidBody(): THREE.ShaderMaterial {
+  const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  white.needsUpdate = true;
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uAbyss: { value: VOID_COL.abyss.clone() },
+      uInner: { value: new THREE.Color(VOID.bodyInner) },
+      uMid: { value: VOID_COL.bodyMid.clone() },
+      uRim: { value: VOID_COL.bodyRim.clone() },
+      uSwirl: { value: new THREE.Color(VOID.swirl) },
+      uTime: { value: 0 },
+      uTex: { value: white },
+      uTexAmt: { value: 0 },
+      uStars: { value: white },
+      uStarAmt: { value: 0 },
+      uStage: { value: 0 },
+      uWobble: { value: 0 },
+      uGloss: { value: 0 },
+      uPat: { value: 0 },
+      uPatCol: { value: new THREE.Color(0xffffff) },
+    },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
+      uniform float uTime; uniform float uWobble;
+      void main(){
+        vN = normalize(normalMatrix * normal);
+        // FLUID BODY: low-frequency jelly waves ride the surface — a faint
+        // liquid idle so the void never sits static, and a big slosh (uWobble)
+        // every time it absorbs something. The blob visibly digests its meals.
+        float wob =
+            sin(position.y * 3.1 + uTime * 5.0)
+          * sin(position.x * 2.6 - uTime * 4.1)
+          + 0.6 * sin((position.x + position.z) * 4.2 + uTime * 6.3);
+        vec3 pos = position * (1.0 + wob * (0.012 + uWobble * 0.06));
+        vec4 mv = modelViewMatrix * vec4(pos,1.0);
+        vView = normalize(-mv.xyz);
+        vObj = pos;
+        vUv = uv;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
+      uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
+      uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
+      uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
+      uniform float uPat; uniform vec3 uPatCol;
+      // cheap hash for star specks
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
+      // value noise for the HD nebula wisps (procedural — crisp at any zoom)
+      float vnoise(vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0)), d2 = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d2, f.x), f.y);
+      }
+      void main(){
+        // screen-space radius: 0 at disc centre, 1 at the silhouette. This
+        // reproduces the 2D canvas radial gradient (radial in screen space).
+        float d = clamp(dot(normalize(vN), normalize(vView)), 0.0, 1.0);
+        float u = sqrt(max(0.0, 1.0 - d * d));
+        // stops tuned CUTE: the dark heart is small, the visible disc reads as
+        // a bright plush purple that lifts quickly toward the lit rim
+        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.18, u));
+        col = mix(col, uMid, smoothstep(0.15, 0.52, u));
+        col = mix(col, uRim, smoothstep(0.55, 1.0, u));
+        col *= 1.0;
+        // premium skin: wrap the AI texture around the orb (slow drift), keep
+        // the darker core + lit rim so it still reads as a VOID
+        if (uTexAmt > 0.01) {
+          vec3 tc = texture2D(uTex, vec2(vUv.x + uTime * 0.012, vUv.y)).rgb;
+          col = mix(col, tc * (0.34 + 0.9 * u), uTexAmt);
+        }
+        // ✨ a real galaxy inside: AI starfield drifting slowly through the dark
+        // core, fading toward the lit rim so depth reads as "pit into space"
+        if (uStarAmt > 0.01) {
+          vec3 st = texture2D(uStars, vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003)).rgb;
+          col += st * st * uStarAmt * (1.0 - u) * 0.9;   // st*st: keep only the bright stars, drop the nebula haze
+        }
+        float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
+        // ☁️ HD nebula wisps: two octaves of drifting value noise in the dark
+        // core — the "living galaxy inside" reads at every zoom, no asset needed
+        vec2 np = vObj.xy * 2.6 + vec2(uTime * 0.05, -uTime * 0.03);
+        float neb = vnoise(np) * 0.6 + vnoise(np * 2.3 + 7.7) * 0.4;
+        neb = smoothstep(0.45, 0.85, neb);
+        col += mix(uInner, uSwirl, 0.6) * neb * (1.0 - u) * 0.35;
+        // luminous event-horizon rim-light — intensifies with each evolution
+        col += uRim * pow(u, 3.2) * (0.36 + uStage * 0.05);
+        // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
+        // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
+        vec3 iri = mix(uRim, vec3(1.0, 0.62, 0.9), 0.5 + 0.5 * sin(ang * 3.0 + uTime * 0.8));
+        col += iri * pow(u, 6.0) * 0.18;
+        // faint interior galaxy swirl (subtle, alive)
+        float sw = sin(ang * 2.0 + u * 7.0) * 0.5 + 0.5;
+        col += uSwirl * sw * (1.0 - u) * (0.06 + uStage * 0.015);
+        // glossy toy catchlight + soft opposite fill (the key-art polish)
+        vec3 L = normalize(vec3(-0.45, 0.74, 0.5));
+        float spec = pow(max(dot(normalize(vN), L), 0.0), 30.0);
+        col += vec3(1.0, 0.97, 1.0) * spec * 0.26;
+        // CHARACTER SHEEN: pearl/chrome legendaries get a hard wet highlight
+        // plus a wide soft one — this is what sells "expensive" at a glance
+        if (uGloss > 0.01) {
+          col += vec3(1.0) * pow(max(dot(normalize(vN), L), 0.0), 90.0) * uGloss * 0.9;
+          col += vec3(1.0, 0.98, 1.0) * pow(max(dot(normalize(vN), L), 0.0), 8.0) * uGloss * 0.14;
+        }
+        vec3 L2 = normalize(vec3(0.55, 0.28, 0.55));
+        col += vec3(0.82, 0.76, 1.0) * pow(max(dot(normalize(vN), L2), 0.0), 14.0) * 0.08;
+        // ✦ interior star specks — twinkling, concentrated toward the dark core
+        vec2 sc = vObj.xy * 12.0;
+        vec2 cell = floor(sc);
+        float h = hash(cell);
+        if (h > 0.93) {
+          vec2 f = fract(sc) - 0.5;
+          float dot2 = 1.0 - smoothstep(0.0, 0.18, length(f));
+          float tw = 0.4 + 0.6 * sin(uTime * 3.0 + h * 40.0);
+          col += vec3(0.95, 0.9, 1.0) * dot2 * tw * (1.0 - u * 0.55) * 1.1;
+        }
+        // second, finer star layer — HD depth (tiny fast twinkles between the big ones)
+        vec2 sc2 = vObj.xy * 26.0 + 3.7;
+        vec2 cell2 = floor(sc2);
+        float h2 = hash(cell2);
+        if (h2 > 0.955) {
+          vec2 f2 = fract(sc2) - 0.5;
+          float dot3 = 1.0 - smoothstep(0.0, 0.28, length(f2));
+          col += vec3(0.9, 0.85, 1.0) * dot3 * (0.5 + 0.5 * sin(uTime * 5.0 + h2 * 60.0)) * (1.0 - u) * 0.55;
+        }
+        // ── BODY PATTERN: the legendary's actual SKIN. This is what makes a
+        // character stop reading as "a purple ball wearing a costume" — the
+        // surface itself is scaled, plated, furred or full of stars.
+        if (uPat > 0.5) {
+          float shade = 0.0;
+          if (uPat < 1.5) {                       // SCALES — offset-row teardrops
+            vec2 g = vec2(vUv.x * 34.0, vUv.y * 18.0);
+            g.x += mod(floor(g.y), 2.0) * 0.5;
+            vec2 f = fract(g) - 0.5;
+            float dd = length(f * vec2(1.0, 1.25));
+            shade = smoothstep(0.46, 0.30, dd) * 0.55 + smoothstep(0.30, 0.46, dd) * 0.15;
+          } else if (uPat < 2.5) {                // CHROME — machined panel bands
+            float band = abs(fract(vUv.y * 9.0) - 0.5);
+            float seam = smoothstep(0.06, 0.0, band);
+            float rivet = step(0.86, hash(floor(vec2(vUv.x * 22.0, vUv.y * 9.0))));
+            shade = seam * 0.85 + rivet * 0.4;
+          } else if (uPat < 3.5) {                // FUR — fine directional strands
+            float st = vnoise(vec2(vUv.x * 120.0, vUv.y * 22.0));
+            shade = smoothstep(0.55, 0.9, st) * 0.5;
+          } else if (uPat < 4.5) {                // STARFIELD — a night sky for a hide
+            vec2 sc3 = vUv * vec2(60.0, 34.0);
+            float h3 = hash(floor(sc3));
+            float dot4 = h3 > 0.9 ? (1.0 - smoothstep(0.0, 0.34, length(fract(sc3) - 0.5))) : 0.0;
+            shade = dot4 * (0.6 + 0.4 * sin(uTime * 3.0 + h3 * 30.0)) * 1.6;
+          } else {                                // STITCH — cloth seams (ninja wrap)
+            float sew = abs(fract(vUv.y * 13.0 + vUv.x * 0.6) - 0.5);
+            shade = smoothstep(0.09, 0.0, sew) * step(0.45, fract(vUv.x * 46.0)) * 0.7;
+          }
+          // patterns fade toward the silhouette so the fresnel read survives
+          col = mix(col, uPatCol, shade * (1.0 - u * 0.55));
+        }
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+  });
+}
+
+// paint a skin's identity onto any void body (player or family)
+export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
+  m.uniforms.uAbyss.value.set(s.abyss);
+  m.uniforms.uInner.value.set(s.inner);
+  m.uniforms.uMid.value.set(s.mid);
+  m.uniforms.uRim.value.set(s.rim);
+  m.uniforms.uSwirl.value.set(s.glow);
+  const ch = s.char;
+  m.uniforms.uGloss.value = ch?.gloss ?? 0;
+  const PAT: Record<string, number> = { scales: 1, chrome: 2, fur: 3, starfield: 4, stitch: 5 };
+  m.uniforms.uPat.value = ch?.pattern ? PAT[ch.pattern] : 0;
+  if (ch?.patCol) m.uniforms.uPatCol.value.set(ch.patCol);
+}
+
 const texCache = new Map<string, THREE.Texture>();   // premium skin textures
 
 export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
