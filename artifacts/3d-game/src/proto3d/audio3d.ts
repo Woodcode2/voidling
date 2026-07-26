@@ -343,16 +343,63 @@ export function createAudio(): Audio3D {
     o.connect(g); g.connect(dest);
     o.start(t); o.stop(t + dur + 0.03);
   }
-  // STEEL PAN — the sound of the whole level. A struck pan is a strong
-  // fundamental, a loud ringing octave and a slightly-sharp metallic partial
-  // (2.76x, not a clean harmonic — that inharmonicity is what says "metal"),
-  // finished with a tiny mallet tap so it reads as HIT rather than as a bleep.
+  // Percussion runs through STATIC filters that are built once per destination
+  // bus and left connected, so a shaker hit costs a source + an envelope and
+  // nothing else. Four filters per bus, three buses — not four filters a hit,
+  // eight times a bar, for three and a half minutes.
+  interface FxSet { shaker: BiquadFilterNode; hat: BiquadFilterNode; mallet: BiquadFilterNode; click: BiquadFilterNode }
+  const fxCache = new Map<AudioNode, FxSet>();
+  function fxFor(dest: AudioNode): FxSet | null {
+    const c = ctx; if (!c) return null;
+    let f = fxCache.get(dest);
+    if (!f) {
+      const mk = (type: BiquadFilterType, freq: number, q: number) => {
+        const b = c.createBiquadFilter(); b.type = type; b.frequency.value = freq; b.Q.value = q; b.connect(dest); return b;
+      };
+      f = { shaker: mk('highpass', 6800, 0.7), hat: mk('highpass', 8600, 0.7), mallet: mk('bandpass', 3400, 1.1), click: mk('lowpass', 2200, 0.7) };
+      fxCache.set(dest, f);
+    }
+    return f;
+  }
+  // a noise burst straight into a pre-built filter: two nodes, both short-lived
+  function nEnv(dest: AudioNode | null, t: number, dur: number, vol: number, attack = 0.003) {
+    const c = ctx; if (!c || !dest || vol <= 0) return;
+    const src = c.createBufferSource(); src.buffer = white(c); src.loop = true;
+    src.playbackRate.value = 0.85 + Math.random() * 0.3;
+    const g = c.createGain();
+    const atk = Math.min(attack, dur * 0.5);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + atk);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+    src.connect(g); g.connect(dest);
+    src.start(t, Math.random() * 1.4); src.stop(t + dur + 0.03);
+  }
+  // STEEL PAN — the sound of the whole level. The body is a PeriodicWave with
+  // the pan's partial mix baked in (one oscillator, not five), and the two
+  // things that stop it sounding like an organ ride on top: a slightly-sharp
+  // 2.76x partial — inharmonic, which is what the ear reads as METAL — and a
+  // mallet tap so it reads as struck rather than as a bleep.
+  let panWave: PeriodicWave | null = null;
   function pan(dest: AudioNode, freq: number, t: number, dur: number, vol: number, bright = 1) {
     const c = ctx; if (!c || freq <= 0) return;
-    dTone(dest, t, dur, 'sine', vol, freq, 0, 0, 0.005);
-    dTone(dest, t, dur * 0.55, 'sine', vol * 0.44 * bright, freq * 2, 0, 0, 0.004);
-    if (bright > 0.5) dTone(dest, t, dur * 0.3, 'sine', vol * 0.17 * bright, freq * 2.76, 0, 0, 0.003);
-    nHit(dest, t, 0.028, vol * 0.42, 'bandpass', 3400, 1.1);
+    if (!panWave) {
+      panWave = c.createPeriodicWave(
+        new Float32Array([0, 0, 0, 0, 0, 0, 0]),
+        new Float32Array([0, 1, 0.55, 0.2, 0.3, 0.07, 0.1]),
+      );
+    }
+    const o = c.createOscillator(); o.setPeriodicWave(panWave);
+    o.frequency.setValueAtTime(freq, t);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.03);
+    if (bright > 0.5) {
+      dTone(dest, t, dur * 0.3, 'sine', vol * 0.18, freq * 2.76, 0, 0, 0.003);
+      nEnv(fxFor(dest)?.mallet ?? null, t, 0.028, vol * 0.45);
+    }
   }
   // MARIMBA — wooden and dry: fundamental plus the 4th harmonic (two octaves
   // up), which is the bar's signature partial, and a very fast decay.
@@ -364,11 +411,10 @@ export function createAudio(): Audio3D {
     dTone(dest, t, 0.13, 'sine', vol, 145, 46, 0, 0.004);
   }
   function shaker(dest: AudioNode, t: number, vol: number) {
-    nHit(dest, t, 0.055, vol, 'highpass', 6800, 0.7);
+    nEnv(fxFor(dest)?.shaker ?? null, t, 0.055, vol);
   }
   function conga(dest: AudioNode, t: number, freq: number, vol: number) {
     dTone(dest, t, 0.16, 'sine', vol, freq, freq * 0.72, 0, 0.004);
-    nHit(dest, t, 0.04, vol * 0.35, 'bandpass', freq * 4, 1.4);
   }
   // the off-beat SKANK: all three chord tones share one fast envelope, which is
   // what makes it a stab and not a pad. One gain, three oscillators.
@@ -404,11 +450,13 @@ export function createAudio(): Audio3D {
   let pirTimer: ReturnType<typeof setInterval> | null = null;
   let pirRunning = false;
   let pirStep = 0, pirNextT = 0, ambNextT = 0;
+  let pirDelay: DelayNode | null = null, pirDelayStage = -1;
   function buildTropicalBus(c: AudioContext): GainNode {
     const bus = c.createGain(); bus.gain.value = 0.0001;
     const warm = c.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 4600; warm.Q.value = 0.4;
     const dry = c.createGain(); dry.gain.value = 0.88;
-    const delay = c.createDelay(1.0); delay.delayTime.value = 0.43;   // ~dotted 8th at 105bpm
+    const delay = c.createDelay(1.0); delay.delayTime.value = 0.45;   // dotted 8th at 100bpm
+    pirDelay = delay;
     const fb = c.createGain(); fb.gain.value = 0.3;
     const wet = c.createGain(); wet.gain.value = 0.22;
     const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 2600;
@@ -440,7 +488,12 @@ export function createAudio(): Audio3D {
   // ── place layers ──────────────────────────────────────────────────────────
   type ZoneId = 'party' | 'port' | 'jungle' | 'beach';
   interface ZoneLayer { g: GainNode; vol: number; on: boolean; until: number }
-  const ZONE_VOL: Record<ZoneId, number> = { party: 1.0, port: 0.5, jungle: 0.45, beach: 0.5 };
+  // Levels are set RELATIVE TO THE BED, which runs at PIR_VOL (0.27) — that is
+  // the whole mix decision. The dance floor is allowed to be roughly twice the
+  // bed's bass; every other district is a fifth of it, i.e. something you'd
+  // only notice if you stopped and listened. Phone speakers are small and the
+  // music is the star.
+  const ZONE_VOL: Record<ZoneId, number> = { party: 0.34, port: 0.16, jungle: 0.16, beach: 0.16 };
   const ZONE_FADE = 0.6;
   const zones: Partial<Record<ZoneId, ZoneLayer>> = {};
   let curZone: ZoneId | null = null;
@@ -498,18 +551,18 @@ export function createAudio(): Audio3D {
   // Everything crossfades — a hard cut between the bay and the dance floor
   // would feel like a bug. The bed also ducks under the party so stepping onto
   // the floor is an EVENT.
-  function applyZones() {
+  function applyZones(fade = ZONE_FADE) {
     const c = ctx; if (!c || !master) return;
     const now = c.currentTime;
     for (const k of Object.keys(zones) as ZoneId[]) {
       const z = zones[k]!;
-      if (k !== curZone && z.on) { z.on = false; z.until = now + ZONE_FADE; ramp(z.g.gain, 0, now, ZONE_FADE); }
+      if (k !== curZone && z.on) { z.on = false; z.until = now + fade; ramp(z.g.gain, 0, now, fade); }
     }
     if (curZone && pirRunning) {
       const z = zoneLayer(c, curZone);
-      if (!z.on) { z.on = true; z.until = 0; ramp(z.g.gain, z.vol, now, ZONE_FADE); }
+      if (!z.on) { z.on = true; z.until = 0; ramp(z.g.gain, z.vol, now, fade); }
     }
-    if (pirBus) ramp(pirBus.gain, pirRunning ? (curZone === 'party' ? PIR_VOL * 0.5 : PIR_VOL) : 0, now, ZONE_FADE);
+    if (pirBus) ramp(pirBus.gain, pirRunning ? (curZone === 'party' ? PIR_VOL * 0.5 : PIR_VOL) : 0, now, fade);
   }
 
   // ── ambience: gulls, surf, a far-off bell ─────────────────────────────────
@@ -537,7 +590,7 @@ export function createAudio(): Audio3D {
   }
   function surfSwell(t: number) {
     if (!ambGain) return;
-    nHit(ambGain, t, 2.6, 0.07, 'lowpass', 900, 0.5, 240, 0.7);
+    nHit(ambGain, t, 2.6, 0.05, 'lowpass', 900, 0.5, 240, 0.7);
   }
   function ropeCreak(t: number) {
     if (!ambGain) return;
@@ -581,52 +634,58 @@ export function createAudio(): Audio3D {
     const spb = 60 / (100 + st * 5);
     const s16 = spb / 4;
     const now = c.currentTime;
+    // keep the echo a dotted eighth as the tempo climbs — glided, not jumped,
+    // so it slurs like tape instead of clicking. Four times a match, no alloc.
+    if (pirDelay && st !== pirDelayStage) {
+      pirDelayStage = st;
+      pirDelay.delayTime.setTargetAtTime(spb * 0.75, now, 0.35);
+    }
     if (pirNextT < now) pirNextT = now + 0.05;
     while (pirNextT < now + 0.35) {
       const t = pirNextT;
       const bar = (pirStep >> 4) & 3, s = pirStep & 15;
       const beat = (pirStep >> 2) & 15;   // melody index: one note per beat, 4 bars
       const ch = P_CHORD[bar];
+      // On the dance floor the bed is ducked to half and the floor brings its
+      // own kit — so the bed's percussion is DROPPED rather than buried. Fewer
+      // voices AND a cleaner mix from the same decision.
+      const floor = zoneLive('party', t);
 
       // BASS — root on the one, a lazy push on the "and of 3". That push is
       // the whole tropical feel; a bass on every beat would read as marching.
       if (s === 0) pBass(pirBus, t, P_BASS[bar], spb * 1.5, 0.17);
       if (s === 10) pBass(pirBus, t, P_BASS[bar], spb * 0.55, 0.12);
       if (st >= 2 && s === 6) pBass(pirBus, t, P_BASS[bar] * 1.5, spb * 0.4, 0.08);
-      if (st >= 3 && s === 14) pBass(pirBus, t, P_BASS[bar] * 2, spb * 0.4, 0.07);
       // soft kick on 1 and 3 — a heartbeat, not a club
-      if (s === 0 || s === 8) pKick(pirBus, t, 0.15);
+      if (!floor && (s === 0 || s === 8)) pKick(pirBus, t, 0.15);
       // PAD: one warm swell a bar. This is the "expensive" in the brief —
       // the resort's air conditioning, basically.
       if (s === 0) for (const f of ch) dTone(pirBus, t, spb * 3.6, 'sine', 0.024, f, 0, 0, 0.09);
       // SKANK: the off-beat chord stab, every "and"
       if ((s & 3) === 2) skank(pirBus, t, ch, 0.05 + st * 0.008, s16 * 1.3);
       // SHAKER: off-beats only until stage 2, then straight 8ths with accents
-      if (st >= 2 ? (s & 1) === 0 : (s & 3) === 2) shaker(pirBus, t, (s & 3) === 2 ? 0.032 : 0.016);
+      if (!floor && (st >= 2 ? (s & 1) === 0 : (s & 3) === 2)) shaker(pirBus, t, (s & 3) === 2 ? 0.032 : 0.016);
       // STEEL PAN HOOK — the tune arrives with the first evolution
-      if (st >= 1 && (s & 3) === 0 && P_MEL[beat] > 0) {
-        pan(pirBus, P_MEL[beat], t, s16 * 3, 0.07);
-        if (st >= 3) pan(pirBus, P_MEL[beat] * 2, t, s16 * 1.6, 0.022, 0.4);
-      }
+      if (st >= 1 && (s & 3) === 0 && P_MEL[beat] > 0) pan(pirBus, P_MEL[beat], t, s16 * 3, 0.07);
       // MARIMBA counter-line answers the pans in the gaps
       if (st >= 2 && (s === 6 || s === 14)) marimba(pirBus, P_CNTR[bar][s === 6 ? 0 : 1], t, s16 * 2, 0.04);
       // CONGAS + a bright bell turnaround: stage 3 is BUSIER, never darker
       if (st >= 3) {
-        if (s === 7) conga(pirBus, t, 310, 0.07);
-        if (s === 11) conga(pirBus, t, 205, 0.08);
-        if (s === 15) conga(pirBus, t, 380, 0.06);
+        if (!floor && s === 7) conga(pirBus, t, 310, 0.07);
+        if (!floor && s === 11) conga(pirBus, t, 205, 0.08);
+        if (!floor && s === 15) conga(pirBus, t, 380, 0.06);
         if (bar === 3 && s === 12) P_BELL.forEach((f, i) => pan(pirBus!, f, t + i * s16 * 0.5, 0.5, 0.05, 0.6));
       }
 
       // ── DANCE COVE: the floor's own beat, mixed into the party zone bus ───
-      if (zoneLive('party', t)) {
+      if (floor) {
         const pg = zones.party!.g;
-        if ((s & 3) === 0) { pKick(pg, t, 0.3); nHit(pg, t, 0.014, 0.09, 'lowpass', 2400, 0.7); }
+        const pf = fxFor(pg);
+        if ((s & 3) === 0) { pKick(pg, t, 0.3); nEnv(pf?.click ?? null, t, 0.014, 0.09); }
         if ((s & 3) === 2) {
           skank(pg, t, [ch[0] * 2, ch[1] * 2, ch[2] * 2], 0.055, s16 * 1.5);   // filtered stab
-          nHit(pg, t, 0.06, 0.05, 'highpass', 7600, 0.7);                      // open hat
-        }
-        if ((s & 1) === 0 && (s & 3) !== 2) nHit(pg, t, 0.03, 0.022, 'highpass', 9000, 0.7);
+          nEnv(pf?.hat ?? null, t, 0.06, 0.05);                                // open hat
+        } else if ((s & 1) === 0) nEnv(pf?.hat ?? null, t, 0.03, 0.02);        // closed hat
         if (s === 4 || s === 12) pBass(pg, t, P_BASS[bar], s16 * 1.4, 0.1);
         if (bar === 3 && s === 14) nHit(pg, t, 1.1, 0.09, 'bandpass', 1100, 0.5, 1800, 0.25);   // crowd woo
       }
@@ -640,9 +699,11 @@ export function createAudio(): Audio3D {
     if (!pirBus) pirBus = buildTropicalBus(c);
     if (!ambGain) { ambGain = c.createGain(); ambGain.gain.value = 0.0001; ambGain.connect(master); }
     pirRunning = true;
-    ramp(ambGain.gain, 0.75, c.currentTime, 1.6);
+    ramp(ambGain.gain, 0.45, c.currentTime, 1.6);
     pirStep = 0; pirNextT = c.currentTime + 0.12; ambNextT = 0;
-    applyZones();   // also fades pirBus in to the right level for the district
+    // the match opens on a 1.5s swell, not a switch flick; after this every
+    // zone change rides the shorter 0.6s crossfade
+    applyZones(1.5);
     if (pirTimer) clearInterval(pirTimer);
     pirTimer = setInterval(pirSchedule, 110);
   }
@@ -689,8 +750,8 @@ export function createAudio(): Audio3D {
   function pirateEvolve() {
     const c = ensure(); if (!c || !master) return;
     const t = c.currentTime;
-    panRun(t, [349.23, 440.00, 523.25, 698.46], 0.075, 0.16, 0.55);   // F A C F, up
-    pan(master, 880.00, t + 0.34, 1.0, 0.11);
+    panRun(t, [349.23, 440.00, 523.25, 698.46], 0.075, 0.19, 0.55);   // F A C F, up
+    pan(master, 880.00, t + 0.34, 1.0, 0.13);
     nHit(master, t + 0.28, 0.45, 0.05, 'highpass', 5600, 0.7, 9000, 0.12);   // shaker flourish
     if (curZone === 'party') cheer(t + 0.1, 0.55);
   }
@@ -751,9 +812,9 @@ export function createAudio(): Audio3D {
       const t = c.currentTime;
       const k = String(kind).toLowerCase();
       if (k.includes('dance') || k.includes('party')) {
-        airhorn(t, 0.16);
-        cheer(t + 0.12, 0.8);
-        panRun(t + 0.5, [523.25, 587.33, 698.46, 880.00], 0.09, 0.14, 0.5);
+        airhorn(t, 0.13);
+        cheer(t + 0.12, 0.55);
+        panRun(t + 0.5, [523.25, 587.33, 698.46, 880.00], 0.09, 0.16, 0.5);
       } else if (k.includes('treasure') || k.includes('feast')) {
         panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00], 0.08, 0.15, 0.6);
         pan(master, 1046.5, t + 0.44, 1.2, 0.1);
@@ -847,10 +908,10 @@ export function createAudio(): Audio3D {
         // crowd. The match ends on a beach, not a scoreboard.
         const c = ensure(); if (!c || !master) return;
         const t = c.currentTime;
-        panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00, 1046.5], 0.11, 0.15, 0.7);
-        pan(master, 1396.91, t + 0.68, 1.4, 0.09);
+        panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00, 1046.5], 0.11, 0.18, 0.7);
+        pan(master, 1396.91, t + 0.68, 1.4, 0.1);
         nHit(master, t, 0.9, 0.045, 'highpass', 5000, 0.7, 9500, 0.5);
-        cheer(t + 0.25, 0.9);
+        cheer(t + 0.25, 0.7);
         return;
       }
       if (sample('win_warm.wav', 0.55)) return;

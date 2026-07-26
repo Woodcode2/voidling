@@ -187,13 +187,15 @@ const LAND_BOX = (() => {
 // sand BETWEEN the districts, which a per-region scatter can never reach.
 // band: optional [minDistToCoast, maxDistToCoast] so a caller can ask for
 // "the shoreline" or "well inland" without hand-authoring a polygon.
-export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [number, number]): Pt[] {
+export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [number, number], o?: ScatterOpts): Pt[] {
   const [minX, maxX, minY, maxY] = LAND_BOX;
   const out: Pt[] = [];
   for (let tries = 0; tries < n * 90 && out.length < n; tries++) {
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
     if (!bayPlaceable(x, y, clear)) continue;
     if (band) { const d = distToCoast(x, y); if (d < band[0] || d > band[1]) continue; }
+    if (!passes(x, y, o)) continue;
+    take(x, y, o);
     out.push([x, y]);
   }
   return out;
@@ -201,19 +203,71 @@ export function scatterLand(n: number, rnd: () => number, clear = 40, band?: [nu
 
 // a clump around a point — groves and rock piles read far better than an even
 // dusting when you are looking straight down at them
-export function clusterAt(cx: number, cy: number, n: number, radius: number, rnd: () => number, clear = 30): Pt[] {
+export function clusterAt(cx: number, cy: number, n: number, radius: number, rnd: () => number, clear = 30, o?: ScatterOpts): Pt[] {
   const out: Pt[] = [];
   for (let tries = 0; tries < n * 40 && out.length < n; tries++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * radius;
     const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
     if (!bayPlaceable(x, y, clear)) continue;
+    if (!passes(x, y, o)) continue;
+    take(x, y, o);
     out.push([x, y]);
   }
   return out;
 }
 
+// ── prop separation ────────────────────────────────────────────────────────
+// Nothing used to stop two scatter passes landing a cabana inside a palm, or
+// four thatch huts inside each other: bayPlaceable only knew about the
+// coastline and the paths. A measured audit found 125 pairs of large props
+// overlapping by more than 45% of their eat radii. Every scatter now claims
+// the ground it uses in a coarse spatial hash and refuses to sample on top of
+// something already there.
+const CELL = 400;                       // world units; a 3D radius of 10 is 200 world
+interface Claim { x: number; y: number; r: number; }
+const claims = new Map<string, Claim[]>();
+const cellKey = (x: number, y: number) => `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
+
+export function resetPlacement(): void { claims.clear(); }
+
+/** rWorld is the prop's footprint in WORLD units (3D radius × 20). */
+export function spotFree(x: number, y: number, rWorld: number): boolean {
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  const reach = Math.ceil((rWorld + 260) / CELL);
+  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
+    const bucket = claims.get(`${cx + i},${cy + j}`);
+    if (!bucket) continue;
+    for (const c of bucket) {
+      const need = (c.r + rWorld) * 0.82;   // allow a little interlock; forbid burial
+      const dx = c.x - x, dy = c.y - y;
+      if (dx * dx + dy * dy < need * need) return false;
+    }
+  }
+  return true;
+}
+export function claimSpot(x: number, y: number, rWorld: number): void {
+  const k = cellKey(x, y);
+  const bucket = claims.get(k);
+  if (bucket) bucket.push({ x, y, r: rWorld }); else claims.set(k, [{ x, y, r: rWorld }]);
+}
+
+export interface ScatterOpts {
+  /** the prop's 3D edible radius — enables overlap rejection when set */
+  sep?: number;
+  /** districts this prop may NOT land in (beach clutter belongs on the beach) */
+  avoid?: BayBiome[];
+}
+const passes = (x: number, y: number, o?: ScatterOpts): boolean => {
+  if (o?.avoid?.length) { const d = bayDistrictAt(x, y); if (d && o.avoid.includes(d)) return false; }
+  if (o?.sep !== undefined && !spotFree(x, y, o.sep * 20)) return false;
+  return true;
+};
+const take = (x: number, y: number, o?: ScatterOpts): void => {
+  if (o?.sep !== undefined) claimSpot(x, y, o.sep * 20);
+};
+
 // rejection-sample N legal points inside a region — organic scatter, no grid
-export function scatterInRegion(r: BayRegion, n: number, rnd: () => number, clear = 40): Pt[] {
+export function scatterInRegion(r: BayRegion, n: number, rnd: () => number, clear = 40, o?: ScatterOpts): Pt[] {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const [x, y] of r.poly) {
     minX = Math.min(minX, x); maxX = Math.max(maxX, x);
@@ -224,6 +278,8 @@ export function scatterInRegion(r: BayRegion, n: number, rnd: () => number, clea
     const x = minX + rnd() * (maxX - minX), y = minY + rnd() * (maxY - minY);
     if (!pointInPoly(x, y, r.poly)) continue;
     if (!bayPlaceable(x, y, clear)) continue;
+    if (!passes(x, y, o)) continue;
+    take(x, y, o);
     out.push([x, y]);
   }
   return out;

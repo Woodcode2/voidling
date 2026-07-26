@@ -256,7 +256,8 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
     // PIRATE BAY districts — real region centroids, not Maple grid blocks
     port: [71, -146], oldtown: [-5.8, -185], resort: [141.4, -28.6], party: [71, 224.4],
     market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6],
-    bay: [45, 75] };   // debug: drop INTO the bay to exercise the water-escape
+    bay: [45, 75],   // debug: drop INTO the bay to exercise the water-escape
+    axis: [128, -101], marina: [126, -28], stage: [70, 219] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -1573,6 +1574,7 @@ function animate() {
           audio.evolve(); buzz(35);
           fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
           fx.flash(bt.flash, 0.35);
+      audio.matchBeat(bt.banner);   // happy hour / dance party / treasure feast each get their own sting
         }
       }
       if (feverT > 0) {
@@ -1916,6 +1918,10 @@ function animate() {
   // NEVER downgrade: the growth-law clamp can pull radius back under a form
   // threshold the frame after evolving — re-announcing the same form forever
   voidling.setStage(curStage);
+
+  // the soundtrack follows you: standing on the dance floor brings in the kick,
+  // the stab and the crowd, and ducks the island bed under them
+  if (started) audio.setZone(island.biomeAt(voidState.x, voidState.z));
 
   // combo decays when you stop eating
   comboT -= dt; if (comboT <= 0) combo = 0;

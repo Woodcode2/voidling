@@ -10,6 +10,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
 import * as BAY from './bay';
+import * as LUXE from './luxe';
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
   // ── PIRATE BAY (world 2): a world-class tropical resort with a buccaneer
@@ -355,7 +356,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       g.restore();
     }
     const DCOL: Record<string, string> = {
-      port: '#9c7440', oldtown: '#cf8058', resort: '#ffcf8a', party: '#5e2f72',
+      port: '#b58a52', oldtown: '#e6d9c4', resort: '#ffcf8a', party: '#5e2f72',
       beach: '#ffe6a8', cove: '#c39a4e', jungle: '#2f7a4a', market: '#e5a942',
     };
     // 3. THE BAY — sheltered water carved out, with a shallow shelf + foam
@@ -1554,10 +1555,13 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   return g;
 }
-export function mergedProp(parts: THREE.BufferGeometry[]): THREE.Mesh {
+// unlit accent material: anything merged with this ignores the lighting, which
+// is the only way a neon strip reads as neon on the dark dance floor
+export const PROP_GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true });
+export function mergedProp(parts: THREE.BufferGeometry[], mat: THREE.Material = PROP_SHARED_MAT): THREE.Mesh {
   const merged = mergeGeometries(parts, false)!;
   parts.forEach((pg) => pg.dispose());
-  return new THREE.Mesh(merged, PROP_SHARED_MAT);
+  return new THREE.Mesh(merged, mat);
 }
 
 function makeTree(): THREE.Group {
@@ -1590,6 +1594,35 @@ function makePine(): THREE.Group {
 // Every district needed a silhouette you can see from across the island and
 // a genuinely big meal at the end of it. Small props alone made the map read
 // flat from the top-down camera; these are the things you aim yourself at.
+function makeArrivalArch(): THREE.Group {
+  // THE thing the resort lacked: an arrival. A cream-and-teal arch straddling
+  // the boardwalk, gold finials, PIRATE BAY RESORT lettering implied by a
+  // carved sign board. Repeating this palette down the axis is what makes the
+  // district read as one designed place instead of a scatter.
+  const CREAM = 0xfdf3de, TEAL = 0x2fb8a8, GOLD = 0xf0c050;
+  const parts: THREE.BufferGeometry[] = [];
+  for (const sx of [-1, 1]) {
+    parts.push(part(new THREE.BoxGeometry(3.4, 2, 3.4), 0xe8dcc0, sx * 9, 1, 0));      // plinth
+    parts.push(part(new THREE.CylinderGeometry(1.15, 1.35, 11, 12), CREAM, sx * 9, 7.5, 0));
+    parts.push(part(new THREE.CylinderGeometry(1.5, 1.5, 0.8, 12), GOLD, sx * 9, 13.3, 0));
+    parts.push(part(new THREE.SphereGeometry(1.0, 12, 10), GOLD, sx * 9, 14.2, 0));     // finial
+    for (let k = 0; k < 5; k++) parts.push(part(new THREE.TorusGeometry(1.22, 0.07, 5, 14), TEAL, sx * 9, 3.4 + k * 2, 0, Math.PI / 2));
+  }
+  // the span: a shallow arc of blocks, not a lintel
+  for (let i = 0; i < 11; i++) {
+    const t = (i / 10) * 2 - 1;
+    parts.push(part(new THREE.BoxGeometry(1.75, 1.5, 3.0), i % 2 ? CREAM : 0xf4ead2, t * 9, 14.4 - t * t * 1.9, 0, 0, 0, -t * 0.2));
+  }
+  parts.push(part(new THREE.BoxGeometry(11, 2.4, 0.5), TEAL, 0, 16.6, 1.1));            // sign board
+  parts.push(part(new THREE.BoxGeometry(11.6, 0.45, 0.7), GOLD, 0, 17.9, 1.15));
+  parts.push(part(new THREE.BoxGeometry(11.6, 0.45, 0.7), GOLD, 0, 15.35, 1.15));
+  for (let i = 0; i < 7; i++) parts.push(part(new THREE.BoxGeometry(0.85, 1.0, 0.16), CREAM, -4.2 + i * 1.4, 16.6, 1.42));
+  // pennants along the span
+  for (let i = 0; i < 6; i++) {
+    parts.push(part(new THREE.ConeGeometry(0.42, 1.5, 3), [0xff6a5e, 0x4dd0e1, GOLD][i % 3], -6 + i * 2.4, 13.2, -1.5, Math.PI));
+  }
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
 function makeGrandHotel(): THREE.Group {
   // THE ROYAL MARINER — a colonial resort hotel, three storeys of cream with
   // a teal roof, a portico, and balconies that catch the sun
@@ -1617,15 +1650,17 @@ function makeGrandHotel(): THREE.Group {
 function makeFort(): THREE.Group {
   // OLD TOWN's stone fort: a battlemented drum with cannons and a flag
   const parts = [
-    part(new THREE.CylinderGeometry(11, 12.5, 3, 10), 0x9aa2ab, 0, 1.5, 0),      // rampart base
-    part(new THREE.CylinderGeometry(10, 10.6, 7, 10), 0xb4bcc4, 0, 6.5, 0),      // wall
-    part(new THREE.CylinderGeometry(11.2, 11.2, 1.2, 10), 0xa6aeb8, 0, 10.6, 0), // walk
-    part(new THREE.CylinderGeometry(5, 5.4, 9, 8), 0xc2c9d0, 0, 14, 0),          // keep
-    part(new THREE.ConeGeometry(6, 4, 8), 0xd85a5a, 0, 20.5, 0),                 // keep roof
+    // a CARIBBEAN fort — bone-white coral stone, deep coral roofs, gold trim.
+    // The first pass was a grey Welsh castle on muddy terracotta.
+    part(new THREE.CylinderGeometry(11, 12.5, 3, 10), 0xe0d6c0, 0, 1.5, 0),      // rampart base
+    part(new THREE.CylinderGeometry(10, 10.6, 7, 10), 0xf0e8d8, 0, 6.5, 0),      // wall
+    part(new THREE.CylinderGeometry(11.2, 11.2, 1.2, 10), 0xd8ccb4, 0, 10.6, 0), // walk
+    part(new THREE.CylinderGeometry(5, 5.4, 9, 8), 0xfdf3de, 0, 14, 0),          // keep
+    part(new THREE.ConeGeometry(6, 4, 8), 0xe8604d, 0, 20.5, 0),                 // keep roof
   ];
   for (let i = 0; i < 12; i++) {                                                 // merlons
     const a = (i / 12) * Math.PI * 2;
-    parts.push(part(new THREE.BoxGeometry(2.4, 2.2, 1.6), 0xc2c9d0,
+    parts.push(part(new THREE.BoxGeometry(2.4, 2.2, 1.6), 0xfdf3de,
       Math.cos(a) * 10.6, 12.2, Math.sin(a) * 10.6, 0, -a));
   }
   for (let i = 0; i < 4; i++) {                                                  // cannons on the walk
@@ -1664,12 +1699,12 @@ function makeJungleTemple(): THREE.Group {
   const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 5; i++) {
     const w2 = 20 - i * 3.2;
-    parts.push(part(new THREE.BoxGeometry(w2, 2.6, w2), i % 2 ? 0x8e9a86 : 0x9caa92, 0, 1.3 + i * 2.6, 0));
+    parts.push(part(new THREE.BoxGeometry(w2, 2.6, w2), i % 2 ? 0xe8ddc4 : 0xd6c9ac, 0, 1.3 + i * 2.6, 0));
   }
-  parts.push(part(new THREE.BoxGeometry(6, 5, 6), 0x7e8a78, 0, 15.5, 0));            // shrine
-  parts.push(part(new THREE.ConeGeometry(4.6, 3.4, 4), 0x6e7a6a, 0, 19.7, 0, 0, Math.PI / 4));
+  parts.push(part(new THREE.BoxGeometry(6, 5, 6), 0xd8ccb0, 0, 15.5, 0));            // shrine
+  parts.push(part(new THREE.ConeGeometry(4.6, 3.4, 4), 0xc0b294, 0, 19.7, 0, 0, Math.PI / 4));
   // the stair up the south face
-  for (let i = 0; i < 11; i++) parts.push(part(new THREE.BoxGeometry(5, 1.2, 1.3), 0xb4bfa8, 0, 0.6 + i * 1.18, 9.6 - i * 0.78));
+  for (let i = 0; i < 11; i++) parts.push(part(new THREE.BoxGeometry(5, 1.2, 1.3), 0xf2e8d2, 0, 0.6 + i * 1.18, 9.6 - i * 0.78));
   // vines and moss
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2, r2 = 7 + Math.random() * 3;
@@ -1677,10 +1712,10 @@ function makeJungleTemple(): THREE.Group {
   }
   // two guardian torch bowls + the idol
   for (const sx of [-1, 1]) {
-    parts.push(part(new THREE.CylinderGeometry(0.8, 1.1, 3, 7), 0x7e8a78, sx * 6, 14.5, 6));
+    parts.push(part(new THREE.CylinderGeometry(0.8, 1.1, 3, 7), 0xd8ccb0, sx * 6, 14.5, 6));
     parts.push(part(new THREE.SphereGeometry(1, 8, 6), 0xff8a3a, sx * 6, 16.6, 6));
   }
-  parts.push(part(new THREE.OctahedronGeometry(1.9, 0), 0x4ef0c0, 0, 18.6, 0));
+  parts.push(part(new THREE.OctahedronGeometry(3.6, 0), 0x4ef0c0, 0, 19.8, 0));   // an idol you cannot see is not an idol
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 function makeMainStage(): THREE.Group {
@@ -1807,20 +1842,26 @@ function makeMarketStall(): THREE.Group {
   parts.push(part(new THREE.BoxGeometry(0.1, 1.3, 0.95), 0x2e2a38, 2.65, 0.65, 0.4, 0, 0, 0.16));
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
+// black lacquer with heavy gold banding. The gold is the only part a
+// top-down camera reads; brown-on-brown read as nothing.
 function makeChest(): THREE.Group {
   const parts = [
-    part(new THREE.BoxGeometry(2.4, 1.3, 1.6), 0x8a5a2a, 0, 0.65, 0),
-    part(new THREE.CylinderGeometry(0.8, 0.8, 2.4, 10, 1, false, 0, Math.PI), 0xa8703a, 0, 1.3, 0, 0, 0, Math.PI / 2),
+    part(new THREE.BoxGeometry(2.4, 1.3, 1.6), 0x2e2634, 0, 0.65, 0),
+    part(new THREE.CylinderGeometry(0.8, 0.8, 2.4, 10, 1, false, 0, Math.PI), 0xf0c050, 0, 1.3, 0, 0, 0, Math.PI / 2),
     part(new THREE.BoxGeometry(2.5, 0.22, 0.3), 0xffd23f, 0, 0.9, 0),
     part(new THREE.SphereGeometry(0.5, 10, 8), 0xffd23f, 0, 1.55, 0.5),
   ];
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
+// a resort's DECORATIVE rum barrel — painted staves, dark hoops — not a
+// dockyard cask. Around 90 of these were the largest single source of brown.
+const STAVE_COLS = [0xff6a5e, 0x2fb8a8, 0xf0c050, 0xff8ac0, 0x4dd0e1, 0xfdf3de];
+const PAINTED_STAVE = (): number => STAVE_COLS[(Math.random() * STAVE_COLS.length) | 0];
 function makeBarrel(): THREE.Group {
   const parts = [
-    part(new THREE.CylinderGeometry(0.9, 0.75, 2.2, 12), 0x9a6a38, 0, 1.1, 0),
-    part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x4a3a2a, 0, 0.55, 0, Math.PI / 2),
-    part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x4a3a2a, 0, 1.65, 0, Math.PI / 2),
+    part(new THREE.CylinderGeometry(0.9, 0.75, 2.2, 12), PAINTED_STAVE(), 0, 1.1, 0),
+    part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x2e2a34, 0, 0.55, 0, Math.PI / 2),
+    part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x2e2a34, 0, 1.65, 0, Math.PI / 2),
   ];
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
@@ -2186,10 +2227,13 @@ function makeGolfcartFB(): THREE.Group {
   }
   return g;
 }
+// warm basalt, not the old 0x9aa3b2 blue-grey. Cold grey on warm cream sand
+// separates by value but reads as grime, and this is the dominant object in
+// Smugglers Cove.
 function makeRocksFB(): THREE.Group {
   const g = new THREE.Group();
   for (let i = 0; i < 3; i++) {
-    const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.6, 1.2), 0), std(pick([0x9aa3b2, 0x8a92a4]), 1));
+    const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.6, 1.2), 0), std(pick([0x6b5f6e, 0x7a6c78]), 1));
     r.position.set(rand(-1, 1), rand(0.3, 0.5), rand(-1, 1)); r.rotation.set(rand(0, 3), rand(0, 3), 0); g.add(r);
   }
   return g;
@@ -2336,18 +2380,23 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   // ══ PIRATE BAY: props scattered inside REGIONS, never on a grid ═════════
   if (WORLD_ID === 'pirate') {
     const P3 = (p2: [number, number]): [number, number] => [w(p2[0]), w(p2[1])];
+    // Everything placed claims its ground, hand-authored positions included —
+    // otherwise a scatter pass happily drops a palm inside the galleon.
     const drop = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY?: number) => {
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       place(mesh, x3, z3, r);
+      BAY.claimSpot(p2[0], p2[1], r * 20);
     };
     const dropGlb = (name: string, p2: [number, number], r: number, h: number, fb?: () => THREE.Object3D, rotY?: number) => {
       const [x3, z3] = P3(p2);
       if (!insideIsland3(x3, z3)) return;
       glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback: fb });
+      BAY.claimSpot(p2[0], p2[1], r * 20);
     };
-    const spread = (id: string, n: number, clear = 60) =>
-      BAY.scatterInRegion(BAY.BAY_REGIONS.find((r) => r.id === id)!, n, Math.random, clear);
+    const spread = (id: string, n: number, clear = 60, sep?: number) =>
+      BAY.scatterInRegion(BAY.BAY_REGIONS.find((r) => r.id === id)!, n, Math.random, clear, { sep });
+    BAY.resetPlacement();   // a fresh island starts with empty ground
 
     // A landmark is big enough that "on land" isn't sufficient — it must also
     // clear the boardwalk and the trail by its own footprint. This asserts it
@@ -2356,10 +2405,15 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       if (!BAY.bayPlaceable(p2[0], p2[1], clear)) console.warn('[pirate] landmark site is illegal', p2, clear);
       drop(mesh, p2, r, rotY);
     };
-    const sland = (n: number, clear = 45, band?: [number, number]) =>
-      BAY.scatterLand(n, Math.random, clear, band);
+    // sep = the prop's own 3D radius, so the spatial hash can refuse to bury it
+    // in something else. avoid = districts this prop has no business in: the
+    // island-wide shoreline scatter was dropping grey rocks and beach loungers
+    // onto the nightclub and the port boardwalk.
+    const NO_TOWN: BAY.BayBiome[] = ['party', 'port', 'resort', 'market', 'oldtown'];
+    const sland = (n: number, clear = 45, band?: [number, number], sep?: number, avoid?: BAY.BayBiome[]) =>
+      BAY.scatterLand(n, Math.random, clear, band, { sep, avoid });
     const grove = (cx2: number, cy2: number, n: number, rad: number, clear = 30) =>
-      BAY.clusterAt(cx2, cy2, n, rad, Math.random, clear);
+      BAY.clusterAt(cx2, cy2, n, rad, Math.random, clear, { sep: 2.6 });
 
     // ══ THE WILD ISLAND ═══════════════════════════════════════════════════
     // Everything above is a district; MOST of Pirate Bay is the open sand and
@@ -2374,41 +2428,103 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         dropGlb('palm', p2, 2.6, rand(6.5, 10.5), makePalm, rand(0, Math.PI * 2));
     }
     // dune grass and scrub, thickest just inland of the surf
-    for (const p2 of sland(190, 26)) drop(makeReeds(), p2, 0.9, rand(0, Math.PI * 2));
-    for (const p2 of sland(110, 34)) drop(makeBush(), p2, 1.6);
-    for (const p2 of sland(95, 30)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of sland(190, 26, undefined, 0.9)) drop(makeReeds(), p2, 0.9, rand(0, Math.PI * 2));
+    for (const p2 of sland(110, 34, undefined, 1.6)) drop(makeBush(), p2, 1.6);
+    for (const p2 of sland(95, 30, undefined, 0.7)) drop(makeFlowers(), p2, 0.7);
     // the SHORELINE band: shells, driftwood rocks, and things the tide left
-    for (const p2 of sland(130, 20, [40, 420])) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
-    for (const p2 of sland(75, 34, [60, 520])) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
-    for (const p2 of sland(34, 40, [90, 620])) drop(makeSandcastleFB(), p2, 1.2);
-    for (const p2 of sland(44, 40, [90, 700])) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
-    for (const p2 of sland(40, 34, [90, 700])) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
-    for (const p2 of sland(9, 120, [120, 700])) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of sland(130, 20, [40, 420], 0.5, NO_TOWN)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
+    for (const p2 of sland(58, 34, [60, 520], 2.4, NO_TOWN)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
+    for (const p2 of sland(34, 40, [90, 620], 1.2, NO_TOWN)) drop(makeSandcastleFB(), p2, 1.2);
+    for (const p2 of sland(44, 40, [90, 700], 1.8, NO_TOWN)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+    for (const p2 of sland(40, 34, [90, 700], 1.4, NO_TOWN)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
+    for (const p2 of sland(9, 120, [120, 700], 2.6, NO_TOWN)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
     // doubloons in the sand — treasure is the island's whole fiction
-    for (const p2 of sland(65, 26)) drop(makeCoins(), p2, 0.6);
-    for (const p2 of sland(26, 60)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of sland(65, 26, undefined, 0.6)) drop(makeCoins(), p2, 0.6);
+    for (const p2 of sland(18, 60, undefined, 1.3, NO_TOWN)) drop(makeBarrel(), p2, 1.3);
+
+    // ── ON THE WATER ────────────────────────────────────────────────────────
+    // The bay is 23% of the island and used to contain FIVE props. It is also
+    // where the port crowd shouts "the superyacht!! START IT!!" about a
+    // superyacht that did not exist. place() rejects anything off the land, so
+    // floating things need their own placer: inside the bay polygon, hull
+    // sunk far enough to cut the surface.
+    const afloat = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY = 0, sink = 0.55) => {
+      if (!BAY.pointInPoly(p2[0], p2[1], BAY.WATER_SMOOTH)) { console.warn('[pirate] afloat: not in the bay', p2); return; }
+      const [x3, z3] = P3(p2);
+      mesh.rotation.y = rotY;
+      mesh.position.set(x3, -sink, z3);
+      mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(mesh); addEdible(mesh, r);
+      BAY.claimSpot(p2[0], p2[1], r * 20);
+    };
+    // THE YACHT — the thing the whole resort axis points at, and the biggest
+    // meal on the island
+    afloat(LUXE.makeSuperYacht(), [8080, 5520], 9, -1.15);
+    // the galleons moor in the bay off the docks, not beached on the boardwalk
+    afloat(LUXE.makeGalleon(), [7880, 4180], 8, -0.9);
+    afloat(LUXE.makeGalleon(), [7620, 5080], 8, 2.2);
+    // tenders, jet skis and speedboats scattered along the sheltered side
+    for (const [wx, wy, a2] of [[7500, 6100, 0.6], [8380, 5980, -0.4], [7960, 6700, 1.1],
+      [7400, 7300, 2.3], [7700, 4600, -1.0]] as [number, number, number][]) {
+      afloat(LUXE.makeSpeedboat(), [wx, wy], 2.6, a2, 0.32);
+    }
+    for (const [wx, wy, a2] of [[8250, 5140, 1.2], [8180, 5280, 1.2], [8140, 6320, -0.7],
+      [8060, 6460, -0.7]] as [number, number, number][]) {
+      afloat(LUXE.makeJetSki(), [wx, wy], 1.5, a2, 0.22);
+    }
+
+    // ── THE RESORT AXIS ─────────────────────────────────────────────────────
+    // One straight, mirrored line from the boardwalk out to the yacht, with the
+    // hotel's cream-and-teal repeated down its whole length. This is what
+    // "expensive" looks like from a top-down camera: arrival, symmetry and
+    // repetition. Before this the resort was 246 randomly-scattered props,
+    // one building and two painted puddles.
+    const AX: [number, number] = [8560, 3980];        // arch, on the boardwalk
+    const AXV: [number, number] = [0.62, 0.78];       // unit vector toward the bay
+    const along = (t: number, off = 0): [number, number] =>
+      [AX[0] + AXV[0] * t - AXV[1] * off, AX[1] + AXV[1] * t + AXV[0] * off];
+    const axAng = Math.atan2(AXV[1], AXV[0]);
+    drop(makeArrivalArch(), AX, 5, axAng);
+    drop(LUXE.makeValetStand(), along(-260, -260), 2.2, axAng);
+    drop(LUXE.makeGullwingSupercar(), along(-300, 300), 2.4, axAng + 0.3);
+    drop(LUXE.makeStatueFountain(), along(430), 3, 0);
+    drop(LUXE.makeInfinityPool(), along(1000), 5.5, axAng);
+    drop(LUXE.makeChampagneTower(), along(1000, -330), 1.8, 0);
+    drop(LUXE.makeCaviarBar(), along(1000, 330), 2.4, axAng);
+    // mirrored rows of loungers and parasols down the axis — symmetry reads as
+    // expensive; a circle of randomly-rotated chairs reads as a car boot sale
+    for (let i = 0; i < 8; i++) {
+      const t = 620 + i * 175;
+      for (const sgn of [-1, 1]) {
+        drop(LUXE.makeSunLounger(), along(t, sgn * 480), 1.4, axAng + (sgn > 0 ? 0 : Math.PI));
+        if (i % 2 === 0) drop(LUXE.makeParasolLux(), along(t + 60, sgn * 610), 1.8, 0);
+        if (i % 3 === 1) drop(LUXE.makePotPlant(), along(t, sgn * 300), 0.9, 0);
+      }
+    }
+    for (let i = 0; i < 9; i++) {   // the flag avenue: one motif, repeated
+      const t = 180 + i * 190;
+      for (const sgn of [-1, 1]) drop(LUXE.makePalmLux(), along(t, sgn * 700), 2.6, 0);
+    }
 
     // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
     for (const p2 of spread('port', 34, 40)) drop(Math.random() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
-    { const sh = makeGalleon(); drop(sh, [7750, 3250], 7.5, -0.6); }
-    { const sh = makeGalleon(); drop(sh, [7050, 2650], 7.5, 2.4); }
     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
-    for (const p2 of spread('port', 6, 60)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
-    for (const p2 of spread('port', 4, 90)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
-    for (const p2 of spread('port', 12, 40)) drop(makeShopBox(), p2, 1.1, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 4, 90, 3)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 12, 40, 1.1)) drop(makeShopBox(), p2, 1.1, rand(0, Math.PI * 2));
 
     // ── OLD TOWN: a huddle of thatch houses and market clutter on the bluff
-    for (const p2 of spread('oldtown', 24, 55)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
-    for (const p2 of spread('oldtown', 18, 40)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of spread('oldtown', 24, 55, 3)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 18, 40, 1.3)) drop(makeBarrel(), p2, 1.3);
     landmark(makeFort(), [5400, 2050], 9, 0.3, 280);               // the fort on the bluff
-    for (const p2 of spread('oldtown', 12, 55)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
-    for (const p2 of spread('oldtown', 12, 35)) drop(makeFlowers(), p2, 0.7);
-    for (const p2 of spread('oldtown', 8, 45)) drop(makeMailbox(), p2, 0.8, rand(0, Math.PI * 2));
-    for (const p2 of spread('oldtown', 6, 60)) drop(makeLamp(), p2, 1.2);
+    for (const p2 of spread('oldtown', 12, 55, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 12, 35, 0.7)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of spread('oldtown', 8, 45, 0.8)) drop(makeMailbox(), p2, 0.8, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 6, 60, 1.2)) drop(makeLamp(), p2, 1.2);
 
     // ── THE RESORT: cabanas along the shore, loungers ringing the two pools
-    for (const p2 of spread('resort', 22, 62)) dropGlb('cabana', p2, 3, 4.6, makeThatchHut, rand(-0.3, 0.3));
+    for (const p2 of spread('resort', 22, 62, 3)) dropGlb('cabana', p2, 3, 4.6, makeThatchHut, rand(-0.3, 0.3));
     for (const [ox, oy] of [[8900, 4900], [9050, 6300]] as [number, number][]) {
       for (let k = 0; k < 11; k++) {
         const a2 = (k / 11) * Math.PI * 2;
@@ -2419,16 +2535,16 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         dropGlb('umbrella', [ox + Math.cos(a2) * 300, oy + Math.sin(a2) * 260], 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
       }
     }
-    for (const p2 of spread('resort', 20, 50)) dropGlb('palm', p2, 2.6, rand(7, 9.5), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('resort', 20, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(7, 9.5), makePalm, rand(0, Math.PI * 2));
     // the resort is a narrow beachfront strip — a numeric sweep found exactly
     // one site with the hotel's own footprint of clearance, at its north head
     landmark(makeGrandHotel(), [8540, 3700], 10, -0.9, 300);       // THE ROYAL MARINER
     drop(makeTikiBar(), [9250, 5600], 3.4, -0.4);
     drop(makeTikiBar(), [8800, 4200], 3.4, 0.6);
-    for (const p2 of spread('resort', 16, 34)) drop(makeFlowers(), p2, 0.7);
-    for (const p2 of spread('resort', 10, 40)) drop(makeLuggage(), p2, 1.0, rand(0, Math.PI * 2));
-    for (const p2 of spread('resort', 8, 55)) drop(makeGazeboFB(), p2, 2.8);
-    for (const p2 of spread('resort', 8, 45)) drop(makeIcecreamFB(), p2, 1.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('resort', 16, 34, 0.7)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of spread('resort', 10, 40, 1.0)) drop(makeLuggage(), p2, 1.0, rand(0, Math.PI * 2));
+    for (const p2 of spread('resort', 8, 55, 2.8)) drop(makeGazeboFB(), p2, 2.8);
+    for (const p2 of spread('resort', 8, 45, 1.6)) drop(makeIcecreamFB(), p2, 1.6, rand(0, Math.PI * 2));
 
     // ── DANCE COVE: the stage, speaker walls, torch ring, bars
     landmark(makeMainStage(), [7400, 10380], 8, 0, 200);           // the main stage
@@ -2440,17 +2556,17 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
     drop(makeTikiBar(), [6500, 10450], 3.4, 0.4);
     drop(makeTikiBar(), [8350, 10520], 3.4, -0.4);
-    for (const p2 of spread('party', 16, 34)) drop(makeBarrel(), p2, 1.3);
-    for (const p2 of spread('party', 14, 26)) drop(makeCoins(), p2, 0.6);
+    for (const p2 of spread('party', 16, 34, 1.3)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of spread('party', 14, 26, 0.6)) drop(makeCoins(), p2, 0.6);
 
     // ── THE BAZAAR: stalls, treasure, palms
     landmark(makeBazaarTower(), [5700, 4550], 7, 0.2, 250);        // the spice tower
-    for (const p2 of spread('market', 22, 45)) drop(makeMarketStall(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 22, 45, 2.6)) drop(makeMarketStall(), p2, 2.6, rand(0, Math.PI * 2));
     for (const p2 of spread('market', 16, 36)) drop(Math.random() < 0.5 ? makeChest() : makeBarrel(), p2, 1.4);
-    for (const p2 of spread('market', 10, 50)) dropGlb('palm', p2, 2.6, rand(6, 8.5), makePalm, rand(0, Math.PI * 2));
-    for (const p2 of spread('market', 12, 34)) drop(makeShopBox(), p2, 1.1, rand(0, Math.PI * 2));
-    for (const p2 of spread('market', 10, 30)) drop(makeFlowers(), p2, 0.7);
-    for (const p2 of spread('market', 5, 55)) drop(makeFoodtruckFB(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 10, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6, 8.5), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 12, 34, 1.1)) drop(makeShopBox(), p2, 1.1, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 10, 30, 0.7)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of spread('market', 5, 55, 2.6)) drop(makeFoodtruckFB(), p2, 2.6, rand(0, Math.PI * 2));
 
     // ── THE JUNGLE: dense canopy, boulders, a hidden chest
     for (const p2 of spread('jungle', 62, 34)) {
@@ -2458,30 +2574,32 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       else drop(makePine(), p2, 3);
     }
     landmark(makeJungleTemple(), [4300, 4200], 9, 0.6, 280);       // THE LOST TEMPLE
-    for (const p2 of spread('jungle', 18, 36)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
-    for (const p2 of spread('jungle', 28, 28)) drop(makeBush(), p2, 1.6);
-    for (const p2 of spread('jungle', 26, 22)) drop(makeMushroom(), p2, 0.6);
-    for (const p2 of spread('jungle', 5, 60)) drop(makeChest(), p2, 1.5);
-    for (const p2 of spread('jungle', 4, 90)) drop(makeTentFB(), p2, 2.2, rand(0, Math.PI * 2));
-    for (const p2 of spread('jungle', 2, 120)) drop(makeCampfireFB(), p2, 1.4);
+    for (const p2 of spread('jungle', 18, 36, 2.4)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
+    for (const p2 of spread('jungle', 28, 28, 1.6)) drop(makeBush(), p2, 1.6);
+    for (const p2 of spread('jungle', 26, 22, 0.6)) drop(makeMushroom(), p2, 0.6);
+    for (const p2 of spread('jungle', 5, 60, 1.5)) drop(makeChest(), p2, 1.5);
+    for (const p2 of spread('jungle', 4, 90, 2.2)) drop(makeTentFB(), p2, 2.2, rand(0, Math.PI * 2));
+    for (const p2 of spread('jungle', 2, 120, 1.4)) drop(makeCampfireFB(), p2, 1.4);
 
     // ── SMUGGLERS COVE: treasure, wreck rocks, a cannon
-    for (const p2 of spread('cove', 12, 34)) drop(makeChest(), p2, 1.5);
-    for (const p2 of spread('cove', 18, 32)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
-    for (const p2 of spread('cove', 12, 34)) drop(makeBarrel(), p2, 1.3);
-    for (const p2 of spread('cove', 14, 24)) drop(makeCoins(), p2, 0.6);
-    for (const p2 of spread('cove', 10, 26)) drop(makeReeds(), p2, 0.9);
+    for (const p2 of spread('cove', 12, 34, 1.5)) drop(makeChest(), p2, 1.5);
+    for (const p2 of spread('cove', 18, 32, 2.4)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
+    for (const p2 of spread('cove', 12, 34, 1.3)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of spread('cove', 14, 24, 0.6)) drop(makeCoins(), p2, 0.6);
+    for (const p2 of spread('cove', 10, 26, 0.9)) drop(makeReeds(), p2, 0.9);
     drop(makeCannon(), [2400, 6300], 2, 0.9);
     drop(makeCannon(), [2650, 5800], 2, -0.4);
-    { const wreck = makeGalleon(); wreck.rotation.z = 0.42; drop(wreck, [2150, 6800], 7, 1.9); }
+    // the wreck used to sit 17 units offshore, where place() dropped it on the
+    // floor without a word. landmark() warns if that ever happens again.
+    { const wreck = LUXE.makeGalleon(); wreck.rotation.z = 0.42; landmark(wreck, [2520, 6620], 7, 1.9, 120); }
 
     // ── SUNSET BEACH: the long outer sweep — umbrellas, castles, palms
-    for (const p2 of spread('beach', 30, 36)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 22, 34)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 14, 36)) drop(makeSandcastleFB(), p2, 1.2);
-    for (const p2 of spread('beach', 18, 50)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 20, 22)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
-    for (const p2 of spread('beach', 4, 90)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 30, 36, 1.8)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 22, 34, 1.4)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 14, 36, 1.2)) drop(makeSandcastleFB(), p2, 1.2);
+    for (const p2 of spread('beach', 18, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 20, 22, 0.5)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 4, 90, 2.6)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
 
     // ── THE PROMENADE: torches and benches down its whole length
     for (let t = 0.015; t < 0.99; t += 0.02) {
