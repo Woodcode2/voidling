@@ -158,7 +158,8 @@ _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the l
 }
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
-const rivals = createRivals(scene, camera, edibles, island.biomeAt, 5);   // the WHOLE family shows up (full end-board)
+// 3-5 family members per match, randomly cast — you never know who's coming
+const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
   WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
@@ -502,7 +503,14 @@ const DISTRICT: Record<string, string> = {
 // TEMPLATED headlines: a tiny pool × live variables = copy that never repeats
 // AND is always about the player. This is what killed the "generic ticker"
 // feel — every one of these is a mirror of the run in progress.
+// THE MAYOR — one recurring character running a denial-to-collapse arc
+// across the match. A running joke beats 54 unrelated one-liners.
 const NEWS_LIVE_CALM = [
+  'mayor: "the void is FAKE NEWS." void: *eats {M}*',
+  'mayor denies void exists. void denies mayor exists',
+  'mayor: "that hole? decorative." it is not decorative',
+  'mayor cuts ribbon on {D}. void cuts {D}',
+  'mayor: "I have NEVER been eaten." checks out. so far',
   'void sighted in {D}. residents wave, unsure why',
   'it ate {M}. nobody saw anything. everybody saw',
   '{L} spotted eating. authorities say "same"',
@@ -510,6 +518,10 @@ const NEWS_LIVE_CALM = [
   'local poll: is the dot getting bigger? {P}% say yes',
 ];
 const NEWS_LIVE_WORRIED = [
+  'mayor: "a SMALL crisis." it is a {F}',
+  'mayor rebrands the void as "a water feature"',
+  'mayor: "{P}% is basically zero percent"',
+  'mayor forms committee. committee is eaten',
   '{D} EVACUATING — the {F} is coming',
   'it just ate {M}. that was somebody\'s {M}!',
   '{P}% of the isle is GONE. mayor requests a nap',
@@ -517,6 +529,10 @@ const NEWS_LIVE_WORRIED = [
   'do NOT go to {D}. that is where the {F} is',
 ];
 const NEWS_LIVE_PANIC = [
+  'mayor: "ok FINE it is real." mayor leaves',
+  'mayor now a hat on a boat. the hat is winning',
+  'mayor concedes island to a {F}. shakes its rim',
+  'mayor: "I blame the previous mayor." he WAS the previous mayor',
   '{D} IS GONE. it was nice. it was RIGHT THERE',
   '{P}% DEVOURED. the other {R}% is nervous',
   'the {F} ate {M}. it is still hungry',
@@ -586,10 +602,13 @@ const NEWS_PANIC = [
   'the moon asked if we are ok. we are not',
 ];
 const newsEl = el('news');
-let devouredPct = 0, newsCd = 7;
+let devouredPct = 0, newsCd = 14;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
-function breakingNews(h: string) { newsQueue.push(h); newsCd = Math.min(newsCd, 1.5); }
+function breakingNews(h: string) {
+  if (newsQueue.length > 1) return;   // never stack a queue of cards at the player
+  newsQueue.push(h); newsCd = Math.min(newsCd, 2.5);
+}
 const newsSeen: string[] = [];
 function pickHeadline(pool: string[]): string {
   const fresh = pool.filter((h) => !newsSeen.includes(h));
@@ -1108,7 +1127,7 @@ function resetMatch() {
   curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
   voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   velX = 0; velZ = 0; camDist = 50;
-  playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 7;
+  playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 14;
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
@@ -1811,7 +1830,10 @@ function animate() {
   // island news: a headline every ~20s, tone tracks the devoured meter
   if (started && !ended) {
     newsCd -= dt;
-    if (newsCd <= 0) { newsCd = 14 + Math.random() * 6; showNews(); }
+    // BREATHING ROOM: a headline every 14-20s meant the card was on screen
+    // roughly a third of the match — it stopped being an event. Now 30-42s,
+    // and a breaking beat still cuts the line when the player earns one.
+    if (newsCd <= 0) { newsCd = 30 + Math.random() * 12; showNews(); }
   }
 
   // the DRAG-to-steer hint retires itself once the player has been driving

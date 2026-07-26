@@ -59,6 +59,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uStage: { value: 0 },
       uWobble: { value: 0 },          // jelly amplitude — spikes on every eat
       uGloss: { value: 0 },           // legendary sheen (pearl / chrome character skins)
+      uPat: { value: 0 },             // 0 none · 1 scales · 2 chrome · 3 fur · 4 starfield · 5 stitch
+      uPatCol: { value: new THREE.Color(0xffffff) },
     },
     vertexShader: `
       varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
@@ -85,6 +87,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
       uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
       uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
+      uniform float uPat; uniform vec3 uPatCol;
       // cheap hash for star specks
       float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
       // value noise for the HD nebula wisps (procedural — crisp at any zoom)
@@ -164,6 +167,37 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
           vec2 f2 = fract(sc2) - 0.5;
           float dot3 = 1.0 - smoothstep(0.0, 0.28, length(f2));
           col += vec3(0.9, 0.85, 1.0) * dot3 * (0.5 + 0.5 * sin(uTime * 5.0 + h2 * 60.0)) * (1.0 - u) * 0.55;
+        }
+        // ── BODY PATTERN: the legendary's actual SKIN. This is what makes a
+        // character stop reading as "a purple ball wearing a costume" — the
+        // surface itself is scaled, plated, furred or full of stars.
+        if (uPat > 0.5) {
+          float shade = 0.0;
+          if (uPat < 1.5) {                       // SCALES — offset-row teardrops
+            vec2 g = vec2(vUv.x * 34.0, vUv.y * 18.0);
+            g.x += mod(floor(g.y), 2.0) * 0.5;
+            vec2 f = fract(g) - 0.5;
+            float dd = length(f * vec2(1.0, 1.25));
+            shade = smoothstep(0.46, 0.30, dd) * 0.55 + smoothstep(0.30, 0.46, dd) * 0.15;
+          } else if (uPat < 2.5) {                // CHROME — machined panel bands
+            float band = abs(fract(vUv.y * 9.0) - 0.5);
+            float seam = smoothstep(0.06, 0.0, band);
+            float rivet = step(0.86, hash(floor(vec2(vUv.x * 22.0, vUv.y * 9.0))));
+            shade = seam * 0.85 + rivet * 0.4;
+          } else if (uPat < 3.5) {                // FUR — fine directional strands
+            float st = vnoise(vec2(vUv.x * 120.0, vUv.y * 22.0));
+            shade = smoothstep(0.55, 0.9, st) * 0.5;
+          } else if (uPat < 4.5) {                // STARFIELD — a night sky for a hide
+            vec2 sc3 = vUv * vec2(60.0, 34.0);
+            float h3 = hash(floor(sc3));
+            float dot4 = h3 > 0.9 ? (1.0 - smoothstep(0.0, 0.34, length(fract(sc3) - 0.5))) : 0.0;
+            shade = dot4 * (0.6 + 0.4 * sin(uTime * 3.0 + h3 * 30.0)) * 1.6;
+          } else {                                // STITCH — cloth seams (ninja wrap)
+            float sew = abs(fract(vUv.y * 13.0 + vUv.x * 0.6) - 0.5);
+            shade = smoothstep(0.09, 0.0, sew) * step(0.45, fract(vUv.x * 46.0)) * 0.7;
+          }
+          // patterns fade toward the silhouette so the fresnel read survives
+          col = mix(col, uPatCol, shade * (1.0 - u * 0.55));
         }
         gl_FragColor = vec4(col, 1.0);
       }
@@ -333,6 +367,72 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const BASE = { ...mp };
   // direction-flip anticipation squash
   let pvx = 0, pvz = 0, flipT = 0;
+
+  // ── BODY PARTS: anatomy, not costume. A snout/muzzle/mane changes the
+  // SILHOUETTE of the creature itself, which is the difference between "a
+  // void wearing a unicorn hat" and "a unicorn void".
+  const bodyPart: Record<string, THREE.Group> = {};
+  {
+    const mk = (kind: string, build: (g: THREE.Group) => void) => {
+      const g = new THREE.Group(); build(g); g.visible = false;
+      g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+      bob.add(g); bodyPart[kind] = g;
+    };
+    // DINO SNOUT: a blunt jaw pushing out of the face, with nostrils + teeth
+    mk('snout', (g) => {
+      const skinM = new THREE.MeshStandardMaterial({ color: 0x55b850, roughness: 0.55 });
+      const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 12), skinM);
+      jaw.scale.set(0.78, 0.58, 1.0); jaw.position.set(0, -0.56, 0.8); g.add(jaw);
+      const teeth = new THREE.MeshStandardMaterial({ color: 0xfff6e8, roughness: 0.4 });
+      for (const sx of [-0.17, 0.17]) {
+        const t = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 5), teeth);
+        t.position.set(sx, -0.74, 1.1); t.rotation.x = Math.PI; g.add(t);
+      }
+    });
+    // DRAGON MUZZLE: longer, with brow ridges and warm nostril glow
+    mk('muzzle', (g) => {
+      const skinM = new THREE.MeshStandardMaterial({ color: 0x2394a8, roughness: 0.5 });
+      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.34, 0.62, 12), skinM);
+      snout.rotation.x = Math.PI / 2; snout.position.set(0, -0.5, 0.88); g.add(snout);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10), skinM);
+      tip.position.set(0, -0.5, 1.16); g.add(tip);
+      const glow = new THREE.MeshStandardMaterial({ color: 0xffb054, emissive: 0xff7a2a, emissiveIntensity: 1.2 });
+      for (const sx of [-0.08, 0.08]) {
+        const n = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), glow);
+        n.position.set(sx, -0.46, 1.3); g.add(n);
+      }
+    });
+    // MANE: a soft ruff of tufts around the crown — reads as FUR from above
+    mk('mane', (g) => {
+      const m = new THREE.MeshStandardMaterial({ color: 0xf6e8ff, roughness: 0.85, flatShading: true });
+      // BACK HEMISPHERE ONLY. A ruff that wraps the front buries the face —
+      // the eyes are the character, nothing may sit in front of them.
+      for (let i = 0; i < 9; i++) {
+        const a2 = Math.PI * (0.18 + (i / 8) * 0.64);   // 32deg..145deg, all behind
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.62, 5), m);
+        const sx = Math.cos(a2) * 0.72, sz = -Math.abs(Math.sin(a2)) * 0.72 - 0.18;
+        tuft.position.set(sx, 0.5 + Math.sin(i * 2.1) * 0.1, sz);
+        tuft.rotation.set(-0.75, a2, Math.cos(a2) * 0.6);
+        tuft.scale.setScalar(0.9 + (i % 3) * 0.18);
+        g.add(tuft);
+      }
+    });
+    // VISOR: a wraparound faceplate — the body is MACHINE, not a ball
+    mk('visor', (g) => {
+      // HELMET, not a faceplate: a chrome shell capping the crown and sweeping
+      // down the sides, with a glowing brow band. Eyes stay wide open.
+      const chrome2 = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.85, roughness: 0.22 });
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(1.03, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.34), chrome2);
+      cap.position.z = -0.06; g.add(cap);
+      for (const sx of [-1, 1]) {   // cheek plates, well clear of the face
+        const pl = new THREE.Mesh(new THREE.SphereGeometry(1.02, 20, 14, 0, Math.PI * 0.3, Math.PI * 0.3, Math.PI * 0.4), chrome2);
+        pl.rotation.y = sx > 0 ? -Math.PI * 0.15 : Math.PI * 0.85; g.add(pl);
+      }
+      const brow = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.07, 8, 24, Math.PI * 0.9),
+        new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.3 }));
+      brow.position.set(0, 0.52, 0.62); brow.rotation.set(0.5, 0, 0); g.add(brow);
+    });
+  }
 
   // ── legendary accessories: 3D flair that rides (and squashes with) the orb ──
   const acc: Record<string, THREE.Group> = {};
@@ -514,6 +614,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         for (const sp of auraSp) (sp.material as THREE.SpriteMaterial).opacity = 0;
       }
       bodyMat.uniforms.uGloss.value = ch?.gloss ?? 0;
+      const PAT: Record<string, number> = { scales: 1, chrome: 2, fur: 3, starfield: 4, stitch: 5 };
+      bodyMat.uniforms.uPat.value = ch?.pattern ? PAT[ch.pattern] : 0;
+      if (ch?.patCol) bodyMat.uniforms.uPatCol.value.set(ch.patCol);
+      // extra BODY geometry (a snout is anatomy, not an accessory)
+      for (const k in bodyPart) bodyPart[k].visible = false;
+      if (ch?.body && bodyPart[ch.body]) bodyPart[ch.body].visible = true;
       skinHasTex = !!s.tex;
       if (s.tex) {
         let t = texCache.get(s.tex);

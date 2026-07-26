@@ -240,10 +240,14 @@ export function createRivals(
 ): Rivals {
   // props the family has eaten, mid shrink-out animation
   const shrinking: THREE.Object3D[] = [];
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; visitT: number; visiting: boolean; dyingT: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
-  const JOIN_TIMES = [4, 30, 65, 105, 145];   // the family arrives one by one
+  // WHO SHOWS UP is a roll of the dice: 3-5 family members, shuffled casting,
+  // arriving at randomised times. Every match has a different line-up, so the
+  // island never feels like the same scripted five.
+  const cast = [...NAMES].sort(() => Math.random() - 0.5).slice(0, count);
+  const JOIN_TIMES = [rand(3, 8), rand(22, 40), rand(55, 80), rand(95, 125), rand(135, 165)];
 
   // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member
@@ -259,7 +263,7 @@ export function createRivals(
   const skinFor = (nm: string): Skin =>
     SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];
   for (let i = 0; i < count; i++) {
-    const nm = NAMES[i % NAMES.length];
+    const nm = cast[i % cast.length];
     const sk = skinFor(nm);
     const color = sk.rim;
     const { group, eyes, halo } = makeRivalMesh(sk, i);
@@ -271,9 +275,14 @@ export function createRivals(
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
-      visitT: rand(14, 30), visiting: false, dyingT: 0 });
+      visitT: rand(30, 70), visiting: false, dyingT: 0,
+      // HOME TURF: each family member forages their OWN corner of the island.
+      // Without this they orbited the player all match ("they hover around
+      // you"), which is clingy, not alive.
+      hx: Math.cos(ang) * 130, hz: Math.sin(ang) * 130 });
   }
 
+  const anyVisiting = () => rivals.some((r) => r.visiting);
   const tmp = new THREE.Vector3();
   const api: Rivals = {
     list: rivals,
@@ -363,7 +372,12 @@ export function createRivals(
         const dpx = rv.x - px, dpz = rv.z - pz, dp = Math.hypot(dpx, dpz);
         // flee only from REAL danger, and only when it's actually close —
         // family that bolts the moment you approach never feels like family
-        const fleeing = pr > rv.r * 1.2 && dp < pr + 24;
+        // FLEE ONLY FROM DEATH. The old test made anyone slightly smaller bolt
+        // the moment you approached, so the family read as "hovers, then runs".
+        // Now they only run when you could actually swallow them AND you're
+        // genuinely on top of them; otherwise they keep doing their thing.
+        const canBeEaten = pr > rv.r * 1.25;
+        const fleeing = canBeEaten && dp < pr + rv.r + 10;
         if (fleeing && dp < pr * 1.05) rv.closeCall = true;   // almost swallowed…
         if (rv.closeCall && dp > pr * 1.8) {                   // …and wriggled free
           rv.closeCall = false;
@@ -374,18 +388,19 @@ export function createRivals(
           if (rv.r > pr * 1.15) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearBig)); }
           else if (rv.r < pr * 0.85) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearSmall)); }
         }
-        // ── SWING-BY VISITS: every so often a family member breaks off, rolls
-        // over to wherever YOU are, and says something fun on arrival. The
-        // island feels like a family outing, not five strangers grinding.
+        // ── SWING-BY VISITS: occasionally a family member breaks off, rolls
+        // over to say hi, then goes back to its own business. Rarer now
+        // (every ~30-70s, and only one visitor at a time) — a visit should be
+        // a moment, not the default state of the family.
         rv.visitT -= dt;
         if (rv.visiting && fleeing) rv.visiting = false;   // visit's off — you got scary
-        if (!rv.visiting && !fleeing && rv.visitT <= 0 && dp > 45) {
+        if (!rv.visiting && !fleeing && rv.visitT <= 0 && dp > 60 && !anyVisiting()) {
           rv.visiting = true; rv.tgt = null;
         }
         if (rv.visiting) {
           rv.tx = px; rv.tz = pz;   // chase the moving player, not a stale spot
           if (dp < pr + rv.r + 9) {   // arrived: deliver the line, hang out beat
-            rv.visiting = false; rv.visitT = rand(26, 44);
+            rv.visiting = false; rv.visitT = rand(45, 90);
             rv.speakCd = rand(10, 14);
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].visit));
             rv.retarget = 0;   // pick a snack right away (near the player now)
@@ -417,10 +432,15 @@ export function createRivals(
           if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; rv.tgt = best; }
           else if (rv.name === 'BITSY') { rv.tx = px + rand(-45, 45); rv.tz = pz + rand(-45, 45); rv.tgt = null; }   // the baby follows the player around
           else {
-            // idle wander orbits the PLAYER's neighborhood (family sticks with
-            // the outing), falling back inland if that spot is off-island
-            const a3 = rand(0, Math.PI * 2), rr2 = rand(35, 110);
-            rv.tx = px + Math.cos(a3) * rr2; rv.tz = pz + Math.sin(a3) * rr2;
+            // idle wander sweeps their OWN turf, and the turf itself drifts —
+            // so a family member works a district, moves on, and occasionally
+            // ends up near you by coincidence rather than by clinging
+            if (Math.random() < 0.25) {
+              const ha = rand(0, Math.PI * 2);
+              rv.hx = Math.cos(ha) * rand(60, 165); rv.hz = Math.sin(ha) * rand(60, 165);
+            }
+            const a3 = rand(0, Math.PI * 2), rr2 = rand(20, 70);
+            rv.tx = rv.hx + Math.cos(a3) * rr2; rv.tz = rv.hz + Math.sin(a3) * rr2;
             if (!biomeAt(rv.tx, rv.tz)) { rv.tx = Math.cos(a3) * rand(40, 150); rv.tz = Math.sin(a3) * rand(40, 150); }
             rv.tgt = null;
           }

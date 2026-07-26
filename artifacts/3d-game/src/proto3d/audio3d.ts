@@ -28,6 +28,10 @@ export function createAudio(): Audio3D {
   let master: GainNode | null = null;
   // persisted mute — a parent hitting mute expects it to STAY muted tomorrow
   let muted = localStorage.getItem('voidMute') === '1';
+  // major pentatonic: every eat lands on a consonant note, so fast eating
+  // sounds like a tune rather than a stutter
+  const PENTA = [0, 2, 4, 7, 9, 12, 9, 7];
+  let comboStep = 0;
   const MASTER_VOL = 0.32;
 
   function ensure(): Ctx | null {
@@ -44,7 +48,7 @@ export function createAudio(): Audio3D {
     ensure();
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
-    for (const n of ['gulp_1.wav', 'gulp_2.wav', 'gulp_3.wav', 'gulp_4.wav', 'gulp_5.wav', 'eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+    for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
   };
   window.addEventListener('pointerdown', unlock, { passive: true });
   window.addEventListener('keydown', unlock);
@@ -261,7 +265,7 @@ export function createAudio(): Audio3D {
   return {
     startMusic() {
       // prefetch the recorded kit so the very first gulp is the real sample
-      for (const n of ['gulp_1.wav', 'gulp_2.wav', 'gulp_3.wav', 'gulp_4.wav', 'gulp_5.wav', 'eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+      for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
       // licensed-track hook: if a real music file ships with the build, prefer
       // it (gapless crossfade loop); the synth score is the fallback
       themeWanted = true;
@@ -301,27 +305,35 @@ export function createAudio(): Audio3D {
       }
     },
     pop(combo, size = 0.9) {
-      // the GULP (hole.io's swallow): a quick two-step downward glide — like a
-      // throat closing — plus a soft airy swallow. Pitch rides the combo,
-      // DEEPENS with the void's size. Hard rate-limit for hoover sprees.
+      // ── THE CHOMP, rebuilt ────────────────────────────────────────────────
+      // The recorded gulp takes read as wet and rough on a phone speaker, so
+      // they're out of the eat sound entirely (they still carry bigEat). This
+      // is a three-layer synthesised NOM:
+      //   1. BITE   — a 20ms low-passed thump: jaws closing, felt not heard
+      //   2. BODY   — a plump sine bloop that glides down a fifth
+      //   3. POP    — a tiny bright tail so small bites feel crunchy-cute
+      // and the whole thing is TUNED: consecutive bites walk up a pentatonic
+      // ladder, so a hoover spree plays a little melody instead of machine-
+      // gunning one sample. That's the difference between noise and delight.
       const c = ensure(); if (!c) return;
       const now = c.currentTime;
-      if (now - lastPop < 0.1) return;
+      if (now - lastPop < 0.075) return;
+      // a gap in eating resets the melody back to the root
+      if (now - lastPop > 1.1) comboStep = 0; else comboStep = (comboStep + 1) % PENTA.length;
       lastPop = now;
-      const depth = Math.min(1, (size - 0.9) / 9);          // 0 tiny -> 1 huge
-      // recorded gulps first (5 takes, pitch rides size: deeper as you grow);
-      // synth swallow only until the samples decode
-      const take = 1 + ((Math.random() * 5) | 0);
-      if (sample(`gulp_${take}.wav`, 0.4 + depth * 0.25, 1.15 - depth * 0.35)) {
-        if (depth > 0.4) tone(54, 32, 0.18, 'sine', depth * 0.12, 0.05);      // sub thump under big bites
-        return;
-      }
-      const base = (330 + Math.min(combo, 20) * 8) * (1 - depth * 0.5);
-      // pure rounded swallow: one smooth glide down an octave-and-a-half,
-      // with a soft body underneath — no noise (crackles on phone speakers)
-      tone(base, base * 0.34, 0.16 + depth * 0.06, 'sine', 0.13 + depth * 0.05);
-      tone(base * 0.5, base * 0.22, 0.14, 'triangle', 0.05, 0.03);
-      if (depth > 0.4) tone(54, 32, 0.18, 'sine', depth * 0.12, 0.05);        // sub thump
+      const depth = Math.min(1, (size - 0.9) / 9);            // 0 tiny -> 1 huge
+      const semis = PENTA[comboStep] + Math.min(12, Math.floor(combo / 3) * 2);
+      // big voids sing LOWER: a world-ender's nom is a bass note, not a chirp
+      const base = 300 * Math.pow(2, semis / 12) * (1 - depth * 0.52);
+      // 1. bite transient
+      noise(0.035, 0.10 + depth * 0.05, 620 - depth * 260, 90);
+      // 2. body — fat sine glide + a triangle underneath for weight
+      tone(base, base * 0.62, 0.13 + depth * 0.05, 'sine', 0.15 + depth * 0.04);
+      tone(base * 0.5, base * 0.34, 0.11, 'triangle', 0.055, 0.006);
+      // 3. bright tail — only on small snappy bites, keeps them crisp
+      if (depth < 0.5) tone(base * 2.02, base * 1.5, 0.05, 'sine', 0.045 * (1 - depth * 2), 0.05);
+      // 4. sub thump when something big goes down
+      if (depth > 0.35) tone(52, 30, 0.2, 'sine', depth * 0.14, 0.03);
     },
     bigEat() {
       if (sample('eaten_deep.wav', 0.55)) return;
