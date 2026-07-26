@@ -58,6 +58,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       uStarAmt: { value: 0 },
       uStage: { value: 0 },
       uWobble: { value: 0 },          // jelly amplitude — spikes on every eat
+      uGloss: { value: 0 },           // legendary sheen (pearl / chrome character skins)
     },
     vertexShader: `
       varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
@@ -83,7 +84,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
       uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
       uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
-      uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage;
+      uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
       // cheap hash for star specks
       float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
       // value noise for the HD nebula wisps (procedural — crisp at any zoom)
@@ -137,6 +138,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         vec3 L = normalize(vec3(-0.45, 0.74, 0.5));
         float spec = pow(max(dot(normalize(vN), L), 0.0), 30.0);
         col += vec3(1.0, 0.97, 1.0) * spec * 0.26;
+        // CHARACTER SHEEN: pearl/chrome legendaries get a hard wet highlight
+        // plus a wide soft one — this is what sells "expensive" at a glance
+        if (uGloss > 0.01) {
+          col += vec3(1.0) * pow(max(dot(normalize(vN), L), 0.0), 90.0) * uGloss * 0.9;
+          col += vec3(1.0, 0.98, 1.0) * pow(max(dot(normalize(vN), L), 0.0), 8.0) * uGloss * 0.14;
+        }
         vec3 L2 = normalize(vec3(0.55, 0.28, 0.55));
         col += vec3(0.82, 0.76, 1.0) * pow(max(dot(normalize(vN), L2), 0.0), 14.0) * 0.08;
         // ✦ interior star specks — twinkling, concentrated toward the dark core
@@ -218,6 +225,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // eyes: dark outline ring + sclera + tracking pupil + catchlight (2D spec)
   interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; }
   const eyes: Eye[] = [];
+  const charEyes: { star: THREE.Mesh; ring: THREE.Mesh }[] = [];   // legendary pupil overrides
   for (const sx of [-0.36, 0.36]) {
     const g = new THREE.Group();
     const sclera = new THREE.Group(); sclera.position.z = 1.0;
@@ -234,6 +242,16 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const catch_ = flat(0.046, 0xffffff); catch_.position.set(-0.038, 0.042, 0.01);
     const catch2 = flat(0.018, 0xffffff); catch2.position.set(0.032, -0.03, 0.01);
     pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
+    // ── CHARACTER EYES: legendary skins change the PUPIL, which is what your
+    // brain reads as "a different creature". Hidden on the default void.
+    const starPupil = new THREE.Mesh(new THREE.CircleGeometry(0.058, 5),
+      new THREE.MeshBasicMaterial({ color: 0xffe8a0, transparent: true, opacity: 0, depthWrite: false }));
+    starPupil.position.z = 0.012; starPupil.rotation.z = Math.PI;   // point up
+    const glowRing = new THREE.Mesh(new THREE.RingGeometry(0.085, 0.13, 28),
+      new THREE.MeshBasicMaterial({ color: 0x4de8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glowRing.position.z = 0.008;
+    pupilGrp.add(starPupil); pupilGrp.add(glowRing);
+    charEyes.push({ star: starPupil, ring: glowRing });
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
     face.add(g); eyes.push({ g, sclera, pupilGrp });
@@ -369,6 +387,45 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     orbit.add(sp); orbStars.push(sp);
   }
 
+  // ── SIGNATURE AURA: the third thing (after silhouette and eyes) that makes a
+  // legendary read as a CHARACTER — stars for the unicorn, embers for the
+  // dragon, bolts for the mecha. Twelve billboards, one shared texture per
+  // kind, drawn only when a skin asks for them.
+  const auraTex: Record<string, THREE.CanvasTexture> = {};
+  const makeAuraTex = (kind: string) => {
+    if (auraTex[kind]) return auraTex[kind];
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const x = cv.getContext('2d')!;
+    x.fillStyle = '#ffffff';
+    x.translate(32, 32);
+    if (kind === 'stars') {
+      x.beginPath();
+      for (let i = 0; i < 4; i++) { x.moveTo(0, 0); x.quadraticCurveTo(5, -6, 0, -28); x.quadraticCurveTo(-5, -6, 0, 0); x.rotate(Math.PI / 2); }
+      x.fill();
+    } else if (kind === 'bolts') {
+      x.beginPath(); x.moveTo(-4, -26); x.lineTo(9, -4); x.lineTo(1, -2); x.lineTo(6, 26); x.lineTo(-9, 3); x.lineTo(-1, 1); x.closePath(); x.fill();
+    } else {   // embers + bubbles: soft round dot
+      const gr = x.createRadialGradient(0, 0, 0, 0, 0, 28);
+      gr.addColorStop(0, 'rgba(255,255,255,1)');
+      gr.addColorStop(kind === 'bubbles' ? 0.55 : 0.35, 'rgba(255,255,255,0.55)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = gr; x.beginPath(); x.arc(0, 0, 28, 0, Math.PI * 2); x.fill();
+    }
+    const t = new THREE.CanvasTexture(cv);
+    auraTex[kind] = t; return t;
+  };
+  const AURA_N = 12;
+  const aura = new THREE.Group();
+  bob.add(aura);   // rides the squash/stretch so it feels attached to the body
+  const auraSp: THREE.Sprite[] = [];
+  const auraSeed: number[] = [];
+  for (let i = 0; i < AURA_N; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    sp.scale.setScalar(0.2);
+    aura.add(sp); auraSp.push(sp); auraSeed.push(Math.random() * Math.PI * 2);
+  }
+  let auraOn = false, auraKind = 'stars', pupilSquash = 1;
+
   let radius = 4;
   // AAA growth feel: gameplay radius is the TARGET; what you SEE is a spring
   // chasing it with a slight underdamp — every meal lands as a visible jiggly
@@ -432,6 +489,31 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
       if (s.acc && acc[s.acc]) acc[s.acc].visible = true;
+      // ── apply the CHARACTER RIG (legendary skins only) ──────────────────
+      const ch = s.char;
+      const eyeMode = ch?.eyes;
+      for (const ce of charEyes) {
+        const sm = ce.star.material as THREE.MeshBasicMaterial;
+        const rm = ce.ring.material as THREE.MeshBasicMaterial;
+        sm.opacity = eyeMode === 'star' ? 1 : 0;
+        rm.opacity = eyeMode === 'glow' ? 0.9 : eyeMode === 'fierce' ? 0.75 : 0;
+        if (eyeMode === 'glow') rm.color.set(s.glow);
+        if (eyeMode === 'fierce') rm.color.set(s.rim);
+      }
+      // fierce = narrowed pupils (predator read); star/glow keep the round eye
+      pupilSquash = eyeMode === 'fierce' ? 0.72 : 1;
+      auraOn = !!ch?.aura;
+      auraKind = ch?.auraKind ?? 'stars';
+      if (auraOn) {
+        const t = makeAuraTex(auraKind);
+        for (const sp of auraSp) {
+          const m = sp.material as THREE.SpriteMaterial;
+          m.map = t; m.color.set(ch!.aura!); m.needsUpdate = true;
+        }
+      } else {
+        for (const sp of auraSp) (sp.material as THREE.SpriteMaterial).opacity = 0;
+      }
+      bodyMat.uniforms.uGloss.value = ch?.gloss ?? 0;
       skinHasTex = !!s.tex;
       if (s.tex) {
         let t = texCache.get(s.tex);
@@ -570,12 +652,35 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         const oy = Math.max(0.08, open) * mp.lid;
         e.sclera.scale.set(mp.wide, Math.max(0.08, oy) * mp.wide, 1);
         const pk = stageBoost * mp.pupil;
-        e.pupilGrp.scale.set(pk, Math.max(0.08, oy) * pk, 1);
+        e.pupilGrp.scale.set(pk, Math.max(0.08, oy) * pk * pupilSquash, 1);
       }
       // mouth: smile scale + smirk tilt + frown flip (scale.y through ~0 = flat)
       mouth.scale.set(mp.smile, Math.sign(mp.mouthY || 1) * Math.max(0.06, Math.abs(mp.mouthY)) * mp.smile, 1);
       mouth.rotation.z = Math.PI + mp.smirk;
       mouth.position.y = mp.mouthY < 0 ? -0.22 : -0.28;   // frowns ride a touch higher
+
+      // ── SIGNATURE AURA: sparkles orbit the body on their own little paths.
+      // Stars twinkle and drift; embers rise and fade; bubbles bob; bolts
+      // flicker. Costs 12 sprites and gives every legendary a moving identity.
+      if (auraOn) {
+        for (let i = 0; i < AURA_N; i++) {
+          const sp = auraSp[i], sd = auraSeed[i];
+          const a = sd + s.t * (auraKind === 'bolts' ? 1.4 : 0.55) + i * 0.52;
+          const rr = 1.24 + Math.sin(s.t * 0.9 + sd) * 0.1;
+          const rise = auraKind === 'embers' ? ((s.t * 0.42 + sd) % 1) : 0;
+          sp.position.set(
+            Math.cos(a) * rr,
+            Math.sin(sd * 3.1 + s.t * 0.8) * 0.55 + rise * 1.5 - (auraKind === 'embers' ? 0.5 : 0),
+            Math.sin(a) * rr,
+          );
+          const tw = auraKind === 'bolts'
+            ? (Math.sin(s.t * 9 + sd * 5) > 0.35 ? 1 : 0.05)
+            : 0.45 + 0.55 * Math.sin(s.t * 2.4 + sd * 4);
+          const fade = auraKind === 'embers' ? 1 - rise : 1;
+          (sp.material as THREE.SpriteMaterial).opacity = tw * fade * 0.85;
+          sp.scale.setScalar((auraKind === 'bubbles' ? 0.2 : 0.26) * (0.7 + tw * 0.5));
+        }
+      }
 
       // contact shadow tracks the void on the floor
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.02);
@@ -590,24 +695,46 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 export function buildAccessory(kind: string): THREE.Group {
   const g = new THREE.Group();
   if (kind === 'unicorn') {
-    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.72, 10),
-      new THREE.MeshStandardMaterial({ color: 0xffd9f0, roughness: 0.3, metalness: 0.4, emissive: 0xff9ad8, emissiveIntensity: 0.3 }));
-    horn.position.set(0, 1.2, 0.16); horn.rotation.x = 0.24; g.add(horn);
-    const earMat = new THREE.MeshStandardMaterial({ color: 0xf6e8ff, roughness: 0.6 });
-    for (const sx of [-0.44, 0.44]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 8), earMat);
-      ear.position.set(sx, 1.0, 0); ear.rotation.z = -sx * 0.9; g.add(ear);
+    // matches the Uni-Void card: a BIG rainbow spiral horn and real fluffy
+    // ears with pink inners. The old 0.16×0.72 nub was invisible in play.
+    const RAINBOW = [0xff5d7e, 0xffb054, 0xffe066, 0x7ef2a0, 0x6fd8ff, 0xb875ff];
+    for (let i = 0; i < 6; i++) {
+      const t = i / 6;
+      const seg = new THREE.Mesh(new THREE.ConeGeometry(0.3 * (1 - t * 0.82), 0.2, 12, 1, true),
+        new THREE.MeshStandardMaterial({ color: RAINBOW[i], roughness: 0.25, metalness: 0.45,
+          emissive: RAINBOW[i], emissiveIntensity: 0.45 }));
+      seg.position.set(0, 1.12 + t * 0.92, 0.12);
+      seg.rotation.set(0.2, t * 2.4, 0);   // twisting spiral
+      seg.scale.setScalar(1 - t * 0.08);
+      g.add(seg);
+    }
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.24, 10),
+      new THREE.MeshStandardMaterial({ color: 0xfff0ff, emissive: 0xffd2f0, emissiveIntensity: 1.1, roughness: 0.2 }));
+    tip.position.set(0, 2.16, 0.12); tip.rotation.x = 0.2; g.add(tip);
+    const earMat = new THREE.MeshStandardMaterial({ color: 0xfbf2ff, roughness: 0.55 });
+    const innerMat = new THREE.MeshStandardMaterial({ color: 0xffb8d8, roughness: 0.7 });
+    for (const sx of [-0.62, 0.62]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.66, 10), earMat);
+      ear.position.set(sx, 0.95, 0.05); ear.rotation.z = -sx * 0.55; g.add(ear);
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.42, 8), innerMat);
+      inner.position.set(sx * 0.94, 0.94, 0.19); inner.rotation.z = -sx * 0.55; g.add(inner);
     }
   }
   else if (kind === 'dino') {
-    const m = new THREE.MeshStandardMaterial({ color: 0x2e7a34, roughness: 0.6 });
-    for (let i = 0; i < 4; i++) {
-      const th = 0.16 + i * 0.36;
-      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.36, 6), m);
-      sp.position.set(0, Math.cos(th) * 1.0, -Math.sin(th) * 1.0);
+    // a real dorsal crest (6 tall plates) + horns — reads as DINO at any zoom
+    const m = new THREE.MeshStandardMaterial({ color: 0x2e7a34, roughness: 0.55 });
+    const m2 = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.5 });
+    for (let i = 0; i < 6; i++) {
+      const th = 0.1 + i * 0.3;
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.62, 4), i % 2 ? m2 : m);
+      sp.position.set(0, Math.cos(th) * 1.02, -Math.sin(th) * 1.02);
       sp.rotation.x = -th;
-      sp.scale.setScalar(1 - i * 0.13);
+      sp.scale.setScalar(1.05 - i * 0.11);
       g.add(sp);
+    }
+    for (const sx of [-0.4, 0.4]) {   // little brow horns
+      const hn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.34, 7), m2);
+      hn.position.set(sx, 1.0, 0.22); hn.rotation.set(0.3, 0, -sx * 0.7); g.add(hn);
     }
   }
   else if (kind === 'wizard') {
@@ -623,10 +750,10 @@ export function buildAccessory(kind: string): THREE.Group {
   else if (kind === 'dragon') {
     const wingMat = new THREE.MeshStandardMaterial({ color: 0x2a8a9a, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x1a5a6a, emissiveIntensity: 0.3 });
     for (const sx of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.CircleGeometry(0.62, 5, 0, Math.PI * 0.7), wingMat);
-      wing.position.set(sx * 0.82, 0.62, -0.5);
+      const wing = new THREE.Mesh(new THREE.CircleGeometry(0.95, 5, 0, Math.PI * 0.72), wingMat);
+      wing.position.set(sx * 0.88, 0.72, -0.5);
       wing.rotation.set(0.3, sx * 1.1, sx * 0.9);
-      wing.scale.set(1.5, 1, 1); g.add(wing);
+      wing.scale.set(1.6, 1.15, 1); g.add(wing);
     }
     const hornMat = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.35, metalness: 0.4 });
     for (const sx of [-0.3, 0.3]) {
@@ -642,11 +769,14 @@ export function buildAccessory(kind: string): THREE.Group {
   }
   else if (kind === 'mecha') {
     const chrome = new THREE.MeshStandardMaterial({ color: 0xb8c4d0, metalness: 0.8, roughness: 0.25 });
-    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.7, 6), chrome);
-    ant.position.set(0.18, 1.24, 0); g.add(ant);
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
-      new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.4 }));
-    tip.position.set(0.18, 1.62, 0); g.add(tip);
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.0, 6), chrome);
+    ant.position.set(0.18, 1.42, 0); g.add(ant);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0x4de8ff, emissive: 0x4de8ff, emissiveIntensity: 1.8 }));
+    tip.position.set(0.18, 1.98, 0); g.add(tip);
+    // brow plate: the single strongest "this is a robot" cue at gameplay size
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.2, 0.3), chrome);
+    brow.position.set(0, 0.62, 0.72); brow.rotation.x = 0.32; g.add(brow);
     for (const sx of [-1, 1]) {   // ear pods
       const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 10), chrome);
       pod.rotation.z = Math.PI / 2; pod.position.set(sx * 1.02, 0.12, 0); g.add(pod);

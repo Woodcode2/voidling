@@ -371,6 +371,40 @@
         animation: giftWiggle 2.4s ease-in-out infinite; box-shadow: 0 0 18px rgba(255,224,138,0.25); }
       @keyframes giftWiggle { 0%, 100% { transform: rotate(0); } 6% { transform: rotate(-8deg); } 12% { transform: rotate(8deg); } 18% { transform: rotate(0); } }
 
+      /* ── settings ── */
+      #btnSettings { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
+        z-index: 3; width: 44px; height: 44px; border-radius: 13px; font-size: 20px;
+        background: rgba(30,16,58,0.7); border: 2px solid rgba(201,166,255,0.32); }
+      #btnSettings:active { transform: scale(0.94); }
+      #settings { position: fixed; inset: 0; z-index: 46; display: none; align-items: center; justify-content: center;
+        background: rgba(10,5,22,0.82); backdrop-filter: blur(6px); }
+      #settings.show { display: flex; }
+      #settings.show .setCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
+      #settings .setCard { width: min(330px, calc(100vw - 32px)); box-sizing: border-box; border-radius: 24px; text-align: center; padding: 24px 18px 20px;
+        background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
+        border: 2.5px solid rgba(201,166,255,0.5); box-shadow: 0 0 40px rgba(154,92,255,0.45); }
+      #settings .setTitle { font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff; margin-bottom: 16px; }
+      #settings .setRow { display: flex; width: 100%; align-items: center; justify-content: space-between;
+        font-family: inherit; font-size: 15px; font-weight: 900; letter-spacing: 1px; color: #e8dcff;
+        background: rgba(255,255,255,0.07); border: 2px solid rgba(168,123,255,0.28); border-radius: 15px;
+        padding: 14px 18px; margin-bottom: 10px; cursor: pointer; }
+      #settings .setRow b { color: #7ef2a0; font-size: 14px; letter-spacing: 1.5px; }
+      #settings .setRow.off { opacity: 0.65; }
+      #settings .setRow.off b { color: #ff8a9a; }
+      #settings .setRow:active { transform: scale(0.97); }
+      #settings .setNote { font-size: 11px; font-weight: 700; color: #9a86c8; line-height: 1.6; margin: 14px 0 16px; }
+      #setClose { font-family: inherit; font-size: 16px; font-weight: 900; letter-spacing: 2px; color: #fff;
+        background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 15px; padding: 13px 42px;
+        cursor: pointer; box-shadow: 0 5px 0 #b8163a; }
+      #setClose:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
+      /* ── shop tier headers: the money must not be four scrolls down ── */
+      .shopTier { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+        font-size: 12px; font-weight: 900; letter-spacing: 2.5px; color: #cbb2ff; margin: 6px 0 2px; }
+      .shopTier::after { content: ''; flex: 1; height: 2px; border-radius: 1px; background: rgba(201,166,255,0.2); }
+      .shopTier.gold { color: #ffd25a; }
+      .shopTier.gold::after { background: rgba(255,210,90,0.35); }
+      .shopTier span { font-size: 9.5px; font-weight: 800; letter-spacing: 1px; color: #8a7ab0; }
+
       /* ── meta screens (trophies / top voids) ── */
       .metaScr { position: fixed; inset: 0; z-index: 11; display: none; flex-direction: column; align-items: center;
         background: rgba(13,8,33,0.96); backdrop-filter: blur(8px); padding-top: 26px; overflow-y: auto; }
@@ -418,6 +452,9 @@
       .skCard .orb { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; position: relative; overflow: hidden;
         box-shadow: 0 8px 18px rgba(0,0,0,0.45), inset 0 -6px 14px rgba(0,0,0,0.3); }
       .skCard .face { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      /* art sits ON TOP of the face; a failed load leaves it empty and the
+         branded gradient + face read through — never a bare circle */
+      .skCard .artLay { position: absolute; inset: 0; background-size: cover; background-position: center; pointer-events: none; }
       .skCard .nm { font-size: 15px; font-weight: 900; color: #fff; letter-spacing: 1px; }
       .skCard .pr { font-size: 12px; font-weight: 900; margin-top: 5px; color: #ffe08a; }
       .skCard .pr.owned { color: #7ef2a0; }
@@ -522,7 +559,19 @@
         <button class="navCard" id="btnTrophies"><i>🏆</i>TROPHIES</button>
         <button class="navCard" id="btnTop"><i>👑</i>TOP VOIDS</button>
       </div>
+      <button id="btnSettings" title="settings">⚙️</button>
       <button id="gift" title="free gift!">🎁</button>
+    </div>
+
+    <!-- ── settings: sound toggle + about (App Store expects both) ── -->
+    <div id="settings">
+      <div class="setCard">
+        <div class="setTitle">SETTINGS</div>
+        <button class="setRow" id="setSound"><span>🔊 SOUND</span><b>ON</b></button>
+        <button class="setRow" id="setHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
+        <div class="setNote">VOIDLING · the cute world ender<br>made for kids who like snacks 🍩</div>
+        <button id="setClose">DONE</button>
+      </div>
     </div>
 
     <!-- ── world select ── -->

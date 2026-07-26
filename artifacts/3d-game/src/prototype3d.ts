@@ -159,7 +159,7 @@ const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 5);   // the WHOLE family shows up (full end-board)
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
-  YIKES: 'Cousin', DAZZLE: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', SNOOZLE: 'Grandpa',
+  WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
 };
 rivals.onJoin = (name, color, x, z) => {
   announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined the feast!`);
@@ -329,7 +329,9 @@ function announce(text: string) {
 // Rate-capped so a feeding frenzy doesn't turn the phone into a massager.
 let buzzGate = 0, hadGesture = false;
 window.addEventListener('pointerdown', () => { hadGesture = true; }, { once: true });
+let hapticsOn = localStorage.getItem('voidHaptics') !== '0';
 function buzz(ms: number) {
+  if (!hapticsOn) return;
   const now = performance.now();
   if (ms < 20 && now < buzzGate) return;   // ticks are rate-limited; big hits always land
   buzzGate = now + 70;
@@ -1104,8 +1106,8 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
   const mul = [1.85, 1.6, 1.38, 1.2, 1.08, 0.86, 0.55];
   const seeds = [
     { name: 'CHOMPZILLA', color: 0x7ed57a }, { name: 'BITSY', color: 0xff9a3a },
-    { name: 'DAZZLE', color: 0xff6fb0 }, { name: 'SNOOZLE', color: 0x4d8ff0 },
-    { name: 'YIKES', color: 0x2fd8c0 }, { name: 'B1G-B1TE', color: 0xd85a5a },
+    { name: 'GLITZ', color: 0xff6fb0 }, { name: 'DOZER', color: 0x4d8ff0 },
+    { name: 'WOBBLES', color: 0x2fd8c0 }, { name: 'B1G-B1TE', color: 0xd85a5a },
     { name: 'snackrat', color: 0xb98cff },
   ].map((s, i) => ({ ...s, score: Math.round((anchor * mul[i]) / 5) * 5 }));
   const rows = [...seeds, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
@@ -1179,6 +1181,28 @@ renderRank();
     modal.classList.add('show');
   }
 }
+// ── SETTINGS: sound + rumble toggles, persisted. A parent (and an App Store
+// reviewer) expects to be able to silence a kids' game in one tap.
+{
+  const panel = el('settings');
+  const sndRow = el('setSound'), hapRow = el('setHaptics');
+  const paint = () => {
+    const sOff = audio.isMuted();
+    sndRow.classList.toggle('off', sOff);
+    sndRow.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
+    hapRow.classList.toggle('off', !hapticsOn);
+    hapRow.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+  };
+  el('btnSettings').addEventListener('click', () => { paint(); panel.classList.add('show'); });
+  el('setClose').addEventListener('click', () => panel.classList.remove('show'));
+  panel.addEventListener('click', (e) => { if (e.target === panel) panel.classList.remove('show'); });
+  sndRow.addEventListener('click', () => { audio.setMuted(!audio.isMuted()); paint(); });
+  hapRow.addEventListener('click', () => {
+    hapticsOn = !hapticsOn;
+    localStorage.setItem('voidHaptics', hapticsOn ? '1' : '0');
+    paint(); if (hapticsOn) buzz(30);
+  });
+}
 // EXPLICIT debug params only skip the menu — arbitrary query strings on shared
 // links (?utm_source=…) must land on the real splash like any player
 if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'); beginMatch(); }
@@ -1213,17 +1237,31 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
         : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}`;
     }
   };
-  // shop order tells the value story: colours → AI textures → LEGENDARY
-  const SORTED = [...SKINS].sort((a, b) =>
-    (a.cash ? 2 : a.tex ? 1 : 0) - (b.cash ? 2 : b.tex ? 1 : 0));
+  // LEGENDARY FIRST. The old order buried every cash skin four scrolls below
+  // the fold — the shop opened on 150-coin swatches and a kid never saw the
+  // characters. Now the store opens on the heroes, then epics, then colours.
+  const tierOf = (s: Skin) => (s.cash ? 0 : s.tex ? 1 : 2);
+  const SORTED = [...SKINS].sort((a, b) => tierOf(a) - tierOf(b));
+  const TIER_HEAD = [
+    '<div class="shopTier gold">✨ LEGENDARY <span>CHARACTERS</span></div>',
+    '<div class="shopTier">💫 EPIC <span>SPEND ✦ COINS</span></div>',
+    '<div class="shopTier">🎨 EVERYDAY <span>SPEND ✦ COINS</span></div>',
+  ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
   // still shows a branded colored orb, never a bare black hole on a $4.99 card
   const skinGrad = (s: Skin) => `radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
-  const orbStyle = (s: Skin) => s.art
-    ? `background: url('${s.art}') center / cover, ${skinGrad(s)}; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
+  const orbStyle = (s: Skin) => s.cash
+    ? `background: ${skinGrad(s)}; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
     : s.tex
-      ? `background: url('${s.tex}') center / cover, ${skinGrad(s)}; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.45);`
+      ? `background: ${skinGrad(s)}; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.45);`
       : `background: ${skinGrad(s)}`;
+  // the ART rides ABOVE the face on its own layer: when the CDN blinks the
+  // layer is simply empty and the branded gradient + face show through, so a
+  // premium card can never render as a bare circle
+  const artLayer = (s: Skin) => {
+    const src = s.art ?? s.tex;
+    return src ? `<div class="artLay" style="background-image:url('${src}')"></div>` : '';
+  };
   // every orb wears the FACE — it's the voidling you're buying, not a marble
   // (legendary card art already has the character drawn in)
   const FACE_SVG = `<svg class="face" viewBox="0 0 100 100">
@@ -1283,11 +1321,21 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     localStorage.setItem('voidSkin', s.id);
     refresh(); refreshPreview();
   });
+  let lastTier = -1;
   for (const s of SORTED) {
+    const tier = tierOf(s);
+    if (tier !== lastTier) {
+      lastTier = tier;
+      const hd = document.createElement('div');
+      hd.innerHTML = TIER_HEAD[tier];
+      grid.appendChild(hd.firstElementChild!);
+    }
     const card = document.createElement('div');
     card.className = 'skCard' + (s.cash ? ' legend' : s.tex ? ' epic' : '');
     const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : s.tex ? '<div class="rib epicRib">EPIC</div>' : '';
-    card.innerHTML = `${ribbon}<div class="orb" style="${orbStyle(s)}">${s.art ? '' : FACE_SVG}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
+    // the face ALWAYS renders under the art: if the art CDN blinks, a $9.99
+    // card must still show a voidling, never a bare gradient circle
+    card.innerHTML = `${ribbon}<div class="orb" style="${orbStyle(s)}">${FACE_SVG}${artLayer(s)}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => openPreview(s));
     cards.set(s.id, card);
     grid.appendChild(card);
@@ -1331,10 +1379,19 @@ function animate() {
       // hole.io opening: the first 30s run HOT so the first evolution lands
       // around ~15s and a new player feels growth immediately; then it settles
       const el2 = matchLen - matchClock;
-      const lawCap = START_R + 0.022 * Math.min(el2, 30) + LAW_RATE * el2;
+      // ── THE FINALE SURGE ────────────────────────────────────────────────
+      // The old law topped out at 6.06 on a 3:00 clock — so WORLD ENDER (5.0)
+      // was reached and then barely grew, and R_CAP 12 was unreachable dead
+      // code. The last third is now the POWER FANTASY: the ceiling opens up
+      // hard, so earning the final form actually feels like ending a world.
+      const surgeT = Math.max(0, el2 - matchLen * 0.66) / Math.max(1, matchLen * 0.34);
+      const lawCap = START_R + 0.022 * Math.min(el2, 30) + LAW_RATE * el2
+        + surgeT * surgeT * 4.2;   // +0 at 2/3, +4.2 at the whistle (~10.3 ceiling)
       if (voidling.radius > lawCap) voidling.setRadius(lawCap);
       // 2D score-floor: strong scoring pulls your radius up toward the cap
-      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)));
+      // the floor rides the surge too — a strong late run is PULLED to the
+      // new ceiling instead of being pinned at the old 6.06 plateau
+      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6);
       if (voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
     }
   }

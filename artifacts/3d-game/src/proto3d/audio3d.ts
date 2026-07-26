@@ -19,17 +19,22 @@ export interface Audio3D {
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
+  setMuted(m: boolean): void;      // settings toggle (App Store expects one)
+  isMuted(): boolean;
 }
 
 export function createAudio(): Audio3D {
   let ctx: Ctx | null = null;
   let master: GainNode | null = null;
+  // persisted mute — a parent hitting mute expects it to STAY muted tomorrow
+  let muted = localStorage.getItem('voidMute') === '1';
+  const MASTER_VOL = 0.32;
 
   function ensure(): Ctx | null {
     if (!ctx) {
       try {
         ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        master = ctx.createGain(); master.gain.value = 0.32; master.connect(ctx.destination);
+        master = ctx.createGain(); master.gain.value = muted ? 0 : MASTER_VOL; master.connect(ctx.destination);
       } catch { return null; }
     }
     if (ctx.state === 'suspended') void ctx.resume();
@@ -276,6 +281,15 @@ export function createAudio(): Audio3D {
       startSynth();
     },
     setMusicStage(n) { musStage = n; },
+    setMuted(m: boolean) {
+      muted = m;
+      localStorage.setItem('voidMute', m ? '1' : '0');
+      if (master && ctx) {
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setTargetAtTime(m ? 0 : MASTER_VOL, ctx.currentTime, 0.05);
+      }
+    },
+    isMuted() { return muted; },
     stopMusic() {
       themeWanted = false;
       stopThemeLoop(1.2);

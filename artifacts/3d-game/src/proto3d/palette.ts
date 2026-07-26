@@ -77,12 +77,23 @@ export const PROPS = {
 // rarity tiers: colour skins (common, coins) → `tex` AI-texture skins (epic,
 // coins) → `cash` LEGENDARY character skins (AI card art + 3D accessory `acc`,
 // real-money tier — IAP lands with the App Store build)
+// A LEGENDARY is a CHARACTER, not a colour swatch. `char` is what makes the
+// in-game void actually look like the art on the card a player paid for:
+// its eyes change shape, it wears a real silhouette, and it carries its own
+// signature aura. (Five colours + one prop was never going to get there.)
+export interface SkinChar {
+  eyes?: 'star' | 'glow' | 'sleepy' | 'fierce';   // pupil treatment
+  aura?: number;                                   // orbiting sparkle colour
+  auraKind?: 'stars' | 'embers' | 'bubbles' | 'bolts';
+  gloss?: number;                                  // extra specular punch (pearl/chrome)
+}
 export interface Skin {
   id: string; name: string;
   abyss: number; inner: number; mid: number; rim: number; glow: number;
   tex?: string;                                    // epic: AI texture wrap
   art?: string;                                    // legendary: AI card icon
   acc?: 'unicorn' | 'dino' | 'wizard' | 'king' | 'dragon' | 'mecha' | 'ninja';   // legendary: 3D accessory
+  char?: SkinChar;                                 // legendary: full character rig
   cash?: number;                                   // legendary: USD price
   streak?: number;                                 // unlock by daily play streak
 }
@@ -109,22 +120,22 @@ export const SKINS: Skin[] = [
   // ✨ LEGENDARY — character skins with 3D accessories, cash tier.
   // Colour stops are tuned to MATCH each skin's shop card art (App Store
   // advertising accuracy): the in-game orb must read as the same character.
-  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', cash: 4.99,
+  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', char: { eyes: 'star', aura: 0xffd2f0, auraKind: 'stars', gloss: 1.4 }, cash: 4.99,
     art: '/assets/hf/hf_20260717_221342_1fed1f77-b19c-416e-9e0d-e84a02a57845.png' },
-  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', cash: 4.99,
+  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', char: { eyes: 'fierce', aura: 0xb8ff8a, auraKind: 'bubbles', gloss: 0.5 }, cash: 4.99,
     art: '/assets/hf/hf_20260723_181705_6e91b3cd-72f3-4867-817f-58dbd714d5a9.jpeg' },
-  { id: 'archmage', name: 'Archmage', abyss: 0x0e0c38, inner: 0x2c2088, mid: 0x4635d8, rim: 0x8878ff, glow: 0xb0a4ff, acc: 'wizard', cash: 6.99,
+  { id: 'archmage', name: 'Archmage', abyss: 0x0e0c38, inner: 0x2c2088, mid: 0x4635d8, rim: 0x8878ff, glow: 0xb0a4ff, acc: 'wizard', char: { eyes: 'glow', aura: 0xa89aff, auraKind: 'stars', gloss: 0.7 }, cash: 6.99,
     art: '/assets/hf/hf_20260717_221344_d766bd2d-ba32-4cf3-8ed0-fef26f6116b8.png' },
   // King Void card art: BLACK glossy orb with a purple-nebula heart, wrapped
   // in a swirling gold-stardust ring — body stays dark, the RIM is the gold
-  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', cash: 9.99,
+  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', char: { eyes: 'glow', aura: 0xffd25a, auraKind: 'stars', gloss: 1.2 }, cash: 9.99,
     art: '/assets/hf/hf_20260717_221346_49c57d8f-d589-4a59-9c11-b5d96dbd9bc7.png' },
   // Drako card art: teal-blue dragon orb, warm golden glow around the edges
-  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', cash: 7.99,
+  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9 }, cash: 7.99,
     art: '/assets/hf/hf_20260723_181409_a7a76db9-9711-48e8-9e0e-4f43188251d0.jpeg' },
-  { id: 'mecha', name: 'Mecha-Void', abyss: 0x131a24, inner: 0x30485e, mid: 0x5e80a0, rim: 0x4de8ff, glow: 0x7bffe8, acc: 'mecha', cash: 5.99,
+  { id: 'mecha', name: 'Mecha-Void', abyss: 0x131a24, inner: 0x30485e, mid: 0x5e80a0, rim: 0x4de8ff, glow: 0x7bffe8, acc: 'mecha', char: { eyes: 'glow', aura: 0x4de8ff, auraKind: 'bolts', gloss: 1.6 }, cash: 5.99,
     art: '/assets/hf/hf_20260723_181412_8c2d9932-42ce-43ce-8027-299428ce21fc.jpeg' },
-  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', cash: 4.99,
+  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', char: { eyes: 'fierce', aura: 0xff4d5e, auraKind: 'bolts', gloss: 0.4 }, cash: 4.99,
     art: '/assets/hf/hf_20260723_181414_a23e8298-d3ea-47e4-bba9-d7a468fc88e1.jpeg' },
 ];
 

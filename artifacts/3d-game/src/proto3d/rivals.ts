@@ -19,9 +19,9 @@ export interface Rivals {
   reset(): void;                                         // instant rematch
 }
 
-const NAMES = ['YIKES', 'DAZZLE', 'BITSY', 'CHOMPZILLA', 'SNOOZLE'];
+const NAMES = ['WOBBLES', 'GLITZ', 'BITSY', 'CHOMPZILLA', 'DOZER'];
 // the family: anxious / show-off / baby / drama queen / sleepy. Names ARE the
-// personalities now (YIKES saying "I KNEW this would happen" is the joke).
+// personalities now (Wobbles saying "I KNEW this would happen" is the joke).
 // All lines <=26 chars so bubbles never wrap.
 export const RIVAL_VOICE: Record<string, {
   taunt: string[]; respawn: string[]; eaten: string[];
@@ -29,7 +29,7 @@ export const RIVAL_VOICE: Record<string, {
   nearBig: string[]; nearSmall: string[]; rankUp: string[];
   visit: string[];   // the swing-by-and-say-hi lines (family, not enemies)
 }> = {
-  YIKES: {
+  WOBBLES: {
     taunt: ['sorry!! but also: yum!!', 'I ate it?? I ATE IT!', "don't be mad don't be mad", 'oh no. am I winning??', 'was that ok to eat??', 'eek— I mean… NOM!'],
     respawn: ['I KNEW this would happen', 'ow. told you. OW.', 'respawning. nervously.', "is it safe?? it's not."],
     eaten: ['called it.', "it's dark in here??", 'worst. day. EVER.'],
@@ -41,7 +41,7 @@ export const RIVAL_VOICE: Record<string, {
     rankUp: ['I passed you?? sorry!!', 'winning is stressful!!', 'how did THAT happen'],
     visit: ['hi!! just checking on you', 'you look bigger?? EEP', 'stay safe ok?? ok bye!!', 'I brought moral support'],
   },
-  DAZZLE: {
+  GLITZ: {
     taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, superstar'],
     respawn: ['I meant to do that', 'nobody saw that. good.', 'a fluke. obviously.', 'my glow!! ruined!!'],
     eaten: ["unfair!! I'm the STAR", 'my fans will hear of this', 'rude AND jealous'],
@@ -57,7 +57,7 @@ export const RIVAL_VOICE: Record<string, {
     taunt: ['nom nom nom hehe', 'I did a WINNING!', 'big bite! BIGGEST bite!', 'dat one was YUMMY', 'me first! ME FIRST!', 'look!! I ate a house!!'],
     respawn: ['owie.', 'I want a do-over!!', 'not fair!! *sniff*', 'nap. then REVENGE.'],
     eaten: ['waaaAAAH!!', "you're a MEANIE", "I'm telling CHOMPZILLA"],
-    steal: ['MINE! dat was MINE!!', 'gimme it BACK!!', "I'm telling SNOOZLE!!"],
+    steal: ['MINE! dat was MINE!!', 'gimme it BACK!!', "I'm telling DOZER!!"],
     escape: ["can't catch meee!", 'hehehe too wiggly!', 'nyoom nyoom nyoom!'],
     bite: ['CHOMP! hehehe', 'you taste like grape', 'oopsie chompsie!'],
     nearBig: ["I'm da BIG kid now!", 'look how BIG I got!!', 'fear my tiny might!!'],
@@ -77,7 +77,7 @@ export const RIVAL_VOICE: Record<string, {
     rankUp: ['the LEAD is my destiny', 'a STAR is reborn!!', 'weep, understudy!!'],
     visit: ['a VISIT from greatness', 'we feast TOGETHER, kid', 'the gala is SATURDAY', 'family!! DRAMATIC hug!!'],
   },
-  SNOOZLE: {
+  DOZER: {
     taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],
     respawn: ['best nap ever', "wake me when it's safe", 'ugh. mornings.', 'snooze… then chomp'],
     eaten: ['finally, a nap', 'cozy in here, actually', 'zzzzz…'],
@@ -195,10 +195,10 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
   // (skipped when a legendary skin brings its own 3D accessory — no double hats)
   const bmat = (c2: number) => new THREE.MeshBasicMaterial({ color: c2 });
   if (sk.acc) { /* legendary accessory IS the look */ }
-  else if (idx % 5 === 0) {   // YIKES: sweat drop at the temple
+  else if (idx % 5 === 0) {   // WOBBLES: sweat drop at the temple
     const drop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.9, depthWrite: false }));
     drop.scale.set(1, 1.5, 1); drop.position.set(0.5, 0.72, 0.5); group.add(drop);
-  } else if (idx % 5 === 1) {   // DAZZLE: star shades (billboard with the eyes)
+  } else if (idx % 5 === 1) {   // GLITZ: star shades (billboard with the eyes)
     for (const sx of [-0.32, 0.32]) {
       const lens = new THREE.Mesh(new THREE.CircleGeometry(0.15, 16), new THREE.MeshBasicMaterial({ color: 0x140a26, depthTest: false, depthWrite: false }));
       lens.position.set(sx, 0.1, 1.03); lens.renderOrder = 7; eyes.add(lens);
@@ -218,7 +218,7 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
       spike.position.set(Math.cos(a) * 0.15, 0.11, Math.sin(a) * 0.15); crown.add(spike);
     }
     crown.position.set(0.12, 0.96, 0.1); crown.rotation.z = -0.3; group.add(crown);
-  } else {   // SNOOZLE: floppy nightcap + pom-pom
+  } else {   // DOZER: floppy nightcap + pom-pom
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 12), bmat(0x4d6bff));
     cap.position.set(0, 1.0, 0); cap.rotation.z = 0.7; group.add(cap);
     const pom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bmat(0xffffff));
@@ -249,16 +249,25 @@ export function createRivals(
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member
   // looks like something the player wants to own. Unique per rival, shuffled
   // per boot so each match features a different line-up.
-  const showcase = (() => SKINS.filter((s) => s.acc).sort(() => Math.random() - 0.5))();
+  // FIXED CASTING: every family member always wears the SAME legendary, so a
+  // kid learns "the sparkly unicorn is Uncle Glitz" instead of meeting five
+  // strangers in new costumes every match. Recognition is the whole point.
+  const FAMILY_SKIN: Record<string, string> = {
+    WOBBLES: 'mecha', GLITZ: 'univoid', BITSY: 'rexling',
+    CHOMPZILLA: 'kingvoid', DOZER: 'archmage',
+  };
+  const skinFor = (nm: string): Skin =>
+    SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];
   for (let i = 0; i < count; i++) {
-    const sk = showcase[i % showcase.length];
+    const nm = NAMES[i % NAMES.length];
+    const sk = skinFor(nm);
     const color = sk.rim;
     const { group, eyes, halo } = makeRivalMesh(sk, i);
     scene.add(group); scene.add(halo);
     group.visible = halo.visible = false;   // hidden until they join the feast
     // spread rivals around the island away from the player start
     const ang = (i / count) * Math.PI * 2 + 0.6;
-    rivals.push({ name: NAMES[i % NAMES.length], color, score: 0, r: START_R, group, eyes, halo,
+    rivals.push({ name: nm, color, score: 0, r: START_R, group, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
