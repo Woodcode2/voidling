@@ -73,10 +73,15 @@ export const BAY_REGIONS: BayRegion[] = [
 // begins — so the island's only path missed the spawn district at one end and
 // the old town at the other, and the shuttle buggies ping-ponged between two
 // patches of bare sand.
+// Both ends were re-measured against the landmarks they pass: pushing the
+// north end out to 5600 put the fort inside the boardwalk's clearance, and
+// running the south end through Dance Cove did the same to the main stage.
+// It now stops on the district's north edge, which reaches it without
+// bulldozing it. (6300,9600 is off the land entirely — the coast moved when
+// the bay's south lobe was reshaped — so that node went too.)
 export const PROMENADE: Pt[] = [
-  [5600, 1750], [6600, 1900], [7300, 2900], [7900, 3900], [8600, 4900], [8800, 6100],
-  [8500, 7300], [7900, 8300], [7100, 9000], [6300, 9600], [5800, 10100], [6500, 10450],
-  [7400, 10600],
+  [6100, 1800], [6600, 1900], [7300, 2900], [7900, 3900], [8600, 4900], [8800, 6100],
+  [8500, 7300], [7900, 8300], [7100, 9000], [6100, 10050], [6800, 10280],
 ];
 export const TRAIL: Pt[] = [
   [6200, 3500], [5000, 4200], [4000, 5200], [3200, 6200], [2700, 7400], [3400, 8600],

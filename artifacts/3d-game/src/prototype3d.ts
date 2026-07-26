@@ -257,7 +257,7 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
     port: [71, -146], oldtown: [-5.8, -185], resort: [141.4, -28.6], party: [71, 224.4],
     market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6],
     bay: [45, 75],   // debug: drop INTO the bay to exercise the water-escape
-    axis: [128, -101], marina: [126, -28], stage: [70, 219] };
+    axis: [151, -16], marina: [126, -28], stage: [70, 219] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -304,7 +304,15 @@ function joySet(ev: PointerEvent) {
   const dx = ev.clientX - joy.ax, dy = ev.clientY - joy.ay;
   const m = Math.hypot(dx, dy);
   const k = m > JOY_R ? JOY_R / m : 1;
-  joy.dx = (dx * k) / JOY_R; joy.dy = (dy * k) / JOY_R; joy.mag = Math.min(1, m / JOY_R);
+  // THE DOUBLE RAMP. joy.dx/dy used to be (dx*k)/JOY_R, whose MAGNITUDE is
+  // already joy.mag — and the speed line then multiplied by joy.mag again. The
+  // response curve was squared, so the thumb had to travel about 1.7x further
+  // than intended: full speed needed the thumb exactly on the rim, half a ring
+  // gave 42%, and easing back after a re-anchor gave 6%. Measured against the
+  // intended curve at twelve rungs, the fit was exact. Direction is a UNIT
+  // vector now; joy.mag alone carries the ramp.
+  const inv = m > 0 ? 1 / m : 0;
+  joy.dx = dx * inv; joy.dy = dy * inv; joy.mag = Math.min(1, m / JOY_R);
   joyNubEl.style.left = `${joy.ax + dx * k}px`; joyNubEl.style.top = `${joy.ay + dy * k}px`;
   lastInput = tClock;
 }
@@ -716,6 +724,8 @@ function showNews() {
   audio.ready();   // a soft chime so headlines register even mid-chomp
 }
 
+let lastRankBrag = -99;
+let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 function refreshHud() {
   const R = voidling.radius;
@@ -729,7 +739,11 @@ function refreshHud() {
     announce(`👑 you passed ${rows[myRank]?.name ?? 'a rival'}!`);
     audio.ready(); buzz(20);
   }
-  if (started && !ended && prevRank > 0 && myRank > prevRank) {
+  // refreshHud runs 5x/s and rank oscillates, so this fired 18 times in one
+  // measured match — the banner channel that should carry HAPPY HOUR was
+  // mostly carrying rank noise. One brag per rival per 12 seconds.
+  if (started && !ended && prevRank > 0 && myRank > prevRank && tClock - lastRankBrag > 12) {
+    lastRankBrag = tClock;
     // a rival just passed YOU — they get to brag about it
     const passer = rows[myRank - 2];
     const rv = passer && !passer.me ? rivals.list.find((r) => r.name === passer.name) : undefined;
@@ -748,12 +762,16 @@ function refreshHud() {
   // hour of snacking read 0% because towers own the mass). One prop = one
   // tick, so a kid sees the number move in the first minute — and Solo's
   // "devour 100%" honestly means "ate everything".
-  let consumed = 0, total = 0;
-  for (const e of edibles) { total++; if (e.eaten || !e.mesh.visible) consumed++; }
+  // MINE vs THEIRS. This counted every prop eaten by ANYONE, so a player who
+  // scored 31 points all match was told "85% DEVOURED" — the second-biggest
+  // number on screen was mostly a report on what the family had done. Split it.
+  let consumed = 0, total = 0, mine = 0;
+  for (const e of edibles) { total++; if (e.eaten || !e.mesh.visible) { consumed++; if (e.mesh.userData.byPlayer) mine++; } }
   if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
   if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
-  devEl.textContent = `${devouredPct}% DEVOURED`;
+  const minePct = Math.min(100, Math.round((mine / Math.max(1, initialMass)) * 100));
+  devEl.innerHTML = `${minePct}% DEVOURED<span class="devThem">family ${Math.max(0, devouredPct - minePct)}%</span>`;
   formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
 }
 
@@ -929,6 +947,7 @@ function capture(e: Edible, giveHunger = true) {
   } else { audio.pop(combo, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
   // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'big')
+  e.mesh.userData.byPlayer = true;   // the DEVOURED meter is split you-vs-family
   const qk = e.mesh.userData.qk as string | undefined;
   if (e.radius < 1) questEvent('snack');
   if (e.radius >= 6) questEvent('big');   // landmark-class: hotels, ships, the temple, the stage
@@ -1187,6 +1206,30 @@ function validateWorld() {
   _validated = true;
 }
 
+// Match starts: real, verified district centres. A match opens somewhere
+// different each time, so the first twenty seconds — the part a player
+// remembers — are not the same twenty seconds five runs running.
+const PIRATE_STARTS: [number, number][] = [
+  [71, 224], [151, -16], [-21, -70], [71, -146], [-114, -51], [-103, 145], [-5.8, -185], [-181, 18],
+];
+const MAPLE_STARTS: [number, number][] = [
+  [-128.25, -128.25], [42.75, -30], [-42.75, 213.75], [128.25, -42.75],
+  [-128.25, -42.75], [-42.75, -42.75], [128.25, -213.75],
+];
+let lastStart = -1;
+function pickStart(): [number, number] {
+  const pool = pickedWorld === 'pirate' ? PIRATE_STARTS : MAPLE_STARTS;
+  for (let k = 0; k < 24; k++) {
+    const i = Math.floor(Math.random() * pool.length);
+    if (i === lastStart) continue;                 // never the same district twice running
+    const [x, z] = pool[i];
+    if (!insideIsland3(x, z)) continue;
+    lastStart = i;
+    return pool[i];
+  }
+  return [island.spawn.x, island.spawn.z];
+}
+
 function resetMatch() {
   resetNews();   // the newsroom's anti-repeat memory is per-match
   // restore every eaten thing to its remembered home — the island regrows in
@@ -1194,6 +1237,7 @@ function resetMatch() {
   for (const e of edibles) {
     e.eaten = false; e.t = 0;
     e.mesh.userData.eaten = false;
+    e.mesh.userData.byPlayer = false;
     e.mesh.visible = true;
     if (!e.mesh.parent) scene.add(e.mesh);
     // magnet drift + topple mean EVERYTHING goes back to its surveyed home
@@ -1205,7 +1249,10 @@ function resetMatch() {
   }
   rivals.reset();
   curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
-  voidState.x = island.spawn.x; voidState.z = island.spawn.z;
+  // START SOMEWHERE ELSE. The spawn was a single fixed point, so every match
+  // opened on the same twenty seconds — the biggest single reason three
+  // back-to-back runs read as one run played three times.
+  { const st = pickStart(); voidState.x = st[0]; voidState.z = st[1]; }
   velX = 0; velZ = 0; camDist = 50;
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 14;
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
@@ -1588,9 +1635,13 @@ function animate() {
       }
     }
     if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
-    if (matchClock <= 30) {
+    if (matchClock <= 35) {
       timerEl.style.color = '#ff8a8a';
-      if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 30 SECONDS — EAT FASTER!!'); }
+      // The warning used to fire at 30s — the exact frame the TREASURE FEAST
+      // beat fires — and announce() overwrote the beat banner in the same
+      // animate() call. The game's biggest scoring moment was silent in every
+      // logged run. Moved to 35s so the two never collide.
+      if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 35 SECONDS — EAT FASTER!!'); }
     }
     if (matchClock <= 0 && !ended && outroT <= 0) {
       outroT = 2.0;   // slow-mo push-in beat before the results panel
@@ -1648,8 +1699,21 @@ function animate() {
       // PERCEIVED speed is constant: world speed rides the camera distance, so
       // a WORLD ENDER crosses its screen exactly as fast as a hatchling does.
       // Joystick: full speed at ~58% thumb extension (hole.io feel), linear below.
-      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.08) / 0.5, 0, 1) : 1;
-      const speed = Math.min(58, 16 * (camDist / 50)) * jm;
+      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.06) / 0.5, 0, 1) : 1;
+      // The 58 cap bound at camDist 181 — a radius ABOVE the WORLD ENDER
+      // threshold — after which world speed stopped rising while the camera
+      // kept pulling back. Measured: 440-470 screen px/s up to r=6, then 291
+      // at r=12, i.e. the late-game void crossed its own body 2.4x slower.
+      // That is the whole "end game feels like wading" complaint. 96 = 16*340/50,
+      // so the cap now only binds where camDist is itself clamped.
+      // During the intro dive camDist is still falling from 300, which spiked
+      // the first touch to the cap and then sagged 60% — take the target.
+      // targetDist is computed later in the frame, so derive the settled camera
+      // distance from the radius directly rather than reading the diving one
+      const cd = introT > 0
+        ? Math.min(camDist, Math.min(340, Math.max(26, 38 * Math.pow(voidling.radius / 0.9, 0.82))))
+        : camDist;
+      const speed = Math.min(96, 16 * (cd / 50)) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
       tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
     } else if ((!started || DEBUG_HARNESS) && tClock - lastInput > 4) {
@@ -1714,6 +1778,21 @@ function animate() {
       };
       const landDir = (x: number, z: number): [number, number] | null =>
         dirScan(x, z, solid) ?? dirScan(x, z, (px, pz) => !!island.biomeAt(px, pz));
+      // STALL BREAKER. `solid` needs all four cardinal probes on land, which a
+      // concave shoreline can fail permanently — a play-through wedged the void
+      // against the Dance Cove spit for 74 seconds of a 180-second match, and
+      // again for a whole run. The rivals have had an escape hatch for this the
+      // whole time (rv.stall > 0.8 abandons the target and wanders inland); the
+      // player did not. If we are driving and going nowhere, walk inland.
+      if (driving && Math.hypot(voidState.x - prev.x, voidState.z - prev.z) < 0.02 * Math.max(0.4, dt * 60)) {
+        stallT += dt;
+        if (stallT > 0.7) {
+          const ld = landDir(voidState.x, voidState.z) ?? [-voidState.x, -voidState.z];
+          const L = Math.hypot(ld[0], ld[1]) || 1;
+          voidState.x += (ld[0] / L) * dt * 34; voidState.z += (ld[1] / L) * dt * 34;
+          if (stallT > 2.2) stallT = 0;
+        }
+      } else stallT = 0;
       if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
       else {
         const ld = landDir(voidState.x, voidState.z);
@@ -1784,7 +1863,7 @@ function animate() {
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
   rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R);   // solo: the family never joins
-  bubbles.update();
+  bubbles.update(dt);
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
@@ -1870,7 +1949,7 @@ function animate() {
     // CONTINUOUS zoom (hole.io): distance ∝ R^0.78 — the void visibly gains
     // ~20% screen size across a form before the camera catches up, so growth
     // reads every few seconds instead of only at evolutions
-    let targetDist = Math.min(300, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
+    let targetDist = Math.min(340, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
     if (introT > 0) {
       introT -= dt;
       const k2 = Math.max(0, introT / 2.2);

@@ -233,8 +233,13 @@ export function createRivals(
   // WHO SHOWS UP is a roll of the dice: 3-5 family members, shuffled casting,
   // arriving at randomised times. Every match has a different line-up, so the
   // island never feels like the same scripted five.
-  const cast = [...NAMES].sort(() => Math.random() - 0.5).slice(0, count);
-  const JOIN_TIMES = [rand(3, 8), rand(22, 40), rand(55, 80), rand(95, 125), rand(135, 165)];
+  let cast: string[] = [];
+  let JOIN_TIMES: number[] = [];
+  function reroll() {
+    cast = [...NAMES].sort(() => Math.random() - 0.5).slice(0, count);
+    JOIN_TIMES = [rand(3, 8), rand(22, 40), rand(55, 80), rand(95, 125), rand(135, 165)];
+  }
+  reroll();
 
   // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member
@@ -286,6 +291,22 @@ export function createRivals(
         rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
         rv.group.visible = rv.halo.visible = false;
         rv.group.rotation.y = 0;
+      });
+      // RE-ROLL THE MATCH. The cast shuffle and the join times used to be
+      // rolled once, in the closure, at module load — so they only ever changed
+      // on a full page reload, and the game's own PLAY AGAIN button never
+      // reloads. A play-through of three back-to-back matches produced the same
+      // line-up joining at the same seconds, three times running. The variety
+      // was real and permanently invisible.
+      reroll();
+      rivals.forEach((rv, i) => {
+        rv.name = cast[i % cast.length];
+        rv.joinAt = JOIN_TIMES[i % JOIN_TIMES.length];
+        rv.speakCd = rand(4, 10);
+        rv.ph = rand(0, 6);
+        // and a different corner of the island to forage each time
+        const a2 = (i / rivals.length) * Math.PI * 2 + rand(0, Math.PI * 2);
+        rv.hx = Math.cos(a2) * rand(105, 155); rv.hz = Math.sin(a2) * rand(105, 155);
       });
     },
     update(dt, _t, px, pz, pr) {

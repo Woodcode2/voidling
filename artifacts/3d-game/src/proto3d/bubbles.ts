@@ -8,7 +8,7 @@ export type BubbleKind = 'ambient' | 'panic' | 'event';
 export interface Bubbles {
   say(pos: THREE.Vector3, text: string, kind: BubbleKind): void;
   float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
-  update(): void;
+  update(dt: number): void;
 }
 
 interface Slot {
@@ -24,12 +24,16 @@ interface Slot {
 // 2 unique lines per 10s in the BUSIEST district at camDist 155, 1 at 202.
 // The gate now rides the camera so the talking distance scales with the view.
 const BUBBLE_MAX_CAMD = 150;   // whole-island views don't need street gossip
-export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
+// Six simultaneous bubbles, each up to ~250px wide on a 460px screen, with a
+// 60px separation rule measured on the ANCHOR rather than the rendered box.
+// A measured frame had four of them stacked in one corner, and an evolution
+// fired seven text elements at once. Three is a crowd; six is a wall.
+export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
   // inject styles once
   const style = document.createElement('style');
   style.textContent = `
     .vb {
-      position: fixed; transform: translate(-50%, -100%); z-index: 6;
+      position: fixed; transform: translate(-50%, -100%); z-index: 4;
       font-family: system-ui, sans-serif; font-weight: 800; font-size: 14px;
       padding: 6px 11px; border-radius: 13px; white-space: nowrap;
       background: #fff; color: #23203a; pointer-events: none;
@@ -44,7 +48,7 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
     .vb.event::after { border-top-color: #efe4ff; }
     .vb.show { opacity: 1; }
     .vf {
-      position: fixed; transform: translate(-50%, -50%); z-index: 6; pointer-events: none;
+      position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
       font-family: system-ui, sans-serif; font-weight: 900; font-size: 17px; color: #ff7da8;
       -webkit-text-stroke: 1px rgba(70,20,50,0.35);
       text-shadow: 0 2px 6px rgba(0,0,0,0.35); opacity: 0; white-space: nowrap;
@@ -128,8 +132,11 @@ export function createBubbles(camera: THREE.Camera, max = 6): Bubbles {
       void (f.el as HTMLElement).offsetWidth;
       f.el.classList.add('go');
     },
-    update() {
-      clock += 1 / 60;
+    update(dt: number) {
+      // was a hard 1/60 per FRAME, so a "4.2s" bubble was really 252 frames:
+      // 8.4s on a 30fps phone and 2.1s on a 120Hz one, where a child cannot
+      // finish reading it. Bubbles now age in seconds like everything else.
+      clock += dt;
       const w = window.innerWidth, h = window.innerHeight;
       for (const s of slots) {
         if (!s.active) continue;

@@ -35,7 +35,7 @@
       #form .scBar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); overflow: hidden; margin-top: 3px; }
       #form #scFill { height: 100%; width: 0%; background: linear-gradient(90deg, #7b4fe0, #c9a6ff); border-radius: 2px; transition: width 0.2s linear; }
       /* in-game guidance strip — objective-style onboarding (no modal) */
-      #guide { position: fixed; top: 20%; left: 0; right: 0; z-index: 7; text-align: center; pointer-events: none;
+      #guide { position: fixed; top: 250px; left: 0; right: 0; z-index: 7; text-align: center; pointer-events: none;
         background: rgba(12,6,24,0.68); color: #fff; font-size: 19px; font-weight: 900; letter-spacing: 0.4px;
         padding: 14px 5vw; opacity: 0; transform: translateY(-8px); transition: opacity 0.35s, transform 0.35s; }
       #guide.show { opacity: 1; transform: translateY(0); }
@@ -80,6 +80,11 @@
         100% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.96); }
       }
       body.menu #news { display: none; }
+      /* the DEVOURED meter is now YOURS, with the family's share beside it —
+         it used to count every prop eaten by anyone, so a losing player was
+         told "92% DEVOURED" */
+      #devoured .devThem { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1px;
+        color: #c9a6ff; opacity: 0.85; margin-top: 1px; }
       #banner { position: fixed; top: calc(96px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 6; pointer-events: none;
         color: #fff; font-size: 24px; font-weight: 900; letter-spacing: 1px; opacity: 0;
         text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
