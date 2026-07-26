@@ -3,9 +3,10 @@
 // The context unlocks on the first user gesture per autoplay policy.
 //
 // PIRATE BAY RESORT (world 2) runs a SECOND, completely separate score in the
-// back half of this file: steel pans, an off-beat skank and a warm bass, plus
-// a place-aware layer that swaps in the DANCE COVE party when the player is
-// standing on the dance floor. Maple's music is untouched by any of it.
+// back half of this file: a 6/8 SEA SHANTY — squeezebox, fiddle, stomp, clap
+// and a crew shouting HEY — with the resort's steel pans as garnish on top,
+// plus a place-aware layer that swaps in the DANCE COVE club beat when the
+// player is on the dance floor. Maple's music is untouched by any of it.
 import { worldId } from './island';
 
 type Ctx = AudioContext;
@@ -273,18 +274,28 @@ export function createAudio(): Audio3D {
   // ══════════════════════════════════════════════════════════════════════════
   // PIRATE BAY RESORT
   // ──────────────────────────────────────────────────────────────────────────
-  // A holiday, not a heist. The bed is a lazy tropical loop — steel-pan hook,
-  // marimba counter-line, an off-beat skank and a warm round bass — in F MAJOR
-  // throughout. There is deliberately no minor-key darkness anywhere in this
-  // score, including the "urgent" stages: escalation is done with MORE PARTY
-  // (extra percussion, a busier bass, a bright bell topline, +5 BPM a stage),
-  // never with menace. Six-year-olds play this.
+  // A SEA SHANTY, played by a resort band. That sentence is the whole design.
   //
-  // On top of the bed sits a PLACE LAYER: each district can add its own quiet
-  // world (the dance floor's four-on-the-floor, the docks' creaking rigging,
-  // jungle crickets, beach surf) which crossfades in over 0.6s. The music is
-  // still the star — every place layer is mixed to sit under it, because this
-  // gets played on a phone speaker in the back of a car.
+  // The bones are a shanty and nothing else: 6/8, squeezebox oom-pah-pah, a
+  // plucked bass on the root, a fiddle doubling the tune, and — the part that
+  // actually makes it fun — a STOMP AND CLAP on the strong beats with the crew
+  // shouting HEY on the turnarounds. On top of that sits the resort: steel pan
+  // and marimba, demoted from "the identity" to "the garnish", answering the
+  // hook on off-beats. Pirate-themed luxury holiday; the score tells the joke.
+  //
+  // The hook is four bars, call / answer / call / bigger answer, and bars 0
+  // and 2 are byte-identical. Repetition is not laziness here, it is the
+  // brief: the test this music has to pass is a seven-year-old humming it in
+  // the car afterwards. Escalation is the room getting ROWDIER — more voices
+  // shouting, faster claps, the whistle joining in, +6 BPM a stage — never
+  // darker, never scarier.
+  //
+  // Over the top sits a PLACE LAYER: each district adds its own quiet world
+  // (the dance floor's straight-4/4 club beat, the docks' creaking rigging,
+  // jungle crickets, beach surf) crossfading in over 0.6s. The dance floor is
+  // the one place the shanty stands down — a nightclub is no place for an
+  // accordion — but DJ Coconut quotes the hook once a loop, so the island has
+  // exactly one tune however you happen to be hearing it.
   // ══════════════════════════════════════════════════════════════════════════
   const isPirate = () => worldId() === 'pirate';
 
@@ -669,11 +680,20 @@ export function createAudio(): Audio3D {
   // pans were already using (D minor and F major are the same scale), so the
   // resort band's tropical topping sits on the crew's shanty without a single
   // wrong note. That's the joke of the level made literal.
+  // The LEFT HAND, and it lives low on purpose. First pass had the chord chops
+  // voiced C4-A4, which is exactly where the hook lives — the tune came out
+  // buried inside its own accompaniment, every melody note doubled by a chord
+  // tone at the same pitch. Down an octave the chops top out at A3, a clean
+  // fourth below the melody's lowest note, and the tune sits on top where a
+  // kid can actually follow it. It shares a register with the bass, which is
+  // fine and is literally how an accordion is laid out: they never sound at
+  // the same instant (bass on the pulses, chops on the eighths between) and a
+  // triangle bass against reedy saws separates by timbre anyway.
   const S_CHORD = [
-    [293.66, 349.23, 440.00],   // Dm  (D4 F4 A4)
-    [261.63, 329.63, 392.00],   // C   (C4 E4 G4)
-    [261.63, 349.23, 440.00],   // F   (C4 F4 A4)  ← the bright one
-    [261.63, 329.63, 392.00],   // C
+    [146.83, 174.61, 220.00],   // Dm  (D3 F3 A3)
+    [130.81, 164.81, 196.00],   // C   (C3 E3 G3)
+    [130.81, 174.61, 220.00],   // F   (C3 F3 A3)  ← the bright one
+    [130.81, 164.81, 196.00],   // C
   ];
   const S_BASS = [146.83, 130.81, 174.61, 130.81];   // D3 C3 F3 C3 — the "oom"
   const S_FIFTH = [220.00, 196.00, 261.63, 196.00];  // A3 G3 C4 G3
@@ -866,8 +886,13 @@ export function createAudio(): Audio3D {
       // This one pattern is what makes it a shanty and not a chord bed.
       if (e === 0 && onE) pBass(pirBus, t, S_BASS[bar], e8 * 1.7, 0.17);
       if (e === 3 && onE) pBass(pirBus, t, S_FIFTH[bar], e8 * 1.4, 0.12);
-      if (st >= 2 && e === 5 && onE) pBass(pirBus, t, S_BASS[bar], e8 * 0.7, 0.08);
-      if (onE && (e === 1 || e === 2 || e === 4 || e === 5)) accChord(ch, t, e8 * 0.85, 0.05);
+      if (!floor && st >= 2 && e === 5 && onE) pBass(pirBus, t, S_BASS[bar], e8 * 0.7, 0.08);
+      // through the club door you get the band's bass and half its chops — the
+      // bass lands on the house kick (both sit on the pulse) and the remaining
+      // chops read as a three-against-two shimmer instead of mud
+      if (onE && (floor ? (e === 2 || e === 5) : (e === 1 || e === 2 || e === 4 || e === 5))) {
+        accChord(ch, t, e8 * 0.85, 0.05);
+      }
 
       // ── STOMP AND CLAP: the rowdy floor ───────────────────────────────────
       if (!floor && onE) {
@@ -880,13 +905,23 @@ export function createAudio(): Audio3D {
       }
       // stage 3 claps land BETWEEN the eighths too — the room speeding up
       if (!floor && st >= 3 && !onE && (s === 7 || s === 11)) clap(pirBus, t, 0.055);
-      if (!floor && st >= 3 && !onE) shaker(pirBus, t, 0.013);
+      if (!floor && st >= 3 && (s === 3 || s === 7 || s === 11)) shaker(pirBus, t, 0.014);
 
       // ── THE HOOK ──────────────────────────────────────────────────────────
       if (!floor && onE && note > 0) {
-        accord(note, t, e8 * 0.92, 0.1);                              // squeezebox, always
-        if (st >= 1) fiddle(note * 2, t, e8 * 0.95, 0.04);            // fiddle doubles it up
-        if (st >= 3 && (e === 0 || e === 3)) whistle(note * 2, t, e8 * 1.5, 0.028);
+        accord(note, t, e8 * 0.92, 0.1);   // squeezebox has the tune from bar one
+        // The fiddle joins on the ANSWER bars first (1 and 3), so the arrival
+        // of stage 1 sounds like a second player picking the tune up mid-verse
+        // — call on the box alone, answer in octaves. From stage 2 it's on the
+        // whole thing, and stage 3 puts a whistle on the strong beats.
+        // and it doubles IN OCTAVES on the low call bars, in UNISON on the high
+        // answer bars — an octave up from bar 3's G5 puts a fiddle at 1.5kHz,
+        // which is a squeak, not a lift. A real fiddler picks the octave that
+        // keeps the line in one register; so does this one.
+        if (st >= 2 || (st >= 1 && (bar & 1) === 1)) {
+          fiddle(note * ((bar & 1) === 0 ? 2 : 1), t, e8 * 0.95, 0.04);
+        }
+        if (st >= 3 && (e === 0 || e === 3)) whistle(note * 2, t, e8 * 1.5, 0.026);
       }
 
       // ── THE RESORT BAND'S TOPPING ─────────────────────────────────────────
@@ -894,10 +929,10 @@ export function createAudio(): Audio3D {
       // the off-beats instead of being the tune. Pirate-themed LUXURY resort —
       // shanty bones, tropical garnish.
       if (!floor && st >= 2 && onE) {
-        if (e === 2) pan(pirBus, ch[2] * 2, t, e8 * 1.8, 0.04);
-        if (e === 5) pan(pirBus, ch[1] * 2, t, e8 * 1.4, 0.033);
+        if (e === 2) pan(pirBus, ch[2] * 4, t, e8 * 1.8, 0.04);
+        if (e === 5) pan(pirBus, ch[1] * 4, t, e8 * 1.4, 0.033, 0.4);   // ghost ping
       }
-      if (!floor && st >= 3 && (s === 5 || s === 11)) marimba(pirBus, ch[0] * 2, t, e8 * 0.9, 0.028);
+      if (!floor && st >= 3 && s === 11) marimba(pirBus, ch[0] * 4, t, e8 * 0.9, 0.028);
 
       // ── "HEY!" ────────────────────────────────────────────────────────────
       // On the downbeat of the 8-bar phrase. One voice at stage 0, a whole
@@ -939,7 +974,7 @@ export function createAudio(): Audio3D {
   }
   function startTropical() {
     const c = ensure(); if (!c || !master) return;
-    if (!pirBus) pirBus = buildTropicalBus(c);
+    if (!pirBus) pirBus = buildBandBus(c);
     if (!ambGain) { ambGain = c.createGain(); ambGain.gain.value = 0.0001; ambGain.connect(master); }
     pirRunning = true;
     ramp(ambGain.gain, 0.45, c.currentTime, 1.6);
@@ -990,13 +1025,64 @@ export function createAudio(): Audio3D {
     seq.forEach((f, i) => tone(f, f, 0.22, 'triangle', 0.22, i * 0.085));
     tone(1567.98, 1567.98, 0.4, 'sine', 0.1, 0.34);
   }
+  // a stomp-and-clap hit — the band landing on a beat together
+  function bandHit(t: number, vol: number) {
+    if (!master) return;
+    stomp(master, t, vol * 1.1);
+    clap(master, t, vol * 0.8);
+  }
   function pirateEvolve() {
     const c = ensure(); if (!c || !master) return;
     const t = c.currentTime;
-    panRun(t, [349.23, 440.00, 523.25, 698.46], 0.075, 0.19, 0.55);   // F A C F, up
-    pan(master, 880.00, t + 0.34, 1.0, 0.13);
-    nHit(master, t + 0.28, 0.45, 0.05, 'highpass', 5600, 0.7, 9000, 0.12);   // shaker flourish
+    // the crew shouts, the band stomps, and the resort's pans sparkle on top —
+    // the whole level's identity in six tenths of a second
+    hey(master, t, 0.2, 2);
+    bandHit(t, 0.22);
+    accord(587.33, t + 0.02, 0.3, 0.11); accord(698.46, t + 0.16, 0.42, 0.11);
+    panRun(t + 0.14, [523.25, 698.46, 880.00], 0.085, 0.15, 0.5);
     if (curZone === 'party') cheer(t + 0.1, 0.55);
+  }
+  // ── THE TREASURE FEAST FANFARE ────────────────────────────────────────────
+  // The biggest moment in the match, so it gets a real cadence rather than a
+  // flourish: the crew shouts, the band climbs the hook's own opening figure,
+  // and it lands on a proper V-i — A major into D minor, the strongest turn in
+  // the key — with the pans and the fiddle both on the last chord.
+  function treasureFanfare(t: number) {
+    if (!master) return;
+    hey(master, t, 0.26, 4);
+    bandHit(t, 0.26);
+    const climb = [293.66, 349.23, 440.00, 523.25, 587.33];   // D F A C D
+    climb.forEach((f, i) => {
+      const tt = t + 0.1 + i * 0.1;
+      accord(f, tt, 0.16, 0.1);
+      fiddle(f * 2, tt, 0.16, 0.05);
+      if (i % 2 === 0) bandHit(tt, 0.13);
+    });
+    // V: A major (A C# E) — the one accidental in the whole score, and it's
+    // there because a raised third is what makes a cadence feel like ARRIVING
+    const land = t + 0.62;
+    accChord([440.00, 554.37, 659.25], land, 0.3, 0.09);
+    bandHit(land, 0.24);
+    // i: D minor, everybody in
+    const home = t + 0.92;
+    accChord([293.66, 349.23, 440.00], home, 0.9, 0.11);
+    pBass(master, home, 146.83, 0.9, 0.18);
+    fiddle(587.33, home, 0.85, 0.06);
+    whistle(1174.66, home + 0.04, 0.8, 0.035);
+    panRun(home, [587.33, 880.00, 1174.66], 0.1, 0.14, 0.8);
+    bandHit(home, 0.3);
+    hey(master, home + 0.06, 0.24, 4);
+    cheer(home + 0.1, 0.8);
+  }
+  // a rare accordion WHEEZE — one squeezed chord and a breath, for when
+  // something enormous goes down. Rate-limited hard: this is a garnish, and a
+  // garnish you hear every time is a smell.
+  let bigEatCount = 0;
+  function yoHo(t: number) {
+    if (!master) return;
+    accChord([293.66, 349.23, 440.00], t, 0.42, 0.075);
+    accord(220.00, t + 0.02, 0.5, 0.07);
+    nEnv(fxFor(master, 'shaker'), t, 0.3, 0.02, 0.1);   // bellows air
   }
 
   return {
@@ -1047,8 +1133,9 @@ export function createAudio(): Audio3D {
       if (!ctx || !isPirate()) return;
       applyZones();
     },
-    // The authored match beats. Maple keeps the fanfare it always had; the
-    // resort answers with the pans, and DANCE PARTY gets the full horn.
+    // The authored match beats. Maple keeps the fanfare it always had; the bay
+    // answers in character — the DANCE PARTY is the only one the club horn
+    // belongs to, and TREASURE FEAST gets the full band cadence.
     matchBeat(kind) {
       const c = ensure(); if (!c || !master) return;
       if (!isPirate()) { mapleEvolve(); return; }
@@ -1057,14 +1144,16 @@ export function createAudio(): Audio3D {
       if (k.includes('dance') || k.includes('party')) {
         airhorn(t, 0.13);
         cheer(t + 0.12, 0.55);
+        hey(master, t + 0.06, 0.2, 4);
         panRun(t + 0.5, [523.25, 587.33, 698.46, 880.00], 0.09, 0.16, 0.5);
       } else if (k.includes('treasure') || k.includes('feast')) {
-        panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00], 0.08, 0.15, 0.6);
-        pan(master, 1046.5, t + 0.44, 1.2, 0.1);
-        nHit(master, t + 0.38, 0.6, 0.05, 'highpass', 5200, 0.7, 9500, 0.14);
+        treasureFanfare(t);
       } else {
-        panRun(t, [523.25, 659.25, 783.99], 0.1, 0.14, 0.55);   // happy hour: a bright toast
-        marimba(master, 1046.5, t + 0.32, 0.7, 0.08);
+        // happy hour: the crew raises a glass — a shout, a stomp, a toast
+        hey(master, t, 0.18, 3);
+        bandHit(t, 0.2);
+        accChord([293.66, 349.23, 440.00], t + 0.04, 0.5, 0.09);
+        panRun(t + 0.2, [523.25, 659.25, 783.99], 0.1, 0.14, 0.55);
       }
     },
     stopMusic() {
@@ -1110,6 +1199,12 @@ export function createAudio(): Audio3D {
       if (depth > 0.35) tone(52, 30, 0.2, 'sine', depth * 0.14, 0.03);
     },
     bigEat() {
+      // the crunch itself is shared and untouched. In the bay a squeezebox
+      // wheeze is layered ON TOP roughly every fifth big meal — often enough
+      // to be a running joke, rare enough to stay one.
+      if (isPirate() && ++bigEatCount % 5 === 2) {
+        const c = ensure(); if (c) yoHo(c.currentTime + 0.1);
+      }
       if (sample('eaten_deep.wav', 0.55)) return;
       noise(0.22, 0.3, 900, 180);
       tone(160, 70, 0.24, 'sine', 0.24);
@@ -1147,14 +1242,25 @@ export function createAudio(): Audio3D {
     },
     win() {
       if (isPirate()) {
-        // closing party: a pan run up the F major triad, a shaker roll and the
-        // crowd. The match ends on a beach, not a scoreboard.
+        // last orders: the whole band plays the hook's big answer out, lands
+        // on home, and the room goes up. The match ends on a singalong.
         const c = ensure(); if (!c || !master) return;
         const t = c.currentTime;
-        panRun(t, [349.23, 440.00, 523.25, 698.46, 880.00, 1046.5], 0.11, 0.18, 0.7);
-        pan(master, 1396.91, t + 0.68, 1.4, 0.1);
-        nHit(master, t, 0.9, 0.045, 'highpass', 5000, 0.7, 9500, 0.5);
-        cheer(t + 0.25, 0.7);
+        const out = [523.25, 587.33, 659.25, 783.99];   // the "big one", bar 3
+        out.forEach((f, i) => {
+          const tt = t + i * 0.13;
+          accord(f, tt, 0.2, 0.11);
+          fiddle(f * 2, tt, 0.2, 0.05);
+          bandHit(tt, i === 0 ? 0.22 : 0.14);
+        });
+        const home = t + 0.58;
+        accChord([293.66, 349.23, 440.00], home, 1.1, 0.11);
+        pBass(master, home, 146.83, 1.0, 0.18);
+        whistle(1174.66, home, 0.9, 0.035);
+        panRun(home, [587.33, 880.00, 1174.66], 0.12, 0.14, 0.9);
+        bandHit(home, 0.28);
+        hey(master, home, 0.24, 4);
+        cheer(home + 0.15, 0.75);
         return;
       }
       if (sample('win_warm.wav', 0.55)) return;

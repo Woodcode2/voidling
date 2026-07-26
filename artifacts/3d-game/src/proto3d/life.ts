@@ -191,7 +191,11 @@ function makeCar(): THREE.Group {
   if (Math.random() < 0.65) vehicleGlb(g, Math.random() < 0.72 ? 'car_sedan' : 'car_taxi', 6.2);
   return g;
 }
-interface Limbs { la: THREE.Object3D; ra: THREE.Object3D; ll: THREE.Object3D; rl: THREE.Object3D; phase: number; }
+interface Limbs {
+  la: THREE.Object3D; ra: THREE.Object3D; ll: THREE.Object3D; rl: THREE.Object3D;
+  torso: THREE.Object3D; head: THREE.Object3D;
+  phase: number; bob: number;   // bob = per-person stride height, so a crowd is not a metronome
+}
 
 // shared material + geometry pools — hundreds of townsfolk, one GPU footprint
 const _matCache = new Map<string, THREE.MeshStandardMaterial>();
@@ -273,135 +277,154 @@ const HAIRC = [0x241d1f, 0x2f2320, 0x4a3226, 0x6a4a2a, 0x8a5a30, 0xb0793a, 0xd8b
 const HAIRC_FUN = [0xff4fa0, 0x35d6f0, 0x9a5cf0, 0x4ef0a0, 0xffd23f];
 
 export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel'
-  | 'toque' | 'bellhop' | 'flower' | 'cap' | 'beanie';
+  | 'toque' | 'bellhop' | 'flower' | 'bucket' | 'cap' | 'beanie';
 export type Prop = 'cocktail' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie';
+// HAIR is the single most important surface at a top-down camera — it is the
+// only thing you see of most people. Nine silhouettes, fourteen colours.
+export type Hair = 'short' | 'buzz' | 'bob' | 'long' | 'bun' | 'pony' | 'curly' | 'braids' | 'bald';
+// GARMENTS change the SHAPE, not just the colour: a sundress flares wider than
+// the shoulders, a robe drops to the shins, a tank top shows bare arms.
+export type Wear = 'tee' | 'tank' | 'open' | 'dress' | 'sarong' | 'blazer'
+  | 'robe' | 'wet' | 'apron' | 'swim' | 'uniform';
+export type Pattern = 'plain' | 'stripe' | 'floral' | 'twotone' | 'sash';
+export type Shoe = 'bare' | 'flip' | 'shoe' | 'boot';
 interface PersonOpts {
-  shirt?: number; pants?: number;
+  shirt?: number; pants?: number; accent?: number;
   hat?: Hat | null;          // null = explicitly bare-headed (overrides the dress code)
   hatCol?: number;
+  hair?: Hair; hairCol?: number;
+  wear?: Wear; pattern?: Pattern; shoe?: Shoe;
   glasses?: boolean; eyepatch?: boolean; headphones?: boolean;
   parrot?: boolean; lanyard?: boolean; necklace?: boolean; robe?: boolean;
+  armbands?: boolean; floatRing?: boolean; rucksack?: boolean;
   prop?: Prop; kid?: boolean;
 }
 
-// Hats hang off a HEAD PIVOT sitting at the head centre, so a kid's oversized
-// head carries its hat correctly with a single scale on the pivot.
-function hatOn(h: THREE.Group, kind: Hat, col: number): void {
-  const m = mat(col, 0.9);
+// ── part builders. Each pushes GEOMETRY into `out`; the caller welds the list
+// into one mesh. Coordinates are local to the pivot that owns them.
+
+// HEAD PIVOT space: origin at the head centre, head radius ≈ 0.53.
+function hatParts(out: Geo[], kind: Hat, col: number): void {
   if (kind === 'tricorn') {
-    const felt = mat(INK, 0.85);
-    const brim = new THREE.Mesh(G.tri, felt); brim.position.y = 0.24; h.add(brim);
-    const crown = new THREE.Mesh(G.crown, felt);
-    crown.scale.set(0.92, 1.2, 0.92); crown.position.y = 0.19; h.add(crown);
-    const cock = new THREE.Mesh(G.blob, mat(GOLD, 0.35));   // gold cockade at the front point
-    cock.scale.set(1.5, 1.3, 0.8); cock.position.set(0, 0.33, 0.38); h.add(cock);
+    out.push(pc(B.tri, INK, 0, 0.24, 0, 2.0, 0.09, 2.0));            // TRIANGLE brim, not a cone
+    out.push(pc(B.hemi, INK, 0, 0.18, 0, 1.06, 1.15, 1.06));
+    out.push(pc(B.dot, GOLD, 0, 0.35, 0.40, 0.34, 0.30, 0.20));      // cockade on the front point
   } else if (kind === 'bandana') {
-    const wrap = new THREE.Mesh(G.crown, m);
-    wrap.scale.set(1.06, 0.62, 1.06); wrap.position.y = 0.1; h.add(wrap);
-    const knot = new THREE.Mesh(G.blob, m);
-    knot.scale.set(1.3, 1.1, 2.4); knot.position.set(0, 0.02, -0.52); h.add(knot);
+    out.push(pc(B.hemi, col, 0, 0.08, 0, 1.13, 0.74, 1.13));
+    out.push(pc(B.dot, col, 0, 0.0, -0.54, 0.32, 0.26, 0.50));       // knot at the back
   } else if (kind === 'captain') {
-    const white = mat(WHITE, 0.75);
-    const crown = new THREE.Mesh(G.crown, white);
-    crown.scale.set(1.08, 0.86, 1.08); crown.position.y = 0.13; h.add(crown);
-    const gband = new THREE.Mesh(G.band, mat(GOLD, 0.35)); gband.position.y = 0.11; h.add(gband);
-    const peak = new THREE.Mesh(G.hand, mat(INK, 0.6));
-    peak.scale.set(2.3, 0.3, 1.6); peak.position.set(0, 0.11, 0.56); h.add(peak);
+    out.push(pc(B.hemi, WHITE, 0, 0.11, 0, 1.16, 0.92, 1.16));
+    out.push(pc(B.cyl, GOLD, 0, 0.10, 0, 1.18, 0.12, 1.18));
+    out.push(pc(B.box, INK, 0, 0.10, 0.58, 0.58, 0.07, 0.42));
   } else if (kind === 'sun') {
-    const brim = new THREE.Mesh(G.brimWide, m);
-    brim.position.y = 0.26; brim.rotation.x = 0.07; h.add(brim);   // a touch floppy
-    const top = new THREE.Mesh(G.beanie, m); top.scale.y = 0.8; top.position.y = 0.19; h.add(top);
+    out.push(pc(B.disc, col, 0, 0.26, 0, 2.26, 0.07, 2.26, 0.07));   // wide, faintly floppy
+    out.push(pc(B.hemi, col, 0, 0.19, 0, 1.15, 0.82, 1.15));
   } else if (kind === 'visor') {
-    const bandm = new THREE.Mesh(G.band, m); bandm.position.y = 0.16; h.add(bandm);
-    const bill = new THREE.Mesh(G.hand, m);
-    bill.scale.set(2.5, 0.3, 1.9); bill.position.set(0, 0.17, 0.6); h.add(bill);
+    out.push(pc(B.cyl, col, 0, 0.16, 0, 1.18, 0.13, 1.18));
+    out.push(pc(B.box, col, 0, 0.17, 0.62, 0.62, 0.07, 0.50));
   } else if (kind === 'snorkel') {
-    const mask = new THREE.Mesh(G.hand, mat(0x63d6f0, 0.25));
-    mask.scale.set(2.4, 1.1, 0.7); mask.position.set(0, 0.06, 0.42); h.add(mask);
-    const tube = new THREE.Mesh(G.tube, mat(0xffd23f, 0.6));
-    tube.scale.y = 0.7; tube.position.set(0.44, 0.3, 0.16); tube.rotation.z = -0.2; h.add(tube);
+    out.push(pc(B.box, 0x63d6f0, 0, 0.06, 0.44, 0.62, 0.26, 0.20));
+    out.push(pc(B.tube, 0xffd23f, 0.44, 0.30, 0.14, 0.09, 0.70, 0.09, 0, 0, -0.2));
   } else if (kind === 'toque') {
-    const white = mat(WHITE, 0.85);
-    const hatm = new THREE.Mesh(G.toque, white); hatm.position.y = 0.42; h.add(hatm);
-    const puff = new THREE.Mesh(G.blob, white); puff.scale.setScalar(3.2); puff.position.y = 0.76; h.add(puff);
+    out.push(pc(B.cyl, WHITE, 0, 0.42, 0, 0.90, 0.62, 0.90));
+    out.push(pc(B.sphS, WHITE, 0, 0.76, 0, 0.78));
   } else if (kind === 'bellhop') {
-    const box = new THREE.Mesh(G.pill, m); box.position.y = 0.3; h.add(box);
-    const trim = new THREE.Mesh(G.band, mat(GOLD, 0.35));
-    trim.scale.set(0.79, 0.5, 0.79); trim.position.y = 0.16; h.add(trim);
+    out.push(pc(B.cyl, col, 0, 0.30, 0, 0.92, 0.34, 0.92));
+    out.push(pc(B.cyl, GOLD, 0, 0.15, 0, 0.96, 0.10, 0.96));
   } else if (kind === 'flower') {
-    const ring = new THREE.Mesh(G.ring, mat(0x4fae62, 0.9));
-    ring.rotation.x = Math.PI / 2; ring.scale.setScalar(1.08); ring.position.y = 0.14; h.add(ring);
-    for (const a of [0.4, 2.5, 4.6]) {
-      const fl = new THREE.Mesh(G.blob, mat(pick([0xff7fb0, 0xffd54f, 0xffffff]), 0.85));
-      fl.scale.setScalar(1.15); fl.position.set(Math.sin(a) * 0.52, 0.16, Math.cos(a) * 0.52); h.add(fl);
-    }
+    out.push(pc(B.ring, 0x4fae62, 0, 0.14, 0, 1.30, 1.30, 1.30, Math.PI / 2));
+    for (const a of [0.4, 2.5, 4.6])
+      out.push(pc(B.dot, pick([0xff7fb0, 0xffd54f, 0xffffff]), Math.sin(a) * 0.55, 0.17, Math.cos(a) * 0.55, 0.24));
+  } else if (kind === 'bucket') {   // kids' floppy bucket hat
+    out.push(pc(B.disc, col, 0, 0.22, 0, 1.66, 0.09, 1.66));
+    out.push(pc(B.cyl, col, 0, 0.34, 0, 1.16, 0.40, 1.16));
   } else if (kind === 'cap') {
-    const top = new THREE.Mesh(G.beanie, m); top.position.y = 0.2; h.add(top);
-    const bill = new THREE.Mesh(G.hand, m);
-    bill.scale.set(2.2, 0.35, 1.6); bill.position.set(0, 0.22, 0.55); h.add(bill);
-  } else {   // beanie
-    const top = new THREE.Mesh(G.beanie, m); top.scale.y = 1.25; top.position.y = 0.13; h.add(top);
+    out.push(pc(B.hemi, col, 0, 0.14, -0.02, 1.17, 0.94, 1.17));
+    out.push(pc(B.box, col, 0, 0.16, 0.56, 0.54, 0.08, 0.42));
+  } else {   // beanie: dome + rolled brim
+    out.push(pc(B.hemi, col, 0, 0.10, 0, 1.16, 1.18, 1.16));
+    out.push(pc(B.cyl, col, 0, 0.02, 0, 1.21, 0.16, 1.21));
   }
 }
 
-// held props ride the RIGHT SHOULDER pivot, so they swing with the walk cycle
-function propOn(ra: THREE.Object3D, kind: Prop): void {
+function hairParts(out: Geo[], style: Hair, col: number): void {
+  if (style === 'bald') return;
+  if (style === 'buzz') { out.push(pc(B.hemi, col, 0, 0.03, -0.02, 1.09, 0.66, 1.09)); return; }
+  if (style === 'curly') {   // lumpy crown — the most distinctive top-down read
+    out.push(pc(B.hemi, col, 0, 0.04, -0.02, 1.08, 0.90, 1.08));
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.2566;
+      out.push(pc(B.dot, col, Math.sin(a) * 0.35, 0.28 + (i % 2) * 0.11, Math.cos(a) * 0.35 - 0.03, 0.38));
+    }
+    return;
+  }
+  out.push(pc(B.hemi, col, 0, 0.05, -0.02, 1.14, 0.98, 1.14));   // shared crown
+  if (style === 'bob') out.push(pc(B.flare, col, 0, -0.16, -0.03, 1.24, 0.48, 1.24));
+  else if (style === 'long') out.push(pc(B.box, col, 0, -0.38, -0.30, 0.70, 0.86, 0.34));
+  else if (style === 'bun') out.push(pc(B.sphS, col, 0, 0.34, -0.30, 0.44));
+  else if (style === 'pony') out.push(pc(B.taper, col, 0, -0.24, -0.52, 0.24, 0.66, 0.24, -0.5));
+  else if (style === 'braids') for (const sx of [-0.36, 0.36])
+    out.push(pc(B.taper, col, sx, -0.30, -0.12, 0.20, 0.68, 0.20));
+}
+
+// ARM PIVOT space: origin at the shoulder, hand around y -1.06.
+function propParts(out: Geo[], kind: Prop): void {
   if (kind === 'cocktail') {
-    const gl = new THREE.Mesh(G.glass, mat(0xdff6ff, 0.2));
-    gl.rotation.x = Math.PI; gl.position.set(0, -1.3, 0.16); ra.add(gl);
-    const cherry = new THREE.Mesh(G.blob, mat(0xff8a3a, 0.6));
-    cherry.scale.setScalar(0.75); cherry.position.set(0, -1.16, 0.16); ra.add(cherry);
+    out.push(pc(B.cone, 0xdff6ff, 0, -1.30, 0.16, 0.34, 0.30, 0.34, Math.PI));
+    out.push(pc(B.dot, 0xff8a3a, 0, -1.16, 0.16, 0.18));
   } else if (kind === 'clipboard') {
-    const bd = new THREE.Mesh(G.plate, mat(0xb9793f, 0.85));
-    bd.scale.set(1.5, 1, 1.7); bd.rotation.x = -0.7; bd.position.set(0.02, -1.18, 0.3); ra.add(bd);
-    const sheet = new THREE.Mesh(G.plate, mat(WHITE, 0.9));
-    sheet.scale.set(1.25, 0.5, 1.45); sheet.rotation.x = -0.7; sheet.position.set(0.02, -1.13, 0.33); ra.add(sheet);
+    out.push(pc(B.box, 0xb9793f, 0.02, -1.18, 0.30, 0.44, 0.05, 0.40, -0.7));
+    out.push(pc(B.box, WHITE, 0.02, -1.13, 0.33, 0.36, 0.03, 0.32, -0.7));
   } else if (kind === 'tray') {
-    const tr = new THREE.Mesh(G.disc, mat(0xd8d2c2, 0.4));
-    tr.scale.set(1.15, 0.8, 1.15); tr.position.set(0.06, -1.08, 0.34); ra.add(tr);
-    const drink = new THREE.Mesh(G.glass, mat(0xffd54f, 0.3));
-    drink.scale.setScalar(0.7); drink.position.set(0.06, -0.96, 0.34); ra.add(drink);
+    out.push(pc(B.disc, 0xd8d2c2, 0.06, -1.06, 0.34, 0.52, 0.06, 0.52));
+    out.push(pc(B.cone, 0xffd54f, 0.06, -0.94, 0.34, 0.20, 0.22, 0.20, Math.PI));
   } else if (kind === 'ball') {
-    const b = new THREE.Mesh(G.blob, mat(pick([0xff5d7e, 0x2fd8e8, 0xffd23f]), 0.7));
-    b.scale.setScalar(2.9); b.position.set(0.1, -1.24, 0.34); ra.add(b);
+    out.push(pc(B.sphS, pick([0xff5d7e, 0x2fd8e8, 0xffd23f]), 0.10, -1.22, 0.34, 0.62));
   } else if (kind === 'detector') {
-    const shaft = new THREE.Mesh(G.tube, mat(0x8a8f9c, 0.5));
-    shaft.scale.y = 1.35; shaft.rotation.x = 0.5; shaft.position.set(0, -1.5, 0.34); ra.add(shaft);
-    const coil = new THREE.Mesh(G.disc, mat(0x3a3f4d, 0.6));
-    coil.scale.set(0.95, 0.6, 0.95); coil.position.set(0, -2.06, 0.66); ra.add(coil);
+    out.push(pc(B.tube, 0x8a8f9c, 0, -1.50, 0.34, 0.08, 1.35, 0.08, 0.5));
+    out.push(pc(B.disc, 0x3a3f4d, 0, -2.06, 0.66, 0.40, 0.05, 0.40));
   } else {   // selfie stick
-    const stick = new THREE.Mesh(G.tube, mat(0xc8cdd8, 0.4));
-    stick.scale.y = 1.5; stick.rotation.x = 0.85; stick.position.set(0, -1.42, 0.5); ra.add(stick);
-    const phone = new THREE.Mesh(G.plate, mat(INK, 0.35));
-    phone.scale.set(0.75, 1, 1.3); phone.rotation.x = 1.2; phone.position.set(0, -0.93, 1.07); ra.add(phone);
+    out.push(pc(B.tube, 0xc8cdd8, 0, -1.42, 0.50, 0.07, 1.50, 0.07, 0.85));
+    out.push(pc(B.box, INK, 0, -0.93, 1.07, 0.16, 0.22, 0.05, 1.2));
   }
 }
 
-// a small parrot perched on the shoulder — the single most charming 4 meshes
-// on the island. Only pirate entertainers (and one lucky dock hand) get one.
-function parrotOn(g: THREE.Group, side: number): void {
-  const body = new THREE.Mesh(G.pbody, mat(0xe8342a, 0.75));
-  body.scale.set(1, 1.25, 0.9); body.position.set(side * 0.56, 2.5, -0.02); g.add(body);
-  const head = new THREE.Mesh(G.phead, mat(0xffd23f, 0.7));
-  head.position.set(side * 0.56, 2.71, 0.05); g.add(head);
-  const beak = new THREE.Mesh(G.blob, mat(0x2e2a2a, 0.5));
-  beak.scale.set(0.5, 0.5, 0.9); beak.position.set(side * 0.56, 2.68, 0.16); g.add(beak);
-  const tail = new THREE.Mesh(G.ptail, mat(0x2fd8a0, 0.8));
-  tail.rotation.x = -0.55; tail.position.set(side * 0.56, 2.34, -0.24); g.add(tail);
+// BODY PIVOT space: origin at the hip line; `sy` is the local shoulder height.
+function parrotParts(out: Geo[], side: number, sy: number): void {
+  const x = side * 0.50;
+  out.push(pc(B.sphS, 0xe8342a, x, sy + 0.32, -0.02, 0.34, 0.42, 0.30));
+  out.push(pc(B.dot, 0xffd23f, x, sy + 0.53, 0.05, 0.21));
+  out.push(pc(B.dot, 0x2e2a2a, x, sy + 0.50, 0.16, 0.11, 0.11, 0.18));
+  out.push(pc(B.cone, 0x2fd8a0, x, sy + 0.16, -0.24, 0.15, 0.34, 0.15, -0.55));
 }
 
-// what people WEAR is where they ARE — biome dress codes
-const OUTFIT: Record<string, { shirt: number[]; pants: number[]; hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean }> = {
+
+// what people WEAR is where they ARE — biome dress codes. `wear` is the pool of
+// GARMENTS (which change the silhouette), `shoe` the footwear, so two people in
+// the same district still look like two people from directly overhead.
+interface Fit {
+  shirt: number[]; pants: number[];
+  hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean;
+  wear?: Wear[]; shoe?: Shoe[]; fun?: boolean;   // fun = dyed hair shows up here
+}
+const OUTFIT: Record<string, Fit> = {
   // PIRATE BAY: everyone is on holiday, so everyone is in colour
-  port: { shirt: [0xe8604d, 0x4d9de8, 0xf0e6d2, 0x2e5a7a], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34], hat: 'cap', hatOdds: 0.6 },
-  resort: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.7 },
-  party: { shirt: [0xff2fa0, 0x7bffe8, 0xffe066, 0xb875ff, 0xff5d7e], pants: [0x2a1240, 0x4a2a8a, 0x1a3a5a], hat: 'sun', hatOdds: 0.25 },
-  market: { shirt: [0xff8a3a, 0xffd23f, 0x7ef2a0, 0xff5d7e, 0xf0e6d2], pants: [0x5a4a3a, 0x3a4a6a, 0x6a3a4a], hat: 'sun', hatOdds: 0.45 },
-  jungle: { shirt: [0x5a7a4a, 0x8a9a5a, 0xc4a03a, 0x7a8a5a], pants: [0x4a4a3a, 0x5a5a3a], hat: 'cap', hatOdds: 0.65, pack: true },
-  cove: { shirt: [0x4dd0e1, 0xffd54f, 0xff8a5c, 0xffffff], pants: [0x2ab8d8, 0xffb347, 0x3a4a6a], hat: 'sun', hatOdds: 0.5 },
-  beach: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.5 },
-  downtown: { shirt: [0x2e3a55, 0x3d4756, 0x545c6e, 0xffffff, 0xb9c6dd, 0x6e5c7a], pants: [0x232a3a, 0x2f2f38, 0x3a3f4d] },
-  fancy: { shirt: [0x8a5cb8, 0xd8a848, 0xc65a78, 0x4a7a9a, 0xf0ead8], pants: [0x2a2a34, 0x4a3a5a, 0x5a4a3a] },
+  port: { shirt: [0xe8604d, 0x4d9de8, 0xf0e6d2, 0x2e5a7a], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34], hat: 'cap', hatOdds: 0.6,
+    wear: ['tee', 'tee', 'tank', 'open', 'uniform'], shoe: ['boot', 'boot', 'shoe'] },
+  resort: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.7,
+    wear: ['tee', 'dress', 'dress', 'tank', 'open', 'sarong', 'robe', 'swim'], shoe: ['flip', 'flip', 'bare', 'shoe'] },
+  party: { shirt: [0xff2fa0, 0x7bffe8, 0xffe066, 0xb875ff, 0xff5d7e], pants: [0x2a1240, 0x4a2a8a, 0x1a3a5a], hat: 'sun', hatOdds: 0.25,
+    wear: ['tee', 'tank', 'tank', 'dress', 'open'], shoe: ['flip', 'shoe', 'bare'], fun: true },
+  market: { shirt: [0xff8a3a, 0xffd23f, 0x7ef2a0, 0xff5d7e, 0xf0e6d2], pants: [0x5a4a3a, 0x3a4a6a, 0x6a3a4a], hat: 'sun', hatOdds: 0.45,
+    wear: ['tee', 'open', 'dress', 'apron', 'tank'], shoe: ['flip', 'shoe', 'bare'] },
+  jungle: { shirt: [0x5a7a4a, 0x8a9a5a, 0xc4a03a, 0x7a8a5a], pants: [0x4a4a3a, 0x5a5a3a], hat: 'cap', hatOdds: 0.65, pack: true,
+    wear: ['tee', 'tee', 'uniform'], shoe: ['boot', 'shoe'] },
+  cove: { shirt: [0x4dd0e1, 0xffd54f, 0xff8a5c, 0xffffff], pants: [0x2ab8d8, 0xffb347, 0x3a4a6a], hat: 'sun', hatOdds: 0.5,
+    wear: ['tee', 'tank', 'swim', 'wet', 'sarong'], shoe: ['bare', 'flip', 'shoe'] },
+  beach: { shirt: [0xff8a5c, 0x4dd0e1, 0xffd54f, 0xff6f91, 0x7be8b0, 0xffffff], pants: [0xff5470, 0x2ab8d8, 0xffb347, 0x66de93], hat: 'sun', hatOdds: 0.5,
+    wear: ['swim', 'swim', 'tank', 'sarong', 'dress', 'tee', 'wet'], shoe: ['bare', 'bare', 'flip'] },
+  downtown: { shirt: [0x2e3a55, 0x3d4756, 0x545c6e, 0xffffff, 0xb9c6dd, 0x6e5c7a], pants: [0x232a3a, 0x2f2f38, 0x3a3f4d], wear: ['blazer', 'blazer', 'tee', 'uniform'] },
+  fancy: { shirt: [0x8a5cb8, 0xd8a848, 0xc65a78, 0x4a7a9a, 0xf0ead8], pants: [0x2a2a34, 0x4a3a5a, 0x5a4a3a], wear: ['blazer', 'dress', 'dress', 'tee'] },
   park: { shirt: [0xffffff, 0xe8604d, 0x58c470, 0x4da3ff, 0xffd54f], pants: [0x3a4a6a, 0x2a2a34, 0x58c470], hat: 'cap', hatOdds: 0.45 },
   forest: { shirt: [0x5a7a4a, 0x8a6a4a, 0xc4693a, 0x7a8a5a], pants: [0x4a4a3a, 0x5a4a3a, 0x3a4a3a], hat: 'beanie', hatOdds: 0.6, pack: true },
   cozy: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xc65a9a, 0x7a6ae8], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34, 0x6a3a4a, 0x3a5a4a] },
@@ -409,86 +432,167 @@ const OUTFIT: Record<string, { shirt: number[]; pants: number[]; hat?: 'sun' | '
   plaza: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xffffff, 0x9a6ae8], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a] },
 };
 
+// SKELETON: hip line, shoulder line, head centre. A child is not a shrunken
+// adult — the legs and arms are proportionally shorter, the barrel is rounder
+// and the head is nearly adult-sized on a two-thirds-height body.
+interface Build { hipY: number; shY: number; headY: number; girth: number; armL: number; headS: number; scale: number; }
+const ADULT: Build = { hipY: 1.24, shY: 2.18, headY: 2.90, girth: 1.00, armL: 1.06, headS: 1.00, scale: 1 };
+const CHILD: Build = { hipY: 0.86, shY: 1.62, headY: 2.20, girth: 1.17, armL: 0.82, headS: 1.16, scale: 0.80 };
+
+const HAIRS: Hair[] = ['short', 'short', 'buzz', 'bob', 'bob', 'long', 'long', 'bun', 'pony', 'pony', 'curly', 'curly', 'braids', 'bald'];
+const PATTERNS: Pattern[] = ['plain', 'plain', 'plain', 'stripe', 'floral', 'twotone', 'sash'];
+const FLIP_COL = [0xff5d7e, 0x2fd8e8, 0xffd23f, 0x7ef05a, 0xffffff];
+
 function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE.Group {
-  // little character with real limbs + a walk cycle — dressed for their biome,
-  // then accessorised by ROLE (hat, shades, parrot, something in their hand)
   const g = new THREE.Group();
   const fit = OUTFIT[biome ?? 'cozy'] ?? OUTFIT.cozy;
-  const shirt = mat(o?.shirt ?? colOverride ?? pick(fit.shirt));
-  const pants = mat(o?.pants ?? pick(fit.pants), 0.9);
-  const skin = mat(pick(PROPS.skin), 0.75);
-  const hair = mat(pick([0x2a2024, 0x6a4a2a, 0xd8b46a, 0x8a3a2a, 0x4a4a52, 0xe8e2d8]), 0.9);
-  // legs (pivot at hip so they swing)
-  const mkLeg = (sx: number) => {
-    const hip = new THREE.Group(); hip.position.set(sx, 1.15, 0);
-    const leg = new THREE.Mesh(G.leg, pants);
-    leg.position.y = -0.57; hip.add(leg); g.add(hip); return hip;
-  };
-  const ll = mkLeg(-0.24), rl = mkLeg(0.24);
-  // torso
-  const torso = new THREE.Mesh(G.torso, shirt);
-  torso.position.y = 1.75; g.add(torso);
-  // arms (pivot at shoulder)
-  const mkArm = (sx: number) => {
-    const sh = new THREE.Group(); sh.position.set(sx, 2.2, 0);
-    const arm = new THREE.Mesh(G.arm, shirt);
-    arm.position.y = -0.5; sh.add(arm);
-    const hand = new THREE.Mesh(G.hand, skin);
-    hand.position.y = -1.05; sh.add(hand);
-    g.add(sh); return sh;
-  };
-  const la = mkArm(-0.62), ra = mkArm(0.62);
-  // HEAD PIVOT: head, hair and every hat/face accessory live in here with their
-  // origin at the head centre, so making a kid's head 30% bigger is one scale.
-  const hd = new THREE.Group();
-  hd.position.y = 2.9; g.add(hd);
-  const head = new THREE.Mesh(G.head, skin); hd.add(head);
-  const cap = new THREE.Mesh(G.cap, hair); cap.position.y = 0.08; hd.add(cap);
-  // headwear: an explicit role hat wins, otherwise the biome dress code rolls
+  const kid = !!(o && o.kid);
+  const bd = kid ? CHILD : ADULT;
+  const th = bd.shY - bd.hipY;                 // torso height, hip line -> shoulders
+  const gr = bd.girth;
+  const shirt = o?.shirt ?? colOverride ?? pick(fit.shirt);
+  const pants = o?.pants ?? pick(fit.pants);
+  const skin = pick(SKIN);
+  const hairCol = o?.hairCol ?? (fit.fun && Math.random() < 0.3 ? pick(HAIRC_FUN) : pick(HAIRC));
+  const hair: Hair = o?.hair ?? pick(HAIRS);
+  const wear: Wear = o?.wear ?? (fit.wear ? pick(fit.wear) : 'tee');
+  const pat: Pattern = o?.pattern ?? pick(PATTERNS);
+  const shoe: Shoe = o?.shoe ?? (fit.shoe ? pick(fit.shoe) : 'shoe');
+  const accent = o?.accent ?? pick([WHITE, INK, 0xffd23f, 0xff5d7e, 0x2fd8e8, 0x1f2a4a]);
+  // garment consequences: what covers the arms, what covers the legs, and
+  // whether there is a skirt in the way of the thighs
+  const sleeved = wear === 'tee' || wear === 'blazer' || wear === 'uniform' || wear === 'apron' || wear === 'open';
+  const fullArm = wear === 'wet' || wear === 'robe';
+  const bareLegs = wear === 'swim' || wear === 'sarong' || wear === 'dress' || wear === 'robe';
+  const legCol = wear === 'wet' ? shirt : wear === 'swim' ? shirt : pants;
+  const shortLeg = wear === 'swim' || wear === 'tank' || (!kid && wear === 'tee' && Math.random() < 0.45);
+
+  // ── LEGS ── two merged meshes. Interior segments are open-ended tubes: the
+  // caps live inside the joint above them and are never rendered.
+  const legs: THREE.Group[] = [];
+  const L = bd.hipY;                            // leg length: hip pivot down to the floor
+  for (const sx of [-0.235 * gr, 0.235 * gr]) {
+    const p: Geo[] = [];
+    const thighCol = bareLegs ? skin : legCol;
+    const shinCol = (bareLegs || shortLeg) ? skin : legCol;
+    // thigh top pokes INTO the hips and the shin top INTO the thigh, so no
+    // joint can ever show a seam however the limb swings
+    p.push(pc(B.taper, thighCol, 0, -0.23 * L, 0, 0.36 * gr, 0.50 * L, 0.36 * gr, Math.PI));
+    p.push(pc(B.taper, shinCol, 0, -0.70 * L, 0.01, 0.29 * gr, 0.52 * L, 0.29 * gr, Math.PI));
+    const fy = -0.95 * L, fh = 0.13 * L;
+    if (shoe === 'bare') p.push(pc(B.box, skin, 0, fy, 0.07, 0.24 * gr, fh, 0.38));
+    else if (shoe === 'flip') {
+      p.push(pc(B.box, skin, 0, fy, 0.07, 0.23 * gr, fh, 0.36));
+      p.push(pc(B.box, pick(FLIP_COL), 0, fy - fh * 0.6, 0.08, 0.29 * gr, fh * 0.36, 0.45));
+    } else if (shoe === 'boot') {
+      p.push(pc(B.tube, INK, 0, -0.78 * L, 0.01, 0.32 * gr, 0.32 * L, 0.32 * gr));
+      p.push(pc(B.box, INK, 0, fy, 0.08, 0.28 * gr, fh * 1.25, 0.45));
+    } else p.push(pc(B.box, INK, 0, fy, 0.07, 0.26 * gr, fh, 0.42));
+    const hip = new THREE.Group(); hip.position.set(sx, L, 0);
+    hip.add(weld(p)); g.add(hip); legs.push(hip);
+  }
+
+  // ── BODY ── ONE merged mesh: hips, tapered chest, rounded shoulder yoke,
+  // neck, every garment layer, the lanyard, the parrot, the rubber ring.
+  const bp: Geo[] = [];
+  const bare = wear === 'swim' || (wear === 'sarong' && Math.random() < 0.6);
+  const torsoCol = bare ? skin : shirt;
+  bp.push(pc(B.drum, wear === 'dress' || wear === 'robe' ? shirt : bareLegs ? shirt : pants,
+    0, 0.14 * th, 0, 0.84 * gr, 0.40 * th, 0.62 * gr));                        // hips
+  if (pat === 'twotone' && !bare) {
+    bp.push(pc(B.taper, shirt, 0, 0.42 * th, 0, 0.80 * gr, 0.36 * th, 0.58 * gr, Math.PI));
+    bp.push(pc(B.taper, accent, 0, 0.80 * th, 0, 0.90 * gr, 0.40 * th, 0.65 * gr, Math.PI));
+  } else {
+    bp.push(pc(B.taper, torsoCol, 0, 0.61 * th, 0, 0.90 * gr, 0.74 * th, 0.65 * gr, Math.PI));
+  }
+  bp.push(pc(B.sphS, bare ? skin : shirt, 0, th, 0, 1.12 * gr, 0.60, 0.80 * gr));   // shoulder yoke
+  bp.push(pc(B.tube, skin, 0, 1.14 * th, 0, 0.30, 0.24, 0.28));                     // neck
+  // patterns are free: extra parts, same mesh, same material
+  if (pat === 'stripe' && !bare) for (let i = 0; i < 3; i++)
+    bp.push(pc(B.drum, accent, 0, (0.38 + i * 0.22) * th, 0, (0.83 + i * 0.035) * gr, 0.10 * th, (0.60 + i * 0.025) * gr));
+  else if (pat === 'floral' && !bare) for (let i = 0; i < 5; i++) {
+    const a = i * 1.9;
+    bp.push(pc(B.dot, accent, Math.sin(a) * 0.36 * gr, (0.42 + (i % 3) * 0.2) * th, Math.cos(a) * 0.28 * gr, 0.15));
+  } else if (pat === 'sash' && !bare)
+    bp.push(pc(B.box, accent, 0, 0.66 * th, 0.30 * gr, 0.98 * gr, 0.20, 0.10, 0, 0, 0.7));
+  // silhouette-changing layers
+  if (wear === 'dress')                                                            // flares WIDER than the shoulders
+    bp.push(pc(B.flare, shirt, 0, -0.10 * th, 0, 1.42 * gr, 0.66 * th, 1.20 * gr));
+  else if (wear === 'sarong')
+    bp.push(pc(B.flare, o?.pants ?? pick(fit.pants), 0, -0.02 * th, 0, 1.20 * gr, 0.48 * th, 1.02 * gr));
+  else if (wear === 'robe') {
+    bp.push(pc(B.flare, shirt, 0, 0.30 * th, 0, 1.16 * gr, 1.30 * th, 0.92 * gr));
+    bp.push(pc(B.box, accent, 0, 0.34 * th, 0.30 * gr, 0.90 * gr, 0.13, 0.10));     // belt
+  } else if (wear === 'open') {                                                    // shirt open over a vest
+    bp.push(pc(B.box, accent, -0.26 * gr, 0.66 * th, 0.28 * gr, 0.26, 0.72 * th, 0.10));
+    bp.push(pc(B.box, accent, 0.26 * gr, 0.66 * th, 0.28 * gr, 0.26, 0.72 * th, 0.10));
+  } else if (wear === 'blazer') {
+    bp.push(pc(B.box, accent, -0.24 * gr, 0.68 * th, 0.29 * gr, 0.30, 0.70 * th, 0.10));
+    bp.push(pc(B.box, accent, 0.24 * gr, 0.68 * th, 0.29 * gr, 0.30, 0.70 * th, 0.10));
+    bp.push(pc(B.box, accent, 0, 1.02 * th, 0.14 * gr, 0.62, 0.12, 0.44));          // collar
+  } else if (wear === 'apron') {
+    bp.push(pc(B.box, accent, 0, 0.52 * th, 0.30 * gr, 0.62 * gr, 0.86 * th, 0.08));
+  } else if (wear === 'uniform') {
+    bp.push(pc(B.box, accent, 0, 1.02 * th, 0.10 * gr, 0.66, 0.12, 0.48));          // collar band
+  }
+  if (o?.necklace) bp.push(pc(B.ring, GOLD, 0, 1.02 * th, 0.02, 0.58, 0.58, 0.58, Math.PI / 2));
+  if (o?.lanyard) {
+    bp.push(pc(B.box, 0x2fb8a8, 0, 0.86 * th, 0.30 * gr, 0.07, 0.40 * th, 0.09));
+    bp.push(pc(B.box, WHITE, 0, 0.60 * th, 0.32 * gr, 0.26, 0.30, 0.05));
+  }
+  if (o?.floatRing)                                                                // instantly reads as CHILD from above
+    bp.push(pc(B.ring, pick([0xff8a3a, 0xff5d7e, 0x35d6f0]), 0, 0.30 * th, 0, 3.0, 3.0, 3.0, Math.PI / 2));
+  if (o?.rucksack || (fit.pack && Math.random() < 0.7))
+    bp.push(pc(B.box, pick([0xc4693a, 0x4a7a9a, 0x8a5cb8]), 0, 0.62 * th, -0.40 * gr, 0.62, 0.62 * th, 0.28));
+  if (o?.parrot) parrotParts(bp, Math.random() < 0.5 ? -1 : 1, th);
+  const body = new THREE.Group(); body.position.y = bd.hipY;
+  body.add(weld(bp)); g.add(body);
+
+  // ── ARMS ── one merged mesh each: tapered upper, a forearm bent forward at
+  // the elbow, and a hand. Hands are what make a walk cycle read.
+  const armX = 0.52 * gr;
+  const arms: THREE.Group[] = [];
+  for (const sx of [-armX, armX]) {
+    const p: Geo[] = [];
+    const upCol = fullArm ? shirt : sleeved ? shirt : skin;
+    const loCol = fullArm ? shirt : skin;
+    p.push(pc(B.taper, upCol, 0, -0.255 * bd.armL, 0, 0.24 * gr, 0.52 * bd.armL, 0.24 * gr, Math.PI));
+    p.push(pc(B.taper, loCol, 0, -0.745 * bd.armL, 0.055 * bd.armL, 0.20 * gr, 0.50 * bd.armL, 0.20 * gr, Math.PI + 0.2));
+    p.push(pc(B.dot, skin, 0, -1.00 * bd.armL, 0.12 * bd.armL, 0.26));
+    if (o?.armbands) p.push(pc(B.ring, 0xff8a3a, 0, -0.34 * bd.armL, 0, 0.62, 0.62, 0.62, Math.PI / 2));
+    const sh = new THREE.Group(); sh.position.set(sx, bd.shY, 0);
+    sh.add(weld(p)); g.add(sh); arms.push(sh);
+  }
+  // the right hand carries the prop, welded straight into the arm
+  if (o?.prop) {
+    const p: Geo[] = []; propParts(p, o.prop);
+    arms[1].add(weld(p));
+  }
+
+  // ── HEAD ── one merged mesh: skull, hair, hat, face. This is the surface the
+  // play camera spends all its time looking at, so it gets the vertex budget.
+  const hp: Geo[] = [];
+  hp.push(pc(B.sph, skin, 0, 0, 0.01, 1.06, 1.12, 0.99));
+  hairParts(hp, hair, hairCol);
   const hk: Hat | null = (o && o.hat !== undefined) ? o.hat
     : (fit.hat && Math.random() < (fit.hatOdds ?? 0.4) ? fit.hat : null);
-  if (hk) hatOn(hd, hk, o?.hatCol ?? pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]));
-  if (o?.glasses) {
-    const gl = new THREE.Mesh(G.hand, mat(INK, 0.2));
-    gl.scale.set(2.35, 0.42, 0.5); gl.position.set(0, 0.08, 0.45); hd.add(gl);
-  }
-  if (o?.eyepatch) {
-    const ep = new THREE.Mesh(G.hand, mat(0x1a1620, 0.5));
-    ep.scale.set(0.95, 0.85, 0.34); ep.position.set(-0.18, 0.11, 0.45); hd.add(ep);
-  }
+  if (hk) hatParts(hp, hk, o?.hatCol ?? pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]));
+  if (o?.glasses) hp.push(pc(B.box, INK, 0, 0.08, 0.46, 0.58, 0.10, 0.13));
+  if (o?.eyepatch) hp.push(pc(B.box, 0x1a1620, -0.18, 0.11, 0.46, 0.23, 0.19, 0.09));
   if (o?.headphones) {
-    // squashed so the bottom of the hoop tucks inside the skull — a headband,
-    // not a halo
-    const arc = new THREE.Mesh(G.ring, mat(INK, 0.4));
-    arc.scale.set(1.16, 0.86, 1); arc.position.y = 0.06; hd.add(arc);
-    for (const sx of [-1, 1]) {
-      const cup = new THREE.Mesh(G.blob, mat(pick([0xff2fa0, 0x2fd8e8, 0xffd23f]), 0.5));
-      cup.scale.set(1.1, 1.6, 1.4); cup.position.set(sx * 0.55, 0.02, 0); hd.add(cup);
-    }
+    hp.push(pc(B.ring, INK, 0, 0.06, 0, 1.40, 1.05, 1.40));   // squashed: a band, not a halo
+    for (const sx of [-0.55, 0.55])
+      hp.push(pc(B.dot, pick([0xff2fa0, 0x2fd8e8, 0xffd23f]), sx, 0.02, 0, 0.28, 0.40, 0.36));
   }
-  if (o && o.robe) {   // spa bathrobe over the top — the resort's poshest silhouette
-    const rb = new THREE.Mesh(G.robe, mat(o.shirt ?? WHITE, 0.95));
-    rb.position.y = 1.62; g.add(rb);
-  }
-  if (o?.necklace) {
-    const nk = new THREE.Mesh(G.ring, mat(GOLD, 0.3));
-    nk.rotation.x = Math.PI / 2; nk.scale.setScalar(0.62); nk.position.y = 2.3; g.add(nk);
-  }
-  if (o?.lanyard) {
-    const strap = new THREE.Mesh(G.plate, mat(0x2fb8a8, 0.9));
-    strap.scale.set(0.16, 5.5, 0.28); strap.position.set(0, 2.0, 0.3); g.add(strap);
-    const badge = new THREE.Mesh(G.plate, mat(WHITE, 0.6));
-    badge.scale.set(0.62, 1, 0.9); badge.rotation.x = Math.PI / 2; badge.position.set(0, 1.72, 0.31); g.add(badge);
-  }
-  if (o && o.parrot) parrotOn(g, Math.random() < 0.5 ? -1 : 1);
-  if (o && o.prop) propOn(ra, o.prop);
-  if (fit.pack && Math.random() < 0.7) {
-    const pk = new THREE.Mesh(G.pack, mat(pick([0xc4693a, 0x4a7a9a, 0x8a5cb8]), 0.9));
-    pk.position.set(0, 1.85, -0.48); g.add(pk);
-  }
-  // KIDS: shorter, rounder, bigger head — readable at a glance from the play camera
-  if (o?.kid) { hd.scale.setScalar(1.3); g.scale.setScalar(0.62); }
-  g.userData.limbs = { la, ra, ll, rl, phase: Math.random() * 6 } as Limbs;
+  const hd = new THREE.Group();
+  hd.position.y = bd.headY; hd.scale.setScalar(bd.headS);
+  hd.add(weld(hp)); g.add(hd);
+
+  if (bd.scale !== 1) g.scale.setScalar(bd.scale);
+  g.userData.limbs = {
+    la: arms[0], ra: arms[1], ll: legs[0], rl: legs[1], torso: body, head: hd,
+    phase: Math.random() * 6, bob: 0.028 + Math.random() * 0.016,
+  } as Limbs;
   return g;
 }
 
@@ -503,78 +607,114 @@ const KID_PANTS = [0x2f6fe0, 0xff5470, 0x2ab8d8, 0x66de93, 0xffb347];
 
 function makeCast(role: Role, dress: string): THREE.Group {
   switch (role) {
-    case 'kid':
+    case 'kid': {
+      // a child is not a shrunk adult: short limbs, round barrel, big head, and
+      // an armband or a rubber ring you can read from directly overhead
+      const swim = Math.random() < 0.5;
       return makePerson(dress, undefined, {
-        kid: true, shirt: pick(KID_SHIRT), pants: pick(KID_PANTS),
-        hat: Math.random() < 0.45 ? pick(['cap', 'sun', 'bandana', 'snorkel'] as Hat[]) : null,
+        kid: true, shirt: pick(KID_SHIRT), pants: pick(KID_PANTS), accent: pick(KID_SHIRT),
+        wear: swim ? 'swim' : pick(['tee', 'tank', 'dress'] as Wear[]),
+        pattern: pick(['stripe', 'floral', 'twotone', 'plain'] as Pattern[]),
+        shoe: pick(['bare', 'flip', 'shoe'] as Shoe[]),
+        hair: pick(['curly', 'bob', 'pony', 'short', 'braids', 'buzz'] as Hair[]),
+        hat: Math.random() < 0.5 ? pick(['bucket', 'cap', 'sun', 'snorkel'] as Hat[]) : null,
         hatCol: pick([0xff4f9a, 0x35d6f0, 0xffd23f, 0xffffff]),
-        prop: Math.random() < 0.3 ? pick(['ball', 'cocktail'] as Prop[]) : undefined,
+        armbands: swim && Math.random() < 0.6,
+        floatRing: swim && Math.random() < 0.3,
+        rucksack: !swim && Math.random() < 0.25,
+        prop: Math.random() < 0.3 ? pick(['ball', 'selfie'] as Prop[]) : undefined,
       });
+    }
     case 'rich':
       return makePerson(dress, undefined, {
         shirt: pick([WHITE, 0xf6e9c8, 0xffd0e0, 0xcfe6ff, 0xf0e6d2]),
-        pants: pick([WHITE, 0xe8ddc4, 0x2a3a5a, 0xf6e3b8]),
+        pants: pick([WHITE, 0xe8ddc4, 0x2a3a5a, 0xf6e3b8]), accent: GOLD,
+        wear: pick(['dress', 'dress', 'open', 'blazer', 'sarong', 'tee'] as Wear[]),
+        pattern: pick(['plain', 'plain', 'stripe', 'sash'] as Pattern[]),
+        shoe: pick(['flip', 'shoe'] as Shoe[]),
+        hair: pick(['bob', 'long', 'bun', 'short', 'pony'] as Hair[]),
         hat: Math.random() < 0.62 ? 'sun' : null, hatCol: pick([0xf6e3b8, WHITE, 0xffe0ec]),
         glasses: Math.random() < 0.85, necklace: Math.random() < 0.55,
         prop: Math.random() < 0.55 ? pick(['cocktail', 'selfie'] as Prop[]) : undefined,
       });
     case 'robe':   // straight out of the spa, and not changing for anybody
       return makePerson(dress, undefined, {
-        shirt: WHITE, pants: WHITE, robe: true, hat: Math.random() < 0.4 ? 'flower' : null,
+        shirt: WHITE, pants: WHITE, accent: pick([0xd8cfc0, 0x9ac0d8]),
+        wear: 'robe', shoe: 'flip', hat: Math.random() < 0.4 ? 'flower' : null,
         glasses: Math.random() < 0.6, necklace: Math.random() < 0.4,
         prop: Math.random() < 0.5 ? 'cocktail' : undefined,
       });
     case 'waiter':
       return makePerson(dress, undefined, {
-        shirt: WHITE, pants: 0x2a2a34, hat: null, prop: 'tray', lanyard: Math.random() < 0.4,
+        shirt: WHITE, pants: 0x2a2a34, accent: 0x24242e, wear: 'apron', shoe: 'shoe',
+        pattern: 'plain', hat: null, prop: 'tray', lanyard: Math.random() < 0.4,
       });
     case 'bellhop':
       return makePerson(dress, undefined, {
-        shirt: 0xb03a4a, pants: 0x2a2a34, hat: 'bellhop', hatCol: 0xb03a4a,
+        shirt: 0xb03a4a, pants: 0x2a2a34, accent: GOLD, wear: 'uniform', shoe: 'shoe',
+        pattern: 'plain', hat: 'bellhop', hatCol: 0xb03a4a,
       });
     case 'lifeguard':
       return makePerson(dress, undefined, {
-        shirt: 0xe8342a, pants: 0xe8342a, hat: 'visor', hatCol: 0xe8342a,
+        shirt: 0xe8342a, pants: 0xe8342a, accent: WHITE, wear: 'tank', shoe: 'bare',
+        pattern: 'plain', hat: 'visor', hatCol: 0xe8342a,
         glasses: true, prop: Math.random() < 0.4 ? 'ball' : undefined,
       });
     case 'spa':
       return makePerson(dress, undefined, {
-        shirt: WHITE, pants: 0xe8f2ee, hat: Math.random() < 0.5 ? 'flower' : null,
+        shirt: WHITE, pants: 0xe8f2ee, accent: 0xcfe4dc, wear: 'uniform', shoe: 'shoe',
+        pattern: 'plain', hair: pick(['bun', 'bun', 'bob'] as Hair[]),
+        hat: Math.random() < 0.5 ? 'flower' : null,
       });
     case 'dock':
       return makePerson(dress, undefined, {
-        shirt: pick([0x2e5a7a, 0x4d9de8, 0xf0e6d2]), pants: 0x5a4a3a,
+        shirt: pick([0x2e5a7a, 0x4d9de8, 0xf0e6d2]), pants: 0x5a4a3a, accent: pick([WHITE, INK]),
+        wear: pick(['tank', 'open', 'tee'] as Wear[]), shoe: 'boot',
+        pattern: pick(['stripe', 'stripe', 'plain'] as Pattern[]),
         hat: pick(['bandana', 'cap', 'captain'] as Hat[]), hatCol: pick([0xe8604d, 0x2e5a7a, WHITE]),
         parrot: Math.random() < 0.12,
       });
     case 'grounds':
       return makePerson(dress, undefined, {
-        shirt: 0x4a7a4a, pants: 0x5a5a3a, hat: 'sun', hatCol: 0xc8b088,
+        shirt: 0x4a7a4a, pants: 0x5a5a3a, accent: 0x3a5a3a, wear: 'uniform', shoe: 'boot',
+        pattern: 'plain', hat: 'sun', hatCol: 0xc8b088,
         prop: Math.random() < 0.4 ? 'clipboard' : undefined,
       });
     case 'chef':
-      return makePerson(dress, undefined, { shirt: WHITE, pants: 0xd8d4cc, hat: 'toque', prop: 'tray' });
+      return makePerson(dress, undefined, {
+        shirt: WHITE, pants: 0xd8d4cc, accent: 0xe4e0d6, wear: 'apron', shoe: 'shoe',
+        pattern: 'plain', hat: 'toque', prop: 'tray',
+      });
     case 'manager':   // blazer, lanyard, headset, clipboard — the user asked by name
       return makePerson(dress, undefined, {
-        shirt: pick([0x2a3a6a, 0x1f2a4a, 0x3a4a7a]), pants: 0x24242e,
+        shirt: pick([0x2a3a6a, 0x1f2a4a, 0x3a4a7a]), pants: 0x24242e, accent: 0xf0c050,
+        wear: 'blazer', shoe: 'shoe', pattern: 'plain',
         hat: null, headphones: true, lanyard: true, prop: 'clipboard',
       });
     case 'pirate':   // costumed staff committing hard to the bit
       return makePerson(dress, undefined, {
         shirt: pick([0x8a2a3a, 0x2a4a6a, 0x6a3a7a, 0x2e2a3a]), pants: pick([0x3a2a24, 0x24202c]),
+        accent: pick([WHITE, GOLD, 0xd83a3a]),
+        wear: pick(['open', 'open', 'tee'] as Wear[]), shoe: 'boot',
+        pattern: pick(['stripe', 'sash', 'sash'] as Pattern[]),
+        hair: pick(['long', 'long', 'braids', 'pony'] as Hair[]),
         hat: Math.random() < 0.62 ? 'tricorn' : 'bandana', hatCol: pick([0xd83a3a, 0x2a2a34, 0x8a2a3a]),
         eyepatch: Math.random() < 0.55, parrot: Math.random() < 0.45,
       });
     case 'dj':
       return makePerson(dress, undefined, {
-        shirt: pick([0xff2fa0, 0x7bffe8, 0xb875ff]), hat: null,
-        headphones: true, glasses: true,
+        shirt: pick([0xff2fa0, 0x7bffe8, 0xb875ff]), accent: INK,
+        wear: pick(['tank', 'tee'] as Wear[]), pattern: pick(['twotone', 'stripe'] as Pattern[]),
+        hairCol: pick(HAIRC_FUN), hat: null, headphones: true, glasses: true,
       });
     case 'diver':
-      return makePerson(dress, undefined, { hat: 'snorkel', shirt: pick([0x2fd8e8, 0xffd23f]) });
+      return makePerson(dress, undefined, {
+        hat: 'snorkel', shirt: pick([0x2fd8e8, 0xffd23f]), wear: 'wet', shoe: 'bare',
+        pattern: 'twotone', accent: INK,
+      });
     case 'digger':   // treasure hunter, sweeping the cove for bottlecaps
       return makePerson(dress, undefined, {
-        hat: pick(['sun', 'bandana', 'cap'] as Hat[]), prop: 'detector',
+        hat: pick(['sun', 'bandana', 'cap'] as Hat[]), prop: 'detector', shoe: pick(['boot', 'shoe'] as Shoe[]),
       });
     default:         // generic holidaymaker in whatever the district wears
       return makePerson(dress, undefined, {
@@ -1065,10 +1205,17 @@ export function createLife(
         }
         if (biomeAt(nx, nz)) { mesh.position.x = nx; mesh.position.z = nz; }
         else if (hop > 0) hop = 0;   // pinned: stop the panic bounce so nothing vibrates in place
-        mesh.rotation.y = -ang + Math.PI / 2;
+        // THE HEAD LEADS THE TURN. Snapping the whole body to the travel
+        // heading every frame is what made everyone read as a sliding brick:
+        // the body now eases toward the heading and the head takes up the
+        // slack, so a change of direction has a beat to it.
+        let dyaw = (-ang + Math.PI / 2) - mesh.rotation.y;
+        while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+        while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+        mesh.rotation.y += dyaw * Math.min(1, dt * 9);
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
         // walk cycle: arms + legs swing with travel speed
-        const limbs = mesh.userData.limbs;
+        const limbs = mesh.userData.limbs as Limbs | undefined;
         const dnc = mesh.userData.dancer as { t: number; spin: number; mode?: number } | undefined;
         if (dnc && dnc.mode === 1 && hop <= 0) {
           // ── EVENT MANAGER: rooted to the spot, one arm sweeping the crowd
@@ -1106,10 +1253,31 @@ export function createLife(
             limbs.ll.rotation.x = st; limbs.rl.rotation.x = -st;
           }
         } else if (limbs) {
-          limbs.phase += dt * spd * 2.4;
-          const sw = Math.sin(limbs.phase) * 0.55;
+          // ── WALK / IDLE / FLEE, one branch. The phase always advances (so a
+          // standing person breathes and shifts weight instead of being a
+          // statue) but the AMPLITUDE tracks travel speed, so an idler sways
+          // and a walker strides.
+          limbs.phase += dt * (spd * 2.4 + 1.1);
+          const ph = limbs.phase;
+          const amp = Math.min(0.55, 0.055 + spd * 0.09);
+          const sw = Math.sin(ph) * amp;
           limbs.ll.rotation.x = sw; limbs.rl.rotation.x = -sw;
-          limbs.la.rotation.x = -sw * 0.8; limbs.ra.rotation.x = sw * 0.8;
+          if (fled) {
+            // panicking looks NOTHING like walking fast: arms straight up and
+            // wobbling, body pitched forward, stride at full amplitude
+            limbs.la.rotation.x = -2.4 + sw; limbs.ra.rotation.x = -2.4 - sw;
+            limbs.la.rotation.z = 0.45; limbs.ra.rotation.z = -0.45;
+            limbs.torso.rotation.x = 0.16;
+          } else {
+            limbs.la.rotation.x = -sw * 0.8; limbs.ra.rotation.x = sw * 0.8;
+            limbs.la.rotation.z = 0; limbs.ra.rotation.z = 0;
+            limbs.torso.rotation.x = Math.min(0.09, spd * 0.012);   // lean into the walk
+          }
+          // stride bob + torso counter-rotation + head lag: the three things
+          // that stop a walk cycle reading as a mesh sliding on a plane
+          if (hop <= 0) mesh.position.y = (1 - Math.cos(ph * 2)) * limbs.bob * (0.25 + amp);
+          limbs.torso.rotation.y = -sw * 0.30;
+          limbs.head.rotation.y = sw * 0.16 + Math.max(-0.6, Math.min(0.6, dyaw * 0.8));
         }
         // the blob stays ON the ground while its owner hops / skips / dances —
         // computed last so the bob branches above are already applied
