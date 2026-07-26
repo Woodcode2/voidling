@@ -490,8 +490,11 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     const fy = -0.95 * L, fh = 0.13 * L;
     if (shoe === 'bare') p.push(pc(B.box, skin, 0, fy, 0.07, 0.24 * gr, fh, 0.38));
     else if (shoe === 'flip') {
-      p.push(pc(B.box, skin, 0, fy, 0.07, 0.23 * gr, fh, 0.36));
-      p.push(pc(B.box, pick(FLIP_COL), 0, fy - fh * 0.6, 0.08, 0.29 * gr, fh * 0.36, 0.45));
+      // the STRAP goes on top of the foot, not the sole underneath it — from a
+      // top-down camera the sole is buried in the sand and the strap is the
+      // only part anyone will ever see
+      p.push(pc(B.box, skin, 0, fy, 0.07, 0.23 * gr, fh, 0.38));
+      p.push(pc(B.box, pick(FLIP_COL), 0, fy + fh * 0.45, 0.10, 0.25 * gr, fh * 0.4, 0.30));
     } else if (shoe === 'boot') {
       p.push(pc(B.tube, INK, 0, -0.78 * L, 0.01, 0.32 * gr, 0.32 * L, 0.32 * gr));
       p.push(pc(B.box, INK, 0, fy, 0.08, 0.28 * gr, fh * 1.25, 0.45));
