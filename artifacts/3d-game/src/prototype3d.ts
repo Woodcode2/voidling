@@ -1186,7 +1186,11 @@ function validateWorld() {
     // fleet a few seconds after the match started.
     if (!insideIsland3(px, pz) && !ud.afloat) { cull.push(i); continue; }
     if (ud.afloat) continue;   // moored: no road/coast correction applies
-    for (const rc of ROAD_CENTERS_3D) {
+    // Pirate Bay Resort has NO ROADS. This sweep was still nudging its props
+    // off Maple's road centres — phantom bands at world 2580/4290/6000/7710/
+    // 9420 that do not exist on the hooked island — quietly shoving cabanas and
+    // market stalls sideways for a grid that isn't there.
+    for (const rc of pickedWorld === 'pirate' ? [] : ROAD_CENTERS_3D) {
       if (Math.abs(px - rc) < band + hx) {   // straddles a vertical road lane
         const off = band + hx + 0.4;
         const side = px >= rc ? 1 : -1;

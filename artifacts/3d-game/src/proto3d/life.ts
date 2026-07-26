@@ -8,8 +8,10 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
-  railPointAt, insideIsland3, inLagoon3, worldId, type Biome, type AddEdible,
+  railPointAt, insideIsland3, inLagoon3, worldId, part, mergedProp,
+  type Biome, type AddEdible,
 } from './island';
+import * as LUXE from './luxe';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
@@ -36,6 +38,14 @@ const AMBIENT: Record<string, string[]> = {
   market: ['fresh mango! FRESH MANGO!', 'that parrot insulted me', 'half price! for you: full price', 'genuine treasure! probably!', 'I bought a hat. no regrets.', 'three coconuts for a doubloon', 'my stall, my rules', 'the fruit here is UNREAL', 'hand-carved. by a machine.', 'a real pirate map. laminated.', 'haggle? I LOVE to haggle.', 'that is a very expensive shell', 'spices! smell them! SMELL THEM', 'authentic. mostly. sort of.'],
   jungle: ['I heard a monkey. I think.', 'the guided walk is at ten', 'bug spray was a good call', 'is that a waterfall??', 'left at the big rock, right?', 'nature! so much of it!', 'something just moved', 'no bars out here. bliss.', 'the zipline goes over THAT?', 'they built a spa in a tree', 'my sandals were a mistake', 'a butterfly landed on me!!'],
   cove: ['there\'s treasure here. FACT.', 'that wreck is CENTURIES old', 'a crab took my sandal', 'X marks... somewhere', 'rock pools! so many crabs!', 'I found a doubloon! (a bottlecap)', 'the tide sounds so nice', 'shipwreck selfie time', 'smugglers! right here! probably!', 'my detector beeped. it lied.', 'that cave goes back FOREVER', 'kayaks at eleven, treasure at noon'],
+  // ── OLD TOWN: the village that was here before the resort was. Nobody here
+  // is on holiday — these are the people whose grandparents mended these nets.
+  oldtown: ['this net has seen things', 'the well is cold. always cold.', 'the resort bought my cousin\'s field',
+    'catch was thin. it happens.', 'kids! not through the washing!', 'that thatch needs redoing',
+    'my grandfather laid this wall', 'the tourists never come UP here', 'boat\'s in at four. or five.',
+    'we had a fort before they had a POOL', 'salt gets in everything', 'mind the bucket!',
+    'she mends faster than me. always has.', 'nine generations on this hill', 'the goat is out AGAIN',
+    'rope don\'t mend itself', 'bread\'s on. give it ten.', 'that gull knows my name'],
   cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
   fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how gauche', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
   downtown: ['need. more. coffee.', 'this commute is BRUTAL', 'meeting ran LONG', "elevator's down AGAIN", 'lunch is a spreadsheet today', 'hustle never sleeps', "circle back? I'll circle back", 'my inbox says 4,000', 'sell! no wait— buy!', 'is it friday yet'],
@@ -52,6 +62,9 @@ const PANIC: Record<string, string[]> = {
   market: ['MY MANGOES!!', 'the parrot saw everything!!', 'closing early!! VERY early!!', 'not my STALL!!', 'take the coconuts!!', 'everything must go!! WE must go!!'],
   jungle: ['INTO THE TREES!!', 'that is NOT a monkey!!', 'follow the trail!! ANY trail!!', 'it ate the waterfall!!', 'the tree spa is GONE!!', 'zipline!! EVERYONE!!'],
   cove: ['it took the TREASURE!!', 'crabs, scatter!!', 'not the shipwreck!!', 'to the rock pools!!', 'X marked THIS. my mistake.', 'grab the shovel and GO!!'],
+  oldtown: ['THE NETS!! GRAB THE NETS!!', 'nine generations!! GONE!!', 'get the KIDS off the wall!!',
+    'it took the WELL!!', 'to the fort!! it held before!!', 'my grandfather built that!!',
+    'leave the catch!! LEAVE IT!!'],
   cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the HOA form!!'],
   fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
   downtown: ['MY STARTUP!!', "the WIFI'S DOWN!!", 'not my oat-milk latte!!', 'OUT OF OFFICE. FOREVER.', 'meeting cancelled, RUN!!', 'this is NOT on my calendar'],
@@ -807,6 +820,188 @@ function makeCrab(): THREE.Group {
   }
   return g;
 }
+// ══ PIRATE BAY PROP KIT ══════════════════════════════════════════════════════
+// Everything below follows island.ts's house rules: ONE merged mesh per prop on
+// the shared vertex-coloured prop material, nose facing +X, y = 0 is the ground.
+// A monkey costs the same one draw call as a barrel.
+
+/** Canopy monkey, ~1.4 across. Faces +X, arms up ready to swing. */
+function makeMonkey(): THREE.Group {
+  const fur = pick([0x8a6a4a, 0x775330, 0x9c7a52, 0x6b4a2e]);
+  const face = 0xe8c39a;
+  const p: THREE.BufferGeometry[] = [
+    part(new THREE.SphereGeometry(0.38, 8, 6), fur, 0, 0.42, 0, 0, 0, 0, 1, 1.15, 0.9),
+    part(new THREE.SphereGeometry(0.28, 8, 6), fur, 0.16, 0.92, 0),
+    part(new THREE.SphereGeometry(0.17, 7, 5), face, 0.34, 0.86, 0, 0, 0, 0, 1, 0.9, 0.85),
+    part(new THREE.SphereGeometry(0.07, 6, 4), 0x241f2c, 0.44, 0.94, 0.09),
+    part(new THREE.SphereGeometry(0.07, 6, 4), 0x241f2c, 0.44, 0.94, -0.09),
+  ];
+  for (const sz of [-0.26, 0.26]) {                    // ears — the top-down tell
+    p.push(part(new THREE.CylinderGeometry(0.14, 0.14, 0.07, 7), fur, 0.12, 0.98, sz, Math.PI / 2));
+    p.push(part(new THREE.CylinderGeometry(0.08, 0.08, 0.09, 6), face, 0.12, 0.98, sz, Math.PI / 2));
+  }
+  for (const sz of [-0.3, 0.3]) {                      // arms up (hanging), legs tucked
+    p.push(part(new THREE.CylinderGeometry(0.09, 0.11, 0.62, 5), fur, -0.02, 0.86, sz, 0, 0, -0.35));
+    p.push(part(new THREE.CylinderGeometry(0.1, 0.12, 0.4, 5), fur, -0.1, 0.2, sz, 0, 0, 0.5));
+  }
+  // the tail is the silhouette: three segments curling up and back
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.CylinderGeometry(0.07 - i * 0.015, 0.08 - i * 0.015, 0.42, 5), fur,
+      -0.42 - i * 0.12, 0.42 + i * 0.3, 0, 0, 0, 0.5 - i * 0.5));
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
+/** Jungle zipline: two towers and the cable, spanning local x 0..len, y drop. */
+function makeZipline(len: number, drop: number): THREE.Group {
+  const p: THREE.BufferGeometry[] = [];
+  const post = (x: number, h: number) => {
+    for (const sz of [-0.5, 0.5]) for (const sx of [-0.5, 0.5])
+      p.push(part(new THREE.CylinderGeometry(0.16, 0.22, h, 5), 0x8a6a44, x + sx, h / 2, sz));
+    p.push(part(new THREE.BoxGeometry(2.2, 0.3, 2.2), 0xb0834e, x, h, 0));
+    for (let k = 0; k < 3; k++)                          // ladder rungs
+      p.push(part(new THREE.BoxGeometry(0.16, 0.16, 1.3), 0x8a6a44, x - 0.5, 1 + k * (h - 1.6) / 3, 0));
+  };
+  post(0, 9 + drop); post(len, 9);
+  // the cable: one long thin cylinder laid from tower to tower. part() rotates
+  // Z last, and a +Y cylinder turned by rz points along (-sin rz, cos rz) — so
+  // the angle that lands it on (len, dy) is atan2(dy, len) − π/2.
+  const dy = -drop, L = Math.hypot(len, dy);
+  p.push(part(new THREE.CylinderGeometry(0.07, 0.07, L, 4), 0x3a3f4d,
+    len / 2, 9 + drop + dy / 2, 0, 0, 0, Math.atan2(dy, len) - Math.PI / 2));
+  p.push(part(new THREE.BoxGeometry(2.6, 0.2, 2.6), 0xff6a5e, 0, 9 + drop + 0.3, 0));   // launch deck
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
+/** The jungle waterfall: a mossy lip, a plunge pool, and the falling sheets
+ *  (returned separately — they are the only thing that animates). */
+const FALL_MAT = new THREE.MeshStandardMaterial({ color: 0xd8f2fb, roughness: 0.2, transparent: true, opacity: 0.8 });
+const FALL_SHEET = new THREE.BoxGeometry(3.2, 3.0, 0.5);
+function makeWaterfall(): { grp: THREE.Group; sheets: THREE.Mesh[] } {
+  const p: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 5; i++) {                          // the rock face, stepped back
+    const y = i * 1.9;
+    p.push(part(new THREE.BoxGeometry(6.4 - i * 0.5, 2.0, 3.0 - i * 0.35), i % 2 ? 0x7a7466 : 0x8c8474,
+      -i * 0.35, y + 1, 0, 0, i * 0.12, 0));
+  }
+  p.push(part(new THREE.CylinderGeometry(4.6, 4.0, 0.5, 12), 0x3fc9d8, 3.4, 0.26, 0));   // plunge pool
+  p.push(part(new THREE.TorusGeometry(4.6, 0.42, 5, 14), 0x8c8474, 3.4, 0.3, 0, Math.PI / 2));
+  for (let i = 0; i < 7; i++) {                          // ferns on the lip
+    const a = i * 1.4;
+    p.push(part(new THREE.ConeGeometry(0.5, 1.5, 5), i % 2 ? 0x3f8f52 : 0x56a862,
+      -1.4 + Math.sin(a) * 1.4, 9.6, Math.cos(a) * 1.6, 0, 0, Math.sin(a) * 0.5));
+  }
+  const grp = new THREE.Group();
+  grp.add(mergedProp(p));
+  const sheets: THREE.Mesh[] = [];      // the falling water, over the pool
+  for (let i = 0; i < 3; i++) {
+    const s = new THREE.Mesh(FALL_SHEET, FALL_MAT);
+    s.position.set(3.2, 7 - i * 3, 0);
+    grp.add(s); sheets.push(s);
+  }
+  return { grp, sheets };
+}
+
+/** A fishing net spread on the ground for mending, ~4 across. */
+function makeNet(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [];
+  const cord = 0xdccfae;
+  for (let i = -3; i <= 3; i++) {
+    p.push(part(new THREE.BoxGeometry(4.2, 0.08, 0.09), cord, 0, 0.1, i * 0.5));
+    p.push(part(new THREE.BoxGeometry(0.09, 0.08, 3.2), cord, i * 0.66, 0.1, 0));
+  }
+  for (const [fx, fz] of [[-2, -1.4], [1.6, 1.5], [0.2, -1.6], [2.0, -0.4]] as [number, number][])
+    p.push(part(new THREE.SphereGeometry(0.26, 7, 5), pick([0xe8604d, 0xf0c050, 0x4d9de8]), fx, 0.24, fz));
+  p.push(part(new THREE.CylinderGeometry(0.5, 0.55, 0.7, 8), 0x9a7a4a, -2.3, 0.35, 1.5));   // the basket
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
+/** The village well — stone drum, timber frame, bucket on a rope. */
+function makeWell(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [
+    part(new THREE.CylinderGeometry(1.5, 1.6, 1.5, 12), 0x9aa2ab, 0, 0.75, 0),
+    part(new THREE.TorusGeometry(1.5, 0.18, 5, 14), 0xb8bec6, 0, 1.5, 0, Math.PI / 2),
+    part(new THREE.CylinderGeometry(1.2, 1.2, 0.2, 12), 0x2a3440, 0, 1.4, 0),          // the dark water
+  ];
+  for (const sz of [-1.3, 1.3]) p.push(part(new THREE.BoxGeometry(0.28, 3.2, 0.28), 0x8a6a44, 0, 1.6, sz));
+  p.push(part(new THREE.CylinderGeometry(0.22, 0.22, 2.8, 7), 0xb0834e, 0, 3.2, 0, Math.PI / 2));  // winch
+  p.push(part(new THREE.BoxGeometry(0.14, 0.14, 0.9), 0x8a6a44, 0.5, 3.2, 1.5, 0, 0, 0.6));       // handle
+  for (const sx of [-1.6, 1.6]) p.push(part(new THREE.BoxGeometry(0.3, 0.24, 3.4), 0xc4693a, sx, 4.1, 0, 0, 0, sx > 0 ? -0.45 : 0.45));
+  p.push(part(new THREE.BoxGeometry(3.6, 0.22, 3.6), 0xd8934a, 0, 4.6, 0));            // thatch cap
+  p.push(part(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 4), 0x6a5a48, 0, 2.5, 0));   // rope
+  p.push(part(new THREE.CylinderGeometry(0.34, 0.28, 0.5, 8), 0x8a6a44, 0, 1.85, 0));  // bucket
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
+/** Beach volleyball net, 12 wide — posts, cord lattice and a tape band. */
+function makeVolleyNet(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [];
+  for (const sz of [-6, 6]) p.push(part(new THREE.CylinderGeometry(0.16, 0.2, 6.4, 7), 0xf2ede0, 0, 3.2, sz));
+  for (let i = 0; i <= 12; i++) p.push(part(new THREE.BoxGeometry(0.06, 2.2, 0.06), 0xf6f4ee, 0, 4.5, -6 + i));
+  for (let k = 0; k <= 4; k++) p.push(part(new THREE.BoxGeometry(0.06, 0.06, 12), 0xf6f4ee, 0, 3.5 + k * 0.5, 0));
+  p.push(part(new THREE.BoxGeometry(0.12, 0.34, 12), 0x2fd8e8, 0, 5.7, 0));
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
+/** A paddleboard, ~3.4 long, nose +X. The rider is added by the caller. */
+function makePaddleboard(): THREE.Group {
+  const col = pick([0xff8a5c, 0x4dd0e1, 0xffd54f, 0x7be8b0]);
+  const p: THREE.BufferGeometry[] = [
+    part(new THREE.CylinderGeometry(0.55, 0.42, 3.4, 8), col, 0, 0.12, 0, 0, 0, -Math.PI / 2, 1, 1, 0.34),
+    part(new THREE.CylinderGeometry(0.36, 0.5, 0.9, 8), col, 1.9, 0.12, 0, 0, 0, -Math.PI / 2, 1, 1, 0.34),
+    part(new THREE.BoxGeometry(1.5, 0.06, 0.62), 0xf2ede0, -0.2, 0.26, 0),
+  ];
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
+/** A boat's wake: a foam V that trails the hull. Shares ONE material. */
+const WAKE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.42, depthWrite: false });
+function makeWake(w: number, len: number): THREE.Mesh {
+  const p: THREE.BufferGeometry[] = [];
+  for (const sz of [-1, 1]) for (let i = 0; i < 5; i++) {
+    const k = i / 4;
+    p.push(part(new THREE.BoxGeometry(len * 0.26, 0.05, 0.5 + k * 0.7), 0xffffff,
+      -len * (0.14 + k * 0.22), 0.02, sz * (w * 0.35 + k * w * 0.8)));
+  }
+  p.push(part(new THREE.BoxGeometry(len * 0.4, 0.05, w * 0.8), 0xf2fbff, -len * 0.22, 0.02, 0));
+  return mergedProp(p, WAKE_MAT);
+}
+
+/** The parasail rig. Origin is the HARNESS, so the caller hangs it off the tow
+ *  boat's stern and the canopy, lines and tow rope all follow for free. */
+function makeParasailCanopy(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [];
+  const cols = [0xff2fa0, 0xffd23f, 0x2fd8e8, 0xff8a3a, 0x7ef05a, 0xff2fa0, 0xffd23f];
+  for (let i = 0; i < cols.length; i++) {                 // a domed gore canopy
+    const a = (i + 0.5) / cols.length * Math.PI;
+    p.push(part(new THREE.BoxGeometry(1.3, 0.18, 2.6), cols[i],
+      -Math.cos(a) * 3.3, 5.8 + Math.sin(a) * 1.3, 0, 0, 0, Math.cos(a) * 0.85));
+  }
+  for (const sx of [-2.4, 0, 2.4]) {                      // rigging lines
+    const L = Math.hypot(sx, 5.2);
+    p.push(part(new THREE.CylinderGeometry(0.045, 0.045, L, 4), 0xf0ece0, sx / 2, 2.9, 0,
+      0, 0, Math.atan2(-sx, 5.2)));
+  }
+  p.push(part(new THREE.BoxGeometry(0.8, 0.28, 1.1), 0x3d3648, 0, 0, 0));       // harness seat
+  const rl = Math.hypot(3.5, 5.2);                        // tow rope down to the stern
+  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, rl, 4), 0xf6f2e4, 1.75, -2.6, 0,
+    0, 0, Math.atan2(-3.5, -5.2)));
+  const g = new THREE.Group();
+  g.add(mergedProp(p));
+  return g;
+}
+
 function makeAnimal(): THREE.Group {
   // three readable species so the "lions are LOOSE" bark is true: elephant,
   // lion, sheep — cycled so every pen mixes
@@ -1227,7 +1422,8 @@ export function createLife(
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
         // walk cycle: arms + legs swing with travel speed
         const limbs = mesh.userData.limbs as Limbs | undefined;
-        const dnc = mesh.userData.dancer as { t: number; spin: number; mode?: number } | undefined;
+        const dnc = mesh.userData.dancer as
+          { t: number; spin: number; mode?: number; px?: number; pz?: number } | undefined;
         if (dnc && dnc.mode === 1 && hop <= 0) {
           // ── EVENT MANAGER: rooted to the spot, one arm sweeping the crowd
           // toward whatever is scheduled next. Same userData slot as the
@@ -1248,20 +1444,64 @@ export function createLife(
             limbs.ll.rotation.x = sw; limbs.rl.rotation.x = -sw;
             limbs.la.rotation.x = -sw; limbs.ra.rotation.x = sw;
           }
+        } else if (dnc && dnc.mode === 3 && hop <= 0) {
+          // ── WORKING: rooted, both hands busy in front — mending a net,
+          // winding the well, gutting the catch. Old Town's whole read.
+          dnc.t += dt;
+          const s = Math.sin(dnc.t * 2.2), s2 = Math.sin(dnc.t * 2.2 + 1.1);
+          if (limbs) {
+            limbs.la.rotation.x = -1.1 + s * 0.42; limbs.ra.rotation.x = -1.1 + s2 * 0.42;
+            limbs.la.rotation.z = 0.3; limbs.ra.rotation.z = -0.3;
+            limbs.torso.rotation.x = 0.24 + s * 0.09;      // stooped over the work
+            limbs.torso.rotation.y = s * 0.12;
+            limbs.head.rotation.x = 0.3;
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+            mesh.position.y = s * 0.05;
+          }
+        } else if (dnc && dnc.mode === 4 && hop <= 0) {
+          // ── CONGA: hands on the shoulders in front, hips going, and every
+          // second bar the whole line kicks out to the side. Position comes
+          // from the follow chain — this is only the pose.
+          dnc.t += dt;
+          const b = dnc.t * 3.8;
+          const kick = Math.sin(b * 0.5) > 0.72 ? Math.sin(b * 4) : 0;
+          mesh.position.y = Math.abs(Math.sin(b)) * 0.3;
+          if (limbs) {
+            limbs.la.rotation.x = -1.5; limbs.ra.rotation.x = -1.5;   // arms straight forward
+            limbs.la.rotation.z = 0.22; limbs.ra.rotation.z = -0.22;
+            limbs.ll.rotation.x = Math.sin(b) * 0.42; limbs.rl.rotation.x = -Math.sin(b) * 0.42;
+            limbs.ll.rotation.z = kick * 0.55; limbs.rl.rotation.z = kick * 0.55;
+            limbs.torso.rotation.y = Math.sin(b) * 0.26;
+            limbs.head.rotation.y = Math.sin(b * 0.5) * 0.4;
+          }
         } else if (dnc && hop <= 0) {
           // ── DANCING: everyone on the floor is on the SAME beat (a shared
           // clock), arms up, hips swinging, bobbing on the downbeat. Offset
           // per dancer so it reads as a crowd, not a chorus line of clones.
+          //
+          // The bob used to be 0.34 units — under two screen pixels at the
+          // mid-game camera, which is why a floor of 42 dancers measured as
+          // almost perfectly still. It is now a real jump, plus a LATERAL
+          // sway: side to side is what reads at a top-down camera, where
+          // vertical motion is almost entirely foreshortened away. The sway is
+          // applied as a delta against the previous frame's offset so it never
+          // corrupts the wander integration underneath it.
           dnc.t += dt;
           const beat = dnc.t * 4.4;
-          mesh.position.y = Math.abs(Math.sin(beat)) * 0.34;
+          mesh.position.y = Math.abs(Math.sin(beat)) * 0.78;
           mesh.rotation.y += dt * dnc.spin * 1.1;
+          const sway = Math.sin(beat * 0.5) * 0.62, surge = Math.sin(beat * 0.25) * 0.44;
+          mesh.position.x += sway - (dnc.px ?? 0); dnc.px = sway;
+          mesh.position.z += surge - (dnc.pz ?? 0); dnc.pz = surge;
           if (limbs) {
             const up = 2.3 + Math.sin(beat * 2) * 0.5;      // hands in the air
             limbs.la.rotation.x = -up; limbs.ra.rotation.x = -up + Math.sin(beat) * 0.5;
-            limbs.la.rotation.z = 0.35; limbs.ra.rotation.z = -0.35;
-            const st = Math.sin(beat) * 0.4;
+            limbs.la.rotation.z = 0.35 + Math.sin(beat * 0.5) * 0.3;
+            limbs.ra.rotation.z = -0.35 + Math.sin(beat * 0.5) * 0.3;
+            const st = Math.sin(beat) * 0.55;
             limbs.ll.rotation.x = st; limbs.rl.rotation.x = -st;
+            limbs.torso.rotation.z = -Math.sin(beat * 0.5) * 0.2;    // hips lead the sway
+            limbs.torso.rotation.y = Math.sin(beat) * 0.22;
           }
         } else if (limbs) {
           // ── WALK / IDLE / FLEE, one branch. The phase always advances (so a
@@ -1424,7 +1664,8 @@ export function createLife(
 
     // THE DANCE FLOOR — a packed crowd on ONE shared beat, barely travelling.
     // Short tether + near-zero base speed is what turns a walk into a dance.
-    for (const [x, z] of spread('party', 24, 20)) {
+    // (24 before the conga line existed — ten of them are in it now)
+    for (const [x, z] of spread('party', 18, 20)) {
       const dancer = makePerson('party', pick([0xff2fa0, 0x2fd8e8, 0xffd23f, 0x9a5cf0, 0x4ef0a0, 0xff8a3a]),
         { glasses: Math.random() < 0.3, hat: Math.random() < 0.18 ? 'flower' : undefined });
       dancer.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
@@ -1512,6 +1753,637 @@ export function createLife(
           if (Math.hypot(pos[0] - vx, pos[1] - vz) < vR + 26) t += d * spd * dt * 2.2;
         },
       });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  THINGS ON TRACKS
+    // ══════════════════════════════════════════════════════════════════════
+    // A measured review parked a camera in each district for ten seconds. The
+    // busiest frame on the island changed by 3 world-units a second; the bay —
+    // 22% of the map, a superyacht, two galleons, five speedboats and four jet
+    // skis — contained no moving object at all; the jungle (17%) had five
+    // residents; Old Town had three. Nothing on the island was on a track
+    // except seven golf buggies.
+    //
+    // Everything below is on a TRACK: a polyline walked at a fixed rate. A
+    // track is the cheapest motion there is — no steering, no collision
+    // queries, no per-frame allocation — and it reads from any camera height.
+
+    // ── track kit ─────────────────────────────────────────────────────────
+    // w3() allocates a tuple, which is fine at build time and forbidden in an
+    // update; these are the per-frame versions.
+    const W3 = (v: number) => (v - 6000) * 0.05;
+    interface Route { p: BAY.Pt[]; cum: number[]; len: number }
+    const route = (pts: BAY.Pt[], closed: boolean): Route => {
+      const p = closed ? [...pts, pts[0]] : pts;
+      const cum = [0];
+      for (let i = 1; i < p.length; i++)
+        cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+      return { p, cum, len: cum[cum.length - 1] || 1 };
+    };
+    const ovalRoute = (cx: number, cy: number, rx: number, ry: number, n = 16): Route => {
+      const pts: BAY.Pt[] = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
+      }
+      return route(pts, true);
+    };
+    // ONE shared scratch result — read immediately by the caller, never stored
+    const _rp = { x: 0, y: 0, ang: 0 };
+    const routeAt = (r: Route, t: number): void => {
+      const want = ((t % 1) + 1) % 1 * r.len;
+      let i = 0;
+      while (i < r.cum.length - 2 && r.cum[i + 1] <= want) i++;
+      const seg = r.cum[i + 1] - r.cum[i] || 1;
+      const k = (want - r.cum[i]) / seg;
+      const a = r.p[i], b = r.p[i + 1];
+      _rp.x = a[0] + (b[0] - a[0]) * k;
+      _rp.y = a[1] + (b[1] - a[1]) * k;
+      _rp.ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    };
+    // ping-pong: 0..1..0 for open routes (a trail has two ends)
+    const bounce = (t: number) => { const u = ((t % 2) + 2) % 2; return u > 1 ? 2 - u : u; };
+
+    // people face +Z, every vehicle in the kit faces +X
+    const FACE_X = Math.PI / 2;
+    const posed = (p: THREE.Group, la: number, ra: number, ll = 0, rl = 0): THREE.Group => {
+      const L = p.userData.limbs as Limbs;
+      L.la.rotation.x = la; L.ra.rotation.x = ra; L.ll.rotation.x = ll; L.rl.rotation.x = rl;
+      return p;
+    };
+
+    // ══ 1. ON THE WATER ═══════════════════════════════════════════════════
+    // Three circuits, measured offline against BAY.WATER_SMOOTH and the moored
+    // fleet: worst shore clearance 153 world units, worst approach to a moored
+    // hull 236, and no two circuits ever cross (the tender runs the east and
+    // the tow boat's oval sits inside the west, with the jet ski concentric
+    // inside that). Everything here sets userData.afloat — without it the
+    // off-island sweep in prototype3d.ts deletes the whole fleet.
+    const TENDER_RUN = route([[6350, 8800], [7050, 7950], [7200, 6600], [7350, 5400],
+      [6950, 4800], [6800, 5900], [6900, 7100]], true);
+    const TOW_RUN = ovalRoute(6350, 6650, 350, 1450, 20);
+    const SKI_RUN = ovalRoute(6350, 6650, 180, 750, 14);
+
+    const boat = (mesh: THREE.Object3D, r: number, rt: Route, spd: number, t0: number,
+                  sink: number, roll = 0.05, onTick?: (dt: number, tm: number) => void) => {
+      let t = t0;
+      routeAt(rt, t);
+      mesh.position.set(W3(_rp.x), -sink, W3(_rp.y));
+      mesh.rotation.y = -_rp.ang;
+      mesh.userData.afloat = true;      // exempt from the off-island cull
+      mesh.userData.mover = true;       // steers itself: the magnet must not grab it
+      mesh.userData.ptsMult = 1.5;
+      setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
+      movers.push({
+        mesh,
+        update(dt, tm, vx, vz, vR) {
+          if (eaten(mesh)) return;
+          // a void on the water makes them open the throttle
+          const close = Math.hypot(mesh.position.x - vx, mesh.position.z - vz) < vR + 34;
+          t += spd * dt * (close ? 2.6 : 1);
+          routeAt(rt, t);
+          mesh.position.set(W3(_rp.x), -sink + Math.sin(tm * 1.9 + t * 40) * 0.07, W3(_rp.y));
+          mesh.rotation.y = -_rp.ang;
+          mesh.rotation.z = Math.sin(tm * 1.4 + t * 26) * roll;
+          if (onTick) onTick(dt, tm);
+        },
+      });
+      return mesh;
+    };
+    const crew = (host: THREE.Object3D, role: Role, x: number, y: number, z: number) => {
+      const p = makeCast(role, 'resort');
+      p.position.set(x, y, z); p.rotation.y = FACE_X;
+      host.add(p);
+      return p;
+    };
+
+    // THE TENDER — the six o'clock run the docks keep talking about. Calls at
+    // the two southern pier heads, loops back up the middle of the bay.
+    {
+      const tender = LUXE.makeSpeedboat();
+      tender.add(makeWake(1.6, 9));
+      crew(tender, 'dock', -0.6, 2.05, 0);                 // the helmsman, at the wheel
+      crew(tender, 'rich', -2.4, 1.5, 0.7);
+      crew(tender, 'guest', -2.8, 1.5, -0.7);
+      boat(tender, 2.8, TENDER_RUN, 0.021, 0.1, 0.3);
+    }
+    // THE TOW BOAT + PARASAIL — one guest, 400 feet of nylon and a very long
+    // invoice. The canopy hangs off the stern as a child, so it tracks the
+    // boat for free and costs nothing per frame but its own sway.
+    {
+      const tow = LUXE.makeSpeedboat();
+      tow.add(makeWake(1.8, 11));
+      crew(tow, 'dock', -0.6, 2.05, 0);
+      const rig = makeParasailCanopy();
+      rig.position.set(-7.6, 7.4, 0);
+      const flyer = crew(rig, 'guest', 0, -1.3, 0);
+      posed(flyer, -2.55, -2.55, 0.22, 0.28);
+      (flyer.userData.limbs as Limbs).la.rotation.z = 0.42;
+      (flyer.userData.limbs as Limbs).ra.rotation.z = -0.42;
+      tow.add(rig);
+      boat(tow, 2.8, TOW_RUN, 0.03, 0.42, 0.32, 0.07, (_dt, tm) => {
+        rig.rotation.z = Math.sin(tm * 0.7) * 0.09;        // the canopy swings
+        rig.position.y = 7.4 + Math.sin(tm * 0.55) * 0.55;
+      });
+    }
+    // THE JET SKI — tight laps inside the tow boat's oval, banking into them.
+    {
+      const ski = LUXE.makeJetSki();
+      ski.add(makeWake(1.0, 5.5));
+      posed(crew(ski, 'guest', -0.3, 1.35, 0), -1.2, -1.2, 0.5, 0.5);
+      boat(ski, 1.8, SKI_RUN, 0.055, 0.7, 0.22, 0.16);
+    }
+
+    // ══ 2. THE JUNGLE ═════════════════════════════════════════════════════
+    // 17% of the island, five residents, and an ambient pool promising a
+    // zipline and a waterfall that did not exist. Both exist now.
+
+    // a static prop, placed in WORLD coords, refused if it isn't on land
+    const prop = (mesh: THREE.Object3D, wx: number, wy: number, r: number, rotY = 0) => {
+      if (!BAY.onBayLand(wx, wy)) return null;
+      mesh.position.set(W3(wx), 0, W3(wy));
+      mesh.rotation.y = rotY;
+      setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
+      return mesh;
+    };
+
+    // THE GUIDED WALK — "the guided walk is at ten". A guide with a flag and
+    // five guests strung out behind on BAY.TRAIL, ping-ponging the jungle
+    // stretch of it. The leader is driven by the track; the rest follow the
+    // person in front, exactly like the duck parade.
+    {
+      const TOUR: BAY.Pt[] = [];
+      for (let i = 0; i <= 10; i++) {
+        const q = BAY.pathPointAt(BAY.TRAIL, 0.24 + (0.7 - 0.24) * (i / 10));
+        TOUR.push([q.x, q.y]);
+      }
+      const TOUR_RUN = route(TOUR, false);
+      const line: THREE.Object3D[] = [];
+      for (let i = 0; i < 6; i++) {
+        routeAt(TOUR_RUN, i === 0 ? 0.02 : 0);
+        const p = makeCast(i === 0 ? 'manager' : i === 4 ? 'kid' : 'guest', 'jungle');
+        if (i === 4) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+        // tether 200: the tour walks a long way from where it started and the
+        // leash must never argue with the track
+        const rec = addWanderer(p, W3(_rp.x) + rand(-1, 1), W3(_rp.y) + rand(-1, 1),
+          200, rand(2.4, 3.4), 18, i === 4 ? 1.9 : 2.4, 'jungle', undefined,
+          i === 0 ? 'manager' : undefined);
+        if (rec) line.push(rec.mesh);
+      }
+      if (line.length) {
+        const guide = line[0];
+        let tt = 0;
+        movers.push({
+          mesh: guide,
+          update(dt, _tm, vx, vz, vR) {
+            if (eaten(guide)) return;
+            if (Math.hypot(guide.position.x - vx, guide.position.z - vz) < vR + 22) return;
+            tt += dt * 0.028;
+            routeAt(TOUR_RUN, bounce(tt) * 0.999);
+            const nx = W3(_rp.x), nz = W3(_rp.y);
+            const dx = nx - guide.position.x, dz = nz - guide.position.z;
+            guide.position.x = nx; guide.position.z = nz;
+            if (dx || dz) guide.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+          },
+        });
+        for (let i = 1; i < line.length; i++) {
+          const lead = line[i - 1], me = line[i];
+          movers.push({
+            mesh: me,
+            update(dt, _tm, vx, vz, vR) {
+              if (eaten(me) || eaten(lead)) return;
+              if (Math.hypot(me.position.x - vx, me.position.z - vz) < vR + 22) return;  // scatter
+              const dx = lead.position.x - me.position.x, dz = lead.position.z - me.position.z;
+              const d = Math.hypot(dx, dz);
+              if (d > 2.6) {
+                const step = Math.min(d - 2.4, 7 * dt);
+                me.position.x += (dx / d) * step; me.position.z += (dz / d) * step;
+                me.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+              }
+            },
+          });
+        }
+      }
+    }
+
+    // MONKEYS IN THE CANOPY — "that is NOT a monkey!!" needed a monkey. Ten of
+    // them, swinging along a short arc six to nine units up. They come in
+    // TROOPS clustered on the trail, plus a few loners deeper in, because a
+    // troop reads as a place and an even dusting reads as noise.
+    const MONKEYS: [number, number][] = [];
+    for (const [gx, gy] of [[3960, 5250], [3560, 5820], [4380, 4560]] as [number, number][])
+      for (const p2 of BAY.clusterAt(gx, gy, 2, 320, Math.random, 25)) MONKEYS.push(w3(p2));
+    for (const p2 of spread('jungle', 4, 30)) MONKEYS.push(p2);
+    for (const [x, z] of MONKEYS) {
+      const m = makeMonkey();
+      const y0 = rand(6.2, 9.0), sw = rand(1.6, 3.2), sp = rand(0.5, 0.95), ph = rand(0, 6.3);
+      const face = rand(0, Math.PI * 2);
+      m.position.set(x, y0, z);
+      m.userData.mover = true; m.userData.ptsMult = 1.5;
+      setShadow(m); scene.add(m); addEdible(m, 1.3);
+      movers.push({
+        mesh: m,
+        update(dt, tm, vx, vz, vR) {
+          if (eaten(m)) return;
+          const s = Math.sin(tm * sp + ph);
+          // a void underneath sends them straight up into the top branches
+          const scared = Math.hypot(m.position.x - vx, m.position.z - vz) < vR + 20;
+          m.position.x = x + Math.cos(face) * s * sw;
+          m.position.z = z + Math.sin(face) * s * sw;
+          m.position.y = (scared ? y0 + 2.4 : y0) + Math.abs(Math.cos(tm * sp + ph)) * 0.9;
+          m.rotation.y = -face + Math.PI / 2 + s * 0.5;
+          m.rotation.z = -s * 0.5;
+          if (scared) m.rotation.y += dt * 6;
+        },
+      });
+    }
+
+    // THE ZIPLINE — promised by the ambient pool, now real: two towers over
+    // the trail and a rider who launches, screams down the cable, and climbs
+    // back up to do it again.
+    {
+      // both towers sit 180+ world units off BAY.TRAIL, so the cable crosses
+      // the path overhead instead of standing in it
+      const A: BAY.Pt = [4760, 4740], B: BAY.Pt = [3560, 5460];
+      if (BAY.onBayLand(A[0], A[1]) && BAY.onBayLand(B[0], B[1])) {
+        const ax = W3(A[0]), az = W3(A[1]), bx = W3(B[0]), bz = W3(B[1]);
+        const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bz - az, bx - ax);
+        const zl = makeZipline(len, 3.2);
+        zl.position.set(ax, 0, az); zl.rotation.y = -ang;
+        setShadow(zl); scene.add(zl); addEdible(zl, 4);
+        const flier = makeCast('guest', 'jungle');
+        posed(flier, -2.7, -2.7, 0.3, 0.5);
+        flier.rotation.y = -ang + Math.PI / 2;
+        flier.userData.mover = true; flier.userData.ptsMult = 1.5;
+        setShadow(flier); scene.add(flier); addEdible(flier, 2.2);
+        const L = flier.userData.limbs as Limbs;
+        let u = 0;
+        movers.push({
+          mesh: flier,
+          update(dt) {
+            if (eaten(flier)) return;
+            u += dt * (u < 1 ? 0.22 : 0.1);               // fast down the wire, slow walk back
+            if (u >= 2) u = 0;
+            if (u < 1) {                                   // riding: hanging off the pulley
+              flier.position.set(ax + (bx - ax) * u, 9.2 - 3.2 * u, az + (bz - az) * u);
+              flier.rotation.y = -ang + Math.PI / 2;
+              L.la.rotation.x = -2.7; L.ra.rotation.x = -2.7;
+              L.ll.rotation.x = 0.35; L.rl.rotation.x = 0.55;
+            } else {                                       // trudging back up the trail
+              const k = 2 - u;
+              flier.position.set(ax + (bx - ax) * k, 0, az + (bz - az) * k);
+              flier.rotation.y = -ang - Math.PI / 2;
+              const sw = Math.sin(u * 14) * 0.5;
+              L.la.rotation.x = -sw; L.ra.rotation.x = sw;
+              L.ll.rotation.x = sw; L.rl.rotation.x = -sw;
+            }
+          },
+        });
+      }
+    }
+
+    // THE WATERFALL — "is that a waterfall??" / "it ate the waterfall!!". Three
+    // sheets falling on a loop, which is the only part of it that moves.
+    {
+      const wf = makeWaterfall();
+      // 320 world units off the trail: you HEAR it from the path and walk to it
+      if (prop(wf.grp, 3477, 6366, 5, 0.9)) {
+        const sheets = wf.sheets;
+        movers.push({
+          mesh: wf.grp,
+          update(dt, tm) {
+            if (eaten(wf.grp)) return;
+            for (let i = 0; i < sheets.length; i++) {
+              const k = ((tm * 0.55 + i / sheets.length) % 1);
+              sheets[i].position.set(3.2, 8.4 - k * 7.6, 0);
+              sheets[i].scale.set(1 + k * 0.35, 1, 1 + k * 0.5);
+            }
+          },
+        });
+      }
+    }
+    // …and a few more people who live out here, so the jungle is not just a
+    // tour walking through an empty one. Half of them are scattered across the
+    // whole region, half kept in the middle where the district reads from.
+    for (const [x, z] of spread('jungle', 5, 40))
+      place(pick(['guest', 'guest', 'grounds', 'kid', 'digger'] as Role[]), 'jungle', x, z, 'jungle');
+    for (const p2 of BAY.clusterAt(3760, 5060, 5, 430, Math.random, 40)) {
+      const [x, z] = w3(p2);
+      place(pick(['guest', 'grounds', 'kid', 'guest'] as Role[]), 'jungle', x, z, 'jungle');
+    }
+    // (a parrot is seven meshes, not one — three of them, in the one place the
+    // district reads from, buys more than eight dusted across the region)
+    for (const p2 of BAY.clusterAt(3820, 5180, 3, 400, Math.random, 25)) {
+      const [x, z] = w3(p2);
+      addWanderer(makeParrot(), x, z, 14, rand(1.8, 3.0), 22, 1.4, 'jungle');
+    }
+
+    // ══ 3. OLD TOWN ═══════════════════════════════════════════════════════
+    // 51 props, three people, the deadest reading on the island. The resort is
+    // somewhere people VISIT; this is somewhere people LIVE, and the
+    // difference is that everybody here is doing a job.
+    const worker = (role: Role, wx: number, wy: number, face: number, mode = 3) => {
+      if (!BAY.onBayLand(wx, wy)) return null;
+      const p = makeCast(role, 'market');
+      p.userData.dancer = { t: rand(0, 6), spin: 1, mode };
+      const rec = addWanderer(p, W3(wx), W3(wy), 1.2, rand(0.15, 0.4), 16, 2.4, 'oldtown',
+        undefined, VOICE_OF[role]);
+      if (rec) rec.mesh.rotation.y = face;
+      return rec;
+    };
+    // THE NETS — two spread on the ground with three villagers over them
+    for (const [nx, ny, rot] of [[6280, 2750, 0.5], [6120, 2880, -0.8]] as [number, number, number][]) {
+      prop(makeNet(), nx, ny, 2.2, rot);
+      worker('dock', nx + 70, ny + 30, -2.2);
+      if (nx > 6200) worker('dock', nx - 40, ny + 80, -0.8);
+    }
+    // THE WELL — one drawing water, one waiting with a jar and an opinion
+    prop(makeWell(), 5800, 2350, 2.4);
+    worker('grounds', 5860, 2420, -2.4);
+    worker('guest', 5720, 2420, 1.2, 3);
+    // THE KIDS — a running loop through the village. Nothing says "people live
+    // here" like children who are absolutely not supposed to be doing that.
+    {
+      const KID_RUN = ovalRoute(5950, 2360, 470, 380, 14);
+      for (let i = 0; i < 5; i++) {
+        const t0 = i / 5 + rand(-0.03, 0.03);
+        routeAt(KID_RUN, t0);
+        const k = makeCast('kid', 'market');
+        k.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+        const rec = addWanderer(k, W3(_rp.x), W3(_rp.y), 200, rand(1, 2), 16, 1.9, 'oldtown', undefined, 'kid');
+        if (!rec) continue;
+        let t = t0;
+        const spd = rand(0.05, 0.075);
+        movers.push({
+          mesh: rec.mesh,
+          update(dt, _tm, vx, vz, vR) {
+            const m = rec.mesh;
+            if (eaten(m)) return;
+            if (Math.hypot(m.position.x - vx, m.position.z - vz) < vR + 22) return;
+            t += spd * dt;
+            routeAt(KID_RUN, t);
+            const nx = W3(_rp.x), nz = W3(_rp.y);
+            const dx = nx - m.position.x, dz = nz - m.position.z;
+            m.position.x = nx; m.position.z = nz;
+            if (dx || dz) m.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+          },
+        });
+      }
+    }
+    // …and the rest of the village, on a long leash so they actually walk
+    // somewhere instead of shuffling around one hut
+    for (const [x, z] of spread('oldtown', 8, 45)) {
+      const role = pick(['guest', 'guest', 'dock', 'grounds', 'kid', 'pirate'] as Role[]);
+      const p = makeCast(role, 'market');
+      if (role === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+      addWanderer(p, x, z, role === 'kid' ? 34 : 30, role === 'kid' ? rand(6, 8.5) : rand(4, 6.5),
+        18, role === 'kid' ? 1.9 : 2.4, 'oldtown', undefined, VOICE_OF[role]);
+    }
+
+    // ══ 4. DANCE COVE ═════════════════════════════════════════════════════
+    // 42 movers producing 3.1 u/s, because their whole animation was a
+    // 0.34-unit bob (see the dance branch above — it is now a real jump with a
+    // lateral sway). And six dialogue lines joked about a conga line.
+
+    // THE CONGA LINE — a closed loop measured against the district: every one
+    // of 601 sampled points is on land, it never touches the main stage deck,
+    // and the tightest pass to a speaker stack is 3.4 units from its centre
+    // (the stack is 1.5 wide). It laps the whole floor in about a minute.
+    {
+      const CONGA_RUN = ovalRoute(7300, 10660, 580, 95, 18);
+      const line: THREE.Object3D[] = [];
+      for (let i = 0; i < 10; i++) {
+        routeAt(CONGA_RUN, -i * 0.014);
+        const p = i === 0 ? makeCast('manager', 'party')
+          : makePerson('party', pick([0xff2fa0, 0x2fd8e8, 0xffd23f, 0x9a5cf0, 0x4ef0a0, 0xff8a3a]),
+            { glasses: Math.random() < 0.3 });
+        p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 4 };
+        const rec = addWanderer(p, W3(_rp.x), W3(_rp.y), 200, rand(0.2, 0.5), 20, 2.4, 'party',
+          undefined, i === 0 ? 'manager' : undefined);
+        if (rec) line.push(rec.mesh);
+      }
+      if (line.length) {
+        const head = line[0];
+        let t = 0;
+        movers.push({
+          mesh: head,
+          update(dt, _tm, vx, vz, vR) {
+            if (eaten(head)) return;
+            const close = Math.hypot(head.position.x - vx, head.position.z - vz) < vR + 26;
+            t += dt * (close ? 0.05 : 0.019);       // "conga line — THIS WAY!!"
+            routeAt(CONGA_RUN, t);
+            const nx = W3(_rp.x), nz = W3(_rp.y);
+            const dx = nx - head.position.x, dz = nz - head.position.z;
+            head.position.x = nx; head.position.z = nz;
+            if (dx || dz) head.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+          },
+        });
+        for (let i = 1; i < line.length; i++) {
+          const lead = line[i - 1], me = line[i];
+          movers.push({
+            mesh: me,
+            update(dt) {
+              if (eaten(me) || eaten(lead)) return;
+              const dx = lead.position.x - me.position.x, dz = lead.position.z - me.position.z;
+              const d = Math.hypot(dx, dz);
+              if (d > 1.5) {
+                const step = Math.min(d - 1.4, 9 * dt);
+                me.position.x += (dx / d) * step; me.position.z += (dz / d) * step;
+                me.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+              }
+            },
+          });
+        }
+      }
+    }
+    // WAITERS working the front rows — a tight circuit between the stage apron
+    // and the speaker stacks, trays up. (A wide lap of the district put them
+    // through the deck and off the coast; this one is clear of both.)
+    {
+      const BAR_RUN = ovalRoute(7450, 10600, 300, 70, 12);
+      for (let i = 0; i < 3; i++) {
+        const t0 = i / 3;
+        routeAt(BAR_RUN, t0);
+        const wtr = makeCast('waiter', 'party');
+        const rec = addWanderer(wtr, W3(_rp.x), W3(_rp.y), 200, rand(0.3, 0.6), 20, 2.4, 'party',
+          undefined, 'staff');
+        if (!rec) continue;
+        (rec.mesh.userData.limbs as Limbs).ra.rotation.x = -1.5;   // tray held high
+        (rec.mesh.userData.limbs as Limbs).ra.rotation.z = -0.5;
+        let t = t0;
+        const spd = rand(0.026, 0.034);
+        movers.push({
+          mesh: rec.mesh,
+          update(dt, _tm, vx, vz, vR) {
+            const m = rec.mesh;
+            if (eaten(m)) return;
+            if (Math.hypot(m.position.x - vx, m.position.z - vz) < vR + 22) return;
+            t += spd * dt;
+            routeAt(BAR_RUN, t);
+            const nx = W3(_rp.x), nz = W3(_rp.y);
+            const dx = nx - m.position.x, dz = nz - m.position.z;
+            m.position.x = nx; m.position.z = nz;
+            if (dx || dz) m.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+          },
+        });
+      }
+    }
+    // DJ COCONUT, actually ON the decks. The stage is at world [7400,10380],
+    // deck top y = 2.85, booth at local z = 0 — so the DJ stands just behind
+    // it, facing the crowd (+Z), and never moves off the rig.
+    {
+      const dj = makeCast('dj', 'party');
+      dj.position.set(W3(7400), 2.85, W3(10380) - 2.3);
+      dj.userData.mover = true; dj.userData.ptsMult = 2;
+      setShadow(dj); scene.add(dj); addEdible(dj, 2.2);
+      peds.push({ mesh: dj, biome: 'party', panic: 0, voice: 'staff' });
+      const L = dj.userData.limbs as Limbs;
+      movers.push({
+        mesh: dj,
+        update(_dt, tm) {
+          if (eaten(dj)) return;
+          const beat = tm * 4.4;
+          dj.position.y = 2.85 + Math.abs(Math.sin(beat)) * 0.3;
+          L.la.rotation.x = -0.85 + Math.sin(beat * 2) * 0.6;      // one hand on the deck
+          L.ra.rotation.x = -2.5 + Math.sin(beat) * 0.35;          // the other in the air
+          L.ra.rotation.z = -0.55;
+          L.ll.rotation.x = Math.sin(beat) * 0.2; L.rl.rotation.x = -Math.sin(beat) * 0.2;
+          L.torso.rotation.y = Math.sin(beat) * 0.26;
+          L.head.rotation.x = Math.sin(beat) * 0.2;
+          dj.rotation.y = Math.sin(beat * 0.5) * 0.25;
+        },
+      });
+    }
+
+    // ══ 5. THE BAY'S SOUTH SHORE ══════════════════════════════════════════
+    // Four props, no movers, 0.0 u/s — and it is the first thing a player sees,
+    // because the match starts here. It gets a beach club's worth of activity.
+    {
+      const CX = 6880, CY = 9880;    // the strip between the bay and Dance Cove
+
+      // BEACH VOLLEYBALL — a net, six players and a ball that actually crosses
+      // it. The ball is the mover the eye follows.
+      const NET_ROT = 0.35;
+      prop(makeVolleyNet(), CX, CY, 3, NET_ROT);
+      const court = w3([CX, CY]);
+      // rotY turns the net's local +Z (its 12-unit span) to (sin,cos); ACROSS
+      // the net — which is where the two teams and the ball live — is (cos,-sin)
+      const acx = Math.cos(NET_ROT), acz = -Math.sin(NET_ROT);
+      const alx = Math.sin(NET_ROT), alz = Math.cos(NET_ROT);
+      for (let i = 0; i < 6; i++) {
+        const side = i < 3 ? 1 : -1, lat = ((i % 3) - 1) * 4.5, back = side * rand(3.5, 8);
+        const ox = acx * back + alx * lat, oz = acz * back + alz * lat;
+        const p = makeCast(pick(['guest', 'kid', 'guest', 'rich'] as Role[]), 'beach');
+        const rec = addWanderer(p, court[0] + ox, court[1] + oz, 4, rand(1.2, 2.2), 18, 2.2, 'beach');
+        if (!rec) continue;
+        const ph = rand(0, 6.3), L = rec.mesh.userData.limbs as Limbs;
+        movers.push({
+          mesh: rec.mesh,
+          update(_dt, tm) {
+            const m = rec.mesh;
+            if (eaten(m)) return;
+            const s = Math.sin(tm * 2.2 + ph);
+            if (s > 0.86) {                       // the jump-and-swing
+              m.position.y = (s - 0.86) * 5.5;
+              L.ra.rotation.x = -2.7; L.la.rotation.x = -2.4;
+            } else {
+              L.ra.rotation.x = -0.5 + s * 0.5; L.la.rotation.x = -0.5 - s * 0.5;
+              L.ra.rotation.z = -0.6; L.la.rotation.z = 0.6;
+            }
+          },
+        });
+      }
+      {
+        const ball = new THREE.Group();
+        ball.add(mergedProp([
+          part(new THREE.SphereGeometry(0.42, 10, 8), 0xf8f6f0),
+          part(new THREE.TorusGeometry(0.42, 0.07, 5, 12), 0xffd23f, 0, 0, 0, 0.6),
+          part(new THREE.TorusGeometry(0.42, 0.07, 5, 12), 0x4da3ff, 0, 0, 0, 0, 0.9),
+        ]));
+        ball.position.set(court[0], 3, court[1]);
+        ball.userData.mover = true;
+        setShadow(ball); scene.add(ball); addEdible(ball, 1);
+        const rx = acx * 7, rz = acz * 7;          // the rally crosses the net
+        movers.push({
+          mesh: ball,
+          update(_dt, tm) {
+            if (eaten(ball)) return;
+            const u = (tm * 0.42) % 2;             // one rally leg per second-ish
+            const k = u > 1 ? 2 - u : u;           // over and back
+            ball.position.set(court[0] + rx * (k * 2 - 1), 1.2 + Math.sin(k * Math.PI) * 5.2,
+              court[1] + rz * (k * 2 - 1));
+            ball.rotation.x += 0.11; ball.rotation.z += 0.07;
+          },
+        });
+      }
+
+      // THE PADDLEBOARD LESSON — four boards on the flat water off the shore,
+      // an instructor on the sand telling them all to bend their knees.
+      const LESSON = route([[6420, 9430], [6640, 9520], [6880, 9560], [6620, 9600], [6400, 9520]], true);
+      for (let i = 0; i < 4; i++) {
+        const bd = makePaddleboard();
+        const std = makeCast(pick(['guest', 'kid', 'rich'] as Role[]), 'beach');
+        std.position.set(-0.2, 0.3, 0); std.rotation.y = FACE_X;
+        bd.add(std);
+        const L = std.userData.limbs as Limbs;
+        const ph = rand(0, 6.3);
+        boat(bd, 1.6, LESSON, rand(0.02, 0.028), i / 4, -0.08, 0.05, (_dt2, tm) => {
+          const s = Math.sin(tm * 1.5 + ph);            // the paddle stroke
+          L.ra.rotation.x = -1.1 + s * 0.7; L.la.rotation.x = -1.4 - s * 0.4;
+          L.ra.rotation.z = -0.35; L.la.rotation.z = 0.5;
+          L.torso.rotation.y = s * 0.24;
+        });
+      }
+      {
+        const coach = makeCast('lifeguard', 'beach');
+        const c = w3([6700, 9760]);
+        const rec = addWanderer(coach, c[0], c[1], 3, rand(0.6, 1.1), 18, 2.4, 'beach', undefined, 'staff');
+        if (rec) rec.mesh.userData.dancer = { t: rand(0, 6), spin: 1, mode: 1 };   // arm sweeping the class
+      }
+
+      // SWIMMERS at the water's edge — sunk to the chest, crawling up and down
+      // the shallows. afloat, because they are legitimately in the bay.
+      for (let i = 0; i < 5; i++) {
+        const p: BAY.Pt = [6480 + i * 105, 9600 + (i % 2) * 70];
+        if (!BAY.pointInPoly(p[0], p[1], BAY.WATER_SMOOTH)) continue;
+        const sw = makeCast(pick(['guest', 'kid', 'rich'] as Role[]), 'beach');
+        const x0 = W3(p[0]), z0 = W3(p[1]);
+        sw.position.set(x0, -1.25, z0);
+        sw.rotation.y = rand(0, Math.PI * 2);
+        sw.userData.afloat = true; sw.userData.mover = true; sw.userData.ptsMult = 1.5;
+        setShadow(sw); scene.add(sw); addEdible(sw, 2);
+        const L = sw.userData.limbs as Limbs;
+        const ph = rand(0, 6.3), sp = rand(0.35, 0.6);
+        const head = rand(0, Math.PI * 2);
+        // a swimmer's lane is only as long as the water it is in: shrink the
+        // reach until BOTH ends of the lap are still inside the bay polygon
+        let reach = rand(2.5, 4.5);
+        while (reach > 0.4 && !(
+          BAY.pointInPoly(p[0] + Math.cos(head) * reach * 20, p[1] + Math.sin(head) * reach * 20, BAY.WATER_SMOOTH)
+          && BAY.pointInPoly(p[0] - Math.cos(head) * reach * 20, p[1] - Math.sin(head) * reach * 20, BAY.WATER_SMOOTH)
+        )) reach -= 0.3;
+        movers.push({
+          mesh: sw,
+          update(_dt, tm) {
+            if (eaten(sw)) return;
+            const s = Math.sin(tm * sp + ph);
+            sw.position.set(x0 + Math.cos(head) * s * reach, -1.25 + Math.sin(tm * 2 + ph) * 0.1,
+              z0 + Math.sin(head) * s * reach);
+            sw.rotation.y = -head + Math.PI / 2 + (s > 0 ? 0 : Math.PI);
+            const st = tm * 4 + ph;                       // front crawl
+            L.la.rotation.x = -1.6 + Math.sin(st) * 1.5; L.ra.rotation.x = -1.6 - Math.sin(st) * 1.5;
+            L.la.rotation.z = 0.5; L.ra.rotation.z = -0.5;
+            L.ll.rotation.x = Math.sin(st * 2) * 0.3; L.rl.rotation.x = -Math.sin(st * 2) * 0.3;
+          },
+        });
+      }
+      // …and the people who came to watch: towels, kids and a drinks waiter
+      for (const [bx, by] of BAY.clusterAt(CX - 120, CY + 60, 7, 380, Math.random, 40)) {
+        const role = pick(['guest', 'kid', 'rich', 'kid', 'waiter'] as Role[]);
+        const [x, z] = w3([bx, by]);
+        place(role, 'beach', x, z, 'beach');
+      }
     }
   }
 
