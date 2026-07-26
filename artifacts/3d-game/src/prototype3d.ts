@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3 } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, setWorld } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -133,6 +133,26 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
     home: mesh.position.clone(), homeScale: mesh.scale.clone(), homeRotY: mesh.rotation.y });
 }
 
+// ── WORLD SELECT ────────────────────────────────────────────────────────────
+// The chosen world must be set BEFORE the island is built (the ground bake and
+// the prop pass both read the plan). Switching worlds reloads, which is fine:
+// it's a level select, not a mid-match toggle.
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE ISLE', pirate: 'PIRATE BAY' };
+const pickedWorld = (new URLSearchParams(location.search).get('w')
+  ?? localStorage.getItem('voidWorld') ?? 'maple') === 'pirate' ? 'pirate' : 'maple';
+setWorld(pickedWorld);
+// every world-facing label follows the pick — title card, loading screen, and
+// the newsroom's own brand
+{
+  const PB = pickedWorld === 'pirate';
+  const nm = WORLD_NAMES[pickedWorld];
+  document.title = `VOIDLING · ${nm} (3D)`;
+  const tc = document.querySelector('#titlecard .name'); if (tc) tc.textContent = nm;
+  const tl = document.querySelector('#titlecard .lvl'); if (tl) tl.textContent = PB ? 'LEVEL 2' : 'LEVEL 1';
+  const ts = document.querySelector('#titlecard .sub');
+  if (ts) ts.textContent = PB ? 'the resort is packed · eat the party' : 'the little void is hungry · eat the island';
+  const ln = document.querySelector('#loadScr .lName'); if (ln) ln.textContent = nm;
+}
 const island = createIsland(scene, addEdible);
 // dev/QA introspection hooks (harmless in prod; no gameplay reads these).
 // __edibles + __insideIsland3 + __validateWorld power the placement auditor:
@@ -231,7 +251,10 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -30], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75] };
+  const spots: Record<string, [number, number]> = { plaza: [42.75, -30], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75],
+    // PIRATE BAY districts
+    port: [-42.75, -213.75], resort: [-128.25, -128.25], party: [-42.75, 42.75],
+    market: [42.75, -128.25], jungle: [-128.25, -213.75], cove: [-213.75, -213.75] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -499,6 +522,9 @@ const DISTRICT: Record<string, string> = {
   cozy: 'MAPLE HEIGHTS', fancy: 'FANCY HILLS', downtown: 'DOWNTOWN', plaza: 'THE PLAZA',
   park: 'THE PARK', forest: 'PINE WOODS', zoo: 'THE ZOO', beach: 'SUNNY BEACH',
   airport: 'THE AIRPORT', military: 'THE ARMY BASE',
+  // PIRATE BAY
+  port: 'THE DOCKS', resort: 'THE RESORT', party: 'THE DANCE FLOOR',
+  market: 'THE BAZAAR', jungle: 'THE JUNGLE', cove: 'SMUGGLERS COVE',
 };
 // TEMPLATED headlines: a tiny pool × live variables = copy that never repeats
 // AND is always about the player. This is what killed the "generic ticker"
@@ -650,7 +676,10 @@ function showNews() {
   const body = newsQueue.shift()
     ?? (live.length && Math.random() < 0.55 ? fillHeadline(pickHeadline(live)) : pickHeadline(pool));
   const h = body;
-  newsEl.innerHTML = `<i>${['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier]}</i>${h}`;
+  const brand = pickedWorld === 'pirate'
+    ? ['🏴‍☠️ BAY RADIO', '⚠️ BAY RADIO', '🚨 ALL HANDS'][tier]
+    : ['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier];
+  newsEl.innerHTML = `<i>${brand}</i>${h}`;
   newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
   newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
   audio.ready();   // a soft chime so headlines register even mid-chomp
@@ -1029,6 +1058,20 @@ el('btnGotIt').addEventListener('click', () => {
 if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlayed')) {
   menuEl.style.display = 'none';
   withWorldReady(() => beginMatch());
+}
+// world cards: MAPLE ISLE + PIRATE BAY are both live now
+{
+  const chip = el('btnWorlds');
+  chip.innerHTML = `<i>${pickedWorld === 'pirate' ? '🏴‍☠️' : '🏝️'}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${pickedWorld === 'pirate' ? 2 : 1} OF 3</span><b>›</b>`;
+  document.querySelectorAll('#worldRow .wCard[data-world]').forEach((c) => {
+    const id = (c as HTMLElement).dataset.world!;
+    c.classList.toggle('sel', id === pickedWorld);
+    c.addEventListener('click', () => {
+      if (id === pickedWorld) { el('worlds').classList.remove('show'); return; }
+      localStorage.setItem('voidWorld', id);
+      location.href = location.pathname;   // rebuild the island for the new world
+    });
+  });
 }
 // locked world teasers wiggle on tap
 document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {

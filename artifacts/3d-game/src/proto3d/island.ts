@@ -10,7 +10,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
 
-export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military';
+export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
+  // ── PIRATE BAY (world 2): a world-class tropical resort with a buccaneer
+  // theme. Same 6x6 block grid and the same road network, but the "roads" are
+  // BOARDWALKS and every district is a holiday.
+  | 'port' | 'resort' | 'party' | 'market' | 'jungle' | 'cove';
+export type WorldId = 'maple' | 'pirate';
 
 export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
 export interface Island {
@@ -35,7 +40,7 @@ const ISLAND_CTRL: [number, number][] = [
 ];
 
 // 6x6 biome plan (rows = gy north->south)
-const PLAN: Biome[][] = [
+const MAPLE_PLAN: Biome[][] = [
   ['cozy', 'cozy', 'cozy', 'cozy', 'forest', 'forest'],
   ['cozy', 'cozy', 'downtown', 'downtown', 'forest', 'zoo'],
   ['fancy', 'fancy', 'downtown', 'plaza', 'park', 'forest'],
@@ -43,6 +48,26 @@ const PLAN: Biome[][] = [
   ['cozy', 'cozy', 'fancy', 'fancy', 'forest', 'airport'],
   ['beach', 'beach', 'beach', 'beach', 'beach', 'military'],
 ];
+// PIRATE BAY — the resort reads north-to-south as ARRIVE -> PLAY -> PARTY:
+// the working port and jungle up top, the resort and market in the middle,
+// the dance floor and the beaches along the warm southern shore.
+const PIRATE_PLAN: Biome[][] = [
+  ['cove', 'jungle', 'port', 'port', 'jungle', 'cove'],
+  ['jungle', 'resort', 'port', 'market', 'resort', 'jungle'],
+  ['beach', 'resort', 'plaza', 'market', 'resort', 'jungle'],
+  ['beach', 'resort', 'party', 'party', 'resort', 'beach'],
+  ['beach', 'party', 'party', 'party', 'market', 'beach'],
+  ['beach', 'beach', 'beach', 'beach', 'beach', 'cove'],
+];
+let WORLD_ID: WorldId = 'pirate';
+let PLAN: Biome[][] = PIRATE_PLAN;
+// pick the world BEFORE createIsland — the bake and populate both read it
+export function setWorld(id: WorldId): void {
+  WORLD_ID = id;
+  PLAN = id === 'pirate' ? PIRATE_PLAN : MAPLE_PLAN;
+}
+export const worldId = (): WorldId => WORLD_ID;
+setWorld('maple');   // default until the menu says otherwise
 const BLOCK_ORIGIN = 925, STRIDE = 1710, BLOCK_SIZE = 1600;
 const blockCenter = (g: number) => BLOCK_ORIGIN + STRIDE * g + BLOCK_SIZE / 2;
 
@@ -247,6 +272,13 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     cozy: null, fancy: null, downtown: WORLD.pavement, plaza: WORLD.pavement,
     park: WORLD.park, forest: WORLD.forest, beach: WORLD.sand, zoo: WORLD.zooGround,
     airport: 0xd9dbe6, military: 0x8f9576,
+    // ── PIRATE BAY ground: sun-bleached sand, teak decking, jungle green
+    port: 0xa8814f,      // wet dock timber
+    resort: 0xf2e2b8,    // raked resort sand
+    party: 0x6a4a7a,     // the dance floor slab (lit up in the bake)
+    market: 0xe8cf9a,    // packed market ground
+    jungle: 0x2f7a4a,    // deep tropical canopy floor
+    cove: 0xefdcae,      // pale cove sand
   };
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
@@ -268,17 +300,36 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.stroke();
   };
   g.lineCap = 'butt';
-  g.strokeStyle = hex(WORLD.pavement); g.lineWidth = roadPx * 1.6;          // sidewalks
+  // PIRATE BAY paves in TEAK: the whole road network becomes a raised
+  // boardwalk — pale sand shoulders, warm planking, dark plank seams.
+  const PIRATE = WORLD_ID === 'pirate';
+  const SIDE_COL = PIRATE ? 0xf2e2b8 : WORLD.pavement;
+  const ROAD_COL = PIRATE ? 0xc79350 : WORLD.road;
+  const LINE_COL = PIRATE ? 0x8a5a2a : WORLD.roadLine;
+  g.strokeStyle = hex(SIDE_COL); g.lineWidth = roadPx * 1.6;                // sidewalks
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  g.strokeStyle = 'rgba(120,126,150,0.5)'; g.lineWidth = roadPx * 1.62;     // curb shadow edge
+  g.strokeStyle = PIRATE ? 'rgba(150,110,60,0.45)' : 'rgba(120,126,150,0.5)'; g.lineWidth = roadPx * 1.62;
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  g.strokeStyle = hex(WORLD.pavement); g.lineWidth = roadPx * 1.56;
+  g.strokeStyle = hex(SIDE_COL); g.lineWidth = roadPx * 1.56;
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  g.strokeStyle = hex(WORLD.road); g.lineWidth = roadPx;                     // asphalt
+  g.strokeStyle = hex(ROAD_COL); g.lineWidth = roadPx;                       // asphalt / teak deck
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
+  if (PIRATE) {
+    // PLANKING: cross-seams every ~46 units turn the deck into real boards,
+    // plus a warm highlight down the middle so the boardwalk reads as raised
+    g.strokeStyle = 'rgba(120,78,34,0.5)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+    for (const c of ROAD_CENTERS) {
+      for (let a2 = 900; a2 < 11200; a2 += 46) {
+        g.beginPath(); g.moveTo(pxW(c) - roadPx / 2, pyW(a2)); g.lineTo(pxW(c) + roadPx / 2, pyW(a2)); g.stroke();
+        g.beginPath(); g.moveTo(pxW(a2), pyW(c) - roadPx / 2); g.lineTo(pxW(a2), pyW(c) + roadPx / 2); g.stroke();
+      }
+    }
+    g.strokeStyle = 'rgba(255,226,168,0.35)'; g.lineWidth = roadPx * 0.24;
+    for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
+  }
   // (lane dashes are crisp GEOMETRY now — see the InstancedMesh below)
   // crosswalks: zebra ladders on all four arms of every junction
-  g.fillStyle = 'rgba(240,244,252,0.88)';
+  g.fillStyle = PIRATE ? 'rgba(255,236,190,0.75)' : 'rgba(240,244,252,0.88)';
   for (const cx of ROAD_CENTERS) for (const cyR of ROAD_CENTERS) {
     const jx = pxW(cx), jy = pyW(cyR), half = roadPx / 2;
     const crossW = roadPx * 0.34;          // ladder depth (walking direction)
@@ -428,6 +479,82 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         g.beginPath(); g.ellipse(pxW(pool.x - 30), pyW(pool.y - 20), pxW(34) - pxW(0), pxW(18) - pxW(0), 0.5, 0, Math.PI * 2); g.fill();
       }
     });
+  }
+
+  // ══ PIRATE BAY ground decals ═══════════════════════════════════════════
+  // Every district gets a painted floor so the resort reads from the air:
+  // a lit dance floor, kidney pools with tiled surrounds, plank piers running
+  // into the lagoon, and market cobbles.
+  if (PIRATE) for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    const b2 = PLAN[gy][gx];
+    const cx = blockCenter(gx), cy = blockCenter(gy), H = BLOCK_SIZE / 2;
+    if (b2 === 'party') {
+      // DANCE FLOOR: a checker of glowing panels + a ring of torch marks
+      const cell = 150, span = 4;
+      for (let iy = -span; iy <= span; iy++) for (let ix = -span; ix <= span; ix++) {
+        const lit = (ix + iy) % 2 === 0;
+        g.fillStyle = lit ? 'rgba(255,120,200,0.55)' : 'rgba(90,200,255,0.42)';
+        g.fillRect(pxW(cx + ix * cell - cell / 2), pyW(cy + iy * cell - cell / 2),
+          pxW(cell) - pxW(0), pxW(cell) - pxW(0));
+      }
+      g.strokeStyle = 'rgba(255,236,150,0.75)'; g.lineWidth = pxW(26) - pxW(0);
+      g.strokeRect(pxW(cx - cell * 4.5), pyW(cy - cell * 4.5), pxW(cell * 9) - pxW(0), pxW(cell * 9) - pxW(0));
+    } else if (b2 === 'resort') {
+      // KIDNEY POOLS: two lagoon pools with tiled decks + a lounger row
+      for (const [ox, oy, rr] of [[-330, -180, 260], [300, 240, 210]] as [number, number, number][]) {
+        g.fillStyle = '#f6ecd2';
+        g.beginPath(); g.ellipse(pxW(cx + ox), pyW(cy + oy), pxW(rr + 90) - pxW(0), pxW(rr * 0.72 + 90) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#3fc9d8';
+        g.beginPath(); g.ellipse(pxW(cx + ox), pyW(cy + oy), pxW(rr) - pxW(0), pxW(rr * 0.72) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.42)';
+        g.beginPath(); g.ellipse(pxW(cx + ox - rr * 0.3), pyW(cy + oy - rr * 0.2), pxW(rr * 0.3) - pxW(0), pxW(rr * 0.14) - pxW(0), 0.5, 0, Math.PI * 2); g.fill();
+      }
+      // raked sand lines — the "someone grooms this beach at 6am" cue
+      g.strokeStyle = 'rgba(214,190,140,0.35)'; g.lineWidth = Math.max(1, pxW(8) - pxW(0));
+      for (let k = -H + 90; k < H; k += 96) {
+        g.beginPath(); g.moveTo(pxW(cx - H), pyW(cy + k)); g.lineTo(pxW(cx + H), pyW(cy + k + 40)); g.stroke();
+      }
+    } else if (b2 === 'port') {
+      // PIERS: three plank fingers reaching south out of the dock apron
+      g.fillStyle = '#8a6132';
+      g.fillRect(pxW(cx - H), pyW(cy + H - 220), pxW(BLOCK_SIZE) - pxW(0), pxW(220) - pxW(0));
+      for (const px2 of [-420, 0, 420]) {
+        g.fillStyle = '#a8814f';
+        g.fillRect(pxW(cx + px2 - 80), pyW(cy - H + 120), pxW(160) - pxW(0), pxW(H * 1.4) - pxW(0));
+        g.strokeStyle = 'rgba(110,72,32,0.55)'; g.lineWidth = Math.max(1, pxW(8) - pxW(0));
+        for (let k = 0; k < 14; k++) {
+          const yy = cy - H + 120 + k * 84;
+          g.beginPath(); g.moveTo(pxW(cx + px2 - 80), pyW(yy)); g.lineTo(pxW(cx + px2 + 80), pyW(yy)); g.stroke();
+        }
+      }
+    } else if (b2 === 'market') {
+      // MARKET COBBLES + a bunting-lit central square
+      g.fillStyle = 'rgba(196,150,92,0.35)';
+      for (let iy = -4; iy <= 4; iy++) for (let ix = -4; ix <= 4; ix++) {
+        if ((ix * 7 + iy * 13) % 3) continue;
+        g.fillRect(pxW(cx + ix * 160 - 60), pyW(cy + iy * 160 - 60), pxW(120) - pxW(0), pxW(120) - pxW(0));
+      }
+      g.fillStyle = 'rgba(255,214,120,0.28)';
+      g.beginPath(); g.ellipse(pxW(cx), pyW(cy), pxW(420) - pxW(0), pxW(360) - pxW(0), 0, 0, Math.PI * 2); g.fill();
+    } else if (b2 === 'cove') {
+      // COVE: a tide pool + a dark wreck scar in the sand
+      g.fillStyle = '#5bc8d8';
+      g.beginPath(); g.ellipse(pxW(cx + 180), pyW(cy - 120), pxW(330) - pxW(0), pxW(240) - pxW(0), 0.4, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(120,96,60,0.35)';
+      g.beginPath(); g.ellipse(pxW(cx - 220), pyW(cy + 180), pxW(300) - pxW(0), pxW(120) - pxW(0), -0.5, 0, Math.PI * 2); g.fill();
+    } else if (b2 === 'jungle') {
+      // JUNGLE: dappled canopy shadow + a winding dirt trail
+      g.fillStyle = 'rgba(20,70,40,0.30)';
+      for (let k = 0; k < 26; k++) {
+        const jx2 = cx + rand(-H, H), jy2 = cy + rand(-H, H);
+        g.beginPath(); g.ellipse(pxW(jx2), pyW(jy2), pxW(rand(120, 240)) - pxW(0), pxW(rand(90, 190)) - pxW(0), rand(0, 3), 0, Math.PI * 2); g.fill();
+      }
+      g.strokeStyle = 'rgba(206,178,124,0.55)'; g.lineWidth = pxW(120) - pxW(0);
+      g.lineCap = 'round';
+      g.beginPath(); g.moveTo(pxW(cx - H), pyW(cy - 200));
+      g.quadraticCurveTo(pxW(cx), pyW(cy + 260), pxW(cx + H), pyW(cy - 120));
+      g.stroke();
+    }
   }
 
   // GOLF COURSE — park block (4,2): fairway sweep, putting green, bunkers, tee
@@ -1248,6 +1375,74 @@ function makePine(): THREE.Group {
   const grp = new THREE.Group(); grp.add(mergedProp(parts));
   return grp;
 }
+// ══ PIRATE BAY prop kit ═══════════════════════════════════════════════════
+// A tiki bar, a dance speaker stack, a market stall, a treasure chest, a
+// barrel, a cannon and a palm-thatch cabana. All merged single-draw props.
+function makeTikiBar(): THREE.Group {
+  const parts = [
+    part(new THREE.BoxGeometry(7, 1.5, 3), 0xc79350, 0, 0.75, 0),          // counter
+    part(new THREE.BoxGeometry(7.4, 0.35, 3.4), 0xe8c07a, 0, 1.62, 0),     // bar top
+  ];
+  for (const sx of [-3.2, 3.2]) parts.push(part(new THREE.CylinderGeometry(0.24, 0.28, 4.4, 7), 0x8a6132, sx, 2.2, -1.2));
+  parts.push(part(new THREE.ConeGeometry(5.4, 2.2, 4), 0xd8b56a, 0, 5.4, -0.6));   // thatch roof
+  parts.push(part(new THREE.TorusGeometry(0.6, 0.14, 6, 12), 0xff8a3a, -2.4, 2.3, 1.2, Math.PI / 2));
+  for (let i = 0; i < 3; i++) parts.push(part(new THREE.CylinderGeometry(0.34, 0.3, 1.1, 8), [0x7ee8d8, 0xffd23f, 0xff6fb0][i], -2 + i * 2, 2.35, 1.1));
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
+function makeSpeakerStack(): THREE.Group {
+  const parts = [
+    part(new THREE.BoxGeometry(2.6, 3.4, 2.2), 0x241a2e, 0, 1.7, 0),
+    part(new THREE.BoxGeometry(2.6, 2.4, 2.2), 0x2e2238, 0, 4.6, 0),
+    part(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 14), 0x4a3a58, 0, 1.4, 1.12, Math.PI / 2),
+    part(new THREE.CylinderGeometry(0.62, 0.62, 0.3, 12), 0x4a3a58, 0, 4.9, 1.12, Math.PI / 2),
+    part(new THREE.CylinderGeometry(0.3, 0.3, 0.3, 10), 0xff5d7e, 0, 3.0, 1.12, Math.PI / 2),
+  ];
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
+function makeMarketStall(): THREE.Group {
+  const awn = pick([0xff5d7e, 0x4de8ff, 0xffd23f, 0x7ef2a0]);
+  const parts = [
+    part(new THREE.BoxGeometry(5, 1.2, 2.6), 0xc79350, 0, 1.5, 0),
+    part(new THREE.BoxGeometry(5.6, 0.3, 3.4), awn, 0, 3.6, 0.2, -0.24),
+  ];
+  for (const sx of [-2.2, 2.2]) for (const sz of [-1.1, 1.1]) parts.push(part(new THREE.CylinderGeometry(0.14, 0.14, 3.4, 6), 0x8a6132, sx, 1.7, sz));
+  for (let i = 0; i < 4; i++) parts.push(part(new THREE.SphereGeometry(0.34, 8, 6), [0xff8a3a, 0xffd23f, 0xff5d7e, 0x7ef2a0][i], -1.6 + i * 1.05, 2.3, 0.4));
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
+function makeChest(): THREE.Group {
+  const parts = [
+    part(new THREE.BoxGeometry(2.4, 1.3, 1.6), 0x8a5a2a, 0, 0.65, 0),
+    part(new THREE.CylinderGeometry(0.8, 0.8, 2.4, 10, 1, false, 0, Math.PI), 0xa8703a, 0, 1.3, 0, 0, 0, Math.PI / 2),
+    part(new THREE.BoxGeometry(2.5, 0.22, 0.3), 0xffd23f, 0, 0.9, 0),
+    part(new THREE.SphereGeometry(0.5, 10, 8), 0xffd23f, 0, 1.55, 0.5),
+  ];
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
+function makeBarrel(): THREE.Group {
+  const parts = [
+    part(new THREE.CylinderGeometry(0.9, 0.75, 2.2, 12), 0x9a6a38, 0, 1.1, 0),
+    part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x4a3a2a, 0, 0.55, 0, Math.PI / 2),
+    part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x4a3a2a, 0, 1.65, 0, Math.PI / 2),
+  ];
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
+function makeCannon(): THREE.Group {
+  const parts = [
+    part(new THREE.BoxGeometry(2.6, 0.9, 1.6), 0x6a4526, 0, 0.7, 0),
+    part(new THREE.CylinderGeometry(0.36, 0.46, 3.2, 12), 0x30343c, 0.3, 1.5, 0, 0, 0, Math.PI / 2 - 0.22),
+  ];
+  for (const sx of [-0.8, 0.8]) parts.push(part(new THREE.CylinderGeometry(0.55, 0.55, 0.24, 12), 0x4a3a2a, sx, 0.55, 0.85, 0, 0, Math.PI / 2));
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
+function makeThatchHut(): THREE.Group {
+  const wall = pick([0xf0e0c0, 0xe8d4a8, 0xf6ecd2]);
+  const parts = [
+    part(new THREE.CylinderGeometry(2.6, 2.8, 3.2, 10), wall, 0, 1.6, 0),
+    part(new THREE.ConeGeometry(3.9, 2.8, 10), 0xc9a25e, 0, 4.5, 0),
+    part(new THREE.BoxGeometry(1.2, 2, 0.2), 0x8a6132, 0, 1, 2.7),
+  ];
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
 function makePalm(): THREE.Group {
   // leaning trunk + 6 drooping fronds on Y-pivots (the old Euler order spun
   // every frond horizontal — the infamous green pinwheel)
@@ -1298,6 +1493,16 @@ function makeBench(): THREE.Group {
 }
 
 // ── tiny "starter food" — what a speck-sized void eats first ──────────────────
+function makeTorch(): THREE.Group {
+  // a lit bamboo tiki torch — the resort's answer to a traffic cone
+  const parts = [
+    part(new THREE.CylinderGeometry(0.13, 0.16, 2.6, 7), 0x8a6132, 0, 1.3, 0),
+    part(new THREE.CylinderGeometry(0.32, 0.24, 0.5, 8), 0x4a3a2a, 0, 2.7, 0),
+    part(new THREE.ConeGeometry(0.26, 0.72, 7), 0xffb054, 0, 3.3, 0),
+    part(new THREE.ConeGeometry(0.14, 0.4, 6), 0xffe066, 0, 3.5, 0),
+  ];
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+}
 function makeCone(): THREE.Group {
   const g = new THREE.Group();
   g.add(mergedProp([
@@ -1833,7 +2038,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // north corner pockets: a street tree + hydrant each
       for (const sxc of [-1, 1]) {
         placeGlb('parktree', cx + sxc * half * 0.87, cz - half * 0.87, 3.2, 7, makeTree);
-        place(makeHydrant(), cx + sxc * half * 0.8, cz - half * 0.8, 0.8);
+        if (WORLD_ID !== 'pirate') place(makeHydrant(), cx + sxc * half * 0.8, cz - half * 0.8, 0.8);
       }
       // court dressing: benches + ice-cream cart in the courtyard shade
       place(makeBench(), cx - 7, cz + 8, 2.4);
@@ -1907,6 +2112,76 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         placeGlb('campfire', cx, cz, 1.4, 1.7, makeCampfireFB);
       }
       for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
+    } else if (biome === 'resort') {
+      // ── THE RESORT: villas along the boardwalk, cabanas and loungers
+      // ringing the two painted pools, palms everywhere
+      for (const ux of [-0.6, -0.2, 0.2, 0.6]) {
+        placeGlb('cabana', cx + ux * half, cz - half * 0.72, 3, 4.6, makeThatchHut, rand(-0.3, 0.3));
+        if (Math.random() < 0.8) placeGlb('palm', cx + ux * half + 30, cz - half * 0.5, 2.6, rand(6.5, 8.5), makePalm, rand(0, Math.PI * 2));
+      }
+      // loungers + umbrellas around the painted pools (bake: -330,-180 / 300,240)
+      for (const [ox, oy] of [[-330, -180], [300, 240]] as const) {
+        const px2 = cx + wLen(ox) * 20 * SCALE, pz2 = cz + wLen(oy) * 20 * SCALE;
+        for (let k = 0; k < 5; k++) {
+          const a2 = (k / 5) * Math.PI * 2;
+          place(makeBeachChairFB(), px2 + Math.cos(a2) * 16, pz2 + Math.sin(a2) * 12, 1.4);
+        }
+        placeGlb('umbrella', px2 + 12, pz2 - 10, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+      }
+      place(makeTikiBar(), cx + half * 0.45, cz + half * 0.35, 3.4);
+      for (let t = 0; t < 3; t++) place(makeFlowers(), cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.7, half * 0.7), 0.7);
+    } else if (biome === 'party') {
+      // ── THE DANCE FLOOR: a stage of speaker stacks at the north edge,
+      // tiki torches on the perimeter, bar carts and a scatter of stools
+      placeGlb('stage', cx, cz - half * 0.66, 5, 3.2, makeThatchHut, Math.PI);
+      for (const sx of [-1, 1]) place(makeSpeakerStack(), cx + sx * 18, cz - half * 0.66 + 4, 2.6);
+      for (const sx of [-1, 1]) place(makeSpeakerStack(), cx + sx * 34, cz - half * 0.3, 2.6);
+      for (let k = 0; k < 10; k++) {   // torch ring around the floor
+        const a2 = (k / 10) * Math.PI * 2;
+        place(makeCone(), cx + Math.cos(a2) * half * 0.82, cz + Math.sin(a2) * half * 0.82, 1.1);
+      }
+      place(makeTikiBar(), cx - half * 0.6, cz + half * 0.55, 3.4);
+      place(makeTikiBar(), cx + half * 0.6, cz + half * 0.55, 3.4);
+      for (let t = 0; t < 6; t++) place(makeBarrel(), cx + rand(-half * 0.75, half * 0.75), cz + rand(-half * 0.75, half * 0.75), 1.3);
+    } else if (biome === 'port') {
+      // ── THE PORT: the galleon at the pier head, cargo everywhere, cannons
+      placeGlb('lighthouse', cx - half * 0.7, cz - half * 0.6, 6.5, 19, makeLighthouseFB);
+      for (const px2 of [-0.5, 0, 0.5]) {   // crates + barrels down each pier
+        for (let k = 0; k < 4; k++) {
+          const z2 = cz - half * 0.5 + k * (half * 0.45);
+          place(makeBarrel(), cx + px2 * half * 0.62 + rand(-5, 5), z2, 1.3);
+          if (k % 2 === 0) place(makeChest(), cx + px2 * half * 0.62 + rand(-6, 6), z2 + 6, 1.5);
+        }
+      }
+      for (const sx of [-1, 1]) place(makeCannon(), cx + sx * half * 0.75, cz + half * 0.5, 2);
+      place(makeThatchHut(), cx + half * 0.55, cz - half * 0.55, 3);
+    } else if (biome === 'market') {
+      // ── THE MARKET: stall rows around the bunting square, treasure piles
+      for (let ry = -1; ry <= 1; ry++) for (let rx2 = -1; rx2 <= 1; rx2++) {
+        if (rx2 === 0 && ry === 0) continue;
+        place(makeMarketStall(), cx + rx2 * half * 0.6 + rand(-6, 6), cz + ry * half * 0.6 + rand(-6, 6), 2.6);
+      }
+      place(makeChest(), cx, cz, 1.5);
+      for (let t = 0; t < 5; t++) place(makeBarrel(), cx + rand(-half * 0.8, half * 0.8), cz + rand(-half * 0.8, half * 0.8), 1.3);
+      for (let t = 0; t < 3; t++) placeGlb('palm', cx + rand(-half * 0.8, half * 0.8), cz + rand(-half * 0.8, half * 0.8), 2.6, rand(6, 8), makePalm, rand(0, Math.PI * 2));
+    } else if (biome === 'jungle') {
+      // ── THE JUNGLE: dense palms, boulders, a hidden chest on the trail
+      for (let t = 0; t < 9; t++) {
+        const [x, z] = jitter();
+        if (Math.random() < 0.7) placeGlb('palm', x, z, 2.6, rand(7, 10), makePalm, rand(0, Math.PI * 2));
+        else place(makePine(), x, z, 3);
+      }
+      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeRocksFB(), x, z, 2.4); }
+      place(makeChest(), cx + rand(-half * 0.4, half * 0.4), cz + rand(-half * 0.4, half * 0.4), 1.5);
+      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
+    } else if (biome === 'cove') {
+      // ── THE COVE: the wreck scar, treasure, boulders, a lonely palm pair
+      for (let t = 0; t < 3; t++) place(makeChest(), cx - half * 0.35 + rand(-14, 14), cz + half * 0.3 + rand(-10, 10), 1.5);
+      for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeRocksFB(), x, z, 2.4); }
+      for (const sx of [-1, 1]) placeGlb('palm', cx + sx * half * 0.62, cz - half * 0.55, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+      place(makeCannon(), cx + half * 0.3, cz - half * 0.2, 2);
+      for (let t = 0; t < 4; t++) place(makeBarrel(), cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.7, half * 0.7), 1.3);
+      place(makeSandcastleFB(), cx + rand(-20, 20), cz + half * 0.6, 1.2);
     } else if (biome === 'beach') {
       // the DESIGNED beach: palms line the boardwalk promenade at the top,
       // umbrellas sit in staggered resort rows on the sand (matching the baked
@@ -2066,8 +2341,11 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (let a = -270; a < 270; a += 32, ci++) {
       const side = ci % 2 ? 4.9 : -4.9;   // road shoulder — cars never clip them
       if (nearCrossRoad(a, 4.5)) continue;
-      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
-      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
+      // Pirate Bay's boardwalks are lit by TIKI TORCHES, not traffic cones
+      const kerb = () => (WORLD_ID === 'pirate' ? makeTorch() : makeCone());
+      const kr = WORLD_ID === 'pirate' ? 1.0 : 0.7;
+      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(kerb(), a, rc + side, kr);
+      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(kerb(), rc - side, a, kr);
     }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {

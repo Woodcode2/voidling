@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
-  railPointAt, insideIsland3, inLagoon3, type Biome, type AddEdible,
+  railPointAt, insideIsland3, inLagoon3, worldId, type Biome, type AddEdible,
 } from './island';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 
@@ -712,7 +712,7 @@ export function createLife(
     grp.userData.mover = true;
     setShadow(grp); addEdible(grp, 5.4); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
   }
-  buildTrain();
+  if (worldId() !== 'pirate') buildTrain();   // no commuter rail at a beach resort
   movers.push({
     get mesh() { return trainGrp!; },
     update(dt) {
