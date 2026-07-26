@@ -480,17 +480,52 @@ export function createRivals(
         rv.vz += ((mz / md) * spdSec - rv.vz) * Math.min(1, dt * 5);
         const spd = Math.hypot(rv.vx, rv.vz) * dt;
         const nx = rv.x + rv.vx * dt, nz = rv.z + rv.vz * dt;
+        // BODY-AWARE. This used to test the CENTRE point only, so a rival would
+        // walk its whole body out over the water and jitter on the waterline —
+        // the "AI tries to go into the water and it's glitching" report. Test a
+        // ring at the rival's own size, exactly like the player's wall does.
+        const bm = Math.min(rv.r * 0.7, 3.5 + rv.r * 0.15) + 1.0;
+        const fits = (x: number, z: number) => !!biomeAt(x, z)
+          && !!biomeAt(x + bm, z) && !!biomeAt(x - bm, z)
+          && !!biomeAt(x, z + bm) && !!biomeAt(x, z - bm);
         let movedOk = false;
-        if (biomeAt(nx, nz)) { rv.x = nx; rv.z = nz; movedOk = true; }
+        if (fits(nx, nz)) { rv.x = nx; rv.z = nz; movedOk = true; }
         else {
           const sx = -(mz / md), sz = mx / md;   // slide directions along the wall
-          if (biomeAt(rv.x + sx * spd, rv.z + sz * spd)) { rv.x += sx * spd; rv.z += sz * spd; movedOk = true; }
-          else if (biomeAt(rv.x - sx * spd, rv.z - sz * spd)) { rv.x -= sx * spd; rv.z -= sz * spd; movedOk = true; }
+          if (fits(rv.x + sx * spd, rv.z + sz * spd)) { rv.x += sx * spd; rv.z += sz * spd; movedOk = true; }
+          else if (fits(rv.x - sx * spd, rv.z - sz * spd)) { rv.x -= sx * spd; rv.z -= sz * spd; movedOk = true; }
+          // and if the body is ALREADY off the land, walk it back on rather
+          // than leaving it hovering over the sea until the stall timer fires
+          if (!movedOk && !fits(rv.x, rv.z)) {
+            const h = Math.max(2, bm * 0.6);
+            const gx = (biomeAt(rv.x + h, rv.z) ? 1 : 0) - (biomeAt(rv.x - h, rv.z) ? 1 : 0);
+            const gz = (biomeAt(rv.x, rv.z + h) ? 1 : 0) - (biomeAt(rv.x, rv.z - h) ? 1 : 0);
+            const gl = Math.hypot(gx, gz);
+            if (gl > 0) { rv.x += (gx / gl) * dt * 30; rv.z += (gz / gl) * dt * 30; }
+          }
         }
         rv.stall = movedOk ? Math.max(0, rv.stall - dt * 2) : rv.stall + dt;
         if (rv.stall > 0.8) {   // pinned in a corner: abandon target, wander inland
           rv.stall = 0; rv.retarget = rand(1.2, 2.2);
-          const inland = Math.atan2(-rv.z, -rv.x) + rand(-0.9, 0.9);
+          // "inland" was ALWAYS toward the world origin. That is only correct
+          // for an island with water strictly on the outside — Pirate Bay has a
+          // bay in the MIDDLE, so from the resort shore this aimed the escape
+          // straight across the water and the rival re-pinned immediately.
+          // Find real land instead, and fall back to the origin heading.
+          let inland = Math.atan2(-rv.z, -rv.x);
+          for (let ring = 1; ring <= 10; ring++) {
+            let found = false;
+            for (let k = 0; k < 12; k++) {
+              const a4 = (k / 12) * Math.PI * 2 + ring * 0.26;
+              const rr = ring * 12;
+              if (biomeAt(rv.x + Math.cos(a4) * rr, rv.z + Math.sin(a4) * rr)
+                && biomeAt(rv.x + Math.cos(a4) * (rr + 24), rv.z + Math.sin(a4) * (rr + 24))) {
+                inland = a4; found = true; break;
+              }
+            }
+            if (found) break;
+          }
+          inland += rand(-0.5, 0.5);
           rv.tx = rv.x + Math.cos(inland) * rand(50, 110);
           rv.tz = rv.z + Math.sin(inland) * rand(50, 110);
         }

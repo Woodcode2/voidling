@@ -1228,36 +1228,13 @@ function validateWorld() {
   _validated = true;
 }
 
-// Match starts: real, verified district centres. A match opens somewhere
-// different each time, so the first twenty seconds — the part a player
-// remembers — are not the same twenty seconds five runs running.
-const PIRATE_STARTS: [number, number][] = [
-  [71, 224], [151, -16], [-21, -70], [71, -146], [-114, -51], [-103, 145], [-5.8, -185], [-181, 18],
-];
-const MAPLE_STARTS: [number, number][] = [
-  [-128.25, -128.25], [42.75, -30], [-42.75, 213.75], [128.25, -42.75],
-  [-128.25, -42.75], [-42.75, -42.75], [128.25, -213.75],
-];
-let lastStart = -1;
-function pickStart(): [number, number] {
-  const pool = pickedWorld === 'pirate' ? PIRATE_STARTS : MAPLE_STARTS;
-  for (let k = 0; k < 24; k++) {
-    const i = Math.floor(Math.random() * pool.length);
-    if (i === lastStart) continue;                 // never the same district twice running
-    const [x, z] = pool[i];
-    if (!insideIsland3(x, z)) continue;
-    lastStart = i;
-    return pool[i];
-  }
-  return [island.spawn.x, island.spawn.z];
-}
-
 // GOLDEN FINDS. capture() has always had a coin payout branch and not one
 // prop in either world ever set userData.coin — the whole discovery layer was
 // written and dead. There was nothing on the island worth going to look for: a
 // treasure chest in Smugglers Cove paid exactly what a beach towel of the same
 // size paid. Twenty props are gilded per match, re-rolled every time, biased
-// toward the things that already look special.
+// toward the things that already look special. This is where the run-to-run
+// variety lives now that the opening is deliberately fixed.
 const GILD_N = 20;
 let gilded: Edible[] = [];
 function gildTreasure() {
@@ -1265,7 +1242,6 @@ function gildTreasure() {
   gilded = [];
   const pool = edibles.filter((e) => e.radius >= 0.5 && e.radius <= 6 && !e.mesh.userData.mover);
   if (!pool.length) return;
-  // weight the hand-authored, characterful props over generic scatter
   const score = (e: Edible) => (e.mesh.userData.building ? 3 : 1) + (e.radius > 2 ? 2 : 0);
   for (let k = 0; k < GILD_N && pool.length; k++) {
     let best: Edible | null = null, bw = -1;
@@ -1300,10 +1276,15 @@ function resetMatch() {
   }
   rivals.reset();
   curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
-  // START SOMEWHERE ELSE. The spawn was a single fixed point, so every match
-  // opened on the same twenty seconds — the biggest single reason three
-  // back-to-back runs read as one run played three times.
-  { const st = pickStart(); voidState.x = st[0]; voidState.z = st[1]; }
+  // FIXED START, deliberately. A replay review argued for randomising this —
+  // every match opening on the same twenty seconds is real repetition — but the
+  // owner's call is that the opening must be hand-authored and identical every
+  // single load: "the void should start somewhere more fun and super crisp.
+  // Consistency is key here. Always the same for every load." A first
+  // impression you can tune beats one you can only sample. The variety budget
+  // is spent on the rival cast, their join times and the gilded treasure
+  // instead, all of which re-roll per match without touching the opening.
+  voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 14;
@@ -1802,7 +1783,16 @@ function animate() {
     // OUTWARD half of the velocity is cancelled (tangential sliding survives),
     // and a void that grows past the shore is eased back in instead of stuck.
     {
-      const m = voidling.radius * 0.75 + 1.2;   // keep the body on land, still reach coastal snacks
+      // HOW MUCH BODY MUST BE ON LAND. A linear R*0.75 meant a WORLD ENDER
+      // needed 26 units of clear corridor — and the island's narrowest
+      // walkable stretches measure 16 and 25 units, so the late game was
+      // physically unable to cross its own map and pinned against the sand
+      // spits. A small void is still held tight to the shore (it would look
+      // like it was floating otherwise); a big one is allowed to span, because
+      // a giant hole bridging an isthmus is exactly what the fantasy looks
+      // like. R=2 unchanged at 2.7; R=16 goes 13.2 -> 7.6.
+      const R0 = voidling.radius;
+      const m = Math.min(R0 * 0.75, 4 + R0 * 0.15) + 1.2;
       const solid = (x: number, z: number) => !!island.biomeAt(x, z)
         && insideIsland3(x + m, z) && insideIsland3(x - m, z)
         && insideIsland3(x, z + m) && insideIsland3(x, z - m);
