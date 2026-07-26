@@ -1281,8 +1281,13 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     return PLAN[gy][gx];
   }
 
-  // spawn: a cozy-suburb road junction, clear of the downtown core
-  const spawn = { x: w(ROAD_CENTERS[0]), z: w(ROAD_CENTERS[2]) };
+  // spawn: a cozy-suburb road junction, clear of the downtown core. On Pirate
+  // Bay that same point is the empty scrub on the wild west coast — the worst
+  // possible opening. Start at the Bazaar's south edge instead: stalls and a
+  // crowd within a few seconds, the promenade and the jungle both close.
+  const spawn = WORLD_ID === 'pirate'
+    ? { x: w(5400), z: w(5200) }
+    : { x: w(ROAD_CENTERS[0]), z: w(ROAD_CENTERS[2]) };
 
   return {
     spawn,
