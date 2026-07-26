@@ -227,7 +227,7 @@ export function createRivals(
 ): Rivals {
   // props the family has eaten, mid shrink-out animation
   const shrinking: THREE.Object3D[] = [];
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; }
+  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number; }
   const rivals: R[] = [];
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
   // WHO SHOWS UP is a roll of the dice: 3-5 family members, shuffled casting,
@@ -267,7 +267,7 @@ export function createRivals(
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
-      visitT: rand(30, 70), visiting: false, dyingT: 0,
+      visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
       // HOME TURF: each family member forages their OWN corner of the island.
       // Without this they orbited the player all match ("they hover around
       // you"), which is clingy, not alive.
@@ -393,7 +393,9 @@ export function createRivals(
         // Now they only run when you could actually swallow them AND you're
         // genuinely on top of them; otherwise they keep doing their thing.
         const canBeEaten = pr > rv.r * 1.25;
-        const fleeing = canBeEaten && dp < pr + rv.r + 10;
+        // 10 units of warning at every size meant a rival was already sprinting
+        // before you were close enough to matter
+        const fleeing = canBeEaten && dp < pr + rv.r * 1.4;
         if (fleeing && dp < pr * 1.05) rv.closeCall = true;   // almost swallowed…
         if (rv.closeCall && dp > pr * 1.8) {                   // …and wriggled free
           rv.closeCall = false;
@@ -463,7 +465,17 @@ export function createRivals(
         }
         // SMOOTHED motion (no more teleporty slides) + coast handling
         const mx = rv.tx - rv.x, mz = rv.tz - rv.z, md = Math.hypot(mx, mz) || 1;
-        const spdSec = (fleeing ? 34 : 22) * Math.min(2.1, Math.pow(rv.r / START_R, 0.5));
+        // CATCHABLE. Flee speed peaked at 34 * 2.1 = 71 u/s against a player
+        // hard-capped at 58, so at every size where you were big enough to
+        // swallow a rival they outran you by 40-70%. Six full measured matches
+        // produced ONE rival eaten — the marquee play, the thing a kid re-tells,
+        // was mechanically unreachable. Flee now tops out below the player's
+        // ceiling, and panic costs stamina so a determined 3-second chase
+        // closes: they bolt, then tire, and that is the whole drama.
+        if (fleeing) rv.panic = Math.min(1, (rv.panic ?? 0) + dt * 0.42);
+        else rv.panic = Math.max(0, (rv.panic ?? 0) - dt * 0.30);
+        const tired = 1 - 0.34 * (rv.panic ?? 0);
+        const spdSec = (fleeing ? 31 * tired : 22) * Math.min(1.7, Math.pow(rv.r / START_R, 0.5));
         rv.vx += ((mx / md) * spdSec - rv.vx) * Math.min(1, dt * 5);
         rv.vz += ((mz / md) * spdSec - rv.vz) * Math.min(1, dt * 5);
         const spd = Math.hypot(rv.vx, rv.vz) * dt;

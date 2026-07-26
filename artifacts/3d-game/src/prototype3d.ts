@@ -257,7 +257,7 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
     port: [71, -146], oldtown: [-5.8, -185], resort: [141.4, -28.6], party: [71, 224.4],
     market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6],
     bay: [45, 75],   // debug: drop INTO the bay to exercise the water-escape
-    axis: [151, -16], marina: [126, -28], stage: [70, 219] };
+    axis: [151, -16], marina: [131, -24], stage: [70, 219] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -460,10 +460,20 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   { id: 'evolve', icon: '🕳️', label: 'Evolve to DEVOURER', target: 1, reward: 25, kind: 'devourer' },
   { id: 'solo', icon: '🏝️', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
   { id: 'houses', icon: '🏠', label: 'Home Wrecker: eat 3 houses', target: 3, reward: 25, kind: 'house' },
+  // PER-WORLD. Houses only exist in Maple's cozy/fancy biomes and Pirate Bay's
+  // entire car population is seven shuttle buggies, so a board drawn as
+  // "6 cars / combo / 3 houses" — which is what today drew — was impossible on
+  // the flagship world. Measured: Maple cleared 3/3 and 2/3, Pirate 1/3, 1/3, 0/3.
+  { id: 'cabanas', icon: '⛱️', label: 'Beach Party: eat 4 cabanas', target: 4, reward: 25, kind: 'cabana' },
+  { id: 'gold', icon: '✦', label: 'Treasure Hunter: find 4 golden things', target: 4, reward: 25, kind: 'gild' },
   { id: 'rival', icon: '😈', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
   { id: 'big', icon: '🏨', label: 'Big Fish: eat 3 LANDMARK buildings', target: 3, reward: 25, kind: 'big' },
 ];
-const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve'], HARD_Q = ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
+// EASY and MED both contained 'cars' and 'combo', so roughly one day in seven
+// drew the SAME chip twice. Disjoint now, and the hard slot is world-aware.
+const EASY_Q = ['snack', 'gold', 'combo'];
+const MED_Q = pickedWorld === 'pirate' ? ['cabanas', 'evolve', 'gold'] : ['cars', 'evolve', 'combo'];
+const HARD_Q = pickedWorld === 'pirate' ? ['cabanas', 'rival', 'big'] : ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   // uint32 hash (imul + >>>0). The old float reduce blew past 2^53, and the
@@ -724,6 +734,8 @@ function showNews() {
   audio.ready();   // a soft chime so headlines register even mid-chomp
 }
 
+const GATE_GREY = new THREE.Color(0x6b6b7a);
+let gateT = 0;      // throttle for the too-big-to-eat tint
 let lastRankBrag = -99;
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
@@ -932,7 +944,7 @@ function capture(e: Edible, giveHunger = true) {
     fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd23f, 7, 0.6);
     audio.ready(); buzz(25);
   }
-  if (guideStep === 1 && stats.eaten > 2) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
+  if (guideStep === 1 && stats.eaten > 2 && tClock > 4) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   const coinVal = e.mesh.userData.coin as number | undefined;
@@ -951,6 +963,8 @@ function capture(e: Edible, giveHunger = true) {
   const qk = e.mesh.userData.qk as string | undefined;
   if (e.radius < 1) questEvent('snack');
   if (e.radius >= 6) questEvent('big');   // landmark-class: hotels, ships, the temple, the stage
+  if (e.mesh.userData.gild) questEvent('gild');
+  if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana');
   if (qk) questEvent(qk);
   if (comboMult >= 2) questEvent('combo');
   if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); breakingNews('BREAKING: it ate a HOUSE. a WHOLE house.'); }
@@ -1108,7 +1122,7 @@ el('btnGotIt').addEventListener('click', () => {
 // (hole.io's onboarding). The menu earns its place from session two.
 if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlayed')) {
   menuEl.style.display = 'none';
-  withWorldReady(() => beginMatch());
+  withWorldReady(() => { gildTreasure(); beginMatch(); });   // the FIRST match needs treasure too
 }
 // world cards: MAPLE ISLE + PIRATE BAY are both live now
 {
@@ -1230,6 +1244,35 @@ function pickStart(): [number, number] {
   return [island.spawn.x, island.spawn.z];
 }
 
+// GOLDEN FINDS. capture() has always had a coin payout branch and not one
+// prop in either world ever set userData.coin — the whole discovery layer was
+// written and dead. There was nothing on the island worth going to look for: a
+// treasure chest in Smugglers Cove paid exactly what a beach towel of the same
+// size paid. Twenty props are gilded per match, re-rolled every time, biased
+// toward the things that already look special.
+const GILD_N = 20;
+let gilded: Edible[] = [];
+function gildTreasure() {
+  for (const e of gilded) { e.mesh.userData.coin = undefined; e.mesh.userData.gild = false; }
+  gilded = [];
+  const pool = edibles.filter((e) => e.radius >= 0.5 && e.radius <= 6 && !e.mesh.userData.mover);
+  if (!pool.length) return;
+  // weight the hand-authored, characterful props over generic scatter
+  const score = (e: Edible) => (e.mesh.userData.building ? 3 : 1) + (e.radius > 2 ? 2 : 0);
+  for (let k = 0; k < GILD_N && pool.length; k++) {
+    let best: Edible | null = null, bw = -1;
+    for (let t = 0; t < 6; t++) {
+      const c = pool[(Math.random() * pool.length) | 0];
+      const w = score(c) * Math.random();
+      if (w > bw && !c.mesh.userData.gild) { bw = w; best = c; }
+    }
+    if (!best) break;
+    best.mesh.userData.coin = 3 + Math.round(best.radius * 2);
+    best.mesh.userData.gild = true;
+    gilded.push(best);
+  }
+}
+
 function resetMatch() {
   resetNews();   // the newsroom's anti-repeat memory is per-match
   // restore every eaten thing to its remembered home — the island regrows in
@@ -1253,6 +1296,7 @@ function resetMatch() {
   // opened on the same twenty seconds — the biggest single reason three
   // back-to-back runs read as one run played three times.
   { const st = pickStart(); voidState.x = st[0]; voidState.z = st[1]; }
+  gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 14;
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
@@ -1750,7 +1794,7 @@ function animate() {
     // OUTWARD half of the velocity is cancelled (tangential sliding survives),
     // and a void that grows past the shore is eased back in instead of stuck.
     {
-      const m = voidling.radius * 0.55 + 1.2;   // keep the body on land, still reach coastal snacks
+      const m = voidling.radius * 0.75 + 1.2;   // keep the body on land, still reach coastal snacks
       const solid = (x: number, z: number) => !!island.biomeAt(x, z)
         && insideIsland3(x + m, z) && insideIsland3(x - m, z)
         && insideIsland3(x, z + m) && insideIsland3(x, z - m);
@@ -1795,7 +1839,23 @@ function animate() {
       } else stallT = 0;
       if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
       else {
-        const ld = landDir(voidState.x, voidState.z);
+        // THE SURFACE NORMAL, not "the direction of the nearest land". landDir is
+        // a 16-spoke ring search quantised to 22.5 degrees, so using it as the
+        // wall normal ate the TANGENTIAL component too — measured 0.00 u/s for
+        // 60 straight frames when pushing into the shore at 20, 45 and 70
+        // degrees off the water bearing, against a 58 u/s free field. The wall
+        // didn't chatter or snag, it just glued. A finite difference over four
+        // cheap probes gives the real normal for a fifth of the cost, and
+        // landDir stays as the rescue path for when we are fully off the land.
+        let nrm: [number, number] | null = null;
+        {
+          const h = Math.max(2, m * 0.5);
+          const gx = (solid(voidState.x + h, voidState.z) ? 1 : 0) - (solid(voidState.x - h, voidState.z) ? 1 : 0);
+          const gz = (solid(voidState.x, voidState.z + h) ? 1 : 0) - (solid(voidState.x, voidState.z - h) ? 1 : 0);
+          const gl = Math.hypot(gx, gz);
+          if (gl > 0) nrm = [-gx / gl, -gz / gl];   // outward = away from the land gradient
+        }
+        const ld = nrm ? [-nrm[0], -nrm[1]] as [number, number] : landDir(voidState.x, voidState.z);
         if (ld) {
           const ox = -ld[0], oz = -ld[1];                        // outward = away from land
           const out = velX * ox + velZ * oz;
@@ -1825,6 +1885,41 @@ function animate() {
   const vz = (voidState.z - prev.z) / Math.max(1e-4, dt);
   prev.x = voidState.x; prev.z = voidState.z;
   { const sp = Math.hypot(vx, vz); if (sp > 4) { aim.x = vx / sp; aim.z = vz / sp; } }
+
+  // ── CAN I EAT THAT? ───────────────────────────────────────────────────────
+  // The only signal that a prop was over the size gate used to be a shake, set
+  // when you were already touching it. Measured at the Pirate spawn: 160 props
+  // on screen and 28.1% edible, so a child's first minute was 115 visible
+  // objects silently refusing them. (Maple: 70 on screen, 58.6% edible — which
+  // is most of why Maple feels better to play.) Anything too big is now
+  // desaturated toward slate, so the line is glanceable from across the street.
+  gateT -= dt;
+  if (started && gateT <= 0) {
+    gateT = 0.4;
+    const Rg = voidling.radius, reach = Rg * 26 + 40;
+    for (const e of edibles) {
+      if (e.eaten || !e.mesh.visible) continue;
+      const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
+      if (dx * dx + dz * dz > reach * reach) continue;
+      const tooBig = e.radius > Rg * EAT_RATIO;
+      if (tooBig === e.mesh.userData.gated) continue;   // no per-frame churn: only on the transition
+      e.mesh.userData.gated = tooBig;
+      e.mesh.traverse((o) => {
+        const mm = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (!mm || !mm.color) return;
+        if (tooBig) {
+          if (!o.userData.baseCol) o.userData.baseCol = mm.color.clone();
+          // clone the material once per gated mesh, or every prop sharing the
+          // merged-prop material would grey out together
+          if (!o.userData.gateMat) { o.userData.gateMat = mm.clone(); (o as THREE.Mesh).material = o.userData.gateMat; }
+          ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color
+            .copy(o.userData.baseCol).lerp(GATE_GREY, 0.42);
+        } else if (o.userData.baseCol && o.userData.gateMat) {
+          ((o as THREE.Mesh).material as THREE.MeshStandardMaterial).color.copy(o.userData.baseCol);
+        }
+      });
+    }
+  }
 
   // powers are PLAYER decisions — auto-fire only exists for the headless demo
   // harness (debug URLs). In a real match nothing ever blasts on its own.
@@ -1885,7 +1980,7 @@ function animate() {
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
     const reach = R * 2.0 + e.radius * 2.4;
-    const inWell = d < reach && e.radius < 2.5 && !e.mesh.userData.mover && e.radius <= R * EAT_RATIO;
+    const inWell = d < reach && e.radius < 2.5 && (!e.mesh.userData.mover || e.radius < 0.9) && e.radius <= R * EAT_RATIO;
     // spring-back runs FIRST, unconditionally: if a rival bite shrank us while
     // this prop was displaced, the old size-gated flow stranded it on the
     // asphalt forever — displaced props ALWAYS walk home when out of the well
@@ -1964,7 +2059,7 @@ function animate() {
     camOffset.set(0.62 + (0.45 - 0.62) * steep, 0.92 + (1.4 - 0.92) * steep, 0.62 + (0.45 - 0.62) * steep).normalize();
     // LOOKAHEAD: frame the ground AHEAD of travel — a steer-to-eat game gives
     // the pixels to where you're going, the void rides slightly behind center
-    const lookX = voidState.x + velX * 0.22, lookZ = voidState.z + velZ * 0.22;
+    const lookX = voidState.x + velX * 0.10, lookZ = voidState.z + velZ * 0.10;
     tmpV.copy(camOffset).multiplyScalar(camDist);
     tmpV.x += lookX; tmpV.z += lookZ;
     camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
@@ -1974,7 +2069,7 @@ function animate() {
     camera.updateMatrixWorld();
     _chipV.set(voidState.x, 0, voidState.z).project(camera);
     formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
-    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + R * 9 + 30}px`;
+    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + 70}px`;
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }
