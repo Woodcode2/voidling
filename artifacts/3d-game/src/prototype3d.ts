@@ -19,10 +19,10 @@ import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx } from './proto3d/fx';
-import { createDefense } from './proto3d/defense';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
+import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -137,7 +137,7 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 // The chosen world must be set BEFORE the island is built (the ground bake and
 // the prop pass both read the plan). Switching worlds reloads, which is fine:
 // it's a level select, not a mid-match toggle.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE ISLE', pirate: 'PIRATE BAY' };
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE ISLE', pirate: 'PIRATE BAY RESORT' };
 const pickedWorld = (new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple') === 'pirate' ? 'pirate' : 'maple';
 setWorld(pickedWorld);
@@ -162,10 +162,12 @@ const _dbg = window as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __news: () => void;
+  __voidState: () => { x: number; z: number; r: number };
 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
+_dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
   const bs = document.createElement('div');
@@ -230,7 +232,6 @@ rivals.onPlayerBitten = (name) => {
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   buzz(50);
 };
-const defense = createDefense(scene, fx, island.biomeAt);
 const audio = createAudio();
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
 
@@ -254,7 +255,8 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
   const spots: Record<string, [number, number]> = { plaza: [42.75, -30], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75],
     // PIRATE BAY districts — real region centroids, not Maple grid blocks
     port: [71, -146], oldtown: [-5.8, -185], resort: [141.4, -28.6], party: [71, 224.4],
-    market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6] };
+    market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6],
+    bay: [45, 75] };   // debug: drop INTO the bay to exercise the water-escape
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 
@@ -450,9 +452,9 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   { id: 'solo', icon: '🏝️', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
   { id: 'houses', icon: '🏠', label: 'Home Wrecker: eat 3 houses', target: 3, reward: 25, kind: 'house' },
   { id: 'rival', icon: '😈', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
-  { id: 'army', icon: '🪖', label: 'Delicious Irony: eat 2 army units', target: 2, reward: 25, kind: 'army' },
+  { id: 'big', icon: '🏨', label: 'Big Fish: eat 3 LANDMARK buildings', target: 3, reward: 25, kind: 'big' },
 ];
-const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve'], HARD_Q = ['houses', 'rival', 'army'];   // easy rotates daily; 'solo' retired with the menu button
+const EASY_Q = ['snack', 'cars', 'combo'], MED_Q = ['cars', 'combo', 'evolve'], HARD_Q = ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   // uint32 hash (imul + >>>0). The old float reduce blew past 2^53, and the
@@ -524,7 +526,7 @@ const PIRATE_BEATS: typeof MAPLE_BEATS = [
 ];
 const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = {
-  house: 'a whole HOUSE', car: 'a parked car', army: 'an army truck',
+  house: 'a whole HOUSE', car: 'a parked car', big: 'an entire LANDMARK',
 };
 const mealBySize = (r: number) =>
   r > 5 ? 'an entire BUILDING' : r > 2.5 ? 'something big' : r > 1.2 ? 'a mailbox' : 'a snack';
@@ -575,61 +577,9 @@ const NEWS_LIVE_PANIC = [
   '{S} SECONDS LEFT. run. politely. RUN',
   '{L} leads the feast. we root for nobody now',
 ];
-// ══ PIRATE BAY newsroom — the resort manager is this world's mayor, and he
-// is having a WEEK. Same denial-to-collapse arc, different beach.
-const PB_LIVE_CALM = [
-  'manager: "the purple thing is a PROMOTION"',
-  'guest review of {D}: five stars, one void',
-  'it ate {M}. front desk calls it "turndown service"',
-  'manager insists {D} is "themed, not doomed"',
-  'lost property: {M}. found property: nothing',
-];
-const PB_LIVE_WORRIED = [
-  '{D} EVACUATING - a {F} is at the buffet',
-  'manager rebrands the void as "an infinity pool"',
-  '{P}% of the resort gone. still no refunds',
-  '{L} leads the buffet. staff applaud nervously',
-  'do NOT book {D}. that is where the {F} is',
-];
-const PB_LIVE_PANIC = [
-  '{D} IS GONE. the towels were RESERVED',
-  '{P}% DEVOURED. the other {R}% is at the bar',
-  'the {F} ate {M}. it is asking about dessert',
-  '{S} SECONDS LEFT. conga to the boats!!',
-  'manager: "ok it is a void." manager sails away',
-];
-const PB_CALM = [
-  'BAY RADIO: DJ Coconut spinning til sunrise',
-  'parrot escapes market, files for management',
-  'crab crowned "employee of the month" again',
-  'buffet restocked. buffet immediately unstocked',
-  'lost: one flip-flop. found: eleven flip-flops',
-  'the swim-up bar has a swim-up bar now',
-  'shipwreck tour sells out. ship still wrecked',
-  'limbo record broken. so was the limbo pole',
-  'sunscreen shortage. everyone is "fine, honestly"',
-  'dance floor reaches legal maximum boogie',
-];
-const PB_WORRIED = [
-  'manager: DO NOT feed the guest in aisle three',
-  'lifeguards now guarding the LAND. and the bar.',
-  'conga line rerouted around "the situation"',
-  'DJ switches to a tense playlist',
-  'the parrot has started screaming coordinates',
-  'crabs seen leaving in an orderly single file',
-  'happy hour extended. nervously.',
-  'staff meeting held entirely at a sprint',
-];
-const PB_PANIC = [
-  'THE BUFFET IS GONE. ALL OF IT.',
-  'DJ plays one final banger. respect.',
-  'the parrot was RIGHT. the parrot was always right',
-  'crabs have taken the last boat',
-  'BAY RADIO broadcasting from a pool float',
-  'manager last seen doing the limbo, away',
-  'the dance floor danced its last dance',
-  'resort rated 1 star: "was eaten, otherwise lovely"',
-];
+// PIRATE BAY RESORT's newsroom lives in ./proto3d/newsroom — a per-district
+// pool for all seven areas plus CAPT. ROGER's running arc. What used to be
+// here was eight lines per tier, shared across the whole island.
 const NEWS_CALM = [
   'BREAKING: mayor announces run for a THIRD term',
   'local cat stuck in tree again. hang on, Waffles',
@@ -668,7 +618,6 @@ const NEWS_WORRIED = [
   'hardware store now also out of ladders, rope, and nope',
   'zoo sloth finishes evacuating (started tuesday)',
   'ferris wheel adds seatbelts "for no reason. stop asking"',
-  'army practicing pointing at the sky, nodding gravely',
   'mayor unveils anti-void plan: a really big net',
   "MISSING: 14 mailboxes, 3 cars, the mayor's hat",
 ];
@@ -731,23 +680,35 @@ function showNews() {
   // downtown must never get "spelling bee ends in a 14-way tie"
   const formTier = Math.max(0, curStage - 2);
   const pctTier = devouredPct < 5 ? 0 : devouredPct < 18 ? 1 : 2;
-  const tier = Math.max(pctTier, formTier);
+  const tier = Math.min(2, Math.max(pctTier, formTier)) as 0 | 1 | 2;
   const PB = pickedWorld === 'pirate';
-  const pool = PB
-    ? [PB_CALM, PB_WORRIED, PB_PANIC][tier]
-    : [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
-  // a countdown headline only makes sense near the end — "179 SECONDS LEFT"
-  // is not a panic, it's a weather report
-  const live = (PB ? [PB_LIVE_CALM, PB_LIVE_WORRIED, PB_LIVE_PANIC]
-    : [NEWS_LIVE_CALM, NEWS_LIVE_WORRIED, NEWS_LIVE_PANIC])[tier]
-    .filter((t) => !t.includes('{S}') || matchClock <= 70);
-  // 55% of headlines are now LIVE — filled from the actual run
-  const body = newsQueue.shift()
-    ?? (live.length && Math.random() < 0.55 ? fillHeadline(pickHeadline(live)) : pickHeadline(pool));
-  const h = body;
-  const brand = PB
-    ? ['🏴‍☠️ BAY RADIO', '⚠️ BAY RADIO', '🚨 ALL HANDS'][tier]
-    : ['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier];
+  let h: string, brand: string;
+  if (PB) {
+    // PIRATE BAY RESORT runs its own newsroom: ~380 lines, a per-district pool
+    // for all seven areas, and CAPT. ROGER holding the resort's PR line all the
+    // way from "enjoy a nice cold drink" to "the resort is gone, the SPA is
+    // still bookable". The old shared templates were the "lame news".
+    const dist = island.biomeAt(voidState.x, voidState.z);
+    const lead = rivals.list.length
+      ? Math.max(...rivals.list.map((r) => r.score)) - playerScore : 0;
+    const top = rivals.list.slice().sort((a, b) => b.score - a.score)[0];
+    h = newsQueue.shift() ?? pickNews({
+      tier, district: (dist as PBDist | null), lastMeal, devouredPct,
+      form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
+      rivalName: top?.name ?? 'CHOMPZILLA', rivalLead: lead,
+    });
+    brand = PB_BRAND[tier];
+  } else {
+    const pool = [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
+    // a countdown headline only makes sense near the end — "179 SECONDS LEFT"
+    // is not a panic, it's a weather report
+    const live = [NEWS_LIVE_CALM, NEWS_LIVE_WORRIED, NEWS_LIVE_PANIC][tier]
+      .filter((t) => !t.includes('{S}') || matchClock <= 70);
+    // 55% of headlines are now LIVE — filled from the actual run
+    h = newsQueue.shift()
+      ?? (live.length && Math.random() < 0.55 ? fillHeadline(pickHeadline(live)) : pickHeadline(pool));
+    brand = ['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier];
+  }
   newsEl.innerHTML = `<i>${brand}</i>${h}`;
   newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
   newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
@@ -966,9 +927,10 @@ function capture(e: Edible, giveHunger = true) {
     bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
   } else { audio.pop(combo, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
-  // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'army')
+  // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'big')
   const qk = e.mesh.userData.qk as string | undefined;
   if (e.radius < 1) questEvent('snack');
+  if (e.radius >= 6) questEvent('big');   // landmark-class: hotels, ships, the temple, the stage
   if (qk) questEvent(qk);
   if (comboMult >= 2) questEvent('combo');
   if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); breakingNews('BREAKING: it ate a HOUSE. a WHOLE house.'); }
@@ -1220,6 +1182,7 @@ function validateWorld() {
 }
 
 function resetMatch() {
+  resetNews();   // the newsroom's anti-repeat memory is per-match
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
   for (const e of edibles) {
@@ -1235,7 +1198,6 @@ function resetMatch() {
     e.mesh.rotation.set(e.mesh.userData.homeRotX ?? 0, e.homeRotY, e.mesh.userData.homeRotZ ?? 0);
   }
   rivals.reset();
-  defense.reset();
   curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
   voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   velX = 0; velZ = 0; camDist = 50;
@@ -1721,19 +1683,54 @@ function animate() {
       const solid = (x: number, z: number) => !!island.biomeAt(x, z)
         && insideIsland3(x + m, z) && insideIsland3(x - m, z)
         && insideIsland3(x, z + m) && insideIsland3(x, z - m);
+      // WHICH WAY IS LAND? The old version assumed "away from the island
+      // centre", which is only true for a blob with water on the outside.
+      // Pirate Bay has water INSIDE it: standing on the resort's inner shore,
+      // "toward the centre" points straight across the bay, so the
+      // recover-inland nudge was shoving the player into the water and the
+      // wall normal was backwards. Search for the actual nearest land instead
+      // — correct for the outer coast, the bay, and anything added later.
+      // The reach has to cover the widest stretch of water on the map — the bay
+      // is ~190 units across, so a step tied to the void's own size ran out of
+      // rings for a small void dropped in the middle. Fixed 4-unit rings out to
+      // 260 units instead. Two passes: prefer somewhere the whole body fits,
+      // and fall back to bare land for a void too big for any shoreline.
+      const dirScan = (x: number, z: number, test: (px: number, pz: number) => boolean): [number, number] | null => {
+        for (let ring = 1; ring <= 65; ring++) {
+          const rr = ring * 4;
+          for (let a2 = 0; a2 < 16; a2++) {
+            const ang = (a2 / 16) * Math.PI * 2 + ring * 0.19;   // stagger so rings don't resample the same spokes
+            if (test(x + Math.cos(ang) * rr, z + Math.sin(ang) * rr)) return [Math.cos(ang), Math.sin(ang)];
+          }
+        }
+        return null;
+      };
+      const landDir = (x: number, z: number): [number, number] | null =>
+        dirScan(x, z, solid) ?? dirScan(x, z, (px, pz) => !!island.biomeAt(px, pz));
       if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
       else {
-        // outward normal ≈ away from the island centre (the coast is a blob)
-        const len = Math.hypot(voidState.x, voidState.z) || 1;
-        const ox = voidState.x / len, oz = voidState.z / len;
-        const out = velX * ox + velZ * oz;
-        if (out > 0) { velX -= out * ox; velZ -= out * oz; }   // cancel ONLY the into-the-wall part
-        const tx = voidState.x + velX * dt, tz = voidState.z + velZ * dt;
-        if (solid(tx, tz)) { voidState.x = tx; voidState.z = tz; }   // slide along the shore
-        else { velX *= 0.86; velZ *= 0.86; }                          // ease, never snap
-        // grew past the shoreline (or spawned tight): drift gently inland
-        if (!solid(voidState.x, voidState.z)) {
-          voidState.x -= ox * dt * 26; voidState.z -= oz * dt * 26;
+        const ld = landDir(voidState.x, voidState.z);
+        if (ld) {
+          const ox = -ld[0], oz = -ld[1];                        // outward = away from land
+          const out = velX * ox + velZ * oz;
+          if (out > 0) { velX -= out * ox; velZ -= out * oz; }   // cancel ONLY the into-the-wall part
+          const tx = voidState.x + velX * dt, tz = voidState.z + velZ * dt;
+          if (solid(tx, tz)) { voidState.x = tx; voidState.z = tz; }   // slide along the shore
+          else { velX *= 0.86; velZ *= 0.86; }                          // ease, never snap
+          // off the land entirely (grew past the shore, or nudged in): swim
+          // back toward the REAL nearest land, fast enough that it never reads
+          // as being stuck
+          if (!solid(voidState.x, voidState.z)) {
+            // OFF THE LAND ENTIRELY. Swimming back has to be authoritative, not
+            // a nudge: a big void's steering (or the attract-mode autopilot)
+            // runs at up to 58 u/s and simply out-pushed the old 55 u/s drift,
+            // which is how a WORLD ENDER could sit in the middle of the bay
+            // indefinitely. Overwrite the velocity outright.
+            velX = ld[0] * 62; velZ = ld[1] * 62;
+            voidState.x += velX * dt; voidState.z += velZ * dt;
+          }
+        } else {
+          velX *= 0.86; velZ *= 0.86;   // nothing found anywhere (never in practice)
         }
       }
     }
@@ -1913,8 +1910,6 @@ function animate() {
     }
     audio.evolve();
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
-    const wave = defense.setPhase(curStage);   // the city escalates with your form
-    if (wave) { announce(wave); audio.alert(); breakingNews('army arrives, immediately forms a snack line'); }
     audio.setMusicStage(curStage);             // the soundtrack escalates too
     buzz(45);
   }
@@ -1925,13 +1920,11 @@ function animate() {
   // combo decays when you stop eating
   comboT -= dt; if (comboT <= 0) combo = 0;
 
-  // the city fights back — apply hits taken / units devoured
-  if (started) {
-    const defDelta = defense.update(dt, voidState.x, voidState.z, R);
-    // a void CANNOT take damage — army fire is fireworks, not a threat.
-    // Only positive deltas (devouring the units themselves) reach the score.
-    if (defDelta > 0) { questEvent('army'); playerScore += defDelta; }
-  }
+  // NO DEFENCE LAYER. Police cars, army jeeps, tanks and gunships used to
+  // escalate with the player's form. A void cannot be hurt, so they were free
+  // points with a siren attached — noise that made the world feel less like a
+  // holiday and generated the worst headline in the game ("army forms a snack
+  // line"). Removed outright rather than re-themed.
 
   // throttle DOM leaderboard updates (~5/s)
   // power-ready toast: celebrate the moment a power charges up

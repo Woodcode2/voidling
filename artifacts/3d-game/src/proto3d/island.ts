@@ -1286,7 +1286,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // possible opening. Start at the Bazaar's south edge instead: stalls and a
   // crowd within a few seconds, the promenade and the jungle both close.
   const spawn = WORLD_ID === 'pirate'
-    ? { x: w(5400), z: w(5200) }
+    ? { x: w(6950), z: w(10560) }          // DANCE COVE, just off the main stage
     : { x: w(ROAD_CENTERS[0]), z: w(ROAD_CENTERS[2]) };
 
   return {
@@ -1532,9 +1532,9 @@ function makeTower(tall = false): THREE.Group {
 // with its own materials (a hydrant alone was 8 draw calls; downtown measured
 // ~2250 calls/frame). Each factory now bakes its parts into ONE geometry with
 // per-vertex colors, and every prop on the island shares ONE material.
-const PROP_SHARED_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
+export const PROP_SHARED_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
 const _pc = new THREE.Color();
-function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
+export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo;
   if (g !== geo) geo.dispose();
   g.scale(sx, sy ?? sx, sz ?? sx);
@@ -1549,7 +1549,7 @@ function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   return g;
 }
-function mergedProp(parts: THREE.BufferGeometry[]): THREE.Mesh {
+export function mergedProp(parts: THREE.BufferGeometry[]): THREE.Mesh {
   const merged = mergeGeometries(parts, false)!;
   parts.forEach((pg) => pg.dispose());
   return new THREE.Mesh(merged, PROP_SHARED_MAT);

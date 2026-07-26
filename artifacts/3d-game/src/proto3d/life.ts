@@ -24,41 +24,134 @@ const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mes
 export type Say = (pos: THREE.Vector3, text: string, kind: 'ambient' | 'panic' | 'event') => void;
 
 // ── biome dialogue (from the 2D AMBIENT_BY_BIOME / PANIC_BY_BIOME pools) ─────────
+// These are the FALLBACK pools — "what someone standing HERE would say". Who a
+// speaker actually IS overrides them (see VOICE_AMBIENT below): a rich guest
+// complains the same way on the beach as at the spa.
 const AMBIENT: Record<string, string[]> = {
-  // ── PIRATE BAY: holidaymakers, dock hands, dancers and market traders
-  port: ['mind the gangplank!', 'she sails at sunset', 'that crate is DEFINITELY rum', 'seagull stole my lunch AGAIN', 'tide\'s coming in, matey', 'who parked a galleon here', 'cargo says "fragile". it is not', 'salt in my boots. always.'],
-  resort: ['two more days of THIS', 'the swim-up bar is unreal', 'sunscreen? never heard of her', 'my lounger. MY lounger.', 'is that a free smoothie??', 'towel on the chair = MINE', 'I could live here honestly', 'spa at four, snacks at five'],
-  party: ['THIS SONG!! THIS ONE!!', 'my hips have opinions', 'conga line in 5!!', 'DJ said one more hour!!', 'I am dancing. do not stop me.', 'is the floor supposed to glow', 'someone hydrate me', 'best. holiday. EVER.'],
-  market: ['fresh mango! FRESH MANGO!', 'that parrot insulted me', 'half price! for you: full price', 'genuine treasure! probably!', 'I bought a hat. no regrets.', 'three coconuts for a doubloon', 'my stall, my rules', 'the fruit here is UNREAL'],
-  jungle: ['I heard a monkey. I think.', 'this trail is very... trail', 'bug spray was a good call', 'is that a waterfall??', 'left at the big rock, right?', 'nature! so much of it!', 'something just moved', 'my phone has no bars. bliss.'],
-  cove: ['there\'s treasure here. FACT.', 'that wreck is CENTURIES old', 'a crab took my sandal', 'X marks... somewhere', 'rock pools! so many crabs!', 'I found a doubloon! (a bottlecap)', 'the tide sounds so nice', 'shipwreck selfie time'],
+  // ── PIRATE BAY: a five-star resort cosplaying a pirate hideout
+  port: ['mind the gangplank, sir', 'the tender leaves at six', 'that crate is DEFINITELY rum', 'a seagull took my croissant', 'tide\'s coming in, matey', 'who moored a superyacht THERE', 'says fragile. it is not.', 'salt in me boots. always.', 'thirty bags. for one guest.', 'the harbourmaster is napping', 'polish the brass. again.', 'that ship is a photo prop', 'lobster delivery, coming through', 'this jetty needs a new plank'],
+  resort: ['two more weeks of THIS', 'the swim-up bar is unreal', 'my cabana has a doorbell', 'MY lounger. the towel says so.', 'is the smoothie included?', 'they fold towels into swans', 'I could live here, honestly', 'spa at four, snacks at five', 'the infinity pool goes FOREVER', 'gold flakes. on the ice cream.', 'they have a pillow menu', 'someone is playing harp. outside.', 'my sunburn has a sunburn', 'this robe is coming home with me'],
+  party: ['THIS SONG!! THIS ONE!!', 'DJ COCONUT!! COCONUT!!', 'my hips have opinions', 'conga line in 5!!', 'is the floor supposed to glow', 'someone hydrate me', 'best. holiday. EVER.', 'I am dancing. do not stop me.', 'the bass is in my SMOOTHIE', 'FREE GLOW STICKS!!', 'my flip-flop flew off. worth it.', 'limbo record: still me', 'they hired a whole steel band', 'one more song. one more. ONE.'],
+  market: ['fresh mango! FRESH MANGO!', 'that parrot insulted me', 'half price! for you: full price', 'genuine treasure! probably!', 'I bought a hat. no regrets.', 'three coconuts for a doubloon', 'my stall, my rules', 'the fruit here is UNREAL', 'hand-carved. by a machine.', 'a real pirate map. laminated.', 'haggle? I LOVE to haggle.', 'that is a very expensive shell', 'spices! smell them! SMELL THEM', 'authentic. mostly. sort of.'],
+  jungle: ['I heard a monkey. I think.', 'the guided walk is at ten', 'bug spray was a good call', 'is that a waterfall??', 'left at the big rock, right?', 'nature! so much of it!', 'something just moved', 'no bars out here. bliss.', 'the zipline goes over THAT?', 'they built a spa in a tree', 'my sandals were a mistake', 'a butterfly landed on me!!'],
+  cove: ['there\'s treasure here. FACT.', 'that wreck is CENTURIES old', 'a crab took my sandal', 'X marks... somewhere', 'rock pools! so many crabs!', 'I found a doubloon! (a bottlecap)', 'the tide sounds so nice', 'shipwreck selfie time', 'smugglers! right here! probably!', 'my detector beeped. it lied.', 'that cave goes back FOREVER', 'kayaks at eleven, treasure at noon'],
   cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
   fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how gauche', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
   downtown: ['need. more. coffee.', 'this commute is BRUTAL', 'meeting ran LONG', "elevator's down AGAIN", 'lunch is a spreadsheet today', 'hustle never sleeps', "circle back? I'll circle back", 'my inbox says 4,000', 'sell! no wait— buy!', 'is it friday yet'],
   park: ['lovely day for it', 'the ducks are rowdy', "picnic o'clock!", 'kite weather!!', 'ice cream truck?! where!', 'the gazebo band plays at noon', '10k steps, easy', 'frisbee!', 'that squirrel took my chips', 'best bench. tell no one'],
   forest: ['so peaceful out here', 'found the COOLEST rock', "s'mores tonight!", 'trail mix is 90% chocolate', 'shhh… deer!', 'fresh piney air', 'my boots are soaked', 'that birdsong? me. thanks.', 'one with nature right now', 'is moss edible? asking.'],
-  beach: ['sunscreen me. NOW.', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', "don't feed the seagulls!!", 'SPF one MILLION', 'crab looked at me funny', 'ice cream, swim, ice cream', 'nap. then more nap.', 'dude, the ocean is SO wet'],
+  beach: ['sunscreen me. NOW.', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', "don't feed the seagulls!!", 'SPF one MILLION', 'crab looked at me funny', 'ice cream, swim, ice cream', 'nap. then more nap.', 'dude, the ocean is SO wet', 'they RAKE this beach at dawn', 'a man brings you cold flannels', 'sunset is at 6:42. sharp.', 'this sand is imported. really.'],
   plaza: ['meet me by the fountain', 'taco truck line is LONG', 'market day is the best day', "the mayor's speaking today!", 'live music by the fountain!', 'street food time', 'fountain coin = one wish', 'free samples!! FREE SAMPLES', 'pigeons own this plaza', 'is there a rally?'],
   zoo: ['the elephant waved at me!!', 'do NOT tap the glass', 'look, flamingos!', 'gift shop. NOW.', 'feeding time!!', 'popcorn! 🍿', 'the lions look hungry', 'penguins: tiny tuxedo guys', 'that monkey has my hat', 'sloth update: still asleep'],
 };
 const PANIC: Record<string, string[]> = {
-  port: ['ABANDON DOCK!!', 'save the RUM!!', 'not my CARGO!!', 'to the boats!! ALL of them!!', 'it ate the pier!!'],
-  resort: ['MY LOUNGER!!', 'not the swim-up bar!!', 'my HOLIDAY!!', 'I paid for ALL-INCLUSIVE!!', 'grab the sunscreen and RUN!!'],
-  party: ['THE MUSIC STOPPED!!', 'not the DANCE FLOOR!!', 'conga line — THIS WAY!!', 'DJ RUN!! DJ RUUUN!!', 'it ate the speakers!!'],
-  market: ['MY MANGOES!!', 'the parrot saw everything!!', 'closing early!! VERY early!!', 'not my STALL!!', 'take the coconuts!!'],
-  jungle: ['INTO THE TREES!!', 'that is NOT a monkey!!', 'follow the trail!! ANY trail!!', 'it ate the waterfall!!'],
-  cove: ['it took the TREASURE!!', 'crabs, scatter!!', 'not the shipwreck!!', 'to the rock pools!!'],
+  port: ['ABANDON DOCK!!', 'save the RUM!!', 'not my CARGO!!', 'to the boats!! ALL of them!!', 'it ate the pier!!', 'the superyacht!! START IT!!', 'lower the fancy lifeboat!!'],
+  resort: ['MY LOUNGER!!', 'not the swim-up bar!!', 'my HOLIDAY!!', 'I paid for ALL-INCLUSIVE!!', 'grab the sunscreen and RUN!!', 'it ate the infinity pool!!', 'not the TOWEL SWANS!!'],
+  party: ['THE MUSIC STOPPED!!', 'not the DANCE FLOOR!!', 'conga line — THIS WAY!!', 'DJ RUN!! DJ RUUUN!!', 'it ate the speakers!!', 'save the glow sticks!!', 'last dance!! literally!!'],
+  market: ['MY MANGOES!!', 'the parrot saw everything!!', 'closing early!! VERY early!!', 'not my STALL!!', 'take the coconuts!!', 'everything must go!! WE must go!!'],
+  jungle: ['INTO THE TREES!!', 'that is NOT a monkey!!', 'follow the trail!! ANY trail!!', 'it ate the waterfall!!', 'the tree spa is GONE!!', 'zipline!! EVERYONE!!'],
+  cove: ['it took the TREASURE!!', 'crabs, scatter!!', 'not the shipwreck!!', 'to the rock pools!!', 'X marked THIS. my mistake.', 'grab the shovel and GO!!'],
   cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the HOA form!!'],
   fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
   downtown: ['MY STARTUP!!', "the WIFI'S DOWN!!", 'not my oat-milk latte!!', 'OUT OF OFFICE. FOREVER.', 'meeting cancelled, RUN!!', 'this is NOT on my calendar'],
   park: ['not the PICNIC!!', 'the DUCKS!! SAVE THE DUCKS', 'grab the frisbee, RUN!!', 'abandon the sandwiches!!', 'the gazebo!! NOO!!', 'jog!! FOR REAL this time!!'],
   forest: ['BEAR?! no— WORSE!!', 'ABANDON TRAIL!!', "save the s'mores!!", 'the trees are LEAVING!!', 'hug a tree GOODBYE!!', 'nature says RUN!!'],
-  beach: ['SAVE THE COOLER!!', 'my SANDCASTLE!!', 'not the towels!!', 'gnarly!! BAD gnarly!!', 'paddle, dude, PADDLE!!', 'even the crabs left!!'],
+  beach: ['SAVE THE COOLER!!', 'my SANDCASTLE!!', 'not the towels!!', 'gnarly!! BAD gnarly!!', 'paddle, dude, PADDLE!!', 'even the crabs left!!', 'it ate the raked bit!!'],
   plaza: ['EVERYONE RUN!!', "it's REAL!!", 'save the taco truck!!', 'the fountain!! NOOO!!', 'my churros!!', "this wasn't on the flyer!!"],
   zoo: ['WHO OPENED THE PENS?!', 'the lions are LOOSE!!', 'the flamingos flew AWAY!!', 'even the sloth is running!!', 'save the gift shop!!', "WE'RE the feeding time!!"],
   generic: ['AAAAH!!', 'RUN FOR IT!!', "it's HUNGRY!!", 'tell my cat I love her!!', 'nope nope NOPE!!', 'why is it SMILING?!'],
 };
 const biomeKey = (b: Biome): string => (b === 'military' || b === 'airport') ? 'downtown' : b;
+
+// ══ WHO IS TALKING ═══════════════════════════════════════════════════════════
+// A line should sound like the PERSON, not the postcode. Every Pirate Bay NPC
+// carries a voice key; these pools beat the per-biome fallback above. Register:
+// silly, warm, no menace. Kept short — a phone speech bubble truncates fast.
+const VOICE_AMBIENT: Record<string, string[]> = {
+  // out-of-touch guests: everything is a service failure, nothing is their fault
+  rich: [
+    'this is NOT the good champagne', 'my yacht is double-parked', 'I asked for a SEA view.',
+    'the concierge knows my name', 'my chef flew in this morning', 'is this... TAP water?',
+    'the other guests are so LOUD', 'we know the owner, obviously', 'my sunbed has a butler',
+    'I never queue. ever.', 'this robe is not silk. feel it.', 'darling, fetch the smaller boat',
+    'we summered here in the 90s', 'my daughter has a jet ski guy', 'this sand is very... public',
+    'send it to the room. any room.', 'I tipped someone. once.', 'the sunset is running late',
+    'nobody warned me about weather', 'that pool has PEOPLE in it', 'my suitcase has its own suite',
+    'I only eat food I can pronounce',
+  ],
+  // kids: the only guests actually enjoying themselves
+  kid: [
+    'MUM! MUM! a purple hole!!', 'can we keep it?? can we??', 'I named it Gary',
+    'it ate a whole PALM TREE', 'is it a pet? it looks like a pet', 'I want to feed it my chips',
+    'PHOTO! quick, do a pose!', 'it is SO round. so so round.', 'best holiday ever ever EVER',
+    'dad said no. so I asked mum.', 'it blinked! I SAW it blink!', 'can I ride it? just once?',
+    'my ice cream fell in. worth it.', 'grown ups are so boring', 'nobody believed me. NOBODY.',
+    'it likes me. I can tell.', 'shhh. it is sleeping. maybe.', 'I drew it. want to see?',
+    'do voids like mango?', 'I am not scared. YOU are.', 'it followed me home. probably.',
+  ],
+  // event managers: an apocalypse is simply an unscheduled activity
+  manager: [
+    'Coconut Hour starts at four!', 'please form an orderly conga', 'towel folding: pier two!',
+    'has anyone seen the pinata?', 'smile! you are on HOLIDAY!', 'limbo at five, sunset at six',
+    'yes, it IS mandatory fun', 'who booked the parrot? me.', 'kids club needs one more kid',
+    'GREAT energy, row three!', 'the bouncy castle is inflating', 'raffle tickets! last call!',
+    'we are BACK ON SCHEDULE', 'quiz night: no phones please', 'clap if you can hear me!!',
+    'pool games in ten! stretch!', 'lost child at the smoothie bar', 'my clipboard, my kingdom',
+    'anyone for water aerobics?', 'the schedule is a SUGGESTION', 'let us hear it for the SUN!',
+  ],
+  // staff: dry, off-the-clock energy, in-jokes about the guests
+  staff: [
+    'four hours left. four.', 'table nine wants a new sun', 'someone tipped me in buttons',
+    'I fold 400 towels a day', 'the swans are made of towels', 'guest asked to see the chef',
+    'we are out of the good ice', 'yes sir, the sea is closed', 'break in ten. maybe twenty.',
+    'room 12 ordered nine lobsters', 'that man tried to buy a wave', 'I have seen the buffet. things.',
+    'clock off, then chips', 'the parrot works harder than me', 'somebody lost a shoe. again.',
+    'I only work here in theory', 'pool boy? POOL PROFESSIONAL.', 'they complained about the moon',
+    'do not ask about the ice swan', 'new guy is hiding in the laundry', 'nine days till my day off',
+  ],
+  // pirate entertainers: committing HARD to a bit nobody asked for
+  pirate: [
+    'ARR. and also, ARR.', 'yo ho ho, and a tip jar', 'me parrot has an agent now',
+    'shiver me... lovely weather', 'avast! that be a buffet!', 'I be contractually a pirate',
+    'walk the plank! it is 30cm.', 'arrr you having a nice day', 'me hearties! and me hearty!',
+    'this be me pirate voice. hi.', 'treasure map: also a menu', 'polly wants a sun lounger',
+    'sixteen men on a paddleboat', 'me eyepatch be fashion, savvy', 'yarrr. is that the time?',
+    'the sea? never been. seasick.', 'photos with the captain: free!', 'me hook is a spoon, honestly',
+    'a pirate life, but with wifi', 'arr, mind the wet floor sign', 'me treasure be dental work',
+  ],
+};
+const VOICE_PANIC: Record<string, string[]> = {
+  rich: [
+    'I am NOT insured for this!!', 'GET ME THE MANAGER!!', 'my LUGGAGE!! all nine bags!!',
+    'this is a ONE STAR holiday!!', 'to the yacht!! the BIG yacht!!', 'refund AND an apology!!',
+    'nobody said VOID at check-in!!', 'save the champagne!! ALL of it!', 'my robe!! my lovely robe!!',
+    'call my people!! ALL my people!', 'I want to speak to the ISLAND!!',
+  ],
+  kid: [
+    'RUN!! this is the BEST BIT!!', 'it wants to play TAG!!', 'WHEEEEE!!',
+    'wait for me!! WAIT!!', 'again!! do it AGAIN!!', 'mum you are SO slow!!',
+    'better than the pool!!', 'I TOLD you it was real!!', 'catch me if you can, Gary!!',
+    'five more minutes!! PLEASE!!',
+  ],
+  manager: [
+    'ORDERLY conga line! THIS WAY!', 'this is a SCHEDULED event!!', 'unscheduled! but still FUN!!',
+    'follow my flag!! MY FLAG!!', 'evacuating is a GROUP ACTIVITY', 'points for best running!!',
+    'we will refund the limbo!!', 'nobody panic! panic GENTLY!!', 'plan B! we HAVE a plan B!',
+    'to the buffet!! I mean— OUT!!', 'everybody say WEEEE!!',
+  ],
+  staff: [
+    'not my problem. LEAVING.', 'that is above my pay grade!!', 'I quit! effective IMMEDIATELY',
+    'staff exit! staff exit!!', 'grab the tips jar!!', 'kitchen is SHUT. tell them.',
+    'I am NOT cleaning that up!!', 'shift over. FOREVER.', 'the buffet is closed!! RUN!!',
+    'last one out gets the mop!!',
+  ],
+  pirate: [
+    'ABANDON BIT!! I mean SHIP!!', 'arrr!! ARRR!! actual arrr!!', 'me parrot went freelance!!',
+    'that be no seagull!!', 'to the plank!! the 30cm one!!', 'yo ho HOOOO!!',
+    'break character!! BREAK IT!!', 'save the foam treasure chest!!', 'even the parrot is running!!',
+    'arr, this be above me pay!!',
+  ],
+};
 
 interface Mover { mesh: THREE.Object3D; update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
 export interface Life { update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
@@ -117,7 +210,146 @@ const G = {
   brim: new THREE.CylinderGeometry(0.85, 0.85, 0.08, 12),
   beanie: new THREE.SphereGeometry(0.56, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5),
   pack: new THREE.BoxGeometry(0.7, 0.85, 0.35),
+  // ── HEADWEAR + PROPS. Every accessory reuses one of these shared buffers and
+  // one cached material, so a tricorn costs exactly what the old beanie cost:
+  // no per-person geometry, no per-person material, hundreds of people.
+  tri: new THREE.CylinderGeometry(1.0, 1.0, 0.09, 3),   // tricorn brim — a TRIANGLE from above, not a cone
+  crown: new THREE.SphereGeometry(0.5, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5),
+  brimWide: new THREE.CylinderGeometry(1.12, 1.12, 0.07, 12),
+  band: new THREE.CylinderGeometry(0.575, 0.575, 0.12, 12),
+  pill: new THREE.CylinderGeometry(0.42, 0.46, 0.34, 10),
+  toque: new THREE.CylinderGeometry(0.44, 0.4, 0.62, 10),
+  ring: new THREE.TorusGeometry(0.5, 0.07, 6, 12),
+  disc: new THREE.CylinderGeometry(0.42, 0.42, 0.07, 12),
+  blob: new THREE.SphereGeometry(0.12, 8, 6),
+  tube: new THREE.CylinderGeometry(0.045, 0.045, 1.0, 5),
+  glass: new THREE.ConeGeometry(0.17, 0.3, 8),
+  plate: new THREE.BoxGeometry(0.42, 0.06, 0.32),
+  robe: new THREE.BoxGeometry(1.04, 1.85, 0.66),
+  pbody: new THREE.SphereGeometry(0.17, 8, 6),
+  phead: new THREE.SphereGeometry(0.105, 8, 6),
+  ptail: new THREE.ConeGeometry(0.075, 0.34, 5),
 };
+
+const INK = 0x241f2c, WHITE = 0xf7f4ec, GOLD = 0xe6c35c;
+
+export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel'
+  | 'toque' | 'bellhop' | 'flower' | 'cap' | 'beanie';
+export type Prop = 'cocktail' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie';
+interface PersonOpts {
+  shirt?: number; pants?: number;
+  hat?: Hat | null;          // null = explicitly bare-headed (overrides the dress code)
+  hatCol?: number;
+  glasses?: boolean; eyepatch?: boolean; headphones?: boolean;
+  parrot?: boolean; lanyard?: boolean; necklace?: boolean; robe?: boolean;
+  prop?: Prop; kid?: boolean;
+}
+
+// Hats hang off a HEAD PIVOT sitting at the head centre, so a kid's oversized
+// head carries its hat correctly with a single scale on the pivot.
+function hatOn(h: THREE.Group, kind: Hat, col: number): void {
+  const m = mat(col, 0.9);
+  if (kind === 'tricorn') {
+    const felt = mat(INK, 0.85);
+    const brim = new THREE.Mesh(G.tri, felt); brim.position.y = 0.24; h.add(brim);
+    const crown = new THREE.Mesh(G.crown, felt);
+    crown.scale.set(0.92, 1.2, 0.92); crown.position.y = 0.19; h.add(crown);
+    const cock = new THREE.Mesh(G.blob, mat(GOLD, 0.35));   // gold cockade at the front point
+    cock.scale.set(1.5, 1.3, 0.8); cock.position.set(0, 0.33, 0.38); h.add(cock);
+  } else if (kind === 'bandana') {
+    const wrap = new THREE.Mesh(G.crown, m);
+    wrap.scale.set(1.06, 0.62, 1.06); wrap.position.y = 0.1; h.add(wrap);
+    const knot = new THREE.Mesh(G.blob, m);
+    knot.scale.set(1.3, 1.1, 2.4); knot.position.set(0, 0.02, -0.52); h.add(knot);
+  } else if (kind === 'captain') {
+    const white = mat(WHITE, 0.75);
+    const crown = new THREE.Mesh(G.crown, white);
+    crown.scale.set(1.08, 0.86, 1.08); crown.position.y = 0.13; h.add(crown);
+    const gband = new THREE.Mesh(G.band, mat(GOLD, 0.35)); gband.position.y = 0.11; h.add(gband);
+    const peak = new THREE.Mesh(G.hand, mat(INK, 0.6));
+    peak.scale.set(2.3, 0.3, 1.6); peak.position.set(0, 0.11, 0.56); h.add(peak);
+  } else if (kind === 'sun') {
+    const brim = new THREE.Mesh(G.brimWide, m);
+    brim.position.y = 0.26; brim.rotation.x = 0.07; h.add(brim);   // a touch floppy
+    const top = new THREE.Mesh(G.beanie, m); top.scale.y = 0.8; top.position.y = 0.19; h.add(top);
+  } else if (kind === 'visor') {
+    const bandm = new THREE.Mesh(G.band, m); bandm.position.y = 0.16; h.add(bandm);
+    const bill = new THREE.Mesh(G.hand, m);
+    bill.scale.set(2.5, 0.3, 1.9); bill.position.set(0, 0.17, 0.6); h.add(bill);
+  } else if (kind === 'snorkel') {
+    const mask = new THREE.Mesh(G.hand, mat(0x63d6f0, 0.25));
+    mask.scale.set(2.4, 1.1, 0.7); mask.position.set(0, 0.06, 0.42); h.add(mask);
+    const tube = new THREE.Mesh(G.tube, mat(0xffd23f, 0.6));
+    tube.scale.y = 0.7; tube.position.set(0.44, 0.3, 0.16); tube.rotation.z = -0.2; h.add(tube);
+  } else if (kind === 'toque') {
+    const white = mat(WHITE, 0.85);
+    const hatm = new THREE.Mesh(G.toque, white); hatm.position.y = 0.42; h.add(hatm);
+    const puff = new THREE.Mesh(G.blob, white); puff.scale.setScalar(3.2); puff.position.y = 0.76; h.add(puff);
+  } else if (kind === 'bellhop') {
+    const box = new THREE.Mesh(G.pill, m); box.position.y = 0.3; h.add(box);
+    const trim = new THREE.Mesh(G.band, mat(GOLD, 0.35));
+    trim.scale.set(0.79, 0.5, 0.79); trim.position.y = 0.16; h.add(trim);
+  } else if (kind === 'flower') {
+    const ring = new THREE.Mesh(G.ring, mat(0x4fae62, 0.9));
+    ring.rotation.x = Math.PI / 2; ring.scale.setScalar(1.08); ring.position.y = 0.14; h.add(ring);
+    for (const a of [0.4, 2.5, 4.6]) {
+      const fl = new THREE.Mesh(G.blob, mat(pick([0xff7fb0, 0xffd54f, 0xffffff]), 0.85));
+      fl.scale.setScalar(1.15); fl.position.set(Math.sin(a) * 0.52, 0.16, Math.cos(a) * 0.52); h.add(fl);
+    }
+  } else if (kind === 'cap') {
+    const top = new THREE.Mesh(G.beanie, m); top.position.y = 0.2; h.add(top);
+    const bill = new THREE.Mesh(G.hand, m);
+    bill.scale.set(2.2, 0.35, 1.6); bill.position.set(0, 0.22, 0.55); h.add(bill);
+  } else {   // beanie
+    const top = new THREE.Mesh(G.beanie, m); top.scale.y = 1.25; top.position.y = 0.13; h.add(top);
+  }
+}
+
+// held props ride the RIGHT SHOULDER pivot, so they swing with the walk cycle
+function propOn(ra: THREE.Object3D, kind: Prop): void {
+  if (kind === 'cocktail') {
+    const gl = new THREE.Mesh(G.glass, mat(0xdff6ff, 0.2));
+    gl.rotation.x = Math.PI; gl.position.set(0, -1.3, 0.16); ra.add(gl);
+    const cherry = new THREE.Mesh(G.blob, mat(0xff8a3a, 0.6));
+    cherry.scale.setScalar(0.75); cherry.position.set(0, -1.16, 0.16); ra.add(cherry);
+  } else if (kind === 'clipboard') {
+    const bd = new THREE.Mesh(G.plate, mat(0xb9793f, 0.85));
+    bd.scale.set(1.5, 1, 1.7); bd.rotation.x = -0.7; bd.position.set(0.02, -1.18, 0.3); ra.add(bd);
+    const sheet = new THREE.Mesh(G.plate, mat(WHITE, 0.9));
+    sheet.scale.set(1.25, 0.5, 1.45); sheet.rotation.x = -0.7; sheet.position.set(0.02, -1.13, 0.33); ra.add(sheet);
+  } else if (kind === 'tray') {
+    const tr = new THREE.Mesh(G.disc, mat(0xd8d2c2, 0.4));
+    tr.scale.set(1.15, 0.8, 1.15); tr.position.set(0.06, -1.08, 0.34); ra.add(tr);
+    const drink = new THREE.Mesh(G.glass, mat(0xffd54f, 0.3));
+    drink.scale.setScalar(0.7); drink.position.set(0.06, -0.96, 0.34); ra.add(drink);
+  } else if (kind === 'ball') {
+    const b = new THREE.Mesh(G.blob, mat(pick([0xff5d7e, 0x2fd8e8, 0xffd23f]), 0.7));
+    b.scale.setScalar(2.9); b.position.set(0.1, -1.24, 0.34); ra.add(b);
+  } else if (kind === 'detector') {
+    const shaft = new THREE.Mesh(G.tube, mat(0x8a8f9c, 0.5));
+    shaft.scale.y = 1.35; shaft.rotation.x = 0.5; shaft.position.set(0, -1.5, 0.34); ra.add(shaft);
+    const coil = new THREE.Mesh(G.disc, mat(0x3a3f4d, 0.6));
+    coil.scale.set(0.95, 0.6, 0.95); coil.position.set(0, -2.06, 0.66); ra.add(coil);
+  } else {   // selfie stick
+    const stick = new THREE.Mesh(G.tube, mat(0xc8cdd8, 0.4));
+    stick.scale.y = 1.5; stick.rotation.x = 0.85; stick.position.set(0, -1.42, 0.5); ra.add(stick);
+    const phone = new THREE.Mesh(G.plate, mat(INK, 0.35));
+    phone.scale.set(0.75, 1, 1.3); phone.rotation.x = 1.2; phone.position.set(0, -1.9, 1.02); ra.add(phone);
+  }
+}
+
+// a small parrot perched on the shoulder — the single most charming 4 meshes
+// on the island. Only pirate entertainers (and one lucky dock hand) get one.
+function parrotOn(g: THREE.Group, side: number): void {
+  const body = new THREE.Mesh(G.pbody, mat(0xe8342a, 0.75));
+  body.scale.set(1, 1.25, 0.9); body.position.set(side * 0.56, 2.5, -0.02); g.add(body);
+  const head = new THREE.Mesh(G.phead, mat(0xffd23f, 0.7));
+  head.position.set(side * 0.56, 2.71, 0.05); g.add(head);
+  const beak = new THREE.Mesh(G.blob, mat(0x2e2a2a, 0.5));
+  beak.scale.set(0.5, 0.5, 0.9); beak.position.set(side * 0.56, 2.68, 0.16); g.add(beak);
+  const tail = new THREE.Mesh(G.ptail, mat(0x2fd8a0, 0.8));
+  tail.rotation.x = -0.55; tail.position.set(side * 0.56, 2.34, -0.24); g.add(tail);
+}
 
 // what people WEAR is where they ARE — biome dress codes
 const OUTFIT: Record<string, { shirt: number[]; pants: number[]; hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean }> = {
@@ -138,12 +370,13 @@ const OUTFIT: Record<string, { shirt: number[]; pants: number[]; hat?: 'sun' | '
   plaza: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xffffff, 0x9a6ae8], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a] },
 };
 
-function makePerson(biome?: string, colOverride?: number): THREE.Group {
-  // little character with real limbs + a walk cycle — dressed for their biome
+function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE.Group {
+  // little character with real limbs + a walk cycle — dressed for their biome,
+  // then accessorised by ROLE (hat, shades, parrot, something in their hand)
   const g = new THREE.Group();
   const fit = OUTFIT[biome ?? 'cozy'] ?? OUTFIT.cozy;
-  const shirt = mat(colOverride ?? pick(fit.shirt));
-  const pants = mat(pick(fit.pants), 0.9);
+  const shirt = mat(o?.shirt ?? colOverride ?? pick(fit.shirt));
+  const pants = mat(o?.pants ?? pick(fit.pants), 0.9);
   const skin = mat(pick(PROPS.skin), 0.75);
   const hair = mat(pick([0x2a2024, 0x6a4a2a, 0xd8b46a, 0x8a3a2a, 0x4a4a52, 0xe8e2d8]), 0.9);
   // legs (pivot at hip so they swing)
@@ -166,31 +399,155 @@ function makePerson(biome?: string, colOverride?: number): THREE.Group {
     g.add(sh); return sh;
   };
   const la = mkArm(-0.62), ra = mkArm(0.62);
-  // head + hair cap
-  const head = new THREE.Mesh(G.head, skin);
-  head.position.y = 2.9; g.add(head);
-  const cap = new THREE.Mesh(G.cap, hair);
-  cap.position.y = 2.98; g.add(cap);
-  // biome accessories: sun hats at the beach, caps in the park, beanies + packs on the trail
-  if (fit.hat && Math.random() < (fit.hatOdds ?? 0.4)) {
-    const hatCol = mat(pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]), 0.9);
-    if (fit.hat === 'sun') {
-      const brim = new THREE.Mesh(G.brim, hatCol); brim.position.y = 3.18; g.add(brim);
-      const top = new THREE.Mesh(G.beanie, hatCol); top.position.y = 3.1; g.add(top);
-    } else if (fit.hat === 'cap') {
-      const top = new THREE.Mesh(G.beanie, hatCol); top.position.y = 3.12; g.add(top);
-      const bill = new THREE.Mesh(G.hand, hatCol); bill.scale.set(2.2, 0.35, 1.6); bill.position.set(0, 3.14, 0.55); g.add(bill);
-    } else {
-      const top = new THREE.Mesh(G.beanie, hatCol); top.scale.y = 1.25; top.position.y = 3.05; g.add(top);
+  // HEAD PIVOT: head, hair and every hat/face accessory live in here with their
+  // origin at the head centre, so making a kid's head 30% bigger is one scale.
+  const hd = new THREE.Group();
+  hd.position.y = 2.9; g.add(hd);
+  const head = new THREE.Mesh(G.head, skin); hd.add(head);
+  const cap = new THREE.Mesh(G.cap, hair); cap.position.y = 0.08; hd.add(cap);
+  // headwear: an explicit role hat wins, otherwise the biome dress code rolls
+  const hk: Hat | null = (o && o.hat !== undefined) ? o.hat
+    : (fit.hat && Math.random() < (fit.hatOdds ?? 0.4) ? fit.hat : null);
+  if (hk) hatOn(hd, hk, o?.hatCol ?? pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]));
+  if (o?.glasses) {
+    const gl = new THREE.Mesh(G.hand, mat(INK, 0.2));
+    gl.scale.set(2.35, 0.42, 0.5); gl.position.set(0, 0.08, 0.45); hd.add(gl);
+  }
+  if (o?.eyepatch) {
+    const ep = new THREE.Mesh(G.hand, mat(0x1a1620, 0.5));
+    ep.scale.set(0.95, 0.85, 0.34); ep.position.set(-0.18, 0.11, 0.45); hd.add(ep);
+  }
+  if (o?.headphones) {
+    const arc = new THREE.Mesh(G.ring, mat(INK, 0.4));
+    arc.scale.set(1.16, 1.16, 1); arc.position.y = 0.05; hd.add(arc);
+    for (const sx of [-1, 1]) {
+      const cup = new THREE.Mesh(G.blob, mat(pick([0xff2fa0, 0x2fd8e8, 0xffd23f]), 0.5));
+      cup.scale.set(1.1, 1.6, 1.4); cup.position.set(sx * 0.55, 0.02, 0); hd.add(cup);
     }
   }
+  if (o && o.robe) {   // spa bathrobe over the top — the resort's poshest silhouette
+    const rb = new THREE.Mesh(G.robe, mat(o.shirt ?? WHITE, 0.95));
+    rb.position.y = 1.62; g.add(rb);
+  }
+  if (o?.necklace) {
+    const nk = new THREE.Mesh(G.ring, mat(GOLD, 0.3));
+    nk.rotation.x = Math.PI / 2; nk.scale.setScalar(0.62); nk.position.y = 2.36; g.add(nk);
+  }
+  if (o?.lanyard) {
+    const strap = new THREE.Mesh(G.plate, mat(0x2fb8a8, 0.9));
+    strap.scale.set(0.16, 5.5, 0.28); strap.position.set(0, 2.0, 0.3); g.add(strap);
+    const badge = new THREE.Mesh(G.plate, mat(WHITE, 0.6));
+    badge.scale.set(0.62, 1, 0.9); badge.rotation.x = Math.PI / 2; badge.position.set(0, 1.72, 0.31); g.add(badge);
+  }
+  if (o && o.parrot) parrotOn(g, Math.random() < 0.5 ? -1 : 1);
+  if (o && o.prop) propOn(ra, o.prop);
   if (fit.pack && Math.random() < 0.7) {
     const pk = new THREE.Mesh(G.pack, mat(pick([0xc4693a, 0x4a7a9a, 0x8a5cb8]), 0.9));
     pk.position.set(0, 1.85, -0.48); g.add(pk);
   }
+  // KIDS: shorter, rounder, bigger head — readable at a glance from the play camera
+  if (o?.kid) { hd.scale.setScalar(1.3); g.scale.setScalar(0.62); }
   g.userData.limbs = { la, ra, ll, rl, phase: Math.random() * 6 } as Limbs;
   return g;
 }
+
+// ══ THE CAST ═════════════════════════════════════════════════════════════════
+// Distinct silhouettes with matching uniform colours per role, so you can read
+// "waiter", "kid", "event manager" from the top-down camera without a label.
+export type Role = 'guest' | 'rich' | 'robe' | 'kid' | 'waiter' | 'bellhop' | 'lifeguard'
+  | 'spa' | 'dock' | 'grounds' | 'chef' | 'manager' | 'pirate' | 'dj' | 'diver' | 'digger';
+
+const KID_SHIRT = [0xff4f9a, 0x35d6f0, 0xffd23f, 0x7ef05a, 0xff8a3a, 0xb875ff];
+const KID_PANTS = [0x2f6fe0, 0xff5470, 0x2ab8d8, 0x66de93, 0xffb347];
+
+function makeCast(role: Role, dress: string): THREE.Group {
+  switch (role) {
+    case 'kid':
+      return makePerson(dress, undefined, {
+        kid: true, shirt: pick(KID_SHIRT), pants: pick(KID_PANTS),
+        hat: Math.random() < 0.45 ? pick(['cap', 'sun', 'bandana', 'snorkel'] as Hat[]) : null,
+        hatCol: pick([0xff4f9a, 0x35d6f0, 0xffd23f, 0xffffff]),
+        prop: Math.random() < 0.3 ? pick(['ball', 'cocktail'] as Prop[]) : undefined,
+      });
+    case 'rich':
+      return makePerson(dress, undefined, {
+        shirt: pick([WHITE, 0xf6e9c8, 0xffd0e0, 0xcfe6ff, 0xf0e6d2]),
+        pants: pick([WHITE, 0xe8ddc4, 0x2a3a5a, 0xf6e3b8]),
+        hat: Math.random() < 0.62 ? 'sun' : null, hatCol: pick([0xf6e3b8, WHITE, 0xffe0ec]),
+        glasses: Math.random() < 0.85, necklace: Math.random() < 0.55,
+        prop: Math.random() < 0.55 ? pick(['cocktail', 'selfie'] as Prop[]) : undefined,
+      });
+    case 'robe':   // straight out of the spa, and not changing for anybody
+      return makePerson(dress, undefined, {
+        shirt: WHITE, pants: WHITE, robe: true, hat: Math.random() < 0.4 ? 'flower' : null,
+        glasses: Math.random() < 0.6, necklace: Math.random() < 0.4,
+        prop: Math.random() < 0.5 ? 'cocktail' : undefined,
+      });
+    case 'waiter':
+      return makePerson(dress, undefined, {
+        shirt: WHITE, pants: 0x2a2a34, hat: null, prop: 'tray', lanyard: Math.random() < 0.4,
+      });
+    case 'bellhop':
+      return makePerson(dress, undefined, {
+        shirt: 0xb03a4a, pants: 0x2a2a34, hat: 'bellhop', hatCol: 0xb03a4a,
+      });
+    case 'lifeguard':
+      return makePerson(dress, undefined, {
+        shirt: 0xe8342a, pants: 0xe8342a, hat: 'visor', hatCol: 0xe8342a,
+        glasses: true, prop: Math.random() < 0.4 ? 'ball' : undefined,
+      });
+    case 'spa':
+      return makePerson(dress, undefined, {
+        shirt: WHITE, pants: 0xe8f2ee, hat: Math.random() < 0.5 ? 'flower' : null,
+      });
+    case 'dock':
+      return makePerson(dress, undefined, {
+        shirt: pick([0x2e5a7a, 0x4d9de8, 0xf0e6d2]), pants: 0x5a4a3a,
+        hat: pick(['bandana', 'cap', 'captain'] as Hat[]), hatCol: pick([0xe8604d, 0x2e5a7a, WHITE]),
+        parrot: Math.random() < 0.12,
+      });
+    case 'grounds':
+      return makePerson(dress, undefined, {
+        shirt: 0x4a7a4a, pants: 0x5a5a3a, hat: 'sun', hatCol: 0xc8b088,
+        prop: Math.random() < 0.4 ? 'clipboard' : undefined,
+      });
+    case 'chef':
+      return makePerson(dress, undefined, { shirt: WHITE, pants: 0xd8d4cc, hat: 'toque', prop: 'tray' });
+    case 'manager':   // blazer, lanyard, headset, clipboard — the user asked by name
+      return makePerson(dress, undefined, {
+        shirt: pick([0x2a3a6a, 0x1f2a4a, 0x3a4a7a]), pants: 0x24242e,
+        hat: null, headphones: true, lanyard: true, prop: 'clipboard',
+      });
+    case 'pirate':   // costumed staff committing hard to the bit
+      return makePerson(dress, undefined, {
+        shirt: pick([0x8a2a3a, 0x2a4a6a, 0x6a3a7a, 0x2e2a3a]), pants: pick([0x3a2a24, 0x24202c]),
+        hat: Math.random() < 0.62 ? 'tricorn' : 'bandana', hatCol: pick([0xd83a3a, 0x2a2a34, 0x8a2a3a]),
+        eyepatch: Math.random() < 0.55, parrot: Math.random() < 0.45,
+      });
+    case 'dj':
+      return makePerson(dress, undefined, {
+        shirt: pick([0xff2fa0, 0x7bffe8, 0xb875ff]), hat: null,
+        headphones: true, glasses: true,
+      });
+    case 'diver':
+      return makePerson(dress, undefined, { hat: 'snorkel', shirt: pick([0x2fd8e8, 0xffd23f]) });
+    case 'digger':   // treasure hunter, sweeping the cove for bottlecaps
+      return makePerson(dress, undefined, {
+        hat: pick(['sun', 'bandana', 'cap'] as Hat[]), prop: 'detector',
+      });
+    default:         // generic holidaymaker in whatever the district wears
+      return makePerson(dress, undefined, {
+        glasses: Math.random() < 0.35,
+        prop: Math.random() < 0.22 ? pick(['cocktail', 'selfie', 'ball'] as Prop[]) : undefined,
+      });
+  }
+}
+// which pool a role SPEAKS from (undefined = fall back to the biome pool)
+const VOICE_OF: Partial<Record<Role, string>> = {
+  rich: 'rich', robe: 'rich', kid: 'kid', manager: 'manager', pirate: 'pirate',
+  waiter: 'staff', bellhop: 'staff', lifeguard: 'staff', spa: 'staff',
+  dock: 'staff', grounds: 'staff', chef: 'staff', dj: 'staff',
+};
 let animalN = 0;
 function makeBuggy(): THREE.Group {
   // the only traffic at a beach resort: a cream shuttle buggy with a striped
@@ -378,7 +735,7 @@ export function createLife(
 ): Life {
   const movers: Mover[] = [];
   movers.push({ mesh: new THREE.Object3D(), update(dt) { pingClock += dt; } });   // shared clock for panic contagion
-  const peds: { mesh: THREE.Object3D; biome: string; panic: number }[] = [];
+  const peds: { mesh: THREE.Object3D; biome: string; panic: number; voice?: string }[] = [];
 
   // ── cars: grid-locked lanes with real arc turns ──────────────────────────
   // The car model's nose points +X, so heading comes from the velocity vector:
@@ -603,7 +960,7 @@ export function createLife(
   const panicPings: { x: number; z: number; t: number }[] = [];
   let pingClock = 0;
   const tmp = new THREE.Vector3();
-  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[]) {
+  function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string) {
     if (!biomeAt(hx, hz)) return;   // don't spawn anyone off the coastline
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
@@ -611,7 +968,7 @@ export function createLife(
     const cs = contactShadow(radius * 0.55);   // grounded on every quality tier
     mesh.add(cs);
     mesh.position.set(hx, 0, hz); setShadow(mesh); scene.add(mesh); addEdible(mesh, radius);
-    const rec = { mesh, biome, panic: 0 };
+    const rec = { mesh, biome, panic: 0, voice };
     peds.push(rec);
     movers.push({
       mesh,
@@ -632,7 +989,8 @@ export function createLife(
             panicPings.push({ x: mesh.position.x, z: mesh.position.z, t: pingClock });
             if (panicPings.length > 24) panicPings.shift();
             if (Math.random() < 0.5) {
-              const pool = panicLines || PANIC[biome] || PANIC.generic;
+              // a pirate entertainer panics like a pirate wherever they stand
+              const pool = panicLines || (voice ? VOICE_PANIC[voice] : null) || PANIC[biome] || PANIC.generic;
               tmp.set(mesh.position.x, 5, mesh.position.z);
               say(tmp, pick(pool), 'panic');
             }
@@ -668,11 +1026,30 @@ export function createLife(
         else if (hop > 0) hop = 0;   // pinned: stop the panic bounce so nothing vibrates in place
         mesh.rotation.y = -ang + Math.PI / 2;
         if (hop > 0) { hop -= dt; mesh.position.y = Math.abs(Math.sin(hop * 12)) * 0.8; } else mesh.position.y = 0;
-        cs.position.y = 0.045 - mesh.position.y;   // the blob stays ON the ground while its owner hops
         // walk cycle: arms + legs swing with travel speed
         const limbs = mesh.userData.limbs;
-        const dnc = mesh.userData.dancer as { t: number; spin: number } | undefined;
-        if (dnc && hop <= 0) {
+        const dnc = mesh.userData.dancer as { t: number; spin: number; mode?: number } | undefined;
+        if (dnc && dnc.mode === 1 && hop <= 0) {
+          // ── EVENT MANAGER: rooted to the spot, one arm sweeping the crowd
+          // toward whatever is scheduled next. Same userData slot as the
+          // dancer, so this costs zero extra per-frame lookups.
+          dnc.t += dt;
+          if (limbs) {
+            const s = Math.sin(dnc.t * 2.4);
+            limbs.ra.rotation.z = -2.25 + s * 0.4; limbs.ra.rotation.x = 0.2;
+            limbs.la.rotation.x = s * 0.2; limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+          }
+        } else if (dnc && dnc.mode === 2 && hop <= 0) {
+          // ── KIDS: they do not walk anywhere, they SKIP
+          dnc.t += dt;
+          const b = dnc.t * 9;
+          mesh.position.y = Math.abs(Math.sin(b)) * 0.24;
+          if (limbs) {
+            const sw = Math.sin(b) * 0.85;
+            limbs.ll.rotation.x = sw; limbs.rl.rotation.x = -sw;
+            limbs.la.rotation.x = -sw; limbs.ra.rotation.x = sw;
+          }
+        } else if (dnc && hop <= 0) {
           // ── DANCING: everyone on the floor is on the SAME beat (a shared
           // clock), arms up, hips swinging, bobbing on the downbeat. Offset
           // per dancer so it reads as a crowd, not a chorus line of clones.
@@ -693,6 +1070,9 @@ export function createLife(
           limbs.ll.rotation.x = sw; limbs.rl.rotation.x = -sw;
           limbs.la.rotation.x = -sw * 0.8; limbs.ra.rotation.x = sw * 0.8;
         }
+        // the blob stays ON the ground while its owner hops / skips / dances —
+        // computed last so the bob branches above are already applied
+        cs.position.y = 0.045 - mesh.position.y;
       },
     });
     return rec;
@@ -778,37 +1158,74 @@ export function createLife(
     const spread = (id: BAY.BayBiome, n: number, clear = 45): [number, number][] =>
       BAY.scatterInRegion(region(id), n, Math.random, clear).map(w3);
 
-    // sized by how busy each district should FEEL: the resort and the bazaar
-    // are heaving, the jungle is where you go to escape them
-    const CROWD: [BAY.BayBiome, string, number][] = [
-      ['resort', 'resort', 16], ['market', 'market', 13], ['oldtown', 'market', 11],
-      ['port', 'port', 10], ['beach', 'resort', 11], ['cove', 'cove', 6], ['jungle', 'jungle', 5],
+    // ── who works and who holidays WHERE. Every district gets a cast list, not
+    // a crowd count: rich guests and their staff at the resort, dock hands and
+    // costumed pirates at the docks, kids anywhere there is sand or a pool.
+    // Placement still goes through spread() -> BAY.scatterInRegion, so nobody
+    // can land in the bay.
+    const castOf = (role: Role, dress: string) => makeCast(role, dress);
+    const place = (role: Role, dress: string, x: number, z: number, biome: string) => {
+      const p = castOf(role, dress);
+      if (role === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+      else if (role === 'manager') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 1 };
+      addWanderer(p,
+        x, z,
+        role === 'manager' ? 2 : role === 'kid' ? 26 : 22,
+        role === 'manager' ? rand(0.2, 0.5) : role === 'kid' ? rand(6.5, 9) : rand(3.5, 6.5),
+        18, role === 'kid' ? 1.9 : 2.4, biome, undefined, VOICE_OF[role]);
+    };
+    const CAST: [BAY.BayBiome, string, [Role, number][]][] = [
+      // THE RESORT — the machine: guests being waited on, staff doing the waiting
+      ['resort', 'resort', [['rich', 6], ['robe', 3], ['guest', 2], ['kid', 4],
+        ['waiter', 2], ['bellhop', 1], ['spa', 1], ['chef', 1], ['manager', 1]]],
+      // THE BAZAAR — traders, hagglers and a pirate posing for photos
+      ['market', 'market', [['guest', 5], ['pirate', 2], ['kid', 2], ['rich', 2], ['manager', 1]]],
+      ['oldtown', 'market', [['guest', 4], ['pirate', 2], ['kid', 2], ['grounds', 1], ['manager', 1]]],
+      // THE DOCKS — working crew, and the entertainment that greets the tenders
+      ['port', 'port', [['dock', 5], ['pirate', 3], ['guest', 2], ['rich', 1], ['kid', 1]]],
+      // SUNSET BEACH — kids, lifeguards, and people who paid for the raked sand
+      ['beach', 'resort', [['kid', 4], ['guest', 2], ['lifeguard', 2], ['rich', 2],
+        ['waiter', 1], ['diver', 1], ['manager', 1]]],
+      // SMUGGLERS COVE — treasure hunters who have found four bottlecaps
+      ['cove', 'cove', [['digger', 3], ['kid', 3], ['guest', 2], ['pirate', 1]]],
+      // THE JUNGLE — where you go to get away from all of the above
+      ['jungle', 'jungle', [['guest', 3], ['grounds', 2]]],
+      // DANCE COVE fringe — crew, bar staff and kids orbiting the DJ set
+      ['party', 'party', [['kid', 3], ['dj', 2], ['waiter', 1], ['manager', 1]]],
     ];
-    for (const [id, dress, n] of CROWD)
-      for (const [x, z] of spread(id, n))
-        addWanderer(makePerson(dress), x, z, 22, rand(3.5, 6.5), 18, 2.4, dress);
+    for (const [id, dress, roles] of CAST) {
+      let total = 0;
+      for (const r of roles) total += r[1];
+      const pts = spread(id, total);
+      let i = 0;
+      for (const [role, n] of roles) for (let k = 0; k < n && i < pts.length; k++, i++)
+        place(role, dress, pts[i][0], pts[i][1], dress);
+    }
 
     // THE DANCE FLOOR — a packed crowd on ONE shared beat, barely travelling.
     // Short tether + near-zero base speed is what turns a walk into a dance.
     for (const [x, z] of spread('party', 24, 20)) {
-      const dancer = makePerson('party', pick([0xff2fa0, 0x2fd8e8, 0xffd23f, 0x9a5cf0, 0x4ef0a0, 0xff8a3a]));
+      const dancer = makePerson('party', pick([0xff2fa0, 0x2fd8e8, 0xffd23f, 0x9a5cf0, 0x4ef0a0, 0xff8a3a]),
+        { glasses: Math.random() < 0.3, hat: Math.random() < 0.18 ? 'flower' : undefined });
       dancer.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
       addWanderer(dancer, x, z, 3, rand(0.3, 0.8), 24, 2.4, 'party');
     }
 
-    // STROLLERS strung along the promenade so the boardwalk is never empty
+    // STROLLERS strung along the promenade so the boardwalk is never empty —
+    // and the boardwalk is where the money walks, so it skews posh
+    const PROM_ROLES: Role[] = ['rich', 'rich', 'guest', 'kid', 'robe', 'bellhop', 'waiter', 'pirate', 'manager'];
     for (let i = 0; i < 20; i++) {
       const pp = BAY.pathPointAt(BAY.PROMENADE, i / 20 + rand(-0.015, 0.015));
       const off = rand(-BAY.PROM_HALF * 0.72, BAY.PROM_HALF * 0.72);
       const dress = pick(['resort', 'market', 'port']);
       const [x, z] = w3([pp.x + Math.cos(pp.ang + Math.PI / 2) * off, pp.y + Math.sin(pp.ang + Math.PI / 2) * off]);
-      addWanderer(makePerson(dress), x, z, 14, rand(3.5, 6), 18, 2.4, dress);
+      place(pick(PROM_ROLES), dress, x, z, dress);
     }
-    // and a few hikers on the jungle trail
-    for (let i = 0; i < 5; i++) {
-      const pp = BAY.pathPointAt(BAY.TRAIL, (i + 0.5) / 5);
+    // and a few hikers + a groundskeeper on the jungle trail
+    for (let i = 0; i < 6; i++) {
+      const pp = BAY.pathPointAt(BAY.TRAIL, (i + 0.5) / 6);
       const [x, z] = w3([pp.x + rand(-90, 90), pp.y + rand(-90, 90)]);
-      addWanderer(makePerson('jungle'), x, z, 16, rand(3, 5), 18, 2.4, 'jungle');
+      place(i === 2 ? 'grounds' : i === 4 ? 'kid' : 'guest', 'jungle', x, z, 'jungle');
     }
 
     // WILDLIFE: parrots squabbling over the bazaar and the canopy, crabs
@@ -826,7 +1243,9 @@ export function createLife(
         const towel = new THREE.Mesh(towelGeo, mat(pick([0xff6f91, 0x4dd0e1, 0xffd54f, 0x7be8b0]), 0.95));
         towel.rotation.x = -Math.PI / 2; towel.rotation.z = rand(0, Math.PI * 2);
         towel.position.set(tx, 0.08, tz); scene.add(towel);
-        const bather = makePerson(id === 'beach' ? 'cove' : 'resort');
+        // half the loungers are rich guests in shades — the other half are the
+        // people who will complain about them later
+        const bather = makeCast(pick(['rich', 'rich', 'robe', 'guest'] as Role[]), id === 'beach' ? 'cove' : 'resort');
         bather.rotation.x = -Math.PI / 2;
         bather.rotation.z = towel.rotation.z;
         bather.position.set(tx, 0.55, tz);
@@ -977,41 +1396,71 @@ export function createLife(
   // centres — there is no grid here), each with its own crowd and voice, so
   // the resort has beats the way Maple Isle has its rally and its ball game.
   if (worldId() === 'pirate') {
+    // every vignette is RUN by somebody: an event manager stands at the front
+    // of it with a clipboard and a headset, gesturing, on their own voice pool.
+    // The crowd is a mix of guests and kids so the bubbles are not one note.
     const addPB = (wx: number, wy: number, dress: string, dance: boolean,
-                   amb: string[], pan: string[], n: number, col?: number) => {
+                   amb: string[], pan: string[], n: number, col?: number, extra?: Role[]) => {
       const [x, z] = w3([wx, wy]);
       for (let i = 0; i < n; i++) {
-        const p2 = makePerson(dress, col);
+        const p2 = makePerson(dress, col, { glasses: Math.random() < 0.3 });
         if (dance) p2.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
         addWanderer(p2, x + rand(-14, 14), z + rand(-14, 14), dance ? 3 : 13,
           dance ? rand(0.3, 0.8) : rand(2.5, 4.5), 22, 2.4, 'generic', pan);
+      }
+      // the compere, plus whoever else this particular bit needs
+      for (const role of ['manager', ...(extra ?? [])] as Role[]) {
+        const p3 = makeCast(role, dress);
+        if (role === 'kid') p3.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+        else if (role === 'manager') p3.userData.dancer = { t: rand(0, 6), spin: 1, mode: 1 };
+        addWanderer(p3, x + rand(-10, 10), z + rand(-10, 10),
+          role === 'manager' ? 2 : 14,
+          role === 'manager' ? rand(0.2, 0.5) : role === 'kid' ? rand(6.5, 9) : rand(2.5, 4.5),
+          22, role === 'kid' ? 1.9 : 2.4, dress, undefined, VOICE_OF[role]);
       }
       events.push({ x, z, ambient: amb, panic: pan, cd: rand(1, 4), panicked: 0 });
     };
     // THE DJ SET — dead centre of Dance Cove, the biggest crowd on the island
     addPB(7420, 10480, 'party', true,
-      ['DJ COCONUT! DJ COCONUT!', 'DROP IT!! DROP THE THING!!', 'my legs have given up. still dancing.',
-        'this is the BEST song', 'one more!! ONE MORE!!', 'I love everyone here'],
-      ['THE DJ IS GONE!!', 'save the SPEAKERS!!', 'conga OUT!! conga OUT!!', 'the beat has DROPPED. us.'],
-      11, 0xff2fa0);
+      ['DJ COCONUT! DJ COCONUT!', 'DROP IT!! DROP THE THING!!', 'my legs have quit. still dancing.',
+        'this is the BEST song', 'one more!! ONE MORE!!', 'I love everyone here',
+        'the foam machine is ARMED', 'conga at half past! be there!'],
+      ['THE DJ IS GONE!!', 'save the SPEAKERS!!', 'conga OUT!! conga OUT!!', 'the beat has DROPPED. us.',
+        'that was NOT in the setlist!!'],
+      11, 0xff2fa0, ['dj', 'kid', 'waiter']);
     // THE MARKET HAGGLE — the Bazaar, traders and a very rude parrot
     addPB(5580, 4600, 'market', false,
       ['final price! FINAL price!', 'the parrot called me a name', 'mango so good it is illegal',
-        'genuine pirate gold, probably', 'two for one! one for two!'],
-      ['MY MANGOES!! MY LIFE!!', 'take the stall!! LEAVE the stall!!', 'the parrot KNEW'],
-      7, 0xffd23f);
+        'genuine pirate gold, probably', 'two for one! one for two!',
+        'hand-woven. by a very fast man.', 'that shell costs HOW much'],
+      ['MY MANGOES!! MY LIFE!!', 'take the stall!! LEAVE the stall!!', 'the parrot KNEW',
+        'everything half price!! GO!!'],
+      7, 0xffd23f, ['pirate', 'kid']);
     // THE TREASURE DIG — Smugglers Cove, everyone sure X marks right here
     addPB(2380, 6360, 'cove', false,
       ['X marks... hang on', 'I felt something! it was a crab', 'DIG! we are SO close!',
-        'my metal detector loves bottlecaps', 'the map is upside down, isn\'t it'],
-      ['LEAVE THE TREASURE!!', 'the crabs were a WARNING', 'RUN! bring the shovel!!'],
-      6, 0xffb054);
+        'my detector only loves bottlecaps', 'the map is upside down, isn\'t it',
+        'the resort buried this. probably.'],
+      ['LEAVE THE TREASURE!!', 'the crabs were a WARNING', 'RUN! bring the shovel!!',
+        'X marked US. bad map.'],
+      6, 0xffb054, ['digger', 'kid', 'kid']);
     // THE DOCKSIDE ARGUMENT — a galleon's crew, mid-loading, mid-row
     addPB(7420, 3080, 'port', false,
       ['that crate goes STARBOARD', 'we are NOT sailing tonight', 'the captain is asleep. again.',
-        'count the barrels. COUNT THEM.', 'she is seaworthy. mostly.'],
-      ['ABANDON THE DOCK!!', 'save the RUM!! I mean— cargo!!', 'cut the ropes!! CUT THEM!!'],
-      7, 0x4dd0e1);
+        'count the barrels. COUNT THEM.', 'she is seaworthy. mostly.',
+        'nine suitcases for ONE guest', 'the galleon is a photo booth'],
+      ['ABANDON THE DOCK!!', 'save the RUM!! I mean— cargo!!', 'cut the ropes!! CUT THEM!!',
+        'the tender!! LAUNCH THE TENDER!!'],
+      7, 0x4dd0e1, ['pirate', 'dock', 'rich']);
+    // THE GRAND POOL — the flagship vignette: rich guests being waited on hand
+    // and foot, and one event manager insisting it is Coconut Hour
+    addPB(9200, 5400, 'resort', false,
+      ['is this the ADULTS pool?', 'my lounger has a sea view. barely.',
+        'the towel swan lost a wing', 'four straws. FOUR.', 'they know my order. obviously.',
+        'the water is 28 degrees exactly', 'someone brought a BALL in here'],
+      ['MY LOUNGER!! MY TOWEL!!', 'the pool has GONE!!', 'refund the whole WEEK!!',
+        'grab the champagne, leave the bags'],
+      4, undefined, ['rich', 'robe', 'waiter', 'kid', 'bellhop']);
   }
 
   // Mayor's rally at town hall: mayor up on the stage, crowd gathered in front
@@ -1186,7 +1635,7 @@ export function createLife(
         const near = peds.filter((p) => !eaten(p.mesh) && Math.hypot(p.mesh.position.x - vx, p.mesh.position.z - vz) < 68);
         if (near.length) {
           const p = pick(near);
-          const pool = AMBIENT[p.biome] || AMBIENT.cozy;
+          const pool = (p.voice ? VOICE_AMBIENT[p.voice] : null) || AMBIENT[p.biome] || AMBIENT.cozy;
           cpos.set(p.mesh.position.x, 5, p.mesh.position.z);
           say(cpos, pick(pool), 'ambient');
         }
