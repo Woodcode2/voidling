@@ -200,7 +200,7 @@
       /* key art on its own feathered layer — the island, waterfall and the
          void's face melt into the cosmos with no hard photo edges */
       #menu::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-        background: url('/assets/splash_hero.webp') center 11vh / auto 68vh no-repeat; }
+        background: url('/assets/splash_hero.webp') center 7vh / auto 70vh no-repeat; }
       @media (max-width: 480px) {
         #menu::after { background-image: url('/assets/splash_hero_sm.webp'); }
       }
@@ -244,20 +244,52 @@
         background: rgba(10,5,22,0.8); backdrop-filter: blur(6px); }
       #daily.show { display: flex; }
       #daily.show .dCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
-      #daily .dCard { width: min(360px, calc(100vw - 24px)); box-sizing: border-box; border-radius: 24px; text-align: center; padding: 26px 18px 22px;
-        background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
-        border: 2.5px solid rgba(255,210,90,0.6); box-shadow: 0 0 40px rgba(154,92,255,0.5); }
-      #daily .dTitle { font-size: 22px; font-weight: 900; letter-spacing: 3px; color: #ffd25a; margin-bottom: 14px; }
-      #dailyGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-      #dailyGrid .dCell { border-radius: 12px; padding: 9px 4px; font-size: 12px; font-weight: 800; color: #cbb2ff;
-        background: rgba(255,255,255,0.06); border: 1.5px solid rgba(168,123,255,0.25); }
-      #dailyGrid .dCell b { display: block; font-size: 9px; letter-spacing: 1px; color: #9a86c8; margin-bottom: 3px; }
-      #dailyGrid .dCell.past { opacity: 0.45; }
-      #dailyGrid .dCell.now { border-color: #ffd25a; background: rgba(255,210,90,0.14); color: #ffe08a;
-        box-shadow: 0 0 12px rgba(255,210,90,0.35); transform: scale(1.06); }
-      #dailyClaim { font-family: inherit; font-size: 17px; font-weight: 900; letter-spacing: 2px; color: #fff;
-        background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 14px; padding: 13px 44px;
-        cursor: pointer; box-shadow: 0 5px 0 #b8163a, 0 8px 18px rgba(0,0,0,0.4); }
+      /* a PRIZE screen, not a spreadsheet: glowing card, a big wobbling gift,
+         chunky prize tiles, today's tile bouncing under a gold ring */
+      #daily .dCard { position: relative; width: min(370px, calc(100vw - 20px)); box-sizing: border-box; border-radius: 26px; text-align: center;
+        padding: 34px 16px 22px; overflow: hidden;
+        background:
+          radial-gradient(ellipse at 50% -8%, rgba(255,210,90,0.28), transparent 58%),
+          linear-gradient(160deg, #4a2288 0%, #2a1258 55%, #1a0b33 100%);
+        border: 3px solid #ffd25a;
+        box-shadow: 0 0 46px rgba(255,210,90,0.35), 0 0 90px rgba(154,92,255,0.45), inset 0 0 40px rgba(154,92,255,0.2); }
+      /* slow sheen sweep across the whole card — premium, alive */
+      #daily .dCard::after { content: ''; position: absolute; top: -60%; left: -70%; width: 50%; height: 240%;
+        transform: rotate(24deg); pointer-events: none;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent);
+        animation: sheen 3.8s linear infinite; }
+      #daily .dGift { font-size: 46px; line-height: 1; margin-bottom: 2px;
+        filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); animation: giftWiggle 2.2s ease-in-out infinite; }
+      #daily .dTitle { font-size: 25px; font-weight: 900; letter-spacing: 3px; color: #ffd25a;
+        text-shadow: 0 0 18px rgba(255,210,90,0.6), 0 2px 4px rgba(0,0,0,0.5); }
+      #daily .dStreak { font-size: 12px; font-weight: 900; letter-spacing: 1.5px; color: #ffb8d8; margin: 4px 0 14px; }
+      #dailyGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+      #dailyGrid .dCell { position: relative; border-radius: 15px; padding: 9px 3px 7px;
+        background: linear-gradient(170deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04));
+        border: 2px solid rgba(168,123,255,0.3); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+      #dailyGrid .dCell b { display: block; font-size: 8.5px; letter-spacing: 1px; color: #b9a4e8; font-weight: 900; }
+      #dailyGrid .dIcon { display: block; font-size: 21px; line-height: 1.25; }
+      #dailyGrid .dAmt { display: block; font-size: 13px; font-weight: 900; color: #fff; }
+      #dailyGrid .dAmt i { font-style: normal; font-size: 10px; color: #ffd25a; margin-left: 1px; }
+      #dailyGrid .dCell.past { opacity: 0.5; }
+      #dailyGrid .dCell.past .dAmt { color: #7ef2a0; }
+      #dailyGrid .dCell.mega { border-color: rgba(255,210,90,0.55);
+        background: linear-gradient(170deg, rgba(255,210,90,0.22), rgba(255,140,60,0.08)); }
+      #dailyGrid .dCell.now { border-color: #ffd25a; color: #fff;
+        background: linear-gradient(170deg, rgba(255,210,90,0.32), rgba(255,90,140,0.14));
+        box-shadow: 0 0 20px rgba(255,210,90,0.6), 0 4px 0 rgba(184,22,58,0.4);
+        animation: dNow 1.1s ease-in-out infinite; }
+      @keyframes dNow { 0%,100% { transform: scale(1.08); } 50% { transform: scale(1.16); } }
+      #dailyGrid .dCell.now::before { content: ''; position: absolute; inset: -5px; border-radius: 18px;
+        border: 2px solid rgba(255,210,90,0.5); animation: dRing 1.6s ease-out infinite; }
+      @keyframes dRing { 0% { opacity: 0.9; transform: scale(0.94); } 100% { opacity: 0; transform: scale(1.18); } }
+      #dailyGrid .dCell.pop { animation: dPop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+      @keyframes dPop { 0% { transform: scale(1.1); } 45% { transform: scale(1.42); } 100% { transform: scale(1.08); } }
+      #dailyClaim { font-family: inherit; font-size: 19px; font-weight: 900; letter-spacing: 2px; color: #fff;
+        background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 16px; padding: 15px 46px;
+        cursor: pointer; box-shadow: 0 6px 0 #b8163a, 0 10px 22px rgba(0,0,0,0.45);
+        animation: againPulse 1.7s ease-in-out infinite; }
+      #dailyClaim i { font-style: normal; color: #ffe08a; margin-left: 3px; }
       /* skin preview modal */
       #skinPrev { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.78); backdrop-filter: blur(6px); }
@@ -509,7 +541,9 @@
     <!-- ── daily login rewards (agar.io calendar) ── -->
     <div id="daily">
       <div class="dCard">
+        <div class="dGift">🎁</div>
         <div class="dTitle">DAILY REWARD</div>
+        <div class="dStreak" id="dailyStreak"></div>
         <div id="dailyGrid"></div>
         <button id="dailyClaim">CLAIM</button>
       </div>

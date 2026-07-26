@@ -78,9 +78,8 @@ sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
 sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.15;
-const SUN_DAY = new THREE.Color(0xfff2d8), SUN_DUSK = new THREE.Color(0xffc07a);
-let duskK = 0;   // 0 midday -> 1 full golden hour (drives the sun's horizon drop)
-const HEMI_DAY = new THREE.Color(0xdfeaff), HEMI_DUSK = new THREE.Color(0xffd9b0);
+const SUN_DAY = new THREE.Color(0xfff2d8);
+const HEMI_DAY = new THREE.Color(0xdfeaff);
 // the shadow frustum rides the camera: tight box up close = crisp tree
 // shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
 function fitShadow(dist: number) {
@@ -969,6 +968,11 @@ function validateWorld() {
     const band = house || parked ? ASPHALT_HALF + 1.4 : ASPHALT_HALF;
     const hx = (Math.min(_vSz.x, 24) / 2) * f, hz = (Math.min(_vSz.z, 24) / 2) * f;
     let px = e.home.x, pz = e.home.z, dirty = false, dead = false;
+    // OFF-ISLAND CULL — the catch-all. Any static prop sitting over open space
+    // is retired outright, no matter which placement path put it there. (A raw
+    // glb() call bypassing its island guard is how cars ended up in orbit;
+    // this makes that class of bug invisible to the player forever.)
+    if (!insideIsland3(px, pz)) { cull.push(i); continue; }
     for (const rc of ROAD_CENTERS_3D) {
       if (Math.abs(px - rc) < band + hx) {   // straddles a vertical road lane
         const off = band + hx + 0.4;
@@ -1028,7 +1032,7 @@ function resetMatch() {
   renderQuests();
   ended = false;
   sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.08; outroT = 0;
-  hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0); duskK = 0; sun.intensity = 1.75;
+  hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0); sun.intensity = 1.75;
   el('end').classList.remove('show');
   timerEl.style.color = '';
   beginMatch(soloMode);
@@ -1145,14 +1149,32 @@ renderRank();
     const yd = new Date(Date.now() - 86400000).toDateString();
     const day = last === yd ? Math.min(6, Number(localStorage.getItem('voidDailyDay') || 0) + 1) : 0;
     const modal = el('daily');
+    // each day is a PRIZE, not a table cell: claimed days stamp a green tick,
+    // today's cell is a big bouncing gift, day 7 is the gold treasure chest
+    const ICON = ['🪙', '🪙', '💰', '💰', '💎', '💎', '🏆'];
     el('dailyGrid').innerHTML = DAILY.map((amt, i) =>
-      `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''}"><b>DAY ${i + 1}</b>✦ ${amt}✦</div>`).join('');
+      `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''} ${i === 6 ? 'mega' : ''}">` +
+      `<b>DAY ${i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
+      `<span class="dAmt">${amt}<i>✦</i></span></div>`).join('');
+    el('dailyStreak').textContent = day > 0 ? `🔥 ${day + 1} DAY STREAK!` : 'welcome back!';
+    (el('dailyClaim') as HTMLButtonElement).innerHTML = `CLAIM ${DAILY[day]}<i>✦</i>`;
     (el('dailyClaim') as HTMLButtonElement).onclick = () => {
       addCoins(DAILY[day]);
       localStorage.setItem('voidDailyLast', today);
       localStorage.setItem('voidDailyDay', String(day));
-      modal.classList.remove('show');
+      // payoff: the prize bursts, coins rain across the card, THEN it closes
+      const cell = modal.querySelector('.dCell.now');
+      if (cell) { cell.classList.add('pop'); cell.querySelector('.dIcon')!.textContent = '✅'; }
+      for (let i = 0; i < 14; i++) {
+        const c = document.createElement('div');
+        c.className = 'endConf'; c.textContent = i % 3 === 0 ? '✦' : i % 3 === 1 ? '🪙' : '⭐';
+        c.style.left = `${Math.random() * 100}%`;
+        c.style.animationDelay = `${Math.random() * 0.35}s`;
+        modal.appendChild(c);
+        setTimeout(() => c.remove(), 3000);
+      }
       audio.evolve(); buzz(40);
+      setTimeout(() => modal.classList.remove('show'), 750);
     };
     modal.classList.add('show');
   }
@@ -1375,8 +1397,34 @@ function animate() {
     velX += (tvx - velX) * k;
     velZ += (tvz - velZ) * k;
     const nx = voidState.x + velX * dt, nz = voidState.z + velZ * dt;
-    if (island.biomeAt(nx, voidState.z)) voidState.x = nx; else velX = 0;   // slide along the coast
-    if (island.biomeAt(voidState.x, nz)) voidState.z = nz; else velZ = 0;
+    // ── INVISIBLE WALL at the coast ──────────────────────────────────────────
+    // The old per-axis accept/reject (hard velX = 0) made the void SHUDDER on
+    // the waterline: rejected frame kills the speed, the joystick instantly
+    // re-accelerates into the same wall, position flickers across the boundary.
+    // Now the wall is a real surface: the orb's RIM stops on land, only the
+    // OUTWARD half of the velocity is cancelled (tangential sliding survives),
+    // and a void that grows past the shore is eased back in instead of stuck.
+    {
+      const m = voidling.radius * 0.55 + 1.2;   // keep the body on land, still reach coastal snacks
+      const solid = (x: number, z: number) => !!island.biomeAt(x, z)
+        && insideIsland3(x + m, z) && insideIsland3(x - m, z)
+        && insideIsland3(x, z + m) && insideIsland3(x, z - m);
+      if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
+      else {
+        // outward normal ≈ away from the island centre (the coast is a blob)
+        const len = Math.hypot(voidState.x, voidState.z) || 1;
+        const ox = voidState.x / len, oz = voidState.z / len;
+        const out = velX * ox + velZ * oz;
+        if (out > 0) { velX -= out * ox; velZ -= out * oz; }   // cancel ONLY the into-the-wall part
+        const tx = voidState.x + velX * dt, tz = voidState.z + velZ * dt;
+        if (solid(tx, tz)) { voidState.x = tx; voidState.z = tz; }   // slide along the shore
+        else { velX *= 0.86; velZ *= 0.86; }                          // ease, never snap
+        // grew past the shoreline (or spawned tight): drift gently inland
+        if (!solid(voidState.x, voidState.z)) {
+          voidState.x -= ox * dt * 26; voidState.z -= oz * dt * 26;
+        }
+      }
+    }
   }
   const vx = (voidState.x - prev.x) / Math.max(1e-4, dt);
   const vz = (voidState.z - prev.z) / Math.max(1e-4, dt);
@@ -1535,10 +1583,9 @@ function animate() {
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }
-  // sun follows the void so shadows stay crisp near the action
-  // duskK drops the sun toward the horizon in the finale — long golden
-  // shadows are the whole "golden hour" read, and they're free
-  sun.position.set(voidState.x + sunOff.x - duskK * 40, sunOff.y - duskK * 55, voidState.z + sunOff.z);
+  // sun follows the void so shadows stay crisp near the action (fixed high
+  // noon — the sun never drops, the island never changes colour mid-match)
+  sun.position.set(voidState.x + sunOff.x, sunOff.y, voidState.z + sunOff.z);
   sun.target.position.set(voidState.x, 0, voidState.z);
 
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
@@ -1617,19 +1664,10 @@ function animate() {
 
   const shakeOff = fx.update(dt);
   camera.position.add(shakeOff);
-  if (started && !ended && matchClock < 45 && matchClock > -10) {
-    const gk = 1 - Math.max(0, matchClock) / 45;
-    duskK = gk;
-    sun.color.lerpColors(SUN_DAY, SUN_DUSK, gk);
-    sun.intensity = 1.75 - gk * 0.3;
-    renderer.toneMappingExposure = 1.08 + gk * 0.08;
-    // full golden hour: warm sky fill drops, nebula dims, windows + lamps
-    // light up across the island — the last 45 seconds LOOK like a finale
-    hemi.color.lerpColors(HEMI_DAY, HEMI_DUSK, gk);
-    hemi.intensity = 0.5 - gk * 0.22;
-    scene.backgroundIntensity = 0.55 - gk * 0.3;
-    island.setDusk(gk);
-  }
+  // GOLDEN HOUR IS OUT. Dimming the sky and sun over the last 45s read as the
+  // world randomly "turning to night" — confusing mid-match, and a kids' game
+  // should look identical from the first second to the last. Maple Isle is
+  // permanently high noon. (The lamp/window emissive ramp goes with it.)
   if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
   renderer.render(scene, camera);
   requestAnimationFrame(animate);

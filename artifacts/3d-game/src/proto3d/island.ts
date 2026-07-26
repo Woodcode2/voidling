@@ -1723,10 +1723,16 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
             c2.userData.qk = 'car'; c2.userData.ptsMult = 1.5;
             return c2;
           };
-          glb(scene, addEdible, Math.random() < 0.85 ? 'car_sedan' : 'car_taxi',
-            hx + fx3 * 4.9 + dvx, hz + fz3 * 4.9 + dvz, 2.8,
-            { h: 2.6, rotY: lot.rot + Math.PI / 2, fallback: carFB,
-              onReady: (g2) => { g2.userData.qk = 'car'; g2.userData.ptsMult = 1.5; } });
+          // ⚠️ MUST gate on insideIsland3 — glb() places blind. Calling it raw
+          // here is what parked coastal driveways over open space (the
+          // "cars in space" screenshots); placeGlb's guard is not optional.
+          const pcx = hx + fx3 * 4.9 + dvx, pcz = hz + fz3 * 4.9 + dvz;
+          if (insideIsland3(pcx, pcz) && coastClear(pcx, pcz, 6) && !inLagoon3(pcx, pcz, 40)) {
+            glb(scene, addEdible, Math.random() < 0.85 ? 'car_sedan' : 'car_taxi',
+              pcx, pcz, 2.8,
+              { h: 2.6, rotY: lot.rot + Math.PI / 2, fallback: carFB,
+                onReady: (g2) => { g2.userData.qk = 'car'; g2.userData.ptsMult = 1.5; } });
+          }
         }
         // backyard: shed on every third lot, hedge bush otherwise (pool lots
         // stay clear — the water is baked into the ground there)
