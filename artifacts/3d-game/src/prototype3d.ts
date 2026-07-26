@@ -1042,6 +1042,10 @@ function showGuide(text: string, dur = 5) {
 let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
   validateWorld();   // covers late async-registered GLB props on every start
+  // gild HERE, not at the world-ready hook: there are several entry points
+  // into a match (menu PLAY, solo, the debug autostart) and only one of them
+  // went through that hook, so most matches shipped with no treasure at all
+  gildTreasure();
   for (const bt of BEATS) bt.fired = false;
   feverMult = 1; feverT = 0;
   // GLBs stream in for a while after start — re-sweep twice so props that
@@ -1122,7 +1126,7 @@ el('btnGotIt').addEventListener('click', () => {
 // (hole.io's onboarding). The menu earns its place from session two.
 if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlayed')) {
   menuEl.style.display = 'none';
-  withWorldReady(() => { gildTreasure(); beginMatch(); });   // the FIRST match needs treasure too
+  withWorldReady(() => beginMatch());
 }
 // world cards: MAPLE ISLE + PIRATE BAY are both live now
 {
