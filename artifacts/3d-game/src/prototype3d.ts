@@ -252,9 +252,9 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 {
   const at = new URLSearchParams(location.search).get('at');
   const spots: Record<string, [number, number]> = { plaza: [42.75, -30], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75],
-    // PIRATE BAY districts
-    port: [-42.75, -213.75], resort: [-128.25, -128.25], party: [-42.75, 42.75],
-    market: [42.75, -128.25], jungle: [-128.25, -213.75], cove: [-213.75, -213.75] };
+    // PIRATE BAY districts — real region centroids, not Maple grid blocks
+    port: [71, -146], oldtown: [-5.8, -185], resort: [141.4, -28.6], party: [71, 224.4],
+    market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6] };
   if (at && spots[at]) { voidState.x = spots[at][0]; voidState.z = spots[at][1]; }
 }
 

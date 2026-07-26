@@ -11,6 +11,11 @@ import {
   railPointAt, insideIsland3, inLagoon3, worldId, type Biome, type AddEdible,
 } from './island';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
+import * as BAY from './bay';
+
+// Pirate Bay's geometry is authored in WORLD units (0..12000, centre 6000);
+// life places things in 3D. Same conversion island.ts uses for everything else.
+const w3 = (p: BAY.Pt): [number, number] => [(p[0] - 6000) * 0.05, (p[1] - 6000) * 0.05];
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -187,6 +192,36 @@ function makePerson(biome?: string, colOverride?: number): THREE.Group {
   return g;
 }
 let animalN = 0;
+function makeBuggy(): THREE.Group {
+  // the only traffic at a beach resort: a cream shuttle buggy with a striped
+  // canopy, rolling the boardwalk end to end. Nose points +X like makeCar.
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.7, 1.9), mat(0xfdf6e6, 0.6));
+  body.position.y = 0.72; g.add(body);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 1.6), mat(0x2fb8a8, 0.75));
+  seat.position.set(-0.5, 1.22, 0); g.add(seat);
+  const dash = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.55, 1.7), mat(0xfdf6e6, 0.6));
+  dash.position.set(1.25, 1.2, 0); g.add(dash);
+  const canopyCol = pick([0xff6a5e, 0x2fd8e8, 0xffd23f, 0xff8ac0]);
+  for (const sx of [-1.3, 1.3]) for (const sz of [-0.78, 0.78]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 5), mat(0xf4f0e2, 0.6));
+    post.position.set(sx, 1.85, sz); g.add(post);
+  }
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.16, 2.2), mat(canopyCol, 0.7));
+  canopy.position.y = 2.65; g.add(canopy);
+  // scalloped valance so it reads as fabric, not a lid
+  for (let i = 0; i < 7; i++) {
+    const sc = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6, 0, Math.PI), mat(canopyCol, 0.7));
+    sc.rotation.x = Math.PI / 2;
+    sc.position.set(-1.6 + i * 0.53, 2.56, 1.1); g.add(sc);
+    const sc2 = sc.clone(); sc2.position.z = -1.1; g.add(sc2);
+  }
+  for (const sx of [-1.15, 1.15]) for (const sz of [-0.95, 0.95]) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.24, 12), mat(0x35303c, 0.85));
+    wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.42, sz); g.add(wh);
+  }
+  return g;
+}
 function makeParrot(): THREE.Group {
   // a fat tropical parrot: scarlet body, gold head, teal wings, big beak
   const g = new THREE.Group();
@@ -393,7 +428,9 @@ export function createLife(
   // Handles multi-interval roads (the island blob clips a road into several
   // on-island pieces) because each piece is its own entry.
   const spanList: { axis: 'h' | 'v'; centre: number; sp: Span }[] = [];
-  for (const rc of ROAD_CENTERS_3D) {
+  // Pirate Bay has no road grid at all — one boardwalk and a dirt trail —
+  // so there is nothing to span, and its traffic is built further down.
+  for (const rc of worldId() === 'pirate' ? [] : ROAD_CENTERS_3D) {
     for (const axis of ['h', 'v'] as const) {
       const spans: Span[] = [];
       let s0: number | null = null;
@@ -446,7 +483,7 @@ export function createLife(
     mesh.position.set(bx, 0, bz);
     mesh.rotation.y = bSlot.axis === 'h' ? headingOf(st.dir, 0) : headingOf(0, st.dir);
   };
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < (worldId() === 'pirate' ? 0 : 30); i++) {
     const mesh = makeCar();
     let horiz = Math.random() < 0.5;
     let centre = pick(ROAD_CENTERS_3D);
@@ -666,6 +703,7 @@ export function createLife(
     // PIRATE BAY is a RESORT — it should feel busier than a suburb
     'port', 'resort', 'party', 'market', 'jungle', 'cove'];
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    if (worldId() === 'pirate') break;   // no grid here — see the PIRATE BAY block below
     const b = PLAN_GRID[gy][gx];
     if (!pedZones.includes(b)) continue;
     const [cx, cz] = blockCenter3D(gx, gy);
@@ -682,7 +720,7 @@ export function createLife(
   }
 
   // zoo animals: clamped near the pen
-  {
+  if (worldId() !== 'pirate') {
     const [zx, zz] = blockCenter3D(5, 1);
     // each animal is TETHERED to its pen (matching the baked pen floors):
     // savanna NW, paddock SW, flamingo lagoon E
@@ -710,6 +748,7 @@ export function createLife(
   // beach sunbathers: flat out on their towels, working on the tan
   const towelGeo = new THREE.PlaneGeometry(3.6, 5.4);
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    if (worldId() === 'pirate') break;
     if (PLAN_GRID[gy][gx] !== 'beach') continue;
     const [bx, bz] = blockCenter3D(gx, gy);
     for (let i = 0; i < 3; i++) {
@@ -729,10 +768,118 @@ export function createLife(
     }
   }
 
+  // ══ PIRATE BAY life — scattered inside REGIONS, never on a grid ═════════
+  // Maple Isle drops its crowd on 6x6 block centres. Pirate Bay has no blocks:
+  // every holidaymaker, dancer, parrot, crab and sunbather is rejection-sampled
+  // inside a district polygon (so nobody stands in the bay), and the boardwalk
+  // gets its own stream of strollers and shuttle buggies.
+  if (worldId() === 'pirate') {
+    const region = (id: BAY.BayBiome) => BAY.BAY_REGIONS.find((r) => r.id === id)!;
+    const spread = (id: BAY.BayBiome, n: number, clear = 45): [number, number][] =>
+      BAY.scatterInRegion(region(id), n, Math.random, clear).map(w3);
+
+    // sized by how busy each district should FEEL: the resort and the bazaar
+    // are heaving, the jungle is where you go to escape them
+    const CROWD: [BAY.BayBiome, string, number][] = [
+      ['resort', 'resort', 16], ['market', 'market', 13], ['oldtown', 'market', 11],
+      ['port', 'port', 10], ['beach', 'resort', 11], ['cove', 'cove', 6], ['jungle', 'jungle', 5],
+    ];
+    for (const [id, dress, n] of CROWD)
+      for (const [x, z] of spread(id, n))
+        addWanderer(makePerson(dress), x, z, 22, rand(3.5, 6.5), 18, 2.4, dress);
+
+    // THE DANCE FLOOR — a packed crowd on ONE shared beat, barely travelling.
+    // Short tether + near-zero base speed is what turns a walk into a dance.
+    for (const [x, z] of spread('party', 24, 20)) {
+      const dancer = makePerson('party', pick([0xff2fa0, 0x2fd8e8, 0xffd23f, 0x9a5cf0, 0x4ef0a0, 0xff8a3a]));
+      dancer.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
+      addWanderer(dancer, x, z, 3, rand(0.3, 0.8), 24, 2.4, 'party');
+    }
+
+    // STROLLERS strung along the promenade so the boardwalk is never empty
+    for (let i = 0; i < 20; i++) {
+      const pp = BAY.pathPointAt(BAY.PROMENADE, i / 20 + rand(-0.015, 0.015));
+      const off = rand(-BAY.PROM_HALF * 0.72, BAY.PROM_HALF * 0.72);
+      const dress = pick(['resort', 'market', 'port']);
+      const [x, z] = w3([pp.x + Math.cos(pp.ang + Math.PI / 2) * off, pp.y + Math.sin(pp.ang + Math.PI / 2) * off]);
+      addWanderer(makePerson(dress), x, z, 14, rand(3.5, 6), 18, 2.4, dress);
+    }
+    // and a few hikers on the jungle trail
+    for (let i = 0; i < 5; i++) {
+      const pp = BAY.pathPointAt(BAY.TRAIL, (i + 0.5) / 5);
+      const [x, z] = w3([pp.x + rand(-90, 90), pp.y + rand(-90, 90)]);
+      addWanderer(makePerson('jungle'), x, z, 16, rand(3, 5), 18, 2.4, 'jungle');
+    }
+
+    // WILDLIFE: parrots squabbling over the bazaar and the canopy, crabs
+    // scuttling the sand. Both are edible, both flee, both are tiny.
+    for (const id of ['market', 'jungle'] as const)
+      for (const [x, z] of spread(id, id === 'jungle' ? 5 : 3, 20))
+        addWanderer(makeParrot(), x, z, 12, rand(1.6, 2.8), 22, 1.4, id);
+    for (const id of ['beach', 'cove'] as const)
+      for (const [x, z] of spread(id, 6, 20))
+        addWanderer(makeCrab(), x, z, 9, rand(1.2, 2.2), 16, 1.2, id);
+
+    // SUNBATHERS flat out on towels — the resort's answer to Maple's beach
+    for (const id of ['beach', 'resort'] as const)
+      for (const [tx, tz] of spread(id, 8, 60)) {
+        const towel = new THREE.Mesh(towelGeo, mat(pick([0xff6f91, 0x4dd0e1, 0xffd54f, 0x7be8b0]), 0.95));
+        towel.rotation.x = -Math.PI / 2; towel.rotation.z = rand(0, Math.PI * 2);
+        towel.position.set(tx, 0.08, tz); scene.add(towel);
+        const bather = makePerson(id === 'beach' ? 'cove' : 'resort');
+        bather.rotation.x = -Math.PI / 2;
+        bather.rotation.z = towel.rotation.z;
+        bather.position.set(tx, 0.55, tz);
+        bather.userData.homeRotX = bather.rotation.x; bather.userData.homeRotZ = bather.rotation.z;
+        setShadow(bather); scene.add(bather); addEdible(bather, 2.4);
+      }
+
+    // SHUTTLE BUGGIES — the island's only traffic, ping-ponging the boardwalk
+    for (let i = 0; i < 7; i++) {
+      const mesh = makeBuggy();
+      let t = (i + 0.5) / 7, d: 1 | -1 = i % 2 === 0 ? 1 : -1;
+      const side = i % 2 === 0 ? 1 : -1;
+      // the boardwalk narrows at the bends, so a fixed outer lane can hang off
+      // the land — resolve the widest lane that is still ON the island, and
+      // fall back to the centre line rather than stalling (the buggy that used
+      // to bounce forever at the world origin)
+      const at = (tt: number): [number, number] | null => {
+        const pp = BAY.pathPointAt(BAY.PROMENADE, tt);
+        for (const off of [side * 120, side * 60, 0]) {
+          const [x, z] = w3([pp.x + Math.cos(pp.ang + Math.PI / 2) * off, pp.y + Math.sin(pp.ang + Math.PI / 2) * off]);
+          if (biomeAt(x, z)) return [x, z];
+        }
+        return null;
+      };
+      const spd = rand(0.009, 0.015);              // path fraction per second
+      const p0 = at(t);
+      if (!p0) continue;               // no legal lane at this offset — skip the buggy entirely
+      mesh.position.set(p0[0], 0, p0[1]);
+      mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car'; mesh.userData.mover = true;
+      mesh.add(contactShadow(2)); setShadow(mesh); scene.add(mesh); addEdible(mesh, 2.6);
+      movers.push({
+        mesh,
+        update(dt, _tm, vx, vz, vR) {
+          if (eaten(mesh)) return;
+          // the promenade is an OPEN path — bounce at the ends, never wrap
+          t += d * spd * dt;
+          if (t >= 1) { t = 1; d = -1; } else if (t <= 0) { t = 0; d = 1; }
+          const pos = at(t);
+          if (!pos) { t = Math.min(1, Math.max(0, t + d * 0.01)); d = (d === 1 ? -1 : 1); return; }
+          mesh.position.set(pos[0], 0, pos[1]);
+          const hd = BAY.pathPointAt(BAY.PROMENADE, t).ang;
+          mesh.rotation.y = Math.atan2(-Math.sin(hd) * d, Math.cos(hd) * d);
+          // the void looming makes them floor it toward the far end
+          if (Math.hypot(pos[0] - vx, pos[1] - vz) < vR + 26) t += d * spd * dt * 2.2;
+        },
+      });
+    }
+  }
+
   // pond ducks — "the ducks are rowdy" is finally TRUE, and they PARADE:
   // ducks 1-3 tail duck 0 in the classic line
   const duckLine: THREE.Object3D[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (worldId() === 'pirate' ? 0 : 4); i++) {
     const duck = new THREE.Group();
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xf6f2da : 0xffd54f, roughness: 0.9 }));
     body.scale.set(1.25, 0.85, 1); body.position.y = 0.36; duck.add(body);
@@ -755,7 +902,11 @@ export function createLife(
 
   // birds: a couple of small flocks, high up and out of the way
   for (let f = 0; f < 2; f++) {
-    const cx = rand(-180, 180), cz = rand(-180, 180), fly = rand(26, 34);
+    // flock centres must be over LAND — a gull circling the open sea is
+    // unreachable food and reads as a bug from the top-down camera
+    let cx = 0, cz = 0;
+    for (let k = 0; k < 200; k++) { cx = rand(-180, 180); cz = rand(-180, 180); if (biomeAt(cx, cz)) break; }
+    const fly = rand(26, 34);
     for (let i = 0; i < 3; i++) {
       const mesh = makeBird();
       let ang = rand(0, Math.PI * 2);
@@ -767,7 +918,9 @@ export function createLife(
           if (eaten(mesh)) return;
           const dx = mesh.position.x - vx, dz = mesh.position.z - vz;
           if (Math.hypot(dx, dz) < vR + 40) { ang = Math.atan2(dz, dx); mesh.position.x += Math.cos(ang) * 26 * dt; mesh.position.z += Math.sin(ang) * 26 * dt; }
-          else { ang += rand(-1, 1) * dt * 2; if (Math.hypot(mesh.position.x - cx, mesh.position.z - cz) > 70) ang = Math.atan2(cz - mesh.position.z, cx - mesh.position.x); mesh.position.x += Math.cos(ang) * 10 * dt; mesh.position.z += Math.sin(ang) * 10 * dt; }
+          else { ang += rand(-1, 1) * dt * 2; if (Math.hypot(mesh.position.x - cx, mesh.position.z - cz) > 40) ang = Math.atan2(cz - mesh.position.z, cx - mesh.position.x); mesh.position.x += Math.cos(ang) * 10 * dt; mesh.position.z += Math.sin(ang) * 10 * dt; }
+          // …and they turn back the moment they drift out over open water
+          if (!biomeAt(mesh.position.x, mesh.position.z)) { ang = Math.atan2(cz - mesh.position.z, cx - mesh.position.x); mesh.position.x += Math.cos(ang) * 18 * dt; mesh.position.z += Math.sin(ang) * 18 * dt; }
           mesh.position.y = fly + Math.sin(t * 3 + i) * 1.5;
           mesh.rotation.y = -ang + Math.PI / 2;
           const flap = 0.5 + Math.sin(t * 14 + i) * 0.5;
@@ -820,36 +973,45 @@ export function createLife(
 
 
   // ══ PIRATE BAY vignettes ═══════════════════════════════════════════════
-  // Three staged scenes with their own crowds and their own voices, so the
-  // resort has beats the way Maple Isle has its rally and its ball game.
+  // Three staged scenes anchored on real district geography (not block
+  // centres — there is no grid here), each with its own crowd and voice, so
+  // the resort has beats the way Maple Isle has its rally and its ball game.
   if (worldId() === 'pirate') {
-    const addPB = (gx: number, gy: number, amb: string[], pan: string[], n: number, col?: number) => {
-      const [x, z] = blockCenter3D(gx, gy);
+    const addPB = (wx: number, wy: number, dress: string, dance: boolean,
+                   amb: string[], pan: string[], n: number, col?: number) => {
+      const [x, z] = w3([wx, wy]);
       for (let i = 0; i < n; i++) {
-        const p2 = makePerson('party', col);
-        p2.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
-        addWanderer(p2, x + rand(-16, 16), z + rand(-16, 16), 3, rand(0.3, 0.8), 24, 2.4, 'generic', pan);
+        const p2 = makePerson(dress, col);
+        if (dance) p2.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1 };
+        addWanderer(p2, x + rand(-14, 14), z + rand(-14, 14), dance ? 3 : 13,
+          dance ? rand(0.3, 0.8) : rand(2.5, 4.5), 22, 2.4, 'generic', pan);
       }
       events.push({ x, z, ambient: amb, panic: pan, cd: rand(1, 4), panicked: 0 });
     };
-    // THE DJ SET — the biggest crowd on the island, all on the same beat
-    addPB(2, 4,
+    // THE DJ SET — dead centre of Dance Cove, the biggest crowd on the island
+    addPB(7420, 10480, 'party', true,
       ['DJ COCONUT! DJ COCONUT!', 'DROP IT!! DROP THE THING!!', 'my legs have given up. still dancing.',
         'this is the BEST song', 'one more!! ONE MORE!!', 'I love everyone here'],
       ['THE DJ IS GONE!!', 'save the SPEAKERS!!', 'conga OUT!! conga OUT!!', 'the beat has DROPPED. us.'],
-      9, 0xff2fa0);
-    // THE MARKET HAGGLE — traders and a very rude parrot
-    addPB(3, 1,
+      11, 0xff2fa0);
+    // THE MARKET HAGGLE — the Bazaar, traders and a very rude parrot
+    addPB(5580, 4600, 'market', false,
       ['final price! FINAL price!', 'the parrot called me a name', 'mango so good it is illegal',
         'genuine pirate gold, probably', 'two for one! one for two!'],
       ['MY MANGOES!! MY LIFE!!', 'take the stall!! LEAVE the stall!!', 'the parrot KNEW'],
-      6, 0xffd23f);
-    // THE TREASURE DIG — everyone convinced X marks right here
-    addPB(0, 0,
+      7, 0xffd23f);
+    // THE TREASURE DIG — Smugglers Cove, everyone sure X marks right here
+    addPB(2380, 6360, 'cove', false,
       ['X marks... hang on', 'I felt something! it was a crab', 'DIG! we are SO close!',
         'my metal detector loves bottlecaps', 'the map is upside down, isn\'t it'],
       ['LEAVE THE TREASURE!!', 'the crabs were a WARNING', 'RUN! bring the shovel!!'],
-      5, 0xffb054);
+      6, 0xffb054);
+    // THE DOCKSIDE ARGUMENT — a galleon's crew, mid-loading, mid-row
+    addPB(7420, 3080, 'port', false,
+      ['that crate goes STARBOARD', 'we are NOT sailing tonight', 'the captain is asleep. again.',
+        'count the barrels. COUNT THEM.', 'she is seaworthy. mostly.'],
+      ['ABANDON THE DOCK!!', 'save the RUM!! I mean— cargo!!', 'cut the ropes!! CUT THEM!!'],
+      7, 0x4dd0e1);
   }
 
   // Mayor's rally at town hall: mayor up on the stage, crowd gathered in front

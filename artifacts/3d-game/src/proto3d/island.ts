@@ -9,6 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
+import * as BAY from './bay';
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
   // ── PIRATE BAY (world 2): a world-class tropical resort with a buccaneer
@@ -168,8 +169,13 @@ function silhouetteWorld(steps = 10): [number, number][] {
 
 // module-level silhouette polygon (world coords) + point-in-polygon test, so
 // prop placement and movement respect the actual coastline, not just the grid
-const SIL_POLY = silhouetteWorld(12);
+const MAPLE_SIL = silhouetteWorld(12);
+// Pirate Bay has its OWN coastline — a hooked headland, not Maple's blob
+const silPoly = (): [number, number][] => (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH : MAPLE_SIL);
+const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
 function insideIslandWorld(wx: number, wy: number): boolean {
+  // Pirate Bay: its own hooked coastline, and the BAY water is not land
+  if (WORLD_ID === 'pirate') return BAY.onBayLand(wx, wy);
   let inside = false;
   for (let i = 0, j = SIL_POLY.length - 1; i < SIL_POLY.length; j = i++) {
     const [xi, yi] = SIL_POLY[i], [xj, yj] = SIL_POLY[j];
@@ -191,8 +197,8 @@ export function coastClear(x3: number, z3: number, d = 12): boolean {
 }
 
 export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
-  const silW = SIL_POLY;
-  const sil3 = silW.map(([x, y]) => new THREE.Vector2(w(x), w(y)));
+  const silW = silPoly();
+  const sil3 = silW.map(([x, y]) => new THREE.Vector2(w(x), w(y)));   // active coastline, world-aware
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const p of sil3) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.y); maxZ = Math.max(maxZ, p.y); }
   const W3 = maxX - minX, H3 = maxZ - minZ;
@@ -267,6 +273,176 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   }
 
+  // ══ PIRATE BAY BAKE ═══════════════════════════════════════════════════
+  // A whole different island: no block fills, no road grid, no driveways.
+  // Sand everywhere, the bay cut out of it, organic district floors, one
+  // curving promenade and a jungle trail.
+  const BAY_R = (id: string) => BAY.BAY_REGIONS.find((r) => r.id === id)!;
+  if (WORLD_ID === 'pirate') {
+    const wpath = (pts: [number, number][], close = true) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (const [x, y] of pts) g.lineTo(pxW(x), pyW(y));
+      if (close) g.closePath();
+    };
+    const opath = (pts: [number, number][]) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (let i = 1; i < pts.length - 1; i++) {
+        const a2 = pts[i], b2 = pts[i + 1];
+        g.quadraticCurveTo(pxW(a2[0]), pyW(a2[1]), pxW((a2[0] + b2[0]) / 2), pyW((a2[1] + b2[1]) / 2));
+      }
+      const L = pts[pts.length - 1]; g.lineTo(pxW(L[0]), pyW(L[1]));
+    };
+    // 1. base sand across the whole landmass, with a sun-bleached gradient
+    g.fillStyle = '#f2e2b8'; g.fillRect(0, 0, TEX, TEX);
+    for (let k = 0; k < 900; k++) {   // grain
+      const x = Math.random() * TEX, y = Math.random() * TEX;
+      g.fillStyle = `rgba(${208 + ((Math.random() * 30) | 0)},${190 + ((Math.random() * 26) | 0)},140,0.16)`;
+      g.beginPath(); g.arc(x, y, rand(2, 7), 0, Math.PI * 2); g.fill();
+    }
+    // 1b. THE ISLAND IS NOT A SAND DISC. A real tropical island reads as a
+    // green interior with a bright sand rim wherever it meets water — the
+    // coast AND the bay. Canvas can't inset a polygon, so the bands are built
+    // by stroking the two rings inward under a land clip: lush core first,
+    // then dry scrub, then the beach on top.
+    {
+      g.save();
+      wpath(BAY.LAND_SMOOTH); g.clip();
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      g.fillStyle = '#7fb85c'; g.fillRect(0, 0, TEX, TEX);           // lush core
+      // dappled canopy over the core so it isn't a flat green field
+      g.fillStyle = 'rgba(46,110,62,0.20)';
+      for (let k = 0; k < 260; k++) {
+        g.beginPath();
+        g.ellipse(pxW(rand(1700, 10400)), pyW(rand(600, 10900)),
+          pxW(rand(160, 520)) - pxW(0), pxW(rand(120, 400)) - pxW(0), rand(0, 3), 0, Math.PI * 2);
+        g.fill();
+      }
+      // sun-bleached scrub band between the green and the sand
+      for (const [ring, wdt] of [[BAY.LAND_SMOOTH, 3000], [BAY.WATER_SMOOTH, 2700]] as [[number, number][], number][]) {
+        wpath(ring); g.strokeStyle = '#bfcb7e'; g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
+      }
+      g.fillStyle = 'rgba(168,182,106,0.28)';
+      for (let k = 0; k < 160; k++) {
+        g.beginPath();
+        g.ellipse(pxW(rand(1700, 10400)), pyW(rand(600, 10900)),
+          pxW(rand(120, 380)) - pxW(0), pxW(rand(90, 280)) - pxW(0), rand(0, 3), 0, Math.PI * 2);
+        g.fill();
+      }
+      // the beach itself — bright sand wherever the land touches water
+      for (const [ring, wdt] of [[BAY.LAND_SMOOTH, 1500], [BAY.WATER_SMOOTH, 1350]] as [[number, number][], number][]) {
+        wpath(ring); g.strokeStyle = '#f2e2b8'; g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
+      }
+      // damp sand right at the tideline
+      for (const [ring, wdt] of [[BAY.LAND_SMOOTH, 420], [BAY.WATER_SMOOTH, 360]] as [[number, number][], number][]) {
+        wpath(ring); g.strokeStyle = 'rgba(216,196,150,0.55)'; g.lineWidth = pxW(wdt) - pxW(0); g.stroke();
+      }
+      // wind-blown grain over everything
+      for (let k = 0; k < 700; k++) {
+        g.fillStyle = `rgba(${196 + ((Math.random() * 40) | 0)},${186 + ((Math.random() * 40) | 0)},${130 + ((Math.random() * 40) | 0)},0.13)`;
+        g.beginPath(); g.arc(Math.random() * TEX, Math.random() * TEX, rand(2, 7), 0, Math.PI * 2); g.fill();
+      }
+      // the north headland is HIGH and ROCKY — a slate cap so the island has
+      // a top end that isn't just more beach
+      g.fillStyle = 'rgba(122,128,140,0.40)';
+      for (const [hx, hy, rx, ry] of [[5600, 1250, 1500, 620], [7050, 1500, 900, 480], [3550, 1650, 800, 430]] as [number, number, number, number][]) {
+        g.beginPath(); g.ellipse(pxW(hx), pyW(hy), pxW(rx) - pxW(0), pxW(ry) - pxW(0), 0.1, 0, Math.PI * 2); g.fill();
+      }
+      g.restore();
+    }
+    const DCOL: Record<string, string> = {
+      port: '#9c7440', oldtown: '#cf8058', resort: '#ffcf8a', party: '#5e2f72',
+      beach: '#ffe6a8', cove: '#c39a4e', jungle: '#2f7a4a', market: '#e5a942',
+    };
+    // the jungle gets canopy dapple; the dance cove gets a lit floor
+    {
+      const jr = BAY.BAY_REGIONS.find((r) => r.id === 'jungle')!;
+      g.save(); wpath(BAY.smoothPoly(jr.poly, 5)); g.clip();
+      g.fillStyle = 'rgba(18,62,38,0.34)';
+      for (let k = 0; k < 60; k++) {
+        g.beginPath();
+        g.ellipse(pxW(rand(2600, 5300)), pyW(rand(3000, 7100)), pxW(rand(130, 300)) - pxW(0), pxW(rand(100, 240)) - pxW(0), rand(0, 3), 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+      const pr = BAY.BAY_REGIONS.find((r) => r.id === 'party')!;
+      g.save(); wpath(BAY.smoothPoly(pr.poly, 5)); g.clip();
+      const cell = 175;
+      for (let iy = 0; iy < 14; iy++) for (let ix = 0; ix < 16; ix++) {
+        const x = 6150 + ix * cell, y = 10050 + iy * cell;
+        g.fillStyle = (ix + iy) % 2 === 0 ? 'rgba(255,120,200,0.62)' : 'rgba(90,200,255,0.5)';
+        g.fillRect(pxW(x), pyW(y), pxW(cell) - pxW(0), pxW(cell) - pxW(0));
+      }
+      g.restore();
+      // the resort's pools + raked sand
+      g.save(); wpath(BAY.smoothPoly(BAY_R('resort').poly, 5)); g.clip();
+      for (const [ox, oy, rr] of [[8900, 4900, 330], [9050, 6300, 290]] as [number, number, number][]) {
+        g.fillStyle = '#f8efd8';
+        g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr + 90) - pxW(0), pxW(rr * 0.7 + 90) - pxW(0), 0.4, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#3fc9d8';
+        g.beginPath(); g.ellipse(pxW(ox), pyW(oy), pxW(rr) - pxW(0), pxW(rr * 0.7) - pxW(0), 0.4, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.4)';
+        g.beginPath(); g.ellipse(pxW(ox - rr * 0.3), pyW(oy - rr * 0.2), pxW(rr * 0.3) - pxW(0), pxW(rr * 0.13) - pxW(0), 0.6, 0, Math.PI * 2); g.fill();
+      }
+      g.strokeStyle = 'rgba(214,190,140,0.4)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+      for (let k = 3300; k < 7400; k += 105) {
+        g.beginPath(); g.moveTo(pxW(8150), pyW(k)); g.lineTo(pxW(9700), pyW(k + 60)); g.stroke();
+      }
+      g.restore();
+    }
+    // 3. THE BAY — sheltered water carved out, with a shallow shelf + foam
+    g.save(); wpath(BAY.WATER_SMOOTH); g.clip();
+    g.fillStyle = '#43cfdd'; g.fillRect(0, 0, TEX, TEX);
+    g.fillStyle = 'rgba(31,136,168,0.6)';
+    g.beginPath(); g.ellipse(pxW(7100), pyW(7000), pxW(1450) - pxW(0), pxW(2050) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.16)';
+    for (let k = 0; k < 40; k++) {
+      g.beginPath(); g.ellipse(pxW(rand(5300, 9500)), pyW(rand(3800, 9900)), pxW(rand(60, 190)) - pxW(0), pxW(rand(18, 46)) - pxW(0), rand(0, 3), 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+    wpath(BAY.WATER_SMOOTH); g.strokeStyle = 'rgba(255,246,214,0.85)'; g.lineWidth = pxW(90) - pxW(0); g.stroke();
+    // 2b. DISTRICT FLOORS — painted AFTER the bay is cut and clipped to LAND,
+    // so a shoreline district (the dance cove on the hook) is never drowned
+    for (const r of BAY.BAY_REGIONS) {
+      g.save();
+      wpath(BAY.LAND_SMOOTH); g.clip();          // land only
+      wpath(BAY.smoothPoly(r.poly, 5)); g.clip();  // ...inside this region
+      // erase the bay from the region before filling it
+      g.fillStyle = DCOL[r.id] ?? '#f2e2b8';
+      g.fillRect(0, 0, TEX, TEX);
+      g.restore();
+      // re-cut the water over the region edge so the shore stays crisp
+      g.save(); wpath(BAY.WATER_SMOOTH); g.clip();
+      g.fillStyle = 'rgba(67,207,221,0.96)'; g.fillRect(0, 0, TEX, TEX);
+      g.restore();
+    }
+    wpath(BAY.WATER_SMOOTH); g.strokeStyle = 'rgba(255,246,214,0.85)'; g.lineWidth = pxW(90) - pxW(0); g.stroke();
+    // 4. surf ring on the OUTER coast
+    wpath(BAY.LAND_SMOOTH); g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = pxW(120) - pxW(0); g.stroke();
+    // 5. THE PROMENADE — teak boardwalk with plank seams
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    opath(BAY.PROMENADE); g.strokeStyle = '#f2e2b8'; g.lineWidth = pxW(BAY.PROM_HALF * 2 + 130) - pxW(0); g.stroke();
+    opath(BAY.PROMENADE); g.strokeStyle = '#c79350'; g.lineWidth = pxW(BAY.PROM_HALF * 2) - pxW(0); g.stroke();
+    g.strokeStyle = 'rgba(118,76,32,0.5)'; g.lineWidth = Math.max(1, pxW(11) - pxW(0));
+    for (let t = 0; t < 1; t += 0.006) {
+      const a2 = BAY.pathPointAt(BAY.PROMENADE, t);
+      const nx = Math.cos(a2.ang + Math.PI / 2), ny = Math.sin(a2.ang + Math.PI / 2);
+      g.beginPath();
+      g.moveTo(pxW(a2.x - nx * BAY.PROM_HALF), pyW(a2.y - ny * BAY.PROM_HALF));
+      g.lineTo(pxW(a2.x + nx * BAY.PROM_HALF), pyW(a2.y + ny * BAY.PROM_HALF));
+      g.stroke();
+    }
+    opath(BAY.PROMENADE); g.strokeStyle = 'rgba(255,226,168,0.34)'; g.lineWidth = pxW(120) - pxW(0); g.stroke();
+    // 6. piers into the water
+    g.strokeStyle = '#a8814f'; g.lineWidth = pxW(170) - pxW(0);
+    for (const [x0, y0, x1, y1] of BAY.PIERS) {
+      g.beginPath(); g.moveTo(pxW(x0), pyW(y0)); g.lineTo(pxW(x1), pyW(y1)); g.stroke();
+    }
+    // 7. the jungle trail
+    opath(BAY.TRAIL); g.strokeStyle = 'rgba(206,178,124,0.8)'; g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
+  }
+
   // biome block fills
   const biomeColor: Record<Biome, number | null> = {
     cozy: null, fancy: null, downtown: WORLD.pavement, plaza: WORLD.pavement,
@@ -280,7 +456,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     jungle: 0x2f7a4a,    // deep tropical canopy floor
     cove: 0xefdcae,      // pale cove sand
   };
-  for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+  if (WORLD_ID !== 'pirate') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
     if (col == null) continue;
     const cx = blockCenter(gx), cy = blockCenter(gy);
@@ -291,6 +467,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   }
   // forest gets a darker dappling; downtown a plaza tint already via pavement
 
+  if (WORLD_ID !== 'pirate') {
   // roads — sidewalk band first, asphalt over it, crisp edge lines, dashes
   const roadPx = pxW(ROAD_CENTERS[1]) - pxW(ROAD_CENTERS[1] - 110);
   const roadLine = (c: number, vert: boolean) => {
@@ -300,36 +477,19 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.stroke();
   };
   g.lineCap = 'butt';
-  // PIRATE BAY paves in TEAK: the whole road network becomes a raised
-  // boardwalk — pale sand shoulders, warm planking, dark plank seams.
-  const PIRATE = WORLD_ID === 'pirate';
-  const SIDE_COL = PIRATE ? 0xf2e2b8 : WORLD.pavement;
-  const ROAD_COL = PIRATE ? 0xc79350 : WORLD.road;
-  const LINE_COL = PIRATE ? 0x8a5a2a : WORLD.roadLine;
+  const SIDE_COL = WORLD.pavement;
+  const ROAD_COL = WORLD.road;
   g.strokeStyle = hex(SIDE_COL); g.lineWidth = roadPx * 1.6;                // sidewalks
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  g.strokeStyle = PIRATE ? 'rgba(150,110,60,0.45)' : 'rgba(120,126,150,0.5)'; g.lineWidth = roadPx * 1.62;
+  g.strokeStyle = 'rgba(120,126,150,0.5)'; g.lineWidth = roadPx * 1.62;
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
   g.strokeStyle = hex(SIDE_COL); g.lineWidth = roadPx * 1.56;
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
   g.strokeStyle = hex(ROAD_COL); g.lineWidth = roadPx;                       // asphalt / teak deck
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  if (PIRATE) {
-    // PLANKING: cross-seams every ~46 units turn the deck into real boards,
-    // plus a warm highlight down the middle so the boardwalk reads as raised
-    g.strokeStyle = 'rgba(120,78,34,0.5)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
-    for (const c of ROAD_CENTERS) {
-      for (let a2 = 900; a2 < 11200; a2 += 46) {
-        g.beginPath(); g.moveTo(pxW(c) - roadPx / 2, pyW(a2)); g.lineTo(pxW(c) + roadPx / 2, pyW(a2)); g.stroke();
-        g.beginPath(); g.moveTo(pxW(a2), pyW(c) - roadPx / 2); g.lineTo(pxW(a2), pyW(c) + roadPx / 2); g.stroke();
-      }
-    }
-    g.strokeStyle = 'rgba(255,226,168,0.35)'; g.lineWidth = roadPx * 0.24;
-    for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
-  }
   // (lane dashes are crisp GEOMETRY now — see the InstancedMesh below)
   // crosswalks: zebra ladders on all four arms of every junction
-  g.fillStyle = PIRATE ? 'rgba(255,236,190,0.75)' : 'rgba(240,244,252,0.88)';
+  g.fillStyle = 'rgba(240,244,252,0.88)';
   for (const cx of ROAD_CENTERS) for (const cyR of ROAD_CENTERS) {
     const jx = pxW(cx), jy = pyW(cyR), half = roadPx / 2;
     const crossW = roadPx * 0.34;          // ladder depth (walking direction)
@@ -479,82 +639,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         g.beginPath(); g.ellipse(pxW(pool.x - 30), pyW(pool.y - 20), pxW(34) - pxW(0), pxW(18) - pxW(0), 0.5, 0, Math.PI * 2); g.fill();
       }
     });
-  }
-
-  // ══ PIRATE BAY ground decals ═══════════════════════════════════════════
-  // Every district gets a painted floor so the resort reads from the air:
-  // a lit dance floor, kidney pools with tiled surrounds, plank piers running
-  // into the lagoon, and market cobbles.
-  if (PIRATE) for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
-    const b2 = PLAN[gy][gx];
-    const cx = blockCenter(gx), cy = blockCenter(gy), H = BLOCK_SIZE / 2;
-    if (b2 === 'party') {
-      // DANCE FLOOR: a checker of glowing panels + a ring of torch marks
-      const cell = 150, span = 4;
-      for (let iy = -span; iy <= span; iy++) for (let ix = -span; ix <= span; ix++) {
-        const lit = (ix + iy) % 2 === 0;
-        g.fillStyle = lit ? 'rgba(255,120,200,0.55)' : 'rgba(90,200,255,0.42)';
-        g.fillRect(pxW(cx + ix * cell - cell / 2), pyW(cy + iy * cell - cell / 2),
-          pxW(cell) - pxW(0), pxW(cell) - pxW(0));
-      }
-      g.strokeStyle = 'rgba(255,236,150,0.75)'; g.lineWidth = pxW(26) - pxW(0);
-      g.strokeRect(pxW(cx - cell * 4.5), pyW(cy - cell * 4.5), pxW(cell * 9) - pxW(0), pxW(cell * 9) - pxW(0));
-    } else if (b2 === 'resort') {
-      // KIDNEY POOLS: two lagoon pools with tiled decks + a lounger row
-      for (const [ox, oy, rr] of [[-330, -180, 260], [300, 240, 210]] as [number, number, number][]) {
-        g.fillStyle = '#f6ecd2';
-        g.beginPath(); g.ellipse(pxW(cx + ox), pyW(cy + oy), pxW(rr + 90) - pxW(0), pxW(rr * 0.72 + 90) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#3fc9d8';
-        g.beginPath(); g.ellipse(pxW(cx + ox), pyW(cy + oy), pxW(rr) - pxW(0), pxW(rr * 0.72) - pxW(0), 0.3, 0, Math.PI * 2); g.fill();
-        g.fillStyle = 'rgba(255,255,255,0.42)';
-        g.beginPath(); g.ellipse(pxW(cx + ox - rr * 0.3), pyW(cy + oy - rr * 0.2), pxW(rr * 0.3) - pxW(0), pxW(rr * 0.14) - pxW(0), 0.5, 0, Math.PI * 2); g.fill();
-      }
-      // raked sand lines — the "someone grooms this beach at 6am" cue
-      g.strokeStyle = 'rgba(214,190,140,0.35)'; g.lineWidth = Math.max(1, pxW(8) - pxW(0));
-      for (let k = -H + 90; k < H; k += 96) {
-        g.beginPath(); g.moveTo(pxW(cx - H), pyW(cy + k)); g.lineTo(pxW(cx + H), pyW(cy + k + 40)); g.stroke();
-      }
-    } else if (b2 === 'port') {
-      // PIERS: three plank fingers reaching south out of the dock apron
-      g.fillStyle = '#8a6132';
-      g.fillRect(pxW(cx - H), pyW(cy + H - 220), pxW(BLOCK_SIZE) - pxW(0), pxW(220) - pxW(0));
-      for (const px2 of [-420, 0, 420]) {
-        g.fillStyle = '#a8814f';
-        g.fillRect(pxW(cx + px2 - 80), pyW(cy - H + 120), pxW(160) - pxW(0), pxW(H * 1.4) - pxW(0));
-        g.strokeStyle = 'rgba(110,72,32,0.55)'; g.lineWidth = Math.max(1, pxW(8) - pxW(0));
-        for (let k = 0; k < 14; k++) {
-          const yy = cy - H + 120 + k * 84;
-          g.beginPath(); g.moveTo(pxW(cx + px2 - 80), pyW(yy)); g.lineTo(pxW(cx + px2 + 80), pyW(yy)); g.stroke();
-        }
-      }
-    } else if (b2 === 'market') {
-      // MARKET COBBLES + a bunting-lit central square
-      g.fillStyle = 'rgba(196,150,92,0.35)';
-      for (let iy = -4; iy <= 4; iy++) for (let ix = -4; ix <= 4; ix++) {
-        if ((ix * 7 + iy * 13) % 3) continue;
-        g.fillRect(pxW(cx + ix * 160 - 60), pyW(cy + iy * 160 - 60), pxW(120) - pxW(0), pxW(120) - pxW(0));
-      }
-      g.fillStyle = 'rgba(255,214,120,0.28)';
-      g.beginPath(); g.ellipse(pxW(cx), pyW(cy), pxW(420) - pxW(0), pxW(360) - pxW(0), 0, 0, Math.PI * 2); g.fill();
-    } else if (b2 === 'cove') {
-      // COVE: a tide pool + a dark wreck scar in the sand
-      g.fillStyle = '#5bc8d8';
-      g.beginPath(); g.ellipse(pxW(cx + 180), pyW(cy - 120), pxW(330) - pxW(0), pxW(240) - pxW(0), 0.4, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(120,96,60,0.35)';
-      g.beginPath(); g.ellipse(pxW(cx - 220), pyW(cy + 180), pxW(300) - pxW(0), pxW(120) - pxW(0), -0.5, 0, Math.PI * 2); g.fill();
-    } else if (b2 === 'jungle') {
-      // JUNGLE: dappled canopy shadow + a winding dirt trail
-      g.fillStyle = 'rgba(20,70,40,0.30)';
-      for (let k = 0; k < 26; k++) {
-        const jx2 = cx + rand(-H, H), jy2 = cy + rand(-H, H);
-        g.beginPath(); g.ellipse(pxW(jx2), pyW(jy2), pxW(rand(120, 240)) - pxW(0), pxW(rand(90, 190)) - pxW(0), rand(0, 3), 0, Math.PI * 2); g.fill();
-      }
-      g.strokeStyle = 'rgba(206,178,124,0.55)'; g.lineWidth = pxW(120) - pxW(0);
-      g.lineCap = 'round';
-      g.beginPath(); g.moveTo(pxW(cx - H), pyW(cy - 200));
-      g.quadraticCurveTo(pxW(cx), pyW(cy + 260), pxW(cx + H), pyW(cy - 120));
-      g.stroke();
-    }
   }
 
   // GOLF COURSE — park block (4,2): fairway sweep, putting green, bunkers, tee
@@ -913,6 +997,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   for (const p of sil3) g.lineTo(px(p.x), py(p.y));
   g.closePath(); g.stroke();
 
+  }   // ← end of the Maple-only ground detail (roads, blocks, districts)
+
   const groundTex = new THREE.CanvasTexture(cv);
   groundTex.anisotropy = (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ? 4 : 16;
   groundTex.colorSpace = THREE.SRGBColorSpace;
@@ -996,8 +1082,9 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     cap.rotation.x = -Math.PI / 2; cap.position.y = -DEPTH; scene.add(cap);
   }
 
-  // crisp geometry lane dashes — razor sharp at any zoom (the baked ones blur)
-  {
+  // crisp geometry lane dashes — razor sharp at any zoom (the baked ones blur).
+  // Pirate Bay has no traffic lanes: its boardwalk is one curve, not a grid.
+  if (WORLD_ID !== 'pirate') {
     const dashGeo = new THREE.BoxGeometry(2.6, 0.03, 0.34);
     const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2f5fa });
     const spots: { x: number; z: number; rot: number }[] = [];
@@ -1046,6 +1133,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // Higgsfield image→3D hero landmark: the ferris wheel — moved out of the city
   // core to a beach BOARDWALK FAIR where a ferris wheel actually belongs.
+  // …and on Pirate Bay it belongs to DANCE COVE — Maple's fairground block
+  // is open water on the hooked island, which is exactly where the wheel used
+  // to render.
+  const FERRIS: [number, number] = WORLD_ID === 'pirate'
+    ? [w(7400), w(10700)] : [w(blockCenter(3)) + 4, w(blockCenter(5)) - 14];
   new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb', (gltf) => {
     const model = gltf.scene;
     const box = new THREE.Box3().setFromObject(model);
@@ -1056,14 +1148,14 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     model.position.y -= box.min.y;                      // feet on the ground
     const grp = new THREE.Group();
     grp.add(model);
-    grp.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);   // beach fairground
+    grp.position.set(FERRIS[0], 0, FERRIS[1]);   // beach fairground / dance cove
     grp.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(grp);
     addEdible(grp, 5.6);   // ferris wheel: dessert, not decoration
   }, undefined, () => {
     // asset unreachable: the FAIR still exists — procedural wheel stand-in
     const fb = makeFerrisFB();
-    fb.position.set(w(blockCenter(3)) + 4, 0, w(blockCenter(5)) - 14);
+    fb.position.set(FERRIS[0], 0, FERRIS[1]);
     fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     scene.add(fb); addEdible(fb, 5.6);
   });
@@ -1075,6 +1167,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // ── biome lookup ───────────────────────────────────────────────────────────
   function biomeAt(x3: number, z3: number): Biome | null {
+    if (WORLD_ID === 'pirate') {
+      const d = BAY.bayDistrictAt(x3 / SCALE + CX, z3 / SCALE + CZ);
+      return d === 'oldtown' ? 'market' : (d as Biome | null);
+    }
     const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
     if (!insideIslandWorld(wx, wy)) return null;   // off the coast = off the island
     // inside the coast, clamp to the nearest block so the whole island is
@@ -1935,6 +2031,157 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     scene.add(mesh); addEdible(mesh, r);
   };
 
+  // ══ PIRATE BAY: props scattered inside REGIONS, never on a grid ═════════
+  if (WORLD_ID === 'pirate') {
+    const P3 = (p2: [number, number]): [number, number] => [w(p2[0]), w(p2[1])];
+    const drop = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY?: number) => {
+      const [x3, z3] = P3(p2);
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      place(mesh, x3, z3, r);
+    };
+    const dropGlb = (name: string, p2: [number, number], r: number, h: number, fb?: () => THREE.Object3D, rotY?: number) => {
+      const [x3, z3] = P3(p2);
+      if (!insideIsland3(x3, z3)) return;
+      glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback: fb });
+    };
+    const spread = (id: string, n: number, clear = 60) =>
+      BAY.scatterInRegion(BAY.BAY_REGIONS.find((r) => r.id === id)!, n, Math.random, clear);
+
+    const sland = (n: number, clear = 45, band?: [number, number]) =>
+      BAY.scatterLand(n, Math.random, clear, band);
+    const grove = (cx2: number, cy2: number, n: number, rad: number, clear = 30) =>
+      BAY.clusterAt(cx2, cy2, n, rad, Math.random, clear);
+
+    // ══ THE WILD ISLAND ═══════════════════════════════════════════════════
+    // Everything above is a district; MOST of Pirate Bay is the open sand and
+    // scrub between them. A per-region scatter can never reach it, so this
+    // pass samples the whole landmass — it is what stops the island reading
+    // like eight busy islands floating in an empty cream disc.
+
+    // palm GROVES (clumps, not an even dusting — from above a clump reads as
+    // a place, a dusting reads as noise)
+    for (const [gx2, gy2] of sland(17, 240)) {
+      for (const p2 of grove(gx2, gy2, 4 + Math.floor(Math.random() * 5), 420, 55))
+        dropGlb('palm', p2, 2.6, rand(6.5, 10.5), makePalm, rand(0, Math.PI * 2));
+    }
+    // dune grass and scrub, thickest just inland of the surf
+    for (const p2 of sland(190, 26)) drop(makeReeds(), p2, 0.9, rand(0, Math.PI * 2));
+    for (const p2 of sland(110, 34)) drop(makeBush(), p2, 1.6);
+    for (const p2 of sland(95, 30)) drop(makeFlowers(), p2, 0.7);
+    // the SHORELINE band: shells, driftwood rocks, and things the tide left
+    for (const p2 of sland(130, 20, [40, 420])) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
+    for (const p2 of sland(75, 34, [60, 520])) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
+    for (const p2 of sland(34, 40, [90, 620])) drop(makeSandcastleFB(), p2, 1.2);
+    for (const p2 of sland(44, 40, [90, 700])) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+    for (const p2 of sland(40, 34, [90, 700])) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
+    for (const p2 of sland(9, 120, [120, 700])) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
+    // doubloons in the sand — treasure is the island's whole fiction
+    for (const p2 of sland(65, 26)) drop(makeCoins(), p2, 0.6);
+    for (const p2 of sland(26, 60)) drop(makeBarrel(), p2, 1.3);
+
+    // ── THE DOCKS: the galleon at the pier head, cargo, cannons, lighthouse
+    for (const p2 of spread('port', 34, 40)) drop(Math.random() < 0.6 ? makeBarrel() : makeChest(), p2, 1.4);
+    { const sh = makeGalleon(); drop(sh, [7750, 3250], 7.5, -0.6); }
+    { const sh = makeGalleon(); drop(sh, [7050, 2650], 7.5, 2.4); }
+    dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
+    for (const p2 of spread('port', 6, 60)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 4, 90)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 12, 40)) drop(makeShopBox(), p2, 1.1, rand(0, Math.PI * 2));
+
+    // ── OLD TOWN: a huddle of thatch houses and market clutter on the bluff
+    for (const p2 of spread('oldtown', 24, 55)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 18, 40)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of spread('oldtown', 12, 55)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 12, 35)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of spread('oldtown', 8, 45)) drop(makeMailbox(), p2, 0.8, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 6, 60)) drop(makeLamp(), p2, 1.2);
+
+    // ── THE RESORT: cabanas along the shore, loungers ringing the two pools
+    for (const p2 of spread('resort', 22, 62)) dropGlb('cabana', p2, 3, 4.6, makeThatchHut, rand(-0.3, 0.3));
+    for (const [ox, oy] of [[8900, 4900], [9050, 6300]] as [number, number][]) {
+      for (let k = 0; k < 11; k++) {
+        const a2 = (k / 11) * Math.PI * 2;
+        drop(makeBeachChairFB(), [ox + Math.cos(a2) * 430, oy + Math.sin(a2) * 340], 1.4, a2);
+      }
+      for (let k = 0; k < 3; k++) {
+        const a2 = (k / 3) * Math.PI * 2 + 0.5;
+        dropGlb('umbrella', [ox + Math.cos(a2) * 300, oy + Math.sin(a2) * 260], 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+      }
+    }
+    for (const p2 of spread('resort', 20, 50)) dropGlb('palm', p2, 2.6, rand(7, 9.5), makePalm, rand(0, Math.PI * 2));
+    drop(makeTikiBar(), [9250, 5600], 3.4, -0.4);
+    drop(makeTikiBar(), [8800, 4200], 3.4, 0.6);
+    for (const p2 of spread('resort', 16, 34)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of spread('resort', 10, 40)) drop(makeLuggage(), p2, 1.0, rand(0, Math.PI * 2));
+    for (const p2 of spread('resort', 8, 55)) drop(makeGazeboFB(), p2, 2.8);
+    for (const p2 of spread('resort', 8, 45)) drop(makeIcecreamFB(), p2, 1.6, rand(0, Math.PI * 2));
+
+    // ── DANCE COVE: the stage, speaker walls, torch ring, bars
+    drop(makeThatchHut(), [7400, 10250], 5, 0);
+    for (const p2 of [[6950, 10330], [7900, 10350], [7100, 10680], [8000, 10700],
+      [6600, 10500], [8300, 10620]] as [number, number][]) drop(makeSpeakerStack(), p2, 2.6);
+    for (let k = 0; k < 20; k++) {
+      const a2 = (k / 20) * Math.PI * 2;
+      drop(makeTorch(), [7400 + Math.cos(a2) * 1050, 10480 + Math.sin(a2) * 300], 1.0);
+    }
+    drop(makeTikiBar(), [6500, 10450], 3.4, 0.4);
+    drop(makeTikiBar(), [8350, 10520], 3.4, -0.4);
+    for (const p2 of spread('party', 16, 34)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of spread('party', 14, 26)) drop(makeCoins(), p2, 0.6);
+
+    // ── THE BAZAAR: stalls, treasure, palms
+    for (const p2 of spread('market', 22, 45)) drop(makeMarketStall(), p2, 2.6, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 16, 36)) drop(Math.random() < 0.5 ? makeChest() : makeBarrel(), p2, 1.4);
+    for (const p2 of spread('market', 10, 50)) dropGlb('palm', p2, 2.6, rand(6, 8.5), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 12, 34)) drop(makeShopBox(), p2, 1.1, rand(0, Math.PI * 2));
+    for (const p2 of spread('market', 10, 30)) drop(makeFlowers(), p2, 0.7);
+    for (const p2 of spread('market', 5, 55)) drop(makeFoodtruckFB(), p2, 2.6, rand(0, Math.PI * 2));
+
+    // ── THE JUNGLE: dense canopy, boulders, a hidden chest
+    for (const p2 of spread('jungle', 62, 34)) {
+      if (Math.random() < 0.72) dropGlb('palm', p2, 2.6, rand(7, 10.5), makePalm, rand(0, Math.PI * 2));
+      else drop(makePine(), p2, 3);
+    }
+    for (const p2 of spread('jungle', 18, 36)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
+    for (const p2 of spread('jungle', 28, 28)) drop(makeBush(), p2, 1.6);
+    for (const p2 of spread('jungle', 26, 22)) drop(makeMushroom(), p2, 0.6);
+    for (const p2 of spread('jungle', 5, 60)) drop(makeChest(), p2, 1.5);
+    for (const p2 of spread('jungle', 4, 90)) drop(makeTentFB(), p2, 2.2, rand(0, Math.PI * 2));
+    for (const p2 of spread('jungle', 2, 120)) drop(makeCampfireFB(), p2, 1.4);
+
+    // ── SMUGGLERS COVE: treasure, wreck rocks, a cannon
+    for (const p2 of spread('cove', 12, 34)) drop(makeChest(), p2, 1.5);
+    for (const p2 of spread('cove', 18, 32)) drop(makeRocksFB(), p2, 2.4, rand(0, Math.PI * 2));
+    for (const p2 of spread('cove', 12, 34)) drop(makeBarrel(), p2, 1.3);
+    for (const p2 of spread('cove', 14, 24)) drop(makeCoins(), p2, 0.6);
+    for (const p2 of spread('cove', 10, 26)) drop(makeReeds(), p2, 0.9);
+    drop(makeCannon(), [2400, 6300], 2, 0.9);
+    drop(makeCannon(), [2650, 5800], 2, -0.4);
+    { const wreck = makeGalleon(); wreck.rotation.z = 0.42; drop(wreck, [2150, 6800], 7, 1.9); }
+
+    // ── SUNSET BEACH: the long outer sweep — umbrellas, castles, palms
+    for (const p2 of spread('beach', 30, 36)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 22, 34)) drop(makeBeachChairFB(), p2, 1.4, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 14, 36)) drop(makeSandcastleFB(), p2, 1.2);
+    for (const p2 of spread('beach', 18, 50)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 20, 22)) drop(makeShell(), p2, 0.5, rand(0, Math.PI * 2));
+    for (const p2 of spread('beach', 4, 90)) drop(makeLifeguardFB(), p2, 2.6, rand(0, Math.PI * 2));
+
+    // ── THE PROMENADE: torches and benches down its whole length
+    for (let t = 0.015; t < 0.99; t += 0.02) {
+      const a2 = BAY.pathPointAt(BAY.PROMENADE, t);
+      const nx = Math.cos(a2.ang + Math.PI / 2), ny = Math.sin(a2.ang + Math.PI / 2);
+      const side = (t * 100) % 2 < 1 ? 1 : -1;
+      drop(makeTorch(), [a2.x + nx * side * (BAY.PROM_HALF - 55), a2.y + ny * side * (BAY.PROM_HALF - 55)], 1.0);
+      if ((t * 100) % 4 < 1) {
+        const bn = makeBench(); bn.rotation.y = -a2.ang;
+        drop(bn, [a2.x - nx * side * (BAY.PROM_HALF - 60), a2.y - ny * side * (BAY.PROM_HALF - 60)], 2.4);
+      }
+      if ((t * 100) % 6 < 1) drop(makeTrash(), [a2.x - nx * side * (BAY.PROM_HALF - 30), a2.y - ny * side * (BAY.PROM_HALF - 30)], 0.8);
+    }
+    return;   // Pirate Bay is fully populated — the Maple grid pass never runs
+  }
+
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const biome = PLAN[gy][gx];
     const cxW = blockCenter(gx), cyW = blockCenter(gy);
@@ -2065,7 +2312,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // north corner pockets: a street tree + hydrant each
       for (const sxc of [-1, 1]) {
         placeGlb('parktree', cx + sxc * half * 0.87, cz - half * 0.87, 3.2, 7, makeTree);
-        if (WORLD_ID !== 'pirate') place(makeHydrant(), cx + sxc * half * 0.8, cz - half * 0.8, 0.8);
+        place(makeHydrant(), cx + sxc * half * 0.8, cz - half * 0.8, 0.8);
       }
       // court dressing: benches + ice-cream cart in the courtyard shade
       place(makeBench(), cx - 7, cz + 8, 2.4);
@@ -2369,11 +2616,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (let a = -270; a < 270; a += 32, ci++) {
       const side = ci % 2 ? 4.9 : -4.9;   // road shoulder — cars never clip them
       if (nearCrossRoad(a, 4.5)) continue;
-      // Pirate Bay's boardwalks are lit by TIKI TORCHES, not traffic cones
-      const kerb = () => (WORLD_ID === 'pirate' ? makeTorch() : makeCone());
-      const kr = WORLD_ID === 'pirate' ? 1.0 : 0.7;
-      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(kerb(), a, rc + side, kr);
-      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(kerb(), rc - side, a, kr);
+      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
+      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
     }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {
