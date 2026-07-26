@@ -3,6 +3,7 @@
 // through MAPLE ISLE — the 2D island ported to 3D, floating in cosmic space.
 // Void: ./proto3d/void3d · island: ./proto3d/island · palette: ./proto3d/palette
 // Standalone page — the main game bundle is untouched.
+declare const __BUILD__: string;   // injected by vite.config define (build stamp)
 import * as THREE from 'three';
 // brand type: the shipping page used system-ui while only the retired React
 // entry bundled the brand font — single cheapest "top-10 app" lift
@@ -144,6 +145,16 @@ const _dbg = window as unknown as {
 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
+// build stamp: tiny, menu-only — every screenshot identifies its build
+{
+  const bs = document.createElement('div');
+  bs.textContent = `v ${__BUILD__}`;
+  bs.style.cssText = 'position:fixed;right:8px;bottom:4px;z-index:11;font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(203,178,255,0.5);pointer-events:none;';
+  document.body.appendChild(bs);
+  const vis = () => { bs.style.display = document.body.classList.contains('menu') ? 'block' : 'none'; };
+  new MutationObserver(vis).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  vis();
+}
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 5);   // the WHOLE family shows up (full end-board)
@@ -944,8 +955,9 @@ function validateWorld() {
     // HOUSES are the exception: near-true footprint (0.85) and the no-go band
     // includes the sidewalk, so a porch can never ride the curb again.
     const house = ud.qk === 'house';
+    const parked = ud.qk === 'car';   // (movers were skipped above — this is only driveway cars)
     const f = house ? 0.85 : ud.building ? 0.45 : 0.7;
-    const band = house ? ASPHALT_HALF + 1.4 : ASPHALT_HALF;
+    const band = house || parked ? ASPHALT_HALF + 1.4 : ASPHALT_HALF;
     const hx = (Math.min(_vSz.x, 24) / 2) * f, hz = (Math.min(_vSz.z, 24) / 2) * f;
     let px = e.home.x, pz = e.home.z, dirty = false, dead = false;
     for (const rc of ROAD_CENTERS_3D) {

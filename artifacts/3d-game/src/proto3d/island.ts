@@ -1716,7 +1716,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
             return c2;
           };
           glb(scene, addEdible, Math.random() < 0.85 ? 'car_sedan' : 'car_taxi',
-            hx + fx3 * 5.6 + dvx, hz + fz3 * 5.6 + dvz, 2.8,
+            hx + fx3 * 4.9 + dvx, hz + fz3 * 4.9 + dvz, 2.8,
             { h: 2.6, rotY: lot.rot + Math.PI / 2, fallback: carFB,
               onReady: (g2) => { g2.userData.qk = 'car'; g2.userData.ptsMult = 1.5; } });
         }

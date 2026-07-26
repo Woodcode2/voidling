@@ -268,6 +268,9 @@ function escapeHtml(s: string): string {
 
 export default defineConfig({
   base: basePath,
+  // build stamp shown tiny on the menu — production screenshots always tell
+  // us WHICH build they came from (ends the "is this the old bundle?" loop)
+  define: { __BUILD__: JSON.stringify(new Date().toISOString().slice(5, 16).replace('T', ' ') + 'Z') },
   plugins: [
     react(),
     tailwindcss(),
