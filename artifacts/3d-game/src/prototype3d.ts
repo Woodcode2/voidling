@@ -174,6 +174,10 @@ const _dbg = window as unknown as {
   __voidState: () => { x: number; z: number; r: number };
   __biomeAt: (x: number, z: number) => string | null;
   __rushClock: (to: number) => void;
+  // QA: whole-match telemetry — player score/radius against every rival's, so a
+  // harness can log the real race curve instead of scraping the HUD.
+  __matchState: () => { t: number; clock: number; score: number; r: number;
+    rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
@@ -183,6 +187,12 @@ _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: distri
 // QA: wind the match clock forward so a harness can photograph the results
 // screen without simulating three real minutes of software rendering
 _dbg.__rushClock = (to: number) => { matchClock = to; };
+// QA: one call returns the whole race — used to log score curves over a match
+_dbg.__matchState = () => ({
+  t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius,
+  rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
+    joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting })),
+});
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
   const bs = document.createElement('div');
@@ -456,9 +466,19 @@ let dashT = 0; const dashDir = { x: 0, z: 1 };
 const aim = { x: 0, z: 1 };            // last travel direction
 let autoFireCd = 3;
 
-const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'WORLD ENDER'];
+// SIX FORMS, and the last one is RARE. WORLD ENDER sat at radius 5.0, which
+// the old clock-locked curve handed to literally every run at about two
+// minutes — so "BIGGEST: WORLD ENDER" on the results screen was decoration,
+// not an achievement. It is 8.0 now, above where a weak run finishes, and
+// COLOSSUS fills the gap so the ladder still has a rung every 30-40 seconds.
+// Ending a world should be the thing you tell someone about.
+const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'COLOSSUS', 'WORLD ENDER'];
 // 2D thresholds 18/32/50/78/110 world-px, mapped through the 0.05 world scale
-const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.0];
+const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0];
+// the void renderer and the soundtrack both ship five visual tiers. COLOSSUS
+// wears DEVOURER's dressing — it IS a huge devourer — so the top tier stays
+// unique to WORLD ENDER and arriving there looks like something.
+const VISUAL_STAGE = [0, 1, 2, 3, 3, 4];
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
 const PLAYER_COLOR = 0x9a5cff;
 
@@ -2221,12 +2241,26 @@ function animate() {
     }
     audio.evolve();
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
-    audio.setMusicStage(curStage);             // the soundtrack escalates too
+    audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);   // the soundtrack escalates too
     buzz(45);
+    // …and the last rung gets a whole moment of its own. Three rings, a white
+    // flash, a long shake and its own headline: you are not meant to see this
+    // every match.
+    if (curStage === FORMS.length - 1) {
+      fx.ring(voidState.x, voidState.z, 0xffffff, R * 9, 1.2);
+      fx.ring(voidState.x, voidState.z, 0xffd23f, R * 6.5, 1.0);
+      fx.flash('#ffffff', 0.55);
+      fx.shake(1.1);
+      announce('🌑 WORLD ENDER — the island is OVER');
+      breakingNews(pickedWorld === 'pirate'
+        ? 'THE RESORT IS CANCELLED. it was lovely while it lasted.'
+        : 'MAPLE FALLS: BOTH CANDIDATES CONCEDE. to the hole.');
+      buzz(120);
+    }
   }
   // NEVER downgrade: the growth-law clamp can pull radius back under a form
   // threshold the frame after evolving — re-announcing the same form forever
-  voidling.setStage(curStage);
+  voidling.setStage(VISUAL_STAGE[curStage] ?? 4);
 
   // the soundtrack follows you: standing on the dance floor brings in the kick,
   // the stab and the crowd, and ducks the island bed under them
