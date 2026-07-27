@@ -172,12 +172,16 @@ const _dbg = window as unknown as {
   __news: () => void;
   __voidState: () => { x: number; z: number; r: number };
   __biomeAt: (x: number, z: number) => string | null;
+  __rushClock: (to: number) => void;
 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 _dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
 _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: district centroid sweeps
+// QA: wind the match clock forward so a harness can photograph the results
+// screen without simulating three real minutes of software rendering
+_dbg.__rushClock = (to: number) => { matchClock = to; };
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
   const bs = document.createElement('div');
@@ -467,6 +471,7 @@ const R_CAP = 12;                       // 2D MAX_RADIUS 240 · 0.05
 // Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHER ~23s,
 // GOBBLER ~53s, DEVOURER ~100s, WORLD ENDER ~153s on a strong run.
 const LAW_RATE = 0.025;   // evolutions are EARNED — slower clock, same 2D shape
+let lastR = 0.9;          // previous frame's radius — the growth RATE limiter
 const growRadius = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;   // 2D: <34 → 1.6, <50 → 1.3
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
@@ -478,6 +483,7 @@ const MATCH_LEN = Number(_q.get('len')) || 180;                // 3:00 — tight
 const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
 let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
+let matchEaten = 0;   // props eaten THIS match — the results screen's own number
 let initialMass = 0;                   // set once, after the world is built
 let hudCd = 0;
 
@@ -775,6 +781,28 @@ let xp = Number(localStorage.getItem('voidXP') || 0);
 let streak = Number(localStorage.getItem('voidStreak') || 0);
 // per-level XP spans: the first levels pop in 1-2 matches, MASTER is a season
 const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250, 300, 400];
+const PRICES: Record<string, number> = {
+  classic: 0, galaxy: 150, wizard: 150, sunset: 250, toxic: 250, ocean: 400,
+  nebula: 600, magma: 600, candy: 600, aurora: 750,
+  honey: 750, glacier: 750, sherbet: 900, cyber: 900, blossom: 900, royal: 1500,
+};
+/** THE NEXT THING TO CHASE. The results screen stated an outcome and offered a
+ *  button; it never stated a goal, which is the moment a child decides whether
+ *  there is a reason to press PLAY AGAIN. Cheapest skin they don't own yet. */
+function nextGoal(): { label: string; have: number; need: number } | null {
+  let owned: Set<string>;
+  try { owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]')); }
+  catch { owned = new Set(['classic']); }
+  let best: { id: string; p: number } | null = null;
+  for (const sk of SKINS) {
+    const p = PRICES[sk.id];
+    if (p === undefined || p <= 0 || owned.has(sk.id)) continue;
+    if (!best || p < best.p) best = { id: sk.id, p };
+  }
+  if (!best) return null;
+  const nm = SKINS.find((sk) => sk.id === best!.id)?.name ?? best.id;
+  return { label: nm.toUpperCase(), have: coins, need: best.p };
+}
 function rankInfo(x: number) {
   let lvl = 1, rem = x, span = XP_SPANS[0];
   for (const sp of XP_SPANS) {
@@ -857,12 +885,22 @@ function endMatch() {
   const myRank = rows.findIndex((r) => r.me) + 1;
   // everyone leaves with something; winning is 5x last place, not infinity-x
   const today = new Date().toDateString();
-  let reward = ([50, 35, 25, 15, 10][myRank - 1] ?? 10) + Math.min(60, Math.floor(playerScore / 50));
+  // The score term was min(60, score/50) — SATURATED at 3,000 points, which a
+  // logged match crossed at thirty-five seconds. A 134,063-point run and a
+  // 53,259-point run both paid exactly +160 coins. Two thirds of every match
+  // was unpaid, and playing twice as well paid nothing at all: the game was
+  // rewarding a child for stopping after half a minute. A log curve keeps
+  // climbing — 3k pays 60, 20k pays 137, 130k pays 219 — without ever letting
+  // one enormous run out-earn a week of ordinary ones.
+  const scoreCoins = Math.floor(60 * Math.log10(1 + playerScore / 500) / Math.log10(7));
+  let reward = ([50, 35, 25, 15, 10][myRank - 1] ?? 10) + Math.min(300, scoreCoins);
   if (myRank === 1 && localStorage.getItem('voidFirstWinDay') !== today) {
     localStorage.setItem('voidFirstWinDay', today); reward += 50;
   }
   addCoins(reward);
-  let gain = ([25, 18, 12, 8, 5][myRank - 1] ?? 5) + Math.min(10, Math.floor(playerScore / 400));
+  // …and XP saturated at 4,000, crossed at about the same moment
+  const scoreXp = Math.floor(22 * Math.log10(1 + playerScore / 800) / Math.log10(6));
+  let gain = ([25, 18, 12, 8, 5][myRank - 1] ?? 5) + Math.min(90, scoreXp);
   if (localStorage.getItem('voidFirstMatchDay') !== today) { localStorage.setItem('voidFirstMatchDay', today); gain += 10; }
   xp += gain; localStorage.setItem('voidXP', String(xp)); renderRank();
   // lifetime stats + weekly best
@@ -878,6 +916,28 @@ function endMatch() {
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
   celebrateEnd(reward, gain, myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`, myRank === 1);
+  // THE RUN'S OWN NUMBERS. % DEVOURED was shown in Solo and nowhere else — the
+  // figure a child watched climb for three minutes simply vanished at the
+  // whistle — and nothing on the screen compared this run to their best.
+  {
+    const pb = Number(localStorage.getItem('voidBestScore') || 0);
+    const isPb = Math.round(playerScore) > pb;
+    if (isPb) localStorage.setItem('voidBestScore', String(Math.round(playerScore)));
+    const st = el('endStats');
+    st.innerHTML =
+      `<div class="es"><i>DEVOURED</i><b>${devouredPct}%</b></div>` +
+      `<div class="es"><i>EATEN</i><b>${matchEaten}</b></div>` +
+      `<div class="es"><i>BIGGEST</i><b>${FORMS[curStage]}</b></div>` +
+      `<div class="es${isPb ? ' pb' : ''}"><i>${isPb ? 'NEW BEST!' : 'YOUR BEST'}</i><b>${Math.round(isPb ? playerScore : pb)}</b></div>`;
+    const g = nextGoal();
+    const nx = el('endNext');
+    if (g) {
+      const k = Math.min(1, g.have / g.need);
+      nx.innerHTML = g.have >= g.need
+        ? `✦ <b>${g.label} SKIN UNLOCKED</b> — go and get it!<div class="nb"><div style="width:100%"></div></div>`
+        : `${g.need - g.have}✦ to the <b>${g.label}</b> skin<div class="nb"><div style="width:${Math.round(k * 100)}%"></div></div>`;
+    } else nx.innerHTML = '';
+  }
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${r.me && i === 0 ? '👑' : i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
@@ -918,7 +978,7 @@ function capture(e: Edible, giveHunger = true) {
     spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6);
   }
   voidling.chomp();
-  stats.eaten++;
+  stats.eaten++; matchEaten++;
   // the very first thing a brand-new player ever eats gets a PARTY — the
   // guaranteed wow inside the first 30 seconds
   if (!localStorage.getItem('voidFirstNom')) {
@@ -1030,7 +1090,7 @@ function beginMatch(solo = false) {
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
   for (const bt of BEATS) bt.fired = false;
-  feverMult = 1; feverT = 0;
+  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0;
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
@@ -1487,11 +1547,6 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
 // skin SHOP — earn coins in matches, spend them on skins (LoL soft-currency
 // model, same as the 2D shop); owned + equipped persist across sessions
 {
-  const PRICES: Record<string, number> = {
-    classic: 0, galaxy: 150, wizard: 150, sunset: 250, toxic: 250, ocean: 400,
-    nebula: 600, magma: 600, candy: 600, aurora: 750,
-    honey: 750, glacier: 750, sherbet: 900, cyber: 900, blossom: 900, royal: 1500,
-  };
   const grid = el('shopGrid');
   const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
   let equipped = localStorage.getItem('voidSkin') || 'classic';
@@ -1690,9 +1745,46 @@ function animate() {
       // code. The last third is now the POWER FANTASY: the ceiling opens up
       // hard, so earning the final form actually feels like ending a world.
       const surgeT = Math.max(0, el2 - matchLen * 0.66) / Math.max(1, matchLen * 0.34);
-      const lawCap = START_R + 0.022 * Math.min(el2, 30) + LAW_RATE * el2
-        + surgeT * surgeT * 4.2;   // +0 at 2/3, +4.2 at the whistle (~10.3 ceiling)
+      // ── PACE ────────────────────────────────────────────────────────────
+      // The ceiling was a pure function of the clock, and it BOUND in 99% of
+      // sampled frames. Two logged matches on different islands — 902 props
+      // and 134,063 points against 385 props and 53,259 — came out the same
+      // radius at every single checkpoint: 2.31 vs 2.32 at thirty seconds,
+      // 4.56 vs 4.56 at two minutes. Every evolution fired within a second of
+      // the same timestamp in both. A child who plays brilliantly and one who
+      // wanders finished identically, which quietly tells them mastery does
+      // not matter, and that is what kills the third session.
+      //
+      // The stated intent — "no ballooning off one item" — is right. So keep
+      // it, but enforce it as a RATE, and let the ceiling itself move with how
+      // well the run is actually going. pace 1 is par; a strong run opens the
+      // ceiling by 45%, a weak one holds at 78% and the score floor below still
+      // catches anyone struggling.
+      // par is fitted to logged matches: ~3.2k at thirty seconds, ~9.4k at a
+      // minute, ~63k at the whistle. A weak run holds the ceiling at 0.75 and
+      // still reaches WORLD ENDER; a strong one opens it to 1.83 and can max
+      // the final form. Nobody is locked out of the fantasy, and nobody gets
+      // there without playing.
+      // par is fitted to logged matches: ~3.2k at thirty seconds, ~9.4k at a
+      // minute, ~63k at the whistle. The finale surge scales with pace too,
+      // because that is where the spread has to live — a par run lands on the
+      // old 10.3 ceiling exactly, a strong one maxes the final form, and a
+      // weak one still reaches WORLD ENDER, just later. Nobody is locked out
+      // of the fantasy, and nobody arrives without playing.
+      const par = Math.max(1, 60 * el2 + 1.6 * el2 * el2);
+      const pace = THREE.MathUtils.clamp(playerScore / par, 0, 1.2);
+      // …and pace is meaningless in the opening seconds, when the score is
+      // still near zero. Blend it in over 25s so the hook stays untouched.
+      const warm = Math.min(1, el2 / 25);
+      const paceK = (1 - warm) + warm * (0.60 + 0.40 * pace);
+      const lawCap = START_R + (0.022 * Math.min(el2, 30) + LAW_RATE * el2) * paceK
+        + surgeT * surgeT * (2.8 + 2.6 * pace);
+      // the rate limiter is what actually stops a single landmark ballooning
+      // you — it is the job the absolute clamp was doing by accident
+      const maxStep = (0.11 + surgeT * 0.16) * dt;
+      if (voidling.radius > lastR + maxStep) voidling.setRadius(lastR + maxStep);
       if (voidling.radius > lawCap) voidling.setRadius(lawCap);
+      lastR = voidling.radius;
       // 2D score-floor: strong scoring pulls your radius up toward the cap
       // the floor rides the surge too — a strong late run is PULLED to the
       // new ceiling instead of being pinned at the old 6.06 plateau
@@ -2101,7 +2193,11 @@ function animate() {
     camera.updateMatrixWorld();
     _chipV.set(voidState.x, 0, voidState.z).project(camera);
     formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
-    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + 70}px`;
+    // …clear of the HOLE, not a flat 70px below its centre. A WORLD ENDER is
+    // wider than that offset, so late in the match the chip sat inside the void
+    // it was labelling — and it overlapped the speech bubbles behind it.
+    const pxPerWorld = innerHeight / (2 * camDist * Math.tan((camera.fov * Math.PI / 180) / 2));
+    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + 34 + R * pxPerWorld}px`;
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }
