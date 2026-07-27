@@ -285,12 +285,11 @@ export function createRivals(
     // scoring, on the player's own terms
     combo: number; comboT: number;
     // BULLY: the charge state machine (0 prowl, 1 wind-up, 2 lunge, 3 recover)
-    cst: number; ctim: number; missPend: boolean; missCd: number; stolen: number; stuffedSaid: boolean;
+    cst: number; ctim: number; missPend: boolean; missCd: number; stolen: number; stuffedSaid: boolean; stuffCap: number;
     // SHOWOFF: the radius of the landmark it is currently crossing the map for
     lockR: number;
     // HOARDER: the district it has decided is its
     campX: number; campZ: number; campT: number;
-    archSaid: number;   // cooldown on the "here is what I am doing" line
     roll: THREE.Quaternion;
   }
   const roster: R[] = [];        // one per NAME — built once, skins fixed forever
@@ -327,8 +326,8 @@ export function createRivals(
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
       visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
       combo: 0, comboT: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
-      stolen: 0, stuffedSaid: false, lockR: 0,
-      campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0, archSaid: 0,
+      stolen: 0, stuffedSaid: false, stuffCap: 0, lockR: 0,
+      campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0,
       roll: new THREE.Quaternion(),
       // HOME TURF: each family member forages their OWN corner of the island.
       // Without this they orbited the player all match ("they hover around
@@ -371,6 +370,36 @@ export function createRivals(
   let trailT = 0;
   let pvx = 0, pvz = 0;   // player velocity, derived from the trail (charge leading)
 
+  // ── NEVER SET A FAMILY MEMBER DOWN WHERE ITS BODY DOES NOT FIT ────────────
+  // Joins and respawns only ever checked biomeAt at the CENTRE point, so a
+  // rival could be placed on a spit, a jetty or a strip of park too narrow for
+  // it — and then every candidate move failed the body test and the escape
+  // gradient was zero in all directions, so it stayed there. Measured: Grandpa
+  // Dozer spent an entire 180-second match with a total path length of 144
+  // units and a final score of 21. That is the "they just float" complaint in
+  // its purest form, and it was a spawn bug, not an AI one.
+  const bodyMargin = (r: number) => Math.min(r * 0.7, 3.5 + r * 0.15) + 1.0;
+  const fitsAt = (x: number, z: number, r: number) => {
+    const bm = bodyMargin(r);
+    if (!biomeAt(x, z) || inWater3(x, z, bm)) return false;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      if (!biomeAt(x + Math.cos(a) * bm, z + Math.sin(a) * bm)) return false;
+    }
+    return true;
+  };
+  const placeOnLand = (x: number, z: number, r: number): [number, number] => {
+    if (fitsAt(x, z, r)) return [x, z];
+    for (let ring = 1; ring <= 14; ring++) {
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2 + ring * 0.37, rr = ring * 14;
+        const nx = x + Math.cos(a) * rr, nz = z + Math.sin(a) * rr;
+        if (fitsAt(nx, nz, r)) return [nx, nz];
+      }
+    }
+    return [0, 0];   // the island centre always works
+  };
+
   const anyVisiting = () => rivals.some((r) => r.visiting);
   const tmp = new THREE.Vector3();
   const rollQ = new THREE.Quaternion();   // scratch: the rolling-ball delta
@@ -389,8 +418,8 @@ export function createRivals(
         rv.joined = false; rv.respawnT = 0; rv.biteCd = 0; rv.stall = 0; rv.pulse = 0;
         rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
         rv.combo = 0; rv.comboT = 0; rv.cst = 0; rv.ctim = rand(6, 10);
-        rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false;
-        rv.lockR = 0; rv.archSaid = 0; rv.tgt = null;
+        rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false; rv.stuffCap = 0;
+        rv.lockR = 0; rv.tgt = null;
         rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
         rv.roll.identity(); rv.body.quaternion.identity();
         rv.group.visible = rv.halo.visible = false;
@@ -485,14 +514,13 @@ export function createRivals(
             // the last seat is a rival rather than a snack.
             if (isHunter) {
               const a0 = rand(0, Math.PI * 2), d0 = rand(46, 74);
-              rv.x = px + Math.cos(a0) * d0; rv.z = pz + Math.sin(a0) * d0;
-              if (!biomeAt(rv.x, rv.z)) { rv.x = Math.cos(a0) * 120; rv.z = Math.sin(a0) * 120; }
               rv.r = Math.max(START_R * 1.35, pr * 1.5);
+              [rv.x, rv.z] = placeOnLand(px + Math.cos(a0) * d0, pz + Math.sin(a0) * d0, rv.r);
             } else {
-              rv.x = rv.hx; rv.z = rv.hz;
-              if (!biomeAt(rv.x, rv.z)) { const a0 = rand(0, Math.PI * 2); rv.x = Math.cos(a0) * 120; rv.z = Math.sin(a0) * 120; }
               rv.r = Math.max(START_R, Math.min(softCap, pr * 0.62));
+              [rv.x, rv.z] = placeOnLand(rv.hx, rv.hz, rv.r);
             }
+            rv.campX = rv.x; rv.campZ = rv.z; rv.campT = 0;
             rv.group.visible = rv.halo.visible = true;
             api.onJoin?.(rv.name, rv.color, rv.x, rv.z, rv.arch);
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
@@ -500,17 +528,31 @@ export function createRivals(
           } else continue;   // not on the island yet
         }
         // ── THE THREAT'S TWO ACTS ───────────────────────────────────────────
+        // hardCap is applied AFTER the eating loop, not here. Doing it here was
+        // a measured bug: the stuffed hunter kept swallowing buildings and grew
+        // 7.2 → 9.6 in the last third against a player of 2.1, so the marquee
+        // meal — the whole payoff of the arc — could never happen.
+        let hardCap = softCap;
         if (isHunter) {
           if (hunting) {
-            // eased, never popped: she looms at ~1.5x whatever you are
+            // she looms at ~1.5x whatever you are, eased so it never pops
             const want = Math.min(R_CAP, Math.max(START_R * 1.35, pr * 1.5));
             rv.r += (want - rv.r) * Math.min(1, dt * 0.9);
+            hardCap = want * 1.04;
+            rv.stuffCap = 0;
           } else {
-            // STUFFED. She stops growing and sags very slowly (0.9%/s, which is
-            // invisible frame to frame) while the player's finale surge runs —
-            // so somewhere in the last third she crosses under your swallow
-            // line and becomes the biggest prize on the island.
-            rv.r = Math.max(START_R, rv.r * (1 - dt * 0.009));
+            // STUFFED. Growth stops dead at whatever she reached, and the
+            // ceiling sags 0.7%/s — invisible frame to frame — while the
+            // player's finale surge runs. Somewhere in the last third she
+            // crosses under the swallow line and becomes the best meal on the
+            // island.
+            if (!rv.stuffCap) rv.stuffCap = rv.r;
+            // 0.3%/s. A first pass ran 0.7 and she deflated to r=1.3 by the
+            // whistle — still a prize on points, but she no longer LOOKED like
+            // the biggest meal on the island, which is half of why a kid goes
+            // after her. The player's finale surge is what should overtake her.
+            rv.stuffCap = Math.max(START_R, rv.stuffCap * (1 - dt * 0.003));
+            hardCap = rv.stuffCap;
             if (!rv.stuffedSaid) {
               rv.stuffedSaid = true; rv.cst = 0;
               api.onStuffed?.(rv.name, rv.x, rv.z);
@@ -518,7 +560,8 @@ export function createRivals(
               rv.speakCd = rand(8, 12);
             }
           }
-        } else if (rv.r > softCap) rv.r = softCap;
+        }
+        if (rv.r > hardCap) rv.r = hardCap;
         // being devoured: a visible SUCK-IN — the rival spirals into the
         // player's pit, shrinking, before it winks out. Cause and effect a kid
         // can see (the old instant-hide read as "nothing happened").
@@ -543,8 +586,7 @@ export function createRivals(
           if (rv.respawnT <= 0) {
             const a2 = rand(0, Math.PI * 2);
             const rr = rand(45, 80);   // near the player — a grumpy tiny rival re-entering IS a story
-            rv.x = px + Math.cos(a2) * rr; rv.z = pz + Math.sin(a2) * rr;
-            if (!biomeAt(rv.x, rv.z)) { rv.x = Math.cos(a2) * 100; rv.z = Math.sin(a2) * 100; }
+            [rv.x, rv.z] = placeOnLand(px + Math.cos(a2) * rr, pz + Math.sin(a2) * rr, rv.r);
             rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
             api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn));
           } else continue;
@@ -646,11 +688,24 @@ export function createRivals(
         }
         else if (!rv.visiting && (rv.retarget <= 0 || reached)) {
           rv.retarget = rand(2.5, 4);
-          rv.archSaid = Math.max(0, rv.archSaid - 1);
           // ── FIVE BRAINS, NOT ONE ───────────────────────────────────────────
           // Every branch below answers "what is this character DOING?" in a way
           // a six-year-old can narrate out loud. That is the whole spec.
           let best: RivalEdible | null = null, bd = -Infinity;
+          // ── THE FAMILY EATS MEALS, NOT CRUMBS ─────────────────────────────
+          // Measured, and the most important number in this file. Once the
+          // family was sized near the player they hunted the player's exact
+          // food class — the small props — and there are three or four of them
+          // moving faster than the player is. The player's score flatlined at
+          // 173 points and radius 1.24 at ninety seconds (the old build reached
+          // 1,781 and 2.18 by then): they were beelining to snacks that were
+          // always swallowed before they arrived. Starved out by the AI.
+          // So the family ignores anything below 45% of their own size. The
+          // whole bottom layer of the island — cones, hydrants, flowers, the
+          // stuff a beginner lives on — is now permanently the player's, and
+          // the family competes for the tier above it. It also means each thing
+          // they eat is WORTH more, so their score does not need the volume.
+          const minBite = rv.r * 0.45;
           // where this archetype is allowed to look, and how it ranks what it finds
           let ax = rv.x, az = rv.z, reach = Infinity, bigHunger = 0;
           if (rv.arch === 'HOARDER') { ax = rv.campX; az = rv.campZ; reach = 62; }
@@ -664,7 +719,7 @@ export function createRivals(
             else { ax = px; az = pz; reach = 55; }
           } else if (rv.arch === 'BULLY' && hunting) { ax = px; az = pz; reach = 85; }  // prowls YOUR block
           for (const e of edibles) {
-            if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;   // only hunt what it can eat
+            if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minBite) continue;
             const d = Math.hypot(e.mesh.position.x - ax, e.mesh.position.z - az);
             if (d > reach) continue;
             // SHOWOFF trades distance for spectacle: it will cross the entire
@@ -689,12 +744,25 @@ export function createRivals(
           } else if (rv.arch === 'HOARDER') {
             // camped out: sweep the patch, and only move house when the
             // district is genuinely stripped — with a grumble about it
+            // MOVING HOUSE. Camping is only charming while there is something
+            // in the district to eat; a hoarder squatting on a stripped patch
+            // is the wallpaper we are trying to delete. Two empty sweeps and he
+            // relocates — onto real food, found by search rather than by a
+            // random offset that could easily land him in the sea again.
             rv.campT -= 1;
             if (rv.campT <= 0) {
-              rv.campT = 6;
-              const ca = rand(0, Math.PI * 2), cr = rand(70, 130);
-              const nx2 = rv.campX + Math.cos(ca) * cr, nz2 = rv.campZ + Math.sin(ca) * cr;
-              if (biomeAt(nx2, nz2)) { rv.campX = nx2; rv.campZ = nz2; }
+              rv.campT = 2;
+              let pick: RivalEdible | null = null, pd = Infinity;
+              for (const e of edibles) {
+                if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minBite) continue;
+                const d2 = Math.hypot(e.mesh.position.x - rv.x, e.mesh.position.z - rv.z);
+                if (d2 > 70 && d2 < pd) { pd = d2; pick = e; }
+              }
+              if (pick) [rv.campX, rv.campZ] = placeOnLand(pick.mesh.position.x, pick.mesh.position.z, rv.r);
+              else {
+                const ca = rand(0, Math.PI * 2), cr = rand(70, 130);
+                [rv.campX, rv.campZ] = placeOnLand(rv.campX + Math.cos(ca) * cr, rv.campZ + Math.sin(ca) * cr, rv.r);
+              }
               if (rv.speakCd <= 0) { rv.speakCd = rand(12, 18); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch)); }
             }
             const a3 = rand(0, Math.PI * 2), rr2 = rand(10, 50);
@@ -903,10 +971,13 @@ export function createRivals(
         // ever becoming hopeless. A family member well ahead of the player eats
         // for less; one falling behind eats for more. Bounded both ways, so it
         // nudges the race without deciding it.
-        const gap = (rv.score - pScore) / Math.max(1500, pScore * 0.5);
-        const band = THREE.MathUtils.clamp(1 - gap * 0.6, 0.45, 1.55);
+        const gap = (rv.score - pScore) / Math.max(900, pScore * 0.4);
+        const band = THREE.MathUtils.clamp(1 - gap * 0.7, 0.34, 1.55);
+        // …and the same crumb floor applies to what they sweep up in passing,
+        // or they would strip the beginner layer just by driving over it
+        const minSwallow = rv.r * 0.45;
         for (const e of edibles) {
-          if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;
+          if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minSwallow) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius * 0.6) ** 2) {
             e.mesh.userData.eaten = true;
@@ -932,6 +1003,10 @@ export function createRivals(
           const floor = Math.min(softCap, START_R * (1 + Math.pow(Math.max(0, rv.score) / 974, 0.57)));
           if (rv.r < floor) rv.r = floor;
         }
+        // THE CEILING, ENFORCED AFTER EATING. A single swallowed landmark can
+        // add more radius in one frame than any per-frame easing can take back,
+        // so the clamp has to be the last word on size every frame.
+        if (rv.r > hardCap) rv.r = hardCap;
 
         // render — alive: a little roll-hop while moving, a squash-gulp on eats
         rv.pulse = Math.max(0, rv.pulse - dt * 3);

@@ -177,6 +177,7 @@ const _dbg = window as unknown as {
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
   __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv;
+    ate: { you: number; family: number };
     rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
 };
 // QA counters: what the family actually DID to the player over a match
@@ -192,6 +193,7 @@ _dbg.__rushClock = (to: number) => { matchClock = to; };
 // QA: one call returns the whole race — used to log score curves over a match
 _dbg.__matchState = () => ({
   t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
+  ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
     joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting })),
 });
@@ -730,6 +732,9 @@ const DISTRICT: Record<string, string> = {
 // across the match. A running joke beats 54 unrelated one-liners.
 const newsEl = el('news');
 let devouredPct = 0, newsCd = 14;
+// QA: the you-vs-family split of what the island has lost, so a harness can
+// check the family is not simply eating the player's food out from under them
+let devPlayerPct = 0, devFamilyPct = 0;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
 function breakingNews(h: string) {
@@ -893,6 +898,7 @@ function refreshHud() {
   // 948-point run. Lead with the COUNT, which is a number that moves on every
   // single bite, and keep the percentage as the meter underneath it.
   const minePct = Math.min(100, Math.round((mine / Math.max(1, initialMass)) * 100));
+  devPlayerPct = minePct; devFamilyPct = Math.max(0, devouredPct - minePct);   // QA readout
   const themPct = Math.max(0, devouredPct - minePct);
   devEl.innerHTML = `${matchEaten} EATEN<span class="devThem">you ${minePct}% · family ${themPct}%</span>`;
   formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
@@ -1459,7 +1465,10 @@ function resetMatch() {
     // every bather up at towel height after a rematch
     e.mesh.rotation.set(e.mesh.userData.homeRotX ?? 0, e.homeRotY, e.mesh.userData.homeRotZ ?? 0);
   }
-  rivals.reset(matchLen);   // join times are scaled to the clock they'll run on
+  // join times are scaled to the clock they'll run on. beginMatch() sets
+  // matchLen further down, so pass the length it is ABOUT to choose — reading
+  // the live one here would scale the new match's joins to the old match's clock.
+  rivals.reset(soloMode ? 120 : MATCH_LEN);
   curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
   // every match opening on the same twenty seconds is real repetition — but the
