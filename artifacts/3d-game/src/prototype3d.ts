@@ -1829,14 +1829,18 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
         : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}`;
     }
   };
-  // LEGENDARY FIRST. The old order buried every cash skin four scrolls below
-  // the fold — the shop opened on 150-coin swatches and a kid never saw the
-  // characters. Now the store opens on the heroes, then epics, then colours.
-  const tierOf = (s: Skin) => (s.cash ? 0 : s.tex ? 1 : 2);
+  // LEGENDARY FIRST was the right instinct for a store whose in-app purchases
+  // work. Ours do not yet: every cash card is locked and dead-ends on a big red
+  // button that says COMING WITH THE APP STORE BUILD. So the shop opened on
+  // seven consecutive refusals at $4.99-$9.99, and with two thousand coins in
+  // the wallet the first thing a child could actually buy was the eighth card,
+  // below the fold. Open on what they can afford, and keep the heroes right
+  // underneath as the thing to want. Flip this back the day IAP ships.
+  const tierOf = (s: Skin) => (s.tex ? 0 : s.cash ? 1 : 2);
   const SORTED = [...SKINS].sort((a, b) => tierOf(a) - tierOf(b));
   const TIER_HEAD = [
-    '<div class="shopTier gold">✨ LEGENDARY <span>CHARACTERS</span></div>',
     '<div class="shopTier">💫 EPIC <span>SPEND ✦ COINS</span></div>',
+    '<div class="shopTier gold">✨ LEGENDARY <span>COMING SOON</span></div>',
     '<div class="shopTier">🎨 EVERYDAY <span>SPEND ✦ COINS</span></div>',
   ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
@@ -1900,7 +1904,9 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     if (!s) return;
     if (s.streak && !owned.has(s.id)) { audio.hit(); return; }   // earned by coming back
     if (s.cash && !owned.has(s.id)) {
-      spAct.textContent = '✨ COMING WITH THE APP STORE BUILD';
+      // it was a big red primary button that answered "no". A locked hero
+      // should read as something to look forward to, not a refusal.
+      spAct.textContent = '👀 SNEAK PEEK — COMING SOON!';
       audio.ready();
       setTimeout(refreshPreview, 1800);
       return;
