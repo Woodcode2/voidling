@@ -176,9 +176,11 @@ const _dbg = window as unknown as {
   __rushClock: (to: number) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
-  __matchState: () => { t: number; clock: number; score: number; r: number;
+  __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv;
     rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
 };
+// QA counters: what the family actually DID to the player over a match
+const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
@@ -189,7 +191,7 @@ _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: distri
 _dbg.__rushClock = (to: number) => { matchClock = to; };
 // QA: one call returns the whole race — used to log score curves over a match
 _dbg.__matchState = () => ({
-  t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius,
+  t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
     joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting })),
 });
@@ -231,6 +233,7 @@ rivals.onSpeak = (x, z, line) => {
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
+  rivalEv.eaten++; if (marquee) rivalEv.marquee++;
   smugUntil = tClock + 2.4; audio.voice('happy');
   // no breakingNews here: announceFam already puts a full-screen card up for
   // this, and a ticker headline three seconds later is the same news twice
@@ -265,6 +268,7 @@ rivals.onPlayerBitten = (name, hit) => {
   // MERCY FRAMES. Longer after the hunter connects, so a caught player gets a
   // clear, visible moment to drive away instead of being chain-bitten.
   biteMercy = tClock + (hit.hunter ? 3.2 : 2.5);
+  rivalEv.bites++; if (hit.hunter) rivalEv.hunterBites++; rivalEv.stolen += hit.steal;
   hurtUntil = tClock + (hit.hunter ? 1.3 : 0.9); audio.voice('hurt');
   // THE COST. The old flat 12% shrink was silently refunded by the score floor
   // (which is a pure function of playerScore) inside a frame or two — measured
@@ -288,11 +292,13 @@ rivals.onPlayerBitten = (name, hit) => {
 // predator becomes the prize. Near-misses are the thing a seven-year-old
 // retells, so the whiff gets more spectacle than the hit.
 rivals.onCharge = (name, x, z) => {
+  rivalEv.charges++;
   announce(`⚠️ ${name} is CHARGING at you!!`);
   fx.ring(x, z, 0xff2b3c, 26, 0.6); fx.flash('rgba(255,43,60,0.16)', 0.35);
   audio.alert(); audio.voice('scared'); buzz(35);
 };
 rivals.onNearMiss = (name, x, z) => {
+  rivalEv.nearMiss++;
   announce('😤 MISSED ME!!');
   floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
   bubbles.float(floatPos, 'NEAR MISS!! 😤', true);
@@ -2307,9 +2313,6 @@ function animate() {
     // it was labelling — and it overlapped the speech bubbles behind it.
     const pxPerWorld = innerHeight / (2 * camDist * Math.tan((camera.fov * Math.PI / 180) / 2));
     formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + 34 + R * pxPerWorld}px`;
-    // one hero message at a time: the title card owns the centre of the screen
-    // for its 4.2 seconds, and the size chip was landing straight through it
-    formEl.style.opacity = tClock < titleUntil ? '0' : '1';
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }

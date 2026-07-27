@@ -37,6 +37,218 @@ const RADIUS_SINK = 0.9;   // how much of the orb sits above ground (rest sinks)
 // wobble, the four-stop fresnel, the character sheen and the hide pattern.
 // Rivals used to get a cut-down two-stop shader, which is exactly why they
 // read as flat stickers next to the hero.
+// ── THE BODY SHADER ────────────────────────────────────────────────────────
+// One source of truth, shared by the hero and the family. It was duplicated
+// verbatim in createVoid, so every tuning pass had to be made twice and the
+// two copies had already started to drift.
+const VOID_VERT = `
+  varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv; varying vec3 vRay;
+  uniform float uTime; uniform float uWobble; uniform float uSlow; uniform float uStage;
+  uniform vec3 uStretchDir; uniform float uStretchAmt;
+  void main(){
+    // MASS: a big void sloshes SLOWER than a little one. Same waveform, time
+    // scaled by uSlow — the cheapest possible read on "this thing is heavy".
+    float tt = uTime * uSlow;
+    vec3 p = position;
+    // FLUID BODY: low-frequency jelly waves ride the surface — a faint liquid
+    // idle so the void never sits static, and a big slosh (uWobble) every time
+    // it absorbs something. The blob visibly digests its meals.
+    float wob =
+        sin(p.y * 3.1 + tt * 5.0)
+      * sin(p.x * 2.6 - tt * 4.1)
+      + 0.6 * sin((p.x + p.z) * 4.2 + tt * 6.3);
+    // EVENT-HORIZON CHURN: the late forms BOIL. The camera pulls back as the
+    // void grows, so every form used to fill the same patch of screen as a
+    // clean circle — VOIDLING and WORLD ENDER were the same picture. Now the
+    // silhouette itself lobes and rolls harder with each evolution, which is a
+    // read a six-year-old gets instantly and at any size.
+    float churn = sin(p.x * 1.9 + tt * 0.55) * sin(p.z * 1.7 - tt * 0.44) * sin(p.y * 1.5 + tt * 0.66);
+    p *= 1.0 + wob * (0.012 + uWobble * 0.06) + churn * 0.022 * max(0.0, uStage - 1.0);
+    // DIRECTIONAL SQUASH & STRETCH: he elongates ALONG travel. The old rig
+    // scaled him uniformly wider and shorter, which reads as breathing, not
+    // as speed — nothing about it said which way he was going.
+    p += uStretchDir * dot(p, uStretchDir) * uStretchAmt;
+    // normal of the STRETCHED sphere, or the fresnel slides off the silhouette
+    vec3 n = normalize(position);
+    n = normalize(n - uStretchDir * dot(n, uStretchDir) * (uStretchAmt / (1.0 + uStretchAmt)));
+    vN = normalize(normalMatrix * n);
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    vView = normalize(-mv.xyz);
+    // the view ray back in OBJECT space — this is what lets the fragment
+    // shader parallax the galaxy that lives inside the shell
+    mat3 m = mat3(modelViewMatrix);
+    mat3 mt = mat3(m[0][0], m[1][0], m[2][0], m[0][1], m[1][1], m[2][1], m[0][2], m[1][2], m[2][2]);
+    vRay = normalize(mt * mv.xyz);
+    vObj = p;
+    vUv = uv;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const VOID_FRAG = `
+  varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv; varying vec3 vRay;
+  uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
+  uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
+  uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
+  uniform float uPat; uniform vec3 uPatCol; uniform float uSmall;
+  // cheap hash for star specks
+  float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
+  // value noise for the HD nebula wisps (procedural — crisp at any zoom)
+  float vnoise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0)), d2 = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d2, f.x), f.y);
+  }
+  void main(){
+    vec3 N = normalize(vN);
+    vec3 V = normalize(vView);
+    // screen-space radius: 0 at disc centre, 1 at the silhouette. This
+    // reproduces the 2D canvas radial gradient (radial in screen space).
+    float d = clamp(dot(N, V), 0.0, 1.0);
+    float u = sqrt(max(0.0, 1.0 - d * d));
+    // stops tuned CUTE: the dark heart is small, the visible disc reads as
+    // a bright plush purple that lifts quickly toward the lit rim.
+    // uSmall (1 when he is only a few dozen pixels across) widens the rim so
+    // the lit edge never falls below a pixel and dissolve into the ground.
+    vec3 col = mix(uInner, uMid, smoothstep(0.10, 0.55, u));
+    col = mix(col, uRim, smoothstep(mix(0.58, 0.34, uSmall), 1.0, u));
+    // premium skin: wrap the AI texture around the orb (slow drift), keep
+    // the darker core + lit rim so it still reads as a VOID
+    if (uTexAmt > 0.01) {
+      vec3 tc = texture2D(uTex, vec2(vUv.x + uTime * 0.012, vUv.y)).rgb;
+      col = mix(col, tc * (0.34 + 0.9 * u), uTexAmt);
+    }
+    // ── FORM LIGHT ────────────────────────────────────────────────────────
+    // The fresnel gradient alone is radially symmetric, and a radially
+    // symmetric ball is a flat disc with a glow: there is no up, no volume,
+    // nothing for the eye to read as roundness. A single screen-anchored key
+    // gives him a lit top-left cheek and a deep bottom-right. Anchored in VIEW
+    // space on purpose — this is illustration lighting, so the read is
+    // identical no matter where the camera has swung to.
+    vec3 L = normalize(vec3(-0.40, 0.60, 0.69));
+    float ndl = dot(N, L);
+    float key = smoothstep(-0.55, 0.95, ndl);
+    float low = smoothstep(-0.15, -0.95, N.y);      // his underside
+    // ── THE DARK HEART, RELOCATED ─────────────────────────────────────────
+    // The abyss used to be a radial stop centred on the disc — which put it
+    // dead between his eyes, where it read as a thumbprint of dirt on the poor
+    // thing's face, and where the face covered the only place the "pit" was
+    // ever visible. It now lives in the SHADOW, on the far side of the key,
+    // where a hole in a lit object actually belongs.
+    float core = (1.0 - smoothstep(0.02, 0.62, u)) * mix(0.06, 0.92, 1.0 - key);
+    col = mix(col, uAbyss, core);
+    col *= mix(0.62, 1.22, key);
+    col *= mix(1.0, 0.84, low);                     // occlusion where he meets the floor
+    col += uRim * low * pow(u, 2.2) * 0.13;         // ...and the bounce lip just above it
+    // ── THE PIT INTO SPACE ────────────────────────────────────────────────
+    // The galaxy genuinely sits INSIDE the shell now: every interior layer is
+    // sampled along the REFRACTED view ray, so the deeper a layer is the more
+    // it slides against the surface — real parallax, the way something
+    // suspended in glass behaves. The old star specks were pinned to object
+    // space, i.e. painted on the outside, which is exactly why the interior
+    // read as flat fill instead of depth.
+    vec3 P = normalize(vObj);
+    vec3 R = refract(vRay, P, 0.74);
+    float b = dot(P, R);
+    vec3 gal = vec3(0.0);
+    vec3 starTint = mix(vec3(1.0), uSwirl, 0.6);    // each skin's galaxy is ITS colour
+    float spin = uTime * 0.05, cs = cos(spin), sn = sin(spin);
+    // three concentric INNER SHELLS, each hit by the refracted ray. Offsetting
+    // a flat lookup by the ray (the obvious version) smears into scratches
+    // near the silhouette; a real ray/sphere intersection stays clean, gives
+    // honest parallax between the layers, and self-masks near the rim exactly
+    // the way looking into a marble from the side does.
+    for (int i = 0; i < 3; i++) {
+      float k = 0.80 - float(i) * 0.24;
+      float disc = b * b - (1.0 - k * k);
+      if (disc <= 0.0) continue;                    // this shell isn't visible here
+      vec3 q = P + R * (-b - sqrt(disc));
+      vec2 qr = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs);   // the galaxy turns
+      vec2 sc = qr * (9.0 + float(i) * 11.0) + float(i) * 7.3;
+      float h = hash(floor(sc));
+      if (h > 0.885) {
+        float dot2 = 1.0 - smoothstep(0.0, 0.26 - float(i) * 0.045, length(fract(sc) - 0.5));
+        float tw = 0.5 + 0.5 * sin(uTime * (2.4 + float(i)) + h * 40.0);
+        gal += starTint * dot2 * tw * (1.25 - float(i) * 0.3);
+      }
+    }
+    // ☁️ HD nebula wisps: two octaves of drifting value noise on the outer shell
+    float ndisc = max(0.0, b * b - (1.0 - 0.80 * 0.80));
+    vec3 nq = P + R * (-b - sqrt(ndisc));
+    vec2 np = nq.xy * 2.4 + vec2(uTime * 0.045, -uTime * 0.028);
+    float neb = vnoise(np) * 0.62 + vnoise(np * 2.3 + 7.7) * 0.38;
+    neb = smoothstep(0.42, 0.88, neb);
+    gal += mix(uInner, uSwirl, 0.7) * neb * 0.85;
+    // ✨ the AI starfield, drifting with the same parallax offset
+    if (uStarAmt > 0.01) {
+      vec2 su = vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003) + R.xy * 0.05;
+      vec3 st = texture2D(uStars, su).rgb;
+      gal += st * st * uStarAmt * 0.75;   // st*st: keep the bright stars, drop the haze
+    }
+    // the interior only shows through the face-on disc, and reads deepest on
+    // the shaded side — which is what makes it a HOLE and not a decal
+    float inside = (1.0 - smoothstep(0.30, 0.98, u)) * mix(0.30, 1.30, 1.0 - key);
+    col += gal * inside * (0.85 + uStage * 0.11);
+    // ── EVENT HORIZON ─────────────────────────────────────────────────────
+    // rim light lives OPPOSITE the key, like a real one, and fattens with
+    // both the evolution stage and how small he is on screen
+    col += uRim * pow(u, mix(3.0, 1.9, uSmall)) * (0.30 + uStage * 0.05) * mix(1.45, 0.72, key);
+    // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
+    // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
+    float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
+    vec3 iri = mix(uRim, vec3(1.0, 0.62, 0.9), 0.5 + 0.5 * sin(ang * 3.0 + uTime * 0.8));
+    col += iri * pow(u, 6.0) * 0.16;
+    // glossy toy catchlight: one tight hot dot plus a wide soft sheen
+    col += vec3(1.0, 0.97, 1.0) * pow(max(ndl, 0.0), 46.0) * 0.34;
+    col += mix(vec3(1.0), uRim, 0.5) * pow(max(ndl, 0.0), 7.0) * 0.09;
+    // CHARACTER SHEEN: pearl/chrome legendaries get a hard wet highlight
+    // plus a wide soft one — this is what sells "expensive" at a glance
+    if (uGloss > 0.01) {
+      col += vec3(1.0) * pow(max(ndl, 0.0), 90.0) * uGloss * 0.9;
+      col += vec3(1.0, 0.98, 1.0) * pow(max(ndl, 0.0), 8.0) * uGloss * 0.14;
+    }
+    vec3 L2 = normalize(vec3(0.55, 0.10, 0.55));
+    col += vec3(0.82, 0.76, 1.0) * pow(max(dot(N, L2), 0.0), 14.0) * 0.07;
+    // ── BODY PATTERN: the legendary's actual SKIN. This is what makes a
+    // character stop reading as "a purple ball wearing a costume" — the
+    // surface itself is scaled, plated, furred or full of stars.
+    if (uPat > 0.5) {
+      float shade = 0.0;
+      if (uPat < 1.5) {                       // SCALES — offset-row teardrops
+        vec2 g = vec2(vUv.x * 34.0, vUv.y * 18.0);
+        g.x += mod(floor(g.y), 2.0) * 0.5;
+        vec2 f = fract(g) - 0.5;
+        float dd = length(f * vec2(1.0, 1.25));
+        shade = smoothstep(0.46, 0.30, dd) * 0.55 + smoothstep(0.30, 0.46, dd) * 0.15;
+      } else if (uPat < 2.5) {                // CHROME — machined panel bands
+        float band = abs(fract(vUv.y * 9.0) - 0.5);
+        float seam = smoothstep(0.06, 0.0, band);
+        float rivet = step(0.86, hash(floor(vec2(vUv.x * 22.0, vUv.y * 9.0))));
+        shade = seam * 0.85 + rivet * 0.4;
+      } else if (uPat < 3.5) {                // FUR — fine directional strands
+        float st = vnoise(vec2(vUv.x * 120.0, vUv.y * 22.0));
+        shade = smoothstep(0.55, 0.9, st) * 0.5;
+      } else if (uPat < 4.5) {                // STARFIELD — a night sky for a hide
+        vec2 sc3 = vUv * vec2(60.0, 34.0);
+        float h3 = hash(floor(sc3));
+        float dot4 = h3 > 0.9 ? (1.0 - smoothstep(0.0, 0.34, length(fract(sc3) - 0.5))) : 0.0;
+        shade = dot4 * (0.6 + 0.4 * sin(uTime * 3.0 + h3 * 30.0)) * 1.6;
+      } else {                                // STITCH — cloth seams (ninja wrap)
+        float sew = abs(fract(vUv.y * 13.0 + vUv.x * 0.6) - 0.5);
+        shade = smoothstep(0.09, 0.0, sew) * step(0.45, fract(vUv.x * 46.0)) * 0.7;
+      }
+      // patterns fade toward the silhouette so the fresnel read survives
+      col = mix(col, uPatCol, shade * (1.0 - u * 0.55));
+    }
+    // at postage-stamp size, punch the whole thing up a touch — small objects
+    // lose apparent contrast to the surrounding frame
+    col *= 1.0 + 0.10 * uSmall;
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
 export function makeVoidBody(): THREE.ShaderMaterial {
   const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
   white.needsUpdate = true;
@@ -48,156 +260,22 @@ export function makeVoidBody(): THREE.ShaderMaterial {
       uRim: { value: VOID_COL.bodyRim.clone() },
       uSwirl: { value: new THREE.Color(VOID.swirl) },
       uTime: { value: 0 },
-      uTex: { value: white },
+      uTex: { value: white },         // premium skin texture (AI-generated)
       uTexAmt: { value: 0 },
-      uStars: { value: white },
+      uStars: { value: white },       // AI starfield living inside the pit
       uStarAmt: { value: 0 },
       uStage: { value: 0 },
-      uWobble: { value: 0 },
-      uGloss: { value: 0 },
-      uPat: { value: 0 },
+      uWobble: { value: 0 },          // jelly amplitude — spikes on every eat
+      uGloss: { value: 0 },           // legendary sheen (pearl / chrome character skins)
+      uPat: { value: 0 },             // 0 none · 1 scales · 2 chrome · 3 fur · 4 starfield · 5 stitch
       uPatCol: { value: new THREE.Color(0xffffff) },
+      uSmall: { value: 0 },           // 1 when he is only a few dozen pixels wide
+      uSlow: { value: 1 },            // wobble time scale — big voids slosh slower
+      uStretchDir: { value: new THREE.Vector3(0, 0, 1) },
+      uStretchAmt: { value: 0 },
     },
-    vertexShader: `
-      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
-      uniform float uTime; uniform float uWobble;
-      void main(){
-        vN = normalize(normalMatrix * normal);
-        // FLUID BODY: low-frequency jelly waves ride the surface — a faint
-        // liquid idle so the void never sits static, and a big slosh (uWobble)
-        // every time it absorbs something. The blob visibly digests its meals.
-        float wob =
-            sin(position.y * 3.1 + uTime * 5.0)
-          * sin(position.x * 2.6 - uTime * 4.1)
-          + 0.6 * sin((position.x + position.z) * 4.2 + uTime * 6.3);
-        vec3 pos = position * (1.0 + wob * (0.012 + uWobble * 0.06));
-        vec4 mv = modelViewMatrix * vec4(pos,1.0);
-        vView = normalize(-mv.xyz);
-        vObj = pos;
-        vUv = uv;
-        gl_Position = projectionMatrix * mv;
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
-      uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
-      uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
-      uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
-      uniform float uPat; uniform vec3 uPatCol;
-      // cheap hash for star specks
-      float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
-      // value noise for the HD nebula wisps (procedural — crisp at any zoom)
-      float vnoise(vec2 p){
-        vec2 i = floor(p), f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        float a = hash(i), b = hash(i + vec2(1.0, 0.0));
-        float c = hash(i + vec2(0.0, 1.0)), d2 = hash(i + vec2(1.0, 1.0));
-        return mix(mix(a, b, f.x), mix(c, d2, f.x), f.y);
-      }
-      void main(){
-        // screen-space radius: 0 at disc centre, 1 at the silhouette. This
-        // reproduces the 2D canvas radial gradient (radial in screen space).
-        float d = clamp(dot(normalize(vN), normalize(vView)), 0.0, 1.0);
-        float u = sqrt(max(0.0, 1.0 - d * d));
-        // stops tuned CUTE: the dark heart is small, the visible disc reads as
-        // a bright plush purple that lifts quickly toward the lit rim
-        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.18, u));
-        col = mix(col, uMid, smoothstep(0.15, 0.52, u));
-        col = mix(col, uRim, smoothstep(0.55, 1.0, u));
-        col *= 1.0;
-        // premium skin: wrap the AI texture around the orb (slow drift), keep
-        // the darker core + lit rim so it still reads as a VOID
-        if (uTexAmt > 0.01) {
-          vec3 tc = texture2D(uTex, vec2(vUv.x + uTime * 0.012, vUv.y)).rgb;
-          col = mix(col, tc * (0.34 + 0.9 * u), uTexAmt);
-        }
-        // ✨ a real galaxy inside: AI starfield drifting slowly through the dark
-        // core, fading toward the lit rim so depth reads as "pit into space"
-        if (uStarAmt > 0.01) {
-          vec3 st = texture2D(uStars, vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003)).rgb;
-          col += st * st * uStarAmt * (1.0 - u) * 0.9;   // st*st: keep only the bright stars, drop the nebula haze
-        }
-        float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
-        // ☁️ HD nebula wisps: two octaves of drifting value noise in the dark
-        // core — the "living galaxy inside" reads at every zoom, no asset needed
-        vec2 np = vObj.xy * 2.6 + vec2(uTime * 0.05, -uTime * 0.03);
-        float neb = vnoise(np) * 0.6 + vnoise(np * 2.3 + 7.7) * 0.4;
-        neb = smoothstep(0.45, 0.85, neb);
-        col += mix(uInner, uSwirl, 0.6) * neb * (1.0 - u) * 0.35;
-        // luminous event-horizon rim-light — intensifies with each evolution
-        col += uRim * pow(u, 3.2) * (0.36 + uStage * 0.05);
-        // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
-        // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
-        vec3 iri = mix(uRim, vec3(1.0, 0.62, 0.9), 0.5 + 0.5 * sin(ang * 3.0 + uTime * 0.8));
-        col += iri * pow(u, 6.0) * 0.18;
-        // faint interior galaxy swirl (subtle, alive)
-        float sw = sin(ang * 2.0 + u * 7.0) * 0.5 + 0.5;
-        col += uSwirl * sw * (1.0 - u) * (0.06 + uStage * 0.015);
-        // glossy toy catchlight + soft opposite fill (the key-art polish)
-        vec3 L = normalize(vec3(-0.45, 0.74, 0.5));
-        float spec = pow(max(dot(normalize(vN), L), 0.0), 30.0);
-        col += vec3(1.0, 0.97, 1.0) * spec * 0.26;
-        // CHARACTER SHEEN: pearl/chrome legendaries get a hard wet highlight
-        // plus a wide soft one — this is what sells "expensive" at a glance
-        if (uGloss > 0.01) {
-          col += vec3(1.0) * pow(max(dot(normalize(vN), L), 0.0), 90.0) * uGloss * 0.9;
-          col += vec3(1.0, 0.98, 1.0) * pow(max(dot(normalize(vN), L), 0.0), 8.0) * uGloss * 0.14;
-        }
-        vec3 L2 = normalize(vec3(0.55, 0.28, 0.55));
-        col += vec3(0.82, 0.76, 1.0) * pow(max(dot(normalize(vN), L2), 0.0), 14.0) * 0.08;
-        // ✦ interior star specks — twinkling, concentrated toward the dark core
-        vec2 sc = vObj.xy * 12.0;
-        vec2 cell = floor(sc);
-        float h = hash(cell);
-        if (h > 0.93) {
-          vec2 f = fract(sc) - 0.5;
-          float dot2 = 1.0 - smoothstep(0.0, 0.18, length(f));
-          float tw = 0.4 + 0.6 * sin(uTime * 3.0 + h * 40.0);
-          col += vec3(0.95, 0.9, 1.0) * dot2 * tw * (1.0 - u * 0.55) * 1.1;
-        }
-        // second, finer star layer — HD depth (tiny fast twinkles between the big ones)
-        vec2 sc2 = vObj.xy * 26.0 + 3.7;
-        vec2 cell2 = floor(sc2);
-        float h2 = hash(cell2);
-        if (h2 > 0.955) {
-          vec2 f2 = fract(sc2) - 0.5;
-          float dot3 = 1.0 - smoothstep(0.0, 0.28, length(f2));
-          col += vec3(0.9, 0.85, 1.0) * dot3 * (0.5 + 0.5 * sin(uTime * 5.0 + h2 * 60.0)) * (1.0 - u) * 0.55;
-        }
-        // ── BODY PATTERN: the legendary's actual SKIN. This is what makes a
-        // character stop reading as "a purple ball wearing a costume" — the
-        // surface itself is scaled, plated, furred or full of stars.
-        if (uPat > 0.5) {
-          float shade = 0.0;
-          if (uPat < 1.5) {                       // SCALES — offset-row teardrops
-            vec2 g = vec2(vUv.x * 34.0, vUv.y * 18.0);
-            g.x += mod(floor(g.y), 2.0) * 0.5;
-            vec2 f = fract(g) - 0.5;
-            float dd = length(f * vec2(1.0, 1.25));
-            shade = smoothstep(0.46, 0.30, dd) * 0.55 + smoothstep(0.30, 0.46, dd) * 0.15;
-          } else if (uPat < 2.5) {                // CHROME — machined panel bands
-            float band = abs(fract(vUv.y * 9.0) - 0.5);
-            float seam = smoothstep(0.06, 0.0, band);
-            float rivet = step(0.86, hash(floor(vec2(vUv.x * 22.0, vUv.y * 9.0))));
-            shade = seam * 0.85 + rivet * 0.4;
-          } else if (uPat < 3.5) {                // FUR — fine directional strands
-            float st = vnoise(vec2(vUv.x * 120.0, vUv.y * 22.0));
-            shade = smoothstep(0.55, 0.9, st) * 0.5;
-          } else if (uPat < 4.5) {                // STARFIELD — a night sky for a hide
-            vec2 sc3 = vUv * vec2(60.0, 34.0);
-            float h3 = hash(floor(sc3));
-            float dot4 = h3 > 0.9 ? (1.0 - smoothstep(0.0, 0.34, length(fract(sc3) - 0.5))) : 0.0;
-            shade = dot4 * (0.6 + 0.4 * sin(uTime * 3.0 + h3 * 30.0)) * 1.6;
-          } else {                                // STITCH — cloth seams (ninja wrap)
-            float sew = abs(fract(vUv.y * 13.0 + vUv.x * 0.6) - 0.5);
-            shade = smoothstep(0.09, 0.0, sew) * step(0.45, fract(vUv.x * 46.0)) * 0.7;
-          }
-          // patterns fade toward the silhouette so the fresnel read survives
-          col = mix(col, uPatCol, shade * (1.0 - u * 0.55));
-        }
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `,
+    vertexShader: VOID_VERT,
+    fragmentShader: VOID_FRAG,
   });
 }
 
@@ -226,167 +304,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   group.add(bob);
 
   // ── body: fresnel "pit into space" ────────────────────────────────────────
-  const whiteTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
-  whiteTex.needsUpdate = true;
-  const bodyMat = new THREE.ShaderMaterial({
-    uniforms: {
-      uAbyss: { value: VOID_COL.abyss },
-      uInner: { value: new THREE.Color(VOID.bodyInner) },
-      uMid: { value: VOID_COL.bodyMid },
-      uRim: { value: VOID_COL.bodyRim },
-      uSwirl: { value: new THREE.Color(VOID.swirl) },
-      uTime: { value: 0 },
-      uTex: { value: whiteTex },      // premium skin texture (AI-generated)
-      uTexAmt: { value: 0 },
-      uStars: { value: whiteTex },    // AI starfield living inside the pit
-      uStarAmt: { value: 0 },
-      uStage: { value: 0 },
-      uWobble: { value: 0 },          // jelly amplitude — spikes on every eat
-      uGloss: { value: 0 },           // legendary sheen (pearl / chrome character skins)
-      uPat: { value: 0 },             // 0 none · 1 scales · 2 chrome · 3 fur · 4 starfield · 5 stitch
-      uPatCol: { value: new THREE.Color(0xffffff) },
-    },
-    vertexShader: `
-      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
-      uniform float uTime; uniform float uWobble;
-      void main(){
-        vN = normalize(normalMatrix * normal);
-        // FLUID BODY: low-frequency jelly waves ride the surface — a faint
-        // liquid idle so the void never sits static, and a big slosh (uWobble)
-        // every time it absorbs something. The blob visibly digests its meals.
-        float wob =
-            sin(position.y * 3.1 + uTime * 5.0)
-          * sin(position.x * 2.6 - uTime * 4.1)
-          + 0.6 * sin((position.x + position.z) * 4.2 + uTime * 6.3);
-        vec3 pos = position * (1.0 + wob * (0.012 + uWobble * 0.06));
-        vec4 mv = modelViewMatrix * vec4(pos,1.0);
-        vView = normalize(-mv.xyz);
-        vObj = pos;
-        vUv = uv;
-        gl_Position = projectionMatrix * mv;
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vN; varying vec3 vView; varying vec3 vObj; varying vec2 vUv;
-      uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
-      uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
-      uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
-      uniform float uPat; uniform vec3 uPatCol;
-      // cheap hash for star specks
-      float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
-      // value noise for the HD nebula wisps (procedural — crisp at any zoom)
-      float vnoise(vec2 p){
-        vec2 i = floor(p), f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        float a = hash(i), b = hash(i + vec2(1.0, 0.0));
-        float c = hash(i + vec2(0.0, 1.0)), d2 = hash(i + vec2(1.0, 1.0));
-        return mix(mix(a, b, f.x), mix(c, d2, f.x), f.y);
-      }
-      void main(){
-        // screen-space radius: 0 at disc centre, 1 at the silhouette. This
-        // reproduces the 2D canvas radial gradient (radial in screen space).
-        float d = clamp(dot(normalize(vN), normalize(vView)), 0.0, 1.0);
-        float u = sqrt(max(0.0, 1.0 - d * d));
-        // stops tuned CUTE: the dark heart is small, the visible disc reads as
-        // a bright plush purple that lifts quickly toward the lit rim
-        vec3 col = mix(uAbyss, uInner, smoothstep(0.0, 0.18, u));
-        col = mix(col, uMid, smoothstep(0.15, 0.52, u));
-        col = mix(col, uRim, smoothstep(0.55, 1.0, u));
-        col *= 1.0;
-        // premium skin: wrap the AI texture around the orb (slow drift), keep
-        // the darker core + lit rim so it still reads as a VOID
-        if (uTexAmt > 0.01) {
-          vec3 tc = texture2D(uTex, vec2(vUv.x + uTime * 0.012, vUv.y)).rgb;
-          col = mix(col, tc * (0.34 + 0.9 * u), uTexAmt);
-        }
-        // ✨ a real galaxy inside: AI starfield drifting slowly through the dark
-        // core, fading toward the lit rim so depth reads as "pit into space"
-        if (uStarAmt > 0.01) {
-          vec3 st = texture2D(uStars, vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003)).rgb;
-          col += st * st * uStarAmt * (1.0 - u) * 0.9;   // st*st: keep only the bright stars, drop the nebula haze
-        }
-        float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
-        // ☁️ HD nebula wisps: two octaves of drifting value noise in the dark
-        // core — the "living galaxy inside" reads at every zoom, no asset needed
-        vec2 np = vObj.xy * 2.6 + vec2(uTime * 0.05, -uTime * 0.03);
-        float neb = vnoise(np) * 0.6 + vnoise(np * 2.3 + 7.7) * 0.4;
-        neb = smoothstep(0.45, 0.85, neb);
-        col += mix(uInner, uSwirl, 0.6) * neb * (1.0 - u) * 0.35;
-        // luminous event-horizon rim-light — intensifies with each evolution
-        col += uRim * pow(u, 3.2) * (0.36 + uStage * 0.05);
-        // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
-        // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
-        vec3 iri = mix(uRim, vec3(1.0, 0.62, 0.9), 0.5 + 0.5 * sin(ang * 3.0 + uTime * 0.8));
-        col += iri * pow(u, 6.0) * 0.18;
-        // faint interior galaxy swirl (subtle, alive)
-        float sw = sin(ang * 2.0 + u * 7.0) * 0.5 + 0.5;
-        col += uSwirl * sw * (1.0 - u) * (0.06 + uStage * 0.015);
-        // glossy toy catchlight + soft opposite fill (the key-art polish)
-        vec3 L = normalize(vec3(-0.45, 0.74, 0.5));
-        float spec = pow(max(dot(normalize(vN), L), 0.0), 30.0);
-        col += vec3(1.0, 0.97, 1.0) * spec * 0.26;
-        // CHARACTER SHEEN: pearl/chrome legendaries get a hard wet highlight
-        // plus a wide soft one — this is what sells "expensive" at a glance
-        if (uGloss > 0.01) {
-          col += vec3(1.0) * pow(max(dot(normalize(vN), L), 0.0), 90.0) * uGloss * 0.9;
-          col += vec3(1.0, 0.98, 1.0) * pow(max(dot(normalize(vN), L), 0.0), 8.0) * uGloss * 0.14;
-        }
-        vec3 L2 = normalize(vec3(0.55, 0.28, 0.55));
-        col += vec3(0.82, 0.76, 1.0) * pow(max(dot(normalize(vN), L2), 0.0), 14.0) * 0.08;
-        // ✦ interior star specks — twinkling, concentrated toward the dark core
-        vec2 sc = vObj.xy * 12.0;
-        vec2 cell = floor(sc);
-        float h = hash(cell);
-        if (h > 0.93) {
-          vec2 f = fract(sc) - 0.5;
-          float dot2 = 1.0 - smoothstep(0.0, 0.18, length(f));
-          float tw = 0.4 + 0.6 * sin(uTime * 3.0 + h * 40.0);
-          col += vec3(0.95, 0.9, 1.0) * dot2 * tw * (1.0 - u * 0.55) * 1.1;
-        }
-        // second, finer star layer — HD depth (tiny fast twinkles between the big ones)
-        vec2 sc2 = vObj.xy * 26.0 + 3.7;
-        vec2 cell2 = floor(sc2);
-        float h2 = hash(cell2);
-        if (h2 > 0.955) {
-          vec2 f2 = fract(sc2) - 0.5;
-          float dot3 = 1.0 - smoothstep(0.0, 0.28, length(f2));
-          col += vec3(0.9, 0.85, 1.0) * dot3 * (0.5 + 0.5 * sin(uTime * 5.0 + h2 * 60.0)) * (1.0 - u) * 0.55;
-        }
-        // ── BODY PATTERN: the legendary's actual SKIN. This is what makes a
-        // character stop reading as "a purple ball wearing a costume" — the
-        // surface itself is scaled, plated, furred or full of stars.
-        if (uPat > 0.5) {
-          float shade = 0.0;
-          if (uPat < 1.5) {                       // SCALES — offset-row teardrops
-            vec2 g = vec2(vUv.x * 34.0, vUv.y * 18.0);
-            g.x += mod(floor(g.y), 2.0) * 0.5;
-            vec2 f = fract(g) - 0.5;
-            float dd = length(f * vec2(1.0, 1.25));
-            shade = smoothstep(0.46, 0.30, dd) * 0.55 + smoothstep(0.30, 0.46, dd) * 0.15;
-          } else if (uPat < 2.5) {                // CHROME — machined panel bands
-            float band = abs(fract(vUv.y * 9.0) - 0.5);
-            float seam = smoothstep(0.06, 0.0, band);
-            float rivet = step(0.86, hash(floor(vec2(vUv.x * 22.0, vUv.y * 9.0))));
-            shade = seam * 0.85 + rivet * 0.4;
-          } else if (uPat < 3.5) {                // FUR — fine directional strands
-            float st = vnoise(vec2(vUv.x * 120.0, vUv.y * 22.0));
-            shade = smoothstep(0.55, 0.9, st) * 0.5;
-          } else if (uPat < 4.5) {                // STARFIELD — a night sky for a hide
-            vec2 sc3 = vUv * vec2(60.0, 34.0);
-            float h3 = hash(floor(sc3));
-            float dot4 = h3 > 0.9 ? (1.0 - smoothstep(0.0, 0.34, length(fract(sc3) - 0.5))) : 0.0;
-            shade = dot4 * (0.6 + 0.4 * sin(uTime * 3.0 + h3 * 30.0)) * 1.6;
-          } else {                                // STITCH — cloth seams (ninja wrap)
-            float sew = abs(fract(vUv.y * 13.0 + vUv.x * 0.6) - 0.5);
-            shade = smoothstep(0.09, 0.0, sew) * step(0.45, fract(vUv.x * 46.0)) * 0.7;
-          }
-          // patterns fade toward the silhouette so the fresnel read survives
-          col = mix(col, uPatCol, shade * (1.0 - u * 0.55));
-        }
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `,
-  });
+  // ONE shader, shared with the family (see VOID_VERT / VOID_FRAG above).
+  const bodyMat = makeVoidBody();
+  const whiteTex = bodyMat.uniforms.uTex.value as THREE.Texture;
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 72), bodyMat);
   bob.add(body);
 
@@ -428,9 +348,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // (The old ground-halo colour disc is GONE — over pale asphalt it read as a
   // rough white circle glued around the hero. The dark contact shadow grounds
   // him; the bloom sprite carries what little aura remains.)
+  // Retuned: a TIGHT dark core right where he touches the floor, falling off
+  // fast. The old even 0.55→0.28 spread was a grey smudge the same value all
+  // the way out, so he hovered — nothing said which pixel he was standing on.
   const contact = new THREE.Mesh(
     new THREE.CircleGeometry(1, 40),
-    new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.55, 0.28, 12), color: 0x160a30, transparent: true, opacity: 0.6, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.92, 0.30, 4), color: 0x160a30, transparent: true, opacity: 0.62, depthWrite: false }),
   );
   contact.rotation.x = -Math.PI / 2; contact.position.y = 0.05; scene.add(contact);
 
@@ -440,26 +363,91 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const flat = (r: number, col: number, opacity = 1) =>
     new THREE.Mesh(new THREE.CircleGeometry(r, 56), new THREE.MeshBasicMaterial({ color: col, transparent: opacity < 1, opacity, depthWrite: false }));
 
-  // eyes: dark outline ring + sclera + tracking pupil + catchlight (2D spec)
-  interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; }
+  // ── THE EYES ──────────────────────────────────────────────────────────────
+  // Everything a player feels about this character comes through here, so the
+  // eye is no longer three flat colour discs stacked up. The sclera and the
+  // pupil are each a small painted texture: the sclera carries a cool lid
+  // shadow across the top and a warm bounce underneath (so it sits IN a face
+  // instead of on it), and the pupil carries an iris falloff, a violet
+  // reflected-light crescent at the bottom and both catchlights baked in.
+  // Baking the catchlights also retired four meshes.
+  const SCL_R = 0.21;
+  const scleraTex = (() => {
+    const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const x = cv.getContext('2d')!;
+    x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2); x.clip();
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, S, S);
+    // lid shadow across the top — the single cheapest cue that there is a
+    // brow above this eye and a skull behind it
+    let g = x.createLinearGradient(0, 0, 0, S * 0.62);
+    g.addColorStop(0, 'rgba(96,74,150,0.42)');
+    g.addColorStop(0.45, 'rgba(120,100,180,0.13)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    // warm bounce off the cheek
+    g = x.createLinearGradient(0, S, 0, S * 0.6);
+    g.addColorStop(0, 'rgba(255,196,214,0.30)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    // inner edge darkening so the white never blows out against the body
+    g = x.createRadialGradient(S / 2, S / 2, S * 0.30, S / 2, S / 2, S * 0.5);
+    g.addColorStop(0, 'rgba(120,100,180,0)');
+    g.addColorStop(1, 'rgba(88,66,140,0.34)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const pupilTex = (() => {
+    const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const x = cv.getContext('2d')!;
+    x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2); x.clip();
+    // iris: a hair lighter at the edge than dead centre, so the pupil has a
+    // pupil. Flat black reads as a hole punched in the face.
+    let g = x.createRadialGradient(S * 0.5, S * 0.56, S * 0.05, S * 0.5, S * 0.5, S * 0.5);
+    g.addColorStop(0, '#0d0520');
+    g.addColorStop(0.62, '#1b0e38');
+    g.addColorStop(1, '#33195c');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    // reflected light: the sky bouncing up into the bottom of the iris
+    g = x.createRadialGradient(S * 0.58, S * 0.78, 0, S * 0.58, S * 0.78, S * 0.42);
+    g.addColorStop(0, 'rgba(140,110,255,0.55)');
+    g.addColorStop(1, 'rgba(140,110,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    // the big soft catchlight, upper-left, matching the body's key
+    g = x.createRadialGradient(S * 0.35, S * 0.31, 0, S * 0.35, S * 0.31, S * 0.20);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.95)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    // …and the tiny hard one opposite it
+    x.fillStyle = 'rgba(255,255,255,0.92)';
+    x.beginPath(); x.arc(S * 0.655, S * 0.68, S * 0.062, 0, Math.PI * 2); x.fill();
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; }
   const eyes: Eye[] = [];
   const charEyes: { star: THREE.Mesh; ring: THREE.Mesh }[] = [];   // legendary pupil overrides
   for (const sx of [-0.36, 0.36]) {
     const g = new THREE.Group();
     const sclera = new THREE.Group(); sclera.position.z = 1.0;
-    // crisp full-opacity outline ring (not a translucent blur disc)
-    const outline = new THREE.Mesh(new THREE.RingGeometry(0.198, 0.218, 56),
+    // The outline is a dark disc BEHIND the sclera, not a ring on top of it.
+    // A ring's weight is baked into its geometry; a backing disc's weight is
+    // one scale value, so the line can be fattened per frame as he shrinks on
+    // screen. A 0.02-wide ring was a third of a pixel at gameplay size, which
+    // is exactly why the eyes dissolved into the body when he was small.
+    const outline = new THREE.Mesh(new THREE.CircleGeometry(1, 56),
       new THREE.MeshBasicMaterial({ color: 0x2a1f45, depthWrite: false }));
-    outline.position.z = 0.005;
-    const white = flat(0.21, VOID.sclera);
-    sclera.add(white); sclera.add(outline);
+    outline.position.z = -0.004; outline.renderOrder = 1;
+    const white = new THREE.Mesh(new THREE.CircleGeometry(SCL_R, 56),
+      new THREE.MeshBasicMaterial({ map: scleraTex, depthWrite: false }));
+    white.renderOrder = 2;
+    sclera.add(outline); sclera.add(white);
     const pupilGrp = new THREE.Group(); pupilGrp.position.z = 1.02;
-    // KEY-ART eye: clean white sclera + big dark pupil + twin catchlights.
-    // (The old violet iris ring read as a hazy glow over the whole eye — cut.)
-    const pupil = flat(0.128, VOID.pupil);
-    const catch_ = flat(0.046, 0xffffff); catch_.position.set(-0.038, 0.042, 0.01);
-    const catch2 = flat(0.018, 0xffffff); catch2.position.set(0.032, -0.03, 0.01);
-    pupilGrp.add(pupil); pupilGrp.add(catch_); pupilGrp.add(catch2);
+    const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.122, 48),
+      new THREE.MeshBasicMaterial({ map: pupilTex, depthWrite: false }));
+    pupil.renderOrder = 3;   // outline(1) → sclera(2) → pupil(3) → char eyes(4)
+    pupilGrp.add(pupil);
     // ── CHARACTER EYES: legendary skins change the PUPIL, which is what your
     // brain reads as "a different creature". Hidden on the default void.
     const starPupil = new THREE.Mesh(new THREE.CircleGeometry(0.058, 5),
@@ -468,16 +456,29 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const glowRing = new THREE.Mesh(new THREE.RingGeometry(0.085, 0.13, 28),
       new THREE.MeshBasicMaterial({ color: 0x4de8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     glowRing.position.z = 0.008;
+    starPupil.renderOrder = 4; glowRing.renderOrder = 4;
     pupilGrp.add(starPupil); pupilGrp.add(glowRing);
     charEyes.push({ star: starPupil, ring: glowRing });
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
-    face.add(g); eyes.push({ g, sclera, pupilGrp });
+    face.add(g); eyes.push({ g, sclera, pupilGrp, outline });
   }
-  // blush (pink, soft)
-  for (const sx of [-0.5, 0.5]) {
-    const b = flat(0.15, VOID.blush, 0.5);
-    b.scale.set(1.06, 0.72, 1); b.position.set(sx, -0.2, 0.99);
+  // blush (pink, soft) — a painted falloff, not a flat pink lozenge. The hard
+  // edge of a plain disc is what made the cheeks read as two stickers.
+  const blushTex = (() => {
+    const S = 64, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const x = cv.getContext('2d')!;
+    const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.85)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    return new THREE.CanvasTexture(cv);
+  })();
+  for (const sx of [-0.49, 0.49]) {
+    const b = new THREE.Mesh(new THREE.CircleGeometry(0.155, 32),
+      new THREE.MeshBasicMaterial({ color: VOID.blush, map: blushTex, transparent: true, opacity: 0.5, depthWrite: false }));
+    b.scale.set(1.06, 0.70, 1); b.position.set(sx, -0.19, 0.99);
     face.add(b);
   }
   // smiling mouth — the KEY-ART kawaii open smile: a soft plum half-disc with
@@ -485,6 +486,18 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // — read as a too-wide clown grin.) Plus the big "maw" that scales in when
   // eating or firing GULP.
   const mouth = new THREE.Group();
+  // ── FANGS: the second half of the per-form read. From GOBBLER on, two little
+  // teeth drop into the smile — a shape change a child clocks in one frame,
+  // and one that survives at eighteen pixels where a colour shift would not.
+  const fangMat = new THREE.MeshBasicMaterial({ color: 0xfff6ec, depthWrite: false });
+  const fangs: THREE.Mesh[] = [];
+  const mkFang = (parent: THREE.Group, x: number, y: number, r: number) => {
+    const f = new THREE.Mesh(new THREE.CircleGeometry(r, 3), fangMat);
+    f.rotation.z = Math.PI / 2;   // point along +y (the group flip aims it down)
+    f.position.set(x, y, 0.006);
+    f.scale.set(0.72, 1, 1);
+    parent.add(f); fangs.push(f); return f;
+  };
   {
     // upper semicircle; the group's PI rotation (below) hangs the dome down
     const lip = new THREE.Mesh(new THREE.CircleGeometry(0.165, 40, 0, Math.PI),
@@ -493,6 +506,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
     tongue.scale.set(1.35, 0.6, 1); tongue.position.set(0, 0.075, 0.004);
     mouth.add(lip); mouth.add(tongue);
+    mkFang(mouth, -0.082, 0.048, 0.05); mkFang(mouth, 0.082, 0.048, 0.05);
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
   face.add(mouth);
@@ -500,15 +514,33 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
   const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
   maw.add(mawDark); maw.add(tongue);
+  {
+    // the gape gets its own, bigger set — hanging down from the upper lip
+    const a = mkFang(maw, -0.095, 0.145, 0.062); a.rotation.z = -Math.PI / 2;
+    const b = mkFang(maw, 0.095, 0.145, 0.062); b.rotation.z = -Math.PI / 2;
+  }
   face.add(maw);
 
   // ── EXPRESSION RIG: brows / sweat / zzz — the mood system's extra parts ────
   // (flat meshes inside the billboarded face group: cheap, always camera-true)
-  const browMat = new THREE.MeshBasicMaterial({ color: 0x2a1f45, transparent: true, opacity: 0, depthWrite: false });
+  // brows are painted, not stamped: a tapered stroke with rounded ends reads
+  // as a drawn brow. Two hard-edged rectangles read as two dashes of tape.
+  const browTex = (() => {
+    const W = 128, H = 32, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const x = cv.getContext('2d')!;
+    x.strokeStyle = '#ffffff'; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(10, H * 0.66); x.quadraticCurveTo(W * 0.5, H * 0.16, W - 10, H * 0.44);
+    x.lineWidth = H * 0.52; x.stroke();
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const browMat = new THREE.MeshBasicMaterial({ color: 0x2a1f45, map: browTex, transparent: true, opacity: 0, depthWrite: false });
   const brows: THREE.Mesh[] = [];
   for (const sx of [-0.36, 0.36]) {
-    const bw = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.06), browMat);
+    const bw = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.09), browMat);
     bw.position.set(sx, 0.4, 1.0);
+    if (sx > 0) bw.scale.x = -1;   // mirror, so both brows sweep off the nose
     face.add(bw); brows.push(bw);
   }
   const emoteTex = (txt: string) => {
@@ -525,6 +557,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const zzz = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42),
     new THREE.MeshBasicMaterial({ map: emoteTex('💤'), transparent: true, opacity: 0, depthWrite: false }));
   zzz.position.set(0.55, 0.92, 1.0); face.add(zzz);
+  // the whole face draws AFTER the body, in a fixed internal order. Left to
+  // three's opaque sort these flat discs shuffle against each other and
+  // against the sphere depending on camera angle — which is how you end up
+  // with a pupil hidden behind its own eye white.
+  face.traverse((o) => { o.renderOrder += 1; });
   // remember the blush materials — moods flush and fade the cheeks
   const blushMats: THREE.MeshBasicMaterial[] = [];
   face.children.forEach((c) => {
@@ -706,7 +743,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   for (let i = 0; i < AURA_N; i++) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     sp.scale.setScalar(0.2);
-    aura.add(sp); auraSp.push(sp); auraSeed.push(Math.random() * Math.PI * 2);
+    // FIXED phases, not Math.random(): the hero has to look identical on every
+    // single load. A sparkle ring that reshuffles itself per session is exactly
+    // the kind of drift that makes a splash screen impossible to art-direct.
+    aura.add(sp); auraSp.push(sp); auraSeed.push((i * 2.399963) % (Math.PI * 2));
   }
   let auraOn = false, auraKind = 'stars', pupilSquash = 1;
 
@@ -718,13 +758,15 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let dispR = 4, dispV = 0;
   let wobble = 0;   // jelly slosh amplitude (decays after each eat)
   let stage = 0, ringFade = 0;
-  let moveAmt = 0, blinkT = 3 + Math.random() * 3, blink = 0;
+  let moveAmt = 0, blinkT = 3.4, blink = 0, blinkN = 0;   // blink cadence is authored, not rolled
   let mouthT = 0, mouthMax = 0;    // open-mouth envelope
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
   let ringBurst = 0;               // ring + star flare on evolve
   let skinHasTex = false;
+  const stretchDir = new THREE.Vector3(0, 0, 1);   // travel direction, body space
+  let fangGrow = 0;                                // teeth ease in with the form
 
   const api: Void3D = {
     group,
@@ -868,49 +910,88 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       pvx = s.vx; pvz = s.vz;
       if (flipT > 0) flipT -= dt;
 
+      // ── MASS ── a heavier void breathes, sloshes and bobs SLOWER. Same
+      // curves, one time scale, and suddenly WORLD ENDER has weight instead of
+      // vibrating at exactly the speed a marble does.
+      const slow = THREE.MathUtils.clamp(1.25 / (0.6 + dispR * 0.28), 0.36, 1.25);
+      bodyMat.uniforms.uSlow.value = slow;
+
       // lift so the orb rests partly sunk into the ground; roll-bob while
       // moving — frenzy/victory add a real happy bounce
-      const lift = dispR * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3))) * moveAmt * (0.05 + mp.bounce * 0.055));
+      const lift = dispR * (RADIUS_SINK + Math.abs(Math.sin(s.t * (6 + mp.bounce * 3) * slow)) * moveAmt * (0.05 + mp.bounce * 0.055));
       group.position.set(s.x, lift, s.z);
 
       // squash/stretch + lean on the bob (body+glow only) — gentle, so the orb
       // stays a cute round orb, never pinched
-      const breathe = Math.sin(s.t * 2.2) * 0.016;
-      let stretch = 1 + moveAmt * 0.05 - breathe;
-      let squash = 1 - moveAmt * 0.045 + breathe;
-      if (flipT > 0) { stretch *= 0.87; squash *= 1.1; }   // wind-up before the turn
+      const breathe = Math.sin(s.t * 2.2 * slow) * 0.016;
+      // DIRECTIONAL stretch goes to the shader (along the travel vector);
+      // the bob keeps only the vertical squash, so hats and sparkles ride the
+      // body without being sheared with it.
+      let along = moveAmt * 0.085;
+      let squash = 1 - moveAmt * 0.05 + breathe;
+      if (flipT > 0) { along *= 0.25; squash *= 1.10; }   // wind-up before the turn
       if (mood === 'hurt') bob.rotation.y = Math.sin(s.t * 34) * 0.05; else bob.rotation.y *= 1 - Math.min(1, dt * 8);
       // power envelopes
       if (stretchT > 0) {           // ROCKET BITE: lunge-stretch pulse
         stretchT -= dt;
         const k = Math.sin(Math.max(0, stretchT) / 0.5 * Math.PI) * 0.2;
-        stretch += k; squash -= k * 0.7;
+        along += k; squash -= k * 0.7;
       }
+      let uniformK = 1;
       if (inhaleT > 0) {            // COLLAPSE: inhale-shrink, then burst back
         inhaleT -= dt;
         const ph = 1 - Math.max(0, inhaleT) / 0.9;
-        const k = ph < 0.62 ? -0.24 * (ph / 0.62) : -0.24 + 0.42 * ((ph - 0.62) / 0.38);
-        stretch += k; squash += k;
+        uniformK += ph < 0.62 ? -0.24 * (ph / 0.62) : -0.24 + 0.42 * ((ph - 0.62) / 0.38);
       }
       if (evolveT > 0) {            // EVOLVED! celebratory double-bounce
         evolveT -= dt;
-        const k = Math.sin(Math.max(0, evolveT) / 0.7 * Math.PI * 2) * 0.16 * (evolveT / 0.7);
-        stretch += k; squash += k;
+        uniformK += Math.sin(Math.max(0, evolveT) / 0.7 * Math.PI * 2) * 0.16 * (evolveT / 0.7);
       }
-      bob.scale.set(dispR * stretch, dispR * squash, dispR * stretch);
+      const lat = uniformK - breathe;
+      squash *= uniformK;
+      bob.scale.set(dispR * lat, dispR * squash, dispR * lat);
       bob.rotation.z = THREE.MathUtils.clamp(-s.vx / 520, -0.11, 0.11);
       bob.rotation.x = THREE.MathUtils.clamp(s.vz / 520, -0.11, 0.11);
+      // feed the travel direction to the vertex shader in the body's own space
+      if (speed > 0.5) stretchDir.set(s.vx / speed, 0, s.vz / speed);
+      bodyMat.uniforms.uStretchDir.value.copy(stretchDir);
+      bodyMat.uniforms.uStretchAmt.value = along;
+
+      // ── READABILITY ── how many pixels across is he, right now? The camera
+      // pulls back as he grows, so his on-screen size is nearly constant in
+      // play but collapses on a phone and in the opening dive. Everything the
+      // player needs to read — rim width, eye size, outline weight — is scaled
+      // off this instead of being authored once for a screenshot.
+      const persp = camera as THREE.PerspectiveCamera;
+      const fov = persp.isPerspectiveCamera ? persp.fov : 32;
+      const camD = Math.max(1, camera.position.distanceTo(group.position));
+      const pxR = (window.innerHeight / (2 * camD * Math.tan(fov * Math.PI / 360))) * dispR;
+      const small = THREE.MathUtils.clamp((64 - pxR) / 40, 0, 1);
+      bodyMat.uniforms.uSmall.value = small;
 
       // face: billboard to camera, scale with the void
       face.scale.setScalar(dispR);
       face.position.set(0, dispR * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
+      // ── AND PUSH IT CLEAR OF THE BODY ──────────────────────────────────
+      // The features used to sit at z = 1.0–1.02 in a unit-sphere face, i.e.
+      // exactly ON the surface. Every jelly slosh (up to +11%) and every
+      // ROCKET BITE stretch (up to +20%) therefore swallowed the eyes and the
+      // smile — the void went blank at the exact moment it ate something,
+      // which is the moment the whole game is about. The face now rides out in
+      // front of whatever envelope the body is currently occupying, measured,
+      // so it can never be buried and never floats further than it must.
+      const envelope = Math.max(lat, squash) * (1 + along) * (1 + wobble * 0.075);
+      face.translateZ(dispR * Math.max(0.04, envelope - 1 + 0.05));
 
       // mouth: maw scales in while open, smile hides
       if (mouthT > 0) mouthT -= dt;
       const mo = Math.max(mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0, mp.maw);
       maw.scale.setScalar(Math.max(0.001, mo));
       mouth.visible = mo < 0.25;
+      // FANGS grow in over GOBBLER→WORLD ENDER — the void's face itself levels up
+      fangGrow += (THREE.MathUtils.clamp((stage - 1.2) * 0.75, 0, 1) - fangGrow) * Math.min(1, dt * 3);
+      for (const f of fangs) { f.visible = fangGrow > 0.02; f.scale.set(0.72 * fangGrow, fangGrow, 1); }
 
       // ── MOOD ENGINE: lerp every expression param toward the mood's targets
       moodT += dt;
@@ -922,30 +1003,58 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       browMat.opacity = mp.brow;
       brows[0].rotation.z = mp.browAng; brows[1].rotation.z = -mp.browAng;
       brows[0].position.y = brows[1].position.y = mp.browY;
-      for (const bm of blushMats) bm.opacity = mp.blush;
+      // blush turns to mud once the cheeks are a few pixels wide — fade it out
+      // rather than let it grey down the two brightest parts of the silhouette
+      for (const bm of blushMats) bm.opacity = mp.blush * (1 - small * 0.45);
       (sweat.material as THREE.MeshBasicMaterial).opacity = mp.sweat;
       sweat.position.y = 0.52 + Math.sin(s.t * 9) * 0.045;
       sweat.scale.setScalar(0.9 + Math.sin(s.t * 9) * 0.1);
       (zzz.material as THREE.MeshBasicMaterial).opacity = mp.zzz * (0.55 + 0.45 * Math.sin(s.t * 1.6));
       zzz.position.set(0.55 + Math.sin(s.t * 0.9) * 0.05, 0.92 + Math.sin(s.t * 1.3) * 0.09, 1.0);
 
-      // pupil tracking + blink (sleepy mood = slow drowsy wander)
+      // pupil tracking + blink (sleepy mood = slow drowsy wander). The cadence
+      // is an authored cycle, not Math.random() — same void every load.
       blinkT -= dt;
-      if (blinkT <= 0 && blink <= 0) { blink = 0.16; blinkT = (mood === 'sleepy' ? 1.4 : 2.5) + Math.random() * 4; }
+      if (blinkT <= 0 && blink <= 0) {
+        blink = 0.16; blinkN++;
+        blinkT = (mood === 'sleepy' ? 1.4 : 2.5) + [1.7, 3.4, 0.9, 2.6, 4.1][blinkN % 5];
+      }
       let open = 1;
       if (blink > 0) { blink -= dt; open = Math.abs(blink - 0.08) / 0.08; }
       const wanderX = mood === 'sleepy' ? Math.sin(s.t * 0.7) * 0.6 : 0;
       const wanderY = mood === 'sleepy' ? Math.sin(s.t * 0.47) * 0.3 - 0.25 : 0;
+      // AT SMALL SIZE THE FACE GROWS. The eyes ARE the character; at 18 px a
+      // "correctly proportioned" eye is four pixels of mush. Caricature them
+      // back up as he shrinks on screen, exactly the way an icon designer would.
+      const eyeLod = 1 + small * 0.18;
       for (const e of eyes) {
-        e.pupilGrp.position.x = (s.lookX + wanderX) * 0.09;
-        e.pupilGrp.position.y = 0.06 + (s.lookY + wanderY) * 0.06;
+        // the pupil must live INSIDE the eyeball. It used to be offset by a
+        // flat 0.09 on a 0.21 sclera with a pupil that grew to 0.198 in the
+        // hungry/frenzy moods — so at the exact moments he was most alive, both
+        // pupils slid out through the side of his own eyes.
+        const pk = Math.min(1.3, stageBoost * mp.pupil);          // pupil vs sclera
+        const grow = 1 + (stageBoost * mp.pupil - pk) * 0.5;      // surplus grows the EYE
+        const eyeK = eyeLod * grow;
+        e.g.scale.set(eyeK, eyeK, 1);
+        e.g.position.x = Math.sign(e.g.position.x || 1) * 0.36 * (1 + small * 0.05);
+        const room = Math.max(0, SCL_R - 0.122 * pk - 0.012);
+        e.pupilGrp.position.x = THREE.MathUtils.clamp((s.lookX + wanderX) * 0.09, -room, room);
+        e.pupilGrp.position.y = 0.06 + THREE.MathUtils.clamp((s.lookY + wanderY) * 0.06, -room, room);
+        // BLINK FROM THE TOP: a lid comes down, it does not implode toward the
+        // middle of the eyeball. Anchoring the collapse high sells the lid.
         const oy = Math.max(0.08, open) * mp.lid;
-        e.sclera.scale.set(mp.wide, Math.max(0.08, oy) * mp.wide, 1);
-        const pk = stageBoost * mp.pupil;
-        e.pupilGrp.scale.set(pk, Math.max(0.08, oy) * pk * pupilSquash, 1);
+        const drop = SCL_R * (1 - oy) * 0.5;
+        e.sclera.scale.set(mp.wide, oy * mp.wide, 1);
+        e.sclera.position.y = drop;
+        e.pupilGrp.scale.set(pk, oy * pk * pupilSquash, 1);
+        e.pupilGrp.position.y += drop;
+        // outline weight: fattens as he shrinks, so the eye keeps a dark
+        // boundary against a bright body even at a handful of pixels
+        e.outline.scale.setScalar(SCL_R * (1 + 0.05 + small * 0.14));
       }
       // mouth: smile scale + smirk tilt + frown flip (scale.y through ~0 = flat)
-      mouth.scale.set(mp.smile, Math.sign(mp.mouthY || 1) * Math.max(0.06, Math.abs(mp.mouthY)) * mp.smile, 1);
+      const mk = mp.smile * (1 + small * 0.20);            // caricature when tiny
+      mouth.scale.set(mk, Math.sign(mp.mouthY || 1) * Math.max(0.06, Math.abs(mp.mouthY)) * mk, 1);
       mouth.rotation.z = Math.PI + mp.smirk;
       mouth.position.y = mp.mouthY < 0 ? -0.22 : -0.28;   // frowns ride a touch higher
 

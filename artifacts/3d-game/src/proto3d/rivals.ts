@@ -8,18 +8,44 @@ import { SKINS, type Skin } from './palette';
 import { buildAccessory, makeVoidBody, applySkinToBody } from './void3d';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
+// live match context the family needs to race the player fairly: the clock
+// length, the player's score (the rubber band reads it) and the shared HAPPY
+// HOUR multiplier (the family eats the bake sale too).
+export interface RivalCtx { matchLen: number; playerScore: number; fever: number; }
+// what a rival COSTS you when it catches you — the HUD reports both halves
+export interface RivalHit { shrink: number; steal: number; hunter: boolean; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean; }
 export interface Rivals {
   list: Rival[];
-  update(dt: number, t: number, playerX: number, playerZ: number, playerR: number): void;
-  onJoin?: (name: string, color: number, x: number, z: number) => void;
-  onRivalEaten?: (name: string, pts: number, x: number, z: number, r: number) => void;    // you swallowed one
-  onPlayerBitten?: (name: string) => void;               // one bit YOU
+  update(dt: number, t: number, playerX: number, playerZ: number, playerR: number, ctx?: RivalCtx): void;
+  onJoin?: (name: string, color: number, x: number, z: number, arch: Arch) => void;
+  onRivalEaten?: (name: string, pts: number, x: number, z: number, r: number, marquee: boolean) => void; // you swallowed one
+  onPlayerBitten?: (name: string, hit: RivalHit) => void; // one bit YOU
   onSpeak?: (x: number, z: number, line: string) => void; // personality bubbles
-  reset(): void;                                         // instant rematch
+  onCharge?: (name: string, x: number, z: number) => void;   // the BULLY winds up a lunge
+  onNearMiss?: (name: string, x: number, z: number) => void; // …and it whiffs. the retellable beat.
+  onStuffed?: (name: string, x: number, z: number) => void;  // the threat turns into the MEAL
+  reset(matchLen?: number): void;                        // instant rematch
 }
 
 const NAMES = ['WOBBLES', 'GLITZ', 'BITSY', 'CHOMPZILLA', 'DOZER'];
+// ── ARCHETYPES ───────────────────────────────────────────────────────────────
+// The family used to path to food and back — five different faces running one
+// brain. Every member now plays a game a child can NAME after watching it for
+// ten seconds, and the archetype is FIXED to the name so it is learnable:
+//   BULLY   CHOMPZILLA  hunts YOU. charges, bites, gloats. the threat.
+//   COWARD  WOBBLES     bolts from anything bigger. wide berth, jittery.
+//   SHOWOFF GLITZ       crosses the whole island for the biggest landmark.
+//   COPYCAT BITSY       drives your own route about 7 seconds behind you.
+//   HOARDER DOZER       camps one district and never leaves it.
+export type Arch = 'BULLY' | 'COWARD' | 'SHOWOFF' | 'COPYCAT' | 'HOARDER';
+export const ARCH_OF: Record<string, Arch> = {
+  CHOMPZILLA: 'BULLY', WOBBLES: 'COWARD', GLITZ: 'SHOWOFF', BITSY: 'COPYCAT', DOZER: 'HOARDER',
+};
+// cruising speed IS characterisation: Grandpa ambles, the bully drives
+const ARCH_SPD: Record<Arch, number> = {
+  BULLY: 27, COWARD: 25, SHOWOFF: 26, COPYCAT: 25, HOARDER: 16,
+};
 // the family: anxious / show-off / baby / drama queen / sleepy. Names ARE the
 // personalities now (Wobbles saying "I KNEW this would happen" is the joke).
 // All lines <=26 chars so bubbles never wrap.
@@ -28,6 +54,11 @@ export const RIVAL_VOICE: Record<string, {
   steal: string[]; escape: string[]; bite: string[];
   nearBig: string[]; nearSmall: string[]; rankUp: string[];
   visit: string[];   // the swing-by-and-say-hi lines (family, not enemies)
+  // ARCHETYPE lines: fired at the exact moment the behaviour becomes legible,
+  // so what a family member SAYS matches what it is DOING.
+  arch: string[];
+  charge?: string[];    // BULLY only: the wind-up before a lunge
+  stuffed?: string[];   // BULLY only: the turn from threat into marquee meal
 }> = {
   WOBBLES: {
     taunt: ['sorry!! but also: yum!!', 'I ate it?? I ATE IT!', "don't be mad don't be mad", 'oh no. am I winning??', 'was that ok to eat??', 'eek— I mean… NOM!'],
@@ -40,6 +71,7 @@ export const RIVAL_VOICE: Record<string, {
     nearSmall: ['NOPE NOPE NOPE NOPE', 'pretend I am a rock', 'walking away quickly!!'],
     rankUp: ['I passed you?? sorry!!', 'winning is stressful!!', 'how did THAT happen'],
     visit: ['hi!! just checking on you', 'you look bigger?? EEP', 'stay safe ok?? ok bye!!', 'I brought moral support'],
+    arch: ['RUNNING AWAY NOW!!', 'nope nope nope nope NOPE', 'I choose: not that!!', 'scattering!! like a bird!!'],
   },
   GLITZ: {
     taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, superstar'],
@@ -52,6 +84,7 @@ export const RIVAL_VOICE: Record<string, {
     nearSmall: ["I'm not scared. (I am)", 'my agent said RUN', 'this is bad for my brand'],
     rankUp: ['outta my way, slowpoke', 'first place suits me', 'and THAT is star power'],
     visit: ['came to bless your day', 'you may admire me. go.', 'we are SO photogenic', 'twinning!! sort of.'],
+    arch: ['that one. the BIG one.', 'only landmarks, darling', 'watch me eat something HUGE', 'small snacks are for YOU'],
   },
   BITSY: {
     taunt: ['nom nom nom hehe', 'I did a WINNING!', 'big bite! BIGGEST bite!', 'dat one was YUMMY', 'me first! ME FIRST!', 'look!! I ate a house!!'],
@@ -64,6 +97,7 @@ export const RIVAL_VOICE: Record<string, {
     nearSmall: ['eep!! big person!!', 'be nice to babies!!', 'I want my blankie!!'],
     rankUp: ['I winned past you!!', 'zoom zoom, slowpoke!', 'babies rule!!'],
     visit: ['HI HI HI HI HI!!', 'watcha eating?? can I??', "tag!! you're it!! hehe", 'I missed you SO much'],
+    arch: ['I go where YOU go!!', 'copying you!! hehehe', 'me too!! me too!! me TOO', 'following!! following!!'],
   },
   CHOMPZILLA: {
     taunt: ['BEHOLD: dinner theater', 'a FEAST worthy of ME', 'the island? MY stage.', 'gasp. magnificent. me.', 'act two: I DEVOUR', "applause. I'll wait."],
@@ -76,6 +110,9 @@ export const RIVAL_VOICE: Record<string, {
     nearSmall: ["spare me!! I'm FAMOUS", 'not the FACE!!', 'exit!! stage LEFT!!'],
     rankUp: ['the LEAD is my destiny', 'a STAR is reborn!!', 'weep, understudy!!'],
     visit: ['a VISIT from greatness', 'we feast TOGETHER, kid', 'the gala is SATURDAY', 'family!! DRAMATIC hug!!'],
+    arch: ['I am HUNTING you, dear', 'you. are. the MAIN COURSE', 'I have chosen my snack', 'run, darling. RUN.'],
+    charge: ['ACT TWO: I DEVOUR!!', 'HERE I COME, DARLING!!', 'CHAAARGE!! dramatically!!', 'brace yourself, SNACK!!'],
+    stuffed: ['ohh… I am SO full…', 'too full… to chase… ugh', 'do NOT eat me. I mean it', 'I regret… everything…'],
   },
   DOZER: {
     taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],
@@ -88,6 +125,7 @@ export const RIVAL_VOICE: Record<string, {
     nearSmall: ['zzz— AAH okay running', 'five more minutes!!', 'too sleepy to flee…'],
     rankUp: ['passed you in my sleep', '*overtakes while yawning*', 'zzzoom.'],
     visit: ['strolled by… *yawn* hi', 'nice spot for a nap', 'you grew. neat. zzz', 'grandpa hug… later…'],
+    arch: ['this is MY spot. zzz', 'not moving. ever. bye.', 'I live here now', 'my corner. my snacks.'],
   },
 };
 const pickLine = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -100,6 +138,17 @@ const growR = (R: number, eR: number) => {
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
   return Math.min(R_CAP, Math.sqrt(R * R + 0.5 * eR * eR * rookie * diminish));
 };
+// the player's own world speed, as a pure function of radius (prototype3d
+// derives it from the camera distance). The BULLY's charge is tuned AGAINST
+// this number, so a lunge is always a near thing at every size — outrunnable
+// if you are steering, catchable if you are not looking.
+const playerSpeed = (pr: number) =>
+  Math.min(96, 16 * (Math.min(340, Math.max(26, 38 * Math.pow(pr / START_R, 0.82))) / 50));
+// ── the family's scoring model ───────────────────────────────────────────────
+// It used to be a flat radius*12 with no combo, no prey bonus and no rush
+// multiplier, against a player who had all three — so the family ate 2.2-3.4x
+// more of the island and still lost 15:1. They now score on the SAME terms.
+const RIVAL_COMBO_HOLD = 1.9;   // slightly longer than the player's 1.6: they sweep, they don't dart
 
 let _rivalGlowTex: THREE.CanvasTexture | null = null;
 function rivalGlowTex(): THREE.CanvasTexture {
@@ -227,70 +276,128 @@ export function createRivals(
 ): Rivals {
   // props the family has eaten, mid shrink-out animation
   const shrinking: THREE.Object3D[] = [];
-  interface R extends Rival { group: THREE.Group; eyes: THREE.Group; halo: THREE.Mesh; tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number; respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean; visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number; }
-  const rivals: R[] = [];
-  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
-  // WHO SHOWS UP is a roll of the dice: 3-5 family members, shuffled casting,
-  // arriving at randomised times. Every match has a different line-up, so the
-  // island never feels like the same scripted five.
-  let cast: string[] = [];
-  let JOIN_TIMES: number[] = [];
-  function reroll() {
-    cast = [...NAMES].sort(() => Math.random() - 0.5).slice(0, count);
-    JOIN_TIMES = [rand(3, 8), rand(22, 40), rand(55, 80), rand(95, 125), rand(135, 165)];
+  interface R extends Rival {
+    arch: Arch; group: THREE.Group; body: THREE.Mesh; eyes: THREE.Group; halo: THREE.Mesh;
+    tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; cast: boolean;
+    stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number;
+    respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean;
+    visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number;
+    // scoring, on the player's own terms
+    combo: number; comboT: number;
+    // BULLY: the charge state machine (0 prowl, 1 wind-up, 2 lunge, 3 recover)
+    cst: number; ctim: number; missPend: boolean; missCd: number; stolen: number; stuffedSaid: boolean;
+    // SHOWOFF: the radius of the landmark it is currently crossing the map for
+    lockR: number;
+    // HOARDER: the district it has decided is its
+    campX: number; campZ: number; campT: number;
+    archSaid: number;   // cooldown on the "here is what I am doing" line
+    roll: THREE.Quaternion;
   }
-  reroll();
+  const roster: R[] = [];        // one per NAME — built once, skins fixed forever
+  const rivals: R[] = [];        // THIS match's cast (api.list points at it)
+  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
 
   // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member
-  // looks like something the player wants to own. Unique per rival, shuffled
-  // per boot so each match features a different line-up.
+  // looks like something the player wants to own.
   // FIXED CASTING: every family member always wears the SAME legendary, so a
   // kid learns "the sparkly unicorn is Uncle Glitz" instead of meeting five
   // strangers in new costumes every match. Recognition is the whole point.
+  // This used to be a LIE on every rematch: the meshes were built once per
+  // SLOT and reset() reassigned the names, so match two put Grandpa's wizard
+  // hat on Baby Bitsy — and now that behaviour is keyed to the name, it would
+  // have put the bully's brain in the coward's body. One rival object per
+  // NAME, permanently: the body, the voice and the archetype never separate.
   const FAMILY_SKIN: Record<string, string> = {
     WOBBLES: 'mecha', GLITZ: 'univoid', BITSY: 'rexling',
     CHOMPZILLA: 'kingvoid', DOZER: 'archmage',
   };
   const skinFor = (nm: string): Skin =>
     SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];
-  for (let i = 0; i < count; i++) {
-    const nm = cast[i % cast.length];
+  NAMES.forEach((nm, i) => {
     const sk = skinFor(nm);
-    const color = sk.rim;
-    const { group, eyes, halo } = makeRivalMesh(sk, i);
+    const { group, eyes, halo } = makeRivalMesh(sk, NAMES.indexOf(nm));
     scene.add(group); scene.add(halo);
     group.visible = halo.visible = false;   // hidden until they join the feast
-    // spread rivals around the island away from the player start
-    const ang = (i / count) * Math.PI * 2 + 0.6;
-    rivals.push({ name: nm, color, score: 0, r: START_R, group, eyes, halo,
+    const ang = (i / NAMES.length) * Math.PI * 2 + 0.6;
+    roster.push({ name: nm, arch: ARCH_OF[nm], color: sk.rim, score: 0, r: START_R,
+      group, body: group.children[0] as THREE.Mesh, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
-      joinAt: JOIN_TIMES[i % JOIN_TIMES.length], joined: false, stall: 0, ph: rand(0, 6), pulse: 0,
+      joinAt: 9e9, joined: false, cast: false, stall: 0, ph: rand(0, 6), pulse: 0,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
       visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
+      combo: 0, comboT: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
+      stolen: 0, stuffedSaid: false, lockR: 0,
+      campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0, archSaid: 0,
+      roll: new THREE.Quaternion(),
       // HOME TURF: each family member forages their OWN corner of the island.
       // Without this they orbited the player all match ("they hover around
       // you"), which is clingy, not alive.
       hx: Math.cos(ang) * 130, hz: Math.sin(ang) * 130 });
+  });
+
+  // WHO SHOWS UP is a roll of the dice — with one fixed point. CHOMPZILLA is
+  // ALWAYS at the table, because she is the match's threat and, later, its
+  // marquee meal; a match where the danger simply failed to be cast is a match
+  // with no story. The other 2-4 seats are shuffled.
+  function reroll(matchLen = 180) {
+    const others = NAMES.filter((n) => n !== 'CHOMPZILLA').sort(() => Math.random() - 0.5);
+    const picked = ['CHOMPZILLA', ...others.slice(0, Math.max(2, count - 1))];
+    // ── JOIN TIMES ────────────────────────────────────────────────────────
+    // The last seat used to open as late as 165s of a 180s match: a family
+    // member who arrives with fifteen seconds left is a cutscene, not a rival.
+    // The whole family is now on the island inside the first third, scaled to
+    // the clock so a short match still fills up early.
+    const k = matchLen / 180;
+    const slots = [rand(2, 5), rand(9, 15), rand(19, 27), rand(30, 40), rand(42, 54)].map((s) => s * k);
+    // …and the threat needs to be early enough to BE the mid-match, so she
+    // takes an early seat regardless of which slot she drew.
+    roster.forEach((rv) => { rv.cast = false; rv.joinAt = 9e9; });
+    picked.forEach((nm, i) => {
+      const rv = roster.find((r) => r.name === nm)!;
+      rv.cast = true;
+      rv.joinAt = nm === 'CHOMPZILLA' ? rand(7, 13) * k : slots[i];
+    });
+    rivals.length = 0;
+    for (const rv of roster) if (rv.cast) rivals.push(rv);
   }
+  reroll();
+
+  // ── the player's breadcrumb trail ──────────────────────────────────────────
+  // Sampled every third of a second. BITSY the COPYCAT drives down it about
+  // seven seconds behind you, which is the single most legible AI behaviour in
+  // the game: a child watches once and says "she's copying me".
+  const trail: { x: number; z: number }[] = [];
+  let trailT = 0;
+  let pvx = 0, pvz = 0;   // player velocity, derived from the trail (charge leading)
 
   const anyVisiting = () => rivals.some((r) => r.visiting);
   const tmp = new THREE.Vector3();
+  const rollQ = new THREE.Quaternion();   // scratch: the rolling-ball delta
   const api: Rivals = {
     list: rivals,
-    reset() {
+    reset(matchLen = 180) {
       // abandon in-flight eaten-anims: resetMatch restores those props to their
       // homes — leaving them queued here re-shrank them at match start (a
       // half-buried spinning house on lot #1 of every rematch)
       shrinking.length = 0;
-      rivals.forEach((rv, i) => {
-        const ang = (i / rivals.length) * Math.PI * 2 + 0.6;
+      trail.length = 0; trailT = 0;
+      roster.forEach((rv, i) => {
+        const ang = (i / roster.length) * Math.PI * 2 + rand(0, Math.PI * 2);
         rv.x = Math.cos(ang) * 150; rv.z = Math.sin(ang) * 150;
         rv.r = START_R; rv.score = 0; rv.vx = 0; rv.vz = 0;
         rv.joined = false; rv.respawnT = 0; rv.biteCd = 0; rv.stall = 0; rv.pulse = 0;
         rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
+        rv.combo = 0; rv.comboT = 0; rv.cst = 0; rv.ctim = rand(6, 10);
+        rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false;
+        rv.lockR = 0; rv.archSaid = 0; rv.tgt = null;
+        rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
+        rv.roll.identity(); rv.body.quaternion.identity();
         rv.group.visible = rv.halo.visible = false;
         rv.group.rotation.y = 0;
+        // a different corner of the island to forage — and to camp in — each time
+        rv.hx = Math.cos(ang) * rand(105, 155); rv.hz = Math.sin(ang) * rand(105, 155);
+        rv.campX = rv.hx; rv.campZ = rv.hz; rv.campT = 0;
       });
       // RE-ROLL THE MATCH. The cast shuffle and the join times used to be
       // rolled once, in the closure, at module load — so they only ever changed
@@ -298,18 +405,30 @@ export function createRivals(
       // reloads. A play-through of three back-to-back matches produced the same
       // line-up joining at the same seconds, three times running. The variety
       // was real and permanently invisible.
-      reroll();
-      rivals.forEach((rv, i) => {
-        rv.name = cast[i % cast.length];
-        rv.joinAt = JOIN_TIMES[i % JOIN_TIMES.length];
-        rv.speakCd = rand(4, 10);
-        rv.ph = rand(0, 6);
-        // and a different corner of the island to forage each time
-        const a2 = (i / rivals.length) * Math.PI * 2 + rand(0, Math.PI * 2);
-        rv.hx = Math.cos(a2) * rand(105, 155); rv.hz = Math.sin(a2) * rand(105, 155);
-      });
+      reroll(matchLen);
     },
-    update(dt, _t, px, pz, pr) {
+    update(dt, _t, px, pz, pr, ctx) {
+      const matchLen = ctx?.matchLen ?? 180;
+      const pScore = ctx?.playerScore ?? 0;
+      const fever = ctx?.fever ?? 1;
+      // ── THE HUNT WINDOW ─────────────────────────────────────────────────
+      // CHOMPZILLA is a genuine predator for the first 55% of the match — she
+      // spawns near you at 1.5x your size and charges. After that she is
+      // STUFFED: she stops growing while your finale surge runs, and turns
+      // into the best thing on the island to eat. One rival, two acts.
+      const huntEnd = matchLen * 0.55;
+      const hunting = _t > 0 && _t < huntEnd;
+      // breadcrumbs for the COPYCAT + a player velocity for the BULLY's lead
+      if (_t > 0) {
+        trailT -= dt;
+        if (trailT <= 0) {
+          trailT = 0.33;
+          const last = trail[trail.length - 1];
+          if (last) { pvx = (px - last.x) / 0.33; pvz = (pz - last.z) / 0.33; }
+          trail.push({ x: px, z: pz });
+          if (trail.length > 64) trail.shift();
+        }
+      }
       // drive the SHARED void shader for every family body: the clock runs the
       // jelly idle + nebula drift, and each rival's wobble decays after its
       // own bites — they slosh when they swallow, exactly like the hero
@@ -331,16 +450,68 @@ export function createRivals(
         if (!big) m.rotation.y += dt * 5;   // spinning HOUSES read as parked-on-road chaos
         if (m.scale.x < 0.05) { m.visible = false; scene.remove(m); shrinking.splice(i, 1); }
       }
-      const lawCap = START_R + LAW_RATE * _t;   // rivals obey the growth law too
+      // ── THE GROWTH LAW, REBALANCED ────────────────────────────────────────
+      // It used to be a flat START_R + 0.025·t, topping out at 5.4 on a 3:00
+      // clock while the player reached ~11.5. That single line is most of why
+      // the family could not race: half the island's props were permanently
+      // too big for them to even target.
+      //
+      // The family now tracks the PLAYER's size instead of the clock, and sits
+      // deliberately just BELOW it. That is the whole shape of the fight: the
+      // family competes on SCORE, the player wins on SIZE. A kid ends up the
+      // biggest thing on the island and still has to work to out-point them —
+      // and the way to close a points gap is to EAT one, which is exactly the
+      // play we want them chasing. 0.78 sits just under the 1/1.11 swallow
+      // threshold, so a rival at its ceiling is always catchable.
+      // Early on the ceiling is an absolute track instead, so the opening
+      // minute has real peers rather than a family scaled to a 0.9 hatchling.
+      const softCap = Math.max(Math.min(START_R + 0.05 * _t, 2.7), pr * 0.78);
       for (const rv of rivals) {
+        const isHunter = rv.arch === 'BULLY';
+        rv.hunting = isHunter && hunting && rv.joined;   // HUD + QA read this
         if (!rv.joined) {
           if (_t >= rv.joinAt) {
             rv.joined = true;
+            // WHERE they walk in from is characterisation. The threat arrives
+            // on top of you, already big; everyone else walks in off their own
+            // turf. And a late arrival is scaled to the match it is joining, so
+            // the last seat is a rival rather than a snack.
+            if (isHunter) {
+              const a0 = rand(0, Math.PI * 2), d0 = rand(46, 74);
+              rv.x = px + Math.cos(a0) * d0; rv.z = pz + Math.sin(a0) * d0;
+              if (!biomeAt(rv.x, rv.z)) { rv.x = Math.cos(a0) * 120; rv.z = Math.sin(a0) * 120; }
+              rv.r = Math.max(START_R * 1.35, pr * 1.5);
+            } else {
+              rv.x = rv.hx; rv.z = rv.hz;
+              if (!biomeAt(rv.x, rv.z)) { const a0 = rand(0, Math.PI * 2); rv.x = Math.cos(a0) * 120; rv.z = Math.sin(a0) * 120; }
+              rv.r = Math.max(START_R, Math.min(softCap, pr * 0.62));
+            }
             rv.group.visible = rv.halo.visible = true;
-            api.onJoin?.(rv.name, rv.color, rv.x, rv.z);
+            api.onJoin?.(rv.name, rv.color, rv.x, rv.z, rv.arch);
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+            rv.speakCd = rand(6, 10);
           } else continue;   // not on the island yet
         }
-        if (rv.r > lawCap) rv.r = lawCap;
+        // ── THE THREAT'S TWO ACTS ───────────────────────────────────────────
+        if (isHunter) {
+          if (hunting) {
+            // eased, never popped: she looms at ~1.5x whatever you are
+            const want = Math.min(R_CAP, Math.max(START_R * 1.35, pr * 1.5));
+            rv.r += (want - rv.r) * Math.min(1, dt * 0.9);
+          } else {
+            // STUFFED. She stops growing and sags very slowly (0.9%/s, which is
+            // invisible frame to frame) while the player's finale surge runs —
+            // so somewhere in the last third she crosses under your swallow
+            // line and becomes the biggest prize on the island.
+            rv.r = Math.max(START_R, rv.r * (1 - dt * 0.009));
+            if (!rv.stuffedSaid) {
+              rv.stuffedSaid = true; rv.cst = 0;
+              api.onStuffed?.(rv.name, rv.x, rv.z);
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].stuffed ?? RIVAL_VOICE[rv.name].taunt));
+              rv.speakCd = rand(8, 12);
+            }
+          }
+        } else if (rv.r > softCap) rv.r = softCap;
         // being devoured: a visible SUCK-IN — the rival spirals into the
         // player's pit, shrinking, before it winks out. Cause and effect a kid
         // can see (the old instant-hide read as "nothing happened").
@@ -395,7 +566,31 @@ export function createRivals(
         const canBeEaten = pr > rv.r * 1.25;
         // 10 units of warning at every size meant a rival was already sprinting
         // before you were close enough to matter
-        const fleeing = canBeEaten && dp < pr + rv.r * 1.4;
+        // …and the COWARD is the exception that proves the rule: Wobbles bolts
+        // from four times as far out as anyone else, which is the entire joke
+        // and the entire read. You can name him from the far side of a street.
+        const fleeReach = rv.arch === 'COWARD' ? pr + rv.r * 4.5 : pr + rv.r * 1.4;
+        let fleeing = (rv.arch === 'COWARD' ? pr > rv.r * 1.02 : canBeEaten) && dp < fleeReach
+          // the STUFFED threat is prey now, and she knows it
+          && !(rv.arch === 'BULLY' && hunting);
+        // …and Wobbles runs from the FAMILY too. Watching the coward scatter
+        // away from Auntie Chompzilla — with no player involved at all — is the
+        // cheapest, clearest proof on screen that these are characters and not
+        // five instances of one pathfinder.
+        let scareX = px, scareZ = pz;   // what he is running FROM
+        if (rv.arch === 'COWARD' && !fleeing) {
+          for (const o of rivals) {
+            if (o === rv || !o.joined || o.dyingT > 0 || o.respawnT > 0) continue;
+            if (o.r < rv.r * 1.15) continue;
+            if (Math.hypot(o.x - rv.x, o.z - rv.z) < o.r + rv.r * 4.0) {
+              fleeing = true; scareX = o.x; scareZ = o.z; break;
+            }
+          }
+        }
+        if (fleeing && rv.arch === 'COWARD' && rv.speakCd <= 0 && dp < fleeReach * 0.6) {
+          rv.speakCd = rand(9, 14);
+          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+        }
         if (fleeing && dp < pr * 1.05) rv.closeCall = true;   // almost swallowed…
         if (rv.closeCall && dp > pr * 1.8) {                   // …and wriggled free
           rv.closeCall = false;
@@ -412,7 +607,9 @@ export function createRivals(
         // a moment, not the default state of the family.
         rv.visitT -= dt;
         if (rv.visiting && fleeing) rv.visiting = false;   // visit's off — you got scary
-        if (!rv.visiting && !fleeing && rv.visitT <= 0 && dp > 60 && !anyVisiting()) {
+        // the HOARDER does not travel and the BULLY is not paying a social call
+        const sociable = rv.arch !== 'HOARDER' && !(rv.arch === 'BULLY' && hunting);
+        if (sociable && !rv.visiting && !fleeing && rv.visitT <= 0 && dp > 60 && !anyVisiting()) {
           rv.visiting = true; rv.tgt = null;
         }
         if (rv.visiting) {
@@ -429,7 +626,8 @@ export function createRivals(
           // flee INLAND-biased: near the coast the escape vector curves back
           // toward the island centre — no more rivals pinned jittering on the
           // waterline with nowhere to run
-          let fdx = dpx / (dp || 1), fdz = dpz / (dp || 1);
+          const sdx = rv.x - scareX, sdz = rv.z - scareZ, sd = Math.hypot(sdx, sdz) || 1;
+          let fdx = sdx / sd, fdz = sdz / sd;
           const cd = Math.hypot(rv.x, rv.z);
           if (cd > 190) {
             const k2 = Math.min(1, (cd - 190) / 60);
@@ -441,15 +639,61 @@ export function createRivals(
         }
         else if (!rv.visiting && (rv.retarget <= 0 || reached)) {
           rv.retarget = rand(2.5, 4);
-          let best: RivalEdible | null = null, bd = Infinity;
+          rv.archSaid = Math.max(0, rv.archSaid - 1);
+          // ── FIVE BRAINS, NOT ONE ───────────────────────────────────────────
+          // Every branch below answers "what is this character DOING?" in a way
+          // a six-year-old can narrate out loud. That is the whole spec.
+          let best: RivalEdible | null = null, bd = -Infinity;
+          // where this archetype is allowed to look, and how it ranks what it finds
+          let ax = rv.x, az = rv.z, reach = Infinity, bigHunger = 0;
+          if (rv.arch === 'HOARDER') { ax = rv.campX; az = rv.campZ; reach = 62; }
+          else if (rv.arch === 'SHOWOFF') { bigHunger = 1; }      // size beats distance
+          else if (rv.arch === 'COPYCAT') {
+            // drive the player's own route, ~7 seconds behind, and eat whatever
+            // they left. Bitsy is literally following your footprints.
+            const back = Math.max(0, trail.length - 1 - 21);
+            const spot = trail[back];
+            if (spot) { ax = spot.x; az = spot.z; reach = 55; }
+            else { ax = px; az = pz; reach = 55; }
+          } else if (rv.arch === 'BULLY' && hunting) { ax = px; az = pz; reach = 85; }  // prowls YOUR block
           for (const e of edibles) {
             if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;   // only hunt what it can eat
-            const d = (e.mesh.position.x - rv.x) ** 2 + (e.mesh.position.z - rv.z) ** 2;
-            if (d < bd) { bd = d; best = e; }
+            const d = Math.hypot(e.mesh.position.x - ax, e.mesh.position.z - az);
+            if (d > reach) continue;
+            // SHOWOFF trades distance for spectacle: it will cross the entire
+            // island for a hotel and step over a hundred traffic cones on the
+            // way. Everyone else takes the nearest thing.
+            const w = bigHunger ? e.radius * 26 - d * 0.55 : -d;
+            if (w > bd) { bd = w; best = e; }
           }
-          if (best) { rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; rv.tgt = best; }
-          else if (rv.name === 'BITSY') { rv.tx = px + rand(-45, 45); rv.tz = pz + rand(-45, 45); rv.tgt = null; }   // the baby follows the player around
-          else {
+          if (best) {
+            rv.tx = best.mesh.position.x; rv.tz = best.mesh.position.z; rv.tgt = best;
+            // "watch me eat something HUGE" — said only when it really is huge
+            if (rv.arch === 'SHOWOFF' && best.radius > 2.2 && best.radius > rv.lockR * 1.15 && rv.speakCd <= 0) {
+              rv.lockR = best.radius; rv.speakCd = rand(10, 16);
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+            }
+          } else if (rv.arch === 'COPYCAT') {
+            rv.tx = ax + rand(-18, 18); rv.tz = az + rand(-18, 18); rv.tgt = null;
+            if (rv.speakCd <= 0 && dp < 90) {
+              rv.speakCd = rand(12, 18);
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+            }
+          } else if (rv.arch === 'HOARDER') {
+            // camped out: sweep the patch, and only move house when the
+            // district is genuinely stripped — with a grumble about it
+            rv.campT -= 1;
+            if (rv.campT <= 0) {
+              rv.campT = 6;
+              const ca = rand(0, Math.PI * 2), cr = rand(70, 130);
+              const nx2 = rv.campX + Math.cos(ca) * cr, nz2 = rv.campZ + Math.sin(ca) * cr;
+              if (biomeAt(nx2, nz2)) { rv.campX = nx2; rv.campZ = nz2; }
+              if (rv.speakCd <= 0) { rv.speakCd = rand(12, 18); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch)); }
+            }
+            const a3 = rand(0, Math.PI * 2), rr2 = rand(10, 50);
+            rv.tx = rv.campX + Math.cos(a3) * rr2; rv.tz = rv.campZ + Math.sin(a3) * rr2;
+            rv.tgt = null;
+          } else {
             // idle wander sweeps their OWN turf, and the turf itself drifts —
             // so a family member works a district, moves on, and occasionally
             // ends up near you by coincidence rather than by clinging
@@ -463,6 +707,41 @@ export function createRivals(
             rv.tgt = null;
           }
         }
+        // ── THE CHARGE ────────────────────────────────────────────────────────
+        // The threat does not simply home in on you — that is unreadable and
+        // unfair. She TELEGRAPHS: she plants, her ring flashes, she announces
+        // the lunge, and only then does she come. Two seconds of warning is
+        // what turns "the game shrank me" into "she CHARGED and I DODGED",
+        // which is the sentence a seven-year-old repeats at dinner.
+        if (isHunter && hunting) {
+          rv.ctim -= dt; rv.missCd = Math.max(0, rv.missCd - dt);
+          if (rv.cst === 0) {
+            if (rv.ctim <= 0 && dp < 95 && dp > rv.r * 0.9) {
+              rv.cst = 1; rv.ctim = 0.85; rv.missPend = false;
+              api.onCharge?.(rv.name, rv.x, rv.z);
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].charge ?? RIVAL_VOICE[rv.name].taunt));
+              rv.speakCd = rand(6, 9);
+            }
+          } else if (rv.cst === 1 && rv.ctim <= 0) { rv.cst = 2; rv.ctim = 2.6; }
+          else if (rv.cst === 2) {
+            // a whisker away and still empty-jawed: bank the near miss
+            if (dp < rv.r * 1.5 && dp > rv.r * 0.85) rv.missPend = true;
+            if (rv.ctim <= 0) {
+              rv.cst = 3; rv.ctim = 1.7;
+              if (rv.missPend && rv.missCd <= 0) {
+                rv.missCd = 12; api.onNearMiss?.(rv.name, rv.x, rv.z);
+              }
+              rv.missPend = false;
+            }
+          } else if (rv.cst === 3 && rv.ctim <= 0) { rv.cst = 0; rv.ctim = rand(5.5, 9); }
+          // during wind-up and lunge she is aimed squarely at you (leading a
+          // little, so a straight line away is not a free escape)
+          if (rv.cst >= 1 && rv.cst <= 2) {
+            const lead = rv.cst === 2 ? 0.55 : 0;
+            rv.tx = px + pvx * lead; rv.tz = pz + pvz * lead;
+            rv.tgt = null; rv.visiting = false;
+          }
+        } else if (isHunter) { rv.cst = 0; }
         // SMOOTHED motion (no more teleporty slides) + coast handling
         const mx = rv.tx - rv.x, mz = rv.tz - rv.z, md = Math.hypot(mx, mz) || 1;
         // CATCHABLE. Flee speed peaked at 34 * 2.1 = 71 u/s against a player
@@ -475,7 +754,25 @@ export function createRivals(
         if (fleeing) rv.panic = Math.min(1, (rv.panic ?? 0) + dt * 0.42);
         else rv.panic = Math.max(0, (rv.panic ?? 0) - dt * 0.30);
         const tired = 1 - 0.34 * (rv.panic ?? 0);
-        const spdSec = (fleeing ? 31 * tired : 22) * Math.min(1.7, Math.pow(rv.r / START_R, 0.5));
+        // ── SPEED IS CHARACTER ────────────────────────────────────────────────
+        // Grandpa ambles, Uncle Glitz struts, Auntie Chompzilla drives. You can
+        // tell them apart at fifty metres with the labels off.
+        const cruise = ARCH_SPD[rv.arch];
+        // the STUFFED threat is heavy and slow — the chase that ends the match
+        // has to actually close
+        const heavy = isHunter && !hunting ? 0.72 : 1;
+        let spdSec = (fleeing ? 31 * tired : cruise) * heavy
+          * Math.min(1.7, Math.pow(rv.r / START_R, 0.5));
+        if (isHunter && hunting) {
+          // the lunge is pinned to the PLAYER's own top speed, so a charge is a
+          // near thing at every size: outrun it by steering, eat the shrink by
+          // not looking. Wind-up plants her; recovery leaves her wallowing.
+          const ps = playerSpeed(pr);
+          if (rv.cst === 1) spdSec = 1.5;
+          else if (rv.cst === 2) spdSec = ps * 1.22;
+          else if (rv.cst === 3) spdSec = ps * 0.28;
+          else spdSec = Math.min(spdSec, ps * 0.62);   // prowling, not chasing
+        }
         rv.vx += ((mx / md) * spdSec - rv.vx) * Math.min(1, dt * 5);
         rv.vz += ((mz / md) * spdSec - rv.vz) * Math.min(1, dt * 5);
         const spd = Math.hypot(rv.vx, rv.vz) * dt;
@@ -540,62 +837,137 @@ export function createRivals(
         if (pr > rv.r * 1.2 && dp < pr * 0.95) {
           // the player swallows this rival whole — kick off the suck-in
           // spectacle (spiral + shrink above), out for 6s, respawns small
-          const pts = Math.round(100 + rv.r * 40);   // eating a hole is the marquee play
+          // THE MARQUEE MEAL. Once the threat is stuffed she is the single best
+          // thing on the island to eat: a fat flat bounty, a size bounty, and
+          // HALF HER SCORE, plus every point she ever bit off you handed back.
+          // That is the comeback play — you can be losing the leaderboard all
+          // match and take the lead in one bite, which is exactly the kind of
+          // ending a kid replays for.
+          const marquee = isHunter && !hunting;
+          const looted = marquee ? Math.round(rv.score * 0.5) : 0;
+          const pts = marquee
+            ? Math.round(400 + rv.r * 180 + looted + rv.stolen)
+            : Math.round(100 + rv.r * 40);
+          if (marquee) { rv.score -= looted; rv.stolen = 0; }
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten));
           rv.halo.visible = false;
-          rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null;
-          api.onRivalEaten?.(rv.name, pts, rv.x, rv.z, rv.r);
+          rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null; rv.cst = 0;
+          api.onRivalEaten?.(rv.name, pts, rv.x, rv.z, rv.r, marquee);
           continue;
         }
         if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0) {
-          rv.biteCd = 9; rv.pulse = 1;
+          // ── WHAT A BITE COSTS ───────────────────────────────────────────────
+          // -12% radius was undone by the score floor within a frame or two, so
+          // being caught was free and the family had no teeth at all. A bite now
+          // takes SCORE as well as size — and the threat's bite is the one that
+          // hurts, because she banks what she takes and you can win it all back
+          // by eating her later. Shrink alone can be refunded by the growth law;
+          // points cannot, so this is a cost the leaderboard actually shows.
+          const heavyBite = isHunter && hunting;
+          const steal = heavyBite ? Math.min(1600, Math.round(pScore * 0.10)) : 0;
+          rv.biteCd = heavyBite ? 7 : 9; rv.pulse = 1;
+          rv.missPend = false;   // she connected: this was no near miss
+          if (steal > 0) { rv.score += steal; rv.stolen += steal; }
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].bite));
-          api.onPlayerBitten?.(rv.name);
+          api.onPlayerBitten?.(rv.name, { shrink: heavyBite ? 0.80 : 0.90, steal, hunter: heavyBite });
         }
 
-        // eat nearby food (size-gated) -> grow by area + score
+        // ── eat nearby food -> grow by area + score ON THE PLAYER'S TERMS ─────
+        // The family used to score a flat radius·12 with no combo, no prey
+        // bonus and no rush multiplier, against a player who had all three.
+        // They ate 2.2-3.4x more of the island than the player and still lost
+        // 15:1, which meant the HUD and the leaderboard told a child two
+        // opposite stories about the same match.
+        rv.comboT -= dt; if (rv.comboT <= 0) rv.combo = 0;
+        // RUBBER BAND — the leaderboard has to stay a real question without
+        // ever becoming hopeless. A family member well ahead of the player eats
+        // for less; one falling behind eats for more. Bounded both ways, so it
+        // nudges the race without deciding it.
+        const gap = (rv.score - pScore) / Math.max(1500, pScore * 0.5);
+        const band = THREE.MathUtils.clamp(1 - gap * 0.6, 0.55, 1.55);
         for (const e of edibles) {
           if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius * 0.6) ** 2) {
             e.mesh.userData.eaten = true;
             shrinking.push(e.mesh);   // animate out — buildings must never BLINK away
-            rv.score += Math.max(1, Math.round(e.radius * 12));   // same points scale as the player
+            rv.combo++; rv.comboT = RIVAL_COMBO_HOLD;
+            const comboMult = 1 + Math.min(rv.combo, 25) * 0.1;
+            const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
+            rv.score += Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * fever * band));
             rv.r = growR(rv.r, e.radius);
             rv.pulse = 1;   // visible gulp — the family EATS, not just exists
-            const bm = (rv.group.children[0] as THREE.Mesh)?.material as THREE.ShaderMaterial | undefined;
-            if (bm?.uniforms?.uWobble) bm.uniforms.uWobble.value = Math.min(1, (bm.uniforms.uWobble.value as number) + 0.6);
+            const bm2 = rv.body.material as THREE.ShaderMaterial | undefined;
+            if (bm2?.uniforms?.uWobble) bm2.uniforms.uWobble.value = Math.min(1, (bm2.uniforms.uWobble.value as number) + 0.6);
             if (e.radius > rv.r * 0.55 && rv.speakCd <= 0) {   // a BIG bite earns a taunt
               rv.speakCd = rand(9, 16);
               api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].taunt));
             }
           }
         }
+        // …and a score FLOOR, the same contract the player has: a family member
+        // who is genuinely out-eating the island grows into it instead of being
+        // pinned under a clock-shaped ceiling.
+        if (!isHunter) {
+          const floor = Math.min(softCap, START_R * (1 + Math.pow(Math.max(0, rv.score) / 974, 0.57)));
+          if (rv.r < floor) rv.r = floor;
+        }
 
         // render — alive: a little roll-hop while moving, a squash-gulp on eats
         rv.pulse = Math.max(0, rv.pulse - dt * 3);
-        const hopA = Math.abs(Math.sin(_t * 5 + rv.ph)) * (movedOk ? 0.07 : 0.02);
-        const sq = 1 + rv.pulse * 0.2;
-        rv.group.position.set(rv.x, rv.r * (0.9 + hopA), rv.z);
+        // ── THEY MUST NOT FLOAT ───────────────────────────────────────────────
+        // A sphere translated across a plane reads as a sliding orb, however
+        // pretty it is. Three things fix that, and all three are free:
+        //   1. it ROLLS. Rolling without slipping, ω = (up × v)/r, applied to
+        //      the BODY only — the crown and the nightcap stay upright, which
+        //      is what sells the body as a physical thing under a hat.
+        //   2. it BOUNCES, at a rate and height set by how fast it is going,
+        //      and it SQUASHES at the bottom of every bounce. Contact.
+        //   3. it never leaves the ground: the centre sits at 0.88·r, so the
+        //      bottom of the sphere is buried a little at all times.
+        const spdN = Math.min(1, Math.hypot(rv.vx, rv.vz) / 34);
+        const bounce = Math.abs(Math.sin(_t * (4.4 + 3.4 * spdN) + rv.ph));
+        const hopA = bounce * (movedOk ? 0.035 + 0.085 * spdN : 0.02);
+        const land = (1 - bounce) * spdN;                 // 1 at ground contact, at speed
+        const sq = 1 + rv.pulse * 0.2 - land * 0.075;     // squash on landing, stretch on the gulp
+        rv.group.position.set(rv.x, rv.r * (0.88 + hopA), rv.z);
         rv.group.scale.set(rv.r / Math.sqrt(sq), rv.r * sq, rv.r / Math.sqrt(sq));
+        if (spdN > 0.01) {
+          const vm = Math.hypot(rv.vx, rv.vz) || 1;
+          tmp.set(rv.vz / vm, 0, -rv.vx / vm);            // up × v, normalised
+          rollQ.setFromAxisAngle(tmp, (vm * dt) / Math.max(0.5, rv.r));
+          rv.roll.premultiply(rollQ);
+          rv.body.quaternion.copy(rv.roll);
+        }
         rv.eyes.quaternion.copy(camera.quaternion);
         // look toward travel dir
         const aimX = dp < 30 ? (rv.x - px) / (dp || 1) * -1 : mx / md;   // it SAW you
-        const wide = fleeing ? 1.28 : 1;
+        const wide = fleeing ? 1.28 : rv.cst === 1 ? 1.2 : 1;
         rv.eyes.children.forEach((c, ci) => {
           if (ci >= 4) return;   // accessory shades stay put
           c.position.x = (c.position.x < 0 ? -0.32 : 0.32) + THREE.MathUtils.clamp(aimX * 0.06, -0.06, 0.06);
           if (ci % 2 === 0) c.scale.setScalar(wide);   // scared stare
         });
-        rv.halo.position.set(rv.x, 0.14, rv.z); rv.halo.scale.setScalar(rv.r * 1.5);
         // hole.io's danger cue, pre-reader-proof: the ground disc tells the
         // truth at a glance — green = you can eat them, red = RUN, skin glow
         // when it's a fair fight
         const hm = rv.halo.material as THREE.MeshBasicMaterial;
-        if (pr > rv.r * 1.2) hm.color.setHex(0x54e88a);
-        else if (rv.r > pr * EAT_RATIO) hm.color.setHex(0xff5560);
-        else hm.color.setHex(rv.color);
-        void tmp;
+        let haloK = 1.5;
+        if (isHunter && hunting && rv.cst >= 1 && rv.cst <= 2) {
+          // WIND-UP: the ring strobes and swells. Two seconds of "something is
+          // about to happen" that a pre-reader cannot miss.
+          const f = Math.abs(Math.sin(_t * (rv.cst === 1 ? 16 : 9)));
+          hm.color.setHex(0xff2b3c); hm.opacity = 0.55 + 0.45 * f; haloK = 1.6 + 0.5 * f;
+        } else if (isHunter && !hunting && rv.r > START_R * 2 && pr > rv.r * 1.05) {
+          // THE PRIZE: gold, pulsing, unmistakable — the best meal on the island
+          hm.color.setHex(0xffcf3a); hm.opacity = 0.7 + 0.3 * Math.abs(Math.sin(_t * 4)); haloK = 1.75;
+        } else {
+          hm.opacity = 0.85;
+          if (pr > rv.r * 1.2) hm.color.setHex(0x54e88a);
+          else if (rv.r > pr * EAT_RATIO) hm.color.setHex(0xff5560);
+          else hm.color.setHex(rv.color);
+        }
+        rv.halo.position.set(rv.x, 0.14, rv.z); rv.halo.scale.setScalar(rv.r * haloK);
       }
     },
   };
