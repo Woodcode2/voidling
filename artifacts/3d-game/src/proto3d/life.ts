@@ -15,6 +15,13 @@ import * as LUXE from './luxe';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
+// MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
+// exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
+// the same voice ids the cast carries (politician, protester, gossip, farmer,
+// teen, kid, diner, booster). They are selected per WORLD at speak time rather
+// than merged into the module tables — 'kid' exists in both worlds and a
+// Pirate Bay child must never start talking about the pie contest.
+import { MAPLE_VOICE_AMBIENT, MAPLE_VOICE_PANIC } from './newsroom_maple';
 
 // Pirate Bay's geometry is authored in WORLD units (0..12000, centre 6000);
 // life places things in 3D. Same conversion island.ts uses for everything else.
@@ -48,7 +55,27 @@ const AMBIENT: Record<string, string[]> = {
     'rope don\'t mend itself', 'bread\'s on. give it ten.', 'that gull knows my name'],
   cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
   fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how gauche', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
-  downtown: ['need. more. coffee.', 'this commute is BRUTAL', 'meeting ran LONG', "elevator's down AGAIN", 'lunch is a spreadsheet today', 'hustle never sleeps', "circle back? I'll circle back", 'my inbox says 4,000', 'sell! no wait— buy!', 'is it friday yet'],
+  // ── MAPLE FALLS: `downtown` is MAIN STREET, four shops and a stoplight
+  downtown: ['morning! morning. morning.', 'the hardware store knows me', 'that meter is a DISGRACE',
+    'parade route goes past here', 'coffee at Gus\'s? always.', 'one stoplight. it works fine.',
+    'the bank shut at noon. again.', 'they repainted the crosswalk', 'sign in the window! look!',
+    'nine years of that protest', 'window display is new. bold.', 'everybody waves here. everybody.'],
+  fair: ['funnel cake! FUNNEL CAKE!', 'the pie judging is at four', 'that goat won a ribbon',
+    'the tilt-a-whirl is fine. mostly.', 'nine tickets for ONE ride', 'best week of the whole year',
+    'the twine ball is round back', 'I entered the jam. again.', 'the band plays at six',
+    'ring toss is RIGGED. I love it.', 'somebody find the pig', 'blue ribbon or nothing'],
+  farm: ['that tractor is older than me', 'corn maze opens saturday', 'the rooster starts at 4:40',
+    'good dirt out here. the best.', 'a cow got out. tuesday. again.', 'pumpkins are early this year',
+    'that silo is county famous', 'four generations on this hill', 'rain would help. or not.',
+    'the scarecrow has a jacket now', 'mind the fence. it has moods.', 'town folks drive too fast'],
+  campus: ['GO OTTERS! two and eight!', 'band practice. every day. LOUD.', 'the bell is broken. still.',
+    'homecoming is a whole ordeal', 'coach says run it AGAIN', 'the field flooded in 2019',
+    'we lost. shocker. we lost.', 'bake sale in the gym! cash!', 'my mom knows your mom. sorry.',
+    'the trophy case has one trophy', 'pep rally! mandatory pep!', 'six days till my license'],
+  strip: ['gas is two cents cheaper here', 'coffee 90 cents. refills free.', 'the special is the special',
+    'that booth is Marge\'s booth', 'the laundromat has one dryer', 'we close when Gus says so',
+    'the debate is at 8. be early.', 'they banned him. still feed him.', 'nobody leaves here hungry',
+    'the neon E has been out for years', 'kids loiter here. always have.', 'pie? we got PEARL\'s pie.'],
   park: ['lovely day for it', 'the ducks are rowdy', "picnic o'clock!", 'kite weather!!', 'ice cream truck?! where!', 'the gazebo band plays at noon', '10k steps, easy', 'frisbee!', 'that squirrel took my chips', 'best bench. tell no one'],
   forest: ['so peaceful out here', 'found the COOLEST rock', "s'mores tonight!", 'trail mix is 90% chocolate', 'shhh… deer!', 'fresh piney air', 'my boots are soaked', 'that birdsong? me. thanks.', 'one with nature right now', 'is moss edible? asking.'],
   beach: ['sunscreen me. NOW.', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', "don't feed the seagulls!!", 'SPF one MILLION', 'crab looked at me funny', 'ice cream, swim, ice cream', 'nap. then more nap.', 'dude, the ocean is SO wet', 'they RAKE this beach at dawn', 'a man brings you cold flannels', 'sunset is at 6:42. sharp.', 'this sand is imported. really.'],
@@ -67,7 +94,16 @@ const PANIC: Record<string, string[]> = {
     'leave the catch!! LEAVE IT!!'],
   cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the HOA form!!'],
   fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
-  downtown: ['MY STARTUP!!', "the WIFI'S DOWN!!", 'not my oat-milk latte!!', 'OUT OF OFFICE. FOREVER.', 'meeting cancelled, RUN!!', 'this is NOT on my calendar'],
+  downtown: ['NOT MAIN STREET!!', 'it ate the hardware store!!', 'the parade route is GONE!!',
+    'somebody move the stoplight!!', 'it left the METER. of course.', 'call the Bugle!! CALL HER!!'],
+  fair: ['SAVE THE PIES!! ALL OF THEM!!', 'the twine ball!! THE TWINE BALL!!', 'it ate the ferris wheel!!',
+    'my blue ribbon!! MY RIBBON!!', 'get the goat!! GET THE GOAT!!', 'judging is POSTPONED!!'],
+  farm: ['open the GATES!! let em run!!', 'the tractor!! start the tractor!!', 'it ate the corn maze!!',
+    'four generations!! GONE!!', 'somebody grab the chickens!!', 'not the SILO!! that\'s county famous!!'],
+  campus: ['PRACTICE IS CANCELLED!!', 'coach says RUN. actually run!!', 'it ate the FIELD!!',
+    'save the trophy!! the ONE trophy!!', 'band, keep playing!! KEEP PLAYING!!', 'homecoming is OFF!!'],
+  strip: ['it ate the DINER!!', 'grab the pie!! LEAVE the eggs!!', 'the coffee!! save the coffee!!',
+    'we are CLOSED. permanently. RUN.', 'not Marge\'s booth!!', 'refills are OVER!!'],
   park: ['not the PICNIC!!', 'the DUCKS!! SAVE THE DUCKS', 'grab the frisbee, RUN!!', 'abandon the sandwiches!!', 'the gazebo!! NOO!!', 'jog!! FOR REAL this time!!'],
   forest: ['BEAR?! no— WORSE!!', 'ABANDON TRAIL!!', "save the s'mores!!", 'the trees are LEAVING!!', 'hug a tree GOODBYE!!', 'nature says RUN!!'],
   beach: ['SAVE THE COOLER!!', 'my SANDCASTLE!!', 'not the towels!!', 'gnarly!! BAD gnarly!!', 'paddle, dude, PADDLE!!', 'even the crabs left!!', 'it ate the raked bit!!'],
@@ -296,15 +332,26 @@ const HAIRC = [0x241d1f, 0x2f2320, 0x4a3226, 0x6a4a2a, 0x8a5a30, 0xb0793a, 0xd8b
 const HAIRC_FUN = [0xff4fa0, 0x35d6f0, 0x9a5cf0, 0x4ef0a0, 0xffd23f];
 
 export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel'
-  | 'toque' | 'bellhop' | 'flower' | 'bucket' | 'cap' | 'beanie';
-export type Prop = 'cocktail' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie';
+  | 'toque' | 'bellhop' | 'flower' | 'bucket' | 'cap' | 'beanie'
+  // ── MAPLE FALLS. From the play camera a hat is 60% of a person's footprint,
+  // so a town of jobs needs a town of hats: the straw brim IS the farmer, the
+  // shako plume IS the marching band, the hood IS the teenager.
+  | 'straw' | 'hood' | 'helmet' | 'shako' | 'postal';
+export type Prop = 'cocktail' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie'
+  // MAPLE FALLS props. `placard` is the loudest object in the town — it is the
+  // only thing an adult holds that is visible from directly overhead, which is
+  // why the protest and both campaigns are told with them.
+  | 'leaflets' | 'placard' | 'coffeepot' | 'rod' | 'pompom' | 'horn' | 'bat'
+  | 'pie' | 'tape' | 'board' | 'leash';
 // HAIR is the single most important surface at a top-down camera — it is the
 // only thing you see of most people. Nine silhouettes, fourteen colours.
 export type Hair = 'short' | 'buzz' | 'bob' | 'long' | 'bun' | 'pony' | 'curly' | 'braids' | 'bald';
 // GARMENTS change the SHAPE, not just the colour: a sundress flares wider than
 // the shoulders, a robe drops to the shins, a tank top shows bare arms.
 export type Wear = 'tee' | 'tank' | 'open' | 'dress' | 'sarong' | 'blazer'
-  | 'robe' | 'wet' | 'apron' | 'swim' | 'uniform';
+  | 'robe' | 'wet' | 'apron' | 'swim' | 'uniform'
+  // MAPLE FALLS garments — each changes the SILHOUETTE, not just the colour
+  | 'dungarees' | 'hoodie' | 'jersey' | 'waders';
 export type Pattern = 'plain' | 'stripe' | 'floral' | 'twotone' | 'sash';
 export type Shoe = 'bare' | 'flip' | 'shoe' | 'boot';
 interface PersonOpts {
@@ -316,7 +363,10 @@ interface PersonOpts {
   glasses?: boolean; eyepatch?: boolean; headphones?: boolean;
   parrot?: boolean; lanyard?: boolean; necklace?: boolean; robe?: boolean;
   armbands?: boolean; floatRing?: boolean; rucksack?: boolean;
-  prop?: Prop; kid?: boolean;
+  prop?: Prop; propL?: Prop; kid?: boolean;
+  // MAPLE FALLS: a campaign rosette (DINKLE red / HOLLIS blue) on the chest,
+  // and a mail satchel slung across the body.
+  rosette?: number; satchel?: number;
 }
 
 // ── part builders. Each pushes GEOMETRY into `out`; the caller welds the list
@@ -360,6 +410,31 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
   } else if (kind === 'cap') {
     out.push(pc(B.hemi, col, 0, 0.14, -0.02, 1.17, 0.94, 1.17));
     out.push(pc(B.box, col, 0, 0.16, 0.56, 0.54, 0.08, 0.42));
+  } else if (kind === 'straw') {
+    // the widest brim in the game — a farmer is legible from the top of the
+    // camera's travel purely because of this disc
+    out.push(pc(B.disc, 0xd9b76a, 0, 0.20, 0, 2.60, 0.07, 2.60));
+    out.push(pc(B.hemi, 0xe0c078, 0, 0.14, 0, 1.14, 0.88, 1.14));
+    out.push(pc(B.cyl, col, 0, 0.20, 0, 1.19, 0.10, 1.19));            // hat band, campaign-coloured
+  } else if (kind === 'hood') {
+    // hood UP: a dome a size too big, sitting back off the face, with the
+    // drawstring collar showing under it
+    out.push(pc(B.hemi, col, 0, 0.02, -0.10, 1.40, 1.24, 1.44));
+    out.push(pc(B.cyl, col, 0, -0.34, -0.06, 1.30, 0.30, 1.34));
+  } else if (kind === 'helmet') {
+    out.push(pc(B.hemi, col, 0, 0.02, 0, 1.24, 1.06, 1.24));
+    out.push(pc(B.cyl, col, 0, -0.06, 0, 1.26, 0.20, 1.26));
+    out.push(pc(B.box, col, 0, 0.10, 0.60, 0.60, 0.08, 0.44));         // peak
+    out.push(pc(B.box, WHITE, 0, -0.20, 0.50, 0.52, 0.06, 0.30));      // face bar
+  } else if (kind === 'shako') {   // marching band: tall drum, peak, and a PLUME
+    out.push(pc(B.cyl, col, 0, 0.52, 0, 0.96, 0.86, 0.96));
+    out.push(pc(B.cyl, GOLD, 0, 0.20, 0, 1.00, 0.10, 1.00));
+    out.push(pc(B.box, INK, 0, 0.16, 0.56, 0.56, 0.08, 0.40));
+    out.push(pc(B.cone, 0xf3f0e6, 0, 1.14, 0, 0.26, 0.62, 0.26));      // the plume
+  } else if (kind === 'postal') {
+    out.push(pc(B.hemi, 0x2f4f8a, 0, 0.14, -0.02, 1.17, 0.94, 1.17));
+    out.push(pc(B.box, 0x2f4f8a, 0, 0.16, 0.56, 0.54, 0.08, 0.42));
+    out.push(pc(B.box, 0xd8d4cc, 0, 0.30, 0.02, 0.72, 0.07, 0.30));    // service flash
   } else {   // beanie: dome + rolled brim
     out.push(pc(B.hemi, col, 0, 0.10, 0, 1.16, 1.18, 1.16));
     out.push(pc(B.cyl, col, 0, 0.02, 0, 1.21, 0.16, 1.21));
@@ -389,6 +464,11 @@ function hairParts(out: Geo[], style: Hair, col: number): void {
 // ARM PIVOT space: origin at the shoulder, hand around y -1.01*s. Everything is
 // expressed in units of the arm length `s`, so a child's cocktail ends up in a
 // child's hand at a child's scale.
+// The tint the CURRENT prop is painted in (placards, leaflets, pompoms,
+// skateboards). Set immediately before the call and read inside it — a
+// parameter would have meant changing every existing call site for the sake of
+// four props, and this bakes into the geometry at build time either way.
+let _propCol = 0xd8443c;
 function propParts(out: Geo[], kind: Prop, s: number): void {
   if (kind === 'cocktail') {
     out.push(pc(B.cone, 0xdff6ff, 0, -1.23 * s, 0.18 * s, 0.34 * s, 0.30 * s, 0.34 * s, Math.PI));
@@ -404,6 +484,49 @@ function propParts(out: Geo[], kind: Prop, s: number): void {
   } else if (kind === 'detector') {
     out.push(pc(B.tube, 0x8a8f9c, 0, -1.42 * s, 0.36 * s, 0.08 * s, 1.35 * s, 0.08 * s, 0.5));
     out.push(pc(B.disc, 0x3a3f4d, 0, -1.95 * s, 0.66 * s, 0.40 * s, 0.05 * s, 0.40 * s));
+  // ══ MAPLE FALLS ══════════════════════════════════════════════════════════
+  // A placard is a FLAT PANEL HELD ABOVE THE HEAD. That is the whole trick: it
+  // is the only hand prop in the kit with a footprint from directly overhead,
+  // so a protest, a rally and a heckler all read at any camera height. The
+  // colour is passed in through `propCol` — that is where the campaign lives.
+  } else if (kind === 'placard') {
+    out.push(pc(B.tube, 0xb9793f, 0, -0.30 * s, 0.30 * s, 0.075 * s, 2.30 * s, 0.075 * s));
+    out.push(pc(B.box, _propCol, 0, 0.90 * s, 0.30 * s, 1.35 * s, 1.00 * s, 0.07 * s));
+    out.push(pc(B.box, WHITE, 0, 0.90 * s, 0.36 * s, 1.05 * s, 0.62 * s, 0.05 * s));   // the lettering slab
+  } else if (kind === 'leaflets') {
+    // a whole ream, held out flat — the campaigner's entire personality
+    for (let i = 0; i < 3; i++)
+      out.push(pc(B.box, i === 1 ? _propCol : WHITE, 0.02, (-1.00 + i * 0.055) * s, 0.44 * s,
+        0.40 * s, 0.025 * s, 0.52 * s, -1.25));
+  } else if (kind === 'coffeepot') {
+    out.push(pc(B.cyl, 0x2b3038, 0.02, -1.16 * s, 0.30 * s, 0.28 * s, 0.42 * s, 0.28 * s, 0.5));
+    out.push(pc(B.cone, 0x2b3038, 0.02, -1.20 * s, 0.52 * s, 0.11 * s, 0.26 * s, 0.11 * s, 1.9));
+    out.push(pc(B.box, 0xd8443c, 0.02, -1.34 * s, 0.30 * s, 0.30 * s, 0.09 * s, 0.09 * s));
+  } else if (kind === 'rod') {
+    // a long diagonal — the fisher is a person with a LINE coming off them
+    out.push(pc(B.tube, 0x8a5a30, 0.05 * s, -1.20 * s, 0.95 * s, 0.05 * s, 2.60 * s, 0.05 * s, 1.05));
+    out.push(pc(B.dot, 0xc8cdd8, 0.05 * s, -0.62 * s, 0.42 * s, 0.16 * s));
+  } else if (kind === 'pompom') {
+    out.push(pc(B.sphS, _propCol, 0, -1.16 * s, 0.20 * s, 0.62 * s));
+    out.push(pc(B.sphS, WHITE, 0.10 * s, -1.06 * s, 0.30 * s, 0.42 * s));
+  } else if (kind === 'horn') {
+    out.push(pc(B.tube, GOLD, 0, -1.02 * s, 0.52 * s, 0.09 * s, 0.80 * s, 0.09 * s, Math.PI / 2));
+    out.push(pc(B.cone, GOLD, 0, -1.02 * s, 1.00 * s, 0.34 * s, 0.46 * s, 0.34 * s, -Math.PI / 2));
+  } else if (kind === 'bat') {
+    out.push(pc(B.taper, 0xc79a5a, 0.10 * s, -0.72 * s, -0.44 * s, 0.13 * s, 1.55 * s, 0.13 * s, -0.75));
+  } else if (kind === 'pie') {
+    out.push(pc(B.disc, 0xd8d2c2, 0.06 * s, -1.02 * s, 0.44 * s, 0.60 * s, 0.06 * s, 0.60 * s));
+    out.push(pc(B.disc, 0xe0a24a, 0.06 * s, -0.94 * s, 0.44 * s, 0.50 * s, 0.14 * s, 0.50 * s));
+    out.push(pc(B.dot, 0xb03a4a, 0.06 * s, -0.86 * s, 0.44 * s, 0.30 * s, 0.14 * s, 0.30 * s));
+  } else if (kind === 'tape') {
+    out.push(pc(B.box, 0xf0c050, 0.02, -1.10 * s, 0.34 * s, 0.24 * s, 0.22 * s, 0.16 * s));
+    out.push(pc(B.box, 0xe8e4d8, 0.02, -1.06 * s, 0.72 * s, 0.10 * s, 0.02 * s, 0.62 * s));   // the extended blade
+  } else if (kind === 'board') {   // skateboard tucked under the arm, deck outward
+    out.push(pc(B.box, _propCol, 0.16 * s, -0.86 * s, 0.02 * s, 0.10 * s, 0.90 * s, 0.34 * s, 0, 0, 0.14));
+    for (const dy of [-0.44, 0.44])
+      out.push(pc(B.dot, 0xf0c050, 0.24 * s, (-0.86 + dy * 0.7) * s, 0.02 * s, 0.11 * s));
+  } else if (kind === 'leash') {
+    out.push(pc(B.box, 0xd8443c, 0.02, -1.30 * s, 0.62 * s, 0.05 * s, 0.05 * s, 0.95 * s, -0.55));
   } else {   // selfie stick
     out.push(pc(B.tube, 0xc8cdd8, 0, -1.34 * s, 0.52 * s, 0.07 * s, 1.50 * s, 0.07 * s, 0.85));
     out.push(pc(B.box, INK, 0, -0.86 * s, 1.09 * s, 0.16 * s, 0.22 * s, 0.05 * s, 1.2));
@@ -451,7 +574,27 @@ const OUTFIT: Record<string, Fit> = {
   cozy: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xc65a9a, 0x7a6ae8], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34, 0x6a3a4a, 0x3a5a4a] },
   zoo: { shirt: [0xf0c050, 0xe8604d, 0x4da3ff, 0xc8b088], pants: [0x3a4a6a, 0x8a7a5a], hat: 'cap', hatOdds: 0.3 },
   plaza: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xffffff, 0x9a6ae8], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a] },
+  // ── MAPLE FALLS's four new districts. The election runs through the palette:
+  // every one of these shirt pools carries DINKLE red and HOLLIS blue, so a
+  // crowd is never politically neutral even before anyone puts a hat on.
+  fair: { shirt: [0xd8443c, 0x2f6fd0, 0xf0c050, 0xffffff, 0x58c470, 0xe8604d], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34],
+    hat: 'cap', hatOdds: 0.5, wear: ['tee', 'tee', 'dress', 'dungarees', 'tank'], shoe: ['shoe', 'shoe', 'boot'] },
+  farm: { shirt: [0xd8443c, 0x4d9de8, 0xc4693a, 0xf0e6d2, 0x58c470], pants: [0x3a5a8a, 0x4a4a3a, 0x5a4a3a],
+    hat: 'cap', hatOdds: 0.75, wear: ['dungarees', 'dungarees', 'tee', 'open'], shoe: ['boot', 'boot', 'shoe'] },
+  campus: { shirt: [0xd8443c, 0x2f6fd0, 0xf0c050, 0xffffff, 0x9a6ae8], pants: [0x2a2a34, 0x3a4a6a, 0x5a5a64],
+    hat: 'cap', hatOdds: 0.4, wear: ['tee', 'hoodie', 'hoodie', 'jersey', 'tank'], shoe: ['shoe'] },
+  strip: { shirt: [0xd8443c, 0x2f6fd0, 0xe8604d, 0xf0c050, 0xf0e6d2, 0x5a5a64], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a],
+    hat: 'cap', hatOdds: 0.4, wear: ['tee', 'hoodie', 'apron', 'open', 'dress'], shoe: ['shoe'] },
 };
+
+// ══ THE ELECTION ═════════════════════════════════════════════════════════════
+// Maple Falls is choosing between MAYOR DINKLE (who denies the void exists) and
+// DEB HOLLIS (whose entire platform is that the void is Dinkle's fault). Two
+// colours carry that through the whole town — rosettes, caps, tees, placards
+// and the yard signs on every verge — so from the play camera you can see which
+// STREET backs whom without reading a single word.
+const DINKLE = 0xd8443c;      // incumbent red
+const HOLLIS = 0x2f6fd0;      // challenger blue
 
 // SKELETON: hip line, shoulder line, head centre. A child is not a shrunken
 // adult — the legs and arms are proportionally shorter, the barrel is rounder
@@ -482,8 +625,9 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   const accent = o?.accent ?? pick([WHITE, INK, 0xffd23f, 0xff5d7e, 0x2fd8e8, 0x1f2a4a]);
   // garment consequences: what covers the arms, what covers the legs, and
   // whether there is a skirt in the way of the thighs
-  const sleeved = wear === 'tee' || wear === 'blazer' || wear === 'uniform' || wear === 'apron' || wear === 'open';
-  const fullArm = wear === 'wet' || wear === 'robe';
+  const sleeved = wear === 'tee' || wear === 'blazer' || wear === 'uniform' || wear === 'apron' || wear === 'open'
+    || wear === 'jersey' || wear === 'dungarees';
+  const fullArm = wear === 'wet' || wear === 'robe' || wear === 'hoodie';
   const bareLegs = wear === 'swim' || wear === 'sarong' || wear === 'dress' || wear === 'robe';
   const legCol = wear === 'wet' ? shirt : wear === 'swim' ? shirt : pants;
   const shortLeg = wear === 'swim' || wear === 'tank' || (!kid && wear === 'tee' && Math.random() < 0.45);
@@ -558,6 +702,39 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     bp.push(pc(B.box, accent, 0, 0.52 * th, 0.30 * gr, 0.62 * gr, 0.86 * th, 0.08));
   } else if (wear === 'uniform') {
     bp.push(pc(B.box, accent, 0, 1.02 * th, 0.10 * gr, 0.66, 0.12, 0.48));          // collar band
+  // ══ MAPLE FALLS GARMENTS ═════════════════════════════════════════════════
+  } else if (wear === 'dungarees') {
+    // denim bib over a tee, and two straps that clear the shoulder yoke — the
+    // straps are the bit that reads from above, so they are deliberately wide
+    bp.push(pc(B.box, pants, 0, 0.56 * th, 0.31 * gr, 0.70 * gr, 0.80 * th, 0.10));
+    for (const sx of [-0.34, 0.34])
+      bp.push(pc(B.box, pants, sx * gr, 0.94 * th, 0.12 * gr, 0.17, 0.30 * th, 0.62));
+    bp.push(pc(B.dot, GOLD, 0, 0.90 * th, 0.36 * gr, 0.16));                        // brass button
+  } else if (wear === 'hoodie') {
+    bp.push(pc(B.box, accent, 0, 0.40 * th, 0.31 * gr, 0.66 * gr, 0.26 * th, 0.08));   // kangaroo pocket
+    bp.push(pc(B.sphS, shirt, 0, 1.06 * th, -0.34 * gr, 0.78, 0.62, 0.50));            // the hood, down
+  } else if (wear === 'jersey') {
+    bp.push(pc(B.box, accent, 0, 0.72 * th, 0.31 * gr, 0.52 * gr, 0.44 * th, 0.07));   // the number
+    for (const sx of [-0.62, 0.62])
+      bp.push(pc(B.box, accent, sx * gr, 0.98 * th, 0, 0.30, 0.16, 0.62));             // shoulder flashes
+  } else if (wear === 'waders') {
+    // chest-high rubber. The whole torso below the collarbone is ONE colour,
+    // which is exactly why a fisher never reads as "a person standing in water"
+    bp.push(pc(B.taper, pants, 0, 0.44 * th, 0, 0.94 * gr, 0.94 * th, 0.70 * gr, Math.PI));
+    for (const sx of [-0.36, 0.36])
+      bp.push(pc(B.box, pants, sx * gr, 0.98 * th, 0.06 * gr, 0.15, 0.26 * th, 0.66));
+  }
+  // ── the CAMPAIGN, worn on the chest. Maple Falls is mid-election and the
+  // cheapest way to see which street backs whom is to put the colour on people.
+  if (o?.rosette !== undefined) {
+    bp.push(pc(B.disc, o.rosette, 0.30 * gr, 0.96 * th, 0.30 * gr, 0.42, 0.06, 0.42, Math.PI / 2));
+    bp.push(pc(B.disc, WHITE, 0.30 * gr, 0.96 * th, 0.34 * gr, 0.22, 0.05, 0.22, Math.PI / 2));
+    for (const rz of [-0.35, 0.35])
+      bp.push(pc(B.box, o.rosette, 0.30 * gr + rz * 0.28, 0.76 * th, 0.30 * gr, 0.12, 0.34, 0.05, 0, 0, rz));
+  }
+  if (o?.satchel !== undefined) {
+    bp.push(pc(B.box, o.satchel, 0.42 * gr, 0.36 * th, -0.10 * gr, 0.40, 0.44 * th, 0.62));   // the bag
+    bp.push(pc(B.box, o.satchel, 0, 0.92 * th, 0.02, 1.05 * gr, 0.13, 0.34, 0, 0, 0.55));     // the strap
   }
   if (o?.necklace) bp.push(pc(B.ring, GOLD, 0, 1.07 * th, 0.03, 0.60, 0.60, 0.60, Math.PI / 2));
   if (o?.lanyard) {
@@ -588,7 +765,11 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     if (o?.armbands) p.push(pc(B.ring, 0xff8a3a, 0, -0.34 * A, 0, 0.60, 0.60, 0.60, Math.PI / 2));
     // the held prop welds INTO the right arm: a waiter's tray is not an extra
     // draw call, it is extra triangles on a mesh that already exists
+    _propCol = accent;                                  // placards/pompoms take the accent
     if (o?.prop && sx > 0) propParts(p, o.prop, A);
+    // …and `propL` in the LEFT, for the two-handed jobs — pompoms, and a
+    // placard carried in one hand with leaflets in the other
+    if (o?.propL && sx < 0) propParts(p, o.propL, A);
     const sh = new THREE.Group(); sh.position.set(sx, bd.shY, 0);
     sh.add(weld(p)); g.add(sh); arms.push(sh);
   }
@@ -624,12 +805,27 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
 // Distinct silhouettes with matching uniform colours per role, so you can read
 // "waiter", "kid", "event manager" from the top-down camera without a label.
 export type Role = 'guest' | 'rich' | 'robe' | 'kid' | 'waiter' | 'bellhop' | 'lifeguard'
-  | 'spa' | 'dock' | 'grounds' | 'chef' | 'manager' | 'pirate' | 'dj' | 'diver' | 'digger';
+  | 'spa' | 'dock' | 'grounds' | 'chef' | 'manager' | 'pirate' | 'dj' | 'diver' | 'digger'
+  // ── MAPLE FALLS. The sixteen above are a RESORT's cast list; these are a
+  // TOWN's. Same six-mesh budget, same shared material, same makePerson kit —
+  // a role is nothing but a bundle of options, so a town costs no more to
+  // populate than a resort does.
+  | 'campaigner' | 'protester' | 'farmer' | 'teen' | 'server' | 'cheer' | 'bandkid'
+  | 'fisher' | 'camper' | 'dogwalker' | 'mail' | 'ballplayer' | 'coach' | 'baker'
+  | 'gossip' | 'booster';
 
 const KID_SHIRT = [0xff4f9a, 0x35d6f0, 0xffd23f, 0x7ef05a, 0xff8a3a, 0xb875ff];
 const KID_PANTS = [0x2f6fe0, 0xff5470, 0x2ab8d8, 0x66de93, 0xffb347];
 
-function makeCast(role: Role, dress: string): THREE.Group {
+// `side` is the CAMPAIGN COLOUR this person is wearing — DINKLE or HOLLIS.
+// Callers pass their block's allegiance so a whole street reads as one camp;
+// omitted, the person picks a side at random like anybody else.
+function makeCast(role: Role, dress: string, side?: number): THREE.Group {
+  // LAZY on purpose: the sixteen Pirate Bay roles below must not draw a single
+  // number from Math.random that they did not draw before this parameter
+  // existed, or every spawn position on that island shifts.
+  let _camp = side;
+  const camp = (): number => (_camp ??= (Math.random() < 0.5 ? DINKLE : HOLLIS));
   switch (role) {
     case 'kid': {
       // a child is not a shrunk adult: short limbs, round barrel, big head, and
@@ -740,6 +936,133 @@ function makeCast(role: Role, dress: string): THREE.Group {
       return makePerson(dress, undefined, {
         hat: pick(['sun', 'bandana', 'cap'] as Hat[]), prop: 'detector', shoe: pick(['boot', 'shoe'] as Shoe[]),
       });
+
+    // ══ MAPLE FALLS ═══════════════════════════════════════════════════════
+    case 'campaigner':
+      // rosette, clipboard-stiff posture, a cap in the campaign colour and an
+      // arm full of leaflets they will hand to anyone who stands still
+      return makePerson(dress, camp(), {
+        shirt: camp(), pants: 0x2a2a34, accent: camp(),
+        wear: Math.random() < 0.5 ? 'blazer' : 'tee', shoe: 'shoe', pattern: 'plain',
+        hat: Math.random() < 0.7 ? 'cap' : null, hatCol: camp(),
+        rosette: camp(), prop: 'leaflets', propL: Math.random() < 0.25 ? 'clipboard' : undefined,
+        glasses: Math.random() < 0.3,
+      });
+    case 'protester':
+      // nine years. one parking meter. the placard is laminated and it shows.
+      return makePerson(dress, undefined, {
+        shirt: pick([0xf0e6d2, 0x58c470, 0xe8604d, 0x9a6ae8]), pants: pick([0x3a4a6a, 0x5a4a3a]),
+        accent: pick([0xf0c050, 0xe8604d, 0x2f6fd0]),
+        wear: pick(['tee', 'open', 'dress'] as Wear[]), shoe: 'shoe',
+        hat: pick(['bucket', 'sun', 'cap', 'beanie'] as Hat[]),
+        hatCol: pick([0xf0e6d2, 0x58c470]),
+        prop: 'placard', glasses: Math.random() < 0.55,
+        hair: pick(['bun', 'curly', 'short', 'bob'] as Hair[]),
+      });
+    case 'farmer':
+      return makePerson('farm', undefined, {
+        shirt: pick([0xd8443c, 0x4d9de8, 0xc4693a, 0xf0e6d2]), pants: 0x3a5a8a, accent: camp(),
+        wear: 'dungarees', shoe: 'boot', pattern: 'plain',
+        hat: Math.random() < 0.72 ? 'straw' : 'cap', hatCol: camp(),
+        prop: Math.random() < 0.25 ? 'clipboard' : undefined,
+      });
+    case 'teen':
+      // hood up, headphones on, board under the arm, three feet from a parent
+      return makePerson('campus', undefined, {
+        shirt: pick([0x2a2a34, 0x5a5a64, 0x2f4a6a, 0x6a3a5a, 0x3a5a3a]), pants: pick([0x2a2a34, 0x3a4a6a]),
+        accent: pick([DINKLE, HOLLIS, 0xf0c050, WHITE]),
+        wear: 'hoodie', shoe: 'shoe', pattern: 'plain',
+        hat: Math.random() < 0.55 ? 'hood' : null,
+        hatCol: pick([0x2a2a34, 0x5a5a64, 0x2f4a6a]),
+        headphones: Math.random() < 0.7,
+        prop: Math.random() < 0.55 ? 'board' : undefined,
+        hair: pick(['long', 'curly', 'short', 'pony', 'buzz'] as Hair[]),
+      });
+    case 'server':   // the diner. coffee is 90 cents and the refills are free.
+      return makePerson('strip', undefined, {
+        shirt: pick([0xdfe8ee, 0xf0e6d2]), pants: 0x2a3038, accent: pick([0xd8443c, 0x2f8a6a]),
+        wear: 'apron', shoe: 'shoe', pattern: 'plain', hat: null,
+        prop: 'coffeepot', hair: pick(['bun', 'pony', 'bob', 'short'] as Hair[]),
+      });
+    case 'cheer':
+      return makePerson('campus', undefined, {
+        shirt: camp(), pants: WHITE, accent: camp(), wear: 'dress', shoe: 'shoe',
+        pattern: 'twotone', hat: null, prop: 'pompom', propL: 'pompom',
+        hair: pick(['pony', 'pony', 'braids', 'bun'] as Hair[]),
+      });
+    case 'bandkid':
+      // the shako plume is two units of bright white directly above the head —
+      // the single most legible thing in a marching column from overhead
+      return makePerson('campus', undefined, {
+        kid: Math.random() < 0.6,
+        shirt: camp(), pants: 0x2a2a34, accent: GOLD, wear: 'uniform', shoe: 'shoe',
+        pattern: 'sash', hat: 'shako', hatCol: camp(), prop: 'horn',
+      });
+    case 'fisher':
+      return makePerson('beach', undefined, {
+        shirt: pick([0x58704a, 0xc4693a, 0x4d7d9e, 0xf0e6d2]), pants: 0x4a5a52, accent: 0x3a4a42,
+        wear: 'waders', shoe: 'boot', pattern: 'plain',
+        hat: Math.random() < 0.6 ? 'bucket' : 'straw', hatCol: 0x6a7a5a,
+        prop: 'rod', glasses: Math.random() < 0.3,
+      });
+    case 'camper':
+      return makePerson('forest', undefined, {
+        shirt: pick([0xc4693a, 0x5a7a4a, 0xd8443c, 0x4d7d9e]), pants: pick([0x4a4a3a, 0x3a4a3a]),
+        accent: 0xf0c050, wear: pick(['tee', 'open'] as Wear[]), shoe: 'boot',
+        hat: Math.random() < 0.6 ? 'beanie' : 'bucket', hatCol: pick([0xd8443c, 0xf0c050, 0x4d7d9e]),
+        rucksack: true, prop: Math.random() < 0.3 ? 'selfie' : undefined,
+      });
+    case 'dogwalker':
+      return makePerson(dress, undefined, {
+        shirt: pick([0x58c470, 0x9a6ae8, 0xf0c050, 0xe8604d, HOLLIS]), pants: pick([0x3a4a6a, 0x2a2a34]),
+        accent: 0xd8443c, wear: pick(['tee', 'hoodie'] as Wear[]), shoe: 'shoe',
+        hat: Math.random() < 0.35 ? 'cap' : null, hatCol: camp(),
+        prop: 'leash', rosette: Math.random() < 0.4 ? camp() : undefined,
+      });
+    case 'mail':
+      return makePerson(dress, undefined, {
+        shirt: 0x4a6ea8, pants: 0x2f4f8a, accent: 0xd8d4cc, wear: 'uniform', shoe: 'shoe',
+        pattern: 'plain', hat: 'postal', satchel: 0x2f4f8a, prop: 'leaflets',
+      });
+    case 'ballplayer':   // little league: helmet, jersey, bat over the shoulder
+      return makePerson('campus', undefined, {
+        kid: Math.random() < 0.75,
+        shirt: camp(), pants: pick([WHITE, 0xe4e0d6]), accent: camp(),
+        wear: 'jersey', shoe: 'shoe', pattern: 'plain',
+        hat: Math.random() < 0.5 ? 'helmet' : 'cap', hatCol: camp(),
+        prop: Math.random() < 0.5 ? 'bat' : 'ball',
+      });
+    case 'coach':
+      return makePerson('campus', undefined, {
+        shirt: pick([0x2a2a34, 0x3a4a5a]), pants: 0x5a5a64, accent: camp(),
+        wear: 'tee', shoe: 'shoe', pattern: 'plain', hat: 'cap', hatCol: camp(),
+        prop: 'clipboard', glasses: Math.random() < 0.4,
+        hair: pick(['bald', 'buzz', 'short'] as Hair[]),
+      });
+    case 'baker':   // PEARL. runs the pie contest. judges it. wins it. eleven years.
+      return makePerson('fair', undefined, {
+        shirt: pick([0xf0e6d2, 0xffd9e0, 0xdfe8ee]), pants: pick([0x6a3a4a, 0x3a4a6a]),
+        accent: pick([0xd8443c, 0x8a2a3a]), wear: 'apron', shoe: 'shoe',
+        pattern: 'floral', hat: null, prop: 'pie',
+        hair: pick(['bun', 'bun', 'curly'] as Hair[]), glasses: Math.random() < 0.7,
+      });
+    case 'gossip':
+      return makePerson(dress, undefined, {
+        shirt: pick([0x9a6ae8, 0xc65a9a, 0x58c470, 0xf0c050, 0x4d9de8]), pants: pick([0x3a4a6a, 0x5a4a3a]),
+        accent: camp(), wear: pick(['dress', 'tee', 'blazer'] as Wear[]), shoe: 'shoe',
+        pattern: pick(['floral', 'plain', 'stripe'] as Pattern[]),
+        hat: Math.random() < 0.3 ? 'sun' : null, hatCol: pick([0xf6e3b8, 0xffe0ec]),
+        glasses: Math.random() < 0.6, necklace: Math.random() < 0.5,
+        rosette: Math.random() < 0.35 ? camp() : undefined,
+        hair: pick(['bob', 'bun', 'curly', 'short'] as Hair[]),
+      });
+    case 'booster':   // relentlessly proud of a town with one stoplight
+      return makePerson(dress, camp(), {
+        shirt: camp(), pants: pick([0x3a4a6a, 0x2a2a34, 0xf0e6d2]), accent: WHITE,
+        wear: 'tee', shoe: 'shoe', pattern: pick(['stripe', 'sash', 'plain'] as Pattern[]),
+        hat: 'cap', hatCol: camp(), rosette: camp(),
+        prop: Math.random() < 0.3 ? 'leaflets' : undefined,
+      });
     default:         // generic holidaymaker in whatever the district wears
       return makePerson(dress, undefined, {
         glasses: Math.random() < 0.35,
@@ -752,6 +1075,16 @@ const VOICE_OF: Partial<Record<Role, string>> = {
   rich: 'rich', robe: 'rich', kid: 'kid', manager: 'manager', pirate: 'pirate',
   waiter: 'staff', bellhop: 'staff', lifeguard: 'staff', spa: 'staff',
   dock: 'staff', grounds: 'staff', chef: 'staff', dj: 'staff',
+  // MAPLE FALLS — these keys resolve against newsroom_maple's MAPLE_VOICE_*
+  // pools (see ambPool/panPool inside createLife), which are only consulted on
+  // Maple. 'kid' is deliberately shared: same key, different town, different
+  // child. On Pirate Bay it is a boy who named the void Gary; here it is Tater,
+  // who named it Steve and is correct about it throughout.
+  campaigner: 'politician', protester: 'protester', farmer: 'farmer',
+  teen: 'teen', cheer: 'teen', bandkid: 'teen',
+  server: 'diner', baker: 'gossip', gossip: 'gossip', dogwalker: 'gossip',
+  booster: 'booster', coach: 'booster', mail: 'booster', camper: 'booster',
+  fisher: 'farmer', ballplayer: 'kid',
 };
 let animalN = 0;
 function makeBuggy(): THREE.Group {
@@ -854,6 +1187,208 @@ function makeMonkey(): THREE.Group {
 }
 
 /** Jungle zipline: two towers and the cable, spanning local x 0..len, y drop. */
+// ══ TRACK KIT ════════════════════════════════════════════════════════════════
+// A polyline walked at a fixed rate. The cheapest motion there is — no
+// steering, no collision queries, no per-frame allocation — and it reads from
+// any camera height. Pirate Bay's tender, tow boat, jet ski, guided walk,
+// conga line and kid circuit run on it; so do Maple Falls's parade, school
+// bus, tractor, joggers, bikes, dog walkers and mail round.
+//
+// w3() allocates a tuple, which is fine at build time and forbidden in an
+// update; W3 is the per-frame scalar version.
+const W3 = (v: number) => (v - 6000) * 0.05;
+interface Route { p: BAY.Pt[]; cum: number[]; len: number }
+const route = (pts: BAY.Pt[], closed: boolean): Route => {
+  const p = closed ? [...pts, pts[0]] : pts;
+  const cum = [0];
+  for (let i = 1; i < p.length; i++)
+    cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+  return { p, cum, len: cum[cum.length - 1] || 1 };
+};
+const ovalRoute = (cx: number, cy: number, rx: number, ry: number, n = 16): Route => {
+  const pts: BAY.Pt[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
+  }
+  return route(pts, true);
+};
+// ONE shared scratch result — read immediately by the caller, never stored
+const _rp = { x: 0, y: 0, ang: 0 };
+const routeAt = (r: Route, t: number): void => {
+  const want = ((t % 1) + 1) % 1 * r.len;
+  let i = 0;
+  while (i < r.cum.length - 2 && r.cum[i + 1] <= want) i++;
+  const seg = r.cum[i + 1] - r.cum[i] || 1;
+  const k = (want - r.cum[i]) / seg;
+  const a = r.p[i], b = r.p[i + 1];
+  _rp.x = a[0] + (b[0] - a[0]) * k;
+  _rp.y = a[1] + (b[1] - a[1]) * k;
+  _rp.ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+};
+// ping-pong: 0..1..0 for open routes (a trail, or a street, has two ends)
+const bounce = (t: number) => { const u = ((t % 2) + 2) % 2; return u > 1 ? 2 - u : u; };
+
+// people face +Z, every vehicle in the kit faces +X
+const FACE_X = Math.PI / 2;
+const posed = (p: THREE.Group, la: number, ra: number, ll = 0, rl = 0): THREE.Group => {
+  const L = p.userData.limbs as Limbs;
+  L.la.rotation.x = la; L.ra.rotation.x = ra; L.ll.rotation.x = ll; L.rl.rotation.x = rl;
+  return p;
+};
+
+// ══ MAPLE FALLS SET DRESSING ═════════════════════════════════════════════════
+// Every one of these is a SINGLE merged, vertex-coloured mesh on the shared
+// prop material (island.ts's `part` + `mergedProp`) — one draw call each,
+// however many bits it is made of. Base primitives are tessellated once here
+// and cloned by `part`, exactly like the body kit above.
+const MG = {
+  box: new THREE.BoxGeometry(1, 1, 1),
+  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 8),
+  cyl6: new THREE.CylinderGeometry(0.5, 0.5, 1, 6),
+  sph: new THREE.SphereGeometry(0.5, 8, 6),
+  sphS: new THREE.SphereGeometry(0.5, 6, 5),
+  cone: new THREE.ConeGeometry(0.5, 1, 6),
+  wheel: new THREE.TorusGeometry(0.40, 0.11, 5, 10),
+  disc: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
+};
+const grp1 = (m: THREE.Mesh): THREE.Group => { const g = new THREE.Group(); g.add(m); return g; };
+
+// A YARD SIGN. The single most important object in this town: two verges of
+// them in DINKLE red and one in HOLLIS blue is how a street declares itself,
+// and it reads from the highest the camera ever goes.
+function makeYardSign(col: number): THREE.Group {
+  return grp1(mergedProp([
+    part(MG.box, 0xb9b4a8, -0.32, 0.55, 0, 0, 0, 0, 0.07, 1.1, 0.07),
+    part(MG.box, 0xb9b4a8, 0.32, 0.55, 0, 0, 0, 0, 0.07, 1.1, 0.07),
+    part(MG.box, col, 0, 1.36, 0, 0, 0, 0, 1.75, 1.05, 0.10),
+    part(MG.box, WHITE, 0, 1.36, 0.07, 0, 0, 0, 1.30, 0.26, 0.06),
+    part(MG.box, WHITE, 0, 1.36, -0.07, 0, 0, 0, 1.30, 0.26, 0.06),
+  ]));
+}
+// THE PARKING METER. Nine years. Four people. This thing.
+function makeParkingMeter(): THREE.Group {
+  return grp1(mergedProp([
+    part(MG.disc, 0x8a8f9c, 0, 0.10, 0, 0, 0, 0, 0.9, 0.2, 0.9),
+    part(MG.cyl6, 0x6a707c, 0, 1.5, 0, 0, 0, 0, 0.26, 3.0, 0.26),
+    part(MG.box, 0x3d434e, 0, 3.25, 0, 0, 0, 0, 0.85, 1.30, 0.62),
+    part(MG.box, 0xe8e2d0, 0, 3.45, 0.33, 0, 0, 0, 0.55, 0.55, 0.06),
+    part(MG.box, 0xd8443c, 0, 3.02, 0.33, 0, 0, 0, 0.30, 0.09, 0.06),
+    part(MG.cyl6, 0x9aa0ac, 0, 4.05, 0, 0, 0, 0, 0.16, 0.6, 0.16),
+  ]));
+}
+// THE JUDGING TABLE — trestle, gingham cloth, and eleven pies nobody is
+// allowed to touch until four o'clock.
+function makePieTable(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [
+    part(MG.box, 0xf3ece0, 0, 2.05, 0, 0, 0, 0, 9.0, 0.25, 2.6),
+    part(MG.box, 0xd8443c, 0, 1.35, 1.28, 0, 0, 0, 9.0, 1.35, 0.10),
+    part(MG.box, 0xd8443c, 0, 1.35, -1.28, 0, 0, 0, 9.0, 1.35, 0.10),
+  ];
+  for (const sx of [-3.9, 3.9]) {
+    p.push(part(MG.box, 0x8a6a4a, sx, 1.0, 1.1, 0, 0, 0, 0.22, 2.0, 0.22));
+    p.push(part(MG.box, 0x8a6a4a, sx, 1.0, -1.1, 0, 0, 0, 0.22, 2.0, 0.22));
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = -3.2 + i * 1.6;
+    p.push(part(MG.disc, 0xe6e0d2, x, 2.28, 0, 0, 0, 0, 1.05, 0.20, 1.05));
+    p.push(part(MG.disc, [0xe0a24a, 0xc4693a, 0xd8b46a][i % 3], x, 2.44, 0, 0, 0, 0, 0.86, 0.22, 0.86));
+    p.push(part(MG.sphS, 0xb03a4a, x, 2.56, 0, 0, 0, 0, 0.5, 0.28, 0.5));
+  }
+  return grp1(mergedProp(p));
+}
+// FOOTBALL PRACTICE — one set of uprights. Yellow, because it is the only
+// thing at a school field that is allowed to be.
+function makeGoalPosts(): THREE.Group {
+  return grp1(mergedProp([
+    part(MG.cyl6, 0xf0c050, 0, 2.6, 0, 0, 0, 0, 0.28, 5.2, 0.28),
+    part(MG.box, 0xf0c050, 0, 5.2, 0, 0, 0, 0, 0.24, 0.24, 6.0),
+    part(MG.cyl6, 0xf0c050, 0, 7.4, 2.9, 0, 0, 0, 0.24, 4.4, 0.24),
+    part(MG.cyl6, 0xf0c050, 0, 7.4, -2.9, 0, 0, 0, 0.24, 4.4, 0.24),
+    part(MG.box, 0xe8e2d0, 0, 0.12, 0, 0, 0, 0, 1.4, 0.24, 1.4),
+  ]));
+}
+// TOWN HALL STEPS — the meeting is inside. The meeting is also very much
+// outside, which is the entire joke.
+function makeHallSteps(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 4; i++)
+    p.push(part(MG.box, i % 2 ? 0xe6dfd0 : 0xf0ebdd, 0, 0.28 + i * 0.55, -i * 1.15, 0, 0, 0, 13 - i * 0.8, 0.55, 3.4));
+  for (const sx of [-6.2, 6.2]) {
+    p.push(part(MG.cyl, 0xf3efe2, sx, 3.6, 1.6, 0, 0, 0, 0.7, 7.2, 0.7));
+    p.push(part(MG.box, 0xe6dfd0, sx, 7.4, 1.6, 0, 0, 0, 1.1, 0.5, 1.1));
+  }
+  p.push(part(MG.box, 0xe6dfd0, 0, 7.7, 1.6, 0, 0, 0, 13.6, 0.7, 2.4));
+  return grp1(mergedProp(p));
+}
+// A DOG. Not a prop — it walks itself, on a loop, at the end of a lead.
+function makeDog(): THREE.Group {
+  const c = pick([0xc4934a, 0x6a5040, 0x2e2a2a, 0xe8e2d0, 0xa46a3a]);
+  const g = grp1(mergedProp([
+    part(MG.sphS, c, 0, 0.62, 0, 0, 0, 0, 1.30, 0.72, 0.66),
+    part(MG.sphS, c, 0.62, 0.86, 0, 0, 0, 0, 0.62, 0.60, 0.56),
+    part(MG.box, 0x2e2a2a, 0.92, 0.76, 0, 0, 0, 0, 0.34, 0.24, 0.26),
+    part(MG.box, c, 0.52, 1.14, 0.20, 0, 0, 0.4, 0.16, 0.30, 0.14),
+    part(MG.box, c, 0.52, 1.14, -0.20, 0, 0, 0.4, 0.16, 0.30, 0.14),
+    part(MG.cone, c, -0.68, 0.90, 0, 0, 0, -0.9, 0.20, 0.70, 0.20),
+    part(MG.cyl6, c, 0.34, 0.24, 0.24, 0, 0, 0, 0.16, 0.50, 0.16),
+    part(MG.cyl6, c, 0.34, 0.24, -0.24, 0, 0, 0, 0.16, 0.50, 0.16),
+    part(MG.cyl6, c, -0.36, 0.24, 0.24, 0, 0, 0, 0.16, 0.50, 0.16),
+    part(MG.cyl6, c, -0.36, 0.24, -0.24, 0, 0, 0, 0.16, 0.50, 0.16),
+  ]));
+  return g;   // nose +X, like every vehicle in the kit
+}
+// A BIKE with a kid already on it — the kid is a real cast member parented to
+// the frame, so it animates and eats exactly like anybody else.
+function makeBike(col: number): THREE.Group {
+  return grp1(mergedProp([
+    part(MG.wheel, 0x2a2a30, 0.72, 0.42, 0, Math.PI / 2, 0, 0, 1.05),
+    part(MG.wheel, 0x2a2a30, -0.72, 0.42, 0, Math.PI / 2, 0, 0, 1.05),
+    part(MG.box, col, 0, 0.72, 0, 0, 0, 0, 1.55, 0.13, 0.11),
+    part(MG.box, col, -0.12, 0.95, 0, 0, 0, -0.55, 0.11, 0.85, 0.11),
+    part(MG.box, col, 0.42, 0.86, 0, 0, 0, 0.6, 0.11, 0.80, 0.11),
+    part(MG.box, 0x2a2a30, 0.62, 1.24, 0, 0, 0, 0, 0.10, 0.10, 0.92),
+    part(MG.box, 0x3a3a44, -0.30, 1.12, 0, 0, 0, 0, 0.42, 0.13, 0.28),
+  ]));
+}
+// THE SCHOOL BUS. Nose +X, exactly like makeCar, so it drops straight into the
+// road-lane driver with no special casing.
+function makeBus(): THREE.Group {
+  const p: THREE.BufferGeometry[] = [
+    part(MG.box, 0xf0b429, 0, 2.35, 0, 0, 0, 0, 10.6, 3.1, 3.2),
+    part(MG.box, 0xf0b429, 0, 4.05, 0, 0, 0, 0, 9.8, 0.4, 3.0),
+    part(MG.box, 0x2e2a2a, 0, 3.05, 1.62, 0, 0, 0, 9.2, 1.2, 0.10),
+    part(MG.box, 0x2e2a2a, 0, 3.05, -1.62, 0, 0, 0, 9.2, 1.2, 0.10),
+    part(MG.box, 0x2e2a2a, 5.34, 2.9, 0, 0, 0, 0, 0.10, 1.5, 2.9),
+    part(MG.box, 0x2a2a30, 0, 1.05, 0, 0, 0, 0, 10.2, 0.5, 3.0),
+    part(MG.box, 0xd8443c, -5.36, 2.6, 0, 0, 0, 0, 0.12, 0.9, 1.2),
+    part(MG.box, 0xd8443c, 4.0, 2.2, 1.70, 0, 0, 0, 1.5, 1.0, 0.12),   // the STOP arm
+  ];
+  for (const sx of [-3.4, 3.6]) for (const sz of [-1.5, 1.5]) {
+    p.push(part(MG.cyl, 0x20242c, sx, 0.85, sz, Math.PI / 2, 0, 0, 1.7, 0.55, 1.7));
+    p.push(part(MG.cyl, 0xc9cdd6, sx, 0.85, sz, Math.PI / 2, 0, 0, 0.7, 0.60, 0.7));
+  }
+  return grp1(mergedProp(p));
+}
+// THE TRACTOR. Older than the man driving it, and he says so. Nose +X.
+function makeTractor(): THREE.Group {
+  const c = pick([0x3a8a4a, 0xd8443c, 0x2f6fd0]);
+  const p: THREE.BufferGeometry[] = [
+    part(MG.box, c, 0.5, 1.55, 0, 0, 0, 0, 4.6, 1.3, 2.0),
+    part(MG.box, c, 2.1, 2.35, 0, 0, 0, 0, 1.5, 0.9, 1.7),
+    part(MG.box, 0x2a2a30, -1.0, 2.5, 0, 0, 0, 0, 1.4, 1.0, 1.5),
+    part(MG.box, 0x3a3a44, -1.0, 3.2, 0, 0, 0, 0, 0.22, 0.5, 1.6),
+    part(MG.cyl6, 0x6a707c, 1.9, 3.3, 0, 0, 0, 0, 0.24, 1.9, 0.24),
+    part(MG.box, 0x2a2a30, -2.6, 1.9, 0, 0, 0, 0, 0.9, 0.2, 2.2),
+  ];
+  for (const sz of [-1.25, 1.25]) {
+    p.push(part(MG.cyl, 0x24282e, -1.4, 1.55, sz, Math.PI / 2, 0, 0, 3.1, 0.7, 3.1));
+    p.push(part(MG.cyl, 0xc9cdd6, -1.4, 1.55, sz, Math.PI / 2, 0, 0, 1.1, 0.75, 1.1));
+    p.push(part(MG.cyl, 0x24282e, 2.2, 0.95, sz * 0.86, Math.PI / 2, 0, 0, 1.9, 0.55, 1.9));
+  }
+  return grp1(mergedProp(p));
+}
+
 function makeZipline(len: number, drop: number): THREE.Group {
   const p: THREE.BufferGeometry[] = [];
   const post = (x: number, h: number) => {
@@ -1124,6 +1659,17 @@ export function createLife(
   movers.push({ mesh: new THREE.Object3D(), update(dt) { pingClock += dt; } });   // shared clock for panic contagion
   const peds: { mesh: THREE.Object3D; biome: string; panic: number; voice?: string }[] = [];
 
+  // ── WHICH TOWN IS TALKING ────────────────────────────────────────────────
+  // newsroom_maple's voice pools are keyed identically to VOICE_AMBIENT /
+  // VOICE_PANIC on purpose, so they resolve with no adapter — but they are
+  // resolved PER WORLD instead of merged into the module tables. 'kid' exists
+  // in both and the two children are not interchangeable.
+  const MAPLE = worldId() !== 'pirate';
+  const ambPool = (v?: string): string[] | null =>
+    (v ? ((MAPLE ? MAPLE_VOICE_AMBIENT[v] : null) || VOICE_AMBIENT[v] || null) : null);
+  const panPool = (v?: string): string[] | null =>
+    (v ? ((MAPLE ? MAPLE_VOICE_PANIC[v] : null) || VOICE_PANIC[v] || null) : null);
+
   // ── cars: grid-locked lanes with real arc turns ──────────────────────────
   // The car model's nose points +X, so heading comes from the velocity vector:
   // rotY = atan2(-vz, vx). (The old +Z-forward formula had every car rotated
@@ -1227,26 +1773,30 @@ export function createLife(
     mesh.position.set(bx, 0, bz);
     mesh.rotation.y = bSlot.axis === 'h' ? headingOf(st.dir, 0) : headingOf(0, st.dir);
   };
-  for (let i = 0; i < (worldId() === 'pirate' ? 0 : 30); i++) {
-    const mesh = makeCar();
+  // ONE road-lane driver, used by every wheeled thing in Maple Falls: the 30
+  // cars, the school bus and the tractor. Extracting it is what let the bus
+  // exist at all — it inherits the span clamp, the coast invariant, the
+  // junction arcs and the panic-flee for free, so there is exactly one place
+  // where "a vehicle drives on this island" is implemented.
+  const roadVehicle = (mesh: THREE.Object3D, eatR: number, speed: number): void => {
     let horiz = Math.random() < 0.5;
     let centre = pick(ROAD_CENTERS_3D);
     const dir = Math.random() < 0.5 ? 1 : -1;
     // spawn INSIDE a known on-island span — zero retries, zero sea spawns
     let sp0 = spanFor(horiz ? 'h' : 'v', centre, 0);
     for (let k = 0; k < 8 && !sp0; k++) { horiz = Math.random() < 0.5; centre = pick(ROAD_CENTERS_3D); sp0 = spanFor(horiz ? 'h' : 'v', centre, 0); }
-    if (!sp0) continue;
+    if (!sp0) return;
     const along0 = rand(sp0[0] + EDGE_M, sp0[1] - EDGE_M);
     const st: CarState = {
       axis: horiz ? 'h' : 'v', dir, centre, along: along0,
-      laneOff: dir * LANE * (horiz ? 1 : -1), speed: rand(14, 22), turnCd: rand(0, 2), pauseT: 0,
+      laneOff: dir * LANE * (horiz ? 1 : -1), speed, turnCd: rand(0, 2), pauseT: 0,
       arc: null as Arc | null, nAxis: 'h' as 'h' | 'v', nCentre: 0, nAlong: 0, nLaneOff: 0,
     };
     if (st.axis === 'h') mesh.position.set(st.along, 0, centre + st.laneOff); else mesh.position.set(centre + st.laneOff, 0, st.along);
     mesh.rotation.y = st.axis === 'h' ? headingOf(dir, 0) : headingOf(0, dir);
     mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car'; mesh.userData.mover = true;
     mesh.add(contactShadow(2));
-    setShadow(mesh); scene.add(mesh); addEdible(mesh, 2.8);
+    setShadow(mesh); scene.add(mesh); addEdible(mesh, eatR);
     const drive = (dt: number, vx: number, vz: number, vR: number): void => {
         // mid-turn: follow the bezier so nose and path always agree
         if (st.arc) {
@@ -1339,7 +1889,10 @@ export function createLife(
         if (!carSafe(mesh.position.x, mesh.position.z)) teleportCar(st, mesh, vx, vz);
       },
     });
-  }
+  };
+  // Pirate Bay has no road grid, so it gets no traffic here — its shuttle
+  // buggies run on the boardwalk path instead, further down.
+  for (let i = 0; i < (worldId() === 'pirate' ? 0 : 30); i++) roadVehicle(makeCar(), 2.8, rand(14, 22));
 
   // ── wanderer (pedestrians, animals, event NPCs) ──────────────────────────
   // panic CONTAGION: a fleeing ped scares nearby strollers, so the void's
@@ -1347,8 +1900,13 @@ export function createLife(
   const panicPings: { x: number; z: number; t: number }[] = [];
   let pingClock = 0;
   const tmp = new THREE.Vector3();
+  // MAPLE FALLS has a lagoon on its south shore that biomeAt() calls dry land
+  // (it is inside the coastline), so a beach crowd would wade into it and keep
+  // going. Pirate Bay has no lagoon and this must not cost it a single test —
+  // hence the flag first, which short-circuits the whole check there.
+  const wet = (x: number, z: number, m: number) => MAPLE && inLagoon3(x, z, m);
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string) {
-    if (!biomeAt(hx, hz)) return;   // don't spawn anyone off the coastline
+    if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.userData.mover = true;    // steers itself — the magnet must never grab it
@@ -1377,7 +1935,7 @@ export function createLife(
             if (panicPings.length > 24) panicPings.shift();
             if (Math.random() < 0.5) {
               // a pirate entertainer panics like a pirate wherever they stand
-              const pool = panicLines || (voice ? VOICE_PANIC[voice] : null) || PANIC[biome] || PANIC.generic;
+              const pool = panicLines || panPool(voice) || PANIC[biome] || PANIC.generic;
               tmp.set(mesh.position.x, 5, mesh.position.z);
               say(tmp, pick(pool), 'panic');
             }
@@ -1399,17 +1957,18 @@ export function createLife(
         }
         // margin test: the step must keep the WHOLE body on land, not just the
         // center — a ped standing with its center on the cliff lip reads broken
-        const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
+        const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !wet(px, pz, 0)
+          && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
         let nx = mesh.position.x + Math.cos(ang) * spd * dt, nz = mesh.position.z + Math.sin(ang) * spd * dt;
         if (!stand(nx, nz)) {
           // blocked (coast/water): slide sideways and COMMIT to it for half a
           // second, only reverse as a last resort
           for (const alt of [ang + Math.PI / 2, ang - Math.PI / 2, ang + Math.PI]) {
             const ax2 = mesh.position.x + Math.cos(alt) * spd * dt, az2 = mesh.position.z + Math.sin(alt) * spd * dt;
-            if (biomeAt(ax2, az2) && biomeAt(ax2 + Math.cos(alt) * 2, az2 + Math.sin(alt) * 2)) { ang = alt; nx = ax2; nz = az2; slideT = 0.5; break; }
+            if (biomeAt(ax2, az2) && !wet(ax2, az2, 0) && biomeAt(ax2 + Math.cos(alt) * 2, az2 + Math.sin(alt) * 2)) { ang = alt; nx = ax2; nz = az2; slideT = 0.5; break; }
           }
         }
-        if (biomeAt(nx, nz)) { mesh.position.x = nx; mesh.position.z = nz; }
+        if (biomeAt(nx, nz) && !wet(nx, nz, 0)) { mesh.position.x = nx; mesh.position.z = nz; }
         else if (hop > 0) hop = 0;   // pinned: stop the panic bounce so nothing vibrates in place
         // THE HEAD LEADS THE TURN. Snapping the whole body to the travel
         // heading every frame is what made everyone read as a sliding brick:
@@ -1457,6 +2016,51 @@ export function createLife(
             limbs.head.rotation.x = 0.3;
             limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
             mesh.position.y = s * 0.05;
+          }
+        } else if (dnc && dnc.mode === 5 && hop <= 0) {
+          // ── CAMPAIGNING: rooted on the pavement, the leaflet arm held out
+          // to anyone who stands still, the body slowly scanning the street
+          // for the next one. Maple Falls in one animation.
+          dnc.t += dt;
+          if (limbs) {
+            const s = Math.sin(dnc.t * 1.9), thrust = Math.max(0, Math.sin(dnc.t * 1.9 + 0.9));
+            limbs.ra.rotation.x = -1.35 - thrust * 0.45;   // "take one. TAKE one."
+            limbs.ra.rotation.z = -0.30;
+            limbs.la.rotation.x = -0.55;                    // the rest of the ream
+            limbs.la.rotation.z = 0.30;
+            limbs.torso.rotation.y = s * 0.34;
+            limbs.head.rotation.y = s * 0.5;
+            limbs.ll.rotation.x = 0; limbs.rl.rotation.x = 0;
+            mesh.rotation.y += dt * 0.35 * dnc.spin;        // works the whole pavement
+          }
+        } else if (dnc && dnc.mode === 6 && hop <= 0) {
+          // ── PROTESTING: day 3,281. The placard is welded above the shoulder,
+          // so all this has to do is give it a slow, immovable sway and shift
+          // the weight from foot to foot. Nine years of exactly this.
+          dnc.t += dt;
+          const s = Math.sin(dnc.t * 1.15);
+          mesh.position.y = Math.abs(s) * 0.06;
+          if (limbs) {
+            limbs.ra.rotation.x = -0.22 + s * 0.16;
+            limbs.ra.rotation.z = -0.12 - s * 0.10;         // the sign leans, then leans back
+            limbs.la.rotation.x = 0.10 - s * 0.12;
+            limbs.torso.rotation.z = s * 0.05;
+            limbs.head.rotation.y = Math.sin(dnc.t * 0.55) * 0.45;
+            limbs.ll.rotation.x = s * 0.05; limbs.rl.rotation.x = -s * 0.05;
+          }
+        } else if (dnc && dnc.mode === 7 && hop <= 0) {
+          // ── HECKLING: one arm punching the air on the off-beat, pitched
+          // forward, absolutely certain. Never mean — just LOUD.
+          dnc.t += dt;
+          const b = dnc.t * 2.1, punch = Math.max(0, Math.sin(b));
+          mesh.position.y = punch * 0.14;
+          if (limbs) {
+            limbs.ra.rotation.x = -0.4 - punch * 2.2;
+            limbs.ra.rotation.z = -0.25;
+            limbs.la.rotation.x = 0.3;
+            limbs.torso.rotation.x = 0.18 + punch * 0.10;
+            limbs.head.rotation.x = -0.12;
+            limbs.ll.rotation.x = 0.1; limbs.rl.rotation.x = -0.1;
           }
         } else if (dnc && dnc.mode === 4 && hop <= 0) {
           // ── CONGA: hands on the shoulders in front, hips going, and every
@@ -1538,28 +2142,161 @@ export function createLife(
     return rec;
   }
 
-  // scatter pedestrians across walkable biomes
-  const pedZones: Biome[] = ['cozy', 'fancy', 'park', 'beach', 'plaza', 'downtown', 'forest', 'zoo',
-    // PIRATE BAY is a RESORT — it should feel busier than a suburb
-    'port', 'resort', 'party', 'market', 'jungle', 'cove'];
-  for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
-    if (worldId() === 'pirate') break;   // no grid here — see the PIRATE BAY block below
-    const b = PLAN_GRID[gy][gx];
-    if (!pedZones.includes(b)) continue;
+  // a static prop, placed and made edible only if it is actually on land
+  const decor = (mesh: THREE.Object3D, x: number, z: number, r = 3, rotY?: number) => {
+    if (!insideIsland3(x, z) || (worldId() !== 'pirate' && inLagoon3(x, z, 20))) return;   // never off the coast, never in the lagoon
+    mesh.position.set(x, 0, z);
+    if (rotY !== undefined) mesh.rotation.y = rotY;
+    setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  MAPLE FALLS — ZONES
+  // ══════════════════════════════════════════════════════════════════════════
+  // The 6x6 plan's biome ids are OWNED BY island.ts and get re-zoned without
+  // warning (the districts were `cozy/fancy/downtown/plaza/park/forest/beach/
+  // zoo/airport/military` this morning and are `forest/farm/fair/strip/cozy/
+  // downtown/plaza/park/campus/beach` now). So nothing below keys off a biome
+  // literal: every id is normalised through this table into one of ten TOWN
+  // ZONES, and an id nobody has taught us about degrades to `burb` — a
+  // residential street, which has a full cast and is never empty or wrong.
+  // The ids are read as STRINGS deliberately, so a rename in island.ts is a
+  // graceful demotion here rather than a compile error or a missing crowd.
+  type MZone = 'main' | 'civic' | 'burb' | 'school' | 'farm' | 'fair' | 'lake' | 'woods' | 'strip' | 'park';
+  const ZONE_OF: Record<string, MZone> = {
+    // current island.ts ids
+    downtown: 'main', plaza: 'civic', cozy: 'burb', campus: 'school', farm: 'farm',
+    fair: 'fair', beach: 'lake', forest: 'woods', strip: 'strip', park: 'park',
+    // ids island.ts has retired but kept in the union, and the ones the
+    // re-zoning brief floated — all mapped so either naming works unchanged
+    fancy: 'burb', burb: 'burb', suburb: 'burb', mainst: 'main', main: 'main',
+    square: 'civic', civic: 'civic', townhall: 'civic', school: 'school',
+    field: 'farm', fairground: 'fair', fairgrounds: 'fair', lake: 'lake',
+    shore: 'lake', woods: 'woods', pines: 'woods', mall: 'strip', diner: 'strip',
+    airport: 'strip', military: 'strip', zoo: 'park', green: 'park',
+  };
+  const GH = PLAN_GRID.length, GW = PLAN_GRID[0].length;
+  const biomeIdAt = (gx: number, gy: number): string => String(PLAN_GRID[gy][gx]);
+  const zoneAt = (gx: number, gy: number): MZone => ZONE_OF[biomeIdAt(gx, gy)] ?? 'burb';
+
+  // Which candidate a BLOCK backs. Column-striped, because the read we want
+  // from the play camera is "that whole street is red and the next one is
+  // blue" — the south two rows flip so the town is not a mirror of itself.
+  const sideOf = (gx: number, gy: number): number =>
+    ((gx + (gy >= GH - 2 ? 1 : 0)) % 2 === 0) ? DINKLE : HOLLIS;
+
+  // every block, grouped by zone, and only if its centre is actually on land
+  const zoneBlocks = new Map<MZone, [number, number][]>();
+  if (worldId() !== 'pirate') for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
     const [cx, cz] = blockCenter3D(gx, gy);
-    const n = b === 'party' ? 10 : b === 'market' || b === 'resort' ? 8
-      : b === 'beach' || b === 'plaza' ? 6 : b === 'forest' || b === 'jungle' ? 2 : b === 'zoo' ? 5 : 5;
-    for (let i = 0; i < n; i++) {
+    if (!biomeAt(cx, cz)) continue;
+    const z = zoneAt(gx, gy);
+    const l = zoneBlocks.get(z);
+    if (l) l.push([gx, gy]); else zoneBlocks.set(z, [[gx, gy]]);
+  }
+  // resolve a zone to a block, preferring one no vignette has claimed yet, then
+  // the listed fallback zones, then anything on the map. A vignette NEVER
+  // silently fails to exist because a district was renamed.
+  const usedBlocks = new Set<string>();
+  const anchorOf = (z: MZone, ...fb: MZone[]): [number, number] | null => {
+    // FIRST pass: an unclaimed block anywhere down the preference list. This is
+    // what stops the stump speech and the town-hall meeting piling onto the one
+    // civic block and reading as a single 40-person mosh pit.
+    for (const want of [z, ...fb]) {
+      const list = zoneBlocks.get(want);
+      if (!list) continue;
+      const free = list.filter((b) => !usedBlocks.has(b[0] + ',' + b[1]));
+      if (!free.length) continue;
+      const b = pick(free);
+      usedBlocks.add(b[0] + ',' + b[1]);
+      return b;
+    }
+    // SECOND pass: everything is claimed, so double up — in preference order
+    for (const want of [z, ...fb]) {
+      const list = zoneBlocks.get(want);
+      if (!list || !list.length) continue;
+      const b = pick(list);
+      usedBlocks.add(b[0] + ',' + b[1]);
+      return b;
+    }
+    for (const list of zoneBlocks.values()) if (list.length) {
+      const b = pick(list); usedBlocks.add(b[0] + ',' + b[1]); return b;
+    }
+    return null;
+  };
+
+  // ── THE TOWNSFOLK ────────────────────────────────────────────────────────
+  // Per-zone cast lists, not crowd counts: who LIVES here and what they are
+  // doing. `n` people are drawn from `roles` in order and then wrapped, so the
+  // head of each list is the district's signature and the tail is its texture.
+  const ZONE_CAST: Record<MZone, { n: number; roles: Role[] }> = {
+    main: { n: 8, roles: ['campaigner', 'gossip', 'server', 'booster', 'teen', 'mail', 'gossip', 'kid', 'dogwalker', 'protester'] },
+    civic: { n: 9, roles: ['campaigner', 'protester', 'campaigner', 'gossip', 'booster', 'teen', 'kid', 'mail', 'gossip'] },
+    burb: { n: 5, roles: ['dogwalker', 'kid', 'gossip', 'mail', 'kid', 'booster', 'teen', 'campaigner'] },
+    school: { n: 5, roles: ['teen', 'ballplayer', 'cheer', 'bandkid', 'teen', 'kid', 'coach', 'teen'] },
+    farm: { n: 4, roles: ['farmer', 'farmer', 'kid', 'farmer', 'teen', 'booster'] },
+    fair: { n: 7, roles: ['booster', 'kid', 'baker', 'gossip', 'farmer', 'kid', 'teen', 'campaigner', 'server', 'cheer'] },
+    lake: { n: 5, roles: ['fisher', 'kid', 'camper', 'gossip', 'kid', 'teen', 'booster'] },
+    woods: { n: 2, roles: ['camper', 'fisher', 'camper', 'kid'] },
+    strip: { n: 6, roles: ['server', 'teen', 'gossip', 'teen', 'booster', 'mail', 'kid'] },
+    park: { n: 6, roles: ['dogwalker', 'kid', 'gossip', 'booster', 'teen', 'camper', 'kid'] },
+  };
+  const KID_ROLES: Role[] = ['kid', 'ballplayer'];
+  // one place where "put a named townsperson here" is implemented
+  const townie = (role: Role, x: number, z: number, dress: string, side?: number,
+                  tether = 16, spd = rand(3.4, 5.6), fear = 18, pan?: string[]) => {
+    const p = makeCast(role, dress, side);
+    if (KID_ROLES.includes(role)) p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+    return addWanderer(p, x, z, tether, spd, fear,
+      KID_ROLES.includes(role) ? 1.9 : 2.4, dress, pan, VOICE_OF[role]);
+  };
+  // rooted, doing a job: campaigning (5), protesting (6), heckling (7),
+  // working with both hands (3) or running the show (1)
+  const rooted = (role: Role, x: number, z: number, dress: string, mode: number,
+                  side?: number, face?: number, fear = 16, pan?: string[]) => {
+    const p = makeCast(role, dress, side);
+    p.userData.dancer = { t: rand(0, 6), spin: Math.random() < 0.5 ? 1 : -1, mode };
+    const rec = addWanderer(p, x, z, 1.6, rand(0.15, 0.45), fear, 2.4, dress, pan, VOICE_OF[role]);
+    if (rec && face !== undefined) rec.mesh.rotation.y = face;
+    return rec;
+  };
+
+  for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+    if (worldId() === 'pirate') break;   // no grid here — see the PIRATE BAY block below
+    const dress = biomeIdAt(gx, gy);
+    const zone = zoneAt(gx, gy);
+    const cast = ZONE_CAST[zone];
+    const [cx, cz] = blockCenter3D(gx, gy);
+    const side = sideOf(gx, gy);
+    for (let i = 0; i < cast.n; i++) {
       // half the crowd lives mid-block, half strolls near the sidewalk edges
       const edge = i % 2 === 1;
       const t = HALF_BLOCK_3D * (edge ? rand(0.88, 0.98) : rand(-0.7, 0.7));
       const hx = edge && Math.random() < 0.5 ? cx + (Math.random() < 0.5 ? t : -t) : cx + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7);
       const hz = edge ? cz + (Math.random() < 0.5 ? t : -t) : cz + rand(-HALF_BLOCK_3D * 0.7, HALF_BLOCK_3D * 0.7);
-      addWanderer(makePerson(biomeKey(b)), hx, hz, edge ? 28 : 20, rand(4, 7), 18, 2.4, biomeKey(b));
+      const role = cast.roles[i % cast.roles.length];
+      // one in six is off-message: the house on a red street with a blue sign
+      const wear = Math.random() < 0.17 ? (side === DINKLE ? HOLLIS : DINKLE) : side;
+      if (role === 'campaigner') rooted(role, hx, hz, dress, 5, wear);
+      else townie(role, hx, hz, dress, wear, edge ? 28 : 20, rand(4, 7));
+    }
+    // ── YARD SIGNS. The cheapest possible statement of allegiance and the one
+    // that reads from the very top of the camera's travel: a verge of them in
+    // one colour, the next street over in the other.
+    if (zone === 'burb' || zone === 'main' || zone === 'civic' || zone === 'strip') {
+      const E = HALF_BLOCK_3D * 0.9;
+      for (let i = 0; i < 4; i++) {
+        const along = rand(-E * 0.75, E * 0.75);
+        const onX = i < 2;
+        const sx = onX ? cx + along : cx + (i === 2 ? -E : E);
+        const sz = onX ? cz + (i === 0 ? -E : E) : cz + along;
+        // the one neighbour on the street who has other ideas
+        decor(makeYardSign(Math.random() < 0.22 ? (side === DINKLE ? HOLLIS : DINKLE) : side), sx, sz, 1.2);
+      }
     }
   }
 
-  // zoo animals: clamped near the pen
+  // livestock / zoo animals: clamped near the pen
   if (worldId() !== 'pirate') {
     const [zx, zz] = blockCenter3D(5, 1);
     // each animal is TETHERED to its pen (matching the baked pen floors):
@@ -1769,49 +2506,9 @@ export function createLife(
     // track is the cheapest motion there is — no steering, no collision
     // queries, no per-frame allocation — and it reads from any camera height.
 
-    // ── track kit ─────────────────────────────────────────────────────────
-    // w3() allocates a tuple, which is fine at build time and forbidden in an
-    // update; these are the per-frame versions.
-    const W3 = (v: number) => (v - 6000) * 0.05;
-    interface Route { p: BAY.Pt[]; cum: number[]; len: number }
-    const route = (pts: BAY.Pt[], closed: boolean): Route => {
-      const p = closed ? [...pts, pts[0]] : pts;
-      const cum = [0];
-      for (let i = 1; i < p.length; i++)
-        cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
-      return { p, cum, len: cum[cum.length - 1] || 1 };
-    };
-    const ovalRoute = (cx: number, cy: number, rx: number, ry: number, n = 16): Route => {
-      const pts: BAY.Pt[] = [];
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2;
-        pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
-      }
-      return route(pts, true);
-    };
-    // ONE shared scratch result — read immediately by the caller, never stored
-    const _rp = { x: 0, y: 0, ang: 0 };
-    const routeAt = (r: Route, t: number): void => {
-      const want = ((t % 1) + 1) % 1 * r.len;
-      let i = 0;
-      while (i < r.cum.length - 2 && r.cum[i + 1] <= want) i++;
-      const seg = r.cum[i + 1] - r.cum[i] || 1;
-      const k = (want - r.cum[i]) / seg;
-      const a = r.p[i], b = r.p[i + 1];
-      _rp.x = a[0] + (b[0] - a[0]) * k;
-      _rp.y = a[1] + (b[1] - a[1]) * k;
-      _rp.ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
-    };
-    // ping-pong: 0..1..0 for open routes (a trail has two ends)
-    const bounce = (t: number) => { const u = ((t % 2) + 2) % 2; return u > 1 ? 2 - u : u; };
-
-    // people face +Z, every vehicle in the kit faces +X
-    const FACE_X = Math.PI / 2;
-    const posed = (p: THREE.Group, la: number, ra: number, ll = 0, rl = 0): THREE.Group => {
-      const L = p.userData.limbs as Limbs;
-      L.la.rotation.x = la; L.ra.rotation.x = ra; L.ll.rotation.x = ll; L.rl.rotation.x = rl;
-      return p;
-    };
+    // (the track kit itself now lives at module scope — see "TRACK KIT"
+    // above — because MAPLE FALLS puts a parade, a school bus, a tractor, two
+    // dog walkers and a bike gang on exactly the same rails.)
 
     // ══ 1. ON THE WATER ═══════════════════════════════════════════════════
     // Three circuits, measured offline against BAY.WATER_SMOOTH and the moored
@@ -2468,7 +3165,6 @@ export function createLife(
   // ── staged VIGNETTE EVENTS ──────────────────────────────────────────────────
   interface Ev { x: number; z: number; ambient: string[]; panic: string[]; cd: number; panicked: number; }
   const events: Ev[] = [];
-  const decor = (mesh: THREE.Object3D, x: number, z: number, r = 3) => { if (!insideIsland3(x, z)) return; mesh.position.set(x, 0, z); setShadow(mesh); scene.add(mesh); addEdible(mesh, r); };
 
   function addEvent(gx: number, gy: number, ambient: string[], panic: string[], build: (x: number, z: number) => void, pedN: number, pedCol?: number) {
     // Maple Isle's staged vignettes (the mayor's rally, the farmers market,
@@ -2555,162 +3251,724 @@ export function createLife(
       4, undefined, ['rich', 'robe', 'waiter', 'kid', 'bellhop']);
   }
 
-  // Mayor's rally at town hall: mayor up on the stage, crowd gathered in front
-  addEvent(3, 2,
-    ['re-elect me, and the void LEAVES!', 'my fellow citizens…', 'VOIDLING is UNDER CONTROL', 'read my lips: no new voids', 'four more years! four more years!', 'boooo! …sorry, continue', 'and ANOTHER thing about potholes—'],
-    ["MAYORS FIRST!! IT'S THE LAW!!", 'IT HAS MY VOTE— I MEAN—', 'SECURITY! SECUR—', 'the rally is CANCELLED!!'],
-    (x, z) => {
-      // The rally happens on TOWN HALL's steps (north end of the square), the
-      // stage facing the fountain — nobody is standing in the water anymore.
-      const SZ = z - 12;   // stage line, south of the town hall facade
-      glb(scene, addEdible, 'stage', x, SZ, 5, {
-        h: 3.2, rotY: Math.PI,
-        fallback: () => {
-          const grp = new THREE.Group();
-          const stage = new THREE.Mesh(new THREE.BoxGeometry(10, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0xf0e6d2, roughness: 0.8 }));
-          stage.position.y = 0.8; grp.add(stage);
-          const lectern = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xe8ddc4, roughness: 0.75 }));
-          lectern.position.set(0, 2.7, 1.6); grp.add(lectern);
-          return grp;
-        },
-      });
-      // the mayor: on the stage, one arm working the crowd
-      const mayor = makePerson('downtown', 0x2a2a44);
-      mayor.position.set(x, 1.6, SZ); mayor.rotation.y = Math.PI;   // faces the fountain
-      setShadow(mayor); scene.add(mayor); addEdible(mayor, 2.4);
+  // ══════════════════════════════════════════════════════════════════════════
+  //  MAPLE FALLS — THINGS ON TRACKS, AND THE SCENES THEY RUN PAST
+  // ══════════════════════════════════════════════════════════════════════════
+  // The same measurement that drove the Pirate Bay work: a district with no
+  // moving object in it reads as unfinished no matter how many props it has.
+  // Maple starts ahead of Pirate — it has a road grid and thirty cars — but its
+  // PEOPLE stood about. Everything below is either on a TRACK (a polyline
+  // walked at a fixed rate: no steering, no collision queries, no per-frame
+  // allocation) or is a staged scene with people doing a specific thing in it.
+  if (worldId() !== 'pirate') {
+    // a closed loop that FITS: shrink until every sampled point is on land, so
+    // a re-zoned or coast-clipped block degrades to a smaller circuit instead
+    // of walking a jogger into the sea
+    const fitOval = (cx: number, cz: number, rx: number, rz: number): Route | null => {
+      for (let k = 0; k < 9; k++) {
+        const r = ovalRoute(cx, cz, rx, rz, 16);
+        let ok = true;
+        for (const p of r.p) if (!biomeAt(p[0], p[1])) { ok = false; break; }
+        if (ok) return r;
+        rx *= 0.82; rz *= 0.82;
+      }
+      return null;
+    };
+    // put an object on a route. People hand control back to their wanderer when
+    // the void closes in (so they scatter); vehicles floor it instead.
+    const onTrack = (mesh: THREE.Object3D, rt: Route, spd: number, t0: number,
+                     veh: boolean, scare = 22, boost = 1): void => {
+      let t = t0;
+      routeAt(rt, t);
+      mesh.position.x = _rp.x; mesh.position.z = _rp.y;
       movers.push({
-        mesh: mayor,
-        update(dt, t) {
-          if (eaten(mayor)) return;
-          mayor.rotation.y = Math.PI;   // keep facing the crowd
-          const L = mayor.userData.limbs as Limbs;
-          L.ra.rotation.z = -Math.PI * 0.8 + Math.sin(t * 2.6) * 0.3;   // raised, waving
-          L.la.rotation.x = Math.sin(t * 1.4) * 0.25;
+        mesh,
+        update(dt, _tm, vx, vz, vR) {
+          if (eaten(mesh)) return;
+          const close = Math.hypot(mesh.position.x - vx, mesh.position.z - vz) < vR + scare;
+          if (close && boost <= 1) return;
+          t += spd * dt * (close ? boost : 1);
+          routeAt(rt, t);
+          const nx = _rp.x, nz = _rp.y;
+          const dx = nx - mesh.position.x, dz = nz - mesh.position.z;
+          mesh.position.x = nx; mesh.position.z = nz;
+          if (dx || dz) mesh.rotation.y = veh ? Math.atan2(-dz, dx) : -Math.atan2(dz, dx) + Math.PI / 2;
         },
       });
-      // the crowd: a loose arc between the stage and the fountain
-      for (let i = 0; i < 7; i++) {
-        const a = Math.PI * (0.15 + 0.7 * (i / 6));
-        const cx2 = x + Math.cos(a) * rand(8, 14), cz2 = SZ + 5 + Math.sin(a) * rand(4, 9);
-        addWanderer(makePerson('plaza'), cx2, cz2, 3.5, rand(0.6, 1.2), 20, 2.4, 'plaza',
-          ['the SPEECH!! RUN!!', 'democracy is DOOMED!!', 'save the ballot box!!']);
+    };
+    // a vehicle that is not on the road grid — the tractor in its own field
+    const trackVehicle = (mesh: THREE.Object3D, r: number, rt: Route, spd: number, t0: number) => {
+      mesh.userData.ptsMult = 1.5; mesh.userData.qk = 'car'; mesh.userData.mover = true;
+      mesh.add(contactShadow(r * 0.7));
+      setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
+      onTrack(mesh, rt, spd, t0, true, 26, 2.2);
+      return mesh;
+    };
+    // B follows A at `gap` units — the dog on the lead, the tail of a line
+    const follow = (lead: THREE.Object3D, me: THREE.Object3D, gap: number, spd: number, veh: boolean) => {
+      movers.push({
+        mesh: me,
+        update(dt) {
+          if (eaten(me) || eaten(lead)) return;
+          const dx = lead.position.x - me.position.x, dz = lead.position.z - me.position.z;
+          const d = Math.hypot(dx, dz);
+          if (d > gap) {
+            const step = Math.min(d - gap * 0.92, spd * dt);
+            me.position.x += (dx / d) * step; me.position.z += (dz / d) * step;
+            me.rotation.y = veh ? Math.atan2(-dz, dx) : -Math.atan2(dz, dx) + Math.PI / 2;
+          }
+        },
+      });
+    };
+    // nearest DRY point to (x,z) — on the island and out of the lagoon. The
+    // lakeside block's centre is inside the lagoon ellipse, so anything staged
+    // there has to walk itself onto the sand first.
+    const dryNear = (x: number, z: number, span: number): [number, number] | null => {
+      for (let k = 0; k < 28; k++) {
+        const a = k === 0 ? 0 : rand(0, Math.PI * 2), d = (k / 28) * span;
+        const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+        if (biomeAt(px, pz) && !inLagoon3(px, pz, 22)) return [px, pz];
       }
-    }, 0);
-
-  // Campsite in the forest (s'mores)
-  addEvent(4, 0,
-    ['s\'mores?! 🔥', 'nature is HEALING', 'one more ghost story…', 'who packed the bug spray?'],
-    ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!'],
-    (x, z) => {
-      for (const [ox, oz, col] of [[-7, 0, 0xff8a70], [7, 3, 0x6db8e8]] as const) {
-        const grp2 = new THREE.Group();
-        const tent = new THREE.Mesh(new THREE.ConeGeometry(4, 5, 4), new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true }));
-        tent.rotation.y = Math.PI / 4; tent.position.y = 2.5; grp2.add(tent);
-        const flap = new THREE.Mesh(new THREE.CircleGeometry(1.1, 3),
-          new THREE.MeshStandardMaterial({ color: 0x2a2438, roughness: 0.95, side: THREE.DoubleSide }));
-        flap.position.set(0, 1.05, 2.62); flap.rotation.x = -0.42; grp2.add(flap);
-        decor(grp2, x + ox, z + oz, 3);
+      return null;
+    };
+    // a block centre for a zone, WITHOUT claiming it for a vignette
+    const zoneCentre = (z: MZone, ...fb: MZone[]): { x: number; z: number; gx: number; gy: number; dress: string; side: number } | null => {
+      for (const want of [z, ...fb]) {
+        const list = zoneBlocks.get(want);
+        if (!list || !list.length) continue;
+        const [gx, gy] = pick(list);
+        const [x, cz] = blockCenter3D(gx, gy);
+        return { x, z: cz, gx, gy, dress: biomeIdAt(gx, gy), side: sideOf(gx, gy) };
       }
-      const logs = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.8, 8), new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 1 }));
-      logs.position.y = 0.4; decor(logs, x, z, 2);
-      const flame = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3, 7), new THREE.MeshStandardMaterial({ color: 0xff8a3a, emissive: 0xff5a1a, emissiveIntensity: 1.2, roughness: 0.6 }));
-      flame.position.set(x, 2, z); scene.add(flame);
-    }, 3);
+      return null;
+    };
 
-  // Golf on the park
-  addEvent(4, 2,
-    ['FORE!! ⛳', 'keep your head down', 'nice putt, coach', 'that\'s a birdie'],
-    ['it ate the GREEN!!', 'MY HANDICAP!!', 'not the 18th hole!!'],
-    (x, z) => {
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf2f4f8 }));
-      pole.position.y = 4; const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.6), new THREE.MeshStandardMaterial({ color: 0xe8453c, side: THREE.DoubleSide }));
-      flag.position.set(1.5, 7, 0); const grp = new THREE.Group(); grp.add(pole); grp.add(flag);
-      grp.rotation.y = 0.8;   // angled to the play camera — never edge-on invisible
-      decor(grp, x - 15, z - 21, 3);   // on the putting green, west of the river
-    }, 3, 0xf0f0f0);
-
-  // Beach volleyball
-  addEvent(2, 5,
-    ['SPIKE IT!! 🏐', 'set! set! SET!', 'point, beach team!', 'ace!'],
-    ['sand in my EVERYTHING!!', 'GAME. OVER.', 'serve THAT, void!!'],
-    (x, z) => {
-      for (const ox of [-6, 6]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 0.8 }));
-        post.position.y = 3; decor(post, x + ox, z + 9, 2);   // baked court sits +9 south of block center
+    // ══ 1. THE PARADE ══════════════════════════════════════════════════════
+    // Maple Falls will hold a parade for anything, and both campaigns have
+    // entered a float. It marches a REAL STREET: the road-span table the cars
+    // drive on is the single authority for how far a road runs on-island, so
+    // the parade route is guaranteed to be pavement from end to end.
+    {
+      let best: { axis: 'h' | 'v'; centre: number; sp: [number, number] } | null = null;
+      let bestScore = -1;
+      for (const s of spanList) {
+        const mid = (s.sp[0] + s.sp[1]) / 2;
+        const mx = s.axis === 'h' ? mid : s.centre, mz = s.axis === 'h' ? s.centre : mid;
+        const b = biomeAt(mx, mz);
+        const z = b ? (ZONE_OF[String(b)] ?? 'burb') : 'burb';
+        // length, WEIGHTED by whether this is a street the town would actually
+        // close. A multiplier not a bonus: a long road through the pine woods
+        // can out-score a short Main Street on raw length, and a parade
+        // marching through empty forest is the one place it must not be.
+        const w = z === 'main' ? 3.0 : z === 'civic' ? 2.6 : z === 'strip' ? 1.9
+          : z === 'burb' ? 1.3 : z === 'fair' ? 1.2 : 0.45;
+        const score = (s.sp[1] - s.sp[0]) * w;
+        if (score > bestScore) { bestScore = score; best = s; }
       }
-      const netTex = (() => {   // a real grid so the net reads over sand
-        const cv2 = document.createElement('canvas'); cv2.width = 96; cv2.height = 24;
-        const x2 = cv2.getContext('2d')!;
-        x2.strokeStyle = 'rgba(255,255,255,0.95)'; x2.lineWidth = 1.4;
-        for (let gx2 = 0; gx2 <= 96; gx2 += 8) { x2.beginPath(); x2.moveTo(gx2, 0); x2.lineTo(gx2, 24); x2.stroke(); }
-        for (let gy2 = 0; gy2 <= 24; gy2 += 8) { x2.beginPath(); x2.moveTo(0, gy2); x2.lineTo(96, gy2); x2.stroke(); }
-        return new THREE.CanvasTexture(cv2);
-      })();
-      const net = new THREE.Mesh(new THREE.PlaneGeometry(12, 2.4),
-        new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-      net.position.set(x, 4.4, z + 9); scene.add(net);
-      const ball = new THREE.Group();
-      const bwhite = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.45 }));
-      ball.add(bwhite);
-      const band = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 20),
-        new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.5 }));
-      band.rotation.x = 0.6; ball.add(band);
-      const band2 = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 20),
-        new THREE.MeshStandardMaterial({ color: 0x4da3ff, roughness: 0.5 }));
-      band2.rotation.y = 0.9; ball.add(band2);
-      ball.position.y = 1; decor(ball, x + 3, z + 14, 1.5);
-    }, 4, 0xff9f4d);
-
-  // Soccer match in the park (second park block)
-  addEvent(4, 3,
-    ['GOOOAL! ⚽', 'DEFENSE!! DEFENSE!!', 'ref, that was SO offside', 'nutmeg!!'],
-    ['REF!! TIME OUT!!', 'it ate the REF?!', 'match ABANDONED!!'],
-    (x, z) => {
-      // pitch stripes
-      const pitch = new THREE.Mesh(new THREE.PlaneGeometry(30, 20),
-        new THREE.MeshStandardMaterial({ color: 0x6fbe5e, roughness: 0.95 }));
-      pitch.rotation.x = -Math.PI / 2; pitch.position.set(x, 0.06, z); scene.add(pitch);
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 20), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      line.rotation.x = -Math.PI / 2; line.position.set(x, 0.08, z); scene.add(line);
-      // goals
-      for (const gx2 of [-14, 14]) {
-        const goal = new THREE.Group();
-        const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-        for (const oz of [-3, 3]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 3, 6), white); p.position.set(0, 1.5, oz); goal.add(p); }
-        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 6, 6), white);
-        bar.rotation.x = Math.PI / 2; bar.position.y = 3; goal.add(bar);
-        decor(goal, x + gx2, z, 2.6);
+      if (best) {
+        const OFF = -LANE;                       // one lane; the other stays open for traffic
+        const a0 = best.sp[0] + EDGE_M + 4, a1 = best.sp[1] - EDGE_M - 4;
+        const pt0: BAY.Pt = best.axis === 'h' ? [a0, best.centre + OFF] : [best.centre + OFF, a0];
+        const pt1: BAY.Pt = best.axis === 'h' ? [a1, best.centre + OFF] : [best.centre + OFF, a1];
+        const PARADE = route([pt0, pt1], false);
+        // lateral is constant on an axis-aligned street — no per-frame trig
+        const latX = best.axis === 'h' ? 0 : 1, latZ = best.axis === 'h' ? 1 : 0;
+        const dressP = String(biomeAt(pt0[0], pt0[1]) ?? 'downtown');
+        const SPACING = 3.0 / PARADE.len;        // three units between ranks
+        const marchers: THREE.Object3D[] = [];
+        const rankOf: number[] = [], latOf: number[] = [];
+        // rank 0: the drum major (a campaigner, waving, both camps furious
+        // about who got the front). Then band, then cheer, then the kids.
+        const COLUMN: Role[] = ['campaigner', 'bandkid', 'bandkid', 'bandkid', 'bandkid',
+          'cheer', 'cheer', 'bandkid', 'bandkid', 'kid', 'kid', 'booster'];
+        for (let i = 0; i < COLUMN.length; i++) {
+          const rank = Math.floor((i + 1) / 2);
+          const lat = i === 0 ? 0 : (i % 2 === 1 ? -1.05 : 1.05);
+          routeAt(PARADE, bounce(-rank * SPACING) * 0.999);
+          // alternate the two camps down the column so the parade is visibly
+          // BIPARTISAN and visibly annoyed about it
+          const p = makeCast(COLUMN[i], dressP, i % 2 === 0 ? DINKLE : HOLLIS);
+          if (COLUMN[i] === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
+          const rec = addWanderer(p, _rp.x + latX * lat, _rp.y + latZ * lat,
+            400, rand(0.6, 1.1), 18, COLUMN[i] === 'kid' ? 1.9 : 2.4, dressP,
+            undefined, VOICE_OF[COLUMN[i]]);
+          if (!rec) continue;
+          marchers.push(rec.mesh); rankOf.push(rank); latOf.push(lat);
+        }
+        if (marchers.length) {
+          let pt = 0;
+          const PSPD = 0.022;
+          // ONE mover drives the whole column — twelve people for the price of
+          // one update, and no follow chain to concertina at the turnaround
+          movers.push({
+            mesh: marchers[0],
+            update(dt, _tm, vx, vz, vR) {
+              pt += dt * PSPD;
+              for (let i = 0; i < marchers.length; i++) {
+                const m = marchers[i];
+                if (eaten(m)) continue;
+                // a marcher the void has reached drops out and runs: their
+                // wanderer already has the panic, we simply stop steering them
+                if (Math.hypot(m.position.x - vx, m.position.z - vz) < vR + 20) continue;
+                routeAt(PARADE, bounce(pt - rankOf[i] * SPACING) * 0.999);
+                const nx = _rp.x + latX * latOf[i], nz = _rp.y + latZ * latOf[i];
+                const dx = nx - m.position.x, dz = nz - m.position.z;
+                m.position.x = nx; m.position.z = nz;
+                if (dx || dz) m.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+              }
+            },
+          });
+          // …and the crowd that came out to watch it, on both kerbs
+          for (let i = 0; i < 8; i++) {
+            routeAt(PARADE, 0.18 + 0.64 * (i / 7));
+            const side2 = i % 2 === 0 ? 4.6 : -4.6;
+            townie(pick(['gossip', 'kid', 'booster', 'teen'] as Role[]),
+              _rp.x + latX * side2, _rp.y + latZ * side2, dressP,
+              i % 2 === 0 ? DINKLE : HOLLIS, 4, rand(0.5, 1.2));
+          }
+          events.push({
+            x: (pt0[0] + pt1[0]) / 2, z: (pt0[1] + pt1[1]) / 2,
+            ambient: ['the parade! IT IS THE PARADE!', 'band, keep your ranks!',
+              'that float is just a truck', 'both campaigns entered. of course.',
+              'we do this for everything', 'the twine ball is on the truck',
+              'candy! they throw CANDY!', 'Pike Hollow has no parade.'],
+            panic: ['the parade route is COMPROMISED!!', 'keep marching!! KEEP MARCHING!!',
+              'the band is still playing!!', 'save the float!! it is a TRUCK!!'],
+            cd: rand(1, 4), panicked: 0,
+          });
+        }
       }
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 10), new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.4 }));
-      ball.position.y = 0.7; decor(ball, x + rand(-4, 4), z + rand(-3, 3), 1);
-    }, 6, 0xffffff);
+    }
 
-  // School at recess (fancy district)
-  addEvent(2, 4,
-    ['recess!! 🎒', 'tag, you\'re it!', 'pop quiz?! nooo', 'the bell! THE BELL!'],
-    ['SNOW DAY!! I mean— VOID DAY!!', 'homework CANCELLED!!', 'RUN, class, RUN!!'],
-    (x, z) => {
-      // AI schoolhouse (bell tower + clock);      // a procedural brick school if offline
-      const buildFallback = () => {
-        const school = new THREE.Group();
-        const brick = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 9),
-          new THREE.MeshStandardMaterial({ color: 0xc25a4a, roughness: 0.85 }));
-        brick.position.y = 3; school.add(brick);
-        const trim = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.8, 9.4), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 }));
-        trim.position.y = 6.2; school.add(trim);
-        const bell = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 4),
-          new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8, flatShading: true }));
-        bell.position.y = 7.6; school.add(bell);
-        const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.7 }));
-        door.position.set(0, 1.6, 4.6); school.add(door);
-        return school;
-      };
-      glb(scene, addEdible, 'school', x, z - 6, 6.0, { h: 11, fallback: buildFallback });   // r=9 was mathematically uneatable in a 3:00 match
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
-      pole.position.set(x + 9.5, 3.5, z - 3); setShadow(pole); scene.add(pole);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({ color: 0x9350e8, side: THREE.DoubleSide }));
-      flag.position.set(x + 10.6, 6.4, z - 3); scene.add(flag);
-    }, 5);
+    // ══ 2. THE SCHOOL BUS ══════════════════════════════════════════════════
+    // Inherits the whole road-lane driver — spans, junction arcs, the coast
+    // invariant — for one line, because that driver is now shared.
+    roadVehicle(makeBus(), 3.6, rand(10, 13));
+
+    // ══ 3. THE TRACTOR ═════════════════════════════════════════════════════
+    // The farm was the emptiest district in town: no people at all and nothing
+    // moving except cars passing through on the county road.
+    {
+      const f = zoneCentre('farm', 'woods', 'park');
+      if (f) {
+        const rt = fitOval(f.x, f.z, HALF_BLOCK_3D * 0.62, HALF_BLOCK_3D * 0.44);
+        if (rt) trackVehicle(makeTractor(), 3.0, rt, 0.017, rand(0, 1));
+        // …and the farmer walking the fence line behind it
+        const rt2 = fitOval(f.x, f.z, HALF_BLOCK_3D * 0.80, HALF_BLOCK_3D * 0.62);
+        if (rt2) for (let i = 0; i < 2; i++) {
+          routeAt(rt2, i / 2);
+          const rec = townie('farmer', _rp.x, _rp.y, f.dress, f.side, 400, rand(0.4, 0.8));
+          if (rec) onTrack(rec.mesh, rt2, rand(0.020, 0.028), i / 2, false, 20);
+        }
+      }
+    }
+
+    // ══ 4. THE JOGGER CIRCUIT ══════════════════════════════════════════════
+    {
+      const p = zoneCentre('park', 'civic', 'burb');
+      if (p) {
+        const rt = fitOval(p.x, p.z, HALF_BLOCK_3D * 0.68, HALF_BLOCK_3D * 0.52);
+        if (rt) for (let i = 0; i < 3; i++) {
+          const t0 = i / 3;
+          routeAt(rt, t0);
+          const rec = townie(pick(['booster', 'teen', 'gossip'] as Role[]), _rp.x, _rp.y,
+            p.dress, p.side, 400, rand(0.4, 0.9));
+          if (rec) onTrack(rec.mesh, rt, rand(0.038, 0.052), t0, false, 20);
+        }
+      }
+    }
+
+    // ══ 5. THE BIKE GANG ═══════════════════════════════════════════════════
+    // Kids doing laps of a residential block, standing on the pedals, going
+    // nowhere in particular at speed. The rider is a real cast member parented
+    // to the frame, so it eats, animates and pedals like anybody else.
+    {
+      const b = zoneCentre('burb', 'park', 'main');
+      if (b) {
+        const rt = fitOval(b.x, b.z, HALF_BLOCK_3D * 0.74, HALF_BLOCK_3D * 0.58);
+        if (rt) for (let i = 0; i < 4; i++) {
+          const bike = makeBike(pick([DINKLE, HOLLIS, 0xf0c050, 0x58c470]));
+          const rider = makeCast('kid', b.dress, i % 2 ? DINKLE : HOLLIS);
+          rider.position.set(-0.12, 0.46, 0); rider.rotation.y = FACE_X;
+          posed(rider, -1.30, -1.30, 0.42, -0.42);
+          const L = rider.userData.limbs as Limbs;
+          L.torso.rotation.x = 0.38;
+          bike.add(rider);
+          bike.userData.ptsMult = 1.5; bike.userData.mover = true;
+          bike.add(contactShadow(1.4));
+          setShadow(bike); scene.add(bike); addEdible(bike, 1.9);
+          const ph = rand(0, 6.3);
+          onTrack(bike, rt, rand(0.055, 0.075), i / 4, true, 20, 2.4);
+          movers.push({
+            mesh: bike,
+            update(_dt, tm) {
+              if (eaten(bike)) return;
+              const s = Math.sin(tm * 7 + ph) * 0.55;      // pedalling
+              L.ll.rotation.x = 0.42 + s; L.rl.rotation.x = -0.42 - s;
+              L.torso.rotation.y = s * 0.10;
+            },
+          });
+        }
+      }
+    }
+
+    // ══ 6. THE DOG WALKERS ═════════════════════════════════════════════════
+    for (const zoneId of ['burb', 'park'] as MZone[]) {
+      const d = zoneCentre(zoneId, 'main', 'burb');
+      if (!d) continue;
+      const rt = fitOval(d.x, d.z, HALF_BLOCK_3D * 0.66, HALF_BLOCK_3D * 0.5);
+      if (!rt) continue;
+      routeAt(rt, 0.3);
+      const rec = townie('dogwalker', _rp.x, _rp.y, d.dress, d.side, 400, rand(0.4, 0.8));
+      if (!rec) continue;
+      onTrack(rec.mesh, rt, rand(0.026, 0.034), 0.3, false, 20);
+      const dog = makeDog();
+      dog.position.set(rec.mesh.position.x + 1.8, 0, rec.mesh.position.z);
+      dog.userData.ptsMult = 1.5; dog.userData.mover = true;
+      dog.add(contactShadow(0.9));
+      setShadow(dog); scene.add(dog); addEdible(dog, 1.2);
+      // the dog is AHEAD of the walker, because it always is
+      follow(rec.mesh, dog, 2.0, 9, true);
+    }
+
+    // ══ 7. THE MAIL ROUND ══════════════════════════════════════════════════
+    {
+      const m = zoneCentre('burb', 'main', 'strip');
+      if (m) {
+        const E = HALF_BLOCK_3D * 0.84;
+        const box: BAY.Pt[] = [[m.x - E, m.z - E], [m.x + E, m.z - E], [m.x + E, m.z + E], [m.x - E, m.z + E]];
+        if (box.every((p) => biomeAt(p[0], p[1]))) {
+          const rt = route(box, true);
+          routeAt(rt, 0);
+          const rec = townie('mail', _rp.x, _rp.y, m.dress, m.side, 400, rand(0.3, 0.6));
+          if (rec) onTrack(rec.mesh, rt, 0.024, 0, false, 20);
+        }
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  THE STAGED SCENES
+    // ══════════════════════════════════════════════════════════════════════
+    // Anchored by ZONE, never by grid coordinate: island.ts re-zones the plan
+    // without warning, and a vignette that hard-codes block (3,2) ends up in a
+    // cornfield. anchorOf() also prefers a block no other scene has claimed.
+    const mEvent = (z: MZone, fb: MZone[], amb: string[], pan: string[],
+                    build: (x: number, cz: number, side: number, dress: string) => void): void => {
+      const a = anchorOf(z, ...fb);
+      if (!a) return;
+      const [gx, gy] = a;
+      const dress = biomeIdAt(gx, gy), side = sideOf(gx, gy);
+      addEvent(gx, gy, amb, pan, (x, cz) => build(x, cz, side, dress), 0);
+    };
+
+    // ── THE STUMP SPEECH ──────────────────────────────────────────────────
+    // Mayor Dinkle, third term, running on a platform of the void not existing.
+    // A crowd in both colours, and one heckler who has been asked to leave.
+    mEvent('civic', ['main', 'strip', 'burb'],
+      ['there is NO void. next question.', 'my opponent has NO plan.',
+        'four more years! or eight!', 'I fixed that pothole. me.',
+        'boooo! …sorry, continue', 'let me finish. LET ME FINISH.',
+        'and ANOTHER thing about potholes—', 'name ONE thing she has done.',
+        'a vote for me is a vote for me', 'the twine ball put us on maps.'],
+      ['I NEVER said it was fake!!', 'this is my opponent\'s fault!!',
+        'the polls are still OPEN!!', 'I demand a RECOUNT!!',
+        'four more— okay, RUN!! RUN!!'],
+      (x, z, side, dress) => {
+        const SZ = z - 12;   // the stage line, back from the square
+        glb(scene, addEdible, 'stage', x, SZ, 5, {
+          h: 3.2, rotY: Math.PI,
+          fallback: () => {
+            const grp = new THREE.Group();
+            const stage = new THREE.Mesh(new THREE.BoxGeometry(10, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0xf0e6d2, roughness: 0.8 }));
+            stage.position.y = 0.8; grp.add(stage);
+            const lectern = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.2), new THREE.MeshStandardMaterial({ color: 0xe8ddc4, roughness: 0.75 }));
+            lectern.position.set(0, 2.7, 1.6); grp.add(lectern);
+            return grp;
+          },
+        });
+        // bunting: the two campaigns' colours, alternating, over the stage
+        for (let i = 0; i < 8; i++)
+          decor(makeYardSign(i % 2 ? DINKLE : HOLLIS), x - 10.5 + i * 3, SZ - 4.5, 1.2);
+        // THE MAYOR, up on the stage where the wanderer's ground-level walk
+        // cannot reach him — his own tiny mover keeps him facing the crowd
+        const mayor = makeCast('campaigner', dress, DINKLE);
+        mayor.position.set(x, 1.6, SZ); mayor.rotation.y = Math.PI;
+        mayor.userData.mover = true; mayor.userData.ptsMult = 2;
+        setShadow(mayor); scene.add(mayor); addEdible(mayor, 2.4);
+        peds.push({ mesh: mayor, biome: dress, panic: 0, voice: 'politician' });
+        const ML = mayor.userData.limbs as Limbs;
+        movers.push({
+          mesh: mayor,
+          update(_dt, t) {
+            if (eaten(mayor)) return;
+            mayor.rotation.y = Math.PI + Math.sin(t * 0.7) * 0.22;
+            ML.ra.rotation.z = -Math.PI * 0.8 + Math.sin(t * 2.6) * 0.3;   // the wave
+            ML.ra.rotation.x = -0.4;
+            ML.la.rotation.x = Math.sin(t * 1.4) * 0.25;
+            ML.torso.rotation.y = Math.sin(t * 0.7) * 0.12;
+          },
+        });
+        // the faithful, in an arc, in both colours
+        for (let i = 0; i < 9; i++) {
+          const a = Math.PI * (0.12 + 0.76 * (i / 8));
+          const cx2 = x + Math.cos(a) * rand(7, 13), cz2 = SZ + 6 + Math.sin(a) * rand(4, 9);
+          const camp = i % 3 === 0 ? HOLLIS : DINKLE;
+          townie(pick(['booster', 'gossip', 'kid', 'booster', 'teen'] as Role[]),
+            cx2, cz2, dress, camp, 3.5, rand(0.6, 1.2), 20,
+            ['the SPEECH!! RUN!!', 'democracy is DOOMED!!', 'save the ballot box!!',
+              'he said it was FAKE!!']);
+        }
+        // …and one campaign worker on the edge of it, leafleting the queue
+        rooted('campaigner', x + 12, SZ + 9, dress, 5, DINKLE);
+        // THE HECKLER. Blue placard, one arm going, absolutely certain.
+        rooted('protester', x - 13, SZ + 10, dress, 7, HOLLIS, 0.9, 20,
+          ['I was heckling him about THAT!!', 'ASK HIM ABOUT THE VOID!!', 'told you!! TOLD you!!']);
+      });
+
+    // ── THE PARKING METER ─────────────────────────────────────────────────
+    // Nine years. One meter. Four people. They have folding chairs and they
+    // are not going anywhere, and that includes now.
+    mEvent('main', ['civic', 'strip'],
+      ['the METER. it is the meter.', 'day 3,281 of the protest.',
+        'nine years. NINE. still here.', 'twenty five cents. an HOUR.',
+        'honk if you hate that meter!', 'we have a petition. sign it.',
+        'there are four of us. FOUR.', 'the meter is a SYMBOL.',
+        'my sign is laminated. it lasts', 'I brought folding chairs.'],
+      ['the METER!! SAVE THE METER!!', 'this changes NOTHING!!',
+        'we protest ON THE RUN!!', 'still twenty five cents!!',
+        'day 3,281 continues!!'],
+      (x, z, _side, dress) => {
+        decor(makeParkingMeter(), x, z, 1.6);
+        // the folding chairs. Nine years of them.
+        for (const [ox, oz] of [[-3.6, 2.4], [3.4, 2.8]] as [number, number][])
+          decor(grp1(mergedProp([
+            part(MG.box, 0x3a6a8a, 0, 0.9, 0, 0, 0, 0, 1.5, 0.16, 1.4),
+            part(MG.box, 0x3a6a8a, -0.6, 1.55, 0, 0, 0, 0.12, 0.16, 1.4, 1.4),
+            part(MG.box, 0x8a8f9c, 0, 0.45, 0, 0, 0, 0, 1.3, 0.9, 1.2),
+          ])), x + ox, z + oz, 1.2);
+        // FOUR PROTESTERS. Fear 5, not 18: they do not move for anything, and
+        // the void is not going to be the exception.
+        const ring: [number, number, number][] = [
+          [-2.6, -2.2, 0.7], [2.7, -2.0, -0.7], [-2.9, 3.0, 2.4], [3.1, 3.2, -2.4],
+        ];
+        for (let i = 0; i < ring.length; i++)
+          rooted('protester', x + ring[i][0], z + ring[i][1], dress, 6,
+            i % 2 ? HOLLIS : DINKLE, ring[i][2], 5,
+            ['the METER!! SAVE THE METER!!', 'this changes NOTHING!!', 'day 3,281 continues!!',
+              'still twenty five cents!!']);
+        // …and the two people who stopped to argue with them
+        townie('gossip', x - 6.5, z + 5.5, dress, undefined, 3, rand(0.4, 0.9));
+        townie('booster', x + 6.8, z + 5.2, dress, undefined, 3, rand(0.4, 0.9));
+      });
+
+    // ── THE PIE CONTEST ───────────────────────────────────────────────────
+    // PEARL runs it, judges it and wins it. Eleven years. Nobody has worked
+    // out how to raise this without it becoming a whole thing.
+    mEvent('fair', ['park', 'civic', 'main'],
+      ['judging is at four. FOUR.', 'Pearl has won eleven years.',
+        'that crust is store bought.', 'blue ribbon or nothing.',
+        'she judges her OWN pie?', 'I entered the jam instead.',
+        'nobody move the pies.', 'it was RIGGED in 96 too.',
+        'the recipe is a family secret', 'we do not question Pearl.'],
+      ['SAVE THE PIES!! ALL OF THEM!!', 'not the BLUE RIBBON!!',
+        'Pearl has the pies!! GO!!', 'judging is POSTPONED!!',
+        'it ate the winning entry!!'],
+      (x, z, side, dress) => {
+        decor(makePieTable(), x, z - 2, 4.5);
+        // PEARL, behind the table, presenting
+        rooted('baker', x, z - 4.6, dress, 5, side, Math.PI, 18,
+          ['MY PIES!! ALL ELEVEN!!', 'the ribbon!! grab the RIBBON!!', 'it has NO PALATE!!']);
+        // the judges, leaning over the entries with both hands busy
+        for (const ox of [-3.0, 3.0])
+          rooted('gossip', x + ox, z - 4.4, dress, 3, side, Math.PI);
+        // the crowd on the public side of the table
+        for (let i = 0; i < 9; i++) {
+          const a = -Math.PI * (0.1 + 0.8 * (i / 8));
+          townie(pick(['booster', 'kid', 'gossip', 'farmer', 'kid', 'teen'] as Role[]),
+            x + Math.cos(a) * rand(5, 12), z + 1 - Math.sin(a) * rand(3, 9),
+            dress, i % 3 === 0 ? HOLLIS : DINKLE, 4, rand(0.6, 1.4));
+        }
+      });
+
+    // ── FOOTBALL PRACTICE ─────────────────────────────────────────────────
+    mEvent('school', ['park', 'farm', 'burb'],
+      ['GO OTTERS! two and eight!', 'run it AGAIN. from the top.',
+        'that is not what I drew!', 'water break. NINETY seconds.',
+        'coach has ONE play. one.', 'homecoming is in two weeks',
+        'the band is watching. focus.', 'we lost to Pike Hollow. again.'],
+      ['PRACTICE IS CANCELLED!!', 'coach says RUN. actually RUN!!',
+        'it ate the FIELD!!', 'save the trophy!! the ONE trophy!!'],
+      (x, z, side, dress) => {
+        for (const oz of [-17, 17]) decor(makeGoalPosts(), x, z + oz, 3.4, Math.PI / 2);
+        // THE COACH — rooted, clipboard, one arm running the whole session
+        rooted('coach', x - 11, z, dress, 1, side, -Math.PI / 2, 20,
+          ['RUN IT AGAIN!! I mean— RUN!!', 'that is NOT the play!!', 'nobody stops!! NOBODY!!']);
+        // THE DRILL — a shuttle run up and down the field, which is the most
+        // motion per person of anything in the town
+        const drill = route([[x - 2, z - 13], [x - 2, z + 13]], false);
+        for (let i = 0; i < 6; i++) {
+          const t0 = i / 6;
+          routeAt(drill, bounce(t0));
+          const rec = townie('ballplayer', _rp.x + (i % 3 - 1) * 3.4, _rp.y, dress,
+            i % 2 ? side : (side === DINKLE ? HOLLIS : DINKLE), 400, rand(0.4, 0.9));
+          if (!rec) continue;
+          const lane = route([[x - 2 + (i % 3 - 1) * 3.4, z - 13], [x - 2 + (i % 3 - 1) * 3.4, z + 13]], false);
+          let tt = t0;
+          const sp = rand(0.16, 0.23);   // a shuttle run is a SPRINT
+          movers.push({
+            mesh: rec.mesh,
+            update(dt, _tm, vx, vz, vR) {
+              const m = rec.mesh;
+              if (eaten(m)) return;
+              if (Math.hypot(m.position.x - vx, m.position.z - vz) < vR + 20) return;
+              tt += dt * sp;
+              routeAt(lane, bounce(tt) * 0.999);
+              const dx = _rp.x - m.position.x, dz = _rp.y - m.position.z;
+              m.position.x = _rp.x; m.position.z = _rp.y;
+              if (dx || dz) m.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+            },
+          });
+        }
+        // THE SIDELINE — cheerleaders on the near touchline and the band kids
+        // who are only here because the coach said the band has to be here
+        for (let i = 0; i < 3; i++)
+          townie('cheer', x + 9, z - 6 + i * 6, dress, side, 2.5, rand(0.3, 0.7));
+        for (let i = 0; i < 3; i++)
+          townie('bandkid', x + 13, z - 4 + i * 5, dress, side, 2.5, rand(0.3, 0.7));
+        for (let i = 0; i < 3; i++)
+          townie(pick(['teen', 'gossip', 'booster', 'kid'] as Role[]),
+            x + 16 + rand(-2, 2), z + rand(-11, 11), dress, undefined, 4, rand(0.5, 1.2));
+      });
+
+    // ── THE TOWN-HALL MEETING ─────────────────────────────────────────────
+    // It is a standing-room-only meeting about a void, held by a man who says
+    // there is no void, and it has spilled all the way down the steps.
+    mEvent('civic', ['main', 'strip', 'burb'],
+      ['the meeting is FULL. sit outside.', 'point of order! POINT of order!',
+        'that is not on the agenda.', 'we have been here since six.',
+        'somebody open a window.', 'she is going to bring up the meter.',
+        'the minutes will reflect that.', 'nine people. NINE. and a feud.',
+        'move to adjourn? DENIED.', 'the Bugle is recording this.'],
+      ['ADJOURNED!! ADJOURNED!!', 'the MINUTES!! save the minutes!!',
+        'point of order — RUN!!', 'this meeting is OVER!!'],
+      (x, z, side, dress) => {
+        const steps = makeHallSteps();
+        steps.rotation.y = Math.PI;
+        decor(steps, x, z - 8, 6);
+        // the chair of the meeting, at the top, losing control of it
+        rooted('campaigner', x, z - 11.5, dress, 1, side, 0);
+        // the meeting, on the steps and spilling into the square
+        for (let i = 0; i < 12; i++) {
+          const row = Math.floor(i / 4);
+          const cx2 = x + ((i % 4) - 1.5) * 3.4 + rand(-1, 1);
+          const cz2 = z - 5 + row * 4.2 + rand(-1, 1);
+          const camp = i % 2 ? DINKLE : HOLLIS;
+          if (i === 3 || i === 8) rooted('protester', cx2, cz2, dress, 6, camp);
+          else townie(pick(['gossip', 'booster', 'farmer', 'teen', 'server', 'gossip'] as Role[]),
+            cx2, cz2, dress, camp, 3, rand(0.4, 1.0));
+        }
+        // and two people who could not get in, arguing on the pavement
+        rooted('gossip', x - 9, z + 4, dress, 7, HOLLIS, 1.4);
+        rooted('booster', x - 6.4, z + 4.6, dress, 7, DINKLE, -1.7);
+      });
+
+    // ── THE LAWN-SIGN DISPUTE ─────────────────────────────────────────────
+    // Two neighbours, one boundary, one tape measure and a difference of two
+    // inches that is going to a county court.
+    mEvent('burb', ['main', 'park', 'strip'],
+      ['it is two inches. TWO.', 'that sign is on MY verge.',
+        'I have the original survey.', 'we were friends. in 2011.',
+        'measure it again. AGAIN.', 'the hedge is the LINE.',
+        'my lawyer says nothing. yet.', 'both signs. same verge. war.',
+        'the HOA has recused itself.', 'his lawn is not even level.'],
+      ['MY LAWN!! MY LAWN!!', 'it crossed the BOUNDARY!!',
+        'take the sign!! LEAVE the hedge!!', 'this is STILL two inches!!'],
+      (x, z, side, dress) => {
+        const other = side === DINKLE ? HOLLIS : DINKLE;
+        // the boundary itself: a hedge, and a picket line of signs along it
+        decor(grp1(mergedProp([
+          part(MG.box, 0x4a7a4a, 0, 1.0, 0, 0, 0, 0, 1.7, 2.0, 15.0),
+          part(MG.box, 0x5a8a52, 0, 2.05, 0, 0, 0, 0, 1.9, 0.5, 15.2),
+        ])), x, z, 3.4);
+        for (let i = 0; i < 6; i++)
+          decor(makeYardSign(i < 3 ? side : other),
+            x + (i < 3 ? -2.6 : 2.6), z - 6 + (i % 3) * 6, 1.2);
+        // THE TAPE MEASURE. Mode 3 is "both hands busy in front", which is
+        // exactly what a man proving a two-inch encroachment looks like.
+        const dale = makeCast('booster', dress, side);
+        dale.userData.dancer = { t: rand(0, 6), spin: 1, mode: 3 };
+        const r1 = addWanderer(dale, x - 3.2, z, 1.2, rand(0.1, 0.3), 14, 2.4, dress,
+          ['STILL two inches!!', 'measure it!! SOMEBODY MEASURE IT!!', 'MY LAWN!!'], 'booster');
+        if (r1) r1.mesh.rotation.y = -Math.PI / 2;
+        // …and the neighbour, arms going, who has heard all of this before
+        rooted('gossip', x + 3.2, z + 0.6, dress, 7, other, Math.PI / 2, 14,
+          ['he is STILL measuring!!', 'it is TWO INCHES!!', 'take the hedge!! TAKE IT!!']);
+        // the rest of the street, out on their porches, loving it
+        for (let i = 0; i < 5; i++)
+          townie(pick(['gossip', 'kid', 'dogwalker', 'teen'] as Role[]),
+            x + rand(-14, 14), z + rand(-13, 13), dress, i % 2 ? side : other, 5, rand(0.5, 1.3));
+        // Dale's tape measure is the prop that sells it — hand it to a second
+        // surveyor so the joke reads even if Dale is eaten first
+        rooted('farmer', x - 5.4, z - 5.0, dress, 3, side, -1.2);
+      });
+
+    // ── THE DINER ─────────────────────────────────────────────────────────
+    // GUS. Refills are free. So are the opinions. The debate is at eight.
+    mEvent('strip', ['main', 'civic', 'burb'],
+      ['coffee is 90 cents. always.', 'refills free. opinions free.',
+        'that booth is Marge\'s booth.', 'the special is the special.',
+        'no, we do not do oat milk.', 'the debate is at 8. be early.',
+        'banned him. still feed him.', 'you two. outside. talk it out.',
+        'I lost to Pearl again. again.', 'nobody leaves here hungry.'],
+      ['it ate the DINER!!', 'grab the pie!! LEAVE the eggs!!',
+        'we are CLOSED. permanently. RUN!!', 'not Marge\'s booth!!'],
+      (x, z, side, dress) => {
+        // the counter, out front, because the whole town eats outside in July
+        decor(grp1(mergedProp([
+          part(MG.box, 0xe8e2d0, 0, 2.0, 0, 0, 0, 0, 11.0, 0.3, 2.4),
+          part(MG.box, 0xd8443c, 0, 1.0, 0, 0, 0, 0, 10.6, 1.7, 2.0),
+          part(MG.box, 0x8a8f9c, 0, 0.15, 0, 0, 0, 0, 11.0, 0.3, 2.6),
+        ])), x, z - 3, 4.5);
+        for (let i = 0; i < 5; i++)
+          decor(grp1(mergedProp([
+            part(MG.cyl6, 0x9aa0ac, 0, 0.9, 0, 0, 0, 0, 0.3, 1.8, 0.3),
+            part(MG.disc, 0xd8443c, 0, 1.85, 0, 0, 0, 0, 1.1, 0.25, 1.1),
+          ])), x - 4 + i * 2, z - 0.6, 1.0);
+        // two servers working the counter, pots in hand
+        rooted('server', x - 2.4, z - 5.0, dress, 5, side, 0);
+        rooted('server', x + 3.0, z - 4.6, dress, 3, side, 0);
+        // the regulars, at the stools
+        for (let i = 0; i < 5; i++)
+          townie(pick(['gossip', 'farmer', 'booster', 'teen', 'protester'] as Role[]),
+            x - 4 + i * 2 + rand(-0.6, 0.6), z + 1.4 + rand(-0.6, 0.6), dress,
+            i % 2 ? DINKLE : HOLLIS, 2, rand(0.2, 0.6));
+        // and the teenagers in the parking lot, where the teenagers are
+        for (let i = 0; i < 4; i++)
+          townie('teen', x + rand(6, 15), z + rand(2, 12), dress, undefined, 4, rand(0.5, 1.4));
+      });
+
+    // ── THE CAMPSITE ──────────────────────────────────────────────────────
+    mEvent('woods', ['park', 'lake', 'farm'],
+      ['s\'mores?! 🔥', 'one more ghost story…', 'who packed the bug spray?',
+        'the fair is four miles that way', 'a raccoon took the whole bag',
+        'nature is HEALING', 'we come out here every August'],
+      ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!',
+        'save the s\'mores!! ALL of them!!'],
+      (x, z, side, dress) => {
+        for (const [ox, oz, col] of [[-7, 0, 0xff8a70], [7, 3, 0x6db8e8]] as const) {
+          const grp2 = new THREE.Group();
+          const tent = new THREE.Mesh(new THREE.ConeGeometry(4, 5, 4), new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true }));
+          tent.rotation.y = Math.PI / 4; tent.position.y = 2.5; grp2.add(tent);
+          const flap = new THREE.Mesh(new THREE.CircleGeometry(1.1, 3),
+            new THREE.MeshStandardMaterial({ color: 0x2a2438, roughness: 0.95, side: THREE.DoubleSide }));
+          flap.position.set(0, 1.05, 2.62); flap.rotation.x = -0.42; grp2.add(flap);
+          decor(grp2, x + ox, z + oz, 3);
+        }
+        const logs = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.8, 8), new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 1 }));
+        logs.position.y = 0.4; decor(logs, x, z, 2);
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3, 7), new THREE.MeshStandardMaterial({ color: 0xff8a3a, emissive: 0xff5a1a, emissiveIntensity: 1.2, roughness: 0.6 }));
+        flame.position.set(x, 2, z); scene.add(flame);
+        for (let i = 0; i < 5; i++) {
+          const a = Math.PI * 2 * (i / 5);
+          townie(i === 4 ? 'kid' : 'camper', x + Math.cos(a) * rand(4, 6), z + Math.sin(a) * rand(4, 6),
+            dress, side, 3, rand(0.4, 1.0));
+        }
+      });
+
+    // ── THE LAKE ──────────────────────────────────────────────────────────
+    mEvent('lake', ['park', 'woods'],
+      ['the boat parade is saturday', 'four boats and a canoe. HUGE.',
+        'nothing is biting today.', 'that photo? catfish. 1996.',
+        'SPIKE IT!! 🏐', 'the water is FINE. get in.',
+        'somebody lost a cooler out there'],
+      ['SAVE THE COOLER!!', 'even the fish left!!', 'not the BOAT PARADE!!',
+        'reel it in!! REEL IT IN!!'],
+      (x, z, side, dress) => {
+        // the court is baked +9 south of the block centre, which on this shore
+        // is INSIDE the lagoon — find sand before building anything on it, and
+        // if there is none (a re-zone put the lake somewhere else) skip the
+        // court and keep the fishers, rather than floating a net on the water
+        const court = dryNear(x, z + 9, 34);
+        if (court) {
+        const [x0, z0] = court;
+        for (const ox of [-6, 6]) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 6), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 0.8 }));
+          post.position.y = 3; decor(post, x0 + ox, z0, 2);
+        }
+        const netTex = (() => {
+          const cv2 = document.createElement('canvas'); cv2.width = 96; cv2.height = 24;
+          const x2 = cv2.getContext('2d')!;
+          x2.strokeStyle = 'rgba(255,255,255,0.95)'; x2.lineWidth = 1.4;
+          for (let gx2 = 0; gx2 <= 96; gx2 += 8) { x2.beginPath(); x2.moveTo(gx2, 0); x2.lineTo(gx2, 24); x2.stroke(); }
+          for (let gy2 = 0; gy2 <= 24; gy2 += 8) { x2.beginPath(); x2.moveTo(0, gy2); x2.lineTo(96, gy2); x2.stroke(); }
+          return new THREE.CanvasTexture(cv2);
+        })();
+        const net = new THREE.Mesh(new THREE.PlaneGeometry(12, 2.4),
+          new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+        net.position.set(x0, 4.4, z0); scene.add(net);
+        const ball = new THREE.Group();
+        ball.add(mergedProp([
+          part(MG.sph, 0xf6f6f2, 0, 0, 0, 0, 0, 0, 2.0),
+          part(MG.disc, 0xffd23f, 0, 0, 0, 0.6, 0, 0, 2.02, 0.14, 2.02),
+          part(MG.disc, 0x4da3ff, 0, 0, 0, 0, 0, 0.9, 2.02, 0.14, 2.02),
+        ]));
+        ball.position.y = 1; decor(ball, x0 + 3, z0 + 5, 1.5);
+        }
+        // THE FISHERS. Waders, rods, and a total absence of fish. They stand on
+        // the BANK — dryNear keeps them out of the water they are fishing.
+        for (let i = 0; i < 3; i++) {
+          const sp = dryNear(x - 12 + i * 4.5, z + 15 + rand(-2, 2), 26);
+          if (sp) rooted('fisher', sp[0], sp[1], dress, 3, side, 0.2, 20,
+            ['reel it in!! REEL IT IN!!', 'nothing was biting ANYWAY!!', 'the LAKE!! it took the LAKE!!']);
+        }
+        for (let i = 0; i < 6; i++)
+          townie(pick(['kid', 'teen', 'gossip', 'camper', 'kid'] as Role[]),
+            x + rand(-14, 14), z + rand(-2, 14), dress, side, 6, rand(1.2, 3.0));
+      });
+
+    // ── SCHOOL, AT RECESS ─────────────────────────────────────────────────
+    mEvent('school', ['burb', 'civic', 'main'],
+      ['recess!! 🎒', 'tag, you\'re it!', 'the bell is broken. still.',
+        'band practice. every day. LOUD.', 'bake sale in the gym! cash!',
+        'pop quiz?! nooo', 'summer reading! I won it!'],
+      ['SNOW DAY!! I mean— VOID DAY!!', 'homework CANCELLED!!', 'RUN, class, RUN!!',
+        'band, KEEP PLAYING!!'],
+      (x, z, side, dress) => {
+        const buildFallback = () => {
+          const school = new THREE.Group();
+          const brick = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 9),
+            new THREE.MeshStandardMaterial({ color: 0xc25a4a, roughness: 0.85 }));
+          brick.position.y = 3; school.add(brick);
+          const trim = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.8, 9.4), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 }));
+          trim.position.y = 6.2; school.add(trim);
+          const bell = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 2.4, 4),
+            new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8, flatShading: true }));
+          bell.position.y = 7.6; school.add(bell);
+          const door = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x3a5a7a, roughness: 0.7 }));
+          door.position.set(0, 1.6, 4.6); school.add(door);
+          return school;
+        };
+        glb(scene, addEdible, 'school', x, z - 6, 6.0, { h: 11, fallback: buildFallback });
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
+        pole.position.set(x + 9.5, 3.5, z - 3); setShadow(pole); scene.add(pole);
+        const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.3), new THREE.MeshStandardMaterial({ color: side, side: THREE.DoubleSide }));
+        flag.position.set(x + 10.6, 6.4, z - 3); scene.add(flag);
+        // THE MARCHING BAND, practising a single bar of one song, forever, on
+        // a tight loop across the front of the school
+        const bandRun = fitOval(x, z + 8, 10, 5);
+        for (let i = 0; i < 5; i++) {
+          const t0 = i / 5;
+          if (bandRun) routeAt(bandRun, t0);
+          const bx = bandRun ? _rp.x : x - 8 + i * 4, bz = bandRun ? _rp.y : z + 8;
+          const rec = townie('bandkid', bx, bz, dress, side, 400, rand(0.3, 0.8));
+          if (rec && bandRun) onTrack(rec.mesh, bandRun, 0.055, t0, false, 18);
+        }
+        // and the rest of recess, at speed
+        for (let i = 0; i < 5; i++)
+          townie(pick(['kid', 'kid', 'teen', 'ballplayer'] as Role[]),
+            x + rand(-15, 15), z + rand(2, 15), dress, undefined, 12, rand(5, 8));
+      });
+  }
 
   // ── ambient chatter throttle ────────────────────────────────────────────────
   let chatCd = 2;
@@ -2727,7 +3985,7 @@ export function createLife(
         const near = peds.filter((p) => !eaten(p.mesh) && Math.hypot(p.mesh.position.x - vx, p.mesh.position.z - vz) < 68);
         if (near.length) {
           const p = pick(near);
-          const pool = (p.voice ? VOICE_AMBIENT[p.voice] : null) || AMBIENT[p.biome] || AMBIENT.cozy;
+          const pool = ambPool(p.voice) || AMBIENT[p.biome] || AMBIENT.cozy;
           cpos.set(p.mesh.position.x, 5, p.mesh.position.z);
           say(cpos, pick(pool), 'ambient');
         }
