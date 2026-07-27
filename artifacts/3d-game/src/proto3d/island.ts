@@ -1640,8 +1640,7 @@ function makeHouse(): THREE.Group {
   const grp = new THREE.Group();
   const wWall = rand(5.4, 7), d = rand(5.4, 7), h = rand(3.2, 4.2);
   const wallCol = pick(PROPS.house);
-  const walls = new THREE.Mesh(new THREE.BoxGeometry(wWall, h, d),
-    new THREE.MeshStandardMaterial({ color: wallCol, roughness: 0.9 }));
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(wWall, h, d), stdMat(wallCol, 0.9));
   walls.position.y = h / 2; grp.add(walls);
   // gabled roof: explicit prism geometry, ridge along the depth axis, with
   // eaves overhang (reads "house", not "tent")
@@ -1660,26 +1659,24 @@ function makeHouse(): THREE.Group {
     gGeo.computeVertexNormals();
     return gGeo;
   })();
-  const roof = new THREE.Mesh(roofGeo, new THREE.MeshStandardMaterial({ color: roofCol, roughness: 0.85, flatShading: true }));
+  const roof = new THREE.Mesh(roofGeo, stdMat(roofCol, 0.85, true));
   roof.position.y = h - 0.02;
   grp.add(roof);
   // eaves trim under the roofline
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(wWall * 1.08, 0.28, d * 1.08),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(wWall * 1.08, 0.28, d * 1.08), stdMat(0xffffff, 0.8));
   trim.position.y = h + 0.05; grp.add(trim);
   // chimney
   if (Math.random() < 0.65) {
-    const ch = new THREE.Mesh(new THREE.BoxGeometry(0.7, rand(1.6, 2.2), 0.7),
-      new THREE.MeshStandardMaterial({ color: 0xb8776a, roughness: 0.9 }));
+    const ch = new THREE.Mesh(new THREE.BoxGeometry(0.7, rand(1.6, 2.2), 0.7), stdMat(0xb8776a, 0.9));
     ch.position.set(wWall * rand(-0.22, 0.22), h + roofH * 0.75, d * 0.18); grp.add(ch);
   }
   // door with frame + step
   const doorG = new THREE.Group();
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.1, 0.12), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }));
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.1, 0.12), stdMat(0xffffff, 0.85));
   frame.position.y = 1.05;
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.8, 0.16), new THREE.MeshStandardMaterial({ color: pick([0x7a4a5e, 0x4a5e7a, 0x5e7a4a, 0x8a5a3a]), roughness: 0.7 }));
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.8, 0.16), stdMat(pick([0x7a4a5e, 0x4a5e7a, 0x5e7a4a, 0x8a5a3a]), 0.7));
   door.position.set(0, 0.9, 0.03);
-  const step = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 0.7), new THREE.MeshStandardMaterial({ color: 0xd9dbe2, roughness: 0.9 }));
+  const step = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 0.7), stdMat(0xd9dbe2, 0.9));
   step.position.set(0, 0.11, 0.4);
   doorG.add(frame); doorG.add(door); doorG.add(step);
   doorG.scale.set(1.2, 1.3, 1);   // people are ~3.4u tall — doors must beat them
@@ -1769,6 +1766,18 @@ function facadeMat(wall: number, warm: boolean): THREE.MeshStandardMaterial {
 }
 // roof caps come in a small family of tints — one shared slate cap made the
 // big-void aerial view read as a parking-garage roofscape
+/** One MeshStandardMaterial per (colour, roughness, shading) instead of one per
+ *  MESH. makeHouse allocated six of its own every time it was called, and a
+ *  Maple match measured 2,513 distinct materials in the scene — 2,513 shader
+ *  binds the renderer cannot batch away. The colours are drawn from small fixed
+ *  palettes, so the real count is dozens. */
+const _stdMats = new Map<string, THREE.MeshStandardMaterial>();
+function stdMat(color: number, roughness = 0.85, flatShading = false): THREE.MeshStandardMaterial {
+  const k = `${color}:${roughness}:${flatShading ? 1 : 0}`;
+  let m = _stdMats.get(k);
+  if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness, flatShading }); _stdMats.set(k, m); }
+  return m;
+}
 const capMats = [0x565e74, 0x606a85, 0x6e6280, 0x4f5a6e, 0x746a70].map((c2) => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.8 }));
 const capMatShared = capMats[0];
 const acMatShared = new THREE.MeshStandardMaterial({ color: 0x9aa3b2, roughness: 0.8 });
@@ -1812,9 +1821,9 @@ function makeParkedCar(): THREE.Group {
 }
 function makeShed(): THREE.Group {
   const grp = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2, 2), new THREE.MeshStandardMaterial({ color: pick([0xbfe0cf, 0xd8c8ec, 0xf2c9a0]), roughness: 0.9 }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2, 2), stdMat(pick([0xbfe0cf, 0xd8c8ec, 0xf2c9a0]), 0.9));
   body.position.y = 1; grp.add(body);
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.1, 4), new THREE.MeshStandardMaterial({ color: pick(PROPS.roof), roughness: 0.85, flatShading: true }));
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.1, 4), stdMat(pick(PROPS.roof), 0.85, true));
   roof.rotation.y = Math.PI / 4; roof.position.y = 2.5; grp.add(roof);
   return grp;
 }
@@ -1828,25 +1837,22 @@ function makeTower(tall = false): THREE.Group {
   // podium base + tower shaft with facade texture on all four sides
   const podH = Math.min(4.5, h * 0.22);
   const pod = new THREE.Mesh(new THREE.BoxGeometry(wB * 1.18, podH, d * 1.18),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(wall).multiplyScalar(0.82), roughness: 0.7 }));
+    stdMat(new THREE.Color(wall).multiplyScalar(0.82).getHex(), 0.7));
   pod.position.y = podH / 2; grp.add(pod);
   const body = new THREE.Mesh(new THREE.BoxGeometry(wB, h, d), [side, side, capMat, capMat, side, side]);
   body.position.y = podH + h / 2; grp.add(body);
   // roof parapet + AC units + some spires on tall towers
   const parapet = new THREE.Mesh(new THREE.BoxGeometry(wB * 1.04, 0.9, d * 1.04), capMat);
   parapet.position.y = podH + h + 0.35; grp.add(parapet);
-  const ac = new THREE.Mesh(new THREE.BoxGeometry(rand(1.6, 2.6), 1.1, rand(1.6, 2.6)),
-    new THREE.MeshStandardMaterial({ color: 0x9aa3b2, roughness: 0.8 }));
+  const ac = new THREE.Mesh(new THREE.BoxGeometry(rand(1.6, 2.6), 1.1, rand(1.6, 2.6)), acMatShared);
   ac.position.set(rand(-wB * 0.24, wB * 0.24), podH + h + 1.2, rand(-d * 0.24, d * 0.24)); grp.add(ac);
   if (tall && Math.random() < 0.5) {
-    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.3, rand(4, 7), 6),
-      new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5, roughness: 0.4 }));
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.3, rand(4, 7), 6), tankMatShared);
     spire.position.y = podH + h + 3.4; grp.add(spire);
   }
   // street-level awning strip for shop-front charm
   if (Math.random() < 0.6) {
-    const aw = new THREE.Mesh(new THREE.BoxGeometry(wB * 0.9, 0.24, 1.5),
-      new THREE.MeshStandardMaterial({ color: pick([0xe8604d, 0x4db07a, 0x4d7de8, 0xf0c050]), roughness: 0.7 }));
+    const aw = new THREE.Mesh(new THREE.BoxGeometry(wB * 0.9, 0.24, 1.5), pick(awningMats));
     aw.position.set(0, podH * 0.72, d * 0.62); grp.add(aw);
   }
   return grp;
@@ -2274,7 +2280,7 @@ function makePalm(): THREE.Group {
 
 function makeBush(): THREE.Mesh {
   const b = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.4, 2.1), 0),
-    new THREE.MeshStandardMaterial({ color: pick([0x6cc86e, 0x5db06a, 0x7ed57a]), roughness: 0.95, flatShading: true }));
+    stdMat(pick([0x6cc86e, 0x5db06a, 0x7ed57a]), 0.95, true));
   b.position.y = 1; b.scale.y = 0.7; return b;
 }
 function makeMailbox(): THREE.Group {
@@ -2394,25 +2400,25 @@ const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])
 function makeShell(): THREE.Group {
   const g = new THREE.Group();
   const sh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: pick([0xffd9e8, 0xfff0d8, 0xe8f0ff]), roughness: 0.55, flatShading: true }));
+    stdMat(pick([0xffd9e8, 0xfff0d8, 0xe8f0ff]), 0.55, true));
   sh.scale.set(1, 0.55, 0.85); g.add(sh);
   return g;
 }
 function makeMushroom(): THREE.Group {
   const g = new THREE.Group();
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.5, 7),
-    new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.8 }));
+    stdMat(0xf2ead8, 0.8));
   stem.position.y = 0.25; g.add(stem);
   const capM = new THREE.Mesh(new THREE.SphereGeometry(0.42, 9, 7, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: pick([0xe0483a, 0xd88a3a]), roughness: 0.7, flatShading: true }));
+    stdMat(pick([0xe0483a, 0xd88a3a]), 0.7, true));
   capM.position.y = 0.48; capM.scale.y = 0.7; g.add(capM);
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 5), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 5), stdMat(0xffffff, 1));
   dot.position.set(0.16, 0.72, 0.14); g.add(dot);
   return g;
 }
 function makeGolfball(): THREE.Group {
   const g = new THREE.Group();
-  const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 }));
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), stdMat(0xffffff, 0.35));
   b.position.y = 0.3; g.add(b);
   return g;
 }
@@ -2441,9 +2447,9 @@ const tinyForMaple = (biome: Biome): THREE.Object3D => {
 };
 function makeLuggage(): THREE.Group {
   const g = new THREE.Group();
-  const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.4), new THREE.MeshStandardMaterial({ color: pick([0xff5a4d, 0x5ec8d8, 0xffd23f, 0xb98cff]), roughness: 0.7 }));
+  const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.4), stdMat(pick([0xff5a4d, 0x5ec8d8, 0xffd23f, 0xb98cff]), 0.7));
   b.position.y = 0.3; g.add(b);
-  const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a3f4d }));
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.08), stdMat(0x3a3f4d, 1));
   h.position.y = 0.68; g.add(h);
   return g;
 }
@@ -2482,7 +2488,7 @@ function makeShopBox(): THREE.Group {
 }
 function makeCivicHall(): THREE.Group {
   const g = new THREE.Group();
-  const cream = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.8 });
+  const cream = stdMat(0xf2efe6, 0.8);
   const body = new THREE.Mesh(new THREE.BoxGeometry(16, 8, 9), cream);
   body.position.y = 4; g.add(body);
   for (const sx of [-5.4, -1.8, 1.8, 5.4]) {
@@ -2492,13 +2498,13 @@ function makeCivicHall(): THREE.Group {
   const ped = new THREE.Mesh(new THREE.BoxGeometry(17, 1.4, 10.5), cream);
   ped.position.y = 8.4; g.add(ped);
   const dome = new THREE.Mesh(new THREE.SphereGeometry(3.4, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x6fa8a0, roughness: 0.5, metalness: 0.2 }));
+    stdMat(0x6fa8a0, 0.5));
   dome.position.y = 9; g.add(dome);
   return g;
 }
 function makeFountainFB(): THREE.Group {
   const g = new THREE.Group();
-  const stone = new THREE.MeshStandardMaterial({ color: 0xd8d4de, roughness: 0.7 });
+  const stone = stdMat(0xd8d4de, 0.7);
   const basin = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5, 1.2, 18), stone);
   basin.position.y = 0.6; g.add(basin);
   const water = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.3, 18),
@@ -2520,7 +2526,7 @@ const SIL3_FRINGE: [number, number][] = SIL_POLY.filter((_, i) => i % 3 === 0)
 // ── P0 fallback kit: every GLB prop has a real procedural stand-in, so no
 // district is ever sparse while meshes stream (or offline). Cheap primitives,
 // toy-bright colors, correct silhouettes.
-const std = (c: number, r = 0.8) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+const std = (c: number, r = 0.8) => stdMat(c, r);   // was a fresh material per mesh, per prop, per island
 function makeUmbrellaFB(): THREE.Group {
   const g = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6), std(0xf4f6fa));
@@ -3720,7 +3726,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     if (isCamp) {
       for (let i = 0; i < 3; i++) {
         const a = (i / 3) * Math.PI * 2 + 0.5;
-        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 1 }));
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 8), stdMat(0x9a7a5a, 1));
         log.rotation.z = Math.PI / 2; log.rotation.y = a; log.position.y = 0.35;
         const lg = new THREE.Group(); lg.add(log);
         place(lg, cx + Math.cos(a) * 3.4, cz + Math.sin(a) * 3.4, 1.4);

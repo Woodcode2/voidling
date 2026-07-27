@@ -259,10 +259,15 @@ interface Limbs {
 
 // shared material + geometry pools — hundreds of townsfolk, one GPU footprint
 const _matCache = new Map<string, THREE.MeshStandardMaterial>();
-function mat(color: number, roughness = 0.85): THREE.MeshStandardMaterial {
-  const k = `${color}:${roughness}`;
+// alias: several factories declare a local `mat`, which shadows the helper
+const sharedMat = (c: number, r = 0.85, f = false, d = false) => mat(c, r, f, d);
+function mat(color: number, roughness = 0.85, flat = false, dbl = false): THREE.MeshStandardMaterial {
+  const k = `${color}:${roughness}:${flat ? 1 : 0}:${dbl ? 1 : 0}`;
   let m = _matCache.get(k);
-  if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness }); _matCache.set(k, m); }
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({ color, roughness, flatShading: flat, side: dbl ? THREE.DoubleSide : THREE.FrontSide });
+    _matCache.set(k, m);
+  }
   return m;
 }
 // ══ THE BODY KIT ═════════════════════════════════════════════════════════════
@@ -1582,7 +1587,7 @@ function makeAnimal(): THREE.Group {
   const g = new THREE.Group();
   const kind = animalN++ % 3;
   const col = kind === 0 ? 0x9aa3b2 : kind === 1 ? 0xf2d06b : 0xf0eee6;
-  const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.85, flatShading: true });
+  const mat = sharedMat(col, 0.85, true);
   const body = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 10), mat);
   body.scale.set(1.5, 1, 1); body.position.y = 1.6; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), mat);
@@ -1595,15 +1600,15 @@ function makeAnimal(): THREE.Group {
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 1.8, 8), mat);
     trunk.position.set(2.9, 1.5, 0); trunk.rotation.z = 0.5; g.add(trunk);
     for (const sz of [-0.95, 0.95]) {
-      const ear = new THREE.Mesh(new THREE.CircleGeometry(0.75, 12), new THREE.MeshStandardMaterial({ color: 0x8a92a4, roughness: 0.9, side: THREE.DoubleSide }));
+      const ear = new THREE.Mesh(new THREE.CircleGeometry(0.75, 12), sharedMat(0x8a92a4, 0.9, false, true));
       ear.position.set(1.8, 2.6, sz); ear.rotation.y = sz > 0 ? 0.5 : -0.5; g.add(ear);
     }
   } else if (kind === 1) {   // lion: mane + tail tuft
-    const mane = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.4, 8, 14), new THREE.MeshStandardMaterial({ color: 0xc9812a, roughness: 0.95, flatShading: true }));
+    const mane = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.4, 8, 14), sharedMat(0xc9812a, 0.95, true));
     mane.position.set(1.7, 2.2, 0); mane.rotation.y = Math.PI / 2; g.add(mane);
     const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.6, 6), mat);
     tail.position.set(-2.4, 2, 0); tail.rotation.z = 0.7; g.add(tail);
-    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc9812a, roughness: 0.95 }));
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), sharedMat(0xc9812a, 0.95));
     tuft.position.set(-3, 2.6, 0); g.add(tuft);
   } else {   // sheep: ear cones + tail puff
     for (const sz of [-0.6, 0.6]) {
@@ -1617,7 +1622,7 @@ function makeAnimal(): THREE.Group {
 }
 function makeBird(): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: pick([0xffffff, 0xf0f0f0, 0xe8eef6]), roughness: 0.7, flatShading: true, side: THREE.DoubleSide });
+  const mat = sharedMat(pick([0xffffff, 0xf0f0f0, 0xe8eef6]), 0.7, true, true);
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), mat); g.add(body);
   for (const s of [-1, 1]) {
     const wing = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.2, 4), mat);
@@ -2347,15 +2352,15 @@ export function createLife(
     }
     for (let i = 0; i < 3; i++) {   // flamingos wade in their lagoon
       const fl = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff9ec2, roughness: 0.85 }));
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), sharedMat(0xff9ec2, 0.85));
       body.scale.set(1.15, 0.9, 1); body.position.y = 1.5; fl.add(body);
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 5), new THREE.MeshStandardMaterial({ color: 0xe86a9a, roughness: 0.9 }));
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 5), sharedMat(0xe86a9a, 0.9));
       leg.position.y = 0.75; fl.add(leg);
-      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.1, 6), new THREE.MeshStandardMaterial({ color: 0xff9ec2, roughness: 0.85 }));
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.1, 6), sharedMat(0xff9ec2, 0.85));
       neck.position.set(0.4, 2.4, 0); neck.rotation.z = -0.35; fl.add(neck);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff9ec2, roughness: 0.85 }));
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), sharedMat(0xff9ec2, 0.85));
       head.position.set(0.62, 2.95, 0); fl.add(head);
-      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 6), new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.7 }));
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 6), sharedMat(0x2c3038, 0.7));
       beak.rotation.z = -Math.PI / 2; beak.position.set(0.85, 2.9, 0); fl.add(beak);
       addWanderer(fl, PENS[2][0] + rand(-6, 6), PENS[2][1] + rand(-6, 6), 8, rand(1.2, 2), 26, 2.2, 'zoo');
     }
@@ -3128,11 +3133,11 @@ export function createLife(
   const duckLine: THREE.Object3D[] = [];
   for (let i = 0; i < (worldId() === 'pirate' ? 0 : 4); i++) {
     const duck = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xf6f2da : 0xffd54f, roughness: 0.9 }));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), sharedMat(i % 2 ? 0xf6f2da : 0xffd54f, 0.9));
     body.scale.set(1.25, 0.85, 1); body.position.y = 0.36; duck.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshStandardMaterial({ color: i % 2 ? 0x7ed57a : 0xf6f2da, roughness: 0.9 }));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), sharedMat(i % 2 ? 0x7ed57a : 0xf6f2da, 0.9));
     head.position.set(0.42, 0.78, 0); duck.add(head);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 6), new THREE.MeshStandardMaterial({ color: 0xff9a3a, roughness: 0.8 }));
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 6), sharedMat(0xff9a3a, 0.8));
     beak.rotation.z = -Math.PI / 2; beak.position.set(0.68, 0.75, 0); duck.add(beak);
     const rec = addWanderer(duck, 128.25 + rand(-9, 9), -33.15 + rand(-9, 9), 11, rand(1.5, 2.5), 20, 1.2, 'park');
     if (rec) duckLine.push(rec.mesh);
