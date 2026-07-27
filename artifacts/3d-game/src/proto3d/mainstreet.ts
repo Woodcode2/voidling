@@ -1,7 +1,7 @@
 // ══ MAPLE FALLS ═══════════════════════════════════════════════════════════
 // World 1's prop kit: a small American town in the middle of a mayoral
 // election. Mayor DINKLE (red signs) is running for a fourth term against
-// PAT SPRUCE (teal signs), and every yard, verge and shop window in town has
+// DEB HOLLIS (blue signs), and every yard, verge and shop window in town has
 // picked a side. Everything here is warm and silly — the joke is that a town
 // this small can argue this hard about a parking meter.
 //
@@ -62,8 +62,15 @@ export function spotFree(x: number, y: number, rWorld: number): boolean {
 }
 
 // ── the town's colours ─────────────────────────────────────────────────────
-export const RED = 0xd8392f;     // MAYOR DINKLE — incumbent, four terms, one idea
-export const TEAL = 0x1fa8a0;    // PAT SPRUCE — challenger, owns the hardware store
+// THE TOWN ONLY HAS TWO CANDIDATES. This file used to name a third — "PAT
+// SPRUCE", teal — who appears nowhere else in the game: life.ts and all 66
+// mentions in newsroom_maple.ts say the challenger is DEB HOLLIS, in blue. So
+// twenty-five props were campaigning for a candidate who does not exist, and on
+// screen you saw red plaques, teal plaques AND blue plaques and could not tell
+// which two were the two sides. The whole premise of the level was unreadable
+// because of one constant. Both colours are now the exact values life.ts uses.
+export const RED = 0xd8443c;     // MAYOR DINKLE — incumbent, four terms, one idea
+export const BLUE = 0x2f6fd0;    // DEB HOLLIS — challenger, blames Dinkle for the weather
 const CREAM = 0xf6f0e2, WHITE = 0xfdfaf2, BONE = 0xe8e0cc;
 const BARN = 0xb5372e, BRICK = 0xa8543f, SLATE = 0x5b6070, SHINGLE = 0x7a5a44;
 const WOOD = 0x9a7a5a, DARKWOOD = 0x6b503a, TIMBER = 0xc0a887;
@@ -205,7 +212,7 @@ export function makeDiner(): THREE.Mesh {
   p.push(part(box(4.6, 1, 0.3), NEON_GOLD, 2.2, 10.2, 0));
   // the argument, permanently in progress by the door
   personParts(p, 7.6, 5.6, mpick(SHIRTS), -0.6, RED);
-  personParts(p, 9.2, 5.2, mpick(SHIRTS), 2.5, TEAL);
+  personParts(p, 9.2, 5.2, mpick(SHIRTS), 2.5, BLUE);
   return M(p);
 }
 
@@ -229,7 +236,7 @@ export function makeStorefront(w = 9, h = 8, side = -1): THREE.Mesh {
     p.push(part(box(1.3, 2, 0.35), NIGHTGLASS, wx, h - 3.4, 4.6));
     p.push(part(box(1.6, 0.25, 0.45), CREAM, wx, h - 2.3, 4.65));
   }
-  if (side >= 0) p.push(part(box(1.6, 1.1, 0.2), side ? TEAL : RED, -w / 2 + 1.6, 2.4, 4.85));  // window poster
+  if (side >= 0) p.push(part(box(1.6, 1.1, 0.2), side ? BLUE : RED, -w / 2 + 1.6, 2.4, 4.85));  // window poster
   return M(p);
 }
 
@@ -251,7 +258,7 @@ export function makeMailboxRow(): THREE.Mesh {
     part(cyl(0.16, 0.19, 2, 6), DARKWOOD, 1.6, 1, 0),
     part(box(4, 0.24, 0.3), DARKWOOD, 0, 1.95, 0),
   ];
-  const cols = [RED, TEAL, 0xe0a83a, 0x8fa9d8];
+  const cols = [RED, BLUE, 0xe0a83a, 0x8fa9d8];
   for (let i = 0; i < 4; i++) {
     const x = -1.5 + i;
     p.push(part(box(0.5, 0.55, 0.9), cols[i], x, 2.4, 0));
@@ -295,7 +302,7 @@ export function makeWaterTower(): THREE.Mesh {
   p.push(part(cyl(3.6, 3.6, 0.5, 12), CREAM, 0, 13.6, 0));
   p.push(part(cyl(0.1, 0.1, 1.6, 5), STEEL, 0, 18, 0));
   p.push(part(sph(0.26, 8, 6), RED, 0, 18.9, 0));
-  p.push(part(box(1.3, 0.9, 0.14), TEAL, 1.9, 12.2, 3.1, 0, 0, 0.25));  // somebody's editorial
+  p.push(part(box(1.3, 0.9, 0.14), BLUE, 1.9, 12.2, 3.1, 0, 0, 0.25));  // somebody's editorial
   return M(p);
 }
 
@@ -370,10 +377,10 @@ export function makeParkingMeter(): THREE.Mesh {
   ]);
 }
 
-/** A CAMPAIGN LAWN SIGN. side 0 = DINKLE (red), 1 = SPRUCE (teal). There are
+/** A CAMPAIGN LAWN SIGN. side 0 = DINKLE (red), 1 = HOLLIS (blue). There are
  *  hundreds of these. That is the point. */
 export function makeLawnSign(side: number): THREE.Mesh {
-  const c = side ? TEAL : RED;
+  const c = side ? BLUE : RED;
   return M([
     part(box(0.06, 0.9, 0.06), 0xd8d8d8, -0.34, 0.45, 0),
     part(box(0.06, 0.9, 0.06), 0xd8d8d8, 0.34, 0.45, 0),
@@ -386,7 +393,7 @@ export function makeLawnSign(side: number): THREE.Mesh {
 /** THE BIG ROADSIDE SIGN — the 4x8 sheet of plywood version, staked in a
  *  field, angled at the traffic. */
 export function makeBigSign(side: number): THREE.Mesh {
-  const c = side ? TEAL : RED;
+  const c = side ? BLUE : RED;
   return M([
     part(box(0.22, 2.6, 0.22), DARKWOOD, -1.7, 1.3, 0),
     part(box(0.22, 2.6, 0.22), DARKWOOD, 1.7, 1.3, 0),
@@ -403,7 +410,7 @@ export function makeProtester(side: number): THREE.Mesh {
   const p: G[] = [];
   personParts(p, 0, 0, mpick(SHIRTS), 0);
   p.push(part(box(0.12, 2.2, 0.12), WOOD, 0.5, 1.6, 0.2, 0, 0, -0.22));
-  p.push(part(box(1.5, 1.05, 0.1), side ? TEAL : RED, 0.9, 3.2, 0.2, 0, 0, -0.22));
+  p.push(part(box(1.5, 1.05, 0.1), side ? BLUE : RED, 0.9, 3.2, 0.2, 0, 0, -0.22));
   p.push(part(box(1.1, 0.22, 0.14), WHITE, 0.92, 3.35, 0.24, 0, 0, -0.22));
   p.push(part(box(0.7, 0.16, 0.14), WHITE, 0.85, 3.02, 0.24, 0, 0, -0.22));
   return M(p);
@@ -413,7 +420,7 @@ export function makeProtester(side: number): THREE.Mesh {
  *  face — the fair judges, the farmhands, the crowd at the drive-in. */
 export function makeTownsfolk(hat = false): THREE.Mesh {
   const p: G[] = [];
-  personParts(p, 0, 0, mpick(SHIRTS), mr(0, Math.PI * 2), hat ? mpick([0xd8b878, 0x5b6070, RED, TEAL]) : undefined);
+  personParts(p, 0, 0, mpick(SHIRTS), mr(0, Math.PI * 2), hat ? mpick([0xd8b878, 0x5b6070, RED, BLUE]) : undefined);
   return M(p);
 }
 
@@ -426,7 +433,7 @@ export function makeNoticeBoard(): THREE.Mesh {
     part(box(3.9, 0.3, 0.45), 0x8c5a4a, 0, 4.25, 0, -0.2, 0, 0),
   ];
   for (let i = 0; i < 7; i++) {
-    p.push(part(box(mr(0.5, 0.8), mr(0.4, 0.7), 0.06), mpick([WHITE, CREAM, 0xffe9a8, RED, TEAL]),
+    p.push(part(box(mr(0.5, 0.8), mr(0.4, 0.7), 0.06), mpick([WHITE, CREAM, 0xffe9a8, RED, BLUE]),
       mr(-1.4, 1.4), mr(2.3, 3.6), 0.13, 0, 0, mr(-0.2, 0.2)));
   }
   return M(p);
@@ -447,7 +454,7 @@ export function makeFairTent(col = RED): THREE.Mesh {
   p.push(part(cone(R, 3.4, 10), CREAM, 0, 4.6, 0));
   p.push(part(cone(R * 0.62, 2.6, 10), col, 0, 6.4, 0));
   p.push(part(cyl(0.12, 0.12, 1.6, 5), WOOD, 0, 8.4, 0));
-  p.push(part(box(1.2, 0.7, 0.06), mpick([RED, TEAL]), 0.6, 8.9, 0));
+  p.push(part(box(1.2, 0.7, 0.06), mpick([RED, BLUE]), 0.6, 8.9, 0));
   for (let i = 0; i < 10; i++) {                                        // pole ring
     const a = (i / 10) * Math.PI * 2;
     p.push(part(cyl(0.1, 0.12, 2.9, 5), WOOD, Math.cos(a) * R, 1.45, Math.sin(a) * R));
@@ -465,7 +472,7 @@ export function makeFairArch(): THREE.Mesh {
     part(box(16.6, 0.5, 1.9), NEON_GOLD, 0, 9.8, 0),
   ];
   for (let i = 0; i < 13; i++) p.push(part(sph(0.28, 6, 5), NEON_GOLD, -7.5 + i * 1.25, 10.2, 0));
-  for (let i = 0; i < 8; i++) p.push(part(cone(0.6, 1.1, 3), i % 2 ? TEAL : CREAM, -6.3 + i * 1.8, 7.4, 0.9, Math.PI, 0, 0));
+  for (let i = 0; i < 8; i++) p.push(part(cone(0.6, 1.1, 3), i % 2 ? BLUE : CREAM, -6.3 + i * 1.8, 7.4, 0.9, Math.PI, 0, 0));
   return M(p);
 }
 
@@ -478,7 +485,7 @@ export function makePrizeWheel(): THREE.Mesh {
   ];
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2;
-    p.push(part(box(1.7, 0.5, 0.36), i % 2 ? RED : TEAL, Math.cos(a) * 1.05, 4 + Math.sin(a) * 1.05, 0.02, 0, 0, a));
+    p.push(part(box(1.7, 0.5, 0.36), i % 2 ? RED : BLUE, Math.cos(a) * 1.05, 4 + Math.sin(a) * 1.05, 0.02, 0, 0, a));
   }
   p.push(part(cyl(0.3, 0.3, 0.5, 10), NEON_GOLD, 0, 4, 0.2, Math.PI / 2, 0, 0));
   p.push(part(cone(0.3, 0.7, 3), 0x2c2438, 0, 6.3, 0.1, Math.PI, 0, 0));
@@ -543,7 +550,7 @@ export function makeTicketBooth(): THREE.Mesh {
     part(cone(2.5, 1.4, 4), RED, 0, 3.7, 0, 0, Math.PI / 4, 0),
     part(box(1.6, 1.1, 0.3), NIGHTGLASS, 0, 2, 1.35),
     part(box(1.9, 0.3, 0.45), WOOD, 0, 1.35, 1.45),
-    part(box(2, 0.6, 0.14), TEAL, 0, 3.05, 1.4),
+    part(box(2, 0.6, 0.14), BLUE, 0, 3.05, 1.4),
     part(cyl(0.1, 0.1, 1, 5), STEEL, 0, 4.9, 0),
     part(box(0.9, 0.6, 0.08), NEON_GOLD, 0.4, 5.3, 0),
   ]);
@@ -560,7 +567,7 @@ export function makeStrikerBell(): THREE.Mesh {
     part(box(1.4, 0.6, 0.6), 0x2c2438, 0.9, 0.7, 0, 0, 0, 0.4),         // the mallet
     part(cyl(0.1, 0.1, 1.8, 5), WOOD, 1.5, 0.9, 0, 0, 0, 1.1),
   ];
-  for (let i = 0; i < 8; i++) p.push(part(box(0.9, 0.22, 0.75), i % 2 ? CREAM : TEAL, 0, 1 + i * 0.9, 0));
+  for (let i = 0; i < 8; i++) p.push(part(box(0.9, 0.22, 0.75), i % 2 ? CREAM : BLUE, 0, 1 + i * 0.9, 0));
   return M(p);
 }
 
@@ -582,7 +589,7 @@ export function makeBarn(): THREE.Mesh {
     part(box(5.2, 0.3, 0.5), CREAM, 0, 0.3, 5.75),
     part(box(3, 2.4, 0.4), 0x7a2119, 0, 9.6, 5.6),                      // hay loft
     part(cyl(1.2, 1.2, 0.24, 10), CREAM, -5.4, 9.4, 5.7, Math.PI / 2, 0, 0),
-    part(cyl(0.8, 0.8, 0.28, 8), TEAL, -5.4, 9.4, 5.8, Math.PI / 2, 0, 0),
+    part(cyl(0.8, 0.8, 0.28, 8), BLUE, -5.4, 9.4, 5.8, Math.PI / 2, 0, 0),
     part(cyl(0.4, 0.4, 0.3, 8), RED, -5.4, 9.4, 5.9, Math.PI / 2, 0, 0),
     part(cyl(0.1, 0.1, 1.4, 5), STEEL, 6, 13.4, 0),                     // weather vane
     part(box(1.2, 0.5, 0.1), 0x2c2438, 6.4, 14.2, 0),
@@ -695,7 +702,7 @@ export function makePumpkin(): THREE.Mesh {
 
 /** THE SCARECROW. Wearing a Dinkle shirt, because the farm has views. */
 export function makeScarecrow(): THREE.Mesh {
-  const side = mchance(0.5) ? RED : TEAL;
+  const side = mchance(0.5) ? RED : BLUE;
   return M([
     part(box(0.22, 3.4, 0.22), DARKWOOD, 0, 1.7, 0),
     part(box(3, 0.2, 0.2), DARKWOOD, 0, 2.7, 0),
@@ -935,8 +942,8 @@ export function makeGasStation(): THREE.Mesh {
 export function makeMotel(): THREE.Mesh {
   const p: G[] = [
     part(box(24, 4.2, 8), 0xe8dcc0, 0, 2.1, 0),
-    part(box(24.6, 0.5, 8.6), TEAL, 0, 4.5, 0),
-    part(box(25, 0.4, 3.2), TEAL, 0, 4.1, 5.2, -0.14, 0, 0),            // walkway roof
+    part(box(24.6, 0.5, 8.6), BLUE, 0, 4.5, 0),
+    part(box(25, 0.4, 3.2), BLUE, 0, 4.1, 5.2, -0.14, 0, 0),            // walkway roof
   ];
   for (let i = 0; i < 8; i++) {
     const x = -10.5 + i * 3;
@@ -994,7 +1001,7 @@ export function makeBallOfTwine(): THREE.Mesh {
   p.push(part(cone(5.4, 1.8, 4), RED, 10, 4.6, 0, 0, Math.PI / 4, 0, 1, 1, 0.8));
   p.push(part(box(1.8, 2.6, 0.3), 0x3f5a7a, 10, 1.3, 2.6));
   p.push(part(box(2.2, 1.4, 0.3), GLASS, 12.6, 2.1, 2.6));
-  p.push(part(box(5.4, 1, 0.2), TEAL, 10, 3.9, 2.7));
+  p.push(part(box(5.4, 1, 0.2), BLUE, 10, 3.9, 2.7));
   p.push(part(box(0.5, 5, 0.5), STEEL, 16, 2.5, 3));
   p.push(part(box(2.8, 1.8, 0.3), NEON_GOLD, 16, 6, 3));
   p.push(part(box(2.2, 0.7, 0.2), 0x2c2438, 16, 6.2, 3.2));
@@ -1003,7 +1010,7 @@ export function makeBallOfTwine(): THREE.Mesh {
 
 /** A BILLBOARD. Whatever is on it, somebody has already complained. */
 export function makeBillboard(side = -1): THREE.Mesh {
-  const face = side < 0 ? mpick([0xf0a83a, 0x4d7de8, 0xd8586f, 0x3f7a4e]) : (side ? TEAL : RED);
+  const face = side < 0 ? mpick([0xf0a83a, 0x4d7de8, 0xd8586f, 0x3f7a4e]) : (side ? BLUE : RED);
   const p: G[] = [
     part(box(0.7, 8, 0.7), DARKSTEEL, -3, 4, 0),
     part(box(0.7, 8, 0.7), DARKSTEEL, 3, 4, 0),
@@ -1019,7 +1026,7 @@ export function makeBillboard(side = -1): THREE.Mesh {
 
 /** A HIGHWAY PYLON SIGN — the tall pole kind you see before the exit. */
 export function makePylonSign(): THREE.Mesh {
-  const col = mpick([RED, TEAL, 0xf0a83a, 0x4d7de8]);
+  const col = mpick([RED, BLUE, 0xf0a83a, 0x4d7de8]);
   return M([
     part(box(0.9, 12, 0.9), STEEL, 0, 6, 0),
     part(box(4.6, 4.6, 1.2), col, 0, 13.4, 0),
@@ -1112,7 +1119,7 @@ export function makeBaitShack(): THREE.Mesh {
     part(box(6.6, 0.35, 5.6), 0x5b6070, 0, 3.4, 0, 0, 0, 0.14),
     part(box(1.6, 2.4, 0.3), 0x6b503a, -1.6, 1.2, 2.6),
     part(box(2, 1.3, 0.3), NIGHTGLASS, 1.5, 2, 2.6),
-    part(box(4.6, 0.9, 0.2), TEAL, 0, 3.4, 2.7),
+    part(box(4.6, 0.9, 0.2), BLUE, 0, 3.4, 2.7),
     part(box(1.4, 0.9, 0.12), WHITE, 2.4, 1.8, 2.72),
     part(box(1.2, 1.4, 1.2), 0xd0d4dc, 3.6, 0.7, 2.4),                   // the ice chest
     part(box(1.3, 0.2, 1.3), 0x9fd0e8, 3.6, 1.5, 2.4),
@@ -1164,7 +1171,7 @@ export function makeCanoeRack(): THREE.Mesh {
     part(box(7, 0.2, 3), DARKWOOD, 0, 1.5, 0),
   ];
   for (let i = 0; i < 4; i++) {
-    p.push(part(sph(1.6, 10, 7), mpick([RED, TEAL, CORN, 0x4d7de8]),
+    p.push(part(sph(1.6, 10, 7), mpick([RED, BLUE, CORN, 0x4d7de8]),
       0, (i < 2 ? 3.4 : 1.9), (i % 2 ? 0.85 : -0.85), 0, 0, 0, 2.4, 0.28, 0.32));
   }
   return M(p);
@@ -1202,7 +1209,7 @@ export function makePickup(): THREE.Mesh {
     part(cyl(0.62, 0.62, 0.45, 10), 0x2c2438, 2.1, 0.62, 1.2, 0, 0, Math.PI / 2),
     part(cyl(0.62, 0.62, 0.45, 10), 0x2c2438, 2.1, 0.62, -1.2, 0, 0, Math.PI / 2),
     part(box(0.4, 0.4, 2), NEON_GOLD, -2.9, 1.7, 0),
-    part(box(1.1, 0.7, 0.08), mchance(0.5) ? RED : TEAL, 3.35, 2.1, 0),  // bumper sticker energy
+    part(box(1.1, 0.7, 0.08), mchance(0.5) ? RED : BLUE, 3.35, 2.1, 0),  // bumper sticker energy
   ]);
 }
 

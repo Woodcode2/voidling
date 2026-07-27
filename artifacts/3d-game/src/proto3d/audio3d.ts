@@ -1,12 +1,21 @@
-// Synthesized SFX for MAPLE ISLE — zero assets, pure WebAudio, tuned soft and
+// Synthesized SFX for VOIDLING — zero assets, pure WebAudio, tuned soft and
 // toy-like (this is for kids: pops and whooshes, no harsh 8-bit edges).
 // The context unlocks on the first user gesture per autoplay policy.
 //
-// PIRATE BAY RESORT (world 2) runs a SECOND, completely separate score in the
-// back half of this file: a 6/8 SEA SHANTY — squeezebox, fiddle, stomp, clap
-// and a crew shouting HEY — with the resort's steel pans as garnish on top,
-// plus a place-aware layer that swaps in the DANCE COVE club beat when the
-// player is on the dance floor. Maple's music is untouched by any of it.
+// The shared one-shots come first. After them the file holds TWO complete and
+// completely separate scores, one per world, each with its own band, its own
+// hook and its own place layer, gated on worldId():
+//
+//   PIRATE BAY RESORT — a 6/8 SEA SHANTY: squeezebox, fiddle, stomp, clap and
+//   a crew shouting HEY, with the resort's steel pans as garnish, and a layer
+//   that swaps in the DANCE COVE club beat on the dance floor.
+//
+//   MAPLE FALLS — a small-town band mid-election: front-porch bluegrass at the
+//   bottom of the match (banjo, upright, brushes, fiddle) growing into a
+//   marching band by the top (sousaphone, snare, cornets, bell lyre), ten
+//   districts of place layer, and a campaign loudhailer two streets away.
+//
+// Neither score can hear the other; they share only the voice helpers.
 import { worldId } from './island';
 
 type Ctx = AudioContext;
@@ -28,6 +37,7 @@ export interface Audio3D {
   stopMusic(): void;
   setZone(zone: string | null): void;   // player's current district — drives the place layer
   matchBeat(kind: string): void;        // authored match beat (happy hour / dance party / feast)
+  jingle(): void;                       // quote MAPLE FALLS' municipal jingle (no-op in the bay)
   setMuted(m: boolean): void;      // settings toggle (App Store expects one)
   isMuted(): boolean;
 }
@@ -37,6 +47,9 @@ export function createAudio(): Audio3D {
   let master: GainNode | null = null;
   // persisted mute — a parent hitting mute expects it to STAY muted tomorrow
   let muted = localStorage.getItem('voidMute') === '1';
+  // set voidTheme=1 to play /assets/music/theme.mp3 (and the old generic synth
+  // bed behind it) on MAPLE FALLS instead of the town band. Off by default.
+  const LICENSED_THEME = localStorage.getItem('voidTheme') === '1';
   // major pentatonic: every eat lands on a consonant note, so fast eating
   // sounds like a tune rather than a stutter
   const PENTA = [0, 2, 4, 7, 9, 12, 9, 7];
@@ -366,6 +379,13 @@ export function createAudio(): Audio3D {
     clap: ['bandpass', 1250, 0.9],    // hands, not a snare
     stomp: ['lowpass', 240, 1.0],     // a boot on a deck
     lead: ['lowpass', 2800, 3.5],     // the club synth quoting the shanty
+    // ── MAPLE FALLS ──
+    pick: ['highpass', 3200, 0.8],    // the banjo's fingerpick on the wire
+    brush: ['bandpass', 2600, 0.5],   // a wire brush on a snare head
+    snare: ['highpass', 1700, 0.7],   // and the same head hit properly
+    crash: ['highpass', 5200, 0.6],   // one cymbal, at the top of the phrase
+    horn: ['lowpass', 2500, 1.6],     // the cornet section's bell
+    calli: ['lowpass', 1400, 0.9],    // a steam organ, heard across a field
   };
   const fxCache = new Map<AudioNode, Record<string, BiquadFilterNode>>();
   function fxFor(dest: AudioNode, key: string): BiquadFilterNode | null {
@@ -1104,6 +1124,766 @@ export function createAudio(): Audio3D {
     nEnv(fxFor(master, 'shaker'), t, 0.3, 0.02, 0.1);   // bellows air
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // MAPLE FALLS
+  // ──────────────────────────────────────────────────────────────────────────
+  // A SMALL-TOWN BAND, and the joke is that there are two of them.
+  //
+  // Stages 0-1 are the front porch: an upright bass walking quarter notes, a
+  // banjo rolling eighths, brushes on the backbeat and — from stage 1 — a
+  // fiddle and a pair of hands clapping along. Stage 2 is the moment the
+  // MARCHING BAND turns the corner: the sousaphone takes the bass line over
+  // (oom on one and three, honks on the two and four the porch never asked
+  // for), the brushes become a snare, and the horns pick up the tune. Stage 3
+  // is the whole town: bell lyre on top, rudiments in the snare, a drum
+  // major's whistle, a cymbal crash on the phrase and a crowd hollering.
+  //
+  // It is G major from end to end. No minor-key dread, no horror stings: this
+  // is a town where four people have protested one parking meter since March,
+  // and the score should sound like it takes that very seriously.
+  //
+  // The band is DELIBERATELY not quite together. Every marching voice —
+  // sousaphone, brass, snare rudiments — is dragged a few milliseconds behind
+  // the grid by `drag()`, and the bell lyre player rushes by eight. It is
+  // never enough to break the groove, and it is the entire personality.
+  //
+  // THE JINGLE lives in M_HOOK. Four bars, and bars 0 and 2 are byte-
+  // identical: "it's MA-PLE FALLS / everybody smile / it's MA-PLE FALLS /
+  // ...MAPLE FAAALLS!" It is written to be sung by someone who is not
+  // listening carefully, which is the only test that matters here. jingle()
+  // quotes it on demand so the town can hum its own theme at itself.
+  // ══════════════════════════════════════════════════════════════════════════
+  const MAP_VOL = 0.17;
+  // the "pah" of the oompah, voiced LOW (top note E4) so the hook — which
+  // never goes below G4 — sits clean on top of it instead of inside it
+  const M_CHOP = [
+    [196.00, 246.94, 293.66],   // G   (G3 B3 D4)
+    [196.00, 261.63, 329.63],   // C   (G3 C4 E4)
+    [196.00, 246.94, 293.66],   // G
+    [185.00, 220.00, 261.63],   // D7  (F#3 A3 C4) — the turnaround
+  ];
+  // the "oom": root on beat one, fifth on beat three. All of it lands between
+  // 92 and 147 Hz, which is the one octave a phone speaker actually moves air in
+  const M_OOM = [
+    [98.00, 146.83],    // G2 D3
+    [130.81, 98.00],    // C3 G2
+    [98.00, 146.83],    // G2 D3
+    [146.83, 110.00],   // D3 A2
+  ];
+  // the porch bass walks instead: four quarters a bar, bar 3 climbing F#2->G2
+  const M_WALK = [
+    [98.00, 123.47, 146.83, 164.81],    // G  B  D  E
+    [130.81, 164.81, 196.00, 146.83],   // C  E  G  D
+    [98.00, 123.47, 146.83, 164.81],    // G  B  D  E
+    [146.83, 110.00, 130.81, 92.50],    // D  A  C  F# -> home
+  ];
+  // THE JINGLE. Eight eighths a bar, 0 = rest. Bars 0 and 2 are identical on
+  // purpose; a municipal jingle that develops is a municipal jingle nobody can
+  // sing back at the mayor.
+  const M_HOOK = [
+    [392.00, 0, 392.00, 493.88, 0, 587.33, 0, 0],           // G  G B . D      "it's MA-PLE FALLS"
+    [659.25, 0, 587.33, 0, 493.88, 0, 392.00, 0],           // E  D  B  G      the answer, coming down
+    [392.00, 0, 392.00, 493.88, 0, 587.33, 0, 0],           // same as bar 0
+    [659.25, 0, 587.33, 0, 493.88, 587.33, 783.99, 0],      // E  D  B D  G5   the big one
+  ];
+  const M_ROLL = [0, 2, 1, 2, 0, 1, 2, 1];   // banjo forward roll, chord-tone index
+  // the quotable phrase, as [freq, beat-offset] — bar 0 plus the top of bar 1
+  const M_QUOTE: [number, number][] = [
+    [392.00, 0], [392.00, 0.5], [493.88, 0.75], [587.33, 1.25],
+    [659.25, 2], [587.33, 2.5], [493.88, 3], [392.00, 3.5],
+  ];
+  // the band is never quite together — a few ms behind the grid, every time
+  const drag = (amt: number) => Math.random() * amt;
+
+  // ── the town's instruments ────────────────────────────────────────────────
+  // BANJO: a bright plucked wire. One PeriodicWave with a lot of upper
+  // harmonic and a very fast decay does the whole job; the pick click on
+  // accents is what stops it reading as a harpsichord.
+  let banjoWave: PeriodicWave | null = null;
+  function banjoW(c: AudioContext): PeriodicWave {
+    if (!banjoWave) {
+      banjoWave = c.createPeriodicWave(
+        new Float32Array(10),
+        new Float32Array([0, 1, 0.82, 0.61, 0.44, 0.31, 0.23, 0.16, 0.11, 0.07]),
+      );
+    }
+    return banjoWave;
+  }
+  function banjo(dest: AudioNode, freq: number, t: number, dur: number, vol: number, pick = false) {
+    const c = ctx; if (!c || freq <= 0 || vol <= 0) return;
+    const o = c.createOscillator(); o.setPeriodicWave(banjoW(c));
+    o.frequency.setValueAtTime(freq, t);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.03);
+    if (pick) nEnv(fxFor(dest, 'pick'), t, 0.014, vol * 0.35, 0.001);
+  }
+  // the banjo/guitar CHOP — three strings, one short envelope. A stab, not a pad.
+  function chop(dest: AudioNode, chord: number[], t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || vol <= 0) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    g.connect(dest);
+    for (const f of chord) {
+      const o = c.createOscillator(); o.setPeriodicWave(banjoW(c));
+      o.detune.value = Math.random() * 9 - 4.5;      // nobody's guitar is in tune
+      o.frequency.setValueAtTime(f, t);
+      o.connect(g); o.start(t); o.stop(t + dur + 0.03);
+    }
+  }
+  // SOUSAPHONE: a fat triangle with a soft octave on top and a slow lip-on
+  // attack. Never below 92 Hz, because below that a phone plays nothing at all.
+  function sousa(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    if (freq <= 0) return;
+    dTone(dest, t, dur, 'triangle', vol, freq, 0, 0, 0.028);
+    dTone(dest, t, dur * 0.7, 'sine', vol * 0.3, freq * 2, 0, 0, 0.03);
+  }
+  // BRASS: two saws a hair apart through a horn-shaped lowpass, with the pitch
+  // SCOOPED up into the note. That scoop is the only reason it reads as a
+  // cornet and not as a synth pad.
+  function brass(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || freq <= 0 || vol <= 0) return;
+    const f = fxFor(dest, 'horn'); if (!f) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.035);
+    g.gain.setValueAtTime(vol, t + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    g.connect(f);
+    for (const d of [-9, 9]) {
+      const o = c.createOscillator(); o.type = 'sawtooth'; o.detune.value = d;
+      o.frequency.setValueAtTime(freq * 0.945, t);
+      o.frequency.exponentialRampToValueAtTime(freq, t + 0.045);
+      o.connect(g); o.start(t); o.stop(t + dur + 0.03);
+    }
+  }
+  // GLOCKENSPIEL / bell lyre — the thing on a pole at the front of the band
+  function glock(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    dTone(dest, t, dur, 'sine', vol, freq, 0, 0, 0.002);
+    dTone(dest, t, dur * 0.35, 'sine', vol * 0.32, freq * 2.76, 0, 0, 0.002);
+  }
+  function brush(dest: AudioNode, t: number, vol: number) {      // wire brush swish
+    nEnv(fxFor(dest, 'brush'), t, 0.14, vol, 0.035);
+  }
+  function mSnare(dest: AudioNode, t: number, vol: number, body = true) {
+    nEnv(fxFor(dest, 'snare'), t, 0.07, vol, 0.0015);
+    if (body) dTone(dest, t, 0.05, 'triangle', vol * 0.3, 195, 160, 0, 0.002);
+  }
+  function bDrum(dest: AudioNode, t: number, vol: number) {
+    dTone(dest, t, 0.22, 'sine', vol, 92, 48, 0, 0.005);
+  }
+  function crash(dest: AudioNode, t: number, vol: number) {
+    nEnv(fxFor(dest, 'crash'), t, 1.3, vol, 0.004);
+  }
+  function refWhistle(dest: AudioNode, t: number, vol: number) {   // drum major / PA
+    dTone(dest, t, 0.26, 'square', vol, 2320, 2560, 2380, 0.012);
+    nEnv(fxFor(dest, 'hat'), t, 0.05, vol * 0.3, 0.006);
+  }
+  // "WHOO!" — the same formant trick the bay's crew shout uses, moved to an
+  // /u/ vowel and a friendlier register. A crowd is never together, so the
+  // voices are pitched apart and nudged off the beat.
+  const WHOO_PITCH = [196.0, 233.08, 174.61, 261.63, 155.56, 220.0];
+  function holler(dest: AudioNode, t: number, vol: number, voices: number) {
+    const c = ctx; if (!c || vol <= 0) return;
+    const v0 = vol / Math.sqrt(Math.max(1, voices));
+    for (let v = 0; v < voices; v++) {
+      const f0 = WHOO_PITCH[v % WHOO_PITCH.length] * (1 + (Math.random() * 0.04 - 0.02));
+      const tt = t + (v === 0 ? 0 : Math.random() * 0.05);
+      const dur = 0.3 + Math.random() * 0.09;
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0 * 0.94, tt);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.14, tt + dur * 0.7);   // it goes UP
+      for (const [fc0, fc1, q, lvl] of [[640, 900, 5, 1], [1150, 1500, 8, 0.42]] as number[][]) {
+        const b = c.createBiquadFilter(); b.type = 'bandpass'; b.Q.value = q;
+        b.frequency.setValueAtTime(fc0, tt);
+        b.frequency.exponentialRampToValueAtTime(fc1, tt + dur * 0.8);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, tt);
+        g.gain.linearRampToValueAtTime(v0 * lvl, tt + 0.03);
+        g.gain.setValueAtTime(v0 * lvl, tt + dur * 0.55);
+        g.gain.exponentialRampToValueAtTime(0.0006, tt + dur);
+        o.connect(b); b.connect(g); g.connect(dest);
+      }
+      o.start(tt); o.stop(tt + dur + 0.05);
+    }
+  }
+  function crowdSwell(dest: AudioNode, t: number, vol: number, dur = 1.4) {
+    nHit(dest, t, dur, vol, 'bandpass', 1000, 0.5, 1700, dur * 0.28);
+  }
+  // FAIRGROUND ORGAN — a steam calliope is loud, square and permanently out of
+  // tune with itself. Heard from the next field over it is mostly the wobble.
+  function calliope(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || freq <= 0) return;
+    const f = fxFor(dest, 'calli'); if (!f) return;
+    const o = c.createOscillator(); o.type = 'square';
+    o.frequency.setValueAtTime(freq * 1.006, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.994, t + dur * 0.5);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.004, t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.03);
+    g.gain.setValueAtTime(vol, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(g); g.connect(f);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+
+  // ── THE CAMPAIGN PA ───────────────────────────────────────────────────────
+  // The cheapest thing in this file and the one that makes the theme audible:
+  // somebody two streets away is saying something about the parking meter
+  // through a loudhailer. One saw, a stepped pitch contour, a syllabic
+  // envelope and a single narrow bandpass — which is what a megaphone IS, a
+  // band-limited horn — and the ear fills in words that were never there.
+  // The last syllable always goes UP. It is always a name, or "VOTE".
+  const PA_STEP = [1, 1.14, 0.93, 1.08, 0.97, 1.2, 0.9];
+  function stump(dest: AudioNode, t: number, vol: number) {
+    const c = ctx; if (!c || vol <= 0) return;
+    const syl = 4 + Math.floor(Math.random() * 4);
+    const base = 148 + Math.random() * 46;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    const b = c.createBiquadFilter(); b.type = 'bandpass';
+    b.frequency.value = 1250 + Math.random() * 320; b.Q.value = 2.6;   // the horn
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t);
+    o.connect(b); b.connect(g); g.connect(dest);
+    let tt = t;
+    for (let i = 0; i < syl; i++) {
+      const last = i === syl - 1;
+      const dur = last ? 0.3 : 0.11 + Math.random() * 0.07;
+      const f = base * (last ? 1.32 : PA_STEP[(i + syl) % PA_STEP.length]);
+      o.frequency.setValueAtTime(f, tt);
+      if (last) o.frequency.exponentialRampToValueAtTime(f * 1.18, tt + dur * 0.8);
+      g.gain.setValueAtTime(0.0001, tt);
+      g.gain.linearRampToValueAtTime(vol, tt + 0.025);
+      g.gain.setValueAtTime(vol, tt + dur * 0.66);
+      g.gain.exponentialRampToValueAtTime(0.0006, tt + dur);
+      tt += dur + 0.035;
+    }
+    o.start(t); o.stop(tt + 0.05);
+    // the loudhailer feeding back on itself, now and then
+    if (Math.random() < 0.35) dTone(dest, tt + 0.02, 0.34, 'sine', vol * 0.3, 2100, 2420, 0, 0.06);
+  }
+
+  // ── the town's ambience one-shots ─────────────────────────────────────────
+  function churchBell(dest: AudioNode, t: number, vol: number) {
+    // a real bell is a stack of partials, and the 1.2x tierce is what makes it
+    // a BELL. Two strikes, because a church clock never rings once.
+    for (const off of [0, 2.1]) {
+      for (const [m, v, d] of [[1, 1, 3.6], [1.2, 0.4, 2.4], [1.5, 0.3, 1.8], [2, 0.22, 1.2]] as number[][]) {
+        dTone(dest, t + off, d, 'sine', vol * v, 196.0 * m, 0, 0, 0.004);
+      }
+    }
+  }
+  function cockerel(dest: AudioNode, t: number, vol: number) {
+    const c = ctx; if (!c) return;
+    const b = c.createBiquadFilter(); b.type = 'bandpass'; b.frequency.value = 1150; b.Q.value = 2.2;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t);
+    o.connect(b); b.connect(g); g.connect(dest);
+    // cock-a-doodle-DOOOO
+    const syl: [number, number][] = [[620, 0.12], [900, 0.1], [780, 0.12], [1180, 0.42]];
+    let tt = t;
+    for (const [f, d] of syl) {
+      o.frequency.setValueAtTime(f, tt);
+      if (d > 0.3) o.frequency.exponentialRampToValueAtTime(f * 0.78, tt + d);
+      g.gain.setValueAtTime(0.0001, tt);
+      g.gain.linearRampToValueAtTime(vol, tt + 0.02);
+      g.gain.setValueAtTime(vol, tt + d * 0.7);
+      g.gain.exponentialRampToValueAtTime(0.0006, tt + d);
+      tt += d + 0.03;
+    }
+    o.start(t); o.stop(tt + 0.05);
+  }
+  function tractor(dest: AudioNode, t: number, vol: number) {
+    // a two-cylinder diesel three fields away: eight putts, not a drone
+    for (let i = 0; i < 9; i++) {
+      dTone(dest, t + i * (0.145 + Math.random() * 0.012), 0.11, 'triangle',
+        vol * (0.7 + Math.random() * 0.4), 88, 60, 0, 0.008);
+    }
+  }
+  function moo(dest: AudioNode, t: number, vol: number) {
+    dTone(dest, t, 0.95, 'sawtooth', vol, 168, 132, 148, 0.12);
+  }
+  function dogBark(dest: AudioNode, t: number, vol: number) {
+    for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+      const tt = t + i * (0.22 + Math.random() * 0.1);
+      dTone(dest, tt, 0.11, 'sawtooth', vol, 232, 168, 0, 0.006);
+      nEnv(fxFor(dest, 'click'), tt, 0.05, vol * 0.5, 0.002);
+    }
+  }
+  function songbird(dest: AudioNode, t: number, vol: number) {
+    const n = 3 + Math.floor(Math.random() * 3);
+    const base = 2400 + Math.random() * 1100;
+    for (let i = 0; i < n; i++) {
+      dTone(dest, t + i * 0.085, 0.06, 'sine', vol, base, base * (1.2 + Math.random() * 0.3), 0, 0.005);
+    }
+  }
+  function duck(dest: AudioNode, t: number, vol: number) {
+    for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+      dTone(dest, t + i * 0.19, 0.11, 'sawtooth', vol, 470, 320, 0, 0.008);
+    }
+  }
+  function carPass(dest: AudioNode, t: number, vol: number) {
+    nHit(dest, t, 1.7, vol, 'bandpass', 720, 0.9, 360, 0.8);   // swells in, dulls away
+  }
+  function sprinkler(dest: AudioNode, t: number, vol: number) {
+    for (let i = 0; i < 7; i++) nEnv(fxFor(dest, 'shaker'), t + i * 0.115, 0.05, vol * (1 - i * 0.09), 0.002);
+  }
+  function windChime(dest: AudioNode, t: number, vol: number) {
+    const notes = [1174.66, 1396.91, 1567.98, 880.0];
+    for (let i = 0; i < 3; i++) {
+      glock(dest, notes[Math.floor(Math.random() * notes.length)], t + i * (0.13 + Math.random() * 0.2), 0.9, vol);
+    }
+  }
+  function golfTock(dest: AudioNode, t: number, vol: number) {
+    nEnv(fxFor(dest, 'click'), t, 0.02, vol, 0.001);
+    dTone(dest, t, 0.05, 'triangle', vol * 0.7, 940, 700, 0, 0.002);
+  }
+  function woodpecker(dest: AudioNode, t: number, vol: number) {
+    for (let i = 0; i < 6; i++) nEnv(fxFor(dest, 'pick'), t + i * 0.055, 0.02, vol, 0.001);
+  }
+  function rideBell(dest: AudioNode, t: number, vol: number) {
+    glock(dest, 1318.51, t, 0.6, vol);
+    glock(dest, 1318.51, t + 0.16, 0.7, vol * 0.8);
+  }
+
+  // ── the bandstand bus ─────────────────────────────────────────────────────
+  // Outdoors in a town square: brighter than the bay's tavern (the top end is
+  // where a banjo lives) and a short slapback rather than a wash, locked to an
+  // eighth so it thickens the oompah instead of smearing it.
+  let mapBus: GainNode | null = null;
+  let mapAmb: GainNode | null = null;
+  let mapTimer: ReturnType<typeof setInterval> | null = null;
+  let mapRunning = false;
+  let mapStep = 0, mapNextT = 0, mAmbNextT = 0, mPaNextT = 0, mBellNextT = 0;
+  let mapDelay: DelayNode | null = null, mapDelayStage = -1;
+  function buildTownBus(c: AudioContext): GainNode {
+    const bus = c.createGain(); bus.gain.value = 0.0001;
+    const warm = c.createBiquadFilter(); warm.type = 'lowpass'; warm.frequency.value = 5600; warm.Q.value = 0.4;
+    const dry = c.createGain(); dry.gain.value = 0.93;
+    const delay = c.createDelay(1.0); delay.delayTime.value = 0.29;
+    mapDelay = delay;
+    const fb = c.createGain(); fb.gain.value = 0.16;
+    const wet = c.createGain(); wet.gain.value = 0.12;
+    const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 2100;
+    bus.connect(warm);
+    warm.connect(dry); dry.connect(master!);
+    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
+    delay.connect(fb); fb.connect(delay);
+    return bus;
+  }
+
+  // ── the place layer ───────────────────────────────────────────────────────
+  // Ten districts, nine soundscapes, all of them SUBTLE. The rule is the same
+  // as the bay's: you should notice a district only if you stop and listen,
+  // because the tune is the star and a phone speaker is the size of a stamp.
+  type MZoneId = 'town' | 'fair' | 'campus' | 'farm' | 'strip' | 'lake' | 'park' | 'woods' | 'suburb';
+  const MZONE_VOL: Record<MZoneId, number> = {
+    town: 0.11, fair: 0.16, campus: 0.13, farm: 0.12, strip: 0.12,
+    lake: 0.13, park: 0.11, woods: 0.11, suburb: 0.10,
+  };
+  const mzones: Partial<Record<MZoneId, ZoneLayer>> = {};
+  let mZone: MZoneId | null = null;
+  // THE SQUARE and MAIN STREET share one bed — they are fifty yards apart and
+  // it is the same murmur — which is also what lets the campaign PA and the
+  // church bell treat them as one place.
+  function mNormZone(z: string | null): MZoneId | null {
+    switch (z) {
+      case 'plaza': case 'downtown': return 'town';
+      case 'fair': return 'fair';
+      case 'campus': return 'campus';
+      case 'farm': return 'farm';
+      case 'strip': return 'strip';
+      case 'beach': return 'lake';
+      case 'park': return 'park';
+      case 'forest': return 'woods';
+      case 'cozy': return 'suburb';
+      default: return null;
+    }
+  }
+  // One looping noise source per district, built once on first visit and left
+  // running for the match; only its gain ever moves. THE STRIP gets a second
+  // permanent voice — a 120 Hz mains buzz — because a neon sign is not noise,
+  // it is a tone, and that is exactly what makes the motel sign read as a
+  // motel sign.
+  function buildMBed(c: AudioContext, id: MZoneId, dest: AudioNode) {
+    const src = c.createBufferSource(); src.buffer = white(c); src.loop = true;
+    const f = c.createBiquadFilter();
+    const g = c.createGain();
+    const lfo = c.createOscillator(); lfo.type = 'sine';
+    const lfoG = c.createGain();
+    if (id === 'town') {              // a low municipal murmur: traffic and talk
+      f.type = 'bandpass'; f.frequency.value = 500; f.Q.value = 0.5;
+      g.gain.value = 0.06; lfo.frequency.value = 0.11; lfoG.gain.value = 0.025;
+    } else if (id === 'fair') {       // the midway: a crowd with its money out
+      f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.6;
+      g.gain.value = 0.07; lfo.frequency.value = 0.17; lfoG.gain.value = 0.03;
+    } else if (id === 'campus') {     // bleachers, a long way off
+      f.type = 'bandpass'; f.frequency.value = 760; f.Q.value = 0.5;
+      g.gain.value = 0.05; lfo.frequency.value = 0.13; lfoG.gain.value = 0.025;
+    } else if (id === 'farm') {       // crickets — a fast chirr, barely there
+      f.type = 'bandpass'; f.frequency.value = 4600; f.Q.value = 7;
+      g.gain.value = 0.022; lfo.frequency.value = 8.5; lfoG.gain.value = 0.017;
+    } else if (id === 'strip') {      // tyre hum off the highway
+      f.type = 'lowpass'; f.frequency.value = 330; f.Q.value = 0.7;
+      g.gain.value = 0.065; lfo.frequency.value = 0.07; lfoG.gain.value = 0.03;
+      const nz = c.createOscillator(); nz.type = 'sawtooth'; nz.frequency.value = 120;   // the neon
+      const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 1150; nf.Q.value = 4.5;
+      const ng = c.createGain(); ng.gain.value = 0.012;
+      nz.connect(nf); nf.connect(ng); ng.connect(dest); nz.start();
+    } else if (id === 'lake') {       // water on a boat ramp
+      f.type = 'lowpass'; f.frequency.value = 560; f.Q.value = 0.6;
+      g.gain.value = 0.07; lfo.frequency.value = 0.09; lfoG.gain.value = 0.045;
+    } else if (id === 'park') {       // the pond, and a lot of grass
+      f.type = 'lowpass'; f.frequency.value = 700; f.Q.value = 0.5;
+      g.gain.value = 0.04; lfo.frequency.value = 0.06; lfoG.gain.value = 0.022;
+    } else if (id === 'woods') {      // wind in pine
+      f.type = 'lowpass'; f.frequency.value = 430; f.Q.value = 0.5;
+      g.gain.value = 0.05; lfo.frequency.value = 0.05; lfoG.gain.value = 0.03;
+    } else {                          // MAPLE HEIGHTS: somebody's mower, two streets over
+      f.type = 'bandpass'; f.frequency.value = 210; f.Q.value = 3;
+      g.gain.value = 0.045; lfo.frequency.value = 0.12; lfoG.gain.value = 0.02;
+    }
+    lfo.connect(lfoG); lfoG.connect(g.gain);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(); lfo.start();
+  }
+  function mZoneLayer(c: AudioContext, id: MZoneId): ZoneLayer {
+    let z = mzones[id];
+    if (!z) {
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      z = { g, vol: MZONE_VOL[id], on: false, until: 0 };
+      mzones[id] = z;
+      buildMBed(c, id, g);
+    }
+    return z;
+  }
+  const mZoneLive = (id: MZoneId, now: number) => {
+    const z = mzones[id];
+    return !!z && (z.on || now < z.until);
+  };
+  function mApplyZones(fade = ZONE_FADE) {
+    const c = ctx; if (!c || !master) return;
+    const now = c.currentTime;
+    for (const k of Object.keys(mzones) as MZoneId[]) {
+      const z = mzones[k]!;
+      if (k !== mZone && z.on) { z.on = false; z.until = now + fade; ramp(z.g.gain, 0, now, fade); }
+    }
+    if (mZone && mapRunning) {
+      const z = mZoneLayer(c, mZone);
+      if (!z.on) { z.on = true; z.until = 0; ramp(z.g.gain, z.vol, now, fade); }
+    }
+    if (mapBus) ramp(mapBus.gain, mapRunning ? MAP_VOL : 0, now, fade);
+  }
+
+  // ── ambience ──────────────────────────────────────────────────────────────
+  // Sparse, weighted by district. A wash reads as tape hiss on a phone; one
+  // cockerel eight seconds after the last one reads as a farm. Three separate
+  // accumulators, all on the audio clock: the general pool, the campaign PA
+  // (15-25s, town only) and the church bell (a minute-ish, town only).
+  function mapAmbience(c: AudioContext) {
+    const dest = mapAmb; if (!dest) return;
+    const now = c.currentTime;
+    if (mAmbNextT === 0) mAmbNextT = now + 3 + Math.random() * 4;
+    while (mAmbNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, mAmbNextT);
+      const r = Math.random();
+      let gap = 7 + Math.random() * 8;
+      switch (mZone) {
+        case 'farm':
+          if (r < 0.3) cockerel(dest, t, 0.05); else if (r < 0.6) tractor(dest, t, 0.035);
+          else if (r < 0.8) moo(dest, t, 0.04); else songbird(dest, t, 0.03);
+          break;
+        case 'fair':
+          if (r < 0.4) rideBell(dest, t, 0.05); else if (r < 0.75) crowdSwell(dest, t, 0.05);
+          else holler(dest, t, 0.06, 2);
+          gap = 6 + Math.random() * 6;
+          break;
+        case 'campus':
+          if (r < 0.35) refWhistle(dest, t, 0.05); else if (r < 0.7) crowdSwell(dest, t, 0.055);
+          else bDrum(dest, t, 0.07);
+          break;
+        case 'strip':
+          if (r < 0.6) carPass(dest, t, 0.05); else if (r < 0.85) dogBark(dest, t, 0.025);
+          else golfTock(dest, t, 0.03);
+          break;
+        case 'lake':
+          if (r < 0.45) duck(dest, t, 0.04); else if (r < 0.8) songbird(dest, t, 0.035);
+          else crowdSwell(dest, t, 0.03, 2.2);
+          break;
+        case 'park':
+          if (r < 0.5) songbird(dest, t, 0.04); else if (r < 0.75) duck(dest, t, 0.03);
+          else golfTock(dest, t, 0.035);
+          break;
+        case 'woods':
+          if (r < 0.55) songbird(dest, t, 0.04); else if (r < 0.85) woodpecker(dest, t, 0.03);
+          else moo(dest, t, 0.022);
+          break;
+        case 'suburb':
+          if (r < 0.35) dogBark(dest, t, 0.035); else if (r < 0.65) sprinkler(dest, t, 0.03);
+          else windChime(dest, t, 0.03);
+          break;
+        default:   // THE SQUARE and MAIN STREET, or off the map entirely
+          if (r < 0.35) carPass(dest, t, 0.035); else if (r < 0.6) dogBark(dest, t, 0.025);
+          else if (r < 0.85) songbird(dest, t, 0.03); else crowdSwell(dest, t, 0.03);
+          gap = 9 + Math.random() * 9;
+      }
+      mAmbNextT = t + gap;
+    }
+    // THE ELECTION, two streets away
+    const inTown = mZone === 'town';
+    if (mPaNextT === 0) mPaNextT = now + 8 + Math.random() * 8;
+    while (mPaNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, mPaNextT);
+      if (inTown) stump(dest, t, 0.055);
+      mPaNextT = t + 15 + Math.random() * 10;
+    }
+    // the church clock, on a long timer, so it is an event and not a texture
+    if (mBellNextT === 0) mBellNextT = now + 25 + Math.random() * 25;
+    while (mBellNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, mBellNextT);
+      if (inTown) churchBell(dest, t, 0.045);
+      mBellNextT = t + 55 + Math.random() * 35;
+    }
+  }
+
+  // ── the scheduler ─────────────────────────────────────────────────────────
+  // Same idiom as the bay: the interval is a LOOKAHEAD PUMP and never decides
+  // when a note happens. Cut time — sixteen steps to the bar, oom on one and
+  // three, pah on two and four.
+  function mapSchedule() {
+    const c = ensure(); if (!c || !mapBus) return;
+    const st = Math.max(0, Math.min(3, musStage));
+    const spb = 60 / (104 + st * 7);   // seconds per beat
+    const s16 = spb / 4;
+    const now = c.currentTime;
+    if (mapDelay && st !== mapDelayStage) {
+      mapDelayStage = st;
+      mapDelay.delayTime.setTargetAtTime(spb * 0.5, now, 0.35);   // glided, four times a match
+    }
+    if (mapNextT < now) mapNextT = now + 0.05;
+    while (mapNextT < now + 0.35) {
+      const t = mapNextT;
+      const barN = Math.floor(mapStep / 16);
+      const bar = barN & 3;          // where we are in the 4-bar tune
+      const ph = barN & 7;           // where we are in the 8-bar phrase
+      const s = mapStep % 16;
+      const e = s >> 1, onE = (s & 1) === 0;   // eighth index 0..7
+      const ch = M_CHOP[bar];
+      const note = M_HOOK[bar][e];
+      const march = st >= 2;
+
+      // ── THE ENGINE: oom-pah ────────────────────────────────────────────────
+      if (march) {
+        // the marching band has arrived and the sousaphone has the bass
+        if (s === 0) sousa(mapBus, M_OOM[bar][0], t + drag(0.012), spb * 0.8, 0.17);
+        if (s === 8) sousa(mapBus, M_OOM[bar][1], t + drag(0.012), spb * 0.7, 0.14);
+        // ...and by stage 3 he is honking the two and four as well, which
+        // nobody asked him to do
+        // an octave up from the root, so it lands in the chop's register as a
+        // honk rather than doubling the oom into mud
+        if (st >= 3 && (s === 4 || s === 12)) sousa(mapBus, M_OOM[bar][0] * 2, t + drag(0.016), spb * 0.3, 0.06);
+      } else if (s % 4 === 0) {
+        // the porch: an upright walking four to the bar
+        pBass(mapBus, t, M_WALK[bar][s >> 2], spb * 0.92, 0.15);
+      }
+      // the upright never actually leaves — under the march it keeps the
+      // fourth-beat approach note, which is the walk-up into the next bar and
+      // the one thing that stops this being a straight military two-step
+      if (march && s === 12) pBass(mapBus, t, M_WALK[bar][3], spb * 0.5, 0.085);
+      // the "pah" — chopped chords on the backbeat, all match long
+      if (s === 4 || s === 12) chop(mapBus, ch, t, spb * 0.34, 0.055);
+
+      // ── THE BANJO ─────────────────────────────────────────────────────────
+      // It has the tune from bar one and rolls chord tones through the rests,
+      // which is what makes the gaps in a jingle feel like part of the jingle.
+      if (onE) {
+        if (note > 0) banjo(mapBus, note, t, spb * 0.55, 0.075, e === 0);
+        else banjo(mapBus, ch[M_ROLL[e]] * 2, t, spb * 0.4, 0.032);
+      }
+
+      // ── THE TUNE ──────────────────────────────────────────────────────────
+      if (onE && note > 0) {
+        // the fiddle picks it up mid-verse on the ANSWER bars first, so stage 1
+        // sounds like a second player leaning in off the porch rail
+        if (st >= 2 || (st >= 1 && (bar & 1) === 1)) fiddle(mapBus, note, t, spb * 0.5, 0.04);
+        // horns on the strong eighths only — a cornet section playing every
+        // note of a jingle is a wall, not a band
+        if (march && e % 2 === 0) brass(mapBus, note, t + drag(0.018), spb * 0.62, 0.05);
+        // the bell lyre RUSHES, because the kid with the bell lyre always does
+        if (st >= 3 && e === 0) glock(mapBus, note * 2, t - 0.008, spb * 0.9, 0.022);
+      }
+
+      // ── THE KIT ───────────────────────────────────────────────────────────
+      if (s === 4 || s === 12) {
+        if (march) mSnare(mapBus, t + drag(0.008), 0.085); else brush(mapBus, t, 0.055);
+        if (st >= 1) clap(mapBus, t, 0.06);
+      }
+      if (st >= 1 && (s === 0 || s === 8)) bDrum(mapBus, t, 0.15);
+      if (!march && s === 14) brush(mapBus, t, 0.03);                      // the swish back
+      if (march && (s === 14 || s === 15)) mSnare(mapBus, t + drag(0.006), 0.03, false);   // pickup into the bar
+      if (st >= 3 && (s === 2 || s === 6 || s === 10)) mSnare(mapBus, t + drag(0.01), 0.022, false);
+      if (st >= 3 && ph === 7 && s === 15) mSnare(mapBus, t - 0.022, 0.035, false);        // the flam
+      if (st >= 3 && ph === 0 && s === 0) crash(mapBus, t, 0.045);
+
+      // ── THE TOWN ──────────────────────────────────────────────────────────
+      if (s === 0 && ph === 0 && st >= 1) holler(mapBus, t, 0.14, 1 + st);
+      if (s === 0 && ph === 4 && st >= 3) holler(mapBus, t, 0.11, 2);
+      if (s === 0 && ph === 4 && st >= 3) refWhistle(mapBus, t - 0.03, 0.045);
+
+      // ── THE FAIRGROUNDS, from the next field over ─────────────────────────
+      // The calliope plays the jingle's own opening notes, in the score's own
+      // key, once every two bars. One town, one tune, wherever you're standing.
+      if (mZoneLive('fair', t) && s === 0 && (barN & 1) === 0) {
+        const fg = mzones.fair!.g;
+        const fig = [392.00, 587.33, 493.88];
+        fig.forEach((f, i) => calliope(fg, f * 2, t + i * spb * 0.66, spb * 0.6, 0.045));
+      }
+      // ── THE GRIDIRON: a drumline warming up under the bleachers ───────────
+      if (mZoneLive('campus', t) && s % 2 === 0) {
+        const cg = mzones.campus!.g;
+        const accent = s === 0 || s === 8;
+        mSnare(cg, t + drag(0.01), accent ? 0.06 : 0.028, accent);
+      }
+
+      mapNextT += s16; mapStep++;
+    }
+    mapAmbience(c);
+  }
+  function startTown() {
+    const c = ensure(); if (!c || !master) return;
+    if (!mapBus) mapBus = buildTownBus(c);
+    if (!mapAmb) { mapAmb = c.createGain(); mapAmb.gain.value = 0.0001; mapAmb.connect(master); }
+    mapRunning = true;
+    ramp(mapAmb.gain, 0.36, c.currentTime, 1.6);
+    mapStep = 0; mapNextT = c.currentTime + 0.12;
+    mAmbNextT = 0; mPaNextT = 0; mBellNextT = 0;
+    mApplyZones(1.5);   // the match opens on a swell, not a switch flick
+    if (mapTimer) clearInterval(mapTimer);
+    mapTimer = setInterval(mapSchedule, 110);
+  }
+  function stopTown(fade: number) {
+    mapRunning = false;
+    if (mapTimer) { clearInterval(mapTimer); mapTimer = null; }
+    const c = ctx; if (!c) return;
+    const now = c.currentTime;
+    if (mapBus) ramp(mapBus.gain, 0, now, fade);
+    if (mapAmb) ramp(mapAmb.gain, 0, now, fade);
+    for (const k of Object.keys(mzones) as MZoneId[]) {
+      const z = mzones[k]!; z.on = false; z.until = 0; ramp(z.g.gain, 0, now, fade);
+    }
+    mZone = null;
+  }
+
+  // ── the town's one-shots ──────────────────────────────────────────────────
+  // All of these play STRAIGHT TO MASTER, never through the band bus: win()
+  // fires right after stopMusic(), and a fanfare on a bus that is fading out
+  // would duck underneath itself.
+  function bandLand(t: number, vol: number) {   // the whole band landing together
+    if (!master) return;
+    bDrum(master, t, vol);
+    mSnare(master, t + drag(0.006), vol * 0.55);
+    crash(master, t, vol * 0.3);
+  }
+  // the town jingle, quoted. Banjo, and from the second half a cornet on top.
+  function jingleQuote(t: number, vol: number, beat = 0.26) {
+    if (!master) return;
+    M_QUOTE.forEach(([f, b], i) => {
+      const tt = t + b * beat;
+      banjo(master!, f, tt, beat * 1.4, vol, i === 0);
+      if (i >= 4) brass(master!, f, tt + drag(0.012), beat * 1.3, vol * 0.55);
+    });
+  }
+  // BAKE SALE RUSH — a counter bell and the band falling over itself. Fast,
+  // bright, over in under a second: this beat is a starting pistol.
+  function bakeSting(t: number) {
+    if (!master) return;
+    glock(master, 1567.98, t, 0.5, 0.12);
+    glock(master, 1567.98, t + 0.11, 0.6, 0.1);
+    const run = [392.00, 493.88, 587.33, 659.25, 783.99];   // G B D E G, straight up
+    run.forEach((f, i) => banjo(master!, f, t + 0.2 + i * 0.062, 0.3, 0.09, i === 0));
+    brass(master, 783.99, t + 0.52, 0.42, 0.07);
+    bandLand(t + 0.52, 0.16);
+    holler(master, t + 0.56, 0.12, 2);
+  }
+  // RECALL VOTE — a town siren, and the single most important note in this
+  // file is that it is NOT a wail. Two tones a MAJOR THIRD apart, alternating
+  // and rising, on warm triangles: a fire truck in a cartoon, not an air raid.
+  // Six-year-olds are playing this.
+  function recallSting(t: number) {
+    if (!master) return;
+    const pair = [523.25, 659.25];   // C5 E5
+    for (let i = 0; i < 5; i++) {
+      const f = pair[i & 1] * (1 + i * 0.012);
+      dTone(master!, t + i * 0.17, 0.2, 'triangle', 0.1, f, f * 1.04, 0, 0.02);
+      dTone(master!, t + i * 0.17, 0.18, 'sine', 0.05, f * 2, 0, 0, 0.02);
+    }
+    // the whole town heading for the church hall
+    for (let i = 0; i < 7; i++) mSnare(master, t + 0.15 + i * 0.09, 0.03 + i * 0.008, false);
+    bandLand(t + 0.86, 0.2);
+    chop(master, [392.00, 493.88, 587.33], t + 0.86, 0.5, 0.08);
+    holler(master, t + 0.9, 0.16, 3);
+  }
+  // THE LANDSLIDE — the biggest moment in the match, and it gets a real
+  // cadence instead of a flourish: a snare roll that accelerates into the
+  // band's own big bar, then D7 -> G, the strongest turn in the key, with
+  // sousaphone, horns, bell lyre and the entire square shouting over it.
+  function landslideFanfare(t: number) {
+    if (!master) return;
+    // the roll: sixteen taps getting faster and louder — pure anticipation
+    let rt = t, gapR = 0.085;
+    for (let i = 0; i < 16; i++) {
+      mSnare(master, rt, 0.02 + i * 0.004, false);
+      rt += gapR; gapR *= 0.93;
+    }
+    const hit = t + 0.86;
+    bandLand(hit, 0.3);
+    holler(master, hit, 0.22, 4);
+    // the jingle's big bar, everybody in unison
+    const big = [659.25, 587.33, 493.88, 587.33, 783.99];   // E D B D G
+    big.forEach((f, i) => {
+      const tt = hit + 0.08 + i * 0.15;
+      banjo(master!, f, tt, 0.34, 0.085, i === 0);
+      fiddle(master!, f, tt, 0.3, 0.045);
+      brass(master!, f, tt + drag(0.014), 0.32, 0.07);
+      if (i % 2 === 0) mSnare(master!, tt + drag(0.006), 0.05);
+    });
+    // V: D7, leaning
+    const lean = hit + 0.86;
+    chop(master, [185.00, 220.00, 261.63], lean, 0.34, 0.08);
+    sousa(master, 146.83, lean, 0.34, 0.16);
+    bandLand(lean, 0.18);
+    // I: G major, the whole town, held
+    const home = hit + 1.2;
+    chop(master, [196.00, 246.94, 293.66], home, 1.0, 0.09);
+    sousa(master, 98.00, home + drag(0.014), 1.0, 0.2);
+    brass(master, 783.99, home + drag(0.014), 0.95, 0.075);
+    brass(master, 587.33, home + drag(0.014), 0.9, 0.05);
+    fiddle(master, 783.99, home, 0.9, 0.05);
+    glock(master, 1567.98, home - 0.008, 1.1, 0.035);
+    bandLand(home, 0.34);
+    holler(master, home + 0.05, 0.26, 4);
+    crowdSwell(master, home + 0.1, 0.12, 2.4);
+  }
+  // the fall-through: a bandstand flourish that quotes the jingle's first
+  // three notes, so an unplanned beat still sounds like it happened HERE
+  function townFanfare(t: number) {
+    if (!master) return;
+    bandLand(t, 0.2);
+    const up = [392.00, 493.88, 587.33];
+    up.forEach((f, i) => {
+      const tt = t + i * 0.1;
+      banjo(master!, f, tt, 0.3, 0.09, i === 0);
+      brass(master!, f, tt + drag(0.012), 0.34, 0.06);
+    });
+    glock(master, 1174.66, t + 0.3, 0.7, 0.03);
+    holler(master, t + 0.32, 0.14, 2);
+  }
+
   return {
     startMusic() {
       // PIRATE BAY RESORT has its own score — and deliberately does NOT pick up
@@ -1112,6 +1892,13 @@ export function createAudio(): Audio3D {
       if (isPirate()) { startTropical(); return; }
       // prefetch the recorded kit so the very first gulp is the real sample
       for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+      // MAPLE FALLS plays its own band, for the same reason the bay plays its
+      // own: a stock loop is a stock loop, and this town has an election on.
+      // The licensed-track drop-in (/assets/music/theme.mp3, and behind it the
+      // old generic synth bed) is still here and still works — it is opt-in
+      // now rather than default, so a shipped track can be A/B'd against the
+      // band without a code change.
+      if (!LICENSED_THEME) { startTown(); return; }
       // licensed-track hook: if a real music file ships with the build, prefer
       // it (gapless crossfade loop); the synth score is the fallback
       themeWanted = true;
@@ -1131,6 +1918,13 @@ export function createAudio(): Audio3D {
       startSynth();
     },
     setMusicStage(n) { musStage = n; },
+    // The town's own eight notes, on demand — for a menu, a results screen, a
+    // shop, anywhere the theme wants stating out loud. Silent in the bay,
+    // which has a hook of its own and does not need this one.
+    jingle() {
+      const c = ensure(); if (!c || !master || isPirate()) return;
+      jingleQuote(c.currentTime + 0.02, 0.1);
+    },
     setMuted(m: boolean) {
       muted = m;
       localStorage.setItem('voidMute', m ? '1' : '0');
@@ -1143,13 +1937,22 @@ export function createAudio(): Audio3D {
     // The player's current district, safe to call every frame — unchanged
     // values cost one comparison and nothing else.
     setZone(zone) {
+      // NEVER call ensure() in here: setZone can fire before the first gesture
+      // and creating the context then would trip the autoplay policy. If there
+      // is no context yet the choice is simply remembered for the world's
+      // start function, which applies it on the opening swell.
+      if (!isPirate()) {
+        const mid = mNormZone(zone);
+        if (mid === mZone) return;
+        mZone = mid;
+        if (!ctx) return;
+        mApplyZones();
+        return;
+      }
       const id = normZone(zone);
       if (id === curZone) return;
       curZone = id;
-      // NEVER call ensure() here: setZone can fire before the first gesture and
-      // creating the context then would trip the autoplay policy. If there is
-      // no context yet the choice is simply remembered for startTropical().
-      if (!ctx || !isPirate()) return;
+      if (!ctx) return;
       applyZones();
     },
     // The authored match beats. Maple keeps the fanfare it always had; the bay
@@ -1157,9 +1960,20 @@ export function createAudio(): Audio3D {
     // belongs to, and TREASURE FEAST gets the full band cadence.
     matchBeat(kind) {
       const c = ensure(); if (!c || !master) return;
-      if (!isPirate()) { mapleEvolve(); return; }
-      const t = c.currentTime;
       const k = String(kind).toLowerCase();
+      if (!isPirate()) {
+        // MAPLE FALLS. The banner text is being re-themed to the election in
+        // parallel with this file, so match GENEROUSLY — bake sale or donut
+        // rush, recall vote or evacuation, landslide or final feast — and fall
+        // through to a flourish that still sounds like the town band.
+        const mt = c.currentTime;
+        if (/rush|donut|bake/.test(k)) bakeSting(mt);
+        else if (/evacu|recall|alarm/.test(k)) recallSting(mt);
+        else if (/final|feast|landslide|count/.test(k)) landslideFanfare(mt);
+        else townFanfare(mt);
+        return;
+      }
+      const t = c.currentTime;
       if (k.includes('dance') || k.includes('party')) {
         airhorn(t, 0.13);
         cheer(t + 0.12, 0.55);
@@ -1177,6 +1991,7 @@ export function createAudio(): Audio3D {
     },
     stopMusic() {
       stopTropical(1.2);
+      stopTown(1.2);
       themeWanted = false;
       stopThemeLoop(1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }

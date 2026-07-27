@@ -1495,8 +1495,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // …and on Pirate Bay it belongs to DANCE COVE — Maple's fairground block
   // is open water on the hooked island, which is exactly where the wheel used
   // to render.
+  // The ferris wheel is Pirate Bay's boardwalk-fair prop. On MAPLE FALLS it
+  // landed four blocks from the county fairground it belongs to, in hot pink.
+  // The fair has its own rides.
   const FERRIS: [number, number] = WORLD_ID === 'pirate'
-    ? [w(6650), w(10600)] : [w(blockCenter(3)) + 4, w(blockCenter(5)) - 14];
+    ? [w(6650), w(10600)] : [w(blockCenter(1)) - 120, w(blockCenter(1)) + 260];   // MAPLE: the county fairground
   new GLTFLoader().load('/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/f1918f07-d6ac-4589-abe2-eeaf7ca703b2.glb', (gltf) => {
     const model = gltf.scene;
     const box = new THREE.Box3().setFromObject(model);
@@ -2409,12 +2412,14 @@ const tinyForMaple = (biome: Biome): THREE.Object3D => {
     : biome === 'forest' ? [makeMushroom, makeMushroom, makeFlowers, makeReeds]
     : biome === 'park' ? [makeGolfball, makeFlowers, makeFlowers, MS.makeParkGrill]
     : biome === 'farm' ? [MS.makePumpkin, MS.makePumpkin, makeFlowers, sign]
-    : biome === 'fair' ? [makeCone, makeTrash, MS.makeNewsBox, sign]
-    : biome === 'campus' ? [makeCone, makeTrash, makeFlowers, sign]
-    : biome === 'strip' ? [makeCone, makeCone, makeTrash, MS.makeNewsBox]
+    // these three were cones and bins, which is what a district looks like when
+    // nobody has decided what it sells
+    : biome === 'fair' ? [MS.makePumpkin, makeFlowers, MS.makeNewsBox, sign]
+    : biome === 'campus' ? [makeGolfball, MS.makeLifeRing, makeFlowers, sign]
+    : biome === 'strip' ? [makeTrash, MS.makeNewsBox, MS.makePlanter, sign]
     : biome === 'plaza' ? [makeFlowers, MS.makeNewsBox, MS.makePlanter, sign]
     : biome === 'downtown' ? [makeHydrant, makeTrash, MS.makeNewsBox, sign]
-    : [makeCone, makeHydrant, makeTrash, makeFlowers];
+    : [makeHydrant, makeTrash, makeFlowers, sign];
   return mpick(pool)();
 };
 function makeLuggage(): THREE.Group {
@@ -3382,7 +3387,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       drop(MS.makeTownsfolk(true), jx, jy, 1.2, Math.PI);
     }
     // THE MIDWAY: tents in two matching rows, colours alternating
-    const TENTC = [MS.RED, MS.TEAL, 0xe0a83a, 0x4d7de8];
+    // gold tents on the fair's khaki ground had almost no separation; and the
+    // challenger is BLUE, not teal
+    const TENTC = [MS.RED, MS.BLUE, 0xff5d9e, 0x3f7a4e];
     let ti = 0;
     for (const side of [-1, 1]) {
       for (const [tx, ty] of row(1820, my + side * 430, 5300, my + side * 430, 7)) {
@@ -3694,8 +3701,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // the boardwalk colonnade at the top of the sand (the bake paints the
       // planks at world y 9475..9660 — these stand just behind it)
       for (const ux of [-0.62, -0.21, 0.21, 0.62]) {
-        if (mchance(0.75)) placeGlb3('palm', cx + ux * half, cz - half * 0.82, 2.6, mr(6.5, 8.5), makePalm, mr(0, 6.28));
-        else place(makePalm(), cx + ux * half, cz - half * 0.82, 2.6);
+        // palms in maple country read as leftover content from the other world
+        place(mchance(0.5) ? MS.makeMapleTree() : makePine(), cx + ux * half, cz - half * 0.82, 2.6);
       }
       for (const ux of [-0.4, 0.4]) place(makeBench(), cx + ux * half, cz - half * 1.02, 2.4);
       for (const [ux, vz] of [[-0.55, -0.1], [-0.18, 0.14], [0.18, -0.1], [0.55, 0.14], [-0.36, 0.44], [0.36, 0.44]] as const) {
@@ -3739,14 +3746,19 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   // four, so reject any spot whose along-coordinate is inside a crossing road.
   const roads3 = ROAD_CENTERS.map((c) => w(c));
   const nearCrossRoad = (v: number, m: number) => roads3.some((rc2) => Math.abs(v - rc2) < m);
+  // ROADWORKS, not a cone every 32 units down every road on the island. The old
+  // sweep planted roughly 340 permanent traffic cones, which — because the road
+  // grid crosses everything — put them on the town green, the football pitch,
+  // the beach and the middle of the fairground. It was the single largest
+  // source of "cheap" in the level and the reason the map read as confetti.
+  // Four actual sites now, each a cluster you'd believe: cones and a barrier.
+  for (const [wx, wy] of [[4290, 3400], [7710, 6800], [6000, 9200], [2580, 5600]] as [number, number][]) {
+    const cx4 = w(wx), cz4 = w(wy);
+    if (!insideIsland3(cx4, cz4) || inMapleWater(wx, wy, 1)) continue;
+    for (let k = 0; k < 4; k++) place(makeCone(), cx4 + (k - 1.5) * 2.4, cz4 + 4.6, 0.7);
+    place(MS.makeNoticeBoard(), cx4, cz4 + 6.6, 1.0);
+  }
   for (const rc of roads3) {
-    let ci = 0;
-    for (let a = -270; a < 270; a += 32, ci++) {
-      const side = ci % 2 ? 4.9 : -4.9;
-      if (nearCrossRoad(a, 4.5)) continue;
-      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
-      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
-    }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {
       const side = li % 2 ? 6.8 : -6.8;
@@ -3754,16 +3766,32 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeLamp(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeLamp(), rc - side, a, 0.7);
     }
+    // A STREET HAS A SIDE. This used to alternate red/blue every 17 units along
+    // every verge in town — about 320 signs at perfect 50/50 — which erased the
+    // per-block allegiance the crowd code carefully assigns and left no street
+    // with a readable camp. One modulo defeated the whole premise. Signs now
+    // follow the BLOCK they stand in, with about one defector in six (which is
+    // the joke: the neighbours disagree), and there are a third as many, so the
+    // survivors are legible instead of being a picket fence.
+    const blockSide = (x3: number, z3: number) => {
+      const gx = Math.min(5, Math.max(0, Math.floor((x3 / SCALE + CX) / BLOCK_SIZE)));
+      const gy = Math.min(5, Math.max(0, Math.floor((z3 / SCALE + CZ) / BLOCK_SIZE)));
+      return ((gx * 3 + gy * 5) % 7) < 4 ? 0 : 1;
+    };
     let si = 0;
-    for (let a = -276; a < 276; a += 17, si++) {
-      const side = si % 2 ? 8.6 : -8.6;   // outside the lamp line, on the verge
+    for (let a = -276; a < 276; a += 45, si++) {
+      const side = si % 2 ? 8.6 : -8.6;   // stagger which verge, not which camp
       if (nearCrossRoad(a, 7)) continue;
-      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc, 8)) {
-        const sg = MS.makeLawnSign(si % 2); sg.rotation.y = mr(-0.25, 0.25);
+      // …and the ONLY placement pass in this file with no water test, which is
+      // why signs and cones stood in the river and the pond
+      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc, 8) && !inMapleWater(a / SCALE + CX, (rc + side) / SCALE + CZ, 0.7)) {
+        const sd = mchance(0.16) ? 1 - blockSide(a, rc) : blockSide(a, rc);
+        const sg = MS.makeLawnSign(sd); sg.rotation.y = mr(-0.25, 0.25);
         place(sg, a, rc + side, 0.55);
       }
-      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a, 8)) {
-        const sg = MS.makeLawnSign((si + 1) % 2); sg.rotation.y = Math.PI / 2 + mr(-0.25, 0.25);
+      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a, 8) && !inMapleWater((rc - side) / SCALE + CX, a / SCALE + CZ, 0.7)) {
+        const sd = mchance(0.16) ? 1 - blockSide(rc, a) : blockSide(rc, a);
+        const sg = MS.makeLawnSign(sd); sg.rotation.y = Math.PI / 2 + mr(-0.25, 0.25);
         place(sg, rc - side, a, 0.55);
       }
     }
@@ -3810,7 +3838,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     const x = fx2 * 0.9, z = fz2 * 0.9;
     if (!insideIsland3(x, z) || inLagoon3(x, z, 60)) continue;
     if (ROAD_CENTERS_3D_LOCAL.some((rc2) => Math.abs(x - rc2) < 9 || Math.abs(z - rc2) < 9)) continue;
-    if (z > 150) { if (mchance(0.55)) place(makePalm(), x, z, 2.6); else place(makeBush(), x, z, 1.4); }
+    if (z > 150) { if (mchance(0.55)) place(MS.makeMapleTree(), x, z, 2.6); else place(makeBush(), x, z, 1.4); }
     else if (x > 150) place(mchance(0.6) ? makePine() : makeRocksFB(), x, z, mchance(0.7) ? 3 : 2.2);
     else if (mchance(0.45)) place(makeRocksFB(), x, z, 2.2);
     else if (mchance(0.5)) place(MS.makeMapleTree(), x, z, 2.6);
