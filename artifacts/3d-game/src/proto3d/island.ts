@@ -233,63 +233,6 @@ const MAPLE_SIL = silhouetteWorld(12);
 // Pirate Bay has its OWN coastline — a hooked headland, not Maple's blob
 const silPoly = (): [number, number][] => (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH : MAPLE_SIL);
 const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
-/** WORLD MAPS FOR THE LEVEL SELECT. The picker shipped with hand-rolled CSS
- *  gradients standing in for two fully built 3D islands — a green ellipse with
- *  two grey bars for Maple, a beige blob for Pirate — one tap after a genuinely
- *  beautiful splash. This hands the picker the REAL geometry of both worlds, in
- *  world coordinates, so the card art is the island you are about to play
- *  rather than a drawing of one. Neither depends on WORLD_ID, so a card can be
- *  drawn for the world that is not currently loaded. */
-export interface WorldMap {
-  land: [number, number][];
-  water: [number, number][] | null;      // pirate's interior bay
-  roads: number[] | null;                // maple's grid centrelines
-  patches: { poly: [number, number][]; col: string }[];
-  pond: [number, number, number] | null;
-  river: [number, number][] | null;
-  sea: string; ground: string;
-}
-const BAY_PATCH: Record<string, string> = {
-  port: '#8e93a4', oldtown: '#d8c9a8', resort: '#f2e6cc', party: '#c98fd8',
-  market: '#e0b478', jungle: '#4f9a5c', cove: '#e8dcc0', sunset: '#f0dcae',
-};
-export function worldMap(id: 'maple' | 'pirate'): WorldMap {
-  if (id === 'pirate') {
-    return {
-      land: BAY.LAND_SMOOTH as [number, number][],
-      water: BAY.WATER_SMOOTH as [number, number][],
-      roads: null,
-      patches: BAY.BAY_REGIONS.map((r) => ({ poly: r.poly as [number, number][], col: BAY_PATCH[r.id] ?? '#e8dcc0' })),
-      pond: null, river: null,
-      sea: '#2fa8c8', ground: '#efe0bd',
-    };
-  }
-  // Maple's districts are a 6x6 plan over the road grid — turn each cell into
-  // a square patch so the card shows the town's actual layout
-  const CELL = 12000 / 6;
-  const COL: Record<string, string> = {
-    forest: '#3f8a4e', farm: '#d9b845', fair: '#e08a3a', strip: '#9aa3b2',
-    cozy: '#8ed86f', downtown: '#7d8494', plaza: '#c9cdd6', park: '#6cc86e',
-    campus: '#b0d186', beach: '#efe0bd',
-  };
-  const patches: { poly: [number, number][]; col: string }[] = [];
-  for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) {
-    const x0 = c * CELL, y0 = r * CELL;
-    patches.push({
-      poly: [[x0, y0], [x0 + CELL, y0], [x0 + CELL, y0 + CELL], [x0, y0 + CELL]],
-      col: COL[MAPLE_PLAN[r][c]] ?? '#8ed86f',
-    });
-  }
-  return {
-    land: MAPLE_SIL as [number, number][],
-    water: null,
-    roads: ROAD_CENTERS,
-    patches,
-    pond: POND,
-    river: RIVER as [number, number][],
-    sea: '#6fc0e0', ground: '#7ed57a',
-  };
-}
 /** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
  *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
  *  which is a hook with the water on the inside. */

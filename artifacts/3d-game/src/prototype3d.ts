@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, islandOutline3, worldMap, setWorld } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, islandOutline3, setWorld } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -1373,49 +1373,23 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
   menuEl.style.display = 'none';
   withWorldReady(() => beginMatch());
 }
-/** Paint a world's REAL map onto its level-select card. The picker shipped with
- *  CSS gradients standing in for two fully built islands; this is the actual
- *  coastline, the actual districts, the actual road grid. */
-function paintWorldCard(host: HTMLElement, id: 'maple' | 'pirate'): void {
-  const m = worldMap(id);
-  const W = 480, H = 270;
-  const cv = document.createElement('canvas');
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = W * dpr; cv.height = H * dpr;
-  cv.style.width = '100%'; cv.style.height = '100%'; cv.style.display = 'block';
-  const g = cv.getContext('2d')!; g.scale(dpr, dpr);
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const [x, y] of m.land) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-  const pad = 10;
-  const k = Math.min((W - pad * 2) / (maxX - minX), (H - pad * 2) / (maxY - minY));
-  const ox = (W - (maxX - minX) * k) / 2 - minX * k, oy = (H - (maxY - minY) * k) / 2 - minY * k;
-  const px = (x: number) => x * k + ox, py = (y: number) => y * k + oy;
-  const path = (poly: [number, number][]) => {
-    g.beginPath(); poly.forEach(([x, y], i) => (i ? g.lineTo(px(x), py(y)) : g.moveTo(px(x), py(y)))); g.closePath();
-  };
-  g.fillStyle = m.sea; g.fillRect(0, 0, W, H);
-  path(m.land); g.fillStyle = m.ground; g.fill();
-  g.save(); path(m.land); g.clip();                       // districts stay on land
-  for (const p2 of m.patches) { path(p2.poly); g.fillStyle = p2.col; g.fill(); }
-  if (m.roads) {                                           // the grid
-    g.strokeStyle = '#5a6070'; g.lineWidth = Math.max(2, 150 * k);
-    for (const c of m.roads) {
-      g.beginPath(); g.moveTo(px(c), 0); g.lineTo(px(c), H); g.stroke();
-      g.beginPath(); g.moveTo(0, py(c)); g.lineTo(W, py(c)); g.stroke();
-    }
-  }
-  if (m.river) {                                           // the river
-    g.strokeStyle = m.sea; g.lineWidth = Math.max(3, 240 * k); g.lineJoin = 'round'; g.lineCap = 'round';
-    g.beginPath(); m.river.forEach(([x, y], i) => (i ? g.lineTo(px(x), py(y)) : g.moveTo(px(x), py(y)))); g.stroke();
-  }
-  if (m.pond) { g.beginPath(); g.arc(px(m.pond[0]), py(m.pond[1]), m.pond[2] * k, 0, Math.PI * 2); g.fillStyle = m.sea; g.fill(); }
-  if (m.water) { path(m.water); g.fillStyle = '#37c8d8'; g.fill(); }   // the bay
-  g.restore();
-  path(m.land); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 2.5; g.stroke();
-  const sh = g.createLinearGradient(0, H * 0.55, 0, H);     // the card's own vignette
-  sh.addColorStop(0, 'rgba(11,6,26,0)'); sh.addColorStop(1, 'rgba(11,6,26,0.72)');
-  g.fillStyle = sh; g.fillRect(0, 0, W, H);
-  host.innerHTML = ''; host.appendChild(cv);
+/** The card art. This started as the world's real top-down map — accurate, and
+ *  the wrong job: a map tells you where things are, a poster tells you why you
+ *  want to go. These are hero renders shot in-engine from a low three-quarter
+ *  angle with the HUD stripped — the void standing in the suburbs, the void on
+ *  the resort boardwalk — so the card is a picture of the fun rather than a
+ *  diagram of the terrain, and it is literally the game rather than a promise
+ *  the game has to live up to. Vendored locally, so no CDN can take them away. */
+const CARD_ART: Record<string, string> = {
+  maple: '/assets/card_maple.webp',
+  pirate: '/assets/card_pirate.webp',
+};
+function paintWorldCard(host: HTMLElement, id: string): void {
+  const src = CARD_ART[id];
+  if (!src) return;
+  host.style.backgroundImage = `url('${src}')`;
+  host.style.backgroundSize = 'cover';
+  host.style.backgroundPosition = 'center 42%';
 }
 // world cards: MAPLE ISLE + PIRATE BAY are both live now
 {
@@ -1424,7 +1398,7 @@ function paintWorldCard(host: HTMLElement, id: 'maple' | 'pirate'): void {
   document.querySelectorAll('#worldRow .wCard[data-world]').forEach((c) => {
     const id = (c as HTMLElement).dataset.world!;
     const art = c.querySelector('.wArt') as HTMLElement | null;
-    if (art) paintWorldCard(art, id as 'maple' | 'pirate');
+    if (art) paintWorldCard(art, id);
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
       if (id === pickedWorld) { launchWorld(); return; }   // already built: just go
