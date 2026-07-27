@@ -124,7 +124,10 @@ const ROOF_TAR = 0x4e5560, ROOF_DUCT = 0xaeb6c2, ROOF_VENT = 0x8b93a0;
 function roofKit(p: G[], w: number, d: number, y: number, dense = 1): void {
   p.push(part(box(w - 0.7, 0.22, d - 0.7), ROOF_TAR, 0, y + 0.11, 0));   // membrane
   const jx = () => (mrnd() - 0.5) * (w - 3.2), jz = () => (mrnd() - 0.5) * (d - 3.2);
-  const units = Math.max(1, Math.round((w * d) / 90 * dense));
+  // it was round(w*d/90) — ONE unit on a 9x9 shop, and roof tar measured 13.5%
+  // of the Main Street frame, the largest non-ground colour, carrying a single
+  // grey box.
+  const units = Math.max(3, Math.round((w * d) / 34 * dense));
   for (let i = 0; i < units; i++) {                                       // AC plant
     const ux = jx(), uz = jz(), uw = mr(1.5, 2.6), ud = mr(1.2, 2.0), uh = mr(0.7, 1.2);
     p.push(part(box(uw, uh, ud), ROOF_DUCT, ux, y + 0.22 + uh / 2, uz));
@@ -288,6 +291,26 @@ export function makeStorefront(w = 9, h = 8, side = -1): THREE.Mesh {
     p.push(part(box(1.6, 0.25, 0.45), CREAM, wx, h - 2.3, 4.65));
   }
   if (side >= 0) p.push(part(box(1.6, 1.1, 0.2), side ? BLUE : RED, -w / 2 + 1.6, 2.4, 4.85));  // window poster
+  // THE OTHER THREE SIDES. Every detail above sits at z >= +4.6, and the
+  // camera azimuth is locked at 45 degrees — so any storefront rotated away
+  // from it showed two blank walls. These are merged geometry, so the cost is
+  // triangles, not draw calls.
+  for (let i = 0; i < flr; i++) {                                        // rear windows
+    const wx = (i - (flr - 1) / 2) * (w / flr);
+    p.push(part(box(1.3, 2, 0.35), NIGHTGLASS, wx, h - 3.4, -4.6));
+    p.push(part(box(1.3, 1.8, 0.35), NIGHTGLASS, wx, h - 6.2, -4.6));
+  }
+  p.push(part(box(2.2, 2.8, 0.3), 0x5b4634, -w / 2 + 2, 1.4, -4.6));     // service door
+  p.push(part(box(1.4, 1.2, 1.0), SLATE, w / 2 - 2, 0.6, -4.2));         // bins, out the back
+  const sideWin = Math.max(1, Math.floor(9 / 4));
+  for (const sx of [-w / 2 - 0.02, w / 2 + 0.02]) {                       // gable-end windows
+    for (let i = 0; i < sideWin; i++) {
+      const sz = (i - (sideWin - 1) / 2) * 3.4;
+      p.push(part(box(0.3, 1.8, 1.2), NIGHTGLASS, sx, h - 3.4, sz));
+      p.push(part(box(0.3, 1.6, 1.1), NIGHTGLASS, sx, h - 6.2, sz));
+    }
+    p.push(part(box(0.22, 0.5, 9.2), CREAM, sx, h - 1.4, 0));            // sign band wraps
+  }
   roofKit(p, w, 9, h + 0.8);
   return M(p);
 }

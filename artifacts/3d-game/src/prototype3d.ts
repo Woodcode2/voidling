@@ -212,8 +212,15 @@ const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
   WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
 };
-rivals.onJoin = (name, color, x, z) => {
-  announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined the feast!`);
+// each family member's ARCHETYPE, named on arrival — a kid should be told what
+// to watch for once, then be able to read it off the screen forever after
+const ARCH_TAG: Record<string, string> = {
+  BULLY: '😈 she HUNTS you', COWARD: '😱 runs from everything',
+  SHOWOFF: '✨ only eats big stuff', COPYCAT: '👣 copies your route',
+  HOARDER: '😴 camps one spot',
+};
+rivals.onJoin = (name, color, x, z, arch) => {
+  announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined — ${ARCH_TAG[arch] ?? ''}`);
   fx.ring(x, z, color, 22, 0.8);
   audio.alert();
 };
@@ -223,7 +230,7 @@ rivals.onSpeak = (x, z, line) => {
   bubbles.say(rivalBubblePos.set(x, 5, z), line, 'event');
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
-rivals.onRivalEaten = (name, pts, rx, rz, rr) => {
+rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   smugUntil = tClock + 2.4; audio.voice('happy');
   // no breakingNews here: announceFam already puts a full-screen card up for
   // this, and a ticker headline three seconds later is the same news twice
@@ -231,7 +238,12 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr) => {
   addCoins(15);
   questEvent('rival');
   stats.rivals = (stats.rivals ?? 0) + 1; saveStats();
-  announceFam(`🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
+  // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
+  // off you plus half her score, so it has to land like the ending it is
+  announceFam(marquee
+    ? `🏆 you ATE THE HUNTER! ${name} is DINNER! +${pts}`
+    : `🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
+  if (marquee) { breakingNews(`BREAKING: the HUNTER has been HUNTED. ${name} is gone.`); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -248,16 +260,51 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr) => {
 // ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
 let hungryT = -99, hurtUntil = 0, smugUntil = 0, prevMood: Mood = 'cruise';
 let biteMercy = 0;   // global mercy: two big rivals overlapping must not chain-bite
-rivals.onPlayerBitten = (name) => {
+rivals.onPlayerBitten = (name, hit) => {
   if (tClock < biteMercy) return;
-  biteMercy = tClock + 2.5;
-  hurtUntil = tClock + 0.9; audio.voice('hurt');
-  // 12% shrink, not 18 — a silent-feeling 18% read as "the game glitched me
-  // smaller" to kids; the bite should sting, not punish
-  voidling.setRadius(Math.max(START_R, voidling.radius * 0.88));
-  announce(`😱 ${name} took a BITE of you!!`);
+  // MERCY FRAMES. Longer after the hunter connects, so a caught player gets a
+  // clear, visible moment to drive away instead of being chain-bitten.
+  biteMercy = tClock + (hit.hunter ? 3.2 : 2.5);
+  hurtUntil = tClock + (hit.hunter ? 1.3 : 0.9); audio.voice('hurt');
+  // THE COST. The old flat 12% shrink was silently refunded by the score floor
+  // (which is a pure function of playerScore) inside a frame or two — measured
+  // matches showed the radius back where it started before the flash had even
+  // faded, so being caught was free. The hunter's bite now takes SCORE too,
+  // which the floor cannot hand back, and she banks it: every point she takes
+  // is a point you win back by eating her later.
+  voidling.setRadius(Math.max(START_R, voidling.radius * hit.shrink));
+  if (hit.steal > 0) {
+    playerScore = Math.max(0, playerScore - hit.steal);
+    floatPos.set(voidState.x, voidling.radius + 4, voidState.z);
+    bubbles.float(floatPos, `-${hit.steal} STOLEN!`, true);
+  }
+  announce(hit.hunter ? `😱 ${name} CAUGHT you!! -${hit.steal}` : `😱 ${name} took a BITE of you!!`);
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
-  buzz(50);
+  if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
+  buzz(hit.hunter ? 90 : 50);
+};
+// ── THE THREAT'S THREE BEATS ────────────────────────────────────────────────
+// A charge that is telegraphed, a miss that is celebrated, and the moment the
+// predator becomes the prize. Near-misses are the thing a seven-year-old
+// retells, so the whiff gets more spectacle than the hit.
+rivals.onCharge = (name, x, z) => {
+  announce(`⚠️ ${name} is CHARGING at you!!`);
+  fx.ring(x, z, 0xff2b3c, 26, 0.6); fx.flash('rgba(255,43,60,0.16)', 0.35);
+  audio.alert(); audio.voice('scared'); buzz(35);
+};
+rivals.onNearMiss = (name, x, z) => {
+  announce('😤 MISSED ME!!');
+  floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
+  bubbles.float(floatPos, 'NEAR MISS!! 😤', true);
+  fx.ring(x, z, 0xffffff, 30, 0.5); fx.ring(voidState.x, voidState.z, 0x7ef2a0, voidling.radius * 4, 0.55);
+  fx.shake(6); fx.flash('rgba(126,242,160,0.22)', 0.3);
+  audio.ready(); buzz(45);
+  addCoins(5);   // dodging is a SKILL — pay it
+};
+rivals.onStuffed = (name) => {
+  announceFam(`🍖 ${name} is TOO FULL to chase — EAT HER!`);
+  breakingNews(`the hunter has stopped hunting. ${name} looks… edible.`);
+  audio.ready();
 };
 const audio = createAudio();
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
@@ -786,8 +833,10 @@ let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 function refreshHud() {
   const R = voidling.radius;
   // leaderboard: player + rivals, ranked by score
+  // the hunter is FLAGGED on the board: when a name has a 😈 next to it, that
+  // is the one on the island that can eat you right now
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
-    ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
+    ...rivals.list.map((r) => ({ name: r.hunting ? `😈 ${r.name}` : r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
@@ -802,7 +851,8 @@ function refreshHud() {
     lastRankBrag = tClock;
     // a rival just passed YOU — they get to brag about it
     const passer = rows[myRank - 2];
-    const rv = passer && !passer.me ? rivals.list.find((r) => r.name === passer.name) : undefined;
+    // …the board prefixes the hunter's row with 😈, so match on the bare name
+    const rv = passer && !passer.me ? rivals.list.find((r) => passer.name.endsWith(r.name)) : undefined;
     if (rv && RIVAL_VOICE[rv.name]) {
       bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)], 'event');
       rv.pulse = 1;
@@ -1386,7 +1436,7 @@ function resetMatch() {
     // every bather up at towel height after a rematch
     e.mesh.rotation.set(e.mesh.userData.homeRotX ?? 0, e.homeRotY, e.mesh.userData.homeRotZ ?? 0);
   }
-  rivals.reset();
+  rivals.reset(matchLen);   // join times are scaled to the clock they'll run on
   curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
   // every match opening on the same twenty seconds is real repetition — but the
@@ -2125,7 +2175,11 @@ function animate() {
 
   voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
   life.update(dt, tClock, voidState.x, voidState.z, R);
-  rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R);   // solo: the family never joins
+  // the family races on the SAME terms as the player now, so it needs the same
+  // three numbers: the clock it is pacing against, the score its rubber band
+  // reads, and the shared HAPPY HOUR multiplier
+  rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
+    { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
   bubbles.update(dt);
   const cy = voidling.group.position.y;
 
@@ -2253,6 +2307,9 @@ function animate() {
     // it was labelling — and it overlapped the speech bubbles behind it.
     const pxPerWorld = innerHeight / (2 * camDist * Math.tan((camera.fov * Math.PI / 180) / 2));
     formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + 34 + R * pxPerWorld}px`;
+    // one hero message at a time: the title card owns the centre of the screen
+    // for its 4.2 seconds, and the size chip was landing straight through it
+    formEl.style.opacity = tClock < titleUntil ? '0' : '1';
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }

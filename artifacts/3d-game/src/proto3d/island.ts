@@ -2281,12 +2281,34 @@ function makeGalleon(): THREE.Group {
   return g;
 }
 function makeThatchHut(): THREE.Group {
-  const wall = pick([0xf0e0c0, 0xe8d4a8, 0xf6ecd2]);
-  const parts = [
-    part(new THREE.CylinderGeometry(2.6, 2.8, 3.2, 10), wall, 0, 1.6, 0),
-    part(new THREE.ConeGeometry(3.9, 2.8, 10), 0xc9a25e, 0, 4.5, 0),
-    part(new THREE.BoxGeometry(1.2, 2, 0.2), 0x8a6132, 0, 1, 2.7),
-  ];
+  // Twenty-eight of these across Old Town and the docks with ROTATION as the
+  // only variation — a quarter of the district's frame was one cream and the
+  // rest was identical tan cone-hats, and nothing in it said "old town".
+  // Three builds: a round hut, a taller squared one, and a lean-to shack.
+  const wall = pick([0xf0e0c0, 0xe8d4a8, 0xf6ecd2, 0xdcc9a4]);
+  const thatch = pick([0xc9a25e, 0xb8904c, 0xd4b070]);
+  const kind = Math.random();
+  const parts: THREE.BufferGeometry[] = [];
+  if (kind < 0.42) {                                   // round hut
+    const h = rand(2.8, 3.6);
+    parts.push(part(new THREE.CylinderGeometry(2.6, 2.85, h, 10), wall, 0, h / 2, 0));
+    parts.push(part(new THREE.ConeGeometry(3.9, rand(2.4, 3.2), 10), thatch, 0, h + 1.3, 0));
+    parts.push(part(new THREE.BoxGeometry(1.2, 2, 0.2), 0x8a6132, 0, 1, 2.7));
+  } else if (kind < 0.78) {                            // squared two-storey
+    const h = rand(3.8, 4.8);
+    parts.push(part(new THREE.BoxGeometry(4.6, h, 4.4), wall, 0, h / 2, 0));
+    parts.push(part(new THREE.ConeGeometry(3.9, rand(2.2, 2.8), 4), thatch, 0, h + 1.1, 0, 0, Math.PI / 4, 0));
+    parts.push(part(new THREE.BoxGeometry(1.2, 2.1, 0.2), 0x8a6132, -0.8, 1.05, 2.25));
+    parts.push(part(new THREE.BoxGeometry(1.0, 0.9, 0.2), 0x5a7a8a, 1.2, 2.6, 2.25));   // shutter
+    parts.push(part(new THREE.BoxGeometry(5.0, 0.24, 0.9), 0x8a6132, 0, h * 0.62, 2.5)); // sill run
+  } else {                                             // lean-to, with cargo
+    parts.push(part(new THREE.BoxGeometry(4.2, 2.6, 3.4), wall, 0, 1.3, 0));
+    parts.push(part(new THREE.BoxGeometry(5.0, 0.26, 4.2), thatch, 0, 2.9, 0.3, -0.26));
+    parts.push(part(new THREE.CylinderGeometry(0.14, 0.14, 2.9, 5), 0x8a6132, 2.2, 1.45, 1.9));
+    parts.push(part(new THREE.CylinderGeometry(0.14, 0.14, 2.9, 5), 0x8a6132, -2.2, 1.45, 1.9));
+    parts.push(part(new THREE.CylinderGeometry(0.62, 0.62, 1.3, 8), 0x7a5a3a, 1.5, 0.65, 2.4));   // barrel
+    parts.push(part(new THREE.BoxGeometry(1.1, 0.9, 1.0), 0x9a7448, -1.3, 0.45, 2.5));            // crate
+  }
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 function makePalm(): THREE.Group {
