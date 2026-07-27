@@ -11,12 +11,23 @@ import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
 import * as BAY from './bay';
 import * as LUXE from './luxe';
+import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
+  // ── MAPLE FALLS (world 1): a small American town mid-election. `downtown`
+  // is MAIN STREET, `plaza` is THE SQUARE, `cozy` is the (now small) suburb,
+  // `beach` is LAKESIDE and `forest` is PINE WOODS — the names are kept
+  // because ./life and ./prototype3d key crowd behaviour and district captions
+  // off them. These four are new.
+  | 'fair' | 'farm' | 'campus' | 'strip'
   // ── PIRATE BAY (world 2): a world-class tropical resort with a buccaneer
   // theme. Same 6x6 block grid and the same road network, but the "roads" are
   // BOARDWALKS and every district is a holiday.
   | 'port' | 'resort' | 'party' | 'market' | 'jungle' | 'cove';
+// RETIRED on Maple: 'military' (the army base served a defence layer that was
+// deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
+// the union only because ./life still compares against them; nothing in
+// MAPLE_PLAN uses them and the bake + populate branches are gone.
 export type WorldId = 'maple' | 'pirate';
 
 export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
@@ -41,14 +52,38 @@ const ISLAND_CTRL: [number, number][] = [
   [11050, 3750], [9350, 400], [6000, 150], [2600, 500],
 ];
 
-// 6x6 biome plan (rows = gy north->south)
+// ══ MAPLE FALLS ═══════════════════════════════════════════════════════════
+// 6x6 biome plan (rows = gy north->south, cols = gx west->east).
+//
+// The old plan was 14 of 36 cells of suburb (39% of the island, 61% of its
+// props) with everything else a one-cell garnish. This one is a TOWN: nine
+// districts, none over 17% of the grid, each big enough to be somewhere.
+//
+//   PINE WOODS  the north ridge and the campsite, thinning to the coast
+//   THE FARM    bottomland along the river: barns, silos, the grain elevator
+//   FAIRGROUNDS the Maple County Fair, out on the north-west flats
+//   THE STRIP   the highway into town: gas, motel, drive-in, the twine ball
+//   MAPLE HEIGHTS the suburb — now three blocks and a school, not the island
+//   MAIN STREET two facing rows of storefronts down the road at x=6000
+//   THE SQUARE  town hall, bandstand, war memorial, and the protest
+//   THE PARK    the town green, the pond and nine holes of municipal golf
+//   MAPLE FALLS HIGH  the school, the field, the bleachers, the band
+//   LAKESIDE    the whole south shore
+//
+// Three cells are PINNED by staged vignettes in ./life, which this file does
+// not own: (3,2) is the mayor's re-election rally so it must be the square,
+// (4,0) is the campsite so it must be woods, (4,2) is the golf flag so it must
+// be the park, (4,3) is the ball game so it must be the school field, (2,4) is
+// the schoolhouse at recess so it must be the suburb, (2,5) is beach
+// volleyball so it must be the shore — and ./life tethers wandering livestock
+// to block (5,1) unconditionally, which is why the farm reaches it.
 const MAPLE_PLAN: Biome[][] = [
-  ['cozy', 'cozy', 'cozy', 'cozy', 'forest', 'forest'],
-  ['cozy', 'cozy', 'downtown', 'downtown', 'forest', 'zoo'],
-  ['fancy', 'fancy', 'downtown', 'plaza', 'park', 'forest'],
-  ['fancy', 'fancy', 'downtown', 'downtown', 'park', 'forest'],
-  ['cozy', 'cozy', 'fancy', 'fancy', 'forest', 'airport'],
-  ['beach', 'beach', 'beach', 'beach', 'beach', 'military'],
+  ['forest', 'forest', 'forest', 'farm', 'forest', 'forest'],
+  ['fair', 'fair', 'fair', 'farm', 'farm', 'farm'],
+  ['strip', 'cozy', 'downtown', 'plaza', 'park', 'park'],
+  ['strip', 'cozy', 'downtown', 'downtown', 'campus', 'campus'],
+  ['strip', 'cozy', 'cozy', 'cozy', 'campus', 'campus'],
+  ['beach', 'beach', 'beach', 'beach', 'beach', 'beach'],
 ];
 // PIRATE BAY — the resort reads north-to-south as ARRIVE -> PLAY -> PARTY:
 // the working port and jungle up top, the resort and market in the middle,
@@ -106,6 +141,26 @@ export function lotPool(biome: Biome, li: number, lot: HouseLot): { x: number; y
 }
 const ROAD_CENTERS = [2580, 4290, 6000, 7710, 9420];
 
+// ── MAPLE FALLS: the hand-surveyed heart of town (world units) ──────────────
+// The Square is block (3,2) and it is the one place on the island whose
+// geometry is fixed by hand rather than derived from the block grid, because
+// three separate systems have to agree on it: the ground bake, the props in
+// populate(), and ./life's mayoral rally — which stages itself at the block
+// centre minus 12 units of z, i.e. world y = 4905, and which this file cannot
+// move. So the town hall sits north of that line, its forecourt is the stage,
+// and the green begins south of it.
+const SQ_CX = 6855;                                   // Main Street's square, centre line
+const SQ_HALL_Y = 4640;                               // town hall centre (facing south)
+const SQ_RALLY_Y = 4905;                              // ./life's rally stage — do not build on it
+const SQ_GREEN: [number, number, number, number] = [6240, 4980, 7470, 5880];   // x0,y0,x1,y1
+const MAIN_ST_X = 6000;                               // Main Street's asphalt centreline
+// THE OPENING. Hand-authored, fixed, identical every load: standing on the
+// square's west walk on bright green grass (the player is 0x9a5cff — the one
+// thing the ground here must not be is pale violet), with the town hall in
+// shot to the north-east, the bandstand across the green, Main Street's
+// shopfronts behind, and the parking-meter protest ten units away.
+export const MAPLE_SPAWN: [number, number] = [6420, 5250];
+
 const RIVER: [number, number][] = [
   [8405, 1149], [8277, 3035], [8565, 5337], [8213, 6887], [8469, 8661], [9431, 9305], [9700, 9830], [9800, 10150],
 ];
@@ -126,6 +181,10 @@ const WATERFALL: [number, number] = [9800, 10150];
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+// MAPLE FALLS is HAND-BUILT and the owner asked for the same crisp town every
+// single load: its bake and its populate run off the seeded stream in
+// ./mainstreet, never Math.random. (Pirate Bay keeps rand/pick above.)
+const mr = MS.mr, mpick = MS.mpick, mrnd = MS.mrnd, mchance = MS.mchance;
 
 // ── shared geometry helpers for ./life ─────────────────────────────────────────
 export const worldTo3D = (v: number) => w(v);
@@ -198,6 +257,9 @@ export function coastClear(x3: number, z3: number, d = 12): boolean {
 }
 
 export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
+  // MAPLE FALLS is deterministic: reset the town's seeded stream before the
+  // bake so the ground, and then the props, come out identical every load.
+  if (WORLD_ID !== 'pirate') MS.resetMapleRng();
   const silW = silPoly();
   const sil3 = silW.map(([x, y]) => new THREE.Vector2(w(x), w(y)));   // active coastline, world-aware
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -518,9 +580,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // biome block fills
   const biomeColor: Record<Biome, number | null> = {
-    cozy: null, fancy: null, downtown: WORLD.pavement, plaza: WORLD.pavement,
+    // ── MAPLE FALLS ground. THE SQUARE stays null (a green, not a slab): the
+    // player is 0x9a5cff and the match opens there, so the one thing the
+    // ground under the spawn must not be is pale violet pavement.
+    cozy: null, fancy: null, downtown: WORLD.pavement, plaza: null,
     park: WORLD.park, forest: WORLD.forest, beach: WORLD.sand, zoo: WORLD.zooGround,
     airport: 0xd9dbe6, military: 0x8f9576,
+    fair: 0xc8b98a,      // trampled fairground earth
+    farm: 0xc7ab5c,      // ripe crop; pasture + tilled strips painted over it
+    campus: 0x8fd06a,    // athletic turf
+    strip: 0xc4bda8,     // highway gravel and dust
     // ── PIRATE BAY ground: sun-bleached sand, teak decking, jungle green
     port: 0xa8814f,      // wet dock timber
     resort: 0xf2e2b8,    // raked resort sand
@@ -579,29 +648,49 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
   }
 
-  // pavement blocks read ENGINEERED: expansion-joint grid + inner courtyard
-  // tint on downtown blocks (the street-wall buildings frame a service court)
+  // ══ MAIN STREET ══════════════════════════════════════════════════════════
+  // Not a downtown grid — a STREET. Every `downtown` block is paved with
+  // flagstones, keeps a green service alley behind the shopfronts and a rear
+  // gravel lot, and puts ANGLED PARKING BAYS along the block face that meets
+  // the road at world x=6000. Two facing rows of storefronts on one street
+  // reads as a place; four street-walls around a courtyard reads as a city.
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const b = PLAN[gy][gx];
-    if (b !== 'downtown' && b !== 'plaza') continue;
+    if (b !== 'downtown') continue;
     const cxB = blockCenter(gx), cyB = blockCenter(gy);
     const x0 = pxW(cxB - BLOCK_SIZE / 2), y0 = pyW(cyB - BLOCK_SIZE / 2);
     const x1 = pxW(cxB + BLOCK_SIZE / 2), y1 = pyW(cyB + BLOCK_SIZE / 2);
     g.save(); g.beginPath(); g.rect(x0, y0, x1 - x0, y1 - y0); g.clip();
-    g.strokeStyle = 'rgba(90,100,130,0.10)'; g.lineWidth = Math.max(1.2, pxW(10) - pxW(0));
-    for (let s = 0; s <= 16; s++) {
-      const t = cxB - BLOCK_SIZE / 2 + (s / 16) * BLOCK_SIZE;
+    // flagstone sidewalk grid — small-town pavers, not city expansion joints
+    g.strokeStyle = 'rgba(120,116,134,0.13)'; g.lineWidth = Math.max(1.2, pxW(10) - pxW(0));
+    for (let s = 0; s <= 20; s++) {
+      const t = cxB - BLOCK_SIZE / 2 + (s / 20) * BLOCK_SIZE;
       g.beginPath(); g.moveTo(pxW(t), y0); g.lineTo(pxW(t), y1); g.stroke();
-      const ty = cyB - BLOCK_SIZE / 2 + (s / 16) * BLOCK_SIZE;
+      const ty = cyB - BLOCK_SIZE / 2 + (s / 20) * BLOCK_SIZE;
       g.beginPath(); g.moveTo(x0, pyW(ty)); g.lineTo(x1, pyW(ty)); g.stroke();
     }
-    if (b === 'downtown') {
-      // asphalt service court behind the street walls
-      const ch = BLOCK_SIZE * 0.27;
-      g.fillStyle = '#d4d4e0';
-      g.fillRect(pxW(cxB - ch), pyW(cyB - ch), pxW(cxB + ch) - pxW(cxB - ch), pyW(cyB + ch) - pyW(cyB - ch));
-      g.strokeStyle = 'rgba(90,100,130,0.25)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
-      g.strokeRect(pxW(cxB - ch), pyW(cyB - ch), pxW(cxB + ch) - pxW(cxB - ch), pyW(cyB + ch) - pyW(cyB - ch));
+    // the back of the block: a green service yard with a gravel lot in it
+    g.fillStyle = '#8fc96a';
+    g.fillRect(pxW(cxB - 470), pyW(cyB - 470), pxW(940) - pxW(0), pyW(940) - pyW(0));
+    g.fillStyle = '#c3bcaa';
+    g.fillRect(pxW(cxB - 330), pyW(cyB - 250), pxW(660) - pxW(0), pyW(500) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = Math.max(1.2, pxW(11) - pxW(0));
+    for (let s = 0; s <= 5; s++) {   // parking bay stripes in the rear lot
+      const t = cxB - 330 + (s / 5) * 660;
+      g.beginPath(); g.moveTo(pxW(t), pyW(cyB - 250)); g.lineTo(pxW(t), pyW(cyB - 20)); g.stroke();
+      g.beginPath(); g.moveTo(pxW(t), pyW(cyB + 20)); g.lineTo(pxW(t), pyW(cyB + 250)); g.stroke();
+    }
+    // ANGLED PARKING on the Main Street kerb — the single most legible
+    // "American small town" mark you can paint, and it costs 8 strokes
+    const face = cxB < MAIN_ST_X ? 1 : -1;                 // which way Main Street lies
+    const kerb = cxB + face * (BLOCK_SIZE / 2 - 40);
+    g.strokeStyle = 'rgba(250,250,255,0.72)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
+    for (let s = 0; s < 11; s++) {
+      const ky = cyB - 700 + s * 140;
+      g.beginPath();
+      g.moveTo(pxW(kerb), pyW(ky));
+      g.lineTo(pxW(kerb - face * 230), pyW(ky + 110));
+      g.stroke();
     }
     g.restore();
   }
@@ -740,36 +829,70 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.restore();
   }
 
-  // CIVIC PLAZA — formal axis: paved forecourt, twin lawn panels, a walkway
-  // from the town-hall steps to the fountain (populate stages the buildings)
+  // ══ THE SQUARE ═══════════════════════════════════════════════════════════
+  // Maple Falls' town green, block (3,2). A COURTHOUSE-SQUARE plan: a lawn
+  // with a paved circle at the centre (bandstand), four diagonal walks out to
+  // the corners, a formal forecourt at the north end where the town hall
+  // stands, and Main Street running down the west kerb.
+  //
+  // The ground here is deliberately GRASS. The player is 0x9a5cff and the
+  // match opens on this square; a pale-violet pavement slab under a violet
+  // void is how you make the void invisible in its own first frame.
   {
-    const pcx = 6855, pcy = 5145;
-    // twin lawn panels flanking the axis
-    for (const s of [-1, 1]) {
-      g.fillStyle = hex(WORLD.park);
-      g.fillRect(pxW(pcx + s * 330 - 190), pyW(4780), pxW(380) - pxW(0), pyW(5560) - pyW(4780));
-      g.strokeStyle = 'rgba(140,165,130,0.5)'; g.lineWidth = Math.max(1.5, pxW(16) - pxW(0));
-      g.strokeRect(pxW(pcx + s * 330 - 190), pyW(4780), pxW(380) - pxW(0), pyW(5560) - pyW(4780));
+    const gy0 = SQ_GREEN[1], gy1 = SQ_GREEN[3], gx0 = SQ_GREEN[0], gx1 = SQ_GREEN[2];
+    const gcx = (gx0 + gx1) / 2, gcy = (gy0 + gy1) / 2;
+    // the green itself, a shade brighter than the meadow so it reads mown
+    g.fillStyle = '#8ddc63';
+    g.fillRect(pxW(gx0), pyW(gy0), pxW(gx1 - gx0) - pxW(0), pyW(gy1 - gy0) - pyW(0));
+    g.strokeStyle = 'rgba(120,170,96,0.6)'; g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
+    g.strokeRect(pxW(gx0), pyW(gy0), pxW(gx1 - gx0) - pxW(0), pyW(gy1 - gy0) - pyW(0));
+    // mow stripes, so the green reads MAINTAINED from the top-down camera
+    g.fillStyle = 'rgba(255,255,255,0.075)';
+    for (let s = 0; s < 10; s += 2) {
+      g.fillRect(pxW(gx0), pyW(gy0 + (s / 10) * (gy1 - gy0)), pxW(gx1 - gx0) - pxW(0), pyW((gy1 - gy0) / 10) - pyW(0));
     }
-    // ceremonial walkway: town hall → fountain
-    g.fillStyle = '#ddd6ea';
-    g.fillRect(pxW(pcx - 100), pyW(4520), pxW(200) - pxW(0), pyW(5145) - pyW(4520));
-    g.strokeStyle = 'rgba(122,79,224,0.25)'; g.lineWidth = Math.max(1.5, pxW(12) - pxW(0));
-    g.strokeRect(pxW(pcx - 100), pyW(4520), pxW(200) - pxW(0), pyW(5145) - pyW(4520));
+    // perimeter walk + the four diagonals to the corners
+    const WALK = '#e7e2d2';
+    g.strokeStyle = WALK; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.lineWidth = pxW(120) - pxW(0);
+    g.strokeRect(pxW(gx0 + 80), pyW(gy0 + 80), pxW(gx1 - gx0 - 160) - pxW(0), pyW(gy1 - gy0 - 160) - pyW(0));
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      g.beginPath();
+      g.moveTo(pxW(gcx + dx * 130), pyW(gcy + dy * 110));
+      g.lineTo(pxW(gcx + dx * ((gx1 - gx0) / 2 - 100)), pyW(gcy + dy * ((gy1 - gy0) / 2 - 100)));
+      g.stroke();
+    }
+    // the bandstand circle at the crossing
+    g.fillStyle = WALK;
+    g.beginPath(); g.arc(pxW(gcx), pyW(gcy), pxW(230) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(180,168,140,0.55)'; g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
+    g.beginPath(); g.arc(pxW(gcx), pyW(gcy), pxW(226) - pxW(0), 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.arc(pxW(gcx), pyW(gcy), pxW(140) - pxW(0), 0, Math.PI * 2); g.stroke();
+    // the town hall's forecourt at the north end, with its step lines. ./life
+    // stages the mayor's rally at world y=4905 — this is the stone it stands on
+    g.fillStyle = '#efeadb';
+    g.fillRect(pxW(SQ_CX - 420), pyW(4790), pxW(840) - pxW(0), pyW(170) - pyW(0));
+    g.strokeStyle = 'rgba(176,164,138,0.65)'; g.lineWidth = Math.max(1.5, pxW(16) - pxW(0));
+    for (let s = 0; s < 3; s++) {
+      g.beginPath();
+      g.moveTo(pxW(SQ_CX - 330 + s * 30), pyW(4820 + s * 26));
+      g.lineTo(pxW(SQ_CX + 330 - s * 30), pyW(4820 + s * 26));
+      g.stroke();
+    }
+    // the paved apron between Main Street and the green, where the town
+    // gathers, and the bare patch the parking-meter protest has worn into it
+    g.fillStyle = '#e2ddcd';
+    g.fillRect(pxW(6120), pyW(gy0 - 60), pxW(190) - pxW(0), pyW(gy1 - gy0 + 120) - pyW(0));
+    g.fillStyle = 'rgba(186,166,116,0.45)';
+    g.beginPath(); g.ellipse(pxW(6300), pyW(5090), pxW(190) - pxW(0), pyW(140) - pyW(0), 0.2, 0, Math.PI * 2); g.fill();
   }
 
-  // SCHOOLYARD — blacktop + hopscotch beside the school (kids notice schools)
+  // LAKESIDE's sand runs to the WATERLINE, not to the block grid. The 6x6 grid
+  // stops at world y=11075 and the south coast runs on to 11610, so the old
+  // fill left a band of meadow green between the beach and the sea.
   {
-    const syx = 6440, syy = 5390;
-    g.fillStyle = '#8d93aa';
-    g.fillRect(pxW(syx - 170), pyW(syy - 130), pxW(340) - pxW(0), pyW(260) - pyW(0));
-    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = Math.max(1.2, pxW(10) - pxW(0));
-    // hopscotch ladder
-    for (let k = 0; k < 5; k++) g.strokeRect(pxW(syx - 120), pyW(syy - 100 + k * 42), pxW(44) - pxW(0), pyW(42) - pyW(0));
-    // foursquare
-    g.strokeRect(pxW(syx + 20), pyW(syy - 70), pxW(120) - pxW(0), pyW(120) - pyW(0));
-    g.beginPath(); g.moveTo(pxW(syx + 80), pyW(syy - 70)); g.lineTo(pxW(syx + 80), pyW(syy + 50)); g.stroke();
-    g.beginPath(); g.moveTo(pxW(syx + 20), pyW(syy - 10)); g.lineTo(pxW(syx + 140), pyW(syy - 10)); g.stroke();
+    g.fillStyle = hex(WORLD.sand);
+    g.fillRect(pxW(600), pyW(11060), pxW(9200) - pxW(0), pyW(1300) - pyW(0));
   }
 
   // BEACH BOARDWALK — a continuous plank promenade along the top of the whole
@@ -818,36 +941,210 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
   }
 
-  // AIRPORT — a real little airfield: runway with threshold bars + centerline,
-  // taxiway loop to an apron (control tower + hangar + plane are 3D props)
+  // ══ MAPLE FALLS HIGH ═════════════════════════════════════════════════════
+  // The 2x2 campus, blocks (4..5, 3..4). MEASURED CONSTRAINT: the river runs
+  // down world x≈8220..8460 through the whole of column gx=4, so the stadium —
+  // the widest flat thing in the level — cannot live on the block ./life plays
+  // its ball game on. It sits on (5,3) instead, east of the creek, and (4,3)
+  // keeps a plain lined PRACTICE field drawn to exactly match the pitch plane
+  // ./life lays down at that block centre.
   {
-    const acx = blockCenter(5), acy = blockCenter(4);
+    const sx1 = blockCenter(5), sy1 = blockCenter(3);
     g.save();
     g.beginPath();
-    g.rect(pxW(acx - BLOCK_SIZE / 2), pyW(acy - BLOCK_SIZE / 2), pxW(acx + BLOCK_SIZE / 2) - pxW(acx - BLOCK_SIZE / 2), pyW(acy + BLOCK_SIZE / 2) - pyW(acy - BLOCK_SIZE / 2));
+    g.rect(pxW(sx1 - BLOCK_SIZE / 2), pyW(sy1 - BLOCK_SIZE / 2), pxW(BLOCK_SIZE) - pxW(0), pyW(BLOCK_SIZE) - pyW(0));
     g.clip();
-    // runway diagonal-ish across the block
-    g.strokeStyle = '#5b6070'; g.lineWidth = pxW(240) - pxW(0); g.lineCap = 'butt';
-    g.beginPath(); g.moveTo(pxW(acx - 700), pyW(acy + 520)); g.lineTo(pxW(acx + 700), pyW(acy - 520)); g.stroke();
-    // centerline dashes
-    g.strokeStyle = 'rgba(240,244,252,0.9)'; g.lineWidth = pxW(24) - pxW(0);
-    g.setLineDash([pxW(120) - pxW(0), pxW(90) - pxW(0)]);
-    g.beginPath(); g.moveTo(pxW(acx - 640), pyW(acy + 476)); g.lineTo(pxW(acx + 640), pyW(acy - 476)); g.stroke();
-    g.setLineDash([]);
-    // threshold bars at both ends
-    const ang = Math.atan2(-(pyW(acy - 520) - pyW(acy + 520)), pxW(acx + 700) - pxW(acx - 700));
-    for (const e of [-1, 1]) {
-      const ex = pxW(acx + e * 620), ey = pyW(acy - e * 460);
-      g.save(); g.translate(ex, ey); g.rotate(-ang);
-      g.fillStyle = 'rgba(240,244,252,0.9)';
-      for (let k = -3; k <= 3; k++) if (k) g.fillRect(-(pxW(50) - pxW(0)), k * (pxW(28) - pxW(0)), pxW(100) - pxW(0), pxW(14) - pxW(0));
-      g.restore();
+    // the running track: a rounded rectangle of clay around the field
+    g.strokeStyle = '#c4643f'; g.lineWidth = pxW(190) - pxW(0); g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(pxW(sx1 - 480), pyW(sy1 - 300)); g.lineTo(pxW(sx1 + 480), pyW(sy1 - 300));
+    g.lineTo(pxW(sx1 + 480), pyW(sy1 + 300)); g.lineTo(pxW(sx1 - 480), pyW(sy1 + 300));
+    g.closePath(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = Math.max(1.2, pxW(12) - pxW(0));
+    for (const inset of [-58, 0, 58]) {
+      g.beginPath();
+      g.moveTo(pxW(sx1 - 480), pyW(sy1 - 300 + inset)); g.lineTo(pxW(sx1 + 480), pyW(sy1 - 300 + inset)); g.stroke();
+      g.beginPath();
+      g.moveTo(pxW(sx1 - 480), pyW(sy1 + 300 - inset)); g.lineTo(pxW(sx1 + 480), pyW(sy1 + 300 - inset)); g.stroke();
     }
-    // apron pad (parking) in the DRY south-west quadrant (the NE end of the
-    // block is clipped by the coast — operations all live on solid ground)
-    g.fillStyle = '#c3c7d4';
-    g.fillRect(pxW(acx - 620), pyW(acy + 180), pxW(520) - pxW(0), pyW(380) - pyW(0));
+    // the field
+    g.fillStyle = '#63b84e';
+    g.fillRect(pxW(sx1 - 480), pyW(sy1 - 250), pxW(960) - pxW(0), pyW(500) - pyW(0));
+    for (let s2 = 0; s2 < 8; s2 += 2) {   // mow bands down the field
+      g.fillStyle = 'rgba(255,255,255,0.075)';
+      g.fillRect(pxW(sx1 - 480 + (s2 / 8) * 960), pyW(sy1 - 250), pxW(960 / 8) - pxW(0), pyW(500) - pyW(0));
+    }
+    // end zones in the school colours
+    g.fillStyle = '#2f4a7a';
+    g.fillRect(pxW(sx1 - 480), pyW(sy1 - 250), pxW(130) - pxW(0), pyW(500) - pyW(0));
+    g.fillRect(pxW(sx1 + 350), pyW(sy1 - 250), pxW(130) - pxW(0), pyW(500) - pyW(0));
+    // yard lines + hash marks
+    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
+    g.strokeRect(pxW(sx1 - 480), pyW(sy1 - 250), pxW(960) - pxW(0), pyW(500) - pyW(0));
+    for (let s2 = 0; s2 <= 10; s2++) {
+      const yx = sx1 - 350 + (s2 / 10) * 700;
+      g.beginPath(); g.moveTo(pxW(yx), pyW(sy1 - 250)); g.lineTo(pxW(yx), pyW(sy1 + 250)); g.stroke();
+    }
+    g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+    for (let s2 = 0; s2 < 50; s2++) {
+      const yx = sx1 - 350 + (s2 / 50) * 700;
+      for (const hy of [-80, 80]) {
+        g.beginPath(); g.moveTo(pxW(yx), pyW(sy1 + hy - 16)); g.lineTo(pxW(yx), pyW(sy1 + hy + 16)); g.stroke();
+      }
+    }
+    // the 50-yard-line maple leaf, in navy
+    g.fillStyle = 'rgba(47,74,122,0.75)';
+    g.beginPath(); g.arc(pxW(sx1), pyW(sy1), pxW(96) - pxW(0), 0, Math.PI * 2); g.fill();
     g.restore();
+  }
+  {
+    // the PRACTICE field on (4,3), drawn to the same rectangle ./life's pitch
+    // plane covers, so the two agree instead of z-fighting
+    const px2 = blockCenter(4), py2 = blockCenter(3);
+    g.fillStyle = '#6fc255';
+    g.fillRect(pxW(px2 - 320), pyW(py2 - 220), pxW(640) - pxW(0), pyW(440) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = Math.max(1.5, pxW(13) - pxW(0));
+    g.strokeRect(pxW(px2 - 300), pyW(py2 - 200), pxW(600) - pxW(0), pyW(400) - pyW(0));
+    g.beginPath(); g.moveTo(pxW(px2), pyW(py2 - 200)); g.lineTo(pxW(px2), pyW(py2 + 200)); g.stroke();
+    g.beginPath(); g.arc(pxW(px2), pyW(py2), pxW(70) - pxW(0), 0, Math.PI * 2); g.stroke();
+    // the SCHOOL's drive and bus loop on (5,4)
+    const scx2 = blockCenter(5), scy2 = blockCenter(4);
+    g.fillStyle = '#9aa0ac';
+    g.fillRect(pxW(scx2 - 620), pyW(scy2 + 120), pxW(1240) - pxW(0), pyW(420) - pyW(0));
+    g.strokeStyle = 'rgba(255,210,60,0.7)'; g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
+    g.beginPath(); g.moveTo(pxW(scx2 - 600), pyW(scy2 + 330)); g.lineTo(pxW(scx2 + 600), pyW(scy2 + 330)); g.stroke();
+    // the STUDENT LOT on (4,4), east of the creek
+    const lx = 8880, ly = blockCenter(4) - 190;
+    g.fillStyle = '#9aa0ac';
+    g.fillRect(pxW(lx - 380), pyW(ly - 380), pxW(760) - pxW(0), pyW(760) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.62)'; g.lineWidth = Math.max(1.2, pxW(12) - pxW(0));
+    for (let s2 = 0; s2 <= 8; s2++) {
+      const sy2 = ly - 380 + (s2 / 8) * 760;
+      g.beginPath(); g.moveTo(pxW(lx - 360), pyW(sy2)); g.lineTo(pxW(lx - 40), pyW(sy2)); g.stroke();
+      g.beginPath(); g.moveTo(pxW(lx + 40), pyW(sy2)); g.lineTo(pxW(lx + 360), pyW(sy2)); g.stroke();
+    }
+  }
+
+  // ══ THE FAIRGROUNDS ══════════════════════════════════════════════════════
+  // Maple County Fair, blocks (0..2, 1). A trampled-earth MIDWAY runs the
+  // whole width with tent pads either side of it, a show ring at the east end
+  // and a parking meadow behind. A straight axis is what makes a fair read as
+  // a fair from above instead of a scatter of cones.
+  {
+    const my = blockCenter(1);
+    const mx0 = blockCenter(0) - 700, mx1 = blockCenter(2) + 700;
+    g.fillStyle = '#b8a473';
+    g.fillRect(pxW(mx0), pyW(my - 260), pxW(mx1 - mx0) - pxW(0), pyW(520) - pyW(0));
+    g.strokeStyle = 'rgba(250,244,220,0.55)'; g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
+    g.strokeRect(pxW(mx0), pyW(my - 260), pxW(mx1 - mx0) - pxW(0), pyW(520) - pyW(0));
+    // tent pads, a straight row either side of the midway
+    for (let s = 0; s < 12; s++) {
+      const tx = mx0 + 260 + s * 500;
+      if (tx > mx1 - 200) break;
+      for (const side of [-1, 1]) {
+        g.fillStyle = 'rgba(214,198,158,0.9)';
+        g.beginPath(); g.arc(pxW(tx), pyW(my + side * 420), pxW(190) - pxW(0), 0, Math.PI * 2); g.fill();
+      }
+    }
+    // the show ring at the east end
+    g.fillStyle = '#cbb98c';
+    g.beginPath(); g.ellipse(pxW(blockCenter(2) + 420), pyW(my + 560), pxW(430) - pxW(0), pyW(320) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = Math.max(1.5, pxW(22) - pxW(0));
+    g.beginPath(); g.ellipse(pxW(blockCenter(2) + 420), pyW(my + 560), pxW(430) - pxW(0), pyW(320) - pyW(0), 0, 0, Math.PI * 2); g.stroke();
+    // the parking meadow: rows of tyre-flattened grass north of the midway
+    g.strokeStyle = 'rgba(150,140,100,0.35)'; g.lineWidth = Math.max(1.5, pxW(60) - pxW(0));
+    for (let s = 0; s < 7; s++) {
+      const ry = my - 640 - s * 105;
+      g.beginPath(); g.moveTo(pxW(blockCenter(0) - 400), pyW(ry)); g.lineTo(pxW(blockCenter(2) + 300), pyW(ry)); g.stroke();
+    }
+  }
+
+  // ══ THE FARM ═════════════════════════════════════════════════════════════
+  // Blocks (3,0) and (3..5, 1) — the bottomland east of town, along the rail
+  // spur and the river. Big FIELD STRIPS in four crop colours, a corn maze cut
+  // as a spiral, and the pumpkin patch. Strips read as agriculture instantly;
+  // a green square with a barn on it never will.
+  for (const [fgx, fgy] of [[3, 0], [3, 1], [4, 1], [5, 1]] as [number, number][]) {
+    const cx2 = blockCenter(fgx), cy2 = blockCenter(fgy);
+    g.save();
+    g.beginPath();
+    g.rect(pxW(cx2 - BLOCK_SIZE / 2), pyW(cy2 - BLOCK_SIZE / 2), pxW(BLOCK_SIZE) - pxW(0), pyW(BLOCK_SIZE) - pyW(0));
+    g.clip();
+    const CROP = ['#8fbf4e', '#cfa94a', '#a8c96a', '#b78f52', '#dcc76a'];
+    for (let s = 0; s < 7; s++) {
+      const y0f = cy2 - 800 + s * 230;
+      g.fillStyle = CROP[(fgx * 3 + fgy * 2 + s) % CROP.length];
+      g.fillRect(pxW(cx2 - 800), pyW(y0f), pxW(1600) - pxW(0), pyW(230) - pyW(0));
+      // plough lines down each strip
+      g.strokeStyle = 'rgba(90,70,40,0.13)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
+      for (let k = 0; k < 9; k++) {
+        const ly2 = y0f + 12 + k * 25;
+        g.beginPath(); g.moveTo(pxW(cx2 - 800), pyW(ly2)); g.lineTo(pxW(cx2 + 800), pyW(ly2)); g.stroke();
+      }
+    }
+    // field boundaries
+    g.strokeStyle = 'rgba(96,120,60,0.4)'; g.lineWidth = Math.max(1.5, pxW(26) - pxW(0));
+    for (let s = 0; s <= 7; s++) {
+      const yb = cy2 - 800 + s * 230;
+      g.beginPath(); g.moveTo(pxW(cx2 - 800), pyW(yb)); g.lineTo(pxW(cx2 + 800), pyW(yb)); g.stroke();
+    }
+    g.restore();
+  }
+  {
+    // THE CORN MAZE — a cut spiral on (3,1). Kids find this on the map.
+    const mzx = blockCenter(3), mzy = blockCenter(1);
+    g.fillStyle = '#5f9a34';
+    g.beginPath(); g.arc(pxW(mzx), pyW(mzy), pxW(560) - pxW(0), 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#d8c98a'; g.lineWidth = pxW(90) - pxW(0); g.lineCap = 'round';
+    g.beginPath();
+    for (let t = 0; t < 1; t += 0.004) {
+      const a2 = t * Math.PI * 7, r2 = 60 + t * 480;
+      const mxp = pxW(mzx + Math.cos(a2) * r2), myp = pyW(mzy + Math.sin(a2) * r2);
+      if (t === 0) g.moveTo(mxp, myp); else g.lineTo(mxp, myp);
+    }
+    g.stroke();
+    // THE PUMPKIN PATCH on (4,1): dark tilled soil in short rows
+    const ppx = blockCenter(4), ppy = blockCenter(1) + 460;
+    g.fillStyle = '#7d5c36';
+    g.fillRect(pxW(ppx - 620), pyW(ppy - 230), pxW(1240) - pxW(0), pyW(460) - pyW(0));
+    g.strokeStyle = 'rgba(50,36,20,0.3)'; g.lineWidth = Math.max(1.5, pxW(26) - pxW(0));
+    for (let s = 0; s < 8; s++) {
+      const ry = ppy - 200 + s * 58;
+      g.beginPath(); g.moveTo(pxW(ppx - 600), pyW(ry)); g.lineTo(pxW(ppx + 600), pyW(ry)); g.stroke();
+    }
+  }
+
+  // ══ THE STRIP ════════════════════════════════════════════════════════════
+  // Blocks (0, 2..4): the highway into Maple Falls. Gravel forecourts and
+  // asphalt aprons stacked down the road at x=2580, plus the drive-in's fan of
+  // parking ramps — which is the shape that makes a drive-in a drive-in.
+  {
+    const sx0 = blockCenter(0);
+    for (const sgy of [2, 3, 4]) {
+      const sy = blockCenter(sgy);
+      g.fillStyle = '#adb2b8';   // the apron along the road frontage
+      g.fillRect(pxW(sx0 + 240), pyW(sy - 620), pxW(560) - pxW(0), pyW(1240) - pyW(0));
+      g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = Math.max(1.2, pxW(12) - pxW(0));
+      for (let s = 0; s < 9; s++) {
+        const py3 = sy - 560 + s * 140;
+        g.beginPath(); g.moveTo(pxW(sx0 + 420), pyW(py3)); g.lineTo(pxW(sx0 + 780), pyW(py3)); g.stroke();
+      }
+      // dust and gravel behind it
+      g.fillStyle = 'rgba(190,178,146,0.55)';
+      g.fillRect(pxW(sx0 - 700), pyW(sy - 620), pxW(920) - pxW(0), pyW(1240) - pyW(0));
+    }
+    // THE DRIVE-IN, on (0,3): the fan of viewing ramps facing the screen
+    const dx = sx0 - 180, dy = blockCenter(3);
+    g.fillStyle = '#8f8a7e';
+    g.beginPath(); g.ellipse(pxW(dx), pyW(dy), pxW(620) - pxW(0), pyW(520) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(60,54,44,0.35)'; g.lineWidth = Math.max(1.5, pxW(46) - pxW(0));
+    for (let s = 1; s < 7; s++) {
+      g.beginPath();
+      g.ellipse(pxW(dx), pyW(dy), pxW(90 + s * 82) - pxW(0), pyW(80 + s * 68) - pyW(0), 0, -1.15, 1.15);
+      g.stroke();
+    }
+    g.fillStyle = 'rgba(240,236,226,0.75)';   // the screen's concrete pad
+    g.fillRect(pxW(dx + 560), pyW(dy - 300), pxW(90) - pxW(0), pyW(600) - pyW(0));
   }
 
   // train tracks (ballast + twin rails + ties) around downtown
@@ -965,9 +1262,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
   }
 
-  // plaza fountain — a civic landmark at the heart of downtown
+  // the square's fountain — the SE quadrant of the green, mirroring the war
+  // memorial in the SW. Symmetry is what makes a civic space read as designed.
   {
-    const fx2 = pxW(6855), fy2 = pyW(5145);
+    const fx2 = pxW(7230), fy2 = pyW(5680);
     const rOuter = pxW(190) - pxW(0);
     g.fillStyle = hex(WORLD.pavement); g.beginPath(); g.arc(fx2, fy2, rOuter * 1.35, 0, Math.PI * 2); g.fill();
     g.strokeStyle = '#c9cdd9'; g.lineWidth = rOuter * 0.12; g.beginPath(); g.arc(fx2, fy2, rOuter, 0, Math.PI * 2); g.stroke();
@@ -976,55 +1274,33 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   }
 
 
-  // ZOO — visitor path loop + three pens (savanna / paddock / flamingo water)
+  // THE 4-H PADDOCKS — block (5,1), the farm's east end. ./life tethers its
+  // wandering livestock to this exact block centre and this file cannot move
+  // them, so the pens are drawn to meet the animals: two grazing paddocks, a
+  // duck pond, and a lane between them.
   {
     const zcx = blockCenter(5), zcy = blockCenter(1);
     g.save(); g.beginPath();
-    g.rect(pxW(zcx - BLOCK_SIZE / 2), pyW(zcy - BLOCK_SIZE / 2), pxW(zcx + BLOCK_SIZE / 2) - pxW(zcx - BLOCK_SIZE / 2), pyW(zcy + BLOCK_SIZE / 2) - pyW(zcy - BLOCK_SIZE / 2));
+    g.rect(pxW(zcx - BLOCK_SIZE / 2), pyW(zcy - BLOCK_SIZE / 2), pxW(BLOCK_SIZE) - pxW(0), pyW(BLOCK_SIZE) - pyW(0));
     g.clip();
-    g.strokeStyle = hex(WORLD.dirtPath); g.lineWidth = pxW(120) - pxW(0); g.lineJoin = 'round';
+    g.strokeStyle = hex(WORLD.dirtPath); g.lineWidth = pxW(150) - pxW(0); g.lineJoin = 'round'; g.lineCap = 'round';
     g.beginPath();
-    g.ellipse(pxW(zcx - 240), pyW(zcy), pxW(430) - pxW(0), pyW(520) - pyW(0), 0, 0, Math.PI * 2);
+    g.moveTo(pxW(zcx - 800), pyW(zcy)); g.lineTo(pxW(zcx + 700), pyW(zcy));   // the farm lane
     g.stroke();
     const pen = (px0: number, py0: number, wns: number, hns: number, col: string) => {
       g.fillStyle = col;
-      g.fillRect(pxW(px0), pyW(py0), pxW(px0 + wns) - pxW(px0), pyW(py0 + hns) - pyW(py0));
-      g.strokeStyle = 'rgba(120,100,60,0.4)'; g.lineWidth = Math.max(1.5, pxW(14) - pxW(0));
-      g.strokeRect(pxW(px0), pyW(py0), pxW(px0 + wns) - pxW(px0), pyW(py0 + hns) - pyW(py0));
+      g.fillRect(pxW(px0), pyW(py0), pxW(wns) - pxW(0), pyW(hns) - pyW(0));
+      g.strokeStyle = 'rgba(120,100,60,0.45)'; g.lineWidth = Math.max(1.5, pxW(18) - pxW(0));
+      g.strokeRect(pxW(px0), pyW(py0), pxW(wns) - pxW(0), pyW(hns) - pyW(0));
     };
-    pen(zcx - 560, zcy - 620, 520, 380, '#e6d494');            // savanna sand
-    pen(zcx - 560, zcy + 240, 520, 380, '#cfe0a8');            // grazing paddock
-    pen(zcx - 20, zcy - 200, 440, 400, hex(WORLD.waterShallow)); // flamingo lagoon
+    pen(zcx - 560, zcy - 620, 520, 380, '#a8cf72');            // grazing paddock, north
+    pen(zcx - 560, zcy + 240, 520, 380, '#9ac468');            // grazing paddock, south
+    pen(zcx - 20, zcy - 200, 440, 400, '#b8c28a');             // the mud yard
+    g.fillStyle = hex(WORLD.waterShallow);                      // the duck pond in it
+    g.beginPath(); g.ellipse(pxW(zcx + 200), pyW(zcy), pxW(150) - pxW(0), pyW(115) - pyW(0), 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.beginPath(); g.ellipse(pxW(zcx + 165), pyW(zcy - 25), pxW(45) - pxW(0), pyW(22) - pyW(0), 0.4, 0, Math.PI * 2); g.fill();
     g.restore();
-  }
-
-  // MILITARY — fenced compound pad + painted helipad on the NW land triangle
-  {
-    const mcx = blockCenter(5), mcy = blockCenter(5);
-    g.fillStyle = '#7d8268';
-    g.fillRect(pxW(mcx - 780), pyW(mcy - 780), pxW(700) - pxW(0), pyW(420) - pyW(0));
-    g.strokeStyle = 'rgba(255,210,60,0.75)'; g.lineWidth = Math.max(2, pxW(18) - pxW(0));
-    g.strokeRect(pxW(mcx - 780), pyW(mcy - 780), pxW(700) - pxW(0), pyW(420) - pyW(0));
-    // helipad: ring + H
-    const hx2 = pxW(mcx - 250), hy2 = pyW(mcy - 580), hr = pxW(120) - pxW(0);
-    g.strokeStyle = 'rgba(240,244,252,0.9)'; g.lineWidth = hr * 0.16;
-    g.beginPath(); g.arc(hx2, hy2, hr, 0, Math.PI * 2); g.stroke();
-    g.lineWidth = hr * 0.2; g.lineCap = 'butt';
-    g.beginPath(); g.moveTo(hx2 - hr * 0.4, hy2 - hr * 0.45); g.lineTo(hx2 - hr * 0.4, hy2 + hr * 0.45); g.stroke();
-    g.beginPath(); g.moveTo(hx2 + hr * 0.4, hy2 - hr * 0.45); g.lineTo(hx2 + hr * 0.4, hy2 + hr * 0.45); g.stroke();
-    g.beginPath(); g.moveTo(hx2 - hr * 0.4, hy2); g.lineTo(hx2 + hr * 0.4, hy2); g.stroke();
-  }
-
-  // PARK — real soccer pitch paint at block (4,3): boundary, halfway, circle
-  {
-    const scx = blockCenter(4), scy = blockCenter(3);
-    g.fillStyle = '#8fd472';
-    g.fillRect(pxW(scx - 260), pyW(scy - 170), pxW(520) - pxW(0), pyW(340) - pyW(0));
-    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = Math.max(1.5, pxW(12) - pxW(0));
-    g.strokeRect(pxW(scx - 240), pyW(scy - 150), pxW(480) - pxW(0), pyW(300) - pyW(0));
-    g.beginPath(); g.moveTo(pxW(scx), pyW(scy - 150)); g.lineTo(pxW(scx), pyW(scy + 150)); g.stroke();
-    g.beginPath(); g.arc(pxW(scx), pyW(scy), pxW(60) - pxW(0), 0, Math.PI * 2); g.stroke();
-    for (const sxg of [-1, 1]) g.strokeRect(pxW(scx + sxg * 240 - (sxg > 0 ? 90 : 0)), pyW(scy - 80), pxW(90) - pxW(0), pyW(160) - pyW(0));
   }
 
   // FOREST CAMPSITE — dirt clearing + trail so the camp sits in a real glade
@@ -1046,15 +1322,20 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     g.beginPath(); g.moveTo(pxW(vcx), pyW(vcy - 110)); g.lineTo(pxW(vcx), pyW(vcy + 110)); g.stroke();
   }
 
-  // AIRPORT — darker apron + yellow taxiway centreline + tie-down squares
+  // LAKESIDE — the boat ramp and its little parking apron on the south shore
   {
-    const acx = blockCenter(5), acy = blockCenter(4);
-    g.fillStyle = '#b8bcc9';
-    g.fillRect(pxW(acx - 620), pyW(acy + 180), pxW(520) - pxW(0), pyW(380) - pyW(0));
-    g.strokeStyle = 'rgba(255,210,60,0.85)'; g.lineWidth = Math.max(2, pxW(20) - pxW(0));
-    g.beginPath(); g.moveTo(pxW(acx - 360), pyW(acy + 370)); g.lineTo(pxW(acx - 40), pyW(acy + 370)); g.lineTo(pxW(acx + 140), pyW(acy + 150)); g.stroke();
-    g.strokeStyle = 'rgba(240,244,252,0.6)'; g.lineWidth = Math.max(1.5, pxW(10) - pxW(0));
-    for (const tx of [-540, -420, -300]) g.strokeRect(pxW(acx + tx), pyW(acy + 240), pxW(90) - pxW(0), pyW(90) - pyW(0));
+    const bx = 7100, by = 11150;
+    g.fillStyle = '#d3d0c6';
+    g.fillRect(pxW(bx - 110), pyW(by), pxW(220) - pxW(0), pyW(700) - pyW(0));   // the ramp into the water
+    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = Math.max(1.5, pxW(16) - pxW(0));
+    g.beginPath(); g.moveTo(pxW(bx), pyW(by)); g.lineTo(pxW(bx), pyW(by + 700)); g.stroke();
+    g.fillStyle = '#bdb9ad';
+    g.fillRect(pxW(bx - 480), pyW(by - 380), pxW(960) - pxW(0), pyW(340) - pyW(0));
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = Math.max(1.2, pxW(12) - pxW(0));
+    for (let s = 0; s <= 6; s++) {   // trailer bays: long, because they hold trailers
+      const tx = bx - 460 + (s / 6) * 920;
+      g.beginPath(); g.moveTo(pxW(tx), pyW(by - 370)); g.lineTo(pxW(tx), pyW(by - 60)); g.stroke();
+    }
   }
 
   g.restore(); // end island clip
@@ -1317,13 +1598,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     return PLAN[gy][gx];
   }
 
-  // spawn: a cozy-suburb road junction, clear of the downtown core. On Pirate
-  // Bay that same point is the empty scrub on the wild west coast — the worst
-  // possible opening. Start at the Bazaar's south edge instead: stalls and a
-  // crowd within a few seconds, the promenade and the jungle both close.
+  // ── THE OPENING ─────────────────────────────────────────────────────────
+  // Maple's old spawn was a road junction in the middle of the suburbs — the
+  // dullest cell on the map, on asphalt, with nothing within eight units. It
+  // is now hand-authored and FIXED: the west walk of the town square, on
+  // bright green grass, town hall to the north-east, bandstand across the
+  // green, Main Street's shopfronts behind, and the parking-meter protest ten
+  // units away. Same crisp first frame every single load.
   const spawn = WORLD_ID === 'pirate'
     ? { x: w(6950), z: w(10560) }          // DANCE COVE, just off the main stage
-    : { x: w(ROAD_CENTERS[0]), z: w(ROAD_CENTERS[2]) };
+    : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };   // THE SQUARE, Maple Falls
 
   return {
     spawn,
@@ -2089,7 +2373,6 @@ function makeLamp(): THREE.Group {
   return g;
 }
 const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])();
-// biome-true snacks — no fire hydrants on the 18th hole, no cones on the sand
 function makeShell(): THREE.Group {
   const g = new THREE.Group();
   const sh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -2115,14 +2398,33 @@ function makeGolfball(): THREE.Group {
   b.position.y = 0.3; g.add(b);
   return g;
 }
-const tinyFor = (biome: Biome) =>
-  biome === 'cozy' || biome === 'fancy' ? pick([makeFlowers, makeFlowers, makeBush, makeMushroom])()
-  : biome === 'beach' ? pick([makeShell, makeShell, makeFlowers, makeFlowers])()
-  : biome === 'forest' ? pick([makeMushroom, makeMushroom, makeFlowers])()
-  : biome === 'park' ? pick([makeGolfball, makeFlowers, makeFlowers])()
-  : biome === 'zoo' ? pick([makeFlowers, makeShell, makeMushroom])()
-  : biome === 'airport' ? pick([makeCone, makeLuggage, makeLuggage])()
-  : makeTinyProp();
+// ── MAPLE FALLS' snack vocabulary ─────────────────────────────────────────
+// Same idea, this island's nouns: pumpkins in the fields, shells on the lake
+// shore, and — everywhere, in every district — one more campaign lawn sign.
+const tinyForMaple = (biome: Biome): THREE.Object3D => {
+  const sign = () => MS.makeLawnSign(mrnd() < 0.5 ? 0 : 1);
+  const pool: (() => THREE.Object3D)[] =
+    biome === 'cozy' ? [makeFlowers, makeFlowers, makeBush, makeMushroom, sign]
+    : biome === 'beach' ? [makeShell, makeShell, makeFlowers, MS.makeLifeRing]
+    : biome === 'forest' ? [makeMushroom, makeMushroom, makeFlowers, makeReeds]
+    : biome === 'park' ? [makeGolfball, makeFlowers, makeFlowers, MS.makeParkGrill]
+    : biome === 'farm' ? [MS.makePumpkin, MS.makePumpkin, makeFlowers, sign]
+    : biome === 'fair' ? [makeCone, makeTrash, MS.makeNewsBox, sign]
+    : biome === 'campus' ? [makeCone, makeTrash, makeFlowers, sign]
+    : biome === 'strip' ? [makeCone, makeCone, makeTrash, MS.makeNewsBox]
+    : biome === 'plaza' ? [makeFlowers, MS.makeNewsBox, MS.makePlanter, sign]
+    : biome === 'downtown' ? [makeHydrant, makeTrash, MS.makeNewsBox, sign]
+    : [makeCone, makeHydrant, makeTrash, makeFlowers];
+  return mpick(pool)();
+};
+function makeLuggage(): THREE.Group {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.4), new THREE.MeshStandardMaterial({ color: pick([0xff5a4d, 0x5ec8d8, 0xffd23f, 0xb98cff]), roughness: 0.7 }));
+  b.position.y = 0.3; g.add(b);
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a3f4d }));
+  h.position.y = 0.68; g.add(h);
+  return g;
+}
 function makeReeds(): THREE.Group {
   const g = new THREE.Group();
   for (let i = 0; i < 5; i++) {
@@ -2136,14 +2438,6 @@ function makeReeds(): THREE.Group {
       tip.position.set(r.position.x, h + 0.1, r.position.z); g.add(tip);
     }
   }
-  return g;
-}
-function makeLuggage(): THREE.Group {
-  const g = new THREE.Group();
-  const b = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.4), new THREE.MeshStandardMaterial({ color: pick([0xff5a4d, 0x5ec8d8, 0xffd23f, 0xb98cff]), roughness: 0.7 }));
-  b.position.y = 0.3; g.add(b);
-  const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a3f4d }));
-  h.position.y = 0.68; g.add(h);
   return g;
 }
 
@@ -2313,15 +2607,6 @@ function makeCampfireFB(): THREE.Group {
   tip.position.y = 1.35; g.add(tip);
   return g;
 }
-function makeZooArchFB(): THREE.Group {
-  const g = new THREE.Group(); const stone = std(0xd8c8a0, 0.9);
-  for (const sz of [-3.4, 3.4]) {
-    const p2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 6.5, 1.2), stone); p2.position.set(0, 3.25, sz); g.add(p2);
-  }
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 8.2), stone); bar.position.y = 6.6; g.add(bar);
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.6, 5), std(0x7ed57a)); sign.position.y = 6.6; sign.position.x = 0.6; g.add(sign);
-  return g;
-}
 function makeIcecreamFB(): THREE.Group {
   const g = new THREE.Group();
   const cart = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.3, 1.1), std(0xfaf6ea, 0.6)); cart.position.y = 1; g.add(cart);
@@ -2363,26 +2648,6 @@ function makeFerrisFB(): THREE.Group {
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, 8.6, 8), std(0xf4f6fa));
     leg.position.set(sx, 4.1, 0); leg.rotation.z = sx > 0 ? -0.3 : 0.3; g.add(leg);
   }
-  return g;
-}
-function makeHeliFB(): THREE.Group {
-  const g = new THREE.Group(); const olive = std(0x6b7050, 0.85);
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(1, 2.6, 6, 10), olive); body.rotation.z = Math.PI / 2; body.position.y = 1.6; g.add(body);
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.4, 3.4, 8), olive); tail.rotation.z = Math.PI / 2; tail.position.set(-3, 1.9, 0); g.add(tail);
-  const rotor = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.08, 0.4), std(0x2c3038, 0.6)); rotor.position.y = 3; g.add(rotor);
-  for (const sz of [-0.9, 0.9]) {
-    const skid = new THREE.Mesh(new THREE.BoxGeometry(3, 0.14, 0.16), std(0x3a3f4d)); skid.position.set(0.2, 0.32, sz); g.add(skid);
-  }
-  return g;
-}
-function makeTankFB(): THREE.Group {
-  const g = new THREE.Group(); const olive = std(0x6b7050, 0.9);
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 1.1, 2.4), olive); hull.position.y = 0.95; g.add(hull);
-  for (const sz of [-1.1, 1.1]) {
-    const track = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.9, 0.6), std(0x3a3f30, 1)); track.position.set(0, 0.45, sz); g.add(track);
-  }
-  const tur = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.2, 0.8, 10), olive); tur.position.y = 1.9; g.add(tur);
-  const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 2.8, 8), olive); gun.rotation.z = Math.PI / 2; gun.position.set(2, 2, 0); g.add(gun);
   return g;
 }
 function makeBeachChairFB(): THREE.Group {
@@ -2804,486 +3069,732 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     return;   // Pirate Bay is fully populated — the Maple grid pass never runs
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // ══ MAPLE FALLS ═══════════════════════════════════════════════════════════
+  // Nine authored districts on the 6x6 grid. Every one of them is built from
+  // straight rows, mirrored pairs and repeated motifs — that is what reads as
+  // DESIGNED from a top-down 3/4 camera. Rejection sampling never does; it is
+  // used only for the filler between the authored things.
+  //
+  // Everything here runs off the seeded stream in ./mainstreet, so the town is
+  // byte-identical on every load.
+  MS.resetMapleRng();
+  MS.resetSpots();
+
+  // ── the placement contract ────────────────────────────────────────────────
+  // prototype3d runs a post-build sweep that shoves any prop straddling a
+  // traffic lane sideways, and RETIRES anything sitting off the coastline.
+  // Both are silent. So this file asserts its own sites first: a prop that
+  // fails maplePlaceable is a prop that sweep would have had to fix.
+  // Sized to beat prototype3d's sweep, which tests ASPHALT_HALF (2.75 units)
+  // plus 70% of the prop's real half-extent. 68 + 24r world units clears it for
+  // everything in the kit, including the long ones (a corn row is nine units
+  // of hedge carrying an eat radius of 2.6).
+  const roadClear = (r3: number) => 68 + r3 * 24;      // world units off a road centreline
+  /** the river, the pond and the lagoon are WATER — nothing stands in them.
+   *  The old grid pass had no river test at all, which is why reeds and park
+   *  benches used to end up mid-channel on the east side of the island. */
+  const inMapleWater = (wx: number, wy: number, r3 = 1): boolean => {
+    if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + 40 + r3 * 12) return true;
+    const rx = riverXAtWorld(wy);
+    if (rx != null && Math.abs(wx - rx) < 120 + r3 * 12) return true;
+    return inLagoon3(w(wx), w(wy), 70);
+  };
+  const maplePlaceable = (wx: number, wy: number, r3 = 1): boolean => {
+    const x3 = w(wx), z3 = w(wy);
+    if (!insideIsland3(x3, z3)) return false;
+    if (!coastClear(x3, z3, Math.min(16, 5 + r3))) return false;
+    if (inMapleWater(wx, wy, r3)) return false;
+    const band = roadClear(r3);
+    for (const c of ROAD_CENTERS) if (Math.abs(wx - c) < band || Math.abs(wy - c) < band) return false;
+    return true;
+  };
+  let dropSkip = 0;
+  const legalSite = (wx: number, wy: number, r: number): boolean => {
+    if (!insideIsland3(w(wx), w(wy))) return false;
+    if (inMapleWater(wx, wy, r)) return false;
+    const band = roadClear(r);
+    for (const c of ROAD_CENTERS) if (Math.abs(wx - c) < band || Math.abs(wy - c) < band) return false;
+    return true;
+  };
+  /** place at WORLD coordinates and claim the ground for the separation pass.
+   *  Refuses the water and the road bands outright — a prop that survives this
+   *  is a prop prototype3d's sweep will leave exactly where it was put. */
+  const drop = (mesh: THREE.Object3D, wx: number, wy: number, r: number, rotY?: number): boolean => {
+    if (!legalSite(wx, wy, r)) { dropSkip++; return false; }
+    if (rotY !== undefined) mesh.rotation.y = rotY;
+    place(mesh, w(wx), w(wy), r);
+    MS.claimSpot(wx, wy, r * 20);
+    return true;
+  };
+  const dropGlb = (name: string, wx: number, wy: number, r: number, h: number,
+                   fb?: () => THREE.Object3D, rotY?: number): boolean => {
+    if (!legalSite(wx, wy, r)) { dropSkip++; return false; }
+    glb(scene, addEdible, name, w(wx), w(wy), r, { h, rotY, smallShadow: r < 2.5, fallback: fb });
+    MS.claimSpot(wx, wy, r * 20);
+    return true;
+  };
+  /** glb() places BLIND — it has no island guard of its own, and calling it
+   *  raw is what parked coastal driveways over open space in the first place.
+   *  Every Maple GLB goes through here, in 3D coordinates. */
+  const placeGlb3 = (name: string, x3: number, z3: number, r: number, h: number,
+                     fb?: () => THREE.Object3D, rotY?: number): boolean => {
+    if (!insideIsland3(x3, z3) || !coastClear(x3, z3, 6) || inLagoon3(x3, z3, 40)) return false;
+    glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback: fb });
+    return true;
+  };
+  /** A LANDMARK gets its site ASSERTED. The Pirate branch shipped an avenue
+   *  with 27 of its 55 props standing over open space because place() drops
+   *  illegal props on the floor without a word. Never again, and never
+   *  silently: rejections are counted and named on the console. */
+  let lmFail = 0;
+  const lmRejects: string[] = [];
+  const landmark = (mesh: THREE.Object3D, wx: number, wy: number, r: number, rotY = 0, tag = '?'): boolean => {
+    if (!maplePlaceable(wx, wy, r) || !MS.spotFree(wx, wy, r * 20)) {
+      lmFail++; lmRejects.push(`${tag}@${wx | 0},${wy | 0}`);
+      return false;
+    }
+    return drop(mesh, wx, wy, r, rotY);
+  };
+  const landmarkGlb = (name: string, wx: number, wy: number, r: number, h: number,
+                       fb: () => THREE.Object3D, rotY = 0, tag = '?'): boolean => {
+    if (!maplePlaceable(wx, wy, r) || !MS.spotFree(wx, wy, r * 20)) {
+      lmFail++; lmRejects.push(`${tag}@${wx | 0},${wy | 0}`);
+      return false;
+    }
+    return dropGlb(name, wx, wy, r, h, fb, rotY);
+  };
+  /** rejection-sampled points inside a world-space rectangle, separated. */
+  const scatter = (x0: number, y0: number, x1: number, y1: number,
+                   n: number, r3: number): [number, number][] => {
+    const out: [number, number][] = [];
+    for (let t = 0; t < n * 26 && out.length < n; t++) {
+      const wx = mr(x0, x1), wy = mr(y0, y1);
+      if (!maplePlaceable(wx, wy, r3)) continue;
+      if (!MS.spotFree(wx, wy, r3 * 20)) continue;
+      MS.claimSpot(wx, wy, r3 * 20);
+      out.push([wx, wy]);
+    }
+    return out;
+  };
+  /** a straight ROW of sites — the thing that actually reads as authored. */
+  const row = (x0: number, y0: number, x1: number, y1: number, n: number): [number, number][] => {
+    const out: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      out.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]);
+    }
+    return out;
+  };
+  const SIDE = () => (mrnd() < 0.5 ? 0 : 1);          // which campaign this yard backs
+  const bcW = (g2: number) => blockCenter(g2);
+
+  // ══ THE SQUARE ════════════════════════════════════════════════════════════
+  // Block (3,2). Town hall at the north end facing the green, the bandstand on
+  // the centre circle, the fountain and the war memorial mirrored in the two
+  // south quadrants, elms down both long walks, and — permanently, in all
+  // weathers — four people protesting about one parking meter.
+  {
+    const [gx0, gy0, gx1, gy1] = SQ_GREEN;
+    const gcx = (gx0 + gx1) / 2, gcy = (gy0 + gy1) / 2;
+    landmark(MS.makeTownHall(), SQ_CX, SQ_HALL_Y, 6.5, 0, 'town hall');
+    landmark(MS.makeBandstand(), gcx, gcy, 3.2, 0, 'bandstand');
+    landmarkGlb('fountain', 7230, 5680, 4, 6.5, makeFountainFB, 0, 'fountain');
+    landmark(MS.makeWarMemorial(), 6480, 5680, 2.2, 0, 'war memorial');
+    // the four flagpoles on the forecourt, flanking the rally stage
+    for (const s of [-1, 1]) {
+      const fp = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 9, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5, roughness: 0.4 }));
+      pole.position.y = 4.5; fp.add(pole);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.4), new THREE.MeshStandardMaterial({ color: s < 0 ? 0x2f4a7a : 0xd8392f, side: THREE.DoubleSide, roughness: 0.8 }));
+      flag.position.set(s * 1.25, 8, 0); fp.add(flag);
+      drop(fp, SQ_CX + s * 400, 4830, 1.2);
+    }
+    // THE PROTEST. Four of them, a semicircle round one meter, since March.
+    drop(MS.makeParkingMeter(), 6300, 5090, 0.7);
+    for (let i = 0; i < 4; i++) {
+      const a = -0.9 + i * 0.6;
+      drop(MS.makeProtester(i % 2), 6300 + Math.cos(a) * 130, 5090 + Math.sin(a) * 130 + 40, 1.3, a + Math.PI);
+    }
+    drop(MS.makeNoticeBoard(), 6300, 5390, 1.6, Math.PI / 2);
+    // elms down both long walks, benches facing the bandstand
+    for (const sx of [-1, 1]) {
+      for (const [tx, ty] of row(gcx + sx * 540, gy0 + 120, gcx + sx * 540, gy1 - 120, 5)) {
+        dropGlb('parktree', tx, ty, 3.2, 7, makeTree);
+      }
+      for (const [bx2, by2] of row(gcx + sx * 300, gcy - 260, gcx + sx * 300, gcy + 260, 3)) {
+        const bn = makeBench(); drop(bn, bx2, by2, 2.4, sx < 0 ? Math.PI / 2 : -Math.PI / 2);
+      }
+    }
+    // the square's own campaign war: signs alternating all the way round
+    let sq = 0;
+    for (const [sx2, sy2] of [
+      ...row(gx0 + 60, gy0 + 40, gx1 - 60, gy0 + 40, 7),
+      ...row(gx0 + 60, gy1 - 40, gx1 - 60, gy1 - 40, 7),
+      ...row(gx0 + 40, gy0 + 160, gx0 + 40, gy1 - 160, 4),
+      ...row(gx1 - 40, gy0 + 160, gx1 - 40, gy1 - 160, 4),
+    ]) { drop(MS.makeLawnSign(sq++ % 2), sx2, sy2, 0.55, mr(-0.3, 0.3)); }
+    // the civic hangers-on
+    for (const [px2, py2] of row(6320, 4700, 6320, 4980, 2)) drop(MS.makeNewsBox(), px2, py2, 0.6, Math.PI / 2);
+    dropGlb('icecream', 7400, 5030, 2.2, 3.6, makeIcecreamFB, -Math.PI / 6);
+    dropGlb('foodtruck', 6420, 5820, 4, 5, makeFoodtruckFB, Math.PI / 6);
+    for (const [px2, py2] of row(6700, 5830, 7300, 5830, 4)) drop(MS.makePlanter(), px2, py2, 0.9);
+    for (let i = 0; i < 8; i++) {
+      const [sx3, sy3] = [mr(gx0 + 120, gx1 - 120), mr(gy0 + 120, gy1 - 120)];
+      if (Math.hypot(sx3 - gcx, sy3 - gcy) < 320) continue;
+      drop(MS.makeTownsfolk(mchance(0.4)), sx3, sy3, 1.2);
+    }
+  }
+
+  // ══ MAIN STREET ═══════════════════════════════════════════════════════════
+  // Two facing rows of storefronts down the road at world x=6000. The blocks
+  // are (2,2) west of it, and (2,3)/(3,3) either side of it further south —
+  // so the street is one-sided beside the square and two-sided below it,
+  // which is exactly how a courthouse-square town is laid out.
+  {
+    const SHOP_D = 250;   // how far the shop fronts stand back from the kerb
+    for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+      if (PLAN[gy][gx] !== 'downtown') continue;
+      const cxB = bcW(gx), cyB = bcW(gy);
+      const face = cxB < MAIN_ST_X ? 1 : -1;                // +1 = shop faces east
+      const line = MAIN_ST_X - face * SHOP_D;               // the shop-front line
+      // THE ROW. Flush, deterministic seams, no gaps — a real street wall.
+      let o = -680;
+      let n = 0;
+      while (o < 660) {
+        const bw = 8 + ((n * 3) % 4);                       // 8..11 units wide
+        const h = 7 + ((n * 5) % 4);                        // two or three storeys
+        const sf = MS.makeStorefront(bw, h, n % 3 === 0 ? -1 : SIDE());
+        drop(sf, line, cyB + o + bw * 10, Math.max(3.2, bw * 0.4), face > 0 ? Math.PI / 2 : -Math.PI / 2);
+        o += bw * 20 + 40;
+        n++;
+      }
+      // the kerb furniture: lamps are handled by the road sweep, so this is
+      // the small-town layer — planters, hydrants, papers, meters and signs
+      let k = 0;
+      for (const [fx3, fy3] of row(MAIN_ST_X - face * 130, cyB - 700, MAIN_ST_X - face * 130, cyB + 700, 11)) {
+        if (!maplePlaceable(fx3, fy3, 0.8)) { k++; continue; }
+        if (k % 4 === 0) drop(MS.makePlanter(), fx3, fy3, 0.9);
+        else if (k % 4 === 1) drop(MS.makeParkingMeter(), fx3, fy3, 0.7);
+        else if (k % 4 === 2) drop(makeHydrant(), fx3, fy3, 0.8);
+        else drop(MS.makeNewsBox(), fx3, fy3, 0.6, face > 0 ? -Math.PI / 2 : Math.PI / 2);
+        k++;
+      }
+      // the rear lot: pickups nose-in against the alley
+      for (const [px3, py3] of row(cxB - 300, cyB - 170, cxB + 300, cyB - 170, 4)) {
+        drop(MS.makePickup(), px3, py3, 2.4, Math.PI / 2);
+      }
+      for (const [px3, py3] of row(cxB - 300, cyB + 170, cxB + 300, cyB + 170, 4)) {
+        if (mchance(0.55)) drop(MS.makePickup(), px3, py3, 2.4, -Math.PI / 2);
+      }
+      // the far side of the block, away from Main Street: the town's other
+      // institutions, so a block is never one row and a car park
+      const backX = cxB - face * 520;
+      if (gy === 2) landmark(MS.makeDiner(), backX, cyB - 430, 4.2, face > 0 ? -Math.PI / 2 : Math.PI / 2, 'diner');
+      if (gy === 2) drop(MS.makeBarberPole(), MAIN_ST_X - face * 155, cyB + 60, 0.8);
+      if (gy === 3 && face > 0) landmark(MS.makeFireStation(), backX, cyB - 380, 5.4, -Math.PI / 2, 'fire station');
+      if (gy === 3 && face > 0) landmark(MS.makePostOffice(), backX, cyB + 400, 4.4, -Math.PI / 2, 'post office');
+      if (gy === 3 && face < 0) landmark(MS.makeChurch(), backX, cyB - 340, 5, Math.PI / 2, 'church');
+      if (gy === 3 && face < 0) landmark(MS.makeWaterTower(), backX + 120, cyB + 480, 4, 0, 'water tower');
+      // shade trees + benches along the back alley. Kept inside ±480 of the
+      // block centre: at ±620 the east end of the row walked straight into the
+      // shopfront line at x=5750/6250 and buried a bench in a hardware store.
+      for (const [tx, ty] of row(cxB - 480, cyB + 700, cxB + 480, cyB + 700, 5)) {
+        if (mchance(0.65)) dropGlb('parktree', tx, ty, 3.2, 7, makeTree);
+        else drop(makeBench(), tx, ty, 2.4);
+      }
+      for (const [sx4, sy4] of scatter(cxB - 700, cyB - 700, cxB + 700, cyB + 700, 6, 1.2)) {
+        drop(MS.makeTownsfolk(mchance(0.3)), sx4, sy4, 1.2);
+      }
+    }
+    // the diner's rival: a hand-painted sandwich board on each corner
+    for (const [sx5, sy5] of [[6180, 6420], [5820, 6420], [6180, 7350], [5820, 7350]] as [number, number][]) {
+      drop(MS.makeLawnSign(SIDE()), sx5, sy5, 0.55);
+    }
+  }
+
+  // ══ MAPLE HEIGHTS ═════════════════════════════════════════════════════════
+  // The suburb — five blocks now, not fourteen. Same edge-facing lots (the
+  // driveways are baked into the ground and must still reach a house), but
+  // every yard has taken a side, and the neighbours disagree.
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
-    const biome = PLAN[gy][gx];
-    const cxW = blockCenter(gx), cyW = blockCenter(gy);
-    const cx = w(cxW), cz = w(cyW);
-    const half = wLen(BLOCK_SIZE / 2) - 6;   // inset so props stay off roads
-    const jitter = () => [cx + rand(-half, half), cz + rand(-half, half)] as const;
-
-    // GLB placement helper: skips off-island spots, wires the shadow diet +
-    // procedural fallback so offline dev still shows a full island
-    const placeGlb = (name: string, x3: number, z3: number, r: number, h: number, fallback?: () => THREE.Object3D, rotY?: number) => {
-      if (!insideIsland3(x3, z3)) return;
-      glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback });
-    };
-
-    if (biome === 'cozy' || biome === 'fancy') {
-      // edge-facing lots: every house faces its own road, with a driveway baked
-      // into the ground running from the house to the asphalt (see bake above)
-      const sc = biome === 'fancy' ? 1.3 : 1;
-      // (house_modern is benched: its baked roof reads as a black hole from
-      // the play camera — three strong architectures beat four with one dud)
-      const HOUSES = biome === 'fancy'
-        ? ['house_blue', 'house_craftsman', 'house_pink']
-        : ['house_pink', 'house_craftsman', 'house_blue'];
-      houseLots(gx, gy).forEach((lot, li) => {
-        const hx = w(lot.x), hz = w(lot.y);
-        const fx3 = lot.fx, fz3 = lot.fy;             // toward the street
-        const sx3 = -fz3, sz3 = fx3;                  // along the street
-        placeGlb(HOUSES[li % 3], hx, hz, (biome === 'fancy' ? 4 : 3.2) * sc,
-          (biome === 'fancy' ? 6.2 : 5.2) * rand(0.92, 1.08), makeHouse, lot.rot);
-        // front-yard dressing on the STREET side; mailbox by the driveway
-        const dvx = lot.fy !== 0 ? 5.5 : 0, dvz = lot.fx !== 0 ? 5.5 : 0;
-        if (Math.random() < 0.7) place(makeFlowers(), hx + fx3 * 4.4 + sx3 * 2, hz + fz3 * 4.4 + sz3 * 2, 0.7);
-        if (Math.random() < 0.7) place(makeMailbox(), hx + fx3 * 7.6 + dvx + sx3, hz + fz3 * 7.6 + dvz + sz3, 1.2);
-        if (li % 2 === 0) {   // every other driveway: a parked car (eatable prey that CAN'T run)
-          // REAL car mesh (same GLB the traffic drives) — the procedural box-car
-          // is only the offline/LOD stand-in now, never the hero prop
-          const carFB = () => {
-            const c2 = makeParkedCar();
-            c2.userData.qk = 'car'; c2.userData.ptsMult = 1.5;
-            return c2;
-          };
-          // ⚠️ MUST gate on insideIsland3 — glb() places blind. Calling it raw
-          // here is what parked coastal driveways over open space (the
-          // "cars in space" screenshots); placeGlb's guard is not optional.
-          const pcx = hx + fx3 * 4.9 + dvx, pcz = hz + fz3 * 4.9 + dvz;
-          if (insideIsland3(pcx, pcz) && coastClear(pcx, pcz, 6) && !inLagoon3(pcx, pcz, 40)) {
-            glb(scene, addEdible, Math.random() < 0.85 ? 'car_sedan' : 'car_taxi',
-              pcx, pcz, 2.8,
-              { h: 2.6, rotY: lot.rot + Math.PI / 2, fallback: carFB,
+    if (PLAN[gy][gx] !== 'cozy') continue;
+    const cxB = bcW(gx), cyB = bcW(gy);
+    const cx = w(cxB), cz = w(cyB);
+    const half = wLen(BLOCK_SIZE / 2) - 6;
+    const HOUSES = ['house_pink', 'house_craftsman', 'house_blue'];
+    houseLots(gx, gy).forEach((lot, li) => {
+      const hx = w(lot.x), hz = w(lot.y);
+      const fx3 = lot.fx, fz3 = lot.fy;                 // toward the street
+      const sx3 = -fz3, sz3 = fx3;                      // along the street
+      placeGlb3(HOUSES[li % 3], hx, hz, 3.2, 5.2 * mr(0.92, 1.08), makeHouse, lot.rot);
+      MS.claimSpot(lot.x, lot.y, 64);
+      const dvx = lot.fy !== 0 ? 5.5 : 0, dvz = lot.fx !== 0 ? 5.5 : 0;
+      // THE LAWN SIGN. Every yard. Neighbours alternate, because of course
+      // they do — this is the single loudest thing in the whole level.
+      const side = (li + gx + gy) % 2;
+      place(MS.makeLawnSign(side), hx + fx3 * 6.6 - sx3 * 2.2, hz + fz3 * 6.6 - sz3 * 2.2, 0.55);
+      if (li % 3 === 0) place(MS.makeLawnSign(1 - side), hx + fx3 * 6.2 + sx3 * 3, hz + fz3 * 6.2 + sz3 * 3, 0.55);
+      if (mchance(0.7)) place(makeFlowers(), hx + fx3 * 4.4 + sx3 * 2, hz + fz3 * 4.4 + sz3 * 2, 0.7);
+      if (mchance(0.75)) place(makeMailbox(), hx + fx3 * 7.6 + dvx + sx3, hz + fz3 * 7.6 + dvz + sz3, 1.2);
+      if (li % 2 === 0) {
+        const pcx2 = hx + fx3 * 4.9 + dvx, pcz2 = hz + fz3 * 4.9 + dvz;
+        if (insideIsland3(pcx2, pcz2) && coastClear(pcx2, pcz2, 6) && !inLagoon3(pcx2, pcz2, 40)) {
+          if (mchance(0.45)) {
+            const pk = MS.makePickup(); pk.userData.qk = 'car'; pk.userData.ptsMult = 1.5;
+            place(pk, pcx2, pcz2, 2.4); pk.rotation.y = lot.rot + Math.PI / 2;
+          } else {
+            glb(scene, addEdible, mchance(0.85) ? 'car_sedan' : 'car_taxi', pcx2, pcz2, 2.8,
+              { h: 2.6, rotY: lot.rot + Math.PI / 2,
+                fallback: () => { const c2 = makeParkedCar(); c2.userData.qk = 'car'; c2.userData.ptsMult = 1.5; return c2; },
                 onReady: (g2) => { g2.userData.qk = 'car'; g2.userData.ptsMult = 1.5; } });
           }
         }
-        // backyard: shed on every third lot, hedge bush otherwise (pool lots
-        // stay clear — the water is baked into the ground there)
-        const pool = lotPool(biome, li, lot);
-        if (!pool && li % 3 === 2) { const sh = makeShed(); sh.rotation.y = lot.rot + rand(-0.3, 0.3); place(sh, hx - fx3 * 12, hz - fz3 * 12, 1.8); }
-        else if (!pool && Math.random() < 0.6) place(makeBush(), hx - fx3 * 10 + sx3 * rand(-3, 3), hz - fz3 * 10 + sz3 * rand(-3, 3), 1.6);
-        if (biome === 'fancy') {
-          // the rich part of town DRESSES: hedge along the lot line, topiary
-          // pair flanking the walk, gate pillars at the driveway
-          const hedge = makeFenceRun(9, 0x4faa5a);
-          hedge.rotation.y = lot.fy !== 0 ? 0 : Math.PI / 2;
-          // front offset 7.0, NOT 9.5 — lot center +9.5 is the exact asphalt
-          // line, and a hedge on the curb reads as "stuff in the road".
-          // Lateral: OPPOSITE the driveway (-dv). The old -sx3*5.5 landed on
-          // the driveway side for south rows + west edges — the parked car
-          // drove nose-first through its own hedge.
-          place(hedge, hx + fx3 * 7.0 - dvx, hz + fz3 * 7.0 - dvz, 1.4);
-          for (const sSide of [-1, 1]) {
-            const top = new THREE.Group();
-            const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1, 6), new THREE.MeshStandardMaterial({ color: PROPS.trunk, roughness: 1 }));
-            tr.position.y = 0.5; top.add(tr);
-            const ball = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0x5dbe63, roughness: 0.9, flatShading: true }));
-            ball.position.y = 1.5; top.add(ball);
-            place(top, hx + fx3 * 6.5 + sx3 * (sSide * 2.2 - 1.5), hz + fz3 * 6.5 + sz3 * (sSide * 2.2 - 1.5), 1);
-          }
-          for (const gSide of [-1, 1]) {
-            const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 0.7), new THREE.MeshStandardMaterial({ color: 0xe8e2d2, roughness: 0.8 }));
-            pillar.position.y = 0.75;
-            const finial = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), new THREE.MeshStandardMaterial({ color: 0xd8d0b8, roughness: 0.6 }));
-            finial.position.y = 1.7;
-            const gp = new THREE.Group(); gp.add(pillar); gp.add(finial);
-            // gate pillars straddle the DRIVEWAY (+dv side, matching the bake)
-            place(gp, hx + fx3 * 7.0 + dvx + (dvx ? gSide * 1.6 : 0), hz + fz3 * 7.0 + dvz + (dvz ? gSide * 1.6 : 0), 0.9);
-          }
+      }
+      if (li % 3 === 2) { const sh = makeShed(); sh.rotation.y = lot.rot + mr(-0.3, 0.3); place(sh, hx - fx3 * 12, hz - fz3 * 12, 1.8); }
+      else if (mchance(0.6)) place(makeBush(), hx - fx3 * 10 + sx3 * mr(-3, 3), hz - fz3 * 10 + sz3 * mr(-3, 3), 1.6);
+      if (li % 4 === 1) place(MS.makeMapleTree(), hx - fx3 * 3 + sx3 * 7, hz - fz3 * 3 + sz3 * 7, 2.6);
+    });
+    // the interior commons: a stand of maples and the block's basketball hoop
+    for (let t = 0; t < 4; t++) {
+      const ix = cx + mr(-half * 0.22, half * 0.22), iz = cz + mr(-half * 0.22, half * 0.22);
+      if (mchance(0.5)) placeGlb3('parktree', ix, iz, 3.2, mr(6, 8), makeTree);
+      else place(MS.makeMapleTree(), ix, iz, 3);
+    }
+    for (let t = 0; t < 3; t++) place(makeBush(), cx + mr(-half * 0.24, half * 0.24), cz + mr(-half * 0.24, half * 0.24), 1.6);
+    for (let t = 0; t < 2; t++) place(makeFlowers(), cx + mr(-half * 0.22, half * 0.22), cz + mr(-half * 0.22, half * 0.22), 0.7);
+    drop(MS.makeMailboxRow(), cxB + mr(-300, 300), cyB + 620, 1.2);
+    drop(MS.makeBusShelter(), cxB - 560, cyB - 600, 1.6, Math.PI / 2);
+  }
+
+  // ══ THE FAIRGROUNDS ═══════════════════════════════════════════════════════
+  // The Maple County Fair, blocks (0..2, 1). One straight MIDWAY with tents in
+  // matching rows either side of it, the arch at the west end, the show ring
+  // and the livestock at the east. Symmetry is the whole trick.
+  {
+    const my = bcW(1);
+    const mx0 = bcW(0) - 260, mx1 = bcW(2) + 620;
+    landmark(MS.makeFairArch(), mx0 - 200, my, 5, 0, 'fair arch');
+    landmark(MS.makeTicketBooth(), mx0 + 120, my + 300, 1.6, 0, 'ticket booth');
+    landmark(MS.makePieTable(), bcW(1), my - 440, 1.9, 0, 'pie table');
+    // the pie judges, mid-verdict, and the crowd waiting on it
+    for (const [jx, jy] of row(bcW(1) - 120, my - 560, bcW(1) + 120, my - 560, 3)) {
+      drop(MS.makeTownsfolk(true), jx, jy, 1.2, Math.PI);
+    }
+    // THE MIDWAY: tents in two matching rows, colours alternating
+    const TENTC = [MS.RED, MS.TEAL, 0xe0a83a, 0x4d7de8];
+    let ti = 0;
+    for (const side of [-1, 1]) {
+      for (const [tx, ty] of row(1820, my + side * 430, 5300, my + side * 430, 7)) {
+        if (landmark(MS.makeFairTent(TENTC[ti % TENTC.length]), tx, ty, 3, 0, 'fair tent')) ti++;
+        else ti++;
+      }
+    }
+    // the sideshows and the food row, down the middle of the midway
+    const MIDWAY = row(mx0 + 560, my, mx1 - 560, my, 5);
+    landmark(MS.makeStrikerBell(), MIDWAY[1][0], my, 1.8, 0, 'striker bell');
+    landmark(MS.makePrizeWheel(), MIDWAY[3][0], my, 1.6, 0, 'prize wheel');
+    for (const i of [0, 2, 4]) drop(MS.makeFairStand(), MIDWAY[i][0], my, 2.4, i % 4 ? 0 : Math.PI);
+    // hay-bale seating and the fairgoers
+    for (const [hx2, hy2] of row(1980, my + 700, 5240, my + 700, 5)) drop(MS.makeHayBales(), hx2, hy2, 1.8, mr(0, 1.5));
+    for (const [px4, py4] of scatter(mx0, my - 720, mx1, my + 760, 20, 1.2)) drop(MS.makeTownsfolk(mchance(0.45)), px4, py4, 1.2);
+    // and the campaigns, working the crowd
+    let fsi = 0;
+    for (const [sx6, sy6] of [...row(mx0 + 200, my - 250, mx1 - 200, my - 250, 8), ...row(mx0 + 200, my + 250, mx1 - 200, my + 250, 8)]) {
+      drop(MS.makeLawnSign(fsi++ % 2), sx6, sy6, 0.55, mr(-0.4, 0.4));
+    }
+    // the parking meadow north of the midway, and the pickups in it
+    for (const [cx3, cy3] of scatter(bcW(0) - 500, my - 1150, bcW(2) + 400, my - 760, 12, 2.4)) {
+      drop(MS.makePickup(), cx3, cy3, 2.4, Math.PI / 2 + mr(-0.06, 0.06));
+    }
+    for (const [bx3, by3] of scatter(bcW(0) - 700, my - 1300, bcW(2) + 700, my + 1300, 14, 2.6)) {
+      drop(mchance(0.5) ? makeBush() : MS.makeMapleTree(), bx3, by3, 2.6);
+    }
+  }
+
+  // ══ THE FARM ══════════════════════════════════════════════════════════════
+  // The bottomland east of town: blocks (3,0) and (3..5, 1). The barnyard, the
+  // grain elevator on the rail, the corn maze, the pumpkin patch, and the 4-H
+  // paddocks ./life stocks with livestock.
+  {
+    // THE BARNYARD, on (3,0) — a proper farmstead: house, barn, silos, coop
+    landmark(MS.makeBarn(), 6650, 1560, 5, 0, 'barn');
+    landmark(MS.makeSilo(), 7180, 1420, 2.8, 0, 'silo A');
+    landmark(MS.makeSilo(), 7180, 1760, 2.8, 0, 'silo B');
+    landmark(MS.makeFarmhouse(), 6180, 2060, 4.2, Math.PI, 'farmhouse');
+    landmark(MS.makeChickenCoop(), 6640, 2120, 1.8, 0.4, 'chicken coop');
+    landmark(MS.makeTractor(), 7000, 1980, 1.8, -0.5, 'tractor A');
+    landmark(MS.makeTrough(), 6320, 1560, 1.4, Math.PI / 2, 'trough');
+    for (const [px5, py5] of row(6120, 1300, 7300, 1300, 5)) drop(MS.makeHayBales(), px5, py5, 1.8, mr(0, 1.5));
+    // THE GRAIN ELEVATOR, hard against the freight ring at world x≈7870
+    landmark(MS.makeGrainElevator(), 7280, 3120, 5.5, Math.PI / 2, 'grain elevator');
+    landmark(MS.makeTractor(), 6900, 3420, 1.8, 0.8, 'tractor B');
+    // THE CORN MAZE, on (3,1). Rows laid on the painted spiral, so the maze
+    // you see from the map is the maze you walk through.
+    {
+      const mzx = bcW(3), mzy = bcW(1);
+      for (let t = 0.06; t < 1; t += 0.055) {
+        const a2 = t * Math.PI * 7, r2 = 60 + t * 480;
+        const cxp = mzx + Math.cos(a2) * (r2 + 110), cyp = mzy + Math.sin(a2) * (r2 + 110);
+        if (!maplePlaceable(cxp, cyp, 2.2)) continue;
+        drop(MS.makeCornRow(7), cxp, cyp, 2.2, -a2 + Math.PI / 2);
+      }
+      // straight field rows outside the maze — a farm is mostly crop
+      for (const band of [-700, -610, 610, 700]) {
+        for (const [rx, ry] of row(mzx - 640, mzy + band, mzx + 640, mzy + band, 6)) drop(MS.makeCornRow(9), rx, ry, 2.6, 0);
+      }
+      for (const [rx, ry] of row(7960, 2820, 7960, 4020, 5)) drop(MS.makeCornRow(9), rx, ry, 2.6, Math.PI / 2);
+      landmark(MS.makeScarecrow(), mzx, mzy - 640, 1.2, 0, 'scarecrow A');
+    }
+    // THE PUMPKIN PATCH, on (4,1) — matching the tilled rows in the bake
+    {
+      const ppx = bcW(4), ppy = bcW(1) + 460;
+      for (let r2 = 0; r2 < 7; r2++) {
+        for (const [px6, py6] of row(ppx - 560, ppy - 200 + r2 * 58, ppx + 560, ppy - 200 + r2 * 58, 7)) {
+          if (mchance(0.86)) drop(MS.makePumpkin(), px6 + mr(-30, 30), py6 + mr(-14, 14), 0.6);
         }
-      });
-      // interior commons: a tighter tree cluster at the centre (backyards now
-      // own the mid-band, so greenery reads planted, not scattered)
-      for (let t = 0; t < 4; t++) {
-        const ix = cx + rand(-half * 0.22, half * 0.22), iz = cz + rand(-half * 0.22, half * 0.22);
-        if (Math.random() < 0.5) placeGlb('parktree', ix, iz, 3.2, rand(6, 8), makeTree);
-        else place(makeTree(), ix, iz, 3.2);
       }
-      for (let t = 0; t < 3; t++) place(makeBush(), cx + rand(-half * 0.24, half * 0.24), cz + rand(-half * 0.24, half * 0.24), 1.6);
-      for (let t = 0; t < 2; t++) place(makeFlowers(), cx + rand(-half * 0.22, half * 0.22), cz + rand(-half * 0.22, half * 0.22), 0.7);
-    } else if (biome === 'downtown') {
-      // HOLE.IO STREET WALLS: every block edge is a continuous run of flush
-      // row buildings facing its street — the city reads as solid urban fabric
-      // with a paved service court behind (baked) and the block's signature
-      // tower rising from the middle. Deterministic seams, zero gaps.
-      const inset = half * 0.74, rowD = 10;
-      const buildRow = (len: number, at: (o: number) => [number, number], rotY: number, seed: number) => {
-        let o = -len / 2;
-        const tallAt = ((seed % 4) / 4 - 0.38) * len;   // one skyline slab per row
-        while (o < len / 2 - 4) {
-          const bw = Math.min(rand(8, 13), len / 2 - o);
-          const isTall = o <= tallAt && tallAt < o + bw;
-          const h = isTall ? rand(20, 27) : rand(8, 16);
-          const bld = makeRowBuilding(bw, rowD, h);
-          bld.rotation.y = rotY;
-          const [x, z] = at(o + bw / 2);
-          place(bld, x, z, Math.max(3.4, bw * 0.42));
-          o += bw;
+      landmark(MS.makeScarecrow(), ppx - 640, ppy, 1.2, 0.4, 'scarecrow B');
+      landmark(MS.makeFarmStand(), ppx + 700, ppy - 340, 1.8, -Math.PI / 2, 'farm stand');
+      landmark(MS.makeTractor(), ppx - 560, ppy + 230, 1.8, 0.2, 'tractor C');
+    }
+    // THE 4-H PADDOCKS, on (5,1) — the pens ./life's livestock are tethered to
+    {
+      const zx = bcW(5), zy = bcW(1);
+      for (const [pcx2, pcy2, pw2, pd2] of [
+        [zx - 300, zy - 430, 520, 380], [zx - 300, zy + 430, 520, 380], [zx + 200, zy, 440, 400],
+      ] as [number, number, number, number][]) {
+        const fw = wLen(pw2), fd = wLen(pd2);
+        for (const s of [-1, 1]) {
+          const fn = makeFenceRun(fw, 0xd8cfae); drop(fn, pcx2, pcy2 + s * pd2 / 2, 1.4);
+          const fe = makeFenceRun(fd, 0xd8cfae); drop(fe, pcx2 + s * pw2 / 2, pcy2, 1.4, Math.PI / 2);
         }
-      };
-      const seed = gx * 3 + gy * 5;
-      buildRow(half * 1.76, (o) => [cx + o, cz - inset], Math.PI, seed);          // north wall
-      buildRow(half * 1.76, (o) => [cx + o, cz + inset], 0, seed + 1);            // south wall
-      buildRow(half * 1.0, (o) => [cx - inset, cz + o], -Math.PI / 2, seed + 2);  // west wall
-      buildRow(half * 1.0, (o) => [cx + inset, cz + o], Math.PI / 2, seed + 3);   // east wall
-      // signature tower rising from the service court
-      placeGlb((gx + gy) % 2 ? 'tower_deco' : 'tower_glass', cx, cz, 5.2,
-        22 + ((gx * 7 + gy * 13) % 4) * 3, () => makeTower(true));
-      // corner retail at the south junctions (the gaps the walls leave open)
-      placeGlb('cafe', cx - half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, 0);   // face the street, not the courtyard
-      placeGlb('shop', cx + half * 0.86, cz + half * 0.86, 6, 8.5, makeShopBox, 0);
-      // north corner pockets: a street tree + hydrant each
-      for (const sxc of [-1, 1]) {
-        placeGlb('parktree', cx + sxc * half * 0.87, cz - half * 0.87, 3.2, 7, makeTree);
-        place(makeHydrant(), cx + sxc * half * 0.8, cz - half * 0.8, 0.8);
       }
-      // court dressing: benches + ice-cream cart in the courtyard shade
-      place(makeBench(), cx - 7, cz + 8, 2.4);
-      const b2 = makeBench(); b2.rotation.y = Math.PI; place(b2, cx + 7, cz + 8, 2.4);
-      placeGlb('icecream', cx - 8, cz - 8, 2.2, 3.4, makeIcecreamFB);
-      for (const [ux, vz] of [[-0.4, 0.4], [0.4, -0.4]] as const)
-        placeGlb('parktree', cx + ux * half, cz + vz * half, 3.2, 7, makeTree);
-    } else if (biome === 'plaza') {
-      // civic square, properly staged: TOWN HALL at the north end, the mayor's
-      // stage on its steps (./life), the AI fountain ON the paved circle at the
-      // centre, food truck + ice-cream cart at the south corners
-      placeGlb('townhall', cx, cz - half * 0.62, 6.5, 17, makeCivicHall, 0);
-      placeGlb('fountain', cx, cz, 4, 6.5, makeFountainFB);
-      // civic institutions FLANK the square: school west (facing the axis),
-      // library east — a real town centre, not a lone hall
-      placeGlb('school', cx - half * 0.66, cz + half * 0.1, 5.6, 11, makeCivicHall, Math.PI / 2);
-      { const lib = makeCivicHall(); lib.rotation.y = -Math.PI / 2; lib.scale.setScalar(0.75); place(lib, cx + half * 0.68, cz + half * 0.1, 7); }
-      placeGlb('foodtruck', cx - half * 0.66, cz + half * 0.72, 4, 5, makeFoodtruckFB, Math.PI / 6);
-      placeGlb('icecream', cx + half * 0.64, cz + half * 0.7, 2.2, 3.6, makeIcecreamFB, -Math.PI / 6);
-      // flag poles flanking the town-hall steps
-      for (const sxc of [-1, 1]) {
-        const fp = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 9, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5, roughness: 0.4 }));
-        pole.position.y = 4.5; fp.add(pole);
-        const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.4), new THREE.MeshStandardMaterial({ color: sxc < 0 ? 0x7b4fe0 : 0xffd23f, side: THREE.DoubleSide, roughness: 0.8 }));
-        flag.position.set(sxc * 1.25, 8, 0); fp.add(flag);
-        place(fp, cx + sxc * 6.5, cz - half * 0.44, 1.2);
+      landmark(MS.makeBarn(), zx - 620, zy - 30, 5, Math.PI / 2, 'livestock barn');
+      landmark(MS.makeTrough(), zx + 20, zy - 250, 1.4, 0, 'paddock trough');
+      landmark(MS.makeHayBales(), zx - 300, zy - 60, 1.8, 0.4, 'paddock hay');
+    }
+    // fence lines, farm signs and the trees along the field boundaries
+    for (const fgy of [0, 1]) for (const fgx of [3, 4, 5]) {
+      if (PLAN[fgy][fgx] !== 'farm') continue;
+      const fx5 = bcW(fgx), fy5 = bcW(fgy);
+      for (const [tx, ty] of row(fx5 - 700, fy5 - 780, fx5 + 700, fy5 - 780, 5)) {
+        if (mchance(0.55)) drop(MS.makeMapleTree(), tx, ty, 2.6);
       }
-      // pollarded trees line the lawn panels; benches face the fountain
-      for (const [ux, vz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, -0.15], [0.5, -0.15], [-0.5, 0.2], [0.5, 0.2]] as const)
-        placeGlb('parktree', cx + ux * half, cz + vz * half, 3.2, 7, makeTree);
-      for (const [ux, vz] of [[-0.32, -0.32], [0.32, -0.32], [-0.32, 0.05], [0.32, 0.05]] as const) {
-        const bn = makeBench(); bn.rotation.y = Math.atan2(-(ux), -(vz + 0.1));
-        place(bn, cx + ux * half, cz + vz * half, 2.4);
+      for (const [sx7, sy7] of row(fx5 - 600, fy5 + 760, fx5 + 600, fy5 + 760, 4)) {
+        drop(mchance(0.5) ? MS.makeBigSign(SIDE()) : MS.makeLawnSign(SIDE()), sx7, sy7, mchance(0.5) ? 2.4 : 0.55);
       }
-    } else if (biome === 'park') {
-      // gazebo lives on the pond-walk (block 4,2 east side); block (4,3) centre
-      // belongs to the soccer pitch — no more landmarks stacked on events
-      if (gy === 2) placeGlb('gazebo', cx + half * 0.5, cz + half * 0.42, 5, 8.5, makeGazeboFB);
-      const onPitch = (x: number, z: number) => gx === 4 && gy === 3 && Math.abs(x - cx) < 16 && Math.abs(z - cz) < 12;
-      for (let t = 0; t < 9; t++) {
-        const [x, z] = jitter();
-        if (onPitch(x, z)) continue;
-        if (Math.random() < 0.55) placeGlb('parktree', x, z, 3.4, rand(6.5, 8.5), makeTree);
-        else place(makeTree(), x, z, 3.4);
+      for (const [hx3, hy3] of scatter(fx5 - 720, fy5 - 720, fx5 + 720, fy5 + 720, 5, 1.8)) {
+        drop(mchance(0.5) ? MS.makeHayBales() : MS.makeScarecrow(), hx3, hy3, mchance(0.5) ? 1.8 : 1.2, mr(0, 6.28));
       }
-      if (gy === 2) placeGlb('golfcart', cx - half * 0.55, cz + half * 0.4, 2.6, 3.2, makeGolfcartFB, rand(0, Math.PI));
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); if (!onPitch(x, z)) place(makeBush(), x, z, 1.6); }
-      for (let t = 0; t < 2; t++) { const [x, z] = jitter(); if (!onPitch(x, z)) place(makeBench(), x, z, 2.4); }
-    } else if (biome === 'forest') {
-      const jf = () => [cx + rand(-(half - 4), half - 4), cz + rand(-(half - 4), half - 4)] as const;
-      const isCamp = gx === 4 && gy === 0;
-      const inClearing = (x: number, z: number) => isCamp && Math.hypot(x - (cx - 5), z - (cz + 3)) < 15;
-      for (let t = 0; t < 32; t++) {   // a forest, not a parkland
-        const [x, z] = jf();
-        if (inClearing(x, z)) continue;
-        if (Math.hypot(x - w(8405), z - w(1149)) < 13) continue;   // the river SPRING pool — no trees in the water
-        if (Math.random() < 0.4) placeGlb('pine', x, z, 3, rand(7, 9.5), makePine);
-        else place(Math.random() < 0.7 ? makePine() : makeTree(), x, z, 3);
+      for (const [px7, py7] of scatter(fx5 - 700, fy5 - 700, fx5 + 700, fy5 + 700, 4, 1.2)) {
+        drop(MS.makeTownsfolk(true), px7, py7, 1.2);
       }
-      if (isCamp) for (let i = 0; i < 3; i++) {   // log seats around the fire
+    }
+  }
+
+  // ══ MAPLE FALLS HIGH ══════════════════════════════════════════════════════
+  // Blocks (4..5, 3..4). MEASURED: the river runs down world x≈8220..8460
+  // through the whole of column gx=4, so the STADIUM lives on (5,3), east of
+  // the creek — bleachers down both touchlines, goalposts at both ends, the
+  // scoreboard behind the west end zone and the band trailer at the tunnel.
+  // Block (4,3) keeps the practice field, because ./life stages the Friday
+  // night ball game on that block centre and this file cannot move it.
+  {
+    const fx0 = bcW(5), fy0 = bcW(3);                    // the stadium
+    landmarkGlb('school', bcW(5), bcW(4) - 300, 6, 12, MS.makeHighSchool, 0, 'high school');
+    landmark(MS.makeScoreboard(), fx0 - 700, fy0, 3, Math.PI / 2, 'scoreboard');
+    landmark(MS.makeGoalpost(), fx0 - 540, fy0, 2.2, Math.PI / 2, 'goalpost W');
+    landmark(MS.makeGoalpost(), fx0 + 540, fy0, 2.2, -Math.PI / 2, 'goalpost E');
+    // bleachers: a straight run either side, facing in. Mirror the POSITION,
+    // never the heading — a mirrored heading turns half a stand round.
+    for (const [bx4, by4] of row(fx0 - 340, fy0 - 640, fx0 + 340, fy0 - 640, 3)) {
+      landmark(MS.makeBleachers(), bx4, by4, 4, 0, 'bleacher N');
+    }
+    for (const [bx4, by4] of row(fx0 - 340, fy0 + 640, fx0 + 340, fy0 + 640, 3)) {
+      landmark(MS.makeBleachers(), bx4, by4, 4, Math.PI, 'bleacher S');
+    }
+    landmark(MS.makeBandTrailer(), fx0 + 660, fy0 + 520, 4, Math.PI / 2, 'band trailer');
+    landmark(MS.makeConcession(), fx0 - 660, fy0 + 540, 2.8, 0, 'concession');
+    // the marching band, formed up beside its trailer, in two straight files
+    for (const side of [-1, 1]) {
+      for (const [px8, py8] of row(fx0 + 520 + side * 60, fy0 + 720, fx0 + 520 + side * 60, fy0 + 900, 3)) {
+        drop(MS.makeTownsfolk(true), px8, py8, 1.2, 0);
+      }
+    }
+    // the crowd in the stands, two straight files of them
+    for (const s2 of [-1, 1]) {
+      for (const [px9, py9] of row(fx0 - 300, fy0 + s2 * 760, fx0 + 300, fy0 + s2 * 760, 6)) {
+        drop(MS.makeTownsfolk(mchance(0.4)), px9, py9, 1.2, s2 > 0 ? Math.PI : 0);
+      }
+    }
+    // the bus row on the student lot east of the creek, all facing out
+    for (const [bx5, by5] of row(8880, bcW(4) - 480, 8880, bcW(4) + 100, 4)) {
+      landmark(MS.makeSchoolBus(), bx5, by5, 4, 0, 'school bus');
+    }
+    for (const [cx4, cy4] of row(9140, bcW(4) - 480, 9140, bcW(4) + 100, 5)) {
+      drop(MS.makePickup(), cx4, cy4, 2.4, 0);
+    }
+    // the school's own drive: buses and the flag on (5,4)
+    for (const [cx5, cy5] of row(bcW(5) - 520, bcW(4) + 330, bcW(5) + 520, bcW(4) + 330, 5)) {
+      drop(MS.makePickup(), cx5, cy5, 2.4, Math.PI / 2);
+    }
+    // the practice field on (4,3): a bleacher pair and the team's kit, east of
+    // the creek so nothing stands in the water
+    for (const [bx6, by6] of row(8600, bcW(3) + 430, 9000, bcW(3) + 430, 2)) {
+      drop(MS.makeBleachers(), bx6, by6, 4, Math.PI);
+    }
+    drop(MS.makeConcession(), 8880, bcW(3) - 480, 2.8, Math.PI);
+    // campus dressing across all four blocks
+    for (const cgy of [3, 4]) for (const cgx of [4, 5]) {
+      const gcx2 = bcW(cgx), gcy2 = bcW(cgy);
+      for (const [tx, ty] of row(gcx2 - 700, gcy2 - 760, gcx2 + 700, gcy2 - 760, 5)) {
+        if (mchance(0.6)) dropGlb('parktree', tx, ty, 3.2, 7, makeTree);
+      }
+      for (const [sx8, sy8] of row(gcx2 - 500, gcy2 + 740, gcx2 + 500, gcy2 + 740, 4)) {
+        drop(MS.makeLawnSign(SIDE()), sx8, sy8, 0.55, mr(-0.3, 0.3));
+      }
+      for (const [px9, py9] of scatter(gcx2 - 720, gcy2 - 720, gcx2 + 720, gcy2 + 720, 7, 1.2)) {
+        drop(MS.makeTownsfolk(mchance(0.25)), px9, py9, 1.2);
+      }
+      for (const [bx7, by7] of scatter(gcx2 - 700, gcy2 - 700, gcx2 + 700, gcy2 + 700, 5, 1.6)) {
+        drop(mchance(0.5) ? makeBush() : makeBench(), bx7, by7, 1.6);
+      }
+      for (const [px10, py10] of scatter(gcx2 - 700, gcy2 - 700, gcx2 + 700, gcy2 + 700, 4, 2.6)) {
+        drop(MS.makeMapleTree(), px10, py10, 2.6);
+      }
+    }
+  }
+
+  // ══ THE STRIP ═════════════════════════════════════════════════════════════
+  // Blocks (0, 2..4): the highway into town. Everything here faces the road at
+  // world x=2580 and everything here is trying to sell you something.
+  {
+    const sx0 = bcW(0);
+    landmark(MS.makeGasStation(), sx0 + 200, bcW(2) - 260, 4.5, Math.PI / 2, 'gas station');
+    landmark(MS.makeMotel(), sx0 - 60, bcW(2) + 560, 5.5, 0, 'motel');
+    landmark(MS.makeDriveIn(), sx0 + 620, bcW(3) - 40, 5.5, -Math.PI / 2, 'drive-in screen');
+    landmark(MS.makeTicketBooth(), sx0 + 380, bcW(3) - 520, 1.6, Math.PI / 2, 'drive-in booth');
+    landmark(MS.makeBallOfTwine(), sx0 - 40, bcW(4) - 120, 4.5, -Math.PI / 2, "world's largest ball of twine");
+    landmark(MS.makePylonSign(), sx0 + 340, bcW(4) - 560, 2.4, 0, 'twine pylon');
+    landmark(MS.makeBaitShack(), sx0 - 300, bcW(4) + 560, 2.6, 0, 'strip bait shack');
+    // BILLBOARDS down the whole frontage, alternating campaigns — the strip is
+    // where the election is loudest, because it is where the traffic is
+    let bi = 0;
+    for (const by8 of [4560, 5320, 6260, 7060, 7980, 8720, 9180]) {
+      landmark(MS.makeBillboard(bi % 3 === 2 ? -1 : bi % 2), sx0 + 700, by8, 3.4, -Math.PI / 2, 'billboard');
+      bi++;
+    }
+    // the cars at the drive-in, in the fan of ramps, all facing the screen
+    for (let r2 = 1; r2 < 6; r2++) {
+      const n = 3 + r2;
+      for (let i = 0; i < n; i++) {
+        const a2 = -0.95 + (i / (n - 1)) * 1.9;
+        const cxp = sx0 - 180 + Math.cos(a2) * (110 + r2 * 88), cyp = bcW(3) + Math.sin(a2) * (100 + r2 * 74);
+        if (!maplePlaceable(cxp, cyp, 2.4) || !MS.spotFree(cxp, cyp, 44)) continue;
+        drop(MS.makePickup(), cxp, cyp, 2.4, -a2);
+      }
+    }
+    // the motel's guests, the gas station's regulars, and the roadside scrub
+    for (const sgy of [2, 3, 4]) {
+      const sy = bcW(sgy);
+      for (const [px10, py10] of scatter(sx0 - 700, sy - 700, sx0 + 700, sy + 700, 6, 1.2)) {
+        drop(MS.makeTownsfolk(mchance(0.5)), px10, py10, 1.2);
+      }
+      for (const [px11, py11] of scatter(sx0 - 760, sy - 760, sx0 + 300, sy + 760, 8, 1.6)) {
+        drop(mchance(0.5) ? makeBush() : MS.makeMapleTree(), px11, py11, mchance(0.5) ? 1.6 : 2.6);
+      }
+      for (const [px12, py12] of row(sx0 + 480, sy - 620, sx0 + 480, sy + 620, 5)) {
+        drop(MS.makeLawnSign(SIDE()), px12, py12, 0.55);
+      }
+      drop(MS.makePylonSign(), sx0 + 640, sy + 700, 2.4);
+    }
+  }
+
+  // ══ THE PARK ══════════════════════════════════════════════════════════════
+  // Blocks (4..5, 2). The town green's bigger cousin: the pond, the nine-hole
+  // municipal course the mayor's brother-in-law runs, picnic tables and grills.
+  {
+    landmarkGlb('gazebo', bcW(4) + 470, bcW(2) + 560, 5, 8.5, makeGazeboFB, 0, 'park gazebo');
+    landmarkGlb('golfcart', bcW(4) - 470, bcW(2) + 320, 2.6, 3.2, makeGolfcartFB, 0.6, 'golf cart');
+    landmark(MS.makeLawnSign(0), bcW(4) - 690, bcW(2) - 690, 0.55, 0, 'course sign');
+    for (const pgx of [4, 5]) {
+      const cxB = bcW(pgx), cyB = bcW(2);
+      for (const [tx, ty] of scatter(cxB - 700, cyB - 700, cxB + 700, cyB + 700, 11, 3.2)) {
+        if (mchance(0.5)) dropGlb('parktree', tx, ty, 3.4, mr(6.5, 8.5), makeTree);
+        else drop(MS.makeMapleTree(), tx, ty, 2.8);
+      }
+      for (const [bx9, by9] of scatter(cxB - 640, cyB - 640, cxB + 640, cyB + 640, 5, 1.6)) drop(makeBush(), bx9, by9, 1.6);
+      for (const [px13, py13] of scatter(cxB - 620, cyB - 620, cxB + 620, cyB + 620, 4, 1.6)) drop(MS.makePicnicTable(), px13, py13, 1.8, mr(0, 3.1));
+      for (const [px14, py14] of scatter(cxB - 600, cyB - 600, cxB + 600, cyB + 600, 3, 1.0)) drop(MS.makeParkGrill(), px14, py14, 0.9);
+      for (const [px15, py15] of scatter(cxB - 640, cyB - 640, cxB + 640, cyB + 640, 5, 1.2)) drop(MS.makeTownsfolk(mchance(0.4)), px15, py15, 1.2);
+      for (const [bx10, by10] of row(cxB - 500, cyB + 700, cxB + 500, cyB + 700, 4)) drop(makeBench(), bx10, by10, 2.4);
+    }
+  }
+
+  // ══ PINE WOODS ════════════════════════════════════════════════════════════
+  // The north ridge, blocks (0..2, 0), (4,0), (5,0). ./life keeps its campsite
+  // vignette on (4,0), so the clearing there stays clear.
+  const TOWERS: [number, number][] = [[bcW(4) + 520, bcW(0) - 420], [3980, 1600]];
+  for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    if (PLAN[gy][gx] !== 'forest') continue;
+    const cxB = bcW(gx), cyB = bcW(gy);
+    const cx = w(cxB), cz = w(cyB);
+    const half = wLen(BLOCK_SIZE / 2) - 6;
+    const isCamp = gx === 4 && gy === 0;
+    const inClearing = (x: number, z: number) => isCamp && Math.hypot(x - (cx - 5), z - (cz + 3)) < 15;
+    // the two lookout towers stand in a CLEARING — the tree pass has no
+    // separation hash of its own, so it is told about them explicitly
+    const inTowerYard = (x: number, z: number) =>
+      TOWERS.some(([tx, tz]) => Math.hypot(x - w(tx), z - w(tz)) < 9);
+    for (let t = 0; t < 34; t++) {
+      const x = cx + mr(-(half - 4), half - 4), z = cz + mr(-(half - 4), half - 4);
+      if (inClearing(x, z) || inTowerYard(x, z)) continue;
+      if (Math.hypot(x - w(8405), z - w(1149)) < 13) continue;   // the river spring — no trees in the water
+      if (mchance(0.4)) placeGlb3('pine', x, z, 3, mr(7, 9.5), makePine);
+      else place(mchance(0.72) ? makePine() : MS.makeMapleTree(), x, z, 3);
+    }
+    if (isCamp) {
+      for (let i = 0; i < 3; i++) {
         const a = (i / 3) * Math.PI * 2 + 0.5;
         const log = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 1 }));
         log.rotation.z = Math.PI / 2; log.rotation.y = a; log.position.y = 0.35;
         const lg = new THREE.Group(); lg.add(log);
         place(lg, cx + Math.cos(a) * 3.4, cz + Math.sin(a) * 3.4, 1.4);
       }
-      placeGlb('rocks', cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.5, half * 0.5), 2.4, 2.6, makeRocksFB, rand(0, Math.PI * 2));
-      if (gx === 4 && gy === 0) {   // the campsite block gets the AI camp set
-        placeGlb('tent', cx - 10, cz + 4, 2.6, 4.2, makeTentFB, rand(-0.4, 0.4));
-        placeGlb('campfire', cx, cz, 1.4, 1.7, makeCampfireFB);
-      }
-      for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
-    } else if (biome === 'resort') {
-      // ── THE RESORT: villas along the boardwalk, cabanas and loungers
-      // ringing the two painted pools, palms everywhere
-      for (const ux of [-0.6, -0.2, 0.2, 0.6]) {
-        placeGlb('cabana', cx + ux * half, cz - half * 0.72, 3, 4.6, makeThatchHut, rand(-0.3, 0.3));
-        if (Math.random() < 0.8) placeGlb('palm', cx + ux * half + 30, cz - half * 0.5, 2.6, rand(6.5, 8.5), makePalm, rand(0, Math.PI * 2));
-      }
-      // loungers + umbrellas around the painted pools (bake: -330,-180 / 300,240)
-      for (const [ox, oy] of [[-330, -180], [300, 240]] as const) {
-        const px2 = cx + wLen(ox) * 20 * SCALE, pz2 = cz + wLen(oy) * 20 * SCALE;
-        for (let k = 0; k < 5; k++) {
-          const a2 = (k / 5) * Math.PI * 2;
-          place(makeBeachChairFB(), px2 + Math.cos(a2) * 16, pz2 + Math.sin(a2) * 12, 1.4);
-        }
-        placeGlb('umbrella', px2 + 12, pz2 - 10, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
-      }
-      place(makeTikiBar(), cx + half * 0.45, cz + half * 0.35, 3.4);
-      for (let t = 0; t < 3; t++) place(makeFlowers(), cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.7, half * 0.7), 0.7);
-    } else if (biome === 'party') {
-      // ── THE DANCE FLOOR: a stage of speaker stacks at the north edge,
-      // tiki torches on the perimeter, bar carts and a scatter of stools
-      placeGlb('stage', cx, cz - half * 0.66, 5, 3.2, makeThatchHut, Math.PI);
-      for (const sx of [-1, 1]) place(makeSpeakerStack(), cx + sx * 18, cz - half * 0.66 + 4, 2.6);
-      for (const sx of [-1, 1]) place(makeSpeakerStack(), cx + sx * 34, cz - half * 0.3, 2.6);
-      for (let k = 0; k < 10; k++) {   // torch ring around the floor
-        const a2 = (k / 10) * Math.PI * 2;
-        place(makeCone(), cx + Math.cos(a2) * half * 0.82, cz + Math.sin(a2) * half * 0.82, 1.1);
-      }
-      place(makeTikiBar(), cx - half * 0.6, cz + half * 0.55, 3.4);
-      place(makeTikiBar(), cx + half * 0.6, cz + half * 0.55, 3.4);
-      for (let t = 0; t < 6; t++) place(makeBarrel(), cx + rand(-half * 0.75, half * 0.75), cz + rand(-half * 0.75, half * 0.75), 1.3);
-    } else if (biome === 'port') {
-      // ── THE PORT: the galleon at the pier head, cargo everywhere, cannons
-      placeGlb('lighthouse', cx - half * 0.7, cz - half * 0.6, 6.5, 19, makeLighthouseFB);
-      { const sh = makeGalleon(); sh.rotation.y = rand(-0.12, 0.12); place(sh, cx, cz + half * 0.62, 7.5); }
-      for (const px2 of [-0.5, 0, 0.5]) {   // crates + barrels down each pier
-        for (let k = 0; k < 4; k++) {
-          const z2 = cz - half * 0.5 + k * (half * 0.45);
-          place(makeBarrel(), cx + px2 * half * 0.62 + rand(-5, 5), z2, 1.3);
-          if (k % 2 === 0) place(makeChest(), cx + px2 * half * 0.62 + rand(-6, 6), z2 + 6, 1.5);
-        }
-      }
-      for (const sx of [-1, 1]) place(makeCannon(), cx + sx * half * 0.75, cz + half * 0.5, 2);
-      place(makeThatchHut(), cx + half * 0.55, cz - half * 0.55, 3);
-    } else if (biome === 'market') {
-      // ── THE MARKET: stall rows around the bunting square, treasure piles
-      for (let ry = -1; ry <= 1; ry++) for (let rx2 = -1; rx2 <= 1; rx2++) {
-        if (rx2 === 0 && ry === 0) continue;
-        place(makeMarketStall(), cx + rx2 * half * 0.6 + rand(-6, 6), cz + ry * half * 0.6 + rand(-6, 6), 2.6);
-      }
-      place(makeChest(), cx, cz, 1.5);
-      for (let t = 0; t < 5; t++) place(makeBarrel(), cx + rand(-half * 0.8, half * 0.8), cz + rand(-half * 0.8, half * 0.8), 1.3);
-      for (let t = 0; t < 3; t++) placeGlb('palm', cx + rand(-half * 0.8, half * 0.8), cz + rand(-half * 0.8, half * 0.8), 2.6, rand(6, 8), makePalm, rand(0, Math.PI * 2));
-    } else if (biome === 'jungle') {
-      // ── THE JUNGLE: dense palms, boulders, a hidden chest on the trail
-      for (let t = 0; t < 9; t++) {
-        const [x, z] = jitter();
-        if (Math.random() < 0.7) placeGlb('palm', x, z, 2.6, rand(7, 10), makePalm, rand(0, Math.PI * 2));
-        else place(makePine(), x, z, 3);
-      }
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeRocksFB(), x, z, 2.4); }
-      place(makeChest(), cx + rand(-half * 0.4, half * 0.4), cz + rand(-half * 0.4, half * 0.4), 1.5);
-      for (let t = 0; t < 4; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.6); }
-    } else if (biome === 'cove') {
-      // ── THE COVE: the wreck scar, treasure, boulders, a lonely palm pair
-      for (let t = 0; t < 3; t++) place(makeChest(), cx - half * 0.35 + rand(-14, 14), cz + half * 0.3 + rand(-10, 10), 1.5);
-      for (let t = 0; t < 5; t++) { const [x, z] = jitter(); place(makeRocksFB(), x, z, 2.4); }
-      for (const sx of [-1, 1]) placeGlb('palm', cx + sx * half * 0.62, cz - half * 0.55, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
-      place(makeCannon(), cx + half * 0.3, cz - half * 0.2, 2);
-      for (let t = 0; t < 4; t++) place(makeBarrel(), cx + rand(-half * 0.7, half * 0.7), cz + rand(-half * 0.7, half * 0.7), 1.3);
-      place(makeSandcastleFB(), cx + rand(-20, 20), cz + half * 0.6, 1.2);
-    } else if (biome === 'beach') {
-      // the DESIGNED beach: palms line the boardwalk promenade at the top,
-      // umbrellas sit in staggered resort rows on the sand (matching the baked
-      // towels), club landmarks anchor each block
-      for (const ux of [-0.62, -0.21, 0.21, 0.62]) {   // palm colonnade on the promenade
-        if (Math.random() < 0.75) placeGlb('palm', cx + ux * half, cz - half * 0.82, 2.6, rand(6.5, 8.5), makePalm, rand(0, Math.PI * 2));
+      placeGlb3('tent', cx - 10, cz + 4, 2.6, 4.2, makeTentFB, mr(-0.4, 0.4));
+      placeGlb3('campfire', cx, cz, 1.4, 1.7, makeCampfireFB);
+      landmark(MS.makeRangerTower(), TOWERS[0][0], TOWERS[0][1], 2.8, 0.3, 'ranger tower');
+    }
+    placeGlb3('rocks', cx + mr(-half * 0.5, half * 0.5), cz + mr(-half * 0.5, half * 0.5), 2.4, 2.6, makeRocksFB, mr(0, 6.28));
+    for (let t = 0; t < 6; t++) place(makeBush(), cx + mr(-half, half), cz + mr(-half, half), 1.6);
+  }
+  landmark(MS.makeRangerTower(), TOWERS[1][0], TOWERS[1][1], 2.8, -0.4, 'west ranger tower');
+
+  // ══ LAKESIDE ══════════════════════════════════════════════════════════════
+  // The whole south shore. The pier, the boat ramp, the bait shack, canoes on
+  // a rack, and everybody in Maple Falls on a Saturday.
+  {
+    // these sit ON the waterline, so they use drop() rather than landmark():
+    // a pier is SUPPOSED to overhang the coast, and the coast-clearance test a
+    // landmark runs would (correctly) refuse every one of them
+    drop(MS.makeFishingPier(20), 4700, 11430, 4.2, Math.PI / 2);
+    drop(MS.makeBoatRamp(), 7100, 11250, 3.4, 0);
+    landmark(MS.makeBaitShack(), 7460, 10940, 2.6, -Math.PI / 2, 'bait shack');
+    landmark(MS.makeCanoeRack(), 6620, 11080, 2.8, 0, 'canoe rack');
+    landmark(MS.makeRangerTower(), 8480, 10520, 2.8, 0, 'lake ranger tower');
+    for (const [rx2, ry2] of row(6280, 11250, 5240, 11340, 4)) drop(MS.makeRowboat(), rx2, ry2, 1.8, mr(0, 3.1));
+    for (const [lx2, ly2] of row(3200, 10900, 8740, 10900, 8)) drop(MS.makeLifeRing(), lx2, ly2, 0.8);
+    for (const [px18, py18] of row(4200, 11150, 8200, 11150, 7)) drop(MS.makeTownsfolk(mchance(0.4)), px18, py18, 1.2, Math.PI);
+    for (const [px19, py19] of row(3600, 11000, 8600, 11000, 6)) drop(MS.makePicnicTable(), px19, py19, 1.8, mr(0, 3.1));
+    for (let gx = 0; gx < 6; gx++) {
+      const cxB = bcW(gx), cyB = bcW(5);
+      const cx = w(cxB), cz = w(cyB);
+      const half = wLen(BLOCK_SIZE / 2) - 6;
+      // the boardwalk colonnade at the top of the sand (the bake paints the
+      // planks at world y 9475..9660 — these stand just behind it)
+      for (const ux of [-0.62, -0.21, 0.21, 0.62]) {
+        if (mchance(0.75)) placeGlb3('palm', cx + ux * half, cz - half * 0.82, 2.6, mr(6.5, 8.5), makePalm, mr(0, 6.28));
         else place(makePalm(), cx + ux * half, cz - half * 0.82, 2.6);
       }
-      // boardwalk benches face the water (south)
-      for (const ux of [-0.4, 0.4]) { const bn = makeBench(); place(bn, cx + ux * half, cz - half * 1.02, 2.4); }
-      // umbrella rows — staggered grid, resort-style
-      for (const [ux, vz] of [[-0.55, -0.1], [-0.18, 0.14], [0.18, -0.1], [0.55, 0.14], [-0.36, 0.44], [0.36, 0.44]] as const)
-        placeGlb('umbrella', cx + ux * half, cz + vz * half, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
-      placeGlb('sandcastle', cx + rand(-half * 0.5, half * 0.5), cz + half * 0.68, 1.2, 1.9, makeSandcastleFB, rand(0, Math.PI * 2));
-      for (let t = 0; t < 2; t++) { const ch = makeBeachChairFB(); ch.rotation.y = rand(0, Math.PI * 2); place(ch, cx + rand(-half * 0.5, half * 0.5), cz + rand(-half * 0.1, half * 0.5), 1.3); }
-      if (gx === 1) placeGlb('lifeguard', cx, cz + half * 0.55, 3.4, 7.5, makeLifeguardFB, Math.PI);
-      if (gx === 4) placeGlb('lifeguard', cx - half * 0.3, cz + half * 0.5, 3.4, 7.5, makeLifeguardFB, Math.PI);
-      if (gx === 2) placeGlb('cabana', cx - half * 0.62, cz - half * 0.45, 3, 4.6, makeCabanaFB, rand(-0.3, 0.3));
-      if (gx === 2) placeGlb('cabana', cx + half * 0.62, cz - half * 0.45, 3, 4.6, makeCabanaFB, rand(-0.3, 0.3));
-      if (gx === 0) placeGlb('lighthouse', cx - half * 0.55, cz + half * 0.55, 6.5, 19, makeLighthouseFB);
-      for (let t = 0; t < 2; t++) { const [x, z] = jitter(); place(makeBush(), x, z, 1.4); }
-    } else if (biome === 'zoo') {
-      placeGlb('zooarch', cx - half * 0.7, cz, 6, 9, makeZooArchFB, Math.PI / 2);
-      // pen fences matching the baked pen floors (savanna / paddock / lagoon)
-      const pens: [number, number, number, number][] = [
-        [cx - 15, cz - 21.5, 26, 19], [cx - 15, cz + 21.5, 26, 19], [cx + 10, cz, 22, 20],
-      ];
-      for (const [pcx, pcz, pw2, pd2] of pens) {
-        if (!insideIsland3(pcx + pw2 / 2, pcz) || !insideIsland3(pcx - pw2 / 2, pcz)) continue;
-        const n2 = makeFenceRun(pw2, 0xc9b28a); n2.position.set(pcx, 0, pcz - pd2 / 2); place(n2, pcx, pcz - pd2 / 2, 1.4);
-        const s2 = makeFenceRun(pw2, 0xc9b28a); place(s2, pcx, pcz + pd2 / 2, 1.4);
-        const w2 = makeFenceRun(pd2, 0xc9b28a); w2.rotation.y = Math.PI / 2; place(w2, pcx - pw2 / 2, pcz, 1.4);
-        const e2 = makeFenceRun(pd2, 0xc9b28a); e2.rotation.y = Math.PI / 2; place(e2, pcx + pw2 / 2, pcz, 1.4);
+      for (const ux of [-0.4, 0.4]) place(makeBench(), cx + ux * half, cz - half * 1.02, 2.4);
+      for (const [ux, vz] of [[-0.55, -0.1], [-0.18, 0.14], [0.18, -0.1], [0.55, 0.14], [-0.36, 0.44], [0.36, 0.44]] as const) {
+        placeGlb3('umbrella', cx + ux * half, cz + vz * half, 1.8, 3.2, makeUmbrellaFB, mr(0, 6.28));
       }
-      for (let t = 0; t < 4; t++) place(makeTree(), cx - half * 0.55 + rand(-6, 6), cz + rand(-half * 0.5, half * 0.5), 3);
-    } else if (biome === 'airport') {
-      // a real airfield: hangar + control tower + windsock + parked plane on
-      // the apron (the runway/taxiway markings are baked into the ground)
-      // Quonset hangar with END WALLS + door + stripe — the old bare white
-      // half-cylinder read as a broken slab at WORLD-ENDER zoom
-      const hangGrp = new THREE.Group();
-      const shellMat = new THREE.MeshStandardMaterial({ color: 0xb9c4d2, roughness: 0.65, flatShading: true });
-      const shell = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.2, 15, 16, 1, true, 0, Math.PI), shellMat);
-      shell.rotation.z = Math.PI / 2; shell.position.y = 0; hangGrp.add(shell);
-      const capMatH = new THREE.MeshStandardMaterial({ color: 0x93a2b4, roughness: 0.7, side: THREE.DoubleSide });
-      for (const sxE of [-7.5, 7.5]) {
-        const capEnd = new THREE.Mesh(new THREE.CircleGeometry(7.2, 16, 0, Math.PI), capMatH);
-        capEnd.rotation.y = Math.PI / 2; capEnd.position.x = sxE; hangGrp.add(capEnd);
-      }
-      const door = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 5.6),
-        new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.85 }));
-      door.rotation.y = Math.PI / 2; door.position.set(7.55, 2.8, 0); hangGrp.add(door);
-      const stripe = new THREE.Mesh(new THREE.CylinderGeometry(7.28, 7.28, 1.6, 16, 1, true, 0, Math.PI),
-        new THREE.MeshStandardMaterial({ color: 0x5ec8d8, roughness: 0.6, side: THREE.DoubleSide }));
-      stripe.rotation.z = Math.PI / 2; hangGrp.add(stripe);
-      hangGrp.rotation.y = Math.PI / 4; hangGrp.position.set(cx - half * 0.55, 0, cz + half * 0.6);
-      setShadow(hangGrp); scene.add(hangGrp); addEdible(hangGrp, 5.6);
-      { // control tower with a glass cab
-        const tw = new THREE.Group();
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 12, 10),
-          new THREE.MeshStandardMaterial({ color: 0xe8eaf2, roughness: 0.7 }));
-        col.position.y = 6; tw.add(col);
-        const cab = new THREE.Mesh(new THREE.CylinderGeometry(3, 2.4, 2.6, 10),
-          new THREE.MeshStandardMaterial({ color: 0x9fd8ee, roughness: 0.2, metalness: 0.3 }));
-        cab.position.y = 13.2; tw.add(cab);
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.2, 10),
-          new THREE.MeshStandardMaterial({ color: 0xd85a5a, roughness: 0.6 }));
-        roof.position.y = 15; tw.add(roof);
-        place(tw, cx - half * 0.75, cz + half * 0.35, 6);
-      }
-      { // cute parked plane, nose along the taxi direction
-        const pl = new THREE.Group();
-        const white = new THREE.MeshStandardMaterial({ color: 0xf4f6fa, roughness: 0.4, metalness: 0.1 });
-        const teal = new THREE.MeshStandardMaterial({ color: 0x5ec8d8, roughness: 0.5 });
-        const fus = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 6, 6, 10), white);
-        fus.rotation.z = Math.PI / 2; fus.position.y = 2; pl.add(fus);
-        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0xbfeaff, roughness: 0.15 }));
-        cockpit.position.set(2.6, 2.6, 0); cockpit.scale.set(1.2, 0.8, 0.9); pl.add(cockpit);
-        const wing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.3, 11), teal);
-        wing.position.set(0.4, 2.1, 0); pl.add(wing);
-        const tail = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 0.28), teal);
-        tail.position.set(-4.2, 3.4, 0); pl.add(tail);
-        const hstab = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.24, 4.2), teal);
-        hstab.position.set(-4.2, 2.6, 0); pl.add(hstab);
-        for (const sz of [-1.4, 1.4]) {
-          const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x20242c }));
-          gear.rotation.x = Math.PI / 2; gear.position.set(0.8, 0.55, sz); pl.add(gear);
-        }
-        pl.rotation.y = -Math.PI / 4;    // parked ON the apron tie-downs, nose to the runway
-        place(pl, cx - half * 0.5, cz + half * 0.42, 5);
-      }
-      { // windsock
-        const ws = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 7, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5 }));
-        pole.position.y = 3.5; ws.add(pole);
-        const sock = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.6, 8), new THREE.MeshStandardMaterial({ color: 0xff8a3a, roughness: 0.8 }));
-        sock.rotation.z = Math.PI / 2; sock.position.set(1.4, 6.6, 0); ws.add(sock);
-        place(ws, cx - half * 0.7, cz - half * 0.18, 1.4);
-      }
-    } else if (biome === 'military') {
-      // most of this block is ocean — the base is a neat row on the NW land
-      // triangle: three bunkers facing the road, helipad + tank behind
-      for (const ux of [-0.8, -0.5, -0.2]) {
-        const bunker = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 8),
-          new THREE.MeshStandardMaterial({ color: 0x6b7050, roughness: 0.95, flatShading: true }));
-        place(bunker, cx + ux * half, cz - half * 0.8, 4);
-      }
-      // perimeter fence + guard tower around the baked compound pad
-      const fN = makeFenceRun(34, 0x8a8f74); place(fN, cx - half * 0.53, cz - half * 0.96, 1.4);
-      const fS = makeFenceRun(34, 0x8a8f74); place(fS, cx - half * 0.53, cz - half * 0.45, 1.4);
-      const fW = makeFenceRun(20, 0x8a8f74); fW.rotation.y = Math.PI / 2; place(fW, cx - half * 0.96, cz - half * 0.7, 1.4);
-      {
-        const tower = new THREE.Group();
-        for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 5.5, 6), new THREE.MeshStandardMaterial({ color: 0x8a8f74, roughness: 0.9 }));
-          leg.position.set(lx * 1.1, 2.75, lz * 1.1); tower.add(leg);
-        }
-        const cab = new THREE.Mesh(new THREE.BoxGeometry(3, 1.8, 3), new THREE.MeshStandardMaterial({ color: 0x6b7050, roughness: 0.9 }));
-        cab.position.y = 6.4; tower.add(cab);
-        const rf = new THREE.Mesh(new THREE.ConeGeometry(2.4, 1, 4), new THREE.MeshStandardMaterial({ color: 0x5a5f45, roughness: 0.9, flatShading: true }));
-        rf.rotation.y = Math.PI / 4; rf.position.y = 7.8; tower.add(rf);
-        place(tower, cx - half * 0.93, cz - half * 0.95, 4);
-      }
-      placeGlb('heli', cx - half * 0.31, cz - half * 0.72, 5, 5.5, makeHeliFB, rand(0, Math.PI * 2));
-      placeGlb('tank', cx - half * 0.65, cz - half * 0.5, 4, 3.4, makeTankFB, Math.PI / 2);
-    }
-
-    // starter food — tiny props (cones/hydrants/trash/flowers) scattered in every
-    // walkable block so a speck-sized void always has something to nibble.
-    if (biome !== 'military') {
-      const tinyN = biome === 'forest' ? 12 : 30;   // denser snack carpet
-      // exclusion zones: nothing scatters into the fountain ring or the pond
-      const tinyOk = (x: number, z: number) => {
-        if (biome === 'plaza' && Math.hypot(x - cx, z - cz) < 13) return false;
-        if (biome === 'park' && gx === 4 && gy === 2 && Math.hypot(x - cx, z - (cz + 6)) < 20) return false;
-        // downtown blocks are walled with buildings — snacks live in the court
-        if (biome === 'downtown' && Math.max(Math.abs(x - cx), Math.abs(z - cz)) > half * 0.55) return false;
-        return true;
-      };
-      for (let t = 0; t < tinyN; t++) {
-        const [x, z] = jitter();
-        if (!tinyOk(x, z)) continue;
-        place(tinyFor(biome), x, z, rand(0.6, 0.85));
-      }
-      for (let t = 0; t < 3; t++) { const [x, z] = jitter(); if (tinyOk(x, z)) place(makeCoins(), x, z, 0.55); }
+      for (const [px16, py16] of scatter(cxB - 700, cyB - 700, cxB + 700, cyB + 700, 5, 1.7)) drop(MS.makePicnicTable(), px16, py16, 1.8, mr(0, 3.1));
+      for (const [px17, py17] of scatter(cxB - 700, cyB - 700, cxB + 700, cyB + 700, 6, 1.2)) drop(MS.makeTownsfolk(mchance(0.35)), px17, py17, 1.2);
+      placeGlb3('sandcastle', cx + mr(-half * 0.5, half * 0.5), cz + half * 0.68, 1.2, 1.9, makeSandcastleFB, mr(0, 6.28));
+      for (let t = 0; t < 2; t++) { const ch = makeBeachChairFB(); ch.rotation.y = mr(0, 6.28); place(ch, cx + mr(-half * 0.5, half * 0.5), cz + mr(-half * 0.1, half * 0.5), 1.3); }
+      if (gx === 1 || gx === 4) placeGlb3('lifeguard', cx, cz + half * 0.55, 3.4, 7.5, makeLifeguardFB, Math.PI);
+      if (gx === 0) placeGlb3('lighthouse', cx - half * 0.55, cz + half * 0.4, 6.5, 19, makeLighthouseFB);
+      for (let t = 0; t < 2; t++) place(makeBush(), cx + mr(-half, half), cz + mr(-half, half), 1.4);
     }
   }
 
-  // line the road edges: cones (starter snacks) + streetlamps on the sidewalks.
+  // ── the snack carpet ──────────────────────────────────────────────────────
+  // A speck-sized void must always have something to nibble, in every block,
+  // in the biome's own vocabulary.
+  for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+    const biome = PLAN[gy][gx];
+    const cxB = bcW(gx), cyB = bcW(gy);
+    const cx = w(cxB), cz = w(cyB);
+    const half = wLen(BLOCK_SIZE / 2) - 6;
+    const tinyN = biome === 'forest' ? 17 : 36;
+    for (let t = 0; t < tinyN; t++) {
+      const x = cx + mr(-half, half), z = cz + mr(-half, half);
+      // never in the fountain ring, the pond, the maze heart or the gridiron
+      if (biome === 'plaza' && Math.hypot(x - w(7230), z - w(5680)) < 8) continue;
+      if (biome === 'park' && gx === 4 && Math.hypot(x - cx, z - (cz + 6)) < 20) continue;
+      if (biome === 'campus' && gx === 4 && gy === 3 && Math.abs(x - cx) < 22 && Math.abs(z - cz) < 13) continue;
+      place(tinyForMaple(biome), x, z, mr(0.6, 0.85));
+    }
+    for (let t = 0; t < 3; t++) place(makeCoins(), cx + mr(-half, half), cz + mr(-half, half), 0.55);
+  }
+
+  // ── the roads ─────────────────────────────────────────────────────────────
+  // Cones and streetlamps on the shoulder, and — because this is Maple Falls
+  // in an election year — a campaign sign on every verge, alternating sides
+  // and alternating candidates the entire length of every road in town.
   // CRITICAL: each sweep runs the full length of a road and CROSSES the other
-  // four — reject any spot whose along-coordinate falls inside a crossing
-  // road's asphalt, or the prop stands in a traffic lane
+  // four, so reject any spot whose along-coordinate is inside a crossing road.
   const roads3 = ROAD_CENTERS.map((c) => w(c));
   const nearCrossRoad = (v: number, m: number) => roads3.some((rc2) => Math.abs(v - rc2) < m);
   for (const rc of roads3) {
     let ci = 0;
     for (let a = -270; a < 270; a += 32, ci++) {
-      const side = ci % 2 ? 4.9 : -4.9;   // road shoulder — cars never clip them
+      const side = ci % 2 ? 4.9 : -4.9;
       if (nearCrossRoad(a, 4.5)) continue;
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeCone(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeCone(), rc - side, a, 0.7);
     }
     let li = 0;
     for (let a = -280; a < 280; a += 24, li++) {
-      const side = li % 2 ? 6.8 : -6.8;   // ON the sidewalk, not the asphalt
+      const side = li % 2 ? 6.8 : -6.8;
       if (nearCrossRoad(a, 5.2)) continue;
       if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc)) place(makeLamp(), a, rc + side, 0.7);
       if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a)) place(makeLamp(), rc - side, a, 0.7);
     }
-  }
-
-  // opening snack cluster: a ring of easy food around the spawn junction so a
-  // brand-new player eats 5+ things in the first fifteen seconds (hole.io rule)
-  {
-    const sx0 = w(ROAD_CENTERS[0]), sz0 = w(ROAD_CENTERS[2]);
-    // snacks live on the four GRASS corners of the junction — never the asphalt
     let si = 0;
-    for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-      for (let k = 0; k < 3; k++, si++) {
-        const x = sx0 + qx * (8 + k * 3.2), z = sz0 + qz * (8 + (2 - k) * 3.2);
-        place(si % 4 === 0 ? makeCoins() : makeTinyProp(), x, z, si % 4 === 0 ? 0.55 : rand(0.6, 0.8));
+    for (let a = -276; a < 276; a += 17, si++) {
+      const side = si % 2 ? 8.6 : -8.6;   // outside the lamp line, on the verge
+      if (nearCrossRoad(a, 7)) continue;
+      if (insideIsland3(a, rc) && !inLagoon3(a, rc) && coastClear(a, rc, 8)) {
+        const sg = MS.makeLawnSign(si % 2); sg.rotation.y = mr(-0.25, 0.25);
+        place(sg, a, rc + side, 0.55);
+      }
+      if (insideIsland3(rc, a) && !inLagoon3(rc, a) && coastClear(rc, a, 8)) {
+        const sg = MS.makeLawnSign((si + 1) % 2); sg.rotation.y = Math.PI / 2 + mr(-0.25, 0.25);
+        place(sg, rc - side, a, 0.55);
       }
     }
   }
 
-  // river banks: rocks + reed tufts along the polyline (offset off the water),
-  // and low white BRIDGE RAILINGS wherever a road crosses the river
+  // ── the river banks + the bridge railings ─────────────────────────────────
   {
     const RIVER_W: [number, number][] = [
       [8405, 1149], [8277, 3035], [8565, 5337], [8213, 6887], [8469, 8661], [9431, 9305],
     ];
     for (let i = 0; i < RIVER_W.length - 1; i++) {
       const [x0, y0] = RIVER_W[i], [x1, y1] = RIVER_W[i + 1];
-      const segLen = Math.hypot(x1 - x0, y1 - y0), steps = Math.floor(segLen / 420);
-      const nx = -(y1 - y0) / segLen, ny = (x1 - x0) / segLen;   // perpendicular
+      const segLen = Math.hypot(x1 - x0, y1 - y0), steps = Math.floor(segLen / 380);
+      const nx = -(y1 - y0) / segLen, ny = (x1 - x0) / segLen;
       for (let k2 = 1; k2 < steps; k2++) {
         const t = k2 / steps, side = k2 % 2 ? 1 : -1;
         const bx = w(x0 + (x1 - x0) * t + nx * side * 105), bz = w(y0 + (y1 - y0) * t + ny * side * 105);
-        if (Math.abs((y0 + (y1 - y0) * t) - POND[1]) < 420) continue;   // pond has its own bank
-        place(Math.random() < 0.5 ? makeReeds() : makeRocksFB(), bx, bz, Math.random() < 0.5 ? 0.9 : 1.8);
+        const bwy = y0 + (y1 - y0) * t;
+        if (Math.abs(bwy - POND[1]) < 420) continue;
+        // …and never on a road: the river crosses all five of them
+        if (ROAD_CENTERS.some((c) => Math.abs(bwy - c) < 140 || Math.abs(x0 + (x1 - x0) * t + nx * side * 105 - c) < 140)) continue;
+        place(mchance(0.5) ? makeReeds() : makeRocksFB(), bx, bz, mchance(0.5) ? 0.9 : 1.8);
       }
     }
-    for (const rcW of [2580, 4290, 6000, 7710, 9420]) {
+    for (const rcW of ROAD_CENTERS) {
       const rx = riverXAtWorld(rcW);
       if (rx == null) continue;
+      // a 13-unit railing laid ACROSS a road that happens to run beside the
+      // crossing is a railing in a traffic lane — the SE junction at
+      // (9420, 9420) is exactly that case
+      if (ROAD_CENTERS.some((c) => Math.abs(rx - c) < 200)) continue;
       for (const side of [-1, 1]) {
         const rail = makeFenceRun(13, 0xf4f6fa);
         place(rail, w(rx), w(rcW) + side * 4.6, 1.6);
@@ -3291,38 +3802,45 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
   }
 
-  // plaza market stalls: striped stands along the square's south edge
-  {
-    const pcx = w(6855), pcz = w(5145);
-    const STALL_COLS = [0xff6a5e, 0x4db07a, 0x4d7de8];
-    STALL_COLS.forEach((col, i) => {
-      const st2 = new THREE.Group();
-      const counter = new THREE.Mesh(new THREE.BoxGeometry(3, 1.1, 1.6), new THREE.MeshStandardMaterial({ color: 0xf6f0e2, roughness: 0.85 }));
-      counter.position.y = 0.55; st2.add(counter);
-      for (const sxp of [-1.3, 1.3]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6), new THREE.MeshStandardMaterial({ color: 0xf6f0e2, roughness: 0.85 }));
-        post.position.set(sxp, 1.3, -0.6); st2.add(post);
-      }
-      const awn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 2.2), new THREE.MeshStandardMaterial({ color: col, roughness: 0.75 }));
-      awn.position.set(0, 2.7, 0); awn.rotation.x = 0.14; st2.add(awn);
-      place(st2, pcx - 14 + i * 14, pcz + 27, 2.2);
-    });
-  }
-
-  // coast fringe: the band between the grid and the cliff gets DESIGNED —
-  // boulders + wildflowers north, palms south, pines east (walks the actual
-  // silhouette, pulled inland so nothing hangs over the edge)
+  // ── the coast fringe ──────────────────────────────────────────────────────
+  // The band between the block grid and the cliff. North and west it is scrub
+  // and boulders, east it is pine, south it is the lake shore.
   for (let i = 0; i < SIL3_FRINGE.length; i += 3) {
     const [fx2, fz2] = SIL3_FRINGE[i];
     const x = fx2 * 0.9, z = fz2 * 0.9;
     if (!insideIsland3(x, z) || inLagoon3(x, z, 60)) continue;
-    if (ROAD_CENTERS_3D_LOCAL.some((rc2) => Math.abs(x - rc2) < 9 || Math.abs(z - rc2) < 9)) continue;   // never on a road
-    if (x > 150 && z > 60) { place(makeRocksFB(), x, z, 2.2); continue; }   // airport/military corner: rocks, not palms
-    if (z > 150) { if (Math.random() < 0.6) place(makePalm(), x, z, 2.6); else place(makeBush(), x, z, 1.4); }
-    else if (x > 150) place(Math.random() < 0.7 ? makePine() : makeRocksFB(), x, z, Math.random() < 0.7 ? 3 : 2.2);
-    else if (Math.random() < 0.5) place(makeRocksFB(), x, z, 2.2);
+    if (ROAD_CENTERS_3D_LOCAL.some((rc2) => Math.abs(x - rc2) < 9 || Math.abs(z - rc2) < 9)) continue;
+    if (z > 150) { if (mchance(0.55)) place(makePalm(), x, z, 2.6); else place(makeBush(), x, z, 1.4); }
+    else if (x > 150) place(mchance(0.6) ? makePine() : makeRocksFB(), x, z, mchance(0.7) ? 3 : 2.2);
+    else if (mchance(0.45)) place(makeRocksFB(), x, z, 2.2);
+    else if (mchance(0.5)) place(MS.makeMapleTree(), x, z, 2.6);
     else place(makeFlowers(), x, z, 0.8);
   }
+
+  // ── THE OPENING ───────────────────────────────────────────────────────────
+  // The match begins on the square's west walk, looking across the green at
+  // the town hall with Main Street's shopfronts behind. Hand-place the first
+  // twenty seconds of food: a ring of easy snacks on the grass either side of
+  // the walk, close enough that a brand-new speck eats five things before it
+  // has finished working out which way is up.
+  {
+    const [sx0, sz0] = [w(MAPLE_SPAWN[0]), w(MAPLE_SPAWN[1])];
+    let si = 0;
+    for (let ring = 0; ring < 3; ring++) {
+      const rr = 3.2 + ring * 3.4, n = 5 + ring * 3;
+      for (let k = 0; k < n; k++, si++) {
+        const a = (k / n) * Math.PI * 2 + ring * 0.35;
+        const x = sx0 + Math.cos(a) * rr, z = sz0 + Math.sin(a) * rr;
+        if (!insideIsland3(x, z)) continue;
+        if (ROAD_CENTERS_3D_LOCAL.some((rc2) => Math.abs(x - rc2) < 4 || Math.abs(z - rc2) < 4)) continue;
+        place(si % 5 === 0 ? makeCoins() : si % 3 === 0 ? MS.makeLawnSign(si % 2) : makeTinyProp(),
+          x, z, si % 5 === 0 ? 0.55 : mr(0.6, 0.8));
+      }
+    }
+  }
+
+  if (lmFail) console.warn(`[maple] ${lmFail} landmark site(s) rejected: ${lmRejects.join(', ')}`);
+  if (dropSkip) console.info(`[maple] ${dropSkip} scatter/row site(s) declined (water, coast or road band)`);
 
   // exactly ONE hot-air balloon in the sky — animated from createIsland's update
   spawnBalloon(scene);

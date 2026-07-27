@@ -552,8 +552,10 @@ const mealBySize = (r: number) =>
   r > 5 ? 'an entire BUILDING' : r > 2.5 ? 'something big' : r > 1.2 ? 'a mailbox' : 'a snack';
 const DISTRICT: Record<string, string> = {
   cozy: 'MAPLE HEIGHTS', fancy: 'FANCY HILLS', downtown: 'DOWNTOWN', plaza: 'THE PLAZA',
-  park: 'THE PARK', forest: 'PINE WOODS', zoo: 'THE ZOO', beach: 'SUNNY BEACH',
-  airport: 'THE AIRPORT', military: 'THE ARMY BASE',
+  park: 'THE PARK', forest: 'PINE WOODS', beach: 'LAKESIDE',
+  // MAPLE FALLS re-zone: without these four, a quarter of the island's
+  // headlines said "THE ISLE" instead of naming where you were standing
+  fair: 'THE COUNTY FAIR', farm: 'THE FARM', campus: 'MAPLE FALLS HIGH', strip: 'THE STRIP',
   // PIRATE BAY
   port: 'THE DOCKS', resort: 'THE RESORT', party: 'THE DANCE FLOOR',
   market: 'THE BAZAAR', jungle: 'THE JUNGLE', cove: 'SMUGGLERS COVE',
@@ -654,11 +656,12 @@ let gateT = 0;      // throttle for the too-big-to-eat tint
 // falls back to "general" just because a cell got renamed.
 const MAPLE_DIST: Record<string, MapleDist> = {
   cozy: 'burb', fancy: 'burb', burb: 'burb',
-  plaza: 'mainst', mainst: 'mainst', downtown: 'civic', civic: 'civic',
-  park: 'fair', fair: 'fair', zoo: 'fair',
+  downtown: 'mainst', mainst: 'mainst',   // MAIN STREET: the shopfronts and the diner
+  plaza: 'civic', civic: 'civic',          // THE SQUARE: town hall, bandstand, the protest
+  fair: 'fair', park: 'fair',
   forest: 'woods', woods: 'woods', camp: 'woods',
   beach: 'lake', lake: 'lake',
-  farm: 'farm', school: 'school', strip: 'strip', airport: 'strip',
+  farm: 'farm', campus: 'school', school: 'school', strip: 'strip',
 };
 let lastRankBrag = -99;
 let stallT = 0;     // seconds spent driving into something that will not move
