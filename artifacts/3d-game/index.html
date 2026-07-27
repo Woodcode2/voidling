@@ -104,6 +104,11 @@
         background: rgba(16,8,30,0.55); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(6px);
         color: #ffe08a; font-size: 14px; font-weight: 900; }
       /* daily quests: three icon CHIPS (pre-reader friendly), not sentences */
+      /* The three daily-quest chips sat in the top-left of every single frame
+         for a goal that is not this match's goal. The quests still run and
+         still pay out — they belong on the menu and the results screen, not
+         over the world. */
+      body:not(.menu) #quests { display: none; }
       #quests { position: fixed; top: calc(150px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
         display: flex; gap: 6px; }
       #quests .q { background: rgba(16,8,30,0.55); border-radius: 11px; padding: 5px 8px 4px;

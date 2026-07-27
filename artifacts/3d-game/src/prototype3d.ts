@@ -202,7 +202,8 @@ rivals.onSpeak = (x, z, line) => {
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts, rx, rz, rr) => {
   smugUntil = tClock + 2.4; audio.voice('happy');
-  breakingNews(`${name} devoured. family reunion RUINED`);
+  // no breakingNews here: announceFam already puts a full-screen card up for
+  // this, and a ticker headline three seconds later is the same news twice
   playerScore += pts;
   addCoins(15);
   questEvent('rival');
@@ -1045,13 +1046,19 @@ function startFresh(solo: boolean) {
   if (ended || started) { soloMode = solo; resetMatch(); }
   else beginMatch(solo);
 }
-el('btnPlay').addEventListener('click', () => {
+// PLAY opens the level picker. The old flow ran the other way — pick a level,
+// get returned to the splash, then press PLAY — which asks the player to make
+// the same decision twice and lands them back where they started.
+el('btnPlay').addEventListener('click', () => { el('worlds').classList.add('show'); });
+// …and the picker is what actually starts the match.
+function launchWorld() {
+  el('worlds').classList.remove('show');
   menuEl.style.display = 'none';
   // one-time teach card before the first menu-launched match: it's the only
   // place the danger loop ("eat the family when bigger, RUN when not") lives
   if (!localStorage.getItem('voidTut')) { tutEl.classList.add('show'); return; }
   withWorldReady(() => startFresh(false));
-});
+}
 el('btnSolo').addEventListener('click', () => {
   menuEl.style.display = 'none';
   if (!localStorage.getItem('voidTut')) localStorage.setItem('voidTut', '1');
@@ -1076,9 +1083,11 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
     const id = (c as HTMLElement).dataset.world!;
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
-      if (id === pickedWorld) { el('worlds').classList.remove('show'); return; }
+      if (id === pickedWorld) { launchWorld(); return; }   // already built: just go
+      // a different world needs the island rebuilt, so come back playing
       localStorage.setItem('voidWorld', id);
-      location.href = location.pathname;   // rebuild the island for the new world
+      localStorage.setItem('voidAutoPlay', '1');
+      location.href = location.pathname;
     });
   });
 }
@@ -1087,6 +1096,12 @@ document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('clic
   c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
 }));
 el('btnWorlds').addEventListener('click', () => el('worlds').classList.add('show'));
+// a world switch reloads the page to rebuild the island; pick up where the tap
+// left off rather than dumping the player back on the splash they just left
+if (localStorage.getItem('voidAutoPlay') === '1') {
+  localStorage.removeItem('voidAutoPlay');
+  requestAnimationFrame(() => launchWorld());
+}
 el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 // ── world integrity: NOTHING stands on asphalt, ever ─────────────────────────
@@ -1766,7 +1781,14 @@ function animate() {
       // again for a whole run. The rivals have had an escape hatch for this the
       // whole time (rv.stall > 0.8 abandons the target and wanders inland); the
       // player did not. If we are driving and going nowhere, walk inland.
-      if (driving && Math.hypot(voidState.x - prev.x, voidState.z - prev.z) < 0.02 * Math.max(0.4, dt * 60)) {
+      // …and it only counts as stuck if we are BOTH going nowhere AND properly
+      // off the land. Holding a thumb into the shore is not stuck — you are
+      // leaning on a wall, which is a legitimate thing to do — and treating it
+      // as stuck made the breaker shove you inland while your own input pushed
+      // straight back, once every 0.7 seconds. That was the shudder at the
+      // waterline. It now fires only when the body is genuinely off the land.
+      const wedged = !solid(voidState.x, voidState.z);
+      if (driving && wedged && Math.hypot(voidState.x - prev.x, voidState.z - prev.z) < 0.02 * Math.max(0.4, dt * 60)) {
         stallT += dt;
         if (stallT > 0.7) {
           const ld = landDir(voidState.x, voidState.z) ?? [-voidState.x, -voidState.z];
