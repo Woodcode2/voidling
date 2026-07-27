@@ -164,11 +164,13 @@ const _dbg = window as unknown as {
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __news: () => void;
   __voidState: () => { x: number; z: number; r: number };
+  __biomeAt: (x: number, z: number) => string | null;
 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 _dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
+_dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: district centroid sweeps
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
   const bs = document.createElement('div');
@@ -253,7 +255,15 @@ const voidState = { x: island.spawn.x, z: island.spawn.z };
 // debug: jump the void to an event block (?at=plaza|golf|beach|camp)
 {
   const at = new URLSearchParams(location.search).get('at');
-  const spots: Record<string, [number, number]> = { plaza: [42.75, -30], golf: [128.25, -42.75], beach: [-42.75, 213.75], camp: [128.25, -213.75], cozy: [-128.25, -128.25], downtown: [-42.75, -42.75], zoo: [213.75, -128.25], military: [198, 190], airport: [213.75, 128.25], fancy: [-128.25, -42.75],
+  // MAPLE FALLS districts — swept from the live biome map, not guessed. The old
+  // table still named zoo / military / airport / fancy, none of which exist any
+  // more, so half the debug spots teleported into a district that had been
+  // deleted.
+  const spots: Record<string, [number, number]> = {
+    square: [41, -43], plaza: [41, -43], mainst: [-15, 13], downtown: [-15, 13],
+    burb: [-75, 78], cozy: [-75, 78], fair: [-124, -126], farm: [95, -158],
+    campus: [175, 83], school: [175, 83], strip: [-214, 38], park: [175, -42],
+    forest: [-15, -219], woods: [-15, -219], lake: [-12, 219], beach: [-12, 219],
     // PIRATE BAY districts — real region centroids, not Maple grid blocks
     port: [71, -146], oldtown: [-5.8, -185], resort: [141.4, -28.6], party: [71, 224.4],
     market: [-21, -70], jungle: [-114.3, -51.4], cove: [-181, 18], sunset: [-103.6, 145.6],
@@ -527,13 +537,16 @@ renderQuests();
 let lastMeal = 'a traffic cone';
 let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
 // the match's authored spine — fires on elapsed seconds, resets every run
+// The three beats belong to the town now. A generic DONUT RUSH on an island
+// that is holding a mayoral election is a wasted beat — these are the same
+// three-beat spine, told as election night.
 const MAPLE_BEATS = [
   { at: 32, dur: 15, mult: 2, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
-    banner: '🍩 DONUT RUSH! everything is worth DOUBLE!', news: 'DONUT RUSH declared. bakery furious' },
+    banner: '🥧 BAKE SALE RUSH! everything is DOUBLE!', news: 'PEARL opens the bake sale. rival pies appear instantly' },
   { at: 95, dur: 18, mult: 2, fired: false, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    banner: '🚨 EVACUATION! the whole isle is RUNNING!', news: 'EVACUATION ORDER: everybody out, politely' },
+    banner: '📣 RECALL VOTE! the whole town is OUT!', news: 'RECALL VOTE called. DINKLE calls it a scheduling matter' },
   { at: 150, dur: 30, mult: 3, fired: false, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
-    banner: '🎆 FINAL FEAST! everything is TRIPLE!', news: 'FINAL FEAST begins. bring a bib' },
+    banner: '🗳️ THE LANDSLIDE! everything is TRIPLE!', news: 'THE COUNT BEGINS. turnout is described as "total"' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
 const PIRATE_BEATS: typeof MAPLE_BEATS = [
