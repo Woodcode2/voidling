@@ -16,16 +16,20 @@
         color: #fff; font-size: clamp(26px, 8vw, 40px); font-weight: 900; letter-spacing: 1px;
         text-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none;
       }
-      #devoured { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 5;
-        color: #efe8ff; font-size: 14px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
+      /* it was a full-width centred line at top:60px, which on a 390px phone ran
+         straight through the leaderboard chip. Own pill, clear of the board. */
+      #devoured { position: fixed; top: calc(78px + env(safe-area-inset-top, 0px));
+        left: 50%; right: auto; transform: translateX(-50%); text-align: center; z-index: 6;
+        color: #efe8ff; font-size: 15px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
+        background: rgba(16,8,30,0.5); border-radius: 13px; padding: 4px 14px 6px;
         text-shadow: 0 1px 2px rgba(0,0,0,0.75), 0 2px 8px rgba(0,0,0,0.5); }
       #board { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
         background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
-      #board .row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800;
+      #board .row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800;
         color: #fff; padding: 1px 0; }
       #board .row.me { color: #ffe89a; }
       #board .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
-      #board .nm { flex: 1; min-width: 56px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+      #board .nm { flex: 1; min-width: 72px; max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
       #board .sc { font-variant-numeric: tabular-nums; opacity: 0.9; }
       /* SIZE chip — rides just under the hole, hole.io style (JS-projected) */
       #form { position: fixed; left: 50%; top: 60%; transform: translate(-50%, 0); z-index: 5;
@@ -35,10 +39,20 @@
       #form .scBar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); overflow: hidden; margin-top: 3px; }
       #form #scFill { height: 100%; width: 0%; background: linear-gradient(90deg, #7b4fe0, #c9a6ff); border-radius: 2px; transition: width 0.2s linear; }
       /* in-game guidance strip — objective-style onboarding (no modal) */
-      #guide { position: fixed; top: 250px; left: 0; right: 0; z-index: 7; text-align: center; pointer-events: none;
-        background: rgba(12,6,24,0.68); color: #fff; font-size: 19px; font-weight: 900; letter-spacing: 0.4px;
-        padding: 14px 5vw; opacity: 0; transform: translateY(-8px); transition: opacity 0.35s, transform 0.35s; }
-      #guide.show { opacity: 1; transform: translateY(0); }
+      /* It was a full-bleed black letterbox at a hard-coded top:250px — the only
+         hard-edged rectangle in a build made of rounded glowing cards, landing
+         dead centre on a tablet and occluding a whole band of the playfield for
+         six seconds. Now a content-sized pill, above the thumb zone, in the same
+         language as the news card. */
+      #guide { position: fixed; top: auto; bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+        left: 50%; right: auto; width: max-content; max-width: min(88vw, 460px);
+        z-index: 7; text-align: center; pointer-events: none;
+        background: linear-gradient(180deg, #2c1454, #180a30); color: #fff;
+        font-size: clamp(15px, 4.2vw, 20px); font-weight: 900; letter-spacing: 0.4px;
+        border: 2.5px solid #7ef2a0; border-radius: 18px; padding: 12px 20px;
+        box-shadow: 0 8px 26px rgba(0,0,0,0.55), 0 0 22px rgba(126,242,160,0.3);
+        opacity: 0; transform: translate(-50%, 10px); transition: opacity 0.35s, transform 0.35s; }
+      #guide.show { opacity: 1; transform: translate(-50%, 0); }
       #guide b { color: #7ef2a0; }
       body.menu #guide { display: none; }
       /* hunger / power meter */
@@ -55,7 +69,9 @@
         font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #efe6ff; pointer-events: none; opacity: 0.95;
         text-shadow: 0 1px 3px rgba(0,0,0,0.55); transition: opacity 0.8s ease; }
       /* MAPLE ISLE NEWS — headlines that POP, and turn nervous as you eat */
-      #news { position: fixed; top: calc(84px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
+      /* was top:84px, which sliced the DEVOURED meter in half every 30 seconds
+         and hid the milestone banner behind it entirely */
+      #news { position: fixed; top: calc(172px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
         background: linear-gradient(180deg, #2c1454, #180a30);
         border: 2.5px solid #ffd25a; border-radius: 15px; overflow: hidden;
         padding: 11px 22px 13px; color: #fff; font-size: clamp(14px, 4vw, 19px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none; text-align: center;
@@ -83,18 +99,24 @@
       /* the DEVOURED meter is now YOURS, with the family's share beside it —
          it used to count every prop eaten by anyone, so a losing player was
          told "92% DEVOURED" */
-      #devoured .devThem { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1px;
-        color: #c9a6ff; opacity: 0.85; margin-top: 1px; }
-      #banner { position: fixed; top: calc(96px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 6; pointer-events: none;
-        color: #fff; font-size: 24px; font-weight: 900; letter-spacing: 1px; opacity: 0;
+      /* 11px at 0.85 opacity over bright sand measured 2.35:1. This is the
+         "how am I doing against the rivals" number. It gets its own chip. */
+      #devoured .devThem { display: inline-block; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+        color: #d9c2ff; margin-top: 3px; padding: 2px 10px; border-radius: 9px;
+        background: rgba(16,8,30,0.62); }
+      #banner { position: fixed; top: 30%; left: 0; right: 0; text-align: center; z-index: 8; pointer-events: none;
+        color: #fff; font-size: clamp(20px, 6vw, 28px); font-weight: 900; letter-spacing: 1px; opacity: 0;
         text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
       #banner.show { animation: bnr 2.2s ease forwards; }
       #banner.fam { font-size: 30px; color: #ffd9f4; top: 27%;
         text-shadow: 0 0 22px rgba(184,117,255,0.9), 0 3px 10px rgba(0,0,0,0.65); }
       @keyframes bnr { 0%{opacity:0; transform:translateY(-8px)} 12%{opacity:1; transform:translateY(0)} 78%{opacity:1} 100%{opacity:0} }
       /* drag joystick */
+      /* the ring stroke measured 1.04:1 against island ground — a lens artifact,
+         not a control */
       #joy { position: fixed; width: 128px; height: 128px; border-radius: 50%; z-index: 6;
-        background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.28);
+        background: rgba(16,8,30,0.42); border: 3px solid rgba(255,255,255,0.85);
+        box-shadow: 0 0 18px rgba(0,0,0,0.45);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 6;
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);
@@ -154,7 +176,8 @@
         opacity: 0; }
       #titlecard.show { animation: cardFade 4.2s ease forwards; }
       #titlecard .lvl { font-size: 15px; font-weight: 800; letter-spacing: 6px; opacity: 0.85; color: #c9a6ff; }
-      #titlecard .name { font-size: 62px; font-weight: 900; letter-spacing: 1px; margin-top: 6px;
+      #titlecard .name { font-size: clamp(34px, 12vw, 62px); text-wrap: balance; margin-top: 6px;
+        font-weight: 900; letter-spacing: 1px;
         text-shadow: 0 4px 24px rgba(123,79,224,0.7), 0 2px 6px rgba(0,0,0,0.5); }
       #titlecard .sub { font-size: 15px; font-weight: 700; opacity: 0.8; margin-top: 10px; letter-spacing: 1px; }
       @keyframes cardFade { 0%{opacity:0; transform:translateY(10px) scale(0.98)} 14%{opacity:1; transform:translateY(0) scale(1)} 72%{opacity:1} 100%{opacity:0; transform:translateY(-6px) scale(1.02)} }
@@ -163,8 +186,14 @@
         align-items: center; justify-content: center; background: rgba(13,8,33,0.82); backdrop-filter: blur(8px);
         color: #fff; text-align: center; }
       #end.show { display: flex; }
-      #end .hd { font-size: 44px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; }
-      #end .sub { font-size: 15px; font-weight: 700; opacity: 0.8; letter-spacing: 2px; margin-bottom: 20px; }
+      #end { overflow-y: auto; padding: calc(20px + env(safe-area-inset-top,0px)) 0 calc(20px + env(safe-area-inset-bottom,0px)); }
+      /* "#2 · OUT-NOMMED!" broke across two lines with the hyphen mid-word, and
+         "CHOMPION OF THE ISLE" measured 390px on a 390px phone */
+      #end .hd { font-size: clamp(26px, 7.5vw, 44px); font-weight: 900; letter-spacing: 1px;
+        margin-bottom: 4px; text-wrap: balance; hyphens: none; padding: 0 16px; }
+      /* the reward IS the retention hook; it was the dimmest text on the screen */
+      #end .sub { font-size: clamp(17px, 5vw, 22px); font-weight: 900; letter-spacing: 2px;
+        margin-bottom: 20px; color: #ffd25a; text-shadow: 0 0 18px rgba(255,210,90,0.45); }
       #end .list { min-width: 260px; }
       #end .er { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800;
         animation: erIn 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
@@ -500,7 +529,7 @@
       #tut .card { max-width: min(420px, 88vw); box-sizing: border-box; background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(255,210,90,0.55); border-radius: 22px;
         box-shadow: 0 0 34px rgba(154,92,255,0.45), 0 18px 44px rgba(0,0,0,0.5);
-        padding: 34px 40px; text-align: center; max-width: 420px; }
+        padding: 34px 40px; text-align: center; }
       #tut .tTitle { font-size: 34px; font-weight: 900; color: #fff; letter-spacing: 2px; }
       #tut .tBody { font-size: 15px; font-weight: 600; color: #e8e2f8; margin-top: 14px; line-height: 1.5; }
       #tut .tBody.dim { font-size: 13px; color: #b9a8e0; }
@@ -546,7 +575,7 @@
     <div id="menu">
       <div class="logo">VOIDLING</div>
       <div class="tag">THE CUTE WORLD ENDER</div>
-      <div id="rankChip" style="display:none"></div>
+      <div id="rankChip"></div>
       <div class="spacer"></div>
       <div id="menuOrb"><svg viewBox="0 0 200 200" width="100%" height="100%">
         <defs>

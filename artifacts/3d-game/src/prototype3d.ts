@@ -280,6 +280,41 @@ const puffPos = new Float32Array(PUFF * 3);
 puffGeo.setAttribute('position', new THREE.BufferAttribute(puffPos, 3));
 const puffPoints = new THREE.Points(puffGeo, new THREE.PointsMaterial({ color: 0x9a6ae0, size: 2.1, map: puffTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
 puffPoints.frustumCulled = false; scene.add(puffPoints);
+
+// ── FIND ME ────────────────────────────────────────────────────────────────
+// At match start the void is 18 pixels across on a 390px phone and 10 on a
+// tablet: 4.7% and 1.0% of the screen width, with no ring, no arrow and no
+// pulse. Testers could not locate their own character in the opening shots.
+// This is the ground ring that fixes it — sized in SCREEN space, so it holds a
+// readable footprint however far the camera is, and it retires itself once the
+// void is big enough to find on its own.
+const FIND_RING_PX = 26;            // ring radius in screen pixels, minimum
+const findRingMat = new THREE.MeshBasicMaterial({
+  color: 0x7ef2a0, transparent: true, opacity: 0, depthWrite: false,
+  blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+const findRing = new THREE.Mesh(new THREE.RingGeometry(0.80, 1.0, 48), findRingMat);
+findRing.rotation.x = -Math.PI / 2;
+findRing.frustumCulled = false;
+findRing.renderOrder = 2;
+scene.add(findRing);
+function updateFindRing(t: number, since: number): void {
+  // fades out over 3s once either the grace window closes or the void is
+  // plainly large enough to see
+  const wanted = since < 18 && voidling.radius < 2.6;
+  const target = wanted ? 1 : 0;
+  findRingK += (target - findRingK) * (1 - Math.exp(-3.2 * Math.max(0.001, t - findRingLast)));
+  findRingLast = t;
+  if (findRingK < 0.01) { findRing.visible = false; return; }
+  findRing.visible = true;
+  // world units per screen pixel at the void's depth
+  const wpp = (2 * camDist * Math.tan((camera.fov * Math.PI / 180) / 2)) / Math.max(1, window.innerHeight);
+  const pulse = 1 + Math.sin(t * 4.2) * 0.09;
+  const r = Math.max(voidling.radius * 1.75, FIND_RING_PX * wpp) * pulse;
+  findRing.scale.setScalar(r);
+  findRing.position.set(voidState.x, 0.08, voidState.z);
+  findRingMat.opacity = findRingK * (0.42 + Math.sin(t * 4.2) * 0.16);
+}
+let findRingK = 0, findRingLast = 0;
 const puffVel: THREE.Vector3[] = []; const puffLife: number[] = [];
 for (let i = 0; i < PUFF; i++) { puffVel.push(new THREE.Vector3()); puffLife.push(0); puffPos[i * 3 + 1] = -999; }
 let puffHead = 0;
@@ -2101,6 +2136,8 @@ function animate() {
     formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
     { const f2 = scFill(); if (f2) f2.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`; }
   }
+
+  updateFindRing(tClock, started ? tClock - startT : 999);   // menu never shows it
 
   // LOD band + shadow frustum track the camera
   updateLodBias(camDist);

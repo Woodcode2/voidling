@@ -34,8 +34,13 @@ export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
   style.textContent = `
     .vb {
       position: fixed; transform: translate(-50%, -100%); z-index: 4;
-      font-family: system-ui, sans-serif; font-weight: 800; font-size: 14px;
-      padding: 6px 11px; border-radius: 13px; white-space: nowrap;
+      /* system-ui in a game set entirely in Fredoka, and nowrap with no cap, so
+         a 236px bubble and a 202px bubble anchored 70px apart on a 390px phone
+         landed on top of each other and neither could be read */
+      font-family: 'Fredoka', system-ui, sans-serif; font-weight: 800; font-size: 14px;
+      padding: 6px 11px; border-radius: 13px;
+      max-width: min(64vw, 300px); white-space: normal; text-align: center;
+      overflow-wrap: break-word; line-height: 1.25;
       background: #fff; color: #23203a; pointer-events: none;
       box-shadow: 0 3px 10px rgba(0,0,0,0.28); opacity: 0; transition: opacity 0.18s ease;
       border: 2px solid rgba(0,0,0,0.06);
@@ -49,7 +54,7 @@ export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
     .vb.show { opacity: 1; }
     .vf {
       position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
-      font-family: system-ui, sans-serif; font-weight: 900; font-size: 17px; color: #ff7da8;
+      font-family: 'Fredoka', system-ui, sans-serif; font-weight: 900; font-size: 17px; color: #ff7da8;
       -webkit-text-stroke: 1px rgba(70,20,50,0.35);
       text-shadow: 0 2px 6px rgba(0,0,0,0.35); opacity: 0; white-space: nowrap;
     }
@@ -107,10 +112,14 @@ export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
       if (kind === 'panic' && slots.filter((s) => s.active && s.el.classList.contains('panic')).length >= 2) return;
       v.copy(pos).project(camera);
       const nx = (v.x * 0.5 + 0.5) * window.innerWidth, ny = (-v.y * 0.5 + 0.5) * window.innerHeight;
+      // de-collide against the RENDERED box, not the anchor point. A flat 60px
+      // radius let two 236px-wide bubbles sit on top of each other, which is
+      // exactly what the phone screenshots caught.
       for (const s of slots) {
         if (!s.active) continue;
-        const sx = parseFloat(s.el.style.left) || 0, sy = parseFloat(s.el.style.top) || 0;
-        if (Math.hypot(nx - sx, ny - sy) < 60) return;
+        const r = s.el.getBoundingClientRect();
+        if (!r.width) continue;
+        if (nx > r.left - 14 && nx < r.right + 14 && ny > r.top - 30 && ny < r.bottom + 30) return;
       }
       const slot = slots.find((s) => !s.active);
       if (!slot) return; // at cap — keep it readable
