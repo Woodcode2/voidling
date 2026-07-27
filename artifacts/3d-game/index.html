@@ -23,8 +23,10 @@
         color: #efe8ff; font-size: 15px; font-weight: 800; letter-spacing: 1px; pointer-events: none;
         background: rgba(16,8,30,0.5); border-radius: 13px; padding: 4px 14px 6px;
         text-shadow: 0 1px 2px rgba(0,0,0,0.75), 0 2px 8px rgba(0,0,0,0.5); }
+      /* the score column and the centred timer occupied the same band: "You 948"
+         drawn straight through "0:00" at 390px */
       #board { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
-        background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
+        max-width: 42vw; background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
       #board .row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800;
         color: #fff; padding: 1px 0; }
       #board .row.me { color: #ffe89a; }
@@ -201,8 +203,9 @@
       #end .hd { font-size: clamp(26px, 7.5vw, 44px); font-weight: 900; letter-spacing: 1px;
         margin-bottom: 4px; text-wrap: balance; hyphens: none; padding: 0 16px; }
       /* the reward IS the retention hook; it was the dimmest text on the screen */
-      #end .sub { font-size: clamp(17px, 5vw, 22px); font-weight: 900; letter-spacing: 2px;
-        margin-bottom: 20px; color: #ffd25a; text-shadow: 0 0 18px rgba(255,210,90,0.45); }
+      #end .sub { font-size: clamp(17px, 5vw, 22px); font-weight: 900; letter-spacing: 1px;
+        margin-bottom: 20px; color: #ffd25a; text-shadow: 0 0 18px rgba(255,210,90,0.45);
+        max-width: min(92vw, 460px); text-wrap: balance; }   /* was clipped at both edges */
       #end .list { min-width: 260px; }
       #endStats { display: flex; gap: 10px; margin: 18px 0 4px; flex-wrap: wrap; justify-content: center; }
       #endStats .es { background: rgba(255,255,255,0.07); border: 1.5px solid rgba(201,166,255,0.28);
@@ -430,12 +433,24 @@
       .backBtn, #btnBack { white-space: nowrap; flex: 0 0 auto; padding-top: 12px; padding-bottom: 12px; }
       .shopTitle { font-size: clamp(18px, 5.5vw, 26px) !important; letter-spacing: 2px !important; min-width: 0; }
       /* loading screen — PLAY holds here until the asset pack is resident */
+      /* SHOWN FROM THE FIRST PAINT. The module is deferred, so the finished
+         menu — with its big red PLAY button — painted first and then the main
+         thread blocked for 30-45 seconds building the island. A measured cold
+         start: all 27 scripts downloaded at 1.0s, DOMContentLoaded at 45.8s.
+         The player spent all of it tapping a button that could not answer,
+         because #loadScr was only raised AFTER PLAY was pressed and so could
+         never cover the initial build. It covers it now, and the module takes
+         it down when the world is ready. */
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
         justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
         background:
           url('/assets/splash_hero_sm.webp') center 4vh / auto 78vh no-repeat,
           radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
       #loadScr.show { display: flex; }
+      /* .boot is set in the markup and cleared by the module on its first
+         rendered frame, so the island build is covered rather than hidden
+         behind a menu whose button cannot answer yet */
+      #loadScr.boot { display: flex; }
       #loadScr .lLogo { font-size: 30px; font-weight: 900; letter-spacing: 3px; color: #fff; text-shadow: 0 0 24px #b875ff; }
       #loadScr .lName { font-size: 14px; letter-spacing: 6px; color: #ffd23f; font-weight: 800; }
       .lBarWrap { width: min(340px, 72vw); height: 14px; border-radius: 9px; background: rgba(255,255,255,0.12);
@@ -727,7 +742,7 @@
     </div>
 
     <!-- ── loading screen: PLAY waits here until the asset pack is resident ── -->
-    <div id="loadScr">
+    <div id="loadScr" class="boot">
       <div class="lLogo">VOIDLING</div>
       <div class="lName">MAPLE&nbsp;ISLE</div>
       <div class="lBarWrap"><div id="lBar"></div></div>

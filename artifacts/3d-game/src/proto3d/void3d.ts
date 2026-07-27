@@ -131,14 +131,20 @@ const VOID_FRAG = `
     float ndl = dot(N, L);
     float key = smoothstep(-0.55, 0.95, ndl);
     float low = smoothstep(-0.15, -0.95, N.y);      // his underside
-    // ── THE DARK HEART, RELOCATED ─────────────────────────────────────────
-    // The abyss used to be a radial stop centred on the disc — which put it
-    // dead between his eyes, where it read as a thumbprint of dirt on the poor
-    // thing's face, and where the face covered the only place the "pit" was
-    // ever visible. It now lives in the SHADOW, on the far side of the key,
-    // where a hole in a lit object actually belongs.
-    float core = (1.0 - smoothstep(0.02, 0.62, u)) * mix(0.06, 0.92, 1.0 - key);
-    col = mix(col, uAbyss, core);
+    // ── THE PIT, MOVED OFF HIS FACE ───────────────────────────────────────
+    // The abyss was a radial stop centred on the disc — and the disc centre is
+    // where the eyes and the mouth live, so the one dark region the whole
+    // "hole into space" idea depends on was (a) permanently covered and (b)
+    // visible only as a grey thumbprint between his eyes. Drop the core into
+    // his belly instead: face on top, open space below it. N.xy is the
+    // fragment's position across the projected disc, so this is a clean
+    // screen-space offset and it holds from every angle.
+    float ud = length(N.xy - vec2(0.0, -0.46)) / 1.46;
+    float core = 1.0 - smoothstep(0.02, 0.66, ud);
+    col = mix(col, uAbyss * 0.9, core * 0.90);
+    // a bright lip around the mouth of the pit — the event horizon catching
+    // light, and the thing that stops it reading as a stain
+    col += uRim * smoothstep(0.40, 0.60, ud) * (1.0 - smoothstep(0.60, 0.84, ud)) * 0.14;
     col *= mix(0.62, 1.22, key);
     col *= mix(1.0, 0.84, low);                     // occlusion where he meets the floor
     col += uRim * low * pow(u, 2.2) * 0.13;         // ...and the bounce lip just above it
@@ -171,7 +177,7 @@ const VOID_FRAG = `
       if (h > 0.885) {
         float dot2 = 1.0 - smoothstep(0.0, 0.26 - float(i) * 0.045, length(fract(sc) - 0.5));
         float tw = 0.5 + 0.5 * sin(uTime * (2.4 + float(i)) + h * 40.0);
-        gal += starTint * dot2 * tw * (1.25 - float(i) * 0.3);
+        gal += starTint * dot2 * tw * (1.55 - float(i) * 0.34);
       }
     }
     // ☁️ HD nebula wisps: two octaves of drifting value noise on the outer shell
@@ -179,8 +185,8 @@ const VOID_FRAG = `
     vec3 nq = P + R * (-b - sqrt(ndisc));
     vec2 np = nq.xy * 2.4 + vec2(uTime * 0.045, -uTime * 0.028);
     float neb = vnoise(np) * 0.62 + vnoise(np * 2.3 + 7.7) * 0.38;
-    neb = smoothstep(0.42, 0.88, neb);
-    gal += mix(uInner, uSwirl, 0.7) * neb * 0.85;
+    neb = smoothstep(0.50, 0.92, neb);
+    gal += mix(uInner, uSwirl, 0.75) * neb * 0.6;
     // ✨ the AI starfield, drifting with the same parallax offset
     if (uStarAmt > 0.01) {
       vec2 su = vec2(vUv.x * 2.0 + uTime * 0.006, vUv.y * 2.0 - uTime * 0.003) + R.xy * 0.05;
@@ -189,7 +195,7 @@ const VOID_FRAG = `
     }
     // the interior only shows through the face-on disc, and reads deepest on
     // the shaded side — which is what makes it a HOLE and not a decal
-    float inside = (1.0 - smoothstep(0.30, 0.98, u)) * mix(0.30, 1.30, 1.0 - key);
+    float inside = 0.22 + 1.55 * (1.0 - smoothstep(0.10, 0.78, ud));
     col += gal * inside * (0.85 + uStage * 0.11);
     // ── EVENT HORIZON ─────────────────────────────────────────────────────
     // rim light lives OPPOSITE the key, like a real one, and fattens with
@@ -496,6 +502,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     f.rotation.z = Math.PI / 2;   // point along +y (the group flip aims it down)
     f.position.set(x, y, 0.006);
     f.scale.set(0.72, 1, 1);
+    f.renderOrder = 2;            // lip(0) → tongue(1) → teeth(2); z alone loses
     parent.add(f); fangs.push(f); return f;
   };
   {
@@ -505,19 +512,21 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const tongue = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24),
       new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
     tongue.scale.set(1.35, 0.6, 1); tongue.position.set(0, 0.075, 0.004);
+    tongue.renderOrder = 1;
     mouth.add(lip); mouth.add(tongue);
-    mkFang(mouth, -0.082, 0.048, 0.05); mkFang(mouth, 0.082, 0.048, 0.05);
+    mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
   face.add(mouth);
   const maw = new THREE.Group(); maw.position.set(0, -0.3, 1.01); maw.scale.setScalar(0.001);
   const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
   const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
+  tongue.renderOrder = 1;
   maw.add(mawDark); maw.add(tongue);
   {
     // the gape gets its own, bigger set — hanging down from the upper lip
-    const a = mkFang(maw, -0.095, 0.145, 0.062); a.rotation.z = -Math.PI / 2;
-    const b = mkFang(maw, 0.095, 0.145, 0.062); b.rotation.z = -Math.PI / 2;
+    const a = mkFang(maw, -0.098, 0.142, 0.072); a.rotation.z = -Math.PI / 2;
+    const b = mkFang(maw, 0.098, 0.142, 0.072); b.rotation.z = -Math.PI / 2;
   }
   face.add(maw);
 

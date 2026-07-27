@@ -198,7 +198,10 @@ _dbg.__matchState = () => ({
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
   const bs = document.createElement('div');
-  bs.textContent = `v ${__BUILD__}`;
+  // a missing `define` would take out every statement after this line — the
+  // input handlers, the PLAY listener, beginMatch, the lot — and do it
+  // silently. A build stamp is not worth that risk.
+  bs.textContent = `v ${typeof __BUILD__ === 'undefined' ? 'dev' : __BUILD__}`;
   bs.style.cssText = 'position:fixed;right:8px;bottom:4px;z-index:11;font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(203,178,255,0.5);pointer-events:none;';
   document.body.appendChild(bs);
   const vis = () => { bs.style.display = document.body.classList.contains('menu') ? 'block' : 'none'; };
@@ -560,6 +563,7 @@ const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: st
 let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
 let matchEaten = 0;   // props eaten THIS match — the results screen's own number
 let signedOn = false; // has the station said good morning yet this match?
+let _booted = false;  // has one frame actually rendered? (drops the boot cover)
 let initialMass = 0;                   // set once, after the world is built
 let hudCd = 0;
 
@@ -882,8 +886,15 @@ function refreshHud() {
   if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
   if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
+  // A LINEAR PERCENTAGE OVER 3,286 PROPS IS A METER THAT SAYS ZERO. One percent
+  // costs 33 props, so a child who has eaten two hundred things reads "6%", and
+  // for the whole first half-minute the biggest number on their screen is 0.
+  // Every playtest screenshot showed 0% — including the results panel of a
+  // 948-point run. Lead with the COUNT, which is a number that moves on every
+  // single bite, and keep the percentage as the meter underneath it.
   const minePct = Math.min(100, Math.round((mine / Math.max(1, initialMass)) * 100));
-  devEl.innerHTML = `${minePct}% DEVOURED<span class="devThem">family ${Math.max(0, devouredPct - minePct)}%</span>`;
+  const themPct = Math.max(0, devouredPct - minePct);
+  devEl.innerHTML = `${matchEaten} EATEN<span class="devThem">you ${minePct}% · family ${themPct}%</span>`;
   formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
 }
 
@@ -1389,6 +1400,12 @@ function validateWorld() {
   // %devoured stays honest
   for (let k = cull.length - 1; k >= 0; k--) {
     const e = edibles[cull[k]];
+    // This sweep re-runs 8 and 22 seconds INTO the match, and a bare remove()
+    // meant a prop at full scale, in plain view, blinked out of the world
+    // mid-play — an instrumented run caught a 5.6-unit ferris wheel doing
+    // exactly that at t=258s. If the player can see it go, it has to go the
+    // way everything else goes.
+    if (started && e.mesh.visible) { spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 5); }
     scene.remove(e.mesh);
     edibles.splice(cull[k], 1);
   }
@@ -1626,6 +1643,11 @@ renderRank();
       audio.evolve(); buzz(40);
       setTimeout(() => modal.classList.remove('show'), 750);
     };
+    // …and it must be DISMISSIBLE. It fires on menu open, covers the whole
+    // screen and intercepts every button behind it — a playtest harness could
+    // not reach PLAY at all until it learned to claim first. CLAIM is still the
+    // reward, but tapping the backdrop now gets you out.
+    modal.onclick = (ev) => { if (ev.target === modal) modal.classList.remove('show'); };
     modal.classList.add('show');
   }
 }
@@ -1692,7 +1714,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
   // still shows a branded colored orb, never a bare black hole on a $4.99 card
-  const skinGrad = (s: Skin) => `radial-gradient(circle at 38% 34%, #${s.rim.toString(16).padStart(6, '0')}, #${s.mid.toString(16).padStart(6, '0')} 60%, #${s.abyss.toString(16).padStart(6, '0')})`;
+  // INSIDE OUT. This ran rim -> mid -> abyss from the centre outward, which is
+  // the exact opposite of the void shader (palette.ts: "darkest dead-centre,
+  // lit violet at the rim"). So whenever the CDN art is slow or offline — the
+  // very case this fallback exists for — the shop card advertised a purple ball
+  // with an orange highlight and the match handed over a black orb in a halo.
+  const skinGrad = (s: Skin) => `radial-gradient(circle at 50% 46%, #${s.abyss.toString(16).padStart(6, '0')} 0%, #${s.mid.toString(16).padStart(6, '0')} 58%, #${s.rim.toString(16).padStart(6, '0')} 100%)`;
   const orbStyle = (s: Skin) => s.cash
     ? `background: ${skinGrad(s)}; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
     : s.tex
@@ -2198,10 +2225,25 @@ function animate() {
       const r = e.orbitR * (1 - e.t);
       p.x = voidState.x + Math.cos(e.orbit) * r;
       p.z = voidState.z + Math.sin(e.orbit) * r;
-      p.y = THREE.MathUtils.lerp(p.y, cy * 0.35, Math.min(1, dt * 6));   // sink INTO the pit, not onto the crown
+      // THINGS WERE FALLING UPWARDS. `cy` is the void's group height, which is
+      // dispR * RADIUS_SINK = +0.31 x R ABOVE the ground — so this line, whose
+      // own comment says "sink INTO the pit", lerped every prop UP. Measured
+      // across 295 captures of every prop kind in both worlds: +2.6 to +3.6
+      // units of RISE, 245 of them climbing. Straight down into the hole now.
+      p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dt * 7));
       e.mesh.rotation.x += e.spin.x * dt; e.mesh.rotation.y += e.spin.y * dt; e.mesh.rotation.z += e.spin.z * dt;
-      e.mesh.scale.multiplyScalar(1 - dt * 4.5);
-      if (e.t >= 1) { spawnPuff(voidState.x, cy, voidState.z, 6); scene.remove(e.mesh); e.eaten = false; e.mesh.visible = false; }
+      // …and it was DELETED AT 0.10 SCALE. On a shell nobody notices; on a
+      // seven-unit hotel that is a 1.4-unit chunk of building blinking out in
+      // mid-air, which is exactly the "they just disappear" report. Drive the
+      // scale off e.t directly so it always finishes at zero.
+      const k = Math.max(0, 1 - e.t);
+      e.mesh.scale.set(e.homeScale.x * k, e.homeScale.y * k, e.homeScale.z * k);
+      if (e.t >= 1) {
+        // the puff marks where the THING went, not where the void is standing
+        spawnPuff(p.x, Math.max(0.2, cy * 0.4), p.z, 6);
+        scene.remove(e.mesh); e.eaten = false;
+        e.mesh.visible = false; e.mesh.userData.eaten = false;
+      }
       continue;
     }
     if (!e.mesh.visible || e.mesh.userData.eaten) continue;   // a rival owns it — never double-eat
@@ -2418,6 +2460,15 @@ function animate() {
     else qCd = 3;
   }
 
+  // FIRST FRAME: the boot cover comes down only once there is something behind
+  // it. Until now the menu painted immediately and then the main thread blocked
+  // for 30-45 seconds building the island, with the player tapping PLAY at a
+  // page that could not answer.
+  if (!_booted) {
+    _booted = true;
+    const bs2 = el('loadScr'); bs2.style.transition = 'opacity 0.45s ease'; bs2.style.opacity = '0';
+    setTimeout(() => { bs2.classList.remove('boot'); bs2.style.opacity = ''; bs2.style.transition = ''; }, 480);
+  }
   const shakeOff = fx.update(dt);
   camera.position.add(shakeOff);
   // GOLDEN HOUR IS OUT. Dimming the sky and sun over the last 45s read as the

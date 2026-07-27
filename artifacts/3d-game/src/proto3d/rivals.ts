@@ -463,9 +463,16 @@ export function createRivals(
       // and the way to close a points gap is to EAT one, which is exactly the
       // play we want them chasing. 0.78 sits just under the 1/1.11 swallow
       // threshold, so a rival at its ceiling is always catchable.
-      // Early on the ceiling is an absolute track instead, so the opening
-      // minute has real peers rather than a family scaled to a 0.9 hatchling.
-      const softCap = Math.max(Math.min(START_R + 0.05 * _t, 2.7), pr * 0.78);
+      //
+      // The early clause is an absolute track, so the opening minute still has
+      // real peers instead of a family scaled off a 0.9 hatchling — and it is
+      // deliberately LOW. A first pass ran it to 2.7 by forty seconds against a
+      // player who was still 1.2, and the measured result was ugly in two ways
+      // at once: the family towered over the player for the whole first minute,
+      // and at that size they could swallow prop classes the player could not,
+      // so they stripped the island roughly six times faster than the player
+      // ate. The family must never be the reason the island runs out.
+      const softCap = Math.max(Math.min(START_R + 0.02 * _t, 1.6), pr * 0.78);
       for (const rv of rivals) {
         const isHunter = rv.arch === 'BULLY';
         rv.hunting = isHunter && hunting && rv.joined;   // HUD + QA read this
@@ -884,7 +891,7 @@ export function createRivals(
         // for less; one falling behind eats for more. Bounded both ways, so it
         // nudges the race without deciding it.
         const gap = (rv.score - pScore) / Math.max(1500, pScore * 0.5);
-        const band = THREE.MathUtils.clamp(1 - gap * 0.6, 0.55, 1.55);
+        const band = THREE.MathUtils.clamp(1 - gap * 0.6, 0.45, 1.55);
         for (const e of edibles) {
           if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
