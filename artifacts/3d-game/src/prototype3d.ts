@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, setWorld } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, setWorld } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -43,7 +43,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -53,10 +53,11 @@ const scene = new THREE.Scene();
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.25;   // specular sheen only — keep colours saturated
+  scene.environmentIntensity = 0.15;   // specular sheen only — keep colours saturated
 }
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
 let camDist = 50;
+let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
 const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the GLB pack
@@ -65,9 +66,15 @@ const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the
 // dedicated additive glow sprite inside void3d instead: same pop, zero wash.)
 
 // ── lighting ─────────────────────────────────────────────────────────────────
-const hemi = new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.5);
+// Isolated by rendering sun-only against fill-only from a frozen camera: the
+// ambient fill was supplying 68% of Maple's scene luminance and 73% of Pirate's,
+// against 40% and 49% from the sun. A shadowed pixel therefore kept ~70% of its
+// brightness and shadow contrast capped at 1.44x — a stylised diorama wants
+// 2.5-3.5x. Nothing was clipping (p99 luminance 0.74, 0.00% clipped white in 26
+// frames), so the headroom was there the whole time.
+const hemi = new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.22);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2d8, 1.75);
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.3);
 const sunOff = new THREE.Vector3(-55, 95, 42);
 sun.position.copy(sunOff);
 sun.castShadow = true;
@@ -1281,7 +1288,7 @@ function resetMatch() {
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
-  sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.08; outroT = 0;
+  sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.0; outroT = 0;
   hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0); sun.intensity = 1.75;
   el('end').classList.remove('show');
   timerEl.style.color = '';
@@ -1783,9 +1790,17 @@ function animate() {
       // like. R=2 unchanged at 2.7; R=16 goes 13.2 -> 7.6.
       const R0 = voidling.radius;
       const m = Math.min(R0 * 0.75, 4 + R0 * 0.15) + 1.2;
-      const solid = (x: number, z: number) => !!island.biomeAt(x, z)
+      // biomeAt calls Maple's pond, river and lagoon dry land — they are all
+      // inside the coastline. A live run drove from the spawn to 0.95 units off
+      // the exact centre of the pond in 8 seconds with zero blocked frames.
+      // The diagonals leaked too: 0.4% to 1.7% of accepted cells put the body
+      // over water on a diagonal, which the cars have guarded against for ages.
+      const d45 = m * 0.7071;
+      const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inWater3(x, z, m)
         && insideIsland3(x + m, z) && insideIsland3(x - m, z)
-        && insideIsland3(x, z + m) && insideIsland3(x, z - m);
+        && insideIsland3(x, z + m) && insideIsland3(x, z - m)
+        && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
+        && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
       // WHICH WAY IS LAND? The old version assumed "away from the island
       // centre", which is only true for a blob with water on the outside.
       // Pirate Bay has water INSIDE it: standing on the resort's inner shore,
@@ -1822,8 +1837,16 @@ function animate() {
       // as stuck made the breaker shove you inland while your own input pushed
       // straight back, once every 0.7 seconds. That was the shudder at the
       // waterline. It now fires only when the body is genuinely off the land.
-      const wedged = !solid(voidState.x, voidState.z);
-      if (driving && wedged && Math.hypot(voidState.x - prev.x, voidState.z - prev.z) < 0.02 * Math.max(0.4, dt * 60)) {
+      // …and "genuinely off the land" was WRONG, provably. A live run wedged
+      // the void at (197.24, 201.09) with all four cardinal probes on land —
+      // solid() true, so `wedged` was false, so stallT reset every frame and
+      // this breaker was unreachable in exactly the case it exists for. The
+      // void then held perfectly still for 15 seconds of a 180-second match.
+      // Being fully on land and having no legal step are not mutually
+      // exclusive. The trigger is ACTUAL IMMOBILITY; the "leaning on a wall is
+      // legitimate" case is now handled by the heading sweep below succeeding,
+      // not by disabling the timer.
+      if (driving && Math.hypot(voidState.x - prev.x, voidState.z - prev.z) < 0.02 * Math.max(0.4, dt * 60)) {
         stallT += dt;
         if (stallT > 0.7) {
           const ld = landDir(voidState.x, voidState.z) ?? [-voidState.x, -voidState.z];
@@ -1834,44 +1857,47 @@ function animate() {
       } else stallT = 0;
       if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
       else {
-        // THE SURFACE NORMAL, not "the direction of the nearest land". landDir is
-        // a 16-spoke ring search quantised to 22.5 degrees, so using it as the
-        // wall normal ate the TANGENTIAL component too — measured 0.00 u/s for
-        // 60 straight frames when pushing into the shore at 20, 45 and 70
-        // degrees off the water bearing, against a 58 u/s free field. The wall
-        // didn't chatter or snag, it just glued. A finite difference over four
-        // cheap probes gives the real normal for a fifth of the cost, and
-        // landDir stays as the rescue path for when we are fully off the land.
-        let nrm: [number, number] | null = null;
-        {
-          const h = Math.max(2, m * 0.5);
-          const gx = (solid(voidState.x + h, voidState.z) ? 1 : 0) - (solid(voidState.x - h, voidState.z) ? 1 : 0);
-          const gz = (solid(voidState.x, voidState.z + h) ? 1 : 0) - (solid(voidState.x, voidState.z - h) ? 1 : 0);
-          const gl = Math.hypot(gx, gz);
-          if (gl > 0) nrm = [-gx / gl, -gz / gl];   // outward = away from the land gradient
+        // THE HEADING SWEEP. Two previous attempts projected the velocity onto
+        // a guessed wall normal. Both guesses are quantised — the 16-spoke ring
+        // to 22.5 degrees, the four-probe finite difference to one of eight
+        // compass bearings — so on any oblique shore the "tangential" residue
+        // still pointed into the boundary, solid() refused it, and the 0.86
+        // ease ran every frame: 0.86^40 is 0.002. A sweep measured 0.00 u/s
+        // median tangential speed at 45 degrees incidence AT EVERY RADIUS, and
+        // 61% arrival on 120 A-to-B navigation trials.
+        //
+        // So stop guessing the normal. Fan out from the desired heading and
+        // take the first one that is actually legal — which is what a hole
+        // game's wall does, and it needs no normal at all.
+        let moved = false;
+        const sp = Math.hypot(velX, velZ);
+        if (sp > 0.001) {
+          const base = Math.atan2(velZ, velX);
+          for (const deg of [12, -12, 25, -25, 40, -40, 55, -55, 70, -70, 84, -84]) {
+            const a2 = base + deg * (Math.PI / 180);
+            const cx = Math.cos(a2), cz = Math.sin(a2);
+            const tx = voidState.x + cx * sp * dt, tz = voidState.z + cz * sp * dt;
+            if (solid(tx, tz)) {
+              voidState.x = tx; voidState.z = tz;
+              velX = cx * sp; velZ = cz * sp;    // keep the speed, take the legal heading
+              moved = true; break;
+            }
+          }
         }
-        const ld = nrm ? [-nrm[0], -nrm[1]] as [number, number] : landDir(voidState.x, voidState.z);
-        if (ld) {
-          const ox = -ld[0], oz = -ld[1];                        // outward = away from land
-          const out = velX * ox + velZ * oz;
-          if (out > 0) { velX -= out * ox; velZ -= out * oz; }   // cancel ONLY the into-the-wall part
-          const tx = voidState.x + velX * dt, tz = voidState.z + velZ * dt;
-          if (solid(tx, tz)) { voidState.x = tx; voidState.z = tz; }   // slide along the shore
-          else { velX *= 0.86; velZ *= 0.86; }                          // ease, never snap
-          // off the land entirely (grew past the shore, or nudged in): swim
-          // back toward the REAL nearest land, fast enough that it never reads
-          // as being stuck
-          if (!solid(voidState.x, voidState.z)) {
-            // OFF THE LAND ENTIRELY. Swimming back has to be authoritative, not
-            // a nudge: a big void's steering (or the attract-mode autopilot)
-            // runs at up to 58 u/s and simply out-pushed the old 55 u/s drift,
-            // which is how a WORLD ENDER could sit in the middle of the bay
-            // indefinitely. Overwrite the velocity outright.
+        if (!moved) {
+          // a genuine dead end (an inside corner). Bleed off rather than snap.
+          velX *= 0.86; velZ *= 0.86;
+        }
+        // off the land entirely — grew past the shore, or nudged in. Swimming
+        // back has to be authoritative, not a nudge: a big void's steering runs
+        // at up to 58 u/s and out-pushed the old drift, which is how a WORLD
+        // ENDER could sit in the middle of the bay indefinitely.
+        if (!solid(voidState.x, voidState.z)) {
+          const ld = landDir(voidState.x, voidState.z);
+          if (ld) {
             velX = ld[0] * 62; velZ = ld[1] * 62;
             voidState.x += velX * dt; voidState.z += velZ * dt;
           }
-        } else {
-          velX *= 0.86; velZ *= 0.86;   // nothing found anywhere (never in practice)
         }
       }
     }
@@ -2054,7 +2080,18 @@ function animate() {
     camOffset.set(0.62 + (0.45 - 0.62) * steep, 0.92 + (1.4 - 0.92) * steep, 0.62 + (0.45 - 0.62) * steep).normalize();
     // LOOKAHEAD: frame the ground AHEAD of travel — a steer-to-eat game gives
     // the pixels to where you're going, the void rides slightly behind center
-    const lookX = voidState.x + velX * 0.10, lookZ = voidState.z + velZ * 0.10;
+    // …off SMOOTHED ACTUAL DISPLACEMENT, never off velX/velZ. Those are the
+    // control velocity, which the wall code rewrites every frame — cancelled,
+    // scaled by 0.86, or hard-set to 62 u/s for the swim-back, which is 6.2
+    // units of lookahead in a single frame. camera.lookAt is applied with no
+    // smoothing at all, so every one of those flips became an instantaneous
+    // look-direction flip: measured 0.324 degrees mean angular jitter per frame
+    // grinding the shoreline against 0.025 on open ground, 13x. That was the
+    // screen shake at the waterline.
+    lookVX += ((voidState.x - camPrevX) / Math.max(1e-4, dt) - lookVX) * Math.min(1, dt * 6);
+    lookVZ += ((voidState.z - camPrevZ) / Math.max(1e-4, dt) - lookVZ) * Math.min(1, dt * 6);
+    camPrevX = voidState.x; camPrevZ = voidState.z;
+    const lookX = voidState.x + lookVX * 0.10, lookZ = voidState.z + lookVZ * 0.10;
     tmpV.copy(camOffset).multiplyScalar(camDist);
     tmpV.x += lookX; tmpV.z += lookZ;
     camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));

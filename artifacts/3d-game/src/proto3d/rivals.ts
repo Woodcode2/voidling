@@ -3,7 +3,7 @@
 // wins — so a rival really can beat you. Each is a cute coloured void (a tinted
 // fresnel orb + glow + billboarded eyes) with a name and a live score.
 import * as THREE from 'three';
-import type { Biome } from './island';
+import { inWater3, type Biome } from './island';
 import { SKINS, type Skin } from './palette';
 import { buildAccessory, makeVoidBody, applySkinToBody } from './void3d';
 
@@ -485,9 +485,16 @@ export function createRivals(
         // the "AI tries to go into the water and it's glitching" report. Test a
         // ring at the rival's own size, exactly like the player's wall does.
         const bm = Math.min(rv.r * 0.7, 3.5 + rv.r * 0.15) + 1.0;
-        const fits = (x: number, z: number) => !!biomeAt(x, z)
+        // …and biomeAt calls Maple's pond, river and lagoon dry land, because
+        // they are inside the coastline. Rival 0 spent 5.4 seconds of a live
+        // 90-second match inside the river.
+        const fits = (x: number, z: number) => !!biomeAt(x, z) && !inWater3(x, z, bm)
           && !!biomeAt(x + bm, z) && !!biomeAt(x - bm, z)
-          && !!biomeAt(x, z + bm) && !!biomeAt(x, z - bm);
+          && !!biomeAt(x, z + bm) && !!biomeAt(x, z - bm)
+          // diagonals leak too: up to 1.7% of accepted cells put the body over
+          // water on a diagonal. The cars have had an 8-point ring all along.
+          && !!biomeAt(x + bm * 0.7071, z + bm * 0.7071) && !!biomeAt(x - bm * 0.7071, z - bm * 0.7071)
+          && !!biomeAt(x + bm * 0.7071, z - bm * 0.7071) && !!biomeAt(x - bm * 0.7071, z + bm * 0.7071);
         let movedOk = false;
         if (fits(nx, nz)) { rv.x = nx; rv.z = nz; movedOk = true; }
         else {

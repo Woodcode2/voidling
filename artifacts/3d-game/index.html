@@ -267,10 +267,51 @@
       #btnWorlds i { font-style: normal; font-size: 20px; }
       #btnWorlds span { color: #cbb2ff; font-size: 10px; letter-spacing: 1.5px; font-weight: 800; }
       #btnWorlds b { color: #ffd23f; font-size: 18px; }
-      #worlds #worldRow { justify-content: center; padding-top: 30px; }
-      #worldRow { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 0 0 12px; max-width: 94vw; }
-      #worlds .wCard { width: 130px; padding: 18px 10px 14px; }
-      #worlds .wCard i { font-size: 40px; }
+      /* THE WORLD PICKER. PLAY lands here, so it is a destination, not a
+         footnote: three 154x114 tiles in the corner of a 1000px screen with
+         system emoji standing in for the art of two fully built 3D islands. */
+      #worlds { display: none; flex-direction: column; }
+      #worlds.show { display: flex; }
+      #worlds #worldRow { display: grid; gap: 18px; padding: 8px 4vw 40px; margin: 0 auto;
+        width: 100%; max-width: 1080px; align-content: center; flex: 1;
+        grid-template-columns: repeat(auto-fit, minmax(min(280px, 84vw), 1fr)); }
+      #worlds .wCard { width: auto; padding: 0; overflow: hidden; gap: 0; }
+      #worlds .wCard i { display: none; }
+      /* the art: each island painted in layered gradients — no asset, no CDN,
+         and it survives an offline native build */
+      .wArt { width: 100%; aspect-ratio: 16 / 9; position: relative; overflow: hidden; }
+      .wArt::after { content: ''; position: absolute; inset: 0;
+        box-shadow: inset 0 -30px 40px -18px rgba(11,6,26,0.8); }
+      .wArt.maple {
+        background:
+          radial-gradient(circle at 74% 76%, #2f6fd0 0 7%, transparent 7.6%),
+          radial-gradient(circle at 30% 34%, #d8443c 0 5%, transparent 5.6%),
+          linear-gradient(105deg, transparent 44%, #6b7285 44%, #6b7285 50%, transparent 50%),
+          linear-gradient(14deg, transparent 62%, #6b7285 62%, #6b7285 67%, transparent 67%),
+          radial-gradient(ellipse 78% 92% at 50% 55%, #7ed57a 0 62%, #5db06a 62% 100%),
+          linear-gradient(180deg, #8ed8f0, #6fc0e0); }
+      .wArt.pirate {
+        background:
+          radial-gradient(circle at 30% 30%, #3f9a5a 0 6%, transparent 6.5%),
+          radial-gradient(circle at 22% 62%, #3f9a5a 0 5%, transparent 5.5%),
+          radial-gradient(ellipse 34% 44% at 66% 52%, #37c8d8 0 70%, transparent 72%),
+          radial-gradient(ellipse 82% 92% at 50% 55%, #f2e4c4 0 66%, #e8d2a4 66% 100%),
+          linear-gradient(180deg, #4fd0e8, #2fa8c8); }
+      .wArt.frost {
+        background:
+          linear-gradient(160deg, transparent 46%, #ffffff 46% 54%, transparent 54%),
+          radial-gradient(ellipse 80% 90% at 50% 62%, #dfeaf6 0 60%, #b9cde0 60% 100%),
+          linear-gradient(180deg, #cfe6f6, #9dc2e0); }
+      .wBody { padding: 14px 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+      #worlds .wCard b { font-size: clamp(16px, 4.2vw, 21px); letter-spacing: 0.6px; font-weight: 900; }
+      #worlds .wCard span { font-size: 12px; opacity: 0.8; letter-spacing: 1.6px; }
+      .wGo { margin-top: 10px; font-size: 15px; font-weight: 900; letter-spacing: 1.4px; color: #0d0821;
+        background: linear-gradient(180deg, #ffe07a, #ffc21f); border-radius: 12px; padding: 9px 26px;
+        box-shadow: 0 4px 0 #c98d00; opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
+      /* every unlocked card launches on tap, so every unlocked card says so */
+      .wCard[data-world] .wGo { opacity: 1; transform: none; }
+      .wCard.lock .wGo { display: none; }
+      .wLock { margin-top: 10px; font-size: 13px; font-weight: 900; letter-spacing: 1.4px; color: #cbb2ff; }
       /* in-game home button */
       #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 44px; height: 44px;
         border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
@@ -627,9 +668,18 @@
         <div class="shopTitle">WORLDS</div>
       </div>
       <div id="worldRow">
-        <div class="wCard sel" data-world="maple"><i>🏝️</i><b>MAPLE ISLE</b><span>WORLD 1</span></div>
-        <div class="wCard" data-world="pirate"><i>🏴‍☠️</i><b>PIRATE BAY RESORT</b><span>WORLD 2</span></div>
-        <div class="wCard lock"><i>❄️</i><b>FROST PEAKS</b><span>SOON</span></div>
+        <div class="wCard sel" data-world="maple">
+          <div class="wArt maple"></div>
+          <div class="wBody"><b>MAPLE ISLE</b><span>WORLD 1</span><div class="wGo">▶ PLAY</div></div>
+        </div>
+        <div class="wCard" data-world="pirate">
+          <div class="wArt pirate"></div>
+          <div class="wBody"><b>PIRATE BAY RESORT</b><span>WORLD 2</span><div class="wGo">▶ PLAY</div></div>
+        </div>
+        <div class="wCard lock">
+          <div class="wArt frost"></div>
+          <div class="wBody"><b>FROST PEAKS</b><span>SOON</span><div class="wLock">🔒 LOCKED</div></div>
+        </div>
       </div>
     </div>
 

@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
-  railPointAt, insideIsland3, inLagoon3, worldId, part, mergedProp,
+  railPointAt, insideIsland3, inLagoon3, inWater3, worldId, part, mergedProp,
   type Biome, type AddEdible,
 } from './island';
 import * as LUXE from './luxe';
@@ -1948,7 +1948,10 @@ export function createLife(
   // (it is inside the coastline), so a beach crowd would wade into it and keep
   // going. Pirate Bay has no lagoon and this must not cost it a single test —
   // hence the flag first, which short-circuits the whole check there.
-  const wet = (x: number, z: number, m: number) => MAPLE && inLagoon3(x, z, m);
+  // …and the pond and the river, which it did not: 62 townsfolk spent a
+  // 90-second match standing in interior water, one of them 6 units from the
+  // river centreline for 21 seconds straight.
+  const wet = (x: number, z: number, m: number) => MAPLE && inWater3(x, z, m);
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string) {
     if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;

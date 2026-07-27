@@ -250,6 +250,26 @@ export function inLagoon3(x3: number, z3: number, margin = 120): boolean {
   const nx = (wx - LAGOON.x) / (LAGOON.rx + margin), ny = (wy - LAGOON.y) / (LAGOON.ry + margin);
   return nx * nx + ny * ny < 1;
 }
+/** IS THIS WATER? Maple Falls has a pond, a river and a lagoon, all of them
+ *  INSIDE the coastline. `inMapleWater` — the authority every static prop is
+ *  kept out of — lived as a local closure inside createIsland's populate pass,
+ *  so nothing that MOVES ever consulted it. The only exported predicate was
+ *  inLagoon3, which covers the lagoon and nothing else.
+ *  Measured: 99.3-99.8% of the painted pond, river and lagoon surface passed
+ *  the player's own walkability test at every radius, and a live run drove
+ *  from the Maple spawn to 0.95 units off the exact centre of the pond in 8
+ *  seconds without a single blocked frame. The rivals waded in too, and 62
+ *  townsfolk spent a 90-second match standing in the river.
+ *  One predicate, in 3D coordinates, for everything that moves. */
+export function inWater3(x3: number, z3: number, margin = 0): boolean {
+  if (WORLD_ID === 'pirate') return false;      // the bay is handled by the coastline itself
+  const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
+  const mw = margin / SCALE;
+  if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
+  const rx = riverXAtWorld(wy);
+  if (rx != null && Math.abs(wx - rx) < 118 + mw) return true;
+  return inLagoon3(x3, z3, 40);
+}
 // coast clearance: is this point at least `d` units from the void edge?
 export function coastClear(x3: number, z3: number, d = 12): boolean {
   const len = Math.hypot(x3, z3) || 1;
@@ -2085,8 +2105,15 @@ function makeBazaarTower(): THREE.Group {
     part(new THREE.BoxGeometry(12, 1.6, 12), 0xd8a04a, 0, 0.8, 0),
     part(new THREE.CylinderGeometry(3.6, 4.4, 14, 8), 0xf0d090, 0, 8.6, 0),
   ];
-  for (let i = 0; i < 5; i++) parts.push(part(new THREE.CylinderGeometry(3.75, 3.75, 1.2, 8),
-    i % 2 ? 0xe8604d : 0xf5e4b4, 0, 3.2 + i * 2.6, 0));
+  // the stripes were radius 3.75 inside a shaft tapering 4.4 to 3.6, so they
+  // only emerged above y=12.9 and the landmark read as a blank cream column for
+  // its whole visible height. They follow the taper now.
+  for (let i = 0; i < 5; i++) {
+    const y = 3.2 + i * 2.6;
+    const shaft = 4.4 + (3.6 - 4.4) * ((y - 1.6) / 14);     // shaft radius at this height
+    parts.push(part(new THREE.CylinderGeometry(shaft + 0.16, shaft + 0.16, 1.2, 8),
+      i % 2 ? 0xe8604d : 0xf5e4b4, 0, y, 0));
+  }
   parts.push(part(new THREE.CylinderGeometry(5, 5, 1, 8), 0xc98f52, 0, 15.8, 0));
   parts.push(part(new THREE.CylinderGeometry(2.6, 3.2, 4, 8), 0xf0d090, 0, 18.2, 0));
   parts.push(part(new THREE.ConeGeometry(3.6, 4.6, 8), 0x2fb8a8, 0, 22.4, 0));
@@ -2263,15 +2290,28 @@ function makePalm(): THREE.Group {
   const parts: THREE.BufferGeometry[] = [
     part(new THREE.CylinderGeometry(0.28, 0.42, 6.2, 7), 0xb08a5a, 0.3, 3.1, 0, 0, 0, -0.12),
   ];
-  for (let i = 0; i < 6; i++) {
-    // part() applies Rz LAST, and the palm needs the droop baked in BEFORE the
-    // crown spin — get that backwards and you rebuild the green pinwheel. So:
-    // droop and offset via part(), then spin and lift the finished geometry.
-    const f = part(new THREE.SphereGeometry(1, 8, 6), 0x4faa5a, 1.7, 0, 0, 0, 0, -0.35, 2.3, 0.22, 0.75);
-    f.rotateY((i / 6) * Math.PI * 2);
-    f.translate(0.6, 6.1, 0);
+  // Six identical fronds, all at one height, all drooping the same amount, all
+  // coplanar: from the fixed 46 degree camera that is a green starfish, and it
+  // was the dominant object on the island. Every blade now has its own length,
+  // droop, height and tint, and two ride high while two hang low, so the crown
+  // has volume and shadows itself.
+  const FR = [
+    [1.00, -0.30, 0.55, 0x54b060], [0.86, -0.62, -0.30, 0x459a52],
+    [1.10, -0.18, 0.85, 0x5fbc68], [0.78, -0.70, -0.45, 0x3f8f4c],
+    [0.94, -0.42, 0.10, 0x4faa5a], [1.04, -0.26, 0.40, 0x58b463],
+  ];
+  for (let i = 0; i < FR.length; i++) {
+    const [len, droop, lift, col] = FR[i];
+    const f = part(new THREE.SphereGeometry(1, 8, 6), col as number,
+      1.7 * (len as number), 0, 0, 0, 0, droop as number,
+      2.3 * (len as number), 0.24, 0.72 + i * 0.03);
+    f.rotateY((i / FR.length) * Math.PI * 2 + 0.22);
+    f.translate(0.6, 6.1 + (lift as number), 0);
     parts.push(f);
   }
+  // a nut cluster gives the crown a solid mass instead of a bare hub
+  for (const [nx, ny, nz] of [[0.55, 5.72, 0.34], [0.9, 5.62, -0.2], [0.3, 5.55, -0.35]])
+    parts.push(part(new THREE.SphereGeometry(0.34, 7, 6), 0x8a6a4a, nx, ny, nz));
   for (const a2 of [0.5, 2.6])
     parts.push(part(new THREE.SphereGeometry(0.26, 8, 6), 0x8a6a4a,
       0.6 + Math.cos(a2) * 0.5, 5.8, Math.sin(a2) * 0.5));
