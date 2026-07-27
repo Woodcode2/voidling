@@ -23,6 +23,7 @@ import { createAudio } from './proto3d/audio3d';
 import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
+import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -562,104 +563,6 @@ const DISTRICT: Record<string, string> = {
 // feel — every one of these is a mirror of the run in progress.
 // THE MAYOR — one recurring character running a denial-to-collapse arc
 // across the match. A running joke beats 54 unrelated one-liners.
-const NEWS_LIVE_CALM = [
-  'mayor: "the void is FAKE NEWS." void: *eats {M}*',
-  'mayor denies void exists. void denies mayor exists',
-  'mayor: "that hole? decorative." it is not decorative',
-  'mayor cuts ribbon on {D}. void cuts {D}',
-  'mayor: "I have NEVER been eaten." checks out. so far',
-  'void sighted in {D}. residents wave, unsure why',
-  'it ate {M}. nobody saw anything. everybody saw',
-  '{L} spotted eating. authorities say "same"',
-  'a {F} is loose in {D}. mayor: "a small one"',
-  'local poll: is the dot getting bigger? {P}% say yes',
-];
-const NEWS_LIVE_WORRIED = [
-  'mayor: "a SMALL crisis." it is a {F}',
-  'mayor rebrands the void as "a water feature"',
-  'mayor: "{P}% is basically zero percent"',
-  'mayor forms committee. committee is eaten',
-  '{D} EVACUATING — the {F} is coming',
-  'it just ate {M}. that was somebody\'s {M}!',
-  '{P}% of the isle is GONE. mayor requests a nap',
-  '{L} now in the lead. this is somehow worse',
-  'do NOT go to {D}. that is where the {F} is',
-];
-const NEWS_LIVE_PANIC = [
-  'mayor: "ok FINE it is real." mayor leaves',
-  'mayor now a hat on a boat. the hat is winning',
-  'mayor concedes island to a {F}. shakes its rim',
-  'mayor: "I blame the previous mayor." he WAS the previous mayor',
-  '{D} IS GONE. it was nice. it was RIGHT THERE',
-  '{P}% DEVOURED. the other {R}% is nervous',
-  'the {F} ate {M}. it is still hungry',
-  '{S} SECONDS LEFT. run. politely. RUN',
-  '{L} leads the feast. we root for nobody now',
-];
-// PIRATE BAY RESORT's newsroom lives in ./proto3d/newsroom — a per-district
-// pool for all seven areas plus CAPT. ROGER's running arc. What used to be
-// here was eight lines per tier, shared across the whole island.
-const NEWS_CALM = [
-  'BREAKING: mayor announces run for a THIRD term',
-  'local cat stuck in tree again. hang on, Waffles',
-  'zoo flamingo count: still eleven. riveting.',
-  'ferris wheel voted #1 wheel by wheel fans',
-  'school spelling bee ends in a 14-way tie',
-  'golf course mole "not sorry", witnesses say',
-  'airport adds new flight to the OTHER beach',
-  'duck parade delays traffic. mayor: "worth it"',
-  "weather: sunny. tiny purple dot 'probably a bug'",
-  'town hall bake sale: brownies gone in 4 minutes',
-  'beach crab steals sandwich, declines interview',
-  'ISLE NEWS wins award for best news on the isle',
-];
-const NEWS_CALM_EXTRA = [
-  'Waffles rescued from tree. Waffles returns to tree',
-  'flamingo count hits TWELVE. recount demanded',
-  'duck #4 wins pond race. ducks 1-3 file complaint',
-  'ice cream truck adds 32nd flavor: "vanilla, but louder"',
-  'golf mole digs a 19th hole. golfers furious, impressed',
-  'train conductor waves at everyone. everyone waves back',
-  'local gnome wins "most judgmental" third year running',
-];
-const NEWS_WORRIED = [
-  'mayor: DO NOT feed the void. it feeds itself',
-  "scientists: it's PROBABLY fine (they are packing)",
-  'zoo animals seen forming an escape committee',
-  'golf course now a golf shortcourse',
-  "airport reports all outgoing flights 'very full'",
-  'poll: 6 in 10 residents "would rather not be eaten"',
-  'lifeguards now guarding the land too',
-  'school swaps fire drill for VOID drill. kids thrilled',
-  'ferris wheel operator refuses to look down',
-  'hardware store sells out of locks, tape, courage',
-  "mayor: the dot is 'medium-sized at MOST'",
-  'hardware store now also out of ladders, rope, and nope',
-  'zoo sloth finishes evacuating (started tuesday)',
-  'ferris wheel adds seatbelts "for no reason. stop asking"',
-  'mayor unveils anti-void plan: a really big net',
-  "MISSING: 14 mailboxes, 3 cars, the mayor's hat",
-];
-const NEWS_PANIC = [
-  'THE ARMY HAS A PLAN (the plan is honking)',
-  'LAST ONE OFF THE ISLAND TURNS OFF THE SUN',
-  'town hall meeting cancelled. also town hall.',
-  'ferris wheel now tallest thing left. barely.',
-  'zoo update: the lions are rooting for the void',
-  'mayor spotted rowing away in a paddle boat',
-  'airport gone. planes now simply birds',
-  'golf report: hole in one. the hole is EVERYTHING',
-  'school declares recess FOREVER (for bad reasons)',
-  'void upgraded from weather event to landlord',
-  'ISLE NEWS now broadcasting from a kayak',
-  'beach missing. ocean confused. more at 6, maybe',
-  "mayor's paddle boat now tallest structure on the isle",
-  'flamingo count: zero. they said BYE',
-  "Waffles' tree is gone. Waffles is FINE. Waffles is FURIOUS",
-  'weather: 100% chance of void. bring a jacket anyway',
-  'this just in: AAAAAAAH',
-  'the moon asked if we are ok. we are not',
-];
 const newsEl = el('news');
 let devouredPct = 0, newsCd = 14;
 // reactive one-shots: big beats the player just caused jump the queue
@@ -669,6 +572,10 @@ function breakingNews(h: string) {
   newsQueue.push(h); newsCd = Math.min(newsCd, 2.5);
 }
 const newsSeen: string[] = [];
+// Both worlds now have their own newsroom module — ./proto3d/newsroom for
+// PIRATE BAY RESORT and ./proto3d/newsroom_maple for MAPLE FALLS. What used to
+// live here was one shared pool of about fifty one-liners, reused across every
+// district of both islands, which is the "vanilla and boring" this replaces.
 function pickHeadline(pool: string[]): string {
   const fresh = pool.filter((h) => !newsSeen.includes(h));
   const src = fresh.length ? fresh : pool;
@@ -718,15 +625,21 @@ function showNews() {
     });
     brand = PB_BRAND[tier];
   } else {
-    const pool = [[...NEWS_CALM, ...NEWS_CALM_EXTRA], NEWS_WORRIED, NEWS_PANIC][tier];
-    // a countdown headline only makes sense near the end — "179 SECONDS LEFT"
-    // is not a panic, it's a weather report
-    const live = [NEWS_LIVE_CALM, NEWS_LIVE_WORRIED, NEWS_LIVE_PANIC][tier]
-      .filter((t) => !t.includes('{S}') || matchClock <= 70);
-    // 55% of headlines are now LIVE — filled from the actual run
-    h = newsQueue.shift()
-      ?? (live.length && Math.random() < 0.55 ? fillHeadline(pickHeadline(live)) : pickHeadline(pool));
-    brand = ['📰 ISLE NEWS', '⚠️ ISLE NEWS', '🚨 BREAKING'][tier];
+    // MAPLE FALLS runs its own newsroom too: 449 headlines across nine
+    // districts plus 242 spoken lines, built around a mayoral election nobody
+    // asked for. Mayor Dinkle is denying the void exists, his challenger's
+    // entire platform is that it's Dinkle's fault, and Marge has been
+    // protesting the same parking meter for nine years.
+    const md = MAPLE_DIST[String(island.biomeAt(voidState.x, voidState.z))] ?? null;
+    const lead2 = rivals.list.length
+      ? Math.max(...rivals.list.map((r) => r.score)) - playerScore : 0;
+    const top2 = rivals.list.slice().sort((a, b) => b.score - a.score)[0];
+    h = newsQueue.shift() ?? pickMapleNews({
+      tier, district: md, lastMeal, devouredPct,
+      form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
+      rivalName: top2?.name ?? 'CHOMPZILLA', rivalLead: lead2,
+    });
+    brand = MAPLE_BRAND[tier];
   }
   newsEl.innerHTML = `<i>${brand}</i>${h}`;
   newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
@@ -736,6 +649,17 @@ function showNews() {
 
 const GATE_GREY = new THREE.Color(0x6b6b7a);
 let gateT = 0;      // throttle for the too-big-to-eat tint
+// Maple's biome ids to the newsroom's district ids. Written to cover BOTH the
+// old zoning and the re-zone that is landing separately, so a headline never
+// falls back to "general" just because a cell got renamed.
+const MAPLE_DIST: Record<string, MapleDist> = {
+  cozy: 'burb', fancy: 'burb', burb: 'burb',
+  plaza: 'mainst', mainst: 'mainst', downtown: 'civic', civic: 'civic',
+  park: 'fair', fair: 'fair', zoo: 'fair',
+  forest: 'woods', woods: 'woods', camp: 'woods',
+  beach: 'lake', lake: 'lake',
+  farm: 'farm', school: 'school', strip: 'strip', airport: 'strip',
+};
 let lastRankBrag = -99;
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
@@ -1258,7 +1182,7 @@ function gildTreasure() {
 }
 
 function resetMatch() {
-  resetNews();   // the newsroom's anti-repeat memory is per-match
+  resetNews(); resetMapleNews();   // both newsrooms' anti-repeat memory is per-match
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
   for (const e of edibles) {
