@@ -279,7 +279,7 @@ export function createRivals(
   interface R extends Rival {
     arch: Arch; group: THREE.Group; body: THREE.Mesh; eyes: THREE.Group; halo: THREE.Mesh;
     tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; cast: boolean;
-    stall: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number;
+    stall: number; stuckN: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number;
     respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean;
     visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number;
     // scoring, on the player's own terms
@@ -322,7 +322,7 @@ export function createRivals(
     roster.push({ name: nm, arch: ARCH_OF[nm], color: sk.rim, score: 0, r: START_R,
       group, body: group.children[0] as THREE.Mesh, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
-      joinAt: 9e9, joined: false, cast: false, stall: 0, ph: rand(0, 6), pulse: 0,
+      joinAt: 9e9, joined: false, cast: false, stall: 0, stuckN: 0, ph: rand(0, 6), pulse: 0,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
       visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
       combo: 0, comboT: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
@@ -705,18 +705,38 @@ export function createRivals(
           // stuff a beginner lives on — is now permanently the player's, and
           // the family competes for the tier above it. It also means each thing
           // they eat is WORTH more, so their score does not need the volume.
+          // THIS FLOOR MUST MATCH THE ONE IN THE SWALLOW LOOP. It is 45% of the
+          // rival's own radius in both places, and dropping it here alone — an
+          // attempt to widen the hoarder's diet — was actively worse: he then
+          // LOCKED ON to 0.55 crumbs that the swallow test still refused at
+          // 0.70, drove to one, and sat on it for the rest of the match. A
+          // rival that can target what it cannot eat is a rival that starves
+          // next to food.
           const minBite = rv.r * 0.45;
           // where this archetype is allowed to look, and how it ranks what it finds
           let ax = rv.x, az = rv.z, reach = Infinity, bigHunger = 0;
-          if (rv.arch === 'HOARDER') { ax = rv.campX; az = rv.campZ; reach = 62; }
-          else if (rv.arch === 'SHOWOFF') { bigHunger = 1; }      // size beats distance
+          // THE HOARDER HAS NO CAMP ANY MORE. He had a bespoke one — search
+          // anchored on a fixed point, wander orbiting it, relocate on a sweep
+          // counter — and five separate attempts to make it feed him all ended
+          // the same way: instrumented, he FOUND a target every single tick
+          // (600-plus candidates, best locked at 0.60) and still sat at score
+          // 47 and radius 1.38 from t=34 to the whistle. He was not blind and
+          // he was not slow; the camp was pinning him. Grandpa keeps what
+          // actually reads on screen — half everyone else's cruising speed —
+          // and works a drifting patch of turf like the rest of the family.
+          if (rv.arch === 'SHOWOFF') { bigHunger = 1; }      // size beats distance
           else if (rv.arch === 'COPYCAT') {
-            // drive the player's own route, ~7 seconds behind, and eat whatever
-            // they left. Bitsy is literally following your footprints.
-            const back = Math.max(0, trail.length - 1 - 21);
+            // Drive the player's own route and eat what they left. The flaw was
+            // literal: anchored seven seconds back with a 55-unit reach, Bitsy
+            // was hunting ground the player had just stripped, so she found
+            // nothing almost every tick — 909 to 3,976 points a match. She now
+            // trails four seconds back with a wider look, which is still
+            // unmistakably "following your footprints" but leaves her the
+            // things you drove straight past.
+            const back = Math.max(0, trail.length - 1 - 12);
             const spot = trail[back];
-            if (spot) { ax = spot.x; az = spot.z; reach = 55; }
-            else { ax = px; az = pz; reach = 55; }
+            if (spot) { ax = spot.x; az = spot.z; reach = 78; }
+            else { ax = px; az = pz; reach = 78; }
           } else if (rv.arch === 'BULLY' && hunting) { ax = px; az = pz; reach = 85; }  // prowls YOUR block
           for (const e of edibles) {
             if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minBite) continue;
@@ -741,33 +761,6 @@ export function createRivals(
               rv.speakCd = rand(12, 18);
               api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
             }
-          } else if (rv.arch === 'HOARDER') {
-            // camped out: sweep the patch, and only move house when the
-            // district is genuinely stripped — with a grumble about it
-            // MOVING HOUSE. Camping is only charming while there is something
-            // in the district to eat; a hoarder squatting on a stripped patch
-            // is the wallpaper we are trying to delete. Two empty sweeps and he
-            // relocates — onto real food, found by search rather than by a
-            // random offset that could easily land him in the sea again.
-            rv.campT -= 1;
-            if (rv.campT <= 0) {
-              rv.campT = 2;
-              let pick: RivalEdible | null = null, pd = Infinity;
-              for (const e of edibles) {
-                if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minBite) continue;
-                const d2 = Math.hypot(e.mesh.position.x - rv.x, e.mesh.position.z - rv.z);
-                if (d2 > 70 && d2 < pd) { pd = d2; pick = e; }
-              }
-              if (pick) [rv.campX, rv.campZ] = placeOnLand(pick.mesh.position.x, pick.mesh.position.z, rv.r);
-              else {
-                const ca = rand(0, Math.PI * 2), cr = rand(70, 130);
-                [rv.campX, rv.campZ] = placeOnLand(rv.campX + Math.cos(ca) * cr, rv.campZ + Math.sin(ca) * cr, rv.r);
-              }
-              if (rv.speakCd <= 0) { rv.speakCd = rand(12, 18); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch)); }
-            }
-            const a3 = rand(0, Math.PI * 2), rr2 = rand(10, 50);
-            rv.tx = rv.campX + Math.cos(a3) * rr2; rv.tz = rv.campZ + Math.sin(a3) * rr2;
-            rv.tgt = null;
           } else {
             // idle wander sweeps their OWN turf, and the turf itself drifts —
             // so a family member works a district, moves on, and occasionally
@@ -884,8 +877,23 @@ export function createRivals(
           }
         }
         rv.stall = movedOk ? Math.max(0, rv.stall - dt * 2) : rv.stall + dt;
+        if (movedOk) rv.stuckN = 0;
         if (rv.stall > 0.8) {   // pinned in a corner: abandon target, wander inland
           rv.stall = 0; rv.retarget = rand(1.2, 2.2);
+          // RETARGETING IS NOT ENOUGH. A rival GROWS during a match, and the
+          // body-fit ring grows with it — so a spot that was fine at 0.9 can
+          // become impossible at 1.6, and then every step is refused no matter
+          // where the target is. The loop just runs forever: stall, retarget,
+          // still pinned, stall. Traced on DOZER, who is slowest and therefore
+          // most likely to still be in a tight spot when he grows: score frozen
+          // at 99 and radius at 1.6 from t=46 to the whistle, three matches
+          // running. Joins and respawns already spiral out to somewhere the
+          // body fits; a rival that grows into a corner deserves the same.
+          if (++rv.stuckN >= 3) {
+            rv.stuckN = 0;
+            [rv.x, rv.z] = placeOnLand(rv.x, rv.z, rv.r);
+            rv.vx = 0; rv.vz = 0; rv.tgt = null;
+          }
           // "inland" was ALWAYS toward the world origin. That is only correct
           // for an island with water strictly on the outside — Pirate Bay has a
           // bay in the MIDDLE, so from the resort shore this aimed the escape
