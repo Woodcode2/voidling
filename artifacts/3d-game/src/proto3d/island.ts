@@ -2291,11 +2291,22 @@ function makeMailbox(): THREE.Group {
   return g;
 }
 function makeBench(): THREE.Group {
+  // it had a seat and a back and NOTHING holding either up — 42 of them hovering
+  // a metre off the ground across both islands.
   const g = new THREE.Group();
-  g.add(mergedProp([
-    part(new THREE.BoxGeometry(3, 0.3, 1), 0x9a7a5a, 0, 1, 0),
-    part(new THREE.BoxGeometry(3, 1, 0.3), 0x9a7a5a, 0, 1.6, -0.35),
-  ]));
+  const wood = 0x9a7a5a, iron = 0x4a4a52;
+  const parts = [
+    part(new THREE.BoxGeometry(3, 0.22, 1), wood, 0, 1, 0),          // seat slats
+    part(new THREE.BoxGeometry(3, 0.9, 0.24), wood, 0, 1.55, -0.36), // back
+    part(new THREE.BoxGeometry(3, 0.16, 0.9), wood, 0, 1.14, 0.02),  // second slat
+  ];
+  for (const sx of [-1.28, 1.28]) {                                   // cast-iron end frames
+    parts.push(part(new THREE.BoxGeometry(0.16, 0.9, 0.16), iron, sx, 0.45, -0.36));
+    parts.push(part(new THREE.BoxGeometry(0.16, 0.9, 0.16), iron, sx, 0.45, 0.34));
+    parts.push(part(new THREE.BoxGeometry(0.18, 0.14, 0.95), iron, sx, 0.9, 0));
+    parts.push(part(new THREE.BoxGeometry(0.14, 1.05, 0.14), iron, sx, 1.5, -0.4));
+  }
+  g.add(mergedProp(parts));
   return g;
 }
 
@@ -2415,7 +2426,9 @@ const tinyForMaple = (biome: Biome): THREE.Object3D => {
     // these three were cones and bins, which is what a district looks like when
     // nobody has decided what it sells
     : biome === 'fair' ? [MS.makePumpkin, makeFlowers, MS.makeNewsBox, sign]
-    : biome === 'campus' ? [makeGolfball, MS.makeLifeRing, makeFlowers, sign]
+    // a campus is not a driving range and not a swimming pool. It was seeding
+    // 37 golf balls and 38 life-ring posts across the football field.
+    : biome === 'campus' ? [makeFlowers, MS.makeNewsBox, MS.makePlanter, sign]
     : biome === 'strip' ? [makeTrash, MS.makeNewsBox, MS.makePlanter, sign]
     : biome === 'plaza' ? [makeFlowers, MS.makeNewsBox, MS.makePlanter, sign]
     : biome === 'downtown' ? [makeHydrant, makeTrash, MS.makeNewsBox, sign]
@@ -2706,7 +2719,10 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     const P3 = (p2: [number, number]): [number, number] => [w(p2[0]), w(p2[1])];
     // Everything placed claims its ground, hand-authored positions included —
     // otherwise a scatter pass happily drops a palm inside the galleon.
-    const drop = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY?: number) => {
+    // it claimed ground but never CHECKED it — the source of all 58 of the
+    // bay's prop intersections. A drop onto occupied ground is now refused.
+    const drop = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY?: number, force = false) => {
+      if (!force && !BAY.spotOpen(p2[0], p2[1], r * 20)) return;
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       place(mesh, x3, z3, r);
@@ -2715,6 +2731,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     const dropGlb = (name: string, p2: [number, number], r: number, h: number, fb?: () => THREE.Object3D, rotY?: number) => {
       const [x3, z3] = P3(p2);
       if (!insideIsland3(x3, z3)) return;
+      if (!BAY.spotOpen(p2[0], p2[1], r * 20)) return;
       glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback: fb });
       BAY.claimSpot(p2[0], p2[1], r * 20);
     };
@@ -2725,10 +2742,23 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // A landmark is big enough that "on land" isn't sufficient — it must also
     // clear the boardwalk and the trail by its own footprint. This asserts it
     // at load rather than leaving it to a screenshot to notice.
+    // A landmark is AUTHORED. It goes down where it was designed to go, on top
+    // of whatever the scatter left there — its site is reserved below, before
+    // the wild pass runs, so in practice there is nothing there to sit on.
     const landmark = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY: number, clear: number) => {
       if (!BAY.bayPlaceable(p2[0], p2[1], clear)) console.warn('[pirate] landmark site is illegal', p2, clear);
-      drop(mesh, p2, r, rotY);
+      drop(mesh, p2, r, rotY, true);
     };
+    // THE RESERVE. Every authored landmark site, claimed before a single palm
+    // is scattered. Run the other way round and the galleon lands on eleven of
+    // them — which is exactly what shipped.
+    const RESERVE: [number, number, number][] = [
+      [6850, 3450, 7.5], [5400, 2050, 9], [8540, 3700, 10], [9250, 5150, 7],
+      [9150, 6550, 7.5], [8880, 6980, 5], [7400, 10380, 8], [5700, 4550, 7],
+      [4300, 4200, 9], [2350, 6100, 3], [2750, 6450, 4], [2520, 6620, 7],
+      [4050, 8950, 7.5], [3470, 8220, 4], [4400, 2450, 4], [2450, 4200, 3],
+      [5330, 6890, 4], [5120, 8600, 2.4],
+    ];
     // sep = the prop's own 3D radius, so the spatial hash can refuse to bury it
     // in something else. avoid = districts this prop has no business in: the
     // island-wide shoreline scatter was dropping grey rocks and beach loungers
@@ -2743,11 +2773,15 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       BAY.clusterAt(cx2, cy2, n, rad, Math.random, clear, { sep: 2.6 });
 
     // ══ THE WILD ISLAND ═══════════════════════════════════════════════════
-    // Everything above is a district; MOST of Pirate Bay is the open sand and
+    // Everything below is a district; MOST of Pirate Bay is the open sand and
     // scrub between them. A per-region scatter can never reach it, so this
     // pass samples the whole landmass — it is what stops the island reading
     // like eight busy islands floating in an empty cream disc.
-
+    //
+    // It is DEFINED here and CALLED last. Run first, it seeded 800-odd palms
+    // and shells across ground the authored districts were about to claim, and
+    // the galleon came down on top of eleven of them.
+    const wildIsland = () => {
     // palm GROVES (clumps, not an even dusting — from above a clump reads as
     // a place, a dusting reads as noise)
     for (const [gx2, gy2] of sland(17, 240, undefined, undefined, NO_TOWN)) {
@@ -2768,6 +2802,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // doubloons in the sand — treasure is the island's whole fiction
     for (const p2 of sland(65, 26, undefined, 0.6, ['resort'])) drop(makeCoins(), p2, 0.6);
     for (const p2 of sland(18, 60, undefined, 1.3, NO_TOWN)) drop(makeBarrel(), p2, 1.3);
+    };
+    for (const [rx2, ry2, rr2] of RESERVE) BAY.claimSpot(rx2, ry2, rr2 * 20);
+    wildIsland();
 
     // ── THE PIERS ───────────────────────────────────────────────────────────
     // They were strokes on the ground texture that stopped in flat water with
@@ -3024,7 +3061,16 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (const p2 of spread('cove', 5, 40, 1.4)) drop(LUXE.makeDeckChest(), p2, 1.4, rand(0, Math.PI * 2));
     // the wreck used to sit 17 units offshore, where place() dropped it on the
     // floor without a word. landmark() warns if that ever happens again.
-    { const wreck = LUXE.makeGalleon(); wreck.rotation.z = 0.42; landmark(wreck, [2520, 6620], 7, 1.9, 120); }
+    {
+      // a 0.42 heel drove the low rail 7.1 units UNDER the sand — the wreck read
+      // as half a ship. Gentler list, then settle it on its own measured hull so
+      // the keel kisses the beach whatever the geometry does later.
+      const hull = LUXE.makeGalleon(); hull.rotation.z = 0.17;
+      const wreck = new THREE.Group(); wreck.add(hull);
+      const bb = new THREE.Box3().setFromObject(hull);
+      hull.position.y = -bb.min.y - 0.8;          // 0.8 of keel buried in sand
+      landmark(wreck, [2520, 6620], 7, 1.9, 120);
+    }
 
     // ── SUNSET BEACH: the long outer sweep — umbrellas, castles, palms
     for (const p2 of spread('beach', 30, 36, 1.8)) dropGlb('umbrella', p2, 1.8, 3.2, makeUmbrellaFB, rand(0, Math.PI * 2));
@@ -3058,18 +3104,22 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (const p2 of sland(9, 90, undefined, 1.6)) drop(LUXE.makeSignpost(), p2, 1.6, faceZ(8700 - p2[0], 5800 - p2[1]));
 
     // ── THE PROMENADE: torches and benches down its whole length
-    for (let t = 0.015; t < 0.99; t += 0.02) {
+    // stepping t by 0.02 makes (t*100) land on ...5, ...7, ...9 — never a
+    // multiple of 4, 6 or 8. The whole promenade shipped with zero benches,
+    // zero planters and zero signposts. An integer counter cannot lie like that.
+    let pi = 0;
+    for (let t = 0.015; t < 0.99; t += 0.02, pi++) {
       const a2 = BAY.pathPointAt(BAY.PROMENADE, t);
       const nx = Math.cos(a2.ang + Math.PI / 2), ny = Math.sin(a2.ang + Math.PI / 2);
-      const side = (t * 100) % 2 < 1 ? 1 : -1;
+      const side = pi % 2 === 0 ? 1 : -1;
       drop(makeTorch(), [a2.x + nx * side * (BAY.PROM_HALF - 55), a2.y + ny * side * (BAY.PROM_HALF - 55)], 1.0);
-      if ((t * 100) % 4 < 1) {
+      if (pi % 2 === 0) {
         const bn = makeBench(); bn.rotation.y = -a2.ang;
         drop(bn, [a2.x - nx * side * (BAY.PROM_HALF - 60), a2.y - ny * side * (BAY.PROM_HALF - 60)], 2.4);
       }
       // council wheelie bins on a five-star waterfront. Planters instead.
-      if ((t * 100) % 6 < 1) drop(LUXE.makePotPlant(), [a2.x - nx * side * (BAY.PROM_HALF - 25), a2.y - ny * side * (BAY.PROM_HALF - 25)], 0.9);
-      if ((t * 100) % 8 < 1) drop(LUXE.makeSignpost(), [a2.x + nx * side * (BAY.PROM_HALF - 30), a2.y + ny * side * (BAY.PROM_HALF - 30)], 1.6, -a2.ang);
+      if (pi % 3 === 1) drop(LUXE.makePotPlant(), [a2.x - nx * side * (BAY.PROM_HALF - 25), a2.y - ny * side * (BAY.PROM_HALF - 25)], 0.9);
+      if (pi % 8 === 4) drop(LUXE.makeSignpost(), [a2.x + nx * side * (BAY.PROM_HALF - 30), a2.y + ny * side * (BAY.PROM_HALF - 30)], 1.6, -a2.ang);
     }
     return;   // Pirate Bay is fully populated — the Maple grid pass never runs
   }
@@ -3120,6 +3170,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     if (inMapleWater(wx, wy, r)) return false;
     const band = roadClear(r);
     for (const c of ROAD_CENTERS) if (Math.abs(wx - c) < band || Math.abs(wy - c) < band) return false;
+    // drop() claimed ground but never CHECKED it — only landmark() did. That
+    // asymmetry is where all 93 of Maple's prop intersections came from.
+    if (!MS.spotOpen(wx, wy, r * 20)) return false;
     return true;
   };
   /** place at WORLD coordinates and claim the ground for the separation pass.

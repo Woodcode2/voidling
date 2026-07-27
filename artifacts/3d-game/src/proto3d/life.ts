@@ -1343,15 +1343,19 @@ function makeDog(): THREE.Group {
 // A BIKE with a kid already on it — the kid is a real cast member parented to
 // the frame, so it animates and eats exactly like anybody else.
 function makeBike(col: number): THREE.Group {
-  return grp1(mergedProp([
-    part(MG.wheel, 0x2a2a30, 0.72, 0.42, 0, Math.PI / 2, 0, 0, 1.05),
-    part(MG.wheel, 0x2a2a30, -0.72, 0.42, 0, Math.PI / 2, 0, 0, 1.05),
-    part(MG.box, col, 0, 0.72, 0, 0, 0, 0, 1.55, 0.13, 0.11),
-    part(MG.box, col, -0.12, 0.95, 0, 0, 0, -0.55, 0.11, 0.85, 0.11),
-    part(MG.box, col, 0.42, 0.86, 0, 0, 0, 0.6, 0.11, 0.80, 0.11),
-    part(MG.box, 0x2a2a30, 0.62, 1.24, 0, 0, 0, 0, 0.10, 0.10, 0.92),
-    part(MG.box, 0x3a3a44, -0.30, 1.12, 0, 0, 0, 0, 0.42, 0.13, 0.28),
+  // it was 1.29 tall against a 3.5-unit rider — a child's trike, and the wheels
+  // sat 0.12 under the tarmac. Wheels grounded, then 1.7x for a real bicycle.
+  const g = grp1(mergedProp([
+    part(MG.wheel, 0x2a2a30, 0.72, 0.54, 0, Math.PI / 2, 0, 0, 1.05),
+    part(MG.wheel, 0x2a2a30, -0.72, 0.54, 0, Math.PI / 2, 0, 0, 1.05),
+    part(MG.box, col, 0, 0.84, 0, 0, 0, 0, 1.55, 0.13, 0.11),
+    part(MG.box, col, -0.12, 1.07, 0, 0, 0, -0.55, 0.11, 0.85, 0.11),
+    part(MG.box, col, 0.42, 0.98, 0, 0, 0, 0.6, 0.11, 0.80, 0.11),
+    part(MG.box, 0x2a2a30, 0.62, 1.36, 0, 0, 0, 0, 0.10, 0.10, 0.92),
+    part(MG.box, 0x3a3a44, -0.30, 1.24, 0, 0, 0, 0, 0.42, 0.13, 0.28),
   ]));
+  g.scale.setScalar(1.7);
+  return g;
 }
 // THE SCHOOL BUS. Nose +X, exactly like makeCar, so it drops straight into the
 // road-lane driver with no special casing.
@@ -1376,12 +1380,17 @@ function makeBus(): THREE.Group {
 // the town gets four boats and a canoe. Nose +X.
 function makeRowboat(canoe: boolean): THREE.Group {
   const c = canoe ? pick([0xc4693a, 0x3a8a6a]) : pick([0xf0e6d2, 0x4d9de8, 0xd8443c, 0x58c470]);
+  // it was a rectangular trough with two traffic cones stuck on the ends. A
+  // squashed sphere gives a real sheer line and a rounded bow for one mesh.
+  const L = canoe ? 7.0 : 6.0, B = canoe ? 1.5 : 2.1;
   const p: THREE.BufferGeometry[] = [
-    part(MG.box, c, 0, 0.55, 0, 0, 0, 0, canoe ? 6.4 : 5.4, 0.95, canoe ? 1.5 : 2.1),
-    part(MG.cone, c, canoe ? 3.4 : 2.9, 0.55, 0, 0, 0, -Math.PI / 2, 0.9, 1.3, canoe ? 1.5 : 2.1),
-    part(MG.cone, c, canoe ? -3.4 : -2.9, 0.55, 0, 0, 0, Math.PI / 2, 0.9, 1.1, canoe ? 1.5 : 2.1),
-    part(MG.box, 0x8a6a4a, 0, 0.95, 0, 0, 0, 0, canoe ? 5.6 : 4.6, 0.12, canoe ? 1.1 : 1.7),
+    part(MG.sph, c, 0, 0.62, 0, 0, 0, 0, L, 1.35, B),                       // hull
+    part(MG.sph, 0xe8dcc4, 0, 0.76, 0, 0, 0, 0, L * 0.9, 1.1, B * 0.86),    // inner shell
+    part(MG.box, 0x8a6a4a, 0, 0.92, 0, 0, 0, 0, L * 0.86, 0.12, B * 0.82),  // sole
+    part(MG.box, c, 0, 1.02, 0, 0, 0, 0, L * 0.94, 0.14, B * 0.99),         // gunwale cap
   ];
+  for (const sx of canoe ? [-1.5, 1.5] : [-1.4, 0, 1.4])
+    p.push(part(MG.box, 0x8a6a4a, sx, 1.0, 0, 0, 0, 0, 0.5, 0.14, B * 0.9)); // thwarts
   if (!canoe) {
     for (const sz of [-1.25, 1.25])
       p.push(part(MG.box, 0x8a6a4a, -0.6, 0.9, sz, 0, 0, 0.4, 0.14, 0.14, 2.6));   // the oars

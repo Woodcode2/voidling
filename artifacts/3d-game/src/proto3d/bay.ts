@@ -259,6 +259,30 @@ export function spotFree(x: number, y: number, rWorld: number): boolean {
   }
   return true;
 }
+/** The BURIAL test, for hand-authored drops. `spotFree` refuses any contact at
+ *  all, which is right for a random scatter and catastrophic for authored
+ *  dressing — gating drop() on it deleted two thirds of Pirate Bay, because a
+ *  villa's claim circle is 120 units wide and the loungers belong against it.
+ *  This refuses only what would be swallowed: a torch inside the galleon's
+ *  hull, a fountain inside a tiki bar. Touching is fine. Vanishing is not. */
+export function spotOpen(x: number, y: number, rWorld: number): boolean {
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  const reach = Math.ceil((rWorld + 260) / CELL);
+  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
+    const bucket = claims.get(`${cx + i},${cy + j}`);
+    if (!bucket) continue;
+    for (const c of bucket) {
+      const dx = c.x - x, dy = c.y - y;
+      // the scatter passes claim their points as they sample them, so a prop
+      // asking about the spot the scatter just handed it finds ITSELF sitting
+      // there and refuses to exist. An exact-match claim is your own.
+      if (dx === 0 && dy === 0 && c.r === rWorld) continue;
+      const need = Math.max((c.r + rWorld) * 0.45, Math.max(c.r, rWorld) * 0.62);
+      if (dx * dx + dy * dy < need * need) return false;
+    }
+  }
+  return true;
+}
 export function claimSpot(x: number, y: number, rWorld: number): void {
   const k = cellKey(x, y);
   const bucket = claims.get(k);

@@ -60,6 +60,25 @@ export function spotFree(x: number, y: number, rWorld: number): boolean {
   }
   return true;
 }
+/** The BURIAL test — what drop() gates on. `spotFree` refuses any contact,
+ *  which is right for a random scatter and wrong for authored dressing: a
+ *  mailbox belongs against the house, not 40 units off it. This refuses only
+ *  props that would be swallowed whole by something already standing there. */
+export function spotOpen(x: number, y: number, rWorld: number): boolean {
+  const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  const reach = Math.ceil((rWorld + 260) / CELL);
+  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
+    const b = claims.get(`${cx + i},${cy + j}`);
+    if (!b) continue;
+    for (const c of b) {
+      const dx = c.x - x, dy = c.y - y;
+      if (dx === 0 && dy === 0 && c.r === rWorld) continue;   // your own claim
+      const need = Math.max((c.r + rWorld) * 0.45, Math.max(c.r, rWorld) * 0.62);
+      if (dx * dx + dy * dy < need * need) return false;
+    }
+  }
+  return true;
+}
 
 // ── the town's colours ─────────────────────────────────────────────────────
 // THE TOWN ONLY HAS TWO CANDIDATES. This file used to name a third — "PAT
@@ -97,13 +116,16 @@ const M = (p: G[]) => mergedProp(p);
 // mesh each, and they put a face in every district life.ts can't reach.
 function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?: number): void {
   const skin = mpick(SKIN), leg = mpick(DENIM);
-  out.push(part(box(0.34, 0.85, 0.34), leg, x - 0.17, 0.42, z, 0, ry, 0));
-  out.push(part(box(0.34, 0.85, 0.34), leg, x + 0.17, 0.42, z, 0, ry, 0));
-  out.push(part(box(0.9, 0.95, 0.55), shirt, x, 1.32, z, 0, ry, 0));
-  out.push(part(box(0.22, 0.8, 0.22), shirt, x - 0.54, 1.3, z, 0, ry, 0));
-  out.push(part(box(0.22, 0.8, 0.22), shirt, x + 0.54, 1.3, z, 0, ry, 0));
-  out.push(part(sph(0.36, 8, 6), skin, x, 2.05, z));
-  if (hat !== undefined) out.push(part(cyl(0.34, 0.42, 0.22, 8), hat, x, 2.36, z));
+  // S brings the static townsfolk up to the 3.5-unit walking crowd. They were
+  // built at 2.41 and read as children standing next to every adult in life.ts.
+  const S = 1.41;
+  out.push(part(box(0.34 * S, 0.85 * S, 0.34 * S), leg, x - 0.17 * S, 0.42 * S, z, 0, ry, 0));
+  out.push(part(box(0.34 * S, 0.85 * S, 0.34 * S), leg, x + 0.17 * S, 0.42 * S, z, 0, ry, 0));
+  out.push(part(box(0.9 * S, 0.95 * S, 0.55 * S), shirt, x, 1.32 * S, z, 0, ry, 0));
+  out.push(part(box(0.22 * S, 0.8 * S, 0.22 * S), shirt, x - 0.54 * S, 1.3 * S, z, 0, ry, 0));
+  out.push(part(box(0.22 * S, 0.8 * S, 0.22 * S), shirt, x + 0.54 * S, 1.3 * S, z, 0, ry, 0));
+  out.push(part(sph(0.36 * S, 8, 6), skin, x, 2.05 * S, z));
+  if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 8), hat, x, 2.36 * S, z));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -740,7 +762,8 @@ export function makeChickenCoop(): THREE.Mesh {
 export function makeFarmStand(): THREE.Mesh {
   const p: G[] = [
     part(box(4, 0.3, 2), WOOD, 0, 1.2, 0),
-    part(box(4.2, 0.9, 2.2), 0x8c5a4a, 0, 0.75, 0),
+    part(box(4.2, 1.05, 2.2), 0x8c5a4a, 0, 0.525, 0),   // reached the ground 0.3 short
+
     part(box(4.6, 0.3, 2.6), 0x3f7a4e, 0, 3, 0, -0.2, 0, 0),
     part(cyl(0.14, 0.14, 2.4, 5), WOOD, -1.9, 2, -0.9),
     part(cyl(0.14, 0.14, 2.4, 5), WOOD, 1.9, 2, -0.9),
