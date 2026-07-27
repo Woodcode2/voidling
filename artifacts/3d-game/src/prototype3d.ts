@@ -362,6 +362,61 @@ puffGeo.setAttribute('position', new THREE.BufferAttribute(puffPos, 3));
 const puffPoints = new THREE.Points(puffGeo, new THREE.PointsMaterial({ color: 0x9a6ae0, size: 2.1, map: puffTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
 puffPoints.frustumCulled = false; scene.add(puffPoints);
 
+// ── ONE DRAW CALL FOR EVERY SHADOW ON THE ISLAND ────────────────────────────
+// contactShadow() already shares a single CircleGeometry and a single
+// MeshBasicMaterial across every prop that uses it — 2,682 meshes on Maple
+// (a quarter of the whole scene) and 1,570 on Pirate, all of them the same
+// buffer with the same material, each costing its own draw call. That is an
+// InstancedMesh that nobody had written yet.
+//
+// The static props never move, so the matrices are written ONCE at bake and
+// then only touched when something is eaten (scale to zero) or the match
+// resets. Movers keep their own disc: they need a matrix every frame and
+// there are only a few dozen of them.
+const SH_CAP = 4096;
+let shMesh: THREE.InstancedMesh | null = null;
+let shCount = 0;
+const _shM = new THREE.Matrix4();
+const _shZero = new THREE.Matrix4().makeScale(0, 0, 0);
+function setShadowInstance(idx: number, on: boolean, x = 0, z = 0, s = 1): void {
+  if (!shMesh || idx < 0) return;
+  shMesh.setMatrixAt(idx, on ? _shM.makeScale(s, 1, s).setPosition(x, 0.045, z) : _shZero);
+  shMesh.instanceMatrix.needsUpdate = true;
+}
+/** Harvest every tagged disc off the STATIC props into one instanced mesh.
+ *  Idempotent and re-runnable: GLB props stream in for a while after boot, so
+ *  this is called again once they have landed. */
+function bakeContactShadows(): void {
+  for (const e of edibles) {
+    const ud = e.mesh.userData as Record<string, unknown>;
+    if (ud.mover) continue;
+    if (ud.shIdx !== undefined) {
+      // already harvested — but validateWorld nudges props off roads between
+      // sweeps, so refresh the matrix rather than leaving the disc behind
+      if (!e.eaten && e.mesh.visible) {
+        setShadowInstance(ud.shIdx as number, true, e.mesh.position.x, e.mesh.position.z, (ud.shScale as number) ?? 1);
+      }
+      continue;
+    }
+    const disc = e.mesh.children.find((c) => c.userData.cshadow) as THREE.Mesh | undefined;
+    if (!disc) continue;
+    if (shCount >= SH_CAP) return;
+    if (!shMesh) {
+      shMesh = new THREE.InstancedMesh(disc.geometry, disc.material as THREE.Material, SH_CAP);
+      shMesh.frustumCulled = false;
+      shMesh.renderOrder = -1;
+      shMesh.count = SH_CAP;
+      for (let i = 0; i < SH_CAP; i++) shMesh.setMatrixAt(i, _shZero);
+      scene.add(shMesh);
+    }
+    e.mesh.remove(disc);
+    const idx = shCount++;
+    ud.shIdx = idx;
+    ud.shScale = disc.scale.x;
+    setShadowInstance(idx, true, e.mesh.position.x, e.mesh.position.z, disc.scale.x);
+  }
+}
+
 // ── FIND ME ────────────────────────────────────────────────────────────────
 // At match start the void is 18 pixels across on a 390px phone and 10 on a
 // tablet: 4.7% and 1.0% of the screen width, with no ring, no arrow and no
@@ -1080,6 +1135,7 @@ function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
   const d = Math.hypot(dx, dz) || 1;
   e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx);
+  setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // its shadow goes with it
   e.orbitR = Math.min(Math.max(voidling.radius * 0.6, d), voidling.radius * 0.9);   // spiral stays INSIDE the rim
   e.mesh.userData.eaten = true;
   // topple toward the hole (the hole.io fantasy): the tip axis is perpendicular
@@ -1222,6 +1278,7 @@ function beginMatch(solo = false) {
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
+  bakeContactShadows();   // and again on each re-sweep, for late GLB arrivals
   soloMode = solo;
   matchLen = solo ? 120 : MATCH_LEN;
   matchClock = matchLen;
@@ -1412,6 +1469,7 @@ function validateWorld() {
     // exactly that at t=258s. If the player can see it go, it has to go the
     // way everything else goes.
     if (started && e.mesh.visible) { spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 5); }
+    setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // and its shadow
     scene.remove(e.mesh);
     edibles.splice(cull[k], 1);
   }
@@ -1461,6 +1519,9 @@ function resetMatch() {
     // magnet drift + topple mean EVERYTHING goes back to its surveyed home
     e.mesh.position.copy(e.home);
     e.mesh.scale.copy(e.homeScale);
+    // the island regrows, and so do its shadows
+    setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, true,
+      e.home.x, e.home.z, (e.mesh.userData.shScale as number) ?? 1);
     // sunbathers lie down (rot.x = -π/2) — restoring plain (0, y, 0) stood
     // every bather up at towel height after a rematch
     e.mesh.rotation.set(e.mesh.userData.homeRotX ?? 0, e.homeRotY, e.mesh.userData.homeRotZ ?? 0);
@@ -1828,7 +1889,7 @@ function animate() {
   let dtw = dt;
   if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
   tClock += dt;
-  if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); }
+  if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
   island.update(dt, tClock);
 
   if (started && !ended) {

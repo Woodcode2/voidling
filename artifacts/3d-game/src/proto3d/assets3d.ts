@@ -185,6 +185,10 @@ export function contactShadow(r: number): THREE.Mesh {
   m.rotation.x = -Math.PI / 2;
   m.position.y = 0.045;
   m.scale.setScalar(r * 1.35);
+  // tagged so the match loop can harvest the static ones into a single
+  // InstancedMesh — 2,682 of these on Maple is 2,682 draw calls for one
+  // geometry and one material
+  m.userData.cshadow = true;
   return m;
 }
 
