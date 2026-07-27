@@ -36,11 +36,17 @@ export const WORLD = {
   cliff: 0x574a63,       // island cliff band
   // deepened toward the 2D COMPOSITE (flat colour + soft-light grass wash) so
   // the world reads rich, not pastel-washed
+  // THE GROUND RAMP IS THE READ. A render audit sampled the framebuffer and
+  // found adjacent large surfaces sitting on top of each other in luminance:
+  // sand against pavement at 1.01:1, meadow against forest at 1.19, and Maple's
+  // park reading 67% one flat colour. A district you cannot see the edge of is
+  // not a district. Re-spaced so neighbours that actually meet on the map are
+  // at least ~1.35:1 apart, keeping the hue families intact.
   meadow: 0x74c352,      // base grass
-  park: 0x86d766,        // park grass (brighter)
-  forest: 0x67b25c,      // forest ground
+  park: 0x9ae878,        // park grass — was 0x86d766, 1.23 against meadow
+  forest: 0x479046,      // forest ground — was 0x67b25c, 1.19 against meadow
   sand: 0xf6e3a4,        // beach sand
-  pavement: 0xe4e4ec,    // plaza / sidewalk
+  pavement: 0xbcc4d4,    // plaza / sidewalk — was 0xe4e4ec, 1.01 against sand
   road: 0x6b7292,        // asphalt (cool lavender-gray)
   roadLine: 0xdce3ee,    // lane paint
   waterShallow: 0x7fd4e8,

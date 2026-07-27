@@ -672,14 +672,15 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     fair: 0xc8b98a,      // trampled fairground earth
     farm: 0xc7ab5c,      // ripe crop; pasture + tilled strips painted over it
     campus: 0x8fd06a,    // athletic turf
-    strip: 0xc4bda8,     // highway gravel and dust
+    strip: 0xa8a294,     // highway gravel and dust (was 1.04 against the fairground above it)
     // ── PIRATE BAY ground: sun-bleached sand, teak decking, jungle green
     port: 0xa8814f,      // wet dock timber
-    resort: 0xf2e2b8,    // raked resort sand
+    resort: 0xf7ecd0,    // raked resort sand — the bay's three sands measured
+                         // 1.05 and 1.12 apart, so the resort, the cove and the
     party: 0x6a4a7a,     // the dance floor slab (lit up in the bake)
-    market: 0xe8cf9a,    // packed market ground
+    market: 0xcfa462,    // packed market ground — market were one beige field
     jungle: 0x2f7a4a,    // deep tropical canopy floor
-    cove: 0xefdcae,      // pale cove sand
+    cove: 0xe0c78e,      // pale cove sand
   };
   if (WORLD_ID !== 'pirate') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
