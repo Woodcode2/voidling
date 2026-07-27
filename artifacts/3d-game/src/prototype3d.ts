@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, islandOutline3, setWorld } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, islandOutline3, worldMap, setWorld } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -206,8 +206,19 @@ _dbg.__matchState = () => ({
   bs.textContent = `v ${typeof __BUILD__ === 'undefined' ? 'dev' : __BUILD__}`;
   bs.style.cssText = 'position:fixed;right:8px;bottom:4px;z-index:11;font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(203,178,255,0.5);pointer-events:none;';
   document.body.appendChild(bs);
-  const vis = () => { bs.style.display = document.body.classList.contains('menu') ? 'block' : 'none'; };
-  new MutationObserver(vis).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  // …and NOT on the shop or the worlds screen. body.menu is still set inside
+  // those overlays, so a build stamp shipped on two player-facing screens.
+  const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'skinPrev'];
+  const vis = () => {
+    const overlaid = OVERLAYS.some((id) => document.getElementById(id)?.classList.contains('show'));
+    bs.style.display = document.body.classList.contains('menu') && !overlaid ? 'block' : 'none';
+  };
+  const mo = new MutationObserver(vis);
+  mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  for (const id of OVERLAYS) {
+    const n = document.getElementById(id);
+    if (n) mo.observe(n, { attributes: true, attributeFilter: ['class'] });
+  }
   vis();
 }
 const bubbles = createBubbles(camera);
@@ -1362,12 +1373,58 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
   menuEl.style.display = 'none';
   withWorldReady(() => beginMatch());
 }
+/** Paint a world's REAL map onto its level-select card. The picker shipped with
+ *  CSS gradients standing in for two fully built islands; this is the actual
+ *  coastline, the actual districts, the actual road grid. */
+function paintWorldCard(host: HTMLElement, id: 'maple' | 'pirate'): void {
+  const m = worldMap(id);
+  const W = 480, H = 270;
+  const cv = document.createElement('canvas');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = '100%'; cv.style.height = '100%'; cv.style.display = 'block';
+  const g = cv.getContext('2d')!; g.scale(dpr, dpr);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of m.land) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  const pad = 10;
+  const k = Math.min((W - pad * 2) / (maxX - minX), (H - pad * 2) / (maxY - minY));
+  const ox = (W - (maxX - minX) * k) / 2 - minX * k, oy = (H - (maxY - minY) * k) / 2 - minY * k;
+  const px = (x: number) => x * k + ox, py = (y: number) => y * k + oy;
+  const path = (poly: [number, number][]) => {
+    g.beginPath(); poly.forEach(([x, y], i) => (i ? g.lineTo(px(x), py(y)) : g.moveTo(px(x), py(y)))); g.closePath();
+  };
+  g.fillStyle = m.sea; g.fillRect(0, 0, W, H);
+  path(m.land); g.fillStyle = m.ground; g.fill();
+  g.save(); path(m.land); g.clip();                       // districts stay on land
+  for (const p2 of m.patches) { path(p2.poly); g.fillStyle = p2.col; g.fill(); }
+  if (m.roads) {                                           // the grid
+    g.strokeStyle = '#5a6070'; g.lineWidth = Math.max(2, 150 * k);
+    for (const c of m.roads) {
+      g.beginPath(); g.moveTo(px(c), 0); g.lineTo(px(c), H); g.stroke();
+      g.beginPath(); g.moveTo(0, py(c)); g.lineTo(W, py(c)); g.stroke();
+    }
+  }
+  if (m.river) {                                           // the river
+    g.strokeStyle = m.sea; g.lineWidth = Math.max(3, 240 * k); g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath(); m.river.forEach(([x, y], i) => (i ? g.lineTo(px(x), py(y)) : g.moveTo(px(x), py(y)))); g.stroke();
+  }
+  if (m.pond) { g.beginPath(); g.arc(px(m.pond[0]), py(m.pond[1]), m.pond[2] * k, 0, Math.PI * 2); g.fillStyle = m.sea; g.fill(); }
+  if (m.water) { path(m.water); g.fillStyle = '#37c8d8'; g.fill(); }   // the bay
+  g.restore();
+  path(m.land); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 2.5; g.stroke();
+  const sh = g.createLinearGradient(0, H * 0.55, 0, H);     // the card's own vignette
+  sh.addColorStop(0, 'rgba(11,6,26,0)'); sh.addColorStop(1, 'rgba(11,6,26,0.72)');
+  g.fillStyle = sh; g.fillRect(0, 0, W, H);
+  host.innerHTML = ''; host.appendChild(cv);
+}
 // world cards: MAPLE ISLE + PIRATE BAY are both live now
 {
   const chip = el('btnWorlds');
   chip.innerHTML = `<i>${pickedWorld === 'pirate' ? '🏴‍☠️' : '🏝️'}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${pickedWorld === 'pirate' ? 2 : 1} OF 3</span><b>›</b>`;
   document.querySelectorAll('#worldRow .wCard[data-world]').forEach((c) => {
     const id = (c as HTMLElement).dataset.world!;
+    const art = c.querySelector('.wArt') as HTMLElement | null;
+    if (art) paintWorldCard(art, id as 'maple' | 'pirate');
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
       if (id === pickedWorld) { launchWorld(); return; }   // already built: just go
