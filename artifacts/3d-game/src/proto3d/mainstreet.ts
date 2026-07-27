@@ -111,6 +111,35 @@ const sph = (r: number, s = 8, t = 6) => new THREE.SphereGeometry(r, s, t);
 const M = (p: G[]) => mergedProp(p);
 
 // A PERSON, baked flat. life.ts owns the walking crowd; these are the people
+/** THE ROOF KIT.
+ *  This camera looks down. On a flat-roofed building the roof is most of what
+ *  the player ever sees of it, and every flat roof in this town was one
+ *  unbroken cream rectangle — which is why Main Street photographed as a row
+ *  of blank slabs while its shopfronts, awnings and signage all faced a wall
+ *  nobody can see. Dark membrane for contrast against pale ground, then plant,
+ *  duct, skylight and stack so the shape is nameable from altitude.
+ *  Deterministic: mrnd/mpick run off the seeded Maple RNG, so it is identical
+ *  every load. */
+const ROOF_TAR = 0x4e5560, ROOF_DUCT = 0xaeb6c2, ROOF_VENT = 0x8b93a0;
+function roofKit(p: G[], w: number, d: number, y: number, dense = 1): void {
+  p.push(part(box(w - 0.7, 0.22, d - 0.7), ROOF_TAR, 0, y + 0.11, 0));   // membrane
+  const jx = () => (mrnd() - 0.5) * (w - 3.2), jz = () => (mrnd() - 0.5) * (d - 3.2);
+  const units = Math.max(1, Math.round((w * d) / 90 * dense));
+  for (let i = 0; i < units; i++) {                                       // AC plant
+    const ux = jx(), uz = jz(), uw = mr(1.5, 2.6), ud = mr(1.2, 2.0), uh = mr(0.7, 1.2);
+    p.push(part(box(uw, uh, ud), ROOF_DUCT, ux, y + 0.22 + uh / 2, uz));
+    p.push(part(box(uw * 0.8, 0.12, ud * 0.8), ROOF_VENT, ux, y + 0.3 + uh, uz));
+  }
+  for (let i = 0; i < Math.max(1, Math.round(units * 0.8)); i++)          // vent stacks
+    p.push(part(cyl(0.22, 0.26, mr(0.8, 1.6), 6), ROOF_VENT, jx(), y + 0.9, jz()));
+  if (w > 8 && d > 7) {                                                   // skylight
+    p.push(part(box(2.4, 0.14, 1.7), STEEL, jx() * 0.5, y + 0.3, jz() * 0.5));
+    p.push(part(box(2.0, 0.22, 1.35), GLASS, jx() * 0.5, y + 0.42, jz() * 0.5));
+  }
+  if (mchance(0.45) && w > 9)                                             // roof-access hatch
+    p.push(part(box(1.5, 0.7, 1.4), mpick([RED, BLUE, SLATE]), jx(), y + 0.55, jz()));
+}
+
 // who are STANDING somewhere for a reason — the four-strong parking-meter
 // protest, the two men arguing outside the diner, the pie judges. Static, one
 // mesh each, and they put a face in every district life.ts can't reach.
@@ -259,6 +288,7 @@ export function makeStorefront(w = 9, h = 8, side = -1): THREE.Mesh {
     p.push(part(box(1.6, 0.25, 0.45), CREAM, wx, h - 2.3, 4.65));
   }
   if (side >= 0) p.push(part(box(1.6, 1.1, 0.2), side ? BLUE : RED, -w / 2 + 1.6, 2.4, 4.85));  // window poster
+  roofKit(p, w, 9, h + 0.8);
   return M(p);
 }
 
@@ -344,6 +374,7 @@ export function makeFireStation(): THREE.Mesh {
     part(box(1.7, 1, 0.1), RED, -7.4, 11.4, -4),
     part(box(3, 1.2, 0.2), RED, 0, 6.2, 5.65),                         // the sign
   ];
+  roofKit(p, 16, 11, 7.7);
   return M(p);
 }
 
@@ -362,6 +393,7 @@ export function makePostOffice(): THREE.Mesh {
     part(box(1, 1.3, 0.12), RED, -4.4, 7.2, 4),
     part(box(0.7, 1.1, 1.1), 0x2f6ad8, 4.8, 0.7, 5.6),                 // the blue box
   ];
+  roofKit(p, 11, 9, 6.15);
   return M(p);
 }
 
@@ -809,6 +841,7 @@ export function makeHighSchool(): THREE.Mesh {
     p.push(part(box(1.6, 1.9, 0.3), NIGHTGLASS, wx, 2.2 + f * 3, 6.6));
     p.push(part(box(1.9, 0.24, 0.4), CREAM, wx, 3.3 + f * 3, 6.65));
   }
+  roofKit(p, 26, 13, 9.85, 0.7);
   return M(p);
 }
 
@@ -982,6 +1015,7 @@ export function makeMotel(): THREE.Mesh {
   p.push(part(box(4.4, 1.1, 0.2), NEON_CYAN, -14, 11.5, 2.4));
   p.push(part(box(1.4, 1.1, 0.24), 0x33303a, -16.2, 11.5, 2.42));       // the "NO", burnt out
   p.push(part(cone(1.4, 2.4, 4), NEON_GOLD, -14, 15.8, 2, 0, Math.PI / 4, 0));
+  roofKit(p, 24, 8, 4.75, 0.6);
   return M(p);
 }
 

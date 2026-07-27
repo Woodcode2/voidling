@@ -207,37 +207,48 @@ interface Mover { mesh: THREE.Object3D; update(dt: number, t: number, vx: number
 export interface Life { update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
 
 // ── mesh factories ─────────────────────────────────────────────────────────────
+// one set of trim materials for the whole fleet. Every car used to allocate six
+// of its own, which is 300-odd materials on a full Maple street grid.
+const _carBody = new Map<number, THREE.MeshStandardMaterial>();
+const carBodyMat = (c: number) => {
+  let m = _carBody.get(c);
+  if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.32, metalness: 0.22 }); _carBody.set(c, m); }
+  return m;
+};
+const CAR_GLASS = new THREE.MeshStandardMaterial({ color: 0x2c3a4e, roughness: 0.12, metalness: 0.4 });
+const CAR_HL = new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffe9a8, emissiveIntensity: 0.7, roughness: 0.3 });
+const CAR_TL = new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0xd82a2a, emissiveIntensity: 0.55, roughness: 0.3 });
+const CAR_TYRE = new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.9 });
+const CAR_HUB = new THREE.MeshStandardMaterial({ color: 0xc9cdd6, roughness: 0.4, metalness: 0.5 });
 function makeCar(): THREE.Group {
   const g = new THREE.Group();
   const col = pick(PROPS.car);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.32, metalness: 0.22 });
-  // lower body with a distinct hood + trunk step (reads "car", not "brick")
-  const body = new THREE.Mesh(new THREE.BoxGeometry(5.6, 1.4, 2.9), bodyMat);
-  body.position.y = 1.25; g.add(body);
-  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 2.7), bodyMat);
-  hood.position.set(2.6, 1.1, 0); g.add(hood);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.35, 2.55),
-    new THREE.MeshStandardMaterial({ color: PROPS.carGlass, roughness: 0.12, metalness: 0.4 }));
-  cabin.position.set(-0.5, 2.55, 0); g.add(cabin);
-  const roofM = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.18, 2.5), bodyMat);
-  roofM.position.set(-0.5, 3.3, 0); g.add(roofM);
+  CAR_GLASS.color.setHex(PROPS.carGlass);
+  const bodyMat = carBodyMat(col);
+  // 7.1 long and 3.4 tall next to a 3.5-unit pedestrian: a car the height of a
+  // person and barely twice their length. Stretched to 9.1 and dropped to 3.1,
+  // which is where a real saloon sits against a real adult.
+  const body = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.4, 2.9), bodyMat);
+  body.position.y = 1.18; g.add(body);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 2.7), bodyMat);
+  hood.position.set(3.35, 1.05, 0); g.add(hood);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.7, 1.25, 2.55), CAR_GLASS);
+  cabin.position.set(-0.65, 2.35, 0); g.add(cabin);
+  const roofM = new THREE.Mesh(new THREE.BoxGeometry(3.45, 0.18, 2.5), bodyMat);
+  roofM.position.set(-0.65, 3.02, 0); g.add(roofM);
   // headlights + taillights
-  const hl = new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffe9a8, emissiveIntensity: 0.7, roughness: 0.3 });
-  const tl = new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0xd82a2a, emissiveIntensity: 0.55, roughness: 0.3 });
   for (const sz of [-0.95, 0.95]) {
-    const a = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.5), hl); a.position.set(3.36, 1.2, sz); g.add(a);
-    const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.45), tl); b.position.set(-2.82, 1.35, sz); g.add(b);
+    const a = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.5), CAR_HL); a.position.set(4.3, 1.15, sz); g.add(a);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.45), CAR_TL); b.position.set(-3.62, 1.3, sz); g.add(b);
   }
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.9 });
-  const hubMat = new THREE.MeshStandardMaterial({ color: 0xc9cdd6, roughness: 0.4, metalness: 0.5 });
-  for (const sx of [-1.8, 1.9]) for (const sz of [-1.45, 1.45]) {
-    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 12), wheelMat);
+  for (const sx of [-2.3, 2.45]) for (const sz of [-1.45, 1.45]) {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 12), CAR_TYRE);
     wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.8, sz); g.add(wh);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.54, 8), hubMat);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.54, 8), CAR_HUB);
     hub.rotation.x = Math.PI / 2; hub.position.set(sx, 0.8, sz); g.add(hub);
   }
   // most of the fleet upgrades itself to the AI cars once the GLBs stream in
-  if (Math.random() < 0.65) vehicleGlb(g, Math.random() < 0.72 ? 'car_sedan' : 'car_taxi', 6.2);
+  if (Math.random() < 0.65) vehicleGlb(g, Math.random() < 0.72 ? 'car_sedan' : 'car_taxi', 8.0);
   return g;
 }
 interface Limbs {

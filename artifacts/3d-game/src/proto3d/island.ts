@@ -2251,30 +2251,25 @@ function makeThatchHut(): THREE.Group {
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 function makePalm(): THREE.Group {
-  // leaning trunk + 6 drooping fronds on Y-pivots (the old Euler order spun
-  // every frond horizontal — the infamous green pinwheel)
-  const grp = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 6.2, 7),
-    new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 1, flatShading: true }));
-  trunk.position.set(0.3, 3.1, 0); trunk.rotation.z = -0.12; grp.add(trunk);
-  const frondMat = new THREE.MeshStandardMaterial({ color: 0x4faa5a, roughness: 0.9, flatShading: true });
+  // leaning trunk + 6 drooping fronds. It used to be NINE meshes and three
+  // materials, times 207 palms on Pirate Bay — 1,863 draw calls for the trees
+  // alone. Same silhouette, one mesh, on the shared prop material.
+  const parts: THREE.BufferGeometry[] = [
+    part(new THREE.CylinderGeometry(0.28, 0.42, 6.2, 7), 0xb08a5a, 0.3, 3.1, 0, 0, 0, -0.12),
+  ];
   for (let i = 0; i < 6; i++) {
-    const pivot = new THREE.Group();
-    pivot.position.set(0.6, 6.1, 0);
-    pivot.rotation.y = (i / 6) * Math.PI * 2;
-    const frond = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), frondMat);
-    frond.scale.set(2.3, 0.22, 0.75);
-    frond.position.x = 1.7;
-    frond.rotation.z = -0.35;   // droop
-    pivot.add(frond);
-    grp.add(pivot);
+    // part() applies Rz LAST, and the palm needs the droop baked in BEFORE the
+    // crown spin — get that backwards and you rebuild the green pinwheel. So:
+    // droop and offset via part(), then spin and lift the finished geometry.
+    const f = part(new THREE.SphereGeometry(1, 8, 6), 0x4faa5a, 1.7, 0, 0, 0, 0, -0.35, 2.3, 0.22, 0.75);
+    f.rotateY((i / 6) * Math.PI * 2);
+    f.translate(0.6, 6.1, 0);
+    parts.push(f);
   }
-  for (const a of [0.5, 2.6]) {
-    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 1 }));
-    nut.position.set(0.6 + Math.cos(a) * 0.5, 5.8, Math.sin(a) * 0.5); grp.add(nut);
-  }
-  return grp;
+  for (const a2 of [0.5, 2.6])
+    parts.push(part(new THREE.SphereGeometry(0.26, 8, 6), 0x8a6a4a,
+      0.6 + Math.cos(a2) * 0.5, 5.8, Math.sin(a2) * 0.5));
+  const grp = new THREE.Group(); grp.add(mergedProp(parts)); return grp;
 }
 
 function makeBush(): THREE.Mesh {
@@ -2379,11 +2374,20 @@ const winGlassMatShared = new THREE.MeshStandardMaterial({ color: 0xffe9b8, roug
 const lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x3c4454, roughness: 0.6, metalness: 0.3 });
 const lampHeadMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffdf8a, emissiveIntensity: 0.8, roughness: 0.4 });
 function makeLamp(): THREE.Group {
+  // 4.04 units tall — a street lamp you could change the bulb on without a
+  // ladder, standing beside 3.5-unit pedestrians. A real one is two and a half
+  // people. It also gets a base and a lantern instead of a ball on a stick.
   const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 3.6, 6), lampPoleMat);
-  pole.position.y = 1.8; g.add(pole);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), lampHeadMat);
-  head.position.y = 3.7; g.add(head);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 0.5, 8), lampPoleMat);
+  base.position.y = 0.25; g.add(base);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.19, 7.4, 6), lampPoleMat);
+  pole.position.y = 3.9; g.add(pole);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.95), lampPoleMat);
+  arm.position.set(0, 7.55, 0.42); g.add(arm);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.62, 8), lampPoleMat);
+  head.position.set(0, 7.5, 0.86); g.add(head);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), lampHeadMat);
+  bulb.position.set(0, 7.1, 0.86); g.add(bulb);
   return g;
 }
 const makeTinyProp = () => pick([makeCone, makeHydrant, makeTrash, makeFlowers])();
@@ -2444,37 +2448,36 @@ function makeLuggage(): THREE.Group {
   return g;
 }
 function makeReeds(): THREE.Group {
-  const g = new THREE.Group();
+  // seven meshes and seven materials per clump, hundreds of clumps per island.
+  const parts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 5; i++) {
-    const h = rand(0.9, 1.6);
-    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, h, 4),
-      new THREE.MeshStandardMaterial({ color: pick([0x4faa5a, 0x67b25c, 0x7ec96e]), roughness: 1 }));
-    r.position.set(rand(-0.5, 0.5), h / 2, rand(-0.5, 0.5)); r.rotation.z = rand(-0.15, 0.15); g.add(r);
-    if (i < 2) {
-      const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.24, 3, 6),
-        new THREE.MeshStandardMaterial({ color: 0x9a7a5a, roughness: 1 }));
-      tip.position.set(r.position.x, h + 0.1, r.position.z); g.add(tip);
-    }
+    const h = rand(0.9, 1.6), rx = rand(-0.5, 0.5), rz = rand(-0.5, 0.5);
+    parts.push(part(new THREE.CylinderGeometry(0.03, 0.05, h, 4),
+      pick([0x4faa5a, 0x67b25c, 0x7ec96e]), rx, h / 2, rz, 0, 0, rand(-0.15, 0.15)));
+    if (i < 2) parts.push(part(new THREE.CapsuleGeometry(0.07, 0.24, 3, 6), 0x9a7a5a, rx, h + 0.1, rz));
   }
-  return g;
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
 
 // ── civic/retail stand-ins (offline dev + far LOD) — downtown must NEVER show
 // a gabled suburban house on pavement, and the plaza always has a fountain ────
 function makeShopBox(): THREE.Group {
+  // four meshes and four materials each, and from the only angle the camera
+  // ever uses it was a pale rectangle. One mesh now, and a roof you can name:
+  // dark membrane for contrast, plant, a stack and a skylight.
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(8, 4.5, 6),
-    new THREE.MeshStandardMaterial({ color: pick([0xf6efe2, 0xbfe0cf, 0xeab8cc]), roughness: 0.8 }));
-  body.position.y = 2.25; g.add(body);
-  const parapet = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.5, 6.4),
-    new THREE.MeshStandardMaterial({ color: 0xd8d4de, roughness: 0.8 }));
-  parapet.position.y = 4.6; g.add(parapet);
-  const awning = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.28, 1.7),
-    new THREE.MeshStandardMaterial({ color: pick([0xe8604d, 0x58a8c4, 0x58c470]), roughness: 0.7 }));
-  awning.position.set(0, 3.05, 3.4); awning.rotation.x = 0.35; g.add(awning);
-  const win = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2, 0.2),
-    new THREE.MeshStandardMaterial({ color: 0x2c3a52, roughness: 0.2, metalness: 0.4 }));
-  win.position.set(0, 1.9, 3.02); g.add(win);
+  const wall = pick([0xf6efe2, 0xbfe0cf, 0xeab8cc]);
+  const parts = [
+    part(new THREE.BoxGeometry(8, 4.5, 6), wall, 0, 2.25, 0),
+    part(new THREE.BoxGeometry(8.4, 0.5, 6.4), 0xd8d4de, 0, 4.6, 0),
+    part(new THREE.BoxGeometry(7.3, 0.2, 5.3), 0x4e5560, 0, 4.72, 0),          // membrane
+    part(new THREE.BoxGeometry(8.2, 0.28, 1.7), pick([0xe8604d, 0x58a8c4, 0x58c470]), 0, 3.05, 3.4, 0.35),
+    part(new THREE.BoxGeometry(5.6, 2, 0.2), 0x2c3a52, 0, 1.9, 3.02),
+    part(new THREE.BoxGeometry(1.9, 0.9, 1.5), 0xaeb6c2, rand(-2, 2), 5.25, rand(-1.4, 1.4)),
+    part(new THREE.CylinderGeometry(0.2, 0.24, 1.2, 6), 0x8b93a0, rand(-2.6, 2.6), 5.4, rand(-1.6, 1.6)),
+    part(new THREE.BoxGeometry(1.8, 0.16, 1.3), 0x9fd0e8, rand(-1.6, 1.6), 4.9, rand(-1.2, 1.2)),
+  ];
+  g.add(mergedProp(parts));
   return g;
 }
 function makeCivicHall(): THREE.Group {
