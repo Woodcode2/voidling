@@ -8,7 +8,7 @@ import { SKINS, type Skin } from './palette';
 import { buildAccessory, makeVoidBody, applySkinToBody } from './void3d';
 
 export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
-export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; }
+export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean; }
 export interface Rivals {
   list: Rival[];
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number): void;

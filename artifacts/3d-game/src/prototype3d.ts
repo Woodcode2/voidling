@@ -506,6 +506,7 @@ const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
 let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
 let matchEaten = 0;   // props eaten THIS match — the results screen's own number
+let signedOn = false; // has the station said good morning yet this match?
 let initialMass = 0;                   // set once, after the world is built
 let hudCd = 0;
 
@@ -632,6 +633,27 @@ const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = {
   house: 'a whole HOUSE', car: 'a parked car', big: 'an entire LANDMARK',
 };
+/** WHAT DID IT JUST EAT? The newsroom keys its reaction lines off this string,
+ *  and it only ever saw two of them: nothing in the repo tags 'house' or 'big',
+ *  so every meal that was not a car collapsed to a size bucket and every
+ *  house/landmark/boat/person headline was unreachable. Classify from the flags
+ *  that DO exist — afloat, mover, radius — and make sure the words the
+ *  newsroom's own matcher looks for actually appear in the string. */
+function mealOf(e: Edible): string {
+  const u = e.mesh.userData as Record<string, unknown>;
+  if (u.qk === 'car') return 'a parked car';
+  if (u.afloat) return e.radius > 4 ? 'a whole SHIP' : 'somebody\'s boat';
+  if (u.mover) {
+    if (e.radius > 2.2) return 'a truck, in motion';
+    if (e.radius > 1.1) return 'a guest. mid-sentence.';
+    return 'a very small dog';
+  }
+  if (e.radius > 6) return 'an entire LANDMARK';
+  if (e.radius > 3.4) return 'a whole HOUSE';
+  if (e.radius > 2.2) return 'a big building';
+  if (e.radius > 1.2) return 'a mailbox';
+  return 'a snack';
+}
 const mealBySize = (r: number) =>
   r > 5 ? 'an entire BUILDING' : r > 2.5 ? 'something big' : r > 1.2 ? 'a mailbox' : 'a snack';
 const DISTRICT: Record<string, string> = {
@@ -690,9 +712,20 @@ function fillHeadline(t: string): string {
 function showNews() {
   // tier rides BOTH the meter and the player's form: a WORLD ENDER flattening
   // downtown must never get "spelling bee ends in a 14-way tie"
-  const formTier = Math.max(0, curStage - 2);
-  const pctTier = devouredPct < 5 ? 0 : devouredPct < 18 ? 1 : 2;
+  // DENIAL has to last long enough to be a joke. It flipped to tier 1 at 5%
+  // devoured and tier 2 at 18%, which is one or two headlines — the town went
+  // from "there is no hole" to "goodbye forever" before the player had eaten a
+  // street. The arc is: refuse to admit it, then panic, then read the weather
+  // from a field. Widened, and the form ladder now has six rungs so DEVOURER
+  // rather than GOBBLER is what starts the panic.
+  const formTier = curStage <= 2 ? 0 : curStage <= 3 ? 1 : 2;
+  const pctTier = devouredPct < 10 ? 0 : devouredPct < 30 ? 1 : 2;
   const tier = Math.min(2, Math.max(pctTier, formTier)) as 0 | 1 | 2;
+  // …and the SIGN-ON must be the first thing anyone hears. The newsroom
+  // guarantees it returns the greeting on its first call, but `queue.shift() ??`
+  // short-circuits — so a breaking-news one-shot fired in the opening seconds
+  // would jump the queue and the station would never say good morning.
+  if (!signedOn) { signedOn = true; newsQueue.length = 0; }
   const PB = pickedWorld === 'pirate';
   let h: string, brand: string;
   if (PB) {
@@ -989,7 +1022,7 @@ function capture(e: Edible, giveHunger = true) {
   const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * feverMult));
   playerScore += pts;
   // remember the last meal so the news can report on it BY NAME
-  lastMeal = MEAL_NAME[(e.mesh.userData.qk as string) ?? ''] ?? mealBySize(e.radius);
+  lastMeal = MEAL_NAME[(e.mesh.userData.qk as string) ?? ''] ?? mealOf(e);
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
   spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
   // a building-sized bite lands with a ground shockwave + dust — seismic,
@@ -1112,7 +1145,7 @@ function beginMatch(solo = false) {
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
   for (const bt of BEATS) bt.fired = false;
-  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0;
+  feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
@@ -1337,7 +1370,7 @@ function gildTreasure() {
 }
 
 function resetMatch() {
-  resetNews(); resetMapleNews();   // both newsrooms' anti-repeat memory is per-match
+  resetNews(); resetMapleNews(); signedOn = false;   // memory + the sign-on are per-match
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
   for (const e of edibles) {

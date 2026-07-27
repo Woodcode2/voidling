@@ -1,11 +1,16 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  NEWSROOM — the PIRATE BAY RESORT public address system
 // ══════════════════════════════════════════════════════════════════════════════
-//  Not a news ticker. A *resort announcement arc*.
+//  Not a news ticker. A *resort announcement arc*, in four beats:
 //
-//  Tier 0: a chirpy holiday radio show telling rich people to enjoy themselves.
-//  Tier 1: the same show, with cracks. Still relentlessly on brand.
-//  Tier 2: total collapse. Still upselling. Still smiling.
+//  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed. "GOOD MORNING FROM
+//                    PIRATE BAY RESORT — the dance floor is OPEN."
+//  BEAT 2  DENIAL    tier 0. A chirpy holiday radio show telling rich people to
+//                    enjoy themselves. There is no hole. Have a cold drink.
+//  BEAT 3  ALARM     tier 1. Oh gosh. The evacuation is a FUN WALK. Officials
+//                    contradict themselves mid-sentence. Still on brand.
+//  BEAT 4  FAREWELL  tier 2. The island is gone and CAPT. ROGER is still
+//                    reading out the seven day forecast. Still upselling.
 //
 //  The running joke is CAPT. ROGER — the resort's entertainment director, a
 //  man who is not a captain, wearing a blazer, who will not break character
@@ -45,6 +50,22 @@ export const BRAND: [string, string, string] = [
   '🏴‍☠️ BAY RADIO',
   '⚠️ RESORT UPDATE',
   '🚨 ALL HANDS',
+];
+
+// ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
+// BAY RADIO opens every single match the same way it has opened every morning
+// for thirty years: good morning, the dance floor is open, nothing is wrong.
+// This fires FIRST, guaranteed, before any other headline (see `signedOn`).
+// No {templates} here — the sign-on must never depend on match state.
+const SIGN_ON: string[] = [
+  'GOOD MORNING FROM PIRATE BAY RESORT! the dance floor is OPEN!',
+  'GOOD MORNING! the tiki bar is open. the sea is warm. ARRR.',
+  'CAPT. ROGER: "GOOD MORNING, PIRATE BAY! breakfast is a BUFFET!"',
+  'GOOD MORNING from PIRATE BAY! today: sun, snacks and a shanty.',
+  'BAY RADIO, GOOD MORNING! two pools, one parrot, zero problems.',
+  'CAPT. ROGER: "GOOD MORNING! nothing bad has EVER happened here."',
+  'GOOD MORNING PIRATE BAY! DJ COCONUT starts in nine minutes!',
+  'GOOD MORNING! the dance floor is OPEN and the ice is COLD. in you come.',
 ];
 
 /** Ticker-friendly district names, used to fill {D}. */
@@ -403,6 +424,20 @@ const GENERAL: Pools = [[
   'CAPT. ROGER: "the parrot is not mine. the parrot chose me."',
   'CAPT. ROGER does the 11am shanty. attendance: joyfully forced.',
   'CAPT. ROGER: "there is nothing to do here! do it SLOWLY!"',
+  // — BEAT 2 · DENIAL — there is a hole. there is absolutely not a hole. —
+  'CAPT. ROGER: "do not mind the hole! enjoy a cold drink, friends!"',
+  'CAPT. ROGER: "that is not a hole. that is a NEW POOL. no charge."',
+  'NIGEL: "there is no void, madam. that is a shadow. a big one."',
+  'the hole is not on the resort map. therefore it is not there.',
+  'management: "purple? we do not DO purple here." case closed.',
+  'a guest saw a hole. that guest also saw a mermaid. same guest.',
+  'CAPT. ROGER: "hole? HOLE? I see a WATER FEATURE, friends. ARRR."',
+  'BARNABY squawks "IT IS A HOLE". BARNABY is sent to his perch.',
+  'CAPT. ROGER: "nobody is being eaten. that is a RUMOUR. relax."',
+  'the hole ate a deckchair. we are calling that a laundry matter.',
+  'MRS FENWICK-HYDE stepped in it. she blames her SANDALS.',
+  'MAISIE: "there is a hole." staff: "there is a SMOOTHIE BAR."',
+  'CAPT. ROGER: "a nice cold drink at the tiki bar solves this."',
 ], [
   'PLEASE DO NOT FEED THE VOID. it has eaten. it has DEFINITELY eaten.',
   'NIGEL: "the island is smaller. your room is the same size."',
@@ -425,6 +460,19 @@ const GENERAL: Pools = [[
   'CAPT. ROGER: "we are not worried. this is my worried hat."',
   'CAPT. ROGER: "the void is part of the entertainment programme."',
   'CAPT. ROGER: "it is a water feature. it is FEATURING heavily."',
+  // — BEAT 3 · ALARM — oh gosh. still smiling. smiling harder, actually. —
+  'CAPT. ROGER: "this is NOT an evacuation! this is a FUN WALK!"',
+  'CAPT. ROGER: "there is no hole! also do not go NEAR the hole!"',
+  'oh gosh. it ate the breakfast tent. with the breakfast in it.',
+  'NIGEL: "we have always had a hole. it is very old. it is fine."',
+  'guests jogging to the boats. we are calling it a MORNING JOG.',
+  'CAPT. ROGER: "stay calm! I am calm! LOOK how calm I am! LOOK!"',
+  'the fun walk is now a fun run. same fun. considerably more legs.',
+  'CAPT. ROGER: "small hole. tiny hole. medium hole. RUN, friends."',
+  'it burped. the whole bay heard it. it smelled of MELON. sorry.',
+  'CAPT. ROGER: "nobody panic! panicking is NOT all-inclusive!"',
+  'staff briefing: smile, point at the boats, keep smiling, GO.',
+  'CAPT. ROGER: "oh gosh. I mean: ARRR. I meant ARRR, friends."',
 ], [
   'CAPT. ROGER: "everything is gone! book NOW! prices SLASHED!"',
   'NIGEL still at the front desk. the front desk is on the water.',
@@ -446,7 +494,116 @@ const GENERAL: Pools = [[
   'CAPT. ROGER: "all gone! have you considered our SPA package?"',
   "CAPT. ROGER, waist deep, reading out tomorrow's activities.",
   'CAPT. ROGER: "I remain, technically and legally, a captain."',
+  'it ate the buffet, the bar, and the man who ran the bar. rude.',
+  'somebody burped. it was not a person. we are all leaving now.',
+  'CAPT. ROGER: "still no hole! just a lot of MISSING ISLAND!"',
 ]];
+
+// ── BEAT 4 · SIGN-OFF ─────────────────────────────────────────────────────────
+// The island is gone and CAPT. ROGER is still reading out the weather. These
+// are the *last words* of the arc, so they only go on air once the match is
+// genuinely over the hill — see `endgame` in pickNews, which reads devouredPct
+// and secondsLeft directly. A seven day forecast at 18% devoured is a lie.
+const SIGN_OFF: string[] = [
+  'CAPT. ROGER, floating on a door, reads out the weather. sunny.',
+  'weather tomorrow: sunny, warm, and no island. lovely regardless.',
+  'CAPT. ROGER: "goodbye! tonight in DANCE COVE: nothing! be there!"',
+  'the island is gone. CAPT. ROGER is doing the SEVEN DAY FORECAST.',
+  'CAPT. ROGER: "we are a BOAT resort now! always were! ARRR!"',
+  'NIGEL, standing on water, takes a booking for august. calm man.',
+  'MAISIE waves. Gary waves. everybody waves. lovely end, really.',
+  'and now the sea. the sea is where the resort was. back to you, Nigel.',
+  'BAY RADIO signing off. the dance floor was open. it WAS open.',
+  'CAPT. ROGER: "goodbye from PIRATE BAY! wherever Pirate Bay went!"',
+];
+
+// ── WHAT IT JUST ATE ──────────────────────────────────────────────────────────
+// ctx.lastMeal is free text from the call site. It never says "a boat" or "a
+// person" — the game only tags HOUSE and CAR, and sizes everything else — so
+// these four buckets are everything the API can actually tell us apart.
+// A bite the player just took should be in the news within seconds of it.
+export type MealKind = 'house' | 'car' | 'big' | 'small';
+
+const MEAL_HOUSE: Pools = [[
+  'a house has gone. NIGEL has marked the room as "cleaned".',
+  'a whole HOUSE. staff are calling it a "very late checkout".',
+  'a house went down in one gulp. no chewing. no manners. none.',
+  'staff villa 4 is missing. staff villa 5 has gone very quiet.',
+], [
+  'ANOTHER house?! that is three houses! who is COUNTING? nobody!',
+  'a house went in whole. the doorbell rang on the way down. eek.',
+  'CAPT. ROGER: "houses are OPTIONAL at a resort, friends! ARRR!"',
+  'MRS FENWICK-HYDE: "that was a HOUSE. I had a NAP in there."',
+], [
+  'every house: eaten. CAPT. ROGER offers a TENT. it is not free.',
+  'the last house went in sideways. it did not fit. it went anyway.',
+  'houses gone. NIGEL still turning down beds that do not exist.',
+  'CAPT. ROGER: "no houses! no housework! think POSITIVE, friends!"',
+]];
+
+const MEAL_CAR: Pools = [[
+  'a parked car is gone. the valet insists he "put it somewhere".',
+  'a car went in wheels first. the alarm went off inside it. rude.',
+  'a guest car is missing. NIGEL logs it under "valet, extreme".',
+  'a car. one bite. one BURP. the bay applauds politely. lovely.',
+], [
+  'another car gone. the car park is now a park. a very nice park.',
+  'a car went down honking. it honked all the way. all of the way.',
+  'MRS FENWICK-HYDE: "my CAR. that car cost more than you, Nigel."',
+  'CAPT. ROGER: "cars are so LOUD anyway! good riddance! ARRR!"',
+], [
+  'the last car eaten. its alarm is still going. somewhere. deep.',
+  'car park gone. cars gone. also the man in booth 2. sorry, Trev.',
+  'CAPT. ROGER: "no cars, no traffic! I call that a HOLIDAY, friends!"',
+  'a car went in and the radio kept playing. it is STILL playing.',
+]];
+
+const MEAL_BIG: Pools = [[
+  'a whole BUILDING. gone. NIGEL blinked. NIGEL actually blinked.',
+  'something enormous went in. the ground said WHUMP. good WHUMP.',
+  'a landmark is missing. it was in all the brochures. all of them.',
+  'that was a big one. everybody felt it in their KNEES. everybody.',
+], [
+  'a BUILDING went down whole. the bay wobbled. we all wobbled.',
+  'CAPT. ROGER: "the big one was UGLY anyway. I said it. it was me."',
+  'MRS FENWICK-HYDE: "was that the SPA. tell me that was not the SPA."',
+  'it ate something enormous. it sounded like a bath draining. ugh.',
+], [
+  'the last big thing has gone. it went in slowly. very slowly.',
+  'CAPT. ROGER: "everything BIG is gone! only SMALL things left! us!"',
+  'the galleon went in last. it was not a real galleon. still sad.',
+  'biggest bite yet. it needed a little sit down after. we all did.',
+]];
+
+const MEAL_SMALL: Pools = [[
+  'it ate a bin. one bin. one tiny burp. honestly rather cute.',
+  'a lounger is missing. so is the towel. so is the book. good book.',
+  'a small snack taken by the pool. staff not remotely bothered.',
+  'it ate one flip-flop. the other is still on the beach. so sad.',
+], [
+  'still snacking. bins, cones, and somebody\'s entire HAT. the HAT.',
+  'it ate a deckchair, burped, then took another deckchair. RUDE.',
+  'CAPT. ROGER: "it only ate a SMALL thing! we have BILLIONS!"',
+  'it ate the ice bucket. WITH the ice. the crunching was horrid.',
+], [
+  'nothing big left. it is eating crumbs now. loud, angry crumbs.',
+  'it ate the last umbrella. it did not even WANT the umbrella.',
+  'down to bits and bobs. it is hoovering the beach. genuinely.',
+  'last snack: one melon. it was ALWAYS going to be the melon.',
+]];
+
+const BY_MEAL: Record<MealKind, Pools> = {
+  house: MEAL_HOUSE, car: MEAL_CAR, big: MEAL_BIG, small: MEAL_SMALL,
+};
+
+/** classify ctx.lastMeal into one of the four buckets the API can distinguish. */
+export function mealKind(meal: string): MealKind {
+  const s = (meal || '').toLowerCase();
+  if (s.includes('house') || s.includes('villa') || s.includes('hut')) return 'house';
+  if (s.includes('car') || s.includes('truck') || s.includes('van')) return 'car';
+  if (s.includes('building') || s.includes('landmark') || s.includes('big')) return 'big';
+  return 'small';
+}
 
 // ── LIVE / TEMPLATED ──────────────────────────────────────────────────────────
 //  {F} form   {M} last meal   {P} pct   {R} 100-pct   {S} seconds
@@ -519,9 +676,16 @@ function remember(raw: string, filled: string): void {
   history.push(filled); if (history.length > HISTORY) history.shift();
 }
 
+/**
+ * false until BAY RADIO has said good morning. The FIRST pickNews() call of a
+ * match always returns the sign-on and nothing else can jump ahead of it —
+ * resetNews() puts the station back off air, and resetMatch() calls that.
+ */
+let signedOn = false;
+
 /** clears the anti-repeat memory — call between matches if you like. */
 export function resetNews(): void {
-  history.length = 0; rawHistory.length = 0;
+  history.length = 0; rawHistory.length = 0; signedOn = false;
 }
 
 interface Filled { pct: number; rest: number; form: string; meal: string; dist: string; rival: string; lead: number; secs: number }
@@ -575,28 +739,56 @@ const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
 
 /**
  * One fully-formed headline, ready to drop straight into the ticker.
- * Weighted ~45% district / ~35% live-templated / ~20% general when we know
- * where the player is; live-heavy when we don't.
+ *
+ * THE ARC. Four beats, and the picker has the signal for all four:
+ *   1 SIGN-ON   the first call of every match. good morning, dance floor open.
+ *   2 DENIAL    tier 0 — there is no hole, have a cold drink at the tiki bar.
+ *   3 ALARM     tier 1 — oh gosh. the evacuation is a FUN WALK. still smiling.
+ *   4 FAREWELL  tier 2 — the island is gone and CAPT. ROGER does the weather.
+ * `tier` is derived at the call site from devouredPct AND the player's form, so
+ * a WORLD ENDER never gets a beat-2 line. Beat 1 is ours to guarantee.
+ *
+ * Weighted ~34% district / ~22% what-it-just-ate / ~28% live / ~16% general
+ * when we know where the player is; meal-and-live-heavy when we don't.
  */
 export function pickNews(ctx: NewsCtx, rnd: () => number = Math.random): string {
   const tier = clampTier(ctx.tier);
   const b = bind(ctx);
 
+  // BEAT 1. Nothing gets on air before good morning.
+  if (!signedOn) {
+    signedOn = true;
+    const raw0 = SIGN_ON[Math.floor(rnd() * SIGN_ON.length) % SIGN_ON.length] ?? SIGN_ON[0];
+    const out0 = clip(raw0, TICKER_MAX);
+    remember(raw0, out0);
+    return out0;
+  }
+
   const districtPool = ctx.district ? BY_DIST[ctx.district][tier].filter((t) => usable(t, ctx)) : [];
+  const mealPool = BY_MEAL[mealKind(ctx.lastMeal)][tier].filter((t) => usable(t, ctx));
   const livePool = LIVE[tier].filter((t) => usable(t, ctx));
   const generalPool = GENERAL[tier].filter((t) => usable(t, ctx));
+  // BEAT 4 gate. tier 2 starts as low as 18% devoured, which is far too early
+  // for "goodbye, and here is the seven day forecast" — so the sign-off waits
+  // for the match to be genuinely over the hill.
+  const endgame = tier === 2 && (ctx.devouredPct >= 45 || ctx.secondsLeft <= 45);
+  const signOffPool = endgame ? SIGN_OFF : [];
 
   const chooseRaw = (): string => {
+    if (signOffPool.length && rnd() < 0.25) {
+      return signOffPool[Math.floor(rnd() * signOffPool.length) % signOffPool.length];
+    }
     const r = rnd();
-    // district 45% / live 35% / general 20% — with graceful fallbacks so an
-    // empty bucket never returns undefined into the ticker
+    // graceful fallbacks so an empty bucket never returns undefined to the ticker
     let order: string[][];
     if (districtPool.length) {
-      order = r < 0.45 ? [districtPool, livePool, generalPool]
-        : r < 0.80 ? [livePool, generalPool, districtPool]
-          : [generalPool, districtPool, livePool];
+      order = r < 0.34 ? [districtPool, livePool, generalPool]
+        : r < 0.56 ? [mealPool, livePool, generalPool]
+          : r < 0.84 ? [livePool, generalPool, districtPool]
+            : [generalPool, districtPool, livePool];
     } else {
-      order = r < 0.62 ? [livePool, generalPool] : [generalPool, livePool];
+      order = r < 0.30 ? [mealPool, livePool, generalPool]
+        : r < 0.68 ? [livePool, generalPool] : [generalPool, livePool];
     }
     for (const pool of order) {
       if (pool.length) return pool[Math.floor(rnd() * pool.length) % pool.length];
@@ -625,6 +817,8 @@ export function pickNews(ctx: NewsCtx, rnd: () => number = Math.random): string 
 
 /** total distinct lines across every pool — handy for a content sanity check. */
 export function newsLineCount(): number {
-  const all: Pools[] = [PORT, MARKET, RESORT, PARTY, JUNGLE, COVE, BEACH, GENERAL, LIVE];
-  return all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
+  const all: Pools[] = [PORT, MARKET, RESORT, PARTY, JUNGLE, COVE, BEACH, GENERAL, LIVE,
+    MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL];
+  return SIGN_ON.length + SIGN_OFF.length
+    + all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
 }

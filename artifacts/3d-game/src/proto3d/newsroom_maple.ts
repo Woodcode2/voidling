@@ -3,10 +3,16 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //  Not a news ticker. A *small town local paper* covering the end of the world
 //  the way it covers everything else: as a local controversy with two sides.
+//  Four beats:
 //
-//  Tier 0: an ordinary week. Election season. Everyone is furious about a meter.
-//  Tier 1: the void is now a wedge issue. The paper goes to four pages.
-//  Tier 2: the town is gone. The argument is NOT gone. The argument never goes.
+//  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed. 1980s local radio:
+//                    "GOOD MORNING, MAPLE FALLS — don't forget to vote tuesday."
+//  BEAT 2  DENIAL    tier 0. Election week. MAYOR DINKLE says the hole is FAKE
+//                    NEWS. Everyone is still furious about a parking meter.
+//  BEAT 3  ALARM     tier 1. Oh gosh. The evacuation is a FUN WALK. The paper
+//                    goes to four pages. Nobody admits anything.
+//  BEAT 4  FAREWELL  tier 2. The town is gone, CARLA WEBB is reading the
+//                    weather, and the argument about the meter has NOT stopped.
 //
 //  The running joke is MAYOR DINKLE — a man seeking a third term on a platform
 //  of denying that the void exists, who will cut a ribbon on absolutely nothing
@@ -51,6 +57,22 @@ export const MAPLE_BRAND: [string, string, string] = [
   '📰 THE BUGLE',
   '⚠️ BUGLE ALERT',
   '🚨 BUGLE EXTRA',
+];
+
+// ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
+// Maple Falls opens every match the way local radio opened every morning in
+// 1984: good morning, here is the weather, don't forget to vote Tuesday. This
+// fires FIRST, guaranteed, before any other headline (see `signedOn`).
+// No {templates} here — the sign-on must never depend on match state.
+const SIGN_ON: string[] = [
+  'GOOD MORNING, MAPLE FALLS. election tuesday. do not forget.',
+  'GOOD MORNING, MAPLE FALLS! vote tuesday! the diner has PIE!',
+  "THE BUGLE: good morning, Maple Falls. don't forget to vote tuesday.",
+  'GOOD MORNING MAPLE FALLS. weather: nice. election: tuesday.',
+  'MAYOR DINKLE: "good morning! vote DINKLE! I brought DONUTS!"',
+  'GOOD MORNING, MAPLE FALLS. population 1,412. all of them awake.',
+  'DEB HOLLIS: "good morning. vote tuesday. vote for NOT DINKLE."',
+  'GOOD MORNING, MAPLE FALLS! bake sale saturday. vote tuesday. go OTTERS.',
 ];
 
 /** Ticker-friendly district names, used to fill {D}. All read after "in". */
@@ -492,6 +514,20 @@ const GENERAL: Pools = [[
   'the Bugle went to two pages this week. huge news week. HUGE week.',
   'lost and found at town hall: nine hats, a trombone, a casserole dish.',
   'the water tower says MAPLE FALLS. it was repainted in 1991. it holds.',
+  // — BEAT 2 · DENIAL — there is a hole. the mayor says there is not. —
+  'MAYOR DINKLE: "the hole is FAKE NEWS. I have never seen a hole."',
+  'MAYOR DINKLE has never seen the hole. he is standing next to it.',
+  'the hole is not on the town map. the map is from 1974. checkmate.',
+  'town hall votes on whether the hole is real. 4 to 4. no decision.',
+  'MAYOR DINKLE: "that is a puddle. a deep, dry, purple puddle."',
+  'GUS: "it is a hole." MAYOR DINKLE: "it is a DRAINAGE FEATURE."',
+  'CARLA WEBB asks about the hole. the mayor talks about pie. 20 mins.',
+  'TATER told the grown ups. the grown ups had a MEETING about it.',
+  'a hole ate a bin. the council has formed a BIN COMMITTEE. bins.',
+  'DEB HOLLIS blames DINKLE. DINKLE blames the WEATHER. weather: nice.',
+  'MAYOR DINKLE: "no hole. next question. NEXT QUESTION, Carla."',
+  'the bake sale is still on. the hole was not invited. rude of it.',
+  'DEB HOLLIS: "the hole is real AND it is his fault." both. somehow.',
 ], [
   'MAYOR DINKLE: "the hole is a DRAINAGE PROJECT. it is going great."',
   'DEB HOLLIS: "the hole is DINKLE\'s fault." polls: she is gaining.',
@@ -515,6 +551,19 @@ const GENERAL: Pools = [[
   'MAYOR DINKLE: "I have consulted an expert." the expert is his cousin.',
   'the population sign reads 1,408 and is, for the first time, too high.',
   'four hour meeting on whether to hold a meeting. motion carried. barely.',
+  // — BEAT 3 · ALARM — oh gosh. nobody is admitting anything yet. —
+  'MAYOR DINKLE: "this is NOT an evacuation. this is a FUN WALK."',
+  'MAYOR DINKLE: "there is no hole! also stay AWAY from the hole!"',
+  'oh gosh. it ate the bandstand. with the band still on it. sorry.',
+  'DEB HOLLIS: "I said this would happen." she said the opposite.',
+  'the town siren goes off. it plays the fight song. we all sang. GO.',
+  'the fun walk is now a fun jog. the fun jog is now a fun SPRINT.',
+  'MAYOR DINKLE: "I was always against the hole. write that down."',
+  'it burped and the whole street smelled of GRAVY. every street.',
+  'PEARL is carrying nine pies at a run. nine. not one wobble.',
+  'MAYOR DINKLE: "small hole. medium hole. okay. okay. RUN, folks."',
+  'the bake sale moves indoors. there is no indoors. moved anyway.',
+  'MAYOR DINKLE: "oh gosh." he has never said oh gosh. he said it.',
 ], [
   'MAYOR DINKLE: "fine. it is real. I still say it is a DRAINAGE issue."',
   'DEB HOLLIS wins in a landslide. she is now mayor of a purple circle.',
@@ -538,7 +587,117 @@ const GENERAL: Pools = [[
   'the town is gone. the argument about the meter continues. it continues.',
   'MAPLE FALLS BUGLE: circulation 41. new subscriber. purple. hungry.',
   'the water tower is the last word standing. it says MAPLE FALLS. good.',
+  'MAYOR DINKLE: "I never said FAKE NEWS. I said fake HOLE." he did not.',
+  'it ate town hall, the clock, and the man winding the clock. oh dear.',
+  'something burped and it smelled of the whole diner. all of it.',
+  'MAYOR DINKLE concedes. then asks who ate his TRUCK. it did, sir.',
 ]];
+
+// ── BEAT 4 · SIGN-OFF ─────────────────────────────────────────────────────────
+// The town is gone and CARLA WEBB is still reading out the weather. These are
+// the *last words* of the arc, so they only go to print once the match is
+// genuinely over the hill — see `endgame` in pickMapleNews, which reads
+// devouredPct and secondsLeft directly. A forecast at 18% devoured is a lie.
+const SIGN_OFF: string[] = [
+  'CARLA WEBB reads the WEATHER. the town is gone. weather: mild.',
+  'weather tomorrow: sunny, breezy, no town at all. still sunny.',
+  'the town is gone. the bake sale results are STILL disputed.',
+  'DEB HOLLIS is mayor. of grass. she is doing a very good job of it.',
+  'THE BUGLE: goodnight, Maple Falls. sorry about the everything.',
+  'TATER waves. Steve waves. the grown ups are still arguing. classic.',
+  'and now the weather, from a field, with CARLA WEBB. it is nice out.',
+  'GOODNIGHT, MAPLE FALLS. the election is still tuesday. somehow.',
+  'THE BUGLE signs off. circulation 41. one of them is purple.',
+  'goodnight from a parking lot. go OTTERS. vote tuesday. good luck.',
+];
+
+// ── WHAT IT JUST ATE ──────────────────────────────────────────────────────────
+// ctx.lastMeal is free text from the call site. It never says "a boat" or "a
+// person" — the game only tags HOUSE and CAR, and sizes everything else — so
+// these four buckets are everything the API can actually tell us apart.
+// A bite the player just took should be in the paper within seconds of it.
+export type MealKind = 'house' | 'car' | 'big' | 'small';
+
+const MEAL_HOUSE: Pools = [[
+  'a house is gone. the mailbox stayed. the mailbox is doing fine.',
+  'a whole HOUSE. the council will discuss this for four hours.',
+  'a house went down in one bite. the doorbell rang once. sad, that.',
+  'MAYOR DINKLE: "that house was CONDEMNED." it was not condemned.',
+], [
+  'ANOTHER house! DEB HOLLIS: "how many, DINKLE? HOW MANY?" nine.',
+  'a house went in whole. the dog got out. good dog. very good dog.',
+  'DALE mowed the lawn of a house that is not there. crisp line.',
+  'MAYOR DINKLE: "houses come and houses go, folks." they do not.',
+], [
+  'every house on the street eaten. DALE is still edging. still.',
+  'the last house went in sideways and burped. the burp was worse.',
+  'houses gone. the leaning mailbox at 114 is still up. LEGEND.',
+  'MAYOR DINKLE: "I have always supported houses." nobody is left.',
+]];
+
+const MEAL_CAR: Pools = [[
+  'a parked car is gone. it was parked WRONG anyway, says DALE.',
+  'a car went in honking. the honk got quiet very fast. very fast.',
+  "somebody's car has gone. the street already knows whose. of course.",
+  'a car. one gulp. one small burp. the town says nothing. yet.',
+], [
+  'another car eaten. MAYOR DINKLE calls it "a PARKING solution".',
+  'a car went down with the radio on. we could hear it. faintly.',
+  'MARGE: "fine, it ate a car. now about that METER." year nine.',
+  'DEB HOLLIS: "cars are being EATEN, Dinkle." he is on his phone.',
+], [
+  'the last car eaten. its alarm is still going. under the ground.',
+  "MAYOR DINKLE's truck is gone. the face on the bumper too. sorry.",
+  'no cars left. the parking meter remains. MARGE is FURIOUS. still.',
+  'a car went in and the horn honked for nine whole seconds. NINE.',
+]];
+
+const MEAL_BIG: Pools = [[
+  'a whole BUILDING. gone. the ground went WHUMP. everyone felt it.',
+  'something enormous is missing downtown. nobody can say which one.',
+  'a landmark is gone. it was on the postcard. the ONE postcard.',
+  'that one was big. the cups in the diner all did a little wobble.',
+], [
+  'a BUILDING went down whole. it sounded like a bath draining. ugh.',
+  'MAYOR DINKLE: "that building was UGLY." he cut its ribbon. twice.',
+  'DEB HOLLIS: "he lost a WHOLE BUILDING." he did. the entire thing.',
+  'oh gosh. that was the big one on the corner. with the CLOCK on it.',
+], [
+  'the last big thing went in slowly. very slowly. we all watched.',
+  'MAYOR DINKLE: "we will rebuild it. smaller. cuter. much cheaper."',
+  'the water tower went in last. it said MAPLE FALLS on the way down.',
+  'that bite was so big the ROOSTER stopped. the rooster NEVER stops.',
+]];
+
+const MEAL_SMALL: Pools = [[
+  'it ate a mailbox. one mailbox. one tiny burp. rather adorable.',
+  'a bin is missing. the street has already blamed three people.',
+  'it ate a garden gnome. that gnome had been there since 1988.',
+  'a small snack taken on Elm. nobody has told the council. good.',
+], [
+  "still snacking. bins, mailboxes, one shoe. somebody's good shoe.",
+  'it ate a bin, burped, then took the OTHER bin. greedy. so greedy.',
+  'MAYOR DINKLE: "it only ate a SMALL thing. we have LOADS." nine.',
+  'it ate the swing set. the swings squeaked all the way down. eek.',
+], [
+  'nothing big left. it is eating crumbs now. very loud crumbs.',
+  'it ate the last bin. it did not even WANT the last bin. rude.',
+  'down to gnomes and letterboxes. it is HOOVERING the county.',
+  'the last snack was a casserole. Pike Hollow sent it. serves them.',
+]];
+
+const BY_MEAL: Record<MealKind, Pools> = {
+  house: MEAL_HOUSE, car: MEAL_CAR, big: MEAL_BIG, small: MEAL_SMALL,
+};
+
+/** classify ctx.lastMeal into one of the four buckets the API can distinguish. */
+export function mapleMealKind(meal: string): MealKind {
+  const s = (meal || '').toLowerCase();
+  if (s.includes('house') || s.includes('barn') || s.includes('home')) return 'house';
+  if (s.includes('car') || s.includes('truck') || s.includes('tractor')) return 'car';
+  if (s.includes('building') || s.includes('landmark') || s.includes('big')) return 'big';
+  return 'small';
+}
 
 // ── LIVE / TEMPLATED ──────────────────────────────────────────────────────────
 //  {F} form   {M} last meal   {P} pct   {R} 100-pct   {S} seconds
@@ -750,9 +909,16 @@ function remember(raw: string, filled: string): void {
   history.push(filled); if (history.length > HISTORY) history.shift();
 }
 
+/**
+ * false until the Bugle has said good morning. The FIRST pickMapleNews() call
+ * of a match always returns the sign-on and nothing else can jump ahead of it —
+ * resetMapleNews() puts the paper back to bed, and resetMatch() calls that.
+ */
+let signedOn = false;
+
 /** clears the anti-repeat memory — call between matches if you like. */
 export function resetMapleNews(): void {
-  history.length = 0; rawHistory.length = 0;
+  history.length = 0; rawHistory.length = 0; signedOn = false;
 }
 
 interface Filled { pct: number; rest: number; form: string; meal: string; dist: string; rival: string; lead: number; secs: number }
@@ -806,28 +972,56 @@ const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
 
 /**
  * One fully-formed headline, ready to drop straight into the ticker.
- * Weighted ~45% district / ~35% live-templated / ~20% general when we know
- * where the player is; live-heavy when we don't.
+ *
+ * THE ARC. Four beats, and the picker has the signal for all four:
+ *   1 SIGN-ON   the first call of every match. good morning, vote tuesday.
+ *   2 DENIAL    tier 0 — MAYOR DINKLE says the hole is FAKE NEWS.
+ *   3 ALARM     tier 1 — oh gosh. the evacuation is a FUN WALK. still arguing.
+ *   4 FAREWELL  tier 2 — the town is gone and CARLA WEBB reads the weather.
+ * `tier` is derived at the call site from devouredPct AND the player's form, so
+ * a WORLD ENDER never gets a beat-2 line. Beat 1 is ours to guarantee.
+ *
+ * Weighted ~34% district / ~22% what-it-just-ate / ~28% live / ~16% general
+ * when we know where the player is; meal-and-live-heavy when we don't.
  */
 export function pickMapleNews(ctx: MapleCtx, rnd: () => number = Math.random): string {
   const tier = clampTier(ctx.tier);
   const b = bind(ctx);
 
+  // BEAT 1. Nothing goes to print before good morning.
+  if (!signedOn) {
+    signedOn = true;
+    const raw0 = SIGN_ON[Math.floor(rnd() * SIGN_ON.length) % SIGN_ON.length] ?? SIGN_ON[0];
+    const out0 = clip(raw0, TICKER_MAX);
+    remember(raw0, out0);
+    return out0;
+  }
+
   const districtPool = ctx.district ? BY_DIST[ctx.district][tier].filter((t) => usable(t, ctx)) : [];
+  const mealPool = BY_MEAL[mapleMealKind(ctx.lastMeal)][tier].filter((t) => usable(t, ctx));
   const livePool = LIVE[tier].filter((t) => usable(t, ctx));
   const generalPool = GENERAL[tier].filter((t) => usable(t, ctx));
+  // BEAT 4 gate. tier 2 starts as low as 18% devoured, which is far too early
+  // for "goodnight, Maple Falls" — so the sign-off waits for the match to be
+  // genuinely over the hill.
+  const endgame = tier === 2 && (ctx.devouredPct >= 45 || ctx.secondsLeft <= 45);
+  const signOffPool = endgame ? SIGN_OFF : [];
 
   const chooseRaw = (): string => {
+    if (signOffPool.length && rnd() < 0.25) {
+      return signOffPool[Math.floor(rnd() * signOffPool.length) % signOffPool.length];
+    }
     const r = rnd();
-    // district 45% / live 35% / general 20% — with graceful fallbacks so an
-    // empty bucket never returns undefined into the ticker
+    // graceful fallbacks so an empty bucket never returns undefined to the ticker
     let order: string[][];
     if (districtPool.length) {
-      order = r < 0.45 ? [districtPool, livePool, generalPool]
-        : r < 0.80 ? [livePool, generalPool, districtPool]
-          : [generalPool, districtPool, livePool];
+      order = r < 0.34 ? [districtPool, livePool, generalPool]
+        : r < 0.56 ? [mealPool, livePool, generalPool]
+          : r < 0.84 ? [livePool, generalPool, districtPool]
+            : [generalPool, districtPool, livePool];
     } else {
-      order = r < 0.62 ? [livePool, generalPool] : [generalPool, livePool];
+      order = r < 0.30 ? [mealPool, livePool, generalPool]
+        : r < 0.68 ? [livePool, generalPool] : [generalPool, livePool];
     }
     for (const pool of order) {
       if (pool.length) return pool[Math.floor(rnd() * pool.length) % pool.length];
@@ -856,8 +1050,10 @@ export function pickMapleNews(ctx: MapleCtx, rnd: () => number = Math.random): s
 
 /** total distinct lines across every pool — handy for a content sanity check. */
 export function mapleLineCount(): number {
-  const all: Pools[] = [MAINST, FAIR, SCHOOL, FARM, LAKE, WOODS, STRIP, BURB, CIVIC, GENERAL, LIVE];
-  return all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
+  const all: Pools[] = [MAINST, FAIR, SCHOOL, FARM, LAKE, WOODS, STRIP, BURB, CIVIC, GENERAL, LIVE,
+    MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL];
+  return SIGN_ON.length + SIGN_OFF.length
+    + all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
 }
 
 /** total distinct spoken lines across every voice pool. */
