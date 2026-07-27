@@ -14,10 +14,11 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, setWorld } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, islandOutline3, setWorld } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
+import { createMinimap } from './proto3d/minimap';
 import { createFx } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS, type Skin } from './proto3d/palette';
@@ -196,6 +197,7 @@ const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 // 3-5 family members per match, randomly cast — you never know who's coming
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
+const minimap = createMinimap(islandOutline3());
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
   WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
@@ -2260,6 +2262,10 @@ function animate() {
   hudCd -= dt;
   if (hudCd <= 0) {
     hudCd = 0.2; refreshHud();
+    // treasure is the whole reason this exists — show the ones still out there
+    minimap.update(voidState.x, voidState.z, voidling.radius,
+      gilded.filter((e) => !e.eaten).map((e) => ({ x: e.mesh.position.x, z: e.mesh.position.z })),
+      rivals.list.map((rv) => ({ x: rv.x, z: rv.z, r: rv.r, color: rv.color })));
     hungerFill.style.width = `${Math.max(6, Math.round(hunger * 100))}%`;
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);

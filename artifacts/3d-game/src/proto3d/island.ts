@@ -233,6 +233,12 @@ const MAPLE_SIL = silhouetteWorld(12);
 // Pirate Bay has its OWN coastline — a hooked headland, not Maple's blob
 const silPoly = (): [number, number][] => (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH : MAPLE_SIL);
 const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
+/** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
+ *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
+ *  which is a hook with the water on the inside. */
+export function islandOutline3(): [number, number][] {
+  return silPoly().map(([wx, wy]) => [w(wx), w(wy)] as [number, number]);
+}
 function insideIslandWorld(wx: number, wy: number): boolean {
   // Pirate Bay: its own hooked coastline, and the BAY water is not land
   if (WORLD_ID === 'pirate') return BAY.onBayLand(wx, wy);

@@ -111,6 +111,15 @@
       #banner.fam { font-size: 30px; color: #ffd9f4; top: 27%;
         text-shadow: 0 0 22px rgba(184,117,255,0.9), 0 3px 10px rgba(0,0,0,0.65); }
       @keyframes bnr { 0%{opacity:0; transform:translateY(-8px)} 12%{opacity:1; transform:translateY(0)} 78%{opacity:1} 100%{opacity:0} }
+      /* the minimap — bottom-left, out of the thumb's way and out of the
+         HUD stack at the top of the screen */
+      #minimap { position: fixed; z-index: 6; pointer-events: none;
+        left: calc(10px + env(safe-area-inset-left, 0px));
+        bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        width: 116px; height: 116px; border-radius: 14px;
+        background: rgba(16,8,30,0.52); border: 2px solid rgba(201,166,255,0.32);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+      body.menu #minimap { display: none !important; }
       /* drag joystick */
       /* the ring stroke measured 1.04:1 against island ground — a lens artifact,
          not a control */
