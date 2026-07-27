@@ -862,7 +862,15 @@ export function createRivals(
           api.onRivalEaten?.(rv.name, pts, rv.x, rv.z, rv.r, marquee);
           continue;
         }
-        if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0) {
+        // THE HUNTER ONLY BITES OUT OF A CHARGE. Letting her bite on contact
+        // measured at five hits in the first forty seconds — she simply loomed
+        // over the player and the player walked into her. That is not a
+        // predator, it is a hazard, and it read as the game punishing a child
+        // for nothing they could see. A bite must be the outcome of a lunge the
+        // player was warned about and failed to dodge, which caps it at one per
+        // charge cycle and makes every one of them a beat with a cause.
+        const canBite = !isHunter || !hunting || rv.cst === 2;
+        if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0 && canBite) {
           // ── WHAT A BITE COSTS ───────────────────────────────────────────────
           // -12% radius was undone by the score floor within a frame or two, so
           // being caught was free and the family had no teeth at all. A bite now
@@ -871,12 +879,17 @@ export function createRivals(
           // by eating her later. Shrink alone can be refunded by the growth law;
           // points cannot, so this is a cost the leaderboard actually shows.
           const heavyBite = isHunter && hunting;
-          const steal = heavyBite ? Math.min(1600, Math.round(pScore * 0.10)) : 0;
-          rv.biteCd = heavyBite ? 7 : 9; rv.pulse = 1;
+          const steal = heavyBite ? Math.min(1200, Math.round(pScore * 0.08)) : 0;
+          rv.biteCd = heavyBite ? 12 : 9; rv.pulse = 1;
           rv.missPend = false;   // she connected: this was no near miss
+          if (heavyBite) {
+            // she got what she came for: break off, wallow, and leave a long
+            // gap before the next attempt
+            rv.cst = 3; rv.ctim = 2.2;
+          }
           if (steal > 0) { rv.score += steal; rv.stolen += steal; }
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].bite));
-          api.onPlayerBitten?.(rv.name, { shrink: heavyBite ? 0.80 : 0.90, steal, hunter: heavyBite });
+          api.onPlayerBitten?.(rv.name, { shrink: heavyBite ? 0.85 : 0.90, steal, hunter: heavyBite });
         }
 
         // ── eat nearby food -> grow by area + score ON THE PLAYER'S TERMS ─────
