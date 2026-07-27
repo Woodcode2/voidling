@@ -3861,8 +3861,13 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const x = sx0 + Math.cos(a) * rr, z = sz0 + Math.sin(a) * rr;
         if (!insideIsland3(x, z)) continue;
         if (ROAD_CENTERS_3D_LOCAL.some((rc2) => Math.abs(x - rc2) < 4 || Math.abs(z - rc2) < 4)) continue;
-        place(si % 5 === 0 ? makeCoins() : si % 3 === 0 ? MS.makeLawnSign(si % 2) : makeTinyProp(),
-          x, z, si % 5 === 0 ? 0.55 : mr(0.6, 0.8));
+        // the opening frame is hand-authored, so it does not get the generic
+        // tiny-prop pool — that is where the traffic cones in the town square
+        // were coming from. And the signs here follow the square's own side.
+        const tiny = si % 5 === 0 ? makeCoins()
+          : si % 3 === 0 ? MS.makeLawnSign(mchance(0.45) ? 1 : 0)
+          : mpick([makeFlowers, makeFlowers, MS.makePlanter, MS.makeNewsBox, makeBush])();
+        place(tiny, x, z, si % 5 === 0 ? 0.55 : mr(0.6, 0.8));
       }
     }
   }
