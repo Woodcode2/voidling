@@ -125,7 +125,8 @@ export const RIVAL_VOICE: Record<string, {
     nearSmall: ['zzz— AAH okay running', 'five more minutes!!', 'too sleepy to flee…'],
     rankUp: ['passed you in my sleep', '*overtakes while yawning*', 'zzzoom.'],
     visit: ['strolled by… *yawn* hi', 'nice spot for a nap', 'you grew. neat. zzz', 'grandpa hug… later…'],
-    arch: ['this is MY spot. zzz', 'not moving. ever. bye.', 'I live here now', 'my corner. my snacks.'],
+    // the camp is gone, so these lines cannot promise one either
+    arch: ['no rush. no rush at all.', '*yawn* …still eating', 'slow and steady, dear', 'save some for grandpa'],
   },
 };
 const pickLine = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];

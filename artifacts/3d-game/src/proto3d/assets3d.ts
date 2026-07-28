@@ -160,6 +160,36 @@ export function preloadPack(onProgress: (done: number, total: number) => void): 
   });
 }
 
+/** ONE PREDICATE FOR ONE DECISION. This used to be two: place() gated on
+ *  footprint radius >= 4, while every glb() caller passed `smallShadow: r <
+ *  2.5` — so the same nominal size got opposite treatment depending on which
+ *  placer happened to run it. Measured: 448 Maple props sit in r ∈ [2.5, 4)
+ *  split 226 casting / 222 not, and on Pirate's beach a dropGlb palm throws
+ *  crisp frond shadows on the sand while a place()-path prop at the identical
+ *  r = 2.6 throws none.
+ *
+ *  And radius alone is the wrong axis. It tracks footprint well and HEIGHT
+ *  badly (corr 0.76 vs 0.59), with no height term at all — so a whole band of
+ *  tall, narrow things never cast while the 2-unit pedestrian beside them
+ *  does: ~353 pines and maples at 7-9 units, two grain silos at 17.0, four
+ *  water towers at 16.2, six billboards at 13.1. They are grounded by their
+ *  contact disc but flat-lit next to neighbours with crisp directional
+ *  shadows.
+ *
+ *  The height term is deliberately paired with a MINIMUM THICKNESS. Dropping
+ *  the bar on height alone would bring straight back the artifact the radius
+ *  gate was raised to remove: at the old 165-unit shadow box a palm trunk
+ *  resolved to one or two texels and PCF smeared it into a detached grey
+ *  streak lying on open sand. Tall AND solid casts; tall and thin does not. */
+export function shouldCast(r: number, obj?: THREE.Object3D): boolean {
+  if (r >= 4) return true;
+  if (!obj) return false;
+  const bb = new THREE.Box3().setFromObject(obj);
+  if (!isFinite(bb.min.y)) return false;
+  const h = bb.max.y - bb.min.y;
+  const thin = Math.min(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
+  return h >= 6 && thin >= 0.8;
+}
 // soft contact shadow — grounds every prop so nothing reads as "floating on a
 // lawn" (the single cheapest polish win: one shared texture + geometry)
 let _shTex: THREE.CanvasTexture | null = null;
@@ -214,7 +244,11 @@ export function glb(
     if (qk) fb.userData.qk = qk;
     fb.position.set(x, 0, z);
     if (opts.rotY) fb.rotation.y = opts.rotY;
-    fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
+    const fbCast = shouldCast(r, fb);
+    fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = fbCast; o.receiveShadow = true; } });
+    // glb() never attached a contact disc, so a small GLB prop had neither a
+    // cast shadow nor a blob and was the only genuinely ungrounded thing left
+    if (!fbCast) fb.add(contactShadow(Math.max(0.55, r * 1.1)));
     scene.add(fb);
     addEdible?.(fb, r);
   };
@@ -252,7 +286,9 @@ export function glb(
     if (qk) obj.userData.qk = qk;
     obj.position.set(x, 0, z);
     if (opts.rotY) obj.rotation.y = opts.rotY;
-    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = !opts.smallShadow; o.receiveShadow = true; } });
+    const objCast = shouldCast(r, obj);
+    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = objCast; o.receiveShadow = true; } });
+    if (!objCast) obj.add(contactShadow(Math.max(0.55, r * 1.1)));
     scene.add(obj);
     addEdible?.(obj, r);
     opts.onReady?.(obj as THREE.Group);

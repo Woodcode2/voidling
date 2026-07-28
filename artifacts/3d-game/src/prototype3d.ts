@@ -240,7 +240,11 @@ const FAMILY_TITLE: Record<string, string> = {
 const ARCH_TAG: Record<string, string> = {
   BULLY: '😈 she HUNTS you', COWARD: '😱 runs from everything',
   SHOWOFF: '✨ only eats big stuff', COPYCAT: '👣 copies your route',
-  HOARDER: '😴 camps one spot',
+  // …no longer "camps one spot": the camp was deleted when it turned out to be
+  // what was pinning him (rivals.ts records the five attempts). A join banner
+  // that teaches a behaviour the code does not implement is worse than no
+  // banner — the child watches for it and it never happens.
+  HOARDER: '😴 slow and steady',
 };
 rivals.onJoin = (name, color, x, z, arch) => {
   announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined — ${ARCH_TAG[arch] ?? ''}`);
@@ -1185,9 +1189,22 @@ function endMatch() {
     const nx = el('endNext');
     if (g) {
       const k = Math.min(1, g.have / g.need);
+      // It said UNLOCKED when the skin was merely AFFORDABLE — the shop card
+      // still reads "locked" at its price until the child pays — and then
+      // offered no way to "go and get it", because #end is a full-screen
+      // overlay whose only two buttons are PLAY AGAIN and HOME. Tell the truth,
+      // and put the door in the room.
       nx.innerHTML = g.have >= g.need
-        ? `✦ <b>${g.label} SKIN UNLOCKED</b> — go and get it!<div class="nb"><div style="width:100%"></div></div>`
+        ? `✦ you can afford the <b>${g.label}</b> skin!<div class="nb"><div style="width:100%"></div></div>`
+          + `<button id="endShop" class="goShop">OPEN SHOP →</button>`
         : `${g.need - g.have}✦ to the <b>${g.label}</b> skin<div class="nb"><div style="width:${Math.round(k * 100)}%"></div></div>`;
+      const gs = document.getElementById('endShop');
+      if (gs) gs.addEventListener('click', () => {
+        endEl.classList.remove('show');
+        document.body.classList.add('menu');
+        menuEl.style.display = '';
+        el('shop').classList.add('show');
+      });
     } else nx.innerHTML = '';
   }
   endList.innerHTML = rows.map((r, i) =>

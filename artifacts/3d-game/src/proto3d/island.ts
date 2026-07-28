@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
-import { glb, spawnBalloon, setBalloonHook, contactShadow } from './assets3d';
+import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './assets3d';
 import * as BAY from './bay';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
@@ -2787,7 +2787,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // sand with nothing above it — the "sticks everywhere" on Pirate Bay were
     // palm trunks and dune grass casting shadows the map could not draw. They
     // keep their contact blob, which is what actually grounds a small prop.
-    if (r >= 4) setShadow(mesh);   // real sun shadows; blobs are for the small stuff only
+    if (shouldCast(r, mesh)) setShadow(mesh);   // one predicate, shared with glb()
     else {
       mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
       // tiny props still get the cheap blob — grounded on EVERY quality tier,
