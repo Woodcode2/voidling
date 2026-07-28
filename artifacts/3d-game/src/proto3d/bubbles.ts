@@ -165,9 +165,16 @@ export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
         v.copy(s.pos).project(camera);
         if (v.z > 1) { s.el.style.visibility = 'hidden'; continue; }  // behind camera
         s.el.style.visibility = 'visible';
-        const halfW = s.el.offsetWidth / 2 + 8;
+        // clamp so the whole box stays on screen — and cope with a box wider
+        // than the screen rather than producing an inverted range, which is
+        // what pushed a bubble half off the left edge
+        const halfW = Math.min(s.el.offsetWidth / 2 + 8, w / 2);
+        const halfH = s.el.offsetHeight + 6;
         const x = Math.min(w - halfW, Math.max(halfW, (v.x * 0.5 + 0.5) * w));
-        const y = (-v.y * 0.5 + 0.5) * h;
+        // …and the same on the vertical: the bubble is anchored by its BOTTOM
+        // (translate -100%), so an anchor near the top of the screen put the
+        // whole box above it, which is the clipped bubble behind the board
+        const y = Math.min(h - 8, Math.max(halfH, (-v.y * 0.5 + 0.5) * h));
         s.el.style.left = `${x}px`;
         s.el.style.top = `${y}px`;
       }

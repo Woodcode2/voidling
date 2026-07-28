@@ -978,8 +978,13 @@ function refreshHud() {
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
-  if (started && !ended && prevRank > 0 && myRank < prevRank) {
-    announce(`👑 you passed ${rows[myRank]?.name ?? 'a rival'}!`);
+  // …and the SAME cooldown as its mirror branch below, which had one all along.
+  // Without it, a player whose score sits inside a rival's band flip-flops and
+  // fires the identical brag twice within a second.
+  if (started && !ended && prevRank > 0 && myRank < prevRank && tClock - lastRankBrag > 12) {
+    lastRankBrag = tClock;
+    // the board prefixes the hunter with 😈; the sentence should not
+    announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival').replace('😈 ', '')}!`);
     audio.ready(); buzz(20);
   }
   // refreshHud runs 5x/s and rank oscillates, so this fired 18 times in one

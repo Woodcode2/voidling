@@ -480,10 +480,22 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     {
       const jr = BAY.BAY_REGIONS.find((r) => r.id === 'jungle')!;
       g.save(); wpath(BAY.smoothPoly(jr.poly, 5)); g.clip();
-      g.fillStyle = 'rgba(18,62,38,0.34)';
+      // A FLAT FILL ENDS IN A HARD ALPHA STEP. One of these ellipses spans 13
+      // to 30 world units, and at the closest gameplay camera that is 500 to
+      // 1160 pixels on a phone — so the player can be entirely inside one
+      // canopy patch and read nothing but its edge crossing the frame. A
+      // radial falloff removes the edge without touching the tonal range, and
+      // the dapple has to stay: with it gone the jungle floor goes flat.
       for (let k = 0; k < 60; k++) {
+        const ex = pxW(rand(2600, 5300)), ey = pyW(rand(3000, 7100));
+        const rx = pxW(rand(130, 300)) - pxW(0), ry = pxW(rand(100, 240)) - pxW(0);
+        const grd = g.createRadialGradient(ex, ey, 0, ex, ey, Math.max(rx, ry));
+        grd.addColorStop(0, 'rgba(18,62,38,0.40)');
+        grd.addColorStop(0.55, 'rgba(18,62,38,0.30)');
+        grd.addColorStop(1, 'rgba(18,62,38,0)');
+        g.fillStyle = grd;
         g.beginPath();
-        g.ellipse(pxW(rand(2600, 5300)), pyW(rand(3000, 7100)), pxW(rand(130, 300)) - pxW(0), pxW(rand(100, 240)) - pxW(0), rand(0, 3), 0, Math.PI * 2);
+        g.ellipse(ex, ey, rx, ry, rand(0, 3), 0, Math.PI * 2);
         g.fill();
       }
       g.restore();
@@ -3763,10 +3775,20 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     landmark(MS.makeLawnSign(0), bcW(4) - 690, bcW(2) - 690, 0.55, 0, 'course sign');
     for (const pgx of [4, 5]) {
       const cxB = bcW(pgx), cyB = bcW(2);
-      for (const [tx, ty] of scatter(cxB - 700, cyB - 700, cxB + 700, cyB + 700, 11, 3.2)) {
+      // THE PARK HAD THE FLATTEST SILHOUETTE IN MAPLE FALLS: 16 objects over 3
+      // units a block, against 30 on campus, 45 downtown and 54 on the plaza.
+      // Eleven tree sites, and every other thing in the park kit — tables,
+      // grills, benches, bushes — is under 3 units, so nothing broke the
+      // horizon. Measured at the spawn camera, the golf block rendered 96.5%
+      // one green. 22 trees, and a stand of pines to give the skyline a top.
+      for (const [tx, ty] of scatter(cxB - 700, cyB - 700, cxB + 700, cyB + 700, 22, 3.2)) {
         if (mchance(0.5)) dropGlb('parktree', tx, ty, 3.4, mr(6.5, 8.5), makeTree);
         else drop(MS.makeMapleTree(), tx, ty, 2.8);
       }
+      for (const [px16, py16] of scatter(cxB - 660, cyB - 660, cxB + 660, cyB + 660, 7, 2.6))
+        drop(makePine(), px16, py16, 2.6);
+      // and something to stand under, which a park needs and this one lacked
+      landmark(MS.makeBandstand(), cxB + mr(-260, 260), cyB + mr(-260, 260), 4.2, mr(0, 3.1), 'park bandstand');
       for (const [bx9, by9] of scatter(cxB - 640, cyB - 640, cxB + 640, cyB + 640, 5, 1.6)) drop(makeBush(), bx9, by9, 1.6);
       for (const [px13, py13] of scatter(cxB - 620, cyB - 620, cxB + 620, cyB + 620, 4, 1.6)) drop(MS.makePicnicTable(), px13, py13, 1.8, mr(0, 3.1));
       for (const [px14, py14] of scatter(cxB - 600, cyB - 600, cxB + 600, cyB + 600, 3, 1.0)) drop(MS.makeParkGrill(), px14, py14, 0.9);

@@ -64,15 +64,21 @@ export const MAPLE_BRAND: [string, string, string] = [
 // 1984: good morning, here is the weather, don't forget to vote Tuesday. This
 // fires FIRST, guaranteed, before any other headline (see `signedOn`).
 // No {templates} here — the sign-on must never depend on match state.
+// EIGHT OF EIGHT LED WITH THE ELECTION. This is the one headline guaranteed to
+// fire every match, and the spawn already drops the player between the stump
+// speech and the parking-meter protest — so a child's first thirty seconds of
+// Maple Falls were wall-to-wall municipal politics, which is a joke for their
+// parents. Two of the eight still lead on the vote; the rest lead on pie, the
+// twine ball, the Otters and a goat, which is what the town is actually about.
 const SIGN_ON: string[] = [
-  'GOOD MORNING, MAPLE FALLS. election tuesday. do not forget.',
-  'GOOD MORNING, MAPLE FALLS! vote tuesday! the diner has PIE!',
-  "THE BUGLE: good morning, Maple Falls. don't forget to vote tuesday.",
-  'GOOD MORNING MAPLE FALLS. weather: nice. election: tuesday.',
-  'MAYOR DINKLE: "good morning! vote DINKLE! I brought DONUTS!"',
+  'GOOD MORNING, MAPLE FALLS! the diner has PIE. that is the news.',
   'GOOD MORNING, MAPLE FALLS. population 1,412. all of them awake.',
-  'DEB HOLLIS: "good morning. vote tuesday. vote for NOT DINKLE."',
-  'GOOD MORNING, MAPLE FALLS! bake sale saturday. vote tuesday. go OTTERS.',
+  'GOOD MORNING! the BALL OF TWINE is still the biggest. still.',
+  'GOOD MORNING, MAPLE FALLS! go OTTERS!! (0-9, but still.)',
+  'GOOD MORNING. bake sale saturday. bring a plate. bring TWO.',
+  "GOOD MORNING! the fair is open and somebody's goat is loose.",
+  'GOOD MORNING, MAPLE FALLS. election tuesday. do not forget.',
+  'MAYOR DINKLE: "good morning! vote DINKLE! I brought DONUTS!"',
 ];
 
 /** Ticker-friendly district names, used to fill {D}. All read after "in". */
