@@ -2782,7 +2782,12 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     mesh.position.set(x3, 0, z3);
     // shadow diet: tiny street props don't cast (hundreds of them; their shadows
     // are sub-pixel anyway) — a big chunk of the shadow pass for free
-    if (r >= 2.5) setShadow(mesh);   // real sun shadows; blobs are for the small stuff only
+    // …and the bar is 4, not 2.5. Anything thinner than that resolves to one or
+    // two shadow-map texels and PCF turns it into a grey streak lying on the
+    // sand with nothing above it — the "sticks everywhere" on Pirate Bay were
+    // palm trunks and dune grass casting shadows the map could not draw. They
+    // keep their contact blob, which is what actually grounds a small prop.
+    if (r >= 4) setShadow(mesh);   // real sun shadows; blobs are for the small stuff only
     else {
       mesh.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.receiveShadow = true; });
       // tiny props still get the cheap blob — grounded on EVERY quality tier,

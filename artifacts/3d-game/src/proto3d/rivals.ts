@@ -801,7 +801,14 @@ export function createRivals(
               }
               rv.missPend = false;
             }
-          } else if (rv.cst === 3 && rv.ctim <= 0) { rv.cst = 0; rv.ctim = rand(5.5, 9); }
+          } else if (rv.cst === 3 && rv.ctim <= 0) {
+            // …and then she LEAVES YOU ALONE for a while. A 5.5-9 second gap
+            // produced seven charges a match, which from the player's seat is
+            // one rival attacking them more or less continuously. A threat that
+            // never stops is not a threat, it is weather. Long gaps make each
+            // charge an event again.
+            rv.cst = 0; rv.ctim = rand(21, 34);
+          }
           // during wind-up and lunge she is aimed squarely at you (leading a
           // little, so a straight line away is not a free escape)
           if (rv.cst >= 1 && rv.cst <= 2) {

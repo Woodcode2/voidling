@@ -92,7 +92,12 @@ const HEMI_DAY = new THREE.Color(0xdfeaff);
 // the shadow frustum rides the camera: tight box up close = crisp tree
 // shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
 function fitShadow(dist: number) {
-  const target = THREE.MathUtils.clamp(dist * 1.1, 45, 165);
+  // THE STICKS ON THE SAND. At the 165-unit box the shadow map resolves 6.2
+  // texels per world unit, so a palm trunk or a frond is one or two texels and
+  // PCF smears it into a detached grey streak — dozens of them lying on open
+  // ground with nothing above them. Capping the box at 110 roughly doubles the
+  // resolution where the player actually is.
+  const target = THREE.MathUtils.clamp(dist * 1.1, 45, 110);
   if (Math.abs(target - shCur) < 10) return;
   shCur = target;
   sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
@@ -292,13 +297,35 @@ rivals.onPlayerBitten = (name, hit) => {
   // faded, so being caught was free. The hunter's bite now takes SCORE too,
   // which the floor cannot hand back, and she banks it: every point she takes
   // is a point you win back by eating her later.
-  voidling.setRadius(Math.max(START_R, voidling.radius * hit.shrink));
+  // A LEVEL. Not a percentage. A 15% shrink is a number the player cannot see
+  // and the growth law hands most of it back within seconds; being eaten should
+  // cost the thing the whole game is about. The hunter's connecting bite drops
+  // you to the bottom of the form you are in — one rung down the ladder, with
+  // the form name on the HUD changing to prove it — and the shallow nibble
+  // keeps its percentage. START_R is the floor: a VOIDLING cannot go lower.
+  if (hit.hunter) {
+    const st = stageFor(voidling.radius);
+    const down = Math.max(START_R, (FORM_MIN[Math.max(0, st - 1)] || START_R) * 1.02);
+    voidling.setRadius(Math.max(START_R, Math.min(voidling.radius * hit.shrink, down)));
+    if (st > 0) {
+      curStage = stageFor(voidling.radius);
+      voidling.setStage(VISUAL_STAGE[curStage] ?? 0);
+      audio.setMusicStage(VISUAL_STAGE[curStage] ?? 0);
+    }
+  } else {
+    voidling.setRadius(Math.max(START_R, voidling.radius * hit.shrink));
+  }
   if (hit.steal > 0) {
     playerScore = Math.max(0, playerScore - hit.steal);
     floatPos.set(voidState.x, voidling.radius + 4, voidState.z);
     bubbles.float(floatPos, `-${hit.steal} STOLEN!`, true);
   }
-  announce(hit.hunter ? `😱 ${name} CAUGHT you!! -${hit.steal}` : `😱 ${name} took a BITE of you!!`);
+  // NO BANNER. Being hit already reads without words: the screen flashes, the
+  // camera kicks, the void shrinks and a float rises off it. A full-width
+  // announcement on top of that is the third telling of the same event, and
+  // over a match it is the single biggest source of HUD clutter.
+  floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
+  bubbles.float(floatPos, hit.hunter ? 'CAUGHT!! 😱' : 'OW!! 😱', true);
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
   buzz(hit.hunter ? 90 : 50);
@@ -309,13 +336,15 @@ rivals.onPlayerBitten = (name, hit) => {
 // retells, so the whiff gets more spectacle than the hit.
 rivals.onCharge = (name, x, z) => {
   rivalEv.charges++;
-  announce(`⚠️ ${name} is CHARGING at you!!`);
+  // The telegraph belongs IN THE WORLD, not across the HUD. A red ring under
+  // her, a red pulse on the screen edge, an alert sting and a rumble say
+  // "something is coming at you" without a banner — and the banner was firing
+  // often enough to read as the game shouting the same sentence all match.
   fx.ring(x, z, 0xff2b3c, 26, 0.6); fx.flash('rgba(255,43,60,0.16)', 0.35);
   audio.alert(); audio.voice('scared'); buzz(35);
 };
 rivals.onNearMiss = (name, x, z) => {
   rivalEv.nearMiss++;
-  announce('😤 MISSED ME!!');
   floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
   bubbles.float(floatPos, 'NEAR MISS!! 😤', true);
   fx.ring(x, z, 0xffffff, 30, 0.5); fx.ring(voidState.x, voidState.z, 0x7ef2a0, voidling.radius * 4, 0.55);
@@ -966,7 +995,12 @@ function refreshHud() {
   const minePct = Math.min(100, Math.round((mine / Math.max(1, initialMass)) * 100));
   devPlayerPct = minePct; devFamilyPct = Math.max(0, devouredPct - minePct);   // QA readout
   const themPct = Math.max(0, devouredPct - minePct);
-  devEl.innerHTML = `${matchEaten} EATEN<span class="devThem">you ${minePct}% · family ${themPct}%</span>`;
+  // ONE LINE. The "you 1% · family 3%" sub-line was a second HUD block under
+  // the timer that a child cannot act on mid-match — it is a post-match stat,
+  // and it is on the results screen. Dropping it removes a whole layer from
+  // the busiest part of the screen and lets the news card move up.
+  void themPct;
+  devEl.innerHTML = `${matchEaten} EATEN`;
   formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
 }
 
@@ -2447,7 +2481,14 @@ function animate() {
     lookVX += ((voidState.x - camPrevX) / Math.max(1e-4, dt) - lookVX) * Math.min(1, dt * 6);
     lookVZ += ((voidState.z - camPrevZ) / Math.max(1e-4, dt) - lookVZ) * Math.min(1, dt * 6);
     camPrevX = voidState.x; camPrevZ = voidState.z;
-    const lookX = voidState.x + lookVX * 0.10, lookZ = voidState.z + lookVZ * 0.10;
+    // …and CLAMPED. Smoothing the lookahead fixed the jitter but not the swing:
+    // the shore swim-back overwrites velocity outright at 62 u/s, which even
+    // after smoothing is metres of look-target movement in a few frames, and
+    // that still reads as the camera lurching whenever you touch the water.
+    // Two and a half units is as far as the camera is ever allowed to lead.
+    const lookL = Math.hypot(lookVX, lookVZ) * 0.10;
+    const lookK = lookL > 2.5 ? 2.5 / lookL : 1;
+    const lookX = voidState.x + lookVX * 0.10 * lookK, lookZ = voidState.z + lookVZ * 0.10 * lookK;
     tmpV.copy(camOffset).multiplyScalar(camDist);
     tmpV.x += lookX; tmpV.z += lookZ;
     camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
