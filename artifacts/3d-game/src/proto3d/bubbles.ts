@@ -39,6 +39,15 @@ export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
          landed on top of each other and neither could be read */
       font-family: 'Fredoka', system-ui, sans-serif; font-weight: 800; font-size: 14px;
       padding: 6px 11px; border-radius: 13px;
+      /* WITHOUT max-content THIS BOX SHRINKS TOWARD ITS RIGHT EDGE. A fixed
+         element with only a left offset has a shrink-to-fit width of
+         (viewport - left), so a bubble anchored at x=330 on a 390px phone gets
+         60px and renders one word per line — and because the de-collision
+         clamp then measures that collapsed box, it pushes the anchor further
+         right and the box narrower still, converging on min-content in about
+         four frames. Measured: 141 of 141 right-half bubbles affected on a
+         phone, 0 of 298 left-half. Desktop was clean, which is why it hid. */
+      width: max-content;
       max-width: min(64vw, 300px); white-space: normal; text-align: center;
       overflow-wrap: break-word; line-height: 1.25;
       background: #fff; color: #23203a; pointer-events: none;

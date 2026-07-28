@@ -14,6 +14,11 @@
       #timer {
         position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 0; right: 0; text-align: center; z-index: 5;
         color: #fff; font-size: clamp(26px, 8vw, 40px); font-weight: 900; letter-spacing: 1px;
+        /* every neighbour in the top band has a backing pill; the timer had a
+           single soft blur, and its urgency colour #ff8a8a measured 1.02:1
+           against beach sand — the alarm state was the LOWEST-contrast state
+           in the game. A hard outline works on any ground. */
+        -webkit-text-stroke: 3px rgba(12,6,26,0.92); paint-order: stroke fill;
         text-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: none;
       }
       /* it was a full-width centred line at top:60px, which on a 390px phone ran
@@ -76,7 +81,11 @@
       /* MAPLE ISLE NEWS — headlines that POP, and turn nervous as you eat */
       /* was top:84px, which sliced the DEVOURED meter in half every 30 seconds
          and hid the milestone banner behind it entirely */
-      #news { position: fixed; top: calc(112px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
+      /* …and the same shrink-to-fit trap: at left:50% the card could never be
+         wider than half the viewport, so `max-width: 94vw` below was dead code
+         and every headline broke into 4-5 ragged lines. Measured 166x119 on a
+         390px phone; 352x83 with max-content. */
+      #news { width: max-content; position: fixed; top: calc(112px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%) translateY(-20px) scale(0.9); z-index: 6;
         background: linear-gradient(180deg, #2c1454, #180a30);
         border: 2.5px solid #ffd25a; border-radius: 15px; overflow: hidden;
         padding: 11px 22px 13px; color: #fff; font-size: clamp(14px, 4vw, 19px); font-weight: 900; letter-spacing: 0.3px; pointer-events: none; text-align: center;
