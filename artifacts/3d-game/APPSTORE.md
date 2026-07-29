@@ -35,8 +35,11 @@ game; Capacitor wraps it in a native shell.
   match_start, evolve, caught, ate_rival, match_end, match_quit, shop_view,
   skin_view, skin_buy, skin_short, legendary_tap, purchase_intent/complete,
   session_end. match_end and match_quit both carry fps + worst-second fps, so
-  a quit spike can be checked against the hardware that produced it. Query
-  funnels in the Supabase SQL editor.
+  a quit spike can be checked against the hardware that produced it.
+  **`analytics/funnels.sql`** holds the seven ready-made queries — daily
+  picture, quit points, paid-skin demand, D1/D7 retention, match shape,
+  first-session funnel, world and device split. Paste one into the Supabase
+  SQL editor; they are read-only and create nothing.
 - **Notifications** — Daily Bite reminder at 18:30 next-day, scheduled after
   each session (`src/game/notifications.ts`). Permission is requested after
   the FIRST finished match, never at boot.

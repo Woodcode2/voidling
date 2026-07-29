@@ -202,7 +202,8 @@ _dbg.__matchState = () => ({
   t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
-    joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting })),
+    joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting,
+    lane: r.lane ?? -1, dry: Math.round((r.dry ?? 0) * 10) / 10, full: !!r.full })),
 });
 // build stamp: tiny, menu-only — every screenshot identifies its build
 {
@@ -268,7 +269,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   addCoins(15);
   questEvent('rival');
   stats.rivals = (stats.rivals ?? 0) + 1; saveStats();
-  track('ate_rival', { name, pts: Math.round(pts), marquee: !!marquee, sec: Math.round(matchLen - matchClock) });
+  track('ate_rival', { name, pts: Math.round(pts), marquee: !!marquee, sec: elapsed() });
   // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
   // off you plus half her score, so it has to land like the ending it is
   announceFam(marquee
@@ -337,7 +338,7 @@ rivals.onPlayerBitten = (name, hit) => {
   if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
   buzz(hit.hunter ? 90 : 50);
   track(hit.hunter ? 'caught' : 'nibbled', {
-    name, sec: Math.round(matchLen - matchClock), form: curStage, stolen: Math.round(hit.steal),
+    name, sec: elapsed(), form: curStage, stolen: Math.round(hit.steal),
   });
 };
 // ── THE THREAT'S THREE BEATS ────────────────────────────────────────────────
@@ -706,6 +707,10 @@ const tmpV = new THREE.Vector3();
 const fwdTmp = new THREE.Vector3(), rightTmp = new THREE.Vector3();
 let velX = 0, velZ = 0;   // smoothed velocity — kills the boxy/jerky feel
 
+/** Seconds elapsed in the current match, floored at zero — the clock reads a
+ *  hair over matchLen before the first tick, which put negative timestamps
+ *  into the telemetry. */
+const elapsed = (): number => Math.max(0, Math.round(matchLen - matchClock));
 function fmtTime(s: number) { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
 // ── coin wallet (persisted — the soft-currency for skins) ───────────────────
@@ -1146,7 +1151,7 @@ function endMatch() {
     stats.matches++; saveStats();
     countMatch();
     track('match_end', {
-      solo: true, sec: Math.round(matchLen - matchClock), score: Math.round(playerScore),
+      solo: true, sec: elapsed(), score: Math.round(playerScore),
       eaten: matchEaten, pct: devouredPct, form: curStage, coins: reward2, xp: gain2,
       ...fpsSummary(),
     });
@@ -1245,7 +1250,7 @@ function endMatch() {
   endEl.classList.add('show');
   countMatch();
   track('match_end', {
-    sec: Math.round(matchLen - matchClock), score: Math.round(playerScore), eaten: matchEaten,
+    sec: elapsed(), score: Math.round(playerScore), eaten: matchEaten,
     pct: devouredPct, place: myRank, form: curStage, coins: reward, xp: gain,
     lvl_up: leveledTo, lvl: rankInfo(xp).lvl, bites: rivalEv.bites, hunter_bites: rivalEv.hunterBites,
     ate_rivals: rivalEv.eaten, top: Math.round(rows[0].score), ...fpsSummary(),
@@ -1741,7 +1746,7 @@ el('btnHome').addEventListener('click', () => {
     saveStats();   // partial progress (things eaten) still counts toward trophies
     countMatch();
     track('match_quit', {
-      sec: Math.round(matchLen - matchClock), left: Math.round(matchClock),
+      sec: elapsed(), left: Math.round(matchClock),
       score: Math.round(playerScore), eaten: matchEaten, pct: devouredPct,
       form: curStage, bites: rivalEv.bites, ...fpsSummary(),
     });
@@ -1949,12 +1954,20 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // fold. The coin tier still leads: a child should meet something they can
   // earn before something a parent has to pay for, and that stays true now
   // that the paid tier takes money.
-  const tierOf = (s: Skin) => (s.tex ? 0 : s.cash ? 1 : 2);
+  // …and the reorder only went half way. It moved EPIC above LEGENDARY and
+  // left EVERYDAY at the bottom — but EPIC starts at 600 coins and EVERYDAY
+  // starts at 150, and a first match pays somewhere between 35 and 160. So a
+  // child opening the shop for the first time still met ten cards at
+  // 600-1,500, then seven at $4.99-$9.99, and the first thing they could
+  // realistically save for was card eighteen, below the fold. Cheapest first,
+  // dearest last: the aspirational tier is what you scroll INTO, which is
+  // where wanting things comes from.
+  const tierOf = (s: Skin) => (s.cash ? 2 : s.tex ? 1 : 0);
   const SORTED = [...SKINS].sort((a, b) => tierOf(a) - tierOf(b));
   const TIER_HEAD = [
+    '<div class="shopTier">🎨 EVERYDAY <span>SPEND ✦ COINS</span></div>',
     '<div class="shopTier">💫 EPIC <span>SPEND ✦ COINS</span></div>',
     `<div class="shopTier gold">✨ LEGENDARY <span>${iapAvailable() ? 'REAL MONEY' : 'ON THE APP STORE'}</span></div>`,
-    '<div class="shopTier">🎨 EVERYDAY <span>SPEND ✦ COINS</span></div>',
   ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
   // still shows a branded colored orb, never a bare black hole on a $4.99 card
@@ -2691,7 +2704,7 @@ function animate() {
       holdBanner(2.4);   // this card owns the screen while it plays
     }
     audio.evolve();
-    track('evolve', { form: curStage, name: FORMS[curStage], sec: Math.round(matchLen - matchClock) });
+    track('evolve', { form: curStage, name: FORMS[curStage], sec: elapsed() });
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
     audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);   // the soundtrack escalates too
     buzz(45);

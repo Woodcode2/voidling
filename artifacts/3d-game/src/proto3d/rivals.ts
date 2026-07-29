@@ -14,7 +14,11 @@ export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 export interface RivalCtx { matchLen: number; playerScore: number; fever: number; }
 // what a rival COSTS you when it catches you — the HUD reports both halves
 export interface RivalHit { shrink: number; steal: number; hunter: boolean; }
-export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean; }
+export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean;
+  // QA readouts: which rung of the ladder this one is running, and how long
+  // since it last swallowed anything. Both exist because "why is DOZER on 47
+  // points" cost five wrong guesses to answer without them.
+  lane?: number; dry?: number; full?: boolean; }
 export interface Rivals {
   list: Rival[];
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number, ctx?: RivalCtx): void;
@@ -29,6 +33,9 @@ export interface Rivals {
 }
 
 const NAMES = ['WOBBLES', 'GLITZ', 'BITSY', 'CHOMPZILLA', 'DOZER'];
+const FIRST_LANE: Record<string, number> = {
+  CHOMPZILLA: 0, GLITZ: 1, BITSY: 2, WOBBLES: 3, DOZER: 4,
+};
 // ── ARCHETYPES ───────────────────────────────────────────────────────────────
 // The family used to path to food and back — five different faces running one
 // brain. Every member now plays a game a child can NAME after watching it for
@@ -134,6 +141,42 @@ const COLORS = [0x2fd8c0, 0xff6fb0, 0xff9a3a, 0x7ed57a, 0x4d8ff0];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 // must match the player model (2D game constants through the 0.05 map scale)
 const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.025;
+// ── THE FIELD IS A LADDER, NOT A LOTTERY ─────────────────────────────────────
+// Measured across identical zero-input matches on MAPLE FALLS: the leader
+// finished on 13,482 / 13,459 / 13,313 — a 1.3% spread, because the size cap
+// pins the top of the field — while SECOND place came in on 11,988, then
+// 3,663, then 10,194, and FOURTH on 3,527, then 792, then 4,653. A fifteenfold
+// swing on identical play. A child's finishing position was therefore decided
+// by which district a sibling happened to wander into, not by anything the
+// child did, and "you came 2nd" carried no information about how well they
+// played.
+//
+// Each rival now runs in a LANE: a target score for this moment in the match.
+// They still hunt, flee, follow footprints and amble exactly as before — the
+// lane only nudges what a BITE IS WORTH, bounded hard in both directions, so a
+// sibling who blunders into the fairground cannot run away with the match and
+// one who finds an empty field cannot finish on 47. Placement becomes five
+// spaced thresholds a player can learn and beat.
+//
+// Lanes are re-shuffled every match, so which sibling is the one to beat still
+// changes — the variety lives in the CAST, not in the difficulty.
+//
+// Tuned against measurement, not intuition. A first pass tried to hold the
+// lanes with the score multiplier alone and could not: a rival ten times over
+// its lane was already pinned at the multiplier's floor and still finished on
+// 9,901 against a target of 1,041, because 0.35x of a large appetite is still
+// large. Pushing the floor low enough to bind would have meant a rival
+// swallowing a house for one point, which looks broken on the leaderboard.
+// So the multiplier handles the rival who is BEHIND, and a satiety gate
+// handles the one who is ahead: past its lane it simply stops looking for
+// food and ambles until the lane catches up. That reads on screen as a
+// character who has had enough, which is the same beat the stuffed hunter
+// already plays.
+const LANE_FINAL = [1.00, 0.68, 0.46, 0.31, 0.20];   // fractions of the top lane
+const FIELD_TOP = 16000;        // what first place is worth in a full-length match
+const FIELD_CURVE = 1.45;       // eating accelerates: the ladder rises the same way
+const FULL_AT = 1.20;           // stop foraging this far past the lane…
+const HUNGRY_AT = 0.95;         // …and start again when the lane catches up
 const growR = (R: number, eR: number) => {
   const rookie = R < 1.7 ? 1.6 : R < 2.5 ? 1.3 : 1;
   const diminish = Math.sqrt(START_R / Math.max(START_R, R));
@@ -281,6 +324,9 @@ export function createRivals(
     arch: Arch; group: THREE.Group; body: THREE.Mesh; eyes: THREE.Group; halo: THREE.Mesh;
     tx: number; tz: number; retarget: number; joinAt: number; joined: boolean; cast: boolean;
     stall: number; stuckN: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number;
+    lane: number;   // which rung of the finishing ladder this one is running
+    dry: number;    // seconds since this rival last swallowed anything
+    full: boolean;  // past its lane: ambling, not foraging
     respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean;
     visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number;
     // scoring, on the player's own terms
@@ -324,6 +370,11 @@ export function createRivals(
       group, body: group.children[0] as THREE.Mesh, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
       joinAt: 9e9, joined: false, cast: false, stall: 0, stuckN: 0, ph: rand(0, 6), pulse: 0,
+      // THE FIRST MATCH OF A PAGE LOAD IS AUTHORED, like the spawn. reset()
+      // re-deals the ladder on every rematch, but a fresh load should open on
+      // the reading that teaches the game: the hunter is the one to beat and
+      // grandpa is bringing up the rear.
+      lane: FIRST_LANE[nm] ?? i, dry: 0, full: false,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
       visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
       combo: 0, comboT: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
@@ -401,6 +452,25 @@ export function createRivals(
     return [0, 0];   // the island centre always works
   };
 
+  /**
+   * The score a rival in this lane should be carrying at time t.
+   *
+   * The ladder is anchored to FIELD_TOP but scaled by how the player is
+   * actually doing, bounded to 0.62x-1.35x. That keeps both halves of the
+   * promise: a struggling child can still reach third rather than staring at
+   * an unreachable wall, and a child who is genuinely eating the island has to
+   * keep earning first place instead of lapping a frozen field. It is a nudge
+   * with a hard ceiling, not the old lottery.
+   */
+  const laneWant = (lane: number, t: number, matchLen: number, pScore: number): number => {
+    const prog = THREE.MathUtils.clamp(t / Math.max(1, matchLen), 0, 1);
+    const shape = Math.pow(prog, FIELD_CURVE);
+    // par: what a player keeping level with third place would be carrying now
+    const par = Math.max(200, FIELD_TOP * LANE_FINAL[2] * shape);
+    const scale = THREE.MathUtils.clamp(0.62 + 0.38 * (pScore / par), 0.62, 1.35);
+    return FIELD_TOP * (LANE_FINAL[lane] ?? 0.14) * shape * scale;
+  };
+
   const anyVisiting = () => rivals.some((r) => r.visiting);
   const tmp = new THREE.Vector3();
   const rollQ = new THREE.Quaternion();   // scratch: the rolling-ball delta
@@ -420,7 +490,7 @@ export function createRivals(
         rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
         rv.combo = 0; rv.comboT = 0; rv.cst = 0; rv.ctim = rand(6, 10);
         rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false; rv.stuffCap = 0;
-        rv.lockR = 0; rv.tgt = null;
+        rv.lockR = 0; rv.tgt = null; rv.dry = 0; rv.full = false;
         rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
         rv.roll.identity(); rv.body.quaternion.identity();
         rv.group.visible = rv.halo.visible = false;
@@ -429,6 +499,12 @@ export function createRivals(
         rv.hx = Math.cos(ang) * rand(105, 155); rv.hz = Math.sin(ang) * rand(105, 155);
         rv.campX = rv.hx; rv.campZ = rv.hz; rv.campT = 0;
       });
+      // …and re-deal the ladder. Every sibling gets a turn at the top of the
+      // leaderboard across a session, while the thresholds themselves stay put.
+      {
+        const lanes = roster.map((_, i) => i).sort(() => Math.random() - 0.5);
+        roster.forEach((rv, i) => { rv.lane = lanes[i]; });
+      }
       // RE-ROLL THE MATCH. The cast shuffle and the join times used to be
       // rolled once, in the closure, at module load — so they only ever changed
       // on a full page reload, and the game's own PLAY AGAIN button never
@@ -724,7 +800,9 @@ export function createRivals(
           // 0.70, drove to one, and sat on it for the rest of the match. A
           // rival that can target what it cannot eat is a rival that starves
           // next to food.
-          const minBite = rv.r * 0.45;
+          // A rival past its lane picks no target at all — it wanders, chats and
+          // waits for the ladder to rise past it.
+          const minBite = rv.full ? Infinity : rv.r * 0.45;
           // where this archetype is allowed to look, and how it ranks what it finds
           let ax = rv.x, az = rv.z, reach = Infinity, bigHunger = 0;
           // THE HOARDER HAS NO CAMP ANY MORE. He had a bespoke one — search
@@ -745,9 +823,14 @@ export function createRivals(
             // trails four seconds back with a wider look, which is still
             // unmistakably "following your footprints" but leaves her the
             // things you drove straight past.
+            // …and if the footprints stop paying she forages for herself.
+            // Measured: against a player who parked, BITSY went 79.9 seconds
+            // without swallowing anything, because the patch four seconds
+            // behind a stationary void is a patch she already stripped.
             const back = Math.max(0, trail.length - 1 - 12);
-            const spot = trail[back];
+            const spot = rv.dry > 12 ? null : trail[back];
             if (spot) { ax = spot.x; az = spot.z; reach = 78; }
+            else if (rv.dry > 12) { /* forage anywhere, like everyone else */ }
             else { ax = px; az = pz; reach = 78; }
           } else if (rv.arch === 'BULLY' && hunting) { ax = px; az = pz; reach = 85; }  // prowls YOUR block
           for (const e of edibles) {
@@ -994,22 +1077,30 @@ export function createRivals(
         // 15:1, which meant the HUD and the leaderboard told a child two
         // opposite stories about the same match.
         rv.comboT -= dt; if (rv.comboT <= 0) rv.combo = 0;
-        // RUBBER BAND — the leaderboard has to stay a real question without
-        // ever becoming hopeless. A family member well ahead of the player eats
-        // for less; one falling behind eats for more. Bounded both ways, so it
-        // nudges the race without deciding it.
-        const gap = (rv.score - pScore) / Math.max(900, pScore * 0.4);
-        const band = THREE.MathUtils.clamp(1 - gap * 0.7, 0.34, 1.55);
+        rv.dry += dt;
+        // LANE CONTROL — see LANE_FINAL. Where this rival's score OUGHT to be
+        // by now, and a bounded correction toward it. The old rubber band read
+        // the gap to the PLAYER, which kept the race close on average and did
+        // nothing at all about the field's own wild internal spread.
+        const want = laneWant(rv.lane, _t, matchLen, pScore);
+        // >1 means behind the lane. The square root makes the correction firm
+        // without being a teleport: a quarter of the way to target eats at 2x,
+        // four times past it eats at half.
+        const off = want / Math.max(120, rv.score);
+        const band = THREE.MathUtils.clamp(Math.sqrt(off), 0.50, 2.4);
+        // SATIETY. The half of lane control the multiplier cannot do.
+        if (rv.score > want * FULL_AT) rv.full = true;
+        else if (rv.score < want * HUNGRY_AT) rv.full = false;
         // …and the same crumb floor applies to what they sweep up in passing,
         // or they would strip the beginner layer just by driving over it
-        const minSwallow = rv.r * 0.45;
+        const minSwallow = rv.full ? Infinity : rv.r * 0.45;
         for (const e of edibles) {
           if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minSwallow) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius * 0.6) ** 2) {
             e.mesh.userData.eaten = true;
             shrinking.push(e.mesh);   // animate out — buildings must never BLINK away
-            rv.combo++; rv.comboT = RIVAL_COMBO_HOLD;
+            rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
             const comboMult = 1 + Math.min(rv.combo, 25) * 0.1;
             const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
             rv.score += Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * fever * band));
