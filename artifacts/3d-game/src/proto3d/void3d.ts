@@ -32,6 +32,22 @@ export interface Void3D {
 
 const RADIUS_SINK = 0.9;   // how much of the orb sits above ground (rest sinks)
 
+/** A real N-point star. CircleGeometry(r, 5) is a regular PENTAGON, which is
+ *  exactly what Uni-Void's signature "star eyes" and the Archmage's hat star
+ *  were rendering as: two flat beige polygons in the pupils, and a pale
+ *  pentagon on the wizard's forehead. */
+function starShape(outer: number, inner: number, points = 5): THREE.ShapeGeometry {
+  const sh = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? outer : inner;
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) sh.moveTo(x, y); else sh.lineTo(x, y);
+  }
+  sh.closePath();
+  return new THREE.ShapeGeometry(sh);
+}
+
 // ── ONE BODY FOR EVERY VOID ────────────────────────────────────────────────
 // The player and the family now render with the SAME material: the jelly
 // wobble, the four-stop fresnel, the character sheen and the hide pattern.
@@ -113,7 +129,14 @@ const VOID_FRAG = `
     // uSmall (1 when he is only a few dozen pixels across) widens the rim so
     // the lit edge never falls below a pixel and dissolve into the ground.
     vec3 col = mix(uInner, uMid, smoothstep(0.10, 0.55, u));
-    col = mix(col, uRim, smoothstep(mix(0.58, 0.34, uSmall), 1.0, u));
+    // THE RIM IS AN EVENT HORIZON, NOT THE BODY. u is the normalised disc
+    // radius, so a 0.58 stop mixed the rim colour over 1 - 0.58^2 = 66% of the
+    // disc AREA, and 88% at speck size. King Void therefore rendered as a solid
+    // gold ball with a brown smudge, contradicting both its own palette comment
+    // (body stays dark, the RIM is the gold) and its shop card, which draws a
+    // dark orb with a thin gold edge. Pulled out to 0.74 so mid and inner
+    // carry the character and the rim is the lit lip of the hole.
+    col = mix(col, uRim, smoothstep(mix(0.74, 0.50, uSmall), 1.0, u));
     // premium skin: wrap the AI texture around the orb (slow drift), keep
     // the darker core + lit rim so it still reads as a VOID
     if (uTexAmt > 0.01) {
@@ -467,7 +490,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     pupilGrp.add(pupil);
     // ── CHARACTER EYES: legendary skins change the PUPIL, which is what your
     // brain reads as "a different creature". Hidden on the default void.
-    const starPupil = new THREE.Mesh(new THREE.CircleGeometry(0.058, 5),
+    const starPupil = new THREE.Mesh(starShape(0.075, 0.032, 5),
       new THREE.MeshBasicMaterial({ color: 0xffe8a0, transparent: true, opacity: 0, depthWrite: false }));
     starPupil.position.z = 0.012; starPupil.rotation.z = Math.PI;   // point up
     const glowRing = new THREE.Mesh(new THREE.RingGeometry(0.085, 0.13, 28),
@@ -613,11 +636,15 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // SILHOUETTE of the creature itself, which is the difference between "a
   // void wearing a unicorn hat" and "a unicorn void".
   const bodyPart: Record<string, THREE.Group> = {};
+  let maneMat: THREE.MeshStandardMaterial | null = null;
+  const dress = new THREE.Group();
+  dress.name = 'dress';   // QA: the costume-placement probe finds parts by this
+  bob.add(dress);
   {
     const mk = (kind: string, build: (g: THREE.Group) => void) => {
       const g = new THREE.Group(); build(g); g.visible = false;
       g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
-      bob.add(g); bodyPart[kind] = g;
+      dress.add(g); bodyPart[kind] = g;
     };
     // DINO SNOUT: a blunt jaw pushing out of the face, with nostrils + teeth
     mk('snout', (g) => {
@@ -646,6 +673,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // MANE: a soft ruff of tufts around the crown — reads as FUR from above
     mk('mane', (g) => {
       const m = new THREE.MeshStandardMaterial({ color: 0xf6e8ff, roughness: 0.85, flatShading: true });
+      maneMat = m;   // tinted per skin at equip time — see setSkin
       // BACK HEMISPHERE ONLY. A ruff that wraps the front buries the face —
       // the eyes are the character, nothing may sit in front of them.
       for (let i = 0; i < 9; i++) {
@@ -681,7 +709,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     for (const name of ['unicorn', 'dino', 'wizard', 'dragon', 'mecha', 'ninja', 'king']) {
       const g = buildAccessory(name);
       g.visible = false;
-      bob.add(g); acc[name] = g;
+      dress.add(g); acc[name] = g;
     }
   }
 
@@ -835,6 +863,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       orbStars.forEach((sp) => (sp.material as THREE.SpriteMaterial).color.set(s.glow));
       for (const k in acc) acc[k].visible = false;
       if (s.acc && acc[s.acc]) acc[s.acc].visible = true;
+      // the mane is shared geometry, so it takes the wearer's own colour —
+      // otherwise the Archmage turns up in Uni-Void's white unicorn hair
+      if (maneMat) maneMat.color.set(s.rim);
       // ── apply the CHARACTER RIG (legendary skins only) ──────────────────
       const ch = s.char;
       const eyeMode = ch?.eyes;
@@ -993,6 +1024,14 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       face.scale.setScalar(dispR);
       face.position.set(0, dispR * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
+      // …and the costume follows the face round the orb. Yaw only: a crown
+      // must stay on top of the head, not tip toward the lens.
+      dress.rotation.y = Math.atan2(camera.position.x - group.position.x, camera.position.z - group.position.z);
+      // A crown point 0.38 units tall is 3.5 device pixels at match start, so
+      // the parts get the same caricature LOD the eyes and mouth already have
+      // (eyeLod below) — otherwise the thing a parent paid for is invisible for
+      // the first third of every match.
+      dress.scale.setScalar(1 + small * 0.42);
       // ── AND PUSH IT CLEAR OF THE BODY ──────────────────────────────────
       // The features used to sit at z = 1.0–1.02 in a unit-sphere face, i.e.
       // exactly ON the surface. Every jelly slosh (up to +11%) and every
@@ -1171,7 +1210,7 @@ export function buildAccessory(kind: string): THREE.Group {
     cone.position.set(0.06, 1.34, 0); cone.rotation.z = -0.14; g.add(cone);
     const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.66, 0.08, 16), hm);
     brim.position.set(0.03, 0.94, 0); brim.rotation.z = -0.08; g.add(brim);
-    const star = new THREE.Mesh(new THREE.CircleGeometry(0.09, 5),
+    const star = new THREE.Mesh(starShape(0.115, 0.05, 5),
       new THREE.MeshBasicMaterial({ color: 0xffe08a, side: THREE.DoubleSide }));
     star.position.set(0.28, 1.28, 0.3); g.add(star);
   }
