@@ -1065,10 +1065,15 @@ let xp = Number(localStorage.getItem('voidXP') || 0);
 let streak = Number(localStorage.getItem('voidStreak') || 0);
 // per-level XP spans: the first levels pop in 1-2 matches, MASTER is a season
 const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250, 300, 400];
+// ONE LADDER, FIVE RUNGS, VISIBLE DOUBLING. There were five price points
+// inside a single tier with 1.2x steps between them (600/600/600/750/750/750/
+// 900/900/900/1500), which is noise a child cannot rank — Royal cost 2.5x
+// Nebula and wore the identical ribbon. The whole coin catalogue was 9,450
+// coins: at ~139 a match that is 68 matches, about three and a half hours, to
+// own a set in which ten of the sixteen differ by one texture uniform. It is
+// now 2,700 coins, roughly 19 matches, and every rung is a different colour.
 const PRICES: Record<string, number> = {
-  classic: 0, galaxy: 150, wizard: 150, sunset: 250, toxic: 250, ocean: 400,
-  nebula: 600, magma: 600, candy: 600, aurora: 750,
-  honey: 750, glacier: 750, sherbet: 900, cyber: 900, blossom: 900, royal: 1500,
+  classic: 0, toxic: 150, sunset: 300, ocean: 500, candy: 750, honey: 1000,
 };
 /** THE NEXT THING TO CHASE. The results screen stated an outcome and offered a
  *  button; it never stated a goal, which is the moment a child decides whether
@@ -1974,12 +1979,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // realistically save for was card eighteen, below the fold. Cheapest first,
   // dearest last: the aspirational tier is what you scroll INTO, which is
   // where wanting things comes from.
-  const tierOf = (s: Skin) => (s.cash ? 2 : s.tex ? 1 : 0);
+  // THE EPIC TIER IS GONE. void3d's setSkin shows the engine's entire
+  // difference between CLASSIC and EPIC: one texture uniform. Pattern, eye
+  // shape, aura, body geometry and accessories are all gated on the character
+  // rig, which only the paid skins have. So there were three rarity names for
+  // two real classes — colour, and character. Now there are two, plus the free
+  // streak rewards, which had been sorting under a header that said SPEND
+  // COINS above two cards that cannot be bought with coins.
+  const tierOf = (s: Skin) => (s.cash ? 2 : s.streak ? 1 : 0);
   const SORTED = [...SKINS].sort((a, b) => tierOf(a) - tierOf(b));
   const TIER_HEAD = [
-    '<div class="shopTier">🎨 EVERYDAY <span>SPEND ✦ COINS</span></div>',
-    '<div class="shopTier">💫 EPIC <span>SPEND ✦ COINS</span></div>',
-    `<div class="shopTier gold">✨ LEGENDARY <span>${iapAvailable() ? 'REAL MONEY' : 'ON THE APP STORE'}</span></div>`,
+    '<div class="shopTier">🎨 COINS <span>A NEW LOOK FOR YOUR VOID</span></div>',
+    '<div class="shopTier">🔥 COME BACK <span>FREE — PLAY EVERY DAY</span></div>',
+    `<div class="shopTier gold">✨ LEGENDARY <span>${iapAvailable() ? 'A WHOLE NEW CHARACTER' : 'COMING SOON ON iPHONE'}</span></div>`,
   ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
   // still shows a branded colored orb, never a bare black hole on a $4.99 card
@@ -2037,9 +2049,10 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     prevSkin = s;
     const orb = el('spOrb');
     orb.setAttribute('style', orbStyle(s));
-    orb.innerHTML = s.art ? '' : FACE_SVG;
+    orb.innerHTML = FACE_SVG + (s.art ? `<div class="artLay" style="background-image:url('${s.art}')"></div>` : '');
     el('spName').textContent = s.name;
-    el('spTier').textContent = s.cash ? 'LEGENDARY' : s.streak ? 'STREAK REWARD' : s.tex ? 'EPIC' : 'CLASSIC LINE';
+    el('spTier').textContent = s.cash ? 'LEGENDARY · A WHOLE NEW CHARACTER'
+      : s.streak ? 'COME BACK · FREE' : 'COINS · A NEW LOOK';
     refreshPreview();
     prevEl.classList.add('show');
     audio.ready();
@@ -2054,8 +2067,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const s = prevSkin;
     if (!s) return;
     if (s.streak && !owned.has(s.id)) {
+      // it used to fire the error buzz and return — no toast, no explanation,
+      // no state change. A child taps a card in the shop and the game buzzes.
       track('skin_streak_tap', { skin: s.id, days: s.streak });
-      audio.hit(); return;   // earned by coming back
+      spAct.textContent = `PLAY ${s.streak} DAYS IN A ROW — YOU'RE ON DAY ${streak}`;
+      audio.ready();
+      setTimeout(refreshPreview, 2200);
+      return;
     }
     if (s.cash && !owned.has(s.id)) {
       // THE demand signal for in-app purchases: how many children reach for a
@@ -2133,8 +2151,11 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       grid.appendChild(hd.firstElementChild!);
     }
     const card = document.createElement('div');
-    card.className = 'skCard' + (s.cash ? ' legend' : s.tex ? ' epic' : '');
-    const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : s.tex ? '<div class="rib epicRib">EPIC</div>' : '';
+    // the ribbon marks the ONE tier that is different in kind. It used to key
+    // on s.tex, which is now on every coin skin, so a 150-coin card wore an
+    // EPIC banner.
+    card.className = 'skCard' + (s.cash ? ' legend' : '');
+    const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : '';
     // the face ALWAYS renders under the art: if the art CDN blinks, a $9.99
     // card must still show a voidling, never a bare gradient circle
     card.innerHTML = `${ribbon}<div class="orb" style="${orbStyle(s)}">${FACE_SVG}${artLayer(s)}</div><div class="nm">${s.name}</div><div class="pr"></div>`;

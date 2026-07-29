@@ -110,21 +110,15 @@ export interface Skin {
 }
 export const SKINS: Skin[] = [
   { id: 'classic', name: 'Classic', abyss: 0x321253, inner: 0x6128ad, mid: 0x8f4ce6, rim: 0xb678ff, glow: 0xb875ff },
-  { id: 'galaxy', name: 'Galaxy', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x7a54d8, glow: 0xb98cff },
-  { id: 'wizard', name: 'Violet', abyss: 0x1c1038, inner: 0x45308a, mid: 0x6a4ab8, rim: 0xa888e8, glow: 0xc9a6ff },
-  { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a },
-  { id: 'toxic', name: 'Toxic', abyss: 0x0e2412, inner: 0x1e5a2a, mid: 0x3a9a4a, rim: 0x7ed57a, glow: 0xa8ff8a },
-  { id: 'ocean', name: 'Ocean', abyss: 0x0a1830, inner: 0x1a4070, mid: 0x2a6ab8, rim: 0x5ec8d8, glow: 0x8ae8ff },
-  { id: 'nebula', name: 'Nebula', abyss: 0x0d0821, inner: 0x241250, mid: 0x45248a, rim: 0x8a5cf0, glow: 0xb98cff, tex: '/assets/hf/hf_20260717_005240_697d3ae9-f61f-4f42-8ece-3b2413779221.png' },
-  { id: 'magma', name: 'Magma', abyss: 0x1a0b06, inner: 0x51200a, mid: 0x8a3510, rim: 0xff7a2a, glow: 0xff9a4d, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
+  // Toxic pushed off Rexling's deep dinosaur green toward acid lime, so the
+  // 150-coin skin no longer arrives first and undercuts the $4.99 one.
+  { id: 'toxic', name: 'Toxic', abyss: 0x14300c, inner: 0x357a12, mid: 0x7ec832, rim: 0xc4ff6a, glow: 0xd8ff8a, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },
+  { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
+  { id: 'ocean', name: 'Ocean', abyss: 0x0a1830, inner: 0x1a4070, mid: 0x2a6ab8, rim: 0x5ec8d8, glow: 0x8ae8ff, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
   { id: 'candy', name: 'Candy', abyss: 0x40182a, inner: 0x8a3a5e, mid: 0xd86a9a, rim: 0xffb8d8, glow: 0xffc9e2, tex: '/assets/hf/hf_20260717_005243_b9bfd850-ba19-4200-8b94-c91e7f8554a2.png' },
-  { id: 'aurora', name: 'Aurora', abyss: 0x061a20, inner: 0x0e3a4a, mid: 0x1a6a78, rim: 0x5ee8d8, glow: 0x8affe8, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },
-  { id: 'honey', name: 'Honey', abyss: 0x2a1606, inner: 0x6a4210, mid: 0xb87f1a, rim: 0xffd25a, glow: 0xffe08a, tex: '/assets/hf/hf_20260717_131501_87fecffb-5637-49ad-87f5-106990a4f100.png' },
-  { id: 'glacier', name: 'Glacier', abyss: 0x0a1c28, inner: 0x1a4a5e, mid: 0x3a8aa8, rim: 0x9fe8ff, glow: 0xc9f2ff, tex: '/assets/hf/hf_20260717_131503_47baaeac-a806-4062-9114-5b37f8279aeb.png' },
-  { id: 'sherbet', name: 'Sherbet', abyss: 0x3a2030, inner: 0x8a4a62, mid: 0xd88aa0, rim: 0xffd2b8, glow: 0xffe2d2, tex: '/assets/hf/hf_20260717_131504_d3840e82-4c2b-4b68-8857-811dfcf85084.png' },
-  { id: 'cyber', name: 'Cyber', abyss: 0x060d20, inner: 0x102a50, mid: 0x1a4a8a, rim: 0x4de8ff, glow: 0x7bffe8, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
-  { id: 'blossom', name: 'Blossom', abyss: 0x38182a, inner: 0x7a3a55, mid: 0xc0688a, rim: 0xffb8cc, glow: 0xffd2e2, tex: '/assets/hf/hf_20260717_131508_1f6ff369-a72a-4d3a-9a37-2261344cde24.png' },
-  { id: 'royal', name: 'Royal', abyss: 0x200a38, inner: 0x48207a, mid: 0x7a3ab8, rim: 0xd8a848, glow: 0xffd25a, tex: '/assets/hf/hf_20260717_131509_a28d269a-2130-4f39-9b72-b46f5c3ebbeb.png' },
+  // Honey's rim was byte-identical to King Void's (#ffd25a) — the gold that is
+  // meant to make the $9.99 crown feel royal was already on a coin skin.
+  { id: 'honey', name: 'Honey', abyss: 0x2a1606, inner: 0x6a4210, mid: 0xb87f1a, rim: 0xffb84a, glow: 0xffd486, tex: '/assets/hf/hf_20260717_131501_87fecffb-5637-49ad-87f5-106990a4f100.png' },
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
   { id: 'ember', name: 'Ember', abyss: 0x260a06, inner: 0x6a2410, mid: 0xc4571a, rim: 0xffb054, glow: 0xffcf7a, streak: 2 },
   { id: 'prism', name: 'Prism', abyss: 0x1a1030, inner: 0x4a2a8a, mid: 0x8a5ac8, rim: 0xe8b8ff, glow: 0xfff0a8, streak: 7 },

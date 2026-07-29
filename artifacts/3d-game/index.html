@@ -176,10 +176,8 @@
          and the owner counted them. The chip's bar is the one that stays: it
          is where a player is already looking, and it is hole.io's own idiom. */
       /* skin swatches */
-      #skins { position: fixed; left: 14px; bottom: 18px; z-index: 6; display: flex; gap: 8px; }
-      #skins button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35);
-        cursor: pointer; padding: 0; transition: transform 0.1s, border-color 0.15s; }
-      #skins button.sel { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 10px rgba(255,255,255,0.4); }
+      /* the #skins swatch row is gone — it had no matching element in the body
+         and appeared in none of 143 measured frames */
       /* powers are CARVED OUT for launch — pure hole.io: drag + eat. UI hidden,
          systems stay in code for a future update */
       #powers, #hunger, #hungerlbl { display: none !important; }
@@ -579,7 +577,12 @@
       #shop { position: fixed; inset: 0; z-index: 11; display: none; flex-direction: column; align-items: center;
         background: rgba(13,8,33,0.94); backdrop-filter: blur(8px); padding-top: 26px; overflow-y: auto; }
       #shop.show { display: flex; }
-      #shopGrid { padding-bottom: 22px; }
+      #shopGrid { padding-bottom: 22px; padding-top: 44px; }
+      /* the preview orb layers card art OVER the face, exactly like the grid
+         card — so a slow or blocked image still shows a voidling, never a bare
+         gradient circle on a $9.99 product */
+      #spOrb { position: relative; overflow: hidden; }
+      #spOrb .artLay { position: absolute; inset: 0; background-size: cover; background-position: center; }
       /* App Review requires a restore control; it must be findable but must
          never compete with the cards for a child's attention */
       #btnRestore { font-family: inherit; font-size: 12px; font-weight: 800; letter-spacing: 1.4px;
