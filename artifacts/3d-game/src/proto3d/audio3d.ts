@@ -54,13 +54,30 @@ export function createAudio(): Audio3D {
   // sounds like a tune rather than a stutter
   const PENTA = [0, 2, 4, 7, 9, 12, 9, 7];
   let comboStep = 0;
-  const MASTER_VOL = 0.32;
+  // ── THE MIX HAD 40 dB OF UNUSED HEADROOM ──────────────────────────────────
+  // Measured with a calibrated analyser on ctx.destination: median RMS
+  // -62 dBFS on Maple, -56 on the bay, with peaks never past -30. Meanwhile a
+  // single chomp peaks at -26 dBFS — one eat is louder than the loudest instant
+  // of thirty-six seconds of band, and about 30 dB above the music's median. On
+  // a phone speaker the score is simply inaudible under the effects, which is
+  // most of why "the music is gone" was the report on BOTH worlds.
+  //
+  // Raising the gains alone would clip, because the one-shots bypass the band
+  // bus and go straight to master. So master now runs through a limiter and the
+  // band buses come up underneath it.
+  const MASTER_VOL = 0.62;
 
   function ensure(): Ctx | null {
     if (!ctx) {
       try {
         ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        master = ctx.createGain(); master.gain.value = muted ? 0 : MASTER_VOL; master.connect(ctx.destination);
+        master = ctx.createGain(); master.gain.value = muted ? 0 : MASTER_VOL;
+        // a soft limiter, not a compressor doing tone: it sits nearly idle on
+        // the band and only catches the one-shot stack when several land at once
+        const lim = ctx.createDynamicsCompressor();
+        lim.threshold.value = -6; lim.knee.value = 6; lim.ratio.value = 12;
+        lim.attack.value = 0.003; lim.release.value = 0.14;
+        master.connect(lim); lim.connect(ctx.destination);
       } catch { return null; }
     }
     if (ctx.state === 'suspended') void ctx.resume();
@@ -687,7 +704,7 @@ export function createAudio(): Audio3D {
   // as MAPLE ISLE's. Switching worlds should not be a jump scare. This lands
   // the band a few dB above Maple, which is the right relationship for the
   // rowdier of the two, and leaves plenty of headroom for the one-shots.
-  const PIR_VOL = 0.19;
+  const PIR_VOL = 0.42;   // was 0.19 — see the headroom note on MASTER_VOL
   let pirBus: GainNode | null = null;
   let ambGain: GainNode | null = null;
   let pirTimer: ReturnType<typeof setInterval> | null = null;
@@ -825,7 +842,10 @@ export function createAudio(): Audio3D {
       const z = zoneLayer(c, curZone);
       if (!z.on) { z.on = true; z.until = 0; ramp(z.g.gain, z.vol, now, fade); }
     }
-    if (pirBus) ramp(pirBus.gain, pirRunning ? (curZone === 'party' ? PIR_VOL * 0.5 : PIR_VOL) : 0, now, fade);
+    // was PIR_VOL * 0.5 on the floor — a further 6 dB off a band that had
+    // already lost most of its voices, which is what turned "quieter" into
+    // "gone". The club is additive now, so a gentle 0.82 is enough to make room.
+    if (pirBus) ramp(pirBus.gain, pirRunning ? (curZone === 'party' ? PIR_VOL * 0.82 : PIR_VOL) : 0, now, fade);
   }
 
   // ── ambience: gulls, surf, a far-off bell ─────────────────────────────────
@@ -883,7 +903,7 @@ export function createAudio(): Audio3D {
         if (r < 0.38) gull(t); else if (r < 0.6) surfSwell(t); else if (r < 0.82) shipBell(t); else ropeCreak(t);
       }
       // the dance floor is loud enough already — thin the ambience right out
-      ambNextT = t + (curZone === 'party' ? 13 : 6) + Math.random() * 9;
+      ambNextT = t + (curZone === 'party' ? 9 : 6) + Math.random() * 9;
     }
   }
 
@@ -914,11 +934,26 @@ export function createAudio(): Audio3D {
       const e = s >> 1, onE = (s & 1) === 0;   // eighth index 0..5
       const ch = S_CHORD[bar];
       const note = S_HOOK[bar][e];
-      // On the dance floor the bed ducks to half and the floor brings its own
-      // kit — so the band's percussion and melody are DROPPED rather than
-      // buried, leaving bass and squeezebox chords bleeding through the door.
-      // Fewer voices AND a cleaner mix out of the same decision.
-      const floor = zoneLive('party', t);
+      // ── WHY THE BAY SOUNDED LIKE IT HAD NO MUSIC ────────────────────────
+      // This flag used to DROP the band's percussion and melody outright on
+      // the dance floor. That is a fine idea for a district you visit and a
+      // fatal one for the district the game SPAWNS you in: an instrumented
+      // voice census over the first 40 seconds of a bay match counted 883
+      // sound starts and, among them, 0 stomps, 0 claps, 0 shakers, 0
+      // accordion, 0 fiddle, 0 whistle, 0 steel pan, 0 marimba and 0 crew
+      // shouts. Every note of the level's identity, gone, for the whole
+      // opening. Walk 25 units north and the accordion jumped from 0 to 9.44
+      // notes a second.
+      //
+      // The club is now ADDITIVE, the way Maple's districts are — it lays its
+      // kit ON TOP of the band instead of replacing it. `duck` thins the
+      // shanty's percussion so the two do not fight, but the hook, the fiddle
+      // and the HEYs always play. The bay always has its tune.
+      const duck = zoneLive('party', t);
+      // …and the tune gets a grace period regardless: for the first eight bars
+      // of a match the band plays in full even on the floor, so the very first
+      // thing a child hears on PIRATE BAY is the shanty.
+      const floor = duck && pirStep > 96;
 
       // ── THE ENGINE: oom-pah-pah, oom-pah-pah ───────────────────────────────
       // Bass on the two pulses, squeezebox chops on the four eighths between.
@@ -947,8 +982,11 @@ export function createAudio(): Audio3D {
       if (!floor && st >= 3 && (s === 3 || s === 7 || s === 11)) shaker(pirBus, t, 0.014);
 
       // ── THE HOOK ──────────────────────────────────────────────────────────
-      if (!floor && onE && note > 0) {
-        accord(pirBus, note, t, e8 * 0.92, 0.1);   // squeezebox has the tune from bar one
+      // THE HOOK ALWAYS PLAYS. On the floor it sits under the club kit at
+      // 55% rather than disappearing.
+      if (onE && note > 0) {
+        const hookV = floor ? 0.55 : 1;
+        accord(pirBus, note, t, e8 * 0.92, 0.1 * hookV);   // squeezebox has the tune from bar one
         // The fiddle joins on the ANSWER bars first (1 and 3), so the arrival
         // of stage 1 sounds like a second player picking the tune up mid-verse
         // — call on the box alone, answer in octaves. From stage 2 it's on the
@@ -958,18 +996,19 @@ export function createAudio(): Audio3D {
         // which is a squeak, not a lift. A real fiddler picks the octave that
         // keeps the line in one register; so does this one.
         if (st >= 2 || (st >= 1 && (bar & 1) === 1)) {
-          fiddle(pirBus, note * ((bar & 1) === 0 ? 2 : 1), t, e8 * 0.95, 0.04);
+          fiddle(pirBus, note * ((bar & 1) === 0 ? 2 : 1), t, e8 * 0.95, 0.04 * hookV);
         }
-        if (st >= 3 && (e === 0 || e === 3)) whistle(pirBus, note * 2, t, e8 * 1.5, 0.026);
+        if (st >= 3 && (e === 0 || e === 3)) whistle(pirBus, note * 2, t, e8 * 1.5, 0.026 * hookV);
       }
 
       // ── THE RESORT BAND'S TOPPING ─────────────────────────────────────────
       // Steel pan and marimba are demoted to colour: they answer the hook on
       // the off-beats instead of being the tune. Pirate-themed LUXURY resort —
       // shanty bones, tropical garnish.
-      if (!floor && st >= 2 && onE) {
-        if (e === 2) pan(pirBus, ch[2] * 4, t, e8 * 1.8, 0.04);
-        if (e === 5) pan(pirBus, ch[1] * 4, t, e8 * 1.4, 0.033, 0.4);   // ghost ping
+      if (st >= 2 && onE) {
+        const panV = floor ? 0.5 : 1;
+        if (e === 2) pan(pirBus, ch[2] * 4, t, e8 * 1.8, 0.04 * panV);
+        if (e === 5) pan(pirBus, ch[1] * 4, t, e8 * 1.4, 0.033 * panV, 0.4);   // ghost ping
       }
       if (!floor && st >= 3 && s === 11) marimba(pirBus, ch[0] * 4, t, e8 * 0.9, 0.028);
 
@@ -977,9 +1016,10 @@ export function createAudio(): Audio3D {
       // On the downbeat of the 8-bar phrase. One voice at stage 0, a whole
       // crew by stage 3, and from stage 2 they shout twice as often. This is
       // the cheapest thing in the file and the thing that makes it FUN.
-      if (!floor && s === 0) {
-        if (ph === 0) hey(pirBus, t, 0.22, 1 + st);
-        else if (st >= 2 && ph === 4) hey(pirBus, t, 0.18, 1 + st);
+      if (s === 0) {
+        const heyV = floor ? 0.6 : 1;
+        if (ph === 0) hey(pirBus, t, 0.22 * heyV, 1 + st);
+        else if (st >= 2 && ph === 4) hey(pirBus, t, 0.18 * heyV, 1 + st);
       }
       if (!floor && st >= 3 && ph === 7 && s === 10) hey(pirBus, t, 0.13, 2);   // pickup shout
 
@@ -1153,7 +1193,7 @@ export function createAudio(): Audio3D {
   // listening carefully, which is the only test that matters here. jingle()
   // quotes it on demand so the town can hum its own theme at itself.
   // ══════════════════════════════════════════════════════════════════════════
-  const MAP_VOL = 0.17;
+  const MAP_VOL = 0.40;   // was 0.17 — see the headroom note on MASTER_VOL
   // the "pah" of the oompah, voiced LOW (top note E4) so the hook — which
   // never goes below G4 — sits clean on top of it instead of inside it
   const M_CHOP = [
