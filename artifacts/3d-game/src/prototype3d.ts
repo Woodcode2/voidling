@@ -26,6 +26,7 @@ import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 import { track, setCtx, countMatch, tickFrame, fpsSummary, resetFps } from './proto3d/telemetry';
+import { initIAP, iapPrice, iapAvailable, purchase as iapPurchase, restorePurchases } from './proto3d/store3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -1937,22 +1938,22 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       card.classList.toggle('locked', !owned.has(s.id));
       pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
       pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED'
-        : s.cash ? `💎 $${s.cash.toFixed(2)}`
+        : s.cash ? `💎 ${iapPrice(s.id) ?? `$${s.cash.toFixed(2)}`}`
         : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}`;
     }
   };
-  // LEGENDARY FIRST was the right instinct for a store whose in-app purchases
-  // work. Ours do not yet: every cash card is locked and dead-ends on a big red
-  // button that says COMING WITH THE APP STORE BUILD. So the shop opened on
-  // seven consecutive refusals at $4.99-$9.99, and with two thousand coins in
-  // the wallet the first thing a child could actually buy was the eighth card,
-  // below the fold. Open on what they can afford, and keep the heroes right
-  // underneath as the thing to want. Flip this back the day IAP ships.
+  // LEGENDARY FIRST is the right instinct for a store whose in-app purchases
+  // work — but when they did not, the shop opened on seven consecutive
+  // refusals at $4.99-$9.99, and with two thousand coins in the wallet the
+  // first thing a child could actually buy was the eighth card, below the
+  // fold. The coin tier still leads: a child should meet something they can
+  // earn before something a parent has to pay for, and that stays true now
+  // that the paid tier takes money.
   const tierOf = (s: Skin) => (s.tex ? 0 : s.cash ? 1 : 2);
   const SORTED = [...SKINS].sort((a, b) => tierOf(a) - tierOf(b));
   const TIER_HEAD = [
     '<div class="shopTier">💫 EPIC <span>SPEND ✦ COINS</span></div>',
-    '<div class="shopTier gold">✨ LEGENDARY <span>COMING SOON</span></div>',
+    `<div class="shopTier gold">✨ LEGENDARY <span>${iapAvailable() ? 'REAL MONEY' : 'ON THE APP STORE'}</span></div>`,
     '<div class="shopTier">🎨 EVERYDAY <span>SPEND ✦ COINS</span></div>',
   ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
@@ -1989,12 +1990,21 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // ── skin PREVIEW: tap a card → meet the skin BIG, then equip/buy from there
   const prevEl = el('skinPrev'), spAct = el('spAct');
   let prevSkin: Skin | null = null;
+  // The store's own localized price where StoreKit has one — a child in
+  // France should read "4,99 €", not a hard-coded dollar figure — falling back
+  // to the config USD everywhere else.
+  const priceOf = (s: Skin) => iapPrice(s.id) ?? `$${(s.cash ?? 0).toFixed(2)}`;
+  let buying = false;
   const refreshPreview = () => {
     if (!prevSkin) return;
     const s = prevSkin;
-    spAct.textContent = equipped === s.id ? '✓ EQUIPPED'
+    spAct.classList.toggle('busy', buying);
+    spAct.textContent = buying ? '…' : equipped === s.id ? '✓ EQUIPPED'
       : owned.has(s.id) ? 'EQUIP'
-      : s.cash ? `💎 $${s.cash.toFixed(2)} · APP STORE SOON`
+      // The legendary tier took no money and said COMING SOON. It now says
+      // what it costs, and on iOS it charges. On the open web there is no way
+      // to take payment, so it points at the App Store rather than pretending.
+      : s.cash ? (iapAvailable() ? `💎 BUY · ${priceOf(s)}` : `💎 ${priceOf(s)} · ON THE APP STORE`)
       : s.streak ? `🔥 PLAY ${s.streak} DAYS IN A ROW`
       : `BUY · ✦ ${PRICES[s.id]}`;
   };
@@ -2023,14 +2033,27 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       audio.hit(); return;   // earned by coming back
     }
     if (s.cash && !owned.has(s.id)) {
-      // it was a big red primary button that answered "no". A locked hero
-      // should read as something to look forward to, not a refusal.
       // THE demand signal for in-app purchases: how many children reach for a
       // paid skin, and which one. Nothing else in the build answers that.
       track('legendary_tap', { skin: s.id, usd: s.cash, coins, lvl: rankInfo(xp).lvl, played: stats.matches });
-      spAct.textContent = '👀 SNEAK PEEK — COMING SOON!';
-      audio.ready();
-      setTimeout(refreshPreview, 1800);
+      if (buying) return;
+      if (!iapAvailable()) {
+        // No payment path on this platform. Say where to get it — a locked
+        // hero should read as something to look forward to, not a refusal.
+        spAct.textContent = '👀 COMING TO THE APP STORE!';
+        audio.ready();
+        setTimeout(refreshPreview, 2000);
+        return;
+      }
+      buying = true; refreshPreview();
+      void iapPurchase(s.id, s.cash).then((res) => {
+        buying = false;
+        if (res === 'started') { spAct.textContent = 'CONFIRM IN THE APP STORE…'; return; }
+        if (res === 'granted') { audio.evolve(); refresh(); refreshPreview(); return; }
+        spAct.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!' : 'COULD NOT BUY — TRY AGAIN';
+        audio.hit();
+        setTimeout(refreshPreview, 2000);
+      });
       return;
     }
     if (!owned.has(s.id)) {
@@ -2052,6 +2075,29 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     localStorage.setItem('voidSkin', s.id);
     refresh(); refreshPreview();
   });
+  // StoreKit hands ownership back here — from a fresh purchase, and from
+  // RESTORE PURCHASES, which App Review requires and which a child who got a
+  // new iPad genuinely needs.
+  initIAP((skinIds) => {
+    let gained = false;
+    for (const id of skinIds) if (!owned.has(id)) { owned.add(id); gained = true; }
+    if (!gained) return;
+    localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+    refresh(); refreshPreview();
+    audio.evolve(); buzz(70);
+  }, () => { refresh(); refreshPreview(); });   // prices land async — repaint
+
+  {
+    const rb = el('btnRestore');
+    rb.addEventListener('click', () => {
+      rb.textContent = 'RESTORING…';
+      void restorePurchases().then((ok) => {
+        rb.textContent = ok ? 'RESTORED ✓' : 'NOTHING TO RESTORE';
+        setTimeout(() => { rb.textContent = 'RESTORE PURCHASES'; }, 2400);
+      });
+    });
+  }
+
   let lastTier = -1;
   for (const s of SORTED) {
     const tier = tierOf(s);
