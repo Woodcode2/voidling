@@ -231,6 +231,15 @@
         letter-spacing: 1.4px; color: #c9a6ff; margin-bottom: 2px; }
       #endStats .es b { font-size: 20px; font-weight: 900; }
       #endStats .es.pb { border-color: #ffd25a; box-shadow: 0 0 16px rgba(255,210,90,0.3); }
+      #endStats .es.rk { min-width: 132px; }
+      #endStats .es.rk .xpb { width: 100%; height: 5px; border-radius: 3px; margin-top: 5px;
+        background: rgba(255,255,255,0.16); overflow: hidden; }
+      #endStats .es.rk .xpb div { height: 100%; background: linear-gradient(90deg, #ffb82a, #ffd25a); border-radius: 3px; }
+      /* the level-up beat: the one moment the ladder is visible */
+      #endStats .es.rk.up { border-color: #7ef2a0; box-shadow: 0 0 20px rgba(126,242,160,0.45);
+        animation: lvlPop 0.6s cubic-bezier(0.2,1.5,0.4,1) 0.5s backwards; }
+      #endStats .es.rk.up i { color: #7ef2a0; }
+      @keyframes lvlPop { from { transform: scale(0.7); opacity: 0; } to { transform: none; opacity: 1; } }
       #endNext { margin: 8px 0 18px; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; color: #e8dcff;
         max-width: min(360px, 86vw); }
       #endNext .nb { width: min(300px, 80vw); height: 7px; border-radius: 4px; background: rgba(255,255,255,0.14);

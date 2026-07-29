@@ -1163,7 +1163,15 @@ function endMatch() {
   const scoreXp = Math.floor(22 * Math.log10(1 + playerScore / 800) / Math.log10(6));
   let gain = ([25, 18, 12, 8, 5][myRank - 1] ?? 5) + Math.min(90, scoreXp);
   if (localStorage.getItem('voidFirstMatchDay') !== today) { localStorage.setItem('voidFirstMatchDay', today); gain += 10; }
+  // LEVELLING UP WAS SILENT. XP increments, persists and renders correctly —
+  // on the MENU, which a player who only ever taps PLAY AGAIN never sees.
+  // Verified across three back-to-back matches crossing three level boundaries
+  // with no acknowledgement on any results screen. A ladder nobody is told
+  // they are climbing is not a ladder.
+  const lvlBefore = rankInfo(xp).lvl;
   xp += gain; localStorage.setItem('voidXP', String(xp)); renderRank();
+  const rankAfter = rankInfo(xp);
+  const leveledTo = rankAfter.lvl > lvlBefore ? rankAfter.lvl : 0;
   // lifetime stats + weekly best
   stats.matches++;
   if (myRank === 1) stats.wins++;
@@ -1190,6 +1198,13 @@ function endMatch() {
       `<div class="es"><i>EATEN</i><b>${matchEaten}</b></div>` +
       `<div class="es"><i>BIGGEST</i><b>${FORMS[curStage]}</b></div>` +
       `<div class="es${isPb ? ' pb' : ''}"><i>${isPb ? 'NEW BEST!' : 'YOUR BEST'}</i><b>${Math.round(isPb ? playerScore : pb)}</b></div>`;
+    // the rank row: tier, level, the bar, and a LEVEL UP! beat when it moved
+    const rk = rankInfo(xp);
+    st.innerHTML +=
+      `<div class="es rk${leveledTo ? ' up' : ''}"><i>${leveledTo ? 'LEVEL UP!' : rk.nm}</i>` +
+      `<b>${rk.ic} LVL ${rk.lvl}</b>` +
+      `<div class="xpb"><div style="width:${Math.round(rk.prog * 100)}%"></div></div></div>`;
+    if (leveledTo) { audio.evolve(); buzz(70); }
     const g = nextGoal();
     const nx = el('endNext');
     if (g) {
