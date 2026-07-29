@@ -314,6 +314,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const bodyMat = makeVoidBody();
   const whiteTex = bodyMat.uniforms.uTex.value as THREE.Texture;
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 72), bodyMat);
+  body.castShadow = true;
   bob.add(body);
 
   // the interior starfield (Higgsfield seamless texture) — engages on load,
@@ -358,10 +359,20 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // fast. The old even 0.55→0.28 spread was a grey smudge the same value all
   // the way out, so he hovered — nothing said which pixel he was standing on.
   const contact = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 40),
-    new THREE.MeshBasicMaterial({ map: softRadialTex(128, 0.92, 0.30, 4), color: 0x160a30, transparent: true, opacity: 0.62, depthWrite: false }),
+    new THREE.CircleGeometry(1, 64),
+    new THREE.MeshBasicMaterial({ map: softRadialTex(256, 0.95, 0.72, 4), color: 0x140828, transparent: true, opacity: 0.7, depthWrite: false }),
   );
   contact.rotation.x = -Math.PI / 2; contact.position.y = 0.05; scene.add(contact);
+  // …and the LIP. A bright, thin ring just outside the pit's dark edge, which
+  // is the single read that says "hole" rather than "ball": hole.io's whole
+  // silhouette is that ring. Additive would blow out over pale ground (the
+  // evolution torus already learned that), so it is a normal-blended warm
+  // highlight that sits between the pit and the world.
+  const lip = new THREE.Mesh(
+    new THREE.RingGeometry(0.88, 1, 72),
+    new THREE.MeshBasicMaterial({ color: 0xd9c2ff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  lip.rotation.x = -Math.PI / 2; lip.position.y = 0.06; scene.add(lip);
 
   // ── face: crisp billboarded flat features (matches 2D canvas) ─────────────
   const face = new THREE.Group();
@@ -1090,8 +1101,17 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         }
       }
 
-      // contact shadow tracks the void on the floor
-      contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.02);
+      // THE PIT tracks the void on the floor. 1.52x the ball's own width, so a
+      // half-radius annulus of dark ground is always visible around the
+      // silhouette however the camera is framed — at the fixed 46.4-degree
+      // elevation anything under about 1.45x is entirely hidden behind the ball.
+      contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.52);
+      lip.position.set(s.x, 0.06, s.z); lip.scale.setScalar(dispR * 1.5);
+      // the lip is a RIM, not a hoop: it carries the read at speck size, where
+      // the pit alone is a few pixels, and steps back once the hole is big
+      // enough to speak for itself
+      (lip.material as THREE.MeshBasicMaterial).opacity =
+        THREE.MathUtils.clamp(0.52 - dispR * 0.028, 0.2, 0.52);
     },
   };
 

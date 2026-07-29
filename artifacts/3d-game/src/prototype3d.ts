@@ -181,6 +181,7 @@ const _dbg = window as unknown as {
   __voidState: () => { x: number; z: number; r: number };
   __biomeAt: (x: number, z: number) => string | null;
   __rushClock: (to: number) => void;
+  __setVoidR: (r: number) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
   __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv;
@@ -197,6 +198,15 @@ _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: distri
 // QA: wind the match clock forward so a harness can photograph the results
 // screen without simulating three real minutes of software rendering
 _dbg.__rushClock = (to: number) => { matchClock = to; };
+// QA: force the hero to a size so the renderer can be shot at every form
+// without playing a whole match. Sets the visual stage too, so the void looks
+// exactly as it would if a player had grown into it.
+_dbg.__setVoidR = (r: number) => {
+  frozenR = true;             // …and hold it there against the growth law
+  voidling.setRadius(r); lastR = r;
+  curStage = stageFor(r); voidling.setStage(VISUAL_STAGE[curStage] ?? 0);
+  audio.setMusicStage(VISUAL_STAGE[curStage] ?? 0);
+};
 // QA: one call returns the whole race — used to log score curves over a match
 _dbg.__matchState = () => ({
   t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
@@ -692,6 +702,9 @@ const MATCH_LEN = Number(_q.get('len')) || 180;                // 3:00 — tight
 const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
 let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
+// QA only: __setVoidR sets this so the growth law stops pulling the hero back
+// to its clock-derived size, which is what a renderer screenshot needs.
+let frozenR = false;
 let matchEaten = 0;   // props eaten THIS match — the results screen's own number
 let signedOn = false; // has the station said good morning yet this match?
 let _booted = false;  // has one frame actually rendered? (drops the boot cover)
@@ -2240,14 +2253,14 @@ function animate() {
       // the rate limiter is what actually stops a single landmark ballooning
       // you — it is the job the absolute clamp was doing by accident
       const maxStep = (0.11 + surgeT * 0.16) * dt;
-      if (voidling.radius > lastR + maxStep) voidling.setRadius(lastR + maxStep);
-      if (voidling.radius > lawCap) voidling.setRadius(lawCap);
+      if (!frozenR && voidling.radius > lastR + maxStep) voidling.setRadius(lastR + maxStep);
+      if (!frozenR && voidling.radius > lawCap) voidling.setRadius(lawCap);
       lastR = voidling.radius;
       // 2D score-floor: strong scoring pulls your radius up toward the cap
       // the floor rides the surge too — a strong late run is PULLED to the
       // new ceiling instead of being pinned at the old 6.06 plateau
       const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6);
-      if (voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
+      if (!frozenR && voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
     }
   }
 
