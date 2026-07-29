@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { PROPS } from './palette';
 import {
   ROAD_CENTERS_3D, blockCenter3D, PLAN_GRID, HALF_BLOCK_3D,
-  railPointAt, insideIsland3, inLagoon3, inWater3, worldId, part, mergedProp,
+  railPointAt, insideIsland3, inLagoon3, inWater3, worldId, part, mergedProp, nearSpawn,
   type Biome, type AddEdible,
 } from './island';
 import * as LUXE from './luxe';
@@ -1954,6 +1954,11 @@ export function createLife(
   const wet = (x: number, z: number, m: number) => MAPLE && inWater3(x, z, m);
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string) {
     if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
+    // …and nobody lives on the void's opening square. The owner's report was
+    // "he starts on top of a person": this is the single choke point every
+    // walking person in both worlds goes through, so one test covers the lot.
+    // They can still WANDER in later — by then the player has moved.
+    if (nearSpawn(hx, hz)) return;
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.userData.mover = true;    // steers itself — the magnet must never grab it

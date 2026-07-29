@@ -170,10 +170,11 @@
       #quests .q.done { opacity: 0.7; }
       #quests .q.done .qc { color: #7ef2a0; }
       #quests .q.done .qb div { background: #7ef2a0; width: 100% !important; }
-      /* form progress (VOIDLING -> MUNCHER) */
-      #formbar { position: fixed; bottom: 62px; left: 50%; transform: translateX(-50%); z-index: 5;
-        width: 200px; height: 5px; border-radius: 3px; background: rgba(16,8,30,0.5); overflow: hidden; }
-      #formbar .fill { height: 100%; width: 0%; background: #c9a6ff; border-radius: 3px; transition: width 0.2s linear; }
+      /* THE SECOND PROGRESS BAR IS GONE. #formbar sat at the foot of the screen
+         showing form progress — the exact same number as the bar inside the
+         size chip that rides under the hole. Two bars, one fact, 300px apart,
+         and the owner counted them. The chip's bar is the one that stays: it
+         is where a player is already looking, and it is hole.io's own idiom. */
       /* skin swatches */
       #skins { position: fixed; left: 14px; bottom: 18px; z-index: 6; display: flex; gap: 8px; }
       #skins button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35);
@@ -645,7 +646,7 @@
 
       /* hide gameplay HUD while in the menu */
       body.menu #timer, body.menu #devoured, body.menu #board, body.menu #quests, body.menu #form,
-      body.menu #formbar, body.menu #hunger, body.menu #hungerlbl, body.menu #powers, body.menu #banner { display: none; }
+      body.menu #hunger, body.menu #hungerlbl, body.menu #powers, body.menu #banner { display: none; }
       #coins { z-index: 12; }   /* wallet stays visible over menu + shop */
     </style>
   </head>
@@ -656,7 +657,6 @@
     <div id="coins">✦ 0</div>
     <div id="quests"></div>
     <div id="form">VOIDLING</div>
-    <div id="formbar"><div class="fill"></div></div>
     <div id="banner"></div>
     <div id="news"></div>
     <div id="hungerlbl">DRAG or WASD to steer · HUNGER fuels powers</div>

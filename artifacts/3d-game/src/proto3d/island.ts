@@ -159,7 +159,34 @@ const MAIN_ST_X = 6000;                               // Main Street's asphalt c
 // thing the ground here must not be is pale violet), with the town hall in
 // shot to the north-east, the bandstand across the green, Main Street's
 // shopfronts behind, and the parking-meter protest ten units away.
-export const MAPLE_SPAWN: [number, number] = [6420, 5250];
+// Nudged +49, -10 map units (about 2.5 3D units, two void diameters) off the
+// original point. MEASURED: with the void driven away and the vacated spot
+// scanned, clearance at the old spawn was 0.08 units — the void's own body was
+// touching the nearest solid prop, which is what "he starts on top of a person"
+// looks like from the camera. The new point measures 2.1 units of clear ground
+// and keeps the same view: town hall to the north-east, bandstand across the
+// green, Main Street's shopfronts behind.
+export const MAPLE_SPAWN: [number, number] = [6469, 5240];
+
+/** The match's opening position in 3D, resolved for whichever world is loaded.
+ *  Exported so the crowd can be kept out of it — see SPAWN_KEEP_OUT. */
+export function spawn3(): { x: number; z: number } {
+  return WORLD_ID === 'pirate'
+    ? { x: w(6950), z: w(10560) }
+    : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };
+}
+/** Nobody stands here. The opening frame is hand-authored and the void must
+ *  arrive on clear ground, not inside somebody's shopping. */
+export const SPAWN_KEEP_OUT = 4.2;
+let _spawnCacheWorld = '';
+let _spawnCache = { x: 0, z: 0 };
+export function nearSpawn(x: number, z: number, pad = SPAWN_KEEP_OUT): boolean {
+  // called once per placed person during the world build, so it caches rather
+  // than allocating a vector each time
+  if (_spawnCacheWorld !== WORLD_ID) { _spawnCacheWorld = WORLD_ID; _spawnCache = spawn3(); }
+  const dx = x - _spawnCache.x, dz = z - _spawnCache.z;
+  return dx * dx + dz * dz < pad * pad;
+}
 
 const RIVER: [number, number][] = [
   [8405, 1149], [8277, 3035], [8565, 5337], [8213, 6887], [8469, 8661], [9431, 9305], [9700, 9830], [9800, 10150],
@@ -1663,9 +1690,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // bright green grass, town hall to the north-east, bandstand across the
   // green, Main Street's shopfronts behind, and the parking-meter protest ten
   // units away. Same crisp first frame every single load.
-  const spawn = WORLD_ID === 'pirate'
-    ? { x: w(6950), z: w(10560) }          // DANCE COVE, just off the main stage
-    : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };   // THE SQUARE, Maple Falls
+  const spawn = spawn3();   // DANCE COVE on the bay, THE SQUARE in Maple Falls
 
   return {
     spawn,

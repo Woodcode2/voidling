@@ -583,7 +583,6 @@ const _chipV = new THREE.Vector3();
 const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
-const formFill = el('formbar').querySelector('.fill') as HTMLElement;
 const scFill = () => document.getElementById('scFill');
 let prevHunger = 0;
 
@@ -2769,10 +2768,11 @@ function animate() {
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
     pwBtns[1].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
-    // form progress toward the next evolution
+    // form progress toward the next evolution — ONE bar, in the size chip that
+    // rides under the hole. The duplicate at the foot of the screen is gone.
     const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
-    formFill.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
-    { const f2 = scFill(); if (f2) f2.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`; }
+    const f2 = scFill();
+    if (f2) f2.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
   }
 
   pumpBanner();   // anything the evolve card held back gets its turn now
