@@ -3,7 +3,7 @@
 // wins — so a rival really can beat you. Each is a cute coloured void (a tinted
 // fresnel orb + glow + billboarded eyes) with a name and a live score.
 import * as THREE from 'three';
-import { inWater3, type Biome } from './island';
+import { inDeepWater3, type Biome } from './island';
 import { SKINS, type Skin } from './palette';
 import { buildAccessory, makeVoidBody, applySkinToBody } from './void3d';
 
@@ -382,7 +382,7 @@ export function createRivals(
   const bodyMargin = (r: number) => Math.min(r * 0.7, 3.5 + r * 0.15) + 1.0;
   const fitsAt = (x: number, z: number, r: number) => {
     const bm = bodyMargin(r);
-    if (!biomeAt(x, z) || inWater3(x, z, bm)) return false;
+    if (!biomeAt(x, z) || inDeepWater3(x, z, bm)) return false;
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2;
       if (!biomeAt(x + Math.cos(a) * bm, z + Math.sin(a) * bm)) return false;
@@ -514,11 +514,22 @@ export function createRivals(
             // turf. And a late arrival is scaled to the match it is joining, so
             // the last seat is a rival rather than a snack.
             if (isHunter) {
+              // 1.5x THE PLAYER, ON ARRIVAL, was too much. She only has to be
+              // over the swallow line (1.11) to be a threat you must respect;
+              // half again your size reads as the game dropping a boss on you
+              // rather than a family member turning up, and it is what makes
+              // the family "feel like it starts bigger". 1.18 keeps her
+              // genuinely dangerous — she can still eat you and you cannot eat
+              // her — while leaving the gap small enough that a good run closes
+              // it. She grows into the marquee meal later regardless.
               const a0 = rand(0, Math.PI * 2), d0 = rand(46, 74);
-              rv.r = Math.max(START_R * 1.35, pr * 1.5);
+              rv.r = Math.max(START_R * 1.2, pr * 1.18);
               [rv.x, rv.z] = placeOnLand(px + Math.cos(a0) * d0, pz + Math.sin(a0) * d0, rv.r);
             } else {
-              rv.r = Math.max(START_R, Math.min(softCap, pr * 0.62));
+              // …and nobody else ever walks in BIGGER than the player. The
+              // softCap floor is 0.78x the player, so a late arrival could
+              // land above them; the extra clamp makes "a snack joined" true.
+              rv.r = Math.max(START_R, Math.min(softCap, pr * 0.62, pr * 0.92));
               [rv.x, rv.z] = placeOnLand(rv.hx, rv.hz, rv.r);
             }
             rv.campX = rv.x; rv.campZ = rv.z; rv.campT = 0;
@@ -861,7 +872,7 @@ export function createRivals(
         // …and biomeAt calls Maple's pond, river and lagoon dry land, because
         // they are inside the coastline. Rival 0 spent 5.4 seconds of a live
         // 90-second match inside the river.
-        const fits = (x: number, z: number) => !!biomeAt(x, z) && !inWater3(x, z, bm)
+        const fits = (x: number, z: number) => !!biomeAt(x, z) && !inDeepWater3(x, z, bm)
           && !!biomeAt(x + bm, z) && !!biomeAt(x - bm, z)
           && !!biomeAt(x, z + bm) && !!biomeAt(x, z - bm)
           // diagonals leak too: up to 1.7% of accepted cells put the body over

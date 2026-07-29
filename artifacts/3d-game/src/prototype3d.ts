@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inWater3, islandOutline3, setWorld } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, islandOutline3, setWorld } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -2213,7 +2213,7 @@ function animate() {
       // The diagonals leaked too: 0.4% to 1.7% of accepted cells put the body
       // over water on a diagonal, which the cars have guarded against for ages.
       const d45 = m * 0.7071;
-      const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inWater3(x, z, m)
+      const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
         && insideIsland3(x + m, z) && insideIsland3(x - m, z)
         && insideIsland3(x, z + m) && insideIsland3(x, z - m)
         && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)

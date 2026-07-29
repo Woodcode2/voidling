@@ -276,6 +276,22 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
   if (rx != null && Math.abs(wx - rx) < 118 + mw) return true;
   return inLagoon3(x3, z3, 40);
 }
+/** …and the version for things that MOVE and are big enough to span a stream.
+ *  Maple's river is 118 world units of water — under 6 units in 3D, narrower
+ *  than the roads that bridge it, and the void is 32 units across at WORLD
+ *  ENDER. Blocking it turned a decorative brook into an invisible wall down
+ *  the middle of the map, and standing on the far bank unable to cross a
+ *  stream you dwarf is the single most obviously wrong thing a hole can do.
+ *  The pond and the lagoon are real bodies of water and still stop you; the
+ *  river does not. Static props and the walking crowd keep using inWater3 —
+ *  a townsperson standing mid-current is a different problem. */
+export function inDeepWater3(x3: number, z3: number, margin = 0): boolean {
+  if (WORLD_ID === 'pirate') return false;
+  const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
+  const mw = margin / SCALE;
+  if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
+  return inLagoon3(x3, z3, 40);
+}
 // coast clearance: is this point at least `d` units from the void edge?
 export function coastClear(x3: number, z3: number, d = 12): boolean {
   const len = Math.hypot(x3, z3) || 1;
