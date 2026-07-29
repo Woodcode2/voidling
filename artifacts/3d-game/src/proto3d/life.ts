@@ -3763,7 +3763,7 @@ export function createLife(
           const camp = i % 3 === 0 ? HOLLIS : DINKLE;
           townie(pick(['booster', 'gossip', 'kid', 'booster', 'teen'] as Role[]),
             cx2, cz2, dress, camp, 5, rand(1.5, 2.8), 20,
-            ['the SPEECH!! RUN!!', 'democracy is DOOMED!!', 'save the ballot box!!',
+            ['the SPEECH!! RUN!!', 'the PIE TABLE!! SAVE IT!!', 'save the good chairs!!',
               'he said it was a PUDDLE!!']);
         }
         // …and one campaign worker on the edge of it, leafleting the queue

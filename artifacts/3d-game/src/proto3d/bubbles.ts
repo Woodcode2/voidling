@@ -27,8 +27,20 @@ const BUBBLE_MAX_CAMD = 150;   // whole-island views don't need street gossip
 // Six simultaneous bubbles, each up to ~250px wide on a 460px screen, with a
 // 60px separation rule measured on the ANCHOR rather than the rendered box.
 // A measured frame had four of them stacked in one corner, and an evolution
-// fired seven text elements at once. Three is a crowd; six is a wall.
-export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
+// fired seven text elements at once. Three is a crowd; six is a wall — and a
+// later measurement over 143 frames found 87% of bay frames carrying two or
+// more and 42% carrying the full three, with 47% of frames showing bubbles
+// physically overlapping (worst case: one bubble 100% hidden behind another).
+// Two.
+/** The top strip the leaderboard, clock and wallet own. Everything else the
+ *  HUD occupies is measured from its real rect at clamp time — guessed bands
+ *  went stale the moment an element moved. */
+const HUD_TOP = 206;
+/** HUD elements a bubble must never be drawn over. The size chip is projected
+ *  from the void's own screen position, so it moves; the minimap and the guide
+ *  pill are fixed but their sizes are CSS. Read them, do not assume them. */
+const HUD_AVOID = ['form', 'minimap', 'guide'];
+export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
   // inject styles once
   const style = document.createElement('style');
   style.textContent = `
@@ -173,8 +185,46 @@ export function createBubbles(camera: THREE.Camera, max = 3): Bubbles {
         const x = Math.min(w - halfW, Math.max(halfW, (v.x * 0.5 + 0.5) * w));
         // …and the same on the vertical: the bubble is anchored by its BOTTOM
         // (translate -100%), so an anchor near the top of the screen put the
-        // whole box above it, which is the clipped bubble behind the board
-        const y = Math.min(h - 8, Math.max(halfH, (-v.y * 0.5 + 0.5) * h));
+        // whole box above it, which is the clipped bubble behind the board.
+        //
+        // THE HUD BAND. The clamp used to clamp to the raw viewport, at
+        // z-index 4, underneath every HUD element — so bubbles were drawn
+        // BEHIND the leaderboard and the clock. Measured over 91 bay frames:
+        // the board covered a bubble in 30 of them, worst case 79% of it; the
+        // clock in 34; the coin chip in 12, worst case 93%. That is the
+        // half-sentence of clipped text in the owner's screenshot — it is a
+        // speech bubble, not the news card. Raising the z-index would only put
+        // chatter over the score, so the fix is to keep bubbles OUT of the
+        // band: refuse the top strip and the bottom-left minimap square, and
+        // drop anything that cannot fit rather than squeezing it in.
+        const top = HUD_TOP + halfH;
+        let y = Math.min(h - 26, Math.max(top, (-v.y * 0.5 + 0.5) * h));   // never under the iOS home indicator
+        // …and out from under every HUD panel it would otherwise hide behind.
+        // A bubble is anchored by its BOTTOM edge, so its box is
+        // [y - offsetHeight, y].
+        for (const id of HUD_AVOID) {
+          const r = document.getElementById(id)?.getBoundingClientRect();
+          if (!r || !r.width) continue;
+          const hx = Math.abs(x - (r.left + r.width / 2)) < halfW + r.width / 2 - 4;
+          if (!hx) continue;
+          if (y > r.top - 4 && y - s.el.offsetHeight < r.bottom + 4) {
+            const above = r.top - s.el.offsetHeight - 10;
+            const below = r.bottom + s.el.offsetHeight + 10;
+            y = above >= top ? above : Math.min(h - 26, below);
+          }
+        }
+        // …and never on top of another bubble: the spawn-time de-collision
+        // does not survive two anchors both leaving the viewport and clamping
+        // to the same coordinate, which measured as one bubble 100% hidden.
+        let clash = false;
+        for (const o of slots) {
+          if (o === s || !o.active || o.el.style.visibility === 'hidden') continue;
+          const r = o.el.getBoundingClientRect();
+          if (!r.width) continue;
+          if (Math.abs(x - (r.left + r.width / 2)) < (halfW + r.width / 2 - 6)
+            && Math.abs(y - r.bottom) < (s.el.offsetHeight + r.height) * 0.5 - 4) { clash = true; break; }
+        }
+        if (clash) { s.el.style.visibility = 'hidden'; continue; }
         s.el.style.left = `${x}px`;
         s.el.style.top = `${y}px`;
       }

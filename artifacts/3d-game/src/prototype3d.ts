@@ -588,7 +588,7 @@ window.addEventListener('resize', () => {
 
 // ── match state + HUD ─────────────────────────────────────────────────────────
 const el = (id: string) => document.getElementById(id)!;
-const timerEl = el('timer'), devEl = el('devoured'), boardEl = el('board'), formEl = el('form');
+const timerEl = el('timer'), boardEl = el('board'), formEl = el('form');
 const _chipV = new THREE.Vector3();
 const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
@@ -1056,7 +1056,6 @@ function refreshHud() {
   // and it is on the results screen. Dropping it removes a whole layer from
   // the busiest part of the screen and lets the news card move up.
   void themPct;
-  devEl.innerHTML = `${matchEaten} EATEN`;
   formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
 }
 
