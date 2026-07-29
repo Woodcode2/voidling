@@ -10,7 +10,10 @@ const INGEST_URL = 'https://uzkzuxwykajzoicuxhic.supabase.co/functions/v1/ingest
 // with its own service role; the events table itself has no anon access).
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6a3p1eHd5a2Fqem9pY3V4aGljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDE1MTksImV4cCI6MjA4NjMxNzUxOX0.8RmY1xXqd4bOlhKNAPF5N4GVchbkZ0O8hwtJbJ7LhKs';
 
-const APP_VERSION = 'v32';
+// Which build is talking. The 2D game and the 3D game share this pipeline and
+// the same vd_events table, so without a tag every funnel query mixes two
+// different products. Set by bootAnalytics(); lands in the app_version column.
+let APP_VERSION = 'v32';
 const FLUSH_MS = 12000;
 const FLUSH_N = 20;
 
@@ -70,16 +73,26 @@ export function logEvent(event: string, props: Record<string, unknown> = {}): vo
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(true); });
 window.addEventListener('pagehide', () => flush(true));
 
-if (!lsGet('vd_first_open')) {
-  lsSet('vd_first_open', String(Date.now()));
-  logEvent('first_open', {});
-}
-// daily-return marker (D1/D7 computed server-side from these)
-{
+let booted = false;
+/**
+ * Fire the install/return/open trio, tagged with which build is running.
+ * Idempotent — safe to call from every entry point. This used to run as a bare
+ * import side effect, which meant the tag could never be set before the first
+ * three events had already gone out untagged.
+ */
+export function bootAnalytics(version: string): void {
+  if (booted) return;
+  booted = true;
+  APP_VERSION = version;
+  if (!lsGet('vd_first_open')) {
+    lsSet('vd_first_open', String(Date.now()));
+    logEvent('first_open', {});
+  }
+  // daily-return marker (D1/D7 computed server-side from these)
   const today = new Date().toDateString();
   if (lsGet('vd_last_open_day') !== today) {
     lsSet('vd_last_open_day', today);
     logEvent('day_open', { installed_at: Number(lsGet('vd_first_open')) || 0 });
   }
+  logEvent('app_open', {});
 }
-logEvent('app_open', {});

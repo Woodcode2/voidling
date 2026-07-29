@@ -1,4 +1,6 @@
-import { logEvent } from './analytics';
+import { bootAnalytics, logEvent } from './analytics';
+
+bootAnalytics('2d-v32');
 
 // Machine round: track() now feeds the REAL analytics pipeline (Supabase edge
 // ingest, batched). The local ring buffer is kept for offline debugging.

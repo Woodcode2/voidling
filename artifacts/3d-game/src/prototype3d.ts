@@ -25,6 +25,7 @@ import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
+import { track, setCtx, countMatch, tickFrame, fpsSummary, resetFps } from './proto3d/telemetry';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -266,12 +267,13 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   addCoins(15);
   questEvent('rival');
   stats.rivals = (stats.rivals ?? 0) + 1; saveStats();
+  track('ate_rival', { name, pts: Math.round(pts), marquee: !!marquee, sec: Math.round(matchLen - matchClock) });
   // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
   // off you plus half her score, so it has to land like the ending it is
   announceFam(marquee
     ? `🏆 you ATE THE HUNTER! ${name} is DINNER! +${pts}`
     : `🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
-  if (marquee) { breakingNews(`BREAKING: the HUNTER has been HUNTED. ${name} is gone.`); addCoins(35); }
+  if (marquee) { breakingNews('one hole has eaten the other. there is one left. it is bigger.'); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -333,6 +335,9 @@ rivals.onPlayerBitten = (name, hit) => {
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
   buzz(hit.hunter ? 90 : 50);
+  track(hit.hunter ? 'caught' : 'nibbled', {
+    name, sec: Math.round(matchLen - matchClock), form: curStage, stolen: Math.round(hit.steal),
+  });
 };
 // ── THE THREAT'S THREE BEATS ────────────────────────────────────────────────
 // A charge that is telegraphed, a miss that is celebrated, and the moment the
@@ -358,7 +363,7 @@ rivals.onNearMiss = (name, x, z) => {
 };
 rivals.onStuffed = (name) => {
   announceFam(`🍖 ${name} is TOO FULL to chase — EAT HER!`);
-  breakingNews(`the hunter has stopped hunting. ${name} looks… edible.`);
+  breakingNews('the second hole has stopped moving. it looks full. it looks slow.');
   audio.ready();
 };
 const audio = createAudio();
@@ -1138,6 +1143,12 @@ function endMatch() {
     endList.innerHTML = '';
     endEl.classList.add('show');
     stats.matches++; saveStats();
+    countMatch();
+    track('match_end', {
+      solo: true, sec: Math.round(matchLen - matchClock), score: Math.round(playerScore),
+      eaten: matchEaten, pct: devouredPct, form: curStage, coins: reward2, xp: gain2,
+      ...fpsSummary(),
+    });
     return;
   }
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
@@ -1220,6 +1231,7 @@ function endMatch() {
         : `${g.need - g.have}✦ to the <b>${g.label}</b> skin<div class="nb"><div style="width:${Math.round(k * 100)}%"></div></div>`;
       const gs = document.getElementById('endShop');
       if (gs) gs.addEventListener('click', () => {
+        track('shop_view', { coins, from: 'end' });
         endEl.classList.remove('show');
         document.body.classList.add('menu');
         menuEl.style.display = '';
@@ -1230,6 +1242,13 @@ function endMatch() {
   endList.innerHTML = rows.map((r, i) =>
     `<div class="er ${r.me ? 'me' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><span>${r.me && i === 0 ? '👑' : i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`).join('');
   endEl.classList.add('show');
+  countMatch();
+  track('match_end', {
+    sec: Math.round(matchLen - matchClock), score: Math.round(playerScore), eaten: matchEaten,
+    pct: devouredPct, place: myRank, form: curStage, coins: reward, xp: gain,
+    lvl_up: leveledTo, lvl: rankInfo(xp).lvl, bites: rivalEv.bites, hunter_bites: rivalEv.hunterBites,
+    ate_rivals: rivalEv.eaten, top: Math.round(rows[0].score), ...fpsSummary(),
+  });
 }
 
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
@@ -1300,7 +1319,7 @@ function capture(e: Edible, giveHunger = true) {
   if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana');
   if (qk) questEvent(qk);
   if (comboMult >= 2) questEvent('combo');
-  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); breakingNews('BREAKING: it ate a HOUSE. a WHOLE house.'); }
+  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); breakingNews('it ate a house. a WHOLE house. we have questions.'); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 first car! tastes like vroom'); }
 }
 
@@ -1389,6 +1408,14 @@ function beginMatch(solo = false) {
   matchLen = solo ? 120 : MATCH_LEN;
   matchClock = matchLen;
   started = true; startT = tClock;
+  resetFps();
+  setCtx('world', pickedWorld);
+  setCtx('skin', localStorage.getItem('voidSkin') || 'classic');
+  track('match_start', {
+    solo, lvl: rankInfo(xp).lvl, coins, played: stats.matches,
+    skins: (JSON.parse(localStorage.getItem('voidSkinsOwned') || '[]') as string[]).length,
+    first: !localStorage.getItem('voidPlayed'),
+  });
   document.body.classList.remove('menu');
   menuEl.style.display = 'none';
   boardEl.style.display = solo ? 'none' : '';
@@ -1429,7 +1456,9 @@ function withWorldReady(cb: () => void) {
   (scr.querySelector('.lTip') as HTMLElement).textContent = LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)];
   scr.classList.add('show');
   // slow networks still get in: cap the wait, fallbacks cover stragglers
+  const waitT0 = performance.now();
   Promise.race([preloadP, new Promise((r) => setTimeout(r, 12000))]).then(() => {
+    track('load_wait', { ms: Math.round(performance.now() - waitT0) });
     packReady = true;
     el('lBar').style.width = '100%'; el('lPct').textContent = '100%';
     setTimeout(() => { scr.classList.remove('show'); cb(); }, 300);
@@ -1442,14 +1471,17 @@ function startFresh(solo: boolean) {
 // PLAY opens the level picker. The old flow ran the other way — pick a level,
 // get returned to the splash, then press PLAY — which asks the player to make
 // the same decision twice and lands them back where they started.
-el('btnPlay').addEventListener('click', () => { el('worlds').classList.add('show'); });
+el('btnPlay').addEventListener('click', () => {
+  track('play_tap', { played: stats.matches, lvl: rankInfo(xp).lvl });
+  el('worlds').classList.add('show');
+});
 // …and the picker is what actually starts the match.
 function launchWorld() {
   el('worlds').classList.remove('show');
   menuEl.style.display = 'none';
   // one-time teach card before the first menu-launched match: it's the only
   // place the danger loop ("eat the family when bigger, RUN when not") lives
-  if (!localStorage.getItem('voidTut')) { tutEl.classList.add('show'); return; }
+  if (!localStorage.getItem('voidTut')) { track('tutorial_view', {}); tutEl.classList.add('show'); return; }
   withWorldReady(() => startFresh(false));
 }
 el('btnSolo').addEventListener('click', () => {
@@ -1458,6 +1490,7 @@ el('btnSolo').addEventListener('click', () => {
   withWorldReady(() => startFresh(true));
 });
 el('btnGotIt').addEventListener('click', () => {
+  track('tutorial_done', {});
   localStorage.setItem('voidTut', '1');
   tutEl.classList.remove('show');
   withWorldReady(() => startFresh(false));
@@ -1496,6 +1529,7 @@ function paintWorldCard(host: HTMLElement, id: string): void {
     if (art) paintWorldCard(art, id);
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
+      track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld });
       if (id === pickedWorld) { launchWorld(); return; }   // already built: just go
       // a different world needs the island rebuilt, so come back playing
       localStorage.setItem('voidWorld', id);
@@ -1506,6 +1540,8 @@ function paintWorldCard(host: HTMLElement, id: string): void {
 }
 // locked world teasers wiggle on tap
 document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {
+  // demand signal for world 3: a locked card nobody taps is a world nobody wants
+  track('world_locked_tap', { card: (c as HTMLElement).dataset.name || c.textContent?.trim().slice(0, 24) });
   c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
 }));
 el('btnWorlds').addEventListener('click', () => el('worlds').classList.add('show'));
@@ -1515,7 +1551,7 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   localStorage.removeItem('voidAutoPlay');
   requestAnimationFrame(() => launchWorld());
 }
-el('btnShop').addEventListener('click', () => shopEl.classList.add('show'));
+el('btnShop').addEventListener('click', () => { track('shop_view', { coins, from: 'menu' }); shopEl.classList.add('show'); });
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 // ── world integrity: NOTHING stands on asphalt, ever ─────────────────────────
 // Footprint-aware post-build sweep. Runs at every match start (so props that
@@ -1678,8 +1714,9 @@ function resetMatch() {
   timerEl.style.color = '';
   beginMatch(soloMode);
 }
-el('btnAgain').addEventListener('click', resetMatch);
+el('btnAgain').addEventListener('click', () => { track('again_tap', { played: stats.matches }); resetMatch(); });
 el('btnHome').addEventListener('click', () => {
+  track('home_tap', { played: stats.matches });
   el('end').classList.remove('show');
   document.body.classList.add('menu');
   menuEl.style.display = '';
@@ -1701,6 +1738,12 @@ el('btnHome').addEventListener('click', () => {
     }
     qBtn.textContent = '⌂'; qBtn.classList.remove('arm');
     saveStats();   // partial progress (things eaten) still counts toward trophies
+    countMatch();
+    track('match_quit', {
+      sec: Math.round(matchLen - matchClock), left: Math.round(matchClock),
+      score: Math.round(playerScore), eaten: matchEaten, pct: devouredPct,
+      form: curStage, bites: rivalEv.bites, ...fpsSummary(),
+    });
     started = false; ended = true;
     audio.stopMusic();
     document.body.classList.add('menu');
@@ -1965,16 +2008,26 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     refreshPreview();
     prevEl.classList.add('show');
     audio.ready();
+    track('skin_view', {
+      skin: s.id, tier: s.cash ? 'legendary' : s.streak ? 'streak' : s.tex ? 'epic' : 'classic',
+      owned: owned.has(s.id), price: s.cash ?? PRICES[s.id] ?? 0, coins,
+    });
   };
   el('spClose').addEventListener('click', () => prevEl.classList.remove('show'));
   prevEl.addEventListener('click', (ev) => { if (ev.target === prevEl) prevEl.classList.remove('show'); });
   spAct.addEventListener('click', () => {
     const s = prevSkin;
     if (!s) return;
-    if (s.streak && !owned.has(s.id)) { audio.hit(); return; }   // earned by coming back
+    if (s.streak && !owned.has(s.id)) {
+      track('skin_streak_tap', { skin: s.id, days: s.streak });
+      audio.hit(); return;   // earned by coming back
+    }
     if (s.cash && !owned.has(s.id)) {
       // it was a big red primary button that answered "no". A locked hero
       // should read as something to look forward to, not a refusal.
+      // THE demand signal for in-app purchases: how many children reach for a
+      // paid skin, and which one. Nothing else in the build answers that.
+      track('legendary_tap', { skin: s.id, usd: s.cash, coins, lvl: rankInfo(xp).lvl, played: stats.matches });
       spAct.textContent = '👀 SNEAK PEEK — COMING SOON!';
       audio.ready();
       setTimeout(refreshPreview, 1800);
@@ -1982,12 +2035,18 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     }
     if (!owned.has(s.id)) {
       if (coins >= PRICES[s.id]) {
+        track('skin_buy', { skin: s.id, price: PRICES[s.id], left: coins - PRICES[s.id], played: stats.matches });
         addCoins(-PRICES[s.id]);
         owned.add(s.id);
         localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
         audio.evolve();
-      } else { spAct.textContent = `NEED ${PRICES[s.id] - coins}✦ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return; }
+      } else {
+        // how far short, and how often — the coin economy's only real feedback
+        track('skin_short', { skin: s.id, price: PRICES[s.id], coins, short: PRICES[s.id] - coins });
+        spAct.textContent = `NEED ${PRICES[s.id] - coins}✦ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return;
+      }
     }
+    if (equipped !== s.id) track('skin_equip', { skin: s.id });
     equipped = s.id;
     voidling.setSkin(s);
     localStorage.setItem('voidSkin', s.id);
@@ -2017,6 +2076,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
 }
 
 function animate() {
+  tickFrame();
   const dt = Math.min(0.05, clock.getDelta());
   let dtw = dt;
   if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
@@ -2585,6 +2645,7 @@ function animate() {
       holdBanner(2.4);   // this card owns the screen while it plays
     }
     audio.evolve();
+    track('evolve', { form: curStage, name: FORMS[curStage], sec: Math.round(matchLen - matchClock) });
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
     audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);   // the soundtrack escalates too
     buzz(45);
@@ -2598,8 +2659,8 @@ function animate() {
       fx.shake(1.1);
       announce('🌑 WORLD ENDER — the island is OVER');
       breakingNews(pickedWorld === 'pirate'
-        ? 'THE RESORT IS CANCELLED. it was lovely while it lasted.'
-        : 'MAPLE FALLS: BOTH CANDIDATES CONCEDE. to the hole.');
+        ? 'PIRATE BAY is CANCELLED!! it was lovely while it lasted.'
+        : 'MAPLE FALLS: both candidates concede!! to the hole.');
       buzz(120);
     }
   }
