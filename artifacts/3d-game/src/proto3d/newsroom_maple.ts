@@ -194,7 +194,7 @@ const FAIR: Pools = [[
   'the goat got out of the goat tent again. the goat is undefeated.',
   'DEB HOLLIS handed out flyers in the corn dog queue. a captive crowd.',
   'CARLA WEBB covered the pie contest like it was the moon landing.',
-  'a blue ribbon for the largest courgette. it is unsettling. it is.',
+  'a blue ribbon for the largest zucchini. it is unsettling. it is.',
   'GUS entered a pie. GUS lost to PEARL. GUS entered again. respect.',
   'TATER, 9, won the science fair with a drawing of a purple hole.',
   'the recipe PEARL uses is a family secret. even her family suspects.',
@@ -221,8 +221,8 @@ const FAIR: Pools = [[
   'TATER gave it a blue ribbon. it fits. it fits it really well.',
   'the prize hog reached PIKE HOLLOW. good luck anyway, hog.',
   'GUS finally beat PEARL. by default. GUS is not celebrating. much.',
-  'the courgette survived. of course it survived. look at the thing.',
-  'the goat got out and took two children with it. what a goat.',
+  'the zucchini survived. of course it survived. look at the thing.',
+  'the goat got out and two children went with it. what a goat.',
 ]];
 
 // ── THE HIGH SCHOOL ───────────────────────────────────────────────────────────
@@ -359,11 +359,11 @@ const LAKE: Pools = [[
 const WOODS: Pools = [[
   'the pine woods something was sighted in 1981. we still discuss it.',
   'the campground host has laminated the rules. all forty. laminated.',
-  'quiet hours begin at 9pm, enforced by one man with a torch.',
+  'quiet hours begin at 9pm, enforced by one man with a flashlight.',
   'scout troop 12 earned a badge for arguing. not an official badge.',
   'one family has held site 4 every july since 1977. do not ask why.',
   'MAYOR DINKLE camps one night a year, for the photograph. one night.',
-  'firewood is five dollars. the next lot is four dollars. this is WAR.',
+  'firewood is five dollars. the next lot is four dollars. this is a FEUD.',
   'TATER is convinced the something is friendly. TATER is usually right.',
   'the trail map has been wrong since 1990. we find it charming now.',
   'GUS: "the something? a raccoon. a large and confident raccoon."',
@@ -404,14 +404,14 @@ const STRIP: Pools = [[
   'the twine ball gift shop sells small twine balls. made of twine.',
   'the motel sign reads VACANC. it has read VACANC since 1996.',
   'the drive-in has shown one film for two years. it is a good film.',
-  'petrol is two cents cheaper here than PIKE HOLLOW. we mention it.',
+  'gas is two cents cheaper here than PIKE HOLLOW. we mention it.',
   'PIKE HOLLOW claims a bigger twine ball. PIKE HOLLOW lies. probably.',
   'the twine ball has a live camera. two people watch it. every day.',
-  'motel room 6 has the good telly. everyone asks for room 6. everyone.',
+  'motel room 6 has the good TV. everyone asks for room 6. everyone.',
   'CARLA WEBB measured the twine ball. she will not release the number.',
   'the drive-in snack bar is staffed by a teen who never looks up.',
   'TATER visits the twine ball weekly. TATER LOVES the twine ball.',
-  'the coffee at the petrol station has been in that pot since tuesday.',
+  'the coffee at the gas station has been in that pot since tuesday.',
   'GUS refuses to acknowledge the twine ball. GUS has his reasons.',
   'the motel has eleven rooms and one story about room 6. one story.',
   'MAYOR DINKLE ran on twine ball tourism. eleven visitors last year.',
@@ -423,20 +423,20 @@ const STRIP: Pools = [[
   'the drive-in is playing the film anyway. half a screen. still good.',
   'PIKE HOLLOW offered to hold our twine ball for safekeeping. no.',
   'DEB HOLLIS: "he saved the TWINE and not the SCHOOL." fair, honestly.',
-  'petrol is now four cents cheaper than PIKE HOLLOW. a silver lining.',
+  'gas is now four cents cheaper than PIKE HOLLOW. a silver lining.',
   'TATER waved goodbye to the twine ball. then it came back. hero twine!',
   'the twine ball live camera has 900 viewers. finally. after ten years.',
-  'room 6 has been evacuated. the good telly went with it. of course.',
+  'room 6 has been evacuated. the good TV went with it. of course.',
 ], [
   'the twine ball is safe. the town is not. the town accepts this.',
   'the motel sign reads VAC. still lit. still very lit. a proud sign.',
   'the drive-in showed the film to the end. nobody left. nobody could.',
   'MAYOR DINKLE saved the twine ball. it is on his truck. he DID that.',
   'PIKE HOLLOW has the only twine ball now!! no. ours is on a truck.',
-  'the petrol sign still shows a price. loyal to the very last.',
+  'the gas sign still shows a price. loyal to the very last.',
   'CARLA WEBB released the twine measurement. it was second. we knew.',
   'TATER is riding in the truck with the twine ball. a perfect ending.',
-  'the good telly from room 6 is in somebody\'s back seat. it is fine.',
+  'the good TV from room 6 is in somebody\'s back seat. it is fine.',
   'the goat is on the twine ball, on the truck, going down the road.',
 ]];
 
@@ -479,7 +479,7 @@ const BURB: Pools = [[
   'MAYOR DINKLE knocked on the last door. nobody home. he talked anyway.',
   'TATER made 40 dollars. the other kid made 45. good hustle, kid.',
   'GUS never mowed. GUS was RIGHT. DALE will never accept this. never.',
-  'somebody\'s bins are still at the kerb. correct day. no street left.',
+  'somebody\'s bins are still at the curb. correct day. no street left.',
   'every yard sign has gone. one is in a tree. it is upside down.',
 ]];
 
@@ -511,7 +511,7 @@ const CIVIC: Pools = [[
   'MARGE relocated the meter protest. the meter came WITH her. wow.',
   'CARLA WEBB is writing from her chair. her chair is on a lawn now.',
   'the statue of the man nobody can name has been moved to a truck.',
-  'MAYOR DINKLE declared an emergency. the emergency is his poll number.',
+  'MAYOR DINKLE declared an emergency. the emergency is his pie sales.',
   'the goat is in the library. the goat has a library card. somehow.',
 ], [
   'the courthouse has GONE!! the two-inch case will be heard. somehow.',
@@ -597,7 +597,7 @@ const GENERAL: Pools = [[
   'TATER named it. the whole town is using the name now. it is Steve.',
   'the twine ball has been loaded onto a flatbed truck. priorities set.',
   'the debate was cancelled, rescheduled, cancelled. GUS is furious.',
-  'MAYOR DINKLE consulted an expert. the expert runs the petrol station.',
+  'MAYOR DINKLE consulted an expert. the expert runs the gas station.',
   'the population sign reads 1,408 and is, for the first time, too high.',
   'a four hour meeting on whether to hold a meeting. motion carried.',
   'MAYOR DINKLE: "this is NOT an evacuation. this is a fun walk."',
@@ -617,7 +617,7 @@ const GENERAL: Pools = [[
 ], [
   // — BEAT 4 · PANIC — the town is gone and the meter argument goes on. —
   'MAYOR DINKLE: "fine. it is real. I still say it is a DRAINAGE issue."',
-  'MAYOR DINKLE conceded. then asked about a recount. immediately after.',
+  'MAYOR DINKLE conceded. then asked for a rematch. immediately after.',
   'the BUGLE printed a special edition. six pages. CARLA WEBB has peaked.',
   'GUS is still serving coffee. GUS will always be serving coffee.',
   'the pies PEARL made are all safe. she planned for this in 1998.',
@@ -635,13 +635,13 @@ const GENERAL: Pools = [[
   'the town has gone. the argument about the meter continues. it does.',
   'the BUGLE: circulation 41. there is a new subscriber. purple. hungry.',
   'the water tower is the last word standing. it says MAPLE FALLS. good.',
-  'MAYOR DINKLE: "I never said fake news. I said fake HOLE." he did not.',
+  'MAYOR DINKLE: "I never said puddle. I said POND." he said puddle.',
   'it ate town hall, the clock, and the ladder. the man got down first.',
   'something burped and it smelled of the whole diner. all of it.',
   'MAYOR DINKLE conceded. then asked who ate his TRUCK. it did, sir.',
   'another hole has opened by the water tower. they are MULTIPLYING.',
   'there are three of them now. THREE. we have stopped counting.',
-  'the goat came back for two more children. what a goat!!',
+  'the goat came back for its two best friends. what a goat!!',
   'DEB HOLLIS won in a landslide. she is the mayor of a purple circle.',
   'the first act of the new mayor was blaming MAYOR DINKLE. correct.',
 ]];
@@ -762,7 +762,7 @@ const LIVE: Pools = [[
   'MAYOR DINKLE: "there is no {F} in {D}." there is, though.',
   'a {F} was sighted in {D}. residents waved. they always do.',
   'it ate {M}. MAYOR DINKLE calls this "a scheduling matter".',
-  'DEB HOLLIS: "{M}? gone." her polls are up nine points.',
+  'DEB HOLLIS: "{M}? gone." her pie sales are up nine pies.',
   'CARLA WEBB: "mayor, about the {F} in {D}?" he walks away.',
   'TATER fed the {F}. TATER says it prefers {M}.',
   'poll: is the purple thing getting bigger? {P}% say yes.',
@@ -810,7 +810,7 @@ const LIVE: Pools = [[
   'the {F} ate {M}. PIKE HOLLOW sent a casserole.',
   'DALE mowed the last lawn in {D}. crisp to the very end, that man.',
   '{S} SECONDS LEFT!! the twine ball is on the truck. go. go. go.',
-  'the {F} ate {M}. the recount goes ahead anyway.',
+  'the {F} ate {M}. the pie judging goes ahead anyway.',
   'there are two of them at {D} now. TWO. we are leaving.',
 ]];
 
@@ -842,13 +842,15 @@ export const MAPLE_VOICE_AMBIENT: Record<string, string[]> = {
   ],
   // does not gossip. is currently gossiping.
   gossip: [
-    'well. I heard something.', 'do not tell a soul. tell one.', 'her cousin at the DMV said—',
-    'apparently it is about money.', 'they are not speaking. still.', 'I saw whose truck that was.',
-    'the pie contest was RIGGED.', 'that casserole was store bought', 'they moved here in 2019. new.',
-    'I do not gossip. but listen.', 'that is not his real lawn.', 'there was a WHOLE incident.',
+    'well. I heard something.', 'do not tell a soul. tell everyone.', 'her cousin heard it first.',
+    'apparently it is about the pie.', 'they are not speaking. still.', 'I saw whose truck that was.',
+    'the pie contest was RIGGED.', 'that casserole was store bought.', 'they moved here in 2019. brand new!',
+    'I do not gossip. I just KNOW.', 'that is not his real lawn.', 'there was a WHOLE incident.',
     'nine people know. now ten.', 'the mayor knows. of course.', 'I have said too much. more?',
-    'it started at the fair, in 96.', 'her sister told my sister.', 'this stays between us. and Deb.',
-    'ask me again in ten minutes.', 'I would never repeat it. so:',
+    // …and the pool no longer models keeping secrets from grown-ups: in a game
+    // for six-year-olds "do not tell" is a habit worth not teaching.
+    'it started at the fair, in 96.', 'her sister told my sister.', 'everybody knows. even Deb.',
+    'ask me again in ten minutes.', 'I will absolutely repeat it. so:',
   ],
   farmer: [
     'rain would be nice. or not.', 'that corn is coming in fine.', 'the rooster starts at 4:40.',
@@ -866,7 +868,7 @@ export const MAPLE_VOICE_AMBIENT: Record<string, string[]> = {
     'homecoming is a whole ordeal.', 'literally no signal out here.', 'the diner or the parking lot.',
     'my dad coaches. it is a lot.', 'PIKE HOLLOW is worse. barely.', 'I am in the band. one song.',
     'six days till I get my license', 'yes my last name is Dinkle.', 'this is the most exciting day.',
-    'I have a job at the fair. ugh.', 'do NOT tell my aunt about this.',
+    'I have a job at the fair. ugh.', 'my aunt is going to LOVE this.',
   ],
   // the only person in town who has this correctly figured out
   kid: [
@@ -881,11 +883,11 @@ export const MAPLE_VOICE_AMBIENT: Record<string, string[]> = {
   // GUS energy: refills are free, so are the opinions
   diner: [
     'coffee is 90 cents. always.', 'you want my opinion? here it is.', 'pie? we got PEARL\'s pie.',
-    'that booth is Marge\'s booth.', 'no, we do not do oat milk.', 'sit anywhere. not there.',
+    'that booth is Marge\'s booth.', 'no, we do not do sprinkles.', 'sit anywhere. not there.',
     'the debate is at 8. be early.', 'banned him. still feed him.', 'I have been here 31 years.',
     'the special is the special.', 'refills free. opinions free.', 'that photo? catfish. 1996.',
     'the mayor sits in the corner.', 'we close when I say we close.', 'eggs how you like em, hon.',
-    'I moderate. I do not referee.', 'you two. outside. talk it out.', 'I lost to Pearl again. again.',
+    'I moderate. I do not referee.', 'you two. shake hands. now.', 'I lost to Pearl again. again.',
     'more coffee. sit back down.', 'nobody leaves here hungry.',
   ],
   // relentlessly, unshakeably proud of a town with one stoplight
@@ -903,7 +905,7 @@ export const MAPLE_VOICE_AMBIENT: Record<string, string[]> = {
 export const MAPLE_VOICE_PANIC: Record<string, string[]> = {
   politician: [
     'this is my opponent\'s fault!!', 'I NEVER said it was fake!!', 'to the truck!! MY truck!!',
-    'vote for me from wherever!!', 'save the yard signs!!', 'I demand a RECOUNT!!',
+    'vote for me from wherever!!', 'save the yard signs!!', 'I demand a REMATCH!!',
     'I was AGAINST it all along!!', 'the polls are still OPEN!!', 'somebody grab the ribbon!!',
     'four more— okay, RUN!! RUN!!', 'I will fix this in term THREE!',
   ],
@@ -934,7 +936,7 @@ export const MAPLE_VOICE_PANIC: Record<string, string[]> = {
   kid: [
     'RUN!! it is a GAME!! run!!', 'GO STEVE!! GO!!', 'this is better than the fair!!',
     'wait for me!! WAIT!!', 'I TOLD you he was real!!', 'Steve is just hungry! stop it!',
-    'again!! do it AGAIN!!', 'mum you are SO slow!!', 'can I bring him home?!',
+    'again!! do it AGAIN!!', 'mom you are SO slow!!', 'can I bring him home?!',
     'best. field trip. EVER!!',
   ],
   diner: [

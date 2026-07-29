@@ -98,7 +98,7 @@ export const BRAND: [string, string, string] = [
 // Punctuation: exactly one "!", on the greeting. That is the whole allowance.
 const SIGN_ON: string[] = [
   'GOOD MORNING from PIRATE BAY! the boat parade sets off at noon, as ever.',
-  'GOOD MORNING! the tiki bar is open, the sea is warm, the ice is cold.',
+  'GOOD MORNING! the smoothie hut is open, the sea is warm, the ice is cold.',
   'CAPT. ROGER: "GOOD MORNING! breakfast is a buffet. it is always a buffet."',
   'GOOD MORNING from PIRATE BAY! sandcastle contest at three. bring a bucket.',
   'GOOD MORNING! two pools, one parrot, and a new slide on the big pool.',
@@ -476,7 +476,7 @@ const GENERAL: Pools = [[
   'the hole ate a deckchair. we are calling that a laundry matter.',
   'MRS FENWICK-HYDE stepped in it. she blames her SANDALS.',
   'MAISIE said "there is a hole". staff said "there is a SMOOTHIE BAR".',
-  'CAPT. ROGER: "a nice cold drink at the tiki bar solves this."',
+  'CAPT. ROGER: "a nice cold smoothie at the smoothie hut solves this."',
 ], [
   // — BEAT 3 · ALARM — dawning horror, delivered cheerfully. one "!" max. —
   'please do not feed the hole. it has eaten. it has DEFINITELY eaten.',
@@ -695,7 +695,7 @@ const LIVE: Pools = [[
   'MRS FENWICK-HYDE: "{M}? I was USING that."',
   'a {F} now owns {P}% of a luxury resort. good for it, honestly.',
   'NIGEL has confirmed the {F}\'s late checkout. a very late one.',
-  '{S} SECONDS LEFT. finish your drinks calmly. and quickly.',
+  '{S} SECONDS LEFT. finish your ice creams calmly. and quickly.',
   'MAISIE says the {F} is just hungry. MAISIE gets it.',
   'CAPT. ROGER: "{P}% gone. that is {R}% still AMAZING."',
   'the {F} ate {M}. it looked so pleased.',

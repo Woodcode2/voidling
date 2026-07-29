@@ -39,8 +39,8 @@ export type Say = (pos: THREE.Vector3, text: string, kind: 'ambient' | 'panic' |
 // complains the same way on the beach as at the spa.
 const AMBIENT: Record<string, string[]> = {
   // ── PIRATE BAY: a five-star resort cosplaying a pirate hideout
-  port: ['mind the gangplank, sir', 'the tender leaves at six', 'that crate is DEFINITELY rum', 'a seagull took my croissant', 'tide\'s coming in, matey', 'who moored a superyacht THERE', 'says fragile. it is not.', 'salt in me boots. always.', 'thirty bags. for one guest.', 'the harbourmaster is napping', 'polish the brass. again.', 'that ship is a photo prop', 'lobster delivery, coming through', 'this jetty needs a new plank'],
-  resort: ['two more weeks of THIS', 'the swim-up bar is unreal', 'my cabana has a doorbell', 'MY lounger. the towel says so.', 'is the smoothie included?', 'they fold towels into swans', 'I could live here, honestly', 'spa at four, snacks at five', 'the infinity pool goes FOREVER', 'gold flakes. on the ice cream.', 'they have a pillow menu', 'someone is playing harp. outside.', 'my sunburn has a sunburn', 'this robe is coming home with me'],
+  port: ['mind the gangplank, sir', 'the tender leaves at six', 'that crate is DEFINITELY snacks', 'a seagull took my croissant', 'tide\'s coming in, matey', 'who moored a superyacht THERE', 'says fragile. it is not.', 'salt in me boots. always.', 'thirty bags. for one guest.', 'the harbourmaster is napping', 'polish the brass. again.', 'that ship is a photo prop', 'lobster delivery, coming through', 'this jetty needs a new plank'],
+  resort: ['two more weeks of THIS', 'the swim-up snack bar is unreal', 'my cabana has a doorbell', 'MY lounger. the towel says so.', 'is the smoothie included?', 'they fold towels into swans', 'I could live here, honestly', 'spa at four, snacks at five', 'the infinity pool goes FOREVER', 'gold flakes. on the ice cream.', 'they have a pillow menu', 'someone is playing harp. outside.', 'my sunburn has a sunburn', 'this robe is coming home with me'],
   party: ['THIS SONG!! THIS ONE!!', 'DJ COCONUT!! COCONUT!!', 'my hips have opinions', 'conga line in 5!!', 'is the floor supposed to glow', 'someone hydrate me', 'best. holiday. EVER.', 'I am dancing. do not stop me.', 'the bass is in my SMOOTHIE', 'FREE GLOW STICKS!!', 'my flip-flop flew off. worth it.', 'limbo record: still me', 'they hired a whole steel band', 'one more song. one more. ONE.'],
   market: ['fresh mango! FRESH MANGO!', 'that parrot insulted me', 'half price! for you: full price', 'genuine treasure! probably!', 'I bought a hat. no regrets.', 'three coconuts for a doubloon', 'my stall, my rules', 'the fruit here is UNREAL', 'hand-carved. by a machine.', 'a real pirate map. laminated.', 'haggle? I LOVE to haggle.', 'that is a very expensive shell', 'spices! smell them! SMELL THEM', 'authentic. mostly. sort of.'],
   jungle: ['I heard a monkey. I think.', 'the guided walk is at ten', 'bug spray was a good call', 'is that a waterfall??', 'left at the big rock, right?', 'nature! so much of it!', 'something just moved', 'no bars out here. bliss.', 'the zipline goes over THAT?', 'they built a spa in a tree', 'my sandals were a mistake', 'a butterfly landed on me!!'],
@@ -53,8 +53,8 @@ const AMBIENT: Record<string, string[]> = {
     'we had a fort before they had a POOL', 'salt gets in everything', 'mind the bucket!',
     'she mends faster than me. always has.', 'nine generations on this hill', 'the goat is out AGAIN',
     'rope don\'t mend itself', 'bread\'s on. give it ten.', 'that gull knows my name'],
-  cozy: ['my hedge. my rules.', 'did you see the HOA email?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
-  fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how gauche', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
+  cozy: ['my hedge. my rules.', 'did you see the fence rules?', 'new mailbox day!', 'fresh cookies, anyone?', 'bin day tomorrow!', 'sprinklers at 6 sharp', 'my gnome is judging you', "lawn's looking CRISP", 'block party friday?', 'that fence is 2cm too tall'],
+  fancy: ['this fountain? imported.', 'my topiary won an award', 'darling, how ORDINARY', 'we summer elsewhere, obviously', 'the gala is SATURDAY', 'chandelier #3 arrives today', 'is that valet parking?', 'one simply does not jog', 'my dog has a butler', 'this hedge is by an artist'],
   // ── MAPLE FALLS: `downtown` is MAIN STREET, four shops and a stoplight
   downtown: ['morning! morning. morning.', 'the hardware store knows me', 'that meter is a DISGRACE',
     'parade route goes past here', 'coffee at Gus\'s? always.', 'one stoplight. it works fine.',
@@ -83,8 +83,8 @@ const AMBIENT: Record<string, string[]> = {
   zoo: ['the elephant waved at me!!', 'do NOT tap the glass', 'look, flamingos!', 'gift shop. NOW.', 'feeding time!!', 'popcorn! 🍿', 'the lions look hungry', 'penguins: tiny tuxedo guys', 'that monkey has my hat', 'sloth update: still asleep'],
 };
 const PANIC: Record<string, string[]> = {
-  port: ['ABANDON DOCK!!', 'save the RUM!!', 'not my CARGO!!', 'to the boats!! ALL of them!!', 'it ate the pier!!', 'the superyacht!! START IT!!', 'lower the fancy lifeboat!!'],
-  resort: ['MY LOUNGER!!', 'not the swim-up bar!!', 'my HOLIDAY!!', 'I paid for ALL-INCLUSIVE!!', 'grab the sunscreen and RUN!!', 'it ate the infinity pool!!', 'not the TOWEL SWANS!!'],
+  port: ['ABANDON DOCK!!', 'save the CARGO!!', 'not my CARGO!!', 'to the boats!! ALL of them!!', 'it ate the pier!!', 'the superyacht!! START IT!!', 'lower the fancy lifeboat!!'],
+  resort: ['MY LOUNGER!!', 'not the swim-up snack bar!!', 'my HOLIDAY!!', 'I paid for ALL-INCLUSIVE!!', 'grab the sunscreen and RUN!!', 'it ate the infinity pool!!', 'not the TOWEL SWANS!!'],
   party: ['THE MUSIC STOPPED!!', 'not the DANCE FLOOR!!', 'conga line — THIS WAY!!', 'DJ RUN!! DJ RUUUN!!', 'it ate the speakers!!', 'save the glow sticks!!', 'last dance!! literally!!'],
   market: ['MY MANGOES!!', 'the parrot saw everything!!', 'closing early!! VERY early!!', 'not my STALL!!', 'take the coconuts!!', 'everything must go!! WE must go!!'],
   jungle: ['INTO THE TREES!!', 'that is NOT a monkey!!', 'follow the trail!! ANY trail!!', 'it ate the waterfall!!', 'the tree spa is GONE!!', 'zipline!! EVERYONE!!'],
@@ -92,8 +92,8 @@ const PANIC: Record<string, string[]> = {
   oldtown: ['THE NETS!! GRAB THE NETS!!', 'nine generations!! GONE!!', 'get the KIDS off the wall!!',
     'it took the WELL!!', 'to the fort!! it held before!!', 'my grandfather built that!!',
     'leave the catch!! LEAVE IT!!'],
-  cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the HOA!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the HOA form!!'],
-  fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call my lawyer!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
+  cozy: ['NOT my garden gnome!!', 'MY LAWN!!', 'save the flower beds!!', 'grab the cookies!!', 'the sprinklers did NOTHING', 'it skipped the FENCE FORM!!'],
+  fancy: ['my ANTIQUES!!', 'the CHANDELIER!!', 'call the BUTLER!!', 'flee ELEGANTLY!!', 'NOT the topiary!!', 'the butler quit!!'],
   downtown: ['NOT MAIN STREET!!', 'it ate the hardware store!!', 'the parade route is GONE!!',
     'somebody move the stoplight!!', 'it left the METER. of course.', 'call the Bugle!! CALL HER!!'],
   fair: ['SAVE THE PIES!! ALL OF THEM!!', 'the twine ball!! THE TWINE BALL!!', 'it ate the ferris wheel!!',
@@ -105,7 +105,7 @@ const PANIC: Record<string, string[]> = {
   strip: ['it ate the DINER!!', 'grab the pie!! LEAVE the eggs!!', 'the coffee!! save the coffee!!',
     'we are CLOSED. permanently. RUN.', 'not Marge\'s booth!!', 'refills are OVER!!'],
   park: ['not the PICNIC!!', 'the DUCKS!! SAVE THE DUCKS', 'grab the frisbee, RUN!!', 'abandon the sandwiches!!', 'the gazebo!! NOO!!', 'jog!! FOR REAL this time!!'],
-  forest: ['BEAR?! no— WORSE!!', 'ABANDON TRAIL!!', "save the s'mores!!", 'the trees are LEAVING!!', 'hug a tree GOODBYE!!', 'nature says RUN!!'],
+  forest: ['BEAR! no. BIGGER!!', 'ABANDON TRAIL!!', "save the s'mores!!", 'the trees are LEAVING!!', 'hug a tree GOODBYE!!', 'nature says RUN!!'],
   beach: ['SAVE THE COOLER!!', 'my SANDCASTLE!!', 'not the towels!!', 'gnarly!! BAD gnarly!!', 'paddle, dude, PADDLE!!', 'even the crabs left!!', 'it ate the raked bit!!'],
   plaza: ['EVERYONE RUN!!', "it's REAL!!", 'save the taco truck!!', 'the fountain!! NOOO!!', 'my churros!!', "this wasn't on the flyer!!"],
   zoo: ['WHO OPENED THE PENS?!', 'the lions are LOOSE!!', 'the flamingos flew AWAY!!', 'even the sloth is running!!', 'save the gift shop!!', "WE'RE the feeding time!!"],
@@ -120,7 +120,7 @@ const biomeKey = (b: Biome): string => (b === 'military' || b === 'airport') ? '
 const VOICE_AMBIENT: Record<string, string[]> = {
   // out-of-touch guests: everything is a service failure, nothing is their fault
   rich: [
-    'this is NOT the good champagne', 'my yacht is double-parked', 'I asked for a SEA view.',
+    'this is NOT the good lemonade', 'my yacht is double-parked', 'I asked for a SEA view.',
     'the concierge knows my name', 'my chef flew in this morning', 'is this... TAP water?',
     'the other guests are so LOUD', 'we know the owner, obviously', 'my sunbed has a butler',
     'I never queue. ever.', 'this robe is not silk. feel it.', 'darling, fetch the smaller boat',
@@ -146,7 +146,7 @@ const VOICE_AMBIENT: Record<string, string[]> = {
     'yes, it IS mandatory fun', 'who booked the parrot? me.', 'kids club needs one more kid',
     'GREAT energy, row three!', 'the bouncy castle is inflating', 'raffle tickets! last call!',
     'we are BACK ON SCHEDULE', 'quiz night: no phones please', 'clap if you can hear me!!',
-    'pool games in ten! stretch!', 'lost child at the smoothie bar', 'my clipboard, my kingdom',
+    'pool games in ten! stretch!', 'lost flip-flop at the smoothie bar', 'my clipboard, my kingdom',
     'anyone for water aerobics?', 'the schedule is a SUGGESTION', 'let us hear it for the SUN!',
   ],
   // staff: dry, off-the-clock energy, in-jokes about the guests
@@ -174,7 +174,7 @@ const VOICE_PANIC: Record<string, string[]> = {
   rich: [
     'I am NOT insured for this!!', 'GET ME THE MANAGER!!', 'my LUGGAGE!! all nine bags!!',
     'this is a ONE STAR holiday!!', 'to the yacht!! the BIG yacht!!', 'refund AND an apology!!',
-    'nobody said VOID at check-in!!', 'save the champagne!! ALL of it!', 'my robe!! my lovely robe!!',
+    'nobody said VOID at check-in!!', 'save the lemonade!! ALL of it!', 'my robe!! my lovely robe!!',
     'call my people!! ALL my people!', 'I want to speak to the ISLAND!!',
   ],
   kid: [
@@ -190,7 +190,7 @@ const VOICE_PANIC: Record<string, string[]> = {
     'to the buffet!! I mean— OUT!!', 'everybody say WEEEE!!',
   ],
   staff: [
-    'not my problem. LEAVING.', 'that is above my pay grade!!', 'I quit! effective IMMEDIATELY',
+    'not my problem. LEAVING.', 'that is not my job!!', 'I quit! effective IMMEDIATELY',
     'staff exit! staff exit!!', 'grab the tips jar!!', 'kitchen is SHUT. tell them.',
     'I am NOT cleaning that up!!', 'shift over. FOREVER.', 'the buffet is closed!! RUN!!',
     'last one out gets the mop!!',
@@ -3289,17 +3289,17 @@ export function createLife(
       ['that crate goes STARBOARD', 'we are NOT sailing tonight', 'the captain is asleep. again.',
         'count the barrels. COUNT THEM.', 'she is seaworthy. mostly.',
         'nine suitcases for ONE guest', 'the galleon is a photo booth'],
-      ['ABANDON THE DOCK!!', 'save the RUM!! I mean— cargo!!', 'cut the ropes!! CUT THEM!!',
+      ['ABANDON THE DOCK!!', 'save the CARGO!! ALL of it!!', 'cut the ropes!! CUT THEM!!',
         'the tender!! LAUNCH THE TENDER!!'],
       7, 0x4dd0e1, ['pirate', 'dock', 'rich']);
     // THE GRAND POOL — the flagship vignette: rich guests being waited on hand
     // and foot, and one event manager insisting it is Coconut Hour
     addPB(9200, 5400, 'resort', false,
-      ['is this the ADULTS pool?', 'my lounger has a sea view. barely.',
+      ['is this the QUIET pool?', 'my lounger has a sea view. barely.',
         'the towel swan lost a wing', 'four straws. FOUR.', 'they know my order. obviously.',
         'the water is 28 degrees exactly', 'someone brought a BALL in here'],
       ['MY LOUNGER!! MY TOWEL!!', 'the pool has GONE!!', 'refund the whole WEEK!!',
-        'grab the champagne, leave the bags'],
+        'grab the smoothies, leave the bags'],
       4, undefined, ['rich', 'robe', 'waiter', 'kid', 'bellhop']);
   }
 
@@ -3716,10 +3716,10 @@ export function createLife(
       ['there is NO void. next question.', 'my opponent has NO plan.',
         'four more years! or eight!', 'I fixed that pothole. me.',
         'boooo! …sorry, continue', 'let me finish. LET ME FINISH.',
-        'and ANOTHER thing about potholes—', 'name ONE thing she has done.',
+        'and ANOTHER thing about potholes.', 'name ONE thing she has done.',
         'a vote for me is a vote for me', 'the twine ball put us on maps.'],
       ['I NEVER said it was fake!!', 'this is my opponent\'s fault!!',
-        'the polls are still OPEN!!', 'I demand a RECOUNT!!',
+        'the polls are still OPEN!!', 'I demand a REMATCH!!',
         'four more— okay, RUN!! RUN!!'],
       (x, z, side, dress) => {
         const SZ = z - 12;   // the stage line, back from the square
@@ -3764,7 +3764,7 @@ export function createLife(
           townie(pick(['booster', 'gossip', 'kid', 'booster', 'teen'] as Role[]),
             cx2, cz2, dress, camp, 5, rand(1.5, 2.8), 20,
             ['the SPEECH!! RUN!!', 'democracy is DOOMED!!', 'save the ballot box!!',
-              'he said it was FAKE!!']);
+              'he said it was a PUDDLE!!']);
         }
         // …and one campaign worker on the edge of it, leafleting the queue
         rooted('campaigner', x + 12, SZ + 9, dress, 5, DINKLE);
@@ -3927,8 +3927,8 @@ export function createLife(
       ['it is two inches. TWO.', 'that sign is on MY verge.',
         'I have the original survey.', 'we were friends. in 2011.',
         'measure it again. AGAIN.', 'the hedge is the LINE.',
-        'my lawyer says nothing. yet.', 'both signs. same verge. war.',
-        'the HOA has recused itself.', 'his lawn is not even level.'],
+        'my ruler says two inches.', 'both signs. same lawn. a FEUD.',
+        'the FENCE COMMITTEE gave up.', 'his lawn is not even level.'],
       ['MY LAWN!! MY LAWN!!', 'it crossed the BOUNDARY!!',
         'take the sign!! LEAVE the hedge!!', 'this is STILL two inches!!'],
       (x, z, side, dress) => {
@@ -3974,8 +3974,8 @@ export function createLife(
     mEvent('strip', ['main', 'civic', 'burb'],
       ['coffee is 90 cents. always.', 'refills free. opinions free.',
         'that booth is Marge\'s booth.', 'the special is the special.',
-        'no, we do not do oat milk.', 'the debate is at 8. be early.',
-        'banned him. still feed him.', 'you two. outside. talk it out.',
+        'no, we do not do sprinkles.', 'the debate is at 8. be early.',
+        'banned him. still feed him.', 'you two. shake hands. now.',
         'I lost to Pearl again. again.', 'nobody leaves here hungry.'],
       ['it ate the DINER!!', 'grab the pie!! LEAVE the eggs!!',
         'we are CLOSED. permanently. RUN!!', 'not Marge\'s booth!!'],
@@ -4008,8 +4008,8 @@ export function createLife(
     mEvent('woods', ['park', 'lake', 'farm'],
       ['s\'mores?! 🔥', 'one more ghost story…', 'who packed the bug spray?',
         'the fair is four miles that way', 'a raccoon took the whole bag',
-        'nature is HEALING', 'we come out here every August'],
-      ['BEAR?! no— WORSE!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!',
+        'nature is so LOUD', 'we come out here every August'],
+      ['BEAR! no. BIGGER!!', 'ABANDON CAMP!!', 'the tent has NO defense stat!!',
         'save the s\'mores!! ALL of them!!'],
       (x, z, side, dress) => {
         for (const [ox, oz, col] of [[-7, 0, 0xff8a70], [7, 3, 0x6db8e8]] as const) {
@@ -4118,7 +4118,7 @@ export function createLife(
     mEvent('school', ['burb', 'civic', 'main'],
       ['recess!! 🎒', 'tag, you\'re it!', 'the bell is broken. still.',
         'band practice. every day. LOUD.', 'bake sale in the gym! cash!',
-        'pop quiz?! nooo', 'summer reading! I won it!'],
+        'pop quiz! nooo', 'summer reading! I won it!'],
       ['SNOW DAY!! I mean— VOID DAY!!', 'homework CANCELLED!!', 'RUN, class, RUN!!',
         'band, KEEP PLAYING!!'],
       (x, z, side, dress) => {

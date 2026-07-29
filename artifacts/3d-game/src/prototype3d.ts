@@ -241,7 +241,7 @@ const FAMILY_TITLE: Record<string, string> = {
 // each family member's ARCHETYPE, named on arrival — a kid should be told what
 // to watch for once, then be able to read it off the screen forever after
 const ARCH_TAG: Record<string, string> = {
-  BULLY: '😈 she HUNTS you', COWARD: '😱 runs from everything',
+  BULLY: '⚡ she CHASES you', COWARD: '😱 runs from everything',
   SHOWOFF: '✨ only eats big stuff', COPYCAT: '👣 copies your route',
   // …no longer "camps one spot": the camp was deleted when it turned out to be
   // what was pinning him (rivals.ts records the five attempts). A join banner
@@ -273,7 +273,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
   // off you plus half her score, so it has to land like the ending it is
   announceFam(marquee
-    ? `🏆 you ATE THE HUNTER! ${name} is DINNER! +${pts}`
+    ? `🏆 you OUT-GOBBLED THE CHASER! +${pts}`
     : `🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
   if (marquee) { breakingNews('one hole has eaten the other. there is one left. it is bigger.'); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
@@ -333,7 +333,7 @@ rivals.onPlayerBitten = (name, hit) => {
   // announcement on top of that is the third telling of the same event, and
   // over a match it is the single biggest source of HUD clutter.
   floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
-  bubbles.float(floatPos, hit.hunter ? 'CAUGHT!! 😱' : 'OW!! 😱', true);
+  bubbles.float(floatPos, hit.hunter ? 'BONK!! 💫' : 'OOF!! 💫', true);
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
   buzz(hit.hunter ? 90 : 50);
@@ -364,7 +364,7 @@ rivals.onNearMiss = (name, x, z) => {
   addCoins(5);   // dodging is a SKILL — pay it
 };
 rivals.onStuffed = (name) => {
-  announceFam(`🍖 ${name} is TOO FULL to chase — EAT HER!`);
+  announceFam(`🍰 ${name} is TOO FULL to chase — now is your chance!`);
   breakingNews('the second hole has stopped moving. it looks full. it looks slow.');
   audio.ready();
 };
@@ -734,14 +734,14 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   { id: 'combo', icon: '🔥', label: 'Combo Chef: hit a ×2.0 combo', target: 1, reward: 20, kind: 'combo' },
   { id: 'evolve', icon: '🕳️', label: 'Evolve to DEVOURER', target: 1, reward: 25, kind: 'devourer' },
   { id: 'solo', icon: '🏝️', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
-  { id: 'houses', icon: '🏠', label: 'Home Wrecker: eat 3 houses', target: 3, reward: 25, kind: 'house' },
+  { id: 'houses', icon: '🏠', label: 'Roof Raider: eat 3 houses', target: 3, reward: 25, kind: 'house' },
   // PER-WORLD. Houses only exist in Maple's cozy/fancy biomes and Pirate Bay's
   // entire car population is seven shuttle buggies, so a board drawn as
   // "6 cars / combo / 3 houses" — which is what today drew — was impossible on
   // the flagship world. Measured: Maple cleared 3/3 and 2/3, Pirate 1/3, 1/3, 0/3.
   { id: 'cabanas', icon: '⛱️', label: 'Beach Party: eat 4 cabanas', target: 4, reward: 25, kind: 'cabana' },
   { id: 'gold', icon: '✦', label: 'Treasure Hunter: find 4 golden things', target: 4, reward: 25, kind: 'gild' },
-  { id: 'rival', icon: '😈', label: 'Void Eats Void: devour a rival', target: 1, reward: 30, kind: 'rival' },
+  { id: 'rival', icon: '⚡', label: 'Out-Gobbler: out-gobble a rival', target: 1, reward: 30, kind: 'rival' },
   { id: 'big', icon: '🏨', label: 'Big Fish: eat 3 LANDMARK buildings', target: 3, reward: 25, kind: 'big' },
 ];
 // EASY and MED both contained 'cars' and 'combo', so roughly one day in seven
@@ -808,18 +808,18 @@ const MAPLE_BEATS = [
   { at: 32, dur: 15, mult: 2, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
     banner: '🥧 BAKE SALE RUSH! everything is DOUBLE!', news: 'PEARL opens the bake sale. rival pies appear instantly' },
   { at: 95, dur: 18, mult: 2, fired: false, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    banner: '📣 RECALL VOTE! the whole town is OUT!', news: 'RECALL VOTE called. DINKLE calls it a scheduling matter' },
+    banner: '📣 TOWN PARADE! the whole town is OUT!', news: 'the parade sets off. DINKLE calls it a scheduling matter' },
   { at: 150, dur: 30, mult: 3, fired: false, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
-    banner: '🗳️ THE LANDSLIDE! everything is TRIPLE!', news: 'THE COUNT BEGINS. turnout is described as "total"' },
+    banner: '🥧 PIE JUDGING! everything is TRIPLE!', news: 'the judging begins. PEARL is judging her own pie again' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
 const PIRATE_BEATS: typeof MAPLE_BEATS = [
   { at: 32, dur: 15, mult: 2, fired: false, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
-    banner: '🍹 HAPPY HOUR! everything is worth DOUBLE!', news: 'HAPPY HOUR declared. bar is delighted' },
+    banner: '🍦 ICE CREAM HOUR! everything is worth DOUBLE!', news: 'ice cream hour declared. the ice cream hut is delighted' },
   { at: 95, dur: 18, mult: 2, fired: false, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
     banner: '🪩 DANCE PARTY! the whole bay is MOVING!', news: 'DJ Coconut drops the big one. floor shakes' },
   { at: 150, dur: 30, mult: 3, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
-    banner: '🏴‍☠️ TREASURE FEAST! everything is TRIPLE!', news: 'TREASURE FEAST! grab a doubloon and a fork' },
+    banner: '🏴‍☠️ TREASURE HUNT! everything is TRIPLE!', news: 'the treasure hunt begins. bring a bucket and a spade' },
 ];
 const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = {
@@ -981,10 +981,10 @@ let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 function refreshHud() {
   const R = voidling.radius;
   // leaderboard: player + rivals, ranked by score
-  // the hunter is FLAGGED on the board: when a name has a 😈 next to it, that
+  // the chaser is FLAGGED on the board: when a name has a ⚡ next to it, that
   // is the one on the island that can eat you right now
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
-    ...rivals.list.map((r) => ({ name: r.hunting ? `😈 ${r.name}` : r.name, color: r.color, score: r.score, me: false }))]
+    ...rivals.list.map((r) => ({ name: r.hunting ? `⚡ ${r.name}` : r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
@@ -993,8 +993,8 @@ function refreshHud() {
   // fires the identical brag twice within a second.
   if (started && !ended && prevRank > 0 && myRank < prevRank && tClock - lastRankBrag > 12) {
     lastRankBrag = tClock;
-    // the board prefixes the hunter with 😈; the sentence should not
-    announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival').replace('😈 ', '')}!`);
+    // the board prefixes the chaser with ⚡; the sentence should not
+    announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival').replace('⚡ ', '')}!`);
     audio.ready(); buzz(20);
   }
   // refreshHud runs 5x/s and rank oscillates, so this fired 18 times in one
@@ -1004,7 +1004,7 @@ function refreshHud() {
     lastRankBrag = tClock;
     // a rival just passed YOU — they get to brag about it
     const passer = rows[myRank - 2];
-    // …the board prefixes the hunter's row with 😈, so match on the bare name
+    // …the board prefixes the chaser's row with ⚡, so match on the bare name
     const rv = passer && !passer.me ? rivals.list.find((r) => passer.name.endsWith(r.name)) : undefined;
     if (rv && RIVAL_VOICE[rv.name]) {
       bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)], 'event');
@@ -1197,7 +1197,7 @@ function endMatch() {
   const wk = weekKey();
   localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
   const WIN_TITLES = ['ISLAND: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF THE ISLE'];
-  const LOSE_TITLES = ['STILL PECKISH…', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
+  const LOSE_TITLES = ['STILL HUNGRY!', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
   celebrateEnd(reward, gain, myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`, myRank === 1);
@@ -1453,7 +1453,7 @@ const LOAD_TIPS = [
   'tip: eat a rival and they respawn tiny — and grumpy',
   'tip: the ferris wheel is dessert. save room.',
   'tip: quests pay VOID POINTS — check mid-match',
-  'tip: BITSY cries when eaten. worth it.',
+  'tip: BITSY is the smallest — the easiest one in the family to catch',
 ];
 function withWorldReady(cb: () => void) {
   if (packReady) { cb(); return; }
@@ -1775,11 +1775,11 @@ const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: nu
   { ic: '👑', nm: 'Champion', ds: 'win a match', cur: () => stats.wins, max: 1 },
   { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10 },
   { ic: '💯', nm: 'Century', ds: 'score 2,500 in a run', cur: () => stats.best, max: 2500 },
-  { ic: '🚀', nm: 'High Roller', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000 },
-  { ic: '🍽️', nm: 'Glutton', ds: 'eat 500 things', cur: () => stats.eaten, max: 500 },
+  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000 },
+  { ic: '🍽️', nm: 'Big Appetite', ds: 'eat 500 things', cur: () => stats.eaten, max: 500 },
   { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000 },
-  { ic: '😈', nm: 'Void Eats Void', ds: 'devour a family member', cur: () => stats.rivals ?? 0, max: 1 },
-  { ic: '🍴', nm: 'Family Feast', ds: 'devour 10 family', cur: () => stats.rivals ?? 0, max: 10 },
+  { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'out-gobble a family member', cur: () => stats.rivals ?? 0, max: 1 },
+  { ic: '🏅', nm: 'Family Champion', ds: 'out-gobble 10 family members', cur: () => stats.rivals ?? 0, max: 10 },
   { ic: '🔥', nm: 'Combo King', ds: 'hit a x2.5 combo', cur: () => stats.combo ?? 0, max: 25 },
   { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25 },
 ];
@@ -2169,7 +2169,7 @@ function animate() {
           audio.evolve(); buzz(35);
           fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
           fx.flash(bt.flash, 0.35);
-      audio.matchBeat(bt.banner);   // happy hour / dance party / treasure feast each get their own sting
+      audio.matchBeat(bt.banner);   // ice cream hour / dance party / treasure hunt each get their own sting
         }
       }
       if (feverT > 0) {
