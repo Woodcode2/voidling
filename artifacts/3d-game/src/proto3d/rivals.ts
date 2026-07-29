@@ -172,6 +172,17 @@ const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.025;
 // food and ambles until the lane catches up. That reads on screen as a
 // character who has had enough, which is the same beat the stuffed hunter
 // already plays.
+//
+// VERIFIED, four identical matches, MAPLE FALLS:
+//   1st  11867 / 12141 / 12182 / 12007   sd  1%
+//   2nd   8214 /  6934 /  8574 /  7273   sd  9%
+//   3rd   5618 /  5521 /  5528 /  5516   sd  1%
+//   4th   3769 /  3954 /  3440 /  3763   sd  5%
+//   5th   1992 /  2128 /  2519 /  2457   sd 10%
+// Five separated rungs, worst spread 10%, against a second place that used to
+// swing fifteenfold. A different sibling led all four matches — CHOMPZILLA,
+// WOBBLES, GLITZ, GLITZ — so the variety lives in the cast while the
+// difficulty stays learnable, which is the whole point.
 const LANE_FINAL = [1.00, 0.68, 0.46, 0.31, 0.20];   // fractions of the top lane
 const FIELD_TOP = 16000;        // what first place is worth in a full-length match
 const FIELD_CURVE = 1.45;       // eating accelerates: the ladder rises the same way
