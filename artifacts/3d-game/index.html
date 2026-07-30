@@ -322,34 +322,62 @@
          system emoji standing in for the art of two fully built 3D islands. */
       #worlds { display: none; flex-direction: column; }
       #worlds.show { display: flex; }
-      #worlds #worldRow { display: grid; gap: 18px; padding: 8px 4vw 40px; margin: 0 auto;
-        width: 100%; max-width: 1080px; box-sizing: border-box; align-content: center; flex: 1;
-        grid-template-columns: repeat(auto-fit, minmax(min(260px, 84vw), 1fr)); }
+      #worlds #worldRow { display: grid; gap: 14px; padding: 8px 4vw 40px; margin: 0 auto;
+        width: 100%; max-width: 1080px; box-sizing: border-box; flex: 1;
+        /* start-aligned: a shelf reads from the top. Centring left a 174px gap
+           under the header on a phone. */
+        align-content: start; padding-top: 4px;
+        /* two posters abreast on a phone, three on a tablet — a shelf, not a
+           stack you scroll through one card at a time */
+        grid-template-columns: repeat(auto-fit, minmax(min(190px, 40vw), 1fr)); }
       #worlds .wCard { width: auto; padding: 0; overflow: hidden; gap: 0; }
       #worlds .wCard i { display: none; }
-      /* the art: each island painted in layered gradients — no asset, no CDN,
-         and it survives an offline native build */
-      .wArt { width: 100%; aspect-ratio: 16 / 9; position: relative; overflow: hidden; }
-      .wArt::after { content: ''; position: absolute; inset: 0;
-        box-shadow: inset 0 -30px 40px -18px rgba(11,6,26,0.8); }
-      /* the .maple / .pirate / .frost gradient stacks are gone: the module now
-         paints each card from the world's REAL coastline, districts, road grid
-         and water. FROST PEAKS has no geometry yet, so it keeps a placeholder. */
-      .wArt.frost {
-        background:
-          linear-gradient(160deg, transparent 46%, #ffffff 46% 54%, transparent 54%),
-          radial-gradient(ellipse 80% 90% at 50% 62%, #dfeaf6 0 60%, #b9cde0 60% 100%),
-          linear-gradient(180deg, #cfe6f6, #9dc2e0); }
-      .wBody { padding: 14px 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-      #worlds .wCard b { font-size: clamp(16px, 4.2vw, 21px); letter-spacing: 0.6px; font-weight: 900; }
-      #worlds .wCard span { font-size: 12px; opacity: 0.8; letter-spacing: 1.6px; }
+      /* ── THE POSTER ────────────────────────────────────────────────────────
+         This was a 16:9 in-engine screenshot with the HUD stripped, and it read
+         as exactly that: a screenshot. A level picker is a shelf of posters —
+         its job is to make a child want to go somewhere, not to show them the
+         terrain. These are painted key-art illustrations, 3:4 so the card is a
+         poster rather than a letterbox, with the title sitting ON the art
+         behind a scrim instead of in a separate strip below it. */
+      .wArt { width: 100%; aspect-ratio: 3 / 4; position: relative; overflow: hidden;
+        background: #1b0f36 center/cover no-repeat; }
+      /* a bottom scrim so white type is legible over any illustration, and a
+         top sheen so the card reads as glossy card stock rather than a photo */
+      .wArt::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 22%,
+          transparent 44%, rgba(13,8,33,0.55) 74%, rgba(13,8,33,0.94) 100%); }
+      /* the title block rides the poster's foot */
+      .wBody { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+        padding: 12px 14px 15px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+      #worlds .wCard { position: relative; }
+      #worlds .wCard b { font-size: clamp(17px, 4.6vw, 23px); letter-spacing: 0.6px; font-weight: 900;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.75); }
+      #worlds .wCard span { font-size: 11px; opacity: 0.85; letter-spacing: 1.8px;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+      /* YOUR BEST, on the card. It existed only on the results overlay — a
+         screen you leave and never see again — so the picker gave a returning
+         child nothing to beat. */
+      .wBest { font-size: 11px; font-weight: 900; letter-spacing: 1.2px; color: #ffe08a;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.85); min-height: 14px; }
+      /* the number-of-worlds chip, top-left of the poster */
+      .wNum { position: absolute; top: 10px; left: 10px; z-index: 2; font-size: 10px; font-weight: 900;
+        letter-spacing: 1.6px; color: #fff; background: rgba(13,8,33,0.62); border-radius: 8px;
+        padding: 4px 9px; backdrop-filter: blur(4px); }
       .wGo { margin-top: 10px; font-size: 15px; font-weight: 900; letter-spacing: 1.4px; color: #0d0821;
         background: linear-gradient(180deg, #ffe07a, #ffc21f); border-radius: 12px; padding: 9px 26px;
         box-shadow: 0 4px 0 #c98d00; opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
       /* every unlocked card launches on tap, so every unlocked card says so */
       .wCard[data-world] .wGo { opacity: 1; transform: none; }
       .wCard.lock .wGo { display: none; }
-      .wLock { margin-top: 10px; font-size: 13px; font-weight: 900; letter-spacing: 1.4px; color: #cbb2ff; }
+      .wLock { margin-top: 8px; font-size: 12px; font-weight: 900; letter-spacing: 1.4px; color: #e6d8ff;
+        background: rgba(13,8,33,0.6); border-radius: 10px; padding: 6px 14px;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+      /* the locked poster is DESATURATED, not hidden — a child should be able to
+         see what they are waiting for */
+      #worlds .wCard.lock .wArt { filter: saturate(0.5) brightness(0.78); }
+      #worlds .wCard.lock { opacity: 1; filter: none; }
+      /* the selected world gets the gold frame it always had, on the poster */
+      #worlds .wCard.sel { box-shadow: 0 0 0 3px #ffd23f, 0 10px 30px rgba(0,0,0,0.5); }
       /* in-game home button */
       #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 44px; height: 44px;
         border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
@@ -731,16 +759,18 @@
       </div>
       <div id="worldRow">
         <div class="wCard sel" data-world="maple">
-          <div class="wArt maple"></div>
-          <div class="wBody"><b>MAPLE ISLE</b><span>WORLD 1</span><div class="wGo">▶ PLAY</div></div>
+          <div class="wArt"></div><div class="wNum">WORLD 1</div>
+          <div class="wBody"><b>MAPLE FALLS</b><span>SLEEPY LITTLE TOWN</span>
+            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
         </div>
         <div class="wCard" data-world="pirate">
-          <div class="wArt pirate"></div>
-          <div class="wBody"><b>PIRATE BAY RESORT</b><span>WORLD 2</span><div class="wGo">▶ PLAY</div></div>
+          <div class="wArt"></div><div class="wNum">WORLD 2</div>
+          <div class="wBody"><b>PIRATE BAY</b><span>SUN, SAND, SNACKS</span>
+            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
         </div>
-        <div class="wCard lock">
-          <div class="wArt frost"></div>
-          <div class="wBody"><b>FROST PEAKS</b><span>SOON</span><div class="wLock">🔒 LOCKED</div></div>
+        <div class="wCard lock" data-name="FROST PEAKS">
+          <div class="wArt"></div><div class="wNum">WORLD 3</div>
+          <div class="wBody"><b>FROST PEAKS</b><span>COMING SOON</span><div class="wLock">🔒 LOCKED</div></div>
         </div>
       </div>
     </div>

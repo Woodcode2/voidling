@@ -1220,6 +1220,12 @@ function endMatch() {
   // figure a child watched climb for three minutes simply vanished at the
   // whistle — and nothing on the screen compared this run to their best.
   {
+    // per-world best too, so each poster in the picker carries its own number
+    {
+      const wk = `voidBest_${pickedWorld}`;
+      const wb = Number(localStorage.getItem(wk) || 0);
+      if (Math.round(playerScore) > wb) localStorage.setItem(wk, String(Math.round(playerScore)));
+    }
     const pb = Number(localStorage.getItem('voidBestScore') || 0);
     const isPb = Math.round(playerScore) > pb;
     if (isPb) localStorage.setItem('voidBestScore', String(Math.round(playerScore)));
@@ -1521,24 +1527,41 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
   menuEl.style.display = 'none';
   withWorldReady(() => beginMatch());
 }
-/** The card art. This started as the world's real top-down map — accurate, and
- *  the wrong job: a map tells you where things are, a poster tells you why you
- *  want to go. These are hero renders shot in-engine from a low three-quarter
- *  angle with the HUD stripped — the void standing in the suburbs, the void on
- *  the resort boardwalk — so the card is a picture of the fun rather than a
- *  diagram of the terrain, and it is literally the game rather than a promise
- *  the game has to live up to. Vendored locally, so no CDN can take them away. */
+/** THE POSTERS.
+ *
+ *  This started as the world's real top-down map, then became an in-engine hero
+ *  render with the HUD stripped. Both were the wrong job, and the second was
+ *  the owner's own verdict: "it's just showing a screenshot." A shelf of levels
+ *  is a shelf of POSTERS — the card's job is to make a child want to go
+ *  somewhere, which a photograph of the terrain cannot do however well it is
+ *  framed.
+ *
+ *  These are painted key-art illustrations: the void grinning in a sunlit
+ *  suburb of clapboard houses and picket fences, the void on a tropical resort
+ *  boardwalk with a galleon in the lagoon, and — desaturated behind its lock —
+ *  a snowbound alpine village with two curious eyes glowing in a drift.
+ *
+ *  Served through the /assets/hf/ rewrite in vercel.json, which proxies the
+ *  generation CDN. The same path the legendary shop cards already use, and the
+ *  reason nothing has to be vendored into the bundle.
+ *
+ *  ALTERNATES, if any of these three misses: swap the filename. Maple's second
+ *  take is hf_20260730_000250_edb19107-6160-42ab-8ab0-f9629e9687a9.png and the
+ *  bay's is hf_20260730_000310_403f5eb7-57e7-40be-a75e-dd152c124618.png. */
 const CARD_ART: Record<string, string> = {
-  maple: '/assets/card_maple.webp',
-  pirate: '/assets/card_pirate.webp',
+  maple: '/assets/hf/hf_20260730_000250_b58a695b-4bbd-487e-9858-326f39e8ba59.png',
+  pirate: '/assets/hf/hf_20260730_000310_2f7abb84-dc7c-4c3a-9ecd-31736931ac2c.png',
+  frost: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
   const src = CARD_ART[id];
   if (!src) return;
   host.style.backgroundImage = `url('${src}')`;
   host.style.backgroundSize = 'cover';
-  host.style.backgroundPosition = 'center 42%';
+  host.style.backgroundPosition = 'center 46%';
 }
+/** Best score on a given world, or 0. Written by endMatch(). */
+const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) || 0);
 // world cards: MAPLE ISLE + PIRATE BAY are both live now
 {
   const chip = el('btnWorlds');
@@ -1547,6 +1570,11 @@ function paintWorldCard(host: HTMLElement, id: string): void {
     const id = (c as HTMLElement).dataset.world!;
     const art = c.querySelector('.wArt') as HTMLElement | null;
     if (art) paintWorldCard(art, id);
+    // …and the thing to beat. Best score per world was never stored and never
+    // shown anywhere a player looks BEFORE a match, so "play again" could not
+    // become "beat 12,045".
+    const bestEl = c.querySelector('.wBest') as HTMLElement | null;
+    if (bestEl) { const b = worldBest(id); bestEl.textContent = b ? `★ BEST ${b.toLocaleString()}` : ''; }
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
       track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld });
@@ -1558,7 +1586,12 @@ function paintWorldCard(host: HTMLElement, id: string): void {
     });
   });
 }
-// locked world teasers wiggle on tap
+// locked world teasers wiggle on tap — and show what they are, desaturated,
+// because a child should be able to see what they are waiting for
+document.querySelectorAll('.wCard.lock').forEach((c) => {
+  const art = c.querySelector('.wArt') as HTMLElement | null;
+  if (art) paintWorldCard(art, 'frost');
+});
 document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {
   // demand signal for world 3: a locked card nobody taps is a world nobody wants
   track('world_locked_tap', { card: (c as HTMLElement).dataset.name || c.textContent?.trim().slice(0, 24) });
