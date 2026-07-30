@@ -706,7 +706,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // ── legendary accessories: 3D flair that rides (and squashes with) the orb ──
   const acc: Record<string, THREE.Group> = {};
   {
-    for (const name of ['unicorn', 'dino', 'wizard', 'dragon', 'mecha', 'ninja', 'king']) {
+    // the five that ship. buildAccessory still knows 'wizard' and 'mecha' —
+    // rivals.ts calls it directly — but the hero does not build hidden groups
+    // for skins that no longer exist.
+    for (const name of ['unicorn', 'dino', 'dragon', 'ninja', 'king']) {
       const g = buildAccessory(name);
       g.visible = false;
       dress.add(g); acc[name] = g;

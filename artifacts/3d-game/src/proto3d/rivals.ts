@@ -366,8 +366,12 @@ export function createRivals(
   // have put the bully's brain in the coward's body. One rival object per
   // NAME, permanently: the body, the voice and the archetype never separate.
   const FAMILY_SKIN: Record<string, string> = {
-    WOBBLES: 'mecha', GLITZ: 'univoid', BITSY: 'rexling',
-    CHOMPZILLA: 'kingvoid', DOZER: 'archmage',
+    // Five paid characters, five family members, one each — and the casting
+    // now says something. DOZER the HOARDER is the dragon: an ancient thing
+    // dozing on a pile of treasure. WOBBLES the COWARD is the ninja, because a
+    // nervous ninja hiding behind things is funnier than a brave one.
+    WOBBLES: 'shadowninja', GLITZ: 'univoid', BITSY: 'rexling',
+    CHOMPZILLA: 'kingvoid', DOZER: 'drako',
   };
   const skinFor = (nm: string): Skin =>
     SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];

@@ -53,19 +53,25 @@ The client uses cordova-plugin-purchase (StoreKit) with product ids
 App Store Connect with ids that match EXACTLY. The bridge is
 `src/proto3d/store3d.ts`; the shop wiring is in `src/prototype3d.ts`.
 
-| Product id | Skin | Price |
-|---|---|---|
-| com.voidling.skin.univoid | Uni-Void | $4.99 |
-| com.voidling.skin.rexling | Rexling | $4.99 |
-| com.voidling.skin.shadowninja | Shadow Ninja | $4.99 |
-| com.voidling.skin.mecha | Mecha-Void | $5.99 |
-| com.voidling.skin.archmage | Archmage | $6.99 |
-| com.voidling.skin.drako | Drako | $7.99 |
-| com.voidling.skin.kingvoid | King Void | $9.99 |
+FIVE products, not seven. Archmage and Mecha-Void were cut: Archmage's
+blue-violet measured weighted dE 17.2 from the FREE default skin, and
+Mecha-Void's rim AND glow were byte-identical to a coin skin's, so a parent
+would have paid $5.99 for a colour their child already had.
+
+| Product id | Skin | Price | Character |
+|---|---|---|---|
+| com.voidling.skin.univoid | Uni-Void | $4.99 | unicorn: horn, mane, star eyes |
+| com.voidling.skin.rexling | Rexling | $4.99 | dino: snout, crest, scales |
+| com.voidling.skin.shadowninja | Shadow Ninja | $4.99 | ninja: mask, stitching |
+| com.voidling.skin.drako | Drako | $4.99 | dragon: muzzle, wings, embers |
+| com.voidling.skin.kingvoid | King Void | $9.99 | the crown, gold rim, stardust |
+
+Four at $4.99 and one halo item at $9.99 — four price points across seven items
+was a ladder a child could not rank.
 
 What still needs a human with the Apple account:
 
-1. Create the seven non-consumables above, each with a localized display
+1. Create the five non-consumables above, each with a localized display
    name, description, and a review screenshot (the shop card art in
    `public/assets/hf/` is fine).
 2. Fill in the Paid Applications agreement and banking/tax details, or every
@@ -74,13 +80,13 @@ What still needs a human with the Apple account:
 
 Behaviour, by platform:
 
-- **iOS (Capacitor shell)** — real StoreKit. `initIAP()` registers all seven
+- **iOS (Capacitor shell)** — real StoreKit. `initIAP()` registers all five
   at boot, `purchase()` opens the sheet, and the `approved` handler unlocks
   the skin and calls `finish()` on the transaction. Prices shown in the shop
   come from StoreKit itself, so they are correct in every storefront and
   currency; the USD figures above are only the fallback.
 - **Web (the public URL)** — no payment path exists, so the shop says
-  "ON THE APP STORE" and grants nothing. This is deliberate: the older 2D
+  "COMING SOON ON iPHONE" and grants nothing. This is deliberate: the older 2D
   bridge fell back to a sandbox mock that handed the skin over for free on
   any non-native platform, which on a live web build gives away every paid
   skin to anyone who finds the page. `?iapmock=1` re-enables that mock for

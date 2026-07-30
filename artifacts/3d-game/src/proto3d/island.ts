@@ -263,6 +263,9 @@ const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
 /** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
  *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
  *  which is a hook with the water on the inside. */
+/** The island silhouette as world-space points. No live caller since the
+ *  minimap was cut; kept because it is the only public description of the
+ *  coastline and the next map feature will want it. */
 export function islandOutline3(): [number, number][] {
   return silPoly().map(([wx, wy]) => [w(wx), w(wy)] as [number, number]);
 }

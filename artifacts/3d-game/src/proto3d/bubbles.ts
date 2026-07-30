@@ -37,9 +37,10 @@ const BUBBLE_MAX_CAMD = 150;   // whole-island views don't need street gossip
  *  went stale the moment an element moved. */
 const HUD_TOP = 206;
 /** HUD elements a bubble must never be drawn over. The size chip is projected
- *  from the void's own screen position, so it moves; the minimap and the guide
- *  pill are fixed but their sizes are CSS. Read them, do not assume them. */
-const HUD_AVOID = ['form', 'minimap', 'guide'];
+ *  from the void's own screen position, so it moves; the guide pill is fixed
+ *  but its size is CSS. Read them, do not assume them. Unknown ids are skipped,
+ *  so this list is safe to keep an element in after it is cut. */
+const HUD_AVOID = ['form', 'guide'];
 export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
   // inject styles once
   const style = document.createElement('style');
@@ -195,7 +196,7 @@ export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
         // half-sentence of clipped text in the owner's screenshot — it is a
         // speech bubble, not the news card. Raising the z-index would only put
         // chatter over the score, so the fix is to keep bubbles OUT of the
-        // band: refuse the top strip and the bottom-left minimap square, and
+        // band: refuse the top strip, keep clear of the panels that remain, and
         // drop anything that cannot fit rather than squeezing it in.
         const top = HUD_TOP + halfH;
         let y = Math.min(h - 26, Math.max(top, (-v.y * 0.5 + 0.5) * h));   // never under the iOS home indicator

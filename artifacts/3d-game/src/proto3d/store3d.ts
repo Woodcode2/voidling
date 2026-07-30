@@ -25,10 +25,8 @@ import { track } from './telemetry';
 export const IAP_PRODUCTS: Record<string, string> = {
   univoid: 'com.voidling.skin.univoid',
   rexling: 'com.voidling.skin.rexling',
-  archmage: 'com.voidling.skin.archmage',
   kingvoid: 'com.voidling.skin.kingvoid',
   drako: 'com.voidling.skin.drako',
-  mecha: 'com.voidling.skin.mecha',
   shadowninja: 'com.voidling.skin.shadowninja',
 };
 
