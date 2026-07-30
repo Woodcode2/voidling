@@ -39,8 +39,17 @@ const HUD_TOP = 206;
 /** HUD elements a bubble must never be drawn over. The size chip is projected
  *  from the void's own screen position, so it moves; the guide pill is fixed
  *  but its size is CSS. Read them, do not assume them. Unknown ids are skipped,
- *  so this list is safe to keep an element in after it is cut. */
+ *  so this list is safe to keep an element in after it is cut.
+ *
+ *  The banner, the evolve card and the news card were added after a screenshot
+ *  caught "BAKE SALE RUSH! everything is DOUBLE!" drawn straight across "our
+ *  gas is two cents cheaper." — the earlier pass only guarded the always-on
+ *  panels, and those three are exactly the ones that arrive without warning. */
 const HUD_AVOID = ['form', 'guide'];
+/** Full-bleed centred text that arrives without warning. These are dodged as
+ *  horizontal BANDS — their element box spans the whole screen, so an x-overlap
+ *  test would always match — and only while they are actually on screen. */
+const HUD_BANDS = ['banner', 'evolve', 'news', 'titlecard'];
 export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
   // inject styles once
   const style = document.createElement('style');
@@ -203,16 +212,29 @@ export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
         // …and out from under every HUD panel it would otherwise hide behind.
         // A bubble is anchored by its BOTTOM edge, so its box is
         // [y - offsetHeight, y].
+        const dodge = (rTop: number, rBot: number) => {
+          if (y <= rTop - 4 || y - s.el.offsetHeight >= rBot + 4) return;
+          const above = rTop - s.el.offsetHeight - 10;
+          const below = rBot + s.el.offsetHeight + 10;
+          y = above >= top ? above : Math.min(h - 26, below);
+        };
         for (const id of HUD_AVOID) {
-          const r = document.getElementById(id)?.getBoundingClientRect();
-          if (!r || !r.width) continue;
-          const hx = Math.abs(x - (r.left + r.width / 2)) < halfW + r.width / 2 - 4;
-          if (!hx) continue;
-          if (y > r.top - 4 && y - s.el.offsetHeight < r.bottom + 4) {
-            const above = r.top - s.el.offsetHeight - 10;
-            const below = r.bottom + s.el.offsetHeight + 10;
-            y = above >= top ? above : Math.min(h - 26, below);
-          }
+          const el2 = document.getElementById(id);
+          const r = el2?.getBoundingClientRect();
+          if (!el2 || !r || !r.width) continue;
+          if (Math.abs(x - (r.left + r.width / 2)) < halfW + r.width / 2 - 4) dodge(r.top, r.bottom);
+        }
+        // …and the hero-message bands, which is what caught the owner's
+        // screenshot: "BAKE SALE RUSH! everything is DOUBLE!" drawn straight
+        // across "our gas is two cents cheaper."
+        for (const id of HUD_BANDS) {
+          const el2 = document.getElementById(id);
+          if (!el2) continue;
+          const cs = getComputedStyle(el2);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.06) continue;
+          const r = el2.getBoundingClientRect();
+          if (!r.height) continue;
+          dodge(r.top, r.bottom);
         }
         // …and never on top of another bubble: the spawn-time de-collision
         // does not survive two anchors both leaving the viewport and clamping

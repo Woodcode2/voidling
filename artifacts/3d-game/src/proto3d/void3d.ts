@@ -526,9 +526,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // — read as a too-wide clown grin.) Plus the big "maw" that scales in when
   // eating or firing GULP.
   const mouth = new THREE.Group();
-  // ── FANGS: the second half of the per-form read. From GOBBLER on, two little
-  // teeth drop into the smile — a shape change a child clocks in one frame,
-  // and one that survives at eighteen pixels where a colour shift would not.
+  // ── NO FANGS ────────────────────────────────────────────────────────────
+  // Two little teeth used to drop into the smile from GOBBLER on, as a per-form
+  // read that survives at eighteen pixels. The owner's verdict: "Why do the
+  // voids have teeth? Doesn't make sense." He is right, and for a better reason
+  // than legibility. This character is a HOLE with a face — a hole has no
+  // dentistry — and teeth on a purple thing that eats people is the one detail
+  // that tips it from cute toward predatory, in a game for six-year-olds where
+  // every other decision has been pulled the other way.
+  //
+  // The mesh factory stays and the array stays empty, so the per-frame loop and
+  // the growth easing below are untouched and there is one obvious place to put
+  // a different per-form read if one is ever wanted (a wider maw, a rounder
+  // lip, a brighter tongue — anything but teeth).
   const fangMat = new THREE.MeshBasicMaterial({ color: 0xfff6ec, depthWrite: false });
   const fangs: THREE.Mesh[] = [];
   const mkFang = (parent: THREE.Group, x: number, y: number, r: number) => {
@@ -537,7 +547,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     f.position.set(x, y, 0.006);
     f.scale.set(0.72, 1, 1);
     f.renderOrder = 2;            // lip(0) → tongue(1) → teeth(2); z alone loses
-    parent.add(f); fangs.push(f); return f;
+    // NOT added to the mouth and NOT registered: see the note above. Returning
+    // the mesh keeps every caller's shape.
+    void parent;
+    return f;
   };
   {
     // upper semicircle; the group's PI rotation (below) hangs the dome down
@@ -597,9 +610,34 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const sweat = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3),
     new THREE.MeshBasicMaterial({ map: emoteTex('💧'), transparent: true, opacity: 0, depthWrite: false }));
   sweat.position.set(0.62, 0.52, 1.02); face.add(sweat);
-  const zzz = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42),
-    new THREE.MeshBasicMaterial({ map: emoteTex('💤'), transparent: true, opacity: 0, depthWrite: false }));
-  zzz.position.set(0.55, 0.92, 1.0); face.add(zzz);
+  /** THREE CRISP Zs, NOT AN EMOJI. The idle tell was a 💤 glyph on a 64px
+   *  canvas scaled to 0.42 face-units — about fifteen device pixels at ordinary
+   *  play size, drawn in whatever the system font felt like, with no outline. It
+   *  was invisible against a bright island, which is exactly the owner's report:
+   *  "when we don't move we see zzzzz. It's hard to see." Hand-drawn Zs on a
+   *  512px canvas with a dark stroke behind white fill read at any size and over
+   *  any ground, and the three sizes give it the rising-cartoon-snore shape. */
+  const zzzTex = (() => {
+    const S = 512, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const g = cv.getContext('2d')!;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    // small at the mouth, big at the top — a snore drifting upward
+    const zs: [number, number, number][] = [[0.30, 0.80, 96], [0.50, 0.52, 150], [0.72, 0.22, 210]];
+    for (const [fx, fy, size] of zs) {
+      g.font = `900 ${size}px Fredoka, system-ui, sans-serif`;
+      g.strokeStyle = 'rgba(20,8,40,0.92)'; g.lineWidth = size * 0.26;
+      g.strokeText('Z', fx * S, fy * S);
+      g.fillStyle = '#ffffff';
+      g.fillText('Z', fx * S, fy * S);
+    }
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const zzz = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.15),
+    new THREE.MeshBasicMaterial({ map: zzzTex, transparent: true, opacity: 0, depthWrite: false }));
+  zzz.position.set(0.62, 1.05, 1.0); face.add(zzz);
   // the whole face draws AFTER the body, in a fixed internal order. Left to
   // three's opaque sort these flat discs shuffle against each other and
   // against the sphere depending on camera angle — which is how you end up
@@ -1071,8 +1109,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       (sweat.material as THREE.MeshBasicMaterial).opacity = mp.sweat;
       sweat.position.y = 0.52 + Math.sin(s.t * 9) * 0.045;
       sweat.scale.setScalar(0.9 + Math.sin(s.t * 9) * 0.1);
-      (zzz.material as THREE.MeshBasicMaterial).opacity = mp.zzz * (0.55 + 0.45 * Math.sin(s.t * 1.6));
-      zzz.position.set(0.55 + Math.sin(s.t * 0.9) * 0.05, 0.92 + Math.sin(s.t * 1.3) * 0.09, 1.0);
+      (zzz.material as THREE.MeshBasicMaterial).opacity = mp.zzz * (0.7 + 0.3 * Math.sin(s.t * 1.6));
+      // …and it gets the same small-size caricature the eyes and mouth get, so
+      // the idle tell is readable on a speck as well as on a WORLD ENDER
+      zzz.scale.setScalar(1 + small * 0.5);
+      zzz.position.set(0.62 + Math.sin(s.t * 0.9) * 0.05, 1.05 + Math.sin(s.t * 1.3) * 0.09, 1.0);
 
       // pupil tracking + blink (sleepy mood = slow drowsy wander). The cadence
       // is an authored cycle, not Math.random() — same void every load.

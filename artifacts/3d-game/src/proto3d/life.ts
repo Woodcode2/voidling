@@ -242,9 +242,9 @@ function makeCar(): THREE.Group {
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, 0.45), CAR_TL); b.position.set(-3.62, 1.3, sz); g.add(b);
   }
   for (const sx of [-2.3, 2.45]) for (const sz of [-1.45, 1.45]) {
-    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 12), CAR_TYRE);
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 22), CAR_TYRE);
     wh.rotation.x = Math.PI / 2; wh.position.set(sx, 0.8, sz); g.add(wh);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.54, 8), CAR_HUB);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.54, 16), CAR_HUB);
     hub.rotation.x = Math.PI / 2; hub.position.set(sx, 0.8, sz); g.add(hub);
   }
   // most of the fleet upgrades itself to the AI cars once the GLBs stream in
@@ -294,23 +294,41 @@ const PEOPLE_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughnes
 const nb = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
   const n = g.toNonIndexed(); g.dispose(); n.deleteAttribute('uv'); return n;
 };
+// ── TESSELLATION: THE PEOPLE WERE FACETED ────────────────────────────────────
+// The owner: "Some people or items aren't HD or crisp, they're rather blocky
+// like the image shows a person." He is looking at real geometry, not a shading
+// bug — PEOPLE_MAT is smooth-shaded with no flatShading anywhere. The counts
+// were simply too low for a camera that gets to fifteen units:
+//
+//   head            SphereGeometry(r, 8, 6)   — an octagon in silhouette
+//   arms and legs   CylinderGeometry(..., 5)  — PENTAGONAL PRISMS
+//   torso           8 segments
+//
+// A five-sided arm has a visible flat facing the camera at any distance a child
+// plays at. These are the primitives, tessellated once and cloned, so raising
+// them costs build time and triangles but not draw calls: a person is still six
+// merged meshes and the whole population still shares one material.
+//
+// Chosen by what the play camera actually sees, not uniformly. The head and
+// torso are the large smooth curves the eye reads, so they get the most; hands
+// and hat bands are a few pixels and stay cheap. Measured triangle cost is
+// recorded in the commit.
 const B = {
-  sph: nb(new THREE.SphereGeometry(0.5, 8, 6)),           // head
-  sphS: nb(new THREE.SphereGeometry(0.5, 7, 5)),          // shoulders, buns, balls
-  dot: nb(new THREE.SphereGeometry(0.5, 5, 3)),           // hands, freckles of pattern
-  // 8 segments AROUND (the top-down circle has to stay round), only 3 down the
-  // profile — nobody ever sees a hair dome edge-on
-  hemi: nb(new THREE.SphereGeometry(0.5, 8, 3, 0, Math.PI * 2, 0, Math.PI * 0.56)),
-  tube: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 5, 1, true)),    // open limb segment
-  taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 5, 1, true)),   // open, wider at the BOTTOM
-  drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 8, 1, true)),    // open torso barrel
-  cyl: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 8)),              // capped: hat bands, trays
-  flare: nb(new THREE.CylinderGeometry(0.34, 0.5, 1, 10, 1, true)), // skirts, bobs, robes
+  sph: nb(new THREE.SphereGeometry(0.5, 16, 11)),         // head — the silhouette that matters most
+  sphS: nb(new THREE.SphereGeometry(0.5, 10, 7)),         // shoulders, buns, balls
+  dot: nb(new THREE.SphereGeometry(0.5, 6, 4)),           // hands: a few pixels, stays cheap
+  // AROUND matters (the top-down circle has to stay round), the profile less so
+  hemi: nb(new THREE.SphereGeometry(0.5, 12, 4, 0, Math.PI * 2, 0, Math.PI * 0.56)),
+  tube: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 9, 1, true)),    // open limb segment
+  taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 9, 1, true)),   // open, wider at the BOTTOM
+  drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 12, 1, true)),   // open torso barrel
+  cyl: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 12)),             // capped: hat bands, trays
+  flare: nb(new THREE.CylinderGeometry(0.34, 0.5, 1, 14, 1, true)), // skirts, bobs, robes
   box: nb(new THREE.BoxGeometry(1, 1, 1)),
-  tri: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 3)),              // tricorn brim: a TRIANGLE from above
-  disc: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 9)),
-  ring: nb(new THREE.TorusGeometry(0.42, 0.13, 4, 9)),              // armbands, rubber rings, necklaces
-  cone: nb(new THREE.ConeGeometry(0.5, 1, 6)),
+  tri: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 3)),              // tricorn brim: a TRIANGLE from above, deliberately
+  disc: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 14)),
+  ring: nb(new THREE.TorusGeometry(0.42, 0.13, 5, 12)),             // armbands, rubber rings, necklaces
+  cone: nb(new THREE.ConeGeometry(0.5, 1, 10)),
 };
 type Geo = THREE.BufferGeometry;
 const _pcol = new THREE.Color();

@@ -341,19 +341,22 @@
          behind a scrim instead of in a separate strip below it. */
       .wArt { width: 100%; aspect-ratio: 3 / 4; position: relative; overflow: hidden;
         background: #1b0f36 center/cover no-repeat; }
-      /* a bottom scrim so white type is legible over any illustration, and a
-         top sheen so the card reads as glossy card stock rather than a photo */
+      /* THE TITLE SAT ON THE VOID'S FACE. The first pass floated the name over
+         the middle of the poster, and in both illustrations the hero is
+         centred — so "MAPLE FALLS" was drawn straight across the void's eyes,
+         which is the owner's "the images are slightly hiding the void". The
+         type now lives in a defined footer band: an opaque plate across the
+         bottom quarter, art above it untouched, nothing overlapping the hero. */
       .wArt::after { content: ''; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 22%,
-          transparent 44%, rgba(13,8,33,0.55) 74%, rgba(13,8,33,0.94) 100%); }
-      /* the title block rides the poster's foot */
+        background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 20%,
+          transparent 62%, rgba(13,8,33,0.86) 78%, rgba(11,6,26,0.99) 100%); }
       .wBody { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-        padding: 12px 14px 15px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        padding: 8px 10px 12px; display: flex; flex-direction: column; align-items: center; gap: 1px; }
       #worlds .wCard { position: relative; }
-      #worlds .wCard b { font-size: clamp(17px, 4.6vw, 23px); letter-spacing: 0.6px; font-weight: 900;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.75); }
-      #worlds .wCard span { font-size: 11px; opacity: 0.85; letter-spacing: 1.8px;
-        text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+      #worlds .wCard b { font-size: clamp(15px, 4.1vw, 20px); letter-spacing: 0.4px; font-weight: 900;
+        line-height: 1.1; text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
+      #worlds .wCard span { font-size: 10px; opacity: 0.85; letter-spacing: 1.4px;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.85); }
       /* YOUR BEST, on the card. It existed only on the results overlay — a
          screen you leave and never see again — so the picker gave a returning
          child nothing to beat. */
@@ -363,8 +366,8 @@
       .wNum { position: absolute; top: 10px; left: 10px; z-index: 2; font-size: 10px; font-weight: 900;
         letter-spacing: 1.6px; color: #fff; background: rgba(13,8,33,0.62); border-radius: 8px;
         padding: 4px 9px; backdrop-filter: blur(4px); }
-      .wGo { margin-top: 10px; font-size: 15px; font-weight: 900; letter-spacing: 1.4px; color: #0d0821;
-        background: linear-gradient(180deg, #ffe07a, #ffc21f); border-radius: 12px; padding: 9px 26px;
+      .wGo { margin-top: 6px; font-size: 14px; font-weight: 900; letter-spacing: 1.2px; color: #0d0821;
+        background: linear-gradient(180deg, #ffe07a, #ffc21f); border-radius: 11px; padding: 7px 22px;
         box-shadow: 0 4px 0 #c98d00; opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
       /* every unlocked card launches on tap, so every unlocked card says so */
       .wCard[data-world] .wGo { opacity: 1; transform: none; }
@@ -779,7 +782,7 @@
     <div id="daily">
       <div class="dCard">
         <div class="dGift">🎁</div>
-        <div class="dTitle">DAILY REWARD</div>
+        <div class="dTitle" id="dailyTitle">DAILY REWARD</div>
         <div class="dStreak" id="dailyStreak"></div>
         <div id="dailyGrid"></div>
         <button id="dailyClaim">CLAIM</button>

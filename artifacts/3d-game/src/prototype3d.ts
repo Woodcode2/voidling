@@ -994,8 +994,13 @@ function refreshHud() {
   // leaderboard: player + rivals, ranked by score
   // the chaser is FLAGGED on the board: when a name has a ⚡ next to it, that
   // is the one on the island that can eat you right now
+  // ONLY WHO IS ACTUALLY ON THE ISLAND. rivals.list is this match's whole cast,
+  // including the two or three who have not walked in yet, so the board was
+  // ranking the player against voids that did not exist — and the end screen
+  // listed every one of them, which is the "ton of voids" at the whistle.
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
-    ...rivals.list.map((r) => ({ name: r.hunting ? `⚡ ${r.name}` : r.name, color: r.color, score: r.score, me: false }))]
+    ...rivals.list.filter((r) => r.joined)
+      .map((r) => ({ name: r.hunting ? `⚡ ${r.name}` : r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
@@ -1023,7 +1028,13 @@ function refreshHud() {
     }
   }
   prevRank = myRank;
-  const shown = rows.filter((r, i) => i < 3 || r.me);   // compact: podium + you
+  // EVERY VOID ON THE ISLAND, always. It was capped at the podium plus you, so
+  // a family member who joined at ninety seconds and was quietly beating two
+  // others never appeared at all — the owner's report was that the board "isn't
+  // in line with who's joining later" and "isn't updating". It was updating; it
+  // was hiding two thirds of the field. With the cast filtered to arrivals this
+  // is at most six rows, and each one is a name a child recognises.
+  const shown = rows;
   boardEl.innerHTML = shown.map((r) => {
     const i = rows.indexOf(r);
     return `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`;
@@ -1171,8 +1182,12 @@ function endMatch() {
     });
     return;
   }
+  // the same filter as the live board: only voids that actually turned up. This
+  // listed the whole cast including the ones who never arrived, which is why a
+  // three-rival match ended on a screen full of names at zero.
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
-    ...rivals.list.map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
+    ...rivals.list.filter((r) => r.joined)
+      .map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   const myRank = rows.findIndex((r) => r.me) + 1;
   // everyone leaves with something; winning is 5x last place, not infinity-x
@@ -1898,29 +1913,57 @@ if (false) {
   refreshGift();
 }
 renderRank();
-// ── daily login rewards — the agar.io calendar: 7 escalating days, resets
-// if you skip a day, shows once per day on the menu
+// ── daily login rewards — a calendar that DOES NOT END ────────────────────
+// It used to clamp the day index with Math.min(6, ...), so from the seventh day
+// onward a returning child saw the identical "DAY 7 · 300✦" card every single
+// morning, with the streak frozen at 7 and nothing new ever again. The owner
+// asked the obvious question — "what happens after they hit 7 days?" — and the
+// answer was nothing, forever.
+//
+// The week now CYCLES. Finish day 7 and the calendar rolls over to WEEK 2, and
+// every reward in it is worth more: +20% per completed week, capped at 3x so it
+// climbs without running away. The true consecutive-day count is kept and shown
+// separately, so a child on day 23 is told they are on day 23 rather than
+// day 7 for the seventeenth time.
 {
   const DAILY = [50, 75, 100, 125, 150, 200, 300];
   const today = new Date().toDateString();
   const last = localStorage.getItem('voidDailyLast');
   if (last !== today && menuEl.style.display !== 'none' && !DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW) {
     const yd = new Date(Date.now() - 86400000).toDateString();
-    const day = last === yd ? Math.min(6, Number(localStorage.getItem('voidDailyDay') || 0) + 1) : 0;
+    const kept = last === yd;                                  // did they come back yesterday?
+    const prevDay = Number(localStorage.getItem('voidDailyDay') || 0);
+    // day 0-6 inside the week; finishing 6 rolls the week over
+    const day = kept ? (prevDay + 1) % 7 : 0;
+    const week = kept
+      ? Number(localStorage.getItem('voidDailyWeek') || 1) + (prevDay === 6 ? 1 : 0)
+      : 1;
+    const streak = kept ? Number(localStorage.getItem('voidDailyStreak') || 1) + 1 : 1;
+    // +20% a week, capped at 3x. Day 7 of week 4 pays 900 instead of 300.
+    const mult = Math.min(3, 1 + 0.2 * (week - 1));
+    const amount = (i: number) => Math.round(DAILY[i] * mult / 5) * 5;
     const modal = el('daily');
     // each day is a PRIZE, not a table cell: claimed days stamp a green tick,
     // today's cell is a big bouncing gift, day 7 is the gold treasure chest
     const ICON = ['🪙', '🪙', '💰', '💰', '💎', '💎', '🏆'];
-    el('dailyGrid').innerHTML = DAILY.map((amt, i) =>
+    el('dailyGrid').innerHTML = DAILY.map((_amt, i) =>
       `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''} ${i === 6 ? 'mega' : ''}">` +
       `<b>DAY ${i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
-      `<span class="dAmt">${amt}<i>✦</i></span></div>`).join('');
-    el('dailyStreak').textContent = day > 0 ? `🔥 ${day + 1} DAY STREAK!` : 'welcome back!';
-    (el('dailyClaim') as HTMLButtonElement).innerHTML = `CLAIM ${DAILY[day]}<i>✦</i>`;
+      `<span class="dAmt">${amount(i)}<i>✦</i></span></div>`).join('');
+    // the streak is the LIFETIME consecutive-day count, and the week is stated,
+    // so the card is different on day 8 from how it was on day 7
+    el('dailyStreak').textContent = streak > 1
+      ? `🔥 ${streak} DAY STREAK!${week > 1 ? ` · WEEK ${week}` : ''}`
+      : 'welcome back!';
+    el('dailyTitle').textContent = week > 1 ? `WEEK ${week} REWARD` : 'DAILY REWARD';
+    (el('dailyClaim') as HTMLButtonElement).innerHTML = `CLAIM ${amount(day)}<i>✦</i>`;
     (el('dailyClaim') as HTMLButtonElement).onclick = () => {
-      addCoins(DAILY[day]);
+      addCoins(amount(day));
       localStorage.setItem('voidDailyLast', today);
       localStorage.setItem('voidDailyDay', String(day));
+      localStorage.setItem('voidDailyWeek', String(week));
+      localStorage.setItem('voidDailyStreak', String(streak));
+      track('daily_claim', { day: day + 1, week, streak, coins: amount(day) });
       // payoff: the prize bursts, coins rain across the card, THEN it closes
       const cell = modal.querySelector('.dCell.now');
       if (cell) { cell.classList.add('pop'); cell.querySelector('.dIcon')!.textContent = '✅'; }
