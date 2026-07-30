@@ -279,9 +279,18 @@ export default defineConfig({
     rollupOptions: {
       input: {
         // The 3D game IS the site now — served at the root URL.
+        //
+        // THE RETIRED 2D GAME IS NO LONGER BUILT. It was still an entry point,
+        // so every iOS binary carried it — and with it `src/game/iap.ts`, a
+        // SECOND StoreKit bridge registering six product ids that do not exist
+        // in App Store Connect, whose non-native branch is a free grant
+        // (`owned.add(skinId); return true`). It also carried the pre-safety
+        // copy the 3D build was scrubbed of: "devoured for good", "obliterated",
+        // "tag. you are FOOD", "ARMY MOBILIZED", "Tank shell". None of that
+        // belongs in a children's app, and none of it is reachable from the
+        // game anyone plays. The source stays in the tree; it just stops
+        // shipping. Restore this line if the 2D game is ever revived.
         main: path.resolve(import.meta.dirname, 'index.html'),
-        // The original 2D game lives on at /classic.html.
-        classic: path.resolve(import.meta.dirname, 'classic.html'),
       },
     },
   },

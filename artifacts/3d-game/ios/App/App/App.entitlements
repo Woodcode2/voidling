@@ -2,7 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.developer.game-center</key>
-	<true/>
+	<!-- The Game Center entitlement was declared here and never used. Its only
+	     caller, initGameCenter(), is imported by src/main.tsx — the entry point
+	     of the retired 2D build, which no longer ships. Declaring it makes the
+	     archive fail unless the capability is enabled on the App ID, and once
+	     enabled App Store Connect expects a configured leaderboard that nothing
+	     submits a score to. It also contradicted privacy.html, which correctly
+	     tells parents the game has no social features. -->
 </dict>
 </plist>

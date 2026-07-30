@@ -618,6 +618,18 @@
         border-radius: 12px; padding: 10px 20px; margin: 4px auto 10px; cursor: pointer; display: block; }
       #btnRestore:active { transform: scale(0.96); }
       /* the gate */
+      #policy { position: fixed; inset: 0; z-index: 68; display: none; flex-direction: column;
+        background: #14082a; }
+      #policy.show { display: flex; }
+      .polBar { display: flex; align-items: center; gap: 12px; flex: 0 0 auto;
+        padding: calc(env(safe-area-inset-top) + 10px) 14px 10px; background: #1e0f3d;
+        border-bottom: 1px solid #3a2264; }
+      .polBar span { font-size: 13px; font-weight: 900; letter-spacing: 2px; color: #d9c2ff; }
+      #polClose { font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px;
+        color: #fff; background: #7a3cc8; border: none; border-radius: 12px;
+        min-height: 44px; padding: 0 16px; }
+      #polFrame { flex: 1 1 auto; width: 100%; border: 0; background: #14082a; }
+
       /* 70 — ABOVE EVERYTHING. The gate is opened from settings (46), from the
          skin preview (40) and from the shop, so anything less and the surface
          that raised it covers its own CONTINUE button. */
@@ -783,6 +795,20 @@
          line of static text reading "ask a grown-up before you buy", which is
          a sign, not a gate. Two-digit multiplication is the standard form: a
          six-year-old cannot do it, an adult does not notice it. -->
+    <!-- ── privacy policy, read INSIDE the app ────────────────────────────
+         window.open() cannot work here. A Capacitor build runs at
+         capacitor://localhost with no CFBundleURLTypes registered, so
+         WKUIDelegate hands the call to UIApplication.open, which silently
+         returns false. A parent solved the multiplication gate and nothing
+         happened at all. An iframe needs no scheme and no browser. -->
+    <div id="policy">
+      <div class="polBar">
+        <button id="polClose">‹ DONE</button>
+        <span>PRIVACY POLICY</span>
+      </div>
+      <iframe id="polFrame" title="Privacy policy" src="about:blank"></iframe>
+    </div>
+
     <div id="gate">
       <div class="setCard">
         <div class="setTitle">ASK A GROWN-UP</div>

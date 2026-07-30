@@ -46,5 +46,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Export compliance. Without this key every single upload stops and waits
+	     for a human to answer the encryption question in App Store Connect.
+	     VOIDLING uses only HTTPS, which is exempt. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

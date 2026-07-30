@@ -118,18 +118,40 @@ export function iapPrice(skinId: string): string | null {
   try { return store.get(pid)?.pricing?.price ?? null; } catch { return null; }
 }
 
-export type BuyResult = 'started' | 'granted' | 'unavailable' | 'failed';
+export type BuyResult = 'started' | 'granted' | 'unavailable' | 'not_ready' | 'failed';
+
+// How long to wait for StoreKit before giving up on a tap. Initialisation
+// takes a few seconds from a cold launch and longer on a poor connection.
+const READY_WAIT_MS = 8000;
+/** Resolve once StoreKit has finished initialising, or on timeout. */
+async function waitReady(): Promise<boolean> {
+  if (ready) return true;
+  const until = Date.now() + READY_WAIT_MS;
+  while (!ready && Date.now() < until) await new Promise((r) => setTimeout(r, 150));
+  return ready;
+}
 
 /**
  * Begin a purchase.
  *  • 'started'     — StoreKit has the sheet; ownership arrives via the callback
  *  • 'granted'     — mock build only, skin handed over immediately
  *  • 'unavailable' — this platform cannot buy (the web); tell the player where
+ *  • 'not_ready'   — native, but StoreKit has not finished initialising
  *  • 'failed'      — the order was refused or threw
+ *
+ * 'not_ready' exists because the old code folded it into 'unavailable', and the
+ * shop rendered that as "COMING TO THE APP STORE!" — on a shipping build, in
+ * the App Store, during the first several seconds of every launch and any time
+ * the network is poor. That is exactly when a reviewer taps it.
  */
 export async function purchase(skinId: string, usd: number): Promise<BuyResult> {
   track('purchase_intent', { skin: skinId, usd, native: isNative(), ready });
   const pid = IAP_PRODUCTS[skinId];
+  // a native build with a store still warming up: wait for it rather than
+  // telling a paying customer the product does not exist
+  if (store && pid && !ready) {
+    if (!(await waitReady())) { track('purchase_not_ready', { skin: skinId }); return 'not_ready'; }
+  }
   if (store && pid && ready) {
     try {
       const offer = store.get(pid)?.getOffer?.();
@@ -150,10 +172,36 @@ export async function purchase(skinId: string, usd: number): Promise<BuyResult> 
   return 'unavailable';
 }
 
-/** App Review requirement: a user-triggered restore that costs nothing. */
-export async function restorePurchases(): Promise<boolean> {
+/**
+ * App Review requirement: a user-triggered restore that costs nothing.
+ *
+ * This lied in BOTH directions. `if (!store || !ready) return false` reported
+ * "NOTHING TO RESTORE" without ever contacting StoreKit — which is what a tap
+ * in the first seconds after launch did. And the success branch returned true
+ * whether or not a single transaction came back, so a fresh install with no
+ * purchases was told "RESTORED ✓". "We were unable to restore our purchase" is
+ * one of the most common in-app-purchase rejections there is.
+ *
+ * It now waits for the store, and answers on whether ownership actually
+ * changed, not on whether the call threw.
+ */
+export type RestoreResult = 'restored' | 'nothing' | 'not_ready' | 'failed';
+export async function restorePurchases(): Promise<RestoreResult> {
   track('restore_tap', { native: isNative(), ready });
-  if (!store || !ready) return false;
-  try { await store.restorePurchases(); return true; }
-  catch { return false; }   // user cancelled, or no network
+  if (!store) return 'not_ready';
+  if (!ready && !(await waitReady())) return 'not_ready';
+  let gained = 0;
+  const prev = onOwnedChange;
+  onOwnedChange = (ids) => { gained += ids.length; prev?.(ids); };
+  try {
+    await store!.restorePurchases();
+    // StoreKit delivers restored transactions through the approved handler,
+    // which lands asynchronously — give it a moment before answering.
+    await new Promise((r) => setTimeout(r, 1200));
+    return gained > 0 ? 'restored' : 'nothing';
+  } catch {
+    return 'failed';   // user cancelled, or no network
+  } finally {
+    onOwnedChange = prev;
+  }
 }

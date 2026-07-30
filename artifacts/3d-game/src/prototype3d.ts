@@ -1524,6 +1524,16 @@ function beginMatch(solo = false) {
     skins: (JSON.parse(localStorage.getItem('voidSkinsOwned') || '[]') as string[]).length,
     first: !localStorage.getItem('voidPlayed'),
   });
+  // BANK IT NOW, NOT AT THE WHISTLE. This flag was written in exactly one
+  // place — endMatch() — so a child who put the iPad down before the three
+  // minutes were up never earned it. Every later launch then took the
+  // auto-start branch, which hides the menu, which makes the shop, the
+  // trophies and TOP VOIDS unreachable — and because the daily-reward block
+  // tests menu visibility at module-init time, that child received NO DAILY
+  // REWARD, EVER. At this age most first sessions end early. It also cost
+  // every player day 1 of the calendar, because the first launch always
+  // auto-plays. The flag means "has seen a match", so it belongs here.
+  localStorage.setItem('voidPlayed', '1');
   document.body.classList.remove('menu');
   menuEl.style.display = 'none';
   boardEl.style.display = solo ? 'none' : '';
@@ -2092,10 +2102,24 @@ renderRank();
   staRow.addEventListener('click', () => {
     askGrownUp(() => { setAnalyticsEnabled(!analyticsEnabled()); paint(); });
   });
-  // Leaving the app entirely is exactly what the gate is for.
-  el('setPrivacy').addEventListener('click', () => {
-    askGrownUp(() => { window.open('/privacy.html', '_blank', 'noopener'); });
-  });
+  // Reading the policy is exactly what the gate is for — and it is READ IN
+  // APP. window.open() is a dead end inside Capacitor: the app runs at
+  // capacitor://localhost with no CFBundleURLTypes registered, so the call is
+  // handed to UIApplication.open, which silently returns false for an unknown
+  // scheme. A parent answered the sum and absolutely nothing happened.
+  {
+    const pol = el('policy');
+    const frame = el('polFrame') as HTMLIFrameElement;
+    const close = () => { pol.classList.remove('show'); frame.src = 'about:blank'; };
+    el('setPrivacy').addEventListener('click', () => {
+      askGrownUp(() => {
+        frame.src = 'privacy.html';   // relative: works at file://, capacitor:// and https
+        pol.classList.add('show');
+        track('privacy_open', {});
+      });
+    });
+    el('polClose').addEventListener('click', close);
+  }
 }
 // ── THE PARENTAL GATE ──────────────────────────────────────────────────────
 // Apple's Kids guidance requires a real CHALLENGE in front of anything that
@@ -2305,7 +2329,11 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
           buying = false;
           if (res === 'started') { spAct.textContent = 'CONFIRM IN THE APP STORE…'; return; }
           if (res === 'granted') { audio.evolve(); refresh(); refreshPreview(); return; }
-          spAct.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!' : 'COULD NOT BUY — TRY AGAIN';
+          // 'not_ready' must NEVER read as "coming soon" — the product exists,
+          // the store is simply still waking up.
+          spAct.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!'
+            : res === 'not_ready' ? 'THE STORE IS BUSY — TRY AGAIN'
+            : 'COULD NOT BUY — TRY AGAIN';
           audio.hit();
           setTimeout(refreshPreview, 2000);
         });
@@ -2348,9 +2376,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     rb.addEventListener('click', () => {
       askGrownUp(() => {
         rb.textContent = 'RESTORING…';
-        void restorePurchases().then((ok) => {
-          rb.textContent = ok ? 'RESTORED ✓' : 'NOTHING TO RESTORE';
-          setTimeout(() => { rb.textContent = 'RESTORE PURCHASES'; }, 2400);
+        void restorePurchases().then((res) => {
+          rb.textContent = res === 'restored' ? 'RESTORED ✓'
+            : res === 'nothing' ? 'NOTHING TO RESTORE'
+            : res === 'not_ready' ? 'THE STORE IS BUSY — TRY AGAIN'
+            : 'COULD NOT RESTORE — TRY AGAIN';
+          track('restore_result', { res });
+          setTimeout(() => { rb.textContent = 'RESTORE PURCHASES'; }, 2600);
         });
       });
     });
@@ -2495,7 +2527,15 @@ function animate() {
       // 2D score-floor: strong scoring pulls your radius up toward the cap
       // the floor rides the surge too — a strong late run is PULLED to the
       // new ceiling instead of being pinned at the old 6.06 plateau
-      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6);
+      // …and the SURGE half of the floor has to be earned too. It had no pace
+      // term, so it pulled an idle player's radius up unconditionally: a run
+      // with the pointer parked at dead centre, six props eaten and 328 points
+      // was awarded MUNCHER, then GOBBLER, then DEVOURER, and the results
+      // screen told it "BIGGEST: DEVOURER". WORLD ENDER fired inside a
+      // seven-second window across a SEVEN-FOLD spread in final score. The
+      // ceiling was already pace-scaled; the floor underneath it was not, so
+      // the floor decided the outcome and skill did nothing.
+      const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6 * pace);
       if (!frozenR && voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
     }
   }
@@ -2780,13 +2820,24 @@ function animate() {
   // the family races on the SAME terms as the player now, so it needs the same
   // three numbers: the clock it is pacing against, the score its rubber band
   // reads, and the shared HAPPY HOUR multiplier
-  rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
-    { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
+  // …and the family stops when the match stops. Passing t=0 was not enough:
+  // the rivals keep moving and scoring at t=0, so twenty seconds parked on the
+  // results screen still added points to a board the panel had already
+  // snapshotted. The ambient town (life.update, above) deliberately keeps
+  // running — the world behind the score card should still look alive.
+  if (!ended) {
+    rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
+      { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
+  }
   bubbles.update(dt);
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
-    if (!started) break;   // menu attract mode: the world idles, nothing is eaten
+    if (!started || ended) break;   // menu attract mode, AND the results screen:
+    // the sim used to run at full rate behind the score card, so the panel (a
+    // snapshot) disagreed with the live board underneath it, rivals kept
+    // scoring, chomp SFX chewed over the results, and the coins actually
+    // banked drifted past the number the child had just been shown.
     if (e.eaten) {
       e.t += dt * 2.4;
       const p = e.mesh.position;
