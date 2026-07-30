@@ -85,20 +85,25 @@ would have paid $5.99 for a colour their child already had.
 
 | Product id | Skin | Price | Character |
 |---|---|---|---|
-| com.voidling.skin.univoid | Uni-Void | $4.99 | unicorn: horn, mane, star eyes |
-| com.voidling.skin.rexling | Rexling | $4.99 | dino: snout, crest, scales |
-| com.voidling.skin.shadowninja | Shadow Ninja | $4.99 | ninja: mask, stitching |
-| com.voidling.skin.drako | Drako | $4.99 | dragon: muzzle, wings, embers |
-| com.voidling.skin.kingvoid | King Void | $9.99 | the crown, gold rim, stardust |
+| com.voidling.skin.univoid | Uni-Void | $2.99 | unicorn: horn, mane, star eyes |
+| com.voidling.skin.rexling | Rexling | $2.99 | dino: snout, crest, scales |
+| com.voidling.skin.shadowninja | Shadow Ninja | $2.99 | ninja: mask, stitching |
+| com.voidling.skin.drako | Drako | $2.99 | dragon: muzzle, wings, embers |
+| com.voidling.skin.kingvoid | King Void | $2.99 | the crown, gold rim, stardust |
 
-Four at $4.99 and one halo item at $9.99 — four price points across seven items
-was a ladder a child could not rank.
+ONE price across all five — Apple tier 3 ($2.99). Every product is the same
+size of decision, so the only question left is which character you like best.
+A tiered ladder asked a six-year-old to rank five things by a number they
+cannot judge, and asked a parent to approve $9.99 for a skin in a children's
+game. **Create all five at the same tier in App Store Connect.**
 
 What still needs a human with the Apple account:
 
-1. Create the five non-consumables above, each with a localized display
-   name, description, and a review screenshot (the shop card art in
-   `public/assets/hf/` is fine).
+1. Create the five non-consumables above, all at the SAME price tier
+   ($2.99 / tier 3), each with a localized display name, description, and a
+   review screenshot (the shop card art in `public/assets/hf/` is fine).
+   If any of these already exist at an older price, edit the tier — do not
+   create a second product, the ids must stay exactly as listed.
 2. Fill in the Paid Applications agreement and banking/tax details, or every
    product stays in "Missing Metadata" and StoreKit returns nothing.
 3. Test each product end to end with a Sandbox Apple ID before submitting.

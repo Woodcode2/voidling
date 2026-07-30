@@ -111,32 +111,37 @@ export interface Skin {
 export const SKINS: Skin[] = [
   { id: 'classic', name: 'Classic', abyss: 0x321253, inner: 0x6128ad, mid: 0x8f4ce6, rim: 0xb678ff, glow: 0xb875ff },
   // Toxic pushed off Rexling's deep dinosaur green toward acid lime, so the
-  // 150-coin skin no longer arrives first and undercuts the $4.99 one.
+  // 150-coin skin no longer arrives first and undercuts the paid one.
   { id: 'toxic', name: 'Toxic', abyss: 0x14300c, inner: 0x357a12, mid: 0x7ec832, rim: 0xc4ff6a, glow: 0xd8ff8a, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },
   { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
   { id: 'ocean', name: 'Ocean', abyss: 0x0a1830, inner: 0x1a4070, mid: 0x2a6ab8, rim: 0x5ec8d8, glow: 0x8ae8ff, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
   { id: 'candy', name: 'Candy', abyss: 0x40182a, inner: 0x8a3a5e, mid: 0xd86a9a, rim: 0xffb8d8, glow: 0xffc9e2, tex: '/assets/hf/hf_20260717_005243_b9bfd850-ba19-4200-8b94-c91e7f8554a2.png' },
   // Honey's rim was byte-identical to King Void's (#ffd25a) — the gold that is
-  // meant to make the $9.99 crown feel royal was already on a coin skin.
+  // meant to make the crown feel royal was already on a coin skin.
   { id: 'honey', name: 'Honey', abyss: 0x2a1606, inner: 0x6a4210, mid: 0xb87f1a, rim: 0xffb84a, glow: 0xffd486, tex: '/assets/hf/hf_20260717_131501_87fecffb-5637-49ad-87f5-106990a4f100.png' },
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
   { id: 'ember', name: 'Ember', abyss: 0x260a06, inner: 0x6a2410, mid: 0xc4571a, rim: 0xffb054, glow: 0xffcf7a, streak: 2 },
   { id: 'prism', name: 'Prism', abyss: 0x1a1030, inner: 0x4a2a8a, mid: 0x8a5ac8, rim: 0xe8b8ff, glow: 0xfff0a8, streak: 7 },
   // ✨ LEGENDARY — character skins with 3D accessories, cash tier.
+  // ONE price, $2.99, across all five. A tiered ladder ($4.99 / $9.99) asked a
+  // six-year-old to rank five things by a number they cannot judge, and asked a
+  // parent to approve $9.99 for a skin in a children's game. At one low price
+  // the only question left is which character you like best, which is the only
+  // question a child is equipped to answer.
   // Colour stops are tuned to MATCH each skin's shop card art (App Store
   // advertising accuracy): the in-game orb must read as the same character.
-  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', char: { eyes: 'star', aura: 0xffd2f0, auraKind: 'stars', gloss: 1.4, pattern: 'fur', patCol: 0xffe4ff, body: 'mane' }, cash: 4.99,
+  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', char: { eyes: 'star', aura: 0xffd2f0, auraKind: 'stars', gloss: 1.4, pattern: 'fur', patCol: 0xffe4ff, body: 'mane' }, cash: 2.99,
     art: '/assets/hf/hf_20260717_221342_1fed1f77-b19c-416e-9e0d-e84a02a57845.png' },
-  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', char: { eyes: 'fierce', aura: 0xb8ff8a, auraKind: 'bubbles', gloss: 0.5, pattern: 'scales', patCol: 0x2a6a30, body: 'snout' }, cash: 4.99,
+  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', char: { eyes: 'fierce', aura: 0xb8ff8a, auraKind: 'bubbles', gloss: 0.5, pattern: 'scales', patCol: 0x2a6a30, body: 'snout' }, cash: 2.99,
     art: '/assets/hf/hf_20260723_181705_6e91b3cd-72f3-4867-817f-58dbd714d5a9.jpeg' },
   // King Void card art: BLACK glossy orb with a purple-nebula heart, wrapped
   // in a swirling gold-stardust ring — body stays dark, the RIM is the gold
-  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', char: { eyes: 'glow', aura: 0xffd25a, auraKind: 'stars', gloss: 1.2, pattern: 'starfield', patCol: 0xffd25a }, cash: 9.99,
+  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', char: { eyes: 'glow', aura: 0xffd25a, auraKind: 'stars', gloss: 1.2, pattern: 'starfield', patCol: 0xffd25a }, cash: 2.99,
     art: '/assets/hf/hf_20260717_221346_49c57d8f-d589-4a59-9c11-b5d96dbd9bc7.png' },
   // Drako card art: teal-blue dragon orb, warm golden glow around the edges
-  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9, pattern: 'scales', patCol: 0x1e6a7a, body: 'muzzle' }, cash: 4.99,
+  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9, pattern: 'scales', patCol: 0x1e6a7a, body: 'muzzle' }, cash: 2.99,
     art: '/assets/hf/hf_20260723_181409_a7a76db9-9711-48e8-9e0e-4f43188251d0.jpeg' },
-  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', char: { eyes: 'fierce', aura: 0xff4d5e, auraKind: 'bolts', gloss: 0.4, pattern: 'stitch', patCol: 0x4a2a5e }, cash: 4.99,
+  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', char: { eyes: 'fierce', aura: 0xff4d5e, auraKind: 'bolts', gloss: 0.4, pattern: 'stitch', patCol: 0x4a2a5e }, cash: 2.99,
     art: '/assets/hf/hf_20260723_181414_a23e8298-d3ea-47e4-bba9-d7a468fc88e1.jpeg' },
 ];
 

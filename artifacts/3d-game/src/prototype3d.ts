@@ -2146,7 +2146,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     `<div class="shopTier gold">✨ LEGENDARY <span>${iapAvailable() ? 'A WHOLE NEW CHARACTER' : 'COMING SOON ON iPHONE'}</span></div>`,
   ];
   // the skin's own gradient always sits UNDER the AI art — a failed CDN load
-  // still shows a branded colored orb, never a bare black hole on a $4.99 card
+  // still shows a branded colored orb, never a bare black hole on a paid card
   // INSIDE OUT. This ran rim -> mid -> abyss from the centre outward, which is
   // the exact opposite of the void shader (palette.ts: "darkest dead-centre,
   // lit violet at the rim"). So whenever the CDN art is slow or offline — the
@@ -2315,7 +2315,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     // EPIC banner.
     card.className = 'skCard' + (s.cash ? ' legend' : '');
     const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : '';
-    // the face ALWAYS renders under the art: if the art CDN blinks, a $9.99
+    // the face ALWAYS renders under the art: if the art CDN blinks, a paid
     // card must still show a voidling, never a bare gradient circle
     card.innerHTML = `${ribbon}<div class="orb" style="${orbStyle(s)}">${FACE_SVG}${artLayer(s)}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => openPreview(s));
