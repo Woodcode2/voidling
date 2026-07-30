@@ -525,7 +525,24 @@ export function createRivals(
     //   player = 180,000    -> first ~104,000, player wins by ~70%
     const ratio = Math.max(0, pScore / par);
     const scale = THREE.MathUtils.clamp(0.62 + 0.38 * Math.pow(ratio, 0.88), 0.62, 6.5);
-    return FIELD_TOP * (LANE_FINAL[lane] ?? 0.14) * shape * scale;
+    // ── AND THE LADDER IS ANCHORED TO THE PLAYER, NOT JUST SCALED BY THEM ──
+    // The scale curve alone over-corrected in the middle of the range. Worked
+    // out from FULL_AT (a rival stops eating at 1.2x its lane, so that product
+    // is the most it can ever be worth): at a player score of 20,000 first
+    // place capped at 29,489, and at 50,000 it capped at 51,289 — ABOVE the
+    // player in both cases. A child playing competently but not brilliantly
+    // would have been beaten by the rubber band itself. That is worse than the
+    // decorative race it replaced, and I would have shipped it without this.
+    //
+    // Anchoring the top of the field at 0.78x the player's own score fixes the
+    // whole range at once: x1.2 for satiety puts the best possible rival at
+    // 0.94x, so a player who is playing always finishes first — by a nose, with
+    // the leader visible on the board the entire match, which is the point.
+    // The nominal ladder stays as a FLOOR so a struggling child still has a
+    // field to chase (and can still lose, which has to remain possible).
+    const top = Math.min(FIELD_TOP * shape * scale,
+      Math.max(FIELD_TOP * LANE_FINAL[2] * shape, pScore * 0.78));
+    return top * (LANE_FINAL[lane] ?? 0.14);
   };
 
   const anyVisiting = () => rivals.some((r) => r.visiting);
