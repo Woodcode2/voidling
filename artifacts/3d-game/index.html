@@ -38,8 +38,15 @@
          EATEN pill sits — so "You" was covered whenever the player was 4th or
          worse, which is most of the first two minutes. The board is capped and
          the player's row is pinned visible inside it. */
+      /* THE CAP THE COMMENT ALREADY PROMISED. The note below says "the board is
+         capped and the player's row is pinned visible inside it" — there was no
+         cap anywhere in the file (one max-height, on #skinPrev). With all five
+         siblings on the island the board grew to six rows and overlapped the
+         news card by 2,460 square pixels, carving away its gold border and
+         rounded corner. Six rows now fit exactly; a seventh would scroll. */
       #board { position: fixed; top: max(10px, calc(10px + env(safe-area-inset-top, 0px))); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 7; pointer-events: none;
-        max-width: 38vw; background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
+        max-width: 38vw; max-height: 152px; overflow: hidden;
+        background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
       /* the 😈 hunter marker wrapped onto its own line, which grew the board by
          a whole row and pushed "You" straight into the DEVOURED chip */
       #board .row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800;
@@ -471,7 +478,10 @@
       #skinPrev #spAct { font-family: inherit; font-size: 16px; font-weight: 900; letter-spacing: 1px; color: #fff;
         background: linear-gradient(180deg, #ff5d7e, #ff2450); border: none; border-radius: 14px; padding: 13px 34px;
         cursor: pointer; box-shadow: 0 5px 0 #b8163a, 0 8px 18px rgba(0,0,0,0.4); }
-      #skinPrev #spClose { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #cbb2ff;
+      /* 28.8x26 — 61% under the 44pt floor, on a modal one tap from a charge. */
+      #skinPrev #spClose { position: absolute; top: 10px; right: 12px; min-width: 44px; min-height: 44px;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: none; color: #cbb2ff;
         font-size: 20px; cursor: pointer; font-family: inherit; }
       .wCard { width: 96px; padding: 10px 6px 8px; border-radius: 14px; text-align: center; cursor: pointer;
         background: rgba(28,12,52,0.6); border: 2px solid rgba(168,123,255,0.28); color: #e8dcff;
@@ -489,7 +499,10 @@
       #dailyClaim:active, #spAct:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
       #tut .card, #daily .dCard, #skinPrev .spCard { border-radius: 24px; }
       .tr .nm { text-transform: uppercase; }
-      .backBtn, #btnBack { white-space: nowrap; flex: 0 0 auto; padding-top: 12px; padding-bottom: 12px; }
+      /* already carried 12px of padding specifically to grow it, and still
+         landed at 39px — five short. */
+      .backBtn, #btnBack { white-space: nowrap; flex: 0 0 auto; padding-top: 12px; padding-bottom: 12px;
+        min-height: 44px; display: inline-flex; align-items: center; }
       .shopTitle { font-size: clamp(18px, 5.5vw, 26px) !important; letter-spacing: 2px !important; min-width: 0; }
       /* loading screen — PLAY holds here until the asset pack is resident */
       /* SHOWN FROM THE FIRST PAINT. The module is deferred, so the finished
@@ -581,8 +594,14 @@
       .shopTier span { font-size: 9.5px; font-weight: 800; letter-spacing: 1px; color: #8a7ab0; }
 
       /* ── meta screens (trophies / top voids) ── */
+      /* SAFE AREA. This was a bare 26px while every other element in the file
+         uses env(safe-area-inset-top) — so on an iPhone 15 Pro the BACK button
+         on WORLDS, TROPHIES and TOP VOIDS sat 33pt above the safe area, behind
+         the Dynamic Island. An omission, not a decision. */
       .metaScr { position: fixed; inset: 0; z-index: 11; display: none; flex-direction: column; align-items: center;
-        background: #0d0821; backdrop-filter: blur(8px); padding-top: 26px; overflow-y: auto; }
+        background: #0d0821; backdrop-filter: blur(8px);
+        padding-top: calc(env(safe-area-inset-top) + 26px);
+        padding-bottom: calc(env(safe-area-inset-bottom) + 12px); overflow-y: auto; }
       .metaScr.show { display: flex; }
       .backBtn { font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #c9a6ff;
         background: rgba(122,79,224,0.3); border: 2px solid rgba(201,166,255,0.35); border-radius: 12px;
@@ -617,7 +636,9 @@
 
       /* ── shop ── */
       #shop { position: fixed; inset: 0; z-index: 11; display: none; flex-direction: column; align-items: center;
-        background: rgba(13,8,33,0.94); backdrop-filter: blur(8px); padding-top: 26px; overflow-y: auto; }
+        background: rgba(13,8,33,0.94); backdrop-filter: blur(8px);
+        padding-top: calc(env(safe-area-inset-top) + 26px);
+        padding-bottom: calc(env(safe-area-inset-bottom) + 12px); overflow-y: auto; }
       #shop.show { display: flex; }
       #shopGrid { padding-bottom: 22px; padding-top: 44px; }
       /* the preview orb layers card art OVER the face, exactly like the grid
@@ -627,11 +648,31 @@
       #spOrb .artLay { position: absolute; inset: 0; background-size: cover; background-position: center; }
       /* App Review requires a restore control; it must be findable but must
          never compete with the cards for a child's attention */
-      #btnRestore { font-family: inherit; font-size: 12px; font-weight: 800; letter-spacing: 1.4px;
+      #btnRestore { min-height: 44px; font-family: inherit; font-size: 12px; font-weight: 800; letter-spacing: 1.4px;
         color: #b39ede; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.12);
         border-radius: 12px; padding: 10px 20px; margin: 4px auto 10px; cursor: pointer; display: block; }
       #btnRestore:active { transform: scale(0.96); }
       /* the gate */
+      #pause { position: fixed; inset: 0; z-index: 66; display: none; align-items: center; justify-content: center;
+        background: rgba(9,5,20,0.86); backdrop-filter: blur(6px); padding: 20px; }
+      #pause.show { display: flex; }
+      #pause .setCard { width: min(330px, calc(100vw - 32px)); box-sizing: border-box; border-radius: 24px;
+        text-align: center; padding: 24px 18px 20px;
+        background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
+        border: 2.5px solid rgba(201,166,255,0.5); box-shadow: 0 0 40px rgba(154,92,255,0.45); }
+      #pause .setTitle { font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff; margin-bottom: 16px; }
+      #pause .setRow { display: flex; width: 100%; align-items: center; justify-content: space-between;
+        box-sizing: border-box; min-height: 52px; margin-bottom: 10px; padding: 0 16px; border-radius: 14px;
+        font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #fff;
+        background: rgba(255,255,255,0.08); border: 1.5px solid rgba(201,166,255,0.28); }
+      #pause .setRow b { color: #7ef2a0; }
+      #pause .setRow.off b { color: #ff8a9c; }
+      #pauseResume { width: 100%; font-family: inherit; font-size: 16px; font-weight: 900; letter-spacing: 2px;
+        color: #fff; min-height: 54px; margin-top: 6px; border: none; border-radius: 16px;
+        background: linear-gradient(180deg, #45d67a, #24a558); box-shadow: 0 5px 0 #17773f; }
+      #pauseQuit { width: 100%; font-family: inherit; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+        color: #c9a6ff; background: none; border: none; min-height: 44px; margin-top: 10px; }
+
       #policy { position: fixed; inset: 0; z-index: 68; display: none; flex-direction: column;
         background: #14082a; }
       #policy.show { display: flex; }
@@ -659,7 +700,9 @@
       #gateGo { width: 100%; font-family: inherit; font-size: 15px; font-weight: 900; letter-spacing: 1.4px;
         color: #0d0821; background: linear-gradient(180deg, #ffe07a, #ffc21f); border: none;
         border-radius: 13px; padding: 13px; cursor: pointer; box-shadow: 0 4px 0 #c98d00; }
-      .gateCancel { width: 100%; margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 800;
+      /* the parental gate's DECLINE was 290x32. A grown-up saying no needs at
+         least as big a target as one saying yes. */
+      .gateCancel { width: 100%; min-height: 44px; margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 800;
         letter-spacing: 1.2px; color: #c9a6ff; background: none; border: none; cursor: pointer; padding: 8px; }
       #shopLegal { font-size: 11px; font-weight: 700; line-height: 1.5; color: rgba(201,166,255,0.6);
         text-align: center; max-width: min(420px, 88vw); margin: 0 auto 44px; letter-spacing: 0.3px; }
@@ -722,7 +765,11 @@
       /* hide gameplay HUD while in the menu */
       body.menu #timer, body.menu #board, body.menu #quests, body.menu #form,
       body.menu #hunger, body.menu #hungerlbl, body.menu #powers, body.menu #banner { display: none; }
-      #coins { z-index: 12; }   /* wallet stays visible over menu + shop */
+      /* 12 painted the wallet chip over four scrolling screens — it sat on the
+         Honey voidling's face at the bottom of the shop and clipped the TOP
+         VOIDS title with no scrolling at all. It only ever needed to clear the
+         menu (z-index 10), not the overlays above it. */
+      #coins { z-index: 11; }
     </style>
   </head>
   <body class="menu">
@@ -815,6 +862,23 @@
          WKUIDelegate hands the call to UIApplication.open, which silently
          returns false. A parent solved the multiplication gate and nothing
          happened at all. An iframe needs no scheme and no browser. -->
+    <!-- ── PAUSE ────────────────────────────────────────────────────────
+         There was no pause and no way to reach sound mid-match: #btnSettings
+         lives inside #menu, which is display:none while playing, so it
+         measures 0x0. To silence the game a parent had to end the child's run.
+         "Dinner's ready" is the single most common interruption in this
+         audience and the only two options were lose the match or throw it
+         away. -->
+    <div id="pause">
+      <div class="setCard">
+        <div class="setTitle">PAUSED</div>
+        <button class="setRow" id="pauseSound"><span>🔊 SOUND</span><b>ON</b></button>
+        <button class="setRow" id="pauseHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
+        <button id="pauseResume">▶ KEEP PLAYING</button>
+        <button id="pauseQuit" class="gateCancel">LEAVE THE MATCH</button>
+      </div>
+    </div>
+
     <div id="policy">
       <div class="polBar">
         <button id="polClose">‹ DONE</button>

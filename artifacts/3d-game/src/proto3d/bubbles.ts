@@ -9,6 +9,8 @@ export interface Bubbles {
   say(pos: THREE.Vector3, text: string, kind: BubbleKind): void;
   float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
   update(dt: number): void;
+  /** Clear every live bubble and floater. Called at match reset. */
+  reset(): void;
 }
 
 interface Slot {
@@ -197,6 +199,23 @@ const style = document.createElement('style');
       f.el.className = `vf${big ? ' big' : ''}`;
       void (f.el as HTMLElement).offsetWidth;
       f.el.classList.add('go');
+    },
+    reset() {
+      // Every live bubble and floater dies at the match boundary. They used to
+      // carry over verbatim — measured in 5 of 5 match transitions — and hang
+      // over empty grass for two to four seconds while the new match started
+      // underneath them, saying things about a match that had already ended.
+      for (const sl of slots) {
+        sl.active = false; sl.until = 0;
+        sl.el.classList.remove('show');
+        sl.el.style.visibility = '';
+        sl.el.textContent = '';
+      }
+      for (const f of floats) {
+        f.active = false; f.until = 0;
+        f.el.classList.remove('show');
+        f.el.textContent = '';
+      }
     },
     update(dt: number) {
       // was a hard 1/60 per FRAME, so a "4.2s" bubble was really 252 frames:

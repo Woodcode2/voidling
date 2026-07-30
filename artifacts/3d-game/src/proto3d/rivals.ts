@@ -420,6 +420,17 @@ export function createRivals(
   // marquee meal; a match where the danger simply failed to be cast is a match
   // with no story. The other 2-4 seats are shuffled.
   function reroll(matchLen = 180) {
+    // ── HOW MANY, NOT JUST WHO ────────────────────────────────────────────
+    // The cast SIZE was drawn once, at module scope, in prototype3d.ts:
+    // `createRivals(..., 3 + Math.floor(Math.random() * 3))`. reroll() reads
+    // that closure-captured number, so it re-shuffled which siblings filled the
+    // seats and never how many there were. One page load meant three rivals in
+    // every match of that session; another meant five in every match — while
+    // the comment beside the call promised "3-5 family members per match,
+    // randomly cast — you never know who's coming."
+    //
+    // The roll belongs here, where the match starts.
+    count = 3 + Math.floor(Math.random() * 3);
     const others = shuffle(NAMES.filter((n) => n !== 'CHOMPZILLA'));
     const picked = ['CHOMPZILLA', ...others.slice(0, Math.max(2, count - 1))];
     // ── JOIN TIMES ────────────────────────────────────────────────────────
@@ -495,7 +506,25 @@ export function createRivals(
     const shape = Math.pow(prog, FIELD_CURVE);
     // par: what a player keeping level with third place would be carrying now
     const par = Math.max(200, FIELD_TOP * LANE_FINAL[2] * shape);
-    const scale = THREE.MathUtils.clamp(0.62 + 0.38 * (pScore / par), 0.62, 1.35);
+    // THE CEILING WAS THE WHOLE PROBLEM. Clamped at 1.35, first place could
+    // never be worth more than 16,000 x 1.35 = 21,600 in a full match, while a
+    // player who is actually playing finishes on 86,000-180,000. Measured final
+    // boards: 179,923 against 9,571. The leaderboard is on screen for the whole
+    // three minutes and it never once said anything true — you had already won
+    // by the first evolution and nothing after that was a contest.
+    //
+    // The SLOPE was already right (0.38 against a par of 0.46 x FIELD_TOP puts
+    // first place at roughly 0.8 x the player's score). Only the clamp was
+    // wrong. The exponent is the one addition: sub-linear, so a genuinely great
+    // run still pulls clear instead of being shadowed point for point, which is
+    // the thing that makes rubber-banding feel like cheating.
+    //
+    //   player = par        -> first 16,000, player ties third   (as designed)
+    //   player = 2x par     -> player runs second
+    //   player = 100,000    -> first ~70,000, player wins by ~40%
+    //   player = 180,000    -> first ~104,000, player wins by ~70%
+    const ratio = Math.max(0, pScore / par);
+    const scale = THREE.MathUtils.clamp(0.62 + 0.38 * Math.pow(ratio, 0.88), 0.62, 6.5);
     return FIELD_TOP * (LANE_FINAL[lane] ?? 0.14) * shape * scale;
   };
 
@@ -1115,7 +1144,15 @@ export function createRivals(
         // without being a teleport: a quarter of the way to target eats at 2x,
         // four times past it eats at half.
         const off = want / Math.max(120, rv.score);
-        const band = THREE.MathUtils.clamp(Math.sqrt(off), 0.50, 2.4);
+        // …and raising the target alone would have changed nothing, because
+        // this is what actually gets them there. A rival's score is EARNED, one
+        // prop at a time, multiplied by this band — and at a ceiling of 2.4 they
+        // were already saturated and falling short of even the old 21,600. The
+        // headroom has to match the target or the ladder is decoration with
+        // extra steps. Radius is unaffected (it comes from growR and is held at
+        // 0.78x the player by softCap), so they stay believable competitors
+        // rather than tiny voids with enormous numbers.
+        const band = THREE.MathUtils.clamp(Math.sqrt(off), 0.50, 8);
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;

@@ -46,10 +46,17 @@ export function createAudio(): Audio3D {
   let ctx: Ctx | null = null;
   let master: GainNode | null = null;
   // persisted mute — a parent hitting mute expects it to STAY muted tomorrow
-  let muted = localStorage.getItem('voidMute') === '1';
+  // Guarded: with storage blocked (iOS "Block All Cookies", a kiosk profile, an
+  // iframe) a bare read throws, and this module is imported during boot — so
+  // the throw took the whole game down while a fully-rendered static menu sat
+  // there inviting a child to tap PLAY. prototype3d.ts shadows localStorage for
+  // its own 65 call sites; these three are the only other live ones.
+  const lsGet = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k: string, v: string): void => { try { localStorage.setItem(k, v); } catch { /* session-only */ } };
+  let muted = lsGet('voidMute') === '1';
   // set voidTheme=1 to play /assets/music/theme.mp3 (and the old generic synth
   // bed behind it) on MAPLE FALLS instead of the town band. Off by default.
-  const LICENSED_THEME = localStorage.getItem('voidTheme') === '1';
+  const LICENSED_THEME = lsGet('voidTheme') === '1';
   // major pentatonic: every eat lands on a consonant note, so fast eating
   // sounds like a tune rather than a stutter
   const PENTA = [0, 2, 4, 7, 9, 12, 9, 7];
@@ -1967,7 +1974,7 @@ export function createAudio(): Audio3D {
     },
     setMuted(m: boolean) {
       muted = m;
-      localStorage.setItem('voidMute', m ? '1' : '0');
+      lsSet('voidMute', m ? '1' : '0');
       if (master && ctx) {
         master.gain.cancelScheduledValues(ctx.currentTime);
         master.gain.setTargetAtTime(m ? 0 : MASTER_VOL, ctx.currentTime, 0.05);

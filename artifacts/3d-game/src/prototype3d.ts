@@ -30,6 +30,51 @@ import {
 } from './proto3d/telemetry';
 import { initIAP, iapPrice, iapAvailable, purchase as iapPurchase, restorePurchases } from './proto3d/store3d';
 
+// ── STORAGE THAT CANNOT KILL THE GAME ───────────────────────────────────────
+// A DEAD APP THAT LOOKS COMPLETELY ALIVE. There are 65 bare localStorage calls
+// in this file and the first one runs before the renderer is even registered.
+// With storage throwing — iOS Safari with "Block All Cookies", a managed school
+// or kiosk profile, an iframe embed, or a full quota — the module threw on
+// import, so NOTHING after that line ran: no input handlers, no PLAY listener,
+// no beginMatch. Measured in that state: renderer absent, zero edibles, zero
+// scene nodes. And the child sees a perfect main menu, because #menu is static
+// HTML in index.html. They tap the real PLAY button and the game simply never
+// starts, with no error and no clue.
+//
+// This shadows the global for the whole module, so all 65 call sites are fixed
+// without touching one of them, and a call site added tomorrow is safe too. It
+// falls back to an in-memory map: progress lasts the session instead of
+// forever, which is an enormous improvement on a blank screen. Every operation
+// is individually guarded as well, because a quota error can arrive at any
+// setItem long after the constructor probed clean.
+const localStorage: Storage = (() => {
+  const mem = new Map<string, string>();
+  let real: Storage | null = null;
+  try {
+    const probe = '__vd_probe__';
+    window.localStorage.setItem(probe, '1');
+    window.localStorage.removeItem(probe);
+    real = window.localStorage;
+  } catch { real = null; }
+  return {
+    getItem: (k: string) => {
+      try { const v = real?.getItem(k); if (v !== null && v !== undefined) return v; } catch { /* fall through */ }
+      return mem.has(k) ? mem.get(k)! : null;
+    },
+    setItem: (k: string, v: string) => {
+      mem.set(k, String(v));                       // the mirror always succeeds
+      try { real?.setItem(k, String(v)); } catch { /* session-only from here */ }
+    },
+    removeItem: (k: string) => {
+      mem.delete(k);
+      try { real?.removeItem(k); } catch { /* ignore */ }
+    },
+    clear: () => { mem.clear(); try { real?.clear(); } catch { /* ignore */ } },
+    key: (i: number) => [...mem.keys()][i] ?? null,
+    get length() { return mem.size; },
+  } as Storage;
+})();
+
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 // THE "NOT HD" BUG. This was hard-capped at 1.3 on every touch device — and
@@ -258,11 +303,16 @@ _dbg.__matchState = () => ({
   // input handlers, the PLAY listener, beginMatch, the lot — and do it
   // silently. A build stamp is not worth that risk.
   bs.textContent = `v ${typeof __BUILD__ === 'undefined' ? 'dev' : __BUILD__}`;
-  bs.style.cssText = 'position:fixed;right:8px;bottom:4px;z-index:11;font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(203,178,255,0.5);pointer-events:none;';
+  bs.style.cssText = 'position:fixed;right:8px;bottom:calc(4px + env(safe-area-inset-bottom, 0px));z-index:11;font-size:9px;font-weight:700;letter-spacing:1px;color:rgba(203,178,255,0.5);pointer-events:none;';
   document.body.appendChild(bs);
   // …and NOT on the shop or the worlds screen. body.menu is still set inside
   // those overlays, so a build stamp shipped on two player-facing screens.
-  const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'skinPrev'];
+  // 'topvoids' was missing, so the dev build stamp painted over the TOP VOIDS
+// board — on a screen whose whole job is to look like a real leaderboard. The
+// comment two lines up already said "and NOT on the shop or the worlds screen":
+// a fix that missed a case. 'pause' and 'policy' are new and belong here too.
+const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'skinPrev',
+  'topvoids', 'pause', 'policy', 'gate'];
   const vis = () => {
     const overlaid = OVERLAYS.some((id) => document.getElementById(id)?.classList.contains('show'));
     bs.style.display = document.body.classList.contains('menu') && !overlaid ? 'block' : 'none';
@@ -880,21 +930,36 @@ let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
 // The three beats belong to the town now. A generic DONUT RUSH on an island
 // that is holding a mayoral election is a wasted beat — these are the same
 // three-beat spine, told as election night.
+// THE MID-MATCH HOLE. The spine was three beats at 32 / 95 / 150 with durations
+// 15 / 18 / 30, which leaves 47s->95s and 113s->150s with no beat, no
+// multiplier and — because DEVOURER->COLOSSUS has a median 52-second gap —
+// usually no evolution either. That is 47 seconds and 37 seconds of a
+// three-minute match where nothing is scheduled to happen. A fourth beat fills
+// the larger hole and the rest re-space around it.
+//
+// `at` is the BASE time; jitter() moves each one per match (see resetBeats).
+// Measured before: beat 1 fired at 32.1-32.2s, beat 2 at 95.0-95.5s and beat 3
+// at 150.1-151.4s across ELEVEN matches on both worlds. Same island, same
+// spawn, same cast, same script, to the tenth of a second.
 const MAPLE_BEATS = [
-  { at: 32, dur: 15, mult: 2, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
+  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
     banner: '🎺 BAND PRACTICE! Everything is DOUBLE!', news: 'The marching band is out. They know one song. Here it comes.' },
-  { at: 95, dur: 18, mult: 2, fired: false, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
+  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0x5ee8d8, flash: 'rgba(94,232,216,0.26)',
+    banner: '🐕 DOG OFF THE LEAD! Everything is DOUBLE!', news: 'A dog is loose on Main Street. Six people are chasing it. It thinks this is a game.' },
+  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
     banner: '📣 TOWN PARADE! The whole town is OUT!', news: 'The parade has started. The mayor calls it a scheduling matter.' },
-  { at: 150, dur: 30, mult: 3, fired: false, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
+  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
     banner: '🐐 THE GOAT IS LOOSE! Everything is TRIPLE!', news: 'The goat is out again. Nobody is chasing it. Everybody is watching.' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
 const PIRATE_BEATS: typeof MAPLE_BEATS = [
-  { at: 32, dur: 15, mult: 2, fired: false, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
+  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
     banner: '🍦 ICE CREAM HOUR! Everything is DOUBLE!', news: 'Ice cream hour has been declared. The ice cream hut is delighted.' },
-  { at: 95, dur: 18, mult: 2, fired: false, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
+  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffa63f, flash: 'rgba(255,166,63,0.26)',
+    banner: '🦜 THE PARROT ESCAPED! Everything is DOUBLE!', news: 'The resort parrot is loose. It has learned the breakfast menu and will not stop.' },
+  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
     banner: '🪩 DANCE PARTY! The whole bay is MOVING!', news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
-  { at: 150, dur: 30, mult: 3, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
+  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
     banner: '🏴‍☠️ TREASURE HUNT! Everything is TRIPLE!', news: 'The treasure hunt has begun. The map is still wrong.' },
 ];
 const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
@@ -1212,9 +1277,14 @@ function bumpStreak() {
   const last = localStorage.getItem('voidLastDay');
   if (last === today) return;
   const yd = new Date(Date.now() - 86400000).toDateString();
-  streak = last === yd ? streak + 1 : 1;
-  localStorage.setItem('voidStreak', String(streak));
+  setStreak(last === yd ? streak + 1 : 1);
   localStorage.setItem('voidLastDay', today);
+}
+/** The single writer for the streak the chip, the shop and the calendar share. */
+function setStreak(n: number): void {
+  streak = n;
+  localStorage.setItem('voidStreak', String(n));
+  renderRank();
 }
 // the end screen is THE retention moment — the reward has to land as a beat,
 // not a gray sub-line: warm sting, coins visibly counting up, rows sliding in
@@ -1537,6 +1607,7 @@ let introT = 0, outroT = 0;
 // THE HAND-AUTHORED FIRST SIXTY SECONDS. All of these are per-match, and all of
 // them exist because the opening was measured and found to teach the wrong
 // things in the wrong order.
+let paused = false;        // the pause sheet is up: the whole match holds still
 let firstRun = false;      // this child has never seen a match before
 let dragTaught = false;    // the DRAG pill has been shown for this match
 let nomArmed = true;       // the FIRST NOM party may fire (see beginMatch)
@@ -1555,7 +1626,6 @@ function beginMatch(solo = false) {
   // into a match (menu PLAY, solo, the debug autostart) and only one of them
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
-  for (const bt of BEATS) bt.fired = false;
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
@@ -1564,6 +1634,16 @@ function beginMatch(solo = false) {
   soloMode = solo;
   matchLen = solo ? 120 : MATCH_LEN;
   matchClock = matchLen;
+  // NO TWO MATCHES ON THE SAME SCHEDULE. Each beat keeps its authored slot as a
+  // base and moves +-6s around it, so the arc is recognisable but never
+  // recited. Clamped so the finale never lands late enough to be a cutscene.
+  // This has to sit AFTER matchLen is assigned — one line earlier it clamps
+  // against the PREVIOUS match's length, and against 0 on the very first match.
+  for (const bt of BEATS) {
+    if (!bt.base) bt.base = bt.at;
+    bt.at = Math.max(8, Math.min(matchLen - bt.dur - 2, bt.base + (Math.random() * 12 - 6)));
+    bt.fired = false;
+  }
   started = true; startT = tClock;
   resetFps();
   setCtx('world', pickedWorld);
@@ -1889,6 +1969,24 @@ function gildTreasure() {
 
 function resetMatch() {
   resetNews(); resetMapleNews(); signedOn = false;   // memory + the sign-on are per-match
+  // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
+  // Proven with an isolation test, not inferred: a uniquely-tagged banner
+  // planted on the menu, left for ten seconds (the animation is 2.2s), then a
+  // match launched — peak opacity 1.00 at 330ms, with the planted text. The
+  // cause is that `body.menu #banner { display:none }` cancels the CSS
+  // animation, and restoring display restarts it from 0%. Natural captures
+  // included "🍰 CHOMPZILLA is TOO FULL to chase — now is your chance!" at
+  // t=0.1s of a match CHOMPZILLA had not joined, and "QUEST DONE! +15✦" over a
+  // 2:57 clock and a score of 10. Neither resetMatch() nor beginMatch() cleared
+  // the text, the .show class, the queue or the hold timer — all four.
+  bannerEl.classList.remove('show', 'fam');
+  bannerEl.textContent = '';
+  bannerQ.length = 0;
+  bannerFree = 0;
+  evolveEl.classList.remove('show');
+  // …and the speech bubbles, which carried over verbatim in 5 of 5 transitions
+  // and hovered over empty grass for 2-4 seconds at the start of the new match.
+  bubbles.reset();
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
   for (const e of edibles) {
@@ -1946,15 +2044,42 @@ el('btnHome').addEventListener('click', () => {
 {
   const qBtn = el('btnQuit');
   let armT = 0;
-  qBtn.addEventListener('click', () => {
-    if (!started) return;
-    if (performance.now() - armT > 3000) {
-      armT = performance.now();
-      qBtn.textContent = 'LEAVE?';
-      qBtn.classList.add('arm');
-      setTimeout(() => { qBtn.textContent = '⌂'; qBtn.classList.remove('arm'); }, 3000);
-      return;
+  // FIRST TAP PAUSES. It used to arm a LEAVE? confirm, which meant the only
+  // in-match control a child had was "throw this away" — and there was no way
+  // to reach sound at all, because #btnSettings lives inside #menu and measures
+  // 0x0 during a match. A parent who needed quiet had to end the run.
+  const pauseEl = el('pause');
+  const pSnd = el('pauseSound'), pHap = el('pauseHaptics');
+  const paintPause = () => {
+    const sOff = audio.isMuted();
+    pSnd.classList.toggle('off', sOff);
+    pSnd.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
+    pHap.classList.toggle('off', !hapticsOn);
+    pHap.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+  };
+  const resume = () => { paused = false; pauseEl.classList.remove('show'); clock.getDelta(); };
+  pSnd.addEventListener('click', () => { audio.setMuted(!audio.isMuted()); paintPause(); });
+  pHap.addEventListener('click', () => {
+    hapticsOn = !hapticsOn;
+    localStorage.setItem('voidHaptics', hapticsOn ? '1' : '0');
+    paintPause(); if (hapticsOn) buzz(30);
+  });
+  el('pauseResume').addEventListener('click', resume);
+  // …and backgrounding the app pauses it too, so a child who is called away
+  // does not come back to a finished match they never got to play.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && started && !ended && !paused) {
+      paused = true; paintPause(); pauseEl.classList.add('show');
     }
+  });
+  qBtn.addEventListener('click', () => {
+    if (!started || ended) return;
+    void armT;
+    paused = true; paintPause(); pauseEl.classList.add('show');
+    track('pause_open', { sec: elapsed() });
+  });
+  const doQuit = () => {
+    resume();
     qBtn.textContent = '⌂'; qBtn.classList.remove('arm');
     saveStats();   // partial progress (things eaten) still counts toward trophies
     countMatch();
@@ -1968,7 +2093,8 @@ el('btnHome').addEventListener('click', () => {
     document.body.classList.add('menu');
     menuEl.style.display = '';
     renderRank();
-  });
+  };
+  el('pauseQuit').addEventListener('click', doQuit);
 }
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
@@ -2077,7 +2203,11 @@ renderRank();
 // separately, so a child on day 23 is told they are on day 23 rather than
 // day 7 for the seventeenth time.
 {
-  const DAILY = [50, 75, 100, 125, 150, 200, 300];
+  // Flatter than [50,75,100,125,150,200,300], which made day 7 a 6x spike over
+  // day 1 and therefore a 5x fall on the morning after. A cyclical calendar
+  // always dips at the roll-over — the fix is to make the dip small and to
+  // label the day honestly, not to pretend it is not there.
+  const DAILY = [90, 110, 130, 160, 190, 230, 300];
   const today = new Date().toDateString();
   const last = localStorage.getItem('voidDailyLast');
   if (last !== today && menuEl.style.display !== 'none' && !DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW) {
@@ -2089,17 +2219,36 @@ renderRank();
     const week = kept
       ? Number(localStorage.getItem('voidDailyWeek') || 1) + (prevDay === 6 ? 1 : 0)
       : 1;
+    // ONE STREAK, NOT TWO. `voidStreak` (bumped when a match ends) and
+    // `voidDailyStreak` (bumped when the calendar is claimed) counted the same
+    // idea separately and drifted apart: measured, the calendar header read
+    // "🔥 22 DAY STREAK!" while the rank chip beside it read "🥉 BRONZE · LVL 1"
+    // with no flame at all, and the shop still gated Prism behind "7-DAY
+    // STREAK". A child was on three different streaks at once.
+    //
+    // The daily calendar is the honest one — it counts days the game was
+    // OPENED, which is what a streak means and what the streak skins are
+    // promising. It now writes the shared counter that the chip and the shop
+    // already read.
     const streak = kept ? Number(localStorage.getItem('voidDailyStreak') || 1) + 1 : 1;
     // +20% a week, capped at 3x. Day 7 of week 4 pays 900 instead of 300.
-    const mult = Math.min(3, 1 + 0.2 * (week - 1));
+    const mult = Math.min(3.5, 1 + 0.3 * (week - 1));   // week 2 already pays 30% more
     const amount = (i: number) => Math.round(DAILY[i] * mult / 5) * 5;
     const modal = el('daily');
     // each day is a PRIZE, not a table cell: claimed days stamp a green tick,
     // today's cell is a big bouncing gift, day 7 is the gold treasure chest
     const ICON = ['🪙', '🪙', '💰', '💰', '💎', '💎', '🏆'];
+    // LIFETIME day numbers, not day-of-week. On the morning after a child
+    // finished day 7 for 300 coins, the card reset to a cell labelled "DAY 1"
+    // paying 60 — the single most important morning in the whole retention
+    // loop, and it read as a demotion for coming back. The prizes still cycle
+    // (they have to; that is what a calendar is) but the number never goes
+    // backwards, so day 8 is day 8 and the WEEK 2 header explains why the
+    // prizes are bigger this time round.
+    const dayNo = (week - 1) * 7;
     el('dailyGrid').innerHTML = DAILY.map((_amt, i) =>
       `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''} ${i === 6 ? 'mega' : ''}">` +
-      `<b>DAY ${i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
+      `<b>DAY ${dayNo + i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
       `<span class="dAmt">${amount(i)}<i>✦</i></span></div>`).join('');
     // the streak is the LIFETIME consecutive-day count, and the week is stated,
     // so the card is different on day 8 from how it was on day 7
@@ -2114,6 +2263,8 @@ renderRank();
       localStorage.setItem('voidDailyDay', String(day));
       localStorage.setItem('voidDailyWeek', String(week));
       localStorage.setItem('voidDailyStreak', String(streak));
+      // …and the one the rank chip and the streak skins read
+      setStreak(streak);
       track('daily_claim', { day: day + 1, week, streak, coins: amount(day) });
       // payoff: the prize bursts, coins rain across the card, THEN it closes
       const cell = modal.querySelector('.dCell.now');
@@ -2489,7 +2640,7 @@ function animate() {
   if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
   island.update(dt, tClock);
 
-  if (started && !ended) {
+  if (started && !ended && !paused) {
     matchClock -= dtw * clockSpeed;
     if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
     // PRESENCE: a big void is an EVENT — ambient suction sparkles from stage 2,
@@ -2891,7 +3042,7 @@ function animate() {
   // results screen still added points to a board the panel had already
   // snapshotted. The ambient town (life.update, above) deliberately keeps
   // running — the world behind the score card should still look alive.
-  if (!ended) {
+  if (!ended && !paused) {
     rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
       { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
   }
@@ -2928,7 +3079,7 @@ function animate() {
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
-    if (!started || ended) break;   // menu attract mode, AND the results screen:
+    if (!started || ended || paused) break;   // menu attract mode, the results screen, AND pause:
     // the sim used to run at full rate behind the score card, so the panel (a
     // snapshot) disagreed with the live board underneath it, rivals kept
     // scoring, chomp SFX chewed over the results, and the coins actually
