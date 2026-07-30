@@ -185,7 +185,11 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 // The chosen world must be set BEFORE the island is built (the ground bake and
 // the prop pass both read the plan). Switching worlds reloads, which is fine:
 // it's a level select, not a mid-match toggle.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE ISLE', pirate: 'PIRATE BAY RESORT' };
+// MAPLE FALLS, everywhere. This said MAPLE ISLE — on the loading screen and
+// the match title card, the two places a child reads the world's name — while
+// 60 other player-facing strings, including the world-picker card they tap
+// immediately beforehand, say MAPLE FALLS.
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT' };
 const pickedWorld = (new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple') === 'pirate' ? 'pirate' : 'maple';
 setWorld(pickedWorld);
@@ -588,6 +592,10 @@ function joySet(ev: PointerEvent) {
   // vector now; joy.mag alone carries the ramp.
   const inv = m > 0 ? 1 / m : 0;
   joy.dx = dx * inv; joy.dy = dy * inv; joy.mag = Math.min(1, m / JOY_R);
+  // A REAL STEER, not a stray tap. Arms the FIRST NOM celebration so the party
+  // belongs to a bite the child aimed at, not to the void drifting into a
+  // postbox on the auto-started first launch.
+  if (!nomArmed && joy.mag > 0.25) nomArmed = true;
   joyNubEl.style.left = `${joy.ax + dx * k}px`; joyNubEl.style.top = `${joy.ay + dy * k}px`;
   lastInput = tClock;
 }
@@ -905,7 +913,12 @@ function mealOf(e: Edible): string {
   if (u.afloat) return e.radius > 4 ? 'a whole SHIP' : 'somebody\'s boat';
   if (u.mover) {
     if (e.radius > 2.2) return 'a truck, in motion';
-    if (e.radius > 1.1) return 'a guest. mid-sentence.';
+    // NO TERMINAL PUNCTUATION IN A FRAGMENT. This is substituted into 22
+    // newsroom templates, every one of which supplies its own sentence end, so
+    // it produced "It ate a guest. mid-sentence.. Somebody owned that." on a
+    // full-screen card — in the best-written part of the build, every time the
+    // player ate a mid-size mover, which is constantly.
+    if (e.radius > 1.1) return 'a guest, mid-sentence';
     return 'a very small dog';
   }
   if (e.radius > 6) return 'an entire LANDMARK';
@@ -1420,7 +1433,14 @@ function capture(e: Edible, giveHunger = true) {
   stats.eaten++; matchEaten++;
   // the very first thing a brand-new player ever eats gets a PARTY — the
   // guaranteed wow inside the first 30 seconds
-  if (!localStorage.getItem('voidFirstNom')) {
+  // …and it has to be a bite the child MEANT. The first launch auto-starts
+  // into a live match, so the void drifts into a prop and burns this on its
+  // own: measured at 913ms after the match went live with zero taps recorded,
+  // and in one run 657ms BEFORE the title card had even faded in over the top
+  // of it. The one designed celebration in the game was being spent before the
+  // child touched the screen, and their real first bite then got nothing.
+  // nomArmed is set true by the first genuine drag (see the pointer handler).
+  if (nomArmed && !localStorage.getItem('voidFirstNom')) {
     localStorage.setItem('voidFirstNom', '1');
     bubbles.float(floatPos.set(e.mesh.position.x, voidling.radius + 3, e.mesh.position.z), 'FIRST NOM! 🎉', true);
     fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd23f, 7, 0.6);
@@ -1514,6 +1534,13 @@ let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
 let guideStep = 0, guideT = 0, presenceT = 0;
 let introT = 0, outroT = 0;
+// THE HAND-AUTHORED FIRST SIXTY SECONDS. All of these are per-match, and all of
+// them exist because the opening was measured and found to teach the wrong
+// things in the wrong order.
+let firstRun = false;      // this child has never seen a match before
+let dragTaught = false;    // the DRAG pill has been shown for this match
+let nomArmed = true;       // the FIRST NOM party may fire (see beginMatch)
+let dangerTaught = false;  // the "you can be eaten" beat has played this match
 const guideEl = () => el('guide');
 function showGuide(text: string, dur = 5) {
   const g = guideEl();
@@ -1541,10 +1568,13 @@ function beginMatch(solo = false) {
   resetFps();
   setCtx('world', pickedWorld);
   setCtx('skin', localStorage.getItem('voidSkin') || 'classic');
+  // read it BEFORE it is banked below — everything downstream that means
+  // "this child has never played" has to key off this, not off the flag
+  const firstEver = !localStorage.getItem('voidPlayed');
   track('match_start', {
     solo, lvl: rankInfo(xp).lvl, coins, played: stats.matches,
     skins: (JSON.parse(localStorage.getItem('voidSkinsOwned') || '[]') as string[]).length,
-    first: !localStorage.getItem('voidPlayed'),
+    first: firstEver,
   });
   // BANK IT NOW, NOT AT THE WHISTLE. This flag was written in exactly one
   // place — endMatch() — so a child who put the iPad down before the three
@@ -1559,11 +1589,25 @@ function beginMatch(solo = false) {
   document.body.classList.remove('menu');
   menuEl.style.display = 'none';
   boardEl.style.display = solo ? 'none' : '';
-  el('titlecard').classList.add('show');
+  // RESTART the card animation. classList.add on an element that already has
+  // the class is a no-op, so `cardFade 4.2s forwards` played on match 1 and
+  // never again — and PLAY AGAIN is how children actually start matches.
+  // Measured: peak opacity 1.00 on the first match, 0.00 on the second. Same
+  // remove/reflow/add the evolve card already uses correctly.
+  const tcEl = el('titlecard');
+  tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
   titleUntil = tClock + 4.6;
   audio.startMusic(); audio.setMusicStage(0);
   introT = 2.2;   // orbital reveal: the whole island, then dive to the tiny void
-  if (!localStorage.getItem('voidPlayed')) { guideStep = 1; showGuide('<b>DRAG</b> anywhere to move!', 6); }
+  // THE FIRST INSTRUCTION USED TO ARRIVE WHILE THE CONTROLS WERE OFF. This
+  // fired here, in the same block that sets introT = 2.2 — and the intro damps
+  // velocity by 0.9^(dt*60) for those 2.2 seconds, roughly 0.0018x per second.
+  // A six-year-old obeys the first thing they are told, drags, and learns that
+  // the screen does not respond. It is now queued and fires the moment the
+  // controls are actually live.
+  firstRun = firstEver;
+  dragTaught = false;
+  nomArmed = !firstEver;   // see onEat: the FIRST NOM party waits for a real drag
 }
 // ── asset preloader: menu time is download time; PLAY holds on a branded
 // loading bar until every pack mesh is resident, so a match never starts
@@ -1684,7 +1728,7 @@ function paintWorldCard(host: HTMLElement, id: string): void {
 }
 /** Best score on a given world, or 0. Written by endMatch(). */
 const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) || 0);
-// world cards: MAPLE ISLE + PIRATE BAY are both live now
+// world cards: MAPLE FALLS + PIRATE BAY are live; FROST PEAKS is the locked third
 {
   const chip = el('btnWorlds');
   chip.innerHTML = `<i>${pickedWorld === 'pirate' ? '🏴‍☠️' : '🏝️'}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${pickedWorld === 'pirate' ? 2 : 1} OF 3</span><b>›</b>`;
@@ -2851,6 +2895,35 @@ function animate() {
     rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
       { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
   }
+  // ── THE RULE NOBODY WAS EVER TAUGHT ────────────────────────────────────────
+  // "A bigger void eats you" is the entire danger half of the game, and the
+  // ONLY place it was written down is the #tut card — which is shown from
+  // launchWorld(), reachable only through the menu. The very first launch
+  // bypasses the menu and drops straight into a live match, so a brand-new
+  // child never saw it, while a rival was already charging them with a screen
+  // shake and a red flash. The three guide beats that do fire cover moving,
+  // eating and evolving. None of them mentions being eaten.
+  //
+  // Taught in context instead of in a modal: the beat fires the first time a
+  // genuinely bigger rival is close enough to matter, which is the moment the
+  // lesson is about. Its partner fires when the tables turn.
+  if (firstRun && started && !ended && guideT <= 0) {
+    for (const rv of rivals.list) {
+      if (!rv.joined) continue;
+      const d = Math.hypot(rv.x - voidState.x, rv.z - voidState.z);
+      if (!dangerTaught && rv.r > R * 1.15 && d < 70) {
+        dangerTaught = true;
+        showGuide('that one is <b>BIGGER</b> than you — run! 😱', 5);
+        audio.alert(); buzz(30);
+        break;
+      }
+      if (dangerTaught && guideStep < 4 && rv.r < R * 0.8 && d < 70) {
+        guideStep = 4;
+        showGuide('now <b>YOU</b> are bigger — eat them! 😋', 5);
+        break;
+      }
+    }
+  }
   bubbles.update(dt);
   const cy = voidling.group.position.y;
 
@@ -2959,6 +3032,11 @@ function animate() {
     let targetDist = Math.min(340, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
     if (introT > 0) {
       introT -= dt;
+      if (introT <= 0 && firstRun && !dragTaught) {
+        // controls are live THIS frame — now the instruction is true
+        dragTaught = true; guideStep = 1;
+        showGuide('<b>DRAG</b> anywhere to move!', 6);
+      }
       const k2 = Math.max(0, introT / 2.2);
       camDist = 38 + 262 * k2 * k2;   // ease-in dive from orbit
       targetDist = camDist;

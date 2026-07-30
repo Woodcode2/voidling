@@ -52,7 +52,31 @@ const HUD_AVOID = ['form', 'guide'];
 const HUD_BANDS = ['banner', 'evolve', 'news', 'titlecard'];
 export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
   // inject styles once
-  const style = document.createElement('style');
+  // ── HOUSE SENTENCE CASE, ENFORCED AT THE GLASS ──────────────────────────────
+// 84% of the town's spoken lines were authored lower-case — 743 of 885 across
+// life.ts and rivals.ts — against a house style the owner rejected twice, in
+// writing, and which both newsroom modules carry a header about: "That rule is
+// DEAD… it is the reason the newsfeed was rejected twice." The rewrite reached
+// two of the six pools. The result is a child reading "The mayor says there is
+// no hole" on the news card and "i fixed that pothole. me." two inches below.
+//
+// Doing this at the point of display rather than by rewriting 743 string
+// literals is deliberate: it cannot corrupt a key, a path or a CSS value by
+// accident, it costs one charAt per bubble, and — the part that matters — a
+// line added next month is correct without anyone remembering the rule.
+//
+// Only the first LETTER is touched. Lines opening with an emoji, an ellipsis
+// or a number keep their opening, and nothing is done to punctuation: "+15✦"
+// and "owie." are both already right and neither wants a full stop bolted on.
+function sentence(t: string): string {
+  const i = t.search(/[A-Za-z]/);
+  if (i < 0) return t;
+  const c = t[i];
+  if (c === c.toUpperCase()) return t;          // already capitalised, or ALL CAPS
+  return t.slice(0, i) + c.toUpperCase() + t.slice(i + 1);
+}
+
+const style = document.createElement('style');
   style.textContent = `
     .vb {
       position: fixed; transform: translate(-50%, -100%); z-index: 4;
@@ -122,6 +146,7 @@ export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
 
   return {
     say(pos, text, kind) {
+      text = sentence(text);
       // whole-island zoom doesn't need street gossip — but FAMILY lines
       // ('event') must survive the big-void camera pull-back, or the rivals go
       // silent exactly when the drama happens
@@ -165,6 +190,7 @@ export function createBubbles(camera: THREE.Camera, max = 2): Bubbles {
       slot.el.classList.add('show');
     },
     float(pos, text, big = false) {
+      text = sentence(text);
       const f = floats[fHead]; fHead = (fHead + 1) % floats.length;
       f.active = true; f.pos.copy(pos); f.until = clock + 0.9;
       f.el.textContent = text;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0d0821">
-    <title>VOIDLING · MAPLE ISLE (3D)</title>
+    <title>VOIDLING · The cute world ender</title>
     <link rel="icon" type="image/png" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="apple-touch-icon" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="manifest" href="/manifest.json">
@@ -195,15 +195,29 @@
       #evolve.show { animation: ev 1.8s ease forwards; }
       @keyframes ev { 0%{opacity:0; transform:scale(0.7)} 18%{opacity:1; transform:scale(1.05)} 70%{opacity:1; transform:scale(1)} 100%{opacity:0; transform:scale(1.1)} }
       /* title card — plays only when .show is added (on PLAY) */
+      /* THE SCRIM. This card had inset:0, no background of any kind, and sat
+         over a live 3D town of pale plaza and light grass. Measured per-glyph
+         against the exact pixels behind it: median contrast 1.65:1, 75% of the
+         solid ink below the WCAG 3:1 floor, worst pixel 1.00:1 — the same
+         colour as its background. The goal line "the little void is hungry ·
+         eat the island" is the ONLY place on the entire first-run path that
+         tells a child what the game is, and it was invisible. A soft radial
+         scrim costs one gradient and darkens nothing at the edges. */
       #titlecard { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column;
         align-items: center; justify-content: center; pointer-events: none; text-align: center; color: #fff;
-        opacity: 0; }
+        opacity: 0;
+        background: radial-gradient(ellipse 78% 34% at 50% 50%, rgba(9,5,20,0.72) 0%,
+                                    rgba(9,5,20,0.55) 45%, rgba(9,5,20,0) 78%); }
       #titlecard.show { animation: cardFade 4.2s ease forwards; }
-      #titlecard .lvl { font-size: 15px; font-weight: 800; letter-spacing: 6px; opacity: 0.85; color: #c9a6ff; }
+      #titlecard .lvl { font-size: 15px; font-weight: 800; letter-spacing: 6px; opacity: 0.95; color: #d9c2ff;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
       #titlecard .name { font-size: clamp(34px, 12vw, 62px); text-wrap: balance; margin-top: 6px;
         font-weight: 900; letter-spacing: 1px;
-        text-shadow: 0 4px 24px rgba(123,79,224,0.7), 0 2px 6px rgba(0,0,0,0.5); }
-      #titlecard .sub { font-size: 15px; font-weight: 700; opacity: 0.8; margin-top: 10px; letter-spacing: 1px; }
+        text-shadow: 0 4px 24px rgba(123,79,224,0.7), 0 2px 6px rgba(0,0,0,0.85); }
+      /* the goal line carries its own stroke, the same trick #timer already
+         uses to stay legible over arbitrary terrain */
+      #titlecard .sub { font-size: 16px; font-weight: 800; opacity: 1; margin-top: 10px; letter-spacing: 1px;
+        color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.95); }
       @keyframes cardFade { 0%{opacity:0; transform:translateY(10px) scale(0.98)} 14%{opacity:1; transform:translateY(0) scale(1)} 72%{opacity:1} 100%{opacity:0; transform:translateY(-6px) scale(1.02)} }
       /* end screen */
       #end { position: fixed; inset: 0; z-index: 9; display: none; flex-direction: column;
@@ -762,7 +776,7 @@
         <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
       </svg></div>
       <button id="btnPlay">PLAY</button>
-      <button id="btnWorlds"><i>🏝️</i> MAPLE ISLE <span>WORLD 1 OF 3</span><b>›</b></button>
+      <button id="btnWorlds"><i>🏝️</i> MAPLE FALLS <span>WORLD 1 OF 3</span><b>›</b></button>
       <button id="btnSolo" style="display:none">SOLO RUN<span>no rivals · 2:00 · devour 100%</span></button>
       <div class="navRow">
         <button class="navCard" id="btnShop"><i>🛍️</i>SHOP</button>

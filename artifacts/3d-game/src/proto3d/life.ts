@@ -3770,18 +3770,29 @@ export function createLife(
       addEvent(gx, gy, amb, pan, (x, cz) => build(x, cz, side, dress), 0);
     };
 
-    // ── THE STUMP SPEECH ──────────────────────────────────────────────────
-    // Mayor Dinkle, third term, running on a platform of the void not existing.
-    // A crowd in both colours, and one heckler who has been asked to leave.
+    // ── THE RIBBON CUTTING ────────────────────────────────────────────────
+    // Mayor Dinkle, at a podium, on the subject of the bandstand. A crowd, and
+    // one heckler who has been asked to leave.
+    //
+    // THIS WAS A TWO-PARTY ELECTION. "four more years! or eight!", "a vote for
+    // me is a vote for me", "the polls are still OPEN!!", "I demand a
+    // REMATCH!!" — live, on screen, in a game rated 4+. The team wrote the rule
+    // down itself in newsroom_maple.ts: "RATED 4+. NO real politics of any kind
+    // — no election, no voting, no polls, no candidates, no recounts." An
+    // entire newsroom was rewritten around that rule and the vignette layer
+    // never got the memo, so the surface a child watches most was still running
+    // a campaign. Same joke — a small-town mayor who will not admit to a hole
+    // in the ground — with the politics taken out and the house sentence case
+    // put back in.
     mEvent('civic', ['main', 'strip', 'burb'],
-      ['there is NO void. next question.', 'my opponent has NO plan.',
-        'four more years! or eight!', 'I fixed that pothole. me.',
-        'boooo! …sorry, continue', 'let me finish. LET ME FINISH.',
-        'and ANOTHER thing about potholes.', 'name ONE thing she has done.',
-        'a vote for me is a vote for me', 'the twine ball put us on maps.'],
-      ['I NEVER said it was fake!!', 'this is my opponent\'s fault!!',
-        'the polls are still OPEN!!', 'I demand a REMATCH!!',
-        'four more— okay, RUN!! RUN!!'],
+      ['There is no void. Next question.', 'I have a plan for the bandstand.',
+        'I cut that ribbon myself.', 'I fixed that pothole. Me.',
+        'Boooo! …sorry, continue.', 'Let me finish. LET ME FINISH.',
+        'And another thing about potholes.', 'Shake my hand. Firm. Good.',
+        'I named that prize hog myself.', 'The twine ball put us on the map.'],
+      ['I never said it was fake!!', 'That is a VERY large puddle!!',
+        'The bandstand! Save the bandstand!!', 'I have looked into it. It is BAD!!',
+        'Meeting adjourned!! RUN!! RUN!!'],
       (x, z, side, dress) => {
         const SZ = z - 12;   // the stage line, back from the square
         glb(scene, addEdible, 'stage', x, SZ, 5, {
