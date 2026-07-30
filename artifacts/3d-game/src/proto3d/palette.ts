@@ -134,7 +134,7 @@ export const SKINS: Skin[] = [
   { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', char: { eyes: 'glow', aura: 0xffd25a, auraKind: 'stars', gloss: 1.2, pattern: 'starfield', patCol: 0xffd25a }, cash: 9.99,
     art: '/assets/hf/hf_20260717_221346_49c57d8f-d589-4a59-9c11-b5d96dbd9bc7.png' },
   // Drako card art: teal-blue dragon orb, warm golden glow around the edges
-  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9, pattern: 'scales', patCol: 0x1e6a7a, body: 'muzzle' }, cash: 7.99,
+  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9, pattern: 'scales', patCol: 0x1e6a7a, body: 'muzzle' }, cash: 4.99,
     art: '/assets/hf/hf_20260723_181409_a7a76db9-9711-48e8-9e0e-4f43188251d0.jpeg' },
   { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', char: { eyes: 'fierce', aura: 0xff4d5e, auraKind: 'bolts', gloss: 0.4, pattern: 'stitch', patCol: 0x4a2a5e }, cash: 4.99,
     art: '/assets/hf/hf_20260723_181414_a23e8298-d3ea-47e4-bba9-d7a468fc88e1.jpeg' },

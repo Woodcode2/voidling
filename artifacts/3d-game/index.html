@@ -540,11 +540,11 @@
       #settings { position: fixed; inset: 0; z-index: 46; display: none; align-items: center; justify-content: center;
         background: rgba(10,5,22,0.82); backdrop-filter: blur(6px); }
       #settings.show { display: flex; }
-      #settings.show .setCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
-      #settings .setCard { width: min(330px, calc(100vw - 32px)); box-sizing: border-box; border-radius: 24px; text-align: center; padding: 24px 18px 20px;
+      #settings.show .setCard, #gate.show .setCard { animation: modalIn 0.24s cubic-bezier(0.2, 1.4, 0.4, 1); }
+      #settings .setCard, #gate .setCard { width: min(330px, calc(100vw - 32px)); box-sizing: border-box; border-radius: 24px; text-align: center; padding: 24px 18px 20px;
         background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(201,166,255,0.5); box-shadow: 0 0 40px rgba(154,92,255,0.45); }
-      #settings .setTitle { font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff; margin-bottom: 16px; }
+      #settings .setTitle, #gate .setTitle { font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff; margin-bottom: 16px; }
       #settings .setRow { display: flex; width: 100%; align-items: center; justify-content: space-between;
         font-family: inherit; font-size: 15px; font-weight: 900; letter-spacing: 1px; color: #e8dcff;
         background: rgba(255,255,255,0.07); border: 2px solid rgba(168,123,255,0.28); border-radius: 15px;
@@ -617,6 +617,24 @@
         color: #b39ede; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.12);
         border-radius: 12px; padding: 10px 20px; margin: 4px auto 10px; cursor: pointer; display: block; }
       #btnRestore:active { transform: scale(0.96); }
+      /* the gate */
+      /* 70 — ABOVE EVERYTHING. The gate is opened from settings (46), from the
+         skin preview (40) and from the shop, so anything less and the surface
+         that raised it covers its own CONTINUE button. */
+      #gate { position: fixed; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center;
+        background: rgba(9,5,20,0.88); backdrop-filter: blur(6px); padding: 20px; }
+      #gate.show { display: flex; }
+      .gateQ { font-size: 17px; font-weight: 800; color: #e8dcff; margin: 6px 0 14px; text-align: center; }
+      .gateQ b { font-size: 26px; color: #fff; letter-spacing: 2px; display: block; margin-top: 6px; }
+      #gateIn { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 26px; font-weight: 900;
+        text-align: center; letter-spacing: 4px; padding: 12px; border-radius: 13px;
+        border: 2px solid rgba(201,166,255,0.4); background: rgba(255,255,255,0.06); color: #fff; }
+      .gateErr { min-height: 18px; font-size: 12px; font-weight: 800; color: #ff8a9c; text-align: center; margin-top: 8px; }
+      #gateGo { width: 100%; font-family: inherit; font-size: 15px; font-weight: 900; letter-spacing: 1.4px;
+        color: #0d0821; background: linear-gradient(180deg, #ffe07a, #ffc21f); border: none;
+        border-radius: 13px; padding: 13px; cursor: pointer; box-shadow: 0 4px 0 #c98d00; }
+      .gateCancel { width: 100%; margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 800;
+        letter-spacing: 1.2px; color: #c9a6ff; background: none; border: none; cursor: pointer; padding: 8px; }
       #shopLegal { font-size: 11px; font-weight: 700; line-height: 1.5; color: rgba(201,166,255,0.6);
         text-align: center; max-width: min(420px, 88vw); margin: 0 auto 44px; letter-spacing: 0.3px; }
       #spAct.busy { opacity: 0.6; pointer-events: none; }
@@ -749,8 +767,31 @@
         <div class="setTitle">SETTINGS</div>
         <button class="setRow" id="setSound"><span>🔊 SOUND</span><b>ON</b></button>
         <button class="setRow" id="setHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
+        <!-- Kids-category apps must not send data to a third party without
+             consent. This is default OFF and the row itself is behind the
+             parental gate, so a child cannot switch it on. -->
+        <button class="setRow" id="setStats"><span>📊 ANONYMOUS STATS</span><b>OFF</b></button>
+        <button class="setRow" id="setPrivacy"><span>🔒 PRIVACY POLICY</span><b>›</b></button>
         <div class="setNote">VOIDLING · the cute world ender<br>made for kids who like snacks 🍩</div>
         <button id="setClose">DONE</button>
+      </div>
+    </div>
+
+    <!-- ── parental gate ──────────────────────────────────────────────────
+         Apple requires an actual CHALLENGE in front of anything that spends
+         money or leaves the app — not a notice. The build previously had one
+         line of static text reading "ask a grown-up before you buy", which is
+         a sign, not a gate. Two-digit multiplication is the standard form: a
+         six-year-old cannot do it, an adult does not notice it. -->
+    <div id="gate">
+      <div class="setCard">
+        <div class="setTitle">ASK A GROWN-UP</div>
+        <div class="gateQ">What is<b id="gateSum">7 × 8 = ?</b></div>
+        <input id="gateIn" type="text" inputmode="numeric" autocomplete="off"
+               aria-label="answer" maxlength="4" />
+        <div class="gateErr" id="gateErr"></div>
+        <button id="gateGo">CONTINUE</button>
+        <button id="gateNo" class="gateCancel">NOT NOW</button>
       </div>
     </div>
 

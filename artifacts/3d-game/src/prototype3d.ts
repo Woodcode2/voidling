@@ -24,7 +24,10 @@ import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
-import { track, setCtx, countMatch, tickFrame, fpsSummary, resetFps } from './proto3d/telemetry';
+import {
+  track, setCtx, countMatch, tickFrame, fpsSummary, resetFps,
+  analyticsEnabled, setAnalyticsEnabled,
+} from './proto3d/telemetry';
 import { initIAP, iapPrice, iapAvailable, purchase as iapPurchase, restorePurchases } from './proto3d/store3d';
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
@@ -98,7 +101,15 @@ function fitShadow(dist: number) {
   // PCF smears it into a detached grey streak — dozens of them lying on open
   // ground with nothing above them. Capping the box at 110 roughly doubles the
   // resolution where the player actually is.
-  const target = THREE.MathUtils.clamp(dist * 1.1, 45, 110);
+  // …and the 110 cap is only right while the void is small. The camera reaches
+  // ~318 units at WORLD ENDER and sees roughly +/-150-190 units of ground, so
+  // everything past 110 fell outside the shadow frustum and rendered fully
+  // shadowed — a hard straight diagonal across the screen with the corner flat
+  // dark, in the last third of EVERY match. Crisp palm-frond shadows stop
+  // mattering once the hero is nineteen metres wide, so the cap opens up with
+  // the camera instead of fighting it.
+  const cap = dist > 150 ? 220 : dist > 90 ? 150 : 110;
+  const target = THREE.MathUtils.clamp(dist * 1.1, 45, cap);
   if (Math.abs(target - shCur) < 10) return;
   shCur = target;
   sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
@@ -1999,12 +2010,16 @@ renderRank();
 {
   const panel = el('settings');
   const sndRow = el('setSound'), hapRow = el('setHaptics');
+  const staRow = el('setStats');
   const paint = () => {
     const sOff = audio.isMuted();
     sndRow.classList.toggle('off', sOff);
     sndRow.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
     hapRow.classList.toggle('off', !hapticsOn);
     hapRow.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    const on = analyticsEnabled();
+    staRow.classList.toggle('off', !on);
+    staRow.querySelector('b')!.textContent = on ? 'ON' : 'OFF';
   };
   el('btnSettings').addEventListener('click', () => { paint(); panel.classList.add('show'); });
   el('setClose').addEventListener('click', () => panel.classList.remove('show'));
@@ -2015,7 +2030,63 @@ renderRank();
     localStorage.setItem('voidHaptics', hapticsOn ? '1' : '0');
     paint(); if (hapticsOn) buzz(30);
   });
+  // Consent is a grown-up's to give AND to take back, so the gate guards the
+  // switch in both directions — a child cannot turn it on, and cannot silently
+  // turn off a parent's choice either.
+  staRow.addEventListener('click', () => {
+    askGrownUp(() => { setAnalyticsEnabled(!analyticsEnabled()); paint(); });
+  });
+  // Leaving the app entirely is exactly what the gate is for.
+  el('setPrivacy').addEventListener('click', () => {
+    askGrownUp(() => { window.open('/privacy.html', '_blank', 'noopener'); });
+  });
 }
+// ── THE PARENTAL GATE ──────────────────────────────────────────────────────
+// Apple's Kids guidance requires a real CHALLENGE in front of anything that
+// spends money or leaves the app. What shipped was one line of static text
+// reading "ask a grown-up before you buy" — a sign, not a gate. Two-digit
+// multiplication is the standard form: a six-year-old cannot do it, an adult
+// does not notice it. The numbers are re-rolled every time so it cannot be
+// learned by repetition.
+const gateEl = el('gate');
+let gatePass: (() => void) | null = null;
+let gateAns = 0;
+/** Run `then` only if a grown-up answers the sum. */
+function askGrownUp(then: () => void): void {
+  // Two-digit x one-digit, never a times-table fact. 3 x 6 is homework for a
+  // seven-year-old; 17 x 8 is not something the target age does in their head
+  // while a grown-up is out of the room, and an adult answers it without
+  // thinking. Re-rolled every time, so it cannot be learned by repetition.
+  const a = 12 + Math.floor(Math.random() * 8);     // 12..19
+  const b = 6 + Math.floor(Math.random() * 4);      // 6..9
+  gateAns = a * b;
+  gatePass = then;
+  el('gateSum').textContent = `${a} × ${b} = ?`;
+  (el('gateIn') as HTMLInputElement).value = '';
+  el('gateErr').textContent = '';
+  gateEl.classList.add('show');
+  setTimeout(() => (el('gateIn') as HTMLInputElement).focus(), 60);
+}
+{
+  const go = () => {
+    const v = Number((el('gateIn') as HTMLInputElement).value.trim());
+    if (v === gateAns) {
+      gateEl.classList.remove('show');
+      const fn = gatePass; gatePass = null;
+      track('gate_pass', {});
+      fn?.();
+    } else {
+      el('gateErr').textContent = 'Not quite. Ask a grown-up to help.';
+      (el('gateIn') as HTMLInputElement).value = '';
+      audio.hit();
+    }
+  };
+  el('gateGo').addEventListener('click', go);
+  el('gateIn').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') go(); });
+  el('gateNo').addEventListener('click', () => { gatePass = null; gateEl.classList.remove('show'); track('gate_cancel', {}); });
+  gateEl.addEventListener('click', (e) => { if (e.target === gateEl) { gatePass = null; gateEl.classList.remove('show'); } });
+}
+
 // EXPLICIT debug params only skip the menu — arbitrary query strings on shared
 // links (?utm_source=…) must land on the real splash like any player
 if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'); beginMatch(); }
@@ -2169,14 +2240,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
         setTimeout(refreshPreview, 2000);
         return;
       }
-      buying = true; refreshPreview();
-      void iapPurchase(s.id, s.cash).then((res) => {
-        buying = false;
-        if (res === 'started') { spAct.textContent = 'CONFIRM IN THE APP STORE…'; return; }
-        if (res === 'granted') { audio.evolve(); refresh(); refreshPreview(); return; }
-        spAct.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!' : 'COULD NOT BUY — TRY AGAIN';
-        audio.hit();
-        setTimeout(refreshPreview, 2000);
+      // THE gate. Before this, the StoreKit sheet was three taps from the main
+      // menu with nothing but a line of text in between.
+      const price = s.cash;
+      askGrownUp(() => {
+        buying = true; refreshPreview();
+        void iapPurchase(s.id, price).then((res) => {
+          buying = false;
+          if (res === 'started') { spAct.textContent = 'CONFIRM IN THE APP STORE…'; return; }
+          if (res === 'granted') { audio.evolve(); refresh(); refreshPreview(); return; }
+          spAct.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!' : 'COULD NOT BUY — TRY AGAIN';
+          audio.hit();
+          setTimeout(refreshPreview, 2000);
+        });
       });
       return;
     }
@@ -2214,10 +2290,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   {
     const rb = el('btnRestore');
     rb.addEventListener('click', () => {
-      rb.textContent = 'RESTORING…';
-      void restorePurchases().then((ok) => {
-        rb.textContent = ok ? 'RESTORED ✓' : 'NOTHING TO RESTORE';
-        setTimeout(() => { rb.textContent = 'RESTORE PURCHASES'; }, 2400);
+      askGrownUp(() => {
+        rb.textContent = 'RESTORING…';
+        void restorePurchases().then((ok) => {
+          rb.textContent = ok ? 'RESTORED ✓' : 'NOTHING TO RESTORE';
+          setTimeout(() => { rb.textContent = 'RESTORE PURCHASES'; }, 2400);
+        });
       });
     });
   }
@@ -2802,8 +2880,18 @@ function animate() {
   }
   // sun follows the void so shadows stay crisp near the action (fixed high
   // noon — the sun never drops, the island never changes colour mid-match)
+  // A DIRECTIONAL LIGHT'S DIRECTION IS target MINUS position, so both ends have
+  // to travel together. The target followed the player and the position did
+  // not, which rotated the sun as you drove: measured 53.9 degrees of elevation
+  // at the island centre and 21.7 at the east edge — shadows more than doubled
+  // in length and swung about 180 degrees in azimuth depending on where the
+  // player was standing. This line already moved the position; the bug was that
+  // sunOff.y was used as an ABSOLUTE height while x and z were relative, so the
+  // triangle changed shape with distance from the origin. All three are now
+  // relative and the sun angle is fixed everywhere on the island.
   sun.position.set(voidState.x + sunOff.x, sunOff.y, voidState.z + sunOff.z);
   sun.target.position.set(voidState.x, 0, voidState.z);
+  sun.target.updateMatrixWorld();
 
   // evolution: form change on growth (with a flash), plus ring/glow via setStage
   const ns = stageFor(voidling.radius);

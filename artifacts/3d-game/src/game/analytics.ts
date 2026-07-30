@@ -20,16 +20,22 @@ const FLUSH_N = 20;
 function lsGet(k: string): string | null { try { return localStorage.getItem(k); } catch { return null; } }
 function lsSet(k: string, v: string): void { try { localStorage.setItem(k, v); } catch { /* session-only */ } }
 
-function stableId(): string {
-  let id = lsGet('vd_uid');
-  if (!id) {
-    id = 'u_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    lsSet('vd_uid', id);
-  }
-  return id;
-}
-
-const userId = stableId();
+// ── NO PERSISTENT IDENTIFIER. EVER. ────────────────────────────────────────
+// This used to mint a `vd_uid` into localStorage and send it with every batch,
+// which is a persistent per-install identifier — and under COPPA a persistent
+// identifier IS personal information when it is collected from a child. Apple's
+// Kids rule is blunter still: an app in that category "may not send personally
+// identifiable information OR DEVICE INFORMATION to third parties", and
+// Supabase is a third party.
+//
+// There is now no user id at all. Analytics is per-boot and anonymous: a random
+// session id that is never written to storage and cannot be joined across
+// launches. Retention has to be measured some other way, or not at all. That is
+// the correct trade for a game aimed at six-year-olds.
+//
+// The old key is actively deleted on load, so an install that already has one
+// stops sending it and does not keep it lying around.
+try { localStorage.removeItem('vd_uid'); } catch { /* ignore */ }
 const sessionId = 's_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const platform = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
   .Capacitor?.isNativePlatform?.() ? 'ios' : 'web';
@@ -38,7 +44,8 @@ let queue: Array<{ event: string; ts: number; props: Record<string, unknown> }> 
 let flushTimer: number | null = null;
 
 function payload(events: typeof queue): string {
-  return JSON.stringify({ user_id: userId, session_id: sessionId, app_version: APP_VERSION, platform, events });
+  // user_id is deliberately absent — see the note above.
+  return JSON.stringify({ session_id: sessionId, app_version: APP_VERSION, platform, events });
 }
 
 function flush(useBeacon = false): void {
@@ -62,8 +69,25 @@ function scheduleFlush(): void {
   flushTimer = window.setTimeout(() => { flushTimer = null; flush(); }, FLUSH_MS);
 }
 
+// ── OFF UNTIL A GROWN-UP SAYS OTHERWISE ────────────────────────────────────
+// Analytics used to start transmitting as an import side effect: first_open,
+// day_open, app_open and a device fingerprint all left the device BEFORE THE
+// FIRST FRAME RENDERED, before a child or a parent had seen anything. It is now
+// opt-in, default OFF, behind a settings row that lives behind a parental gate.
+const OPT_KEY = 'vd_analytics_on';
+let enabled = lsGet(OPT_KEY) === '1';
+/** Is anonymous analytics switched on? Default false. */
+export function analyticsEnabled(): boolean { return enabled; }
+/** Settings toggle. Turning it off also drops anything already queued. */
+export function setAnalyticsEnabled(on: boolean): void {
+  enabled = on;
+  lsSet(OPT_KEY, on ? '1' : '0');
+  if (!on) queue = [];
+}
+
 /** Queue an analytics event. Safe to call from anywhere, never throws. */
 export function logEvent(event: string, props: Record<string, unknown> = {}): void {
+  if (!enabled) return;
   queue.push({ event, ts: Date.now(), props });
   if (queue.length >= FLUSH_N) flush();
   else scheduleFlush();
@@ -84,15 +108,15 @@ export function bootAnalytics(version: string): void {
   if (booted) return;
   booted = true;
   APP_VERSION = version;
-  if (!lsGet('vd_first_open')) {
-    lsSet('vd_first_open', String(Date.now()));
-    logEvent('first_open', {});
-  }
-  // daily-return marker (D1/D7 computed server-side from these)
+  // first_open and the install date are GONE. `installed_at` existed to compute
+  // D1/D7 cohorts, which is longitudinal tracking of a child by definition.
+  // day_open stays because it carries nothing but the fact that a session began
+  // today, and it only sends at all once analytics has been switched on.
+  try { localStorage.removeItem('vd_first_open'); } catch { /* ignore */ }
   const today = new Date().toDateString();
   if (lsGet('vd_last_open_day') !== today) {
     lsSet('vd_last_open_day', today);
-    logEvent('day_open', { installed_at: Number(lsGet('vd_first_open')) || 0 });
+    logEvent('day_open', {});
   }
   logEvent('app_open', {});
 }

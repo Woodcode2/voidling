@@ -14,7 +14,9 @@
 //
 // Everything here is queued and batched by analytics.ts. A whole match costs
 // about a dozen events.
-import { bootAnalytics, logEvent } from '../game/analytics';
+import { bootAnalytics, logEvent, analyticsEnabled, setAnalyticsEnabled } from '../game/analytics';
+
+export { analyticsEnabled, setAnalyticsEnabled };
 
 // The 3D build's own version tag, so a funnel query can separate the two
 // products that share this table. Bump when the shape of the funnel changes.
@@ -93,15 +95,18 @@ export function resetFps(): void {
 }
 
 // ── device shape ────────────────────────────────────────────────────────────
-// Reported once, so every later event can be sliced by hardware class without
-// carrying the fields.
+// This used to report devicePixelRatio, the exact viewport, CPU core count,
+// device memory and touch capability. Together those are a DEVICE FINGERPRINT,
+// and Apple's Kids rule forbids sending device information to a third party
+// full stop — Supabase is a third party.
+//
+// The question it existed to answer was "was this child's device fast enough?",
+// and one coarse bucket answers that without identifying anything. A hardware
+// tier has a few thousand members; a fingerprint has one.
 {
   const nav = navigator as Navigator & { deviceMemory?: number };
-  track('device', {
-    dpr: Math.round((window.devicePixelRatio || 1) * 10) / 10,
-    w: window.innerWidth, h: window.innerHeight,
-    cores: nav.hardwareConcurrency ?? 0,
-    mem: nav.deviceMemory ?? 0,
-    touch: 'ontouchstart' in window,
-  });
+  const cores = nav.hardwareConcurrency ?? 0;
+  const mem = nav.deviceMemory ?? 0;
+  const tier = cores >= 8 && mem >= 6 ? 'high' : cores >= 4 && mem >= 3 ? 'mid' : 'low';
+  track('device', { tier });
 }
