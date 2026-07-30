@@ -8,7 +8,10 @@
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "safety": "node scripts/safety-scan.mjs"
+    "safety": "node scripts/safety-scan.mjs",
+    "vendor:assets": "node scripts/vendor-assets.mjs",
+    "check:assets": "node scripts/check-assets.mjs",
+    "build:ios": "npm run build && node scripts/check-assets.mjs dist && npx cap sync ios"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
