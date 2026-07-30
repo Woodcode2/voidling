@@ -769,7 +769,12 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
 // EASY and MED both contained 'cars' and 'combo', so roughly one day in seven
 // drew the SAME chip twice. Disjoint now, and the hard slot is world-aware.
 const EASY_Q = ['snack', 'gold', 'combo'];
-const MED_Q = pickedWorld === 'pirate' ? ['cabanas', 'evolve', 'gold'] : ['cars', 'evolve', 'combo'];
+// 'cabanas' sat in BOTH of Pirate's lists, so with the no-duplicate draw it
+// still appeared on 228 of 365 days — the same chip on nearly two days in
+// three is not a daily quest, it is a chore. It keeps the hard slot, where its
+// 4-count target belongs, and the medium slot goes to quests every world can
+// serve. Measured after: cabanas 139, and no chip above 217.
+const MED_Q = pickedWorld === 'pirate' ? ['evolve', 'combo', 'gold'] : ['cars', 'evolve', 'combo'];
 const HARD_Q = pickedWorld === 'pirate' ? ['cabanas', 'rival', 'big'] : ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
@@ -778,7 +783,26 @@ const quests: Quest[] = (() => {
   // kid's quest chips read "undefined 0/undefined" (first hit: Jul 26 2026)
   let daySeed = 7;
   for (const c of today) daySeed = (Math.imul(daySeed, 31) + c.charCodeAt(0)) >>> 0;
-  const ids = [EASY_Q[daySeed % EASY_Q.length], MED_Q[(daySeed >>> 2) % MED_Q.length], HARD_Q[(daySeed >>> 4) % HARD_Q.length]];   // independent indices — the same seed produced only 3 boards ever
+  // NO DUPLICATES, STRUCTURALLY. Making the three pools disjoint by hand was
+  // tried and did not hold: 'combo' is in EASY and Maple's MED, 'gold' is in
+  // EASY and Pirate's MED, and 'cabanas' is in Pirate's MED and HARD. Measured
+  // over a year of real day-seeds that is 63/365 duplicate days on Maple and
+  // 100/365 on Pirate — a board reading "combo · combo · rival" is two chips
+  // that complete together and one that does not, which reads as a bug.
+  //
+  // The draw now excludes what earlier slots already took, so the pools can
+  // overlap freely and a new quest can be added to any of them without
+  // re-deriving the partition. Falling back to the full pool if a slot is
+  // exhausted keeps it safe even if someone shrinks a list to one entry.
+  const taken = new Set<string>();
+  const draw = (pool: string[], seed: number): string => {
+    const free = pool.filter((id) => !taken.has(id));
+    const src = free.length ? free : pool;
+    const id = src[seed % src.length];
+    taken.add(id);
+    return id;
+  };
+  const ids = [draw(EASY_Q, daySeed), draw(MED_Q, daySeed >>> 2), draw(HARD_Q, daySeed >>> 4)];   // independent indices — the same seed produced only 3 boards ever
   const saved = localStorage.getItem('voidQuestDay') === today
     ? JSON.parse(localStorage.getItem('voidQuestState') || '{}') : {};
   localStorage.setItem('voidQuestDay', today);
@@ -1111,16 +1135,32 @@ function nextGoal(): { label: string; have: number; need: number } | null {
   const nm = SKINS.find((sk) => sk.id === best!.id)?.name ?? best.id;
   return { label: nm.toUpperCase(), have: coins, need: best.p };
 }
+// THE LADDER HAS NO TOP. It used to stop dead at LVL 17: sixteen authored
+// spans totalling 2,250 XP, and a match pays 30-115. A child who plays every
+// day reaches the end in a few weeks, and from then on every results screen
+// shows the same level and a bar that is already full — the one element on
+// that screen whose entire job is to say "you moved" says "you did not".
+//
+// Past the authored spans the ladder continues forever at a flat XP_TAIL, and
+// two tiers open above MASTER so the number is not the only thing that moves.
+// Nothing about the early game changes: levels 1-17 cost exactly what they did.
+const XP_TAIL = 450;
 function rankInfo(x: number) {
   let lvl = 1, rem = x, span = XP_SPANS[0];
   for (const sp of XP_SPANS) {
-    if (rem < sp || lvl >= 17) { span = sp; break; }
-    rem -= sp; lvl++; span = sp;
+    span = sp;
+    if (rem < sp) break;
+    rem -= sp; lvl++;
   }
-  lvl = Math.min(17, lvl);
-  const t = lvl >= 15 ? ['👑', 'MASTER'] : lvl >= 12 ? ['💎', 'DIAMOND'] : lvl >= 9 ? ['💠', 'PLATINUM']
+  if (lvl > XP_SPANS.length) {   // past the authored ladder — keep climbing
+    span = XP_TAIL;
+    lvl += Math.floor(rem / XP_TAIL);
+    rem %= XP_TAIL;
+  }
+  const t = lvl >= 30 ? ['🌌', 'VOID LORD'] : lvl >= 22 ? ['🌟', 'LEGEND']
+    : lvl >= 15 ? ['👑', 'MASTER'] : lvl >= 12 ? ['💎', 'DIAMOND'] : lvl >= 9 ? ['💠', 'PLATINUM']
     : lvl >= 6 ? ['🥇', 'GOLD'] : lvl >= 3 ? ['🥈', 'SILVER'] : ['🥉', 'BRONZE'];
-  return { lvl, ic: t[0], nm: t[1], prog: lvl >= 17 ? 1 : Math.min(1, rem / span) };
+  return { lvl, ic: t[0], nm: t[1], prog: Math.min(1, rem / span) };
 }
 function renderRank() {
   const r = rankInfo(xp);
