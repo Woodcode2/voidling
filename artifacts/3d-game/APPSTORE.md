@@ -130,14 +130,22 @@ non-consumables, and a child moving to a new iPad genuinely needs it.
 ```bash
 cd artifacts/3d-game
 pnpm install
-node scripts/vendor-assets.mjs       # REQUIRED — see below. 51 art files
+pnpm build:ios          # vendor art -> build -> verify art -> sync into iOS
+npx cap open ios        # opens Xcode
+```
+
+`build:ios` is those four steps in order:
+
+```bash
+node scripts/vendor-assets.mjs       # downloads 51 art files into public/
 pnpm build                           # web build -> dist/
 node scripts/check-assets.mjs dist   # refuses to continue if art is missing
 npx cap sync ios                     # copies dist/ into the iOS shell
-npx cap open ios                     # opens Xcode
 ```
 
-`pnpm build:ios` runs the last four in order.
+Vendoring skips anything already on disk, so re-running costs one directory
+listing. Run it on the same Mac you archive from — it needs ordinary internet
+access and nothing else.
 
 ### The vendoring step is not optional
 

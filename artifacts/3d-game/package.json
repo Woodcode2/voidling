@@ -11,7 +11,7 @@
     "safety": "node scripts/safety-scan.mjs",
     "vendor:assets": "node scripts/vendor-assets.mjs",
     "check:assets": "node scripts/check-assets.mjs",
-    "build:ios": "npm run build && node scripts/check-assets.mjs dist && npx cap sync ios"
+    "build:ios": "node scripts/vendor-assets.mjs && npm run build && node scripts/check-assets.mjs dist && npx cap sync ios"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
