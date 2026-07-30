@@ -945,11 +945,18 @@ export function createRivals(
           } else if (rv.cst === 1 && rv.ctim <= 0) { rv.cst = 2; rv.ctim = 2.6; }
           else if (rv.cst === 2) {
             // a whisker away and still empty-jawed: bank the near miss
-            if (dp < rv.r * 1.5 && dp > rv.r * 0.85) rv.missPend = true;
+            // THE WHIFF IS THE POINT, AND IT ALMOST NEVER FIRED. Measured
+            // once in eleven matches. The band was 0.85r-1.5r, which is barely
+            // wider than the bite itself, so a lunge that missed by a body
+            // length registered as nothing at all. Widened: a charge that ends
+            // anywhere near the player now banks the beat the whole arc is
+            // built around — and unlike a bite it costs the child nothing, so
+            // it can afford to be generous.
+            if (dp < rv.r * 2.4 && dp > rv.r * 0.9) rv.missPend = true;
             if (rv.ctim <= 0) {
               rv.cst = 3; rv.ctim = 1.7;
               if (rv.missPend && rv.missCd <= 0) {
-                rv.missCd = 12; api.onNearMiss?.(rv.name, rv.x, rv.z);
+                rv.missCd = 7; api.onNearMiss?.(rv.name, rv.x, rv.z);   // was 12: at most one whiff a match
               }
               rv.missPend = false;
             }
@@ -1105,7 +1112,13 @@ export function createRivals(
         // player was warned about and failed to dodge, which caps it at one per
         // charge cycle and makes every one of them a beat with a cause.
         const canBite = !isHunter || !hunting || rv.cst === 2;
-        if (rv.r > pr * 1.2 && dp < rv.r * 0.85 && rv.biteCd <= 0 && canBite) {
+        // …and 0.85r asked the player's CENTRE to be inside 0.85 of the
+        // hunter's radius while she is only 1.5x their size — a near-total
+        // overlap, during a 2.6s lunge, against a moving target. Two bites in
+        // eleven matches, on the one character the banner promises "CHASES
+        // you". At 1.05r she connects when she actually reaches you, which is
+        // still only ever out of a telegraphed charge you were warned about.
+        if (rv.r > pr * 1.2 && dp < rv.r * 1.05 && rv.biteCd <= 0 && canBite) {
           // ── WHAT A BITE COSTS ───────────────────────────────────────────────
           // -12% radius was undone by the score floor within a frame or two, so
           // being caught was free and the family had no teeth at all. A bite now
@@ -1152,7 +1165,15 @@ export function createRivals(
         // extra steps. Radius is unaffected (it comes from growR and is held at
         // 0.78x the player by softCap), so they stay believable competitors
         // rather than tiny voids with enormous numbers.
-        const band = THREE.MathUtils.clamp(Math.sqrt(off), 0.50, 8);
+        // 8 was not enough with a FULL cast. Measured you/top across three
+        // matches: 1.95x with three rivals, 2.29x with four, 3.45x with five —
+        // because five siblings compete for the same props, so each one eats
+        // less and falls further behind a target it can only reach by eating.
+        // The ceiling has to cover the worst case, not the average. It only
+        // engages when a rival is far behind its lane, which is exactly when it
+        // should; a rival at target sits near 1.0 and one ahead is throttled to
+        // 0.5, both unchanged.
+        const band = THREE.MathUtils.clamp(Math.sqrt(off), 0.50, 16);
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;

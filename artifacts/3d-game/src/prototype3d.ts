@@ -1693,8 +1693,18 @@ function beginMatch(solo = false) {
 // loading bar until every pack mesh is resident, so a match never starts
 // with stand-in geometry visible (hole.io's load-then-play flow)
 let packReady = false;
+// THE BAR REWOUND. When the 12-second bail-out below won the Promise.race it
+// wrote 100%, and this callback — still firing, because the pack keeps
+// downloading — immediately overwrote it with the true, lower number. A child
+// watched the bar reach 100% and then snap back to 48%, and the match started
+// anyway, which defeats the whole point of the gate. It is also latched
+// monotonic: a progress bar that goes backwards reads as a fault.
+let loadFinal = false, loadPct = 0;
 const preloadP = preloadPack((done, total) => {
+  if (loadFinal) return;
   const pct = Math.round((done / total) * 100);
+  if (pct <= loadPct) return;
+  loadPct = pct;
   el('lBar').style.width = pct + '%';
   el('lPct').textContent = pct + '%';
 }).then(() => { packReady = true; });
@@ -1724,6 +1734,7 @@ function withWorldReady(cb: () => void) {
   Promise.race([preloadP, new Promise((r) => setTimeout(r, 12000))]).then(() => {
     track('load_wait', { ms: Math.round(performance.now() - waitT0) });
     packReady = true;
+    loadFinal = true;   // …and nothing may write the bar after this
     el('lBar').style.width = '100%'; el('lPct').textContent = '100%';
     setTimeout(() => { scr.classList.remove('show'); cb(); }, 300);
   });
@@ -2392,9 +2403,41 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
 // model, same as the 2D shop); owned + equipped persist across sessions
 {
   const grid = el('shopGrid');
-  const owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'));
+  // ── SAVE MIGRATION ────────────────────────────────────────────────────────
+  // The catalogue went from 25 skins to 15. Anyone who played before that has
+  // ids in voidSkinsOwned that no longer exist, and — the part that actually
+  // breaks — if their EQUIPPED skin was one of the cut ones, `owned.has(id)`
+  // is still true, so the guard below never fires, no card ever renders as
+  // EQUIPPED, and setSkin is never called. They are wearing a skin the shop
+  // cannot show them and cannot change.
+  //
+  // Small population today; unfixable after launch. The version key means the
+  // next catalogue change gets a place to hang its own migration.
+  const SAVE_VER = 2;
+  const knownSkin = new Set(SKINS.map((sk) => sk.id));
+  {
+    const ver = Number(localStorage.getItem('voidSaveVer') || 0);
+    if (ver < SAVE_VER) {
+      try {
+        const raw = JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]') as string[];
+        const kept = raw.filter((id) => knownSkin.has(id));
+        if (!kept.includes('classic')) kept.push('classic');
+        if (kept.length !== raw.length) {
+          localStorage.setItem('voidSkinsOwned', JSON.stringify(kept));
+          track('save_migrated', { from: ver, dropped: raw.length - kept.length });
+        }
+      } catch { localStorage.setItem('voidSkinsOwned', '["classic"]'); }
+      const eq = localStorage.getItem('voidSkin');
+      if (eq && !knownSkin.has(eq)) localStorage.setItem('voidSkin', 'classic');
+      localStorage.setItem('voidSaveVer', String(SAVE_VER));
+    }
+  }
+  let owned: Set<string>;
+  try { owned = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]')); }
+  catch { owned = new Set(['classic']); }
+  owned.add('classic');   // the free one can never be missing
   let equipped = localStorage.getItem('voidSkin') || 'classic';
-  if (!owned.has(equipped)) equipped = 'classic';
+  if (!owned.has(equipped) || !knownSkin.has(equipped)) equipped = 'classic';
   const cards = new Map<string, HTMLElement>();
   const refresh = () => {
     for (const s of SKINS) {
