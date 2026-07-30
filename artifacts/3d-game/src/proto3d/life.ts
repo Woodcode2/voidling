@@ -209,6 +209,49 @@ export interface Life { update(dt: number, t: number, vx: number, vz: number, vR
 // ── mesh factories ─────────────────────────────────────────────────────────────
 // one set of trim materials for the whole fleet. Every car used to allocate six
 // of its own, which is 300-odd materials on a full Maple street grid.
+// ── ROUNDED BOX ─────────────────────────────────────────────────────────────
+// The townsfolk got a documented fidelity pass and the traffic never did.
+// Measured side by side at gameplay framing: a pedestrian is 1,052 triangles
+// filling 121 screen px (8.7 tris/px); the car parked beside them is a stack of
+// hard-edged BoxGeometry at 0.97 tris/px. Nothing about a car is hard-edged in
+// real life, and a bare box reads as unfinished next to a smooth-shaded person
+// — which is exactly the "blocky, not HD" the owner reported, pointing at cars.
+//
+// A box, then every vertex pushed out onto the surface of its own corner
+// radius. Cheap (a 3-segment box is ~200 triangles), exact, and it keeps the
+// silhouette a child recognises as a car. Geometries are cached by shape, so a
+// thirty-car fleet costs one buffer per distinct body part.
+const _rbox = new Map<string, THREE.BufferGeometry>();
+export function roundedBox(w: number, h: number, d: number, r: number, seg = 3): THREE.BufferGeometry {
+  const key = `${w}|${h}|${d}|${r}|${seg}`;
+  const hit = _rbox.get(key);
+  if (hit) return hit;
+  const g = new THREE.BoxGeometry(w, h, d, seg, seg, seg);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  // never let the radius exceed half of the smallest side, or the shape inverts
+  const rr = Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4);
+  const ix = w / 2 - rr, iy = h / 2 - rr, iz = d / 2 - rr;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    // the nearest point on the inner box…
+    const cx = Math.max(-ix, Math.min(ix, v.x));
+    const cy = Math.max(-iy, Math.min(iy, v.y));
+    const cz = Math.max(-iz, Math.min(iz, v.z));
+    // …then step out along the corner radius from there
+    const dx = v.x - cx, dy = v.y - cy, dz = v.z - cz;
+    const len = Math.hypot(dx, dy, dz);
+    if (len > 1e-6) {
+      const k = rr / len;
+      pos.setXYZ(i, cx + dx * k, cy + dy * k, cz + dz * k);
+    }
+  }
+  pos.needsUpdate = true;
+  g.computeVertexNormals();   // smooth shading across the fillet
+  _rbox.set(key, g);
+  return g;
+}
+
 const _carBody = new Map<number, THREE.MeshStandardMaterial>();
 const carBodyMat = (c: number) => {
   let m = _carBody.get(c);
@@ -228,13 +271,13 @@ function makeCar(): THREE.Group {
   // 7.1 long and 3.4 tall next to a 3.5-unit pedestrian: a car the height of a
   // person and barely twice their length. Stretched to 9.1 and dropped to 3.1,
   // which is where a real saloon sits against a real adult.
-  const body = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.4, 2.9), bodyMat);
+  const body = new THREE.Mesh(roundedBox(7.2, 1.4, 2.9, 0.34), bodyMat);
   body.position.y = 1.18; g.add(body);
-  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 2.7), bodyMat);
+  const hood = new THREE.Mesh(roundedBox(1.9, 1.0, 2.7, 0.26), bodyMat);
   hood.position.set(3.35, 1.05, 0); g.add(hood);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.7, 1.25, 2.55), CAR_GLASS);
+  const cabin = new THREE.Mesh(roundedBox(3.7, 1.25, 2.55, 0.28), CAR_GLASS);
   cabin.position.set(-0.65, 2.35, 0); g.add(cabin);
-  const roofM = new THREE.Mesh(new THREE.BoxGeometry(3.45, 0.18, 2.5), bodyMat);
+  const roofM = new THREE.Mesh(roundedBox(3.45, 0.18, 2.5, 0.08), bodyMat);
   roofM.position.set(-0.65, 3.02, 0); g.add(roofM);
   // headlights + taillights
   for (const sz of [-0.95, 0.95]) {

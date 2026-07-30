@@ -32,10 +32,21 @@ import { initIAP, iapPrice, iapAvailable, purchase as iapPurchase, restorePurcha
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-// 1.6 is visually indistinguishable at mobile viewing distance but ~35% fewer
-// pixels than 2.0 — the single biggest lag lever on phones.
+// THE "NOT HD" BUG. This was hard-capped at 1.3 on every touch device — and
+// the adaptive ladder below re-clamped to 1.3 as well, so even the TOP quality
+// rung could not exceed it. Measured on a 390x844 iPhone viewport: a drawing
+// buffer of 507x1097, which is 18.8% of the device's actual pixel count, then
+// upscaled 2.31x by the compositor. Every edge in the game crossed four device
+// pixels instead of one. It was not the models that looked soft first — it was
+// all of them, in every frame, including the UI-adjacent 3D.
+//
+// The ladder is the right mechanism and it already steps down within four
+// seconds below 46fps, so the ceiling can simply be raised: a device that
+// cannot hold 2.0 lands back on 1.3 by itself, which is exactly where it is
+// today. Nothing gets worse; most things get much sharper.
 const IS_SMALL_SCREEN = matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? 1.3 : 1.6));
+const PR_TOP = 2;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, PR_TOP));
 renderer.shadowMap.autoUpdate = false;   // half-rate shadow pass (updated in the frame loop)
 let shadowFrame = 0;
 // if the OS ever reclaims the GPU context, recover with a clean reload instead
@@ -46,7 +57,15 @@ renderer.domElement.addEventListener('webglcontextlost', (ev) => {
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// PCFSoftShadowMap is DEPRECATED in three 0.185 — WebGLShadowMap substitutes
+// PCFShadowMap and logs a warning on every launch (three.module.js:9148). So
+// the lighting was authored against a soft filter and has been shipping a hard
+// one for as long as the dependency has been current, silently. Ask for what
+// we actually get, and buy the softness back with resolution instead: the
+// shadow map now runs at the top of the quality ladder, and the frustum is
+// already distance-capped by fitShadow(), so those texels land where the
+// player is looking.
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
@@ -121,16 +140,19 @@ scene.add(sun); scene.add(sun.target);
 // ── adaptive quality: hold a smooth frame rate on ANY device ─────────────────
 // samples real fps and walks a quality ladder (pixel ratio → shadow res →
 // shadows off). Climbing back up is slow and rare so it never oscillates.
+// Each rung carries its own phone value now. The old code applied
+// Math.min(q.pr, 1.3) on touch devices, which flattened the whole ladder to a
+// single blurry rung and made three of the four entries unreachable.
 const QUALITY = [
-  { pr: 1.6, shadows: true, shSize: 2048 },
-  { pr: 1.35, shadows: true, shSize: 1024 },
-  { pr: 1.15, shadows: true, shSize: 1024 },
-  { pr: 1.0, shadows: false, shSize: 512 },
+  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048 },
+  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024 },
+  { pr: 1.35, prSmall: 1.3, shadows: true, shSize: 1024 },
+  { pr: 1.15, prSmall: 1.0, shadows: false, shSize: 512 },
 ];
 let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
 function applyQuality() {
   const q = QUALITY[qLevel];
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? Math.min(q.pr, 1.3) : q.pr));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? q.prSmall : q.pr));
   if (renderer.shadowMap.enabled !== q.shadows) {
     renderer.shadowMap.enabled = q.shadows;
     sun.castShadow = q.shadows;

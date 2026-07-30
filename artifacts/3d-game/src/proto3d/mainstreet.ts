@@ -14,6 +14,7 @@
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
 import { part, mergedProp } from './island';
+import { roundedBox } from './life';
 
 // ── determinism ────────────────────────────────────────────────────────────
 // "Consistency is key here. Always the same for every load." Maple Falls is
@@ -105,6 +106,8 @@ const DENIM = [0x40567a, 0x5a6070, 0x8a6a4a, 0x2f3a52] as const;
 
 type G = THREE.BufferGeometry;
 const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
+// vehicles get the fillet the buildings do not need — see life.ts roundedBox
+const rbox = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, r);
 const cyl = (rt: number, rb: number, h: number, s = 8) => new THREE.CylinderGeometry(rt, rb, h, s);
 const cone = (r: number, h: number, s = 8) => new THREE.ConeGeometry(r, h, s);
 const sph = (r: number, s = 8, t = 6) => new THREE.SphereGeometry(r, s, t);
@@ -1278,18 +1281,23 @@ export function makePlanter(): THREE.Mesh {
 export function makePickup(): THREE.Mesh {
   const col = mpick([0x3f7a4e, 0x2f4a7a, 0x8c5a4a, 0xd8d2c4, RED]);
   return M([
-    part(box(5.6, 1.3, 2.4), col, 0, 1.5, 0),
-    part(box(2.4, 1.3, 2.3), col, -0.6, 2.6, 0),
-    part(box(2.2, 1.1, 2.35), GLASS, -0.6, 2.65, 0),
-    part(box(2.8, 0.9, 2.4), col, 2, 2, 0),                              // bed sides
-    part(box(2.6, 0.4, 2.1), 0x4a4a52, 2, 2.1, 0),
-    part(box(5.8, 0.35, 2.5), 0x3a3a42, 0, 0.9, 0),
-    part(cyl(0.62, 0.62, 0.45, 10), 0x2c2438, -1.7, 0.62, 1.2, 0, 0, Math.PI / 2),
-    part(cyl(0.62, 0.62, 0.45, 10), 0x2c2438, -1.7, 0.62, -1.2, 0, 0, Math.PI / 2),
-    part(cyl(0.62, 0.62, 0.45, 10), 0x2c2438, 2.1, 0.62, 1.2, 0, 0, Math.PI / 2),
-    part(cyl(0.62, 0.62, 0.45, 10), 0x2c2438, 2.1, 0.62, -1.2, 0, 0, Math.PI / 2),
-    part(box(0.4, 0.4, 2), NEON_GOLD, -2.9, 1.7, 0),
-    part(box(1.1, 0.7, 0.08), mchance(0.5) ? RED : BLUE, 3.35, 2.1, 0),  // bumper sticker energy
+    part(rbox(5.6, 1.3, 2.4, 0.3), col, 0, 1.5, 0),
+    part(rbox(2.4, 1.3, 2.3, 0.26), col, -0.6, 2.6, 0),
+    part(rbox(2.2, 1.1, 2.35, 0.2), GLASS, -0.6, 2.65, 0),
+    part(rbox(2.8, 0.9, 2.4, 0.16), col, 2, 2, 0),                       // bed sides
+    part(rbox(2.6, 0.4, 2.1, 0.1), 0x4a4a52, 2, 2.1, 0),
+    part(rbox(5.8, 0.35, 2.5, 0.1), 0x3a3a42, 0, 0.9, 0),
+    part(cyl(0.62, 0.62, 0.45, 18), 0x2c2438, -1.7, 0.62, 1.2, 0, 0, Math.PI / 2),
+    part(cyl(0.62, 0.62, 0.45, 18), 0x2c2438, -1.7, 0.62, -1.2, 0, 0, Math.PI / 2),
+    part(cyl(0.62, 0.62, 0.45, 18), 0x2c2438, 2.1, 0.62, 1.2, 0, 0, Math.PI / 2),
+    part(cyl(0.62, 0.62, 0.45, 18), 0x2c2438, 2.1, 0.62, -1.2, 0, 0, Math.PI / 2),
+    part(rbox(0.4, 0.4, 2, 0.1), NEON_GOLD, -2.9, 1.7, 0),
+    // THE TAILGATE PLATE. This was box(1.1, 0.7, 0.08) at x = 3.35 — a card 1.1
+    // units LONG and 0.08 thin, spanning x 2.80..3.90 while the bed it is meant
+    // to sit on ends at 3.40. Half a world unit of it hung in open air off the
+    // back of every pickup in town, including a whole parked row. It is a
+    // tailgate sticker: thin along X, tall in Y, wide in Z, flush to the bed.
+    part(rbox(0.08, 0.5, 1.3, 0.04), mchance(0.5) ? RED : BLUE, 3.36, 2.15, 0),
   ]);
 }
 
