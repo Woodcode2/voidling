@@ -283,7 +283,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   announceFam(marquee
     ? `🏆 you OUT-GOBBLED THE CHASER! +${pts}`
     : `🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
-  if (marquee) { breakingNews('one hole has eaten the other. there is one left. it is bigger.'); addCoins(35); }
+  if (marquee) { breakingNews('One hole has eaten the other. There is one left. It is bigger.'); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -373,7 +373,7 @@ rivals.onNearMiss = (name, x, z) => {
 };
 rivals.onStuffed = (name) => {
   announceFam(`🍰 ${name} is TOO FULL to chase — now is your chance!`);
-  breakingNews('the second hole has stopped moving. it looks full. it looks slow.');
+  breakingNews('The second hole has stopped moving. It looks full. It looks slow.');
   audio.ready();
 };
 const audio = createAudio();
@@ -817,20 +817,20 @@ let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
 // three-beat spine, told as election night.
 const MAPLE_BEATS = [
   { at: 32, dur: 15, mult: 2, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
-    banner: '🥧 BAKE SALE RUSH! everything is DOUBLE!', news: 'PEARL opens the bake sale. rival pies appear instantly' },
+    banner: '🎺 BAND PRACTICE! Everything is DOUBLE!', news: 'The marching band is out. They know one song. Here it comes.' },
   { at: 95, dur: 18, mult: 2, fired: false, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    banner: '📣 TOWN PARADE! the whole town is OUT!', news: 'the parade sets off. DINKLE calls it a scheduling matter' },
+    banner: '📣 TOWN PARADE! The whole town is OUT!', news: 'The parade has started. The mayor calls it a scheduling matter.' },
   { at: 150, dur: 30, mult: 3, fired: false, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
-    banner: '🥧 PIE JUDGING! everything is TRIPLE!', news: 'the judging begins. PEARL is judging her own pie again' },
+    banner: '🐐 THE GOAT IS LOOSE! Everything is TRIPLE!', news: 'The goat is out again. Nobody is chasing it. Everybody is watching.' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
 const PIRATE_BEATS: typeof MAPLE_BEATS = [
   { at: 32, dur: 15, mult: 2, fired: false, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
-    banner: '🍦 ICE CREAM HOUR! everything is worth DOUBLE!', news: 'ice cream hour declared. the ice cream hut is delighted' },
+    banner: '🍦 ICE CREAM HOUR! Everything is DOUBLE!', news: 'Ice cream hour has been declared. The ice cream hut is delighted.' },
   { at: 95, dur: 18, mult: 2, fired: false, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
-    banner: '🪩 DANCE PARTY! the whole bay is MOVING!', news: 'DJ Coconut drops the big one. floor shakes' },
+    banner: '🪩 DANCE PARTY! The whole bay is MOVING!', news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
   { at: 150, dur: 30, mult: 3, fired: false, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
-    banner: '🏴‍☠️ TREASURE HUNT! everything is TRIPLE!', news: 'the treasure hunt begins. bring a bucket and a spade' },
+    banner: '🏴‍☠️ TREASURE HUNT! Everything is TRIPLE!', news: 'The treasure hunt has begun. The map is still wrong.' },
 ];
 const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = {
@@ -1050,7 +1050,7 @@ function refreshHud() {
   for (const e of edibles) { total++; if (e.eaten || !e.mesh.visible) { consumed++; if (e.mesh.userData.byPlayer) mine++; } }
   if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
-  if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. gone.'); }
+  if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. Gone.'); }
   // A LINEAR PERCENTAGE OVER 3,286 PROPS IS A METER THAT SAYS ZERO. One percent
   // costs 33 props, so a child who has eaten two hundred things reads "6%", and
   // for the whole first half-minute the biggest number on their screen is 0.
@@ -1360,8 +1360,8 @@ function capture(e: Edible, giveHunger = true) {
   if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana');
   if (qk) questEvent(qk);
   if (comboMult >= 2) questEvent('combo');
-  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! crunch.'); breakingNews('it ate a house. a WHOLE house. we have questions.'); }
-  if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 first car! tastes like vroom'); }
+  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews('It ate a house. A WHOLE house. We have questions.'); }
+  if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -1560,12 +1560,20 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
  *  generation CDN. The same path the legendary shop cards already use, and the
  *  reason nothing has to be vendored into the bundle.
  *
- *  ALTERNATES, if any of these three misses: swap the filename. Maple's second
- *  take is hf_20260730_000250_edb19107-6160-42ab-8ab0-f9629e9687a9.png and the
- *  bay's is hf_20260730_000310_403f5eb7-57e7-40be-a75e-dd152c124618.png. */
+ *  SECOND PASS. The first set had two faults, both visible the moment they were
+ *  on a real phone: the hero was dead-centre so the title landed on the void's
+ *  face, and the Pirate Bay illustration had painted a "TIKI DRINKS" sign into
+ *  the scene — an alcohol reference sitting in the ART, immediately after a
+ *  sweep that removed twelve of them from the TEXT. These are regenerated with
+ *  the void in the upper middle, a deliberately empty bottom third for the
+ *  title plate, and signage of any kind forbidden outright.
+ *
+ *  ALTERNATES, if one still misses: Maple's second take is
+ *  hf_20260730_125858_e31cc3b1-18ca-4e17-a47a-26ead66b54ff.png and the bay's is
+ *  hf_20260730_125832_499e6122-b092-4923-aa0e-f2b40d65ba33.png. */
 const CARD_ART: Record<string, string> = {
-  maple: '/assets/hf/hf_20260730_000250_b58a695b-4bbd-487e-9858-326f39e8ba59.png',
-  pirate: '/assets/hf/hf_20260730_000310_2f7abb84-dc7c-4c3a-9ecd-31736931ac2c.png',
+  maple: '/assets/hf/hf_20260730_125858_a0ff7398-b424-4a8d-b93d-c96d690d6a3c.png',
+  pirate: '/assets/hf/hf_20260730_125831_be23864c-a25f-4149-875e-84a31aa15e85.png',
   frost: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
@@ -2281,7 +2289,7 @@ function animate() {
       }
       if (feverT > 0) {
         feverT -= dt;
-        if (feverT <= 0) { feverMult = 1; announce('…rush over. keep eating!'); }
+        if (feverT <= 0) { feverMult = 1; announce('Rush over. Keep eating!'); }
       }
     }
     if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
@@ -2822,10 +2830,10 @@ function animate() {
       fx.ring(voidState.x, voidState.z, 0xffd23f, R * 6.5, 1.0);
       fx.flash('#ffffff', 0.55);
       fx.shake(1.1);
-      announce('🌑 WORLD ENDER — the island is OVER');
+      announce('🌑 WORLD ENDER! The island is OVER.');
       breakingNews(pickedWorld === 'pirate'
-        ? 'PIRATE BAY is CANCELLED!! it was lovely while it lasted.'
-        : 'MAPLE FALLS: both candidates concede!! to the hole.');
+        ? 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.'
+        : 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.');
       buzz(120);
     }
   }

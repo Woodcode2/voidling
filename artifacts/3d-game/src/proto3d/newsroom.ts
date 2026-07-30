@@ -3,41 +3,56 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //
 //  ┌──────────────────────────────────────────────────────────────────────────┐
-//  │  HOUSE STYLE. ONE RULE. EVERY LINE OBEYS IT. NO EXCEPTIONS.              │
+//  │  HOUSE STYLE — REWRITTEN. READ THIS BEFORE YOU TOUCH A LINE.             │
+//  │  The old rule said "the body is LOWER CASE, always, including the first  │
+//  │  word". That rule is DEAD. It made the ticker read like a broken robot   │
+//  │  and it is the reason the newsfeed was rejected twice.                   │
 //  ├──────────────────────────────────────────────────────────────────────────┤
-//  │  1. THE BODY IS LOWER CASE. Always — including the first word of the     │
-//  │     line. The ticker is a voice, not a headline.                         │
-//  │  2. ALL CAPS IS THE JOKE OR THE PANIC. Never more than TWO capitalised   │
-//  │     words in a line, and most lines have none. Caps is the punchline     │
-//  │     landing, so if everything is capitalised nothing is.                 │
-//  │  3. A NAME IS CAPS. The recurring cast are always capitalised —          │
-//  │     CAPT. ROGER, NIGEL, BARNABY — as is PIRATE BAY, the resort itself.   │
-//  │     Cast names do NOT count against the two-word caps budget.            │
-//  │     Everything else — districts, places, things — is lower case.         │
-//  │  4. PUNCTUATION ESCALATES WITH THE BEAT. This is how the arc is *felt*   │
-//  │     rather than merely described:                                        │
+//  │  1. WRITE PROPER ENGLISH SENTENCES. Capital letter at the start. Full    │
+//  │     stop at the end. Proper nouns capitalised normally — Capt. Roger,    │
+//  │     Nigel, Pirate Bay, Sunset Beach. NOT in caps. Title case.            │
+//  │  2. CAPS IS THE JOKE OR THE PANIC, and nothing else. At most TWO         │
+//  │     capitalised words in a line, and most lines have none. {TOKENS} do   │
+//  │     not count — the game supplies those in caps.                         │
+//  │  3. ONE JOKE PER LINE. Concrete nouns. An animal doing something daft,   │
+//  │     a grown-up refusing to admit the obvious, something enormous         │
+//  │     described as normal, somebody's lunch going missing. It must land    │
+//  │     for a SIX-YEAR-OLD, not for a copywriter.                            │
+//  │  4. PUNCTUATION ESCALATES WITH THE BEAT. This is how the arc is felt.    │
 //  │        BEAT 1 sign-on  — exactly ONE "!", and it lands on the greeting.  │
-//  │        BEAT 2 denial   — ZERO "!". the resort is completely calm.        │
-//  │        BEAT 3 alarm    — at most ONE "!". cheerfulness under strain.     │
+//  │        BEAT 2 denial   — ZERO "!". The resort is completely calm.        │
+//  │        BEAT 3 alarm    — at most ONE "!". Cheerfulness under strain.     │
 //  │        BEAT 4 panic    — at most ONE "!!" and never a lone "!".          │
-//  │        BEAT 4 sign-off — back to at most ONE "!". calm goodbye.          │
-//  │     One "?" per line, max. No "?!", no "…", no em dashes, no ALL-CAPS    │
-//  │     SENTENCES. Full stops do the work.                                   │
+//  │        BEAT 4 sign-off — back to at most ONE "!". A calm goodbye.        │
+//  │     One "?" per line, max. No "?!", no ellipsis, no em dashes.           │
+//  │  5. NO RUNNING GAG OWNS THE FEED. No character and no bit may appear in  │
+//  │     more than ~8% of lines. Capt. Roger is the host, not the newsfeed.   │
+//  │     If a line only needs an official, use the tannoy, the front desk,    │
+//  │     management or staff instead.                                        │
 //  └──────────────────────────────────────────────────────────────────────────┘
 //
 //  THE ARC, in four beats:
 //
-//  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed. A good morning and a
-//                    REAL piece of resort news — the boat parade, the sandcastle
-//                    contest, a new towel man. Nothing to do with the hole.
-//  BEAT 2  DENIAL    tier 0. Nobody connects the dots. A chirpy holiday radio
-//                    show telling rich people to enjoy themselves. There is no
-//                    hole. That is a water feature. Have a cold drink.
+//  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed, and ALWAYS opens
+//                    with "Good morning". Then a real piece of resort news
+//                    with a pirate gag in it. Nothing about the hole.
+//  BEAT 2  DENIAL    tier 0. Ordinary resort news, running alongside somebody
+//                    flatly insisting the hole is not there. It is a water
+//                    feature. Do have an ice cream.
 //  BEAT 3  ALARM     tier 1. Dawning horror, delivered cheerfully. The
 //                    evacuation is a FUN WALK. Officials contradict themselves
 //                    mid-sentence and keep smiling.
-//  BEAT 4  PANIC     tier 2. Everything is gone and CAPT. ROGER is still
-//                    upselling. Then the sign-off: the seven day forecast.
+//  BEAT 4  PANIC     tier 2. The resort is going and the broadcast is still
+//                    doing the weather and the spa bookings.
+//
+//  THE PREMISE. A luxury holiday resort with a pirate theme, full of very rich
+//  guests. BOTH halves must be in the copy: pirate silliness (a parrot that
+//  repeats guest complaints, a treasure map that is wrong, a cannon that fires
+//  beach balls, staff who will not stop saying arrr, a first mate who is just a
+//  man named Nigel) AND resort comedy (a guest who wants to speak to the manager
+//  about the sea, an enormous hat, the towel situation, the conga line, the
+//  world's slowest water slide queue, a guest who has booked the same lounger
+//  for eleven years).
 //
 //  THE RULE ABOUT THE HOLE. The news covers ONE thing: a hole is eating the
 //  resort. Guests have no way of knowing that some *other* hole somewhere has a
@@ -47,20 +62,23 @@
 //  field, `fill()` knows no rival token, and `usable()` refuses point blank to
 //  air any template containing a token outside {D}{M}{F}{P}{R}{S}.
 //
-//  Recurring cast (reuse is the joke — do not add one-off names):
-//    CAPT. ROGER        host. hospitality in freefall. never stops upselling.
-//    NIGEL              concierge. unblinking. confirms bookings into the void.
-//    BARNABY            the parrot. rude. correct about everything.
-//    DJ COCONUT         Dance Cove. one more hour. always one more hour.
-//    MRS FENWICK-HYDE   guest. paid for a SEA view. out of touch, load-bearing.
-//    MAISIE (7)         kid. delighted. wants to feed it. names it. adopts it.
-//    CRESSIDA VANE      food critic. reviews everything. gives out stars.
-//    the GILDED LAGOON  the smug rival resort across the bay.
+//  RATED 4+. Nothing about alcohol, bars, cocktails, rum, champagne, gambling,
+//  money trouble or real politics. The resort has ice cream, smoothies and
+//  lemonade. Nothing frightening, nothing mean about how anybody looks, nothing
+//  a child would repeat at school and get in trouble for.
 //
-//  Register: silly, warm, British understatement. Ages 6-11. Concrete nouns,
-//  short sentences, silly over clever. No menace, no violence, no army, no
-//  police, nobody gets hurt. The hole is a guest who is simply very hungry.
-//  Lines render in a one-line phone ticker — aim under ~62 chars, hard cap 78.
+//  Recurring cast (reuse is the joke — do not add one-off names):
+//    Capt. Roger        the host. Hospitality in freefall. Always upselling.
+//    Nigel              the first mate. Also just a man named Nigel.
+//    Barnaby            the parrot. Repeats guest complaints. Always correct.
+//    DJ Coconut         Dance Cove. One more hour. Always one more hour.
+//    Mrs Fenwick-Hyde   guest. Paid for a sea view. Wants a word about the sea.
+//    Maisie (7)         kid. Delighted. Wants to feed it. Names it. Adopts it.
+//    Cressida Vane      critic. Awards stars to leaves, mangoes and toast.
+//    the Gilded Lagoon  the smug rival resort across the bay.
+//
+//  Lines render in a one-line phone ticker — aim under ~64 chars, hard cap 78
+//  AT WORST-CASE TOKEN FILL (a 14-char form plus a 22-char meal).
 // ══════════════════════════════════════════════════════════════════════════════
 
 export type NewsTier = 0 | 1 | 2;
@@ -91,339 +109,320 @@ export const BRAND: [string, string, string] = [
 ];
 
 // ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
-// Good morning, and here is a REAL piece of resort news. Not a joke about the
-// hole — the hole has not happened yet as far as anyone here is concerned. This
+// ALWAYS begins "Good morning". Then a real piece of resort news with a pirate
+// gag in it — the hole has not happened yet as far as anyone here knows. This
 // fires FIRST, guaranteed, before any other headline (see `signedOn`).
 // No {templates} — the sign-on must never depend on match state.
 // Punctuation: exactly one "!", on the greeting. That is the whole allowance.
 const SIGN_ON: string[] = [
-  'GOOD MORNING from PIRATE BAY! the boat parade sets off at noon, as ever.',
-  'GOOD MORNING! the smoothie hut is open, the sea is warm, the ice is cold.',
-  'CAPT. ROGER: "GOOD MORNING! breakfast is a buffet. it is always a buffet."',
-  'GOOD MORNING from PIRATE BAY! sandcastle contest at three. bring a bucket.',
-  'GOOD MORNING! two pools, one parrot, and a new slide on the big pool.',
-  'GOOD MORNING, PIRATE BAY! today: sun, snacks, and a shanty at eleven.',
-  'GOOD MORNING! the spa has a new towel man. his name is also Roger.',
-  'GOOD MORNING from PIRATE BAY! lost property: one violin, still unclaimed.',
+  'Good morning! The boat parade sets off at noon, as it always does.',
+  'Good morning! Staff have said arrr eleven times before breakfast.',
+  'Good morning! Breakfast is a buffet. It has always been a buffet.',
+  'Good morning! Sandcastle contest at three. Please bring a bucket.',
+  'Good morning! Two pools, one parrot, and a brand new water slide.',
+  'Good morning! Today we have sun, snacks and a shanty at eleven.',
+  'Good morning! The spa has a new towel man. His name is also Roger.',
+  'Good morning! Lost property has one violin and one enormous hat.',
+  'Good morning! The treasure hunt starts at ten. The map is wrong.',
+  'Good morning! Nigel is the first mate. Nigel is a man named Nigel.',
+  'Good morning! The ice cream hut opens at nine, which is very soon.',
+  'Good morning! Last night\'s conga line has only just stopped.',
 ];
 
-/** Ticker-friendly district names, used to fill {D}. Lower case — see rule 3. */
+/** Ticker-friendly district names, used to fill {D}. Longest is 14 chars. */
 const DIST_NAME: Record<Dist, string> = {
   port: 'the docks',
   market: 'the bazaar',
   resort: 'the resort',
-  party: 'dance cove',
+  party: 'Dance Cove',
   jungle: 'the jungle',
-  cove: 'smugglers cove',
-  beach: 'sunset beach',
+  cove: 'Smugglers Cove',
+  beach: 'Sunset Beach',
 };
 
 type Pools = [string[], string[], string[]];
 
 // ── THE DOCKS ─────────────────────────────────────────────────────────────────
-// yachts, galleons, dock hands, cargo, one seagull with ambitions
+// yachts, dock hands, cargo, one seagull with ambitions, a cannon full of balls
 const PORT: Pools = [[
-  'CAPT. ROGER: "welcome to the docks. mind the wet bit."',
-  'a guest asked which yacht is hers. all of them, madam.',
-  'the dock hands are paid extra to say arrr when asked.',
-  'cargo manifest: 400 crates. 399 hold inflatable swans.',
-  'MRS FENWICK-HYDE says her yacht is touching another yacht.',
-  'NIGEL confirms the galleon is, in fact, a restaurant.',
-  'a seagull was elected harbourmaster. the seagull declined.',
-  'the yacht "second boat" has docked beside "first boat".',
-  'kids may steer the galleon today. the galleon does not move.',
-  'a crate marked fragile was opened. it held eleven smaller crates.',
-  'CAPT. ROGER: "enjoy a nice cold drink by the water."',
-  'a guest has complained that the sea is frankly too wide.',
-  'MAISIE, 7, has named every rope on the dock. all of them.',
-  'BARNABY bit a rope this morning. the rope had it coming.',
-  'jet ski hire is two doubloons. bringing it back is optional.',
-  'CAPT. ROGER salutes every departing boat. every single one.',
+  'Welcome to the docks, everybody. Please do mind the wet bit.',
+  'A guest asked which yacht is hers. All of them, madam.',
+  'The dock hands are paid to say arrr. They say it constantly.',
+  'Cargo today: 400 crates. Of those, 399 hold inflatable swans.',
+  'A crate marked fragile was opened. Inside were smaller crates.',
+  'A seagull has taken the harbour master\'s chair and will not move.',
+  'The yacht called Second Boat has docked beside First Boat.',
+  'Children may steer the galleon today. The galleon does not move.',
+  'Capt. Roger salutes every boat that leaves. Every single one.',
+  'A guest has complained to the front desk that the sea is too wide.',
+  'Maisie has given every rope on the dock a name. All of them.',
+  'Barnaby the parrot bit a rope this morning. The rope started it.',
+  'The cannon fired forty beach balls into the bay. Lovely, that.',
 ], [
-  'CAPT. ROGER: "the dock is shorter today. cosier, really."',
-  'a yacht owner asked whether the hole takes reservations.',
-  'NIGEL: "your boat has moved, sir. inward. a bit."',
-  'the dock hands are saying arrr now without being asked.',
-  'MRS FENWICK-HYDE demands a yacht with considerably more hull.',
-  'MAISIE waved at the purple thing. it wobbled back at her.',
-  'the 399 inflatable swans have been deployed as an actual plan.',
-  'harbour rope inventory: one rope, and it is fraying.',
-  'a second hole has opened by the slipway. that makes two.',
-  'CAPT. ROGER: "the pier is a jetty now. an upgrade, arguably!"',
-  'CAPT. ROGER: "do stay clear of the edge. wherever the edge is."',
+  'The dock is shorter today, and the tannoy says that is cosier.',
+  'A guest asked whether the hole takes bookings. Nigel said yes.',
+  'Nigel reports that your boat has moved. Inward. A little bit.',
+  'The dock hands are saying arrr without being asked now. Worrying.',
+  'Mrs Fenwick-Hyde demands a yacht with considerably more hull.',
+  'Maisie waved at the purple thing and it wobbled back at her.',
+  'All 399 inflatable swans have been deployed as an actual plan.',
+  'The harbour has one rope left, and that rope is fraying badly.',
+  'A second hole has opened by the slipway. That makes two of them.',
+  'The pier is a jetty now. Capt. Roger is calling that an upgrade!',
+  'Please stay clear of the edge, wherever the edge happens to be.',
 ], [
-  'CAPT. ROGER: "the docks are GONE!! boat hire is still open."',
-  'the galleon has left. it did not say goodbye to anybody.',
-  'NIGEL is rowing away, still holding the clipboard, still ticking.',
-  'the last crate was opened. it was swans. it was always swans.',
-  'MAISIE has named the hole. she says the hole is called Gary.',
-  'the harbour is one seagull, standing in water, thinking.',
-  'MRS FENWICK-HYDE: "and WHERE am I to moor now?"',
-  'BARNABY is perched on the last post. king of nothing.',
-  'CAPT. ROGER: "dockside dining is still on!! bring a raft."',
-  'CAPT. ROGER waved off the last boat from a floating crate.',
-  'CAPT. ROGER: "no docks, no docking fees. savings, friends."',
+  'The docks have GONE!! Boat hire is open as usual.',
+  'The galleon has left. It did not say goodbye to anybody.',
+  'Nigel is rowing away, still ticking things off his clipboard.',
+  'The last crate was opened. Swans. It was always going to be swans.',
+  'Maisie has named the hole. She says the hole is called Gary.',
+  'The harbour is now one seagull standing in water, thinking.',
+  'Mrs Fenwick-Hyde would like to know where she is meant to moor.',
+  'Barnaby is perched on the last post, king of absolutely nothing.',
+  'Capt. Roger waved off the final boat from a floating crate.',
+  'The cannon fired one last beach ball. It came straight back.',
 ]];
 
 // ── THE BAZAAR ────────────────────────────────────────────────────────────────
-// stalls, traders, mangoes, and BARNABY the rude parrot
+// stalls, traders, mangoes, enormous hats, and a treasure map that is wrong
 const MARKET: Pools = [[
-  'BARNABY the parrot rated a guest\'s hat. the rating was "no".',
-  'one mango at the bazaar now costs slightly more than a car.',
-  'CAPT. ROGER: "haggle gently, friends. and do hydrate."',
-  'a genuine antique compass, on stall 2. genuinely made on tuesday.',
-  'a guest bought a mysterious pirate map. it is a lunch menu.',
-  'BARNABY has learned a new word. the word is refund.',
-  'stall 4 sells hats. stall 5 sells slightly bigger hats.',
-  'MRS FENWICK-HYDE bought the entire spice aisle. then again.',
-  'MAISIE traded one shell for a doubloon. an excellent trade.',
-  'a trader insists his coconuts are vintage. they are damp.',
-  'NIGEL confirms the bazaar closes whenever it likes.',
-  'a man haggled for ten minutes, saved nothing, and beamed anyway.',
-  'CRESSIDA VANE reviewed a mango. she gave the mango six stars.',
-  'the sign says everything must go. nothing has ever gone.',
-  'CAPT. ROGER: "everything here is GENUINE. define genuine."',
-  'CAPT. ROGER bought a hat from his own gift shop. he does this daily.',
+  'Barnaby the parrot rated a guest\'s enormous hat. The rating was no.',
+  'Stall four sells hats. Stall five sells slightly larger hats.',
+  'A genuine antique compass is for sale. It was made on Tuesday.',
+  'A guest bought a mysterious pirate map. It is a lunch menu.',
+  'Barnaby has learned a new phrase: speak to the manager, please.',
+  'Mrs Fenwick-Hyde bought the whole spice aisle, then bought it again.',
+  'Maisie traded one shell for a coconut. An excellent trade, frankly.',
+  'A trader says his coconuts are vintage. They are simply damp.',
+  'The bazaar closes whenever it feels like closing. No timetable.',
+  'A man haggled for ten minutes, saved nothing, and beamed anyway.',
+  'Cressida Vane reviewed a mango this morning and gave it six stars.',
+  'The sign says everything must go. Nothing has ever gone.',
+  'The treasure map on stall two leads to the treasure map on stall two.',
 ], [
-  'CAPT. ROGER: "the bazaar is now a bazaa. still charming."',
-  'BARNABY is screaming directions again. correct ones, sadly.',
-  'the stalls are on wheels now. the traders are also on wheels.',
-  'mango prices up. mango supply down. mango situation: tense.',
-  'MRS FENWICK-HYDE asked the hole whether it takes card.',
-  'MAISIE offered the hole a mango. the hole said yes.',
-  'the everything must go sign is now a documentary.',
-  'NIGEL: "the bazaar has relocated. inward. do mind the edge."',
-  'the trader has marked his vintage coconuts down to "please".',
-  'CAPT. ROGER: "fewer stalls, easier browsing. you are WELCOME!"',
-  'CAPT. ROGER haggled with BARNABY. CAPT. ROGER lost badly.',
+  'The bazaar is now a bazaa, says Capt. Roger, and still charming.',
+  'Barnaby is shouting directions. They are the correct directions.',
+  'The stalls are on wheels now. So are the traders. So is the sign.',
+  'Mrs Fenwick-Hyde asked the hole whether it takes bookings.',
+  'Maisie offered the hole a mango. The hole said yes to the mango.',
+  'The everything must go sign has quietly become a documentary.',
+  'Nigel reports the bazaar has relocated inward. Do mind the edge.',
+  'The vintage coconuts have been marked down to the word please.',
+  'Fewer stalls means easier browsing, says a beaming front desk!',
+  'The wrong treasure map is now the only map. Everyone is using it.',
 ], [
-  'CAPT. ROGER: "the bazaar has GONE!! the gift shop is thriving."',
-  'BARNABY was right about everything. BARNABY is unbearable.',
-  'the last trader sold the last stall. to himself. a good price.',
-  'MRS FENWICK-HYDE haggled with the hole and lost badly.',
-  'the mangoes were the real treasure. also gone. sorry, everyone.',
-  'MAISIE: "he LIKED the mango." he did like the mango.',
-  'one doubloon rolled past. nobody chased it. it was a tuesday.',
-  'CRESSIDA VANE: "the bazaar: gone. the mango: unforgettable."',
-  'CAPT. ROGER sold the last mango. to himself. arrr.',
-  'CAPT. ROGER: "no stalls means no queues. think about it."',
+  'The bazaar has GONE!! The gift shop is somehow thriving.',
+  'Barnaby was right about everything. Barnaby is unbearable.',
+  'The last trader sold the last stall to himself. A fair price.',
+  'Mrs Fenwick-Hyde tried to haggle with the hole and lost badly.',
+  'The mangoes were the real treasure. The mangoes have gone.',
+  'Maisie says he liked the mango. He did seem to like the mango.',
+  'Cressida Vane writes: bazaar gone, mango unforgettable, six stars.',
+  'Somebody is still following the wrong map. Good luck to them.',
+  'One coconut rolled past. Nobody chased it. It was that sort of day.',
+  'The hat stall has gone. The hats are enormous and easy to find.',
 ]];
 
 // ── THE RESORT ────────────────────────────────────────────────────────────────
-// grand hotel, big pool, cabanas, spa, and the wrong bubbles
+// the hotel, the big pool, the towel situation, the slowest queue on earth
 const RESORT: Pools = [[
-  'CAPT. ROGER: "the spa is open. I have been. I am RADIANT."',
-  'a guest sent back her fizzy drink. "these are the WRONG bubbles."',
-  'NIGEL has confirmed 400 bookings and blinked twice. a legend.',
-  'the big pool now has a smaller pool in it. nobody ordered this.',
-  'MRS FENWICK-HYDE has requested a quieter breeze for the terrace.',
-  'a guest asked the fancy chef for toast. he made the toast. sadly.',
-  'the spa has a new treatment where they simply say nice things.',
-  'cabana 12 has been upgraded to cabana 12 plus. same cabana.',
-  'MAISIE has done 41 lengths. staff are concerned and impressed.',
-  'the pool snack bar now has its own smaller pool snack bar.',
-  'CRESSIDA VANE reviewed breakfast. she gave the toast five stars.',
-  'a guest has complained that the towels are aggressively folded.',
-  'the GILDED LAGOON insists their pool is significantly wetter.',
-  'turndown service left a chocolate. the guest has requested two.',
-  'CAPT. ROGER: "all-inclusive means ALL, friends. go wild."',
-  'CAPT. ROGER: "book the spa. I have booked the spa. twice."',
-  'CAPT. ROGER watered a plastic palm today. with real care.',
+  'The spa is open. Capt. Roger has been twice and says he is radiant.',
+  'A guest sent back her lemonade. She says these are the wrong bubbles.',
+  'Nigel has confirmed four hundred bookings and blinked only twice.',
+  'The big pool now has a smaller pool inside it. Nobody ordered that.',
+  'Mrs Fenwick-Hyde has requested a quieter breeze for the terrace.',
+  'A guest asked the fancy chef for toast. He made toast. He is sad.',
+  'The spa has a new treatment where somebody just says nice things.',
+  'Cabana twelve has been upgraded to cabana twelve plus. Same cabana.',
+  'Maisie has swum forty one lengths. Staff are concerned and impressed.',
+  'The water slide queue has not moved since Tuesday. Spirits are high.',
+  'A guest has complained that the towels are far too neatly folded.',
+  'The Gilded Lagoon insists that their pool is significantly wetter.',
+  'A guest has booked the same lounger for eleven years. Lounger nine.',
+  'Cressida Vane reviewed the toast at breakfast and gave it five stars.',
 ], [
-  'CAPT. ROGER: "the sinkhole is a FEATURE. a water feature."',
-  'NIGEL: "your suite has moved, madam. downward. slightly."',
-  'the big pool has joined the small pool. the staff applauded.',
-  'MRS FENWICK-HYDE: "I paid for a SEA view, not a HOLE view."',
-  'a guest asked the concierge to cancel the hole. NIGEL: "noted."',
-  'MAISIE wanted a photo with the hole. she got one. it is lovely.',
-  'the GILDED LAGOON has offered us a sympathy rate. how dare they.',
-  'cabana 12 plus has been downgraded to a memory of cabana 12.',
-  'CAPT. ROGER: "fewer rooms means shorter corridors. progress!"',
-  'CAPT. ROGER: "the lobby is OPEN PLAN now. very open indeed."',
-  'CAPT. ROGER: "your suite has a pool now. it is all pool."',
+  'Capt. Roger says the sinkhole is a feature. A water feature.',
+  'Nigel reports that your suite has moved. Downward. Only slightly.',
+  'The big pool has joined the small pool. The staff applauded warmly.',
+  'Mrs Fenwick-Hyde paid for a sea view and has received a hole view.',
+  'A guest asked the front desk to cancel the hole. It is noted.',
+  'Maisie wanted a photo with the hole. The photo is genuinely lovely.',
+  'The Gilded Lagoon has offered us a sympathy rate. How dare they.',
+  'Lounger nine has gone. That lounger was booked until 2039.',
+  'Fewer rooms means shorter corridors, says a very calm tannoy.',
+  'The lobby is open plan now. It is extremely open indeed.',
+  'The water slide queue has finally moved. Everybody cheered!',
 ], [
-  'CAPT. ROGER: "the resort has GONE!! the spa is still bookable."',
-  'NIGEL confirmed your booking from a slowly drifting lounger.',
-  'MRS FENWICK-HYDE: "so this is a THREE star experience now."',
-  'CRESSIDA VANE: "the hotel: gone. the service: flawless."',
-  'the big pool has joined the sea. the sea is unimpressed.',
-  'the GILDED LAGOON sent flowers. and a brochure. mostly brochure.',
-  'a guest requested a late checkout. she got a very early one.',
-  'MAISIE left the hole a five star review. "he is nice."',
-  'CAPT. ROGER: "no hotel, no queues. I call that an UPGRADE."',
-  'CAPT. ROGER: "check-in is closed. check-in was ALWAYS closed."',
-  'CAPT. ROGER is handing out spa vouchers from a lilo. a pro.',
+  'The resort has GONE!! The spa is still taking bookings.',
+  'Nigel confirmed your booking from a slowly drifting lounger.',
+  'Mrs Fenwick-Hyde says this is now a three star experience.',
+  'Cressida Vane writes: hotel gone, service flawless, five stars.',
+  'The big pool has joined the sea. The sea seems unimpressed.',
+  'The Gilded Lagoon sent flowers, and a brochure. Mostly brochure.',
+  'A guest requested a late checkout and got a very early one.',
+  'Maisie left the hole a five star review that says he is nice.',
+  'No hotel means no queues, and the tannoy calls that an upgrade.',
+  'Capt. Roger is handing out spa vouchers from a lilo. A true pro.',
 ]];
 
 // ── DANCE COVE ────────────────────────────────────────────────────────────────
-// DJ COCONUT, the main stage, the dance floor, one blazer doing the limbo
+// DJ Coconut, the conga line, the limbo, and one blazer that will not quit
 const PARTY: Pools = [[
-  'DJ COCONUT dropped a beat. a guest dropped a smoothie. even.',
-  'CAPT. ROGER attempted the limbo in a full blazer. respect.',
-  'the conga line can be seen from the hill. maybe from space.',
-  'MRS FENWICK-HYDE has requested something considerably less loud.',
-  'the dance floor has reached its legal maximum boogie.',
-  'DJ COCONUT: "one more hour." it has been nine hours.',
-  'the main stage now has a second, smaller, angrier stage.',
-  'MAISIE has invented a dance. she calls it the wobble.',
-  'NIGEL danced. NIGEL did not smile. NIGEL was superb.',
-  'glow sticks have been recalled for being far too glowy.',
-  'a guest asked the DJ for the good one. he played the good one.',
-  'the limbo pole was lowered. then it snapped. limbo goes on.',
-  'BARNABY was on the decks for ten seconds. banned for life.',
-  'CAPT. ROGER requests the conga at seven. and eight. and nine.',
-  'CAPT. ROGER: "dance like nobody is watching. I am watching."',
+  'DJ Coconut dropped a beat. A guest dropped a smoothie. All square.',
+  'Capt. Roger attempted the limbo in a full blazer. Total respect.',
+  'The conga line can be seen from the hill and possibly from space.',
+  'Mrs Fenwick-Hyde has requested something considerably less loud.',
+  'The dance floor has reached its legal maximum amount of boogie.',
+  'DJ Coconut says one more hour. It has now been nine hours.',
+  'The main stage now has a second, smaller, angrier stage on it.',
+  'Maisie has invented a dance. She has named it the Wobble.',
+  'Nigel danced last night. Nigel did not smile. Nigel was superb.',
+  'The glow sticks have been recalled for being much too glowy.',
+  'A guest asked for the good song. The good song was played.',
+  'The limbo pole snapped in half, so the limbo carries on lower.',
+  'Barnaby was on the decks for ten seconds and is banned for life.',
 ], [
-  'CAPT. ROGER: "the dance floor is smaller. more INTIMATE."',
-  'DJ COCONUT has switched to the nervous playlist. we know it.',
-  'the conga line rerouted around the situation. still conga-ing.',
-  'MRS FENWICK-HYDE: "is that the bass, or is that a HOLE?"',
-  'MAISIE taught the hole the wobble. it is a natural.',
-  'the speakers have been repositioned to face the hole. tactical.',
-  'NIGEL confirms the party ends at eleven. or sooner.',
-  'the glow stick supply is now described as emotional.',
-  'CAPT. ROGER: "smaller floor, BIGGER dancing. it is maths!"',
-  'CAPT. ROGER is conga-ing determinedly in the wrong direction.',
+  'The dance floor is smaller today, which the tannoy calls intimate.',
+  'DJ Coconut has switched to the nervous playlist. We all know it.',
+  'The conga line has rerouted around the situation and carries on.',
+  'Mrs Fenwick-Hyde asked whether that was the bass or a large hole.',
+  'Maisie taught the hole the Wobble. The hole is a natural.',
+  'The speakers have been turned to face the hole. Tactical, that.',
+  'The party ends at eleven, or possibly a good deal sooner.',
+  'The glow stick supply is now being described as emotional.',
+  'A smaller floor means bigger dancing. Capt. Roger insists it is maths!',
+  'The conga line is heading determinedly in the wrong direction.',
 ], [
-  'CAPT. ROGER: "dance floor: eaten. the VIBE: untouched."',
-  'DJ COCONUT played one final banger. an absolute legend.',
-  'the conga line congaed straight past the hole. very rude.',
-  'MRS FENWICK-HYDE danced at last. the worst possible moment.',
-  'MAISIE and the hole are doing the wobble together.',
-  'DJ COCONUT is now DJing from a raft. the crowd is three crabs.',
-  'one glow stick remains, glowing bravely into the night.',
-  'the main stage has gone. the smaller angrier stage: also gone.',
-  'CAPT. ROGER is still conga-ing. alone. magnificently.',
-  'CAPT. ROGER: "silent disco tonight!! very silent. no floor."',
+  'The dance floor has been eaten!! The vibe remains untouched.',
+  'DJ Coconut played one final banger and then bowed. A legend.',
+  'The conga line congaed straight past the hole. Extremely rude.',
+  'Mrs Fenwick-Hyde danced at last, at the worst possible moment.',
+  'Maisie and the hole are doing the Wobble together right now.',
+  'DJ Coconut is playing from a raft. The crowd is three crabs.',
+  'One glow stick remains, glowing bravely on into the night.',
+  'The main stage has gone. The smaller angrier stage has gone too.',
+  'Capt. Roger is still conga-ing. Alone. Absolutely magnificently.',
+  'Tonight is a silent disco!! Very silent. There is no floor.',
 ]];
 
 // ── THE JUNGLE ────────────────────────────────────────────────────────────────
-// canopy, a lost temple that is found daily, guided tours, 31 bugs called Kevin
+// a lost temple that is found daily, guided tours, and 31 bugs called Kevin
 const JUNGLE: Pools = [[
-  'CAPT. ROGER: "the temple is LOST. we know exactly where it is."',
-  'the guided tour found the lost temple again. twice daily.',
-  'MRS FENWICK-HYDE asked whether the jungle has air conditioning.',
-  'a monkey stole a hat. the monkey wears the hat much better.',
-  'NIGEL led a tour in full uniform. he does not sweat. ever.',
-  'MAISIE has named 31 bugs. all 31 bugs are called Kevin.',
-  'the zipline queue is now longer than the actual zipline.',
-  'the guide said do not touch anything. everyone touched everything.',
-  'the temple gift shop sells small replicas of the gift shop.',
-  'a guest requested a jungle experience, but less jungly.',
-  'the waterfall was rated four stars. one complaint: too damp.',
-  'CRESSIDA VANE reviewed a leaf. she awarded the leaf six stars.',
-  'CAPT. ROGER: "bug spray at reception. hydrate, friends."',
-  'the rope bridge wobbled. everyone screamed. everyone did it again.',
-  'CAPT. ROGER: "I discovered that temple. in 2019. with a map."',
-  'CAPT. ROGER wears the blazer into the jungle. he always does.',
+  'The lost temple is lost. We know exactly where the lost temple is.',
+  'The guided tour found the lost temple again. That is twice today.',
+  'Mrs Fenwick-Hyde has asked whether the jungle has air conditioning.',
+  'A monkey stole a hat. The monkey wears the hat much better.',
+  'The guide led a tour in full uniform and did not sweat once.',
+  'Maisie has named thirty one bugs. All thirty one are called Kevin.',
+  'The zipline queue is now longer than the actual zipline itself.',
+  'The guide said do not touch anything. Everybody touched everything.',
+  'The temple gift shop sells small replicas of the temple gift shop.',
+  'A guest has requested a jungle experience that is far less jungly.',
+  'The waterfall was given four stars. The one complaint was too damp.',
+  'Cressida Vane reviewed a leaf this morning and gave it six stars.',
+  'The rope bridge wobbled. Everybody screamed and then did it again.',
 ], [
-  'CAPT. ROGER: "the canopy is now a canop. still very leafy."',
-  'the lost temple is lost again. properly lost, this time.',
-  'MRS FENWICK-HYDE has demanded the jungle be moved further off.',
-  'the monkeys are packing. the monkeys have small suitcases.',
-  'the tour is now a brisk tour. NIGEL walks very fast indeed.',
-  'MAISIE told the hole about the temple. helpful. sort of.',
-  'the zipline now ends nowhere at all. the queue is unchanged.',
-  'all 31 Kevins are accounted for. Kevin 12 is on a leaf.',
-  'CAPT. ROGER: "fewer trees, better VIEWS. I said what I said!"',
-  'CAPT. ROGER led the tour backwards, briskly, still smiling.',
+  'The canopy is now a canop, says Capt. Roger, and still very leafy.',
+  'The lost temple is lost again, and this time properly lost.',
+  'Mrs Fenwick-Hyde has demanded that the jungle be moved further off.',
+  'The monkeys are packing. The monkeys have small suitcases.',
+  'The tour is now a brisk tour. Nigel is walking very fast indeed.',
+  'Maisie told the hole about the temple. Helpful, in a way.',
+  'The zipline now ends nowhere at all. The queue is unchanged.',
+  'All thirty one Kevins are accounted for. Kevin twelve is on a leaf.',
+  'Fewer trees means better views, says the front desk, standing firm!',
+  'The guide led the whole tour backwards, briskly, still smiling.',
 ], [
-  'CAPT. ROGER: "the jungle has GONE!! tours resume at four."',
-  'the lost temple has been found. by a large purple thing.',
-  'the monkeys waved from a boat. a classy exit, monkeys.',
-  'MRS FENWICK-HYDE: "well now there is no SHADE whatsoever."',
-  'NIGEL is guiding a tour of the sky. it is going rather well.',
-  'the 31 Kevins are all fine. MAISIE checked. all 31 of them.',
-  'the waterfall is now simply a fall. rated five stars. bold.',
-  'CRESSIDA VANE: "jungle: gone. that leaf: still six stars."',
-  'CAPT. ROGER: "temple gone. gift shop replicas: HALF PRICE."',
-  'CAPT. ROGER, blazer intact, is on the very last branch.',
+  'The jungle has GONE!! Guided tours will resume at four.',
+  'The lost temple has been found by a very large purple thing.',
+  'The monkeys waved from a boat. A classy exit, monkeys.',
+  'Mrs Fenwick-Hyde reports that there is now no shade whatsoever.',
+  'Nigel is guiding a tour of the sky. It is going rather well.',
+  'All thirty one Kevins are fine. Maisie counted them all twice.',
+  'The waterfall is simply a fall now. It has five stars. Bold.',
+  'Cressida Vane writes: jungle gone, that leaf still six stars.',
+  'The temple has gone. The gift shop replicas are selling well.',
+  'Capt. Roger, blazer intact, is standing on the very last branch.',
 ]];
 
 // ── SMUGGLERS COVE ────────────────────────────────────────────────────────────
-// treasure hunting, the wreck, rock pools, employee-of-the-month crab
+// a treasure hunt with a wrong map, the wreck, rock pools, a crab in management
 const COVE: Pools = [[
-  'CAPT. ROGER buries the treasure daily and finds it daily.',
-  'the treasure map leads to the gift shop. as it always does.',
-  'MRS FENWICK-HYDE found a doubloon and asked for a receipt.',
-  'the wreck has been wrecked for 300 years. beautifully.',
-  'MAISIE found a crab. the crab has a job now. it is management.',
-  'the rock pool crab is employee of the month. again.',
-  'NIGEL confirms the treasure is in the general area.',
-  'a guest asked whether the shipwreck comes with wifi.',
-  'the metal detector found 400 bottlecaps and one spoon.',
-  'CAPT. ROGER: "arrr. also hydrate. very important. arrr."',
-  'smugglers cove has nothing to smuggle. lovely, though.',
-  'CRESSIDA VANE called the rock pools damp but honest.',
-  'BARNABY found the treasure first. BARNABY said nothing.',
-  'X marks the spot. the spot is a bench. it is a lovely bench.',
-  'CAPT. ROGER: "I have NEVER smuggled anything. probably."',
-  'CAPT. ROGER loses the map daily. he finds it in his pocket.',
+  'Capt. Roger buries the treasure each morning and finds it by lunch.',
+  'The treasure map leads to the gift shop, as it does every day.',
+  'Mrs Fenwick-Hyde found a doubloon and has asked for a receipt.',
+  'The wreck has been wrecked for three hundred years. Beautifully.',
+  'Maisie found a crab. The crab has a job now. The crab is management.',
+  'The rock pool crab is employee of the month again. Well done, crab.',
+  'The treasure is somewhere in the general area. Probably.',
+  'A guest asked whether the shipwreck comes with wifi. It does not.',
+  'The metal detector found four hundred bottle caps and one spoon.',
+  'There is nothing to smuggle in Smugglers Cove. It is lovely, though.',
+  'Cressida Vane called the rock pools damp but honest. Four stars.',
+  'Barnaby found the treasure first. Barnaby has said nothing.',
+  'X marks the spot. The spot is a bench. It is a very good bench.',
 ], [
-  'CAPT. ROGER: "the cove is smaller, and hence more EXCLUSIVE."',
-  'the treasure hunt is over. something else found it first.',
-  'MRS FENWICK-HYDE wants her doubloon confirmed in writing.',
-  'the crabs are leaving in a single, very orderly file. no fuss.',
-  'MAISIE showed the hole the rock pools. the hole approved.',
-  'the wreck has been wrecked again. in record time, honestly.',
-  'NIGEL: "the treasure has relocated. inward. do keep up."',
-  'the bench that marked the spot has gone. so has the spot.',
-  'CAPT. ROGER: "a smaller cove is a WARMER cove, friends!"',
-  'CAPT. ROGER buried the treasure again. optimism, honestly.',
+  'A smaller cove is a more exclusive cove, says the front desk.',
+  'The treasure hunt is over. Something else found the treasure first.',
+  'Mrs Fenwick-Hyde wants her doubloon confirmed in writing.',
+  'The crabs are leaving in one very orderly line, without any fuss.',
+  'Maisie showed the hole the rock pools. The hole approved of them.',
+  'The wreck has been wrecked again, in record time, honestly.',
+  'Nigel reports that the treasure has relocated inward. Do keep up.',
+  'The bench that marked the spot has gone, and so has the spot.',
+  'The treasure has been buried again. That is pure optimism!',
+  'The map is still wrong. It is now wrong about the sea as well.',
 ], [
-  'CAPT. ROGER: "the cove has GONE!! treasure hunt still at four."',
-  'X marked the spot. the spot has also gone now. awkward.',
-  'the doubloon MRS FENWICK-HYDE found: eaten. her receipt: pending.',
-  'the crabs took the last boat. the crabs had a plan all along.',
-  'the crab MAISIE found got promoted. it is a captain now.',
-  'the wreck has been unwrecked by removal. that counts, apparently.',
-  'CRESSIDA VANE on the hole: "bold. purple. deeply hungry."',
-  'BARNABY knew where the treasure was. BARNABY still says nothing.',
-  'CAPT. ROGER: "the treasure is out there. somewhere. inward."',
-  'CAPT. ROGER drew a fresh X on the water. commitment, that.',
+  'The cove has GONE!! The treasure hunt is still on at four.',
+  'X marked the spot. The spot has now gone as well. Awkward.',
+  'The crabs took the last boat. The crabs had a plan all along.',
+  'The crab Maisie found has been promoted. It is a captain now.',
+  'The wreck has been unwrecked by removal. That counts, apparently.',
+  'Cressida Vane on the hole: bold, purple, and deeply hungry.',
+  'Barnaby knows where the treasure is. Barnaby still says nothing.',
+  'Capt. Roger has drawn a fresh X on the water. Real commitment.',
+  'Mrs Fenwick-Hyde has lost her doubloon and would like a form.',
+  'The treasure is out there somewhere. Somewhere inward, sadly.',
 ]];
 
 // ── SUNSET BEACH ──────────────────────────────────────────────────────────────
-// umbrellas, sandcastles, lifeguards, eleven unmatched flip-flops
+// umbrellas, sandcastles, a lifeguard with nothing to do, eleven flip-flops
 const BEACH: Pools = [[
-  'CAPT. ROGER: "enjoy a nice cold drink by the beach, friends."',
-  'the lifeguard has saved nobody all week and is thrilled.',
-  'MRS FENWICK-HYDE has requested less sand. ideally all of it.',
-  'the sandcastle contest was won by a nine year old. again.',
-  'umbrella 12 flipped inside out. the beach applauded warmly.',
-  'the sandcastle MAISIE built has a moat, a spa and a gift shop.',
-  'NIGEL rakes the sand into perfect lines. nobody asked him to.',
-  'a guest asked whether the sunset could be moved to earlier.',
-  'the tide has taken eleven flip-flops. no matching pairs.',
-  'CAPT. ROGER: "the sea is FREE. the loungers are not."',
-  'CRESSIDA VANE rated the sunset last night. she gave it four stars.',
-  'the ice cream van plays one song. only one. for ever and ever.',
-  'a guest complained that the sand gets everywhere. it is sand.',
-  'BARNABY stole a chip. BARNABY has always stolen the chip.',
-  'CAPT. ROGER: "sunscreen, friends. I am a captain, not a doctor."',
-  'CAPT. ROGER judged the sandcastle contest. he lost to a child.',
+  'The lifeguard has rescued nobody all week and is absolutely thrilled.',
+  'Mrs Fenwick-Hyde has requested less sand, and ideally none at all.',
+  'The sandcastle contest was won by a nine year old for the third time.',
+  'Umbrella twelve flipped inside out. The beach applauded warmly.',
+  'The sandcastle Maisie built has a moat, a spa and a gift shop.',
+  'Nigel rakes the sand into perfect lines. Nobody asked him to.',
+  'A guest has asked whether the sunset could happen a bit earlier.',
+  'The tide has taken eleven flip-flops. There are no matching pairs.',
+  'Every towel was claimed by seven in the morning. Every single one.',
+  'Cressida Vane rated last night\'s sunset and gave it four stars.',
+  'The ice cream van plays one song. Only one. For ever and ever.',
+  'A guest complained that the sand gets everywhere. It is sand.',
+  'Barnaby stole a chip. Barnaby has always stolen the chip.',
 ], [
-  'CAPT. ROGER: "the beach is shorter. we are calling it a beachlet."',
-  'the lifeguards are now guarding the land. and the ice cream hut.',
-  'MRS FENWICK-HYDE: "the SAND is leaving. do something, NIGEL."',
-  'MAISIE built a sandcastle for the hole. it fits perfectly.',
-  'the umbrellas have been repositioned. defensively. by NIGEL.',
-  'NIGEL rakes on. the sand is going. NIGEL rakes on regardless.',
-  'the sunset has been moved earlier by popular demand. sort of.',
-  'the ice cream van has moved. the song is unchanged. eternal.',
-  'CAPT. ROGER: "less beach, less sand in your sandwich. a WIN!"',
-  'CAPT. ROGER moved his lounger. then moved it again. calmly.',
+  'The beach is shorter today. The tannoy is calling it a beachlet.',
+  'The lifeguards are now guarding the land and the ice cream hut.',
+  'Mrs Fenwick-Hyde says the sand is leaving and somebody must act.',
+  'Maisie built a sandcastle for the hole and it fits perfectly.',
+  'The umbrellas have been repositioned defensively by Nigel.',
+  'Nigel rakes on. The sand is going. Nigel rakes on regardless.',
+  'The sunset has been moved earlier by popular demand, sort of.',
+  'The ice cream van has moved. The song is unchanged. It is eternal.',
+  'Less beach means less sand in your sandwich. A win, says Capt. Roger.',
+  'Somebody has moved their towel twice and is being talked about.',
 ], [
-  'CAPT. ROGER: "beach: GONE!! sunset: on time. you are welcome."',
-  'the lifeguard finally has something to do. he politely declines.',
-  'MRS FENWICK-HYDE: "and now where am I to put my TOWEL."',
-  'the sandcastle MAISIE built survived. of course it did.',
-  'all eleven flip-flops are accounted for. still unmatched.',
-  'NIGEL is raking the sea now. it is going surprisingly well.',
-  'the ice cream van is still playing that song. from a raft.',
-  'CRESSIDA VANE: "sunset: four stars. beach: absent."',
-  'CAPT. ROGER: "sunbathing continues. bring your own beach."',
-  'CAPT. ROGER, on a lilo, in a blazer, is still taking bookings.',
+  'The beach has GONE!! The sunset is on time. You are welcome.',
+  'The lifeguard finally has something to do. He politely declines.',
+  'Mrs Fenwick-Hyde would like to know where she should put her towel.',
+  'The sandcastle Maisie built survived it all. Of course it did.',
+  'All eleven flip-flops are accounted for and still unmatched.',
+  'Nigel is raking the sea. It is going surprisingly well for him.',
+  'The ice cream van is playing that same one song from a raft.',
+  'Cressida Vane writes: sunset four stars, beach entirely absent.',
+  'Sunbathing continues as normal. Please bring your own beach.',
+  'Capt. Roger, on a lilo, in a blazer, is still taking bookings.',
 ]];
 
 const BY_DIST: Record<Dist, Pools> = {
@@ -435,129 +434,133 @@ const BY_DIST: Record<Dist, Pools> = {
 // The arc in miniature. Tier 0 opens on ordinary resort news — nobody has
 // connected a single dot — and only then slides into flat denial. Tier 1 is
 // dawning horror said with a smile. Tier 2 is everything gone and still an
-// upsell. CAPT. ROGER never once breaks character.
+// upsell.
 const GENERAL: Pools = [[
-  // ordinary resort news. nothing is wrong. nothing has ever been wrong.
-  'CAPT. ROGER: "welcome to PIRATE BAY. I am barely a captain."',
-  'BAY RADIO: the buffet now has a second buffet, for puddings only.',
-  'NIGEL the concierge has not blinked since tuesday. a legend.',
-  'guest survey: 98 happy out of 100. the rest say the sea is salty.',
-  'the GILDED LAGOON says their sunsets are sharper. they are not.',
-  'activities today: nothing at all, beautifully scheduled.',
-  'CAPT. ROGER: "hydrate, friends. it is basically a rule here."',
-  'a small purple dot was seen by the pool. staff assume it is a guest.',
-  'MAISIE, 7, has asked if she may keep the purple thing. pending.',
-  'lost property: two hats, one violin, and somebody\'s uncle.',
-  'BARNABY was fired this morning. BARNABY was rehired by lunch.',
-  'MRS FENWICK-HYDE asked for the manager. she got CAPT. ROGER.',
-  'weather: perfect. tomorrow: perfect. that is simply the deal here.',
-  'the wristbands now come with a smaller wristband. nobody knows why.',
-  'a guest rated the island ten out of ten. "would island again."',
-  'staff briefing: smile, point at the sea, repeat until sunset.',
-  'the resort cat has a suite. the resort cat pays nothing.',
-  'DJ COCONUT has been declared a national treasure. by DJ COCONUT.',
-  'kids club today: making friends with absolutely anything.',
-  'CAPT. ROGER: "a cold drink, a warm sea. that is the whole idea."',
-  'CAPT. ROGER: "I am not a real captain. I am a real host."',
-  'CAPT. ROGER: "the parrot is not mine. the parrot chose me."',
-  'CAPT. ROGER did the eleven o\'clock shanty. attendance: everyone.',
-  'CRESSIDA VANE reviewed the eggs at breakfast. six stars.',
-  'the big pool has a small pool inside it. staff are delighted.',
-  'a guest asked for a quieter breeze. the terrace is looking into it.',
-  // — BEAT 2 · DENIAL — there is a hole. there is absolutely not a hole. —
-  'CAPT. ROGER: "do not mind the hole. enjoy a cold drink, friends."',
-  'CAPT. ROGER: "that is not a hole. that is a NEW POOL. no charge."',
-  'NIGEL: "there is no hole, madam. that is a shadow. a big one."',
-  'the hole is not on the resort map. therefore there is no hole.',
-  'management: "purple? we do not DO purple here." case closed.',
-  'a guest saw a hole. that guest also saw a mermaid. same guest.',
-  'BARNABY squawked "it is a HOLE". BARNABY was sent to his perch.',
-  'CAPT. ROGER: "nobody is being eaten. that is a RUMOUR. relax."',
-  'the hole ate a deckchair. we are calling that a laundry matter.',
-  'MRS FENWICK-HYDE stepped in it. she blames her SANDALS.',
-  'MAISIE said "there is a hole". staff said "there is a SMOOTHIE BAR".',
-  'CAPT. ROGER: "a nice cold smoothie at the smoothie hut solves this."',
+  // ── ordinary resort news. Nothing is wrong. Nothing has ever been wrong. ──
+  'Welcome to Pirate Bay. Capt. Roger is barely a captain at all.',
+  'The buffet now has a second buffet, and that one is only puddings.',
+  'Nigel the first mate has not blinked since Tuesday. What a man.',
+  'Ninety eight guests are happy. The other two say the sea is salty.',
+  'The Gilded Lagoon claims their sunsets are sharper. They are not.',
+  'Today\'s activities: absolutely nothing, beautifully scheduled.',
+  'A small purple dot was seen by the pool. Staff assume it is a guest.',
+  'Maisie has asked if she may keep the purple thing. It is pending.',
+  'Lost property today: two hats, one violin and somebody\'s uncle.',
+  'Barnaby was fired this morning and rehired again before lunch.',
+  'Mrs Fenwick-Hyde asked for the manager and was given Capt. Roger.',
+  'Weather today: perfect. Weather tomorrow: also perfect. Standard.',
+  'The wristbands now come with a smaller wristband. Nobody knows why.',
+  'A guest rated the island ten out of ten and would island again.',
+  'Staff briefing: smile, point at the sea, repeat until sunset.',
+  'The resort cat has a suite of its own and pays for nothing.',
+  'DJ Coconut has been declared a national treasure by DJ Coconut.',
+  'Kids club today: making friends with absolutely anything at all.',
+  'The eleven o\'clock shanty went ahead. Attendance was everybody.',
+  'Cressida Vane reviewed the breakfast eggs and gave them six stars.',
+  'A guest asked for a quieter breeze. The terrace is looking into it.',
+  'Nigel is the first mate. Nigel is also just a man called Nigel.',
+  'A guest has arrived with a hat so enormous it needs its own chair.',
+  'The pirate cannon has been repurposed to launch beach balls.',
+  'The parrot repeated a guest complaint back at the guest. Awkward.',
+  'Every member of staff has said arrr today. Nigel said it sadly.',
+  'The towel situation is the real story today, says the front desk.',
+  'A guest would like to speak to the manager about the sea.',
+  // ── BEAT 2 · DENIAL. There is a hole. There is absolutely not a hole. ──
+  'Please do not mind the hole. Do enjoy an ice cream instead.',
+  'That is not a hole. That is a new pool, and there is no charge.',
+  'Nigel says there is no hole, madam. It is a shadow. A big one.',
+  'The hole is not on the resort map, so there is no hole. Simple.',
+  'Management says we do not do purple here. The case is closed.',
+  'A guest saw a hole. That same guest also saw a mermaid on Monday.',
+  'Barnaby squawked that it is a hole and was sent to his perch.',
+  'Nobody is being eaten. The front desk says that is only a rumour.',
+  'The hole ate a deckchair. We are calling that a laundry matter.',
+  'Mrs Fenwick-Hyde stepped in it and is blaming her sandals.',
+  'Maisie said there is a hole. Staff said there is a smoothie hut.',
+  'A cold smoothie solves most things, and Capt. Roger insists on it.',
 ], [
-  // — BEAT 3 · ALARM — dawning horror, delivered cheerfully. one "!" max. —
-  'please do not feed the hole. it has eaten. it has DEFINITELY eaten.',
-  'NIGEL: "the island is smaller, madam. your room is the same size."',
-  'BAY RADIO: everything is fine, at a slightly higher volume.',
-  'MRS FENWICK-HYDE would like to speak to whoever runs the hole.',
-  'guests are reminded that the hole is not part of the water park.',
-  'the GILDED LAGOON is advertising hole-free weekends. smug.',
-  'MAISIE fed the hole a biscuit. we said do not. she DID.',
-  'CAPT. ROGER: "a small hiccup, friends. do enjoy the buffet!"',
-  'BARNABY has learned the word evacuate. BARNABY loves it.',
-  'the staff meeting was held entirely at a brisk, dignified walk.',
-  'CRESSIDA VANE gave the hole two stars. it took her starter.',
-  'kids club is full. the three o\'clock activity is feeding the friend.',
-  'DJ COCONUT has switched to the tense playlist. we all know it.',
-  'CAPT. ROGER: "we are not evacuating. we are MINGLING outward."',
-  'NIGEL has confirmed nothing is wrong. in writing. twice. calmly.',
-  'CAPT. ROGER: "do not feed it. it is on a SCHEDULE."',
-  'CAPT. ROGER: "we are not worried. this is simply my worried hat."',
-  'CAPT. ROGER: "the hole is part of the entertainment programme."',
-  'CAPT. ROGER: "this is NOT an evacuation. this is a fun walk!"',
-  'CAPT. ROGER: "there is no hole. also do not go near the hole."',
-  'oh gosh. it ate the breakfast tent, with the breakfast still in it.',
-  'NIGEL: "we have always had a hole. it is very old. it is fine."',
-  'guests are jogging to the boats. we are calling it a morning jog.',
-  'CAPT. ROGER: "stay calm. I am calm. LOOK how calm I am."',
-  'the fun walk is now a fun run. same fun. considerably more legs.',
-  'it burped and the whole bay heard it. it smelled of melon. sorry.',
-  'CAPT. ROGER: "nobody panic. panicking is not included."',
-  'staff briefing: smile, point at the boats, keep smiling, go.',
-  'CAPT. ROGER: "oh gosh. I mean ARRR. I meant ARRR, friends."',
-  'there is a second hole now. we are not going to talk about that.',
-  'a guest counted the holes. she got to three. she has stopped now.',
+  // ── BEAT 3 · ALARM. Dawning horror, delivered cheerfully. One "!" max. ──
+  'Please do not feed the hole. It has eaten. It has definitely eaten.',
+  'Nigel says the island is smaller but your room is the same size.',
+  'Everything is fine, and is now being said at a higher volume.',
+  'Mrs Fenwick-Hyde would like to speak to whoever runs the hole.',
+  'Guests are reminded that the hole is not part of the water park.',
+  'The Gilded Lagoon is advertising hole-free weekends. So smug.',
+  'Maisie fed the hole a biscuit. We said do not. She did anyway.',
+  'A small hiccup, friends. Do please enjoy the enormous buffet!',
+  'Barnaby has learned the word evacuate and absolutely loves it.',
+  'The staff meeting was held entirely at a brisk, dignified walk.',
+  'Cressida Vane gave the hole two stars. It took her starter.',
+  'Kids club is full. The three o\'clock activity is feeding the friend.',
+  'DJ Coconut has moved to the tense playlist. Everybody noticed.',
+  'We are not evacuating. We are mingling outward, says Capt. Roger.',
+  'Nigel has confirmed in writing, twice, that nothing is wrong.',
+  'Do not feed it. The front desk says the hole is on a schedule.',
+  'Nobody here is worried. This is simply my worried hat, says Roger.',
+  'The hole is now part of the entertainment programme. Officially.',
+  'This is not an evacuation. This is a fun walk, says the tannoy!',
+  'There is no hole. Also, please do not go anywhere near the hole.',
+  'Oh dear. It ate the breakfast tent with the breakfast still in it.',
+  'Nigel says we have always had a hole. It is very old. It is fine.',
+  'Guests are jogging to the boats. We are calling it a morning jog.',
+  'Stay calm. Management is calm. Look how calm management is.',
+  'The fun walk is now a fun run. Same fun, considerably more legs.',
+  'It burped and the whole bay heard it. It smelled of melon. Sorry.',
+  'Nobody panic. Panicking is not included in your package.',
+  'Capt. Roger said oh dear, and then remembered to say arrr.',
+  'There is a second hole now. We are not going to talk about that.',
+  'A guest counted the holes and got to three. She has stopped now.',
+  'The towel situation has resolved itself. There are no towels.',
+  'The water slide queue has gone. So has the water slide. Sorry.',
 ], [
-  // — BEAT 4 · PANIC — everything is gone and the upselling continues. —
-  'CAPT. ROGER: "everything is GONE!! book now, prices slashed."',
-  'NIGEL is still at the front desk. the front desk is on the water.',
-  'BARNABY was right. BARNABY was always right. BARNABY knows it.',
-  'MRS FENWICK-HYDE would like to speak to the manager of the ocean.',
-  'the GILDED LAGOON has stopped gloating. that is the scary part.',
-  'MAISIE has adopted the hole. paperwork pending. its name is Gary.',
-  'CRESSIDA VANE, final review: "ate the island. lovely staff."',
-  'BAY RADIO is broadcasting from a pool float. signal: excellent.',
-  'DJ COCONUT is seeing us out from a raft. an absolute professional.',
-  'a guest asked about the wifi. there is no wifi. there is no lobby.',
-  'the resort was rated one star. "was eaten, otherwise quite lovely."',
-  'kids club update: everybody drew the hole. every single one.',
-  'CAPT. ROGER: still in the blazer, still smiling, still upselling.',
-  'the buffet is GONE!! all of it. even the melon. especially that.',
-  'lost property: one island. please enquire at the front desk.',
-  'CAPT. ROGER: "goodbye from PIRATE BAY. do leave us a review."',
-  'CAPT. ROGER: "same time next year!! bring a bigger boat."',
-  'CAPT. ROGER: "all gone. have you considered our spa package?"',
-  'CAPT. ROGER, waist deep, is reading out tomorrow\'s activities.',
-  'CAPT. ROGER: "I remain, technically and legally, a captain."',
-  'it ate the buffet, the bar, and the bar man\'s hat. the HAT.',
-  'somebody burped. it was not a person. we are all leaving now.',
-  'CAPT. ROGER: "still no hole!! just a lot of MISSING island."',
-  'another hole has opened beside the first one. they are MULTIPLYING.',
-  'there are three of them now. THREE. we have stopped counting.',
-  'the resort cat got out. the resort cat is FINE. we checked twice.',
+  // ── BEAT 4 · PANIC. Everything is gone and the upselling continues. ──
+  'Everything has GONE!! Do book now, while there is still a now.',
+  'Nigel is at the front desk. The front desk is now on the water.',
+  'Barnaby was right. Barnaby was always right. Barnaby knows it.',
+  'Mrs Fenwick-Hyde would like to speak to the manager of the ocean.',
+  'The Gilded Lagoon has gone very quiet. That is quite something.',
+  'Maisie has adopted the hole. Its name is Gary. Paperwork pending.',
+  'Cressida Vane, final review: ate the island, lovely staff, four stars.',
+  'Bay Radio is broadcasting from a pool float. The signal is excellent.',
+  'DJ Coconut is seeing us all out from a raft. A total professional.',
+  'A guest asked about the wifi. There is no wifi. There is no lobby.',
+  'The resort has one star: was eaten, but otherwise really lovely.',
+  'Kids club update: every single child drew a picture of the hole.',
+  'Capt. Roger remains in the blazer, smiling, and still upselling.',
+  'The buffet has GONE!! All of it. Even the melon. Especially that.',
+  'Lost property: one island. Please enquire at the front desk.',
+  'Goodbye from Pirate Bay. Do please leave us a lovely review.',
+  'Same time next year, friends!! Do bring a slightly bigger boat.',
+  'It has all gone. Have you considered our spa package, madam?',
+  'Capt. Roger, waist deep, is reading out tomorrow\'s activities.',
+  'The first mate remains, technically and legally, a first mate.',
+  'It ate the buffet, the ice cream hut, and the towel man\'s hat.',
+  'Somebody burped and it was not a person. We are all leaving now.',
+  'Still no hole!! Just a very large amount of missing island.',
+  'Another hole has opened beside the first. They are MULTIPLYING.',
+  'There are three of them now. Three. We have stopped counting.',
+  'The resort cat got out. The resort cat is fine. We checked twice.',
+  'Nigel has taken a booking for August from a floating deckchair.',
+  'The conga line is still going. It is congaing out to sea now.',
 ]];
 
 // ── BEAT 4 · SIGN-OFF ─────────────────────────────────────────────────────────
-// The island is gone and CAPT. ROGER is still reading out the weather. These
-// are the *last words* of the arc, so they only go on air once the match is
-// genuinely over the hill — see `endgame` in pickNews, which reads devouredPct
-// and secondsLeft directly. A seven day forecast at 18% devoured is a lie.
-// Punctuation drops back to at most one "!": the panic is over, this is a
-// goodbye.
+// The island is gone and the broadcast is still doing the weather. These are the
+// *last words* of the arc, so they only go on air once the match is genuinely
+// over the hill — see `endgame` in pickNews, which reads devouredPct and
+// secondsLeft directly. A seven day forecast at 18% devoured is a lie.
+// Punctuation drops back to at most one "!": this is a goodbye, not a panic.
 const SIGN_OFF: string[] = [
-  'CAPT. ROGER, floating on a door, reads out the weather. sunny.',
-  'weather tomorrow: sunny, warm, and no island. lovely regardless.',
-  'CAPT. ROGER: "goodbye. tonight in dance cove: nothing. be there."',
-  'the island has gone. CAPT. ROGER is doing the seven day forecast.',
-  'CAPT. ROGER: "we are a boat resort now. we always were. arrr."',
-  'NIGEL, standing on water, took a booking for august. calm man.',
-  'MAISIE waves. Gary waves. everybody waves. a lovely end, really.',
-  'and now the sea. the sea is where the resort was. back to you, NIGEL.',
-  'BAY RADIO is signing off. the dance floor was open. it WAS open.',
-  'CAPT. ROGER: "goodbye from PIRATE BAY. wherever PIRATE BAY went."',
+  'Capt. Roger, floating on a door, reads out the weather. Sunny.',
+  'The forecast tomorrow: sunny, warm, and no island. Lovely anyway.',
+  'Goodbye. Tonight in Dance Cove there is nothing at all. Be there.',
+  'The island has gone and the seven day forecast is going ahead.',
+  'We are a boat resort now. We always were a boat resort. Arrr.',
+  'Nigel, standing on water, has taken a booking for August. Calm man.',
+  'Maisie waves. Gary waves. Everybody waves. A lovely end, really.',
+  'And now the sea, which is where the resort used to be. Back to you.',
+  'Bay Radio is signing off. The dance floor was open. It WAS open.',
+  'Goodbye from Pirate Bay, wherever Pirate Bay has gone.',
 ];
 
 // ── WHAT IT JUST ATE ──────────────────────────────────────────────────────────
@@ -568,71 +571,71 @@ const SIGN_OFF: string[] = [
 export type MealKind = 'house' | 'car' | 'big' | 'small';
 
 const MEAL_HOUSE: Pools = [[
-  'a house has gone. NIGEL has marked the room as cleaned.',
-  'a whole HOUSE. staff are calling it a very late checkout.',
-  'a house went down in one gulp. no chewing. no manners at all.',
-  'staff villa 4 is missing. staff villa 5 has gone very quiet.',
+  'A house has gone. Nigel has marked the room as cleaned.',
+  'A whole HOUSE. Staff are calling it a very late checkout.',
+  'A house went down in one gulp, with no chewing and no manners.',
+  'Staff villa four is missing. Villa five has gone very quiet.',
 ], [
-  'another house. that is three houses. who is counting? nobody!',
-  'a house went in whole. the doorbell rang on the way down. eek.',
-  'CAPT. ROGER: "houses are OPTIONAL at a resort, friends."',
-  'MRS FENWICK-HYDE: "that was a HOUSE. I had a NAP in there."',
+  'Another house. That is three houses. Nobody at all is counting.',
+  'A house went in whole. The doorbell rang on the way down. Eek.',
+  'Houses are optional at a resort, says a very relaxed tannoy.',
+  'Mrs Fenwick-Hyde says that was a HOUSE. She had a nap in there.',
 ], [
-  'every house has gone. CAPT. ROGER is offering a tent. not free.',
-  'the last house went in sideways. it did not fit. it went anyway.',
-  'the houses are GONE!! NIGEL is still turning down the beds.',
-  'CAPT. ROGER: "no houses, no housework. think POSITIVE, friends."',
+  'Every house has gone. Capt. Roger is offering a tent instead.',
+  'The last house went in sideways. It did not fit. It went anyway.',
+  'The houses have GONE!! Nigel is still turning down the beds.',
+  'No houses means no housework. Do think positive, friends.',
 ]];
 
 const MEAL_CAR: Pools = [[
-  'a parked car has gone. the valet insists he put it somewhere.',
-  'a car went in wheels first. the alarm went off inside it. rude.',
-  'a guest car is missing. NIGEL has logged it under valet, extreme.',
-  'a car. one bite. one burp. the bay applauded politely.',
+  'A parked car has gone. The valet insists he put it somewhere.',
+  'A car went in wheels first. Its alarm went off inside it. Rude.',
+  'A guest car is missing. Nigel has logged it as valet, extreme.',
+  'A car. One bite. One burp. The bay applauded politely.',
 ], [
-  'another car gone. the car park is now a park. a very nice park.',
-  'a car went down honking. it honked all the way. all of the way.',
-  'MRS FENWICK-HYDE: "my CAR. that car cost more than the hotel!"',
-  'CAPT. ROGER: "cars are so LOUD anyway. good riddance."',
+  'Another car gone. The car park is now a park. A very nice park.',
+  'A car went down honking. It honked all of the way down.',
+  'Mrs Fenwick-Hyde says that was her second favourite car.',
+  'Cars are terribly loud anyway, says the front desk. Good riddance.',
 ], [
-  'the last car has been eaten. its alarm is still going. somewhere.',
-  'the car park has gone. so has booth 2. Trev got out. Trev is fine.',
-  'CAPT. ROGER: "no cars, no traffic!! I call that a holiday."',
-  'a car went in and the radio kept playing. it is STILL playing.',
+  'The last car has been eaten. Its alarm is still going somewhere.',
+  'The car park has gone, and so has booth two. Trev is fine.',
+  'No cars means no traffic!! The tannoy calls that a holiday.',
+  'A car went in and its radio kept playing. It is STILL playing.',
 ]];
 
 const MEAL_BIG: Pools = [[
-  'a whole building has gone. NIGEL blinked. NIGEL actually blinked.',
-  'something enormous went in. the ground said whump. a good whump.',
-  'a landmark is missing. it was in all the brochures. all of them.',
-  'that was a big one. everybody felt it in their KNEES. everybody.',
+  'A whole building has gone. Nigel blinked. Nigel actually blinked.',
+  'Something enormous went in and the ground said whump. Good whump.',
+  'A landmark is missing. It was in every one of the brochures.',
+  'That was a big one. Everybody felt it in their knees. Everybody.',
 ], [
-  'a building went down whole. the bay wobbled. we all wobbled.',
-  'CAPT. ROGER: "the big one was UGLY anyway. I said it. it was me."',
-  'MRS FENWICK-HYDE: "was that the spa. tell me it was not the SPA."',
-  'it ate something enormous. it sounded like a bath draining. ugh.',
+  'A building went down whole. The bay wobbled. We all wobbled.',
+  'Capt. Roger says the big one was ugly anyway, and that was him.',
+  'Mrs Fenwick-Hyde asks whether that was the spa. It was the spa.',
+  'It ate something enormous. It sounded like a bath draining.',
 ], [
-  'the last big thing has gone. it went in slowly. very slowly.',
-  'CAPT. ROGER: "everything big has GONE!! only small things left."',
-  'the galleon went in last. it was not a real galleon. still sad.',
-  'the biggest bite yet. it had a little sit down after. we all did.',
+  'The last big thing has gone. It went in slowly. Very slowly.',
+  'Everything big has GONE!! Only the small things are left now.',
+  'The galleon went in last. It was not a real galleon. Still sad.',
+  'The biggest bite yet. It had a little sit down afterwards.',
 ]];
 
 const MEAL_SMALL: Pools = [[
-  'it ate a bin. one bin. one tiny burp. honestly rather cute.',
-  'a lounger is missing. so is the towel. so is the book. good book.',
-  'a small snack was taken by the pool. staff are not bothered.',
-  'it ate one flip-flop. the other is still on the beach. so sad.',
+  'It ate a bin. One bin. One tiny burp. Honestly rather cute.',
+  'A lounger is missing, and so is the towel, and so is the book.',
+  'A small snack was taken by the pool. Staff are not bothered.',
+  'It ate one flip-flop. The other is still on the beach. So sad.',
 ], [
-  'still snacking. bins, cones, and somebody\'s entire HAT. the HAT.',
-  'it ate a deckchair, burped, then took another deckchair. RUDE.',
-  'CAPT. ROGER: "it only ate a SMALL thing. we have hundreds!"',
-  'it ate the ice bucket. with the ice in it. the crunching was awful.',
+  'Still snacking. Bins, cones, and somebody\'s entire enormous hat.',
+  'It ate a deckchair, burped, then took another deckchair. Rude.',
+  'It only ate a small thing, says the tannoy. We have hundreds.',
+  'It ate the ice bucket with the ice still in it. Awful crunching.',
 ], [
-  'nothing big is left. it is eating crumbs now. loud, angry crumbs.',
-  'it ate the last umbrella. it did not even WANT the umbrella.',
-  'down to bits and bobs. it is HOOVERING the beach. genuinely.',
-  'last snack: one melon. it was ALWAYS going to be the melon.',
+  'Nothing big is left. It is eating crumbs now. Loud, angry crumbs.',
+  'It ate the last umbrella. It did not even WANT the umbrella.',
+  'Down to bits and bobs. It is HOOVERING the beach. Genuinely.',
+  'The last snack was one melon. It was always going to be melon.',
 ]];
 
 const BY_MEAL: Record<MealKind, Pools> = {
@@ -652,58 +655,62 @@ export function mealKind(meal: string): MealKind {
 //  {F} form   {M} last meal   {P} pct   {R} 100-pct   {S} seconds   {D} district
 //  Those SIX are the entire vocabulary. There is no rival token and there never
 //  will be — `usable()` blocks any template carrying anything else.
+//  Never start a line with {D} or {M}: they arrive lower case and a sentence
+//  must begin with a capital.
 const LIVE: Pools = [[
-  'CAPT. ROGER: "the {F} is a guest. do give it space, friends."',
-  'a {F} was seen at {D}. staff waved. it sort of waved back.',
-  'it ate {M}. NIGEL has logged this under turndown service.',
-  'MAISIE fed the {F}. the {F} said thank you. probably.',
-  'guest review of {D}: five stars, one hole. still five stars.',
-  'lost property: {M}. found property: nothing at all.',
-  'CAPT. ROGER: "the {F} is THEMED. everything here is themed."',
-  'MRS FENWICK-HYDE: "something ate {M}. was that included?"',
-  'poll: is the purple thing getting bigger? {P}% say yes.',
-  'a {F} has checked in. no booking, no luggage, no problem.',
-  'CRESSIDA VANE reviewed {M}. "eaten. no notes. bravo."',
-  'NIGEL confirmed your booking at {D}. and the {F}\'s booking.',
-  'BARNABY saw a {F} at {D}. BARNABY told everyone. loudly.',
-  'staff are calling it a {F} now. staff named it themselves.',
-  'CAPT. ROGER offered the {F} a lounger at {D}. it declined.',
-  'CAPT. ROGER: "a {F}. how DELIGHTFUL. do not approach it."',
+  'Capt. Roger says the {F} is a guest and should be given space.',
+  'A {F} was seen at {D}. Staff waved and it waved back.',
+  'It ate {M}. Nigel has logged this under turndown service.',
+  'Maisie fed the {F}. The {F} said thank you, probably.',
+  'Guest review of {D}: five stars, one hole, still five stars.',
+  'Lost property: {M}. Found property: nothing at all today.',
+  'The {F} is themed. Everything at this resort is themed.',
+  'Mrs Fenwick-Hyde asks if {M} was included in her package.',
+  'Guests were asked if the purple thing is bigger. {P}% said yes.',
+  'A {F} has checked in with no booking and no luggage at all.',
+  'Cressida Vane reviewed {M}. Her note says: eaten, bravo.',
+  'Nigel confirmed your booking at {D}. And the {F}\'s.',
+  'Barnaby saw a {F} at {D} and told everybody. Loudly.',
+  'Staff are calling it a {F} now. Staff named it themselves.',
+  'A {F} was offered a lounger. The {F} politely declined.',
+  'A {F} at {D}. How delightful. Please do not approach it.',
+  'The {F} at {D} has been given a wristband. It fits.',
 ], [
-  'CAPT. ROGER: "a {F} at {D}? that is a FEATURE, friends."',
-  'we are evacuating {D}. politely. with drinks. in a neat line.',
-  'it ate {M}. somebody owned that. somebody is upset.',
-  '{P}% of the resort has gone. there are still no refunds.',
-  'MRS FENWICK-HYDE: "{P}% is basically none percent, surely?"',
-  'do not book {D}. that is precisely where the {F} is.',
-  'MAISIE has named the {F}. it answers to the name now.',
-  'NIGEL: "we have moved {D}, madam. inward. only slightly."',
-  'a {F} ate {M}. it would now like to see the menu.',
-  'CAPT. ROGER: "the {F} is small. ish. smallish. roughly."',
-  '{P}% devoured. the other {R}% is queuing at the ice cream hut.',
-  'the GILDED LAGOON has asked how {D} is going. rude of them.',
-  'CAPT. ROGER: "{P}% is a rounding error. round it DOWN."',
-  'CAPT. ROGER: "{D}: closed for refurbishment. by a {F}."',
-  'CAPT. ROGER: "it only ate {M}. we have LOADS of those!"',
-  'a second {F} has been reported at {D}. that makes two.',
+  'A {F} at {D}? The front desk calls that a feature.',
+  'We are evacuating {D}. Politely. With ice creams. In one line.',
+  'It ate {M}. Somebody owned that. Somebody is very upset.',
+  '{P}% of the resort has gone. The buffet is still on, though.',
+  'Mrs Fenwick-Hyde says {P}% is basically none percent, surely.',
+  'Do not book {D}. That is exactly where the {F} is.',
+  'Maisie has named the {F} and it answers to the name now.',
+  'Nigel reports that {D} has moved inward. Only slightly.',
+  'A {F} ate {M}. It would like the menu.',
+  'The {F} is small. Smallish. Roughly smallish, says the tannoy.',
+  '{P}% has been devoured. The other {R}% is queuing for ice cream.',
+  'The Gilded Lagoon asked how {D} is going. Rude of them, frankly.',
+  'Capt. Roger says {P}% is a rounding error. Do round it down.',
+  'A {F} has closed {D} for refurbishment.',
+  'It only ate {M}. Management says we have loads of those.',
+  'A second {F} has been reported at {D}. That makes two.',
+  'The {F} was offered a towel. The {F} took the towel.',
 ], [
-  '{D}: GONE!! the towels there were reserved.',
-  '{P}% DEVOURED. the other {R}% is queuing for a boat.',
-  'the {F} ate {M}. it is now asking about pudding.',
-  '{S} SECONDS LEFT!! everybody conga to the boats.',
-  'CAPT. ROGER: "{D}: all gone. tours resume at four regardless."',
-  'MRS FENWICK-HYDE: "{M}? I was USING that."',
-  'a {F} now owns {P}% of a luxury resort. good for it, honestly.',
-  'NIGEL has confirmed the {F}\'s late checkout. a very late one.',
-  '{S} SECONDS LEFT. finish your ice creams calmly. and quickly.',
-  'MAISIE says the {F} is just hungry. MAISIE gets it.',
-  'CAPT. ROGER: "{P}% gone. that is {R}% still AMAZING."',
-  'the {F} ate {M}. it looked so pleased.',
-  '{S} SECONDS LEFT and the spa is somehow still bookable.',
-  'CAPT. ROGER: "the {F} ate {M}. good choice."',
-  'CAPT. ROGER: "{S} seconds left!! last orders at the ice cream hut."',
-  'CAPT. ROGER: "{D}: all gone. the memories are FREE."',
-  'there are two of them at {D} now. TWO. we are leaving.',
+  'It has eaten {D}!! The towels there were all reserved.',
+  '{P}% has been DEVOURED. The other {R}% is queuing for a boat.',
+  'The {F} ate {M}. It is asking about pudding.',
+  'There are {S} seconds left!! Everybody conga to the boats.',
+  'Capt. Roger says {D} has gone. Tours resume at four regardless.',
+  'Mrs Fenwick-Hyde says she was using {M}.',
+  'A {F} now owns {P}% of a luxury resort. Good for it, honestly.',
+  'Nigel has confirmed the {F}\'s late checkout. A very late one.',
+  'There are {S} seconds left. Finish your ice creams quickly.',
+  'Maisie says the {F} is only hungry. Maisie understands it.',
+  'The tannoy says {P}% gone leaves {R}% still absolutely amazing.',
+  'The {F} ate {M} and looked extremely pleased.',
+  'There are {S} seconds left and the spa is still bookable.',
+  'The {F} ate {M}. A very good choice.',
+  'Only {S} seconds left!! The ice cream hut is still serving.',
+  'Capt. Roger says {D} has gone, but the memories are free.',
+  'There are two of them at {D} now. Two. We are leaving.',
 ]];
 
 // ── selection ─────────────────────────────────────────────────────────────────
@@ -754,7 +761,7 @@ function bind(ctx: NewsCtx): Filled {
     rest: 100 - pct,
     form: clip(ctx.form || 'VOIDLING', 14),
     meal: clip(ctx.lastMeal || 'the buffet', 22),
-    dist: ctx.district ? DIST_NAME[ctx.district] : 'PIRATE BAY',
+    dist: ctx.district ? DIST_NAME[ctx.district] : 'Pirate Bay',
     secs: Math.max(1, Math.ceil(ctx.secondsLeft || 0)),
   };
 }
@@ -800,9 +807,9 @@ const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
  * One fully-formed headline, ready to drop straight into the ticker.
  *
  * THE ARC. Four beats, and the picker has the signal for all four:
- *   1 SIGN-ON   the first call of every match. good morning + real resort news.
- *   2 DENIAL    tier 0 — nobody connects the dots. have a cold drink.
- *   3 ALARM     tier 1 — dawning horror, cheerfully. the evacuation is a walk.
+ *   1 SIGN-ON   the first call of every match. Good morning + real resort news.
+ *   2 DENIAL    tier 0 — ordinary news beside a flat denial. Have an ice cream.
+ *   3 ALARM     tier 1 — dawning horror, cheerfully. The evacuation is a walk.
  *   4 PANIC     tier 2 — everything gone, still upselling, then the forecast.
  * `tier` is derived at the call site from devouredPct AND the player's form, so
  * a WORLD ENDER never gets a beat-2 line. Beat 1 is ours to guarantee.

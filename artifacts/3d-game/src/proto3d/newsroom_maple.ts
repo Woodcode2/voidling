@@ -3,45 +3,51 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //
 //  ┌──────────────────────────────────────────────────────────────────────────┐
-//  │  HOUSE STYLE. ONE RULE. EVERY LINE OBEYS IT. NO EXCEPTIONS.              │
-//  │  Identical to the PIRATE BAY newsroom — same game, one voice.            │
+//  │  HOUSE STYLE — REWRITTEN. READ THIS BEFORE YOU TOUCH A LINE.             │
+//  │  The old rule said "the body is LOWER CASE, always, including the first  │
+//  │  word". That rule is DEAD. It made the paper read like a broken robot    │
+//  │  and it is the reason the newsfeed was rejected twice. Identical to the  │
+//  │  PIRATE BAY newsroom — same game, one voice.                             │
 //  ├──────────────────────────────────────────────────────────────────────────┤
-//  │  1. THE BODY IS LOWER CASE. Always — including the first word of the     │
-//  │     line. The ticker is a voice, not a headline.                         │
-//  │  2. ALL CAPS IS THE JOKE OR THE PANIC. Never more than TWO capitalised   │
-//  │     words in a line, and most lines have none. Caps is the punchline     │
-//  │     landing, so if everything is capitalised nothing is.                 │
-//  │  3. A NAME IS CAPS. The recurring cast are always capitalised —          │
-//  │     MAYOR DINKLE, GUS, PEARL, TATER — as is MAPLE FALLS itself and the   │
-//  │     BUGLE and the OTTERS. Cast names do NOT count against the two-word   │
-//  │     caps budget. Everything else — streets, districts, the fairgrounds,  │
-//  │     the twine ball — is lower case. The hole's pet name is written like  │
-//  │     an ordinary name (Steve), because it is affectionate, not a          │
-//  │     masthead.                                                            │
-//  │  4. PUNCTUATION ESCALATES WITH THE BEAT. This is how the arc is *felt*   │
-//  │     rather than merely described:                                        │
+//  │  1. WRITE PROPER ENGLISH SENTENCES. Capital letter at the start. Full    │
+//  │     stop at the end. Proper nouns capitalised normally — Mayor Dinkle,   │
+//  │     Gus, Pearl, Tater, Maple Falls, Pike Hollow. NOT in caps.            │
+//  │  2. CAPS IS THE JOKE OR THE PANIC, and nothing else. At most TWO         │
+//  │     capitalised words in a line, and most lines have none. {TOKENS} do   │
+//  │     not count — the game supplies those in caps.                         │
+//  │  3. ONE JOKE PER LINE, and it must land for a SIX-YEAR-OLD: an animal    │
+//  │     doing something absurd, a grown-up refusing to admit something       │
+//  │     obvious, something enormous described as normal, somebody's lunch    │
+//  │     going missing. Not clever. Silly.                                    │
+//  │  4. PUNCTUATION ESCALATES WITH THE BEAT. This is how the arc is felt.    │
 //  │        BEAT 1 sign-on  — exactly ONE "!", and it lands on the greeting.  │
-//  │        BEAT 2 denial   — ZERO "!". the town is completely calm.          │
-//  │        BEAT 3 alarm    — at most ONE "!". cheerfulness under strain.     │
+//  │        BEAT 2 denial   — ZERO "!". The town is completely calm.          │
+//  │        BEAT 3 alarm    — at most ONE "!". Cheerfulness under strain.     │
 //  │        BEAT 4 panic    — at most ONE "!!" and never a lone "!".          │
-//  │        BEAT 4 sign-off — back to at most ONE "!". calm goodbye.          │
-//  │     One "?" per line, max. No "?!", no "…", no em dashes, no ALL-CAPS    │
-//  │     SENTENCES. Full stops do the work.                                   │
+//  │        BEAT 4 sign-off — back to at most ONE "!". A calm goodnight.      │
+//  │     One "?" per line, max. No "?!", no ellipsis, no em dashes.           │
+//  │  5. NO RUNNING GAG OWNS THE FEED. No character and no bit may appear in  │
+//  │     more than ~8% of lines. THE PIE JOKES ARE RETIRED — no pies, no pie  │
+//  │     contest, no bake sale, ever again. The variety IS the brief: a very   │
+//  │     large zucchini, the library's one computer, a sinkhole in the car    │
+//  │     park, the second-biggest ball of twine, a dog that opens doors, the  │
+//  │     marching band, a raccoon in the vending machine, a trampoline up a   │
+//  │     tree, somebody's lunch going missing.                                │
 //  └──────────────────────────────────────────────────────────────────────────┘
 //
 //  THE ARC, in four beats:
 //
-//  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed. A good morning and a
-//                    REAL local news item — the diner has pie, the goat is out
-//                    again, the bake sale is saturday. Nothing about the hole.
-//  BEAT 2  DENIAL    tier 0. Nobody connects the dots. Ordinary small-town news
-//                    running alongside a mayor who says the hole is a puddle.
+//  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed, and ALWAYS opens
+//                    "Good morning, Maple Falls!" followed by a real, silly
+//                    local news item. Nothing about the hole.
+//  BEAT 2  DENIAL    tier 0. Ordinary small-town news running alongside a mayor
+//                    who insists the hole is a puddle.
 //  BEAT 3  ALARM     tier 1. Dawning horror, delivered cheerfully. The
 //                    evacuation is a FUN WALK. The paper goes to four pages.
 //                    Nobody admits anything.
-//  BEAT 4  PANIC     tier 2. The town is gone and the argument about the
-//                    parking meter has not stopped. Then CARLA WEBB reads the
-//                    weather from a field.
+//  BEAT 4  PANIC     tier 2. The town is going and the argument about the
+//                    parking meter has not stopped. Then the weather, from a
+//                    field.
 //
 //  THE RULE ABOUT THE HOLE. The news covers ONE thing: a hole is eating Maple
 //  Falls. Nobody in this town has any way of knowing that some *other* hole
@@ -51,28 +57,26 @@
 //  rival field, `fill()` knows no rival token, and `usable()` refuses point
 //  blank to air any template containing a token outside {D}{M}{F}{P}{R}{S}.
 //
-//  THE ELECTION IS ONE RUNNING GAG, NOT THE SPINE. It sits alongside the pie
-//  contest, the ball of twine, the OTTERS, the fair, the parking meter and the
-//  loose goat, and it never leads more than one sign-on in eight. There are
-//  exactly TWO candidates and there will only ever be two.
+//  RATED 4+. NO real politics of any kind — no election, no voting, no polls,
+//  no candidates, no recounts. Mayor Dinkle is funny because he will not admit
+//  an obvious hole, not because of any office he holds. No alcohol, no money
+//  trouble, nothing frightening, nothing mean about how anybody looks, nothing
+//  a child would repeat at school and get in trouble for.
 //
 //  Recurring cast (reuse IS the joke — do not add one-off names):
-//    MAYOR DINKLE   incumbent. the hole is not real. later: it is real, but RUDE.
-//    DEB HOLLIS     the challenger. one policy: she is not MAYOR DINKLE.
-//    GUS            owns the diner. has an opinion. you did not ask. here it is.
-//    CARLA WEBB     the MAPLE FALLS BUGLE. circulation 40. career-defining week.
-//    PEARL          runs the pie contest. judges the pie contest. wins it. 11 yrs.
-//    TATER (9)      thinks the hole is great. names it Steve. is right throughout.
-//    DALE           his whole personality is his lawn. the two-inch court case.
-//    MARGE          nine years protesting one parking meter. will not be deterred.
-//    THE GOAT       loose. always loose. knows more than anybody else in town.
-//    PIKE HOLLOW    the smug rival town over the county line. they got a roundabout.
+//    Mayor Dinkle   the hole is not real. Later: it is real, but RUDE.
+//    Gus            owns the diner. Has an opinion. You did not ask. Here it is.
+//    Carla Webb     the Maple Falls Bugle. Circulation 40. Career-defining week.
+//    Pearl          grows vegetables the size of furniture. Utterly calm.
+//    Tater (9)      thinks the hole is great. Names it Steve. Right throughout.
+//    Dale           his whole personality is his lawn. The two-inch court case.
+//    Marge          nine years protesting one parking meter. Will not be moved.
+//    the goat       loose. Always loose. Knows more than anybody else in town.
+//    Biscuit        a dog who has learned to open doors. All of the doors.
+//    Pike Hollow    the smug rival town over the county line. They got a roundabout.
 //
-//  Register: warm, silly, small-town self-importance. Ages 6-11. Concrete nouns,
-//  short sentences, silly over clever. NO real politics, no parties, no policy,
-//  no menace, nobody gets hurt. The joke is that a town this small can have this
-//  many feuds — never politics itself.
-//  Lines render in a one-line phone ticker — aim under ~62 chars, hard cap 78.
+//  Lines render in a one-line phone ticker — aim under ~64 chars, hard cap 78
+//  AT WORST-CASE TOKEN FILL (a 14-char form plus a 22-char meal).
 // ══════════════════════════════════════════════════════════════════════════════
 
 export type NewsTier = 0 | 1 | 2;
@@ -104,33 +108,34 @@ export const MAPLE_BRAND: [string, string, string] = [
 ];
 
 // ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
-// Good morning, and here is a REAL piece of local news. Not a joke about the
-// hole — as far as this town is concerned the hole has not happened yet. This
+// ALWAYS begins "Good morning, Maple Falls!" and then a real, silly, local news
+// item — as far as this town is concerned the hole has not happened yet. This
 // fires FIRST, guaranteed, before any other headline (see `signedOn`).
 // No {templates} — the sign-on must never depend on match state.
-// ONE of the eight leads on the election. Exactly one. The other seven lead on
-// pie, the twine ball, the OTTERS, the fair, the library and a loose goat,
-// which is what this town is actually about.
 // Punctuation: exactly one "!", on the greeting. That is the whole allowance.
 const SIGN_ON: string[] = [
-  'GOOD MORNING, MAPLE FALLS! the diner has pie today. that is the news.',
-  'GOOD MORNING! population 1,412, and all of them are already awake.',
-  'GOOD MORNING, MAPLE FALLS! the ball of twine is still second biggest.',
-  'GOOD MORNING! go OTTERS. nought and nine so far, but still. go OTTERS.',
-  'GOOD MORNING! bake sale saturday at the church hall. bring a plate.',
-  'GOOD MORNING, MAPLE FALLS! the fair is open and a goat is loose again.',
-  'GOOD MORNING! the library has a new chair. it is a very good chair.',
-  'GOOD MORNING, MAPLE FALLS! the election is tuesday. do not forget.',
+  'Good morning, Maple Falls! A goat is loose on Main Street again.',
+  'Good morning, Maple Falls! Pearl has grown a zucchini the size of a dog.',
+  'Good morning, Maple Falls! The ball of twine is still second biggest.',
+  'Good morning, Maple Falls! Go Otters. Nought and nine, but go Otters.',
+  'Good morning, Maple Falls! A raccoon is living in the vending machine.',
+  'Good morning, Maple Falls! The library computer has finished starting up.',
+  'Good morning, Maple Falls! Somebody\'s trampoline is up a tree again.',
+  'Good morning, Maple Falls! The marching band knows one song. Enjoy it.',
+  'Good morning, Maple Falls! There is a sinkhole in the diner car park.',
+  'Good morning, Maple Falls! Biscuit the dog can open doors now. All doors.',
+  'Good morning, Maple Falls! Gus has lost his lunch. Somebody else has it.',
+  'Good morning, Maple Falls! The town clock is nine minutes fast. It stays.',
 ];
 
-/** Ticker-friendly district names, used to fill {D}. Lower case — see rule 3. */
+/** Ticker-friendly district names, used to fill {D}. Longest is 15 chars. */
 const DIST_NAME: Record<MapleDist, string> = {
-  mainst: 'main street',
+  mainst: 'Main Street',
   fair: 'the fairgrounds',
   school: 'the high school',
   farm: 'the farms',
   lake: 'the lakeside',
-  woods: 'pine woods',
+  woods: 'Pine Woods',
   strip: 'the strip',
   burb: 'the suburbs',
   civic: 'the courthouse',
@@ -139,391 +144,356 @@ const DIST_NAME: Record<MapleDist, string> = {
 type Pools = [string[], string[], string[]];
 
 // ── MAIN STREET ───────────────────────────────────────────────────────────────
-// town hall, the diner GUS runs, the barber, and MARGE's nine-year meter vigil
+// the diner, the barber, town hall, a clock nobody will fix, a dog with a plan
 const MAINST: Pools = [[
-  'GUS at the diner: "you want my opinion? here it comes anyway."',
-  'the parking meter protest has entered year nine. four people. proud.',
-  'the barber gives one haircut. he has given it since 1988.',
-  'the town hall clock is nine minutes fast. it was voted on. it stays.',
-  'the BUGLE has a circulation of 40. all forty of them read it.',
-  'diner coffee is still 90 cents. the sign says so. LEGALLY.',
-  'MARGE has chained herself to the meter. gently. for the photo.',
-  'DALE mowed the grass outside town hall. nobody asked him to.',
-  'GUS banned a man for life. the man ordered lunch. GUS served him.',
-  'town hall agenda, item 1 of 1: the meter. it is always the meter.',
-  'the barber has opinions about the meter. STRONG barber opinions.',
-  'a new bench downtown. the plaque credits MAYOR DINKLE. DALE built it.',
-  'CARLA WEBB has covered eleven town hall meetings. not one vote.',
-  'the goat got into the barber shop. the goat now has a haircut.',
-  'MAYOR DINKLE cut a ribbon on the ribbon shop. the third time.',
-  'somebody parked in front of the diner all day. the street is talking.',
+  'Gus at the diner has an opinion. You did not ask. Here it comes.',
+  'The parking meter protest has reached year nine. Four people. Proud.',
+  'The barber gives one haircut. He has given it since 1988.',
+  'The town hall clock is nine minutes fast. Nobody is fixing it.',
+  'Gus made a sandwich, put it down, and now the sandwich has gone.',
+  'Marge has chained herself to the meter, gently, for the photograph.',
+  'Dale mowed the grass outside town hall. Nobody asked him to.',
+  'Gus banned a man for life. The man ordered lunch. Gus served him.',
+  'The town hall agenda has one item on it, and the item is the meter.',
+  'There is a new bench downtown. The plaque thanks the mayor. Dale built it.',
+  'The goat got into the barber shop. The goat now has a haircut.',
+  'Biscuit the dog opened the diner door and served himself bacon.',
+  'Somebody parked outside the diner all day and the street is talking.',
 ], [
-  'MAYOR DINKLE: "main street is FINE. main street is a CONCEPT."',
-  'GUS closed the diner. GUS reopened the diner. GUS is not leaving.',
-  'MARGE will not move. the meter is still the real issue. STILL.',
-  'CARLA WEBB has a front page at last. she has waited nineteen years.',
-  'the barber shop is down to one chair. still a forty minute wait.',
-  'the town hall clock is now eleven minutes fast. nobody has fixed it.',
-  'DALE edged around the hole. a crisp line. honestly, a crisp line.',
-  'the press conference was held in a shrinking car park. undeterred.',
-  'the booth by the window has gone. that was the booth MARGE sits in.',
-  'the goat is on the roof of the diner. the goat has the right idea!',
-  'DEB HOLLIS: "the hole downtown is DINKLE-shaped." bold. effective.',
+  'The mayor says Main Street is fine. Main Street is a concept.',
+  'Gus closed the diner, then reopened it. Gus is not leaving.',
+  'Marge will not move. The meter is still the real issue here.',
+  'Carla Webb has a front page at last, after nineteen quiet years.',
+  'The barber shop is down to one chair and a forty minute wait.',
+  'The town clock is eleven minutes fast now. It is trying its best.',
+  'Dale edged around the hole. A crisp line. Honestly, a crisp line.',
+  'The window booth has gone. That was the booth Marge sits in.',
+  'The goat is on the roof of the diner. The goat had the right idea!',
+  'Biscuit has opened every door on Main Street. Every single one.',
 ], [
-  'MAYOR DINKLE: "I never said it was fake. I said it was RUDE."',
-  'GUS is serving coffee off a card table. 90 cents. still LEGALLY.',
-  'the meter survived!! MARGE is furious. MARGE keeps protesting.',
-  'CARLA WEBB filed the story. circulation is now 41. a huge night.',
-  'town hall has gone. the clock is still floating. still eleven fast.',
-  'the barber gave one last haircut. it was the same haircut.',
-  'DALE mowed where town hall used to be. somebody has to, folks.',
-  'four people are still protesting a meter in an empty lot. legends.',
-  'the goat is fine. the goat was ALWAYS going to be fine.',
-  'DEB HOLLIS won. DEB HOLLIS is now the mayor of a hole. well done.',
+  'The mayor says he never called it fake. He called it RUDE.',
+  'Gus is serving coffee off a card table and taking no questions.',
+  'The meter survived!! Marge is furious and is still protesting.',
+  'Carla Webb filed the story. Circulation is now 41. A huge night.',
+  'Town hall has gone. The clock is floating, still eleven fast.',
+  'The barber gave one last haircut, and it was the same haircut.',
+  'Dale mowed where town hall used to be. Somebody has to, folks.',
+  'The goat is fine. The goat was always going to be fine.',
+  'Biscuit opened one last door. There was no house behind it.',
 ]];
 
 // ── THE FAIRGROUNDS ───────────────────────────────────────────────────────────
-// PEARL's eleven-year pie dynasty, the prize hog, and a permanently stuck wheel
+// a stuck ferris wheel car, a prize hog, an unwinnable ring toss, giant veg
 const FAIR: Pools = [[
-  'PEARL won the pie contest. PEARL also judges the pie contest.',
-  'the pie contest has been disputed eleven years running. eleven.',
-  'the prize hog is named after MAYOR DINKLE. he calls it an honour.',
-  'the tractor pull was won by a tractor. the other tractors object.',
-  'funnel cake stand against funnel cake stand. a delicious feud.',
-  'the ferris wheel has eleven cars. one is stuck at the top. always.',
-  'the goat got out of the goat tent again. the goat is undefeated.',
-  'DEB HOLLIS handed out flyers in the corn dog queue. a captive crowd.',
-  'CARLA WEBB covered the pie contest like it was the moon landing.',
-  'a blue ribbon for the largest zucchini. it is unsettling. it is.',
-  'GUS entered a pie. GUS lost to PEARL. GUS entered again. respect.',
-  'TATER, 9, won the science fair with a drawing of a purple hole.',
-  'the recipe PEARL uses is a family secret. even her family suspects.',
-  'the ring toss has been unwinnable since 1994. one boy won. once.',
-  'DALE entered the lawn category. there is no lawn category. yet.',
-  'the demolition derby is postponed. everyone brought the same truck.',
+  'Pearl has entered a zucchini so large it arrived on a trailer.',
+  'The prize hog is named after the mayor. He calls it an honour.',
+  'The tractor pull was won by a tractor. The other tractors object.',
+  'The ferris wheel has eleven cars. One is stuck at the top. Always.',
+  'The goat got out of the goat tent again. The goat is undefeated.',
+  'Carla Webb covered the vegetable weigh-in like it was the moon landing.',
+  'A blue ribbon went to the largest cabbage. It is faintly unsettling.',
+  'Tater, aged nine, won the science fair with a drawing of a hole.',
+  'The ring toss has been unwinnable since 1994. One boy won once.',
+  'Dale entered the lawn category. There is no lawn category. Yet.',
+  'The demolition derby is off. Everybody brought the same truck.',
+  'A raccoon has been found inside the funnel cake stand. Again.',
+  'The corn dog queue is now longer than the actual county fair.',
 ], [
-  'PEARL evacuated the pies first. then more pies. then the people.',
-  'the pie contest continues. the hole is not eligible. PEARL checked.',
-  'the ferris wheel is down to nine cars. the stuck one is still stuck.',
-  'the prize hog has fled. MAYOR DINKLE calls this entirely unrelated.',
-  'MAYOR DINKLE: "the fairgrounds are being RESIZED. it is by design."',
-  'the goat has taken charge of the fairground. the goat leads. we go!',
-  'TATER is feeding it funnel cake. TATER says it prefers cinnamon.',
-  'the tractor pull is cancelled. the tractors pulled. away. quickly.',
-  'CARLA WEBB asked PEARL if the pies are safe. the pies are safe.',
-  'the stuck ferris wheel car has the best view in the county. sorry.',
+  'Pearl has evacuated the zucchini. It took four adults and a trailer.',
+  'The ferris wheel is down to nine cars. The stuck one is still stuck.',
+  'The prize hog has fled. The mayor calls this entirely unrelated.',
+  'Town hall says the fairgrounds are being resized on purpose.',
+  'The goat has taken charge of the fairground. We are following it.',
+  'Tater is feeding it funnel cake and says it prefers cinnamon.',
+  'The tractor pull is cancelled. The tractors pulled away. Quickly.',
+  'Carla Webb asked if the zucchini is safe. The zucchini is safe.',
+  'The stuck ferris wheel car has the best view in the whole county.',
+  'The raccoon has left the funnel cake stand. It took the funnel.',
 ], [
-  'PEARL won year twelve. one entrant. and somehow still disputed.',
-  'the fairgrounds have GONE!! the pies are fine. PEARL saw to that.',
-  'the ferris wheel is down to one car. still stuck. still at the top.',
-  'the ring toss has gone. nobody ever won it. except that one boy.',
-  'MAYOR DINKLE: "we will rebuild the fair. smaller. and cuter."',
-  'TATER gave it a blue ribbon. it fits. it fits it really well.',
-  'the prize hog reached PIKE HOLLOW. good luck anyway, hog.',
-  'GUS finally beat PEARL. by default. GUS is not celebrating. much.',
-  'the zucchini survived. of course it survived. look at the thing.',
-  'the goat got out and two children went with it. what a goat.',
+  'The fairgrounds have GONE!! The zucchini is safe on a trailer.',
+  'The ferris wheel is down to one car, still stuck at the very top.',
+  'The ring toss has gone. Nobody ever won it, except that one boy.',
+  'The mayor says we will rebuild the fair, smaller and much cuter.',
+  'Tater gave it a blue ribbon. It fits it really rather well.',
+  'The prize hog reached Pike Hollow. Good luck anyway, hog.',
+  'The zucchini survived. Of course it survived. Look at the thing.',
+  'The goat got out and two children went with it. What a goat.',
+  'The raccoon left on the last truck, holding a corn dog. A legend.',
 ]];
 
 // ── THE HIGH SCHOOL ───────────────────────────────────────────────────────────
-// the OTTERS (two and eight), one trophy from 1978, a band with one song
+// the Otters (nought and nine), one trophy from 1978, a band with one song
 const SCHOOL: Pools = [[
-  'the OTTERS are two and eight. the town is fully behind them.',
-  'the homecoming float budget is twice the school library budget.',
-  'the coach benched his own nephew. family dinner was very tense.',
-  'the marching band knows one song. the town knows it TOO well.',
-  'the school board argued three hours about a snack machine. no vote.',
-  'the trophy case holds one trophy. it is from 1978. it is polished.',
-  'TATER, 9, is not in high school. TATER attends anyway. nobody minds.',
-  'the pep rally was replaced with a pep rally about the pep rally.',
-  'the field is named after a man nobody can identify. plaque worn off.',
-  'the chemistry teacher drives the bus, coaches track, and is tired.',
-  'CARLA WEBB filed 900 words on a junior scrimmage. nine hundred.',
-  'the cheer squad spells out MAPLE. there are four of them. brave.',
-  'PIKE HOLLOW leads the series 41 to 3. we do not discuss the series.',
-  'the senior prank was mowing a shape into the field. DALE was upset.',
-  'a goat got into the gym. the goat has been made team mascot.',
-  'DEB HOLLIS was prom queen in 1994. she mentions this daily. daily.',
+  'The Otters are nought and nine. The town is fully behind them.',
+  'The homecoming float is somehow larger than the school library.',
+  'The coach benched his own nephew. Family dinner was very tense.',
+  'The marching band knows one song. The town knows it far too well.',
+  'The school board argued for three hours about a snack machine.',
+  'The trophy case holds one trophy. It is from 1978. It is polished.',
+  'Tater is nine and not in high school. Tater attends anyway.',
+  'The pep rally was replaced by a pep rally about the pep rally.',
+  'The field is named after a man nobody can identify any more.',
+  'The chemistry teacher drives the bus, coaches track, and is tired.',
+  'A raccoon is living in the vending machine and will not be moved.',
+  'The cheer squad spells out MAPLE. There are four of them. Brave.',
+  'The senior prank was mowing a shape into the field. Dale was upset.',
+  'Somebody\'s lunch has gone missing from the fridge in room nine.',
 ], [
-  'the OTTERS are two and eight and now down one end zone. still ours.',
-  'the coach says we play through it. the field is HALF GONE, coach.',
-  'the marching band played the one song. louder. defiantly. bravely.',
-  'MAYOR DINKLE: "school is FINE. school is a state of mind, kids."',
-  'the 1978 trophy has been evacuated. by four adults. in a truck.',
-  'PIKE HOLLOW has offered to host our game. suspiciously kind of them.',
-  'TATER brought it to show and tell. it was a hit. an enormous hit!',
-  'the school board is still arguing about the snack machine. no vote.',
-  'the homecoming float is finished. nowhere to parade it. parading on.',
-  'the goat is in the gym again. this time nobody is arguing about it.',
+  'The Otters are nought and nine and down one end zone. Still ours.',
+  'The coach says we play through it. Half the field has gone, coach.',
+  'The marching band played the one song, louder, and very bravely.',
+  'The school board says school is fine. It is a state of mind.',
+  'The 1978 trophy has been evacuated by four adults in a truck.',
+  'Pike Hollow has offered to host our game. Suspiciously kind.',
+  'Tater brought it in for show and tell. It was an enormous hit!',
+  'The school board is still arguing about the snack machine. Still.',
+  'The homecoming float is finished. There is nowhere to parade it.',
+  'The raccoon has left the vending machine, carrying most of row C.',
 ], [
-  'the OTTERS finish two and eight. no field. still two and eight.',
-  'the coach is still drawing plays on the ground. there is no ground.',
-  'the 1978 trophy is safe. the school is not. priorities, though.',
-  'the marching band played the one song from a car park. an encore!!',
-  'MAYOR DINKLE: "I never went to that school." he went to that school.',
-  'PIKE HOLLOW forfeits out of pity. we do NOT accept pity, PIKE HOLLOW.',
-  'the snack machine vote passed 6 to 0. there is no snack machine.',
-  'TATER named it Steve. the yearbook lists Steve under teachers.',
-  'the homecoming float made it out. the float is the whole town now.',
-  'the goat is on the float. best day of that goat\'s entire life.',
+  'The Otters finish nought and nine. No field. Still nought and nine.',
+  'The coach is drawing plays on the ground. There is no ground.',
+  'The 1978 trophy is safe. The school is not. Priorities, though.',
+  'The marching band played the one song from a car park. An encore!!',
+  'The mayor says he never went to that school. He went to that school.',
+  'Pike Hollow forfeits out of pity. We do not accept pity, Pike Hollow.',
+  'The snack machine was approved at last. There is no snack machine.',
+  'Tater has named it Steve. The yearbook lists Steve under teachers.',
+  'The goat is on the homecoming float. Best day of that goat\'s life.',
 ]];
 
 // ── THE FARMS ─────────────────────────────────────────────────────────────────
-// PEARL's pumpkins, a corn maze with a disputed middle, one committed rooster
+// Pearl's enormous vegetables, a corn maze, one committed rooster, loose gates
 const FARM: Pools = [[
-  'PEARL grows the pumpkins. PEARL judges the pumpkins. PEARL wins.',
-  'the corn maze has a middle. nobody has confirmed this since 2011.',
-  'a man has been in the corn maze since october. he is fine. waving.',
-  'the silo is the tallest thing in the county. we mention it a lot.',
-  'pumpkin patch dispute: the good pumpkins are all on ONE side.',
-  'MAYOR DINKLE was photographed with a cow. the cow looks unconvinced.',
-  'the rooster crows at 4:40. the town voted. the rooster abstained.',
-  'one barn was painted last year. the other barn is a conversation.',
-  'TATER has named every chicken. one chicken is called MAYOR DINKLE.',
-  'a tractor blocked the road for 20 minutes. nobody honked. we waited.',
-  'the scarecrow has a jacket now. the scarecrow is doing very well.',
-  'CARLA WEBB has opened an investigation into the pumpkin weigh-in.',
-  'GUS buys his pies from PEARL. GUS also enters against PEARL. bold.',
-  'a cow got out. four trucks helped. it took an hour. a lovely hour.',
-  'the corn maze map is upside down. it has always been upside down.',
-  'the goat has learned to open the gate. every gate. all of them.',
+  'Pearl grows the pumpkins, judges the pumpkins, and wins every year.',
+  'The corn maze has a middle. Nobody has confirmed this since 2011.',
+  'A man has been in the corn maze since October. He is fine. Waving.',
+  'The silo is the tallest thing in the county. We mention it a lot.',
+  'The rooster crows at twenty to five. The town has given up on it.',
+  'One barn was painted last year. The other barn is a conversation.',
+  'Tater has named every chicken. One chicken is called Mayor Dinkle.',
+  'A tractor blocked the road for twenty minutes. Nobody honked once.',
+  'The scarecrow has a jacket now. The scarecrow is doing very well.',
+  'A cow got out. Four trucks helped. It took an hour. A lovely hour.',
+  'The corn maze map is upside down and has always been upside down.',
+  'The goat has learned to open the gate. Every gate. All of them.',
+  'Pearl\'s zucchini has been described by the county as normal sized.',
 ], [
-  'the corn maze got easier. that is not good news. that is the hole.',
-  'the man in the corn maze walked out. by accident. after nine months.',
-  'PEARL moved every pumpkin. herself. in one night. she is PEARL.',
-  'MAYOR DINKLE: "the silo is FINE." the silo is at a slight angle.',
-  'the cows were moved calmly. the cows have been calm the whole time.',
-  'TATER walked the chickens to safety. he named them all again en route.',
-  'the scarecrow is facing the hole now. brave. useless. still brave.',
-  'the rooster crowed at 4:40 anyway. the rooster has a JOB to do.',
-  'the good side of the pumpkin patch went first. of course it did.',
-  'the goat opened every gate in the county. best goat we ever had!',
+  'The corn maze got easier. That is not good news. That is the hole.',
+  'The man in the corn maze walked out by accident after nine months.',
+  'Pearl moved every pumpkin herself in one night. She is Pearl.',
+  'The county says the silo is fine. The silo is at a slight angle.',
+  'The cows were moved calmly. The cows have been calm throughout.',
+  'Tater walked the chickens to safety and named them all again.',
+  'The scarecrow is facing the hole now. Brave. Useless. Still brave.',
+  'The rooster crowed at twenty to five anyway. It has a job to do.',
+  'The good side of the pumpkin patch went first. Of course it did.',
+  'The goat opened every gate in the county. Best goat we ever had!',
 ], [
-  'the silo has GONE!! it was the tallest thing. we will find another.',
-  'the corn maze is solved. by removal. we are counting it as solved.',
-  'the pumpkins PEARL grew: safe. her barn: gone. PEARL: unbothered.',
-  'the scarecrow held the line. the scarecrow did not hold the line.',
-  'every chicken is accounted for. TATER counted twice. he is thorough.',
-  'MAYOR DINKLE: "I have always supported barns." he has, actually.',
-  'the cow that got out last spring was RIGHT. the cow knew, folks.',
-  'PIKE HOLLOW now has the tallest silo in the county. unbearable.',
-  'the rooster is on a fence post crowing at nothing. total respect.',
-  'the other barn never did get painted. that one stings, honestly.',
+  'The silo has GONE!! It was the tallest thing. We will find another.',
+  'The corn maze is solved by removal. We are counting that as solved.',
+  'Pearl\'s pumpkins are safe. Her barn is not. Pearl is unbothered.',
+  'The scarecrow held the line. The scarecrow did not hold the line.',
+  'Every chicken is accounted for. Tater counted twice. He is thorough.',
+  'The mayor says he has always supported barns. He actually has.',
+  'The cow that got out last spring was RIGHT. The cow knew, folks.',
+  'Pike Hollow now has the tallest silo in the county. Unbearable.',
+  'The rooster is on a fence post crowing at nothing. Total respect.',
 ]];
 
 // ── THE LAKESIDE ──────────────────────────────────────────────────────────────
 // a record catfish from 1996, a boat ramp grudge, four boats and one canoe
 const LAKE: Pools = [[
-  'the lake association and the town council are not speaking. again.',
-  'a record catfish was caught in 1996. the photo hangs in the diner.',
-  'the boat ramp etiquette dispute has entered its fourteenth summer.',
-  'a man has fished this pier daily for 30 years. total catch: eleven.',
-  'MAYOR DINKLE fishes for one photograph, then leaves. every year.',
-  'the swim dock drifted. two families claim it. this may go to court.',
-  'GUS says the catfish was smaller than the photo. GUS was not there.',
-  'TATER caught a boot. TATER is telling absolutely everyone. a boot.',
-  'it is a no wake zone. everyone wakes. the sign is decorative now.',
-  'CARLA WEBB writes about the lake weekly. the lake is unchanged.',
-  'somebody parked a truck at the ramp in 2016. still a live grudge.',
-  'the lake is twelve feet deep. locals insist it is bottomless.',
-  'DALE mows down to the waterline. exactly to it. not one inch more.',
-  'the annual boat parade: four boats and a canoe. a huge turnout.',
-  'fishing licence renewals are up. one man renewed twice. by accident.',
-  'the goat swam the lake. nobody knows why. the goat knows why.',
+  'A record catfish was caught in 1996. The photo hangs in the diner.',
+  'The boat ramp etiquette dispute has entered its fourteenth summer.',
+  'A man has fished this pier daily for thirty years. Total catch: eleven.',
+  'The swim dock drifted. Two families claim it. This may go to court.',
+  'Gus says the catfish was smaller than the photo. Gus was not there.',
+  'Tater caught a boot. Tater is telling absolutely everybody. A boot.',
+  'It is a no wake zone. Everybody wakes. The sign is decorative now.',
+  'The lake is twelve feet deep. Locals insist that it is bottomless.',
+  'Dale mows down to the waterline and not one inch further.',
+  'The annual boat parade had four boats and a canoe. A huge turnout.',
+  'A duck has taken over the swim dock and will not share it.',
+  'The goat swam the lake. Nobody knows why. The goat knows why.',
+  'Somebody left a picnic on the pier. The picnic has gone. Gulls.',
 ], [
-  'the lake is smaller. the lake association blames the town council.',
-  'MAYOR DINKLE: "the lake is CONCENTRATING. that is good for fish."',
-  'the catfish photo was evacuated first. before the people. correct.',
-  'the boat ramp is finally free. nobody wants it now. figures.',
-  'the man on the pier is still fishing. he has noticed. still fishing.',
-  'TATER threw the boot back in as an offering. results unclear.',
-  'the disputed swim dock has gone. the dispute continues regardless.',
-  'the no wake zone is repealed. there is no wake. there is no water.',
-  'the canoe is out. the canoe is always out. a good, steady canoe.',
-  'the goat is in the canoe. nobody is going to argue with the goat!',
+  'The lake is smaller. The lake association blames the town council.',
+  'The lake association says the lake is concentrating. Good for fish.',
+  'The catfish photo was evacuated first, before the people. Correct.',
+  'The boat ramp is finally free. Nobody wants it now. Figures.',
+  'The man on the pier has noticed, and is still fishing regardless.',
+  'Tater threw the boot back in as an offering. Results are unclear.',
+  'The disputed swim dock has gone. The dispute continues anyway.',
+  'The no wake zone is lifted. There is no wake. There is no water.',
+  'The canoe is out. The canoe is always out. A good, steady canoe.',
+  'The goat is in the canoe. Nobody is going to argue with the goat!',
 ], [
-  'the lake has gone somewhere. the lake association wants answers.',
-  'the pier has gone. the man is still fishing. do not disturb him.',
-  'the catfish photo is SAFE!! it is in a truck. the photo is fine.',
-  'MAYOR DINKLE: "a lake is really more of a mood." concede, sir.',
-  'the boat ramp dispute was resolved by the hole. nobody is happy.',
-  'TATER says the boot is in there somewhere. TATER wants it back.',
-  'PIKE HOLLOW still has a lake. PIKE HOLLOW will not stop saying so.',
-  'the canoe made it. the canoe always makes it. classic canoe, that.',
-  'thirty years of fishing. eleven fish. and one very good last cast.',
-  'the goat is still in the canoe. the goat is steering. it is fine.',
+  'The lake has gone somewhere. The lake association wants answers.',
+  'The pier has gone. The man is still fishing. Do not disturb him.',
+  'The catfish photo is SAFE!! It is in a truck. The photo is fine.',
+  'The mayor says a lake is really more of a mood. Concede, sir.',
+  'The boat ramp dispute was settled by the hole. Nobody is happy.',
+  'Tater says the boot is in there somewhere and he wants it back.',
+  'Pike Hollow still has a lake and will not stop mentioning it.',
+  'The canoe made it out. The canoe always makes it. Classic canoe.',
+  'Thirty years of fishing, eleven fish, and one very good last cast.',
 ]];
 
 // ── PINE WOODS ────────────────────────────────────────────────────────────────
-// the campground, 40 laminated rules, and the pine woods something (1981)
+// the campground, forty laminated rules, and the pine woods something (1981)
 const WOODS: Pools = [[
-  'the pine woods something was sighted in 1981. we still discuss it.',
-  'the campground host has laminated the rules. all forty. laminated.',
-  'quiet hours begin at 9pm, enforced by one man with a flashlight.',
-  'scout troop 12 earned a badge for arguing. not an official badge.',
-  'one family has held site 4 every july since 1977. do not ask why.',
-  'MAYOR DINKLE camps one night a year, for the photograph. one night.',
-  'firewood is five dollars. the next lot is four dollars. this is a FEUD.',
-  'TATER is convinced the something is friendly. TATER is usually right.',
-  'the trail map has been wrong since 1990. we find it charming now.',
-  'GUS: "the something? a raccoon. a large and confident raccoon."',
-  'somebody left a chair at site 9. it has been there four years.',
-  'CARLA WEBB has covered the something eleven times. no new facts.',
-  'the outhouse was rated surprisingly fine by the county. it is framed.',
-  'DALE brought a mower to a campground. DALE mowed a campsite.',
-  'the campfire ban was lifted, then reinstated. it has been one day.',
-  'the goat has joined scout troop 12. the goat earned two badges.',
+  'The pine woods something was sighted in 1981. We still discuss it.',
+  'The campground host has laminated the rules. All forty of them.',
+  'Quiet hours begin at nine, enforced by one man with a flashlight.',
+  'Scout troop twelve earned a badge for arguing. Not a real badge.',
+  'One family has held site four every July since 1977. Do not ask.',
+  'The trail map has been wrong since 1990. We find it charming now.',
+  'Gus says the something is a raccoon. A large and confident raccoon.',
+  'Somebody left a chair at site nine. It has been there four years.',
+  'Carla Webb has covered the something eleven times. No new facts.',
+  'Dale brought a mower to a campground and mowed an entire campsite.',
+  'The campfire ban was lifted and then reinstated. It has been a day.',
+  'The goat has joined scout troop twelve and earned two badges.',
+  'A raccoon opened a cooler, took one sandwich, and left the rest.',
 ], [
-  'the something has been sighted. it is purple. it is very round.',
-  'the host has laminated a 41st rule. rule 41 is about the hole.',
-  'quiet hours have been suspended for the first time ever. one night.',
-  'the site 4 family will not leave. it is july. they have HELD it.',
-  'the scouts are building something. nobody knows what. scouts stay calm.',
-  'MAYOR DINKLE: "the woods are simply more open plan now, folks."',
-  'the firewood price war has ended in a truce. mid-crisis. a truce!',
-  'TATER has befriended the something. TATER calls the something Steve.',
-  'the trail map is now accidentally correct. nobody can explain this.',
-  'the chair at site 9 has not moved. the chair is not going to move.',
+  'The something has been sighted. It is purple. It is very round.',
+  'The host has laminated a forty first rule. It is about the hole.',
+  'Quiet hours have been suspended for the first time ever. One night.',
+  'The site four family will not leave. It is July. They have held it.',
+  'The scouts are building something. Nobody knows what. Scouts stay calm.',
+  'The campground host says the woods are more open plan now.',
+  'Tater has befriended the something and calls the something Steve.',
+  'The trail map is now accidentally correct. Nobody can explain it.',
+  'The chair at site nine has not moved. The chair will not move.',
+  'A raccoon walked out of the woods carrying a bag of marshmallows.',
 ], [
-  'the pine woods something is identified at last. it is Steve. hello.',
-  'the host read all 41 rules aloud to nobody at all. all forty-one.',
-  'the site 4 family finally left site 4. only by force of nature.',
-  'the chair at site 9 survived. of course it did. it is THAT chair.',
-  'MAYOR DINKLE: "I have camped these woods." one night. for a photo.',
-  'the scouts built a raft!! the scouts were right. very good scouts.',
-  'CARLA WEBB finally has her something story. twelve tries. worth it.',
-  'quiet hours are permanently observed now. very quiet. too quiet.',
-  'the trail map is wrong again. good. honestly, that feels correct.',
-  'somebody put the campfire ban sign on a raft. rules are rules.',
+  'The pine woods something is identified at last. It is Steve. Hello.',
+  'The host read all forty one rules aloud to absolutely nobody.',
+  'The site four family finally left site four. By force of nature.',
+  'The chair at site nine survived. Of course it did. It is that chair.',
+  'The mayor says he has camped these woods. One night. For a photo.',
+  'The scouts built a raft!! The scouts were right. Very good scouts.',
+  'Carla Webb has her something story at last. Twelve tries. Worth it.',
+  'Quiet hours are permanently observed now. Very quiet. Too quiet.',
+  'The trail map is wrong again. Good. Honestly, that feels correct.',
 ]];
 
 // ── THE STRIP ─────────────────────────────────────────────────────────────────
 // petrol station, motel, drive-in, and the world's (second) largest twine ball
 const STRIP: Pools = [[
-  'the world\'s largest ball of twine. second largest. do not say that.',
-  'the twine ball gift shop sells small twine balls. made of twine.',
-  'the motel sign reads VACANC. it has read VACANC since 1996.',
-  'the drive-in has shown one film for two years. it is a good film.',
-  'gas is two cents cheaper here than PIKE HOLLOW. we mention it.',
-  'PIKE HOLLOW claims a bigger twine ball. PIKE HOLLOW lies. probably.',
-  'the twine ball has a live camera. two people watch it. every day.',
-  'motel room 6 has the good TV. everyone asks for room 6. everyone.',
-  'CARLA WEBB measured the twine ball. she will not release the number.',
-  'the drive-in snack bar is staffed by a teen who never looks up.',
-  'TATER visits the twine ball weekly. TATER LOVES the twine ball.',
-  'the coffee at the gas station has been in that pot since tuesday.',
-  'GUS refuses to acknowledge the twine ball. GUS has his reasons.',
-  'the motel has eleven rooms and one story about room 6. one story.',
-  'MAYOR DINKLE ran on twine ball tourism. eleven visitors last year.',
-  'the goat has climbed the twine ball. the live camera got it all.',
+  'The world\'s largest ball of twine. Second largest. Do not say that.',
+  'The twine ball gift shop sells small twine balls, made of twine.',
+  'The motel sign reads VACANC. It has read VACANC since 1996.',
+  'The drive-in has shown one film for two years. It is a good film.',
+  'Pike Hollow claims a bigger twine ball. Pike Hollow is fibbing.',
+  'The twine ball has a live camera. Two people watch it every day.',
+  'Motel room six has the good television. Everybody asks for room six.',
+  'Carla Webb measured the twine ball and will not release the number.',
+  'The drive-in snack stand has a teen who never once looks up.',
+  'Tater visits the twine ball weekly. Tater loves the twine ball.',
+  'The coffee at the gas station has been in that pot since Tuesday.',
+  'Gus refuses to acknowledge the twine ball. Gus has his reasons.',
+  'A dog has learned to open the motel doors. All eleven of them.',
 ], [
-  'the twine ball has been MOVED. eleven men. one flatbed. legendary.',
-  'MAYOR DINKLE is guarding the twine ball himself. a stance, at last.',
-  'the motel sign now reads VACAN. we are losing letters and land.',
-  'the drive-in is playing the film anyway. half a screen. still good.',
-  'PIKE HOLLOW offered to hold our twine ball for safekeeping. no.',
-  'DEB HOLLIS: "he saved the TWINE and not the SCHOOL." fair, honestly.',
-  'gas is now four cents cheaper than PIKE HOLLOW. a silver lining.',
-  'TATER waved goodbye to the twine ball. then it came back. hero twine!',
-  'the twine ball live camera has 900 viewers. finally. after ten years.',
-  'room 6 has been evacuated. the good TV went with it. of course.',
+  'The twine ball has been MOVED. Eleven men. One flatbed. Legendary.',
+  'The mayor is guarding the twine ball himself. A stance, at last.',
+  'The motel sign now reads VACAN. We are losing letters and land.',
+  'The drive-in is playing the film anyway, on half a screen.',
+  'Pike Hollow offered to hold our twine ball for safekeeping. No.',
+  'Tater waved goodbye to the twine ball. Then it came back. Hero twine!',
+  'The twine ball camera has nine hundred viewers. Finally, after ten years.',
+  'Room six has been evacuated. The good television went with it.',
+  'The gas station has run out of coffee for the first time ever.',
+  'A raccoon has been sighted on the twine ball, on the flatbed.',
 ], [
-  'the twine ball is safe. the town is not. the town accepts this.',
-  'the motel sign reads VAC. still lit. still very lit. a proud sign.',
-  'the drive-in showed the film to the end. nobody left. nobody could.',
-  'MAYOR DINKLE saved the twine ball. it is on his truck. he DID that.',
-  'PIKE HOLLOW has the only twine ball now!! no. ours is on a truck.',
-  'the gas sign still shows a price. loyal to the very last.',
-  'CARLA WEBB released the twine measurement. it was second. we knew.',
-  'TATER is riding in the truck with the twine ball. a perfect ending.',
-  'the good TV from room 6 is in somebody\'s back seat. it is fine.',
-  'the goat is on the twine ball, on the truck, going down the road.',
+  'The twine ball is safe. The town is not. The town accepts this.',
+  'The motel sign reads VAC and is still lit. A very proud sign.',
+  'The drive-in showed the film to the end. Nobody left. Nobody could.',
+  'The mayor saved the twine ball. It is on his truck. He did that.',
+  'Pike Hollow has the only twine ball now!! No. Ours is on a truck.',
+  'Carla Webb released the twine measurement. It was second. We knew.',
+  'Tater is riding in the truck with the twine ball. A perfect ending.',
+  'The good television from room six is in somebody\'s back seat.',
+  'The goat is on the twine ball, on the truck, going down the road.',
 ]];
 
 // ── THE SUBURBS ───────────────────────────────────────────────────────────────
-// DALE's lawn, seventeen yard signs, and a court case about two inches
+// Dale's lawn, two inches of fence, a leaning mailbox, a trampoline up a tree
 const BURB: Pools = [[
-  'the lawn sign DALE put up is two inches over the line. it went to court.',
-  'the property line case has entered year four. two inches. four years.',
-  'DALE edges his lawn with an actual ruler. an actual ruler. daily.',
-  'the sprinklers go on at 6am. the ones DALE owns go at 5:58. a message.',
-  'the mailbox at 114 leans. it has leaned six years. it is beloved.',
-  'a trampoline appeared overnight. the street has THOUGHTS about it.',
-  'DALE reported a neighbour for leaf placement. leaf PLACEMENT.',
-  'CARLA WEBB filed 4,000 words on the property line case. two inches.',
-  'TATER sells lemonade at 50 cents. another kid undercut him at 45.',
-  'the cul-de-sac basketball hoop has been contested since 2019.',
-  'GUS lives out here. GUS has never once mowed. DALE has NOTICED.',
-  'somebody put their bins out on the wrong day. the street is talking.',
-  'a HOLLIS sign went up. the neighbours brought a casserole anyway.',
-  'the goat ate four yard signs. the goat did not check whose. fair.',
-  'seventeen yard signs on one street. one of them is upside down.',
-  'MAYOR DINKLE door-knocks. he stays 40 minutes at each door. each one.',
+  'Dale put up a fence two inches over the line and it went to court.',
+  'The property line case has entered year four. Two inches. Four years.',
+  'Dale edges his lawn with an actual ruler, every single day.',
+  'The sprinklers come on at six. Dale\'s come on at 5:58. A message.',
+  'The mailbox at 114 leans. It has leaned six years. It is beloved.',
+  'A trampoline appeared overnight and the street has thoughts.',
+  'Dale reported a neighbour for leaf placement. Leaf PLACEMENT.',
+  'Carla Webb filed four thousand words on two inches of fence.',
+  'Tater is selling lemonade. Another kid has set up right beside him.',
+  'The cul-de-sac basketball hoop has been contested since 2019.',
+  'Gus lives out here. Gus has never mowed. Dale has noticed.',
+  'Somebody put their bins out on the wrong day. The street is talking.',
+  'Biscuit the dog let himself into four houses and had four dinners.',
+  'A trampoline is up a tree. Nobody will say how it got up there.',
 ], [
-  'DALE mowed to the very edge of the hole. a crisp, immaculate line.',
-  'the property line case is moot. DALE wishes to continue regardless.',
-  'the yard signs are down to eleven. one blew into the hole. suspicious.',
-  'the sprinklers still run at 6am. on a hole. on principle. on time.',
-  'the leaning mailbox at 114 is still leaning. inspiring, honestly.',
-  'MAYOR DINKLE knocked on a door with no house behind it. 40 minutes.',
-  'the trampoline has gone. the street has quietly moved on. quietly.',
-  'DALE has offered to mow the hole. DALE is serious. DALE always is.',
-  'the bins went out on the right day for once. nobody noticed. typical!',
-  'the goat is on the trampoline. it is the best thing all week.',
+  'Dale mowed right to the edge of the hole. A crisp, immaculate line.',
+  'The property line case is moot. Dale wishes to continue regardless.',
+  'The sprinklers still run at six, on a hole, on principle, on time.',
+  'The leaning mailbox at 114 is still leaning. Inspiring, honestly.',
+  'The trampoline in the tree has gone. The tree has gone as well.',
+  'Dale has offered to mow the hole. Dale is serious. Dale always is.',
+  'The bins went out on the correct day and nobody noticed. Typical!',
+  'Biscuit is opening doors for everybody. Biscuit is a hero now.',
+  'Somebody knocked on a door with no house behind it for an hour.',
+  'The basketball hoop is leaning. The dispute leans with it.',
 ], [
-  'the lawn DALE tended has gone. the two inches too. case closed.',
-  'the leaning mailbox at 114 is the last thing standing. still leaning.',
-  'DALE is mowing a patch the size of a towel. it looks fantastic.',
-  'the property line ruling came in!! DALE won. he won by two inches.',
-  'the basketball hoop dispute is unresolved. it never will be resolved.',
-  'MAYOR DINKLE knocked on the last door. nobody home. he talked anyway.',
-  'TATER made 40 dollars. the other kid made 45. good hustle, kid.',
-  'GUS never mowed. GUS was RIGHT. DALE will never accept this. never.',
-  'somebody\'s bins are still at the curb. correct day. no street left.',
-  'every yard sign has gone. one is in a tree. it is upside down.',
+  'The lawn Dale tended has gone, and the two inches with it.',
+  'The leaning mailbox at 114 is the last thing standing. Still leaning.',
+  'Dale is mowing a patch the size of a towel. It looks fantastic.',
+  'The property line ruling came in!! Dale won it by two inches.',
+  'The basketball hoop dispute is unresolved and always will be.',
+  'The mayor knocked on the last door. Nobody home. He talked anyway.',
+  'Gus never mowed. Gus was RIGHT. Dale will never accept this.',
+  'Somebody\'s bins are still at the curb, on the correct day, alone.',
+  'Biscuit opened the last door and let everybody out. Good dog!!',
 ]];
 
 // ── THE COURTHOUSE ────────────────────────────────────────────────────────────
-// courthouse steps, the library, one overdue book from 1974, the county clerk
+// the library, one overdue book from 1974, one very slow computer, a sinkhole
 const CIVIC: Pools = [[
-  'the library has one overdue book. out since 1974. we know who has it.',
-  'the courthouse steps: where every announcement in this town happens.',
-  'the library book club has read one book. they discussed it six years.',
-  'the county clerk knows everything and says nothing. an absolute pro.',
-  'the courthouse statue is of a man nobody can name. beloved anyway.',
-  'the two-inch case is in courtroom 2 on thursday. again. still.',
-  'the library summer reading champion, eleven years running: TATER, 9.',
-  'jury summonses went out. eight people asked to be excused. eight.',
-  'CARLA WEBB has a chair in the courthouse. it is HER chair. hers.',
-  'the library computer takes twelve minutes to start. we have adapted.',
-  'town records go back to 1841. somebody has argued since 1843.',
-  'MARGE brought the meter protest to the courthouse. wrong building.',
-  'GUS was on a jury once. GUS talks about it constantly. constantly.',
-  'the courthouse bell rings at noon. it is eleven minutes early. fine.',
-  'the goat got into the courthouse. the goat was excused from jury duty.',
-  'MAYOR DINKLE announced his re-election on the steps. the third time.',
+  'The library has one overdue book, out since 1974. We know who has it.',
+  'Every announcement in this town happens on the courthouse steps.',
+  'The library book club has read one book and discussed it six years.',
+  'The county clerk knows everything and says nothing. A total pro.',
+  'The courthouse statue is of a man nobody can name. Beloved anyway.',
+  'The library computer takes twelve minutes to start. We have adapted.',
+  'The summer reading champion, eleven years running, is Tater, aged nine.',
+  'Town records go back to 1841. Somebody has argued since 1843.',
+  'Marge brought the meter protest to the courthouse. Wrong building.',
+  'The courthouse bell rings at noon, eleven minutes early. It is fine.',
+  'The goat got into the courthouse and was excused from jury duty.',
+  'There is a sinkhole in the courthouse car park. Unrelated, surely.',
+  'The library has a new chair. The old chair has been moved. Drama.',
 ], [
-  'the 1974 overdue book has been returned. under THESE circumstances?',
-  'the library evacuated its books. all of them. the town carried them.',
-  'the courthouse steps are now the courthouse step. announcements go on.',
-  'the two-inch case has moved to courtroom 1. it is a big case now!',
-  'the county clerk is still filing paperwork. calm as a summer lake.',
-  'MARGE relocated the meter protest. the meter came WITH her. wow.',
-  'CARLA WEBB is writing from her chair. her chair is on a lawn now.',
-  'the statue of the man nobody can name has been moved to a truck.',
-  'MAYOR DINKLE declared an emergency. the emergency is his pie sales.',
-  'the goat is in the library. the goat has a library card. somehow.',
+  'The 1974 overdue book has been returned. Under these circumstances?',
+  'The library evacuated its books. All of them. The town carried them.',
+  'The courthouse steps are now one courthouse step. Announcements go on.',
+  'The county clerk is still filing paperwork, calm as a summer lake.',
+  'Marge relocated the meter protest. The meter came with her. Wow.',
+  'Carla Webb is writing from her chair. Her chair is on a lawn now.',
+  'The statue of the man nobody can name has been loaded on a truck.',
+  'The library computer is still starting up. Eleven minutes to go.',
+  'The goat is in the library. The goat has a library card, somehow.',
+  'The car park sinkhole and the hole have met. They get along fine.',
 ], [
-  'the courthouse has GONE!! the two-inch case will be heard. somehow.',
-  'the 1974 book is safe. the library is not. the book, though: safe.',
-  'the county clerk filed the last form, stamped it, and went home.',
-  'MAYOR DINKLE conceded on the steps. there are no steps. he conceded.',
-  'DEB HOLLIS was sworn in on a folding chair. the clerk says it counts.',
-  'the statue of the man nobody can name was rescued first. of course.',
-  'MARGE and the meter, alone in a field, still protesting. an icon.',
-  'town records saved back to 1841. the 1843 argument goes on. and on.',
-  'library summer reading: TATER wins again. twelve years. undefeated.',
-  'the courthouse bell rang at noon. eleven minutes early. to the end.',
+  'The courthouse has GONE!! The two inch case will be heard somehow.',
+  'The 1974 book is safe. The library is not. The book, though: safe.',
+  'The county clerk filed one last form, stamped it, and went home.',
+  'The statue of the man nobody can name was rescued first, of course.',
+  'Marge and the meter, alone in a field, still protesting. An icon.',
+  'Town records are saved back to 1841. The 1843 argument goes on.',
+  'Summer reading: Tater wins again. Twelve years. Still undefeated.',
+  'The courthouse bell rang at noon, eleven minutes early, to the end.',
+  'The library computer finished starting up. Nobody was there to see.',
 ]];
 
 const BY_DIST: Record<MapleDist, Pools> = {
@@ -537,133 +507,137 @@ const BY_DIST: Record<MapleDist, Pools> = {
 // dawning horror said with a smile. Tier 2 is the town gone and the argument
 // about the parking meter still going.
 const GENERAL: Pools = [[
-  // ordinary local news. an entirely normal week in a very small town.
-  'the BUGLE has a circulation of 40. it is the paper of record.',
-  'the bake sale on saturday is at the church hall. bring a plate.',
-  'the town motto is "we have a ball of twine". adopted in 1974.',
-  'the meter protest has entered year nine. four people. rain or shine.',
-  'GUS at the diner has settled the debate. GUS settles all debates.',
-  'PEARL has won the pie contest eleven years. PEARL also judges it.',
-  'PIKE HOLLOW got a roundabout. we will never hear the end of this.',
-  'CARLA WEBB: "I will ask the hard question." she always, always does.',
-  'the town hall meeting ran four hours. one item passed: the minutes.',
-  'DALE has been mowing since 6am. it is a wednesday. it is always 6am.',
-  'TATER, 9, drew a purple circle at school. the teacher kept it.',
-  'weather: nice. the small purple dot: also nice, apparently. so far.',
-  'the OTTERS lost again. the town remains fully committed to them.',
-  'the goat is loose again. it is the same goat. it is always the goat.',
-  'a casserole was delivered to the wrong house. it stayed. correct.',
-  'MARGE: "the meter is the REAL issue." nine years of saying that.',
-  'population 1,412. the sign says 1,408. a four-year argument, that.',
-  'the BUGLE went to two pages this week. a huge news week. huge.',
-  'lost and found at town hall: nine hats, a trombone, a casserole dish.',
-  'the water tower says MAPLE FALLS. repainted in 1991. it holds.',
-  'a small purple dot was reported near the water tower. probably a bug.',
-  'the fair opens friday. the stuck ferris wheel car is still stuck.',
-  'the library has a new chair. the old chair has been moved. drama.',
-  'the barber raised his price a dollar. the first time since 1988.',
-  'MAYOR DINKLE has announced a third run. his slogan is "still DINKLE".',
-  'DEB HOLLIS has launched her campaign. election tuesday. turnout: 411.',
-  'the debate is at the diner. GUS moderates. GUS will not be fair.',
-  // — BEAT 2 · DENIAL — there is a hole. the mayor says there is not. —
-  'MAYOR DINKLE: "there is no hole. I would KNOW about a hole, folks."',
-  'MAYOR DINKLE has never seen the hole. he is standing next to it.',
-  'the hole is not on the town map. the map is from 1974. checkmate.',
-  'town hall voted on whether the hole is real. 4 to 4. no decision.',
-  'MAYOR DINKLE: "that is a puddle. a deep, dry, purple puddle."',
-  'GUS: "it is a hole." MAYOR DINKLE: "it is a DRAINAGE FEATURE."',
-  'CARLA WEBB asked about the hole. the mayor talked about pie. 20 mins.',
-  'TATER told the grown ups. the grown ups had a MEETING about it.',
-  'a hole ate a bin. the council has formed a bin committee. bins.',
-  'MAYOR DINKLE: "no hole. next question. NEXT QUESTION, CARLA."',
-  'the bake sale is still on. the hole was not invited. rude of it.',
-  'the goat has stared at the hole all morning. the goat knows.',
+  // ── an entirely normal week in a very small town ──
+  'The Bugle has a circulation of forty. It is the paper of record.',
+  'The town motto is: we have a ball of twine. Adopted in 1974.',
+  'The meter protest has reached year nine. Four people. Rain or shine.',
+  'Gus at the diner has settled the debate. Gus settles all debates.',
+  'Pike Hollow got a roundabout. We will never hear the end of it.',
+  'Carla Webb says she will ask the hard question. She always does.',
+  'The town hall meeting ran four hours and decided nothing at all.',
+  'Dale has been mowing since six. It is a Wednesday. It is always six.',
+  'Tater, aged nine, drew a purple circle at school. His teacher kept it.',
+  'Weather: nice. The small purple dot: also nice, apparently, so far.',
+  'The Otters lost again. The town remains fully committed to them.',
+  'The goat is loose again. It is the same goat. It is always the goat.',
+  'A casserole was delivered to the wrong house. It stayed. Correct.',
+  'Population 1,412. The sign says 1,408. That is a four year argument.',
+  'The Bugle has gone to two pages this week. A huge news week. Huge.',
+  'Lost and found at town hall: nine hats, a trombone, and one mitten.',
+  'The water tower says MAPLE FALLS. Repainted in 1991. It holds.',
+  'A small purple dot was reported near the water tower. Probably a bug.',
+  'The fair opens Friday. The stuck ferris wheel car is still stuck.',
+  'A raccoon has moved into the vending machine at the high school.',
+  'Pearl has grown a zucchini that four adults describe as normal.',
+  'Biscuit the dog can open doors. Nobody taught him. He simply can.',
+  'The marching band played its one song by the water tower. Lovely.',
+  'Somebody\'s lunch has gone missing at town hall. An inquiry is open.',
+  'A trampoline is up a tree on Elm Street. It has been there a week.',
+  'The library computer started up at last. Everybody came to look.',
+  'There is a sinkhole in the diner car park. It is not the hole.',
+  'The barber has raised his price by a dollar, his first rise since 1988.',
+  // ── BEAT 2 · DENIAL. There is a hole. The mayor says there is not. ──
+  'The mayor says there is no hole. He would know about a hole, folks.',
+  'The mayor has never seen the hole. He is standing right beside it.',
+  'The hole is not on the town map. The map is from 1974. Checkmate.',
+  'Town hall discussed whether the hole is real and decided nothing.',
+  'The mayor says it is a puddle. A deep, dry, purple puddle.',
+  'Gus says it is a hole. The mayor says it is a drainage feature.',
+  'Carla Webb asked about the hole. The mayor talked about the fair.',
+  'Tater told the grown ups. The grown ups held a meeting about it.',
+  'A hole ate a bin. The council has formed a committee about bins.',
+  'The mayor says there is no hole and would like the next question.',
+  'The band concert is still on. The hole was not invited. Rude of it.',
+  'The goat has stared at the hole all morning. The goat knows.',
+  'The car park sinkhole is unrelated, says the council. Twice.',
+  'Biscuit will not go outside today. Biscuit has thoughts about it.',
 ], [
-  // — BEAT 3 · ALARM — dawning horror, delivered cheerfully. one "!" max. —
-  'MAYOR DINKLE: "the hole is a DRAINAGE PROJECT. it is going great."',
-  'a sign says do not feed the hole. TATER has already fed the hole.',
-  'the town hall meeting: four hours on the hole. no vote. classic.',
-  'CARLA WEBB asked the mayor a follow-up. the mayor went very quiet.',
-  'MAYOR DINKLE formed a committee. the committee formed a subcommittee.',
-  'the BUGLE has gone to four pages. CARLA WEBB is having a week.',
-  'MARGE: "and another thing about that meter." MARGE. please. MARGE.',
-  'PIKE HOLLOW offered help. we would rather be eaten. that is official.',
-  'GUS closed the diner at noon. GUS reopened at 12:04. GUS is fine.',
-  'PEARL is evacuating pies. calm. on schedule. she is simply PEARL.',
-  'MAYOR DINKLE unveiled a plan. the plan is a tarp. a very large tarp.',
-  'DALE has mowed the same lawn three times today. a coping mechanism.',
-  'the emergency siren was tested. it plays the school fight song.',
-  'MAYOR DINKLE: "we are not shrinking. we are getting COZIER, folks."',
-  'TATER named it. the whole town is using the name now. it is Steve.',
-  'the twine ball has been loaded onto a flatbed truck. priorities set.',
-  'the debate was cancelled, rescheduled, cancelled. GUS is furious.',
-  'MAYOR DINKLE consulted an expert. the expert runs the gas station.',
-  'the population sign reads 1,408 and is, for the first time, too high.',
-  'a four hour meeting on whether to hold a meeting. motion carried.',
-  'MAYOR DINKLE: "this is NOT an evacuation. this is a fun walk."',
-  'MAYOR DINKLE: "there is no hole. also stay away from the hole."',
-  'oh gosh. it ate the bandstand. with the band still on it. sorry.',
-  'the town siren went off. it played the fight song. we all sang!',
-  'the fun walk is now a fun jog. the fun jog is now a fun SPRINT.',
-  'MAYOR DINKLE: "I was always against the hole. write that down."',
-  'it burped and the whole street smelled of GRAVY. every street.',
-  'PEARL is carrying nine pies at a run. nine. not one wobble.',
-  'MAYOR DINKLE: "small hole. medium hole. okay. okay. RUN, folks."',
-  'the bake sale moved indoors. there is no indoors. moved anyway.',
-  'MAYOR DINKLE said oh gosh. he has never said oh gosh. he said it.',
-  'there is a second hole now, out by the water tower. that makes two.',
-  'the goat has left town. the goat left first. the goat always knows.',
-  'DEB HOLLIS: "the hole is real AND it is his fault." both. somehow.',
+  // ── BEAT 3 · ALARM. Dawning horror, delivered cheerfully. One "!" max. ──
+  'The mayor says the hole is a drainage project that is going well.',
+  'A sign says do not feed the hole. Tater has already fed the hole.',
+  'The town hall meeting spent four hours on the hole. No decision.',
+  'Carla Webb asked the mayor a follow-up. The mayor went very quiet.',
+  'A committee was formed. The committee formed a subcommittee.',
+  'The Bugle has gone to four pages. Carla Webb is having a week.',
+  'Marge has another point to make about the meter. Marge, please.',
+  'Pike Hollow offered to help. We would rather be eaten, officially.',
+  'Gus closed the diner at noon and reopened it at 12:04. Gus is fine.',
+  'Pearl is evacuating the zucchini. Calm. On schedule. She is Pearl.',
+  'The mayor unveiled a plan. The plan is a tarp. A very large tarp.',
+  'Dale has mowed the same lawn three times today. A coping mechanism.',
+  'The emergency siren was tested. It plays the school fight song.',
+  'The mayor says we are not shrinking. We are getting cosier, folks.',
+  'Tater named it. The whole town is using the name now. It is Steve.',
+  'The twine ball has been loaded onto a flatbed truck. Priorities.',
+  'The band concert was moved, then moved again. The band plays on.',
+  'The town consulted an expert. The expert runs the gas station.',
+  'The population sign reads 1,408 and is, for the first time, too high.',
+  'A four hour meeting was held about holding a meeting. It carried.',
+  'This is not an evacuation. This is a fun walk, says the mayor.',
+  'There is no hole. Also, please stay well away from the hole.',
+  'Oh dear. It ate the bandstand with the band still standing on it.',
+  'The town siren went off. It played the fight song. We all sang!',
+  'The fun walk is now a fun jog. The fun jog is now a fun SPRINT.',
+  'The mayor says he was always against the hole. Write that down.',
+  'It burped and the whole street smelled of GRAVY. Every street.',
+  'Pearl is carrying the zucchini at a run. Not one single wobble.',
+  'Small hole. Medium hole. All right, folks. Run. Everybody run.',
+  'The band concert moved indoors. There is no indoors. It moved anyway.',
+  'Gus said oh dear. Gus has never said oh dear. Gus said it.',
+  'There is a second hole now, out by the water tower. That makes two.',
+  'The goat has left town. The goat left first. The goat always knows.',
+  'A raccoon ran past carrying an entire vending machine tray.',
+  'Biscuit has opened every door on the street. Everybody is out.',
 ], [
-  // — BEAT 4 · PANIC — the town is gone and the meter argument goes on. —
-  'MAYOR DINKLE: "fine. it is real. I still say it is a DRAINAGE issue."',
-  'MAYOR DINKLE conceded. then asked for a rematch. immediately after.',
-  'the BUGLE printed a special edition. six pages. CARLA WEBB has peaked.',
-  'GUS is still serving coffee. GUS will always be serving coffee.',
-  'the pies PEARL made are all safe. she planned for this in 1998.',
-  'MARGE is still protesting the meter. the meter is the last thing left.',
-  'TATER says Steve is just hungry. TATER has been right the whole time.',
-  'PIKE HOLLOW sent a casserole. PIKE HOLLOW is smug about the casserole.',
-  'DALE is mowing a lawn the size of a doormat. it is immaculate. DALE.',
-  'the town hall meeting was held in a field. four hours. still no vote.',
-  'the twine ball is on a truck out of town. we saved what mattered.',
-  'MAYOR DINKLE: "I blame the last mayor." it was him. it was him.',
-  'the population sign is eaten. final count: everyone, in one car park.',
-  'the emergency siren played the fight song!! we all sang. all of us.',
-  'MAYOR DINKLE cut a ribbon on nothing at all. the man is UNBREAKABLE.',
-  'CARLA WEBB: "one more question, mayor." she gets the last question.',
-  'the town has gone. the argument about the meter continues. it does.',
-  'the BUGLE: circulation 41. there is a new subscriber. purple. hungry.',
-  'the water tower is the last word standing. it says MAPLE FALLS. good.',
-  'MAYOR DINKLE: "I never said puddle. I said POND." he said puddle.',
-  'it ate town hall, the clock, and the ladder. the man got down first.',
-  'something burped and it smelled of the whole diner. all of it.',
-  'MAYOR DINKLE conceded. then asked who ate his TRUCK. it did, sir.',
-  'another hole has opened by the water tower. they are MULTIPLYING.',
-  'there are three of them now. THREE. we have stopped counting.',
-  'the goat came back for its two best friends. what a goat!!',
-  'DEB HOLLIS won in a landslide. she is the mayor of a purple circle.',
-  'the first act of the new mayor was blaming MAYOR DINKLE. correct.',
+  // ── BEAT 4 · PANIC. The town is gone and the meter argument goes on. ──
+  'Fine, it is real, says the mayor. He still calls it a drainage issue.',
+  'The Bugle printed a special edition. Six pages. Carla Webb has peaked.',
+  'Gus is still serving coffee. Gus will always be serving coffee.',
+  'The zucchini Pearl grew is safe. She planned for this in 1998.',
+  'Marge is still protesting the meter. The meter is the last thing left.',
+  'Tater says Steve is only hungry. Tater has been right all along.',
+  'Pike Hollow sent a casserole and is being smug about the casserole.',
+  'Dale is mowing a lawn the size of a doormat. It is immaculate.',
+  'The town hall meeting was held in a field. Four hours. No decision.',
+  'The twine ball is on a truck out of town. We saved what mattered.',
+  'The mayor blames the last mayor. He was the last mayor. It was him.',
+  'The population sign has been eaten. Final count: everyone, in a field.',
+  'The emergency siren played the fight song!! We all sang. All of us.',
+  'The mayor cut a ribbon on nothing at all. The man is unbreakable.',
+  'Carla Webb has one more question, mayor. She gets the last question.',
+  'The town has gone. The argument about the meter continues. It does.',
+  'The Bugle now has 41 subscribers. The new one is purple and hungry.',
+  'The water tower is the last word standing. It says MAPLE FALLS.',
+  'The mayor says he never said puddle. He said pond. He said puddle.',
+  'It ate town hall, the clock, and the ladder. The man got down first.',
+  'Something burped and it smelled of the entire diner. All of it.',
+  'The mayor asked who ate his truck. It did, sir. It ate the truck.',
+  'Another hole has opened by the water tower. They are MULTIPLYING.',
+  'There are three of them now. Three. We have stopped counting.',
+  'The goat came back for its two best friends. What a goat!!',
+  'Biscuit opened every door in town and every dog got out. Good dog.',
+  'The raccoon left with the vending machine. It earned that machine.',
+  'The marching band is playing the one song from the back of a truck.',
+  'Somebody found Gus\'s lunch. It was in the fridge the whole time.',
 ]];
 
 // ── BEAT 4 · SIGN-OFF ─────────────────────────────────────────────────────────
-// The town is gone and CARLA WEBB is still reading out the weather. These are
+// The town is gone and Carla Webb is still reading out the weather. These are
 // the *last words* of the arc, so they only go to print once the match is
 // genuinely over the hill — see `endgame` in pickMapleNews, which reads
 // devouredPct and secondsLeft directly. A forecast at 18% devoured is a lie.
-// Punctuation drops back to at most one "!": the panic is over, this is a
-// goodnight.
+// Punctuation drops back to at most one "!": this is a goodnight, not a panic.
 const SIGN_OFF: string[] = [
-  'CARLA WEBB reads the weather. the town has gone. weather: mild.',
-  'weather tomorrow: sunny, breezy, no town at all. still sunny.',
-  'the town has gone. the bake sale results are still disputed.',
-  'DEB HOLLIS is the mayor of grass. she is doing a very good job.',
-  'the BUGLE: goodnight, MAPLE FALLS. sorry about the everything.',
-  'TATER waves. Steve waves. the grown ups are still arguing. classic.',
-  'and now the weather, from a field, with CARLA WEBB. it is nice out.',
-  'goodnight, MAPLE FALLS. the election is still on tuesday. somehow.',
-  'the BUGLE signs off. circulation 41. one of them is purple.',
-  'goodnight from a car park. go OTTERS. and good luck, everybody.',
+  'Carla Webb reads the weather. The town has gone. Weather: mild.',
+  'The forecast tomorrow: sunny, breezy, no town at all. Still sunny.',
+  'The town has gone. The vegetable results are still being disputed.',
+  'The Bugle says goodnight, Maple Falls. Sorry about the everything.',
+  'Tater waves. Steve waves. The grown ups are still arguing. Classic.',
+  'And now the weather, from a field, with Carla Webb. It is nice out.',
+  'Goodnight, Maple Falls. The band concert is still on for Tuesday.',
+  'The Bugle signs off. Circulation 41. One of them is purple.',
+  'Goodnight from a car park. Go Otters. And good luck, everybody.',
+  'The goat is in the last car out of town, riding up front. Goodnight.',
 ];
 
 // ── WHAT IT JUST ATE ──────────────────────────────────────────────────────────
@@ -674,71 +648,71 @@ const SIGN_OFF: string[] = [
 export type MealKind = 'house' | 'car' | 'big' | 'small';
 
 const MEAL_HOUSE: Pools = [[
-  'a house has gone. the mailbox stayed. the mailbox is doing fine.',
-  'a whole HOUSE. the council will discuss this for four hours.',
-  'a house went down in one bite. the doorbell rang once. sad, that.',
-  'MAYOR DINKLE: "that house was CONDEMNED." it was not condemned.',
+  'A house has gone. The mailbox stayed. The mailbox is doing fine.',
+  'A whole HOUSE. The council will discuss this for four hours.',
+  'A house went down in one bite. The doorbell rang once. Sad, that.',
+  'The mayor says that house was condemned. It was not condemned.',
 ], [
-  'another house. DEB HOLLIS asks how many. the answer is nine.',
-  'a house went in whole. the dog got out. good dog. very good dog!',
-  'DALE mowed the lawn of a house that is not there. a crisp line.',
-  'MAYOR DINKLE: "houses come and houses go, folks." they do not.',
+  'Another house. Somebody asked how many. The answer is nine.',
+  'A house went in whole. The dog got out. Good dog. Very good dog!',
+  'Dale mowed the lawn of a house that is not there. A crisp line.',
+  'Town hall says houses come and houses go. They do not, sir.',
 ], [
-  'every house on the street is eaten. DALE is still edging. still.',
-  'the last house went in sideways and burped. the burp was worse.',
-  'the houses are GONE!! the leaning mailbox at 114 is still up.',
-  'MAYOR DINKLE: "I have always supported houses." nobody is left.',
+  'Every house on the street is eaten. Dale is still edging. Still.',
+  'The last house went in sideways and burped. The burp was worse.',
+  'The houses have GONE!! The leaning mailbox at 114 is still up.',
+  'The council always supported houses. There are no houses now.',
 ]];
 
 const MEAL_CAR: Pools = [[
-  'a parked car has gone. it was parked WRONG anyway, says DALE.',
-  'a car went in honking. the honk got quiet very fast. very fast.',
-  'somebody\'s car has gone. the street already knows whose. of course.',
-  'a car. one gulp. one small burp. the town says nothing. yet.',
+  'A parked car has gone. It was parked wrong anyway, says Dale.',
+  'A car went in honking. The honking got quiet very fast indeed.',
+  'Somebody\'s car has gone. The street already knows whose it was.',
+  'A car. One gulp. One small burp. The town says nothing yet.',
 ], [
-  'another car eaten. MAYOR DINKLE is calling it a parking solution.',
-  'a car went down with the radio on. we could hear it. faintly.',
-  'MARGE: "fine, it ate a car. now about that METER." year nine.',
-  'DEB HOLLIS: "cars are being EATEN." the mayor is on his phone.',
+  'Another car eaten. Town hall is calling it a parking solution.',
+  'A car went down with the radio on. We could hear it, faintly.',
+  'Marge says fine, it ate a car, now about that meter. Year nine.',
+  'Cars are being eaten. Dale says they were parked wrong anyway.',
 ], [
-  'the last car is eaten. its alarm is still going. under the ground.',
-  'the truck MAYOR DINKLE drove has gone. the face on the bumper too.',
-  'no cars left. the parking meter remains. MARGE is FURIOUS. still.',
-  'a car went in and the horn honked for nine whole seconds!! nine.',
+  'The last car is eaten. Its alarm is still going, underground.',
+  'The truck the mayor drives has gone, with his face on the bumper.',
+  'No cars are left. The parking meter remains. Marge is FURIOUS.',
+  'A car went in and the horn honked for nine whole seconds!! Nine.',
 ]];
 
 const MEAL_BIG: Pools = [[
-  'a whole building has gone. the ground went whump. everyone felt it.',
-  'something enormous is missing downtown. nobody can say which one.',
-  'a landmark has gone. it was on the postcard. the ONE postcard.',
-  'that one was big. the cups in the diner all did a little wobble.',
+  'A whole building has gone. The ground went whump. We all felt it.',
+  'Something enormous is missing downtown. Nobody can say which one.',
+  'A landmark has gone. It was on the postcard. The one postcard.',
+  'That one was big. The cups in the diner all did a little wobble.',
 ], [
-  'a building went down whole. it sounded like a bath draining. ugh.',
-  'MAYOR DINKLE: "that building was UGLY." he cut its ribbon. twice.',
-  'DEB HOLLIS: "he lost a WHOLE BUILDING." he did. the entire thing.',
-  'oh gosh. that was the big one on the corner. with the clock on it.',
+  'A building went down whole. It sounded like a bath draining.',
+  'That building was ugly, says the council. It cut the ribbon twice.',
+  'A whole building has gone. The entire thing. Every brick of it.',
+  'Oh dear. That was the big one on the corner with the clock on it.',
 ], [
-  'the last big thing went in slowly. very slowly. we all watched.',
-  'MAYOR DINKLE: "we will rebuild it. smaller. cuter. much cheaper."',
-  'the water tower went in last!! it said MAPLE FALLS on the way down.',
-  'that bite was so big the rooster stopped. the rooster NEVER stops.',
+  'The last big thing went in slowly. Very slowly. We all watched.',
+  'Town hall will rebuild it smaller, cuter and much sooner.',
+  'The water tower went in last!! It said MAPLE FALLS on the way down.',
+  'That bite was so big the rooster stopped. The rooster never stops.',
 ]];
 
 const MEAL_SMALL: Pools = [[
-  'it ate a mailbox. one mailbox. one tiny burp. rather adorable.',
-  'a bin is missing. the street has already blamed three people.',
-  'it ate a garden gnome. that gnome had been there since 1988.',
-  'a small snack was taken on elm street. the council does not know.',
+  'It ate a mailbox. One mailbox. One tiny burp. Rather adorable.',
+  'A bin is missing. The street has already blamed three people.',
+  'It ate a garden gnome. That gnome had been there since 1988.',
+  'A small snack was taken on Elm Street. The council does not know.',
 ], [
-  'still snacking. bins, mailboxes, one shoe. somebody\'s good shoe.',
-  'it ate a bin, burped, then took the OTHER bin. greedy. so greedy.',
-  'MAYOR DINKLE: "it only ate a SMALL thing. we have loads." nine.',
-  'it ate the swing set. the swings squeaked all the way down. eek!',
+  'Still snacking. Bins, mailboxes, and somebody\'s good left shoe.',
+  'It ate a bin, burped, then took the OTHER bin. Greedy. So greedy.',
+  'Town hall says it only ate a small thing and we have loads. Nine.',
+  'It ate the swing set. The swings squeaked all the way down. Eek!',
 ], [
-  'nothing big is left. it is eating crumbs now. very loud crumbs.',
-  'it ate the last bin. it did not even WANT the last bin. rude.',
-  'down to gnomes and letterboxes. it is HOOVERING the county.',
-  'the last snack was a casserole. PIKE HOLLOW sent it. serves them.',
+  'Nothing big is left. It is eating crumbs now. Very loud crumbs.',
+  'It ate the last bin. It did not even WANT the last bin. Rude.',
+  'Down to gnomes and letterboxes. It is HOOVERING the county.',
+  'The last snack was a casserole from Pike Hollow. Serves them.',
 ]];
 
 const BY_MEAL: Record<MealKind, Pools> = {
@@ -758,198 +732,202 @@ export function mapleMealKind(meal: string): MealKind {
 //  {F} form   {M} last meal   {P} pct   {R} 100-pct   {S} seconds   {D} district
 //  Those SIX are the entire vocabulary. There is no rival token and there never
 //  will be — `usable()` blocks any template carrying anything else.
+//  Never start a line with {D} or {M}: they arrive lower case and a sentence
+//  must begin with a capital.
 const LIVE: Pools = [[
-  'MAYOR DINKLE: "there is no {F} in {D}." there is, though.',
-  'a {F} was sighted in {D}. residents waved. they always do.',
-  'it ate {M}. MAYOR DINKLE calls this "a scheduling matter".',
-  'DEB HOLLIS: "{M}? gone." her pie sales are up nine pies.',
-  'CARLA WEBB: "mayor, about the {F} in {D}?" he walks away.',
-  'TATER fed the {F}. TATER says it prefers {M}.',
-  'poll: is the purple thing getting bigger? {P}% say yes.',
-  'GUS on the {F}: "you want my opinion? it needs a haircut."',
-  'a second hole has opened. that is two holes now. two of them.',
-  'MAYOR DINKLE cut a ribbon in {D}. the ribbon has gone now.',
-  'PEARL asked if the {F} is eligible for the pie contest. denied.',
-  'a {F} in {D}. town hall schedules four hours of meeting.',
-  'BUGLE front page: "{M}, GONE?" note the question mark.',
-  'DALE offered to mow around the {F}. DALE is not joking. never is.',
-  'MARGE: "a {F}? fine. now can we discuss the METER." year nine.',
-  'MAYOR DINKLE: "I have never seen a {F}." he is looking at one.',
-  'it ate {M}. nobody saw a thing. everybody saw it.',
+  'The mayor says there is no {F} in {D}. There is.',
+  'A {F} was sighted in {D}. Residents waved back at it.',
+  'It ate {M}. Town hall calls this a scheduling matter.',
+  'Carla Webb asked about the {F} in {D}. He walked away.',
+  'Tater fed the {F}. Tater says it prefers {M}.',
+  'Residents were asked if the purple thing is bigger. {P}% said yes.',
+  'Gus on the {F}: it needs a haircut, and that is his opinion.',
+  'A second hole has opened. That is two holes now. Two of them.',
+  'The mayor cut a ribbon in {D}. The ribbon has gone now.',
+  'Pearl asked if the {F} could enter the vegetable contest. Denied.',
+  'A {F} in {D}. Town hall has scheduled a long meeting.',
+  'Bugle front page: {M}, gone? Note the question mark.',
+  'Dale offered to mow around the {F}. Dale is not joking, ever.',
+  'Marge says fine, a {F}, but can we discuss the meter.',
+  'The mayor says he has never seen a {F}. He is looking at one.',
+  'It ate {M}. Nobody saw a thing. Everybody saw it happen.',
+  'Biscuit opened a door and a {F} came in. Biscuit is sorry.',
 ], [
-  'MAYOR DINKLE: "a SMALL {F}." it is {P}% of the town. small-ish.',
-  'we are evacuating {D}. politely. with casseroles. in one line.',
-  'it ate {M}. somebody owned that. there will be a MEETING.',
-  '{P}% of MAPLE FALLS has gone. the mayor calls it a rounding error.',
-  'DEB HOLLIS: "{P}% gone." she is up nine points. NINE points.',
-  'do not go to {D}. that is exactly where the {F} is.',
-  'TATER named the {F}. everyone is using the name now. it is Steve.',
-  'CARLA WEBB in {D}: "how do you feel?" they feel terrible, CARLA.',
-  'it ate {M}. GUS: "I said this would happen." he did not.',
-  'MAYOR DINKLE has renamed the {F} the maple falls basin. nice try.',
-  'PEARL has moved the pies out of {D}. THAT is leadership.',
-  '{P}% devoured. the other {R}% is at a town hall meeting about it.',
-  'PIKE HOLLOW asked how {D} is going. they KNOW how it is going.',
-  'DALE mowed the edge of the {F} in {D}. the line is CRISP.',
-  'MAYOR DINKLE: "{P}% is a very DINKLE-friendly number." it is not.',
-  'MARGE has moved the protest to {D}. the meter came too.',
-  'a second {F} has been reported. that makes two of them now.',
+  'Town hall says it is a small {F}. It is {P}% of the town.',
+  'We are evacuating {D}. Politely. With casseroles. In one line.',
+  'It ate {M}. Somebody owned that. There will be a meeting.',
+  '{P}% of Maple Falls has gone. Town hall calls it a rounding error.',
+  'Do not go to {D}. That is exactly where the {F} is.',
+  'Tater named the {F}. Everybody uses the name now. It is Steve.',
+  'Carla Webb is in {D} asking how people feel. They feel terrible.',
+  'It ate {M}. Gus says he knew this would happen. He did not.',
+  'Town hall has renamed the {F} the Maple Falls basin. Nice try.',
+  'Pearl has moved the zucchini out of {D}. That is leadership.',
+  '{P}% devoured. The other {R}% is at a meeting about it.',
+  'Pike Hollow asked how {D} is going. They know how it is going.',
+  'Dale mowed the edge of the {F}. The line is CRISP.',
+  'The mayor says {P}% is a very Dinkle-friendly number. It is not.',
+  'Marge has moved the protest to {D}. The meter came with her.',
+  'A second {F} has been reported. That makes two of them now.',
+  'A raccoon met the {F} and was entirely unbothered by it.',
 ], [
-  '{D}: GONE!! a four hour meeting has been scheduled about it.',
-  '{P}% DEVOURED. the other {R}% has already formed a committee.',
-  'the {F} ate {M}. the mayor blames the last mayor.',
-  '{S} SECONDS LEFT!! everyone to the car park. bring casseroles.',
-  'a {F} now holds {P}% of MAPLE FALLS. it filed no paperwork at all.',
-  '{S} SECONDS LEFT and MARGE is still protesting that meter.',
-  'the {F} ate {M}. TATER said it was hungry.',
-  'CARLA WEBB got a quote from the {F}. it said nothing. she printed it.',
-  'MAYOR DINKLE concedes {D}. he is keeping the ribbon scissors.',
-  '{S} SECONDS LEFT. GUS is still open. GUS is always still open.',
-  'PEARL saved the pies. the {F} got {M}.',
-  '{P}% gone. that is {R}% of a town still arguing about a meter.',
-  'the {F} ate {M}. PIKE HOLLOW sent a casserole.',
-  'DALE mowed the last lawn in {D}. crisp to the very end, that man.',
-  '{S} SECONDS LEFT!! the twine ball is on the truck. go. go. go.',
-  'the {F} ate {M}. the pie judging goes ahead anyway.',
-  'there are two of them at {D} now. TWO. we are leaving.',
+  'It has eaten {D}!! A four hour meeting has been scheduled.',
+  '{P}% has been DEVOURED. The other {R}% has formed a committee.',
+  'The {F} ate {M}. The mayor blames the last one.',
+  'There are {S} seconds left!! Everyone to the car park. Bring food.',
+  'A {F} now holds {P}% of Maple Falls. It filed no paperwork at all.',
+  'There are {S} seconds left and Marge is still protesting the meter.',
+  'The {F} ate {M}. Tater said it was hungry.',
+  'Carla Webb asked the {F} for a quote. It said nothing at all.',
+  'The mayor has conceded {D}. He is keeping the ribbon scissors.',
+  'There are {S} seconds left. Gus is open. Gus is always open.',
+  'Pearl saved the zucchini. The {F} got {M}.',
+  '{P}% gone. That is {R}% of a town still arguing about a meter.',
+  'The {F} ate {M}. Pike Hollow sent a casserole.',
+  'Dale mowed the last lawn in {D}. Crisp to the very end.',
+  'Only {S} seconds left!! The twine ball is on the truck. Go now.',
+  'The {F} ate {M}. Judging goes ahead anyway.',
+  'There are two of them at {D} now. Two. We are leaving.',
+  'Biscuit has opened every door in {D}. Everybody is out. Good dog.',
 ]];
 
 // ══ WHO IS TALKING ═══════════════════════════════════════════════════════════
 // Speech bubbles over people's heads — a different medium from the ticker, and
 // deliberately left in their own voice. A line should sound like the PERSON,
-// not the newspaper. Kept SHORT: a phone bubble truncates fast, so aim under
-// ~34 characters, hard cap 46.
+// not the newspaper. Same house style: proper sentences, capital at the start,
+// full stop at the end. Kept SHORT: a phone bubble truncates fast, so aim under
+// ~34 characters, hard cap 46. The keys are consumed by life.ts — do not rename
+// them. 'politician' is Mayor Dinkle, and he is a man who will not admit to a
+// hole, NOT a candidate: no elections, no voting, no campaigning.
 export const MAPLE_VOICE_AMBIENT: Record<string, string[]> = {
-  // campaigning at anyone who holds still for three seconds
+  // the mayor, mayoring, at anyone who holds still for three seconds
   politician: [
-    'DINKLE. you know the name.', 'can I count on your vote?', 'I have a plan for the pier.',
-    'lovely dog. is it registered?', 'my opponent has NO plan.', 'I grew up two streets over.',
-    'four more years! or eight!', 'we are polling very well.', 'great question. the answer is no.',
-    'yard sign? free yard sign!', 'I fixed that pothole. me.', 'my opponent hates the fair.',
-    'shake my hand. firm. good.', 'I will be at the diner at 8.', 'the twine ball put us on maps.',
-    'I have never been eaten.', 'a vote for me is a vote for me', 'let me finish. LET ME FINISH.',
-    'I love this town. on record.', 'kiss the baby? I kissed it.', 'name one thing she has done.',
+    'I am the mayor. Have we met?', 'There is no hole. I would know.', 'I cut that ribbon myself.',
+    'Lovely dog. Is it licensed?', 'I have a plan for the bandstand.', 'That is a puddle. A dry puddle.',
+    'I grew up two streets over.', 'Great question. The answer is no.', 'I fixed that pothole. Me.',
+    'Shake my hand. Firm. Good.', 'I will be at the diner at eight.', 'The twine ball put us on the map.',
+    'I have never been eaten.', 'Let me finish. LET ME FINISH.', 'I love this town. On the record.',
+    'I named that prize hog myself.', 'The clock is fast on purpose.', 'My office is the whole town.',
+    'I have looked into it. It is fine.', 'Nobody has told me anything.',
   ],
   // nine years. one parking meter. four people. total commitment.
   protester: [
-    'the METER. it is the meter.', 'nine years. NINE. still here.', 'honk if you hate that meter!',
-    'twenty five cents. an HOUR.', 'we have a petition. sign it.', 'nobody asked for that meter.',
-    'my sign is laminated. it lasts', 'we protest rain or shine.', 'there are four of us. FOUR.',
-    'the meter is a SYMBOL.', 'I brought folding chairs.', 'day 3,281 of the protest.',
-    'ask me about the meter.', 'we are not going anywhere.', 'the council knows my name.',
-    'coffee break. then back to it.', 'I have a bullhorn. legally.', 'this is about PRINCIPLE.',
-    'the meter started all of this.', 'my husband agrees. mostly.',
+    'The meter is the real issue.', 'Nine years. Nine. Still here.', 'Honk if you dislike that meter.',
+    'Twenty five cents for one hour.', 'We have a petition. Please sign.', 'Nobody asked for that meter.',
+    'My sign is laminated. It lasts.', 'We protest in rain or in shine.', 'There are four of us. Four.',
+    'The meter is a symbol, you see.', 'I brought the folding chairs.', 'It is day 3,281 of the protest.',
+    'Ask me about the meter.', 'We are not going anywhere.', 'The council knows my name.',
+    'Coffee break, then back to it.', 'I have a bullhorn. Legally.', 'This is about principle.',
+    'The meter started all of this.', 'My husband agrees. Mostly.',
   ],
   // does not gossip. is currently gossiping.
   gossip: [
-    'well. I heard something.', 'do not tell a soul. tell everyone.', 'her cousin heard it first.',
-    'apparently it is about the pie.', 'they are not speaking. still.', 'I saw whose truck that was.',
-    'the pie contest was RIGGED.', 'that casserole was store bought.', 'they moved here in 2019. brand new!',
-    'I do not gossip. I just KNOW.', 'that is not his real lawn.', 'there was a WHOLE incident.',
-    'nine people know. now ten.', 'the mayor knows. of course.', 'I have said too much. more?',
-    // …and the pool no longer models keeping secrets from grown-ups: in a game
-    // for six-year-olds "do not tell" is a habit worth not teaching.
-    'it started at the fair, in 96.', 'her sister told my sister.', 'everybody knows. even Deb.',
-    'ask me again in ten minutes.', 'I will absolutely repeat it. so:',
+    'Well. I heard something today.', 'Her cousin heard it first.', 'They are not speaking. Still.',
+    'That casserole was store bought.', 'They moved here in 2019. New!', 'I do not gossip. I simply know.',
+    'That is not his real lawn.', 'There was a whole incident.', 'Nine people know. Now ten.',
+    'The mayor knows. Of course.', 'I have said too much. More?', 'It started at the fair in 1996.',
+    'Her sister told my sister.', 'Everybody knows. Even the goat.', 'Ask me again in ten minutes.',
+    'I will happily repeat all of it.', 'Somebody took Gus\'s lunch.', 'That zucchini is not natural.',
+    'I saw whose truck that was.', 'The raccoon has a whole family.',
   ],
   farmer: [
-    'rain would be nice. or not.', 'that corn is coming in fine.', 'the rooster starts at 4:40.',
-    'a cow got out again. tuesday.', 'that silo is county famous.', 'four generations on this dirt.',
-    'tractor is slow. road is long.', 'pumpkins look good this year.', 'the maze has a middle. maybe.',
-    'town folks do not understand.', 'up at four, done at nine.', 'the scarecrow has a jacket now.',
-    'the fair is the only holiday.', 'that fence has an opinion.', 'never trust a flat horizon.',
-    'my chickens are all named.', 'if it rains, it rains.', 'that barn needs paint. next year.',
-    'good dirt. the best dirt.', 'I have not been to the city.',
+    'Rain would be nice. Or not.', 'That corn is coming in fine.', 'The rooster starts at twenty to five.',
+    'A cow got out again. Tuesday.', 'That silo is county famous.', 'Four generations on this dirt.',
+    'The tractor is slow. Road is long.', 'The pumpkins look good this year.', 'The maze has a middle. Maybe.',
+    'Town folks do not understand.', 'Up at four, done at nine.', 'The scarecrow has a jacket now.',
+    'The fair is the only holiday.', 'That fence has an opinion.', 'Never trust a flat horizon.',
+    'My chickens are all named.', 'If it rains, then it rains.', 'That barn needs paint. Next year.',
+    'Good dirt. The very best dirt.', 'The goat opened my gate again.',
   ],
   teen: [
-    'this town has one stoplight.', 'nothing happens here. ever.', 'I am moving to the city. soon.',
-    'the drive-in has ONE movie.', 'we lost again. shocker.', 'my mom knows your mom. sorry.',
-    'everybody knows everything.', 'the twine ball is not a thing.', 'I work at the gas station. yay.',
-    'homecoming is a whole ordeal.', 'literally no signal out here.', 'the diner or the parking lot.',
-    'my dad coaches. it is a lot.', 'PIKE HOLLOW is worse. barely.', 'I am in the band. one song.',
-    'six days till I get my license', 'yes my last name is Dinkle.', 'this is the most exciting day.',
-    'I have a job at the fair. ugh.', 'my aunt is going to LOVE this.',
+    'This town has one stoplight.', 'Nothing happens here. Ever.', 'I am moving to the city soon.',
+    'The drive-in has one movie.', 'We lost again. Big shock.', 'My mom knows your mom. Sorry.',
+    'Everybody knows everything.', 'The twine ball is not a thing.', 'I work at the gas station. Yay.',
+    'Homecoming is a whole ordeal.', 'There is no signal out here.', 'The diner or the parking lot.',
+    'My dad coaches. It is a lot.', 'Pike Hollow is worse. Barely.', 'I am in the band. One song.',
+    'Six days until I can drive.', 'Yes, my last name is Dinkle.', 'This is the best day all year.',
+    'I have a job at the fair. Ugh.', 'A raccoon stole my lunch again.',
   ],
   // the only person in town who has this correctly figured out
   kid: [
-    'his name is Steve. I named him', 'can we keep it?? please??', 'it ate the mailbox! COOL!',
-    'Steve likes pie. I checked.', 'grown ups are being so weird.', 'I drew him. want to see?',
-    'he is SO round. so so round.', 'nobody believed me. NOBODY.', 'I fed him a funnel cake.',
-    'he waved! sort of! he waved!', 'this is the best day EVER.', 'I won summer reading again.',
-    'my lemonade is 50 cents.', 'Steve is not scary. he is shy.', 'I named all the chickens too.',
-    'can Steve come to the fair?', 'the mayor is boring. Steve rules', 'I told the newspaper lady!',
-    'Steve blinked. I SAW it.', 'I am not scared. YOU are.',
+    'His name is Steve. I named him.', 'Can we keep him? Please?', 'It ate the mailbox! So cool!',
+    'Steve likes funnel cake.', 'Grown ups are being so weird.', 'I drew him. Want to see it?',
+    'He is so round. So very round.', 'Nobody believed me. Nobody.', 'I fed him a funnel cake.',
+    'He waved. Sort of. He waved.', 'This is the best day ever.', 'I won summer reading again.',
+    'My lemonade stand is open.', 'Steve is not scary. He is shy.', 'I named all the chickens too.',
+    'Can Steve come to the fair?', 'Steve blinked. I saw it.', 'I am not scared. You are.',
+    'Biscuit opened my door again.', 'The raccoon and I are friends.',
   ],
-  // GUS energy: refills are free, so are the opinions
+  // Gus energy: refills are free, so are the opinions
   diner: [
-    'coffee is 90 cents. always.', 'you want my opinion? here it is.', 'pie? we got PEARL\'s pie.',
-    'that booth is Marge\'s booth.', 'no, we do not do sprinkles.', 'sit anywhere. not there.',
-    'the debate is at 8. be early.', 'banned him. still feed him.', 'I have been here 31 years.',
-    'the special is the special.', 'refills free. opinions free.', 'that photo? catfish. 1996.',
-    'the mayor sits in the corner.', 'we close when I say we close.', 'eggs how you like em, hon.',
-    'I moderate. I do not referee.', 'you two. shake hands. now.', 'I lost to Pearl again. again.',
-    'more coffee. sit back down.', 'nobody leaves here hungry.',
+    'Coffee is ninety cents. Always.', 'You want my opinion? Here it is.', 'That booth is Marge\'s booth.',
+    'No, we do not do sprinkles.', 'Sit anywhere. Not there.', 'Banned him. Still feed him.',
+    'I have been here thirty one years.', 'The special is the special.', 'Refills free. Opinions free.',
+    'That photo? Catfish. 1996.', 'The mayor sits in the corner.', 'We close when I say we close.',
+    'Eggs however you like them.', 'You two. Shake hands. Now.', 'More coffee. Sit back down.',
+    'Nobody leaves here hungry.', 'Somebody took my sandwich.', 'That dog let himself in again.',
+    'My car park has a sinkhole.', 'Best pancakes in the county.',
   ],
   // relentlessly, unshakeably proud of a town with one stoplight
   booster: [
-    'best little town in the county', 'have you seen our twine ball?', 'GO OTTERS! two and eight!',
-    'we got a fair. a WHOLE fair.', 'PIKE HOLLOW wishes. they WISH.', 'population 1,412. and growing.',
-    'our gas is two cents cheaper.', 'the pie here is world class.', 'sign the guest book, friend!',
-    'we were in a magazine. once.', 'that silo? tallest in county.', 'stay for the boat parade!',
-    'four boats and a canoe. HUGE.', 'the drive-in is a landmark.', 'buy a shirt! support the band!',
-    'we peaked in 1978. we return.', 'you should see us in October.', 'nowhere better. I mean it.',
-    'that water tower? repainted 91', 'one stoplight. it is a GOOD one',
+    'Best little town in the county.', 'Have you seen our twine ball?', 'Go Otters! Nought and nine!',
+    'We have a fair. A whole fair.', 'Pike Hollow wishes. They wish.', 'Population 1,412, and growing.',
+    'Our gas is two cents cheaper.', 'Sign the guest book, friend.', 'We were in a magazine once.',
+    'That silo is the county tallest.', 'Stay for the boat parade.', 'Four boats and a canoe. Huge.',
+    'The drive-in is a landmark.', 'Buy a shirt. Support the band.', 'We peaked in 1978. We return.',
+    'You should see us in October.', 'Nowhere better. I mean it.', 'That water tower? Painted in 91.',
+    'One stoplight. It is a good one.', 'Pearl grew a giant zucchini.',
   ],
 };
 
 export const MAPLE_VOICE_PANIC: Record<string, string[]> = {
   politician: [
-    'this is my opponent\'s fault!!', 'I NEVER said it was fake!!', 'to the truck!! MY truck!!',
-    'vote for me from wherever!!', 'save the yard signs!!', 'I demand a REMATCH!!',
-    'I was AGAINST it all along!!', 'the polls are still OPEN!!', 'somebody grab the ribbon!!',
-    'four more— okay, RUN!! RUN!!', 'I will fix this in term THREE!',
+    'This is NOT my fault!!', 'I never said it was fake!!', 'To the truck!! My truck!!',
+    'Save the ribbon scissors!!', 'I was against it all along!!', 'Somebody grab the plaque!!',
+    'I will fix this on Monday!!', 'Run, folks!! Everybody run!!', 'I looked into it!! RUN!!',
+    'The clock!! Save the clock!!', 'This is a drainage issue!!',
   ],
   protester: [
-    'the METER!! SAVE THE METER!!', 'this changes NOTHING!!', 'still twenty five cents!!',
-    'we protest ON THE RUN!!', 'grab the laminated signs!!', 'day 3,281 continues!!',
-    'nobody drop that petition!!', 'the meter is still WRONG!!', 'four of us! STILL four!!',
+    'The meter!! Save the meter!!', 'This changes nothing!!', 'Still twenty five cents!!',
+    'We protest on the run!!', 'Grab the laminated signs!!', 'Day 3,281 continues!!',
+    'Nobody drop that petition!!', 'The meter is still wrong!!', 'Four of us!! Still four!!',
     'I am taking the chairs!!',
   ],
   gossip: [
-    'I KNEW it! I TOLD everyone!!', 'wait till Deb hears THIS!!', 'who do I call FIRST?!',
-    'this is the biggest news EVER', 'I heard it was the mayor!!', 'somebody knew! SOMEBODY KNEW!',
-    'I am telling EVERYONE!!', 'run! and TALK while you run!!', 'this beats the 96 fair thing!!',
-    'ask me later!! I will KNOW!!',
+    'I knew it!! I told everyone!!', 'Wait until they hear this!!', 'I am calling everybody now!!',
+    'This is the biggest news ever!!', 'I heard it was the mayor!!', 'Somebody knew!! Somebody knew!!',
+    'I am telling EVERYONE!!', 'Run, and talk while you run!!', 'This beats the 1996 fair!!',
+    'Ask me later!! I will know!!',
   ],
   farmer: [
-    'get the COWS out! ALL of em!!', 'not the SILO!! anything else!!', 'the chickens!! get a bucket!!',
-    'four generations!! FOUR!!', 'take the tractor! it is slow!!', 'the pumpkins! the GOOD ones!!',
-    'I said rain. this ain\'t rain!!', 'that maze HAD a middle!!', 'somebody get the rooster!!',
-    'forget the paint! GO! GO!!',
+    'Get the cows out!! All of them!!', 'Not the silo!! Anything else!!', 'The chickens!! Get a bucket!!',
+    'Four generations!! FOUR!!', 'Take the tractor!! It is slow!!', 'The pumpkins!! The good ones!!',
+    'I said rain. This is not rain!!', 'That maze had a middle!!', 'Somebody get the rooster!!',
+    'Forget the paint!! Go!! GO!!',
   ],
   teen: [
-    'okay this is actually sick', 'I am FILMING this!!', 'finally something HAPPENED!!',
-    'nobody is going to believe me!', 'told you this town was cursed', 'coach! COACH! the FIELD!!',
-    'moving to the city TODAY!!', 'this beats homecoming!!', 'RUN! also is my hair okay?!',
-    'my mom is SO going to hear this',
+    'Okay, this is actually amazing!!', 'I am filming all of this!!', 'Finally something happened!!',
+    'Nobody will believe me!!', 'I told you this town was odd!!', 'Coach!! COACH!! The field!!',
+    'I am moving to the city today!!', 'This beats homecoming!!', 'Run!! Check my hair later!!',
+    'My mom is going to hear this!!',
   ],
   kid: [
-    'RUN!! it is a GAME!! run!!', 'GO STEVE!! GO!!', 'this is better than the fair!!',
-    'wait for me!! WAIT!!', 'I TOLD you he was real!!', 'Steve is just hungry! stop it!',
-    'again!! do it AGAIN!!', 'mom you are SO slow!!', 'can I bring him home?!',
-    'best. field trip. EVER!!',
+    'Run!! It is a game!! Run!!', 'Go, Steve!! Go!!', 'This is better than the fair!!',
+    'Wait for me!! WAIT!!', 'I told you he was real!!', 'Steve is only hungry!! Stop it!!',
+    'Again!! Do it again!!', 'Mom, you are so slow!!', 'Can I please bring him home!!',
+    'Best field trip ever!!',
   ],
   diner: [
-    'we are STILL OPEN!! sit down!', 'grab the coffee pot!! GO!!', 'save the catfish photo!!',
-    'I said this would happen!!', 'nobody leaves hungry!! RUN!!', 'take a pie with you!! GO!!',
-    'the booth! save Marge\'s booth!', 'thirty one years!! THIRTY ONE!', 'still 90 cents!! LEGALLY!!',
-    'out the back, hon!! MOVE!!',
+    'We are still open!! Sit down!!', 'Grab the coffee pot!! Go!!', 'Save the catfish photo!!',
+    'I said this would happen!!', 'Nobody leaves hungry!! Run!!', 'Take some pancakes!! Go!!',
+    'The booth!! Save Marge\'s booth!!', 'Thirty one years!! THIRTY ONE!!', 'Still ninety cents!! Legally!!',
+    'Out the back, folks!! Move!!',
   ],
   booster: [
-    'the TWINE BALL!! save it!!', 'we will REBUILD! BIGGER!!', 'PIKE HOLLOW cannot know!!',
-    'GO OTTERS!! even NOW!! GO!!', 'get the 1978 trophy!!', 'this is STILL a great town!!',
-    'take the guest book!! GO!!', 'we were in a MAGAZINE!!', 'best little town! STILL!!',
-    'do NOT tell the county!!',
+    'The twine ball!! Save it!!', 'We will rebuild!! Bigger!!', 'Pike Hollow cannot know!!',
+    'Go Otters!! Even now!! Go!!', 'Get the 1978 trophy!!', 'This is still a great town!!',
+    'Take the guest book!! Go!!', 'We were in a magazine!!', 'Best little town!! Still!!',
+    'Do not tell the county!!',
   ],
 };
 
@@ -1001,7 +979,7 @@ function bind(ctx: MapleCtx): Filled {
     rest: 100 - pct,
     form: clip(ctx.form || 'VOIDLING', 14),
     meal: clip(ctx.lastMeal || 'a mailbox', 22),
-    dist: ctx.district ? DIST_NAME[ctx.district] : 'MAPLE FALLS',
+    dist: ctx.district ? DIST_NAME[ctx.district] : 'Maple Falls',
     secs: Math.max(1, Math.ceil(ctx.secondsLeft || 0)),
   };
 }
@@ -1047,9 +1025,9 @@ const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
  * One fully-formed headline, ready to drop straight into the ticker.
  *
  * THE ARC. Four beats, and the picker has the signal for all four:
- *   1 SIGN-ON   the first call of every match. good morning + real local news.
- *   2 DENIAL    tier 0 — nobody connects the dots. that is a puddle.
- *   3 ALARM     tier 1 — dawning horror, cheerfully. the evacuation is a walk.
+ *   1 SIGN-ON   the first call of every match. Good morning + real local news.
+ *   2 DENIAL    tier 0 — ordinary news beside a mayor calling it a puddle.
+ *   3 ALARM     tier 1 — dawning horror, cheerfully. The evacuation is a walk.
  *   4 PANIC     tier 2 — the town is gone, the meter argument is not.
  * `tier` is derived at the call site from devouredPct AND the player's form, so
  * a WORLD ENDER never gets a beat-2 line. Beat 1 is ours to guarantee.
