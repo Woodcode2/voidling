@@ -12,7 +12,15 @@ game; Capacitor wraps it in a native shell.
   (`favicon.png`, `apple-touch-icon.png`, `icon-192/512.png`, `manifest.json`).
 - **Launch screen** — cosmic splash (2732×2732) in
   `ios/App/App/Assets.xcassets/Splash.imageset/`.
-- **App Store screenshots** — `store/01..06-*.png` EXIST BUT MUST BE RESHOT.
+- **App Store screenshots** — `pnpm shoot:store` captures all five at
+  1290x2796 (the 6.7" slot, which also covers 6.5"): menu, world picker, a
+  match mid-devour, the shop framed on the legendary tier, and the results
+  screen. It seeds a wallet and a play history first so the shop photographs
+  the catalogue rather than an empty account, and it REFUSES to run until the
+  art is vendored — screenshots of grey boxes would misrepresent the app in the
+  other direction. Run it against `vite preview`, never the dev server, which
+  hot-reloads the page mid-capture.
+- **The existing `store/01..06-*.png` MUST BE REPLACED.**
   They are of the RETIRED 2D game, which is no longer what the bundle runs.
   Submitting screenshots that do not match the app is Guideline 2.3.3, and it
   is what got the previous attempt rejected. Same for `store/preview.mp4`.
@@ -163,12 +171,45 @@ Vendoring skips anything already on disk, so re-running costs one directory
 listing. Run it on the same Mac you archive from — it needs ordinary internet
 access and nothing else.
 
-### The vendoring step is not optional
+### Step 1 in plain words: the pictures are not in the app yet
 
-Every piece of generated art — 17 skin and card images, 34 GLB meshes — is
-referenced as a same-origin path (`/assets/hf/…`, `/assets/hf3d/…`). Those
-paths resolve ONLY because `vercel.json` rewrites them to two CloudFront
-distributions, with `vite.config.ts` mirroring the rewrite for the dev server.
+The game's artwork — 17 images (the skin cards, the shop art) and 34 3D models
+(houses, towers, palm trees, cars, the helicopter) — **is not stored in this
+project**. It lives on a server on the internet, and the game downloads it every
+time someone plays.
+
+That is fine for the website. A browser is online by definition, and there is a
+rule in `vercel.json` that quietly forwards each request to that server.
+
+**It does not work for an iPhone app.** The app runs off files on the phone.
+There is no server to forward anything, so every one of those 51 requests fails.
+The game does not crash — it is built to cope — it just draws a plain shape
+instead. On a real phone that means:
+
+- the five paid skins are **featureless coloured balls**. Someone pays $2.99 and
+  gets a sphere.
+- the void loses the galaxy inside it
+- the sky goes flat
+- all 34 models — every house, tree, tower and car — become **grey boxes**
+
+So the files have to be **copied into the project** before the app is built.
+That is all "vendoring" means: copying them in. `node scripts/vendor-assets.mjs`
+does it — it reads the game's own source to work out exactly which 51 files are
+needed, downloads them into `public/`, and refuses anything suspiciously small
+(a CDN error page saved as a `.glb` passes an existence check and fails on the
+phone, which is the worst possible time to find out).
+
+**It has to run on a machine with ordinary internet.** It is one command, and
+`pnpm build:ios` runs it for you as its first step, so in practice you do not
+type it separately — you just need to be somewhere the download can happen.
+Re-running is free; it skips anything already on disk.
+
+### Why the build cannot catch this for you
+
+Every piece of generated art is referenced as a same-origin path
+(`/assets/hf/…`, `/assets/hf3d/…`). Those paths resolve ONLY because
+`vercel.json` rewrites them to two CloudFront distributions, with
+`vite.config.ts` mirroring the rewrite for the dev server.
 
 A Capacitor bundle has neither. It loads from `file://` with no server in
 front of it, so on device every one of those requests fails and the game falls
