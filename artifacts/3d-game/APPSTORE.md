@@ -53,6 +53,22 @@ game; Capacitor wraps it in a native shell.
   **`analytics/funnels.sql`** holds the ready-made queries. The D1/D7 retention
   query in it no longer returns anything and is kept only as a record of what
   was dropped.
+- **In-app pause** — the ⌂ button opens a pause sheet (SOUND / RUMBLE / KEEP
+  PLAYING / LEAVE) and the match holds still behind it. Backgrounding the app
+  pauses it too. Before this there was no pause at all and no way to reach
+  sound mid-match, because `#btnSettings` lives inside `#menu` and measures
+  0x0 during play — a parent who needed quiet had to end the child's run.
+- **Storage-safe** — every `localStorage` call in the game module goes through
+  a guarded shim that falls back to memory. With storage blocked (iOS "Block
+  All Cookies", a managed school profile, an iframe embed, a full quota) the
+  build used to throw on import and render a perfect, completely dead main
+  menu. Verified: with `localStorage` throwing on every access the game now
+  boots, loads 3,303 props and runs a match with zero page errors.
+- **iPhone only** — `TARGETED_DEVICE_FAMILY = "1"`. There is no iPad layout
+  (`#btnPlay` is the same 224px wide at 390pt and at 1366pt), and declaring
+  family 2 makes App Store Connect demand 13" iPad screenshots before it will
+  enable Submit. If iPad is ever wanted it needs a real layout scaled off
+  `min(vw,vh)`, not just the flag flipped back.
 - **Kids-category compliance** — a real parental gate (`askGrownUp()` in
   `src/prototype3d.ts`) in front of all four things that spend money or leave
   the app: the legendary purchase, RESTORE PURCHASES, the privacy-policy link,
