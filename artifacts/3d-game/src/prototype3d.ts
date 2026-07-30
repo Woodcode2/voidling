@@ -914,6 +914,10 @@ let devouredPct = 0, newsCd = 14;
 // QA: the you-vs-family split of what the island has lost, so a harness can
 // check the family is not simply eating the player's food out from under them
 let devPlayerPct = 0, devFamilyPct = 0;
+// …and the raw counts behind that split. The percentages are rounded to whole
+// numbers against a 3,297-prop island, so at the low end they quantise to
+// nothing useful — the results screen needs the counts themselves.
+let devMineN = 0, devAllN = 0;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
 function breakingNews(h: string) {
@@ -1094,6 +1098,7 @@ function refreshHud() {
   // single bite, and keep the percentage as the meter underneath it.
   const minePct = Math.min(100, Math.round((mine / Math.max(1, initialMass)) * 100));
   devPlayerPct = minePct; devFamilyPct = Math.max(0, devouredPct - minePct);   // QA readout
+  devMineN = mine; devAllN = consumed;
   const themPct = Math.max(0, devouredPct - minePct);
   // ONE LINE. The "you 1% · family 3%" sub-line was a second HUD block under
   // the timer that a child cannot act on mid-match — it is a post-match stat,
@@ -1297,7 +1302,18 @@ function endMatch() {
     if (isPb) localStorage.setItem('voidBestScore', String(Math.round(playerScore)));
     const st = el('endStats');
     st.innerHTML =
-      `<div class="es"><i>DEVOURED</i><b>${devouredPct}%</b></div>` +
+      // DEVOURED read the share of the WHOLE ISLAND that vanished, counting
+      // every rival's meal as well as yours. Maple Falls carries 3,297 props,
+      // so one percent costs 33 of them and a real match lands in single
+      // digits — the headline number on the results screen was "1%", most of
+      // which somebody else ate. It is the same dead-air problem the live HUD
+      // already solved by leading with the count.
+      //
+      // Your share OF WHAT WAS EATEN is the stat this screen wants: it is
+      // about you, it answers the question the match actually posed (did I
+      // out-eat the family), and against six voids it sits in a range a child
+      // can read. EATEN, right beside it, still gives the raw count.
+      `<div class="es"><i>YOUR SHARE</i><b>${devAllN ? Math.round((devMineN / devAllN) * 100) : 0}%</b></div>` +
       `<div class="es"><i>EATEN</i><b>${matchEaten}</b></div>` +
       `<div class="es"><i>BIGGEST</i><b>${FORMS[curStage]}</b></div>` +
       `<div class="es${isPb ? ' pb' : ''}"><i>${isPb ? 'NEW BEST!' : 'YOUR BEST'}</i><b>${Math.round(isPb ? playerScore : pb)}</b></div>`;
