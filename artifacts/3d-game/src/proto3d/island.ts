@@ -776,36 +776,59 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     //    camera and it is the one surface in the game a child will recognise
     //    on sight, so it is painted properly — hash marks included.
     const S = GD.STADIUM;
+    // THE BAKE WAS PAINTING A FIELD 2.6 TIMES THE STADIUM. gameday.ts's
+    // STADIUM.rx/ry describe the PRECINCT — the ground the bowl and its
+    // concourse own — while makeStadium() produces a mesh 57.4 x 43 on plan.
+    // Painting the pitch at precinct scale put a green striped ellipse 152
+    // units wide around a 57-unit stadium, with the yard lines running out from
+    // under the stands and across the car park. Caught in the establishing
+    // shot, which is the first thing this level now shows anybody.
+    // 0.37 is the mesh's own footprint as a fraction of the precinct.
+    const MESH_K = GD.STADIUM_MESH_K;
     const ell = (rx: number, ry: number) => {
       g.beginPath(); g.ellipse(pxW(S.cx), pyW(S.cy), rx * PU, ry * PU, 0, 0, Math.PI * 2);
     };
-    ell(S.rx, S.ry); g.fillStyle = '#8d8578'; g.fill();               // stand footprint
-    ell(S.rx * 0.86, S.ry * 0.82); g.fillStyle = '#6f6f7c'; g.fill(); // the tunnel apron
+    // the forecourt: swept concrete from the stands out to the concourse ring,
+    // which is what the precinct actually is once the pitch is the right size
+    ell(S.rx, S.ry); g.fillStyle = '#bdb7ab'; g.fill();
+    for (let i = 0; i < 900; i++) {   // a little grain so it is not a flat disc
+      const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random());
+      g.fillStyle = 'rgba(255,255,255,0.05)';
+      g.beginPath();
+      g.arc(pxW(S.cx + Math.cos(a) * rr * S.rx), pyW(S.cy + Math.sin(a) * rr * S.ry), rand(3, 9), 0, Math.PI * 2);
+      g.fill();
+    }
+    ell(S.rx * MESH_K, S.ry * MESH_K); g.fillStyle = '#8d8578'; g.fill();               // stand footprint
+    ell(S.rx * MESH_K * 0.86, S.ry * MESH_K * 0.82); g.fillStyle = '#6f6f7c'; g.fill(); // the tunnel apron
+    // THE PLAYING SURFACE, inside the bowl and nowhere else.
+    const FX = S.rx * MESH_K * 0.78, FY = S.ry * MESH_K * 0.74;   // the pitch's half-extents
+    const EZ = FX * 0.15;                                          // end zone depth
     g.save();
-    ell(S.rx * 0.78, S.ry * 0.74); g.clip();
+    ell(S.rx * MESH_K * 0.78, S.ry * MESH_K * 0.74); g.clip();
     g.fillStyle = '#3f8f4e'; g.fillRect(0, 0, TEX, TEX);
     // mowing bands the length of the pitch
     g.fillStyle = 'rgba(255,255,255,0.085)';
-    for (let x = -S.rx; x < S.rx; x += 220) g.fillRect(pxW(S.cx + x), 0, 110 * PU, TEX);
+    for (let x = -FX; x < FX; x += FX * 0.29) g.fillRect(pxW(S.cx + x), 0, FX * 0.145 * PU, TEX);
     // end zones — home crimson at the near end, visitor teal at the far
-    g.fillStyle = 'rgba(196,52,47,0.55)'; g.fillRect(pxW(S.cx - S.rx), 0, 230 * PU, TEX);
-    g.fillStyle = 'rgba(42,169,160,0.50)'; g.fillRect(pxW(S.cx + S.rx - 230), 0, 230 * PU, TEX);
-    // yard lines, then hash marks between them
+    g.fillStyle = 'rgba(196,52,47,0.55)'; g.fillRect(pxW(S.cx - FX), 0, EZ * PU, TEX);
+    g.fillStyle = 'rgba(42,169,160,0.50)'; g.fillRect(pxW(S.cx + FX - EZ), 0, EZ * PU, TEX);
+    // ten yard lines, then hash marks between them
     g.strokeStyle = 'rgba(255,255,255,0.92)'; g.lineWidth = Math.max(1.6, 11 * PU); g.lineCap = 'butt';
-    for (let x = -S.rx + 230; x <= S.rx - 230 + 1; x += 118) {
-      g.beginPath(); g.moveTo(pxW(S.cx + x), pyW(S.cy - S.ry)); g.lineTo(pxW(S.cx + x), pyW(S.cy + S.ry)); g.stroke();
+    const STEP = (FX - EZ) * 2 / 10;
+    for (let x = -FX + EZ; x <= FX - EZ + 1; x += STEP) {
+      g.beginPath(); g.moveTo(pxW(S.cx + x), pyW(S.cy - FY)); g.lineTo(pxW(S.cx + x), pyW(S.cy + FY)); g.stroke();
     }
-    g.lineWidth = Math.max(1.2, 8 * PU);
-    for (let x = -S.rx + 230; x <= S.rx - 230 + 1; x += 23.6) {
+    g.lineWidth = Math.max(1.0, 7 * PU);
+    for (let x = -FX + EZ; x <= FX - EZ + 1; x += STEP / 5) {
       for (const hy of [-0.30, 0.30]) {
         g.beginPath();
-        g.moveTo(pxW(S.cx + x), pyW(S.cy + hy * S.ry - 26));
-        g.lineTo(pxW(S.cx + x), pyW(S.cy + hy * S.ry + 26));
+        g.moveTo(pxW(S.cx + x), pyW(S.cy + hy * FY - FY * 0.06));
+        g.lineTo(pxW(S.cx + x), pyW(S.cy + hy * FY + FY * 0.06));
         g.stroke();
       }
     }
     // the midfield mark
-    g.beginPath(); g.arc(pxW(S.cx), pyW(S.cy), 210 * PU, 0, Math.PI * 2);
+    g.beginPath(); g.arc(pxW(S.cx), pyW(S.cy), FX * 0.26 * PU, 0, Math.PI * 2);
     g.fillStyle = 'rgba(240,180,41,0.42)'; g.fill();
     g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(1.6, 14 * PU); g.stroke();
     g.restore();
@@ -3247,15 +3270,35 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // of whatever the lot pass left there — the bug bay.ts records as the
     // galleon landing on eleven palms. Claim the authored sites first.
     const STAD: GD.Pt = [GD.STADIUM.cx, GD.STADIUM.cy];
-    GD.claimSpot(STAD[0], STAD[1], 1450);
+    // …and the RESERVE was sized off the old 24 collider, so it kept a 72-unit
+    // circle of ground clear around a mesh 28 units across — a bare ring the
+    // player crosses on the way to the finale. 780 clears the stands and their
+    // shadow and lets the apron dress itself.
+    GD.claimSpot(STAD[0], STAD[1], 780);
     const TOWER: GD.Pt = [8380, 4550];
     GD.claimSpot(TOWER[0], TOWER[1], 260);
 
     // ── THE HERO ──────────────────────────────────────────────────────────
-    // Eaten last, and worth the wait: 123 parts, 18 units tall. Its radius is
-    // deliberately under its visual half-width so a WORLD ENDER can actually
-    // close on it rather than bouncing off a collider the size of the bowl.
-    drop(TG.makeStadium(), STAD, 24, 0, true, 'big');
+    // Eaten last, and worth the wait: 123 parts, 18 units tall.
+    //
+    // IT WAS NOT EATABLE AT ALL. The radius was 24; the player's growth law
+    // caps at R_CAP 12 and the eat gate is target.radius <= R * 1.11, so
+    // nothing above 13.32 can ever be swallowed. A live census across the three
+    // worlds: Maple 0 unreachable props, Pirate Bay 0, GAME DAY exactly 1 — the
+    // stadium, the thing the entire level is built around and the finale its
+    // design contract promises. The comment above even reasoned about the
+    // radius being under the visual half-width, which is right, and then set it
+    // to twice what the player can reach.
+    //
+    // 11.0 puts it inside the gate at R >= 9.91. Measured growth curves cross
+    // that at about 167 seconds of a 180-second match, so the bowl comes into
+    // range in the last quarter, with the fourth-quarter multiplier live and
+    // just enough clock to drive north and take it. That is the finale.
+    //
+    // The mesh is 57.4 across, so the half-width to radius ratio is 2.6 —
+    // Pirate Bay's landmarks run 1.6 to 2.4, so this is in family: a big meal
+    // reads bigger than the hole that takes it, which is the hole.io fantasy.
+    drop(TG.makeStadium(), STAD, 11.0, 0, true, 'big');
     drop(TG.makeClockTower(), TOWER, 4.5, 0, true, 'big');
 
     // ── THE TAILGATE ──────────────────────────────────────────────────────
@@ -3377,18 +3420,28 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('practice', 20, 44, 2.4, TG.makeLadderToss);
     plant('practice', 20, 44, 1.4, TG.makeHayStack);
 
-    // ── THE STADIUM APRON ─────────────────────────────────────────────────
-    // The concourse ring is claimed ground, but the dodecagon around it is
-    // not, and it was completely bare — the walk from the gates to the bowl
-    // had nothing in it at all.
-    plant('bowl', 40, 60, 2.0, TG.makeConcessionCart);
-    plant('bowl', 30, 60, 2.4, TG.makeMerchStand);
-    plant('bowl', 24, 60, 1.5, TG.makeSouvenirRack);
-    plant('bowl', 60, 40, 0.9, TG.makeConeStack);
-    plant('bowl', 44, 44, 0.8, TG.makeTrashBarrel);
-    plant('bowl', 40, 50, 1.2, TG.makeBanner);
-    plant('bowl', 24, 50, 1.6, TG.makePortaloo);
-    plant('bowl', 20, 50, 0.45, TG.makeMegaphone);
+    // ── THE STADIUM FORECOURT ─────────────────────────────────────────────
+    // Everything between the stands and the concourse ring. Shrinking the
+    // painted pitch to the mesh's real footprint (see the bake) exposed how
+    // much ground this actually is — a bare pale disc forty units across, and
+    // the establishing shot looks straight down at it. It is the last stretch
+    // the player crosses before the finale, so it gets a proper precinct:
+    // stands and carts working the crowd, ticket gates facing OUT the way a
+    // gate faces, barriers, bins, and the litter of a place that has had
+    // ninety thousand people walk through it since noon.
+    plant('bowl', 90, 44, 2.0, TG.makeConcessionCart);
+    plant('bowl', 70, 46, 2.4, TG.makeMerchStand);
+    plant('bowl', 60, 44, 1.5, TG.makeSouvenirRack);
+    plant('bowl', 150, 26, 0.9, TG.makeConeStack);
+    plant('bowl', 110, 30, 0.8, TG.makeTrashBarrel);
+    plant('bowl', 90, 36, 1.2, TG.makeBanner);
+    plant('bowl', 50, 40, 1.6, TG.makePortaloo);
+    plant('bowl', 44, 34, 0.45, TG.makeMegaphone);
+    plant('bowl', 34, 40, 0.6, TG.makeHelmetProp);
+    plant('bowl', 40, 44, 1.2, TG.makeFacePaintStand);
+    plant('bowl', 26, 70, 3.4, TG.makeTicketGate, true);
+    plant('bowl', 60, 30, 0.7, TG.makeFoldingChair);
+    plant('bowl', 30, 60, 2.0, TG.makePennantString);
 
     // ── THE TREE LINE ─────────────────────────────────────────────────────
     // Autumn. makeTree draws from FALL_FOLIAGE on this world, so the rim is

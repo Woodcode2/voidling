@@ -316,6 +316,28 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 // compiler naming anything left out.
 interface WorldCopy {
   n: number;            // which level this is, for the title card and the chip
+  newsGap: [number, number];   // seconds between scheduled headlines, min/spread
+  signOn: number;              // …and how long before the station says hello
+  /** THE ESTABLISHING SHOT'S SUBJECT, in 3D coords, or null to open on the void.
+   *
+   *  GAME DAY's design contract promises the player spawns "facing the stadium,
+   *  so the first thing they see is the thing they are working toward". It never
+   *  happened, and projecting the bowl's bounding box each frame says why it
+   *  never could: the camera sits at a 46-62 degree pitch with a 32 degree
+   *  field of view, the stadium is 281 units away, and it lands at NDC y 1.28
+   *  to 1.78 — entirely above the top of the screen, at every size the player
+   *  passes through. Nothing 280 units out is visible in a top-down camera, on
+   *  any of the three worlds, and making the bowl taller pushes it FURTHER off
+   *  the top rather than into frame.
+   *
+   *  So the promise is kept the way films keep it: the match opens on the
+   *  stadium and pulls back to the void. The existing 2.2-second dive already
+   *  had the altitude for it and was simply pointed at the player's feet. */
+  hero: [number, number] | null;
+  /** How long the opening camera move runs. The title card animation is 4.2s,
+   *  so anything up to about 3.6 plays UNDER the card, which is the point:
+   *  the world's name over a shot of the world's landmark. */
+  introLen: number;
   icon: string;         // the chip's glyph
   sub: string;          // the title card's one line
   ender: string;        // the WORLD ENDER announce banner
@@ -327,6 +349,7 @@ interface WorldCopy {
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
     n: 1, icon: '🏝️', sub: 'the little void is hungry · eat the island',
+    newsGap: [30, 12], signOn: 14, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The island is OVER.',
     enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
     winSub: 'the island belongs to the void', place: 'the island',
@@ -334,6 +357,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
+    newsGap: [30, 12], signOn: 14, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The resort is OVER.',
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
@@ -341,6 +365,24 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
   },
   gameday: {
     n: 3, icon: '🏈', sub: 'the whole town turned out · eat the tailgate',
+    // THE BOOTH IS NOT A TICKER. Hank and Bill are two announcers who never
+    // stop calling the game — that is the entire conceit of this world's
+    // newsroom, and on a 30-42 second cadence a full match produced EIGHT
+    // headlines out of a pool of 464, about 2% of the writing, delivered at
+    // the pace of a station ident. Halved, so a match runs 10-12 scheduled
+    // calls plus whatever the player causes. The card itself lives 5.6s, so
+    // even at the short end there is a clear ten-second gap between them.
+    // The sign-on comes early too: "Good afternoon from Marston!" is the
+    // opening line of a broadcast, not something you hear a quarter in.
+    newsGap: [16, 8], signOn: 6,
+    // the bowl, in 3D: gameday.ts authors it at world (5930, 3200), and the
+    // world-to-3D transform is (v - 6000) * 0.05.
+    hero: [(5930 - 6000) * 0.05, (3200 - 6000) * 0.05],
+    // 2.2 was not long enough to READ the shot: at 0.6s the pan had already
+    // cleared the bowl and was over the concourse, because the dive and the
+    // pan both ran off the same curve. 3.4 still finishes inside the 4.2s
+    // title card, and the hero hold below buys the first second outright.
+    introLen: 3.4,
     ender: '🌑 WORLD ENDER! The stadium is OVER.',
     enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
@@ -1158,7 +1200,7 @@ const DISTRICT: Record<string, string> = {
 // THE MAYOR — one recurring character running a denial-to-collapse arc
 // across the match. A running joke beats 54 unrelated one-liners.
 const newsEl = el('news');
-let devouredPct = 0, newsCd = 14;
+let devouredPct = 0, newsCd = COPY.signOn;
 // QA: the you-vs-family split of what the island has lost, so a harness can
 // check the family is not simply eating the player's food out from under them
 let devPlayerPct = 0, devFamilyPct = 0;
@@ -1780,6 +1822,8 @@ let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
 let guideStep = 0, guideT = 0, presenceT = 0;
 let introT = 0, outroT = 0;
+// how far the opening shot's subject currently sits from the void (see COPY.hero)
+let introHX = 0, introHZ = 0;
 // THE HAND-AUTHORED FIRST SIXTY SECONDS. All of these are per-match, and all of
 // them exist because the opening was measured and found to teach the wrong
 // things in the wrong order.
@@ -1861,7 +1905,7 @@ function beginMatch(solo = false) {
   tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
   titleUntil = tClock + 4.6;
   audio.startMusic(); audio.setMusicStage(0);
-  introT = 2.2;   // orbital reveal: the whole island, then dive to the tiny void
+  introT = COPY.introLen;   // orbital reveal: the world's landmark, then dive to the tiny void
   // THE FIRST INSTRUCTION USED TO ARRIVE WHILE THE CONTROLS WERE OFF. This
   // fired here, in the same block that sets introT = 2.2 — and the intro damps
   // velocity by 0.9^(dt*60) for those 2.2 seconds, roughly 0.0018x per second.
@@ -2224,7 +2268,7 @@ function resetMatch() {
   voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
-  playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = 14;
+  playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
@@ -3424,10 +3468,30 @@ function animate() {
         dragTaught = true; guideStep = 1;
         showGuide('<b>DRAG</b> anywhere to move!', 6);
       }
-      const k2 = Math.max(0, introT / 2.2);
+      const k2 = Math.max(0, introT / COPY.introLen);
       camDist = 38 + 262 * k2 * k2;   // ease-in dive from orbit
       targetDist = camDist;
     }
+    // THE ESTABLISHING SHOT. While the intro runs, the camera's subject slides
+    // from the world's hero landmark to the void — so GAME DAY opens looking
+    // straight down the sightline at the stadium, holds it while the title card
+    // is up, and arrives on the player as the controls go live. Smoothstep
+    // rather than the dive's own quadratic: the subject should still be the
+    // bowl for the first half-second, not already halfway home.
+    // Worlds with no hero pass null and behave exactly as before.
+    if (introT > 0 && COPY.hero) {
+      const u = Math.max(0, Math.min(1, introT / COPY.introLen));
+      // HOLD, THEN TRAVEL. A straight smoothstep across the whole intro left
+      // the camera off the stadium within half a second — there was never a
+      // frame you could call an establishing shot. This holds the subject ON
+      // the landmark for the first quarter, hands it over across the middle
+      // half, and spends the last quarter settled on the void so the controls
+      // go live on a still camera.
+      const q = Math.max(0, Math.min(1, (u - 0.25) / 0.5));
+      const e = q * q * (3 - 2 * q);
+      introHX = (COPY.hero[0] - voidState.x) * e;
+      introHZ = (COPY.hero[1] - voidState.z) * e;
+    } else { introHX = 0; introHZ = 0; }
     if (outroT > 0) targetDist *= 0.72;   // end-of-match push-in on the winner moment
     camDist += (targetDist - camDist) * (1 - Math.exp(-1.6 * dt));
     // steepen the camera as the void grows (hole.io): big hole ⇒ near-top-down,
@@ -3454,7 +3518,8 @@ function animate() {
     // Two and a half units is as far as the camera is ever allowed to lead.
     const lookL = Math.hypot(lookVX, lookVZ) * 0.10;
     const lookK = lookL > 2.5 ? 2.5 / lookL : 1;
-    const lookX = voidState.x + lookVX * 0.10 * lookK, lookZ = voidState.z + lookVZ * 0.10 * lookK;
+    const lookX = voidState.x + lookVX * 0.10 * lookK + introHX;
+    const lookZ = voidState.z + lookVZ * 0.10 * lookK + introHZ;
     tmpV.copy(camOffset).multiplyScalar(camDist);
     tmpV.x += lookX; tmpV.z += lookZ;
     camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
@@ -3546,7 +3611,7 @@ function animate() {
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen
     // roughly a third of the match — it stopped being an event. Now 30-42s,
     // and a breaking beat still cuts the line when the player earns one.
-    if (newsCd <= 0) { newsCd = 30 + Math.random() * 12; showNews(); }
+    if (newsCd <= 0) { newsCd = COPY.newsGap[0] + Math.random() * COPY.newsGap[1]; showNews(); }
   }
 
   // the DRAG-to-steer hint retires itself once the player has been driving

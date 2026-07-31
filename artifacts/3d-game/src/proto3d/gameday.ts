@@ -310,11 +310,26 @@ export function gdRegionAt(wx: number, wy: number): GdBiome | null {
   return 'woods';   // the rim, and the seams between districts
 }
 
+/** The stadium MESH's own footprint as a fraction of the precinct ellipse
+ *  above. STADIUM.rx/ry describe the ground the bowl and its concourse own;
+ *  tailgate.ts's makeStadium() produces something 57.4 x 43 on plan, which is
+ *  0.37 of it. Both numbers are needed and they are not the same number —
+ *  conflating them painted a playing surface 2.6 times the size of the
+ *  stadium, and kept every prop out of forty units of forecourt. */
+export const STADIUM_MESH_K = 0.37;
+
 /** Inside the bowl — the stands and the pitch. The stadium is one authored
  *  prop, so this is the "is it in the water" test of this world: nothing that
- *  scatters may land here. */
+ *  scatters may land here.
+ *
+ *  Tested against the MESH, not the precinct. Against the precinct it also
+ *  refused the whole forecourt — the last stretch of ground the player crosses
+ *  before the finale, and the one the opening establishing shot looks straight
+ *  down at — which is why that ring photographed as a bare pale disc. 1.10
+ *  keeps a stand's-width margin so nothing tucks under the overhang. */
 export const inStadium = (wx: number, wy: number): boolean => {
-  const dx = (wx - STADIUM.cx) / STADIUM.rx, dy = (wy - STADIUM.cy) / STADIUM.ry;
+  const k = STADIUM_MESH_K * 1.10;
+  const dx = (wx - STADIUM.cx) / (STADIUM.rx * k), dy = (wy - STADIUM.cy) / (STADIUM.ry * k);
   return dx * dx + dy * dy <= 1;
 };
 
