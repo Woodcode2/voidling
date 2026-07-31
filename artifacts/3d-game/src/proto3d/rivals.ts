@@ -524,7 +524,23 @@ export function createRivals(
     //   player = 100,000    -> first ~70,000, player wins by ~40%
     //   player = 180,000    -> first ~104,000, player wins by ~70%
     const ratio = Math.max(0, pScore / par);
-    const scale = THREE.MathUtils.clamp(0.62 + 0.38 * Math.pow(ratio, 0.88), 0.62, 6.5);
+    // THE CEILING CAME BACK, ONE WORLD LATER. 6.5 put a hard cap of
+    // 16,000 x 6.5 = 104,000 on the ramp below, and since the ramp is the
+    // MIN'd term, the player anchor stops binding the moment 0.78 x pScore
+    // clears 104,000 — i.e. above a player score of about 133,000. On MAPLE
+    // FALLS that never happened (a measured optimal run finishes near 47,000),
+    // so the cap was invisible. GAME DAY is dense enough that the combo
+    // multiplier never lapses, an optimal run finishes above 300,000, and the
+    // field froze at 76,000 — a fourfold win, on a leaderboard that is on
+    // screen the whole match. Exactly the bug the block above was written to
+    // kill, hiding one world away.
+    //
+    // 24 is chosen so the ramp can still reach 0.78 x pScore at full time for
+    // any player score up to ~490,000, which is well past anything reachable.
+    // It does not loosen the early match: `shape` is what holds the field back
+    // there, and re-measuring the same run gives a TIGHTER opening (1.30x at
+    // 30 seconds against 1.78x before) because the ramp was clipped there too.
+    const scale = THREE.MathUtils.clamp(0.62 + 0.38 * Math.pow(ratio, 0.88), 0.62, 24);
     // ── AND THE LADDER IS ANCHORED TO THE PLAYER, NOT JUST SCALED BY THEM ──
     // The scale curve alone over-corrected in the middle of the range. Worked
     // out from FULL_AT (a rival stops eating at 1.2x its lane, so that product
@@ -1190,7 +1206,22 @@ export function createRivals(
         // engages when a rival is far behind its lane, which is exactly when it
         // should; a rival at target sits near 1.0 and one ahead is throttled to
         // 0.5, both unchanged.
-        const band = THREE.MathUtils.clamp(Math.sqrt(off), 0.50, 16);
+        // …AND THE SQUARE ROOT IS TOO SOFT ON A DENSE WORLD. sqrt(off) is
+        // strongly self-limiting: a rival earning E raw points a match settles
+        // at (E^2 * want)^(1/3), so closing a gap needs the gap to be enormous.
+        // On MAPLE FALLS that never mattered — an optimal run scores 47,000
+        // and the family's raw earnings are within about 2x of it. GAME DAY is
+        // dense enough that the player's combo multiplier never lapses, so an
+        // optimal run earns nine times what a rival does, and measured, the
+        // band sat at 1.72 against a 16 ceiling it never came near. The field
+        // froze at 66,000 against 357,000.
+        //
+        // Linear settles at sqrt(E * want) instead, which is the same answer
+        // when a rival is near its lane (off ~ 1, and sqrt(1) = 1 either way,
+        // so Maple is untouched) and a much firmer pull when it is far below.
+        // The 0.50 floor is unchanged: a rival AHEAD of its lane is still
+        // throttled to half, and satiety above still stops it outright.
+        const band = THREE.MathUtils.clamp(off, 0.50, 16);
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;

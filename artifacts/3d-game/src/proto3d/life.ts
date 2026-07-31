@@ -3354,9 +3354,23 @@ export function createLife(
         ? makeCast('kid', dress)
         : makePerson(dress, o?.col, { hat: Math.random() < 0.6 ? 'cap' : undefined });
       const [x, z] = g3([wx, wy]);
+      // SPEED IS A TRAP HERE, AND I WALKED INTO IT. A fleeing ped runs at
+      // base x 3.4, and this district holds four hundred of them. At base
+      // 2.4-4.4 they flee at 8-15, which is close enough to the void's own
+      // world speed that a RING forms: everyone within the fear radius runs
+      // outward at once and holds station about eight units off the rim, and
+      // the void chases whichever is nearest, turns as the next one becomes
+      // nearest, and oscillates in a cleared twenty-unit box. Measured: 45
+      // seconds of a 180-second match with the score frozen at 59,773 and the
+      // void moving the whole time.
+      //
+      // Maple's grid crowd walks at 0.15-0.45 and has never done this. These
+      // are people standing around a car park with a plate of food, so slow is
+      // also the correct READ — the earlier numbers had a tailgate power-
+      // walking in circles.
       const rec = addWanderer(p, x, z,
-        o?.tether ?? (o?.kid ? 20 : 15),
-        o?.speed ?? (o?.kid ? rand(5.5, 8) : rand(2.4, 4.4)),
+        o?.tether ?? (o?.kid ? 14 : 10),
+        o?.speed ?? (o?.kid ? rand(1.6, 2.6) : rand(0.5, 1.4)),
         18, o?.kid ? 1.9 : 2.4, dress, undefined, voice);
       // EVERYONE FACES THE BOWL. gdFacingStadium is a world-space bearing and
       // the mesh's forward is +X, so the sign flips going into 3D — the same
@@ -3422,7 +3436,7 @@ export function createLife(
         // short tether, low speed: these people are STANDING AROUND A GRILL,
         // not commuting. It is the same trick the dance floor uses at the
         // resort, for the opposite feeling.
-        gdPlace(wx, wy, 'lot', voice, { tether: 5, speed: rand(0.4, 1.1) });
+        gdPlace(wx, wy, 'lot', voice, { tether: 5, speed: rand(0.3, 0.8) });
       }
     }
 
@@ -3437,8 +3451,11 @@ export function createLife(
       if (!GD.gdPlaceable(wx, wy, 20)) continue;
       const id: GD.GdBiome = wy > 6350 ? 'lot' : wy > 4900 ? 'plaza' : 'bowl';
       const roll = Math.random();
+      // the walk-up and the concourse are the two groups that are visibly
+      // GOING somewhere, so they keep a walk — but a walk, not a jog: base
+      // 1.5 flees at 5.1, which the void outruns at every size.
       gdPlace(wx, wy, id, roll < 0.55 ? 'fan' : roll < 0.75 ? 'student' : roll < 0.9 ? 'parent' : 'superfan',
-        { tether: 26, speed: rand(4.2, 6.2) });
+        { tether: 22, speed: rand(1.2, 1.9) });
     }
 
     // THE CONCOURSE RING. People circling the bowl, evenly spread, so the ring
@@ -3450,7 +3467,7 @@ export function createLife(
       const wy = pp.y + Math.sin(pp.ang + Math.PI / 2) * off;
       const roll = Math.random();
       gdPlace(wx, wy, 'bowl', roll < 0.5 ? 'fan' : roll < 0.7 ? 'vendor' : roll < 0.85 ? 'steward' : 'superfan',
-        { tether: 24, speed: rand(3.4, 5.2) });
+        { tether: 20, speed: rand(1.1, 1.8) });
     }
   }
 
@@ -3639,7 +3656,7 @@ export function createLife(
       const [x, z] = g3([wx, wy]);
       const put = (mesh: THREE.Object3D, ox: number, oz: number, kid: boolean) => {
         const rec = addWanderer(mesh, x + ox, z + oz,
-          opts?.still ? 4 : 13, opts?.still ? rand(0.3, 0.9) : kid ? rand(5.5, 8) : rand(2.4, 4.2),
+          opts?.still ? 4 : 11, opts?.still ? rand(0.25, 0.7) : kid ? rand(1.6, 2.6) : rand(0.5, 1.3),
           20, kid ? 1.9 : 2.4, dress, pan, voice);
         // faces the bowl, like everybody else on the plateau
         if (rec) rec.mesh.rotation.y = -GD.gdFacingStadium(wx, wy) + Math.PI / 2;
