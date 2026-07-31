@@ -13,7 +13,7 @@
 //   • no Math.random(). The town is hand-built and the same every load —
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
-import { part, mergedProp } from './island';
+import { part, mergedProp, PROP_SMOOTH_MAT } from './island';
 import { roundedBox } from './life';
 
 // ── determinism ────────────────────────────────────────────────────────────
@@ -89,8 +89,23 @@ export function spotOpen(x: number, y: number, rWorld: number): boolean {
 // screen you saw red plaques, teal plaques AND blue plaques and could not tell
 // which two were the two sides. The whole premise of the level was unreadable
 // because of one constant. Both colours are now the exact values life.ts uses.
-export const RED = 0xd8443c;     // MAYOR DINKLE — incumbent, four terms, one idea
-export const BLUE = 0x2f6fd0;    // DEB HOLLIS — challenger, blames Dinkle for the weather
+// ── THE FAIR, NOT AN ELECTION ───────────────────────────────────────────────
+// This town used to be mid-campaign: hundreds of red-and-blue lawn signs on
+// every verge, alternating "candidates" the length of every road, rosettes on
+// chests, whole streets colour-striped by which side they backed. The team
+// banned political content in writing (newsroom_maple.ts: "RATED 4+. NO real
+// politics of any kind") and rewrote a newsroom around it — the props never got
+// the memo, and they are the single most repeated object in the game.
+//
+// It is now the COUNTY FAIR, which the town was already holding: pie judging,
+// blue ribbons, a fair district. Same signs, same density, same charm — three
+// festival colours instead of two party colours, which stops the two-party read
+// on sight, and a rosette where "FOR MAYOR" used to be. A rosette at a county
+// fair is a prize ribbon, so the chest badges became correct by doing nothing.
+export const RED = 0xd8443c;     // fair crimson
+export const BLUE = 0x2f6fd0;    // ribbon blue
+export const FAIR_C = 0xf0b429;  // …and a third, so nothing reads as two sides
+export const FAIR_SIGN = [RED, BLUE, FAIR_C] as const;
 const CREAM = 0xf6f0e2, WHITE = 0xfdfaf2, BONE = 0xe8e0cc;
 const BARN = 0xb5372e, BRICK = 0xa8543f, SLATE = 0x5b6070, SHINGLE = 0x7a5a44;
 const WOOD = 0x9a7a5a, DARKWOOD = 0x6b503a, TIMBER = 0xc0a887;
@@ -457,23 +472,26 @@ export function makeParkingMeter(): THREE.Mesh {
   ]);
 }
 
-/** A CAMPAIGN LAWN SIGN. side 0 = DINKLE (red), 1 = HOLLIS (blue). There are
- *  hundreds of these. That is the point. */
+/** A FAIR SIGN on a verge — "THE FAIR, THIS WAY". There are hundreds of these.
+ *  That is the point: a town that has committed to an event. */
 export function makeLawnSign(side: number): THREE.Mesh {
-  const c = side ? BLUE : RED;
+  const c = FAIR_SIGN[Math.abs(side) % FAIR_SIGN.length];
   return M([
     part(box(0.06, 0.9, 0.06), 0xd8d8d8, -0.34, 0.45, 0),
     part(box(0.06, 0.9, 0.06), 0xd8d8d8, 0.34, 0.45, 0),
     part(box(1.05, 0.72, 0.07), c, 0, 1.16, 0),
-    part(box(0.78, 0.2, 0.1), WHITE, 0, 1.28, 0.02),                   // the name
-    part(box(0.5, 0.1, 0.1), WHITE, -0.1, 1.02, 0.02),                 // FOR MAYOR
+    part(box(0.78, 0.2, 0.1), WHITE, 0, 1.30, 0.02),                   // the banner line
+    // a rosette, where the candidate's office used to be printed
+    part(new THREE.CircleGeometry(0.15, 12), WHITE, -0.28, 1.02, 0.03),
+    part(new THREE.CircleGeometry(0.09, 10), c, -0.28, 1.02, 0.04),
+    part(box(0.34, 0.09, 0.1), WHITE, 0.16, 1.02, 0.02),               // "THIS WAY"
   ]);
 }
 
 /** THE BIG ROADSIDE SIGN — the 4x8 sheet of plywood version, staked in a
  *  field, angled at the traffic. */
 export function makeBigSign(side: number): THREE.Mesh {
-  const c = side ? BLUE : RED;
+  const c = FAIR_SIGN[Math.abs(side) % FAIR_SIGN.length];
   return M([
     part(box(0.22, 2.6, 0.22), DARKWOOD, -1.7, 1.3, 0),
     part(box(0.22, 2.6, 0.22), DARKWOOD, 1.7, 1.3, 0),
@@ -1309,11 +1327,14 @@ export function makeMapleTree(): THREE.Mesh {
     part(cyl(0.3, 0.34, 1.8, 6), 0x7a5a3e, 0.7, 4.2, 0, 0, 0, -0.5),
     part(cyl(0.3, 0.34, 1.8, 6), 0x7a5a3e, -0.7, 4.2, 0, 0, 0, 0.5),
   ];
+  // The town's namesake tree was seven 20-face icosahedra, flat-shaded — a pile
+  // of orange rocks at gameplay distance. Spheres keep the clustered-canopy
+  // silhouette and shade smoothly. See PROP_SMOOTH_MAT in island.ts.
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
-    p.push(part(new THREE.IcosahedronGeometry(mr(1.5, 2.1), 0), i % 2 ? leaf : 0xe8903a,
+    p.push(part(new THREE.SphereGeometry(mr(1.5, 2.1), 12, 9), i % 2 ? leaf : 0xe8903a,
       Math.cos(a) * mr(1.1, 1.9), mr(5.2, 6.6), Math.sin(a) * mr(1.1, 1.9)));
   }
-  p.push(part(new THREE.IcosahedronGeometry(2.3, 0), leaf, 0, 6.6, 0));
-  return M(p);
+  p.push(part(new THREE.SphereGeometry(2.3, 13, 10), leaf, 0, 6.6, 0));
+  return mergedProp(p, PROP_SMOOTH_MAT);
 }

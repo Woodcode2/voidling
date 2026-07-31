@@ -14,7 +14,7 @@ import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
-  // ── MAPLE FALLS (world 1): a small American town mid-election. `downtown`
+  // ── MAPLE FALLS (world 1): a small town mid-county-fair. `downtown`
   // is MAIN STREET, `plaza` is THE SQUARE, `cozy` is the (now small) suburb,
   // `beach` is LAKESIDE and `forest` is PINE WOODS — the names are kept
   // because ./life and ./prototype3d key crowd behaviour and district captions
@@ -71,7 +71,7 @@ const ISLAND_CTRL: [number, number][] = [
 //   LAKESIDE    the whole south shore
 //
 // Three cells are PINNED by staged vignettes in ./life, which this file does
-// not own: (3,2) is the mayor's re-election rally so it must be the square,
+// not own: (3,2) is the mayor's fair-opening speech so it must be the square,
 // (4,0) is the campsite so it must be woods, (4,2) is the golf flag so it must
 // be the park, (4,3) is the ball game so it must be the school field, (2,4) is
 // the schoolhouse at recess so it must be the suburb, (2,5) is beach
@@ -715,8 +715,12 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.strokeStyle = hex(ROAD_COL); g.lineWidth = roadPx;                       // asphalt / teak deck
   for (const c of ROAD_CENTERS) { roadLine(c, true); roadLine(c, false); }
   // (lane dashes are crisp GEOMETRY now — see the InstancedMesh below)
-  // crosswalks: zebra ladders on all four arms of every junction
-  g.fillStyle = 'rgba(240,244,252,0.88)';
+  // crosswalks: zebra ladders on all four arms of every junction.
+  // These are drawn FAINT now — the crisp ones are instanced geometry (search
+  // ZEBRA CROSSINGS below). What stays here is a soft under-shadow so the
+  // geometry has something to sit on and the junction still reads from the
+  // map-height camera, where the geometry bars are sub-pixel.
+  g.fillStyle = 'rgba(240,244,252,0.30)';
   for (const cx of ROAD_CENTERS) for (const cyR of ROAD_CENTERS) {
     const jx = pxW(cx), jy = pyW(cyR), half = roadPx / 2;
     const crossW = roadPx * 0.34;          // ladder depth (walking direction)
@@ -1543,6 +1547,42 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     spots.forEach((s, i) => { dm.position.set(s.x, 0.06, s.z); dm.rotation.y = s.rot; dm.updateMatrix(); inst.setMatrixAt(i, dm.matrix); });
     inst.instanceMatrix.needsUpdate = true;
     scene.add(inst);
+
+    // ── ZEBRA CROSSINGS, ALSO GEOMETRY ────────────────────────────────────
+    // The lane dashes were moved out of the bake for exactly this reason and
+    // the crossings were left behind. The ground texture resolves ~5.4 texels
+    // per world unit against ~38.7 screen pixels per unit at the play camera —
+    // a 7.2x magnification, so every baked edge is a seven-pixel gradient. It
+    // does not matter much on grass; it matters on the highest-contrast, most
+    // recognisable marking in the game, sitting in the middle of the junction
+    // the player drives through.
+    //
+    // Raising the bake is the wrong lever (3072 squared is already a ~37MB
+    // canvas, and 4096 would be 67MB before mipmaps, on a phone). Geometry is
+    // free by comparison: one instanced box mesh, razor-sharp at any zoom.
+    const BAR = new THREE.BoxGeometry(3.05, 0.03, 0.62);
+    const barMat = new THREE.MeshBasicMaterial({ color: 0xf0f4fc });
+    const bars: { x: number; z: number; rot: number }[] = [];
+    const CENTRES = ROAD_CENTERS.map((v) => w(v));
+    for (const jx of CENTRES) for (const jz of CENTRES) {
+      for (const side of [-1, 1]) {
+        for (let k = -2; k <= 2; k++) {
+          // crossing the horizontal road: bars run east-west, laid north/south
+          const ax = jx + k * 1.5, az = jz + side * 6.2;
+          if (insideIsland3(ax, az) && !inLagoon3(ax, az) && coastClear(ax, az, 5)) bars.push({ x: ax, z: az, rot: Math.PI / 2 });
+          // crossing the vertical road: the same ladder, turned
+          const bx = jx + side * 6.2, bz = jz + k * 1.5;
+          if (insideIsland3(bx, bz) && !inLagoon3(bx, bz) && coastClear(bx, bz, 5)) bars.push({ x: bx, z: bz, rot: 0 });
+        }
+      }
+    }
+    if (bars.length) {
+      const zi = new THREE.InstancedMesh(BAR, barMat, bars.length);
+      const zm = new THREE.Object3D();
+      bars.forEach((s, i) => { zm.position.set(s.x, 0.055, s.z); zm.rotation.y = s.rot; zm.updateMatrix(); zi.setMatrixAt(i, zm.matrix); });
+      zi.instanceMatrix.needsUpdate = true;
+      scene.add(zi);
+    }
   }
 
   // ── waterfall at the SE edge (animated) ────────────────────────────────────
@@ -1945,6 +1985,21 @@ function makeTower(tall = false): THREE.Group {
 // ~2250 calls/frame). Each factory now bakes its parts into ONE geometry with
 // per-vertex colors, and every prop on the island shares ONE material.
 export const PROP_SHARED_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
+// ── …AND ONE FOR THINGS THAT GREW ───────────────────────────────────────────
+// flatShading is right for architecture: a chunky, crisply-facetted building is
+// the house style and it reads as deliberate. It is wrong for a tree. Measured
+// at the play camera, a canopy facet spans ~40 screen pixels and a pine tier
+// chord 107 — so the foliage photographed as a faceted lump standing next to a
+// SMOOTH-shaded pedestrian (life.ts builds people with flatShading off), and
+// the mismatch is most of what reads as "not HD" once the cars are fixed.
+//
+// part() calls toNonIndexed(), which duplicates vertices but KEEPS their
+// normals — so a SphereGeometry stays smooth through the merge and an
+// IcosahedronGeometry, whose normals are per-face to begin with, cannot. The
+// fix is therefore two things together: this material, and sphere-based
+// canopies below. Cost is one extra shader program; draw calls are unchanged,
+// because every merged prop was already its own mesh.
+export const PROP_SMOOTH_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: false });
 const _pc = new THREE.Color();
 export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -1978,19 +2033,25 @@ function makeTree(): THREE.Group {
   const light = new THREE.Color(base).multiplyScalar(1.28).getHex();
   const R0 = rand(2.2, 2.9);
   const grp = new THREE.Group();
+  // spheres, not icosahedra: same silhouette and cost, smooth normals through
+  // the merge. 14x10 is the point where the profile stops reading as a polygon
+  // at the closest the camera ever gets.
   grp.add(mergedProp([
-    part(new THREE.CylinderGeometry(0.5, 0.72, 3.2, 7), PROPS.trunk, 0, 1.6, 0),
-    part(new THREE.IcosahedronGeometry(R0, 1), dark, 0, 4.6, 0),
-    part(new THREE.IcosahedronGeometry(R0 * 0.72, 1), base, R0 * 0.55, 5.4, R0 * 0.3),
-    part(new THREE.IcosahedronGeometry(R0 * 0.62, 1), light, -R0 * 0.5, 5.6, -R0 * 0.25),
-    part(new THREE.IcosahedronGeometry(R0 * 0.5, 1), base, 0.2, 6.4, 0.2),
-  ]));
+    part(new THREE.CylinderGeometry(0.5, 0.72, 3.2, 10), PROPS.trunk, 0, 1.6, 0),
+    part(new THREE.SphereGeometry(R0, 14, 10), dark, 0, 4.6, 0),
+    part(new THREE.SphereGeometry(R0 * 0.72, 12, 9), base, R0 * 0.55, 5.4, R0 * 0.3),
+    part(new THREE.SphereGeometry(R0 * 0.62, 12, 9), light, -R0 * 0.5, 5.6, -R0 * 0.25),
+    part(new THREE.SphereGeometry(R0 * 0.5, 11, 8), base, 0.2, 6.4, 0.2),
+  ], PROP_SMOOTH_MAT));
   return grp;
 }
 function makePine(): THREE.Group {
-  const parts = [part(new THREE.CylinderGeometry(0.5, 0.7, 2.4, 6), PROPS.trunk, 0, 1.2, 0)];
-  for (let i = 0; i < 3; i++) parts.push(part(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 7), PROPS.pine, 0, 3 + i * 2.1, 0));
-  const grp = new THREE.Group(); grp.add(mergedProp(parts));
+  // 7 segments put a 107-pixel straight edge across the widest tier. 14 halves
+  // the chord and the cone's own side normals do the rest once the material
+  // stops flattening them.
+  const parts = [part(new THREE.CylinderGeometry(0.5, 0.7, 2.4, 9), PROPS.trunk, 0, 1.2, 0)];
+  for (let i = 0; i < 3; i++) parts.push(part(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 14), PROPS.pine, 0, 3 + i * 2.1, 0));
+  const grp = new THREE.Group(); grp.add(mergedProp(parts, PROP_SMOOTH_MAT));
   return grp;
 }
 // ══ PIRATE BAY prop kit ═══════════════════════════════════════════════════
@@ -2404,8 +2465,9 @@ function makePalm(): THREE.Group {
 }
 
 function makeBush(): THREE.Mesh {
-  const b = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.4, 2.1), 0),
-    stdMat(pick([0x6cc86e, 0x5db06a, 0x7ed57a]), 0.95, true));
+  // a 20-face icosahedron, flat-shaded, is a rock. These are meant to be soft.
+  const b = new THREE.Mesh(new THREE.SphereGeometry(rand(1.4, 2.1), 12, 8),
+    stdMat(pick([0x6cc86e, 0x5db06a, 0x7ed57a]), 0.95, false));
   b.position.y = 1; b.scale.y = 0.7; return b;
 }
 function makeMailbox(): THREE.Group {
@@ -2549,7 +2611,7 @@ function makeGolfball(): THREE.Group {
 }
 // ── MAPLE FALLS' snack vocabulary ─────────────────────────────────────────
 // Same idea, this island's nouns: pumpkins in the fields, shells on the lake
-// shore, and — everywhere, in every district — one more campaign lawn sign.
+// shore, and — everywhere, in every district — one more sign for the fair.
 const tinyForMaple = (biome: Biome): THREE.Object3D => {
   const sign = () => MS.makeLawnSign(mrnd() < 0.5 ? 0 : 1);
   const pool: (() => THREE.Object3D)[] =
@@ -3383,7 +3445,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
     return out;
   };
-  const SIDE = () => (mrnd() < 0.5 ? 0 : 1);          // which campaign this yard backs
+  const SIDE = () => Math.floor(mrnd() * 3);          // which ribbon this yard flies
   const bcW = (g2: number) => blockCenter(g2);
 
   // ══ THE SQUARE ════════════════════════════════════════════════════════════
@@ -3423,7 +3485,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         const bn = makeBench(); drop(bn, bx2, by2, 2.4, sx < 0 ? Math.PI / 2 : -Math.PI / 2);
       }
     }
-    // the square's own campaign war: signs alternating all the way round
+    // the square's own bunting: signs cycling all the way round
     let sq = 0;
     for (const [sx2, sy2] of [
       ...row(gx0 + 60, gy0 + 40, gx1 - 60, gy0 + 40, 7),
@@ -3580,7 +3642,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
     // THE MIDWAY: tents in two matching rows, colours alternating
     // gold tents on the fair's khaki ground had almost no separation; and the
-    // challenger is BLUE, not teal
+    // the second ribbon is BLUE, not teal
     const TENTC = [MS.RED, MS.BLUE, 0xff5d9e, 0x3f7a4e];
     let ti = 0;
     for (const side of [-1, 1]) {
@@ -3597,7 +3659,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // hay-bale seating and the fairgoers
     for (const [hx2, hy2] of row(1980, my + 700, 5240, my + 700, 5)) drop(MS.makeHayBales(), hx2, hy2, 1.8, mr(0, 1.5));
     for (const [px4, py4] of scatter(mx0, my - 720, mx1, my + 760, 20, 1.2)) drop(MS.makeTownsfolk(mchance(0.45)), px4, py4, 1.2);
-    // and the campaigns, working the crowd
+    // and the fair stewards, working the crowd
     let fsi = 0;
     for (const [sx6, sy6] of [...row(mx0 + 200, my - 250, mx1 - 200, my - 250, 8), ...row(mx0 + 200, my + 250, mx1 - 200, my + 250, 8)]) {
       drop(MS.makeLawnSign(fsi++ % 2), sx6, sy6, 0.55, mr(-0.4, 0.4));
@@ -3777,8 +3839,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     landmark(MS.makeBallOfTwine(), sx0 - 40, bcW(4) - 120, 4.5, -Math.PI / 2, "world's largest ball of twine");
     landmark(MS.makePylonSign(), sx0 + 340, bcW(4) - 560, 2.4, 0, 'twine pylon');
     landmark(MS.makeBaitShack(), sx0 - 300, bcW(4) + 560, 2.6, 0, 'strip bait shack');
-    // BILLBOARDS down the whole frontage, alternating campaigns — the strip is
-    // where the election is loudest, because it is where the traffic is
+    // BILLBOARDS down the whole frontage, cycling ribbons — the strip is
+    // where the fair is loudest, because it is where the traffic is
     let bi = 0;
     for (const by8 of [4560, 5320, 6260, 7060, 7980, 8720, 9180]) {
       landmark(MS.makeBillboard(bi % 3 === 2 ? -1 : bi % 2), sx0 + 700, by8, 3.4, -Math.PI / 2, 'billboard');
@@ -3941,9 +4003,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   }
 
   // ── the roads ─────────────────────────────────────────────────────────────
-  // Cones and streetlamps on the shoulder, and — because this is Maple Falls
-  // in an election year — a campaign sign on every verge, alternating sides
-  // and alternating candidates the entire length of every road in town.
+  // Cones and streetlamps on the shoulder, and — because the fair is on — a
+  // sign on every verge, alternating sides of the road and cycling the three
+  // ribbon colours the entire length of every road in town.
   // CRITICAL: each sweep runs the full length of a road and CROSSES the other
   // four, so reject any spot whose along-coordinate is inside a crossing road.
   const roads3 = ROAD_CENTERS.map((c) => w(c));

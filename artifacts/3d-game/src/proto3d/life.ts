@@ -417,7 +417,7 @@ export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel
 export type Prop = 'cocktail' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie'
   // MAPLE FALLS props. `placard` is the loudest object in the town — it is the
   // only thing an adult holds that is visible from directly overhead, which is
-  // why the protest and both campaigns are told with them.
+  // why the protest and the fair are both told with them.
   | 'leaflets' | 'placard' | 'coffeepot' | 'rod' | 'pompom' | 'horn' | 'bat'
   | 'pie' | 'tape' | 'board' | 'leash';
 // HAIR is the single most important surface at a top-down camera — it is the
@@ -441,7 +441,7 @@ interface PersonOpts {
   parrot?: boolean; lanyard?: boolean; necklace?: boolean; robe?: boolean;
   armbands?: boolean; floatRing?: boolean; rucksack?: boolean;
   prop?: Prop; propL?: Prop; kid?: boolean;
-  // MAPLE FALLS: a campaign rosette (DINKLE red / HOLLIS blue) on the chest,
+  // MAPLE FALLS: a fair prize rosette (crimson / blue / gold) on the chest,
   // and a mail satchel slung across the body.
   rosette?: number; satchel?: number;
 }
@@ -492,7 +492,7 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
     // camera's travel purely because of this disc
     out.push(pc(B.disc, 0xd9b76a, 0, 0.20, 0, 2.60, 0.07, 2.60));
     out.push(pc(B.hemi, 0xe0c078, 0, 0.14, 0, 1.14, 0.88, 1.14));
-    out.push(pc(B.cyl, col, 0, 0.20, 0, 1.19, 0.10, 1.19));            // hat band, campaign-coloured
+    out.push(pc(B.cyl, col, 0, 0.20, 0, 1.19, 0.10, 1.19));            // hat band, ribbon-coloured
   } else if (kind === 'hood') {
     // hood UP: a dome a size too big, sitting back off the face, with the
     // drawstring collar showing under it
@@ -565,7 +565,7 @@ function propParts(out: Geo[], kind: Prop, s: number): void {
   // A placard is a FLAT PANEL HELD ABOVE THE HEAD. That is the whole trick: it
   // is the only hand prop in the kit with a footprint from directly overhead,
   // so a protest, a rally and a heckler all read at any camera height. The
-  // colour is passed in through `propCol` — that is where the campaign lives.
+  // colour is passed in through `propCol` — that is where the ribbon lives.
   } else if (kind === 'placard') {
     out.push(pc(B.tube, 0xb9793f, 0, -0.30 * s, 0.30 * s, 0.075 * s, 2.30 * s, 0.075 * s));
     out.push(pc(B.box, _propCol, 0, 0.90 * s, 0.30 * s, 1.35 * s, 1.00 * s, 0.07 * s));
@@ -651,9 +651,9 @@ const OUTFIT: Record<string, Fit> = {
   cozy: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xc65a9a, 0x7a6ae8], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34, 0x6a3a4a, 0x3a5a4a] },
   zoo: { shirt: [0xf0c050, 0xe8604d, 0x4da3ff, 0xc8b088], pants: [0x3a4a6a, 0x8a7a5a], hat: 'cap', hatOdds: 0.3 },
   plaza: { shirt: [0xe8604d, 0x4d9de8, 0x58c470, 0xf0c050, 0xffffff, 0x9a6ae8], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a] },
-  // ── MAPLE FALLS's four new districts. The election runs through the palette:
-  // every one of these shirt pools carries DINKLE red and HOLLIS blue, so a
-  // crowd is never politically neutral even before anyone puts a hat on.
+  // ── MAPLE FALLS's four new districts. The fair runs through the palette:
+  // every one of these shirt pools carries the ribbon colours, so a crowd
+  // always looks like it turned out for something.
   fair: { shirt: [0xd8443c, 0x2f6fd0, 0xf0c050, 0xffffff, 0x58c470, 0xe8604d], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34],
     hat: 'cap', hatOdds: 0.5, wear: ['tee', 'tee', 'dress', 'dungarees', 'tank'], shoe: ['shoe', 'shoe', 'boot'] },
   farm: { shirt: [0xd8443c, 0x4d9de8, 0xc4693a, 0xf0e6d2, 0x58c470], pants: [0x3a5a8a, 0x4a4a3a, 0x5a4a3a],
@@ -670,8 +670,14 @@ const OUTFIT: Record<string, Fit> = {
 // colours carry that through the whole town — rosettes, caps, tees, placards
 // and the yard signs on every verge — so from the play camera you can see which
 // STREET backs whom without reading a single word.
-const DINKLE = 0xd8443c;      // incumbent red
-const HOLLIS = 0x2f6fd0;      // challenger blue
+// The fair's three ribbon colours. These were DINKLE red and HOLLIS blue, the
+// two "candidates" — see the note in mainstreet.ts. Three breaks the two-party
+// read everywhere they are used at once: signs, billboards, block striping and
+// the badges on people's chests.
+const DINKLE = 0xd8443c;      // fair crimson
+const HOLLIS = 0x2f6fd0;      // ribbon blue
+const FAIR_GOLD = 0xf0b429;   // first prize
+const FAIR_COLS = [DINKLE, HOLLIS, FAIR_GOLD] as const;
 
 // SKELETON: hip line, shoulder line, head centre. A child is not a shrunken
 // adult — the legs and arms are proportionally shorter, the barrel is rounder
@@ -801,8 +807,10 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     for (const sx of [-0.36, 0.36])
       bp.push(pc(B.box, pants, sx * gr, 0.98 * th, 0.06 * gr, 0.15, 0.26 * th, 0.66));
   }
-  // ── the CAMPAIGN, worn on the chest. Maple Falls is mid-election and the
-  // cheapest way to see which street backs whom is to put the colour on people.
+  // ── the PRIZE ROSETTE, worn on the chest. Maple Falls is mid-fair and the
+  // cheapest way to see which street is backing which ribbon is to put the
+  // colour on people. (This geometry was always a rosette; only the story
+  // around it changed, and a rosette at a county fair is exactly right.)
   if (o?.rosette !== undefined) {
     bp.push(pc(B.disc, o.rosette, 0.30 * gr, 0.96 * th, 0.30 * gr, 0.42, 0.06, 0.42, Math.PI / 2));
     bp.push(pc(B.disc, WHITE, 0.30 * gr, 0.96 * th, 0.34 * gr, 0.22, 0.05, 0.22, Math.PI / 2));
@@ -902,7 +910,7 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
   // number from Math.random that they did not draw before this parameter
   // existed, or every spawn position on that island shifts.
   let _camp = side;
-  const camp = (): number => (_camp ??= (Math.random() < 0.5 ? DINKLE : HOLLIS));
+  const camp = (): number => (_camp ??= FAIR_COLS[Math.floor(Math.random() * FAIR_COLS.length)]);
   switch (role) {
     case 'kid': {
       // a child is not a shrunk adult: short limbs, round barrel, big head, and
@@ -2292,11 +2300,11 @@ export function createLife(
   const biomeIdAt = (gx: number, gy: number): string => String(PLAN_GRID[gy][gx]);
   const zoneAt = (gx: number, gy: number): MZone => ZONE_OF[biomeIdAt(gx, gy)] ?? 'burb';
 
-  // Which candidate a BLOCK backs. Column-striped, because the read we want
-  // from the play camera is "that whole street is red and the next one is
-  // blue" — the south two rows flip so the town is not a mirror of itself.
+  // Which RIBBON a block flies. Still striped, because "that whole street is
+  // crimson and the next one is blue" is a lovely read from the play camera —
+  // but three-wide now, so it is a fair and not a ballot.
   const sideOf = (gx: number, gy: number): number =>
-    ((gx + (gy >= GH - 2 ? 1 : 0)) % 2 === 0) ? DINKLE : HOLLIS;
+    FAIR_COLS[(gx * 2 + gy + (gy >= GH - 2 ? 1 : 0)) % FAIR_COLS.length];
 
   // every block, grouped by zone, and only if its centre is actually on land
   const zoneBlocks = new Map<MZone, [number, number][]>();
@@ -3888,7 +3896,7 @@ export function createLife(
       ['judging is at four. FOUR.', 'Pearl has won eleven years.',
         'that crust is store bought.', 'blue ribbon or nothing.',
         'she judges her OWN pie?', 'I entered the jam instead.',
-        'nobody move the pies.', 'it was RIGGED in 96 too.',
+        'nobody move the pies.', 'the 96 judging was a SCANDAL.',
         'the recipe is a family secret', 'we do not question Pearl.'],
       ['SAVE THE PIES!! ALL OF THEM!!', 'not the BLUE RIBBON!!',
         'Pearl has the pies!! GO!!', 'judging is POSTPONED!!',
