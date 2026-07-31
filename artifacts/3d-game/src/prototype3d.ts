@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, type WorldId } from './proto3d/island';
 import { createLife } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -234,9 +234,15 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 // the match title card, the two places a child reads the world's name — while
 // 60 other player-facing strings, including the world-picker card they tap
 // immediately beforehand, say MAPLE FALLS.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT' };
-const pickedWorld = (new URLSearchParams(location.search).get('w')
-  ?? localStorage.getItem('voidWorld') ?? 'maple') === 'pirate' ? 'pirate' : 'maple';
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY' };
+// A ternary chain resolved exactly two worlds, so a third could never be
+// picked however the picker was wired. Validate against the real list instead,
+// which also means an unknown ?w= on a shared link lands on Maple rather than
+// on a world that does not exist.
+const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday'];
+const _wantWorld = new URLSearchParams(location.search).get('w')
+  ?? localStorage.getItem('voidWorld') ?? 'maple';
+const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
 setWorld(pickedWorld);
 // every world-facing label follows the pick — title card, loading screen, and
 // the newsroom's own brand
@@ -962,7 +968,22 @@ const PIRATE_BEATS: typeof MAPLE_BEATS = [
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
     banner: '🏴‍☠️ TREASURE HUNT! Everything is TRIPLE!', news: 'The treasure hunt has begun. The map is still wrong.' },
 ];
-const BEATS = pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
+// GAME DAY runs the clock of an actual football game, which is the whole
+// pleasure of the conceit: the beats are not generic multipliers with a coat of
+// paint on, they are the four moments of a match. The finale is the fourth
+// quarter, and the commentary box knows it.
+const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
+  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xf0b429, flash: 'rgba(240,180,41,0.28)',
+    banner: '🏈 KICKOFF! Everything is DOUBLE!', news: 'And we are under way. The ball is in the air and so, apparently, is the parking lot.' },
+  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xc4342f, flash: 'rgba(196,52,47,0.26)',
+    banner: '🥁 THE BAND TAKES THE FIELD! Everything is DOUBLE!', news: 'The marching band has taken the field. They have not been told. They are playing anyway.' },
+  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.26)',
+    banner: '🌭 CONCESSION RUSH! Everything is DOUBLE!', news: 'Everybody has gone for a hot dog at once. The queue is now the largest thing here.' },
+  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x2aa9a0, flash: 'rgba(42,169,160,0.30)',
+    banner: '📣 FOURTH QUARTER! Everything is TRIPLE!', news: 'Fourth quarter. The stadium is on its feet, which is fortunate, because the seats have gone.' },
+];
+const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
+  : pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = {
   house: 'a whole HOUSE', car: 'a parked car', big: 'an entire LANDMARK',
 };

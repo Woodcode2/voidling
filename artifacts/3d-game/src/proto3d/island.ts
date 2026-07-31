@@ -23,12 +23,21 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
   // ── PIRATE BAY (world 2): a world-class tropical resort with a buccaneer
   // theme. Same 6x6 block grid and the same road network, but the "roads" are
   // BOARDWALKS and every district is a holiday.
-  | 'port' | 'resort' | 'party' | 'market' | 'jungle' | 'cove';
+  | 'port' | 'resort' | 'party' | 'market' | 'jungle' | 'cove'
+  // ── GAME DAY (world 3): a fall Saturday in a college town, the whole place
+  // out for the football game. The player spawns in the parking lot facing the
+  // bowl and finishes by swallowing it.
+  //
+  // Deliberately NOT reusing 'plaza' or 'campus' even though the gate plaza and
+  // the old campus would fit those words. ./life keys crowd behaviour, prop
+  // sets and district captions off these literals, so sharing a name with
+  // Maple's town square would drag a county fair into a football stadium.
+  | 'bowl' | 'gate' | 'lot' | 'rvpark' | 'greek' | 'quad' | 'practice' | 'treeline';
 // RETIRED on Maple: 'military' (the army base served a defence layer that was
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
 // the union only because ./life still compares against them; nothing in
 // MAPLE_PLAN uses them and the bake + populate branches are gone.
-export type WorldId = 'maple' | 'pirate';
+export type WorldId = 'maple' | 'pirate' | 'gameday';
 
 export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
 export interface Island {
@@ -682,6 +691,18 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     market: 0xcfa462,    // packed market ground — market were one beige field
     jungle: 0x2f7a4a,    // deep tropical canopy floor
     cove: 0xe0c78e,      // pale cove sand
+    // ── GAME DAY ground. An autumn Saturday: warm asphalt, worn turf and
+    // fallen leaves, kept a clear step apart from each other in value so the
+    // districts read as separate surfaces from the play camera rather than one
+    // beige field — which is the mistake the three pirate sands made above.
+    bowl: 0x3f8f4e,      // the playing surface, deeper than any campus turf
+    gate: 0xb9b3a8,      // swept concourse concrete
+    lot: 0x6e6b74,       // parking asphalt, cool against everything around it
+    rvpark: 0x8a8578,    // compacted gravel hardstanding
+    greek: 0x8fc76a,     // frat lawn, worn but green
+    quad: 0x76b85a,      // the old campus quad, greener and better kept
+    practice: 0x5fa356,  // practice turf, between the bowl and the quad
+    treeline: 0x9a6a3a,  // leaf litter at the rim
   };
   if (WORLD_ID !== 'pirate') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
