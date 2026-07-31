@@ -1808,6 +1808,11 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
 const CARD_ART: Record<string, string> = {
   maple: '/assets/hf/hf_20260730_125858_a0ff7398-b424-4a8d-b93d-c96d690d6a3c.png',
   pirate: '/assets/hf/hf_20260730_125831_be23864c-a25f-4149-875e-84a31aa15e85.png',
+  // WORLD 3 — GAME DAY. A stadium above, a tailgate party below, in the same
+  // chunky-clay register as the other two posters so the picker reads as one
+  // set. (An alternate take from the same batch is
+  // hf_20260731_091353_ac1f7e36-5d53-40f7-971b-ba23d7377f5f.png.)
+  gameday: '/assets/hf/hf_20260731_091353_67fffce6-1f4a-4db8-a357-b85b0fe4fdf4.png',
   frost: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
