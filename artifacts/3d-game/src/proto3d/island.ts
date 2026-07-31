@@ -10,6 +10,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './assets3d';
 import * as BAY from './bay';
+import * as GD from './gameday';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
 
@@ -105,12 +106,28 @@ const PIRATE_PLAN: Biome[][] = [
   ['beach', 'party', 'party', 'party', 'market', 'beach'],
   ['beach', 'beach', 'beach', 'beach', 'beach', 'cove'],
 ];
+// GAME DAY's districts are polygon regions (see gameday.ts), not grid cells —
+// this table exists only so callers that index PLAN[gy][gx] without asking
+// which world they are in get a sane answer instead of undefined. It is a
+// coarse map of the real layout: bowl north, plaza under it, the lot across the
+// middle, RV row and frat row south, campus east, the tree line at the rim.
+const GAMEDAY_PLAN: Biome[][] = [
+  ['treeline', 'treeline', 'bowl', 'bowl', 'treeline', 'treeline'],
+  ['treeline', 'bowl', 'bowl', 'bowl', 'bowl', 'quad'],
+  ['practice', 'gate', 'gate', 'gate', 'quad', 'quad'],
+  ['practice', 'lot', 'lot', 'lot', 'lot', 'quad'],
+  ['rvpark', 'lot', 'lot', 'lot', 'lot', 'greek'],
+  ['treeline', 'rvpark', 'rvpark', 'greek', 'greek', 'treeline'],
+];
 let WORLD_ID: WorldId = 'pirate';
 let PLAN: Biome[][] = PIRATE_PLAN;
 // pick the world BEFORE createIsland — the bake and populate both read it
 export function setWorld(id: WorldId): void {
   WORLD_ID = id;
-  PLAN = id === 'pirate' ? PIRATE_PLAN : MAPLE_PLAN;
+  // GAME DAY does not use the 6x6 block PLAN at all — its districts are
+  // polygon regions sited by geography, the way Pirate Bay's are, so the grid
+  // it carries is only there to satisfy callers that index PLAN blindly.
+  PLAN = id === 'pirate' ? PIRATE_PLAN : id === 'gameday' ? GAMEDAY_PLAN : MAPLE_PLAN;
 }
 export const worldId = (): WorldId => WORLD_ID;
 setWorld('maple');   // default until the menu says otherwise
@@ -180,6 +197,7 @@ export const MAPLE_SPAWN: [number, number] = [6469, 5240];
 /** The match's opening position in 3D, resolved for whichever world is loaded.
  *  Exported so the crowd can be kept out of it — see SPAWN_KEEP_OUT. */
 export function spawn3(): { x: number; z: number } {
+  if (WORLD_ID === 'gameday') return { x: w(GD.GD_SPAWN[0]), z: w(GD.GD_SPAWN[1]) };
   return WORLD_ID === 'pirate'
     ? { x: w(6950), z: w(10560) }
     : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };
@@ -267,7 +285,8 @@ function silhouetteWorld(steps = 10): [number, number][] {
 // prop placement and movement respect the actual coastline, not just the grid
 const MAPLE_SIL = silhouetteWorld(12);
 // Pirate Bay has its OWN coastline — a hooked headland, not Maple's blob
-const silPoly = (): [number, number][] => (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH : MAPLE_SIL);
+const silPoly = (): [number, number][] =>
+  (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH : WORLD_ID === 'gameday' ? GD.GD_LAND_SMOOTH : MAPLE_SIL);
 const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
 /** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
  *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
@@ -281,6 +300,7 @@ export function islandOutline3(): [number, number][] {
 function insideIslandWorld(wx: number, wy: number): boolean {
   // Pirate Bay: its own hooked coastline, and the BAY water is not land
   if (WORLD_ID === 'pirate') return BAY.onBayLand(wx, wy);
+  if (WORLD_ID === 'gameday') return GD.onGameDayLand(wx, wy);
   let inside = false;
   for (let i = 0, j = SIL_POLY.length - 1; i < SIL_POLY.length; j = i++) {
     const [xi, yi] = SIL_POLY[i], [xj, yj] = SIL_POLY[j];
@@ -1737,6 +1757,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     if (WORLD_ID === 'pirate') {
       const d = BAY.bayDistrictAt(x3 / SCALE + CX, z3 / SCALE + CZ);
       return d === 'oldtown' ? 'market' : (d as Biome | null);
+    }
+    if (WORLD_ID === 'gameday') {
+      const d = GD.gdRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ);
+      // gameday.ts names two of its districts 'plaza' and 'campus' because that
+      // is what they are. The shared Biome union cannot use those words for a
+      // football ground — ./life keys crowd behaviour and props off them and
+      // Maple already owns both — so they are translated at the boundary. See
+      // the note on the Biome union above.
+      return d === 'plaza' ? 'gate' : d === 'campus' ? 'quad' : d === 'woods' ? 'treeline'
+        : (d as Biome | null);
     }
     const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
     if (!insideIslandWorld(wx, wy)) return null;   // off the coast = off the island
