@@ -613,6 +613,9 @@ rivals.onStuffed = (name) => {
   audio.ready();
 };
 const audio = createAudio();
+// QA: drive the score's stage directly, so a harness can audit each world's
+// arrangement at every rung without playing four matches to reach them
+(window as unknown as { __audio: typeof audio }).__audio = audio;
 if (TOPDOWN) scene.fog = null;   // debug: see the whole island unfogged
 
 // soft round sprite for absorb puffs (avoids hard square points)

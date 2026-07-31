@@ -335,6 +335,7 @@ export function createAudio(): Audio3D {
   // exactly one tune however you happen to be hearing it.
   // ══════════════════════════════════════════════════════════════════════════
   const isPirate = () => worldId() === 'pirate';
+  const isGameday = () => worldId() === 'gameday';
 
   // ONE flat white-noise buffer, generated once and shared by every noise voice
   // in the level (shakers, hats, surf, crowd, gulls, creaks). Rebuilding a
@@ -1931,6 +1932,485 @@ export function createAudio(): Audio3D {
     holler(master, t + 0.32, 0.14, 2);
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  GAME DAY — THE FIGHT SONG, FROM THE CAR PARK
+  //
+  //  The third world shipped with no score at all. startMusic() branched two
+  //  ways — Pirate Bay, or everything else — so a football Saturday played
+  //  Maple Falls' front-porch bluegrass, and mNormZone() had no cases for any
+  //  of the eight Game Day districts, so it returned null everywhere and the
+  //  place layer never engaged once. Standing in the stadium bowl, in the
+  //  parking lot and in the woods all sounded identical, on the one world
+  //  whose design contract opens on the word "Noise".
+  //
+  //  THE CONCEIT, straight out of docs/GAMEDAY.md: "The band is playing
+  //  somewhere you cannot see. There is a distant roar every so often, and it
+  //  gets louder as the match goes on." So this is not a soundtrack — it is a
+  //  MARCHING BAND HEARD ACROSS A CAR PARK, and every stage moves it closer:
+  //
+  //    stage 0  a drumline warming up under the stands, and nothing else.
+  //             Two blocks away. You can hear the bass drum and not the tune.
+  //    stage 1  the sousaphone finds the bottom and the crowd starts answering
+  //             on the phrase ends. The band has taken the field.
+  //    stage 2  the cornets have the fight song outright, snare in cut time.
+  //    stage 3  everybody, plus the bell lyre rushing, plus ninety thousand
+  //             people. This is the fourth quarter.
+  //
+  //  It shares the instrument bench with MAPLE FALLS on purpose — sousa,
+  //  brass, glock, mSnare, bDrum, crash, refWhistle, holler, crowdSwell are
+  //  the same functions. A cornet is a cornet. What is different is the TUNE,
+  //  the arrangement (drumline-forward, never a banjo), the eight beds and the
+  //  roar. Nothing here is reachable from either of the other two scores.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // THE FIGHT SONG. F major, cut time, eight eighths to the bar, four bars
+  // round. Written to be singable by a child after one match: the first two
+  // bars are a rising call, the second two answer it and land back on the
+  // tonic. 0 is a rest — the rests are the point, they are where the crowd
+  // shouts back.
+  const G_HOOK: number[][] = [
+    [523.25, 523.25, 349.23, 349.23, 440.00, 440.00, 523.25, 0],
+    [466.16, 440.00, 392.00, 440.00, 349.23, 0, 0, 0],
+    [523.25, 523.25, 349.23, 349.23, 440.00, 440.00, 587.33, 0],
+    [587.33, 523.25, 466.16, 440.00, 349.23, 0, 0, 0],
+  ];
+  // F · C · Bb · C — the plainest turn in the key, which is what a fight song
+  // written in 1911 by somebody's uncle actually sounds like.
+  const G_CHOP: number[][] = [
+    [349.23, 440.00, 523.25],
+    [329.63, 392.00, 523.25],
+    [349.23, 466.16, 587.33],
+    [329.63, 392.00, 523.25],
+  ];
+  const G_OOM: number[][] = [[87.31, 130.81], [130.81, 98.00], [116.54, 174.61], [130.81, 98.00]];
+  // the four notes the crowd shouts in the gaps, which is the whole reason the
+  // gaps are there
+  const G_SHOUT: [number, number][] = [[349.23, 5], [349.23, 5.5], [440.00, 6], [523.25, 6.5]];
+
+  let gdBus: GainNode | null = null;
+  let gdAmb: GainNode | null = null;
+  let gdStep = 0, gdNextT = 0;
+  let gdTimer: ReturnType<typeof setInterval> | null = null;
+  let gdRunning = false;
+  let gAmbNextT = 0, gPaNextT = 0, gRoarNextT = 0;
+  const GD_VOL = 0.42;   // in family with PIR_VOL 0.42 and MAP_VOL 0.40
+
+  type GZoneId = 'bowl' | 'gate' | 'lot' | 'rvpark' | 'greek' | 'quad' | 'practice' | 'treeline';
+  const GZONE_VOL: Record<GZoneId, number> = {
+    bowl: 0.17, gate: 0.14, lot: 0.13, rvpark: 0.11,
+    greek: 0.13, quad: 0.09, practice: 0.10, treeline: 0.10,
+  };
+  const gzones: Partial<Record<GZoneId, ZoneLayer>> = {};
+  let gZone: GZoneId | null = null;
+  // island.ts renames three of gameday.ts's districts on the way out, so both
+  // spellings are listed — the same care MAPLE_DIST and GAMEDAY_DIST take.
+  function gNormZone(z: string | null): GZoneId | null {
+    switch (z) {
+      case 'bowl': return 'bowl';
+      case 'gate': case 'plaza': return 'gate';
+      case 'lot': return 'lot';
+      case 'rvpark': return 'rvpark';
+      case 'greek': return 'greek';
+      case 'quad': case 'campus': return 'quad';
+      case 'practice': return 'practice';
+      case 'treeline': case 'woods': return 'treeline';
+      default: return null;
+    }
+  }
+
+  function buildGBed(c: AudioContext, id: GZoneId, dest: AudioNode) {
+    const src = c.createBufferSource(); src.buffer = white(c); src.loop = true;
+    const f = c.createBiquadFilter();
+    const g = c.createGain();
+    const lfo = c.createOscillator(); lfo.type = 'sine';
+    const lfoG = c.createGain();
+    if (id === 'bowl') {              // ninety thousand people, one wall of them
+      f.type = 'bandpass'; f.frequency.value = 620; f.Q.value = 0.4;
+      g.gain.value = 0.10; lfo.frequency.value = 0.09; lfoG.gain.value = 0.055;
+    } else if (id === 'gate') {       // a queue: closer, brighter, more voices
+      f.type = 'bandpass'; f.frequency.value = 980; f.Q.value = 0.55;
+      g.gain.value = 0.075; lfo.frequency.value = 0.15; lfoG.gain.value = 0.032;
+    } else if (id === 'lot') {        // the tailgate, plus somebody's car radio
+      f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.5;
+      g.gain.value = 0.062; lfo.frequency.value = 0.12; lfoG.gain.value = 0.028;
+      // A CAR RADIO TWO ROWS OVER. Not a tune — a tuned hum through a paper
+      // cone, which is what a radio sounds like from the far side of a truck.
+      const rz = c.createOscillator(); rz.type = 'sawtooth'; rz.frequency.value = 174.61;
+      const rf = c.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 900; rf.Q.value = 5.5;
+      const rg = c.createGain(); rg.gain.value = 0.009;
+      rz.connect(rf); rf.connect(rg); rg.connect(dest); rz.start();
+    } else if (id === 'rvpark') {     // a generator that has been on since Wednesday
+      f.type = 'lowpass'; f.frequency.value = 280; f.Q.value = 0.7;
+      g.gain.value = 0.05; lfo.frequency.value = 0.06; lfoG.gain.value = 0.02;
+      const gz = c.createOscillator(); gz.type = 'sawtooth'; gz.frequency.value = 61;
+      const gf = c.createBiquadFilter(); gf.type = 'lowpass'; gf.frequency.value = 240; gf.Q.value = 2;
+      const gg = c.createGain(); gg.gain.value = 0.019;
+      gz.connect(gf); gf.connect(gg); gg.connect(dest); gz.start();
+    } else if (id === 'greek') {      // a party thump through a wall
+      f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.6;
+      g.gain.value = 0.055; lfo.frequency.value = 0.19; lfoG.gain.value = 0.03;
+    } else if (id === 'quad') {       // the quiet one: grass, brick and distance
+      f.type = 'lowpass'; f.frequency.value = 460; f.Q.value = 0.5;
+      g.gain.value = 0.032; lfo.frequency.value = 0.05; lfoG.gain.value = 0.018;
+    } else if (id === 'practice') {   // open ground, wind across it
+      f.type = 'lowpass'; f.frequency.value = 520; f.Q.value = 0.5;
+      g.gain.value = 0.04; lfo.frequency.value = 0.07; lfoG.gain.value = 0.026;
+    } else {                          // THE TREE LINE: wind in dry autumn leaves
+      f.type = 'bandpass'; f.frequency.value = 2400; f.Q.value = 0.9;
+      g.gain.value = 0.036; lfo.frequency.value = 0.055; lfoG.gain.value = 0.026;
+    }
+    lfo.connect(lfoG); lfoG.connect(g.gain);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(); lfo.start();
+  }
+  function gZoneLayer(c: AudioContext, id: GZoneId): ZoneLayer {
+    let z = gzones[id];
+    if (!z) {
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      z = { g, vol: GZONE_VOL[id], on: false, until: 0 };
+      gzones[id] = z;
+      buildGBed(c, id, g);
+    }
+    return z;
+  }
+  const gZoneLive = (id: GZoneId, now: number) => {
+    const z = gzones[id];
+    return !!z && (z.on || now < z.until);
+  };
+  function gApplyZones(fade = ZONE_FADE) {
+    const c = ctx; if (!c || !master) return;
+    const now = c.currentTime;
+    for (const k of Object.keys(gzones) as GZoneId[]) {
+      const z = gzones[k]!;
+      if (k !== gZone && z.on) { z.on = false; z.until = now + fade; ramp(z.g.gain, 0, now, fade); }
+    }
+    if (gZone && gdRunning) {
+      const z = gZoneLayer(c, gZone);
+      if (!z.on) { z.on = true; z.until = 0; ramp(z.g.gain, z.vol, now, fade); }
+    }
+    if (gdBus) ramp(gdBus.gain, gdRunning ? GD_VOL : 0, now, fade);
+  }
+
+  // ── the sounds this world owns ────────────────────────────────────────────
+
+  /** THE ROAR. The one sound the design contract names, and the single most
+   *  characteristic noise a stadium makes: a long swell of eighty thousand
+   *  people that arrives from nowhere, peaks, and takes four seconds to die
+   *  away. Two bands of filtered noise — a body around 500 Hz and a bright
+   *  edge near 2 kHz that comes in late — because a crowd is not one colour,
+   *  it starts as a rumble and turns into voices. */
+  function roar(dest: AudioNode, t: number, vol: number, dur = 4.2) {
+    const c = ctx; if (!c) return;
+    for (const [fc, q, k, lag] of [[520, 0.5, 1, 0], [1950, 0.8, 0.42, 0.5]] as number[][]) {
+      const src = c.createBufferSource(); src.buffer = white(c); src.loop = true;
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = fc; f.Q.value = q;
+      const g = c.createGain(); g.gain.setValueAtTime(0.0001, t + lag);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * k), t + lag + dur * 0.26);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(dest);
+      src.start(t + lag); src.stop(t + dur + 0.1);
+    }
+  }
+  /** THE STADIUM PA, from outside the stadium. A syllabic contour through a
+   *  horn: you can hear that somebody is reading a name and not which name,
+   *  which is exactly right and also means it never needs translating. */
+  function stadiumPa(dest: AudioNode, t: number, vol: number) {
+    const c = ctx; if (!c) return;
+    const horn = c.createBiquadFilter(); horn.type = 'bandpass';
+    horn.frequency.value = 1250; horn.Q.value = 3.2; horn.connect(dest);
+    const syl = [0, 0.17, 0.3, 0.47, 0.6, 0.78];
+    const step = [0, 2, 3, 2, 5, 3];
+    syl.forEach((o, i) => {
+      const f = 168 * Math.pow(2, step[i] / 12);
+      dTone(horn, t + o, 0.13, 'sawtooth', vol * (i === 4 ? 1.15 : 0.85), f, f * 1.03, 0, 0.012);
+    });
+    // and the tail of it bouncing off the far stand
+    dTone(horn, t + 0.94, 0.2, 'sawtooth', vol * 0.28, 168 * Math.pow(2, 3 / 12), 0, 0, 0.03);
+  }
+  /** A whistle-and-thump: somebody kicking a ball on the practice field. */
+  function kickThump(dest: AudioNode, t: number, vol: number) {
+    nHit(dest, t, 0.05, vol, 'lowpass', 220, 70);
+    dTone(dest, t, 0.09, 'sine', vol * 0.7, 120, 62, 0, 0.004);
+  }
+  /** A turnstile: a ratchet and a clack. Gate plaza only. */
+  function turnstile(dest: AudioNode, t: number, vol: number) {
+    for (let i = 0; i < 4; i++) nHit(dest, t + i * 0.035, 0.02, vol * 0.5, 'bandpass', 2600, 2600);
+    nHit(dest, t + 0.17, 0.045, vol, 'bandpass', 1400, 900);
+  }
+  /** Cornhole: a bag landing on a board. Two thirds of a thump, one third of
+   *  a slide, and it is the sound of the district the player spawns in. */
+  function bagToss(dest: AudioNode, t: number, vol: number) {
+    nHit(dest, t, 0.07, vol, 'lowpass', 700, 260);
+    nHit(dest, t + 0.06, 0.11, vol * 0.35, 'bandpass', 1800, 900);
+  }
+  /** A grill, from about four metres. */
+  function sizzle(dest: AudioNode, t: number, vol: number) {
+    nHit(dest, t, 1.5, vol, 'highpass', 3200, 4200, 0.25);
+  }
+
+  function buildGDBus(c: AudioContext): GainNode {
+    const bus = c.createGain(); bus.gain.value = 0.0001;
+    // THE BAND IS OUTSIDE. A low-pass and a long reverb-ish delay is what a
+    // hundred yards of open tarmac does to a brass band, and it is the whole
+    // reason this reads as "somewhere you cannot see" rather than "in your ear".
+    const air = c.createBiquadFilter(); air.type = 'lowpass';
+    air.frequency.value = 2600; air.Q.value = 0.4;
+    const dly = c.createDelay(1.2); dly.delayTime.value = 0.26;
+    const fb = c.createGain(); fb.gain.value = 0.22;
+    const wet = c.createGain(); wet.gain.value = 0.3;
+    bus.connect(air); air.connect(master!);
+    air.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(master!);
+    return bus;
+  }
+
+  // ── the ambience ──────────────────────────────────────────────────────────
+  function gdAmbience(c: AudioContext) {
+    const dest = gdAmb; if (!dest) return;
+    const now = c.currentTime;
+    const st = Math.max(0, Math.min(3, musStage));
+    if (gAmbNextT === 0) gAmbNextT = now + 2 + Math.random() * 3;
+    while (gAmbNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, gAmbNextT);
+      const r = Math.random();
+      let gap = 5 + Math.random() * 6;
+      switch (gZone) {
+        case 'lot':
+          if (r < 0.3) bagToss(dest, t, 0.05); else if (r < 0.55) sizzle(dest, t, 0.03);
+          else if (r < 0.78) carPass(dest, t, 0.035); else holler(dest, t, 0.05, 2);
+          break;
+        case 'gate':
+          if (r < 0.4) turnstile(dest, t, 0.045); else if (r < 0.75) crowdSwell(dest, t, 0.05);
+          else refWhistle(dest, t, 0.04);
+          gap = 4 + Math.random() * 4;
+          break;
+        case 'bowl':
+          if (r < 0.5) crowdSwell(dest, t, 0.07, 2.0); else if (r < 0.8) holler(dest, t, 0.07, 3);
+          else bDrum(dest, t, 0.06);
+          gap = 3.5 + Math.random() * 4;
+          break;
+        case 'rvpark':
+          if (r < 0.4) dogBark(dest, t, 0.03); else if (r < 0.7) sizzle(dest, t, 0.028)
+          ; else windChime(dest, t, 0.028);
+          gap = 7 + Math.random() * 7;
+          break;
+        case 'greek':
+          if (r < 0.4) holler(dest, t, 0.06, 3); else if (r < 0.7) clap(dest, t, 0.045);
+          else crowdSwell(dest, t, 0.045);
+          break;
+        case 'quad':
+          if (r < 0.45) songbird(dest, t, 0.035); else if (r < 0.75) churchBell(dest, t, 0.03);
+          else windChime(dest, t, 0.025);
+          gap = 9 + Math.random() * 9;
+          break;
+        case 'practice':
+          if (r < 0.4) refWhistle(dest, t, 0.05); else if (r < 0.7) kickThump(dest, t, 0.045);
+          else mSnare(dest, t, 0.035, false);
+          break;
+        case 'treeline':
+          if (r < 0.5) songbird(dest, t, 0.035); else if (r < 0.8) woodpecker(dest, t, 0.028);
+          else crowdSwell(dest, t, 0.03, 2.4);
+          gap = 8 + Math.random() * 8;
+          break;
+        default:
+          if (r < 0.4) crowdSwell(dest, t, 0.035); else if (r < 0.7) carPass(dest, t, 0.03);
+          else holler(dest, t, 0.04, 2);
+          gap = 8 + Math.random() * 8;
+      }
+      gAmbNextT = t + gap;
+    }
+    // THE PA, from wherever you are on the plateau. Louder near the gates.
+    if (gPaNextT === 0) gPaNextT = now + 10 + Math.random() * 8;
+    while (gPaNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, gPaNextT);
+      const near = gZone === 'bowl' || gZone === 'gate';
+      stadiumPa(dest, t, near ? 0.05 : 0.028);
+      gPaNextT = t + 17 + Math.random() * 13;
+    }
+    // AND THE ROAR. It gets louder as the match goes on and more frequent with
+    // it — at stage 0 it is a thing that happens twice; by the fourth quarter
+    // the stadium never quite stops. This is the sound the level is named for.
+    if (gRoarNextT === 0) gRoarNextT = now + 12 + Math.random() * 10;
+    while (gRoarNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, gRoarNextT);
+      const near = gZone === 'bowl' || gZone === 'gate' ? 1.7 : 1;
+      roar(dest, t, (0.035 + st * 0.022) * near, 3.6 + Math.random() * 1.6);
+      gRoarNextT = t + (26 - st * 5) + Math.random() * 14;
+    }
+  }
+
+  // ── the scheduler ─────────────────────────────────────────────────────────
+  // Same lookahead pump as the other two. Cut time, and the tempo climbs with
+  // the stage the way a band speeds up when the score is close.
+  function gdSchedule() {
+    const c = ensure(); if (!c || !gdBus) return;
+    const st = Math.max(0, Math.min(3, musStage));
+    const spb = 60 / (112 + st * 8);
+    const s16 = spb / 4;
+    const now = c.currentTime;
+    if (gdNextT < now) gdNextT = now + 0.05;
+    while (gdNextT < now + 0.35) {
+      const t = gdNextT;
+      const barN = Math.floor(gdStep / 16);
+      const bar = barN & 3;
+      const ph = barN & 7;
+      const sx = gdStep % 16;
+      const e = sx >> 1, onE = (sx & 1) === 0;
+      const ch = G_CHOP[bar];
+      const note = G_HOOK[bar][e];
+
+      // ── THE DRUMLINE. Present from the first bar and never absent: at stage
+      //    0 it is the ONLY thing playing, which is what "warming up under the
+      //    stands" sounds like from a car park two hundred yards away.
+      if (sx === 0 || sx === 8) bDrum(gdBus, t, 0.15 + st * 0.02);
+      if (sx === 4 || sx === 12) mSnare(gdBus, t + drag(0.008), 0.075 + st * 0.012);
+      if (sx === 14 || sx === 15) mSnare(gdBus, t + drag(0.006), 0.028, false);
+      if (st >= 1 && (sx === 2 || sx === 6 || sx === 10)) mSnare(gdBus, t + drag(0.01), 0.02, false);
+      if (st >= 2 && ph === 7 && sx === 15) mSnare(gdBus, t - 0.02, 0.038, false);
+      if (st >= 1 && ph === 0 && sx === 0) crash(gdBus, t, 0.04 + st * 0.012);
+
+      // ── WARMING UP. Stage 0 is meant to be a drumline two hundred yards
+      //    away and nothing else, and measured against the other two scores
+      //    that came out at 37 scheduled events per eight seconds against
+      //    Maple's 95 — the conceit was right and the result was a hole. A
+      //    band before a game is not silent, it is TUNING: long single notes
+      //    at no particular tempo, one player at a time, nobody together. So
+      //    that is what fills it, and it disappears the moment the band
+      //    actually starts playing at stage 1.
+      if (st === 0) {
+        if (sx === 0 && (barN % 3) === 0) {
+          const warm = G_HOOK[(barN >> 1) & 3];
+          const pick = warm[(barN * 5) % 8] || 349.23;
+          brass(gdBus, pick, t + drag(0.06), spb * 2.4, 0.028);
+        }
+        if (sx === 8 && (barN % 5) === 2) sousa(gdBus, G_OOM[bar][0], t + drag(0.05), spb * 1.8, 0.075);
+        if (sx === 4 && (barN % 7) === 3) glock(gdBus, G_HOOK[bar][2] * 2 || 880, t, spb * 1.4, 0.018);
+      }
+
+      // ── THE SOUSAPHONE finds the bottom at stage 1 and never lets go
+      if (st >= 1) {
+        if (sx === 0) sousa(gdBus, G_OOM[bar][0], t + drag(0.012), spb * 0.8, 0.17);
+        if (sx === 8) sousa(gdBus, G_OOM[bar][1], t + drag(0.012), spb * 0.7, 0.14);
+        if (st >= 3 && (sx === 4 || sx === 12)) sousa(gdBus, G_OOM[bar][0] * 2, t + drag(0.016), spb * 0.3, 0.06);
+      }
+      // the off-beat chop: the horn section punching two and four
+      if (st >= 1 && (sx === 4 || sx === 12)) chop(gdBus, ch, t, spb * 0.32, 0.05);
+
+      // ── THE TUNE. Cornets from stage 2; before that only the tops of the
+      //    phrase get through, which is how a band sounds across open ground.
+      if (onE && note > 0) {
+        if (st >= 2) brass(gdBus, note, t + drag(0.016), spb * 0.6, 0.055);
+        else if (st >= 1 && e === 0) brass(gdBus, note, t + drag(0.02), spb * 0.7, 0.03);
+        if (st >= 3 && e % 2 === 0) glock(gdBus, note * 2, t - 0.008, spb * 0.85, 0.024);
+      }
+
+      // ── THE CROWD ANSWERS. The rests in bars 1 and 3 are where a real crowd
+      //    shouts the team's name back, so that is what goes there.
+      if (st >= 1 && (bar === 1 || bar === 3) && onE) {
+        for (const [f, at] of G_SHOUT) {
+          if (e === Math.floor(at) && (at % 1 === 0)) holler(gdBus, t, 0.05 + st * 0.02, 1 + st);
+          if (e === Math.floor(at) && st >= 2 && at % 1 !== 0) brass(gdBus, f * 2, t + spb * 0.5, spb * 0.4, 0.025);
+        }
+      }
+      // the drum major, once a phrase, from stage 2
+      if (st >= 2 && ph === 4 && sx === 0) refWhistle(gdBus, t - 0.03, 0.04);
+      // ninety thousand people, on the top of every other phrase, at the end
+      if (st >= 3 && ph === 0 && sx === 0) crowdSwell(gdBus, t, 0.06, 1.8);
+
+      // ── AND THE DISTRICT PLAYS ALONG. Standing on the practice field puts a
+      //    second drumline in the mix, a half-bar behind, the way two bands
+      //    warming up in earshot of each other never quite line up.
+      if (gZoneLive('practice', t) && sx % 4 === 2) {
+        mSnare(gzones.practice!.g, t + drag(0.014), 0.03, false);
+      }
+      // …and on Frat Row the thump next door is on the same beat as the band,
+      // because they are playing along with it out of a window.
+      if (gZoneLive('greek', t) && (sx === 0 || sx === 8)) {
+        bDrum(gzones.greek!.g, t + drag(0.01), 0.05);
+      }
+
+      gdNextT += s16; gdStep++;
+    }
+    gdAmbience(c);
+  }
+  function startGameday() {
+    const c = ensure(); if (!c || !master) return;
+    if (!gdBus) gdBus = buildGDBus(c);
+    if (!gdAmb) { gdAmb = c.createGain(); gdAmb.gain.value = 0.0001; gdAmb.connect(master); }
+    gdRunning = true;
+    ramp(gdAmb.gain, 0.4, c.currentTime, 1.6);
+    gdStep = 0; gdNextT = c.currentTime + 0.12;
+    gAmbNextT = 0; gPaNextT = 0; gRoarNextT = 0;
+    gApplyZones(1.5);
+    if (gdTimer) clearInterval(gdTimer);
+    gdTimer = setInterval(gdSchedule, 110);
+  }
+  function stopGameday(fade: number) {
+    gdRunning = false;
+    if (gdTimer) { clearInterval(gdTimer); gdTimer = null; }
+    const c = ctx; if (!c) return;
+    const now = c.currentTime;
+    if (gdBus) ramp(gdBus.gain, 0, now, fade);
+    if (gdAmb) ramp(gdAmb.gain, 0, now, fade);
+    for (const k of Object.keys(gzones) as GZoneId[]) {
+      const z = gzones[k]!; z.on = false; z.until = 0; ramp(z.g.gain, 0, now, fade);
+    }
+    gZone = null;
+  }
+
+  // ── GAME DAY's one-shots, straight to master (see the note on the town's) ──
+  /** Evolution: the band hits it, and the crowd goes up. */
+  function gamedayEvolve() {
+    const c = ensure(); if (!c || !master) return;
+    const t = c.currentTime + 0.01;
+    bDrum(master, t, 0.2); crash(master, t, 0.09);
+    mSnare(master, t + drag(0.006), 0.09);
+    [349.23, 440.00, 523.25].forEach((f, i) => brass(master!, f, t + i * 0.06, 0.42, 0.075));
+    holler(master, t + 0.18, 0.16, 3);
+    crowdSwell(master, t + 0.1, 0.075, 1.4);
+  }
+  /** KICKOFF: a whistle, and everybody on their feet. */
+  function kickoffSting(t: number) {
+    if (!master) return;
+    refWhistle(master, t, 0.09);
+    bDrum(master, t + 0.18, 0.2);
+    roar(master, t + 0.16, 0.075, 2.6);
+    [523.25, 587.33, 698.46].forEach((f, i) => brass(master!, f, t + 0.22 + i * 0.08, 0.34, 0.06));
+  }
+  /** THE BAND TAKES THE FIELD: a drum major's whistle and the whole line. */
+  function bandOnSting(t: number) {
+    if (!master) return;
+    refWhistle(master, t, 0.08);
+    for (let i = 0; i < 6; i++) mSnare(master!, t + 0.12 + i * 0.085, 0.03 + i * 0.009, i > 3);
+    bDrum(master, t + 0.62, 0.2); crash(master, t + 0.62, 0.07);
+    G_HOOK[0].forEach((f, i) => { if (f > 0) brass(master!, f, t + 0.66 + i * 0.09, 0.3, 0.055); });
+    holler(master, t + 0.72, 0.14, 3);
+  }
+  /** CONCESSION RUSH: a counter bell, a turnstile and a lot of feet. */
+  function concessionSting(t: number) {
+    if (!master) return;
+    glock(master, 1567.98, t, 0.45, 0.1);
+    glock(master, 1318.51, t + 0.1, 0.5, 0.085);
+    turnstile(master, t + 0.16, 0.06);
+    for (let i = 0; i < 5; i++) nHit(master!, t + 0.3 + i * 0.07, 0.05, 0.03, 'lowpass', 400, 180);
+    holler(master, t + 0.5, 0.12, 2);
+  }
+  /** FOURTH QUARTER: the biggest moment on this world. A roll into the band's
+   *  own big bar, and eighty thousand people underneath the whole thing. */
+  function fourthQuarterSting(t: number) {
+    if (!master) return;
+    for (let i = 0; i < 10; i++) mSnare(master!, t + i * 0.058, 0.022 + i * 0.006, i > 6);
+    refWhistle(master, t + 0.42, 0.075);
+    roar(master, t + 0.3, 0.10, 4.4);
+    bDrum(master, t + 0.62, 0.24); crash(master, t + 0.62, 0.1);
+    G_HOOK[3].forEach((f, i) => {
+      if (f <= 0) return;
+      brass(master!, f, t + 0.66 + i * 0.1, 0.4, 0.07);
+      sousa(master!, f / 4, t + 0.66 + i * 0.1, 0.36, 0.09);
+    });
+    glock(master, 1396.91, t + 1.14, 0.8, 0.035);
+    holler(master, t + 0.9, 0.18, 4);
+  }
+
   return {
     startMusic() {
       // PIRATE BAY RESORT has its own score — and deliberately does NOT pick up
@@ -1939,6 +2419,10 @@ export function createAudio(): Audio3D {
       if (isPirate()) { startTropical(); return; }
       // prefetch the recorded kit so the very first gulp is the real sample
       for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+      // GAME DAY has its own too — and it needs one more than the others did,
+      // because "the band is playing somewhere you cannot see" is not a mood
+      // this file can express by leaving the field blank.
+      if (isGameday()) { startGameday(); return; }
       // MAPLE FALLS plays its own band, for the same reason the bay plays its
       // own: a stock loop is a stock loop, and this town has an election on.
       // The licensed-track drop-in (/assets/music/theme.mp3, and behind it the
@@ -1969,7 +2453,7 @@ export function createAudio(): Audio3D {
     // shop, anywhere the theme wants stating out loud. Silent in the bay,
     // which has a hook of its own and does not need this one.
     jingle() {
-      const c = ensure(); if (!c || !master || isPirate()) return;
+      const c = ensure(); if (!c || !master || isPirate() || isGameday()) return;
       jingleQuote(c.currentTime + 0.02, 0.1);
     },
     setMuted(m: boolean) {
@@ -1988,6 +2472,14 @@ export function createAudio(): Audio3D {
       // and creating the context then would trip the autoplay policy. If there
       // is no context yet the choice is simply remembered for the world's
       // start function, which applies it on the opening swell.
+      if (isGameday()) {
+        const gid = gNormZone(zone);
+        if (gid === gZone) return;
+        gZone = gid;
+        if (!ctx) return;
+        gApplyZones();
+        return;
+      }
       if (!isPirate()) {
         const mid = mNormZone(zone);
         if (mid === mZone) return;
@@ -2008,6 +2500,18 @@ export function createAudio(): Audio3D {
     matchBeat(kind) {
       const c = ensure(); if (!c || !master) return;
       const k = String(kind).toLowerCase();
+      if (isGameday()) {
+        // the four moments of a football match, each with its own sound —
+        // matched generously, the way Maple's are, so a re-worded banner does
+        // not silently fall through to a generic flourish
+        const gt = c.currentTime;
+        if (/kick|kickoff/.test(k)) kickoffSting(gt);
+        else if (/band|drum|field/.test(k)) bandOnSting(gt);
+        else if (/concession|hot ?dog|rush|snack/.test(k)) concessionSting(gt);
+        else if (/fourth|quarter|final|whistle/.test(k)) fourthQuarterSting(gt);
+        else { bDrum(master, gt, 0.18); crash(master, gt, 0.07); holler(master, gt + 0.1, 0.14, 3); }
+        return;
+      }
       if (!isPirate()) {
         // MAPLE FALLS. The banner text is being re-themed to the election in
         // parallel with this file, so match GENEROUSLY — bake sale or donut
@@ -2039,6 +2543,7 @@ export function createAudio(): Audio3D {
     stopMusic() {
       stopTropical(1.2);
       stopTown(1.2);
+      stopGameday(1.2);
       themeWanted = false;
       stopThemeLoop(1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
@@ -2106,6 +2611,7 @@ export function createAudio(): Audio3D {
     evolve() {
       // the resort answers in steel pans instead — same beat, different island
       if (isPirate()) { pirateEvolve(); return; }
+      if (isGameday()) { gamedayEvolve(); return; }
       mapleEvolve();
     },
     voice(kind) {
