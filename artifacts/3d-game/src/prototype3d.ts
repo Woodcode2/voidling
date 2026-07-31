@@ -24,6 +24,7 @@ import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
+import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
 import {
   track, setCtx, countMatch, tickFrame, fpsSummary, resetFps,
   analyticsEnabled, setAnalyticsEnabled,
@@ -1024,6 +1025,13 @@ const DISTRICT: Record<string, string> = {
   // PIRATE BAY
   port: 'THE DOCKS', resort: 'THE RESORT', party: 'THE DANCE FLOOR',
   market: 'THE BAZAAR', jungle: 'THE JUNGLE', cove: 'SMUGGLERS COVE',
+  // GAME DAY. island.ts renames three of gameday.ts's district ids on the way
+  // out (plaza→gate, campus→quad, woods→treeline) because 'plaza' and 'campus'
+  // already mean something in Maple; both spellings are listed so a headline
+  // never says "THE ISLE" because of a rename.
+  bowl: 'MARSTON STADIUM', gate: 'GATE PLAZA', lot: 'THE TAILGATE',
+  rvpark: 'RV ROW', greek: 'FRAT ROW', quad: 'OLD CAMPUS',
+  practice: 'THE PRACTICE FIELD', treeline: 'THE TREE LINE',
 };
 // TEMPLATED headlines: a tiny pool × live variables = copy that never repeats
 // AND is always about the player. This is what killed the "generic ticker"
@@ -1094,7 +1102,21 @@ function showNews() {
   if (!signedOn) { signedOn = true; newsQueue.length = 0; }
   const PB = pickedWorld === 'pirate';
   let h: string, brand: string;
-  if (PB) {
+  if (pickedWorld === 'gameday') {
+    // GAME DAY is not a newsroom at all — it is a COMMENTARY BOOTH. Hank
+    // Prewitt has the play-by-play and Bill Ordway has the colour, and the
+    // conceit is that they never stop calling the game: tier 0 is pre-game
+    // chat about the weather and somebody's casserole, tier 1 is the two of
+    // them describing a hole in the parking lot as if it were a formation
+    // they have not seen before, and tier 2 is two professionals calling the
+    // end of the world because that is the job. 464 headlines.
+    const gd = GAMEDAY_DIST[String(island.biomeAt(voidState.x, voidState.z))] ?? null;
+    h = newsQueue.shift() ?? pickGamedayNews({
+      tier, district: gd, lastMeal, devouredPct,
+      form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
+    });
+    brand = GAMEDAY_BRAND[tier];
+  } else if (PB) {
     // PIRATE BAY RESORT runs its own newsroom: ~380 lines, a per-district pool
     // for all seven areas, and CAPT. ROGER holding the resort's PR line all the
     // way from "enjoy a nice cold drink" to "the resort is gone, the SPA is
@@ -1145,6 +1167,13 @@ const MAPLE_DIST: Record<string, MapleDist> = {
   forest: 'woods', woods: 'woods', camp: 'woods',
   beach: 'lake', lake: 'lake',
   farm: 'farm', campus: 'school', school: 'school', strip: 'strip',
+};
+// …and the same for GAME DAY. island.ts's Biome union renames three of
+// gameday.ts's ids on the way out; the booth's GdDist keeps the originals.
+const GAMEDAY_DIST: Record<string, GdDist> = {
+  bowl: 'bowl', gate: 'plaza', plaza: 'plaza', lot: 'lot', rvpark: 'rvpark',
+  greek: 'greek', quad: 'campus', campus: 'campus', practice: 'practice',
+  treeline: 'woods', woods: 'woods',
 };
 let lastRankBrag = -99;
 let stallT = 0;     // seconds spent driving into something that will not move
@@ -2005,7 +2034,7 @@ function gildTreasure() {
 }
 
 function resetMatch() {
-  resetNews(); resetMapleNews(); signedOn = false;   // memory + the sign-on are per-match
+  resetNews(); resetMapleNews(); resetGamedayNews(); signedOn = false;   // memory + the sign-on are per-match
   // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
   // Proven with an isolation test, not inferred: a uniquely-tagged banner
   // planted on the menu, left for ten seconds (the animation is 2.2s), then a

@@ -254,7 +254,10 @@ export function makeStadium(): THREE.Group {
 /** Pickup with the tailgate down, a cooler in the bed and two chairs out. Body ~7
  *  long, 9 with the chairs pulled out behind it. */
 export function makeTailgateTruck(): THREE.Group {
-  const col = pick([CRIM, CRIM, CRIM, NAVY, WHITE, TEAL]);    // crimson roughly 3 in 6
+  // Crimson 4 in 8, visitor teal 1 in 8 — the 4:1 the palette note asks for.
+  // At 3-in-6 with a 200-vehicle lot, 33 teal trucks read as a second team
+  // parked in the middle of the home lot rather than as a few visiting fans.
+  const col = pick([CRIM, CRIM, CRIM, CRIM, NAVY, WHITE, CREAM, TEAL]);
   const p: G[] = [
     part(new THREE.BoxGeometry(5.9, 0.9, 2.4), col, 0, 1.35, 0),
     part(new THREE.BoxGeometry(2.3, 1.35, 2.3), col, 0.55, 2.4, 0),
@@ -325,11 +328,17 @@ export function makeGrill(): THREE.Group {
   p.push(part(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 8), STEEL, -0.55, 2.2, 0));
   p.push(part(new THREE.BoxGeometry(0.5, 0.24, 0.06), GOLD, 0.5, 1.05, 0.63));          // badge
   // The plume stays on the flat prop material with the rest of the prop: at
-  // 0.26 radius these spheres facet at about four screen pixels, and splitting
+  // this radius the spheres facet at about three screen pixels, and splitting
   // the grill into two meshes to smooth them would double its draw calls.
-  for (let i = 0; i < 4; i++)
-    p.push(part(new THREE.SphereGeometry(0.26 + i * 0.07, 8, 6), SMOKE,
-      -0.55 - i * 0.15, 2.35 + i * 0.36, Math.sin(i * 1.6) * 0.22));
+  //
+  // It used to be four spheres from 0.26 to 0.47 climbing to y=3.4 — a solid
+  // white column TALLER than the grill, on every one of the hundred-odd
+  // cookers in the lot. From the play camera the whole district read as a
+  // field of white mushrooms. Three small puffs, close to the stack, is a
+  // wisp; a column is a landmark, and a grill is not a landmark.
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.SphereGeometry(0.15 + i * 0.035, 7, 5), SMOKE,
+      -0.55 - i * 0.1, 2.32 + i * 0.24, Math.sin(i * 1.6) * 0.14));
   return finish(p);
 }
 
@@ -863,6 +872,316 @@ export function makeMegaphone(): THREE.Group {
   return finish(p);
 }
 
+// ══ THE SECOND PASS ══════════════════════════════════════════════════════
+// The first build of this level scattered ten prop types across eight
+// districts and the lot came out looking like a warehouse of the same grey
+// kettle grill every three metres. Density was never the problem — variety
+// was. Everything below exists to break up a repeat: a second way to cook, a
+// second thing to sit on, a second thing to buy, and the four or five objects
+// a child would actually point at in a car park on a Saturday.
+
+/** A BARREL SMOKER on a trailer — the other way a car park cooks, and a
+ *  completely different silhouette from the kettle grill it stands next to. */
+export function makeSmoker(): THREE.Group {
+  const p: G[] = [];
+  const drum = new THREE.CylinderGeometry(0.72, 0.72, 2.6, 14);
+  drum.rotateZ(Math.PI / 2);
+  p.push(part(drum, CHAR, 0, 1.35, 0));
+  for (const bx of [-0.9, 0, 0.9])
+    p.push(part(new THREE.TorusGeometry(0.74, 0.055, 5, 16), CRIM_D, bx, 1.35, 0, 0, 0, Math.PI / 2));
+  // the firebox hanging off the end, which is what makes it a smoker
+  p.push(part(new THREE.BoxGeometry(0.9, 0.8, 0.9), CHAR, -1.72, 1.05, 0));
+  p.push(part(new THREE.BoxGeometry(0.1, 0.5, 0.62), STEEL, -2.2, 1.05, 0));
+  p.push(part(new THREE.CylinderGeometry(0.13, 0.15, 1.5, 8), CHAR, 1.5, 2.1, 0));   // stack
+  p.push(part(new THREE.CylinderGeometry(0.19, 0.19, 0.12, 8), STEEL, 1.5, 2.9, 0));
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.SphereGeometry(0.17 + i * 0.045, 7, 5), SMOKE,
+      1.5 + Math.sin(i * 1.1) * 0.16, 3.02 + i * 0.26, Math.cos(i * 1.4) * 0.14));
+  // trailer frame and a tongue you could actually hitch
+  p.push(part(new THREE.BoxGeometry(3.4, 0.16, 0.9), STEEL, 0, 0.62, 0));
+  p.push(part(new THREE.BoxGeometry(1.3, 0.12, 0.12), STEEL, 2.3, 0.62, 0));
+  p.push(part(new THREE.SphereGeometry(0.14, 8, 6), CHAR, 2.9, 0.62, 0));
+  wheelParts(p, -0.2, 0.34, 0.62, 0.34, 0.2);
+  wheelParts(p, -0.2, 0.34, -0.62, 0.34, 0.2);
+  p.push(part(new THREE.BoxGeometry(0.7, 0.26, 0.06), GOLD, 0.2, 1.5, 0.74));
+  return finish(p);
+}
+
+/** A TV ON A STAND with a generator and two chairs pulled up to it. The one
+ *  object in the level that explains why anybody is still in the car park. */
+export function makeTailgateTv(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.BoxGeometry(0.14, 1.5, 0.5), STEEL, 0, 0.75, 0),
+    part(new THREE.BoxGeometry(0.7, 0.1, 0.9), CHAR, 0, 0.06, 0),
+    part(new THREE.BoxGeometry(0.14, 1.4, 2.5), CHAR, 0, 2.1, 0),
+    // the screen: TURF green with white yard lines. It is showing the game
+    // being played four hundred metres away.
+    part(new THREE.BoxGeometry(0.05, 1.2, 2.3), TURF, 0.1, 2.1, 0),
+  ];
+  for (let i = 0; i < 5; i++)
+    p.push(part(new THREE.BoxGeometry(0.03, 1.1, 0.05), WHITE, 0.13, 2.1, -0.9 + i * 0.45));
+  p.push(part(new THREE.BoxGeometry(0.05, 1.2, 0.3), CRIM, 0.13, 2.1, -1.0));
+  // the generator, humming away behind it
+  p.push(part(new THREE.BoxGeometry(0.9, 0.62, 0.7), CRIM, -1.5, 0.31, 0.5));
+  p.push(part(new THREE.BoxGeometry(0.94, 0.12, 0.74), CHAR, -1.5, 0.66, 0.5));
+  p.push(part(new THREE.CylinderGeometry(0.09, 0.09, 0.3, 7), STEEL, -1.5, 0.82, 0.5));
+  p.push(rope([-1.2, 0.2, 0.35], [-0.1, 0.1, 0.1], CHAR, 0.04));
+  chairParts(p, -1.7, 0, -0.9, 1, NAVY);
+  chairParts(p, -2.5, 0, -0.2, 1, CRIM);
+  return finish(p);
+}
+
+/** A FOOD TRUCK — a proper one, with a serving hatch, an awning and a menu
+ *  board. Bigger than the concession cart and the thing a queue forms at. */
+export function makeFoodTruck(): THREE.Group {
+  const body = pick([WHITE, CREAM, TEAL, GOLD]);
+  const p: G[] = [
+    part(new THREE.BoxGeometry(6.4, 2.5, 2.5), body, 0, 1.85, 0),
+    part(new THREE.BoxGeometry(6.5, 0.4, 2.56), CRIM, 0, 3.2, 0),          // roof band
+    part(new THREE.BoxGeometry(2.0, 1.7, 2.4), body, 3.4, 1.5, 0),          // cab
+    part(new THREE.BoxGeometry(0.14, 0.9, 2.2), 0xbfe6f2, 4.35, 1.9, 0),    // windscreen
+    part(new THREE.BoxGeometry(2.2, 0.3, 2.5), CHAR, 3.4, 0.6, 0),
+    // the hatch, and the counter under it
+    part(new THREE.BoxGeometry(3.6, 1.2, 0.1), CHAR, -0.6, 2.0, 1.28),
+    part(new THREE.BoxGeometry(3.8, 0.14, 0.6), TIMBER, -0.6, 1.35, 1.5),
+    part(new THREE.BoxGeometry(3.8, 0.12, 1.5), CREAM, -0.6, 3.05, 2.0, 0.22),   // awning
+  ];
+  for (const ax of [-2.3, 1.1])
+    p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 1.3, 5), STEEL, ax, 2.5, 2.6, 0, 0, 0.2));
+  // menu board — three price rows, no words, which is how every sign in this
+  // game stays legible and stays out of a translator's way
+  p.push(part(new THREE.BoxGeometry(1.4, 1.1, 0.08), CHAR, -2.6, 2.2, 1.32));
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.BoxGeometry(1.0, 0.13, 0.03), i === 1 ? GOLD : WHITE, -2.6, 2.55 - i * 0.3, 1.37));
+  p.push(part(new THREE.CylinderGeometry(0.16, 0.16, 0.9, 8), ALU, -2.9, 3.6, -0.6));   // flue
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.SphereGeometry(0.16 + i * 0.04, 7, 5), SMOKE, -2.9, 4.16 + i * 0.24, -0.6 + Math.sin(i) * 0.12));
+  wheelParts(p, 2.6, 0.55, 1.2, 0.55, 0.4);
+  wheelParts(p, 2.6, 0.55, -1.2, 0.55, 0.4);
+  wheelParts(p, -2.2, 0.55, 1.2, 0.55, 0.4);
+  wheelParts(p, -2.2, 0.55, -1.2, 0.55, 0.4);
+  return finish(p);
+}
+
+/** A SOUVENIR RACK — jerseys on hangers, a shelf of caps and a scarf rail.
+ *  "Shopping" in a car park is a man with a rail, and that is what this is. */
+export function makeSouvenirRack(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.BoxGeometry(2.6, 0.1, 0.1), STEEL, 0, 2.0, 0),
+    part(new THREE.BoxGeometry(0.1, 2.0, 0.1), STEEL, -1.2, 1.0, 0),
+    part(new THREE.BoxGeometry(0.1, 2.0, 0.1), STEEL, 1.2, 1.0, 0),
+    part(new THREE.BoxGeometry(0.14, 0.08, 1.2), STEEL, -1.2, 0.06, 0),
+    part(new THREE.BoxGeometry(0.14, 0.08, 1.2), STEEL, 1.2, 0.06, 0),
+  ];
+  // the jerseys. Crimson four to one, exactly as the palette note says.
+  const SHIRTS = [CRIM, CRIM, GOLD, CRIM, WHITE, CRIM, TEAL, CRIM];
+  for (let i = 0; i < 7; i++) {
+    const x = -1.0 + i * 0.32, col = SHIRTS[i % SHIRTS.length];
+    p.push(part(new THREE.BoxGeometry(0.26, 0.85, 0.5), col, x, 1.5, 0));
+    p.push(part(new THREE.BoxGeometry(0.24, 0.2, 0.78), col, x, 1.82, 0));
+    p.push(part(new THREE.BoxGeometry(0.2, 0.16, 0.03), WHITE, x, 1.34, 0.26));
+    p.push(part(new THREE.CylinderGeometry(0.03, 0.03, 0.18, 5), ALU, x, 1.96, 0));
+  }
+  // the cap shelf underneath
+  p.push(part(new THREE.BoxGeometry(2.4, 0.08, 0.8), TIMBER, 0, 0.85, 0));
+  for (let i = 0; i < 6; i++) {
+    const cx = -0.95 + i * 0.38, col = i % 3 === 1 ? GOLD : CRIM;
+    p.push(part(new THREE.SphereGeometry(0.16, 9, 7), col, cx, 0.98, rnd(-0.2, 0.2), 0, 0, 0, 1, 0.62, 1));
+    p.push(part(new THREE.BoxGeometry(0.3, 0.05, 0.22), col, cx + 0.2, 0.94, 0));
+  }
+  return finish(p);
+}
+
+/** A BOUNCE HOUSE. Soft material, big warm silhouette, and the only thing on
+ *  the plateau a five-year-old will spot first. */
+export function makeBounceHouse(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.BoxGeometry(4.6, 2.2, 4.2), CRIM, 0, 1.1, 0),
+    part(new THREE.BoxGeometry(4.2, 0.5, 3.8), GOLD, 0, 2.35, 0),
+  ];
+  // the four corner columns and the roof they hold up
+  for (const cx of [-1.9, 1.9]) for (const cz of [-1.7, 1.7]) {
+    p.push(part(new THREE.CylinderGeometry(0.42, 0.42, 3.4, 10), i2(cx, cz), cx, 1.7, cz));
+    p.push(part(new THREE.SphereGeometry(0.44, 10, 8), GOLD, cx, 3.4, cz));
+  }
+  p.push(part(new THREE.BoxGeometry(4.4, 0.35, 4.0), TEAL, 0, 3.5, 0));
+  // the mouth: a soft ramp you climb in over
+  p.push(part(new THREE.BoxGeometry(1.9, 0.5, 1.6), GOLD, 2.6, 0.3, 0, 0, 0, -0.18));
+  p.push(part(new THREE.BoxGeometry(2.2, 1.6, 0.4), CRIM, 1.9, 1.4, 1.3));
+  p.push(part(new THREE.BoxGeometry(2.2, 1.6, 0.4), CRIM, 1.9, 1.4, -1.3));
+  // the blower, chugging away at the back
+  p.push(part(new THREE.BoxGeometry(0.8, 0.6, 0.7), CHAR, -3.0, 0.3, 1.4));
+  p.push(part(new THREE.CylinderGeometry(0.3, 0.3, 1.4, 10), CREAM, -2.3, 0.4, 1.2, 0, 0, Math.PI / 2));
+  return finishSoft(p);
+}
+// two-tone corner columns, so the box does not read as one slab of crimson
+function i2(cx: number, cz: number): number { return cx * cz > 0 ? GOLD : WHITE; }
+
+/** THE HOT TUB. docs/GAMEDAY.md promises RV Row exactly one of these. */
+export function makeHotTub(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.CylinderGeometry(1.5, 1.35, 1.0, 16), TIMBER, 0, 0.5, 0),
+    part(new THREE.CylinderGeometry(1.55, 1.55, 0.16, 16), TIMBER_D, 0, 1.02, 0),
+    part(new THREE.CylinderGeometry(1.34, 1.34, 0.1, 16), 0x5fc8d8, 0, 0.96, 0),
+    part(new THREE.BoxGeometry(0.9, 0.5, 1.4), CHAR, -2.0, 0.25, 0),      // the pump
+    part(new THREE.BoxGeometry(2.0, 0.14, 0.9), TIMBER_D, 1.9, 0.3, 0),   // the steps
+    part(new THREE.BoxGeometry(2.0, 0.14, 0.9), TIMBER_D, 2.1, 0.62, 0),
+  ];
+  for (const bx of [-0.9, 0, 0.9])
+    p.push(part(new THREE.TorusGeometry(1.44, 0.06, 5, 20), TIMBER_D, 0, 0.28 + Math.abs(bx) * 0.3, 0, Math.PI / 2));
+  // steam
+  for (let i = 0; i < 4; i++)
+    p.push(part(new THREE.SphereGeometry(0.18 + i * 0.05, 7, 5), SMOKE,
+      Math.cos(i * 1.9) * 0.45, 1.24 + i * 0.24, Math.sin(i * 1.9) * 0.45));
+  return finish(p);
+}
+
+/** A PORCH SOFA, on the grass, where it has clearly lived for some months. */
+export function makePorchSofa(): THREE.Group {
+  const col = pick([0x8a6a4a, 0x5f6a7a, 0x7a5a6a, 0x6a7a5a]);
+  const p: G[] = [
+    part(new THREE.BoxGeometry(2.8, 0.5, 1.1), col, 0, 0.5, 0),
+    part(new THREE.BoxGeometry(2.8, 0.9, 0.3), col, 0, 1.05, -0.5),
+    part(new THREE.BoxGeometry(0.3, 0.75, 1.1), col, -1.4, 0.9, 0),
+    part(new THREE.BoxGeometry(0.3, 0.75, 1.1), col, 1.4, 0.9, 0),
+  ];
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.BoxGeometry(0.8, 0.22, 0.9), i === 1 ? CRIM : GOLD, -0.9 + i * 0.9, 0.85, 0.05));
+  for (const sx of [-1.2, 1.2]) for (const sz of [-0.4, 0.4])
+    p.push(part(new THREE.BoxGeometry(0.16, 0.28, 0.16), TIMBER_D, sx, 0.14, sz));
+  cupParts(p, 1.1, 1.28, 0, 2);
+  return finish(p);
+}
+
+/** HAY BALES AND PUMPKINS. Autumn, stated plainly, in a shape a child reads
+ *  instantly. Dressing for the tree line, the quad and the frat lawns. */
+export function makeHayStack(): THREE.Group {
+  const p: G[] = [];
+  const bale = (x: number, y: number, z: number, ry: number) => {
+    const b = new THREE.CylinderGeometry(0.7, 0.7, 1.2, 12);
+    b.rotateZ(Math.PI / 2);
+    p.push(part(b, 0xd9b45e, x, y, z, 0, ry));
+    p.push(part(new THREE.CylinderGeometry(0.71, 0.71, 0.1, 12), 0xc09a44, x, y, z, 0, ry, Math.PI / 2));
+  };
+  bale(-0.7, 0.7, 0, 0);
+  bale(0.7, 0.7, 0.2, 0.3);
+  bale(0, 2.0, 0.1, 0.15);
+  for (let i = 0; i < 4; i++) {
+    const a = i * 1.7;
+    p.push(part(new THREE.SphereGeometry(0.34, 10, 8), ORANGE,
+      Math.cos(a) * 1.5, 0.3, Math.sin(a) * 1.2, 0, 0, 0, 1, 0.8, 1));
+    p.push(part(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 5), 0x5a7a3a, Math.cos(a) * 1.5, 0.6, Math.sin(a) * 1.2));
+  }
+  return finish(p);
+}
+
+/** THE BAND'S KIT, parked between numbers: a bass drum on its side, a sousa-
+ *  phone on a stand and two music stands. */
+export function makeBandRig(): THREE.Group {
+  const p: G[] = [];
+  const drum = new THREE.CylinderGeometry(1.0, 1.0, 0.7, 18);
+  drum.rotateZ(Math.PI / 2);
+  p.push(part(drum, WHITE, -1.2, 1.0, 0));
+  p.push(part(new THREE.CylinderGeometry(1.02, 1.02, 0.08, 18), CRIM, -0.85, 1.0, 0, 0, 0, Math.PI / 2));
+  p.push(part(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 14), GOLD, -0.82, 1.0, 0, 0, 0, Math.PI / 2));
+  for (let i = 0; i < 6; i++)
+    p.push(part(new THREE.BoxGeometry(0.07, 0.07, 0.72), STEEL, -1.2, 1.0 + Math.cos(i) * 0.86, Math.sin(i) * 0.86));
+  // the sousaphone: a big gold bell on a stand
+  p.push(part(new THREE.CylinderGeometry(0.9, 0.34, 0.9, 14, 1, true), GOLD, 1.4, 2.3, 0, -0.25));
+  p.push(part(new THREE.TorusGeometry(0.5, 0.12, 6, 14), GOLD, 1.4, 1.4, 0, 0.3));
+  p.push(part(new THREE.CylinderGeometry(0.07, 0.07, 1.3, 6), STEEL, 1.4, 0.65, 0));
+  p.push(part(new THREE.BoxGeometry(0.8, 0.08, 0.8), STEEL, 1.4, 0.06, 0));
+  // two music stands
+  for (const [sx, sz] of [[0.1, 1.4], [0.4, -1.5]] as [number, number][]) {
+    p.push(part(new THREE.CylinderGeometry(0.04, 0.04, 1.2, 5), CHAR, sx, 0.6, sz));
+    p.push(part(new THREE.BoxGeometry(0.5, 0.4, 0.05), CHAR, sx, 1.3, sz, 0.4));
+    p.push(part(new THREE.BoxGeometry(0.42, 0.32, 0.03), WHITE, sx, 1.33, sz + 0.04, 0.4));
+    p.push(part(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 8), CHAR, sx, 0.03, sz));
+  }
+  return finish(p);
+}
+
+/** A CAMPUS STATUE on a plinth. Old Campus had brick halls and nothing to
+ *  meet anybody by. */
+export function makeStatue(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.BoxGeometry(2.0, 0.4, 2.0), CONC_D, 0, 0.2, 0),
+    part(new THREE.BoxGeometry(1.6, 1.6, 1.6), CONC, 0, 1.2, 0),
+    part(new THREE.BoxGeometry(1.75, 0.16, 1.75), CONC_D, 0, 2.06, 0),
+    part(new THREE.BoxGeometry(0.9, 0.24, 0.5), GOLD, 0, 1.4, 0.82),          // plaque
+  ];
+  // the figure: bronze, mid-stride, holding a ball out in front of it
+  const BR = 0x8a6a3a;
+  p.push(part(new THREE.BoxGeometry(0.6, 1.1, 0.42), BR, 0, 2.72, 0));
+  p.push(part(new THREE.SphereGeometry(0.28, 10, 8), BR, 0, 3.46, 0));
+  p.push(part(new THREE.BoxGeometry(0.44, 0.12, 0.5), BR, 0.08, 3.6, 0));     // the helmet's brim
+  p.push(part(new THREE.BoxGeometry(0.2, 0.9, 0.2), BR, -0.18, 1.85, 0.16, 0.3));
+  p.push(part(new THREE.BoxGeometry(0.2, 0.9, 0.2), BR, 0.22, 1.9, -0.16, -0.2));
+  p.push(part(new THREE.BoxGeometry(0.18, 0.8, 0.18), BR, 0.42, 2.9, 0.2, 0, 0, -0.9));
+  p.push(part(new THREE.SphereGeometry(0.22, 10, 8), BR, 0.92, 3.2, 0.24, 0, 0, 0, 1.35, 1, 1));
+  return finish(p);
+}
+
+/** A SATELLITE RIG: the dish, the mast and the awning it lives under. RV Row
+ *  arrived on Wednesday and is not missing a minute of anything. */
+export function makeSatelliteRig(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.BoxGeometry(1.1, 0.14, 1.1), CHAR, 0, 0.07, 0),
+    part(new THREE.CylinderGeometry(0.09, 0.11, 2.6, 8), STEEL, 0, 1.3, 0),
+  ];
+  const dish = new THREE.SphereGeometry(0.95, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2.6);
+  p.push(part(dish, CREAM, 0, 2.6, 0, -0.9));
+  p.push(part(new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6), STEEL, 0.5, 2.5, 0, 0, 0, -0.6));
+  p.push(part(new THREE.SphereGeometry(0.16, 8, 6), CHAR, 0.85, 2.3, 0));
+  // the awning, striped, because every awning in every car park is striped
+  for (let i = 0; i < 5; i++)
+    p.push(part(new THREE.BoxGeometry(0.62, 0.08, 3.0), i % 2 ? CRIM : CREAM, -2.4 + i * 0.62, 2.5 + i * 0.06, 0));
+  for (const az of [-1.4, 1.4])
+    p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5), ALU, -3.5, 1.2, az));
+  return finish(p);
+}
+
+/** LADDER TOSS — the other car-park game, and a different silhouette from
+ *  cornhole's two flat boards. */
+export function makeLadderToss(): THREE.Group {
+  const p: G[] = [];
+  for (const [bx, col] of [[-2.2, CRIM], [2.2, GOLD]] as [number, number][]) {
+    for (const sz of [-0.55, 0.55])
+      p.push(part(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 6), WHITE, bx, 0.8, sz));
+    for (let i = 0; i < 3; i++)
+      p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 6), WHITE, bx, 0.35 + i * 0.55, 0, Math.PI / 2));
+    p.push(part(new THREE.BoxGeometry(1.0, 0.08, 1.3), TIMBER_D, bx, 0.04, 0));
+    // a bola hooked over the middle rung
+    p.push(part(new THREE.SphereGeometry(0.11, 8, 6), col, bx - 0.12, 0.8, 0.2));
+    p.push(part(new THREE.SphereGeometry(0.11, 8, 6), col, bx + 0.12, 0.72, 0.2));
+    p.push(rope([bx - 0.12, 0.8, 0.2], [bx + 0.12, 0.72, 0.2], CHAR, 0.03));
+  }
+  return finish(p);
+}
+
+/** A FACE-PAINT STAND. Small, cheerful, and squarely aimed at the six-year-old
+ *  this whole game is for. */
+export function makeFacePaintStand(): THREE.Group {
+  const p: G[] = [
+    part(new THREE.BoxGeometry(1.8, 0.12, 0.9), TIMBER, 0, 0.9, 0),
+    part(new THREE.BoxGeometry(1.9, 0.6, 0.06), CRIM, 0, 0.56, 0.46),
+    part(new THREE.BoxGeometry(1.9, 0.5, 0.9), CREAM, 0, 1.7, 0, 0, 0, 0.1),   // the parasol's shade
+  ];
+  for (const sx of [-0.75, 0.75]) {
+    p.push(part(new THREE.BoxGeometry(0.09, 0.86, 0.09), TIMBER_D, sx, 0.45, 0.36));
+    p.push(part(new THREE.BoxGeometry(0.09, 0.86, 0.09), TIMBER_D, sx, 0.45, -0.36));
+  }
+  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 6), STEEL, 0, 1.0, -0.3));
+  // the paint pots, in a row, all the team colours plus a gold
+  for (let i = 0; i < 6; i++)
+    p.push(part(new THREE.CylinderGeometry(0.09, 0.09, 0.16, 8),
+      [CRIM, GOLD, WHITE, TEAL, CRIM, GOLD][i], -0.6 + i * 0.24, 1.04, 0.1));
+  p.push(part(new THREE.BoxGeometry(0.5, 0.36, 0.04), WHITE, -0.55, 1.28, -0.2));
+  p.push(part(new THREE.SphereGeometry(0.13, 9, 7), CRIM, -0.55, 1.28, -0.16));
+  chairParts(p, 0.9, 0, -0.9, -1, GOLD);
+  return finish(p);
+}
+
 // ══ MANIFEST ═════════════════════════════════════════════════════════════
 // `r` is the edible radius (roughly half the footprint) used for scoring and
 // size-gating. `district` lists where the scatterer may place the prop, using
@@ -901,4 +1220,18 @@ export const TAILGATE_KIT: { name: string; make: () => THREE.Group; r: number; d
   { name: 'football', make: makeFootball, r: 0.35, district: ['practice', 'greek', 'campus', 'lot'] },
   { name: 'helmetProp', make: makeHelmetProp, r: 0.6, district: ['practice', 'lot', 'plaza'] },
   { name: 'megaphone', make: makeMegaphone, r: 0.45, district: ['plaza', 'lot', 'practice'] },
+  // ── the second pass: variety, because density without it is wallpaper
+  { name: 'smoker', make: makeSmoker, r: 1.8, district: ['lot', 'rvpark', 'greek'] },
+  { name: 'tailgateTv', make: makeTailgateTv, r: 1.6, district: ['lot', 'rvpark', 'greek'] },
+  { name: 'foodTruck', make: makeFoodTruck, r: 4.0, district: ['lot', 'plaza', 'campus'] },
+  { name: 'souvenirRack', make: makeSouvenirRack, r: 1.5, district: ['plaza', 'lot', 'campus'] },
+  { name: 'bounceHouse', make: makeBounceHouse, r: 3.0, district: ['lot', 'plaza', 'greek'] },
+  { name: 'hotTub', make: makeHotTub, r: 1.9, district: ['rvpark'] },
+  { name: 'porchSofa', make: makePorchSofa, r: 1.5, district: ['greek', 'lot'] },
+  { name: 'hayStack', make: makeHayStack, r: 1.4, district: ['woods', 'campus', 'greek', 'practice'] },
+  { name: 'bandRig', make: makeBandRig, r: 1.8, district: ['practice', 'campus', 'greek'] },
+  { name: 'statue', make: makeStatue, r: 1.6, district: ['campus'] },
+  { name: 'satelliteRig', make: makeSatelliteRig, r: 2.2, district: ['rvpark'] },
+  { name: 'ladderToss', make: makeLadderToss, r: 2.4, district: ['lot', 'greek', 'practice'] },
+  { name: 'facePaintStand', make: makeFacePaintStand, r: 1.2, district: ['plaza', 'lot'] },
 ];

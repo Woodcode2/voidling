@@ -11,6 +11,7 @@ import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './assets3d';
 import * as BAY from './bay';
 import * as GD from './gameday';
+import * as TG from './tailgate';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
 
@@ -360,7 +361,7 @@ export function coastClear(x3: number, z3: number, d = 12): boolean {
 export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   // MAPLE FALLS is deterministic: reset the town's seeded stream before the
   // bake so the ground, and then the props, come out identical every load.
-  if (WORLD_ID !== 'pirate') MS.resetMapleRng();
+  if (WORLD_ID === 'maple') MS.resetMapleRng();
   const silW = silPoly();
   const sil3 = silW.map(([x, y]) => new THREE.Vector2(w(x), w(y)));   // active coastline, world-aware
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -691,6 +692,207 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     opath(BAY.TRAIL); g.strokeStyle = 'rgba(206,178,124,0.8)'; g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
   }
 
+  // ══ GAME DAY BAKE ═════════════════════════════════════════════════════
+  // Maple's ground is a 6x6 grid of blocks with a road lattice through it, and
+  // for two builds Game Day inherited the whole thing — the spiral maze, the
+  // farm strips, the lake — because the bake branched on `!== 'pirate'` and
+  // gameday is not pirate. From the overview camera the stadium sat in the
+  // middle of Maple Falls. There is no grid here at all: the districts are
+  // polygons, the only road is the concourse ring, and the dominant marking in
+  // the level is eleven rows of painted parking stalls.
+  const GD_R = (id: GD.GdBiome) => GD.GD_REGIONS.find((r) => r.id === id)!;
+  if (WORLD_ID === 'gameday') {
+    const PU = (pxW(1000) - pxW(0)) / 1000;         // canvas px per world unit
+    const gpath = (pts: GD.Pt[], close = true) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (const [x, y] of pts) g.lineTo(pxW(x), pyW(y));
+      if (close) g.closePath();
+    };
+    const fillPoly = (pts: GD.Pt[], col: number | string) => {
+      gpath(pts); g.fillStyle = typeof col === 'number' ? hex(col) : col; g.fill();
+    };
+
+    // 1. BASE — a warm autumn Saturday, not Maple's midday green. Everything
+    //    below is painted on top of this, and the slack ring between the built
+    //    districts and the tree line keeps it: rough unmown grass.
+    g.fillStyle = '#7fa84a'; g.fillRect(0, 0, TEX, TEX);
+    for (let i = 0; i < 3200; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX;
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(150,180,90,0.20)' : 'rgba(196,150,64,0.13)';
+      g.beginPath(); g.arc(x, y, rand(3, 9), 0, Math.PI * 2); g.fill();
+    }
+
+    // 2. DISTRICT FLOORS, tree line first so the built ground overlaps it.
+    const GD_FLOOR: Record<GD.GdBiome, number> = {
+      woods: 0x9a6a3a, practice: 0x5fa356, campus: 0x76b85a, greek: 0x8fc76a,
+      rvpark: 0x8a8578, lot: 0x6e6b74, plaza: 0xb9b3a8, bowl: 0xb9b3a8,
+    };
+    fillPoly(GD_R('woods').poly, GD_FLOOR.woods);
+    // leaf litter: the rim is the only place in the level with fallen colour
+    g.save(); gpath(GD_R('woods').poly); g.clip();
+    for (let i = 0; i < 2600; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX;
+      const c2 = ['rgba(196,74,44,0.30)', 'rgba(224,150,44,0.28)', 'rgba(150,96,40,0.30)', 'rgba(108,138,58,0.22)'];
+      g.fillStyle = c2[(Math.random() * c2.length) | 0];
+      g.beginPath(); g.arc(x, y, rand(2, 7), 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+    for (const id of ['practice', 'campus', 'greek', 'rvpark', 'lot', 'plaza', 'bowl'] as GD.GdBiome[]) {
+      fillPoly(GD_R(id).poly, GD_FLOOR[id]);
+    }
+
+    // 3. MOWN STRIPES on the three grass districts. Ride-on mowers leave
+    //    alternating light/dark bands and it is the single cheapest thing that
+    //    says "somebody looks after this" — the frat lawns and the quad were
+    //    otherwise two flat green fields.
+    const stripe = (id: GD.GdBiome, pitch: number, vert: boolean) => {
+      g.save(); gpath(GD_R(id).poly); g.clip();
+      g.fillStyle = 'rgba(255,255,255,0.075)';
+      const [x0, y0, x1, y1] = [0, 0, TEX, TEX];
+      const step = pitch * PU;
+      for (let v = x0; v < (vert ? x1 : y1); v += step * 2) {
+        if (vert) g.fillRect(v, y0, step, y1 - y0); else g.fillRect(x0, v, x1 - x0, step);
+      }
+      g.restore();
+    };
+    stripe('greek', 210, true);
+    stripe('campus', 240, false);
+    stripe('practice', 260, false);
+
+    // 4. THE CONCOURSE — the ring road around the bowl, and the only road in
+    //    the level. Kerb band under, swept concrete over.
+    const ring = (col: string, half: number) => {
+      gpath(GD.CONCOURSE, false);
+      g.strokeStyle = col; g.lineWidth = half * 2 * PU; g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
+    };
+    ring('rgba(120,116,108,0.55)', GD.CONCOURSE_HALF + 26);
+    ring('#cfc9bd', GD.CONCOURSE_HALF);
+    ring('rgba(255,255,255,0.10)', GD.CONCOURSE_HALF - 55);
+
+    // 5. THE BOWL. Everything inside the stadium ellipse: the stand footprint
+    //    ring, then the playing surface with real markings. The mesh sits on
+    //    top of this, but the field shows through the open bowl from the play
+    //    camera and it is the one surface in the game a child will recognise
+    //    on sight, so it is painted properly — hash marks included.
+    const S = GD.STADIUM;
+    const ell = (rx: number, ry: number) => {
+      g.beginPath(); g.ellipse(pxW(S.cx), pyW(S.cy), rx * PU, ry * PU, 0, 0, Math.PI * 2);
+    };
+    ell(S.rx, S.ry); g.fillStyle = '#8d8578'; g.fill();               // stand footprint
+    ell(S.rx * 0.86, S.ry * 0.82); g.fillStyle = '#5a5a66'; g.fill(); // the tunnel apron
+    g.save();
+    ell(S.rx * 0.78, S.ry * 0.74); g.clip();
+    g.fillStyle = '#3f8f4e'; g.fillRect(0, 0, TEX, TEX);
+    // mowing bands the length of the pitch
+    g.fillStyle = 'rgba(255,255,255,0.085)';
+    for (let x = -S.rx; x < S.rx; x += 220) g.fillRect(pxW(S.cx + x), 0, 110 * PU, TEX);
+    // end zones — home crimson at the near end, visitor teal at the far
+    g.fillStyle = 'rgba(196,52,47,0.55)'; g.fillRect(pxW(S.cx - S.rx), 0, 230 * PU, TEX);
+    g.fillStyle = 'rgba(42,169,160,0.50)'; g.fillRect(pxW(S.cx + S.rx - 230), 0, 230 * PU, TEX);
+    // yard lines, then hash marks between them
+    g.strokeStyle = 'rgba(255,255,255,0.92)'; g.lineWidth = Math.max(1.6, 11 * PU); g.lineCap = 'butt';
+    for (let x = -S.rx + 230; x <= S.rx - 230 + 1; x += 118) {
+      g.beginPath(); g.moveTo(pxW(S.cx + x), pyW(S.cy - S.ry)); g.lineTo(pxW(S.cx + x), pyW(S.cy + S.ry)); g.stroke();
+    }
+    g.lineWidth = Math.max(1.2, 8 * PU);
+    for (let x = -S.rx + 230; x <= S.rx - 230 + 1; x += 23.6) {
+      for (const hy of [-0.30, 0.30]) {
+        g.beginPath();
+        g.moveTo(pxW(S.cx + x), pyW(S.cy + hy * S.ry - 26));
+        g.lineTo(pxW(S.cx + x), pyW(S.cy + hy * S.ry + 26));
+        g.stroke();
+      }
+    }
+    // the midfield mark
+    g.beginPath(); g.arc(pxW(S.cx), pyW(S.cy), 210 * PU, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(240,180,41,0.42)'; g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(1.6, 14 * PU); g.stroke();
+    g.restore();
+
+    // 6. THE TAILGATE APRON. Eleven painted rows: asphalt band, a stall line
+    //    per bay, and a worn tyre track down the aisle between each pair.
+    for (const row of GD.LOT_ROWS) {
+      const dx = row.b[0] - row.a[0], dy = row.b[1] - row.a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len;
+      const nx = -uy, ny = ux;
+      // the band itself, slightly darker than the surrounding lot
+      g.beginPath();
+      g.moveTo(pxW(row.a[0]), pyW(row.a[1])); g.lineTo(pxW(row.b[0]), pyW(row.b[1]));
+      g.strokeStyle = 'rgba(48,46,54,0.42)'; g.lineWidth = GD.LOT_ROW_HALF * 2 * PU; g.lineCap = 'butt'; g.stroke();
+      // stall lines
+      g.strokeStyle = 'rgba(240,224,140,0.60)'; g.lineWidth = Math.max(1.4, 9 * PU);
+      const n = Math.floor(len / row.pitch);
+      const start = (len - (n - 1) * row.pitch) / 2;
+      for (let i = 0; i <= n; i++) {
+        const d = start + (i - 0.5) * row.pitch;
+        if (d < 0 || d > len) continue;
+        const cx2 = row.a[0] + ux * d, cy2 = row.a[1] + uy * d;
+        g.beginPath();
+        g.moveTo(pxW(cx2 + nx * GD.LOT_ROW_HALF), pyW(cy2 + ny * GD.LOT_ROW_HALF));
+        g.lineTo(pxW(cx2 - nx * GD.LOT_ROW_HALF), pyW(cy2 - ny * GD.LOT_ROW_HALF));
+        g.stroke();
+      }
+      // tyre tracks in the aisle just north of the row
+      g.strokeStyle = 'rgba(30,28,34,0.16)'; g.lineWidth = Math.max(1, 22 * PU);
+      for (const off of [GD.LOT_AISLE * 0.5 - 30, GD.LOT_AISLE * 0.5 + 30]) {
+        g.beginPath();
+        g.moveTo(pxW(row.a[0] + nx * off), pyW(row.a[1] + ny * off));
+        g.lineTo(pxW(row.b[0] + nx * off), pyW(row.b[1] + ny * off));
+        g.stroke();
+      }
+    }
+
+    // 7. RV ROW hardstanding: gravel grain plus long pull-through bays.
+    g.save(); gpath(GD_R('rvpark').poly); g.clip();
+    for (let i = 0; i < 1400; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX;
+      g.fillStyle = `rgba(${150 + ((Math.random() * 40) | 0)},${144 + ((Math.random() * 36) | 0)},124,0.22)`;
+      g.beginPath(); g.arc(x, y, rand(2, 6), 0, Math.PI * 2); g.fill();
+    }
+    g.strokeStyle = 'rgba(255,255,255,0.16)'; g.lineWidth = Math.max(1.2, 12 * PU);
+    for (let y = 6300; y < 9900; y += 420) {
+      g.beginPath(); g.moveTo(pxW(2500), pyW(y)); g.lineTo(pxW(4600), pyW(y)); g.stroke();
+    }
+    g.restore();
+
+    // 8. THE PRACTICE FIELD gets its own markings — this is where the team
+    //    actually works, so it is a marked pitch and not just mown grass.
+    g.save(); gpath(GD_R('practice').poly); g.clip();
+    g.strokeStyle = 'rgba(255,255,255,0.42)'; g.lineWidth = Math.max(1.2, 9 * PU);
+    for (let y = 3100; y < 5500; y += 150) {
+      g.beginPath(); g.moveTo(pxW(2900), pyW(y)); g.lineTo(pxW(3800), pyW(y)); g.stroke();
+    }
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = Math.max(1.6, 14 * PU);
+    g.strokeRect(pxW(2900), pyW(3100), (3800 - 2900) * PU, (5500 - 3100) * PU);
+    g.restore();
+
+    // 9. GATE PLAZA: swept radial sweep lines fanning out from the bowl, and
+    //    the queue snake painted on the concrete in front of the gates.
+    g.save(); gpath(GD_R('plaza').poly); g.clip();
+    g.strokeStyle = 'rgba(255,255,255,0.09)'; g.lineWidth = Math.max(1.4, 26 * PU);
+    for (let a = Math.PI * 0.10; a < Math.PI * 0.90; a += Math.PI / 26) {
+      g.beginPath();
+      g.moveTo(pxW(S.cx + Math.cos(a) * 1700), pyW(S.cy + Math.sin(a) * 1700));
+      g.lineTo(pxW(S.cx + Math.cos(a) * 3400), pyW(S.cy + Math.sin(a) * 3400));
+      g.stroke();
+    }
+    g.strokeStyle = 'rgba(240,180,41,0.45)'; g.lineWidth = Math.max(1.2, 10 * PU);
+    for (let k = 0; k < 5; k++) {
+      const y = 5450 + k * 130;
+      g.beginPath(); g.moveTo(pxW(4600), pyW(y)); g.lineTo(pxW(7300), pyW(y)); g.stroke();
+    }
+    g.restore();
+
+    // 10. OLD CAMPUS paths: two brick walks crossing the quad.
+    g.save(); gpath(GD_R('campus').poly); g.clip();
+    g.strokeStyle = '#b98a63'; g.lineWidth = Math.max(2, 62 * PU); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(pxW(8100), pyW(3900)); g.lineTo(pxW(9500), pyW(6300)); g.stroke();
+    g.beginPath(); g.moveTo(pxW(9700), pyW(4600)); g.lineTo(pxW(8100), pyW(6600)); g.stroke();
+    g.restore();
+  }
+
   // biome block fills
   const biomeColor: Record<Biome, number | null> = {
     // ── MAPLE FALLS ground. THE SQUARE stays null (a green, not a slab): the
@@ -724,7 +926,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     practice: 0x5fa356,  // practice turf, between the bowl and the quad
     treeline: 0x9a6a3a,  // leaf litter at the rim
   };
-  if (WORLD_ID !== 'pirate') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+  if (WORLD_ID === 'maple') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
     if (col == null) continue;
     const cx = blockCenter(gx), cy = blockCenter(gy);
@@ -735,7 +937,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   }
   // forest gets a darker dappling; downtown a plaza tint already via pavement
 
-  if (WORLD_ID !== 'pirate') {
+  if (WORLD_ID === 'maple') {
   // roads — sidewalk band first, asphalt over it, crisp edge lines, dashes
   const roadPx = pxW(ROAD_CENTERS[1]) - pxW(ROAD_CENTERS[1] - 110);
   const roadLine = (c: number, vert: boolean) => {
@@ -1573,7 +1775,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // crisp geometry lane dashes — razor sharp at any zoom (the baked ones blur).
   // Pirate Bay has no traffic lanes: its boardwalk is one curve, not a grid.
-  if (WORLD_ID !== 'pirate') {
+  if (WORLD_ID === 'maple') {
     const dashGeo = new THREE.BoxGeometry(2.6, 0.03, 0.34);
     const dashMat = new THREE.MeshBasicMaterial({ color: 0xf2f5fa });
     const spots: { x: number; z: number; rot: number }[] = [];
@@ -2076,10 +2278,19 @@ export function mergedProp(parts: THREE.BufferGeometry[], mat: THREE.Material = 
   return new THREE.Mesh(merged, mat);
 }
 
+// AUTUMN, and it is not decoration. docs/GAMEDAY.md opens on "low warm sun,
+// long shadows, amber and crimson trees at the edges" and the first top-down
+// render of the finished plateau had the stadium, the lot, the concourse and
+// the whole thing ringed in high-summer green — one pool of colours away from
+// the season the level is about. Warm enough to sit against the crimson team
+// colour without arguing with it: a run of ambers and one true red per tree.
+const FALL_FOLIAGE = [0xd9702b, 0xc4442f, 0xe8a02c, 0xb8552f, 0xd98f2b, 0x9a7a34, 0xcf6a3a];
+const foliagePool = (): number[] => (WORLD_ID === 'gameday' ? FALL_FOLIAGE : PROPS.foliage);
+
 function makeTree(): THREE.Group {
   // clustered two-tone canopy like the 2D tree sprites — reads lush, not
   // "gumdrop". ONE merged mesh, ONE draw call (was 5).
-  const base = pick(PROPS.foliage);
+  const base = pick(foliagePool());
   const dark = new THREE.Color(base).multiplyScalar(0.7).getHex();
   const light = new THREE.Color(base).multiplyScalar(1.28).getHex();
   const R0 = rand(2.2, 2.9);
@@ -2518,7 +2729,11 @@ function makePalm(): THREE.Group {
 function makeBush(): THREE.Mesh {
   // a 20-face icosahedron, flat-shaded, is a rock. These are meant to be soft.
   const b = new THREE.Mesh(new THREE.SphereGeometry(rand(1.4, 2.1), 12, 8),
-    stdMat(pick([0x6cc86e, 0x5db06a, 0x7ed57a]), 0.95, false));
+    stdMat(pick(WORLD_ID === 'gameday'
+      // scrub under a fall tree line: still mostly green, going over at the
+      // tips. All-amber bushes made the rim read as one flat orange band.
+      ? [0x6a9a4a, 0x8a9a3a, 0xb8823a, 0x7a8f3a, 0xa8622f]
+      : [0x6cc86e, 0x5db06a, 0x7ed57a]), 0.95, false));
   b.position.y = 1; b.scale.y = 0.7; return b;
 }
 function makeMailbox(): THREE.Group {
@@ -2965,6 +3180,228 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
     scene.add(mesh); addEdible(mesh, r);
   };
+
+  // ══ GAME DAY: a fall Saturday, and the whole town is here ══════════════
+  // Same model as Pirate Bay below — polygon regions, a spatial hash, authored
+  // landmarks reserved BEFORE the scatter runs. The difference is density: a
+  // parking lot on game day is nose to tail, and "it feels empty" is the one
+  // failure mode this world invites.
+  if (WORLD_ID === 'gameday') {
+    const P3 = (p2: GD.Pt): [number, number] => [w(p2[0]), w(p2[1])];
+    GD.resetPlacement();
+    const drop = (mesh: THREE.Object3D, p2: GD.Pt, r: number, rotY?: number, force = false) => {
+      if (!force && !GD.spotOpen(p2[0], p2[1], r * 20)) return;
+      const [x3, z3] = P3(p2);
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      place(mesh, x3, z3, r);
+      GD.claimSpot(p2[0], p2[1], r * 20);
+    };
+    const REG = (id: GD.GdBiome) => GD.GD_REGIONS.find((r) => r.id === id)!;
+    const spread = (id: GD.GdBiome, n: number, clear = 60, sep?: number) =>
+      GD.scatterInRegion(REG(id), n, Math.random, clear, { sep });
+
+    /** Scatter n of a prop through a district and place EVERY one of them.
+     *
+     *  ONE radius, used for both the scatter's overlap rejection and the
+     *  drop's burial test. It used to be two numbers on every line — a `sep`
+     *  passed to spread() and an `r` passed to drop() — and they disagreed
+     *  everywhere. scatterInRegion claims each sampled point at `sep`; drop()
+     *  then asks spotOpen() about that same point at `r`, and spotOpen only
+     *  exempts an EXACT-match claim (same centre AND same radius). With
+     *  sep 2.2 and r 1.4 the prop read its own claim as an obstacle and
+     *  refused to exist.
+     *
+     *  Measured on the shipped build: 2,364 props requested by this pass,
+     *  861 present. Every scatter that carried a separation was discarded in
+     *  full; what survived was the parked vehicles (no sep) and the one tree
+     *  pass whose two numbers happened to match at 3.0. Which is exactly what
+     *  the top-down render showed — a busy lot ringed by empty districts.
+     */
+    const plant = (id: GD.GdBiome, n: number, clear: number, r: number,
+                   make: () => THREE.Object3D, face = false) => {
+      for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
+        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined);
+    };
+    /** …and the same for the ground between the districts. */
+    const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
+                       band?: [number, number]) => {
+      for (const p2 of GD.scatterLand(n, Math.random, clear, band, { sep: r })) drop(make(), p2, r);
+    };
+
+    // ── THE RESERVE ───────────────────────────────────────────────────────
+    // The stadium is 57 units across. Scatter first and it comes down on top
+    // of whatever the lot pass left there — the bug bay.ts records as the
+    // galleon landing on eleven palms. Claim the authored sites first.
+    const STAD: GD.Pt = [GD.STADIUM.cx, GD.STADIUM.cy];
+    GD.claimSpot(STAD[0], STAD[1], 1450);
+    const TOWER: GD.Pt = [8380, 4550];
+    GD.claimSpot(TOWER[0], TOWER[1], 260);
+
+    // ── THE HERO ──────────────────────────────────────────────────────────
+    // Eaten last, and worth the wait: 123 parts, 18 units tall. Its radius is
+    // deliberately under its visual half-width so a WORLD ENDER can actually
+    // close on it rather than bouncing off a collider the size of the bowl.
+    drop(TG.makeStadium(), STAD, 24, 0, true);
+    drop(TG.makeClockTower(), TOWER, 4.5, 0, true);
+
+    // ── THE TAILGATE ──────────────────────────────────────────────────────
+    // The hero district, and the spawn. lotSlots() lays vehicles along the
+    // parking rows with alternating headings — real lots park back to back,
+    // and one shared heading reads as a car transporter. Every third slot is
+    // a canopy or an RV instead of a truck so the rows have silhouette.
+    for (const [i, s] of GD.lotSlots(Math.random).entries()) {
+      const p2: GD.Pt = [s.x, s.y];
+      const face = s.ang;
+      if (i % 7 === 3) drop(TG.makeCanopy(), p2, 2.4, face);
+      else if (i % 11 === 5) drop(TG.makeRV(), p2, 4.2, face);
+      else drop(TG.makeTailgateTruck(), p2, 3.0, face);
+    }
+    // …and the party BETWEEN the rows, which is the whole point of an aisle.
+    //
+    // TWO passes went wrong here before this one. The first requested 2,364
+    // props and placed 861, because the scatter's separation and the drop's
+    // radius were different numbers and every prop rejected its own claim.
+    // The second fixed that and asked for the same shape at higher counts,
+    // which put 260 identical grey kettle grills in the lot — 6,237 props and
+    // the ground invisible under them. Density was never the problem; the
+    // repeat was. So the counts below are lower AND the kit is twice the size:
+    // two ways to cook, two yard games, a television, a food truck, a bounce
+    // house, a souvenir rail. A player should be able to look at any twenty
+    // square metres of this lot and find something they have not seen yet.
+    plant('lot', 110, 40, 1.4, TG.makeGrill);
+    plant('lot', 60, 48, 1.8, TG.makeSmoker);
+    plant('lot', 150, 38, 1.6, TG.makeTailgateTable);
+    plant('lot', 130, 34, 1.4, TG.makeCoolerStack);
+    plant('lot', 70, 46, 2.8, TG.makeCornhole);
+    plant('lot', 50, 44, 2.4, TG.makeLadderToss);
+    plant('lot', 220, 26, 0.7, TG.makeFoldingChair);
+    plant('lot', 80, 38, 1.0, TG.makeFlagPole);
+    plant('lot', 70, 30, 0.8, TG.makeTrashBarrel);
+    plant('lot', 70, 28, 0.5, TG.makeFootball);
+    plant('lot', 55, 40, 2.4, TG.makeCanopy);
+    plant('lot', 40, 42, 2.0, TG.makeConcessionCart);
+    plant('lot', 55, 44, 1.6, TG.makeTailgateTv);
+    plant('lot', 26, 60, 1.5, TG.makeSouvenirRack);
+    plant('lot', 12, 90, 4.0, TG.makeFoodTruck, true);
+    plant('lot', 8, 110, 3.0, TG.makeBounceHouse);
+    plant('lot', 20, 60, 1.5, TG.makePorchSofa);
+    plant('lot', 24, 50, 1.2, TG.makeFacePaintStand);
+    plant('lot', 40, 34, 0.6, TG.makeHelmetProp);
+
+    // ── GATE PLAZA ────────────────────────────────────────────────────────
+    // The gates FACE the bowl, because a ticket gate you approach from behind
+    // is a wall. Everything else here is the queue and the SHOPPING: this is
+    // where a family spends money on the way in.
+    plant('plaza', 20, 90, 3.4, TG.makeTicketGate, true);
+    plant('plaza', 40, 60, 2.4, TG.makeMerchStand);
+    plant('plaza', 46, 52, 2.0, TG.makeConcessionCart);
+    plant('plaza', 34, 56, 1.5, TG.makeSouvenirRack);
+    plant('plaza', 20, 60, 1.2, TG.makeFacePaintStand);
+    plant('plaza', 10, 100, 4.0, TG.makeFoodTruck, true);
+    plant('plaza', 6, 120, 3.0, TG.makeBounceHouse);
+    plant('plaza', 40, 42, 1.2, TG.makeBanner);
+    plant('plaza', 70, 30, 0.9, TG.makeConeStack);
+    plant('plaza', 30, 40, 1.6, TG.makePortaloo);
+    plant('plaza', 50, 28, 0.7, TG.makeFoldingChair);
+    plant('plaza', 36, 30, 0.8, TG.makeTrashBarrel);
+    plant('plaza', 24, 34, 0.45, TG.makeMegaphone);
+    // the inflatable the team runs out through — at the gate, facing in
+    plant('plaza', 2, 150, 6.5, TG.makeHelmetTunnel, true);
+
+    // ── RV ROW ────────────────────────────────────────────────────────────
+    // People who arrived on Wednesday: motorhomes, awnings, satellite dishes,
+    // deck chairs and — per docs/GAMEDAY.md — a hot tub. Four of them, since
+    // the joke is better when you can find a second one.
+    plant('rvpark', 52, 100, 4.2, TG.makeRV, true);
+    plant('rvpark', 34, 70, 2.2, TG.makeSatelliteRig);
+    plant('rvpark', 4, 130, 1.9, TG.makeHotTub);
+    plant('rvpark', 120, 28, 0.7, TG.makeFoldingChair);
+    plant('rvpark', 55, 36, 1.4, TG.makeGrill);
+    plant('rvpark', 26, 46, 1.8, TG.makeSmoker);
+    plant('rvpark', 60, 34, 1.4, TG.makeCoolerStack);
+    plant('rvpark', 60, 38, 1.6, TG.makeTailgateTable);
+    plant('rvpark', 34, 44, 1.6, TG.makeTailgateTv);
+    plant('rvpark', 36, 34, 1.0, TG.makeFlagPole);
+    plant('rvpark', 34, 30, 0.8, TG.makeTrashBarrel);
+
+    // ── FRAT ROW ──────────────────────────────────────────────────────────
+    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true);
+    plant('greek', 44, 46, 1.5, TG.makePorchSofa);
+    plant('greek', 70, 36, 1.2, TG.makeBanner);
+    plant('greek', 110, 26, 0.7, TG.makeFoldingChair);
+    plant('greek', 55, 34, 1.4, TG.makeCoolerStack);
+    plant('greek', 50, 46, 2.0, TG.makePennantString);
+    plant('greek', 44, 36, 1.6, TG.makeTailgateTable);
+    plant('greek', 34, 34, 1.4, TG.makeGrill);
+    plant('greek', 30, 44, 2.4, TG.makeLadderToss);
+    plant('greek', 26, 46, 1.4, TG.makeHayStack);
+    plant('greek', 20, 50, 1.8, TG.makeBandRig);
+
+    // ── OLD CAMPUS ────────────────────────────────────────────────────────
+    plant('campus', 22, 160, 8.0, TG.makeBrickHall);
+    plant('campus', 8, 90, 1.6, TG.makeStatue);
+    plant('campus', 55, 40, 1.2, TG.makeBanner);
+    plant('campus', 70, 32, 0.8, TG.makeTrashBarrel);
+    plant('campus', 60, 30, 0.7, TG.makeFoldingChair);
+    plant('campus', 30, 44, 2.0, TG.makeConcessionCart);
+    plant('campus', 20, 60, 1.5, TG.makeSouvenirRack);
+    plant('campus', 26, 44, 1.4, TG.makeHayStack);
+    plant('campus', 18, 50, 1.8, TG.makeBandRig);
+    plant('campus', 6, 100, 4.0, TG.makeFoodTruck, true);
+    plant('campus', 70, 60, 3.0, makeTree);
+
+    // ── PRACTICE FIELD ────────────────────────────────────────────────────
+    plant('practice', 6, 130, 2.6, TG.makeGoalpost);
+    plant('practice', 16, 100, 3.6, TG.makeBleacherStack);
+    plant('practice', 34, 50, 1.8, TG.makeBlockingSled);
+    plant('practice', 26, 50, 1.8, TG.makeBandRig);
+    plant('practice', 60, 30, 0.6, TG.makeHelmetProp);
+    plant('practice', 34, 28, 0.45, TG.makeMegaphone);
+    plant('practice', 50, 28, 0.5, TG.makeFootball);
+    plant('practice', 44, 28, 0.7, TG.makeFoldingChair);
+    plant('practice', 26, 34, 1.4, TG.makeCoolerStack);
+    plant('practice', 20, 44, 2.4, TG.makeLadderToss);
+    plant('practice', 20, 44, 1.4, TG.makeHayStack);
+
+    // ── THE STADIUM APRON ─────────────────────────────────────────────────
+    // The concourse ring is claimed ground, but the dodecagon around it is
+    // not, and it was completely bare — the walk from the gates to the bowl
+    // had nothing in it at all.
+    plant('bowl', 40, 60, 2.0, TG.makeConcessionCart);
+    plant('bowl', 30, 60, 2.4, TG.makeMerchStand);
+    plant('bowl', 24, 60, 1.5, TG.makeSouvenirRack);
+    plant('bowl', 60, 40, 0.9, TG.makeConeStack);
+    plant('bowl', 44, 44, 0.8, TG.makeTrashBarrel);
+    plant('bowl', 40, 50, 1.2, TG.makeBanner);
+    plant('bowl', 24, 50, 1.6, TG.makePortaloo);
+    plant('bowl', 20, 50, 0.45, TG.makeMegaphone);
+
+    // ── THE TREE LINE ─────────────────────────────────────────────────────
+    // Autumn. makeTree draws from FALL_FOLIAGE on this world, so the rim is
+    // amber and crimson rather than the high-summer green the other two use.
+    plant('woods', 300, 60, 3.0, makeTree);
+    plant('woods', 120, 55, 2.8, makePine);
+    plant('woods', 200, 30, 1.0, makeBush);
+    plant('woods', 40, 50, 1.4, TG.makeHayStack);
+
+    // ── THE GROUND BETWEEN ────────────────────────────────────────────────
+    // Districts are places; most of a site this size is the ground between
+    // them. Without this pass the world reads as eight busy islands floating
+    // in an empty disc — the exact note bay.ts records against itself.
+    plantLand(90, 50, 0.8, TG.makeTrashBarrel);
+    plantLand(90, 50, 0.9, TG.makeConeStack);
+    plantLand(110, 40, 0.7, TG.makeFoldingChair);
+    plantLand(70, 50, 1.2, TG.makeBanner);
+    plantLand(60, 44, 1.4, TG.makeCoolerStack);
+    plantLand(60, 50, 1.4, TG.makeHayStack);
+    plantLand(180, 80, 3.0, makeTree);
+    // …and a band of scrub pressed right up against the rim, which is what
+    // stops the tree line reading as a drawn-on brown ring.
+    plantLand(200, 26, 1.0, makeBush, [0, 620]);
+    plantLand(140, 60, 3.0, makeTree, [0, 760]);
+
+    return;   // GAME DAY is fully populated — the Maple grid pass must not run
+  }
 
   // ══ PIRATE BAY: props scattered inside REGIONS, never on a grid ═════════
   if (WORLD_ID === 'pirate') {

@@ -15,6 +15,7 @@ import * as LUXE from './luxe';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
+import * as GD from './gameday';
 // MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
 // exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
 // the same voice ids the cast carries (politician, protester, gossip, farmer,
@@ -22,10 +23,17 @@ import * as BAY from './bay';
 // than merged into the module tables — 'kid' exists in both worlds and a
 // Pirate Bay child must never start talking about the pie contest.
 import { MAPLE_VOICE_AMBIENT, MAPLE_VOICE_PANIC } from './newsroom_maple';
+// …and GAME DAY's, which are keyed the same way again: fan, superfan, cheer,
+// band, ref, coach, mascot, cook, student, parent, vendor, steward.
+import { GAMEDAY_VOICE_AMBIENT, GAMEDAY_VOICE_PANIC } from './newsroom_gameday';
 
 // Pirate Bay's geometry is authored in WORLD units (0..12000, centre 6000);
 // life places things in 3D. Same conversion island.ts uses for everything else.
 const w3 = (p: BAY.Pt): [number, number] => [(p[0] - 6000) * 0.05, (p[1] - 6000) * 0.05];
+// Game Day is authored in the same world units and shares the same centre,
+// so it is literally the same conversion — aliased rather than re-derived so
+// there is one place to change if the plateau ever moves.
+const g3 = (p: GD.Pt): [number, number] => w3(p as BAY.Pt);
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
@@ -81,6 +89,50 @@ const AMBIENT: Record<string, string[]> = {
   beach: ['sunscreen me. NOW.', 'wave check! 🌊', 'sandcastle masterpiece incoming', 'the tide stole my flip-flop', "don't feed the seagulls!!", 'SPF one MILLION', 'crab looked at me funny', 'ice cream, swim, ice cream', 'nap. then more nap.', 'dude, the ocean is SO wet', 'they RAKE this beach at dawn', 'a man brings you cold flannels', 'sunset is at 6:42. sharp.', 'this sand is imported. really.'],
   plaza: ['meet me by the fountain', 'taco truck line is LONG', 'market day is the best day', "the mayor's speaking today!", 'live music by the fountain!', 'street food time', 'fountain coin = one wish', 'free samples!! FREE SAMPLES', 'pigeons own this plaza', 'is there a rally?'],
   zoo: ['the elephant waved at me!!', 'do NOT tap the glass', 'look, flamingos!', 'gift shop. NOW.', 'feeding time!!', 'popcorn! 🍿', 'the lions look hungry', 'penguins: tiny tuxedo guys', 'that monkey has my hat', 'sloth update: still asleep'],
+  // ── GAME DAY: a fall Saturday in Marston, and the whole town is here. The
+  // keys are island.ts's Biome ids, which rename three of gameday.ts's
+  // districts on the way out (plaza→gate, campus→quad, woods→treeline).
+  // House style is newsroom_gameday's: proper sentences, terminal punctuation,
+  // no politics, nothing anybody could read as a contest with sides.
+  lot: ['We park in this spot every year.', 'The grill is on. Give it ten.',
+    'Cornhole. Right now. Grab a bag.', 'Whose truck is that? Lovely truck.',
+    'I have chairs for everybody.', 'Kickoff is at three. We have time.',
+    'Somebody brought a whole smoker.', 'That is a lot of casserole.',
+    'The radio is on. Turn it up.', 'Row nine, same as always.',
+    'Second helping? Yes. Obviously.', 'Buckley came by. Buckley waved.',
+    'Bring the cooler. And the other one.', 'Tailgate first, football second.'],
+  gate: ['Gate C is quicker. It always is.', 'Tickets are on my phone. Somewhere.',
+    'Bag check is on the left there.', 'Two hot dogs and a lemonade.',
+    'They are letting us in early!', 'The queue moves. It always moves.',
+    'The helmet tunnel is that way.', 'Programme? One programme, please.',
+    'I lost my group. I will find them.', 'Have your bags open, please.',
+    'The band comes through here first.', 'Souvenir cup. Free refills.'],
+  bowl: ['Look at that. Just look at it.', 'Ninety thousand of us in here.',
+    'The turf looks perfect today.', 'Section 114, row three.',
+    'When it gets loud, it gets LOUD.', 'Stand up! Everybody up!',
+    'The tunnel is right down there.', 'I have had this seat for years.',
+    'Here comes the band. Here we go.', 'That roar goes through your chest.'],
+  rvpark: ['We arrived on Wednesday night.', 'The awning took an hour to raise.',
+    'Satellite dish is up. We are set.', 'Coffee is on. Help yourself.',
+    'Forty feet of home, right here.', 'The generator hums. You get used to it.',
+    'We have done this for twenty years.', 'There is a hot tub. Genuinely.',
+    'Deck chairs are round the back.', 'Every neighbour brings a dish.'],
+  greek: ['The sofa lives on the porch now.', 'That banner took us all night.',
+    'Music down a bit! A BIT!', 'The whole street is out here.',
+    'We painted the porch again.', 'Somebody is on the roof. Again.',
+    'Meet at the steps before we walk.', 'The pancakes start at nine.'],
+  quad: ['Class was cancelled. Obviously.', 'The clock tower is four minutes fast.',
+    'This brick walk is a hundred years old.', 'Meet me by the statue after.',
+    'I study here when it is quiet.', 'It is never quiet on a Saturday.',
+    'The chime goes off at the hour.', 'They ring the bell when we win.'],
+  practice: ['They ran that drill nine times.', 'The sleds are heavier than they look.',
+    'Water cart! Over here!', 'Coach has the whistle. Coach always does.',
+    'Kick it again. And again.', 'That is a long way to throw a ball.',
+    'The bleachers hold about forty.', 'Line up. From the top.'],
+  treeline: ['The colour out here is unreal.', 'You can hear the crowd from here.',
+    'Best parking spot on the whole hill.', 'Leaves right up to my ankles.',
+    'It is quieter under the trees.', 'We walk in from here every year.',
+    'Somebody left a chair. Ages ago.', 'You can see the whole bowl from here.'],
 };
 const PANIC: Record<string, string[]> = {
   port: ['ABANDON DOCK!!', 'save the CARGO!!', 'not my CARGO!!', 'to the boats!! ALL of them!!', 'it ate the pier!!', 'the superyacht!! START IT!!', 'lower the fancy lifeboat!!'],
@@ -110,6 +162,32 @@ const PANIC: Record<string, string[]> = {
   plaza: ['EVERYONE RUN!!', "it's REAL!!", 'save the taco truck!!', 'the fountain!! NOOO!!', 'my churros!!', "this wasn't on the flyer!!"],
   zoo: ['WHO OPENED THE PENS?!', 'the lions are LOOSE!!', 'the flamingos flew AWAY!!', 'even the sloth is running!!', 'save the gift shop!!', "WE'RE the feeding time!!"],
   generic: ['AAAAH!!', 'RUN FOR IT!!', "it's HUNGRY!!", 'tell my cat I love her!!', 'nope nope NOPE!!', 'why is it SMILING?!'],
+  // ── GAME DAY. Everyone here is having the best day of the year and it is
+  // being taken away one row of trucks at a time.
+  lot: ['It took the TRUCK! The whole truck!', 'Get the cooler! LEAVE the chairs!',
+    'Grill is off! Grill is OFF! Move!', 'Row nine is GONE!', 'Everybody up the hill! Now!',
+    'It ate the casserole. All of it.', 'My chairs! Somebody grab my chairs!'],
+  gate: ['Gate C! Everybody to Gate C!', 'Leave the bags! Just go!',
+    'It took the ticket booth!', 'The tunnel is gone! It is gone!',
+    'Walk, do not run! Please walk!', 'Follow the steward! Follow her!'],
+  bowl: ['Clear the field! Clear it!', 'Everybody out through the tunnel!',
+    'It is on the fifty! The FIFTY!', 'That is the north stand! Gone!',
+    'Down the steps! Keep moving!', 'They are still calling the game!'],
+  rvpark: ['Start the engine! START IT!', 'It took the awning!',
+    'Forty feet of home! Gone!', 'Unhook the water! No, leave it!',
+    'Get the dog! Where is the dog?', 'Everybody in! Doors shut! Go!'],
+  greek: ['Off the roof! GET OFF THE ROOF!', 'It ate the porch! The whole porch!',
+    'Save the banner! Somebody!', 'Down the steps! All of you!',
+    'That was our sofa!', 'Out the back! Out the back!'],
+  quad: ['It took the clock tower!', 'Off the grass! Off the grass!',
+    'The bell is ringing on its own!', 'Everybody to the brick walk!',
+    'Not the statue! Not the statue!'],
+  practice: ['Off the field! Everybody off!', 'It ate the goalposts!',
+    'Coach! COACH! We are going!', 'Leave the sleds! Just leave them!',
+    'Down the tunnel! Single file!'],
+  treeline: ['Into the trees! Go! Go!', 'Up the hill! Keep going up!',
+    'It came through the woods!', 'Leave the chairs! Leave everything!',
+    'You can still hear the crowd.'],
 };
 const biomeKey = (b: Biome): string => (b === 'military' || b === 'airport') ? 'downtown' : b;
 
@@ -623,6 +701,11 @@ function parrotParts(out: Geo[], side: number, sy: number): void {
 // what people WEAR is where they ARE — biome dress codes. `wear` is the pool of
 // GARMENTS (which change the silhouette), `shoe` the footwear, so two people in
 // the same district still look like two people from directly overhead.
+// GAME DAY's, straight out of docs/GAMEDAY.md. Home crimson and gold, visitors
+// in teal, and crimson dominates roughly 4:1 wherever these are drawn from.
+const GD_HOME_A = 0xc4342f;   // crimson
+const GD_GOLD = 0xf0b429;     // gold
+const GD_AWAY = 0x2aa9a0;     // visitor teal
 interface Fit {
   shirt: number[]; pants: number[];
   hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean;
@@ -662,6 +745,29 @@ const OUTFIT: Record<string, Fit> = {
     hat: 'cap', hatOdds: 0.4, wear: ['tee', 'hoodie', 'hoodie', 'jersey', 'tank'], shoe: ['shoe'] },
   strip: { shirt: [0xd8443c, 0x2f6fd0, 0xe8604d, 0xf0c050, 0xf0e6d2, 0x5a5a64], pants: [0x3a4a6a, 0x2a2a34, 0x5a4a3a],
     hat: 'cap', hatOdds: 0.4, wear: ['tee', 'hoodie', 'apron', 'open', 'dress'], shoe: ['shoe'] },
+  // ── GAME DAY. Crimson four to one over the visitors' teal, so the plateau
+  // reads as ONE town turned out for the day rather than two factions — the
+  // same call the county-fair re-theme made in mainstreet.ts, for the same
+  // reason. Gold is the trim colour and shows up on about one shirt in six.
+  // Keyed by island.ts's Biome ids; without these eight, every person on the
+  // level fell through to OUTFIT.cozy and the crowd came out in suburban
+  // pastels at a football game.
+  lot: { shirt: [GD_HOME_A, GD_HOME_A, GD_HOME_A, GD_HOME_A, GD_GOLD, GD_AWAY, 0xf0e6d2], pants: [0x2a2a34, 0x3a4a6a, 0x4a4034, 0x5a5a64],
+    hat: 'cap', hatOdds: 0.7, wear: ['jersey', 'hoodie', 'tee', 'open'], shoe: ['shoe', 'boot'] },
+  gate: { shirt: [GD_HOME_A, GD_HOME_A, GD_HOME_A, GD_GOLD, GD_AWAY, 0xffffff], pants: [0x2a2a34, 0x3a4a6a, 0x5a5a64],
+    hat: 'cap', hatOdds: 0.6, wear: ['jersey', 'hoodie', 'tee', 'dress'], shoe: ['shoe'] },
+  bowl: { shirt: [GD_HOME_A, GD_HOME_A, GD_HOME_A, GD_GOLD, GD_AWAY, 0xffffff], pants: [0x2a2a34, 0x3a4a6a],
+    hat: 'cap', hatOdds: 0.55, wear: ['jersey', 'jersey', 'hoodie', 'tee'], shoe: ['shoe'] },
+  rvpark: { shirt: [GD_HOME_A, GD_HOME_A, GD_GOLD, 0xf0e6d2, 0x4a7a58, GD_AWAY], pants: [0x3a4a6a, 0x4a4034, 0x2a2a34],
+    hat: 'cap', hatOdds: 0.65, wear: ['open', 'tee', 'hoodie', 'dungarees'], shoe: ['shoe', 'boot'] },
+  greek: { shirt: [GD_HOME_A, GD_HOME_A, GD_HOME_A, GD_GOLD, 0xffffff, GD_AWAY], pants: [0x2a2a34, 0x5a5a64, 0x3a4a6a],
+    hat: 'cap', hatOdds: 0.45, wear: ['jersey', 'tee', 'tank', 'hoodie'], shoe: ['shoe'], fun: true },
+  quad: { shirt: [GD_HOME_A, GD_HOME_A, GD_GOLD, 0xffffff, 0x3a4a6a, GD_AWAY], pants: [0x2a2a34, 0x3a4a6a, 0x5a5a64],
+    hat: 'cap', hatOdds: 0.35, wear: ['hoodie', 'hoodie', 'jersey', 'tee'], shoe: ['shoe'], pack: true },
+  practice: { shirt: [GD_HOME_A, GD_HOME_A, GD_GOLD, 0xffffff, 0x5a5a64], pants: [0x2a2a34, 0x3a4a6a],
+    hat: 'cap', hatOdds: 0.8, wear: ['jersey', 'jersey', 'tee'], shoe: ['shoe'] },
+  treeline: { shirt: [GD_HOME_A, GD_HOME_A, GD_GOLD, 0x4a7a58, 0xf0e6d2, GD_AWAY], pants: [0x4a4034, 0x3a4a6a, 0x2a2a34],
+    hat: 'beanie', hatOdds: 0.5, wear: ['hoodie', 'open', 'tee'], shoe: ['boot', 'shoe'] },
 };
 
 // ══ THE ELECTION ═════════════════════════════════════════════════════════════
@@ -1777,11 +1883,23 @@ export function createLife(
   // VOICE_PANIC on purpose, so they resolve with no adapter — but they are
   // resolved PER WORLD instead of merged into the module tables. 'kid' exists
   // in both and the two children are not interchangeable.
-  const MAPLE = worldId() !== 'pirate';
+  // THREE worlds now, and this is where the third one leaked. Maple was
+  // selected by `!== 'pirate'`, so a Game Day tailgater standing beside a
+  // pickup truck said "Do not tell the county!!" — a line about Maple Falls'
+  // pie judging, live on screen in a screenshot. A world is not "not pirate".
+  const WID = worldId();
+  const OWN_AMBIENT: Record<string, string[]> =
+    WID === 'maple' ? MAPLE_VOICE_AMBIENT : WID === 'gameday' ? GAMEDAY_VOICE_AMBIENT : {};
+  const OWN_PANIC: Record<string, string[]> =
+    WID === 'maple' ? MAPLE_VOICE_PANIC : WID === 'gameday' ? GAMEDAY_VOICE_PANIC : {};
+  // Pirate Bay's own pools ARE the module tables, so it falls through to them.
+  // Game Day must NOT: 'kid' and 'staff' exist there and a child at a football
+  // game has no business talking about a swim-up bar. On Game Day the module
+  // tables are only reachable for a voice key Game Day never assigns.
   const ambPool = (v?: string): string[] | null =>
-    (v ? ((MAPLE ? MAPLE_VOICE_AMBIENT[v] : null) || VOICE_AMBIENT[v] || null) : null);
+    (v ? (OWN_AMBIENT[v] || (WID === 'gameday' ? null : VOICE_AMBIENT[v]) || null) : null);
   const panPool = (v?: string): string[] | null =>
-    (v ? ((MAPLE ? MAPLE_VOICE_PANIC[v] : null) || VOICE_PANIC[v] || null) : null);
+    (v ? (OWN_PANIC[v] || (WID === 'gameday' ? null : VOICE_PANIC[v]) || null) : null);
 
   // ── cars: grid-locked lanes with real arc turns ──────────────────────────
   // The car model's nose points +X, so heading comes from the velocity vector:
@@ -1833,7 +1951,7 @@ export function createLife(
   const spanList: { axis: 'h' | 'v'; centre: number; sp: Span }[] = [];
   // Pirate Bay has no road grid at all — one boardwalk and a dirt trail —
   // so there is nothing to span, and its traffic is built further down.
-  for (const rc of worldId() === 'pirate' ? [] : ROAD_CENTERS_3D) {
+  for (const rc of worldId() === 'maple' ? ROAD_CENTERS_3D : []) {
     for (const axis of ['h', 'v'] as const) {
       const spans: Span[] = [];
       let s0: number | null = null;
@@ -2005,7 +2123,7 @@ export function createLife(
   };
   // Pirate Bay has no road grid, so it gets no traffic here — its shuttle
   // buggies run on the boardwalk path instead, further down.
-  for (let i = 0; i < (worldId() === 'pirate' ? 0 : 30); i++) roadVehicle(makeCar(), 2.8, rand(14, 22));
+  for (let i = 0; i < (worldId() === 'maple' ? 30 : 0); i++) roadVehicle(makeCar(), 2.8, rand(14, 22));
 
   // ── wanderer (pedestrians, animals, event NPCs) ──────────────────────────
   // panic CONTAGION: a fleeing ped scares nearby strollers, so the void's
@@ -2015,12 +2133,14 @@ export function createLife(
   const tmp = new THREE.Vector3();
   // MAPLE FALLS has a lagoon on its south shore that biomeAt() calls dry land
   // (it is inside the coastline), so a beach crowd would wade into it and keep
-  // going. Pirate Bay has no lagoon and this must not cost it a single test —
-  // hence the flag first, which short-circuits the whole check there.
+  // going. Neither Pirate Bay nor Game Day has one, and this must not cost
+  // either a single test — hence the world check first, which short-circuits
+  // the whole thing there. (Game Day has no interior water at all: it is a
+  // plateau, and inWater3's pond and river are Maple's coordinates.)
   // …and the pond and the river, which it did not: 62 townsfolk spent a
   // 90-second match standing in interior water, one of them 6 units from the
   // river centreline for 21 seconds straight.
-  const wet = (x: number, z: number, m: number) => MAPLE && inWater3(x, z, m);
+  const wet = (x: number, z: number, m: number) => WID === 'maple' && inWater3(x, z, m);
   function addWanderer(mesh: THREE.Object3D, hx: number, hz: number, tether: number, base: number, fear: number, radius: number, biome: string, panicLines?: string[], voice?: string) {
     if (!biomeAt(hx, hz) || wet(hx, hz, 8)) return;   // don't spawn anyone off the coastline, or in the water
     // …and nobody lives on the void's opening square. The owner's report was
@@ -2265,7 +2385,7 @@ export function createLife(
 
   // a static prop, placed and made edible only if it is actually on land
   const decor = (mesh: THREE.Object3D, x: number, z: number, r = 3, rotY?: number) => {
-    if (!insideIsland3(x, z) || (worldId() !== 'pirate' && inLagoon3(x, z, 20))) return;   // never off the coast, never in the lagoon
+    if (!insideIsland3(x, z) || (worldId() === 'maple' && inLagoon3(x, z, 20))) return;   // never off the coast, never in the lagoon
     mesh.position.set(x, 0, z);
     if (rotY !== undefined) mesh.rotation.y = rotY;
     setShadow(mesh); scene.add(mesh); addEdible(mesh, r);
@@ -2308,7 +2428,7 @@ export function createLife(
 
   // every block, grouped by zone, and only if its centre is actually on land
   const zoneBlocks = new Map<MZone, [number, number][]>();
-  if (worldId() !== 'pirate') for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
+  if (worldId() === 'maple') for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
     const [cx, cz] = blockCenter3D(gx, gy);
     if (!biomeAt(cx, cz)) continue;
     const z = zoneAt(gx, gy);
@@ -2383,7 +2503,7 @@ export function createLife(
   };
 
   for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
-    if (worldId() === 'pirate') break;   // no grid here — see the PIRATE BAY block below
+    if (worldId() !== 'maple') break;   // no grid here — see the per-world blocks below
     const dress = biomeIdAt(gx, gy);
     const zone = zoneAt(gx, gy);
     const cast = ZONE_CAST[zone];
@@ -2418,7 +2538,7 @@ export function createLife(
   }
 
   // livestock / zoo animals: clamped near the pen
-  if (worldId() !== 'pirate') {
+  if (worldId() === 'maple') {
     const [zx, zz] = blockCenter3D(5, 1);
     // each animal is TETHERED to its pen (matching the baked pen floors):
     // savanna NW, paddock SW, flamingo lagoon E
@@ -2446,7 +2566,7 @@ export function createLife(
   // beach sunbathers: flat out on their towels, working on the tan
   const towelGeo = new THREE.PlaneGeometry(3.6, 5.4);
   for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
-    if (worldId() === 'pirate') break;
+    if (worldId() !== 'maple') break;
     if (PLAN_GRID[gy][gx] !== 'beach') continue;
     const [bx, bz] = blockCenter3D(gx, gy);
     for (let i = 0; i < 3; i++) {
@@ -3205,10 +3325,139 @@ export function createLife(
     }
   }
 
+  // ══ GAME DAY — THE MARSTON CROWD ═══════════════════════════════════════
+  // The thing that makes this level look unlike the other two is that the
+  // crowd has a DIRECTION. Nobody here is milling: every single person is
+  // oriented on the bowl, because that is where they are all going. Maple's
+  // people face wherever their block faced and Pirate Bay's face the sea from
+  // wherever they happen to be, and both read as scatter. This reads as an
+  // event.
+  //
+  // Twelve voices, all of them out of newsroom_gameday: fan, superfan, cheer,
+  // band, ref, coach, mascot, cook, student, parent, vendor, steward. They are
+  // assigned per district, not globally, so the person you walk past in RV Row
+  // is a different person from the one at the gates.
+  if (worldId() === 'gameday') {
+    const gdRegion = (id: GD.GdBiome) => GD.GD_REGIONS.find((r) => r.id === id)!;
+    // island.ts renames three districts on the way out; `dress` and the AMBIENT
+    // fallback are keyed on the RENAMED ids, because that is what biomeAt
+    // returns under a person's feet.
+    const DRESS: Record<GD.GdBiome, string> = {
+      bowl: 'bowl', plaza: 'gate', lot: 'lot', rvpark: 'rvpark',
+      greek: 'greek', campus: 'quad', practice: 'practice', woods: 'treeline',
+    };
+    /** Place one person, facing the stadium. `voice` is a newsroom_gameday key. */
+    const gdPlace = (wx: number, wy: number, id: GD.GdBiome, voice: string,
+                     o?: { kid?: boolean; tether?: number; speed?: number; col?: number }) => {
+      const dress = DRESS[id];
+      const p = o?.kid
+        ? makeCast('kid', dress)
+        : makePerson(dress, o?.col, { hat: Math.random() < 0.6 ? 'cap' : undefined });
+      const [x, z] = g3([wx, wy]);
+      const rec = addWanderer(p, x, z,
+        o?.tether ?? (o?.kid ? 20 : 15),
+        o?.speed ?? (o?.kid ? rand(5.5, 8) : rand(2.4, 4.4)),
+        18, o?.kid ? 1.9 : 2.4, dress, undefined, voice);
+      // EVERYONE FACES THE BOWL. gdFacingStadium is a world-space bearing and
+      // the mesh's forward is +X, so the sign flips going into 3D — the same
+      // conversion the car headings use.
+      if (rec) rec.mesh.rotation.y = -GD.gdFacingStadium(wx, wy) + Math.PI / 2;
+      return rec;
+    };
+    // per-district cast lists. Counts are deliberately front-loaded onto the
+    // lot and the gates: those are the two districts a player spends the first
+    // sixty seconds in, and "it feels empty" is the complaint this level is
+    // most exposed to (see docs/GAMEDAY.md §1).
+    const GD_CAST: [GD.GdBiome, [string, number][], number][] = [
+      // THE TAILGATE — the hero district. Cooks at the grills, families
+      // between the rows, students who have been here since eight in the
+      // morning, and a mascot doing the rounds.
+      ['lot', [['fan', 26], ['cook', 8], ['parent', 7], ['student', 9],
+               ['superfan', 4], ['vendor', 3], ['mascot', 1]], 34],
+      // GATE PLAZA — queues, stewards on the barriers, vendors working the line
+      ['plaza', [['fan', 18], ['steward', 6], ['vendor', 5], ['parent', 4],
+                 ['student', 4], ['superfan', 3], ['cheer', 2]], 30],
+      // RV ROW — people who arrived on Wednesday. Older, slower, settled in.
+      ['rvpark', [['fan', 12], ['cook', 4], ['parent', 4], ['vendor', 2]], 38],
+      // FRAT ROW — students, and the loudest people on the plateau
+      ['greek', [['student', 14], ['superfan', 4], ['fan', 4], ['band', 2]], 30],
+      // OLD CAMPUS — the quiet one. Students crossing, a few families.
+      ['campus', [['student', 9], ['parent', 4], ['fan', 4], ['band', 3]], 34],
+      // PRACTICE FIELD — the team's own ground: coaches, refs, the band
+      ['practice', [['coach', 3], ['ref', 3], ['band', 6], ['cheer', 4], ['fan', 4]], 32],
+      // THE STADIUM — the concourse ring and the gates into it
+      ['bowl', [['fan', 12], ['steward', 4], ['cheer', 4], ['superfan', 3], ['vendor', 2]], 30],
+      // THE TREE LINE — the walk-in crowd, thinning out
+      ['woods', [['fan', 7], ['parent', 4], ['student', 3]], 44],
+    ];
+    for (const [id, roles, clear] of GD_CAST) {
+      let total = 0; for (const r of roles) total += r[1];
+      const pts = GD.scatterInRegion(gdRegion(id), total, Math.random, clear);
+      let i = 0;
+      for (const [voice, n] of roles) for (let k = 0; k < n && i < pts.length; k++, i++) {
+        // a quarter of the 'parent' slots come with an actual child, which is
+        // what makes a family read as a family rather than two adults
+        const kid = voice === 'parent' && Math.random() < 0.45;
+        gdPlace(pts[i][0], pts[i][1], id, kid ? 'fan' : voice, { kid });
+      }
+    }
+
+    // THE PARTY IN THE AISLES. The lot's rows are 340 apart and 120 of that is
+    // metal; the remaining 220 is where the tailgate actually happens. Sizing
+    // the district off the vehicles alone gave a lot that was nose-to-tail and
+    // completely lifeless between them, so this fills the aisles explicitly
+    // rather than trusting a scatter to find the gaps.
+    for (const row of GD.LOT_ROWS) {
+      const dx = row.b[0] - row.a[0], dy = row.b[1] - row.a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+      const off = GD.LOT_AISLE * 0.5;
+      for (let d = 220; d < len - 220; d += rand(150, 260)) {
+        const wx = row.a[0] + ux * d + nx * (off + rand(-70, 70));
+        const wy = row.a[1] + uy * d + ny * (off + rand(-70, 70));
+        if (!GD.gdPlaceable(wx, wy, 22)) continue;
+        const roll = Math.random();
+        const voice = roll < 0.44 ? 'fan' : roll < 0.62 ? 'cook' : roll < 0.78 ? 'student'
+          : roll < 0.90 ? 'parent' : 'superfan';
+        // short tether, low speed: these people are STANDING AROUND A GRILL,
+        // not commuting. It is the same trick the dance floor uses at the
+        // resort, for the opposite feeling.
+        gdPlace(wx, wy, 'lot', voice, { tether: 5, speed: rand(0.4, 1.1) });
+      }
+    }
+
+    // THE WALK-UP. A steady file of people coming off the lot, through the
+    // gates, into the bowl — the one thing on the plateau that is visibly
+    // GOING somewhere. Strung along the spawn-to-stadium sightline, which is
+    // dead straight by construction (see gameday.ts's GD_SPAWN note).
+    for (let i = 0; i < 26; i++) {
+      const t = i / 26;
+      const wy = 9600 - t * 4300;                       // lot → plaza → concourse
+      const wx = 5950 + Math.sin(i * 1.7) * (260 + t * 520);
+      if (!GD.gdPlaceable(wx, wy, 20)) continue;
+      const id: GD.GdBiome = wy > 6350 ? 'lot' : wy > 4900 ? 'plaza' : 'bowl';
+      const roll = Math.random();
+      gdPlace(wx, wy, id, roll < 0.55 ? 'fan' : roll < 0.75 ? 'student' : roll < 0.9 ? 'parent' : 'superfan',
+        { tether: 26, speed: rand(4.2, 6.2) });
+    }
+
+    // THE CONCOURSE RING. People circling the bowl, evenly spread, so the ring
+    // road reads as used rather than as a painted stripe.
+    for (let i = 0; i < 22; i++) {
+      const pp = GD.pathPointAt(GD.CONCOURSE, i / 22 + rand(-0.012, 0.012));
+      const off = rand(-GD.CONCOURSE_HALF * 0.7, GD.CONCOURSE_HALF * 0.7);
+      const wx = pp.x + Math.cos(pp.ang + Math.PI / 2) * off;
+      const wy = pp.y + Math.sin(pp.ang + Math.PI / 2) * off;
+      const roll = Math.random();
+      gdPlace(wx, wy, 'bowl', roll < 0.5 ? 'fan' : roll < 0.7 ? 'vendor' : roll < 0.85 ? 'steward' : 'superfan',
+        { tether: 24, speed: rand(3.4, 5.2) });
+    }
+  }
+
   // pond ducks — "the ducks are rowdy" is finally TRUE, and they PARADE:
   // ducks 1-3 tail duck 0 in the classic line
   const duckLine: THREE.Object3D[] = [];
-  for (let i = 0; i < (worldId() === 'pirate' ? 0 : 4); i++) {
+  for (let i = 0; i < (worldId() === 'maple' ? 4 : 0); i++) {
     const duck = new THREE.Group();
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), sharedMat(i % 2 ? 0xf6f2da : 0xffd54f, 0.9));
     body.scale.set(1.25, 0.85, 1); body.position.y = 0.36; duck.add(body);
@@ -3269,7 +3518,7 @@ export function createLife(
     grp.userData.mover = true;
     setShadow(grp); addEdible(grp, 5.4); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
   }
-  if (worldId() !== 'pirate') buildTrain();   // no commuter rail at a beach resort
+  if (worldId() === 'maple') buildTrain();   // no commuter rail at a resort or a stadium
   movers.push({
     get mesh() { return trainGrp!; },
     update(dt) {
@@ -3291,7 +3540,7 @@ export function createLife(
     // Maple Isle's staged vignettes (the mayor's rally, the farmers market,
     // the ball game) are that island's fiction. Running them at a pirate
     // resort put "MY STARTUP!!" and "no new voids" on the dance floor.
-    if (worldId() === 'pirate') return;
+    if (worldId() !== 'maple') return;
     const [x, z] = blockCenter3D(gx, gy);
     const evBiome = biomeKey(PLAN_GRID[gy][gx]);
     build(x, z);
@@ -3372,6 +3621,108 @@ export function createLife(
       4, undefined, ['rich', 'robe', 'waiter', 'kid', 'bellhop']);
   }
 
+  // ══ GAME DAY vignettes ═════════════════════════════════════════════════
+  // Six staged scenes on real district geography. Every one is a thing a child
+  // would recognise from a Saturday: a grill, a game of cornhole, a band
+  // warming up, a queue, a mascot with a crowd of kids around him, and the
+  // team walking in. Same house style as the booth — proper sentences, no
+  // politics, nothing that reads as two sides against each other.
+  if (worldId() === 'gameday') {
+    const addGD = (wx: number, wy: number, id: GD.GdBiome, voice: string,
+                   amb: string[], pan: string[], n: number, spread = 15,
+                   opts?: { kids?: number; still?: boolean }) => {
+      const DRESS: Record<GD.GdBiome, string> = {
+        bowl: 'bowl', plaza: 'gate', lot: 'lot', rvpark: 'rvpark',
+        greek: 'greek', campus: 'quad', practice: 'practice', woods: 'treeline',
+      };
+      const dress = DRESS[id];
+      const [x, z] = g3([wx, wy]);
+      const put = (mesh: THREE.Object3D, ox: number, oz: number, kid: boolean) => {
+        const rec = addWanderer(mesh, x + ox, z + oz,
+          opts?.still ? 4 : 13, opts?.still ? rand(0.3, 0.9) : kid ? rand(5.5, 8) : rand(2.4, 4.2),
+          20, kid ? 1.9 : 2.4, dress, pan, voice);
+        // faces the bowl, like everybody else on the plateau
+        if (rec) rec.mesh.rotation.y = -GD.gdFacingStadium(wx, wy) + Math.PI / 2;
+      };
+      for (let i = 0; i < n; i++)
+        put(makePerson(dress, undefined, { hat: Math.random() < 0.6 ? 'cap' : undefined }),
+          rand(-spread, spread), rand(-spread, spread), false);
+      for (let i = 0; i < (opts?.kids ?? 0); i++)
+        put(makeCast('kid', dress), rand(-spread, spread), rand(-spread, spread), true);
+      events.push({ x, z, ambient: amb, panic: pan, cd: rand(1, 4), panicked: 0 });
+    };
+
+    // THE BIG GRILL — dead centre of the lot, three aisles up from the spawn.
+    // The flagship vignette: this is the one the player opens next to.
+    addGD(5950, 8300, 'lot', 'cook',
+      ['Twenty minutes. Not a second less.', 'Who ordered the big one?',
+        'Two racks on, four to go.', 'The secret is the rub. That is it.',
+        'Do not lift the lid. I mean it.', 'There is enough for everybody.',
+        'Somebody find me the long tongs.', 'This grill has been to nine states.'],
+      ['Grill is off! Grill is OFF!', 'Take the food! Take all of it!',
+        'Move the propane! MOVE IT!', 'Twenty minutes wasted!',
+        'Everybody back! Back up the row!'],
+      7, 14, { kids: 2 });
+
+    // CORNHOLE — two boards, a small crowd, and one person who is very good
+    addGD(5300, 8900, 'lot', 'student',
+      ['Best of five. Come on then.', 'That was in. That was clearly in.',
+        'Four bags each. Keep up.', 'She has not missed all morning.',
+        'Winners stay on. House rules.', 'One more and we are square.'],
+      ['Leave the boards! Just go!', 'Game over! GAME OVER!',
+        'Grab the bags! No, leave them!', 'Up the row! Everybody!'],
+      6, 12, { kids: 2 });
+
+    // THE BAND WARMING UP — behind the practice field, out of sight of the
+    // bowl, which is exactly where a marching band actually warms up.
+    addGD(3300, 4200, 'practice', 'band',
+      ['From the top. Bar sixteen.', 'Brass, you are ahead. Watch me.',
+        'Sixteen minutes until we walk.', 'My valves froze. Genuinely froze.',
+        'Drumline, hold the tempo there.', 'Hats on when we step off.',
+        'One more run and we go.'],
+      ['Keep playing! KEEP PLAYING!', 'Instruments up! Everybody move!',
+        'Off the field! Now! Go!', 'Drumline, follow me! Follow me!'],
+      9, 16);
+
+    // THE QUEUE AT GATE C — stewards on the barrier, a line that moves
+    addGD(6100, 5600, 'plaza', 'steward',
+      ['Have your bags open, please.', 'Gate C is moving. Keep coming.',
+        'Tickets ready. Screens bright.', 'No bottles through here, sorry.',
+        'Straight down and to the left.', 'Plenty of time. Plenty of time.'],
+      ['Everybody out! Away from the gate!', 'Leave the bags! Walk! Walk!',
+        'This way! Follow me! This way!', 'Do not run! Please do not run!'],
+      8, 18, { kids: 3 });
+
+    // BUCKLEY. The mascot never speaks — in character, a mascot cannot — so
+    // his pool is what he DOES, and the children around him do the talking.
+    addGD(6600, 6050, 'plaza', 'mascot',
+      ['Buckley is here! BUCKLEY!', 'He waved at me. At ME.',
+        'He signed my programme somehow.', 'How does he see out of that?',
+        'Buckley does the dance! Do it!', 'He is taller in person.'],
+      ['Buckley, RUN! Buckley!', 'Somebody get the kids!',
+        'Follow Buckley! He knows a way!', 'Hold hands! Everybody hold on!'],
+      4, 12, { kids: 6 });
+
+    // THE TEAM WALK — coaches and officials coming up the concourse. The one
+    // vignette north of the gates, so there is something to find up there.
+    addGD(5930, 4700, 'bowl', 'coach',
+      ['Same walk, every home game.', 'Heads up. Look at that crowd.',
+        'Warm-ups in eleven minutes.', 'Watch the step coming in.',
+        'That is a good noise, that.', 'Straight down the tunnel, all of you.'],
+      ['Down the tunnel! Everybody!', 'Clear the concourse! Clear it!',
+        'Get them off the field!', 'Move! Keep them moving!'],
+      6, 14);
+
+    // THE PORCH — Frat Row, the loudest fifty feet on the plateau
+    addGD(8250, 8600, 'greek', 'student',
+      ['The whole street is out here.', 'That banner took us all night.',
+        'Pancakes since nine this morning.', 'Somebody get him off the roof.',
+        'We walk down together at two.', 'Turn it up. A bit. A BIT.'],
+      ['Off the roof! GET DOWN!', 'Everybody off the porch!',
+        'Down the street! Go! Go!', 'Leave it! Just leave it!'],
+      8, 16);
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   //  MAPLE FALLS — THINGS ON TRACKS, AND THE SCENES THEY RUN PAST
   // ══════════════════════════════════════════════════════════════════════════
@@ -3381,7 +3732,7 @@ export function createLife(
   // PEOPLE stood about. Everything below is either on a TRACK (a polyline
   // walked at a fixed rate: no steering, no collision queries, no per-frame
   // allocation) or is a staged scene with people doing a specific thing in it.
-  if (worldId() !== 'pirate') {
+  if (worldId() === 'maple') {
     // a closed loop that FITS: shrink until every sampled point is on land, so
     // a re-zoned or coast-clipped block degrades to a smaller circuit instead
     // of walking a jogger into the sea
