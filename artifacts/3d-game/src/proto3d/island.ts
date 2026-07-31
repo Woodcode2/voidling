@@ -780,7 +780,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       g.beginPath(); g.ellipse(pxW(S.cx), pyW(S.cy), rx * PU, ry * PU, 0, 0, Math.PI * 2);
     };
     ell(S.rx, S.ry); g.fillStyle = '#8d8578'; g.fill();               // stand footprint
-    ell(S.rx * 0.86, S.ry * 0.82); g.fillStyle = '#5a5a66'; g.fill(); // the tunnel apron
+    ell(S.rx * 0.86, S.ry * 0.82); g.fillStyle = '#6f6f7c'; g.fill(); // the tunnel apron
     g.save();
     ell(S.rx * 0.78, S.ry * 0.74); g.clip();
     g.fillStyle = '#3f8f4e'; g.fillRect(0, 0, TEX, TEX);
@@ -820,7 +820,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       // the band itself, slightly darker than the surrounding lot
       g.beginPath();
       g.moveTo(pxW(row.a[0]), pyW(row.a[1])); g.lineTo(pxW(row.b[0]), pyW(row.b[1]));
-      g.strokeStyle = 'rgba(48,46,54,0.42)'; g.lineWidth = GD.LOT_ROW_HALF * 2 * PU; g.lineCap = 'butt'; g.stroke();
+      g.strokeStyle = 'rgba(60,58,68,0.30)'; g.lineWidth = GD.LOT_ROW_HALF * 2 * PU; g.lineCap = 'butt'; g.stroke();
       // stall lines
       g.strokeStyle = 'rgba(240,224,140,0.60)'; g.lineWidth = Math.max(1.4, 9 * PU);
       const n = Math.floor(len / row.pitch);
@@ -835,7 +835,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         g.stroke();
       }
       // tyre tracks in the aisle just north of the row
-      g.strokeStyle = 'rgba(30,28,34,0.16)'; g.lineWidth = Math.max(1, 22 * PU);
+      g.strokeStyle = 'rgba(30,28,34,0.13)'; g.lineWidth = Math.max(1, 22 * PU);
       for (const off of [GD.LOT_AISLE * 0.5 - 30, GD.LOT_AISLE * 0.5 + 30]) {
         g.beginPath();
         g.moveTo(pxW(row.a[0] + nx * off), pyW(row.a[1] + ny * off));
@@ -918,9 +918,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     // districts read as separate surfaces from the play camera rather than one
     // beige field — which is the mistake the three pirate sands made above.
     bowl: 0x3f8f4e,      // the playing surface, deeper than any campus turf
-    gate: 0xb9b3a8,      // swept concourse concrete
-    lot: 0x6e6b74,       // parking asphalt, cool against everything around it
-    rvpark: 0x8a8578,    // compacted gravel hardstanding
+    gate: 0xc4beb2,      // swept concourse concrete
+    // SUN-BLEACHED, NOT FRESH. A framebuffer sample put Game Day's mean scene
+    // luminance at 0.357 against Maple's 0.626 — 43% darker than the flagship
+    // world, in a game for six-year-olds — and it was NOT the light: the level
+    // measured 0.357 under Maple's own midday rig too. It is the albedo. The
+    // lot is over half the frame and it was fresh-laid tarmac; a car park that
+    // has been baking since August is a pale grey, which is both truer and
+    // most of a stop brighter.
+    lot: 0x918e97,       // parking asphalt, cool against everything around it
+    rvpark: 0x9d978a,    // compacted gravel hardstanding
     greek: 0x8fc76a,     // frat lawn, worn but green
     quad: 0x76b85a,      // the old campus quad, greener and better kept
     practice: 0x5fa356,  // practice turf, between the bowl and the quad
@@ -3189,10 +3196,17 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   if (WORLD_ID === 'gameday') {
     const P3 = (p2: GD.Pt): [number, number] => [w(p2[0]), w(p2[1])];
     GD.resetPlacement();
-    const drop = (mesh: THREE.Object3D, p2: GD.Pt, r: number, rotY?: number, force = false) => {
+    // `qk` is the QUEST/MEAL TAG, and it is not decoration: it drives the daily
+    // quest counters, the newsroom's {M} meal name, the FIRST CAR / FIRST
+    // BUILDING moments, and the SHOWOFF rival's "that one is big" test. Nothing
+    // on this world carried one, so all four were silently dead here — a child
+    // could be handed "eat 6 cars" on a world whose live prop census showed
+    // zero tagged cars and zero tagged houses.
+    const drop = (mesh: THREE.Object3D, p2: GD.Pt, r: number, rotY?: number, force = false, qk?: string) => {
       if (!force && !GD.spotOpen(p2[0], p2[1], r * 20)) return;
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
+      if (qk) mesh.userData.qk = qk;
       place(mesh, x3, z3, r);
       GD.claimSpot(p2[0], p2[1], r * 20);
     };
@@ -3218,9 +3232,9 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
      *  the top-down render showed — a busy lot ringed by empty districts.
      */
     const plant = (id: GD.GdBiome, n: number, clear: number, r: number,
-                   make: () => THREE.Object3D, face = false) => {
+                   make: () => THREE.Object3D, face = false, qk?: string) => {
       for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
-        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined);
+        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, false, qk);
     };
     /** …and the same for the ground between the districts. */
     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
@@ -3241,8 +3255,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // Eaten last, and worth the wait: 123 parts, 18 units tall. Its radius is
     // deliberately under its visual half-width so a WORLD ENDER can actually
     // close on it rather than bouncing off a collider the size of the bowl.
-    drop(TG.makeStadium(), STAD, 24, 0, true);
-    drop(TG.makeClockTower(), TOWER, 4.5, 0, true);
+    drop(TG.makeStadium(), STAD, 24, 0, true, 'big');
+    drop(TG.makeClockTower(), TOWER, 4.5, 0, true, 'big');
 
     // ── THE TAILGATE ──────────────────────────────────────────────────────
     // The hero district, and the spawn. lotSlots() lays vehicles along the
@@ -3253,8 +3267,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       const p2: GD.Pt = [s.x, s.y];
       const face = s.ang;
       if (i % 7 === 3) drop(TG.makeCanopy(), p2, 2.4, face);
-      else if (i % 11 === 5) drop(TG.makeRV(), p2, 4.2, face);
-      else drop(TG.makeTailgateTruck(), p2, 3.0, face);
+      else if (i % 11 === 5) drop(TG.makeRV(), p2, 4.2, face, false, 'rv');
+      else drop(TG.makeTailgateTruck(), p2, 3.0, face, false, 'car');
     }
     // …and the party BETWEEN the rows, which is the whole point of an aisle.
     //
@@ -3282,7 +3296,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('lot', 40, 42, 2.0, TG.makeConcessionCart);
     plant('lot', 55, 44, 1.6, TG.makeTailgateTv);
     plant('lot', 26, 60, 1.5, TG.makeSouvenirRack);
-    plant('lot', 12, 90, 4.0, TG.makeFoodTruck, true);
+    plant('lot', 12, 90, 4.0, TG.makeFoodTruck, true, 'car');
     plant('lot', 8, 110, 3.0, TG.makeBounceHouse);
     plant('lot', 20, 60, 1.5, TG.makePorchSofa);
     plant('lot', 24, 50, 1.2, TG.makeFacePaintStand);
@@ -3297,7 +3311,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('plaza', 46, 52, 2.0, TG.makeConcessionCart);
     plant('plaza', 34, 56, 1.5, TG.makeSouvenirRack);
     plant('plaza', 20, 60, 1.2, TG.makeFacePaintStand);
-    plant('plaza', 10, 100, 4.0, TG.makeFoodTruck, true);
+    plant('plaza', 10, 100, 4.0, TG.makeFoodTruck, true, 'car');
     plant('plaza', 6, 120, 3.0, TG.makeBounceHouse);
     plant('plaza', 40, 42, 1.2, TG.makeBanner);
     plant('plaza', 70, 30, 0.9, TG.makeConeStack);
@@ -3312,7 +3326,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // People who arrived on Wednesday: motorhomes, awnings, satellite dishes,
     // deck chairs and — per docs/GAMEDAY.md — a hot tub. Four of them, since
     // the joke is better when you can find a second one.
-    plant('rvpark', 52, 100, 4.2, TG.makeRV, true);
+    plant('rvpark', 52, 100, 4.2, TG.makeRV, true, 'rv');
     plant('rvpark', 34, 70, 2.2, TG.makeSatelliteRig);
     plant('rvpark', 4, 130, 1.9, TG.makeHotTub);
     plant('rvpark', 120, 28, 0.7, TG.makeFoldingChair);
@@ -3325,7 +3339,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('rvpark', 34, 30, 0.8, TG.makeTrashBarrel);
 
     // ── FRAT ROW ──────────────────────────────────────────────────────────
-    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true);
+    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true, 'house');
     plant('greek', 44, 46, 1.5, TG.makePorchSofa);
     plant('greek', 70, 36, 1.2, TG.makeBanner);
     plant('greek', 110, 26, 0.7, TG.makeFoldingChair);
@@ -3338,7 +3352,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('greek', 20, 50, 1.8, TG.makeBandRig);
 
     // ── OLD CAMPUS ────────────────────────────────────────────────────────
-    plant('campus', 22, 160, 8.0, TG.makeBrickHall);
+    plant('campus', 22, 160, 8.0, TG.makeBrickHall, false, 'house');
     plant('campus', 8, 90, 1.6, TG.makeStatue);
     plant('campus', 55, 40, 1.2, TG.makeBanner);
     plant('campus', 70, 32, 0.8, TG.makeTrashBarrel);
@@ -3347,7 +3361,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('campus', 20, 60, 1.5, TG.makeSouvenirRack);
     plant('campus', 26, 44, 1.4, TG.makeHayStack);
     plant('campus', 18, 50, 1.8, TG.makeBandRig);
-    plant('campus', 6, 100, 4.0, TG.makeFoodTruck, true);
+    plant('campus', 6, 100, 4.0, TG.makeFoodTruck, true, 'car');
     plant('campus', 70, 60, 3.0, makeTree);
 
     // ── PRACTICE FIELD ────────────────────────────────────────────────────

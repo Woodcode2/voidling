@@ -116,6 +116,21 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
+// ── WHICH WORLD ───────────────────────────────────────────────────────────
+// Resolved before anything else, because the light rig, the ground bake and
+// the prop kit all branch on it.
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY' };
+// A ternary chain resolved exactly two worlds, so a third could never be
+// picked however the picker was wired. Validate against the real list instead,
+// which also means an unknown ?w= on a shared link lands on Maple rather than
+// on a world that does not exist.
+const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday'];
+const _wantWorld = new URLSearchParams(location.search).get('w')
+  ?? localStorage.getItem('voidWorld') ?? 'maple';
+const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
+setWorld(pickedWorld);
+
+
 const scene = new THREE.Scene();
 
 // image-based ambience: gives every PBR material real specular response so
@@ -142,10 +157,63 @@ const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the
 // brightness and shadow contrast capped at 1.44x — a stylised diorama wants
 // 2.5-3.5x. Nothing was clipping (p99 luminance 0.74, 0.00% clipped white in 26
 // frames), so the headroom was there the whole time.
-const hemi = new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.22);
+// ── THE LIGHT RIG IS PER WORLD ─────────────────────────────────────────────
+// It was one rig for all three: sun at (-55, 95, 42), which is an elevation of
+// 53.9 degrees — midday — in a warm white, everywhere. That is right for a
+// sleepy town at noon and right for a tropical resort, and wrong for the world
+// whose design contract opens on "low warm sun, long shadows, amber and
+// crimson trees at the edges". The trees went amber; the light stayed at noon,
+// so the level's whole stated mood was carried by foliage alone.
+//
+// GAME DAY now runs a real late-afternoon rig:
+//   • the sun drops to ~26 degrees, so every truck, canopy and goalpost throws
+//     a shadow two to three times its own length across flat tarmac — which is
+//     the single most characteristic image a car park at 4pm produces, and the
+//     one thing a dense flat district needs to stop reading as a texture;
+//   • the azimuth swings round so the rake runs ACROSS the parking rows rather
+//     than down them, giving the lot a visible rhythm from the play camera;
+//   • the key warms to a low amber and the fill goes COLD, so lit and shadowed
+//     faces separate by hue as well as by value — the golden-hour read;
+//   • baseline dusk sits at 0.45, which lights the stadium's own fittings and
+//     every window on Frat Row and Old Campus without waiting for the outro.
+// Low sun costs shadow precision, so gameday carries its own normalBias.
+//
+// FIRST PASS OF THIS WAS TOO DARK, and only a framebuffer sample said so: mean
+// luminance 0.280 against Maple's 0.626 and Pirate's 0.514, with the shadows
+// coming out WARMER than the lit faces (red:blue 2.45 vs 1.36) because the fill
+// was a brown. That is dusk, not late afternoon, and it is the wrong register
+// for a game aimed at six-year-olds. Dropping the sun costs roughly half the
+// light, so the key and the fill have to be paid back — the angle is the point,
+// the darkness is not.
+interface WorldLight {
+  sun: number; sunI: number; hemiSky: number; hemiGround: number; hemiI: number;
+  off: [number, number, number]; dusk: number; normalBias: number; exposure: number;
+}
+const WORLD_LIGHT: Record<WorldId, WorldLight> = {
+  maple:   { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
+             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0 },
+  pirate:  { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
+             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0 },
+  // key paid back to 3.05, fill lifted to 0.66 and swung COOL (a slate, not a
+  // brown) so the shadow side goes blue against the amber key instead of
+  // muddying into it — warm light, cool shade, which is the whole read.
+  // …AND 26 DEGREES WAS STILL TOO LOW, for a reason specific to this level:
+  // it is a WALL-TO-WALL car park. A 2.5-unit truck at 26 degrees throws a
+  // 5-unit shadow and the rows sit about 8 apart, so the shadows very nearly
+  // bridge the aisles and the whole district ends up in shade — paying the key
+  // back from 1.75 to 3.05 moved mean luminance only 0.280 to 0.331, because
+  // there was hardly any lit ground left to brighten. Density and a low sun
+  // fight each other. 40 degrees keeps the rake across the rows and a shadow
+  // about 1.2x each object's height — long enough to read as afternoon, short
+  // enough that the aisles stay lit.
+  gameday: { sun: 0xffd9a8, sunI: 2.55, hemiSky: 0xc8dcf8, hemiGround: 0x53658c, hemiI: 0.86,
+             off: [-38, 72, 78], dusk: 0.45, normalBias: 0.26, exposure: 1.12 },
+};
+const LIGHT = WORLD_LIGHT[pickedWorld];
+const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, 0.22);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2d8, 2.3);
-const sunOff = new THREE.Vector3(-55, 95, 42);
+const sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunI * 1.31);
+const sunOff = new THREE.Vector3(...LIGHT.off);
 sun.position.copy(sunOff);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -155,9 +223,9 @@ let shCur = 165;
 sun.shadow.camera.left = -shCur; sun.shadow.camera.right = shCur;
 sun.shadow.camera.top = shCur; sun.shadow.camera.bottom = -shCur;
 sun.shadow.bias = -0.0004;
-sun.shadow.normalBias = 0.15;
-const SUN_DAY = new THREE.Color(0xfff2d8);
-const HEMI_DAY = new THREE.Color(0xdfeaff);
+sun.shadow.normalBias = LIGHT.normalBias;
+const SUN_DAY = new THREE.Color(LIGHT.sun);
+const HEMI_DAY = new THREE.Color(LIGHT.hemiSky);
 // the shadow frustum rides the camera: tight box up close = crisp tree
 // shadows, widening as you zoom out (fixed 330u box was ~6 texels/unit)
 function fitShadow(dist: number) {
@@ -235,26 +303,58 @@ function addEdible(mesh: THREE.Object3D, radius: number) {
 // the match title card, the two places a child reads the world's name — while
 // 60 other player-facing strings, including the world-picker card they tap
 // immediately beforehand, say MAPLE FALLS.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY' };
-// A ternary chain resolved exactly two worlds, so a third could never be
-// picked however the picker was wired. Validate against the real list instead,
-// which also means an unknown ?w= on a shared link lands on Maple rather than
-// on a world that does not exist.
-const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday'];
-const _wantWorld = new URLSearchParams(location.search).get('w')
-  ?? localStorage.getItem('voidWorld') ?? 'maple';
-const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
-setWorld(pickedWorld);
-// every world-facing label follows the pick — title card, loading screen, and
-// the newsroom's own brand
+// ── EVERY WORLD-FACING STRING, IN ONE PLACE ────────────────────────────────
+// This used to be a scatter of `pirate ? A : B` ternaries, which is a two-world
+// shape in a three-world game: GAME DAY silently took Maple Falls' half of
+// every one of them. It shipped as "LEVEL 1", "the little void is hungry · eat
+// the island", a palm-island chip reading "WORLD 1 OF 3", a results screen
+// titled CHOMPION OF THE ISLE, and — loudest of all — a WORLD ENDER headline
+// announcing that MAPLE FALLS had gone, at the biggest moment of the match, on
+// a plateau in a college town.
+//
+// A table cannot do that. Adding a fourth world means filling in a row and the
+// compiler naming anything left out.
+interface WorldCopy {
+  n: number;            // which level this is, for the title card and the chip
+  icon: string;         // the chip's glyph
+  sub: string;          // the title card's one line
+  ender: string;        // the WORLD ENDER announce banner
+  enderNews: string;    // …and the headline that goes with it
+  winSub: string;       // the results screen, when the player came first
+  winTitles: string[];  // …and the rotating title above it
+  place: string;        // the noun for this world, mid-sentence
+}
+const WORLD_COPY: Record<WorldId, WorldCopy> = {
+  maple: {
+    n: 1, icon: '🏝️', sub: 'the little void is hungry · eat the island',
+    ender: '🌑 WORLD ENDER! The island is OVER.',
+    enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
+    winSub: 'the island belongs to the void', place: 'the island',
+    winTitles: ['ISLAND: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF THE ISLE'],
+  },
+  pirate: {
+    n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
+    ender: '🌑 WORLD ENDER! The resort is OVER.',
+    enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
+    winSub: 'the whole resort belongs to the void', place: 'the resort',
+    winTitles: ['RESORT: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'ALL-INCLUSIVE, LITERALLY', 'CHOMPION OF THE BAY'],
+  },
+  gameday: {
+    n: 3, icon: '🏈', sub: 'the whole town turned out · eat the tailgate',
+    ender: '🌑 WORLD ENDER! The stadium is OVER.',
+    enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
+    winSub: 'the whole of Marston belongs to the void', place: 'the town',
+    winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
+  },
+};
+const COPY = WORLD_COPY[pickedWorld];
 {
-  const PB = pickedWorld === 'pirate';
   const nm = WORLD_NAMES[pickedWorld];
   document.title = `VOIDLING · ${nm} (3D)`;
   const tc = document.querySelector('#titlecard .name'); if (tc) tc.textContent = nm;
-  const tl = document.querySelector('#titlecard .lvl'); if (tl) tl.textContent = PB ? 'LEVEL 2' : 'LEVEL 1';
+  const tl = document.querySelector('#titlecard .lvl'); if (tl) tl.textContent = `LEVEL ${COPY.n}`;
   const ts = document.querySelector('#titlecard .sub');
-  if (ts) ts.textContent = PB ? 'the resort is packed · eat the party' : 'the little void is hungry · eat the island';
+  if (ts) ts.textContent = COPY.sub;
   const ln = document.querySelector('#loadScr .lName'); if (ln) ln.textContent = nm;
 }
 const island = createIsland(scene, addEdible);
@@ -861,6 +961,18 @@ const EASY_Q = ['snack', 'gold', 'combo'];
 // three is not a daily quest, it is a chore. It keeps the hard slot, where its
 // 4-count target belongs, and the medium slot goes to quests every world can
 // serve. Measured after: cabanas 139, and no chip above 217.
+// PER WORLD, AS A TABLE — the same two-world ternary that broke the copy also
+// broke this. Measured on a live build: Game Day carries 0 props tagged 'car'
+// and 0 tagged 'house', against Maple's 67 and 70, and it was being handed
+// Maple's board. On any day the draw took 'cars' or 'houses' a child got a
+// chip that could not be completed on that world — the exact bug the note
+// above records being fixed for Pirate Bay, one world late.
+//
+// Game Day's own props are now TAGGED instead (see island.ts), so its trucks
+// count as cars and its frat houses, brick halls and motorhomes count as
+// houses. That fixes the board and, at the same time, the FIRST CAR and FIRST
+// BUILDING moments and the newsroom's meal names, all of which were dead here
+// for the same reason.
 const MED_Q = pickedWorld === 'pirate' ? ['evolve', 'combo', 'gold'] : ['cars', 'evolve', 'combo'];
 const HARD_Q = pickedWorld === 'pirate' ? ['cabanas', 'rival', 'big'] : ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
@@ -985,7 +1097,14 @@ const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
 ];
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
-const MEAL_NAME: Record<string, string> = {
+const MEAL_NAME: Record<string, string> = pickedWorld === 'gameday' ? {
+  // GAME DAY names its own meals: 'a parked car' for a pickup with the tailgate
+  // down is the wrong noun, and newsroom_gameday's matcher already looks for
+  // 'truck' and 'rv' by name (its own comment: on RV Row a motorhome IS
+  // somebody's house, and the house lines read correctly for it).
+  house: 'a whole HOUSE', car: 'a pickup truck', rv: 'a whole MOTORHOME',
+  big: 'an entire LANDMARK',
+} : {
   house: 'a whole HOUSE', car: 'a parked car', big: 'an entire LANDMARK',
 };
 /** WHAT DID IT JUST EAT? The newsroom keys its reaction lines off this string,
@@ -1365,6 +1484,9 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false) 
 }
 
 function endMatch() {
+  // the crowd stops fleeing behind the results panel — the world back there
+  // should look alive, not mid-evacuation with nothing chasing it
+  life.calm(Infinity);
   ended = true;
   localStorage.setItem('voidPlayed', '1');
   audio.stopMusic();
@@ -1437,11 +1559,11 @@ function endMatch() {
   saveStats();
   const wk = weekKey();
   localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
-  const WIN_TITLES = ['ISLAND: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF THE ISLE'];
+  const WIN_TITLES = COPY.winTitles;
   const LOSE_TITLES = ['STILL HUNGRY!', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
-  celebrateEnd(reward, gain, myRank === 1 ? 'the island belongs to the void' : `${rows[0].name} devoured the most`, myRank === 1);
+  celebrateEnd(reward, gain, myRank === 1 ? COPY.winSub : `${rows[0].name} devoured the most`, myRank === 1);
   // THE RUN'S OWN NUMBERS. % DEVOURED was shown in Solo and nowhere else — the
   // figure a child watched climb for three minutes simply vanished at the
   // whistle — and nothing on the screen compared this run to their best.
@@ -1588,9 +1710,13 @@ function capture(e: Edible, giveHunger = true) {
   if (e.mesh.userData.gild) questEvent('gild');
   if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana');
   if (qk) questEvent(qk);
+  // a motorhome is somebody's house for the week — it counts for Roof Raider,
+  // which is what makes the 'houses' chip completable in RV Row
+  if (qk === 'rv') questEvent('house');
   if (comboMult >= 2) questEvent('combo');
   if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews('It ate a house. A WHOLE house. We have questions.'); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
+  if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('It has eaten a motorhome. Somebody was living in that until Sunday.'); }
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE
@@ -1677,6 +1803,13 @@ function beginMatch(solo = false) {
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
+  // THE OPENING FRAME IS CALM. The void arrives 0.9 units across inside a fear
+  // radius of eighteen, so without this the crowd is already screaming on the
+  // title card and every world's best writing — its tier-0 ambient pool — is
+  // skipped. Four seconds is the title card plus a beat: long enough to hear
+  // two or three people talking about the pie/the rub/the tide, short enough
+  // that the first thing the player DOES still causes a scream.
+  life.calm(4);
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
@@ -1763,14 +1896,17 @@ const LOAD_TIPS = [
   'tip: cars count as people-sized once you evolve',
   'tip: get CLOSE — small stuff gets sucked right in',
   'tip: rival voids can eat YOU — check the leaderboard sizes',
-  'tip: the downtown towers are the biggest meal on the island',
+  // …was 'the downtown towers are the biggest meal on the island', which is
+  // Maple's skyline and nobody else's. The biggest meal is a different
+  // object on each world, so the tip names the thing rather than the place.
+  'tip: the biggest thing you can see is always worth saving for last',
   'tip: play daily — streak skins unlock at 2 and 7 days',
   "tip: parked cars can't run away. just saying.",
   'tip: buildings topple INTO you. very satisfying.',
   'tip: bite fast — combos multiply your points',
-  'tip: the beach is full of easy snacks (sorry, towels)',
+  'tip: crowds are snacks — and they run, which is worth extra',
   'tip: eat a rival and they respawn tiny — and grumpy',
-  'tip: the ferris wheel is dessert. save room.',
+  'tip: the landmark in the middle is dessert. save room.',
   'tip: quests pay VOID POINTS — check mid-match',
   'tip: BITSY is the smallest — the easiest one in the family to catch',
 ];
@@ -1877,7 +2013,7 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
 // world cards: MAPLE FALLS + PIRATE BAY are live; FROST PEAKS is the locked third
 {
   const chip = el('btnWorlds');
-  chip.innerHTML = `<i>${pickedWorld === 'pirate' ? '🏴‍☠️' : '🏝️'}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${pickedWorld === 'pirate' ? 2 : 1} OF 3</span><b>›</b>`;
+  chip.innerHTML = `<i>${COPY.icon}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${COPY.n} OF 3</span><b>›</b>`;
   document.querySelectorAll('#worldRow .wCard[data-world]').forEach((c) => {
     const id = (c as HTMLElement).dataset.world!;
     const art = c.querySelector('.wArt') as HTMLElement | null;
@@ -1959,11 +2095,12 @@ function validateWorld() {
     // fleet a few seconds after the match started.
     if (!insideIsland3(px, pz) && !ud.afloat) { cull.push(i); continue; }
     if (ud.afloat) continue;   // moored: no road/coast correction applies
-    // Pirate Bay Resort has NO ROADS. This sweep was still nudging its props
-    // off Maple's road centres — phantom bands at world 2580/4290/6000/7710/
-    // 9420 that do not exist on the hooked island — quietly shoving cabanas and
-    // market stalls sideways for a grid that isn't there.
-    for (const rc of pickedWorld === 'pirate' ? [] : ROAD_CENTERS_3D) {
+    // ONLY MAPLE FALLS HAS A ROAD GRID. This sweep nudges props off the road
+    // centres, and it was written as "not pirate" — so Pirate Bay was fixed and
+    // Game Day, which arrived later, inherited the bug: its trucks, canopies
+    // and frat houses were being shoved sideways for phantom bands at world
+    // 2580/4290/6000/7710/9420 that exist on neither island.
+    for (const rc of pickedWorld === 'maple' ? ROAD_CENTERS_3D : []) {
       if (Math.abs(px - rc) < band + hx) {   // straddles a vertical road lane
         const off = band + hx + 0.4;
         const side = px >= rc ? 1 : -1;
@@ -2091,8 +2228,9 @@ function resetMatch() {
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
-  sun.color.copy(SUN_DAY); renderer.toneMappingExposure = 1.0; outroT = 0;
-  hemi.color.copy(HEMI_DAY); hemi.intensity = 0.5; scene.backgroundIntensity = 0.55; island.setDusk(0); sun.intensity = 1.75;
+  sun.color.copy(SUN_DAY); renderer.toneMappingExposure = LIGHT.exposure; outroT = 0;
+  hemi.color.copy(HEMI_DAY); hemi.intensity = LIGHT.hemiI; scene.backgroundIntensity = 0.55;
+  island.setDusk(LIGHT.dusk); sun.intensity = LIGHT.sunI;
   el('end').classList.remove('show');
   timerEl.style.color = '';
   beginMatch(soloMode);
@@ -3374,10 +3512,8 @@ function animate() {
       fx.ring(voidState.x, voidState.z, 0xffd23f, R * 6.5, 1.0);
       fx.flash('#ffffff', 0.55);
       fx.shake(1.1);
-      announce('🌑 WORLD ENDER! The island is OVER.');
-      breakingNews(pickedWorld === 'pirate'
-        ? 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.'
-        : 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.');
+      announce(COPY.ender);
+      breakingNews(COPY.enderNews);
       buzz(120);
     }
   }

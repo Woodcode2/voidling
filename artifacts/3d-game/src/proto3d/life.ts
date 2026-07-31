@@ -282,7 +282,11 @@ const VOICE_PANIC: Record<string, string[]> = {
 };
 
 interface Mover { mesh: THREE.Object3D; update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
-export interface Life { update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
+export interface Life {
+  update(dt: number, t: number, vx: number, vz: number, vR: number): void;
+  /** Hold the crowd calm for `sec` seconds — see the note on `calmT`. */
+  calm(sec: number): void;
+}
 
 // ── mesh factories ─────────────────────────────────────────────────────────────
 // one set of trim materials for the whole fleet. Every car used to allocate six
@@ -1875,7 +1879,25 @@ export function createLife(
   say: Say,
 ): Life {
   const movers: Mover[] = [];
-  movers.push({ mesh: new THREE.Object3D(), update(dt) { pingClock += dt; } });   // shared clock for panic contagion
+  // ── THE OPENING IS CALM ────────────────────────────────────────────────
+  // A ped flees when the void is inside `vR + fear`, and fear is 18-20 units
+  // against a 0.9-unit void — so on a crowded world the match opens with
+  // everybody already inside the trigger. Captured live on GAME DAY: the first
+  // two speech bubbles on screen, at t = 0.0s, were "Since 1989!! Never this!!"
+  // and "Somebody grab that flag!!", both panic lines, before the player had
+  // touched the screen.
+  //
+  // The cost is not the noise, it is the WRITING. Every world's best lines are
+  // its tier-0 ambient pool — Ernie at grill nine since Thursday, the secret
+  // being the rub — and a match that opens at tier 2 skips straight past them.
+  // A short hold lets the place introduce itself first, which is also what the
+  // opening frame is for.
+  // Starts at Infinity, not 0: life.update() runs unconditionally — before the
+  // match, on the title card, and behind the results panel — so without this
+  // the crowd was already fleeing on the loading screen. beginMatch() sets it
+  // to a few seconds and endMatch() puts it back.
+  let calmT = Infinity;
+  movers.push({ mesh: new THREE.Object3D(), update(dt) { pingClock += dt; calmT = Math.max(0, calmT - dt); } });   // shared clock for panic contagion
   const peds: { mesh: THREE.Object3D; biome: string; panic: number; voice?: string }[] = [];
 
   // ── WHICH TOWN IS TALKING ────────────────────────────────────────────────
@@ -2164,7 +2186,7 @@ export function createLife(
         const dist = Math.hypot(dx, dz);
         let spd = base;
         slideT = Math.max(0, slideT - dt);
-        if (dist < vR + fear) {
+        if (dist < vR + fear && calmT <= 0) {
           // COMMIT to the flee heading: while a coast-slide is active the raw
           // away-vector must not overwrite it, or the ped ping-pongs at the
           // cliff (slide inland → re-flee outward → slide → …) = the edge shake
@@ -2189,7 +2211,7 @@ export function createLife(
             const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
             if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
             // contagion: a fresh scream nearby sends this ped scurrying too
-            for (const pg of panicPings) {
+            for (const pg of (calmT > 0 ? [] : panicPings)) {
               if (pingClock - pg.t > 1.5) continue;
               const pdx = mesh.position.x - pg.x, pdz = mesh.position.z - pg.z;
               if (pdx * pdx + pdz * pdz < 625) { ang = Math.atan2(pdz, pdx); spd = base * 2.4; hop = Math.max(hop, 0.3); break; }
@@ -4632,9 +4654,10 @@ export function createLife(
         const d = Math.hypot(ev.x - vx, ev.z - vz);
         ev.panicked = Math.max(0, ev.panicked - dt);
         ev.cd -= dt;
-        if (d < vR + 55 && ev.panicked <= 0) { cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.panic), 'panic'); ev.panicked = 3.5; }
+        if (d < vR + 55 && ev.panicked <= 0 && calmT <= 0) { cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.panic), 'panic'); ev.panicked = 3.5; }
         else if (ev.cd <= 0 && d < 130) { ev.cd = rand(4, 7); cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.ambient), 'event'); }
       }
     },
+    calm(sec) { calmT = sec; },   // SET, not max — Infinity has to be clearable
   };
 }
