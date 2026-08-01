@@ -797,7 +797,21 @@ function joySet(ev: PointerEvent) {
   // intended curve at twelve rungs, the fit was exact. Direction is a UNIT
   // vector now; joy.mag alone carries the ramp.
   const inv = m > 0 ? 1 / m : 0;
-  joy.dx = dx * inv; joy.dy = dy * inv; joy.mag = Math.min(1, m / JOY_R);
+  joy.mag = Math.min(1, m / JOY_R);
+  // HEADING SMOOTHING, WEIGHTED BY HOW HARD YOU ARE PULLING. Near the centre
+  // the direction of a few pixels is mostly noise, so it barely moves the
+  // committed heading; out at the rim the child has clearly decided, so it
+  // snaps. This is the standard twin-stick treatment and it costs one lerp.
+  // (Velocity is smoothed downstream too, but that filter cannot tell a
+  // deliberate flick from a wobble — this one can, by amplitude.)
+  const nx0 = dx * inv, ny0 = dy * inv;
+  if (joy.dx === 0 && joy.dy === 0) { joy.dx = nx0; joy.dy = ny0; }
+  else {
+    const w = 0.28 + 0.72 * joy.mag * joy.mag;   // 0.28 at the centre, 1.0 at the rim
+    let hx = joy.dx + (nx0 - joy.dx) * w, hy = joy.dy + (ny0 - joy.dy) * w;
+    const hl = Math.hypot(hx, hy) || 1;
+    joy.dx = hx / hl; joy.dy = hy / hl;
+  }
   // A REAL STEER, not a stray tap. Arms the FIRST NOM celebration so the party
   // belongs to a bite the child aimed at, not to the void drifting into a
   // postbox on the auto-started first launch.
@@ -833,12 +847,20 @@ window.addEventListener('resize', () => {
 
 // ── match state + HUD ─────────────────────────────────────────────────────────
 const el = (id: string) => document.getElementById(id)!;
-const timerEl = el('timer'), boardEl = el('board'), formEl = el('form');
-const _chipV = new THREE.Vector3();
+const timerEl = el('timer'), boardEl = el('board');
+// THE GROWTH BAR's nodes, resolved ONCE. The old chip was re-templated through
+// innerHTML five times a second, which is why its progress bar could not
+// animate: the fill element it was transitioning was a different element every
+// repaint, always starting from width 0. Nothing below ever touches innerHTML.
+const growthEl = el('growth');
+const gNowEl = growthEl.querySelector('.gNow') as HTMLElement;
+const gMEl = growthEl.querySelector('.gM') as HTMLElement;
+const gNextEl = growthEl.querySelector('.gNext') as HTMLElement;
+const gTrackEl = growthEl.querySelector('.gTrack') as HTMLElement;
+const gFillEl = growthEl.querySelector('.gFill') as HTMLElement;
 const hungerLbl = el('hungerlbl');
 const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = el('endSub'), endList = el('endList');
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
-const scFill = () => document.getElementById('scFill');
 let prevHunger = 0;
 
 /** A rival has arrived. Was: pink 30px text reading
@@ -1486,7 +1508,44 @@ function refreshHud() {
   // and it is on the results screen. Dropping it removes a whole layer from
   // the busiest part of the screen and lets the news card move up.
   void themPct;
-  formEl.innerHTML = `${FORMS[curStage]} · ${Math.round(R * 1.6)}m<div class="scBar"><div id="scFill"></div></div>`;
+}
+
+// ── WHAT THE BAR ACTUALLY MEASURES ─────────────────────────────────────────
+// Growth is AREA-based: growRadius does R² += 0.5·eR²·k, so the currency the
+// player is feeding the void is R², not R. The bar was linear in R, which
+// means an identical prop moved it less and less the further into a form you
+// got — measured across the DEVOURER band (3.6→5.5), one 1-unit prop moved it
+// 1.8% at the bottom and 1.0% at the top, a 45% falloff for eating exactly the
+// same thing. On the R² axis the same two bites read 1.4% and 1.2%, and what
+// is left is the intended `diminish` term rather than an artefact of the axis.
+const formProgress = (r: number) => {
+  const st = stageFor(r);
+  const lo = FORM_MIN[st], hi = FORM_MIN[st + 1] ?? R_CAP;
+  return THREE.MathUtils.clamp((r * r - lo * lo) / Math.max(1e-4, hi * hi - lo * lo), 0, 1);
+};
+// the pips: every form still ahead, drawn on the track once per evolution
+let gPipStage = -1;
+function paintGrowth(r: number) {
+  const st = stageFor(r);
+  if (st !== gPipStage) {
+    gPipStage = st;
+    gNowEl.textContent = FORMS[st];
+    const nxt = FORMS[st + 1];
+    gNextEl.innerHTML = nxt ? `NEXT <b>${nxt}</b>` : '<b>MAXED OUT</b>';
+    growthEl.classList.toggle('max', !nxt);
+    // one pip per remaining form, spaced across what is LEFT of the journey —
+    // "three more to go" is the thing a child wants off this bar
+    for (const p of Array.from(gTrackEl.querySelectorAll('.gPip'))) p.remove();
+    const left = FORMS.length - 1 - st;
+    for (let i = 1; i < left; i++) {
+      const pip = document.createElement('div');
+      pip.className = 'gPip';
+      pip.style.left = `${(i / left) * 100}%`;
+      gTrackEl.appendChild(pip);
+    }
+  }
+  gMEl.textContent = `${Math.round(r * 1.6)}m`;
+  gFillEl.style.width = `${(formProgress(r) * 100).toFixed(2)}%`;
 }
 
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
@@ -2062,11 +2121,41 @@ const LOAD_TIPS = [
   'tip: quests pay VOID POINTS — check mid-match',
   'tip: BITSY is the smallest — the easiest one in the family to catch',
 ];
+// who is currently holding the load cover up. 'boot' is released by the first
+// rendered frame; 'pack' by the asset preload finishing.
+const coverHeld = new Set<string>(['boot']);
+let coverFading = false;
+function coverHold(who: string) {
+  coverHeld.add(who);
+  coverFading = false;
+  const scr = el('loadScr');
+  scr.style.transition = ''; scr.style.opacity = '';
+  scr.classList.add('show');
+}
+/** Release one hold. The cover only leaves when NOBODY is still holding it. */
+function coverRelease(who: string, then?: () => void) {
+  coverHeld.delete(who);
+  if (coverHeld.size) { then?.(); return; }   // someone else still wants it up
+  if (coverFading) { then?.(); return; }
+  coverFading = true;
+  const scr = el('loadScr');
+  scr.style.transition = 'opacity 0.45s ease';
+  scr.style.opacity = '0';
+  setTimeout(() => {
+    // …and only tear down if nothing grabbed it again during the fade
+    if (!coverHeld.size) {
+      scr.classList.remove('show'); scr.classList.remove('boot');
+      scr.style.opacity = ''; scr.style.transition = '';
+    }
+    coverFading = false;
+  }, 480);
+  then?.();
+}
 function withWorldReady(cb: () => void) {
   if (packReady) { cb(); return; }
   const scr = el('loadScr');
   (scr.querySelector('.lTip') as HTMLElement).textContent = LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)];
-  scr.classList.add('show');
+  coverHold('pack');   // idempotent — it is a set, and the autoplay path may already hold it
   // slow networks still get in: cap the wait, fallbacks cover stragglers
   const waitT0 = performance.now();
   Promise.race([preloadP, new Promise((r) => setTimeout(r, 12000))]).then(() => {
@@ -2074,7 +2163,8 @@ function withWorldReady(cb: () => void) {
     packReady = true;
     loadFinal = true;   // …and nothing may write the bar after this
     el('lBar').style.width = '100%'; el('lPct').textContent = '100%';
-    setTimeout(() => { scr.classList.remove('show'); cb(); }, 300);
+    // the bar is allowed to land on 100% before the curtain moves
+    setTimeout(() => coverRelease('pack', cb), 300);
   });
 }
 function startFresh(solo: boolean) {
@@ -2235,6 +2325,14 @@ el('btnWorlds').addEventListener('click', () => el('worlds').classList.add('show
 // left off rather than dumping the player back on the splash they just left
 if (localStorage.getItem('voidAutoPlay') === '1') {
   localStorage.removeItem('voidAutoPlay');
+  // CLAIM THE COVER NOW, not inside the rAF. animate()'s first frame and this
+  // callback are both queued before the browser's next paint, and animate()
+  // was registered first — so it released the boot hold, started the fade, and
+  // only THEN did launchWorld take its own hold, which snapped the curtain
+  // back. Measured on the real reload path: 12ms of the game visible, then 1.4
+  // seconds of load screen. Taking the hold synchronously makes the ordering
+  // irrelevant: there is never a moment when nobody is holding it.
+  if (!packReady) coverHold('pack');
   requestAnimationFrame(() => launchWorld());
 }
 el('btnShop').addEventListener('click', () => { track('shop_view', { coins, from: 'menu' }); shopEl.classList.add('show'); });
@@ -3237,7 +3335,7 @@ function animate() {
   powerCd = Math.max(0, powerCd - dt);
   // screen-space input: joystick first, else keys
   let inX = 0, inY = 0;
-  if (joy.active && joy.mag > 0.08) { inX = joy.dx; inY = joy.dy; }
+  if (joy.active && joy.mag > 0.156) { inX = joy.dx; inY = joy.dy; }
   else if (keys.size) {
     if (keys.has('KeyW') || keys.has('ArrowUp')) inY -= 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) inY += 1;
@@ -3257,12 +3355,18 @@ function animate() {
     // acceleration-based motion so steering feels buttery, never boxy
     let tvx = 0, tvz = 0;
     if (driving) {
-      camera.getWorldDirection(fwdTmp); fwdTmp.y = 0; fwdTmp.normalize();
-      rightTmp.set(1, 0, 0).applyQuaternion(camera.quaternion); rightTmp.y = 0; rightTmp.normalize();
+      fwdTmp.set(-camOffset.x, 0, -camOffset.z).normalize();
+      rightTmp.set(-fwdTmp.z, 0, fwdTmp.x);
       // PERCEIVED speed is constant: world speed rides the camera distance, so
       // a WORLD ENDER crosses its screen exactly as fast as a hatchling does.
       // Joystick: full speed at ~58% thumb extension (hole.io feel), linear below.
-      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.06) / 0.5, 0, 1) : 1;
+      // …and the ramp opens out to match. A real deadzone (10 px, so a resting
+      // thumb is genuinely at rest) and full speed at the RIM — 64 px, where
+      // the ring the player can actually see already is — instead of at 36 px
+      // in the middle of nowhere. The analog band goes from 32 px to 54, half
+      // a ring now means half speed rather than a hair under full, and full
+      // deflection is finally a thing the drawn ring tells you about.
+      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.156) / 0.844, 0, 1) : 1;
       // The 58 cap bound at camDist 181 — a radius ABOVE the WORLD ENDER
       // threshold — after which world speed stopped rising while the camera
       // kept pulling back. Measured: 440-470 screen px/s up to r=6, then 291
@@ -3570,7 +3674,10 @@ function animate() {
       const mass = Math.min(1, e.radius / Math.max(0.4, R));
       e.t += dtw * (2.9 - 1.3 * mass);
       const p = e.mesh.position;
-      e.orbit += dtw * 10 * (1 + 2.2 * e.t);
+      // …never more than 42 degrees of arc in one frame, however long the
+      // frame was. Past about a third of a turn the eye stops joining the
+      // positions into a curve and starts seeing a jump.
+      e.orbit += Math.min(0.73, dtw * 10 * (1 + 2.2 * e.t));
       // …and 1 - t is a straight line into the middle. Squared, the prop hangs
       // at the rim for a beat and then drops, which is what a drain does.
       const r = e.orbitR * (1 - e.t * e.t);
@@ -3581,7 +3688,9 @@ function animate() {
       // own comment says "sink INTO the pit", lerped every prop UP. Measured
       // across 295 captures of every prop kind in both worlds: +2.6 to +3.6
       // units of RISE, 245 of them climbing. Straight down into the hole now.
-      p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dtw * 7));
+      // the DESCENT stays on real time: hit-stop is meant to punch the void's
+      // own body, not to hang the thing that is currently falling into it
+      p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dt * 7));
       e.mesh.rotation.x += e.spin.x * dtw; e.mesh.rotation.y += e.spin.y * dtw; e.mesh.rotation.z += e.spin.z * dtw;
       // …and it was DELETED AT 0.10 SCALE. On a shell nobody notices; on a
       // seven-unit hotel that is a 1.4-unit chunk of building blinking out in
@@ -3741,16 +3850,10 @@ function animate() {
     tmpV.x += lookX; tmpV.z += lookZ;
     camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
     camera.lookAt(lookX, R * 0.5, lookZ);
-    // the SIZE chip rides just under the hole (hole.io pattern) — projected
-    // with THIS frame's camera, or the chip swims against the hole at 30fps
     camera.updateMatrixWorld();
-    _chipV.set(voidState.x, 0, voidState.z).project(camera);
-    formEl.style.left = `${(_chipV.x * 0.5 + 0.5) * innerWidth}px`;
-    // …clear of the HOLE, not a flat 70px below its centre. A WORLD ENDER is
-    // wider than that offset, so late in the match the chip sat inside the void
-    // it was labelling — and it overlapped the speech bubbles behind it.
-    const pxPerWorld = innerHeight / (2 * camDist * Math.tan((camera.fov * Math.PI / 180) / 2));
-    formEl.style.top = `${(-_chipV.y * 0.5 + 0.5) * innerHeight + 34 + R * pxPerWorld}px`;
+    // (the SIZE chip that used to be projected here is gone — the growth bar
+    // on the floor carries the form name and the metres now, and it does not
+    // sit under the steering thumb or swim against the void's own spring)
     // fog rides the zoom: distance melts into cosmos = instant diorama depth
     if (scene.fog) { (scene.fog as THREE.Fog).near = 60 + camDist * 1.4; (scene.fog as THREE.Fog).far = 260 + camDist * 4; }
   }
@@ -3773,6 +3876,11 @@ function animate() {
   const ns = stageFor(voidling.radius);
   if (ns > curStage) {
     curStage = ns;
+    // the bar takes the beat too — the pips retire one at a time and the whole
+    // strip swells, so an evolution is visible at the bottom of the screen and
+    // not only in the middle of it
+    growthEl.classList.remove('pop'); void growthEl.offsetWidth; growthEl.classList.add('pop');
+    setTimeout(() => growthEl.classList.remove('pop'), 260);
     // never draw over the MAPLE ISLE title card — one hero message at a time
     if (tClock > titleUntil) {
       evolveEl.querySelector('.big')!.textContent = FORMS[curStage];
@@ -3855,12 +3963,15 @@ function animate() {
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
     pwBtns[1].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
-    // form progress toward the next evolution — ONE bar, in the size chip that
-    // rides under the hole. The duplicate at the foot of the screen is gone.
-    const lo = FORM_MIN[curStage], hi = FORM_MIN[curStage + 1] ?? R_CAP;
-    const f2 = scFill();
-    if (f2) f2.style.width = `${Math.round(Math.min(1, (R - lo) / Math.max(0.001, hi - lo)) * 100)}%`;
   }
+  // …the growth bar is NOT on that 5Hz tick. It is the one HUD element whose
+  // whole job is to look continuous.
+  // It is also only ever a MATCH element: body.ovl covers the sheets, but the
+  // results card is #end and #end is not in OVERLAYS, so the bar was sitting
+  // on top of the score screen at full opacity.
+  const gOn = started && !ended && !paused;
+  growthEl.classList.toggle('off', !gOn);
+  if (gOn) paintGrowth(R);
 
   pumpBanner();   // anything the evolve card held back gets its turn now
   updateFindRing(tClock, started ? tClock - startT : 999);   // menu never shows it
@@ -3884,8 +3995,10 @@ function animate() {
   // page that could not answer.
   if (!_booted) {
     _booted = true;
-    const bs2 = el('loadScr'); bs2.style.transition = 'opacity 0.45s ease'; bs2.style.opacity = '0';
-    setTimeout(() => { bs2.classList.remove('boot'); bs2.style.opacity = ''; bs2.style.transition = ''; }, 480);
+    // there is something behind the cover now — but if the world picker is
+    // still waiting on the asset pack it keeps its own hold and the curtain
+    // stays down. One owner, no flash of the game underneath.
+    coverRelease('boot');
   }
   const shakeOff = fx.update(dtw);
   camera.position.add(shakeOff);

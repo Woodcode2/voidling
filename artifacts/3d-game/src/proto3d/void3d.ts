@@ -340,7 +340,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const whiteTex = bodyMat.uniforms.uTex.value as THREE.Texture;
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 72), bodyMat);
   // Starts true; setRadius() gates it once the hero is big — see the note there.
-  body.castShadow = true;
+  body.castShadow = false;   // grounded by the contact disc, never by the shadow map
   bob.add(body);
 
   // the interior starfield (Higgsfield seamless texture) — engages on load,
@@ -362,6 +362,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // bloom sprite: a soft radial glow billboard behind the orb — reads as real
   // bloom on the void without post-processing washing out the sunlit world
   // (baked WHITE, tinted via material.color — so skins can recolour it live)
+  /** A shadow MASK for multiply blending: dark in the middle, pure white at
+   *  the rim, so multiplying it over the ground darkens without tinting.
+   *  The profile lives in RGB because multiply blending ignores src alpha. */
+  const shadowMaskTex = (size: number, core: number) => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = size;
+    const x = cv.getContext('2d')!;
+    const gr = x.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    const g255 = (v: number) => Math.round(v * 255);
+    // a continuous ramp — no flat core, so there is no edge to read as a rim
+    gr.addColorStop(0.00, `rgb(${g255(core)},${g255(core)},${g255(core)})`);
+    gr.addColorStop(0.34, `rgb(${g255(core + (1 - core) * 0.16)},${g255(core + (1 - core) * 0.16)},${g255(core + (1 - core) * 0.16)})`);
+    gr.addColorStop(0.62, `rgb(${g255(core + (1 - core) * 0.52)},${g255(core + (1 - core) * 0.52)},${g255(core + (1 - core) * 0.52)})`);
+    gr.addColorStop(0.86, `rgb(${g255(core + (1 - core) * 0.88)},${g255(core + (1 - core) * 0.88)},${g255(core + (1 - core) * 0.88)})`);
+    gr.addColorStop(1.00, 'rgb(255,255,255)');
+    x.fillStyle = gr; x.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(cv);
+  };
   const softRadialTex = (size: number, a0: number, a1: number, inner: number) => {
     const cv = document.createElement('canvas'); cv.width = cv.height = size;
     const x = cv.getContext('2d')!;
@@ -386,9 +403,32 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // the way out, so he hovered — nothing said which pixel he was standing on.
   const contact = new THREE.Mesh(
     new THREE.CircleGeometry(1, 64),
-    new THREE.MeshBasicMaterial({ map: softRadialTex(256, 0.95, 0.72, 4), color: 0x140828, transparent: true, opacity: 0.7, depthWrite: false }),
+    new THREE.MeshBasicMaterial({
+      map: shadowMaskTex(256, 0.46),
+      blending: THREE.MultiplyBlending,
+      // …and it has to be in the SORTED pass, not the opaque one. A multiply
+      // only works if the ground is already in the framebuffer; the opaque
+      // list is sorted front-to-back, and this disc sits a hair in front of
+      // the ground it is meant to be darkening, so it could legally be drawn
+      // first and multiply against the sky. transparent:true puts it after
+      // every opaque object by construction. (Alpha itself is unused —
+      // multiply blending takes the result entirely from RGB.)
+      transparent: true,
+      depthWrite: false,
+    }),
   );
-  contact.rotation.x = -Math.PI / 2; contact.position.y = 0.05; scene.add(contact);
+  contact.rotation.x = -Math.PI / 2; contact.position.y = 0.05;
+  // The disc is now the ONLY thing grounding the hero, so it must not flicker
+  // either. It is transparent and depthWrite-free, which puts it in the sorted
+  // pass with the puffs, the bubbles and Pirate Bay's bay water — all of which
+  // share its x/z, so their sort keys differ by hundredths and can swap order
+  // between frames. Pinning renderOrder takes it out of that argument, and the
+  // polygon offset keeps it off the ground's own depth plane.
+  contact.renderOrder = -2;
+  (contact.material as THREE.MeshBasicMaterial).polygonOffset = true;
+  (contact.material as THREE.MeshBasicMaterial).polygonOffsetFactor = -4;
+  (contact.material as THREE.MeshBasicMaterial).polygonOffsetUnits = -4;
+  scene.add(contact);
   // …and the LIP. A bright, thin ring just outside the pit's dark edge, which
   // is the single read that says "hole" rather than "ball": hole.io's whole
   // silhouette is that ring. Additive would blow out over pale ground (the
@@ -398,7 +438,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     new THREE.RingGeometry(0.88, 1, 72),
     new THREE.MeshBasicMaterial({ color: 0xd9c2ff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
   );
-  lip.rotation.x = -Math.PI / 2; lip.position.y = 0.06; scene.add(lip);
+  lip.rotation.x = -Math.PI / 2; lip.position.y = 0.06;
+  lip.renderOrder = -1;   // always immediately after the pit it rims
+  (lip.material as THREE.MeshBasicMaterial).polygonOffset = true;
+  (lip.material as THREE.MeshBasicMaterial).polygonOffsetFactor = -5;
+  (lip.material as THREE.MeshBasicMaterial).polygonOffsetUnits = -5;
+  scene.add(lip);
 
   // ── face: crisp billboarded flat features (matches 2D canvas) ─────────────
   const face = new THREE.Group();
@@ -875,7 +920,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // below already does that job and does it correctly. It also hands back
       // the largest single caster in the frustum during the heaviest third of
       // every match.
-      body.castShadow = r < 4;
+      // (the body does not cast — see the note on `contact`. Left explicit so
+      // nothing reintroduces it by accident.)
+      body.castShadow = false;
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     setStage(n: number) {
@@ -984,7 +1031,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     },
     /** Kick the growth spring directly — an absorbed meal should shove the
      *  blob, not just raise its target radius. */
-    impulse(v2: number) { dispV += v2; },
+    impulse(v2: number) {
+      dispV += v2;
+      // one meal's worth of kick, never a chain of them summed
+      dispV = Math.min(dispV, 2.6);
+    },
     animGulp() { mouthT = 0.6; mouthMax = 1; wobble = 1; },
     animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); },
     animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; },

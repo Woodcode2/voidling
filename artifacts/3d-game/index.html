@@ -10,7 +10,20 @@
     <link rel="manifest" href="/manifest.json">
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none;
+        overscroll-behavior: none;
         font-family: 'Fredoka', system-ui, -apple-system, sans-serif; }
+      /* THE GREY CIRCLE THAT ATE THE SCREEN. Push and hold — which is the ONLY
+         control this game has — and the browser painted its own press feedback
+         over the element under the thumb. That element is the WebGL canvas, and
+         the canvas is the entire screen, so every steer came with a translucent
+         grey wash across the whole game. Nothing in this stylesheet drew it and
+         nothing could: it is the UA's default tap highlight, plus iOS's
+         long-press callout and text-selection pass on a full-bleed element.
+         All three are off now. There is no selectable text in the app and no
+         link to long-press, so nothing is lost. */
+      * { -webkit-tap-highlight-color: transparent; }
+      html, body, canvas, #joy, #joyNub {
+        -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
       #timer {
         /* a clear lane: the board owns the left, so the clock centres in what
            is left rather than in the whole screen */
@@ -55,13 +68,66 @@
       #board .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
       #board .nm { flex: 1; min-width: 60px; max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
       #board .sc { font-variant-numeric: tabular-nums; opacity: 0.9; }
-      /* SIZE chip — rides just under the hole, hole.io style (JS-projected) */
-      #form { position: fixed; left: 50%; top: 60%; transform: translate(-50%, 0); z-index: 5;
-        color: #fff; font-size: 12.5px; font-weight: 900; letter-spacing: 1.4px; pointer-events: none;
-        background: rgba(16,8,30,0.78); border: 1.5px solid rgba(201,166,255,0.45); border-radius: 11px;
-        padding: 5px 13px 7px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); white-space: nowrap; text-align: center; }
-      #form .scBar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); overflow: hidden; margin-top: 3px; }
-      #form #scFill { height: 100%; width: 0%; background: linear-gradient(90deg, #7b4fe0, #c9a6ff); border-radius: 2px; transition: width 0.2s linear; }
+      /* ── THE GROWTH BAR ────────────────────────────────────────────────
+         It used to be a 4px sliver inside a chip that was JS-projected under
+         the void every frame. Three things were wrong with that and a room of
+         six-year-olds found all of them. It sat exactly where the steering
+         thumb goes. It swam, because the chip is re-projected per frame while
+         the void's own displayed radius is on a springy overshoot, so the
+         label visibly slid around its own subject. And it could not animate at
+         all: refreshHud() rewrote the chip's innerHTML five times a second,
+         which destroys and recreates the fill element, so its width
+         transition never had a previous value to run from — the bar moved in
+         5Hz steps and reset to zero on every repaint.
+
+         So: one bar, on the floor, out of the thumb zone, never rebuilt. It
+         reads as a journey rather than a meter — where you are, what you are
+         becoming, and a pip for every form still ahead of you, which is the
+         part a child actually wants to know. */
+      #growth { position: fixed; z-index: 5; pointer-events: none;
+        left: 50%; transform: translateX(-50%);
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        width: min(92vw, 460px); box-sizing: border-box;
+        padding: 8px 12px 9px; border-radius: 15px;
+        background: linear-gradient(180deg, rgba(30,16,58,0.80), rgba(16,8,30,0.84));
+        border: 1.5px solid rgba(201,166,255,0.28);
+        box-shadow: 0 6px 22px rgba(0,0,0,0.42);
+        backdrop-filter: blur(8px);
+        transition: transform 0.18s cubic-bezier(0.2,1.6,0.4,1); }
+      #growth .gRow { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+      #growth .gNow { color: #fff; font-size: 13px; font-weight: 900; letter-spacing: 1.6px;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.7); white-space: nowrap; }
+      /* the metres are the local "how big am I" read the chip under the void
+         used to carry — it keeps its job, it just stopped moving around */
+      #growth .gM { color: #ffd25a; font-size: 12.5px; font-weight: 900;
+        font-variant-numeric: tabular-nums; white-space: nowrap; }
+      #growth .gNext { margin-left: auto; color: #a892d8; font-size: 11px; font-weight: 800;
+        letter-spacing: 1.4px; white-space: nowrap; }
+      #growth .gNext b { color: #d9c2ff; font-weight: 900; }
+      #growth .gTrack { position: relative; height: 9px; border-radius: 5px; overflow: hidden;
+        background: rgba(255,255,255,0.12); box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); }
+      /* SMOOTH BY CONSTRUCTION. The fill is written every frame and the growth
+         law rate-limits the radius, so the width lands within a hair of where
+         it was — the short transition only exists to absorb the 5Hz HUD tick
+         and the odd dropped frame. */
+      #growth .gFill { position: absolute; inset: 0 auto 0 0; width: 0%; border-radius: 5px;
+        background: linear-gradient(90deg, #7b4fe0 0%, #b875ff 55%, #e3c8ff 100%);
+        box-shadow: 0 0 10px rgba(184,117,255,0.55);
+        transition: width 0.12s linear; }
+      /* a travelling sheen, so a bar that is creeping still reads as ALIVE */
+      #growth .gFill::after { content: ''; position: absolute; inset: 0;
+        background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.42) 50%, transparent 70%);
+        background-size: 220% 100%; animation: gShine 2.1s linear infinite; }
+      @keyframes gShine { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+      /* the forms still ahead, as pips on the track */
+      #growth .gPip { position: absolute; top: 50%; width: 2px; height: 9px; margin-top: -4.5px;
+        background: rgba(255,255,255,0.30); border-radius: 1px; }
+      /* an evolution just landed: the whole bar takes a beat */
+      #growth.pop { transform: translateX(-50%) scale(1.045); }
+      #growth.pop .gTrack { box-shadow: inset 0 1px 2px rgba(0,0,0,0.4), 0 0 16px rgba(255,210,90,0.75); }
+      /* MAXED. There is no next form — say so rather than pinning at 100%. */
+      #growth.max .gFill { background: linear-gradient(90deg, #f0a91e, #ffd25a, #fff2c2); }
+      #growth.max .gNext b { color: #ffd25a; }
       /* in-game guidance strip — objective-style onboarding (no modal) */
       /* It was a full-bleed black letterbox at a hard-coded top:250px — the only
          hard-edged rectangle in a build made of rounded glowing cards, landing
@@ -826,8 +892,11 @@
       #btnGotIt:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
 
       /* hide gameplay HUD while in the menu */
-      body.menu #timer, body.menu #board, body.menu #form,
+      body.menu #timer, body.menu #board, body.menu #growth,
       body.menu #hunger, body.menu #hungerlbl, body.menu #powers, body.menu #banner { display: none; }
+      /* …and it has no business sitting over a results card or a shop sheet */
+      body.ovl #growth { display: none; }
+      #growth.off { display: none; }
       /* 12 painted the wallet chip over four scrolling screens — it sat on the
          Honey voidling's face at the bottom of the shop and clipped the TOP
          VOIDS title with no scrolling at all. It only ever needed to clear the
@@ -847,7 +916,12 @@
     <div id="board"></div>
     <div id="coins">✦ 0</div>
     <div id="quests"></div>
-    <div id="form">VOIDLING</div>
+    <!-- built once by the module; NOTHING here is ever re-templated -->
+    <div id="growth">
+      <div class="gRow"><span class="gNow">VOIDLING</span><span class="gM">6m</span>
+        <span class="gNext">NEXT <b>MUNCHER</b></span></div>
+      <div class="gTrack"><div class="gFill"></div></div>
+    </div>
     <div id="banner"></div>
     <div id="news"></div>
     <div id="hungerlbl">DRAG or WASD to steer · HUNGER fuels powers</div>
