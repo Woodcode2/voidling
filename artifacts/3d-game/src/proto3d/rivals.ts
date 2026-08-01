@@ -21,6 +21,8 @@ export interface Rival { name: string; color: number; score: number; x: number; 
   lane?: number; dry?: number; full?: boolean; }
 export interface Rivals {
   list: Rival[];
+  /** QA: how many props the family has taken off-screen this match. */
+  grazeCount(): number;
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number, ctx?: RivalCtx): void;
   onJoin?: (name: string, color: number, x: number, z: number, arch: Arch) => void;
   onRivalEaten?: (name: string, pts: number, x: number, z: number, r: number, marquee: boolean) => void; // you swallowed one
@@ -350,6 +352,7 @@ export function createRivals(
     stall: number; stuckN: number; ph: number; pulse: number; vx: number; vz: number; biteCd: number;
     lane: number;   // which rung of the finishing ladder this one is running
     dry: number;    // seconds since this rival last swallowed anything
+    graze: number;  // countdown to the next off-screen larder bite (see below)
     full: boolean;  // past its lane: ambling, not foraging
     respawnT: number; speakCd: number; tgt: RivalEdible | null; closeCall: boolean;
     visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number;
@@ -363,6 +366,7 @@ export function createRivals(
     campX: number; campZ: number; campT: number;
     roll: THREE.Quaternion;
   }
+  let grazeN = 0;   // QA: larder bites this match (see api.grazeCount)
   const roster: R[] = [];        // one per NAME — built once, skins fixed forever
   const rivals: R[] = [];        // THIS match's cast (api.list points at it)
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
@@ -396,7 +400,7 @@ export function createRivals(
     const ang = (i / NAMES.length) * Math.PI * 2 + 0.6;
     roster.push({ name: nm, arch: ARCH_OF[nm], color: sk.rim, score: 0, r: START_R,
       group, body: group.children[0] as THREE.Mesh, eyes, halo,
-      x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0,
+      x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0, graze: 0,
       joinAt: 9e9, joined: false, cast: false, stall: 0, stuckN: 0, ph: rand(0, 6), pulse: 0,
       // THE FIRST MATCH OF A PAGE LOAD IS AUTHORED, like the spawn. reset()
       // re-deals the ladder on every rematch, but a fresh load should open on
@@ -556,8 +560,16 @@ export function createRivals(
     // the leader visible on the board the entire match, which is the point.
     // The nominal ladder stays as a FLOOR so a struggling child still has a
     // field to chase (and can still lose, which has to remain possible).
+    // 0.78 x FULL_AT 1.2 = 0.94, so the best possible rival finished at 94% of
+    // the player and the match could not be lost by anyone who touched the
+    // screen. That was the right call while the family was starving — a
+    // rubber band that can overtake a child who is trying is worse than a
+    // decorative race. Now that the larder feeds them, the band can close: at
+    // 0.94 the top lane reaches 1.13x the player with satiety, so a distracted
+    // run genuinely loses and an attentive one genuinely wins. The nominal
+    // ladder still floors it, so a struggling child keeps a field to chase.
     const top = Math.min(FIELD_TOP * shape * scale,
-      Math.max(FIELD_TOP * LANE_FINAL[2] * shape, pScore * 0.78));
+      Math.max(FIELD_TOP * LANE_FINAL[2] * shape, pScore * 0.94));
     return top * (LANE_FINAL[lane] ?? 0.14);
   };
 
@@ -566,11 +578,12 @@ export function createRivals(
   const rollQ = new THREE.Quaternion();   // scratch: the rolling-ball delta
   const api: Rivals = {
     list: rivals,
+    grazeCount: () => grazeN,
     reset(matchLen = 180) {
       // abandon in-flight eaten-anims: resetMatch restores those props to their
       // homes — leaving them queued here re-shrank them at match start (a
       // half-buried spinning house on lot #1 of every rematch)
-      shrinking.length = 0;
+      shrinking.length = 0; grazeN = 0;
       trail.length = 0; trailT = 0;
       roster.forEach((rv, i) => {
         const ang = (i / roster.length) * Math.PI * 2 + rand(0, Math.PI * 2);
@@ -1228,6 +1241,72 @@ export function createRivals(
         // …and the same crumb floor applies to what they sweep up in passing,
         // or they would strip the beginner layer just by driving over it
         const minSwallow = rv.full ? Infinity : rv.r * 0.45;
+        // ── THE LARDER: a rival eats its own patch even when nobody is watching.
+        //
+        // This is the fix for the single worst thing in the game. A rival only
+        // ever scored from props it physically drove over, and five of them
+        // compete for the same food as a player who is hoovering it optimally —
+        // this file's own comment at the forage picker calls it "starved out by
+        // the AI". Measured across the evidence pack: an optimal run finished
+        // 2.8x clear on Maple, 4.1x on Game Day and 7.4x on Pirate Bay, and one
+        // captured results screen shows the LEADER on zero. Not "the player
+        // usually wins" — there was no opponent. A 180-second match whose
+        // outcome is decided by the first evolution is not a match.
+        //
+        // Raising the ladder's ceiling was tried three times and could not work:
+        // `band` multiplies points a rival EARNS, so if it earns nothing, any
+        // multiplier of nothing is still nothing. The missing thing was never
+        // the target, it was the food.
+        //
+        // So each rival works a patch. When the player is far enough away that
+        // this is genuinely off-screen, it consumes what is in that patch on a
+        // timer rather than by driving over it. The props really are removed —
+        // this is not fake score, it is the same island getting eaten by
+        // somebody else, which is exactly the loss a child can understand and
+        // point at: CHOMPZILLA cleared the fairground while you did Main Street.
+        //
+        // It only runs when: the rival is behind its lane (so it can never
+        // overshoot into a rout), the player is more than 150 units away (so a
+        // child never watches props vanish next to them), and the rival is not
+        // hunting. The rate is tuned in the harness, not guessed.
+        rv.graze -= dt;
+        const away = Math.hypot(rv.x - px, rv.z - pz) > 95;
+        if (!rv.full && !isHunter && away && rv.score < want * 0.98 && rv.graze <= 0) {
+          // Tuned in the harness, not guessed. At 0.42s taking the NEAREST
+          // prop the leader reached 31k against a lane that wanted 68k and the
+          // optimal player still finished 2.56x clear — the larder worked and
+          // was simply too slow. It takes the BIGGEST thing in its patch now,
+          // which is both worth more and truer to a rival working through the
+          // good stuff first, and it ticks fast enough to matter.
+          // SELF-CORRECTING RATE. A flat interval is either too slow for a
+          // rival that has fallen right off the pace or too fast for one that
+          // is nearly there. Instrumented at a flat 0.25s the family took 203
+          // props off-screen and the leader reached 36.8k against a lane that
+          // wanted ~85k — working, and running at about half the rate it
+          // needed. Scaling the interval by how far behind the lane it is
+          // makes it hungry when it is losing and calm when it is not, and it
+          // still cannot overshoot because the whole branch stops at 0.98 of
+          // the lane.
+          rv.graze = Math.max(0.09, Math.min(0.42, 0.42 * (rv.score / Math.max(1, want))));
+          let pick2: RivalEdible | null = null, pw = -1;
+          for (const e of edibles) {
+            if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minSwallow) continue;
+            const ddx = e.mesh.position.x - rv.x, ddz = e.mesh.position.z - rv.z;
+            const d2 = ddx * ddx + ddz * ddz;
+            if (d2 > 170 * 170) continue;          // its own patch, not the whole map
+            if (e.radius > pw) { pw = e.radius; pick2 = e; }
+          }
+          if (pick2) {
+            grazeN++;
+            pick2.mesh.userData.eaten = true;
+            shrinking.push(pick2.mesh);
+            rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
+            const cm = 1 + Math.min(rv.combo, 25) * 0.1;
+            const pm = (pick2.mesh.userData.ptsMult as number | undefined) ?? 1;
+            rv.score += Math.max(1, Math.round(pick2.radius * 12 * cm * pm * fever * band));
+            rv.r = growR(rv.r, pick2.radius);
+          }
+        }
         for (const e of edibles) {
           if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minSwallow) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;

@@ -414,7 +414,7 @@ const _dbg = window as unknown as {
   __setVoidR: (r: number) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
-  __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv;
+  __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number;
     ate: { you: number; family: number };
     rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
 };
@@ -439,6 +439,7 @@ _dbg.__setVoidR = (r: number) => {
 };
 // QA: one call returns the whole race — used to log score curves over a match
 _dbg.__matchState = () => ({
+  graze: rivals.grazeCount(),
   t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
@@ -2084,21 +2085,48 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
  *  hf_20260730_125858_e31cc3b1-18ca-4e17-a47a-26ead66b54ff.png and the bay's is
  *  hf_20260730_125832_499e6122-b092-4923-aa0e-f2b40d65ba33.png. */
 const CARD_ART: Record<string, string> = {
-  maple: '/assets/hf/hf_20260730_125858_a0ff7398-b424-4a8d-b93d-c96d690d6a3c.png',
-  pirate: '/assets/hf/hf_20260730_125831_be23864c-a25f-4149-875e-84a31aa15e85.png',
+  // MAPLE and PIRATE point at files that are already IN THE REPO. They were
+  // pointing at /assets/hf/… — a path vercel.json rewrites to CloudFront, which
+  // works on the web and resolves to nothing at all inside a Capacitor bundle,
+  // where there is no server to rewrite anything. card_maple.webp and
+  // card_pirate.webp have been sitting in public/assets the whole time, at 50KB
+  // each, unused. Two thirds of the world picker now needs no network.
+  maple: '/assets/card_maple.webp',
+  pirate: '/assets/card_pirate.webp',
   // WORLD 3 — GAME DAY. A stadium above, a tailgate party below, in the same
   // chunky-clay register as the other two posters so the picker reads as one
   // set. (An alternate take from the same batch is
   // hf_20260731_091353_ac1f7e36-5d53-40f7-971b-ba23d7377f5f.png.)
-  gameday: '/assets/hf/hf_20260731_091353_67fffce6-1f4a-4db8-a357-b85b0fe4fdf4.png',
+  // GAME DAY's card is still remote, and stays written as an /assets/hf path on
+  // purpose: scripts/asset-refs.mjs scans the source for exactly that shape, so
+  // `pnpm build:ios` vendors it to disk with everything else. Regenerated to
+  // match the finished level — a crimson-and-gold bowl above, the tailgate on
+  // the underside of the floating island, autumn rim, golden-hour rake.
+  gameday: '/assets/hf/hf_20260801_053403_0dc79112-b8fd-4304-9d15-8630620b2218.png',
   frost: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
 };
+// A CARD IS NEVER BLANK. This set the background and hoped: if the file 404s —
+// which is exactly what every /assets/hf path does inside an iOS bundle that
+// has not been through vendor-assets — the player gets an empty rectangle with
+// a title under it, which is what the world picker photographed as. Each world
+// now carries a painted fallback in its own colours, applied first and replaced
+// only once the real art has actually decoded.
+const CARD_FALLBACK: Record<string, string> = {
+  maple: 'radial-gradient(ellipse at 50% 34%, #6fd08a 0%, #2f7a4a 44%, #16264a 100%)',
+  pirate: 'radial-gradient(ellipse at 50% 34%, #ffd9a0 0%, #d98f4a 40%, #1a3352 100%)',
+  gameday: 'radial-gradient(ellipse at 50% 34%, #f0b429 0%, #c4342f 42%, #241030 100%)',
+  frost: 'radial-gradient(ellipse at 50% 34%, #cfe9ff 0%, #5a8fd0 42%, #17203f 100%)',
+};
 function paintWorldCard(host: HTMLElement, id: string): void {
-  const src = CARD_ART[id];
-  if (!src) return;
-  host.style.backgroundImage = `url('${src}')`;
   host.style.backgroundSize = 'cover';
   host.style.backgroundPosition = 'center 46%';
+  const fb = CARD_FALLBACK[id];
+  if (fb) host.style.backgroundImage = fb;
+  const src = CARD_ART[id];
+  if (!src) return;
+  const probe = new Image();
+  probe.onload = () => { host.style.backgroundImage = `url('${src}')`; };
+  probe.src = src;   // no onerror handler needed: the fallback is already up
 }
 /** Best score on a given world, or 0. Written by endMatch(). */
 const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) || 0);
