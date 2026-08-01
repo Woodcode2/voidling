@@ -286,6 +286,10 @@ export interface Life {
   update(dt: number, t: number, vx: number, vz: number, vR: number): void;
   /** Hold the crowd calm for `sec` seconds — see the note on `calmT`. */
   calm(sec: number): void;
+  /** How bad has it got, 0..1. Drives what the crowd says and how often.
+   *  Fed from the match loop off the same devoured/form signal the newsroom
+   *  uses for its tier, so the street and the broadcast escalate together. */
+  tension(v: number): void;
 }
 
 // ── mesh factories ─────────────────────────────────────────────────────────────
@@ -2196,7 +2200,12 @@ export function createLife(
             hop = 0.5;   // hop starts on the flee TRANSITION, not every frame
             panicPings.push({ x: mesh.position.x, z: mesh.position.z, t: pingClock });
             if (panicPings.length > 24) panicPings.shift();
-            if (Math.random() < 0.5) {
+            // …and how LOUD a chase is depends on the act too. A flat coin
+            // flip meant the opening minute already ran 38% screaming, which
+            // flattens the arc from underneath — the town cannot escalate to
+            // panic if it started there. One in four early, seven in ten once
+            // the place is actually going.
+            if (Math.random() < 0.25 + 0.45 * tense) {
               // a pirate entertainer panics like a pirate wherever they stand
               const pool = panicLines || panPool(voice) || PANIC[biome] || PANIC.generic;
               tmp.set(mesh.position.x, 5, mesh.position.z);
@@ -4628,24 +4637,34 @@ export function createLife(
       });
   }
 
-  // ── ambient chatter throttle ────────────────────────────────────────────────
+  // ── crowd chatter: escalates with the match ────────────────────────────────
   let chatCd = 2;
+  let tense = 0;            // 0 = nobody has noticed, 1 = the street is going
   const cpos = new THREE.Vector3();
 
   return {
     update(dt, t, vx, vz, vR) {
       for (const m of movers) m.update(dt, t, vx, vz, vR);
 
-      // one ambient line at a time, from a pedestrian near the void (on-screen)
+      // ONE VOICE AT A TIME, from a pedestrian near the void — but which
+      // register, and how often, is now the match's business. At rest it is a
+      // line every 2.4s and all of it small talk; at full tension it is a line
+      // every 1.1s and five in six of them are somebody shouting.
       chatCd -= dt;
       if (chatCd <= 0) {
-        chatCd = rand(1.8, 3.0);
+        // the gap closes as it gets worse: 1.8-3.0s -> 0.8-1.4s
+        chatCd = rand(1.8 - 1.0 * tense, 3.0 - 1.6 * tense);
         const near = peds.filter((p) => !eaten(p.mesh) && Math.hypot(p.mesh.position.x - vx, p.mesh.position.z - vz) < 68);
         if (near.length) {
           const p = pick(near);
-          const pool = ambPool(p.voice) || AMBIENT[p.biome] || AMBIENT.cozy;
+          // …and WHAT they say. calmT still wins outright: the opening seconds
+          // of a match are not the moment to start screaming.
+          const scream = calmT <= 0 && Math.random() < tense * 0.85;
+          const pool = scream
+            ? (panPool(p.voice) || PANIC[p.biome] || PANIC.generic)
+            : (ambPool(p.voice) || AMBIENT[p.biome] || AMBIENT.cozy);
           cpos.set(p.mesh.position.x, 5, p.mesh.position.z);
-          say(cpos, pick(pool), 'ambient');
+          say(cpos, pick(pool), scream ? 'panic' : 'ambient');
         }
       }
 
@@ -4654,10 +4673,14 @@ export function createLife(
         const d = Math.hypot(ev.x - vx, ev.z - vz);
         ev.panicked = Math.max(0, ev.panicked - dt);
         ev.cd -= dt;
-        if (d < vR + 55 && ev.panicked <= 0 && calmT <= 0) { cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.panic), 'panic'); ev.panicked = 3.5; }
+        if (d < vR + 55 && ev.panicked <= 0 && calmT <= 0) {
+          cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.panic), 'panic');
+          ev.panicked = 3.5 - 1.8 * tense;
+        }
         else if (ev.cd <= 0 && d < 130) { ev.cd = rand(4, 7); cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.ambient), 'event'); }
       }
     },
     calm(sec) { calmT = sec; },   // SET, not max — Infinity has to be clearable
+    tension(v) { tense = Math.max(0, Math.min(1, v)); },
   };
 }

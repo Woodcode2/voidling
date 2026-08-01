@@ -180,9 +180,29 @@
       #news i { font-style: normal; color: #1a0b33; font-size: 11.5px; letter-spacing: 2px;
         display: block; width: max-content; margin: 0 auto 6px;
         background: #ffd25a; border-radius: 7px; padding: 3px 10px; }
-      #news.worried { border-color: #ffb054; box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 20px rgba(255,196,60,0.3); }
-      #news.panic { border-color: #ff5a6e; box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 24px rgba(255,60,80,0.4); }
-      #news.panic i { color: #ff8a9a; background: rgba(255,90,110,0.16); }
+      /* THE STATION LOSING ITS COMPOSURE. All three tiers used to be the same
+         card with a different border colour, which is not something anyone
+         notices at arm's length on a phone. Now the whole card changes
+         temperature: the calm bulletin is the gold house style, the worried one
+         warms and leans, and the panic one goes red, sheds the polite shine and
+         will not sit still. */
+      #news.worried { border-color: #ffb054;
+        background: linear-gradient(180deg, #3a1c46, #200c30);
+        box-shadow: 0 6px 22px rgba(0,0,0,0.45), 0 0 22px rgba(255,196,60,0.34); }
+      #news.worried i { color: #2a1206; background: #ffb054; }
+      #news.panic { border-color: #ff5a6e;
+        background: linear-gradient(180deg, #4a1430, #260a1c);
+        box-shadow: 0 6px 26px rgba(0,0,0,0.55), 0 0 30px rgba(255,60,80,0.5); }
+      #news.panic i { color: #fff; background: #e02840; letter-spacing: 2.4px; }
+      /* a newsroom in trouble does not get the glossy sweep */
+      #news.panic::after { display: none; }
+      #news.panic.show { animation: news 5.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards,
+                                     newsRattle 0.44s ease-in-out 3; }
+      @keyframes newsRattle {
+        0%, 100% { margin-left: 0; }
+        25% { margin-left: -3px; }
+        75% { margin-left: 3px; }
+      }
       #news.show { animation: news 5.6s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
       @keyframes news {
         0% { opacity: 0; transform: translateX(-50%) translateY(-22px) scale(0.85); }

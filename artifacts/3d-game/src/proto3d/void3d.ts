@@ -362,20 +362,34 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // bloom sprite: a soft radial glow billboard behind the orb — reads as real
   // bloom on the void without post-processing washing out the sunlit world
   // (baked WHITE, tinted via material.color — so skins can recolour it live)
-  /** A shadow MASK for multiply blending: dark in the middle, pure white at
-   *  the rim, so multiplying it over the ground darkens without tinting.
-   *  The profile lives in RGB because multiply blending ignores src alpha. */
-  const shadowMaskTex = (size: number, core: number) => {
+  /** The contact shadow's falloff, in ALPHA — white pixels the material tints,
+   *  fading to fully transparent at the rim.
+   *
+   *  This was briefly a multiply mask instead, with the profile in RGB. On
+   *  paper that is the correct way to darken ground without tinting it. In
+   *  this renderer MultiplyBlending did not take: at WORLD ENDER scale the
+   *  disc painted the mask as an IMAGE — grey core, white rim, thirty metres
+   *  across — a white blob sitting on the world. Measured too, and dismissed
+   *  at the time: a solid-WHITE mask came back brighter than no disc at all,
+   *  which no multiply can do, and a solid-black one only reached 0.50 rather
+   *  than 0. Both of those are what "the texture is being painted, not
+   *  multiplied" looks like from the outside.
+   *
+   *  So: normal blending, which demonstrably darkens, with the two things that
+   *  made the ORIGINAL normal-blended disc read as a grey circle fixed. It held
+   *  0.72-0.95 alpha out to half its radius, so the ground contributed under a
+   *  quarter of the result and the hue was simply replaced; and that near-solid
+   *  core ended in a step, which is the edge the eye locked onto. The peak is
+   *  a third of that now and the falloff is continuous from the centre. */
+  const softShadowTex = (size: number) => {
     const cv = document.createElement('canvas'); cv.width = cv.height = size;
     const x = cv.getContext('2d')!;
     const gr = x.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    const g255 = (v: number) => Math.round(v * 255);
-    // a continuous ramp — no flat core, so there is no edge to read as a rim
-    gr.addColorStop(0.00, `rgb(${g255(core)},${g255(core)},${g255(core)})`);
-    gr.addColorStop(0.34, `rgb(${g255(core + (1 - core) * 0.16)},${g255(core + (1 - core) * 0.16)},${g255(core + (1 - core) * 0.16)})`);
-    gr.addColorStop(0.62, `rgb(${g255(core + (1 - core) * 0.52)},${g255(core + (1 - core) * 0.52)},${g255(core + (1 - core) * 0.52)})`);
-    gr.addColorStop(0.86, `rgb(${g255(core + (1 - core) * 0.88)},${g255(core + (1 - core) * 0.88)},${g255(core + (1 - core) * 0.88)})`);
-    gr.addColorStop(1.00, 'rgb(255,255,255)');
+    gr.addColorStop(0.00, 'rgba(255,255,255,0.62)');
+    gr.addColorStop(0.30, 'rgba(255,255,255,0.50)');
+    gr.addColorStop(0.58, 'rgba(255,255,255,0.28)');
+    gr.addColorStop(0.80, 'rgba(255,255,255,0.10)');
+    gr.addColorStop(1.00, 'rgba(255,255,255,0)');
     x.fillStyle = gr; x.fillRect(0, 0, size, size);
     return new THREE.CanvasTexture(cv);
   };
@@ -404,16 +418,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const contact = new THREE.Mesh(
     new THREE.CircleGeometry(1, 64),
     new THREE.MeshBasicMaterial({
-      map: shadowMaskTex(256, 0.46),
-      blending: THREE.MultiplyBlending,
-      // …and it has to be in the SORTED pass, not the opaque one. A multiply
-      // only works if the ground is already in the framebuffer; the opaque
-      // list is sorted front-to-back, and this disc sits a hair in front of
-      // the ground it is meant to be darkening, so it could legally be drawn
-      // first and multiply against the sky. transparent:true puts it after
-      // every opaque object by construction. (Alpha itself is unused —
-      // multiply blending takes the result entirely from RGB.)
+      map: softShadowTex(256),
+      // a NEUTRAL near-black, not the old saturated navy: at any alpha a
+      // saturated tint pulls the ground toward its own hue, and that is half
+      // of what made the old disc read as a colour rather than as a shadow
+      color: 0x171021,
       transparent: true,
+      opacity: 0.62,
       depthWrite: false,
     }),
   );

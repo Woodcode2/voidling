@@ -1278,6 +1278,15 @@ const DISTRICT: Record<string, string> = {
 // across the match. A running joke beats 54 unrelated one-liners.
 const newsEl = el('news');
 let devouredPct = 0, newsCd = COPY.signOn;
+/** How bad it has got, 0..1 — the continuous form of the newsroom's tier.
+ *  Form and meter both feed it and the higher one wins, exactly as the tier
+ *  does: a WORLD ENDER standing on an untouched suburb is still an emergency,
+ *  and so is a VOIDLING that has quietly eaten a third of the map. */
+function tension(): number {
+  const byForm = THREE.MathUtils.clamp((curStage - 1.4) / 2.6, 0, 1);   // MUNCHER ~0, COLOSSUS 1
+  const byPct = THREE.MathUtils.clamp((devouredPct - 6) / 26, 0, 1);    // 6% ~0, 32% 1
+  return Math.max(byForm, byPct);
+}
 // QA: the you-vs-family split of what the island has lost, so a harness can
 // check the family is not simply eating the player's food out from under them
 let devPlayerPct = 0, devFamilyPct = 0;
@@ -3956,7 +3965,15 @@ function animate() {
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen
     // roughly a third of the match — it stopped being an event. Now 30-42s,
     // and a breaking beat still cuts the line when the player earns one.
-    if (newsCd <= 0) { newsCd = COPY.newsGap[0] + Math.random() * COPY.newsGap[1]; showNews(); }
+    if (newsCd <= 0) {
+      // A NEWSROOM SPEEDS UP. The gap was a flat 16-24s from the sign-on to the
+      // last second of the match, so the station was as relaxed reporting the
+      // end of the town as it was reading the fair results. Halved at full
+      // tension — a bulletin every 8-12s once it is really going.
+      const urgent = 1 - 0.5 * tension();
+      newsCd = (COPY.newsGap[0] + Math.random() * COPY.newsGap[1]) * urgent;
+      showNews();
+    }
   }
 
   // the DRAG-to-steer hint retires itself once the player has been driving
@@ -3969,6 +3986,8 @@ function animate() {
     hungerEl.classList.toggle('ready', hunger >= COST.gulp);
     pwBtns[0].classList.toggle('off', hunger < COST.gulp || powerCd > 0);
     pwBtns[1].classList.toggle('off', hunger < COST.collapse || powerCd > 0);
+    // the street finds out at the same rate the HUD does
+    life.tension(started && !ended ? tension() : 0);
   }
   // …the growth bar is NOT on that 5Hz tick. It is the one HUD element whose
   // whole job is to look continuous.
