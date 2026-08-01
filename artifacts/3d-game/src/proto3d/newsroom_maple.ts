@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-//  NEWSROOM — MAPLE FALLS, the small town that a hole is eating
+//  NEWSROOM — MAPLE FALLS, the small town that a void is eating
 // ══════════════════════════════════════════════════════════════════════════════
 //
 //  ┌──────────────────────────────────────────────────────────────────────────┐
@@ -39,9 +39,9 @@
 //
 //  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed, and ALWAYS opens
 //                    "Good morning, Maple Falls!" followed by a real, silly
-//                    local news item. Nothing about the hole.
+//                    local news item. Nothing about the void.
 //  BEAT 2  DENIAL    tier 0. Ordinary small-town news running alongside a mayor
-//                    who insists the hole is a puddle.
+//                    who insists the void is a puddle.
 //  BEAT 3  ALARM     tier 1. Dawning horror, delivered cheerfully. The
 //                    evacuation is a FUN WALK. The paper goes to four pages.
 //                    Nobody admits anything.
@@ -49,26 +49,26 @@
 //                    parking meter has not stopped. Then the weather, from a
 //                    field.
 //
-//  THE RULE ABOUT THE HOLE. The news covers ONE thing: a hole is eating Maple
-//  Falls. Nobody in this town has any way of knowing that some *other* hole
+//  THE RULE ABOUT THE VOID. The news covers ONE thing: a void is eating Maple
+//  Falls. Nobody in this town has any way of knowing that some *other* void
 //  somewhere has a name, a family or a scoreboard, so the paper never mentions
-//  one. If a line needs a second hole it says "another one", "a second hole",
+//  one. If a line needs a second void it says "another one", "a second void",
 //  "they are multiplying" — never a name. Enforced in code: `bind()` reads no
 //  rival field, `fill()` knows no rival token, and `usable()` refuses point
 //  blank to air any template containing a token outside {D}{M}{F}{P}{R}{S}.
 //
 //  RATED 4+. NO real politics of any kind — no election, no voting, no polls,
 //  no candidates, no recounts. Mayor Dinkle is funny because he will not admit
-//  an obvious hole, not because of any office he holds. No alcohol, no money
+//  an obvious void, not because of any office he holds. No alcohol, no money
 //  trouble, nothing frightening, nothing mean about how anybody looks, nothing
 //  a child would repeat at school and get in trouble for.
 //
 //  Recurring cast (reuse IS the joke — do not add one-off names):
-//    Mayor Dinkle   the hole is not real. Later: it is real, but RUDE.
+//    Mayor Dinkle   the void is not real. Later: it is real, but RUDE.
 //    Gus            owns the diner. Has an opinion. You did not ask. Here it is.
 //    Carla Webb     the Maple Falls Bugle. Circulation 40. Career-defining week.
 //    Pearl          grows vegetables the size of furniture. Utterly calm.
-//    Tater (9)      thinks the hole is great. Names it Steve. Right throughout.
+//    Tater (9)      thinks the void is great. Names it Steve. Right throughout.
 //    Dale           his whole personality is his lawn. The two-inch court case.
 //    Marge          nine years protesting one parking meter. Will not be moved.
 //    the goat       loose. Always loose. Knows more than anybody else in town.
@@ -92,7 +92,7 @@ export interface MapleCtx {
   secondsLeft: number;
   // ── ACCEPTED AND DELIBERATELY IGNORED ──────────────────────────────────────
   // The call site still hands us the rival scoreboard. The paper has no use for
-  // it: nobody in Maple Falls could possibly know that some other hole is
+  // it: nobody in Maple Falls could possibly know that some other void is
   // called anything, so it never goes to print. These two stay declared purely
   // so the existing call site type-checks. `bind()` does not read them. Do not
   // start reading them.
@@ -109,7 +109,7 @@ export const MAPLE_BRAND: [string, string, string] = [
 
 // ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
 // ALWAYS begins "Good morning, Maple Falls!" and then a real, silly, local news
-// item — as far as this town is concerned the hole has not happened yet. This
+// item — as far as this town is concerned the void has not happened yet. This
 // fires FIRST, guaranteed, before any other headline (see `signedOn`).
 // No {templates} — the sign-on must never depend on match state.
 // Punctuation: exactly one "!", on the greeting. That is the whole allowance.
@@ -166,7 +166,7 @@ const MAINST: Pools = [[
   'Carla Webb has a front page at last, after nineteen quiet years.',
   'The barber shop is down to one chair and a forty minute wait.',
   'The town clock is eleven minutes fast now. It is trying its best.',
-  'Dale edged around the hole. A crisp line. Honestly, a crisp line.',
+  'Dale edged around the void. A crisp line. Honestly, a crisp line.',
   'The window booth has gone. That was the booth Marge sits in.',
   'The goat is on the roof of the diner. The goat had the right idea!',
   'Biscuit has opened every door on Main Street. Every single one.',
@@ -192,7 +192,7 @@ const FAIR: Pools = [[
   'The goat got out of the goat tent again. The goat is undefeated.',
   'Carla Webb covered the vegetable weigh-in like it was the moon landing.',
   'A blue ribbon went to the largest cabbage. It is faintly unsettling.',
-  'Tater, aged nine, won the science fair with a drawing of a hole.',
+  'Tater, aged nine, won the science fair with a drawing of a void.',
   'The ring toss has been unwinnable since 1994. One boy won once.',
   'Dale entered the lawn category. There is no lawn category. Yet.',
   'The demolition derby is off. Everybody brought the same truck.',
@@ -278,13 +278,13 @@ const FARM: Pools = [[
   'The goat has learned to open the gate. Every gate. All of them.',
   'Pearl\'s zucchini has been described by the county as normal sized.',
 ], [
-  'The corn maze got easier. That is not good news. That is the hole.',
+  'The corn maze got easier. That is not good news. That is the void.',
   'The man in the corn maze walked out by accident after nine months.',
   'Pearl moved every pumpkin herself in one night. She is Pearl.',
   'The county says the silo is fine. The silo is at a slight angle.',
   'The cows were moved calmly. The cows have been calm throughout.',
   'Tater walked the chickens to safety and named them all again.',
-  'The scarecrow is facing the hole now. Brave. Useless. Still brave.',
+  'The scarecrow is facing the void now. Brave. Useless. Still brave.',
   'The rooster crowed at twenty to five anyway. It has a job to do.',
   'The good side of the pumpkin patch went first. Of course it did.',
   'The goat opened every gate in the county. Best goat we ever had!',
@@ -332,7 +332,7 @@ const LAKE: Pools = [[
   'The pier has gone. The man is still fishing. Do not disturb him.',
   'The catfish photo is SAFE!! It is in a truck. The photo is fine.',
   'The mayor says a lake is really more of a mood. Concede, sir.',
-  'The boat ramp dispute was settled by the hole. Nobody is happy.',
+  'The boat ramp dispute was settled by the void. Nobody is happy.',
   'Tater says the boot is in there somewhere and he wants it back.',
   'Pike Hollow still has a lake and will not stop mentioning it.',
   'The canoe made it out. The canoe always makes it. Classic canoe.',
@@ -357,7 +357,7 @@ const WOODS: Pools = [[
   'A raccoon opened a cooler, took one sandwich, and left the rest.',
 ], [
   'The something has been sighted. It is purple. It is very round.',
-  'The host has laminated a forty first rule. It is about the hole.',
+  'The host has laminated a forty first rule. It is about the void.',
   'Quiet hours have been suspended for the first time ever. One night.',
   'The site four family will not leave. It is July. They have held it.',
   'The scouts are building something. Nobody knows what. Scouts stay calm.',
@@ -435,12 +435,12 @@ const BURB: Pools = [[
   'Biscuit the dog let himself into four houses and had four dinners.',
   'A trampoline is up a tree. Nobody will say how it got up there.',
 ], [
-  'Dale mowed right to the edge of the hole. A crisp, immaculate line.',
+  'Dale mowed right to the edge of the void. A crisp, immaculate line.',
   'The property line case is moot. Dale wishes to continue regardless.',
-  'The sprinklers still run at six, on a hole, on principle, on time.',
+  'The sprinklers still run at six, on a void, on principle, on time.',
   'The leaning mailbox at 114 is still leaning. Inspiring, honestly.',
   'The trampoline in the tree has gone. The tree has gone as well.',
-  'Dale has offered to mow the hole. Dale is serious. Dale always is.',
+  'Dale has offered to mow the void. Dale is serious. Dale always is.',
   'The bins went out on the correct day and nobody noticed. Typical!',
   'Biscuit is opening doors for everybody. Biscuit is a hero now.',
   'Somebody knocked on a door with no house behind it for an hour.',
@@ -483,7 +483,7 @@ const CIVIC: Pools = [[
   'The statue of the man nobody can name has been loaded on a truck.',
   'The library computer is still starting up. Eleven minutes to go.',
   'The goat is in the library. The goat has a library card, somehow.',
-  'The car park sinkhole and the hole have met. They get along fine.',
+  'The car park sinkhole and the void have met. They get along fine.',
 ], [
   'The courthouse has GONE!! The two inch case will be heard somehow.',
   'The 1974 book is safe. The library is not. The book, though: safe.',
@@ -534,28 +534,28 @@ const GENERAL: Pools = [[
   'Somebody\'s lunch has gone missing at town hall. An inquiry is open.',
   'A trampoline is up a tree on Elm Street. It has been there a week.',
   'The library computer started up at last. Everybody came to look.',
-  'There is a sinkhole in the diner car park. It is not the hole.',
+  'There is a sinkhole in the diner car park. It is not the void.',
   'The barber has raised his price by a dollar, his first rise since 1988.',
-  // ── BEAT 2 · DENIAL. There is a hole. The mayor says there is not. ──
-  'The mayor says there is no hole. He would know about a hole, folks.',
-  'The mayor has never seen the hole. He is standing right beside it.',
-  'The hole is not on the town map. The map is from 1974. Checkmate.',
-  'Town hall discussed whether the hole is real and decided nothing.',
+  // ── BEAT 2 · DENIAL. There is a void. The mayor says there is not. ──
+  'The mayor says there is no void. He would know about a void, folks.',
+  'The mayor has never seen the void. He is standing right beside it.',
+  'The void is not on the town map. The map is from 1974. Checkmate.',
+  'Town hall discussed whether the void is real and decided nothing.',
   'The mayor says it is a puddle. A deep, dry, purple puddle.',
-  'Gus says it is a hole. The mayor says it is a drainage feature.',
-  'Carla Webb asked about the hole. The mayor talked about the fair.',
+  'Gus says it is a void. The mayor says it is a drainage feature.',
+  'Carla Webb asked about the void. The mayor talked about the fair.',
   'Tater told the grown ups. The grown ups held a meeting about it.',
-  'A hole ate a bin. The council has formed a committee about bins.',
-  'The mayor says there is no hole and would like the next question.',
-  'The band concert is still on. The hole was not invited. Rude of it.',
-  'The goat has stared at the hole all morning. The goat knows.',
+  'A void ate a bin. The council has formed a committee about bins.',
+  'The mayor says there is no void and would like the next question.',
+  'The band concert is still on. The void was not invited. Rude of it.',
+  'The goat has stared at the void all morning. The goat knows.',
   'The car park sinkhole is unrelated, says the council. Twice.',
   'Biscuit will not go outside today. Biscuit has thoughts about it.',
 ], [
   // ── BEAT 3 · ALARM. Dawning horror, delivered cheerfully. One "!" max. ──
-  'The mayor says the hole is a drainage project that is going well.',
-  'A sign says do not feed the hole. Tater has already fed the hole.',
-  'The town hall meeting spent four hours on the hole. No decision.',
+  'The mayor says the void is a drainage project that is going well.',
+  'A sign says do not feed the void. Tater has already fed the void.',
+  'The town hall meeting spent four hours on the void. No decision.',
   'Carla Webb asked the mayor a follow-up. The mayor went very quiet.',
   'A committee was formed. The committee formed a subcommittee.',
   'The Bugle has gone to four pages. Carla Webb is having a week.',
@@ -574,17 +574,17 @@ const GENERAL: Pools = [[
   'The population sign reads 1,408 and is, for the first time, too high.',
   'A four hour meeting was held about holding a meeting. It carried.',
   'This is not an evacuation. This is a fun walk, says the mayor.',
-  'There is no hole. Also, please stay well away from the hole.',
+  'There is no void. Also, please stay well away from the void.',
   'Oh dear. It ate the bandstand with the band still standing on it.',
   'The town siren went off. It played the fight song. We all sang!',
   'The fun walk is now a fun jog. The fun jog is now a fun SPRINT.',
-  'The mayor says he was always against the hole. Write that down.',
+  'The mayor says he was always against the void. Write that down.',
   'It burped and the whole street smelled of GRAVY. Every street.',
   'Pearl is carrying the zucchini at a run. Not one single wobble.',
-  'Small hole. Medium hole. All right, folks. Run. Everybody run.',
+  'Small void. Medium void. All right, folks. Run. Everybody run.',
   'The band concert moved indoors. There is no indoors. It moved anyway.',
   'Gus said oh dear. Gus has never said oh dear. Gus said it.',
-  'There is a second hole now, out by the water tower. That makes two.',
+  'There is a second void now, out by the water tower. That makes two.',
   'The goat has left town. The goat left first. The goat always knows.',
   'A raccoon ran past carrying an entire vending machine tray.',
   'Biscuit has opened every door on the street. Everybody is out.',
@@ -612,7 +612,7 @@ const GENERAL: Pools = [[
   'It ate town hall, the clock, and the ladder. The man got down first.',
   'Something burped and it smelled of the entire diner. All of it.',
   'The mayor asked who ate his truck. It did, sir. It ate the truck.',
-  'Another hole has opened by the water tower. They are MULTIPLYING.',
+  'Another void has opened by the water tower. They are MULTIPLYING.',
   'There are three of them now. Three. We have stopped counting.',
   'The goat came back for its two best friends. What a goat!!',
   'Biscuit opened every door in town and every dog got out. Good dog.',
@@ -742,7 +742,7 @@ const LIVE: Pools = [[
   'Tater fed the {F}. Tater says it prefers {M}.',
   'Residents were asked if the purple thing is bigger. {P}% said yes.',
   'Gus on the {F}: it needs a haircut, and that is his opinion.',
-  'A second hole has opened. That is two holes now. Two of them.',
+  'A second void has opened. That is two voids now. Two of them.',
   'The mayor cut a ribbon in {D}. The ribbon has gone now.',
   'Pearl asked if the {F} could enter the vegetable contest. Denied.',
   'A {F} in {D}. Town hall has scheduled a long meeting.',
@@ -798,11 +798,11 @@ const LIVE: Pools = [[
 // full stop at the end. Kept SHORT: a phone bubble truncates fast, so aim under
 // ~34 characters, hard cap 46. The keys are consumed by life.ts — do not rename
 // them. 'politician' is Mayor Dinkle, and he is a man who will not admit to a
-// hole, NOT a candidate: no elections, no voting, no campaigning.
+// void, NOT a candidate: no elections, no voting, no campaigning.
 export const MAPLE_VOICE_AMBIENT: Record<string, string[]> = {
   // the mayor, mayoring, at anyone who holds still for three seconds
   politician: [
-    'I am the mayor. Have we met?', 'There is no hole. I would know.', 'I cut that ribbon myself.',
+    'I am the mayor. Have we met?', 'There is no void. I would know.', 'I cut that ribbon myself.',
     'Lovely dog. Is it licensed?', 'I have a plan for the bandstand.', 'That is a puddle. A dry puddle.',
     'I grew up two streets over.', 'Great question. The answer is no.', 'I fixed that pothole. Me.',
     'Shake my hand. Firm. Good.', 'I will be at the diner at eight.', 'The twine ball put us on the map.',
@@ -973,7 +973,7 @@ function bind(ctx: MapleCtx): Filled {
   // how a newsroom ends up saying "1% gone, the other 100% is nervous".
   const pct = Math.min(99, Math.max(1, Math.round(ctx.devouredPct || 0)));
   // NOTE: ctx.rivalName / ctx.rivalLead are NOT read here, on purpose. See the
-  // note on MapleCtx. Nobody in this town could know another hole's name, so
+  // note on MapleCtx. Nobody in this town could know another void's name, so
   // the paper has no way to print one.
   return {
     pct,

@@ -35,9 +35,9 @@
 //
 //  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed, and ALWAYS opens
 //                    with "Good morning". Then a real piece of resort news
-//                    with a pirate gag in it. Nothing about the hole.
+//                    with a pirate gag in it. Nothing about the void.
 //  BEAT 2  DENIAL    tier 0. Ordinary resort news, running alongside somebody
-//                    flatly insisting the hole is not there. It is a water
+//                    flatly insisting the void is not there. It is a water
 //                    feature. Do have an ice cream.
 //  BEAT 3  ALARM     tier 1. Dawning horror, delivered cheerfully. The
 //                    evacuation is a FUN WALK. Officials contradict themselves
@@ -54,10 +54,10 @@
 //  world's slowest water slide queue, a guest who has booked the same lounger
 //  for eleven years).
 //
-//  THE RULE ABOUT THE HOLE. The news covers ONE thing: a hole is eating the
-//  resort. Guests have no way of knowing that some *other* hole somewhere has a
+//  THE RULE ABOUT THE VOID. The news covers ONE thing: a void is eating the
+//  resort. Guests have no way of knowing that some *other* void somewhere has a
 //  name, a family or a scoreboard, so the newsroom never mentions one. If a
-//  line needs a second hole it says "another one", "a second hole", "there are
+//  line needs a second void it says "another one", "a second void", "there are
 //  two of them" — never a name. Enforced in code: `bind()` reads no rival
 //  field, `fill()` knows no rival token, and `usable()` refuses point blank to
 //  air any template containing a token outside {D}{M}{F}{P}{R}{S}.
@@ -93,7 +93,7 @@ export interface NewsCtx {
   secondsLeft: number;
   // ── ACCEPTED AND DELIBERATELY IGNORED ──────────────────────────────────────
   // The call site still hands us the rival scoreboard. The newsroom no longer
-  // has any use for it: a guest at a resort cannot know that some other hole is
+  // has any use for it: a guest at a resort cannot know that some other void is
   // called anything, so it never goes on air. These two stay declared purely so
   // the existing call site type-checks. `bind()` does not read them. Do not
   // start reading them.
@@ -110,7 +110,7 @@ export const BRAND: [string, string, string] = [
 
 // ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
 // ALWAYS begins "Good morning". Then a real piece of resort news with a pirate
-// gag in it — the hole has not happened yet as far as anyone here knows. This
+// gag in it — the void has not happened yet as far as anyone here knows. This
 // fires FIRST, guaranteed, before any other headline (see `signedOn`).
 // No {templates} — the sign-on must never depend on match state.
 // Punctuation: exactly one "!", on the greeting. That is the whole allowance.
@@ -160,14 +160,14 @@ const PORT: Pools = [[
   'The cannon fired forty beach balls into the bay. Lovely, that.',
 ], [
   'The dock is shorter today, and the tannoy says that is cosier.',
-  'A guest asked whether the hole takes bookings. Nigel said yes.',
+  'A guest asked whether the void takes bookings. Nigel said yes.',
   'Nigel reports that your boat has moved. Inward. A little bit.',
   'The dock hands are saying arrr without being asked now. Worrying.',
   'Mrs Fenwick-Hyde demands a yacht with considerably more hull.',
   'Maisie waved at the purple thing and it wobbled back at her.',
   'All 399 inflatable swans have been deployed as an actual plan.',
   'The harbour has one rope left, and that rope is fraying badly.',
-  'A second hole has opened by the slipway. That makes two of them.',
+  'A second void has opened by the slipway. That makes two of them.',
   'The pier is a jetty now. Capt. Roger is calling that an upgrade!',
   'Please stay clear of the edge, wherever the edge happens to be.',
 ], [
@@ -175,7 +175,7 @@ const PORT: Pools = [[
   'The galleon has left. It did not say goodbye to anybody.',
   'Nigel is rowing away, still ticking things off his clipboard.',
   'The last crate was opened. Swans. It was always going to be swans.',
-  'Maisie has named the hole. She says the hole is called Gary.',
+  'Maisie has named the void. She says the void is called Gary.',
   'The harbour is now one seagull standing in water, thinking.',
   'Mrs Fenwick-Hyde would like to know where she is meant to moor.',
   'Barnaby is perched on the last post, king of absolutely nothing.',
@@ -203,8 +203,8 @@ const MARKET: Pools = [[
   'The bazaar is now a bazaa, says Capt. Roger, and still charming.',
   'Barnaby is shouting directions. They are the correct directions.',
   'The stalls are on wheels now. So are the traders. So is the sign.',
-  'Mrs Fenwick-Hyde asked the hole whether it takes bookings.',
-  'Maisie offered the hole a mango. The hole said yes to the mango.',
+  'Mrs Fenwick-Hyde asked the void whether it takes bookings.',
+  'Maisie offered the void a mango. The void said yes to the mango.',
   'The everything must go sign has quietly become a documentary.',
   'Nigel reports the bazaar has relocated inward. Do mind the edge.',
   'The vintage coconuts have been marked down to the word please.',
@@ -214,7 +214,7 @@ const MARKET: Pools = [[
   'The bazaar has GONE!! The gift shop is somehow thriving.',
   'Barnaby was right about everything. Barnaby is unbearable.',
   'The last trader sold the last stall to himself. A fair price.',
-  'Mrs Fenwick-Hyde tried to haggle with the hole and lost badly.',
+  'Mrs Fenwick-Hyde tried to haggle with the void and lost badly.',
   'The mangoes were the real treasure. The mangoes have gone.',
   'Maisie says he liked the mango. He did seem to like the mango.',
   'Cressida Vane writes: bazaar gone, mango unforgettable, six stars.',
@@ -244,9 +244,9 @@ const RESORT: Pools = [[
   'Capt. Roger says the sinkhole is a feature. A water feature.',
   'Nigel reports that your suite has moved. Downward. Only slightly.',
   'The big pool has joined the small pool. The staff applauded warmly.',
-  'Mrs Fenwick-Hyde paid for a sea view and has received a hole view.',
-  'A guest asked the front desk to cancel the hole. It is noted.',
-  'Maisie wanted a photo with the hole. The photo is genuinely lovely.',
+  'Mrs Fenwick-Hyde paid for a sea view and has received a void view.',
+  'A guest asked the front desk to cancel the void. It is noted.',
+  'Maisie wanted a photo with the void. The photo is genuinely lovely.',
   'The Gilded Lagoon has offered us a sympathy rate. How dare they.',
   'Lounger nine has gone. That lounger was booked until 2039.',
   'Fewer rooms means shorter corridors, says a very calm tannoy.',
@@ -260,7 +260,7 @@ const RESORT: Pools = [[
   'The big pool has joined the sea. The sea seems unimpressed.',
   'The Gilded Lagoon sent flowers, and a brochure. Mostly brochure.',
   'A guest requested a late checkout and got a very early one.',
-  'Maisie left the hole a five star review that says he is nice.',
+  'Maisie left the void a five star review that says he is nice.',
   'No hotel means no queues, and the tannoy calls that an upgrade.',
   'Capt. Roger is handing out spa vouchers from a lilo. A true pro.',
 ]];
@@ -285,9 +285,9 @@ const PARTY: Pools = [[
   'The dance floor is smaller today, which the tannoy calls intimate.',
   'DJ Coconut has switched to the nervous playlist. We all know it.',
   'The conga line has rerouted around the situation and carries on.',
-  'Mrs Fenwick-Hyde asked whether that was the bass or a large hole.',
-  'Maisie taught the hole the Wobble. The hole is a natural.',
-  'The speakers have been turned to face the hole. Tactical, that.',
+  'Mrs Fenwick-Hyde asked whether that was the bass or a large void.',
+  'Maisie taught the void the Wobble. The void is a natural.',
+  'The speakers have been turned to face the void. Tactical, that.',
   'The party ends at eleven, or possibly a good deal sooner.',
   'The glow stick supply is now being described as emotional.',
   'A smaller floor means bigger dancing. Capt. Roger insists it is maths!',
@@ -295,9 +295,9 @@ const PARTY: Pools = [[
 ], [
   'The dance floor has been eaten!! The vibe remains untouched.',
   'DJ Coconut played one final banger and then bowed. A legend.',
-  'The conga line congaed straight past the hole. Extremely rude.',
+  'The conga line congaed straight past the void. Extremely rude.',
   'Mrs Fenwick-Hyde danced at last, at the worst possible moment.',
-  'Maisie and the hole are doing the Wobble together right now.',
+  'Maisie and the void are doing the Wobble together right now.',
   'DJ Coconut is playing from a raft. The crowd is three crabs.',
   'One glow stick remains, glowing bravely on into the night.',
   'The main stage has gone. The smaller angrier stage has gone too.',
@@ -327,7 +327,7 @@ const JUNGLE: Pools = [[
   'Mrs Fenwick-Hyde has demanded that the jungle be moved further off.',
   'The monkeys are packing. The monkeys have small suitcases.',
   'The tour is now a brisk tour. Nigel is walking very fast indeed.',
-  'Maisie told the hole about the temple. Helpful, in a way.',
+  'Maisie told the void about the temple. Helpful, in a way.',
   'The zipline now ends nowhere at all. The queue is unchanged.',
   'All thirty one Kevins are accounted for. Kevin twelve is on a leaf.',
   'Fewer trees means better views, says the front desk, standing firm!',
@@ -366,7 +366,7 @@ const COVE: Pools = [[
   'The treasure hunt is over. Something else found the treasure first.',
   'Mrs Fenwick-Hyde wants her doubloon confirmed in writing.',
   'The crabs are leaving in one very orderly line, without any fuss.',
-  'Maisie showed the hole the rock pools. The hole approved of them.',
+  'Maisie showed the void the rock pools. The void approved of them.',
   'The wreck has been wrecked again, in record time, honestly.',
   'Nigel reports that the treasure has relocated inward. Do keep up.',
   'The bench that marked the spot has gone, and so has the spot.',
@@ -378,7 +378,7 @@ const COVE: Pools = [[
   'The crabs took the last boat. The crabs had a plan all along.',
   'The crab Maisie found has been promoted. It is a captain now.',
   'The wreck has been unwrecked by removal. That counts, apparently.',
-  'Cressida Vane on the hole: bold, purple, and deeply hungry.',
+  'Cressida Vane on the void: bold, purple, and deeply hungry.',
   'Barnaby knows where the treasure is. Barnaby still says nothing.',
   'Capt. Roger has drawn a fresh X on the water. Real commitment.',
   'Mrs Fenwick-Hyde has lost her doubloon and would like a form.',
@@ -405,7 +405,7 @@ const BEACH: Pools = [[
   'The beach is shorter today. The tannoy is calling it a beachlet.',
   'The lifeguards are now guarding the land and the ice cream hut.',
   'Mrs Fenwick-Hyde says the sand is leaving and somebody must act.',
-  'Maisie built a sandcastle for the hole and it fits perfectly.',
+  'Maisie built a sandcastle for the void and it fits perfectly.',
   'The umbrellas have been repositioned defensively by Nigel.',
   'Nigel rakes on. The sand is going. Nigel rakes on regardless.',
   'The sunset has been moved earlier by popular demand, sort of.',
@@ -465,51 +465,51 @@ const GENERAL: Pools = [[
   'Every member of staff has said arrr today. Nigel said it sadly.',
   'The towel situation is the real story today, says the front desk.',
   'A guest would like to speak to the manager about the sea.',
-  // ── BEAT 2 · DENIAL. There is a hole. There is absolutely not a hole. ──
-  'Please do not mind the hole. Do enjoy an ice cream instead.',
-  'That is not a hole. That is a new pool, and there is no charge.',
-  'Nigel says there is no hole, madam. It is a shadow. A big one.',
-  'The hole is not on the resort map, so there is no hole. Simple.',
+  // ── BEAT 2 · DENIAL. There is a void. There is absolutely not a void. ──
+  'Please do not mind the void. Do enjoy an ice cream instead.',
+  'That is not a void. That is a new pool, and there is no charge.',
+  'Nigel says there is no void, madam. It is a shadow. A big one.',
+  'The void is not on the resort map, so there is no void. Simple.',
   'Management says we do not do purple here. The case is closed.',
-  'A guest saw a hole. That same guest also saw a mermaid on Monday.',
-  'Barnaby squawked that it is a hole and was sent to his perch.',
+  'A guest saw a void. That same guest also saw a mermaid on Monday.',
+  'Barnaby squawked that it is a void and was sent to his perch.',
   'Nobody is being eaten. The front desk says that is only a rumour.',
-  'The hole ate a deckchair. We are calling that a laundry matter.',
+  'The void ate a deckchair. We are calling that a laundry matter.',
   'Mrs Fenwick-Hyde stepped in it and is blaming her sandals.',
-  'Maisie said there is a hole. Staff said there is a smoothie hut.',
+  'Maisie said there is a void. Staff said there is a smoothie hut.',
   'A cold smoothie solves most things, and Capt. Roger insists on it.',
 ], [
   // ── BEAT 3 · ALARM. Dawning horror, delivered cheerfully. One "!" max. ──
-  'Please do not feed the hole. It has eaten. It has definitely eaten.',
+  'Please do not feed the void. It has eaten. It has definitely eaten.',
   'Nigel says the island is smaller but your room is the same size.',
   'Everything is fine, and is now being said at a higher volume.',
-  'Mrs Fenwick-Hyde would like to speak to whoever runs the hole.',
-  'Guests are reminded that the hole is not part of the water park.',
-  'The Gilded Lagoon is advertising hole-free weekends. So smug.',
-  'Maisie fed the hole a biscuit. We said do not. She did anyway.',
+  'Mrs Fenwick-Hyde would like to speak to whoever runs the void.',
+  'Guests are reminded that the void is not part of the water park.',
+  'The Gilded Lagoon is advertising void-free weekends. So smug.',
+  'Maisie fed the void a biscuit. We said do not. She did anyway.',
   'A small hiccup, friends. Do please enjoy the enormous buffet!',
   'Barnaby has learned the word evacuate and absolutely loves it.',
   'The staff meeting was held entirely at a brisk, dignified walk.',
-  'Cressida Vane gave the hole two stars. It took her starter.',
+  'Cressida Vane gave the void two stars. It took her starter.',
   'Kids club is full. The three o\'clock activity is feeding the friend.',
   'DJ Coconut has moved to the tense playlist. Everybody noticed.',
   'We are not evacuating. We are mingling outward, says Capt. Roger.',
   'Nigel has confirmed in writing, twice, that nothing is wrong.',
-  'Do not feed it. The front desk says the hole is on a schedule.',
+  'Do not feed it. The front desk says the void is on a schedule.',
   'Nobody here is worried. This is simply my worried hat, says Roger.',
-  'The hole is now part of the entertainment programme. Officially.',
+  'The void is now part of the entertainment programme. Officially.',
   'This is not an evacuation. This is a fun walk, says the tannoy!',
-  'There is no hole. Also, please do not go anywhere near the hole.',
+  'There is no void. Also, please do not go anywhere near the void.',
   'Oh dear. It ate the breakfast tent with the breakfast still in it.',
-  'Nigel says we have always had a hole. It is very old. It is fine.',
+  'Nigel says we have always had a void. It is very old. It is fine.',
   'Guests are jogging to the boats. We are calling it a morning jog.',
   'Stay calm. Management is calm. Look how calm management is.',
   'The fun walk is now a fun run. Same fun, considerably more legs.',
   'It burped and the whole bay heard it. It smelled of melon. Sorry.',
   'Nobody panic. Panicking is not included in your package.',
   'Capt. Roger said oh dear, and then remembered to say arrr.',
-  'There is a second hole now. We are not going to talk about that.',
-  'A guest counted the holes and got to three. She has stopped now.',
+  'There is a second void now. We are not going to talk about that.',
+  'A guest counted the voids and got to three. She has stopped now.',
   'The towel situation has resolved itself. There are no towels.',
   'The water slide queue has gone. So has the water slide. Sorry.',
 ], [
@@ -519,13 +519,13 @@ const GENERAL: Pools = [[
   'Barnaby was right. Barnaby was always right. Barnaby knows it.',
   'Mrs Fenwick-Hyde would like to speak to the manager of the ocean.',
   'The Gilded Lagoon has gone very quiet. That is quite something.',
-  'Maisie has adopted the hole. Its name is Gary. Paperwork pending.',
+  'Maisie has adopted the void. Its name is Gary. Paperwork pending.',
   'Cressida Vane, final review: ate the island, lovely staff, four stars.',
   'Bay Radio is broadcasting from a pool float. The signal is excellent.',
   'DJ Coconut is seeing us all out from a raft. A total professional.',
   'A guest asked about the wifi. There is no wifi. There is no lobby.',
   'The resort has one star: was eaten, but otherwise really lovely.',
-  'Kids club update: every single child drew a picture of the hole.',
+  'Kids club update: every single child drew a picture of the void.',
   'Capt. Roger remains in the blazer, smiling, and still upselling.',
   'The buffet has GONE!! All of it. Even the melon. Especially that.',
   'Lost property: one island. Please enquire at the front desk.',
@@ -536,8 +536,8 @@ const GENERAL: Pools = [[
   'The first mate remains, technically and legally, a first mate.',
   'It ate the buffet, the ice cream hut, and the towel man\'s hat.',
   'Somebody burped and it was not a person. We are all leaving now.',
-  'Still no hole!! Just a very large amount of missing island.',
-  'Another hole has opened beside the first. They are MULTIPLYING.',
+  'Still no void!! Just a very large amount of missing island.',
+  'Another void has opened beside the first. They are MULTIPLYING.',
   'There are three of them now. Three. We have stopped counting.',
   'The resort cat got out. The resort cat is fine. We checked twice.',
   'Nigel has taken a booking for August from a floating deckchair.',
@@ -662,7 +662,7 @@ const LIVE: Pools = [[
   'A {F} was seen at {D}. Staff waved and it waved back.',
   'It ate {M}. Nigel has logged this under turndown service.',
   'Maisie fed the {F}. The {F} said thank you, probably.',
-  'Guest review of {D}: five stars, one hole, still five stars.',
+  'Guest review of {D}: five stars, one void, still five stars.',
   'Lost property: {M}. Found property: nothing at all today.',
   'The {F} is themed. Everything at this resort is themed.',
   'Mrs Fenwick-Hyde asks if {M} was included in her package.',
@@ -755,7 +755,7 @@ function bind(ctx: NewsCtx): Filled {
   // how a newsroom ends up saying "1% gone, the other 100% is nervous".
   const pct = Math.min(99, Math.max(1, Math.round(ctx.devouredPct || 0)));
   // NOTE: ctx.rivalName / ctx.rivalLead are NOT read here, on purpose. See the
-  // note on NewsCtx. A guest cannot know another hole's name, so the newsroom
+  // note on NewsCtx. A guest cannot know another void's name, so the newsroom
   // has no way to say one.
   return {
     pct,

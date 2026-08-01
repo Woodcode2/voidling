@@ -523,7 +523,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   announceHtml(marquee
     ? `<div class="bCard"><span class="bIco">🏆</span><span class="bTx">You beat the chaser!<span class="bSub">${name} is out</span></span><span class="bMul">+${pts}</span></div>`
     : `<div class="bCard"><span class="bIco">🍽️</span><span class="bTx">You ate ${esc(name)}!<span class="bSub">${esc(FAMILY_TITLE[name] ?? 'a rival')} is out</span></span><span class="bMul">+${pts}</span></div>`);
-  if (marquee) { breakingNews('One hole has eaten the other. There is one left. It is bigger.'); addCoins(35); }
+  if (marquee) { breakingNews('One void has eaten the other. There is one left. It is bigger.'); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -613,7 +613,7 @@ rivals.onNearMiss = (name, x, z) => {
 };
 rivals.onStuffed = (name) => {
   announceHtml(`<div class="bCard"><span class="bIco">🍰</span><span class="bTx">${esc(name)} is too full<span class="bSub">now is your chance</span></span></div>`);
-  breakingNews('The second hole has stopped moving. It looks full. It looks slow.');
+  breakingNews('The second void has stopped moving. It looks full. It looks slow.');
   audio.ready();
 };
 const audio = createAudio();
@@ -1316,7 +1316,7 @@ function showNews() {
   // downtown must never get "spelling bee ends in a 14-way tie"
   // DENIAL has to last long enough to be a joke. It flipped to tier 1 at 5%
   // devoured and tier 2 at 18%, which is one or two headlines — the town went
-  // from "there is no hole" to "goodbye forever" before the player had eaten a
+  // from "there is no void" to "goodbye forever" before the player had eaten a
   // street. The arc is: refuse to admit it, then panic, then read the weather
   // from a field. Widened, and the form ladder now has six rungs so DEVOURER
   // rather than GOBBLER is what starts the panic.
@@ -1335,7 +1335,7 @@ function showNews() {
     // Prewitt has the play-by-play and Bill Ordway has the colour, and the
     // conceit is that they never stop calling the game: tier 0 is pre-game
     // chat about the weather and somebody's casserole, tier 1 is the two of
-    // them describing a hole in the parking lot as if it were a formation
+    // them describing a void in the parking lot as if it were a formation
     // they have not seen before, and tier 2 is two professionals calling the
     // end of the world because that is the job. 464 headlines.
     const gd = GAMEDAY_DIST[String(island.biomeAt(voidState.x, voidState.z))] ?? null;

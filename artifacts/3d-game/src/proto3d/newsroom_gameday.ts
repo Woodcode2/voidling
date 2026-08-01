@@ -41,11 +41,11 @@
 //
 //  BEAT 1  SIGN-ON   fires FIRST, every match, guaranteed, and ALWAYS opens
 //                    "Good afternoon from Marston!" then a real pre-game item.
-//                    Nothing about the hole. Nobody has seen it yet.
+//                    Nothing about the void. Nobody has seen it yet.
 //  BEAT 2  PRE-GAME  tier 0. Cheerful and discursive — the weather, the
 //                    attendance, somebody's casserole — sliding at the end into
 //                    a thing in the north lot that is not on the depth chart.
-//  BEAT 3  WRONG     tier 1. They start describing the hole AS IF IT WERE A
+//  BEAT 3  WRONG     tier 1. They start describing the void AS IF IT WERE A
 //                    PLAY. Big gain on first down. Flag on the play. Bill goes
 //                    to the rulebook. The rulebook does not cover it.
 //  BEAT 4  COLLAPSE  tier 2. Total. And they keep calling it, from a press box
@@ -58,10 +58,10 @@
 //  they are doing the same thing together — stacking chairs, carrying the water
 //  carts out, sitting on the same hillside. The crowd is one town.
 //
-//  THE RULE ABOUT THE HOLE. The broadcast covers ONE thing: a hole is eating
-//  Marston. Nobody in this booth has any way of knowing that some *other* hole
+//  THE RULE ABOUT THE VOID. The broadcast covers ONE thing: a void is eating
+//  Marston. Nobody in this booth has any way of knowing that some *other* void
 //  somewhere has a name, a family or a scoreboard, so it never goes on air. If
-//  a line needs a second hole it says "another one", "a second one", "that
+//  a line needs a second void it says "another one", "a second one", "that
 //  makes two of them" — never a name. Enforced in code: `bind()` reads no rival
 //  field, `fill()` knows no rival token, and `usable()` refuses point blank to
 //  air any template containing a token outside {D}{M}{F}{P}{R}{S}.
@@ -104,7 +104,7 @@ export interface GamedayCtx {
   secondsLeft: number;
   // ── ACCEPTED AND DELIBERATELY IGNORED ──────────────────────────────────────
   // The call site still hands us the rival scoreboard. The booth has no use for
-  // it: two announcers calling a football game cannot know that some other hole
+  // it: two announcers calling a football game cannot know that some other void
   // is called anything, so it never goes on air. These two stay declared purely
   // so the existing call site type-checks. `bind()` does not read them. Do not
   // start reading them.
@@ -121,7 +121,7 @@ export const GAMEDAY_BRAND: [string, string, string] = [
 
 // ── BEAT 1 · SIGN-ON ──────────────────────────────────────────────────────────
 // ALWAYS begins "Good afternoon from Marston!" and then a real pre-game item —
-// as far as this booth is concerned the hole has not happened yet. This fires
+// as far as this booth is concerned the void has not happened yet. This fires
 // FIRST, guaranteed, before any other headline (see `signedOn`).
 // No {templates} — the sign-on must never depend on match state.
 // Punctuation: exactly one "!", on the greeting. That is the whole allowance.
@@ -214,7 +214,7 @@ const PLAZA: Pools = [[
   'The merch stand is selling off a trolley and doing record business.',
   'A steward is explaining that the bag rules still apply. Good man!',
   'Marla Beam had the gates. Marla Beam no longer has the gates.',
-  'The ticket scanner beeped twice at the hole. Gold seats, apparently.',
+  'The ticket scanner beeped twice at the void. Gold seats, apparently.',
   'The foam finger is pointing somewhere else now. Sensible finger.',
   'The turnstiles are counting people out and calling it the attendance.',
 ], [
@@ -289,7 +289,7 @@ const RVPARK: Pools = [[
   'Site fourteen has rolled up the outdoor rug and taken both lamps.',
   'The fairy lights at site nine are still on. Still lovely, honestly.',
   'The man polishing the motorhome finished polishing it, then he left.',
-  'The windsock shaped like a fish is pointing straight at the hole.',
+  'The windsock shaped like a fish is pointing straight at the void.',
   'Every deck chair on RV Row is folded and stowed. Not one left behind.',
   'The waffle iron is still going, on a generator, on the move. Superb!',
   'The cat is off the roof. The cat left before anybody else did.',
@@ -399,7 +399,7 @@ const PRACTICE: Pools = [[
   'The water carts have been emptied and rolled off. Both of them. Quickly.',
   'The bleacher stack has been folded down and taken away on a flatbed.',
   'The children\'s game has moved twice and neither side will admit to a score.',
-  'The sprinklers came on again, on schedule, onto the hole. No comment.',
+  'The sprinklers came on again, on schedule, onto the void. No comment.',
   'The chalk lines are still perfectly straight and now go nowhere at all.',
   'The man throwing to nobody has moved back and is still throwing. Bravo!',
   'The spare goalposts are on the truck. Somebody finally knew why.',
@@ -461,7 +461,7 @@ const BY_DIST: Record<GdDist, Pools> = {
 // ── GENERAL / THE BOOTH ───────────────────────────────────────────────────────
 // The arc in miniature. Tier 0 is pre-game chatter — the weather, the coin, the
 // casserole — and only at the end does something appear in the north lot that
-// nobody will name. Tier 1 is the booth calling the hole as a football play.
+// nobody will name. Tier 1 is the booth calling the void as a football play.
 // Tier 2 is everything gone and two men still describing it accurately.
 const GENERAL: Pools = [[
   // ── pre-game. Cheerful, discursive, and completely unaware. ──
@@ -499,7 +499,7 @@ const GENERAL: Pools = [[
   'Hank saw it move. Hank has been in this booth a long time. It moved.',
   'The stadium says the situation in the car park is entirely under control.',
   'Bill has written one word in his notebook and will not say the word.',
-  'That is not a hole, says the man from the stadium. Very well then, sir.',
+  'That is not a void, says the man from the stadium. Very well then, sir.',
   'The PA is still asking about that blue sedan. It has bigger worries now.',
   'Marla Beam asked a steward what it is. The steward said: parking.',
 ], [
@@ -1015,7 +1015,7 @@ function bind(ctx: GamedayCtx): Filled {
   const pct = Math.min(99, Math.max(1, Math.round(ctx.devouredPct || 0)));
   // NOTE: ctx.rivalName / ctx.rivalLead are NOT read here, on purpose. See the
   // note on GamedayCtx. Two men calling a football game cannot know another
-  // hole's name, so the broadcast has no way to say one.
+  // void's name, so the broadcast has no way to say one.
   return {
     pct,
     rest: 100 - pct,
@@ -1069,7 +1069,7 @@ const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
  * THE ARC. Four beats, and the picker has the signal for all four:
  *   1 SIGN-ON   the first call of every match. Good afternoon + a pre-game item.
  *   2 PRE-GAME  tier 0 — the weather, the coin, the casserole, then a purple dot.
- *   3 WRONG     tier 1 — the hole called as a play. Bill goes to the rulebook.
+ *   3 WRONG     tier 1 — the void called as a play. Bill goes to the rulebook.
  *   4 COLLAPSE  tier 2 — everything gone, still being called, then the sign-off.
  * `tier` is derived at the call site from devouredPct AND the player's form, so
  * a WORLD ENDER never gets a beat-2 line. Beat 1 is ours to guarantee.

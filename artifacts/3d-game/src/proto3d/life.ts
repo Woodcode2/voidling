@@ -209,7 +209,7 @@ const VOICE_AMBIENT: Record<string, string[]> = {
   ],
   // kids: the only guests actually enjoying themselves
   kid: [
-    'MUM! MUM! a purple hole!!', 'can we keep it?? can we??', 'I named it Gary',
+    'MUM! MUM! a purple void!!', 'can we keep it?? can we??', 'I named it Gary',
     'it ate a whole PALM TREE', 'is it a pet? it looks like a pet', 'I want to feed it my chips',
     'PHOTO! quick, do a pose!', 'it is SO round. so so round.', 'best holiday ever ever EVER',
     'dad said no. so I asked mum.', 'it blinked! I SAW it blink!', 'can I ride it? just once?',
