@@ -129,13 +129,42 @@
       /* the DEVOURED meter is now YOURS, with the family's share beside it —
          it used to count every prop eaten by anyone, so a losing player was
          told "92% DEVOURED" */
-      #banner { position: fixed; top: 30%; left: 0; right: 0; text-align: center; z-index: 8; pointer-events: none;
-        color: #fff; font-size: clamp(20px, 6vw, 28px); font-weight: 900; letter-spacing: 1px; opacity: 0;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
-      #banner.show { animation: bnr 2.2s ease forwards; }
-      #banner.fam { font-size: 30px; color: #ffd9f4; top: 27%;
-        text-shadow: 0 0 22px rgba(184,117,255,0.9), 0 3px 10px rgba(0,0,0,0.65); }
-      @keyframes bnr { 0%{opacity:0; transform:translateY(-8px)} 12%{opacity:1; transform:translateY(0)} 78%{opacity:1} 100%{opacity:0} }
+      /* THE HERO MESSAGE. It was bare white text dropped over the middle of
+         the playfield — "KICKOFF! Everything is DOUBLE!" in 28px with a drop
+         shadow and nothing behind it, which on a real phone over a bright
+         tarmac read as debug output, and spelled the multiplier out in words
+         nobody needs. It is a CARD now: the event gets the room, the mechanic
+         gets a chip, and the whole thing sits on something. */
+      #banner { position: fixed; top: 27%; left: 0; right: 0; z-index: 8; pointer-events: none;
+        display: flex; justify-content: center; opacity: 0; }
+      #banner .bCard { display: inline-flex; align-items: center; gap: 10px;
+        max-width: min(92vw, 420px); padding: 11px 16px 11px 13px; border-radius: 18px;
+        background: linear-gradient(180deg, rgba(38,20,64,0.94), rgba(20,10,38,0.94));
+        border: 1.5px solid rgba(184,117,255,0.42);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 24px rgba(184,117,255,0.22);
+        backdrop-filter: blur(9px); }
+      #banner .bIco { font-size: 26px; line-height: 1; flex: none; }
+      #banner .bTx { color: #fff; font-size: clamp(16px, 4.6vw, 21px); font-weight: 900;
+        letter-spacing: 0.4px; line-height: 1.15; text-align: left; }
+      #banner .bSub { display: block; color: #c7b4f0; font-size: 12.5px; font-weight: 700;
+        letter-spacing: 0.2px; margin-top: 2px; }
+      /* the multiplier, as a badge — not a sentence */
+      #banner .bMul { flex: none; margin-left: 2px; padding: 4px 9px 3px; border-radius: 9px;
+        background: linear-gradient(180deg, #ffd25a, #f0a91e); color: #3a2408;
+        font-size: 15px; font-weight: 900; letter-spacing: 0.3px;
+        box-shadow: 0 2px 0 rgba(0,0,0,0.28); }
+      /* a rival arriving: their own colour, on the card */
+      #banner .bDot { flex: none; width: 15px; height: 15px; border-radius: 50%;
+        box-shadow: 0 0 12px currentColor; }
+      #banner.show { animation: bnr 2.4s cubic-bezier(0.2, 1.5, 0.4, 1) forwards; }
+      @keyframes bnr {
+        0%   { opacity: 0; transform: translateY(-14px) scale(0.86); }
+        14%  { opacity: 1; transform: translateY(0) scale(1); }
+        22%  { transform: scale(0.985); }
+        30%  { transform: scale(1); }
+        80%  { opacity: 1; }
+        100% { opacity: 0; transform: translateY(-6px) scale(0.97); }
+      }
       /* THE MINIMAP IS GONE. Measured: 116x116 = 3.7% of a 430x900 screen in
          100% of frames — the second-largest permanent element after the
          joystick — and a drag starting at the natural left-thumb position put
@@ -169,7 +198,25 @@
          belongs on the menu rather than the HUD: the in-match screen already
          carries the board, the timer, the form chip, the wallet, the news card
          and the banner, and this is a thing you read BEFORE you press play. */
-      body:not(.menu) #quests { display: none; }
+      /* HIDDEN AGAIN, EVERYWHERE — and this time on purpose rather than by the
+         accident of two rules cancelling out. On the menu it rendered as three
+         unlabelled emoji chips with bare fractions floating in the left margin,
+         attached to nothing: debug output, not a feature. The daily quests are
+         a real system and they belong somewhere a child is actually deciding
+         what to do next, with words on them. That is the results screen — see
+         renderQuestStrip(). */
+      #quests { display: none !important; }
+      #endQuests { width: min(92%, 380px); margin: 2px auto 0; display: none; flex-direction: column; gap: 6px; }
+      #endQuests.on { display: flex; }
+      #endQuests .eqh { font-size: 11px; letter-spacing: 2px; font-weight: 900; color: #9a86c8; text-align: left; }
+      #endQuests .eq { display: flex; align-items: center; gap: 9px; text-align: left;
+        background: rgba(255,255,255,0.05); border-radius: 12px; padding: 8px 11px; }
+      #endQuests .eqi { font-size: 19px; flex: none; }
+      #endQuests .eqt { flex: 1; color: #efe6ff; font-size: 13.5px; font-weight: 700; line-height: 1.25; }
+      #endQuests .eqn { flex: none; color: #ffd25a; font-size: 13px; font-weight: 900; }
+      #endQuests .eq.done { background: rgba(126,242,160,0.12); }
+      #endQuests .eq.done .eqn { color: #7ef2a0; }
+      #endQuests .eq.done .eqt { color: #b6f2c8; }
       /* A COLUMN, DOWN THE LEFT MARGIN. Laid out as a row across the top it
          printed straight over the "THE CUTE WORLD ENDER" tagline — the menu is
          a full-bleed splash with a centred column of art and buttons and it has
@@ -1038,6 +1085,10 @@
       <!-- the run's own numbers, and the next thing to chase. The screen used
            to state an outcome and offer a button; it never stated a goal. -->
       <div id="endStats"></div>
+      <!-- TODAY'S QUESTS, with words on them. They existed as three unlabelled
+           emoji chips floating in the menu's margin and read as debug output;
+           this is where a child is deciding whether to press PLAY AGAIN. -->
+      <div id="endQuests"></div>
       <div id="endNext"></div>
       <button id="btnAgain">PLAY AGAIN</button>
       <button id="btnHome">HOME</button>

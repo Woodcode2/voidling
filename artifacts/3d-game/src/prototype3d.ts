@@ -349,7 +349,7 @@ interface WorldCopy {
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
     n: 1, icon: '🏝️', sub: 'the little void is hungry · eat the island',
-    newsGap: [30, 12], signOn: 14, hero: null, introLen: 2.2,
+    newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The island is OVER.',
     enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
     winSub: 'the island belongs to the void', place: 'the island',
@@ -357,7 +357,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
-    newsGap: [30, 12], signOn: 14, hero: null, introLen: 2.2,
+    newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The resort is OVER.',
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
@@ -498,7 +498,7 @@ const ARCH_TAG: Record<string, string> = {
   HOARDER: '😴 slow and steady',
 };
 rivals.onJoin = (name, color, x, z, arch) => {
-  announceFam(`🌀 ${FAMILY_TITLE[name] ?? 'Cousin'} ${name} joined — ${ARCH_TAG[arch] ?? ''}`);
+  announceJoin(name, color, FAMILY_TITLE[name] ?? 'Cousin', (ARCH_TAG[arch] ?? '').replace(/^\S+\s*/, ''));
   fx.ring(x, z, color, 22, 0.8);
   audio.alert();
 };
@@ -520,9 +520,9 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   track('ate_rival', { name, pts: Math.round(pts), marquee: !!marquee, sec: elapsed() });
   // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
   // off you plus half her score, so it has to land like the ending it is
-  announceFam(marquee
-    ? `🏆 you OUT-GOBBLED THE CHASER! +${pts}`
-    : `🍽️ you DEVOURED ${FAMILY_TITLE[name] ?? ''} ${name}! +${pts}`);
+  announceHtml(marquee
+    ? `<div class="bCard"><span class="bIco">🏆</span><span class="bTx">You beat the chaser!<span class="bSub">${name} is out</span></span><span class="bMul">+${pts}</span></div>`
+    : `<div class="bCard"><span class="bIco">🍽️</span><span class="bTx">You ate ${esc(name)}!<span class="bSub">${esc(FAMILY_TITLE[name] ?? 'a rival')} is out</span></span><span class="bMul">+${pts}</span></div>`);
   if (marquee) { breakingNews('One hole has eaten the other. There is one left. It is bigger.'); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
@@ -612,7 +612,7 @@ rivals.onNearMiss = (name, x, z) => {
   addCoins(5);   // dodging is a SKILL — pay it
 };
 rivals.onStuffed = (name) => {
-  announceFam(`🍰 ${name} is TOO FULL to chase — now is your chance!`);
+  announceHtml(`<div class="bCard"><span class="bIco">🍰</span><span class="bTx">${esc(name)} is too full<span class="bSub">now is your chance</span></span></div>`);
   breakingNews('The second hole has stopped moving. It looks full. It looks slow.');
   audio.ready();
 };
@@ -841,10 +841,26 @@ const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.qu
 const scFill = () => document.getElementById('scFill');
 let prevHunger = 0;
 
-function announceFam(text: string) {
-  bannerEl.classList.add('fam');
-  announce(text);
-  setTimeout(() => bannerEl.classList.remove('fam'), 2300);
+/** A rival has arrived. Was: pink 30px text reading
+ *  "🌀 Cousin WOBBLES joined — 😱 runs from everything", which is a sentence
+ *  with two emoji in it and reads like a chat log. Now it is a card with the
+ *  rival's own colour on it, their name at card size, and what they DO on a
+ *  second line — the same shape a fighting game uses to say who just walked in. */
+function announceJoin(name: string, color: number, title: string, tag: string) {
+  const hex = '#' + color.toString(16).padStart(6, '0');
+  announceHtml(
+    `<div class="bCard"><span class="bDot" style="background:${hex};color:${hex}"></span>`
+    + `<span class="bTx">${esc(title)} ${esc(name)}<span class="bSub">${esc(tag)}</span></span></div>`,
+  );
+}
+/** A scripted beat. The multiplier is a BADGE, not a clause — "Everything is
+ *  DOUBLE!" was two thirds of the sentence and the least interesting third. */
+function announceBeat(icon: string, title: string, sub: string, mult: number) {
+  announceHtml(
+    `<div class="bCard"><span class="bIco">${icon}</span>`
+    + `<span class="bTx">${esc(title)}<span class="bSub">${esc(sub)}</span></span>`
+    + `<span class="bMul">×${mult}</span></div>`,
+  );
 }
 // ── ONE HERO MESSAGE AT A TIME ──────────────────────────────────────────────
 // The EVOLVE card and this banner are two independent channels that nothing
@@ -856,23 +872,38 @@ function announceFam(text: string) {
 // time. The evolve card now owns the screen for its animation, and anything
 // the banner wants to say during that window QUEUES rather than talks over it.
 let bannerFree = 0;          // tClock before which the banner must stay quiet
+// The banner carries MARKUP now, not a string — see the #banner card rules.
+// announce() still takes plain text and wraps it, so the sixty-odd existing
+// call sites are untouched; the structured helpers below build richer cards.
 const bannerQ: string[] = [];
-function announce(text: string) {
+const esc = (v: string) => v.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+/** A plain one-line card. `icon` is pulled out of the string if it starts with one. */
+function cardHtml(text: string): string {
+  // most call sites pass "<emoji> WORDS" — split it so the glyph gets its own
+  // slot at card size instead of sitting inline at text size
+  const m = text.match(/^(\p{Extended_Pictographic}(?:\u200d\p{Extended_Pictographic})*[\uFE0F]?)\s*(.*)$/u);
+  const ico = m ? m[1] : '';
+  const body = m ? m[2] : text;
+  return `<div class="bCard">${ico ? `<span class="bIco">${ico}</span>` : ''}<span class="bTx">${esc(body)}</span></div>`;
+}
+function paintBanner(html: string) {
+  bannerEl.innerHTML = html;
+  bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+}
+function announce(text: string) { announceHtml(cardHtml(text)); }
+function announceHtml(html: string) {
   if (tClock < bannerFree) {
     // never let a backlog build: the newest message is the relevant one
-    bannerQ.length = 0; bannerQ.push(text);
+    bannerQ.length = 0; bannerQ.push(html);
     return;
   }
-  bannerEl.textContent = text;
-  bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+  paintBanner(html);
 }
 /** the evolve card is playing — hold the banner until it has finished */
 function holdBanner(sec: number) { bannerFree = Math.max(bannerFree, tClock + sec); }
 function pumpBanner() {
   if (tClock < bannerFree || !bannerQ.length) return;
-  const t = bannerQ.shift()!;
-  bannerEl.textContent = t;
-  bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+  paintBanner(bannerQ.shift()!);
 }
 
 // haptics — hole.io vibrates on every absorb and it's core to the feel.
@@ -1111,24 +1142,32 @@ let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
 // spawn, same cast, same script, to the tenth of a second.
 const MAPLE_BEATS = [
   { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
-    banner: '🎺 BAND PRACTICE! Everything is DOUBLE!', news: 'The marching band is out. They know one song. Here it comes.' },
+    icon: '🎺', title: 'Band practice', sub: 'they only know one song',
+    news: 'The marching band is out. They know one song. Here it comes.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0x5ee8d8, flash: 'rgba(94,232,216,0.26)',
-    banner: '🐕 DOG OFF THE LEAD! Everything is DOUBLE!', news: 'A dog is loose on Main Street. Six people are chasing it. It thinks this is a game.' },
+    icon: '🐕', title: 'Dog off the lead!', sub: 'six people are chasing it',
+    news: 'A dog is loose on Main Street. Six people are chasing it. It thinks this is a game.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    banner: '📣 TOWN PARADE! The whole town is OUT!', news: 'The parade has started. The mayor calls it a scheduling matter.' },
+    icon: '📣', title: 'Town parade!', sub: 'everybody is on Main Street',
+    news: 'The parade has started. The mayor calls it a scheduling matter.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
-    banner: '🐐 THE GOAT IS LOOSE! Everything is TRIPLE!', news: 'The goat is out again. Nobody is chasing it. Everybody is watching.' },
+    icon: '🐐', title: 'The goat is loose!', sub: 'nobody is even chasing it',
+    news: 'The goat is out again. Nobody is chasing it. Everybody is watching.' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
 const PIRATE_BEATS: typeof MAPLE_BEATS = [
   { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0x7bffe8, flash: 'rgba(123,255,232,0.28)',
-    banner: '🍦 ICE CREAM HOUR! Everything is DOUBLE!', news: 'Ice cream hour has been declared. The ice cream hut is delighted.' },
+    icon: '🍦', title: 'Ice cream hour!', sub: 'the hut is very pleased',
+    news: 'Ice cream hour has been declared. The ice cream hut is delighted.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffa63f, flash: 'rgba(255,166,63,0.26)',
-    banner: '🦜 THE PARROT ESCAPED! Everything is DOUBLE!', news: 'The resort parrot is loose. It has learned the breakfast menu and will not stop.' },
+    icon: '🦜', title: 'The parrot escaped!', sub: 'it knows the whole menu',
+    news: 'The resort parrot is loose. It has learned the breakfast menu and will not stop.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
-    banner: '🪩 DANCE PARTY! The whole bay is MOVING!', news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
+    icon: '🪩', title: 'Dance party!', sub: 'the whole bay is moving',
+    news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
-    banner: '🏴‍☠️ TREASURE HUNT! Everything is TRIPLE!', news: 'The treasure hunt has begun. The map is still wrong.' },
+    icon: '🏴‍☠️', title: 'Treasure hunt!', sub: 'the map is still wrong',
+    news: 'The treasure hunt has begun. The map is still wrong.' },
 ];
 // GAME DAY runs the clock of an actual football game, which is the whole
 // pleasure of the conceit: the beats are not generic multipliers with a coat of
@@ -1136,13 +1175,17 @@ const PIRATE_BEATS: typeof MAPLE_BEATS = [
 // quarter, and the commentary box knows it.
 const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
   { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xf0b429, flash: 'rgba(240,180,41,0.28)',
-    banner: '🏈 KICKOFF! Everything is DOUBLE!', news: 'And we are under way. The ball is in the air and so, apparently, is the parking lot.' },
+    icon: '🏈', title: 'Kickoff!', sub: 'the ball is in the air',
+    news: 'And we are under way. The ball is in the air and so, apparently, is the parking lot.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xc4342f, flash: 'rgba(196,52,47,0.26)',
-    banner: '🥁 THE BAND TAKES THE FIELD! Everything is DOUBLE!', news: 'The marching band has taken the field. They have not been told. They are playing anyway.' },
+    icon: '🥁', title: 'The band is on the field!', sub: 'nobody told them about you',
+    news: 'The marching band has taken the field. They have not been told. They are playing anyway.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.26)',
-    banner: '🌭 CONCESSION RUSH! Everything is DOUBLE!', news: 'Everybody has gone for a hot dog at once. The queue is now the largest thing here.' },
+    icon: '🌭', title: 'Concession rush!', sub: 'everybody wants a hot dog',
+    news: 'Everybody has gone for a hot dog at once. The queue is now the largest thing here.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x2aa9a0, flash: 'rgba(42,169,160,0.30)',
-    banner: '📣 FOURTH QUARTER! Everything is TRIPLE!', news: 'Fourth quarter. The stadium is on its feet, which is fortunate, because the seats have gone.' },
+    icon: '📣', title: 'Fourth quarter!', sub: 'the stadium is on its feet',
+    news: 'Fourth quarter. The stadium is on its feet, which is fortunate, because the seats have gone.' },
 ];
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
@@ -1670,6 +1713,22 @@ function endMatch() {
       `<b>${rk.ic} LVL ${rk.lvl}</b>` +
       `<div class="xpb"><div style="width:${Math.round(rk.prog * 100)}%"></div></div></div>`;
     if (leveledTo) { audio.evolve(); buzz(70); }
+    // ── TODAY'S QUESTS, on the screen where "what next" is the live question.
+    // The board pays a +25 completion bonus and was, until now, invisible.
+    {
+      const qs = el('endQuests');
+      const open2 = quests.filter((q) => !q.done);
+      qs.className = 'on';
+      qs.innerHTML = '<div class="eqh">TODAY</div>' + quests.map((q) => {
+        // the pool's labels carry their own "Name: do the thing" prefix, which
+        // is a lot of words on a results screen — keep the instruction only
+        const said = q.label.includes(':') ? q.label.split(':').slice(1).join(':').trim() : q.label;
+        return `<div class="eq${q.done ? ' done' : ''}"><span class="eqi">${q.icon}</span>`
+          + `<span class="eqt">${said}</span>`
+          + `<span class="eqn">${q.done ? '✓' : `${Math.min(q.count, q.target)}/${q.target}`}</span></div>`;
+      }).join('')
+        + (open2.length ? '' : '<div class="eqh" style="color:#7ef2a0">ALL DONE — COME BACK TOMORROW</div>');
+    }
     const g = nextGoal();
     const nx = el('endNext');
     if (g) {
@@ -2085,14 +2144,20 @@ if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlaye
  *  hf_20260730_125858_e31cc3b1-18ca-4e17-a47a-26ead66b54ff.png and the bay's is
  *  hf_20260730_125832_499e6122-b092-4923-aa0e-f2b40d65ba33.png. */
 const CARD_ART: Record<string, string> = {
-  // MAPLE and PIRATE point at files that are already IN THE REPO. They were
-  // pointing at /assets/hf/… — a path vercel.json rewrites to CloudFront, which
-  // works on the web and resolves to nothing at all inside a Capacitor bundle,
-  // where there is no server to rewrite anything. card_maple.webp and
-  // card_pirate.webp have been sitting in public/assets the whole time, at 50KB
-  // each, unused. Two thirds of the world picker now needs no network.
-  maple: '/assets/card_maple.webp',
-  pirate: '/assets/card_pirate.webp',
+  // THE FIRST TWO CARDS WERE NOT POSTERS AT ALL. On a real device, worlds 1
+  // and 2 photographed as a close-up of the void sitting on a road and on a
+  // jetty — gameplay grabs with the hero pasted in the middle — against world
+  // 3, which is a proper key-art poster of a stadium on a floating island in
+  // space. Three cards, two visual languages, and the odd one out was the pair.
+  // (card_maple.webp / card_pirate.webp in public/assets are those same grabs;
+  // pointing at them fixed the offline problem and kept the wrong picture.)
+  //
+  // Both are re-drawn to World 3's brief: the world itself as a small floating
+  // island against the cosmos, its landmarks legible at card size, no void in
+  // frame. They stay written as /assets/hf paths because asset-refs.mjs scans
+  // the source for exactly that shape — `pnpm build:ios` vendors all three.
+  maple: '/assets/hf/hf_20260801_130607_c92a52e5-8c1c-4a60-a566-ba19583fd532.png',
+  pirate: '/assets/hf/hf_20260801_130624_b1d4e117-1a45-4447-9bb8-e7f764565975.png',
   // WORLD 3 — GAME DAY. A stadium above, a tailgate party below, in the same
   // chunky-clay register as the other two posters so the picker reads as one
   // set. (An alternate take from the same batch is
@@ -3062,17 +3127,29 @@ function animate() {
         if (!bt.fired && el3 >= bt.at) {
           bt.fired = true;
           feverMult = bt.mult; feverT = bt.dur;
-          announce(bt.banner);
-          breakingNews(bt.news);
+          announceBeat(bt.icon, bt.title, bt.sub, bt.mult);
+          // …and the newsroom is NOT told. It used to be handed bt.news the
+          // same frame, so two seconds after "The band is on the field!" the
+          // ticker said "The marching band has taken the field." Captured on
+          // Maple: five of eight headlines in a whole match were the beat text
+          // the player had just read on a card. That is why the news felt
+          // empty — most of it was an echo. The banner owns the beat; the
+          // newsroom keeps its own thread, and it has 400+ lines that were
+          // never getting a turn.
           audio.evolve(); buzz(35);
           fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
           fx.flash(bt.flash, 0.35);
-      audio.matchBeat(bt.banner);   // ice cream hour / dance party / treasure hunt each get their own sting
+      audio.matchBeat(bt.title);   // ice cream hour / dance party / treasure hunt each get their own sting
         }
       }
       if (feverT > 0) {
         feverT -= dt;
-        if (feverT <= 0) { feverMult = 1; announce('Rush over. Keep eating!'); }
+        // …and NOTHING is announced when it ends. "Rush over. Keep eating!"
+        // called every one of the twelve beats a "Rush" (only one of them is
+        // named that), and spending a full hero card to tell a child that a
+        // good thing has stopped is the opposite of a reward. The multiplier
+        // badge leaving the screen is the signal.
+        if (feverT <= 0) feverMult = 1;
       }
     }
     if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
