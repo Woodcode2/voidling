@@ -465,6 +465,9 @@ const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'ski
   const vis = () => {
     const overlaid = OVERLAYS.some((id) => document.getElementById(id)?.classList.contains('show'));
     bs.style.display = document.body.classList.contains('menu') && !overlaid ? 'block' : 'none';
+    // …and the same signal drives the quest board, which is menu furniture now:
+    // it must not sit on top of the shop, the world picker or the settings sheet
+    document.body.classList.toggle('ovl', overlaid);
   };
   const mo = new MutationObserver(vis);
   mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
@@ -1711,12 +1714,26 @@ function capture(e: Edible, giveHunger = true) {
   const d = Math.hypot(dx, dz) || 1;
   e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx);
   setShadowInstance((e.mesh.userData.shIdx as number) ?? -1, false);   // its shadow goes with it
-  e.orbitR = Math.min(Math.max(voidling.radius * 0.6, d), voidling.radius * 0.9);   // spiral stays INSIDE the rim
+  // THE SPIRAL STARTED WITH A TELEPORT. capture() fires while the prop is still
+  // out at d < R + e.radius*0.7, and this line then MOVED it to at least
+  // 0.6 x R — so on exactly the bites a child cares about, the big ones taken
+  // at the rim, the object jumped inward by up to a third of the void's width
+  // on the capture frame. Keep the inner clamp (a prop that is already past the
+  // centre should not spiral outwards) and otherwise start where it actually is.
+  e.orbitR = Math.min(d, voidling.radius * 0.9);
   e.mesh.userData.eaten = true;
   // topple toward the hole (the hole.io fantasy): the tip axis is perpendicular
   // to the pull direction, so things visibly keel over INTO the void
   e.spin.set((dz / d) * rand(4.5, 7.5), rand(-1.5, 1.5), (-dx / d) * rand(4.5, 7.5));
+  // HOW BIG WAS THAT, RELATIVE TO ME? Everything below is graded by it, which
+  // is the whole point: one number separates a landmark from a traffic cone.
+  const bite = THREE.MathUtils.clamp(e.radius / Math.max(0.4, voidling.radius), 0.12, 1);
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
+  // …and the blob LUNGES past its new size rather than easing to it
+  voidling.impulse(Math.min(2.2, e.radius * 0.9));
+  // THE WORLD STOPS for a big one. Gated at 0.55 so it is a landmark event,
+  // never a hoover spree, and hitStop() carries its own cooldown as well.
+  if (bite > 0.55) hitStop(0.055 + 0.05 * bite);
   combo++; comboT = 1.6;
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
   const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
@@ -1736,7 +1753,7 @@ function capture(e: Edible, giveHunger = true) {
     fx.ring(e.mesh.position.x, e.mesh.position.z, 0xb875ff, e.radius * 3, 0.45);
     spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6);
   }
-  voidling.chomp();
+  voidling.chomp(bite);   // graded by how big that was relative to us
   stats.eaten++; matchEaten++;
   // the very first thing a brand-new player ever eats gets a PARTY — the
   // guaranteed wow inside the first 30 seconds
@@ -2430,8 +2447,27 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
   // honesty: a player whose trophy screen says BEST 31,240 must never be
   // shown as "You — 0" here. No weekly score yet? fall back to the real best.
   const mine = Number(localStorage.getItem(weekKey()) || 0) || stats.best;
-  const anchor = Math.max(220, stats.best, mine);
-  const mul = [1.85, 1.6, 1.38, 1.2, 1.08, 0.86, 0.55];
+  // THE BOARD HAD TO BE UNCLIMBABLE, and the comment above says why it was
+  // written that way — a fixed wall parks a new player at permanent rank 8, so
+  // the ladder was scaled to them instead. But scaling every rival off the
+  // player's OWN best just moves the trap: five of the seven multipliers were
+  // at or above 1.0, so the player sat 6th of 8 at 200 points and 6th of 8 at
+  // 200,000, and a brilliant week changed nothing because the whole board rose
+  // with it. It is a leaderboard on which the number can never go up.
+  //
+  // The anchor is now FROZEN on the first view of each week. The rivals are a
+  // fixed ladder for those seven days, so beating your Tuesday score genuinely
+  // overtakes WOBBLES on Wednesday — and the anchor is seeded from the player's
+  // best, so a new child still opens mid-table rather than at the bottom.
+  const aKey = weekKey() + '-anchor';
+  let anchor = Number(localStorage.getItem(aKey) || 0);
+  if (!anchor) {
+    anchor = Math.max(220, stats.best, mine);
+    localStorage.setItem(aKey, String(anchor));
+  }
+  // straddles 1.0 so the opening position is mid-table and both directions are
+  // reachable inside one week
+  const mul = [1.42, 1.19, 1.02, 0.88, 0.72, 0.55, 0.34];
   const seeds = [
     { name: 'CHOMPZILLA', color: 0x7ed57a }, { name: 'BITSY', color: 0xff9a3a },
     { name: 'GLITZ', color: 0xff6fb0 }, { name: 'DOZER', color: 0x4d8ff0 },
@@ -2942,11 +2978,36 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   refresh();
 }
 
+// ── HIT-STOP ───────────────────────────────────────────────────────────────
+// The verb of this game is EATING and it happens about fifty times a match, and
+// until now a WORLD ENDER swallowing a hotel and a hatchling swallowing a
+// postbox were, frame for frame, the same event: the same three-particle puff,
+// the same fixed mouth animation, the same drain speed. There was no
+// discontinuity anywhere in the one thing the product is about.
+//
+// A big bite now stops the world for 55-105ms. Everything that is part of the
+// SIMULATION freezes — the hero, the drain spiral, the crowd, the family, the
+// particles — while everything that would read as a hitch if it froze keeps
+// running on real dt: tClock and its cooldowns, the camera lerp, the HUD, and
+// the audio, which is already scheduled ahead on its own clock.
+//
+// The world time-scale to do it with was already in this file and driving
+// exactly one line. `dtw` existed for the outro's slow-motion push-in and
+// nothing else ever read it.
+let stopT = 0;         // seconds of freeze left
+let stopCd = 0;        // …and the gate that stops a hoover spree stuttering
+function hitStop(sec: number) {
+  if (stopCd > 0) return;
+  stopT = Math.max(stopT, sec);
+  stopCd = 0.35;
+}
 function animate() {
   tickFrame();
   const dt = Math.min(0.05, clock.getDelta());
   let dtw = dt;
   if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
+  stopCd = Math.max(0, stopCd - dt);
+  if (stopT > 0) { stopT = Math.max(0, stopT - dt); dtw *= 0.06; }
   tClock += dt;
   if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
   island.update(dt, tClock);
@@ -3343,8 +3404,8 @@ function animate() {
     }
   }
 
-  voidling.update(dt, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
-  life.update(dt, tClock, voidState.x, voidState.z, R);
+  voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
+  life.update(dtw, tClock, voidState.x, voidState.z, R);
   // the family races on the SAME terms as the player now, so it needs the same
   // three numbers: the clock it is pacing against, the score its rubber band
   // reads, and the shared HAPPY HOUR multiplier
@@ -3354,7 +3415,7 @@ function animate() {
   // snapshotted. The ambient town (life.update, above) deliberately keeps
   // running — the world behind the score card should still look alive.
   if (!ended && !paused) {
-    rivals.update(dt, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
+    rivals.update(dtw, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
       { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
   }
   // ── THE RULE NOBODY WAS EVER TAUGHT ────────────────────────────────────────
@@ -3396,10 +3457,18 @@ function animate() {
     // scoring, chomp SFX chewed over the results, and the coins actually
     // banked drifted past the number the child had just been shown.
     if (e.eaten) {
-      e.t += dt * 2.4;
+      // A HOTEL AND A SEASHELL DRAINED AT THE SAME SPEED. e.t advanced at a flat
+      // 2.4/s, so everything in the game took an identical 0.417s to go down,
+      // on an identical linear ramp — which is most of why a landmark bite felt
+      // like a pebble bite. Big things now take up to twice as long and start
+      // slower, and the spiral accelerates as it falls so the last third whips.
+      const mass = Math.min(1, e.radius / Math.max(0.4, R));
+      e.t += dtw * (2.9 - 1.3 * mass);
       const p = e.mesh.position;
-      e.orbit += dt * 10;
-      const r = e.orbitR * (1 - e.t);
+      e.orbit += dtw * 10 * (1 + 2.2 * e.t);
+      // …and 1 - t is a straight line into the middle. Squared, the prop hangs
+      // at the rim for a beat and then drops, which is what a drain does.
+      const r = e.orbitR * (1 - e.t * e.t);
       p.x = voidState.x + Math.cos(e.orbit) * r;
       p.z = voidState.z + Math.sin(e.orbit) * r;
       // THINGS WERE FALLING UPWARDS. `cy` is the void's group height, which is
@@ -3407,8 +3476,8 @@ function animate() {
       // own comment says "sink INTO the pit", lerped every prop UP. Measured
       // across 295 captures of every prop kind in both worlds: +2.6 to +3.6
       // units of RISE, 245 of them climbing. Straight down into the hole now.
-      p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dt * 7));
-      e.mesh.rotation.x += e.spin.x * dt; e.mesh.rotation.y += e.spin.y * dt; e.mesh.rotation.z += e.spin.z * dt;
+      p.y = THREE.MathUtils.lerp(p.y, -R * 0.55, Math.min(1, dtw * 7));
+      e.mesh.rotation.x += e.spin.x * dtw; e.mesh.rotation.y += e.spin.y * dtw; e.mesh.rotation.z += e.spin.z * dtw;
       // …and it was DELETED AT 0.10 SCALE. On a shell nobody notices; on a
       // seven-unit hotel that is a 1.4-unit chunk of building blinking out in
       // mid-air, which is exactly the "they just disappear" report. Drive the
@@ -3713,7 +3782,7 @@ function animate() {
     const bs2 = el('loadScr'); bs2.style.transition = 'opacity 0.45s ease'; bs2.style.opacity = '0';
     setTimeout(() => { bs2.classList.remove('boot'); bs2.style.opacity = ''; bs2.style.transition = ''; }, 480);
   }
-  const shakeOff = fx.update(dt);
+  const shakeOff = fx.update(dtw);
   camera.position.add(shakeOff);
   // GOLDEN HOUR IS OUT. Dimming the sky and sun over the last 45s read as the
   // world randomly "turning to night" — confusing mid-match, and a kids' game

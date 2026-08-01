@@ -20,10 +20,12 @@ export interface Void3D {
   group: THREE.Group;
   radius: number;
   setRadius(r: number): void;
+  /** Kick the growth spring — an absorbed meal shoves the blob. */
+  impulse(v: number): void;
   setStage(n: number): void;
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   setMood(m: Mood): void;    // the emotional state machine's current state
-  chomp(): void;             // quick mouth-open bite (on eat)
+  chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
   animCollapse(): void;      // inhale-shrink then burst (COLLAPSE)
@@ -337,6 +339,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const bodyMat = makeVoidBody();
   const whiteTex = bodyMat.uniforms.uTex.value as THREE.Texture;
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 72), bodyMat);
+  // Starts true; setRadius() gates it once the hero is big — see the note there.
   body.castShadow = true;
   bob.add(body);
 
@@ -861,7 +864,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     group,
     get radius() { return radius; },
     set radius(r: number) { radius = r; },
-    setRadius(r: number) { radius = r; },
+    setRadius(r: number) {
+      radius = r;
+      // A HOLE SHOULD NOT THROW A SHADOW SIDEWAYS. Under GAME DAY's 40-degree
+      // sun a WORLD ENDER is a 24-unit sphere, and casting from it laid a hard
+      // black ellipse on the ground beside the hero, offset by more than its own
+      // diameter — a second dark mass the eye reads as another void, fighting
+      // the bright aperture lip that is the one cue saying "hole" and not
+      // "ball". Small, a real shadow is what grounds him; big, the contact disc
+      // below already does that job and does it correctly. It also hands back
+      // the largest single caster in the frustum during the heaviest third of
+      // every match.
+      body.castShadow = r < 4;
+    },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     setStage(n: number) {
       if (n < stage) {   // instant rematch: shed the late-form dressing
@@ -957,7 +972,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         bodyMat.uniforms.uTexAmt.value = 0;
       }
     },
-    chomp() { if (mouthT < 0.22) { mouthT = 0.22; mouthMax = 0.55; } wobble = Math.min(1, wobble + 0.55); },
+    // GRADED. This took no argument, so the mouth opened exactly as wide for a
+    // hotel as for a hydrant — about fifty times a match, on the one action the
+    // whole game is made of. `k` is the meal's size relative to the void.
+    chomp(k = 0.3) {
+      const g = Math.min(1, Math.max(0.12, k));
+      const want = 0.18 + 0.30 * g;                 // 0.22 -> 0.48 of a second
+      const wide = 0.42 + 0.58 * g;                 // 0.47 -> 1.00 of the jaw
+      if (mouthT < want) { mouthT = want; mouthMax = wide; }
+      wobble = Math.min(1, wobble + 0.30 + 0.55 * g);
+    },
+    /** Kick the growth spring directly — an absorbed meal should shove the
+     *  blob, not just raise its target radius. */
+    impulse(v2: number) { dispV += v2; },
     animGulp() { mouthT = 0.6; mouthMax = 1; wobble = 1; },
     animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); },
     animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; },
@@ -968,8 +995,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // slightly underdamped, so each absorb visibly swells the blob past its
       // new size and jiggles back — you SEE the growth land, hole.io-style
       if (Math.abs(radius - dispR) > Math.max(1.5, radius * 0.5)) { dispR = radius; dispV = 0; }   // warp/rematch: snap
-      dispV += (radius - dispR) * 46 * dt;
-      dispV *= Math.max(0, 1 - 8.5 * dt);
+      // 46/8.5 is zeta 0.63 — an 8% overshoot, which is invisible. The blob is
+      // meant to visibly swell PAST its new size and jiggle back on every meal;
+      // at 95/9.0 (zeta ~0.46) it actually does, and impulse() above can shove
+      // it further on a big one.
+      dispV += (radius - dispR) * 95 * dt;
+      dispV *= Math.max(0, 1 - 9.0 * dt);
       dispR = Math.max(0.2, dispR + dispV * dt);
       // jelly slosh decays after each meal; a faint idle wave always survives
       wobble = Math.max(0, wobble - dt * 1.7);

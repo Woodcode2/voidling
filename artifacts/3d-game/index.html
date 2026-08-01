@@ -162,16 +162,32 @@
          for a goal that is not this match's goal. The quests still run and
          still pay out — they belong on the menu and the results screen, not
          over the world. */
+      /* THE QUEST BOARD LIVES ON THE MENU. It used to be hidden here when
+         the body was not .menu, and hidden again in the HUD rule below when it
+         was — the union of the two is "never visible in any state", which is
+         how the game's whole daily-quest hook shipped with no UI at all. It
+         belongs on the menu rather than the HUD: the in-match screen already
+         carries the board, the timer, the form chip, the wallet, the news card
+         and the banner, and this is a thing you read BEFORE you press play. */
       body:not(.menu) #quests { display: none; }
-      #quests { position: fixed; top: calc(150px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
-        display: flex; gap: 6px; }
-      #quests .q { background: rgba(16,8,30,0.55); border-radius: 11px; padding: 5px 8px 4px;
-        backdrop-filter: blur(6px); text-align: center; min-width: 40px; }
+      /* A COLUMN, DOWN THE LEFT MARGIN. Laid out as a row across the top it
+         printed straight over the "THE CUTE WORLD ENDER" tagline — the menu is
+         a full-bleed splash with a centred column of art and buttons and it has
+         no free horizontal band anywhere. The strip beside the floating island
+         is the one genuinely empty region on the screen, so the board goes
+         there, stacked, at a width that clears the art. */
+      #quests { position: fixed; top: calc(31vh + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 5; pointer-events: none;
+        display: flex; flex-direction: column; gap: 7px; }
+      #quests .q { background: rgba(16,8,30,0.62); border-radius: 12px; padding: 6px 7px 5px;
+        backdrop-filter: blur(6px); text-align: center; width: 54px; box-sizing: border-box;
+        border: 1px solid rgba(184,117,255,0.16); }
       #quests .qi { display: block; font-size: 17px; line-height: 1.15; }
-      #quests .qc { display: block; font-size: 9.5px; font-weight: 900; color: #d8c8ff; letter-spacing: 0.5px; }
+      #quests .qc { display: block; font-size: 11px; font-weight: 900; color: #e2d6ff; letter-spacing: 0.3px; }
       #quests .qb { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); overflow: hidden; margin-top: 3px; }
       #quests .qb div { height: 100%; background: linear-gradient(90deg, #ffb82a, #ffd25a); border-radius: 2px; }
       #quests .q.done { opacity: 0.7; }
+      /* the board is menu furniture — every full-screen menu overlay hides it */
+      body.ovl #quests { display: none; }
       #quests .q.done .qc { color: #7ef2a0; }
       #quests .q.done .qb div { background: #7ef2a0; width: 100% !important; }
       /* THE SECOND PROGRESS BAR IS GONE. #formbar sat at the foot of the screen
@@ -763,13 +779,20 @@
       #btnGotIt:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
 
       /* hide gameplay HUD while in the menu */
-      body.menu #timer, body.menu #board, body.menu #quests, body.menu #form,
+      body.menu #timer, body.menu #board, body.menu #form,
       body.menu #hunger, body.menu #hungerlbl, body.menu #powers, body.menu #banner { display: none; }
       /* 12 painted the wallet chip over four scrolling screens — it sat on the
          Honey voidling's face at the bottom of the shop and clipped the TOP
          VOIDS title with no scrolling at all. It only ever needed to clear the
          menu (z-index 10), not the overlays above it. */
       #coins { z-index: 11; }
+      /* …and the quest board sits in the same band. #menu is a full-screen
+         splash at z-index 10, so at the HUD's default 5 the board rendered
+         (display:flex, 180x46, measured) and was painted straight over by the
+         key art — invisible for the same reason the wallet chip needed this
+         line. 11 puts it above the splash and below the sheets, and body.ovl
+         hides it whenever one of those sheets is open. */
+      #quests { z-index: 11; }
     </style>
   </head>
   <body class="menu">
@@ -791,9 +814,12 @@
     <div id="guide"></div>
     <button id="btnQuit" title="home">⌂</button>
     <div id="titlecard">
-      <div class="lvl">LEVEL 1</div>
-      <div class="name">MAPLE&nbsp;ISLE</div>
-      <div class="sub">the little void is hungry · eat the island</div>
+      <!-- all three are filled from WORLD_COPY before the card is ever shown;
+           hardcoding them here is how "LEVEL 1 / MAPLE ISLE / eat the island"
+           survived two world launches -->
+      <div class="lvl">&nbsp;</div>
+      <div class="name">&nbsp;</div>
+      <div class="sub">&nbsp;</div>
     </div>
 
     <!-- ── start menu: full splash key art, opaque (not the live game) ── -->
@@ -949,7 +975,12 @@
     <!-- ── loading screen: PLAY waits here until the asset pack is resident ── -->
     <div id="loadScr" class="boot">
       <div class="lLogo">VOIDLING</div>
-      <div class="lName">MAPLE&nbsp;ISLE</div>
+      <!-- LEFT EMPTY ON PURPOSE. #loadScr.boot paints before the module runs,
+           so whatever is written here is the literal first frame of the app —
+           and it said MAPLE ISLE, a world this game has not had since the
+           re-theme to MAPLE FALLS. The module fills it from WORLD_NAMES within
+           a frame or two; the nbsp holds the line height so nothing shifts. -->
+      <div class="lName">&nbsp;</div>
       <div class="lBarWrap"><div id="lBar"></div></div>
       <div id="lPct">0%</div>
       <div class="lTip">tip: eat the little stuff first — cones, hydrants, mailboxes</div>
