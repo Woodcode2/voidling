@@ -711,7 +711,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     scared:  { wide: 1.16, pupil: 0.55, smile: 0.85, mouthY: -0.65, brow: 1, browAng: -0.5, browY: 0.43, sweat: 1, blush: 0.3 },
     hurt:    { lid: 0.3, mouthY: -0.8, smile: 0.8, brow: 1, browAng: -0.6, browY: 0.38, sweat: 1, blush: 0.35 },
     smug:    { lid: 0.55, smile: 1.15, smirk: 0.2, brow: 0.7, browAng: 0.04, browY: 0.33, blush: 0.7 },
-    sleepy:  { lid: 0.35, smile: 0.95, pupil: 0.9, zzz: 1 },
+    // heavy level brows sitting low, a lid most of the way down, and a small
+    // soft mouth — a nap, not a grin with the eyes shut
+    sleepy:  { lid: 0.26, smile: 0.66, mouthY: 0.62, pupil: 0.86,
+               brow: 0.95, browAng: -0.02, browY: 0.33, blush: 0.62, zzz: 1 },
     victory: { pupil: 1.35, wide: 1.06, smile: 1.5, blush: 0.9, maw: 0.18, brow: 0.85, browAng: 0.2, browY: 0.47, bounce: 1 },
   };
   const BASE = { ...mp };
@@ -1201,13 +1204,22 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // is an authored cycle, not Math.random() — same void every load.
       blinkT -= dt;
       if (blinkT <= 0 && blink <= 0) {
-        blink = 0.16; blinkN++;
-        blinkT = (mood === 'sleepy' ? 1.4 : 2.5) + [1.7, 3.4, 0.9, 2.6, 4.1][blinkN % 5];
+        // a drowsy blink is a long slow droop, not the same 0.16s flick fired
+        // more often — that read as fluttering, which is the opposite of tired
+        blink = mood === 'sleepy' ? 0.44 : 0.16; blinkN++;
+        blinkT = (mood === 'sleepy' ? 2.2 : 2.5) + [1.7, 3.4, 0.9, 2.6, 4.1][blinkN % 5];
       }
       let open = 1;
-      if (blink > 0) { blink -= dt; open = Math.abs(blink - 0.08) / 0.08; }
-      const wanderX = mood === 'sleepy' ? Math.sin(s.t * 0.7) * 0.6 : 0;
-      const wanderY = mood === 'sleepy' ? Math.sin(s.t * 0.47) * 0.3 - 0.25 : 0;
+      if (blink > 0) {
+        const halfB = mood === 'sleepy' ? 0.22 : 0.08;
+        blink -= dt; open = Math.min(1, Math.abs(blink - halfB) / halfB);
+      }
+      // A DROWSY GAZE DRIFTS DOWN, it does not scan. This was a 0.7 Hz sweep
+      // across 60% of the eye's width with a bias that ended up ABOVE centre
+      // half the time. Now it settles low and wanders slowly and slightly,
+      // which is what half-shut eyes do.
+      const wanderX = mood === 'sleepy' ? Math.sin(s.t * 0.38) * 0.2 : 0;
+      const wanderY = mood === 'sleepy' ? -0.75 + Math.sin(s.t * 0.29) * 0.12 : 0;
       // AT SMALL SIZE THE FACE GROWS. The eyes ARE the character; at 18 px a
       // "correctly proportioned" eye is four pixels of mush. Caricature them
       // back up as he shrinks on screen, exactly the way an icon designer would.
@@ -1222,17 +1234,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         const eyeK = eyeLod * grow;
         e.g.scale.set(eyeK, eyeK, 1);
         e.g.position.x = Math.sign(e.g.position.x || 1) * 0.36 * (1 + small * 0.05);
-        const room = Math.max(0, SCL_R - 0.122 * pk - 0.012);
-        e.pupilGrp.position.x = THREE.MathUtils.clamp((s.lookX + wanderX) * 0.09, -room, room);
-        e.pupilGrp.position.y = 0.06 + THREE.MathUtils.clamp((s.lookY + wanderY) * 0.06, -room, room);
         // BLINK FROM THE TOP: a lid comes down, it does not implode toward the
         // middle of the eyeball. Anchoring the collapse high sells the lid.
         const oy = Math.max(0.08, open) * mp.lid;
         const drop = SCL_R * (1 - oy) * 0.5;
+        const room = Math.max(0, SCL_R - 0.122 * pk - 0.012);
+        e.pupilGrp.position.x = THREE.MathUtils.clamp((s.lookX + wanderX) * 0.09, -room, room);
+        // …and the VERTICAL offset lives in the squashed eye, so it is squashed
+        // with it. Everything below the lift is in sclera-local space and is
+        // multiplied by the same `oy` the eyeball got, which makes the pupil
+        // containable at any lid value by construction rather than by luck at
+        // lid 1. The clamp gets its own vertical room for the same reason.
+        const roomY = Math.max(0, room * oy);
+        const gazeY = 0.06 * oy + THREE.MathUtils.clamp((s.lookY + wanderY) * 0.06 * oy, -roomY, roomY);
         e.sclera.scale.set(mp.wide, oy * mp.wide, 1);
         e.sclera.position.y = drop;
         e.pupilGrp.scale.set(pk, oy * pk * pupilSquash, 1);
-        e.pupilGrp.position.y += drop;
+        e.pupilGrp.position.y = drop + gazeY;
         // outline weight: fattens as he shrinks, so the eye keeps a dark
         // boundary against a bright body even at a handful of pixels
         e.outline.scale.setScalar(SCL_R * (1 + 0.05 + small * 0.14));

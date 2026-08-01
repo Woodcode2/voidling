@@ -412,6 +412,7 @@ const _dbg = window as unknown as {
   __biomeAt: (x: number, z: number) => string | null;
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
+  __setMood: (m: string | null) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
   __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number;
@@ -428,6 +429,10 @@ _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: distri
 // QA: wind the match clock forward so a harness can photograph the results
 // screen without simulating three real minutes of software rendering
 _dbg.__rushClock = (to: number) => { matchClock = to; };
+// QA: pin an expression so the face rig can be measured mood by mood without
+// waiting on the idle timer or getting bitten. `null` hands control back.
+let moodPin: string | null = null;
+_dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m as never); };
 // QA: force the hero to a size so the renderer can be shot at every form
 // without playing a whole match. Sets the visual stage too, so the void looks
 // exactly as it would if a player had grown into it.
@@ -3604,6 +3609,7 @@ function animate() {
     else if (combo >= 5 && comboT > 0) mood = 'frenzy';
     else if (tClock - hungryT < 0.45) mood = 'hungry';
     else if (started && !ended && tClock - lastInput > 8) mood = 'sleepy';
+    if (moodPin) mood = moodPin as typeof mood;   // QA pin, see __setMood
     voidling.setMood(mood);
     if (mood !== prevMood) {
       if (mood === 'scared') audio.voice('scared');
