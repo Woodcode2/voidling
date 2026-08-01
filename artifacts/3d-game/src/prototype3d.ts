@@ -1211,6 +1211,23 @@ let devPlayerPct = 0, devFamilyPct = 0;
 // numbers against a 3,297-prop island, so at the low end they quantise to
 // nothing useful — the results screen needs the counts themselves.
 let devMineN = 0, devAllN = 0;
+// ── THE FINALE CUE ─────────────────────────────────────────────────────────
+// GAME DAY's stadium is the biggest meal in the game and it comes into range
+// at radius 9.91, which a measured run reaches at about 167 seconds of 180.
+// Timed, that is exactly right: the bowl unlocks in the last quarter with the
+// fourth-quarter multiplier live and just enough clock to drive north and take
+// it. Instrumented, it works — in range at 167, swallowed at 172.
+//
+// But NOTHING TOLD THE PLAYER. A finale nobody is pointed at is a landmark
+// that happens to be edible, and a child in the car park with thirteen seconds
+// left has no reason to look up. So the moment it becomes reachable, the game
+// says so once, loudly, and the booth says it too.
+//
+// Only worlds that declare a hero landmark get this (COPY.hero). Maple and
+// Pirate Bay have no single object the match builds toward — their biggest
+// props come into range halfway through — so a cue there would be noise.
+let heroProp: Edible | null = null;
+let heroCued = false, heroAte = false;
 // reactive one-shots: big beats the player just caused jump the queue
 const newsQueue: string[] = [];
 function breakingNews(h: string) {
@@ -1403,7 +1420,10 @@ function refreshHud() {
   for (const e of edibles) { total++; if (e.eaten || !e.mesh.visible) { consumed++; if (e.mesh.userData.byPlayer) mine++; } }
   if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
   devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
-  if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce('🍽️ HALF the island. Gone.'); }
+  // …and the last of the island words. COPY.place is 'the island', 'the
+  // resort' or 'the town' — the halfway banner is the one milestone that
+  // names the place out loud, so it has to name the right one.
+  if (devouredPct >= 50 && !moments.half && started && !ended) { moments.half = true; announce(`🍽️ HALF ${COPY.place}. Gone.`); }
   // A LINEAR PERCENTAGE OVER 3,286 PROPS IS A METER THAT SAYS ZERO. One percent
   // costs 33 props, so a child who has eaten two hundred things reads "6%", and
   // for the whole first half-minute the biggest number on their screen is 0.
@@ -1827,6 +1847,8 @@ let guideStep = 0, guideT = 0, presenceT = 0;
 let introT = 0, outroT = 0;
 // how far the opening shot's subject currently sits from the void (see COPY.hero)
 let introHX = 0, introHZ = 0;
+// what the shadow map was set to before the opening move borrowed it
+let introShadow: boolean | null = null;
 // THE HAND-AUTHORED FIRST SIXTY SECONDS. All of these are per-match, and all of
 // them exist because the opening was measured and found to teach the wrong
 // things in the wrong order.
@@ -1850,6 +1872,12 @@ function beginMatch(solo = false) {
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
+  // the hero is whatever the biggest thing on this world is — resolved per
+  // match, so a re-rolled or re-scaled landmark needs no second list
+  heroCued = false; heroAte = false; heroProp = null;
+  if (COPY.hero) {
+    for (const e of edibles) if (!heroProp || e.radius > heroProp.radius) heroProp = e;
+  }
   // THE OPENING FRAME IS CALM. The void arrives 0.9 units across inside a fear
   // radius of eighteen, so without this the crowd is already screaming on the
   // title card and every world's best writing — its tier-0 ambient pool — is
@@ -3466,6 +3494,18 @@ function animate() {
     let targetDist = Math.min(340, Math.max(26, 38 * Math.pow(R / 0.9, 0.82)));
     if (introT > 0) {
       introT -= dt;
+      // ── THE ESTABLISHING SHOT IS EXPENSIVE, so it does not pay for shadows.
+      // Measured on GAME DAY: the opening frame renders 4,694 draw calls and
+      // 1.40M triangles against 1,241 and 355k in settled play — the camera is
+      // three hundred units up and pointed at a landmark most of the plateau
+      // away, so nearly the whole world is inside the frustum. Draw calls count
+      // the shadow pass too, and shadow detail is invisible under a 3.4-second
+      // pull-back, so the cheapest half of that bill is also the half nobody
+      // can see. Restored below the moment the move ends.
+      if (introShadow === null) { introShadow = renderer.shadowMap.enabled; renderer.shadowMap.enabled = false; sun.castShadow = false; }
+      if (introT <= 0 && introShadow !== null) {
+        renderer.shadowMap.enabled = introShadow; sun.castShadow = introShadow; introShadow = null;
+      }
       if (introT <= 0 && firstRun && !dragTaught) {
         // controls are live THIS frame — now the instruction is true
         dragTaught = true; guideStep = 1;
@@ -3610,6 +3650,20 @@ function animate() {
 
   // island news: a headline every ~20s, tone tracks the devoured meter
   if (started && !ended) {
+    // ── THE FINALE COMES INTO RANGE ────────────────────────────────────────
+    if (heroProp && !heroCued && !heroProp.mesh.userData.eaten
+        && heroProp.radius <= voidling.radius * EAT_RATIO) {
+      heroCued = true;
+      announce('🏟️ THE STADIUM IS IN REACH — GO!');
+      breakingNews('It is big enough for the stadium. Hank has stopped describing and started watching.');
+      audio.ready(); buzz(30);
+      fx.ring(heroProp.mesh.position.x, heroProp.mesh.position.z, 0xf0b429, heroProp.radius * 5, 0.9);
+    }
+    if (heroProp && !heroAte && heroProp.mesh.userData.eaten) {
+      heroAte = true;
+      announce('🏟️ THE STADIUM IS GONE. ALL OF IT.');
+      audio.voice('happy'); buzz(120);
+    }
     newsCd -= dt;
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen
     // roughly a third of the match — it stopped being an event. Now 30-42s,
