@@ -25,6 +25,11 @@ import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
+import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from './proto3d/newsroom_lantern';
+// the district ids this world's newsroom knows, so a biome from another world
+// can never be handed to it as a key
+const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
+  'moonbridge', 'nightgarden', 'bathhouse', 'bamboo'];
 import {
   track, setCtx, countMatch, tickFrame, fpsSummary, resetFps,
   analyticsEnabled, setAnalyticsEnabled,
@@ -1306,8 +1311,27 @@ const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
     icon: '📣', title: 'Fourth quarter!', sub: 'the stadium is on its feet',
     news: 'Fourth quarter. The stadium is on its feet, which is fortunate, because the seats have gone.' },
 ];
+// ── LANTERN NIGHT. The market's own four beats, and they follow the level's
+// walk north: the gate, the row, the bridge, the bathhouse. The third is the
+// turn — the moment the market stops offering you things — so it is the one
+// with the drum on it.
+const LANTERN_BEATS: typeof MAPLE_BEATS = [
+  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffb256, flash: 'rgba(255,178,86,0.28)',
+    icon: '🏮', title: 'The lanterns are lit!', sub: 'every one of them, for you',
+    news: 'The lanterns have all been lit at once. The market says this is in your honour.' },
+  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xff5a4a, flash: 'rgba(255,90,74,0.26)',
+    icon: '🍡', title: 'Everything is free!', sub: 'they insist. they keep insisting',
+    news: 'Every stall on Lantern Row has waived its prices for the guest in the purple.' },
+  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0x8ad4ff, flash: 'rgba(138,212,255,0.26)',
+    icon: '🥁', title: 'The drum has started', sub: 'nobody ordered the drum',
+    news: 'The drum tower has begun. It is only ever struck for two reasons and this is not the other one.' },
+  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd489, flash: 'rgba(255,212,137,0.32)',
+    icon: '♨️', title: 'The bathhouse is open!', sub: 'they are calling you up',
+    news: 'The bathhouse has opened its doors and lit every window. It is the last thing standing.' },
+];
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
-  : pickedWorld === 'pirate' ? PIRATE_BEATS : MAPLE_BEATS;
+  : pickedWorld === 'pirate' ? PIRATE_BEATS
+    : pickedWorld === 'lantern' ? LANTERN_BEATS : MAPLE_BEATS;
 const MEAL_NAME: Record<string, string> = pickedWorld === 'gameday' ? {
   // GAME DAY names its own meals: 'a parked car' for a pickup with the tailgate
   // down is the wrong noun, and newsroom_gameday's matcher already looks for
@@ -1458,7 +1482,23 @@ function showNews() {
   if (!signedOn) { signedOn = true; newsQueue.length = 0; }
   const PB = pickedWorld === 'pirate';
   let h: string, brand: string;
-  if (pickedWorld === 'gameday') {
+  if (pickedWorld === 'lantern') {
+    // LANTERN NIGHT is not a newsroom either — it is the market's PUBLIC
+    // ADDRESS, a recorded courtesy system that has run the same announcements
+    // for six hundred years and has no mechanism for noticing anything. It
+    // cannot deny the void, because denial requires having considered it. The
+    // arc is HOSPITALITY -> CONCERN -> ALARM rather than the denial-then-panic
+    // the other three all share: tier 0 is pure courtesy, tier 1 is management
+    // several floors up reading a ledger that will not stop going up, and tier
+    // 2 is a person who has taken the microphone — with the recording still
+    // audible underneath, because a recording does not stop for an emergency.
+    const ld = String(island.biomeAt(voidState.x, voidState.z)) as LnDist;
+    h = newsQueue.shift() ?? pickLanternNews({
+      tier, district: (LN_DISTS.includes(ld) ? ld : null), lastMeal, devouredPct,
+      form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
+    });
+    brand = LANTERN_BRAND[tier];
+  } else if (pickedWorld === 'gameday') {
     // GAME DAY is not a newsroom at all — it is a COMMENTARY BOOTH. Hank
     // Prewitt has the play-by-play and Bill Ordway has the colour, and the
     // conceit is that they never stop calling the game: tier 0 is pre-game
@@ -2568,7 +2608,7 @@ function gildTreasure() {
 }
 
 function resetMatch() {
-  resetNews(); resetMapleNews(); resetGamedayNews(); signedOn = false;   // memory + the sign-on are per-match
+  resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); signedOn = false;   // memory + the sign-on are per-match
   // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
   // Proven with an isolation test, not inferred: a uniquely-tagged banner
   // planted on the menu, left for ten seconds (the animation is 2.2s), then a
