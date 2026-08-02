@@ -832,3 +832,193 @@ export function makeStepLantern(): THREE.Group {
   solid.push(part(new THREE.BoxGeometry(0.46, 0.07, 0.46), TILE_D, 0, 0.8, 0));
   return lit(solid, glow);
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+//  THE LADDER
+//  A census of what a LATE void can eat, across all four worlds, found this
+//  one starved: 22 props at radius 4 or above out of 5,293, which is 0.4% of
+//  the level against GAME DAY's 2.1%. Worse than the count is the shape — the
+//  distribution has a CLIFF in it:
+//
+//     0-1: 2509   1-2: 1423   2-3: 1337   3-4: 2   4-5: 19   ...   11: 1
+//
+//  Two props in the whole 3-to-4 band, nothing at all between 6 and the
+//  bathhouse at 11. So the last minute of a match, when the hero is a WORLD
+//  ENDER sixteen metres across, is spent hoovering crumbs — and the one thing
+//  worth eating is the building the match ends on. GAME DAY, which measured a
+//  monotonically accelerating match, has 895 props in that same 3-4 band and a
+//  smooth run of sizes all the way to its stadium.
+//
+//  These are the missing rungs. And the first of them is not an invention:
+//  THE DRUM TOWER is already in this world's fiction — it names an entire
+//  newsroom tier, it is the third match beat ("The drum has started"), and its
+//  headline reads "The drum tower has begun." A child hears that, looks up,
+//  and there is nothing there.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** THE DRUM TOWER (yagura). A timber scaffold with a great drum on top, the
+ *  thing that starts and ends a festival. It is struck for two reasons — to
+ *  call people in, and to warn them — and the level's third beat is the moment
+ *  a child learns which one this is. Tall, open-framed and lit from inside, so
+ *  it reads from anywhere in the valley. */
+export function makeDrumTower(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  const H = 13, W = 5.4;
+  // four legs, battered inward — a straight-sided tower reads as a box
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const lean = 0.055 * sx, leanZ = 0.055 * sz;
+    solid.push(part(new THREE.BoxGeometry(0.5, H, 0.5), TIMBER,
+      sx * W * 0.5, H / 2, sz * W * 0.5, -leanZ, 0, lean));
+  }
+  // cross-bracing on three levels — this is the silhouette
+  for (let lv = 1; lv <= 3; lv++) {
+    const y = (H / 4) * lv, w2 = W * (1 - 0.03 * lv);
+    for (const sz of [-1, 1]) {
+      solid.push(part(new THREE.BoxGeometry(w2 * 1.06, 0.28, 0.28), TIMBER_D, 0, y, sz * w2 * 0.5));
+      solid.push(part(new THREE.BoxGeometry(w2 * 1.4, 0.2, 0.2), TIMBER_D, 0, y - H / 9, sz * w2 * 0.5, 0, 0, 0.62));
+    }
+    for (const sx of [-1, 1]) {
+      solid.push(part(new THREE.BoxGeometry(0.28, 0.28, w2 * 1.06), TIMBER_D, sx * w2 * 0.5, y, 0));
+      solid.push(part(new THREE.BoxGeometry(0.2, 0.2, w2 * 1.4), TIMBER_D, sx * w2 * 0.5, y - H / 9, 0, 0.62, 0, 0));
+    }
+  }
+  // the platform
+  solid.push(part(new THREE.BoxGeometry(W * 1.5, 0.4, W * 1.5), CEDAR, 0, H, 0));
+  solid.push(part(new THREE.BoxGeometry(W * 1.56, 0.16, W * 1.56), CEDAR_D, 0, H - 0.24, 0));
+  // a rail, and the red-and-white festival cloth hung from it
+  for (const sz of [-1, 1]) {
+    solid.push(part(new THREE.BoxGeometry(W * 1.5, 0.14, 0.14), TIMBER, 0, H + 1.1, sz * W * 0.74));
+    for (let i = 0; i < 7; i++)
+      solid.push(part(new THREE.BoxGeometry(W * 0.21, 0.9, 0.05), i % 2 ? VERM : PAPER,
+        (i - 3) * W * 0.22, H + 0.62, sz * W * 0.75));
+  }
+  for (const sx of [-1, 1]) {
+    solid.push(part(new THREE.BoxGeometry(0.14, 0.14, W * 1.5), TIMBER, sx * W * 0.74, H + 1.1, 0));
+    for (let i = 0; i < 7; i++)
+      solid.push(part(new THREE.BoxGeometry(0.05, 0.9, W * 0.21), i % 2 ? VERM : PAPER,
+        sx * W * 0.75, H + 0.62, (i - 3) * W * 0.22));
+  }
+  // THE DRUM. Barrel on its side on a stand, skins facing out, struck from
+  // both ends — this is the object the whole prop exists for, so it is big.
+  solid.push(part(new THREE.CylinderGeometry(1.5, 1.5, 2.2, 14), VERM_D, 0, H + 1.9, 0, 0, 0, Math.PI / 2));
+  for (const sx of [-1, 1])
+    solid.push(part(new THREE.CylinderGeometry(1.56, 1.56, 0.16, 14), ROPE, sx * 1.12, H + 1.9, 0, 0, 0, Math.PI / 2));
+  solid.push(part(new THREE.TorusGeometry(1.52, 0.09, 4, 14), CHAR, 0, H + 1.9, 0, 0, Math.PI / 2, 0));
+  for (const sx of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(0.24, 2.0, 0.24), TIMBER_D, sx * 1.9, H + 1.0, 0, 0, 0, sx * 0.28));
+  // the little roof over it, and the light under that roof
+  solid.push(part(new THREE.ConeGeometry(W * 1.15, 1.9, 4), TILE, 0, H + 4.6, 0, 0, Math.PI / 4));
+  solid.push(part(new THREE.BoxGeometry(W * 1.5, 0.18, W * 1.5), TILE_D, 0, H + 3.66, 0));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(0.18, 1.9, 0.18), TIMBER, sx * W * 0.66, H + 2.7, sz * W * 0.66));
+  glow.push(part(new THREE.BoxGeometry(W * 1.2, 0.12, W * 1.2), G_WARM, 0, H + 3.5, 0));
+  // paper lanterns down each corner post, which is what makes it a beacon
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    for (let k = 0; k < 4; k++) {
+      const y = 2.2 + k * 3.0;
+      glow.push(part(new THREE.CylinderGeometry(0.34, 0.4, 0.5, 8), k % 2 ? G_RED : G_AMBER,
+        sx * W * 0.62, y, sz * W * 0.62));
+      glow.push(part(new THREE.CylinderGeometry(0.4, 0.34, 0.5, 8), k % 2 ? G_RED : G_AMBER,
+        sx * W * 0.62, y - 0.5, sz * W * 0.62));
+    }
+  return lit(solid, glow);
+}
+
+/** THE SHRINE HALL (honden). What the stone stair has been climbing toward the
+ *  whole match, and until now the stair went nowhere. Deep eaves, a heavy
+ *  ridge, vermilion posts and a dark interior with one lamp in it. */
+export function makeShrineHall(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  const W = 11, D = 8, H = 5.2;
+  solid.push(part(new THREE.BoxGeometry(W * 1.3, 1.0, D * 1.4), STONE_D, 0, 0.5, 0));
+  solid.push(part(new THREE.BoxGeometry(W * 1.18, 0.5, D * 1.28), STONE, 0, 1.2, 0));
+  solid.push(part(new THREE.BoxGeometry(W, H, D), CEDAR_D, 0, 1.45 + H / 2, 0));
+  // the pillars, which is what says shrine rather than shed
+  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++)
+    solid.push(part(new THREE.CylinderGeometry(0.34, 0.38, H, 8), VERM,
+      sx * W * 0.5, 1.45 + H / 2, -D * 0.36 + i * D * 0.24));
+  for (const sz of [-1, 1]) for (let i = 0; i < 5; i++)
+    solid.push(part(new THREE.CylinderGeometry(0.34, 0.38, H, 8), VERM,
+      -W * 0.4 + i * W * 0.2, 1.45 + H / 2, sz * D * 0.5));
+  // the dark interior, with a single lamp
+  glow.push(part(new THREE.BoxGeometry(W * 0.5, 1.6, 0.12), G_WARM, 0, 3.4, D * 0.5 + 0.08));
+  glow.push(part(new THREE.SphereGeometry(0.5, 8, 6), G_AMBER, 0, 4.2, 0));
+  // ROOF: two deep pitched planes with a heavy ridge and upswept ends
+  const RY = 1.45 + H;
+  solid.push(part(new THREE.BoxGeometry(W * 1.42, 0.5, D * 1.5), TILE, 0, RY + 0.3, 0));
+  for (const sz of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(W * 1.42, 0.44, D * 0.86), TILE,
+      0, RY + 1.3, sz * D * 0.42, sz * -0.42, 0, 0));
+  solid.push(part(new THREE.BoxGeometry(W * 1.5, 0.7, 0.9), TILE_D, 0, RY + 2.2, 0));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(2.4, 0.4, 1.1), TILE,
+      sx * W * 0.66, RY + 0.7, sz * D * 0.72, 0, sx * sz * 0.6, sx * -0.3));
+  // the crossed finials along the ridge
+  for (const sx of [-1, 1]) for (const k of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(0.2, 2.4, 0.2), CHAR,
+      sx * W * 0.42, RY + 3.0, 0, 0, 0, k * 0.38));
+  // a lantern each side of the door
+  for (const sx of [-1, 1]) {
+    glow.push(part(new THREE.CylinderGeometry(0.4, 0.48, 0.6, 8), G_RED, sx * 2.6, 3.6, D * 0.56));
+    glow.push(part(new THREE.CylinderGeometry(0.48, 0.4, 0.6, 8), G_RED, sx * 2.6, 3.0, D * 0.56));
+  }
+  return lit(solid, glow);
+}
+
+/** A KURA — the white-plastered, black-roofed storehouse every market street
+ *  has one or two of. Fireproof, windowless and deliberately dull, which is
+ *  exactly what a run of them does for a skyline full of lanterns. */
+export function makeKura(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  const W = rnd(5.0, 6.4), D = rnd(4.2, 5.2), H = rnd(4.6, 5.8);
+  solid.push(part(new THREE.BoxGeometry(W * 1.08, 0.6, D * 1.08), STONE_D, 0, 0.3, 0));
+  solid.push(part(new THREE.BoxGeometry(W, H, D), PAPER, 0, 0.6 + H / 2, 0));
+  // the black plinth band and the corner quoins, which is the look
+  solid.push(part(new THREE.BoxGeometry(W * 1.02, H * 0.22, D * 1.02), CHAR, 0, 0.6 + H * 0.11, 0));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(0.35, H, 0.35), TILE_D, sx * W * 0.5, 0.6 + H / 2, sz * D * 0.5));
+  // one heavy door, banded
+  solid.push(part(new THREE.BoxGeometry(W * 0.3, H * 0.5, 0.2), TILE_D, 0, 0.6 + H * 0.27, D * 0.5));
+  glow.push(part(new THREE.BoxGeometry(W * 0.22, 0.16, 0.1), G_AMBER, 0, 0.6 + H * 0.42, D * 0.54));
+  // the roof: a simple heavy hip with a big overhang
+  const RY = 0.6 + H;
+  solid.push(part(new THREE.BoxGeometry(W * 1.3, 0.44, D * 1.32), TILE, 0, RY + 0.22, 0));
+  solid.push(part(new THREE.BoxGeometry(W * 1.05, 0.9, D * 1.06), TILE_D, 0, RY + 0.9, 0));
+  solid.push(part(new THREE.BoxGeometry(W * 1.12, 0.4, 0.7), TILE, 0, RY + 1.42, 0));
+  return lit(solid, glow);
+}
+
+/** A MARKET SHED — a covered row, three or four pitches under one roof. This
+ *  is the 3-to-4 rung specifically: bigger than a stall, smaller than a
+ *  building, and it is what a market street is actually made of once you stop
+ *  drawing every stall separately. */
+export function makeMarketShed(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  const bays = 3 + ((Math.random() * 2) | 0);
+  const BW = 3.0, D = 3.4, H = 2.9;
+  const W = bays * BW;
+  for (let i = 0; i <= bays; i++) {
+    const x = -W / 2 + i * BW;
+    for (const sz of [-1, 1])
+      solid.push(part(new THREE.BoxGeometry(0.22, H, 0.22), TIMBER, x, H / 2, sz * D * 0.5));
+  }
+  solid.push(part(new THREE.BoxGeometry(W + 0.6, 0.2, D + 0.5), TIMBER_D, 0, H, 0));
+  // one long pitched canopy — vermilion, because at night the moon is
+  // deliberately too weak to light anything and PAPER photographs as grey
+  for (const sz of [-1, 1])
+    solid.push(part(new THREE.BoxGeometry(W + 0.9, 0.18, D * 0.66), VERM,
+      0, H + 0.62, sz * D * 0.26, sz * -0.5, 0, 0));
+  solid.push(part(new THREE.BoxGeometry(W + 1.0, 0.24, 0.34), VERM_D, 0, H + 1.16, 0));
+  // counters and the lit interior of each bay
+  for (let i = 0; i < bays; i++) {
+    const x = -W / 2 + BW * (i + 0.5);
+    solid.push(part(new THREE.BoxGeometry(BW * 0.86, 0.9, 0.7), TIMBER, x, 0.45, D * 0.4));
+    solid.push(part(new THREE.BoxGeometry(BW * 0.9, 0.14, 0.85), CEDAR, x, 0.95, D * 0.4));
+    glow.push(part(new THREE.BoxGeometry(BW * 0.7, 0.9, 0.1), i % 2 ? G_PAPER : G_AMBER, x, 1.8, -D * 0.2));
+    if (Math.random() < 0.5)
+      glow.push(part(new THREE.BoxGeometry(BW * 0.4, 0.1, 0.6), G_GRIDDLE, x, 1.04, D * 0.4));
+    glow.push(part(new THREE.CylinderGeometry(0.26, 0.32, 0.42, 8), G_RED, x, H - 0.3, D * 0.42));
+    glow.push(part(new THREE.CylinderGeometry(0.32, 0.26, 0.42, 8), G_RED, x, H - 0.72, D * 0.42));
+  }
+  return lit(solid, glow);
+}

@@ -3804,6 +3804,28 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     drop(NM.makeTorii(1.15), GATE, 5.0, 0, true, 'big');
     drop(NM.makeMoonBridge(24), BRIDGE, 4.2, Math.PI / 2, true, 'big');
 
+    // ── THE DRUM TOWER ────────────────────────────────────────────────────
+    // It already existed in everything except the world. It names a whole
+    // newsroom tier, it is the third match beat ("The drum has started"), and
+    // that beat's headline reads "The drum tower has begun" — so a child hears
+    // the level tell them about a landmark, looks up, and finds nothing there.
+    //
+    // Set on the east bank between the gate and the market, which puts it in
+    // the opening sightline: standing at spawn looking north you now see the
+    // torii, the tower beside it, the lit street beyond, and the bathhouse at
+    // the top. That is the whole match in one frame, which is what an opening
+    // shot is for.
+    const DRUM: LN.Pt = [7040, 9500];
+    LN.claimSpot(DRUM[0], DRUM[1], 260);
+    drop(NM.makeDrumTower(), DRUM, 6.0, -0.5, true, 'big');
+
+    // ── THE SHRINE HALL ───────────────────────────────────────────────────
+    // The stone stair and its twenty-two torii climbed toward nothing. Now
+    // they arrive somewhere, and it is the second-biggest meal in the level.
+    const HALL: LN.Pt = [3980, 7480];
+    LN.claimSpot(HALL[0], HALL[1], 300);
+    drop(NM.makeShrineHall(), HALL, 7.0, 0.9, true, 'big');
+
     // ── LANTERN ROW ───────────────────────────────────────────────────────
     // The stalls, laid along the canal on both banks and turned to face the
     // water. This is the level.
@@ -3848,6 +3870,12 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('stalls', 56, 26, 0.7, NM.makeCoalTub);
     plant('stalls', 52, 28, 1.0, NM.makeUmbrella);
     plant('stalls', 24, 44, 2.0, NM.makeFoodCart, false, 'house');
+    // THE MISSING RUNG. The size census found TWO props in the whole 3-to-4
+    // band against GAME DAY's 895, which is why a late match here fell flat:
+    // past a certain size there was simply nothing the right shape to eat.
+    // A covered row is what a market street is actually built from anyway.
+    plant('stalls', 76, 46, 3.4, NM.makeMarketShed, false, 'house');
+    plant('teahouse', 30, 50, 3.4, NM.makeMarketShed, false, 'house');
     plant('stalls', 26, 60, 1.4, NM.makeKoiFlag);
 
     // ── THE CANAL ─────────────────────────────────────────────────────────
@@ -3889,6 +3917,10 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('bathhouse', 44, 26, 0.9, NM.makeMarketCrate);
     plant('bathhouse', 34, 40, 1.4, NM.makeKoiFlag);
     plant('bathhouse', 22, 44, 1.6, NM.makeSakeBarrels);
+    // storehouses: the 4-to-6 rung, and a run of dull white boxes is what
+    // stops a skyline of lanterns reading as one texture
+    plant('bathhouse', 22, 74, 4.6, NM.makeKura, false, 'house');
+    plant('bathhouse', 26, 54, 3.4, NM.makeMarketShed, false, 'house');
 
     // ── THE MOON BRIDGE ───────────────────────────────────────────────────
     // Six props over 5,210u². The bridge is the level's pinch and its fourth
@@ -3900,6 +3932,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('bridge', 26, 24, 0.6, NM.makePotPlant);
     plant('bridge', 20, 28, 1.0, NM.makeUmbrella);
     plant('bridge', 12, 46, 2.0, NM.makeFoodCart, false, 'house');
+    plant('bridge', 10, 56, 3.4, NM.makeMarketShed, false, 'house');
 
     // ── THE SHRINE STEPS ──────────────────────────────────────────────────
     // Cool, dim and evenly spaced against the market's warm clutter: one bank
@@ -3913,6 +3946,8 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('shrine', 30, 30, 1.6, NM.makeSakeBarrels);
     plant('shrine', 24, 30, 1.2, NM.makeWishRack);
     plant('shrine', 60, 20, 0.5, NM.makeStepLantern);
+    plant('shrine', 14, 82, 4.6, NM.makeKura, false, 'house');
+    plant('shrine', 20, 56, 3.4, NM.makeMarketShed, false, 'house');
     // the torii run: nose to tail up the west stair, which is the one place in
     // the level with a repeating tunnel
     {
@@ -3943,6 +3978,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('garden', 36, 24, 0.6, NM.makePotPlant);
     plant('garden', 34, 22, 0.55, NM.makeJizo);
     plant('garden', 30, 20, 0.5, NM.makeStepLantern);
+    plant('garden', 18, 62, 3.4, NM.makeMarketShed, false, 'house');
 
     // ── THE GREAT GATE ────────────────────────────────────────────────────
     // The apron stays the emptiest floor in the level — a child's first three
@@ -3953,6 +3989,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     plant('gate', 22, 30, 0.5, NM.makeStepLantern);
     plant('gate', 18, 32, 0.55, NM.makeJizo);
     plant('gate', 14, 34, 0.8, NM.makeLuggage);
+    plant('gate', 8, 96, 4.6, NM.makeKura, false, 'house');
 
     // ── THE HOT SPRING ────────────────────────────────────────────────────
     // Authored, not scattered. Five pools stepping DOWN the shoulder, because

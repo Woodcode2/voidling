@@ -2464,7 +2464,11 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
 // world cards: MAPLE FALLS + PIRATE BAY are live; FROST PEAKS is the locked third
 {
   const chip = el('btnWorlds');
-  chip.innerHTML = `<i>${COPY.icon}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${COPY.n} OF 3</span><b>›</b>`;
+  // "OF 3" WAS HARDCODED, and the game shipped a fourth world. Selecting
+  // LANTERN NIGHT put "WORLD 4 OF 3" on the menu — the kind of thing a child
+  // will not articulate but an adult will screenshot. Counted from the list,
+  // so adding a fifth world cannot reintroduce it.
+  chip.innerHTML = `<i>${COPY.icon}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${COPY.n} OF ${WORLDS.length}</span><b>›</b>`;
   document.querySelectorAll('#worldRow .wCard[data-world]').forEach((c) => {
     const id = (c as HTMLElement).dataset.world!;
     const art = c.querySelector('.wArt') as HTMLElement | null;
