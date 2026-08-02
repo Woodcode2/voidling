@@ -38,6 +38,41 @@ const g3 = (p: GD.Pt): [number, number] => w3(p as BAY.Pt);
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+
+// ── AND THE SAME DRAW, WITH A MEMORY ───────────────────────────────────────
+// A replay audit ran three full matches and diffed everything a returning
+// child could notice. Almost all of it came back strong — the newsroom showed
+// 15-17 headlines a match with ZERO repeats inside a run, and the authored
+// beats never doubled. One number did not: the crowd said 96-103 lines a match
+// and repeated 11 to 21 of them.
+//
+// That is what uniform sampling does and no amount of extra writing fixes it:
+// draw a hundred times from a district pool of seven and the birthday problem
+// guarantees you hear some of them three times. The fix is a memory.
+//
+// THE FIRST VERSION OF THIS DID NOT WORK, and the re-measurement said so —
+// 15 repeats against a 15.3 average before, i.e. nothing. It kept ONE global
+// list of recently-said lines and checked the tail of it, so for a seven-line
+// pool it compared against the last four things said ANYWHERE on the island,
+// which are almost always from other districts. The guard never fired.
+//
+// Recency has to be per POOL. Each pool carries its own ring, held weakly so
+// nothing leaks, and the ring is capped at 60% of that pool's length — a
+// four-line district must still be able to speak, and a guard longer than its
+// own pool would deadlock it.
+const _poolRecent = new WeakMap<object, unknown[]>();
+function pickFresh<T>(arr: T[]): T {
+  if (arr.length < 2) return arr[0];
+  let ring = _poolRecent.get(arr as unknown as object);
+  if (!ring) { ring = []; _poolRecent.set(arr as unknown as object, ring); }
+  const cap = Math.max(1, Math.floor(arr.length * 0.6));
+  let out = arr[Math.floor(Math.random() * arr.length)];
+  for (let i = 0; i < 8 && ring.includes(out); i++)
+    out = arr[Math.floor(Math.random() * arr.length)];
+  ring.push(out);
+  while (ring.length > cap) ring.shift();
+  return out;
+}
 const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
 
 export type Say = (pos: THREE.Vector3, text: string, kind: 'ambient' | 'panic' | 'event') => void;
@@ -2372,7 +2407,7 @@ export function createLife(
             greetCd = rand(4.5, 9);
             const pool = OWN_GREET[biome] || OWN_GREET.stalls;
             tmp.set(mesh.position.x, 5, mesh.position.z);
-            say(tmp, pick(pool), 'ambient');
+            say(tmp, pickFresh(pool), 'ambient');
           }
           fled = false;
         } else if (wary && dist < vR + fear * 1.6 && calmT <= 0) {
@@ -2406,7 +2441,7 @@ export function createLife(
                 || (WID === 'lantern' ? (LN_PANIC[biome] || LN_PANIC.stalls) : null)
                 || PANIC[biome] || PANIC.generic;
               tmp.set(mesh.position.x, 5, mesh.position.z);
-              say(tmp, pick(pool), 'panic');
+              say(tmp, pickFresh(pool), 'panic');
             }
           }
           fled = true;
@@ -4961,7 +4996,7 @@ export function createLife(
           // a wary line is not a scream and must not be styled as one — the
           // bubble's panic styling is red and shaking, which would undo the
           // entire point of writing them without exclamation marks
-          say(cpos, pick(pool), scream && !lnWary ? 'panic' : 'ambient');
+          say(cpos, pickFresh(pool), scream && !lnWary ? 'panic' : 'ambient');
         }
       }
 
@@ -4971,7 +5006,7 @@ export function createLife(
         ev.panicked = Math.max(0, ev.panicked - dt);
         ev.cd -= dt;
         if (d < vR + 55 && ev.panicked <= 0 && calmT <= 0) {
-          cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.panic), 'panic');
+          cpos.set(ev.x, 6, ev.z); say(cpos, pickFresh(ev.panic), 'panic');
           ev.panicked = 3.5 - 1.8 * tense;
         }
         else if (ev.cd <= 0 && d < 130) { ev.cd = rand(4, 7); cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.ambient), 'event'); }
