@@ -2003,6 +2003,51 @@ export function createLife(
       'the water is going down', 'that is not the drain',
       'lovely and quiet up here. usually.'],
   };
+  // ── THE MIDDLE ACT HAD NO VOICE ──────────────────────────────────────────
+  // Instrumented over a whole match, the crowd's BEHAVIOUR does exactly what
+  // it was built to do — net movement relative to the void runs +85% toward it
+  // while the market thinks the void is a guest, +2% in the middle, and -74%
+  // once the place is going. Three acts, measured, and the middle one is a
+  // real 51 seconds of a 180-second match.
+  //
+  // But there were only ever three POOLS — greet, ambient, panic — so for that
+  // whole middle act the spirits standing frozen at the edge of the void's
+  // reach, watching it, were saying either "busy! busy tonight!" or "MY
+  // STALL!! SIX HUNDRED YEARS!!". The one act the entire level is built around
+  // was the one act with nothing of its own to say.
+  //
+  // These are the register between. Nobody here is screaming and nobody is
+  // selling: they have stopped what they were doing and they are working out
+  // whether to be frightened. No exclamation marks in the whole table — that
+  // is the rule that keeps it from drifting into the panic pool, and it is why
+  // these lines read quiet on a screen next to the ones that follow them.
+  const LN_WARY: Record<string, string[]> = {
+    stalls: ['it was smaller when it came in', 'has anyone actually been paid tonight',
+      'do not give it another one', 'I am just going to stand here a moment',
+      'the fox stall has shut. the fox stall never shuts.',
+      'somebody go and get somebody'],
+    canal: ['the water was up to here an hour ago', 'where is the boat',
+      'stop floating them. just for a minute.', 'do not put your hand in',
+      'that is the third lantern that has not come back'],
+    torii: ['nobody counted it on the way in', 'shut the gate. quietly.',
+      'we let it through', 'how many came in tonight. exactly.'],
+    shrine: ['ring the bell. no — do not ring the bell.', 'the box is empty and nobody opened it',
+      'stand behind the lanterns', 'I would like everyone to come up the steps now',
+      'it has not looked away'],
+    teahouse: ['clear the low tables. slowly.', 'nobody go down to the street',
+      'we are not serving the purple one again', 'it is looking up here'],
+    moonbridge: ['everyone off the middle', 'one at a time. one at a TIME.',
+      'the bridge felt that'],
+    nightgarden: ['the koi have gone to the bottom', 'do not walk on the moss',
+      'stay where the lanterns are', 'it is very quiet down there'],
+    bathhouse: ['management is aware. management is aware.',
+      'no more guests tonight. none.', 'take the towels off the terrace',
+      'stand away from the rail', 'somebody should go up and say something'],
+    bamboo: ['the lights are going out down there', 'do not go back for anything',
+      'we should start walking'],
+    onsen: ['everyone out of the far pool. calmly.', 'the water has stopped coming',
+      'get dressed. get dressed now.', 'do not look at it while you do it'],
+  };
   const LN_PANIC: Record<string, string[]> = {
     stalls: ['MY STALL!! SIX HUNDRED YEARS!!', 'take the sauce!! TAKE THE SAUCE!!',
       'closing!! we are closing!!', 'not the skewers!!', 'RUN, you fools!! politely!! RUN!!',
@@ -2352,6 +2397,11 @@ export function createLife(
             // the place is actually going.
             if (Math.random() < 0.25 + 0.45 * tense) {
               // a pirate entertainer panics like a pirate wherever they stand
+              // NOT gated on the wary band, and it would be dead code if it
+              // were: the branch above catches everything inside vR+fear*1.6,
+              // which strictly contains this branch's vR+fear, so `wary` is
+              // false by construction every time this line runs. Anything that
+              // reaches here is genuinely fleeing.
               const pool = panicLines || panPool(voice)
                 || (WID === 'lantern' ? (LN_PANIC[biome] || LN_PANIC.stalls) : null)
                 || PANIC[biome] || PANIC.generic;
@@ -4896,11 +4946,22 @@ export function createLife(
           // precisely so that fall-through cannot happen silently.
           const AMB = WID === 'lantern' ? LN_AMBIENT : AMBIENT;
           const PAN = WID === 'lantern' ? LN_PANIC : PANIC;
+          // …and on LANTERN NIGHT there is a third state between them. The
+          // scream roll is the same; what it reaches for changes. In the wary
+          // band a spirit who has decided to speak up says something uneasy
+          // rather than something terrified, which is the whole difference
+          // between a market that has noticed and a market that is running.
+          const lnWary = WID === 'lantern' && tense >= 0.42 && tense < 0.74;
           const pool = scream
-            ? (panPool(p.voice) || PAN[p.biome] || PAN.stalls || PANIC.generic)
+            ? (panPool(p.voice)
+              || (lnWary ? (LN_WARY[p.biome] || LN_WARY.stalls) : null)
+              || PAN[p.biome] || PAN.stalls || PANIC.generic)
             : (ambPool(p.voice) || AMB[p.biome] || AMB.stalls || AMBIENT.cozy);
           cpos.set(p.mesh.position.x, 5, p.mesh.position.z);
-          say(cpos, pick(pool), scream ? 'panic' : 'ambient');
+          // a wary line is not a scream and must not be styled as one — the
+          // bubble's panic styling is red and shaking, which would undo the
+          // entire point of writing them without exclamation marks
+          say(cpos, pick(pool), scream && !lnWary ? 'panic' : 'ambient');
         }
       }
 

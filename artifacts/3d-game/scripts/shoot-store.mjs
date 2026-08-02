@@ -20,7 +20,7 @@
 //
 //   node scripts/vendor-assets.mjs      # once — puts the art on disk
 //   npm run build && npx vite preview --port 4173
-//   node scripts/shoot-store.mjs        # writes store/01..05
+//   node scripts/shoot-store.mjs        # writes store/01..08
 //
 // Run it against `vite preview`, not the dev server: the dev server hot-reloads
 // and will reload the page underneath a capture.
@@ -108,12 +108,9 @@ await page.click('#btnPlay');
 await settle(1800);
 await shot('02-worlds.png');
 
-// ── 03 · a match, mid-devour ────────────────────────────────────────────────
-await page.click('#worldRow .wCard[data-world="maple"]');
-await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2, null, { timeout: 120000 });
-// drive to a photogenic size — big enough to look powerful, small enough that
-// the town still reads around it
-await page.evaluate(() => {
+// Drive the void at whatever is nearest, so a match photographs mid-devour
+// with debris in the air rather than as a ball standing still in a street.
+const autoplay = () => page.evaluate(() => {
   const cv = document.querySelector('canvas');
   const cx = innerWidth / 2, cy = innerHeight / 2;
   cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
@@ -137,13 +134,85 @@ await page.evaluate(() => {
   };
   requestAnimationFrame(tick);
 });
-await page.waitForFunction(() => window.__voidState().r > 3.4, null, { timeout: 300000 });
+const stopPlay = () => page.evaluate(() => { window.__shootStop = true; });
+/** Start a match on a named world from wherever we are. */
+const enterMatch = async (world) => {
+  await page.click(`#worldRow .wCard[data-world="${world}"]`);
+  await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2,
+    null, { timeout: 120000 });
+};
+/** Grow to `r` by actually playing, and if the machine is too slow to get
+ *  there in time, set it. The dry run of this script on a software renderer
+ *  timed out here and took the whole run down with it, having written two of
+ *  eight images — which is the worst possible outcome for a script somebody
+ *  runs once, on a deadline, on a machine I cannot see. A photographed void of
+ *  the right size beats no photograph. */
+const growTo = async (r, ms = 150000) => {
+  await autoplay();
+  try {
+    await page.waitForFunction((t) => window.__voidState().r > t, r, { timeout: ms });
+  } catch {
+    console.log(`  (too slow to grow to ${r} in ${ms / 1000}s — setting it instead)`);
+    await page.evaluate((t) => window.__setVoidR(t), r);
+    await settle(1500);
+  }
+};
+/** Back to the menu, modals cleared, ready to pick a world. */
+const toPicker = async () => {
+  await boot();
+  await settle(3000);
+  await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+    if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
+  }));
+  await page.click('#btnPlay');
+  await settle(1400);
+};
+
+// ── 03 · a match, mid-devour ────────────────────────────────────────────────
+await enterMatch('maple');
+// a photogenic size — big enough to look powerful, small enough that the town
+// still reads around it
+await growTo(3.4);
 await page.evaluate(() => window.__news());     // a headline in frame sells the world
 await settle(900);
 await shot('03-devouring.png');
+await stopPlay();
 
-// ── 04 · the shop ───────────────────────────────────────────────────────────
-await page.evaluate(() => { window.__shootStop = true; });
+// ── 04 · LANTERN NIGHT, the market street ───────────────────────────────────
+// The newest world and the best-looking frame in the game: a corridor of lit
+// stalls with the lantern strings overhead. __warpVoid rather than autoplay,
+// because a hero image should be framed and not hoped for — the auto-driver
+// ends up wherever the food is, which on a market street is usually a gap.
+{
+  const w = (v) => (v - 6000) * 0.05;
+  await toPicker();
+  await enterMatch('lantern');
+  await settle(2000);
+  await page.evaluate(([x, z]) => { window.__setVoidR(3.2); window.__warpVoid(x, z); },
+    [w(6050), w(7800)]);
+  await settle(2600);
+  await shot('04-lantern-market.png');
+
+  // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
+  // The finale, at the size a player reaches it, with its eave lines lit.
+  await page.evaluate(([x, z]) => { window.__setVoidR(9.0); window.__warpVoid(x, z); },
+    [w(6280), w(4400)]);
+  await settle(2600);
+  await shot('05-lantern-bathhouse.png');
+}
+
+// ── 06 · GAME DAY, the bowl ─────────────────────────────────────────────────
+{
+  await toPicker();
+  await enterMatch('gameday');
+  await growTo(5.0);
+  await page.evaluate(() => window.__news());
+  await settle(900);
+  await shot('06-gameday.png');
+  await stopPlay();
+}
+
+// ── 07 · the shop ───────────────────────────────────────────────────────────
 await boot();
 await settle(3000);
 await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
@@ -155,19 +224,37 @@ await settle(1600);
 await page.evaluate(() => document.querySelector('#shopGrid .skCard.legend')
   ?.scrollIntoView({ block: 'center' }));
 await settle(1200);
-await shot('04-skins.png');
+await shot('07-skins.png');
 
-// ── 05 · the results screen ─────────────────────────────────────────────────
+// ── 08 · the results screen ─────────────────────────────────────────────────
 await page.evaluate(() => document.getElementById('shop')?.classList.remove('show'));
 await page.click('#btnPlay');
 await settle(900);
-await page.click('#worldRow .wCard[data-world="pirate"]');
-await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2, null, { timeout: 120000 });
+await enterMatch('pirate');
 await page.evaluate(() => { window.__setVoidR(7.5); window.__rushClock(0.3); });
 await page.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 120000 });
 await settle(2600);   // let the coin count-up and the rows finish sliding in
-await shot('05-results.png');
+await shot('08-results.png');
 
-console.log('\nDone. Upload store/01..05 to the 6.7" slot in App Store Connect.');
+// The retired 2D game's five images are still on disk under their old names
+// and there is exactly one way they end up in a submission: somebody uploads
+// the folder. They are not this app, and 2.3.3 is what the last submission was
+// rejected for — so the script that replaces them also removes them.
+{
+  const STALE = ['01-menu.png', '02-shop.png', '03-downtown.png', '04-zoo.png',
+    '05-results.png', '06-edge.png', '02-worlds.png', '03-devouring.png', '04-skins.png'];
+  const fresh = new Set(['01-menu.png', '02-worlds.png', '03-devouring.png',
+    '04-lantern-market.png', '05-lantern-bathhouse.png', '06-gameday.png',
+    '07-skins.png', '08-results.png']);
+  for (const f of STALE) {
+    if (fresh.has(f)) continue;                      // just written by this run
+    const p = path.join(OUT, f);
+    if (!fs.existsSync(p)) continue;
+    fs.unlinkSync(p);
+    console.log(`  removed stale ${f}  (2D game)`);
+  }
+}
+
+console.log('\nDone. Upload store/01..08 to the 6.7" slot in App Store Connect.');
 console.log('Check each one first: they must show the app a reviewer will actually see.');
 await browser.close();

@@ -465,7 +465,7 @@ const _dbg = window as unknown as {
   __setMood: (m: string | null) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
-  __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number;
+  __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number; tense: number;
     ate: { you: number; family: number };
     rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
 };
@@ -510,6 +510,10 @@ _dbg.__warpVoid = (x: number, z: number) => {
 };
 // QA: one call returns the whole race — used to log score curves over a match
 _dbg.__matchState = () => ({
+  // QA: the crowd's mood driver, so a harness can measure how long LANTERN
+  // NIGHT's three acts actually last in wall-clock instead of inferring them
+  // from the radius curve.
+  tense: tension(),
   graze: rivals.grazeCount(),
   t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   ate: { you: devPlayerPct, family: devFamilyPct },
