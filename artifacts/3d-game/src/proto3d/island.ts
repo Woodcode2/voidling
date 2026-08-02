@@ -12,6 +12,7 @@ import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './
 import * as BAY from './bay';
 import * as GD from './gameday';
 import * as LN from './lantern';
+import * as NM from './nightmarket';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
@@ -3507,6 +3508,154 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
     scene.add(mesh); addEdible(mesh, r);
   };
+
+  // ══ LANTERN NIGHT: a spirit market, and it is open ════════════════════
+  // Same model as GAME DAY below — polygon regions, the shared spatial hash,
+  // authored landmarks reserved BEFORE the scatter runs.
+  //
+  // The difference is that this level is a STREET, so most of it is not
+  // scattered at all. The stalls, the lantern strings and the shrine's torii
+  // are laid along authored paths, because rejection sampling produces a car
+  // boot sale and a market is a line. GAME DAY learned the same lesson with
+  // its parking rows and PIRATE BAY with its bazaar lane; this world is almost
+  // entirely that shape.
+  if (WORLD_ID === 'lantern') {
+    const P3 = (p2: LN.Pt): [number, number] => [w(p2[0]), w(p2[1])];
+    LN.resetPlacement();
+    const drop = (mesh: THREE.Object3D, p2: LN.Pt, r: number, rotY?: number, force = false, qk?: string) => {
+      if (!force && !LN.spotOpen(p2[0], p2[1], r * 20)) return;
+      const [x3, z3] = P3(p2);
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      if (qk) mesh.userData.qk = qk;
+      place(mesh, x3, z3, r);
+      LN.claimSpot(p2[0], p2[1], r * 20);
+    };
+    const REG = (id: LN.LnBiome) => LN.LN_REGIONS.find((r) => r.id === id)!;
+    /** ONE radius for the scatter's overlap rejection AND the drop's burial
+     *  test. Two numbers here is the bug GAME DAY measured at 2,364 props
+     *  requested and 861 placed: scatterInRegion claims the point at `sep`,
+     *  drop() then asks spotOpen() about it at `r`, and spotOpen only exempts
+     *  an EXACT-match claim — so a prop read its own claim as an obstacle and
+     *  refused to exist. */
+    const plant = (id: LN.LnBiome, n: number, clear: number, r: number,
+                   make: () => THREE.Object3D, face = false, qk?: string) => {
+      for (const p2 of LN.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
+        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, false, qk);
+    };
+    const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
+                       band?: [number, number]) => {
+      for (const p2 of LN.scatterLand(n, Math.random, clear, band, { sep: r })) drop(make(), p2, r);
+    };
+
+    // ── THE RESERVE ───────────────────────────────────────────────────────
+    // The bathhouse is ~34 units across before its terrace. Claim its ground
+    // before anything scatters, or the market lands on top of the finale —
+    // the bug bay.ts records as the galleon coming down on eleven palms.
+    const BH: LN.Pt = [LN.BATHHOUSE.cx, LN.BATHHOUSE.cy];
+    LN.claimSpot(BH[0], BH[1], 900);
+    const GATE: LN.Pt = [6260, 10120];
+    LN.claimSpot(GATE[0], GATE[1], 320);
+    const BRIDGE: LN.Pt = [6180, 5860];
+    LN.claimSpot(BRIDGE[0], BRIDGE[1], 300);
+
+    // ── THE LANDMARKS ─────────────────────────────────────────────────────
+    // The bathhouse is EATABLE, at 11.0 — the same call GAME DAY's stadium
+    // needed after shipping at 24, which is above the player's own R_CAP of 12
+    // and so could never be swallowed at all. A finale you cannot eat is not a
+    // finale.
+    drop(NM.makeBathhouse(), BH, 11.0, 0, true, 'big');
+    drop(NM.makeTorii(1.15), GATE, 5.0, 0, true, 'big');
+    drop(NM.makeMoonBridge(24), BRIDGE, 4.2, Math.PI / 2, true, 'big');
+
+    // ── LANTERN ROW ───────────────────────────────────────────────────────
+    // The stalls, laid along the canal on both banks and turned to face the
+    // water. This is the level.
+    {
+      const slots = LN.stallSlots(Math.random, 230, 30);
+      for (const sl of slots) {
+        drop(NM.makeStall(), [sl.x, sl.y], 2.4, sl.ang, false, 'house');
+      }
+    }
+    // …and the strings of lanterns ACROSS the channel, which is what the
+    // player drives under for three minutes.
+    {
+      for (let i = 0; i < LN.CANAL.length - 1; i++) {
+        const [ax, ay] = LN.CANAL[i], [bx, by] = LN.CANAL[i + 1];
+        const L = Math.hypot(bx - ax, by - ay);
+        for (let d = 60; d < L; d += 300) {
+          const t = d / L;
+          const cx = ax + (bx - ax) * t, cy = ay + (by - ay) * t;
+          const ang = Math.atan2(by - ay, bx - ax);
+          // strung perpendicular to the channel, hung high enough to clear a
+          // WORLD ENDER's head — these are scenery, not meals
+          const g = NM.makeLanternString(17, 5);
+          const [x3, z3] = P3([cx, cy]);
+          g.rotation.y = -ang + Math.PI / 2;
+          g.position.set(x3, 0, z3);
+          scene.add(g);
+        }
+      }
+    }
+    // the small change of the street
+    plant('stalls', 130, 26, 0.9, NM.makeMarketCrate);
+    plant('stalls', 46, 34, 1.4, NM.makeGoldfishTank);
+    plant('stalls', 60, 30, 1.2, NM.makeBanner);
+    plant('stalls', 70, 28, 0.9, () => NM.makeLantern(0xffb256, 1.3));
+
+    // ── THE CANAL ─────────────────────────────────────────────────────────
+    // Boats along the channel and a drift of floating candle lanterns. The
+    // float lanterns are the smallest meal in the level, which is why the
+    // opening minute is spent driving down the water.
+    {
+      for (let k = 0; k < 16; k++) {
+        const t = 0.05 + (k / 16) * 0.9;
+        const p = LN.canalPoint(t);
+        drop(NM.makeCanalBoat(), [p.x, p.y], 2.2, p.ang);
+      }
+      for (let k = 0; k < 150; k++) {
+        const t = Math.random();
+        const p = LN.canalPoint(t);
+        const off = (Math.random() - 0.5) * 220;
+        drop(NM.makeFloatLantern(), [p.x + Math.cos(p.ang + 1.57) * off, p.y + Math.sin(p.ang + 1.57) * off], 0.5);
+      }
+    }
+
+    // ── THE SHRINE STEPS ──────────────────────────────────────────────────
+    // Cool, dim and evenly spaced against the market's warm clutter: one bank
+    // devotional, one commercial, told in light temperature.
+    plant('shrine', 140, 24, 1.0, () => NM.makeStoneLantern(Math.random() < 0.25 ? 0x9effb4 : 0x8ad4ff));
+    plant('shrine', 26, 40, 1.5, NM.makeOfferingBox);
+    // the torii run: nose to tail up the west stair, which is the one place in
+    // the level with a repeating tunnel
+    {
+      const A: LN.Pt = [4820, 8600], B: LN.Pt = [4060, 7600];
+      const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy);
+      const ang = Math.atan2(dy, dx);
+      for (let i = 0; i < 22; i++) {
+        const t = (i + 0.5) / 22;
+        drop(NM.makeSmallTorii(), [A[0] + dx * t, A[1] + dy * t], 1.3, -ang + Math.PI / 2);
+      }
+    }
+
+    // ── THE TEAHOUSE TERRACE ──────────────────────────────────────────────
+    plant('teahouse', 16, 130, 4.2, NM.makeTeahouse, true, 'house');
+    plant('teahouse', 40, 40, 1.0, () => NM.makeLantern(0xfff0d2, 1.1));
+    plant('teahouse', 40, 30, 0.9, NM.makeMarketCrate);
+
+    // ── THE NIGHT GARDEN ──────────────────────────────────────────────────
+    plant('garden', 60, 40, 1.1, () => NM.makeStoneLantern(0x8ad4ff));
+    plant('garden', 90, 36, 2.6, NM.makeBamboo);
+
+    // ── THE GREAT GATE ────────────────────────────────────────────────────
+    plant('gate', 30, 40, 1.0, () => NM.makeLantern(0xff8a3c, 1.5));
+    plant('gate', 24, 36, 0.9, NM.makeMarketCrate);
+
+    // ── THE VALLEY WALL ───────────────────────────────────────────────────
+    // Bamboo, thinning inward — it is what the light falls away into.
+    plantLand(260, 40, 2.6, NM.makeBamboo, [0, 700]);
+    plantLand(90, 40, 1.0, () => NM.makeStoneLantern(0x8ad4ff), [0, 500]);
+    return;   // LANTERN NIGHT is fully populated — the Maple grid pass must not run
+  }
 
   // ══ GAME DAY: a fall Saturday, and the whole town is here ══════════════
   // Same model as Pirate Bay below — polygon regions, a spatial hash, authored
