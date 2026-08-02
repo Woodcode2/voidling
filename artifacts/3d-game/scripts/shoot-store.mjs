@@ -187,17 +187,44 @@ await stopPlay();
   const w = (v) => (v - 6000) * 0.05;
   await toPicker();
   await enterMatch('lantern');
-  await settle(2000);
-  await page.evaluate(([x, z]) => { window.__setVoidR(3.2); window.__warpVoid(x, z); },
-    [w(6050), w(7800)]);
-  await settle(2600);
+  // WAIT OUT THE INTRO. Every world opens on an authored camera move over its
+  // hero landmark, and on LANTERN NIGHT that is 3.6 seconds pointed at the
+  // bathhouse. The first version of this warped at +2s and settled for 2.6,
+  // and the intro simply drove the camera back — so BOTH lantern shots came
+  // out as the same bathhouse flyover, one of them labelled "market". A warp
+  // that loses a fight with the camera rig fails silently and photographs
+  // something plausible, which is the worst way for a shot to be wrong.
+  // Tolerant, for the same reason growTo is: a machine slow enough to miss
+  // this is a machine where losing all eight images to one timeout is the
+  // worst possible outcome. Measured on a software renderer at 1864px tall,
+  // the match clock advances about FORTY times slower than real time — so
+  // this wait is roughly 50x what a real GPU needs and still not a guarantee.
+  const afterIntro = async () => {
+    try {
+      await page.waitForFunction(() => (window.__matchState?.().t ?? 0) > 7,
+        null, { timeout: 180000 });
+    } catch {
+      console.log('  (intro camera may still be moving — check 04 and 05 framing)');
+    }
+  };
+  /** Frame a place: set the size, put the void there, let it settle, and put
+   *  it there AGAIN — the camera lerps toward the void every frame, so a
+   *  second warp immediately before the shutter makes the framing exact
+   *  rather than approximately wherever it drifted to. */
+  const frame = async (r, wx, wy) => {
+    await page.evaluate(([rr, x, z]) => { window.__setVoidR(rr); window.__warpVoid(x, z); },
+      [r, w(wx), w(wy)]);
+    await settle(2400);
+    await page.evaluate(([x, z]) => window.__warpVoid(x, z), [w(wx), w(wy)]);
+    await settle(700);
+  };
+  await afterIntro();
+  await frame(3.2, 6050, 7800);
   await shot('04-lantern-market.png');
 
   // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
   // The finale, at the size a player reaches it, with its eave lines lit.
-  await page.evaluate(([x, z]) => { window.__setVoidR(9.0); window.__warpVoid(x, z); },
-    [w(6280), w(4400)]);
-  await settle(2600);
+  await frame(9.0, 6280, 4400);
   await shot('05-lantern-bathhouse.png');
 }
 

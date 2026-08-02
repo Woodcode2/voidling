@@ -538,8 +538,15 @@
       #worlds .wCard { position: relative; }
       #worlds .wCard b { font-size: clamp(15px, 4.1vw, 20px); letter-spacing: 0.4px; font-weight: 900;
         line-height: 1.1; text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
+      /* TWO LINES ARE ALWAYS RESERVED, even though every subtitle currently
+         fits on one. The card body is bottom-anchored, so a subtitle that
+         wraps does not push PLAY down — it pushes the TITLE up, and the row
+         stops lining up. LANTERN NIGHT shipped with a 33-character subtitle
+         against a ceiling of about 22 and sat visibly higher than GAME DAY
+         beside it. The copy is shorter now; this is so the next one cannot do
+         it again, and so a translation cannot either. */
       #worlds .wCard span { font-size: 10px; opacity: 0.85; letter-spacing: 1.4px;
-        text-shadow: 0 1px 4px rgba(0,0,0,0.85); }
+        min-height: 2.5em; text-shadow: 0 1px 4px rgba(0,0,0,0.85); }
       /* YOUR BEST, on the card. It existed only on the results overlay — a
          screen you leave and never see again — so the picker gave a returning
          child nothing to beat. */
@@ -1107,7 +1114,7 @@
         </div>
         <div class="wCard" data-world="lantern">
           <div class="wArt"></div><div class="wNum">WORLD 4</div>
-          <div class="wBody"><b>LANTERN NIGHT</b><span>THE SPIRITS THINK YOU ARE A GUEST</span>
+          <div class="wBody"><b>LANTERN NIGHT</b><span>YOU ARE THEIR GUEST</span>
             <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
         </div>
       </div>
