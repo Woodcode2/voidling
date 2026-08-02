@@ -411,6 +411,12 @@ export function createAudio(): Audio3D {
     crash: ['highpass', 5200, 0.6],   // one cymbal, at the top of the phrase
     horn: ['lowpass', 2500, 1.6],     // the cornet section's bell
     calli: ['lowpass', 1400, 0.9],    // a steam organ, heard across a field
+    // ── LANTERN NIGHT ──
+    nail: ['highpass', 4200, 0.8],    // the koto plectrum's click on the wire
+    skin: ['lowpass', 900, 0.8],      // a taiko head, which is enormous
+    shime: ['bandpass', 2100, 0.8],   // the small rope-tuned drum, tight
+    gong: ['highpass', 3000, 0.7],    // the hand gong's beater
+    clack: ['highpass', 2400, 0.7],   // hardwood on hardwood
   };
   const fxCache = new Map<AudioNode, Record<string, BiquadFilterNode>>();
   function fxFor(dest: AudioNode, key: string): BiquadFilterNode | null {
@@ -2411,6 +2417,518 @@ export function createAudio(): Audio3D {
     holler(master, t + 0.9, 0.18, 4);
   }
 
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  LANTERN NIGHT — a festival, and then not a festival
+  //
+  //  Until this existed the spirit market played MAPLE FALLS' town band: an
+  //  American small-town brass ensemble, cornets and a sousaphone, over a
+  //  Japanese night market. It is the single loudest thing a world can get
+  //  wrong, because a player hears the score before they have finished looking
+  //  at the ground.
+  //
+  //  THE ONE IDEA. This level's whole subject is a welcome that curdles — the
+  //  spirits walk TOWARD the void for the first minute because they think it
+  //  is a guest, and away from it for the last. The score says that in the
+  //  scale itself. It opens on the YO scale (D E G A B — no half-steps, the
+  //  bright pentatonic of festival music, the one that sounds like a welcome)
+  //  and moves to the IN scale (D Eb G A Bb — the same five degrees with two
+  //  of them flattened) as the match escalates. Two notes move. Nothing else
+  //  about the arrangement has to change for the whole thing to turn, and a
+  //  child will feel it happen without ever being able to say what happened.
+  //
+  //  A NOTE ON WHERE THIS COMES FROM, matching the one in nightmarket.ts. The
+  //  instruments are the standard ensemble of a matsuri: taiko, a shime drum,
+  //  the atarigane hand gong, shrine suzu, wooden hyoshigi clappers, koto and
+  //  shakuhachi. Those are folk instruments and folk scales, the same well
+  //  every telling of a festival night draws from. No melody here quotes any
+  //  particular piece, and none should be added that does.
+  // ══════════════════════════════════════════════════════════════════════════
+  const isLantern = () => worldId() === 'lantern';
+
+  // The two scales, one octave, in Hz. Same root, same five degrees; the 2nd
+  // and the 6th drop a semitone. That is the entire dramatic device.
+  const YO = [293.66, 329.63, 392.00, 440.00, 493.88];   // D  E  G  A  B
+  const IN = [293.66, 311.13, 392.00, 440.00, 466.16];   // D  Eb G  A  Bb
+  /** The scale at the current stage, with the two notes bending across rather
+   *  than switching — at stage 1 the level is a third of the way unhappy. */
+  function lnScale(): number[] {
+    const k = Math.max(0, Math.min(1, musStage / 3));
+    return YO.map((f, i) => f * Math.pow(IN[i] / f, k));
+  }
+  const lnDeg = (d: number) => {
+    const sc = lnScale();
+    const oct = Math.floor(d / 5);
+    return sc[((d % 5) + 5) % 5] * Math.pow(2, oct);
+  };
+
+  // ── the voices ────────────────────────────────────────────────────────────
+  /** KOTO. A plucked silk string over a paulownia box: a bright, slightly
+   *  buzzy attack that decays fast into a woody body. Built as a sawtooth
+   *  through a falling low-pass — the sweep IS the pluck — plus the nail's
+   *  click on the fx bus so it reads as struck rather than as a synth pad. */
+  function koto(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || freq <= 0 || vol <= 0) return;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(freq, t);
+    // the press-bend a player makes behind the bridge: a few cents, upward,
+    // and it is most of what separates a koto from a harp
+    o.frequency.linearRampToValueAtTime(freq * 1.004, t + Math.min(0.25, dur));
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 1.6;
+    f.frequency.setValueAtTime(Math.min(9000, freq * 11), t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(220, freq * 2.2), t + dur * 0.7);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(f); f.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.03);
+    nEnv(fxFor(dest, 'nail'), t, 0.02, vol * 0.5);
+  }
+
+  /** SHAKUHACHI. An end-blown bamboo flute, and the reason it does not sound
+   *  like a sine wave is BREATH: the tone is half air. A sine for the pitch, a
+   *  band-passed noise bed riding the same envelope for the wind in the tube,
+   *  and a slow attack because you cannot start a bamboo flute instantly. */
+  function shaku(dest: AudioNode, freq: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || freq <= 0 || vol <= 0) return;
+    const o = c.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(freq * 0.985, t);
+    o.frequency.linearRampToValueAtTime(freq, t + Math.min(0.14, dur * 0.4));
+    // the player's vibrato, which on this instrument is made with the head
+    const lfo = c.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 4.6;
+    const lfoG = c.createGain(); lfoG.gain.value = freq * 0.012;
+    lfo.connect(lfoG); lfoG.connect(o.frequency);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + Math.min(0.11, dur * 0.35));
+    g.gain.setValueAtTime(vol, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + dur);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.05);
+    lfo.start(t); lfo.stop(t + dur + 0.05);
+    // the air, at a third of the level and centred on the tone
+    nHit(dest, t, dur, vol * 0.32, 'bandpass', freq * 1.6, 2.2, freq * 1.4, 0.09);
+  }
+
+  /** TAIKO. The big drum: a low sine dropping fast — that pitch drop is what
+   *  the ear reads as a large struck skin — with the skin's own slap on top. */
+  function taiko(dest: AudioNode, t: number, vol: number, big = true) {
+    dTone(dest, t, big ? 0.5 : 0.3, 'sine', vol, big ? 128 : 190, big ? 52 : 88, 0, 0.002);
+    nEnv(fxFor(dest, 'skin'), t, big ? 0.12 : 0.07, vol * 0.55, 0.001);
+  }
+  /** SHIME. The small rope-tuned drum that keeps the actual time. Tight, high,
+   *  and it is the pulse the feet follow. */
+  function shime(dest: AudioNode, t: number, vol: number) {
+    dTone(dest, t, 0.09, 'sine', vol * 0.7, 640, 380, 0, 0.001);
+    nEnv(fxFor(dest, 'shime'), t, 0.05, vol, 0.001);
+  }
+  /** ATARIGANE. The little hand gong struck with a deer-horn beater — the
+   *  "chan-chiki-chin" that sits on top of every festival ensemble. Metallic,
+   *  which means INHARMONIC: three partials at ratios that are not integers. */
+  function kane(dest: AudioNode, t: number, vol: number, open = true) {
+    const d = open ? 0.42 : 0.09;
+    for (const [r, a] of [[1, 1], [2.41, 0.6], [3.83, 0.34], [5.9, 0.18]] as const)
+      dTone(dest, t, d * (1 - 0.12 * r / 6), 'sine', vol * a, 1180 * r, 0, 0, 0.001);
+    nEnv(fxFor(dest, 'gong'), t, 0.03, vol * 0.5, 0.001);
+  }
+  /** SUZU. The shrine's bell cluster — a dozen tiny bells on a ring, shaken.
+   *  A single bright shimmer, not a pitch. */
+  function suzu(dest: AudioNode, t: number, vol: number, dur = 0.5) {
+    for (let i = 0; i < 7; i++)
+      dTone(dest, t + Math.random() * dur * 0.5, 0.13 + Math.random() * 0.16, 'sine',
+        vol * (0.3 + Math.random() * 0.5), 2400 + Math.random() * 2600, 0, 0, 0.002);
+    nHit(dest, t, dur, vol * 0.4, 'highpass', 5200, 0.7, 0, 0.01);
+  }
+  /** HYOSHIGI. Two blocks of hardwood struck together — the sound that starts
+   *  a performance, and about as dry as a sound gets. */
+  function clack(dest: AudioNode, t: number, vol: number) {
+    nEnv(fxFor(dest, 'clack'), t, 0.028, vol, 0.0008);
+    dTone(dest, t, 0.03, 'square', vol * 0.3, 1900, 1200, 0, 0.001);
+  }
+  /** A stall's griddle. Not music — but a market's real bed is FRYING, and
+   *  this is the only world where the food makes a noise. */
+  function griddle(dest: AudioNode, t: number, vol: number, dur = 0.8) {
+    nHit(dest, t, dur, vol, 'highpass', 3800, 0.6, 6400, 0.06);
+  }
+  /** Water: the canal against a hull, or a spring over rock. */
+  function water(dest: AudioNode, t: number, vol: number, dur = 0.7) {
+    nHit(dest, t, dur, vol, 'bandpass', 700 + Math.random() * 900, 1.4, 300, 0.08);
+  }
+  /** Wooden sandals on a boardwalk — two taps, because feet come in pairs. */
+  function geta(dest: AudioNode, t: number, vol: number) {
+    nEnv(fxFor(dest, 'clack'), t, 0.022, vol * 0.7, 0.0008);
+    nEnv(fxFor(dest, 'clack'), t + 0.13 + Math.random() * 0.05, 0.022, vol * 0.5, 0.0008);
+  }
+  /** The market talking. A crowd is not a sound, it is a shape: a slow swell
+   *  of band-passed noise with no attack the ear can find. */
+  function murmur(dest: AudioNode, t: number, vol: number, dur = 2.4) {
+    nHit(dest, t, dur, vol, 'bandpass', 520, 0.8, 700, dur * 0.4);
+  }
+  /** A stallholder calling. One syllable, pitched, and gone. */
+  function callOut(dest: AudioNode, t: number, vol: number) {
+    const f = 210 + Math.random() * 150;
+    dTone(dest, t, 0.3, 'sawtooth', vol * 0.16, f, f * 1.5, f * 0.8, 0.03);
+    nHit(dest, t, 0.32, vol * 0.2, 'bandpass', 900, 1.6, 1500, 0.03);
+  }
+  /** Bamboo in wind: hollow stems knocking together up on the valley wall. */
+  function bambooKnock(dest: AudioNode, t: number, vol: number) {
+    for (let i = 0; i < 2 + ((Math.random() * 3) | 0); i++)
+      dTone(dest, t + i * (0.07 + Math.random() * 0.09), 0.07, 'sine',
+        vol * (0.5 + Math.random() * 0.5), 300 + Math.random() * 420, 200, 0, 0.001);
+  }
+
+  // ── the bed ───────────────────────────────────────────────────────────────
+  let lnBus: GainNode | null = null;
+  let lnAmb: GainNode | null = null;
+  let lnRunning = false;
+  let lnTimer: ReturnType<typeof setInterval> | null = null;
+  let lnStep = 0;
+  let lnNextT = 0;
+  let lAmbNextT = 0;
+  /** THE BAND IS ACROSS THE WATER. Same trick GAME DAY uses for a band on the
+   *  far side of a car park, tuned differently: a valley at night is small and
+   *  wet, so the delay is shorter and the feedback higher than the stadium's —
+   *  a slap off the far bank rather than an open field. */
+  function buildLnBus(c: AudioContext): GainNode {
+    const bus = c.createGain(); bus.gain.value = 0.0001;
+    const air = c.createBiquadFilter(); air.type = 'lowpass';
+    air.frequency.value = 3400; air.Q.value = 0.4;
+    const dly = c.createDelay(1.0); dly.delayTime.value = 0.19;
+    const fb = c.createGain(); fb.gain.value = 0.3;
+    const wet = c.createGain(); wet.gain.value = 0.26;
+    bus.connect(air); air.connect(master!);
+    air.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(master!);
+    return bus;
+  }
+
+  // 16 steps to the bar at about 100bpm, which is walking pace — this is
+  // processional music and it should be possible to walk to it.
+  const LN_SPB = 0.15;
+  /** The koto figure, by stage. Degrees into lnScale(), -1 for a rest. The
+   *  phrase does not change as the level turns; only the tuning does. */
+  const L_KOTO: number[][] = [
+    [0, -1, 2, -1, 4, -1, 2, -1, 0, -1, -1, -1, 2, -1, -1, -1],
+    [0, -1, 2, 4, 5, -1, 4, -1, 2, -1, 0, -1, 2, -1, 4, -1],
+    [0, 2, 4, 5, 7, -1, 5, 4, 2, -1, 0, 2, 4, -1, 5, 7],
+    [0, 2, 4, 5, 7, 9, 7, 5, 4, 2, 0, 2, 4, 5, 7, 9],
+  ];
+  /** The taiko pattern, by stage: 2 = the big drum, 1 = a rim, 0 = nothing. */
+  const L_TAIKO: number[][] = [
+    [2, 0, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0],
+    [2, 0, 0, 1, 0, 0, 1, 0, 2, 0, 0, 1, 0, 1, 0, 0],
+    [2, 0, 1, 1, 0, 1, 1, 0, 2, 0, 1, 1, 0, 1, 1, 1],
+    [2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 1, 2, 1, 2, 1, 1],
+  ];
+
+  function lnSchedule() {
+    const c = ctx; if (!c || !lnRunning || !lnBus) return;
+    const now = c.currentTime;
+    if (lnNextT === 0) lnNextT = now + 0.1;
+    const st = Math.max(0, Math.min(3, musStage));
+    while (lnNextT < now + 0.35) {
+      const t = Math.max(now + 0.02, lnNextT);
+      const i = lnStep & 15;
+      const bar = (lnStep >> 4) & 7;
+
+      // THE PULSE. The shime keeps eighths under everything; that steady tick
+      // is what makes the whole thing feel like a procession moving past you
+      // rather than a loop playing at you.
+      if (i % 2 === 0) shime(lnBus, t, 0.030 + st * 0.006);
+      // …and the drum
+      const dr = L_TAIKO[st][i];
+      if (dr === 2) taiko(lnBus, t, 0.115 + st * 0.016, true);
+      else if (dr === 1) taiko(lnBus, t, 0.05 + st * 0.008, false);
+
+      // THE HAND GONG. Chan-chiki-chin: a long stroke on the beat and two
+      // damped ones after it. The most identifiably festival thing here.
+      if (i === 0 || i === 8) kane(lnBus, t, 0.048, true);
+      else if (i === 3 || i === 6 || i === 11 || i === 14) kane(lnBus, t, 0.030, false);
+
+      // THE KOTO figure.
+      const d = L_KOTO[st][i];
+      if (d >= 0) koto(lnBus, lnDeg(d), t, 0.34 + Math.random() * 0.2, 0.055 + st * 0.008);
+
+      // THE FLUTE, over the top of every other bar and never on the beat —
+      // shakuhachi phrasing floats free of the drum, which is what stops the
+      // whole thing sounding like a metronome with a tune attached.
+      if (i === 5 && bar % 2 === 0) {
+        const line = [7, 5, 4, 7, 9][bar % 5];
+        shaku(lnBus, lnDeg(line), t, 0.9 + Math.random() * 0.5, 0.05 + st * 0.006);
+      }
+      if (i === 12 && bar % 4 === 2) shaku(lnBus, lnDeg(4), t, 1.3, 0.045);
+
+      // THE CLAPPERS, at the top of every fourth bar: the signal that the next
+      // part of the performance is starting.
+      if (i === 0 && bar % 4 === 0) { clack(lnBus, t, 0.06); clack(lnBus, t + 0.11, 0.045); }
+
+      lnStep++; lnNextT += LN_SPB;
+    }
+    lnAmbience(c);
+  }
+
+  function startLantern() {
+    const c = ensure(); if (!c || !master) return;
+    if (!lnBus) lnBus = buildLnBus(c);
+    if (!lnAmb) { lnAmb = c.createGain(); lnAmb.gain.value = 0.0001; lnAmb.connect(master); }
+    lnRunning = true;
+    ramp(lnBus.gain, 0.5, c.currentTime, 2.2);
+    ramp(lnAmb.gain, 0.42, c.currentTime, 1.8);
+    lnStep = 0; lnNextT = c.currentTime + 0.12;
+    lAmbNextT = 0;
+    lApplyZones(1.5);
+    if (lnTimer) clearInterval(lnTimer);
+    lnTimer = setInterval(lnSchedule, 110);
+  }
+  function stopLantern(fade: number) {
+    lnRunning = false;
+    if (lnTimer) { clearInterval(lnTimer); lnTimer = null; }
+    const c = ctx; if (!c) return;
+    const now = c.currentTime;
+    if (lnBus) ramp(lnBus.gain, 0, now, fade);
+    if (lnAmb) ramp(lnAmb.gain, 0, now, fade);
+    for (const k of Object.keys(lzones) as LZoneId[]) {
+      const z = lzones[k]!; z.on = false; z.until = 0; ramp(z.g.gain, 0, now, fade);
+    }
+    lZone = null;
+  }
+
+  // ── the districts ─────────────────────────────────────────────────────────
+  // Ten of them, and each one is a PLACE before it is a mix level: the market
+  // fries and shouts, the shrine rings and goes quiet, the spring is the only
+  // district whose sound comes from the ground.
+  type LZoneId = 'stalls' | 'canal' | 'gate' | 'shrine' | 'teahouse'
+    | 'bridge' | 'garden' | 'bathhouse' | 'onsen' | 'bamboo';
+  const LZONE_VOL: Record<LZoneId, number> = {
+    stalls: 0.17, canal: 0.11, gate: 0.12, shrine: 0.10, teahouse: 0.10,
+    bridge: 0.09, garden: 0.08, bathhouse: 0.15, onsen: 0.11, bamboo: 0.09,
+  };
+  const lzones: Partial<Record<LZoneId, ZoneLayer>> = {};
+  let lZone: LZoneId | null = null;
+  // island.ts renames three of lantern.ts's districts on the way out, so both
+  // spellings are listed — the same care MAPLE_DIST and GAMEDAY_DIST take.
+  function lNormZone(z: string | null): LZoneId | null {
+    switch (z) {
+      case 'stalls': return 'stalls';
+      case 'canal': return 'canal';
+      case 'gate': case 'torii': return 'gate';
+      case 'shrine': return 'shrine';
+      case 'teahouse': return 'teahouse';
+      case 'bridge': case 'moonbridge': return 'bridge';
+      case 'garden': case 'nightgarden': return 'garden';
+      case 'bathhouse': return 'bathhouse';
+      case 'onsen': return 'onsen';
+      case 'bamboo': return 'bamboo';
+      default: return null;
+    }
+  }
+  /** Each district's continuous bed — one noise source, one filter, one slow
+   *  LFO. Everything episodic (a call, a bell, a splash) is scheduled by the
+   *  ambience loop instead; a bed is the thing that is ALWAYS there. */
+  function buildLBed(c: AudioContext, id: LZoneId, dest: AudioNode) {
+    const src = c.createBufferSource(); src.buffer = white(c); src.loop = true;
+    const f = c.createBiquadFilter();
+    const g = c.createGain();
+    const lfo = c.createOscillator(); lfo.type = 'sine';
+    const lfoG = c.createGain();
+    switch (id) {
+      case 'stalls':                    // frying, and a hundred people talking
+        f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.5;
+        g.gain.value = 0.9; lfo.frequency.value = 0.19; lfoG.gain.value = 0.34; break;
+      case 'canal':                     // water against stone, and hulls
+        f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.9;
+        g.gain.value = 0.7; lfo.frequency.value = 0.32; lfoG.gain.value = 0.36; break;
+      case 'gate':                      // wide, stone, and mostly empty
+        f.type = 'lowpass'; f.frequency.value = 380; f.Q.value = 0.5;
+        g.gain.value = 0.5; lfo.frequency.value = 0.11; lfoG.gain.value = 0.2; break;
+      case 'shrine':                    // the quietest bed in the level
+        f.type = 'lowpass'; f.frequency.value = 260; f.Q.value = 0.6;
+        g.gain.value = 0.42; lfo.frequency.value = 0.08; lfoG.gain.value = 0.18; break;
+      case 'teahouse':                  // a room, not a street: close and warm
+        f.type = 'bandpass'; f.frequency.value = 640; f.Q.value = 0.7;
+        g.gain.value = 0.55; lfo.frequency.value = 0.15; lfoG.gain.value = 0.22; break;
+      case 'bridge':                    // water underneath, air above
+        f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = 1.1;
+        g.gain.value = 0.6; lfo.frequency.value = 0.26; lfoG.gain.value = 0.3; break;
+      case 'garden':                    // crickets, and not much else
+        f.type = 'highpass'; f.frequency.value = 4200; f.Q.value = 0.6;
+        g.gain.value = 0.34; lfo.frequency.value = 0.55; lfoG.gain.value = 0.24; break;
+      case 'bathhouse':                 // a huge wooden building full of water
+        f.type = 'lowpass'; f.frequency.value = 300; f.Q.value = 1.4;
+        g.gain.value = 1.0; lfo.frequency.value = 0.13; lfoG.gain.value = 0.4; break;
+      case 'onsen':                     // steam, which is the only white noise
+        f.type = 'highpass'; f.frequency.value = 2600; f.Q.value = 0.5;
+        g.gain.value = 0.7; lfo.frequency.value = 0.22; lfoG.gain.value = 0.26; break;
+      default:                          // bamboo: wind, high and thin
+        f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 0.4;
+        g.gain.value = 0.5; lfo.frequency.value = 0.09; lfoG.gain.value = 0.34; break;
+    }
+    lfo.connect(lfoG); lfoG.connect(g.gain);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(); lfo.start();
+  }
+  function lZoneLayer(c: AudioContext, id: LZoneId): ZoneLayer {
+    let z = lzones[id];
+    if (!z) {
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      z = { g, vol: LZONE_VOL[id], on: false, until: 0 };
+      lzones[id] = z;
+      buildLBed(c, id, g);
+    }
+    return z;
+  }
+  function lApplyZones(fade = ZONE_FADE) {
+    const c = ctx; if (!c || !master) return;
+    const now = c.currentTime;
+    for (const k of Object.keys(lzones) as LZoneId[]) {
+      const z = lzones[k]!;
+      if (k !== lZone && z.on) { z.on = false; z.until = now + fade; ramp(z.g.gain, 0, now, fade); }
+    }
+    if (lZone && lnRunning) {
+      const z = lZoneLayer(c, lZone);
+      if (!z.on) { z.on = true; z.until = 0; ramp(z.g.gain, z.vol, now, fade); }
+    }
+  }
+
+  /** The episodic layer — what the district DOES, on top of what it sounds
+   *  like. Gaps are per-district: a market street should never be silent, a
+   *  shrine should mostly be. */
+  function lnAmbience(c: AudioContext) {
+    const dest = lnAmb; if (!dest) return;
+    const now = c.currentTime;
+    const st = Math.max(0, Math.min(3, musStage));
+    if (lAmbNextT === 0) lAmbNextT = now + 1.5 + Math.random() * 2.5;
+    while (lAmbNextT < now + 0.4) {
+      const t = Math.max(now + 0.05, lAmbNextT);
+      const r = Math.random();
+      let gap = 4 + Math.random() * 5;
+      switch (lZone) {
+        case 'stalls':
+          // the busiest district in the game, and it never stops
+          if (r < 0.34) griddle(dest, t, 0.09, 0.7 + Math.random() * 0.8);
+          else if (r < 0.62) callOut(dest, t, 0.10);
+          else if (r < 0.82) murmur(dest, t, 0.055, 2.4);
+          else geta(dest, t, 0.05);
+          gap = 1.1 + Math.random() * 1.6;
+          break;
+        case 'canal':
+          if (r < 0.6) water(dest, t, 0.07, 0.6 + Math.random() * 0.7);
+          else if (r < 0.85) murmur(dest, t, 0.035, 2.6);
+          else callOut(dest, t, 0.05);
+          gap = 1.6 + Math.random() * 2.0;
+          break;
+        case 'gate':
+          if (r < 0.5) taiko(dest, t, 0.075, true);       // the drum tower
+          else if (r < 0.8) geta(dest, t, 0.055);
+          else murmur(dest, t, 0.04, 3.0);
+          gap = 2.6 + Math.random() * 3.0;
+          break;
+        case 'shrine':
+          if (r < 0.5) suzu(dest, t, 0.06, 0.6);
+          else if (r < 0.78) clack(dest, t, 0.045);        // two claps, at the box
+          else kane(dest, t, 0.05, true);
+          gap = 3.4 + Math.random() * 4.0;
+          break;
+        case 'teahouse':
+          if (r < 0.4) koto(dest, lnDeg(2 + ((Math.random() * 5) | 0)), t, 0.5, 0.05);
+          else if (r < 0.72) murmur(dest, t, 0.04, 2.2);
+          else clack(dest, t, 0.03);                       // a cup on a tray
+          gap = 2.4 + Math.random() * 2.8;
+          break;
+        case 'bridge':
+          if (r < 0.5) geta(dest, t, 0.06);                // everyone walks over
+          else if (r < 0.8) water(dest, t, 0.05, 0.8);
+          else murmur(dest, t, 0.035, 2.4);
+          gap = 2.0 + Math.random() * 2.4;
+          break;
+        case 'garden':
+          if (r < 0.55) bambooKnock(dest, t, 0.04);
+          else if (r < 0.8) water(dest, t, 0.035, 1.0);    // the koi ponds
+          else suzu(dest, t, 0.03, 0.4);
+          gap = 3.0 + Math.random() * 3.6;
+          break;
+        case 'bathhouse':
+          // the finale, and it should sound like the biggest room in the game
+          if (r < 0.34) water(dest, t, 0.085, 1.1);
+          else if (r < 0.6) geta(dest, t, 0.075);
+          else if (r < 0.82) taiko(dest, t, 0.06, true);
+          else murmur(dest, t, 0.06, 2.6);
+          gap = 1.5 + Math.random() * 1.9;
+          break;
+        case 'onsen':
+          if (r < 0.62) water(dest, t, 0.075, 1.3);        // the spouts
+          else if (r < 0.86) murmur(dest, t, 0.03, 3.0);
+          else bambooKnock(dest, t, 0.035);
+          gap = 1.8 + Math.random() * 2.2;
+          break;
+        case 'bamboo':
+          if (r < 0.7) bambooKnock(dest, t, 0.055);
+          else suzu(dest, t, 0.025, 0.5);
+          gap = 2.6 + Math.random() * 3.4;
+          break;
+        default:
+          if (r < 0.5) murmur(dest, t, 0.04, 2.6);
+          else geta(dest, t, 0.05);
+          gap = 2.6 + Math.random() * 3.0;
+      }
+      // AND THE CROWD TURNS. By the last act the market is not talking any
+      // more, it is reacting — so the ambience thins out and what is left of
+      // it is the drum. A festival with the chatter taken out of it is a
+      // genuinely unsettling sound, and it costs one branch.
+      if (st >= 2 && Math.random() < 0.28 + st * 0.08) taiko(dest, t + 0.2, 0.07, true);
+      lAmbNextT = t + gap * (st >= 2 ? 1.35 : 1);
+    }
+  }
+
+  // ── LANTERN NIGHT's one-shots, straight to master ─────────────────────────
+  /** Evolution: the ensemble hits it together and the gong rings open. */
+  function lanternEvolve() {
+    const c = ensure(); if (!c || !master) return;
+    const t = c.currentTime + 0.01;
+    taiko(master, t, 0.22, true);
+    kane(master, t, 0.11, true);
+    suzu(master, t + 0.04, 0.09, 0.7);
+    [0, 2, 4, 7].forEach((d, i) => koto(master!, lnDeg(d), t + 0.06 + i * 0.055, 0.5, 0.085));
+    shaku(master, lnDeg(9), t + 0.3, 1.1, 0.07);
+  }
+  /** THE GATE OPENS: the drum tower, three strokes and the clappers. */
+  function lnGateSting(t: number) {
+    if (!master) return;
+    clack(master, t, 0.075); clack(master, t + 0.1, 0.055);
+    for (let i = 0; i < 3; i++) taiko(master!, t + 0.28 + i * 0.34, 0.2 - i * 0.02, true);
+    kane(master, t + 0.3, 0.07, true);
+    shaku(master, lnDeg(4), t + 0.6, 1.4, 0.06);
+  }
+  /** THE MARKET NOTICES: the chatter stops, one gong, and it starts again
+   *  wrong. The turn of the level, in four seconds. */
+  function lnNoticeSting(t: number) {
+    if (!master) return;
+    kane(master, t, 0.10, true);
+    murmur(master, t + 0.1, 0.07, 1.2);
+    for (let i = 0; i < 5; i++) shime(master!, t + 0.9 + i * 0.12, 0.05 + i * 0.008);
+    taiko(master, t + 1.5, 0.19, true);
+    // the flute answers a semitone under where it should be
+    shaku(master, lnDeg(4) * 0.944, t + 1.7, 1.5, 0.06);
+  }
+  /** THE BATHHOUSE: the biggest moment in the level. Everything at once, and
+   *  the gong left open underneath it. */
+  function lnBathhouseSting(t: number) {
+    if (!master) return;
+    for (let i = 0; i < 8; i++) taiko(master!, t + i * 0.115, 0.09 + i * 0.017, i > 4);
+    kane(master, t + 0.95, 0.13, true);
+    suzu(master, t + 0.95, 0.10, 0.9);
+    [0, 4, 7, 9, 11].forEach((d, i) => koto(master!, lnDeg(d), t + 1.0 + i * 0.07, 0.6, 0.09));
+    shaku(master, lnDeg(12), t + 1.4, 1.8, 0.08);
+    taiko(master, t + 1.4, 0.24, true);
+  }
+  /** THE LAST MINUTE: the drum, alone, speeding up. No melody left. */
+  function lnLastSting(t: number) {
+    if (!master) return;
+    for (let i = 0; i < 12; i++) taiko(master!, t + i * (0.30 - i * 0.017), 0.10 + i * 0.011, true);
+    kane(master, t + 2.0, 0.12, true);
+    clack(master, t + 2.1, 0.07);
+  }
+
   return {
     startMusic() {
       // PIRATE BAY RESORT has its own score — and deliberately does NOT pick up
@@ -2423,6 +2941,11 @@ export function createAudio(): Audio3D {
       // because "the band is playing somewhere you cannot see" is not a mood
       // this file can express by leaving the field blank.
       if (isGameday()) { startGameday(); return; }
+      // LANTERN NIGHT plays its own too, and this one was not optional: until
+      // it existed the spirit market played MAPLE FALLS' town band — cornets
+      // and a sousaphone over a Japanese festival. A player hears a score
+      // before they have finished looking at the ground.
+      if (isLantern()) { startLantern(); return; }
       // MAPLE FALLS plays its own band, for the same reason the bay plays its
       // own: a stock loop is a stock loop, and this town has an election on.
       // The licensed-track drop-in (/assets/music/theme.mp3, and behind it the
@@ -2453,7 +2976,7 @@ export function createAudio(): Audio3D {
     // shop, anywhere the theme wants stating out loud. Silent in the bay,
     // which has a hook of its own and does not need this one.
     jingle() {
-      const c = ensure(); if (!c || !master || isPirate() || isGameday()) return;
+      const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern()) return;
       jingleQuote(c.currentTime + 0.02, 0.1);
     },
     setMuted(m: boolean) {
@@ -2478,6 +3001,14 @@ export function createAudio(): Audio3D {
         gZone = gid;
         if (!ctx) return;
         gApplyZones();
+        return;
+      }
+      if (isLantern()) {
+        const lid = lNormZone(zone);
+        if (lid === lZone) return;
+        lZone = lid;
+        if (!ctx) return;
+        lApplyZones();
         return;
       }
       if (!isPirate()) {
@@ -2512,6 +3043,19 @@ export function createAudio(): Audio3D {
         else { bDrum(master, gt, 0.18); crash(master, gt, 0.07); holler(master, gt + 0.1, 0.14, 3); }
         return;
       }
+      if (isLantern()) {
+        // The four beats of the night, and they are the level's three acts in
+        // sound: two welcomes, the drum that nobody ordered, and the doors.
+        // Matched generously for the same reason the others are — a re-worded
+        // banner must not silently fall through to a generic flourish.
+        const lt = c.currentTime;
+        if (/lantern|lit|light/.test(k)) lnGateSting(lt);
+        else if (/free|price|insist|stall/.test(k)) lnGateSting(lt);
+        else if (/drum|tower|start/.test(k)) lnNoticeSting(lt);
+        else if (/bath|open|door|last/.test(k)) lnBathhouseSting(lt);
+        else lnNoticeSting(lt);
+        return;
+      }
       if (!isPirate()) {
         // MAPLE FALLS. The banner text is being re-themed to the election in
         // parallel with this file, so match GENEROUSLY — bake sale or donut
@@ -2544,6 +3088,7 @@ export function createAudio(): Audio3D {
       stopTropical(1.2);
       stopTown(1.2);
       stopGameday(1.2);
+      stopLantern(1.2);
       themeWanted = false;
       stopThemeLoop(1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
@@ -2612,6 +3157,7 @@ export function createAudio(): Audio3D {
       // the resort answers in steel pans instead — same beat, different island
       if (isPirate()) { pirateEvolve(); return; }
       if (isGameday()) { gamedayEvolve(); return; }
+      if (isLantern()) { lanternEvolve(); return; }
       mapleEvolve();
     },
     voice(kind) {
@@ -2668,6 +3214,14 @@ export function createAudio(): Audio3D {
           dTone(master, t + off, 0.34, 'triangle', 0.13, f, 0, 0, 0.03);
           dTone(master, t + off, 0.3, 'sine', 0.07, f * 2, 0, 0, 0.03);
         }
+        return;
+      }
+      if (isLantern()) {
+        // The drum tower, alone, speeding up. On this world an alert is not a
+        // siren — nobody here has one. It is the one instrument that is still
+        // playing after the market has stopped talking.
+        const c = ensure(); if (!c || !master) return;
+        lnLastSting(c.currentTime);
         return;
       }
       tone(660, 660, 0.13, 'square', 0.12);

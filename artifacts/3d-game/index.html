@@ -59,7 +59,20 @@
          rounded corner. Six rows now fit exactly; a seventh would scroll. */
       #board { position: fixed; top: max(10px, calc(10px + env(safe-area-inset-top, 0px))); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 7; pointer-events: none;
         max-width: 38vw; max-height: 152px; overflow: hidden;
-        background: rgba(16,8,30,0.5); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(6px); }
+        /* ── PANEL OPACITY, and why these three numbers moved ──────────────
+           Measured across MAPLE FALLS, GAME DAY and LANTERN NIGHT: the game's
+           three most-glanced chips were all light text on a HALF-TRANSPARENT
+           panel, which means their contrast is not a property of the chip at
+           all — it is a property of whatever the world happens to put behind
+           them. Composite rgba(16,8,30,0.5) over Maple's ground (luminance
+           0.65) and the panel lands at 0.34; white on that is 4.0:1, and the
+           coin chip's #ffe08a on its own 0.55 panel was 2.45:1. Both under the
+           4.5:1 floor, and both worst on the BRIGHTEST world, which is exactly
+           backwards from where anyone would look for the problem.
+           At 0.88 the panel is 0.12 whatever is behind it, and the chip has
+           the same contrast on a night market as on a beach. The blur is what
+           keeps it from reading as a solid box. */
+        background: rgba(16,8,30,0.88); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(7px); }
       /* the 😈 hunter marker wrapped onto its own line, which grew the board by
          a whole row and pushed "You" straight into the DEVOURED chip */
       #board .row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800;
@@ -89,7 +102,7 @@
         bottom: calc(14px + env(safe-area-inset-bottom, 0px));
         width: min(92vw, 460px); box-sizing: border-box;
         padding: 8px 12px 9px; border-radius: 15px;
-        background: linear-gradient(180deg, rgba(30,16,58,0.80), rgba(16,8,30,0.84));
+        background: linear-gradient(180deg, rgba(30,16,58,0.91), rgba(16,8,30,0.93));
         border: 1.5px solid rgba(201,166,255,0.28);
         box-shadow: 0 6px 22px rgba(0,0,0,0.42);
         backdrop-filter: blur(8px);
@@ -270,7 +283,7 @@
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       /* coins + quests */
       #coins { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 5; pointer-events: none;
-        background: rgba(16,8,30,0.55); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(6px);
+        background: rgba(16,8,30,0.88); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(7px);
         color: #ffe08a; font-size: 14px; font-weight: 900; }
       /* daily quests: three icon CHIPS (pre-reader friendly), not sentences */
       /* The three daily-quest chips sat in the top-left of every single frame
@@ -553,8 +566,12 @@
       #worlds .wCard.sel { box-shadow: 0 0 0 3px #ffd23f, 0 10px 30px rgba(0,0,0,0.5); }
       /* in-game home button */
       #btnQuit { position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 44px; height: 44px;
-        border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.4); background: rgba(16,8,30,0.6);
-        color: #cbb2ff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(6px); }
+        /* the lowest-contrast element in the game on every world measured —
+           1.46:1 on Maple — because a light purple glyph on a 0.6 panel over
+           bright ground is two mid greys. The panel goes opaque and the glyph
+           goes up; it is a QUIT button and it has to be findable in a hurry. */
+        border-radius: 11px; border: 1.5px solid rgba(201,166,255,0.55); background: rgba(16,8,30,0.88);
+        color: #e6dbff; font-size: 20px; cursor: pointer; font-family: inherit; backdrop-filter: blur(7px); }
       body.menu #btnQuit { display: none; }
       #btnQuit.arm { width: auto; padding: 0 12px; font-size: 12px; font-weight: 900; letter-spacing: 1px;
         color: #ff8a9a; border-color: rgba(255,90,110,0.65); }
