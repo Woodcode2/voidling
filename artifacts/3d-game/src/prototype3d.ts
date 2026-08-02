@@ -378,16 +378,31 @@ interface WorldCopy {
 }
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
-    n: 1, icon: '🏝️', sub: 'the little void is hungry · eat the island',
+    // MAPLE FALLS WAS WEARING PIRATE BAY'S ICON. 🏝️ is a palm on a sand spit,
+    // and this world is a sleepy autumn town — Main Street, a courthouse, a
+    // county fair, and several hundred maples. The card said SLEEPY LITTLE
+    // TOWN under a picture of a tropical island, and every line of its copy
+    // called the place "the island", which is the engine's word for a
+    // landmass, not the player's word for where they are. PIRATE BAY is the
+    // tropical island in this game and it is two cards along.
+    n: 1, icon: '🍁', sub: 'the little void is hungry · eat the town',
     newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
-    ender: '🌑 WORLD ENDER! The island is OVER.',
+    ender: '🌑 WORLD ENDER! The town is OVER.',
     enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
-    winSub: 'the island belongs to the void', place: 'the island',
-    winTitles: ['ISLAND: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF THE ISLE'],
+    winSub: 'the whole town belongs to the void', place: 'the town',
+    winTitles: ['TOWN: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF MAPLE FALLS'],
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
-    newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
+    newsGap: [16, 8], signOn: 6,
+    // THE ROYAL MARINER, in 3D: island.ts authors the grand hotel at world
+    // (8540, 3700). Pirate Bay was written off for a finale cue on the
+    // grounds that it has "no single object the match builds toward" — but it
+    // does, and it is a radius-10 hotel that only becomes edible in the last
+    // half-minute, which is the exact definition GAME DAY's stadium meets.
+    // Without the cue a child reached the biggest meal on the island with no
+    // idea it had become reachable.
+    hero: [(8540 - 6000) * 0.05, (3700 - 6000) * 0.05], introLen: 2.2,
     ender: '🌑 WORLD ENDER! The resort is OVER.',
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',

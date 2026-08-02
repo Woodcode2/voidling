@@ -641,13 +641,45 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // brows are painted, not stamped: a tapered stroke with rounded ends reads
   // as a drawn brow. Two hard-edged rectangles read as two dashes of tape.
   const browTex = (() => {
-    const W = 128, H = 32, cv = document.createElement('canvas');
+    // 512 x 128, not 128 x 32. At WORLD ENDER the hero's face fills most of a
+    // phone screen and this 0.32-unit plane is magnified enormously — at the
+    // old resolution the brow arrived on screen as a blurred bar. It is four
+    // kilobytes; there is no reason for it to be the softest thing on the
+    // character's face.
+    const W = 512, H = 128, cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
     const x = cv.getContext('2d')!;
-    x.strokeStyle = '#ffffff'; x.lineCap = 'round';
-    x.beginPath(); x.moveTo(10, H * 0.66); x.quadraticCurveTo(W * 0.5, H * 0.16, W - 10, H * 0.44);
-    x.lineWidth = H * 0.52; x.stroke();
+    x.fillStyle = '#ffffff';
+    // A TAPER, drawn as an outline rather than stroked at one width. A
+    // constant lineWidth with round caps is a sausage — same thickness at
+    // both ends — and every brow anyone has ever drawn is heavy at the inner
+    // end and runs out to a point at the outer one. That single asymmetry is
+    // most of what makes a mark read as drawn rather than as placed.
+    const P0 = [22, H * 0.70], P1 = [W * 0.46, H * 0.10], P2 = [W - 20, H * 0.40];
+    const at = (t: number) => {
+      const u = 1 - t;
+      return [u * u * P0[0] + 2 * u * t * P1[0] + t * t * P2[0],
+              u * u * P0[1] + 2 * u * t * P1[1] + t * t * P2[1]];
+    };
+    const halfW = (t: number) => H * 0.30 * Math.pow(1 - t, 0.75) + H * 0.035;
+    const N = 48, top: number[][] = [], bot: number[][] = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, [px, py] = at(t);
+      const [nx0, ny0] = at(Math.min(1, t + 0.01));
+      const dx = nx0 - px, dy = ny0 - py, L = Math.hypot(dx, dy) || 1;
+      const nx = -dy / L, ny = dx / L, w2 = halfW(t);
+      top.push([px + nx * w2, py + ny * w2]);
+      bot.push([px - nx * w2, py - ny * w2]);
+    }
+    x.beginPath();
+    x.moveTo(top[0][0], top[0][1]);
+    for (const p of top) x.lineTo(p[0], p[1]);
+    for (let i = bot.length - 1; i >= 0; i--) x.lineTo(bot[i][0], bot[i][1]);
+    x.closePath(); x.fill();
+    // and round the heavy inner end, so the taper starts from a cap not a cut
+    x.beginPath(); x.arc(P0[0], P0[1], halfW(0), 0, Math.PI * 2); x.fill();
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
     return t;
   })();
   const browMat = new THREE.MeshBasicMaterial({ color: 0x2a1f45, map: browTex, transparent: true, opacity: 0, depthWrite: false });
