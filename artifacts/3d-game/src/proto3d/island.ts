@@ -411,28 +411,191 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   for (const p of sil3) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.y); maxZ = Math.max(maxZ, p.y); }
   const W3 = maxX - minX, H3 = maxZ - minZ;
 
+  // the star shader's clock — ticked from update() so the field scintillates
+  let starMatRef: THREE.ShaderMaterial | null = null;
   // ── space backdrop ─────────────────────────────────────────────────────────
-  scene.background = new THREE.Color(WORLD.space);
+  // WHAT WAS HERE: scene.background = one flat colour, and a painted nebula
+  // that swaps in from a CDN when it loads. Which means the sky is a SINGLE
+  // FLAT FILL for the whole of the first load, on any connection where that
+  // image is slow, and permanently anywhere it fails. The island floats in
+  // front of a solid rectangle.
+  //
+  // So the fallback is no longer a colour, it is a painted sky of its own:
+  // a vertical gradient from a deep horizon into a darker zenith, two soft
+  // nebula clouds in the world's own hues, and a faint galactic band raked
+  // across it. It costs one 1024px canvas at boot and it means this game never
+  // shows a flat background, on any device, at any point in the load.
+  const skyCanvas = (() => {
+    // 2048 across, because this one texture is stretched over the ENTIRE sky —
+    // it is the single most magnified image in the game.
+    const c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
+    const g2 = c.getContext('2d')!;
+    const base = new THREE.Color(WORLD.space);
+    const hi = base.clone().offsetHSL(0.02, 0.10, 0.10);
+    const lo = base.clone().offsetHSL(-0.02, 0.0, -0.035);
+    const grad = g2.createLinearGradient(0, 0, 0, 1024);
+    grad.addColorStop(0, `#${lo.getHexString()}`);
+    grad.addColorStop(0.62, `#${base.getHexString()}`);
+    grad.addColorStop(1, `#${hi.getHexString()}`);
+    g2.fillStyle = grad; g2.fillRect(0, 0, 2048, 1024);
+    // NEBULA. Wide, soft, low-alpha blobs in violet and teal, built additively
+    // so they glow rather than smear. Two colours, not one: a single-hue cloud
+    // reads as a stain on the gradient.
+    g2.globalCompositeOperation = 'lighter';
+    const cloud = (cx: number, cy: number, r: number, col: string, a: number) => {
+      const rg = g2.createRadialGradient(cx, cy, 0, cx, cy, r);
+      rg.addColorStop(0, col.replace('ALPHA', String(a)));
+      rg.addColorStop(0.5, col.replace('ALPHA', String(a * 0.42)));
+      rg.addColorStop(1, col.replace('ALPHA', '0'));
+      g2.fillStyle = rg;
+      g2.beginPath(); g2.ellipse(cx, cy, r, r * rand(0.5, 0.8), rand(0, 3.14), 0, Math.PI * 2); g2.fill();
+    };
+    for (let i = 0; i < 16; i++)
+      cloud(rand(0, 2048), rand(120, 940), rand(240, 680), 'rgba(126,74,214,ALPHA)', rand(0.05, 0.12));
+    for (let i = 0; i < 11; i++)
+      cloud(rand(0, 2048), rand(160, 920), rand(180, 520), 'rgba(58,132,190,ALPHA)', rand(0.04, 0.09));
+    for (let i = 0; i < 6; i++)
+      cloud(rand(0, 2048), rand(240, 880), rand(140, 380), 'rgba(224,110,180,ALPHA)', rand(0.03, 0.07));
+    // THE GALACTIC BAND: a raked run of dust that gives the sky a direction.
+    // Without it a field of clouds has no composition, just texture.
+    g2.save();
+    g2.translate(1024, 576); g2.rotate(-0.26);
+    for (let i = 0; i < 130; i++) {
+      const x = rand(-1280, 1280);
+      const y = rand(-1, 1) * 92 * (1 - Math.abs(x) / 1560);
+      cloud(x, y, rand(68, 240), 'rgba(186,166,255,ALPHA)', rand(0.020, 0.050));
+    }
+    // dust motes ON the band — what makes it read as stars too far away to
+    // resolve rather than as fog
+    for (let i = 0; i < 9000; i++) {
+      const x = rand(-1280, 1280);
+      const spreadY = 88 * (1 - Math.abs(x) / 1560);
+      const y = (Math.random() + Math.random() + Math.random() - 1.5) * spreadY;
+      g2.fillStyle = `rgba(214,200,255,${rand(0.05, 0.24).toFixed(2)})`;
+      g2.fillRect(x, y, 1, 1);
+    }
+    g2.restore();
+    g2.globalCompositeOperation = 'source-over';
+    // ── AND THE GRAIN, which is not decoration ────────────────────────────
+    // A photograph of the generated texture showed a fine ORDERED LATTICE
+    // across the whole sky. It is not a bug in the art — it is Chromium's
+    // dither on the canvas gradient, which is invisible at 1:1 and becomes a
+    // grid the moment the image is stretched across an entire sky sphere.
+    //
+    // The fix is the thing the art wanted anyway: random grain at about the
+    // dither's own amplitude. Ordered patterns are visible BECAUSE they are
+    // ordered; noise of the same magnitude destroys the regularity and reads
+    // as film grain, which is what every real photograph of a nebula has.
+    // Drawn as one 256px tile through createPattern rather than two million
+    // fillRects, so it costs nothing at boot.
+    {
+      const nt = document.createElement('canvas'); nt.width = nt.height = 256;
+      const ng = nt.getContext('2d')!;
+      const img = ng.createImageData(256, 256);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = 118 + Math.random() * 20;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+        img.data[i + 3] = 255;
+      }
+      ng.putImageData(img, 0, 0);
+      const pat = g2.createPattern(nt, 'repeat')!;
+      g2.globalCompositeOperation = 'overlay';
+      g2.globalAlpha = 0.5;
+      g2.fillStyle = pat; g2.fillRect(0, 0, 2048, 1024);
+      g2.globalAlpha = 1;
+      g2.globalCompositeOperation = 'source-over';
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    return t;
+  })();
+  scene.background = skyCanvas;
+  scene.backgroundIntensity = 1.0;
   scene.fog = new THREE.Fog(WORLD.space, 420, 1500);   // wide, so big-void pull-back views stay clear
-  // Higgsfield-painted nebula sky — swaps in when it loads (colour fallback stays)
+  // Higgsfield-painted nebula sky — swaps in when it loads (the painted sky
+  // above stays if it does not)
   new THREE.TextureLoader().load('/assets/hf/hf_20260717_021720_8d012b94-ca33-49d6-9db7-237b607fe3da.png', (skyTex) => {
     skyTex.colorSpace = THREE.SRGBColorSpace;
     scene.background = skyTex;
     scene.backgroundIntensity = 0.55;   // deep rich nebula, not washed lavender
   });
 
-  // starfield
+  // ── THE STARFIELD ──────────────────────────────────────────────────────────
+  // WHAT WAS HERE: 900 points, one size, one colour, one opacity, no motion.
+  // Every star in the sky identical — which is the one thing a real sky never
+  // is. A night sky reads because of MAGNITUDE (a few bright, very many faint)
+  // and because of COLOUR TEMPERATURE (blue-white through white to amber), and
+  // it is alive because stars scintillate.
+  //
+  // All three, in one draw call, from one small shader: per-star size, per-star
+  // colour, per-star twinkle phase and rate. PointsMaterial cannot vary size
+  // per point, which is why it looked like this.
   {
-    const N = 900, pos = new Float32Array(N * 3);
+    const N = 1500;
+    const pos = new Float32Array(N * 3);
+    const col = new Float32Array(N * 3);
+    const siz = new Float32Array(N);
+    const pha = new Float32Array(N);
+    const c3 = new THREE.Color();
     for (let i = 0; i < N; i++) {
       const r = rand(340, 620), th = rand(0, Math.PI * 2), ph = rand(0.15, Math.PI * 0.6);
       pos[i * 3] = Math.cos(th) * Math.sin(ph) * r;
       pos[i * 3 + 1] = Math.cos(ph) * r * 0.7 - 40;
       pos[i * 3 + 2] = Math.sin(th) * Math.sin(ph) * r;
+      // MAGNITUDE: a power curve, so most stars are faint and a handful blaze.
+      // Uniform sizes are what made the old field read as noise.
+      const m = Math.pow(Math.random(), 3.2);
+      siz[i] = 1.0 + m * 6.0;
+      // COLOUR TEMPERATURE, weighted the way a real field is: mostly white,
+      // a cool blue majority among the rest, a few warm ones for contrast.
+      const t = Math.random();
+      if (t < 0.55) c3.setHSL(0.62, rand(0.10, 0.30), rand(0.82, 0.98));       // blue-white
+      else if (t < 0.82) c3.setHSL(0.72, rand(0.12, 0.34), rand(0.78, 0.95));  // violet-white
+      else if (t < 0.94) c3.setHSL(0.10, rand(0.30, 0.55), rand(0.76, 0.92));  // amber
+      else c3.setHSL(0.50, rand(0.20, 0.40), rand(0.80, 0.95));                // a few teal
+      col[i * 3] = c3.r; col[i * 3 + 1] = c3.g; col[i * 3 + 2] = c3.b;
+      pha[i] = rand(0, Math.PI * 2);
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd8c8ff, size: 1.5, transparent: true, opacity: 0.8, depthWrite: false })));
+    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
+    g.setAttribute('aPhase', new THREE.BufferAttribute(pha, 1));
+    starMatRef = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uPix: { value: Math.min(2, window.devicePixelRatio || 1) } },
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: `
+        attribute vec3 aColor; attribute float aSize; attribute float aPhase;
+        uniform float uTime; uniform float uPix;
+        varying vec3 vCol; varying float vTw;
+        void main() {
+          vCol = aColor;
+          // TWINKLE: two sines an irrational ratio apart, so the field never
+          // pulses in unison — one rate and every star breathes together, which
+          // reads as a flicker bug rather than as a sky.
+          float tw = 0.72 + 0.28 * (0.6 * sin(uTime * 1.7 + aPhase)
+                                  + 0.4 * sin(uTime * 2.61803 + aPhase * 1.7));
+          vTw = tw;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = aSize * uPix * tw;
+        }`,
+      fragmentShader: `
+        varying vec3 vCol; varying float vTw;
+        void main() {
+          // a soft round core with a wide faint halo — a hard disc reads as a
+          // sprite, this reads as a point of light
+          vec2 d = gl_PointCoord - vec2(0.5);
+          float r = length(d) * 2.0;
+          float core = smoothstep(1.0, 0.0, r);
+          float halo = smoothstep(1.0, 0.25, r) * 0.5;
+          float a = clamp(core * core + halo, 0.0, 1.0) * vTw;
+          if (a < 0.01) discard;
+          gl_FragColor = vec4(vCol, a);
+        }`,
+    });
+    scene.add(new THREE.Points(g, starMatRef));
   }
 
   // violet energy halo bleeding off the island edge (additive radial gradient)
@@ -2564,6 +2727,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.5; });
     },
     update(dt, t) {
+      if (starMatRef) starMatRef.uniforms.uTime.value = t;
       if (bayWater) (bayWater.material as THREE.ShaderMaterial).uniforms.uTime.value = t;
       wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1;
       (spray.material as THREE.MeshBasicMaterial).opacity = 0.42 + Math.sin(t * 3) * 0.08;
@@ -4320,8 +4484,24 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       glb(scene, addEdible, name, x3, z3, r, { h, rotY, smallShadow: r < 2.5, fallback: fb });
       BAY.claimSpot(p2[0], p2[1], r * 20);
     };
+    // ── DENSITY, AS ONE NUMBER ────────────────────────────────────────────
+    // A full instrumented match on every world found PIRATE BAY the worst-paced
+    // level in the game: eats per second peak at 15.0 around two minutes and
+    // then collapse — 10.4, 5.4, 3.9 — so the last third of a match is a slow
+    // decline to a quarter of peak, and it finishes on 110,841 against GAME
+    // DAY's 326,319. The cause is not the layout, which is good; it is that
+    // there are 2,137 things on this island against GAME DAY's 6,537. A big
+    // void eats the resort out and then has nowhere to go: mean distance to
+    // the nearest meal climbs 8 -> 11 -> 13 -> 16 across those same windows.
+    //
+    // Sixty-odd scatter calls were hand-balanced against each other, and
+    // rewriting all of them would keep the density and lose the balance. So
+    // the multiplier lives HERE, in the one helper they all go through: every
+    // prop type grows by the same factor and their proportions are untouched.
+    const BAY_DENSITY = 2.0;
     const spread = (id: string, n: number, clear = 60, sep?: number) =>
-      BAY.scatterInRegion(BAY.BAY_REGIONS.find((r) => r.id === id)!, n, Math.random, clear, { sep });
+      BAY.scatterInRegion(BAY.BAY_REGIONS.find((r) => r.id === id)!,
+        Math.round(n * BAY_DENSITY), Math.random, clear, { sep });
     BAY.resetPlacement();   // a fresh island starts with empty ground
 
     // A landmark is big enough that "on land" isn't sufficient — it must also
@@ -4353,7 +4533,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // and palm trees were growing on the lit dance floor.
     const NO_TOWN: BAY.BayBiome[] = ['party', 'port', 'resort', 'market', 'oldtown'];
     const sland = (n: number, clear = 45, band?: [number, number], sep?: number, avoid?: BAY.BayBiome[]) =>
-      BAY.scatterLand(n, Math.random, clear, band, { sep, avoid });
+      BAY.scatterLand(Math.round(n * BAY_DENSITY), Math.random, clear, band, { sep, avoid });
     const grove = (cx2: number, cy2: number, n: number, rad: number, clear = 30) =>
       BAY.clusterAt(cx2, cy2, n, rad, Math.random, clear, { sep: 2.6 });
 
@@ -4372,6 +4552,39 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (const [gx2, gy2] of sland(17, 240, undefined, undefined, NO_TOWN)) {
       for (const p2 of grove(gx2, gy2, 4 + Math.floor(Math.random() * 5), 420, 55))
         dropGlb('palm', p2, 2.6, rand(6.5, 10.5), makePalm, rand(0, Math.PI * 2));
+    }
+    // ── THE BIG ONES ──────────────────────────────────────────────────────
+    // Doubling the island's density fixed most of PIRATE BAY's pace collapse
+    // — eats per second in the last third went from 5.4 and 3.9 to 22.6 — but
+    // the final twenty seconds still fall off a cliff, and the instrumentation
+    // says why: 6% dead time and a mean distance of TWENTY units to the next
+    // meal, at a moment when the hero is sixteen metres across. There are 29
+    // objects on this island at radius 4 or above. MAPLE FALLS, after the same
+    // treatment, has 240.
+    //
+    // Density feeds the early game; SIZE feeds the last minute. These are the
+    // late-game meals: ancient palms grown from the ordinary ones, sea stacks,
+    // and the beached wrecks a pirate bay ought to have had from the start.
+    for (const p2 of sland(58, 150, undefined, 4.4, NO_TOWN)) {
+      const g = new THREE.Group();
+      const inner = makePalm();
+      inner.scale.setScalar(1.75);          // a palm that has been here a while
+      g.add(inner);
+      drop(g, p2, 4.4, rand(0, Math.PI * 2));
+    }
+    for (const p2 of sland(40, 140, undefined, 4.8, NO_TOWN)) {
+      const g = new THREE.Group();
+      const inner = makeRocksFB();
+      inner.scale.set(2.1, rand(2.4, 3.6), 2.1);   // a stack, not a boulder
+      g.add(inner);
+      drop(g, p2, 4.8, rand(0, Math.PI * 2));
+    }
+    for (const p2 of sland(16, 200, [0, 620], 5.6, NO_TOWN)) {
+      const g = new THREE.Group();
+      const inner = makeThatchHut();
+      inner.scale.set(1.9, 1.7, 1.9);      // a longhouse rather than a hut
+      g.add(inner);
+      drop(g, p2, 5.6, rand(0, Math.PI * 2));
     }
     // dune grass and scrub, thickest just inland of the surf
     for (const p2 of sland(190, 26, undefined, 0.9, NO_TOWN)) drop(makeReeds(), p2, 0.9, rand(0, Math.PI * 2));
@@ -5476,6 +5689,96 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         place(rail, w(rx), w(rcW) + side * 4.6, 1.6);
       }
     }
+  }
+
+  // ══ THE COUNTRY BETWEEN THE BLOCKS ════════════════════════════════════════
+  // MAPLE FALLS is the world a child plays FIRST — the cold-boot launch drops
+  // them straight into it — and a full instrumented match measured it as the
+  // weakest-paced level in the game. Eats per second go flat and then DOWN:
+  //
+  //     9.5  9.4  7.9  8.5  12.2  7.8  6.9        (per 20s, to the whistle)
+  //
+  // against GAME DAY's 12.6, 17.9, 20.3, 20.9, 30.5, 32.1. The climax of a
+  // Maple match is slower than its middle, and it finishes on 82,902 points
+  // where GAME DAY finishes on 326,319. A child's first impression of this
+  // game is its worst-paced world.
+  //
+  // The cause is density. 3,138 objects over 242,887u² is 1.29 per 100u², the
+  // lowest in the game by some way — GAME DAY runs 3.80 and LANTERN NIGHT
+  // 4.85. The TOWN is fine; it is hand-authored block by block and it reads.
+  // What is empty is everything BETWEEN the blocks: verges, hedgerows, scrub,
+  // the long runs of nothing a big void has to cross to find its next meal.
+  // Measured, that is exactly where the match falls apart — mean distance to
+  // the nearest thing worth eating climbs from 7 units to 19 as the clock runs
+  // down, and travel per eat is 4.1 units against GAME DAY's 1.9.
+  //
+  // So: a fill pass over the land the authored town does not use. Nothing here
+  // touches a block, a row or a landmark — maplePlaceable already refuses
+  // roads, water and the coast, and spotFree refuses anything already claimed,
+  // so this can only land in gaps.
+  {
+    let filled = 0, bigTrees = 0, outbuildings = 0;
+    const LO = 6000 - 5700, HI = 6000 + 5700;
+    const pickTiny = () => {
+      const r = mrnd();
+      if (r < 0.30) return { m: MS.makeMapleTree(), r3: 2.6 };
+      if (r < 0.44) return { m: makePine(), r3: 2.8 };
+      if (r < 0.62) return { m: makeBush(), r3: 1.4 };
+      if (r < 0.76) return { m: makeFlowers(), r3: 0.8 };
+      if (r < 0.86) return { m: makeRocksFB(), r3: 2.0 };
+      if (r < 0.93) return { m: MS.makePlanter(), r3: 0.9 };
+      return { m: makeReeds(), r3: 0.9 };
+    };
+    // 1. THE VERGES. Small and many — this is the layer that stops a drive
+    //    across town being a drive across nothing.
+    for (let t = 0; t < 26000 && filled < 2300; t++) {
+      const wx = mr(LO, HI), wy = mr(LO, HI);
+      const { m, r3 } = pickTiny();
+      if (!maplePlaceable(wx, wy, r3)) continue;
+      if (!MS.spotFree(wx, wy, r3 * 20)) continue;
+      MS.claimSpot(wx, wy, r3 * 20);
+      place(m, w(wx), w(wy), r3);
+      filled++;
+    }
+    // 2. THE BIG TREES. The town is called MAPLE FALLS and its largest edible
+    //    was a 6.5-unit town hall — 46 objects in the whole world at radius 4
+    //    or above, and NOTHING above 7, so a WORLD ENDER sixteen metres across
+    //    had nothing left worth swallowing. A mature maple is the most
+    //    obviously right big object this world could possibly have.
+    for (let t = 0; t < 4000 && bigTrees < 150; t++) {
+      const wx = mr(LO, HI), wy = mr(LO, HI);
+      const r3 = mr(4.2, 5.4);
+      if (!maplePlaceable(wx, wy, r3)) continue;
+      if (!MS.spotFree(wx, wy, r3 * 20)) continue;
+      MS.claimSpot(wx, wy, r3 * 20);
+      const g = new THREE.Group();
+      const inner = mchance(0.72) ? MS.makeMapleTree() : makePine();
+      const k = r3 / 2.6;                       // grown from the ordinary one
+      inner.scale.setScalar(k);
+      g.add(inner);
+      place(g, w(wx), w(wy), r3);
+      bigTrees++;
+    }
+    // 3. THE OUTBUILDINGS. Barns, silos and a grain elevator on the outskirts,
+    //    which the prop kit already had and the world was not using. These are
+    //    the 5-to-7 rung: the thing a COLOSSUS drives across town FOR.
+    for (let t = 0; t < 2600 && outbuildings < 46; t++) {
+      const wx = mr(LO, HI), wy = mr(LO, HI);
+      // outskirts only — a silo on the town green is a different game
+      const d = Math.hypot(wx - 6000, wy - 6000);
+      if (d < 2600) continue;
+      const roll = mrnd();
+      const [m, r3] = roll < 0.44 ? [MS.makeBarn(), 5.2]
+        : roll < 0.72 ? [MS.makeSilo(), 4.4]
+        : roll < 0.88 ? [MS.makeWaterTower(), 5.0]
+        : [MS.makeGrainElevator(), 6.4] as [THREE.Object3D, number];
+      if (!maplePlaceable(wx, wy, r3)) continue;
+      if (!MS.spotFree(wx, wy, r3 * 20)) continue;
+      MS.claimSpot(wx, wy, r3 * 20);
+      place(m, w(wx), w(wy), r3);
+      outbuildings++;
+    }
+    console.info(`[maple] country fill: ${filled} verge props, ${bigTrees} mature trees, ${outbuildings} outbuildings`);
   }
 
   // ── the coast fringe ──────────────────────────────────────────────────────
