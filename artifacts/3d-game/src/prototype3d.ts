@@ -145,6 +145,7 @@ let camDist = 50;
 let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 const TOPDOWN = location.search.includes('top');
+const SHOW_WALLS = location.search.includes('walls');   // ?walls=1 — see the containment boundary
 const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the GLB pack
 
 // (Full-screen bloom washed out the sunlit island — the void's "bloom" is a
@@ -889,6 +890,55 @@ function announceBeat(icon: string, title: string, sub: string, mult: number) {
     + `<span class="bMul">×${mult}</span></div>`,
   );
 }
+// ── ?walls=1 : the containment boundary, drawn ─────────────────────────────
+// One InstancedMesh of flat red tiles that follows the player and re-tests the
+// grid around them every third of a second, using the SAME solidity rule the
+// movement code uses at the void's current radius. Nothing is allocated unless
+// the flag is on.
+const WALL_N = 44, WALL_STEP = 7;   // 44x44 tiles at 7 units = a 308-unit window
+let wallMesh: THREE.InstancedMesh | null = null;
+let wallCd = 0;
+const _wm = new THREE.Matrix4();
+function paintWalls() {
+  if (!wallMesh) {
+    wallMesh = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(WALL_STEP * 0.92, WALL_STEP * 0.92),
+      new THREE.MeshBasicMaterial({ color: 0xff2a44, transparent: true, opacity: 0.34, depthWrite: false }),
+      WALL_N * WALL_N,
+    );
+    wallMesh.frustumCulled = false;
+    wallMesh.renderOrder = 3;
+    scene.add(wallMesh);
+  }
+  wallCd -= 1 / 60;
+  if (wallCd > 0) return;
+  wallCd = 0.33;
+  // the movement rule, verbatim — see the containment block in animate()
+  const R0 = voidling.radius;
+  const m = Math.min(R0 * 0.75, 4 + R0 * 0.15) + 1.2;
+  const d45 = m * 0.7071;
+  const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
+    && insideIsland3(x + m, z) && insideIsland3(x - m, z)
+    && insideIsland3(x, z + m) && insideIsland3(x, z - m)
+    && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
+    && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
+  const ox = Math.round(voidState.x / WALL_STEP) * WALL_STEP;
+  const oz = Math.round(voidState.z / WALL_STEP) * WALL_STEP;
+  let n = 0;
+  for (let i = -WALL_N / 2; i < WALL_N / 2; i++) {
+    for (let j = -WALL_N / 2; j < WALL_N / 2; j++) {
+      const x = ox + i * WALL_STEP, z = oz + j * WALL_STEP;
+      if (solid(x, z)) continue;                       // legal — draw nothing
+      if (!insideIsland3(x, z)) continue;              // off the map entirely — not a wall
+      _wm.makeRotationX(-Math.PI / 2); _wm.setPosition(x, 0.12, z);
+      wallMesh.setMatrixAt(n++, _wm);
+      if (n >= WALL_N * WALL_N) break;
+    }
+  }
+  wallMesh.count = n;
+  wallMesh.instanceMatrix.needsUpdate = true;
+}
+
 // ── ONE HERO MESSAGE AT A TIME ──────────────────────────────────────────────
 // The EVOLVE card and this banner are two independent channels that nothing
 // arbitrated between, and at the top rung they fire in the SAME synchronous
@@ -4001,6 +4051,7 @@ function animate() {
   pumpBanner();   // anything the evolve card held back gets its turn now
   updateFindRing(tClock, started ? tClock - startT : 999);   // menu never shows it
 
+  if (SHOW_WALLS) paintWalls();
   // LOD band + shadow frustum track the camera
   updateLodBias(camDist);
   fitShadow(camDist);
