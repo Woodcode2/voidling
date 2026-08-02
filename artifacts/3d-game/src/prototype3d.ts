@@ -139,7 +139,20 @@ setWorld(pickedWorld);
 const scene = new THREE.Scene();
 
 // image-based ambience: gives every PBR material real specular response so
-// surfaces read crisp/dimensional instead of flatly lit (the "2026" lift)
+// surfaces read crisp/dimensional instead of flatly lit (the "2026" lift).
+//
+// AND IT STAYS RoomEnvironment, which was tried and reverted. Swapping it for
+// each world's own painted sky sounds obviously better — a lantern in a night
+// market and a mailbox in an autumn town should not reflect the same grey box
+// — and it measured 15% DARKER on GAME DAY (whole-frame luminance 0.406 ->
+// 0.343), which was the clean control since nothing else about that world had
+// changed. The reasoning was wrong in a way the theory hid: every world in
+// this game floats in the SAME near-black space (WORLD.space is 0x0d0821),
+// only tinted. There is no warm daylight sky to reflect on Maple, so "the
+// world's own sky" hands a sunny autumn town a dark violet sheen and takes
+// away most of the specular that made the props read dimensional at all.
+// A neutral lit box is the right environment for a game lit by a sun it does
+// not draw.
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;

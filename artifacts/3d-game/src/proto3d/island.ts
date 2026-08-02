@@ -61,6 +61,10 @@ export interface Island {
   update(dt: number, t: number): void;
   setDusk(k: number): void;   // 0 = midday, 1 = full golden hour
   W: number;  // 3D world helper (world units -> 3D)
+  /** This world's own painted sky, equirectangular. Handed back so the
+   *  renderer can use it as the image-based light instead of a grey studio
+   *  box — see the note where scene.environment is set. */
+  skyTex: THREE.Texture;
 }
 
 // ── coordinate system ────────────────────────────────────────────────────────
@@ -2726,6 +2730,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       winGlassMatShared.emissiveIntensity = 0.25 + k * 0.75;
       sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.5; });
     },
+    skyTex: skyCanvas,
     update(dt, t) {
       if (starMatRef) starMatRef.uniforms.uTime.value = t;
       if (bayWater) (bayWater.material as THREE.ShaderMaterial).uniforms.uTime.value = t;
