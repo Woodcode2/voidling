@@ -226,12 +226,18 @@ await stopPlay();
     await settle(700);
   };
   await afterIntro();
-  // A BIGGER VOID PULLS THE CAMERA BACK — camDist scales with radius, so the
-  // size here is a framing decision, not a power-level one. At 3.2 the hero
-  // filled the frame and the shot was mostly ground: no lantern strings, no
-  // canal, none of what makes this world look like itself. At 5.5 the street
-  // reads as a street.
-  await frame(5.5, 6050, 7800);
+  // SIZE IS ALMOST NOT A FRAMING CONTROL HERE, which took a photograph to
+  // learn. camDist does scale with the void's radius — but it scales at close
+  // to the same rate the void grows, so making the hero bigger pulls the
+  // camera back by about as much as the hero gained and the composition barely
+  // moves. All that changes is the share of the frame the ball occupies, which
+  // goes UP. Shot at 5.5 on that reasoning and it was worse than 3.2, not
+  // better: fewer stalls, fewer spirits, more purple.
+  //
+  // 3.4 is where a district sweep of this same spot framed the street best —
+  // stall roofs, umbrellas, crates and a crowd around a hero small enough to
+  // be standing IN a market rather than in front of one.
+  await frame(3.4, 6050, 7800);
   await shot('04-lantern-market.png');
 
   // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
