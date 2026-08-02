@@ -867,16 +867,41 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // ✦ orbiting star sparkles riding the evolution ring — they flare on every
   // evolution and stay twinkling once the ring is earned (stage 2+)
   const starTex = (() => {
-    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    // 128, and with a core. These sprites ride the evolution ring, and the ring
+    // scales with the hero — at WORLD ENDER a 0.16 sprite is no longer a
+    // sparkle, it is an object, and a 64px four-pointed cutout with hard edges
+    // and no centre photographs as a small grey cross. A real sparkle is a
+    // bright point with arms coming off it.
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
     const x = cv.getContext('2d')!;
-    x.translate(32, 32); x.fillStyle = '#ffffff';
+    x.translate(64, 64);
+    // the arms
+    x.fillStyle = '#ffffff';
     x.beginPath();
     for (let i = 0; i < 4; i++) {
-      x.moveTo(0, 0); x.quadraticCurveTo(5, -5, 0, -26); x.quadraticCurveTo(-5, -5, 0, 0);
+      x.moveTo(0, 0); x.quadraticCurveTo(9, -9, 0, -56); x.quadraticCurveTo(-9, -9, 0, 0);
       x.rotate(Math.PI / 2);
     }
     x.fill();
-    return new THREE.CanvasTexture(cv);
+    // …and the short diagonal arms, which is what stops it reading as a plus
+    x.save(); x.rotate(Math.PI / 4);
+    x.beginPath();
+    for (let i = 0; i < 4; i++) {
+      x.moveTo(0, 0); x.quadraticCurveTo(5, -5, 0, -22); x.quadraticCurveTo(-5, -5, 0, 0);
+      x.rotate(Math.PI / 2);
+    }
+    x.fill(); x.restore();
+    // the core: a soft bright centre, so the sprite has a source rather than
+    // being four strokes meeting at a hole
+    const rg = x.createRadialGradient(0, 0, 0, 0, 0, 22);
+    rg.addColorStop(0, 'rgba(255,255,255,1)');
+    rg.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = rg;
+    x.beginPath(); x.arc(0, 0, 22, 0, Math.PI * 2); x.fill();
+    const t = new THREE.CanvasTexture(cv);
+    t.anisotropy = 2;
+    return t;
   })();
   const orbit = new THREE.Group();
   orbit.rotation.x = Math.PI / 2 - 0.5;   // ride the same tilt as the ring ribbon
