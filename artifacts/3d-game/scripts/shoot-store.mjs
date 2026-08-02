@@ -215,17 +215,45 @@ await stopPlay();
     await page.evaluate(([rr, x, z]) => { window.__setVoidR(rr); window.__warpVoid(x, z); },
       [r, w(wx), w(wy)]);
     await settle(2400);
-    await page.evaluate(([x, z]) => window.__warpVoid(x, z), [w(wx), w(wy)]);
+    await page.evaluate(([x, z]) => {
+      window.__warpVoid(x, z);
+      // AND WAKE HIM UP. The hero has an idle timer, and a harness that warps
+      // and then waits is by definition idle — the first framed shot came out
+      // with the mascot asleep, eyes shut, Zzz over his head, which is a
+      // remarkable thing to put on an App Store page. Pin it for the shutter.
+      window.__setMood('frenzy');
+    }, [w(wx), w(wy)]);
     await settle(700);
   };
   await afterIntro();
-  await frame(3.2, 6050, 7800);
+  // A BIGGER VOID PULLS THE CAMERA BACK — camDist scales with radius, so the
+  // size here is a framing decision, not a power-level one. At 3.2 the hero
+  // filled the frame and the shot was mostly ground: no lantern strings, no
+  // canal, none of what makes this world look like itself. At 5.5 the street
+  // reads as a street.
+  await frame(5.5, 6050, 7800);
   await shot('04-lantern-market.png');
 
   // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
   // The finale, at the size a player reaches it, with its eave lines lit.
-  await frame(9.0, 6280, 4400);
+  //
+  // The bathhouse mesh stands at world (6280, 2500) and the camera looks
+  // toward DECREASING world y, so the void has to be south of it — far enough
+  // that the six-storey stack is in frame, close enough that it is not a speck.
+  // A first pass used y=4400, which is 1,900 units out and photographed the
+  // night garden with no building in it at all. y=3500 is interpolated from a
+  // district sweep that framed it at y=3400.
+  //
+  // ⚠️ THIS IS THE ONE SHOT TO EYEBALL. The exact framing could not be checked
+  // here: this machine's software renderer runs the match clock about forty
+  // times slower than real time, so each attempt costs several minutes and the
+  // iteration was abandoned rather than guessed at. Everything else in this
+  // script has been photographed and looked at. If the building is cropped or
+  // small, move y (south is a larger number) and adjust the radius — a bigger
+  // void pulls the camera back.
+  await frame(7.0, 6280, 3500);
   await shot('05-lantern-bathhouse.png');
+  await page.evaluate(() => window.__setMood(null));   // hand the face back
 }
 
 // ── 06 · GAME DAY, the bowl ─────────────────────────────────────────────────
