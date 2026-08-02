@@ -460,6 +460,7 @@ const _dbg = window as unknown as {
   __biomeAt: (x: number, z: number) => string | null;
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
+  __warpVoid: (x: number, z: number) => void;
   __setMood: (m: string | null) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
@@ -489,6 +490,19 @@ _dbg.__setVoidR = (r: number) => {
   voidling.setRadius(r); lastR = r;
   curStage = stageFor(r); voidling.setStage(VISUAL_STAGE[curStage] ?? 0);
   audio.setMusicStage(VISUAL_STAGE[curStage] ?? 0);
+};
+// QA: put the hero anywhere on the map. There was no way to photograph a
+// district without playing the three minutes it takes to reach it, which meant
+// every density and lighting judgement was made from the two or three places a
+// harness could actually get to. Snaps the camera with it so the shot is not a
+// two-second dolly.
+_dbg.__warpVoid = (x: number, z: number) => {
+  voidState.x = x; voidState.z = z;
+  voidling.group.position.set(x, voidling.group.position.y, z);
+  // and drag the camera with it rather than letting it lerp across the valley
+  camera.position.set(x + camOffset.x * camDist, camOffset.y * camDist, z + camOffset.z * camDist);
+  camera.lookAt(x, voidling.radius * 0.5, z);
+  camera.updateMatrixWorld();
 };
 // QA: one call returns the whole race — used to log score curves over a match
 _dbg.__matchState = () => ({

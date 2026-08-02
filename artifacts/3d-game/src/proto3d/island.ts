@@ -1040,12 +1040,24 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
     // 8. FIREFLIES in the garden — a handful of tiny hard specks, no falloff.
     //    Cheap, and the eye reads them as depth.
+    //
+    //    …at the RIGHT SIZE, which took a photograph to find. These were 9
+    //    texture units across on a 3,072px bake. That is about two pixels of
+    //    canvas — which sounds like a speck, and is one, right up until the
+    //    play camera magnifies the ground roughly six times and every "speck"
+    //    lands on screen as a pale oval the size of a spirit's head. A hundred
+    //    and twenty of those across the night garden did not read as fireflies;
+    //    they read as somebody had flicked a brush at the lawn.
+    //
+    //    The number that matters is not the canvas radius, it is the SCREEN
+    //    radius: bake px x (screen px per bake px). Three units lands at about
+    //    five screen pixels, which is a firefly.
     {
       const rnd = (() => { let sd = 4700; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
       g.save(); g.globalCompositeOperation = 'lighter';
-      for (const [x, y] of LN.scatterInRegion(LN_R('garden'), 120, rnd, 10)) {
-        g.fillStyle = 'rgba(200,255,170,0.75)';
-        g.beginPath(); g.arc(pxW(x), pyW(y), Math.max(0.8, 9 * PU), 0, Math.PI * 2); g.fill();
+      for (const [x, y] of LN.scatterInRegion(LN_R('garden'), 150, rnd, 10)) {
+        g.fillStyle = 'rgba(200,255,170,0.7)';
+        g.beginPath(); g.arc(pxW(x), pyW(y), Math.max(0.6, 3 * PU), 0, Math.PI * 2); g.fill();
       }
       g.restore();
     }
@@ -2143,10 +2155,26 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
     topGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
-  // detail-grain overlay: a small tiling noise texture multiplied into the
-  // ground at high frequency — hides bake upscaling so grass/asphalt read as
-  // TEXTURE up close (the 2D game's grass richness), not as blurry paint
-  const detailTex = (() => {
+  // ── GROUND GRAIN ────────────────────────────────────────────────────────
+  // detail-grain overlay: small tiling noise multiplied into the ground so it
+  // reads as TEXTURE up close rather than as blurry paint.
+  //
+  // …and a lesson about frequency, measured on LANTERN NIGHT. The original
+  // overlay was one 128px speckle sampled at 140x and 34x repeat. Do the
+  // arithmetic on the 140x layer: 128 x 140 = 17,920 texels across 600 world
+  // units is 30 texels per unit, and one world unit is about eight screen
+  // pixels at the play camera. Four texels per pixel — so the mip chain
+  // averages the entire layer to flat grey before it ever reaches the screen,
+  // and the layer that DOES resolve (34x, ~1 texel per pixel) was mixed at
+  // 0.08. That is the whole reason a close-up floor looked like a gradient:
+  // the detail was real, and every bit of it was either too fine to survive
+  // filtering or too faint to see.
+  //
+  // So there are three layers now, an octave apart, and the weights are per
+  // world. MAPLE, PIRATE BAY and GAME DAY keep exactly the mix they shipped
+  // with — they were tuned by eye against their own bakes and this is not the
+  // place to relitigate them.
+  const speckle = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const x = c.getContext('2d')!;
     x.fillStyle = '#808080'; x.fillRect(0, 0, 128, 128);
@@ -2159,12 +2187,102 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     return t;
   })();
+  // The MOTTLE. Structure rather than speckle: overlapping soft blotches at a
+  // size that survives to the screen, plus a scatter of hard chips for edges
+  // the eye can actually catch on. This is the layer that makes packed earth
+  // read as packed earth, and it carries a little COLOUR — warm and cool
+  // patches, not just light and dark — because a floor whose only variation is
+  // brightness still reads as one paint under a lamp.
+  const mottle = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#808080'; x.fillRect(0, 0, 256, 256);
+    // wrap-safe: every blob is drawn nine times, once per neighbouring tile
+    const blob = (cx: number, cy: number, r: number, style: string) => {
+      x.fillStyle = style;
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+        x.beginPath(); x.arc(cx + ox * 256, cy + oy * 256, r, 0, Math.PI * 2); x.fill();
+      }
+    };
+    for (let i = 0; i < 130; i++) {
+      const warm = Math.random() < 0.5;
+      const up = Math.random() < 0.5;
+      const a = 0.10 + Math.random() * 0.13;
+      blob(Math.random() * 256, Math.random() * 256, 8 + Math.random() * 34,
+        up ? `rgba(${warm ? 170 : 148},${warm ? 158 : 158},${warm ? 138 : 172},${a})`
+           : `rgba(${warm ? 92 : 74},${warm ? 82 : 80},${warm ? 68 : 94},${a})`);
+    }
+    for (let i = 0; i < 900; i++) {
+      const v = 68 + Math.floor(Math.random() * 108);
+      x.fillStyle = `rgba(${v},${v},${v},0.5)`;
+      const w = 1 + Math.random() * 3;
+      x.fillRect(Math.random() * 256, Math.random() * 256, w, w * (0.4 + Math.random()));
+    }
+    // ── NORMALISE, and this is not optional ────────────────────────────────
+    // 130 blobs of mean radius 25 on a 256px tile is 255,000px of paint over
+    // 65,536px of canvas: every pixel is painted about four times, the paint
+    // stacks, and the tile came out with a mean well above the 128 the shader
+    // treats as "no change". The result on screen was the ground blowing out
+    // to white wherever a light pool already sat — which is the SAME mistake
+    // as the additive-pool arithmetic that had to be unpicked from the night
+    // bake, made again in a different medium a hundred lines away.
+    //
+    // So the tile is measured rather than guessed at. Rescale so the mean is
+    // exactly neutral and the spread is a known number, and the layer can only
+    // ever add variation, never brightness. Changing the blob count or their
+    // alphas from here on cannot break the level's exposure.
+    {
+      const img = x.getImageData(0, 0, 256, 256);
+      const d = img.data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += d[i];
+      const mean = sum / (d.length / 4);
+      let sq = 0;
+      for (let i = 0; i < d.length; i += 4) sq += (d[i] - mean) ** 2;
+      const sd = Math.sqrt(sq / (d.length / 4)) || 1;
+      const SD = 26;                       // the spread the shader is tuned for
+      const k = SD / sd;
+      for (let i = 0; i < d.length; i += 4) {
+        for (let ch = 0; ch < 3; ch++) {
+          const v = 128 + (d[i + ch] - mean) * k;
+          d[i + ch] = v < 0 ? 0 : v > 255 ? 255 : v;
+        }
+      }
+      x.putImageData(img, 0, 0);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  })();
+  // fine, mid, coarse — and the repeat of the coarse layer.
+  const GRAIN: Record<WorldId, [number, number, number, number]> = {
+    maple:   [0.45, 0.08, 0.00, 9],
+    pirate:  [0.45, 0.08, 0.00, 9],
+    gameday: [0.45, 0.08, 0.00, 9],
+    // LANTERN NIGHT leans on the mid and coarse layers hard. Its floor is
+    // earth, flagstone, boardwalk and gravel seen under lanterns rather than a
+    // sun, so it has almost no baked lighting variation of its own to hide
+    // behind — every bit of surface interest has to come from here.
+    lantern: [0.30, 0.30, 0.34, 7],
+  };
+  const [gFine, gMid, gCoarse, gRep] = GRAIN[WORLD_ID];
   const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.97 });
   groundMat.onBeforeCompile = (shader) => {
-    shader.uniforms.uDetail = { value: detailTex };
+    shader.uniforms.uDetail = { value: speckle };
+    shader.uniforms.uMottle = { value: mottle };
+    shader.uniforms.uGrain = { value: new THREE.Vector4(gFine, gMid, gCoarse, gRep) };
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\n{ vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb; vec3 g2 = texture2D(uDetail, vMapUv * 34.0).rgb; diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, 0.45) * mix(vec3(1.0), g2 * 2.0, 0.08); }');
+      .replace('#include <map_pars_fragment>',
+        '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nuniform sampler2D uMottle;\nuniform vec4 uGrain;')
+      .replace('#include <map_fragment>',
+        '#include <map_fragment>\n{'
+        + ' vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb;'
+        + ' vec3 g2 = texture2D(uDetail, vMapUv * 34.0).rgb;'
+        + ' vec3 g3 = texture2D(uMottle, vMapUv * uGrain.w).rgb;'
+        + ' diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, uGrain.x)'
+        + '                  * mix(vec3(1.0), g2 * 2.0, uGrain.y)'
+        + '                  * mix(vec3(1.0), g3 * 2.0, uGrain.z);'
+        + ' }');
   };
   const top = new THREE.Mesh(topGeo, groundMat);
   top.rotation.x = -Math.PI / 2;   // shape XY -> world XZ (shape.y -> world -z)
@@ -3698,11 +3816,22 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
         }
       }
     }
-    // the small change of the street
-    plant('stalls', 130, 26, 0.9, NM.makeMarketCrate);
-    plant('stalls', 46, 34, 1.4, NM.makeGoldfishTank);
-    plant('stalls', 60, 30, 1.2, NM.makeBanner);
-    plant('stalls', 70, 28, 0.9, () => NM.makeLantern(0xffb256, 1.3));
+    // the small change of the street. LANTERN ROW measured at 2.15 edibles per
+    // 100u² against GAME DAY's tailgate lot at 5.34, and this is the district
+    // the whole level is named after — it has to be the fullest thing in the
+    // game, not the fourth fullest.
+    plant('stalls', 180, 24, 0.9, NM.makeMarketCrate);
+    plant('stalls', 54, 30, 1.4, NM.makeGoldfishTank);
+    plant('stalls', 76, 28, 1.2, NM.makeBanner);
+    plant('stalls', 104, 24, 0.9, () => NM.makeLantern(0xffb256, 1.3));
+    // …and what people are actually here for: trays to sit at, carts to queue
+    // at, coals to stand near, umbrellas leaned where they were put down.
+    plant('stalls', 180, 20, 0.6, NM.makeSkewerTray);
+    plant('stalls', 110, 22, 0.5, NM.makeStepLantern);
+    plant('stalls', 56, 26, 0.7, NM.makeCoalTub);
+    plant('stalls', 52, 28, 1.0, NM.makeUmbrella);
+    plant('stalls', 24, 44, 2.0, NM.makeFoodCart, false, 'house');
+    plant('stalls', 26, 60, 1.4, NM.makeKoiFlag);
 
     // ── THE CANAL ─────────────────────────────────────────────────────────
     // Boats along the channel and a drift of floating candle lanterns. The
@@ -3722,11 +3851,51 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       }
     }
 
+    // ── THE BATHHOUSE TERRACE ─────────────────────────────────────────────
+    // The census that started this pass put the bathhouse precinct at 0.40
+    // edibles per 100u² across 14,908u² — thirteen per cent of the map, the
+    // place the whole level is aimed at, holding ELEVEN objects. A player
+    // spends the last minute of the match here and there was nothing to eat
+    // on the way in but the building itself.
+    //
+    // What lives on a working bathhouse's forecourt: its laundry, hung where
+    // the heat is; guests' luggage set down; coal tubs; pots on the boards;
+    // lanterns up the stair. Nothing here is invented — it is the ordinary
+    // clutter of a place that washes several hundred people a night.
+    plant('bathhouse', 80, 36, 1.8, NM.makeTowelRack);
+    plant('bathhouse', 76, 26, 0.8, NM.makeLuggage);
+    plant('bathhouse', 110, 20, 0.5, NM.makeStepLantern);
+    plant('bathhouse', 70, 24, 0.6, NM.makePotPlant);
+    plant('bathhouse', 46, 26, 0.7, NM.makeCoalTub);
+    plant('bathhouse', 80, 26, 0.9, () => NM.makeLantern(0xffd489, 1.25));
+    plant('bathhouse', 40, 28, 1.0, NM.makeUmbrella);
+    plant('bathhouse', 44, 26, 0.9, NM.makeMarketCrate);
+    plant('bathhouse', 34, 40, 1.4, NM.makeKoiFlag);
+    plant('bathhouse', 22, 44, 1.6, NM.makeSakeBarrels);
+
+    // ── THE MOON BRIDGE ───────────────────────────────────────────────────
+    // Six props over 5,210u². The bridge is the level's pinch and its fourth
+    // beat lands here — everybody stops on a bridge, so give them the reason.
+    plant('bridge', 30, 28, 1.2, NM.makeWishRack);
+    plant('bridge', 56, 20, 0.5, NM.makeStepLantern);
+    plant('bridge', 44, 22, 0.6, NM.makeSkewerTray);
+    plant('bridge', 36, 26, 0.9, () => NM.makeLantern(0xff8a3c, 1.2));
+    plant('bridge', 26, 24, 0.6, NM.makePotPlant);
+    plant('bridge', 20, 28, 1.0, NM.makeUmbrella);
+    plant('bridge', 12, 46, 2.0, NM.makeFoodCart, false, 'house');
+
     // ── THE SHRINE STEPS ──────────────────────────────────────────────────
     // Cool, dim and evenly spaced against the market's warm clutter: one bank
     // devotional, one commercial, told in light temperature.
-    plant('shrine', 140, 24, 1.0, () => NM.makeStoneLantern(Math.random() < 0.25 ? 0x9effb4 : 0x8ad4ff));
-    plant('shrine', 26, 40, 1.5, NM.makeOfferingBox);
+    plant('shrine', 160, 24, 1.0, () => NM.makeStoneLantern(Math.random() < 0.25 ? 0x9effb4 : 0x8ad4ff));
+    plant('shrine', 32, 36, 1.5, NM.makeOfferingBox);
+    // jizo, in their hundreds, which is how they actually stand. A dark stone
+    // field with one small red note in each figure is the cheapest way there
+    // is to make ground read as tended rather than as unfinished.
+    plant('shrine', 110, 20, 0.55, NM.makeJizo);
+    plant('shrine', 30, 30, 1.6, NM.makeSakeBarrels);
+    plant('shrine', 24, 30, 1.2, NM.makeWishRack);
+    plant('shrine', 60, 20, 0.5, NM.makeStepLantern);
     // the torii run: nose to tail up the west stair, which is the one place in
     // the level with a repeating tunnel
     {
@@ -3741,16 +3910,32 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
 
     // ── THE TEAHOUSE TERRACE ──────────────────────────────────────────────
     plant('teahouse', 16, 130, 4.2, NM.makeTeahouse, true, 'house');
-    plant('teahouse', 40, 40, 1.0, () => NM.makeLantern(0xfff0d2, 1.1));
-    plant('teahouse', 40, 30, 0.9, NM.makeMarketCrate);
+    plant('teahouse', 54, 30, 1.0, () => NM.makeLantern(0xfff0d2, 1.1));
+    plant('teahouse', 44, 28, 0.9, NM.makeMarketCrate);
+    plant('teahouse', 80, 20, 0.6, NM.makeSkewerTray);
+    plant('teahouse', 48, 22, 0.6, NM.makePotPlant);
+    plant('teahouse', 50, 20, 0.5, NM.makeStepLantern);
+    plant('teahouse', 26, 28, 1.0, NM.makeUmbrella);
+    plant('teahouse', 18, 30, 0.7, NM.makeCoalTub);
 
     // ── THE NIGHT GARDEN ──────────────────────────────────────────────────
-    plant('garden', 60, 40, 1.1, () => NM.makeStoneLantern(0x8ad4ff));
+    plant('garden', 80, 34, 1.1, () => NM.makeStoneLantern(0x8ad4ff));
     plant('garden', 90, 36, 2.6, NM.makeBamboo);
+    plant('garden', 54, 26, 1.1, NM.makeMossRock);
+    plant('garden', 70, 22, 0.9, NM.makeFernClump);
+    plant('garden', 36, 24, 0.6, NM.makePotPlant);
+    plant('garden', 34, 22, 0.55, NM.makeJizo);
+    plant('garden', 30, 20, 0.5, NM.makeStepLantern);
 
     // ── THE GREAT GATE ────────────────────────────────────────────────────
+    // The apron stays the emptiest floor in the level — a child's first three
+    // seconds have to be legible — but "empty" should mean uncluttered, not
+    // unlit. Everything added here is under a metre tall and hugs the edges.
     plant('gate', 30, 40, 1.0, () => NM.makeLantern(0xff8a3c, 1.5));
-    plant('gate', 24, 36, 0.9, NM.makeMarketCrate);
+    plant('gate', 22, 36, 0.9, NM.makeMarketCrate);
+    plant('gate', 22, 30, 0.5, NM.makeStepLantern);
+    plant('gate', 18, 32, 0.55, NM.makeJizo);
+    plant('gate', 14, 34, 0.8, NM.makeLuggage);
 
     // ── THE HOT SPRING ────────────────────────────────────────────────────
     // Authored, not scattered. Five pools stepping DOWN the shoulder, because
@@ -3773,16 +3958,31 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
       // the spouts that feed them, each one just above a pool
       for (const [px, py] of [[8080, 1960], [7860, 2400], [8180, 2680]] as [number, number][])
         drop(NM.makeSpoutRock(), [px, py], 1.5, rand(0, Math.PI * 2), true);
-      plant('onsen', 14, 40, 1.6, NM.makeOnsenBench);
+      plant('onsen', 20, 36, 1.6, NM.makeOnsenBench);
       // and the spring's own lanterns: fewer, warmer, low to the water
-      plant('onsen', 22, 30, 0.9, () => NM.makeLantern(0xffd489, 1.0));
+      plant('onsen', 34, 26, 0.9, () => NM.makeLantern(0xffd489, 1.0));
       plant('onsen', 30, 34, 2.6, NM.makeBamboo);
+      plant('onsen', 30, 26, 1.1, NM.makeMossRock);
+      plant('onsen', 24, 24, 0.9, NM.makeFernClump);
+      plant('onsen', 14, 30, 1.8, NM.makeTowelRack);
+      plant('onsen', 26, 22, 0.5, NM.makeStepLantern);
     }
 
     // ── THE VALLEY WALL ───────────────────────────────────────────────────
     // Bamboo, thinning inward — it is what the light falls away into.
-    plantLand(260, 40, 2.6, NM.makeBamboo, [0, 700]);
-    plantLand(90, 40, 1.0, () => NM.makeStoneLantern(0x8ad4ff), [0, 500]);
+    // 27,757u² — a QUARTER of the map — carrying 202 props and not one spirit,
+    // at 0.73 per 100u². That is thinner than Maple's forest and a third of
+    // GAME DAY's treeline. It is meant to be the sparse edge of the level, but
+    // sparse and bare are different things, and a rim of nothing but verticals
+    // reads as a fence rather than as somewhere the market trails off into.
+    plantLand(300, 38, 2.6, NM.makeBamboo, [0, 700]);
+    plantLand(110, 32, 1.0, () => NM.makeStoneLantern(0x8ad4ff), [0, 500]);
+    plantLand(150, 26, 1.1, NM.makeMossRock, [0, 620]);
+    plantLand(170, 22, 0.9, NM.makeFernClump, [0, 700]);
+    // the path in, marked the way a mountain path is marked
+    plantLand(120, 22, 0.55, NM.makeJizo, [40, 560]);
+    plantLand(90, 22, 0.5, NM.makePathPost, [0, 640]);
+    plantLand(50, 28, 0.5, NM.makeStepLantern, [60, 420]);
     return;   // LANTERN NIGHT is fully populated — the Maple grid pass must not run
   }
 

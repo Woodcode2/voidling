@@ -371,6 +371,11 @@ export function makeOfferingBox(): THREE.Object3D {
  *  underside of each eave is modelled — that is the face you actually see. */
 export function makeBathhouse(): THREE.Group {
   const solid: G[] = [], glow: G[] = [];
+  // The bathhouse's own tile, two stops up from the level's TILE (0x2e3440).
+  // That colour is right for a stall roof glimpsed past a lantern and wrong
+  // for the one building the whole map is aimed at: under a moon at 0.42 it
+  // renders at a luminance of about 0.05, which is to say black.
+  const ROOF = 0x4a5468;
   const FL = 6;                       // storeys
   let w = 26, d = 20, y = 0;
   // the terrace and its balustrade
@@ -399,26 +404,48 @@ export function makeBathhouse(): THREE.Group {
     // the eave: wider than the storey, and its UNDERSIDE is what the player
     // sees on the climb, so it gets its own darker plate
     const ew = w * 1.22, ed = d * 1.24;
-    solid.push(part(new THREE.BoxGeometry(ew, 0.5, ed), TILE, 0, y + h + 0.25, 0));
+    solid.push(part(new THREE.BoxGeometry(ew, 0.5, ed), ROOF, 0, y + h + 0.25, 0));
     solid.push(part(new THREE.BoxGeometry(ew * 0.99, 0.2, ed * 0.99), TILE_D, 0, y + h - 0.02, 0));
     // upswept corners
     for (const sx of [-1, 1]) for (const sz of [-1, 1])
-      solid.push(part(new THREE.BoxGeometry(2.6, 0.34, 1.2), TILE,
+      solid.push(part(new THREE.BoxGeometry(2.6, 0.34, 1.2), ROOF,
         sx * ew * 0.44, y + h + 0.5, sz * ed * 0.44, 0, sx * sz * 0.7, sx * -0.22));
+
+    // ── THE EAVE LINES ────────────────────────────────────────────────────
+    // A photograph of the finished level found the problem this fixes: the
+    // bathhouse is a black rectangle. Everything that lit it was on the four
+    // VERTICAL faces — the windows, the corner lanterns tucked under the
+    // overhang — and this game's camera looks DOWN. From up there the building
+    // is six stacked roof plates in a near-black tile, and nothing else.
+    //
+    // So the roofs get lit from the edge in: a warm line along the outer lip
+    // of every eave, on all four sides. It is the shape of the building drawn
+    // in light, which is what a six-storey wooden bathhouse full of lamps
+    // would actually look like from above, and it makes the finale legible
+    // from anywhere in the valley instead of only from its own doorstep.
+    for (const sz of [-1, 1])
+      glow.push(part(new THREE.BoxGeometry(ew * 0.98, 0.12, 0.34), G_WARM, 0, y + h + 0.5, sz * ed * 0.48));
+    for (const sx of [-1, 1])
+      glow.push(part(new THREE.BoxGeometry(0.34, 0.12, ed * 0.98), G_WARM, sx * ew * 0.48, y + h + 0.5, 0));
+
     // a lantern on each corner of every storey — the thing that makes it
-    // twinkle from a distance
+    // twinkle from a distance. Hung OUTSIDE the eave rather than under it:
+    // beneath the overhang they were invisible from the play camera, which is
+    // the one place they had to work from.
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      glow.push(part(new THREE.CylinderGeometry(0.3, 0.38, 0.44, 8), G_RED,
-        sx * ew * 0.46, y + h - 0.6, sz * ed * 0.46));
-      glow.push(part(new THREE.CylinderGeometry(0.38, 0.3, 0.44, 8), G_RED,
-        sx * ew * 0.46, y + h - 1.04, sz * ed * 0.46));
+      glow.push(part(new THREE.CylinderGeometry(0.42, 0.52, 0.6, 8), G_RED,
+        sx * ew * 0.53, y + h + 0.16, sz * ed * 0.53));
+      glow.push(part(new THREE.CylinderGeometry(0.52, 0.42, 0.6, 8), G_RED,
+        sx * ew * 0.53, y + h - 0.44, sz * ed * 0.53));
+      solid.push(part(new THREE.BoxGeometry(0.08, 0.7, 0.08), CHAR,
+        sx * ew * 0.53, y + h + 0.72, sz * ed * 0.53));
     }
     y += h + 0.5;
     w *= 0.86; d *= 0.86;
   }
   // the roof lantern and finial
-  solid.push(part(new THREE.ConeGeometry(w * 0.9, 3.4, 4), TILE, 0, y + 1.7, 0, 0, Math.PI / 4));
-  glow.push(part(new THREE.SphereGeometry(1.0, 8, 6), G_WARM, 0, y + 3.9, 0));
+  solid.push(part(new THREE.ConeGeometry(w * 0.9, 3.4, 4), ROOF, 0, y + 1.7, 0, 0, Math.PI / 4));
+  glow.push(part(new THREE.SphereGeometry(1.4, 8, 6), G_WARM, 0, y + 4.1, 0));
   solid.push(part(new THREE.CylinderGeometry(0.16, 0.16, 1.6, 6), CHAR, 0, y + 4.9, 0));
   // the entrance curtain, split — the one place a spirit walks in
   solid.push(part(new THREE.BoxGeometry(9, 2.2, 0.2), VERM, 0, 4.2, d * 1.62));
@@ -537,4 +564,271 @@ export function makeOnsenBench(): THREE.Object3D {
   for (let i = 0; i < 3; i++)
     p.push(part(new THREE.BoxGeometry(0.5, 0.22, 0.7), PAPER, -0.8 + i * 0.8, 0.81, 0));
   return mergedProp(p);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  THE DENSITY PASS
+//  Measured across all four worlds: GAME DAY carries 3.80 edibles per 100u²
+//  and reads full; LANTERN NIGHT shipped at 1.79 and reads like a market that
+//  has been cleared for the night. The gap is not spread evenly — the census
+//  put the bathhouse precinct at 0.40 across 14,908u² (the FINALE district,
+//  13% of the map, holding eleven objects) and the valley wall at 0.73 across
+//  27,757u². Those two are a third of the level between them.
+//
+//  So: props for the places that had none. Everything below is small, cheap
+//  and specific to where it goes, and more than half of it is under radius 1 —
+//  the census also found only 411 sub-1 edibles against GAME DAY's 1,839, and
+//  that bucket IS the opening minute, when the void is too small to eat
+//  anything else.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** A small stone figure in a red cloth bib and hood. These stand along
+ *  mountain paths and at shrine edges in their hundreds, usually mossy and
+ *  usually leaning. Cheapest possible way to make an empty rim feel tended:
+ *  a dark field with one small red note in it reads as inhabited. */
+export function makeJizo(): THREE.Object3D {
+  const p: G[] = [];
+  const k = rnd(0.8, 1.15), lean = rnd(-0.13, 0.13);
+  p.push(part(new THREE.BoxGeometry(0.5 * k, 0.16 * k, 0.5 * k), STONE_D, 0, 0.08 * k, 0));
+  p.push(part(new THREE.CylinderGeometry(0.17 * k, 0.21 * k, 0.72 * k, 7), STONE, 0, 0.52 * k, 0, lean, 0, lean));
+  p.push(part(new THREE.SphereGeometry(0.19 * k, 7, 6), STONE, lean * 0.5, 0.98 * k, 0));
+  // the bib — the one saturated thing, and it is SOLID not glow, because it is
+  // cloth catching lantern light rather than a light of its own.
+  // FLARED, and the cap is on nearly all of them. First pass put a narrow bib
+  // at chest height under a head sphere of the same radius, which is correct
+  // for a figure seen from eye level and useless in this game: the play camera
+  // looks down, so all it ever saw was the top of a grey head. The red has to
+  // be on the parts of the silhouette that face UP.
+  p.push(part(new THREE.CylinderGeometry(0.2 * k, 0.34 * k, 0.24 * k, 8), VERM, 0, 0.72 * k, 0));
+  if (Math.random() < 0.85)  // a knitted cap, as people leave for them
+    p.push(part(new THREE.SphereGeometry(0.23 * k, 8, 6), VERM, lean * 0.5, 1.02 * k, 0, 0, 0, 0, 1, 0.75, 1));
+  return mergedProp(p);
+}
+
+/** The bathhouse laundry: a tall timber frame hung with long cloths, steaming.
+ *  A working bathhouse washes an enormous quantity of linen and hangs it where
+ *  the heat is, so the terrace is full of these. Tall and soft-edged, which is
+ *  exactly what the terrace was missing — it had a six-storey building and
+ *  nothing at head height. */
+export function makeTowelRack(): THREE.Object3D {
+  const p: G[] = [];
+  const L = rnd(3.4, 5.2);
+  for (const sx of [-1, 1]) {
+    p.push(part(new THREE.CylinderGeometry(0.11, 0.13, 3.1, 7), TIMBER_D, sx * L * 0.5, 1.55, 0));
+    p.push(part(new THREE.BoxGeometry(0.9, 0.12, 0.9), TIMBER_D, sx * L * 0.5, 0.06, 0));
+  }
+  p.push(part(new THREE.CylinderGeometry(0.08, 0.08, L, 6), TIMBER, 0, 3.0, 0, 0, 0, Math.PI / 2));
+  // the hanging cloths, each a slightly different drop so the row is not a comb
+  const n = 3 + ((Math.random() * 4) | 0);
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n, drop = rnd(1.3, 2.3);
+    p.push(part(new THREE.BoxGeometry(0.52, drop, 0.06),
+      pick([PAPER, PAPER, ROPE, VERM_D]), (t - 0.5) * L * 0.9, 3.0 - drop / 2, rnd(-0.06, 0.06),
+      0, rnd(-0.12, 0.12), 0));
+  }
+  return mergedProp(p);
+}
+
+/** Guest luggage, stacked where it was set down: a wicker trunk, a bundle, a
+ *  hat. A bathhouse's forecourt is where arrivals put things down. */
+export function makeLuggage(): THREE.Object3D {
+  const p: G[] = [];
+  const k = rnd(0.75, 1.1);
+  p.push(part(new THREE.BoxGeometry(1.2 * k, 0.62 * k, 0.8 * k), ROPE, 0, 0.31 * k, 0, 0, rnd(-0.3, 0.3), 0));
+  p.push(part(new THREE.BoxGeometry(1.26 * k, 0.08 * k, 0.86 * k), TIMBER_D, 0, 0.64 * k, 0));
+  if (Math.random() < 0.6)
+    p.push(part(new THREE.BoxGeometry(0.8 * k, 0.4 * k, 0.62 * k), TIMBER, rnd(-0.15, 0.15) * k,
+      0.88 * k, 0, 0, rnd(-0.5, 0.5), 0));
+  else
+    p.push(part(new THREE.ConeGeometry(0.55 * k, 0.3 * k, 9), ROPE, 0, 0.8 * k, 0, 0.2, 0, 0.1));
+  return mergedProp(p);
+}
+
+/** A wooden tub of banked coals. Small, waist-low, and it is one of the few
+ *  lights in the level that sits BELOW the eye — everything else hangs. */
+export function makeCoalTub(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  const k = rnd(0.8, 1.1);
+  solid.push(part(new THREE.CylinderGeometry(0.46 * k, 0.4 * k, 0.6 * k, 9), TIMBER, 0, 0.3 * k, 0));
+  solid.push(part(new THREE.TorusGeometry(0.46 * k, 0.05 * k, 4, 9), CHAR, 0, 0.5 * k, 0, Math.PI / 2, 0, 0));
+  glow.push(part(new THREE.CylinderGeometry(0.38 * k, 0.34 * k, 0.1 * k, 9), G_GRIDDLE, 0, 0.6 * k, 0));
+  for (let i = 0; i < 3; i++)
+    glow.push(part(new THREE.SphereGeometry(0.07 * k, 5, 4), G_WARM,
+      rnd(-0.25, 0.25) * k, 0.66 * k, rnd(-0.25, 0.25) * k));
+  return lit(solid, glow);
+}
+
+/** A rack of small wooden prayer plaques, hung five deep and swinging. The
+ *  shrine and the bridge both get these; on the bridge they are what people
+ *  are stopping FOR. */
+export function makeWishRack(): THREE.Object3D {
+  const p: G[] = [];
+  const L = rnd(2.2, 3.4);
+  for (const sx of [-1, 1]) p.push(part(new THREE.BoxGeometry(0.14, 2.1, 0.14), TIMBER_D, sx * L * 0.5, 1.05, 0));
+  p.push(part(new THREE.BoxGeometry(L + 0.3, 0.16, 0.24), TIMBER, 0, 2.16, 0));
+  p.push(part(new THREE.BoxGeometry(L + 0.5, 0.1, 0.34), TILE_D, 0, 2.3, 0));
+  for (let i = 0; i < 14; i++) {
+    const x = rnd(-0.45, 0.45) * L, y = rnd(1.1, 1.9), z = rnd(-0.12, 0.12);
+    p.push(part(new THREE.BoxGeometry(0.3, 0.24, 0.03), PAPER, x, y, z, 0, rnd(-0.4, 0.4), rnd(-0.25, 0.25)));
+  }
+  return mergedProp(p);
+}
+
+/** Votive sake barrels, stacked in a wall two high. Straw-wrapped, painted,
+ *  and stacked at every shrine there has ever been. */
+export function makeSakeBarrels(): THREE.Object3D {
+  const p: G[] = [];
+  const n = 2 + ((Math.random() * 3) | 0);
+  for (let row = 0; row < 2; row++) {
+    const m = row === 0 ? n : Math.max(1, n - 1);
+    for (let i = 0; i < m; i++) {
+      const x = (i - (m - 1) / 2) * 0.92;
+      p.push(part(new THREE.CylinderGeometry(0.44, 0.44, 0.86, 10), ROPE, x, 0.43 + row * 0.9, 0, Math.PI / 2, 0, 0));
+      p.push(part(new THREE.CylinderGeometry(0.45, 0.45, 0.1, 10), row % 2 ? VERM : PAPER,
+        x, 0.43 + row * 0.9, 0.43, Math.PI / 2, 0, 0));
+      p.push(part(new THREE.TorusGeometry(0.44, 0.045, 4, 10), TIMBER_D, x, 0.43 + row * 0.9, 0.2, 0, 0, 0));
+    }
+  }
+  return mergedProp(p);
+}
+
+/** An open paper umbrella, leaned against nothing in particular. Two of these
+ *  in a frame do more for "this is a spirit market" than twenty crates. */
+export function makeUmbrella(): THREE.Object3D {
+  const p: G[] = [];
+  const k = rnd(0.85, 1.15), tip = rnd(-0.5, 0.5);
+  const col = pick([VERM, VERM_D, PAPER, TILE]);
+  p.push(part(new THREE.ConeGeometry(1.05 * k, 0.62 * k, 12, 1, true), col, 0, 1.72 * k, 0, tip, 0, tip * 0.7));
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    p.push(part(new THREE.BoxGeometry(1.02 * k, 0.03, 0.05), TIMBER_D,
+      Math.cos(a) * 0.5 * k, 1.62 * k, Math.sin(a) * 0.5 * k, tip, -a, tip * 0.7 - 0.28));
+  }
+  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 2.1 * k, 6), TIMBER,
+    tip * 1.0 * k, 0.95 * k, tip * 0.7 * k, tip, 0, tip * 0.7));
+  return mergedProp(p);
+}
+
+/** A low tray table with skewers and cups on it — the thing you actually sit
+ *  down in front of. Tiny, and there should be a great many. */
+export function makeSkewerTray(): THREE.Object3D {
+  const p: G[] = [];
+  const k = rnd(0.8, 1.1);
+  p.push(part(new THREE.BoxGeometry(1.05 * k, 0.09 * k, 0.75 * k), CEDAR, 0, 0.28 * k, 0));
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as [number, number][])
+    p.push(part(new THREE.BoxGeometry(0.08 * k, 0.28 * k, 0.08 * k), CEDAR_D, sx * 0.42 * k, 0.14 * k, sz * 0.28 * k));
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.CylinderGeometry(0.12 * k, 0.12 * k, 0.11 * k, 8), PAPER,
+      rnd(-0.35, 0.35) * k, 0.38 * k, rnd(-0.22, 0.22) * k));
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.BoxGeometry(0.5 * k, 0.04, 0.04), TIMBER_D,
+      rnd(-0.2, 0.2) * k, 0.35 * k, rnd(-0.25, 0.25) * k, 0, rnd(0, 3.1), 0));
+  return mergedProp(p);
+}
+
+/** A mossy boulder. The valley wall is a quarter of the map and it had bamboo
+ *  and nothing else; a rim of pure verticals reads as a fence. */
+export function makeMossRock(): THREE.Object3D {
+  const p: G[] = [];
+  const k = rnd(0.7, 1.7);
+  p.push(part(new THREE.DodecahedronGeometry(k, 0), STONE_D, 0, k * 0.52, 0,
+    rnd(0, 3), rnd(0, 3), rnd(0, 3)));
+  // moss on the up-facing side only, which is where moss is
+  p.push(part(new THREE.SphereGeometry(k * 0.78, 7, 5, 0, 6.28, 0, 1.0), GREEN,
+    rnd(-0.1, 0.1) * k, k * 0.72, rnd(-0.1, 0.1) * k, 0, rnd(0, 3), 0, 1, 0.5, 1));
+  if (Math.random() < 0.35)
+    p.push(part(new THREE.DodecahedronGeometry(k * 0.45, 0), STONE,
+      k * rnd(0.7, 1.1), k * 0.24, k * rnd(-0.6, 0.6), rnd(0, 3), rnd(0, 3), rnd(0, 3)));
+  return mergedProp(p);
+}
+
+/** A clump of ferns. Ground cover for the rim — low, wide and dark, which is
+ *  what breaks a flat floor without adding another silhouette at eye level. */
+export function makeFernClump(): THREE.Object3D {
+  const p: G[] = [];
+  const n = 5 + ((Math.random() * 5) | 0);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rnd(-0.3, 0.3), L = rnd(0.9, 1.7);
+    p.push(part(new THREE.BoxGeometry(L, 0.05, 0.3), i % 2 ? GREEN : GREEN_L,
+      Math.cos(a) * L * 0.42, rnd(0.25, 0.5), Math.sin(a) * L * 0.42,
+      0, -a, rnd(-0.5, -0.2)));
+  }
+  return mergedProp(p, PROP_SMOOTH_MAT);
+}
+
+/** A weathered path marker: a squared post with a carved face, half sunk.
+ *  Reads at distance as "somebody made this path". */
+export function makePathPost(): THREE.Object3D {
+  const p: G[] = [];
+  const h = rnd(1.0, 1.9), lean = rnd(-0.18, 0.18);
+  p.push(part(new THREE.BoxGeometry(0.24, h, 0.24), STONE, 0, h / 2, 0, lean, rnd(0, 1.5), lean * 0.5));
+  p.push(part(new THREE.BoxGeometry(0.3, 0.1, 0.3), STONE_D, lean * h * 0.5, h, 0));
+  return mergedProp(p);
+}
+
+/** A two-wheeled food cart with a hot griddle. Bigger than a stall's clutter
+ *  and smaller than a stall — the mid-size meal the market was short of. */
+export function makeFoodCart(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  solid.push(part(new THREE.BoxGeometry(2.8, 0.8, 1.5), TIMBER, 0, 0.95, 0));
+  solid.push(part(new THREE.BoxGeometry(2.9, 0.12, 1.6), TIMBER_D, 0, 1.4, 0));
+  for (const sz of [-1, 1])
+    solid.push(part(new THREE.CylinderGeometry(0.55, 0.55, 0.14, 12), CHAR, -0.5, 0.55, sz * 0.82, 0, 0, Math.PI / 2));
+  solid.push(part(new THREE.CylinderGeometry(0.07, 0.07, 1.6, 6), TIMBER_D, 1.6, 0.9, 0, 0, 0, 0.5));
+  // the griddle, and the awning over it
+  glow.push(part(new THREE.BoxGeometry(1.2, 0.08, 1.1), G_GRIDDLE, -0.6, 1.48, 0));
+  solid.push(part(new THREE.BoxGeometry(3.0, 0.1, 1.8), VERM, 0, 2.7, 0));
+  for (const sx of [-1, 1]) solid.push(part(new THREE.BoxGeometry(0.09, 1.3, 0.09), TIMBER_D, sx * 1.3, 2.05, 0.7));
+  glow.push(part(new THREE.CylinderGeometry(0.2, 0.24, 0.3, 8), G_AMBER, 1.2, 2.45, 0));
+  // steam off the griddle
+  for (let i = 0; i < 3; i++)
+    solid.push(part(new THREE.SphereGeometry(rnd(0.2, 0.36), 6, 5), PAPER,
+      -0.6 + rnd(-0.3, 0.3), 1.8 + i * 0.3, rnd(-0.3, 0.3), 0, 0, 0, 1, 0.6, 1));
+  return lit(solid, glow);
+}
+
+/** A carp streamer on a tall pole. Pure vertical accent — the level is a
+ *  valley seen from above and it needed something that reads from the air. */
+export function makeKoiFlag(): THREE.Object3D {
+  const p: G[] = [];
+  const H = rnd(5.5, 8.0), bend = rnd(-0.2, 0.2);
+  p.push(part(new THREE.CylinderGeometry(0.07, 0.11, H, 6), TIMBER_D, 0, H / 2, 0, bend * 0.3, 0, bend * 0.3));
+  const n = 2 + ((Math.random() * 2) | 0);
+  for (let i = 0; i < n; i++) {
+    const y = H - 0.6 - i * rnd(1.3, 1.8), L = rnd(1.6, 2.4);
+    const col = [VERM, TILE, PAPER][i % 3];
+    p.push(part(new THREE.ConeGeometry(0.34, L, 7, 1, true), col,
+      L * 0.5 + 0.2, y, 0, 0, 0, -Math.PI / 2 + rnd(-0.15, 0.15)));
+    p.push(part(new THREE.SphereGeometry(0.11, 6, 5), CHAR, 0.3, y, 0));
+  }
+  return mergedProp(p);
+}
+
+/** A potted plant on the terrace: a glazed pot with something clipped in it.
+ *  Small, everywhere, and the fastest way to make decking look kept. */
+export function makePotPlant(): THREE.Object3D {
+  const p: G[] = [];
+  const k = rnd(0.75, 1.2);
+  p.push(part(new THREE.CylinderGeometry(0.34 * k, 0.26 * k, 0.46 * k, 9), pick([TILE, VERM_D, STONE_D]), 0, 0.23 * k, 0));
+  p.push(part(new THREE.TorusGeometry(0.34 * k, 0.04 * k, 4, 9), TILE_D, 0, 0.45 * k, 0, Math.PI / 2, 0, 0));
+  if (Math.random() < 0.55) {
+    p.push(part(new THREE.SphereGeometry(0.42 * k, 7, 5), GREEN, 0, 0.82 * k, 0, 0, 0, 0, 1, 0.8, 1));
+  } else {
+    p.push(part(new THREE.CylinderGeometry(0.05, 0.06, 0.9 * k, 5), TIMBER_D, 0, 0.85 * k, 0));
+    for (let i = 0; i < 4; i++)
+      p.push(part(new THREE.BoxGeometry(0.5 * k, 0.04, 0.16 * k), GREEN_L,
+        rnd(-0.2, 0.2), 0.9 * k + i * 0.15 * k, rnd(-0.2, 0.2), 0, rnd(0, 6.28), rnd(-0.4, 0.4)));
+  }
+  return mergedProp(p);
+}
+
+/** A low square stair lantern, the kind set into the edge of a step run.
+ *  Radius 0.5 and it burns — this is the small-food workhorse of the pass. */
+export function makeStepLantern(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  solid.push(part(new THREE.BoxGeometry(0.44, 0.1, 0.44), STONE_D, 0, 0.05, 0));
+  solid.push(part(new THREE.BoxGeometry(0.16, 0.36, 0.16), CHAR, 0, 0.26, 0));
+  glow.push(part(new THREE.BoxGeometry(0.36, 0.34, 0.36), G_PAPER, 0, 0.6, 0));
+  solid.push(part(new THREE.BoxGeometry(0.46, 0.07, 0.46), TILE_D, 0, 0.8, 0));
+  return lit(solid, glow);
 }

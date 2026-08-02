@@ -3547,16 +3547,15 @@ export function createLife(
 
     // Density per district, in people. LANTERN ROW carries the level.
     const LN_CAST: [LN.LnBiome, number, number][] = [
-      ['stalls', 170, 22],       // the market street: the whole point
-      ['canal', 40, 26],         // wading, poling boats, floating lanterns
-      ['gate', 46, 26],          // arriving, counting the torii
-      ['shrine', 70, 24],        // attendants and pilgrims on the steps
-      ['teahouse', 58, 26],      // the terrace, seated and serving
-      ['bridge', 34, 24],        // everybody stops on the bridge
-      ['garden', 30, 30],        // a few, quietly
-      ['bathhouse', 44, 26],     // staff on the terrace, guests arriving
-      ['onsen', 26, 34],         // bathers, and nobody in a hurry
-      ['bamboo', 26, 44],        // stragglers on the path in
+      ['stalls', 260, 20],       // the market street: the whole point
+      ['canal', 60, 24],         // wading, poling boats, floating lanterns
+      ['gate', 56, 26],          // arriving, counting the torii
+      ['shrine', 100, 22],       // attendants and pilgrims on the steps
+      ['teahouse', 90, 24],      // the terrace, seated and serving
+      ['bridge', 60, 22],        // everybody stops on the bridge
+      ['garden', 40, 30],        // a few, quietly
+      ['bathhouse', 130, 24],    // staff on the terrace, guests arriving
+      ['onsen', 34, 32],         // bathers, and nobody in a hurry
     ];
     for (const [id, n, clear] of LN_CAST) {
       const r = lnRegion(id);
@@ -3567,6 +3566,21 @@ export function createLife(
         // children are, and a small fast silhouette among slow tall ones is
         // what stops a crowd reading as wallpaper
         lnPlace(wx, wy, id, { kid: Math.random() < 0.2 });
+      }
+    }
+    // THE VALLEY WALL had NOBODY on it, and not by decision — 'bamboo' is not
+    // a polygon in LN_REGIONS, it is the fallback everything outside a district
+    // falls back TO, so lnRegion('bamboo') returned undefined and the loop
+    // above quietly skipped it. A quarter of the map, zero spirits, no error.
+    // The census found it; the compiler could not have.
+    //
+    // They are placed by distance-to-edge instead, and they are the last few
+    // arrivals still coming down the path — so they walk with a purpose and a
+    // long tether rather than milling.
+    {
+      for (const [wx, wy] of LN.scatterLand(70, Math.random, 40, [0, 620])) {
+        lnPlace(wx, wy, 'bamboo', { tether: 26, speed: rand(0.6, 1.2),
+          kid: Math.random() < 0.22 });
       }
     }
     // …and the stallholders themselves, one behind each stall, rooted. These
