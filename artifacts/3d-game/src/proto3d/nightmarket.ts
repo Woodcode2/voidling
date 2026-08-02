@@ -170,14 +170,21 @@ export function makeStall(): THREE.Group {
   for (const sx of [-1, 1]) for (const sz of [-1, 1])
     solid.push(part(new THREE.BoxGeometry(0.14, h, 0.14), TIMBER_D, sx * (wD / 2 - 0.1), h / 2, sz * (dD / 2 - 0.1)));
   // the canopy: a shallow ridge with a striped valance
-  solid.push(part(new THREE.BoxGeometry(wD * 1.15, 0.12, dD * 1.2), PAPER, 0, h, 0));
+  solid.push(part(new THREE.BoxGeometry(wD * 1.15, 0.16, dD * 1.2), VERM, 0, h, 0));
+  solid.push(part(new THREE.BoxGeometry(wD * 1.17, 0.09, dD * 1.22), VERM_D, 0, h - 0.1, 0));
+  // the valance: six bold bands hanging off the front edge, tall enough to
+  // read at the play camera instead of a 0.34 sliver nobody could see
   for (let i = 0; i < 6; i++) {
     const t = (i + 0.5) / 6;
-    solid.push(part(new THREE.BoxGeometry(wD * 1.15 / 6, 0.34, 0.06),
-      i % 2 ? VERM : PAPER, -wD * 0.575 + wD * 1.15 * t, h - 0.2, dD * 0.6));
+    solid.push(part(new THREE.BoxGeometry(wD * 1.15 / 6 * 0.92, 0.62, 0.07),
+      i % 2 ? PAPER : VERM_D, -wD * 0.575 + wD * 1.15 * t, h - 0.36, dD * 0.61));
   }
   // THE LIGHT: the inside of the stall, and the griddle on the counter.
-  glow.push(part(new THREE.BoxGeometry(wD * 0.86, 0.9, dD * 0.6), G_AMBER, 0, 1.5, -dD * 0.1));
+  // the back wall of the stall, lit — a glowing panel BEHIND the counter is
+  // what a lit yatai actually looks like from the street, and it silhouettes
+  // the stallholder standing in front of it
+  glow.push(part(new THREE.BoxGeometry(wD * 0.9, 1.25, 0.12), G_AMBER, 0, 1.62, -dD * 0.46));
+  glow.push(part(new THREE.BoxGeometry(wD * 0.82, 0.1, dD * 0.5), G_AMBER, 0, 1.05, -dD * 0.16));
   glow.push(part(new THREE.BoxGeometry(wD * 0.4, 0.08, dD * 0.4), G_GRIDDLE, wD * 0.16, 1.03, 0));
   // steam is a solid, not a glow — a glowing cloud reads as fire
   solid.push(part(new THREE.SphereGeometry(0.34, 6, 5), PAPER, wD * 0.16, 1.6, 0, 0, 0, 0, 1, 0.7, 1));

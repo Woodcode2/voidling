@@ -763,10 +763,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
     // 1. BASE — the valley at night with nothing lit. Blue-black, and the one
     //    surface that is never fully dark because the moon reaches it.
-    g.fillStyle = '#161d2b'; g.fillRect(0, 0, TEX, TEX);
+    g.fillStyle = '#3a4560'; g.fillRect(0, 0, TEX, TEX);
     for (let i = 0; i < 2600; i++) {
       const x = Math.random() * TEX, y = Math.random() * TEX;
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(40,54,78,0.22)' : 'rgba(18,24,36,0.30)';
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(74,90,120,0.22)' : 'rgba(28,36,52,0.28)';
       g.beginPath(); g.arc(x, y, rand(4, 12), 0, Math.PI * 2); g.fill();
     }
 
@@ -807,6 +807,89 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       }
     }
     g.restore();
+
+    // 3b. SURFACES. Each district gets the marking it would actually have.
+    {
+      // THE GREAT GATE: big granite flags, laid square to the gate.
+      g.save(); lpath(LN_R('gate').poly); g.clip();
+      // a dark joint with a lit chamfer beside it — one stroke each way
+      for (const [col, wid, off] of [['rgba(24,26,38,0.34)', 8, 0], ['rgba(168,172,196,0.20)', 5, 7]] as const) {
+        g.strokeStyle = col; g.lineWidth = Math.max(1, wid * PU);
+        for (let x = 4300; x < 8200; x += 260) {
+          g.beginPath(); g.moveTo(pxW(x + off), pyW(9400)); g.lineTo(pxW(x + off), pyW(10800)); g.stroke();
+        }
+        for (let y = 9400; y < 10800; y += 260) {
+          g.beginPath(); g.moveTo(pxW(4300), pyW(y + off)); g.lineTo(pxW(8200), pyW(y + off)); g.stroke();
+        }
+      }
+      g.restore();
+
+      // THE SHRINE STEPS: raked gravel. Concentric arcs around the stair head,
+      // which is what a raked garden actually looks like and reads instantly.
+      g.save(); lpath(LN_R('shrine').poly); g.clip();
+      g.strokeStyle = 'rgba(150,152,170,0.20)'; g.lineWidth = Math.max(1, 11 * PU);
+      for (let r = 160; r < 2600; r += 130) {
+        g.beginPath(); g.arc(pxW(4200), pyW(8200), r * PU, 0, Math.PI * 2); g.stroke();
+      }
+      g.restore();
+
+      // THE TEAHOUSE TERRACE: boardwalk planks running with the valley.
+      g.save(); lpath(LN_R('teahouse').poly); g.clip();
+      for (const [col, wid, off] of [['rgba(40,30,22,0.30)', 6, 0], ['rgba(196,164,124,0.18)', 4, 5]] as const) {
+        g.strokeStyle = col; g.lineWidth = Math.max(1, wid * PU);
+        for (let x = 7600; x < 9200; x += 110) {
+          g.beginPath(); g.moveTo(pxW(x + off), pyW(6000)); g.lineTo(pxW(x + off), pyW(10200)); g.stroke();
+        }
+      }
+      // and the cross-joints, so it is planks rather than stripes
+      g.strokeStyle = 'rgba(40,30,22,0.26)';
+      for (let y = 6000; y < 10200; y += 620) {
+        g.beginPath(); g.moveTo(pxW(7600), pyW(y)); g.lineTo(pxW(9200), pyW(y)); g.stroke();
+      }
+      g.restore();
+
+      // THE NIGHT GARDEN: clipped hedge blocks and moss patches.
+      g.save(); lpath(LN_R('garden').poly); g.clip();
+      for (let i = 0; i < 90; i++) {
+        const x = 4600 + Math.random() * 3300, y = 3900 + Math.random() * 1700;
+        g.fillStyle = Math.random() < 0.5 ? 'rgba(34,84,52,0.30)' : 'rgba(112,156,104,0.26)';
+        g.beginPath(); g.ellipse(pxW(x), pyW(y), rand(60, 190) * PU, rand(40, 120) * PU,
+          Math.random() * 3, 0, Math.PI * 2); g.fill();
+      }
+      g.restore();
+
+      // LANTERN ROW: trodden earth, darker where the crowd walks and scuffed.
+      g.save(); lpath(LN_R('stalls').poly); g.clip();
+      for (let i = 0; i < 700; i++) {
+        const x = 5000 + Math.random() * 3000, y = 6200 + Math.random() * 4300;
+        g.fillStyle = Math.random() < 0.5 ? 'rgba(48,36,28,0.16)' : 'rgba(190,158,116,0.22)';
+        g.beginPath(); g.ellipse(pxW(x), pyW(y), rand(30, 110) * PU, rand(20, 70) * PU,
+          Math.random() * 3, 0, Math.PI * 2); g.fill();
+      }
+      g.restore();
+
+      // THE BATHHOUSE TERRACE: big lacquer boards, radial to the building.
+      g.save(); lpath(LN_R('bathhouse').poly); g.clip();
+      g.strokeStyle = 'rgba(255,196,140,0.16)'; g.lineWidth = Math.max(1, 9 * PU);
+      for (let a = 0; a < 28; a++) {
+        const th = (a / 28) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(pxW(6280 + Math.cos(th) * 380), pyW(2500 + Math.sin(th) * 300));
+        g.lineTo(pxW(6280 + Math.cos(th) * 1700), pyW(2500 + Math.sin(th) * 1400));
+        g.stroke();
+      }
+      g.restore();
+
+      // THE VALLEY WALL: bamboo litter, so the rim is not one flat field.
+      for (let i = 0; i < 1400; i++) {
+        const x = 3000 + Math.random() * 6200, y = 800 + Math.random() * 10200;
+        if (!LN.onLanternLand(x, y)) continue;
+        if (LN.lnRegionAt(x, y) !== 'bamboo') continue;
+        g.fillStyle = Math.random() < 0.5 ? 'rgba(96,128,104,0.26)' : 'rgba(30,40,56,0.22)';
+        g.beginPath(); g.ellipse(pxW(x), pyW(y), rand(40, 130) * PU, rand(24, 80) * PU,
+          Math.random() * 3, 0, Math.PI * 2); g.fill();
+      }
+    }
 
     // 4. THE MARKET STREET — packed earth down the east bank, worn pale in the
     //    middle where everybody walks.
@@ -1232,17 +1315,22 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     // 0.10 to 0.26 — because at night the districts must separate by HUE and
     // by what is lit, not by albedo. GAME DAY's three sands taught the opposite
     // lesson under a sun; the same trick at night just produces grey.
-    torii: 0x3a3547,     // swept granite flags, cool and almost black
-    stalls: 0x4a3b33,    // packed earth of the market street, warm under the lanterns
-    canal: 0x14283c,     // the channel: deep and blue, and the one surface that
+    torii: 0x585269,     // swept granite flags, cool — lifted from 0x3a3547
+    stalls: 0x7d6552,    // packed earth of the market street, warm under the lanterns
+    canal: 0x24455f,     // the channel: deep and blue, and the one surface that
                          // takes a specular from every lantern above it
-    teahouse: 0x4f4034,  // cedar decking, a step warmer and lighter than the street
-    shrine: 0x3f3f4a,    // mossy stone steps, cooler than the market
-    moonbridge: 0x5a4a3e, // the bridge's timber, the lightest ground in the level
+    teahouse: 0x715a49,  // cedar decking, a step warmer and lighter than the street
+    shrine: 0x5c5c6b,    // mossy stone steps, cooler than the market
+    moonbridge: 0x7d6753, // the bridge's timber, the lightest ground in the level
                           // because it is the one thing the moon actually hits
-    nightgarden: 0x1f3a2c, // clipped hedge and dark lawn
-    bathhouse: 0x5c3230,  // the terrace's red lacquer boards
-    bamboo: 0x18202c,     // the valley wall: blue-black, where the light stops
+    nightgarden: 0x33573e, // clipped hedge and dark lawn
+    bathhouse: 0x82443f,  // the terrace's red lacquer boards
+    // THE RIM WAS THE PROBLEM. At 0x18202c this is 27.6% of the map at a
+    // luminance of 0.12 — a quarter of every frame, functionally black, with
+    // three hundred bamboo stems in it that nobody could see. Lifted to a
+    // readable blue-grey; it is still the darkest ground in the level and it
+    // still says "the light stops here", but there is something there now.
+    bamboo: 0x44526a,     // the valley wall: blue-grey, where the light stops
   };
   if (WORLD_ID === 'maple') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
