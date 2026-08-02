@@ -243,21 +243,22 @@ await stopPlay();
   // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
   // The finale, at the size a player reaches it, with its eave lines lit.
   //
-  // The bathhouse mesh stands at world (6280, 2500) and the camera looks
-  // toward DECREASING world y, so the void has to be south of it — far enough
-  // that the six-storey stack is in frame, close enough that it is not a speck.
-  // A first pass used y=4400, which is 1,900 units out and photographed the
-  // night garden with no building in it at all. y=3500 is interpolated from a
-  // district sweep that framed it at y=3400.
+  // THE REASON THREE ATTEMPTS AT THIS MISSED. The bathhouse stands at world
+  // (6280, 2500) and every attempt moved the void due NORTH of it — which
+  // cannot work, because north is not up the screen. camOffset is
+  // (0.62, 0.92, 0.62), so the ground direction away from the camera is
+  // (-1, -1)/sqrt2 in world axes: screen-up is x and y decreasing EQUALLY.
+  // A void placed due south of the building sees it up AND right in equal
+  // measure, which is exactly where it kept appearing, and no amount of
+  // sliding along y alone was ever going to centre it.
   //
-  // ⚠️ THIS IS THE ONE SHOT TO EYEBALL. The exact framing could not be checked
-  // here: this machine's software renderer runs the match clock about forty
-  // times slower than real time, so each attempt costs several minutes and the
-  // iteration was abandoned rather than guessed at. Everything else in this
-  // script has been photographed and looked at. If the building is cropped or
-  // small, move y (south is a larger number) and adjust the radius — a bigger
-  // void pulls the camera back.
-  await frame(7.0, 6280, 3500);
+  // So it is derived rather than guessed. To put the building d world units
+  // straight up-screen, offset the void by d/sqrt2 in BOTH axes:
+  //     void = (6280 + d/sqrt2, 2500 + d/sqrt2)
+  // d = 600 gives (6704, 2924). Photographed at radius 8.5 and 10; 10 wins —
+  // all six storeys in frame with headroom, the golden pool at the base, the
+  // finial clear of the timer, and the hero at its feet.
+  await frame(10.0, 6704, 2924);
   await shot('05-lantern-bathhouse.png');
   await page.evaluate(() => window.__setMood(null));   // hand the face back
 }
