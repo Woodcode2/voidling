@@ -732,6 +732,8 @@ const OUTFIT: Record<string, Fit> = {
   // costume blows out under a lantern pool and everything mid-grey vanishes
   // between them, so the crowd is dressed in inks, indigos and vermilions that
   // hold their hue at both ends of the exposure.
+  onsen: { shirt: [LN_PAPER, LN_PAPER, LN_GOLD], pants: [LN_PAPER, 0xb8a074],
+    wear: ['tee'], shoe: ['shoe'] },
   stalls: { shirt: [LN_VERM, LN_INDIGO, LN_GOLD, LN_PLUM, LN_INK], pants: [LN_INK, 0x33283f, 0x2a3348],
     wear: ['uniform', 'tee', 'open', 'uniform'], shoe: ['shoe', 'boot'] },
   canal: { shirt: [LN_INDIGO, LN_INK, LN_MOSS], pants: [LN_INK, 0x2a3348],
@@ -1975,6 +1977,10 @@ export function createLife(
       'the big tub, I think', 'reservation? no matter, no matter'],
     bamboo: ['out here? nothing out here', 'the market is that way',
       'careful in the dark, friend'],
+    onsen: ['plenty of room! plenty of room!', 'the far pool is the hot one',
+      'you found it! nobody finds it', 'get in, get in, do not be shy',
+      'towels on the bench, honoured guest', 'six hundred years and still warm',
+      'no, no — stay as long as you like'],
   };
   const LN_AMBIENT: Record<string, string[]> = {
     stalls: ['six hundred years I have run this stall', 'the fox stall undercuts me. always.',
@@ -1993,6 +1999,9 @@ export function createLife(
     bathhouse: ['the guest in the purple has had eleven', 'management has been informed',
       'we are out of the big towels', 'nobody has seen the third floor'],
     bamboo: ['it is very dark out here now', 'the lights are going out one by one'],
+    onsen: ['somebody has been in the far pool a very long time',
+      'the water is going down', 'that is not the drain',
+      'lovely and quiet up here. usually.'],
   };
   const LN_PANIC: Record<string, string[]> = {
     stalls: ['MY STALL!! SIX HUNDRED YEARS!!', 'take the sauce!! TAKE THE SAUCE!!',
@@ -2012,6 +2021,8 @@ export function createLife(
       'top floor!! go UP!!', 'I want it noted that I said something!!',
       'cancel the reservation!! CANCEL IT!!'],
     bamboo: ['keep running!! do not look!!', 'the market is GONE!!', 'up the valley!! GO!!'],
+    onsen: ['OUT OF THE WATER!! ALL OF YOU!!', 'it drank the POOL!!',
+      'never mind the towels!! GO!!', 'six hundred years!! DRY!!'],
   };
   const OWN_AMBIENT: Record<string, string[]> =
     WID === 'maple' ? MAPLE_VOICE_AMBIENT : WID === 'gameday' ? GAMEDAY_VOICE_AMBIENT : {};
@@ -3516,7 +3527,7 @@ export function createLife(
     const DRESS: Record<LN.LnBiome, string> = {
       gate: 'torii', stalls: 'stalls', canal: 'canal', teahouse: 'teahouse',
       shrine: 'shrine', bridge: 'moonbridge', garden: 'nightgarden',
-      bathhouse: 'bathhouse', bamboo: 'bamboo',
+      bathhouse: 'bathhouse', onsen: 'onsen', bamboo: 'bamboo',
     };
     const lnPlace = (wx: number, wy: number, id: LN.LnBiome,
                      o?: { kid?: boolean; tether?: number; speed?: number }) => {
@@ -3544,6 +3555,7 @@ export function createLife(
       ['bridge', 34, 24],        // everybody stops on the bridge
       ['garden', 30, 30],        // a few, quietly
       ['bathhouse', 44, 26],     // staff on the terrace, guests arriving
+      ['onsen', 26, 34],         // bathers, and nobody in a hurry
       ['bamboo', 26, 44],        // stragglers on the path in
     ];
     for (const [id, n, clear] of LN_CAST) {

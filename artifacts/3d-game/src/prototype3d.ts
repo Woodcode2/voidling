@@ -29,7 +29,7 @@ import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from '.
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
-  'moonbridge', 'nightgarden', 'bathhouse', 'bamboo'];
+  'moonbridge', 'nightgarden', 'bathhouse', 'onsen', 'bamboo'];
 import {
   track, setCtx, countMatch, tickFrame, fpsSummary, resetFps,
   analyticsEnabled, setAnalyticsEnabled,

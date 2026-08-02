@@ -47,7 +47,7 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
   // speed and panic pool off these strings, and a shared name drags one world's
   // cast into another's street. Every one of these is new.
   | 'torii' | 'stalls' | 'canal' | 'teahouse' | 'shrine' | 'moonbridge'
-  | 'nightgarden' | 'bathhouse' | 'bamboo';
+  | 'nightgarden' | 'bathhouse' | 'onsen' | 'bamboo';
 // RETIRED on Maple: 'military' (the army base served a defence layer that was
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
 // the union only because ./life still compares against them; nothing in
@@ -772,15 +772,15 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
     // 2. DISTRICT FLOORS. Bamboo first so everything built overlaps it.
     const LN_FLOOR: Record<LN.LnBiome, number> = {
-      bamboo: 0x18202c, shrine: 0x3f3f4a, garden: 0x1f3a2c, teahouse: 0x4f4034,
-      stalls: 0x4a3b33, gate: 0x3a3547, bridge: 0x5a4a3e, bathhouse: 0x5c3230,
-      canal: 0x14283c,
+      bamboo: 0x44526a, shrine: 0x5c5c6b, garden: 0x33573e, teahouse: 0x715a49,
+      stalls: 0x7d6552, gate: 0x585269, bridge: 0x7d6753, bathhouse: 0x82443f,
+      canal: 0x24455f, onsen: 0x8a7a6e,
     };
     // `bamboo` is lnRegionAt's FALLBACK, not a polygon — it is the rim and the
     // seams between districts. So it is painted as the whole valley floor and
     // everything built gets laid on top of it.
     fillPoly(LN.LN_LAND_SMOOTH as LN.Pt[], LN_FLOOR.bamboo);
-    for (const id of ['garden', 'shrine', 'teahouse', 'gate', 'bathhouse', 'stalls', 'bridge'] as LN.LnBiome[]) {
+    for (const id of ['garden', 'shrine', 'teahouse', 'gate', 'onsen', 'bathhouse', 'stalls', 'bridge'] as LN.LnBiome[]) {
       const r = LN.LN_REGIONS.find((q) => q.id === id);
       if (r) fillPoly(r.poly, LN_FLOOR[id]);
     }
@@ -1018,6 +1018,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
       pool(6280, 3120 + t * 900, 300 + t * 160,
         `rgba(255,190,110,${(0.11 * (1 - t * 0.7)).toFixed(3)})`,
         `rgba(230,140,70,${(0.05 * (1 - t * 0.7)).toFixed(3)})`);
+    }
+
+    // 7f-b. THE HOT SPRING. The only light in the level that comes from the
+    //     GROUND rather than from something hanging over it — a lit pool
+    //     throws up, so the pool is bright and everything around it catches a
+    //     rim rather than a wash. Cooler than the market, because water is.
+    for (const [px, py, rr] of [[8080, 2180, 5.4], [7860, 2620, 4.6], [8180, 2900, 3.9],
+      [7820, 3180, 3.4], [8060, 3420, 2.8]] as const) {
+      pool(px, py, rr * 46, 'rgba(150,230,255,0.26)', 'rgba(90,170,220,0.11)');
+      pool(px, py, rr * 20, 'rgba(216,248,255,0.34)', 'rgba(150,220,255,0.15)');
     }
 
     // 7g. THE MOON. The one COLD light in the level, and the only one that is
@@ -1325,6 +1335,10 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
                           // because it is the one thing the moon actually hits
     nightgarden: 0x33573e, // clipped hedge and dark lawn
     bathhouse: 0x82443f,  // the terrace's red lacquer boards
+    // THE HOT SPRING is the warmest and PALEST ground in the level, and that is
+    // the read: wet rock under standing steam, lit from the water rather than
+    // from a lantern. It is the only district whose light comes from below.
+    onsen: 0x8a7a6e,
     // THE RIM WAS THE PROBLEM. At 0x18202c this is 27.6% of the map at a
     // luminance of 0.12 — a quarter of every frame, functionally black, with
     // three hundred bamboo stems in it that nobody could see. Lifted to a
@@ -3737,6 +3751,33 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // ── THE GREAT GATE ────────────────────────────────────────────────────
     plant('gate', 30, 40, 1.0, () => NM.makeLantern(0xff8a3c, 1.5));
     plant('gate', 24, 36, 0.9, NM.makeMarketCrate);
+
+    // ── THE HOT SPRING ────────────────────────────────────────────────────
+    // Authored, not scattered. Five pools stepping DOWN the shoulder, because
+    // a spring runs downhill and a ring of identical circles reads as a car
+    // park with puddles. The biggest is at the top against the valley wall
+    // where the water comes out; each one below is smaller, which is also the
+    // order a child will eat them in on the way up.
+    {
+      const POOLS: [number, number, number][] = [
+        [8080, 2180, 5.4],   // the source pool, hard against the wall
+        [7860, 2620, 4.6],
+        [8180, 2900, 3.9],
+        [7820, 3180, 3.4],
+        [8060, 3420, 2.8],
+      ];
+      for (const [px, py, rr] of POOLS) {
+        drop(NM.makeHotPool(rr), [px, py], rr * 0.9, rand(0, Math.PI * 2), true);
+        LN.claimSpot(px, py, rr * 22);
+      }
+      // the spouts that feed them, each one just above a pool
+      for (const [px, py] of [[8080, 1960], [7860, 2400], [8180, 2680]] as [number, number][])
+        drop(NM.makeSpoutRock(), [px, py], 1.5, rand(0, Math.PI * 2), true);
+      plant('onsen', 14, 40, 1.6, NM.makeOnsenBench);
+      // and the spring's own lanterns: fewer, warmer, low to the water
+      plant('onsen', 22, 30, 0.9, () => NM.makeLantern(0xffd489, 1.0));
+      plant('onsen', 30, 34, 2.6, NM.makeBamboo);
+    }
 
     // ── THE VALLEY WALL ───────────────────────────────────────────────────
     // Bamboo, thinning inward — it is what the light falls away into.

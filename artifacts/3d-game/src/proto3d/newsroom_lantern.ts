@@ -47,7 +47,7 @@ export type NewsTier = 0 | 1 | 2;
  *  what comes out, not with what went in. */
 export type LnDist =
   | 'torii' | 'stalls' | 'canal' | 'teahouse' | 'shrine'
-  | 'moonbridge' | 'nightgarden' | 'bathhouse' | 'bamboo';
+  | 'moonbridge' | 'nightgarden' | 'bathhouse' | 'onsen' | 'bamboo';
 
 export interface LanternCtx {
   tier: NewsTier;
@@ -125,6 +125,9 @@ const T0_BY_DIST: Record<LnDist, string[]> = {
   bathhouse: ['A room is being prepared for our guest.',
     'The bathhouse welcomes guests of any size. Any size at all.',
     'Towels are provided. We are fetching more towels.'],
+  onsen: ['The hot spring is open to all guests and always has been.',
+    'The far pool is the hot one. Most guests work that out eventually.',
+    'Very few guests find the spring. Congratulations to this one.'],
   bamboo: ['The path in is well lit. Please follow the lanterns.',
     'There is nothing out here but bamboo and the way back.'],
 };
@@ -170,6 +173,8 @@ const T1_BY_DIST: Record<LnDist, string[]> = {
     'Three hundred years of moss. We would like it back.'],
   bathhouse: ['The bathhouse has been advised to expect a guest. A large one.',
     'The third floor has stopped answering.'],
+  onsen: ['The spring is lower than it was. Springs do not do that.',
+    'Somebody has been in the far pool for a very long time.'],
   bamboo: ['The path in is dark. The lanterns on it are gone.'],
 };
 
@@ -211,6 +216,8 @@ const T2_BY_DIST: Record<LnDist, string[]> = {
     'The garden is gone. Keep going up.'],
   bathhouse: ['IT IS AT THE BATHHOUSE. Every floor. Everybody. Out.',
     'The bathhouse is the last thing. There is nothing behind it.'],
+  onsen: ['OUT OF THE WATER. All of you. Now.',
+    'It has drunk the spring. Six hundred years, and it is dry.'],
   bamboo: ['Keep climbing. Do not look back down the valley.',
     'You are nearly out. Keep going.'],
 };
@@ -250,7 +257,7 @@ const DIST_NAME: Record<LnDist, string> = {
   torii: 'the great gate', stalls: 'Lantern Row', canal: 'the canal',
   teahouse: 'the teahouse terrace', shrine: 'the shrine steps',
   moonbridge: 'the moon bridge', nightgarden: 'the night garden',
-  bathhouse: 'the bathhouse', bamboo: 'the bamboo path',
+  bathhouse: 'the bathhouse', onsen: 'the hot spring', bamboo: 'the bamboo path',
 };
 
 /** One headline. The sign-on is guaranteed first; after that it is a weighted

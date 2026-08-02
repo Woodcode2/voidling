@@ -465,3 +465,76 @@ export function makeBanner(): THREE.Object3D {
   p.push(part(new THREE.BoxGeometry(0.5, 0.1, 0.1), TIMBER, 0.2, h * 0.92, 0));
   return mergedProp(p);
 }
+
+// ── THE HOT SPRING ─────────────────────────────────────────────────────────
+// An onsen terrace on the shoulder behind the bathhouse: rock-rimmed pools
+// cut into the hillside, steam standing off them, and the warmest light in
+// the level. It exists for two reasons beyond being asked for.
+//
+// The first is contrast. Everything south of the bridge is COMMERCE — a street
+// shouting at you, a hundred stalls competing for the same eye. The valley
+// needed somewhere that is the opposite of that: quiet, warm, nobody selling
+// anything, the one place a child would want to just sit. A level that is
+// loud everywhere has no loud parts.
+//
+// The second is that it makes the climb pay off twice. The bathhouse is the
+// finale you can see from the spawn; the spring is the thing you did not know
+// was up there, and finding it is the reward for going all the way north.
+
+/** One pool: a rock rim, a lit surface, and steam. The water is a GLOW rather
+ *  than a lit surface, because a hot spring at night is a light source — the
+ *  steam above it is the giveaway, and steam is only visible if something
+ *  underneath is bright enough to throw light into it. */
+export function makeHotPool(rr = 4.2): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  // the rim: irregular boulders around the edge, which is what stops a pool
+  // reading as a swimming pool. A perfect circle of rock is a jacuzzi.
+  const N = 11 + ((Math.random() * 4) | 0);
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 + rnd(-0.14, 0.14);
+    const d = rr * rnd(0.94, 1.12);
+    const s = rnd(0.5, 1.0);
+    solid.push(part(new THREE.DodecahedronGeometry(s, 0), i % 3 ? STONE : STONE_D,
+      Math.cos(a) * d, s * rnd(0.3, 0.55), Math.sin(a) * d, rnd(0, 3), rnd(0, 3), rnd(0, 3)));
+  }
+  // the basin below the waterline, so the pool has depth rather than being a disc
+  solid.push(part(new THREE.CylinderGeometry(rr * 0.94, rr * 0.7, 0.9, 18), 0x2a2430, 0, -0.45, 0));
+  // THE WATER. Unlit, so it holds its colour at night and reads as the source.
+  glow.push(part(new THREE.CylinderGeometry(rr * 0.92, rr * 0.92, 0.12, 18), 0x8fe8ff, 0, 0.14, 0));
+  // a hotter core, because a spring is fed from one place
+  glow.push(part(new THREE.CylinderGeometry(rr * 0.42, rr * 0.42, 0.14, 14), 0xd8f8ff, 0, 0.17, 0));
+  // STEAM. Solid, not glow: a glowing cloud reads as fire, and the whole point
+  // is that this is the one soft thing in a level made of hard lanterns.
+  for (let i = 0; i < 7; i++) {
+    const a = Math.random() * Math.PI * 2, d = Math.random() * rr * 0.7;
+    const s = rnd(0.7, 1.5);
+    solid.push(part(new THREE.SphereGeometry(s, 7, 5), PAPER,
+      Math.cos(a) * d, 0.8 + i * 0.42 + rnd(0, 0.4), Math.sin(a) * d,
+      0, 0, 0, 1, 0.62, 1));
+  }
+  return lit(solid, glow);
+}
+
+/** A bamboo spout feeding a pool — the sound of a hot spring, made visible.
+ *  Small, cheap, and the thing that says "this water is arriving from
+ *  somewhere" rather than "this water was always here". */
+export function makeSpoutRock(): THREE.Group {
+  const solid: G[] = [], glow: G[] = [];
+  solid.push(part(new THREE.DodecahedronGeometry(1.5, 0), STONE_D, 0, 0.7, 0, 0.3, 0.8, 0.2));
+  solid.push(part(new THREE.CylinderGeometry(0.16, 0.16, 2.2, 8), GREEN, 0.2, 1.7, 0, 0, 0, 1.15));
+  solid.push(part(new THREE.CylinderGeometry(0.19, 0.19, 0.1, 8), GREEN_L, 0.2, 1.7, 0));
+  // the falling water, as a thin lit ribbon
+  glow.push(part(new THREE.BoxGeometry(0.14, 1.5, 0.14), 0xaef0ff, 1.15, 1.0, 0));
+  return lit(solid, glow);
+}
+
+/** A slatted changing bench with folded towels — the human (spirit) detail
+ *  that makes a pool read as a place people USE. */
+export function makeOnsenBench(): THREE.Object3D {
+  const p: G[] = [];
+  p.push(part(new THREE.BoxGeometry(3.2, 0.16, 1.0), CEDAR, 0, 0.62, 0));
+  for (const sx of [-1, 1]) p.push(part(new THREE.BoxGeometry(0.18, 0.62, 0.9), CEDAR_D, sx * 1.35, 0.31, 0));
+  for (let i = 0; i < 3; i++)
+    p.push(part(new THREE.BoxGeometry(0.5, 0.22, 0.7), PAPER, -0.8 + i * 0.8, 0.81, 0));
+  return mergedProp(p);
+}

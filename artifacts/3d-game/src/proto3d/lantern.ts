@@ -116,7 +116,7 @@ export const MARKET_HALF = 190;
 
 // ── districts ──────────────────────────────────────────────────────────────
 export type LnBiome = 'gate' | 'stalls' | 'canal' | 'teahouse' | 'shrine'
-  | 'bridge' | 'garden' | 'bathhouse' | 'bamboo';
+  | 'bridge' | 'garden' | 'bathhouse' | 'onsen' | 'bamboo';
 
 export interface LnRegion { id: LnBiome; name: string; poly: Pt[]; density: number; }
 
@@ -131,6 +131,15 @@ export const LN_REGIONS: LnRegion[] = [
            [5980, 2900], [6000, 3350], [6080, 3950], [6180, 4600],
            [6020, 5250], [5820, 5900], [5880, 6550], [6180, 7200],
            [6220, 7950], [5960, 8700], [5880, 9500], [6020, 10280]] },
+
+  // THE HOT SPRING. Deliberately placed where the sightline does not reach:
+  // north-east of the bathhouse, behind its shoulder, against the valley wall.
+  // Everything else in this level is visible from the market street, which is
+  // what makes the walk legible — and it is exactly why one thing should not
+  // be. Finding it is the reward for going all the way north.
+  { id: 'onsen', name: 'THE HOT SPRING', density: 0.6,
+    poly: [[7180, 1620], [7900, 1560], [8420, 2060], [8560, 2760], [8320, 3400],
+           [7760, 3700], [7560, 3620], [7880, 2960], [7760, 2180]] },
 
   // THE BATHHOUSE. The biggest meal in the level, and like GAME DAY's bowl its
   // polygon swallows the terrace and the stair head as well — a player eating
