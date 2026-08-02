@@ -461,6 +461,7 @@ const _dbg = window as unknown as {
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
   __warpVoid: (x: number, z: number) => void;
+  __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
@@ -475,6 +476,9 @@ _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateW
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 _dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
 _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: district centroid sweeps
+// QA: the third term of the containment rule, so a harness can reproduce
+// solid() exactly and sweep a whole map for pockets the player cannot enter.
+_dbg.__inDeepWater3 = (x: number, z: number, m: number) => inDeepWater3(x, z, m);
 // QA: wind the match clock forward so a harness can photograph the results
 // screen without simulating three real minutes of software rendering
 _dbg.__rushClock = (to: number) => { matchClock = to; };

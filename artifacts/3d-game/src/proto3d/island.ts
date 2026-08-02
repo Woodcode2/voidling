@@ -354,6 +354,22 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
   // walkable by design; falling through to Maple's pond and river here would
   // drop an invisible pond into the middle of the market.
   if (WORLD_ID === 'lantern') return false;
+  // …AND GAME DAY, which has none either, and which nobody checked.
+  //
+  // gameday.ts says so in its own opening paragraph — "a broad flat PLATEAU
+  // with nothing around it but woodland. There is no sea here, so there is no
+  // water polygon" — and this function went on handing it MAPLE FALLS' pond
+  // and lagoon anyway. Two invisible bodies of water, on painted grass, in the
+  // middle of a stadium campus: a 39x39-unit no-go square in THE QUAD and an
+  // 87x66 one out where Maple's lagoon is. That is the invisible wall reported
+  // near a house on the third level.
+  //
+  // What makes this worth writing down is that the guard directly above was
+  // added for LANTERN NIGHT with the comment "falling through to Maple's pond
+  // and river here would drop an invisible pond into the middle of the
+  // market" — the exact bug, correctly reasoned about, one world too late.
+  // A new-world guard should have been a sweep of the existing ones.
+  if (WORLD_ID === 'gameday') return false;
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -373,6 +389,7 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
 export function inDeepWater3(x3: number, z3: number, margin = 0): boolean {
   if (WORLD_ID === 'pirate') return false;
   if (WORLD_ID === 'lantern') return false;     // the canal is shallow — see inWater3
+  if (WORLD_ID === 'gameday') return false;     // no water on the plateau — see inWater3
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
