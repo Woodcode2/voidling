@@ -11,6 +11,7 @@ import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './assets3d';
 import * as BAY from './bay';
 import * as GD from './gameday';
+import * as LN from './lantern';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
@@ -34,12 +35,23 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
   // the old campus would fit those words. ./life keys crowd behaviour, prop
   // sets and district captions off these literals, so sharing a name with
   // Maple's town square would drag a county fair into a football stadium.
-  | 'bowl' | 'gate' | 'lot' | 'rvpark' | 'greek' | 'quad' | 'practice' | 'treeline';
+  | 'bowl' | 'gate' | 'lot' | 'rvpark' | 'greek' | 'quad' | 'practice' | 'treeline'
+  // ── LANTERN NIGHT (world 4): a spirit night market, the one night a year it
+  // opens. A valley with a canal down it, stalls on both banks, and a bathhouse
+  // lit at the top of a stair.
+  //
+  // Same rule as GAME DAY: no literal is shared with another world even where
+  // the word would fit. 'gate' already belongs to the football ground and
+  // 'garden' would have been fine, but ./life keys the crowd's voice, walking
+  // speed and panic pool off these strings, and a shared name drags one world's
+  // cast into another's street. Every one of these is new.
+  | 'torii' | 'stalls' | 'canal' | 'teahouse' | 'shrine' | 'moonbridge'
+  | 'nightgarden' | 'bathhouse' | 'bamboo';
 // RETIRED on Maple: 'military' (the army base served a defence layer that was
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
 // the union only because ./life still compares against them; nothing in
 // MAPLE_PLAN uses them and the bake + populate branches are gone.
-export type WorldId = 'maple' | 'pirate' | 'gameday';
+export type WorldId = 'maple' | 'pirate' | 'gameday' | 'lantern';
 
 export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
 export interface Island {
@@ -199,6 +211,7 @@ export const MAPLE_SPAWN: [number, number] = [6469, 5240];
  *  Exported so the crowd can be kept out of it — see SPAWN_KEEP_OUT. */
 export function spawn3(): { x: number; z: number } {
   if (WORLD_ID === 'gameday') return { x: w(GD.GD_SPAWN[0]), z: w(GD.GD_SPAWN[1]) };
+  if (WORLD_ID === 'lantern') return { x: w(LN.LN_SPAWN[0]), z: w(LN.LN_SPAWN[1]) };
   return WORLD_ID === 'pirate'
     ? { x: w(6950), z: w(10560) }
     : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };
@@ -286,8 +299,14 @@ function silhouetteWorld(steps = 10): [number, number][] {
 // prop placement and movement respect the actual coastline, not just the grid
 const MAPLE_SIL = silhouetteWorld(12);
 // Pirate Bay has its OWN coastline — a hooked headland, not Maple's blob
+// A CHAIN, not a ternary pair. Every one of these that stayed two-way handed
+// the new world Maple's answer silently — which is exactly how GAME DAY once
+// shipped announcing that MAPLE FALLS had gone.
 const silPoly = (): [number, number][] =>
-  (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH : WORLD_ID === 'gameday' ? GD.GD_LAND_SMOOTH : MAPLE_SIL);
+  (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH
+    : WORLD_ID === 'gameday' ? GD.GD_LAND_SMOOTH
+      : WORLD_ID === 'lantern' ? LN.LN_LAND_SMOOTH
+        : MAPLE_SIL);
 const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
 /** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
  *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
@@ -302,6 +321,7 @@ function insideIslandWorld(wx: number, wy: number): boolean {
   // Pirate Bay: its own hooked coastline, and the BAY water is not land
   if (WORLD_ID === 'pirate') return BAY.onBayLand(wx, wy);
   if (WORLD_ID === 'gameday') return GD.onGameDayLand(wx, wy);
+  if (WORLD_ID === 'lantern') return LN.onLanternLand(wx, wy);
   let inside = false;
   for (let i = 0, j = SIL_POLY.length - 1; i < SIL_POLY.length; j = i++) {
     const [xi, yi] = SIL_POLY[i], [xj, yj] = SIL_POLY[j];
@@ -329,6 +349,10 @@ export function inLagoon3(x3: number, z3: number, margin = 120): boolean {
  *  One predicate, in 3D coordinates, for everything that moves. */
 export function inWater3(x3: number, z3: number, margin = 0): boolean {
   if (WORLD_ID === 'pirate') return false;      // the bay is handled by the coastline itself
+  // LANTERN NIGHT has no standing water at all. Its canal is ankle-deep and
+  // walkable by design; falling through to Maple's pond and river here would
+  // drop an invisible pond into the middle of the market.
+  if (WORLD_ID === 'lantern') return false;
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -347,6 +371,7 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
  *  a townsperson standing mid-current is a different problem. */
 export function inDeepWater3(x3: number, z3: number, margin = 0): boolean {
   if (WORLD_ID === 'pirate') return false;
+  if (WORLD_ID === 'lantern') return false;     // the canal is shallow — see inWater3
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -692,6 +717,246 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     opath(BAY.TRAIL); g.strokeStyle = 'rgba(206,178,124,0.8)'; g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
   }
 
+  // ══ LANTERN NIGHT BAKE ════════════════════════════════════════════════
+  // THE LIGHT IS IN THE GROUND. Every other world bakes ALBEDO — what the
+  // surface would look like under a lamp — and lets the rig do the lighting.
+  // This one cannot: the level is lit by roughly two hundred paper lanterns,
+  // and two hundred real point lights is not a thing that ships on a phone.
+  //
+  // So the lanterns' contribution to the FLOOR is painted in. Each pool is an
+  // additive radial gradient dropped at the lantern's own position, which is
+  // exactly what a light two metres up does to the ground under it, and it
+  // costs nothing at runtime because it is a texture. The props then carry
+  // emissive materials for the lantern itself, so the source and its pool agree.
+  //
+  // The order matters and is the reverse of a daylight bake: darks first,
+  // every district painted DOWN toward blue-black, and then light added back
+  // only where something is actually burning. Paint the districts at daylight
+  // values first and no amount of glow on top will read as night — it comes
+  // out as an evening filter, which is the single most common way a night
+  // level fails.
+  const LN_R = (id: LN.LnBiome) => LN.LN_REGIONS.find((r) => r.id === id)!;
+  if (WORLD_ID === 'lantern') {
+    const PU = (pxW(1000) - pxW(0)) / 1000;         // canvas px per world unit
+    const lpath = (pts: LN.Pt[], close = true) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (const [x, y] of pts) g.lineTo(pxW(x), pyW(y));
+      if (close) g.closePath();
+    };
+    const fillPoly = (pts: LN.Pt[], col: number | string) => {
+      lpath(pts); g.fillStyle = typeof col === 'number' ? hex(col) : col; g.fill();
+    };
+    /** A lantern's footprint on the floor: warm core, fast falloff, additive.
+     *  `r` is in WORLD units — a paper lantern hung at stall height throws a
+     *  pool about 260 across, a big gate lantern about 700. */
+    const pool = (wx: number, wy: number, r: number, core: string, mid: string) => {
+      const px = pxW(wx), py = pyW(wy), pr = Math.max(2, r * PU);
+      const gr = g.createRadialGradient(px, py, 0, px, py, pr);
+      gr.addColorStop(0, core);
+      gr.addColorStop(0.34, mid);
+      gr.addColorStop(1, 'rgba(255,180,80,0)');
+      g.fillStyle = gr;
+      g.beginPath(); g.arc(px, py, pr, 0, Math.PI * 2); g.fill();
+    };
+
+    // 1. BASE — the valley at night with nothing lit. Blue-black, and the one
+    //    surface that is never fully dark because the moon reaches it.
+    g.fillStyle = '#161d2b'; g.fillRect(0, 0, TEX, TEX);
+    for (let i = 0; i < 2600; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX;
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(40,54,78,0.22)' : 'rgba(18,24,36,0.30)';
+      g.beginPath(); g.arc(x, y, rand(4, 12), 0, Math.PI * 2); g.fill();
+    }
+
+    // 2. DISTRICT FLOORS. Bamboo first so everything built overlaps it.
+    const LN_FLOOR: Record<LN.LnBiome, number> = {
+      bamboo: 0x18202c, shrine: 0x3f3f4a, garden: 0x1f3a2c, teahouse: 0x4f4034,
+      stalls: 0x4a3b33, gate: 0x3a3547, bridge: 0x5a4a3e, bathhouse: 0x5c3230,
+      canal: 0x14283c,
+    };
+    // `bamboo` is lnRegionAt's FALLBACK, not a polygon — it is the rim and the
+    // seams between districts. So it is painted as the whole valley floor and
+    // everything built gets laid on top of it.
+    fillPoly(LN.LN_LAND_SMOOTH as LN.Pt[], LN_FLOOR.bamboo);
+    for (const id of ['garden', 'shrine', 'teahouse', 'gate', 'bathhouse', 'stalls', 'bridge'] as LN.LnBiome[]) {
+      const r = LN.LN_REGIONS.find((q) => q.id === id);
+      if (r) fillPoly(r.poly, LN_FLOOR[id]);
+    }
+
+    // 3. THE CANAL. Painted last of the floors so it cuts through the banks,
+    //    and given a lengthwise gradient rather than a flat fill — still water
+    //    is darkest in the middle and picks up the bank light at its edges,
+    //    which is the read that stops it looking like blue tarmac.
+    fillPoly(LN_R('canal').poly, LN_FLOOR.canal);
+    g.save(); lpath(LN_R('canal').poly); g.clip();
+    // FINE, not banded. At 26 world units and 0.16 these strokes were four
+    // hard stripes down the channel — a world unit is 0.05 of a 3D unit, so a
+    // 26-unit line is over a metre wide in play and reads as paint, not water.
+    g.strokeStyle = 'rgba(90,150,190,0.07)';
+    g.lineWidth = Math.max(1, 12 * PU); g.lineCap = 'round';
+    for (let i = 0; i < LN.CANAL.length - 1; i++) {
+      const [ax, ay] = LN.CANAL[i], [bx, by] = LN.CANAL[i + 1];
+      for (const off of [-96, -34, 34, 96]) {
+        const L = Math.hypot(bx - ax, by - ay), nx = -(by - ay) / L, ny = (bx - ax) / L;
+        g.beginPath();
+        g.moveTo(pxW(ax + nx * off), pyW(ay + ny * off));
+        g.lineTo(pxW(bx + nx * off), pyW(by + ny * off));
+        g.stroke();
+      }
+    }
+    g.restore();
+
+    // 4. THE MARKET STREET — packed earth down the east bank, worn pale in the
+    //    middle where everybody walks.
+    {
+      const opath2 = (pts: LN.Pt[]) => { lpath(pts, false); };
+      opath2(LN.MARKET);
+      g.strokeStyle = '#5a4a3c'; g.lineCap = 'round';
+      g.lineWidth = Math.max(2, LN.MARKET_HALF * 2 * PU); g.stroke();
+      opath2(LN.MARKET);
+      g.strokeStyle = 'rgba(120,100,80,0.35)';
+      g.lineWidth = Math.max(1, LN.MARKET_HALF * 0.9 * PU); g.stroke();
+    }
+
+    // 5. THE SHRINE STAIR and THE BATHHOUSE STAIR — the two flights of stone
+    //    steps, drawn as rungs so the climb reads from the play camera.
+    const stair = (x0: number, y0: number, x1: number, y1: number, n: number, wHalf: number) => {
+      const L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+      const nx = -uy, ny = ux;
+      g.strokeStyle = 'rgba(150,150,164,0.55)'; g.lineWidth = Math.max(1, 22 * PU);
+      for (let k = 0; k <= n; k++) {
+        const d = (k / n) * L, cx = x0 + ux * d, cy = y0 + uy * d;
+        g.beginPath();
+        g.moveTo(pxW(cx + nx * wHalf), pyW(cy + ny * wHalf));
+        g.lineTo(pxW(cx - nx * wHalf), pyW(cy - ny * wHalf));
+        g.stroke();
+      }
+    };
+    // up to the bathhouse, dead on the level's sightline
+    g.save(); lpath(LN_R('bathhouse').poly); g.clip();
+    g.fillStyle = 'rgba(140,140,156,0.30)';
+    g.beginPath();
+    g.moveTo(pxW(5800), pyW(4020)); g.lineTo(pxW(6760), pyW(4020));
+    g.lineTo(pxW(6560), pyW(3120)); g.lineTo(pxW(6000), pyW(3120)); g.closePath(); g.fill();
+    stair(6280, 4020, 6280, 3120, 14, 420);
+    g.restore();
+    // and up the west bank into the shrine
+    g.save(); lpath(LN_R('shrine').poly); g.clip();
+    stair(4820, 8600, 4060, 7600, 11, 300);
+    g.restore();
+
+    // 6. THE GARDEN's koi ponds — three dark ovals with a lit rim.
+    for (const [cx, cy, rr] of [[5180, 4720, 260], [7180, 4680, 210], [6060, 4520, 170]] as const) {
+      g.fillStyle = '#0e2430';
+      g.beginPath(); g.ellipse(pxW(cx), pyW(cy), rr * PU, rr * 0.72 * PU, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(120,170,190,0.30)'; g.lineWidth = Math.max(1, 16 * PU); g.stroke();
+    }
+
+    // ── 7. THE LIGHT ──────────────────────────────────────────────────────
+    // Everything above is unlit ground. From here on it is additive, and this
+    // is the entire look of the level.
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+
+    // 7a. THE LANTERN STRINGS over the canal. Two hundred pools down the
+    //     channel, alternating warm amber and a cooler paper white so the row
+    //     has rhythm rather than reading as one continuous smear of orange.
+    {
+      const rnd = (() => { let sd = 20260802; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+      for (let i = 0; i < LN.CANAL.length - 1; i++) {
+        const [ax, ay] = LN.CANAL[i], [bx, by] = LN.CANAL[i + 1];
+        const L = Math.hypot(bx - ax, by - ay);
+        // 260 spacing against a ~200 radius is 0.77 pools deep along the run,
+        // and two lanes rather than four — about 4 overlaps at the centre line.
+        for (let d = 0; d < L; d += 260) {
+          const t = d / L;
+          const cx = ax + (bx - ax) * t, cy = ay + (by - ay) * t;
+          const warm = rnd() < 0.68;
+          // strung ACROSS the channel, so the pools land on the water and on
+          // both banks — the reflection is what sells a canal at night
+          for (const off of [-115, 115]) {
+            const nx = -(by - ay) / L, ny = (bx - ax) / L;
+            pool(cx + nx * off, cy + ny * off, 180 + rnd() * 60,
+              warm ? 'rgba(255,176,88,0.13)' : 'rgba(255,232,196,0.11)',
+              warm ? 'rgba(240,132,54,0.055)' : 'rgba(226,206,178,0.05)');
+          }
+        }
+      }
+    }
+
+    // 7b. THE STALLS' OWN LIGHT. Each stall is a lit box with a griddle in it,
+    //     so it throws a stronger, warmer, tighter pool than the strings do —
+    //     and this is what draws the eye down the street.
+    {
+      const rnd = (() => { let sd = 771; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+      for (const sl of LN.stallSlots(rnd)) {
+        pool(sl.x, sl.y, 300, 'rgba(255,196,110,0.17)', 'rgba(246,140,50,0.07)');
+        // the hot spot on the griddle: tight enough that it barely overlaps its
+        // neighbours, so it can stay strong — this is the brightest ground in
+        // the level and the thing that draws the eye down the street
+        pool(sl.x, sl.y, 96, 'rgba(255,238,206,0.34)', 'rgba(255,190,120,0.15)');
+      }
+    }
+
+    // 7c. THE GREAT GATE. One enormous lantern each side of the torii — the
+    //     first thing the match paints and the frame the opening shot sits in.
+    pool(5900, 10120, 700, 'rgba(255,150,80,0.26)', 'rgba(226,96,44,0.11)');
+    pool(6620, 10120, 700, 'rgba(255,150,80,0.26)', 'rgba(226,96,44,0.11)');
+
+    // 7d. THE SHRINE. A hundred small stone lanterns up the steps: dimmer,
+    //     colder, and evenly spaced, so the west bank reads as devotional
+    //     rather than commercial. Same trick, opposite mood.
+    {
+      const rnd = (() => { let sd = 5150; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+      for (const [x, y] of LN.scatterInRegion(LN_R('shrine'), 90, rnd, 30)) {
+        pool(x, y, 150, 'rgba(226,214,255,0.075)', 'rgba(150,150,220,0.032)');
+      }
+    }
+
+    // 7e. THE TEAHOUSE terrace: fewer, larger, softer — hanging lanterns under
+    //     a deep eave, so the light is diffuse instead of pooled.
+    {
+      const rnd = (() => { let sd = 7780; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+      for (const [x, y] of LN.scatterInRegion(LN_R('teahouse'), 22, rnd, 60)) {
+        pool(x, y, 260, 'rgba(255,206,140,0.10)', 'rgba(224,156,80,0.045)');
+      }
+    }
+
+    // 7f. THE BATHHOUSE. The brightest thing in the level by a distance, and
+    //     the only light the player can see from the spawn 7,600 units away.
+    //     It is the whole reason to walk north.
+    pool(LN.BATHHOUSE.cx, LN.BATHHOUSE.cy, 2400, 'rgba(255,196,120,0.20)', 'rgba(236,140,70,0.09)');
+    pool(LN.BATHHOUSE.cx, LN.BATHHOUSE.cy, 1050, 'rgba(255,232,180,0.24)', 'rgba(255,180,110,0.11)');
+    // spill down the stair, so the climb is lit from the top
+    for (let k = 0; k <= 8; k++) {
+      const t = k / 8;
+      pool(6280, 3120 + t * 900, 300 + t * 160,
+        `rgba(255,190,110,${(0.11 * (1 - t * 0.7)).toFixed(3)})`,
+        `rgba(230,140,70,${(0.05 * (1 - t * 0.7)).toFixed(3)})`);
+    }
+
+    // 7g. THE MOON. The one COLD light in the level, and the only one that is
+    //     not a fire: a broad, weak, blue wash over the bridge and the garden,
+    //     which is what stops the whole frame going amber. Painted after the
+    //     warm sources so it sits on top of them at the waist.
+    pool(6200, 5800, 3200, 'rgba(120,160,240,0.045)', 'rgba(90,120,200,0.022)');
+
+    g.restore();
+
+    // 8. FIREFLIES in the garden — a handful of tiny hard specks, no falloff.
+    //    Cheap, and the eye reads them as depth.
+    {
+      const rnd = (() => { let sd = 4700; return () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (const [x, y] of LN.scatterInRegion(LN_R('garden'), 120, rnd, 10)) {
+        g.fillStyle = 'rgba(200,255,170,0.75)';
+        g.beginPath(); g.arc(pxW(x), pyW(y), Math.max(0.8, 9 * PU), 0, Math.PI * 2); g.fill();
+      }
+      g.restore();
+    }
+  }
+
   // ══ GAME DAY BAKE ═════════════════════════════════════════════════════
   // Maple's ground is a 6x6 grid of blocks with a road lattice through it, and
   // for two builds Game Day inherited the whole thing — the spiral maze, the
@@ -955,6 +1220,28 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     quad: 0x76b85a,      // the old campus quad, greener and better kept
     practice: 0x5fa356,  // practice turf, between the bowl and the quad
     treeline: 0x9a6a3a,  // leaf litter at the rim
+    // ── LANTERN NIGHT ground. Everything above is an albedo read under a sun.
+    // These are read under lantern light, so they are chosen for what they do
+    // to a WARM POOL falling on them from two metres up, not for what they look
+    // like at noon: dark, low-saturation bases that take an amber wash and give
+    // back a colour. A pale ground would blow out under the lantern pools and
+    // flatten the one effect this world is built on.
+    //
+    // They also sit in a much tighter value band than any daylight world —
+    // 0.10 to 0.26 — because at night the districts must separate by HUE and
+    // by what is lit, not by albedo. GAME DAY's three sands taught the opposite
+    // lesson under a sun; the same trick at night just produces grey.
+    torii: 0x3a3547,     // swept granite flags, cool and almost black
+    stalls: 0x4a3b33,    // packed earth of the market street, warm under the lanterns
+    canal: 0x14283c,     // the channel: deep and blue, and the one surface that
+                         // takes a specular from every lantern above it
+    teahouse: 0x4f4034,  // cedar decking, a step warmer and lighter than the street
+    shrine: 0x3f3f4a,    // mossy stone steps, cooler than the market
+    moonbridge: 0x5a4a3e, // the bridge's timber, the lightest ground in the level
+                          // because it is the one thing the moon actually hits
+    nightgarden: 0x1f3a2c, // clipped hedge and dark lawn
+    bathhouse: 0x5c3230,  // the terrace's red lacquer boards
+    bamboo: 0x18202c,     // the valley wall: blue-black, where the light stops
   };
   if (WORLD_ID === 'maple') for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
     const col = biomeColor[PLAN[gy][gx]];
@@ -1989,6 +2276,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     if (WORLD_ID === 'pirate') {
       const d = BAY.bayDistrictAt(x3 / SCALE + CX, z3 / SCALE + CZ);
       return d === 'oldtown' ? 'market' : (d as Biome | null);
+    }
+    if (WORLD_ID === 'lantern') {
+      const d = LN.lnRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ);
+      // lantern.ts names its districts for what they are; three of those words
+      // are already spoken for in the shared union ('gate' is the football
+      // ground's, 'bridge' and 'garden' are too generic to key crowd behaviour
+      // off), so they are translated here at the boundary exactly as GAME DAY's
+      // 'plaza' and 'campus' are below.
+      return d === 'gate' ? 'torii' : d === 'bridge' ? 'moonbridge'
+        : d === 'garden' ? 'nightgarden' : (d as Biome | null);
     }
     if (WORLD_ID === 'gameday') {
       const d = GD.gdRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ);

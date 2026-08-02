@@ -200,7 +200,13 @@ export const LN_REGIONS: LnRegion[] = [
 // then THE MOON BRIDGE, THE NIGHT GARDEN and finally THE BATHHOUSE, with
 // nothing else in the way. That is the establishing shot and the match plan in
 // one straight line.
-export const LN_SPAWN: Pt = [6260, 10120];
+// …and it is on the EAST BANK, not in the channel. At [6260, 10120] the spawn
+// landed inside the canal polygon: the opening frame was the darkest surface in
+// the level with nothing lit within reach, which is the worst possible first
+// three seconds for a world whose whole pitch is that it glows. 360 east puts
+// the void on the lit stone of the gate apron with the torii lanterns either
+// side and the channel running away in front of it.
+export const LN_SPAWN: Pt = [6620, 10150];
 
 /** Bearing from (wx,wy) to the bathhouse. Everything that can face something —
  *  spirits, stall canopies, the lantern strings, the shrine torii — faces this,

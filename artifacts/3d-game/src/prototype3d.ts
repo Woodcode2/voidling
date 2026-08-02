@@ -119,12 +119,12 @@ document.body.appendChild(renderer.domElement);
 // ── WHICH WORLD ───────────────────────────────────────────────────────────
 // Resolved before anything else, because the light rig, the ground bake and
 // the prop kit all branch on it.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY' };
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT' };
 // A ternary chain resolved exactly two worlds, so a third could never be
 // picked however the picker was wired. Validate against the real list instead,
 // which also means an unknown ?w= on a shared link lands on Maple rather than
 // on a world that does not exist.
-const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday'];
+const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday', 'lantern'];
 const _wantWorld = new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple';
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
@@ -209,6 +209,30 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // enough that the aisles stay lit.
   gameday: { sun: 0xffd9a8, sunI: 2.55, hemiSky: 0xc8dcf8, hemiGround: 0x53658c, hemiI: 0.86,
              off: [-38, 72, 78], dusk: 0.45, normalBias: 0.26, exposure: 1.12 },
+  // ── LANTERN NIGHT: the first rig in the game with no sun in it ──────────
+  // Everything above is a daylight rig with the key doing the work. Here the
+  // key is the MOON — cold, dim, and high, at 0.42 — and it is deliberately
+  // too weak to light anything on its own. It exists to put a cool rim on the
+  // roofs and a soft blue on the ground so the world has form; the actual
+  // illumination comes from the lanterns, baked into the ground and carried by
+  // emissive materials on the props themselves.
+  //
+  // That inversion is the whole look. In the other three worlds a prop is lit
+  // BY the scene; here half the props ARE the scene's light sources, so the
+  // street glows from within and the bamboo at the rim falls away into blue-
+  // black. It is also why this is the cheapest world to light: a hundred real
+  // point lights would be unshippable on a phone, and none of them are real.
+  //
+  // The hemisphere carries the mood: a deep indigo sky against a warm ground
+  // bounce, which is the trick that stops night reading as "the day but darker"
+  // — the ground is warmer than the sky, exactly backwards from every daylight
+  // rig above, because the light is coming from the lanterns at street level.
+  // dusk 1.0 lights every window, sign and paper lantern in the level from the
+  // first frame; there is no golden hour to wait for here.
+  // Exposure runs high (1.34) so the lantern pools bloom out toward white
+  // while the shadows still have somewhere to go.
+  lantern: { sun: 0xbfd4ff, sunI: 0.42, hemiSky: 0x141a3a, hemiGround: 0x6a4a3c, hemiI: 1.05,
+             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.34 },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, 0.22);
@@ -388,6 +412,24 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
     winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
+  },
+  lantern: {
+    n: 4, icon: '🏮', sub: 'the spirits think you are a guest · eat the market',
+    // The market's own voice is a PA that cannot tell anything is wrong, so it
+    // talks like a station that has nothing to report — often, and cheerfully.
+    newsGap: [15, 7], signOn: 5,
+    // the bathhouse, in 3D: lantern.ts authors it at world (6280, 2500), and
+    // the world-to-3D transform is (v - 6000) * 0.05.
+    hero: [(6280 - 6000) * 0.05, (2500 - 6000) * 0.05],
+    // Longer than GAME DAY's 3.4. This world's establishing shot is a CORRIDOR
+    // — lanterns receding to a lit building — and a corridor needs travel to
+    // read as one. 3.6 still finishes inside the 4.2s title card.
+    introLen: 3.6,
+    ender: '🌑 WORLD ENDER! The market is OVER.',
+    enderNews: 'THE MARKET HAS GONE. The bathhouse thanks you for visiting.',
+    winSub: 'the whole market belongs to the void', place: 'the market',
+    winTitles: ['MARKET: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
+                'THE GUEST HAS FINISHED', 'HONOURED, AND ALSO ENORMOUS'],
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -2322,6 +2364,11 @@ const CARD_ART: Record<string, string> = {
   // match the finished level — a crimson-and-gold bowl above, the tailgate on
   // the underside of the floating island, autumn rim, golden-hour rake.
   gameday: '/assets/hf/hf_20260801_053403_0dc79112-b8fd-4304-9d15-8630620b2218.png',
+  // LANTERN NIGHT: the valley from above, the canal down the middle strung
+  // with lanterns, the bathhouse lit at the top. Two candidates were painted;
+  // this is the first. The alternate is
+  // hf_20260802_020637_ab38aed8-5041-4109-83be-23acf11175a6.png.
+  lantern: '/assets/hf/hf_20260802_020636_0bc97a9d-a168-4667-bf5d-76ac9418bff1.png',
   frost: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
 };
 // A CARD IS NEVER BLANK. This set the background and hoped: if the file 404s —
@@ -2335,6 +2382,9 @@ const CARD_FALLBACK: Record<string, string> = {
   pirate: 'radial-gradient(ellipse at 50% 34%, #ffd9a0 0%, #d98f4a 40%, #1a3352 100%)',
   gameday: 'radial-gradient(ellipse at 50% 34%, #f0b429 0%, #c4342f 42%, #241030 100%)',
   frost: 'radial-gradient(ellipse at 50% 34%, #cfe9ff 0%, #5a8fd0 42%, #17203f 100%)',
+  // lantern amber falling into an indigo night — the level's own two colours,
+  // so a card that never loads its poster still says the right thing
+  lantern: 'radial-gradient(ellipse at 50% 38%, #ffbe6a 0%, #d1452f 34%, #241436 68%, #0e1226 100%)',
 };
 function paintWorldCard(host: HTMLElement, id: string): void {
   host.style.backgroundSize = 'cover';
