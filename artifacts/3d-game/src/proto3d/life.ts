@@ -16,6 +16,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
 import * as GD from './gameday';
+import * as LN from './lantern';
 // MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
 // exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
 // the same voice ids the cast carries (politician, protester, gossip, farmer,
@@ -719,7 +720,33 @@ interface Fit {
   hat?: 'sun' | 'cap' | 'beanie'; hatOdds?: number; pack?: boolean;
   wear?: Wear[]; shoe?: Shoe[]; fun?: boolean;   // fun = dyed hair shows up here
 }
+const LN_INK = 0x241c2e;      // the near-black every spirit is trimmed with
+const LN_VERM = 0xc1382e;     // shrine and stall vermilion
+const LN_INDIGO = 0x2a3a6a;   // the market's working blue
+const LN_MOSS = 0x3f6a48;
+const LN_PLUM = 0x5a2f52;
+const LN_GOLD = 0xd9a24a;
+const LN_PAPER = 0xd8cdb6;
 const OUTFIT: Record<string, Fit> = {
+  // ── LANTERN NIGHT. Deep, saturated, low-value colours: at night a pale
+  // costume blows out under a lantern pool and everything mid-grey vanishes
+  // between them, so the crowd is dressed in inks, indigos and vermilions that
+  // hold their hue at both ends of the exposure.
+  stalls: { shirt: [LN_VERM, LN_INDIGO, LN_GOLD, LN_PLUM, LN_INK], pants: [LN_INK, 0x33283f, 0x2a3348],
+    wear: ['uniform', 'tee', 'open', 'uniform'], shoe: ['shoe', 'boot'] },
+  canal: { shirt: [LN_INDIGO, LN_INK, LN_MOSS], pants: [LN_INK, 0x2a3348],
+    wear: ['uniform', 'open'], shoe: ['boot'] },
+  torii: { shirt: [LN_VERM, LN_PAPER, LN_INK], pants: [LN_INK, 0x33283f],
+    wear: ['uniform', 'uniform', 'tee'], shoe: ['shoe'] },
+  shrine: { shirt: [LN_PAPER, LN_VERM, LN_PAPER], pants: [LN_VERM, 0x8e2620],
+    wear: ['uniform'], shoe: ['shoe'] },
+  teahouse: { shirt: [LN_PLUM, LN_GOLD, LN_PAPER, LN_INDIGO], pants: [LN_INK, 0x33283f],
+    wear: ['uniform', 'open'], shoe: ['shoe'] },
+  moonbridge: { shirt: [LN_INDIGO, LN_PLUM, LN_INK], pants: [LN_INK], wear: ['tee', 'open'], shoe: ['shoe'] },
+  nightgarden: { shirt: [LN_MOSS, LN_INK, LN_INDIGO], pants: [LN_INK, 0x2a3348], wear: ['uniform'], shoe: ['shoe'] },
+  bathhouse: { shirt: [LN_VERM, LN_GOLD, LN_PAPER], pants: [LN_INK, LN_VERM],
+    wear: ['uniform'], shoe: ['shoe'] },
+  bamboo: { shirt: [LN_INK, LN_MOSS], pants: [LN_INK], wear: ['tee'], shoe: ['boot'] },
   // PIRATE BAY: everyone is on holiday, so everyone is in colour
   port: { shirt: [0xe8604d, 0x4d9de8, 0xf0e6d2, 0x2e5a7a], pants: [0x3a4a6a, 0x5a4a3a, 0x2a2a34], hat: 'cap', hatOdds: 0.6,
     wear: ['tee', 'tee', 'tank', 'open', 'uniform'], shoe: ['boot', 'boot', 'shoe'] },
@@ -1914,6 +1941,78 @@ export function createLife(
   // pickup truck said "Do not tell the county!!" — a line about Maple Falls'
   // pie judging, live on screen in a screenshot. A world is not "not pirate".
   const WID = worldId();
+
+  // ── LANTERN NIGHT: three registers, not two ─────────────────────────────
+  // Every other world has AMBIENT (small talk) and PANIC (screaming). This one
+  // needs a third in front of both: GREET, said by a spirit walking toward you
+  // because it has decided you are a customer. It is the level's whole premise
+  // and it only works if the words are hospitable rather than merely calm —
+  // "lovely evening" is ambient; "sit, sit, you must be tired" is a greeting,
+  // and a child hears the difference immediately.
+  const OWN_GREET: Record<string, string[]> = {
+    stalls: ['two skewers? three?', 'you look hungry, friend', 'still hot! still hot!',
+      'first one is free', 'sit, sit — you must be tired', 'try it. TRY it.',
+      'big appetite! good! good!', 'we have more in the back', 'no no, take TWO',
+      'the round ones are best', 'careful, it is hot', 'you are new here!'],
+    canal: ['mind the step, honoured guest', 'the water is shallow tonight',
+      'a boat? a nice boat?', 'let me light your way', 'the lanterns are for you',
+      'follow the lights, that way'],
+    torii: ['welcome! welcome!', 'first time at the market?', 'come in, come in',
+      'we do not get many purple ones', 'straight up, you cannot miss it',
+      'the bathhouse is expecting you'],
+    shrine: ['a blessing for the traveller?', 'ring the bell if you like',
+      'one coin, any coin', 'the steps are steep, take your time',
+      'you have a very round aura', 'the spirits approve of you'],
+    teahouse: ['tea? we have the good one', 'a cushion for the guest!',
+      'you may sit anywhere', 'the view is better up here',
+      'one moment, one moment', 'no need to remove anything'],
+    moonbridge: ['a fine night for the bridge', 'the moon is that way',
+      'mind the rail, honoured guest', 'everybody stops here'],
+    nightgarden: ['the koi are asleep', 'quiet here, isn\'t it',
+      'the moss is three hundred years old', 'you may look at anything'],
+    bathhouse: ['a room for the guest!', 'your bath is nearly ready',
+      'we have never had one your shape', 'towels! bring towels!',
+      'the big tub, I think', 'reservation? no matter, no matter'],
+    bamboo: ['out here? nothing out here', 'the market is that way',
+      'careful in the dark, friend'],
+  };
+  const LN_AMBIENT: Record<string, string[]> = {
+    stalls: ['six hundred years I have run this stall', 'the fox stall undercuts me. always.',
+      'somebody is eating a LOT tonight', 'my sauce. my own sauce.', 'busy! busy tonight!',
+      'that one has had eleven', 'we open one night a year and look at it'],
+    canal: ['the lanterns go out at dawn', 'somebody dropped a boat', 'the water is lower than it was',
+      'float one for luck', 'that is a lot of missing water'],
+    torii: ['count them on the way in, count them on the way out',
+      'the gate has been here longer than the market', 'somebody is not counting'],
+    shrine: ['the bell has been quiet all night', 'three hundred lanterns, I lit every one',
+      'the offering box is lighter than it was', 'somebody took the box. the whole box.'],
+    teahouse: ['the guest has had eleven pots', 'we are running low on cups',
+      'the terrace was here before the market', 'do not look down'],
+    moonbridge: ['the bridge is fine. the bridge is FINE.', 'it creaked. it has never creaked.'],
+    nightgarden: ['the koi have left', 'the pond is a hole now', 'three hundred years. a hole.'],
+    bathhouse: ['the guest in the purple has had eleven', 'management has been informed',
+      'we are out of the big towels', 'nobody has seen the third floor'],
+    bamboo: ['it is very dark out here now', 'the lights are going out one by one'],
+  };
+  const LN_PANIC: Record<string, string[]> = {
+    stalls: ['MY STALL!! SIX HUNDRED YEARS!!', 'take the sauce!! TAKE THE SAUCE!!',
+      'closing!! we are closing!!', 'not the skewers!!', 'RUN, you fools!! politely!! RUN!!',
+      'it ate the whole ROW!!', 'I said the first one was free!! NOT ALL OF THEM!!'],
+    canal: ['THE WATER IS GONE!!', 'the boats!! save the boats!!', 'swim!! there is nothing to swim in!!',
+      'it is IN the canal!!', 'the lanterns!! all of them!!'],
+    torii: ['SHUT THE GATE!! SHUT IT!!', 'nobody else in!! NOBODY!!', 'it came through the GATE!!',
+      'we welcomed it!! WE WELCOMED IT!!'],
+    shrine: ['RING THE BELL!! RING IT!!', 'the spirits do NOT approve!!', 'up the steps!! ALL of you!!',
+      'take the offering box!! I said TAKE IT!!', 'three hundred lanterns!! GONE!!'],
+    teahouse: ['LEAVE THE TEA!! LEAVE IT!!', 'off the terrace!! JUMP!!', 'the good cups!! the GOOD ones!!',
+      'it is coming UP HERE!!'],
+    moonbridge: ['OFF THE BRIDGE!!', 'the bridge is going!! THE BRIDGE!!', 'both ends!! run to BOTH ends!!'],
+    nightgarden: ['INTO THE BAMBOO!!', 'the koi!! somebody get the koi!!', 'not the moss!! NOT THE MOSS!!'],
+    bathhouse: ['EVERYBODY OUT!! EVERYBODY!!', 'the guest is eating the BATHHOUSE!!',
+      'top floor!! go UP!!', 'I want it noted that I said something!!',
+      'cancel the reservation!! CANCEL IT!!'],
+    bamboo: ['keep running!! do not look!!', 'the market is GONE!!', 'up the valley!! GO!!'],
+  };
   const OWN_AMBIENT: Record<string, string[]> =
     WID === 'maple' ? MAPLE_VOICE_AMBIENT : WID === 'gameday' ? GAMEDAY_VOICE_AMBIENT : {};
   const OWN_PANIC: Record<string, string[]> =
@@ -2175,6 +2274,7 @@ export function createLife(
     // They can still WANDER in later — by then the player has moved.
     if (nearSpawn(hx, hz)) return;
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
+    let greetCd = rand(0, 5);   // LANTERN NIGHT: when this spirit last offered you something
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.userData.mover = true;    // steers itself — the magnet must never grab it
     const cs = contactShadow(radius * 0.55);   // grounded on every quality tier
@@ -2190,7 +2290,41 @@ export function createLife(
         const dist = Math.hypot(dx, dz);
         let spd = base;
         slideT = Math.max(0, slideT - dt);
-        if (dist < vR + fear && calmT <= 0) {
+        // ── THE THREE ACTS OF LANTERN NIGHT ─────────────────────────────
+        // Below a third of the way up the tension curve the spirits have not
+        // worked out what you are and treat you as a paying guest: they come
+        // OVER. Between a third and two thirds they have noticed something is
+        // wrong but not what, so they hold their ground and stare — the pause
+        // is the whole joke, and it is also the only moment in the game where
+        // a crowd does neither thing. Past two thirds it is an ordinary rout.
+        // Measured over a full match at the first thresholds (0.34 / 0.66):
+        // act one ran +65% net TOWARD the void, but by the top of minute two
+        // it was already -74% away — the welcome was over before the child had
+        // finished reading the first greeting, and the wary middle, which is
+        // the best beat of the three, lasted seconds. Widened so the market
+        // stays hospitable through most of the first act and the stare has
+        // somewhere to live.
+        const guest = WID === 'lantern' && tense < 0.42;
+        const wary = WID === 'lantern' && tense >= 0.42 && tense < 0.74;
+        if (guest && dist < vR + fear * 2.4 && dist > vR * 0.9 && calmT <= 0) {
+          // TOWARD, not away — the sign is the entire mechanic. Gently: this
+          // is somebody crossing a market to offer you a skewer, not a charge.
+          ang = Math.atan2(-dz, -dx);
+          spd = base * 1.35;
+          greetCd -= dt;
+          if (greetCd <= 0) {
+            greetCd = rand(4.5, 9);
+            const pool = OWN_GREET[biome] || OWN_GREET.stalls;
+            tmp.set(mesh.position.x, 5, mesh.position.z);
+            say(tmp, pick(pool), 'ambient');
+          }
+          fled = false;
+        } else if (wary && dist < vR + fear * 1.6 && calmT <= 0) {
+          // rooted. They have stopped to look at you, which reads as unease
+          // precisely because nothing else in the game ever stops.
+          spd = 0;
+          fled = false;
+        } else if (dist < vR + fear && calmT <= 0) {
           // COMMIT to the flee heading: while a coast-slide is active the raw
           // away-vector must not overwrite it, or the ped ping-pongs at the
           // cliff (slide inland → re-flee outward → slide → …) = the edge shake
@@ -2207,7 +2341,9 @@ export function createLife(
             // the place is actually going.
             if (Math.random() < 0.25 + 0.45 * tense) {
               // a pirate entertainer panics like a pirate wherever they stand
-              const pool = panicLines || panPool(voice) || PANIC[biome] || PANIC.generic;
+              const pool = panicLines || panPool(voice)
+                || (WID === 'lantern' ? (LN_PANIC[biome] || LN_PANIC.stalls) : null)
+                || PANIC[biome] || PANIC.generic;
               tmp.set(mesh.position.x, 5, mesh.position.z);
               say(tmp, pick(pool), 'panic');
             }
@@ -3368,6 +3504,73 @@ export function createLife(
   // band, ref, coach, mascot, cook, student, parent, vendor, steward. They are
   // assigned per district, not globally, so the person you walk past in RV Row
   // is a different person from the one at the gates.
+  // ══ LANTERN NIGHT: the market's spirits ═════════════════════════════════
+  // A market is its crowd. GAME DAY's lesson applies twice over here — "it
+  // feels empty" is the failure mode a night market invites hardest, because
+  // the lanterns imply somebody lit them.
+  if (worldId() === 'lantern') {
+    const lnRegion = (id: LN.LnBiome) => LN.LN_REGIONS.find((r) => r.id === id)!;
+    // island.ts renames three of lantern.ts's districts on the way out, and
+    // biomeAt returns the RENAMED id under a person's feet — which is what
+    // OUTFIT, the greet/ambient/panic pools and the flee test all key on.
+    const DRESS: Record<LN.LnBiome, string> = {
+      gate: 'torii', stalls: 'stalls', canal: 'canal', teahouse: 'teahouse',
+      shrine: 'shrine', bridge: 'moonbridge', garden: 'nightgarden',
+      bathhouse: 'bathhouse', bamboo: 'bamboo',
+    };
+    const lnPlace = (wx: number, wy: number, id: LN.LnBiome,
+                     o?: { kid?: boolean; tether?: number; speed?: number }) => {
+      const dress = DRESS[id];
+      const p = o?.kid ? makeCast('kid', dress) : makePerson(dress);
+      const [x, z] = g3([wx, wy]);
+      // SLOW, for the same reason GAME DAY's crowd is slow and then some. A
+      // fleeing ped runs at base x 3.4; at market density that is a ring of
+      // people holding station just off the void's rim, and the void chasing
+      // whichever is nearest oscillates in a cleared box. It is worse here
+      // because for the first act they are walking TOWARD the player — a fast
+      // approach reads as a charge, and this is somebody crossing a market to
+      // offer you a skewer.
+      addWanderer(p, x, z, o?.tether ?? 7, o?.speed ?? rand(0.35, 0.95),
+        16, o?.kid ? 1.9 : 2.4, dress, undefined, undefined);
+    };
+
+    // Density per district, in people. LANTERN ROW carries the level.
+    const LN_CAST: [LN.LnBiome, number, number][] = [
+      ['stalls', 170, 22],       // the market street: the whole point
+      ['canal', 40, 26],         // wading, poling boats, floating lanterns
+      ['gate', 46, 26],          // arriving, counting the torii
+      ['shrine', 70, 24],        // attendants and pilgrims on the steps
+      ['teahouse', 58, 26],      // the terrace, seated and serving
+      ['bridge', 34, 24],        // everybody stops on the bridge
+      ['garden', 30, 30],        // a few, quietly
+      ['bathhouse', 44, 26],     // staff on the terrace, guests arriving
+      ['bamboo', 26, 44],        // stragglers on the path in
+    ];
+    for (const [id, n, clear] of LN_CAST) {
+      const r = lnRegion(id);
+      if (!r) continue;
+      const pts = LN.scatterInRegion(r, n, Math.random, clear);
+      for (const [wx, wy] of pts) {
+        // a fifth of the market crowd is a child, because a festival is where
+        // children are, and a small fast silhouette among slow tall ones is
+        // what stops a crowd reading as wallpaper
+        lnPlace(wx, wy, id, { kid: Math.random() < 0.2 });
+      }
+    }
+    // …and the stallholders themselves, one behind each stall, rooted. These
+    // are the spirits who do the greeting, so they stand where the player will
+    // actually drive past them.
+    {
+      const slots = LN.stallSlots(Math.random, 230, 30);
+      for (const sl of slots) {
+        // just BEHIND the counter, on the far side from the water
+        const bx = sl.x + Math.cos(sl.ang + Math.PI) * 46;
+        const by = sl.y + Math.sin(sl.ang + Math.PI) * 46;
+        lnPlace(bx, by, 'stalls', { tether: 2.2, speed: rand(0.1, 0.3) });
+      }
+    }
+  }
+
   if (worldId() === 'gameday') {
     const gdRegion = (id: GD.GdBiome) => GD.GD_REGIONS.find((r) => r.id === id)!;
     // island.ts renames three districts on the way out; `dress` and the AMBIENT
@@ -4660,9 +4863,16 @@ export function createLife(
           // …and WHAT they say. calmT still wins outright: the opening seconds
           // of a match are not the moment to start screaming.
           const scream = calmT <= 0 && Math.random() < tense * 0.85;
+          // LANTERN NIGHT keeps its own biome pools: the shared AMBIENT/PANIC
+          // tables are keyed on Maple's and the bay's district names, and a
+          // spirit market falling through to them would have a tanuki saying
+          // "MY LOUNGER!!". Nothing here shares a literal with another world
+          // precisely so that fall-through cannot happen silently.
+          const AMB = WID === 'lantern' ? LN_AMBIENT : AMBIENT;
+          const PAN = WID === 'lantern' ? LN_PANIC : PANIC;
           const pool = scream
-            ? (panPool(p.voice) || PANIC[p.biome] || PANIC.generic)
-            : (ambPool(p.voice) || AMBIENT[p.biome] || AMBIENT.cozy);
+            ? (panPool(p.voice) || PAN[p.biome] || PAN.stalls || PANIC.generic)
+            : (ambPool(p.voice) || AMB[p.biome] || AMB.stalls || AMBIENT.cozy);
           cpos.set(p.mesh.position.x, 5, p.mesh.position.z);
           say(cpos, pick(pool), scream ? 'panic' : 'ambient');
         }
