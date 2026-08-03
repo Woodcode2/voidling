@@ -2931,45 +2931,65 @@ export function createAudio(): Audio3D {
 
   return {
     startMusic() {
-      // PIRATE BAY RESORT has its own score — and deliberately does NOT pick up
-      // /assets/music/theme.mp3, which is Maple's track. Its bed is synthesised
-      // end to end so the resort always sounds like the resort.
-      if (isPirate()) { startTropical(); return; }
-      // prefetch the recorded kit so the very first gulp is the real sample
+      // prefetch the recorded kit so the very first gulp is the real sample.
+      // (This used to sit AFTER the pirate early-return, so the resort was the
+      // one world that never warmed it.)
       for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
-      // GAME DAY has its own too — and it needs one more than the others did,
-      // because "the band is playing somewhere you cannot see" is not a mood
-      // this file can express by leaving the field blank.
-      if (isGameday()) { startGameday(); return; }
-      // LANTERN NIGHT plays its own too, and this one was not optional: until
-      // it existed the spirit market played MAPLE FALLS' town band — cornets
-      // and a sousaphone over a Japanese festival. A player hears a score
-      // before they have finished looking at the ground.
-      if (isLantern()) { startLantern(); return; }
-      // MAPLE FALLS plays its own band, for the same reason the bay plays its
-      // own: a stock loop is a stock loop, and this town has an election on.
-      // The licensed-track drop-in (/assets/music/theme.mp3, and behind it the
-      // old generic synth bed) is still here and still works — it is opt-in
-      // now rather than default, so a shipped track can be A/B'd against the
-      // band without a code change.
-      if (!LICENSED_THEME) { startTown(); return; }
-      // licensed-track hook: if a real music file ships with the build, prefer
-      // it (gapless crossfade loop); the synth score is the fallback
+
+      // ── EVERY WORLD'S OWN SCORE, AND EVERY WORLD'S OWN TRACK SLOT ─────────
+      // Each world has a hand-written synthesised score, and each is the right
+      // sound for its place — the resort must not play the town band, and until
+      // Lantern Night had its own the spirit market played cornets and a
+      // sousaphone over a Japanese festival.
+      //
+      // What was missing is the other half. A licensed-track drop-in existed,
+      // but only for MAPLE, only under the fixed name theme.mp3, and only
+      // behind a localStorage opt-in — so three of the four worlds had no way
+      // to play a real recording at all. Now every world has a slot, and
+      // PRESENCE OF THE FILE IS THE SWITCH: drop
+      // /assets/music/<world>.mp3 into public/ and that world plays it on the
+      // gapless crossfade loop; leave it out and the world keeps its synth
+      // score, exactly as today. No flag, no code change, no rebuild of the
+      // audio engine to A/B a track.
+      const synth = isPirate() ? startTropical
+        : isGameday() ? startGameday
+        : isLantern() ? startLantern
+        : startTown;
+      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : 'maple';
+      // theme.mp3 stays as Maple's legacy name so an existing drop-in keeps
+      // working; the opt-in flag now only forces that older path.
+      const urls = slot === 'maple' && LICENSED_THEME
+        ? ['/assets/music/theme.mp3', '/assets/music/maple.mp3']
+        : [`/assets/music/${slot}.mp3`];
+
       themeWanted = true;
       const c = ensure();
-      if (c && !themeBad) {
-        if (themeBuf) { startThemeLoop(c, themeBuf); return; }
-        if (!themeLoading) {
-          themeLoading = true;
-          fetch('/assets/music/theme.mp3')
-            .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('404'))))
-            .then((b) => c.decodeAudioData(b))
-            .then((buf) => { themeBuf = buf; if (themeWanted) startThemeLoop(c, buf); })
-            .catch(() => { themeBad = true; if (themeWanted) startSynth(); });
-        }
-        return;   // theme decoding — it fades in the moment it's ready
+      if (!c || themeBad) { synth(); return; }
+      if (themeBuf) { startThemeLoop(c, themeBuf); return; }
+      if (!themeLoading) {
+        themeLoading = true;
+        // try each candidate in order; the first that decodes wins, and if none
+        // does we are simply a world with no recording yet
+        (async () => {
+          for (const u of urls) {
+            try {
+              const r = await fetch(u);
+              if (!r.ok) continue;
+              const buf = await c.decodeAudioData(await r.arrayBuffer());
+              themeBuf = buf;
+              if (themeWanted) startThemeLoop(c, buf);
+              return;
+            } catch { /* next candidate */ }
+          }
+          themeBad = true;
+          if (themeWanted) synth();
+        })();
       }
-      startSynth();
+      // NOTE: do NOT also start the synth here as a stopgap. startThemeLoop()
+      // does not silence a running score — there is no shared stop — so the two
+      // would play over each other for the life of the match. The fetch fails
+      // fast when there is no file (a 404 is one round trip), which is the case
+      // for every world today, so the synth still comes up effectively at once.
     },
     setMusicStage(n) { musStage = n; },
     // The town's own eight notes, on demand — for a menu, a results screen, a
