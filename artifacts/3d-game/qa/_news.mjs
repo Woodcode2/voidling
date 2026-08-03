@@ -19,14 +19,18 @@ for (const [label,r] of [['tier0',1.2],['tier1',6],['tier2',11]]) {
   for (let i=0;i<7;i++){
     await p.evaluate(()=>window.__news());
     await p.waitForTimeout(260);
+    // the card is `<i>BRAND</i>headline` — the headline is a bare TEXT NODE, so
+    // reading n.children gives you the masthead and nothing else. Ask for the
+    // line itself, which is the only part anybody is judging.
     const t = await p.evaluate(()=>{ const n=document.getElementById('news'); if(!n) return null;
-      const kids=[...n.children].map(c=>c.className+': '+(c.textContent||'').trim());
-      return { cls:n.className, kids, all:(n.textContent||'').trim() }; });
-    if(t) lines.push(t);
+      const brand=(n.querySelector('i')?.textContent||'').trim();
+      return { cls:n.className, brand,
+        head:(n.textContent||'').trim().slice(brand.length).trim() }; });
+    if(t && !lines.some(l=>l.head===t.head)) lines.push(t);
   }
   const tense = await p.evaluate(()=>window.__matchState().tense.toFixed(2));
   console.log(`\n===== ${WORLD.toUpperCase()} ${label}  tense=${tense} =====`);
-  for(const l of lines) console.log('  ['+l.cls+']  '+l.kids.join('   |   '));
+  for(const l of lines) console.log('  '+l.brand.padEnd(20)+' '+l.head);
   await p.evaluate(()=>window.__news());
   await p.waitForTimeout(500);
   await p.screenshot({ path:`qa-out/news-${WORLD}-${label}.png`, clip:{x:0,y:60,width:430,height:230} });

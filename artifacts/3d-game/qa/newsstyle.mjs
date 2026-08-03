@@ -25,8 +25,11 @@
 //   - some must be real questions
 // plus the punctuation ladder, the token vocabulary, and the length cap.
 //
-// SCOPE. It reads SIGN_ON, the three GENERAL tiers and SIGN_OFF — the beats
-// every player is guaranteed to see. The district pools are not covered yet.
+// SCOPE. SIGN_ON, the three GENERAL tiers, SIGN_OFF, LIVE and the four per-meal
+// pools — the guaranteed beats plus the two pools that carry every {M}/{D}/{P}
+// token and, by the picker's own weighting, half of everything aired. The
+// per-district pools are the one gap: 767 lines, and the healthiest of the
+// bunch when measured (40-52% two-sentence against LIVE's 71%).
 import fs from 'node:fs';
 
 const DIR = new URL('../src/proto3d/', import.meta.url);
@@ -67,10 +70,15 @@ const grab = (src, n) => { const [a, b] = declSpan(src, n); return src.slice(a, 
 const tiersOf = (b) => b.split(/\],\s*\[/).map(strs);
 
 const sentences = (s) => s.split(/(?<=[.!?])\s+/).filter(Boolean).length;
-/** the ticker gets the FILLED line, so measure the filled length: the call site
- *  clips {F} to 14 and {M} to 22, and the longest {D} is 20. */
-const worstFill = (s) => s.replace(/\{M\}/g, 'x'.repeat(22)).replace(/\{F\}/g, 'x'.repeat(14))
-  .replace(/\{D\}/g, 'x'.repeat(20)).replace(/\{[PRS]\}/g, '99');
+/** the ticker gets the FILLED line, so measure the FILLED length. The call site
+ *  clips {F} to 14 and {M} to 22; {D} is not clipped at all, so its worst case
+ *  is whatever this world's longest district name happens to be — 14 at Pirate
+ *  Bay ("Smugglers Cove"), 20 at Lantern Night ("the teahouse terrace"). Using
+ *  one flat number for all four fails lines that are in fact fine. */
+const worstFill = (s, dw) => s.replace(/\{M\}/g, 'x'.repeat(22)).replace(/\{F\}/g, 'x'.repeat(14))
+  .replace(/\{D\}/g, 'x'.repeat(dw)).replace(/\{[PRS]\}/g, '99');
+const longestDistrict = (src) =>
+  Math.max(...strs(grab(src, 'DIST_NAME')).map((v) => v.length));
 
 let bad = 0;
 const fail = (w, beat, why, line) => {
@@ -79,16 +87,25 @@ const fail = (w, beat, why, line) => {
 
 for (const [w, f] of Object.entries(F)) {
   const src = fs.readFileSync(new URL(f, DIR), 'utf8');
+  const dw = longestDistrict(src);
+  // `tier` is the beat index the punctuation ladder is keyed on; null means the
+  // pool sits outside the ladder (sign-on and sign-off both get one "!").
+  const beats = [['sign-on', strs(grab(src, 'SIGN_ON')), null]];
   // LANTERN NIGHT keeps its tiers in three separate consts; the other three
-  // share one `Pools` triple.
-  const beats = [['sign-on', strs(grab(src, 'SIGN_ON')), 1]];
+  // share one `Pools` triple, and only they have LIVE and per-meal pools.
   if (w === 'lantern') for (let t = 0; t < 3; t++) beats.push([`tier${t}`, strs(grab(src, `T${t}_GENERAL`)), t]);
-  else tiersOf(grab(src, 'GENERAL')).forEach((p, t) => beats.push([`tier${t}`, p, t]));
-  beats.push(['sign-off', strs(grab(src, 'SIGN_OFF')), 1]);
+  else {
+    for (const name of ['GENERAL', 'LIVE', 'MEAL_HOUSE', 'MEAL_CAR', 'MEAL_BIG', 'MEAL_SMALL']) {
+      const label = name === 'GENERAL' ? 'tier' : name.replace('MEAL_', 'meal-').toLowerCase() + ' ';
+      tiersOf(grab(src, name)).forEach((p, t) => beats.push([`${label}${t}`, p, t]));
+    }
+  }
+  beats.push(['sign-off', strs(grab(src, 'SIGN_OFF')), null]);
 
   let n = 0, one = 0, two = 0, q = 0;
   console.log('\n' + w);
-  for (const [beat, pool, maxBang] of beats) {
+  for (const [beat, pool, tier] of beats) {
+    const maxBang = tier === null ? 1 : tier;
     if (!pool.length) fail(w, beat, 'empty pool', '');
     for (const line of pool) {
       n++;
@@ -98,15 +115,15 @@ for (const [w, f] of Object.entries(F)) {
 
       // ── the punctuation ladder IS the arc, felt rather than read ──
       const bangs = (line.match(/!/g) || []).length;
-      if (beat === 'tier0' && bangs) fail(w, beat, 'denial carries zero "!"', line);
-      else if (beat === 'tier2' && bangs === 1) fail(w, beat, 'panic uses "!!" or nothing, never a lone "!"', line);
-      else if (bangs > 2 || (beat !== 'tier2' && bangs > maxBang)) fail(w, beat, `${bangs} "!"`, line);
+      if (tier === 0 && bangs) fail(w, beat, 'denial carries zero "!"', line);
+      else if (tier === 2 && bangs === 1) fail(w, beat, 'panic uses "!!" or nothing, never a lone "!"', line);
+      else if (bangs > 2 || (tier !== 2 && bangs > maxBang)) fail(w, beat, `${bangs} "!"`, line);
       if ((line.match(/\?/g) || []).length > 1) fail(w, beat, 'more than one "?"', line);
       if (/\?!|!\?|\.\.\.|—/.test(line)) fail(w, beat, 'banned punctuation', line);
       if (!/^["'(]?[A-Z0-9{]/.test(line)) fail(w, beat, 'does not open with a capital', line);
 
       // ── the ticker is one line on a phone ──
-      const len = worstFill(line).length;
+      const len = worstFill(line, dw).length;
       if (len > 78) fail(w, beat, `${len} chars once the tokens fill`, line);
 
       // ── an unfillable token reaches the child as literal braces. This is the
@@ -115,7 +132,7 @@ for (const [w, f] of Object.entries(F)) {
         if (!/^[DMFPRS]$/.test(t)) fail(w, beat, `unfillable token {${t}}`, line);
       }
       // a countdown at 2:40 remaining is a weather report. Only the last beat.
-      if (line.includes('{S}') && beat !== 'tier2') fail(w, beat, '{S} outside the final beat', line);
+      if (line.includes('{S}') && tier !== 2) fail(w, beat, '{S} outside the final beat', line);
     }
     console.log(`  ${beat.padEnd(9)} n=${String(pool.length).padStart(3)}`);
   }

@@ -562,71 +562,83 @@ const SIGN_OFF: string[] = [
 export type MealKind = 'house' | 'car' | 'big' | 'small';
 
 const MEAL_HOUSE: Pools = [[
-  'A house has gone. Nigel has marked the room as cleaned.',
-  'A whole HOUSE. Staff are calling it a very late checkout.',
-  'A house went down in one gulp, with no chewing and no manners.',
-  'Staff villa four is missing. Villa five has gone very quiet.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M}, so Nigel has marked the room as cleaned.',
+  'Villa four has gone. Villa five is pretending not to notice.',
+  'Was that a whole house? Staff call it a very late checkout.',
+  'No chewing, no manners, and {M} went straight down.',
 ], [
-  'Another house. That is three houses. Nobody at all is counting.',
-  'A house went in whole. The doorbell rang on the way down. Eek.',
-  'Houses are optional at a resort, says a very relaxed tannoy.',
-  'Mrs Fenwick-Hyde says that was a HOUSE. She had a nap in there.',
+  // ── BEAT 3 · ALARM ──
+  'It ate {M}. Three now. Nigel is quietly counting.',
+  'Villa five has stopped pretending.',
+  'In went {M}, doorbell ringing the whole way down.',
+  'Mrs Fenwick-Hyde says {M} was hers. She napped in there.',
 ], [
-  'Every house has gone. Capt. Roger is offering a tent instead.',
-  'The last house went in sideways. It did not fit. It went anyway.',
-  'The houses have GONE!! Nigel is still turning down the beds.',
-  'No houses means no housework. Do think positive, friends.',
+  // ── BEAT 4 · PANIC ──
+  'It ate {M}, so the front desk is offering you a tent.',
+  'That was {M}, and its doorbell is still ringing.',
+  'Villa five has GONE!! It was right about everything.',
+  'Lost property: one gate, one doormat and {M}.',
 ]];
 
 const MEAL_CAR: Pools = [[
-  'A parked car has gone. The valet insists he put it somewhere.',
-  'A car went in wheels first. Its alarm went off inside it. Rude.',
-  'A guest car is missing. Nigel has logged it as valet, extreme.',
-  'A car. One bite. One burp. The bay applauded politely.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M} and the valet insists he left it right there.',
+  'Wheels first, alarm going, gone. That was {M}.',
+  'One bite, one burp, and the bay applauded politely.',
+  'Has anybody lost a car? Nigel has filed it under valet parking.',
 ], [
-  'Another car gone. The car park is now a park. A very nice park.',
-  'A car went down honking. It honked all of the way down.',
-  'Mrs Fenwick-Hyde says that was her second favourite car.',
-  'Cars are terribly loud anyway, says the front desk. Good riddance.',
+  // ── BEAT 3 · ALARM ──
+  'It ate {M}, so the car park is simply a park now.',
+  'That was {M}, and it honked all of the way down.',
+  'Mrs Fenwick-Hyde says {M} was her second favourite.',
+  'Cars are loud anyway, says Capt. Roger. Good riddance to them.',
 ], [
-  'The last car has been eaten. Its alarm is still going somewhere.',
-  'The car park has gone, and so has booth two. Trev is fine.',
-  'No cars means no traffic!! The tannoy calls that a holiday.',
-  'A car went in and its radio kept playing. It is STILL playing.',
+  // ── BEAT 4 · PANIC ──
+  'The valet has found the keys!! He has not found the car.',
+  'It ate {M} and its radio is still playing down there.',
+  'That was {M}. No cars means no traffic. A holiday, really.',
+  'Car park inventory: one cone, one puddle, one lost glove.',
 ]];
 
 const MEAL_BIG: Pools = [[
-  'A whole building has gone. Nigel blinked. Nigel actually blinked.',
-  'Something enormous went in and the ground said whump. Good whump.',
-  'A landmark is missing. It was in every one of the brochures.',
-  'That was a big one. Everybody felt it in their knees. Everybody.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M} and the ground said whump. A very good whump.',
+  'That was {M}, and it was in every single brochure.',
+  'Everybody felt {M} go, right in the knees.',
+  'Was that the water slide? It was the water slide.',
 ], [
-  'A building went down whole. The bay wobbled. We all wobbled.',
-  'Capt. Roger says the big one was ugly anyway, and that was him.',
-  'Mrs Fenwick-Hyde asks whether that was the spa. It was the spa.',
-  'It ate something enormous. It sounded like a bath draining.',
+  // ── BEAT 3 · ALARM ──
+  'It ate {M} and the whole bay wobbled. We all wobbled.',
+  'Mrs Fenwick-Hyde has learned that {M} was the spa.',
+  'Down went {M}, sounding exactly like a bath draining.',
+  'The brochures are being reprinted. Again. Much thinner now.',
 ], [
-  'The last big thing has gone. It went in slowly. Very slowly.',
-  'Everything big has GONE!! Only the small things are left now.',
-  'The galleon went in last. It was not a real galleon. Still sad.',
-  'The biggest bite yet. It had a little sit down afterwards.',
+  // ── BEAT 4 · PANIC ──
+  'The new brochure has one photo!! It is a photo of the sea.',
+  'The water slide has gone, and the queue has not moved.',
+  'It ate {M} very slowly, and then had a little sit down.',
+  'Biggest bite yet: {M}. Everything else looks small now.',
 ]];
 
 const MEAL_SMALL: Pools = [[
-  'It ate a bin. One bin. One tiny burp. Honestly rather cute.',
-  'A lounger is missing, and so is the towel, and so is the book.',
-  'A small snack was taken by the pool. Staff are not bothered.',
-  'It ate one flip-flop. The other is still on the beach. So sad.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate one flip-flop and left the other on the beach.',
+  'It ate {M}. One tiny burp. Honestly rather cute.',
+  'Missing from lounger nine: one towel, one book and {M}.',
+  'Nobody minds about {M}. Staff are entirely unbothered.',
 ], [
-  'Still snacking. Bins, cones, and somebody\'s entire enormous hat.',
-  'It ate a deckchair, burped, then took another deckchair. Rude.',
-  'It only ate a small thing, says the tannoy. We have hundreds.',
-  'It ate the ice bucket with the ice still in it. Awful crunching.',
+  // ── BEAT 3 · ALARM ──
+  'Still snacking on bins, cones and {M}.',
+  'It ate {M}, burped, then took another one.',
+  'Only {M}? The tannoy says we have loads of those.',
+  'It ate the ice bucket with all of the ice still in it.',
 ], [
-  'Nothing big is left. It is eating crumbs now. Loud, angry crumbs.',
-  'It ate the last umbrella. It did not even WANT the umbrella.',
-  'Down to bits and bobs. It is HOOVERING the beach. Genuinely.',
-  'The last snack was one melon. It was always going to be melon.',
+  // ── BEAT 4 · PANIC ──
+  'The other flip-flop has gone. A matching pair at last.',
+  'It ate {M}, which by now counts as a crumb.',
+  'It ate the last umbrella. It did not want it. It ate it anyway.',
+  'Down to the last crumbs!! It has just eaten {M}.',
 ]];
 
 const BY_MEAL: Record<MealKind, Pools> = {
@@ -649,59 +661,62 @@ export function mealKind(meal: string): MealKind {
 //  Never start a line with {D} or {M}: they arrive lower case and a sentence
 //  must begin with a capital.
 const LIVE: Pools = [[
-  'Capt. Roger says the {F} is a guest and should be given space.',
-  'A {F} was seen at {D}. Staff waved and it waved back.',
-  'It ate {M}. Nigel has logged this under turndown service.',
-  'Maisie fed the {F}. The {F} said thank you, probably.',
-  'Guest review of {D}: five stars, one void, still five stars.',
-  'Lost property: {M}. Found property: nothing at all today.',
-  'The {F} is themed. Everything at this resort is themed.',
-  'Mrs Fenwick-Hyde asks if {M} was included in her package.',
-  'Guests were asked if the purple thing is bigger. {P}% said yes.',
-  'A {F} has checked in with no booking and no luggage at all.',
-  'Cressida Vane reviewed {M}. Her note says: eaten, bravo.',
-  'Nigel confirmed your booking at {D}. And the {F}\'s.',
-  'Barnaby saw a {F} at {D} and told everybody. Loudly.',
-  'Staff are calling it a {F} now. Staff named it themselves.',
-  'A {F} was offered a lounger. The {F} politely declined.',
-  'A {F} at {D}. How delightful. Please do not approach it.',
-  'The {F} at {D} has been given a wristband. It fits.',
+  // ── BEAT 2 · DENIAL ──
+  'The {F} at {D} now has an all you can eat wristband.',
+  'Lost property: one towel, one sandal and {M}.',
+  'Is the purple thing at {D} new? Management says it is a pool.',
+  'Nigel logged the {F} as a guest, a feature, then a water feature.',
+  'Mrs Fenwick-Hyde was using {M}. She would like a word.',
+  'Cressida Vane on {M}: gone in one go, six stars.',
+  'Maisie fed the {F} one chip. She says it wanted only the one.',
+  'A {F} checked in at {D} with no bags and no booking.',
+  'Delightful. A {F} is swimming at {D} for free.',
+  'Staff have listed the {F} at {D} under water features.',
+  'Correction: the {F} at {D} is a feature, not a guest.',
+  'Barnaby watched the {F} eat {M}. Loudly.',
+  'Today at {D}: sun, snacks, a shanty and one {F}.',
+  'It ate {M}. Nigel logged it. Nigel logs everything.',
+  'Review of {D}: five stars, one {F}, still five stars.',
+  'The pool at {D} has a hole. Capt. Roger calls that two pools.',
+  'Kids club at {D}: draw the {F} from a safe distance.',
 ], [
-  'A {F} at {D}? The front desk calls that a feature.',
-  'We are evacuating {D}. Politely. With ice creams. In one line.',
-  'It ate {M}. Somebody owned that. Somebody is very upset.',
-  '{P}% of the resort has gone. The buffet is still on, though.',
-  'Mrs Fenwick-Hyde says {P}% is basically none percent, surely.',
-  'Do not book {D}. That is exactly where the {F} is.',
-  'Maisie has named the {F} and it answers to the name now.',
-  'Nigel reports that {D} has moved inward. Only slightly.',
-  'A {F} ate {M}. It would like the menu.',
-  'The {F} is small. Smallish. Roughly smallish, says the tannoy.',
-  '{P}% has been devoured. The other {R}% is queuing for ice cream.',
-  'The Gilded Lagoon asked how {D} is going. Rude of them, frankly.',
-  'Capt. Roger says {P}% is a rounding error. Do round it down.',
-  'A {F} has closed {D} for refurbishment.',
-  'It only ate {M}. Management says we have loads of those.',
+  // ── BEAT 3 · ALARM ──
+  'We are evacuating {D}. Slowly. With ice creams.',
+  'How big is the {F} now? Smallish, says the tannoy.',
+  '{P}% of the resort has gone and the pudding buffet is unaffected.',
+  'Mrs Fenwick-Hyde says {P}% rounds down to nothing at all.',
+  'Correction: {D} has not closed. It has moved inward.',
+  'It ate {M}. Somebody owned that. Somebody is upset.',
+  'Maisie has named the {F} and it comes when she calls.',
+  'The wristband said all you can eat. Nobody expected {M}.',
+  'Do not book {D}, which is where the {F} lives now.',
+  'The {F} at {D} has asked for a second wristband.',
+  'Missing at {D}: one queue, one slide and one lost bucket.',
+  'The Gilded Lagoon has asked how {D} is coping. Rude.',
+  '{P}% has gone and the other {R}% is queuing for ice cream.',
   'A second {F} has been reported at {D}. That makes two.',
-  'The {F} was offered a towel. The {F} took the towel.',
+  'Nigel says {D} has moved inward, only slightly, and is fine.',
+  'This is not an evacuation at {D}. This is a fun walk!',
+  'The {F} ate {M} and would like the menu.',
 ], [
-  'It has eaten {D}!! The towels there were all reserved.',
-  '{P}% has been DEVOURED. The other {R}% is queuing for a boat.',
-  'The {F} ate {M}. It is asking about pudding.',
-  'There are {S} seconds left!! Everybody conga to the boats.',
-  'Capt. Roger says {D} has gone. Tours resume at four regardless.',
+  // ── BEAT 4 · PANIC ──
+  'The {F} ate {D}!! Every towel there was reserved.',
+  '{P}% devoured. The other {R}% is queuing for a boat.',
+  'The {F} ate {M} and asked about pudding.',
+  'There are {S} seconds left, so do finish your ice creams.',
+  'Is the spa still open? The spa is still taking bookings.',
   'Mrs Fenwick-Hyde says she was using {M}.',
-  'A {F} now owns {P}% of a luxury resort. Good for it, honestly.',
-  'Nigel has confirmed the {F}\'s late checkout. A very late one.',
-  'There are {S} seconds left. Finish your ice creams quickly.',
-  'Maisie says the {F} is only hungry. Maisie understands it.',
-  'The tannoy says {P}% gone leaves {R}% still absolutely amazing.',
-  'The {F} ate {M} and looked extremely pleased.',
-  'There are {S} seconds left and the spa is still bookable.',
-  'The {F} ate {M}. A very good choice.',
-  'Only {S} seconds left!! The ice cream hut is still serving.',
-  'Capt. Roger says {D} has gone, but the memories are free.',
-  'There are two of them at {D} now. Two. We are leaving.',
+  'A {F} now owns {P}% of this five star resort outright.',
+  'The wristband did say all you can eat. Our mistake, madam.',
+  'Maisie says it only wanted one chip. That was {P}% ago.',
+  'Nigel has confirmed the {F} for a very late checkout.',
+  'Gone. The {F} took {D} and most of the car park.',
+  'There are {S} seconds left and the buffet is still on.',
+  'Still on the island: one flag, one lilo and one {F}.',
+  'Cressida Vane, final review of {D}: eaten, four stars.',
+  'The tannoy says {P}% gone leaves {R}% of paradise intact.',
+  'There are two of them at {D} now. Two. We are all leaving.',
+  'DJ Coconut says one more hour. There are {S} seconds left.',
 ]];
 
 // ── selection ─────────────────────────────────────────────────────────────────

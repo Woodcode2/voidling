@@ -585,71 +585,83 @@ const SIGN_OFF: string[] = [
 export type MealKind = 'house' | 'car' | 'big' | 'small';
 
 const MEAL_HOUSE: Pools = [[
-  'A house has gone off Frat Row. The sofa on the lawn is still there.',
-  'A whole HOUSE. Bill says he has never seen a house do that before.',
-  'A house went in whole with the porch light still on. Goodness me.',
-  'That was a house. Hank called it, Bill wrote it down. That is the job.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M} and left the porch light burning on the lawn.',
+  'It ate {M} off Frat Row. The sofa on the lawn stayed put.',
+  'Bill, has {M} ever gone that quickly before?',
+  'That was {M}. Hank called it. Bill wrote it down.',
 ], [
-  'Another house off Frat Row. That is four. Bill is keeping the count.',
-  'A house went in and the porch swing came off and got away. Good swing.',
-  'A motorhome has gone. It was the one with the doorbell. Site twenty two.',
-  'Bill says a house is a big gain on any down. Bill is not wrong there.',
+  // ── BEAT 3 · ALARM ──
+  'That is four houses off Frat Row, and it just ate {M}.',
+  'The porch swing came off {M} and got clean away.',
+  'Bill says {M} is a big gain on any down.',
+  'It ate {M}. Site twenty two had the doorbell on it.',
 ], [
-  'Every house on the row has gone. Six crimson columns are on a truck.',
-  'The last house went in sideways. It did not fit. It went in anyway.',
-  'The houses have GONE!! The sofas all got out. Every single sofa.',
-  'A motorhome went in with the awning still out. It was a lovely awning.',
+  // ── BEAT 4 · PANIC ──
+  'Every sofa on Frat Row got out before it ate {M}.',
+  'It ate {M}. One porch light got out, and it is still on.',
+  'It ate {M} with the lovely awning still out!!',
+  'It ate {M} and six crimson columns went out on a truck.',
 ]];
 
 const MEAL_CAR: Pools = [[
-  'A parked car has gone from row B. It was the blue sedan. At last.',
-  'A pickup has gone, tailgate down, grill still warm. Ernie is upset.',
-  'A car went in with the alarm going, and the alarm carried on down there.',
-  'One car. One gulp. The lot barely noticed. Bill noticed. Bill notes it.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M} out of row B. Was that the blue sedan?',
+  'It ate {M} with eight of Ernie\'s sausages still on it.',
+  'It ate {M} and the car alarm carried on all the way down.',
+  'One gulp. It ate {M}. The lot did not look up.',
 ], [
-  'Another car out of row B. The PA has stopped reading out the plates.',
-  'A truck went down with the tailgate radio on. Song four of nine.',
-  'The golf cart has gone. That was the cart that towed Gerald to safety.',
-  'The cars are going now. The man with the paddles is waving them all out!',
+  // ── BEAT 3 · ALARM ──
+  'It ate {M}. The PA has stopped reading out the plates.',
+  'It ate {M} with the tailgate radio on, song four of nine.',
+  'It ate {M}. The golf cart towed Gerald out first!',
+  'It ate {M} and the man with the paddles waved row B out.',
 ], [
-  'The last car in the overflow lot has gone. Everybody else got out.',
-  'A truck went in with the lights on, and the lights went a long way down.',
-  'No cars left in Marston!! The man with the paddles has nothing to direct.',
-  'The team buses are safe. Both of them. Somebody went and checked twice.',
+  // ── BEAT 4 · PANIC ──
+  'The blue sedan got out at last, and then it ate {M}.',
+  'It ate {M} last. Ernie had already fed the whole hill.',
+  'No cars left in Marston!! It ate {M} and then sat still.',
+  'It ate {M}. Both buses got out. Somebody checked twice.',
 ]];
 
 const MEAL_BIG: Pools = [[
-  'Something enormous has gone and this booth felt it through the floor.',
-  'A building is missing from Old Campus. Bill cannot say which one it was.',
-  'That was a big one. The coffee in the press box did a little wobble.',
-  'A landmark has gone. It was on the front of the programme. Page one.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M} and Hank\'s coffee did a small wobble.',
+  'That was {M}, and this booth felt it through the floor.',
+  'Nobody up here can name it. It ate {M} all the same.',
+  'It ate {M}, and that was on page one of the programme.',
 ], [
-  'A whole building went down and it sounded like a bath draining out.',
-  'Bill says that was the biggest gain of the afternoon. He has it timed.',
-  'The bleacher stack has gone. Two hundred people were on it at eleven.',
-  'That one was enormous. Dwight nearly came off the ladder. Steady, lad!',
+  // ── BEAT 3 · ALARM ──
+  'It ate {M} and it sounded like a bath draining out.',
+  'That was {M}. Hank has moved his coffee to safety.',
+  'Biggest gain of the afternoon: {M}, by a distance.',
+  'It ate {M}. Everybody was off it by eleven this morning.',
 ], [
-  'The last big thing went in slowly. Very slowly. We all watched it go.',
-  'Everything big has GONE!! Only the small things are left out there now.',
-  'The clock tower went in chiming, four minutes fast, right to the end.',
-  'The biggest bite of the afternoon. It sat still afterwards for a moment.',
+  // ── BEAT 4 · PANIC ──
+  'It ate {M} and Hank\'s coffee finally went over. A first.',
+  'It ate {M} very slowly while the whole hill watched it go.',
+  'That was {M}!! Only small things are left out there now.',
+  'It ate {M}. It sat still. Then it went quiet.',
 ]];
 
 const MEAL_SMALL: Pools = [[
-  'It ate a cone. One traffic cone. The man with the paddles has spares.',
-  'A cooler has gone. That cooler belonged to row F, and row F is asking.',
-  'It ate a bin behind the concession stand and nobody has noticed yet.',
-  'A folding chair has gone. It was a good chair. It had a cup holder.',
+  // ── BEAT 2 · DENIAL ──
+  'It ate {M}. The man with the paddles has spares.',
+  'The good mustard ran out at eleven. Then it ate {M}.',
+  'Row F would like {M} back, please.',
+  'It ate {M} behind the concession stand and nobody noticed.',
 ], [
-  'Still snacking. Cones, coolers and somebody\'s entire folding table.',
-  'It ate a cornhole board, burped, and then took the other one. Rude.',
-  'It took the water cart. It did not want the water cart. It took it.',
-  'It ate a foam finger. The child is fine. The child wants another one!',
+  // ── BEAT 3 · ALARM ──
+  'Still snacking on {M} and an entire folding table.',
+  'It ate {M}, burped, and then took the other one. Rude!',
+  'It did not even want {M}, and it took it anyway.',
+  'It ate {M} and a foam finger. The child got a bigger one.',
 ], [
-  'Nothing big is left. It is eating cones now. Loud, plastic crunching.',
-  'It ate the last folding chair. It did not even WANT that chair.',
-  'Down to cones and cups. It is HOOVERING the overflow lot, folks.',
-  'The last snack was a tub of mustard. The good mustard, very sadly.',
+  // ── BEAT 4 · PANIC ──
+  'It ate {M}. The man with the paddles is out of spares.',
+  'It ate {M} but the good mustard got up that hill.',
+  'It ate {M}. The biggest foam finger in Marston got out.',
+  'Nothing big is left. It ate {M}. Loud, plastic crunching.',
 ]];
 
 const BY_MEAL: Record<MealKind, Pools> = {
@@ -677,59 +689,62 @@ export function gamedayMealKind(meal: string): MealKind {
 //  {P} and {R} are always written "{P} percent" here rather than "{P}%": a
 //  commentator says the word out loud, and the ticker is quoting a commentator.
 const LIVE: Pools = [[
-  'A {F} has been sighted at {D}. Bill has it noted.',
-  'Hank has the call. There is a {F} down at {D}.',
+  // ── BEAT 2 · DENIAL ──
+  'Hank has the call. A {F} is down at {D}.',
   'It ate {M}. The stadium is calling that a parking matter.',
-  'A {F} at {D}. That is not on the depth chart.',
-  'Bill says a {F} is a first for him, and Bill has seen a great deal.',
-  'Marla Beam is at {D} and wants a word with the {F}.',
+  'Bill, what is a {F} exactly?',
+  'A {F} at {D}, and it is not on the depth chart.',
   'The graphics machine has a stat: the {F} is at {P} percent.',
-  'It ate {M}. Bill wrote it down. Bill writes it all down.',
+  'Marla Beam wants a word with the {F} at {D}.',
   'Buckley waved at the {F}. It did not wave back. Not yet.',
-  'The PA has an announcement about {D}. It is: please move.',
-  'Coach Duffy was asked about the {F}. He is chewing the same gum.',
-  'Dwight can see the {F} from the ladder. It is round.',
-  'A {F} at {D}. Hank has never called one of those.',
+  'Doreen has the casserole going down row A at {D}.',
+  'Round. That is Dwight on the {F}, from the ladder.',
+  'Coach Duffy was asked about the {F}. Same gum. No comment.',
+  'The chain crew measured the {F}. Longer than the chains are.',
+  'A steward asked for its ticket. It ate {M} instead.',
+  'It ate {M} and the lot has not looked up from the grills.',
+  'Correction from the truck: that is {P} percent, not a puddle.',
   'Deb asked us to describe the {F}. Bill said: purple.',
-  'The chain crew measured the {F}. It is longer than the chains are.',
-  'A steward has asked the {F} for its ticket. Fair enough.',
-  'It ate {M}. That was on nobody\'s list of worries today.',
+  'Nobody in this booth has ever called a {F} before.',
+  'What is that in the north lot? The stadium says drainage.',
 ], [
+  // ── BEAT 3 · ALARM ──
   'It has taken {D}. Bill calls that a big gain on first down.',
-  'We are moving everybody off {D}. Calmly. In one line.',
-  'It ate {M}. Somebody owned that and is having a word.',
+  'Flag on the play. The flag went in with {M}.',
+  'The PA is asking everybody to walk briskly up to level two.',
   'Marston is {P} percent gone and this booth is staying with it.',
-  'Do not go to {D}. That is exactly where the {F} is.',
-  'A {F} at {D}. The officials are pointing four ways.',
-  'Bill has the rulebook open at {D}. There is nothing in it.',
+  'Bill, is there a rule for a {F} at {D}?',
+  'Do not go to {D}. That is where the {F} is.',
   'The {F} ate {M}. You cannot teach that.',
-  'Marla Beam is at {D} asking how people feel. Strongly.',
+  'First down. It ate {M}. First down again.',
   'The graphics machine says {P} percent. The other {R} percent is walking.',
-  'Hank has the {F} at {D} and has called every yard.',
-  'The band was moved off {D} and is playing on the move!',
-  'The chain crew measured the {F} at {D}. Still short.',
-  'Coach Duffy was asked about {D}. Still chewing, no comment.',
-  'A second {F} at {D}. That makes two of them now.',
-  'The stadium says {D} is a drainage project. Bill has stopped.',
-  'Buckley has led a section off {D}, dancing the whole way.',
+  'Marla Beam is at {D} asking how people feel. Strongly!',
+  'The band was moved off {D} and has not missed a beat.',
+  'There is a second one at {D} now, which makes two.',
+  'Coach Duffy on {D}: still chewing, still no comment.',
+  'The rulebook is open at {D} and there is nothing in it.',
+  'Buckley has led a whole section off {D}, dancing all the way.',
+  'It ate {M}. Ernie moved the grill and kept cooking.',
+  'Hank has called every yard of it from {D} to here.',
 ], [
-  'It has eaten {D}!! Hank is calling it from the press box.',
+  // ── BEAT 4 · PANIC ──
+  'Gone. All of {D}, and Hank is still calling it.',
   'That is {P} percent DEVOURED. The other {R} percent is on the hill.',
   'The {F} ate {M}. Bill has stopped taking notes.',
-  'There are {S} seconds left!! Everybody up the hill. Bring the casserole.',
+  'There are {S} seconds left!! Everybody bring the casserole.',
   'Hank has conceded {D}. Hank has not conceded the broadcast.',
   'A {F} now holds {P} percent of Marston and filed no paperwork.',
-  'There are {S} seconds left and the band has not stopped playing once.',
-  'It ate {M}. Marla Beam got a word. The word was: goodness.',
+  'With {S} seconds left the band has still not stopped playing.',
+  'Buckley waved. The {F} waved back!! Thirty one seasons for that.',
+  'The casserole reached the front row of the hill, still warm.',
   'Deb says stay with it. There is no {D} to stay with. We stay.',
-  'There are {S} seconds left. The casserole is going along the front row.',
-  'The chain crew measured {D} one final time. Short to the inch.',
+  'It ate {M} and nine thousand people on a hill went ooh.',
+  'Where is everybody? Up on the hill, every last one of them.',
+  'The chain crew measured {D} one final time and came up short.',
   'At {P} percent gone, {R} percent of this town is on one hill.',
-  'It ate {M} and the whole hill went ooh. Every one of them.',
-  'Only {S} seconds left!! Both benches are stacking chairs together.',
-  'Buckley waved the {F} off and never broke character. A legend.',
+  'Marla Beam has {S} seconds and one last word: goodness.',
+  'It ate {M} while both benches stacked chairs on the hill.',
   'There are two of them at {D} now. Two. Up the hill we go.',
-  'It ate {M}. Coach Duffy said: well. That is the comment.',
 ]];
 
 // ══ WHO IS TALKING ═══════════════════════════════════════════════════════════
