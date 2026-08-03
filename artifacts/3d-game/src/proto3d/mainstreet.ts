@@ -198,14 +198,23 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // S brings the static townsfolk up to the 3.5-unit walking crowd. They were
   // built at 2.41 and read as children standing next to every adult in life.ts.
   const S = 1.41;
-  const rb = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, r, 2);
-  out.push(part(rb(0.34 * S, 0.85 * S, 0.34 * S, 0.11 * S), leg, x - 0.17 * S, 0.42 * S, z, 0, ry, 0));
-  out.push(part(rb(0.34 * S, 0.85 * S, 0.34 * S, 0.11 * S), leg, x + 0.17 * S, 0.42 * S, z, 0, ry, 0));
-  out.push(part(rb(0.9 * S, 0.95 * S, 0.55 * S, 0.17 * S), shirt, x, 1.32 * S, z, 0, ry, 0));
-  out.push(part(rb(0.22 * S, 0.8 * S, 0.22 * S, 0.09 * S), shirt, x - 0.54 * S, 1.3 * S, z, 0, ry, 0));
-  out.push(part(rb(0.22 * S, 0.8 * S, 0.22 * S, 0.09 * S), shirt, x + 0.54 * S, 1.3 * S, z, 0, ry, 0));
-  out.push(part(sph(0.36 * S, 16, 11), skin, x, 2.05 * S, z));
-  if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 14), hat, x, 2.36 * S, z));
+  // ROUNDED BOXES WERE NOT ENOUGH. The first attempt bevelled the corners with
+  // roundedBox() and fixed the head, and the head did stop being an octagon —
+  // but a 0.9 x 0.95 x 0.55 BOX reads as a slab however softly its edges are
+  // cut, so the bodies still photographed as crates next to the walking crowd.
+  // life.ts does not use boxes at all: hips and chest are cylinders, the
+  // shoulders are a sphere yoke, the limbs are tapered tubes. That silhouette is
+  // the thing that reads as a person. Same primitives here, same proportions.
+  out.push(part(cyl(0.155 * S, 0.175 * S, 0.86 * S, 10), leg, x - 0.17 * S, 0.43 * S, z, 0, ry, 0));
+  out.push(part(cyl(0.155 * S, 0.175 * S, 0.86 * S, 10), leg, x + 0.17 * S, 0.43 * S, z, 0, ry, 0));
+  out.push(part(cyl(0.30 * S, 0.26 * S, 0.30 * S, 14), leg, x, 0.96 * S, z, 0, ry, 0));          // hips
+  out.push(part(cyl(0.40 * S, 0.31 * S, 0.82 * S, 14), shirt, x, 1.44 * S, z, 0, ry, 0));        // chest
+  out.push(part(sph(0.40 * S, 14, 10), shirt, x, 1.78 * S, z));                                  // shoulder yoke
+  out.push(part(cyl(0.10 * S, 0.115 * S, 0.74 * S, 9), shirt, x - 0.44 * S, 1.42 * S, z, 0, ry, 0));
+  out.push(part(cyl(0.10 * S, 0.115 * S, 0.74 * S, 9), shirt, x + 0.44 * S, 1.42 * S, z, 0, ry, 0));
+  out.push(part(cyl(0.13 * S, 0.13 * S, 0.16 * S, 10), skin, x, 1.98 * S, z));                   // neck
+  out.push(part(sph(0.36 * S, 16, 11), skin, x, 2.22 * S, z));
+  if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 14), hat, x, 2.52 * S, z));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

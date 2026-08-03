@@ -496,10 +496,23 @@
       /* key art on its own feathered layer — the island, waterfall and the
          void's face melt into the cosmos with no hard photo edges */
       #menu::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-        background: url('/assets/splash_hero.webp') center 7vh / auto 70vh no-repeat; }
-      @media (max-width: 480px) {
-        #menu::after { background-image: url('/assets/splash_hero_sm.webp'); }
-      }
+        /* SIZED SO THE ART CLEARS THE CHROME. The key art's island sits high and
+           its hero sits low, and the menu occupies both ends: the rank chip runs
+           to 20vh and PLAY starts at 75vh. At `7vh / auto 70vh` the island's top
+           was behind the chip and the hero's chin was behind PLAY. The asset is
+           cropped to 0.744 now instead of 0.558, so `auto 62vh` fills the width
+           of a phone while leaving 14vh of clean sky above and PLAY unobstructed.
+           image-set, NOT a width media query: the half-size file was being served
+           to phones, which are exactly the screens whose pixel density needs the
+           full one. Resolution picks the file now, not viewport width. */
+        background: image-set(url('/assets/splash_hero_sm.webp') 1x,
+                              url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat;
+        background: -webkit-image-set(url('/assets/splash_hero_sm.webp') 1x,
+                              url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat; }
+      /* (the max-width:480px swap to the half-size file used to live here — it
+         served the SOFT art to every phone. image-set above decides by pixel
+         density instead, which is the thing that actually determines whether a
+         768px-wide image is enough.) */
       @media (orientation: landscape) {
         #menu::after { background-size: auto 88vh; background-position: center 0; }
       }
@@ -720,7 +733,12 @@
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
         justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
         background:
-          url('/assets/splash_hero_sm.webp') center 4vh / auto 78vh no-repeat,
+          /* THE LOADING SCREEN WAS THE HALF-SIZE FILE, SCALED UP HARDER THAN THE
+             MENU SCALES THE FULL ONE — 78vh of a 768px-wide image against the
+             menu's 62vh of a 1536px one. That is why picking a world visibly
+             dropped the quality: same picture, half the pixels, bigger. */
+          image-set(url('/assets/splash_hero_sm.webp') 1x,
+                    url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat,
           radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
       #loadScr.show { display: flex; }
       /* .boot is set in the markup and cleared by the module on its first

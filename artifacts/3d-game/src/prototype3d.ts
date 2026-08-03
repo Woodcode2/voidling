@@ -2275,6 +2275,16 @@ function beginMatch(solo = false) {
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
+  // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
+  // `sleepy` fires at `tClock - lastInput > 8`, and tClock is WALL time since
+  // the page loaded while lastInput only moves on canvas input. Tapping PLAY
+  // and then a world card are DOM button clicks — neither touches it. Loading,
+  // the picker and the intro camera comfortably exceed eight seconds, so the
+  // very first frame of every match had the void half-lidded with Zzz over its
+  // head, before the child had done anything at all. The owner: "when the game
+  // loads the voids eyes are half closed. It looks so weird."
+  // The match is new input by definition; start the idle clock from here.
+  lastInput = tClock;
   // the hero is whatever the biggest thing on this world is — resolved per
   // match, so a re-rolled or re-scaled landmark needs no second list
   heroCued = false; heroAte = false; heroProp = null;

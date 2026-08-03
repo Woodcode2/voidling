@@ -20,19 +20,32 @@ import fs from 'node:fs';
 
 const SRC = process.argv[2];
 if (!SRC) { console.error('usage: node qa/splash.mjs <source-image>'); process.exit(1); }
-const W = 1536, H = 2752;                       // what the shipped asset has always been
+// 0.744, not the source's 0.558. The menu has chrome at BOTH ends — the rank
+// chip runs to 20vh, PLAY starts at 75vh — so a 9:16 asset either overlaps them
+// or sits too small to fill the width. Cropping empty sky off the top and the
+// hero's already-clipped bottom gives a shorter, wider frame that fills a phone
+// at `auto 62vh` with the island under the chip and the hero above PLAY.
+const W = 1536, H = 2313;
+// Measured off a gridded copy of the source, not estimated: skyline top 0.11,
+// island grass 0.24-0.38, rock to 0.55, debris spiral 0.52-0.80, the hero's eyes
+// 0.72-0.82 and its mouth 0.83-0.87. Keeping 0.08-0.92 holds the whole
+// composition and drops only empty sky and the hero's already-clipped chin.
+// A first pass guessed 0.195 off the bottom and cut the face in half.
+const CROP_TOP = 0.08, CROP_BOTTOM = 0.08;      // fractions of the SOURCE height
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const p = await b.newPage();
-const out = await p.evaluate(async ({ src, W, H }) => {
+const out = await p.evaluate(async ({ src, W, H, CROP_TOP, CROP_BOTTOM }) => {
   const img = new Image(); img.src = 'data:image/png;base64,' + src; await img.decode();
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const x = c.getContext('2d');
   x.imageSmoothingQuality = 'high';
-  // cover-fit, so a source that is not exactly 9:16 is cropped rather than squashed
-  const sc = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-  const dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
-  x.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  // take the authored band out of the source first, then cover-fit that
+  const sy = img.naturalHeight * CROP_TOP;
+  const sh = img.naturalHeight * (1 - CROP_TOP - CROP_BOTTOM);
+  const sc = Math.max(W / img.naturalWidth, H / sh);
+  const dw = img.naturalWidth * sc, dh = sh * sc;
+  x.drawImage(img, 0, sy, img.naturalWidth, sh, (W - dw) / 2, (H - dh) / 2, dw, dh);
 
   // ── feather every edge to transparency ──────────────────────────────────
   const m = document.createElement('canvas'); m.width = W; m.height = H;
@@ -60,7 +73,7 @@ const out = await p.evaluate(async ({ src, W, H }) => {
   hc.drawImage(c, 0, 0, half.width, half.height);
   return { big: c.toDataURL('image/webp', 0.92), sm: half.toDataURL('image/webp', 0.86),
            srcW: img.naturalWidth, srcH: img.naturalHeight };
-}, { src: fs.readFileSync(SRC).toString('base64'), W, H });
+}, { src: fs.readFileSync(SRC).toString('base64'), W, H, CROP_TOP, CROP_BOTTOM });
 
 const w = (u, f) => { fs.writeFileSync(f, Buffer.from(u.split(',')[1], 'base64'));
   console.log(f, (fs.statSync(f).size / 1024).toFixed(0) + ' KB'); };
