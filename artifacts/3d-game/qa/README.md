@@ -35,7 +35,8 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `lnperf.mjs` | Draw calls, triangles, geometries per world. |
 | `lnsound.mjs` | Does the score actually PLAY? Counts voices constructed per second — a score that compiles is not a score that makes a sound. |
 | `invert.mjs` | Lantern Night's three acts: net crowd movement toward/away from the void, bucketed by tension band. |
-| `keyart.mjs` + `poster.mjs` | **The splash art pipeline.** `keyart` finds the densest cluster of props in Maple Falls, drops the void there at full size in its `victory` mood and photographs it at DPR 4 — so every pixel of the subject is the shipping game. `poster` grades that frame, blooms the hero, feathers it to transparency and writes `splash_hero.webp` + `_sm`. Re-runnable: `node qa/keyart.mjs && node qa/poster.mjs`. |
+| `splash.mjs` | **The splash pipeline.** `node qa/splash.mjs <image>` downscales supplied key art to 1536x2752 and feathers every edge to transparency, then writes `splash_hero.webp` + `_sm`. The feather is mandatory, not decoration — see the trap below. |
+| `keyart.mjs` | Photographs the game's own money shot: finds the densest cluster of props in Maple Falls, drops the void there at full radius in its `victory` mood and shoots at DPR 4. Every pixel is the shipping game, which is the right property for **store screenshots** (Guideline 2.3.3). |
 | `menushot.mjs` | Writes `qa-out/menu.png` — the menu as it actually renders, which is the only honest way to judge splash art. |
 | `hero.mjs` | Is the hero CLEAR in the opening frame? Samples a disc over the void's silhouette from a reconstructed opening camera and reports what fraction is behind scenery. A single centre ray misses the case that actually looks wrong — scenery clipping the edge. |
 | `shot.mjs` | Writes `qa-out/<world>-spawn.png` so the opening can be looked at rather than argued about, plus what stands nearest the spawn. |
@@ -118,6 +119,16 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
 - **The hero's own rig is not an occluder.** The void carries a find-ring, a
   contact shadow and a glow disc, all centred on it and wider than the body.
   Counting them reported 94% of the hero "hidden" — behind itself.
+- **The menu's key art layer MUST have an alpha feather.** `index.html` draws it
+  as `#menu::after` over the menu's own radial gradient and asks for art that
+  "melt[s] into the cosmos with no hard photo edges"; the shipped asset is 66%
+  semi-transparent with all four corners at alpha 0. Export a fully opaque
+  rectangle and its left and right edges show as two vertical lines down the
+  menu. An edge vignette does not fix it — that darkens the *inside* of the
+  rectangle and reads worse. `qa/splash.mjs` does the fade.
+- **Judge splash art in the menu, not on its own.** `qa/menushot.mjs` renders the
+  real screen. Whether the hero clears the PLAY button and whether the rank chip
+  lands on sky or on rooftops are only visible there.
 - **Run the negative control.** A regression test that passes tells you nothing
   until you have watched it fail. Both of `rematch.mjs`'s were verified by
   reverting the fix and rebuilding: the ghost train reappeared at exactly
