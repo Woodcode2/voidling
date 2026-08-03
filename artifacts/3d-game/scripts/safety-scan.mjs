@@ -1,7 +1,15 @@
 // Static sweep: no player-facing string may contain the retired vocabulary.
 import { readFileSync } from 'fs';
+// EVERY file that can put words in front of a child. This listed six and missed
+// the two newest newsrooms — 1,486 lines of headlines for GAME DAY and LANTERN
+// NIGHT that no safety pass had ever read — plus the skin names and the IAP
+// copy. A scanner with a stale file list reports CLEAN about the files it was
+// told about, which is the most reassuring way to be wrong.
 const FILES = ['src/prototype3d.ts','src/proto3d/rivals.ts','src/proto3d/life.ts',
-  'src/proto3d/newsroom.ts','src/proto3d/newsroom_maple.ts','index.html'];
+  'src/proto3d/newsroom.ts','src/proto3d/newsroom_maple.ts',
+  'src/proto3d/newsroom_gameday.ts','src/proto3d/newsroom_lantern.ts',
+  'src/proto3d/palette.ts','src/proto3d/store3d.ts','src/proto3d/bubbles.ts',
+  'index.html'];
 const BAD = [
   ['alcohol', /\b(happy hour|tiki bar|rum|champagne|the good drink|adults pool|swim-up bar)\b/i],
   ['gambling', /\bhigh roller\b/i],
@@ -27,4 +35,10 @@ for (const f of FILES) {
     }
   });
 }
-console.log(bad === 0 ? '\nCLEAN — no retired vocabulary in any player-facing string.' : `\n${bad} REMAINING`);
+console.log(bad === 0
+  ? `\nCLEAN — no retired vocabulary in any player-facing string (${FILES.length} files).`
+  : `\n${bad} REMAINING`);
+// EXIT NON-ZERO ON A HIT. This only ever printed, so `npm run safety` succeeded
+// whatever it found — a gate that cannot fail is a report, and reports get
+// skimmed. Now it can sit in front of an archive.
+process.exit(bad === 0 ? 0 : 1);

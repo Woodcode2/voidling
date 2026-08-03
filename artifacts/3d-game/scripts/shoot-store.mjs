@@ -42,6 +42,27 @@ const OUT = path.join(ROOT, 'store');
   }
 }
 
+// ── the eight shots this run must produce ───────────────────────────────────
+const EXPECTED = ['01-menu.png', '02-worlds.png', '03-devouring.png',
+  '04-lantern-market.png', '05-lantern-bathhouse.png', '06-gameday.png',
+  '07-skins.png', '08-results.png'];
+
+// ── PURGE FIRST, SHOOT SECOND ───────────────────────────────────────────────
+// Every .png in store/ goes before the first capture: the retired 2D game's
+// images, and any earlier run's output that is about to be replaced anyway.
+// Deleting them at the END, which is what this used to do, meant a capture that
+// threw left the 2D shots on disk beside a handful of new ones — and a mixed
+// folder is indistinguishable from a finished one to whoever uploads it. That
+// is Guideline 2.3.3, which is what the previous submission was rejected for.
+// Losing a good previous set to a failed re-run costs one command. Shipping a
+// mixture costs a review cycle.
+{
+  fs.mkdirSync(OUT, { recursive: true });
+  const gone = fs.readdirSync(OUT).filter((f) => f.toLowerCase().endsWith('.png'));
+  for (const f of gone) fs.unlinkSync(path.join(OUT, f));
+  if (gone.length) console.log(`cleared ${gone.length} old screenshot(s) from store/ before shooting`);
+}
+
 // Playwright drives the capture. It is imported AFTER the asset check so the
 // useful error ("run vendor-assets first") wins over the boring one, and
 // dynamically so the message is a sentence rather than a stack trace.
@@ -298,22 +319,25 @@ await page.waitForFunction(() => document.getElementById('end')?.classList.conta
 await settle(2600);   // let the coin count-up and the rows finish sliding in
 await shot('08-results.png');
 
-// The retired 2D game's five images are still on disk under their old names
-// and there is exactly one way they end up in a submission: somebody uploads
-// the folder. They are not this app, and 2.3.3 is what the last submission was
-// rejected for — so the script that replaces them also removes them.
+// ── the folder must contain THIS run, or obviously nothing ──────────────────
+// The stale 2D images used to be removed here, at the end, after all eight
+// captures. Any capture that threw — a timeout, a renamed selector — exited the
+// script with the old 2D shots still on disk NEXT TO however many new ones had
+// been written, and there is exactly one way that folder ends up in a
+// submission: somebody uploads it. A mixed set is the 2.3.3 rejection all over
+// again, and it is the failure mode that looks most like success.
+//
+// They are deleted before the first capture now (see PURGE above), so a run
+// that dies half way leaves a short set, which is obvious, instead of a
+// plausible-looking mixture. This is the completeness check for the other half.
 {
-  const STALE = ['01-menu.png', '02-shop.png', '03-downtown.png', '04-zoo.png',
-    '05-results.png', '06-edge.png', '02-worlds.png', '03-devouring.png', '04-skins.png'];
-  const fresh = new Set(['01-menu.png', '02-worlds.png', '03-devouring.png',
-    '04-lantern-market.png', '05-lantern-bathhouse.png', '06-gameday.png',
-    '07-skins.png', '08-results.png']);
-  for (const f of STALE) {
-    if (fresh.has(f)) continue;                      // just written by this run
-    const p = path.join(OUT, f);
-    if (!fs.existsSync(p)) continue;
-    fs.unlinkSync(p);
-    console.log(`  removed stale ${f}  (2D game)`);
+  const missing = EXPECTED.filter((f) => !fs.existsSync(path.join(OUT, f)));
+  if (missing.length) {
+    console.error(`\nINCOMPLETE: ${missing.length} of ${EXPECTED.length} shots are missing:`);
+    for (const f of missing) console.error('  ' + f);
+    console.error('DO NOT UPLOAD store/. Fix the failure and re-run.');
+    await browser.close();
+    process.exit(1);
   }
 }
 

@@ -12,19 +12,29 @@ game; Capacitor wraps it in a native shell.
   (`favicon.png`, `apple-touch-icon.png`, `icon-192/512.png`, `manifest.json`).
 - **Launch screen** — cosmic splash (2732×2732) in
   `ios/App/App/Assets.xcassets/Splash.imageset/`.
-- **App Store screenshots** — `pnpm shoot:store` captures all five at
+- **App Store screenshots** — `pnpm shoot:store` captures **eight** at
   1290x2796 (the 6.7" slot, which also covers 6.5"): menu, world picker, a
-  match mid-devour, the shop framed on the legendary tier, and the results
-  screen. It seeds a wallet and a play history first so the shop photographs
-  the catalogue rather than an empty account, and it REFUSES to run until the
-  art is vendored — screenshots of grey boxes would misrepresent the app in the
-  other direction. Run it against `vite preview`, never the dev server, which
-  hot-reloads the page mid-capture.
+  match mid-devour, Lantern Night's market and bathhouse, Game Day, the shop
+  framed on the legendary tier, and the results screen. It seeds a wallet and a
+  play history first so the shop photographs the catalogue rather than an empty
+  account, and it REFUSES to run until the art is vendored — screenshots of grey
+  boxes would misrepresent the app in the other direction. Run it against
+  `vite preview`, never the dev server, which hot-reloads the page mid-capture.
+  It deletes every old `.png` in `store/` BEFORE the first capture and verifies
+  all eight exist afterwards, so a run that fails half way leaves an obviously
+  short set rather than a plausible mixture of old and new.
 - **The existing `store/01..06-*.png` MUST BE REPLACED.**
   They are of the RETIRED 2D game, which is no longer what the bundle runs.
   Submitting screenshots that do not match the app is Guideline 2.3.3, and it
-  is what got the previous attempt rejected. Same for `store/preview.mp4`.
-  Reshoot at iPhone 6.7" (1290×2796) from the 3D build before submitting.
+  is what got the previous attempt rejected. `shoot:store` now handles this
+  itself — it purges them before shooting.
+- **`store/preview.mp4` IS ALSO THE RETIRED 2D GAME, AND THERE IS NO TOOL TO
+  RESHOOT IT.** The transcode step below turns `preview-raw.webm` into the mp4,
+  but nothing produces that raw capture, so "reshoot it" is not an instruction
+  anyone can follow. An App Preview is **optional** in App Store Connect.
+  Until a real one exists: **do not upload the existing file** — submitting a
+  video of a different game is the same 2.3.3 finding as the screenshots.
+  Ship the eight screenshots alone, or record a fresh capture by hand first.
 - **Capacitor** — `capacitor.config.ts` (appId `com.voidling.game`), iOS
   platform generated in `ios/` (SwiftPM, no CocoaPods needed), portrait-only,
   status bar hidden, haptics + status-bar plugins installed.
@@ -236,10 +246,14 @@ In Xcode:
 - **Name**: VOIDLING
 - **Subtitle**: The cute world ender
 - **Keywords**: hole, io, black hole, eat, city, arcade, casual, devour, grow
-- **Description opener**: "Feed a tiny void until it swallows the whole city.
+- **Description opener**: "Feed a tiny void until it swallows the whole town.
   Outgrow your rivals, dodge the ones bigger than you, and end the world —
-  adorably." Then: 3-minute matches, five rival voids to outgrow, two worlds,
+  adorably." Then: 3-minute matches, three to five rival voids to outgrow,
+  **four worlds** — Maple Falls, Pirate Bay, Game Day and Lantern Night —
   six evolution forms, rare & legendary skins, trophies and ranks.
+  (This said "two worlds" and "five rival voids". There are four worlds, and
+  the cast is `3 + rand(0..2)`. Understating the app is not a 2.3.1 finding the
+  way overstating it is, but it sells three quarters of the content short.)
   Do NOT mention SOLO RUN, mutations or reminders — none of them are in this
   build. Store copy that describes absent features is Guideline 2.3.1.
 - **Category**: Games → Arcade (secondary: Casual)
