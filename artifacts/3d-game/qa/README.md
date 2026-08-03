@@ -35,6 +35,8 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `lnperf.mjs` | Draw calls, triangles, geometries per world. |
 | `lnsound.mjs` | Does the score actually PLAY? Counts voices constructed per second — a score that compiles is not a score that makes a sound. |
 | `invert.mjs` | Lantern Night's three acts: net crowd movement toward/away from the void, bucketed by tension band. |
+| `hero.mjs` | Is the hero CLEAR in the opening frame? Samples a disc over the void's silhouette from a reconstructed opening camera and reports what fraction is behind scenery. A single centre ray misses the case that actually looks wrong — scenery clipping the edge. |
+| `shot.mjs` | Writes `qa-out/<world>-spawn.png` so the opening can be looked at rather than argued about, plus what stands nearest the spawn. |
 | `rematch.mjs` | The two bugs that only exist on the **second** match or **after a pause**: a retired mover resurrected at the world origin by `resetMatch`, and the rival schedule drifting because it ran off wall time instead of the match clock. Both were invisible to a one-match playtest. |
 | `smoke.mjs` | Does a build boot, load its assets, grow, eat and make a sound? `node qa/smoke.mjs [world] [port]`. Separates **expected** CDN-blocked `/assets/hf*` failures from real same-origin ones and fails only on the second kind — run it against two ports to compare builds. |
 | `fresh.mjs` | Does the crowd's per-pool recency guard actually work? Drives the **shipped** `__pickFresh` 100k times per pool size and reports immediate repeats, repeats inside the guard's own ring, closest recurrence, and distribution skew — the last so a guard that bought freshness by developing favourites cannot pass. |
@@ -105,6 +107,15 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
   on `eaten` gives ~3 and `__matchState().ate.you` gives ~1 — `ate` is the
   devoured PERCENTAGE, and eaten props do not linger in the array wearing a flag.
   Count the drop in the live edible count, as `pace.mjs` does (~130 in 25s).
+- **Measure the spawn against `__spawn()`, not `__voidState()`.** The void drifts
+  toward whatever it is eating, so a few seconds in it is a couple of units off
+  its mark — the same build read 8.2% and 51% occluded on two runs. The authored
+  spawn is fixed forever; that is the thing with a right answer. `hero.mjs` also
+  reconstructs the opening camera (`spawn + camOffset * 50`) rather than reading
+  the live one, which has followed the void.
+- **The hero's own rig is not an occluder.** The void carries a find-ring, a
+  contact shadow and a glow disc, all centred on it and wider than the body.
+  Counting them reported 94% of the hero "hidden" — behind itself.
 - **Run the negative control.** A regression test that passes tells you nothing
   until you have watched it fail. Both of `rematch.mjs`'s were verified by
   reverting the fix and rebuilding: the ghost train reappeared at exactly

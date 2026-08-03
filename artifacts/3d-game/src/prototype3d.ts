@@ -521,6 +521,7 @@ const _dbg = window as unknown as {
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
   __pickFresh: <T>(arr: T[]) => T;
+  __spawn: () => { x: number; z: number };
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
   __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number; tense: number;
@@ -549,6 +550,10 @@ _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m 
 // baseline), so qa/fresh.mjs drives THIS — the shipped function, not a copy —
 // a hundred thousand times and settles it on the statistics instead.
 _dbg.__pickFresh = pickFresh;
+// QA: the AUTHORED spawn, which is not the same as where the void is a few
+// seconds in — it drifts toward whatever it is eating. Spawn-framing checks
+// have to test against this, not against __voidState().
+_dbg.__spawn = () => ({ x: island.spawn.x, z: island.spawn.z });
 // QA: force the hero to a size so the renderer can be shot at every form
 // without playing a whole match. Sets the visual stage too, so the void looks
 // exactly as it would if a player had grown into it.
@@ -2694,7 +2699,60 @@ function validateWorld() {
     scene.remove(e.mesh);
     edibles.splice(cull[k], 1);
   }
-  if ((moved || cull.length) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired`);
+  // ── AND NOTHING MAY STAND IN FRONT OF THE HERO AT SPAWN ───────────────────
+  // The opening is hand-authored and identical every load, so whatever sits in
+  // the first frame sits there forever, for every player, in the screenshot the
+  // store gets. Maple Falls opened with a 2.6-radius tree across the lower right
+  // of the void — 8.2% of the hero's silhouette, measured — and a child's first
+  // sight of the character they are about to be was partly behind a shrub.
+  //
+  // A single ray at the void's centre does NOT find this: scenery that clips the
+  // edge leaves the centre completely clear. The rule is geometric instead.
+  //
+  // The camera sits at spawn + camOffset * camDist, so the ground direction from
+  // the hero TOWARD the lens is (camOffset.x, camOffset.z) normalised — with the
+  // authored (0.62, 0.92, 0.62) that is (0.707, 0.707), i.e. x and z increase
+  // together. A prop at horizontal distance t along that direction rises into
+  // the sight line if its top is above t * (camY / camHoriz). Anything inside
+  // that wedge, and within its own half-width of the line, is in the way.
+  //
+  // Offenders are pushed sideways out of the corridor rather than retired: this
+  // is authored scenery and a town with a hole in it is a worse opening than a
+  // tree two metres to the left.
+  let cleared = 0;
+  if (!_validated && island.spawn) {
+    const sx = island.spawn.x, sz = island.spawn.z;
+    const camH = Math.hypot(camOffset.x, camOffset.z) * 50;   // camDist at spawn
+    const camY = camOffset.y * 50;
+    const dx = camOffset.x / Math.hypot(camOffset.x, camOffset.z);
+    const dz = camOffset.z / Math.hypot(camOffset.x, camOffset.z);
+    const slope = camY / camH;
+    for (const e of edibles) {
+      const ox = e.mesh.position.x - sx, oz = e.mesh.position.z - sz;
+      const t = ox * dx + oz * dz;                   // along the sight line
+      if (t <= 0 || t > camH) continue;              // behind the hero, or past the lens
+      const lat = Math.abs(ox * dz - oz * dx);       // perpendicular offset
+      const half = e.radius;
+      if (lat > half + START_R * 1.6) continue;      // clear of the corridor
+      // does it actually rise into the line of sight at its own distance?
+      const box = new THREE.Box3().setFromObject(e.mesh);
+      const top = box.max.y - box.min.y;
+      if (top < t * slope * 0.55) continue;          // too short to matter
+      // push it perpendicular, to whichever side is nearer, and keep it legal
+      const need = half + START_R * 1.6 + 0.6;
+      const side = (ox * dz - oz * dx) >= 0 ? 1 : -1;
+      for (const s of [side, -side]) {
+        const nx = e.mesh.position.x + dz * s * (need - lat);
+        const nz = e.mesh.position.z - dx * s * (need - lat);
+        if (insideIsland3(nx, nz) && !inDeepWater3(nx, nz, 1)) {
+          e.home.x = nx; e.home.z = nz;
+          e.mesh.position.x = nx; e.mesh.position.z = nz;
+          cleared++; break;
+        }
+      }
+    }
+  }
+  if ((moved || cull.length || cleared) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired, ${cleared} cleared from the spawn shot`);
   _validated = true;
 }
 

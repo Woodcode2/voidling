@@ -164,18 +164,48 @@ function roofKit(p: G[], w: number, d: number, y: number, dense = 1): void {
 // who are STANDING somewhere for a reason — the four-strong parking-meter
 // protest, the two men arguing outside the diner, the pie judges. Static, one
 // mesh each, and they put a face in every district life.ts can't reach.
+// ── THE STATIC TOWNSFOLK, AT THE WALKING CROWD'S FIDELITY ───────────────────
+// These stand in the districts life.ts never walks — the fair judges, the
+// farmhands, the drive-in crowd — and about eighty of them are on screen in the
+// world a child sees FIRST. They were five hard boxes and an 8x6 sphere head.
+//
+// That is the identical defect life.ts already fixed for the walking crowd, in
+// a second copy nobody swept: its comment names "head SphereGeometry(r, 8, 6)
+// — an octagon in silhouette" as the thing that made people read as blocky, and
+// raised its own primitives. This file kept the octagon. Worse, it renders
+// through PROP_SHARED_MAT, which is flatShading:true — right for architecture,
+// where a crisply-facetted building is the house style, and wrong for a face.
+//
+// So the two populations stood next to each other at different resolutions, and
+// the low one is the one beside the spawn. An earlier pass noticed they were
+// side by side and fixed their SCALE (the S below) without touching their
+// geometry, which is why the mismatch survived as a purely visual complaint.
+//
+// Rounded boxes for the body — soft-edged cloth rather than crates — a 16x11
+// head to match life.ts's, and smooth shading via PROP_SMOOTH_MAT at the two
+// call sites that return a person on their own. Boxes are unaffected by the
+// material swap (a box already has per-face normals); it is the head and the
+// hat brim that stop being faceted.
+//
+// Cost is triangles, not draw calls: still one merged mesh each, ~156 -> ~600
+// triangles, on the order of 40k extra across the whole town.
+//
+// DETERMINISM: exactly two seeded draws, mpick(SKIN) then mpick(DENIM), in that
+// order — unchanged. Adding or removing one would shift every subsequent
+// authored placement in Maple Falls.
 function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?: number): void {
   const skin = mpick(SKIN), leg = mpick(DENIM);
   // S brings the static townsfolk up to the 3.5-unit walking crowd. They were
   // built at 2.41 and read as children standing next to every adult in life.ts.
   const S = 1.41;
-  out.push(part(box(0.34 * S, 0.85 * S, 0.34 * S), leg, x - 0.17 * S, 0.42 * S, z, 0, ry, 0));
-  out.push(part(box(0.34 * S, 0.85 * S, 0.34 * S), leg, x + 0.17 * S, 0.42 * S, z, 0, ry, 0));
-  out.push(part(box(0.9 * S, 0.95 * S, 0.55 * S), shirt, x, 1.32 * S, z, 0, ry, 0));
-  out.push(part(box(0.22 * S, 0.8 * S, 0.22 * S), shirt, x - 0.54 * S, 1.3 * S, z, 0, ry, 0));
-  out.push(part(box(0.22 * S, 0.8 * S, 0.22 * S), shirt, x + 0.54 * S, 1.3 * S, z, 0, ry, 0));
-  out.push(part(sph(0.36 * S, 8, 6), skin, x, 2.05 * S, z));
-  if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 8), hat, x, 2.36 * S, z));
+  const rb = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, r, 2);
+  out.push(part(rb(0.34 * S, 0.85 * S, 0.34 * S, 0.11 * S), leg, x - 0.17 * S, 0.42 * S, z, 0, ry, 0));
+  out.push(part(rb(0.34 * S, 0.85 * S, 0.34 * S, 0.11 * S), leg, x + 0.17 * S, 0.42 * S, z, 0, ry, 0));
+  out.push(part(rb(0.9 * S, 0.95 * S, 0.55 * S, 0.17 * S), shirt, x, 1.32 * S, z, 0, ry, 0));
+  out.push(part(rb(0.22 * S, 0.8 * S, 0.22 * S, 0.09 * S), shirt, x - 0.54 * S, 1.3 * S, z, 0, ry, 0));
+  out.push(part(rb(0.22 * S, 0.8 * S, 0.22 * S, 0.09 * S), shirt, x + 0.54 * S, 1.3 * S, z, 0, ry, 0));
+  out.push(part(sph(0.36 * S, 16, 11), skin, x, 2.05 * S, z));
+  if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 14), hat, x, 2.36 * S, z));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -511,7 +541,7 @@ export function makeProtester(side: number): THREE.Mesh {
   p.push(part(box(1.5, 1.05, 0.1), side ? BLUE : RED, 0.9, 3.2, 0.2, 0, 0, -0.22));
   p.push(part(box(1.1, 0.22, 0.14), WHITE, 0.92, 3.35, 0.24, 0, 0, -0.22));
   p.push(part(box(0.7, 0.16, 0.14), WHITE, 0.85, 3.02, 0.24, 0, 0, -0.22));
-  return M(p);
+  return mergedProp(p, PROP_SMOOTH_MAT);   // a face is not architecture
 }
 
 /** A CITIZEN, standing about. Used to give districts life.ts never visits a
@@ -519,7 +549,7 @@ export function makeProtester(side: number): THREE.Mesh {
 export function makeTownsfolk(hat = false): THREE.Mesh {
   const p: G[] = [];
   personParts(p, 0, 0, mpick(SHIRTS), mr(0, Math.PI * 2), hat ? mpick([0xd8b878, 0x5b6070, RED, BLUE]) : undefined);
-  return M(p);
+  return mergedProp(p, PROP_SMOOTH_MAT);   // a face is not architecture
 }
 
 /** THE TOWN NOTICEBOARD — every flyer in Maple Falls, layered six deep. */
