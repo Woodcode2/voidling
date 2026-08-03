@@ -1,8 +1,17 @@
 name: fetch-assets
-# Utility: download externally generated art (e.g. AI icon candidates) into the
-# repo, since the dev container's egress proxy blocks the asset CDN.
-# Usage: push a .github/asset-manifest.txt whose first line is the repo-relative
-# dest dir and remaining lines are URLs (one per line).
+# Download externally hosted assets into the repo, because the dev container's
+# egress proxy blocks external hosts and a session cannot fetch them.
+#
+# Usage: push a .github/asset-manifest.txt whose FIRST line is the repo-relative
+# destination directory. Every line after that is one asset, in either form:
+#
+#   https://host/path/file.mp3                     -> dest/candidate-N.mp3
+#   maple  https://host/path.mp3  Pixabay Licence  -> dest/maple.mp3 + CREDITS.txt
+#
+# The second form is whitespace-separated: NAME, URL, then the licence as free
+# text to the end of the line. Use it for anything that ships — it lands the
+# file under its final name and records where it came from and under what terms,
+# which is the record that answers a rights query later.
 on:
   push:
     # never on main — merging a manifest change to main must not re-run the
@@ -23,30 +32,54 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
       - name: Download assets
+        # A 404 used to leave the loop running and the job green, so the manifest
+        # looked applied and no file existed. Every failure is fatal now.
         run: |
+          set -euo pipefail
           dest=$(head -n1 .github/asset-manifest.txt)
           mkdir -p "$dest"
           i=0
-          tail -n +2 .github/asset-manifest.txt | while read -r u; do
-            [ -z "$u" ] && continue
-            case "$u" in \#*) continue ;; esac
+          while IFS= read -r line || [ -n "$line" ]; do
+            [ -z "$line" ] && continue
+            case "$line" in \#*) continue ;; esac
+            case "$line" in
+              http*)   name=""; url="$line"; lic="" ;;
+              *)       name=$(printf '%s' "$line" | awk '{print $1}')
+                       url=$(printf  '%s' "$line" | awk '{print $2}')
+                       lic=$(printf  '%s' "$line" | awk '{$1="";$2="";sub(/^ +/,"");print}') ;;
+            esac
+            [ -z "$url" ] && { echo "::error::no URL in: $line"; exit 1; }
             i=$((i+1))
-            ext="${u##*.}"; ext="${ext%%\?*}"
-            curl -fsSL "$u" -o "$dest/candidate-$i.$ext"
-          done
-          # m4a/AAC doesn't decode in open-source Chromium builds — transcode to
-          # universally-supported MP3 and drop the original.
-          for f in "$dest"/candidate-*.m4a; do
-            [ -e "$f" ] || continue
-            ffmpeg -y -loglevel error -i "$f" -codec:a libmp3lame -b:a 160k "${f%.m4a}.mp3"
-            rm "$f"
-          done
+            ext="${url##*.}"; ext="${ext%%\?*}"
+            case "$ext" in mp3|m4a|ogg|wav|png|jpg|jpeg|webp|svg|glb) ;; *) ext=bin ;; esac
+            [ -z "$name" ] && name="candidate-$i"
+            echo "→ $name.$ext"
+            curl -fsSL --retry 3 --retry-delay 2 "$url" -o "$dest/$name.$ext"
+            [ -s "$dest/$name.$ext" ] || { echo "::error::empty: $url"; exit 1; }
+            # open-source Chromium cannot decode AAC, so m4a never survives
+            if [ "$ext" = "m4a" ]; then
+              ffmpeg -y -loglevel error -i "$dest/$name.m4a" -codec:a libmp3lame -b:a 160k "$dest/$name.mp3"
+              rm "$dest/$name.m4a"; ext=mp3
+            fi
+            # a file that downloaded fine and does not decode is the failure mode
+            # that reaches a player as silence, so prove it decodes here
+            case "$ext" in
+              mp3|ogg|wav)
+                dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$dest/$name.$ext")
+                echo "   ${dur}s"
+                awk -v d="$dur" 'BEGIN{exit !(d>3)}' || { echo "::error::$name is ${dur}s"; exit 1; }
+                [ -n "$lic" ] && printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
+                ;;
+            esac
+          done < <(tail -n +2 .github/asset-manifest.txt)
+          echo "── $dest"
           ls -la "$dest"
       - name: Commit
         run: |
+          set -euo pipefail
           dest=$(head -n1 .github/asset-manifest.txt)
           git config user.name "voidling-assets-bot"
           git config user.email "actions@github.com"
           git add "$dest"
-          git commit -m "assets: fetch icon candidates" || echo "nothing to commit"
+          git commit -m "assets: fetch from manifest into $dest" || echo "nothing to commit"
           git push
