@@ -35,9 +35,11 @@
 //  reason — the ticker is diegetic and the leaderboard is not.
 //
 //  TEMPLATES. {M} is the last thing eaten, {D} the district the player is
-//  standing in, {P} the percent devoured, {F} the player's form, {S} seconds
-//  left. Every one is real live state, so the market is narrating the child's
-//  own run back to them.
+//  standing in, {P} the percent devoured, {R} the percent still standing,
+//  {F} the player's form, {S} seconds left. Every one is real live state, so
+//  the market is narrating the child's own run back to them. This world has no
+//  LIVE pool and no per-meal pools, so the token lines at the foot of each
+//  T*_GENERAL are the ONLY route live state has to the ticker here — keep them.
 // ══════════════════════════════════════════════════════════════════════════
 
 export type NewsTier = 0 | 1 | 2;
@@ -74,32 +76,63 @@ export const LANTERN_BRAND: [string, string, string] = [
 // The first thing anybody hears, guaranteed. It has to establish the whole
 // premise in one line: this place is open, it is pleased to see you, and it
 // has absolutely no idea.
-const SIGN_ON = [
-  'Welcome to the night market. The market opens one night a year, and tonight is the night.',
-  'Good evening, honoured guest, and welcome. Please enjoy the market at your own pace.',
-  'The lanterns are lit and the market is open. We are so pleased you could come.',
+const SIGN_ON: string[] = [
+  'Good evening, night market! Nine hundred lanterns, one upside down.',
+  'Good evening, night market! "Best dumplings on the row," says Ponta.',
+  'Good evening, night market! Lost property so far: one sandal, one hat.',
+  'Good evening, night market! Kasa the umbrella is up. It is not raining.',
+  'Good evening, night market! How many gates are there? Twelve, as always.',
+  'Good evening, night market! Yuki sold out of fox masks before opening time.',
+  'Good evening, night market! The stall called Eleven Bowls has eleven bowls.',
+  'Good evening, night market! Madam Yuzu scrubbed the bathhouse stair twice.',
+  'Good evening, night market! Tea is on. The boats are out. The moon is up.',
+  'Good evening, night market! The teahouse has forty cups and one favourite.',
+  'Good evening, night market! Six hundred years open. No trouble yet.',
+  'Good evening, night market! Ponta ate nine of his own dumplings. Nine.',
+  'Good evening, night market! The koi are asleep. They have had a long year.',
 ];
 
 // ── TIER 0 · THE PA ────────────────────────────────────────────────────────
 // Pure courtesy. Not one line here acknowledges that anything is wrong,
 // because the system that speaks them has no way to.
 const T0_GENERAL = [
-  'Guests are reminded that the market closes at first light.',
-  'Please enjoy the market. Please enjoy the market.',
-  'A guest has been seated. We hope you are comfortable.',
-  'The market thanks you for visiting and hopes you will visit again.',
-  'Lost property may be collected at the gate. We have found a great deal of it.',
-  'Please do not run on the stones. They are old and so are we.',
-  'The market would like to thank the guest in the purple for their custom.',
-  'This evening the market is fully staffed and delighted about it.',
-  'Guests with large appetites are especially welcome.',
-  'The stalls will restock as required. They always have.',
-  'Please mind your step. Please mind everyone else’s step also.',
-  'The market has been open for six hundred years without incident.',
-  'Somebody has eaten {M}. The market is happy to hear it.',
+  'The market is open and Ponta has already sold nine hundred dumplings.',
+  'A round purple guest has arrived at the gate. Everybody is delighted.',
+  '"Welcome, honoured guest," says Yuki, bowing low to a hole in the road.',
+  'Ponta has given the purple guest one free dumpling, then eleven more.',
+  'The dark patch by stall six is a new pond, says the man with the mop.',
+  'Kasa says the purple guest moved. Kasa says a great many things.',
+  'Eleven Bowls is down to nine bowls and will not discuss the matter.',
+  'Lost property tonight: two sandals, one paper fan and one small boat.',
+  'Tea has been poured for the purple guest. That is the eleventh pot.',
+  'Correction: the thing by stall four is a guest, not a puddle.',
+  'Madam Yuzu is making up a room at the bathhouse for the round guest.',
+  'Has anybody seen the little lantern from the moon bridge?',
+  'The koi are asleep, and the night garden asks that they stay asleep.',
+  'Everything is free to guests tonight. It says so on the gate.',
+  'Ponta drummed his belly for the guest. The guest did not clap.',
+  'Update. The purple guest has now visited every stall on Lantern Row.',
+  'Yuki has offered the guest a fox mask. It does not appear to fit.',
+  'Two boats have drifted off down the canal with nobody aboard.',
+  'The offering box has gone from the shrine. It will turn up somewhere.',
+  'Bowls. The stack is down to six and nobody is counting out loud.',
+  'The purple guest has been offered a towel, a room and a small cake.',
+  'The stone stair has one step fewer than it had this morning.',
+  'Ponta\'s stall has a queue of one, and the one is extremely large.',
+  'Madam Yuzu says the guest may stay as long as the guest likes.',
+  'Nothing is wrong with the moon bridge. It has always been that short.',
+  'Kasa hopped the whole length of the row. Nobody hops like Kasa.',
+  'Please mind the step by stall nine, where the step used to be.',
+  '"Have another one, honoured guest," says Ponta, for the ninetieth time.',
+  // ── live state, in the PA's voice. See the note above TOKENS. ──
+  'The guest has enjoyed {M}, and the market is delighted.',
   'A guest is enjoying {D}. Wonderful. Wonderful.',
-  'Tonight’s guest is a {F}. All shapes are welcome here.',
-  'A reminder that everything is free to guests. Everything.',
+  'Tonight the market welcomes a {F}, and all shapes are welcome.',
+  'Has the guest tried {M} yet? The guest has, twice.',
+  'Compliments of the market: {M}. And everything else too.',
+  '{P} percent of the market has been enjoyed by our guest so far.',
+  'Ponta reports that the guest liked {M} very much indeed.',
+  'Our guest is in {D} and having, we think, a lovely time.',
 ];
 const T0_BY_DIST: Record<LnDist, string[]> = {
   torii: ['Please count the gates on your way in. It is traditional.',
@@ -137,23 +170,43 @@ const T0_BY_DIST: Record<LnDist, string[]> = {
 // window — everything it knows, it knows from a number that will not stop
 // going up. The comedy is administrative.
 const T1_GENERAL = [
-  'Management has been informed. Management is reviewing the figures.',
-  'The guest in the purple has now had eleven of everything.',
-  'A note from the office: the guest’s account is the largest ever opened.',
-  'We are reviewing our policy on complimentary items.',
+  'Management has counted the stalls twice and would like to count again.',
+  'The guest\'s bill is now four pages long. The guest has no pockets.',
+  'This is not an evacuation. This is a lantern walk, says Management!',
+  'Eleven Bowls is down to four bowls and has changed his name to Four.',
+  'Guests counted twelve gates on the way in and nine on the way out.',
+  '"Everything is fine," says Management, closing a very large ledger.',
+  'Kasa was right about the purple guest. Nobody is saying that out loud.',
+  'The canal is lower than it was and Ponta is standing on dry stones.',
+  'Please walk up the stone stair briskly and enjoy the lovely views.',
+  'Yuki is leading everybody up the steps with one small paper lantern.',
+  'Madam Yuzu has cancelled the guest\'s room. The guest has taken the lobby.',
+  'Missing since ten: one offering box, one bridge lantern, two boats.',
+  'The teahouse has run out of cups and is now running out of terrace.',
+  'Ponta has stopped saying the first one is free. Ponta looks thoughtful.',
+  'Is the guest larger than the bathhouse? Management would like a number.',
+  'The drum has been struck twice and nobody up the tower is admitting it.',
+  'Stall nine has been relocated to the void. Its owner is fine and cross.',
+  'Three hundred years of moss has gone from the night garden.',
+  'The koi are fine. They went up the stream at the very first wobble.',
+  'Update. Lantern Row is now half a row, says a cheerful stallholder.',
+  'Kasa is hopping up the stair and telling everybody else to hop.',
+  'The shrine attendant is ringing the bell and will not be talked out of it.',
+  'Management would like a word with whoever welcomed the guest in.',
+  'Yuki says her mask is still smiling. Yuki is not smiling.',
+  'The bathhouse is a floor shorter. Madam Yuzu is not amused.',
+  'Everything is free to guests. Management deeply regrets writing that.',
+  'The queue for the moon bridge is going the other way now.',
+  'A second purple guest has been reported. We are calling that a rumour.',
+  // ── live state, read off the ledger ──
   'The guest has eaten {M}. That was on the inventory.',
-  'Stock levels in {D} are described by the stallholders as "gone".',
+  'Stock in {D} is described by the stallholders as gone.',
   'Approximately {P} percent of the market is now unaccounted for.',
-  'The market has never closed early. We are discussing whether it could.',
-  'A ledger has been opened. A second ledger has been opened.',
-  'Management would like a word with whoever let the guest in.',
-  'The guest is now a {F}. The paperwork does not have a box for that.',
-  'We remind guests that "everything is free" was intended warmly.',
-  'Nobody is panicking. Several people are walking quickly.',
-  'The stallholders have asked what the plan is. There is no plan yet.',
-  'A second void has been reported. We are treating that as a rumour.',
-  'The bell has been rung. Nobody is sure who rang it.',
-  'Somebody has counted the gates on the way out and got a different number.',
+  'The guest is now a {F}, and the paperwork has no box for that.',
+  'Added to the bill: {M}. Management has stopped reading it.',
+  'Is {D} still there or is that another blank in the ledger?',
+  'Management notes that {R} percent of the market remains.',
+  'Ponta says the guest ate {M} and looked round for more.',
 ];
 const T1_BY_DIST: Record<LnDist, string[]> = {
   torii: ['One of the gates is missing. We are counting them again.',
@@ -182,22 +235,43 @@ const T1_BY_DIST: Record<LnDist, string[]> = {
 // Somebody has taken the microphone. The courtesy formulas are still running
 // underneath, which is the joke: a recording does not stop for an emergency.
 const T2_GENERAL = [
-  'EVERYBODY OUT. Up the valley. Do not stop for your things.',
-  'This is not the recording. This is a person. Please listen.',
-  'The market is closing. The market has never closed.',
+  'The market has GONE!! Tea is served until the lanterns go out.',
+  'Lantern Row has gone. The dumplings are safe. Ponta carried them all.',
+  'Ponta is up the drum tower, drumming, and waving people up the stair.',
+  'Weather tonight: clear, mild, and no market whatsoever.',
+  'Eleven Bowls is one bowl now, and that bowl is holding up remarkably well.',
+  'The great gate has gone!! Nobody counted it on the way out.',
+  '"Up the stair, everybody," says Yuki, holding her small lantern high.',
+  'The canal has no water in it and the boats are sitting on stones.',
+  'Kasa told us at seven o\'clock. Nobody ever listens to the umbrella.',
+  'Tonight\'s sport: the stone stair. Everybody is going up it very fast.',
+  'Missing: the moon bridge, both ends of it, and the moon in the water.',
+  'Management has left the ledger on a rock and run up the valley.',
+  'The guest was honoured. The guest was welcomed. The guest ate the gate.',
+  'Ponta is drumming, Kasa is hopping, and Yuki is counting us all out.',
+  'The teahouse terrace has gone. The teapot is still on the tray.',
+  'Take the bamboo path. Ponta will keep that drum going for you.',
+  'The hot spring is dry!! Six hundred years, and it is a bowl of stones.',
+  'Yuki has counted every spirit onto the path twice, and we are all here.',
+  'Correction: the market closes at first light. The market closed at nine.',
+  'A stallholder is running uphill carrying an entire noodle pot.',
+  'Lost property is now a rock by the bamboo path. Please enquire there.',
+  'Free to guests tonight: the stalls, the stair and the whole bathhouse.',
+  'Madam Yuzu has locked the bathhouse door. There is no bathhouse behind it.',
+  'The drum is still going!! If you can hear it, walk toward the sound.',
+  'Everybody up the stone stair. UP. Do not stop at the shrine.',
+  'And now the weather. Clear all night, with one lantern left over.',
+  'The shrine attendant is still ringing that bell from the top step.',
+  'Ponta gave the last dumplings away on the stair. All of them.',
+  // ── live state, from the drum tower ──
   '{P} percent of the market is gone. Please move.',
   'It has eaten {M}. It is still hungry. GO.',
   '{D} is gone. Do not go back for anything.',
   'The guest is a {F} now. There is no larger word for it.',
-  'Get to the bamboo. Get UP the valley. Now.',
-  'The drum is being struck. If you can hear it, run toward the sound.',
-  'The gate is that way. The gate is the only way.',
   '{S} seconds. That is the honest number. Use them.',
-  '…and the market thanks you for visiting. SORRY. That was the recording.',
-  'Please enjoy the market — no. NO. Somebody switch that off.',
-  'A second one has been seen. We were wrong to call it a rumour.',
-  'We welcomed it. We WELCOMED it. Please go.',
-  'Six hundred years. Six hundred years. Move.',
+  'It took {M} and did not slow down, so up the stair.',
+  'Only {R} percent left!! Everybody up the valley now.',
+  '{S} seconds, and the drum is still going, so walk toward it.',
 ];
 const T2_BY_DIST: Record<LnDist, string[]> = {
   torii: ['The gate is going. GET THROUGH THE GATE.',
@@ -222,36 +296,73 @@ const T2_BY_DIST: Record<LnDist, string[]> = {
     'You are nearly out. Keep going.'],
 };
 
+// ── THE LAST WORDS ─────────────────────────────────────────────────────────
+// The market had no ending. It escalated to the drum tower and then simply
+// kept shouting until the match ran out, which is the one beat the other three
+// worlds all have and this one did not: somebody, safe, up the valley, saying
+// goodnight. The PA is still running underneath — it does not stop for an
+// emergency, and it does not stop for a goodnight either.
+const SIGN_OFF: string[] = [
+  'Goodnight from the night market, wherever the night market has gone.',
+  'Ponta has stopped drumming, because everybody is up the valley and safe.',
+  'The lanterns are out, the koi are fine, and every sandal is accounted for.',
+  'Kasa put his umbrella up over the whole crowd, and we all fitted under.',
+  'Tomorrow: clear skies, a warm wind, and no market at all. Sleep well.',
+  'The market opens one night a year, and the lanterns keep well.',
+  'Eleven Bowls is carrying his last bowl home, and singing about it.',
+  'Goodnight, honoured guest. You were welcome, and you knew it.',
+  'Six hundred years, one hungry guest, and everybody home. Goodnight!',
+  'The recording is still saying please enjoy the market. Let it finish.',
+];
+
 // ── the pools, per tier ────────────────────────────────────────────────────
 const GENERAL: [string[], string[], string[]] = [T0_GENERAL, T1_GENERAL, T2_GENERAL];
 const BY_DIST: [Record<LnDist, string[]>, Record<LnDist, string[]>, Record<LnDist, string[]>] =
   [T0_BY_DIST, T1_BY_DIST, T2_BY_DIST];
 
 let signedOn = false;
+let signedOff = false;   // the tower has said goodnight; it does not come back
 let recent: string[] = [];
 
 export function resetLanternNews(): void {
   signedOn = false;
+  signedOff = false;
   recent = [];
 }
 
 /** How many distinct lines this world can say, for the census the other
  *  newsrooms report. Counted rather than asserted. */
 export function lanternNewsCount(): number {
-  let n = SIGN_ON.length;
+  let n = SIGN_ON.length + SIGN_OFF.length;
   for (const g of GENERAL) n += g.length;
   for (const d of BY_DIST) for (const k of Object.keys(d)) n += d[k as LnDist].length;
   return n;
 }
 
+/** the ticker is one line on a phone. nothing here gets to be a paragraph. */
+const TICKER_MAX = 78;
+const clip = (s: string, n: number): string => {
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > n * 0.5 ? cut.slice(0, sp) : cut).trim();
+};
+
 function fill(t: string, c: LanternCtx): string {
+  const pct = Math.max(1, Math.min(99, Math.round(c.devouredPct)));
   return t
-    .replace(/\{M\}/g, c.lastMeal || 'something')
+    .replace(/\{M\}/g, clip(c.lastMeal || 'something', 22))
     .replace(/\{D\}/g, DIST_NAME[c.district ?? 'stalls'])
-    .replace(/\{P\}/g, String(Math.max(1, Math.min(99, Math.round(c.devouredPct)))))
-    .replace(/\{F\}/g, c.form || 'guest')
+    .replace(/\{P\}/g, String(pct))
+    .replace(/\{R\}/g, String(100 - pct))
+    .replace(/\{F\}/g, clip(c.form || 'guest', 14))
     .replace(/\{S\}/g, String(Math.max(1, Math.ceil(c.secondsLeft))));
 }
+
+/** A countdown line with two and a half minutes left is a weather report, not
+ *  an evacuation. The other three newsrooms all gate {S}; this one did not. */
+const usable = (t: string, c: LanternCtx): boolean =>
+  !(t.includes('{S}') && c.secondsLeft > 70);
 
 const DIST_NAME: Record<LnDist, string> = {
   torii: 'the great gate', stalls: 'Lantern Row', canal: 'the canal',
@@ -267,18 +378,27 @@ const DIST_NAME: Record<LnDist, string> = {
 export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random): string {
   if (!signedOn) {
     signedOn = true;
-    return SIGN_ON[Math.floor(rnd() * SIGN_ON.length)];
+    return clip(SIGN_ON[Math.floor(rnd() * SIGN_ON.length)], TICKER_MAX);
   }
   const tier = Math.max(0, Math.min(2, ctx.tier)) as NewsTier;
+  // ONCE, AND LAST. tier 2 can start as early as 18% devoured, far too soon for
+  // "goodnight" — so the goodnight waits for the match to be genuinely over the
+  // hill, and taking it closes the tower for the match. Same gate the Bugle
+  // uses, for the same reason: a sign-off that fires twice is not an ending.
+  if (tier === 2 && !signedOff && ctx.secondsLeft <= 26 && rnd() < 0.45) {
+    signedOff = true;
+    return clip(SIGN_OFF[Math.floor(rnd() * SIGN_OFF.length)], TICKER_MAX);
+  }
   const dist = ctx.district && BY_DIST[tier][ctx.district] ? ctx.district : null;
   const local = dist ? BY_DIST[tier][dist] : [];
   // 55% local when there is a local pool — enough that the street is usually
   // the subject, not so much that the general voice never gets a turn
-  const pool = local.length && rnd() < 0.55 ? local : GENERAL[tier];
+  const wide = GENERAL[tier].filter((h) => usable(h, ctx));
+  const pool = local.length && rnd() < 0.55 ? local : wide;
   const fresh = pool.filter((h) => !recent.includes(h));
-  const src = fresh.length ? fresh : pool;
+  const src = fresh.length ? fresh : (pool.length ? pool : wide);
   const line = src[Math.floor(rnd() * src.length)];
   recent.push(line);
   if (recent.length > 6) recent.shift();
-  return fill(line, ctx);
+  return clip(fill(line, ctx), TICKER_MAX);
 }

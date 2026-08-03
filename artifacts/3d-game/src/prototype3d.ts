@@ -1649,11 +1649,12 @@ function showNews() {
     });
     brand = PB_BRAND[tier];
   } else {
-    // MAPLE FALLS runs its own newsroom too: 449 headlines across nine
-    // districts plus 242 spoken lines, built around a mayoral election nobody
-    // asked for. Mayor Dinkle is denying the void exists, his challenger's
-    // entire platform is that it's Dinkle's fault, and Marge has been
-    // protesting the same parking meter for nine years.
+    // MAPLE FALLS runs its own newsroom too: the Bugle, circulation 40, across
+    // nine districts plus 242 spoken lines. Mayor Dinkle is denying the void
+    // exists and Marge has been protesting the same parking meter for nine
+    // years. NO ELECTION — the newsroom file is rated 4+ and bars real politics
+    // outright, so Dinkle is funny for refusing to admit an obvious void, not
+    // for any office he holds. Do not put the election back.
     const md = MAPLE_DIST[String(island.biomeAt(voidState.x, voidState.z))] ?? null;
     const lead2 = rivals.list.length
       ? Math.max(...rivals.list.map((r) => r.score)) - playerScore : 0;
