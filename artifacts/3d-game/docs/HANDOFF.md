@@ -151,6 +151,27 @@ on every map; ground detail energy 0.042–0.052 mid-band across all four (none
 reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
 15–17 headlines a match with **zero repeats within a run**.
 
+**The shipped payload was 207 MB and is now 6.5 MB.** `public/assets` held
+200 MB of art for the **retired 2D game**, and Vite copies `publicDir` wholesale
+into the build output — nothing has to reference a file for it to ship. Because
+`capacitor.config.ts` reads `webDir: 'dist'`, `public/` looked unrelated to the
+iOS binary while being 205 MB of the 207 MB `dist/`.
+
+Measured by extracting the `/assets/…` **path literals** from the emitted bundle
+(the authoritative test — a reference that resolves at runtime must appear as a
+path). The 3D game uses exactly four things out of `public/assets`: the whole
+`audio/` directory (reached by the one dynamic path in the bundle,
+`fetch("/assets/audio/" + name)`), `music/theme.mp3`, and the two
+`splash_hero` webps. The other 138 files had zero references. They are moved to
+`legacy-2d/`, not deleted, because `vite.config.ts` deliberately keeps the 2D
+game's *source* for a possible revival — see `legacy-2d/README.md`.
+
+Verified rather than assumed: `qa/smoke.mjs` on all four worlds against the new
+build — zero same-origin asset failures, radius 0.90→~1.98, 121–144 props
+consumed in 25 match-seconds, audio graph present — statistically identical to
+the same probe against the 207 MB build (136 props). All four still validate
+clean, with byte-identical placement-sweep output.
+
 **The crowd's recency guard is proved** (`qa/fresh.mjs`, 100k draws per pool
 size against the shipped `window.__pickFresh`). At the median shipped pool
 (n=6) it turns a 16.84% chance of hearing a line twice in a row into 0.05% —

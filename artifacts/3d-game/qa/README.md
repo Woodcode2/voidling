@@ -35,6 +35,7 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `lnperf.mjs` | Draw calls, triangles, geometries per world. |
 | `lnsound.mjs` | Does the score actually PLAY? Counts voices constructed per second — a score that compiles is not a score that makes a sound. |
 | `invert.mjs` | Lantern Night's three acts: net crowd movement toward/away from the void, bucketed by tension band. |
+| `smoke.mjs` | Does a build boot, load its assets, grow, eat and make a sound? `node qa/smoke.mjs [world] [port]`. Separates **expected** CDN-blocked `/assets/hf*` failures from real same-origin ones and fails only on the second kind — run it against two ports to compare builds. |
 | `fresh.mjs` | Does the crowd's per-pool recency guard actually work? Drives the **shipped** `__pickFresh` 100k times per pool size and reports immediate repeats, repeats inside the guard's own ring, closest recurrence, and distribution skew — the last so a guard that bought freshness by developing favourites cannot pass. |
 
 ## Debug hooks these rely on
@@ -89,6 +90,23 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
   child is reaped when the wrapper task completes, and the log simply stops —
   a full four-world `pace` run died after world one and looked like it was still
   going. Launch it as the background task itself.
+- **`public/` ships whether or not anything references it.** Vite copies
+  `publicDir` wholesale into `outDir`, and `capacitor.config.ts` says
+  `webDir: 'dist'` — so `public/` looked unrelated to the iOS binary while being
+  205 MB of the 207 MB `dist/`. Measure `du -sh dist` after a build, not `public`.
+- **Match asset references on the PATH, not the filename stem.** A scan that
+  looked for `dragon` counted `skins/dragon.png` as live because `"dragon"` is a
+  skin **id** in the bundle; `ghost` matched three.js's `ghostwhite`, `pond`
+  matched `correspond`. Extract the `/assets/…` string literals instead, and
+  check separately for dynamically-composed paths (`"/assets/audio/" + name`) —
+  there is exactly one in this bundle.
+- **Three different "how many did it eat" fields are wrong.** `__edibles` filtered
+  on `eaten` gives ~3 and `__matchState().ate.you` gives ~1 — `ate` is the
+  devoured PERCENTAGE, and eaten props do not linger in the array wearing a flag.
+  Count the drop in the live edible count, as `pace.mjs` does (~130 in 25s).
+- **Filter the expected CDN failures out of the CONSOLE log too**, not just the
+  request log. A blocked asset shows up in both, and `smoke.mjs` first reported
+  41 console errors on a build that was completely fine.
 - **`pgrep -f <probe>` matches your own waiter.** A `while pgrep -f pace.mjs;
   do sleep; done` shell has `pace.mjs` in its own command line, so it waits on
   itself forever and reports the probe as running long after it exited.

@@ -290,6 +290,12 @@ export default defineConfig({
         // belongs in a children's app, and none of it is reachable from the
         // game anyone plays. The source stays in the tree; it just stops
         // shipping. Restore this line if the 2D game is ever revived.
+        //
+        // ITS ART KEPT SHIPPING ANYWAY, for a while, because dropping an entry
+        // point does nothing about `public/`: Vite copies publicDir wholesale
+        // into outDir, so 200 MB of 2D sprite sheets rode into every deploy and
+        // every iOS binary without a single reference pointing at them. That art
+        // now lives in `legacy-2d/` — see the README there before reviving.
         main: path.resolve(import.meta.dirname, 'index.html'),
       },
     },
