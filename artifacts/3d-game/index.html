@@ -359,8 +359,20 @@
       /* EVOLVED flash */
       #evolve { position: fixed; top: 24%; left: 0; right: 0; text-align: center; z-index: 7; pointer-events: none;
         color: #fff; font-weight: 900; opacity: 0; }
-      #evolve .big { font-size: 46px; letter-spacing: 2px; text-shadow: 0 0 24px rgba(172,108,255,0.9); }
-      #evolve .sm { font-size: 16px; letter-spacing: 4px; color: #c9a6ff; }
+      /* THE LAST HERO MESSAGE THAT NEVER GOT THE STROKE. #timer, #titlecard and
+         #banner were each measured against the live world and given a hard
+         treatment — a stroke, a radial scrim and a card respectively. #evolve
+         was skipped, and it is the one that fires up to five times a match on
+         whatever terrain the player happens to be standing on.
+         A `0 0 24px` glow is a soft Gaussian, not an outline: it lifts the 46px
+         white .big somewhat, and does nothing at all for .sm, which is 16px
+         #c9a6ff with no shadow and no stroke over arbitrary bright ground —
+         plaza, sand, farm and airport are all bad backdrops for it.
+         The stroke is #timer's idiom, works on any ground, and needs no markup. */
+      #evolve .big { font-size: 46px; letter-spacing: 2px; text-shadow: 0 0 24px rgba(172,108,255,0.9);
+        -webkit-text-stroke: 3px rgba(12,6,26,0.92); paint-order: stroke fill; }
+      #evolve .sm { font-size: 16px; letter-spacing: 4px; color: #c9a6ff;
+        -webkit-text-stroke: 2.5px rgba(12,6,26,0.92); paint-order: stroke fill; }
       #evolve.show { animation: ev 1.8s ease forwards; }
       @keyframes ev { 0%{opacity:0; transform:scale(0.7)} 18%{opacity:1; transform:scale(1.05)} 70%{opacity:1; transform:scale(1)} 100%{opacity:0; transform:scale(1.1)} }
       /* title card — plays only when .show is added (on PLAY) */
@@ -425,7 +437,14 @@
         margin: 7px auto 0; overflow: hidden; }
       #endNext .nb div { height: 100%; background: linear-gradient(90deg, #ffb82a, #ffd25a); border-radius: 4px; }
       /* the door out of the results screen, next to the thing it points at */
-      .goShop { display: block; margin: 12px auto 0; font-family: inherit; font-size: 14px; font-weight: 900;
+      /* 44pt, like .backBtn. At 14px + 9px padding and no border this computed
+         to ~35px — 20% under the floor — on the one screen where it matters
+         most: it is injected only when the child can already AFFORD the next
+         skin, which is the run where the shop door is the whole point. */
+      /* flex + width:fit-content, NOT inline-flex — `margin: 12px auto 0` is what
+         centres this button, and inline-flex would drop it to the left. */
+      .goShop { display: flex; align-items: center; justify-content: center; width: fit-content;
+        min-height: 44px; margin: 12px auto 0; font-family: inherit; font-size: 14px; font-weight: 900;
         letter-spacing: 1px; color: #0d0821; background: linear-gradient(180deg, #ffe07a, #ffc21f);
         border: none; border-radius: 12px; padding: 9px 22px; cursor: pointer; box-shadow: 0 4px 0 #c98d00; }
       #end .er { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800;
@@ -450,7 +469,12 @@
         8% { opacity: 1; }
         100% { transform: translateY(105vh) rotate(540deg); opacity: 0.7; }
       }
-      #btnHome { margin-top: 12px; font-family: inherit; font-size: 13px; font-weight: 900; letter-spacing: 2px;
+      /* 44pt. This computed to ~40px, and the miss is not a harmless one:
+         #btnHome sits 12px under #btnAgain, which is ~49px, is the dominant red
+         CTA and actively pulses to pull the eye. A child aiming at HOME and
+         landing high starts an unwanted match — a real action, not a no-op. */
+      #btnHome { display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
+        margin-top: 12px; font-family: inherit; font-size: 13px; font-weight: 900; letter-spacing: 2px;
         color: #cbb2ff; background: rgba(123,79,224,0.28); border: 2px solid rgba(168,123,255,0.5);
         border-radius: 13px; padding: 10px 34px; cursor: pointer; }
 
@@ -610,7 +634,14 @@
       #dailyGrid .dCell { position: relative; border-radius: 15px; padding: 9px 3px 7px;
         background: linear-gradient(170deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04));
         border: 2px solid rgba(168,123,255,0.3); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
-      #dailyGrid .dCell b { display: block; font-size: 8.5px; letter-spacing: 1px; color: #b9a4e8; font-weight: 900; }
+      /* 11px, Apple's HIG floor. This was 8.5px — the smallest rendered text in
+         the app — carrying "DAY 8", on the first screen a returning child sees.
+         The lifetime day number is the whole point of a deliberate retention
+         fix ("day 8 is day 8", prototype3d.ts), and it shipped at three
+         quarters of the legible minimum. It costs nothing to fix: .dCard is
+         min(370px, 100vw - 20px) with 16px side padding, so four columns get
+         ~67px of inner width and "DAY 28" at 11px needs about 46. */
+      #dailyGrid .dCell b { display: block; font-size: 11px; letter-spacing: 1px; color: #b9a4e8; font-weight: 900; }
       #dailyGrid .dIcon { display: block; font-size: 21px; line-height: 1.25; }
       #dailyGrid .dAmt { display: block; font-size: 13px; font-weight: 900; color: #fff; }
       #dailyGrid .dAmt i { font-style: normal; font-size: 10px; color: #ffd25a; margin-left: 1px; }
@@ -910,7 +941,8 @@
         background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
         animation: sheen 3.4s linear infinite; }
       @keyframes sheen { 0% { left: -70%; } 100% { left: 140%; } }
-      .skCard .rib { position: absolute; top: 12px; right: -34px; transform: rotate(38deg); z-index: 2; padding: 3px 40px; font-size: 8.5px;
+      /* declared font-size and padding twice; the 8.5px/40px pair was dead. */
+      .skCard .rib { position: absolute; top: 12px; right: -34px; transform: rotate(38deg); z-index: 2;
         background: linear-gradient(90deg, #ffb82a, #ffd25a); color: #3a2a06;
         font-size: 9px; font-weight: 900; letter-spacing: 1px; padding: 3px 32px; }
       .skCard .rib.epicRib { background: linear-gradient(90deg, #7a4fe0, #a87bff); color: #fff; }
@@ -953,6 +985,39 @@
          line. 11 puts it above the splash and below the sheets, and body.ovl
          hides it whenever one of those sheets is open. */
       #quests { z-index: 11; }
+
+      /* ── REDUCE MOTION ──────────────────────────────────────────────────
+         The parts that actually provoke motion sickness are handled in JS,
+         because they ARE JS: the full-screen wash is an inline opacity set
+         from fx.flash(), and the shake is a WebGL camera offset. Neither is
+         reachable from a stylesheet. See proto3d/fx.ts.
+
+         What is left for CSS is the decorative loop animations. Nine of the
+         ten live on menu and card surfaces rather than in a match, so this is
+         the smaller half of the problem — but they are also the ones that run
+         forever, and a permanent 1.08-1.16 pulse on the daily-reward cell is
+         exactly the sort of thing a child with vestibular sensitivity is stuck
+         looking at while deciding what to tap.
+
+         Honours the OS setting only. The in-app BIG MOTION switch cannot reach
+         these rules, which is the trade for keeping it a two-line change; the
+         switch governs the flash and the shake, which are the ones that matter
+         in play. */
+      @media (prefers-reduced-motion: reduce) {
+        #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
+        #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
+        #shopFloat, #skinPrev .spCard, #daily .dCard, .skCard .rib {
+          animation: none !important;
+        }
+        /* the one that is on screen for every second of every match */
+        #growth .gFill { background-size: 100% 100%; }
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
     </style>
   </head>
   <body class="menu">
@@ -1031,6 +1096,7 @@
         <div class="setTitle">SETTINGS</div>
         <button class="setRow" id="setSound"><span>🔊 SOUND</span><b>ON</b></button>
         <button class="setRow" id="setHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
+        <button class="setRow" id="setMotion"><span>🎢 BIG MOTION</span><b>ON</b></button>
         <!-- Kids-category apps must not send data to a third party without
              consent. This is default OFF and the row itself is behind the
              parental gate, so a child cannot switch it on. -->
@@ -1065,6 +1131,7 @@
         <div class="setTitle">PAUSED</div>
         <button class="setRow" id="pauseSound"><span>🔊 SOUND</span><b>ON</b></button>
         <button class="setRow" id="pauseHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
+        <button class="setRow" id="pauseMotion"><span>🎢 BIG MOTION</span><b>ON</b></button>
         <button id="pauseResume">▶ KEEP PLAYING</button>
         <button id="pauseQuit" class="gateCancel">LEAVE THE MATCH</button>
       </div>

@@ -3882,14 +3882,26 @@ export function createLife(
     const cars: THREE.Group[] = [];
     for (let i = 0; i < 4; i++) { const c = makeLoco(i === 0); c.add(contactShadow(3)); grp.add(c); cars.push(c); }
     grp.userData.mover = true;
-    setShadow(grp); addEdible(grp, 5.4); trainGrp = grp; trainCars = cars; trainT = rand(0, 1);
+    // Put it ON THE RAIL before registering it. addEdible() snapshots `home`
+    // from the current position, and this used to register at (0,0,0) — which
+    // resetMatch() then treated as the train's surveyed home, i.e. the central
+    // crossroads. Choose the loop position first so the snapshot is somewhere
+    // the train can legitimately be.
+    trainT = rand(0, 1);
+    const lead0 = railPointAt(trainT);
+    grp.position.set(lead0.x, 0, lead0.z);
+    setShadow(grp); addEdible(grp, 5.4); trainGrp = grp; trainCars = cars;
   }
   if (worldId() === 'maple') buildTrain();   // no commuter rail at a resort or a stadium
   movers.push({
     get mesh() { return trainGrp!; },
     update(dt) {
       if (!trainGrp) return;
-      if (eaten(trainGrp)) { respawn += dt; if (respawn > 6) { respawn = 0; trainGrp = null; buildTrain(); } return; }
+      // Retire the swallowed group before replacing it. It stays in the
+      // edibles array — there is no removal path — so it has to be marked, or
+      // resetMatch() restores it as a second, frozen train. See the guard there.
+      if (eaten(trainGrp)) { respawn += dt; if (respawn > 6) {
+        respawn = 0; trainGrp.userData.retired = true; trainGrp = null; buildTrain(); } return; }
       trainT = (trainT + dt * 0.02) % 1;
       const lead = railPointAt(trainT);
       trainGrp.position.set(lead.x, 0, lead.z);

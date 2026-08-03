@@ -151,6 +151,50 @@ on every map; ground detail energy 0.042–0.052 mid-band across all four (none
 reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
 15–17 headlines a match with **zero repeats within a run**.
 
+**Three second-match bugs are fixed** (`qa/rematch.mjs`, both tests verified
+against a reverted build so they are known to have power):
+
+- **The ghost train.** Maple Falls' commuter train rebuilds itself six seconds
+  after being swallowed. The consumed group stayed in `edibles`, and
+  `resetMatch` restored it to its remembered home — `(0,0,0)`, because
+  `addEdible` snapshots `home` and the replacement was registered before the
+  rail placed it. That is world 6000, the central crossroads. Every match after
+  the first opened with a dead four-car locomotive in the middle of town, on the
+  world the store screenshots come from. Fixed with a general `userData.retired`
+  guard plus registering the new train on the rail. Reverting the fix puts the
+  ghost back at exactly `(0.0, 0.0)`.
+- **The rival clock.** The family was scheduled off `tClock - startT` — wall
+  time, which keeps running while the pause sheet is up — while everything else
+  in the match uses the visible countdown. Any pause slid the rivals forward:
+  the hunt window closed early, rivals scheduled during the pause all joined on
+  the resume frame, and past ~99s the hunter was stuffed before play resumed.
+  `?fast` diverged the two 6× for a whole match, quietly making every harness
+  run with that flag see a family that barely joined. Now one named
+  `matchElapsed()` shared by all four call sites. Measured drift across a 3s
+  pause: 1.566s before, 0s after.
+- **The finale cue was Game Day's on every world.** `heroProp` resolves as the
+  largest edible in whatever world is loaded, but the three cue strings were
+  hard-coded, so Pirate Bay's Royal Mariner and Lantern Night's bathhouse both
+  announced "🏟️ THE STADIUM IS IN REACH" and a headline naming Hank, Game Day's
+  commentator, at the biggest moment of the match. Moved into `WORLD_COPY` so
+  the compiler names any world left out. The "GONE" banner also fired when a
+  *rival* ate the hero prop — now gated on `byPlayer`, which was already tracked.
+
+**Four accessibility fixes**, all confirmed in the built output: `#evolve` got
+the stroke its three sibling hero messages already had (its `.sm` line was 16px
+untreated over arbitrary bright terrain); `#btnHome` and `.goShop` raised to the
+44pt floor — `#btnHome` measured at 44.0px, and it sits 12px under a pulsing
+PLAY AGAIN, so a low-landing tap started an unwanted match; the smallest text in
+the app raised from 8.5px to 11px (it carried "DAY 8" on the returning-player
+card, which is the entire point of a deliberate retention fix); and reduce-motion
+support, which the game had none of. That last one is JS, not CSS — the flash is
+an inline style and the shake is a WebGL camera offset, so the
+`prefers-reduced-motion` block in `src/ui.css` never applied to this game and in
+any case belongs to the retired React shell. Defaults to the OS setting and is
+overridable in Settings and the pause sheet as **BIG MOTION** (phrased so a
+parent is not reasoning about a double negative). Verified: label reads ON under
+`no-preference` and OFF under `reduce`.
+
 **The shipped payload was 207 MB and is now 6.5 MB.** `public/assets` held
 200 MB of art for the **retired 2D game**, and Vite copies `publicDir` wholesale
 into the build output — nothing has to reference a file for it to ship. Because

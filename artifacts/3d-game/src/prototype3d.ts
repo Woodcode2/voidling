@@ -18,7 +18,7 @@ import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, 
 import { createLife, pickFresh } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
-import { createFx } from './proto3d/fx';
+import { createFx, reduceMotion, setReduceMotion } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
@@ -388,6 +388,23 @@ interface WorldCopy {
   winSub: string;       // the results screen, when the player came first
   winTitles: string[];  // …and the rotating title above it
   place: string;        // the noun for this world, mid-sentence
+  /** THE FINALE CUE, per world — the banner when the hero landmark becomes
+   *  edible, the headline under it, and the banner when it goes.
+   *
+   *  These three were hard-coded to GAME DAY's stadium while `heroProp` is
+   *  resolved per-match as the largest edible in the world. So Pirate Bay's
+   *  radius-10 Royal Mariner and Lantern Night's radius-11 bathhouse both
+   *  raised '🏟️ THE STADIUM IS IN REACH' at the single biggest moment of the
+   *  match, followed by a headline naming Hank — Game Day's play-by-play
+   *  announcer, who does not exist in either world.
+   *
+   *  This is the exact failure WORLD_COPY was built to make impossible: a
+   *  table cannot be forgotten, because adding a world means filling in a row
+   *  and the compiler names anything left out. These three strings were simply
+   *  never moved into it. `null` on a world with no hero landmark. */
+  heroCue: string | null;
+  heroCueNews: string | null;
+  heroGone: string | null;
 }
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
@@ -404,6 +421,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
     winSub: 'the whole town belongs to the void', place: 'the town',
     winTitles: ['TOWN: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF MAPLE FALLS'],
+    // no hero landmark — the biggest thing in Maple Falls is a 6.5 town hall,
+    // which the void passes without ceremony. A cue here would be noise.
+    heroCue: null, heroCueNews: null, heroGone: null,
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
@@ -420,6 +440,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
     winTitles: ['RESORT: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'ALL-INCLUSIVE, LITERALLY', 'CHOMPION OF THE BAY'],
+    heroCue: '🏨 THE ROYAL MARINER IS IN REACH — GO!',
+    heroCueNews: 'It is big enough for the Royal Mariner. The concierge has stopped taking bookings.',
+    heroGone: '🏨 THE ROYAL MARINER IS GONE. ALL FIVE STARS.',
   },
   gameday: {
     n: 3, icon: '🏈', sub: 'the whole town turned out · eat the tailgate',
@@ -445,6 +468,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
     winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
+    heroCue: '🏟️ THE STADIUM IS IN REACH — GO!',
+    heroCueNews: 'It is big enough for the stadium. Hank has stopped describing and started watching.',
+    heroGone: '🏟️ THE STADIUM IS GONE. ALL OF IT.',
   },
   lantern: {
     n: 4, icon: '🏮', sub: 'the spirits think you are a guest · eat the market',
@@ -463,6 +489,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     winSub: 'the whole market belongs to the void', place: 'the market',
     winTitles: ['MARKET: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
                 'THE GUEST HAS FINISHED', 'HONOURED, AND ALSO ENORMOUS'],
+    heroCue: '🏮 THE BATHHOUSE IS IN REACH — GO!',
+    heroCueNews: 'It is big enough for the bathhouse. The PA has stopped announcing the closing time.',
+    heroGone: '🏮 THE BATHHOUSE IS GONE. SIX HUNDRED YEARS, DRY.',
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -549,7 +578,7 @@ _dbg.__matchState = () => ({
   // from the radius curve.
   tense: tension(),
   graze: rivals.grazeCount(),
-  t: started ? tClock - startT : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
+  t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
     joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting,
@@ -1158,6 +1187,28 @@ const MATCH_LEN = Number(_q.get('len')) || 180;                // 3:00 — tight
 const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
 let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
+// ── HOW LONG THE MATCH HAS BEEN RUNNING ────────────────────────────────────
+// There are two clocks in this file and they are not interchangeable. `tClock`
+// is wall time: it advances every frame, forever, including while the pause
+// sheet is up, during hit-stop, and on the results screen. `matchClock` is the
+// one the player can see — it counts down only inside
+// `if (started && !ended && !paused)`, it is scaled by hit-stop through `dtw`,
+// and it honours ?fast.
+//
+// The rivals were scheduled off `tClock - startT`, so ANY pause slid the whole
+// family forward relative to the match the child was watching. Pause 40s to
+// turn the sound off — the pause sheet is the only in-match route to that — and
+// the hunt window, which ends at matchLen * 0.55, closes 40s early in match
+// terms; every rival scheduled during the pause joins on the single resume
+// frame, stacking one audio.alert() sting per arrival; and past ~99s of
+// accumulated pause CHOMPZILLA is stuffed the instant play resumes, skipping
+// the whole predator act while the HUD still reads nearly three minutes.
+// ?fast diverged the two by 6x for an entire match, which quietly made every
+// harness run with that flag see a family that barely joined.
+//
+// The authored beats always used the visible clock (`matchLen - matchClock`).
+// This is that same expression, named once, so the two cannot drift apart again.
+const matchElapsed = () => matchLen - matchClock;
 // QA only: __setVoidR sets this so the growth law stops pulling the hero back
 // to its clock-derived size, which is what a renderer screenshot needs.
 let frozenR = false;
@@ -1478,9 +1529,18 @@ let devMineN = 0, devAllN = 0;
 // left has no reason to look up. So the moment it becomes reachable, the game
 // says so once, loudly, and the booth says it too.
 //
-// Only worlds that declare a hero landmark get this (COPY.hero). Maple and
-// Pirate Bay have no single object the match builds toward — their biggest
-// props come into range halfway through — so a cue there would be noise.
+// Only worlds that declare a hero landmark get this (COPY.hero). Of the four,
+// only MAPLE FALLS has none — its biggest prop is a 6.5 town hall that comes
+// into range halfway through, so a cue there would be noise. Pirate Bay's
+// Royal Mariner (r10) and Lantern Night's bathhouse (r11) both qualify on
+// GAME DAY's own definition and both declare one.
+//
+// THE WORDING IS PER-WORLD AND LIVES IN WORLD_COPY. It used to be three
+// hard-coded strings about a stadium, which is what Pirate Bay and Lantern
+// Night announced — naming Game Day's commentator — at the biggest moment of
+// their matches. `heroProp` is resolved below as the largest edible in
+// whatever world is loaded, so nothing about it was ever Game Day-specific
+// except the copy.
 let heroProp: Edible | null = null;
 let heroCued = false, heroAte = false;
 // reactive one-shots: big beats the player just caused jump the queue
@@ -2690,6 +2750,27 @@ function resetMatch() {
   // restore every eaten thing to its remembered home — the island regrows in
   // one frame and the next run starts in under a second
   for (const e of edibles) {
+    // ── A REPLACED MOVER MUST NOT BE RESURRECTED ────────────────────────────
+    // Maple Falls' commuter train is the only thing in the game that rebuilds
+    // itself mid-match: six seconds after it is swallowed, life.ts constructs a
+    // NEW four-car train and registers it. The old group stayed in this array
+    // forever, and this loop faithfully restored it — visible, un-eaten, and
+    // at its remembered home.
+    //
+    // That home was (0,0,0), because addEdible() snapshots `home` from the
+    // group's position and buildTrain() registered the new train while it was
+    // still at the origin, before the rail placed it. Under w(v)=(v-6000)*0.05
+    // the origin is world 6000: the central crossroads. So every match after
+    // the first opened with a dead locomotive parked in the middle of town, on
+    // top of whatever is authored there — and the placement sweep that would
+    // have nudged or retired it skips anything flagged `mover`. Each further
+    // eat-and-respawn added another one.
+    //
+    // Nothing reached this except a session's SECOND match, which is why it
+    // survived every single-match playtest — on the world the store screenshots
+    // are shot from. Rivals eat by the same rule with no mover exclusion, so it
+    // did not even need the player to be near the rail.
+    if (e.mesh.userData.retired) { e.mesh.visible = false; if (e.mesh.parent) scene.remove(e.mesh); continue; }
     e.eaten = false; e.t = 0;
     e.mesh.userData.eaten = false;
     e.mesh.userData.byPlayer = false;
@@ -2750,13 +2831,16 @@ el('btnHome').addEventListener('click', () => {
   // to reach sound at all, because #btnSettings lives inside #menu and measures
   // 0x0 during a match. A parent who needed quiet had to end the run.
   const pauseEl = el('pause');
-  const pSnd = el('pauseSound'), pHap = el('pauseHaptics');
+  const pSnd = el('pauseSound'), pHap = el('pauseHaptics'), pMot = el('pauseMotion');
   const paintPause = () => {
     const sOff = audio.isMuted();
     pSnd.classList.toggle('off', sOff);
     pSnd.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
     pHap.classList.toggle('off', !hapticsOn);
     pHap.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    const bigMotion = !reduceMotion();
+    pMot.classList.toggle('off', !bigMotion);
+    pMot.querySelector('b')!.textContent = bigMotion ? 'ON' : 'OFF';
   };
   const resume = () => { paused = false; pauseEl.classList.remove('show'); clock.getDelta(); };
   pSnd.addEventListener('click', () => { audio.setMuted(!audio.isMuted()); paintPause(); });
@@ -2765,6 +2849,7 @@ el('btnHome').addEventListener('click', () => {
     localStorage.setItem('voidHaptics', hapticsOn ? '1' : '0');
     paintPause(); if (hapticsOn) buzz(30);
   });
+  pMot.addEventListener('click', () => { setReduceMotion(!reduceMotion()); paintPause(); });
   el('pauseResume').addEventListener('click', resume);
   // …and backgrounding the app pauses it too, so a child who is called away
   // does not come back to a finished match they never got to play.
@@ -3012,7 +3097,7 @@ renderRank();
 // reviewer) expects to be able to silence a kids' game in one tap.
 {
   const panel = el('settings');
-  const sndRow = el('setSound'), hapRow = el('setHaptics');
+  const sndRow = el('setSound'), hapRow = el('setHaptics'), motRow = el('setMotion');
   const staRow = el('setStats');
   const paint = () => {
     const sOff = audio.isMuted();
@@ -3020,6 +3105,12 @@ renderRank();
     sndRow.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
     hapRow.classList.toggle('off', !hapticsOn);
     hapRow.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    // BIG MOTION rather than "reduce motion": the row reads as the thing being
+    // turned off, like SOUND and RUMBLE above it, so a parent does not have to
+    // reason about a double negative to work out which way is calmer.
+    const bigMotion = !reduceMotion();
+    motRow.classList.toggle('off', !bigMotion);
+    motRow.querySelector('b')!.textContent = bigMotion ? 'ON' : 'OFF';
     const on = analyticsEnabled();
     staRow.classList.toggle('off', !on);
     staRow.querySelector('b')!.textContent = on ? 'ON' : 'OFF';
@@ -3033,6 +3124,7 @@ renderRank();
     localStorage.setItem('voidHaptics', hapticsOn ? '1' : '0');
     paint(); if (hapticsOn) buzz(30);
   });
+  motRow.addEventListener('click', () => { setReduceMotion(!reduceMotion()); paint(); });
   // Consent is a grown-up's to give AND to take back, so the gate guards the
   // switch in both directions — a child cannot turn it on, and cannot silently
   // turn off a parent's choice either.
@@ -3839,7 +3931,7 @@ function animate() {
   // snapshotted. The ambient town (life.update, above) deliberately keeps
   // running — the world behind the score card should still look alive.
   if (!ended && !paused) {
-    rivals.update(dtw, started && !soloMode ? tClock - startT : 0, voidState.x, voidState.z, R,
+    rivals.update(dtw, started && !soloMode ? matchElapsed() : 0, voidState.x, voidState.z, R,
       { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
   }
   // ── THE RULE NOBODY WAS EVER TAUGHT ────────────────────────────────────────
@@ -4148,18 +4240,22 @@ function animate() {
   // island news: a headline every ~20s, tone tracks the devoured meter
   if (started && !ended) {
     // ── THE FINALE COMES INTO RANGE ────────────────────────────────────────
-    if (heroProp && !heroCued && !heroProp.mesh.userData.eaten
+    if (heroProp && COPY.heroCue && !heroCued && !heroProp.mesh.userData.eaten
         && heroProp.radius <= voidling.radius * EAT_RATIO) {
       heroCued = true;
-      announce('🏟️ THE STADIUM IS IN REACH — GO!');
-      breakingNews('It is big enough for the stadium. Hank has stopped describing and started watching.');
+      announce(COPY.heroCue);
+      if (COPY.heroCueNews) breakingNews(COPY.heroCueNews);
       audio.ready(); buzz(30);
       fx.ring(heroProp.mesh.position.x, heroProp.mesh.position.z, 0xf0b429, heroProp.radius * 5, 0.9);
     }
-    if (heroProp && !heroAte && heroProp.mesh.userData.eaten) {
+    if (heroProp && COPY.heroGone && !heroAte && heroProp.mesh.userData.eaten) {
       heroAte = true;
-      announce('🏟️ THE STADIUM IS GONE. ALL OF IT.');
-      audio.voice('happy'); buzz(120);
+      // …but only celebrate it if the PLAYER ate it. Rivals eat by the same
+      // rule with no exclusion for the hero prop, so this fired a full-screen
+      // congratulation for something a rival had just taken off the board —
+      // on every hero world, including the one the copy was written for.
+      // byPlayer is already tracked for the DEVOURED meter's you-vs-family split.
+      if (heroProp.mesh.userData.byPlayer) { announce(COPY.heroGone); audio.voice('happy'); buzz(120); }
     }
     newsCd -= dt;
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen
@@ -4177,7 +4273,7 @@ function animate() {
   }
 
   // the DRAG-to-steer hint retires itself once the player has been driving
-  if (started && tClock - lastInput < 1 && tClock - startT > 8) hungerLbl.style.opacity = '0';
+  if (started && tClock - lastInput < 1 && matchElapsed() > 8) hungerLbl.style.opacity = '0';
 
   hudCd -= dt;
   if (hudCd <= 0) {
@@ -4199,7 +4295,7 @@ function animate() {
   if (gOn) paintGrowth(R);
 
   pumpBanner();   // anything the evolve card held back gets its turn now
-  updateFindRing(tClock, started ? tClock - startT : 999);   // menu never shows it
+  updateFindRing(tClock, started ? matchElapsed() : 999);   // menu never shows it
 
   if (SHOW_WALLS) paintWalls();
   // LOD band + shadow frustum track the camera

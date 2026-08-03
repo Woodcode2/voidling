@@ -9,6 +9,41 @@ export interface Fx {
   update(dt: number): THREE.Vector3;   // returns a camera-shake offset to add
 }
 
+// ── REDUCE MOTION ───────────────────────────────────────────────────────────
+// The shipped build had no motion accessibility of any kind: no
+// prefers-reduced-motion CSS, no matchMedia check, and no toggle in Settings.
+// A child with iOS Reduce Motion turned on — one of the settings parents of
+// vestibular-sensitive, migraine-prone and autistic children most often enable
+// — still got the full-screen 0.6-alpha wash on eating a rival, a 0.55-alpha
+// white flash at final evolution, and camera shake of 11/9/6 on bites, meals
+// and near-misses.
+//
+// IT HAS TO LIVE HERE, not in CSS. The flash is an inline style set from JS
+// (flashEl.style.opacity) and the shake is a WebGL camera offset, so a media
+// query in the stylesheet would not have gated either of them. There IS a
+// prefers-reduced-motion block in src/ui.css, but that file is imported only by
+// the retired React shell and index.html never loads it — it styles .vd-* and
+// never covered this game.
+//
+// Default follows the OS; an explicit choice in Settings wins over it either
+// way, so a parent can turn it on for a device whose global setting is off.
+let _reduce: boolean | null = null;
+const osReduce = () => {
+  try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+};
+export function reduceMotion(): boolean {
+  if (_reduce === null) {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem('voidMotion'); } catch { /* private mode */ }
+    _reduce = saved === null ? osReduce() : saved === '0';
+  }
+  return _reduce;
+}
+export function setReduceMotion(on: boolean) {
+  _reduce = on;
+  try { localStorage.setItem('voidMotion', on ? '0' : '1'); } catch { /* private mode */ }
+}
+
 interface Ring { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; t: number; dur: number; maxR: number; }
 
 export function createFx(scene: THREE.Scene): Fx {
@@ -40,10 +75,18 @@ export function createFx(scene: THREE.Scene): Fx {
     },
     flash(color, alpha = 0.5) {
       flashEl.style.background = color;
-      flashEl.style.opacity = String(alpha);
+      // REDUCE MOTION caps the wash rather than removing it. The flash is a
+      // readable signal — "you ate a rival", "you reached the final form" — so
+      // silencing it outright would cost information; what makes it a
+      // vestibular problem is the 0.55-0.6 alpha full-screen swing, not the
+      // cue itself.
+      flashEl.style.opacity = String(reduceMotion() ? Math.min(alpha, 0.15) : alpha);
       flashT = 0.12;
     },
-    shake(amt) { shakeAmt = Math.max(shakeAmt, amt); },
+    // …and camera shake goes entirely. Unlike the flash it carries no
+    // information the rest of the frame does not already show, and translating
+    // the viewpoint is the part that actually provokes motion sickness.
+    shake(amt) { if (!reduceMotion()) shakeAmt = Math.max(shakeAmt, amt); },
     update(dt) {
       for (const r of rings) {
         if (!r.mesh.visible) continue;

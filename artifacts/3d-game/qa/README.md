@@ -35,6 +35,7 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `lnperf.mjs` | Draw calls, triangles, geometries per world. |
 | `lnsound.mjs` | Does the score actually PLAY? Counts voices constructed per second — a score that compiles is not a score that makes a sound. |
 | `invert.mjs` | Lantern Night's three acts: net crowd movement toward/away from the void, bucketed by tension band. |
+| `rematch.mjs` | The two bugs that only exist on the **second** match or **after a pause**: a retired mover resurrected at the world origin by `resetMatch`, and the rival schedule drifting because it ran off wall time instead of the match clock. Both were invisible to a one-match playtest. |
 | `smoke.mjs` | Does a build boot, load its assets, grow, eat and make a sound? `node qa/smoke.mjs [world] [port]`. Separates **expected** CDN-blocked `/assets/hf*` failures from real same-origin ones and fails only on the second kind — run it against two ports to compare builds. |
 | `fresh.mjs` | Does the crowd's per-pool recency guard actually work? Drives the **shipped** `__pickFresh` 100k times per pool size and reports immediate repeats, repeats inside the guard's own ring, closest recurrence, and distribution skew — the last so a guard that bought freshness by developing favourites cannot pass. |
 
@@ -104,6 +105,20 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
   on `eaten` gives ~3 and `__matchState().ate.you` gives ~1 — `ate` is the
   devoured PERCENTAGE, and eaten props do not linger in the array wearing a flag.
   Count the drop in the live edible count, as `pace.mjs` does (~130 in 25s).
+- **Run the negative control.** A regression test that passes tells you nothing
+  until you have watched it fail. Both of `rematch.mjs`'s were verified by
+  reverting the fix and rebuilding: the ghost train reappeared at exactly
+  `(0.0, 0.0)` with 2 visible trains, and the paused match clock drifted 1.566s.
+  A test with no demonstrated power is worse than no test, because it is
+  believed.
+- **Identify a thing by what it IS, not by its size.** `rematch.mjs` first
+  looked for the train by `radius === 5.4` and found two — Maple Falls has a
+  static prop of exactly that radius — so the check silently measured the wrong
+  object and reported a failure that was not there. The train is the mover whose
+  group carries four cars.
+- **A mover has to be chased.** Warping onto the train once lands where it was;
+  it runs a rail loop. The first version of the swallow step reported no eat at
+  all and looked like a passing test of nothing.
 - **Filter the expected CDN failures out of the CONSOLE log too**, not just the
   request log. A blocked asset shows up in both, and `smoke.mjs` first reported
   41 console errors on a build that was completely fine.
