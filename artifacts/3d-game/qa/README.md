@@ -35,6 +35,7 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `lnperf.mjs` | Draw calls, triangles, geometries per world. |
 | `lnsound.mjs` | Does the score actually PLAY? Counts voices constructed per second — a score that compiles is not a score that makes a sound. |
 | `invert.mjs` | Lantern Night's three acts: net crowd movement toward/away from the void, bucketed by tension band. |
+| `fresh.mjs` | Does the crowd's per-pool recency guard actually work? Drives the **shipped** `__pickFresh` 100k times per pool size and reports immediate repeats, repeats inside the guard's own ring, closest recurrence, and distribution skew — the last so a guard that bought freshness by developing favourites cannot pass. |
 
 ## Debug hooks these rely on
 
@@ -43,7 +44,7 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
 `__voidState()` · `__matchState()` (includes `tense`) · `__biomeAt(x,z)` ·
 `__insideIsland3` · `__inDeepWater3` · `__edibles` · `__scene` · `__renderer` ·
 `__setVoidR(r)` · `__warpVoid(x,z)` · `__setMood(m)` · `__rushClock(t)` ·
-`__validateWorld()` · `__news()` · `__audio`
+`__validateWorld()` · `__news()` · `__audio` · `__pickFresh(arr)`
 
 `?w=<world>` picks a world directly. `?walls=1` draws the containment boundary.
 
@@ -67,3 +68,27 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
   looked like the worst element in the game when it is the best.
 - **Do not rebuild while a determinism or replay probe is running.** It changes
   the bundle underneath the test.
+- **A guard keyed on an object identity dies silently if the caller rebuilds
+  that object.** `pickFresh` keeps each pool's ring in a `WeakMap` keyed on the
+  pool ARRAY. Any caller that composed its pool per call — `[...A, ...B]` —
+  would miss the map every time, leave the ring permanently empty, and disable
+  the guard while reading as completely correct. Check the call sites return
+  stable references *before* writing the test, not after it comes back null.
+- **Test the shipped function, not a copy of it.** `fresh.mjs` reaches the real
+  `pickFresh` through a `window.__` hook. Reimplementing the algorithm in the
+  probe proves only that it can be written twice.
+- **Check the ruler against a known answer first.** Two oracles cost minutes and
+  make every later number trustworthy: uniform sampling must give an
+  immediate-repeat rate of exactly 1/n and a mean recurrence gap of exactly n;
+  a strict round-robin must give zero, a minimum gap of exactly n, and no skew.
+- **Measure the number that would show the fix made things worse**, not only the
+  one that shows it working. A recency guard trades distribution flatness for
+  freshness; a repeat count alone cannot see a pool that has developed
+  favourites, which is the more noticeable bug.
+- **Do not launch a long probe with `nohup … &` from a backgrounded shell.** The
+  child is reaped when the wrapper task completes, and the log simply stops —
+  a full four-world `pace` run died after world one and looked like it was still
+  going. Launch it as the background task itself.
+- **`pgrep -f <probe>` matches your own waiter.** A `while pgrep -f pace.mjs;
+  do sleep; done` shell has `pace.mjs` in its own command line, so it waits on
+  itself forever and reports the probe as running long after it exited.

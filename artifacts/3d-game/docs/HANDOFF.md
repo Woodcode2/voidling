@@ -151,6 +151,28 @@ on every map; ground detail energy 0.042–0.052 mid-band across all four (none
 reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
 15–17 headlines a match with **zero repeats within a run**.
 
+**The crowd's recency guard is proved** (`qa/fresh.mjs`, 100k draws per pool
+size against the shipped `window.__pickFresh`). At the median shipped pool
+(n=6) it turns a 16.84% chance of hearing a line twice in a row into 0.05% —
+358× fewer — and a 42.30% chance of repeating inside its own memory into 0.18%.
+It wins at every shipped pool size (n=2…22).
+
+It also did **not** buy that with a skewed distribution, which is the way this
+fix could have traded one defect for a worse one: the guard measures *flatter*
+than uniform sampling in almost every row (0.6% vs 1.8% at n=6, 1.0% vs 3.8%
+at n=22). Anti-clustering pushes toward even usage, not away from it.
+
+Two things that result does not say. Min gap is 1 in every guarded row — the
+eight retries can all miss, and that *is* the 0.05%; it is a strong
+probabilistic guarantee, not a hard one. And at n=2 the ring holds 1, so the
+four two-line pools now alternate ABAB near-strictly — probably better than
+random doubling for a pool of two, but a behaviour change, not a free win.
+
+The reason the earlier end-to-end attempt could not settle this: a match draws
+~100 lines across **112 dialogue pools** (min 2, median 6, max 22), so no single
+pool is sampled enough times in one run to have a distribution at all. Counting
+repeats across a whole match is a blunt instrument for a per-pool guarantee.
+
 ---
 
 ## 7. Open work
@@ -169,10 +191,6 @@ reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
 - Privacy policy contact is the owner's personal email.
 
 **Unresolved / worth re-checking:**
-- **Crowd-line repetition.** A per-pool recency guard is in
-  (`pickFresh` in `life.ts`) and is correct by construction, but the
-  end-to-end measurement was too noisy at n=2 to prove it (9 and 16 repeats
-  against a 21/11/14 baseline). Prove it on the function, not on a match.
 - **Layout determinism.** `island.ts` says Maple is deterministic. Measured
   layouts agree to within 0.1% but not exactly — and that residue cannot be
   separated from CDN-blocked async prop loading in this sandbox. Re-run
@@ -185,13 +203,20 @@ reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
 
 ## 8. The QA kit
 
-`artifacts/3d-game/qa/` — thirteen Playwright probes. `pace.mjs` is the
+`artifacts/3d-game/qa/` — fourteen Playwright probes. `pace.mjs` is the
 important one: it found that the two worlds a child plays first were the two
 whose matches died in the last forty seconds. Also `sizes`/`dens` for "it feels
 empty" as a number, `pockets` for invisible walls, `contrast2` for HUD
 legibility, `ground` for texture-vs-lighting, `replay` for whether run 20
 differs from run 2, `lnsound` for whether a score that compiles actually makes
-a sound.
+a sound, and `fresh` for whether the crowd's recency guard does anything.
+
+`fresh.mjs` is the one to copy the *shape* of when a per-unit guarantee needs
+proving. It drives the shipped function through a QA hook rather than a copy of
+it, it checks its own metrics against two oracles with known answers before
+trusting them (uniform must give 1/n and mean gap n; round-robin must give 0
+and exactly n), and it reports the number that would reveal the fix having
+made things worse alongside the one that shows it working.
 
 Setup: `npm i -D playwright`, then build, then `npx vite preview --port 4177`.
 If Playwright is a global install, ESM will not find it —
