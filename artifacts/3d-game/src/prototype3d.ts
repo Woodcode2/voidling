@@ -15,7 +15,7 @@ import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, type WorldId } from './proto3d/island';
-import { createLife } from './proto3d/life';
+import { createLife, pickFresh } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx } from './proto3d/fx';
@@ -491,6 +491,7 @@ const _dbg = window as unknown as {
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
+  __pickFresh: <T>(arr: T[]) => T;
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
   __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number; tense: number;
@@ -514,6 +515,11 @@ _dbg.__rushClock = (to: number) => { matchClock = to; };
 // waiting on the idle timer or getting bitten. `null` hands control back.
 let moodPin: string | null = null;
 _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m as never); };
+// QA: the crowd's recency guard itself. The end-to-end match measurement of it
+// was too noisy at n=2 to say anything (9 and 16 repeats against a 21/11/14
+// baseline), so qa/fresh.mjs drives THIS — the shipped function, not a copy —
+// a hundred thousand times and settles it on the statistics instead.
+_dbg.__pickFresh = pickFresh;
 // QA: force the hero to a size so the renderer can be shot at every form
 // without playing a whole match. Sets the visual stage too, so the void looks
 // exactly as it would if a player had grown into it.

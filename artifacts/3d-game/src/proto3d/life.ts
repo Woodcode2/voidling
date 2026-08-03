@@ -60,8 +60,12 @@ const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 // nothing leaks, and the ring is capped at 60% of that pool's length — a
 // four-line district must still be able to speak, and a guard longer than its
 // own pool would deadlock it.
+//
+// Exported ONLY so a harness can drive the shipped function rather than a copy
+// of it — the last attempt at this was argued from the source instead of
+// measured, and the argument was wrong. Nothing but qa/fresh.mjs imports it.
 const _poolRecent = new WeakMap<object, unknown[]>();
-function pickFresh<T>(arr: T[]): T {
+export function pickFresh<T>(arr: T[]): T {
   if (arr.length < 2) return arr[0];
   let ring = _poolRecent.get(arr as unknown as object);
   if (!ring) { ring = []; _poolRecent.set(arr as unknown as object, ring); }
