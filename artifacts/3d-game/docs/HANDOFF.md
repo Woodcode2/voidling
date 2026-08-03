@@ -15,7 +15,8 @@ bigger still, and in three minutes you eat an entire town.
 The goal the owner has stated: **a top-10 game in the Apple App Store.**
 
 It ships as a web build (Vercel, at the site root) and is wrapped for iOS with
-Capacitor.
+Capacitor. The repo is `woodcode2/voidling`; the game is in
+`artifacts/3d-game/`.
 
 ---
 
@@ -182,7 +183,34 @@ reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
 
 ---
 
-## 8. How to work on this
+## 8. The QA kit
+
+`artifacts/3d-game/qa/` — thirteen Playwright probes. `pace.mjs` is the
+important one: it found that the two worlds a child plays first were the two
+whose matches died in the last forty seconds. Also `sizes`/`dens` for "it feels
+empty" as a number, `pockets` for invisible walls, `contrast2` for HUD
+legibility, `ground` for texture-vs-lighting, `replay` for whether run 20
+differs from run 2, `lnsound` for whether a score that compiles actually makes
+a sound.
+
+Setup: `npm i -D playwright`, then build, then `npx vite preview --port 4177`.
+If Playwright is a global install, ESM will not find it —
+`ln -sfn /opt/node22/lib/node_modules/playwright node_modules/playwright`.
+
+**Traps, all learned the hard way:**
+- The software renderer is 1/9 to 1/40 real time — never quote a wall clock.
+  Sample against `__matchState().t`.
+- `preserveDrawingBuffer` is off, so reading the live WebGL canvas returns
+  black. Screenshot, then decode the PNG in-page.
+- `glb()` registers props asynchronously — anything fingerprinting the world
+  early counts a different one each run.
+- A whole-set hash flips on ONE prop; it cannot measure degree.
+- A box mean cannot see a text outline.
+- Do not rebuild while a determinism or replay probe is running.
+
+---
+
+## 9. How to work on this
 
 The thing that has repeatedly worked: **measure, change, re-measure, and
 believe the number over the intuition.** In one session the measurements
@@ -199,4 +227,5 @@ ground detail across the worlds, and Pirate Bay's theme, both of which looked
 wrong and measured fine.
 
 When a probe and your expectation disagree, suspect the probe first (see the
-trap list in `qa/README.md`) — but once the probe is sound, take the number.
+trap list above and in `qa/README.md`) — but once the probe is sound, take the
+number.
