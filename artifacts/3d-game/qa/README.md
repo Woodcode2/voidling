@@ -35,6 +35,8 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `lnperf.mjs` | Draw calls, triangles, geometries per world. |
 | `lnsound.mjs` | Does the score actually PLAY? Counts voices constructed per second — a score that compiles is not a score that makes a sound. |
 | `invert.mjs` | Lantern Night's three acts: net crowd movement toward/away from the void, bucketed by tension band. |
+| `keyart.mjs` + `poster.mjs` | **The splash art pipeline.** `keyart` finds the densest cluster of props in Maple Falls, drops the void there at full size in its `victory` mood and photographs it at DPR 4 — so every pixel of the subject is the shipping game. `poster` grades that frame, blooms the hero, feathers it to transparency and writes `splash_hero.webp` + `_sm`. Re-runnable: `node qa/keyart.mjs && node qa/poster.mjs`. |
+| `menushot.mjs` | Writes `qa-out/menu.png` — the menu as it actually renders, which is the only honest way to judge splash art. |
 | `hero.mjs` | Is the hero CLEAR in the opening frame? Samples a disc over the void's silhouette from a reconstructed opening camera and reports what fraction is behind scenery. A single centre ray misses the case that actually looks wrong — scenery clipping the edge. |
 | `shot.mjs` | Writes `qa-out/<world>-spawn.png` so the opening can be looked at rather than argued about, plus what stands nearest the spawn. |
 | `rematch.mjs` | The two bugs that only exist on the **second** match or **after a pause**: a retired mover resurrected at the world origin by `resetMatch`, and the rival schedule drifting because it ran off wall time instead of the match clock. Both were invisible to a one-match playtest. |
