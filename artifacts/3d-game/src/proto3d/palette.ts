@@ -74,12 +74,32 @@ export const WORLD = {
 
 // ── props (buildings/trees/etc — matched to the 2D toy-city screenshot) ──────
 export const PROPS = {
-  // pastel house walls
-  house: [0xbfe0cf, 0xc9b8e8, 0xf2c9a0, 0xa9c4e8, 0xeab8cc, 0xf0e6d2, 0xb8d8c8, 0xd8c8ec],
+  // ── HOUSE WALLS, WITH A DARK END AT LAST ────────────────────────────────
+  // These were eight pastels running luminance 0.525 to 0.798 with NOTHING
+  // below 0.5. Every building in the game was structurally a pale box with a
+  // dark cap, so a street had no value structure at all — and value structure
+  // is most of what "flat" means once the light rig is fixed. Contrast in the
+  // lighting is wasted if the albedo has none: the sun can only reveal
+  // differences the paint already has.
+  // Five deeper members go in and the eight pastels stay, so a row still reads
+  // as a friendly toy town and now has somewhere for the eye to rest. The
+  // range is 0.10 to 0.80 rather than 0.53 to 0.80.
+  house: [0xbfe0cf, 0xc9b8e8, 0xf2c9a0, 0xa9c4e8, 0xeab8cc, 0xf0e6d2, 0xb8d8c8, 0xd8c8ec,
+    0x8c4a3f,   // brick red — the one every small town actually has
+    0x2f5d52,   // deep teal, a painted clapboard
+    0x4a3f6b,   // plum, for the odd house that went its own way
+    0x6b5330,   // stained timber
+    0x33506e],  // navy weatherboard
   // warm-but-clean roofs (terracotta / slate / teal — no mud)
   roof: [0xc97f5a, 0x6a6480, 0xb5654a, 0x6fa8a0, 0xcf8a63, 0x746e8c],
-  // downtown towers — cooler pastels + glass
-  tower: [0xff8a7a, 0x5ec8d8, 0xf7c85a, 0x8fa9d8, 0xf6efe2, 0xb98cff, 0x7ed57a, 0xff9fbf],
+  // downtown towers — cooler pastels + glass, plus three that are actually
+  // dark. Same argument as `house`: a skyline of eight bright faces is a
+  // sticker sheet, and one dark tower between two bright ones is what makes
+  // the bright ones read as lit.
+  tower: [0xff8a7a, 0x5ec8d8, 0xf7c85a, 0x8fa9d8, 0xf6efe2, 0xb98cff, 0x7ed57a, 0xff9fbf,
+    0x2d4055,   // slate
+    0x4a2f52,   // aubergine
+    0x1f4a46],  // deep sea green
   towerGlass: 0x2c3a52,
   car: [0xff5a4d, 0x2f9bd8, 0xffd23f, 0x7ed57a, 0xf06fb0, 0x9fe8f0, 0xf2f4f8, 0xb98cff],
   carGlass: 0xbfeaff,
