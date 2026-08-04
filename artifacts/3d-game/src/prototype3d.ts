@@ -26,6 +26,8 @@ import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './p
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
 import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from './proto3d/newsroom_lantern';
+import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
+import { STICKERS_BY_WORLD, collectInRun, hasSticker, TIER_POINTS } from './game/stickers';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
@@ -564,6 +566,69 @@ const COPY = WORLD_COPY[pickedWorld];
   const ln = document.querySelector('#loadScr .lName'); if (ln) ln.textContent = nm;
 }
 const island = createIsland(scene, addEdible);
+
+// ══ THE SCRAPBOOK, IN THE WORLD ═══════════════════════════════════════════
+// One hidden curio per sticker this world has, dropped in the district its
+// clue names. Placement is DETERMINISTIC — the same seed every time — because
+// the point is a hunt a child can learn, finish and then tell somebody else
+// about. A randomised hiding place is a slot machine; a fixed one is a secret.
+//
+// Already-found stickers are not placed at all. A book you have filled in is
+// a world you have finished, and re-eating a sticker you own is a non-event
+// standing where a real prop could be.
+const curios: { mesh: THREE.Object3D; seed: number }[] = [];
+function placeStickers(): void {
+  // the district maps are per-world; biomeAt returns raw biome ids
+  const distOf = (x: number, z: number): string => {
+    const b = String(island.biomeAt(x, z));
+    if (pickedWorld === 'maple') return MAPLE_DIST[b] ?? b;
+    if (pickedWorld === 'gameday') return GAMEDAY_DIST[b] ?? b;
+    return b;   // Pirate Bay and Lantern Night already speak in district ids
+  };
+  for (const st of STICKERS_BY_WORLD(pickedWorld)) {
+    if (hasSticker(st.id)) continue;
+    // a tiny deterministic PRNG seeded off the id: same hiding place forever
+    let h = 2166136261;
+    for (let i = 0; i < st.id.length; i++) { h ^= st.id.charCodeAt(i); h = Math.imul(h, 16777619); }
+    const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
+    let put: [number, number] | null = null;
+    // reject until the point is in the RIGHT district, on land, out of the
+    // water and away from the spawn — 900 tries is generous and costs nothing
+    // once, at boot. Districts are large; this lands inside twenty on average.
+    for (let i = 0; i < 4000 && !put; i++) {
+      // ±290, not ±130. The island spans roughly ±280 in 3D units (12,000
+      // world units at SCALE 0.05, centred on 6000), and a ±130 box is the
+      // MIDDLE of it — so the outer districts, which is where the good
+      // hiding is, could never be sampled at all. Four of Maple's twelve
+      // silently failed to place: the strip, the lake shore and the woods.
+      const x = (rnd() - 0.5) * 580, z = (rnd() - 0.5) * 580;
+      if (!insideIsland3(x, z)) continue;
+      if (inDeepWater3(x, z, 4)) continue;
+      if (Math.hypot(x - island.spawn.x, z - island.spawn.z) < 26) continue;   // never on the doorstep
+      if (distOf(x, z) !== st.biome) continue;
+      put = [x, z];
+    }
+    if (!put) continue;   // this world has no such district — skip, never crash
+    const g = makeCurio(st.tier as CurioTier);
+    g.position.set(put[0], 0, put[1]);
+    g.rotation.y = rnd() * Math.PI * 2;
+    g.userData.sticker = st.id;
+    scene.add(g);
+    addEdible(g, CURIO_R[st.tier as CurioTier]);
+    curios.push({ mesh: g, seed: rnd() * 6.28 });
+  }
+}
+// NOT CALLED HERE. This runs at module scope, and the district maps it reads
+// (MAPLE_DIST, GAMEDAY_DIST) are consts declared a thousand lines further
+// down — touching them from up here is a temporal dead zone and the whole
+// module fails to initialise. It is latched and called from the first
+// beginMatch instead, which is after everything exists.
+let _stickersPlaced = false;
+function placeStickersOnce(): void {
+  if (_stickersPlaced) return;
+  _stickersPlaced = true;
+  placeStickers();
+}
 // dev/QA introspection hooks (harmless in prod; no gameplay reads these).
 // __edibles + __insideIsland3 + __validateWorld power the placement auditor:
 // a headless sweep measures every edible's REAL world-space bounding box
@@ -2209,6 +2274,21 @@ function capture(e: Edible, giveHunger = true) {
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
   const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * feverMult));
   playerScore += pts;
+  // ── A FIND ────────────────────────────────────────────────────────────
+  // Loud, and immediately: this is the only thing in the game a child keeps.
+  const sid = e.mesh.userData.sticker as string | undefined;
+  if (sid) {
+    const got = collectInRun(sid);
+    if (got) {
+      playerScore += TIER_POINTS[got.tier];
+      announceBeat('⭐', 'STICKER FOUND!', got.name.toUpperCase(), 1);
+      audio.voice('yum');
+      fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd25a, 14, 0.7);
+      spawnPuff(e.mesh.position.x, 1.2, e.mesh.position.z, 14);
+      buzz(30);
+      breakingNews(`${got.name} has gone. It was ${got.where.toLowerCase()} the whole time.`);
+    }
+  }
   // remember the last meal so the news can report on it BY NAME
   lastMeal = MEAL_NAME[(e.mesh.userData.qk as string) ?? ''] ?? mealOf(e);
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
@@ -2352,6 +2432,7 @@ function showGuide(text: string, dur = 5) {
 }
 let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
+  placeStickersOnce();   // hidden curios go in before the world is validated
   validateWorld();   // covers late async-registered GLB props on every start
   // gild HERE, not at the world-ready hook: there are several entry points
   // into a match (menu PLAY, solo, the debug autostart) and only one of them
@@ -3660,6 +3741,8 @@ function animate() {
   tClock += dt;
   if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
   island.update(dt, tClock);
+  // the curios turn and catch the light — the glint is what the eye finds
+  for (const c of curios) if (c.mesh.visible) animateCurio(c.mesh, tClock, c.seed);
 
   if (started && !ended && !paused) {
     matchClock -= dtw * clockSpeed;
