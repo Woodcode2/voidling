@@ -254,11 +254,35 @@ In Xcode:
   (This said "two worlds" and "five rival voids". There are four worlds, and
   the cast is `3 + rand(0..2)`. Understating the app is not a 2.3.1 finding the
   way overstating it is, but it sells three quarters of the content short.)
-  Do NOT mention SOLO RUN, mutations or reminders — none of them are in this
-  build. Store copy that describes absent features is Guideline 2.3.1.
+  Do NOT mention mutations — they are not in this build. Store copy that
+  describes absent features is Guideline 2.3.1. SOLO RUN *is* now in the build
+  (it was coded, wired and hidden behind an inline display:none) and may be
+  named: "no rivals, eat the whole town".
 - **Category**: Games → Arcade (secondary: Casual)
-- **Age rating**: 4+ (cartoon fantasy violence: none — people are "relocated
-  to the void")
+- **Age rating**: **4+**, and answered honestly rather than defensively — the
+  content questionnaire finds nothing to declare. Nobody is hurt, nobody dies,
+  nobody is trapped; every newsroom file carries an explicit rule that no line
+  may say a person was eaten, and the substitution point enforces it.
+  NOTE: Apple replaced the tiers in July 2025 — they are now 4+, 9+, 13+, 16+
+  and 18+; **12+ and 17+ no longer exist and there has never been a 6+**. The
+  questionnaire was re-issued with new mandatory questions (in-app controls,
+  app capabilities, violent themes) and every app had to re-answer by
+  31 Jan 2026, so this must be filled in fresh rather than inherited.
+  WHY NOT 9+, since hole.io is 9+ at 360M downloads: 9+ only buys headroom for
+  infrequent cartoon violence, mild horror and mild profanity, and we want none
+  of it — taking the rating without using it is pure cost. The cost is real and
+  one-directional: a device with Screen Time content restrictions set to "4+"
+  cannot see or download a 9+ app at all, and the children most likely to be
+  restricted are the 6-8 half of our core audience. A 4+ app is visible at
+  every setting. The rating is a content ceiling, not an audience label —
+  Minecraft is 9+ and nobody reads that as "for nine-year-olds".
+- **Kids Category**: stay OUT. Separate decision from the age rating. Guideline
+  1.3's ratchet clause — "once customers expect your app to follow the Kids
+  Category requirements, it will need to continue to meet these guidelines in
+  subsequent updates, even if you decide to deselect the category" — makes
+  entry permanent, and it bars the third-party analytics any paid acquisition
+  needs. We adopt Kids-Category-grade behaviour voluntarily and say so in the
+  copy, which is worth more than the badge.
 
 ## TestFlight
 
