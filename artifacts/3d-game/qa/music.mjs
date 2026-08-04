@@ -56,17 +56,28 @@ for (const w of list) {
   await p.click(`#worldRow .wCard[data-world="${w}"]`);
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
 
-  // count what the synth builds over three seconds of real play
-  const bed = await p.evaluate(async () => {
-    let n = 0;
-    const P = AudioContext.prototype;
-    const o0 = P.createOscillator, b0 = P.createBufferSource;
-    P.createOscillator = function () { n++; return o0.call(this); };
-    P.createBufferSource = function () { n++; return b0.call(this); };
-    await new Promise((r) => setTimeout(r, 3000));
-    P.createOscillator = o0; P.createBufferSource = b0;
-    return n;
-  });
+  // Count what the synth builds, at four sizes. One number at the start of a
+  // match is not enough: every score is written to open sparse and fill out as
+  // the player grows, so a world can be perfectly healthy at full size and a
+  // hole at the size everybody actually starts at. That is exactly how GAME
+  // DAY hid — 31 voices a second grown, 4 at spawn.
+  const rates = [];
+  for (const r of [1.2, 4, 11]) {
+    await p.evaluate((rr) => window.__setVoidR(rr), r);
+    await p.waitForTimeout(1200);
+    const n = await p.evaluate(async () => {
+      let k = 0;
+      const P = AudioContext.prototype;
+      const o0 = P.createOscillator, b0 = P.createBufferSource;
+      P.createOscillator = function () { k++; return o0.call(this); };
+      P.createBufferSource = function () { k++; return b0.call(this); };
+      await new Promise((z) => setTimeout(z, 3000));
+      P.createOscillator = o0; P.createBufferSource = b0;
+      return k;
+    });
+    rates.push(Math.round(n / 3));
+  }
+  const bed = rates[0] * 3;
 
   const ok = hits.filter((h) => h.real);
   const miss = hits.filter((h) => !h.real);
@@ -74,12 +85,16 @@ for (const w of list) {
   const slot = ok.length ? ok[0].url.split('/').pop() : null;
   // the synth also builds voices for crunches and stings, so this is a rate
   // question, not a presence one: a running bed is dozens a second.
+  const curve = rates.map((n, i) => `${['spawn', 'mid', 'full'][i]} ${String(n).padStart(3)}/s`).join('  ');
   const verdict = slot && rate < 4 ? `RECORDING (${slot})`
-    : slot ? `BOTH — ${slot} loaded AND the bed is running at ${rate}/s`
-      : `synth (${rate} voices/s)`;
+    : slot ? `BOTH — ${slot} loaded AND the bed is running (${curve})`
+      : `synth   ${curve}`;
   if (slot && rate >= 4) bad++;
   if (!slot && rate < 4) bad++;
-  console.log(`${w.padEnd(8)} ${verdict}`);
+  // A score that only arrives once the player is big is a score nobody hears
+  // at the moment they are deciding whether this world sounds good.
+  if (!slot && rates[0] < 8) { bad++; console.log(`${w.padEnd(8)} ${verdict}\n         ← ${rates[0]}/s at spawn is a hole; the other worlds run 15 to 44`); }
+  else console.log(`${w.padEnd(8)} ${verdict}`);
   for (const h of miss) {
     console.log(`         no track at ${h.url.split('/').pop()} — ${h.status} ${h.ct || '?'} ${h.len} bytes`);
   }

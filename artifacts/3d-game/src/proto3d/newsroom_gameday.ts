@@ -737,7 +737,7 @@ const LIVE: Pools = [[
   'With {S} seconds left the band has still not stopped playing.',
   'Buckley waved. The {F} waved back!! Thirty one seasons for that.',
   'The casserole reached the front row of the hill, still warm.',
-  'Deb says stay with it. There is no {D} to stay with. We stay.',
+  'Deb says stay with it. Not much of {D} left to stay with, Deb.',
   'It ate {M} and nine thousand people on a hill went ooh.',
   'Where is everybody? Up on the hill, every last one of them.',
   'The chain crew measured {D} one final time and came up short.',
@@ -1003,6 +1003,12 @@ interface Filled { pct: number; rest: number; form: string; meal: string; dist: 
 
 /** the ticker is one line on a phone. nothing gets to be a paragraph. */
 const TICKER_MAX = 78;
+/** {M} lands MID-CLAUSE in most templates, so what arrives has to be a bare
+ *  noun phrase: no terminal stop, no comma, nothing after one. Both have
+ *  shipped from the call site and both were only visible on a rendered card —
+ *  "It ate a guest. mid-sentence.." and "and a truck, in motion was gone".
+ *  The pools cannot defend against this, so the substitution point does. */
+const fragment = (s: string): string => (s.split(/[,.;:]/)[0] || s).trim();
 const clip = (s: string, n: number): string => {
   if (s.length <= n) return s;
   const cut = s.slice(0, n);
@@ -1021,7 +1027,7 @@ function bind(ctx: GamedayCtx): Filled {
     pct,
     rest: 100 - pct,
     form: clip(ctx.form || 'VOIDLING', 14),
-    meal: clip(ctx.lastMeal || 'a folding chair', 22),
+    meal: clip(fragment(ctx.lastMeal || 'a folding chair'), 22),
     dist: ctx.district ? DIST_NAME[ctx.district] : 'Marston',
     secs: Math.max(1, Math.ceil(ctx.secondsLeft || 0)),
   };

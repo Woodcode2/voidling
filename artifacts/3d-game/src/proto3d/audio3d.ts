@@ -2282,14 +2282,33 @@ export function createAudio(): Audio3D {
       //    at no particular tempo, one player at a time, nobody together. So
       //    that is what fills it, and it disappears the moment the band
       //    actually starts playing at stage 1.
+      //    THE TUNING WAS NOT ENOUGH. Measured again, per world, at the radius
+      //    a player actually starts at: Maple 14 voices a second, Lantern 29,
+      //    Pirate Bay 44 — and GAME DAY 4. It comes back to 31 the instant the
+      //    player grows, so the hole is exactly the opening, which is the one
+      //    stretch of a football world that has to sound like a football
+      //    world. On a phone speaker in a room with a television on, four
+      //    events a second is silence, and the first thing anybody would say
+      //    is that the music is broken.
+      //
+      //    The fix is not to make stage 0 louder — it is to give it the thing
+      //    a drumline actually does before a game. They do not tune. They run
+      //    the same rudiment for twenty minutes: eights on a hand, right hand
+      //    then left, quiet, relentless, nowhere near the tune. That fills the
+      //    bar honestly, stays two hundred yards away, and still leaves stage
+      //    1 the moment where the band starts PLAYING.
       if (st === 0) {
-        if (sx === 0 && (barN % 3) === 0) {
+        // eights on a hand — the accent falls on the quarter, the rest are taps
+        if (sx % 2 === 0) mSnare(gdBus, t + drag(0.016), sx % 4 === 0 ? 0.019 : 0.011, false);
+        // and the stick clicks between them, the two rests of the exercise
+        if (sx === 7 || sx === 15) nHit(gdBus, t + drag(0.012), 0.03, 0.014, 'highpass', 2400, 1.1);
+        if (sx === 0 && (barN & 1) === 0) {
           const warm = G_HOOK[(barN >> 1) & 3];
           const pick = warm[(barN * 5) % 8] || 349.23;
           brass(gdBus, pick, t + drag(0.06), spb * 2.4, 0.028);
         }
-        if (sx === 8 && (barN % 5) === 2) sousa(gdBus, G_OOM[bar][0], t + drag(0.05), spb * 1.8, 0.075);
-        if (sx === 4 && (barN % 7) === 3) glock(gdBus, G_HOOK[bar][2] * 2 || 880, t, spb * 1.4, 0.018);
+        if (sx === 8 && (barN % 3) === 1) sousa(gdBus, G_OOM[bar][0], t + drag(0.05), spb * 1.8, 0.075);
+        if (sx === 4 && (barN % 4) === 2) glock(gdBus, G_HOOK[bar][2] * 2 || 880, t, spb * 1.4, 0.018);
       }
 
       // ── THE SOUSAPHONE finds the bottom at stage 1 and never lets go

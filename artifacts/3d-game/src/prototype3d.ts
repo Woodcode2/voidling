@@ -405,6 +405,16 @@ interface WorldCopy {
   heroCue: string | null;
   heroCueNews: string | null;
   heroGone: string | null;
+  /** THE REACTIVE ONE-SHOTS, per world. `breakingNews()` jumps the newsroom
+   *  queue when the player causes a big beat, and until now three of those
+   *  beats were hard-coded generic strings that fired in ALL FOUR worlds.
+   *  LANTERN NIGHT is where it showed: the market's public address is a
+   *  recording that has no mechanism for noticing anything, and it was
+   *  printing "It ate a house. A WHOLE house. We have questions." That is the
+   *  same class of leak as the stadium banner above, and the same fix. */
+  houseNews: string;      // the first building goes
+  rivalGoneNews: string;  // one void has eaten the other
+  rivalFullNews: string;  // …and the survivor has slowed right down
 }
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
   maple: {
@@ -419,6 +429,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The town is OVER.',
     enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
+    houseNews: 'A whole house has gone. Town hall will discuss it for four hours.',
+    rivalGoneNews: 'One void has eaten the other. There is one left, and it is bigger.',
+    rivalFullNews: 'The second void has stopped moving. It looks full. It looks slow.',
     winSub: 'the whole town belongs to the void', place: 'the town',
     winTitles: ['TOWN: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF MAPLE FALLS'],
     // no hero landmark — the biggest thing in Maple Falls is a 6.5 town hall,
@@ -438,10 +451,13 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     hero: [(8540 - 6000) * 0.05, (3700 - 6000) * 0.05], introLen: 2.2,
     ender: '🌑 WORLD ENDER! The resort is OVER.',
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
+    houseNews: 'A whole villa, gone in one go. Do book early for next year.',
+    rivalGoneNews: 'One of them has eaten the other. There is one left. Rather large.',
+    rivalFullNews: 'The other one has stopped moving. It looks full. Extremely full.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
     winTitles: ['RESORT: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'ALL-INCLUSIVE, LITERALLY', 'CHOMPION OF THE BAY'],
     heroCue: '🏨 THE ROYAL MARINER IS IN REACH — GO!',
-    heroCueNews: 'It is big enough for the Royal Mariner. The concierge has stopped taking bookings.',
+    heroCueNews: 'It is big enough for the Royal Mariner. The concierge has gone quiet.',
     heroGone: '🏨 THE ROYAL MARINER IS GONE. ALL FIVE STARS.',
   },
   gameday: {
@@ -466,10 +482,13 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     introLen: 3.4,
     ender: '🌑 WORLD ENDER! The stadium is OVER.',
     enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
+    houseNews: 'Bill, that was a HOUSE. Straight down the middle, and no flag.',
+    rivalGoneNews: 'One took the other, Bill. One left on the field, and it is bigger.',
+    rivalFullNews: 'The second one has stopped moving. Bill calls that a slow start.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
     winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
     heroCue: '🏟️ THE STADIUM IS IN REACH — GO!',
-    heroCueNews: 'It is big enough for the stadium. Hank has stopped describing and started watching.',
+    heroCueNews: 'It is big enough for the stadium. Hank has stopped describing it.',
     heroGone: '🏟️ THE STADIUM IS GONE. ALL OF IT.',
   },
   lantern: {
@@ -486,11 +505,14 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     introLen: 3.6,
     ender: '🌑 WORLD ENDER! The market is OVER.',
     enderNews: 'THE MARKET HAS GONE. The bathhouse thanks you for visiting.',
+    houseNews: 'A guest has taken a whole house. We hope it was to their liking.',
+    rivalGoneNews: 'There is one guest tonight. The guest list has been updated.',
+    rivalFullNews: 'The other guest has stopped. We think the other guest is full.',
     winSub: 'the whole market belongs to the void', place: 'the market',
     winTitles: ['MARKET: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
                 'THE GUEST HAS FINISHED', 'HONOURED, AND ALSO ENORMOUS'],
     heroCue: '🏮 THE BATHHOUSE IS IN REACH — GO!',
-    heroCueNews: 'It is big enough for the bathhouse. The PA has stopped announcing the closing time.',
+    heroCueNews: 'It is big enough for the bathhouse. The PA is still reading the hours.',
     heroGone: '🏮 THE BATHHOUSE IS GONE. SIX HUNDRED YEARS, DRY.',
   },
 };
@@ -666,7 +688,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   announceHtml(marquee
     ? `<div class="bCard"><span class="bIco">🏆</span><span class="bTx">You beat the chaser!<span class="bSub">${name} is out</span></span><span class="bMul">+${pts}</span></div>`
     : `<div class="bCard"><span class="bIco">🍽️</span><span class="bTx">You ate ${esc(name)}!<span class="bSub">${esc(FAMILY_TITLE[name] ?? 'a rival')} is out</span></span><span class="bMul">+${pts}</span></div>`);
-  if (marquee) { breakingNews('One void has eaten the other. There is one left. It is bigger.'); addCoins(35); }
+  if (marquee) { breakingNews(COPY.rivalGoneNews); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -756,7 +778,7 @@ rivals.onNearMiss = (name, x, z) => {
 };
 rivals.onStuffed = (name) => {
   announceHtml(`<div class="bCard"><span class="bIco">🍰</span><span class="bTx">${esc(name)} is too full<span class="bSub">now is your chance</span></span></div>`);
-  breakingNews('The second void has stopped moving. It looks full. It looks slow.');
+  breakingNews(COPY.rivalFullNews);
   audio.ready();
 };
 const audio = createAudio();
@@ -1465,14 +1487,24 @@ function mealOf(e: Edible): string {
   if (u.qk === 'car') return 'a parked car';
   if (u.afloat) return e.radius > 4 ? 'a whole SHIP' : 'somebody\'s boat';
   if (u.mover) {
-    if (e.radius > 2.2) return 'a truck, in motion';
-    // NO TERMINAL PUNCTUATION IN A FRAGMENT. This is substituted into 22
-    // newsroom templates, every one of which supplies its own sentence end, so
-    // it produced "It ate a guest. mid-sentence.. Somebody owned that." on a
-    // full-screen card — in the best-written part of the build, every time the
-    // player ate a mid-size mover, which is constantly.
-    if (e.radius > 1.1) return 'a guest, mid-sentence';
-    return 'a very small dog';
+    // NO TERMINAL PUNCTUATION IN A FRAGMENT, and NO COMMA EITHER. This is
+    // substituted into 22 newsroom templates, every one of which supplies its
+    // own sentence end and most of which embed {M} mid-clause. The full stop
+    // was caught first — it produced "It ate a guest. mid-sentence.." on a
+    // full-screen card. The comma survived it and does the same job more
+    // quietly: "One gulp, one burp, and a truck, in motion was gone" is what
+    // the ticker printed, measured on a live run.
+    if (e.radius > 2.2) return 'a moving truck';
+    // AND NOT A PERSON, EVER. A mover this size is a pedestrian or a monkey,
+    // and the old string said "a guest" — so the paper printed "It ate a
+    // guest" at a six-year-old, in a 4+ app whose four newsroom files all
+    // carry an explicit rule that no line may say a person was eaten. The
+    // rule was enforced in the pools and broken at the substitution point,
+    // which is why nobody reading the pools ever saw it. Cartoon convention
+    // and the paper's own voice agree: name what got dropped, not who
+    // dropped it. Every newsroom already runs on lost property.
+    if (e.radius > 1.1) return 'somebody\'s hat';
+    return 'somebody\'s lunch';
   }
   if (e.radius > 6) return 'an entire LANDMARK';
   if (e.radius > 3.4) return 'a whole HOUSE';
@@ -1552,7 +1584,11 @@ let heroCued = false, heroAte = false;
 const newsQueue: string[] = [];
 function breakingNews(h: string) {
   if (newsQueue.length > 1) return;   // never stack a queue of cards at the player
-  newsQueue.push(h); newsCd = Math.min(newsCd, 2.5);
+  // The queue BYPASSES the newsroom, so it also bypassed the newsroom's own
+  // 78-character ticker clip — all three hero cues ran to 84, 88 and 89 and
+  // reached the card unclipped. Everything on the ticker gets the same width.
+  newsQueue.push(h.length > 78 ? h.slice(0, h.lastIndexOf(' ', 78)).trim() : h);
+  newsCd = Math.min(newsCd, 2.5);
 }
 const newsSeen: string[] = [];
 // Both worlds now have their own newsroom module — ./proto3d/newsroom for
@@ -2183,9 +2219,11 @@ function capture(e: Edible, giveHunger = true) {
   // which is what makes the 'houses' chip completable in RV Row
   if (qk === 'rv') questEvent('house');
   if (comboMult >= 2) questEvent('combo');
-  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews('It ate a house. A WHOLE house. We have questions.'); }
+  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
-  if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('It has eaten a motorhome. Somebody was living in that until Sunday.'); }
+  // no COPY row for this one: 'rv' is tagged on RV Row and nowhere else, so it
+  // can only ever fire on GAME DAY. It should still sound like the booth.
+  if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.'); }
 }
 
 // converging suck streaks — sells the "vacuum" on GULP / COLLAPSE

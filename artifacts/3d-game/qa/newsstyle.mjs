@@ -133,6 +133,11 @@ for (const [w, f] of Object.entries(F)) {
       }
       // a countdown at 2:40 remaining is a weather report. Only the last beat.
       if (line.includes('{S}') && tier !== 2) fail(w, beat, '{S} outside the final beat', line);
+      // MOST DISTRICT NAMES CARRY THEIR OWN ARTICLE — "the tailgate", "the
+      // practice field", "the teahouse terrace"; 25 of the 34 across the four
+      // worlds do. So a template that supplies one as well prints "There is no
+      // the tailgate to stay with", which is what shipped.
+      if (/\b(the|a|an|no)\s+\{D\}/i.test(line)) fail(w, beat, 'article before {D}, which brings its own', line);
     }
     console.log(`  ${beat.padEnd(9)} n=${String(pool.length).padStart(3)}`);
   }

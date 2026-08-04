@@ -270,7 +270,7 @@ const T2_GENERAL = [
   'The guest is a {F} now. There is no larger word for it.',
   '{S} seconds. That is the honest number. Use them.',
   'It took {M} and did not slow down, so up the stair.',
-  'Only {R} percent left!! Everybody up the valley now.',
+  '{R} percent of the market is still standing. Everybody up the valley.',
   '{S} seconds, and the drum is still going, so walk toward it.',
 ];
 const T2_BY_DIST: Record<LnDist, string[]> = {
@@ -341,6 +341,12 @@ export function lanternNewsCount(): number {
 
 /** the ticker is one line on a phone. nothing here gets to be a paragraph. */
 const TICKER_MAX = 78;
+/** {M} lands MID-CLAUSE in most templates, so what arrives has to be a bare
+ *  noun phrase: no terminal stop, no comma, nothing after one. Both have
+ *  shipped from the call site and both were only visible on a rendered card —
+ *  "It ate a guest. mid-sentence.." and "and a truck, in motion was gone".
+ *  The pools cannot defend against this, so the substitution point does. */
+const fragment = (s: string): string => (s.split(/[,.;:]/)[0] || s).trim();
 const clip = (s: string, n: number): string => {
   if (s.length <= n) return s;
   const cut = s.slice(0, n);
@@ -351,7 +357,7 @@ const clip = (s: string, n: number): string => {
 function fill(t: string, c: LanternCtx): string {
   const pct = Math.max(1, Math.min(99, Math.round(c.devouredPct)));
   return t
-    .replace(/\{M\}/g, clip(c.lastMeal || 'something', 22))
+    .replace(/\{M\}/g, clip(fragment(c.lastMeal || 'something'), 22))
     .replace(/\{D\}/g, DIST_NAME[c.district ?? 'stalls'])
     .replace(/\{P\}/g, String(pct))
     .replace(/\{R\}/g, String(100 - pct))
