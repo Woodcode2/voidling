@@ -27,7 +27,8 @@ import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './pr
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
 import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from './proto3d/newsroom_lantern';
 import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
-import { STICKERS_BY_WORLD, collectInRun, hasSticker, TIER_POINTS } from './game/stickers';
+import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
+  runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
@@ -2161,6 +2162,7 @@ function endMatch() {
     const pb = Number(localStorage.getItem('voidBestScore') || 0);
     const isPb = Math.round(playerScore) > pb;
     if (isPb) localStorage.setItem('voidBestScore', String(Math.round(playerScore)));
+    renderFinds(); paintBookChip();
     const st = el('endStats');
     st.innerHTML =
       // DEVOURED read the share of the WHOLE ISLAND that vanished, counting
@@ -2432,6 +2434,7 @@ function showGuide(text: string, dur = 5) {
 }
 let _revalQueue: number[] = [];
 function beginMatch(solo = false) {
+  clearRun();            // last match's finds are not this match's finds
   placeStickersOnce();   // hidden curios go in before the world is validated
   validateWorld();   // covers late async-registered GLB props on every start
   // gild HERE, not at the world-ready hook: there are several entry points
@@ -2798,6 +2801,59 @@ el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 const ASPHALT_HALF = 2.75;
 const _vBox = new THREE.Box3(); const _vSz = new THREE.Vector3();
 let _validated = false;   // homes are canonical after the first pass — later passes are cheap re-checks of new props
+// ══ THE SCRAPBOOK, ON SCREEN ══════════════════════════════════════════════
+const TIER_ICON: Record<string, string> = { common: '🔹', rare: '💜', legendary: '⭐' };
+
+/** The results-screen reveal. Nothing at all on a run with no finds — an empty
+ *  trophy case is worse than no trophy case. */
+function renderFinds(): void {
+  const box = el('endFinds');
+  const got = runFinds();
+  box.classList.toggle('show', got.length > 0);
+  if (!got.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="fLbl">${got.length === 1 ? 'NEW STICKER' : `${got.length} NEW STICKERS`}</div>`
+    + got.map((g, i) => `<div class="stk t-${g.tier}" style="animation-delay:${0.12 + i * 0.16}s">`
+      + `<i>${TIER_ICON[g.tier]}</i><span><b>${g.name}</b>`
+      + `<s>${g.where.toUpperCase()} · ${g.tier.toUpperCase()}</s></span></div>`).join('');
+}
+
+let bookWorld: WorldId = pickedWorld;
+function renderBook(): void {
+  const tabs = el('bookTabs'), grid = el('bookGrid'), foot = el('bookFoot');
+  const NAMES: Record<WorldId, string> = { maple: '🍁 MAPLE FALLS', pirate: '🏴‍☠️ PIRATE BAY',
+    gameday: '🏈 GAME DAY', lantern: '🏮 LANTERN NIGHT' };
+  tabs.innerHTML = (Object.keys(NAMES) as WorldId[]).map((w) =>
+    `<button data-w="${w}" class="${w === bookWorld ? 'on' : ''}">${NAMES[w]} `
+    + `${foundCount(w)}/${totalCount(w)}</button>`).join('');
+  tabs.querySelectorAll('button').forEach((btn) => btn.addEventListener('click', () => {
+    bookWorld = (btn as HTMLElement).dataset.w as WorldId; renderBook();
+  }));
+  grid.innerHTML = STICKERS_BY_WORLD(bookWorld).map((st: Sticker) => {
+    const got = hasSticker(st.id);
+    // A found cell states what it is. An empty one states WHERE TO LOOK — the
+    // clue is the entire point of a gap, so it is a to-do list rather than a
+    // locked door, and it is the same sentence the newsroom has been saying.
+    return `<div class="bkCell ${got ? 'got' : 'miss'} t-${st.tier}">`
+      + `<i>${TIER_ICON[st.tier]}</i>`
+      + `<b>${got ? st.name : '· · ·'}</b>`
+      + `<s>${got ? st.where.toUpperCase() : st.hint}</s></div>`;
+  }).join('');
+  const f = foundCount(), t = totalCount();
+  foot.textContent = f === t ? 'EVERY LAST ONE. Goodness.' : `${f} of ${t} found`;
+}
+function openBook(): void {
+  bookWorld = pickedWorld; renderBook();
+  el('book').classList.add('show');
+}
+el('btnBook')?.addEventListener('click', () => { openBook(); track('book_open', { found: foundCount() }); });
+el('bookClose')?.addEventListener('click', () => el('book').classList.remove('show'));
+/** the menu chip's own count, refreshed whenever the menu is shown */
+function paintBookChip(): void {
+  const e = document.getElementById('bookCount');
+  if (e) e.textContent = `${foundCount()}/${totalCount()}`;
+}
+paintBookChip();
+
 function validateWorld() {
   let moved = 0;
   const cull: number[] = [];
