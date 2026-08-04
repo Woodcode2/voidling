@@ -264,6 +264,22 @@ repeats across a whole match is a blunt instrument for a per-pool guarantee.
   **The existing `store/*.png` are from the retired 2D game — Guideline 2.3.3
   is what the last submission was rejected for.**
 
+**Needs the owner's ears (nothing here can hear audio):**
+- **The four music slots are empty.** `public/assets/music/{maple,pirate,
+  gameday,lantern}.mp3` — drop a file in and that world plays it; no flag, no
+  code change. Every world falls back to its own synth score today and none of
+  them is silent (`node qa/music.mjs` proves which is playing, at spawn, mid
+  and full size). The dev container's egress proxy blocks every music library,
+  so a session cannot fetch or audition a track. `public/assets/music/README.md`
+  has the licence rule, a per-slot shortlist with links, and both landing
+  routes — by hand, or by manifest through `.github/workflows/fetch-assets.yml`.
+- **GAME DAY's opening is the sparsest score in the game** at 9 voices/sec
+  against 15, 27 and 35. It was 4 before the stage-0 rudiment went in. The
+  number says it is no longer a hole; only an ear can say it is good.
+- **`theme.mp3` has no licence record.** 1.4 MB, in `public/`, therefore in the
+  shipping bundle, gated behind `voidTheme=1` so nothing plays it. It came from
+  the legacy 2D game. Establish where it came from or take it out of `public/`.
+
 **Product gaps:**
 - **No failure state.** You cannot lose. This is a real design question and
   it is the owner's call, not an engineering one.
@@ -283,7 +299,24 @@ repeats across a whole match is a blunt instrument for a per-pool guarantee.
 
 ## 8. The QA kit
 
-`artifacts/3d-game/qa/` — fourteen Playwright probes. `pace.mjs` is the
+`artifacts/3d-game/qa/` — sixteen probes. Two are new and neither needs a
+browser to be useful: `newsstyle.mjs` is a static check that makes the four
+newsrooms' HOUSE STYLE boxes enforceable instead of aspirational (at most 45%
+two-sentence lines, at least 35% single-sentence, real questions present, the
+punctuation ladder per beat, the six-token vocabulary, 78 characters at
+worst-case token fill, and no article in front of {D} — 25 of the 34 district
+names bring their own). `music.mjs` answers which score each world is actually
+playing, which nothing could answer before, because both failure modes are
+silent: an empty slot falls back to the synth and so does a file that
+downloads fine and will not decode.
+
+**The lesson those two encode: render the card, do not read the pool.** Every
+newsroom bug this week was invisible in the source and obvious on screen — "It
+ate a guest", "and a truck, in motion was gone", "There is no the tailgate to
+stay with", a hero cue eight characters past the ticker width. `qa/_news.mjs
+<world>` fires headlines at each tier and prints them.
+
+The rest: `pace.mjs` is the
 important one: it found that the two worlds a child plays first were the two
 whose matches died in the last forty seconds. Also `sizes`/`dens` for "it feels
 empty" as a number, `pockets` for invisible walls, `contrast2` for HUD
