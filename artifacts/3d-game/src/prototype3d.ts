@@ -535,6 +535,7 @@ const _dbg = window as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __news: () => void;
+  __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
   __biomeAt: (x: number, z: number) => string | null;
   __rushClock: (to: number) => void;
@@ -572,6 +573,12 @@ _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m 
 // baseline), so qa/fresh.mjs drives THIS — the shipped function, not a copy —
 // a hundred thousand times and settles it on the statistics instead.
 _dbg.__pickFresh = pickFresh;
+// QA: repaint the hero's four body colours live. Every argument about whether
+// he reads as DEFINED — dark heart, crisp lit rim, real separation between the
+// two — is a question about these four numbers, and settling it by editing the
+// palette and waiting for a rebuild is how it stayed unsettled. qa/voidgrid.mjs
+// drives this to shoot a whole sweep in one run.
+_dbg.__setSkin = (s: Record<string, unknown>) => voidling.setSkin(s as never);
 // QA: the AUTHORED spawn, which is not the same as where the void is a few
 // seconds in — it drifts toward whatever it is eating. Spawn-framing checks
 // have to test against this, not against __voidState().

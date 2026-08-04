@@ -12,10 +12,21 @@ export const VOID = {
   // warmed toward true PURPLE (more red, less indigo) — matches the key art.
   // Brightened: the face-on disc must read MEDIUM purple (cute plush toy),
   // never near-black — the abyss survives only as a small dark heart.
-  abyss: 0x321253,      // gradient centre — deep space heart (small, not the whole face)
-  bodyInner: 0x6128ad,  // inner — clearly purple even in shade
-  bodyMid: 0x8f4ce6,    // mid-body — vivid warm purple
-  bodyRim: 0xb678ff,    // lit warm-violet rim (crisp, high contrast vs core)
+  // THE DEFINITION PASS. These four used to be 0x321253 / 0x6128ad / 0x8f4ce6 /
+  // 0xb678ff — four neighbouring purples with nothing between them. There was
+  // no dark heart and the "lit rim" was barely a shade off the body, so at
+  // COLOSSUS size the hero rendered as one flat bright mass: no silhouette
+  // against grass, no interior, and a face that sat on top of it like a
+  // sticker. Every premium skin in this file already knew better; King Void's
+  // own comment says "body stays dark, the RIM is the gold". Measured on a
+  // sweep of eight candidate palettes at gameplay size (qa/voidgrid.mjs), an
+  // ink core with a bright violet rim was the only family where the eyes read,
+  // the galaxy inside him read, and the edge held against every ground tone in
+  // four worlds.
+  abyss: 0x050308,      // gradient centre — actual deep space, not a dark purple
+  bodyInner: 0x241055,  // inner — deep, so the interior galaxy has somewhere to live
+  bodyMid: 0x5f2ab4,    // mid-body — rich purple, no longer the brightest thing
+  bodyRim: 0xcb99ff,    // lit violet rim — this is the highlight now, by a mile
   rimLight: 0xb678ff,   // luminous event-horizon rim
   glow: 0xb875ff,       // warm amethyst aura
   swirl: 0xd4b2ff,      // faint interior swirl arcs
@@ -109,7 +120,7 @@ export interface Skin {
   streak?: number;                                 // unlock by daily play streak
 }
 export const SKINS: Skin[] = [
-  { id: 'classic', name: 'Classic', abyss: 0x321253, inner: 0x6128ad, mid: 0x8f4ce6, rim: 0xb678ff, glow: 0xb875ff },
+  { id: 'classic', name: 'Classic', abyss: 0x050308, inner: 0x241055, mid: 0x5f2ab4, rim: 0xcb99ff, glow: 0xb98cff },
   // Toxic pushed off Rexling's deep dinosaur green toward acid lime, so the
   // 150-coin skin no longer arrives first and undercuts the paid one.
   { id: 'toxic', name: 'Toxic', abyss: 0x14300c, inner: 0x357a12, mid: 0x7ec832, rim: 0xc4ff6a, glow: 0xd8ff8a, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },

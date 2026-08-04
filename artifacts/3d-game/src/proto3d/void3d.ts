@@ -138,7 +138,13 @@ const VOID_FRAG = `
     // (body stays dark, the RIM is the gold) and its shop card, which draws a
     // dark orb with a thin gold edge. Pulled out to 0.74 so mid and inner
     // carry the character and the rim is the lit lip of the hole.
-    col = mix(col, uRim, smoothstep(mix(0.74, 0.50, uSmall), 1.0, u));
+    // …and NARROWER than it was. u is the normalised disc radius, so the old
+    // 0.74 stop painted rim over 1 - 0.74^2 = 45% of the disc AREA — a wide
+    // soft halo, which is the opposite of definition. 0.86 is 26%, a lit lip
+    // rather than a gradient, and the body underneath finally has room to be
+    // dark. uSmall still fattens it at speck size so it never drops below a
+    // pixel and dissolves into the ground.
+    col = mix(col, uRim, smoothstep(mix(0.86, 0.50, uSmall), 1.0, u));
     // premium skin: wrap the AI texture around the orb (slow drift), keep
     // the darker core + lit rim so it still reads as a VOID
     if (uTexAmt > 0.01) {
