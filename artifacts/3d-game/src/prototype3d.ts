@@ -2289,6 +2289,16 @@ function capture(e: Edible, giveHunger = true) {
       spawnPuff(e.mesh.position.x, 1.2, e.mesh.position.z, 14);
       buzz(30);
       breakingNews(`${got.name} has gone. It was ${got.where.toLowerCase()} the whole time.`);
+      // FIRST ONE EVER. Nothing else in the game says the Scrapbook exists, so
+      // without this a child gets a nice banner, never opens the menu card,
+      // and never learns there are forty seven more.
+      let seen = '1';
+      try { seen = localStorage.getItem('voidBookSeen') ?? ''; } catch { /* private mode */ }
+      if (!seen) {
+        try { localStorage.setItem('voidBookSeen', '1'); } catch { /* private mode */ }
+        setTimeout(() => announceBeat('📗', 'YOUR SCRAPBOOK',
+          `${totalCount() - 1} MORE ARE HIDDEN OUT THERE`, 1), 2600);
+      }
     }
   }
   // remember the last meal so the news can report on it BY NAME
@@ -2804,6 +2814,18 @@ let _validated = false;   // homes are canonical after the first pass — later 
 // ══ THE SCRAPBOOK, ON SCREEN ══════════════════════════════════════════════
 const TIER_ICON: Record<string, string> = { common: '🔹', rare: '💜', legendary: '⭐' };
 
+/** THE STICKER'S FACE. Painted art if we have it, the tier glyph if we do not.
+ *  The art is 48 separate files that land through CI, so at any moment some,
+ *  none or all of them exist — an <img> that swaps itself for the glyph on
+ *  error means the book is never broken and never waits, and a half-delivered
+ *  art set degrades one cell at a time instead of all at once. */
+function stickerFace(st: Sticker, px: number): string {
+  const g = TIER_ICON[st.tier];
+  return `<img class="stkArt" src="/assets/stickers/${st.id}.webp" alt="" width="${px}" height="${px}"`
+    + ` loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'),`
+    + `{textContent:'${g}'}))">`;
+}
+
 /** The results-screen reveal. Nothing at all on a run with no finds — an empty
  *  trophy case is worse than no trophy case. */
 function renderFinds(): void {
@@ -2813,7 +2835,7 @@ function renderFinds(): void {
   if (!got.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<div class="fLbl">${got.length === 1 ? 'NEW STICKER' : `${got.length} NEW STICKERS`}</div>`
     + got.map((g, i) => `<div class="stk t-${g.tier}" style="animation-delay:${0.12 + i * 0.16}s">`
-      + `<i>${TIER_ICON[g.tier]}</i><span><b>${g.name}</b>`
+      + `${stickerFace(g, 44)}<span><b>${g.name}</b>`
       + `<s>${g.where.toUpperCase()} · ${g.tier.toUpperCase()}</s></span></div>`).join('');
 }
 
@@ -2834,7 +2856,7 @@ function renderBook(): void {
     // clue is the entire point of a gap, so it is a to-do list rather than a
     // locked door, and it is the same sentence the newsroom has been saying.
     return `<div class="bkCell ${got ? 'got' : 'miss'} t-${st.tier}">`
-      + `<i>${TIER_ICON[st.tier]}</i>`
+      + (got ? stickerFace(st, 56) : `<i>${TIER_ICON[st.tier]}</i>`)
       + `<b>${got ? st.name : '· · ·'}</b>`
       + `<s>${got ? st.where.toUpperCase() : st.hint}</s></div>`;
   }).join('');

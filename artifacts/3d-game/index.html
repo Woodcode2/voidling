@@ -414,6 +414,11 @@
         padding: 10px 14px; border-radius: 16px; text-align: left;
         background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.16); }
       .stk i { font-size: 26px; font-style: normal; line-height: 1; }
+      /* the painted card. object-fit contain so a tall subject is never
+         cropped through the middle — these are illustrations of one object
+         and the object is the whole point. */
+      .stkArt { display: block; border-radius: 10px; object-fit: contain; flex: 0 0 auto; }
+      .bkCell .stkArt { width: 56px; height: 56px; margin-bottom: 2px; }
       .stk b { display: block; font-size: 15px; font-weight: 700; letter-spacing: 0.2px; }
       .stk s { display: block; font-size: 11.5px; font-weight: 600; opacity: 0.66;
         text-decoration: none; letter-spacing: 0.6px; }
