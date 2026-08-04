@@ -253,9 +253,46 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
              off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.34 },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
-const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, 0.22);
+
+// ── ONE RIG, APPLIED IN ONE PLACE ──────────────────────────────────────────
+// THE GAME WAS LIT DIFFERENTLY ON EVERY MATCH AFTER THE FIRST, in all four
+// worlds, and had been for as long as resetMatch has existed. The rig is built
+// here from three numbers that are not in WORLD_LIGHT — a hemisphere pinned at
+// 0.22, the key paid back by 1.31, exposure at 1.0 — and `scene
+// .backgroundIntensity` was never set here at all, so it sat at three's
+// default of 1. resetMatch() then wrote the RAW table values over all four.
+//
+// Measured on the live scene: Maple's key:fill went 10.42 -> 3.50 the instant
+// a child tapped PLAY AGAIN, Game Day 15.18 -> 2.97, Lantern 2.50 -> 0.40, and
+// the sky dropped 45%. Three times less contrast, on the screen that decides
+// whether there is a third match. No returning player has ever seen this game
+// lit the way it was tuned.
+//
+// The constructor is the authored side — the 0.22 and the 1.31 are the RESULT
+// of the fill-vs-key measurement written up above WORLD_LIGHT, and resetMatch
+// simply never got the memo. So the fix is to name those numbers once and have
+// both paths read them. Nothing about match 1 changes in any world, which is
+// the point: every screenshot, every palette call and every art argument in
+// this repo was made against match 1.
+const RIG = {
+  /** the key, paid back after the fill measurement */
+  sunI: LIGHT.sunI * 1.31,
+  /** flat across worlds on purpose — the per-world hemiI in the table was
+   *  never once applied at construction, and every world was tuned without it */
+  hemiI: 0.22,
+  exposure: 1.0,
+  bgI: 1.0,
+};
+/** The ONLY place these four are written. Called at boot and on every reset. */
+function applyLightRig(): void {
+  sun.intensity = RIG.sunI;
+  hemi.intensity = RIG.hemiI;
+  renderer.toneMappingExposure = RIG.exposure;
+  scene.backgroundIntensity = RIG.bgI;
+}
+const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, RIG.hemiI);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunI * 1.31);
+const sun = new THREE.DirectionalLight(LIGHT.sun, RIG.sunI);
 const sunOff = new THREE.Vector3(...LIGHT.off);
 sun.position.copy(sunOff);
 sun.castShadow = true;
@@ -2212,7 +2249,7 @@ function capture(e: Edible, giveHunger = true) {
   if (e.radius > voidling.radius && tClock > chompCd) {
     chompCd = tClock + 7;
     bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
-  } else { audio.pop(combo, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
+  } else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
   // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'big')
   e.mesh.userData.byPlayer = true;   // the DEVOURED meter is split you-vs-family
@@ -2920,9 +2957,10 @@ function resetMatch() {
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
-  sun.color.copy(SUN_DAY); renderer.toneMappingExposure = LIGHT.exposure; outroT = 0;
-  hemi.color.copy(HEMI_DAY); hemi.intensity = LIGHT.hemiI; scene.backgroundIntensity = 0.55;
-  island.setDusk(LIGHT.dusk); sun.intensity = LIGHT.sunI;
+  // colours and dusk reset per match; the four INTENSITIES come from the one
+  // rig, so a replay is lit exactly like the first match (see RIG above)
+  sun.color.copy(SUN_DAY); hemi.color.copy(HEMI_DAY); island.setDusk(LIGHT.dusk);
+  applyLightRig(); outroT = 0;
   el('end').classList.remove('show');
   timerEl.style.color = '';
   beginMatch(soloMode);
@@ -4159,7 +4197,19 @@ function animate() {
       if (d < reach * 0.85) hungryT = tClock;   // food in the well: the face gets HUNGRY
       e.mesh.position.x -= (dx / d) * dt * pull;
       e.mesh.position.z -= (dz / d) * dt * pull;
-      e.mesh.rotation.z = (dx / d) * Math.min(0.16, (1 - d / reach) * 0.3);
+      // …AND IT LEANS. This was capped at 0.16 rad — NINE DEGREES — which is
+      // a nudge nobody has ever noticed. The single frame this genre sells
+      // itself on is a lamppost or a hotel keeling over the rim and hanging
+      // there for a beat before it goes, and at nine degrees we were not
+      // taking that frame. 0.75 rad is 43 degrees: a real topple. It is scaled
+      // by how far into the well the prop is, so distant things still only
+      // shiver and the lean builds as it is drawn in.
+      // Tilt on BOTH axes, toward the void rather than only side to side — a
+      // prop directly up-screen of the hero was leaning sideways instead of
+      // toward it, which reads as a wobble instead of a fall.
+      const leanK = Math.min(0.75, (1 - d / reach) * 1.35);
+      e.mesh.rotation.z = (dx / d) * leanK;
+      e.mesh.rotation.x = -(dz / d) * leanK;
       e.mesh.userData.drifted = true;
     }
   }

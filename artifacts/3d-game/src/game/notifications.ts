@@ -5,11 +5,31 @@
 import { track } from './services';
 
 const REMINDER_ID = 1001;
+// ── WHAT A PUSH NOTIFICATION TO A SIX-YEAR-OLD IS ALLOWED TO SAY ────────────
+// Two of these four were reward pressure aimed at children:
+//
+//   'Snack o clock 🌆' / 'One quick round? Your family already started
+//                         without you.'
+//   'Streak check ⭐'  / 'Keep your Daily Bite streak alive — bonus coins
+//                         today.'
+//
+// The first manufactures a peer dynamic — your family is playing and you are
+// missing it — and the second is loss framing: something you own is dying
+// unless you open the app now. CARU's guidelines prohibit both for children
+// specifically, and the ICO Children's Code treats streak mechanics as a nudge
+// technique (it is why Snapchat had to build a streak pause). Neither is a
+// grey area, and a screenshot of that second line is a review-bomb waiting to
+// happen on a 4+ game.
+//
+// The replacements offer something rather than threaten to take something
+// away. Nothing here says "your streak", nothing says "before it is gone",
+// nothing invokes other people. If a line cannot survive being read aloud by
+// a parent to the child it was sent to, it does not ship.
 const LINES = [
   ['Your DAILY BITE is ready 🍩', 'The city rebuilt itself overnight. Rude. Go eat it again.'],
   ['The void is hungry 😋', 'Daily Bite bonus coins are waiting. The mayor is nervous.'],
-  ['Snack o’clock 🌆', 'One quick round? Your family already started without you.'],
-  ['Streak check ⭐', 'Keep your Daily Bite streak alive — bonus coins today.'],
+  ['New day, new town 🌆', 'There is a fresh Daily Bite whenever you fancy one.'],
+  ['Something big turned up ⭐', 'Today\'s Daily Bite has bonus coins in it. No rush.'],
 ];
 
 const isNative = (): boolean =>

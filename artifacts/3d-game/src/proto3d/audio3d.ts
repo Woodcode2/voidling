@@ -21,7 +21,7 @@ import { worldId } from './island';
 type Ctx = AudioContext;
 
 export interface Audio3D {
-  pop(combo: number, size?: number): void;   // eat — pitch rises with combo, deepens with size
+  pop(combo: number, mealR?: number, voidR?: number): void;   // eat — pitch rises with combo, deepens with WHAT WAS EATEN
   gulp(): void;                    // GULP whoosh
   rocket(): void;                  // ROCKET BITE zip
   collapse(): void;                // COLLAPSE boom
@@ -3137,7 +3137,7 @@ export function createAudio(): Audio3D {
         musGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
       }
     },
-    pop(combo, size = 0.9) {
+    pop(combo, mealR = 0.9, voidR = 0.9) {
       // ── THE CHOMP, rebuilt ────────────────────────────────────────────────
       // The recorded gulp takes read as wet and rough on a phone speaker, so
       // they're out of the eat sound entirely (they still carry bigEat). This
@@ -3154,7 +3154,20 @@ export function createAudio(): Audio3D {
       // a gap in eating resets the melody back to the root
       if (now - lastPop > 1.1) comboStep = 0; else comboStep = (comboStep + 1) % PENTA.length;
       lastPop = now;
-      const depth = Math.min(1, (size - 0.9) / 9);            // 0 tiny -> 1 huge
+      // ── DEPTH FOLLOWS THE MEAL, NOT THE MOUTH ──────────────────────────
+      // This read `voidling.radius` at the call site, so `depth` described how
+      // big the PLAYER was and knew nothing about what had just gone down. A
+      // seven-unit hotel and a traffic cone eaten in the same second produced
+      // byte-identical audio, and every bite in a WORLD ENDER's last thirty
+      // seconds was the same bass note whatever it hit. Children hear size
+      // before they see it, and this is the cheapest size cue in the build —
+      // it costs no GPU at all.
+      // The player's own size still gets a third of the vote, because a big
+      // void genuinely should sound heavier across the board; it just no
+      // longer gets all of it.
+      const mealD = Math.min(1, Math.max(0, mealR / 6));
+      const voidD = Math.min(1, Math.max(0, (voidR - 0.9) / 9));
+      const depth = mealD * 0.7 + voidD * 0.3;               // 0 tiny -> 1 huge
       const semis = PENTA[comboStep] + Math.min(12, Math.floor(combo / 3) * 2);
       // big voids sing LOWER: a world-ender's nom is a bass note, not a chirp
       const base = 300 * Math.pow(2, semis / 12) * (1 - depth * 0.52);
