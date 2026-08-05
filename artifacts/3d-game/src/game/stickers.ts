@@ -111,7 +111,16 @@ const PIRATE: Sticker[] = [
   { id: 'crab-manager', world: 'pirate', name: 'The Crab In Management', where: 'Smugglers Cove', biome: 'cove',
     hint: 'Employee of the month. Runs the rock pools. Do not argue.', tier: 'rare',
     art: 'a round orange crab wearing a tiny name badge' },
-  { id: 'flip-flop', world: 'pirate', name: 'The Other Flip-Flop', where: 'The Beach', biome: 'beach',
+  // DANCE COVE, NOT THE BEACH, AND IT IS LOAD-BEARING. Dance Cove is where
+  // Pirate Bay drops you, and it used to hold exactly one curio: DJ Coconut,
+  // a LEGENDARY at radius 2.8 against a void that starts at 0.9. So the child
+  // stood in a district whose only collectible was three times too big to eat,
+  // with the nearest eatable one 181 units away — against 30u in Game Day, 47u
+  // in Lantern Night and 59u in Maple Falls. Measured, that made Pirate Bay
+  // the only world where a wandering child's first find came at 119 seconds.
+  // A single lost flip-flop is the most natural object at a beach dance there
+  // is, and it gives the spawn district something a starting void can swallow.
+  { id: 'flip-flop', world: 'pirate', name: 'The Other Flip-Flop', where: 'Dance Cove', biome: 'party',
     hint: 'Eleven in lost property and not one matching pair.', tier: 'common',
     art: 'one single blue rubber flip-flop sandal' },
   { id: 'inflatable-swans', world: 'pirate', name: 'Crate 400', where: 'The Port', biome: 'port',

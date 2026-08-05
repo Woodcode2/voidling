@@ -323,7 +323,6 @@ export function islandOutline3(): [number, number][] {
   return silPoly().map(([wx, wy]) => [w(wx), w(wy)] as [number, number]);
 }
 function insideIslandWorld(wx: number, wy: number): boolean {
-  (window as never as Record<string, number>).__C_iiw = (((window as never as Record<string, number>).__C_iiw) || 0) + 1; // PERFCOUNT
   // Pirate Bay: its own hooked coastline, and the BAY water is not land
   if (WORLD_ID === 'pirate') return BAY.onBayLand(wx, wy);
   if (WORLD_ID === 'gameday') return GD.onGameDayLand(wx, wy);
@@ -392,7 +391,6 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
  *  river does not. Static props and the walking crowd keep using inWater3 —
  *  a townsperson standing mid-current is a different problem. */
 export function inDeepWater3(x3: number, z3: number, margin = 0): boolean {
-  (window as never as Record<string, number>).__C_deep = (((window as never as Record<string, number>).__C_deep) || 0) + 1; // PERFCOUNT
   if (WORLD_ID === 'pirate') return false;
   if (WORLD_ID === 'lantern') return false;     // the canal is shallow — see inWater3
   if (WORLD_ID === 'gameday') return false;     // no water on the plateau — see inWater3
@@ -419,7 +417,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   // the star shader's clock — ticked from update() so the field scintillates
   let starMatRef: THREE.ShaderMaterial | null = null;
-(window as any).__bt?.push(['island:sky', performance.now()]);
     // ── space backdrop ─────────────────────────────────────────────────────────
   // WHAT WAS HERE: scene.background = one flat colour, and a painted nebula
   // that swaps in from a CDN when it loads. Which means the sky is a SINGLE
@@ -528,7 +525,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     scene.backgroundIntensity = 0.55;   // deep rich nebula, not washed lavender
   });
 
-(window as any).__bt?.push(['island:starfield', performance.now()]);
     // ── THE STARFIELD ──────────────────────────────────────────────────────────
   // WHAT WAS HERE: 900 points, one size, one colour, one opacity, no motion.
   // Every star in the sky identical — which is the one thing a real sky never
@@ -625,7 +621,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     scene.add(halo);
   }
 
-(window as any).__bt?.push(['island:groundbake', performance.now()]);
     // ── baked ground texture ───────────────────────────────────────────────────
   const TEX = 3072;   // high-res bake so roads/crosswalks stay crisp up close
   const cv = document.createElement('canvas'); cv.width = cv.height = TEX;
@@ -2119,7 +2114,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   g.setLineDash([]);
   g.strokeStyle = '#c7ccd6'; g.lineWidth = Math.max(1.5, (pxW(104) - pxW(0)) * 0.1); railPath(); g.stroke(); // rail sheen
 
-(window as any).__bt?.push(['island:river', performance.now()]);
     // ── RIVER, drawn as a real waterway ────────────────────────────────────
   // It used to be straight lineTo segments with round caps, so short spans
   // rendered as hard-edged PILLS and every bend was a visible kink. Now the
@@ -2345,7 +2339,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
     topGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
-(window as any).__bt?.push(['island:grain', performance.now()]);
     // ── GROUND GRAIN ────────────────────────────────────────────────────────
   // detail-grain overlay: small tiling noise multiplied into the ground so it
   // reads as TEXTURE up close rather than as blurry paint.
@@ -2557,7 +2550,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     }
   }
 
-(window as any).__bt?.push(['island:waterfall', performance.now()]);
     // ── waterfall at the SE edge (animated) ────────────────────────────────────
   const wfX = w(WATERFALL[0]), wfZ = w(WATERFALL[1]);
   const wfTex = (() => {
@@ -2585,7 +2577,6 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   spray.scale.setScalar(0.32); (spray.material as THREE.MeshBasicMaterial).opacity = 0.2;
   spray.rotation.x = -Math.PI / 2; spray.position.set(wfX, -22, wfZ); scene.add(spray);   // AT the waterfall foot — not a UFO over the abyss
 
-(window as any).__bt?.push(['island:pre-populate', performance.now()]);
     // ── PROPS: populate each block per biome ───────────────────────────────────
   populate(scene, addEdible);
 
@@ -2685,10 +2676,8 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   let balloon: THREE.Group | null = null;
   setBalloonHook((grp) => { balloon = grp; });
 
-(window as any).__bt?.push(['island:post-populate', performance.now()]);
     // ── biome lookup ───────────────────────────────────────────────────────────
   function biomeAt(x3: number, z3: number): Biome | null {
-    (window as never as Record<string, number>).__C_biome = (((window as never as Record<string, number>).__C_biome) || 0) + 1; // PERFCOUNT
     if (WORLD_ID === 'pirate') {
       const d = BAY.bayDistrictAt(x3 / SCALE + CX, z3 / SCALE + CZ);
       return d === 'oldtown' ? 'market' : (d as Biome | null);

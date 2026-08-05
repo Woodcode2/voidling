@@ -125,6 +125,18 @@ for (const wid of WORLDS) {
     if (d < -1e6) sawDrop++; else if (d > 0) alloc += d;
   }
   const dur = F.length ? F[F.length - 1][1] - F[0][1] : 1;
+  // DO THE SPIKES LINE UP WITH A COLLECTION? A frame whose heap shrank is a
+  // frame the collector ran in. Compare the spike population against the base
+  // rate, because "some spikes had a GC" means nothing without it.
+  const med = js[Math.floor(js.length / 2)];
+  let spikeN = 0, spikeGC = 0, allGC = 0;
+  for (let i = 1; i < F.length; i++) {
+    const gc = F[i][4] > 0 && F[i][4] < F[i - 1][4] - 2e6;
+    if (gc) allGC++;
+    if (F[i][0] > med * 3) { spikeN++; if (gc) spikeGC++; }
+  }
+  const gcLink = { spikes: spikeN, withGC: spikeGC, baseRate: +(100 * allGC / F.length).toFixed(1),
+    spikeRate: +(100 * spikeGC / Math.max(1, spikeN)).toFixed(1) };
 
   // ── CPU profile: top self time ────────────────────────────────────────
   const nodes = prof.profile.nodes;
@@ -146,12 +158,13 @@ for (const wid of WORLDS) {
     worst: idx.map(([ms, i]) => ({ ms, t: F[i][1], r: F[i][2], alive: F[i][3], near: markNear(i) })),
     heapMB0: +(mem0 / 1048576).toFixed(1), heapMBn: +(memN / 1048576).toFixed(1),
     gcDrops: sawDrop, allocMBperSec: +(alloc / 1048576 / Math.max(1, dur)).toFixed(2),
-    marks: MARK.length, top };
+    marks: MARK.length, top, gcLink };
   console.log(`\n===== ${wid.toUpperCase()} =====`);
   const o = out[wid];
   console.log(`frames ${o.frames} over ${o.matchSec}s match   JS ms: mean ${o.mean}  p50 ${o.p50}  p90 ${o.p90}  p95 ${o.p95}  p99 ${o.p99}  MAX ${o.max}`);
   console.log(`frames over 8ms ${o.over8} (${(100*o.over8/o.frames).toFixed(1)}%)  over 16ms ${o.over16}  over 33ms ${o.over33}`);
   console.log(`heap ${o.heapMB0} -> ${o.heapMBn} MB   allocation ${o.allocMBperSec} MB/match-sec   GC drops ${o.gcDrops}`);
+  console.log(`spikes (>3x median ${o.p50}ms): ${gcLink.spikes} frames, ${gcLink.withGC} of them (${gcLink.spikeRate}%) had a heap drop; base rate across all frames ${gcLink.baseRate}%`);
   console.log('worst frames:');
   for (const w of o.worst) console.log(`  ${String(w.ms).padStart(8)}ms  t=${String(w.t).padStart(6)}s r=${String(w.r).padStart(5)} alive=${String(w.alive).padStart(4)}  ${w.near}`);
   console.log('top self time (CPU profile, 200us sampling):');
