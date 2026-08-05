@@ -1,5 +1,6 @@
 artifacts/3d-game/public/assets/stickers
-# retry of the 14 that silently never reached disk in the 44-entry run
+# the 14 that never reached disk, plus 4 cards regenerated because they
+# were unreadable at 56px: the beetle, the maze, the seagull, the tower.
 pearl-zucchini	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_d1bdcb70-092f-4f2f-bd94-276e29956645.png	Generated for VOIDLING, owned by the project
 gus-sandwich	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_49e06c2c-af50-4c64-b0fd-a80c8309ed15.png	Generated for VOIDLING, owned by the project
 library-book	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171437_e975cebf-9e09-4443-85d9-b7470d7e8684.png	Generated for VOIDLING, owned by the project
@@ -14,3 +15,7 @@ eleven-bowls	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCm
 offering-box	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_89a2a171-6bc9-4426-9c84-f046b72ac69b.png	Generated for VOIDLING, owned by the project
 ponta-dumpling	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_a0fecf31-985f-4075-b4a2-413a44587d09.png	Generated for VOIDLING, owned by the project
 good-cup	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_9dc1f64c-10a7-4bf8-8ab0-656b2ac0856c.png	Generated for VOIDLING, owned by the project
+kevin-beetle	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_173859_76924ba8-f10a-4f56-b725-c33d19948c62.png	Generated for VOIDLING, owned by the project
+maze-middle	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_173859_3d153508-f421-4bd2-a505-41861a679b64.png	Generated for VOIDLING, owned by the project
+harbour-seagull	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_173859_a9c3624e-fd5e-45be-84d8-f48f594b0353.png	Generated for VOIDLING, owned by the project
+water-tower	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_173859_71d014d2-8696-4ddf-95cf-771f3fa01b8a.png	Generated for VOIDLING, owned by the project

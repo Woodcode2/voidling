@@ -85,10 +85,10 @@ const MAPLE: Sticker[] = [
   // of thing only a placement census finds.
   { id: 'water-tower', world: 'maple', name: 'The Water Tower', where: 'The Fairgrounds', biome: 'fair',
     hint: 'Repainted in 1991. It says MAPLE FALLS and it holds.', tier: 'common',
-    art: 'a small white water tower on four steel legs with a round tank' },
+    art: 'a tall water tower, a round silver tank on four tall steel legs with a ladder' },
   { id: 'maze-middle', world: 'maple', name: 'The Middle Of The Corn Maze', where: 'The Farm', biome: 'farm',
     hint: 'Norm went in during October. Norm liked it so much he stayed.', tier: 'legendary',
-    art: 'a small circle of trodden ground at the centre of tall green maize, seen from above' },
+    art: 'a square green hedge maze seen from directly above, with winding paths' },
   { id: 'twine-trophy', world: 'maple', name: 'The 1978 Trophy', where: 'Pine Woods', biome: 'woods',
     hint: 'The year we peaked. Somebody took it camping and never brought it back.', tier: 'rare',
     art: 'a small gold sports trophy with two handles on a wooden base' },
@@ -125,13 +125,13 @@ const PIRATE: Sticker[] = [
     art: 'an absurdly wide floppy straw sun hat' },
   { id: 'kevin-beetle', world: 'pirate', name: 'Kevin', where: 'The Jungle', biome: 'jungle',
     hint: 'Maisie has named thirty one beetles. Every one of them is Kevin.', tier: 'rare',
-    art: 'one small shiny green rhinoceros beetle' },
+    art: 'a chunky green beetle with one curved horn on its head, seen from above' },
   { id: 'royal-mariner', world: 'pirate', name: 'The Royal Mariner', where: 'The Resort', biome: 'resort',
     hint: 'You will need to be considerably larger. Do book for next year.', tier: 'legendary',
     art: 'a grand white cruise ship with a red funnel' },
   { id: 'harbour-seagull', world: 'pirate', name: 'The Harbour Master\'s Chair', where: 'The Port', biome: 'port',
     hint: 'A seagull has it now and will not be moved.', tier: 'common',
-    art: 'a weathered wooden harbourmaster\'s chair with a seagull sitting on it' },
+    art: 'a white seagull standing on the back of a weathered wooden chair' },
 ];
 
 // ── GAME DAY ──────────────────────────────────────────────────────────────
