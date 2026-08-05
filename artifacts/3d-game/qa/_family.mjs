@@ -22,7 +22,11 @@ fs.mkdirSync('qa-out/family', { recursive: true });
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
-const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 });
+// DPR is an argument because this box is shared: at 3 the software renderer is
+// painting 3.6 megapixels a frame and a boot never lands. The uniform dump and
+// the occlusion answer are both DPR-independent.
+const DPR = Number(process.argv[3] || 1);
+const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: DPR });
 await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try {
   localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');

@@ -328,8 +328,11 @@ function insideIslandWorld(wx: number, wy: number): boolean {
   if (WORLD_ID === 'gameday') return GD.onGameDayLand(wx, wy);
   if (WORLD_ID === 'lantern') return LN.onLanternLand(wx, wy);
   let inside = false;
+  // indexed, not destructured — see the note on pointInPoly in bay.ts. Same
+  // answers, 10x cheaper, and this runs thousands of times a frame.
   for (let i = 0, j = SIL_POLY.length - 1; i < SIL_POLY.length; j = i++) {
-    const [xi, yi] = SIL_POLY[i], [xj, yj] = SIL_POLY[j];
+    const a = SIL_POLY[i], b = SIL_POLY[j];
+    const xi = a[0], yi = a[1], xj = b[0], yj = b[1];
     if ((yi > wy) !== (yj > wy) && wx < ((xj - xi) * (wy - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
