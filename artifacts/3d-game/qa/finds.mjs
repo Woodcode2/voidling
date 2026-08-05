@@ -126,7 +126,7 @@ for (const wid of WORLDS) {
     rows.push({ wid, run, placed, ...r });
     console.log(`${wid.padEnd(8)} ${POLICY.padEnd(6)} run${run + 1}  hid ${String(placed).padStart(2)}  found ${String(r.hits.length).padStart(2)}`
       + `  reveal ${r.reveal ? `yes (${r.revealCells})` : 'NO '}`
-      + `  at ${r.hits.map((h) => `${h.t}s/r${h.r}`).join(' ') || '—'}`);
+      + `  at ${r.hits.map((h) => `${h.id}@${h.t}s/r${h.r}`).join(' ') || '—'}`);
     await p.close();
   }
 }
