@@ -103,7 +103,12 @@ jobs:
               webp|png)
                 px=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$dest/$name.$ext" </dev/null)
                 echo "   ${px}px"
-                [ "${px:-0}" -ge 128 ] || { echo "::error::$name is ${px}px"; exit 1; }
+                # WARN, do not die. A batch is dozens of independent cards;
+                # one that comes back odd should not throw away the rest.
+                if [ "${px:-0}" -lt 128 ]; then
+                  echo "::warning::$name is ${px}px — dropping it"
+                  rm -f "$dest/$name.$ext"; continue
+                fi
                 [ -n "$lic" ] && printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
                 ;;
             esac
@@ -125,5 +130,17 @@ jobs:
           git config user.name "voidling-assets-bot"
           git config user.email "actions@github.com"
           git add "$dest"
-          git commit -m "assets: fetch from manifest into $dest" || echo "nothing to commit"
-          git push
+          git commit -m "assets: fetch from manifest into $dest" || { echo "nothing to commit"; exit 0; }
+          # ── THE PUSH RACES THE HUMAN ─────────────────────────────────────
+          # Every manifest push starts a run, and each run ends by pushing a
+          # commit of its own. Push three manifests in five minutes — which is
+          # exactly what generating 48 cards in batches looks like — and run A
+          # finishes into a branch that has moved twice since it checked out.
+          # A bare `git push` then fails non-fast-forward, the job goes red,
+          # and the art it just fetched and converted is thrown away with the
+          # runner. Two runs died this way before anyone looked.
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "$(git rev-parse --abbrev-ref HEAD)" && git push && exit 0
+            echo "push race, retry $i"; sleep $((i * 5))
+          done
+          echo "::error::could not push after 5 attempts"; exit 1
