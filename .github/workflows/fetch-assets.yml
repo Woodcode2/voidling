@@ -54,11 +54,20 @@ jobs:
             case "$ext" in mp3|m4a|ogg|wav|png|jpg|jpeg|webp|svg|glb) ;; *) ext=bin ;; esac
             [ -z "$name" ] && name="candidate-$i"
             echo "→ $name.$ext"
-            curl -fsSL --retry 3 --retry-delay 2 "$url" -o "$dest/$name.$ext"
+            # ── </dev/null IS LOAD-BEARING ────────────────────────────────
+            # curl inherits the while-read loop's stdin and EATS A BYTE of the
+            # next manifest line. Measured on the first real run: line 1
+            # landed as marge-meter.webp and the next three landed as
+            # leeping-koi, evin-beetle and ood-mustard — each missing exactly
+            # its first character, each one consumed by the previous
+            # iteration's curl. The game looks those files up by exact id, so
+            # 47 of 48 stickers would have had art on disk and an empty cell
+            # on screen, with nothing anywhere reporting a problem.
+            curl -fsSL --retry 3 --retry-delay 2 "$url" -o "$dest/$name.$ext" </dev/null
             [ -s "$dest/$name.$ext" ] || { echo "::error::empty: $url"; exit 1; }
             # open-source Chromium cannot decode AAC, so m4a never survives
             if [ "$ext" = "m4a" ]; then
-              ffmpeg -y -loglevel error -i "$dest/$name.m4a" -codec:a libmp3lame -b:a 160k "$dest/$name.mp3"
+              ffmpeg -nostdin -y -loglevel error -i "$dest/$name.m4a" -codec:a libmp3lame -b:a 160k "$dest/$name.mp3"
               rm "$dest/$name.m4a"; ext=mp3
             fi
             # ── A 1024px PNG PER STICKER IS 72 MB OF REPO FOR A 56px CELL ─────
@@ -70,7 +79,7 @@ jobs:
             # the game asks for.
             case "$ext" in
               png|jpg|jpeg)
-                ffmpeg -y -loglevel error -i "$dest/$name.$ext" \
+                ffmpeg -nostdin -y -loglevel error -i "$dest/$name.$ext" \
                   -vf "scale=512:512:force_original_aspect_ratio=decrease" \
                   -quality 88 "$dest/$name.webp"
                 rm "$dest/$name.$ext"; ext=webp
@@ -81,7 +90,7 @@ jobs:
             # empty cell. Prove it decodes here.
             case "$ext" in
               webp|png)
-                px=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$dest/$name.$ext")
+                px=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$dest/$name.$ext" </dev/null)
                 echo "   ${px}px"
                 [ "${px:-0}" -ge 128 ] || { echo "::error::$name is ${px}px"; exit 1; }
                 [ -n "$lic" ] && printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
@@ -89,7 +98,7 @@ jobs:
             esac
             case "$ext" in
               mp3|ogg|wav)
-                dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$dest/$name.$ext")
+                dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$dest/$name.$ext" </dev/null)
                 echo "   ${dur}s"
                 awk -v d="$dur" 'BEGIN{exit !(d>3)}' || { echo "::error::$name is ${dur}s"; exit 1; }
                 [ -n "$lic" ] && printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
