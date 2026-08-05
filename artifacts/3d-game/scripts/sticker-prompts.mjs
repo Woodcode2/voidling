@@ -44,15 +44,32 @@ if (all.length !== 48) {
 //   "plain flat background"     — the card supplies its colour, not the art
 //   "no text, no faces"         — the void is the only thing in this product
 //                                 with a face, and text would need localising
+// v2, after the four-card test batch. Two things came back wrong and both
+// were mine:
+//   BACKGROUNDS DRIFTED. "Plain flat pale background" let each card pick its
+//   own — lilac, peach, blue, cream — which in a grid of twelve is noise, and
+//   it is the exact failure the locked style exists to prevent. Fixed by
+//   naming ONE colour, and by picking a colour no subject can contain so CI
+//   can key it out: the cards become true die-cut stickers sitting on the
+//   book's own tier colour. Chroma green costs nothing at generation time and
+//   buys transparency, which is the single biggest look upgrade available.
+//   THE CONTACT SHADOW had to go with it — a shadow cast on the background is
+//   the one thing a chroma key cannot cleanly remove. The white die-cut border
+//   the model was already adding unprompted is a better sticker edge anyway.
+//   THE KOI HAD AN EYE. "No faces, no eyes" was in the string and an animal
+//   subject overrode it, so it is now stated twice and specifically.
 const STYLE = [
-  'Children\'s game sticker illustration.',
+  'Children\'s game sticker illustration, in the style of a die-cut vinyl sticker',
+  'with a clean thin white border following the silhouette.',
   'A single object, centred, complete, filling most of the frame.',
   'Soft 3D toy render: matte clay surfaces, gentle rounded bevels, chunky simple forms.',
   'Warm key light from the upper left, cool soft bounce from the lower right.',
-  'A soft round contact shadow directly beneath the object.',
-  'Plain flat pale background, no scenery, no horizon, no props other than the subject.',
+  'Isolated on a completely flat solid chroma green background, pure RGB 0 177 64,',
+  'one uniform colour, no gradient, no vignette, no scenery, no horizon,',
+  'and no shadow cast onto the background.',
   'Bright saturated friendly colours. Clean crisp edges. No text, no letters, no numbers.',
-  'No faces, no eyes, no characters. Nothing frightening.',
+  'The object must have NO FACE and NO EYES of any kind, even if it is an animal.',
+  'No characters. Nothing frightening.',
 ].join(' ');
 
 const promptFor = (s) => `${STYLE} The object is ${s.art}.`;

@@ -79,9 +79,20 @@ jobs:
             # the game asks for.
             case "$ext" in
               png|jpg|jpeg)
+                # ── KEY THE GREEN OUT ────────────────────────────────────
+                # The art is generated on flat chroma green (RGB 0,177,64) —
+                # a colour no subject in the set contains — precisely so it
+                # can be removed here for nothing. The result is a true
+                # die-cut sticker sitting on the book's own tier colour,
+                # instead of forty-eight cards each bringing its own
+                # background. That drift was the one thing the four-card test
+                # batch actually failed on.
+                # colorkey similarity 0.30 catches the compression fringe
+                # around the silhouette; blend 0.10 keeps the edge soft
+                # enough not to alias at 56 CSS pixels.
                 ffmpeg -nostdin -y -loglevel error -i "$dest/$name.$ext" \
-                  -vf "scale=512:512:force_original_aspect_ratio=decrease" \
-                  -quality 88 "$dest/$name.webp"
+                  -vf "colorkey=0x00B140:0.30:0.10,scale=512:512:force_original_aspect_ratio=decrease" \
+                  -quality 90 "$dest/$name.webp"
                 rm "$dest/$name.$ext"; ext=webp
                 ;;
             esac
