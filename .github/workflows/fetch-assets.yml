@@ -101,15 +101,27 @@ jobs:
             # empty cell. Prove it decodes here.
             case "$ext" in
               webp|png)
-                px=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$dest/$name.$ext" </dev/null)
-                echo "   ${px}px"
-                # WARN, do not die. A batch is dozens of independent cards;
-                # one that comes back odd should not throw away the rest.
-                if [ "${px:-0}" -lt 128 ]; then
-                  echo "::warning::$name is ${px}px — dropping it"
+                # ── THE CHECK THAT WAS EATING THE ART ─────────────────────
+                # This asked ffprobe for stream=width and dropped anything
+                # under 128. On a chroma-keyed webp with an alpha channel
+                # ffprobe does not reliably report a width, so px came back
+                # EMPTY, ${px:-0} made it 0, and the card was deleted as
+                # "too small" — with a warning nobody reads and a green job.
+                # Fifteen of forty eight vanished this way, and a regenerated
+                # maze-middle deleted the perfectly good copy already on
+                # disk. A safety check that destroys the thing it is
+                # checking is worse than no check.
+                # Bytes are the honest measure here: these land at 10-120 KB,
+                # and anything under 2 KB is an error page or a stub.
+                sz=$(wc -c < "$dest/$name.$ext")
+                echo "   ${sz} bytes"
+                if [ "$sz" -lt 2048 ]; then
+                  echo "::warning::$name is ${sz} bytes — dropping it"
                   rm -f "$dest/$name.$ext"; continue
                 fi
-                [ -n "$lic" ] && printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
+                if [ -n "$lic" ]; then
+                  printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
+                fi
                 ;;
             esac
             case "$ext" in
