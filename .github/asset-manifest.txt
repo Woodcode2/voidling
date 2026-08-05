@@ -1,12 +1,47 @@
 artifacts/3d-game/public/assets/stickers
-# batch 2 — Pirate Bay, plus the first two of Game Day
+# EVERYTHING REMAINING, IN ONE PUSH. Three earlier manifests in five
+# minutes had CI runs racing each other's push and two died red.
+gus-sandwich	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_49e06c2c-af50-4c64-b0fd-a80c8309ed15.png	Generated for VOIDLING, owned by the project
+vending-raccoon	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_7710925f-b2b7-4dee-b463-a33d4ab6ca59.png	Generated for VOIDLING, owned by the project
+water-tower	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_8ab9de58-01a2-4f93-a463-d40841975007.png	Generated for VOIDLING, owned by the project
+maze-middle	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_116d07c1-f6a5-4ab1-a2e9-f43bddb68468.png	Generated for VOIDLING, owned by the project
+twine-trophy	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_ce8c27e6-62ed-4fd4-b48d-db9bd053c6aa.png	Generated for VOIDLING, owned by the project
+twine-ball	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171437_1400cd28-5995-4dfa-9fc4-faddbcae7e47.png	Generated for VOIDLING, owned by the project
+pearl-zucchini	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_d1bdcb70-092f-4f2f-bd94-276e29956645.png	Generated for VOIDLING, owned by the project
+car-nine	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171437_f5804576-6517-4053-b15c-538c1bc6c6a0.png	Generated for VOIDLING, owned by the project
+library-book	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171437_e975cebf-9e09-4443-85d9-b7470d7e8684.png	Generated for VOIDLING, owned by the project
+tree-trampoline	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_eef4cc62-d416-4d83-91f3-365711b3ca0e.png	Generated for VOIDLING, owned by the project
+catfish-photo	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_98c4a10e-90d0-4fea-9b3f-79826517130e.png	Generated for VOIDLING, owned by the project
+lounger-nine	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_ea1f8c16-233b-4cde-bc19-7fdc1ad899f2.png	Generated for VOIDLING, owned by the project
+antique-compass	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_2274386d-920f-4131-9ea4-91d1a9e039b2.png	Generated for VOIDLING, owned by the project
 beach-ball-cannon	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_1009fb0b-4104-41a0-8641-c776a0af1e4a.png	Generated for VOIDLING, owned by the project
-enormous-hat	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_479a513a-a470-494d-ba23-601edc4cc7bd.png	Generated for VOIDLING, owned by the project
-gerald-sled	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_b7b7bf00-1c47-4e05-9f87-26a25a8c8d05.png	Generated for VOIDLING, owned by the project
-crab-manager	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_1364aa88-8709-42bd-8d8b-e5f51550ec30.png	Generated for VOIDLING, owned by the project
-inflatable-swans	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_213f037f-066f-4239-abd9-90834812dc11.png	Generated for VOIDLING, owned by the project
 lost-temple	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_ecdb6df7-836d-47e5-aacd-33d9f56cd0ad.png	Generated for VOIDLING, owned by the project
+crab-manager	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_1364aa88-8709-42bd-8d8b-e5f51550ec30.png	Generated for VOIDLING, owned by the project
+flip-flop	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_0370ff26-4793-4f27-8287-fcba43aba4f9.png	Generated for VOIDLING, owned by the project
+inflatable-swans	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_213f037f-066f-4239-abd9-90834812dc11.png	Generated for VOIDLING, owned by the project
 coconut-decks	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_d5e19295-968a-4c92-aa00-6ec3f88f00c0.png	Generated for VOIDLING, owned by the project
+enormous-hat	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_479a513a-a470-494d-ba23-601edc4cc7bd.png	Generated for VOIDLING, owned by the project
 royal-mariner	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_eac2845f-ab27-42c1-b2b8-ec9d049bee30.png	Generated for VOIDLING, owned by the project
 harbour-seagull	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_a0bdc3c9-8348-4a66-99d2-630d2cf8b44e.png	Generated for VOIDLING, owned by the project
+gerald-sled	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_b7b7bf00-1c47-4e05-9f87-26a25a8c8d05.png	Generated for VOIDLING, owned by the project
 doreen-casserole	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_5c5b7186-2c53-4af8-82a1-01364902eb78.png	Generated for VOIDLING, owned by the project
+blue-sedan	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_9603517d-7eb6-4c41-960b-4bb4128d99d9.png	Generated for VOIDLING, owned by the project
+grill-nine	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_86c7a36f-83fe-44e6-acee-ad922d883d88.png	Generated for VOIDLING, owned by the project
+dwight-ladder	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_38c4f364-5ae6-4d06-af61-f1f1d1221521.png	Generated for VOIDLING, owned by the project
+parked-sofa	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_995e85d1-616e-4b7d-8086-33d1b2ee92bd.png	Generated for VOIDLING, owned by the project
+clock-tower	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_684265f0-532b-4ceb-aa92-9e7914a11e86.png	Generated for VOIDLING, owned by the project
+foam-finger	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_32329b44-712a-4b86-b28a-e1e9f493b39d.png	Generated for VOIDLING, owned by the project
+motorhome-cat	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_6e8acc40-c209-4bae-bc7b-5702666c63c6.png	Generated for VOIDLING, owned by the project
+lemonade-stand	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_87c843f1-037b-4bee-963c-4a1bc47687e9.png	Generated for VOIDLING, owned by the project
+chain-crew	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_81d99156-0bd5-493a-9c26-c3b062e38e62.png	Generated for VOIDLING, owned by the project
+upside-lantern	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_81044e77-873e-4743-aa22-ac2e17fb40bb.png	Generated for VOIDLING, owned by the project
+eleven-bowls	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_6a79ad32-7fe5-4561-85ce-f6033002b8d1.png	Generated for VOIDLING, owned by the project
+kasa-umbrella	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_1eaa21da-053f-497c-ba63-a9deb1e877fd.png	Generated for VOIDLING, owned by the project
+fox-mask	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_2a59efae-6d97-4b51-bcf2-c09a3a847c05.png	Generated for VOIDLING, owned by the project
+offering-box	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_89a2a171-6bc9-4426-9c84-f046b72ac69b.png	Generated for VOIDLING, owned by the project
+ponta-dumpling	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_a0fecf31-985f-4075-b4a2-413a44587d09.png	Generated for VOIDLING, owned by the project
+good-cup	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_9dc1f64c-10a7-4bf8-8ab0-656b2ac0856c.png	Generated for VOIDLING, owned by the project
+twelfth-gate	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_c492ba63-5425-4f19-b6ca-cdb57fa808b9.png	Generated for VOIDLING, owned by the project
+yuzu-stair	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_e7cb8f72-b3b6-4906-8ee0-4cab35005db3.png	Generated for VOIDLING, owned by the project
+far-pool	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_1c7d6790-7057-4d76-83f7-e0c30f95e9df.png	Generated for VOIDLING, owned by the project
+lost-sandal	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_748ae695-489b-4ebd-8efa-41b24f1c4ef7.png	Generated for VOIDLING, owned by the project
