@@ -235,6 +235,10 @@ export function glb(
   scene: THREE.Scene, addEdible: AddEdible | null, name: string,
   x: number, z: number, r: number, opts: GlbOpts = {},
 ): void {
+  // SCRATCH CENSUS — remove
+  const _w = window as unknown as { __glbCount?: Record<string, number> };
+  _w.__glbCount = _w.__glbCount || {};
+  _w.__glbCount[name] = (_w.__glbCount[name] || 0) + 1;
   const spec = PACK[name];
   const qk = name.startsWith('house') ? 'house' : undefined;
   const placeFallback = () => {
@@ -337,6 +341,10 @@ export function vehicleGlb(
   container: THREE.Object3D, name: string, len: number,
   opts: { tint?: number; keep?: THREE.Object3D[] } = {},
 ) {
+  // SCRATCH CENSUS — remove
+  const _w = window as unknown as { __glbCount?: Record<string, number> };
+  _w.__glbCount = _w.__glbCount || {};
+  _w.__glbCount['veh:' + name] = (_w.__glbCount['veh:' + name] || 0) + 1;
   const spec = PACK[name];
   if (!spec) return;
   template(spec.url).then((tpl) => {

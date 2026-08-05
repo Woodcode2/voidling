@@ -29,6 +29,8 @@ import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from '.
 import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
 import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
+// SCRATCH BOOT TIMER — remove
+(window as any).__bt = [['module-start', performance.now()]];
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
@@ -137,6 +139,7 @@ const _wantWorld = new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple';
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
 setWorld(pickedWorld);
+(window as any).__bt?.push(['post-setWorld', performance.now()]);
 
 
 const scene = new THREE.Scene();
@@ -156,11 +159,13 @@ const scene = new THREE.Scene();
 // away most of the specular that made the props read dimensional at all.
 // A neutral lit box is the right environment for a game lit by a sun it does
 // not draw.
+(window as any).__bt?.push(['pre-pmrem', performance.now()]);
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.15;   // specular sheen only — keep colours saturated
 }
+(window as any).__bt?.push(['post-pmrem', performance.now()]);
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
 let camDist = 50;
 let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
@@ -566,7 +571,11 @@ const COPY = WORLD_COPY[pickedWorld];
   if (ts) ts.textContent = COPY.sub;
   const ln = document.querySelector('#loadScr .lName'); if (ln) ln.textContent = nm;
 }
+// SCRATCH BOOT TIMER — remove
+const _bt = (n: string) => (window as any).__bt.push([n, performance.now()]);
+_bt('pre-createIsland');
 const island = createIsland(scene, addEdible);
+_bt('post-createIsland');
 
 // ══ THE SCRAPBOOK, IN THE WORLD ═══════════════════════════════════════════
 // One hidden curio per sticker this world has, dropped in the district its
@@ -3810,6 +3819,9 @@ function hitStop(sec: number) {
   stopCd = 0.35;
 }
 function animate() {
+  { const W = window as never as Record<string, unknown>;   // PERFCOUNT
+    W.__CF = { iiw: W.__C_iiw || 0, biome: W.__C_biome || 0, deep: W.__C_deep || 0, solid: W.__C_solid || 0, dirscan: W.__C_dirscan || 0, nEd: edibles.length };
+    W.__C_iiw = 0; W.__C_biome = 0; W.__C_deep = 0; W.__C_solid = 0; W.__C_dirscan = 0; }
   tickFrame();
   const dt = Math.min(0.05, clock.getDelta());
   let dtw = dt;
@@ -4052,7 +4064,7 @@ function animate() {
       // The diagonals leaked too: 0.4% to 1.7% of accepted cells put the body
       // over water on a diagonal, which the cars have guarded against for ages.
       const d45 = m * 0.7071;
-      const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
+      const solid = (x: number, z: number) => (((window as never as Record<string, number>).__C_solid = (((window as never as Record<string, number>).__C_solid) || 0) + 1), true) && !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
         && insideIsland3(x + m, z) && insideIsland3(x - m, z)
         && insideIsland3(x, z + m) && insideIsland3(x, z - m)
         && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
@@ -4070,6 +4082,7 @@ function animate() {
       // 260 units instead. Two passes: prefer somewhere the whole body fits,
       // and fall back to bare land for a void too big for any shoreline.
       const dirScan = (x: number, z: number, test: (px: number, pz: number) => boolean): [number, number] | null => {
+        (window as never as Record<string, number>).__C_dirscan = (((window as never as Record<string, number>).__C_dirscan) || 0) + 1; // PERFCOUNT
         for (let ring = 1; ring <= 65; ring++) {
           const rr = ring * 4;
           for (let a2 = 0; a2 < 16; a2++) {
@@ -4668,4 +4681,6 @@ else {
   camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
   camera.lookAt(voidState.x, voidling.radius * 0.5, voidState.z);
 }
+_bt('pre-animate');
 animate();
+_bt('post-first-render');

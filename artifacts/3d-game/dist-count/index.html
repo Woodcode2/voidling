@@ -449,16 +449,8 @@
       .bkTabs button { border: 0; border-radius: 999px; padding: 8px 13px; font-size: 12.5px;
         font-weight: 700; letter-spacing: 0.6px; background: rgba(255,255,255,0.09); color: #cbb8e8; }
       .bkTabs button.on { background: #cb99ff; color: #1a0f2e; }
-      /* grid-auto-rows: min-content IS LOAD-BEARING. Without it the six rows
-         were sized to exactly fill the scroller — 6 x 120.17 + 5 x 8 = 761px,
-         the grid's own height, to the pixel — so a row never grew for its
-         content. Every two-line name ("The Second-Biggest Ball of Twine",
-         "The Raccoon's Vending Machine", "The Middle Of The Corn Maze") pushed
-         its location line 8.7px past the cell's own border, where it read as a
-         caption belonging to the row below. Rows must size to what is in them. */
       .bkGrid { flex: 1; overflow-y: auto; display: grid; gap: 8px;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        align-content: start; grid-auto-rows: min-content; }
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-content: start; }
       .bkCell { border-radius: 16px; padding: 11px 12px; min-height: 92px;
         background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.10); }
       .bkCell i { font-size: 24px; font-style: normal; }
@@ -597,10 +589,8 @@
            image-set, NOT a width media query: the half-size file was being served
            to phones, which are exactly the screens whose pixel density needs the
            full one. Resolution picks the file now, not viewport width. */
-        background: image-set(url('/assets/splash_hero_sm.webp') 1x,
-                              url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat;
-        background: -webkit-image-set(url('/assets/splash_hero_sm.webp') 1x,
-                              url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat; }
+        background: image-set(url('/assets/splash_hero_sm.webp') 1x, url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat;
+        background: -webkit-image-set(url('/assets/splash_hero_sm.webp') 1x, url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat; }
       /* (the max-width:480px swap to the half-size file used to live here — it
          served the SOFT art to every phone. image-set above decides by pixel
          density instead, which is the thing that actually determines whether a
@@ -829,8 +819,7 @@
              MENU SCALES THE FULL ONE — 78vh of a 768px-wide image against the
              menu's 62vh of a 1536px one. That is why picking a world visibly
              dropped the quality: same picture, half the pixels, bigger. */
-          image-set(url('/assets/splash_hero_sm.webp') 1x,
-                    url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat,
+          image-set(url('/assets/splash_hero_sm.webp') 1x, url('/assets/splash_hero.webp') 2x) center 13vh / auto 66vh no-repeat,
           radial-gradient(ellipse at 50% 34%, #33175e 0%, #1c0f3d 46%, #0d0821 100%); }
       #loadScr.show { display: flex; }
       /* .boot is set in the markup and cleared by the module on its first
@@ -1129,6 +1118,8 @@
         }
       }
     </style>
+    <script type="module" crossorigin src="/assets/main-R4ehLENZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-4rKu0c4l.css">
   </head>
   <body class="menu">
     <div id="timer">3:00</div>
@@ -1413,6 +1404,5 @@
       <button id="btnAgain">PLAY AGAIN</button>
       <button id="btnHome">HOME</button>
     </div>
-    <script type="module" src="/src/prototype3d.ts"></script>
   </body>
 </html>
