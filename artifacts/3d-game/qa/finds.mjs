@@ -1,7 +1,15 @@
 // HOW MANY STICKERS DOES A REAL PLAYTHROUGH ACTUALLY FIND?
 //
 //   npm run build && npx vite preview --port 4177 --host 127.0.0.1
-//   node qa/finds.mjs [worlds] [runs]
+//   node qa/finds.mjs [worlds] [runs] [policy] [port]
+//
+// POLICY is the player being simulated, and it is the whole experiment:
+//   keen    — drive at the nearest thing you can swallow. A competent player.
+//   wander  — pick a direction, hold it for a couple of seconds, pick another,
+//             and only divert to something edible if it is already close. This
+//             is a SIX-YEAR-OLD, and it is the floor that decides whether the
+//             Scrapbook ships: `keen` finding four per run is meaningless if
+//             the child who actually buys this game finds nothing.
 //
 // This is the one claim the whole Scrapbook rests on and it had never been
 // measured. Twelve curios are hidden across an island spanning ±290 units in
@@ -28,7 +36,8 @@ import { chromium } from 'playwright';
 
 const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
 const RUNS = +(process.argv[3] || 1);
-const PORT = process.argv[4] || '4177';
+const POLICY = process.argv[4] || 'keen';
+const PORT = process.argv[5] || '4177';
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -58,7 +67,7 @@ for (const wid of WORLDS) {
 
     const placed = await p.evaluate(() => window.__edibles.filter((e) => e.mesh?.userData?.sticker).length);
 
-    await p.evaluate(() => {
+    await p.evaluate((policy) => {
       // Log each find with the clock and the void's radius at that moment.
       // WHEN a find happens is as interesting as whether: all twelve landing
       // in the last thirty seconds would mean the curios are simply gated
@@ -77,6 +86,10 @@ for (const wid of WORLDS) {
       const cv = document.querySelector('canvas');
       const cx = innerWidth / 2, cy = innerHeight / 2;
       cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+      // the wanderer's current heading and how long it has held it — seeded off
+      // a fixed number so a wander run is repeatable rather than a coin toss
+      let seed = 20260805, head = 0, holdUntil = -1;
+      const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return ((seed >>> 0) % 100000) / 100000; };
       const tick = () => {
         const vs = window.__voidState(); let best = null, bd = 1e9;
         for (const e of window.__edibles) {
@@ -84,13 +97,22 @@ for (const wid of WORLDS) {
           const dx = e.mesh.position.x - vs.x, dz = e.mesh.position.z - vs.z;
           const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = { dx, dz }; }
         }
-        if (best) { const m = Math.hypot(best.dx, best.dz) || 1;
+        let aim = best;
+        if (policy === 'wander') {
+          const t = (window.__matchState?.().t ?? 0);
+          if (t > holdUntil) { head = rnd() * Math.PI * 2; holdUntil = t + 1.6 + rnd() * 2.2; }
+          // only divert to food already under your nose — 22 units, which is
+          // about a thumb's width on the screen. Everything further away the
+          // wanderer simply does not go and get.
+          aim = (best && bd < 22 * 22) ? best : { dx: Math.cos(head), dz: Math.sin(head) };
+        }
+        if (aim) { const m = Math.hypot(aim.dx, aim.dz) || 1;
           dispatchEvent(new PointerEvent('pointermove', { pointerId: 1,
-            clientX: cx + best.dx / m * 110, clientY: cy + best.dz / m * 110, bubbles: true })); }
+            clientX: cx + aim.dx / m * 110, clientY: cy + aim.dz / m * 110, bubbles: true })); }
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-    });
+    }, POLICY);
 
     await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'),
       null, { timeout: 900000 });
@@ -102,7 +124,7 @@ for (const wid of WORLDS) {
       revealCells: document.querySelectorAll('#endFinds .stk').length,
     }));
     rows.push({ wid, run, placed, ...r });
-    console.log(`${wid.padEnd(8)} run${run + 1}  hid ${String(placed).padStart(2)}  found ${String(r.hits.length).padStart(2)}`
+    console.log(`${wid.padEnd(8)} ${POLICY.padEnd(6)} run${run + 1}  hid ${String(placed).padStart(2)}  found ${String(r.hits.length).padStart(2)}`
       + `  reveal ${r.reveal ? `yes (${r.revealCells})` : 'NO '}`
       + `  at ${r.hits.map((h) => `${h.t}s/r${h.r}`).join(' ') || '—'}`);
     await p.close();
@@ -112,7 +134,7 @@ await b.close();
 
 const tot = rows.reduce((a, r) => a + r.hits.length, 0);
 const hid = rows.reduce((a, r) => a + r.placed, 0);
-console.log(`\n${tot} finds across ${rows.length} run(s), ${hid} hidden — ${(tot / rows.length).toFixed(1)} per run`);
+console.log(`\n[${POLICY}] ${tot} finds across ${rows.length} run(s), ${hid} hidden — ${(tot / rows.length).toFixed(1)} per run`);
 const zero = rows.filter((r) => r.hits.length === 0);
 const mismatch = rows.filter((r) => r.hits.length !== r.revealCells);
 if (rows.some((r) => r.placed !== 12)) console.log(`WARN: a run hid ${rows.map((r) => r.placed).join('/')} curios, not 12`);
