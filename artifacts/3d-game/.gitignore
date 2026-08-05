@@ -2,3 +2,5 @@
 # QA probe output
 qa-out/
 qa-out/
+dist-nomin/
+dist-count/
