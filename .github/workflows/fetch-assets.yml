@@ -61,8 +61,32 @@ jobs:
               ffmpeg -y -loglevel error -i "$dest/$name.m4a" -codec:a libmp3lame -b:a 160k "$dest/$name.mp3"
               rm "$dest/$name.m4a"; ext=mp3
             fi
+            # ── A 1024px PNG PER STICKER IS 72 MB OF REPO FOR A 56px CELL ─────
+            # Generators return 1k+ PNGs; the book draws them at 56 CSS pixels
+            # and the reveal at 44. Shipping the originals would put ~1.5 MB x
+            # 48 into the app bundle for art nobody sees at more than 168
+            # device pixels. This repo has already shipped a 200 MB payload
+            # once. So: down to 512 and into webp, which is also the extension
+            # the game asks for.
+            case "$ext" in
+              png|jpg|jpeg)
+                ffmpeg -y -loglevel error -i "$dest/$name.$ext" \
+                  -vf "scale=512:512:force_original_aspect_ratio=decrease" \
+                  -quality 88 "$dest/$name.webp"
+                rm "$dest/$name.$ext"; ext=webp
+                ;;
+            esac
             # a file that downloaded fine and does not decode is the failure mode
-            # that reaches a player as silence, so prove it decodes here
+            # that reaches a player as silence — or, for art, as a permanently
+            # empty cell. Prove it decodes here.
+            case "$ext" in
+              webp|png)
+                px=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$dest/$name.$ext")
+                echo "   ${px}px"
+                [ "${px:-0}" -ge 128 ] || { echo "::error::$name is ${px}px"; exit 1; }
+                [ -n "$lic" ] && printf '%s\t%s\t%s\n' "$name.$ext" "$url" "$lic" >> "$dest/CREDITS.txt"
+                ;;
+            esac
             case "$ext" in
               mp3|ogg|wav)
                 dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$dest/$name.$ext")

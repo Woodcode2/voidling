@@ -1,5 +1,9 @@
-artifacts/3d-game/public/assets/music
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_153339_ebc9638c-5120-4a25-9c56-49ffb9e6dc6e.m4a
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_153353_8a489bbd-bed1-4740-abe2-9efa2cdb1ab2.m4a
-https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260712_153356_54d0fa40-0e5c-451f-aac8-ae855e557a50.m4a
-
+artifacts/3d-game/public/assets/stickers
+# THE STICKER TEST BATCH — four subjects chosen because they are the four most
+# likely to break the set: a machine, an animal in water, an insect, and a
+# glass jar. If one locked style string holds across these it holds across all
+# 48. Generated from scripts/sticker-prompts.mjs; do not hand-edit a prompt.
+marge-meter	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_170109_4faaa31d-7000-4f07-bd68-c5364164da4b.png	Generated for VOIDLING, owned by the project
+sleeping-koi	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_170109_ba9e702c-c1bc-49c5-ab21-61046a113cdb.png	Generated for VOIDLING, owned by the project
+kevin-beetle	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_170109_4e8e3adc-0108-48ed-84ee-fea29931f378.png	Generated for VOIDLING, owned by the project
+good-mustard	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_170109_52e1f463-0804-41d0-b394-886f718384e0.png	Generated for VOIDLING, owned by the project
