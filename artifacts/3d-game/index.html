@@ -417,7 +417,16 @@
       /* the painted card. object-fit contain so a tall subject is never
          cropped through the middle — these are illustrations of one object
          and the object is the whole point. */
-      .stkArt { display: block; border-radius: 10px; object-fit: contain; flex: 0 0 auto; }
+      /* A PALE PLATE UNDER EVERY STICKER. The art is die-cut with transparency,
+         which is what makes it look like a real album — but a dark subject on
+         a dark card vanishes, and one of the four test cards (a beetle) came
+         back near-black and disappeared completely. A light disc behind every
+         one of them fixes that for the whole set at once, without
+         regenerating anything, and it is also what a sticker album page
+         actually looks like. */
+      .stkArt { display: block; object-fit: contain; flex: 0 0 auto;
+        border-radius: 50%; background: rgba(255,255,255,0.90); padding: 3px;
+        box-shadow: inset 0 -2px 6px rgba(0,0,0,0.10); }
       .bkCell .stkArt { width: 56px; height: 56px; margin-bottom: 2px; }
       .stk b { display: block; font-size: 15px; font-weight: 700; letter-spacing: 0.2px; }
       .stk s { display: block; font-size: 11.5px; font-weight: 600; opacity: 0.66;
