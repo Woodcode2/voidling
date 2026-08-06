@@ -28,6 +28,10 @@ await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
 await p.click('#btnPlay'); await p.waitForTimeout(1400);
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+// Stub the renderer. The uniforms are written by the rivals update loop, not
+// by the draw, and this probe reads VALUES rather than pixels — so nothing
+// measured here changes, and the sim stops running at a fraction of real time.
+await p.evaluate(() => { window.__renderer.render = () => { }; });
 // wait until siblings have actually joined the feast — they are hidden before
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 40, null, { timeout: 900000 });
 
