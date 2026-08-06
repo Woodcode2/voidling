@@ -284,14 +284,26 @@ const RIG = {
    *  never once applied at construction, and every world was tuned without it */
   hemiI: 0.22,
   exposure: 1.0,
-  bgI: 1.0,
 };
-/** The ONLY place these four are written. Called at boot and on every reset. */
+/** The ONLY place these three are written. Called at boot and on every reset.
+ *
+ *  THE SKY IS NOT ONE OF THEM, and it used to be. This rig carried a bgI of
+ *  1.0 and wrote it here, which fixed half of a bug and installed the other
+ *  half: island.ts hangs a painted nebula on an async texture load and sets
+ *  backgroundIntensity to 0.55 when it lands, so match 1 was correct, and then
+ *  resetMatch() called this and forced the sky back to 1.0 — 82% brighter than
+ *  authored — with the texture already cached so the 0.55 callback could never
+ *  run again. Every match after the first, forever.
+ *
+ *  The rig cannot own that number because it does not know which sky is
+ *  installed: the procedural canvas fallback wants 1.0 and the painted nebula
+ *  wants 0.55, and which one is up depends on whether a download finished.
+ *  Whoever sets scene.background sets its intensity with it. Measured with
+ *  qa/_sky.mjs, which fails on 0.55 -> 1 and passes when the sky holds. */
 function applyLightRig(): void {
   sun.intensity = RIG.sunI;
   hemi.intensity = RIG.hemiI;
   renderer.toneMappingExposure = RIG.exposure;
-  scene.backgroundIntensity = RIG.bgI;
 }
 const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, RIG.hemiI);
 scene.add(hemi);
