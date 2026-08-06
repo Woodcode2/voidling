@@ -222,7 +222,15 @@ export function createAudio(): Audio3D {
   let musGain: GainNode | null = null;
   let musTimer: ReturnType<typeof setInterval> | null = null;
   let musStage = 0, step = 0, nextT = 0;
-  let lastPop = 0;
+  // -1, NOT 0. The rate limiter in pop() is `now - lastPop < 0.075`, and
+  // ensure() creates the AudioContext lazily on the first sound — so if the
+  // first sound of a session is a chomp, currentTime is ~0, the test reads
+  // 0 - 0 < 0.075, and the very first bite a child ever takes is dropped.
+  // Starting in the past means the first one always plays. (It is also what
+  // makes pop() renderable in an OfflineAudioContext, which is how
+  // qa/chomp.mjs measures it — a limiter that swallows the only call is
+  // indistinguishable from a synth that makes no sound.)
+  let lastPop = -1;
   const voiceCd: Record<string, number> = {};
   // warm bus: music -> soft lowpass -> (dry + echo) -> master. The gentle
   // feedback echo is what turns bare oscillators into something that sounds
@@ -3171,14 +3179,39 @@ export function createAudio(): Audio3D {
       const semis = PENTA[comboStep] + Math.min(12, Math.floor(combo / 3) * 2);
       // big voids sing LOWER: a world-ender's nom is a bass note, not a chirp
       const base = 300 * Math.pow(2, semis / 12) * (1 - depth * 0.52);
-      // 1. bite transient
-      noise(0.035, 0.10 + depth * 0.05, 620 - depth * 260, 90);
+      // ── THE BIG BITE USED TO BE THE QUIET ONE ─────────────────────────
+      // Every layer here got darker with depth at once, and past depth 0.5
+      // there was nothing left above ~360 Hz: the bright tail was gated off
+      // outright, the body sat at 300*(1-0.52) = 144 Hz, the transient was
+      // filtered at 620-260 = 360 Hz, and the remaining weight was a 52 Hz sub.
+      // A phone speaker reproduces almost none of that — it rolls off hard
+      // below ~500 Hz — so swallowing a HOUSE measured -64.6 dBFS through a
+      // 450 Hz high-pass against -47.1 for a traffic cone, under music at -33
+      // to -38. The core reward of the entire game got quieter the better you
+      // were doing, and on the device it ships on it very nearly vanished.
+      //
+      // Depth still makes a bite sound BIGGER. It no longer makes it darker in
+      // every band at once, which is not how a big thing breaking sounds
+      // anyway: the body drops, and the transient gets brighter and sharper,
+      // because more material is fracturing at once.
+      // 1. bite transient — cutoff RISES with depth. Splintering timber is not
+      //    a duller sound than a snapping twig, it is a louder brighter one.
+      noise(0.040 + depth * 0.02, 0.11 + depth * 0.22, 900 + depth * 700, 90);
       // 2. body — fat sine glide + a triangle underneath for weight
       tone(base, base * 0.62, 0.13 + depth * 0.05, 'sine', 0.15 + depth * 0.04);
       tone(base * 0.5, base * 0.34, 0.11, 'triangle', 0.055, 0.006);
-      // 3. bright tail — only on small snappy bites, keeps them crisp
-      if (depth < 0.5) tone(base * 2.02, base * 1.5, 0.05, 'sine', 0.045 * (1 - depth * 2), 0.05);
-      // 4. sub thump when something big goes down
+      // 3. bright tail — at EVERY depth now. Its old gain term was
+      //    0.045*(1-depth*2), which is negative past 0.5, so ungating it alone
+      //    would have done nothing: it had to be re-scaled, not just re-enabled.
+      tone(base * 2.02, base * 1.5, 0.05 + depth * 0.03, 'sine', 0.030 + 0.030 * depth, 0.05);
+      // 4. THE PART A PHONE CAN ACTUALLY PLAY. A big meal's fundamental is
+      //    down at 144 Hz where a phone speaker has nothing, so give it a
+      //    harmonic up where the speaker lives — this is what carries the
+      //    weight of a building on the device, rather than the sub below.
+      tone(base * 4.05, base * 2.9, 0.075 + depth * 0.05, 'triangle', 0.022 + 0.130 * depth, 0.02);
+      // 5. sub thump — still there for a good speaker and for the felt
+      //    low end on a tablet; it is no longer the only thing carrying a
+      //    building.
       if (depth > 0.35) tone(52, 30, 0.2, 'sine', depth * 0.14, 0.03);
     },
     bigEat() {
