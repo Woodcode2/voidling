@@ -2605,8 +2605,12 @@ let loadFinal = false, loadPct = 0;
 // the world builders maintain by construction.
 const preloadP = requestedReady((done, total) => {
   if (loadFinal) return;
-  const pct = Math.round((done / total) * 100);
-  if (pct <= loadPct) return;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 100;
+  // belt and braces on the NaN: `NaN <= loadPct` is false, so an unguarded
+  // divide-by-zero sails through the monotonic check and writes NaN% to the
+  // bar. requestedReady no longer reports 0/0, and this could not print it
+  // even if something else did.
+  if (!Number.isFinite(pct) || pct <= loadPct) return;
   loadPct = pct;
   el('lBar').style.width = pct + '%';
   el('lPct').textContent = pct + '%';

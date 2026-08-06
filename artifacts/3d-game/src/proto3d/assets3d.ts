@@ -162,7 +162,13 @@ function template(url: string): Promise<THREE.Object3D | null> {
 export function requestedReady(onProgress: (done: number, total: number) => void): Promise<void> {
   const ps = [...templates.values()];
   const total = ps.length;
-  if (!total) { onProgress(0, 0); return Promise.resolve(); }
+  // A WORLD THAT NEEDS NOTHING IS 100% READY, NOT 0/0. Reporting (0, 0) here
+  // put `NaN%` on the loading screen of GAME DAY and LANTERN NIGHT — the two
+  // worlds that place no pack meshes at all — because the caller computes
+  // Math.round((done / total) * 100), NaN survives its `pct <= loadPct` guard
+  // (every comparison with NaN is false), and NaN% went straight to the bar.
+  // Caught by the store screenshot tool, which photographed it at 1290x2796.
+  if (!total) { onProgress(1, 1); return Promise.resolve(); }
   let done = 0;
   return new Promise((resolve) => {
     for (const p of ps) p.then(() => { done++; onProgress(done, total); if (done === total) resolve(); });
