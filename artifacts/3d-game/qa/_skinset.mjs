@@ -16,7 +16,14 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const R = Number(process.argv[2] || 3.6);
+// R DEFAULTS LOW ON PURPOSE. camDist eases toward 38·(r/0.9)^0.82 at 1.6 units
+// per SIM second, and the software renderer runs at ~0.55 fps with dt capped
+// at 0.05 — i.e. 0.028x real time — so pinning r=3.6 asks the dolly to travel
+// 80 units, which is 51 sim-seconds, which is half an hour of wall clock.
+// It also does not matter: the void's APPARENT size goes as r / r^0.82 =
+// r^0.18, so between VOIDLING (0.9) and WORLD ENDER (8.0) the hero changes by
+// only 8^0.18/0.9^0.18 = 1.46x on screen. One vantage point covers the match.
+const R = Number(process.argv[2] || 1.2);
 const PORT = process.argv[3] || '4177';
 const OUT = 'qa-out/skinset';
 fs.mkdirSync(OUT, { recursive: true });
@@ -58,14 +65,18 @@ const HOME = await p.evaluate(() => window.__spawn());
 await p.evaluate((r) => window.__setVoidR(r), R);
 log(`hero pinned at r=${R}`);
 
+// re-pin the radius every time: the hero keeps eating, and a drifting r moves
+// the dolly target, which would change the framing between two shots that are
+// meant to differ only by a skin.
 const settle = async () => {
+  await p.evaluate((r) => { window.__setVoidR(r); }, R);
   await p.evaluate((h) => window.__warpVoid(h.x, h.z), HOME);
   await p.waitForFunction(() => {
     const s = window.__voidState(), c = window.__cam;
     const d = Math.hypot(c.position.x - s.x, c.position.y, c.position.z - s.z);
     const want = Math.min(340, Math.max(26, 38 * Math.pow(s.r / 0.9, 0.82)));
-    return Math.abs(d - want) / want < 0.006;
-  }, null, { polling: 400, timeout: 180000 });
+    return Math.abs(d - want) / want < 0.01;
+  }, null, { polling: 400, timeout: 600000 });
   await p.evaluate((h) => window.__warpVoid(h.x, h.z), HOME);
 };
 await settle();
@@ -156,7 +167,11 @@ const silCon = (a) => {
     cr: +((Math.max(a1, b1) + 0.05) / (Math.min(a1, b1) + 0.05)).toFixed(2) };
 };
 
-const setSkin = async (s) => { await p.evaluate((sk) => window.__setSkin(sk), s); await p.waitForTimeout(250); };
+const setSkin = async (s) => {
+  await p.evaluate((sk) => window.__setSkin(sk), s);
+  await p.evaluate((r) => { window.__setVoidR(r); }, R);
+  await p.evaluate((h) => window.__warpVoid(h.x, h.z), HOME);
+};
 
 await setSkin(SKINS[0]);
 const n1 = await capture('_noise-a');

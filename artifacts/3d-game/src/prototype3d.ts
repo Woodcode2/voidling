@@ -2341,7 +2341,16 @@ function capture(e: Edible, giveHunger = true) {
     fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd23f, 7, 0.6);
     audio.ready(); buzz(25);
   }
-  if (guideStep === 1 && stats.eaten > 2 && tClock > 4) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
+  // …AND THE SAME TRAP CAUGHT THE LESSON THAT TEACHES THE CONTROL. This used
+  // to advance on `stats.eaten > 2 && tClock > 4` alone, and the void's
+  // gravity well feeds itself: a child who never touches the screen still eats
+  // four props in the first few seconds. So the drag lesson — authored for six
+  // seconds, and the ONLY thing in the game that says how to move — was
+  // measured surviving 1.38s with the child driving and 2.76s with the child
+  // sitting there, overwritten by a sentence about eating things they had not
+  // learned to reach yet. `nomArmed` is already the "a real drag happened"
+  // flag (pointer handler, joy.mag > 0.25); the lesson now waits for it.
+  if (guideStep === 1 && nomArmed && stats.eaten > 2 && tClock > 4) { guideStep = 2; showGuide('eat everything <b>smaller than you</b> — grow!', 6); }
   // juice: score floater on the morsel, flair on big bites and hot combos
   floatPos.set(e.mesh.position.x, voidling.radius + 2, e.mesh.position.z);
   const coinVal = e.mesh.userData.coin as number | undefined;
@@ -2445,6 +2454,8 @@ let introShadow: boolean | null = null;
 let paused = false;        // the pause sheet is up: the whole match holds still
 let firstRun = false;      // this child has never seen a match before
 let dragTaught = false;    // the DRAG pill has been shown for this match
+let dragNagT = 0;          // cooldown before the drag lesson repeats
+let dragNags = 0;          // how many times it has repeated (capped at 3)
 let nomArmed = true;       // the FIRST NOM party may fire (see beginMatch)
 let dangerTaught = false;  // the "you can be eaten" beat has played this match
 const guideEl = () => el('guide');
@@ -2547,6 +2558,7 @@ function beginMatch(solo = false) {
   // controls are actually live.
   firstRun = firstEver;
   dragTaught = false;
+  dragNagT = 0; dragNags = 0;   // the drag lesson gets its repeats back each match
   nomArmed = !firstEver;   // see onEat: the FIRST NOM party waits for a real drag
 }
 // ── asset preloader: menu time is download time; PLAY holds on a branded
@@ -4271,6 +4283,17 @@ function animate() {
   // Taught in context instead of in a modal: the beat fires the first time a
   // genuinely bigger rival is close enough to matter, which is the moment the
   // lesson is about. Its partner fires when the tables turn.
+  // THE DRAG LESSON REPEATS UNTIL IT IS LEARNED. Gating step 1->2 on a real
+  // drag stops the lesson being overwritten, but on its own it leaves the
+  // child who still has not worked out the control with a pill that expired
+  // six seconds in and nothing after it. So while they have not driven, the
+  // instruction comes back — three times, three seconds apart, then it stops
+  // and lets them be. It cannot nag a child who is already playing, because
+  // nomArmed goes true on their first real drag and this never runs again.
+  if (firstRun && started && !ended && guideStep === 1 && !nomArmed && dragNags < 3) {
+    dragNagT -= dt;
+    if (guideT <= 0 && dragNagT <= 0) { showGuide('<b>DRAG</b> anywhere to move!', 5); dragNagT = 3; dragNags++; }
+  }
   if (firstRun && started && !ended && guideT <= 0) {
     for (const rv of rivals.list) {
       if (!rv.joined) continue;

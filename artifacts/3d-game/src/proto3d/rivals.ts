@@ -638,13 +638,36 @@ export function createRivals(
           if (trail.length > 64) trail.shift();
         }
       }
-      // drive the SHARED void shader for every family body: the clock runs the
-      // jelly idle + nebula drift, and each rival's wobble decays after its
-      // own bites — they slosh when they swallow, exactly like the hero
-      for (let i = 0; i < rivalMats.length; i++) {
-        const u = rivalMats[i].uniforms;
+      // Drive the SHARED void shader for every family body: the clock runs the
+      // jelly idle + nebula drift, and each rival's wobble decays after its own
+      // bites — they slosh when they swallow, exactly like the hero.
+      //
+      // AND THE REST OF ITS INPUTS, which is what was missing. The rivals wear
+      // the hero's body (makeVoidBody) but only two of its seven per-frame
+      // uniforms were ever written, so every sibling sat at uSmall 0, uStage 0,
+      // uSlow 1 while the hero moved through 0.6, 1.25 and the rest. uSmall is
+      // the readability law — it is what widens the rim when a void is only a
+      // few dozen pixels across — so a small rival, which is exactly when a
+      // child most needs to see one coming, rendered with the narrow lip meant
+      // for a WORLD ENDER filling the screen. uSlow is the mass law: without it
+      // a five-unit rival vibrates at the speed a marble does.
+      //
+      // Read off rv.body, not a parallel array. rivalMats aligns with roster
+      // today only because both are pushed in the same forEach, and that is the
+      // kind of coupling that survives exactly until someone adds a sixth
+      // sibling or a menu preview.
+      const persp = camera as THREE.PerspectiveCamera;
+      const fovR = (persp.isPerspectiveCamera ? persp.fov : 32) * Math.PI / 360;
+      const halfH = window.innerHeight / 2;
+      for (const rv of roster) {
+        const u = (rv.body.material as THREE.ShaderMaterial).uniforms;
         u.uTime.value = _t;
         u.uWobble.value = Math.max(0, (u.uWobble.value as number) - dt * 1.7);
+        if (!rv.joined) continue;   // hidden siblings cost nothing
+        u.uSlow.value = Math.min(1.25, Math.max(0.36, 1.25 / (0.6 + rv.r * 0.28)));
+        const camD = Math.max(1, camera.position.distanceTo(rv.group.position));
+        const pxR = (halfH / (camD * Math.tan(fovR))) * rv.r;
+        u.uSmall.value = Math.min(1, Math.max(0, (64 - pxR) / 40));
       }
       // rival-eaten props spiral down and shrink — cause and effect a kid can
       // SEE (they used to vanish in one frame, reading as a rendering bug)
