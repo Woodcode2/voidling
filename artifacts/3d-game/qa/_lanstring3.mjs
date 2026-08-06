@@ -1,4 +1,12 @@
-// Point a free camera at one canal lantern string and shoot it side-on.
+// THE CANAL LANTERN STRINGS. Counts them, then points a free camera at one and
+// shoots it side-on.
+//
+//   node qa/_lanstring3.mjs
+//
+// Written to refute "the lanterns are floating cups with no string and no
+// glow". island.ts:4011-4028 hangs makeLanternString(17,5) every 300 world
+// units along LN.CANAL; this counts what actually landed in the graph and
+// photographs one. See also qa/_lanternprop.mjs for the glow-material census.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 fs.mkdirSync('qa-out/lan', { recursive: true });
@@ -35,6 +43,20 @@ const s = await p.evaluate(() => {
   }
   return null;
 });
+const n = await p.evaluate(() => {
+  let k = 0;
+  for (const o of window.__scene.children) {
+    if (!o.isGroup || o.children.length !== 2) continue;
+    const glow = o.children.find(c => c.isMesh && c.material?.type === 'MeshBasicMaterial' && c.material.vertexColors);
+    const sol = o.children.find(c => c.isMesh && c !== glow);
+    if (!glow || !sol) continue;
+    sol.geometry.computeBoundingBox(); const sb = sol.geometry.boundingBox;
+    const sx = sb.max.x - sb.min.x;
+    if (sx > 16.5 && sx < 17.5 && sb.min.y > 1.8 && sb.min.y < 2.2 && sb.max.y < 5) k++;
+  }
+  return k;
+});
+console.log('canal lantern strings in the graph:', n);
 console.log('target', JSON.stringify(s));
 await p.evaluate(() => {
   const THREE = window.__THREE, T = window.__TARGET;

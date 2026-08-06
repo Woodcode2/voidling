@@ -12,6 +12,22 @@ import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 const port = Number(process.env.PORT ?? 3000) || 3000;
 const basePath = process.env.BASE_PATH ?? '/';
 
+/** Serve a vendored asset from disk if we have it, otherwise let the proxy
+ *  fetch it from the CDN. `public/` is what the dev server serves from and
+ *  `dist/` is what preview serves from, so both are checked — the same file
+ *  lives in each at a different point in the build. Used by the /assets/hf
+ *  and /assets/hf3d proxies below; see the note there. */
+const localFirst = (req: { url?: string }): string | undefined => {
+  const url = (req.url ?? '').split('?')[0];
+  if (!url.startsWith('/assets/')) return undefined;
+  // never let a crafted ../ escape the static roots
+  const rel = path.normalize(url).replace(/^(\.\.[/\\])+/, '');
+  for (const root of ['public', 'dist']) {
+    if (fs.existsSync(path.join(process.cwd(), root, rel))) return url;
+  }
+  return undefined;
+};
+
 // ── review.txt — served as plain text before Vite's SPA catch-all ────────────
 // Vite's HTML-fallback middleware swallows anything it doesn't recognise as a
 // static asset, including files in public/.  Unshifting our own handler first
@@ -310,16 +326,33 @@ export default defineConfig({
     },
     // Same-origin path for Higgsfield-generated art in dev (mirrors the
     // vercel.json rewrite in production) — the splash/skins/sky load locally.
+    // LOCAL FIRST, CDN ONLY AS A FALLBACK.
+    //
+    // This proxy used to be unconditional, which was right when none of the
+    // art was in the repo and wrong the moment it was: a vendored file sitting
+    // in public/ was shadowed by a request to CloudFront, so the only way to
+    // SEE the art you had just vendored was to deploy. It is also why the
+    // world cards render as bare gradient fallbacks in this sandbox — the
+    // egress policy blocks the CDN, the proxy never falls back to the file
+    // three inches away, and paintWorldCard's Image() probe simply never
+    // fires. Note that vite's preview server inherits server.proxy, so both
+    // were affected.
+    //
+    // bypass returning the url means "serve this from the static root
+    // instead"; returning undefined falls through to the CDN, which is what
+    // still needs to happen for anything not yet vendored.
     proxy: {
       '/assets/hf3d': {
         target: 'https://d3u0tzju9qaucj.cloudfront.net',
         changeOrigin: true,
         rewrite: (p: string) => p.replace(/^\/assets\/hf3d/, ''),
+        bypass: localFirst,
       },
       '/assets/hf': {
         target: 'https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS',
         changeOrigin: true,
         rewrite: (p: string) => p.replace(/^\/assets\/hf/, ''),
+        bypass: localFirst,
       },
     },
   },
