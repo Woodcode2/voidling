@@ -1,19 +1,14 @@
-// REFUTATION PROBE for "the family is excluded from the readability law".
-//
-//   node qa/_famref.mjs [world]
-//
-// 1. Dump every void body's per-frame uniforms at t=12/60/130 (as qa/_family
-//    did) so the "five of seven never written" claim can be checked at HEAD.
-// 2. At t=130, photograph the frame twice — rivals at their shipped uStage=0
-//    and again with uStage forced to the value stageFor(rv.r) would give the
-//    hero — and measure the pixel difference inside each rival's own bounding
-//    disc. That answers "would a child ever notice" with a number.
-// 3. Same for uStretchAmt at the hero's ceiling (0.085).
+// Fast companion to qa/_famref.mjs. Forces the endgame instead of waiting for
+// it: the family's size ceiling is 0.78x the player (rivals.ts:707), so
+// __setVoidR(11.5) drags every sibling up to r~9 in a few seconds of match
+// time. That is where the "a rival at r=8 renders as a stage-0 hatchling"
+// claim bites hardest, so that is where the pixel diff is worth taking.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const WORLD = process.argv[2] || 'maple';
 fs.mkdirSync('qa-out/famref', { recursive: true });
+const log = (s) => { console.log(s); fs.appendFileSync(`qa-out/famref/${WORLD}-log.txt`, s + '\n'); };
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -41,22 +36,18 @@ await p.evaluate(() => {
       const sc = new THREE.Vector3(); o.getWorldScale(sc);
       const camD = Math.max(1, cam.position.distanceTo(wp));
       const pxR = (H / (2 * camD * Math.tan(fov * Math.PI / 360))) * sc.x;
-      // project the centre to screen space so a diff can be scoped to the body
       const ndc = wp.clone().project(cam);
       out.push({ hero: (o.geometry.parameters?.widthSegments ?? -1) >= 90,
-        x: +wp.x.toFixed(1), z: +wp.z.toFixed(1),
         r: +sc.x.toFixed(2), camD: +camD.toFixed(1), pxR: Math.round(pxR),
         sx: Math.round((ndc.x * 0.5 + 0.5) * window.innerWidth),
         sy: Math.round((-ndc.y * 0.5 + 0.5) * window.innerHeight),
-        onscreen: Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1 && ndc.z < 1,
+        onscreen: Math.abs(ndc.x) < 0.95 && Math.abs(ndc.y) < 0.95 && ndc.z < 1,
         uSmall: +m.uniforms.uSmall.value.toFixed(3), uStage: m.uniforms.uStage.value,
         uSlow: +m.uniforms.uSlow.value.toFixed(3),
-        uStretch: +m.uniforms.uStretchAmt.value.toFixed(3),
-        uWobble: +m.uniforms.uWobble.value.toFixed(3) });
+        uStretch: +m.uniforms.uStretchAmt.value.toFixed(3) });
     });
     return { t: window.__matchState().t, pr: window.__voidState().r, bodies: out };
   };
-  // force a uniform on every RIVAL body (hero is the 96-segment sphere)
   window.__forceRivals = (name, val) => {
     let n = 0;
     window.__scene.traverse((o) => {
@@ -73,7 +64,6 @@ await p.evaluate(() => {
     });
     return n;
   };
-  // read a screenshot back through a 2D canvas (preserveDrawingBuffer is off)
   window.__px = (b64) => new Promise((res) => {
     const i = new Image();
     i.onload = () => {
@@ -87,61 +77,55 @@ await p.evaluate(() => {
 });
 
 const dump = (s, tag) => {
-  console.log(`\n=== ${WORLD} ${tag} t=${s.t.toFixed(1)}s playerR=${s.pr.toFixed(2)} ===`);
+  log(`\n=== ${WORLD} ${tag} t=${s.t.toFixed(1)}s playerR=${s.pr.toFixed(2)} ===`);
   for (const o of s.bodies) {
-    console.log(`${o.hero ? 'HERO ' : 'rival'} r=${String(o.r).padStart(6)} pxR=${String(o.pxR).padStart(5)} on=${o.onscreen ? 'Y' : 'n'} @(${o.sx},${o.sy})  uSmall=${o.uSmall} uStage=${o.uStage} uSlow=${o.uSlow} uStretch=${o.uStretch}`);
+    log(`${o.hero ? 'HERO ' : 'rival'} r=${String(o.r).padStart(6)} pxR=${String(o.pxR).padStart(5)} on=${o.onscreen ? 'Y' : 'n'}  uSmall=${o.uSmall} uStage=${o.uStage} uSlow=${o.uSlow} uStretch=${o.uStretch}`);
   }
 };
 
-for (const target of [12, 60, 130]) {
-  await p.waitForFunction((tt) => (window.__matchState?.().t ?? 0) > tt, target, { timeout: 900000 });
-  dump(await p.evaluate(() => window.__bodies()), 't' + target);
-}
+await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 12, null, { timeout: 900000 });
+dump(await p.evaluate(() => window.__bodies()), 'shipped t12');
 
-// ── the visible cost of uStage / uStretch, in pixels ────────────────────────
+// force the endgame
+await p.evaluate(() => window.__setVoidR(11.5));
+await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 30, null, { timeout: 900000 });
+await p.evaluate(() => window.__setVoidR(11.5));
+await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 45, null, { timeout: 900000 });
+dump(await p.evaluate(() => window.__bodies()), 'endgame-forced');
+
 await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins{opacity:0!important}' });
-// park the hero far away and freeze the clock feel: we compare two frames of a
-// LIVE game, so first measure the frame-to-frame noise floor with nothing
-// changed at all. Anything below that noise floor is not a visible difference.
-async function shoot(name) {
-  const buf = await p.screenshot({ path: `qa-out/famref/${WORLD}-${name}.png` });
-  return buf.toString('base64');
-}
-const before = await shoot('a');
+const shoot = async (n) => (await p.screenshot({ path: `qa-out/famref/${WORLD}-${n}.png` })).toString('base64');
+const A = await shoot('shipped');
 await p.waitForTimeout(1200);
-const noiseShot = await shoot('a2');
-const state = await p.evaluate(() => window.__bodies());
-const rivals = state.bodies.filter((o) => !o.hero && o.onscreen);
-console.log('\nvisible rivals for the diff:', JSON.stringify(rivals.map((r) => ({ r: r.r, pxR: r.pxR, at: [r.sx, r.sy] }))));
-
-const forced = await p.evaluate(() => window.__forceRivals('uStage', 0));
-console.log('rival bodies forced:', forced);
+const noise = await shoot('shipped2');
+const st = await p.evaluate(() => window.__bodies());
+const rivals = st.bodies.filter((o) => !o.hero && o.onscreen && o.pxR > 3);
+log('\nrivals in frame for the diff: ' + JSON.stringify(rivals.map((r) => ({ r: r.r, pxR: r.pxR }))));
+await p.evaluate(() => window.__forceRivals('uStage', 0));
 await p.waitForTimeout(1200);
-const stageShot = await shoot('b');
+const S = await shoot('stage');
 await p.evaluate(() => window.__forceRivals('uStretchAmt', 0.085));
 await p.waitForTimeout(1200);
-const stretchShot = await shoot('c');
+const T = await shoot('stretch');
 
-const diff = await p.evaluate(async ([base, others, boxes]) => {
-  const A = await window.__px(base);
-  const out = [];
+const res = await p.evaluate(async ([base, others, boxes]) => {
+  const a = await window.__px(base); const out = [];
   for (const [name, b64] of others) {
-    const B = await window.__px(b64);
+    const b2 = await window.__px(b64);
     for (const bx of boxes) {
-      const rr = Math.max(6, Math.min(120, bx.pxR + 6));
-      let n = 0, sum = 0, mx = 0;
-      for (let y = Math.max(0, bx.sy - rr); y < Math.min(A.h, bx.sy + rr); y++) {
-        for (let x = Math.max(0, bx.sx - rr); x < Math.min(A.w, bx.sx + rr); x++) {
-          const i = (y * A.w + x) * 4;
-          const d = Math.max(Math.abs(A.d[i] - B.d[i]), Math.abs(A.d[i + 1] - B.d[i + 1]), Math.abs(A.d[i + 2] - B.d[i + 2]));
-          n++; sum += d; if (d > mx) mx = d;
+      const rr = Math.max(6, Math.min(160, bx.pxR + 8));
+      let n = 0, sum = 0, mx = 0, over8 = 0;
+      for (let y = Math.max(0, bx.sy - rr); y < Math.min(a.h, bx.sy + rr); y++)
+        for (let x = Math.max(0, bx.sx - rr); x < Math.min(a.w, bx.sx + rr); x++) {
+          const i = (y * a.w + x) * 4;
+          const d = Math.max(Math.abs(a.d[i] - b2.d[i]), Math.abs(a.d[i + 1] - b2.d[i + 1]), Math.abs(a.d[i + 2] - b2.d[i + 2]));
+          n++; sum += d; if (d > mx) mx = d; if (d > 8) over8++;
         }
-      }
-      out.push({ name, pxR: bx.pxR, r: bx.r, meanDiff: +(sum / n).toFixed(2), maxDiff: mx });
+      out.push({ name, r: bx.r, pxR: bx.pxR, mean: +(sum / n).toFixed(2), max: mx, pctOver8: +(100 * over8 / n).toFixed(1) });
     }
   }
   return out;
-}, [before, [['noise(no change)', noiseShot], ['uStage=ladder', stageShot], ['+uStretch=0.085', stretchShot]], rivals]);
-console.log('\nper-rival pixel difference vs the shipped frame:');
-for (const d of diff) console.log(`  ${d.name.padEnd(18)} rival r=${d.r} pxR=${d.pxR}  mean|d|=${d.meanDiff}  max|d|=${d.maxDiff}`);
+}, [A, [['noise', noise], ['uStage=ladder', S], ['+uStretch.085', T]], rivals]);
+log('\npixel difference vs the shipped frame, inside each rival disc:');
+for (const d of res) log(`  ${d.name.padEnd(16)} r=${String(d.r).padStart(5)} pxR=${String(d.pxR).padStart(4)}  mean|d|=${d.mean}  max|d|=${d.max}  %px>8=${d.pctOver8}`);
 await b.close();

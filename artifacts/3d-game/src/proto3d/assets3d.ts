@@ -141,6 +141,45 @@ function template(url: string): Promise<THREE.Object3D | null> {
   return p;
 }
 
+/** WAIT FOR WHAT THIS WORLD ACTUALLY ASKED FOR — nothing else.
+ *
+ *  createIsland() runs at module scope, long before the menu exists, so by the
+ *  time the loading cover has to decide what to hold PLAY for, `templates`
+ *  already holds exactly the meshes populate() requested. No manifest, nothing
+ *  that can drift out of step with the world builders.
+ *
+ *  This replaces gating on preloadPack(), which waited for all 34 pack meshes.
+ *  Measured, that is a wait for work that cannot finish and mostly is not
+ *  wanted: 17 of the 34 are permanently 403 at the CDN, and GAME DAY and
+ *  LANTERN NIGHT place ZERO meshes between them (runtime census, qa/_census.mjs
+ *  — MAPLE 22 names / 216 placements, PIRATE 3 / 555, GAME DAY 0, LANTERN 0).
+ *  So two of the four worlds sat on the loading cover for up to its full
+ *  12-second cap waiting on downloads they would never use, and the other two
+ *  waited on seventeen that were never going to arrive.
+ *
+ *  template() resolves null on failure rather than rejecting, so a dead URL
+ *  settles this promise instead of hanging it. */
+export function requestedReady(onProgress: (done: number, total: number) => void): Promise<void> {
+  const ps = [...templates.values()];
+  const total = ps.length;
+  if (!total) { onProgress(0, 0); return Promise.resolve(); }
+  let done = 0;
+  return new Promise((resolve) => {
+    for (const p of ps) p.then(() => { done++; onProgress(done, total); if (done === total) resolve(); });
+  });
+}
+
+/** Meshes that only appear PART WAY THROUGH a match — the defense vehicles.
+ *  populate() never asks for these, so they are not in requestedReady()'s set,
+ *  but a tank that starts downloading the moment it spawns is a tank that
+ *  shows up as a box. Warmed in the background; never gates anything. */
+export function warmLater(): void {
+  for (const n of ['tank', 'car_sedan', 'car_taxi']) {
+    const spec = PACK[n];
+    if (spec) void template(spec.url);
+  }
+}
+
 // preloader: attach to (or start) every pack download and report progress.
 // populate() already requests the meshes it uses at boot, so these promises
 // mostly piggyback on in-flight downloads — the menu's loading bar simply

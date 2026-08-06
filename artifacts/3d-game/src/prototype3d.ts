@@ -21,7 +21,7 @@ import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS, type Skin } from './proto3d/palette';
-import { buildGallery, updateLodBias, preloadPack } from './proto3d/assets3d';
+import { buildGallery, updateLodBias, requestedReady } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
@@ -2593,7 +2593,17 @@ let packReady = false;
 // anyway, which defeats the whole point of the gate. It is also latched
 // monotonic: a progress bar that goes backwards reads as a fault.
 let loadFinal = false, loadPct = 0;
-const preloadP = preloadPack((done, total) => {
+// WAIT FOR THIS WORLD'S MESHES, NOT FOR ALL THIRTY-FOUR. This used to be
+// preloadPack(), which requested the whole pack and held PLAY until every one
+// resolved or the 12-second cap fired. Two measurements killed it: a runtime
+// census (qa/_census.mjs) says GAME DAY and LANTERN NIGHT place ZERO pack
+// meshes and Pirate Bay places three, and the vendoring job says 17 of the 34
+// URLs are permanently 403. So on half the worlds the loading cover was
+// holding the child on downloads the world never uses, and on the other half
+// it was also waiting on seventeen that were never going to arrive.
+// requestedReady() waits on exactly what populate() asked for, which is a set
+// the world builders maintain by construction.
+const preloadP = requestedReady((done, total) => {
   if (loadFinal) return;
   const pct = Math.round((done / total) * 100);
   if (pct <= loadPct) return;
@@ -2601,6 +2611,16 @@ const preloadP = preloadPack((done, total) => {
   el('lBar').style.width = pct + '%';
   el('lPct').textContent = pct + '%';
 }).then(() => { packReady = true; });
+// NO PRE-WARMING THE DEFENSE VEHICLES. I added a warmLater() here on the
+// reasoning that a tank which starts downloading when it spawns is a tank that
+// shows up as a box, and it cost Maple Falls 4.8 SECONDS on the gate — 9,440ms
+// against 4,841ms with it gone, repeatable. Two reasons, both measured:
+// assets3d caps concurrent GLB loads at MAX_PARALLEL to stay under iOS
+// Safari's memory ceiling, so those requests take slots at exactly the moment
+// the match is starting; and `tank` is one of the seventeen URLs that are
+// permanently 403, so it was a slot spent on a download that can never finish.
+// vehicleGlb already swaps the mesh in whenever it arrives, which is the right
+// behaviour for something that appears a minute into a match.
 const LOAD_TIPS = [
   'tip: eat the little stuff first — cones, hydrants, mailboxes',
   'tip: cars count as people-sized once you evolve',
