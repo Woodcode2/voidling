@@ -4290,11 +4290,22 @@ function animate() {
   // instruction comes back — three times, three seconds apart, then it stops
   // and lets them be. It cannot nag a child who is already playing, because
   // nomArmed goes true on their first real drag and this never runs again.
-  if (firstRun && started && !ended && guideStep === 1 && !nomArmed && dragNags < 3) {
+  // The cooldown only runs while the pill is DOWN. Ticking it during the five
+  // seconds the pill is up meant it had already expired by the time the pill
+  // hid, so the repeat fired in the same frame — measured as one unbroken
+  // 20.78s label, which reads as a stuck HUD element rather than as the game
+  // saying it again. The gap is the whole message.
+  if (firstRun && started && !ended && guideStep === 1 && !nomArmed && dragNags < 3 && guideT <= 0) {
     dragNagT -= dt;
-    if (guideT <= 0 && dragNagT <= 0) { showGuide('<b>DRAG</b> anywhere to move!', 5); dragNagT = 3; dragNags++; }
+    if (dragNagT <= 0) { showGuide('<b>DRAG</b> anywhere to move!', 5); dragNagT = 3; dragNags++; }
   }
-  if (firstRun && started && !ended && guideT <= 0) {
+  // …and NOT UNTIL THEY CAN MOVE. This fires on any frame the guide is idle,
+  // which includes the gaps between the drag lesson's repeats — so a child who
+  // had not yet worked out the control was being told "that one is BIGGER than
+  // you — run!" about a rival they had no way to run from, in the middle of
+  // being taught how to run. Measured sequence before this gate: DRAG, DRAG,
+  // BIGGER, DRAG. `nomArmed` means a real drag has happened.
+  if (firstRun && started && !ended && guideT <= 0 && nomArmed) {
     for (const rv of rivals.list) {
       if (!rv.joined) continue;
       const d = Math.hypot(rv.x - voidState.x, rv.z - voidState.z);
@@ -4460,6 +4471,7 @@ function animate() {
         // controls are live THIS frame — now the instruction is true
         dragTaught = true; guideStep = 1;
         showGuide('<b>DRAG</b> anywhere to move!', 6);
+        dragNagT = 3;   // the repeat waits its gap too, not just the ones after it
       }
       const k2 = Math.max(0, introT / COPY.introLen);
       camDist = 38 + 262 * k2 * k2;   // ease-in dive from orbit

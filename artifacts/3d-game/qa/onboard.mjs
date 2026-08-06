@@ -37,6 +37,12 @@ async function run(mode) {
     await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
   }
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+  // Stub the renderer: the sim then runs at its proper rate instead of the
+  // ninth-to-fortieth of real time swiftshader manages, and nothing measured
+  // here is drawn by three.js — the guide pill is a DOM element, so it is
+  // completely unaffected. Without this the probe times out before the second
+  // player has finished.
+  await p.evaluate(() => { window.__renderer.render = () => { }; });
 
   // sample the guide pill against the MATCH clock, never the wall clock —
   // this renderer is a fraction of real time and a wall-clock number here
@@ -64,7 +70,7 @@ async function run(mode) {
     }
   }, mode);
 
-  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 30, null, { timeout: 900000 });
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 26, null, { timeout: 900000 });
   const g = await p.evaluate(() => window.__guide);
   await p.close();
   return g;
