@@ -568,8 +568,8 @@ export function createRivals(
     // 0.94 the top lane reaches 1.13x the player with satiety, so a distracted
     // run genuinely loses and an attentive one genuinely wins. The nominal
     // ladder still floors it, so a struggling child keeps a field to chase.
-    const top = Math.min(FIELD_TOP * shape * scale,
-      Math.max(FIELD_TOP * LANE_FINAL[2] * shape, pScore * 0.94));
+    void scale;   // EXPERIMENT 2 — maximal target, revert after
+    const top = Math.max(FIELD_TOP * LANE_FINAL[2] * shape, pScore * 0.94);
     return top * (LANE_FINAL[lane] ?? 0.14);
   };
 

@@ -31,14 +31,42 @@ import { collectRefs, ROOT } from './asset-refs.mjs';
 const URL = process.env.SHOOT_URL || 'http://127.0.0.1:4173';
 const OUT = path.join(ROOT, 'store');
 
-// ── precondition: the art must be on disk ───────────────────────────────────
+// ── precondition: the art that PHOTOGRAPHS must be on disk ──────────────────
+//
+// This used to refuse on any missing ref and counted meshes alongside images,
+// which made it unrunnable rather than safe: 17 of the 34 GLB URLs are
+// permanently 403 at the CDN, so "17 of 53 missing" was a permanent state and
+// the tool that produces the store screenshots could never be run at all. That
+// is worse than no guard, because the last submission died on Guideline 2.3.3
+// for shipping the retired 2D game's screenshots — exactly what happens when
+// the replacement cannot run.
+//
+// The two kinds of missing are not the same thing:
+//   IMAGES are the failure the guard was written for. A missing skin texture
+//   photographs as a plain ball and a missing nebula leaves the void with no
+//   galaxy in it, and there is no fallback — the screenshot is simply a lie
+//   about what the app looks like. Still fatal.
+//   MESHES have hand-written procedural fallbacks at every call site
+//   (makePalm, LUXE.makeCabanaLux, makeTree...), and GAME DAY and LANTERN
+//   NIGHT place NO pack meshes at all — two of the four worlds are already
+//   100% procedural and the audit rated Game Day's prop density the highest of
+//   the four. A missing mesh changes what the shot contains; it does not make
+//   the shot dishonest.
 {
-  const missing = collectRefs().filter((r) => !fs.existsSync(path.join(ROOT, 'public', r.replace(/^\//, ''))));
-  if (missing.length) {
-    console.error(`REFUSING TO SHOOT: ${missing.length} of ${collectRefs().length} art files are missing.`);
+  const refs = collectRefs();
+  const missing = refs.filter((r) => !fs.existsSync(path.join(ROOT, 'public', r.replace(/^\//, ''))));
+  const images = missing.filter((r) => !r.endsWith('.glb'));
+  const meshes = missing.filter((r) => r.endsWith('.glb'));
+  if (images.length) {
+    console.error(`REFUSING TO SHOOT: ${images.length} of ${refs.filter((r) => !r.endsWith('.glb')).length} IMAGES are missing.`);
     console.error('Every paid skin would photograph as a plain ball and the void would have no');
     console.error('galaxy inside it. Run `node scripts/vendor-assets.mjs` first.');
+    for (const r of images) console.error('  ' + r);
     process.exit(1);
+  }
+  if (meshes.length) {
+    console.warn(`${meshes.length} of ${refs.filter((r) => r.endsWith('.glb')).length} meshes are absent — those props will`);
+    console.warn('photograph as their procedural fallbacks, which is what a player sees too.');
   }
 }
 
