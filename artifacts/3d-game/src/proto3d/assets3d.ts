@@ -235,7 +235,13 @@ export function glb(
   scene: THREE.Scene, addEdible: AddEdible | null, name: string,
   x: number, z: number, r: number, opts: GlbOpts = {},
 ): void {
-  // SCRATCH CENSUS — remove
+  // WHICH MESHES DOES THIS WORLD ACTUALLY PLACE? Not a question grep can
+  // answer: island.ts passes `name` as a variable at four of its call sites,
+  // so the only honest census is a runtime one. Read it with qa/_census.mjs.
+  // It matters because preloadPack() downloads all 33 pack meshes at boot and
+  // withWorldReady() holds PLAY until every one lands — while GAME DAY and
+  // LANTERN NIGHT place zero of them and Pirate Bay places three.
+  // One property write per placement, at boot only, never per frame.
   const _w = window as unknown as { __glbCount?: Record<string, number> };
   _w.__glbCount = _w.__glbCount || {};
   _w.__glbCount[name] = (_w.__glbCount[name] || 0) + 1;
@@ -341,7 +347,10 @@ export function vehicleGlb(
   container: THREE.Object3D, name: string, len: number,
   opts: { tint?: number; keep?: THREE.Object3D[] } = {},
 ) {
-  // SCRATCH CENSUS — remove
+  // vehicles count under a `veh:` prefix — see the note in glb(). They are the
+  // reason the pack cannot simply be trimmed to what populate() places:
+  // defense units and traffic ask for their meshes DURING a match, so a mesh
+  // that no world places at boot may still be needed at t+60s.
   const _w = window as unknown as { __glbCount?: Record<string, number> };
   _w.__glbCount = _w.__glbCount || {};
   _w.__glbCount['veh:' + name] = (_w.__glbCount['veh:' + name] || 0) + 1;

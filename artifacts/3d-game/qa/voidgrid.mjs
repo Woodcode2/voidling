@@ -45,7 +45,7 @@ await p.evaluate(() => document.querySelectorAll('.show')
 await p.click('#btnPlay'); await p.waitForTimeout(1400);
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
-await p.addStyleTag({ content: '#news,#hud,#stageBar,.bub,#btnHome,#coins,#rank{opacity:0!important}' });
+await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins,#rank{opacity:0!important}' });
 await p.evaluate((rr) => window.__setVoidR(rr), R);
 await p.waitForTimeout(2400);
 

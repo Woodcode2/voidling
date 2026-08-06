@@ -33,7 +33,7 @@ await p.evaluate(() => document.querySelectorAll('.show')
 await p.click('#btnPlay'); await p.waitForTimeout(1400);
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 900000 });
-await p.addStyleTag({ content: '#news,#hud,#stageBar,.bub,#btnHome,#coins{opacity:0!important}' });
+await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins{opacity:0!important}' });
 
 const read = () => {
   const THREE = window.__THREE, cam = window.__cam;

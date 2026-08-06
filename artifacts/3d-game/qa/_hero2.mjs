@@ -53,7 +53,7 @@ const tap = async (sel) => {
 await tap('#btnPlay'); await p.waitForTimeout(2500);
 await tap(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 1800000 });
-await p.addStyleTag({ content: '#news,#hud,#stageBar,.bub,#btnHome,#coins{opacity:0!important}' });
+await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins{opacity:0!important}' });
 
 await p.evaluate(() => {
   window.__bodies = () => {

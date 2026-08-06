@@ -72,7 +72,7 @@ for (const target of [12, 60, 130]) {
 }
 
 // ── 2. SIDE BY SIDE ─────────────────────────────────────────────────────────
-await p.addStyleTag({ content: '#news,#hud,#stageBar,.bub,#btnHome,#coins{opacity:0!important}' });
+await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins{opacity:0!important}' });
 const pos = await p.evaluate(() => {
   const bs = window.__bodies().bodies.filter((o) => o.seg < 90);
   bs.sort((a, b2) => b2.r - a.r);

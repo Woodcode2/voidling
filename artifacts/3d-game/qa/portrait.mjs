@@ -30,7 +30,7 @@ await p.click('#btnPlay'); await p.waitForTimeout(1400);
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 600000 });
 // the ticker and the bubbles crowd the frame and none of them are the subject
-await p.addStyleTag({ content: '#news,#hud,#stageBar,.bub,#btnHome,#coins{opacity:0!important}' });
+await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins{opacity:0!important}' });
 
 for (const r of radii) {
   await p.evaluate((rr) => window.__setVoidR(rr), r);
