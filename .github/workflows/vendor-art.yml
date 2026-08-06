@@ -1,0 +1,88 @@
+name: vendor-art
+# PUT THE AI ART IN THE REPO, so an iOS archive contains it.
+#
+# Every skin image, the nebula sky, the splash and all 34 GLB meshes are
+# referenced as same-origin paths (/assets/hf/..., /assets/hf3d/...). Those
+# resolve in production only because vercel.json rewrites them to two
+# CloudFront distributions. A Capacitor bundle loads from file:// with no
+# server in front of it, so on device every one of those requests fails: paid
+# skins render as plain balls, the void loses its galaxy interior, the sky goes
+# flat and all 34 meshes fall back to boxes.
+#
+# `node scripts/check-assets.mjs` exits 1 today with "MISSING 53 of 53
+# (34 meshes)". The web build is fine, which is exactly why this survived this
+# long — nothing a browser does reveals it.
+#
+# This has to run in CI rather than in a session: the dev container's egress
+# policy blocks both CloudFront hosts, by design, and that is not something to
+# work around.
+#
+# It runs scripts/vendor-assets.mjs rather than carrying its own list, because
+# scripts/asset-refs.mjs is the single source of truth for what the build
+# needs — a manifest here would be a second list, and a second list is how you
+# ship a skin as a grey ball.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - '.github/vendor-art.trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: artifacts/3d-game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch the art
+        run: node scripts/vendor-assets.mjs
+
+      - name: Prove the build can find it
+        # The whole point. vendor-assets and check-assets read the same ref
+        # list, so if this still exits 1 the fetch did not do what it claimed.
+        run: node scripts/check-assets.mjs
+
+      - name: Weigh it before committing
+        # THIS REPO HAS ALREADY SHIPPED A 200 MB PAYLOAD ONCE. 34 GLB meshes of
+        # unknown size are about to go into git permanently, and nobody can
+        # measure them from a sandbox where the CDN is blocked. Fail loudly
+        # rather than quietly doubling the clone size for everyone forever.
+        run: |
+          set -euo pipefail
+          hf=$(du -sb public/assets/hf 2>/dev/null | cut -f1 || echo 0)
+          hf3d=$(du -sb public/assets/hf3d 2>/dev/null | cut -f1 || echo 0)
+          tot=$(( hf + hf3d ))
+          echo "images  $(( hf / 1048576 )) MB"
+          echo "meshes  $(( hf3d / 1048576 )) MB"
+          echo "total   $(( tot / 1048576 )) MB"
+          echo "### vendored art: $(( tot / 1048576 )) MB" >> "$GITHUB_STEP_SUMMARY"
+          du -sh public/assets/hf3d/* 2>/dev/null | sort -h | tail -10 >> "$GITHUB_STEP_SUMMARY" || true
+          if [ "$tot" -gt 262144000 ]; then
+            echo "::error::vendored art is $(( tot / 1048576 )) MB, over the 250 MB ceiling — decide deliberately, do not auto-commit"
+            exit 1
+          fi
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "voidling-assets-bot"
+          git config user.email "actions@github.com"
+          git add public/assets/hf public/assets/hf3d
+          git commit -m "art: vendor the 53 CDN assets so an iOS bundle contains them" || { echo "nothing to commit"; exit 0; }
+          # same push race as fetch-assets.yml: a run can finish into a branch
+          # that moved under it, and a bare push then throws away what it fetched
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin "$(git rev-parse --abbrev-ref HEAD)" && git push && exit 0
+            echo "push race, retry $i"; sleep $((i * 5))
+          done
+          echo "::error::could not push after 5 attempts"; exit 1
