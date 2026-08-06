@@ -410,6 +410,10 @@
         margin: 6px 0 12px; }
       #endFinds.show { display: flex; }
       #endFinds .fLbl { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #ffd25a; }
+      /* the overflow line, when a run finds more than the three the screen can
+         hold — the count in .fLbl is still the true one */
+      #endFinds .fMore { font-size: 12px; font-weight: 700; letter-spacing: 1px;
+        opacity: 0.66; padding-top: 2px; }
       .stk { display: flex; align-items: center; gap: 10px; width: min(330px, 86vw);
         padding: 10px 14px; border-radius: 16px; text-align: left;
         background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.16); }
@@ -497,7 +501,19 @@
       #end.show { display: flex; }
       #end { overflow-y: auto; padding: calc(20px + env(safe-area-inset-top,0px)) 0 calc(20px + env(safe-area-inset-bottom,0px)); }
       #end.show > *:first-child { margin-block-start: auto; }
-      #end.show > *:last-child  { margin-block-end: auto; }
+      /* …but NOT the button row, which pins itself instead — an auto bottom
+         margin on a sticky element pushes it out of its own scrollport. */
+      #end.show > *:last-child:not(.endGo) { margin-block-end: auto; }
+      /* PINNED. margin-top:auto puts it at the end of the flex content when the
+         screen is short enough to centre; sticky holds it against the bottom of
+         the scrollport when it is not. The gradient is so the last stat card
+         slides under it rather than colliding with it. */
+      .endGo { position: sticky; bottom: 0; z-index: 2; width: 100%;
+        display: flex; flex-direction: column; align-items: center;
+        margin-block-start: auto;
+        padding: 14px 0 calc(10px + env(safe-area-inset-bottom,0px));
+        background: linear-gradient(to top, rgba(13,8,33,0.98) 55%, rgba(13,8,33,0)); }
+      .endGo #btnAgain { margin-top: 0; }
       /* "#2 · OUT-NOMMED!" broke across two lines with the hyphen mid-word, and
          "CHOMPION OF THE ISLE" measured 390px on a 390px phone */
       #end .hd { font-size: clamp(26px, 7.5vw, 44px); font-weight: 900; letter-spacing: 1px;
@@ -1410,8 +1426,17 @@
            this is where a child is deciding whether to press PLAY AGAIN. -->
       <div id="endQuests"></div>
       <div id="endNext"></div>
-      <button id="btnAgain">PLAY AGAIN</button>
-      <button id="btnHome">HOME</button>
+      <!-- THE WAY BACK IN NEVER SCROLLS AWAY. These were direct children of a
+           scrolling #end, so every row added above them pushed them down — and
+           the Scrapbook reveal adds a row per sticker. Measured: with no finds
+           the content is 848px in an 844px viewport and both buttons are 100%
+           visible; with TWO finds it is 1,012px and both are at 0%, on every
+           iPhone Apple sells. The run a child most wants to repeat is exactly
+           the run whose PLAY AGAIN button they cannot see. -->
+      <div class="endGo">
+        <button id="btnAgain">PLAY AGAIN</button>
+        <button id="btnHome">HOME</button>
+      </div>
     </div>
     <script type="module" src="/src/prototype3d.ts"></script>
   </body>

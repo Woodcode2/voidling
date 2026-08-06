@@ -2902,10 +2902,20 @@ function renderFinds(): void {
   const got = runFinds();
   box.classList.toggle('show', got.length > 0);
   if (!got.length) { box.innerHTML = ''; return; }
+  // AT MOST THREE CARDS. Each one is a ~64px row on a screen that was already
+  // 848px of content in an 844px viewport with none of them — measured, five
+  // finds put it at 1,207px and pushed PLAY AGAIN completely off. The count in
+  // the label is still the true count and the rest are one line of text, so a
+  // six-sticker run reads as a bigger win than a three-sticker run without
+  // costing the screen six rows. The book is where you go to see them all;
+  // this is a receipt, not the collection.
+  const MAX = 3;
+  const show = got.slice(0, MAX), rest = got.length - show.length;
   box.innerHTML = `<div class="fLbl">${got.length === 1 ? 'NEW STICKER' : `${got.length} NEW STICKERS`}</div>`
-    + got.map((g, i) => `<div class="stk t-${g.tier}" style="animation-delay:${0.12 + i * 0.16}s">`
+    + show.map((g, i) => `<div class="stk t-${g.tier}" style="animation-delay:${0.12 + i * 0.16}s">`
       + `${stickerFace(g, 44)}<span><b>${g.name}</b>`
-      + `<s>${g.where.toUpperCase()} · ${g.tier.toUpperCase()}</s></span></div>`).join('');
+      + `<s>${g.where.toUpperCase()} · ${g.tier.toUpperCase()}</s></span></div>`).join('')
+    + (rest > 0 ? `<div class="fMore">and ${rest} more in the scrapbook</div>` : '');
 }
 
 let bookWorld: WorldId = pickedWorld;
