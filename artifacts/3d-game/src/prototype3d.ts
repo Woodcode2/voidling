@@ -359,6 +359,10 @@ const QUALITY = [
   { pr: 1.15, prSmall: 1.0, shadows: false, shSize: 512 },
 ];
 let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
+/** QA only: when non-null the adapter stops walking and stays on this rung.
+ *  See __pinQuality — a moving ladder makes every graphics measurement a
+ *  reading from a rung nobody chose. */
+let qPinned: number | null = null;
 function applyQuality() {
   const q = QUALITY[qLevel];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? q.prSmall : q.pr));
@@ -655,6 +659,8 @@ const _dbg = window as unknown as {
   __biomeAt: (x: number, z: number) => string | null;
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
+  __pinQuality: (n: number | null) => void;
+  __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
@@ -707,6 +713,21 @@ _dbg.__setVoidR = (r: number) => {
   curStage = stageFor(r); voidling.setStage(VISUAL_STAGE[curStage] ?? 0);
   audio.setMusicStage(VISUAL_STAGE[curStage] ?? 0);
 };
+// QA: PIN THE QUALITY LADDER. The adapter samples real fps and walks a ladder
+// whose bottom rung turns shadows off and drops the pixel ratio — correct on a
+// real device, ruinous for measurement, because a software renderer is slow
+// enough to demote inside the first few seconds of any probe. Any graphics
+// number sampled while it is moving is a number from a rung nobody chose: a
+// shadow-cost sweep came back with rows reading a 0% saving, which was not the
+// shadows being free but the ladder having already switched them off.
+// __pinQuality(n) parks it on rung n and stops the adapter; __pinQuality(null)
+// hands it back.
+_dbg.__pinQuality = (n: number | null) => {
+  qPinned = n;
+  if (n !== null) { qLevel = Math.max(0, Math.min(QUALITY.length - 1, n)); applyQuality(); }
+};
+_dbg.__quality = () => ({ level: qLevel, pinned: qPinned, shadows: renderer.shadowMap.enabled,
+  shSize: sun.shadow.mapSize.x, pr: renderer.getPixelRatio() });
 // QA: put the hero anywhere on the map. There was no way to photograph a
 // district without playing the three minutes it takes to reach it, which meant
 // every density and lighting judgement was made from the two or three places a
@@ -4676,7 +4697,7 @@ function animate() {
 
   // adaptive quality: step down fast when fps dips, climb back slowly
   qAccT += dt; qAccN++; qCd -= dt;
-  if (qCd <= 0 && qAccT > 0) {
+  if (qPinned === null && qCd <= 0 && qAccT > 0) {
     const avg = qAccN / qAccT; qAccN = 0; qAccT = 0;
     if (avg < 46 && qLevel < QUALITY.length - 1) { qLevel++; applyQuality(); qCd = 4; }
     else if (avg > 57 && qLevel > 0) { qLevel--; applyQuality(); qCd = 10; }

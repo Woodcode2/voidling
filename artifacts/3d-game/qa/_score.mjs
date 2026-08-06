@@ -3,7 +3,19 @@
 //   node qa/_score.mjs            # all four worlds, four stages each
 //
 // audio3d.ts needs nothing from the 3D world except worldId(), so this loads
-// ONLY those two modules (dist/_lab.js, built by hand with esbuild) into a page
+// ONLY those two modules into a page. Build the harness first — it is two
+// lines and lives outside src/ so nothing ships it:
+//
+//   cat > /tmp/lab.ts <<'EOF'
+//   import { setWorld } from '<repo>/src/proto3d/island';
+//   import { createAudio } from '<repo>/src/proto3d/audio3d';
+//   (window as any).__lab = { setWorld, createAudio };
+//   EOF
+//   node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin/esbuild /tmp/lab.ts \
+//     --bundle --format=esm --outfile=dist/_lab.js
+//   printf '<!doctype html><script type=module src=/_lab.js></script>' > dist/_lab.html
+//
+// with no WebGL, splices a recorder in front of ctx.destination, and captures
 // with no WebGL, splices a recorder in front of ctx.destination, and captures
 // the real output of every score at every stage. Cheap enough to run under
 // load, and unlike a game probe it measures the AUDIO and nothing else.

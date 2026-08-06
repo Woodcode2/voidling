@@ -65,12 +65,32 @@ function analyse(x) {
     return e;
   });
   const tot = bandE.reduce((a, b) => a + b, 0) || 1e-30;
-  // a phone speaker: nothing under 300 Hz, -6dB/oct 300..600, flat above
-  let phone = 0;
-  for (let k = 1; k < N / 2; k++) {
-    const fq = k * RATE / N;
-    const w = fq < 250 ? 0 : fq < 600 ? (fq - 250) / 350 : 1;
-    phone += mag[k] * w * w;
+  // A PHONE SPEAKER, in the time domain so it can be windowed: two cascaded
+  // 2nd-order high-passes at 450 Hz (~24 dB/oct), which is roughly what an
+  // iPhone's bottom-firing driver does to everything under its resonance.
+  // The number that matters is the LOUDEST 200 ms — comparable between a
+  // 24-second bed and a 200 ms chomp, which a plain RMS is not.
+  const hp = (src) => {
+    const fc = 450, w0 = 2 * Math.PI * fc / RATE, Q = 0.707;
+    const al = Math.sin(w0) / (2 * Q), cw = Math.cos(w0);
+    const b0 = (1 + cw) / 2, b1 = -(1 + cw), b2 = (1 + cw) / 2;
+    const a0 = 1 + al, a1 = -2 * cw, a2 = 1 - al;
+    const out = new Float64Array(src.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < src.length; i++) {
+      const y = (b0 / a0) * src[i] + (b1 / a0) * x1 + (b2 / a0) * x2 - (a1 / a0) * y1 - (a2 / a0) * y2;
+      x2 = x1; x1 = src[i]; y2 = y1; y1 = y; out[i] = y;
+    }
+    return out;
+  };
+  const ph = hp(hp(x));
+  const W = Math.round(RATE * 0.2);
+  let phone = 0, loudest = 0;
+  for (let o = 0; o + W <= ph.length; o += Math.round(W / 4)) {
+    let s = 0, s2 = 0;
+    for (let i = 0; i < W; i++) { s += ph[o + i] * ph[o + i]; s2 += x[o + i] * x[o + i]; }
+    const r = Math.sqrt(s / W); if (r > phone) phone = r;
+    const r2 = Math.sqrt(s2 / W); if (r2 > loudest) loudest = r2;
   }
 
   // amplitude envelope at 100 Hz for loop hunting
@@ -101,11 +121,12 @@ function analyse(x) {
   const seen = [];
   for (const pk of peaks) { if (!seen.some((s) => Math.abs(s[0] - pk[0]) < 0.25)) seen.push(pk); if (seen.length >= 3) break; }
 
-  return { peak, rms, bandE: bandE.map((e) => e / tot), phone: Math.sqrt(phone / (N / 2)), loops: seen };
+  return { peak, rms, bandE: bandE.map((e) => e / tot), phone, loudest, loops: seen };
 }
 
 const files = readdirSync(DIR).filter((f) => f.endsWith('.pcm')).sort();
-console.log('file                    peak    rms  crest | sub  low  lomid pres  top  air | phone-audible | loop (s, r)');
+console.log('file                    peak  loud200 phone200 | sub  low  lomid pres  top  air | loop (s, r)');
+console.log('                             loudest 200ms, full band and phone-speaker band');
 for (const f of files) {
   const buf = readFileSync(`${DIR}/${f}`);
   const i16 = new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2);
@@ -115,6 +136,6 @@ for (const f of files) {
   const a = analyse(x);
   const bands = a.bandE.map((v) => (v * 100).toFixed(0).padStart(4)).join(' ');
   const lp = a.loops.map(([s, r]) => `${s.toFixed(2)}s ${r.toFixed(2)}`).join('  ');
-  console.log(`${f.replace('.pcm', '').padEnd(22)} ${f1(dB(a.peak))} ${f1(dB(a.rms))} ${(dB(a.peak) - dB(a.rms)).toFixed(1).padStart(5)} |${bands} | ${f1(dB(a.phone))} dB | ${lp}`);
+  console.log(`${f.replace('.pcm', '').padEnd(22)} ${f1(dB(a.peak))} ${f1(dB(a.loudest))} ${f1(dB(a.phone))} |${bands} | ${lp}`);
 }
 console.log('\nbands are % of total energy: ' + LBL.map((l, i) => `${l} ${BANDS[i][0]}-${BANDS[i][1]}Hz`).join(', '));
