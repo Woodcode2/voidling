@@ -16,6 +16,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 const worlds = (process.argv[2] || 'gameday,lantern,pirate,maple').split(',');
 const PORT = process.argv[3] || '4177';
+const GAP = 3;   // frames between shots — as few as will re-upload the buffer
 const SPOT = { gameday: [-40, 40, 3.0], lantern: [0, 30, 3.0], pirate: [30, -20, 3.0], maple: [-63, 70, 3.0] };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -48,26 +49,49 @@ for (const wid of worlds) {
       const a = o.geometry && o.geometry.getAttribute && o.geometry.getAttribute('aGloss');
       if (a) { o.userData._gloss = a.array.slice(); n++; }
     });
-    for (let i = 0; i < 90; i++) await new Promise((r) => requestAnimationFrame(r));
+    // 90 frames was not enough. __warpVoid teleports the void and the camera
+    // eases after it exponentially, so the frame was still creeping when the
+    // first shot was taken — and a creeping frame diffs against itself far
+    // harder than any shading change does. The null control below is what
+    // caught it; raise this settle until that control reads near zero.
+    for (let i = 0; i < 220; i++) await new Promise((r) => requestAnimationFrame(r));
     return n;
   }, SPOT[wid]);
   const clip = { x: 0, y: 60, width: 430, height: 620 };
+  const idle = (n) => p.evaluate(async (k) => {
+    for (let i = 0; i < k; i++) await new Promise((r) => requestAnimationFrame(r));
+  }, n);
   await p.screenshot({ path: `qa-out/gloss-${wid}-on.png`, clip });
-  // …and now the same frame with the channel switched off
-  await p.evaluate(async () => {
+  // THE NULL CONTROL, and it is the whole reason this probe can be believed.
+  // The same frame again, same gap, NOTHING changed. Whatever this picks up —
+  // a camera still easing toward its target, the void breathing, a light
+  // ramping with the match clock — is the noise floor, and any gloss result
+  // smaller than it is not a result. The first version of this probe had no
+  // control and reported that switching the channel off changed 76% of
+  // Lantern's pixels with a p99 of 195/255, which is not what a specular
+  // highlight does to a frame; it is what a moving camera does to one.
+  await idle(GAP);
+  await p.screenshot({ path: `qa-out/gloss-${wid}-null.png`, clip });
+  await p.evaluate(() => {
     window.__scene.traverse((o) => {
       const a = o.geometry && o.geometry.getAttribute && o.geometry.getAttribute('aGloss');
       if (a && o.userData._gloss) { a.array.fill(0); a.needsUpdate = true; }
     });
-    for (let i = 0; i < 12; i++) await new Promise((r) => requestAnimationFrame(r));
   });
+  await idle(GAP);
   await p.screenshot({ path: `qa-out/gloss-${wid}-off.png`, clip });
   const bad = errs.filter((e) => !/hf3d|\/assets\/hf|403|404|net::/.test(e));
-  const d = await diff(p, `qa-out/gloss-${wid}-on.png`, `qa-out/gloss-${wid}-off.png`);
-  console.log(`${wid.padEnd(8)} ${covered} meshes carry aGloss   `
-    + `changed ${d.pct.toFixed(2)}% of pixels   mean |delta| ${d.mean.toFixed(2)}/255   `
-    + `p99 ${d.p99}/255   brighter ${d.upPct.toFixed(0)}%`
-    + (bad.length ? `\n  ERRORS: ${bad.join(' | ')}` : ''));
+  const noise = await diff(p, `qa-out/gloss-${wid}-on.png`, `qa-out/gloss-${wid}-null.png`);
+  const d = await diff(p, `qa-out/gloss-${wid}-null.png`, `qa-out/gloss-${wid}-off.png`);
+  const fmt = (x) => `${x.pct.toFixed(2).padStart(6)}% of px  mean ${x.mean.toFixed(2).padStart(6)}/255  `
+    + `p99 ${String(x.p99).padStart(3)}/255  brighter ${x.upPct.toFixed(0).padStart(3)}%`;
+  console.log(`\n${wid.toUpperCase()}  ${covered} meshes carry aGloss`);
+  console.log(`  noise floor (same frame twice)  ${fmt(noise)}`);
+  console.log(`  gloss on vs off                 ${fmt(d)}`);
+  const ratio = noise.pct > 0.001 ? d.pct / noise.pct : Infinity;
+  console.log(`  signal / noise by area: ${ratio.toFixed(1)}x`
+    + (ratio < 3 ? '   << TOO CLOSE TO THE FLOOR TO CONCLUDE ANYTHING' : ''));
+  if (bad.length) console.log(`  ERRORS: ${bad.join(' | ')}`);
   await p.close();
 }
 await b.close();

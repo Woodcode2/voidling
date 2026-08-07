@@ -3123,9 +3123,45 @@ const GLOSS_PARS_V = 'attribute float aGloss;\nvarying float vGloss;\n';
 const GLOSS_PARS_F = 'varying float vGloss;\n';
 // three's meshphysical_frag runs roughnessmap_fragment then metalnessmap_fragment,
 // so appending after the second one has both factors in scope.
+//
+// METALNESS IS 0.38, DOWN FROM THE 0.55 THIS SHIPPED WITH, and the reason is
+// the measurement below. A metal has no diffuse term, so every point of
+// metalness is albedo removed; the deal is only worth taking if the specular
+// pays it back. At 0.38 a fully-glossy vertex keeps 62% of the colour a child
+// expects the object to be, which for a toy-bright game matters more than
+// physical accuracy about chrome.
 const GLOSS_BODY = `
   roughnessFactor = mix(roughnessFactor, 0.20, vGloss);
-  metalnessFactor = max(metalnessFactor, 0.55 * vGloss * vGloss);
+  metalnessFactor = max(metalnessFactor, 0.38 * vGloss * vGloss);
+`;
+// ── …AND SOMETHING FOR IT TO REFLECT ───────────────────────────────────────
+//
+// THE FIRST VERSION OF THIS FEATURE DID NOT WORK, and the A/B said so before
+// anyone looked at it: switching the channel off changed the frame mostly by
+// making it BRIGHTER — 73% of changed pixels on Game Day were darker with
+// gloss ON. That is the whole feature running backwards.
+//
+// The cause is not the roughness. It is that lowering roughness only sharpens
+// a reflection of whatever is there to reflect, and in this scene that is a
+// RoomEnvironment at intensity 0.15 — deliberately dim, because it is a sheen
+// on the whole island and anything higher desaturates every colour in the
+// game (see prototype3d, where the 0.15 is argued and a per-world sky was
+// tried and reverted). So a "polished" surface got a sharper picture of
+// almost nothing, and paid for it in lost albedo. Cardboard, but darker.
+//
+// The fix has to be per-vertex too, or it is the same washed-out island the
+// 0.15 exists to prevent: scale the IBL SPECULAR term, and only that term, by
+// the gloss channel. Diffuse irradiance is untouched, so the 70% of the world
+// that is matte renders bit-identically and every palette argument in this
+// repo still holds. A chrome bumper effectively sees an environment at 0.9
+// and looks like chrome; a painted truck door at 0.42 sees 0.44 and looks
+// waxed; a canopy at 0 sees 0.15, exactly as before.
+//
+// `radiance` is three's name for the specular IBL contribution and it is in
+// scope right after lights_fragment_maps — the same chunk that adds it.
+const GLOSS_ENV = 5.0;
+const GLOSS_RADIANCE = `
+  radiance *= 1.0 + ${GLOSS_ENV.toFixed(1)} * vGloss;
 `;
 /** Patch a shared prop material: per-mesh fade + per-vertex specular.
  *  Safe to call once per material. */
@@ -3136,9 +3172,20 @@ export function installPropShader(m: THREE.Material): void {
     shader.uniforms.uFade = { value: 1 };
     shader.vertexShader = GLOSS_PARS_V + shader.vertexShader.replace(
       'void main() {', 'void main() {\n  vGloss = aGloss;');
-    shader.fragmentShader = FADE_PARS + GLOSS_PARS_F + shader.fragmentShader
-      .replace('void main() {', 'void main() {' + FADE_BODY)
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>' + GLOSS_BODY);
+    // Each replace is checked. A three upgrade that renames a chunk would
+    // otherwise turn this into a silent no-op — the shader still compiles,
+    // the game still runs, and the feature is simply gone with nothing to
+    // notice it. That is the failure mode worth a couple of lines.
+    let f = FADE_PARS + GLOSS_PARS_F + shader.fragmentShader;
+    for (const [needle, add] of [
+      ['void main() {', FADE_BODY],
+      ['#include <metalnessmap_fragment>', GLOSS_BODY],
+      ['#include <lights_fragment_maps>', GLOSS_RADIANCE],
+    ] as [string, string][]) {
+      if (!f.includes(needle)) { console.warn(`VOIDLING: prop shader hook "${needle}" not found`); continue; }
+      f = f.replace(needle, needle + add);
+    }
+    shader.fragmentShader = f;
     (m as { userData: Record<string, unknown> }).userData.shader = shader;
   };
   // a material whose program changed needs recompiling
