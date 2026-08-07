@@ -530,7 +530,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
-  interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; }
+  interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; white: THREE.Mesh; }
   const eyes: Eye[] = [];
   const charEyes: { star: THREE.Mesh; ring: THREE.Mesh }[] = [];   // legendary pupil overrides
   for (const sx of [-0.36, 0.36]) {
@@ -566,7 +566,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     charEyes.push({ star: starPupil, ring: glowRing });
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
-    face.add(g); eyes.push({ g, sclera, pupilGrp, outline });
+    face.add(g); eyes.push({ g, sclera, pupilGrp, outline, white });
   }
   // blush (pink, soft) — a painted falloff, not a flat pink lozenge. The hard
   // edge of a plain disc is what made the cheeks read as two stickers.
@@ -752,7 +752,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let mood: Mood = 'cruise';
   let moodT = 0;
   let stageBoost = 1;   // pupil boost from evolution stage (was set directly)
-  const mp = { lid: 1, pupil: 1, wide: 1, smile: 1, mouthY: 1, smirk: 0, brow: 0, browAng: 0, browY: 0.4, maw: 0, blush: 0.5, sweat: 0, zzz: 0, bounce: 0 };
+  const mp = { lid: 1, pupil: 1, wide: 1, smile: 1, mouthY: 1, smirk: 0, brow: 0, browAng: 0, browY: 0.4, maw: 0, blush: 0.5, sweat: 0, zzz: 0, bounce: 0, shut: 0 };
   const MOODS: Record<Mood, Partial<typeof mp>> = {
     cruise:  {},
     hungry:  { pupil: 1.28, smile: 1.1, maw: 0.26, brow: 0.85, browAng: 0.12, browY: 0.45, blush: 0.6 },
@@ -762,7 +762,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     smug:    { lid: 0.55, smile: 1.15, smirk: 0.2, brow: 0.7, browAng: 0.04, browY: 0.33, blush: 0.7 },
     // heavy level brows sitting low, a lid most of the way down, and a small
     // soft mouth — a nap, not a grin with the eyes shut
-    sleepy:  { lid: 0.26, smile: 0.66, mouthY: 0.62, pupil: 0.86,
+    // EYES ACTUALLY CLOSED. lid 0.26 squashed the eye to a quarter height but
+    // still drew the white and the pupil, so a napping void read as dazed —
+    // half-lidded and staring — with Zzz floating over it. `shut` hides the
+    // white and the pupil and leaves only the dark backing disc, squashed
+    // flat: a line where the eye was, which is what a sleeping cartoon face
+    // is. The lid value still drives how thick that line is.
+    sleepy:  { lid: 0.13, smile: 0.66, mouthY: 0.62, pupil: 0.86, shut: 1,
                brow: 0.95, browAng: -0.02, browY: 0.33, blush: 0.62, zzz: 1 },
     victory: { pupil: 1.35, wide: 1.06, smile: 1.5, blush: 0.9, maw: 0.18, brow: 0.85, browAng: 0.2, browY: 0.47, bounce: 1 },
   };
@@ -1325,6 +1331,31 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         e.sclera.position.y = drop;
         e.pupilGrp.scale.set(pk, oy * pk * pupilSquash, 1);
         e.pupilGrp.position.y = drop + gazeY;
+        // ── ASLEEP MEANS SHUT ──────────────────────────────────────────────
+        // Squashing the eye alone leaves a thin white slit with a dark dash in
+        // it, which reads as half-lidded and dazed rather than asleep — and it
+        // was doing that under a stack of floating Zzz. Hiding the white and
+        // the pupil leaves the dark backing disc as the only thing drawn, and
+        // a flattened disc IS the line a closed cartoon eye is made of.
+        // Crossfaded rather than switched so waking up is not a pop.
+        // The white and the pupil have to fade TOGETHER. The first version
+        // faded the white by opacity and switched the pupil with .visible, so
+        // waking up passed through a frame of blank white ovals with no pupil —
+        // the same dazed look this whole change exists to remove, just briefly.
+        const shut = mp.shut;
+        const eyeOpen = 1 - shut;
+        e.white.visible = eyeOpen > 0.02;
+        e.pupilGrp.visible = eyeOpen > 0.02;
+        if (eyeOpen > 0.02) {
+          const wm = e.white.material as THREE.Material;
+          if (wm.opacity !== eyeOpen) { wm.transparent = eyeOpen < 0.999; wm.opacity = eyeOpen; }
+          e.pupilGrp.traverse((o) => {
+            const pm = (o as THREE.Mesh).material as THREE.Material | undefined;
+            // the character-eye star and ring carry their own opacity for the
+            // legendary skins — those are driven elsewhere and left alone
+            if (pm && o === e.pupilGrp.children[0]) { pm.transparent = eyeOpen < 0.999; pm.opacity = eyeOpen; }
+          });
+        }
         // outline weight: fattens as he shrinks, so the eye keeps a dark
         // boundary against a bright body even at a handful of pixels
         e.outline.scale.setScalar(SCL_R * (1 + 0.05 + small * 0.14));
