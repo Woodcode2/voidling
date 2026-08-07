@@ -3224,9 +3224,26 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
   g.translate(x, y, z);
   _pc.setHex(col);
   const n = g.getAttribute('position').count;
-  const cols = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { cols[i * 3] = _pc.r; cols[i * 3 + 1] = _pc.g; cols[i * 3 + 2] = _pc.b; }
-  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  // ── COLOUR AS UINT16, NOT FLOAT32 ─────────────────────────────────────────
+  // Measured with qa/heap.mjs: the geometry IS the heap. Game Day carries 376
+  // MB of vertex buffers inside a 446 MB JS heap — 84% — at 36.9 bytes per
+  // vertex against a predicted 37.0 (position 12 + normal 12 + colour 12 +
+  // aGloss 1). Nothing releases the CPU copy, so every byte here is resident
+  // for the life of the page on top of the GPU's own copy.
+  //
+  // A flat per-vertex colour is one hex value flooded across a part, so 32-bit
+  // floats are storing a number that came from 8 bits. Uint16 normalised is 6
+  // bytes instead of 12 — a sixth of the whole vertex — and 65,536 levels per
+  // channel is far past anything a screen or an eye resolves.
+  //
+  // NOT Uint8, which is the tempting version and is wrong here: _pc.setHex()
+  // returns LINEAR values (three's ColorManagement converts from sRGB on the
+  // way in), and 8-bit linear bands visibly in the darks — which is most of a
+  // night market and all of the contact shading baked in below.
+  const cols = new Uint16Array(n * 3);
+  const cr = Math.round(_pc.r * 65535), cg = Math.round(_pc.g * 65535), cb = Math.round(_pc.b * 65535);
+  for (let i = 0; i < n; i++) { cols[i * 3] = cr; cols[i * 3 + 1] = cg; cols[i * 3 + 2] = cb; }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3, true));
   // no prop material samples a map — see installPropShader. Dropping uv pays
   // for aGloss twice over, and both have to happen HERE so every geometry
   // reaching mergeGeometries carries the identical attribute set.
