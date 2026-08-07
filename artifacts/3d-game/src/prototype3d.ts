@@ -755,7 +755,16 @@ _dbg.__matchState = () => ({
     lane: r.lane ?? -1, dry: Math.round((r.dry ?? 0) * 10) / 10, full: !!r.full })),
 });
 // build stamp: tiny, menu-only — every screenshot identifies its build
-{
+//
+// DEV AND QA ONLY. Its whole purpose is telling one internal screenshot from
+// another, and it does that job in dev; on a shipped build it is a version
+// string sitting in the corner of the App Store's first screenshot, which
+// reads as an unfinished app to the one reviewer whose opinion decides
+// whether anyone else ever sees it. `?stamp` brings it back on any build, so
+// the store shooter can still identify what it photographed when it needs to.
+// (reads the query string directly rather than through _qd, which is declared
+// 550 lines below this and would be a temporal dead zone from here)
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('stamp')) {
   const bs = document.createElement('div');
   // a missing `define` would take out every statement after this line — the
   // input handlers, the PLAY listener, beginMatch, the lot — and do it

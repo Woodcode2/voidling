@@ -1014,8 +1014,13 @@ export function makeParrotPerch(): THREE.Group {
   return finish(p);
 }
 
-/** Wicker cigar lounge under a raised canopy, ~6.6 × 6.2, 5.3 tall. */
-export function makeCigarLounge(): THREE.Group {
+/** Wicker reading lounge under a raised canopy, ~6.6 × 6.2, 5.3 tall.
+ *  WAS a cigar lounge, placed as a NAMED LANDMARK in Pirate Bay — a resort
+ *  smoking room in a game rated 4+. The furniture was always just wicker; only
+ *  the name and one small ivory cylinder on the side table said otherwise, and
+ *  the cylinder is now a rolled magazine. Nothing else about the geometry
+ *  changed. */
+export function makeWickerLounge(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(6.6, 0.12, 5.2), 0x7a3b48, 0, 0.06, 0),
     part(new THREE.BoxGeometry(6.0, 0.06, 4.6), 0x8f4a58, 0, 0.13, 0),
@@ -1033,7 +1038,8 @@ export function makeCigarLounge(): THREE.Group {
   p.push(part(new THREE.BoxGeometry(0.9, 0.34, 0.6), TEAK_D, 0.9, 0.96, 0));
   p.push(part(new THREE.BoxGeometry(0.94, 0.08, 0.64), GOLD, 0.9, 1.15, 0));
   p.push(part(new THREE.CylinderGeometry(0.24, 0.2, 0.1, 10), MARBLE, 1.5, 0.84, 0.45));
-  p.push(part(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 5), IVORY, 1.6, 0.94, 0.45, 0, 0, -Math.PI / 2));
+  // the rolled magazine on the side table (was a cigar)
+  p.push(part(new THREE.CylinderGeometry(0.07, 0.07, 0.44, 6), CREAM, 1.6, 0.96, 0.45, 0, 0, -Math.PI / 2));
   // canopy
   for (const sx of [-2.6, 2.6]) for (const sz of [-2.1, 2.1])
     p.push(part(new THREE.CylinderGeometry(0.11, 0.13, 4.2, 7), TEAK, sx, 2.1, sz));
@@ -1046,8 +1052,10 @@ export function makeCigarLounge(): THREE.Group {
   return finish(p);
 }
 
-/** Tiered rum-punch fountain with a skull finial, ~3.6 wide, 3.7 tall. */
-export function makeGrogFountain(): THREE.Group {
+/** Tiered fruit-punch fountain with a skull finial, ~3.6 wide, 3.7 tall.
+ *  The skull stays — it is a pirate resort and a skull is set dressing. The
+ *  rum does not. */
+export function makePunchFountain(): THREE.Group {
   const p: G[] = [
     part(new THREE.CylinderGeometry(1.2, 1.45, 0.8, 12), TEAK, 0, 0.4, 0),
     part(new THREE.TorusGeometry(1.24, 0.09, 5, 14), GOLD, 0, 0.76, 0, Math.PI / 2),
@@ -1292,7 +1300,7 @@ export const LUXE_KIT: { name: string; make: () => THREE.Group; r: number; distr
   { name: 'deckBar', make: makeDeckBar, r: 4.8, district: ['party', 'resort'] },
   { name: 'anchorMonument', make: makeAnchorMonument, r: 2.0, district: ['port', 'market'] },
   { name: 'mapPavilion', make: makeMapPavilion, r: 3.6, district: ['resort', 'jungle', 'market'] },
-  { name: 'cigarLounge', make: makeCigarLounge, r: 3.4, district: ['resort', 'party'] },
+  { name: 'wickerLounge', make: makeWickerLounge, r: 3.4, district: ['resort', 'party'] },
   { name: 'caviarBar', make: makeCaviarBar, r: 2.7, district: ['market', 'party', 'resort'] },
   { name: 'cabanaLux', make: makeCabanaLux, r: 3.0, district: ['beach', 'resort', 'cove'] },
   { name: 'giftKiosk', make: makeGiftKiosk, r: 1.8, district: ['market', 'resort', 'beach'] },
@@ -1300,7 +1308,7 @@ export const LUXE_KIT: { name: string; make: () => THREE.Group; r: number; distr
   { name: 'fireTable', make: makeFireTable, r: 3.6, district: ['beach', 'party', 'cove'] },
   { name: 'valetStand', make: makeValetStand, r: 3.2, district: ['resort', 'market'] },
   { name: 'champagneTower', make: makeChampagneTower, r: 1.5, district: ['party', 'resort'] },
-  { name: 'grogFountain', make: makeGrogFountain, r: 1.7, district: ['party', 'market'] },
+  { name: 'punchFountain', make: makePunchFountain, r: 1.7, district: ['party', 'market'] },
   // ── vehicles and watercraft
   { name: 'speedboat', make: makeSpeedboat, r: 3.6, district: ['port', 'cove'] },
   { name: 'jetSki', make: makeJetSki, r: 1.8, district: ['cove', 'beach', 'port'] },

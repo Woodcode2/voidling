@@ -342,22 +342,28 @@ export function makeGrill(): THREE.Group {
   return finish(p);
 }
 
-/** Coolers and a keg tub, the drinks station of a tailgate, ~3 across. */
+/** Coolers and a drinks urn, the refreshment station of a tailgate, ~3 across. */
 export function makeCoolerStack(): THREE.Group {
   const p: G[] = [];
   coolerParts(p, -0.9, 0, -0.4, 1.15, 0.68, BLUE);
   coolerParts(p, -0.9, 0.78, -0.4, 1.0, 0.5, CRIM);
   coolerParts(p, -0.6, 0, 0.85, 0.95, 0.58, WHITE);
-  // the keg tub: a galvanised tub of ice with the keg standing in it
+  // A LEMONADE URN IN A TUB OF ICE. This was a keg, and it read as one: a
+  // steel cylinder with a tap on a stick is the only thing that silhouette
+  // says. The tub, the ice and the urn are unchanged; the tap handle is now
+  // lemon yellow and the urn is enamel cream rather than brushed aluminium,
+  // which is what a church-hall lemonade urn actually looks like.
   p.push(part(new THREE.CylinderGeometry(0.86, 0.72, 0.72, 14), ALU, 1.1, 0.36, 0));
   p.push(part(new THREE.TorusGeometry(0.86, 0.07, 5, 16), STEEL, 1.1, 0.7, 0, Math.PI / 2));
   for (let i = 0; i < 5; i++)
     p.push(part(new THREE.IcosahedronGeometry(0.17, 0), 0xe8f4f8, 1.1 + Math.cos(i * 1.3) * 0.5, 0.72, Math.sin(i * 1.3) * 0.5));
-  p.push(part(new THREE.CylinderGeometry(0.42, 0.42, 1.1, 12), ALU, 1.1, 1.05, 0));
-  p.push(part(new THREE.TorusGeometry(0.42, 0.08, 5, 12), STEEL, 1.1, 1.55, 0, Math.PI / 2));
-  p.push(part(new THREE.CylinderGeometry(0.18, 0.18, 0.16, 8), CHAR, 1.1, 1.68, 0));
-  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 6), STEEL, 1.1, 1.95, 0));
-  p.push(part(new THREE.BoxGeometry(0.4, 0.1, 0.1), CRIM, 1.28, 2.16, 0));
+  p.push(part(new THREE.CylinderGeometry(0.42, 0.42, 1.1, 12), 0xfdf3de, 1.1, 1.05, 0));
+  p.push(part(new THREE.TorusGeometry(0.42, 0.08, 5, 12), 0xffd23f, 1.1, 1.55, 0, Math.PI / 2));
+  p.push(part(new THREE.CylinderGeometry(0.18, 0.18, 0.16, 8), 0xffd23f, 1.1, 1.68, 0));
+  p.push(part(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 6), 0xfdf3de, 1.1, 1.95, 0));
+  p.push(part(new THREE.BoxGeometry(0.4, 0.1, 0.1), 0xffd23f, 1.28, 2.16, 0));
+  // a lemon on the lid, because at this size the read has to be instant
+  p.push(part(new THREE.SphereGeometry(0.17, 8, 6), 0xffd23f, 1.1, 1.72, 0.34));
   cupParts(p, 0.1, 1.06, -0.4, 4);
   return finish(p);
 }

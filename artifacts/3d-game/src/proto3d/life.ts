@@ -449,7 +449,7 @@ function mat(color: number, roughness = 0.85, flat = false, dbl = false): THREE.
 // baked once at build time from the base primitives below with per-vertex
 // colours, so the ENTIRE population shares ONE material and a person costs six
 // draw calls whether they are a naked swimmer or a captain with a parrot, an
-// eyepatch and a cocktail. Only the six pieces that have to animate are separate.
+// eyepatch and a drink. Only the six pieces that have to animate are separate.
 //
 // Everything the camera cannot see is deleted rather than drawn: limb segments
 // are open-ended tubes (their caps are inside the joint above), the torso barrel
@@ -540,7 +540,7 @@ export type Hat = 'tricorn' | 'bandana' | 'captain' | 'sun' | 'visor' | 'snorkel
   // so a town of jobs needs a town of hats: the straw brim IS the farmer, the
   // shako plume IS the marching band, the hood IS the teenager.
   | 'straw' | 'hood' | 'helmet' | 'shako' | 'postal';
-export type Prop = 'cocktail' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie'
+export type Prop = 'juice' | 'clipboard' | 'tray' | 'ball' | 'detector' | 'selfie'
   // MAPLE FALLS props. `placard` is the loudest object in the town — it is the
   // only thing an adult holds that is visible from directly overhead, which is
   // why the protest and the fair are both told with them.
@@ -665,7 +665,7 @@ function hairParts(out: Geo[], style: Hair, col: number): void {
 }
 
 // ARM PIVOT space: origin at the shoulder, hand around y -1.01*s. Everything is
-// expressed in units of the arm length `s`, so a child's cocktail ends up in a
+// expressed in units of the arm length `s`, so a child's drink ends up in a
 // child's hand at a child's scale.
 // The tint the CURRENT prop is painted in (placards, leaflets, pompoms,
 // skateboards). Set immediately before the call and read inside it — a
@@ -673,9 +673,15 @@ function hairParts(out: Geo[], style: Hair, col: number): void {
 // four props, and this bakes into the geometry at build time either way.
 let _propCol = 0xd8443c;
 function propParts(out: Geo[], kind: Prop, s: number): void {
-  if (kind === 'cocktail') {
-    out.push(pc(B.cone, 0xdff6ff, 0, -1.23 * s, 0.18 * s, 0.34 * s, 0.30 * s, 0.34 * s, Math.PI));
-    out.push(pc(B.dot, 0xff8a3a, 0, -1.09 * s, 0.18 * s, 0.18 * s));
+  if (kind === 'juice') {
+    // A TALL GLASS WITH A STRAW, NOT A COUPE. This was an inverted cone with a
+    // garnish dot, which is the martini silhouette and nothing else — carried
+    // by up to 55% of the resort crowd in a game rated 4+, while
+    // newsroom.ts:65 already forbids the same thing in words. The App Store
+    // questionnaire asks about alcohol references and does not care whether
+    // the glass was ever named in the source.
+    out.push(pc(B.tube, 0xffb03a, 0, -1.20 * s, 0.18 * s, 0.20 * s, 0.36 * s, 0.20 * s));
+    out.push(pc(B.tube, 0xff5d7e, 0.07 * s, -1.00 * s, 0.18 * s, 0.035 * s, 0.34 * s, 0.035 * s, 0, 0, 0.38));
   } else if (kind === 'clipboard') {
     out.push(pc(B.box, 0xb9793f, 0.02, -1.12 * s, 0.32 * s, 0.44 * s, 0.05 * s, 0.40 * s, -0.7));
     out.push(pc(B.box, WHITE, 0.02, -1.07 * s, 0.35 * s, 0.36 * s, 0.03 * s, 0.32 * s, -0.7));
@@ -1122,14 +1128,14 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
         hair: pick(['bob', 'long', 'bun', 'short', 'pony'] as Hair[]),
         hat: Math.random() < 0.62 ? 'sun' : null, hatCol: pick([0xf6e3b8, WHITE, 0xffe0ec]),
         glasses: Math.random() < 0.85, necklace: Math.random() < 0.55,
-        prop: Math.random() < 0.55 ? pick(['cocktail', 'selfie'] as Prop[]) : undefined,
+        prop: Math.random() < 0.55 ? pick(['juice', 'selfie'] as Prop[]) : undefined,
       });
     case 'robe':   // straight out of the spa, and not changing for anybody
       return makePerson(dress, undefined, {
         shirt: WHITE, pants: WHITE, accent: pick([0xd8cfc0, 0x9ac0d8]),
         wear: 'robe', shoe: 'flip', hat: Math.random() < 0.4 ? 'flower' : null,
         glasses: Math.random() < 0.6, necklace: Math.random() < 0.4,
-        prop: Math.random() < 0.5 ? 'cocktail' : undefined,
+        prop: Math.random() < 0.5 ? 'juice' : undefined,
       });
     case 'waiter':
       return makePerson(dress, undefined, {
@@ -1335,7 +1341,7 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
     default:         // generic holidaymaker in whatever the district wears
       return makePerson(dress, undefined, {
         glasses: Math.random() < 0.35,
-        prop: Math.random() < 0.22 ? pick(['cocktail', 'selfie', 'ball'] as Prop[]) : undefined,
+        prop: Math.random() < 0.22 ? pick(['juice', 'selfie', 'ball'] as Prop[]) : undefined,
       });
   }
 }

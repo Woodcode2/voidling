@@ -245,7 +245,12 @@ In Xcode:
 
 - **Name**: VOIDLING
 - **Subtitle**: The cute world ender
-- **Keywords**: hole, io, black hole, eat, city, arcade, casual, devour, grow
+- **Keywords**: hole, black hole, eat, city, arcade, casual, devour, grow, void
+  - the bare token `io` is gone. On its own it is not a word a player searches,
+    it exists only to ride the `.io` genre suffix, and 4.1 of the Review
+    Guidelines treats metadata that leans on another app's name as
+    impersonation. `hole` already reaches the same searches without inviting
+    the question. `void` earns its place in a way `io` never did.
 - **Description opener**: "Feed a tiny void until it swallows the whole town.
   Outgrow your rivals, dodge the ones bigger than you, and end the world —
   adorably." Then: 3-minute matches, three to five rival voids to outgrow,

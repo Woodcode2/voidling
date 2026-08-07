@@ -3350,8 +3350,8 @@ function makeChest(): THREE.Group {
   ];
   const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
 }
-// a resort's DECORATIVE rum barrel — painted staves, dark hoops — not a
-// dockyard cask. Around 90 of these were the largest single source of brown.
+// a resort's DECORATIVE painted barrel — bright staves, dark hoops — not a
+// dockyard cask, and nothing to do with what might once have been in it. Around 90 of these were the largest single source of brown.
 const STAVE_COLS = [0xff6a5e, 0x2fb8a8, 0xf0c050, 0xff8ac0, 0x4dd0e1, 0xfdf3de];
 const PAINTED_STAVE = (): number => STAVE_COLS[(Math.random() * STAVE_COLS.length) | 0];
 function makeBarrel(): THREE.Group {
@@ -4780,7 +4780,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     // flagship district had exactly one object over 8 units tall across 246 props.
     landmark(LUXE.makeSpaPavilion(), [9250, 5150], 7, 0.4, 130);
     landmark(LUXE.makeYachtClub(), [9150, 6550], 7.5, -0.5, 130);
-    landmark(LUXE.makeCigarLounge(), [8880, 6980], 5, 0.9, 110);
+    landmark(LUXE.makeWickerLounge(), [8880, 6980], 5, 0.9, 110);
     for (const p2 of spread('resort', 6, 70, 2.4)) drop(LUXE.makeGolfBuggyLux(), p2, 2.4, rand(0, Math.PI * 2));
     for (const p2 of spread('resort', 8, 50, 1.6)) drop(LUXE.makeLuggageCart(), p2, 1.6, rand(0, Math.PI * 2));
     for (const p2 of spread('resort', 10, 40, 1.1)) drop(LUXE.makeRolledTowels(), p2, 1.1);
@@ -4837,7 +4837,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     for (const p2 of spread('market', 10, 50, 2.6)) dropGlb('palm', p2, 2.6, rand(6, 8.5), makePalm, rand(0, Math.PI * 2));
     for (const p2 of spread('market', 8, 34, 1.6)) drop(LUXE.makeGiftKiosk(), p2, 1.6, rand(0, Math.PI * 2));
     for (const p2 of spread('market', 4, 60, 2.2)) drop(LUXE.makeParrotPerch(), p2, 2.2);
-    for (const p2 of spread('market', 3, 70, 2.4)) drop(LUXE.makeGrogFountain(), p2, 2.4);
+    for (const p2 of spread('market', 3, 70, 2.4)) drop(LUXE.makePunchFountain(), p2, 2.4);
     for (const p2 of spread('market', 10, 30, 0.7)) drop(makeFlowers(), p2, 0.7);
     for (const p2 of spread('market', 5, 55, 2.6)) drop(makeFoodtruckFB(), p2, 2.6, rand(0, Math.PI * 2));
 
