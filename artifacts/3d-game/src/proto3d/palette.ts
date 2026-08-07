@@ -144,8 +144,22 @@ export const SKINS: Skin[] = [
   // Toxic pushed off Rexling's deep dinosaur green toward acid lime, so the
   // 150-coin skin no longer arrives first and undercuts the paid one.
   { id: 'toxic', name: 'Toxic', abyss: 0x14300c, inner: 0x357a12, mid: 0x7ec832, rim: 0xc4ff6a, glow: 0xd8ff8a, tex: '/assets/hf/hf_20260717_005246_314c786a-72c9-4a63-889f-c09dd0c04199.png' },
-  { id: 'sunset', name: 'Sunset', abyss: 0x2e0f1e, inner: 0x7a2a4a, mid: 0xb8506a, rim: 0xff9a5a, glow: 0xffb86a, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
-  { id: 'ocean', name: 'Ocean', abyss: 0x0a1830, inner: 0x1a4070, mid: 0x2a6ab8, rim: 0x5ec8d8, glow: 0x8ae8ff, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
+  // ── TWO SKINS WERE NAMED AFTER ART THEY DO NOT HAVE ──────────────────────
+  // Opened the actual files. 'Sunset' is textured with cracked black basalt
+  // and running magma; 'Ocean' is a neon cyan-and-magenta printed circuit
+  // board, chips and traces, nothing in it is water. A child saves coins for
+  // these and the shop card shows the raw texture cropped to a circle, so what
+  // is in the file is literally what they are buying.
+  //
+  // The ART is good — it is the NAMES that are wrong, so the names move rather
+  // than the assets. `id` is never rendered anywhere (it is a storage key, a
+  // lookup and a CSS class; `name` is the only string a player reads), so the
+  // ids stay put and nobody's purchase is stranded and no save migration is
+  // needed. The palettes come with them: MAGMA goes charred-black with an
+  // ember rim instead of the old rose-and-peach, CIRCUIT keeps its blue but
+  // picks up the board's violet in the midtone.
+  { id: 'sunset', name: 'Magma', abyss: 0x140d10, inner: 0x33201a, mid: 0x6e2d18, rim: 0xff6a1e, glow: 0xffa53a, tex: '/assets/hf/hf_20260717_005242_6530bd58-bacd-4fc7-81f2-42796a5e163f.png' },
+  { id: 'ocean', name: 'Circuit', abyss: 0x090a24, inner: 0x281c66, mid: 0x2f6ad0, rim: 0x4fe6ff, glow: 0x9df6ff, tex: '/assets/hf/hf_20260717_131506_a3cc2f51-d953-4831-8531-1c3be1fedf97.png' },
   { id: 'candy', name: 'Candy', abyss: 0x40182a, inner: 0x8a3a5e, mid: 0xd86a9a, rim: 0xffb8d8, glow: 0xffc9e2, tex: '/assets/hf/hf_20260717_005243_b9bfd850-ba19-4200-8b94-c91e7f8554a2.png' },
   // Honey's rim was byte-identical to King Void's (#ffd25a) — the gold that is
   // meant to make the crown feel royal was already on a coin skin.
