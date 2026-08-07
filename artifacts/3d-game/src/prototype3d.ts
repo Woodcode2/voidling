@@ -15,7 +15,7 @@ import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, type WorldId } from './proto3d/island';
-import { createLife, pickFresh } from './proto3d/life';
+import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion } from './proto3d/fx';
@@ -771,6 +771,7 @@ function placeStickersOnce(): void {
 const _dbg = window as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
+  __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -794,6 +795,7 @@ const _dbg = window as unknown as {
 const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
+
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 _dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
 _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: district centroid sweeps
@@ -915,6 +917,15 @@ const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'ski
 }
 const bubbles = createBubbles(camera);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
+// QA: the crowd gate. `life` is exposed so qa/crowdgate.mjs can time
+// life.update() directly with the gate on and off, isolating the crowd from
+// the renderer and the sim — the only way to get a number out of a software-GL
+// harness that is not mostly noise. __crowdGate is what the game is using this
+// frame. ASSIGNED HERE, not up with the other hooks: `life` is a const
+// declared on this line, so touching it from the hook block 120 lines above is
+// a temporal dead zone and the module fails to initialise.
+_dbg.__life = life;
+_dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // 3-5 family members per match, randomly cast — you never know who's coming
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
 const fx = createFx(scene);
@@ -4635,7 +4646,21 @@ function animate() {
   }
 
   voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
-  life.update(dtw, tClock, voidState.x, voidState.z, R);
+  // ── HOW FAR THE CROWD MATTERS ──────────────────────────────────────────
+  // Everything past this runs on a stagger rather than every frame (see the
+  // dispatch in life.ts). It is derived from the CAMERA, not from a constant,
+  // because how much town is on screen is entirely a function of camDist —
+  // which climbs from 38 to 340 as the void grows, so a fixed radius would be
+  // generous at the start and would cut into the visible frame at the end.
+  //
+  // 2.2x plus 90 is deliberately loose. The saving comes from the hundreds of
+  // walkers on the far side of the island, not from shaving the edge of the
+  // frame, and a gate tight enough to be visible is a gate that will be
+  // noticed for the wrong reason. During the establishing shot the gate is
+  // off entirely: the camera is 300 units up and looking at the whole map.
+  const crowdGate = introT > 0 ? Infinity : camDist * 2.2 + 90;
+  _dbg.__crowdGate = crowdGate;
+  life.update(dtw, tClock, voidState.x, voidState.z, R, crowdGate);
   // the family races on the SAME terms as the player now, so it needs the same
   // three numbers: the clock it is pacing against, the score its rubber band
   // reads, and the shared HAPPY HOUR multiplier

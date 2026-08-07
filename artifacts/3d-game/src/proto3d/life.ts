@@ -321,11 +321,19 @@ const VOICE_PANIC: Record<string, string[]> = {
   ],
 };
 
-interface Mover { mesh: THREE.Object3D; update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
+// mesh is nullable in practice: the train mover is pushed on every world but
+// only BUILT on Maple, so it reports null on the other three. See the gate.
+interface Mover { mesh: THREE.Object3D | null; update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
 export interface Life {
-  update(dt: number, t: number, vx: number, vz: number, vR: number): void;
+  /** `gate` = world-units past which a mover updates on a stagger instead of
+   *  every frame. Omit for the old behaviour (everything, every frame). */
+  update(dt: number, t: number, vx: number, vz: number, vR: number, gate?: number): void;
   /** Hold the crowd calm for `sec` seconds — see the note on `calmT`. */
   calm(sec: number): void;
+  /** QA only: how many movers fall inside a given gate. The ones inside run
+   *  every frame with or without it, so this is the honest answer to "does
+   *  gating change what the player sees". */
+  moverStats(gate: number): { near: number; total: number };
   /** How bad has it got, 0..1. Drives what the crowd says and how often.
    *  Fed from the match loop off the same devoured/form signal the newsroom
    *  uses for its tier, so the street and the broadcast escalate together. */
@@ -1975,7 +1983,15 @@ export function createLife(
   // the crowd was already fleeing on the loading screen. beginMatch() sets it
   // to a few seconds and endMatch() puts it back.
   let calmT = Infinity;
-  movers.push({ mesh: new THREE.Object3D(), update(dt) { pingClock += dt; calmT = Math.max(0, calmT - dt); } });   // shared clock for panic contagion
+  // THE SHARED CLOCK IS NOT A THING IN THE WORLD, so it is not a mover any
+  // more. It used to be pushed as a bare Object3D parked at the origin, which
+  // worked only because every mover ran every frame — the moment the dispatch
+  // below started skipping distant ones, a void anywhere except the middle of
+  // the map would have culled the clock and silently frozen `pingClock` and
+  // `calmT`: no panic contagion, and a `calm()` hold that never expires. Run
+  // it unconditionally at the top of update() instead, where it cannot be
+  // skipped by anything.
+  const tickClock = (dt: number) => { pingClock += dt; calmT = Math.max(0, calmT - dt); };
   const peds: { mesh: THREE.Object3D; biome: string; panic: number; voice?: string }[] = [];
 
   // ── WHICH TOWN IS TALKING ────────────────────────────────────────────────
@@ -4975,12 +4991,53 @@ export function createLife(
 
   // ── crowd chatter: escalates with the match ────────────────────────────────
   let chatCd = 2;
+  let farPhase = 0;   // spreads the staggered quarter across frames
+  let lastVX = 0, lastVZ = 0;   // for moverStats
   let tense = 0;            // 0 = nobody has noticed, 1 = the street is going
   const cpos = new THREE.Vector3();
 
   return {
-    update(dt, t, vx, vz, vR) {
-      for (const m of movers) m.update(dt, t, vx, vz, vR);
+    update(dt, t, vx, vz, vR, gate = Infinity) {
+      tickClock(dt);
+      lastVX = vx; lastVZ = vz;
+      // ── THE CROWD OUTSIDE THE FRAME ────────────────────────────────────
+      // This was `for (const m of movers) m.update(...)` with no cull of any
+      // kind — no frustum test, no distance test, no stride. Lantern Night
+      // spawns ~966 walkers and every one of them ran a full update every
+      // frame, including three biomeAt() point-in-polygon tests, whether or
+      // not it was within a hundred units of the camera.
+      //
+      // IT IS A STAGGER, NOT A SKIP, and that is the whole design. Freezing
+      // distant movers outright is what makes a naive version of this look
+      // broken: timers stop, so a train swallowed off-screen never respawns,
+      // and a walker that wandered out returns still mid-stride from a minute
+      // ago. Far movers instead run one frame in four with four times the dt,
+      // so they advance at the correct AVERAGE rate for a quarter of the cost
+      // and nothing in the world is ever actually paused. The phase is offset
+      // by index so the quarters are spread across frames rather than landing
+      // together.
+      //
+      // `mesh` is read once and checked, because it is genuinely null on three
+      // of four worlds: life.ts pushes the train mover unconditionally and only
+      // calls buildTrain() on Maple, so `get mesh()` returns null everywhere
+      // else. A gate written as `m.mesh.position.x` throws on the first frame
+      // of every Pirate, Game Day and Lantern match. Anything without a mesh
+      // has no position to be far from, so it always runs.
+      const g2 = gate * gate;
+      farPhase = (farPhase + 1) & 3;
+      for (let i = 0; i < movers.length; i++) {
+        const m = movers[i];
+        const o = m.mesh;
+        if (o && gate < Infinity) {
+          const dx = o.position.x - vx, dz = o.position.z - vz;
+          if (dx * dx + dz * dz > g2) {
+            if (((i + farPhase) & 3) !== 0) continue;
+            m.update(dt * 4, t, vx, vz, vR);
+            continue;
+          }
+        }
+        m.update(dt, t, vx, vz, vR);
+      }
 
       // ONE VOICE AT A TIME, from a pedestrian near the void — but which
       // register, and how often, is now the match's business. At rest it is a
@@ -5033,6 +5090,16 @@ export function createLife(
         }
         else if (ev.cd <= 0 && d < 130) { ev.cd = rand(4, 7); cpos.set(ev.x, 6, ev.z); say(cpos, pick(ev.ambient), 'event'); }
       }
+    },
+    moverStats(gate: number) {
+      let near = 0;
+      for (const mv of movers) {
+        const o = mv.mesh;
+        if (!o) { near++; continue; }
+        const dx = o.position.x - lastVX, dz = o.position.z - lastVZ;
+        if (dx * dx + dz * dz <= gate * gate) near++;
+      }
+      return { near, total: movers.length };
     },
     calm(sec) { calmT = sec; },   // SET, not max — Infinity has to be clearable
     tension(v) { tense = Math.max(0, Math.min(1, v)); },
