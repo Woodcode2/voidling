@@ -34,25 +34,35 @@ const read = (r) => p.evaluate(async (radius) => {
   const THREE = window.__THREE;
   window.__setVoidR(radius);
   for (let i = 0; i < 40; i++) await new Promise((res) => requestAnimationFrame(res));
-  let dress = null;
-  window.__scene.traverse((o) => { if (o.name === 'dress') dress = o; });
-  if (!dress) return { err: 'no dress group' };
+  let dress = null, bob = null;
+  window.__scene.traverse((o) => { if (o.name === 'dress') { dress = o; bob = o.parent; } });
+  if (!dress || !bob) return { err: 'no dress group' };
+  // MEASURE IN BOB-LOCAL SPACE, where the body is a unit sphere. Box3's
+  // expandByObject/setFromObject return WORLD coordinates — the first version
+  // of this probe used them and then multiplied by dress.scale on top, so the
+  // numbers were neither world nor local and the unicorn came out seated at
+  // 2.04 "body radii", which is not a plausible anything. Composing each
+  // geometry's own bounding box with (inverse bob world) * (mesh world) gives
+  // a figure that means what the header says it means.
+  const inv = new THREE.Matrix4().copy(bob.matrixWorld).invert();
   const out = {};
-  const box = new THREE.Box3();
   for (const child of dress.children) {
     if (!child.visible) continue;
-    box.makeEmpty();
-    box.expandByObject(child);
+    const box = new THREE.Box3();
+    child.updateWorldMatrix(true, true);
+    child.traverse((o) => {
+      if (!o.geometry) return;
+      o.geometry.computeBoundingBox();
+      const bb = o.geometry.boundingBox.clone();
+      bb.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      box.union(bb);
+    });
     if (!isFinite(box.min.y)) continue;
-    // dress sits inside `bob`, which is scaled by the display radius; report in
-    // BODY RADII so the number is comparable at any size
-    const bodyR = dress.parent ? dress.parent.scale.x : 1;
     out[child.name || '(unnamed)'] = {
-      lowest: +(box.min.y * dress.scale.y / (bodyR / bodyR)).toFixed(3),
-      dressScale: +dress.scale.y.toFixed(3),
+      lowest: +box.min.y.toFixed(3), top: +box.max.y.toFixed(3),
     };
   }
-  return { pxR: null, dressScale: +dress.scale.y.toFixed(3), parts: out };
+  return { dressScale: +dress.scale.y.toFixed(3), parts: out };
 }, r);
 
 console.log('Each legendary accessory, lowest point in body radii.');
