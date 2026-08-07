@@ -1225,6 +1225,10 @@ const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0,
   // stick when two fingers are down.
   px: 0, py: 0, moved: false };
 const JOY_R = 64;
+// "pinned": this close to the bezel there is no glass left to deflect into
+const JOY_EDGE = 22;
+// px of base travel per rescue tick — ~4 frames from crippled to full reach
+const JOY_STEP = 16;
 let lastInput = -9999, tClock = 0;
 function joySet(cx: number, cy: number) {
   joy.px = cx; joy.py = cy;
@@ -1265,13 +1269,11 @@ function joySet(cx: number, cy: number) {
   // void. Nothing slides until the thumb has actually driven.
   if (joy.moved) {
     const W = window.innerWidth, H = window.innerHeight;
-    const EDGE = 22;    // "pinned": this close to the bezel there is no room left
-    const STEP = 16;    // px of base travel per event — ~4 frames to full recovery
-    const gap = (short: number) => Math.min(JOY_R - short, STEP);
-    if (cx > W - EDGE && cx - joy.ax < JOY_R) joy.ax -= gap(cx - joy.ax);
-    else if (cx < EDGE && joy.ax - cx < JOY_R) joy.ax += gap(joy.ax - cx);
-    if (cy > H - EDGE && cy - joy.ay < JOY_R) joy.ay -= gap(cy - joy.ay);
-    else if (cy < EDGE && joy.ay - cy < JOY_R) joy.ay += gap(joy.ay - cy);
+    const gap = (short: number) => Math.min(JOY_R - short, JOY_STEP);
+    if (cx > W - JOY_EDGE && cx - joy.ax < JOY_R) joy.ax -= gap(cx - joy.ax);
+    else if (cx < JOY_EDGE && joy.ax - cx < JOY_R) joy.ax += gap(joy.ax - cx);
+    if (cy > H - JOY_EDGE && cy - joy.ay < JOY_R) joy.ay -= gap(cy - joy.ay);
+    else if (cy < JOY_EDGE && joy.ay - cy < JOY_R) joy.ay += gap(joy.ay - cy);
     joyEl.style.left = `${joy.ax}px`; joyEl.style.top = `${joy.ay}px`;
   }
   const dx = cx - joy.ax, dy = cy - joy.ay;
@@ -1329,6 +1331,26 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   joySet(e.clientX, e.clientY);
 });
 window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) joySet(e.clientX, e.clientY); });
+/** Is the thumb jammed against a bezel with nowhere left to push? */
+function joyPinned(): boolean {
+  return joy.active && joy.moved
+    && (joy.px > window.innerWidth - JOY_EDGE || joy.px < JOY_EDGE
+      || joy.py > window.innerHeight - JOY_EDGE || joy.py < JOY_EDGE);
+}
+/** THE RESCUE HAS TO RUN OFF THE CLOCK, NOT OFF THE EVENTS.
+ *
+ *  Sliding the base inside joySet only helps while the thumb is still MOVING,
+ *  and a thumb that has hit the bezel has by definition stopped. Measured with
+ *  qa/joyedge.mjs: from 20px out there is just enough travel left to emit the
+ *  handful of pointermoves the rescue needs and it recovers to 0.97 of the
+ *  speed the same push gets away from the edge — but from 12px out there is
+ *  almost nothing left to move through, only two events fire, and it stalls at
+ *  0.53. Half speed, in the exact corner grip that started this.
+ *
+ *  So the frame loop drives it too, from the last known thumb position. Gated
+ *  on actually being pinned, so during normal play this never runs and the
+ *  heading filter keeps its existing event-driven cadence. */
+function joyEdgeTick(): void { if (joyPinned()) joySet(joy.px, joy.py); }
 // ── LETTING GO, FROM EVERY DIRECTION ──────────────────────────────────────
 // A finger lifting is only ONE of the ways a drive ends, and it was the only
 // one handled. The joystick is a latch: joy.mag survives until something
@@ -4290,6 +4312,7 @@ function animate() {
   }
 
   powerCd = Math.max(0, powerCd - dt);
+  joyEdgeTick();   // a thumb jammed on the bezel stops emitting events — see joyEdgeTick
   // screen-space input: joystick first, else keys
   let inX = 0, inY = 0;
   if (joy.active && joy.mag > 0.156) { inX = joy.dx; inY = joy.dy; }
