@@ -88,7 +88,7 @@ export const HATS: Hat[] = [
     seat: 1.04, accent: 0xff8ac0 },
 
   { id: 'wizard', name: 'Star Wizard', blurb: 'the hat knows things', tier: 'plus', usd: 2.99,
-    seat: 1.02, drop: -0.15, accent: 0x6f5cff },
+    seat: 0.92, accent: 0x6f5cff },
   { id: 'tricorn', name: 'Pirate Tricorn', blurb: 'yo ho, and also nom', tier: 'plus', usd: 2.99,
     seat: 1.04, accent: 0x2a2430 },
   { id: 'viking', name: 'Viking Helm', blurb: 'horns first, questions later', tier: 'plus', usd: 2.99,

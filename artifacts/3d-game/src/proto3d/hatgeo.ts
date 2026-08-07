@@ -1052,23 +1052,39 @@ function buildWizard(): THREE.Group {
     emissive: 0xffce2e, emissiveIntensity: 2.6, flatShading: true,
   });
 
-  // ── brim: 14-sided, droops from y=1.54 at the crown down to y=1.17 at the
-  // 1.88 rim. Wide enough to be the base of the silhouette, low-poly enough to
-  // look hand-carved.
+  // ── THE BRIM COMES DOWN, AND SO DOES THE HAT ────────────────────────────
+  // v1's brim ran from radius 0.52 at y = 1.54 out to 1.88 at y = 1.23, which
+  // puts its inner edge at |p| = 1.63 — two thirds of a body radius above a
+  // head that reaches 1.0. Legal by the clearance rule and, seen next to the
+  // other twelve on one sheet, plainly a hat hovering over a ball.
+  //
+  // A wizard hat has no crown to speak of below the cone, so the brim has to
+  // BE the descent: its inner edge moves out to radius 1.00 and down to
+  // y = 0.88, where a skirt carries it up to meet the cone's base at 1.32. The
+  // droop is flattened at the same time — at the old angle the front of a brim
+  // this low crosses the void's face.
   const brim = new THREE.Mesh(new THREE.LatheGeometry([
-    new THREE.Vector2(0.52, 0.10),   // top surface, inner → outer, drooping
-    new THREE.Vector2(0.98, 0.05),
-    new THREE.Vector2(1.42, -0.03),
-    new THREE.Vector2(1.72, -0.12),
-    new THREE.Vector2(1.88, -0.21),
-    new THREE.Vector2(1.86, -0.27),  // rolled edge
-    new THREE.Vector2(1.68, -0.19),  // underside, outer → inner
-    new THREE.Vector2(1.38, -0.11),
-    new THREE.Vector2(0.94, -0.03),
-    new THREE.Vector2(0.50, 0.03),
-  ], 14), hatMat);
-  brim.position.y = 1.44;
+    new THREE.Vector2(1.00, 0.10),   // top surface, inner → outer, drooping
+    new THREE.Vector2(1.34, 0.06),
+    new THREE.Vector2(1.66, 0.00),
+    new THREE.Vector2(1.90, -0.06),
+    new THREE.Vector2(2.02, -0.12),
+    new THREE.Vector2(2.00, -0.19),  // rolled edge
+    new THREE.Vector2(1.84, -0.13),  // underside, outer → inner
+    new THREE.Vector2(1.56, -0.07),
+    new THREE.Vector2(1.26, -0.01),
+    new THREE.Vector2(0.98, 0.03),
+  ], 16), hatMat);
+  brim.position.y = 0.78;
   g.add(brim);
+
+  // the skirt: brim rim to cone base, so the hat is one continuous form rather
+  // than a cone standing on a plate
+  const skirt = new THREE.Mesh(new THREE.LatheGeometry([
+    new THREE.Vector2(1.00, 0.86), new THREE.Vector2(0.94, 1.00),
+    new THREE.Vector2(0.80, 1.16), new THREE.Vector2(0.66, 1.32),
+  ], 16), hatMat);
+  g.add(skirt);
 
   // ── crown: four frusta walking a spine that leans harder at every step, so
   // the cone curls forward instead of standing to attention. The crown's base
@@ -1138,6 +1154,9 @@ function buildWizard(): THREE.Group {
     g.add(st);
   }
 
+  // tipped back: level, the brim's lowest front point lands at y = 0.59 with
+  // the void's brows at 0.55, and rotation about the origin costs no clearance.
+  g.rotation.x = -0.10;
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }
