@@ -499,7 +499,18 @@
         align-items: center; justify-content: flex-start; background: rgba(13,8,33,0.82); backdrop-filter: blur(8px);
         color: #fff; text-align: center; }
       #end.show { display: flex; }
-      #end { overflow-y: auto; padding: calc(20px + env(safe-area-inset-top,0px)) 0 calc(20px + env(safe-area-inset-bottom,0px)); }
+      /* THE TOP PADDING CLEARS THE COIN CHIP, and that is not arbitrary.
+         #coins is fixed at top 12px and about 29px tall, and it was raised to
+         z-index 11 to clear the menu — the comment where that happens says it
+         "only ever needed to clear the menu, not the overlays above it", but
+         #end sits at 9, so the chip paints straight over the results headline.
+         Owner's screenshot: the D of "MARKET: DEVOURED" behind the coin pill.
+         Raising #end above 11 is the wrong fix — the shop and the scrapbook
+         are at 11 and 12 and they open FROM this screen, so they have to stay
+         on top of it. Reserving the strip costs nothing when the card fits,
+         because the first child takes an auto top margin and centres; it only
+         applies in the overflow case, which is the case that collided. */
+      #end { overflow-y: auto; padding: calc(54px + env(safe-area-inset-top,0px)) 0 calc(20px + env(safe-area-inset-bottom,0px)); }
       #end.show > *:first-child { margin-block-start: auto; }
       /* …but NOT the button row, which pins itself instead — an auto bottom
          margin on a sticky element pushes it out of its own scrollport. */
