@@ -61,6 +61,30 @@ for (const wid of WORLDS) {
     const cv = document.querySelector('canvas');
     const cx = innerWidth / 2, cy = innerHeight / 2;
     cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+    // ── THE AUTOPILOT STEERS IN SCREEN SPACE, NOT WORLD SPACE ───────────────
+    // This drove 45 DEGREES OFF TARGET for as long as the probe has existed,
+    // and every pacing number in the repo was tuned against it.
+    //
+    // The bug was feeding a WORLD direction straight into a SCREEN joystick:
+    // `clientX: cx + best.dx * 110, clientY: cy + best.dz * 110`. The game
+    // converts the stick through the camera basis (prototype3d.ts, `tvx =
+    // rightTmp.x * inX - fwdTmp.x * inY`), and the play camera is isometric —
+    // camOffset is (0.62, 0.92, 0.62), so its X and Z are EQUAL and forward on
+    // screen is world (-1,-1)/sqrt(2). Handing it (dx, dz) therefore produced
+    // world (0.707(dx+dz), 0.707(dz-dx)): the same vector, rotated 45 degrees.
+    //
+    // It still converged — retargeting every frame turns a constant angular
+    // bias into a spiral — but it walked 1/cos(45) = 1.41x further than a
+    // straight line to reach anything. So travel-per-eat was inflated by about
+    // 41%, eats-per-second depressed to match, and dead time overstated. Every
+    // "this world feels empty" judgement was made against a driver taking the
+    // long way to everything.
+    //
+    // The basis is read from the LIVE camera rather than hardcoded, so this
+    // stays correct if the camera angle is ever retuned. Inverting the game's
+    // own 2x2 (its determinant is 1, since right is fwd rotated 90 degrees):
+    //   inX = -fwd.z * wx + fwd.x * wz
+    //   inY = -right.z * wx + right.x * wz
     const tick = () => {
       const vs = window.__voidState(); let best = null, bd = 1e9;
       for (const e of window.__edibles) {
@@ -68,9 +92,19 @@ for (const wid of WORLDS) {
         const dx = e.mesh.position.x - vs.x, dz = e.mesh.position.z - vs.z;
         const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = { dx, dz }; }
       }
-      if (best) { const m = Math.hypot(best.dx, best.dz) || 1;
+      if (best) {
+        const cam = window.__cam;
+        let fx = vs.x - cam.position.x, fz = vs.z - cam.position.z;
+        const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;      // camera forward, on the ground
+        const rx = -fz, rz = fx;                                      // and screen-right
+        const m = Math.hypot(best.dx, best.dz) || 1;
+        const wx = best.dx / m, wz = best.dz / m;
+        const sx = -fz * wx + fx * wz;                                // screen x
+        const sy = -rz * wx + rx * wz;                                // screen y
+        const sm = Math.hypot(sx, sy) || 1;
         dispatchEvent(new PointerEvent('pointermove', { pointerId: 1,
-          clientX: cx + best.dx / m * 110, clientY: cy + best.dz / m * 110, bubbles: true })); }
+          clientX: cx + sx / sm * 110, clientY: cy + sy / sm * 110, bubbles: true }));
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
