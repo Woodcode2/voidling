@@ -3114,9 +3114,62 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
 // unlit accent material: anything merged with this ignores the lighting, which
 // is the only way a neon strip reads as neon on the dark dance floor
 export const PROP_GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true });
+// ── CONTACT SHADING, BAKED INTO THE COLOUR THAT IS ALREADY THERE ───────────
+// Measured: aoMap covers 0% of the scene on all four worlds, while 80-94% of
+// every world's triangles ride one of two vertex-coloured materials. So the
+// hook for ambient occlusion is already in every vertex buffer and nothing was
+// using it — props sat ON the ground rather than IN it, which is most of what
+// separates a clay render from a toy photographed on a table.
+//
+// This is not screen-space AO and does not pretend to be. It is the oldest
+// trick there is: darken the vertices near a prop's base, where a real
+// occluder would eat the bounce light. Costs nothing at runtime — no pass, no
+// buffer, no shader change — because it is folded into the colours at build
+// time, and it is exactly right for chunky flat-shaded geometry.
+//
+// Height is prop-LOCAL and part() has already applied its translate, so y is
+// distance above the prop's own origin, which for almost everything on the
+// island is where it meets the ground. That makes the rule self-correcting:
+// a crate at y 0-1 darkens at its base, a lantern hanging at y=5 does not,
+// and the balloon envelope at y=9.6 is untouched.
+// THE BAND SCALES WITH THE PROP, and getting that wrong is why the first
+// version of this was invisible. A fixed 0.95-world-unit band is a fifth of a
+// wheelie bin and a twentieth of a tower — and on a tower, viewed from the
+// 50-300 units the play camera actually sits at, it is a sub-pixel line.
+// Measured then: 54% of changed pixels darker against 46% lighter, a mean
+// shift of 0.47/255. Indistinguishable from the crowd moving.
+// Proportional instead: everything shades over its own bottom third, so a bin
+// and a tower both read as sitting IN the world rather than on it.
+const AO_FRAC = 0.34;     // share of a prop's own height that shades
+const AO_MAX = 0.40;      // how dark it gets right at the base
+const _aoBox = new THREE.Box3();
+function bakeContactAO(geo: THREE.BufferGeometry): void {
+  const pos = geo.getAttribute('position');
+  const col = geo.getAttribute('color') as THREE.BufferAttribute | undefined;
+  if (!pos || !col) return;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  if (!bb) return;
+  const base = bb.min.y;
+  const h = bb.max.y - base;
+  if (h < 0.05) return;                 // a decal has no base to shade
+  const band = h * AO_FRAC;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i) - base;
+    if (y >= band) continue;
+    // squared falloff: a linear ramp reads as a painted band, this reads as shade
+    const t = 1 - y / band;
+    const k = 1 - AO_MAX * t * t;
+    col.setXYZ(i, col.getX(i) * k, col.getY(i) * k, col.getZ(i) * k);
+  }
+  col.needsUpdate = true;
+}
 export function mergedProp(parts: THREE.BufferGeometry[], mat: THREE.Material = PROP_SHARED_MAT): THREE.Mesh {
   const merged = mergeGeometries(parts, false)!;
   parts.forEach((pg) => pg.dispose());
+  // …but NOT on the unlit accent material. A neon strip is neon because it
+  // ignores the lighting; shading its base would just make it a dimmer strip.
+  if (mat !== PROP_GLOW_MAT) bakeContactAO(merged);
   const m = new THREE.Mesh(merged, mat);
   armFade(m);   // see installFade — every prop must write the uniform, not just fading ones
   return m;
