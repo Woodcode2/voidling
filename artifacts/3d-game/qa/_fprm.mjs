@@ -36,7 +36,7 @@ for (const wid of WORLDS) {
     });
   });
   console.log(`\n═══ ${wid.toUpperCase()}  edibles=${await p.evaluate(() => window.__edibles.length)}  scene children=${await p.evaluate(() => window.__scene.children.length)}`);
-  console.log('  rep |  end→results |  PLAY AGAIN frame | worst of next 60 frames | heap after (MB) | geometries | textures | scene kids');
+  console.log('  rep |  end→results |  PLAY AGAIN handler | worst of next 60 frames | heap after (MB) | geometries | textures | scene kids');
   for (let rep = 0; rep <= REPS; rep++) {
     // run the clock down to the finale rather than sitting through 3 minutes
     await p.evaluate(() => window.__rushClock(4));
@@ -47,19 +47,21 @@ for (const wid of WORLDS) {
     if (rep === REPS) { console.log(`  final: worst frame in the end sequence ${endWorst.toFixed(1)} ms`); break; }
     const before = await p.evaluate(() => { window.__R.length = 0;
       return performance.memory.usedJSHeapSize; });
-    await p.click('#btnAgain');
+    // resetMatch() runs SYNCHRONOUSLY inside the click handler, not in a rAF
+    // callback — timing frames around the click never sees it at all. click()
+    // dispatches inline, so this stopwatch brackets the real work.
+    const clickMs = await p.evaluate(() => { const a = performance.now();
+      document.getElementById('btnAgain').click(); return performance.now() - a; });
     await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 2.5, null, { timeout: 600000 });
     const o = await p.evaluate((bf) => { const R = window.__R;
-      const spike = Math.max(...R.slice(0, 3).map(x => x.d));
-      const first = R.findIndex(x => x.d === spike);
-      const after = R.slice(first + 1, first + 61).map(x => x.d);
+      const after = R.slice(0, 60).map(x => x.d);
       const inf = window.__renderer.info;
-      return { spike, next: Math.max(...after), heap: performance.memory.usedJSHeapSize,
+      return { next: Math.max(...after), heap: performance.memory.usedJSHeapSize,
         d: (performance.memory.usedJSHeapSize - bf) / 1048576,
         geo: inf.memory.geometries, tex: inf.memory.textures,
         kids: window.__scene.children.length, ed: window.__edibles.length };
     }, before);
-    console.log(`  ${String(rep).padStart(3)} | ${endWorst.toFixed(1).padStart(9)} ms | ${o.spike.toFixed(1).padStart(14)} ms | ${o.next.toFixed(1).padStart(20)} ms | ${(o.heap / 1048576).toFixed(0).padStart(11)} (${o.d >= 0 ? '+' : ''}${o.d.toFixed(0)}) | ${String(o.geo).padStart(10)} | ${String(o.tex).padStart(8)} | ${String(o.kids).padStart(10)}  edibles=${o.ed}`);
+    console.log(`  ${String(rep).padStart(3)} | ${endWorst.toFixed(1).padStart(9)} ms | ${clickMs.toFixed(1).padStart(14)} ms | ${o.next.toFixed(1).padStart(20)} ms | ${(o.heap / 1048576).toFixed(0).padStart(11)} (${o.d >= 0 ? '+' : ''}${o.d.toFixed(0)}) | ${String(o.geo).padStart(10)} | ${String(o.tex).padStart(8)} | ${String(o.kids).padStart(10)}  edibles=${o.ed}`);
   }
   await p.close();
 }

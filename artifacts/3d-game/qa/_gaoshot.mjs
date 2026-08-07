@@ -8,6 +8,12 @@ fs.mkdirSync('qa-out', { recursive: true });
 const LABEL = process.argv[2] || 'before';
 const PORT = process.argv[3] || '4231';
 const WORLDS = (process.argv[4] || 'maple,lantern').split(',');
+// A FIXED WARP POINT, because "the densest cluster" is not a control. The
+// first pass let each build pick its own densest cell and the two runs landed
+// 200 units apart in different districts — two different pictures, which
+// cannot be compared. These are the points the BEFORE run chose; both builds
+// now go to the same place.
+const FIXED = { maple: [-123.6, -208.9], lantern: [0.4, 28.9] };
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of WORLDS) {
@@ -39,12 +45,13 @@ for (const wid of WORLDS) {
     const l = [...cells.values()].filter(c => c.n > 10).sort((a, b) => b.w - a.w)[0];
     return l ? { x: +(l.x / l.n).toFixed(1), z: +(l.z / l.n).toFixed(1), n: l.n } : { x: 0, z: 0, n: 0 };
   });
-  await p.evaluate(({ x, z }) => { window.__setVoidR(2.2); window.__warpVoid(x, z); window.__setMood('victory'); }, spot);
+  const use = FIXED[wid] ? { x: FIXED[wid][0], z: FIXED[wid][1], n: spot.n } : spot;
+  await p.evaluate(({ x, z }) => { window.__setVoidR(2.2); window.__warpVoid(x, z); window.__setMood('victory'); }, use);
   await p.waitForTimeout(3000);
   const f = `qa-out/ao-${wid}-${LABEL}.png`;
   await p.screenshot({ path: f, timeout: 400000 });
   const calls = await p.evaluate(() => window.__renderer.info.render.calls);
-  console.log(`${f}  warp (${spot.x}, ${spot.z}) n=${spot.n}  draw calls ${calls}`);
+  console.log(`${f}  warp (${use.x}, ${use.z})  densest-cell would have been (${spot.x}, ${spot.z})  draw calls ${calls}`);
   await p.close();
 }
 await b.close();

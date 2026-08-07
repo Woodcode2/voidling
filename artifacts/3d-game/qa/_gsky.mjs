@@ -43,7 +43,22 @@ for (const wid of WORLDS) {
     const list = []; window.__scene.traverse(o => { if (o.isMesh && o.visible && o.geometry) list.push(o); });
     for (const r of [1.2, 5, 12]) {
       window.__setVoidR(r);
-      await new Promise(res2 => setTimeout(res2, 900));
+      // WAIT FOR THE CAMERA, not for a stopwatch. camDist lerps toward
+      // 38*(R/0.9)^0.82 — 318 units at WORLD ENDER — and a 900 ms wait left it
+      // at 46, so the first cut of this measured the sky at the OPENING camera
+      // three times and called it a sweep.
+      {
+        const vs0 = window.__voidState();
+        let last = -1, stable = 0;
+        for (let i = 0; i < 400 && stable < 8; i++) {
+          await new Promise(res2 => setTimeout(res2, 60));
+          const v = window.__voidState();
+          const d0 = cam.position.distanceTo(new T.Vector3(v.x, 0, v.z));
+          if (Math.abs(d0 - last) < 0.5) stable++; else stable = 0;
+          last = d0;
+        }
+        void vs0;
+      }
       const rc = new T.Raycaster(); rc.far = 4000;
       let hit = 0, miss = 0;
       const N = 21;
