@@ -34,6 +34,14 @@ const read = (r) => p.evaluate(async (radius) => {
   const THREE = window.__THREE;
   window.__setVoidR(radius);
   for (let i = 0; i < 40; i++) await new Promise((res) => requestAnimationFrame(res));
+  // THE DRAW IS STUBBED FOR SPEED, so three never calls scene.updateMatrixWorld
+  // and every matrixWorld in the graph is stale. Version two of this probe
+  // captured inverse(bob.matrixWorld) from that stale matrix and then called
+  // child.updateWorldMatrix() inside the loop, which refreshed the child's
+  // ancestors — so the two halves of the transform came from different frames
+  // and the unicorn read 12.7 body radii. Update the whole graph once, here,
+  // before anything is measured.
+  window.__scene.updateMatrixWorld(true);
   let dress = null, bob = null;
   window.__scene.traverse((o) => { if (o.name === 'dress') { dress = o; bob = o.parent; } });
   if (!dress || !bob) return { err: 'no dress group' };
@@ -49,7 +57,6 @@ const read = (r) => p.evaluate(async (radius) => {
   for (const child of dress.children) {
     if (!child.visible) continue;
     const box = new THREE.Box3();
-    child.updateWorldMatrix(true, true);
     child.traverse((o) => {
       if (!o.geometry) return;
       o.geometry.computeBoundingBox();
