@@ -109,13 +109,29 @@ for (const wid of WORLDS) {
       heap: Array.from(S.heap.slice(0, n)), rdr: Array.from(S.rdr.slice(0, n)),
       r: Array.from(S.r.slice(0, n)), join: Array.from(S.join.slice(0, n)),
       prog: Array.from(S.prog.slice(0, n)), calls: Array.from(S.calls.slice(0, n)),
-      ed: Array.from(S.ed.slice(0, n)), driveMs: Array.from(S.driveMs.slice(0, n)) }; });
+      ed: Array.from(S.ed.slice(0, n)), driveMs: Array.from(S.driveMs.slice(0, n)),
+      cal: Array.from(S.cal.slice(0, n)) }; });
 
   writeFileSync(`qa-out/fp-${wid}-${MODE}.json`, JSON.stringify(raw));
 
   // drop the first 30 frames (page still settling from the picker teardown)
   const st = 30;
-  const dts = raw.dt.slice(st), ts = raw.t.slice(st);
+  // The probe's own cost lives INSIDE the interval it reports: at frame i the
+  // interval since frame i-1 contains frame i-1's drive() and calibrator.
+  // Subtract them, then scale by how much the host was stealing at that moment.
+  const calAll = raw.cal.slice(st).filter(v => v > 0).sort((a, x) => a - x);
+  const calMed = pct(calAll, 0.5);
+  const dts = [], ts = [], dtsRaw = [];
+  for (let i = st; i < raw.n; i++) {
+    const ovh = raw.driveMs[i - 1] + raw.cal[i - 1];
+    const scale = raw.cal[i - 1] > 0 ? calMed / raw.cal[i - 1] : 1;
+    dts.push(Math.max(0.1, (raw.dt[i] - ovh)) * Math.min(1, scale));
+    dtsRaw.push(raw.dt[i]); ts.push(raw.t[i]);
+  }
+  console.log(`  calibrator (fixed 300k-iter spin): p50 ${calMed.toFixed(2)}ms  p95 ${pct(calAll, 0.95).toFixed(2)}  max ${calAll[calAll.length - 1].toFixed(2)}  ← host contention, not the game`);
+  const rawSorted = [...dtsRaw].sort((a, x) => a - x);
+  console.log(`  RAW wall interval  p50 ${pct(rawSorted, 0.5).toFixed(1)}  p99 ${pct(rawSorted, 0.99).toFixed(1)}  max ${rawSorted[rawSorted.length - 1].toFixed(1)} ms  (includes probe + host theft)`);
+  console.log(`  --- below: probe cost removed, host contention normalised ---`);
   const sorted = [...dts].sort((a, x) => a - x);
   const med = pct(sorted, 0.5);
   const over2 = dts.filter(d => d > 2 * med).length;
@@ -135,7 +151,7 @@ for (const wid of WORLDS) {
   // the ten worst frames, with their context
   const idx = dts.map((d, i) => i).sort((a, x) => dts[x] - dts[a]).slice(0, 10);
   console.log('  ten worst frames:');
-  for (const i of idx) console.log(`    ${dts[i].toFixed(1).padStart(7)}ms  t=${ts[i].toFixed(1).padStart(6)}  r=${raw.r[i + st].toFixed(2)}  joined=${raw.join[i + st]}  progs=${raw.prog[i + st]}  edibles=${raw.ed[i + st]}  render=${raw.rdr[i + st].toFixed(1)}`);
+  for (const i of idx) console.log(`    ${dts[i].toFixed(1).padStart(7)}ms (raw ${dtsRaw[i].toFixed(0)}, cal ${raw.cal[i + st - 1].toFixed(1)})  t=${ts[i].toFixed(1).padStart(6)}  r=${raw.r[i + st].toFixed(2)}  joined=${raw.join[i + st]}  progs=${raw.prog[i + st]}  render=${raw.rdr[i + st].toFixed(1)}`);
 
   // allocation: sum of positive heap deltas / match seconds; GC drops
   const hp = raw.heap.slice(st);
