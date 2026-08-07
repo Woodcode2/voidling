@@ -74,11 +74,19 @@ for (const wid of worlds) {
     null, { timeout: 900000 });
   const f = await p.evaluate(() => window.__fin);
   const pct = f.cue === null ? null : (f.cue / 180) * 100;
-  const ok = f.cue !== null && pct > 50;
+  // A WINDOW, NOT A THRESHOLD. The first version asserted "fires after
+  // halfway", which Pirate passes at 97% — five seconds before the buzzer,
+  // under a driver that plays better than any child. That is the same trap as
+  // a test that cannot fail: it was measuring that the cue is late, and late
+  // was never the question. A finale has to arrive late enough to be a climax
+  // AND early enough to cross the map and act on. 55-85% of a 180s match is
+  // 27 to 81 seconds of runway.
+  const ok = f.cue !== null && pct >= 55 && pct <= 85;
+  const why = f.cue === null ? 'never fires' : pct > 85 ? `only ${(180 - f.cue).toFixed(0)}s left to reach it` : pct < 55 ? 'fires too early to be a climax' : '';
   rows.push(`${ok ? 'PASS' : 'FAIL'}  ${wid.padEnd(8)} cue at `
     + `${f.cue === null ? 'NEVER' : `${f.cue.toFixed(0)}s (${pct.toFixed(0)}% in)`}`
     + `   eaten at ${f.gone === null ? '—' : `${f.gone.toFixed(0)}s`}`
-    + `   "${(f.cueText || '').slice(0, 38)}"`);
+    + `   "${(f.cueText || '').slice(0, 34)}"${why ? `   <-- ${why}` : ''}`);
   await p.close();
 }
 for (const r of rows) console.log(r);
