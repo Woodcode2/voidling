@@ -1219,10 +1219,15 @@ function spawnPuff(x: number, y: number, z: number, n: number, col?: THREE.Color
 
 // ── input: relative drag joystick (hole.io style) + WASD/arrows ───────────────
 const joyEl = document.getElementById('joy')!, joyNubEl = document.getElementById('joyNub')!;
-const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0 };
+const joy = { active: false, id: -1, ax: 0, ay: 0, dx: 0, dy: 0, mag: 0,
+  // where the thumb was last seen, and whether it has actually DRIVEN yet.
+  // Both exist for the edge rescue below; `moved` also decides who owns the
+  // stick when two fingers are down.
+  px: 0, py: 0, moved: false };
 const JOY_R = 64;
 let lastInput = -9999, tClock = 0;
-function joySet(ev: PointerEvent) {
+function joySet(cx: number, cy: number) {
+  joy.px = cx; joy.py = cy;
   // RE-ANCHOR (hole.io convention) with an OVERSHOOT ZONE: the base only
   // chases the finger once it's pulled well past the ring (1.7×). The old
   // tight follow parked the rim exactly under the thumb, so every micro-
@@ -1231,13 +1236,45 @@ function joySet(ev: PointerEvent) {
   // comfortably past the rim at full speed; big pulls and direction flips
   // still drag the base along, so a flip never needs a 2-ring swipe back.
   const FOLLOW = JOY_R * 1.7;
-  const m0 = Math.hypot(ev.clientX - joy.ax, ev.clientY - joy.ay);
+  const m0 = Math.hypot(cx - joy.ax, cy - joy.ay);
   if (m0 > FOLLOW) {
     const g = 1 - FOLLOW / m0;
-    joy.ax += (ev.clientX - joy.ax) * g; joy.ay += (ev.clientY - joy.ay) * g;
+    joy.ax += (cx - joy.ax) * g; joy.ay += (cy - joy.ay) * g;
     joyEl.style.left = `${joy.ax}px`; joyEl.style.top = `${joy.ay}px`;
   }
-  const dx = ev.clientX - joy.ax, dy = ev.clientY - joy.ay;
+  // ── THE GLASS RUNS OUT ────────────────────────────────────────────────────
+  // The owner, playing on a phone: "eventually your finger goes off screen
+  // with the way it's designed. Surely this is an oversight."
+  //
+  // It is, and it is worse than it looks. The base is planted wherever the
+  // thumb lands, and full speed needs the thumb JOY_R past it — so a thumb
+  // that lands 20px from the right bezel and pushes right can never deflect
+  // more than 20px, which is mag 0.31 and about 19% of full speed. Pushing
+  // LEFT from that same spot gives 100%. A child holding the phone one-handed
+  // gets a void that is fast one way and treacle the other, and the escape
+  // hatch cannot fire either: the re-anchor above needs 109px of deflection to
+  // trigger, and there are only 20px of glass to find it in.
+  //
+  // So when the thumb is pinned against an edge and short of full deflection,
+  // the BASE slides away from that edge instead. A few frames of that and the
+  // ring is back in reach without the thumb moving at all.
+  //
+  // GATED ON `moved`, and that gate is the whole design. Clamping the base
+  // into a safe rect at pointerdown — the obvious fix — starts every touch
+  // near an edge already deflected by up to a full ring, so a TAP flings the
+  // void. Nothing slides until the thumb has actually driven.
+  if (joy.moved) {
+    const W = window.innerWidth, H = window.innerHeight;
+    const EDGE = 22;    // "pinned": this close to the bezel there is no room left
+    const STEP = 16;    // px of base travel per event — ~4 frames to full recovery
+    const gap = (short: number) => Math.min(JOY_R - short, STEP);
+    if (cx > W - EDGE && cx - joy.ax < JOY_R) joy.ax -= gap(cx - joy.ax);
+    else if (cx < EDGE && joy.ax - cx < JOY_R) joy.ax += gap(joy.ax - cx);
+    if (cy > H - EDGE && cy - joy.ay < JOY_R) joy.ay -= gap(cy - joy.ay);
+    else if (cy < EDGE && joy.ay - cy < JOY_R) joy.ay += gap(joy.ay - cy);
+    joyEl.style.left = `${joy.ax}px`; joyEl.style.top = `${joy.ay}px`;
+  }
+  const dx = cx - joy.ax, dy = cy - joy.ay;
   const m = Math.hypot(dx, dy);
   const k = m > JOY_R ? JOY_R / m : 1;
   // THE DOUBLE RAMP. joy.dx/dy used to be (dx*k)/JOY_R, whose MAGNITUDE is
@@ -1267,19 +1304,31 @@ function joySet(ev: PointerEvent) {
   // belongs to a bite the child aimed at, not to the void drifting into a
   // postbox on the auto-started first launch.
   if (!nomArmed && joy.mag > 0.25) nomArmed = true;
+  // a real drive, which is what arms the edge rescue and settles ownership
+  if (joy.mag > 0.12) joy.moved = true;
   joyNubEl.style.left = `${joy.ax + dx * k}px`; joyNubEl.style.top = `${joy.ay + dy * k}px`;
   lastInput = tClock;
 }
 renderer.domElement.style.touchAction = 'none';   // stop iOS turning a fast drag into a browser gesture (pointercancel mid-steer)
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  if (joy.active) return;   // a second finger/palm must NEVER steal the anchor mid-drive
+  // A second finger must never steal the anchor MID-DRIVE — but the old guard
+  // said `if (joy.active) return`, and a thumb merely RESTING on the glass is
+  // active at mag 0. Two-handed, that idle contact took ownership and the hand
+  // actually steering was filtered out by the pointerId check below: the game
+  // looked frozen for as long as the resting thumb stayed down. Ownership is
+  // provisional until the owner has driven.
+  if (joy.active && joy.moved) return;
+  if (joy.active) { try { renderer.domElement.releasePointerCapture(joy.id); } catch { /* fine */ } }
   joy.active = true; joy.id = e.pointerId; joy.ax = e.clientX; joy.ay = e.clientY;
+  // load-bearing on the takeover path: without it the heading filter would
+  // lerp the new thumb's direction out of the abandoned one
+  joy.dx = joy.dy = 0; joy.mag = 0; joy.moved = false;
   try { renderer.domElement.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   joyEl.style.display = joyNubEl.style.display = 'block';
   joyEl.style.left = `${e.clientX}px`; joyEl.style.top = `${e.clientY}px`;
-  joySet(e);
+  joySet(e.clientX, e.clientY);
 });
-window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) joySet(e); });
+window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) joySet(e.clientX, e.clientY); });
 // ── LETTING GO, FROM EVERY DIRECTION ──────────────────────────────────────
 // A finger lifting is only ONE of the ways a drive ends, and it was the only
 // one handled. The joystick is a latch: joy.mag survives until something
@@ -1300,7 +1349,7 @@ window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId ==
 //
 // So the reset is a named function and every one of those paths calls it.
 function joyRelease(): void {
-  joy.active = false; joy.id = -1; joy.mag = 0; joy.dx = joy.dy = 0;
+  joy.active = false; joy.id = -1; joy.mag = 0; joy.dx = joy.dy = 0; joy.moved = false;
   joyEl.style.display = joyNubEl.style.display = 'none';
 }
 const joyEnd = (e: PointerEvent) => { if (joy.active && e.pointerId === joy.id) joyRelease(); };
@@ -2900,18 +2949,39 @@ function launchWorld() {
   // one-time teach card before the first menu-launched match: it's the only
   // place the danger loop ("eat the family when bigger, RUN when not") lives
   if (!localStorage.getItem('voidTut')) { track('tutorial_view', {}); tutEl.classList.add('show'); return; }
-  withWorldReady(() => startFresh(false));
+  withWorldReady(() => startFresh(soloOn()));
 }
-el('btnSolo').addEventListener('click', () => {
-  menuEl.style.display = 'none';
-  if (!localStorage.getItem('voidTut')) localStorage.setItem('voidTut', '1');
-  withWorldReady(() => startFresh(true));
-});
+// ── SOLO IS A SETTING NOW, NOT A SECOND FRONT DOOR ────────────────────────
+// It used to be a full-width button under PLAY, which made the first choice a
+// pre-reader faced a choice between two words they cannot read — one of which
+// led to the same four world cards as the other. It is a MODE, so it lives on
+// the screen where the run is chosen, and it costs the splash art nothing.
+//
+// It also PERSISTS now. The old button set the mode for exactly one match and
+// forgot it; a child who wants to play without rivals wants that every time,
+// and PLAY AGAIN already carried soloMode forward, so the menu was the only
+// place it was dropped.
+//
+// And deleting that handler fixes something it did quietly: it wrote voidTut
+// itself, so a child whose first tap was SOLO RUN was marked as taught and
+// never saw the danger card — the one place the game explains "eat the family
+// when you are bigger, RUN when you are not."
+const soloOn = () => localStorage.getItem('voidSolo') === '1';
+{
+  const tog = el('soloTog');
+  tog.classList.toggle('on', soloOn());
+  tog.addEventListener('click', () => {
+    const on = !soloOn();
+    localStorage.setItem('voidSolo', on ? '1' : '0');
+    tog.classList.toggle('on', on);
+    track('solo_toggle', { on });
+  });
+}
 el('btnGotIt').addEventListener('click', () => {
   track('tutorial_done', {});
   localStorage.setItem('voidTut', '1');
   tutEl.classList.remove('show');
-  withWorldReady(() => startFresh(false));
+  withWorldReady(() => startFresh(soloOn()));
 });
 // FIRST LAUNCH: no menu — splash straight into the game with in-game guidance
 // (hole.io's onboarding). The menu earns its place from session two.
@@ -3010,12 +3080,6 @@ function paintWorldCard(host: HTMLElement, id: string): void {
 const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) || 0);
 // world cards: MAPLE FALLS + PIRATE BAY are live; FROST PEAKS is the locked third
 {
-  const chip = el('btnWorlds');
-  // "OF 3" WAS HARDCODED, and the game shipped a fourth world. Selecting
-  // LANTERN NIGHT put "WORLD 4 OF 3" on the menu — the kind of thing a child
-  // will not articulate but an adult will screenshot. Counted from the list,
-  // so adding a fifth world cannot reintroduce it.
-  chip.innerHTML = `<i>${COPY.icon}</i> ${WORLD_NAMES[pickedWorld]} <span>WORLD ${COPY.n} OF ${WORLDS.length}</span><b>›</b>`;
   document.querySelectorAll('#worldRow .wCard[data-world]').forEach((c) => {
     const id = (c as HTMLElement).dataset.world!;
     const art = c.querySelector('.wArt') as HTMLElement | null;
@@ -3047,7 +3111,6 @@ document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('clic
   track('world_locked_tap', { card: (c as HTMLElement).dataset.name || c.textContent?.trim().slice(0, 24) });
   c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
 }));
-el('btnWorlds').addEventListener('click', () => el('worlds').classList.add('show'));
 // a world switch reloads the page to rebuild the island; pick up where the tap
 // left off rather than dumping the player back on the splash they just left
 if (localStorage.getItem('voidAutoPlay') === '1') {
@@ -4236,9 +4299,16 @@ function animate() {
     if (keys.has('KeyA') || keys.has('ArrowLeft')) inX -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) inX += 1;
     const m = Math.hypot(inX, inY) || 1; inX /= m; inY /= m;
-    if (inX || inY) lastInput = tClock;
   }
   const driving = inX !== 0 || inY !== 0;
+  // TRACK THE STATE, NOT THE EVENT. lastInput only advanced inside joySet and
+  // in the key branch above, both of which fire on EVENTS — so a stick held at
+  // full deflection with the thumb mechanically still (pressed into a bezel, or
+  // a mouse button down and the cursor stationary, which emits no pointermove
+  // by spec) counted as no input at all. After eight seconds the void yawned,
+  // pulled a sleepy face and played the sleepy voice line while barrelling
+  // across the island at full speed.
+  if (driving) lastInput = tClock;
   if (dashT > 0) {
     // ROCKET BITE dash — barrel forward, eating in the path
     dashT -= dt;

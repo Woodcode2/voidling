@@ -628,8 +628,7 @@
       @media (orientation: portrait) {
         #menu .foot { margin-top: 8px; }
         .navRow { margin-top: 10px; }
-        #btnSolo { margin-top: 9px; }
-        #btnPlay { padding: 14px 64px; }
+          #btnPlay { padding: 14px 64px; }
       }
       #menuOrb { display: none; }
       #menu .logo { font-size: clamp(52px, 9vw, 84px); font-weight: 900; letter-spacing: 3px; color: #fff;
@@ -637,14 +636,6 @@
       #menu .tag { font-size: clamp(11px, 1.6vw, 15px); font-weight: 800; letter-spacing: 7px; color: #ffffff; margin-top: 2px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
       #menu .spacer { flex: 1; }   /* the key-art hero shows through here */
-      /* world select — compact launcher button (hole.io pattern), cards in a modal */
-      #btnWorlds { display: flex; align-items: center; gap: 9px; margin: 12px auto 0; cursor: pointer;
-        background: rgba(28,12,52,0.72); border: 2px solid rgba(255,210,90,0.55); border-radius: 14px;
-        color: #fff; font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px;
-        padding: 10px 18px; box-shadow: 0 0 16px rgba(184,117,255,0.3); }
-      #btnWorlds i { font-style: normal; font-size: 20px; }
-      #btnWorlds span { color: #cbb2ff; font-size: 10px; letter-spacing: 1.5px; font-weight: 800; }
-      #btnWorlds b { color: #ffd23f; font-size: 18px; }
       /* THE WORLD PICKER. PLAY lands here, so it is a destination, not a
          footnote: three 154x114 tiles in the corner of a 1000px screen with
          system emoji standing in for the art of two fully built 3D islands. */
@@ -820,7 +811,7 @@
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
       @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
       /* touch feel: every control presses down */
-      #btnWorlds:active, .backBtn:active, #btnBack:active, #btnHome:active, #btnQuit:active, .wCard:active, .skCard:active { transform: scale(0.96); }
+      .backBtn:active, #btnBack:active, #btnHome:active, #btnQuit:active, .wCard:active, .skCard:active { transform: scale(0.96); }
       #dailyClaim:active, #spAct:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8163a; }
       #tut .card, #daily .dCard, #skinPrev .spCard { border-radius: 24px; }
       .tr .nm { text-transform: uppercase; }
@@ -883,11 +874,21 @@
         padding: 6px 16px 8px; backdrop-filter: blur(4px); }
       #rankChip .rkBar { width: 120px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.15); margin: 5px auto 0; overflow: hidden; }
       #rankChip .rkBar div { height: 100%; background: linear-gradient(90deg, #ffb82a, #ffd25a); border-radius: 2px; }
-      /* SOLO RUN — the second big button */
-      #btnSolo { margin-top: 12px; font-size: 15px; font-weight: 900; letter-spacing: 2px; padding: 12px 44px; border-radius: 16px;
-        color: #fff; background: linear-gradient(180deg, #7a4fe0, #5a2fc0); box-shadow: 0 5px 0 #3a1a80, 0 10px 22px rgba(0,0,0,0.4); }
-      #btnSolo:active { transform: translateY(3px); box-shadow: 0 2px 0 #3a1a80; }
-      #btnSolo span { display: block; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; opacity: 0.85; margin-top: 2px; }
+      /* SOLO RUN lives in the picker now, bottom right, as a toggle. It is a
+         MODE, not a destination: on the menu it sat under PLAY as an equal-
+         weight second button, so the first choice a pre-reader faced was
+         between two words they cannot read, one of which leads nowhere new.
+         Here it is a setting on the screen where the run is actually chosen,
+         and it costs the splash nothing. */
+      #soloTog { position: absolute; right: 18px; bottom: 18px; z-index: 3; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        background: rgba(28,12,52,0.82); border: 2px solid rgba(255,255,255,0.16); border-radius: 14px;
+        color: #cbb2ff; font-family: inherit; font-size: 12px; font-weight: 900; letter-spacing: 1.4px;
+        padding: 9px 16px; }
+      #soloTog em { font-style: normal; font-size: 9px; letter-spacing: 1px; opacity: 0.8; }
+      #soloTog.on { border-color: rgba(255,210,90,0.85); color: #ffd23f;
+        box-shadow: 0 0 16px rgba(255,210,90,0.28); }
+      #soloTog:active { transform: translateY(2px); }
       /* gift box: bottom-left present with a wiggle */
       #gift { display: none !important; position: absolute; left: 14px; bottom: 74px; font-size: 34px; background: rgba(30,16,58,0.85);
         border: 2px solid rgba(255,224,138,0.5); border-radius: 18px; padding: 10px 14px; cursor: pointer;
@@ -1210,14 +1211,6 @@
         <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
       </svg></div>
       <button id="btnPlay">PLAY</button>
-      <button id="btnWorlds"><i>🍁</i> MAPLE FALLS <span>WORLD 1 OF 4</span><b>›</b></button>
-      <!-- SOLO RUN was fully coded, fully wired, and hidden behind an inline
-           display:none. It is the calm on-ramp: a child who is not ready to be
-           chased by CHOMPZILLA, or who just wants to eat a town in peace, has
-           had nowhere to go. This genre's quieter players are a real share of
-           it, and the mode already exists. Sub-line matches the real rules —
-           the old one advertised 2:00 against a 3:00 match. -->
-      <button id="btnSolo">SOLO RUN<span>no rivals · eat the whole town</span></button>
       <div class="navRow">
         <button class="navCard" id="btnBook"><i>📗</i>SCRAPBOOK<em id="bookCount"></em></button>
         <button class="navCard" id="btnShop"><i>🛍️</i>SHOP</button>
@@ -1309,6 +1302,7 @@
         <button class="backBtn" data-close="worlds">‹ BACK</button>
         <div class="shopTitle">WORLDS</div>
       </div>
+      <button id="soloTog">🏝️ BY MYSELF<em>NO RIVALS</em></button>
       <div id="worldRow">
         <div class="wCard sel" data-world="maple">
           <div class="wArt"></div><div class="wNum">WORLD 1</div>

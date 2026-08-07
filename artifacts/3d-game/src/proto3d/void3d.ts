@@ -1395,11 +1395,29 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // elevation anything under about 1.45x is entirely hidden behind the ball.
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.52);
       lip.position.set(s.x, 0.06, s.z); lip.scale.setScalar(dispR * 1.5);
-      // the lip is a RIM, not a hoop: it carries the read at speck size, where
-      // the pit alone is a few pixels, and steps back once the hole is big
-      // enough to speak for itself
-      (lip.material as THREE.MeshBasicMaterial).opacity =
-        THREE.MathUtils.clamp(0.52 - dispR * 0.028, 0.2, 0.52);
+      // ── AND THEN IT GETS OUT OF THE WAY ────────────────────────────────
+      // The owner, looking at his own game: "There's a white circle always
+      // around the void?" There was, and he is right that it should not be.
+      //
+      // The lip was written to make the hero read as a HOLE rather than a
+      // ball — hole.io's entire silhouette is that ring. But this hero is not
+      // drawn as a hole: it is a ball with a face, eyebrows, blush and a
+      // mouth, sitting on the ground. A bright violet annulus at 1.32-1.5x
+      // its radius therefore reads as an RTS selection circle, permanently
+      // ringing the one thing on screen that is supposed to be a character.
+      //
+      // The rim still earns its place at SPECK SIZE. In the opening seconds
+      // the void is 0.9 units across, the pit under it is a handful of pixels
+      // and the ring is genuinely how a child finds themselves in a crowded
+      // frame. So it keeps that job and loses the other one: full strength at
+      // the start radius, gone entirely by 3.2, which is roughly the point the
+      // void is unmistakably the biggest cute thing in the picture. It fades
+      // out during the first stretch of a match and never comes back.
+      // (The rivals keep theirs — a ring around something that is HUNTING you
+      // is information, not decoration.)
+      const lipM = lip.material as THREE.MeshBasicMaterial;
+      lipM.opacity = THREE.MathUtils.clamp(0.52 * (1 - (dispR - 0.9) / 2.3), 0, 0.52);
+      lip.visible = lipM.opacity > 0.01;
     },
   };
 
