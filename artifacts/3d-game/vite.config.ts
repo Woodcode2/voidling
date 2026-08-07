@@ -342,12 +342,6 @@ export default defineConfig({
     // instead"; returning undefined falls through to the CDN, which is what
     // still needs to happen for anything not yet vendored.
     proxy: {
-      '/assets/hf3d': {
-        target: 'https://d3u0tzju9qaucj.cloudfront.net',
-        changeOrigin: true,
-        rewrite: (p: string) => p.replace(/^\/assets\/hf3d/, ''),
-        bypass: localFirst,
-      },
       '/assets/hf': {
         target: 'https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS',
         changeOrigin: true,

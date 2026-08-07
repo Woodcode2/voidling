@@ -15,9 +15,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // The two rewrites in vercel.json, as origins. On the web these are resolved by
 // Vercel at request time; inside a Capacitor bundle there is no server to
 // rewrite anything, so every one of these has to exist on disk.
+// hf3d is gone with the GLB pack — see the note at the top of
+// src/proto3d/assets3d.ts. Only the 2D art is remote now.
 export const ORIGINS = {
   hf: 'https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS',
-  hf3d: 'https://d3u0tzju9qaucj.cloudfront.net',
 };
 
 function walk(dir, out = []) {
@@ -38,20 +39,14 @@ export function collectRefs() {
   const refs = new Set();
   for (const f of files) {
     const src = fs.readFileSync(f, 'utf8');
-    // Plain literals: '/assets/hf/<file>' and '/assets/hf3d/<dir>/<file>'
-    for (const m of src.matchAll(/\/assets\/hf3d\/[A-Za-z0-9-]+\/[A-Za-z0-9-]+\.glb/g)) refs.add(m[0]);
+    // Plain literals: '/assets/hf/<file>'
     for (const m of src.matchAll(/\/assets\/hf\/[A-Za-z0-9_.-]+\.(png|jpg|jpeg|webp)/g)) refs.add(m[0]);
-    // Template literals: the GLB pack builds every url as `${DIR}/<uuid>.glb`,
-    // so the paths never appear whole in the source. Resolve DIR and expand.
-    const dir = src.match(/const DIR = '(\/assets\/hf3d\/[A-Za-z0-9-]+)'/);
-    if (dir) for (const m of src.matchAll(/\$\{DIR\}\/([A-Za-z0-9-]+\.glb)/g)) refs.add(`${dir[1]}/${m[1]}`);
   }
   return [...refs].sort();
 }
 
 /** Web path → the CDN url it is rewritten to in production. */
 export function remoteUrl(ref) {
-  if (ref.startsWith('/assets/hf3d/')) return `${ORIGINS.hf3d}/${ref.slice('/assets/hf3d/'.length)}`;
   if (ref.startsWith('/assets/hf/')) return `${ORIGINS.hf}/${ref.slice('/assets/hf/'.length)}`;
   throw new Error(`not a rewritten asset: ${ref}`);
 }

@@ -1,231 +1,50 @@
-// The Higgsfield asset pack: every landmark, house, tree and beach toy on the
-// island can be an AI-generated textured GLB. Meshes load async through the
-// same-origin /assets/hf3d rewrite; each named asset is normalized defensively
-// (uniform scale to height 1, centred, feet on the ground) so a generation
-// quirk can never produce a floating or buried prop. When a mesh can't load
-// (offline dev) the caller's procedural fallback is placed instead — the
-// island is never sparse.
+// PROP PLACEMENT. Every landmark, house, tree and beach toy on the island is
+// built from primitives, here and in the world builders.
+//
+// THERE USED TO BE A GLB PACK: thirty-three AI-generated textured meshes,
+// fetched at boot through an /assets/hf3d rewrite, with the built prop as a
+// fallback for when a download failed. It is deleted and the fallback is the
+// game. Every reason is measured:
+//   - 17 of the 33 URLs are permanently 403 and unrecoverable from any
+//     network, and the missing half was the VISIBLE half. Pirate Bay placed
+//     palm x352 and cabana x44 procedurally while umbrella x142 loaded as a
+//     photoreal mesh: a beach where the umbrellas were detailed and every
+//     palm tree was a cone.
+//   - the 16 that did vendor came to 100.7 MB, averaging 6.3 MB a prop (a
+//     7.26 MB taxi, a 7.22 MB sandcastle), taking dist/ to 149 MB. For a
+//     no-brand children's game that is an abandoned download, not a feature.
+//   - GAME DAY and LANTERN NIGHT place none of them at all, and of the four
+//     worlds Game Day measures the highest prop density on screen.
+//   - nobody has ever seen the mesh build. Every screenshot, hero portrait,
+//     palette sweep and contrast decision in this repo describes the built
+//     game. That is the look that has been reviewed and liked.
+// The pack also cost a 12-second gate on PLAY, a GLTFLoader, an LOD registry,
+// a texture-shrinking pass and a load queue. All of it goes.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 type AddEdible = (mesh: THREE.Object3D, radius: number) => void;
 
-// name → { url (same-origin GLB), h (world-unit height) }
-// URLs are produced by the image→3D pipeline (see scratchpad hf_manifest).
-const DIR = '/assets/hf3d/7d051b5a-7bfe-49fe-a484-24e7b3a9458a';
-export const PACK: Record<string, { url: string; h: number }> = {
-  house_pink: { url: `${DIR}/4953e198-a7b0-4604-9ac6-579cc8392fcb.glb`, h: 5.2 },
-  house_blue: { url: `${DIR}/70d62764-352b-4524-9260-4f263e48928b.glb`, h: 5.6 },
-  house_modern: { url: `${DIR}/3bd79c73-43c6-47a9-8620-281d4926df84.glb`, h: 5 },
-  house_craftsman: { url: `${DIR}/40bdfd42-f7a9-4032-9172-663990078e9e.glb`, h: 5.2 },
-  tower_glass: { url: `${DIR}/629e3d55-fe73-4dd6-a0e9-6dec17b2e072.glb`, h: 24 },
-  tower_deco: { url: `${DIR}/34959892-e727-40ba-bdc5-667a10c5b741.glb`, h: 22 },
-  townhall: { url: `${DIR}/ef5fa4e4-968f-4993-a2ee-0c9461671c4e.glb`, h: 17 },
-  school: { url: `${DIR}/464daa25-a487-4aca-b81e-68ff8d33a15f.glb`, h: 11 },
-  cafe: { url: `${DIR}/95e469c0-e8ec-40b9-9f9e-2ccb3d732c1e.glb`, h: 8.5 },
-  shop: { url: `${DIR}/f771c107-f5aa-4162-9f1b-d1751bb4b9db.glb`, h: 8.5 },
-  fountain: { url: `${DIR}/290f6c1c-f762-4b6c-a13f-a9fc5caa5218.glb`, h: 6.5 },
-  icecream: { url: `${DIR}/df76ace5-489f-4c31-beb6-5e72090612c1.glb`, h: 3.6 },
-  palm: { url: `${DIR}/ea798bca-5fbb-4cb0-bb98-45bfbe3ea752.glb`, h: 7.5 },
-  lifeguard: { url: `${DIR}/4e960a6a-63bb-4a68-90a4-979fb40610cd.glb`, h: 7.5 },
-  umbrella: { url: `${DIR}/14ad375d-efd0-4559-8c50-22b2731d6c65.glb`, h: 3.2 },
-  sandcastle: { url: `${DIR}/d09ff62f-dda2-4987-9500-9354ae5124f8.glb`, h: 1.9 },
-  cabana: { url: `${DIR}/d5e1d66b-89aa-48c9-86d2-497097047527.glb`, h: 4.6 },
-  lighthouse: { url: `${DIR}/18c46841-f358-46a8-8c72-d0238f044fb2.glb`, h: 19 },
-  pine: { url: `${DIR}/b20dda53-b332-48e2-8a3f-2438942cf83b.glb`, h: 8.5 },
-  tent: { url: `${DIR}/3d7ea70a-4587-4662-b1b4-f9ab25836e71.glb`, h: 4.2 },
-  campfire: { url: `${DIR}/bbd46ddc-312e-40a9-85bc-dbcc9d9b04dd.glb`, h: 1.7 },
-  gazebo: { url: `${DIR}/2b1ff369-4fd9-4bd2-8def-d125a0065606.glb`, h: 8.5 },
-  golfcart: { url: `${DIR}/1ca1e5ec-22fe-4fd1-93b1-e4881d9d01b6.glb`, h: 3.2 },
-  balloon2: { url: `${DIR}/f25baa8c-1220-40a4-bf67-cebfb6791a00.glb`, h: 13 },
-  zooarch: { url: `${DIR}/730acaba-6caf-452a-9acb-5b41f911601a.glb`, h: 9 },
-  foodtruck: { url: `${DIR}/8dee24fe-6070-4c22-9b96-64f0e2bf5c44.glb`, h: 5 },
-  parktree: { url: `${DIR}/e755b0f3-fe13-4d0b-ada5-c219faa7866f.glb`, h: 7 },
-  rocks: { url: `${DIR}/02ad2c55-a0e3-4d14-8932-537b42ea5c85.glb`, h: 2.6 },
-  stage: { url: `${DIR}/e4f7a55c-a7f3-4408-a6bb-2d5362ecba94.glb`, h: 3.2 },
-  car_sedan: { url: `${DIR}/b3d07fca-ccdd-4f41-8dbd-3954958e22c3.glb`, h: 2.6 },
-  car_taxi: { url: `${DIR}/4275a986-fe46-463f-a73e-47571f262ac7.glb`, h: 2.6 },
-  tank: { url: `${DIR}/ccb80bfc-fc5d-4352-976b-15b5fc42085a.glb`, h: 3.4 },
-  heli: { url: `${DIR}/eed92755-71ef-4e6f-a201-128b0c56975a.glb`, h: 5.5 },
-};
-
-const loader = new GLTFLoader();
-const templates = new Map<string, Promise<THREE.Object3D | null>>();
 
 // small screens get small textures: a 2K texture set across 33 meshes decodes
 // to hundreds of MB — past iOS Safari's tab ceiling (the load-screen crash).
 // At gameplay zoom a 512px cap is visually identical on a phone.
 export const IS_MOBILE = typeof matchMedia !== 'undefined' && (matchMedia('(pointer: coarse)').matches || window.innerWidth < 900);
-const TEX_CAP = IS_MOBILE ? 512 : 2048;
-function shrinkTexture(tex: THREE.Texture): void {
-  const img = tex.image as { width?: number; height?: number } | undefined;
-  if (!img || !img.width || !img.height) return;
-  const m = Math.max(img.width, img.height);
-  if (m <= TEX_CAP) return;
-  const k = TEX_CAP / m;
-  const cv = document.createElement('canvas');
-  cv.width = Math.max(1, Math.round(img.width * k));
-  cv.height = Math.max(1, Math.round(img.height * k));
-  const g = cv.getContext('2d');
-  if (!g) return;
-  g.drawImage(tex.image as CanvasImageSource, 0, 0, cv.width, cv.height);
-  const src = tex.image as { close?: () => void };
-  tex.image = cv;
-  tex.needsUpdate = true;
-  src.close?.();   // free the full-size ImageBitmap immediately
-}
-function dietMaterials(root: THREE.Object3D): void {
-  root.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const mm of mats) {
-      const std2 = mm as THREE.MeshStandardMaterial;
-      for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'] as const) {
-        const t = std2[key] as THREE.Texture | null;
-        if (t) shrinkTexture(t);
-      }
-    }
-  });
-}
+// LOD went with the pack: there is one level of detail now, the built one.
+// Kept as a no-op because the frame loop calls it every frame.
+export function updateLodBias(_camDist: number): void { /* no LODs without the pack */ }
 
-// mobile-safe loading: GLTF parse allocates large intermediate buffers and
-// decodes textures — 33 in flight at once spikes past iOS Safari's per-tab
-// memory ceiling and kills the page at the loading screen. A small queue
-// keeps peak memory flat; total load time barely changes (network dominates).
-const MAX_PARALLEL = IS_MOBILE ? 2 : 4;
-let active = 0;
-const waiting: (() => void)[] = [];
-function slot(): Promise<void> {
-  if (active < MAX_PARALLEL) { active++; return Promise.resolve(); }
-  return new Promise((res) => waiting.push(() => { active++; res(); }));
-}
-function release() {
-  active--;
-  const next = waiting.shift();
-  if (next) next();
-}
-
-// LOD registry: switch distances must TRACK the camera. A fixed threshold dies
-// the moment the camera pulls back past it (every AI mesh degraded to its
-// stand-in for the whole match). Instead the game feeds us its camera distance
-// each frame and the hi-detail band rides just beyond it — crisp where the
-// player is looking, cheap at the screen edges and far side of the island.
-const LODS: THREE.LOD[] = [];
-export function updateLodBias(camDist: number) {
-  // 1.9x keeps the swap boundary beyond the visible frustum edge — the swap
-  // itself is what reads as "houses popping" (meshes are preloaded; it was
-  // never streaming, it was LOD switching in view)
-  const d = Math.min(420, camDist * 1.9);
-  for (const l of LODS) if (l.levels.length > 1) l.levels[1].distance = d;
-}
-
-function template(url: string): Promise<THREE.Object3D | null> {
-  let p = templates.get(url);
-  if (!p) {
-    p = slot().then(() => new Promise<THREE.Object3D | null>((resolve) => {
-      loader.load(url, (gltf) => {
-        const m = gltf.scene;
-        dietMaterials(m);
-        const box = new THREE.Box3().setFromObject(m);
-        const size = box.getSize(new THREE.Vector3());
-        m.scale.setScalar(1 / Math.max(size.y, 1e-4));      // height exactly 1
-        box.setFromObject(m);
-        const c = box.getCenter(new THREE.Vector3());
-        m.position.set(m.position.x - c.x, m.position.y - box.min.y, m.position.z - c.z);
-        resolve(m);
-      }, undefined, () => resolve(null));
-    })).then((m) => { release(); return m; });
-    templates.set(url, p);
-  }
-  return p;
-}
-
-/** WAIT FOR WHAT THIS WORLD ACTUALLY ASKED FOR — nothing else.
- *
- *  createIsland() runs at module scope, long before the menu exists, so by the
- *  time the loading cover has to decide what to hold PLAY for, `templates`
- *  already holds exactly the meshes populate() requested. No manifest, nothing
- *  that can drift out of step with the world builders.
- *
- *  This replaces gating on preloadPack(), which waited for all 34 pack meshes.
- *  Measured, that is a wait for work that cannot finish and mostly is not
- *  wanted: 17 of the 34 are permanently 403 at the CDN, and GAME DAY and
- *  LANTERN NIGHT place ZERO meshes between them (runtime census, qa/_census.mjs
- *  — MAPLE 22 names / 216 placements, PIRATE 3 / 555, GAME DAY 0, LANTERN 0).
- *  So two of the four worlds sat on the loading cover for up to its full
- *  12-second cap waiting on downloads they would never use, and the other two
- *  waited on seventeen that were never going to arrive.
- *
- *  template() resolves null on failure rather than rejecting, so a dead URL
- *  settles this promise instead of hanging it. */
 export function requestedReady(onProgress: (done: number, total: number) => void): Promise<void> {
-  const ps = [...templates.values()];
-  const total = ps.length;
-  // A WORLD THAT NEEDS NOTHING IS 100% READY, NOT 0/0. Reporting (0, 0) here
-  // put `NaN%` on the loading screen of GAME DAY and LANTERN NIGHT — the two
-  // worlds that place no pack meshes at all — because the caller computes
-  // Math.round((done / total) * 100), NaN survives its `pct <= loadPct` guard
-  // (every comparison with NaN is false), and NaN% went straight to the bar.
-  // Caught by the store screenshot tool, which photographed it at 1290x2796.
-  if (!total) { onProgress(1, 1); return Promise.resolve(); }
-  let done = 0;
-  return new Promise((resolve) => {
-    for (const p of ps) p.then(() => { done++; onProgress(done, total); if (done === total) resolve(); });
-  });
+  // NOTHING TO WAIT FOR ANY MORE. This held the loading cover until every mesh
+  // this world places had downloaded — the whole reason PLAY sat behind a
+  // 12-second gate. With the pack deleted there is no network work at boot, so
+  // it resolves at once and reports a truthful 100%. Kept because
+  // prototype3d drives the loading bar through it, and the cover still has a
+  // job: createIsland() is a long synchronous build and the cover stands in
+  // front of it.
+  onProgress(1, 1);
+  return Promise.resolve();
 }
 
-/** Meshes that only appear PART WAY THROUGH a match — the defense vehicles.
- *  populate() never asks for these, so they are not in requestedReady()'s set,
- *  but a tank that starts downloading the moment it spawns is a tank that
- *  shows up as a box. Warmed in the background; never gates anything. */
-export function warmLater(): void {
-  for (const n of ['tank', 'car_sedan', 'car_taxi']) {
-    const spec = PACK[n];
-    if (spec) void template(spec.url);
-  }
-}
-
-// preloader: attach to (or start) every pack download and report progress.
-// populate() already requests the meshes it uses at boot, so these promises
-// mostly piggyback on in-flight downloads — the menu's loading bar simply
-// guarantees a match never starts with stand-in meshes visible.
-export function preloadPack(onProgress: (done: number, total: number) => void): Promise<void> {
-  const urls = Object.values(PACK).map((p) => p.url);
-  const total = urls.length;
-  let done = 0;
-  return new Promise((resolve) => {
-    for (const u of urls) {
-      template(u).then(() => {
-        done++;
-        onProgress(done, total);
-        if (done === total) resolve();
-      });
-    }
-  });
-}
-
-/** ONE PREDICATE FOR ONE DECISION. This used to be two: place() gated on
- *  footprint radius >= 4, while every glb() caller passed `smallShadow: r <
- *  2.5` — so the same nominal size got opposite treatment depending on which
- *  placer happened to run it. Measured: 448 Maple props sit in r ∈ [2.5, 4)
- *  split 226 casting / 222 not, and on Pirate's beach a dropGlb palm throws
- *  crisp frond shadows on the sand while a place()-path prop at the identical
- *  r = 2.6 throws none.
- *
- *  And radius alone is the wrong axis. It tracks footprint well and HEIGHT
- *  badly (corr 0.76 vs 0.59), with no height term at all — so a whole band of
- *  tall, narrow things never cast while the 2-unit pedestrian beside them
- *  does: ~353 pines and maples at 7-9 units, two grain silos at 17.0, four
- *  water towers at 16.2, six billboards at 13.1. They are grounded by their
- *  contact disc but flat-lit next to neighbours with crisp directional
- *  shadows.
- *
- *  The height term is deliberately paired with a MINIMUM THICKNESS. Dropping
- *  the bar on height alone would bring straight back the artifact the radius
- *  gate was raised to remove: at the old 165-unit shadow box a palm trunk
- *  resolved to one or two texels and PCF smeared it into a detached grey
- *  streak lying on open sand. Tall AND solid casts; tall and thin does not. */
 export function shouldCast(r: number, obj?: THREE.Object3D): boolean {
   if (r >= 4) return true;
   if (!obj) return false;
@@ -269,10 +88,10 @@ export function contactShadow(r: number): THREE.Mesh {
 
 export interface GlbOpts {
   rotY?: number;
-  h?: number;                              // override PACK height
+  h?: number;                              // inert since the pack was deleted
   smallShadow?: boolean;                   // receive-only (tiny props)
-  fallback?: () => THREE.Object3D;         // procedural stand-in (offline + far LOD)
-  lodDist?: number;                        // distance where the stand-in takes over
+  fallback?: () => THREE.Object3D;         // THE prop — no longer a stand-in
+  lodDist?: number;                        // inert since the pack was deleted
   onReady?: (g: THREE.Group) => void;      // hook for animated placements
 }
 
@@ -280,168 +99,95 @@ export function glb(
   scene: THREE.Scene, addEdible: AddEdible | null, name: string,
   x: number, z: number, r: number, opts: GlbOpts = {},
 ): void {
-  // WHICH MESHES DOES THIS WORLD ACTUALLY PLACE? Not a question grep can
-  // answer: island.ts passes `name` as a variable at four of its call sites,
-  // so the only honest census is a runtime one. Read it with qa/_census.mjs.
-  // It matters because preloadPack() downloads all 33 pack meshes at boot and
-  // withWorldReady() holds PLAY until every one lands — while GAME DAY and
-  // LANTERN NIGHT place zero of them and Pirate Bay places three.
-  // One property write per placement, at boot only, never per frame.
+  // A CENSUS OF WHAT EACH WORLD PLACES. island.ts passes `name` as a variable
+  // at four call sites, so this is still the only way to answer the question
+  // without reading every builder — qa/_census.mjs reads it. One property
+  // write per placement, at boot only, never per frame.
   const _w = window as unknown as { __glbCount?: Record<string, number> };
   _w.__glbCount = _w.__glbCount || {};
   _w.__glbCount[name] = (_w.__glbCount[name] || 0) + 1;
-  const spec = PACK[name];
+  // THE PACK IS GONE AND THE BUILT PROP IS THE GAME. This used to fetch a GLB
+  // and place the procedural version only if the download failed; that is now
+  // the only path. See the note at the top of this file for why.
+  //
+  // opts.h and opts.lodDist are inert. They stay in the signature so several
+  // hundred call sites do not have to change, and so restoring the pack would
+  // be a change to this one function.
+  if (!opts.fallback) return;
+  const fb = opts.fallback();
+  // never register an INVISIBLE edible — an empty group is a prop the player
+  // can eat and cannot see
+  if (fb.children.length === 0 && !(fb as THREE.Mesh).isMesh) return;
   const qk = name.startsWith('house') ? 'house' : undefined;
-  const placeFallback = () => {
-    if (!opts.fallback) return;
-    const fb = opts.fallback();
-    if (fb.children.length === 0 && !(fb as THREE.Mesh).isMesh) return;   // never register an INVISIBLE edible
-    if (qk) fb.userData.qk = qk;
-    fb.position.set(x, 0, z);
-    if (opts.rotY) fb.rotation.y = opts.rotY;
-    const fbCast = shouldCast(r, fb);
-    fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = fbCast; o.receiveShadow = true; } });
-    // glb() never attached a contact disc, so a small GLB prop had neither a
-    // cast shadow nor a blob and was the only genuinely ungrounded thing left
-    if (!fbCast) fb.add(contactShadow(Math.max(0.55, r * 1.1)));
-    scene.add(fb);
-    addEdible?.(fb, r);
-  };
-  if (!spec) { placeFallback(); return; }
-  template(spec.url).then((tpl) => {
-    if (!tpl) { placeFallback(); return; }
-    const hi = new THREE.Group();
-    hi.add(tpl.clone(true));
-    hi.scale.setScalar(opts.h ?? spec.h);
-    // FOOTPRINT CAP — models are normalized by HEIGHT, so a wide model (a
-    // sprawling house) can blow far past its gameplay radius r and visually
-    // sit on sidewalks/roads no matter how far its lot is set back. If the
-    // visual half-extent exceeds 1.3×r, shrink uniformly to fit. This is the
-    // structural fix behind every "the houses are in the street" report.
-    {
-      const bb = new THREE.Box3().setFromObject(hi);
-      const half = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2;
-      const cap = r * 1.3;
-      if (half > cap) hi.scale.multiplyScalar(cap / half);
-    }
-    // PERF: generated meshes are dense (30-150k tris each, ~100 instances on
-    // the island). With a procedural fallback available, wrap in an LOD so the
-    // full-detail mesh only renders near the camera and the cheap procedural
-    // stand-in carries the distance — most of the island most of the time.
-    let obj: THREE.Object3D;
-    if (opts.fallback) {
-      const lod = new THREE.LOD();
-      lod.addLevel(hi, 0);
-      lod.addLevel(opts.fallback(), opts.lodDist ?? 110);
-      LODS.push(lod);
-      obj = lod;
-    } else {
-      obj = hi;
-    }
-    if (qk) obj.userData.qk = qk;
-    obj.position.set(x, 0, z);
-    if (opts.rotY) obj.rotation.y = opts.rotY;
-    const objCast = shouldCast(r, obj);
-    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = objCast; o.receiveShadow = true; } });
-    if (!objCast) obj.add(contactShadow(Math.max(0.55, r * 1.1)));
-    scene.add(obj);
-    addEdible?.(obj, r);
-    opts.onReady?.(obj as THREE.Group);
-  });
+  if (qk) fb.userData.qk = qk;
+  fb.position.set(x, 0, z);
+  if (opts.rotY) fb.rotation.y = opts.rotY;
+  const fbCast = shouldCast(r, fb);
+  fb.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = fbCast; o.receiveShadow = true; } });
+  // anything that does not cast gets a contact disc, or it reads as floating
+  if (!fbCast) fb.add(contactShadow(Math.max(0.55, r * 1.1)));
+  scene.add(fb);
+  addEdible?.(fb, r);
+  opts.onReady?.(fb as THREE.Group);
 }
 
-// ?debug=assets — QA gallery: every pack asset on a floating platform with a
-// name label, one screenshot audits the whole set (which meshes need a re-roll)
-export function buildGallery(scene: THREE.Scene) {
-  const names = Object.keys(PACK);
-  const COLS = 7, GAP = 26, Y = 600;
-  const label = (text: string) => {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
-    const x = cv.getContext('2d')!;
-    x.fillStyle = 'rgba(13,8,33,0.85)'; x.fillRect(0, 0, 256, 64);
-    x.fillStyle = '#fff'; x.font = '900 30px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText(text, 128, 34);
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthWrite: false }));
-    sp.scale.set(10, 2.5, 1);
-    return sp;
-  };
-  const rows = Math.ceil(names.length / COLS);
-  names.forEach((name, i) => {
-    const gx = (i % COLS - (COLS - 1) / 2) * GAP;
-    const gz = (Math.floor(i / COLS) - (rows - 1) / 2) * GAP;
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 0.5, 24),
-      new THREE.MeshStandardMaterial({ color: 0x3a2a5a, roughness: 0.9 }));
-    pad.position.set(gx, Y - 0.25, gz); scene.add(pad);
-    const tag = label(name); tag.position.set(gx, Y + 13, gz); scene.add(tag);
-    template(PACK[name].url).then((tpl) => {
-      if (!tpl) return;
-      const g = new THREE.Group();
-      g.add(tpl.clone(true));
-      g.scale.setScalar(10);          // uniform preview height
-      g.position.set(gx, Y, gz);
-      scene.add(g);
-    });
-  });
-}
+// ?debug=assets used to photograph the whole GLB pack on floating platforms.
+// There is no pack; qa/keyart.mjs and qa/hero.mjs shoot the actual game.
+export function buildGallery(_scene: THREE.Scene): void { /* the pack is gone */ }
 
-// vehicles: swap a mover's procedural mesh for the AI one once it loads. The
-// game's vehicle convention is nose = +X, so the mesh's longest horizontal
-// axis is rotated onto X and scaled to `len` world units. If the GLB never
-// loads, the procedural vehicle simply stays — no empty roads.
+/** THE VEHICLES ARE PROCEDURAL TOO. This swapped a mover's built mesh for a
+ *  downloaded one once it arrived. Its three names — tank, car_sedan and
+ *  car_taxi — are gone with the rest of the pack (`tank` was one of the
+ *  seventeen permanent 403s anyway), so the procedural vehicle that used to be
+ *  the fallback is simply the vehicle.
+ *
+ *  A no-op rather than a deletion: defense.ts and the traffic builders call it
+ *  at several sites, and this keeps the decision reversible in one file. */
 export function vehicleGlb(
-  container: THREE.Object3D, name: string, len: number,
-  opts: { tint?: number; keep?: THREE.Object3D[] } = {},
-) {
-  // vehicles count under a `veh:` prefix — see the note in glb(). They are the
-  // reason the pack cannot simply be trimmed to what populate() places:
-  // defense units and traffic ask for their meshes DURING a match, so a mesh
-  // that no world places at boot may still be needed at t+60s.
-  const _w = window as unknown as { __glbCount?: Record<string, number> };
-  _w.__glbCount = _w.__glbCount || {};
-  _w.__glbCount['veh:' + name] = (_w.__glbCount['veh:' + name] || 0) + 1;
-  const spec = PACK[name];
-  if (!spec) return;
-  template(spec.url).then((tpl) => {
-    if (!tpl) return;
-    const inst = tpl.clone(true);
-    // tint: clone materials and multiply (e.g. the police cruiser is the sedan
-    // mesh washed toward blue — one asset, many liveries)
-    if (opts.tint !== undefined) {
-      const t = new THREE.Color(opts.tint);
-      inst.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        mesh.material = (Array.isArray(mesh.material) ? mats.map((m) => m.clone()) : mats[0].clone()) as typeof mesh.material;
-        const nm = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const m of nm) { const mm = m as THREE.MeshStandardMaterial; if (mm.color) mm.color.multiply(t); }
-      });
-    }
-    const box = new THREE.Box3().setFromObject(inst);
-    const size = box.getSize(new THREE.Vector3());
-    const wrap = new THREE.Group();
-    wrap.add(inst);
-    // longest axis → +X, then a 180° flip: the generated meshes model their
-    // nose toward -X (verified in the ?assets gallery), the game drives +X
-    wrap.rotation.y = (size.z > size.x ? Math.PI / 2 : 0) + Math.PI;
-    wrap.scale.setScalar(len / Math.max(Math.max(size.x, size.z), 1e-4));
-    wrap.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    // LOD: the existing procedural vehicle becomes the far level, the dense AI
-    // mesh only renders near the camera. `keep` children (light bars, rotors)
-    // stay on the container itself so they ride both levels.
-    const lo = new THREE.Group();
-    for (const c of [...container.children]) if (!opts.keep?.includes(c)) lo.add(c);
-    const lod = new THREE.LOD();
-    lod.addLevel(wrap, 0);
-    lod.addLevel(lo, 95);
-    LODS.push(lod);
-    container.add(lod);
-  });
-}
+  _container: THREE.Object3D, _name: string, _len: number,
+  _opts: { tint?: number; keep?: THREE.Object3D[] } = {},
+): void { /* the pack is gone — the procedural mesh stays */ }
 
-// the drifting hot-air balloon needs an animation handle back in island.ts
 let balloonHook: (g: THREE.Group) => void = () => {};
 export const setBalloonHook = (fn: (g: THREE.Group) => void) => { balloonHook = fn; };
+/** THE ONE PROP THE PACK WAS CARRYING ALONE. Every other glb() call site
+ *  passes a `fallback`, so deleting the pack changed how they look and not
+ *  whether they exist — but `balloon2` had none, which means it would have
+ *  silently ceased to be, and Maple Falls is already the world with the least
+ *  going on. It is drifting scenery seen from a long way off, so it is a
+ *  striped envelope, a basket and four lines. */
 export function spawnBalloon(scene: THREE.Scene) {
-  glb(scene, null, 'balloon2', 0, 0, 0, { h: 13, onReady: (g) => balloonHook(g) });
+  glb(scene, null, 'balloon2', 0, 0, 0, {
+    h: 13,
+    fallback: () => {
+      const g = new THREE.Group();
+      const envelope = new THREE.Mesh(
+        new THREE.SphereGeometry(3.1, 18, 14),
+        new THREE.MeshStandardMaterial({ color: 0xff6b8a, roughness: 0.72, flatShading: true }));
+      envelope.scale.set(1, 1.24, 1);
+      envelope.position.y = 9.6;
+      g.add(envelope);
+      // gores, so it reads as a balloon and not a floating ball
+      for (let i = 0; i < 4; i++) {
+        const gore = new THREE.Mesh(
+          new THREE.SphereGeometry(3.13, 10, 14, (i / 4) * Math.PI * 2, Math.PI / 5.5),
+          new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.72, flatShading: true }));
+        gore.scale.set(1, 1.24, 1); gore.position.y = 9.6;
+        g.add(gore);
+      }
+      const basket = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 1.25, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.95, flatShading: true }));
+      basket.position.y = 5.0;
+      g.add(basket);
+      const lineMat = new THREE.MeshStandardMaterial({ color: 0x5a4630, roughness: 1 });
+      for (const [sx, sz] of [[0.62, 0.62], [-0.62, 0.62], [0.62, -0.62], [-0.62, -0.62]]) {
+        const line = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.1, 4), lineMat);
+        line.position.set(sx, 6.7, sz);
+        g.add(line);
+      }
+      return g;
+    },
+    onReady: (g) => balloonHook(g),
+  });
 }
