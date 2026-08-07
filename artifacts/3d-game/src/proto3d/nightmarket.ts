@@ -77,12 +77,21 @@ const G_WINDOW = 0xffd489;   // the bathhouse's windows
 // else. This is the only rig in the game with no sun in it (moon at 0.42),
 // so nothing here goes chrome; it goes damp.
 //
-// TILE is the big one — a hundred-odd roofs, every one of them a ceramic
-// pantile — and it is the surface a night market is photographed by.
 // WATER runs highest because the canal is the only true mirror on the level.
+//
+// VERM IS HERE BECAUSE THE MEASUREMENT SAID SO. The first pass registered
+// TILE and called it "the big one — a hundred-odd roofs". It is not: TILE is
+// the shrine, the kura and the bathhouse, and the surface that actually fills
+// this frame is the VERMILION STALL CANOPY, repeated down every row of the
+// market. With TILE alone the channel reached 1.32% of the level's pixels.
+// A vermilion canopy is lacquered cloth over a frame, so it takes a low
+// value, not a metal one — but at 45% of the world's triangles a low value on
+// the right surface beats a high one on the wrong surface every time.
 registerGloss([
+  [VERM, 0.22], [VERM_D, 0.18],
   [TILE, 0.46], [TILE_D, 0.40], [WATER, 0.82], [CHAR, 0.50],
   [STONE, 0.24], [STONE_D, 0.20],
+  [TIMBER, 0.16], [CEDAR, 0.16],   // oiled boards, wet with the night air
 ]);
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
