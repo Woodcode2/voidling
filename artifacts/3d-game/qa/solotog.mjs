@@ -37,8 +37,15 @@ async function play(flip) {
   if (flip) { await p.click('#soloTog'); await p.waitForTimeout(200); }
   const after = await p.evaluate(() => document.getElementById('soloTog').classList.contains('on'));
   await p.click('#worldRow .wCard[data-world="maple"]');
-  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 600000 });
-  await p.evaluate(() => { window.__renderer.render = () => {}; });
+  // SAMPLE LATE ENOUGH THAT THE ANSWER CAN BE "NO".
+  // Rivals join on a stagger — CHOMPZILLA at 7-13s and the rest on later
+  // slots — so at t=3s a NORMAL run has nobody joined either, and "solo has no
+  // rivals" passes without being able to tell the two modes apart. A test that
+  // cannot fail is not evidence. 20s is past the first join slot in every
+  // world, so the normal run is now required to show somebody, which is what
+  // makes the solo zero mean something.
+  await p.evaluate(() => { window.__renderer.render = () => {}; });   // ~9x faster with no draw
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 20, null, { timeout: 900000 });
   const st = await p.evaluate(() => {
     const m = window.__matchState();
     // matchLen is not exposed, but the countdown is: solo runs 120s against
