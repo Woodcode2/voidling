@@ -580,9 +580,37 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     rivalFullNews: 'The second void has stopped moving. It looks full. It looks slow.',
     winSub: 'the whole town belongs to the void', place: 'the town',
     winTitles: ['TOWN: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF MAPLE FALLS'],
-    // no hero landmark — the biggest thing in Maple Falls is a 6.5 town hall,
-    // which the void passes without ceremony. A cue here would be noise.
-    heroCue: null, heroCueNews: null, heroGone: null,
+    // ── MAPLE HAS A FINALE NOW, AND THE REASON IT DID NOT WAS ARITHMETIC ───
+    // This said: "no hero landmark — the biggest thing in Maple Falls is a 6.5
+    // town hall, which the void passes without ceremony. A cue here would be
+    // noise." The claim underneath it was that the hall comes into range
+    // halfway through. It does not.
+    //
+    // The cue fires at `heroProp.radius <= voidling.radius * EAT_RATIO`, and
+    // EAT_RATIO is 1.11, so a 6.5 hall needs the void at r >= 5.86. Measured
+    // on a full match with qa/pace.mjs (after its own 45-degree steering bug
+    // was fixed — every earlier pacing number in this repo is inflated):
+    // Maple's radius is 4.85 at 120s and 6.09 at 140s, so it crosses at about
+    // t=132s of 180. That is the last quarter, the same window Pirate, Game
+    // Day and Lantern were tuned to — not halfway, and not noise.
+    //
+    // Maple needed this more than any of them. Same probe, one match each:
+    // it is LAST on every axis while being WORLD 1 — 3,514 eats against Game
+    // Day's 4,666, 237,784 points against 475,640, 1.9u of travel per eat
+    // against 1.4, and 16 headlines against 21. The first level a child plays
+    // was the least generous one and the only one with no climax.
+    //
+    // A weaker player simply never reaches r5.86 and the cue never fires,
+    // which is exactly today's behaviour — so this is upside for a good run
+    // and unchanged for a poor one.
+    //
+    // `heroGone` calls back a set piece that already exists: life.ts runs a
+    // town-hall meeting whose crowd shouts "move to adjourn? DENIED." and
+    // "ADJOURNED!! ADJOURNED!!". The newsroom register is plain sentences with
+    // a full stop and one joke — see newsroom_maple.ts.
+    heroCue: '🏛️ THE TOWN HALL IS IN REACH — GO!',
+    heroCueNews: 'It is big enough for the town hall. The meeting has gone quiet.',
+    heroGone: '🏛️ TOWN HALL: ADJOURNED.',
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
@@ -2757,7 +2785,12 @@ function beginMatch(solo = false) {
   // the hero is whatever the biggest thing on this world is — resolved per
   // match, so a re-rolled or re-scaled landmark needs no second list
   heroCued = false; heroAte = false; heroProp = null;
-  if (COPY.hero) {
+  // GATED ON THE CUE, NOT ON `hero`. `hero` is a camera waypoint — the fly-by
+  // coordinates for the intro — and Maple deliberately has none, which also
+  // switched off its finale as a side effect. The other three declare both, so
+  // their behaviour is bit-identical; this only lets a world have a climax
+  // without also having an establishing shot.
+  if (COPY.heroCue) {
     for (const e of edibles) if (!heroProp || e.radius > heroProp.radius) heroProp = e;
   }
   // THE OPENING FRAME IS CALM. The void arrives 0.9 units across inside a fear
@@ -4960,6 +4993,13 @@ function animate() {
         && heroProp.radius <= voidling.radius * EAT_RATIO) {
       heroCued = true;
       announce(COPY.heroCue);
+      // …and hold the screen, the way the evolve card does. The "35 SECONDS"
+      // warning fires at t=145s and announce() overwrites whatever is up: the
+      // file already carries a comment about that exact collision eating the
+      // TREASURE FEAST beat in every logged run. Maple's cue lands near 132s
+      // on an optimal run, but a slower one drifts toward the warning, and
+      // holdBanner queues rather than clobbers.
+      holdBanner(2.4);
       if (COPY.heroCueNews) breakingNews(COPY.heroCueNews);
       audio.ready(); buzz(30);
       fx.ring(heroProp.mesh.position.x, heroProp.mesh.position.z, 0xf0b429, heroProp.radius * 5, 0.9);
