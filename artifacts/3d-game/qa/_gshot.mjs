@@ -10,6 +10,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 });
+  p.setDefaultTimeout(300000);
   await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
@@ -40,7 +41,7 @@ for (const wid of WORLDS) {
     await p.evaluate(({ x, z, r }) => { window.__setVoidR(r); window.__warpVoid(x, z); }, { ...spot, r });
     await p.waitForTimeout(2600);
     const f = `qa-out/gceil-${wid}-r${r}.png`;
-    await p.screenshot({ path: f });
+    await p.screenshot({ path: f, timeout: 300000 });
     const info = await p.evaluate(() => ({ calls: window.__renderer.info.render.calls,
       tris: window.__renderer.info.render.triangles, q: window.__quality() }));
     console.log(`${f}  r=${r}  draw calls ${info.calls}  tris ${info.tris}  q${info.q.level}`);
