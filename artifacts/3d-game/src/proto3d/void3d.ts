@@ -5,6 +5,8 @@
 // not a lit glossy sphere. Face is a billboarded set of crisp flat features,
 // exactly like the 2D canvas draw.
 import * as THREE from 'three';
+import { HAT_BY_ID, applyHatLod } from './hats';
+import { buildHat } from './hatgeo';
 import { VOID, VOID_COL, type Skin } from './palette';
 
 export interface VoidState {
@@ -24,6 +26,8 @@ export interface Void3D {
   impulse(v: number): void;
   setStage(n: number): void;
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
+  /** Wear a hat, or null for none. Independent of the skin — see hats.ts. */
+  setHat(id: string | null): void;
   setMood(m: Mood): void;    // the emotional state machine's current state
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
@@ -847,6 +851,24 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     });
   }
 
+  // ── THE HAT SLOT ────────────────────────────────────────────────────────
+  // Separate from `acc` below on purpose. An accessory is welded to a legendary
+  // SKIN — you get the horn because you are Uni-Void — whereas a hat is bought
+  // on its own and goes on any void in the game. Two slots, so a child can be
+  // a Honey void in a Viking helm.
+  //
+  // BUILT LAZILY. The accessory loop below builds all five at boot whether or
+  // not the player owns any; with thirteen hats on top of that, a cold start
+  // would be paying for a wardrobe nobody is wearing. A hat is built the first
+  // time it is worn and then cached — which also means the shop's preview pays
+  // for exactly the hat it is showing.
+  const hats: Record<string, THREE.Group> = {};
+  let wornHat: THREE.Group | null = null;
+  let wornHatId: string | null = null;
+  let wornSeat = 1;
+  let spinner: THREE.Object3D | null = null;
+  let spinRate = 0;
+
   // ── legendary accessories: 3D flair that rides (and squashes with) the orb ──
   const acc: Record<string, THREE.Group> = {};
   {
@@ -1037,6 +1059,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         }
       }
       stage = n;
+    },
+    setHat(id) {
+      if (id === wornHatId) return;
+      if (wornHat) wornHat.visible = false;
+      wornHatId = id; wornHat = null; spinner = null; spinRate = 0;
+      if (!id) return;
+      const meta = HAT_BY_ID[id];
+      if (!meta) return;
+      let g = hats[id];
+      if (!g) {
+        g = buildHat(id);
+        g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+        dress.add(g); hats[id] = g;
+      }
+      g.visible = true;
+      wornHat = g; wornSeat = meta.seat; spinRate = meta.spin ?? 0;
+      if (spinRate) g.traverse((o) => { if (o.name === 'spin') spinner = o; });
     },
     setSkin(s: Skin) {
       bodyMat.uniforms.uAbyss.value.set(s.abyss);
@@ -1237,7 +1276,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the parts get the same caricature LOD the eyes and mouth already have
       // (eyeLod below) — otherwise the thing a parent paid for is invisible for
       // the first third of every match.
-      dress.scale.setScalar(1 + small * 0.42);
+      // THE COSTUME LOD, and the hat is exempt from the group form of it.
+      // Scaling a GROUP scales its children's POSITIONS as well as their size,
+      // so anything seated on TOP of the head lifts off: a brim at y=0.95 lands
+      // at 1.35 at full strength. The five legendary accessories survive that
+      // only by accident — measured with qa/acclift.mjs, every one of them sits
+      // below y=0.6 or wraps the body from underneath, so scaling outward from
+      // the centre keeps them attached. A hat has no such luck, so it takes the
+      // same scalar about its own seat instead. See applyHatLod in hats.ts.
+      const lod = 1 + small * 0.42;
+      dress.scale.setScalar(lod);
+      if (wornHat) {
+        applyHatLod(wornHat, wornSeat, lod);
+        // …and undo the group's scale on the way in, or the hat gets it twice
+        wornHat.scale.multiplyScalar(1 / lod);
+        wornHat.position.y /= lod;
+        if (spinner) spinner.rotation.y += dt * spinRate;
+      }
       // ── AND PUSH IT CLEAR OF THE BODY ──────────────────────────────────
       // The features used to sit at z = 1.0–1.02 in a unit-sphere face, i.e.
       // exactly ON the surface. Every jelly slosh (up to +11%) and every

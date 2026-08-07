@@ -1002,6 +1002,53 @@
          gradient circle on a paid product */
       #spOrb { position: relative; overflow: hidden; }
       #spOrb .artLay { position: absolute; inset: 0; background-size: cover; background-position: center; }
+      /* ── THE TWO SLOTS ──────────────────────────────────────────────────
+         A segmented control, not a row of links: at this size a child needs
+         to see that exactly one of the two is currently true. The active tab
+         is filled rather than underlined, because an underline is a 2px cue
+         on a screen being held at arm's length by someone who is six. */
+      .shopTabs { display: flex; gap: 10px; width: min(560px, 92vw); margin: 0 auto 18px; }
+      .shopTab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+        cursor: pointer; font-family: inherit; font-size: 15px; font-weight: 900; letter-spacing: 1.6px;
+        color: #cbb2ff; background: rgba(28,12,52,0.7); border: 2px solid rgba(255,255,255,0.1);
+        border-radius: 16px; padding: 11px 8px 9px; }
+      .shopTab i { font-style: normal; font-size: 19px; line-height: 1; }
+      .shopTab em { font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: 0.8px;
+        opacity: 0.72; }
+      .shopTab.on { color: #fff; background: linear-gradient(180deg, #7a4fe0, #5a2fc0);
+        border-color: rgba(255,210,90,0.6); box-shadow: 0 4px 0 #3a1a80, 0 0 20px rgba(184,117,255,0.35); }
+      .shopTab:active { transform: translateY(2px); }
+
+      /* ── HAT CARDS ──────────────────────────────────────────────────────
+         Taller than a skin card because a hat needs a NAME and a one-line
+         joke — the joke is most of what is being sold — and because the
+         preview is a 3D render rather than a flat circle. */
+      #hatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 14px; width: min(720px, 94vw); margin: 0 auto; padding-bottom: 8px; }
+      .hatSect { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px;
+        margin: 6px 0 -2px; font-size: 13px; font-weight: 900; letter-spacing: 2.4px; color: #cbb2ff; }
+      .hatSect b { color: #ffd23f; font-weight: 900; }
+      .hatSect span { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(203,178,255,0.4), transparent); }
+      .hatCard { position: relative; overflow: hidden; cursor: pointer; text-align: center;
+        background: rgba(24,13,46,0.86); border: 2px solid rgba(201,166,255,0.22);
+        border-radius: 18px; padding: 10px 8px 12px; }
+      .hatCard canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 14px; }
+      .hatCard .hn { font-size: 13px; font-weight: 900; letter-spacing: 0.6px; color: #fff; margin-top: 6px; }
+      .hatCard .hb { font-size: 10px; font-weight: 700; letter-spacing: 0.2px; color: #b9a6e0;
+        margin-top: 2px; min-height: 24px; line-height: 1.2; }
+      .hatCard .hp { font-size: 14px; font-weight: 900; letter-spacing: 0.8px; color: #ffd23f; margin-top: 5px; }
+      .hatCard .hp.free { color: #7ef2a0; }
+      .hatCard.owned .hp { color: #7ef2a0; }
+      .hatCard.worn { border-color: rgba(255,210,90,0.9); box-shadow: 0 0 22px rgba(255,210,90,0.3); }
+      .hatCard.worn .hp { color: #ffd23f; }
+      .hatCard:active { transform: scale(0.97); }
+      /* the legendary ribbon, same language as the skin cards so the tier
+         reads as one idea across both tabs */
+      .hatCard.leg { border-color: rgba(255,210,90,0.55); }
+      .hatCard.leg::after { content: 'LEGENDARY'; position: absolute; top: 12px; right: -30px;
+        transform: rotate(45deg); width: 116px; text-align: center; font-size: 9px; font-weight: 900;
+        letter-spacing: 1.4px; color: #2a1a00; background: linear-gradient(180deg, #ffe07a, #ffc21f);
+        padding: 3px 0; }
       /* App Review requires a restore control; it must be findable but must
          never compete with the cards for a child's attention */
       #btnRestore { min-height: 44px; font-family: inherit; font-size: 12px; font-weight: 800; letter-spacing: 1.4px;
@@ -1407,9 +1454,19 @@
     <div id="shop">
       <div class="shopHead">
         <button id="btnBack">‹ BACK</button>
-        <div class="shopTitle">VOID SKINS</div>
+        <div class="shopTitle">THE SHOP</div>
+      </div>
+      <!-- TWO SLOTS, TWO TABS, AND THE ORDER IS THE ARGUMENT. VOIDS first,
+           because that is the free collection every child is working through
+           and it must never look like the afterthought next to the paid one.
+           HATS second, as the thing you graduate to. A hat goes on any void,
+           so the two tabs multiply rather than compete. -->
+      <div class="shopTabs">
+        <button class="shopTab on" data-tab="voids"><i>🟣</i>VOIDS<em>earn with ✦</em></button>
+        <button class="shopTab" data-tab="hats"><i>🎩</i>HATS<em>real hats, real money</em></button>
       </div>
       <div id="shopGrid"></div>
+      <div id="hatGrid" style="display:none"></div>
       <!-- App Review requires a user-triggered restore for non-consumables:
            a child who gets a new iPad must not be asked to pay twice. -->
       <button id="btnRestore">RESTORE PURCHASES</button>

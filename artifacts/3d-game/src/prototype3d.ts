@@ -772,6 +772,7 @@ const _dbg = window as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
+  __hatSheet: (ids: string[]) => Promise<unknown>;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -924,6 +925,90 @@ const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 // frame. ASSIGNED HERE, not up with the other hooks: `life` is a const
 // declared on this line, so touching it from the hook block 120 lines above is
 // a temporal dead zone and the module fails to initialise.
+// QA: THE HAT CONTACT SHEET. A hat rides the hero, so it is the closest and
+// largest thing on screen — hundreds of pixels at WORLD ENDER, not the forty a
+// background prop gets. It cannot be signed off from source or from a triangle
+// count; it has to be LOOKED at, at size, from the angles the play camera
+// actually uses. This renders each hat on a real void body with the real light
+// rig into one strip per hat, and reports the closest approach of its geometry
+// to the origin so the 1.22 jelly-clearance rule is a number rather than a
+// hope. See qa/hatsheet.mjs.
+_dbg.__hatSheet = async (ids: string[]) => {
+  const { HATS } = await import('./proto3d/hats');
+  const { buildHat } = await import('./proto3d/hatgeo');
+  const { makeVoidBody, applySkinToBody } = await import('./proto3d/void3d');
+  const want = ids && ids.length ? HATS.filter((h) => ids.includes(h.id)) : HATS;
+  const S = 420, N = 3;                       // three angles per hat
+  const sc = new THREE.Scene();
+  sc.background = new THREE.Color(0x1a1030);
+  sc.environment = scene.environment;
+  sc.environmentIntensity = 0.35;             // a shade brighter than play: this is a shop light
+  const key = new THREE.DirectionalLight(0xfff2d8, 2.6); key.position.set(-3, 5, 4); sc.add(key);
+  const rim = new THREE.DirectionalLight(0x9fc8ff, 1.1); rim.position.set(4, 2, -4); sc.add(rim);
+  sc.add(new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.5));
+  const bodyMat = makeVoidBody();
+  applySkinToBody(bodyMat, SKINS[0]);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 36), bodyMat);
+  sc.add(body);
+  const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  const rt = new THREE.WebGLRenderTarget(S, S);
+  rt.texture.colorSpace = THREE.SRGBColorSpace;
+  const cv = document.createElement('canvas'); cv.width = S * N; cv.height = S;
+  const ctx = cv.getContext('2d')!;
+  const out: unknown[] = [];
+  for (const h of want) {
+    const g = buildHat(h.id);
+    sc.add(g);
+    let meshes = 0, tris = 0, closest = 1e9, top = 0, wide = 0;
+    g.updateWorldMatrix(true, true);
+    const _v = new THREE.Vector3();
+    g.traverse((o) => {
+      const geo = (o as THREE.Mesh).geometry;
+      if (!geo) return;
+      meshes++;
+      const pos = geo.getAttribute('position');
+      if (!pos) return;
+      tris += (geo.index ? geo.index.count : pos.count) / 3;
+      // PER VERTEX, not per bounding sphere. A flat torus lying on the skull
+      // has a bounding sphere whose centre-minus-radius is far inside the
+      // body while every actual vertex clears it — the first version of this
+      // reported the party hat's frill at 0.45 and the frill was fine at 1.06.
+      // Conservative is the wrong kind of wrong for a rule that decides
+      // whether geometry gets rebuilt.
+      for (let i = 0; i < pos.count; i++) {
+        _v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        const d = _v.length();
+        if (d < closest) closest = d;
+        if (_v.y > top) top = _v.y;
+        const rr = Math.hypot(_v.x, _v.z);
+        if (rr > wide) wide = rr;
+      }
+    });
+    // FRAME TO FIT. A fixed camera cropped the pompom off the first hat it
+    // rendered, which is exactly the detail these sheets exist to judge.
+    const hi = Math.max(top, 1.6), mid = (hi - 1.05) / 2;
+    const span = Math.max(hi + 1.05, wide * 2.2);
+    const dist = span / (2 * Math.tan((30 * Math.PI) / 360)) * 1.12;
+    for (let i = 0; i < N; i++) {
+      // 0 deg is the face; 35 and 70 are the 3/4 views the play camera lives at
+      const a = (i * 35 * Math.PI) / 180;
+      cam.position.set(Math.sin(a) * dist, mid + 0.35, Math.cos(a) * dist);
+      cam.lookAt(0, mid, 0);
+      renderer.setRenderTarget(rt);
+      renderer.render(sc, cam);
+      const buf = new Uint8Array(S * S * 4);
+      renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
+      renderer.setRenderTarget(null);
+      const img = ctx.createImageData(S, S);
+      for (let y = 0; y < S; y++) img.data.set(buf.subarray((S - 1 - y) * S * 4, (S - y) * S * 4), y * S * 4);
+      ctx.putImageData(img, i * S, 0);
+    }
+    sc.remove(g);
+    out.push({ id: h.id, meshes, tris: Math.round(tris), closest, top, wide,
+      png: cv.toDataURL('image/png').split(',')[1] });
+  }
+  return out;
+};
 _dbg.__life = life;
 _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // 3-5 family members per match, randomly cast — you never know who's coming
