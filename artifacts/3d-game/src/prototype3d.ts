@@ -1280,11 +1280,36 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   joySet(e);
 });
 window.addEventListener('pointermove', (e) => { if (joy.active && e.pointerId === joy.id) joySet(e); });
-const joyEnd = (e: PointerEvent) => {
-  if (joy.active && e.pointerId === joy.id) { joy.active = false; joy.mag = 0; joy.dx = joy.dy = 0; joyEl.style.display = joyNubEl.style.display = 'none'; }
-};
+// ── LETTING GO, FROM EVERY DIRECTION ──────────────────────────────────────
+// A finger lifting is only ONE of the ways a drive ends, and it was the only
+// one handled. The joystick is a latch: joy.mag survives until something
+// clears it, and the void keeps driving on the last heading for as long as it
+// stays set. Every path below leaves a thumb "down" that will never come up:
+//
+//   • the app is BACKGROUNDED mid-drag — a call banner, the control centre,
+//     Cmd-Tab. The keyboard has been guarded against exactly this since it was
+//     written (`blur` -> keys.clear(), one line down); the joystick, which is
+//     how every phone player actually steers, never was.
+//   • the PAUSE SHEET comes up with the thumb still on the glass. The sheet
+//     stops the clock, and the child lifts their thumb over a modal that is
+//     not listening — so the stick is still pushed when they hit RESUME.
+//   • PLAY AGAIN is tapped and held. The tap lands on the results card, which
+//     is a DOM button, so no pointerdown ever reaches the canvas — but if the
+//     previous match ended while driving, joy.mag is whatever it was, and the
+//     new match opens with the void already moving at 14 u/s.
+//
+// So the reset is a named function and every one of those paths calls it.
+function joyRelease(): void {
+  joy.active = false; joy.id = -1; joy.mag = 0; joy.dx = joy.dy = 0;
+  joyEl.style.display = joyNubEl.style.display = 'none';
+}
+const joyEnd = (e: PointerEvent) => { if (joy.active && e.pointerId === joy.id) joyRelease(); };
 window.addEventListener('pointerup', joyEnd);
 window.addEventListener('pointercancel', joyEnd);
+// Not `joyEnd` — a blur carries no pointerId, and the whole point is that the
+// pointer this was waiting for is never coming back.
+window.addEventListener('blur', joyRelease);
+document.addEventListener('visibilitychange', () => { if (document.hidden) joyRelease(); });
 
 const keys = new Set<string>();
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -3284,6 +3309,7 @@ function gildTreasure() {
 }
 
 function resetMatch() {
+  joyRelease();   // PLAY AGAIN can be tapped and HELD — see joyRelease
   resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); signedOn = false;   // memory + the sign-on are per-match
   // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
   // Proven with an isolation test, not inferred: a uniquely-tagged banner
@@ -3414,11 +3440,14 @@ el('btnHome').addEventListener('click', () => {
     if (document.hidden && started && !ended && !paused) {
       paused = true; paintPause(); pauseEl.classList.add('show');
     }
+    // (the joystick's own visibilitychange handler, next to joyRelease, clears
+    // the stick itself — this listener only owns the sheet)
   });
   qBtn.addEventListener('click', () => {
     if (!started || ended) return;
     void armT;
     paused = true; paintPause(); pauseEl.classList.add('show');
+    joyRelease();   // the thumb that was steering is now over a modal that cannot hear it
     track('pause_open', { sec: elapsed() });
   });
   const doQuit = () => {
