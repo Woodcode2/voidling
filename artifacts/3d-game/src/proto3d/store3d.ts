@@ -21,13 +21,36 @@
 //     a non-consumable product must be restorable without paying twice.
 import { track } from './telemetry';
 
-/** skin id → App Store product id. Non-consumable, one per legendary skin. */
+/** item id → App Store product id. Non-consumable, one per paid cosmetic.
+ *
+ *  TWO FAMILIES, ONE MAP. Skins are the legendary void identities; hats are
+ *  the separate wardrobe slot that goes on any void. Nothing in this file
+ *  cares which is which — purchase(), restore and the approved callback all
+ *  work on ids — so the split is entirely the caller's business, and the
+ *  caller routes the grant by looking the id up in HAT_BY_ID.
+ *
+ *  EVERY ONE OF THESE HAS TO EXIST IN APP STORE CONNECT, created by a human,
+ *  before it can take a penny. Until that is done a tap returns 'not_ready'
+ *  on device — which the shop renders honestly rather than as "coming soon". */
 export const IAP_PRODUCTS: Record<string, string> = {
   univoid: 'com.voidling.skin.univoid',
   rexling: 'com.voidling.skin.rexling',
   kingvoid: 'com.voidling.skin.kingvoid',
   drako: 'com.voidling.skin.drako',
   shadowninja: 'com.voidling.skin.shadowninja',
+  // ── hats ────────────────────────────────────────────────────────────────
+  chef: 'com.voidling.hat.chef',
+  cowboy: 'com.voidling.hat.cowboy',
+  bobble: 'com.voidling.hat.bobble',
+  flower: 'com.voidling.hat.flower',
+  wizard: 'com.voidling.hat.wizard',
+  tricorn: 'com.voidling.hat.tricorn',
+  viking: 'com.voidling.hat.viking',
+  space: 'com.voidling.hat.space',
+  propeller: 'com.voidling.hat.propeller',
+  crown: 'com.voidling.hat.crown',
+  tycoon: 'com.voidling.hat.tycoon',
+  horn: 'com.voidling.hat.horn',
 };
 
 type Offer = { order(): Promise<unknown> };

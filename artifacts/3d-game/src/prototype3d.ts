@@ -13,10 +13,12 @@ import '@fontsource/fredoka/400.css';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { createVoid, type Mood } from './proto3d/void3d';
+import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, type WorldId } from './proto3d/island';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
+import { HATS, HAT_BY_ID, hatLine, type Hat } from './proto3d/hats';
+import { buildHat } from './proto3d/hatgeo';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
@@ -773,6 +775,7 @@ const _dbg = window as unknown as {
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
+  __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -1354,6 +1357,7 @@ const JOY_EDGE = 22;
 // px of base travel per rescue tick — ~4 frames from crippled to full reach
 const JOY_STEP = 16;
 let lastInput = -9999, tClock = 0;
+let hatSayCd = 12;   // legendary hats speak, but not for the first few seconds
 function joySet(cx: number, cy: number) {
   joy.px = cx; joy.py = cy;
   // RE-ANCHOR (hole.io convention) with an OVERSHOOT ZONE: the base only
@@ -2757,6 +2761,23 @@ function capture(e: Edible, giveHunger = true) {
     bubbles.float(floatPos, 'CHOMP!', true); audio.bigEat(); buzz(30);
   } else { audio.pop(combo, e.radius, voidling.radius); buzz(e.radius > 2 ? 15 : 8); }
   if (combo > 0 && combo % 5 === 0) bubbles.float(floatPos, `COMBO ×${comboMult.toFixed(1)}`, true);
+  // ── THE HAT HAS OPINIONS ────────────────────────────────────────────────
+  // Legendary hats only, and RARELY. A hat that comments on every bite is a
+  // hat a child mutes inside one match; one that pipes up every half-minute
+  // or so, on a bite that actually mattered, is a hat with a personality —
+  // and personality is the whole thing being sold at this tier.
+  //
+  // Gated on a BIG meal rather than on a timer alone, so the line always
+  // lands on something the child just did and feels like a reaction. Sharing
+  // the chomp cooldown would tie it to a rarer event than intended, so it
+  // keeps its own, and it never speaks over the CHOMP! callout.
+  if (tClock > hatSayCd && e.radius > voidling.radius * 0.55 && tClock > chompCd - 6.4) {
+    const line = hatLine(voidling.hatId);
+    if (line) {
+      hatSayCd = tClock + 26 + Math.random() * 16;
+      bubbles.say(rivalBubblePos.set(voidState.x, voidling.radius * 2.1 + 2.6, voidState.z), line, 'event');
+    }
+  }
   // quest + milestone hooks (tagged at spawn: qk = 'car' | 'house' | 'big')
   e.mesh.userData.byPlayer = true;   // the DEVOURED meter is split you-vs-family
   const qk = e.mesh.userData.qk as string | undefined;
@@ -4223,13 +4244,20 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // StoreKit hands ownership back here — from a fresh purchase, and from
   // RESTORE PURCHASES, which App Review requires and which a child who got a
   // new iPad genuinely needs.
-  initIAP((skinIds) => {
+  initIAP((ids) => {
+    // TWO WARDROBES NOW. StoreKit hands back product ids and does not care
+    // which slot they belong to, so route by id — a purchased hat landing in
+    // voidSkinsOwned would be a skin the shop cannot show and a hat the child
+    // paid for and never receives.
+    const hats = ids.filter((id) => !!HAT_BY_ID[id]);
+    if (hats.length) _dbg.__grantHats(hats);
     let gained = false;
-    for (const id of skinIds) if (!owned.has(id)) { owned.add(id); gained = true; }
-    if (!gained) return;
-    localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
-    refresh(); refreshPreview();
-    audio.evolve(); buzz(70);
+    for (const id of ids) if (!HAT_BY_ID[id] && !owned.has(id)) { owned.add(id); gained = true; }
+    if (gained) {
+      localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+      refresh(); refreshPreview();
+    }
+    if (gained || hats.length) { audio.evolve(); buzz(70); }
   }, () => { refresh(); refreshPreview(); });   // prices land async — repaint
 
   {
@@ -4273,6 +4301,188 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     if (s.id === equipped) voidling.setSkin(s);
   }
   refresh();
+}
+
+// ══ THE HAT SHOP ═══════════════════════════════════════════════════════════
+//
+// A second, independent slot. The void is who you are and it is earned; the
+// hat is what you are wearing and it is bought. Keeping them apart is what
+// makes the catalogue multiply instead of compete — any hat on any void.
+//
+// THE CARDS ARE RENDERED, NOT PAINTED. The skin cards are a CSS gradient with
+// a face SVG on top, and the owner's own screenshot shows what that costs: a
+// skin called Circuit rendering as a plain blue ball because its texture only
+// exists in game, next to a Honey card that shows its texture and loses the
+// face. Three different treatments across one tier. A hat card cannot afford
+// that — it IS the product — so each one is the real geometry, on a real void,
+// under the real light rig, rendered once into a still. What the child sees on
+// the card is what arrives on their void.
+//
+// One render target, borrowed from the game's own renderer during a modal
+// where nothing else is drawing, so this costs no extra WebGL context and
+// nothing per frame.
+{
+  const grid = el('hatGrid');
+  const skinGrid = el('shopGrid');
+  let ownedHats: Set<string>;
+  try { ownedHats = new Set<string>(JSON.parse(localStorage.getItem('voidHatsOwned') || '["party"]')); }
+  catch { ownedHats = new Set(['party']); }
+  ownedHats.add('party');                       // the free one can never be missing
+  let wornHat = localStorage.getItem('voidHat');
+  if (wornHat && !HAT_BY_ID[wornHat]) wornHat = null;
+  const saveHats = () => localStorage.setItem('voidHatsOwned', JSON.stringify([...ownedHats]));
+  const wearHat = (id: string | null) => {
+    wornHat = id;
+    if (id) localStorage.setItem('voidHat', id); else localStorage.removeItem('voidHat');
+    voidling.setHat(id);
+  };
+  voidling.setHat(wornHat);                     // whatever they had on last time
+
+  // ── THUMBNAILS ────────────────────────────────────────────────────────────
+  // Rendered lazily on first open and cached: thirteen 256px renders is a few
+  // hundred milliseconds of work that should not happen at boot for a child
+  // who never visits the shop.
+  let thumbsDone = false;
+  function paintThumbs(): void {
+    if (thumbsDone) return;
+    thumbsDone = true;
+    const S = 256;
+    const sc = new THREE.Scene();
+    sc.environment = scene.environment;
+    sc.environmentIntensity = 0.35;
+    const key = new THREE.DirectionalLight(0xfff2d8, 2.5); key.position.set(-2.4, 4.4, 3.6); sc.add(key);
+    const rimL = new THREE.DirectionalLight(0x9fc8ff, 1.0); rimL.position.set(3.4, 1.6, -3.4); sc.add(rimL);
+    sc.add(new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.55));
+    const bodyMat = makeVoidBody();
+    applySkinToBody(bodyMat, SKINS.find((sk) => sk.id === (localStorage.getItem('voidSkin') || 'classic')) ?? SKINS[0]);
+    sc.add(new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), bodyMat));
+    const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
+    const rt = new THREE.WebGLRenderTarget(S, S);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    const buf = new Uint8Array(S * S * 4);
+    for (const h of HATS) {
+      const cv = document.getElementById(`hatcv_${h.id}`) as HTMLCanvasElement | null;
+      if (!cv) continue;
+      const g = buildHat(h.id);
+      sc.add(g);
+      // frame the whole thing, hat included — a cropped pompom is exactly the
+      // detail these previews exist to sell
+      g.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(g);
+      const top = Math.max(isFinite(box.max.y) ? box.max.y : 1.6, 1.6);
+      const mid = (top - 1.05) / 2;
+      const dist = ((top + 1.05) / (2 * Math.tan(Math.PI / 12))) * 1.1;
+      cam.position.set(Math.sin(0.55) * dist, mid + 0.3, Math.cos(0.55) * dist);
+      cam.lookAt(0, mid, 0);
+      renderer.setRenderTarget(rt);
+      renderer.setClearColor(0x140c28, 1);
+      renderer.clear();
+      renderer.render(sc, cam);
+      renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
+      renderer.setRenderTarget(null);
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext('2d');
+      if (ctx) {
+        const img = ctx.createImageData(S, S);
+        // readRenderTargetPixels hands back bottom-up
+        for (let y = 0; y < S; y++) img.data.set(buf.subarray((S - 1 - y) * S * 4, (S - y) * S * 4), y * S * 4);
+        ctx.putImageData(img, 0, 0);
+      }
+      sc.remove(g);
+      g.traverse((o) => { const m = o as THREE.Mesh; m.geometry?.dispose(); });
+    }
+    rt.dispose();
+  }
+
+  const hatCards = new Map<string, HTMLElement>();
+  const priceText = (h: Hat): string => {
+    if (wornHat === h.id) return 'WEARING';
+    if (ownedHats.has(h.id)) return 'WEAR IT';
+    if (h.tier === 'free') return 'FREE';
+    return `💎 ${iapPrice(h.id) ?? `$${(h.usd ?? 0).toFixed(2)}`}`;
+  };
+  const refreshHats = () => {
+    for (const h of HATS) {
+      const card = hatCards.get(h.id);
+      if (!card) continue;
+      card.classList.toggle('owned', ownedHats.has(h.id));
+      card.classList.toggle('worn', wornHat === h.id);
+      const pr = card.querySelector('.hp') as HTMLElement;
+      pr.className = 'hp' + (h.tier === 'free' && !ownedHats.has(h.id) ? ' free' : '');
+      pr.textContent = priceText(h);
+    }
+  };
+
+  const SECTIONS: Array<[string, string, (h: Hat) => boolean]> = [
+    ['🎉 START HERE', 'yours already', (h) => h.tier === 'free'],
+    ['🎩 THE COLLECTION', 'one tap, any void', (h) => h.tier === 'plus'],
+    ['✨ LEGENDARY', 'these ones talk back', (h) => h.tier === 'legendary'],
+  ];
+  for (const [title, sub, pick] of SECTIONS) {
+    const head = document.createElement('div');
+    head.className = 'hatSect';
+    head.innerHTML = `<b>${title}</b> ${sub} <span></span>`;
+    grid.appendChild(head);
+    for (const h of HATS.filter(pick)) {
+      const card = document.createElement('div');
+      card.className = 'hatCard' + (h.tier === 'legendary' ? ' leg' : '');
+      card.innerHTML = `<canvas id="hatcv_${h.id}"></canvas>`
+        + `<div class="hn">${h.name}</div><div class="hb">${h.blurb}</div><div class="hp"></div>`;
+      card.addEventListener('click', () => onHatTap(h));
+      hatCards.set(h.id, card);
+      grid.appendChild(card);
+    }
+  }
+
+  function onHatTap(h: Hat): void {
+    // OWNED: tapping is wearing, and tapping the worn one takes it off. No
+    // confirm step — a cosmetic that costs nothing to change should cost
+    // nothing to try, and the void behind the shop updates live so the tap IS
+    // the preview.
+    if (ownedHats.has(h.id)) {
+      wearHat(wornHat === h.id ? null : h.id);
+      audio.evolve(); refreshHats();
+      track('hat_wear', { hat: h.id, on: wornHat === h.id });
+      return;
+    }
+    if (h.tier === 'free') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
+    const pr = hatCards.get(h.id)?.querySelector('.hp') as HTMLElement | undefined;
+    const usd = h.usd ?? 0;
+    // the same parental gate the skins use — App Review expects it and a
+    // six-year-old should not be able to reach a payment sheet unaided
+    askGrownUp(() => {
+      if (pr) pr.textContent = '…';
+      void iapPurchase(h.id, usd).then((res) => {
+        if (res === 'started') { if (pr) pr.textContent = 'CONFIRM IN THE APP STORE…'; return; }
+        if (res === 'granted') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
+        if (pr) {
+          pr.textContent = res === 'unavailable' ? 'COMING TO THE APP STORE'
+            : res === 'not_ready' ? 'THE STORE IS BUSY' : 'COULD NOT BUY';
+        }
+        audio.hit();
+        setTimeout(refreshHats, 2000);
+      });
+    });
+  }
+
+  // ── TABS ──────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.shopTab').forEach((t) => t.addEventListener('click', () => {
+    const tab = (t as HTMLElement).dataset.tab;
+    document.querySelectorAll('.shopTab').forEach((o) => o.classList.toggle('on', o === t));
+    const hats = tab === 'hats';
+    skinGrid.style.display = hats ? 'none' : '';
+    grid.style.display = hats ? '' : 'none';
+    if (hats) paintThumbs();
+    track('shop_tab', { tab });
+  }));
+
+  /** StoreKit restored a purchase, or granted one: it may be a hat. */
+  _dbg.__grantHats = (ids: string[]) => {
+    let any = false;
+    for (const id of ids) if (HAT_BY_ID[id] && !ownedHats.has(id)) { ownedHats.add(id); any = true; }
+    if (any) { saveHats(); refreshHats(); }
+  };
+  refreshHats();
 }
 
 // ── HIT-STOP ───────────────────────────────────────────────────────────────

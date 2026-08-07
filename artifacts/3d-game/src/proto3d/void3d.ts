@@ -28,6 +28,8 @@ export interface Void3D {
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   /** Wear a hat, or null for none. Independent of the skin — see hats.ts. */
   setHat(id: string | null): void;
+  /** What is on its head right now — the hat's voice lines read this. */
+  readonly hatId: string | null;
   setMood(m: Mood): void;    // the emotional state machine's current state
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
@@ -1060,6 +1062,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
       stage = n;
     },
+    get hatId() { return wornHatId; },
     setHat(id) {
       if (id === wornHatId) return;
       if (wornHat) wornHat.visible = false;
