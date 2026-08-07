@@ -22,7 +22,7 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 
 | probe | answers |
 |---|---|
-| `pace.mjs` | Does a match accelerate or die? Eats/sec, dead time, travel-per-eat, radius and score in 20s windows, plus headline cadence. **The single most useful probe in here.** |
+| `pace.mjs` | Does a match accelerate or die? Eats/sec, dead time, travel-per-eat, radius and score in 20s windows, plus headline cadence. **The single most useful probe in here** — and it steered 45° off target until 2026-08-07, so every pacing number predating that is inflated. See the note below. |
 | `sizes.mjs` | What can a LATE void eat? Radius histogram + the biggest objects in the world. A world with nothing above r4 has no last minute. |
 | `dens.mjs` | Objects per 100u² of legal ground, per district. "It feels empty" as a number. |
 | `replay.mjs` | Will it stick? Diffs headlines, crowd lines, beats and rivals across N full matches, and counts repeats *within* one match. |
@@ -45,6 +45,36 @@ Worlds are `maple,pirate,gameday,lantern`. Output images land in `qa-out/`.
 | `rematch.mjs` | The two bugs that only exist on the **second** match or **after a pause**: a retired mover resurrected at the world origin by `resetMatch`, and the rival schedule drifting because it ran off wall time instead of the match clock. Both were invisible to a one-match playtest. |
 | `smoke.mjs` | Does a build boot, load its assets, grow, eat and make a sound? `node qa/smoke.mjs [world] [port]`. Separates **expected** CDN-blocked `/assets/hf*` failures from real same-origin ones and fails only on the second kind — run it against two ports to compare builds. |
 | `fresh.mjs` | Does the crowd's per-pool recency guard actually work? Drives the **shipped** `__pickFresh` 100k times per pool size and reports immediate repeats, repeats inside the guard's own ring, closest recurrence, and distribution skew — the last so a guard that bought freshness by developing favourites cannot pass. |
+
+## The pace.mjs baseline, and why the old one was wrong
+
+The autopilot fed a WORLD direction straight into a SCREEN joystick. The play
+camera is isometric — `camOffset` is (0.62, 0.92, 0.62), X and Z equal — so
+screen-forward is world (-1,-1)/√2 and the driver ran a constant 45° off. It
+still converged (retargeting each frame turns an angular bias into a spiral)
+but walked 1/cos45 = 1.41× further than a straight line to reach anything, so
+travel-per-eat read ~41% high, eats/sec correspondingly low, and dead time
+overstated. Every world was tuned against that.
+
+Corrected baseline, one 3-minute match each, autopilot at 0° error:
+
+| world | eaten | score | dead time | travel/eat | headlines |
+|---|---|---|---|---|---|
+| Maple Falls | 3,514 | 237,784 | 0.2% | 1.9u | 16 |
+| Pirate Bay | ~3,900 | 277,013 | ~0.3% | ~1.6u | 18 |
+| Game Day | 4,666 | 475,640 | 0.4% | 1.4u | 20 |
+| Lantern Night | 4,530 | 369,730 | 1.2% | 1.5u | 21 |
+
+Two things fall out. **No world is empty** — 0.2–1.2% dead time, so the
+density worries the old numbers implied were an artifact of the bug, and
+nothing needs more props. And **Maple Falls is the weakest level on every
+axis, while being world 1**: fewest eats, lowest score, highest travel per
+eat, fewest headlines. A child scores half on their first level what they
+score on Game Day for the same skill — and Maple is also the only world whose
+`heroCue`/`heroCueNews`/`heroGone` are null, so it has no finale either.
+
+These are a CEILING, not a typical run. The driver is now genuinely optimal;
+no child eats 3,514 things in three minutes.
 
 ## Debug hooks these rely on
 
