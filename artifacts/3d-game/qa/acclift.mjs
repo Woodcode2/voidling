@@ -12,6 +12,31 @@
 //
 // A seat of 1.00 means the part is touching a unit-radius body. Below 1.00 it
 // is buried; above ~1.05 there is daylight under a hat.
+//
+// ── WHAT IT ACTUALLY FOUND, AND IT IS A NEGATIVE RESULT ────────────────────
+// The mechanism is real and the arithmetic confirms it exactly — every seat
+// comes back as precisely the LOD factor times its unscaled value (king
+// -0.337 * 1.42 = -0.479, unicorn 0.556 * 1.25 = 0.695). The LOD does move
+// positions, not just sizes.
+//
+// It does NOT detach the accessories, because none of the seven is seated
+// anywhere near the surface. Measured lowest points, unscaled: dragon -1.00,
+// king -0.34, ninja -0.24, dino -0.16, unicorn +0.56 — all of them either
+// wrap the body from below centre or sit deep inside a unit sphere. Scaling
+// outward from the centre by 1.42 moves them FURTHER OUT, which for a
+// wrap-around part is the right behaviour and for a buried one makes it
+// slightly less buried. Nothing lifts off.
+//
+// SO THIS IS A HAZARD FOR HATS, NOT A BUG IN THE FIVE LEGENDARIES. A hat
+// authored the obvious way — brim resting ON the head, base at y ~ 0.95 —
+// goes to y ~ 1.35 at full LOD, which is a third of a body radius of daylight
+// under it. The existing accessories are safe by accident of how deeply they
+// are seated. Keep this probe green as hats are added: anything whose
+// unscaled lowest point is above ~0.75 needs the LOD applied about its own
+// seat rather than about the body's centre.
+//
+// (wizard and mecha report no part: this matches accessory groups by name and
+// those two are not named. Unmeasured, not passed.)
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
