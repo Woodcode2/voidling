@@ -14,7 +14,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, type WorldId } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, type WorldId } from './proto3d/island';
 import { createLife, pickFresh } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
@@ -345,6 +345,73 @@ function fitShadow(dist: number) {
   sun.shadow.camera.updateProjectionMatrix();
 }
 scene.add(sun); scene.add(sun.target);
+
+// ══ NOTHING STANDS IN FRONT OF THE HERO ════════════════════════════════════
+//
+// Measured before this existed: 3-13% of sampled frames per world hid a
+// quarter or more of the void behind scenery, and both Maple and Lantern
+// produced a frame inside the first FORTY SECONDS where it was 100% invisible.
+// The void is the character and the only thing on screen that is the child.
+//
+// The test is a CYLINDER along the camera-to-hero segment, not a raycast:
+// raycasting into ~10,900 meshes every frame is not affordable, and a cylinder
+// is both cheaper and kinder — it catches the prop about to clip the void's
+// edge, which is the case that actually looks wrong, rather than only the one
+// dead centre.
+//
+// Costs one pass over the edibles, which the frame already walks several
+// times, and skips almost everything on a cheap squared-distance test first.
+const _foCam = new THREE.Vector3(), _foDir = new THREE.Vector3(), _foTo = new THREE.Vector3();
+const _foFading = new Set<THREE.Object3D>();
+const _foPrev = new Set<THREE.Object3D>();
+/** how fast a prop dissolves and comes back, in fade units per second */
+const FO_RATE = 5.5;
+function fadeOccluders(dt: number): void {
+  const heroX = voidState.x, heroZ = voidState.z, heroY = voidling.group.position.y;
+  _foCam.copy(camera.position);
+  _foTo.set(heroX - _foCam.x, heroY - _foCam.y, heroZ - _foCam.z);
+  const camToHero = _foTo.length();
+  if (camToHero < 1) return;
+  _foDir.copy(_foTo).multiplyScalar(1 / camToHero);
+  // the void's world radius, plus a margin so a prop clipping its edge counts
+  const shield = voidling.radius * 1.35 + 1.2;
+  // only props whose CENTRE is nearer the camera than the hero can occlude it,
+  // so the search never needs to look past the hero
+  _foPrev.clear();
+  for (const o of _foFading) _foPrev.add(o);
+  _foFading.clear();
+  for (const e of edibles) {
+    if (e.eaten) continue;
+    const m = e.mesh;
+    if (!m.visible || m.userData.fade === undefined) continue;
+    const px = m.position.x - _foCam.x, py = m.position.y - _foCam.y, pz = m.position.z - _foCam.z;
+    // distance ALONG the camera->hero axis
+    const t = px * _foDir.x + py * _foDir.y + pz * _foDir.z;
+    if (t <= 0 || t >= camToHero) continue;          // behind the camera, or past the hero
+    // perpendicular distance from that axis
+    const cx = px - _foDir.x * t, cy = py - _foDir.y * t, cz = pz - _foDir.z * t;
+    const perp2 = cx * cx + cy * cy + cz * cz;
+    const reach = shield + (e.radius || 1);
+    if (perp2 > reach * reach) continue;
+    _foFading.add(m);
+  }
+  // EASE, DO NOT SNAP. A prop that pops to 30% and back as the void slides
+  // past reads as a rendering fault; half a second of dissolve reads as the
+  // camera being polite. Everything that stopped occluding this frame is
+  // walked back up by the same rate.
+  const step = FO_RATE * Math.min(dt, 0.05);
+  for (const m of _foFading) {
+    const cur = (m.userData.fade as number) ?? 1;
+    setMeshFade(m, Math.max(0.28, cur - step));
+  }
+  for (const m of _foPrev) {
+    if (_foFading.has(m)) continue;
+    const cur = (m.userData.fade as number) ?? 1;
+    const next = Math.min(1, cur + step);
+    setMeshFade(m, next);
+    if (next < 1) _foFading.add(m);   // keep easing it back next frame
+  }
+}
 
 // ── adaptive quality: hold a smooth frame rate on ANY device ─────────────────
 // samples real fps and walks a quality ladder (pixel ratio → shadow res →
@@ -4752,6 +4819,7 @@ function animate() {
   // LOD band + shadow frustum track the camera
   updateLodBias(camDist);
   fitShadow(camDist);
+  fadeOccluders(dt);
 
   // adaptive quality: step down fast when fps dips, climb back slowly
   qAccT += dt; qAccN++; qCd -= dt;

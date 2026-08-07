@@ -2990,6 +2990,78 @@ export const PROP_SHARED_MAT = new THREE.MeshStandardMaterial({ vertexColors: tr
 // canopies below. Cost is one extra shader program; draw calls are unchanged,
 // because every merged prop was already its own mesh.
 export const PROP_SMOOTH_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: false });
+
+// ══ FADING WHATEVER IS STANDING IN FRONT OF THE HERO ═══════════════════════
+//
+// Measured: 3-13% of sampled frames per world hid a quarter or more of the
+// void behind scenery, and Maple and Lantern each produced a frame inside the
+// first FORTY SECONDS where the void was 100% invisible. The void is the
+// character, the thing the child is steering and the only thing on screen that
+// is them. Losing it behind a warehouse is the worst thing the renderer does.
+//
+// TWO CONSTRAINTS SHAPE THIS.
+//   Every prop shares ONE of two materials — that is what keeps the draw
+//   calls down — so per-prop material.opacity would fade the entire island.
+//   And alpha blending would drag ~5,700 props into the transparent queue and
+//   sort them every frame, which is a real cost for a cosmetic effect.
+// So: an ORDERED DITHER DISCARD driven by a per-mesh uniform. Uniforms upload
+// per draw call even on a shared program, so onBeforeRender can give each mesh
+// its own fade without cloning a material or touching the render order. It
+// stays fully opaque, fully sorted, and costs one uniform write per occluder.
+//
+// A 4x4 Bayer matrix rather than noise: at 1-2 device pixels per cell it reads
+// as a soft screen-door rather than as sparkle, and unlike hash noise it does
+// not crawl when the camera moves.
+const FADE_PARS = `
+uniform float uFade;
+float voidBayer(vec2 p) {
+  int x = int(mod(p.x, 4.0)), y = int(mod(p.y, 4.0));
+  int i = x + y * 4;
+  if (i == 0) return 0.0000; if (i == 1) return 0.5000; if (i == 2) return 0.1250; if (i == 3) return 0.6250;
+  if (i == 4) return 0.7500; if (i == 5) return 0.2500; if (i == 6) return 0.8750; if (i == 7) return 0.3750;
+  if (i == 8) return 0.1875; if (i == 9) return 0.6875; if (i == 10) return 0.0625; if (i == 11) return 0.5625;
+  if (i == 12) return 0.9375; if (i == 13) return 0.4375; if (i == 14) return 0.8125;
+  return 0.3125;
+}
+`;
+const FADE_BODY = `
+  if (uFade < 0.995 && uFade <= voidBayer(gl_FragCoord.xy)) discard;
+`;
+/** Give a material the per-mesh fade. Safe to call once per material. */
+export function installFade(m: THREE.Material): void {
+  if ((m as { _hasFade?: boolean })._hasFade) return;
+  (m as { _hasFade?: boolean })._hasFade = true;
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uFade = { value: 1 };
+    shader.fragmentShader = FADE_PARS + shader.fragmentShader.replace(
+      'void main() {', 'void main() {' + FADE_BODY);
+    (m as { userData: Record<string, unknown> }).userData.shader = shader;
+  };
+  // a material whose program changed needs recompiling
+  m.needsUpdate = true;
+}
+installFade(PROP_SHARED_MAT);
+installFade(PROP_SMOOTH_MAT);
+// EVERY prop carries this hook, not just the ones currently fading. A uniform
+// on a shared program keeps whatever the last draw wrote, so a mesh with no
+// hook would inherit the previous occluder's 0.3 and disappear — the bug this
+// whole feature exists to prevent, applied to the entire island. One shared
+// function object, no per-frame allocation, and userData.fade defaults to 1.
+const _fadeHook = function (this: THREE.Object3D) {
+  const m = (this as THREE.Mesh).material as { userData?: { shader?: { uniforms: Record<string, { value: number }> } } } | undefined;
+  const sh = m?.userData?.shader;
+  if (sh) sh.uniforms.uFade.value = (this.userData.fade as number | undefined) ?? 1;
+};
+/** Attach the fade hook. Called once per prop, at build time. */
+export function armFade(o: THREE.Object3D): void {
+  o.userData.fade = 1;
+  o.onBeforeRender = _fadeHook;
+}
+/** Per-frame: hand a prop its fade. 1 = solid, 0 = gone. */
+export function setMeshFade(o: THREE.Object3D, fade: number): void {
+  o.userData.fade = fade;
+  if (o.onBeforeRender !== _fadeHook) o.onBeforeRender = _fadeHook;
+}
 const _pc = new THREE.Color();
 export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -3012,7 +3084,9 @@ export const PROP_GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true })
 export function mergedProp(parts: THREE.BufferGeometry[], mat: THREE.Material = PROP_SHARED_MAT): THREE.Mesh {
   const merged = mergeGeometries(parts, false)!;
   parts.forEach((pg) => pg.dispose());
-  return new THREE.Mesh(merged, mat);
+  const m = new THREE.Mesh(merged, mat);
+  armFade(m);   // see installFade — every prop must write the uniform, not just fading ones
+  return m;
 }
 
 // AUTUMN, and it is not decoration. docs/GAMEDAY.md opens on "low warm sun,
