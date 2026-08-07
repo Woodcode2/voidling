@@ -430,16 +430,39 @@ let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
  *  See __pinQuality — a moving ladder makes every graphics measurement a
  *  reading from a rung nobody chose. */
 let qPinned: number | null = null;
+/** Shadows have been turned off once this session. Crossing that boundary
+ *  rebuilds every shader program, so it is a ONE-WAY DOOR: a device weak
+ *  enough to need the bottom rung does not benefit from being handed a
+ *  1,677 ms rebuild every time it briefly recovers. */
+let qShadowLatch = false;
 function applyQuality() {
   const q = QUALITY[qLevel];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? q.prSmall : q.pr));
   if (renderer.shadowMap.enabled !== q.shadows) {
+    // ── THE MOST EXPENSIVE THING IN THE GAME, AND IT FIRES WHEN THE DEVICE
+    //    IS ALREADY STRUGGLING ────────────────────────────────────────────
+    // three bakes shadow support into the compiled program, so flipping
+    // shadowMap.enabled invalidates every material and rebuilds ~45 shader
+    // programs across a 10,869-mesh scene. Measured: a 1,677 ms frame and
+    // 3,190 ms of extra work spread over the next 60 frames — and it was
+    // reachable in BOTH directions roughly every 14 seconds, triggered BY the
+    // frame rate dropping. Frames drop, the ladder demotes, the demotion
+    // freezes for over a second, frames drop.
+    //
+    // Two changes break the loop. This one stops walking 10,869 meshes to
+    // reach ~45 distinct materials: needsUpdate is per MATERIAL, and the whole
+    // island shares two of them. The other is the latch below — crossing this
+    // boundary is now one-way, so the rebuild happens at most once a session
+    // instead of ping-ponging.
     renderer.shadowMap.enabled = q.shadows;
     sun.castShadow = q.shadows;
+    if (!q.shadows) qShadowLatch = true;
+    const seen = new Set<THREE.Material>();
     scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
-      if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
+      if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { seen.add(mm); });
     });
+    seen.forEach((mm) => { mm.needsUpdate = true; });
   }
   if (sun.shadow.mapSize.x !== q.shSize) {
     sun.shadow.mapSize.set(q.shSize, q.shSize);
@@ -4879,7 +4902,15 @@ function animate() {
   if (qPinned === null && qCd <= 0 && qAccT > 0) {
     const avg = qAccN / qAccT; qAccN = 0; qAccT = 0;
     if (avg < 46 && qLevel < QUALITY.length - 1) { qLevel++; applyQuality(); qCd = 4; }
-    else if (avg > 57 && qLevel > 0) { qLevel--; applyQuality(); qCd = 10; }
+    else if (avg > 57 && qLevel > 0) {
+      // climbing back is free EXCEPT across the shadow boundary, which costs a
+      // full shader rebuild. Once shadows have gone off, they stay off: the
+      // pixel-ratio rungs above still give the device its quality back, and
+      // they cost nothing to cross.
+      const up = qLevel - 1;
+      if (qShadowLatch && QUALITY[up].shadows && !QUALITY[qLevel].shadows) { qCd = 10; }
+      else { qLevel = up; applyQuality(); qCd = 10; }
+    }
     else qCd = 3;
   }
 
