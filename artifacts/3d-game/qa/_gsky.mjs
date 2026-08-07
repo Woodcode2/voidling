@@ -37,10 +37,13 @@ for (const wid of WORLDS) {
     const res = { dpr: devicePixelRatio, pr: R.getPixelRatio(),
       css: [innerWidth, innerHeight], buf: [R.domElement.width, R.domElement.height],
       panel: [innerWidth * devicePixelRatio, innerHeight * devicePixelRatio], sky: [] };
+    // buffer size is read above; from here the probe is geometry-only, so stop
+    // drawing — swiftshader at DPR 3 is otherwise minutes per sample
+    R.render = () => {};
     const list = []; window.__scene.traverse(o => { if (o.isMesh && o.visible && o.geometry) list.push(o); });
     for (const r of [1.2, 5, 12]) {
       window.__setVoidR(r);
-      await new Promise(res2 => setTimeout(res2, 2200));
+      await new Promise(res2 => setTimeout(res2, 900));
       const rc = new T.Raycaster(); rc.far = 4000;
       let hit = 0, miss = 0;
       const N = 21;
@@ -54,6 +57,27 @@ for (const wid of WORLDS) {
       const d = cam.position.distanceTo(new T.Vector3(vs.x, 0, vs.z));
       // three's points shader: gl_PointSize = size * (scale / -mvPosition.z), scale = h/2
       const px = 2.1 * ((innerHeight * R.getPixelRatio()) / 2) / d;
+      if (r === 5) {
+        // the biggest (geometry,material) repeat group in the world, and how
+        // many of its members are actually inside the play frustum — the only
+        // form in which "instance the repeated props" could pay
+        const pairs = new Map();
+        window.__scene.traverse(o => {
+          if (!o.isMesh || !o.visible || !o.geometry || o.isInstancedMesh) return;
+          const k = o.geometry.uuid + '|' + (Array.isArray(o.material) ? o.material.map(m => m.uuid).join(',') : o.material?.uuid);
+          const a = pairs.get(k) || []; a.push(o); pairs.set(k, a);
+        });
+        const big = [...pairs.values()].sort((a, c) => c.length - a.length)[0] || [];
+        cam.updateMatrixWorld();
+        const fr = new T.Frustum().setFromProjectionMatrix(
+          new T.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+        let inFrame = 0; const bb2 = new T.Box3();
+        for (const o of big) { bb2.setFromObject(o); if (fr.intersectsBox(bb2)) inFrame++; }
+        res.repeat = { n: big.length, inFrame,
+          tris: big[0] ? (big[0].geometry.index ? big[0].geometry.index.count : big[0].geometry.attributes.position.count) / 3 : 0,
+          name: big[0]?.name || big[0]?.parent?.name || 'unnamed',
+          mat: big[0] ? (Array.isArray(big[0].material) ? big[0].material[0].type : big[0].material.type) : '' };
+      }
       res.sky.push({ r, skyPct: +(100 * miss / (hit + miss)).toFixed(1), camDist: +d.toFixed(0),
         puffPx: +px.toFixed(1), puffCssPx: +(px / R.getPixelRatio()).toFixed(1) });
     }
@@ -65,6 +89,7 @@ for (const wid of WORLDS) {
   console.log(`  the 3D is rendered at ${(100 * out.buf[0] * out.buf[1] / (out.panel[0] * out.panel[1])).toFixed(0)}% of the panel's pixels and upscaled ${(out.panel[0] / out.buf[0]).toFixed(2)}x`);
   for (const s of out.sky)
     console.log(`  r=${String(s.r).padEnd(4)} camDist ${String(s.camDist).padStart(3)}u   SKY ${String(s.skyPct).padStart(5)}% of the frame   eat puff ${s.puffCssPx} CSS px (${s.puffPx} device px)`);
+  if (out.repeat) console.log(`  biggest repeat group: ${out.repeat.n} identical meshes (${out.repeat.tris} tris, ${out.repeat.mat}, "${out.repeat.name}") — ${out.repeat.inFrame} of them inside the play frustum at r=5`);
   await p.close();
 }
 await b.close();

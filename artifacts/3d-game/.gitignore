@@ -1,6 +1,9 @@
 
 # QA probe output
 qa-out/
-qa-out/
-dist-nomin/
-dist-count/
+
+# SCRATCH BUILDS. An agent comparing two renders builds a second dist beside
+# the real one; each is ~41 MB and none of them belong in history. Two got
+# committed by a `git add -A` earlier in this project's life, once as roughly
+# 400 files. One pattern instead of naming them one at a time as they appear.
+dist-*/
