@@ -31,6 +31,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT, PROP_SMOOTH_MAT } from './island';
+import { registerGloss } from './gloss';
 
 type G = THREE.BufferGeometry;
 
@@ -66,6 +67,23 @@ const G_GREEN = 0x9effb4;    // the shrine's few green votives, and fireflies
 const G_BLUE = 0x8ad4ff;     // the spirit-blue votives on the shrine stair
 const G_GRIDDLE = 0xff6a2a;  // a stall's cooking surface — the hottest colour
 const G_WINDOW = 0xffd489;   // the bathhouse's windows
+
+// ── WHAT CATCHES THE MOON ─────────────────────────────────────────────────
+// See installPropShader in island.ts. The palette note above is right that an
+// object's local colour barely survives at night — which is exactly why this
+// world had the most to lose from a flat 0.85 roughness. When the diffuse is
+// nearly gone, the SPECULAR is the shape: a glazed roof tile, a wet stone
+// step and a canal are all read from one cold streak of moonlight and nothing
+// else. This is the only rig in the game with no sun in it (moon at 0.42),
+// so nothing here goes chrome; it goes damp.
+//
+// TILE is the big one — a hundred-odd roofs, every one of them a ceramic
+// pantile — and it is the surface a night market is photographed by.
+// WATER runs highest because the canal is the only true mirror on the level.
+registerGloss([
+  [TILE, 0.46], [TILE_D, 0.40], [WATER, 0.82], [CHAR, 0.50],
+  [STONE, 0.24], [STONE_D, 0.20],
+]);
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(a: T[]): T => a[(Math.random() * a.length) | 0];

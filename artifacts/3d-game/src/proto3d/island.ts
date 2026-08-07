@@ -6,6 +6,7 @@
 // grid. Moving life is added separately (./life).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { glossOf, registerGloss } from './gloss';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WORLD, PROPS } from './palette';
 import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './assets3d';
@@ -3060,21 +3061,91 @@ float voidBayer(vec2 p) {
 const FADE_BODY = `
   if (uFade < 0.995 && uFade <= voidBayer(gl_FragCoord.xy)) discard;
 `;
-/** Give a material the per-mesh fade. Safe to call once per material. */
-export function installFade(m: THREE.Material): void {
+// ══ SPECULAR, PER VERTEX, INSIDE ONE MATERIAL ══════════════════════════════
+//
+// Measured on the shipping build with qa/_matte.mjs, triangle-weighted:
+//
+//              rough<0.6   metal>0.05
+//   maple          2.9%         2.0%     (its 30 road cars, and nothing else)
+//   pirate         3.7%         1.8%
+//   GAME DAY       0.2%         0.1%
+//   LANTERN        0.3%         0.2%
+//
+// Game Day is a STADIUM CAR PARK — two hundred trucks, aluminium bleachers,
+// chrome bumpers, a barrel smoker per pitch — rendered entirely at roughness
+// 0.85, metalness 0. Lantern Night is a night market whose glazed roof tiles
+// and canal cannot catch the moon. Both are cardboard, and they are the two
+// newest worlds precisely because the merged-prop kit made it easy to build
+// them fast out of one matte material.
+//
+// THE OBVIOUS FIX IS THE WRONG ONE. mergedProp bakes ONE material per prop, so
+// "give the bumper a metal material" means splitting every prop that has a
+// bumper into two meshes — and the whole reason this kit exists is that
+// downtown was measuring ~2250 draw calls a frame before it.
+//
+// So the surface property travels the way the COLOUR already does: per vertex.
+// part() writes one byte per vertex, mergeGeometries carries it through, and
+// the shader turns it into roughness and metalness. A truck can have a matte
+// painted door and a chrome bumper in ONE mesh, ONE material, ONE draw call.
+//
+// IT COSTS LESS THAN IT REPLACES. Every prop geometry has been carrying a `uv`
+// attribute since the kit was written — 8 bytes a vertex — and no prop
+// material samples a map, so not one of those bytes has ever been read.
+// Deleting uv and adding a normalized Uint8 is a net 7 bytes per vertex SAVED.
+//
+// METALNESS IS DELIBERATELY CAPPED AT 0.55, not 1. A metal has no diffuse
+// term: it is nothing but its reflections, and this scene's only reflection
+// source is a RoomEnvironment at intensity 0.15 (see prototype3d, where that
+// number is argued). Real chrome here would render as a black hole. At 0.55
+// the surface keeps 45% of its albedo — so it still reads as the colour a
+// child expects — and gains a tight tinted highlight off the key light, which
+// is the part that actually says "metal" at a 30-unit camera.
+// The table itself is in gloss.ts — a leaf module, for the import-cycle reason
+// written up there. This file owns the shader; that one owns the palette.
+//
+// These four are the SHARED palette, used by the prop kit in this file in
+// every world at once: the glazing on a downtown tower, a parked car's
+// windscreen, and the galvanised grey that every water tank, mast and pole in
+// the game is painted. They are registered here rather than in palette.ts so
+// that the whole specular story stays next to the shader that reads it.
+registerGloss([
+  [PROPS.towerGlass, 0.78], [PROPS.carGlass, 0.70],
+  [0xc8cdd8, 0.68], [0x3c4454, 0.45],
+]);
+/** Override the palette lookup for one part — for a colour that is metal HERE
+ *  and cushion fabric two props over. `p.push(glossy(part(...), 0.7))`. */
+export function glossy(g: THREE.BufferGeometry, s: number): THREE.BufferGeometry {
+  const a = g.getAttribute('aGloss') as THREE.BufferAttribute | undefined;
+  if (a) { (a.array as Uint8Array).fill(Math.round(Math.max(0, Math.min(1, s)) * 255)); a.needsUpdate = true; }
+  return g;
+}
+const GLOSS_PARS_V = 'attribute float aGloss;\nvarying float vGloss;\n';
+const GLOSS_PARS_F = 'varying float vGloss;\n';
+// three's meshphysical_frag runs roughnessmap_fragment then metalnessmap_fragment,
+// so appending after the second one has both factors in scope.
+const GLOSS_BODY = `
+  roughnessFactor = mix(roughnessFactor, 0.20, vGloss);
+  metalnessFactor = max(metalnessFactor, 0.55 * vGloss * vGloss);
+`;
+/** Patch a shared prop material: per-mesh fade + per-vertex specular.
+ *  Safe to call once per material. */
+export function installPropShader(m: THREE.Material): void {
   if ((m as { _hasFade?: boolean })._hasFade) return;
   (m as { _hasFade?: boolean })._hasFade = true;
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uFade = { value: 1 };
-    shader.fragmentShader = FADE_PARS + shader.fragmentShader.replace(
-      'void main() {', 'void main() {' + FADE_BODY);
+    shader.vertexShader = GLOSS_PARS_V + shader.vertexShader.replace(
+      'void main() {', 'void main() {\n  vGloss = aGloss;');
+    shader.fragmentShader = FADE_PARS + GLOSS_PARS_F + shader.fragmentShader
+      .replace('void main() {', 'void main() {' + FADE_BODY)
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>' + GLOSS_BODY);
     (m as { userData: Record<string, unknown> }).userData.shader = shader;
   };
   // a material whose program changed needs recompiling
   m.needsUpdate = true;
 }
-installFade(PROP_SHARED_MAT);
-installFade(PROP_SMOOTH_MAT);
+installPropShader(PROP_SHARED_MAT);
+installPropShader(PROP_SMOOTH_MAT);
 // EVERY prop carries this hook, not just the ones currently fading. A uniform
 // on a shared program keeps whatever the last draw wrote, so a mesh with no
 // hook would inherit the previous occluder's 0.3 and disappear — the bug this
@@ -3109,6 +3180,14 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
   const cols = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { cols[i * 3] = _pc.r; cols[i * 3 + 1] = _pc.g; cols[i * 3 + 2] = _pc.b; }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  // no prop material samples a map — see installPropShader. Dropping uv pays
+  // for aGloss twice over, and both have to happen HERE so every geometry
+  // reaching mergeGeometries carries the identical attribute set.
+  g.deleteAttribute('uv');
+  const gl = glossOf(col);
+  const spec = new Uint8Array(n);
+  if (gl) spec.fill(Math.round(gl * 255));
+  g.setAttribute('aGloss', new THREE.BufferAttribute(spec, 1, true));
   return g;
 }
 // unlit accent material: anything merged with this ignores the lighting, which
@@ -3165,6 +3244,17 @@ function bakeContactAO(geo: THREE.BufferGeometry): void {
   col.needsUpdate = true;
 }
 export function mergedProp(parts: THREE.BufferGeometry[], mat: THREE.Material = PROP_SHARED_MAT): THREE.Mesh {
+  // mergeGeometries returns null the moment two inputs disagree about which
+  // attributes exist, and a prop that vanishes is a much worse bug than a
+  // prop that is matte. Almost everything here comes from part(); this makes
+  // the handful of hand-built geometries agree with it rather than trusting.
+  for (const pg of parts) {
+    if (pg.getAttribute('uv')) pg.deleteAttribute('uv');
+    if (!pg.getAttribute('aGloss')) {
+      const n = pg.getAttribute('position').count;
+      pg.setAttribute('aGloss', new THREE.BufferAttribute(new Uint8Array(n), 1, true));
+    }
+  }
   const merged = mergeGeometries(parts, false)!;
   parts.forEach((pg) => pg.dispose());
   // …but NOT on the unlit accent material. A neon strip is neon because it

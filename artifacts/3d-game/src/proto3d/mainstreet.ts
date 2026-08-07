@@ -14,6 +14,7 @@
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
 import { part, mergedProp, PROP_SMOOTH_MAT } from './island';
+import { registerGloss } from './gloss';
 import { roundedBox } from './life';
 
 // ── determinism ────────────────────────────────────────────────────────────
@@ -139,6 +140,20 @@ const M = (p: G[]) => mergedProp(p);
  *  Deterministic: mrnd/mpick run off the seeded Maple RNG, so it is identical
  *  every load. */
 const ROOF_TAR = 0x4e5560, ROOF_DUCT = 0xaeb6c2, ROOF_VENT = 0x8b93a0;
+
+// ── WHAT SHINES IN MAPLE FALLS ────────────────────────────────────────────
+// See installPropShader in island.ts. Maple's 2.9% glossy triangles were its
+// thirty road cars and nothing else — the shopfronts, the diner, the water
+// tower and every window on Main Street were the same matte as the pavement.
+// NIGHTGLASS and GLASS are windows wherever they appear here; the NEONs are
+// signage that already glows, and a little sheen keeps the tube reading as a
+// tube rather than as a painted stripe.
+registerGloss([
+  [STEEL, 0.66], [DARKSTEEL, 0.58], [GLASS, 0.74], [NIGHTGLASS, 0.78],
+  [ROOF_DUCT, 0.55], [ROOF_VENT, 0.50],
+  [NEON_PINK, 0.30], [NEON_CYAN, 0.30], [NEON_GOLD, 0.30],
+]);
+
 function roofKit(p: G[], w: number, d: number, y: number, dense = 1): void {
   p.push(part(box(w - 0.7, 0.22, d - 0.7), ROOF_TAR, 0, y + 0.11, 0));   // membrane
   const jx = () => (mrnd() - 0.5) * (w - 3.2), jz = () => (mrnd() - 0.5) * (d - 3.2);

@@ -16,7 +16,8 @@
 //  happens when signage starts picking a winner.
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
-import { part, mergedProp, PROP_SMOOTH_MAT } from './island';
+import { part, mergedProp, PROP_SMOOTH_MAT, glossy } from './island';
+import { registerGloss } from './gloss';
 
 type G = THREE.BufferGeometry;
 
@@ -48,6 +49,24 @@ const BLUE = 0x3f7ac4;       // the other cooler
 const MEAT = 0xc2603f;       // sausages, chilli, the inside of a sub
 const BUN = 0xe0b070;        // bread
 const SMOKE = 0xd7d3cc;
+
+// ── WHICH OF THOSE COLOURS ARE METAL ──────────────────────────────────────
+// See installPropShader in island.ts. Two of these names mean metal EVERY time
+// they are used — that is what they were defined for — so registering them
+// puts a highlight on every bleacher rail, canopy leg, mast and grill leg in
+// the level without touching a single call site.
+// GOLD is the team colour, so it is paint on a truck and anodised trim on a
+// trophy; half a point of gloss is the honest average and it is what makes
+// crimson-and-gold read as a football lot rather than as two flat swatches.
+// CHAR is tyres AND screens AND grills — barely lifted, because a matte tyre
+// is right and a dead-flat screen is not.
+// The last four are the one-off glazing tints: every hex here is a window in
+// this file and nothing else, so they can go in the table rather than the
+// call sites. Glass is the single loudest specular in a car park at 4pm.
+registerGloss([
+  [ALU, 0.72], [STEEL, 0.62], [GOLD, 0.50], [GOLD_L, 0.42], [CHAR, 0.18],
+  [0x33414f, 0.78], [0x3d4c5c, 0.78], [0x9fd0e0, 0.70], [0xbfe6f2, 0.70],
+]);
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(a: T[]): T => a[(Math.random() * a.length) | 0];
@@ -258,13 +277,17 @@ export function makeTailgateTruck(): THREE.Group {
   // At 3-in-6 with a 200-vehicle lot, 33 teal trucks read as a second team
   // parked in the middle of the home lot rather than as a few visiting fans.
   const col = pick([CRIM, CRIM, CRIM, CRIM, NAVY, WHITE, CREAM, TEAL]);
+  // BODY PANELS TAKE THE PAINT GLOSS, the bed and the tailgate do not: a truck
+  // in a car park is waxed on top and scuffed where the coolers go, and the
+  // difference between those two surfaces is most of what stops two hundred
+  // identical trucks reading as two hundred identical boxes.
   const p: G[] = [
-    part(new THREE.BoxGeometry(5.9, 0.9, 2.4), col, 0, 1.35, 0),
-    part(new THREE.BoxGeometry(2.3, 1.35, 2.3), col, 0.55, 2.4, 0),
-    part(new THREE.BoxGeometry(2.05, 0.62, 2.36), 0x33414f, 0.6, 2.52, 0),      // glazing band
-    part(new THREE.BoxGeometry(1.8, 0.78, 2.3), col, 2.5, 1.98, 0),             // bonnet
+    glossy(part(new THREE.BoxGeometry(5.9, 0.9, 2.4), col, 0, 1.35, 0), 0.42),
+    glossy(part(new THREE.BoxGeometry(2.3, 1.35, 2.3), col, 0.55, 2.4, 0), 0.42),
+    glossy(part(new THREE.BoxGeometry(2.05, 0.62, 2.36), 0x33414f, 0.6, 2.52, 0), 0.75),  // glazing band
+    glossy(part(new THREE.BoxGeometry(1.8, 0.78, 2.3), col, 2.5, 1.98, 0), 0.42),         // bonnet
     part(new THREE.BoxGeometry(0.2, 0.5, 2.0), CHAR, 3.44, 1.85, 0),            // grille
-    part(new THREE.BoxGeometry(0.34, 0.36, 2.5), STEEL, 3.44, 1.2, 0),          // bumper
+    glossy(part(new THREE.BoxGeometry(0.34, 0.36, 2.5), STEEL, 3.44, 1.2, 0), 0.9),       // chrome bumper
   ];
   for (const sz of [-0.78, 0.78]) p.push(part(new THREE.BoxGeometry(0.16, 0.26, 0.5), GOLD_L, 3.46, 2.2, sz));
   // the bed, and the tailgate folded out flat — which is the whole point of
@@ -742,11 +765,11 @@ export function makeBlockingSled(): THREE.Group {
 /** Motorhome with the awning out, a dish and deck chairs, ~12 long. */
 export function makeRV(): THREE.Group {
   const p: G[] = [
-    part(new THREE.BoxGeometry(10.4, 3.0, 3.2), CREAM, -0.4, 2.4, 0),
+    glossy(part(new THREE.BoxGeometry(10.4, 3.0, 3.2), CREAM, -0.4, 2.4, 0), 0.40),
     part(new THREE.BoxGeometry(10.6, 0.3, 3.4), CRIM, -0.4, 3.95, 0),               // roof cap
     part(new THREE.BoxGeometry(10.5, 0.4, 3.3), CRIM, -0.4, 2.2, 0),                // waist stripe
     part(new THREE.BoxGeometry(10.5, 0.16, 3.3), GOLD, -0.4, 1.94, 0),
-    part(new THREE.BoxGeometry(1.8, 2.0, 3.1), CREAM, 5.4, 2.1, 0, 0, 0, 0.12),     // cab
+    glossy(part(new THREE.BoxGeometry(1.8, 2.0, 3.1), CREAM, 5.4, 2.1, 0, 0, 0, 0.12), 0.40),  // cab
     part(new THREE.BoxGeometry(0.4, 1.2, 2.9), 0x3d4c5c, 6.2, 2.5, 0, 0, 0, 0.12),  // windscreen
     part(new THREE.BoxGeometry(0.6, 0.5, 3.2), STEEL, 6.3, 1.1, 0),
     part(new THREE.BoxGeometry(1.4, 0.5, 2.0), ALU, -2.0, 4.3, 0),                  // air con
@@ -942,9 +965,9 @@ export function makeTailgateTv(): THREE.Group {
 export function makeFoodTruck(): THREE.Group {
   const body = pick([WHITE, CREAM, TEAL, GOLD]);
   const p: G[] = [
-    part(new THREE.BoxGeometry(6.4, 2.5, 2.5), body, 0, 1.85, 0),
+    glossy(part(new THREE.BoxGeometry(6.4, 2.5, 2.5), body, 0, 1.85, 0), 0.40),
     part(new THREE.BoxGeometry(6.5, 0.4, 2.56), CRIM, 0, 3.2, 0),          // roof band
-    part(new THREE.BoxGeometry(2.0, 1.7, 2.4), body, 3.4, 1.5, 0),          // cab
+    glossy(part(new THREE.BoxGeometry(2.0, 1.7, 2.4), body, 3.4, 1.5, 0), 0.40),   // cab
     part(new THREE.BoxGeometry(0.14, 0.9, 2.2), 0xbfe6f2, 4.35, 1.9, 0),    // windscreen
     part(new THREE.BoxGeometry(2.2, 0.3, 2.5), CHAR, 3.4, 0.6, 0),
     // the hatch, and the counter under it

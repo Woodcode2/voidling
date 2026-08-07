@@ -12,6 +12,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 import { part, mergedProp } from './island';
+import { registerGloss } from './gloss';
 
 type G = THREE.BufferGeometry;
 
@@ -41,6 +42,18 @@ const CHAR = 0x2a2430;       // near-black: flags, tyres, gun ports
 const SAND = 0xeed9a0;
 const MAROON = 0xa8544a;     // antifouling below the waterline
 const ICE = 0xd8f0f6;
+
+// ── WHAT SHINES ON PIRATE BAY ─────────────────────────────────────────────
+// See installPropShader in island.ts. A resort is glass and polished metal
+// and water, and this level had 3.7% of its triangles able to show any of it
+// — nearly all of that the lagoon, none of it the props sitting in it.
+// Treasure runs highest: gold that cannot catch the light is a yellow box,
+// and a chest of yellow boxes is the one prop in this game a six-year-old is
+// most certain they already know the look of.
+registerGloss([
+  [GOLD, 0.62], [GOLD_B, 0.78], [GLASS, 0.80], [AQUA, 0.62], [TURQ, 0.58],
+  [MARBLE, 0.34], [SLATE, 0.20], [ICE, 0.50],
+]);
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(a: T[]): T => a[(Math.random() * a.length) | 0];
