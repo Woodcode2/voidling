@@ -574,7 +574,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     n: 1, icon: '🍁', sub: 'the little void is hungry · eat the town',
     newsGap: [16, 8], signOn: 6, hero: null, introLen: 2.2,
     ender: '🌑 WORLD ENDER! The town is OVER.',
-    enderNews: 'MAPLE FALLS has GONE!! The clock is still eleven minutes fast.',
+    enderNews: 'MAPLE FALLS has GONE!! The clock is still nine minutes fast.',
     houseNews: 'A whole house has gone. Town hall will discuss it for four hours.',
     rivalGoneNews: 'One void has eaten the other. There is one left, and it is bigger.',
     rivalFullNews: 'The second void has stopped moving. It looks full. It looks slow.',
