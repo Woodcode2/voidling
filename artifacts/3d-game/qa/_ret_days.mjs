@@ -57,9 +57,11 @@ for (let d = 0; d < DAYS; d++) {
     };
   });
   // claim, the way a child would
+  // NOT p.click(): the CLAIM button never stops animating, so Playwright's
+  // stability check times out on it forever. A thumb has no such problem.
   if (s.dailyShown) {
-    await p.click('#dailyClaim');
-    await p.waitForTimeout(1200);
+    await p.evaluate(() => document.getElementById('dailyClaim').click());
+    await p.waitForTimeout(1500);
   }
   const after = await p.evaluate(() => ({
     coins: Number(localStorage.getItem('voidCoins') || 0),

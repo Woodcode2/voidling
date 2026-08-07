@@ -29,8 +29,8 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show')
   .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-await p.click('#btnPlay'); await p.waitForTimeout(1500);
-await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
+await p.click('#btnPlay', { timeout: 300000, force: true }); await p.waitForTimeout(2500);
+await p.click(`#worldRow .wCard[data-world="${WORLD}"]`, { timeout: 300000, force: true });
 // TRAP 1, applied hard. At deviceScaleFactor 3 the swiftshader draw is the
 // whole frame budget, and every wait in this probe is a wait on FRAMES (the
 // match clock is dt-clamped, and camDist is exponentially smoothed at 1.6/s of
@@ -68,43 +68,125 @@ await p.addStyleTag({ content: '#news,#hud,#stageBar,.vb,.vf,#btnHome,#coins,#ra
 // hold him still and neutral so every radius is the same pose
 await p.evaluate(() => window.__setMood('cruise'));
 
+// ── THE FREEZE ─────────────────────────────────────────────────────────────
+// The silhouette is a DIFFERENCE of two frames, so the two frames have to be
+// the same world with and without the void in it. They were not: three frames
+// pass between the shots, and in three frames the crowd walks, the water
+// scrolls and the FX puffs move — so the connected component the mask lands on
+// swallows whatever moved next to the hero. Measured on the first pass:
+// maple r=3 came back with a "silhouette" 154 CSS px across when the void is
+// 97, and a circularity of 0.06 (a circle is 1.0). Those numbers were garbage
+// and are not reported.
+// Fix: stall the game's own rAF loop, then drive the draw by hand. The two
+// frames then differ by exactly one thing.
+await p.evaluate(() => {
+  window.__rafReal = window.requestAnimationFrame.bind(window);
+  window.__frozen = false; window.__rq = [];
+  window.requestAnimationFrame = (cb) => {
+    if (window.__frozen) { window.__rq.push(cb); return -1; }
+    return window.__rafReal(cb);
+  };
+  window.__freeze = () => { window.__frozen = true; };
+  window.__thaw = () => {
+    window.__frozen = false;
+    const q = window.__rq.splice(0);
+    q.forEach((cb) => window.__rafReal(cb));
+  };
+});
 const frames = (n) => p.evaluate((k) => new Promise((res) => {
-  let i = 0; const step = () => { if (++i >= k) return res(1); requestAnimationFrame(step); };
-  requestAnimationFrame(step);
+  let i = 0; const step = () => { if (++i >= k) return res(1); window.__rafReal(step); };
+  window.__rafReal(step);
 }), n);
 
-// locate the hero body mesh + its group once
-await p.evaluate(() => {
-  const vs = window.__voidState();
-  let best = null, bd = 1e9;
+// LOCATE THE HERO BY GEOMETRY, NOT BY PROXIMITY. Nearest-body-to-__voidState
+// picks a rival the moment one overlaps the hero, and the first run of this
+// probe cropped a King Void rival instead. The hero's sphere is
+// SphereGeometry(1, 96, 72) (void3d.ts:347); every rival is (1, 40, 30)
+// (rivals.ts:264), so the segment count is an exact identity test.
+const found = await p.evaluate(() => {
+  let hero = null; const others = [];
   window.__scene.traverse((o) => {
     if (!o.isMesh || !o.material?.uniforms?.uAbyss) return;
-    o.updateWorldMatrix(true, false);
-    const e = o.matrixWorld.elements;
-    const d = (e[12] - vs.x) ** 2 + (e[14] - vs.z) ** 2;
-    if (d < bd) { bd = d; best = o; }
+    if (o.geometry?.parameters?.widthSegments === 96) hero = o;
+    else others.push(o);
   });
-  window.__heroBody = best;
-  window.__heroGroup = best?.parent?.parent || null;
+  window.__heroBody = hero;
+  window.__heroGroup = hero?.parent?.parent || null;
+  // the rival groups, so the hero can be photographed on its own
+  window.__rivalGroups = [...new Set(others.map((o) => o.parent).filter(Boolean))];
+  const vs = window.__voidState();
+  window.__heroGroup?.updateWorldMatrix(true, false);
+  const e = window.__heroGroup?.matrixWorld.elements;
+  return { ok: !!hero, rivals: window.__rivalGroups.length,
+    dx: e ? +(e[12] - vs.x).toFixed(3) : null, dz: e ? +(e[14] - vs.z).toFixed(3) : null };
 });
+console.log('# hero located', JSON.stringify(found));
+if (!found.ok) { console.log('FAILED to find hero body'); await b.close(); process.exit(1); }
+// PORTRAIT PASS: the rivals come OUT OF THE SCENE, not merely hidden. Setting
+// .visible = false does not hold — rivals.ts:738 sets it back to true the
+// moment a sibling joins the feast, and :804 does it again on respawn. The
+// first run of this probe photographed a King Void rival standing in front of
+// the hero at r=6 and would have measured its silhouette. Detaching the group
+// (and the danger halo that lives beside it in the scene) is permanent,
+// because nothing in the rival loop ever re-parents.
+const removed = await p.evaluate(() => {
+  let n = 0;
+  window.__rivalGroups.forEach((g) => { if (g.parent) { g.parent.remove(g); n++; } });
+  // the halo is a separate scene child: RingGeometry(1.15, 1.42, 40)
+  const halos = [];
+  window.__scene.traverse((o) => {
+    if (o.isMesh && o.geometry?.type === 'RingGeometry'
+      && Math.abs((o.geometry.parameters.innerRadius ?? 0) - 1.15) < 1e-6) halos.push(o);
+  });
+  halos.forEach((h) => { if (h.parent) { h.parent.remove(h); n++; } });
+  return n;
+});
+console.log(`# detached ${removed} rival objects from the scene`);
+const SPAWN = await p.evaluate(() => window.__spawn());
 
 const results = [];
 for (const R of RADII) {
   await p.evaluate((r) => window.__setVoidR(r), R);
+  // same ground under him at every size, so the four worlds are compared at
+  // one place each rather than wherever the void had drifted to
+  await p.evaluate((s) => window.__warpVoid(s.x, s.z), SPAWN);
   // WAIT ON THE CAMERA, NOT ON THE CLOCK. camDist is exponentially smoothed at
   // 1.6/s of SIM time and dt is clamped to 0.05, so a settle takes ~50 frames —
   // which under swiftshader is nowhere near a fixed wall-clock number.
-  let prev = 0, stable = 0, polls = 0;
   await draw(false);
-  while (stable < 4 && polls < 400) {
+  // CHEW FIRST, SETTLE SECOND. A void parked on food chomps, and a chomp opens
+  // the maw — the first run of this probe photographed a gape and called it the
+  // idle face. 60 stubbed frames is ~1 s of sim time at 60 Hz, long enough to
+  // clear what is inside a frozen radius. It has to happen BEFORE the camera
+  // settle, not after: the hidden rivals still run their logic and still bite,
+  // and a bite SHRINKS the hero — which drags camDist in with it. That is how
+  // maple's r=3 came back at camD 76 (the settled distance for r≈2.1) with the
+  // settle check reporting success two seconds earlier.
+  await frames(60);
+  let polls = 0, err = 1;
+  while (err > 0.005 && polls < 300) {
     await frames(8);
-    const d = await p.evaluate(() => {
-      const vs = window.__voidState(), c = window.__cam.position;
-      return Math.hypot(c.x - vs.x, c.y, c.z - vs.z);
-    });
-    if (prev && Math.abs(d - prev) / d < 0.002) stable++; else stable = 0;
-    prev = d; polls++;
+    err = await p.evaluate((rr) => {
+      // __setVoidR only pins the growth LAW (frozenR guards the caps at
+      // prototype3d.ts:4023-4038); a void parked on food still eats and still
+      // grows, and the first run of this probe measured r=1.2 at camD 76 —
+      // the settled distance for r=2.1. Re-assert every poll.
+      window.__setVoidR(rr);
+      const c = window.__cam.position;
+      // camera.position.y is camOffset.y * camDist exactly: the lookahead only
+      // ever writes x and z (prototype3d.ts:4592-4594). So camDist is readable
+      // without guessing, and the settle test can be ABSOLUTE against the law
+      // at :4519 instead of a delta that takes 20 s of match clock to satisfy.
+      const steep = Math.min(1, Math.max(0, (rr - 2.5) / 5.5));
+      const ox = 0.62 + (0.45 - 0.62) * steep, oy = 0.92 + (1.4 - 0.92) * steep;
+      const len = Math.hypot(ox, oy, ox);
+      const camDist = c.y / (oy / len);
+      const target = Math.min(340, Math.max(26, 38 * Math.pow(rr / 0.9, 0.82)));
+      return Math.abs(camDist - target) / target;
+    }, R);
+    polls++;
   }
+  if (err > 0.005) console.log(`  !! r=${R} camera never settled (err ${(err * 100).toFixed(1)}%)`);
   await draw(true);
   await frames(4);
 
@@ -130,16 +212,26 @@ for (const R of RADII) {
   const cy = Math.max(S / 2, Math.min(geom.ih - S / 2, geom.sy));
   const clip = { x: Math.round(cx - S / 2), y: Math.round(cy - S / 2), width: S, height: S };
 
-  const a = await p.screenshot({ clip });
-  await p.evaluate(() => { window.__heroGroup.visible = false; });
-  await frames(3);
-  const bkg = await p.screenshot({ clip });
-  await p.evaluate(() => { window.__heroGroup.visible = true; });
-  await frames(2);
+  // STOP THE WORLD, then take both frames by hand.
+  await p.evaluate(() => window.__freeze());
+  await p.evaluate(() => window.__renderer.render(window.__scene, window.__cam));
+  const a = await p.screenshot({ clip, timeout: 180000 });
+  await p.evaluate(() => {
+    window.__heroGroup.visible = false;
+    window.__renderer.render(window.__scene, window.__cam);
+  });
+  const bkg = await p.screenshot({ clip, timeout: 180000 });
+  await p.evaluate(() => {
+    window.__heroGroup.visible = true;
+    window.__renderer.render(window.__scene, window.__cam);
+    window.__thaw();
+  });
 
   fs.writeFileSync(`qa-out/gh/${WORLD}-r${R}.png`, a);
   results.push({ R, geom, S, a: a.toString('base64'), bg: bkg.toString('base64') });
-  console.log(`  r=${R}  camD=${geom.camD}  pxR=${geom.pxR} CSS px (diam ${(geom.pxR * 2).toFixed(0)})  uSmall=${geom.uSmall}  crop=${S}`);
+  const ms = await p.evaluate(() => +window.__matchState().t.toFixed(1));
+  const drift = Math.abs(geom.r - R) / R;
+  console.log(`  [t=${ms}] r=${geom.r.toFixed(2)}${drift > 0.02 ? ` (ASKED ${R})` : ''}  camD=${geom.camD}  pxR=${geom.pxR} CSS px (diam ${(geom.pxR * 2).toFixed(0)})  uSmall=${geom.uSmall}  uStage=${geom.uStage}  crop=${S}`);
 }
 await p.close();
 

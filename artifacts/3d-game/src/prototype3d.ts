@@ -2684,7 +2684,22 @@ function coverRelease(who: string, then?: () => void) {
   then?.();
 }
 function withWorldReady(cb: () => void) {
-  if (packReady) { cb(); return; }
+  // THE FAST PATH MUST STILL DROP THE HOLD, and it used to not — it just ran
+  // the callback. That was survivable while packReady only went true after a
+  // real download, because nothing had taken a 'pack' hold yet when it did.
+  // It stopped being survivable the moment requestedReady() started returning
+  // an ALREADY-RESOLVED promise: `packReady = true` then lands in a microtask,
+  // which runs AFTER module evaluation reaches the world-switch block at the
+  // bottom of this file. So that block sees packReady === false, takes
+  // coverHold('pack') — and by the time launchWorld() calls in here, packReady
+  // is true, this returned early, and nobody ever released it.
+  //
+  // Measured: 4 of 4 worlds, 5 of 5 runs, switching worlds left a frozen 100%
+  // loading screen over the whole screen forever while the match played out
+  // behind it — scoring, banking coins and hitting the whistle invisibly.
+  // coverRelease is safe to call for a hold nobody took: it is a Set delete
+  // followed by a size check.
+  if (packReady) { coverRelease('pack', cb); return; }
   const scr = el('loadScr');
   (scr.querySelector('.lTip') as HTMLElement).textContent = LOAD_TIPS[Math.floor(Math.random() * LOAD_TIPS.length)];
   coverHold('pack');   // idempotent — it is a set, and the autoplay path may already hold it

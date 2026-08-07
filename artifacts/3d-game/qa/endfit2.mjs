@@ -15,7 +15,7 @@
 // find five would take an hour and still not be a controlled test.
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || '4188';
-const SIZES = [[375, 812, 'iPhone SE / mini'], [390, 844, 'iPhone 15'], [430, 932, 'Pro Max']];
+const SIZES = [[375, 667, 'iPhone SE 3'], [375, 812, 'iPhone 13 mini'], [390, 844, 'iPhone 15'], [430, 932, 'Pro Max']];
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 let bad = 0;
