@@ -861,8 +861,17 @@
          — SCRAPBOOK measured 61% / 66% / 82% visible and TOP VOIDS 57% / 63% /
          81% at 375 / 390 / 430pt. The headline feature of this pass read as
          "OOK" on the phone most children hold. */
-      .navRow { display: flex; gap: 14px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
-      .navCard { font-size: 12px; font-weight: 900; letter-spacing: 1.5px; padding: 11px 22px; border-radius: 14px; white-space: nowrap;
+      /* FOUR CARDS, ONE ROW. `padding: 11px 22px` plus `white-space: nowrap`
+         made SCRAPBOOK wide enough that the row wrapped 3 + 1 at 430px, so
+         TOP VOIDS sat alone on a second row costing ~70px of column — on the
+         screen whose whole problem is that the key art is buried. An equal
+         four-up grid with the padding moved to the vertical axis fits every
+         label at 430 and stays centred on a tablet, where max-width keeps the
+         cards from stretching into slabs. */
+      .navRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px;
+        width: 100%; max-width: 420px; margin-inline: auto; }
+      .navCard { font-size: 10px; font-weight: 900; letter-spacing: 0.6px; padding: 10px 4px; border-radius: 14px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         background: rgba(30,16,58,0.82); border: 2px solid rgba(201,166,255,0.4); backdrop-filter: blur(4px); }
       .navCard i { display: block; font-style: normal; font-size: 20px; margin-bottom: 3px; }
       .navCard:active { transform: scale(0.96); }
