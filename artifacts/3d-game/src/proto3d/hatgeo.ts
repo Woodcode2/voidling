@@ -106,6 +106,45 @@ function lay(m: THREE.Object3D, R: number, az: number, pol: number, sweep = 0, l
   return m;
 }
 
+// ── A STRAND OF HAIR ──────────────────────────────────────────────────────
+// One lathe, authored on y in [0,1] with its belly a third of the way up so
+// it reads as a strand and not a sausage, then baked per use.
+//
+// The bake is the point. A STRAIGHT strand laid tangent to a sphere of radius
+// R has its tip at sqrt(R*R + L*L) — a third of a body radius off the skull
+// for a 0.9 lock — and renders as a leaf flying outward, which is how the
+// unicorn's mane failed on its second attempt. Rolling it around the sphere
+// keeps every vertex at (R + its own z), so the mane hugs AND the clearance
+// stays one number: R minus half the strand's thickness.
+//
+//   wx / wz  width across and thickness through. Flat ribbons cover more head
+//            per triangle than round locks, which is what lets a mane be made
+//            of strands with nothing underneath it.
+//   flare    lifts the TIP off the surface: the flick at the end of hair.
+//   bulge    lifts the MIDDLE: the volume in a quiff. Neither can bring a
+//            vertex inward, so neither can break the clearance.
+// Local +Z must be outward from the head, which is what lay() guarantees and
+// seat() does not.
+const _sprof: THREE.Vector2[] = [];
+for (let i = 0; i <= 7; i++) {
+  const t = i / 7;
+  _sprof.push(new THREE.Vector2(0.5 * Math.sin(Math.PI * Math.pow(t, 0.5)) * (1 - t * 0.08), t));
+}
+const _STRAND = new THREE.LatheGeometry(_sprof, 8);
+function strand(wx: number, len: number, wz: number, R: number, flare = 0, bulge = 0)
+  : THREE.BufferGeometry {
+  const geo = _STRAND.clone();
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const z = pos.getZ(i) * wz + flare * y * y + bulge * Math.sin(Math.PI * y);
+    const a = (y * len) / R;
+    pos.setXYZ(i, pos.getX(i) * wx, (R + z) * Math.sin(a), (R + z) * Math.cos(a) - R);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 // ── THE FREE ONE ───────────────────────────────────────────────────────────
 // The reference implementation, and deliberately the simplest thing in here: a
 // cone, a frill, a pompom. Its job is to teach a child that the void's head is
@@ -188,46 +227,59 @@ function buildCrown(): THREE.Group {
   const GOLD = 0xffc21f, GOLD_D = 0xd89400, FUR = 0xfff6e4, FUR_S = 0xe8dcc4;
   const GEMS = [0xff2d55, 0x2fa8ff, 0x35e07a, 0xff8a2f, 0xb875ff];
 
-  // the band — a proper shell with thickness, not a ring
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.76, 0.42, 26, 1, true),
+  // ── THE BAND, AND WHY IT IS THIS WIDE ──────────────────────────────────
+  // v1 was a 0.70-radius tube parked at y=1.34 with the ermine at polar 0.62.
+  // It cleared the jelly and rendered as a party crown perched on a balloon:
+  // a narrow gold cylinder floating over a visible crescent of daylight.
+  //
+  // The cure is the party hat's, and the chef's: carry the thing DOWN past
+  // the point where the head's own silhouette has fallen away. The ermine now
+  // runs to polar 1.02, which puts it at (radial 1.10, y 0.66) — outside the
+  // head's outline at that height — so it reads as a fur band encircling the
+  // king rather than as a ring hovering above him. The band widened to match.
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.98, 0.45, 28, 1, true),
     new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.24, metalness: 0.85 }));
-  band.position.y = 1.34; g.add(band);
+  band.position.y = 1.175; g.add(band);
   // a darker underband so the gold has somewhere to fall away to
-  const under = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.78, 0.09, 26, 1, true),
+  const under = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 1.00, 0.09, 28, 1, true),
     new THREE.MeshStandardMaterial({ color: GOLD_D, roughness: 0.3, metalness: 0.8 }));
-  under.position.y = 1.15; g.add(under);
+  under.position.y = 0.95; g.add(under);
 
   // FIVE POINTS. Four reads as a box and six reads as a cog; five is a crown.
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2 + 0.32;
-    const R = 0.70;
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.155, 0.62, 8),
+    const R = 0.90;
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.66, 8),
       new THREE.MeshStandardMaterial({ color: GOLD, roughness: 0.22, metalness: 0.88, flatShading: true }));
-    spike.position.set(Math.sin(a) * R, 1.83, Math.cos(a) * R);
+    spike.position.set(Math.sin(a) * R, 1.73, Math.cos(a) * R);
     g.add(spike);
     // …each tipped with a gem that actually emits. At this size a gem that is
     // merely a saturated colour is a coloured dot; the glow is the jewel.
-    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.15, 0), glow(GEMS[i], 1.5));
-    gem.position.set(Math.sin(a) * R, 2.19, Math.cos(a) * R);
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), glow(GEMS[i], 1.5));
+    gem.position.set(Math.sin(a) * R, 2.12, Math.cos(a) * R);
     g.add(gem);
   }
 
   // the big centre stone, front and centre where the camera lives
   // …flush against the band rather than hovering in front of it, which is how
   // the first version rendered: a big red diamond floating off the gold
-  const big = new THREE.Mesh(new THREE.OctahedronGeometry(0.17, 0), glow(0xff2d55, 1.7));
-  big.position.set(0, 1.34, 0.70); big.rotation.z = 0.4; g.add(big);
+  const big = new THREE.Mesh(new THREE.OctahedronGeometry(0.19, 0), glow(0xff2d55, 1.7));
+  big.position.set(0, 1.18, 0.93); big.rotation.z = 0.4; g.add(big);
 
   // ERMINE. Two staggered rings of fat lumps read as fur far better than one
   // smooth torus, and they hide the seam where the band meets the head.
-  // Seated on concentric spheres rather than at hand-picked heights: the first
+  // Seated on concentric spheres rather than at hand-picked heights: an early
   // version's lower ring measured 1.13 from the origin, inside the jelly, so
   // the king's own fur was being eaten by his head.
   for (let k = 0; k < 2; k++) {
-    const n = 12;
+    // SIXTEEN, not twelve. At 1.36 the ring is 6.1 long and a 0.29 lump is
+    // 0.29 of it — twelve of them leave gaps, and a fur trim with gaps in it
+    // is a string of ping-pong balls, which is what the second render was.
+    const n = k ? 18 : 16;
     for (let i = 0; i < n; i++) {
-      const lump = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 1), soft(k ? FUR_S : FUR, 0.85));
-      seat(lump, 1.30, (i / n) * Math.PI * 2 + k * 0.26, 0.62 + k * 0.19, 0);
+      const r = 0.17 + (i % 3) * 0.016;
+      const lump = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), soft(k ? FUR_S : FUR, 0.85));
+      seat(lump, 1.365, (i / n) * Math.PI * 2 + k * 0.19, 0.80 + k * 0.26, 0);
       g.add(lump);
     }
   }
@@ -236,52 +288,115 @@ function buildCrown(): THREE.Group {
 
 // ── THE TYCOON ────────────────────────────────────────────────────────────
 // A comedy hat, and the joke is SCALE: far too much hair for a small round
-// void. It has to be sculpted rather than stacked — a pompadour is one
-// continuous swooping mass, so every piece here is a squashed sphere rotated
-// into the same wave, smooth-shaded, with a low roughness so it catches a
-// highlight along the crest the way lacquered hair does.
+// void. A generic bombastic-tycoon archetype — no likeness, no name, no
+// slogans.
 //
-// A generic bombastic-tycoon archetype. No likeness, no name, no slogans.
+// FOUR ATTEMPTS, and the first three were all the same misunderstanding.
+// Stacked flat ellipsoids read as concentric rings. Six similar spheres along
+// a curve read as a croissant, because equal sizes at equal spacing SCALLOP —
+// the eye finds the repeat and counts it. Three masses at clearly different
+// scales fused into one shape at last… and rendered as a smooth lump of
+// butter, because a pompadour that is smooth is not a pompadour. It was the
+// right SILHOUETTE with nothing inside it.
+//
+// Hair is made of hair. So the mass is not sculpted and then textured; it is
+// built out of nine big swept locks, each rolled around the skull with a
+// BULGE that lifts its middle into the quiff. The notches between them are
+// the silhouette, the gaps are the comb marks, and the lacquered highlight
+// runs down each one instead of pooling on a single dome.
+//
+// The part is on the left because every lock is rooted along one meridian at
+// az = -1.32 and sweeps over the crown to break right and forward.
 function buildTycoon(): THREE.Group {
   const g = new THREE.Group();
-  const HAIR = 0xefc964, HAIR_D = 0xd2a63f;
+  const LIT = 0xffe6a0, MID = 0xf0c95f, DARK = 0xc7962f;
   // Low roughness with a little metalness: lacquered hair carries ONE long
-  // highlight down the crest, and that highlight is most of what sells the
+  // highlight down each lock, and that highlight is most of what sells the
   // volume. Smooth-shaded — a faceted pompadour is a pineapple.
-  const hair = new THREE.MeshStandardMaterial({ color: HAIR, roughness: 0.29, metalness: 0.18 });
-  const shade = new THREE.MeshStandardMaterial({ color: HAIR_D, roughness: 0.36, metalness: 0.14 });
+  const lac = (c: number): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({
+    color: c, roughness: 0.26, metalness: 0.20, envMapIntensity: 1.4 });
 
-  // the hair on the skull. Kept ABOVE the equator: carried further it stops
-  // being a hairline and becomes a lampshade, which is exactly how the second
-  // attempt rendered.
-  // phi kept short so the cap's rim ends UNDER the bulk above it — carried
-  // further it shows as a flat disc lip poking out from beneath the hair
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(1.23, 30, 18, 0, Math.PI * 2, 0, 0.66), hair);
-  (cap.material as THREE.Material).side = THREE.DoubleSide;
+  // The scalp under it, carried below the equator so the locks never show
+  // daylight between themselves and the head. MATTE, and dark: the first pass
+  // gave it the same lacquer as the hair and it rendered as a polished brass
+  // dome with a thin blonde fringe round the edge — the cap was the hat. It
+  // is not meant to be seen; it is meant to be the shadow the comb marks fall
+  // into.
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1.152, 22, 12, 0, Math.PI * 2, 0, 0.74),
+    new THREE.MeshStandardMaterial({ color: 0xb9892b, roughness: 0.82, metalness: 0.0,
+      side: THREE.DoubleSide }));
   g.add(cap);
 
-  // ── THREE MASSES, NOT SIX ────────────────────────────────────────────────
-  // Three attempts, and each failed the same way for a different reason.
-  // Stacked flat ellipsoids read as concentric rings from the front; six
-  // similar spheres along a curve read as a croissant, because equal sizes at
-  // equal spacing SCALLOP — the eye finds the repeat and counts it.
-  //
-  // What fuses is a small number of masses at clearly different scales, each
-  // overlapping its neighbour by well over half. Then there is no repeat to
-  // find, and the silhouette is read as one shape: a big mound over the brow,
-  // a curl breaking forward off it, a tail flicking back.
-  const mass = (r: number, sx: number, sy: number, sz: number,
-    y: number, z: number, rx: number, mat: THREE.Material) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 26, 20), mat);
-    m.scale.set(sx, sy, sz); m.position.set(0, y, z); m.rotation.x = rx;
+  // ── THE SWEEP ───────────────────────────────────────────────────────────
+  // Eleven locks rooted down the part line and thrown over the crown. sweep
+  // = PI is straight uphill — over the top and down the far side — and the
+  // per-lock offset fans them so they do not all pile through the pole. The
+  // bulge is graded, biggest at the brow, because a pompadour is tallest at
+  // the front and lies down toward the nape.
+  const A = 11;
+  for (let i = 0; i < A; i++) {
+    const t = i / (A - 1);                               // 0 at the brow, 1 at the nape
+    const R = 1.26 + t * 0.03;
+    const geo = strand(0.46 - t * 0.08, 2.35 - t * 0.60, 0.21, R, 0.12, 0.52 - t * 0.30);
+    const m = new THREE.Mesh(geo, lac(t < 0.28 ? LIT : t < 0.68 ? MID : DARK));
+    lay(m, R, -1.30 + t * 0.10, 0.34 + t * 0.80, Math.PI + (t - 0.45) * 0.95, 0);
     g.add(m);
-  };
-  mass(0.84, 1.28, 0.98, 1.12, 1.36, 0.14, -0.32, hair);   // the bulk
-  // the curl OVERLAPS the bulk by more than its own radius. Pulled any
-  // further forward it stops being a curl breaking off the wave and becomes a
-  // second ball balanced on top, which is exactly how the last pass rendered.
-  mass(0.52, 1.14, 0.84, 0.98, 1.52, 0.74, -0.80, hair);
-  mass(0.48, 1.10, 0.68, 0.94, 1.02, -0.72, 0.50, shade);  // the tail
+  }
+
+  // ── THE FALL ────────────────────────────────────────────────────────────
+  // The sweep converges at the part and diverges over the crown, which leaves
+  // the far side thin — the first pass showed bare cap down the whole right
+  // of the head. These six lie down the right, and five more close the back.
+  for (let j = 0; j < 6; j++) {
+    const u = j / 5;
+    const geo = strand(0.42, 0.98, 0.20, 1.252, 0.24, 0.20);
+    const m = new THREE.Mesh(geo, lac(u < 0.5 ? MID : DARK));
+    lay(m, 1.252, 0.86 + u * 1.10, 0.40 + u * 0.30, 0.22, 0);
+    g.add(m);
+  }
+  for (let j = 0; j < 5; j++) {
+    const u = j / 4;
+    const geo = strand(0.40, 0.88, 0.19, 1.250, 0.26, 0.20);
+    const m = new THREE.Mesh(geo, lac(DARK));
+    lay(m, 1.250, Math.PI - 0.72 + u * 1.44, 0.58, 0.04, 0);
+    g.add(m);
+  }
+
+  // ── THE QUIFF ───────────────────────────────────────────────────────────
+  // Three locks breaking the other way — down off the crown toward the brow,
+  // with the flare turned up so the ends lift instead of lying down. This is
+  // the front of the hair, and it stops at polar 0.87 (z = 0.99, y = 0.87)
+  // because nothing on any hat crosses z = 0.6 down near the brows.
+  for (let k = -1; k <= 1; k++) {
+    const R = 1.30 + Math.abs(k) * 0.01;
+    const geo = strand(0.44, 0.76 - Math.abs(k) * 0.06, 0.22, R, 0.40, 0.24);
+    const m = new THREE.Mesh(geo, lac(k <= 0 ? LIT : MID));
+    lay(m, R, k * 0.42 - 0.10, 0.28, 0.18 + k * 0.30, 0);
+    g.add(m);
+  }
+
+  // ── THE FRINGE ──────────────────────────────────────────────────────────
+  // The quiff ARCS, so it left the cap showing beneath it as a hard brown
+  // visor across the brow — the single loudest thing on the second render.
+  // These five lie flat instead, reaching polar 0.92 while the cap now stops
+  // at 0.74 — so the rim is overhung rather than merely met, which is what the
+  // third render needed after the fringe landed exactly ON it and drew a hard
+  // horizontal line across the brow.
+  for (let j = 0; j < 5; j++) {
+    const u = j / 4 - 0.5;
+    const geo = strand(0.46, 0.64, 0.20, 1.245, 0.06, 0.10);
+    const m = new THREE.Mesh(geo, lac(Math.abs(u) < 0.3 ? LIT : MID));
+    lay(m, 1.245, u * 1.55 - 0.12, 0.46, u * 0.55, 0);
+    g.add(m);
+  }
+
+  // and the flick at the back, which is the bit that makes it funny from
+  // behind: one lock that leaves the head altogether
+  const tail = new THREE.Mesh(strand(0.34, 0.90, 0.18, 1.26, 0.52, 0.12), lac(DARK));
+  lay(tail, 1.26, Math.PI - 0.25, 0.96, -0.35, 0);
+  g.add(tail);
+
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }
 
@@ -404,36 +519,6 @@ function buildHorn(): THREE.Group {
   // half a step so the gaps never line up. Where the void's own colour shows
   // through it reads as a parting, which is what hair does.
   //
-  // One lathe authored on y in [0,1], belly a third of the way up so it reads
-  // as a strand and not a sausage, then baked per row: scaled to its final
-  // size and rolled around a sphere of its own root radius.
-  const lockProf: THREE.Vector2[] = [];
-  for (let i = 0; i <= 7; i++) {
-    const t = i / 7;
-    lockProf.push(new THREE.Vector2(0.5 * Math.sin(Math.PI * Math.pow(t, 0.5)) * (1 - t * 0.08), t));
-  }
-  const lockGeo = new THREE.LatheGeometry(lockProf, 8);
-  /** Scale and roll a strand around the head. +Z is outward (see lay). The
-   *  body centre sits at local (0, 0, -R), so a point `z` proud of the surface
-   *  and `a = y*len/R` radians along it lands at (R+z) on that arc. Distance
-   *  from the body centre stays R+z for every vertex, which is the whole
-   *  point: one clearance number instead of a per-vertex argument.
-   *  A STRAIGHT strand cannot do this — laid tangent to a sphere of radius R
-   *  its tip is at sqrt(R*R + L*L), 0.29 of a body radius off the skull for a
-   *  0.9 lock, and v2's mane rendered as a ring of leaves flying outward. */
-  const bendLock = (wx: number, len: number, wz: number, R: number, flare: number)
-    : THREE.BufferGeometry => {
-    const geo = lockGeo.clone();
-    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-    for (let i = 0; i < pos.count; i++) {
-      const y = pos.getY(i);
-      const x = pos.getX(i) * wx, z = pos.getZ(i) * wz + flare * y * y;
-      const a = (y * len) / R;
-      pos.setXYZ(i, x, (R + z) * Math.sin(a), (R + z) * Math.cos(a) - R);
-    }
-    geo.computeVertexNormals();
-    return geo;
-  };
   //           polar  len   rootR  wide   thick  flare  count
   // Root radius is never a free choice: it is 1.14 plus HALF the strand's own
   // thickness, because bendLock keeps every vertex at (root + its own z) and
@@ -448,7 +533,7 @@ function buildHorn(): THREE.Group {
   const _hc = new THREE.Color();
   for (let r = 0; r < ROWS.length; r++) {
     const [pol, len, R, wx, wz, flare, n] = ROWS[r];
-    const geo = bendLock(wx, len, wz, R, flare);
+    const geo = strand(wx, len, wz, R, flare);
     const spread = 1.45 + pol * 0.75;
     const stagger = (r & 1) ? 0.5 / (n - 1) : 0;
     for (let i = 0; i < n; i++) {
@@ -711,82 +796,115 @@ function buildBobble(): THREE.Group {
   // ENORMOUS cream pompom. Read at 40px = red blob with a cream donut at the
   // bottom and a cream cloud on top. Nothing else competes.
   //
-  // Clearance maths (body churns out to 1.18): the whole hat lives in a tilted
-  // sub-frame `hat` at y=1.27, rotation.x=-0.15 (worn pushed back, jaunty).
-  // That tilt drops the BACK of the roll to |p|=1.29 so it hugs the skull, and
-  // lifts the FRONT of the roll to y=1.20 at z~1.0 — clear of the eyebrows.
-  const hat = new THREE.Group();
-  hat.position.set(0, 1.27, 0);
-  hat.rotation.x = -0.15;
-  g.add(hat);
-
+  // ── WHY THIS WAS REBUILT ────────────────────────────────────────────────
+  // v1 put the whole hat in a sub-frame at y=1.27 and hung a 1.02-radius brim
+  // off it, which lands at |p| = 1.63 — two thirds of a body radius above a
+  // head that only reaches 1.0. It rendered as a flying saucer with a bobble
+  // on it. Every part passed the clearance rule, because the rule only ever
+  // said "not too CLOSE".
+  //
+  // A beanie is pulled ON. So the dome is now a sphere segment CONCENTRIC
+  // with the head at 1.155 — the gap is the same everywhere, which reads as
+  // knitted fit rather than as hover — and it is carried down to polar 1.10,
+  // past the point where the head's own silhouette has fallen away, so the
+  // brim ends up encircling the void instead of floating over it.
   const KNIT = 0xe23a48;   // cosy saturated red
   const CREAM = 0xfff0d2;  // warm wool cream
 
-  const domeMat = new THREE.MeshStandardMaterial({ color: KNIT, roughness: 0.92, metalness: 0.0 });
+  const domeMat = new THREE.MeshStandardMaterial({ color: KNIT, roughness: 0.92, metalness: 0.0,
+    side: THREE.DoubleSide });
   const ribMat = new THREE.MeshStandardMaterial({ color: 0xff6272, roughness: 0.85, metalness: 0.0, flatShading: true });
   const creamMat = new THREE.MeshStandardMaterial({ color: CREAM, roughness: 0.88, metalness: 0.0, flatShading: true });
   const pomMat = new THREE.MeshStandardMaterial({ color: CREAM, roughness: 0.8, metalness: 0.0, emissive: 0xffd9a8, emissiveIntensity: 0.22, flatShading: true });
 
-  // 1. the rolled brim — the fattest, lowest, most nameable part of the hat.
-  // Faceted on purpose: 8 radial segments reads as chunky wool, not rubber.
-  const brim = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.22, 8, 16), creamMat);
-  brim.rotation.x = Math.PI / 2;
-  hat.add(brim);
-
-  // crown lives in its own squashed frame so dome + ribs stay perfectly
-  // concentric while the whole cap gets its beanie squat (0.82 on Y).
+  // 1. THE SHELL, AND WHY IT IS STRETCHED. A spherical cap carried to polar
+  // 1.02 is 2.07 wide and 0.50 tall: a saucer, which is exactly how v2 and v3
+  // both rendered whatever was done to the brim. A beanie is TALL.
+  //
+  // Scaling the cap on Y is the one distortion that is free here, because
+  // |p|^2 = x^2 + z^2 + (k*y)^2 with k > 1 can only ever make a vertex FURTHER
+  // from the origin. The clearance rule survives a stretch it would not
+  // survive a squash.
+  const DR = 1.230, DP = 1.235, KY = 1.28;
   const crown = new THREE.Group();
-  crown.scale.set(1, 0.82, 1);
-  hat.add(crown);
-
-  // 2. the dome. Open-bottomed (thetaLength 1.66) so its rim dies INSIDE the
-  // brim roll — no hem edge showing, no body poking through the shell.
-  // Left smooth-shaded: this is the one soft, rounded thing here.
+  crown.scale.set(1, KY, 1);
+  g.add(crown);
   const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(0.90, 14, 8, 0, Math.PI * 2, 0, 1.66), domeMat);
-  hat.updateMatrix(); // (no-op safety; dome sits at crown origin)
+    new THREE.SphereGeometry(DR, 22, 12, 0, Math.PI * 2, 0, DP), domeMat);
   crown.add(dome);
 
-  // 3-5. the knit. Three great-circle tubes, each rotated 60° about Y, give
-  // SIX raised ribs that converge at the crown exactly like real gathered
-  // knitting. Ring radius 0.905 vs dome 0.90 so they stand proud by a tube.
+  // 2. the ribs, inside the same stretched frame so they stay welded to the
+  // shell. Three great-circle tubes, each rotated 60 degrees about Y, give SIX
+  // raised ribs that converge at the crown exactly like gathered knitting.
+  //
+  // A partial torus starts its arc at +X, so centring a 2.10 arc over the POLE
+  // is a Z rotation of PI/2 - 1.05, not of -1.05. Getting that wrong put the
+  // arcs across the SIDES of the skull and rendered six red bars swinging down
+  // past the void's equator like a roll cage.
+  const RIB = 2.46;
   for (let i = 0; i < 3; i++) {
-    const rib = new THREE.Mesh(new THREE.TorusGeometry(0.905, 0.07, 6, 12, 3.24), ribMat);
-    // Rz first (centres the arc over the pole), then Ry fans them around.
-    rib.rotation.set(0, (i * Math.PI) / 3, -0.049);
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(DR + 0.045, 0.05, 6, 20, RIB), ribMat);
+    rib.rotation.set(0, (i * Math.PI) / 3, Math.PI / 2 - RIB / 2);
     crown.add(rib);
   }
 
-  // 6. deep-red gather collar where the ribs meet — hides the convergence and
+  // 3. the folded cuff. It sits ONE TENTH out along the shell's rim normal
+  // with a 0.13 tube, so it swallows the hem while ending only 0.21 wider than
+  // the cap — a fold, not a flying saucer. v3 put its centreline a whole tube
+  // out on a bigger sphere and the roll finished 27% wider than the shell it
+  // was supposed to be part of.
+  // The rim normal of a STRETCHED cap is not its radial direction: for an
+  // ellipsoid with semi-axes a and b it runs along (x/a^2, y/b^2). Using the
+  // sphere's normal instead threw the cuff up and out, and v4 rendered the
+  // roll floating half a body radius clear of the void with the head plainly
+  // visible under it.
+  const TUBE = 0.13, OUT = 0.06;
+  const a2 = DR * DR, b2 = (DR * KY) * (DR * KY);
+  const rx = DR * Math.sin(DP), ry = DR * Math.cos(DP) * KY;
+  let nx = rx / a2, ny = ry / b2;
+  const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
+  const cuff = new THREE.Mesh(
+    new THREE.TorusGeometry(rx + OUT * nx, TUBE, 10, 26), creamMat);
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.y = ry + OUT * ny;
+  g.add(cuff);
+
+  // 4. deep-red gather collar where the ribs meet — hides the convergence and
   // sells "this was knitted", for the price of one tiny torus.
-  const gather = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.06, 6, 12),
+  const gather = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.055, 6, 14),
     new THREE.MeshStandardMaterial({ color: 0xb42636, roughness: 0.9, flatShading: true }));
   gather.rotation.x = Math.PI / 2;
-  gather.position.y = 0.66;
-  hat.add(gather);
+  gather.position.y = 1.55;
+  g.add(gather);
 
-  // 7. THE POMPOM — the delight, and the only thing allowed to be this big.
+  // 5. THE POMPOM — the delight, and the only thing allowed to be this big.
   // Icosahedron at detail 1, flat-shaded: 80 facets of bobbly wool that throw
   // real highlights as the void rolls. Faint warm emissive so it still glows
-  // cream when the hat is in the orb's own shadow.
-  const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.38, 1), pomMat);
-  pom.position.set(0.04, 0.88, 0.02);
+  // cream when the hat is in the orb's own shadow. Centre at 1.50 so its
+  // underside lands on the shell instead of hovering over it.
+  const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 1), pomMat);
+  pom.position.set(0.05, 1.84, 0.03);
   pom.rotation.set(0.4, 0.7, 0.2);
-  hat.add(pom);
+  g.add(pom);
 
-  // 8-9. two smaller tufts breaking the pompom's outline so it reads FLUFFY
-  // rather than "sphere". They stay under the main ball's height.
-  const tuftA = new THREE.Mesh(new THREE.IcosahedronGeometry(0.20, 1), pomMat);
-  tuftA.position.set(-0.29, 0.93, 0.13);
+  // 6-7. two smaller tufts breaking the pompom's outline so it reads FLUFFY
+  // rather than "sphere".
+  const tuftA = new THREE.Mesh(new THREE.IcosahedronGeometry(0.21, 1), pomMat);
+  tuftA.position.set(-0.34, 1.79, 0.16);
   tuftA.rotation.set(0.9, 0.3, 0.5);
-  hat.add(tuftA);
+  g.add(tuftA);
 
-  const tuftB = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 1), pomMat);
-  tuftB.position.set(0.26, 0.80, -0.23);
+  const tuftB = new THREE.Mesh(new THREE.IcosahedronGeometry(0.20, 1), pomMat);
+  tuftB.position.set(0.30, 1.74, -0.26);
   tuftB.rotation.set(0.2, 1.1, 0.8);
-  hat.add(tuftB);
+  g.add(tuftB);
 
+  // Worn pushed back, and the angle is load-bearing rather than decoration.
+  // Level, the cuff's front underside reaches y = 0.404 at z = 1.219, and the
+  // void's brows reach 0.55. Tipping the whole hat 0.22 about the ORIGIN lifts
+  // that point to 0.660 — and rotation about the origin is the one transform
+  // that leaves every |p| exactly where the clearance rule found it.
+  g.rotation.x = -0.22;
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }
@@ -794,104 +912,97 @@ function buildBobble(): THREE.Group {
 function buildFlower(): THREE.Group {
   const g = new THREE.Group();
   // ── FLOWER CROWN ──────────────────────────────────────────────────────────
-  // A springtime wreath: a chunky green vine circlet carrying three open
-  // blooms, three little blossoms and two splayed leaves. Reads as a CIRCLET —
-  // a ring of colour around the crown of the head, not a hat with a body.
+  // A springtime wreath: a chunky green vine circlet carrying open blooms,
+  // little buds and splayed leaves. Reads as a CIRCLET — a ring of colour
+  // around the crown of the head, not a hat with a body.
   //
-  // Everything rides an invisible sphere of |p| = 1.27–1.45 so the body's
-  // event-horizon churn (peaks at 1.18) can never swallow the vine, and the
-  // whole wreath is tipped back ~17° so not one petal hangs over the face.
-  const RIM = 1.34;                                    // vine centre-line
-  const BLOOM = 1.36;                                  // flower plane
-  const POL = (29 * Math.PI) / 180;                    // how far down the skull the ring sits
-  const TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.30);
-  const AX_Z = new THREE.Vector3(0, 0, 1);
-  const AX_Y = new THREE.Vector3(0, 1, 0);
+  // ── WHY THIS WAS REBUILT ────────────────────────────────────────────────
+  // v1 rode a sphere of 1.34 at 29 degrees down from the crown, which puts
+  // the vine at (radial 0.65, y 1.17): a hoop hanging a third of a body radius
+  // clear of the skull, with the head plainly visible underneath it. And its
+  // flowers were tori squashed flat — a ring is a ring, not a bloom — while
+  // its leaves were four-sided cones, which render as arrowheads.
+  //
+  // The circlet now sits at polar 58 degrees, where the vine lands at
+  // (radial 1.03, y 0.65): OUTSIDE the head's own outline at that height, so
+  // there is no gap to see. Same reason the party hat's brim works.
+  const RIM = 1.235;                                   // vine centre-line sphere
+  const POL = 1.02;                                    // how far down the skull it sits
+  const PET = 0x000000;                                // (placeholder, see blooms)
+  void PET;
 
-  // a point on the wreath sphere: azimuth a (PI/2 = straight ahead, +Z),
-  // pol = degrees down from the crown of the head
-  const onSphere = (a: number, pol: number, d: number): THREE.Vector3 => {
-    const p = (pol * Math.PI) / 180;
-    return new THREE.Vector3(Math.sin(p) * Math.cos(a) * d, Math.cos(p) * d, Math.sin(p) * Math.sin(a) * d);
-  };
-  // tipping happens about the ORIGIN, so every |p| clearance survives it intact
-  const place = (m: THREE.Mesh, pos: THREE.Vector3) => {
-    m.position.copy(pos).applyQuaternion(TILT);
-    m.quaternion.premultiply(TILT);
-    g.add(m);
-  };
+  const vineMat = new THREE.MeshStandardMaterial({ color: 0x3fa838, roughness: 0.62, flatShading: true });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x76d84a, roughness: 0.55 });
 
   // 1 ── the circlet itself: a faceted woody vine, the thing that makes this
   // read as a crown of flowers rather than three flowers stuck to a head
   const vine = new THREE.Mesh(
-    new THREE.TorusGeometry(RIM * Math.sin(POL), 0.065, 5, 16),
-    new THREE.MeshStandardMaterial({ color: 0x46b83f, roughness: 0.62, flatShading: true }),
-  );
+    new THREE.TorusGeometry(RIM * Math.sin(POL), 0.088, 7, 28), vineMat);
   vine.rotation.x = -Math.PI / 2;
-  place(vine, new THREE.Vector3(0, RIM * Math.cos(POL), 0));
+  vine.position.y = RIM * Math.cos(POL);
+  g.add(vine);
 
-  // 2 ── three open flowers, all on the camera-facing half. Each is a torus of
-  // petals squashed flat along its own normal, plugged with a golden heart.
-  // The front daisy is the DELIGHT: bigger than the others, white, with a
-  // honey-gold centre that genuinely glows.
-  const heartMat = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.35, emissive: 0xff9a20, emissiveIntensity: 0.45 });
-  const FLOWERS: [number, number, number, number, number, number, number][] = [
-    // azimuth, polar°, colour,    petalR, tube,  petals, heartR
-    [1.40, 27, 0xfff3f7, 0.230, 0.130, 7, 0.150], // hero daisy, front & centre
-    [2.38, 31, 0xff6f9d, 0.155, 0.095, 6, 0.100], // pink,  front-left
-    [0.50, 32, 0xbb7cff, 0.155, 0.095, 6, 0.100], // lilac, front-right
-  ];
-  for (let i = 0; i < FLOWERS.length; i++) {
-    const [a, pol, col, pr, tb, pc, hr] = FLOWERS[i];
-    const d = onSphere(a, pol, 1).normalize();
-    const petals = new THREE.Mesh(
-      new THREE.TorusGeometry(pr, tb, 6, pc),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.5, flatShading: true }),
-    );
-    petals.quaternion.setFromUnitVectors(AX_Z, d);
-    petals.scale.set(1, 1, 0.5); // squash into a paper-flat bloom facing outward
-    place(petals, d.clone().multiplyScalar(BLOOM));
+  // 2 ── THE BLOOMS, and they are built out of petals. A torus squashed flat
+  // is a washer with a bead in it; a flower is a ring of separate rounded
+  // petals with a heart in the middle, and at forty pixels the difference is
+  // the whole read. Five petals: four is a cross, six is a snowflake.
+  const bloom = (az: number, pol: number, R: number, k: number, col: number,
+    hot: boolean): void => {
+    const b = new THREE.Group();
+    const petMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.48,
+      emissive: col, emissiveIntensity: 0.14 });
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + 0.3;
+      const p = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), petMat);
+      p.scale.set(0.085 * k, 0.042 * k, 0.135 * k);
+      p.position.set(Math.sin(a) * 0.115 * k, 0.012 * k, Math.cos(a) * 0.115 * k);
+      p.rotation.y = a;
+      b.add(p);
+    }
+    const heart = new THREE.Mesh(new THREE.SphereGeometry(0.072 * k, 10, 8),
+      new THREE.MeshStandardMaterial({ color: hot ? 0xffe27a : 0xffd25a, roughness: 0.3,
+        emissive: 0xffb42a, emissiveIntensity: hot ? 1.3 : 0.5 }));
+    heart.scale.set(1, 0.7, 1);
+    heart.position.y = 0.055 * k;
+    b.add(heart);
+    seat(b, R, az, pol, 0);
+    g.add(b);
+  };
 
-    const heart = new THREE.Mesh(
-      new THREE.SphereGeometry(hr, 10, 8),
-      i === 0
-        ? new THREE.MeshStandardMaterial({ color: 0xffe27a, roughness: 0.25, emissive: 0xffb42a, emissiveIntensity: 1.3 })
-        : heartMat,
-    );
-    heart.quaternion.setFromUnitVectors(AX_Z, d);
-    heart.scale.set(1, 1, 0.75);
-    place(heart, d.clone().multiplyScalar(BLOOM + 0.085));
+  // the hero daisy front and centre, then a ring of smaller ones all the way
+  // round so the wreath never goes bald when the void turns away
+  bloom(0.00, POL - 0.06, 1.30, 1.55, 0xfff3f7, true);
+  bloom(1.02, POL - 0.02, 1.28, 1.05, 0xff6f9d, false);
+  bloom(-1.02, POL - 0.02, 1.28, 1.05, 0xbb7cff, false);
+  bloom(2.05, POL + 0.03, 1.28, 0.95, 0xffd66b, false);
+  bloom(-2.05, POL + 0.03, 1.28, 0.95, 0x7ad2ff, false);
+  bloom(Math.PI, POL, 1.28, 1.10, 0xfff3f7, false);
+
+  // 3 ── buds tucked between the blooms, so the vine is never bare gaps
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const bud = new THREE.Mesh(new THREE.DodecahedronGeometry(0.085),
+      new THREE.MeshStandardMaterial({ color: i & 1 ? 0xff9ec7 : 0xd8b4ff, roughness: 0.5,
+        flatShading: true }));
+    seat(bud, 1.27, a, POL - 0.13, 0);
+    g.add(bud);
   }
 
-  // 3 ── little closed blossoms filling the back of the vine so the ring never
-  // goes bald when the void turns away from the camera
-  const BUDS: [number, number, number, number][] = [
-    [3.32, 30, 0xfff3f7, 0.150],
-    [4.55, 33, 0xff8fbf, 0.135],
-    [5.70, 28, 0xc79bff, 0.145],
-  ];
-  for (const [a, pol, col, r] of BUDS) {
-    const d = onSphere(a, pol, 1);
-    const bud = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(r),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.5, flatShading: true }),
-    );
-    bud.quaternion.setFromUnitVectors(AX_Z, d);
-    bud.scale.set(1.12, 1.12, 0.6);
-    place(bud, d.clone().multiplyScalar(RIM + 0.02));
+  // 4 ── leaves, laid ALONG the vine rather than stuck out on stalks. Flat
+  // blades bent around the head so they follow the circlet — a leaf pointing
+  // straight out of a sphere is a spike, which is exactly what v1's four-sided
+  // cones rendered as.
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.62;
+    const leaf = new THREE.Mesh(strand(0.19, 0.42, 0.075, 1.245, 0.06, 0.03), leafMat);
+    lay(leaf, 1.245, a, POL - 0.10, (i & 1) ? 1.35 : -1.35, 0);
+    g.add(leaf);
   }
 
-  // 4 ── two leaves splaying out sideways — they own the widest points of the
-  // silhouette and say "wreath" from across the map
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x7ad94a, roughness: 0.55, flatShading: true });
-  for (const a of [0.95, 2.90]) {
-    const grow = new THREE.Vector3(Math.cos(a) * 0.93, 0.37, Math.sin(a) * 0.93).normalize();
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.46, 4), leafMat);
-    leaf.quaternion.setFromUnitVectors(AX_Y, grow);
-    leaf.scale.set(1.15, 1, 0.45); // a blade, not a spike
-    place(leaf, onSphere(a, 29, RIM).add(grow.clone().multiplyScalar(0.2)));
-  }
-
+  // tipped back off the brows. The hero daisy's lowest petal sits at y=0.53
+  // level, which is under the brow line at 0.55; rotating the wreath about the
+  // ORIGIN lifts it to 0.674 and costs no clearance at all.
+  g.rotation.x = -0.14;
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }

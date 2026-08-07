@@ -83,9 +83,9 @@ export const HATS: Hat[] = [
   { id: 'cowboy', name: 'Ten-Gallon', blurb: 'this town ain’t big enough', tier: 'plus', usd: 1.99,
     seat: 1.02, drop: -0.15, accent: 0xc79350 },
   { id: 'bobble', name: 'Bobble Beanie', blurb: 'cosy little world-ender', tier: 'plus', usd: 1.99,
-    seat: 0.98, drop: -0.14, accent: 0xd8453f },
+    seat: 0.98, accent: 0xd8453f },
   { id: 'flower', name: 'Flower Crown', blurb: 'eats gently, smells lovely', tier: 'plus', usd: 1.99,
-    seat: 1.04, drop: -0.06, accent: 0xff8ac0 },
+    seat: 1.04, accent: 0xff8ac0 },
 
   { id: 'wizard', name: 'Star Wizard', blurb: 'the hat knows things', tier: 'plus', usd: 2.99,
     seat: 1.02, drop: -0.15, accent: 0x6f5cff },
