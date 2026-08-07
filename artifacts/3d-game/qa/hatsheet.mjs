@@ -32,10 +32,14 @@ if (!shots || !shots.length) { console.log('no hats rendered', errs); await b.cl
 fs.mkdirSync('qa-out/hats', { recursive: true });
 for (const s of shots) {
   fs.writeFileSync(`qa-out/hats/${s.id}.png`, Buffer.from(s.png, 'base64'));
-  const bad = s.closest < 1.22 && s.closest > 0.85;
+  const g = s.graze || [];
   console.log(`${s.id.padEnd(10)} ${String(s.meshes).padStart(2)} meshes ${String(s.tris).padStart(5)} tris`
     + `  top ${s.top.toFixed(2)}  width ${s.wide.toFixed(2)}  closest ${s.closest.toFixed(2)}`
-    + (bad ? '  <-- INSIDE THE JELLY (needs >=1.22, or <=0.85 to be buried)' : ''));
+    + (g.length ? `  <-- ${g.length} GRAZING` : ''));
+  // Name the offenders. "the hat fails" is not actionable; "torus#3 spans
+  // 1.02..1.19" says which part to move and by how much.
+  for (const q of g.slice(0, 6)) console.log(`             ${q}`);
+  if (g.length > 6) console.log(`             …and ${g.length - 6} more`);
 }
 if (errs.length) console.log('\nPAGE ERRORS:', errs.slice(0, 3));
 console.log(`\nwrote ${shots.length} sheets to qa-out/hats/`);

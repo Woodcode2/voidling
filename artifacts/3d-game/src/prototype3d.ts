@@ -961,16 +961,18 @@ _dbg.__hatSheet = async (ids: string[]) => {
   const out: unknown[] = [];
   for (const h of want) {
     const g = buildHat(h.id);
+    g.position.y = h.drop ?? 0;   // render what SHIPS, not what was authored
     sc.add(g);
     let meshes = 0, tris = 0, closest = 1e9, top = 0, wide = 0;
+    const graze: string[] = [];
     g.updateWorldMatrix(true, true);
     const _v = new THREE.Vector3();
     g.traverse((o) => {
       const geo = (o as THREE.Mesh).geometry;
       if (!geo) return;
-      meshes++;
       const pos = geo.getAttribute('position');
       if (!pos) return;
+      meshes++;
       tris += (geo.index ? geo.index.count : pos.count) / 3;
       // PER VERTEX, not per bounding sphere. A flat torus lying on the skull
       // has a bounding sphere whose centre-minus-radius is far inside the
@@ -978,14 +980,35 @@ _dbg.__hatSheet = async (ids: string[]) => {
       // reported the party hat's frill at 0.45 and the frill was fine at 1.06.
       // Conservative is the wrong kind of wrong for a rule that decides
       // whether geometry gets rebuilt.
+      //
+      // …AND PER MESH, which the first version was not. It took ONE min over
+      // the whole hat, so a single deliberately-buried part — a chinstrap, a
+      // horn root — set `closest` under 0.85 and passed the entire hat,
+      // floating brim and all. The chef read 1.14 and rendered as a flying
+      // saucer; the horn read 1.02 with a mane hanging off the back in mid
+      // air. A hat is only as good as its worst PART.
+      let lo = 1e9, hi = 0;
       for (let i = 0; i < pos.count; i++) {
         _v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
         const d = _v.length();
-        if (d < closest) closest = d;
+        if (d < lo) lo = d;
+        if (d > hi) hi = d;
         if (_v.y > top) top = _v.y;
         const rr = Math.hypot(_v.x, _v.z);
         if (rr > wide) wide = rr;
       }
+      if (lo < closest) closest = lo;
+      // Three ways to be right, and only three:
+      //   CLEAR  — every vertex outside the jelly's reach (>= 1.14)
+      //   BURIED — every vertex inside the skull (<= 0.85), e.g. a strap
+      //   ROOTED — it CROSSES, steeply: in past 0.85 and out past 1.14. A horn
+      //            or an ear grows through the surface, and the churn only
+      //            ever moves the waterline over a part that is deep on both
+      //            sides of it.
+      // Anything else GRAZES: it hovers just off the skin or barely dips in,
+      // and the body's swell will swallow and spit it out every frame.
+      const ok = lo >= 1.14 || hi <= 0.85 || (lo <= 0.85 && hi >= 1.14);
+      if (!ok) graze.push(`${o.name || geo.type}#${meshes} ${lo.toFixed(2)}..${hi.toFixed(2)}`);
     });
     // FRAME TO FIT. A fixed camera cropped the pompom off the first hat it
     // rendered, which is exactly the detail these sheets exist to judge.
@@ -1007,7 +1030,7 @@ _dbg.__hatSheet = async (ids: string[]) => {
       ctx.putImageData(img, i * S, 0);
     }
     sc.remove(g);
-    out.push({ id: h.id, meshes, tris: Math.round(tris), closest, top, wide,
+    out.push({ id: h.id, meshes, tris: Math.round(tris), closest, top, wide, graze,
       png: cv.toDataURL('image/png').split(',')[1] });
   }
   return out;

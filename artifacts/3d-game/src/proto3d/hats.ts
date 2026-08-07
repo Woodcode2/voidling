@@ -57,6 +57,12 @@ export interface Hat {
   seat: number;
   /** a mesh named 'spin' inside it turns; propellers, mostly */
   spin?: number;
+  /** Vertical trim, applied at mount. Authored hats clear the head by
+   *  construction but several sat visibly ABOVE it — a hat that hovers reads
+   *  as a halo, and the difference between hovering and worn is a few
+   *  hundredths of a body radius that is far easier to judge from a render
+   *  than to derive. Negative lowers it. */
+  drop?: number;
   /** LEGENDARY ONLY: the hat has opinions. See hatLine(). */
   lines?: string[];
   /** shop card accent, and the tint of the legendary ribbon */
@@ -70,34 +76,34 @@ export interface Hat {
 //   legendary — a character. Bigger, glowing, and it TALKS.
 export const HATS: Hat[] = [
   { id: 'party', name: 'Party Hat', blurb: 'every void deserves a party', tier: 'free',
-    seat: 1.02, accent: 0xff6fae },
+    seat: 1.02, drop: -0.12, accent: 0xff6fae },
 
   { id: 'chef', name: 'Chef Toque', blurb: 'the town is the menu', tier: 'plus', usd: 1.99,
-    seat: 1.00, accent: 0xfdf6e8 },
+    seat: 1.00, drop: -0.02, accent: 0xfdf6e8 },
   { id: 'cowboy', name: 'Ten-Gallon', blurb: 'this town ain’t big enough', tier: 'plus', usd: 1.99,
-    seat: 1.02, accent: 0xc79350 },
+    seat: 1.02, drop: -0.15, accent: 0xc79350 },
   { id: 'bobble', name: 'Bobble Beanie', blurb: 'cosy little world-ender', tier: 'plus', usd: 1.99,
-    seat: 0.98, accent: 0xd8453f },
+    seat: 0.98, drop: -0.14, accent: 0xd8453f },
   { id: 'flower', name: 'Flower Crown', blurb: 'eats gently, smells lovely', tier: 'plus', usd: 1.99,
-    seat: 1.04, accent: 0xff8ac0 },
+    seat: 1.04, drop: -0.06, accent: 0xff8ac0 },
 
   { id: 'wizard', name: 'Star Wizard', blurb: 'the hat knows things', tier: 'plus', usd: 2.99,
-    seat: 1.02, accent: 0x6f5cff },
+    seat: 1.02, drop: -0.15, accent: 0x6f5cff },
   { id: 'tricorn', name: 'Pirate Tricorn', blurb: 'yo ho, and also nom', tier: 'plus', usd: 2.99,
     seat: 1.04, accent: 0x2a2430 },
   { id: 'viking', name: 'Viking Helm', blurb: 'horns first, questions later', tier: 'plus', usd: 2.99,
-    seat: 0.96, accent: 0xc8ccd2 },
+    seat: 0.96, drop: -0.09, accent: 0xc8ccd2 },
   { id: 'space', name: 'Space Helmet', blurb: 'for eating other planets', tier: 'plus', usd: 2.99,
-    seat: 0.60, accent: 0x8ad4ff },
+    seat: 0.60, drop: -0.09, accent: 0x8ad4ff },
   { id: 'propeller', name: 'Propeller Cap', blurb: 'it really spins', tier: 'plus', usd: 2.99,
-    seat: 0.98, spin: 3.4, accent: 0x35d6f0 },
+    seat: 0.98, drop: -0.13, spin: 3.4, accent: 0x35d6f0 },
 
   // ── LEGENDARY ────────────────────────────────────────────────────────────
   // Three, and no more. A legendary tier stops being legendary the moment it
   // has eight members. Each one is a CHARACTER: it changes the silhouette from
   // across the map, and it has a voice.
   { id: 'crown', name: 'Crown of the Void King', blurb: 'heavy is the head that eats the town',
-    tier: 'legendary', usd: 4.99, seat: 1.00, accent: 0xffd23f,
+    tier: 'legendary', usd: 4.99, seat: 1.00, drop: -0.01, accent: 0xffd23f,
     lines: [
       'ALL OF THIS IS MINE.',
       'the royal appetite is UNMATCHED',
@@ -153,9 +159,9 @@ export function hatLine(id: string | null): string | null {
 // ── LOD ABOUT THE SEAT, NOT ABOUT THE BODY ────────────────────────────────
 /** Apply the costume LOD to a hat so it grows in place instead of lifting off.
  *  `k` is the same scalar void3d would have put on the whole dress group. */
-export function applyHatLod(g: THREE.Object3D, seat: number, k: number): void {
+export function applyHatLod(g: THREE.Object3D, seat: number, k: number, drop = 0): void {
   g.scale.setScalar(k);
   // scale about (0, seat, 0): the point that stays put is the one where the
   // hat meets the skull, so the brim keeps touching whatever it was touching
-  g.position.y = seat * (1 - k);
+  g.position.y = seat * (1 - k) + drop * k;
 }

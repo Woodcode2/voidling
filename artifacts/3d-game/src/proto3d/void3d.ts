@@ -1078,6 +1078,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
       g.visible = true;
       wornHat = g; wornSeat = meta.seat; spinRate = meta.spin ?? 0;
+      g.position.y = meta.drop ?? 0;   // see Hat.drop
       if (spinRate) g.traverse((o) => { if (o.name === 'spin') spinner = o; });
     },
     setSkin(s: Skin) {
@@ -1290,7 +1291,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const lod = 1 + small * 0.42;
       dress.scale.setScalar(lod);
       if (wornHat) {
-        applyHatLod(wornHat, wornSeat, lod);
+        applyHatLod(wornHat, wornSeat, lod, HAT_BY_ID[wornHatId!]?.drop ?? 0);
         // …and undo the group's scale on the way in, or the hat gets it twice
         wornHat.scale.multiplyScalar(1 / lod);
         wornHat.position.y /= lod;
