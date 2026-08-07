@@ -43,7 +43,13 @@ async function play(flip) {
     const m = window.__matchState();
     // matchLen is not exposed, but the countdown is: solo runs 120s against
     // 180, so the clock a few seconds in separates them by a minute.
-    return { clock: Math.round(m.clock), rivals: m.rivals.length,
+    // JOINED, not roster length. rivals.list is the full cast whether or not
+    // anyone is playing — solo suppresses them by never advancing their clock
+    // (rivals.update is fed t=0), so `joined` stays false and they are never
+    // spawned or drawn. The first version of this test counted the roster and
+    // reported a bug that did not exist.
+    return { clock: Math.round(m.clock),
+      rivals: m.rivals.filter((r) => r.joined).length, roster: m.rivals.length,
       board: getComputedStyle(document.getElementById('board')).display,
       stored: localStorage.getItem('voidSolo') };
   });
@@ -54,7 +60,7 @@ await boot();
 const off = await play(false);
 check('default is rivals-on', off.before === false && off.after === false, `chip on=${off.after}`);
 check('normal run is the 3:00 match', off.clock > 150, `clock=${off.clock}s`);
-check('normal run schedules rivals', off.rivals > 0, `${off.rivals} rivals`);
+check('normal run lets rivals join', off.rivals > 0, `${off.rivals} joined of ${off.roster}`);
 check('leaderboard visible in normal run', off.board !== 'none', `board display=${off.board}`);
 
 // flip it on, mid-session
@@ -62,7 +68,7 @@ await boot();
 const on = await play(true);
 check('toggle turns on', on.after === true, `chip on=${on.after}, stored=${on.stored}`);
 check('solo run is the 2:00 match', on.clock <= 120, `clock=${on.clock}s`);
-check('solo schedules no rivals', on.rivals === 0, `${on.rivals} rivals`);
+check('solo lets none join', on.rivals === 0, `${on.rivals} joined of ${on.roster}`);
 check('leaderboard hidden in solo', on.board === 'none', `board display=${on.board}`);
 check('setting written to storage', on.stored === '1', `voidSolo=${on.stored}`);
 
