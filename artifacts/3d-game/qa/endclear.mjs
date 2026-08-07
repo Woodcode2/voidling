@@ -46,19 +46,27 @@ for (const [w, h] of SIZES) {
     const go = end.querySelector('.endGo');
     const coinsShown = coins && getComputedStyle(coins).display !== 'none';
     const overlap = (coinsShown && hd) ? hit(box(hd), box(coins)) : false;
+    // …and the OTHER collision on this card: #endNext carries the only button
+    // outside the pinned row — "OPEN SHOP →", the door for a child who has
+    // just been told they can afford a skin. Under the sticky row it may as
+    // well not exist, because nothing tells a six-year-old to scroll.
+    const shop = document.getElementById('endShop');
+    const shopHidden = shop && go ? hit(box(shop), box(go)) : null;
     // how far past the bottom of the scrollport the content runs
     const overflow = Math.max(0, end.scrollHeight - end.clientHeight);
     return {
       title: hd ? hd.textContent.trim().slice(0, 40) : '(none)',
       hd: hd ? box(hd) : null, coins: coinsShown ? box(coins) : null,
       overlap, overflow, goH: go ? box(go).h : 0,
+      shopPresent: !!shop, shopHidden,
       atBottomAll: end.scrollHeight <= end.clientHeight,
     };
   });
-  const ok = !r.overlap;
+  const ok = !r.overlap && r.shopHidden !== true;
   rows.push(`${ok ? 'PASS' : 'FAIL'}  ${String(w) + 'x' + h}  headline "${r.title}"`
     + `  hd.top=${r.hd ? r.hd.t.toFixed(0) : '-'}  coin.bottom=${r.coins ? r.coins.b.toFixed(0) : 'hidden'}`
-    + `  overlap=${r.overlap}  scroll overflow=${r.overflow.toFixed(0)}px`);
+    + `  overlap=${r.overlap}  shopCovered=${r.shopPresent ? r.shopHidden : 'n/a'}`
+    + `  scroll overflow=${r.overflow.toFixed(0)}px`);
   await p.screenshot({ path: `qa-out/end-${w}.png` });
   await p.close();
 }

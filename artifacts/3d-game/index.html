@@ -1443,8 +1443,16 @@
       <!-- TODAY'S QUESTS, with words on them. They existed as three unlabelled
            emoji chips floating in the menu's margin and read as debug output;
            this is where a child is deciding whether to press PLAY AGAIN. -->
-      <div id="endQuests"></div>
+      <!-- THE SHOP NUDGE SITS ABOVE THE QUESTS, not below them, and that is a
+           collision fix rather than an editorial preference. #endNext is the
+           only thing on this card that carries a BUTTON — "OPEN SHOP →", added
+           so a child told "you can afford the TOXIC skin" has somewhere to go.
+           Last in the DOM it landed directly under the pinned PLAY AGAIN row,
+           so at the scroll position the card opens at, the door the comment
+           talks about was behind the furniture. Measured at 430x932: it moves
+           from under the sticky row to roughly 300px clear of it. -->
       <div id="endNext"></div>
+      <div id="endQuests"></div>
       <!-- THE WAY BACK IN NEVER SCROLLS AWAY. These were direct children of a
            scrolling #end, so every row added above them pushed them down — and
            the Scrapbook reveal adds a row per sticker. Measured: with no finds
