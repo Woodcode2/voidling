@@ -4387,14 +4387,26 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       const cv = document.getElementById(`hatcv_${h.id}`) as HTMLCanvasElement | null;
       if (!cv) continue;
       const g = buildHat(h.id);
+      g.position.y = h.drop ?? 0;   // preview what SHIPS, not what was authored
       sc.add(g);
-      // frame the whole thing, hat included — a cropped pompom is exactly the
-      // detail these previews exist to sell
+      // Frame the whole thing, hat included — a cropped pompom is exactly the
+      // detail these previews exist to sell.
+      //
+      // …AND FRAME ON THE WIDTH TOO. The first version sized the camera off the
+      // hat's HEIGHT alone, which is fine until a hat is wider than it is tall:
+      // the Ten-Gallon is 3.7 across against a 3.66 frame and its brim ran off
+      // both edges of the card, and the Bobble and the Flower Crown lost their
+      // tops the same way. Hats vary more in width than in height, so the span
+      // has to be the larger of the two.
       g.updateWorldMatrix(true, true);
       const box = new THREE.Box3().setFromObject(g);
       const top = Math.max(isFinite(box.max.y) ? box.max.y : 1.6, 1.6);
+      const wide = isFinite(box.max.x)
+        ? Math.max(Math.abs(box.min.x), box.max.x, Math.abs(box.min.z), box.max.z, 1)
+        : 1.6;
       const mid = (top - 1.05) / 2;
-      const dist = ((top + 1.05) / (2 * Math.tan(Math.PI / 12))) * 1.1;
+      const span = Math.max(top + 1.05, wide * 2.2);
+      const dist = (span / (2 * Math.tan(Math.PI / 12))) * 1.08;
       cam.position.set(Math.sin(0.55) * dist, mid + 0.3, Math.cos(0.55) * dist);
       cam.lookAt(0, mid, 0);
       renderer.setRenderTarget(rt);

@@ -711,34 +711,50 @@ function buildCowboy(): THREE.Group {
     const p = geo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), z = p.getZ(i);
-      p.setY(i, p.getY(i) + 0.22 * x * x - 0.05 * z * z);
+      p.setY(i, p.getY(i) + 0.22 * x * x - 0.02 * z * z);
     }
     geo.computeVertexNormals();
   };
 
   // brim underbody — closed profile, so it has real chunky thickness and the
   // dark tan shows as a binding all the way round the rim
+  // ── THE HAT COMES DOWN OVER THE HEAD ────────────────────────────────────
+  // v1's brim was a flat disc spanning radius 0 to 1.74 at y = 1.34, and the
+  // crown a lathe with a closed bottom at y = 1.30. Nothing on the hat went
+  // below 1.30 — a third of a body radius above a head that reaches 1.0 — so
+  // the shop card showed a hat hovering over a ball.
+  //
+  // There is a hard fact underneath this. Every hat vertex is at |p| >= 1.14,
+  // and a point at |p| > 1 projects OUTSIDE the head's own silhouette from any
+  // angle, so a hat can never be seen touching the head. The gap is not
+  // removable; it is only placeable. Put the brim's rim high on the skull and
+  // it is a wide band of daylight across the widest part of the void. Bring it
+  // down to polar 1.05, where the head's outline has already fallen away, and
+  // the same gap is a thin crescent that reads as the shade under a brim.
+  //
+  // So the brim starts at the crown's own rim rather than at the axis, and the
+  // whole hat sits 0.7 lower than it did.
   const brimGeo = new THREE.LatheGeometry([
-    V(0.00, 1.340), V(0.78, 1.340), V(1.22, 1.325), V(1.56, 1.350), V(1.70, 1.420),
-    V(1.74, 1.480),
-    V(1.67, 1.520), V(1.52, 1.460), V(1.20, 1.415), V(0.78, 1.425), V(0.00, 1.425),
-  ], 16);
+    V(1.05, 0.660), V(1.34, 0.600), V(1.66, 0.620), V(1.82, 0.690),
+    V(1.74, 0.550), V(1.44, 0.470), V(1.12, 0.510), V(1.05, 0.570),
+  ], 20);
   curl(brimGeo);
   const brim = new THREE.Mesh(brimGeo, felt(TAN_DARK));
 
-  // light top skin, inset 0.09 from the rim
+  // light top skin, inset from the rim
   const topGeo = new THREE.LatheGeometry([
-    V(0.00, 1.445), V(0.78, 1.445), V(1.20, 1.435), V(1.52, 1.480), V(1.65, 1.530),
-  ], 16);
+    V(1.06, 0.690), V(1.34, 0.632), V(1.64, 0.652), V(1.76, 0.706),
+  ], 20);
   curl(topGeo);
   const brimTop = new THREE.Mesh(topGeo, new THREE.MeshStandardMaterial({
     color: TAN_LIGHT, roughness: 0.72, side: THREE.DoubleSide }));
 
-  // tall crown, base buried inside the brim's thickness so it grows out of it
+  // tall crown, descending to the brim line. Open at the bottom — the brim
+  // caps it — and DoubleSide because the play camera gets under the curl.
   const crownGeo = new THREE.LatheGeometry([
-    V(0.00, 1.30), V(0.78, 1.30), V(0.75, 1.58), V(0.72, 1.88),
-    V(0.76, 2.14), V(0.79, 2.26), V(0.70, 2.37), V(0.46, 2.43), V(0.00, 2.45),
-  ], 14);
+    V(1.05, 0.62), V(1.02, 0.95), V(0.88, 1.30), V(0.78, 1.70),
+    V(0.75, 2.00), V(0.79, 2.22), V(0.70, 2.34), V(0.46, 2.41), V(0.00, 2.43),
+  ], 18);
   {
     // cattleman crease: a valley pressed down the middle of the top running
     // front-to-back, leaving the two side ridges standing proud
@@ -752,12 +768,13 @@ function buildCowboy(): THREE.Group {
     crownGeo.computeVertexNormals();
   }
   const crown = new THREE.Mesh(crownGeo, felt(TAN_LIGHT));
+  (crown.material as THREE.Material).side = THREE.DoubleSide;
 
   // leather band, tucked under the lifted brim at the sides
-  const band = new THREE.Mesh(new THREE.TorusGeometry(0.755, 0.085, 8, 16),
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.875, 0.085, 8, 18),
     new THREE.MeshStandardMaterial({ color: 0x8a3c1e, roughness: 0.6 }));
   band.rotation.x = Math.PI / 2;
-  band.position.y = 1.70;
+  band.position.y = 1.42;
 
   // ── the one bit of delight: a chunky silver sheriff star on the band ──
   const starGeo = new THREE.CylinderGeometry(0.19, 0.19, 0.055, 10);
@@ -775,14 +792,16 @@ function buildCowboy(): THREE.Group {
   const star = new THREE.Mesh(starGeo, new THREE.MeshStandardMaterial({
     color: 0xeef3fa, roughness: 0.16, metalness: 0.95,
     emissive: 0x9dc0e8, emissiveIntensity: 0.45, flatShading: true }));
-  star.position.set(0, 1.70, 0.87);
+  star.position.set(0, 1.42, 0.945);
   star.rotation.set(Math.PI / 2, Math.PI / 5, 0);   // one point straight up
 
   // everything goes in one group so the rakish tilt is a rotation about the
   // ORIGIN — which is norm-preserving, so the wobble clearance survives it
   const hat = new THREE.Group();
   hat.add(brim, brimTop, crown, band, star);
-  hat.rotation.z = -0.05;
+  // rakish, and the X tilt is load-bearing: level, the brim's lowest front
+  // point lands at y = 0.429 and the void's brows reach 0.55.
+  hat.rotation.set(-0.16, 0, -0.05);
   g.add(hat);
 
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
@@ -1158,10 +1177,21 @@ function buildViking(): THREE.Group {
   });
 
   // beaten-iron dome: a cap of the r=1.30 sphere, stretched along its own axis
-  // then rocked backward. The rim lands at y=1.33 / z=0.49 in front (clear of
-  // the face) and skirts down to y=0.53 at the nape.
+  // then rocked backward.
+  //
+  // Carried to polar 1.16, not 0.86. At 0.86 the rim sat at |p| = 1.42 with the
+  // void's head at 1.0 under it, and the render showed a clear crescent of
+  // daylight between helm and skull — the helm read as hovering. At 1.16 the
+  // rim lands at (radial 1.19, y 0.62), which is OUTSIDE the head's own outline
+  // at that height, so the standoff reads as the flare of a helm instead of as
+  // air. The tilt then carries the front to y=1.05, well clear of the brows,
+  // and skirts the back down to y=0.08 as a nape guard.
+  //
+  // Everything else — band, nasal, horns, rivets — is untouched: the dome now
+  // continues PAST the band rather than ending at it, so the band becomes a
+  // brow band riveted onto the helm, which is what it is called.
   const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(1.30, 12, 8, 0, Math.PI * 2, 0, 0.86), steel);
+    new THREE.SphereGeometry(1.30, 14, 10, 0, Math.PI * 2, 0, 1.16), steel);
   dome.scale.y = 1.20;
   dome.rotation.x = -TILT;
   g.add(dome);
@@ -1352,29 +1382,36 @@ function buildSpace(): THREE.Group {
 function buildPropeller(): THREE.Group {
   const g = new THREE.Group();
   // ── PROPELLER CAP ──────────────────────────────────────────────────────────
-  // Six primary-colour panels, a button, and a two-blade prop on a mast. The
-  // whole thing is authored UPRIGHT — dome pole on +Y — and tilted back at the
-  // very end. That tilt is not decoration, it is the only way this silhouette is
-  // legal. A beanie has to reach down to theta ~0.95 or it reads as a saucer
-  // hovering over the pole, but an upright dome that deep puts its front edge at
-  // (y 0.76, z 1.06) — straight across the eyes. Rotating about X is FREE on the
-  // clearance rule (rotation preserves |p|, so every panel vertex stays exactly
-  // 1.30 from the origin no matter how far it swings) and it moves the front
-  // edge to polar angle 0.95 - 0.55 = 0.40, i.e. (y 1.20, z 0.51): above the
-  // brows, behind the z = 0.6 line, with the deep part of the cap now hanging
-  // down the BACK of the head. Which is where a cartoon child wears one anyway.
+  // Six primary-colour panels, a button, and a two-blade prop on a mast.
+  //
+  // ── WHY THIS WAS REBUILT ──────────────────────────────────────────────────
+  // v1 reasoned that an upright cap deep enough to look like a beanie puts its
+  // front edge across the eyes, and cured that by tilting the whole hat back
+  // 0.55 radians. The reasoning was right and the cure was too strong: at 32
+  // degrees off vertical the cap swings behind the skull, and from the front —
+  // which is most of a shop card — you see a coloured disc edge-on with a
+  // propeller apparently growing out of the back of the void's neck.
+  //
+  // The real fix is the beanie's: STRETCH the cap on Y instead of tilting it
+  // away. |p|^2 = x^2 + z^2 + (k*y)^2 can only grow for k > 1, so a stretch is
+  // free on the clearance rule where a squash would be fatal, and a stretched
+  // cap is tall enough to read as worn while its rim stays high enough to clear
+  // the brows on a tilt of 0.20 rather than 0.55.
   const RED = 0xf0392f, YEL = 0xffd334, BLU = 0x2f86f0, GRN = 0x33c65c;
   const CREAM = 0xfff4e2, STEEL = 0xdbe2ec;
-  const R_CAP = 1.30;          // > 1.22: the jelly can never swallow the cap
-  const TH = 0.95;             // how far down the sides the beanie reaches
-  const TILT = 0.55;
+  const DR = 1.22, DP = 1.20, KY = 1.24, TILT = 0.20;
+
+  // the stretch lives in a frame so every part of the cap shares it exactly
+  const crown = new THREE.Group();
+  crown.scale.set(1, KY, 1);
+  g.add(crown);
 
   // ── THE SIX PANELS ────────────────────────────────────────────────────────
   // One SphereGeometry wedge each, all cut from the SAME sphere of the SAME
   // radius, so the seams are exact and the six meshes shade as one dome — no
   // cracks, no z-fighting, and the clearance is the radius itself: one number,
-  // true at every vertex. DoubleSide because the cap now hangs low at the back
-  // and the play camera looks up under it constantly.
+  // true at every vertex. DoubleSide because the cap hangs low at the back and
+  // the play camera looks up under it constantly.
   // PHI0 centres a whole panel on +Z rather than a seam, so the child sees three
   // clean colours across the front (blue / red / yellow) instead of a join.
   const PANELS = [RED, YEL, BLU, GRN, RED, BLU];
@@ -1382,41 +1419,43 @@ function buildPropeller(): THREE.Group {
   const PHI0 = Math.PI / 2 - STEP / 2;
   for (let i = 0; i < 6; i++) {
     const p = new THREE.Mesh(
-      new THREE.SphereGeometry(R_CAP, 3, 4, PHI0 + i * STEP, STEP, 0, TH),
+      new THREE.SphereGeometry(DR, 5, 7, PHI0 + i * STEP, STEP, 0, DP),
       new THREE.MeshStandardMaterial({
         color: PANELS[i], roughness: 0.58, metalness: 0, side: THREE.DoubleSide,
       }));
-    g.add(p);
+    crown.add(p);
   }
 
   // ── THE BAND ──────────────────────────────────────────────────────────────
-  // Sat on a slightly LARGER sphere (1.35) than the panels so the tube's inner
-  // face still clears at 1.28, and offset from the panel edge by only 0.05 so
-  // the 0.07 tube swallows the raw open hem. Cream, not a fifth primary — the
-  // four colours need one neutral to sing against, and a pale ring is also the
-  // line that separates hat from purple orb at forty pixels.
-  const RB = 1.35;
+  // One tube-radius out along the STRETCHED cap's own rim normal, which runs
+  // along (x/a^2, y/b^2) and not along the radius — get that wrong and the
+  // band floats off the hem. Cream, not a fifth primary: the four colours need
+  // one neutral to sing against, and a pale ring is also the line that
+  // separates hat from purple orb at forty pixels.
+  const a2 = DR * DR, b2 = (DR * KY) * (DR * KY);
+  const rx = DR * Math.sin(DP), ry = DR * Math.cos(DP) * KY;
+  let nx = rx / a2, ny = ry / b2;
+  const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
   const rim = new THREE.Mesh(
-    new THREE.TorusGeometry(RB * Math.sin(TH), 0.07, 8, 18),
+    new THREE.TorusGeometry(rx + 0.055 * nx, 0.075, 8, 26),
     new THREE.MeshStandardMaterial({ color: CREAM, roughness: 0.62 }));
   rim.rotation.x = Math.PI / 2;
-  rim.position.y = RB * Math.cos(TH);
+  rim.position.y = ry + 0.055 * ny;
   g.add(rim);
 
   // ── BUTTON ────────────────────────────────────────────────────────────────
-  // Seated INTO the crown: the bottom face sits at y 1.28, just under the 1.30
-  // dome, so the pole pokes through it and it reads as sewn on rather than
-  // balanced on top. Still 1.28 from the origin, so still outside the churn.
+  // Seated INTO the crown so the pole pokes through it and it reads as sewn on
+  // rather than balanced on top.
   const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.23, 0.14, 10),
     new THREE.MeshStandardMaterial({ color: CREAM, roughness: 0.5, flatShading: true }));
-  btn.position.y = 1.35; g.add(btn);
+  btn.position.y = DR * KY + 0.02; g.add(btn);
 
   // ── MAST ──────────────────────────────────────────────────────────────────
-  // The 0.42 of air between crown and blades is the whole joke. Without a gap
-  // the prop is a hat decoration; with one it is a machine bolted to a child.
+  // The air between crown and blades is the whole joke. Without a gap the prop
+  // is a hat decoration; with one it is a machine bolted to a child.
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.30, 8),
     new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.3, metalness: 0.75, flatShading: true }));
-  post.position.y = 1.55; g.add(post);
+  post.position.y = DR * KY + 0.22; g.add(post);
 
   // ── THE PROPELLER ─────────────────────────────────────────────────────────
   // name === 'spin' and rotation.y is what void3d drives, so the HUB carries the
@@ -1432,7 +1471,7 @@ function buildPropeller(): THREE.Group {
       roughness: 0.3, metalness: 0.25, flatShading: true,
     }));
   hub.name = 'spin';
-  hub.position.y = 1.72;
+  hub.position.y = DR * KY + 0.40;
   g.add(hub);
 
   // Two blades, PITCHED IN OPPOSITE DIRECTIONS about the bar axis. A single flat
@@ -1442,18 +1481,19 @@ function buildPropeller(): THREE.Group {
   // is legible as motion and not as a blur of one hue.
   const BLADES: Array<[number, number]> = [[1, RED], [-1, YEL]];
   for (const [s, col] of BLADES) {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.055, 0.24),
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.055, 0.26),
       new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, flatShading: true }));
-    b.position.x = s * 0.50;      // inner ends buried in the hub
+    b.position.x = s * 0.52;      // inner ends buried in the hub
     b.rotation.x = s * 0.34;
     hub.add(b);
   }
 
-  // Tilted back 0.55 (see the top of this function — this is the clearance fix,
-  // not a flourish) plus a 0.07 roll, because a propeller beanie sitting dead
-  // square is a colander. The roll is small enough that the band's forwardmost
-  // tube point still lands at z 0.597, inside the 0.6 line.
+  // Tipped back and rolled a little, because a propeller beanie sitting dead
+  // square is a colander. Rotation about the origin is free on the clearance
+  // rule — every vertex keeps the |p| it was checked at — and 0.20 is enough to
+  // carry the band's front underside clear of the brows.
   g.rotation.set(-TILT, 0, -0.07);
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }
 
@@ -1464,49 +1504,111 @@ function buildPropeller(): THREE.Group {
 // seated on it, so the corners rise out of the brim rather than sitting on it.
 function buildTricorn(): THREE.Group {
   const g = new THREE.Group();
-  const BLACK = 0x22202c, GOLD = 0xffc21f, BONE = 0xfff4e2, RED = 0xd8302f;
-  const felt = flat(BLACK, 0.78);
+  // ── PIRATE TRICORN ────────────────────────────────────────────────────────
+  // ── WHY THIS WAS REBUILT ────────────────────────────────────────────────
+  // v1 was a flat gold-edged plate with three black triangles standing on it.
+  // The "crown" was a spherical cap 1.71 wide and 0.32 tall — a lid — and the
+  // brim was a 0.10-tall cylinder, which is a disc. The three corners were
+  // 3-segment cylinders, which is to say flat triangular cards. Nothing in it
+  // had volume, so it rendered as a paper cutout from every angle.
+  //
+  // A tricorn is ONE brim FOLDED UP in three places. That is not three plates
+  // glued to a disc, it is a deformation — so the brim here is a single closed
+  // lathe whose vertices are lifted by (1 + cos(3*theta)), which raises three
+  // sides and leaves three points hanging between them. That is the hat.
+  const BLACK = 0x252231, BLACK_L = 0x39344a, GOLD = 0xffc21f, BONE = 0xfff4e2, RED = 0xd8302f;
 
-  // the crown, low and rounded — a tricorn has almost none, which is why the
-  // corners have to do all the work
-  const crown = new THREE.Mesh(new THREE.SphereGeometry(1.30, 26, 12, 0, Math.PI * 2, 0, 0.72), felt);
-  (crown.material as THREE.Material).side = THREE.DoubleSide;
+  // ── THE CROWN ───────────────────────────────────────────────────────────
+  // Stretched on Y, the beanie's trick: |p|^2 = x^2 + z^2 + (k*y)^2 only grows
+  // for k > 1, so the cap can be tall enough to have a shape without costing a
+  // thousandth of clearance.
+  const DR = 1.16, DP = 1.00, KY = 1.22;
+  const crown = new THREE.Group();
+  crown.scale.set(1, KY, 1);
   g.add(crown);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(DR, 24, 12, 0, Math.PI * 2, 0, DP),
+    new THREE.MeshStandardMaterial({ color: BLACK, roughness: 0.8, side: THREE.DoubleSide }));
+  crown.add(cap);
 
-  // the brim: a wide shallow cone, tipped up at the rim
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.30, 0.10, 30, 1, true), felt);
-  brim.position.y = 1.02; g.add(brim);
-  const lip = new THREE.Mesh(new THREE.TorusGeometry(1.70, 0.075, 8, 34), flat(GOLD, 0.3, 0.7));
-  lip.rotation.x = Math.PI / 2; lip.position.y = 1.06; g.add(lip);
+  // ── THE BRIM, AND THE FOLD ──────────────────────────────────────────────
+  // A closed profile so it has real thickness — a brim that ends in a single
+  // edge is paper — running from the crown's own rim out to 1.76 and drooping
+  // as it goes.
+  const RIN = DR * Math.sin(DP), YIN = DR * Math.cos(DP) * KY;
+  const V = (r: number, y: number): THREE.Vector2 => new THREE.Vector2(r, y);
+  const brimGeo = new THREE.LatheGeometry([
+    V(RIN, YIN + 0.06), V(1.24, YIN - 0.03), V(1.60, YIN - 0.08), V(1.76, YIN - 0.05),
+    V(1.72, YIN - 0.17), V(1.56, YIN - 0.20), V(1.22, YIN - 0.15), V(RIN, YIN - 0.06),
+  ], 42);
+  {
+    // Three sides up, three points down — with a POINT dead ahead, which is
+    // the +PI in the lobe. Phased the other way the front of the brim cocks up
+    // and hides the crown, the skull and everything else the shop card is
+    // showing; the first render was a black silhouette with a feather.
+    //
+    // The lift grows as the square of the distance out along the brim so the
+    // fold creases at the crown and opens at the rim, which is what a folded
+    // felt brim does; a linear lift bends the whole brim like a saucer.
+    const pos = brimGeo.getAttribute('position') as THREE.BufferAttribute;
+    const LIFT = 0.86;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const r = Math.hypot(x, z);
+      const t = Math.max(0, Math.min(1, (r - RIN) / (1.76 - RIN)));
+      const lobe = 0.5 + 0.5 * Math.cos(3 * Math.atan2(x, z) + Math.PI);
+      pos.setY(i, pos.getY(i) + LIFT * t * t * lobe);
+    }
+    brimGeo.computeVertexNormals();
+  }
+  const brim = new THREE.Mesh(brimGeo, new THREE.MeshStandardMaterial({
+    color: BLACK, roughness: 0.82, side: THREE.DoubleSide }));
+  g.add(brim);
 
-  // THREE CORNERS, folded up against the crown. Flat plates rather than
-  // curved shells: the fold of a tricorn is a crease, and a crease reads as a
-  // hard edge.
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + Math.PI;
-    const flip = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 1.05, 0.09, 3, 1, false), felt);
-    flip.position.set(Math.sin(a) * 1.05, 1.34, Math.cos(a) * 1.05);
-    flip.rotation.set(-0.95, -a, 0, 'YXZ');
-    g.add(flip);
+  // gold piping, folded by the SAME function so it stays welded to the rim.
+  // A torus laid flat would sit through the middle of the fold.
+  const pipeGeo = new THREE.TorusGeometry(1.74, 0.05, 6, 44);
+  {
+    const pos = pipeGeo.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      // the torus is authored in XY; put it in the brim's plane first
+      const rr = Math.hypot(x, y), th = Math.atan2(x, y);
+      const lobe = 0.5 + 0.5 * Math.cos(3 * th + Math.PI);
+      pos.setXYZ(i, Math.sin(th) * rr, YIN - 0.11 + 0.86 * lobe + z, Math.cos(th) * rr);
+    }
+    pipeGeo.computeVertexNormals();
+  }
+  const pipe = new THREE.Mesh(pipeGeo, flat(GOLD, 0.28, 0.75));
+  g.add(pipe);
+
+  // a felt hatband where the crown meets the brim, so the seam is a decision
+  const band = new THREE.Mesh(new THREE.TorusGeometry(RIN + 0.03, 0.075, 7, 30), flat(BLACK_L, 0.7));
+  band.rotation.x = Math.PI / 2; band.position.y = YIN + 0.02; g.add(band);
+
+  // ── THE SKULL, front and centre where the camera lives ──────────────────
+  // On the CROWN, in the gap the front point leaves — not out on the brim,
+  // where the fold either buries it or carries it out over the void's face.
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), soft(BONE, 0.55));
+  skull.scale.set(1, 1.05, 0.62); skull.position.set(0, 1.10, 0.90); g.add(skull);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 0.11), soft(BONE, 0.55));
+  jaw.position.set(0, 0.92, 0.94); g.add(jaw);
+  for (const sx of [-0.075, 0.075]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), flat(0x14121c, 0.5));
+    eye.position.set(sx, 1.13, 0.97); g.add(eye);
   }
 
-  // the skull badge, front and centre where the camera lives
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), soft(BONE, 0.55));
-  skull.scale.set(1, 1.05, 0.6); skull.position.set(0, 1.42, 1.02); g.add(skull);
-  const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.1), soft(BONE, 0.55));
-  jaw.position.set(0, 1.25, 1.06); g.add(jaw);
-  for (const sx of [-0.07, 0.07]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.052, 8, 6), flat(BLACK, 0.5));
-    eye.position.set(sx, 1.45, 1.14); g.add(eye);
+  // ── THE PLUME, the one piece of delight and the only colour ─────────────
+  // Tucked into the fold on the left, where the brim is up and there is
+  // somewhere for a feather to be held.
+  for (const [k, col, sc] of [[0, RED, 1.0], [1, 0xff6a5e, 0.72]] as [number, number, number][]) {
+    const f = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 9), soft(col, 0.68));
+    f.scale.set(0.15 * sc, 0.52 * sc, 0.22 * sc);
+    f.position.set(-1.16 - k * 0.22, YIN + 0.72 + k * 0.34, 0.52 + k * 0.10);
+    f.rotation.set(-0.30, 0, 0.55 + k * 0.22);
+    g.add(f);
   }
 
-  // …and the plume, which is the one piece of delight and the only colour
-  const plume = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), soft(RED, 0.7));
-  plume.scale.set(0.13, 0.5, 0.2);
-  plume.position.set(0.92, 1.62, -0.42); plume.rotation.set(0.5, 0, -0.6); g.add(plume);
-  const plume2 = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 9), soft(0xff6a5e, 0.7));
-  plume2.scale.set(0.1, 0.34, 0.15);
-  plume2.position.set(1.12, 1.92, -0.66); plume2.rotation.set(0.7, 0, -0.85); g.add(plume2);
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }
 

@@ -81,7 +81,7 @@ export const HATS: Hat[] = [
   { id: 'chef', name: 'Chef Toque', blurb: 'the town is the menu', tier: 'plus', usd: 1.99,
     seat: 1.00, drop: -0.02, accent: 0xfdf6e8 },
   { id: 'cowboy', name: 'Ten-Gallon', blurb: 'this town ain’t big enough', tier: 'plus', usd: 1.99,
-    seat: 1.02, drop: -0.15, accent: 0xc79350 },
+    seat: 0.90, accent: 0xc79350 },
   { id: 'bobble', name: 'Bobble Beanie', blurb: 'cosy little world-ender', tier: 'plus', usd: 1.99,
     seat: 0.98, accent: 0xd8453f },
   { id: 'flower', name: 'Flower Crown', blurb: 'eats gently, smells lovely', tier: 'plus', usd: 1.99,
@@ -96,7 +96,7 @@ export const HATS: Hat[] = [
   { id: 'space', name: 'Space Helmet', blurb: 'for eating other planets', tier: 'plus', usd: 2.99,
     seat: 0.60, drop: -0.09, accent: 0x8ad4ff },
   { id: 'propeller', name: 'Propeller Cap', blurb: 'it really spins', tier: 'plus', usd: 2.99,
-    seat: 0.98, drop: -0.13, spin: 3.4, accent: 0x35d6f0 },
+    seat: 0.98, spin: 3.4, accent: 0x35d6f0 },
 
   // ── LEGENDARY ────────────────────────────────────────────────────────────
   // Three, and no more. A legendary tier stops being legendary the moment it
