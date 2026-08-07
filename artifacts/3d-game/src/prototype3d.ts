@@ -1045,7 +1045,16 @@ const PUFF = 120;
 const puffGeo = new THREE.BufferGeometry();
 const puffPos = new Float32Array(PUFF * 3);
 puffGeo.setAttribute('position', new THREE.BufferAttribute(puffPos, 3));
-const puffPoints = new THREE.Points(puffGeo, new THREE.PointsMaterial({ color: 0x9a6ae0, size: 2.1, map: puffTex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
+// ── THE EAT IS THE VERB, AND IT WAS THREE PURPLE DOTS ─────────────────────
+// Every absorb in the game spat the same 0x9a6ae0 whatever it had just
+// swallowed, so eating a red postbox and eating a green hedge produced
+// identical feedback on the one action the entire game is built around. The
+// colour is per-particle now and comes from the prop's own vertex colours, so
+// the burst is made of the thing that just went in.
+const puffCol = new Float32Array(PUFF * 3);
+puffCol.fill(0.6);
+puffGeo.setAttribute('color', new THREE.BufferAttribute(puffCol, 3));
+const puffPoints = new THREE.Points(puffGeo, new THREE.PointsMaterial({ vertexColors: true, size: 2.1, map: puffTex, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending, depthWrite: false }));
 puffPoints.frustumCulled = false; scene.add(puffPoints);
 
 // ── ONE DRAW CALL FOR EVERY SHADOW ON THE ISLAND ────────────────────────────
@@ -1140,14 +1149,49 @@ let findRingK = 0, findRingLast = 0;
 const puffVel: THREE.Vector3[] = []; const puffLife: number[] = [];
 for (let i = 0; i < PUFF; i++) { puffVel.push(new THREE.Vector3()); puffLife.push(0); puffPos[i * 3 + 1] = -999; }
 let puffHead = 0;
-function spawnPuff(x: number, y: number, z: number, n: number) {
+/** THE COLOUR A PROP IS, averaged from its own vertex colours and cached on
+ *  it. Props are merged geometries with per-vertex colour — that IS the art —
+ *  so the honest tint is already in the buffer and costs one sampled pass the
+ *  first time a prop is eaten. Sampled, not summed: a bus has thousands of
+ *  vertices and 24 of them describe it well enough for a spark.
+ *  Saturation is pushed and lightness floored afterwards, because a straight
+ *  mean of a whole prop tends to mud, and mud on an additive blend is grey. */
+const _tintC = new THREE.Color(), _tintHSL = { h: 0, s: 0, l: 0 };
+function propTint(o: THREE.Object3D): THREE.Color {
+  const hit = o.userData.tint as THREE.Color | undefined;
+  if (hit) return hit;
+  let r = 0, g = 0, b = 0, n = 0;
+  o.traverse((m) => {
+    const ca = (m as THREE.Mesh).geometry?.getAttribute?.('color');
+    if (!ca) return;
+    const step = Math.max(1, Math.floor(ca.count / 24));
+    for (let i = 0; i < ca.count; i += step) { r += ca.getX(i); g += ca.getY(i); b += ca.getZ(i); n++; }
+  });
+  const c = new THREE.Color();
+  if (n) {
+    c.setRGB(r / n, g / n, b / n);
+    c.getHSL(_tintHSL);
+    // a spark should read as the OBJECT's colour, louder than the object is
+    c.setHSL(_tintHSL.h, Math.min(1, _tintHSL.s * 1.6 + 0.12), Math.min(0.82, Math.max(0.52, _tintHSL.l * 1.25)));
+  } else {
+    c.setHex(0x9a6ae0);   // the old purple, for anything with no vertex colour
+  }
+  o.userData.tint = c;
+  return c;
+}
+function spawnPuff(x: number, y: number, z: number, n: number, col?: THREE.Color) {
+  const c = col ?? _tintC.setHex(0x9a6ae0);
   for (let k = 0; k < n; k++) {
     const i = puffHead; puffHead = (puffHead + 1) % PUFF;
     puffPos[i * 3] = x; puffPos[i * 3 + 1] = y; puffPos[i * 3 + 2] = z;
+    // a little per-spark variation so a burst is not one flat colour chip
+    const j = 0.86 + Math.random() * 0.28;
+    puffCol[i * 3] = c.r * j; puffCol[i * 3 + 1] = c.g * j; puffCol[i * 3 + 2] = c.b * j;
     const a = Math.random() * Math.PI * 2, up = rand(2, 8);
     puffVel[i].set(Math.cos(a) * rand(3, 9), up, Math.sin(a) * rand(3, 9));
     puffLife[i] = rand(0.35, 0.7);
   }
+  (puffGeo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 }
 
 // ── input: relative drag joystick (hole.io style) + WASD/arrows ───────────────
@@ -2413,13 +2457,22 @@ function capture(e: Edible, giveHunger = true) {
   // remember the last meal so the news can report on it BY NAME
   lastMeal = MEAL_NAME[(e.mesh.userData.qk as string) ?? ''] ?? mealOf(e);
   if (giveHunger) hunger = Math.min(1, hunger + 0.03);
-  spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z, 3);
+  // THE BURST IS MADE OF WHAT WENT IN, and there is more of it for a bigger
+  // meal. Three particles was the same amount of spectacle for a traffic cone
+  // and a house; the count now rides the radius the way every other cue in the
+  // game does. Small things still fizz rather than explode — 4 at r0.5, 12 at
+  // the top of the range.
+  const tint = propTint(e.mesh);
+  spawnPuff(e.mesh.position.x, voidling.group.position.y, e.mesh.position.z,
+    Math.round(3 + Math.min(9, e.radius * 2.2)), tint);
   // a building-sized bite lands with a ground shockwave + dust — seismic,
   // but deliberately NO camera shake (kids found the shake unpleasant)
   if (e.radius > 2) {
     audio.voice('yum');
-    fx.ring(e.mesh.position.x, e.mesh.position.z, 0xb875ff, e.radius * 3, 0.45);
-    spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6);
+    // …and the shockwave ring takes the prop's colour too, instead of the
+    // house violet it used whatever it had just flattened
+    fx.ring(e.mesh.position.x, e.mesh.position.z, tint.getHex(), e.radius * 3, 0.45);
+    spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6, tint);
   }
   voidling.chomp(bite);   // graded by how big that was relative to us
   stats.eaten++; matchEaten++;

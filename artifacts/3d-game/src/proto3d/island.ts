@@ -2442,6 +2442,28 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     return t;
   })();
   // fine, mid, coarse — and the repeat of the coarse layer.
+  // THE COARSE LAYER WAS BEING SAMPLED AND MULTIPLIED BY ZERO on three of the
+  // four worlds — `mix(vec3(1.0), g3 * 2.0, 0.0)` is exactly vec3(1.0), so the
+  // texture fetch happened every fragment of the largest surface in the frame
+  // and changed nothing. Measured with qa/ground.mjs, Lantern (which does use
+  // it, at 0.34) carries 6x Maple's fine detail energy, 3.9x the mid and 2.7x
+  // the coarse, on triple the spread.
+  // AND TURNING IT ON WAS THE WRONG FIX — measured, with qa/_grainab.mjs,
+  // which pins the camera and moves ONLY this weight (qa/ground.mjs drives the
+  // void and samples wherever it lands, and that variance is bigger than the
+  // effect). On Maple:
+  //     z 0     mid-detail 0.01650   mean 0.706
+  //     z 0.18  mid-detail 0.01656   mean 0.696
+  //     z 0.34  mid-detail 0.01512   mean 0.677
+  //     z 0.5   mid-detail 0.01579   mean 0.671
+  // Detail energy is flat-to-DOWN across the whole range, inside a +/-6% noise
+  // floor, while the mean falls monotonically. The layer is a repeat-9
+  // texture — large-scale patchiness, not grain — so at the radius a phone
+  // resolves it contributes nothing here and only darkens. It earns its place
+  // on Lantern because that floor is flagstone and gravel under lanterns and
+  // genuinely wants area variation; a sunlit town does not.
+  // So these stay at zero, and the fetch is now actually skipped rather than
+  // taken and multiplied by it.
   const GRAIN: Record<WorldId, [number, number, number, number]> = {
     maple:   [0.45, 0.08, 0.00, 9],
     pirate:  [0.45, 0.08, 0.00, 9],
@@ -2458,6 +2480,11 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     shader.uniforms.uDetail = { value: speckle };
     shader.uniforms.uMottle = { value: mottle };
     shader.uniforms.uGrain = { value: new THREE.Vector4(gFine, gMid, gCoarse, gRep) };
+    // QA can reach the live weights — see qa/_grainab.mjs. Judging a ground
+    // texture by rebuilding between values is slow enough that it does not get
+    // done, and the probe that drives the void to sample it has a noise floor
+    // bigger than the effect.
+    groundMat.userData.grainU = shader.uniforms.uGrain;
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <map_pars_fragment>',
         '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nuniform sampler2D uMottle;\nuniform vec4 uGrain;')
@@ -2465,10 +2492,16 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
         '#include <map_fragment>\n{'
         + ' vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb;'
         + ' vec3 g2 = texture2D(uDetail, vMapUv * 34.0).rgb;'
-        + ' vec3 g3 = texture2D(uMottle, vMapUv * uGrain.w).rgb;'
+        // …and SKIP the fetch when a world genuinely wants none of a layer,
+        // rather than sampling it and multiplying by zero. Now that all four
+        // worlds use all three this branch never fires, which is the point:
+        // turning a layer off should give the cost back, not just the effect.
         + ' diffuseColor.rgb *= mix(vec3(1.0), g * 2.0, uGrain.x)'
-        + '                  * mix(vec3(1.0), g2 * 2.0, uGrain.y)'
-        + '                  * mix(vec3(1.0), g3 * 2.0, uGrain.z);'
+        + '                  * mix(vec3(1.0), g2 * 2.0, uGrain.y);'
+        + ' if (uGrain.z > 0.0) {'
+        + '   vec3 g3 = texture2D(uMottle, vMapUv * uGrain.w).rgb;'
+        + '   diffuseColor.rgb *= mix(vec3(1.0), g3 * 2.0, uGrain.z);'
+        + ' }'
         + ' }');
   };
   const top = new THREE.Mesh(topGeo, groundMat);
