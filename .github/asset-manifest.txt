@@ -1,16 +1,35 @@
-artifacts/3d-game/public/assets/stickers
-pearl-zucchini	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_d1bdcb70-092f-4f2f-bd94-276e29956645.png	Generated for VOIDLING, owned by the project
-gus-sandwich	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171436_49e06c2c-af50-4c64-b0fd-a80c8309ed15.png	Generated for VOIDLING, owned by the project
-library-book	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_171437_e975cebf-9e09-4443-85d9-b7470d7e8684.png	Generated for VOIDLING, owned by the project
-beach-ball-cannon	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_1009fb0b-4104-41a0-8641-c776a0af1e4a.png	Generated for VOIDLING, owned by the project
-crab-manager	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_1364aa88-8709-42bd-8d8b-e5f51550ec30.png	Generated for VOIDLING, owned by the project
-flip-flop	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_0370ff26-4793-4f27-8287-fcba43aba4f9.png	Generated for VOIDLING, owned by the project
-enormous-hat	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172224_479a513a-a470-494d-ba23-601edc4cc7bd.png	Generated for VOIDLING, owned by the project
-blue-sedan	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_9603517d-7eb6-4c41-960b-4bb4128d99d9.png	Generated for VOIDLING, owned by the project
-foam-finger	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_32329b44-712a-4b86-b28a-e1e9f493b39d.png	Generated for VOIDLING, owned by the project
-lemonade-stand	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_87c843f1-037b-4bee-963c-4a1bc47687e9.png	Generated for VOIDLING, owned by the project
-eleven-bowls	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172901_6a79ad32-7fe5-4561-85ce-f6033002b8d1.png	Generated for VOIDLING, owned by the project
-offering-box	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_89a2a171-6bc9-4426-9c84-f046b72ac69b.png	Generated for VOIDLING, owned by the project
-ponta-dumpling	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_a0fecf31-985f-4075-b4a2-413a44587d09.png	Generated for VOIDLING, owned by the project
-good-cup	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_172929_9dc1f64c-10a7-4bf8-8ab0-656b2ac0856c.png	Generated for VOIDLING, owned by the project
-maze-middle	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260805_173859_3d153508-f421-4bd2-a505-41861a679b64.png	Generated for VOIDLING, owned by the project
+# ── MUSIC: one track per world ────────────────────────────────────────────
+# First line is the destination directory. Every line after is one asset:
+#     slot<space>URL<space>licence text to end of line
+#
+# Paste a DIRECT FILE URL (ends .mp3 / .m4a / .ogg), not a page URL. Pushing
+# this file on any branch except main runs .github/workflows/fetch-assets.yml,
+# which downloads each one, transcodes m4a -> mp3, names it for its slot and
+# writes CREDITS.txt beside it. A 404 fails the job rather than passing quietly.
+#
+# LICENCE RULE, and it is not negotiable for a children's App Store title:
+# CC0, Public Domain, Pixabay Licence or Kenney only. No CC-BY-SA, no
+# "free for non-commercial", no YouTube Audio Library rips. The licence text
+# you put on the line is the record that answers a rights query later.
+#
+# WHAT EACH SLOT NEEDS TO SOUND LIKE (from public/assets/music/README.md):
+#   maple    sleepy American small town, autumn, county fair. Warm, unhurried,
+#            a bit brass-band.
+#   pirate   five-star tropical resort cosplaying as a pirate hideout. Steel
+#            drums, ukulele, holiday shuffle.
+#   gameday  college football Saturday. Drumline, brass stabs, crowd energy.
+#   lantern  a spirit night market. Koto/shakuhachi colour, lantern-lit,
+#            gentle and a little uncanny.
+#
+# Then verify: node qa/music.mjs — it loads each world in a browser and reports
+# whether the RECORDING or the synth is playing, which is the only check that
+# catches a file that downloaded fine and does not decode.
+#
+# Uncomment and fill. Delete the lines you are not using — an empty URL is a
+# hard error, by design.
+#
+# maple    https://…/track.mp3    Pixabay Licence — <title> by <artist>
+# pirate   https://…/track.mp3    CC0 1.0 — <title> by <artist>
+# gameday  https://…/track.mp3    CC0 1.0 — <title> by <artist>
+# lantern  https://…/track.mp3    CC0 1.0 — <title> by <artist>
+artifacts/3d-game/public/assets/music
