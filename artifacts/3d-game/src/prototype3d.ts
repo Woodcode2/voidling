@@ -3050,6 +3050,15 @@ function endMatch() {
         document.body.classList.add('menu');
         menuEl.style.display = '';
         el('shop').classList.add('show');
+        // …AND PAINT IT. The cards are live renders that only start when
+        // __shopTab() runs, and #btnShop has called it since the day the
+        // comment beside it was written: "without this the first thing a child
+        // sees is thirteen empty gradients until they touch something."
+        // That fix went on the menu button only. This is the other door, and
+        // it is the one a child arrives at holding the coins the card just
+        // told them they could spend — so it opened on a grid of blanks at the
+        // exact moment the shop had earned their attention.
+        requestAnimationFrame(() => { _dbg.__shopTab?.(); });
       });
     } else nx.innerHTML = '';
   }
@@ -4890,6 +4899,21 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   {
     const rb = el('btnRestore');
     rb.addEventListener('click', () => {
+      // ── CHECK THE PLATFORM BEFORE THE GATE, NOT AFTER IT ────────────────
+      // The third instance of this. The skin path has always done it, the hat
+      // path was fixed with the note "a parent was handed a two-digit
+      // multiplication to solve and the reward for solving it was being told
+      // the thing is not for sale", and RESTORE was left behind — worse than
+      // either, because restoring is the button a parent presses when they
+      // believe they have ALREADY paid, so the dead end lands on someone with
+      // a genuine grievance.
+      if (!iapAvailable()) {
+        rb.textContent = 'ONLY ON THE APP STORE';
+        audio.ready();
+        track('restore_noiap', {});
+        setTimeout(() => { rb.textContent = 'RESTORE PURCHASES'; }, 2600);
+        return;
+      }
       askGrownUp(() => {
         rb.textContent = 'RESTORING…';
         void restorePurchases().then((res) => {
