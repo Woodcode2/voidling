@@ -1292,9 +1292,34 @@ export function createRivals(
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;
-        // …and the same crumb floor applies to what they sweep up in passing,
-        // or they would strip the beginner layer just by driving over it
-        const minSwallow = rv.full ? Infinity : rv.r * 0.45;
+        // ── THE CRUMB FLOOR IS WHY THE FAMILY STARVES ─────────────────────
+        // Counted on Maple at match start (5,790 props on the island):
+        //
+        //   the PLAYER at r=12.44          5,790 props    100.0%   no floor
+        //   a rival at 9.70, floor 0.45r     194 props      3.4%
+        //   a rival at 10.75, floor 0.45r     88 props      1.5%
+        //   a rival at 9.70, floor 0.18r   2,255 props     38.9%
+        //
+        // The player may eat EVERYTHING and the family is locked out of 96.6%
+        // of the island. Worse, the floor scales with r, so a rival that eats
+        // well starves itself: growing from 9.70 to 10.75 more than HALVES the
+        // food it is allowed. That is why raising the size cap to 0.88 in the
+        // previous commit moved the leader the wrong way, 59% of its lane to
+        // 44% — I fed them by making them pickier.
+        //
+        // The floor's stated reason is "they would strip the beginner layer
+        // just by driving over it". That reason is real, and it is about props
+        // vanishing where a child can see it — so it belongs on the drive-over
+        // path (minBite, above), which is exactly where it stays. The LARDER
+        // cannot commit that offence: it only runs when the rival is more than
+        // 95 units from the player, which is the gate written for this very
+        // concern. Off-screen, a rival eating small things is not stealing a
+        // beginner's layer; it is the island being eaten by somebody else,
+        // which is the whole point of the mechanism.
+        const minSwallow = rv.full ? Infinity : rv.r * 0.18;   // larder: off-screen
+        // …and the drive-over sweep keeps the original floor, because THAT is
+        // the one that happens where a child can watch it happen.
+        const minPassing = rv.full ? Infinity : rv.r * 0.45;
         // ── THE LARDER: a rival eats its own patch even when nobody is watching.
         //
         // This is the fix for the single worst thing in the game. A rival only
@@ -1362,7 +1387,7 @@ export function createRivals(
           }
         }
         for (const e of edibles) {
-          if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minSwallow) continue;
+          if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minPassing) continue;
           const dx = e.mesh.position.x - rv.x, dz = e.mesh.position.z - rv.z;
           if (dx * dx + dz * dz < (rv.r + e.radius * 0.6) ** 2) {
             e.mesh.userData.eaten = true;
