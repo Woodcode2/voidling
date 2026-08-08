@@ -4740,141 +4740,6 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // Rendered lazily on first open and cached: thirteen 256px renders is a few
   // hundred milliseconds of work that should not happen at boot for a child
   // who never visits the shop.
-  let thumbsDone = false;
-  function paintThumbs(): void {
-    if (thumbsDone) return;
-    thumbsDone = true;
-    const S = 256;
-    const sc = new THREE.Scene();
-    sc.environment = scene.environment;
-    sc.environmentIntensity = 0.35;
-    const key = new THREE.DirectionalLight(0xfff2d8, 2.5); key.position.set(-2.4, 4.4, 3.6); sc.add(key);
-    const rimL = new THREE.DirectionalLight(0x9fc8ff, 1.0); rimL.position.set(3.4, 1.6, -3.4); sc.add(rimL);
-    sc.add(new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.55));
-    const bodyMat = makeVoidBody();
-    applySkinToBody(bodyMat, SKINS.find((sk) => sk.id === (localStorage.getItem('voidSkin') || 'classic')) ?? SKINS[0]);
-    sc.add(new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), bodyMat));
-    const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
-    const rt = new THREE.WebGLRenderTarget(S, S);
-    rt.texture.colorSpace = THREE.SRGBColorSpace;
-    const buf = new Uint8Array(S * S * 4);
-    for (const h of HATS) {
-      const cv = document.getElementById(`hatcv_${h.id}`) as HTMLCanvasElement | null;
-      if (!cv) continue;
-      const g = buildHat(h.id);
-      g.position.y = h.drop ?? 0;   // preview what SHIPS, not what was authored
-      sc.add(g);
-      // Frame the whole thing, hat included — a cropped pompom is exactly the
-      // detail these previews exist to sell.
-      //
-      // …AND FRAME ON THE WIDTH TOO. The first version sized the camera off the
-      // hat's HEIGHT alone, which is fine until a hat is wider than it is tall:
-      // the Ten-Gallon is 3.7 across against a 3.66 frame and its brim ran off
-      // both edges of the card, and the Bobble and the Flower Crown lost their
-      // tops the same way. Hats vary more in width than in height, so the span
-      // has to be the larger of the two.
-      g.updateWorldMatrix(true, true);
-      const box = new THREE.Box3().setFromObject(g);
-      const top = Math.max(isFinite(box.max.y) ? box.max.y : 1.6, 1.6);
-      const wide = isFinite(box.max.x)
-        ? Math.max(Math.abs(box.min.x), box.max.x, Math.abs(box.min.z), box.max.z, 1)
-        : 1.6;
-      const mid = (top - 1.05) / 2;
-      const span = Math.max(top + 1.05, wide * 2.2);
-      const dist = (span / (2 * Math.tan(Math.PI / 12))) * 1.08;
-      cam.position.set(Math.sin(0.55) * dist, mid + 0.3, Math.cos(0.55) * dist);
-      cam.lookAt(0, mid, 0);
-      renderer.setRenderTarget(rt);
-      renderer.setClearColor(0x140c28, 1);
-      renderer.clear();
-      renderer.render(sc, cam);
-      renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
-      renderer.setRenderTarget(null);
-      cv.width = S; cv.height = S;
-      const ctx = cv.getContext('2d');
-      if (ctx) {
-        const img = ctx.createImageData(S, S);
-        // readRenderTargetPixels hands back bottom-up
-        for (let y = 0; y < S; y++) img.data.set(buf.subarray((S - 1 - y) * S * 4, (S - y) * S * 4), y * S * 4);
-        ctx.putImageData(img, 0, 0);
-      }
-      sc.remove(g);
-      g.traverse((o) => { const m = o as THREE.Mesh; m.geometry?.dispose(); });
-    }
-    rt.dispose();
-  }
-
-  const hatCards = new Map<string, HTMLElement>();
-  const priceText = (h: Hat): string => {
-    if (wornHat === h.id) return 'WEARING';
-    if (ownedHats.has(h.id)) return 'WEAR IT';
-    if (h.tier === 'free') return 'FREE';
-    return `💎 ${iapPrice(h.id) ?? `$${(h.usd ?? 0).toFixed(2)}`}`;
-  };
-  const refreshHats = () => {
-    for (const h of HATS) {
-      const card = hatCards.get(h.id);
-      if (!card) continue;
-      card.classList.toggle('owned', ownedHats.has(h.id));
-      card.classList.toggle('worn', wornHat === h.id);
-      const pr = card.querySelector('.hp') as HTMLElement;
-      pr.className = 'hp' + (h.tier === 'free' && !ownedHats.has(h.id) ? ' free' : '');
-      pr.textContent = priceText(h);
-    }
-  };
-
-  const SECTIONS: Array<[string, string, (h: Hat) => boolean]> = [
-    ['🎉 START HERE', 'yours already', (h) => h.tier === 'free'],
-    ['🎩 THE COLLECTION', 'one tap, any void', (h) => h.tier === 'plus'],
-    ['✨ LEGENDARY', 'these ones talk back', (h) => h.tier === 'legendary'],
-  ];
-  for (const [title, sub, pick] of SECTIONS) {
-    const head = document.createElement('div');
-    head.className = 'hatSect';
-    head.innerHTML = `<b>${title}</b> ${sub} <span></span>`;
-    grid.appendChild(head);
-    for (const h of HATS.filter(pick)) {
-      const card = document.createElement('div');
-      card.className = 'hatCard' + (h.tier === 'legendary' ? ' leg' : '');
-      card.innerHTML = `<canvas id="hatcv_${h.id}"></canvas>`
-        + `<div class="hn">${h.name}</div><div class="hb">${h.blurb}</div><div class="hp"></div>`;
-      card.addEventListener('click', () => onHatTap(h));
-      hatCards.set(h.id, card);
-      grid.appendChild(card);
-    }
-  }
-
-  function onHatTap(h: Hat): void {
-    // OWNED: tapping is wearing, and tapping the worn one takes it off. No
-    // confirm step — a cosmetic that costs nothing to change should cost
-    // nothing to try, and the void behind the shop updates live so the tap IS
-    // the preview.
-    if (ownedHats.has(h.id)) {
-      wearHat(wornHat === h.id ? null : h.id);
-      audio.evolve(); refreshHats();
-      track('hat_wear', { hat: h.id, on: wornHat === h.id });
-      return;
-    }
-    if (h.tier === 'free') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
-    const pr = hatCards.get(h.id)?.querySelector('.hp') as HTMLElement | undefined;
-    const usd = h.usd ?? 0;
-    // the same parental gate the skins use — App Review expects it and a
-    // six-year-old should not be able to reach a payment sheet unaided
-    askGrownUp(() => {
-      if (pr) pr.textContent = '…';
-      void iapPurchase(h.id, usd).then((res) => {
-        if (res === 'started') { if (pr) pr.textContent = 'CONFIRM IN THE APP STORE…'; return; }
-        if (res === 'granted') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
-        if (pr) {
-          pr.textContent = res === 'unavailable' ? 'COMING TO THE APP STORE'
-            : res === 'not_ready' ? 'THE STORE IS BUSY' : 'COULD NOT BUY';
-        }
-        audio.hit();
-        setTimeout(refreshHats, 2000);
-      });
-    });
-  }
-
   // ── THE VOID CARDS ────────────────────────────────────────────────────────
   // Same technique as the hats above, on the other half of the shop. The skin
   // cards were a CSS radial-gradient with an SVG face on top and, for some,
@@ -5174,6 +5039,164 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     rig.setHat(null);
   }
   _dbg.__shopMirror = paintMirror;
+  // ── HAT CARDS, ON A VOID WITH A FACE ──────────────────────────────────────
+  // These used to render onto a bare SphereGeometry with makeVoidBody() on it:
+  // a featureless purple ball. That was the right call when it shipped, because
+  // it was the only rig available — but the voids tab now builds a full one,
+  // and a $6.99 product was the last thing in the shop still being sold on a
+  // headless body. Same rig, wearing the void the child actually plays as.
+  //
+  // Keyed on the equipped skin, so equipping a void repaints the hat grid: the
+  // cards are a picture of YOUR void in each hat, not of a stranger's.
+  let thumbsFor: string | null = null;
+  function paintThumbs(): void {
+    const skinId = localStorage.getItem('voidSkin') || 'classic';
+    if (thumbsFor === skinId) return;
+    thumbsFor = skinId;
+    const sk = SKINS.find((x) => x.id === skinId) ?? SKINS[0];
+    const S = 256;
+    const { sc, cam, rig } = voidStudio();
+    rig.setSkin(sk);
+    const rt = new THREE.WebGLRenderTarget(S, S);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    const buf = new Uint8Array(S * S * 4);
+    const st = { t: 6.2, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 };
+    for (const h of HATS) {
+      const cv = document.getElementById(`hatcv_${h.id}`) as HTMLCanvasElement | null;
+      if (!cv) continue;
+      rig.setHat(h.id);
+      for (let i = 0; i < 40; i++) { st.t = 6.2 + i / 60; rig.update(1 / 60, st); }
+      for (let i = 0; i < 90 && lidOpen(rig.group) < 0.98; i++) { st.t = 7 + i / 60; rig.update(1 / 60, st); }
+      // Frame the whole thing, hat included — a cropped pompom is exactly the
+      // detail these previews exist to sell — and frame on the WIDTH too,
+      // because hats vary more across than up: the Ten-Gallon is 3.7 wide
+      // against a 3.66-tall frame and its brim ran off both edges of the card.
+      //
+      // Walking VISIBLE meshes, not Box3.setFromObject: the rig keeps all seven
+      // accessories and four body parts in the graph and shows one, so the box
+      // would be inflated by whatever is switched off.
+      const box = new THREE.Box3(), _bb = new THREE.Box3();
+      rig.group.updateWorldMatrix(true, true);
+      rig.group.traverse((o) => {
+        const g2 = (o as THREE.Mesh).geometry;
+        if (!g2 || !o.visible) return;
+        for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
+        g2.computeBoundingBox();
+        if (g2.boundingBox) box.union(_bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
+      });
+      const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
+      const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
+      const mid = (top + lo) / 2;
+      const dist = (Math.max(top - lo, wide * 2) * 1.10) / (2 * Math.tan((30 * Math.PI) / 360));
+      cam.position.set(Math.sin(0.42) * dist, mid + dist * 0.10, Math.cos(0.42) * dist);
+      cam.lookAt(0, mid, 0);
+      rig.update(1 / 60, st);       // the face billboard is read off the camera IN update
+      renderer.setRenderTarget(rt);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(sc, cam);
+      renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
+      renderer.setRenderTarget(null);
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext('2d');
+      if (ctx) {
+        const img = ctx.createImageData(S, S);
+        // readRenderTargetPixels hands back bottom-up
+        for (let y = 0; y < S; y++) img.data.set(buf.subarray((S - 1 - y) * S * 4, (S - y) * S * 4), y * S * 4);
+        ctx.putImageData(img, 0, 0);
+      }
+    }
+    // hand the rig back the way the card renderer expects to find it
+    rig.setHat(null);
+    rt.dispose();
+  }
+
+  const hatCards = new Map<string, HTMLElement>();
+  const priceText = (h: Hat): string => {
+    if (wornHat === h.id) return 'WEARING';
+    if (ownedHats.has(h.id)) return 'WEAR IT';
+    if (h.tier === 'free') return 'FREE';
+    // …and say so on the card too, the way the skin cards do
+    const p2 = iapPrice(h.id) ?? `$${(h.usd ?? 0).toFixed(2)}`;
+    return iapAvailable() ? `💎 ${p2}` : `💎 ${p2} · ON THE APP STORE`;
+  };
+  const refreshHats = () => {
+    for (const h of HATS) {
+      const card = hatCards.get(h.id);
+      if (!card) continue;
+      card.classList.toggle('owned', ownedHats.has(h.id));
+      card.classList.toggle('worn', wornHat === h.id);
+      const pr = card.querySelector('.hp') as HTMLElement;
+      pr.className = 'hp' + (h.tier === 'free' && !ownedHats.has(h.id) ? ' free' : '');
+      pr.textContent = priceText(h);
+    }
+  };
+
+  const SECTIONS: Array<[string, string, (h: Hat) => boolean]> = [
+    ['🎉 START HERE', 'yours already', (h) => h.tier === 'free'],
+    ['🎩 THE COLLECTION', 'one tap, any void', (h) => h.tier === 'plus'],
+    ['✨ LEGENDARY', 'these ones talk back', (h) => h.tier === 'legendary'],
+  ];
+  for (const [title, sub, pick] of SECTIONS) {
+    const head = document.createElement('div');
+    head.className = 'hatSect';
+    head.innerHTML = `<b>${title}</b> ${sub} <span></span>`;
+    grid.appendChild(head);
+    for (const h of HATS.filter(pick)) {
+      const card = document.createElement('div');
+      card.className = 'hatCard' + (h.tier === 'legendary' ? ' leg' : '');
+      card.innerHTML = `<canvas id="hatcv_${h.id}"></canvas>`
+        + `<div class="hn">${h.name}</div><div class="hb">${h.blurb}</div><div class="hp"></div>`;
+      card.addEventListener('click', () => onHatTap(h));
+      hatCards.set(h.id, card);
+      grid.appendChild(card);
+    }
+  }
+
+  function onHatTap(h: Hat): void {
+    // OWNED: tapping is wearing, and tapping the worn one takes it off. No
+    // confirm step — a cosmetic that costs nothing to change should cost
+    // nothing to try, and the void behind the shop updates live so the tap IS
+    // the preview.
+    if (ownedHats.has(h.id)) {
+      wearHat(wornHat === h.id ? null : h.id);
+      audio.evolve(); refreshHats();
+      track('hat_wear', { hat: h.id, on: wornHat === h.id });
+      return;
+    }
+    if (h.tier === 'free') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
+    const pr = hatCards.get(h.id)?.querySelector('.hp') as HTMLElement | undefined;
+    const usd = h.usd ?? 0;
+    // ── CHECK THE PLATFORM BEFORE THE GATE, NOT AFTER IT ──────────────────
+    // The skin path has done this since it shipped and this one never did: it
+    // went straight to askGrownUp, so on the open web a parent was handed a
+    // two-digit multiplication to solve and the reward for solving it was being
+    // told the thing is not for sale. An advertised price with no way to pay it
+    // is the advertising-accuracy problem in its most literal form.
+    if (!iapAvailable()) {
+      if (pr) pr.textContent = '👀 COMING TO THE APP STORE!';
+      audio.ready();
+      setTimeout(refreshHats, 2000);
+      track('hat_tap_noiap', { hat: h.id, usd });
+      return;
+    }
+    // the same parental gate the skins use — App Review expects it and a
+    // six-year-old should not be able to reach a payment sheet unaided
+    askGrownUp(() => {
+      if (pr) pr.textContent = '…';
+      void iapPurchase(h.id, usd).then((res) => {
+        if (res === 'started') { if (pr) pr.textContent = 'CONFIRM IN THE APP STORE…'; return; }
+        if (res === 'granted') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
+        if (pr) {
+          pr.textContent = res === 'unavailable' ? 'COMING TO THE APP STORE'
+            : res === 'not_ready' ? 'THE STORE IS BUSY' : 'COULD NOT BUY';
+        }
+        audio.hit();
+        setTimeout(refreshHats, 2000);
+      });
+    });
+  }
+
 
   // The shop OPENS on the voids tab, so the tab-switch handler below is not
   // enough on its own — without this the first thing a child sees is thirteen
