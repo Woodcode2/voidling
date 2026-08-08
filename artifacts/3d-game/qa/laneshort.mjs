@@ -80,6 +80,12 @@ await p.evaluate((drv) => {
         t: Math.round(ms.t * 10) / 10,
         pScore: Math.round(ms.score),
         pR: Math.round(vs.r * 100) / 100,
+        // WHO IS ACTUALLY EATING THE ISLAND. The lane shortfall is an outcome;
+        // this is the input. If the family's bite count is a small fraction of
+        // the player's, no multiplier on those bites can close the race.
+        ateYou: ms.ate?.you ?? 0,
+        ateFam: ms.ate?.family ?? 0,
+        left: (window.__edibles || []).reduce((n, e) => n + (e.eaten ? 0 : 1), 0),
         wantTop: Math.round(wantTop),
         rivals: (ms.rivals || []).filter((r) => r.joined).map((r) => ({
           n: r.name,
@@ -151,6 +157,11 @@ console.log(`  leader reached    ${leaderEnd}   = ${(leaderEnd / Math.max(1, las
 // ── question 2: could the larder ever have run? ────────────────────────────
 let slots = 0, eligible = 0;
 for (const s of S) for (const r of s.rivals) { slots++; if (r.d > 95) eligible++; }
+console.log(`\n══ WHO ATE THE ISLAND`);
+console.log(`  player bites ${last.ateYou}   family bites ${last.ateFam}`
+  + `   family share ${(last.ateFam / Math.max(1, last.ateYou + last.ateFam) * 100).toFixed(0)}%`);
+console.log(`  props left: ${last.left}`);
+
 console.log(`\n══ THE LARDER GATE (dist > 95 from the player)`);
 console.log(`  rival-seconds far enough away to graze: ${eligible}/${slots}`
   + ` = ${(eligible / Math.max(1, slots) * 100).toFixed(0)}%`);
