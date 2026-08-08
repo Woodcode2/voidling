@@ -15,6 +15,14 @@
 //              the form is a rumour and the mechanic teaches nothing.
 //
 // Two drivers, same match:
+// THE CONTROL ARM OF THE FIRST VERSION WAS BROKEN and its "pass" meant nothing.
+// graze finished at r=1.9 on a score of 714, against ~12.4 and ~150,000 for the
+// child driver in qa/ab.mjs — it was not playing the game, so "props-only falls
+// short of TITAN" was not evidence of anything. It retargets on the same 2.4s
+// cadence as the child driver now, and the probe FAILS if the control arm does
+// not reach a plausible score, because a control that cannot play cannot
+// control for anything.
+//
 //   graze   never chases a rival — eats props only. Must NOT reach TITAN.
 //   hunter  chases the nearest rival it can actually swallow, and eats props
 //           in between. Should reach it, or at least clearly out-grow graze.
@@ -65,7 +73,7 @@ const run = async (mode) => {
       const vs = window.__voidState();
       if (vs.r > window.__peakR) window.__peakR = vs.r;
 
-      if (ms.t - heldT > 0.25) {
+      if (ms.t - heldT > 0.6) {
         heldT = ms.t;
         held = null;
         // HUNTER: go for a rival we can actually swallow. EAT_RATIO is 1.11, so
@@ -118,6 +126,9 @@ const run = async (mode) => {
 };
 
 const TITAN_R = 13.5;
+// what a run that is actually playing scores — below this the control arm is
+// broken, not virtuous
+const CONTROL_FLOOR = 40000;
 const fail = [];
 const out = {};
 for (const mode of ['graze', 'hunter']) {
@@ -129,6 +140,12 @@ for (const mode of ['graze', 'hunter']) {
 await b.close();
 
 console.log(`\n══ IS THE TOP OF THE LADDER EARNED? (TITAN at r=${TITAN_R})`);
+if (out.graze.score < CONTROL_FLOOR) {
+  fail.push(`the props-only control only scored ${out.graze.score} — it was not playing`);
+  console.log(`  FAIL  control arm scored ${out.graze.score}, under ${CONTROL_FLOOR}.`);
+  console.log('        A control that cannot play the game controls for nothing,');
+  console.log('        and "it fell short of TITAN" then means nothing either.');
+}
 if (out.graze.peakR >= TITAN_R) {
   fail.push(`graze reached ${out.graze.peakR} without hunting anything`);
   console.log(`  FAIL  a run that never chased a rival reached ${out.graze.peakR}.`);

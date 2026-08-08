@@ -2568,6 +2568,20 @@ const GAMEDAY_DIST: Record<string, GdDist> = {
   treeline: 'woods', woods: 'woods',
 };
 let lastRankBrag = -99;
+// ── BEING IN FRONT WAS NEVER AN EVENT ─────────────────────────────────────
+// `myRank === 1` appears nowhere in the match loop — the only tests for it are
+// inside endMatch(). So 5th->4th and 2nd->1st ran the identical code path: the
+// same small card, the same audio.ready(), the same 20ms buzz. Taking the lead,
+// which is the entire reason five rivals exist, registered as nothing, and a
+// child learned they had won when the results panel told them.
+//
+// Debounced, not just cooled down. refreshHud samples at 5Hz and prevRank is a
+// 200ms-old sample, so a crossing flaps 1-2-1-2 for a few seconds; the old
+// code fired on the FIRST flap and burned its shared 12s budget there, which
+// is how a real lead change ended up silent. rankHold waits for the rank to
+// SETTLE before saying anything, so what gets announced is the state the
+// player is actually in.
+let rankHold = 0, shownRank = 0, announcedRank = 0, lastLeadBrag = -99;
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 function refreshHud() {
@@ -2585,11 +2599,33 @@ function refreshHud() {
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
+  // settle first: 1.4s at the 5Hz sample rate the HUD already runs at
+  if (myRank === shownRank) rankHold += 0.2; else { rankHold = 0; shownRank = myRank; }
+  const settled = rankHold >= 1.4 && shownRank !== announcedRank;
+  let ledJust = false;   // …so an ordinary overtake does not also fire below
+  // ── FIRST PLACE GETS ITS OWN MOMENT, AND ITS OWN BUDGET ─────────────────
+  // Its own cooldown, because a traded lead in the last thirty seconds is the
+  // most exciting thing that can happen in a match and it must not be silenced
+  // by an ordinary overtake forty seconds earlier. No holdBanner and no ×1
+  // badge: the banner was measured at a 39% duty cycle and holdBanner is
+  // reserved for EVOLVED and the hero prop, which is a decision worth keeping.
+  if (started && !ended && settled && shownRank === 1 && prevRank > 1
+      && tClock - lastLeadBrag > 6) {
+    lastLeadBrag = tClock; announcedRank = shownRank;
+    const chased = (rows[1]?.name ?? 'the family').replace('⚡ ', '');
+    announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
+      + `YOU ARE IN FRONT!<span class="bSub">${esc(chased)} is behind you</span></span></div>`);
+    fx.ring(voidState.x, voidState.z, 0xffd23f, voidling.radius * 6, 0.9);
+    fx.flash('rgba(255,210,90,0.26)', 0.3);
+    audio.voice('happy'); buzz(70);
+    ledJust = true;
+  }
   // …and the SAME cooldown as its mirror branch below, which had one all along.
   // Without it, a player whose score sits inside a rival's band flip-flops and
   // fires the identical brag twice within a second.
-  if (started && !ended && prevRank > 0 && myRank < prevRank && tClock - lastRankBrag > 12) {
-    lastRankBrag = tClock;
+  if (!ledJust && started && !ended && prevRank > 0 && myRank < prevRank
+      && tClock - lastRankBrag > 12) {
+    lastRankBrag = tClock; announcedRank = shownRank;
     // the board prefixes the chaser with ⚡; the sentence should not
     announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival').replace('⚡ ', '')}!`);
     audio.ready(); buzz(20);
