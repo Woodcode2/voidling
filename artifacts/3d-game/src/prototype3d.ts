@@ -2672,9 +2672,29 @@ const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250,
 // inside a single tier with 1.2x steps between them (600/600/600/750/750/750/
 // 900/900/900/1500), which is noise a child cannot rank — Royal cost 2.5x
 // Nebula and wore the identical ribbon. The whole coin catalogue was 9,450
-// coins: at ~139 a match that is 68 matches, about three and a half hours, to
-// own a set in which ten of the sixteen differ by one texture uniform. It is
-// now 2,700 coins, roughly 19 matches, and every rung is a different colour.
+// coins; it is now 2,700, and every rung is a different colour.
+//
+// ── THE "19 MATCHES" HERE WAS WRONG, AND SO WAS THE 139 IT CAME FROM ──────
+// Both were inherited, neither was ever measured end to end, and qa/_econ.mjs
+// — the only thing that could have checked — had been dispatching its input at
+// a shop thumbnail since the hat grid shipped, so it reported a number for a
+// void that never moved.
+//
+// With that fixed, one full Maple match pays 692 coins to a near-optimal
+// driver and 500 to a sloppier one. The ENTIRE 2,700-coin catalogue is under
+// four matches of good play. Not nineteen — four.
+//
+// Two caveats before anyone prices anything against those figures. Most of the
+// payout is in-match pickups rather than the results-screen bonus (the score
+// term is a log curve capped at 300), so it scales with how much you EAT, and
+// the driver ate 1,725 things. And the "child" driver that produced the 500
+// scored 150,829 and placed 1st of 6 — which is not a child. Treat 692 as a
+// firm ceiling and 500 as another ceiling wearing a hat.
+//
+// What is certain either way: a coin catalogue this size is exhausted almost
+// immediately, and after that coins buy nothing at all. That is a content
+// question (more voids to earn), not a pricing one — and hats are deliberately
+// NOT the answer, because hats are the slot that takes money.
 const PRICES: Record<string, number> = {
   classic: 0, toxic: 150, sunset: 300, ocean: 500, candy: 750, honey: 1000,
 };

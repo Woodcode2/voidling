@@ -49,20 +49,41 @@ for (const wid of WORLDS) {
         let gild = 0;
         for (const e of window.__edibles) if (!e.eaten && e.mesh?.userData?.coin) gild++;
         window.__gildNow = gild;
-        if (drv === 'expert' || ms.t - heldT > 1.2) {
+        // ── THE CHILD DRIVER HAS TO ACTUALLY BE WORSE ────────────────────
+        // It was: retarget every 1.2s, a 17% stall and ±35 degrees of aim
+        // error. Against a target-rich map that is barely a handicap — the
+        // first trustworthy run of this probe had 'child' scoring 150,829 and
+        // placing 1st of 6, eating 1,332 things. That is not a seven-year-old,
+        // it is a slightly tipsy expert, and pricing a coin economy against it
+        // would price it for nobody.
+        //
+        // A child holds a heading for a couple of seconds, stops a lot, aims
+        // roughly, and — the big one — chases whatever is SHINY rather than
+        // whatever is nearest, including things too big to eat.
+        const gap = drv === 'expert' ? 0 : 2.4;
+        if (ms.t - heldT > gap) {
           heldT = ms.t;
+          const cand = [];
           let best = null, bd = 1e9;
           for (const e of window.__edibles) {
-            if (e.eaten || !e.mesh?.visible || e.radius > vs.r * 0.92) continue;
+            if (e.eaten || !e.mesh?.visible) continue;
             const dx = e.mesh.position.x - vs.x, dz = e.mesh.position.z - vs.z;
-            const d = dx * dx + dz * dz; if (d < bd) { bd = d; best = { dx, dz }; }
+            const d = dx * dx + dz * dz;
+            if (e.radius <= vs.r * 0.92) { if (d < bd) { bd = d; best = { dx, dz }; } }
+            // a child does not check whether it fits before setting off
+            if (drv === 'child' && d < 90000) cand.push({ dx, dz });
           }
           held = best;
-          if (drv === 'child') stall = Math.random() < 0.17 ? 1 : 0;
+          if (drv === 'child') {
+            stall = Math.random() < 0.34 ? 1 : 0;               // stops, looks around
+            if (cand.length && Math.random() < 0.30) {          // goes for the shiny one
+              held = cand[(Math.random() * cand.length) | 0];
+            }
+          }
         }
         if (held && !stall) {
           let a = Math.atan2(held.dz, held.dx);
-          if (drv === 'child') a += (Math.random() - 0.5) * 1.22;   // ±35°
+          if (drv === 'child') a += (Math.random() - 0.5) * 2.1;   // ±60°
           dispatchEvent(new PointerEvent('pointermove', { pointerId: 1,
             clientX: cx + Math.cos(a) * 110, clientY: cy + Math.sin(a) * 110, bubbles: true }));
         }
