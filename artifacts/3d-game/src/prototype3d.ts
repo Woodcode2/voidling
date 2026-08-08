@@ -124,7 +124,22 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
-document.body.appendChild(renderer.domElement);
+// ── THE GAME CANVAS GOES FIRST, AND THAT IS NOT COSMETIC ──────────────────
+// Eighty-five probes in qa/ find the play surface with
+// document.querySelector('canvas') and dispatch input at it. That worked for
+// as long as this was the only canvas in the document — and then the shop grew
+// a mirror, thirteen void cards and thirteen hat cards, all of them canvases
+// sitting EARLIER in the DOM than a node appended to the end of <body>. The
+// renderer's canvas went to index 27, every probe started steering a shop
+// thumbnail, and qa/_econ.mjs reported a void that travelled 0.0 units in
+// twenty seconds while dispatching 1,190 pointermoves. It was still reporting
+// a coins-per-match figure.
+//
+// Making it the FIRST child restores that selector for all of them at once.
+// It costs nothing visually: every overlay in this app is position:fixed, so
+// the canvas is the only element in normal flow either way.
+renderer.domElement.id = 'gameCanvas';
+document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
 // ── WHICH WORLD ───────────────────────────────────────────────────────────
 // Resolved before anything else, because the light rig, the ground bake and
