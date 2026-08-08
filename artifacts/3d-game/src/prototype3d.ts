@@ -6261,7 +6261,34 @@ function animate() {
     }
   }
 
-  voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz, lookX: THREE.MathUtils.clamp(vx / 40, -1, 1), lookY: THREE.MathUtils.clamp(vz / 40, -1, 1) });
+  // ── THE PUPILS WERE JAMMED IN A CORNER AT SIZE ────────────────────────────
+  // Owner, from a playtest: "when it gets big I feel like symmetry is off with
+  // its face." The rig is symmetric — the fault is the GAZE, and it was two
+  // bugs stacked.
+  //
+  // 1. `vx / 40` is a constant divisor in a game whose world speed rides the
+  //    camera: speed = min(96, 16 * camDist/50), and camDist grows with radius.
+  //    Top speed is 13.3 u/s at r=1 but 96 u/s at r=12, so from about r=3.8
+  //    upward BOTH channels sat pinned at ±1 for most of the match and both
+  //    pupils lived pressed into the same corner of both eyes. Held there, the
+  //    two eyes stop reading as a pair and the face looks subtly wrong in a way
+  //    that is hard to name and easy to see.
+  // 2. It fed WORLD x/z into a face that is billboarded to the camera, and the
+  //    camera's ground basis is a flat 45° off world axes (camOffset.x equals
+  //    camOffset.z), so "look where you are going" pointed 45° away from where
+  //    the void was actually going.
+  //
+  // Normalised against 3x top speed rather than top speed: perceived speed is
+  // already constant by design ("world speed rides the camera distance"), so
+  // the divisor has to be a fixed MULTIPLE of it to keep the feel identical at
+  // every size. 3x reproduces the small void's current, un-complained-about
+  // gaze (0.33 at full stick) at r=1 and at r=12 alike.
+  const gFl = Math.hypot(camOffset.x, camOffset.z) || 1;
+  const gS = 3 * Math.max(1, Math.min(96, 16 * (camDist / 50)));
+  const gX = (camOffset.z * vx - camOffset.x * vz) / (gFl * gS);   // screen right
+  const gY = (-camOffset.x * vx - camOffset.z * vz) / (gFl * gS);  // screen up
+  voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz,
+    lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: THREE.MathUtils.clamp(gY, -1, 1) });
   // ── HOW FAR THE CROWD MATTERS ──────────────────────────────────────────
   // Everything past this runs on a stagger rather than every frame (see the
   // dispatch in life.ts). It is derived from the CAMERA, not from a constant,
