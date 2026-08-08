@@ -2680,16 +2680,30 @@ const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250,
 // a shop thumbnail since the hat grid shipped, so it reported a number for a
 // void that never moved.
 //
-// With that fixed, one full Maple match pays 692 coins to a near-optimal
-// driver and 500 to a sloppier one. The ENTIRE 2,700-coin catalogue is under
-// four matches of good play. Not nineteen — four.
+// With that fixed, three full Maple matches pay 692, 500 and 554 coins. The
+// ENTIRE 2,700-coin catalogue is four to five matches. Not nineteen — four.
 //
-// Two caveats before anyone prices anything against those figures. Most of the
-// payout is in-match pickups rather than the results-screen bonus (the score
-// term is a log curve capped at 300), so it scales with how much you EAT, and
-// the driver ate 1,725 things. And the "child" driver that produced the 500
-// scored 150,829 and placed 1st of 6 — which is not a child. Treat 692 as a
-// firm ceiling and 500 as another ceiling wearing a hat.
+// AND THE PAYOUT BARELY NOTICES HOW WELL YOU PLAY. The 554 came from a driver
+// rewritten specifically to be bad: it stalls a third of the time, aims to
+// plus or minus sixty degrees, and chases a random nearby prop 30% of the
+// time including ones too big to eat. It scored 228,314 — HIGHER than the
+// near-optimal run's 186,835 — and still placed 1st of 6.
+//
+// Read that carefully rather than triumphantly. At one run per driver the
+// spread between runs (150k to 228k) is wider than any gap between drivers,
+// so this does NOT establish that skill is irrelevant; it establishes that a
+// single run cannot tell them apart, which is a reason not to trust a
+// per-driver number without repeats. What survives either way is the range:
+// somewhere around 500-700 coins a match across a wide band of play quality,
+// which is all a price needs.
+//
+// One thing that is worth someone's attention outside the shop: a driver
+// built to play badly still won its match. Whatever that says about the
+// rivals, it is not a coin-economy question.
+//
+// Last caveat. Most of the payout is in-match pickups rather than the
+// results-screen bonus (the score term is a log curve capped at 300), so it
+// scales with how much you EAT — and these drivers ate 1,300-1,700 things.
 //
 // What is certain either way: a coin catalogue this size is exhausted almost
 // immediately, and after that coins buy nothing at all. That is a content
