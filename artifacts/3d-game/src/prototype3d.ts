@@ -3550,6 +3550,11 @@ el('btnPlay').addEventListener('click', () => {
   track('play_tap', { played: stats.matches, lvl: rankInfo(xp).lvl });
   el('worlds').classList.add('show');
 });
+// A world switch that lands on a day the daily card has not been claimed has
+// to wait for it: the card is z-index 45 and takes the whole screen, so
+// starting the match underneath means a timed run playing on with every drag
+// swallowed by a modal backdrop. closeDaily() below picks this back up.
+let pendingLaunch = false;
 // …and the picker is what actually starts the match.
 function launchWorld() {
   el('worlds').classList.remove('show');
@@ -3753,7 +3758,21 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   // seconds of load screen. Taking the hold synchronously makes the ordering
   // irrelevant: there is never a moment when nobody is holding it.
   if (!packReady) coverHold('pack');
-  requestAnimationFrame(() => launchWorld());
+  requestAnimationFrame(() => {
+    // THE DAILY CARD GOES FIRST. It is built further down this same module
+    // evaluation, so by the time this frame runs it is already on screen — and
+    // launching under it starts a three-minute timed match behind a full-screen
+    // modal that eats every pointer event. Drop the cover too (it is z-60
+    // against the card's z-45, so the child would be looking at a loading
+    // screen with their reward hidden behind it) and let closeDaily() start
+    // the match once the card is done.
+    if (el('daily').classList.contains('show')) {
+      pendingLaunch = true;
+      coverRelease('pack');
+      return;
+    }
+    launchWorld();
+  });
 }
 el('btnShop').addEventListener('click', () => {
   track('shop_view', { coins, from: 'menu' });
@@ -4355,6 +4374,14 @@ renderRank();
       ? `🔥 ${streak} DAY STREAK!${week > 1 ? ` · WEEK ${week}` : ''}`
       : 'welcome back!';
     el('dailyTitle').textContent = week > 1 ? `WEEK ${week} REWARD` : 'DAILY REWARD';
+    // ONE WAY OUT, whichever way they take it — claim or tap the backdrop — so
+    // a world switch that had to wait for this card is never forgotten.
+    const closeDaily = () => {
+      modal.classList.remove('show');
+      if (!pendingLaunch) return;
+      pendingLaunch = false;
+      launchWorld();
+    };
     (el('dailyClaim') as HTMLButtonElement).innerHTML = `CLAIM ${amount(day)}<i>✦</i>`;
     (el('dailyClaim') as HTMLButtonElement).onclick = () => {
       addCoins(amount(day));
@@ -4378,13 +4405,13 @@ renderRank();
         setTimeout(() => c.remove(), 3000);
       }
       audio.evolve(); buzz(40);
-      setTimeout(() => modal.classList.remove('show'), 750);
+      setTimeout(closeDaily, 750);
     };
     // …and it must be DISMISSIBLE. It fires on menu open, covers the whole
     // screen and intercepts every button behind it — a playtest harness could
     // not reach PLAY at all until it learned to claim first. CLAIM is still the
     // reward, but tapping the backdrop now gets you out.
-    modal.onclick = (ev) => { if (ev.target === modal) modal.classList.remove('show'); };
+    modal.onclick = (ev) => { if (ev.target === modal) closeDaily(); };
     modal.classList.add('show');
   }
 }
