@@ -88,9 +88,12 @@ game; Capacitor wraps it in a native shell.
   enable Submit. If iPad is ever wanted it needs a real layout scaled off
   `min(vw,vh)`, not just the flag flipped back.
 - **Kids-category compliance** — a real parental gate (`askGrownUp()` in
-  `src/prototype3d.ts`) in front of all four things that spend money or leave
-  the app: the legendary purchase, RESTORE PURCHASES, the privacy-policy link,
-  and the analytics switch. Two-digit x one-digit multiplication, re-rolled
+  `src/prototype3d.ts`) in front of all FIVE things that spend money or leave
+  the app: the legendary void purchase, the HAT purchase, RESTORE PURCHASES,
+  the privacy-policy link, and the analytics switch. (This said "four" and
+  omitted hats — the code gates them, but this bullet is what gets pasted into
+  App Review notes, and it under-described the app while leaving out the path a
+  reviewer is most likely to tap.) Two-digit x one-digit multiplication, re-rolled
   every time. The gate is enforced in BOTH directions on the analytics row, so
   a child cannot silently undo a parent's choice.
 - **Privacy policy** — `public/privacy.html`, served at `/privacy.html`. Paste
@@ -107,15 +110,21 @@ game; Capacitor wraps it in a native shell.
 
 ## In-App Purchases (App Store Connect setup)
 
-The client uses cordova-plugin-purchase (StoreKit) with product ids
-`com.voidling.skin.<id>` — create these as **Non-Consumable** IAPs in
-App Store Connect with ids that match EXACTLY. The bridge is
-`src/proto3d/store3d.ts`; the shop wiring is in `src/prototype3d.ts`.
+The client uses cordova-plugin-purchase (StoreKit). `initIAP()` registers
+`Object.values(IAP_PRODUCTS)` at boot — **SEVENTEEN products, not five**: the
+five legendary voids AND the twelve paid hats. Create every one of them as a
+**Non-Consumable** in App Store Connect with ids that match EXACTLY. The bridge
+is `src/proto3d/store3d.ts`; the shop wiring is in `src/prototype3d.ts`.
 
-FIVE products, not seven. Archmage and Mecha-Void were cut: Archmage's
-blue-violet measured weighted dE 17.2 from the FREE default skin, and
-Mecha-Void's rim AND glow were byte-identical to a coin skin's, so a parent
-would have paid $5.99 for a colour their child already had.
+THIS SECTION USED TO SAY FIVE, and listed only the `com.voidling.skin.*` ids —
+the word "hat" did not appear in this file at all. A human following it would
+have created five products and shipped a shop with twelve priced cards that
+cannot be bought: `store.get(pid)` returns undefined for a product that does not
+exist in App Store Connect, `purchase()` returns 'failed', and the card paints
+COULD NOT BUY for ever. The hats tab is half the catalogue and the larger half
+of the money.
+
+### Voids — five, all one price
 
 | Product id | Skin | Price | Character |
 |---|---|---|---|
@@ -125,27 +134,56 @@ would have paid $5.99 for a colour their child already had.
 | com.voidling.skin.drako | Drako | $2.99 | dragon: muzzle, wings, embers |
 | com.voidling.skin.kingvoid | King Void | $2.99 | the crown, gold rim, stardust |
 
-ONE price across all five — Apple tier 3 ($2.99). Every product is the same
-size of decision, so the only question left is which character you like best.
-A tiered ladder asked a six-year-old to rank five things by a number they
-cannot judge, and asked a parent to approve $9.99 for a skin in a children's
-game. **Create all five at the same tier in App Store Connect.**
+ONE price across all five — Apple tier 3 ($2.99). Every product is the same size
+of decision, so the only question left is which character you like best. A
+tiered ladder asked a six-year-old to rank five things by a number they cannot
+judge, and asked a parent to approve $9.99 for a skin in a children's game.
+
+Archmage and Mecha-Void were cut: Archmage's blue-violet measured weighted dE
+17.2 from the FREE default skin, and Mecha-Void's rim AND glow were
+byte-identical to a coin skin's, so a parent would have paid $5.99 for a colour
+their child already had.
+
+### Hats — twelve, four price points
+
+Any hat goes on any void, which is why they are a second slot rather than more
+skins. Prices come from `src/proto3d/hats.ts`; `party` is free and is NOT an IAP.
+
+| Product id | Hat | Price |
+|---|---|---|
+| com.voidling.hat.chef | Chef Toque | $1.99 |
+| com.voidling.hat.cowboy | Ten-Gallon | $1.99 |
+| com.voidling.hat.bobble | Bobble Beanie | $1.99 |
+| com.voidling.hat.flower | Flower Crown | $1.99 |
+| com.voidling.hat.wizard | Star Wizard | $2.99 |
+| com.voidling.hat.tricorn | Pirate Tricorn | $2.99 |
+| com.voidling.hat.viking | Viking Helm | $2.99 |
+| com.voidling.hat.space | Space Helmet | $2.99 |
+| com.voidling.hat.propeller | Propeller Cap | $2.99 |
+| com.voidling.hat.crown | Crown of the Void King | $4.99 |
+| com.voidling.hat.horn | Rainbow Horn | $4.99 |
+| com.voidling.hat.tycoon | The Tycoon | $6.99 |
+
+Note the tension with the one-price rule above: the hats DO ladder, $1.99 to
+$6.99. That is deliberate — a hat is an accessory and the ladder is a size-of-
+gift signal a parent reads, not a ranking a child is asked to make — but if the
+ladder is ever cut, cut it here and not on the voids.
 
 What still needs a human with the Apple account:
 
-1. Create the five non-consumables above, all at the SAME price tier
-   ($2.99 / tier 3), each with a localized display name, description, and a
-   review screenshot (the shop card art in `public/assets/hf/` is fine).
-   If any of these already exist at an older price, edit the tier — do not
-   create a second product, the ids must stay exactly as listed.
+1. Create all SEVENTEEN non-consumables above, each at the price listed, with a
+   localized display name, description, and a review screenshot (`store/07-skins.png`
+   covers the voids; the hat card art renders from geometry, so a shop capture
+   works for those too). If any already exist at an older price, edit the tier —
+   do NOT create a second product, the ids must stay exactly as listed.
 2. Fill in the Paid Applications agreement and banking/tax details, or every
    product stays in "Missing Metadata" and StoreKit returns nothing.
 3. Test each product end to end with a Sandbox Apple ID before submitting.
 
 Behaviour, by platform:
 
-- **iOS (Capacitor shell)** — real StoreKit. `initIAP()` registers all five
-  at boot, `purchase()` opens the sheet, and the `approved` handler unlocks
+- **iOS (Capacitor shell)** — real StoreKit. `initIAP()` registers all
+  seventeen at boot, `purchase()` opens the sheet, and the `approved` handler unlocks
   the skin and calls `finish()` on the transaction. Prices shown in the shop
   come from StoreKit itself, so they are correct in every storefront and
   currency; the USD figures above are only the fallback.
