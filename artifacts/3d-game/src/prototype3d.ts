@@ -797,6 +797,8 @@ const _dbg = window as unknown as {
   __previewStop?: () => void;
   __shopMirror?: () => void;
   __shopTab?: () => void;
+  __skinsGranted?: (ids: string[]) => void;
+  __celebrateSkins?: (skins: Skin[]) => void;
   __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -2782,6 +2784,52 @@ function setStreak(n: number): void {
   streak = n;
   localStorage.setItem('voidStreak', String(n));
   renderRank();
+  unlockStreakSkins(n);
+}
+
+// ── THE STREAK REWARD WAS ARRIVING IN SILENCE ──────────────────────────────
+// A child comes back seven days running. The daily modal fires its confetti
+// for the coins, and Prism — the thing those seven days were FOR — was granted
+// by a line inside the shop's own refresh(): no announcement, no sound, not
+// even a state change they could see, because refresh() only runs if the shop
+// is open. So the reward was discoverable only by opening the shop and
+// noticing that a card had quietly changed from a lock to OWNED.
+//
+// It is granted here instead, at the moment the streak is actually earned, and
+// it says so. Anything unlocked is also flagged NEW until the child has looked
+// at it, which is the difference between owning something and knowing you do.
+function unlockStreakSkins(n: number): void {
+  let owned: string[];
+  try { owned = JSON.parse(localStorage.getItem('voidSkinsOwned') || '["classic"]'); }
+  catch { owned = ['classic']; }
+  const have = new Set(owned);
+  const won = SKINS.filter((s) => s.streak && n >= s.streak && !have.has(s.id));
+  if (!won.length) return;
+  for (const s of won) have.add(s.id);
+  localStorage.setItem('voidSkinsOwned', JSON.stringify([...have]));
+  let fresh: string[];
+  try { fresh = JSON.parse(localStorage.getItem('voidSkinsNew') || '[]'); } catch { fresh = []; }
+  localStorage.setItem('voidSkinsNew', JSON.stringify([...new Set([...fresh, ...won.map((s) => s.id)])]));
+  // tell the shop, if it has already built its own copy of the set
+  _dbg.__skinsGranted?.(won.map((s) => s.id));
+  for (const s of won) {
+    track('streak_skin', { skin: s.id, days: s.streak, streak: n });
+  }
+  // …and SHOW it. Two earlier attempts at this line were both still silent in
+  // practice, for the same reason twice over: announce() escapes its argument,
+  // so a message written with a <br> printed the tag; and #banner is HUD, hidden
+  // by `body.menu { display: none }` — and a streak can only ever advance from
+  // the daily card, which only opens ON the menu. Every word sent to the banner
+  // here was posted to an element that was not on screen.
+  //
+  // The preview modal is the surface that works: it is a menu overlay, and it
+  // renders the actual void alive and turning instead of naming it. Delayed
+  // past the daily card's own 750ms close so the two do not stack.
+  //
+  // Biggest prize last — a fresh player who reaches day 7 collects Ember and
+  // Prism together, and Prism is the one to end on.
+  const order = [...won].sort((a, b) => (a.streak ?? 0) - (b.streak ?? 0));
+  setTimeout(() => _dbg.__celebrateSkins?.(order), 1400);
 }
 // the end screen is THE retention moment — the reward has to land as a beat,
 // not a gray sub-line: warm sting, coins visibly counting up, rows sliding in
@@ -4422,6 +4470,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     // the mirror at the top of the shop is the whole point of two slots
     _dbg.__shopMirror?.();
   };
+  // what has been unlocked but not yet looked at
+  let fresh: Set<string>;
+  try { fresh = new Set<string>(JSON.parse(localStorage.getItem('voidSkinsNew') || '[]')); }
+  catch { fresh = new Set(); }
+  const sawSkin = (id: string) => {
+    if (!fresh.delete(id)) return;
+    localStorage.setItem('voidSkinsNew', JSON.stringify([...fresh]));
+    // repaint, or the badge outlives the look that cleared it. Tapping an
+    // owned card takes the equip path, which refreshes anyway — but tapping a
+    // LOCKED one opens the preview and refreshes nothing, so the pill sat
+    // there after the child had plainly seen it.
+    refresh();
+  };
   const walletEl = document.getElementById('shopWalletN');
   let walletShown = coins, walletRaf = 0;
   const paintWallet = (bump = false) => {
@@ -4474,14 +4535,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const tv = document.getElementById('tabVoids');
     if (tv) tv.textContent = `${SKINS.filter((x) => owned.has(x.id)).length} of ${SKINS.length} collected`;
     for (const s of SKINS) {
-      // streak skins unlock themselves the moment the streak is long enough
-      if (s.streak && streak >= s.streak && !owned.has(s.id)) {
-        owned.add(s.id);
-        localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
-      }
       const card = cards.get(s.id)!;
       const pr = card.querySelector('.pr') as HTMLElement;
       const has = owned.has(s.id);
+      // NEW until you have looked at it. Owning a thing and knowing you own it
+      // are different, and a streak reward that appears between sessions is
+      // exactly the case where they come apart.
+      card.classList.toggle('isnew', fresh.has(s.id));
       const cost = PRICES[s.id] ?? 0;
       // AFFORDABLE IS A STATE. Without it the shop asks a six-year-old to hold
       // a four-digit wallet in their head and compare it to thirteen prices.
@@ -4504,6 +4564,14 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // this block finished evaluating, and this file has already lost an evening
   // to exactly that class of bug.
   coinWatchers.push(refresh);
+  // unlockStreakSkins() writes straight to localStorage because it can run
+  // before this block exists; when it runs after, this keeps the in-memory set
+  // and the grid in step instead of waiting for a reload.
+  _dbg.__skinsGranted = (ids: string[]) => {
+    let any = false;
+    for (const id of ids) if (!owned.has(id)) { owned.add(id); fresh.add(id); any = true; }
+    if (any) refresh();
+  };
   // LEGENDARY FIRST is the right instinct for a store whose in-app purchases
   // work — but when they did not, the shop opened on seven consecutive
   // refusals at $4.99-$9.99, and with two thousand coins in the wallet the
@@ -4590,11 +4658,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const orb = el('spOrb');
     orb.setAttribute('style', cardGlow(s));
     orb.innerHTML = '';
-    _dbg.__previewVoid?.(s);
+    prevEl.classList.remove('win');   // showUnlock() puts it back; a plain look never has it
     el('spName').textContent = s.name;
     el('spTier').textContent = s.cash ? 'LEGENDARY · A WHOLE NEW CHARACTER'
       : s.streak ? 'COME BACK · FREE' : 'COINS · A NEW LOOK';
     refreshPreview();
+    _dbg.__previewVoid?.(s);
     prevEl.classList.add('show');
     audio.ready();
     track('skin_view', {
@@ -4604,9 +4673,51 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   };
   // …and it stops dead when the modal shuts. A turntable left running behind a
   // closed overlay is a phone battery being spent on nothing.
-  const closePreview = () => { prevEl.classList.remove('show'); _dbg.__previewStop?.(); };
+  const closePreview = () => {
+    prevEl.classList.remove('show');
+    prevEl.classList.remove('win');
+    _dbg.__previewStop?.();
+    // a second prize waiting behind the first
+    if (celebQ.length) setTimeout(() => showUnlock(celebQ.shift()!), 340);
+  };
   el('spClose').addEventListener('click', closePreview);
   prevEl.addEventListener('click', (ev) => { if (ev.target === prevEl) closePreview(); });
+
+  // ── THE UNLOCK MOMENT ─────────────────────────────────────────────────────
+  // The banner cannot do this job. #banner is HUD furniture and index.html
+  // hides it under `body.menu` — which is precisely where a streak reward
+  // lands, on the menu, a second after the daily card closes. A message posted
+  // to a hidden element is the same silence the reward already had.
+  //
+  // So the celebration is THIS card, which is the only surface in the game
+  // that shows the real void alive and turning rather than describing it. Same
+  // modal, different headline: not "here is something you could have" but
+  // "here is something you just got, go and put it on".
+  const showUnlock = (s: Skin) => {
+    openPreview(s);
+    prevEl.classList.add('win');
+    el('spWin').textContent = s.streak ? `🔥 ${s.streak} DAYS IN A ROW` : 'UNLOCKED!';
+    el('spTier').textContent = 'IT IS YOURS — FOREVER';
+    spAct.textContent = 'WEAR IT!';
+    audio.evolve();
+    buzz(70);
+    for (let i = 0; i < 16; i++) {
+      const c = document.createElement('div');
+      c.className = 'endConf';
+      c.textContent = i % 3 === 0 ? '✦' : i % 3 === 1 ? '⭐' : '🎉';
+      c.style.left = `${Math.random() * 100}%`;
+      c.style.animationDelay = `${Math.random() * 0.4}s`;
+      prevEl.appendChild(c);
+      setTimeout(() => c.remove(), 3000);
+    }
+    track('skin_unlock_shown', { skin: s.id, days: s.streak ?? 0 });
+  };
+  let celebQ: Skin[] = [];
+  _dbg.__celebrateSkins = (list: Skin[]) => {
+    if (!list.length) return;
+    celebQ = list.slice(1);
+    showUnlock(list[0]);
+  };
   spAct.addEventListener('click', () => {
     const s = prevSkin;
     if (!s) return;
@@ -4750,6 +4861,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     // a second button to put on a skin they had already earned. The modal is
     // for deciding, and there is nothing to decide here.
     card.addEventListener('click', () => {
+      sawSkin(s.id);
       if (owned.has(s.id) && equipped !== s.id) { equipSkin(s); return; }
       openPreview(s);
     });
