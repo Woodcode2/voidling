@@ -3511,7 +3511,29 @@ function launchWorld() {
   menuEl.style.display = 'none';
   // one-time teach card before the first menu-launched match: it's the only
   // place the danger loop ("eat the family when bigger, RUN when not") lives
-  if (!localStorage.getItem('voidTut')) { track('tutorial_view', {}); tutEl.classList.add('show'); return; }
+  if (!localStorage.getItem('voidTut')) {
+    track('tutorial_view', {});
+    tutEl.classList.add('show');
+    // …AND DROP THE COVER, because this return skips withWorldReady() and
+    // withWorldReady() is the only thing that ever releases a 'pack' hold.
+    //
+    // The world-switch path takes that hold synchronously before calling in
+    // here (see the autoplay block at the bottom of this file), so on the one
+    // journey that combines the two — session two, where voidPlayed is set but
+    // voidTut is not, because first launch calls beginMatch() directly and only
+    // the card's own button writes voidTut — the child picked a world and got a
+    // loading screen frozen at 100% for ever. #loadScr is z-index 60 and #tut
+    // is 12, so the card asking them to tap was UNDERNEATH the cover, with the
+    // menu already hidden. There was no way out of it at all.
+    //
+    // This is the same bug withWorldReady's own comment describes fixing on the
+    // fast path: "nobody ever released it". The teach card was the other door
+    // into it. Releasing is safe for a hold nobody took — a Set delete and a
+    // size check — and the card is its own full-screen scrim, so nothing
+    // half-built shows through while it is up.
+    coverRelease('pack');
+    return;
+  }
   withWorldReady(() => startFresh(soloOn()));
 }
 // ── SOLO IS A SETTING NOW, NOT A SECOND FRONT DOOR ────────────────────────
