@@ -336,6 +336,7 @@ export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
   if (ch?.patCol) m.uniforms.uPatCol.value.set(ch.patCol);
 }
 
+const WHITE = new THREE.Color(0xffffff);
 const texCache = new Map<string, THREE.Texture>();   // premium skin textures
 // ── …AND WHO IS STILL WAITING FOR EACH ONE ────────────────────────────────
 // TextureLoader fires exactly ONE callback, and it belongs to whoever asked
@@ -627,6 +628,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // — read as a too-wide clown grin.) Plus the big "maw" that scales in when
   // eating or firing GULP.
   const mouth = new THREE.Group();
+  let mouthRim: THREE.MeshBasicMaterial | null = null;
   // ── NO FANGS ────────────────────────────────────────────────────────────
   // Two little teeth used to drop into the smile from GOBBLER on, as a per-form
   // read that survives at eighteen pixels. The owner's verdict: "Why do the
@@ -654,6 +656,33 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     return f;
   };
   {
+    // ── THE SMILE NEEDS A RIM, AND THAT IS A MEASUREMENT ──────────────────
+    // VOID.mouth is 0x4a1a68, a warm dark plum chosen so the smile "reads
+    // friendly, never a black slit". It does — against a light body. Against
+    // the body colours this game actually ships it is very close to invisible:
+    // WCAG contrast of the lip against each skin's mid tone is 1.51:1 on
+    // Classic, 1.10:1 on King Void and 1.02:1 on Shadow Ninja. Six of eight
+    // sampled skins fail 3:1. That is the DEFAULT skin, the hero in every
+    // match, every rival, and every card in the shop.
+    //
+    // Rendered side by side it is obvious: Uni-Void, whose body is nearly
+    // white, has a lovely open smile from this exact geometry; Classic is two
+    // eyes and a floating pink pill. So the geometry was never the problem and
+    // must not be reshaped — it needs somewhere to sit.
+    //
+    // HIGHLIGHT is that: a slightly larger half-disc behind the lip, in the
+    // skin's OWN rim colour pushed 60% toward white. Sweeping that blend
+    // against all thirteen skins, 60% is where the worst case crosses 3:1
+    // (3.50:1, Ember) while the highlight still carries the skin's hue —
+    // at 0% Ember and Prism sit at 2.9, and past 75% it is just white paint.
+    // The smile then reads by one of two routes on every skin: either the lip
+    // contrasts with the body, or the highlight does and the lip contrasts
+    // with the highlight.
+    const highlight = new THREE.Mesh(new THREE.CircleGeometry(0.196, 40, 0, Math.PI),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false }));
+    highlight.position.z = -0.002;
+    highlight.renderOrder = -1;                 // behind lip(0) and tongue(1)
+    mouthRim = highlight.material as THREE.MeshBasicMaterial;
     // upper semicircle; the group's PI rotation (below) hangs the dome down
     const lip = new THREE.Mesh(new THREE.CircleGeometry(0.165, 40, 0, Math.PI),
       new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }));
@@ -661,7 +690,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
     tongue.scale.set(1.35, 0.6, 1); tongue.position.set(0, 0.075, 0.004);
     tongue.renderOrder = 1;
-    mouth.add(lip); mouth.add(tongue);
+    mouth.add(highlight); mouth.add(lip); mouth.add(tongue);
     mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
@@ -1131,6 +1160,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the mane is shared geometry, so it takes the wearer's own colour —
       // otherwise the Archmage turns up in Uni-Void's white unicorn hair
       if (maneMat) maneMat.color.set(s.rim);
+      // the smile's rim, 60% of the way from this skin's lit-edge colour to
+      // white — see the note where it is built
+      if (mouthRim) mouthRim.color.set(s.rim).lerp(WHITE, 0.60);
       // ── apply the CHARACTER RIG (legendary skins only) ──────────────────
       const ch = s.char;
       const eyeMode = ch?.eyes;

@@ -47,7 +47,8 @@ for (const s of shots) {
   const tex = !s.wantsTex ? '   —  ' : s.texAmt >= 1 ? '  LIVE' : '  MISS';
   console.log(`${s.id.padEnd(12)} ${s.name.padEnd(14)} ${s.tier.padEnd(10)}`
     + ` acc=${String(s.acc ?? '-').padEnd(8)} pat=${String(s.pattern ?? '-').padEnd(10)} tex${tex}`
-    + `  lid=${(s.lid ?? 1).toFixed(2)}${s.lid < 0.98 ? '  <-- EYES SHUT' : ''}`);
+    + `  lid=${(s.lid ?? 1).toFixed(2)}${s.lid < 0.98 ? '  <-- EYES SHUT' : ''}`
+    + `  smile=${(s.smile ?? 9).toFixed(2)}:1${s.smile < 3 ? '  <-- SMILE INVISIBLE' : ''}`);
 }
 const d0 = shots[0];
 console.log(`\nhidden: ${(d0.hid||[]).join(', ') || '(none)'}`
@@ -61,6 +62,13 @@ const missing = shots.filter((s) => s.wantsTex && s.texAmt < 1).map((s) => s.id)
 if (errs.length) console.log('\nPAGE ERRORS:', errs.slice(0, 4));
 console.log(`\nwrote ${shots.length} sheets to qa-out/voids/`);
 await b.close();
+const dim = shots.filter((s) => (s.smile ?? 9) < 3).map((s) => s.id);
+if (dim.length) {
+  console.log(`\nFAIL: the smile falls under 3:1 on ${dim.length} skin(s): ${dim.join(', ')}`);
+  console.log('  VOID.mouth is one fixed plum for every skin. Either lift the highlight blend');
+  console.log('  in setSkin, or give the offending skin a lighter rim.');
+}
+
 if (missing.length) {
   // NOT A FAILURE, and an earlier version of this file was wrong twice about
   // why. It is not the CDN (these files are vendored and serve 200 locally),

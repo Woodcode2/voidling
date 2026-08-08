@@ -22,7 +22,7 @@ import { buildHat } from './proto3d/hatgeo';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
-import { SKINS, type Skin } from './proto3d/palette';
+import { SKINS, VOID, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, requestedReady } from './proto3d/assets3d';
 import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './proto3d/newsroom';
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
@@ -1136,6 +1136,25 @@ _dbg.__texRace = async (skinId: string) => {
   a.sc2.remove(a.rig.group); b.sc2.remove(b.rig.group);
   return out;
 };
+/** WCAG relative luminance, so "can you see it" is a number and not a view. */
+function relLum(hex: number): number {
+  const f = (c: number) => { const u = c / 255; return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f((hex >> 16) & 255) + 0.7152 * f((hex >> 8) & 255) + 0.0722 * f(hex & 255);
+}
+function contrast(a: number, b: number): number {
+  const la = relLum(a), lb = relLum(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+/** The smile's worst-case legibility on a skin, by the better of its two routes. */
+function smileContrast(sk: Skin): number {
+  const mixw = (h: number, k: number) => {
+    const g = (c: number) => Math.round(c + (255 - c) * k);
+    return (g((h >> 16) & 255) << 16) | (g((h >> 8) & 255) << 8) | g(h & 255);
+  };
+  const hi = mixw(sk.rim, 0.60);              // must match setSkin's lerp
+  return Math.max(contrast(VOID.mouth, sk.mid),
+    Math.min(contrast(hi, sk.mid), contrast(VOID.mouth, hi)));
+}
 _dbg.__voidSheet = async (ids: string[]) => {
   const { createVoid } = await import('./proto3d/void3d');
   const want = ids && ids.length ? SKINS.filter((s) => ids.includes(s.id)) : SKINS;
@@ -1260,6 +1279,12 @@ _dbg.__voidSheet = async (ids: string[]) => {
       // textured skin — which is exactly the failure mode to design around,
       // not a sandbox artefact to wave away.
       wantsTex: !!sk.tex, texAmt: bodyTexAmt(v.group), lid: lidOpen(v.group),
+      // CAN YOU SEE THE SMILE? VOID.mouth is one fixed plum for every skin, so
+      // a new palette entry can silently make the mouth vanish — it already had,
+      // on six of eight sampled skins, worst of all on the DEFAULT one. The
+      // smile reads by one of two routes: the lip contrasts with the body, or
+      // the highlight does and the lip contrasts with the highlight.
+      smile: smileContrast(sk),
       hid, missed, stray: census(),
       png: cv.toDataURL('image/png').split(',')[1],
     });
