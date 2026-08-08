@@ -324,7 +324,16 @@ await stopPlay();
 }
 
 // ── 07 · the shop ───────────────────────────────────────────────────────────
-await boot();
+// ?iapmock=1 ONLY so iapAvailable() reports what an iPhone reports. Without it
+// this page is a browser with no StoreKit, so the legendary header renders
+// "COMING SOON ON iPHONE" and the buttons offer the App Store instead of a
+// price — and that screenshot then goes to Apple, on the iPhone listing,
+// announcing that the paid tier is not available on iPhone. It is the 2.3.3
+// rule pointing the other way: the browser capture is the misrepresentation,
+// because on device isNative() is true and this tier reads "A WHOLE NEW
+// CHARACTER" with real prices. The flag only affects what is DISPLAYED here;
+// nothing is purchased or granted during a capture.
+await boot('?iapmock=1');
 await settle(3000);
 await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
