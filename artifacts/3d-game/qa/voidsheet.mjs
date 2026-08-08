@@ -1,0 +1,62 @@
+// EVERY VOID, RENDERED THE WAY THE HAT CARDS ARE.
+//
+// The hats tab renders its thirteen cards from the real geometry. The voids tab
+// paints a CSS radial-gradient with an SVG face on top and, for some of them, a
+// CDN photo cropped to a circle — so Toxic, Magma, Circuit, Candy and Honey
+// render as a swatch of aurora, lava, printed circuit board, candy and
+// honeycomb, with no face and no character in the picture at all.
+//
+// This probe drives the spike that says whether the fix works: a SECOND full
+// voidling built offscreen — body shader, face rig, character eyes, aura,
+// pattern and accessory — photographed once per skin.
+//
+// WATCH texAmt. It is uTexAmt read straight off the body material, and it is 1
+// only once the skin's texture has actually loaded. In this sandbox the asset
+// CDN 403s by policy, so every textured skin reads 0 and renders as its colour
+// gradient. That is not a sandbox artefact to wave away: it is the exact
+// failure mode a lazily-cached thumbnail has on a real phone with a slow
+// network, and the shipped renderer has to handle it.
+//
+//   node qa/voidsheet.mjs [ids] [port]
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const only = (process.argv[2] || '').split(',').filter(Boolean);
+const PORT = process.argv[3] || '4177';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+const p = await b.newPage({ viewport: { width: 900, height: 900 }, deviceScaleFactor: 1 });
+const errs = [];
+p.on('pageerror', (e) => errs.push(String(e.message).slice(0, 240)));
+await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
+await p.addInitScript(() => { try {
+  localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
+  localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch { } });
+await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+await p.waitForFunction(() => !!window.__voidSheet, null, { timeout: 400000 });
+
+const shots = await p.evaluate(async (ids) => window.__voidSheet(ids), only);
+if (!shots || !shots.length) { console.log('no voids rendered', errs); await b.close(); process.exit(1); }
+fs.mkdirSync('qa-out/voids', { recursive: true });
+for (const s of shots) {
+  fs.writeFileSync(`qa-out/voids/${s.id}.png`, Buffer.from(s.png, 'base64'));
+  const tex = !s.wantsTex ? '   —  ' : s.texAmt >= 1 ? '  LIVE' : '  MISS';
+  console.log(`${s.id.padEnd(12)} ${s.name.padEnd(14)} ${s.tier.padEnd(10)}`
+    + ` acc=${String(s.acc ?? '-').padEnd(8)} pat=${String(s.pattern ?? '-').padEnd(10)} tex${tex}`
+    + `  lid=${(s.lid ?? 1).toFixed(2)}${s.lid < 0.98 ? '  <-- EYES SHUT' : ''}`);
+}
+const d0 = shots[0];
+console.log(`\nhidden: ${(d0.hid||[]).join(', ') || '(none)'}`
+  + (d0.missed && d0.missed.length ? `   NOT FOUND: ${d0.missed.join(', ')}` : ''));
+if (d0.stray && d0.stray.length) {
+  console.log('still visible and wider than the body (r > 1.25):');
+  for (const q of d0.stray) console.log('  ' + q);
+} else console.log('nothing wide left in frame');
+
+const missing = shots.filter((s) => s.wantsTex && s.texAmt < 1).map((s) => s.id);
+if (missing.length) {
+  console.log(`\n${missing.length} skin(s) rendered WITHOUT their texture: ${missing.join(', ')}`);
+  console.log('  (expected in this sandbox — the asset CDN is blocked by egress policy)');
+}
+if (errs.length) console.log('\nPAGE ERRORS:', errs.slice(0, 4));
+console.log(`\nwrote ${shots.length} sheets to qa-out/voids/`);
+await b.close();

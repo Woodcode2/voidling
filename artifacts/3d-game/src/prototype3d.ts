@@ -775,6 +775,7 @@ const _dbg = window as unknown as {
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
+  __voidSheet: (ids: string[]) => Promise<unknown>;
   __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -954,6 +955,36 @@ _dbg.__hatSheet = async (ids: string[]) => {
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 36), bodyMat);
   sc.add(body);
   const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  // …and a census of everything in the WHOLE SCENE that will actually draw.
+  // Three earlier versions of this were wrong, each differently: one walked
+  // only v.group, and createVoid adds its contact shadow straight to the SCENE
+  // (void3d.ts:431); one tested o.visible, which is the object's OWN flag, so
+  // a child of a hidden group still reported true; and one ran BEFORE update(),
+  // which is where every sprite and ring gets its scale — so it reported an
+  // empty frame while the render came back with a grey ellipse through the
+  // character's waist. Walk the parent chain, and take the census after the
+  // pose has settled.
+  const drawn = (o: THREE.Object3D): boolean => {
+    for (let n: THREE.Object3D | null = o; n; n = n.parent) if (!n.visible) return false;
+    return true;
+  };
+  const census = (): string[] => {
+    const q: string[] = [];
+    sc.traverse((o) => {
+      const g2 = (o as THREE.Mesh).geometry;
+      if (!g2 || !drawn(o)) return;
+      g2.computeBoundingSphere();
+      const r2 = (g2.boundingSphere?.radius ?? 0) * Math.max(o.scale.x, o.scale.y, o.scale.z);
+      if (r2 > 1.3) q.push(`${o.name || o.type}:${g2.type} r=${r2.toFixed(2)} y=${o.position.y.toFixed(2)} parent=${o.parent?.name || o.parent?.type || 'scene'}`);
+    });
+    return q;
+  };
+  /** How open the lid is, 0..1: sclera.scale.y is the lid value times the
+   *  mood's width, and scale.x is that width alone (void3d.ts:1402). */
+  const lidOpen = (g: THREE.Object3D): number => {
+    const sc2 = g.getObjectByName('sclera');
+    return sc2 && sc2.scale.x > 0 ? sc2.scale.y / sc2.scale.x : 1;
+  };
   const rt = new THREE.WebGLRenderTarget(S, S);
   rt.texture.colorSpace = THREE.SRGBColorSpace;
   const cv = document.createElement('canvas'); cv.width = S * N; cv.height = S;
@@ -1033,6 +1064,165 @@ _dbg.__hatSheet = async (ids: string[]) => {
     out.push({ id: h.id, meshes, tris: Math.round(tris), closest, top, wide, graze,
       png: cv.toDataURL('image/png').split(',')[1] });
   }
+  return out;
+};
+// ── EVERY VOID, AS THE SHOP WOULD RENDER IT ────────────────────────────────
+// The hats tab renders its cards; the voids tab paints a CSS gradient with an
+// SVG face and, for five of them, a CDN photo cropped to a circle. Toxic,
+// Magma, Circuit, Candy and Honey render as a swatch of aurora / lava / PCB /
+// candy / honeycomb with no face and no character at all.
+//
+// This is the spike that says whether the fix is possible: it builds a SECOND
+// full voidling — body shader, face rig, character eyes, aura, pattern and
+// accessory — offscreen, and photographs each skin on it. If this works the
+// void cards can be the real thing, the way the hat cards already are.
+//
+// ONE voidling, reused. setSkin hides every accessory and every body part
+// before showing the right one (void3d.ts:1093, :1127) and everything else it
+// touches is a uniform, so a single rig can wear all thirteen in turn. Thirteen
+// separate rigs would be thirteen SphereGeometry(1, 96, 72) bodies.
+//
+//   node qa/voidsheet.mjs [ids] [port]
+/** Read uTexAmt straight off the body material — the one number that says
+ *  whether the skin's texture actually arrived, rather than whether it was
+ *  asked for. */
+function bodyTexAmt(g: THREE.Object3D): number {
+  let amt = -1;
+  g.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
+    if (amt < 0 && m && m.uniforms && m.uniforms.uTexAmt) amt = m.uniforms.uTexAmt.value as number;
+  });
+  return amt;
+}
+_dbg.__voidSheet = async (ids: string[]) => {
+  const { createVoid } = await import('./proto3d/void3d');
+  const want = ids && ids.length ? SKINS.filter((s) => ids.includes(s.id)) : SKINS;
+  const S = 420, N = 2;
+  const sc = new THREE.Scene();
+  sc.background = new THREE.Color(0x150c2a);
+  sc.environment = scene.environment;
+  sc.environmentIntensity = 0.4;
+  const key = new THREE.DirectionalLight(0xfff2d8, 2.4); key.position.set(-3, 5, 4); sc.add(key);
+  const rim = new THREE.DirectionalLight(0x9fc8ff, 1.0); rim.position.set(4, 2, -4); sc.add(rim);
+  sc.add(new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.5));
+  const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  // createVoid billboards the face with camera.quaternion and yaws the costume
+  // to face the camera (void3d.ts:1275, :1278), so it has to be built against
+  // THIS camera — handing it the game's own would point every face off-screen.
+  const v = createVoid(sc, cam);
+  v.setRadius(1);
+  v.setMood('cruise');
+
+  // ── A PORTRAIT HAS NO FLOOR ─────────────────────────────────────────────
+  // createVoid ships a contact shadow and an evolution ring, both there to
+  // plant the hero on a street. On a card they render as a grey ellipse under
+  // the character like a saucer — the exact read the hat rebuild spent a week
+  // removing. Hidden BY NAME: an earlier pass guessed at "flat CircleGeometry
+  // or RingGeometry" and missed the ring, which is a torus tilted 0.5 rather
+  // than a circle laid flat, and then missed the LIP — the bright ring that
+  // says "hole" rather than "ball" — which is parented to the scene and is not
+  // in the void's group at all. void3d names all three now.
+  // DETACHED, not hidden. update() recomputes `lip.visible` from its own
+  // opacity on every single frame (void3d.ts:1492), so setting visible=false
+  // survives exactly until the next update — which is why the census kept
+  // reporting a ring that had just been switched off. Taking the three out of
+  // the graph is the only thing that holds; update() goes on writing their
+  // transforms to orphans, which costs nothing and draws nothing.
+  const hid: string[] = [], missed: string[] = [];
+  for (const n of ['contact', 'rings', 'lip']) {
+    const o = (v.group.getObjectByName(n) ?? sc.getObjectByName(n));
+    if (o) { o.removeFromParent(); hid.push(n); } else missed.push(n);
+  }
+
+  // ── AND A CENSUS TO PROVE IT ────────────────────────────────────────────
+  // Three earlier versions of this check were wrong, each differently: one
+  // walked only v.group, and the contact shadow is added straight to the SCENE
+  // (void3d.ts:431); one tested o.visible, which is the object's OWN flag, so a
+  // child of a hidden group still reported true; and one ran BEFORE update(),
+  // which is where every sprite and ring takes its scale — it reported an empty
+  // frame while the render came back with an ellipse through the character's
+  // waist. Walk the parent chain, and count after the pose has settled.
+  const drawn = (o: THREE.Object3D): boolean => {
+    for (let n: THREE.Object3D | null = o; n; n = n.parent) if (!n.visible) return false;
+    return true;
+  };
+  const census = (): string[] => {
+    const q: string[] = [];
+    sc.traverse((o) => {
+      const g2 = (o as THREE.Mesh).geometry;
+      if (!g2 || !drawn(o)) return;
+      g2.computeBoundingSphere();
+      const r2 = (g2.boundingSphere?.radius ?? 0) * Math.max(o.scale.x, o.scale.y, o.scale.z);
+      if (r2 > 1.3) {
+        q.push(`${o.name || o.type}:${g2.type} r=${r2.toFixed(2)} y=${o.position.y.toFixed(2)}`
+          + ` parent=${o.parent?.name || o.parent?.type || 'scene'}`);
+      }
+    });
+    return q;
+  };
+
+  /** How open the lid is, 0..1: sclera.scale.y is the lid value times the
+   *  mood's width, and scale.x is that width alone (void3d.ts:1402). */
+  const lidOpen = (g: THREE.Object3D): number => {
+    const sc2 = g.getObjectByName('sclera');
+    return sc2 && sc2.scale.x > 0 ? sc2.scale.y / sc2.scale.x : 1;
+  };
+  const rt = new THREE.WebGLRenderTarget(S, S);
+  rt.texture.colorSpace = THREE.SRGBColorSpace;
+  const cv = document.createElement('canvas'); cv.width = S * N; cv.height = S;
+  const ctx = cv.getContext('2d')!;
+  const out: unknown[] = [];
+  for (const sk of want) {
+    v.setSkin(sk);
+    // settle the springs: radius, breathe and the mood blend are all damped, so
+    // one frame renders a half-formed pose
+    for (let i = 0; i < 40; i++) {
+      v.update(1 / 60, { t: 6.2 + i / 60, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 });
+    }
+    // ── AND WAIT FOR THE EYES ────────────────────────────────────────────
+    // blinkT is a free-running clock on the rig (void3d.ts:1018) and this
+    // renderer reuses ONE rig for all thirteen skins, so the blink phase drifts
+    // by 0.68s per skin — Candy came out of the first full run with its eyes
+    // shut. A blink is 0.16s, and blinkT resets to at least 3.4s afterwards, so
+    // stepping until the lid is open always terminates well inside this bound.
+    for (let i = 0; i < 90 && lidOpen(v.group) < 0.98; i++) {
+      v.update(1 / 60, { t: 7 + i / 60, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 });
+    }
+    for (let i = 0; i < N; i++) {
+      // FRAME THE WHOLE CHARACTER. The body's top is at ~1.9 and the unicorn
+      // horn reaches 2.3, so aiming at y=0.15 — the middle of a bare orb —
+      // pushed every accessory out through the top of the frame.
+      const a = (i * 32 * Math.PI) / 180;
+      const d = 6.0;
+      cam.position.set(Math.sin(a) * d, 1.45, Math.cos(a) * d);
+      cam.lookAt(0, 1.05, 0);
+      // one more update AFTER the camera moves: the face billboard and the
+      // costume yaw are both read off the camera inside update()
+      v.update(1 / 60, { t: 7, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 });
+      renderer.setRenderTarget(rt);
+      renderer.render(sc, cam);
+      const buf = new Uint8Array(S * S * 4);
+      renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
+      renderer.setRenderTarget(null);
+      const img = ctx.createImageData(S, S);
+      for (let y = 0; y < S; y++) img.data.set(buf.subarray((S - 1 - y) * S * 4, (S - y) * S * 4), y * S * 4);
+      ctx.putImageData(img, i * S, 0);
+    }
+    out.push({
+      id: sk.id, name: sk.name, tier: sk.cash ? 'legendary' : sk.streak ? 'streak' : 'coins',
+      acc: sk.acc ?? null, pattern: sk.char?.pattern ?? null,
+      // DID THE TEXTURE ACTUALLY ARRIVE? uTexAmt only flips to 1 in the
+      // TextureLoader onLoad callback (void3d.ts:1135). A card rendered before
+      // that lands advertises the wrong orb for ever, because the thumbnail is
+      // cached. In this sandbox the CDN 403s, so this reads 0 for every
+      // textured skin — which is exactly the failure mode to design around,
+      // not a sandbox artefact to wave away.
+      wantsTex: !!sk.tex, texAmt: bodyTexAmt(v.group), lid: lidOpen(v.group),
+      hid, missed, stray: census(),
+      png: cv.toDataURL('image/png').split(',')[1],
+    });
+  }
+  sc.remove(v.group);
   return out;
 };
 _dbg.__life = life;

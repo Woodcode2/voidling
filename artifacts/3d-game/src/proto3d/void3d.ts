@@ -440,6 +440,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       depthWrite: false,
     }),
   );
+  contact.name = 'contact';                     // see the note on rings.name
   contact.rotation.x = -Math.PI / 2; contact.position.y = 0.05;
   // The disc is now the ONLY thing grounding the hero, so it must not flicker
   // either. It is transparent and depthWrite-free, which puts it in the sorted
@@ -461,6 +462,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     new THREE.RingGeometry(0.88, 1, 72),
     new THREE.MeshBasicMaterial({ color: 0xd9c2ff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
   );
+  // NAMED, with `contact` and `rings`: these three are the void's GROUND
+  // FURNITURE and they are added to the scene/group to plant it on a street.
+  // A shop-card portrait has no street, and this lip is the one that hunted
+  // three wrong guesses — it is neither in the void's group nor shaped like
+  // the others. See __voidSheet in prototype3d.ts.
+  lip.name = 'lip';
   lip.rotation.x = -Math.PI / 2; lip.position.y = 0.06;
   lip.renderOrder = -1;   // always immediately after the pit it rims
   (lip.material as THREE.MeshBasicMaterial).polygonOffset = true;
@@ -570,6 +577,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     starPupil.renderOrder = 4; glowRing.renderOrder = 4;
     pupilGrp.add(starPupil); pupilGrp.add(glowRing);
     charEyes.push({ star: starPupil, ring: glowRing });
+    // NAMED so the lid is observable from outside. A shop card is a single
+    // frame, and the blink cadence is a free-running clock (blinkT, :1018) —
+    // photograph a void at the wrong moment and you have shipped a card of a
+    // character with its eyes shut. Anything rendering a still can watch
+    // sclera.scale.y / sclera.scale.x and wait for the lid to open.
+    sclera.name = 'sclera';
     g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
     face.add(g); eyes.push({ g, sclera, pupilGrp, outline, white });
@@ -887,6 +900,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // ── evolution ring — ONE crisp thin ribbon, normal blending so it reads as
   // a saturated violet band (additive washed to white over bright ground)
   const rings = new THREE.Group();
+  // NAMED, because things outside this file need to switch it off. A shop-card
+  // portrait has no floor and no earned evolution ring — see __voidSheet in
+  // prototype3d.ts, which hid these by guessing at their geometry type and
+  // rotation until the guess missed this one (a torus tilted 0.5, not a flat
+  // circle) and every card rendered with a grey ellipse through the character.
+  rings.name = 'rings';
   group.add(rings);
   const ringMats: THREE.MeshBasicMaterial[] = [];
   {
