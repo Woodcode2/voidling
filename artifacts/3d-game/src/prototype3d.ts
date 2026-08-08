@@ -3166,7 +3166,25 @@ function capture(e: Edible, giveHunger = true) {
   if (bite > 0.55) hitStop(0.055 + 0.05 * bite);
   combo++; comboT = 1.6;
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
-  const comboMult = 1 + Math.min(combo, 25) * 0.1;             // 2D: 1 + min(combo,25)·0.1
+  // ── THE COMBO IS WHY NOBODY CAN CATCH THE PLAYER ──────────────────────────
+  // Five attempts to close the race by feeding the family have now failed, four
+  // of them by multiplying an earnings rate that was throttled elsewhere. The
+  // measurement that reframes it: the family is food-limited in ABSOLUTE terms
+  // (~70k a match) while the player reaches ~150k, and the lane the family
+  // chases is 0.94 x the PLAYER's score. So the target moves away from them
+  // exactly as fast as the player's multiplier inflates it.
+  //
+  // 1 + min(combo,25)*0.1 tops out at 3.5x, and on a map this dense it never
+  // lapses — comboT resets to 1.6s on every bite and the player eats far more
+  // often than that, so the multiplier is effectively a constant 3.5 for most
+  // of a match rather than a reward for a streak.
+  //
+  // Sub-linear fixes both halves at once, and it is BETTER early: at combo 5 it
+  // pays 1.54x where linear paid 1.50, so a child sees COMBO x2 sooner; at the
+  // 25 ceiling it pays 2.20x instead of 3.50x, cutting the score inflation that
+  // put the field out of reach. The lane comes down with it, to a number the
+  // family can actually earn.
+  const comboMult = 1 + Math.sqrt(Math.min(combo, 25)) * 0.24;
   // moving prey (people/animals/cars — tagged ptsMult 1.5) beats furniture of
   // the same size: chasing pays. Everything else stays radius-proportional.
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
