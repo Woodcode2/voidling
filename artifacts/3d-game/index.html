@@ -1514,8 +1514,11 @@
            HATS second, as the thing you graduate to. A hat goes on any void,
            so the two tabs multiply rather than compete. -->
       <div class="shopTabs">
-        <button class="shopTab on" data-tab="voids"><i>🟣</i>VOIDS<em>earn with ✦</em></button>
-        <button class="shopTab" data-tab="hats"><i>🎩</i>HATS<em>real hats, real money</em></button>
+        <!-- the subtitles are a COLLECTION METER, filled in at runtime. A
+             collection game has to say how far along you are somewhere, and
+             the tab you are choosing between is the honest place for it. -->
+        <button class="shopTab on" data-tab="voids"><i>🟣</i>VOIDS<em id="tabVoids">earn with ✦</em></button>
+        <button class="shopTab" data-tab="hats"><i>🎩</i>HATS<em id="tabHats">real hats, real money</em></button>
       </div>
       <!-- THE MIRROR. Two tabs exist so that any hat goes on any void — 169
            combinations — and until now the combination was shown NOWHERE. The

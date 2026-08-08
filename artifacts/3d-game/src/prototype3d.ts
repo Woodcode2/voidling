@@ -796,6 +796,7 @@ const _dbg = window as unknown as {
   __previewVoid?: (s: Skin) => void;
   __previewStop?: () => void;
   __shopMirror?: () => void;
+  __shopTab?: () => void;
   __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -2709,8 +2710,15 @@ const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250,
 // immediately, and after that coins buy nothing at all. That is a content
 // question (more voids to earn), not a pricing one — and hats are deliberately
 // NOT the answer, because hats are the slot that takes money.
+// THE LADDER, RE-CUT AGAINST THE MEASUREMENT. Ten rungs instead of five, and
+// each one is roughly a third dearer than the last, so a child can always see
+// the next thing and it is always further than the one before. First rung
+// inside a single match — a first session should end with a purchase — and the
+// whole set around thirty matches at 550✦, which is a collection rather than
+// an afternoon.
 const PRICES: Record<string, number> = {
-  classic: 0, toxic: 150, sunset: 300, ocean: 500, candy: 750, honey: 1000,
+  classic: 0, toxic: 150, sunset: 300, ocean: 500, candy: 800, honey: 1100,
+  lagoon: 1500, neon: 2000, lemon: 2600, silver: 3300, chilli: 4200,
 };
 /** THE NEXT THING TO CHASE. The results screen stated an outcome and offered a
  *  button; it never stated a goal, which is the moment a child decides whether
@@ -3637,7 +3645,7 @@ el('btnShop').addEventListener('click', () => {
   shopEl.classList.add('show');
   // paint on the frame AFTER the overlay is laid out: the canvases have to be
   // in the document and sized before anything is drawn into them
-  requestAnimationFrame(() => { _dbg.__paintVoids?.(); _dbg.__shopMirror?.(); });
+  requestAnimationFrame(() => { _dbg.__shopTab?.(); });
 });
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 // ── world integrity: NOTHING stands on asphalt, ever ─────────────────────────
@@ -4462,6 +4470,9 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   };
   const refresh = () => {
     paintWallet();
+    // the tab is the collection meter: how many of these do you have?
+    const tv = document.getElementById('tabVoids');
+    if (tv) tv.textContent = `${SKINS.filter((x) => owned.has(x.id)).length} of ${SKINS.length} collected`;
     for (const s of SKINS) {
       // streak skins unlock themselves the moment the streak is long enough
       if (s.streak && streak >= s.streak && !owned.has(s.id)) {
@@ -4937,13 +4948,31 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     img.src = s.tex;
   }
 
+  // ── PAINTED ACROSS FRAMES, NOT IN ONE ────────────────────────────────────
+  // Eighteen cards at 118 ms each under the software renderer is 2.1 seconds
+  // in a single synchronous block; on a real GPU it is far less, but it is
+  // still a freeze between tapping SHOP and the shop existing, and it grows
+  // every time a skin is added. Spread over animation frames the shop opens
+  // instantly and fills in top-down, which is also the order a child reads it.
+  //
+  // The budget is per-frame, not per-card: on hardware that can manage several
+  // in 8 ms it does several, and on hardware that cannot it still does one, so
+  // this never stalls and never dawdles.
   function paintVoids(): void {
     if (voidsDone) return;
     voidsDone = true;
-    for (const s of SKINS) {
-      const id = `skcv_${s.id}`;
-      if (!shootVoid(s, id, VS)) repaintOnTexture(s, id, VS);
-    }
+    const queue = [...SKINS];
+    const step = () => {
+      const t0 = performance.now();
+      do {
+        const s = queue.shift();
+        if (!s) break;
+        const id = `skcv_${s.id}`;
+        if (!shootVoid(s, id, VS)) repaintOnTexture(s, id, VS);
+      } while (queue.length && performance.now() - t0 < 8);
+      if (queue.length) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   // ── MEET THE VOID ─────────────────────────────────────────────────────────
@@ -4991,6 +5020,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       prevLast = now;
       st.t += dt;
       prevAz += dt * 0.42;                       // a slow turntable, not a spin
+      // RE-ASSERT THE SKIN EVERY FRAME. The card painter now runs across
+      // frames too and shares this one rig, so a child who taps a card while
+      // the grid is still filling in would otherwise watch the turntable
+      // change colour under them. setSkin is uniforms and visibility flags —
+      // cheap enough to simply do again.
+      rig.setSkin(s);
       rig.update(dt, st);
       const box = new THREE.Box3(); const _bb = new THREE.Box3();
       rig.group.updateWorldMatrix(true, true);
@@ -5035,6 +5070,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // combination was displayed nowhere at all. Equipping something changed a
   // label and nothing else.
   const MIRROR_S = 256;
+  let mirrorWarm = false;
   let mirrorRT: THREE.WebGLRenderTarget | null = null;
   function paintMirror(): void {
     const cv = document.getElementById('mirrorCv') as HTMLCanvasElement | null;
@@ -5045,8 +5081,16 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const { sc, cam, rig } = voidStudio();
     rig.setSkin(sk);
     rig.setHat(wornHat);
+    // A WARM RIG DOES NOT NEED A COLD SETTLE. The mirror repaints on every
+    // equip, and a full forty-frame settle made that a 417 ms hitch (software
+    // renderer) for a rig whose springs are already at rest from the last
+    // paint. Only the skin and hat changed, and those are uniforms and
+    // visibility flags. The lid loop still runs — blink is a free clock and a
+    // mirror of yourself with its eyes shut is worse than a card of one.
     const st = { t: 6.2, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 };
-    for (let i = 0; i < 40; i++) { st.t = 6.2 + i / 60; rig.update(1 / 60, st); }
+    const warm = mirrorWarm ? 8 : 40;
+    mirrorWarm = true;
+    for (let i = 0; i < warm; i++) { st.t = 6.2 + i / 60; rig.update(1 / 60, st); }
     for (let i = 0; i < 90 && lidOpen(rig.group) < 0.98; i++) { st.t = 7 + i / 60; rig.update(1 / 60, st); }
     const box = new THREE.Box3(), _bb = new THREE.Box3();
     rig.group.updateWorldMatrix(true, true);
@@ -5175,6 +5219,8 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     return iapAvailable() ? `💎 ${p2}` : `💎 ${p2} · ON THE APP STORE`;
   };
   const refreshHats = () => {
+    const th = document.getElementById('tabHats');
+    if (th) th.textContent = `${HATS.filter((h) => ownedHats.has(h.id)).length} of ${HATS.length} collected`;
     for (const h of HATS) {
       const card = hatCards.get(h.id);
       if (!card) continue;
@@ -5258,10 +5304,23 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   _dbg.__paintVoids = paintVoids;
 
   // ── TABS ──────────────────────────────────────────────────────────────────
+  // …and remember which one you were on. A child who is saving for a hat and
+  // opens the shop to check on it should not have to cross the room first.
+  const showTab = (tab: string) => {
+    document.querySelectorAll('.shopTab').forEach((o) => o.classList.toggle('on', (o as HTMLElement).dataset.tab === tab));
+    const hats = tab === 'hats';
+    skinGrid.style.display = hats ? 'none' : '';
+    grid.style.display = hats ? '' : 'none';
+    if (hats) paintThumbs(); else paintVoids();
+    paintMirror();
+    localStorage.setItem('voidShopTab', tab);
+  };
+  _dbg.__shopTab = () => showTab(localStorage.getItem('voidShopTab') === 'hats' ? 'hats' : 'voids');
   document.querySelectorAll('.shopTab').forEach((t) => t.addEventListener('click', () => {
     const tab = (t as HTMLElement).dataset.tab;
     document.querySelectorAll('.shopTab').forEach((o) => o.classList.toggle('on', o === t));
     const hats = tab === 'hats';
+    localStorage.setItem('voidShopTab', tab ?? 'voids');
     skinGrid.style.display = hats ? 'none' : '';
     grid.style.display = hats ? '' : 'none';
     if (hats) paintThumbs(); else paintVoids();

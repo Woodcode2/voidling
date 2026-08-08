@@ -170,8 +170,42 @@ export const SKINS: Skin[] = [
   // Honey's rim was byte-identical to King Void's (#ffd25a) — the gold that is
   // meant to make the crown feel royal was already on a coin skin.
   { id: 'honey', name: 'Honey', abyss: 0x2a1606, inner: 0x6a4210, mid: 0xb87f1a, rim: 0xffb84a, glow: 0xffd486, tex: '/assets/hf/hf_20260717_131501_87fecffb-5637-49ad-87f5-106990a4f100.png' },
+  // ── FIVE MORE TO EARN, AND THE REASON IS A MEASUREMENT ───────────────────
+  // The coin tier was five buyable skins totalling 2,700✦. qa/_econ.mjs — once
+  // it stopped dispatching its input at a shop thumbnail — puts a Maple match
+  // at 500-700✦. So the entire earnable collection was four to five matches,
+  // after which coins bought nothing at all for the rest of the child's life.
+  //
+  // The old note above PRICES cut the catalogue from 9,450✦ to 2,700✦ because
+  // 9,450 looked like 68 matches. That arithmetic used ~139✦/match, which was
+  // never measured; at the real rate 9,450 would have been seventeen. The cut
+  // was an over-correction against a wrong number.
+  //
+  // These five fill the gaps in the palette rather than crowding it: seafoam,
+  // magenta, a pale lemon, an ACHROMATIC silver (nothing in the game was grey),
+  // and a true red. Every one clears the smile-contrast rule with margin —
+  // Chilli is the tightest at 3.17:1 — which qa/voidsheet.mjs re-checks on
+  // every run, because VOID.mouth is one fixed plum shared by every entry here.
+  { id: 'lagoon', name: 'Lagoon', abyss: 0x04231e, inner: 0x0d6656, mid: 0x1fb894, rim: 0x62ffd8, glow: 0x9cffe8 },
+  { id: 'neon', name: 'Neon', abyss: 0x2c0524, inner: 0x781060, mid: 0xd426b0, rim: 0xff7ae0, glow: 0xffb0ee },
+  { id: 'lemon', name: 'Lemon', abyss: 0x2e2703, inner: 0x8a7410, mid: 0xf0dc46, rim: 0xfffaa8, glow: 0xfffdd0 },
+  { id: 'silver', name: 'Silver', abyss: 0x101218, inner: 0x3a414d, mid: 0x8e98a6, rim: 0xe6eef8, glow: 0xf6fbff },
+  { id: 'chilli', name: 'Chilli', abyss: 0x2c060e, inner: 0x820f22, mid: 0xe0243f, rim: 0xff7089, glow: 0xffa0b0 },
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
-  { id: 'ember', name: 'Ember', abyss: 0x260a06, inner: 0x6a2410, mid: 0xc4571a, rim: 0xffb054, glow: 0xffcf7a, streak: 2 },
+  // EMBER IS FIRE, NOT TOFFEE. Measured on the rendered cards, ember/honey were
+  // the closest pair in the entire catalogue at 2.4 mean per-pixel — closer
+  // than any two things a child is ever asked to tell apart — because their
+  // rims were 0xffb054 and 0xffb84a, which is the same colour twice. So a
+  // player grinds to 1,100 coins for Honey and receives a skin that looks like
+  // the free two-day reward already in their collection. Ember is now a hot
+  // red-orange over a charred core; Honey keeps the amber.
+  //
+  // The rim is 0xffb36e and not the 0xff7a2a this first tried, because the
+  // smile guard caught that at 2.96:1 — a mid-bright orange rim makes a
+  // highlight too close to the body to separate the mouth from it. Sweeping
+  // the rim's lightness, 0xffb36e is where the two-route contrast clears
+  // (3.49:1) while the skin still reads as fire rather than as toffee.
+  { id: 'ember', name: 'Ember', abyss: 0x1c0603, inner: 0x6e1c08, mid: 0xe03c10, rim: 0xffb36e, glow: 0xffd9a8, streak: 2 },
   // ── PRISM EARNS ITS SEVEN DAYS ────────────────────────────────────────────
   // This is the reward for coming back a week running, and it was rim 0xe8b8ff
   // on mid 0x8a5ac8 against Classic's 0xcb99ff on 0x5f2ab4 — two purple
