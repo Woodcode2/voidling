@@ -1298,7 +1298,28 @@ export function createRivals(
         // so Maple is untouched) and a much firmer pull when it is far below.
         // The 0.50 floor is unchanged: a rival AHEAD of its lane is still
         // throttled to half, and satiety above still stops it outright.
-        const band = THREE.MathUtils.clamp(off, 0.50, 16);
+        // ── PROPORTIONAL CONTROL ALWAYS SETTLES SHORT ─────────────────────
+        // band = off = want/score is a P controller, and a P controller with a
+        // throttled plant converges BELOW its setpoint — always, by the amount
+        // the throttle costs. Measured across 5 matches: the leader sits at
+        // 47.4% +/- 6.2 of the lane while the band reads ~1.68, i.e. the band
+        // and the shortfall are the SAME number. That is the signature, and it
+        // is why the three ceiling-raises recorded above all failed: they moved
+        // the clamp, which was never binding, instead of the authority.
+        //
+        // Squaring past the setpoint is the smallest change that closes it. At
+        // off 2.1 the multiplier goes 2.1 -> 4.4 rather than a 4.7th power that
+        // is violently sensitive to how rich a world is. Below the lane nothing
+        // changes (off <= 1 stays linear, and 1^n == 1, so a rival AT target is
+        // untouched and one AHEAD is still throttled to 0.5).
+        //
+        // It cannot rout the player, and that is structural rather than tuned:
+        // satiety stops a rival dead at FULL_AT 1.2x its lane no matter what
+        // the multiplier says, and lane 0's want is 0.94x the player's score.
+        // 0.94 x 1.2 = 1.128, so the best possible rival finishes at 113% of a
+        // player who is playing — beatable by anyone paying attention, and
+        // genuinely lost by anyone who is not. Which is the whole point.
+        const band = THREE.MathUtils.clamp(off <= 1 ? off : off * off, 0.50, 24);
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;
