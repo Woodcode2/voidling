@@ -113,17 +113,33 @@ export const HATS: Hat[] = [
       'my kingdom is a hole. it is a good hole.',
     ] },
 
-  { id: 'tycoon', name: 'The Tycoon', blurb: 'tremendous hair. the best hair.',
+  // ── THE COPY HAD TO BE REWRITTEN, AND THE RULE WAS ALREADY WRITTEN DOWN ──
+  // hatgeo.ts says of this hat, in its own comment: "A generic bombastic-tycoon
+  // archetype — no likeness, no name, no slogans." The GEOMETRY honoured that.
+  // The eight lines that used to sit here did not: they were borrowed
+  // catchphrases of one specific living public figure, on the most expensive
+  // item in the shop, in a catalogue aimed at six-year-olds — and hatLine()
+  // speaks them aloud during play on a loop, so the likeness was being
+  // delivered by voice, repeatedly, whatever the mesh did.
+  //
+  // App Store Guideline 5.2.1 aside, it is simply not the joke. The joke is
+  // SCALE: far too much hair, far too much appetite. So the lines are about
+  // money and eating, which is what a tycoon in a game about swallowing a town
+  // would actually say, and not one of them is traceable to anybody.
+  //
+  // The id, the name, the price and the StoreKit product id are all unchanged,
+  // so nobody who already owns this is stranded.
+  { id: 'tycoon', name: 'The Tycoon', blurb: 'big hair, bigger appetite',
     tier: 'legendary', usd: 6.99, seat: 0.92, accent: 0xf5c542,
     lines: [
-      'that was TREMENDOUS',
-      'nobody eats towns like me. nobody.',
-      'this hole? BEST hole. everyone says so.',
-      'huge. absolutely huge. i said what i said.',
-      'we are going to eat SO much. you will get bored of eating.',
-      'the hair? natural. next question.',
-      'many people are saying it. many, many people.',
-      'i have the best snacks. tremendous snacks.',
+      'add it to my collection',
+      'i am buying this entire street',
+      'another one for the portfolio',
+      'i did not get rich by sharing',
+      'send the bill to my accountant',
+      'darling, i EAT real estate',
+      'that one was worth a fortune. delicious.',
+      'everything you can see? mine. everything you cannot? also mine.',
     ] },
 
   { id: 'horn', name: 'Rainbow Horn', blurb: 'sparkles now, apologies never',

@@ -337,6 +337,23 @@ export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
 }
 
 const texCache = new Map<string, THREE.Texture>();   // premium skin textures
+// ── …AND WHO IS STILL WAITING FOR EACH ONE ────────────────────────────────
+// TextureLoader fires exactly ONE callback, and it belongs to whoever asked
+// first. The old code closed that callback over the FIRST requester's material,
+// so a second void asking for a texture that was already in flight fell through
+// to `t.image ? 1 : 0`, read 0, and was never told the load had finished. It sat
+// on a flat gradient for ever.
+//
+// With one void in the world that was invisible. The shop's card renderer is a
+// SECOND void, and it warms this cache from the menu — so the shop can now win
+// the race and strand the HERO: a child spends 1,000 coins on Honey and then
+// plays a whole match as a flat brown ball. The card work created that exposure,
+// so it is closed here rather than worked around in the shop.
+//
+// (This was also mis-diagnosed once as the sandbox blocking a CDN. It is not:
+// every one of these files is vendored under public/assets/hf and serves 200
+// locally. It is a race, and it happens on real phones too.)
+const texWaiting = new Map<string, THREE.ShaderMaterial[]>();
 
 export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const group = new THREE.Group();
@@ -1147,18 +1164,33 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       if (ch?.body && bodyPart[ch.body]) bodyPart[ch.body].visible = true;
       skinHasTex = !!s.tex;
       if (s.tex) {
-        let t = texCache.get(s.tex);
+        const url = s.tex;
+        let t = texCache.get(url);
         if (!t) {
           // only engage the texture once it actually loads (offline/dev keeps
-          // the colour-gradient look instead of a broken white orb)
-          t = new THREE.TextureLoader().load(s.tex,
-            () => { if (bodyMat.uniforms.uTex.value === t) bodyMat.uniforms.uTexAmt.value = 1; });
+          // the colour-gradient look instead of a broken white orb) — and tell
+          // EVERY material that was waiting on it, not just this one
+          t = new THREE.TextureLoader().load(url, () => {
+            const tex = texCache.get(url);
+            for (const m of texWaiting.get(url) ?? []) {
+              if (m.uniforms.uTex.value === tex) m.uniforms.uTexAmt.value = 1;
+            }
+            texWaiting.delete(url);
+          });
           t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
           t.colorSpace = THREE.SRGBColorSpace;
-          texCache.set(s.tex, t);
+          texCache.set(url, t);
         }
         bodyMat.uniforms.uTex.value = t;
-        bodyMat.uniforms.uTexAmt.value = (t.image ? 1 : 0);
+        const ready = !!t.image;
+        bodyMat.uniforms.uTexAmt.value = ready ? 1 : 0;
+        if (!ready) {
+          // join the queue. The guard above means a material that has since
+          // moved to another skin is skipped rather than wrongly lit.
+          const q = texWaiting.get(url) ?? [];
+          if (!q.includes(bodyMat)) q.push(bodyMat);
+          texWaiting.set(url, q);
+        }
       } else {
         bodyMat.uniforms.uTex.value = whiteTex;
         bodyMat.uniforms.uTexAmt.value = 0;

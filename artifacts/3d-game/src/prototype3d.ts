@@ -776,7 +776,10 @@ const _dbg = window as unknown as {
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
   __voidSheet: (ids: string[]) => Promise<unknown>;
+  __texRace: (skinId: string) => Promise<Record<string, unknown>>;
   __paintVoids?: () => void;
+  __previewVoid?: (s: Skin) => void;
+  __previewStop?: () => void;
   __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -1095,6 +1098,44 @@ function bodyTexAmt(g: THREE.Object3D): number {
   });
   return amt;
 }
+// ── TWO VOIDS, ONE TEXTURE ────────────────────────────────────────────────
+// The exact shape of the bug the shop's card renderer exposed. void3d caches
+// skin textures in a module-level map and TextureLoader fires exactly ONE
+// callback — so before the fix, the SECOND void to ask for a texture that was
+// already in flight got a cache hit on a Texture with no image yet, read
+// uTexAmt 0, and was never told the load finished.
+//
+// With one void in the world that was unreachable. The shop is a second void
+// that warms the cache from the menu, so the shop could win the race and leave
+// the HERO on a flat gradient for a whole match — a child spends 1,000 coins on
+// Honey and plays a brown ball.
+//
+// A = the shop's rig, B = a fresh stand-in for the hero. Both must reach 1.
+//   node qa/texrace.mjs [port]
+_dbg.__texRace = async (skinId: string) => {
+  const { createVoid } = await import('./proto3d/void3d');
+  const sk = SKINS.find((x) => x.id === skinId);
+  if (!sk?.tex) return { error: `no textured skin "${skinId}"` };
+  const mk = () => {
+    const sc2 = new THREE.Scene();
+    const cm = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    return { rig: createVoid(sc2, cm), sc2 };
+  };
+  const a = mk(), b = mk();
+  // A asks first and starts the fetch; B asks in the SAME tick and gets a cache
+  // hit on a Texture whose image has not arrived. That is the race.
+  a.rig.setSkin(sk);
+  b.rig.setSkin(sk);
+  const t0 = bodyTexAmt(a.rig.group), t1 = bodyTexAmt(b.rig.group);
+  await new Promise((r) => setTimeout(r, 4000));
+  const out = {
+    skin: skinId, url: sk.tex,
+    beforeA: t0, beforeB: t1,
+    afterA: bodyTexAmt(a.rig.group), afterB: bodyTexAmt(b.rig.group),
+  };
+  a.sc2.remove(a.rig.group); b.sc2.remove(b.rig.group);
+  return out;
+};
 _dbg.__voidSheet = async (ids: string[]) => {
   const { createVoid } = await import('./proto3d/void3d');
   const want = ids && ids.length ? SKINS.filter((s) => ids.includes(s.id)) : SKINS;
@@ -4349,29 +4390,11 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
   const cardGlow = (s: Skin) => `background: radial-gradient(circle at 50% 44%, `
     + `${hex(s.mid)}cc 0%, ${hex(s.mid)}88 34%, ${hex(s.rim)}33 58%, transparent 74%);`;
-  const orbStyle = (s: Skin) => s.cash
-    ? `background: ${skinGrad(s)}; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
-    : s.tex
-      ? `background: ${skinGrad(s)}; box-shadow: inset 0 -14px 26px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.45);`
-      : `background: ${skinGrad(s)}`;
-  // the ART rides ABOVE the face on its own layer: when the CDN blinks the
-  // layer is simply empty and the branded gradient + face show through, so a
-  // premium card can never render as a bare circle
-  const artLayer = (s: Skin) => {
-    const src = s.art ?? s.tex;
-    return src ? `<div class="artLay" style="background-image:url('${src}')"></div>` : '';
-  };
-  // every orb wears the FACE — it's the voidling you're buying, not a marble
-  // (legendary card art already has the character drawn in)
-  const FACE_SVG = `<svg class="face" viewBox="0 0 100 100">
-      <ellipse cx="34" cy="26" rx="12" ry="7" fill="#ffffff" opacity="0.14" transform="rotate(-24 34 26)"/>
-      <circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/>
-      <circle cx="40" cy="47" r="6.2" fill="#160a30"/><circle cx="64" cy="47" r="6.2" fill="#160a30"/>
-      <circle cx="38" cy="44" r="2.4" fill="#fff"/><circle cx="62" cy="44" r="2.4" fill="#fff"/>
-      <ellipse cx="25" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
-      <ellipse cx="75" cy="59" rx="6.5" ry="4.2" fill="#ff7da8" opacity="0.6"/>
-      <path d="M41 63 Q50 72 59 63" stroke="#1a0b33" stroke-width="3.6" fill="none" stroke-linecap="round"/>
-    </svg>`;
+  // orbStyle, artLayer and FACE_SVG lived here. All three are gone with the
+  // painted card: orbStyle drew the hard-edged disc that framed every render
+  // as a coin in a saucer, artLayer pasted a CDN photograph over the face, and
+  // FACE_SVG was a hand-drawn approximation of a face the renderer now draws
+  // properly. Nothing on either tab reads Skin.art any more.
   // ── skin PREVIEW: tap a card → meet the skin BIG, then equip/buy from there
   const prevEl = el('skinPrev'), spAct = el('spAct');
   let prevSkin: Skin | null = null;
@@ -4395,9 +4418,14 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   };
   const openPreview = (s: Skin) => {
     prevSkin = s;
+    // THE PREVIEW IS ALIVE. It used to be the card's picture at a larger size —
+    // a gradient, an SVG face, and for the paid tier a CDN photograph. A child
+    // who taps a card has asked to look at ONE character, which is the only
+    // place in the shop where a still is the wrong answer.
     const orb = el('spOrb');
-    orb.setAttribute('style', orbStyle(s));
-    orb.innerHTML = FACE_SVG + (s.art ? `<div class="artLay" style="background-image:url('${s.art}')"></div>` : '');
+    orb.setAttribute('style', cardGlow(s));
+    orb.innerHTML = '';
+    _dbg.__previewVoid?.(s);
     el('spName').textContent = s.name;
     el('spTier').textContent = s.cash ? 'LEGENDARY · A WHOLE NEW CHARACTER'
       : s.streak ? 'COME BACK · FREE' : 'COINS · A NEW LOOK';
@@ -4409,8 +4437,11 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       owned: owned.has(s.id), price: s.cash ?? PRICES[s.id] ?? 0, coins,
     });
   };
-  el('spClose').addEventListener('click', () => prevEl.classList.remove('show'));
-  prevEl.addEventListener('click', (ev) => { if (ev.target === prevEl) prevEl.classList.remove('show'); });
+  // …and it stops dead when the modal shuts. A turntable left running behind a
+  // closed overlay is a phone battery being spent on nothing.
+  const closePreview = () => { prevEl.classList.remove('show'); _dbg.__previewStop?.(); };
+  el('spClose').addEventListener('click', closePreview);
+  prevEl.addEventListener('click', (ev) => { if (ev.target === prevEl) closePreview(); });
   spAct.addEventListener('click', () => {
     const s = prevSkin;
     if (!s) return;
@@ -4874,6 +4905,88 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       if (!shootVoid(s, id, VS)) repaintOnTexture(s, id, VS);
     }
   }
+
+  // ── MEET THE VOID ─────────────────────────────────────────────────────────
+  // The cards are stills, and stills are right for a grid of thirteen. The
+  // PREVIEW is the one place a child has asked to look at a single character,
+  // and it was a CSS gradient with an SVG face pasted on — the same picture as
+  // the card, only bigger. So it is alive: the real rig, breathing and
+  // blinking on its own clock, turning slowly so the accessories read from
+  // every side, which is the whole reason the legendary tier costs money.
+  //
+  // It borrows the game's renderer inside a modal where the menu behind it is
+  // the only other thing drawing, and it stops dead when the modal closes —
+  // there is no second WebGL context and no cost at all when it is shut.
+  let prevRaf = 0, prevAz = 0, prevLast = 0;
+  const PREV_S = 384;
+  let prevRT: THREE.WebGLRenderTarget | null = null;
+
+  function stopPreviewSpin(): void {
+    if (prevRaf) cancelAnimationFrame(prevRaf);
+    prevRaf = 0;
+  }
+
+  function startPreviewSpin(s: Skin): void {
+    stopPreviewSpin();
+    const host = document.getElementById('spOrb');
+    if (!host) return;
+    let cv = host.querySelector('canvas') as HTMLCanvasElement | null;
+    if (!cv) { cv = document.createElement('canvas'); host.appendChild(cv); }
+    cv.width = PREV_S; cv.height = PREV_S;
+    const ctx = cv.getContext('2d');
+    const { sc, cam, rig } = voidStudio();
+    rig.setSkin(s);
+    prevAz = 0.30; prevLast = 0;
+    if (!prevRT) {
+      prevRT = new THREE.WebGLRenderTarget(PREV_S, PREV_S);
+      prevRT.texture.colorSpace = THREE.SRGBColorSpace;
+    }
+    const buf = new Uint8Array(PREV_S * PREV_S * 4);
+    const st = { t: 0, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 };
+    const frame = (now: number) => {
+      prevRaf = requestAnimationFrame(frame);
+      // clamp dt: a backgrounded tab hands back a two-second step, which would
+      // fling the turntable round and fire a whole blink between two frames
+      const dt = prevLast ? Math.min(0.05, (now - prevLast) / 1000) : 1 / 60;
+      prevLast = now;
+      st.t += dt;
+      prevAz += dt * 0.42;                       // a slow turntable, not a spin
+      rig.update(dt, st);
+      const box = new THREE.Box3(); const _bb = new THREE.Box3();
+      rig.group.updateWorldMatrix(true, true);
+      rig.group.traverse((o) => {
+        const g2 = (o as THREE.Mesh).geometry;
+        if (!g2 || !o.visible) return;
+        for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
+        g2.computeBoundingBox();
+        if (g2.boundingBox) box.union(_bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
+      });
+      const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
+      const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
+      const mid = (top + lo) / 2;
+      const dist = (Math.max(top - lo, wide * 2) * 1.14) / (2 * Math.tan((30 * Math.PI) / 360));
+      cam.position.set(Math.sin(prevAz) * dist, mid + dist * 0.10, Math.cos(prevAz) * dist);
+      cam.lookAt(0, mid, 0);
+      rig.update(0, st);                          // face billboard reads the camera
+      renderer.setRenderTarget(prevRT);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(sc, cam);
+      renderer.readRenderTargetPixels(prevRT!, 0, 0, PREV_S, PREV_S, buf);
+      renderer.setRenderTarget(null);
+      if (ctx) {
+        const img = ctx.createImageData(PREV_S, PREV_S);
+        for (let y = 0; y < PREV_S; y++) {
+          img.data.set(buf.subarray((PREV_S - 1 - y) * PREV_S * 4, (PREV_S - y) * PREV_S * 4), y * PREV_S * 4);
+        }
+        ctx.putImageData(img, 0, 0);
+      }
+    };
+    prevRaf = requestAnimationFrame(frame);
+  }
+
+  _dbg.__previewVoid = startPreviewSpin;
+  _dbg.__previewStop = stopPreviewSpin;
 
   // The shop OPENS on the voids tab, so the tab-switch handler below is not
   // enough on its own — without this the first thing a child sees is thirteen

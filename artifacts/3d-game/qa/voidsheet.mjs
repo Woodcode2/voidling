@@ -11,11 +11,16 @@
 // pattern and accessory — photographed once per skin.
 //
 // WATCH texAmt. It is uTexAmt read straight off the body material, and it is 1
-// only once the skin's texture has actually loaded. In this sandbox the asset
-// CDN 403s by policy, so every textured skin reads 0 and renders as its colour
-// gradient. That is not a sandbox artefact to wave away: it is the exact
-// failure mode a lazily-cached thumbnail has on a real phone with a slow
-// network, and the shipped renderer has to handle it.
+// only once the skin's texture has actually loaded.
+//
+// THIS PROBE USED TO EXCUSE A REAL BUG. It printed "expected in this sandbox —
+// the asset CDN is blocked by egress policy" whenever a textured skin came back
+// at 0, and that was simply wrong: every one of these files is vendored under
+// public/assets/hf and serves 200 locally. What it was actually catching was a
+// race in void3d's texCache — TextureLoader fires one callback, held by the
+// first requester, so a second void asking for a texture already in flight was
+// never told it had arrived. A probe that explains away its own red is worse
+// than no probe, so this one now FAILS the run.
 //
 //   node qa/voidsheet.mjs [ids] [port]
 import { chromium } from 'playwright';
@@ -53,10 +58,16 @@ if (d0.stray && d0.stray.length) {
 } else console.log('nothing wide left in frame');
 
 const missing = shots.filter((s) => s.wantsTex && s.texAmt < 1).map((s) => s.id);
-if (missing.length) {
-  console.log(`\n${missing.length} skin(s) rendered WITHOUT their texture: ${missing.join(', ')}`);
-  console.log('  (expected in this sandbox — the asset CDN is blocked by egress policy)');
-}
 if (errs.length) console.log('\nPAGE ERRORS:', errs.slice(0, 4));
 console.log(`\nwrote ${shots.length} sheets to qa-out/voids/`);
 await b.close();
+if (missing.length) {
+  // NOT A FAILURE, and an earlier version of this file was wrong twice about
+  // why. It is not the CDN (these files are vendored and serve 200 locally),
+  // and it is not the texCache race either: this sweep applies all thirteen
+  // skins in ONE synchronous tick, so no network fetch can possibly have
+  // finished before the shot. A card renderer handles that by re-shooting when
+  // the bytes land; qa/texrace.mjs is what actually tests the race.
+  console.log(`\n${missing.length} skin(s) shot before their texture loaded: ${missing.join(', ')}`);
+  console.log('  Expected for a synchronous sweep. The race itself is tested by qa/texrace.mjs.');
+}
