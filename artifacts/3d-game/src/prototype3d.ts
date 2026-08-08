@@ -3848,7 +3848,7 @@ el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 // real bounding box overlaps a road lane is pushed to the nearest legal spot
 // beside the road; if no legal spot exists it is retired from the match.
 const ASPHALT_HALF = 2.75;
-const _vBox = new THREE.Box3(); const _vSz = new THREE.Vector3();
+const _vBox = new THREE.Box3(); const _vSz = new THREE.Vector3(); const _vCtr = new THREE.Vector3();
 let _validated = false;   // homes are canonical after the first pass — later passes are cheap re-checks of new props
 // ══ THE SCRAPBOOK, ON SCREEN ══════════════════════════════════════════════
 const TIER_ICON: Record<string, string> = { common: '🔹', rare: '💜', legendary: '⭐' };
@@ -3932,7 +3932,7 @@ function validateWorld() {
     const e = edibles[i];
     const ud = e.mesh.userData;
     if (ud.mover || ud.vChecked) continue;   // movers steer themselves; checked props are settled
-    _vBox.setFromObject(e.mesh); _vBox.getSize(_vSz);
+    _vBox.setFromObject(e.mesh); _vBox.getSize(_vSz); _vBox.getCenter(_vCtr);
     // a GLB wrapper whose model hasn't streamed yet measures ~empty — do NOT
     // stamp it checked, or the house it becomes is never validated at all
     // (exactly how oversized houses kept ending up "in the street")
@@ -3944,9 +3944,30 @@ function validateWorld() {
     // includes the sidewalk, so a porch can never ride the curb again.
     const house = ud.qk === 'house';
     const parked = ud.qk === 'car';   // (movers were skipped above — this is only driveway cars)
-    const f = house ? 0.85 : ud.building ? 0.45 : 0.7;
-    const band = house || parked ? ASPHALT_HALF + 1.4 : ASPHALT_HALF;
-    const hx = (Math.min(_vSz.x, 24) / 2) * f, hz = (Math.min(_vSz.z, 24) / 2) * f;
+    // ── THE TOLERANCE WAS A HAIRCUT, NOT A CLEARANCE ──────────────────────
+    // `f` scaled the measured half-extent, so the allowance grew with the prop:
+    // a 16.6-unit barn was handed 4.6 units of free overhang while a 2-unit
+    // bollard got 0.55. Worked through with real numbers — Maple's country fill
+    // places a barn (island.ts makeBarn, r3 5.2) at roadClear(5.2) = 9.64 units
+    // from a road centreline, and the barn's true half-extent is 8.3, so its
+    // wall stands 1.41 units INSIDE the traffic lane. The old test needed
+    // band + hx = 2.75 + 8.3x0.45 = 6.49 to flag it and the prop sat at 9.64,
+    // so the sweep never saw the thing it exists to catch.
+    //
+    // The same shrunken half was also used to compute `off`, so anything this
+    // sweep DID move was set back down still on the asphalt. Any fraction — or
+    // any constant — subtracted here leaves a blind window exactly that wide,
+    // and the barn's whole offending range is only 1.41 units, so there is no
+    // slack to spend. The tolerance belongs in the BAND, where it is a fixed
+    // clearance, and the half-extent is measured true.
+    const band = (house || parked ? ASPHALT_HALF + 1.4 : ASPHALT_HALF)
+      - (house ? 0.35 : ud.building ? 0.25 : 0.15);
+    const hx = Math.min(_vSz.x, 40) / 2, hz = Math.min(_vSz.z, 40) / 2;
+    // …AND MAPLE'S KIT PROPS ARE AUTHORED OFF-CENTRE. makeGrainElevator's silo
+    // bank spans x -8.1..+17.25 about its own origin, so a test on e.home.x is
+    // wrong by 4.58 units for that prop alone. Measure the BOX and back the
+    // offset out again when placing.
+    const ox = _vCtr.x - e.mesh.position.x, oz = _vCtr.z - e.mesh.position.z;
     let px = e.home.x, pz = e.home.z, dirty = false, dead = false;
     // OFF-ISLAND CULL — the catch-all. Any static prop sitting over open space
     // is retired outright, no matter which placement path put it there. (A raw
@@ -3964,18 +3985,21 @@ function validateWorld() {
     // and frat houses were being shoved sideways for phantom bands at world
     // 2580/4290/6000/7710/9420 that exist on neither island.
     for (const rc of pickedWorld === 'maple' ? ROAD_CENTERS_3D : []) {
-      if (Math.abs(px - rc) < band + hx) {   // straddles a vertical road lane
+      // tested on the BOX (px + ox), placed so the BOX clears (…- ox)
+      if (Math.abs(px + ox - rc) < band + hx) {   // straddles a vertical road lane
         const off = band + hx + 0.4;
-        const side = px >= rc ? 1 : -1;
-        if (insideIsland3(rc + side * off, pz) && !inLagoon3(rc + side * off, pz)) { px = rc + side * off; dirty = true; }
-        else if (insideIsland3(rc - side * off, pz) && !inLagoon3(rc - side * off, pz)) { px = rc - side * off; dirty = true; }
+        const side = (px + ox) >= rc ? 1 : -1;
+        const a = rc + side * off - ox, bq = rc - side * off - ox;
+        if (insideIsland3(a, pz) && !inLagoon3(a, pz)) { px = a; dirty = true; }
+        else if (insideIsland3(bq, pz) && !inLagoon3(bq, pz)) { px = bq; dirty = true; }
         else { dead = true; break; }
       }
-      if (Math.abs(pz - rc) < band + hz) {   // straddles a horizontal road lane
+      if (Math.abs(pz + oz - rc) < band + hz) {   // straddles a horizontal road lane
         const off = band + hz + 0.4;
-        const side = pz >= rc ? 1 : -1;
-        if (insideIsland3(px, rc + side * off) && !inLagoon3(px, rc + side * off)) { pz = rc + side * off; dirty = true; }
-        else if (insideIsland3(px, rc - side * off) && !inLagoon3(px, rc - side * off)) { pz = rc - side * off; dirty = true; }
+        const side = (pz + oz) >= rc ? 1 : -1;
+        const a = rc + side * off - oz, bq = rc - side * off - oz;
+        if (insideIsland3(px, a) && !inLagoon3(px, a)) { pz = a; dirty = true; }
+        else if (insideIsland3(px, bq) && !inLagoon3(px, bq)) { pz = bq; dirty = true; }
         else { dead = true; break; }
       }
     }
