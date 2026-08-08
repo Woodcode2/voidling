@@ -780,6 +780,7 @@ const _dbg = window as unknown as {
   __paintVoids?: () => void;
   __previewVoid?: (s: Skin) => void;
   __previewStop?: () => void;
+  __shopMirror?: () => void;
   __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -2052,10 +2053,15 @@ function fmtTime(s: number) { s = Math.max(0, Math.ceil(s)); return `${Math.floo
 // ── coin wallet (persisted — the soft-currency for skins) ───────────────────
 let coins = Number(localStorage.getItem('voidCoins') || 0);
 const coinEl = el('coins');
+// Anything that wants to know the wallet moved. The shop needs it: claim a
+// daily reward with the shop open and the balance, the affordable states and
+// every progress bar are all stale until you switch tabs.
+const coinWatchers: ((n: number) => void)[] = [];
 function addCoins(n: number) {
   coins += n;
   localStorage.setItem('voidCoins', String(coins));
   coinEl.textContent = `✦ ${coins}`;
+  for (const f of coinWatchers) f(coins);
 }
 addCoins(0);
 
@@ -3582,7 +3588,7 @@ el('btnShop').addEventListener('click', () => {
   shopEl.classList.add('show');
   // paint on the frame AFTER the overlay is laid out: the canvases have to be
   // in the document and sized before anything is drawn into them
-  requestAnimationFrame(() => _dbg.__paintVoids?.());
+  requestAnimationFrame(() => { _dbg.__paintVoids?.(); _dbg.__shopMirror?.(); });
 });
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 // ── world integrity: NOTHING stands on asphalt, ever ─────────────────────────
@@ -4347,7 +4353,66 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   let equipped = localStorage.getItem('voidSkin') || 'classic';
   if (!owned.has(equipped) || !knownSkin.has(equipped)) equipped = 'classic';
   const cards = new Map<string, HTMLElement>();
+  /** Wear it. Shared by the one-tap card path and the preview's own button so
+   *  the two can never drift. */
+  const equipSkin = (s: Skin) => {
+    if (equipped !== s.id) track('skin_equip', { skin: s.id });
+    equipped = s.id;
+    voidling.setSkin(s);
+    localStorage.setItem('voidSkin', s.id);
+    audio.ready();
+    refresh();
+    // the mirror at the top of the shop is the whole point of two slots
+    _dbg.__shopMirror?.();
+  };
+  const walletEl = document.getElementById('shopWalletN');
+  let walletShown = coins, walletRaf = 0;
+  const paintWallet = (bump = false) => {
+    if (!walletEl) return;
+    walletShown = coins;
+    walletEl.textContent = String(coins);
+    const w = walletEl.parentElement;
+    if (bump && w) { w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); }
+  };
+  /** Count the wallet down instead of teleporting it. A number that jumps has
+   *  not told a six-year-old that THEY SPENT THAT — one that runs down has. */
+  const tweenWallet = (from: number) => {
+    if (!walletEl) return;
+    if (walletRaf) cancelAnimationFrame(walletRaf);
+    const to = coins, t0 = performance.now(), MS = 620;
+    walletShown = from;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / MS);
+      const e = 1 - (1 - k) * (1 - k);                    // ease-out, no overshoot
+      walletShown = Math.round(from + (to - from) * e);
+      walletEl.textContent = String(walletShown);
+      if (k < 1) walletRaf = requestAnimationFrame(step);
+      else { walletRaf = 0; paintWallet(true); }
+    };
+    walletRaf = requestAnimationFrame(step);
+  };
+  /** The card pops and throws a handful of sparkles. Everything here is CSS on
+   *  two throwaway classes, so the reduced-motion block can switch it off. */
+  const celebrate = (s: Skin) => {
+    const card = cards.get(s.id);
+    if (!card) return;
+    card.classList.remove('bought'); void card.offsetWidth; card.classList.add('bought');
+    const burst = document.createElement('div');
+    burst.className = 'burst';
+    for (let i = 0; i < 7; i++) {
+      const g = document.createElement('i');
+      const a = (i / 7) * Math.PI * 2 + 0.4;
+      g.style.setProperty('--dx', `${Math.cos(a) * 46}px`);
+      g.style.setProperty('--dy', `${Math.sin(a) * 46}px`);
+      g.style.animationDelay = `${i * 22}ms`;
+      g.textContent = '✦';
+      burst.appendChild(g);
+    }
+    card.appendChild(burst);
+    setTimeout(() => burst.remove(), 900);
+  };
   const refresh = () => {
+    paintWallet();
     for (const s of SKINS) {
       // streak skins unlock themselves the moment the streak is long enough
       if (s.streak && streak >= s.streak && !owned.has(s.id)) {
@@ -4356,14 +4421,29 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       }
       const card = cards.get(s.id)!;
       const pr = card.querySelector('.pr') as HTMLElement;
+      const has = owned.has(s.id);
+      const cost = PRICES[s.id] ?? 0;
+      // AFFORDABLE IS A STATE. Without it the shop asks a six-year-old to hold
+      // a four-digit wallet in their head and compare it to thirteen prices.
+      const can = !has && !s.cash && !s.streak && cost > 0 && coins >= cost;
       card.classList.toggle('equip', equipped === s.id);
-      card.classList.toggle('locked', !owned.has(s.id));
-      pr.className = 'pr' + (owned.has(s.id) ? ' owned' : '');
-      pr.textContent = equipped === s.id ? 'EQUIPPED' : owned.has(s.id) ? 'OWNED'
+      card.classList.toggle('locked', !has);
+      card.classList.toggle('owned', has);
+      card.classList.toggle('can', can);
+      pr.className = 'pr' + (has ? ' owned' : '');
+      pr.textContent = equipped === s.id ? 'EQUIPPED' : has ? 'OWNED'
         : s.cash ? `💎 ${iapPrice(s.id) ?? `$${s.cash.toFixed(2)}`}`
-        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${PRICES[s.id]}`;
+        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${cost}`;
+      // …and HOW FAR ALONG, which is what turns a price list into a collection
+      const bar = card.querySelector('.skBar > i') as HTMLElement | null;
+      if (bar) bar.style.width = `${Math.min(100, cost ? (coins / cost) * 100 : 0)}%`;
     }
   };
+  // AFTER the definition, not before it. A `() => refresh()` thunk registered
+  // above the const would be fine only until something called addCoins before
+  // this block finished evaluating, and this file has already lost an evening
+  // to exactly that class of bug.
+  coinWatchers.push(refresh);
   // LEGENDARY FIRST is the right instinct for a store whose in-app purchases
   // work — but when they did not, the shop opened on seven consecutive
   // refusals at $4.99-$9.99, and with two thousand coins in the wallet the
@@ -4515,21 +4595,28 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     if (!owned.has(s.id)) {
       if (coins >= PRICES[s.id]) {
         track('skin_buy', { skin: s.id, price: PRICES[s.id], left: coins - PRICES[s.id], played: stats.matches });
+        const before = coins;
         addCoins(-PRICES[s.id]);
+        tweenWallet(before);
         owned.add(s.id);
         localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+        // A PURCHASE SHOULD FEEL LIKE ONE. This used to change a label from
+        // '✦ 750' to 'OWNED' — the entire payoff for roughly nineteen matches
+        // of earning, delivered as a text swap behind a modal the child is
+        // still looking at. Now the card pops, the wallet counts itself down,
+        // and the void says something.
+        celebrate(s);
         audio.evolve();
+        buzz(70);
+        setTimeout(() => audio.voice('happy'), 260);
       } else {
         // how far short, and how often — the coin economy's only real feedback
         track('skin_short', { skin: s.id, price: PRICES[s.id], coins, short: PRICES[s.id] - coins });
         spAct.textContent = `NEED ${PRICES[s.id] - coins}✦ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return;
       }
     }
-    if (equipped !== s.id) track('skin_equip', { skin: s.id });
-    equipped = s.id;
-    voidling.setSkin(s);
-    localStorage.setItem('voidSkin', s.id);
-    refresh(); refreshPreview();
+    equipSkin(s);
+    refreshPreview();
   });
   // StoreKit hands ownership back here — from a fresh purchase, and from
   // RESTORE PURCHASES, which App Review requires and which a child who got a
@@ -4596,8 +4683,16 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     // hole if the render has not run yet.
     card.innerHTML = `${ribbon}<div class="orb" style="${cardGlow(s)}">`
       + `<canvas id="skcv_${s.id}"></canvas></div>`
-      + `<div class="nm">${s.name}</div><div class="pr"></div>`;
-    card.addEventListener('click', () => openPreview(s));
+      + `<div class="nm">${s.name}</div><div class="pr"></div>`
+      + (PRICES[s.id] ? '<div class="skBar"><i></i></div>' : '');
+    // ONE TAP IF YOU OWN IT. The hats tab already settled this — a card you own
+    // equips on touch — while the voids tab made a child open a modal and press
+    // a second button to put on a skin they had already earned. The modal is
+    // for deciding, and there is nothing to decide here.
+    card.addEventListener('click', () => {
+      if (owned.has(s.id) && equipped !== s.id) { equipSkin(s); return; }
+      openPreview(s);
+    });
     cards.set(s.id, card);
     grid.appendChild(card);
     if (s.id === equipped) voidling.setSkin(s);
@@ -4637,6 +4732,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     wornHat = id;
     if (id) localStorage.setItem('voidHat', id); else localStorage.removeItem('voidHat');
     voidling.setHat(id);
+    paintMirror();
   };
   voidling.setHat(wornHat);                     // whatever they had on last time
 
@@ -5013,6 +5109,72 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   _dbg.__previewVoid = startPreviewSpin;
   _dbg.__previewStop = stopPreviewSpin;
 
+  // ── THE MIRROR ────────────────────────────────────────────────────────────
+  // You, in what you are wearing, at the top of both tabs. The whole reason
+  // the shop has two slots is that any hat goes on any void — thirteen voids
+  // and thirteen hats is a hundred and sixty-nine combinations — and the
+  // combination was displayed nowhere at all. Equipping something changed a
+  // label and nothing else.
+  const MIRROR_S = 256;
+  let mirrorRT: THREE.WebGLRenderTarget | null = null;
+  function paintMirror(): void {
+    const cv = document.getElementById('mirrorCv') as HTMLCanvasElement | null;
+    const cap = document.getElementById('mirrorCap');
+    if (!cv) return;
+    const skinId = localStorage.getItem('voidSkin') || 'classic';
+    const sk = SKINS.find((x) => x.id === skinId) ?? SKINS[0];
+    const { sc, cam, rig } = voidStudio();
+    rig.setSkin(sk);
+    rig.setHat(wornHat);
+    const st = { t: 6.2, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 };
+    for (let i = 0; i < 40; i++) { st.t = 6.2 + i / 60; rig.update(1 / 60, st); }
+    for (let i = 0; i < 90 && lidOpen(rig.group) < 0.98; i++) { st.t = 7 + i / 60; rig.update(1 / 60, st); }
+    const box = new THREE.Box3(), _bb = new THREE.Box3();
+    rig.group.updateWorldMatrix(true, true);
+    rig.group.traverse((o) => {
+      const g2 = (o as THREE.Mesh).geometry;
+      if (!g2 || !o.visible) return;
+      for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
+      g2.computeBoundingBox();
+      if (g2.boundingBox) box.union(_bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
+    });
+    const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
+    const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
+    const mid = (top + lo) / 2;
+    const dist = (Math.max(top - lo, wide * 2) * 1.12) / (2 * Math.tan((30 * Math.PI) / 360));
+    cam.position.set(Math.sin(0.34) * dist, mid + dist * 0.10, Math.cos(0.34) * dist);
+    cam.lookAt(0, mid, 0);
+    rig.update(1 / 60, st);
+    if (!mirrorRT) {
+      mirrorRT = new THREE.WebGLRenderTarget(MIRROR_S, MIRROR_S);
+      mirrorRT.texture.colorSpace = THREE.SRGBColorSpace;
+    }
+    renderer.setRenderTarget(mirrorRT);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear();
+    renderer.render(sc, cam);
+    const buf = new Uint8Array(MIRROR_S * MIRROR_S * 4);
+    renderer.readRenderTargetPixels(mirrorRT, 0, 0, MIRROR_S, MIRROR_S, buf);
+    renderer.setRenderTarget(null);
+    cv.width = MIRROR_S; cv.height = MIRROR_S;
+    const ctx = cv.getContext('2d');
+    if (ctx) {
+      const img = ctx.createImageData(MIRROR_S, MIRROR_S);
+      for (let y = 0; y < MIRROR_S; y++) {
+        img.data.set(buf.subarray((MIRROR_S - 1 - y) * MIRROR_S * 4, (MIRROR_S - y) * MIRROR_S * 4), y * MIRROR_S * 4);
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    if (cap) {
+      const hat = wornHat ? HAT_BY_ID[wornHat] : null;
+      cap.innerHTML = `${sk.name}${hat ? ` in the ${hat.name}` : ''}<em>${hat ? 'ANY HAT GOES ON ANY VOID' : 'PICK A HAT TO GO WITH IT'}</em>`;
+    }
+    // the mirror shares the rig with the cards, so hand it back the way the
+    // card renderer expects to find it
+    rig.setHat(null);
+  }
+  _dbg.__shopMirror = paintMirror;
+
   // The shop OPENS on the voids tab, so the tab-switch handler below is not
   // enough on its own — without this the first thing a child sees is thirteen
   // empty gradients until they touch something.
@@ -5026,6 +5188,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     skinGrid.style.display = hats ? 'none' : '';
     grid.style.display = hats ? '' : 'none';
     if (hats) paintThumbs(); else paintVoids();
+    paintMirror();
     track('shop_tab', { tab });
   }));
 

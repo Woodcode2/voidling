@@ -19,8 +19,14 @@
 // public/assets/hf and serves 200 locally. What it was actually catching was a
 // race in void3d's texCache — TextureLoader fires one callback, held by the
 // first requester, so a second void asking for a texture already in flight was
-// never told it had arrived. A probe that explains away its own red is worse
-// than no probe, so this one now FAILS the run.
+// never told it had arrived. That race is real, it is fixed, and qa/texrace.mjs
+// is what tests it; a texAmt of 0 HERE just means the sweep outran the network,
+// which it always will.
+//
+// WHAT THIS PROBE DOES FAIL ON is the smile. VOID.mouth is one fixed plum
+// shared by every palette entry, so a new skin can silently delete its own
+// mouth — six of eight already had, worst of all on the DEFAULT skin. Under
+// 3:1 this exits non-zero.
 //
 //   node qa/voidsheet.mjs [ids] [port]
 import { chromium } from 'playwright';
@@ -79,3 +85,6 @@ if (missing.length) {
   console.log(`\n${missing.length} skin(s) shot before their texture loaded: ${missing.join(', ')}`);
   console.log('  Expected for a synchronous sweep. The race itself is tested by qa/texrace.mjs.');
 }
+
+// last, so the whole report is printed before the run dies
+if (dim.length) process.exit(1);

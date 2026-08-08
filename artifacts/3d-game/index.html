@@ -996,7 +996,9 @@
         padding-top: calc(env(safe-area-inset-top) + 26px);
         padding-bottom: calc(env(safe-area-inset-bottom) + 12px); overflow-y: auto; }
       #shop.show { display: flex; }
-      #shopGrid { padding-bottom: 22px; padding-top: 44px; }
+      /* the 44px of dead top padding held space for nothing; the mirror sits
+         there now and brings its own margin */
+      #shopGrid { padding-bottom: 22px; }
       /* the preview orb layers card art OVER the face, exactly like the grid
          card — so a slow or blocked image still shows a voidling, never a bare
          gradient circle on a paid product */
@@ -1111,11 +1113,25 @@
       #shopLegal { font-size: 11px; font-weight: 700; line-height: 1.5; color: rgba(201,166,255,0.6);
         text-align: center; max-width: min(420px, 88vw); margin: 0 auto 44px; letter-spacing: 0.3px; }
       #spAct.busy { opacity: 0.6; pointer-events: none; }
-      .shopHead { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; padding-right: 64px; }
+      .shopHead { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; }
+      /* the wallet, and the reason .shopHead no longer needs padding-right */
+      #shopWallet { margin-left: auto; font-size: 17px; font-weight: 900; letter-spacing: 0.6px;
+        color: #ffe08a; background: rgba(255,224,138,0.12); border: 2px solid rgba(255,224,138,0.35);
+        border-radius: 999px; padding: 7px 15px 7px 13px; white-space: nowrap; }
+      #shopWallet::before { content: '✦ '; }
+      #shopWallet.bump { animation: walletBump 0.45s ease-out; }
+      @keyframes walletBump { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
       #btnBack { font-family: inherit; font-size: 14px; font-weight: 900; letter-spacing: 1px; color: #c9a6ff;
         background: rgba(122,79,224,0.3); border: 2px solid rgba(201,166,255,0.35); border-radius: 12px;
         padding: 9px 18px; cursor: pointer; }
       .shopTitle { font-size: 26px; font-weight: 900; letter-spacing: 4px; color: #fff; }
+      #shopMirror { width: min(560px, 94vw); margin: 0 auto 14px; display: flex; align-items: center;
+        gap: 14px; padding: 10px 16px; box-sizing: border-box;
+        background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.09); border-radius: 18px; }
+      #mirrorCv { width: 92px; height: 92px; display: block; flex: 0 0 auto; }
+      #mirrorCap { font-size: 13px; font-weight: 900; letter-spacing: 0.5px; color: #fff; text-align: left; line-height: 1.35; }
+      #mirrorCap em { display: block; font-style: normal; font-size: 10px; font-weight: 800;
+        letter-spacing: 0.8px; color: #b9a6e0; margin-top: 3px; }
       #shopGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
         width: min(560px, 94vw); margin: 0 auto; box-sizing: border-box; }
       .skCard { background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.1); border-radius: 18px;
@@ -1134,7 +1150,29 @@
       .skCard .nm { font-size: 15px; font-weight: 900; color: #fff; letter-spacing: 1px; }
       .skCard .pr { font-size: 12px; font-weight: 900; margin-top: 5px; color: #ffe08a; }
       .skCard .pr.owned { color: #7ef2a0; }
-      .skCard.locked { opacity: 0.85; }
+      /* A 15% dim was the ENTIRE affordance: with 9,000 coins in the wallet,
+         Magma and Circuit looked exactly as unreachable as they do with none.
+         Three states now — can afford (green, lit), saving up (a bar showing
+         how far along), owned. */
+      .skCard.locked { opacity: 1; }
+      .skCard.can { border-color: rgba(126,242,160,0.55); box-shadow: 0 0 16px rgba(126,242,160,0.18); }
+      .skCard.can .pr { color: #7ef2a0; }
+      .skCard.can .pr::after { content: ' · TAP TO BUY'; font-size: 9px; opacity: 0.8; letter-spacing: 0.4px; }
+      /* how far along you are, for the ones you cannot afford yet */
+      .skBar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.12); margin: 7px 10px 0; overflow: hidden; }
+      .skBar > i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg,#ffd23f,#ffe08a); }
+      /* BOUGHT. The old payoff for nineteen matches of saving was a text swap. */
+      .skCard.bought { animation: cardPop 0.5s cubic-bezier(0.2,1.6,0.4,1); }
+      @keyframes cardPop { 0% { transform: scale(1); } 40% { transform: scale(1.09); } 100% { transform: scale(1); } }
+      .burst { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+      .burst > i { position: absolute; left: 50%; top: 42%; font-style: normal; font-size: 15px; color: #ffe08a;
+        text-shadow: 0 0 8px rgba(255,210,63,0.9); animation: sparkFly 0.72s ease-out forwards; }
+      @keyframes sparkFly {
+        0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 0; }
+        25%  { opacity: 1; }
+        100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1); opacity: 0; }
+      }
+      .skCard.can .skBar, .skCard.owned .skBar { display: none; }
       /* rarity tiers — epic purple, LEGENDARY gold with a moving sheen */
       .skCard { position: relative; overflow: hidden; }
       .skCard.epic { border-color: rgba(154,106,232,0.55); box-shadow: 0 0 14px rgba(154,106,232,0.14); }
@@ -1209,9 +1247,13 @@
       @media (prefers-reduced-motion: reduce) {
         #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
-        #shopFloat, #skinPrev .spCard, #daily .dCard, .skCard .rib {
+        #shopFloat, #skinPrev .spCard, #daily .dCard, .skCard .rib,
+        .skCard.bought, .burst > i, #shopWallet.bump {
           animation: none !important;
         }
+        /* the sparkles are pure animation: with none, they would sit in a pile
+           in the middle of the card until the timeout removes them */
+        .burst { display: none !important; }
         /* the one that is on screen for every second of every match */
         #growth .gFill { background-size: 100% 100%; }
         *, *::before, *::after {
@@ -1459,6 +1501,12 @@
       <div class="shopHead">
         <button id="btnBack">‹ BACK</button>
         <div class="shopTitle">THE SHOP</div>
+        <!-- A COIN STORE HAS TO SAY WHAT YOU HAVE. The global #coins chip is
+             z-index 11 and so is #shop, but #shop comes later in the DOM, so
+             the chip has been sitting UNDERNEATH the shop sheet the whole time
+             — .shopHead even carries a 64px right padding to dodge something
+             nobody can see. This one is inside the sheet. -->
+        <div id="shopWallet"><span id="shopWalletN">0</span></div>
       </div>
       <!-- TWO SLOTS, TWO TABS, AND THE ORDER IS THE ARGUMENT. VOIDS first,
            because that is the free collection every child is working through
@@ -1469,6 +1517,13 @@
         <button class="shopTab on" data-tab="voids"><i>🟣</i>VOIDS<em>earn with ✦</em></button>
         <button class="shopTab" data-tab="hats"><i>🎩</i>HATS<em>real hats, real money</em></button>
       </div>
+      <!-- THE MIRROR. Two tabs exist so that any hat goes on any void — 169
+           combinations — and until now the combination was shown NOWHERE. The
+           code even justified having no hat confirm step on the grounds that
+           "the void behind the shop updates live so the tap IS the preview",
+           but #menu is opaque and #shop sits at 94% over it, so nothing was
+           ever visible behind the sheet. This makes that claim true. -->
+      <div id="shopMirror"><canvas id="mirrorCv"></canvas><div id="mirrorCap"></div></div>
       <div id="shopGrid"></div>
       <div id="hatGrid" style="display:none"></div>
       <!-- App Review requires a user-triggered restore for non-consumables:
