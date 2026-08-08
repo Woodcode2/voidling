@@ -693,9 +693,8 @@ export function createRivals(
       // family competes on SCORE, the player wins on SIZE. A kid ends up the
       // biggest thing on the island and still has to work to out-point them —
       // and the way to close a points gap is to EAT one, which is exactly the
-      // play we want them chasing. The cap sits just under the 1/1.11 swallow
-      // threshold, so a rival at its ceiling is always catchable. (It was 0.78;
-      // see the block below for why that number ended the race at 70 seconds.)
+      // play we want them chasing. The cap sits just under the 1/1.2 swallow
+      // threshold (0.8333), so a rival at its ceiling is always catchable.
       //
       // The early clause is an absolute track, so the opening minute still has
       // real peers instead of a family scaled off a 0.9 hatchling — and it is
@@ -729,13 +728,24 @@ export function createRivals(
       // it with an exponent needs off^4.7 and is violently sensitive to how
       // rich the world is.
       //
-      // So raise the ceiling on the FOOD instead. 0.88 keeps the promise this
-      // number exists for — a rival is swallowable below 1/EAT_RATIO = 0.9009,
-      // so at 0.88 the biggest rival on the island is still always catchable,
-      // with margin — while lifting what it may eat to 0.98x the player's own
-      // bite. The family competes on score, the player still wins on size, and
-      // now both halves of that sentence are true after minute one.
-      const softCap = Math.max(Math.min(START_R + 0.02 * _t, 1.6), pr * 0.88);
+      // I RAISED THIS TO 0.88 AND BROKE EATING RIVALS ENTIRELY. Caught in a
+      // real playtest — "you can't seem to eat other smaller voids until you
+      // hit a certain size" — and the arithmetic is not close.
+      //
+      // The swallow test is `pr > rv.r * 1.2` (the hole-vs-hole branch below),
+      // NOT EAT_RATIO. The comment above used to claim 0.78 sat "just under the
+      // 1/1.11 swallow threshold", and I repeated it: the real line is
+      // 1/1.2 = 0.8333.
+      //
+      //   0.78 < 0.8333   a rival at its ceiling is catchable, just
+      //   0.88 > 0.8333   a rival at its ceiling can NEVER be eaten
+      //
+      // So the whole family became uneatable the moment each one reached its
+      // cap, which also quietly sabotaged the feast mechanic that VOID TITAN
+      // depends on. 0.80 restores catchability with a little more margin than
+      // 0.78 had, and the crumb floor below — not this number — was always the
+      // real lever on whether the family can score.
+      const softCap = Math.max(Math.min(START_R + 0.02 * _t, 1.6), pr * 0.80);
       for (const rv of rivals) {
         const isHunter = rv.arch === 'BULLY';
         rv.hunting = isHunter && hunting && rv.joined;   // HUD + QA read this
@@ -760,7 +770,7 @@ export function createRivals(
               [rv.x, rv.z] = placeOnLand(px + Math.cos(a0) * d0, pz + Math.sin(a0) * d0, rv.r);
             } else {
               // …and nobody else ever walks in BIGGER than the player. The
-              // softCap floor is 0.88x the player, so a late arrival could
+              // softCap floor is 0.80x the player, so a late arrival could
               // land above them; the extra clamp makes "a snack joined" true.
               rv.r = Math.max(START_R, Math.min(softCap, pr * 0.62, pr * 0.92));
               [rv.x, rv.z] = placeOnLand(rv.hx, rv.hz, rv.r);
@@ -1263,7 +1273,7 @@ export function createRivals(
         // were already saturated and falling short of even the old 21,600. The
         // headroom has to match the target or the ladder is decoration with
         // extra steps. Radius is unaffected (it comes from growR and is held at
-        // 0.88x the player by softCap), so they stay believable competitors
+        // 0.80x the player by softCap), so they stay believable competitors
         // rather than tiny voids with enormous numbers.
         // 8 was not enough with a FULL cast. Measured you/top across three
         // matches: 1.95x with three rivals, 2.29x with four, 3.45x with five —
