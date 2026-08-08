@@ -4621,8 +4621,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // the skin's identity at thumbnail size, but there is no rim for the
   // character to fail to touch.
   const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
-  const cardGlow = (s: Skin) => `background: radial-gradient(circle at 50% 44%, `
-    + `${hex(s.mid)}cc 0%, ${hex(s.mid)}88 34%, ${hex(s.rim)}33 58%, transparent 74%);`;
+  // ── THE BACKDROP IS A HALO, NOT A CLOUD ───────────────────────────────────
+  // It used to run the skin's mid colour at cc (80% alpha) from the centre out
+  // to a third of the radius and 88 (53%) past halfway, which put a saturated
+  // disc DIRECTLY BEHIND a character that only covered 58% of the circle. What
+  // reads as "not crisp" in a screenshot is mostly this: a bright cloud bleeding
+  // out around the silhouette, softening an edge the renderer drew sharp.
+  //
+  // The character carries the picture now. The colour survives as a dim wash
+  // and a rim that peaks OUTSIDE the void's own outline, so a card still reads
+  // as its skin at a glance — and one that has not painted yet is still a
+  // coloured orb rather than a hole.
+  const cardGlow = (s: Skin) => `background: radial-gradient(circle at 50% 46%, `
+    + `${hex(s.mid)}3d 0%, ${hex(s.mid)}33 42%, ${hex(s.rim)}2b 66%, ${hex(s.rim)}14 80%, transparent 92%);`;
   // orbStyle, artLayer and FACE_SVG lived here. All three are gone with the
   // painted card: orbStyle drew the hard-edged disc that framed every render
   // as a coin in a saucer, artLayer pasted a CDN photograph over the face, and
@@ -4932,7 +4943,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   let voidRig: ReturnType<typeof createVoid> | null = null;
   let voidScene: THREE.Scene | null = null;
   let voidCam: THREE.PerspectiveCamera | null = null;
-  const VS = 192;                       // card canvases are 84 CSS px; 192 covers 2x
+  // ── RENDER AT THE PIXELS THE SCREEN ACTUALLY HAS ──────────────────────────
+  // This was a flat 192 with a comment claiming the card canvas was 84 CSS px.
+  // It is 96 (index.html, `.skCard .orb`), and the phone this ships to is a 3x
+  // display — so the card was rendering 192 device pixels into a 288-pixel hole
+  // and letting the browser stretch it 1.5x. Measured at deviceScaleFactor 3:
+  // 0.67x of native on the cards, 0.65x on the preview. Every render in the
+  // shop was being upscaled before a child ever saw it.
+  //
+  // Capped at 3: beyond that the readback and the fill cost grow faster than
+  // anyone can see the difference.
+  const DPR = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+  const ORB_CSS = 96;                   // .skCard .orb — keep in step with the CSS
+  const VS = Math.round(ORB_CSS * DPR);
 
   /** How open the lid is, 0..1. sclera.scale.y is the lid value times the
    *  mood's width and scale.x is that width alone (void3d.ts). Blink is a
@@ -4971,6 +4994,122 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     return { sc, cam, rig };
   }
 
+  // ── ONE FRAMING WALK ──────────────────────────────────────────────────────
+  // This existed twice, copied between the card shooter and the preview
+  // turntable, and that is exactly how the "Zzz" billboard went on inflating
+  // the preview after the cards were fixed. It is also per-frame code in the
+  // turntable, so the two Box3 allocations it used to make every frame are now
+  // module-level scratch.
+  const _fitBox = new THREE.Box3(), _fitBB = new THREE.Box3();
+  function fitVoid(rig: ReturnType<typeof createVoid>): { span: number; mid: number } {
+    _fitBox.makeEmpty();
+    rig.group.updateWorldMatrix(true, true);
+    rig.group.traverse((o) => {
+      const g2 = (o as THREE.Mesh).geometry;
+      if (!g2 || !o.visible) return;
+      for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
+      // …AND SKIP WHAT DRAWS NOTHING. `visible` was not a strict enough test.
+      // The rig carries a 1.15-unit "Zzz" billboard for the sleep mood, parked
+      // at (0.62, 1.05, 1.0) on the face group at opacity 0 — permanently
+      // visible, permanently invisible. It reached y=2.77 on EVERY skin,
+      // including a plain orb that tops out near 1.12, and pushed the fit span
+      // from 2.6 to 3.50. That is a 35% zoom-out on every card and on the
+      // preview, which is most of why the shop read as small characters
+      // floating in coloured haze: the void was rendering into 58% of its own
+      // frame and the rest was gradient.
+      const mm = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      const mats = Array.isArray(mm) ? mm : mm ? [mm] : [];
+      if (mats.length && mats.every((m) => m.transparent && m.opacity <= 0.02)) return;
+      g2.computeBoundingBox();
+      if (!g2.boundingBox) return;
+      _fitBox.union(_fitBB.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
+    });
+    const top = Math.max(_fitBox.max.y, 1.2);
+    const lo = Math.min(_fitBox.min.y, -0.2);
+    const wide = Math.max(_fitBox.max.x, -_fitBox.min.x, _fitBox.max.z, -_fitBox.min.z, 1.0);
+    // 1.18, and it is the horn that set it. The margin was 1.10 until Uni-Void
+    // stopped being a stack of cones and became a real spiral that reaches
+    // y=2.14 — the camera is lifted to look slightly DOWN at the subject, so
+    // the tilt pushes the top of a tall accessory further up the frame than a
+    // straight vertical fit predicts, and the tip clipped.
+    return { span: Math.max(top - lo, wide * 2) * 1.18, mid: (top + lo) / 2 };
+  }
+
+  // ── …THEN FRAME ON THE PIXELS, NOT THE BOX ────────────────────────────────
+  // A bounding box is a poor stand-in for what a round thing actually covers:
+  // fit a sphere by its box and you leave the corners empty, which is most of
+  // the shop. So every skin is shot once, its drawn extent measured from the
+  // alpha it produced, and the span corrected so all eighteen fill their frame
+  // to the same degree — a plain orb and a horned unicorn included. The factor
+  // is kept per skin and handed to the preview, which cannot afford a second
+  // render per frame to work it out again.
+  const FILL = 0.86;                    // of the frame; the rest is breathing room
+  const fitFix = new Map<string, Frame>();
+
+  /** The drawn extent of an RGBA buffer, as a fraction of its width, plus the
+   *  centre of that extent. Rows arrive bottom-up from readRenderTargetPixels;
+   *  `cy` is returned already flipped to top-down image space. */
+  function alphaExtent(buf: Uint8Array, size: number) {
+    let minX = size, maxX = -1, minY = size, maxY = -1;
+    for (let y = 0; y < size; y++) {
+      const row = y * size * 4;
+      for (let x = 0; x < size; x++) {
+        if (buf[row + x * 4 + 3] > 24) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return null;
+    return {
+      fill: Math.max(maxX - minX + 1, maxY - minY + 1) / size,
+      cx: (minX + maxX + 2) / 2 / size,
+      cy: 1 - (minY + maxY + 2) / 2 / size,        // bottom-up -> top-down
+      touches: minX <= 0 || minY <= 0 || maxX >= size - 1 || maxY >= size - 1,
+    };
+  }
+
+  /** span multiplier, look-at height, and lateral offset — the whole framing
+   *  correction for one subject, cached so it is solved once. */
+  type Frame = { k: number; mid: number; off: number };
+
+  // ── SHOOT, LOOK, CORRECT ──────────────────────────────────────────────────
+  // Two passes of measure-and-adjust, then a safety pass that only ever backs
+  // OFF. The lateral term is what the first version was missing: it recentred
+  // vertically only, and the five skins with an asymmetric aura or a wing —
+  // Prism, Uni-Void, Rexling, King Void, Drako — sat at 56-58% across their
+  // own frame and three of them ran off the right edge once the fill target
+  // was raised. Their silhouette is not centred on their origin, so nothing
+  // short of measuring the drawn pixels can know where they actually are.
+  function autoFrame(
+    shoot: (span: number, mid: number, off: number) => void,
+    buf: Uint8Array, size: number, fit: { span: number; mid: number },
+    cached?: Frame,
+  ): Frame {
+    if (cached) { shoot(fit.span * cached.k, cached.mid, cached.off); return cached; }
+    let span = fit.span, mid = fit.mid, off = 0;
+    shoot(span, mid, off);
+    for (let pass = 0; pass < 2; pass++) {
+      const ex = alphaExtent(buf, size);
+      if (!ex || ex.fill < 0.05) break;
+      span *= ex.fill / FILL;                  // too small -> pull the camera in
+      mid += (0.5 - ex.cy) * span;             // …and put it in the middle
+      off += (ex.cx - 0.5) * span;             // both ways
+      shoot(span, mid, off);
+    }
+    // never ship a clipped card: if anything still touches an edge, widen until
+    // it does not. This can only lose fill, never gain it, so it cannot loop.
+    for (let guard = 0; guard < 4; guard++) {
+      const ex = alphaExtent(buf, size);
+      if (!ex || !ex.touches) break;
+      span *= 1.06;
+      shoot(span, mid, off);
+    }
+    return { k: span / fit.span, mid, off };
+  }
+
   /** Photograph one skin onto its card. Also returns whether the skin's body
    *  texture was live at the moment of the shot — see repaintOnTexture. */
   function shootVoid(s: Skin, cvId: string, size: number, az = 0.30): boolean {
@@ -4988,46 +5127,34 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     // Uni-Void's horn reaches 2.3 — and then every plain orb renders small and
     // centred inside its own card, floating in the middle of the gradient like
     // a coin in a saucer. That is exactly how the first pass looked.
-    //
-    // Box3.setFromObject would be the easy way and it is the wrong one: it does
-    // not honour visibility, so every hidden accessory (setSkin leaves all
-    // seven in the graph and shows one) would inflate the box and undo the
-    // point. Walk the visible meshes instead.
-    const box = new THREE.Box3();
-    const _bb = new THREE.Box3();
-    rig.group.updateWorldMatrix(true, true);
-    rig.group.traverse((o) => {
-      const g2 = (o as THREE.Mesh).geometry;
-      if (!g2 || !o.visible) return;
-      for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
-      g2.computeBoundingBox();
-      if (!g2.boundingBox) return;
-      _bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld);
-      box.union(_bb);
-    });
-    const top = Math.max(box.max.y, 1.2);
-    const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
-    const lo = Math.min(box.min.y, -0.2);
-    const mid = (top + lo) / 2;
-    // 1.18, and it is the horn that set it. The margin was 1.10 until Uni-Void
-    // stopped being a stack of cones and became a real spiral that reaches
-    // y=2.14 — the camera is lifted to look slightly DOWN at the subject, so
-    // the tilt pushes the top of a tall accessory further up the frame than a
-    // straight vertical fit predicts, and the tip clipped.
-    const span = Math.max(top - lo, wide * 2) * 1.18;
-    const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
-    cam.position.set(Math.sin(az) * dist, mid + dist * 0.10, Math.cos(az) * dist);
-    cam.lookAt(0, mid, 0);
-    rig.update(1 / 60, st);   // the face billboard is read off the camera IN update
+    const fit = fitVoid(rig);
     const rt = new THREE.WebGLRenderTarget(size, size);
     rt.texture.colorSpace = THREE.SRGBColorSpace;
-    renderer.setRenderTarget(rt);
-    renderer.setClearColor(0x000000, 0);      // transparent: the card's gradient shows through
-    renderer.clear();
-    renderer.render(sc, cam);
     const buf = new Uint8Array(size * size * 4);
-    renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
-    renderer.setRenderTarget(null);
+    // the lateral offset moves the camera ALONG ITS OWN RIGHT VECTOR, so the
+    // view direction is unchanged and only the framing slides
+    const rx = Math.cos(az), rz = -Math.sin(az);
+    const shoot = (span: number, mid: number, off: number) => {
+      const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
+      cam.position.set(Math.sin(az) * dist + rx * off, mid + dist * 0.10, Math.cos(az) * dist + rz * off);
+      cam.lookAt(rx * off, mid, rz * off);
+      // dt 0: the billboard still needs a call to read the camera, but the
+      // correction below re-shoots the SAME pose. At 1/60 each pass advanced
+      // the springs, so the measurement chased a subject that was still
+      // bobbing — the mirror settled 12 points short of its target that way.
+      rig.update(0, st);
+      renderer.setRenderTarget(rt);
+      renderer.setClearColor(0x000000, 0);    // transparent: the card's gradient shows through
+      renderer.clear();
+      renderer.render(sc, cam);
+      renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+      renderer.setRenderTarget(null);
+    };
+    // A bounding box over-reserves for anything round — a sphere leaves its
+    // box's corners empty — so fitting the box left a plain orb small while a
+    // horn filled the frame. Measuring the alpha fits every skin the same.
+    const solved = autoFrame(shoot, buf, size, fit, fitFix.get(s.id));
+    fitFix.set(s.id, solved);
     cv.width = size; cv.height = size;
     const ctx = cv.getContext('2d');
     if (ctx) {
@@ -5099,7 +5226,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // the only other thing drawing, and it stops dead when the modal closes —
   // there is no second WebGL context and no cost at all when it is shut.
   let prevRaf = 0, prevAz = 0, prevLast = 0;
-  const PREV_S = 384;
+  // The hero shot of the whole shop, and it was the softest thing in it: a flat
+  // 384 buffer stretched across 587 device pixels on a 3x phone. Measured off
+  // the element itself rather than re-deriving `min(190px, 42vh)` in code —
+  // a second copy of a CSS rule is a second thing to get out of step, and the
+  // first guess at it was already 3% wrong.
+  let PREV_S = 0;
   let prevRT: THREE.WebGLRenderTarget | null = null;
 
   function stopPreviewSpin(): void {
@@ -5113,6 +5245,8 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     if (!host) return;
     let cv = host.querySelector('canvas') as HTMLCanvasElement | null;
     if (!cv) { cv = document.createElement('canvas'); host.appendChild(cv); }
+    // sized once, from the element, at the screen's own density
+    if (!PREV_S) PREV_S = Math.round((host.getBoundingClientRect().width || 190) * DPR);
     cv.width = PREV_S; cv.height = PREV_S;
     const ctx = cv.getContext('2d');
     const { sc, cam, rig } = voidStudio();
@@ -5139,21 +5273,22 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       // cheap enough to simply do again.
       rig.setSkin(s);
       rig.update(dt, st);
-      const box = new THREE.Box3(); const _bb = new THREE.Box3();
-      rig.group.updateWorldMatrix(true, true);
-      rig.group.traverse((o) => {
-        const g2 = (o as THREE.Mesh).geometry;
-        if (!g2 || !o.visible) return;
-        for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
-        g2.computeBoundingBox();
-        if (g2.boundingBox) box.union(_bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
-      });
-      const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
-      const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
-      const mid = (top + lo) / 2;
-      const dist = (Math.max(top - lo, wide * 2) * 1.18) / (2 * Math.tan((30 * Math.PI) / 360));
-      cam.position.set(Math.sin(prevAz) * dist, mid + dist * 0.10, Math.cos(prevAz) * dist);
-      cam.lookAt(0, mid, 0);
+      // the SAME framing walk the cards use, and the same per-skin correction
+      // measured from their alpha — a turntable cannot afford to re-measure
+      // every frame, and the hero shot should be framed like its own card.
+      // the SAME correction the card solved, offset included: the lateral term
+      // is measured along the camera's own right vector, so it stays lateral as
+      // the turntable comes round. Without it Uni-Void sat at 54% across its
+      // own frame — its sparkles hang off one side, so centring the origin does
+      // not centre the character.
+      const fix = fitFix.get(s.id);
+      const fit = fitVoid(rig);
+      const span = fit.span * (fix?.k ?? 1);
+      const mid = fix?.mid ?? fit.mid, off = fix?.off ?? 0;
+      const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
+      const rx = Math.cos(prevAz), rz = -Math.sin(prevAz);
+      cam.position.set(Math.sin(prevAz) * dist + rx * off, mid + dist * 0.10, Math.cos(prevAz) * dist + rz * off);
+      cam.lookAt(rx * off, mid, rz * off);
       rig.update(0, st);                          // face billboard reads the camera
       renderer.setRenderTarget(prevRT);
       renderer.setClearColor(0x000000, 0);
@@ -5181,8 +5316,10 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // and thirteen hats is a hundred and sixty-nine combinations — and the
   // combination was displayed nowhere at all. Equipping something changed a
   // label and nothing else.
-  const MIRROR_S = 256;
+  // the mirror is 96 CSS px in the shop header; at 3x that is 288
+  const MIRROR_S = Math.round(96 * DPR);
   let mirrorWarm = false;
+  const mirrorFix = new Map<string, Frame>();
   let mirrorRT: THREE.WebGLRenderTarget | null = null;
   function paintMirror(): void {
     const cv = document.getElementById('mirrorCv') as HTMLCanvasElement | null;
@@ -5204,33 +5341,29 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     mirrorWarm = true;
     for (let i = 0; i < warm; i++) { st.t = 6.2 + i / 60; rig.update(1 / 60, st); }
     for (let i = 0; i < 90 && lidOpen(rig.group) < 0.98; i++) { st.t = 7 + i / 60; rig.update(1 / 60, st); }
-    const box = new THREE.Box3(), _bb = new THREE.Box3();
-    rig.group.updateWorldMatrix(true, true);
-    rig.group.traverse((o) => {
-      const g2 = (o as THREE.Mesh).geometry;
-      if (!g2 || !o.visible) return;
-      for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
-      g2.computeBoundingBox();
-      if (g2.boundingBox) box.union(_bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
-    });
-    const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
-    const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
-    const mid = (top + lo) / 2;
-    const dist = (Math.max(top - lo, wide * 2) * 1.18) / (2 * Math.tan((30 * Math.PI) / 360));
-    cam.position.set(Math.sin(0.34) * dist, mid + dist * 0.10, Math.cos(0.34) * dist);
-    cam.lookAt(0, mid, 0);
-    rig.update(1 / 60, st);
+    const fit = fitVoid(rig);
     if (!mirrorRT) {
       mirrorRT = new THREE.WebGLRenderTarget(MIRROR_S, MIRROR_S);
       mirrorRT.texture.colorSpace = THREE.SRGBColorSpace;
     }
-    renderer.setRenderTarget(mirrorRT);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear();
-    renderer.render(sc, cam);
     const buf = new Uint8Array(MIRROR_S * MIRROR_S * 4);
-    renderer.readRenderTargetPixels(mirrorRT, 0, 0, MIRROR_S, MIRROR_S, buf);
-    renderer.setRenderTarget(null);
+    const rx = Math.cos(0.34), rz = -Math.sin(0.34);
+    const shoot = (span: number, mid: number, off: number) => {
+      const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
+      cam.position.set(Math.sin(0.34) * dist + rx * off, mid + dist * 0.10, Math.cos(0.34) * dist + rz * off);
+      cam.lookAt(rx * off, mid, rz * off);
+      rig.update(0, st);            // frozen pose — see the note in shootVoid
+      renderer.setRenderTarget(mirrorRT!);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(sc, cam);
+      renderer.readRenderTargetPixels(mirrorRT!, 0, 0, MIRROR_S, MIRROR_S, buf);
+      renderer.setRenderTarget(null);
+    };
+    // the mirror is the one render that changes with BOTH slots, so it is keyed
+    // on the pair — a hat changes the silhouette as much as a skin does
+    const key = `${skinId}/${wornHat ?? '-'}`;
+    mirrorFix.set(key, autoFrame(shoot, buf, MIRROR_S, fit, mirrorFix.get(key)));
     cv.width = MIRROR_S; cv.height = MIRROR_S;
     const ctx = cv.getContext('2d');
     if (ctx) {
@@ -5259,12 +5392,18 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // Keyed on the equipped skin, so equipping a void repaints the hat grid: the
   // cards are a picture of YOUR void in each hat, not of a stranger's.
   let thumbsFor: string | null = null;
+  const hatFix = new Map<string, Frame>();
   function paintThumbs(): void {
     const skinId = localStorage.getItem('voidSkin') || 'classic';
     if (thumbsFor === skinId) return;
     thumbsFor = skinId;
     const sk = SKINS.find((x) => x.id === skinId) ?? SKINS[0];
-    const S = 256;
+    // measured off a real card so the hats tab gets the same native-resolution
+    // treatment as the voids tab, rather than a constant that goes stale the
+    // next time the grid changes columns
+    const cw = (document.querySelector('#hatGrid .hatCard canvas') as HTMLElement | null)
+      ?.getBoundingClientRect().width || 110;
+    const S = Math.min(512, Math.round(cw * DPR));
     const { sc, cam, rig } = voidStudio();
     rig.setSkin(sk);
     const rt = new THREE.WebGLRenderTarget(S, S);
@@ -5285,28 +5424,25 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       // Walking VISIBLE meshes, not Box3.setFromObject: the rig keeps all seven
       // accessories and four body parts in the graph and shows one, so the box
       // would be inflated by whatever is switched off.
-      const box = new THREE.Box3(), _bb = new THREE.Box3();
-      rig.group.updateWorldMatrix(true, true);
-      rig.group.traverse((o) => {
-        const g2 = (o as THREE.Mesh).geometry;
-        if (!g2 || !o.visible) return;
-        for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
-        g2.computeBoundingBox();
-        if (g2.boundingBox) box.union(_bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld));
-      });
-      const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
-      const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
-      const mid = (top + lo) / 2;
-      const dist = (Math.max(top - lo, wide * 2) * 1.18) / (2 * Math.tan((30 * Math.PI) / 360));
-      cam.position.set(Math.sin(0.42) * dist, mid + dist * 0.10, Math.cos(0.42) * dist);
-      cam.lookAt(0, mid, 0);
-      rig.update(1 / 60, st);       // the face billboard is read off the camera IN update
-      renderer.setRenderTarget(rt);
-      renderer.setClearColor(0x000000, 0);
-      renderer.clear();
-      renderer.render(sc, cam);
-      renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
-      renderer.setRenderTarget(null);
+      const fit = fitVoid(rig);
+      const rx = Math.cos(0.42), rz = -Math.sin(0.42);
+      const shoot = (span: number, mid: number, off: number) => {
+        const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
+        cam.position.set(Math.sin(0.42) * dist + rx * off, mid + dist * 0.10, Math.cos(0.42) * dist + rz * off);
+        cam.lookAt(rx * off, mid, rz * off);
+        rig.update(0, st);          // frozen pose — see the note in shootVoid
+        renderer.setRenderTarget(rt);
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear();
+        renderer.render(sc, cam);
+        renderer.readRenderTargetPixels(rt, 0, 0, S, S, buf);
+        renderer.setRenderTarget(null);
+      };
+      // …corrected on the alpha, exactly as the void cards are. It matters more
+      // here because hats differ so much in shape: measured on the box fit
+      // alone, the Ten-Gallon filled 58% of its card and the Crown 86%, so a
+      // row of hats read as a row of different sizes.
+      hatFix.set(h.id, autoFrame(shoot, buf, S, fit, hatFix.get(h.id)));
       cv.width = S; cv.height = S;
       const ctx = cv.getContext('2d');
       if (ctx) {
