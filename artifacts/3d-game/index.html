@@ -1002,6 +1002,7 @@
          gradient circle on a paid product */
       #spOrb { position: relative; overflow: hidden; }
       #spOrb .artLay { position: absolute; inset: 0; background-size: cover; background-position: center; }
+      #spOrb canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 50%; }
       /* ── THE TWO SLOTS ──────────────────────────────────────────────────
          A segmented control, not a row of links: at this size a child needs
          to see that exactly one of the two is currently true. The active tab
@@ -1121,9 +1122,12 @@
         padding: 18px 12px 14px; text-align: center; cursor: pointer; transition: transform 0.1s, border-color 0.15s; }
       .skCard:hover { transform: translateY(-3px); }
       .skCard.equip { border-color: #ffe08a; box-shadow: 0 0 18px rgba(255,224,138,0.25); }
-      .skCard .orb { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 12px; position: relative; overflow: hidden;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.45), inset 0 -6px 14px rgba(0,0,0,0.3); }
+      /* a SPOTLIGHT, not a disc: the card is a render now, and a hard circular
+         edge behind it just framed the character as a coin in a saucer */
+      .skCard .orb { width: 96px; height: 96px; margin: 0 auto 8px; position: relative; }
       .skCard .face { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+      /* the rendered voidling, sitting on the branded gradient */
+      .skCard .orb canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
       /* art sits ON TOP of the face; a failed load leaves it empty and the
          branded gradient + face read through — never a bare circle */
       .skCard .artLay { position: absolute; inset: 0; background-size: cover; background-position: center; pointer-events: none; }

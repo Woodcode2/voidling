@@ -776,6 +776,7 @@ const _dbg = window as unknown as {
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
   __voidSheet: (ids: string[]) => Promise<unknown>;
+  __paintVoids?: () => void;
   __grantHats: (ids: string[]) => void;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -3510,7 +3511,13 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   if (!packReady) coverHold('pack');
   requestAnimationFrame(() => launchWorld());
 }
-el('btnShop').addEventListener('click', () => { track('shop_view', { coins, from: 'menu' }); shopEl.classList.add('show'); });
+el('btnShop').addEventListener('click', () => {
+  track('shop_view', { coins, from: 'menu' });
+  shopEl.classList.add('show');
+  // paint on the frame AFTER the overlay is laid out: the canvases have to be
+  // in the document and sized before anything is drawn into them
+  requestAnimationFrame(() => _dbg.__paintVoids?.());
+});
 el('btnBack').addEventListener('click', () => shopEl.classList.remove('show'));
 // ── world integrity: NOTHING stands on asphalt, ever ─────────────────────────
 // Footprint-aware post-build sweep. Runs at every match start (so props that
@@ -4328,6 +4335,20 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // very case this fallback exists for — the shop card advertised a purple ball
   // with an orange highlight and the match handed over a black orb in a halo.
   const skinGrad = (s: Skin) => `radial-gradient(circle at 50% 46%, #${s.abyss.toString(16).padStart(6, '0')} 0%, #${s.mid.toString(16).padStart(6, '0')} 58%, #${s.rim.toString(16).padStart(6, '0')} 100%)`;
+  // ── THE CARD'S BACKDROP ──────────────────────────────────────────────────
+  // Once the card became a render, the old orbStyle disc stopped being a
+  // fallback and started being a mistake: a hard-edged coloured circle with an
+  // inset shadow, sitting behind a character that does not quite fill it, so
+  // every card read as a coin in a saucer.
+  //
+  // What it should be is a SPOTLIGHT — a soft bloom in the skin's own colours
+  // that fades out before it reaches an edge. It still does the fallback job
+  // (a card is never a bare hole before the render lands) and it still carries
+  // the skin's identity at thumbnail size, but there is no rim for the
+  // character to fail to touch.
+  const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+  const cardGlow = (s: Skin) => `background: radial-gradient(circle at 50% 44%, `
+    + `${hex(s.mid)}cc 0%, ${hex(s.mid)}88 34%, ${hex(s.rim)}33 58%, transparent 74%);`;
   const orbStyle = (s: Skin) => s.cash
     ? `background: ${skinGrad(s)}; box-shadow: 0 8px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,210,90,0.3);`
     : s.tex
@@ -4507,7 +4528,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const ribbon = s.cash ? '<div class="rib">LEGENDARY</div>' : '';
     // the face ALWAYS renders under the art: if the art CDN blinks, a paid
     // card must still show a voidling, never a bare gradient circle
-    card.innerHTML = `${ribbon}<div class="orb" style="${orbStyle(s)}">${FACE_SVG}${artLayer(s)}</div><div class="nm">${s.name}</div><div class="pr"></div>`;
+    // THE CARD IS A RENDER, NOT A PAINTING. It used to be a CSS radial-gradient
+    // with an SVG face on top and, for some skins, a CDN photo over that — and
+    // the owner's own screenshot showed what that bought: Toxic, Magma,
+    // Circuit, Candy and Honey rendering as swatches of aurora, lava, printed
+    // circuit board, candy and honeycomb. No face, no character, and nothing a
+    // child could match to the orb they play as. Three visual languages inside
+    // one tab, next to a HATS tab where every card is the real geometry.
+    //
+    // The gradient stays as the canvas's backdrop, so a card is never a bare
+    // hole if the render has not run yet.
+    card.innerHTML = `${ribbon}<div class="orb" style="${cardGlow(s)}">`
+      + `<canvas id="skcv_${s.id}"></canvas></div>`
+      + `<div class="nm">${s.name}</div><div class="pr"></div>`;
     card.addEventListener('click', () => openPreview(s));
     cards.set(s.id, card);
     grid.appendChild(card);
@@ -4690,6 +4723,163 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     });
   }
 
+  // ── THE VOID CARDS ────────────────────────────────────────────────────────
+  // Same technique as the hats above, on the other half of the shop. The skin
+  // cards were a CSS radial-gradient with an SVG face on top and, for some,
+  // a CDN photo over that — so five of them rendered as swatches of aurora,
+  // lava, printed circuit board, candy and honeycomb. A child saved a thousand
+  // coins for Honey and the card showed a photograph of honeycomb.
+  //
+  // ONE RIG, THIRTEEN SKINS. setSkin hides every accessory and every body part
+  // before showing the right one, and everything else it touches is a uniform,
+  // so a single voidling wears all of them in turn. Thirteen rigs would be
+  // thirteen SphereGeometry(1, 96, 72) bodies for a screen a child may never
+  // open, which is why this is lazy and cached like the hats.
+  //
+  // Everything here was found by qa/voidsheet.mjs, which drives the same
+  // rendering path — see the commit that added it for the four separate ways
+  // the first attempts came out wrong.
+  let voidsDone = false;
+  let voidRig: ReturnType<typeof createVoid> | null = null;
+  let voidScene: THREE.Scene | null = null;
+  let voidCam: THREE.PerspectiveCamera | null = null;
+  const VS = 192;                       // card canvases are 84 CSS px; 192 covers 2x
+
+  /** How open the lid is, 0..1. sclera.scale.y is the lid value times the
+   *  mood's width and scale.x is that width alone (void3d.ts). Blink is a
+   *  free-running clock, so without this a card can ship a void with its eyes
+   *  shut — Candy did exactly that on the probe's first full run. */
+  const lidOpen = (g: THREE.Object3D): number => {
+    const sc2 = g.getObjectByName('sclera');
+    return sc2 && sc2.scale.x > 0 ? sc2.scale.y / sc2.scale.x : 1;
+  };
+
+  function voidStudio(): { sc: THREE.Scene; cam: THREE.PerspectiveCamera; rig: ReturnType<typeof createVoid> } {
+    if (voidRig && voidScene && voidCam) return { sc: voidScene, cam: voidCam, rig: voidRig };
+    const sc = new THREE.Scene();
+    sc.environment = scene.environment;
+    sc.environmentIntensity = 0.4;
+    const k = new THREE.DirectionalLight(0xfff2d8, 2.4); k.position.set(-3, 5, 4); sc.add(k);
+    const r = new THREE.DirectionalLight(0x9fc8ff, 1.0); r.position.set(4, 2, -4); sc.add(r);
+    sc.add(new THREE.HemisphereLight(0xdfeaff, 0x4a4468, 0.5));
+    const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    // createVoid billboards the face with camera.quaternion and yaws the
+    // costume to face the camera, so it has to be built against THIS camera —
+    // handing it the game's own points every face off-screen.
+    const rig = createVoid(sc, cam);
+    rig.setRadius(1);
+    rig.setMood('cruise');
+    // A PORTRAIT HAS NO FLOOR, and the three pieces of ground furniture are
+    // DETACHED rather than hidden: update() recomputes lip.visible from its own
+    // opacity every frame, so visible=false survives exactly one frame. The
+    // contact shadow is parented to the scene, the evolution ring is a torus
+    // tilted 0.5 and the lip is neither — all three are named in void3d now
+    // because guessing at their shape missed one every time.
+    for (const n of ['contact', 'rings', 'lip']) {
+      (rig.group.getObjectByName(n) ?? sc.getObjectByName(n))?.removeFromParent();
+    }
+    voidScene = sc; voidCam = cam; voidRig = rig;
+    return { sc, cam, rig };
+  }
+
+  /** Photograph one skin onto its card. Also returns whether the skin's body
+   *  texture was live at the moment of the shot — see repaintOnTexture. */
+  function shootVoid(s: Skin, cvId: string, size: number, az = 0.30): boolean {
+    const cv = document.getElementById(cvId) as HTMLCanvasElement | null;
+    if (!cv) return true;
+    const { sc, cam, rig } = voidStudio();
+    rig.setSkin(s);
+    const st = { t: 6.2, x: 0, z: 0, vx: 0, vz: 0, lookX: 0, lookY: 0.06 };
+    for (let i = 0; i < 40; i++) { st.t = 6.2 + i / 60; rig.update(1 / 60, st); }
+    // …then wait for the lid. A blink is 0.16s and blinkT resets to at least
+    // 3.4s afterwards, so this always terminates well inside the bound.
+    for (let i = 0; i < 90 && lidOpen(rig.group) < 0.98; i++) { st.t = 7 + i / 60; rig.update(1 / 60, st); }
+    // ── FRAME TO FIT, PER SKIN ──────────────────────────────────────────
+    // A fixed camera has to leave headroom for the tallest thing in the shop —
+    // Uni-Void's horn reaches 2.3 — and then every plain orb renders small and
+    // centred inside its own card, floating in the middle of the gradient like
+    // a coin in a saucer. That is exactly how the first pass looked.
+    //
+    // Box3.setFromObject would be the easy way and it is the wrong one: it does
+    // not honour visibility, so every hidden accessory (setSkin leaves all
+    // seven in the graph and shows one) would inflate the box and undo the
+    // point. Walk the visible meshes instead.
+    const box = new THREE.Box3();
+    const _bb = new THREE.Box3();
+    rig.group.updateWorldMatrix(true, true);
+    rig.group.traverse((o) => {
+      const g2 = (o as THREE.Mesh).geometry;
+      if (!g2 || !o.visible) return;
+      for (let n: THREE.Object3D | null = o.parent; n; n = n.parent) if (!n.visible) return;
+      g2.computeBoundingBox();
+      if (!g2.boundingBox) return;
+      _bb.copy(g2.boundingBox).applyMatrix4(o.matrixWorld);
+      box.union(_bb);
+    });
+    const top = Math.max(box.max.y, 1.2);
+    const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
+    const lo = Math.min(box.min.y, -0.2);
+    const mid = (top + lo) / 2;
+    const span = Math.max(top - lo, wide * 2) * 1.10;
+    const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
+    cam.position.set(Math.sin(az) * dist, mid + dist * 0.10, Math.cos(az) * dist);
+    cam.lookAt(0, mid, 0);
+    rig.update(1 / 60, st);   // the face billboard is read off the camera IN update
+    const rt = new THREE.WebGLRenderTarget(size, size);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    renderer.setRenderTarget(rt);
+    renderer.setClearColor(0x000000, 0);      // transparent: the card's gradient shows through
+    renderer.clear();
+    renderer.render(sc, cam);
+    const buf = new Uint8Array(size * size * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+    renderer.setRenderTarget(null);
+    cv.width = size; cv.height = size;
+    const ctx = cv.getContext('2d');
+    if (ctx) {
+      const img = ctx.createImageData(size, size);
+      for (let y = 0; y < size; y++) img.data.set(buf.subarray((size - 1 - y) * size * 4, (size - y) * size * 4), y * size * 4);
+      ctx.putImageData(img, 0, 0);
+    }
+    rt.dispose();
+    let live = true;
+    rig.group.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
+      if (m?.uniforms?.uTexAmt) live = (m.uniforms.uTexAmt.value as number) >= 1;
+    });
+    return !s.tex || live;
+  }
+
+  // ── AND SHOOT IT AGAIN WHEN THE TEXTURE LANDS ─────────────────────────────
+  // uTexAmt only flips to 1 inside the TextureLoader's own callback, and by the
+  // time a texture arrives this loop has moved on to another skin — so the flag
+  // is never set for it. A card rendered before its texture lands advertises
+  // the wrong orb FOR EVER, because the thumbnail is painted once and cached.
+  // That is not a hypothetical: it is what a real phone on a slow network does,
+  // and it is what this sandbox does on every run because the asset CDN is
+  // blocked. So any skin photographed without its texture gets re-shot when the
+  // browser has the bytes.
+  function repaintOnTexture(s: Skin, cvId: string, size: number): void {
+    if (!s.tex) return;
+    const img = new Image();
+    img.onload = () => { shootVoid(s, cvId, size); };
+    img.src = s.tex;
+  }
+
+  function paintVoids(): void {
+    if (voidsDone) return;
+    voidsDone = true;
+    for (const s of SKINS) {
+      const id = `skcv_${s.id}`;
+      if (!shootVoid(s, id, VS)) repaintOnTexture(s, id, VS);
+    }
+  }
+
+  // The shop OPENS on the voids tab, so the tab-switch handler below is not
+  // enough on its own — without this the first thing a child sees is thirteen
+  // empty gradients until they touch something.
+  _dbg.__paintVoids = paintVoids;
+
   // ── TABS ──────────────────────────────────────────────────────────────────
   document.querySelectorAll('.shopTab').forEach((t) => t.addEventListener('click', () => {
     const tab = (t as HTMLElement).dataset.tab;
@@ -4697,7 +4887,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const hats = tab === 'hats';
     skinGrid.style.display = hats ? 'none' : '';
     grid.style.display = hats ? '' : 'none';
-    if (hats) paintThumbs();
+    if (hats) paintThumbs(); else paintVoids();
     track('shop_tab', { tab });
   }));
 
