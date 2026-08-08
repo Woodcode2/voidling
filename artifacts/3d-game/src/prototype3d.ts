@@ -5906,11 +5906,25 @@ function animate() {
       // still near zero. Blend it in over 25s so the hook stays untouched.
       const warm = Math.min(1, el2 / 25);
       const paceK = (1 - warm) + warm * (0.60 + 0.40 * pace);
-      // …PLUS whatever the family has been eaten for. This term is the only
-      // way past the law, so the top of the ladder is the one thing in the
-      // match that cannot be reached by waiting.
-      const lawCap = START_R + (0.022 * Math.min(el2, 30) + LAW_RATE * el2) * paceK
-        + surgeT * surgeT * (2.8 + 2.6 * pace) + feastR;
+      // …CLAMPED TO WHAT THE CLOCK ALONE MAY BUY, PLUS THE FEAST.
+      //
+      // I claimed R_CAP was not what binds. It was. The pace term and the
+      // finale surge can reach ~14.5 on a strong run, and R_CAP 12 had been
+      // silently clamping them the whole time — so raising it to 18 did not
+      // unlock hunting, it just let every good run climb higher. Measured
+      // (qa/titan.mjs, corrected control): a props-only driver hit r=14.45 and
+      // sailed past VOID TITAN at 13.5, while hunting the family was worth
+      // MINUS 0.06 radius. The feature was decoration, which is the exact
+      // failure the probe was written to catch.
+      //
+      // LAW_TOP restores the old ceiling for everything the clock buys, so
+      // ordinary play tops out at 12 exactly as it did before any of this, and
+      // feastR is the only term that can carry a run past it. That is what
+      // "you would need to eat the other voids" has to mean mechanically.
+      const LAW_TOP = 12;
+      const lawCap = Math.min(LAW_TOP,
+        START_R + (0.022 * Math.min(el2, 30) + LAW_RATE * el2) * paceK
+        + surgeT * surgeT * (2.8 + 2.6 * pace)) + feastR;
       // the rate limiter is what actually stops a single landmark ballooning
       // you — it is the job the absolute clamp was doing by accident
       const maxStep = (0.11 + surgeT * 0.16) * dt;
