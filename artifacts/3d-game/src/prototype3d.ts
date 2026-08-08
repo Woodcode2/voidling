@@ -1343,6 +1343,11 @@ rivals.onSpeak = (x, z, line) => {
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   rivalEv.eaten++; if (marquee) rivalEv.marquee++;
+  // THE FEAST. This is the only thing in the game that lifts the growth law,
+  // so the size a child ends on finally reflects a decision they made rather
+  // than how long the clock ran. Scaled by the meal: eating the chaser, who is
+  // the biggest thing on the island, is worth more than eating a straggler.
+  feastR += FEAST_PER_RIVAL * (marquee ? 1.6 : 1) * THREE.MathUtils.clamp(rr / 6, 0.55, 1.5);
   smugUntil = tClock + 2.4; audio.voice('happy');
   // no breakingNews here: announceFam already puts a full-screen card up for
   // this, and a ticker headline three seconds later is the same news twice
@@ -1990,13 +1995,17 @@ let autoFireCd = 3;
 // not an achievement. It is 8.0 now, above where a weak run finishes, and
 // COLOSSUS fills the gap so the ladder still has a rung every 30-40 seconds.
 // Ending a world should be the thing you tell someone about.
-const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'COLOSSUS', 'WORLD ENDER'];
+// …and a SEVENTH, which no amount of clock can reach. lawCap tops out near 12
+// on a perfect run, so 13.5 is only crossed on feastR — you get here by eating
+// the family, or you do not get here. It is the one line on the results screen
+// that cannot be earned by turning up.
+const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'COLOSSUS', 'WORLD ENDER', 'VOID TITAN'];
 // 2D thresholds 18/32/50/78/110 world-px, mapped through the 0.05 world scale
-const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0];
+const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5];
 // the void renderer and the soundtrack both ship five visual tiers. COLOSSUS
 // wears DEVOURER's dressing — it IS a huge devourer — so the top tier stays
 // unique to WORLD ENDER and arriving there looks like something.
-const VISUAL_STAGE = [0, 1, 2, 3, 3, 4];
+const VISUAL_STAGE = [0, 1, 2, 3, 3, 4, 4];   // TITAN wears WORLD ENDER's dressing, at scale
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
 const PLAYER_COLOR = 0x9a5cff;
 
@@ -2007,7 +2016,22 @@ const PLAYER_COLOR = 0x9a5cff;
 // real pacing: no ballooning off one item, the whole match is a steady climb.
 const START_R = 0.9;
 export const EAT_RATIO = 1.11;         // eat if target.radius <= R*1.11  (voidR >= targetR*0.9)
-const R_CAP = 12;                       // 2D MAX_RADIUS 240 · 0.05
+// ── THE CEILING IS 50% HIGHER, AND ONLY RIVALS UNLOCK IT ──────────────────
+// 12 was reached by EVERY run, including a driver that picks a random heading
+// every two seconds (qa/difficulty.mjs: flail finished at r=12.5). A ladder
+// whose top rung is handed to random input is decoration, which is the same
+// thing WORLD ENDER itself was before it moved from 5.0 to 8.0.
+//
+// 18 is the owner's call and the right shape: absurd, and out of reach of
+// ordinary play. Raising this alone would do nothing — R_CAP is not what binds,
+// lawCap is (see the growth law below) — so the two move together. Normal
+// eating stays on the law exactly as it was, and every rival you SWALLOW buys
+// permanent headroom above it. Ordinary play still tops out near 12; the last
+// six belong to whoever hunts the family.
+const R_CAP = 18;                       // was 12 (2D MAX_RADIUS 240 · 0.05)
+// headroom bought by eating rivals, in world units, spent against lawCap
+let feastR = 0;
+const FEAST_PER_RIVAL = 1.25;           // five rivals eaten = the full +6
 // Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHER ~23s,
 // GOBBLER ~53s, DEVOURER ~100s, WORLD ENDER ~153s on a strong run.
 const LAW_RATE = 0.025;   // evolutions are EARNED — slower clock, same 2D shape
@@ -4103,6 +4127,7 @@ function resetMatch() {
   gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
+  feastR = 0;     // the ceiling a rival bought you does not carry into the next match
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   renderQuests();
   ended = false;
@@ -5845,8 +5870,11 @@ function animate() {
       // still near zero. Blend it in over 25s so the hook stays untouched.
       const warm = Math.min(1, el2 / 25);
       const paceK = (1 - warm) + warm * (0.60 + 0.40 * pace);
+      // …PLUS whatever the family has been eaten for. This term is the only
+      // way past the law, so the top of the ladder is the one thing in the
+      // match that cannot be reached by waiting.
       const lawCap = START_R + (0.022 * Math.min(el2, 30) + LAW_RATE * el2) * paceK
-        + surgeT * surgeT * (2.8 + 2.6 * pace);
+        + surgeT * surgeT * (2.8 + 2.6 * pace) + feastR;
       // the rate limiter is what actually stops a single landmark ballooning
       // you — it is the job the absolute clamp was doing by accident
       const maxStep = (0.11 + surgeT * 0.16) * dt;
