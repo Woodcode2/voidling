@@ -133,7 +133,13 @@ export interface Skin {
   id: string; name: string;
   abyss: number; inner: number; mid: number; rim: number; glow: number;
   tex?: string;                                    // epic: AI texture wrap
-  art?: string;                                    // legendary: AI card icon
+  // `art` is GONE. It was a 0.5-1.3 MB AI painting per legendary skin, shown
+  // on the shop card and in the preview modal, and both of those now render
+  // the actual character instead — so it was 4.2 MB of download whose only job
+  // was to depict something the game can draw. NOT to be confused with `tex`
+  // below, which is a live sampler2D read every frame by the body shader for
+  // the hero AND every rival: deleting one of those silently turns a skin into
+  // a flat gradient with no build error.
   acc?: 'unicorn' | 'dino' | 'wizard' | 'king' | 'dragon' | 'mecha' | 'ninja';   // legendary: 3D accessory
   char?: SkinChar;                                 // legendary: full character rig
   cash?: number;                                   // legendary: USD price
@@ -191,19 +197,14 @@ export const SKINS: Skin[] = [
   // question a child is equipped to answer.
   // Colour stops are tuned to MATCH each skin's shop card art (App Store
   // advertising accuracy): the in-game orb must read as the same character.
-  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', char: { eyes: 'star', aura: 0xffd2f0, auraKind: 'stars', gloss: 1.4, pattern: 'fur', patCol: 0xffe4ff, body: 'mane' }, cash: 2.99,
-    art: '/assets/hf/hf_20260717_221342_1fed1f77-b19c-416e-9e0d-e84a02a57845.png' },
-  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', char: { eyes: 'fierce', aura: 0xb8ff8a, auraKind: 'bubbles', gloss: 0.5, pattern: 'scales', patCol: 0x2a6a30, body: 'snout' }, cash: 2.99,
-    art: '/assets/hf/hf_20260723_181705_6e91b3cd-72f3-4867-817f-58dbd714d5a9.jpeg' },
+  { id: 'univoid', name: 'Uni-Void', abyss: 0x342647, inner: 0xa890c8, mid: 0xe4d6f4, rim: 0xfff4ff, glow: 0xffc9e8, acc: 'unicorn', char: { eyes: 'star', aura: 0xffd2f0, auraKind: 'stars', gloss: 1.4, pattern: 'fur', patCol: 0xffe4ff, body: 'mane' }, cash: 2.99 },
+  { id: 'rexling', name: 'Rexling', abyss: 0x123018, inner: 0x2f8038, mid: 0x55b850, rim: 0x8ef07a, glow: 0xb8ff8a, acc: 'dino', char: { eyes: 'fierce', aura: 0xb8ff8a, auraKind: 'bubbles', gloss: 0.5, pattern: 'scales', patCol: 0x2a6a30, body: 'snout' }, cash: 2.99 },
   // King Void card art: BLACK glossy orb with a purple-nebula heart, wrapped
   // in a swirling gold-stardust ring — body stays dark, the RIM is the gold
-  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', char: { eyes: 'glow', aura: 0xffd25a, auraKind: 'stars', gloss: 1.2, pattern: 'starfield', patCol: 0xffd25a }, cash: 2.99,
-    art: '/assets/hf/hf_20260717_221346_49c57d8f-d589-4a59-9c11-b5d96dbd9bc7.png' },
+  { id: 'kingvoid', name: 'King Void', abyss: 0x0d0618, inner: 0x2e1552, mid: 0x4a2378, rim: 0xffd25a, glow: 0xffe8a0, acc: 'king', char: { eyes: 'glow', aura: 0xffd25a, auraKind: 'stars', gloss: 1.2, pattern: 'starfield', patCol: 0xffd25a }, cash: 2.99 },
   // Drako card art: teal-blue dragon orb, warm golden glow around the edges
-  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9, pattern: 'scales', patCol: 0x1e6a7a, body: 'muzzle' }, cash: 2.99,
-    art: '/assets/hf/hf_20260723_181409_a7a76db9-9711-48e8-9e0e-4f43188251d0.jpeg' },
-  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', char: { eyes: 'fierce', aura: 0xff4d5e, auraKind: 'bolts', gloss: 0.4, pattern: 'stitch', patCol: 0x4a2a5e }, cash: 2.99,
-    art: '/assets/hf/hf_20260723_181414_a23e8298-d3ea-47e4-bba9-d7a468fc88e1.jpeg' },
+  { id: 'drako', name: 'Drako', abyss: 0x0a2030, inner: 0x14536a, mid: 0x2394a8, rim: 0x5ee8d8, glow: 0xffb054, acc: 'dragon', char: { eyes: 'fierce', aura: 0xffb054, auraKind: 'embers', gloss: 0.9, pattern: 'scales', patCol: 0x1e6a7a, body: 'muzzle' }, cash: 2.99 },
+  { id: 'shadowninja', name: 'Shadow Ninja', abyss: 0x0a0612, inner: 0x241640, mid: 0x3a2a5e, rim: 0xff4d5e, glow: 0xff7a8a, acc: 'ninja', char: { eyes: 'fierce', aura: 0xff4d5e, auraKind: 'bolts', gloss: 0.4, pattern: 'stitch', patCol: 0x4a2a5e }, cash: 2.99 },
 ];
 
 // pre-built THREE.Color instances for the void shader (avoids per-frame alloc)
