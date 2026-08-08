@@ -6,7 +6,7 @@
 // exactly like the 2D canvas draw.
 import * as THREE from 'three';
 import { HAT_BY_ID, applyHatLod } from './hats';
-import { buildHat } from './hatgeo';
+import { buildHat, spiralHorn } from './hatgeo';
 import { VOID, VOID_COL, type Skin } from './palette';
 
 export interface VoidState {
@@ -860,11 +860,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const skinM = new THREE.MeshStandardMaterial({ color: 0x55b850, roughness: 0.55 });
       const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 12), skinM);
       jaw.scale.set(0.78, 0.58, 1.0); jaw.position.set(0, -0.56, 0.8); g.add(jaw);
-      const teeth = new THREE.MeshStandardMaterial({ color: 0xfff6e8, roughness: 0.4 });
-      for (const sx of [-0.17, 0.17]) {
-        const t = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 5), teeth);
-        t.position.set(sx, -0.74, 1.1); t.rotation.x = Math.PI; g.add(t);
-      }
+      // NO TEETH. Two hundred lines up, mkFang builds fangs and deliberately
+      // never adds them, for a reason recorded there: a fang is the one detail
+      // that tips this character from cute toward predatory, in a game for
+      // six-year-olds where every other decision has been pulled the other
+      // way. Rexling's snout then hung two of them under its jaw anyway —
+      // invisible at gameplay size, and the first thing you see on the card.
+      // The decision was right; this was the place that had not heard it.
     });
     // DRAGON MUZZLE: longer, with brow ridges and warm nostril glow
     mk('muzzle', (g) => {
@@ -1571,29 +1573,44 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
 export function buildAccessory(kind: string): THREE.Group {
   const g = new THREE.Group();
   if (kind === 'unicorn') {
-    // matches the Uni-Void card: a BIG rainbow spiral horn and real fluffy
-    // ears with pink inners. The old 0.16×0.72 nub was invisible in play.
-    const RAINBOW = [0xff5d7e, 0xffb054, 0xffe066, 0x7ef2a0, 0x6fd8ff, 0xb875ff];
-    for (let i = 0; i < 6; i++) {
-      const t = i / 6;
-      const seg = new THREE.Mesh(new THREE.ConeGeometry(0.3 * (1 - t * 0.82), 0.2, 12, 1, true),
-        new THREE.MeshStandardMaterial({ color: RAINBOW[i], roughness: 0.25, metalness: 0.45,
-          emissive: RAINBOW[i], emissiveIntensity: 0.45 }));
-      seg.position.set(0, 1.12 + t * 0.92, 0.12);
-      seg.rotation.set(0.2, t * 2.4, 0);   // twisting spiral
-      seg.scale.setScalar(1 - t * 0.08);
-      g.add(seg);
+    // ── THE HORN IS THE HAT'S HORN NOW ────────────────────────────────────
+    // This used to be six open-ended cones stacked up the brow with a twist on
+    // each, which at gameplay size passed for a spiral. Then the shop started
+    // rendering cards, and at 420px it was unmistakably a small rainbow
+    // CHRISTMAS TREE — six flared skirts, one on top of the next — on the card
+    // selling a $2.99 character. A card on a retina phone is a magnifying
+    // glass, and it is the forcing function these five never had.
+    //
+    // spiralHorn is the Rainbow Horn hat's horn: a tapering tube swept along a
+    // real helix over a pearl core. One horn, built once, worn by both.
+    const horn = spiralHorn(1.22, 0.185, 3.0);
+    horn.position.set(0, 0.90, 0.14);
+    horn.rotation.x = 0.20;
+    g.add(horn);
+    // ears: lathe teardrops rather than cones, with the pink inner sitting
+    // proud of the FRONT face — the same shape the hat's ears settled on after
+    // the cone version rendered as two traffic cones.
+    const earProf: THREE.Vector2[] = [];
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      earProf.push(new THREE.Vector2(0.5 * Math.sin(Math.PI * Math.pow(t, 0.68)) * (1 - t * 0.3), t));
     }
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.24, 10),
-      new THREE.MeshStandardMaterial({ color: 0xfff0ff, emissive: 0xffd2f0, emissiveIntensity: 1.1, roughness: 0.2 }));
-    tip.position.set(0, 2.16, 0.12); tip.rotation.x = 0.2; g.add(tip);
-    const earMat = new THREE.MeshStandardMaterial({ color: 0xfbf2ff, roughness: 0.55 });
-    const innerMat = new THREE.MeshStandardMaterial({ color: 0xffb8d8, roughness: 0.7 });
-    for (const sx of [-0.62, 0.62]) {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.66, 10), earMat);
-      ear.position.set(sx, 0.95, 0.05); ear.rotation.z = -sx * 0.55; g.add(ear);
-      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.42, 8), innerMat);
-      inner.position.set(sx * 0.94, 0.94, 0.19); inner.rotation.z = -sx * 0.55; g.add(inner);
+    const earGeo = new THREE.LatheGeometry(earProf, 10);
+    const earMat = new THREE.MeshStandardMaterial({ color: 0xfff2f8, roughness: 0.5 });
+    const innerMat = new THREE.MeshStandardMaterial({ color: 0xff87bd, roughness: 0.45,
+      emissive: 0xff5c9e, emissiveIntensity: 0.3 });
+    for (const sx of [-1, 1]) {
+      const ear = new THREE.Group();
+      const outer = new THREE.Mesh(earGeo, earMat);
+      outer.scale.set(0.34, 0.78, 0.17);
+      ear.add(outer);
+      const inner = new THREE.Mesh(earGeo, innerMat);
+      inner.scale.set(0.20, 0.62, 0.10);
+      inner.position.set(0, -0.10, 0.055);
+      ear.add(inner);
+      ear.position.set(sx * 0.56, 0.66, 0.10);
+      ear.rotation.set(-0.14, sx * 0.22, sx * -0.42);
+      g.add(ear);
     }
   }
   else if (kind === 'dino') {
@@ -1625,11 +1642,36 @@ export function buildAccessory(kind: string): THREE.Group {
   }
   else if (kind === 'dragon') {
     const wingMat = new THREE.MeshStandardMaterial({ color: 0x2a8a9a, roughness: 0.6, side: THREE.DoubleSide, emissive: 0x1a5a6a, emissiveIntensity: 0.3 });
+    // ── WINGS, NOT EARS ──────────────────────────────────────────────────
+    // Mounted at y = 0.72 and swept UP, these two read unmistakably as rabbit
+    // ears at the portrait yaw — two tall teal blades standing straight off the
+    // top of the head, which is the one silhouette a dragon must not have. They
+    // sit lower and further back now, and the sweep is outward rather than
+    // upward, so they read as something folded against the shoulders.
     for (const sx of [-1, 1]) {
+      // MIRRORED BY SCALE, not by negating Euler angles. CircleGeometry's fan
+      // spans 0 to 0.72*PI from +X — it is not symmetric about its own origin —
+      // so flipping the signs of three rotations gives two DIFFERENT shapes,
+      // and the previous pass rendered one visible wing on the left and
+      // nothing on the right. Negating x on a holder is a true reflection, and
+      // the material is already DoubleSide so the flipped winding is fine.
+      const holder = new THREE.Group();
+      holder.scale.x = sx;
+      g.add(holder);
       const wing = new THREE.Mesh(new THREE.CircleGeometry(0.95, 5, 0, Math.PI * 0.72), wingMat);
-      wing.position.set(sx * 0.88, 0.72, -0.5);
-      wing.rotation.set(0.3, sx * 1.1, sx * 0.9);
-      wing.scale.set(1.6, 1.15, 1); g.add(wing);
+      // Three goes, and the third one finally names the cause. At y=0.72 swept
+      // UP they were rabbit ears. A yaw of 1.35 turned them 77 degrees out of
+      // the camera's plane and made them edge-on slivers. Lowering the mount
+      // did not help either — and it could not, because the fan is 0.95 long
+      // and was rolled so it pointed UPWARD, so whatever its origin the tip
+      // still finished above the skull. Anything that rises past the top of a
+      // round head is an ear. The roll is the fix: past a right angle the fan
+      // sweeps DOWN and out, its highest point is its own mount, and it reads
+      // as something folded against the back.
+      wing.position.set(0.80, 0.22, -0.56);
+      wing.rotation.set(0.18, 0.50, 2.40);
+      wing.scale.set(1.55, 1.05, 1);
+      holder.add(wing);
     }
     const hornMat = new THREE.MeshStandardMaterial({ color: 0xffd25a, roughness: 0.35, metalness: 0.4 });
     for (const sx of [-0.3, 0.3]) {
@@ -1693,16 +1735,19 @@ export function buildAccessory(kind: string): THREE.Group {
     }
     crown.position.set(0.14, 0.98, 0); crown.rotation.z = -0.18;   // tilted, like the art
     g.add(crown);
-    // gold-stardust ring: small emissive sparkles orbiting the equator
-    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffe8a0 });
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2 + 0.4;
-      const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.07), sparkMat);
-      sp.position.set(Math.cos(a) * 1.15, ((i % 3) - 1) * 0.16 - 0.05, Math.sin(a) * 1.15);
-      sp.rotation.set(a, a * 1.7, 0);
-      sp.scale.setScalar(0.8 + (i % 2) * 0.5);
-      g.add(sp);
-    }
+    // ── THE STARDUST RING IS GONE, AND THAT IS THE FIX ───────────────────
+    // Six solid gold octahedra rode the equator at |p| = 1.15. Two of them sat
+    // in FRONT of the head at the play camera's yaw and projected a gold cube
+    // onto the king's cheek — which on a shop card reads as a rendering bug on
+    // the product you are being asked to pay for. Moving them to the back
+    // hemisphere only relocated the problem: an octahedron seen edge-on at the
+    // silhouette is a flat quad, so they became gold debris pinned to his rim.
+    //
+    // They were never needed. King Void's char rig already carries
+    // `aura: 0xffd25a, auraKind: 'stars'` — twelve billboarded, glowing,
+    // camera-true star sprites that are gold stardust done properly, and they
+    // were drawing underneath this ring the whole time. One of the two had to
+    // go, and it is not the one that always faces the lens.
   }
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;

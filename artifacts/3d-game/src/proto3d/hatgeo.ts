@@ -400,6 +400,80 @@ function buildTycoon(): THREE.Group {
   return g;
 }
 
+// ── THE RAINBOW, AND THE HORN THAT IS WOUND IN IT ─────────────────────────
+// Both live out here because TWO things need them: the Rainbow Horn HAT, and
+// the Uni-Void SKIN's accessory in void3d. The skin had its own horn — six
+// open-ended cones stacked up the brow — and once the shop started rendering
+// cards it was unmistakably a small rainbow Christmas tree on a $2.99 product.
+// One horn, built once, worn by both.
+
+/** Wrapped end-to-end: the last entry is the first, so a cycling t never snaps
+ *  from violet back to red. */
+const BOW = [0xff3d6e, 0xff9838, 0xffe23d, 0x4fe08a, 0x38c8ff, 0xb06bff, 0xff3d6e];
+const _b1 = new THREE.Color(), _b2 = new THREE.Color();
+export function bowAt(t: number, out: THREE.Color): THREE.Color {
+  const u = ((t % 1) + 1) % 1 * (BOW.length - 1);
+  const i = Math.min(BOW.length - 2, Math.floor(u));
+  _b1.setHex(BOW[i]); _b2.setHex(BOW[i + 1]);
+  return out.copy(_b1).lerp(_b2, u - i);
+}
+
+/** A pearl core with a rainbow ridge wound round it: a tube swept along a
+ *  helix, tapering in BOTH radius and thickness so it ends in a needle rather
+ *  than a traffic cone. Colour cycles the spectrum twice up the length.
+ *  Returns a group whose origin is the horn's BASE, pointing up +Y. */
+export function spiralHorn(H = 1.55, baseR = 0.225, turns = 3.0): THREE.Group {
+  const SEG = 64, RAD = 6;
+  const spine = (t: number, out: THREE.Vector3): THREE.Vector3 => {
+    const a = t * turns * Math.PI * 2;
+    const r = baseR * Math.pow(1 - t, 0.88);
+    return out.set(Math.cos(a) * r, t * H, Math.sin(a) * r);
+  };
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= SEG; i++) pts.push(spine(i / SEG, new THREE.Vector3()));
+  const ridge = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5),
+    SEG, baseR * 0.436, RAD, false);
+  {
+    // TubeGeometry lays (SEG+1) rings of (RAD+1) vertices in order, so the
+    // vertex index recovers t exactly — which is what lets the tube taper and
+    // take its colour AFTER it is built, instead of needing a custom sweep.
+    const pos = ridge.getAttribute('position') as THREE.BufferAttribute;
+    const col = new Float32Array(pos.count * 3);
+    const sp = new THREE.Vector3(), pv = new THREE.Vector3(), c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const t = Math.floor(i / (RAD + 1)) / SEG;
+      spine(t, sp); pv.fromBufferAttribute(pos, i);
+      pv.sub(sp).multiplyScalar(0.34 + 0.66 * Math.pow(1 - t, 0.68)).add(sp);
+      pos.setXYZ(i, pv.x, pv.y, pv.z);
+      bowAt(t * 2.0 + 0.06, c);
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    }
+    ridge.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    ridge.computeVertexNormals();
+  }
+  const ridgeM = new THREE.Mesh(ridge, new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.22, metalness: 0.06,
+    emissive: 0xffffff, emissiveIntensity: 0.12, envMapIntensity: 1.7,
+  }));
+  // the pearl core the ridge is wound around. Concave profile, so the horn
+  // reads as tapering to a needle.
+  const coreProf: THREE.Vector2[] = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    coreProf.push(new THREE.Vector2(baseR * 0.822 * Math.pow(1 - t, 0.94), t * H));
+  }
+  const core = new THREE.Mesh(new THREE.LatheGeometry(coreProf, 16),
+    new THREE.MeshStandardMaterial({ color: 0xfff4fb, roughness: 0.26, metalness: 0.04,
+      emissive: 0xffd6ee, emissiveIntensity: 0.30, envMapIntensity: 1.4 }));
+  // a small hot point at the tip: the one bit that has to survive being forty
+  // pixels tall on Lantern Night's dark street
+  const spark = new THREE.Mesh(new THREE.SphereGeometry(baseR * 0.231, 10, 8), glow(0xfff6ff, 2.6));
+  spark.position.y = H;
+  const g = new THREE.Group();
+  g.add(core, ridgeM, spark);
+  return g;
+}
+
 // ── RAINBOW HORN ──────────────────────────────────────────────────────────
 // THE MOST EXPENSIVE THING IN THE SHOP HAS TO LOOK IT, AND IT TOOK THREE GOES.
 //
@@ -431,80 +505,16 @@ function buildTycoon(): THREE.Group {
 function buildHorn(): THREE.Group {
   const g = new THREE.Group();
 
-  // wrapped end-to-end: the last entry is the first, so a cycling t never
-  // snaps from violet back to red
-  const BOW = [0xff3d6e, 0xff9838, 0xffe23d, 0x4fe08a, 0x38c8ff, 0xb06bff, 0xff3d6e];
-  const _b1 = new THREE.Color(), _b2 = new THREE.Color();
-  const bowAt = (t: number, out: THREE.Color): THREE.Color => {
-    const u = ((t % 1) + 1) % 1 * (BOW.length - 1);
-    const i = Math.min(BOW.length - 2, Math.floor(u));
-    _b1.setHex(BOW[i]); _b2.setHex(BOW[i + 1]);
-    return out.copy(_b1).lerp(_b2, u - i);
-  };
-
   // ── THE HORN ────────────────────────────────────────────────────────────
-  // A pearl core with a rainbow ridge wound round it: a tube swept along a
-  // helix, tapering in BOTH radius and thickness so it ends in a needle rather
-  // than a traffic cone. Colour cycles the spectrum twice up the length.
-  const H = 1.55, TURNS = 3.0, SEG = 64, RAD = 6;
-  const spine = (t: number, out: THREE.Vector3): THREE.Vector3 => {
-    const a = t * TURNS * Math.PI * 2;
-    const r = 0.225 * Math.pow(1 - t, 0.88);
-    return out.set(Math.cos(a) * r, t * H, Math.sin(a) * r);
-  };
-  const pts: THREE.Vector3[] = [];
-  for (let i = 0; i <= SEG; i++) pts.push(spine(i / SEG, new THREE.Vector3()));
-  const ridge = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5),
-    SEG, 0.098, RAD, false);
-  {
-    // TubeGeometry lays (SEG+1) rings of (RAD+1) vertices in order, so the
-    // vertex index recovers t exactly — which is what lets the tube taper and
-    // take its colour AFTER it is built, instead of needing a custom sweep.
-    const pos = ridge.getAttribute('position') as THREE.BufferAttribute;
-    const col = new Float32Array(pos.count * 3);
-    const sp = new THREE.Vector3(), pv = new THREE.Vector3(), c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const t = Math.floor(i / (RAD + 1)) / SEG;
-      spine(t, sp); pv.fromBufferAttribute(pos, i);
-      pv.sub(sp).multiplyScalar(0.34 + 0.66 * Math.pow(1 - t, 0.68)).add(sp);
-      pos.setXYZ(i, pv.x, pv.y, pv.z);
-      bowAt(t * 2.0 + 0.06, c);
-      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-    }
-    ridge.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    ridge.computeVertexNormals();
-  }
-  const ridgeM = new THREE.Mesh(ridge, new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.22, metalness: 0.06,
-    emissive: 0xffffff, emissiveIntensity: 0.12, envMapIntensity: 1.7,
-  }));
-
-  // the pearl core the ridge is wound around. Concave profile, so the horn
-  // reads as tapering to a needle.
-  const coreProf: THREE.Vector2[] = [];
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12;
-    coreProf.push(new THREE.Vector2(0.185 * Math.pow(1 - t, 0.94), t * H));
-  }
-  const core = new THREE.Mesh(new THREE.LatheGeometry(coreProf, 16),
-    new THREE.MeshStandardMaterial({ color: 0xfff4fb, roughness: 0.26, metalness: 0.04,
-      emissive: 0xffd6ee, emissiveIntensity: 0.30, envMapIntensity: 1.4 }));
-
-  // ROOTED, and deliberately so. Nothing on the base ring gets closer to the
-  // body's own surface than |p| = 0.80 — well under the 0.85 the rule wants
-  // for "buried" — so the horn grows out of the skull with no seam, and no
-  // amount of churn can expose its open bottom.
-  const horn = new THREE.Group();
-  horn.add(core, ridgeM);
+  // Shared with the Uni-Void skin — see spiralHorn above. ROOTED, and
+  // deliberately so: nothing on the base ring gets closer to the body than
+  // |p| = 0.80, well under the 0.85 the rule wants for "buried", so the horn
+  // grows out of the skull with no seam and no amount of churn can expose its
+  // open bottom.
+  const horn = spiralHorn(1.55, 0.225, 3.0);
   horn.position.set(0, 0.66, 0.23);
   horn.rotation.x = 0.20;                       // forward off the brow
   g.add(horn);
-
-  // a small hot point at the tip: the one bit of the hat that has to survive
-  // being forty pixels tall on Lantern Night's dark street
-  const spark = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), glow(0xfff6ff, 2.6));
-  spark.position.set(0, 0.66 + H * Math.cos(0.20), 0.23 + H * Math.sin(0.20));
-  g.add(spark);
 
   // ── THE STRANDS, AND NOTHING UNDER THEM ─────────────────────────────────
   // v3 put a sphere-segment shell under the mane to kill the daylight between

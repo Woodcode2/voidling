@@ -166,7 +166,23 @@ export const SKINS: Skin[] = [
   { id: 'honey', name: 'Honey', abyss: 0x2a1606, inner: 0x6a4210, mid: 0xb87f1a, rim: 0xffb84a, glow: 0xffd486, tex: '/assets/hf/hf_20260717_131501_87fecffb-5637-49ad-87f5-106990a4f100.png' },
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
   { id: 'ember', name: 'Ember', abyss: 0x260a06, inner: 0x6a2410, mid: 0xc4571a, rim: 0xffb054, glow: 0xffcf7a, streak: 2 },
-  { id: 'prism', name: 'Prism', abyss: 0x1a1030, inner: 0x4a2a8a, mid: 0x8a5ac8, rim: 0xe8b8ff, glow: 0xfff0a8, streak: 7 },
+  // ── PRISM EARNS ITS SEVEN DAYS ────────────────────────────────────────────
+  // This is the reward for coming back a week running, and it was rim 0xe8b8ff
+  // on mid 0x8a5ac8 against Classic's 0xcb99ff on 0x5f2ab4 — two purple
+  // gradient balls, side by side in the shop, and a child cannot tell which one
+  // they just earned.
+  //
+  // `char` is a plain optional field with nothing gating it on `cash`, and
+  // everything it drives is pre-built geometry toggled by a uniform in setSkin:
+  // the glow eye-rings and the twelve aura sprites already exist on every rig
+  // at opacity 0. So this costs zero bytes and zero build time.
+  //
+  // It does NOT devalue the paid tier, whose exclusivity is `acc` — the horn,
+  // the crown, the wings — which Prism still does not get. The line stays
+  // legible to a six-year-old: come back and your void turns SHINY, pay and
+  // your void gets a new SHAPE.
+  { id: 'prism', name: 'Prism', abyss: 0x1a1030, inner: 0x4a2a8a, mid: 0x8a5ac8, rim: 0xe8b8ff, glow: 0xfff0a8, streak: 7,
+    char: { eyes: 'glow', aura: 0xe8b8ff, auraKind: 'stars', gloss: 1.5, pattern: 'starfield', patCol: 0xfff0a8 } },
   // ✨ LEGENDARY — character skins with 3D accessories, cash tier.
   // ONE price, $2.99, across all five. A tiered ladder ($4.99 / $9.99) asked a
   // six-year-old to rank five things by a number they cannot judge, and asked a

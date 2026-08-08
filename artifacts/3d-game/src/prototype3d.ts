@@ -4837,7 +4837,12 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
     const lo = Math.min(box.min.y, -0.2);
     const mid = (top + lo) / 2;
-    const span = Math.max(top - lo, wide * 2) * 1.10;
+    // 1.18, and it is the horn that set it. The margin was 1.10 until Uni-Void
+    // stopped being a stack of cones and became a real spiral that reaches
+    // y=2.14 — the camera is lifted to look slightly DOWN at the subject, so
+    // the tilt pushes the top of a tall accessory further up the frame than a
+    // straight vertical fit predicts, and the tip clipped.
+    const span = Math.max(top - lo, wide * 2) * 1.18;
     const dist = span / (2 * Math.tan((30 * Math.PI) / 360));
     cam.position.set(Math.sin(az) * dist, mid + dist * 0.10, Math.cos(az) * dist);
     cam.lookAt(0, mid, 0);
@@ -4950,7 +4955,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
       const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
       const mid = (top + lo) / 2;
-      const dist = (Math.max(top - lo, wide * 2) * 1.14) / (2 * Math.tan((30 * Math.PI) / 360));
+      const dist = (Math.max(top - lo, wide * 2) * 1.18) / (2 * Math.tan((30 * Math.PI) / 360));
       cam.position.set(Math.sin(prevAz) * dist, mid + dist * 0.10, Math.cos(prevAz) * dist);
       cam.lookAt(0, mid, 0);
       rig.update(0, st);                          // face billboard reads the camera
@@ -5006,7 +5011,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
     const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
     const mid = (top + lo) / 2;
-    const dist = (Math.max(top - lo, wide * 2) * 1.12) / (2 * Math.tan((30 * Math.PI) / 360));
+    const dist = (Math.max(top - lo, wide * 2) * 1.18) / (2 * Math.tan((30 * Math.PI) / 360));
     cam.position.set(Math.sin(0.34) * dist, mid + dist * 0.10, Math.cos(0.34) * dist);
     cam.lookAt(0, mid, 0);
     rig.update(1 / 60, st);
@@ -5087,7 +5092,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       const top = Math.max(box.max.y, 1.2), lo = Math.min(box.min.y, -0.2);
       const wide = Math.max(box.max.x, -box.min.x, box.max.z, -box.min.z, 1.0);
       const mid = (top + lo) / 2;
-      const dist = (Math.max(top - lo, wide * 2) * 1.10) / (2 * Math.tan((30 * Math.PI) / 360));
+      const dist = (Math.max(top - lo, wide * 2) * 1.18) / (2 * Math.tan((30 * Math.PI) / 360));
       cam.position.set(Math.sin(0.42) * dist, mid + dist * 0.10, Math.cos(0.42) * dist);
       cam.lookAt(0, mid, 0);
       rig.update(1 / 60, st);       // the face billboard is read off the camera IN update
