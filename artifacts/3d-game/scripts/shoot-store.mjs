@@ -330,7 +330,16 @@ await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
 }));
 await page.click('#btnShop');
-await settle(1600);
+// WAIT FOR THE CARDS, DO NOT GUESS AT THEM. Every card is a live render, painted
+// across animation frames on a per-frame budget, and each one now solves its own
+// framing from the alpha it draws — so the grid fills in over rather more frames
+// than it used to. A fixed settle photographs however much happened to be ready,
+// which on a slow machine is a screenshot of empty cards submitted to Apple.
+// An unpainted canvas still reports 300x150; a painted one is square.
+await page.waitForFunction(() => {
+  const cvs = [...document.querySelectorAll('#shopGrid .skCard canvas')];
+  return cvs.length > 0 && cvs.every((c) => c.width > 0 && c.width === c.height);
+}, null, { timeout: 120000 });
 // frame the legendary tier — that is the catalogue's best art
 await page.evaluate(() => document.querySelector('#shopGrid .skCard.legend')
   ?.scrollIntoView({ block: 'center' }));
