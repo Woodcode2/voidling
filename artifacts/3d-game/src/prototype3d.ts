@@ -2669,6 +2669,34 @@ function paintGrowth(r: number) {
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
 let xp = Number(localStorage.getItem('voidXP') || 0);
 let streak = Number(localStorage.getItem('voidStreak') || 0);
+// ── ONE COUNTER, ONE DAY GATE ─────────────────────────────────────────────
+// `voidDailyStreak` is the count and `voidStreakDay` is the day it was last
+// counted. Both writers — the daily calendar and the end of a match — read and
+// write exactly these two, so the streak advances once a day no matter which
+// of them the child reaches first.
+//
+// It did not used to. bumpStreak() had its own gate (`voidLastDay`) and its own
+// arithmetic, and the calendar had `voidDailyLast`, so on any ordinary day —
+// open the menu, claim the card, play a match — the counter moved TWICE.
+// Measured: claim on day six set it to 6, the match pushed it to 7, the rank
+// chip then read 🔥7 beside a card that had just said 6, and Prism, the SEVEN
+// day prize, unlocked at the end of day SIX announcing "7 DAYS IN A ROW".
+//
+// Migration: existing installs have no voidStreakDay. Seed it from whichever
+// of the two old gates ran last, or the streak they are on resets to 1 the
+// first time they open this build.
+if (!localStorage.getItem('voidStreakDay')) {
+  const a = localStorage.getItem('voidDailyLast') || '';
+  const bq = localStorage.getItem('voidLastDay') || '';
+  const today = new Date().toDateString();
+  const seed = [a, bq].includes(today) ? today
+    : [a, bq].find((d) => d) || '';
+  if (seed) localStorage.setItem('voidStreakDay', seed);
+  // …and the count itself, if only the old voidStreak mirror was ever written
+  if (!localStorage.getItem('voidDailyStreak') && streak > 0) {
+    localStorage.setItem('voidDailyStreak', String(streak));
+  }
+}
 // per-level XP spans: the first levels pop in 1-2 matches, MASTER is a season
 const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250, 300, 400];
 // ONE LADDER, FIVE RUNGS, VISIBLE DOUBLING. There were five price points
@@ -2771,13 +2799,21 @@ function renderRank() {
   const st = streak >= 2 ? ` · 🔥${streak}` : '';
   el('rankChip').innerHTML = `${r.ic} ${r.nm} · LVL ${r.lvl}${st}<div class="rkBar"><div style="width:${Math.round(r.prog * 100)}%"></div></div>`;
 }
+/** Count today, if nobody has yet. The daily calendar does the same job from
+ *  the other end; whichever runs first wins and the other is a no-op. */
 function bumpStreak() {
   const today = new Date().toDateString();
-  const last = localStorage.getItem('voidLastDay');
-  if (last === today) return;
+  const last = localStorage.getItem('voidStreakDay');
+  if (last === today) return;                       // already counted today
   const yd = new Date(Date.now() - 86400000).toDateString();
-  setStreak(last === yd ? streak + 1 : 1);
+  const n = last === yd ? Number(localStorage.getItem('voidDailyStreak') || 0) + 1 : 1;
+  localStorage.setItem('voidDailyStreak', String(n));
+  localStorage.setItem('voidStreakDay', today);
+  // voidLastDay is kept written for anything still reading it, but it is no
+  // longer what decides the streak — that was the second gate that caused the
+  // double count.
   localStorage.setItem('voidLastDay', today);
+  setStreak(n);
 }
 /** The single writer for the streak the chip, the shop and the calendar share. */
 function setStreak(n: number): void {
@@ -4275,7 +4311,16 @@ renderRank();
     // OPENED, which is what a streak means and what the streak skins are
     // promising. It now writes the shared counter that the chip and the shop
     // already read.
-    const streak = kept ? Number(localStorage.getItem('voidDailyStreak') || 1) + 1 : 1;
+    // …off the SHARED gate, not `kept`. `kept` asks whether the CARD was
+    // claimed yesterday, which is the right question for the reward index and
+    // the week rollover and the wrong one for the streak: a match finished
+    // yesterday also counts, and a match finished earlier TODAY has already
+    // counted. Reading voidStreakDay makes this and bumpStreak() the same
+    // decision made twice rather than two decisions that disagree.
+    const sDay = localStorage.getItem('voidStreakDay');
+    const streak = sDay === today ? Number(localStorage.getItem('voidDailyStreak') || 1)
+      : sDay === yd ? Number(localStorage.getItem('voidDailyStreak') || 0) + 1
+      : 1;
     // +20% a week, capped at 3x. Day 7 of week 4 pays 900 instead of 300.
     const mult = Math.min(3.5, 1 + 0.3 * (week - 1));   // week 2 already pays 30% more
     const amount = (i: number) => Math.round(DAILY[i] * mult / 5) * 5;
@@ -4308,6 +4353,7 @@ renderRank();
       localStorage.setItem('voidDailyDay', String(day));
       localStorage.setItem('voidDailyWeek', String(week));
       localStorage.setItem('voidDailyStreak', String(streak));
+      localStorage.setItem('voidStreakDay', today);   // counted — bumpStreak stands down
       // …and the one the rank chip and the streak skins read
       setStreak(streak);
       track('daily_claim', { day: day + 1, week, streak, coins: amount(day) });
