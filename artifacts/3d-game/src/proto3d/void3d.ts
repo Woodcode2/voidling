@@ -436,8 +436,12 @@ export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
 // on the face where the shader's belly pit darkens toward abyss (L 0.0016),
 // where the same red measures 4.3:1. Hue does the rest — warm red against cool
 // violet separates even where luminance does not.
-const MOUTH_OPEN = 0xe01e45;   // one warm red opening, on a DARK belly
-const MOUTH_INK = 0x24050f;    // …or one near-black opening, on a LIGHT belly
+// The mouth is a DARK RIM around a LIGHTER INSIDE — the maw's own pair, so the
+// closed smile and the open gape are one design at two sizes. See the long note
+// where the smile is built for why the direction of that value step is the
+// whole difference between "an opening" and "lipstick".
+const MOUTH_RIM = 0x2a0e2e;    // the opening's edge — dark, so it reads as a cavity
+const MOUTH_IN = 0xff6f91;     // …and the lit surface inside it
 // There is deliberately no "inside" colour any more. An opening with something
 // LIGHTER inside it is an annulus, and an annulus drawn on a face is a made-up
 // mouth — that is the shape the owner rejected as lipstick. One mesh, one
@@ -838,16 +842,38 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // (Classic), and there is no white anywhere in the mouth.
     // upper semicircle; the group's PI rotation (below) hangs the dome down
     const lip = new THREE.Mesh(new THREE.CircleGeometry(0.178, 40, 0, Math.PI),
-      new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }));
+      new THREE.MeshBasicMaterial({ color: MOUTH_RIM, depthWrite: false }));
     mouthRim = lip.material as THREE.MeshBasicMaterial;
-    // THE SECOND SHAPE IS GONE. There used to be an ellipse inside the lip — a
-    // "throat" — and whatever colour it took, lip-plus-inner is an annulus, and
-    // an annulus on a face reads as a painted mouth. Shrinking it and pushing
-    // it deeper was my second attempt at keeping it; the right answer is that
-    // the smile is ONE shape. The maw (the big gape when he actually eats) is a
-    // separate group below and still has its tongue, which is where a tongue
-    // belongs — visible only when the mouth is open.
-    mouth.add(lip);
+    // ── THE INNER IS BACK, AND THE OWNER IS RIGHT ABOUT WHY ───────────────
+    // I removed it, reasoning that lip-plus-inner is an annulus and an annulus
+    // on a face reads as lipstick. Half true, and it threw away the thing that
+    // makes a mouth read as a MOUTH. Shown three renders he picked the two-tone
+    // one: "the third one looks better because there's like shading inside".
+    //
+    // The distinction I had missed is the DIRECTION of the value step:
+    //   LIGHT rim around a DARK middle  = lipstick. Rejected, correctly.
+    //   DARK rim around a LIGHTER middle = an opening with depth. This one.
+    // The same two shapes read opposite ways, because a real cavity is dark at
+    // its edge and catches light on the surface inside it. A single flat colour
+    // has no depth cue at all, which is exactly why the pure red shape looked
+    // like a sticker stuck on his face.
+    //
+    // These are the MAW's own two colours, so the little smile and the big gape
+    // are now the same mouth at two sizes instead of two unrelated designs.
+    // They are deliberately skin-blind, like the maw: the pair carries its own
+    // contrast internally (0x2a0e2e against 0xff6f91), so it cannot be defeated
+    // by a skin the way routing against the body could — which is what left
+    // Classic's smile at 1.01:1 and invisible.
+    const inner = new THREE.Mesh(new THREE.CircleGeometry(0.108, 28),
+      new THREE.MeshBasicMaterial({ color: MOUTH_IN, depthWrite: false }));
+    inner.scale.set(1.22, 0.62, 1);
+    inner.position.set(0, 0.052, 0.004);
+    inner.renderOrder = 1;
+    // WIDER AND SHALLOWER, his call: a broad grin rather than a small round
+    // one. The lip is a semicircle, so stretching x and squashing y turns a
+    // half-penny into a smile.
+    lip.scale.set(1.34, 0.76, 1);
+    mouth.add(lip); mouth.add(inner);
     mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
@@ -1319,15 +1345,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the mane is shared geometry, so it takes the wearer's own colour —
       // otherwise the Archmage turns up in Uni-Void's white unicorn hair
       if (maneMat) maneMat.color.set(s.rim);
-      // ── THE MOUTH PICKS ITS ROUTE FROM THE BODY IT IS SITTING ON ─────────
-      // See the note where the mouth is built. Light candy mouth on a dark
-      // body, near-black mouth on a light one, chosen by whichever actually
-      // measures higher rather than by a luminance cut — and the tongue takes
-      // the opposite end so the mouth still has an inside. No white anywhere.
-      if (mouthRim) {
-        const belly = bellyOf(s);
-        mouthRim.color.set(wcag(MOUTH_OPEN, belly) >= wcag(MOUTH_INK, belly) ? MOUTH_OPEN : MOUTH_INK);
-      }
+      // THE MOUTH NO LONGER TAKES THE SKIN'S COLOUR AT ALL, and that is the
+      // fix rather than an omission. It used to route between a light and a
+      // dark mouth by measuring against the body — which put Classic's smile at
+      // 1.01:1 and made it invisible, because it was measuring the wrong pixel.
+      // A dark rim around a lighter inside carries its OWN contrast, so there
+      // is nothing left for a skin to defeat. Same as the maw, which has been
+      // skin-blind all along and has never had this problem.
       // ── apply the CHARACTER RIG (legendary skins only) ──────────────────
       const ch = s.char;
       const eyeMode = ch?.eyes;
