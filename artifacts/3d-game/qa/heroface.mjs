@@ -80,7 +80,7 @@ const rgb2hsv = (r, g, bl) => {
   return [h, mx ? d / mx : 0, mx];
 };
 
-console.log('    r    pxR    saturation    hue      white px    ring sat    OLD rim stop');
+console.log('    r    pxR    saturation    hue      white px    ring sat   OLD sat   belly sd  stars/1k px');
 const rows = [];
 const sample = (forceOld) => p.evaluate((forceOld) => {
     const THREE = window.__THREE, ren = window.__renderer, sc = window.__scene, cam = window.__cam;
@@ -155,6 +155,46 @@ const sample = (forceOld) => p.evaluate((forceOld) => {
         if (d < R * 0.97) body.push(at(x, y));
       }
     }
+    // ── CAN YOU SEE STARS IN HIM? ─────────────────────────────────────────
+    // The owner: "It was the right purple where you could see stars in him
+    // too." The interior galaxy is three refracted star shells, and the specks
+    // are sized in OBJECT space — so they shrink with him on screen and there
+    // is a size below which they are sub-pixel and simply cannot be seen.
+    // Worked out from the shell constants, the outer shell's specks fall under
+    // a 1px radius once his on-screen DIAMETER drops below about 55px.
+    //
+    // Measuring it: the galaxy is high-frequency bright speckle on a smooth
+    // body, so it shows up as LOCAL VARIANCE. A body with visible stars has a
+    // markedly higher standard deviation of luminance than one without, and
+    // counting pixels that are much brighter than their own neighbourhood
+    // counts the specks themselves. Sampled in the BELLY, because the `inside`
+    // mask puts the galaxy at full strength there and near its floor elsewhere.
+    const belly = [];
+    const byPos = new Map();
+    for (let y = Math.round(cy - R); y <= cy + R; y++) {
+      for (let x = Math.round(cx - R); x <= cx + R; x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const dx = (x - cx) / R, dy = (y - cy) / R;
+        // the pit sits low on the disc; sample the region the shader lights
+        if (Math.hypot(dx, dy + 0.30) < 0.52) {
+          const px = at(x, y);
+          const L = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
+          belly.push(L); byPos.set(`${x},${y}`, L);
+        }
+      }
+    }
+    let starN = 0;
+    for (const [k, L] of byPos) {
+      const [x, y] = k.split(',').map(Number);
+      let sum = 0, cnt = 0;
+      for (let j = -3; j <= 3; j += 3) for (let i2 = -3; i2 <= 3; i2 += 3) {
+        const n = byPos.get(`${x + i2},${y + j}`);
+        if (n !== undefined && (i2 || j)) { sum += n; cnt++; }
+      }
+      if (cnt >= 4 && L > sum / cnt + 18) starN++;
+    }
+    const bMean = belly.reduce((a, v) => a + v, 0) / Math.max(1, belly.length);
+    const bSd = Math.sqrt(belly.reduce((a, v) => a + (v - bMean) ** 2, 0) / Math.max(1, belly.length));
     // the ground just outside him, below the waist where the floor actually is
     for (let a = 0; a < 360; a += 4) {
       for (const k of [1.2, 1.4, 1.6]) {
@@ -164,7 +204,7 @@ const sample = (forceOld) => p.evaluate((forceOld) => {
         ring.push(at(x, y));
       }
     }
-    return { cx, cy, pxR, W, H, body, ring, r: vs.r };
+    return { cx, cy, pxR, W, H, body, ring, r: vs.r, bSd, starN, bellyN: belly.length };
 }, forceOld);
 
 const stats = (m) => {
@@ -179,7 +219,8 @@ const stats = (m) => {
   let hueM = Math.atan2(sy, sx) * 180 / Math.PI; if (hueM < 0) hueM += 360;
   let rs = 0;
   for (const px of m.ring) rs += rgb2hsv(px[0], px[1], px[2])[1];
-  return { satM: sS / n, hueM, whitePct: nW / n * 100, ringSat: rs / Math.max(1, m.ring.length) };
+  return { satM: sS / n, hueM, whitePct: nW / n * 100, ringSat: rs / Math.max(1, m.ring.length),
+    bSd: m.bSd, starN: m.starN, starDens: m.starN / Math.max(1, m.bellyN) * 1000 };
 };
 const sampleAt = async (f) => { const m = await sample(f); const s = stats(m); return s ? s.satM : null; };
 
@@ -202,7 +243,8 @@ for (const rr of RADII) {
   console.log(`${String(rr).padStart(6)} ${m.pxR.toFixed(0).padStart(5)}`
     + `        ${s.satM.toFixed(3)}   ${s.hueM.toFixed(0).padStart(4)}deg`
     + `      ${s.whitePct.toFixed(1).padStart(5)}%      ${s.ringSat.toFixed(3)}`
-    + `     ${so ? so.satM.toFixed(3) : '  —  '}`);
+    + `    ${so ? so.satM.toFixed(3) : '  —  '}`
+    + `     ${s.bSd.toFixed(1).padStart(5)}      ${s.starDens.toFixed(1).padStart(5)}`);
 }
 // ── THE LAW ITSELF, AT THE SIZES THE PLAYER ACTUALLY SEES ──────────────────
 // One camera framing, one frame, one variable: the rim law. The owner's
