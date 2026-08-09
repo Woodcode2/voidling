@@ -263,7 +263,17 @@ const VOID_FRAG = `
     // the interior only shows through the face-on disc, and reads deepest on
     // the shaded side — which is what makes it a HOLE and not a decal
     float inside = 0.22 + 1.55 * (1.0 - smoothstep(0.10, 0.78, ud));
-    col += gal * inside * (0.85 + uStage * 0.11);
+    // ── HOW MUCH THE INTERIOR BRIGHTENS AS HE EVOLVES ─────────────────────
+    // Measured with the game's own frame loop FROZEN, so nothing but uStage
+    // moved (the same sweep taken live drifts 0.181 on a null control and is
+    // worthless — see qa notes): value climbed 0.489 at stage 0 to 0.602 at
+    // stage 6, a spread of 0.113 against a null of 0.016. That is the character
+    // getting visibly brighter as a match goes on, which is a large part of
+    // "colour is still switching throughout".
+    // Softened from 0.11 to 0.045 per stage, and the base lifted so the early
+    // forms are not dimmer than they used to be. He still gains interior as he
+    // grows — the owner asked for that — it just no longer doubles.
+    col += gal * inside * (1.02 + uStage * 0.045);
     // ── EVENT HORIZON ─────────────────────────────────────────────────────
     // rim light lives OPPOSITE the key, like a real one, and fattens with
     // both the evolution stage and how small he is on screen
@@ -290,7 +300,9 @@ const VOID_FRAG = `
     // colour much further across the disc. See the note on the brightness lift
     // below: together the two terms made him a measurably different colour at
     // the start of a match than thirty seconds later.
-    col += uRim * pow(u, 3.0) * (0.30 + uStage * 0.05)
+    // The rim carries no stage term at all now. It is the silhouette, so any
+    // change to it changes his outline colour, and uRim is a saturated violet.
+    col += uRim * pow(u, 3.0) * 0.38
          * mix(1.45, 0.72, key) * (1.0 - rimMix);
     // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
     // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
@@ -1021,7 +1033,25 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     frenzy:  { pupil: 1.35, smile: 1.42, wide: 1.05, blush: 0.85, brow: 0.85, browAng: 0.18, browY: 0.47, maw: 0.12, bounce: 1 },
     scared:  { wide: 1.16, pupil: 0.55, smile: 0.85, mouthY: -0.65, brow: 1, browAng: -0.5, browY: 0.43, sweat: 1, blush: 0.3 },
     hurt:    { lid: 0.3, mouthY: -0.8, smile: 0.8, brow: 1, browAng: -0.6, browY: 0.38, sweat: 1, blush: 0.35 },
-    smug:    { lid: 0.55, smile: 1.15, smirk: 0.2, brow: 0.7, browAng: 0.04, browY: 0.33, blush: 0.7 },
+    // ── SMUG IS THE FACE FOR EATING A SIBLING, SO IT HAD BETTER BE A WIN ──
+    // It used to be lid 0.55 — eyelids just over half shut — with a small
+    // smirk. On a drawing board that is "pleased with myself". At 47px on a
+    // phone it is DROWSY, and it is nearly the same face as sleepy below, which
+    // also leads with a low lid. The owner: "When the void eats family he has
+    // this half asleep reaction."
+    //
+    // The bigger problem is what it is attached to. onRivalEaten is the best
+    // thing that happens in this game — the only event that lifts the growth
+    // law, so it is the one moment where a child's decision changes the size
+    // they finish at. It gets 2.4 seconds of face, and it was spending them
+    // looking sleepy.
+    //
+    // Now it reads as triumph: eyes WIDE OPEN, big pupils, a real grin, blush
+    // up, and the bounce that victory uses. The smirk stays, slightly stronger,
+    // so he is gloating rather than merely happy — but nothing about it is
+    // subtle, because subtle does not survive being 47 pixels tall.
+    smug:    { lid: 0.96, pupil: 1.3, wide: 1.04, smile: 1.4, smirk: 0.26,
+               brow: 0.7, browAng: 0.16, browY: 0.45, blush: 0.9, bounce: 1 },
     // heavy level brows sitting low, a lid most of the way down, and a small
     // soft mouth — a nap, not a grin with the eyes shut
     // EYES ACTUALLY CLOSED. lid 0.26 squashed the eye to a quarter height but
