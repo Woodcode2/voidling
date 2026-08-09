@@ -3191,13 +3191,14 @@ function capture(e: Edible, giveHunger = true) {
   // 25 ceiling it pays 2.20x instead of 3.50x, cutting the score inflation that
   // put the field out of reach. The lane comes down with it, to a number the
   // family can actually earn.
-  // 0.24 -> 0.18: the combo is the ONLY lever that has moved this (47.4% ->
-  // 62.2% of lane, and the player's score 150k -> 98k, both predicted before the
-  // run). The family earns a roughly fixed ~58k from the island, so parity needs
-  // the player nearer that number. This takes the ceiling from 2.20x to 1.90x
-  // and should land the player near 82k. Combo 5 still pays 1.40x, so a child
-  // sees the reward on the same schedule.
-  const comboMult = 1 + Math.sqrt(Math.min(combo, 25)) * 0.18;
+  // 0.24 is the measured optimum: pushing to 0.18 gave 59.8% of lane (sd 14.2)
+  // against 62.2% (sd 9.2) — no gain, because the lever SATURATES. The lane is
+  // 0.94 x pScore and the band is want/score, so lowering the player lowers the
+  // family's target AND their multiplier in the same proportion. The ratio is
+  // scale-invariant and pins near 60% whatever the player scores. Only the
+  // family's RAW earning capacity is not scale-invariant, so that is where the
+  // rest of this fight has to happen.
+  const comboMult = 1 + Math.sqrt(Math.min(combo, 25)) * 0.24;
   // moving prey (people/animals/cars — tagged ptsMult 1.5) beats furniture of
   // the same size: chasing pays. Everything else stays radius-proportional.
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;

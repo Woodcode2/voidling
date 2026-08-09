@@ -1406,6 +1406,34 @@ export function createRivals(
             if (d2 > 170 * 170) continue;          // its own patch, not the whole map
             if (e.radius > pw) { pw = e.radius; pick2 = e; }
           }
+          // ── ONE PROP A TICK IS THE CEILING ON RAW EARNINGS ────────────
+          // Everything that scales with the player — the lane, the band, the
+          // player's own multiplier — cancels out of leader/lane, which is why
+          // it sat at ~60% across three different builds. What does NOT cancel
+          // is how much food a rival can physically take per second. A rival far
+          // behind its lane now clears up to three items a tick instead of one,
+          // which is the only term in this system that can move the ratio.
+          // Bounded by the same 0.98-of-lane gate as the rest of the larder, so
+          // it stops the instant the rival is level and cannot overshoot.
+          const deep = rv.score < want * 0.62 ? 3 : rv.score < want * 0.85 ? 2 : 1;
+          for (let extra = 1; extra < deep && pick2; extra++) {
+            let p3: RivalEdible | null = null, w3 = -1;
+            for (const e of edibles) {
+              if (eaten(e.mesh) || e.radius > rv.r * EAT_RATIO || e.radius < minSwallow) continue;
+              const ddx = e.mesh.position.x - rv.x, ddz = e.mesh.position.z - rv.z;
+              if (ddx * ddx + ddz * ddz > 170 * 170) continue;
+              if (e.radius > w3) { w3 = e.radius; p3 = e; }
+            }
+            if (!p3) break;
+            grazeN++;
+            p3.mesh.userData.eaten = true;
+            shrinking.push(p3.mesh);
+            rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
+            const cm3 = 1 + Math.min(rv.combo, 25) * 0.1;
+            const pm3 = (p3.mesh.userData.ptsMult as number | undefined) ?? 1;
+            rv.score += Math.max(1, Math.round(p3.radius * 12 * cm3 * pm3 * fever * band));
+            rv.r = growR(rv.r, p3.radius);
+          }
           if (pick2) {
             grazeN++;
             pick2.mesh.userData.eaten = true;
