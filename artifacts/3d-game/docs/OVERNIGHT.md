@@ -73,8 +73,35 @@ fixed point near 60%, and it will absorb anything fed into it.
 **SO THE TENTH ATTEMPT MUST CHANGE THE CONTROLLER, NOT ITS INPUTS.** Options,
 untried, in order of how much I would trust them:
 1. **Make `want` not a function of `pScore`.** Anchor lane 0 to an absolute
-   par curve for the world (what a good run scores there), so the target stops
-   fleeing. The scale-invariance dies with it. This is the one I would do.
+   par curve for the world, so the target stops fleeing. This is the one I
+   would do, AND HERE IS WHY IT IS NOT A ONE-LINE CHANGE:
+
+   `FIELD_TOP = 16000` (rivals.ts:202) is supposed to be "what first place is
+   worth in a full-length match". A real child run now scores **~98,000**. The
+   absolute par is SIX TIMES too low, which is exactly why
+   `top = min(FIELD_TOP*shape*scale, max(floor, pScore*0.94))` always resolves
+   to the player term — the absolute half of that expression never binds. The
+   player anchor is not a design choice that beat the par curve; it is the only
+   live branch.
+
+   It also explains why attempt 8 failed. Cutting the player 98k -> 82k should
+   have closed the ratio, and did not, because `want` fell with the player and
+   took the band down with it. With an ABSOLUTE want, the player-side lever
+   starts working again: the leader's target stops moving, so every point the
+   player gives up is a point of gap closed. Combo + absolute par together are
+   probably the answer; neither alone is.
+
+   WHAT IT NEEDS FIRST — do not guess these four numbers:
+   - FIELD_TOP has to become PER WORLD. The worlds are not comparable: old
+     comments in this file record an optimal Maple run at 47k while Game Day
+     clears 300k, because Game Day is dense enough that the combo never lapses.
+   - Calibrate by measuring, not by reasoning: run `qa/ab.mjs 5 <world> child`
+     and `qa/ab.mjs 5 <world> expert` on all four worlds and take par from what
+     a CHILD driver actually scores. That is eight runs, ~40 minutes.
+   - Then set lane 0's want to that par (not to pScore), keep the nominal
+     ladder as a FLOOR so a struggling child still has a field to chase, and
+     re-measure. The floor must be absolute too, or scale-invariance returns
+     through the back door.
 2. Remove the band's feedback entirely for lane 0 and give the leader a flat
    points multiplier, letting satiety alone stop the rout.
 3. Give the leader a food source the player cannot touch (its own spawn
