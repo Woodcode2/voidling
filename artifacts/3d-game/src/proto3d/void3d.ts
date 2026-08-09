@@ -114,6 +114,40 @@ const VOID_FRAG = `
   uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
   uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
   uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
+  // ── THE HERO RENDERS IN THE SAME PIPELINE AS THE TOWN, AT LAST ─────────
+  // This is a raw ShaderMaterial, so three appends nothing to it and it used to
+  // end at a bare gl_FragColor. Measured with qa/colorpipe.mjs, which pushes
+  // known sRGB values through every path:
+  //
+  //     input      MeshBasic (correct)   raw ShaderMaterial (this)
+  //     #808080    #8d8d8d               #373737
+  //     #5f2ab4    #5a18bc               #1d0674
+  //
+  // 0x80 -> linear 0.216 -> written raw -> displayed as 0x37. The character was
+  // rendering at roughly a THIRD of his authored brightness and taking no tone
+  // mapping, while every surface around him took both. That is the deepest
+  // reason hero and world never looked like they belonged together, and it is
+  // why no palette ever matched the key art: every palette this project has
+  // chosen was picked through that filter.
+  //
+  // DECLARE NOTHING. three prepends BOTH pars blocks to a non-raw
+  // ShaderMaterial — colorspace_pars always, tonemapping_pars whenever tone
+  // mapping is active — so any #include of them here is a redefinition and the
+  // fragment shader fails to compile outright. When that happens the void is
+  // simply not drawn, and a colour probe cheerfully measures the grass behind
+  // him and reports his hue as 83 degrees.
+  //
+  // Both earlier attempts at this fix died here, and the second one hid: three
+  // forces NoToneMapping while rendering INTO A RENDER TARGET, so the pars are
+  // absent on that path and present on the canvas path. Declaring them
+  // therefore compiles fine for the first few seconds and only fails once
+  // something recompiles against the canvas — which is why it passed a 3-second
+  // probe and failed qa/smoke.mjs at t=25s, with the error naming
+  // 'LinearToneMapping' : function already has a body.
+  //
+  // The two epilogue chunks below are safe on BOTH paths without any
+  // declaration: tonemapping_fragment is guarded by #if defined(TONE_MAPPING),
+  // and linearToOutputTexel is always prepended.
   uniform float uPat; uniform vec3 uPatCol; uniform float uPxR;
   // cheap hash for star specks
   float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
@@ -375,6 +409,9 @@ const VOID_FRAG = `
     // stops compiling. That is how the first version of this note broke it.)
 
     gl_FragColor = vec4(col, 1.0);
+    // ACES first, then the output encode — three's own order.
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
