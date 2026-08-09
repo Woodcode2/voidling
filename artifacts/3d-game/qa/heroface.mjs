@@ -6,20 +6,27 @@
 //   "And there's a ring around him."
 //
 // All three are colour claims, so all three are measurable and none of them
-// should be settled by looking. This boots a real match, pins the void to a
-// given radius, stubs the world to a flat mid-grey so nothing but the character
-// is in frame, and then reports what the pixels ARE:
+// should be settled by looking.
 //
-//   saturation   mean HSV S over the body disc. "Faded" is a low number.
-//   hue          mean hue in degrees. Purple is ~270; drifting toward 300+ is
-//                pink, toward 240 is indigo.
-//   white px     fraction of body pixels with S < 0.18 and V > 0.80 — the
-//                definition of "looks cheap": bright and colourless.
-//   ring         samples an annulus on the GROUND just outside the silhouette.
-//                The ground is stubbed flat, so any deviation there is furniture.
+// The first version of this file DID settle it by looking, and got it wrong in
+// the way these things are always wrong: it hunted the void by walking out from
+// the centre of the frame until the pixels stopped being a grey it had painted
+// the world with. The world did not go grey, the match had never been started
+// so the camera was still in its wide pre-match framing, the disc was never
+// found — and it printed "saturation holds at every size sampled" over ZERO
+// rows. A probe that passes on no data is worse than no probe.
 //
-// The radius matters: the shader used to widen the rim as the void got small,
-// so the fade was worst at exactly the size a match starts at. Sweep it.
+// So: start the match like a player does, then find the void by PROJECTING its
+// known world position through the camera rather than guessing where it landed,
+// and take the pixels out of a render target instead of off a WebGL canvas that
+// has already been cleared. If the disc cannot be found this exits non-zero.
+//
+//   saturation   mean HSV S over the inner body disc. "Faded" is a low number.
+//   hue          mean hue in degrees, weighted by saturation. Purple is ~270.
+//   white px     fraction of body pixels with S < 0.18 and V > 0.80 — bright
+//                AND colourless, which is what "looks cheap" measures.
+//   ring         mean saturation in a ground annulus outside the silhouette,
+//                where a violet hoop would show up against Maple's greens.
 //
 //   node qa/heroface.mjs [port] [radii]
 import { chromium } from 'playwright';
@@ -51,23 +58,14 @@ await p.evaluate(() => document.getElementById('btnPlay')?.click());
 await p.waitForTimeout(1400);
 await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="maple"]')?.click());
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
-await p.waitForTimeout(1200);
-
-// Flatten the world: every mesh that is not the void becomes an untextured
-// mid-grey, so "what colour is the hero" is not a question about what he is
-// standing on. The HUD is hidden for the same reason.
+// START IT. Without a pointer the match sits at 3:00 and the camera never drops
+// into its play framing — which is the whole regime being measured.
 await p.evaluate(() => {
-  const THREE = window.__THREE, sc = window.__scene;
-  const keep = new Set();
-  sc.traverse((o) => { if (/void|face|eye|mouth|body|contact|rings/i.test(o.name)) keep.add(o); });
-  const grey = new THREE.MeshBasicMaterial({ color: 0x8a8a8a });
-  sc.traverse((o) => {
-    if (!o.isMesh || keep.has(o)) return;
-    const inVoid = (() => { for (let n = o; n; n = n.parent) if (keep.has(n)) return true; return false; })();
-    if (!inVoid && !/void/i.test(o.name)) o.material = grey;
-  });
-  document.querySelectorAll('.hud,#hud,#top,#growth,#banner,#chat,#news').forEach((e) => (e.style.display = 'none'));
+  const cv = document.querySelector('canvas');
+  cv.dispatchEvent(new PointerEvent('pointerdown', {
+    pointerId: 1, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true }));
 });
+await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 2.5, null, { timeout: 400000 });
 
 const rgb2hsv = (r, g, bl) => {
   r /= 255; g /= 255; bl /= 255;
@@ -82,77 +80,169 @@ const rgb2hsv = (r, g, bl) => {
   return [h, mx ? d / mx : 0, mx];
 };
 
-console.log('  r     px    saturation   hue     white px   ring delta');
+console.log('    r    pxR    saturation    hue      white px    ring sat    OLD rim stop');
 const rows = [];
-for (const r of RADII) {
-  await p.evaluate((rr) => window.__setVoidR?.(rr), r);
-  await p.waitForTimeout(700);
-  const shot = await p.screenshot();
-  writeFileSync(`${OUT}/r${r}.png`, shot);
-  // read the framebuffer through a canvas the page can sample
-  const m = await p.evaluate(() => {
-    const cv = document.querySelector('canvas');
-    const w = cv.width, h = cv.height;
-    const c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
-    const g = c2.getContext('2d'); g.drawImage(cv, 0, 0);
-    const d = g.getImageData(0, 0, w, h).data;
-    // the void is centred by the follow camera; find its disc by walking out
-    // from the centre until the pixels stop differing from the flat grey
-    const cx = (w / 2) | 0, cy = (h / 2) | 0;
-    const at = (x, y) => { const i = ((y * w) + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-    const isGrey = ([r, g2, b2]) => Math.abs(r - 138) < 26 && Math.abs(g2 - 138) < 26 && Math.abs(b2 - 138) < 26;
-    let rad = 0;
-    for (let x = 0; x < w / 2; x++) { if (isGrey(at(cx + x, cy))) { rad = x; break; } }
+const sample = (forceOld) => p.evaluate((forceOld) => {
+    const THREE = window.__THREE, ren = window.__renderer, sc = window.__scene, cam = window.__cam;
+    const vs = window.__voidState();
+    // where is he, in pixels? Project his centre and derive his on-screen
+    // radius the same way the shader does, so the sample is his BODY and not
+    // whatever happens to be behind him.
+    const wp = new THREE.Vector3(vs.x, vs.r, vs.z);
+    const sp = wp.clone().project(cam);
+    const dpr = ren.getPixelRatio();
+    const W = Math.floor(ren.domElement.width), H = Math.floor(ren.domElement.height);
+    const cx = (sp.x * 0.5 + 0.5) * W, cy = (1 - (sp.y * 0.5 + 0.5)) * H;
+    const camD = Math.max(1, cam.position.distanceTo(wp));
+    const pxR = (window.innerHeight / (2 * camD * Math.tan(cam.fov * Math.PI / 360))) * vs.r * dpr;
+    // ── THE CONTROL ────────────────────────────────────────────────────────
+    // Proving the number is good is not the same as proving the change caused
+    // it. The shader derives its rim stop as clamp(1 - 2/uPxR, 0.62, 0.88), and
+    // the OLD code derived it as mix(0.86, 0.50, small) with
+    // small = clamp((64 - pxRcss)/40, 0, 1). So the old stop can be reproduced
+    // EXACTLY on this same build and this same frame by feeding uPxR the value
+    // that solves 1 - 2/uPxR = oldStop. Same geometry, same lighting, same
+    // ground, one variable.
+    // Patch EVERY material carrying uPxR, not the first one found: the rivals
+    // wear the same shader and are in the same scene, so "the first match" was
+    // patching a sibling and reporting that the change did nothing.
+    // forceOld is either null (leave the shader alone) or a CSS pixel radius to
+    // simulate. Simulating matters because the camera frames the hero at a
+    // roughly constant size in play, so the regime the owner reported — a void
+    // only ~28 CSS px across the radius — cannot be reached just by shrinking
+    // him. Feeding uPxR directly reproduces either law at any size.
+    const restore = [];
+    if (forceOld) {
+      const { cssR, law } = forceOld;
+      let fake;
+      if (law === 'old') {
+        const small = Math.min(1, Math.max(0, (64 - cssR) / 40));
+        const oldStop = 0.86 + (0.50 - 0.86) * small;
+        fake = 2 / Math.max(0.001, 1 - oldStop);
+      } else {
+        fake = cssR * dpr;                    // the new law, at that size
+      }
+      sc.traverse((o) => {
+        const mt = o.material;
+        if (mt && mt.uniforms && mt.uniforms.uPxR) {
+          restore.push({ m: mt, v: mt.uniforms.uPxR.value });
+          mt.uniforms.uPxR.value = fake;
+        }
+      });
+    }
+    // read the frame out of a render target: the drawing buffer itself is not
+    // preserved, so drawImage off the canvas comes back blank or stale.
+    const rt = new THREE.WebGLRenderTarget(W, H);
+    const prev = ren.getRenderTarget();
+    ren.setRenderTarget(rt); ren.render(sc, cam);
+    const buf = new Uint8Array(W * H * 4);
+    ren.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+    ren.setRenderTarget(prev); rt.dispose();
+    for (const r of restore) r.m.uniforms.uPxR.value = r.v;
+    // readRenderTargetPixels is bottom-up
+    const at = (x, y) => { const yy = H - 1 - y; const i = ((yy * W) + x) * 4; return [buf[i], buf[i + 1], buf[i + 2]]; };
     const body = [], ring = [];
-    for (let y = cy - rad; y <= cy + rad; y++) {
-      for (let x = cx - rad; x <= cx + rad; x++) {
-        if (x < 0 || y < 0 || x >= w || y >= h) continue;
-        const dd = Math.hypot(x - cx, y - cy);
-        if (dd < rad * 0.82) body.push(at(x, y));
+    const R = Math.max(2, pxR);
+    for (let y = Math.round(cy - R); y <= cy + R; y++) {
+      for (let x = Math.round(cx - R); x <= cx + R; x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const d = Math.hypot(x - cx, y - cy);
+        // THE WHOLE DISC, not the inner 72%. An earlier version sampled inside
+        // the silhouette to get "the body colour" and thereby excluded the
+        // exact annulus the rim law governs — it reported a 2% difference
+        // between the old law and the new one and would have talked me out of
+        // a fix that is plainly visible. What the owner sees is the whole ball.
+        if (d < R * 0.97) body.push(at(x, y));
       }
     }
-    // the ground annulus just outside the silhouette, sampled BELOW him where
-    // the ground actually is (the camera looks down at ~46 degrees)
-    for (let a = 0; a < 360; a += 3) {
-      for (const k of [1.25, 1.45, 1.7]) {
-        const x = Math.round(cx + Math.cos(a * Math.PI / 180) * rad * k);
-        const y = Math.round(cy + Math.sin(a * Math.PI / 180) * rad * k * 0.62 + rad * 0.5);
-        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+    // the ground just outside him, below the waist where the floor actually is
+    for (let a = 0; a < 360; a += 4) {
+      for (const k of [1.2, 1.4, 1.6]) {
+        const x = Math.round(cx + Math.cos(a * Math.PI / 180) * R * k);
+        const y = Math.round(cy + Math.sin(a * Math.PI / 180) * R * k * 0.6 + R * 0.55);
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
         ring.push(at(x, y));
       }
     }
-    return { rad, body, ring, w, h };
-  });
-  if (!m.rad) { console.log(`  ${r}  — could not find the disc`); continue; }
-  let sS = 0, sH = 0, nW = 0, sx = 0, sy = 0;
+    return { cx, cy, pxR, W, H, body, ring, r: vs.r };
+}, forceOld);
+
+const stats = (m) => {
+  if (!m.body.length) return null;
+  let sS = 0, nW = 0, sx = 0, sy = 0;
   for (const px of m.body) {
     const [h, s, v] = rgb2hsv(px[0], px[1], px[2]);
     sS += s; sx += Math.cos(h * Math.PI / 180) * s; sy += Math.sin(h * Math.PI / 180) * s;
     if (s < 0.18 && v > 0.80) nW++;
   }
-  const n = Math.max(1, m.body.length);
-  const satM = sS / n;
+  const n = m.body.length;
   let hueM = Math.atan2(sy, sx) * 180 / Math.PI; if (hueM < 0) hueM += 360;
-  const whitePct = nW / n * 100;
-  // how far the ground annulus deviates from the flat grey it was stubbed to
-  let dev = 0;
-  for (const px of m.ring) dev += (Math.abs(px[0] - 138) + Math.abs(px[1] - 138) + Math.abs(px[2] - 138)) / 3;
-  const ringDev = dev / Math.max(1, m.ring.length);
-  rows.push({ r, rad: m.rad, satM, hueM, whitePct, ringDev });
-  console.log(`${String(r).padStart(5)} ${String(m.rad).padStart(6)}`
-    + `      ${satM.toFixed(3)}   ${hueM.toFixed(0).padStart(4)}deg`
-    + `    ${whitePct.toFixed(1).padStart(5)}%      ${ringDev.toFixed(1).padStart(5)}`);
+  let rs = 0;
+  for (const px of m.ring) rs += rgb2hsv(px[0], px[1], px[2])[1];
+  return { satM: sS / n, hueM, whitePct: nW / n * 100, ringSat: rs / Math.max(1, m.ring.length) };
+};
+const sampleAt = async (f) => { const m = await sample(f); const s = stats(m); return s ? s.satM : null; };
+
+for (const rr of RADII) {
+  await p.evaluate((v) => window.__setVoidR(v), rr);
+  // 2.2s, not 0.9: jumping the radius fires the EVOLUTION BURST, and its torus
+  // sits at 1.42x the body. The first read of this probe caught that ring and
+  // very nearly had me hunting a bug that a player never sees — in normal play
+  // those materials measure opacity 0.
+  await p.waitForTimeout(2200);
+  const m = await sample(null);
+  const old = await sample({ cssR: m.pxR / 2, law: 'old' });   // same frame, old law
+  const half = Math.max(60, m.pxR * 2.2);
+  await p.screenshot({ path: `${OUT}/r${rr}.png`, clip: {
+    x: Math.max(0, m.cx / 2 - half / 2), y: Math.max(0, m.cy / 2 - half / 2),
+    width: Math.min(430, half), height: Math.min(932, half) } });
+  const s = stats(m), so = stats(old);
+  if (!s) { console.log(`  r=${rr}  DISC NOT FOUND (px ${m.cx.toFixed(0)},${m.cy.toFixed(0)})`); continue; }
+  rows.push({ rr, pxR: m.pxR, ...s, oldSat: so ? so.satM : null });
+  console.log(`${String(rr).padStart(6)} ${m.pxR.toFixed(0).padStart(5)}`
+    + `        ${s.satM.toFixed(3)}   ${s.hueM.toFixed(0).padStart(4)}deg`
+    + `      ${s.whitePct.toFixed(1).padStart(5)}%      ${s.ringSat.toFixed(3)}`
+    + `     ${so ? so.satM.toFixed(3) : '  —  '}`);
+}
+// ── THE LAW ITSELF, AT THE SIZES THE PLAYER ACTUALLY SEES ──────────────────
+// One camera framing, one frame, one variable: the rim law. The owner's
+// screenshot was a void about 28 CSS px in radius, which the follow camera
+// never produces in this probe, so it is fed to the shader directly.
+await p.evaluate(() => window.__setVoidR(6));
+await p.waitForTimeout(2200);
+console.log('\n══ THE RIM LAW, SWEPT BY ON-SCREEN SIZE (same frame, same everything else)');
+console.log('  cssR     OLD sat    NEW sat    delta      old stop  new stop');
+const sweep = [];
+for (const cssR of [20, 28, 40, 52, 80]) {
+  const a = await p.evaluate((c) => {
+    const s = Math.min(1, Math.max(0, (64 - c) / 40));
+    return 0.86 + (0.50 - 0.86) * s;
+  }, cssR);
+  const nStop = Math.min(0.88, Math.max(0.62, 1 - 2 / (cssR * 2)));
+  const mo = await sampleAt({ cssR, law: 'old' });
+  const mn = await sampleAt({ cssR, law: 'new' });
+  if (!mo || !mn) continue;
+  sweep.push({ cssR, o: mo, n: mn });
+  console.log(`${String(cssR).padStart(6)}      ${mo.toFixed(3)}      ${mn.toFixed(3)}`
+    + `    ${(mn - mo >= 0 ? '+' : '') + (mn - mo).toFixed(3)}       ${a.toFixed(3)}     ${nStop.toFixed(3)}`);
 }
 
-console.log('\n══ READ IT LIKE THIS');
-console.log('  saturation  the default body is 0x5f2ab4, S = 0.77. Anything under');
-console.log('              ~0.45 averaged over the disc is the "faded" the owner saw.');
-console.log('  hue         purple is ~270deg. 285+ is drifting pink/lavender.');
-console.log('  white px    bright AND colourless. This is what "looks cheap" measures.');
-console.log('  ring delta  the ground is stubbed flat grey, so anything above ~6 is');
-console.log('              furniture drawn around him rather than the ground itself.');
-const bad = rows.filter((x) => x.satM < 0.45);
-if (bad.length) console.log(`\n  FADED at r = ${bad.map((x) => x.r).join(', ')}`);
-else console.log('\n  saturation holds at every size sampled.');
-console.log(`  frames in ${OUT}/`);
 await b.close();
+
+if (!rows.length) {
+  console.log('\nFAIL — the void was never found at any radius. Nothing was measured.');
+  process.exit(1);
+}
+console.log('\n══ READ IT LIKE THIS');
+console.log('  saturation  bodyMid 0x5f2ab4 is S = 0.77 and bodyRim 0xcb99ff is S = 0.40.');
+console.log('              The disc is a blend, so the bar is ~0.45: under that and the');
+console.log('              rim has eaten the body, which is the "faded" that was reported.');
+console.log('  hue         purple is ~270deg. Drifting past ~285 is lavender/pink.');
+console.log('  white px    bright AND colourless. This is what "cheap" measures.');
+console.log('  ring sat    Maple\'s ground is green; a violet hoop raises this.');
+const faded = rows.filter((x) => x.satM < 0.45);
+console.log(faded.length
+  ? `\nFADED at r = ${faded.map((x) => x.rr).join(', ')}`
+  : '\nPASS — saturation holds at every size sampled.');
+console.log(`  frames in ${OUT}/`);
+process.exit(faded.length ? 1 : 0);

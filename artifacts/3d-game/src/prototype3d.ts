@@ -203,7 +203,7 @@ setWorld(pickedWorld);
 const WORLD_PAR: Record<string, number> = {
   maple: 94000,      // child mean 110,983 over 5 (sd 22,014)
   pirate: 94000,     // provisional — shares Maple's density until measured
-  gameday: 185000,   // child mean 216,141 over 4 (sd 40,600)
+  gameday: 175000,   // child mean 205,299 over 5 (sd 43,856)
   lantern: 94000,    // provisional — until measured
 };
 
