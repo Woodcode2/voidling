@@ -864,10 +864,24 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // contrast internally (0x2a0e2e against 0xff6f91), so it cannot be defeated
     // by a skin the way routing against the body could — which is what left
     // Classic's smile at 1.01:1 and invisible.
-    const inner = new THREE.Mesh(new THREE.CircleGeometry(0.108, 28),
+    // ── AND THE INNER IS A HALF-DISC, NOT A FULL CIRCLE ───────────────────
+    // The first version made this a full CircleGeometry, and the owner caught
+    // it immediately: "the pink overlaps the smile". The arithmetic agrees. The
+    // lip is a HALF disc — CircleGeometry(r, 40, 0, PI) — so after its scale it
+    // spans local y from 0 to 0.135. A full circle centred at y 0.052 with a
+    // half-height of 0.067 spans -0.015 to 0.119, and that -0.015 is outside
+    // the lip altogether: a sliver of pink sitting above the top edge of the
+    // mouth, unattached to anything.
+    //
+    // Matching the lip's own geometry makes the containment structural instead
+    // of arithmetic — a half-disc nested inside a half-disc cannot spill past
+    // the flat edge no matter what either one is scaled to later. The small
+    // downward offset leaves a dark band along the top, so the upper lip reads
+    // as an edge rather than the pink running straight into the face.
+    const inner = new THREE.Mesh(new THREE.CircleGeometry(0.108, 28, 0, Math.PI),
       new THREE.MeshBasicMaterial({ color: MOUTH_IN, depthWrite: false }));
-    inner.scale.set(1.22, 0.62, 1);
-    inner.position.set(0, 0.052, 0.004);
+    inner.scale.set(1.15, 0.62, 1);
+    inner.position.set(0, 0.022, 0.004);
     inner.renderOrder = 1;
     // WIDER AND SHALLOWER, his call: a broad grin rather than a small round
     // one. The lip is a semicircle, so stretching x and squashing y turns a
