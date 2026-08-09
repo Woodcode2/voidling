@@ -37,19 +37,51 @@ serves that.
 ## PRIORITY ORDER
 
 ### 1. THE MATCH MUST BE A CONTEST  (the only structural gap)
-A driver picking a random heading every 2s won 2/2 and outscored a perfect
-player. Five attempts so far; the fifth (band authority, `off*off` past the
-setpoint) is in flight.
 
-- Verify with `node qa/ab.mjs 5 maple child 4173`. Prior honest baseline:
-  **leader/lane 47.4% ± 6.2, player wins 5/5.**
-- Target: leader 85-110% of lane, player place mean ~1.3, worst place ≤ 3
-  (owner's floor: never below 3rd).
-- If the band change lands inside one sd, the next lever is **the player's
-  combo multiplier** — 1 + min(combo,25)*0.1 = 3.5x that never lapses on a
-  dense map is why a 3-minute run scores 150,000. Curve it or decay it.
-- Also worth testing: fewer rivals. Five siblings split one island; three
-  competitors that each matter may beat five that cannot.
+**NINE ATTEMPTS, AND THE MAP IS NOW CLEAR. READ THIS BEFORE TRYING A TENTH.**
+
+Measured, `qa/ab.mjs`, 5 matches each, maple/child:
+
+| attempt | lever | leader/lane | verdict |
+|---|---|---|---|
+| baseline | — | 47.4% sd 6.2 | player wins 5/5 |
+| 1-3 (pre-existing) | raise band ceiling | — | failed, documented in rivals.ts |
+| 4 | rival size cap 0.78 -> 0.88 | worse | ALSO broke eating rivals (0.88 > 1/1.2) |
+| 5 | crumb floor 0.45r -> 0.18r (larder) | inside noise | real finding, kept |
+| 6 | band squared past setpoint | 41.8% sd 11.4 | failed |
+| **7** | **player combo sub-linear** | **62.2% sd 9.2** | **WORKED — kept, 0.24 is optimum** |
+| 8 | combo pushed to 0.18 | 59.8% sd 14.2 | saturated |
+| 8b | field 3-5 -> 3 rivals | 53.5% sd 16.2 | failed, DOUBLED variance |
+| 9 | larder takes 3 items/tick | 61.1% sd 10.1 | failed (bites +3.7pp, score flat) |
+
+**THE REASON THEY ALL FAIL.** `leader/lane` is SCALE-INVARIANT. The lane is
+`0.94 x pScore` and the band is `want/score`, so any change that scales the
+player, the target, or a rival's earnings gets cancelled by the band's own
+negative feedback. Attempt 9 is the proof: the family ate measurably MORE
+(36.7% -> 40.4% of all bites) and scored exactly the same, because earning more
+drops `off`, which drops the multiplier, which drops points per bite.
+
+The band is not a broken corrective. It is a controller holding the ratio at a
+fixed point near 60%, and it will absorb anything fed into it.
+
+**SO THE TENTH ATTEMPT MUST CHANGE THE CONTROLLER, NOT ITS INPUTS.** Options,
+untried, in order of how much I would trust them:
+1. **Make `want` not a function of `pScore`.** Anchor lane 0 to an absolute
+   par curve for the world (what a good run scores there), so the target stops
+   fleeing. The scale-invariance dies with it. This is the one I would do.
+2. Remove the band's feedback entirely for lane 0 and give the leader a flat
+   points multiplier, letting satiety alone stop the rout.
+3. Give the leader a food source the player cannot touch (its own spawn
+   stream), so its earnings are not a share of a pool the player is draining.
+
+Do NOT try: another ceiling, another exponent, another size cap, another field
+size, or another cut to the player's multipliers. Nine runs say the controller
+eats all of them.
+
+Verify any attempt with `node qa/ab.mjs 5 maple child 4173`.
+TARGET: leader 85-110% of lane, player place mean ~1.3, worst place <= 3
+(owner's floor: never finish below 3rd).
+WHERE IT STANDS: 62.2% of lane, player still wins 5/5.
 
 ### 2. VISUAL — "breathtaking from every ground pixel"
 The shop already renders at native resolution filling 86% of frame. The WORLD
