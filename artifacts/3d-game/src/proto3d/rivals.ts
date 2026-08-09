@@ -11,7 +11,13 @@ export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 // live match context the family needs to race the player fairly: the clock
 // length, the player's score (the rubber band reads it) and the shared HAPPY
 // HOUR multiplier (the family eats the bake sale too).
-export interface RivalCtx { matchLen: number; playerScore: number; fever: number; }
+// `par` is what FIRST PLACE is worth in a full-length match ON THIS WORLD, as
+// an ABSOLUTE score. It has to come from the caller because the worlds are not
+// comparable: measured child runs finish around 104k on Maple Falls and 230k on
+// Game Day, because Game Day is dense enough that the combo multiplier never
+// lapses. A single global constant is what made the ladder decorative — see
+// laneWant.
+export interface RivalCtx { matchLen: number; playerScore: number; fever: number; par?: number; }
 // what a rival COSTS you when it catches you — the HUD reports both halves
 export interface RivalHit { shrink: number; steal: number; hunter: boolean; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean;
@@ -199,7 +205,12 @@ const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.025;
 // WOBBLES, GLITZ, GLITZ — so the variety lives in the cast while the
 // difficulty stays learnable, which is the whole point.
 const LANE_FINAL = [1.00, 0.68, 0.46, 0.31, 0.20];   // fractions of the top lane
-const FIELD_TOP = 16000;        // what first place is worth in a full-length match
+const FIELD_TOP = 16000;        // LEGACY fallback only — see laneWant and PAR below
+// How far above the player the whole field may ever be anchored. This is the
+// owner's "never finish below 3rd" floor expressed as a number: at 1.15, lane 1
+// tops out at 0.94 x the player even after satiety, so the leader is the only
+// rival that can beat them.
+const PLAYER_CEIL = 1.15;
 const FIELD_CURVE = 1.45;       // eating accelerates: the ladder rises the same way
 const FULL_AT = 1.20;           // stop foraging this far past the lane…
 const HUNGRY_AT = 0.95;         // …and start again when the lane catches up
@@ -358,6 +369,10 @@ export function createRivals(
     visitT: number; visiting: boolean; dyingT: number; hx: number; hz: number; panic: number;
     // scoring, on the player's own terms
     combo: number; comboT: number;
+    // raw points this rival has earned BEFORE the lane multiplier — the plant
+    // gain the controller below divides by. Without it the band is guessing at
+    // how rich a world is; with it, it measures.
+    raw: number;
     // BULLY: the charge state machine (0 prowl, 1 wind-up, 2 lunge, 3 recover)
     cst: number; ctim: number; missPend: boolean; missCd: number; stolen: number; stuffedSaid: boolean; stuffCap: number;
     // SHOWOFF: the radius of the landmark it is currently crossing the map for
@@ -409,7 +424,7 @@ export function createRivals(
       lane: FIRST_LANE[nm] ?? i, dry: 0, full: false,
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
       visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
-      combo: 0, comboT: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
+      combo: 0, comboT: 0, raw: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
       stolen: 0, stuffedSaid: false, stuffCap: 0, lockR: 0,
       campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0,
       roll: new THREE.Quaternion(),
@@ -505,9 +520,38 @@ export function createRivals(
    * keep earning first place instead of lapping a frozen field. It is a nudge
    * with a hard ceiling, not the old lottery.
    */
-  const laneWant = (lane: number, t: number, matchLen: number, pScore: number): number => {
+  const laneWant = (lane: number, t: number, matchLen: number, pScore: number, absPar?: number): number => {
     const prog = THREE.MathUtils.clamp(t / Math.max(1, matchLen), 0, 1);
     const shape = Math.pow(prog, FIELD_CURVE);
+    // ── THE TARGET STOPS FLEEING ──────────────────────────────────────────
+    // Everything below this block is the OLD ladder and is kept only as the
+    // fallback for a caller that has not supplied a par. Read the block in
+    // laneWant's docstring and docs/OVERNIGHT.md first: nine tuning attempts
+    // failed because `top` was a function of pScore on BOTH branches, so the
+    // whole thing was scale-invariant and any lever aimed at the player was
+    // cancelled by the target moving with them.
+    //
+    // Worked out at full time (shape = 1) with a measured child run at 98k:
+    //   branch A = FIELD_TOP * scale  = 9920 + 6080 * (pScore/7360)^0.88
+    //   branch B = 0.94 * pScore
+    // A binds, and A is very nearly proportional to pScore^0.88 — so cutting
+    // the player 98k -> 82k moved leader/player from 0.706 to 0.739. Three
+    // percentage points, against a measurement noise of nine. That is the whole
+    // story of attempt 8.
+    //
+    // With an absolute par the player-side lever starts working again, because
+    // every point the player gives up is a point of gap closed rather than a
+    // point the target also gives up.
+    //
+    // The player CEILING is what keeps the owner's floor ("never finish below
+    // 3rd"). Lane 1 wants 0.68 of the top and satiety lets it overshoot to
+    // 1.2x, so its best case is 0.816 x top; at a ceiling of 1.15 x pScore that
+    // is 0.94 x the player, i.e. lane 1 structurally cannot beat them. Only the
+    // leader can, so a bad run finishes 2nd and a good one finishes 1st.
+    if (absPar && absPar > 0) {
+      const top = Math.min(absPar * shape, pScore * PLAYER_CEIL);
+      return top * (LANE_FINAL[lane] ?? 0.14);
+    }
     // par: what a player keeping level with third place would be carrying now
     const par = Math.max(200, FIELD_TOP * LANE_FINAL[2] * shape);
     // THE CEILING WAS THE WHOLE PROBLEM. Clamped at 1.35, first place could
@@ -591,7 +635,7 @@ export function createRivals(
         rv.r = START_R; rv.score = 0; rv.vx = 0; rv.vz = 0;
         rv.joined = false; rv.respawnT = 0; rv.biteCd = 0; rv.stall = 0; rv.pulse = 0;
         rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
-        rv.combo = 0; rv.comboT = 0; rv.cst = 0; rv.ctim = rand(6, 10);
+        rv.combo = 0; rv.comboT = 0; rv.raw = 0; rv.cst = 0; rv.ctim = rand(6, 10);
         rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false; rv.stuffCap = 0;
         rv.lockR = 0; rv.tgt = null; rv.dry = 0; rv.full = false;
         rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
@@ -620,6 +664,7 @@ export function createRivals(
       const matchLen = ctx?.matchLen ?? 180;
       const pScore = ctx?.playerScore ?? 0;
       const fever = ctx?.fever ?? 1;
+      const par = ctx?.par;
       // ── THE HUNT WINDOW ─────────────────────────────────────────────────
       // CHOMPZILLA is a genuine predator for the first 55% of the match — she
       // spawns near you at 1.5x your size and charges. After that she is
@@ -644,13 +689,14 @@ export function createRivals(
       //
       // AND THE REST OF ITS INPUTS, which is what was missing. The rivals wear
       // the hero's body (makeVoidBody) but only two of its seven per-frame
-      // uniforms were ever written, so every sibling sat at uSmall 0, uStage 0,
-      // uSlow 1 while the hero moved through 0.6, 1.25 and the rest. uSmall is
-      // the readability law — it is what widens the rim when a void is only a
-      // few dozen pixels across — so a small rival, which is exactly when a
-      // child most needs to see one coming, rendered with the narrow lip meant
-      // for a WORLD ENDER filling the screen. uSlow is the mass law: without it
-      // a five-unit rival vibrates at the speed a marble does.
+      // uniforms were ever written, so every sibling sat at uPxR's default,
+      // uStage 0, uSlow 1 while the hero moved through 0.6, 1.25 and the rest.
+      // uPxR is the readability law — the shader derives the rim's width from
+      // it so the lit lip never drops below about two pixels — so a small
+      // rival, which is exactly when a child most needs to see one coming,
+      // rendered with the narrow lip meant for a WORLD ENDER filling the
+      // screen. uSlow is the mass law: without it a five-unit rival vibrates at
+      // the speed a marble does.
       //
       // Read off rv.body, not a parallel array. rivalMats aligns with roster
       // today only because both are pushed in the same forEach, and that is the
@@ -667,7 +713,7 @@ export function createRivals(
         u.uSlow.value = Math.min(1.25, Math.max(0.36, 1.25 / (0.6 + rv.r * 0.28)));
         const camD = Math.max(1, camera.position.distanceTo(rv.group.position));
         const pxR = (halfH / (camD * Math.tan(fovR))) * rv.r;
-        u.uSmall.value = Math.min(1, Math.max(0, (64 - pxR) / 40));
+        u.uPxR.value = pxR;
       }
       // rival-eaten props spiral down and shrink — cause and effect a kid can
       // SEE (they used to vanish in one frame, reading as a rendering bug)
@@ -1262,11 +1308,47 @@ export function createRivals(
         // by now, and a bounded correction toward it. The old rubber band read
         // the gap to the PLAYER, which kept the race close on average and did
         // nothing at all about the field's own wild internal spread.
-        const want = laneWant(rv.lane, _t, matchLen, pScore);
+        const want = laneWant(rv.lane, _t, matchLen, pScore, par);
         // >1 means behind the lane. The square root makes the correction firm
         // without being a teleport: a quarter of the way to target eats at 2x,
         // four times past it eats at half.
-        const off = want / Math.max(120, rv.score);
+        // ── WHY THIS IS NO LONGER want/score ──────────────────────────────
+        // Ten attempts are recorded above and in docs/OVERNIGHT.md. Nine of
+        // them changed an INPUT to this controller — the target, the food, the
+        // field size, the player's own multipliers — and every one was absorbed,
+        // because `band = want/score` is proportional control and proportional
+        // control has a fixed point it returns to no matter what you feed it.
+        // Measured: the leader sat at 47% of its lane while the band read 1.68,
+        // i.e. the shortfall and the correction were the SAME number. That is
+        // the textbook signature of steady-state error, and you cannot tune it
+        // away — a P controller with a throttled plant converges BELOW setpoint
+        // by exactly the amount the throttle costs. Squaring past the setpoint
+        // (the previous line here) only changed the exponent of the fixed
+        // point: score settles at want^(2/3) instead of want^(1/2). Still short,
+        // just short differently.
+        //
+        // So this is a different controller, not a better-tuned one. Instead of
+        // asking "how far below the lane am I?" it asks "at the rate I am
+        // actually earning, what multiplier puts me on the lane H seconds from
+        // now?" — feedforward against a measured plant gain. It has no
+        // steady-state error by construction: if the rival is on pace the
+        // answer is 1.0, and if it is behind, the answer is exactly the number
+        // that closes the gap rather than a number proportional to it.
+        //
+        // rv.raw is the plant gain, measured rather than assumed: the points
+        // this rival earned BEFORE any multiplier. That is what makes it work
+        // on both MAPLE FALLS and GAME DAY, whose prop densities differ by
+        // roughly a factor of nine — the controller reads the world it is in.
+        const LOOK = 12;                                   // seconds of look-ahead
+        const tA = Math.min(matchLen, _t + LOOK);
+        const dtA = Math.max(1, tA - _t);
+        const wantA = laneWant(rv.lane, tA, matchLen, pScore, par);
+        // observed raw earning rate. The 6s floor on elapsed stops the opening
+        // seconds — when a rival has eaten one prop and `elapsed` is 0.4 — from
+        // reading as an enormous rate and pinning the band at its floor.
+        const rawRate = rv.raw / Math.max(6, _t);
+        const need = Math.max(0, wantA - rv.score) / dtA;
+        const off = need / Math.max(1, rawRate);
         // …and raising the target alone would have changed nothing, because
         // this is what actually gets them there. A rival's score is EARNED, one
         // prop at a time, multiplied by this band — and at a ceiling of 2.4 they
@@ -1319,7 +1401,14 @@ export function createRivals(
         // 0.94 x 1.2 = 1.128, so the best possible rival finishes at 113% of a
         // player who is playing — beatable by anyone paying attention, and
         // genuinely lost by anyone who is not. Which is the whole point.
-        const band = THREE.MathUtils.clamp(off <= 1 ? off : off * off, 0.50, 24);
+        // `off` is now already the multiplier the plan calls for, so it is used
+        // straight. No exponent: shaping it was the old controller's way of
+        // buying authority it structurally could not have, and this one does
+        // not need to. The clamp stays as a sanity rail in both directions —
+        // 0.5 so a rival ahead of its lane is still throttled rather than
+        // frozen, 24 so a rival that has eaten nothing for a long stretch does
+        // not cash a single hedge for a five-figure number.
+        const band = THREE.MathUtils.clamp(off, 0.50, 24);
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;
@@ -1413,7 +1502,9 @@ export function createRivals(
             rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
             const cm = 1 + Math.min(rv.combo, 25) * 0.1;
             const pm = (pick2.mesh.userData.ptsMult as number | undefined) ?? 1;
-            rv.score += Math.max(1, Math.round(pick2.radius * 12 * cm * pm * fever * band));
+            const raw2 = pick2.radius * 12 * cm * pm * fever;
+            rv.raw += raw2;
+            rv.score += Math.max(1, Math.round(raw2 * band));
             rv.r = growR(rv.r, pick2.radius);
           }
         }
@@ -1426,7 +1517,9 @@ export function createRivals(
             rv.combo++; rv.comboT = RIVAL_COMBO_HOLD; rv.dry = 0;
             const comboMult = 1 + Math.min(rv.combo, 25) * 0.1;
             const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
-            rv.score += Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * fever * band));
+            const raw1 = e.radius * 12 * comboMult * preyMult * fever;
+            rv.raw += raw1;
+            rv.score += Math.max(1, Math.round(raw1 * band));
             rv.r = growR(rv.r, e.radius);
             rv.pulse = 1;   // visible gulp — the family EATS, not just exists
             const bm2 = rv.body.material as THREE.ShaderMaterial | undefined;

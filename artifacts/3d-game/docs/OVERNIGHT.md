@@ -70,46 +70,67 @@ drops `off`, which drops the multiplier, which drops points per bite.
 The band is not a broken corrective. It is a controller holding the ratio at a
 fixed point near 60%, and it will absorb anything fed into it.
 
-**SO THE TENTH ATTEMPT MUST CHANGE THE CONTROLLER, NOT ITS INPUTS.** Options,
-untried, in order of how much I would trust them:
-1. **Make `want` not a function of `pScore`.** Anchor lane 0 to an absolute
-   par curve for the world, so the target stops fleeing. This is the one I
-   would do, AND HERE IS WHY IT IS NOT A ONE-LINE CHANGE:
+**SO THE TENTH ATTEMPT MUST CHANGE THE CONTROLLER, NOT ITS INPUTS.**
 
-   `FIELD_TOP = 16000` (rivals.ts:202) is supposed to be "what first place is
-   worth in a full-length match". A real child run now scores **~98,000**. The
-   absolute par is SIX TIMES too low, which is exactly why
-   `top = min(FIELD_TOP*shape*scale, max(floor, pScore*0.94))` always resolves
-   to the player term — the absolute half of that expression never binds. The
-   player anchor is not a design choice that beat the par curve; it is the only
-   live branch.
+### CORRECTION to what an earlier pass recorded here
 
-   It also explains why attempt 8 failed. Cutting the player 98k -> 82k should
-   have closed the ratio, and did not, because `want` fell with the player and
-   took the band down with it. With an ABSOLUTE want, the player-side lever
-   starts working again: the leader's target stops moving, so every point the
-   player gives up is a point of gap closed. Combo + absolute par together are
-   probably the answer; neither alone is.
+An earlier note in this file claimed the absolute half of
+`top = min(FIELD_TOP*shape*scale, max(floor, pScore*0.94))` "never binds". That
+is wrong, and the arithmetic is worth keeping because the real answer is
+sharper. At full time (`shape = 1`) with a child run at 98,000:
 
-   WHAT IT NEEDS FIRST — do not guess these four numbers:
-   - FIELD_TOP has to become PER WORLD. The worlds are not comparable: old
-     comments in this file record an optimal Maple run at 47k while Game Day
-     clears 300k, because Game Day is dense enough that the combo never lapses.
-   - Calibrate by measuring, not by reasoning: run `qa/ab.mjs 5 <world> child`
-     and `qa/ab.mjs 5 <world> expert` on all four worlds and take par from what
-     a CHILD driver actually scores. That is eight runs, ~40 minutes.
-   - Then set lane 0's want to that par (not to pScore), keep the nominal
-     ladder as a FLOOR so a struggling child still has a field to chase, and
-     re-measure. The floor must be absolute too, or scale-invariance returns
-     through the back door.
-2. Remove the band's feedback entirely for lane 0 and give the leader a flat
-   points multiplier, letting satiety alone stop the rout.
-3. Give the leader a food source the player cannot touch (its own spawn
-   stream), so its earnings are not a share of a pool the player is draining.
+| term | value |
+|---|---|
+| `par = FIELD_TOP * 0.46` | 7,360 |
+| `ratio = pScore/par` | 13.3 |
+| `scale = 0.62 + 0.38 * ratio^0.88` | 4.33 |
+| branch A `= FIELD_TOP * scale` | **69,200  <- binds** |
+| branch B `= 0.94 * pScore` | 92,120 |
+
+Branch A DOES bind. But branch A expands to
+`9920 + 6080 * (pScore/7360)^0.88` — it is very nearly proportional to
+`pScore^0.88`. **Both branches are functions of the player.** That 0.88 exponent
+is the whole story of attempt 8: cutting the player 98k -> 82k moves
+leader/player from 0.706 to 0.739, three percentage points against a
+measurement noise of nine.
+
+### WHAT WAS ACTUALLY BUILT (attempt 10, two changes)
+
+Both were needed; the analysis says neither alone suffices.
+
+1. **The band is no longer `want/score`.** That is proportional control, and a
+   P controller with a throttled plant converges BELOW setpoint by exactly what
+   the throttle costs — measured, the leader sat at 47% of lane while the band
+   read 1.68, i.e. the shortfall and the correction were the same number.
+   Squaring past the setpoint (which the shipped code did) only changed the
+   fixed point from `want^(1/2)` to `want^(2/3)`. Still short, differently.
+
+   It is now **feedforward against a measured plant gain**: each rival tracks
+   `rv.raw`, the points it earned BEFORE any multiplier, and the band is
+   `need / rawRate` where `need` is the rate that reaches the lane 12 seconds
+   ahead. No steady-state error by construction, and it self-calibrates to a
+   world's prop density instead of assuming one.
+
+2. **`want` is anchored to an absolute per-world par**, `WORLD_PAR` in
+   prototype3d.ts, so the target stops fleeing. Measured with
+   `qa/ab.mjs 5 <world> child`, par set at 0.85 of the child mean:
+
+   | world | child mean | par |
+   |---|---|---|
+   | maple | 104,400 (sd 17,200) | 88,000 |
+   | gameday | 230,000 (sd 38,600) | 195,000 |
+   | pirate | not yet measured | provisional 88,000 |
+   | lantern | not yet measured | provisional 88,000 |
+
+   The owner's floor ("never finish below 3rd") is now STRUCTURAL rather than
+   tuned: `top = min(par*shape, pScore * PLAYER_CEIL)` with `PLAYER_CEIL = 1.15`.
+   Lane 1 wants 0.68 of top and satiety lets it overshoot to 1.2x, so its best
+   case is 0.816 x top = 0.94 x the player. Lane 1 cannot beat the player at
+   all; only the leader can. A bad run finishes 2nd, a good one 1st.
 
 Do NOT try: another ceiling, another exponent, another size cap, another field
-size, or another cut to the player's multipliers. Nine runs say the controller
-eats all of them.
+size, or another cut to the player's multipliers. Nine runs say the OLD
+controller ate all of them.
 
 Verify any attempt with `node qa/ab.mjs 5 maple child 4173`.
 TARGET: leader 85-110% of lane, player place mean ~1.3, worst place <= 3

@@ -114,7 +114,7 @@ const VOID_FRAG = `
   uniform vec3 uAbyss; uniform vec3 uInner; uniform vec3 uMid; uniform vec3 uRim; uniform vec3 uSwirl;
   uniform float uTime; uniform sampler2D uTex; uniform float uTexAmt;
   uniform sampler2D uStars; uniform float uStarAmt; uniform float uStage; uniform float uGloss;
-  uniform float uPat; uniform vec3 uPatCol; uniform float uSmall;
+  uniform float uPat; uniform vec3 uPatCol; uniform float uPxR;
   // cheap hash for star specks
   float hash(vec2 p){ return fract(sin(dot(p, vec2(41.31, 289.17))) * 43758.5453); }
   // value noise for the HD nebula wisps (procedural — crisp at any zoom)
@@ -134,8 +134,8 @@ const VOID_FRAG = `
     float u = sqrt(max(0.0, 1.0 - d * d));
     // stops tuned CUTE: the dark heart is small, the visible disc reads as
     // a bright plush purple that lifts quickly toward the lit rim.
-    // uSmall (1 when he is only a few dozen pixels across) widens the rim so
-    // the lit edge never falls below a pixel and dissolve into the ground.
+    // The rim's width is derived from uPxR (his on-screen radius) so the lit
+    // edge never falls below a pixel and dissolves into the ground.
     vec3 col = mix(uInner, uMid, smoothstep(0.10, 0.55, u));
     // THE RIM IS AN EVENT HORIZON, NOT THE BODY. u is the normalised disc
     // radius, so a 0.58 stop mixed the rim colour over 1 - 0.58^2 = 66% of the
@@ -148,9 +148,30 @@ const VOID_FRAG = `
     // 0.74 stop painted rim over 1 - 0.74^2 = 45% of the disc AREA — a wide
     // soft halo, which is the opposite of definition. 0.86 is 26%, a lit lip
     // rather than a gradient, and the body underneath finally has room to be
-    // dark. uSmall still fattens it at speck size so it never drops below a
-    // pixel and dissolves into the ground.
-    col = mix(col, uRim, smoothstep(mix(0.86, 0.50, uSmall), 1.0, u));
+    // dark.
+    //
+    // ── AND THE RIM IS MEASURED IN PIXELS, NOT IN DISC FRACTIONS ──────────
+    // This used to widen the stop to 0.50 whenever the void was small, to keep
+    // the lit edge from dropping below a pixel. The goal was right and the
+    // arithmetic was not: u is the normalised RADIUS, so a 0.50 stop paints rim
+    // over 1 - 0.50^2 = 75% of the disc AREA. At the size a match STARTS at —
+    // measured 30px of radius on a phone, which puts the old ramp at 0.55 — the
+    // hero was 69% bodyRim (0xcb99ff, a pale lavender) and only a sliver of
+    // bodyMid (0x5f2ab4, the rich purple that is supposed to BE the character).
+    // Owner, on a screenshot of the live build: "our voids purple faded". It
+    // had: the first thirty seconds of every match, the menu, and every shop
+    // card were rendering a lavender ball.
+    //
+    // A rim that must stay ~2px wide is a stop of 1 - 2/pxR. That is 0.93 at
+    // 30px and only starts eating the body below about 17px, which is genuinely
+    // speck size. Clamped at 0.88 so it never gets THINNER than the authored
+    // look, and at 0.62 so it cannot vanish in the opening dive.
+    float rimStop = clamp(1.0 - 2.0 / max(6.0, uPxR), 0.62, 0.88);
+    // 0 at normal sizes, 1 only when the pixel floor has genuinely taken over.
+    // Everything that used to key off uSmall keys off this instead, so the three
+    // desaturating terms can no longer fire at a size the player actually plays.
+    float wide = smoothstep(0.88, 0.62, rimStop);
+    col = mix(col, uRim, smoothstep(rimStop, 1.0, u));
     // premium skin: wrap the AI texture around the orb (slow drift), keep
     // the darker core + lit rim so it still reads as a VOID
     if (uTexAmt > 0.01) {
@@ -237,7 +258,7 @@ const VOID_FRAG = `
     // ── EVENT HORIZON ─────────────────────────────────────────────────────
     // rim light lives OPPOSITE the key, like a real one, and fattens with
     // both the evolution stage and how small he is on screen
-    col += uRim * pow(u, mix(3.0, 1.9, uSmall)) * (0.30 + uStage * 0.05) * mix(1.45, 0.72, key);
+    col += uRim * pow(u, mix(3.0, 1.9, wide)) * (0.30 + uStage * 0.05) * mix(1.45, 0.72, key);
     // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
     // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
     float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
@@ -287,7 +308,7 @@ const VOID_FRAG = `
     }
     // at postage-stamp size, punch the whole thing up a touch — small objects
     // lose apparent contrast to the surrounding frame
-    col *= 1.0 + 0.10 * uSmall;
+    col *= 1.0 + 0.10 * wide;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -312,7 +333,7 @@ export function makeVoidBody(): THREE.ShaderMaterial {
       uGloss: { value: 0 },           // legendary sheen (pearl / chrome character skins)
       uPat: { value: 0 },             // 0 none · 1 scales · 2 chrome · 3 fur · 4 starfield · 5 stitch
       uPatCol: { value: new THREE.Color(0xffffff) },
-      uSmall: { value: 0 },           // 1 when he is only a few dozen pixels wide
+      uPxR: { value: 64 },            // his on-screen RADIUS in px; rim width is derived from it
       uSlow: { value: 1 },            // wobble time scale — big voids slosh slower
       uStretchDir: { value: new THREE.Vector3(0, 0, 1) },
       uStretchAmt: { value: 0 },
@@ -336,7 +357,23 @@ export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
   if (ch?.patCol) m.uniforms.uPatCol.value.set(ch.patCol);
 }
 
-const WHITE = new THREE.Color(0xffffff);
+// ── THE MOUTH'S TWO ROUTES ──────────────────────────────────────────────────
+// A dark mouth cannot reach 3:1 on a dark body — the default skin's mid is
+// L 0.074, so even pure black tops out at 2.48:1. So dark bodies get a light
+// mouth and light bodies get a dark one, and each carries a contrasting inside
+// so it reads as an opening rather than a painted shape. Measured across all 18
+// skins: every one clears 3:1, worst case 3.20 (Classic).
+const MOUTH_LIGHT = 0xff6f91;      // candy pink — the lip, on a DARK body
+const MOUTH_LIGHT_IN = 0x8c1f3d;   // …and the throat behind it
+const MOUTH_DARK = 0x24050f;       // near-black plum — the lip, on a LIGHT body
+const MOUTH_DARK_IN = 0xff6f91;    // …with the pink tongue showing inside
+/** WCAG contrast ratio. "Can you see the smile" is a number, not a view. */
+function wcag(a: number, b: number): number {
+  const f = (c: number) => { const u = c / 255; return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4; };
+  const l = (h: number) => 0.2126 * f((h >> 16) & 255) + 0.7152 * f((h >> 8) & 255) + 0.0722 * f(h & 255);
+  const la = l(a), lb = l(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
 const texCache = new Map<string, THREE.Texture>();   // premium skin textures
 // ── …AND WHO IS STILL WAITING FOR EACH ONE ────────────────────────────────
 // TextureLoader fires exactly ONE callback, and it belongs to whoever asked
@@ -471,27 +508,27 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   (contact.material as THREE.MeshBasicMaterial).polygonOffsetFactor = -4;
   (contact.material as THREE.MeshBasicMaterial).polygonOffsetUnits = -4;
   scene.add(contact);
-  // …and the LIP. A bright, thin ring just outside the pit's dark edge, which
-  // is the single read that says "hole" rather than "ball": hole.io's whole
-  // silhouette is that ring. Additive would blow out over pale ground (the
-  // evolution torus already learned that), so it is a normal-blended warm
-  // highlight that sits between the pit and the world.
-  const lip = new THREE.Mesh(
-    new THREE.RingGeometry(0.88, 1, 72),
-    new THREE.MeshBasicMaterial({ color: 0xd9c2ff, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }),
-  );
-  // NAMED, with `contact` and `rings`: these three are the void's GROUND
-  // FURNITURE and they are added to the scene/group to plant it on a street.
-  // A shop-card portrait has no street, and this lip is the one that hunted
-  // three wrong guesses — it is neither in the void's group nor shaped like
-  // the others. See __voidSheet in prototype3d.ts.
-  lip.name = 'lip';
-  lip.rotation.x = -Math.PI / 2; lip.position.y = 0.06;
-  lip.renderOrder = -1;   // always immediately after the pit it rims
-  (lip.material as THREE.MeshBasicMaterial).polygonOffset = true;
-  (lip.material as THREE.MeshBasicMaterial).polygonOffsetFactor = -5;
-  (lip.material as THREE.MeshBasicMaterial).polygonOffsetUnits = -5;
-  scene.add(lip);
+  // ── THE GROUND LIP IS GONE, ON THE SECOND REPORT ──────────────────────────
+  // There used to be a bright violet annulus at 1.5x the hero's radius, a thin
+  // ring just outside the pit's dark edge. Its justification was hole.io's:
+  // the ring is the single read that says "hole" rather than "ball".
+  //
+  // The owner flagged it once — "There's a white circle always around the
+  // void?" — and it was given a fade instead of a removal: full strength at the
+  // start radius, gone by 3.2. That was a half-measure and the measurement says
+  // so. The HUD reports 1.6 x radius in metres, so the "VOIDLING 2m" the owner
+  // was looking at in the second report is r = 1.25, where the fade still
+  // leaves opacity at 0.44 of 0.52 — 85% of full. In other words the ring was
+  // at nearly full strength for the whole early match, which is exactly the
+  // stretch a new player spends the most time in. He reported it again:
+  // "And there's a ring around him".
+  //
+  // The hole.io justification never applied to this character anyway. This
+  // hero is a ball with a face, eyebrows, blush and a mouth, sitting on a
+  // street; a permanent annulus around it reads as an RTS selection circle.
+  // The contact shadow is what grounds him and it does that job alone.
+  // (The RIVALS keep their halo — a ring around something that is HUNTING you
+  // is information, not decoration. That one lives in rivals.ts.)
 
   // ── face: crisp billboarded flat features (matches 2D canvas) ─────────────
   const face = new THREE.Group();
@@ -628,7 +665,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // — read as a too-wide clown grin.) Plus the big "maw" that scales in when
   // eating or firing GULP.
   const mouth = new THREE.Group();
-  let mouthRim: THREE.MeshBasicMaterial | null = null;
+  let mouthRim: THREE.MeshBasicMaterial | null = null;      // the lip itself
+  let mouthTongue: THREE.MeshBasicMaterial | null = null;   // …and what sits inside it
   // ── NO FANGS ────────────────────────────────────────────────────────────
   // Two little teeth used to drop into the smile from GOBBLER on, as a per-form
   // read that survives at eighteen pixels. The owner's verdict: "Why do the
@@ -670,27 +708,38 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // eyes and a floating pink pill. So the geometry was never the problem and
     // must not be reshaped — it needs somewhere to sit.
     //
-    // HIGHLIGHT is that: a slightly larger half-disc behind the lip, in the
-    // skin's OWN rim colour pushed 60% toward white. Sweeping that blend
-    // against all thirteen skins, 60% is where the worst case crosses 3:1
-    // (3.50:1, Ember) while the highlight still carries the skin's hue —
-    // at 0% Ember and Prism sit at 2.9, and past 75% it is just white paint.
-    // The smile then reads by one of two routes on every skin: either the lip
-    // contrasts with the body, or the highlight does and the lip contrasts
-    // with the highlight.
-    const highlight = new THREE.Mesh(new THREE.CircleGeometry(0.196, 40, 0, Math.PI),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, depthWrite: false }));
-    highlight.position.z = -0.002;
-    highlight.renderOrder = -1;                 // behind lip(0) and tongue(1)
-    mouthRim = highlight.material as THREE.MeshBasicMaterial;
+    // …AND THE FIX FOR THAT WAS A WHITE PLATE, WHICH IS THE WRONG FIX.
+    // It was a larger half-disc behind the lip in the skin's rim colour pushed
+    // 60% toward white. It cleared 3:1 everywhere (worst 3.50, Ember) and the
+    // owner rejected it on sight of the live build: "that white smile has to
+    // go. The white part I'm not a fan of. It looks cheap." It reads as a pale
+    // sticker ring around a tiny mouth, and at the size a match starts at the
+    // plate, the lip and the tongue mush into one whitish blob.
+    //
+    // THE REAL CONSTRAINT, measured. Contrast against every skin's mid tone:
+    //   - no single mouth colour works. The bodies span L 0.034 (Shadow Ninja)
+    //     to 0.711 (Uni-Void), so anything fixed vanishes at one end.
+    //   - a dark mouth CANNOT reach 3:1 on the default skin. Body L is 0.074,
+    //     so even pure black tops out at 2.48:1. That is why a plate existed.
+    //   - so the light route is genuinely needed on dark bodies — it just has
+    //     no reason to be WHITE. 0xff6f91, the candy pink already used for the
+    //     tongue, scores 3.20:1 on Classic and reads as a mouth, not a decal.
+    //
+    // Hence two routes, and the route is chosen by which one actually scores
+    // higher on that skin rather than by a luminance threshold — chilli and
+    // prism sit exactly at the crossover and fail both ways under a fixed cut.
+    // Measured over all 18 skins: every one clears 3:1, worst case 3.20
+    // (Classic), and there is no white anywhere in the mouth.
     // upper semicircle; the group's PI rotation (below) hangs the dome down
-    const lip = new THREE.Mesh(new THREE.CircleGeometry(0.165, 40, 0, Math.PI),
+    const lip = new THREE.Mesh(new THREE.CircleGeometry(0.178, 40, 0, Math.PI),
       new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }));
+    mouthRim = lip.material as THREE.MeshBasicMaterial;
     const tongue = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24),
       new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
+    mouthTongue = tongue.material as THREE.MeshBasicMaterial;
     tongue.scale.set(1.35, 0.6, 1); tongue.position.set(0, 0.075, 0.004);
     tongue.renderOrder = 1;
-    mouth.add(highlight); mouth.add(lip); mouth.add(tongue);
+    mouth.add(lip); mouth.add(tongue);
     mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
@@ -1162,9 +1211,16 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // the mane is shared geometry, so it takes the wearer's own colour —
       // otherwise the Archmage turns up in Uni-Void's white unicorn hair
       if (maneMat) maneMat.color.set(s.rim);
-      // the smile's rim, 60% of the way from this skin's lit-edge colour to
-      // white — see the note where it is built
-      if (mouthRim) mouthRim.color.set(s.rim).lerp(WHITE, 0.60);
+      // ── THE MOUTH PICKS ITS ROUTE FROM THE BODY IT IS SITTING ON ─────────
+      // See the note where the mouth is built. Light candy mouth on a dark
+      // body, near-black mouth on a light one, chosen by whichever actually
+      // measures higher rather than by a luminance cut — and the tongue takes
+      // the opposite end so the mouth still has an inside. No white anywhere.
+      if (mouthRim && mouthTongue) {
+        const light = wcag(MOUTH_LIGHT, s.mid) >= wcag(MOUTH_DARK, s.mid);
+        mouthRim.color.set(light ? MOUTH_LIGHT : MOUTH_DARK);
+        mouthTongue.color.set(light ? MOUTH_LIGHT_IN : MOUTH_DARK_IN);
+      }
       // ── apply the CHARACTER RIG (legendary skins only) ──────────────────
       const ch = s.char;
       const eyeMode = ch?.eyes;
@@ -1352,7 +1408,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const camD = Math.max(1, camera.position.distanceTo(group.position));
       const pxR = (window.innerHeight / (2 * camD * Math.tan(fov * Math.PI / 360))) * dispR;
       const small = THREE.MathUtils.clamp((64 - pxR) / 40, 0, 1);
-      bodyMat.uniforms.uSmall.value = small;
+      bodyMat.uniforms.uPxR.value = pxR;
 
       // face: billboard to camera, scale with the void
       face.scale.setScalar(dispR);
@@ -1538,30 +1594,6 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // silhouette however the camera is framed — at the fixed 46.4-degree
       // elevation anything under about 1.45x is entirely hidden behind the ball.
       contact.position.set(s.x, 0.05, s.z); contact.scale.setScalar(dispR * 1.52);
-      lip.position.set(s.x, 0.06, s.z); lip.scale.setScalar(dispR * 1.5);
-      // ── AND THEN IT GETS OUT OF THE WAY ────────────────────────────────
-      // The owner, looking at his own game: "There's a white circle always
-      // around the void?" There was, and he is right that it should not be.
-      //
-      // The lip was written to make the hero read as a HOLE rather than a
-      // ball — hole.io's entire silhouette is that ring. But this hero is not
-      // drawn as a hole: it is a ball with a face, eyebrows, blush and a
-      // mouth, sitting on the ground. A bright violet annulus at 1.32-1.5x
-      // its radius therefore reads as an RTS selection circle, permanently
-      // ringing the one thing on screen that is supposed to be a character.
-      //
-      // The rim still earns its place at SPECK SIZE. In the opening seconds
-      // the void is 0.9 units across, the pit under it is a handful of pixels
-      // and the ring is genuinely how a child finds themselves in a crowded
-      // frame. So it keeps that job and loses the other one: full strength at
-      // the start radius, gone entirely by 3.2, which is roughly the point the
-      // void is unmistakably the biggest cute thing in the picture. It fades
-      // out during the first stretch of a match and never comes back.
-      // (The rivals keep theirs — a ring around something that is HUNTING you
-      // is information, not decoration.)
-      const lipM = lip.material as THREE.MeshBasicMaterial;
-      lipM.opacity = THREE.MathUtils.clamp(0.52 * (1 - (dispR - 0.9) / 2.3), 0, 0.52);
-      lip.visible = lipM.opacity > 0.01;
     },
   };
 

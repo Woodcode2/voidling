@@ -185,6 +185,28 @@ const _wantWorld = new URLSearchParams(location.search).get('w')
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
 setWorld(pickedWorld);
 
+// ── WHAT FIRST PLACE IS WORTH, PER WORLD ────────────────────────────────────
+// The family's ladder is anchored to an ABSOLUTE score rather than to a
+// fraction of the player's, because a target defined as a fraction of the
+// player can never be caught — see laneWant in rivals.ts, which carries the
+// nine failed attempts that taught this.
+//
+// These are MEASURED, not chosen. `node qa/ab.mjs 5 <world> child` drives a
+// deliberately sloppy player (stalls a third of the time, 60 degrees of aim
+// error, chases things it cannot eat) and reports what it scores. Par is set at
+// 0.85 of that mean, so a typical child beats the leader most of the time and
+// genuinely loses their worst runs — with the ceiling in laneWant guaranteeing
+// even a bad run finishes 2nd rather than 6th.
+//
+// Re-measure these if scoring changes. A par that drifts low turns the family
+// back into scenery, which is the exact bug this replaced.
+const WORLD_PAR: Record<string, number> = {
+  maple: 94000,      // child mean 110,983 over 5 (sd 22,014)
+  pirate: 94000,     // provisional — shares Maple's density until measured
+  gameday: 185000,   // child mean 216,141 over 4 (sd 40,600)
+  lantern: 94000,    // provisional — until measured
+};
+
 
 const scene = new THREE.Scene();
 
@@ -1200,15 +1222,14 @@ function contrast(a: number, b: number): number {
   const la = relLum(a), lb = relLum(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
-/** The smile's worst-case legibility on a skin, by the better of its two routes. */
+/** The smile's legibility on a skin, by whichever of its two routes it takes.
+ *  Must match setSkin in void3d.ts: light candy mouth on a dark body, near-black
+ *  on a light one, chosen by whichever measures higher. (This used to model a
+ *  white plate behind the lip; the owner rejected that on sight — "the white
+ *  part I'm not a fan of, it looks cheap" — so both routes are warm now.) */
 function smileContrast(sk: Skin): number {
-  const mixw = (h: number, k: number) => {
-    const g = (c: number) => Math.round(c + (255 - c) * k);
-    return (g((h >> 16) & 255) << 16) | (g((h >> 8) & 255) << 8) | g(h & 255);
-  };
-  const hi = mixw(sk.rim, 0.60);              // must match setSkin's lerp
-  return Math.max(contrast(VOID.mouth, sk.mid),
-    Math.min(contrast(hi, sk.mid), contrast(VOID.mouth, hi)));
+  const LIGHT = 0xff6f91, DARK = 0x24050f;    // must match void3d's MOUTH_*
+  return Math.max(contrast(LIGHT, sk.mid), contrast(DARK, sk.mid));
 }
 _dbg.__voidSheet = async (ids: string[]) => {
   const { createVoid } = await import('./proto3d/void3d');
@@ -1245,7 +1266,8 @@ _dbg.__voidSheet = async (ids: string[]) => {
   // the graph is the only thing that holds; update() goes on writing their
   // transforms to orphans, which costs nothing and draws nothing.
   const hid: string[] = [], missed: string[] = [];
-  for (const n of ['contact', 'rings', 'lip']) {
+  // 'lip' — the hero's ground annulus — was deleted outright, see void3d.ts.
+  for (const n of ['contact', 'rings']) {
     const o = (v.group.getObjectByName(n) ?? sc.getObjectByName(n));
     if (o) { o.removeFromParent(); hid.push(n); } else missed.push(n);
   }
@@ -5253,13 +5275,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     const rig = createVoid(sc, cam);
     rig.setRadius(1);
     rig.setMood('cruise');
-    // A PORTRAIT HAS NO FLOOR, and the three pieces of ground furniture are
-    // DETACHED rather than hidden: update() recomputes lip.visible from its own
-    // opacity every frame, so visible=false survives exactly one frame. The
-    // contact shadow is parented to the scene, the evolution ring is a torus
-    // tilted 0.5 and the lip is neither — all three are named in void3d now
-    // because guessing at their shape missed one every time.
-    for (const n of ['contact', 'rings', 'lip']) {
+    // A PORTRAIT HAS NO FLOOR, and the ground furniture is DETACHED rather
+    // than hidden: update() rewrites these every frame, so visible=false
+    // survives exactly one frame. The contact shadow is parented to the scene
+    // and the evolution ring is a torus tilted 0.5 — they are named in void3d
+    // because guessing at their shape missed one every time. (The third,
+    // 'lip', was the hero's ground annulus and no longer exists.)
+    for (const n of ['contact', 'rings']) {
       (rig.group.getObjectByName(n) ?? sc.getObjectByName(n))?.removeFromParent();
     }
     voidScene = sc; voidCam = cam; voidRig = rig;
@@ -6382,7 +6404,7 @@ function animate() {
   // running — the world behind the score card should still look alive.
   if (!ended && !paused) {
     rivals.update(dtw, started && !soloMode ? matchElapsed() : 0, voidState.x, voidState.z, R,
-      { matchLen, playerScore, fever: feverMult });   // solo: the family never joins
+      { matchLen, playerScore, fever: feverMult, par: WORLD_PAR[pickedWorld] });   // solo: the family never joins
   }
   // ── THE RULE NOBODY WAS EVER TAUGHT ────────────────────────────────────────
   // "A bigger void eats you" is the entire danger half of the game, and the
