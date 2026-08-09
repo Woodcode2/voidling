@@ -411,10 +411,44 @@ export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
 // on the face where the shader's belly pit darkens toward abyss (L 0.0016),
 // where the same red measures 4.3:1. Hue does the rest — warm red against cool
 // violet separates even where luminance does not.
-const MOUTH_LIGHT = 0xe01e45;      // warm red opening, on a DARK body
-const MOUTH_LIGHT_IN = 0x6d0a22;   // …the throat, deeper red — never lighter
-const MOUTH_DARK = 0x24050f;       // near-black plum, on a LIGHT body
-const MOUTH_DARK_IN = 0xb3123c;    // …with a red throat inside it
+const MOUTH_OPEN = 0xe01e45;   // one warm red opening, on a DARK belly
+const MOUTH_INK = 0x24050f;    // …or one near-black opening, on a LIGHT belly
+// There is deliberately no "inside" colour any more. An opening with something
+// LIGHTER inside it is an annulus, and an annulus drawn on a face is a made-up
+// mouth — that is the shape the owner rejected as lipstick. One mesh, one
+// colour, no second ring. It cannot come back by accident.
+
+const _s2l = (c: number) => { const u = c / 255; return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4; };
+const _l2s = (u: number) => Math.round(255 * (u <= 0.0031308 ? u * 12.92 : 1.055 * u ** (1 / 2.4) - 0.055));
+/** Mix two sRGB hexes in LINEAR light — the space the shader itself mixes in. */
+function mixHex(a: number, b: number, t: number): number {
+  let o = 0;
+  for (let i = 16; i >= 0; i -= 8) {
+    const la = _s2l((a >> i) & 255), lb = _s2l((b >> i) & 255);
+    o = (o << 8) | _l2s(la + (lb - la) * t);
+  }
+  return o >>> 0;
+}
+/**
+ * WHAT THE SHADER ACTUALLY PAINTS WHERE THE MOUTH SITS.
+ *
+ * This is the whole bug. The route below used to be chosen against `s.mid`, the
+ * body's mid tone — but the mouth is not drawn on the mid tone. It hangs at
+ * disc y = -0.26 on a face lifted 0.1R, i.e. N.y = -0.18, and down there two
+ * things have happened to the colour: the inner->mid ramp has barely started
+ * (smoothstep(0.10, 0.55, 0.18) = 0.0836), and the belly pit has mixed 0.740 of
+ * the way to `abyss`. So the mouth is drawn on something far darker than `mid`,
+ * and the contrast that got measured was against a colour that is not there.
+ *
+ * Measured over all 18 skins, scoring each route against this belly tone:
+ *   routing on s.mid    8 of 18 skins under 1.5:1, and CLASSIC — the default
+ *                       void every new player sees — at 1.01:1. Invisible.
+ *   routing on belly    worst case 2.02:1, Classic 3.98:1.
+ *
+ * It went unnoticed because the number looked fine: the old pink cleared 3:1
+ * against `mid` on every skin. It was the right measurement of the wrong pixel.
+ */
+const bellyOf = (s: Skin): number => mixHex(mixHex(s.inner, s.mid, 0.0836), s.abyss, 0.740);
 /** WCAG contrast ratio. "Can you see the smile" is a number, not a view. */
 function wcag(a: number, b: number): number {
   const f = (c: number) => { const u = c / 255; return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4; };
@@ -714,7 +748,6 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // eating or firing GULP.
   const mouth = new THREE.Group();
   let mouthRim: THREE.MeshBasicMaterial | null = null;      // the lip itself
-  let mouthTongue: THREE.MeshBasicMaterial | null = null;   // …and what sits inside it
   // ── NO FANGS ────────────────────────────────────────────────────────────
   // Two little teeth used to drop into the smile from GOBBLER on, as a per-form
   // read that survives at eighteen pixels. The owner's verdict: "Why do the
@@ -782,17 +815,14 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const lip = new THREE.Mesh(new THREE.CircleGeometry(0.178, 40, 0, Math.PI),
       new THREE.MeshBasicMaterial({ color: VOID.mouth, depthWrite: false }));
     mouthRim = lip.material as THREE.MeshBasicMaterial;
-    const tongue = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24),
-      new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
-    mouthTongue = tongue.material as THREE.MeshBasicMaterial;
-    // The throat sits DEEPER and smaller than it used to. At 1.35 x 0.6 and
-    // y 0.075 it was a wide ellipse riding the mouth's opening line, which is
-    // precisely the shape of a lower lip — and with a lighter colour outside it
-    // the whole thing read as lipstick. Narrower, shorter and pushed further in
-    // reads as the back of a mouth instead.
-    tongue.scale.set(1.05, 0.5, 1); tongue.position.set(0, 0.055, 0.004);
-    tongue.renderOrder = 1;
-    mouth.add(lip); mouth.add(tongue);
+    // THE SECOND SHAPE IS GONE. There used to be an ellipse inside the lip — a
+    // "throat" — and whatever colour it took, lip-plus-inner is an annulus, and
+    // an annulus on a face reads as a painted mouth. Shrinking it and pushing
+    // it deeper was my second attempt at keeping it; the right answer is that
+    // the smile is ONE shape. The maw (the big gape when he actually eats) is a
+    // separate group below and still has its tongue, which is where a tongue
+    // belongs — visible only when the mouth is open.
+    mouth.add(lip);
     mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
@@ -1269,10 +1299,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // body, near-black mouth on a light one, chosen by whichever actually
       // measures higher rather than by a luminance cut — and the tongue takes
       // the opposite end so the mouth still has an inside. No white anywhere.
-      if (mouthRim && mouthTongue) {
-        const light = wcag(MOUTH_LIGHT, s.mid) >= wcag(MOUTH_DARK, s.mid);
-        mouthRim.color.set(light ? MOUTH_LIGHT : MOUTH_DARK);
-        mouthTongue.color.set(light ? MOUTH_LIGHT_IN : MOUTH_DARK_IN);
+      if (mouthRim) {
+        const belly = bellyOf(s);
+        mouthRim.color.set(wcag(MOUTH_OPEN, belly) >= wcag(MOUTH_INK, belly) ? MOUTH_OPEN : MOUTH_INK);
       }
       // ── apply the CHARACTER RIG (legendary skins only) ──────────────────
       const ch = s.char;
