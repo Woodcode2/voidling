@@ -285,7 +285,12 @@ const VOID_FRAG = `
     // Fading it out by (1 - rimMix) hands the silhouette back to uRim's actual
     // colour, which is a light VIOLET rather than white, and keeps the lift
     // where it was always meant to be — on the shoulder just inside the edge.
-    col += uRim * pow(u, mix(3.0, 1.9, wide)) * (0.30 + uStage * 0.05)
+    // …AND ITS SHAPE NO LONGER DEPENDS ON HOW BIG HE IS ON SCREEN. The exponent
+    // used to open from 3.0 to 1.9 as he got small, spreading the pale rim
+    // colour much further across the disc. See the note on the brightness lift
+    // below: together the two terms made him a measurably different colour at
+    // the start of a match than thirty seconds later.
+    col += uRim * pow(u, 3.0) * (0.30 + uStage * 0.05)
          * mix(1.45, 0.72, key) * (1.0 - rimMix);
     // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
     // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
@@ -334,9 +339,29 @@ const VOID_FRAG = `
       // patterns fade toward the silhouette so the fresnel read survives
       col = mix(col, uPatCol, shade * (1.0 - u * 0.55));
     }
-    // at postage-stamp size, punch the whole thing up a touch — small objects
-    // lose apparent contrast to the surrounding frame
-    col *= 1.0 + 0.10 * wide;
+    // ── HE IS ONE COLOUR NOW, AT EVERY SIZE ───────────────────────────────
+    // There used to be a "col *= 1.0 + 0.10 * wide" here — "at postage-stamp
+    // size, punch the whole thing up a touch". Reasonable in isolation, and
+    // wrong in effect: wide tracks how small he is ON SCREEN, and the camera
+    // dives in over the opening seconds, so he was a different colour at the
+    // start of a match than he was once it settled.
+    //
+    // The owner, on two screenshots of the same 2m void nineteen seconds apart:
+    // "When you start the game you're light purple. After moving a bit you're
+    // dark purple."
+    //
+    // Measured across uPxR 18 -> 220 at a FIXED radius, before the fix:
+    //     saturation 0.715 -> 0.640      value 0.517 -> 0.443
+    // A spread of 0.075 on both, where a size-invariant character reads about
+    // 0.02. The brightness lift and the rim exponent above were the two terms
+    // responsible; both are gone. rimStop still adapts, because a lit edge
+    // thinner than a pixel disappears — but it is a narrow band, so it changes
+    // his EDGE without changing his COLOUR.
+    //
+    // (And note the comment characters: this whole shader lives in a JS
+    // template literal, so a BACKTICK in a comment ends the string and the file
+    // stops compiling. That is how the first version of this note broke it.)
+
     gl_FragColor = vec4(col, 1.0);
   }
 `;
