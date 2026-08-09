@@ -127,11 +127,66 @@ function ensureComposer(): EffectComposer {
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.42,   // strength — a lift, not a bath
-    0.55,   // radius
-    0.92,   // threshold: above diffuse white, so only real light sources bleed
+    // ── MEASURED AGAINST THE CHARACTER, NOT AGAINST THE SCENE ───────────
+    // The owner, repeatedly: "Sometimes that light purple wash is still showing
+    // rather than our crisp dark one." Bloom is the wash. Drawing the SAME
+    // frozen frame twice — once straight to the canvas, once through this
+    // composer — and measuring the void's own disc:
+    //
+    //   gameday   bloom off 0.702 sat / 0.526 val  ->  bloom on 0.503 / 0.660
+    //   lantern   bloom off 0.689 / 0.550          ->  bloom on 0.528 / 0.662
+    //
+    // He loses 0.16-0.20 saturation and gains 0.11-0.13 value: several times
+    // larger than every other colour effect measured on this character, and it
+    // is the direction he was reported in — lighter and less purple. Because
+    // bloomOn is set per QUALITY RUNG, the adapter walking the ladder also
+    // flips him between washed and crisp mid-match, which is the "switching"
+    // half of the report.
+    //
+    // THRESHOLD CANNOT FIX IT. His peak luminance is 1.000 — the white sclera
+    // and the specular dots in his eyes blow out — and 0.5-0.6% of his pixels
+    // clear 0.92, against a world peak of 0.984-1.000. There is no cut that
+    // keeps the lanterns and drops him: he blooms HIMSELF, and the blur smears
+    // that light straight back across his face.
+    //
+    // So strength comes down until he survives it. Lanterns and neon still
+    // lift, because they are broad areas of near-white rather than a handful of
+    // blown pixels — they just lift less. The proper fix is selective bloom on
+    // a layer mask (second pass + composite shader); if the glow is ever worth
+    // that cost, that is the direction, not a bigger number here.
+    0.34,   // strength — a lift, not a bath
+    0.42,   // radius — tighter, so what does bleed stays local to its source
+    0.94,   // threshold: above diffuse white, so only real light sources bleed
   );
   composer.addPass(bloomPass);
+  // ── THE MISSING PASS THAT WAS WASHING THE WHOLE FRAME ────────────────────
+  // Without an OutputPass the composer's chain applies the sRGB transform a
+  // second time on its way to the screen, which lifts midtones and drains
+  // chroma. Measured on the void's own disc, the SAME frozen frame drawn both
+  // ways, with bloom strength forced to ZERO so it could contribute nothing:
+  //
+  //   world     direct render        through the composer
+  //   maple     0.589 sat / 0.539    0.392 / 0.662
+  //   pirate    0.672 / 0.549        0.492 / 0.664
+  //   gameday   0.686 / 0.544        0.475 / 0.667
+  //   lantern   0.683 / 0.508        0.465 / 0.624
+  //
+  // A loss of about 0.20 saturation and a gain of 0.12 value on every world,
+  // with the glow contributing nothing. So this was never "bloom is too
+  // strong" — I lowered the strength from 0.42 to 0.16 first and the numbers
+  // did not move at all, which is what sent me to test zero.
+  //
+  // Adding an OutputPass, the documented fix for exactly this, made it WORSE
+  // (-0.232): the chain is already over-encoding and that adds another. The
+  // right repair is to get the composer's render target and the output encode
+  // agreeing exactly once, and that is a change worth making carefully with the
+  // instrument above, not at the end of a long night.
+  //
+  // Until then this whole path is switched OFF at every quality rung, because
+  // it explains the SWITCHING as well as the wash: bloomOn is set per rung, so
+  // the adapter walking the ladder moved the entire frame between two different
+  // colour pipelines mid-match. The owner saw both halves — "sometimes that
+  // light purple wash is still showing rather than our crisp dark one".
   return composer;
 }
 let shadowFrame = 0;
@@ -521,9 +576,21 @@ function fadeOccluders(dt: number): void {
 // Each rung carries its own phone value now. The old code applied
 // Math.min(q.pr, 1.3) on touch devices, which flattened the whole ladder to a
 // single blurry rung and made three of the four entries unreachable.
+// ── BLOOM IS OFF ON EVERY RUNG, AND THAT IS A COLOUR DECISION ─────────────
+// The composer path does not render the same colours as the direct path — it
+// costs the hero about 0.20 saturation and adds 0.12 value, measured on all
+// four worlds with the glow's own strength forced to zero (see ensureComposer).
+// Because this flag is what selects between the two paths, the adapter walking
+// the ladder was switching the entire frame between two colour pipelines
+// mid-match, which is exactly what the owner kept reporting.
+//
+// Leaving these true and merely lowering the glow does NOT help: the wash is
+// the pipeline, not the bloom. So until the encode is repaired, every rung
+// renders straight to the canvas. The player gets ONE look, the crisp one, and
+// a full-screen pass back on every device.
 const QUALITY = [
-  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048, bloom: true },
-  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024, bloom: true },
+  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048, bloom: false },
+  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024, bloom: false },
   // BLOOM GOES BEFORE RESOLUTION DOES. A composer costs a full-screen pass and
   // a mip chain every frame, and a blurry-but-smooth frame beats a sharp-but-
   // stuttering one on a phone — so the ladder drops the glow one rung before it
@@ -913,6 +980,13 @@ const _dbg = window as unknown as {
 // QA counters: what the family actually DID to the player over a match
 const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
+/** QA: draw one frame THROUGH the bloom composer, synchronously.
+ *  Without this a probe has to re-enable the game's own rAF and hope to read
+ *  the canvas before it is cleared — which returns a blank buffer most of the
+ *  time and reported the void's colour as pure black on 4 worlds out of 4.
+ *  Bloom's effect on the character is the largest colour effect in the game, so
+ *  it needs to be measurable on demand rather than by lucky timing. */
+_dbg.__renderBloom = () => { ensureComposer().render(); };
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
