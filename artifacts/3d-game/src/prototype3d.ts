@@ -193,18 +193,37 @@ setWorld(pickedWorld);
 //
 // These are MEASURED, not chosen. `node qa/ab.mjs 5 <world> child` drives a
 // deliberately sloppy player (stalls a third of the time, 60 degrees of aim
-// error, chases things it cannot eat) and reports what it scores. Par is set at
-// 0.85 of that mean, so a typical child beats the leader most of the time and
-// genuinely loses their worst runs — with the ceiling in laneWant guaranteeing
-// even a bad run finishes 2nd rather than 6th.
+// error, chases things it cannot eat) and reports what it scores.
 //
-// Re-measure these if scoring changes. A par that drifts low turns the family
-// back into scenery, which is the exact bug this replaced.
+// ── PAR IS THE DIFFICULTY DIAL, AND IT IS EXACTLY ONE NUMBER ──────────────
+// Worked out from laneWant and confirmed against 10 measured matches: THE
+// PLAYER WINS IF AND ONLY IF THEIR SCORE BEATS PAR. If par is below their
+// score the leader lands on par and finishes behind them; if par is above it,
+// the leader is capped at PLAYER_CEIL x their score and finishes ahead. There
+// is no third case. So the win rate is just P(score > par), and the first
+// measured pass predicted 40% against 2/5 observed.
+//
+// PAR IS ALSO A MOVING TARGET, which is the trap here. A hungrier family eats
+// the island the player was going to eat: the same child driver that scored
+// 110,983 on Maple before this change scored 88,294 after it, a 20% drop, with
+// the family's share of all bites going 40.7% -> 50.1%. Calibrating par against
+// pre-change scores therefore sets it far too high — 94,000 against a post-
+// change mean of 88,294 made Maple a coin flip.
+//
+// So these are set from the POST-change distribution, targeting a child winning
+// roughly 70-75% of the time: often enough that a six-year-old feels good at
+// the game, rarely enough that first place means something. Lowering par also
+// feeds back the other way (a calmer family leaves more food, so scores rise),
+// which is why this wants one more measured pass rather than an exact formula.
+//
+// Re-measure if scoring changes. A par that drifts high makes the game
+// punishing; one that drifts low turns the family back into scenery, which is
+// the exact bug this whole mechanism replaced.
 const WORLD_PAR: Record<string, number> = {
-  maple: 94000,      // child mean 110,983 over 5 (sd 22,014)
-  pirate: 94000,     // provisional — shares Maple's density until measured
-  gameday: 175000,   // child mean 205,299 over 5 (sd 43,856)
-  lantern: 94000,    // provisional — until measured
+  maple: 80000,      // post-change child mean 88,294 (sd 22,737); 94,000 gave 2/5
+  pirate: 80000,     // provisional — shares Maple's density until measured
+  gameday: 175000,   // post-change child mean 198,446 (sd 61,657); 4/5, leader 88.7% of lane
+  lantern: 80000,    // provisional — until measured
 };
 
 

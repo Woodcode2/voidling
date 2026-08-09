@@ -132,10 +132,40 @@ Do NOT try: another ceiling, another exponent, another size cap, another field
 size, or another cut to the player's multipliers. Nine runs say the OLD
 controller ate all of them.
 
+### MEASURED: ATTEMPT 10 WORKS
+
+`qa/ab.mjs 5 <world> child`, 5 matches each, against the baselines above:
+
+| | baseline | attempt 10 | target |
+|---|---|---|---|
+| maple leader/lane | 59.6% sd 14.5 | **106.9% sd 14.7** | 85-110% |
+| gameday leader/lane | 42.9% sd 16.2 | **88.7% sd 23.7** | 85-110% |
+| maple place (mean/worst) | 1.0 / 1st | 1.6 / **2nd** | <= 3 |
+| gameday place (mean/worst) | 1.0 / 1st | 1.2 / **2nd** | <= 3 |
+| maple family bite share | 40.7% | 50.1% | — |
+
+Both worlds moved about 47 points against spreads of 15-24, so this is real by
+the file's own rule. The player no longer wins 5/5 anywhere; the closest match
+finished **92,243 to 93,398**, a gap of 1,155 points in three minutes. The
+owner's floor holds structurally — worst place seen is 2nd, on both worlds,
+because lane 1 cannot reach the player by construction.
+
+Two things this also established:
+
+1. **The win condition is exactly one comparison.** The player wins iff their
+   score beats par: below par the leader lands on par and finishes behind, above
+   it the leader is capped at `PLAYER_CEIL x score` and finishes ahead. Win rate
+   is P(score > par) and nothing else, which makes par the single difficulty
+   dial. The model predicted 40% on Maple against 2/5 observed.
+2. **Par moves when you change it.** A hungrier family eats the island the
+   player was going to eat, so the same child driver went 110,983 -> 88,294 on
+   Maple, a 20% drop. Par calibrated on pre-change scores is therefore too high
+   by construction. Maple is now 80,000 (was 94,000) and wants one more pass.
+
+STILL OPEN: pirate and lantern are on a provisional 80,000 and have never been
+measured. Do that before calling this finished.
+
 Verify any attempt with `node qa/ab.mjs 5 maple child 4173`.
-TARGET: leader 85-110% of lane, player place mean ~1.3, worst place <= 3
-(owner's floor: never finish below 3rd).
-WHERE IT STANDS: 62.2% of lane, player still wins 5/5.
 
 ### 2. VISUAL — "breathtaking from every ground pixel"
 The shop already renders at native resolution filling 86% of frame. The WORLD
