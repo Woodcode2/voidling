@@ -162,10 +162,77 @@ Two things this also established:
    Maple, a 20% drop. Par calibrated on pre-change scores is therefore too high
    by construction. Maple is now 80,000 (was 94,000) and wants one more pass.
 
-STILL OPEN: pirate and lantern are on a provisional 80,000 and have never been
-measured. Do that before calling this finished.
+### PIRATE AND LANTERN, MEASURED — AND A NEW WALL
+
+Both had been running a provisional 80,000 they inherited for no reason beyond
+being the worlds nobody had reached. Their first ever calibrations:
+
+| world | child mean | par when measured | leader reached | player |
+|---|---|---|---|---|
+| pirate | 112,498 | 105,000 | **63,044 (max 72,384)** | won 5/5 |
+| lantern | 199,791 | 80,000 (way low) | 70,890 | won 5/5 |
+
+**Lantern** is simply mis-scaled: the child scores 199,791 against a par of
+80,000, so the leader hits its target and is still lapped. Raise par and
+re-measure; the family reaches ~80k when asked for ~80k, so there is headroom.
+
+**Pirate is a different problem and it is the old lesson returning.** Asked for
+105,000 the leader could only manage 63,044 — it never once reached par, in any
+of five matches. The family is FOOD-LIMITED there, not multiplier-limited, and
+that breaks the clean rule above: the player won the run where they scored only
+80,982, because the leader could only find 54,744 points of food.
+
+The subtlety specific to the new controller: because the band is
+`need / rawRate`, giving that family MORE FOOD changes nothing — the controller
+simply lowers the multiplier to hold the same target. The only thing that can
+bind is the band hitting its clamp of 24. So before touching anything, MEASURE
+WHETHER THE BAND IS SATURATED on pirate. If it is, the clamp is the lever. If it
+is not, the rivals are failing to find food at all and the larder's search
+radius or the size cap is the lever. Do not guess between those two.
+
+STILL OPEN: pirate's food limit, and lantern's par.
 
 Verify any attempt with `node qa/ab.mjs 5 maple child 4173`.
+
+### 1b. THE VOID RENDERS IN THE WRONG COLOUR SPACE  (found, measured, NOT shipped)
+
+**The hero's body shader writes raw linear values into an sRGB buffer.** Proven
+by rendering one colour two ways in the same frame:
+
+| path | `0x5f2ab4` renders as |
+|---|---|
+| `MeshBasicMaterial` | `(90, 24, 188)` — correct |
+| raw `ShaderMaterial` (the void) | **`(29, 6, 116)`** — the linear value |
+
+`THREE.Color` converts a hex to the linear working space on assignment and every
+normal material converts back on the way out via `<colorspace_fragment>`. The
+void is a `ShaderMaterial`, so three appends nothing, and it ends at a bare
+`gl_FragColor`. The character's purple is therefore displayed at roughly a third
+of its authored brightness and pulled toward blue.
+
+The consequence is bigger than one wrong colour: **every palette ever chosen for
+this character was judged through that filter**, including the `qa/voidgrid.mjs`
+sweep that picked the current one. It is a strong candidate for why no set of
+hex values has ever matched the key art.
+
+WHY IT IS NOT SHIPPED, and what the next attempt must know:
+- Adding `#include <colorspace_pars_fragment>` DUPLICATES it — three already
+  prepends it to every ShaderMaterial, and the fragment shader then fails to
+  compile with "'LinearTransferOETF' : function already has a body". When that
+  happens the void is not drawn AT ALL, and a colour probe cheerfully measures
+  the grass behind him and reports a hue of 83 degrees. Only the tone-mapping
+  pars need declaring.
+- With just `<tonemapping_pars_fragment>` + `<tonemapping_fragment>` +
+  `<colorspace_fragment>` it compiles and looks right on the probe's rung, but
+  **`qa/smoke.mjs` still FAILS** with a ShaderMaterial compile error. Smoke runs
+  at `deviceScaleFactor: 1`, which lands on a different quality rung — bloom
+  off, so the frame goes straight to the canvas instead of through a render
+  target. That path is not fixed. Reproduce with
+  `node qa/smoke.mjs`, not with a DPR-2 probe, which passes clean.
+- And the owner has since approved the CURRENT look ("It was this purple
+  before"). The palette is compensating for the crush, so correcting the encode
+  without re-tuning the palette will change a look he has explicitly blessed.
+  This is now a taste decision with a render attached, not a silent fix.
 
 ### 2. VISUAL — "breathtaking from every ground pixel"
 The shop already renders at native resolution filling 86% of frame. The WORLD
