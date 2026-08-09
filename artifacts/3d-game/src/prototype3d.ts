@@ -216,14 +216,28 @@ setWorld(pickedWorld);
 // feeds back the other way (a calmer family leaves more food, so scores rise),
 // which is why this wants one more measured pass rather than an exact formula.
 //
+// The loop is real and it CONVERGES, measured across two passes on Maple:
+//   par 94,000 -> child mean 88,294, wins 2/5   (too hard)
+//   par 80,000 -> child mean 103,642, wins 3/5  (the mean recovered 17%)
+// So each pass moves both numbers and the second pass landed in spec. Two
+// matches in that second pass were decided by 4,772 and 868 points.
+//
+// AND DO NOT JUDGE THIS BY `leader / lane` ANY MORE. qa/ab.mjs reports the
+// leader against 0.94 x the player's score, which was the right yardstick when
+// the lane WAS a fraction of the player. It is not any more. With an absolute
+// par, a player having a great run leaves the leader sitting on par and the
+// ratio falls — correctly. Maple reads 80.9% here not because the field is
+// failing but because the player averaged 103,642 against a par of 80,000.
+// Judge it on WIN RATE, WORST PLACE, and how close the losses are.
+//
 // Re-measure if scoring changes. A par that drifts high makes the game
 // punishing; one that drifts low turns the family back into scenery, which is
 // the exact bug this whole mechanism replaced.
 const WORLD_PAR: Record<string, number> = {
-  maple: 80000,      // post-change child mean 88,294 (sd 22,737); 94,000 gave 2/5
-  pirate: 80000,     // provisional — shares Maple's density until measured
-  gameday: 175000,   // post-change child mean 198,446 (sd 61,657); 4/5, leader 88.7% of lane
-  lantern: 80000,    // provisional — until measured
+  maple: 80000,      // verified: mean 103,642, wins 3/5, worst place 2nd
+  pirate: 105000,    // child mean 142,755 uncontested — nearly 2x Maple's scale
+  gameday: 175000,   // verified: mean 198,446 (sd 61,657), wins 4/5
+  lantern: 80000,    // provisional — never measured
 };
 
 
