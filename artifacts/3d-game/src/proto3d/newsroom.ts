@@ -149,6 +149,9 @@ type Pools = [string[], string[], string[]];
 const PORT: Pools = [[
   // ── BEAT 2 · DENIAL ──
   'Cargo today: 400 crates, 399 of them inflatable swans.',
+  'The General Manager thanks you for choosing Pirate Bay Resort.',
+  'GM Prentice notes the {F} is not an amenity and cannot be booked.',
+  'Guest relations: the {F} in {D} is a themed experience. Enjoy.',
   'Whose seagull is sitting in the harbour master\'s chair?',
   'Fragile. That is what the crate said. Inside were smaller crates.',
   'The dock hands are paid to say arrr and they never stop.',
@@ -163,6 +166,9 @@ const PORT: Pools = [[
   'Correction: the harbour master has a chair. A seagull has it.',
 ], [
   // ── BEAT 3 · ALARM ──
+  'GM Prentice asks guests to enjoy the pool while the pool exists.',
+  'The General Manager is smiling. The General Manager is always smiling.',
+  'Prentice has upgraded everyone to a room further from {D}.',
   'The dock is shorter today. The tannoy is calling that cosier.',
   'All 399 swans have been inflated. That is the plan. That is all of it.',
   'Your boat is closer to the shore than you left it.',
@@ -176,6 +182,9 @@ const PORT: Pools = [[
   'The seagull has left the chair. The seagull knows something.',
 ], [
   // ── BEAT 4 · PANIC ──
+  'GM Prentice recommends the shuttle. Any shuttle. Now.',
+  'The General Manager has stopped saying arrr. That is the bad sign.',
+  'Prentice is running. Prentice has never run in his life.',
   'The docks have GONE!! Boat hire is open as usual.',
   'Crate 400 has been opened. Swans. Of course it was swans.',
   'First Boat has gone. Second Boat is now First Boat.',

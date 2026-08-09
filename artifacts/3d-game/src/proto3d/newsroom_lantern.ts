@@ -96,6 +96,9 @@ const SIGN_ON: string[] = [
 // Pure courtesy. Not one line here acknowledges that anything is wrong,
 // because the system that speaks them has no way to.
 const T0_GENERAL = [
+  'The Warden of the Lanterns bids you welcome, and welcome, and welcome.',
+  'The Warden has lit the lamps. The Warden always lights the lamps.',
+  'A courtesy from the Warden: please do not feed the {F}.',
   'The market is open and Ponta has already sold nine hundred dumplings.',
   'A round purple guest has arrived at the gate. Everybody is delighted.',
   '"Welcome, honoured guest," says Yuki, bowing low to a hole in the road.',
@@ -170,6 +173,9 @@ const T0_BY_DIST: Record<LnDist, string[]> = {
 // window — everything it knows, it knows from a number that will not stop
 // going up. The comedy is administrative.
 const T1_GENERAL = [
+  'The Warden requests that guests keep to the lit path, where there is one.',
+  'The Warden has counted the lanterns twice and reached two answers.',
+  'A courtesy: {D} is closed for the season. This season.',
   'Management has counted the stalls twice and would like to count again.',
   'The guest\'s bill is now four pages long. The guest has no pockets.',
   'This is not an evacuation. This is a lantern walk, says Management!',
@@ -235,6 +241,9 @@ const T1_BY_DIST: Record<LnDist, string[]> = {
 // Somebody has taken the microphone. The courtesy formulas are still running
 // underneath, which is the joke: a recording does not stop for an emergency.
 const T2_GENERAL = [
+  'The Warden asks that you leave by the south gate, which is still there.',
+  'The Warden is still lighting lamps. There is nothing left to light.',
+  'A final courtesy from the Warden: go. Go now. Thank you for visiting.',
   'The market has GONE!! Tea is served until the lanterns go out.',
   'Lantern Row has gone. The dumplings are safe. Ponta carried them all.',
   'Ponta is up the drum tower, drumming, and waving people up the stair.',

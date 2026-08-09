@@ -586,18 +586,26 @@ export type MealKind = 'house' | 'car' | 'big' | 'small';
 
 const MEAL_HOUSE: Pools = [[
   // ── BEAT 2 · DENIAL ──
+  'AD Vance Kroll says the game is ON. The game is always ON.',
+  'Kroll calls the {F} a field-condition issue. Kickoff unchanged.',
   'It ate {M} and left the porch light burning on the lawn.',
   'It ate {M} off Frat Row. The sofa on the lawn stayed put.',
   'Bill, has {M} ever gone that quickly before?',
   'That was {M}. Hank called it. Bill wrote it down.',
 ], [
   // ── BEAT 3 · ALARM ──
+  'Kroll has moved the tailgate. Kroll has not moved the kickoff.',
+  'AD Kroll: "We have played through worse." We have not.',
+  'The Athletic Director is on the phone. Both phones. All the phones.',
   'That is four houses off Frat Row, and it just ate {M}.',
   'The porch swing came off {M} and got clean away.',
   'Bill says {M} is a big gain on any down.',
   'It ate {M}. Site twenty two had the doorbell on it.',
 ], [
   // ── BEAT 4 · PANIC ──
+  'Kroll is evacuating the stadium and calling it a hydration break.',
+  'The Athletic Director has finally cancelled something. Everything.',
+  'Kroll says go. Kroll says GO. Kroll is already in the lot.',
   'Every sofa on Frat Row got out before it ate {M}.',
   'It ate {M}. One porch light got out, and it is still on.',
   'It ate {M} with the lovely awning still out!!',
@@ -690,6 +698,7 @@ export function gamedayMealKind(meal: string): MealKind {
 //  commentator says the word out loud, and the ticker is quoting a commentator.
 const LIVE: Pools = [[
   // ── BEAT 2 · DENIAL ──
+  'AD Kroll reminds you: no refunds. No exceptions. No {F}.',
   'Hank has the call. A {F} is down at {D}.',
   'It ate {M}. The stadium is calling that a parking matter.',
   'Bill, what is a {F} exactly?',
