@@ -29,6 +29,12 @@ serves that.
    Egress blocks both downloads AND the pages, so a session cannot choose
    tracks — see `public/assets/music/README.md`.
 6. **Run `qa/smoke.mjs` before every push to main.** Push to main is a deploy.
+   IT LISTENS ON **4177**, not 4173 — the two are different servers and a
+   container restart kills both. `node qa/smoke.mjs | tail -2` in a `&&` chain
+   will report a CONNECTION REFUSED stack and STILL let the push through,
+   because tail exits 0. I claimed "smoke green" in b88d120 on exactly that
+   false signal. Check the output says PASS; do not trust the exit status of a
+   pipeline.
 7. Working directory resets to the repo root between commands. `cd
    artifacts/3d-game` first, every time.
 
