@@ -168,6 +168,9 @@ const MAINST: Pools = [[
   'Gus is carrying the diner stools out, one at a time.',
   'Wendell is cutting hair on the pavement. Same haircut, better light.',
   'Half of Main Street has gone and the plaque still thanks the mayor.',
+  'Mayor Tuggle is debating an empty chair. The chair was a rival. It got eaten.',
+  'The mayor has moved the polling station twice. It keeps not being there.',
+  'Tuggle has doubled down: "Under my leadership, some of the town remains."',
   'Everybody out of the diner, please, and bring a stool with you.',
   'Biscuit has opened every door on Main Street and is not finished!',
   'The stoplight is still ours. For now it is still ours.',
@@ -177,6 +180,9 @@ const MAINST: Pools = [[
 ], [
   // ── BEAT 4 · PANIC ──
   'The stoplight is the last thing standing. It is green. Go.',
+  'Mayor Tuggle is campaigning from the roof of the roofless town hall.',
+  'Tuggle concedes nothing. Tuggle has, however, started running.',
+  'Polls close at eight. So does everything else, permanently.',
   'Gus took the coffee pot and every one of his opinions with him.',
   'Wendell gave one last haircut. It was the same haircut.',
   'The plaque survived!! It still thanks entirely the wrong man.',
@@ -773,6 +779,11 @@ export function mapleMealKind(meal: string): MealKind {
 const LIVE: Pools = [[
   // ── BEAT 2 · DENIAL ──
   'The mayor says there is no {F} in {D}.',
+  'Mayor Tuggle reminds you the election is Tuesday. Tuggle for Maple Falls.',
+  'Mayor Tuggle cut a ribbon in {D}. The ribbon has gone too.',
+  'The mayor has not lost {D}. He has MISPLACED it. Vote Tuggle.',
+  'Mayor Tuggle asks what {F}. Paid for by Friends of Tuggle.',
+  'Tuggle yard signs are free at the diner. Please take two, one may be eaten.',
   'A {F} was seen in {D} and residents waved at it.',
   'It ate {M}. Town hall has scheduled a meeting.',
   'Carla Webb asked about the {F} and was handed a leaflet.',
