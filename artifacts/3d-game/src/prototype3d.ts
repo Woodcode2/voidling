@@ -367,12 +367,27 @@ const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the
 interface WorldLight {
   sun: number; sunI: number; hemiSky: number; hemiGround: number; hemiI: number;
   off: [number, number, number]; dusk: number; normalBias: number; exposure: number;
+  // ── THE COUNTER-LIGHT, WHICH THE WORLD DID NOT HAVE ──────────────────────
+  // The scene ran one directional sun plus a hemisphere, so every form was lit
+  // from a single direction and its shadow side fell to flat ambient. That is
+  // the difference between "3D" and "lit": with one lamp, a sphere is a
+  // gradient, and with a warm key against a cool counter it is an object.
+  //
+  // The shop-card scenes in this very file have had the right rig all along —
+  // key 0xfff2d8 at 2.4-2.6, rim 0x9fc8ff at 1.0-1.1, plus hemi (see the card
+  // shooters). So the CARDS were better lit than the game they advertise. This
+  // ports that idea to the world, per world, and it casts no shadows: a second
+  // shadow map is the single most expensive thing that could be added here, and
+  // a fill light does not need one.
+  fill: number; fillI: number; fillOff: [number, number, number];
 }
 const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   maple:   { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
-             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0 },
+             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0,
+             fill: 0x9fc8ff, fillI: 0.62, fillOff: [62, 46, -58] },
   pirate:  { sun: 0xfff2d8, sunI: 1.75, hemiSky: 0xdfeaff, hemiGround: 0x4a4468, hemiI: 0.5,
-             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0 },
+             off: [-55, 95, 42], dusk: 0, normalBias: 0.15, exposure: 1.0,
+             fill: 0x8fd6ff, fillI: 0.58, fillOff: [62, 46, -58] },
   // key paid back to 3.05, fill lifted to 0.66 and swung COOL (a slate, not a
   // brown) so the shadow side goes blue against the amber key instead of
   // muddying into it — warm light, cool shade, which is the whole read.
@@ -386,7 +401,8 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // about 1.2x each object's height — long enough to read as afternoon, short
   // enough that the aisles stay lit.
   gameday: { sun: 0xffd9a8, sunI: 2.55, hemiSky: 0xc8dcf8, hemiGround: 0x53658c, hemiI: 0.86,
-             off: [-38, 72, 78], dusk: 0.45, normalBias: 0.26, exposure: 1.12 },
+             off: [-38, 72, 78], dusk: 0.45, normalBias: 0.26, exposure: 1.12,
+             fill: 0x93b4e8, fillI: 0.52, fillOff: [58, 44, -62] },
   // ── LANTERN NIGHT: the first rig in the game with no sun in it ──────────
   // Everything above is a daylight rig with the key doing the work. Here the
   // key is the MOON — cold, dim, and high, at 0.42 — and it is deliberately
@@ -410,7 +426,8 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // Exposure runs high (1.34) so the lantern pools bloom out toward white
   // while the shadows still have somewhere to go.
   lantern: { sun: 0xbfd4ff, sunI: 0.42, hemiSky: 0x141a3a, hemiGround: 0x6a4a3c, hemiI: 1.05,
-             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.34 },
+             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.34,
+             fill: 0x6a8cff, fillI: 0.46, fillOff: [52, 40, -60] },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 
@@ -460,10 +477,22 @@ const RIG = {
 function applyLightRig(): void {
   sun.intensity = RIG.sunI;
   hemi.intensity = RIG.hemiI;
+  // the fill rides the same dimmer as the key, so a world that dims at dusk
+  // does not end up lit only from behind
+  fill.intensity = LIGHT.fillI * (RIG.sunI / WORLD_LIGHT[pickedWorld].sunI);
   renderer.toneMappingExposure = RIG.exposure;
 }
 const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, RIG.hemiI);
 scene.add(hemi);
+// THE COOL COUNTER-LIGHT. See WorldLight.fill: the world had a single sun, so
+// every shadow side fell to flat hemisphere ambient and forms read as gradients
+// rather than as objects. This sits roughly opposite the sun, cool against the
+// sun's warm, and casts NO shadow — a second shadow map is the most expensive
+// thing that could be added to this scene, and a fill does not need one.
+const fill = new THREE.DirectionalLight(LIGHT.fill, LIGHT.fillI);
+fill.position.set(...LIGHT.fillOff);
+fill.castShadow = false;
+scene.add(fill);
 const sun = new THREE.DirectionalLight(LIGHT.sun, RIG.sunI);
 const sunOff = new THREE.Vector3(...LIGHT.off);
 sun.position.copy(sunOff);
