@@ -5,6 +5,9 @@
 // Standalone page — the main game bundle is untouched.
 declare const __BUILD__: string;   // injected by vite.config define (build stamp)
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 // brand type: the shipping page used system-ui while only the retired React
 // entry bundled the brand font — single cheapest "top-10 app" lift
 import { Capacitor } from '@capacitor/core';
@@ -104,6 +107,33 @@ const IS_SMALL_SCREEN = matchMedia('(pointer: coarse)').matches || window.innerW
 const PR_TOP = 2;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, PR_TOP));
 renderer.shadowMap.autoUpdate = false;   // half-rate shadow pass (updated in the frame loop)
+// ── THE GLOW THE GAME NEVER HAD ───────────────────────────────────────────
+// There was no post chain at all: no EffectComposer, no RenderPass, nothing
+// after ACES tone mapping. Every emissive in the game — lantern light, the
+// void's rim, neon, Game Day's floodlights, the legendary auras, 23 materials
+// across island.ts and void3d.ts — rendered as flat bright pixels with no
+// bleed, which is the difference between "lit" and "glowing".
+//
+// THRESHOLD 0.92 IS THE WHOLE DESIGN. Maple is a bright autumn palette under
+// ACES at exposure 1.0, and a naive threshold hazes every white wall and lane
+// line — that reads as fog, not glow, and it is how bloom gets a bad name. The
+// cut sits above diffuse white so only genuine light sources bleed. Strength
+// stays low for the same reason: felt, not seen.
+let composer: EffectComposer | null = null;
+let bloomPass: UnrealBloomPass | null = null;
+function ensureComposer(): EffectComposer {
+  if (composer) return composer;
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.42,   // strength — a lift, not a bath
+    0.55,   // radius
+    0.92,   // threshold: above diffuse white, so only real light sources bleed
+  );
+  composer.addPass(bloomPass);
+  return composer;
+}
 let shadowFrame = 0;
 // if the OS ever reclaims the GPU context, recover with a clean reload instead
 // of a frozen black screen
@@ -437,12 +467,17 @@ function fadeOccluders(dt: number): void {
 // Math.min(q.pr, 1.3) on touch devices, which flattened the whole ladder to a
 // single blurry rung and made three of the four entries unreachable.
 const QUALITY = [
-  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048 },
-  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024 },
-  { pr: 1.35, prSmall: 1.3, shadows: true, shSize: 1024 },
-  { pr: 1.15, prSmall: 1.0, shadows: false, shSize: 512 },
+  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048, bloom: true },
+  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024, bloom: true },
+  // BLOOM GOES BEFORE RESOLUTION DOES. A composer costs a full-screen pass and
+  // a mip chain every frame, and a blurry-but-smooth frame beats a sharp-but-
+  // stuttering one on a phone — so the ladder drops the glow one rung before it
+  // starts dropping pixels the player can see.
+  { pr: 1.35, prSmall: 1.3, shadows: true, shSize: 1024, bloom: false },
+  { pr: 1.15, prSmall: 1.0, shadows: false, shSize: 512, bloom: false },
 ];
 let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
+let bloomOn = true;   // set by applyQuality from the rung's own flag
 /** QA only: when non-null the adapter stops walking and stays on this rung.
  *  See __pinQuality — a moving ladder makes every graphics measurement a
  *  reading from a rung nobody chose. */
@@ -455,6 +490,7 @@ let qShadowLatch = false;
 function applyQuality() {
   const q = QUALITY[qLevel];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? q.prSmall : q.pr));
+  bloomOn = q.bloom;
   if (renderer.shadowMap.enabled !== q.shadows) {
     // ── THE MOST EXPENSIVE THING IN THE GAME, AND IT FIRES WHEN THE DEVICE
     //    IS ALREADY STRUGGLING ────────────────────────────────────────────
@@ -6794,7 +6830,16 @@ function animate() {
   // should look identical from the first second to the last. Maple Isle is
   // permanently high noon. (The lamp/window emissive ramp goes with it.)
   if ((shadowFrame++ & 1) === 0) renderer.shadowMap.needsUpdate = true;
-  renderer.render(scene, camera);
+  // …through the composer only on the rungs that can afford it. applyQuality
+  // owns bloomOn, so the adapter switching rungs switches the glow with it.
+  if (bloomOn) {
+    const c = ensureComposer();
+    c.setPixelRatio(renderer.getPixelRatio());
+    c.setSize(renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+    c.render();
+  } else {
+    renderer.render(scene, camera);
+  }
   requestAnimationFrame(animate);
 }
 // total edible mass on the island — the denominator for "% devoured"
