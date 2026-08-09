@@ -705,8 +705,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // reflected-light crescent at the bottom and both catchlights baked in.
   // Baking the catchlights also retired four meshes.
   const SCL_R = 0.21;
+  // ── THE EYES ARE THE FOCAL POINT, SO THEY GET THE RESOLUTION ────────────
+  // These were 128px. Measured on a DPR-3 phone with the void at r=6, ONE EYE
+  // COVERS 284 DEVICE PIXELS — a 2.2x magnification of the texture, and worse
+  // again at the top forms where he fills the screen. A magnified gradient is
+  // exactly what "not crisp" looks like, and it lands on the one part of the
+  // character a player actually looks at.
+  //
+  // 512 gives 4x linear headroom, which covers every size in the game with room
+  // over. Cost is 1 MB per texture and a one-off canvas draw at load; there are
+  // two of them, and they are SHARED by the hero and all five family voids, so
+  // this is 2 MB total for the whole cast rather than per void.
   const scleraTex = (() => {
-    const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const S = 512, cv = document.createElement('canvas'); cv.width = cv.height = S;
     const x = cv.getContext('2d')!;
     x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2); x.clip();
     x.fillStyle = '#ffffff'; x.fillRect(0, 0, S, S);
@@ -728,10 +739,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     g.addColorStop(1, 'rgba(88,66,140,0.34)');
     x.fillStyle = g; x.fillRect(0, 0, S, S);
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.anisotropy = 4;
     return t;
   })();
   const pupilTex = (() => {
-    const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+    const S = 512, cv = document.createElement('canvas'); cv.width = cv.height = S;
     const x = cv.getContext('2d')!;
     x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2); x.clip();
     // iris: a hair lighter at the edge than dead centre, so the pupil has a
@@ -756,6 +769,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     x.fillStyle = 'rgba(255,255,255,0.92)';
     x.beginPath(); x.arc(S * 0.655, S * 0.68, S * 0.062, 0, Math.PI * 2); x.fill();
     const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    // same sampling as the sclera: mipmaps so he stays clean when small, a
+    // little anisotropy because the face billboards at a tilt
+    t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.anisotropy = 4;
     return t;
   })();
   interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; white: THREE.Mesh; }
