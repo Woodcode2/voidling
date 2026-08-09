@@ -1314,7 +1314,20 @@ _dbg.__voidSheet = async (ids: string[]) => {
 _dbg.__life = life;
 _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // 3-5 family members per match, randomly cast — you never know who's coming
-const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
+// ── THREE RIVALS THAT MATTER, NOT FIVE THAT CANNOT ────────────────────────
+// The family is food-limited in absolute terms, so the island's rival capacity
+// is roughly fixed and splitting it five ways is what put every individual out
+// of reach. It shows in the measurements: across the A/B runs the three-rival
+// matches consistently produced the closest race, and rivals.ts already records
+// the same thing from the other end — "1.95x with three rivals, 2.29x with
+// four, 3.45x with five, because five siblings compete for the same props, so
+// each one eats less and falls further behind a target it can only reach by
+// eating."
+//
+// A leaderboard a child can read at a glance is three names and theirs, not
+// six. The cast is unchanged — arch types, voices, the hunter arc — there are
+// simply fewer of them on the island at once, each one twice the threat.
+const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3);
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
   WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
