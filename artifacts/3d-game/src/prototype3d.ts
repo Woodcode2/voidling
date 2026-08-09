@@ -1671,33 +1671,52 @@ function bakeContactShadows(): void {
 // This is the ground ring that fixes it — sized in SCREEN space, so it holds a
 // readable footprint however far the camera is, and it retires itself once the
 // void is big enough to find on its own.
-const FIND_RING_PX = 26;            // ring radius in screen pixels, minimum
-const findRingMat = new THREE.MeshBasicMaterial({
-  color: 0x7ef2a0, transparent: true, opacity: 0, depthWrite: false,
-  blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-const findRing = new THREE.Mesh(new THREE.RingGeometry(0.80, 1.0, 48), findRingMat);
-findRing.rotation.x = -Math.PI / 2;
-findRing.frustumCulled = false;
-findRing.renderOrder = 2;
-scene.add(findRing);
-function updateFindRing(t: number, since: number): void {
-  // fades out over 3s once either the grace window closes or the void is
-  // plainly large enough to see
-  const wanted = since < 18 && voidling.radius < 2.6;
-  const target = wanted ? 1 : 0;
-  findRingK += (target - findRingK) * (1 - Math.exp(-3.2 * Math.max(0.001, t - findRingLast)));
-  findRingLast = t;
-  if (findRingK < 0.01) { findRing.visible = false; return; }
-  findRing.visible = true;
-  // world units per screen pixel at the void's depth
-  const wpp = (2 * camDist * Math.tan((camera.fov * Math.PI / 180) / 2)) / Math.max(1, window.innerHeight);
-  const pulse = 1 + Math.sin(t * 4.2) * 0.09;
-  const r = Math.max(voidling.radius * 1.75, FIND_RING_PX * wpp) * pulse;
-  findRing.scale.setScalar(r);
-  findRing.position.set(voidState.x, 0.08, voidState.z);
-  findRingMat.opacity = findRingK * (0.42 + Math.sin(t * 4.2) * 0.16);
-}
-let findRingK = 0, findRingLast = 0;
+// ── AND IT IS THE RING THE OWNER KEPT REPORTING ───────────────────────────
+// Twice: "There's a white circle always around the void?" and later "And
+// there's a ring around him". Both times I went looking at the void's own
+// furniture — I deleted the hole.io ground annulus in void3d, which was a real
+// but DIFFERENT ring — and this one survived, because it does not live with the
+// character at all. It is added straight to the scene, two thousand lines away
+// from everything else that draws him.
+//
+// Two things made it read as a permanent white hoop rather than a brief hint:
+//   - ADDITIVE blending. Mint green added onto Maple's pale sand and the pink
+//     plaza clips straight to white, which is why he reported it as white both
+//     times and why no amount of looking for a white MATERIAL found it.
+//   - The retire condition, `since < 18 && radius < 2.6`. The HUD reports
+//     1.6 x radius in metres, so 2.6 is "VOIDLING 4m" — a size a child is still
+//     at well into the match. It was never the opening-seconds hint it was
+//     written to be; it was on for most of the early game.
+// Now: normal blending so it can never blow out, the void's own violet instead
+// of a mint green that belonged to no part of this character, and a window that
+// actually means "the first few seconds".
+// ── THE FIND RING IS GONE. IT WAS THE RING HE KEPT REPORTING. ──────────────
+// There used to be an additively-blended mint-green annulus on the ground at
+// 1.75x the void's radius, on for `since < 18 && radius < 2.6`.
+//
+// The owner reported it twice — "There's a white circle always around the
+// void?" and later "And there's a ring around him" — and BOTH times I went
+// hunting through void3d.ts, because that is where the character is drawn. It
+// was never there. It lived here, two thousand lines away, added straight to
+// the scene by the camera code. I deleted a different ring (the hole.io ground
+// lip) on the first report and told him it was fixed. It was not.
+//
+// Why it read as WHITE when the material was green: AdditiveBlending. Mint
+// added onto Maple's pale sand and the pink plaza clips to white, so searching
+// for a white material was never going to find it.
+//
+// Why it was always on: the retire gate. The HUD shows 1.6 x radius in metres,
+// so `radius < 2.6` is "up to VOIDLING 4m" — most of the early match, not the
+// opening moment. Both of his screenshots are 4-5 seconds in, squarely inside
+// it.
+//
+// Its stated purpose was real: "at match start the void is 18 pixels across on
+// a 390px phone and testers could not locate their own character". That premise
+// is stale. He now starts around 47px on the same phone, the camera is locked
+// to him, he has a dark contact shadow under him and a saturated violet body
+// against pastel ground. The thing the ring was compensating for is fixed, so
+// the compensation goes rather than getting quieter for a third time.
+
 const puffVel: THREE.Vector3[] = []; const puffLife: number[] = [];
 for (let i = 0; i < PUFF; i++) { puffVel.push(new THREE.Vector3()); puffLife.push(0); puffPos[i * 3 + 1] = -999; }
 let puffHead = 0;
@@ -6842,7 +6861,6 @@ function animate() {
   if (gOn) paintGrowth(R);
 
   pumpBanner();   // anything the evolve card held back gets its turn now
-  updateFindRing(tClock, started ? matchElapsed() : 999);   // menu never shows it
 
   if (SHOW_WALLS) paintWalls();
   // LOD band + shadow frustum track the camera

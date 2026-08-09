@@ -66,6 +66,23 @@ await p.evaluate(() => {
     pointerId: 1, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true }));
 });
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 2.5, null, { timeout: 400000 });
+// ── AND HIDE THE JOYSTICK, WHICH IS THIS PROBE'S OWN THUMB ─────────────────
+// The pointerdown above lands at the centre of the screen, the follow camera
+// keeps the void at the centre of the screen, and #joy is a 128px ring drawn at
+// the touch point. So every frame this probe has ever captured had a hard ring
+// sitting exactly on the character — and because the stick only hides on
+// pointerup, which a probe never sends, it never went away.
+//
+// I burned three shader changes hunting that ring inside the void: the rim's
+// additive stacking, the rim stop clamp, and the rim colour. It is a DOM
+// element. It is not in the scene, so a raycast cannot hit it and readPixels on
+// the WebGL buffer cannot see it. The owner diagnosed it from the pictures —
+// "I suspect it's like the cursor when you move but you're just idle?" — which
+// is exactly what it was.
+//
+// The input is still held (the camera framing depends on it); only the overlay
+// is hidden, so what gets photographed is the game, not the instrument.
+await p.addStyleTag({ content: '#joy,#joyNub{display:none !important}' });
 
 const rgb2hsv = (r, g, bl) => {
   r /= 255; g /= 255; bl /= 255;
@@ -226,11 +243,15 @@ const sampleAt = async (f) => { const m = await sample(f); const s = stats(m); r
 
 for (const rr of RADII) {
   await p.evaluate((v) => window.__setVoidR(v), rr);
-  // 2.2s, not 0.9: jumping the radius fires the EVOLUTION BURST, and its torus
-  // sits at 1.42x the body. The first read of this probe caught that ring and
-  // very nearly had me hunting a bug that a player never sees — in normal play
-  // those materials measure opacity 0.
-  await p.waitForTimeout(2200);
+  // 3.4s, not 2.2 and certainly not 0.9: jumping the radius fires the EVOLUTION
+  // BURST, whose torus sits at 1.42x the body. An earlier pass raised this to
+  // 2.2s believing that cleared it. IT DOES NOT — at 2.2s the burst is still
+  // visible as a hard bright ring, and I then spent three separate code changes
+  // hunting a ring that existed only in this file's screenshots. Measured
+  // against an ablation probe that waited 2.5s and saw a clean character, the
+  // effect needs about three seconds to reach opacity zero. If a future render
+  // shows a ring around him, SUSPECT THIS NUMBER BEFORE SUSPECTING THE GAME.
+  await p.waitForTimeout(3400);
   const m = await sample(null);
   const old = await sample({ cssR: m.pxR / 2, law: 'old' });   // same frame, old law
   const half = Math.max(60, m.pxR * 2.2);

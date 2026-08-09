@@ -166,12 +166,21 @@ const VOID_FRAG = `
     // 30px and only starts eating the body below about 17px, which is genuinely
     // speck size. Clamped at 0.88 so it never gets THINNER than the authored
     // look, and at 0.62 so it cannot vanish in the opening dive.
-    float rimStop = clamp(1.0 - 2.0 / max(6.0, uPxR), 0.62, 0.88);
+    // …AND THE CLAMP IS THE WHOLE BALLGAME. u is the normalised RADIUS, so a
+    // stop of 0.88 is not "a lit lip": it is the outer 12% of the radius, which
+    // on the 214px radius he renders at in play is a TWENTY-SIX PIXEL band of
+    // near-white lavender wrapped around him. That is the ring. The pixel-based
+    // numerator was right and I clamped it away — 1 - 2/uPxR only escapes the
+    // clamp below about 17px, a size he is never at.
+    // 0.985 keeps the lip around 3 device px at play size; the 0.90 floor keeps
+    // it from vanishing in the opening dive.
+    float rimStop = clamp(1.0 - 2.5 / max(8.0, uPxR), 0.90, 0.985);
     // 0 at normal sizes, 1 only when the pixel floor has genuinely taken over.
     // Everything that used to key off uSmall keys off this instead, so the three
     // desaturating terms can no longer fire at a size the player actually plays.
-    float wide = smoothstep(0.88, 0.62, rimStop);
-    col = mix(col, uRim, smoothstep(rimStop, 1.0, u));
+    float wide = smoothstep(0.985, 0.90, rimStop);
+    float rimMix = smoothstep(rimStop, 1.0, u);
+    col = mix(col, uRim, rimMix);
     // premium skin: wrap the AI texture around the orb (slow drift), keep
     // the darker core + lit rim so it still reads as a VOID
     if (uTexAmt > 0.01) {
@@ -258,7 +267,26 @@ const VOID_FRAG = `
     // ── EVENT HORIZON ─────────────────────────────────────────────────────
     // rim light lives OPPOSITE the key, like a real one, and fattens with
     // both the evolution stage and how small he is on screen
-    col += uRim * pow(u, mix(3.0, 1.9, wide)) * (0.30 + uStage * 0.05) * mix(1.45, 0.72, key);
+    // ── AND IT MUST NOT STACK ON THE RIM MIX ──────────────────────────────
+    // THIS IS THE WHITE RING. The line above already mixes the body all the way
+    // TO uRim at the silhouette. This term then ADDED uRim on top of it again:
+    //
+    //   mix result at u=1     (0.80, 0.60, 1.00)   uRim, 0xcb99ff
+    //   + this term, max      x 0.30 x 1.45 = x1.435
+    //   = (1.14, 0.86, 1.43) -> clipped by the framebuffer to (1.0, 0.86, 1.0)
+    //
+    // A hard, colourless, blown-out edge, one to two pixels wide, wrapped around
+    // the character at every size. The owner reported it twice as "there's a
+    // ring around him" and I twice went looking for scene furniture — I deleted
+    // the ground annulus, which was a real but DIFFERENT ring, and the white one
+    // survived because it was never a mesh at all. It is also why he reads pale:
+    // the brightest pixels on him carry no chroma.
+    //
+    // Fading it out by (1 - rimMix) hands the silhouette back to uRim's actual
+    // colour, which is a light VIOLET rather than white, and keeps the lift
+    // where it was always meant to be — on the shoulder just inside the edge.
+    col += uRim * pow(u, mix(3.0, 1.9, wide)) * (0.30 + uStage * 0.05)
+         * mix(1.45, 0.72, key) * (1.0 - rimMix);
     // 🌈 iridescent horizon: a slow pink↔violet shimmer riding the last few
     // degrees of the silhouette (premium toy-gloss, kills the flat rim band)
     float ang = atan(vObj.y, vObj.x) + uTime * 0.3;
@@ -357,16 +385,36 @@ export function applySkinToBody(m: THREE.ShaderMaterial, s: Skin): void {
   if (ch?.patCol) m.uniforms.uPatCol.value.set(ch.patCol);
 }
 
-// ── THE MOUTH'S TWO ROUTES ──────────────────────────────────────────────────
-// A dark mouth cannot reach 3:1 on a dark body — the default skin's mid is
-// L 0.074, so even pure black tops out at 2.48:1. So dark bodies get a light
-// mouth and light bodies get a dark one, and each carries a contrasting inside
-// so it reads as an opening rather than a painted shape. Measured across all 18
-// skins: every one clears 3:1, worst case 3.20 (Classic).
-const MOUTH_LIGHT = 0xff6f91;      // candy pink — the lip, on a DARK body
-const MOUTH_LIGHT_IN = 0x8c1f3d;   // …and the throat behind it
-const MOUTH_DARK = 0x24050f;       // near-black plum — the lip, on a LIGHT body
-const MOUTH_DARK_IN = 0xff6f91;    // …with the pink tongue showing inside
+// ── THE MOUTH IS AN OPENING, NOT A FEATURE DRAWN ON HIM ─────────────────────
+// Two wrong answers are recorded here, both mine, both rejected on sight by the
+// owner looking at the live build.
+//
+//   1. A WHITE PLATE behind the lip, to buy 3:1 contrast. "That white smile has
+//      to go. The white part I'm not a fan of. It looks cheap."
+//   2. A CANDY PINK LIP with a darker centre, which measured beautifully — all
+//      18 skins over 3:1 — and looked like LIPSTICK. "Look at those lips. Why
+//      does a void have lips."
+//
+// The second failure is the instructive one, because the measurement was right
+// and the design was still wrong. A ring of one colour around a darker middle
+// is the exact shape of a made-up mouth; contrast ratio cannot see that, and I
+// shipped it because the number was good.
+//
+// What he actually asked for: "why can't it just be like he smiles we see red
+// or whatever like before". So the mouth is now ONE warm red opening with a
+// deeper throat behind it — no outer ring in a lighter colour, nothing that
+// traces the lip line. It reads as a hole into a warm inside, which is what a
+// cute mouth is.
+//
+// On contrast: red against the body is only 1.79:1 by luminance, and that is
+// fine here, because the mouth does not sit on the body's mid tone. It sits low
+// on the face where the shader's belly pit darkens toward abyss (L 0.0016),
+// where the same red measures 4.3:1. Hue does the rest — warm red against cool
+// violet separates even where luminance does not.
+const MOUTH_LIGHT = 0xe01e45;      // warm red opening, on a DARK body
+const MOUTH_LIGHT_IN = 0x6d0a22;   // …the throat, deeper red — never lighter
+const MOUTH_DARK = 0x24050f;       // near-black plum, on a LIGHT body
+const MOUTH_DARK_IN = 0xb3123c;    // …with a red throat inside it
 /** WCAG contrast ratio. "Can you see the smile" is a number, not a view. */
 function wcag(a: number, b: number): number {
   const f = (c: number) => { const u = c / 255; return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4; };
@@ -737,7 +785,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     const tongue = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24),
       new THREE.MeshBasicMaterial({ color: 0xff6f91, depthWrite: false }));
     mouthTongue = tongue.material as THREE.MeshBasicMaterial;
-    tongue.scale.set(1.35, 0.6, 1); tongue.position.set(0, 0.075, 0.004);
+    // The throat sits DEEPER and smaller than it used to. At 1.35 x 0.6 and
+    // y 0.075 it was a wide ellipse riding the mouth's opening line, which is
+    // precisely the shape of a lower lip — and with a lighter colour outside it
+    // the whole thing read as lipstick. Narrower, shorter and pushed further in
+    // reads as the back of a mouth instead.
+    tongue.scale.set(1.05, 0.5, 1); tongue.position.set(0, 0.055, 0.004);
     tongue.renderOrder = 1;
     mouth.add(lip); mouth.add(tongue);
     mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);

@@ -274,9 +274,25 @@
       /* drag joystick */
       /* the ring stroke measured 1.04:1 against island ground — a lens artifact,
          not a control */
+      /* THE JOYSTICK IS DRAWN ON TOP OF THE CHARACTER, so it cannot be opaque.
+         It used to be a 128px disc with a 3px SOLID WHITE border at 0.85 and a
+         rgba(16,8,30,0.42) fill. This is a relative-drag stick that appears
+         wherever the thumb lands, and the thumb lands near the void — which the
+         follow camera keeps in the centre of the screen. So in practice it drew
+         a hard white hoop around the hero and veiled him in 42% near-black.
+         The owner reported it three times, as "There's a white circle always
+         around the void?", "And there's a ring around him", and finally by
+         working out the cause himself: "I suspect it's like the cursor when you
+         move". He was right, and I had spent three shader changes hunting it
+         inside the character, because it is a DOM element and never appears in
+         the 3D scene at all — raycasts and framebuffer reads cannot see it.
+         It also explains part of "our voids purple faded": a 42% dark wash over
+         him drops both his value and his chroma for as long as you are driving,
+         which is the whole match.
+         Now: no fill at all, and a soft ring at 0.30 that reads as a control
+         under a thumb without becoming part of the character. */
       #joy { position: fixed; width: 128px; height: 128px; border-radius: 50%; z-index: 6;
-        background: rgba(16,8,30,0.42); border: 3px solid rgba(255,255,255,0.85);
-        box-shadow: 0 0 18px rgba(0,0,0,0.45);
+        background: transparent; border: 2px solid rgba(255,255,255,0.30);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       #joyNub { position: fixed; width: 52px; height: 52px; border-radius: 50%; z-index: 6;
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);
