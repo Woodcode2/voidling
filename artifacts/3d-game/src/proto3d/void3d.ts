@@ -958,6 +958,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   }
   mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
   face.add(mouth);
+  // The body's key light, copied from the fragment shader so the face and the
+  // body cannot drift apart. If that vector changes, change it here too.
+  const FACE_L = new THREE.Vector3(-0.40, 0.60, 0.69).normalize();
   const maw = new THREE.Group(); maw.position.set(0, -0.3, 1.01); maw.scale.setScalar(0.001);
   const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
   const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
@@ -1643,6 +1646,40 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       face.scale.setScalar(dispR);
       face.position.set(0, dispR * 0.1, 0);
       face.quaternion.copy(camera.quaternion);
+      // ── AND THE FACE TAKES THE SAME LIGHT THE BODY DOES ──────────────────
+      // Every feature is a billboarded circle on a MeshBasicMaterial, which
+      // means it takes NO light at all while the body underneath is fully
+      // shaded. That is what makes a character read as a sticker rather than as
+      // a face: the head turns into the light and the eyes do not.
+      //
+      // The fix is cheap because of the billboard. The face is oriented to the
+      // camera, so its LOCAL x/y are view-space x/y — the same space the body's
+      // key light is anchored in (see vec3 L in the fragment shader). So for a
+      // feature sitting at face-local (px, py), the sphere normal under it is
+      // just (px, py, sqrt(1 - px^2 - py^2)), and running that through the same
+      // smoothstep the body uses gives the same form light, for free, on the
+      // CPU, for a handful of meshes.
+      //
+      // The range is gentler than the body's 0.62-1.22. These are the features
+      // a six-year-old reads the mood from, so they get lit, not dimmed: at
+      // 0.82-1.12 the eye on the shadow side is visibly cooler without ever
+      // becoming hard to see.
+      for (const e of eyes) {
+        const px = e.g.position.x, py = e.g.position.y;
+        const nz = Math.sqrt(Math.max(0, 1 - px * px - py * py));
+        const ndl = px * FACE_L.x + py * FACE_L.y + nz * FACE_L.z;
+        // THE BODY'S OWN RANGE, not a gentler one. The fragment shader does
+        // col *= mix(0.62, 1.22, key) with this same smoothstep, so using any
+        // other numbers here means the face is lit by a different sun than the
+        // head it sits on — which is the exact failure being fixed. A shaded
+        // white sclera going grey is correct; that is what white does in shade.
+        const k = 0.62 + 0.60 * THREE.MathUtils.smoothstep(ndl, -0.55, 0.95);
+        // the sclera and pupil are textured white, so the tint IS the light;
+        // the outline is authored 0x2a1f45 and keeps its own hue
+        (e.white.material as THREE.MeshBasicMaterial).color.setScalar(k);
+        (e.outline.material as THREE.MeshBasicMaterial).color.setRGB(
+          0x2a / 255 * k, 0x1f / 255 * k, 0x45 / 255 * k);
+      }
       // …and the costume follows the face round the orb. Yaw only: a crown
       // must stay on top of the head, not tip toward the lens.
       dress.rotation.y = Math.atan2(camera.position.x - group.position.x, camera.position.z - group.position.z);
