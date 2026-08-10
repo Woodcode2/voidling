@@ -210,10 +210,29 @@ records that field size doubles variance (attempt 8b) and the sd here is 18.5 �
 so five matches were enough to manufacture a structural-looking problem out of
 nothing. Instrument first, and re-measure before believing a mean.
 
-STILL OPEN: lantern's par. Its child driver scores a mean of 199,791 against a
-par of 80,000 it inherited as a placeholder, so the leader hits its target and
-gets lapped anyway. Now set to 150,000 — 0.75 of the measured mean, the ratio
-Maple settled at — and being measured.
+### ALL FOUR WORLDS ARE NOW MEASURED AND IN SPEC
+
+Lantern's par was a placeholder 80,000 against a measured child mean of 199,791,
+so the leader hit its target and was lapped anyway. Set to 150,000 — 0.75 of the
+mean, the ratio Maple settled at — and re-measured:
+
+| world | par | leader/lane | wins | place mean | worst |
+|---|---|---|---|---|---|
+| maple | 80,000 | 80.9% | 3/5 | 1.4 | 2nd |
+| pirate | 105,000 | 99.8% | 3/5 | 1.4 | 2nd |
+| gameday | 175,000 | 88.7% | 4/5 | 1.2 | 2nd |
+| lantern | 150,000 | 82.6% | 3/5 | 1.4 | 2nd |
+
+**The owner's floor holds on every world**: worst place seen is 2nd everywhere,
+and that is structural rather than tuned — lane 1 tops out at 0.94 x the player
+even after satiety, so only the leader can ever beat them.
+
+A note on Lantern's spread: sd 37.4 on leader/lane, much wider than the others.
+On three of five runs the leader could not reach par at all (65k-99k against
+150k); on the other two it sailed past (133k, 135k) and took the match. The
+OUTCOMES are right and match Maple's profile exactly, so this is shipped as is —
+but if Lantern ever needs another pass, the lever is the spread, not the mean.
+Do not "fix" the mean; it is already where it should be.
 
 Verify any attempt with `node qa/ab.mjs 5 maple child 4173`.
 
