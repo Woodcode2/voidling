@@ -333,6 +333,9 @@ Something must want buying at match 40.
 | `qa/iapdoc.mjs` | APPSTORE.md vs the client's real product list |
 | `qa/smoke.mjs` | boots, loads, grows, eats, makes sound |
 | `qa/facewrap.mjs` | how far the face is seated onto the ball, one knob swept |
+| `qa/glosscov.mjs` | what fraction of each world is allowed to shine, by vertex |
+| `qa/glossgap.mjs` | WHERE a world's surface area is, and which of it is matte |
+| `qa/grounding.mjs` | is the hero standing on the floor, by differencing the disc |
 
 ### HOW TO PHOTOGRAPH ONE VARIABLE IN A LIVE GAME
 `qa/facewrap.mjs` exists to compare four values of one constant, and getting
