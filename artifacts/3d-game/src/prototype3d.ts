@@ -207,7 +207,55 @@ renderer.shadowMap.enabled = true;
 // already distance-capped by fitShadow(), so those texels land where the
 // player is looking.
 renderer.shadowMap.type = THREE.PCFShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// ── THE COLOUR GRADE, AND IT COSTS NOTHING ────────────────────────────────
+// A grade over the final frame — crushed blacks, a tint in the shadows,
+// controlled highlights — is most of what reads as "fine-tuned" in a shipped
+// game. The obvious way to get one is a LUT pass in a composer, and this
+// project has already paid for that road: routing the frame through
+// EffectComposer costs the hero 0.20 saturation, the fix for that made it
+// worse, and post is switched off at every rung as a result.
+//
+// So the grade goes where the frame ALREADY passes through a curve. three
+// supports CustomToneMapping precisely for this: define one function, and every
+// material that includes <tonemapping_fragment> runs it — which, since the
+// void's body shader was repaired to include the chunk, is now genuinely
+// everything. No extra pass, no render target, no mip chain, and it works
+// identically on the lowest quality rung as on the highest.
+//
+// The curve is ACES, unchanged, plus three deliberately small moves:
+//   TOE      blacks pulled down a touch so shadows have somewhere to sit
+//   SPLIT    shadows cooled and highlights warmed, the oldest grade there is
+//   CHROMA   a little saturation back, because filmic curves always cost some
+// Small on purpose. A grade a player NOTICES is a filter; this is meant to be
+// felt and not seen, and it has to survive four worlds that already have very
+// different palettes.
+// three ships a STUB — vec3 CustomToneMapping( vec3 color ) { return color; } —
+// inside this chunk, so appending a definition duplicates it and every shader in
+// the game fails to compile. Replace the stub; do not append to the chunk.
+THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
+  'vec3 CustomToneMapping( vec3 color ) { return color; }', `
+vec3 CustomToneMapping( vec3 color ) {
+  color *= toneMappingExposure;
+  // ACES, exactly as three implements it, so the base look does not move
+  const mat3 ACESInputMat = mat3(
+    vec3( 0.59719, 0.07600, 0.02840 ), vec3( 0.35458, 0.90834, 0.13383 ), vec3( 0.04823, 0.01566, 0.83777 ) );
+  const mat3 ACESOutputMat = mat3(
+    vec3(  1.60475, -0.10208, -0.00327 ), vec3( -0.53108, 1.10813, -0.07276 ), vec3( -0.07367, -0.00605, 1.07602 ) );
+  color = ACESInputMat * color;
+  color = RRTAndODTFit( color );
+  color = ACESOutputMat * color;
+  color = clamp( color, 0.0, 1.0 );
+  // ── the grade ──
+  float l = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+  color = max( vec3( 0.0 ), ( color - 0.014 ) / ( 1.0 - 0.014 ) );   // toe
+  vec3 cool = vec3( 0.96, 0.99, 1.06 );
+  vec3 warm = vec3( 1.05, 1.005, 0.95 );
+  color *= mix( cool, warm, smoothstep( 0.18, 0.78, l ) );           // split tone
+  color = mix( vec3( l ), color, 1.07 );                             // chroma back
+  return clamp( color, 0.0, 1.0 );
+}
+`);
+renderer.toneMapping = THREE.CustomToneMapping;
 renderer.toneMappingExposure = 1.0;
 // ── THE GAME CANVAS GOES FIRST, AND THAT IS NOT COSMETIC ──────────────────
 // Eighty-five probes in qa/ find the play surface with
