@@ -961,6 +961,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // The body's key light, copied from the fragment shader so the face and the
   // body cannot drift apart. If that vector changes, change it here too.
   const FACE_L = new THREE.Vector3(-0.40, 0.60, 0.69).normalize();
+  // ── THE FEATURES ARE STILL FLAT, AND THAT IS THE LAST STRUCTURAL GAP ────
+  // Lighting them (above) fixed WHERE the light falls on them. It did not make
+  // them belong to the form: they sit on a flat plane at the sphere's front
+  // pole, so an eye at x = 0.36 floats 0.073 proud of the surface it is drawn
+  // on and never foreshortens toward the rim.
+  //
+  // The obvious fix is not a one-liner and I tried it. Setting the eye group's
+  // z to the surface depth and slerping its quaternion toward the surface
+  // normal throws the eye sideways, because the group's origin is on the FACE
+  // PLANE while the sclera sits 1.0 in front of it — the rotation swings a
+  // full-radius lever arm. Doing it correctly means re-rigging the eye so its
+  // pivot is the sphere CENTRE and its children sit near local zero, which also
+  // touches the blink squash, the gaze clamp and the pupil containment maths
+  // that were all derived in the current space.
+  //
+  // Worth doing deliberately. Not worth doing at the end of a long night on a
+  // face that has already been broken three times.
   const maw = new THREE.Group(); maw.position.set(0, -0.3, 1.01); maw.scale.setScalar(0.001);
   const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
   const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
