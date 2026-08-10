@@ -148,8 +148,13 @@ const box = await p.evaluate(() => {
   const pxR = (innerHeight / (2 * camD * Math.tan(cam.fov * Math.PI / 360))) * vs.r;
   return { cx, cy, pxR, dpr: ren.getPixelRatio() };
 });
+// FULL frames when asked. The crop is 2.6x his on-screen radius, which is right
+// for reading the face and useless for reading whether he is GROUNDED — at
+// WORLD ENDER and TITAN the crop clamps to the viewport and lands inside his
+// own cheek. Grounding questions need the floor in frame.
+const FULL = process.argv.includes('--full');
 const side = Math.min(430, Math.max(120, box.pxR * 2.6));
-const clip = {
+const clip = FULL ? undefined : {
   x: Math.max(0, Math.min(430 - side, box.cx - side / 2)),
   y: Math.max(0, Math.min(932 - side, box.cy - side / 2)),
   width: side, height: side,
@@ -165,7 +170,7 @@ for (const w of WRAPS) {
   await p.evaluate((v) => window.__faceWrap(v), w);
   await step(2);                        // apply it in a real frame, then settle
   const name = `wrap${String(w).replace('.', 'p')}.png`;
-  await p.screenshot({ path: `${OUT}/${name}`, clip });
+  await p.screenshot(clip ? { path: `${OUT}/${name}`, clip } : { path: `${OUT}/${name}` });
   console.log(`  ${String(w).padStart(5)}  ->  ${OUT}/${name}`);
 }
 await b.close();

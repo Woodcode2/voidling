@@ -3111,7 +3111,7 @@ const FADE_BODY = `
 registerGloss([
   [PROPS.towerGlass, 0.78], [PROPS.carGlass, 0.70],
   [0xc8cdd8, 0.68], [0x3c4454, 0.45],
-]);
+], 'island');
 /** Override the palette lookup for one part — for a colour that is metal HERE
  *  and cushion fabric two props over. `p.push(glossy(part(...), 0.7))`. */
 export function glossy(g: THREE.BufferGeometry, s: number): THREE.BufferGeometry {

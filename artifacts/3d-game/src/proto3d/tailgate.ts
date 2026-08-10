@@ -66,7 +66,7 @@ const SMOKE = 0xd7d3cc;
 registerGloss([
   [ALU, 0.72], [STEEL, 0.62], [GOLD, 0.50], [GOLD_L, 0.42], [CHAR, 0.18],
   [0x33414f, 0.78], [0x3d4c5c, 0.78], [0x9fd0e0, 0.70], [0xbfe6f2, 0.70],
-]);
+], 'tailgate');
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(a: T[]): T => a[(Math.random() * a.length) | 0];

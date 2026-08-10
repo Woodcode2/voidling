@@ -92,7 +92,7 @@ registerGloss([
   [TILE, 0.46], [TILE_D, 0.40], [WATER, 0.82], [CHAR, 0.50],
   [STONE, 0.24], [STONE_D, 0.20],
   [TIMBER, 0.16], [CEDAR, 0.16],   // oiled boards, wet with the night air
-]);
+], 'nightmarket');
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(a: T[]): T => a[(Math.random() * a.length) | 0];

@@ -141,6 +141,13 @@ const M = (p: G[]) => mergedProp(p);
  *  every load. */
 const ROOF_TAR = 0x4e5560, ROOF_DUCT = 0xaeb6c2, ROOF_VENT = 0x8b93a0;
 
+// ── THE AUTUMN CANOPY, WHICH IS HALF OF MAPLE FALLS ───────────────────────
+// Named, not inline, because they are registered below and a gloss table that
+// points at loose hex literals rots the first time a leaf colour is tweaked.
+const LEAF_A = 0xe86a2a, LEAF_B = 0xd8392f, LEAF_C = 0xe8a83a, LEAF_D = 0xc9502a;
+const LEAF_HERO = 0xe8903a;              // the one every second canopy ball wears
+const BARK = 0x7a5a3e;
+
 // ── WHAT SHINES IN MAPLE FALLS ────────────────────────────────────────────
 // See installPropShader in island.ts. Maple's 2.9% glossy triangles were its
 // thirty road cars and nothing else — the shopfronts, the diner, the water
@@ -148,11 +155,48 @@ const ROOF_TAR = 0x4e5560, ROOF_DUCT = 0xaeb6c2, ROOF_VENT = 0x8b93a0;
 // NIGHTGLASS and GLASS are windows wherever they appear here; the NEONs are
 // signage that already glows, and a little sheen keeps the tube reading as a
 // tube rather than as a painted stripe.
+//
+// THAT ROUND WAS AIMED AT THE WRONG HALF OF THE WORLD. Measured with
+// qa/glossgap.mjs, Maple's surface area is not shopfronts: five autumn leaf
+// colours are 51.2% of every vertex the player looks at, and all five were dead
+// matte. Game Day is 38.4% glossy, Lantern 33.4%, Pirate 16.9%, and Maple —
+// the world a child sees FIRST and the one in the store screenshots — was 5.3%.
+//
+// The numbers below are low ON PURPOSE and a leaf is not a car:
+//   · 0.14 puts radiance at 1.70x (GLOSS_RADIANCE is 1 + 5*g) while
+//     metalnessFactor is 0.38 * g^2 = 0.007, so the canopy picks up sky on its
+//     upper faces and gives back essentially none of its colour. That squared
+//     term is exactly why a low sheen is nearly free and a high one is not.
+//   · bark gets a third of that. Bark IS rough; it needs only enough to stop
+//     the trunk reading as a flat brown cylinder under the canopy.
+//   · painted clapboard and trim at 0.20 — house paint has a real sheen, and
+//     white is the colour that shows it most.
+//   · balloons, gumballs and candy at 0.42. They are small, round and lacquered,
+//     which is the one case where a hard highlight reads as VOLUME rather than
+//     as material, and this town is full of them.
+//   · fair signage at 0.28: painted metal, not paper.
+// Deliberately NOT registered: grass, and the road. Grass is matte and is only
+// 3% here. A shiny road in a dry autumn town reads as WET, which is a look
+// decision rather than a correctness one — left for the owner to call.
+// Note one collision by design: ASPHALT and DENIM[1] are the same hex, which is
+// why the road being left alone also leaves the crowd's jeans alone.
 registerGloss([
   [STEEL, 0.66], [DARKSTEEL, 0.58], [GLASS, 0.74], [NIGHTGLASS, 0.78],
   [ROOF_DUCT, 0.55], [ROOF_VENT, 0.50],
   [NEON_PINK, 0.30], [NEON_CYAN, 0.30], [NEON_GOLD, 0.30],
-]);
+  // the canopy — 51% of the world, and the whole point of this pass
+  [LEAF_A, 0.14], [LEAF_B, 0.14], [LEAF_C, 0.14], [LEAF_D, 0.14], [LEAF_HERO, 0.14],
+  [BARK, 0.05], [WOOD, 0.10], [DARKWOOD, 0.08], [TIMBER, 0.10],
+  // painted surfaces
+  [WHITE, 0.20], [CREAM, 0.20], [BONE, 0.18],
+  // FAIR_C is NOT here: it is 0xf0b429, the same hex as Game Day's GOLD, which
+  // tailgate registers at 0.50. mainstreet imports last, so listing it here
+  // demoted every gold surface in the stadium. It is 0.05% of Maple. Not worth
+  // a hex collision — see the warning in gloss.ts.
+  [RED, 0.28], [BLUE, 0.28],
+  // lacquered round things
+  [0xff6fb0, 0.42], [0xa87bff, 0.42], [0xff5a4d, 0.42], [0xffffff, 0.42],
+], 'mainstreet');
 
 function roofKit(p: G[], w: number, d: number, y: number, dense = 1): void {
   p.push(part(box(w - 0.7, 0.22, d - 0.7), ROOF_TAR, 0, y + 0.11, 0));   // membrane
@@ -1375,18 +1419,18 @@ export function makePickup(): THREE.Mesh {
 
 /** A ROADSIDE MAPLE — the town's namesake, in autumn colour. */
 export function makeMapleTree(): THREE.Mesh {
-  const leaf = mpick([0xe86a2a, 0xd8392f, 0xe8a83a, 0xc9502a] as const);
+  const leaf = mpick([LEAF_A, LEAF_B, LEAF_C, LEAF_D] as const);
   const p: G[] = [
-    part(cyl(0.44, 0.66, 4, 7), 0x7a5a3e, 0, 2, 0),
-    part(cyl(0.3, 0.34, 1.8, 6), 0x7a5a3e, 0.7, 4.2, 0, 0, 0, -0.5),
-    part(cyl(0.3, 0.34, 1.8, 6), 0x7a5a3e, -0.7, 4.2, 0, 0, 0, 0.5),
+    part(cyl(0.44, 0.66, 4, 7), BARK, 0, 2, 0),
+    part(cyl(0.3, 0.34, 1.8, 6), BARK, 0.7, 4.2, 0, 0, 0, -0.5),
+    part(cyl(0.3, 0.34, 1.8, 6), BARK, -0.7, 4.2, 0, 0, 0, 0.5),
   ];
   // The town's namesake tree was seven 20-face icosahedra, flat-shaded — a pile
   // of orange rocks at gameplay distance. Spheres keep the clustered-canopy
   // silhouette and shade smoothly. See PROP_SMOOTH_MAT in island.ts.
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
-    p.push(part(new THREE.SphereGeometry(mr(1.5, 2.1), 12, 9), i % 2 ? leaf : 0xe8903a,
+    p.push(part(new THREE.SphereGeometry(mr(1.5, 2.1), 12, 9), i % 2 ? leaf : LEAF_HERO,
       Math.cos(a) * mr(1.1, 1.9), mr(5.2, 6.6), Math.sin(a) * mr(1.1, 1.9)));
   }
   p.push(part(new THREE.SphereGeometry(2.3, 13, 10), leaf, 0, 6.6, 0));
