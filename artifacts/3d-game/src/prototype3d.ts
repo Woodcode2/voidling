@@ -1042,10 +1042,12 @@ const _dbg = window as unknown as {
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
   __pinQuality: (n: number | null) => void;
+  __renderBloom: () => void;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
+  __faceWrap: (v: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
   __spawn: () => { x: number; z: number };
   // QA: whole-match telemetry — player score/radius against every rival's, so a
@@ -1079,6 +1081,10 @@ _dbg.__rushClock = (to: number) => { matchClock = to; };
 // waiting on the idle timer or getting bitten. `null` hands control back.
 let moodPin: string | null = null;
 _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m as never); };
+// How far the face is seated onto the sphere, 0..0.9. A look knob — see
+// FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
+// frame at several values and the choice can be made from pictures.
+_dbg.__faceWrap = (v: number) => voidling.setFaceWrap(v);
 // QA: the crowd's recency guard itself. The end-to-end match measurement of it
 // was too noisy at n=2 to say anything (9 and 16 repeats against a 21/11/14
 // baseline), so qa/fresh.mjs drives THIS — the shipped function, not a copy —

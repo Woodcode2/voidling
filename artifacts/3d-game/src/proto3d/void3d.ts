@@ -31,6 +31,10 @@ export interface Void3D {
   /** What is on its head right now — the hat's voice lines read this. */
   readonly hatId: string | null;
   setMood(m: Mood): void;    // the emotional state machine's current state
+  /** How far the face is wrapped onto the sphere, 0..1. A look knob, not a
+   *  quality setting — see FACE_WRAP. Exposed so it can be swept and compared
+   *  side by side (qa/facewrap.mjs) instead of argued about. */
+  setFaceWrap(v: number): void;
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -696,6 +700,62 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const flat = (r: number, col: number, opacity = 1) =>
     new THREE.Mesh(new THREE.CircleGeometry(r, 56), new THREE.MeshBasicMaterial({ color: col, transparent: opacity < 1, opacity, depthWrite: false }));
 
+  // ── THE FEATURES BELONG TO THE FORM ───────────────────────────────────────
+  // Lighting the face fixed WHERE the light falls on it (see FACE_L). This
+  // fixes where it SITS. Every feature used to live on one flat plane at
+  // z = 1.0 — the sphere's tangent plane at its front pole — so a brow at
+  // (0.36, 0.4) floated 0.16 proud of the surface it is painted on and never
+  // foreshortened toward the rim. That is a decal on a ball, not a face, and it
+  // is the single biggest reason the character read as a sticker.
+  //
+  // The naive version of this is wrong and I shipped it once: setting an eye
+  // GROUP's z and slerping ITS quaternion swings the eye clean out of frame,
+  // because that group's origin is on the face plane while the sclera sits a
+  // full radius in front of it — the rotation is a full-radius lever arm. Each
+  // eye now has an intermediate `ball` group AT the eye (:790) so the tilt
+  // happens in place, and every offset derived in the old space — blink drop,
+  // gaze clamp, pupil containment — is still local to that group and needs no
+  // re-derivation.
+  //
+  // FACE_OY matters. `face` is lifted to dispR * 0.1 (:1686) while the body is
+  // a unit sphere at the group origin, so in face-local space the sphere's
+  // centre is at y = -0.1, not at zero. Wrapping about the wrong centre puts
+  // features BEHIND the surface, and these all depth-test — the blush at
+  // x = 0.49 would simply vanish.
+  //
+  // FACE_WRAP is fractional on purpose, and this is a look decision, not a
+  // budget one. A full wrap is geometrically honest and turns the outer eye
+  // into a hard ellipse; this face is read at 40 px far more often than at 400,
+  // and the eyes ARE the character. 0.62 seats the features most of the way
+  // onto the form while every one of them stays clear of the silhouette.
+  let FACE_WRAP = 0.62;
+  const FACE_OY = 0.1;
+  const _wq = new THREE.Quaternion(), _wn = new THREE.Vector3();
+  const _wspin = new THREE.Quaternion(), _wz = new THREE.Vector3(0, 0, 1);
+  // Features that never move (the cheeks, the gape) wrap once at build rather
+  // than every frame. They are remembered so the knob can re-seat them — a
+  // sweep that only moved the per-frame features would be comparing two
+  // different faces, not two values of one number.
+  const pinned: { o: THREE.Object3D; px: number; py: number; dz: number }[] = [];
+  const wrapOnce = (o: THREE.Object3D, px: number, py: number, dz = 0) => {
+    pinned.push({ o, px, py, dz }); wrapTo(o, px, py); o.position.z += dz;
+  };
+  const rewrapPinned = () => { for (const f of pinned) { wrapTo(f.o, f.px, f.py); f.o.position.z += f.dz; } };
+  // px/py are face-local. The face billboards, so that is view space, and the
+  // sphere normal under a feature is just (px, qy, sqrt(1 - px² - qy²)).
+  // `spin` is the feature's own roll (the mouth is upside-down by PI, the brows
+  // tilt by mood) and is composed INSIDE the wrap, so it still means "roll in
+  // the plane you are painted on" after the feature has been tilted.
+  function wrapTo(o: THREE.Object3D, px: number, py: number, spin = 0, amt = FACE_WRAP) {
+    const qy = py + FACE_OY;
+    const nz = Math.sqrt(Math.max(0, 1 - px * px - qy * qy));
+    o.position.z = 1.0 + (nz - 1.0) * amt;
+    _wq.setFromUnitVectors(_wz, _wn.set(px, qy, nz));
+    o.quaternion.identity().slerp(_wq, amt);
+    if (spin) o.quaternion.multiply(_wspin.setFromAxisAngle(_wz, spin));
+    return nz;
+  }
+
   // ── THE EYES ──────────────────────────────────────────────────────────────
   // Everything a player feels about this character comes through here, so the
   // eye is no longer three flat colour discs stacked up. The sclera and the
@@ -775,12 +835,20 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     t.anisotropy = 4;
     return t;
   })();
-  interface Eye { g: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; white: THREE.Mesh; }
+  interface Eye { g: THREE.Group; ball: THREE.Group; sclera: THREE.Group; pupilGrp: THREE.Group; outline: THREE.Mesh; white: THREE.Mesh; }
   const eyes: Eye[] = [];
   const charEyes: { star: THREE.Mesh; ring: THREE.Mesh }[] = [];   // legendary pupil overrides
   for (const sx of [-0.36, 0.36]) {
     const g = new THREE.Group();
-    const sclera = new THREE.Group(); sclera.position.z = 1.0;
+    // ── THE PIVOT LIVES AT THE EYE, NOT ON THE FACE PLANE ─────────────────
+    // `ball` sits where the eye actually is, one radius out along the face's
+    // forward axis, and the sclera and pupil hang off it at local zero. That is
+    // the whole trick for wrapping the features onto the head: rotating `ball`
+    // tilts the eye IN PLACE, while rotating its parent (whose origin is back
+    // on the face plane) swings it on a full-radius lever arm and throws it out
+    // of frame. The first attempt at this did exactly that.
+    const ball = new THREE.Group(); ball.position.z = 1.0;
+    const sclera = new THREE.Group();
     // The outline is a dark disc BEHIND the sclera, not a ring on top of it.
     // A ring's weight is baked into its geometry; a backing disc's weight is
     // one scale value, so the line can be fattened per frame as he shrinks on
@@ -793,7 +861,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       new THREE.MeshBasicMaterial({ map: scleraTex, depthWrite: false }));
     white.renderOrder = 2;
     sclera.add(outline); sclera.add(white);
-    const pupilGrp = new THREE.Group(); pupilGrp.position.z = 1.02;
+    const pupilGrp = new THREE.Group(); pupilGrp.position.z = 0.02;
     const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.122, 48),
       new THREE.MeshBasicMaterial({ map: pupilTex, depthWrite: false }));
     pupil.renderOrder = 3;   // outline(1) → sclera(2) → pupil(3) → char eyes(4)
@@ -815,9 +883,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // character with its eyes shut. Anything rendering a still can watch
     // sclera.scale.y / sclera.scale.x and wait for the lid to open.
     sclera.name = 'sclera';
-    g.add(sclera); g.add(pupilGrp);
     g.position.set(sx, 0.06, 0);
-    face.add(g); eyes.push({ g, sclera, pupilGrp, outline, white });
+    ball.add(sclera); ball.add(pupilGrp); g.add(ball);
+    face.add(g); eyes.push({ g, ball, sclera, pupilGrp, outline, white });
   }
   // blush (pink, soft) — a painted falloff, not a flat pink lozenge. The hard
   // edge of a plain disc is what made the cheeks read as two stickers.
@@ -834,7 +902,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   for (const sx of [-0.49, 0.49]) {
     const b = new THREE.Mesh(new THREE.CircleGeometry(0.155, 32),
       new THREE.MeshBasicMaterial({ color: VOID.blush, map: blushTex, transparent: true, opacity: 0.5, depthWrite: false }));
-    b.scale.set(1.06, 0.70, 1); b.position.set(sx, -0.19, 0.99);
+    // the cheeks never move, so they wrap once. They are also the outermost
+    // feature on the face (x = 0.49), which makes them the one that most needed
+    // it — a flat cheek disc at the rim is the classic sticker tell.
+    b.scale.set(1.06, 0.70, 1); b.position.set(sx, -0.19, 0);
+    wrapOnce(b, sx, -0.19);
     face.add(b);
   }
   // smiling mouth — the KEY-ART kawaii open smile: a soft plum half-disc with
@@ -956,29 +1028,17 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     mouth.add(lip); mouth.add(inner);
     mkFang(mouth, -0.086, 0.052, 0.058); mkFang(mouth, 0.086, 0.052, 0.058);
   }
-  mouth.rotation.z = Math.PI; mouth.position.set(0, -0.26, 1.0);
+  mouth.position.set(0, -0.26, 0);
+  wrapTo(mouth, 0, -0.26, Math.PI);   // re-wrapped per frame (mouthY + smirk move)
   face.add(mouth);
   // The body's key light, copied from the fragment shader so the face and the
   // body cannot drift apart. If that vector changes, change it here too.
   const FACE_L = new THREE.Vector3(-0.40, 0.60, 0.69).normalize();
-  // ── THE FEATURES ARE STILL FLAT, AND THAT IS THE LAST STRUCTURAL GAP ────
-  // Lighting them (above) fixed WHERE the light falls on them. It did not make
-  // them belong to the form: they sit on a flat plane at the sphere's front
-  // pole, so an eye at x = 0.36 floats 0.073 proud of the surface it is drawn
-  // on and never foreshortens toward the rim.
-  //
-  // The obvious fix is not a one-liner and I tried it. Setting the eye group's
-  // z to the surface depth and slerping its quaternion toward the surface
-  // normal throws the eye sideways, because the group's origin is on the FACE
-  // PLANE while the sclera sits 1.0 in front of it — the rotation swings a
-  // full-radius lever arm. Doing it correctly means re-rigging the eye so its
-  // pivot is the sphere CENTRE and its children sit near local zero, which also
-  // touches the blink squash, the gaze clamp and the pupil containment maths
-  // that were all derived in the current space.
-  //
-  // Worth doing deliberately. Not worth doing at the end of a long night on a
-  // face that has already been broken three times.
-  const maw = new THREE.Group(); maw.position.set(0, -0.3, 1.01); maw.scale.setScalar(0.001);
+  const maw = new THREE.Group(); maw.position.set(0, -0.3, 0); maw.scale.setScalar(0.001);
+  // wrapped once (it never moves, only scales), then nudged 0.02 forward. The
+  // gape and the closed mouth overlap for one mood step and the gape has to win
+  // it — same reason it used to sit at 1.01 against the mouth's 1.0.
+  wrapOnce(maw, 0, -0.3, 0.02);
   const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
   const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
   tongue.renderOrder = 1;
@@ -1040,7 +1100,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const brows: THREE.Mesh[] = [];
   for (const sx of [-0.36, 0.36]) {
     const bw = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.09), browMat);
-    bw.position.set(sx, 0.4, 1.0);
+    bw.position.set(sx, 0.4, 1.0);   // z + tilt are re-wrapped per frame (browY moves)
     if (sx > 0) bw.scale.x = -1;   // mirror, so both brows sweep off the nose
     face.add(bw); brows.push(bw);
   }
@@ -1400,6 +1460,12 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       body.castShadow = false;
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
+    setFaceWrap(v) {
+      // clamped short of 1: a full wrap seats the cheeks exactly ON the surface
+      // and they depth-fight the body they are painted on. 0.9 keeps a margin.
+      FACE_WRAP = THREE.MathUtils.clamp(v, 0, 0.9);
+      rewrapPinned();
+    },
     setStage(n: number) {
       if (n < stage) {   // instant rematch: shed the late-form dressing
         stageBoost = n >= 1 ? 1.15 : 1;
@@ -1683,8 +1749,15 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // becoming hard to see.
       for (const e of eyes) {
         const px = e.g.position.x, py = e.g.position.y;
-        const nz = Math.sqrt(Math.max(0, 1 - px * px - py * py));
-        const ndl = px * FACE_L.x + py * FACE_L.y + nz * FACE_L.z;
+        // …and the same normal that lights it also SEATS it: wrapTo pushes the
+        // eyeball back to the surface depth and tilts it to face along the
+        // normal, in place, so the outer eye foreshortens the way a painted
+        // feature on a sphere has to.
+        const nz = wrapTo(e.ball, px, py);
+        // …and the normal is taken about the BODY's centre, which sits at
+        // y = -FACE_OY in this space. Using the raw face y instead lit the top
+        // of the head as if it faced the camera.
+        const ndl = px * FACE_L.x + (py + FACE_OY) * FACE_L.y + nz * FACE_L.z;
         // THE BODY'S OWN RANGE, not a gentler one. The fragment shader does
         // col *= mix(0.62, 1.22, key) with this same smoothstep, so using any
         // other numbers here means the face is lit by a different sun than the
@@ -1749,8 +1822,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         for (const key of Object.keys(mp) as (keyof typeof mp)[]) mp[key] += (tgt[key] - mp[key]) * k;
       }
       browMat.opacity = mp.brow;
-      brows[0].rotation.z = mp.browAng; brows[1].rotation.z = -mp.browAng;
+      // BROWS SIT HIGHEST, so they were the worst offender: at y = 0.4 the flat
+      // plane floats 0.16 proud of the head. The mood angle rides INSIDE the
+      // wrap (see wrapTo's `spin`), so an angry brow still tilts in the plane of
+      // the forehead rather than in the plane of the screen.
       brows[0].position.y = brows[1].position.y = mp.browY;
+      wrapTo(brows[0], brows[0].position.x, mp.browY, mp.browAng);
+      wrapTo(brows[1], brows[1].position.x, mp.browY, -mp.browAng);
       // blush turns to mud once the cheeks are a few pixels wide — fade it out
       // rather than let it grey down the two brightest parts of the silhouette
       for (const bm of blushMats) bm.opacity = mp.blush * (1 - small * 0.45);
@@ -1795,7 +1873,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         const pk = Math.min(1.3, stageBoost * mp.pupil);          // pupil vs sclera
         const grow = 1 + (stageBoost * mp.pupil - pk) * 0.5;      // surplus grows the EYE
         const eyeK = eyeLod * grow;
-        e.g.scale.set(eyeK, eyeK, 1);
+        // THE SCALE GOES ON `ball`, NOT ON `g`. `ball` is tilted to the surface
+        // normal, so scaling it applies inside the eye's own plane. Scaling the
+        // untilted parent by a non-uniform (k, k, 1) instead would shear the
+        // tilted child — the eye would skew as it foreshortened.
+        e.ball.scale.set(eyeK, eyeK, 1);
         e.g.position.x = Math.sign(e.g.position.x || 1) * 0.36 * (1 + small * 0.05);
         // BLINK FROM THE TOP: a lid comes down, it does not implode toward the
         // middle of the eyeball. Anchoring the collapse high sells the lid.
@@ -1846,8 +1928,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // mouth: smile scale + smirk tilt + frown flip (scale.y through ~0 = flat)
       const mk = mp.smile * (1 + small * 0.20);            // caricature when tiny
       mouth.scale.set(mk, Math.sign(mp.mouthY || 1) * Math.max(0.06, Math.abs(mp.mouthY)) * mk, 1);
-      mouth.rotation.z = Math.PI + mp.smirk;
+      // position BEFORE wrap — the wrap reads the y it is seating. The mouth is
+      // built upside-down (the PI), and the smirk rides with it inside the wrap,
+      // so a lopsided grin tilts across the chin rather than across the screen.
       mouth.position.y = mp.mouthY < 0 ? -0.22 : -0.28;   // frowns ride a touch higher
+      wrapTo(mouth, 0, mouth.position.y, Math.PI + mp.smirk);
 
       // ── SIGNATURE AURA: sparkles orbit the body on their own little paths.
       // Stars twinkle and drift; embers rise and fade; bubbles bob; bolts

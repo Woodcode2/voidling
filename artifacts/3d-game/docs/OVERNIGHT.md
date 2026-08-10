@@ -332,3 +332,30 @@ Something must want buying at match 40.
 | `qa/tutstrand.mjs` | the session-two world-switch dead end |
 | `qa/iapdoc.mjs` | APPSTORE.md vs the client's real product list |
 | `qa/smoke.mjs` | boots, loads, grows, eats, makes sound |
+| `qa/facewrap.mjs` | how far the face is seated onto the ball, one knob swept |
+
+### HOW TO PHOTOGRAPH ONE VARIABLE IN A LIVE GAME
+`qa/facewrap.mjs` exists to compare four values of one constant, and getting
+four comparable pictures took three wrong attempts. All three failures looked
+like a real difference in the thing being measured. Reuse the recipe, not the
+mistakes:
+
+1. **Hide every DOM layer over the canvas**, not just `#joy`. The newsroom
+   bubbles and the HUD run on their own clock.
+2. **Capture the rAF loop** (`window.requestAnimationFrame = cb => pend = cb`)
+   and hand-crank it. `animate()` re-arms on its LAST line, so a throw inside it
+   kills the loop silently — listen for `pageerror`.
+3. **Virtualise `performance.now` too.** `animate()` takes dt from
+   `THREE.Clock`, which reads the real wall clock — so a hand-cranked frame
+   still advances the game by however long the previous *screenshot encode*
+   took, clamped to 50 ms. Four variants × 50 ms is enough for the follow camera
+   to reframe and the maw to shut between shots.
+4. **Do not re-assert `__setVoidR` between shots.** `setRadius` sets a target
+   the growth spring eases toward, so re-asserting it on a void that has grown
+   past it shrinks him a little every step — a monotonic ramp across the sweep
+   that reads precisely as "the change makes his face smaller". It cost a wrong
+   conclusion before it was caught by noticing the BODY had shrunk too, and the
+   body is not what the knob touches.
+5. **Assert the freeze held.** Sample `__matchState().t`, sleep 600 ms of wall
+   clock, sample again, fail loudly if it moved. A freeze that quietly does not
+   freeze manufactures the exact artefact it was installed to prevent.
