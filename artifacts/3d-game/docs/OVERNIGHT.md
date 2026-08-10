@@ -190,7 +190,30 @@ WHETHER THE BAND IS SATURATED on pirate. If it is, the clamp is the lever. If it
 is not, the rivals are failing to find food at all and the larder's search
 radius or the size cap is the lever. Do not guess between those two.
 
-STILL OPEN: pirate's food limit, and lantern's par.
+### CORRECTION: PIRATE WAS NEVER FOOD-LIMITED
+
+The entry above concluded from five matches that Pirate's family could not reach
+par and was FOOD-limited. That was wrong, and both halves of the check say so:
+
+  - Instrumented the lane multiplier itself (rivals.bandStat, exposed through
+    __matchState().band). Over 22,451 samples on Pirate the band ran a MEAN OF
+    2.61 and sat pinned at its 24 clamp for 1.9% of the time. A controller
+    asking for 2.6x is not starved of authority; raising the ceiling — the fix I
+    was about to reach for — would have changed nothing.
+  - Re-measured with qa/ab.mjs, same par, same driver: leader/lane 99.8%
+    (sd 18.5), leader/player 93.8%, player place 1.4, worst place 2nd, wins 3/5.
+    That is inside the target band.
+
+What actually differed was the FIELD SIZE. The pessimistic sample ran with
+5,5,5,4,3 rivals splitting one island; the second ran leaner. This file already
+records that field size doubles variance (attempt 8b) and the sd here is 18.5 —
+so five matches were enough to manufacture a structural-looking problem out of
+nothing. Instrument first, and re-measure before believing a mean.
+
+STILL OPEN: lantern's par. Its child driver scores a mean of 199,791 against a
+par of 80,000 it inherited as a placeholder, so the leader hits its target and
+gets lapped anyway. Now set to 150,000 — 0.75 of the measured mean, the ratio
+Maple settled at — and being measured.
 
 Verify any attempt with `node qa/ab.mjs 5 maple child 4173`.
 

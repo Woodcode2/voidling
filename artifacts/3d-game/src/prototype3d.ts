@@ -340,7 +340,7 @@ const WORLD_PAR: Record<string, number> = {
   maple: 80000,      // verified: mean 103,642, wins 3/5, worst place 2nd
   pirate: 105000,    // child mean 142,755 uncontested — nearly 2x Maple's scale
   gameday: 175000,   // verified: mean 198,446 (sd 61,657), wins 4/5
-  lantern: 80000,    // provisional — never measured
+  lantern: 150000,   // child mean 199,791 uncontested; 0.75 of it, as Maple sits
 };
 
 
@@ -1138,6 +1138,7 @@ _dbg.__matchState = () => ({
   // from the radius curve.
   tense: tension(),
   graze: rivals.grazeCount(),
+  band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,

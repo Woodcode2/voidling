@@ -29,6 +29,11 @@ export interface Rivals {
   list: Rival[];
   /** QA: how many props the family has taken off-screen this match. */
   grazeCount(): number;
+  /** QA: the lane multiplier's behaviour this match — mean, max, and how much
+   *  of the time it sat pinned at its clamp. A band pinned at the ceiling means
+   *  the family is FOOD-limited, not multiplier-limited, and no amount of
+   *  raising the target will move them. See qa notes on Pirate Bay. */
+  bandStat(): { mean: number; max: number; pinnedPct: number; n: number };
   update(dt: number, t: number, playerX: number, playerZ: number, playerR: number, ctx?: RivalCtx): void;
   onJoin?: (name: string, color: number, x: number, z: number, arch: Arch) => void;
   onRivalEaten?: (name: string, pts: number, x: number, z: number, r: number, marquee: boolean) => void; // you swallowed one
@@ -382,6 +387,7 @@ export function createRivals(
     roll: THREE.Quaternion;
   }
   let grazeN = 0;   // QA: larder bites this match (see api.grazeCount)
+  let bandSum = 0, bandMax = 0, bandPinned = 0, bandN = 0;   // QA: see bandStat
   const roster: R[] = [];        // one per NAME — built once, skins fixed forever
   const rivals: R[] = [];        // THIS match's cast (api.list points at it)
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
@@ -623,11 +629,14 @@ export function createRivals(
   const api: Rivals = {
     list: rivals,
     grazeCount: () => grazeN,
+    bandStat: () => ({ mean: bandN ? bandSum / bandN : 0, max: bandMax,
+      pinnedPct: bandN ? bandPinned / bandN * 100 : 0, n: bandN }),
     reset(matchLen = 180) {
       // abandon in-flight eaten-anims: resetMatch restores those props to their
       // homes — leaving them queued here re-shrank them at match start (a
       // half-buried spinning house on lot #1 of every rematch)
       shrinking.length = 0; grazeN = 0;
+      bandSum = 0; bandMax = 0; bandPinned = 0; bandN = 0;
       trail.length = 0; trailT = 0;
       roster.forEach((rv, i) => {
         const ang = (i / roster.length) * Math.PI * 2 + rand(0, Math.PI * 2);
@@ -1409,6 +1418,12 @@ export function createRivals(
         // frozen, 24 so a rival that has eaten nothing for a long stretch does
         // not cash a single hedge for a five-figure number.
         const band = THREE.MathUtils.clamp(off, 0.50, 24);
+        // QA only: is this controller ASKING for more than the clamp allows?
+        if (rv.joined && !rv.full) {
+          bandSum += band; bandN++;
+          if (band > bandMax) bandMax = band;
+          if (off >= 23.5) bandPinned++;
+        }
         // SATIETY. The half of lane control the multiplier cannot do.
         if (rv.score > want * FULL_AT) rv.full = true;
         else if (rv.score < want * HUNGRY_AT) rv.full = false;
