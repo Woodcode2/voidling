@@ -2481,6 +2481,50 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     shader.uniforms.uDetail = { value: speckle };
     shader.uniforms.uMottle = { value: mottle };
     shader.uniforms.uGrain = { value: new THREE.Vector4(gFine, gMid, gCoarse, gRep) };
+    // ── A NEGATIVE RESULT, KEPT ON PURPOSE ───────────────────────────────────
+    // ROUGHNESS ON THIS GROUND DOES NOTHING, and the machinery below ships
+    // NEUTRAL because of it. Measured with qa/groundsurf.mjs, camera provably
+    // still (0.000 drift across the sweep): dropping the road from the shipped
+    // 0.97 to 0.45 changes ZERO pixels by more than 3/255. Even at 0.05 — a
+    // near mirror — only 5.3% of the frame moves at all and the peak difference
+    // is 9/255, which no phone shows outdoors.
+    //
+    // The reason is geometric and rules out every other value anyone tries: the
+    // ground is one FLAT HORIZONTAL PLANE. Its normal is +Y everywhere, so the
+    // sun has exactly one mirror direction, and at this camera's elevation that
+    // direction does not point at the lens. Sharpening a lobe that is off
+    // screen changes nothing on screen. The only other specular source is the
+    // RoomEnvironment IBL, deliberately pinned at 0.15 because anything higher
+    // desaturates the whole island.
+    //
+    // SO A WET ROAD IS NOT REACHABLE THROUGH ROUGHNESS. It needs normal
+    // VARIATION — something for a highlight to catch — which means perturbing
+    // the normal from the detail texture already fetched above. That is a real
+    // change to the largest surface in the game and it was not made on the
+    // strength of a guess.
+    //
+    // What is kept is the MASK, because the mask is the hard part and it now
+    // works. It cost three attempts: two heuristics that selected literally
+    // nothing, both because they were tuned against mainstreet's ASPHALT prop
+    // colour instead of the ground bake's own WORLD.road. Anyone doing the
+    // normal-variation version needs this first, and 0.97/0.97 is bit-identical
+    // to the single value it replaced.
+    //
+    // uSurf = (roadRoughness, grassRoughness, debug, unused).
+    // uSurf.z = 1 paints the mask instead of the world: red where the shader
+    // thinks "road", green where it thinks "grass". Look at that picture before
+    // trusting anything applied through it.
+    shader.uniforms.uSurf = { value: new THREE.Vector4(0.97, 0.97, 0, 0) };
+    // the world's OWN road colour, as chromaticity, so the mask is exact per
+    // world instead of a threshold that happens to suit Maple
+    const rc = new THREE.Color(WORLD.road);          // setHex converts sRGB -> linear
+    const rY = Math.max(1e-4, 0.2126 * rc.r + 0.7152 * rc.g + 0.0722 * rc.b);
+    shader.uniforms.uRoadCh = { value: new THREE.Vector3(rc.r / rY, rc.g / rY, rc.b / rY) };
+    groundMat.userData.surfU = shader.uniforms.uSurf;
+    // the same vector as a plain array, so a probe can re-run the mask over the
+    // ground TEXTURE rather than over a screenshot — see qa/groundsurf.mjs on
+    // why screen space was the wrong space to count this in
+    groundMat.userData.roadCh = [rc.r / rY, rc.g / rY, rc.b / rY];
     // QA can reach the live weights — see qa/_grainab.mjs. Judging a ground
     // texture by rebuilding between values is slow enough that it does not get
     // done, and the probe that drives the void to sample it has a noise floor
@@ -2488,7 +2532,42 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
     groundMat.userData.grainU = shader.uniforms.uGrain;
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <map_pars_fragment>',
-        '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nuniform sampler2D uMottle;\nuniform vec4 uGrain;')
+        '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nuniform sampler2D uMottle;\nuniform vec4 uGrain;\nuniform vec4 uSurf;\nuniform vec3 uRoadCh;')
+      // three runs map_fragment before roughnessmap_fragment, so the albedo is
+      // in scope here and the mask costs no extra fetch.
+      .replace('#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\n{'
+        + ' float mx = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b));'
+        + ' float mn = min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b));'
+        + ' float sat = (mx - mn) / max(mx, 1e-4);'
+        + ' float grn = diffuseColor.g - max(diffuseColor.r, diffuseColor.b);'
+        // ── ROAD IS MATCHED, NOT GUESSED ────────────────────────────────────
+        // Two heuristics were tried and both selected NOTHING — the mask came
+        // back with the tarmac pure black twice. Both were tuned against
+        // mainstreet's ASPHALT (0x5a6070), which is a PROP colour; the ground
+        // bake paints WORLD.road, which on Maple is 0x6b7292 and is neither as
+        // dark nor as desaturated. Guessing at a colour when the exact one is
+        // three lines away in palette.ts is the whole mistake.
+        //
+        // So it matches the world's own road colour directly, in CHROMATICITY
+        // (rgb over luminance). That matters: the grain layers above multiply
+        // diffuseColor by up to 2x, so any test on absolute value drifts with
+        // the noise, while a ratio does not. Measured margin on Maple's real
+        // palette — road 0.000, nearest neighbour 0.286 (the prop asphalt, which
+        // is not even in this texture), sidewalk 0.495, lot 0.573, everything
+        // else past 0.6. The gate closes at 0.22, so nothing else is within
+        // 30% of being selected, and it is per-world by construction.
+        + ' vec3 ch = diffuseColor.rgb / max(1e-4, dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)));'
+        + ' float road = 1.0 - smoothstep(0.06, 0.22, distance(ch, uRoadCh));'
+        // grass stays a green-dominance test: the lawn is painted in several
+        // shades plus a lush core and patch overlays, so matching one hex would
+        // miss most of it. Measured 1.00 on meadow and 0.00 on all eight other
+        // ground colours, which is separation enough.
+        + ' float grass = smoothstep(0.10, 0.24, sat) * smoothstep(0.004, 0.045, grn);'
+        + ' roughnessFactor = mix(roughnessFactor, uSurf.x, road);'
+        + ' roughnessFactor = mix(roughnessFactor, uSurf.y, grass);'
+        + ' if (uSurf.z > 0.5) diffuseColor.rgb = vec3(road, grass, 0.0);'
+        + ' }')
       .replace('#include <map_fragment>',
         '#include <map_fragment>\n{'
         + ' vec3 g = texture2D(uDetail, vMapUv * 140.0).rgb;'

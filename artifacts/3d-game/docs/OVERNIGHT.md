@@ -336,6 +336,33 @@ Something must want buying at match 40.
 | `qa/glosscov.mjs` | what fraction of each world is allowed to shine, by vertex |
 | `qa/glossgap.mjs` | WHERE a world's surface area is, and which of it is matte |
 | `qa/grounding.mjs` | is the hero standing on the floor, by differencing the disc |
+| `qa/groundsurf.mjs` | the ground's material mask, and sweeps of what it drives |
+
+### TWO NEGATIVE RESULTS ON THE GROUND, SO NOBODY SPENDS THE DAY AGAIN
+
+**Ground roughness cannot do anything in this game.** The whole island is one
+`MeshStandardMaterial` at roughness 0.97 — tarmac, lawn, sand and plaza all
+answer the sun identically — and the obvious fix is to split it. It does not
+work, and the measurement is not close: with the camera provably still (0.000
+drift, see below), taking the road from 0.97 to 0.45 changes **zero** pixels by
+more than 3/255, and 0.05 — a near mirror — moves 5.3% of the frame with a peak
+difference of 9/255.
+
+The reason rules out every other value: the ground is one FLAT HORIZONTAL plane,
+so its normal is +Y everywhere, the sun has exactly one mirror direction, and at
+this camera's elevation that direction does not point at the lens. Sharpening an
+off-screen lobe changes nothing on screen. The only other specular source is the
+RoomEnvironment IBL, pinned at 0.15 because higher desaturates the island.
+**A wet-looking road needs normal VARIATION, not lower roughness.**
+
+**And the material mask is the hard part, not the effect.** Two heuristics
+selected literally nothing — the mask rendered with the tarmac pure black both
+times — because both were tuned against mainstreet's `ASPHALT` (0x5a6070), which
+is a PROP colour. The ground bake paints `WORLD.road`, which on Maple is
+0x6b7292: neither as dark nor as desaturated. Matching the world's own road
+colour in CHROMATICITY (rgb over luminance, so the grain multiply cannot move
+it) gives road 0.000 against a nearest neighbour of 0.286. Guessing at a colour
+when the exact one is in palette.ts was the entire mistake.
 
 ### HOW TO PHOTOGRAPH ONE VARIABLE IN A LIVE GAME
 `qa/facewrap.mjs` exists to compare four values of one constant, and getting
@@ -362,3 +389,10 @@ mistakes:
 5. **Assert the freeze held.** Sample `__matchState().t`, sleep 600 ms of wall
    clock, sample again, fail loudly if it moved. A freeze that quietly does not
    freeze manufactures the exact artefact it was installed to prevent.
+6. **Step with dt = 0 between variants, and PRINT THE CAMERA DRIFT.** A
+   hand-cranked frame still advances the virtual clock by whatever you tell it
+   to, so two frames per variant at 1/60 is 33 ms of world per shot — and a void
+   at r=7 travels ~145 units a second. That drifted the camera 14.8 units across
+   four shots and reported **90% of pixels changed**, which reads as an enormous
+   lighting effect and was the camera moving. At dt = 0 the frame still draws,
+   uniforms still bind, and nothing integrates. The real number was 0.00%.
