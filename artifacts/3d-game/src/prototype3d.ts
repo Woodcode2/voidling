@@ -1031,7 +1031,7 @@ const bootStage = (label: string): Promise<void> => {
   return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 };
 await bootStage('Raising the island…');
-const island = createIsland(scene, addEdible);
+const island = await createIsland(scene, addEdible, bootStage);
 await bootStage('Opening the streets…');
 
 // ══ THE SCRAPBOOK, IN THE WORLD ═══════════════════════════════════════════

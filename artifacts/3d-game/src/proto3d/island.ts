@@ -409,7 +409,13 @@ export function coastClear(x3: number, z3: number, d = 12): boolean {
   return insideIsland3(x3 + (x3 / len) * d, z3 + (z3 / len) * d);
 }
 
-export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
+// async ON PURPOSE: the world build is the boot's one remaining monolith, and
+// the caller owns the loading cover. `onStage` is awaited at the build's seams
+// so the cover can paint a stage label between chunks — see bootStage in
+// prototype3d.ts, and the note there on why this buys responsiveness, not speed.
+export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
+                                   onStage?: (label: string) => Promise<void>): Promise<Island> {
+  const breathe = async (l: string) => { if (onStage) await onStage(l); };
   // MAPLE FALLS is deterministic: reset the town's seeded stream before the
   // bake so the ground, and then the props, come out identical every load.
   if (WORLD_ID === 'maple') MS.resetMapleRng();
@@ -2305,6 +2311,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
 
   }   // ← end of the Maple-only ground detail (roads, blocks, districts)
 
+  await breathe('Painting the streets…');
   const groundTex = new THREE.CanvasTexture(cv);
   // 16 on phones too. At 4, ground receding from the camera turned to mush —
   // the boardwalk planks and lane lines at the top of the screen were the
@@ -2694,7 +2701,7 @@ export function createIsland(scene: THREE.Scene, addEdible: AddEdible): Island {
   spray.rotation.x = -Math.PI / 2; spray.position.set(wfX, -22, wfZ); scene.add(spray);   // AT the waterfall foot — not a UFO over the abyss
 
     // ── PROPS: populate each block per biome ───────────────────────────────────
-  populate(scene, addEdible);
+  await populate(scene, addEdible, breathe);
 
   // Higgsfield image→3D hero landmark: the ferris wheel — moved out of the city
   // core to a beach BOARDWALK FAIR where a ferris wheel actually belongs.
@@ -4356,7 +4363,8 @@ function makeFenceRun(len: number, col = 0xf4f0e2): THREE.Group {
   return g;
 }
 
-function populate(scene: THREE.Scene, addEdible: AddEdible) {
+async function populate(scene: THREE.Scene, addEdible: AddEdible,
+                        breathe: (l: string) => Promise<void>) {
   const setShadow = (m: THREE.Object3D) => m.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   const place = (mesh: THREE.Object3D, x3: number, z3: number, r: number) => {
     if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
@@ -4673,6 +4681,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     return;   // LANTERN NIGHT is fully populated — the Maple grid pass must not run
   }
 
+  await breathe('Filling the stadium…');
   // ══ GAME DAY: a fall Saturday, and the whole town is here ══════════════
   // Same model as Pirate Bay below — polygon regions, a spatial hash, authored
   // landmarks reserved BEFORE the scatter runs. The difference is density: a
@@ -4932,6 +4941,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     return;   // GAME DAY is fully populated — the Maple grid pass must not run
   }
 
+  await breathe('Docking the ships…');
   // ══ PIRATE BAY: props scattered inside REGIONS, never on a grid ═════════
   if (WORLD_ID === 'pirate') {
     const P3 = (p2: [number, number]): [number, number] => [w(p2[0]), w(p2[1])];
@@ -5392,6 +5402,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  await breathe('Building the town…');
   // ══ MAPLE FALLS ═══════════════════════════════════════════════════════════
   // Nine authored districts on the 6x6 grid. Every one of them is built from
   // straight rows, mirrored pairs and repeated motifs — that is what reads as
@@ -5739,6 +5750,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
   }
 
+  await breathe('Planting the farm…');
   // ══ THE FARM ══════════════════════════════════════════════════════════════
   // The bottomland east of town: blocks (3,0) and (3..5, 1). The barnyard, the
   // grain elevator on the rail, the corn maze, the pumpkin patch, and the 4-H
@@ -5938,6 +5950,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
   }
 
+  await breathe('Raking the park…');
   // ══ THE PARK ══════════════════════════════════════════════════════════════
   // Blocks (4..5, 2). The town green's bigger cousin: the pond, the nine-hole
   // municipal course the mayor's brother-in-law runs, picnic tables and grills.
@@ -6160,6 +6173,7 @@ function populate(scene: THREE.Scene, addEdible: AddEdible) {
     }
   }
 
+  await breathe('Scattering the leaves…');
   // ══ THE COUNTRY BETWEEN THE BLOCKS ════════════════════════════════════════
   // MAPLE FALLS is the world a child plays FIRST — the cold-boot launch drops
   // them straight into it — and a full instrumented match measured it as the
