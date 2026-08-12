@@ -718,7 +718,25 @@ function applyQuality() {
   const q = QUALITY[qLevel];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_SMALL_SCREEN ? q.prSmall : q.pr));
   bloomOn = q.bloom;
-  if (renderer.shadowMap.enabled !== q.shadows) {
+  // ── THE LATCH CHANGES WHAT A RUNG MEANS, NOT WHERE THE LADDER CAN GO ────
+  // The old shape had the latch in the ADAPTER, blocking the 3->2 climb so a
+  // recovered device could never be handed the shadow rebuild. The intent was
+  // right and the geometry was wrong: rung 3 is the ONLY shadowless rung, so
+  // "the pixel-ratio rungs above still give the device its quality back" —
+  // the comment that justified the block — described rungs that do not exist.
+  // A phone with one bad 12-second stretch (and cold boot IS one; see the
+  // started gate in the adapter) landed on 1.15x-no-shadows and stayed there
+  // for the session: ~11% of a 3x panel's pixels, forever, on hardware that
+  // was fine.
+  //
+  // Now the latch lives HERE, where the rung is interpreted: once shadows have
+  // gone off, every rung renders shadowless. A latched device climbs all the
+  // way back to rung 0 and recovers its full pixel ratio, and no crossing ever
+  // re-fires the 1,677 ms shader rebuild, because wantShadows is false on both
+  // sides of every boundary. The rebuild still happens at most once a session
+  // — the latch's whole reason to exist — but it no longer costs resolution.
+  const wantShadows = q.shadows && !qShadowLatch;
+  if (renderer.shadowMap.enabled !== wantShadows) {
     // ── THE MOST EXPENSIVE THING IN THE GAME, AND IT FIRES WHEN THE DEVICE
     //    IS ALREADY STRUGGLING ────────────────────────────────────────────
     // three bakes shadow support into the compiled program, so flipping
@@ -734,9 +752,9 @@ function applyQuality() {
     // island shares two of them. The other is the latch below — crossing this
     // boundary is now one-way, so the rebuild happens at most once a session
     // instead of ping-ponging.
-    renderer.shadowMap.enabled = q.shadows;
-    sun.castShadow = q.shadows;
-    if (!q.shadows) qShadowLatch = true;
+    renderer.shadowMap.enabled = wantShadows;
+    sun.castShadow = wantShadows;
+    if (!wantShadows) qShadowLatch = true;
     const seen = new Set<THREE.Material>();
     scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
@@ -3773,6 +3791,12 @@ function beginMatch(solo = false) {
   }
   started = true; startT = tClock;
   resetFps();
+  // the quality adapter starts its window HERE. Frames before this line are
+  // boot, menu and the world build — none of them say anything about how this
+  // device runs the match, and they are exactly the frames that used to demote
+  // a good phone before play began. Six seconds of grace covers the camera
+  // swoop and the first-second GC without letting a real struggle hide long.
+  qAccT = 0; qAccN = 0; qCd = 6;
   setCtx('world', pickedWorld);
   setCtx('skin', localStorage.getItem('voidSkin') || 'classic');
   // read it BEFORE it is banked below — everything downstream that means
@@ -7067,19 +7091,26 @@ function animate() {
   fitShadow(camDist);
   fadeOccluders(dt);
 
-  // adaptive quality: step down fast when fps dips, climb back slowly
+  // adaptive quality: step down fast when fps dips, climb back slowly.
+  // GATED ON `started`: the ladder used to sample straight through cold boot
+  // and the menu. The world build is a 30-45 s stretch of heavy JavaScript,
+  // and the frames on either side of it read as a device in trouble — so the
+  // adapter demoted a perfectly good phone before the player had touched
+  // anything, and (before the latch moved into applyQuality) that demotion
+  // was permanent. Nothing the player is not looking at is worth demoting
+  // for; the accumulator is reset at match start so this window's samples
+  // never count.
   qAccT += dt; qAccN++; qCd -= dt;
-  if (qPinned === null && qCd <= 0 && qAccT > 0) {
+  if (qPinned === null && started && qCd <= 0 && qAccT > 0) {
     const avg = qAccN / qAccT; qAccN = 0; qAccT = 0;
     if (avg < 46 && qLevel < QUALITY.length - 1) { qLevel++; applyQuality(); qCd = 4; }
     else if (avg > 57 && qLevel > 0) {
-      // climbing back is free EXCEPT across the shadow boundary, which costs a
-      // full shader rebuild. Once shadows have gone off, they stay off: the
-      // pixel-ratio rungs above still give the device its quality back, and
-      // they cost nothing to cross.
-      const up = qLevel - 1;
-      if (qShadowLatch && QUALITY[up].shadows && !QUALITY[qLevel].shadows) { qCd = 10; }
-      else { qLevel = up; applyQuality(); qCd = 10; }
+      // climbing is free at EVERY crossing now. The shadow one-way door lives
+      // in applyQuality (see wantShadows): a latched device climbs these rungs
+      // shadowless, so no climb can ever hand a struggling phone the shader
+      // rebuild — which is what this branch used to block the climb to avoid,
+      // at the price of stranding the device at the bottom pixel ratio.
+      qLevel--; applyQuality(); qCd = 10;
     }
     else qCd = 3;
   }
