@@ -676,7 +676,35 @@ const QUALITY = [
   { pr: 1.15, prSmall: 1.0, shadows: false, shSize: 512, bloom: false },
 ];
 let qLevel = 0, qAccT = 0, qAccN = 0, qCd = 4;
-let bloomOn = true;   // set by applyQuality from the rung's own flag
+// ── READ THE RUNG, DO NOT ASSUME IT ──────────────────────────────────────
+// This was `= true`, with a comment saying applyQuality would correct it. It
+// does — but applyQuality is only ever called when the adapter CHANGES rung
+// (:7046, :7054) or from __pinQuality. Nothing calls it at startup, qLevel
+// starts at 0, so the climb-back branch cannot fire, and the step-down branch
+// only fires under 46 fps. On any device that holds frame rate, applyQuality is
+// never called at all and this initialiser IS the shipped setting.
+//
+// So every rung in the table said bloom:false, thirty lines of comment above
+// said the composer path is not shipped, and the composer path was what
+// shipped — on every phone fast enough to stay off the bottom rung. It costs
+// the hero 0.20 saturation and 0.12 value, because three forces NoToneMapping
+// when the destination is a render target and the graded CustomToneMapping is
+// simply skipped. A device slow enough to drop a rung got the CORRECT frame.
+// The better the phone, the worse the game looked.
+//
+// That is the "light purple wash rather than our crisp dark one", and the
+// "colour is still switching throughout" — the switch was the adapter moving
+// between two colour pipelines mid-match, exactly as the comment above feared,
+// only it started on the wrong side of it.
+//
+// It also explains why every colour probe in qa/ disagreed with the owner:
+// they all measure by calling renderer.render() into their own render target,
+// which is the DIRECT path. No probe that renders its own frame can see this.
+// qa/shippedlook.mjs screenshots the canvas instead, and is the only instrument
+// here that can catch a whole-pipeline swap.
+//
+// Derived from the table so the two can never disagree again.
+let bloomOn = QUALITY[0].bloom;
 /** QA only: when non-null the adapter stops walking and stays on this rung.
  *  See __pinQuality — a moving ladder makes every graphics measurement a
  *  reading from a rung nobody chose. */
