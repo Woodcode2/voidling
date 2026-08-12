@@ -1100,7 +1100,33 @@ function placeStickersOnce(): void {
 // __edibles + __insideIsland3 + __validateWorld power the placement auditor:
 // a headless sweep measures every edible's REAL world-space bounding box
 // against the road/sidewalk bands and the coastline.
-const _dbg = window as unknown as {
+// ── THE DEBUG API ATTACHES ATOMICALLY, AT THE END OF BOOT ──────────────────
+// _dbg used to BE window, so every hook landed on the page the moment its line
+// ran. That was harmless while the module evaluated in one synchronous block —
+// nothing could call in half-way. The boot now yields at its seams (see
+// bootStage), and the first probe to poll during a gap found the hole:
+// __matchState exists early but reads `rivals`, which is declared five hundred
+// lines later, and the call died on the temporal dead zone. So the hooks stage
+// on a local object and land on window in one Object.assign at the very end of
+// the module, after everything they close over is initialised. A probe that
+// waits for __voidState — all of them do — can no longer observe a half-built
+// API, because __voidState and the rest arrive together or not at all.
+//
+// A plain object with one Object.assign at the end is NOT enough: two hooks
+// (__shopTab, __grantHats) are assigned lazily at RUNTIME, inside the shop's
+// init, long after boot — a snapshot copy would strand them on the local
+// object and silently break every probe that calls them. So _dbg is a proxy
+// that buffers writes until the module is fully evaluated and forwards them
+// to window from then on.
+const _dbgStore: Record<string, unknown> = {};
+let _dbgLive = false;
+const _dbg = new Proxy(_dbgStore, {
+  set(t, k, v) {
+    t[k as string] = v;
+    if (_dbgLive) (window as unknown as Record<string, unknown>)[k as string] = v;
+    return true;
+  },
+}) as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
   __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
@@ -7192,4 +7218,7 @@ else {
   camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
   camera.lookAt(voidState.x, voidling.radius * 0.5, voidState.z);
 }
+// the debug API goes live only now — see the note on _dbg's declaration
+_dbgLive = true;
+Object.assign(window, _dbgStore);
 animate();

@@ -3190,6 +3190,23 @@ const FADE_BODY = `
 registerGloss([
   [PROPS.towerGlass, 0.78], [PROPS.carGlass, 0.70],
   [0xc8cdd8, 0.68], [0x3c4454, 0.45],
+  // ── PIRATE BAY, measured with qa/glossgap.mjs: 72% of the island was dead
+  // matte, and the mass was not the ship brass — it was wood, fronds and the
+  // resort's painted plaster. Values follow the Maple canopy argument: the
+  // radiance term is 1 + 5g while metalness goes with g squared, so a low
+  // sheen picks up sky and gives back almost none of the colour.
+  //   frond greens 0.14 (16 shades on the palms and hedges, same as Maple's
+  //   canopy), palm bark 0.06, crate/coconut wood 0.10 (also a brown work-pant
+  //   in Maple's DENIM list — a 0.10 wax on trousers is invisible), the barrel
+  //   iron rings 0.45, and the resort hotel's cream 0.18 like Maple's paint.
+  // NOT here: AO-darkened vertex shades. bakeContactAO darkens colours after
+  // aGloss is stamped, so a dark variant inherits its source part's gloss and
+  // an entry for the darkened hex would key on a colour part() never sees.
+  [0x8a6a4a, 0.10], [0xb08a5a, 0.06], [0xfdf3de, 0.18],
+  [0x2e2a34, 0.45],
+  [0x4faa5a, 0.14], [0x54b060, 0.14], [0x3f8f4c, 0.14], [0x459a52, 0.14],
+  [0x5fbc68, 0.14], [0x58b463, 0.14], [0x67b25c, 0.14], [0x7ec96e, 0.14],
+  [0x5dbe63, 0.14], [0x6cc86e, 0.14],
 ], 'island');
 /** Override the palette lookup for one part — for a colour that is metal HERE
  *  and cushion fabric two props over. `p.push(glossy(part(...), 0.7))`. */

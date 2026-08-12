@@ -53,6 +53,9 @@ const ICE = 0xd8f0f6;
 registerGloss([
   [GOLD, 0.62], [GOLD_B, 0.78], [GLASS, 0.80], [AQUA, 0.62], [TURQ, 0.58],
   [MARBLE, 0.34], [SLATE, 0.20], [ICE, 0.50],
+  // the banding cream is 6.2% of Pirate Bay's vertices (qa/glossgap.mjs) and
+  // was dead matte — painted plaster, same 0.18 as Maple's house paint
+  [CREAM, 0.18],
 ], 'luxe');
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
