@@ -91,6 +91,22 @@ const localStorage: Storage = (() => {
 
 // ── renderer / scene / camera ────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+// ── THE SINGLE BIGGEST LINE ITEM IN THE COLD BOOT WAS A DIAGNOSTIC ─────────
+// Profiled with qa/_bootprof90.mjs on an unminified build: 40.8% of the entire
+// boot — 7.5 of 18.3 seconds — was three's WebGLProgram.onFirstUse, which is
+// not rendering anything. It calls getProgramInfoLog/getShaderInfoLog on every
+// program so it can pretty-print compile errors, and those readbacks force the
+// driver to finish compiling and linking each of ~45 programs SYNCHRONOUSLY,
+// one after another, serialised by the readback. qa/_bootgl.mjs called this
+// exact mechanism out and its number was buried in "99% plain JS" anyway.
+//
+// With the diagnostic off the programs still compile — drivers just get to
+// schedule the work instead of being stalled for a transcript nobody reads in
+// production. A shader that fails to compile still fails visibly (the mesh
+// renders wrong); what is lost is only the console explanation, so the switch
+// stays reachable: ?shaderlog restores full diagnostics for a debugging
+// session or a probe.
+renderer.debug.checkShaderErrors = location.search.includes('shaderlog');
 // THE "NOT HD" BUG. This was hard-capped at 1.3 on every touch device — and
 // the adaptive ladder below re-clamped to 1.3 as well, so even the TOP quality
 // rung could not exceed it. Measured on a 390x844 iPhone viewport: a drawing
@@ -998,7 +1014,25 @@ const COPY = WORLD_COPY[pickedWorld];
   if (ts) ts.textContent = COPY.sub;
   const ln = document.querySelector('#loadScr .lName'); if (ln) ln.textContent = nm;
 }
+// ── THE BOOT BREATHES ──────────────────────────────────────────────────────
+// The world build was ONE unbroken main-thread block — 17 s in the sandbox,
+// a handful of seconds on a phone — during which the page could not paint,
+// the loading bar's own writes coalesced into a single final repaint, input
+// died, and an OS watchdog was one bad device away from killing the tab. The
+// entry is a module script, so top-level await is available: a paint-yield at
+// each big seam turns the block into chunks with a live stage label between
+// them. Total build time is unchanged — this buys RESPONSIVENESS, not speed —
+// which is why each label names what the player is actually waiting for.
+// The double-rAF is the guarantee that the label paints before the next chunk
+// starts; a single rAF only schedules it.
+const bootStage = (label: string): Promise<void> => {
+  const tip = document.querySelector('#loadScr .lTip');
+  if (tip) tip.textContent = label;
+  return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+};
+await bootStage('Raising the island…');
 const island = createIsland(scene, addEdible);
+await bootStage('Opening the streets…');
 
 // ══ THE SCRAPBOOK, IN THE WORLD ═══════════════════════════════════════════
 // One hidden curio per sticker this world has, dropped in the district its
@@ -1252,6 +1286,7 @@ const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'ski
   vis();
 }
 const bubbles = createBubbles(camera);
+await bootStage('Letting everyone in…');
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 // QA: the crowd gate. `life` is exposed so qa/crowdgate.mjs can time
 // life.update() directly with the gate on and off, isolating the crowd from
@@ -1629,6 +1664,7 @@ _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // The older comment in rivals.ts about 3/4/5 rivals is about the ratio between
 // the player and the top rival, not about whether the race is winnable, and I
 // read it as support for a change it does not support.
+await bootStage('Waking the void family…');
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
 const fx = createFx(scene);
 const FAMILY_TITLE: Record<string, string> = {
