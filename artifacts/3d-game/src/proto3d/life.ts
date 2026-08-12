@@ -12,7 +12,7 @@ import {
   type Biome, type AddEdible,
 } from './island';
 import * as LUXE from './luxe';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
 import * as GD from './gameday';
@@ -367,7 +367,21 @@ export function roundedBox(w: number, h: number, d: number, r: number, seg = 3):
   const key = `${w}|${h}|${d}|${r}|${seg}`;
   const hit = _rbox.get(key);
   if (hit) return hit;
-  const g = new THREE.BoxGeometry(w, h, d, seg, seg, seg);
+  // ── WELD BEFORE ROUNDING, OR THE FILLET SHIPS WITH CREASES ──────────────
+  // BoxGeometry stores every corner vertex THREE TIMES — once per face, split
+  // so each copy can carry that face's normal and uv. computeVertexNormals
+  // averages per stored vertex, so the copies along each of the twelve edges
+  // kept three different normals and the "rounded" box rendered with a hard
+  // crease line exactly where the fillet is. That is why every vehicle in the
+  // game photographed as a slab with a curved outline: rounded geometry,
+  // box shading. Deleting uv+normal and welding by position gives
+  // computeVertexNormals one shared vertex per corner, and the fillet finally
+  // shades as a curve. Nothing here needs uvs — the car materials are flat
+  // colours and part() deletes uv anyway.
+  const g0 = new THREE.BoxGeometry(w, h, d, seg, seg, seg);
+  g0.deleteAttribute('uv'); g0.deleteAttribute('normal');
+  const g = mergeVertices(g0);
+  g0.dispose();
   const pos = g.attributes.position as THREE.BufferAttribute;
   // never let the radius exceed half of the smallest side, or the shape inverts
   const rr = Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4);

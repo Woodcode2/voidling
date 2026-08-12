@@ -3534,6 +3534,8 @@ function endMatch() {
 let combo = 0, comboT = 0, chompCd = 0;
 // once-per-match milestone banners (hole.io celebrates the firsts)
 const moments = { firstBuilding: false, firstCar: false, firstRival: false, half: false, last30: false };
+// the last final-countdown second already shown, so each of 10..1 pops once
+let countTick = 0;
 const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
@@ -4616,6 +4618,7 @@ function resetMatch() {
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
   feastR = 0;     // the ceiling a rival bought you does not carry into the next match
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
+  countTick = 0;
   renderQuests();
   ended = false;
   // colours and dusk reset per match; the four INTENSITIES come from the one
@@ -6307,6 +6310,29 @@ function animate() {
       // animate() call. The game's biggest scoring moment was silent in every
       // logged run. Moved to 35s so the two never collide.
       if (!moments.last30 && !ended) { moments.last30 = true; announce('⏰ 35 SECONDS — EAT FASTER!!'); }
+      // ── THE FINAL TEN SECONDS ARE A RITUAL, NOT A SURPRISE ───────────────
+      // Between the 35-second banner and the buzzer there was NOTHING: the
+      // match's whole ending was a red timer in a corner a child in a scramble
+      // is not looking at. Every party game closes with a countdown for the
+      // same reason a school bell rings — the ending should be a shared,
+      // felt event. One huge number a second (pointer-blind, so it can never
+      // eat a touch), a tick whose PITCH RISES as time runs out — pop() takes
+      // a combo and pitches up with it, so 11-n climbs the scale toward the
+      // buzzer — and a ring pulse off the void that tightens as the numbers
+      // fall. Scoring is untouched on purpose: par was measured (WORLD_PAR,
+      // docs/OVERNIGHT.md), and a late multiplier would quietly stale that
+      // calibration for the sake of a spectacle the ritual delivers anyway.
+      const cs = Math.ceil(matchClock);
+      if (cs <= 10 && cs >= 1 && cs !== countTick && !ended) {
+        countTick = cs;
+        const cEl = el('count').firstElementChild as HTMLElement;
+        cEl.textContent = String(cs);
+        cEl.classList.toggle('hot', cs <= 3);
+        cEl.classList.remove('pop'); void cEl.offsetWidth; cEl.classList.add('pop');
+        audio.pop(11 - cs);
+        fx.ring(voidState.x, voidState.z, cs <= 3 ? 0xff6a5e : 0xffd23f,
+          voidling.radius * (1.5 + (10 - cs) * 0.07), 0.55);
+      }
     }
     if (matchClock <= 0 && !ended && outroT <= 0) {
       outroT = 2.0;   // slow-mo push-in beat before the results panel
