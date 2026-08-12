@@ -336,6 +336,32 @@ Something must want buying at match 40.
 | `qa/glosscov.mjs` | what fraction of each world is allowed to shine, by vertex |
 | `qa/glossgap.mjs` | WHERE a world's surface area is, and which of it is matte |
 | `qa/grounding.mjs` | is the hero standing on the floor, by differencing the disc |
+| `qa/groundsurf.mjs` | the ground's road/grass material mask, and a roughness sweep |
+| `qa/shippedlook.mjs` | what the CANVAS shows — the only probe that sees the real path |
+
+### THE PROBE THAT COULD NOT SEE THE BUG
+Every colour probe in `qa/` measures by calling `renderer.render()` into its own
+`WebGLRenderTarget` and reading it back. That is the DIRECT path. For weeks
+`heroface` reported healthy saturation while the owner reported a purple wash,
+and both were right about different frames: `bloomOn` initialised to `true` and
+`applyQuality()` is only called when the adapter CHANGES rung, so every device
+that held 60 fps shipped the EffectComposer path — which three renders with
+`NoToneMapping`, skipping the whole graded tone map, and into a target with no
+MSAA. The better the phone, the worse the game looked.
+
+**No probe that renders its own frame can catch a whole-pipeline swap.**
+`qa/shippedlook.mjs` screenshots the canvas and pins the rung; use it whenever a
+colour or crispness claim is about what SHIPS rather than about a shader.
+
+### A DEAD END, RECORDED SO IT IS NOT RE-PROPOSED
+Splitting the ground into road and grass by ROUGHNESS does nothing. Measured on
+the fixed pipeline with the camera provably held: 0.02% of pixels change and the
+peak delta is 6/255 between roughness 0.97 and 0.45. The island floor is one
+flat horizontal plane, so the sun's mirror direction never points at this camera
+and sharpening a lobe that is off screen changes nothing; the only other
+specular source is the RoomEnvironment IBL, pinned at 0.15 on purpose. A wet or
+sunlit road needs normal VARIATION, not roughness. The verified material MASK is
+kept in `island.ts` at neutral values for whoever does that.
 | `qa/groundsurf.mjs` | the ground's material mask, and sweeps of what it drives |
 
 ### TWO NEGATIVE RESULTS ON THE GROUND, SO NOBODY SPENDS THE DAY AGAIN
