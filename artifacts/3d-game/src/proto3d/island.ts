@@ -3293,7 +3293,16 @@ export function setMeshFade(o: THREE.Object3D, fade: number): void {
   if (o.onBeforeRender !== _fadeHook) o.onBeforeRender = _fadeHook;
 }
 const _pc = new THREE.Color();
+// ── IS THIS PART ROUND? ────────────────────────────────────────────────────
+// Asked here because here is the only place that still knows. part() calls
+// toNonIndexed(), which returns a plain BufferGeometry and throws the class
+// name away, and mergeGeometries then fuses forty parts into one buffer with
+// no record of what any of them were. Two lines later the answer is gone for
+// good — which is exactly why the flat/smooth decision has been made by hand,
+// per factory, in six files, and got it wrong for most of the game.
+const ROUND_GEO = /^(Cylinder|Cone|Sphere|Torus|Lathe|Capsule|Tube)/;
 export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
+  const wasRound = ROUND_GEO.test(geo.type);
   const g = geo.index ? geo.toNonIndexed() : geo;
   if (g !== geo) geo.dispose();
   g.scale(sx, sy ?? sx, sz ?? sx);
@@ -3331,6 +3340,11 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
   const spec = new Uint8Array(n);
   if (gl) spec.fill(Math.round(gl * 255));
   g.setAttribute('aGloss', new THREE.BufferAttribute(spec, 1, true));
+  // carried on userData rather than in a buffer: mergedProp reads it off the
+  // parts BEFORE they are fused, so it costs nothing per vertex and nothing at
+  // runtime. Two numbers per part, discarded at the end of the build.
+  g.userData.roundV = wasRound ? n : 0;
+  g.userData.totV = n;
   return g;
 }
 // unlit accent material: anything merged with this ignores the lighting, which
@@ -3386,7 +3400,44 @@ function bakeContactAO(geo: THREE.BufferGeometry): void {
   }
   col.needsUpdate = true;
 }
-export function mergedProp(parts: THREE.BufferGeometry[], mat: THREE.Material = PROP_SHARED_MAT): THREE.Mesh {
+/** How much of a prop has to be round before it is shaded as round. Half is
+ *  deliberately permissive: a barrel with a square lid, a hydrant on a plinth
+ *  and a mushroom on a stalk are all round objects wearing one flat detail, and
+ *  the flat detail is the part that survives being smoothed. Going the other way
+ *  — a building with one cylindrical vent — loses the crisp facets that make
+ *  architecture read as architecture, which is what PROP_SHARED_MAT is for. */
+const ROUND_SHARE = 0.5;
+export function mergedProp(parts: THREE.BufferGeometry[], mat?: THREE.Material): THREE.Mesh {
+  // ── FLAT OR SMOOTH IS DECIDED HERE, NOT BY A HUNDRED CALL SITES ─────────
+  // flatShading is right for architecture and wrong for anything that grew or
+  // was turned on a lathe — island.ts:3091 says so, life.ts and tailgate.ts say
+  // so again in their own words, and mainstreet.ts says it a fourth time about
+  // the maple canopy. Each time the fix stopped at the file boundary. Counted:
+  // PROP_SMOOTH_MAT is referenced 4 times in island.ts against 33 mergedProp
+  // calls, ZERO times in life.ts against 25, and zero in luxe.ts. Every barrel,
+  // hydrant, bin, drum, cooler, dome, mast and fountain in the game was a
+  // cylinder wearing 6-16 hard tone bands.
+  //
+  // Under FLAT_SHADED three discards vertex normals entirely — normal_vertex
+  // writes vNormal only #ifndef FLAT_SHADED, and the fragment substitutes
+  // normalize(cross(dFdx, dFdy)) — so no segment raise anywhere can fix it, and
+  // the normals are being paid for regardless. This starts reading them.
+  //
+  // An explicit material still wins: PROP_GLOW_MAT and the deliberate choices
+  // already in the tree pass through untouched.
+  if (!mat) {
+    // COUNTED BY PART, NOT BY VERTEX, and the difference is the whole thing.
+    // A BoxGeometry is 36 vertices; a SphereGeometry(r, 12, 9) is about 600 and
+    // a CylinderGeometry(r, r, h, 8) about 96. Weighting by vertex therefore
+    // says a shopfront of twenty boxes with one domed vent is 45% round. That
+    // version measured 91-99.5% of every world onto the smooth material — it
+    // had quietly smoothed the architecture, which is the opposite mistake and
+    // the one PROP_SHARED_MAT exists to prevent.
+    let round = 0;
+    for (const pg of parts) if (((pg.userData.roundV as number) ?? 0) > 0) round++;
+    mat = parts.length > 0 && round / parts.length >= ROUND_SHARE
+      ? PROP_SMOOTH_MAT : PROP_SHARED_MAT;
+  }
   // mergeGeometries returns null the moment two inputs disagree about which
   // attributes exist, and a prop that vanishes is a much worse bug than a
   // prop that is matte. Almost everything here comes from part(); this makes
