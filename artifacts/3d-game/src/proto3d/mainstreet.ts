@@ -356,7 +356,7 @@ export function makeChurch(): THREE.Mesh {
 
 /** THE MAPLE DINER — chrome, checkerboard skirt, a neon coffee cup on the
  *  roof, and an argument that has been running since 1987. */
-export function makeDiner(): THREE.Mesh {
+export function makeDiner(): THREE.Group {
   const p: G[] = [];
   p.push(part(box(14, 4.4, 8), STEEL, 0, 2.2, 0));
   p.push(part(cyl(4, 4, 14, 12), CREAM, 0, 4.4, 0, 0, 0, Math.PI / 2));   // barrel roof
@@ -380,10 +380,19 @@ export function makeDiner(): THREE.Mesh {
   p.push(part(box(0.3, 1.4, 0.3), WHITE, -3.8, 11.6, 0, 0.2, 0, 0.3));  // steam
   p.push(part(box(0.3, 1.2, 0.3), WHITE, -3, 11.5, 0, -0.2, 0, -0.25));
   p.push(part(box(4.6, 1, 0.3), NEON_GOLD, 2.2, 10.2, 0));
-  // the argument, permanently in progress by the door
-  personParts(p, 7.6, 5.6, mpick(SHIRTS), -0.6, RED);
-  personParts(p, 9.2, 5.2, mpick(SHIRTS), 2.5, BLUE);
-  return M(p);
+  // the argument, permanently in progress by the door. In their OWN merge:
+  // the diner is majority-box, so mergedProp's auto flat/smooth pick renders
+  // the whole building faceted — correct for the architecture and wrong for
+  // the two people welded into it, whose cylinder limbs came out as hard
+  // vertical facets. A person is round-majority on their own, so a separate
+  // merge puts them on the smooth material the standalone folk already use.
+  // One extra draw call, on the one storefront that contains people.
+  const folk: G[] = [];
+  personParts(folk, 7.6, 5.6, mpick(SHIRTS), -0.6, RED);
+  personParts(folk, 9.2, 5.2, mpick(SHIRTS), 2.5, BLUE);
+  const g = new THREE.Group();
+  g.add(M(p)); g.add(mergedProp(folk, PROP_SMOOTH_MAT));
+  return g;
 }
 
 /** A MAIN STREET STOREFRONT. Two floors, a parapet, an awning and a sign
