@@ -499,10 +499,19 @@ const nb = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
 // recorded in the commit.
 const B = {
   sph: nb(new THREE.SphereGeometry(0.5, 16, 11)),         // head — the silhouette that matters most
-  sphS: nb(new THREE.SphereGeometry(0.5, 10, 7)),         // shoulders, buns, balls
-  dot: nb(new THREE.SphereGeometry(0.5, 6, 4)),           // hands: a few pixels, stays cheap
-  // AROUND matters (the top-down circle has to stay round), the profile less so
-  hemi: nb(new THREE.SphereGeometry(0.5, 12, 4, 0, Math.PI * 2, 0, Math.PI * 0.56)),
+  sphS: nb(new THREE.SphereGeometry(0.5, 12, 8)),         // shoulders, buns, balls
+  // hands were 6x4 — a six-sided lump is a NUT, not a fist, and hands sit at
+  // the end of every swinging arm where the eye tracks motion
+  dot: nb(new THREE.SphereGeometry(0.5, 9, 6)),
+  // THE CROWN IS THE CLOSE-UP. This was 12x4 with a note that "the profile
+  // matters less" — and the profile is exactly what the player reads at spawn,
+  // where a person stands 100+ px tall beside a small void. Four height rings,
+  // squashed by every hairstyle to 0.66-0.98, photographed as hair cut from
+  // stone: the single loudest blocky tell on a close-range person (measured by
+  // screenshot, people_close). Sixteen around and eight rings kills the bands;
+  // the crown is one or two parts per person, so the cost is small against the
+  // 3,392 verts a person already carries.
+  hemi: nb(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.56)),
   tube: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 9, 1, true)),    // open limb segment
   taper: nb(new THREE.CylinderGeometry(0.4, 0.5, 1, 9, 1, true)),   // open, wider at the BOTTOM
   drum: nb(new THREE.CylinderGeometry(0.5, 0.5, 1, 12, 1, true)),   // open torso barrel
@@ -931,17 +940,20 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
     p.push(pc(B.taper, thighCol, 0, -0.23 * L, 0, 0.36 * gr, 0.50 * L, 0.36 * gr, Math.PI));
     p.push(pc(B.taper, shinCol, 0, -0.70 * L, 0.01, 0.29 * gr, 0.52 * L, 0.29 * gr, Math.PI));
     const fy = -0.95 * L, fh = 0.13 * L;
-    if (shoe === 'bare') p.push(pc(B.box, skin, 0, fy, 0.07, 0.24 * gr, fh, 0.38));
+    // FEET ARE LOAVES, NOT BRICKS. Every shoe in the game was a hard black box,
+    // and at spawn distance two black rectangles under each person were the
+    // second-loudest Lego tell after the hair (people_close, same screenshot).
+    // A squashed sphere reads as a rounded toe box; the sole sinks a little
+    // below the floor, which is where a sole belongs under a top-down camera.
+    // The flip-flop STRAP stays a box — a strap genuinely is flat.
+    if (shoe === 'bare') p.push(pc(B.dot, skin, 0, fy, 0.09, 0.27 * gr, fh * 1.6, 0.50));
     else if (shoe === 'flip') {
-      // the STRAP goes on top of the foot, not the sole underneath it — from a
-      // top-down camera the sole is buried in the sand and the strap is the
-      // only part anyone will ever see
-      p.push(pc(B.box, skin, 0, fy, 0.07, 0.23 * gr, fh, 0.38));
+      p.push(pc(B.dot, skin, 0, fy, 0.09, 0.26 * gr, fh * 1.5, 0.48));
       p.push(pc(B.box, pick(FLIP_COL), 0, fy + fh * 0.45, 0.10, 0.25 * gr, fh * 0.4, 0.30));
     } else if (shoe === 'boot') {
       p.push(pc(B.tube, INK, 0, -0.78 * L, 0.01, 0.32 * gr, 0.32 * L, 0.32 * gr));
-      p.push(pc(B.box, INK, 0, fy, 0.08, 0.28 * gr, fh * 1.25, 0.45));
-    } else p.push(pc(B.box, INK, 0, fy, 0.07, 0.26 * gr, fh, 0.42));
+      p.push(pc(B.dot, INK, 0, fy, 0.10, 0.31 * gr, fh * 1.9, 0.56));
+    } else p.push(pc(B.dot, INK, 0, fy, 0.09, 0.29 * gr, fh * 1.6, 0.52));
     const hip = new THREE.Group(); hip.position.set(sx, L, 0);
     hip.add(weld(p)); g.add(hip); legs.push(hip);
   }
