@@ -1264,6 +1264,7 @@ _dbg.__matchState = () => ({
   tense: tension(),
   graze: rivals.grazeCount(),
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
+  fever: feverMult,          // QA: is a beat window live right now?
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
@@ -2627,6 +2628,11 @@ renderQuests();
 // ── LIVE STATE the newsroom reports on ─────────────────────────────────────
 let lastMeal = 'a traffic cone';
 let feverMult = 1, feverT = 0;   // match-beat scoring multiplier
+// the ACTIVE beat's colour, and the heartbeat clock that repaints the window.
+// A beat fires loud — card, sting, flash — and then its 14-32 second WINDOW
+// looked exactly like normal play: a child who missed the card had no way to
+// know everything was worth double right now. The window itself now pulses.
+let feverCol = 0xffd23f, feverPulseT = 0;
 // the match's authored spine — fires on elapsed seconds, resets every run
 // The three beats belong to the town now. A generic DONUT RUSH on an island
 // that is holding a mayoral election is a wasted beat — these are the same
@@ -3612,6 +3618,10 @@ function capture(e: Edible, giveHunger = true) {
   const preyMult = (e.mesh.userData.ptsMult as number | undefined) ?? 1;
   const pts = Math.max(1, Math.round(e.radius * 12 * comboMult * preyMult * feverMult));
   playerScore += pts;
+  // during a beat window every bite answers in the beat's colour — the doubled
+  // value is FELT at the exact moment and place it is earned. Small and short:
+  // this fires on every eat, and a beat window is when eats come fastest.
+  if (feverMult > 1) fx.ring(e.mesh.position.x, e.mesh.position.z, feverCol, Math.max(1.6, e.radius * 2.2), 0.4);
   // ── A FIND ────────────────────────────────────────────────────────────
   // Loud, and immediately: this is the only thing in the game a child keeps.
   const sid = e.mesh.userData.sticker as string | undefined;
@@ -6294,6 +6304,7 @@ function animate() {
         if (!bt.fired && el3 >= bt.at) {
           bt.fired = true;
           feverMult = bt.mult; feverT = bt.dur;
+          feverCol = bt.col; feverPulseT = 0.9;
           announceBeat(bt.icon, bt.title, bt.sub, bt.mult);
           // …and the newsroom is NOT told. It used to be handed bt.news the
           // same frame, so two seconds after "The band is on the field!" the
@@ -6311,6 +6322,17 @@ function animate() {
       }
       if (feverT > 0) {
         feverT -= dt;
+        // THE WINDOW IS VISIBLE, NOT JUST THE ANNOUNCEMENT. A slow ring in the
+        // beat's own colour beats out from the void every couple of seconds for
+        // as long as the multiplier is live — the world itself says "still
+        // double" without spending a banner or a sound on it. The last pulse
+        // dies with the window, which is the quiet "rush over" signal the old
+        // full-screen card was rightly deleted for.
+        feverPulseT -= dt;
+        if (feverPulseT <= 0) {
+          feverPulseT = 1.7;
+          fx.ring(voidState.x, voidState.z, feverCol, voidling.radius * 3.0, 1.1);
+        }
         // …and NOTHING is announced when it ends. "Rush over. Keep eating!"
         // called every one of the twelve beats a "Rush" (only one of them is
         // named that), and spending a full hero card to tell a child that a
