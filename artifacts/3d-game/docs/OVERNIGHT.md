@@ -133,6 +133,18 @@ size, or another cut to the player's multipliers. Nine runs say the OLD
 controller ate all of them.
 
 ### MEASURED: ATTEMPT 10 WORKS
+### (numbers below are PRE-re-derivation — the final baseline is further down)
+
+**READ THIS BEFORE USING THE 106.9% AS A BASELINE.** These figures were taken
+with the provisional par (maple 88,000). Par was then re-derived from
+post-change player scores (maple 80,000 — the values and their verification
+live as annotations on WORLD_PAR in prototype3d.ts), and the FINAL calibration
+is: maple leader/lane **80.9%**, wins 3/5, worst 2nd; pirate 99.8%; gameday
+88.7% (wins 4/5); lantern 82.6% (sd 37.4) — worst place 2nd on all four.
+A regression gate on 2026-08-13 read maple at 78.9% (sd 7.5) against this and
+was FIRST misread as a 28-point regression against the stale 106.9 below —
+the whole day's renderer work had moved nothing. Compare against 80.9, not
+106.9.
 
 `qa/ab.mjs 5 <world> child`, 5 matches each, against the baselines above:
 
