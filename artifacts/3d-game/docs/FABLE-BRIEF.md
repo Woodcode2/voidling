@@ -80,97 +80,51 @@ with no MSAA. **The better the phone, the worse the game looked.** Fixed now.
 **No probe that renders its own frame can catch a whole-pipeline swap.** When a
 claim is about what *ships* rather than about a shader, screenshot the canvas.
 
+Newer instruments: `qa/ladder.mjs` (the quality adapter, hand-cranked at exact
+virtual frame rates with rendering stubbed), `qa/shading.mjs` (flat/smooth
+split per world). Two probe traps found since: a watch window shorter than
+sandbox game-time reports a working feature as broken (game time runs on frame
+count here — ten game-seconds is ~100 wall-seconds), and any concurrent build
+or second Chromium instance eats a probe's budget. One more code trap with
+teeth: the boot now yields at seams, so anything reachable from window during
+boot must not touch consts declared later — the debug API stages on a
+buffering proxy and attaches atomically at end of module for exactly this
+reason. Do not add window-reachable hooks that bypass it.
+
 ---
 
 ## WHAT I THINK THIS NEEDS, RANKED
 
-### 1. The quality ladder is a one-way door — fix this first, it gates everything
-`prototype3d.ts`, `QUALITY` table and the adapter near the end of `animate()`.
+### STATUS 2026-08-13: the first four items below are DONE and verified.
+Each keeps a one-paragraph record with its commit; item 5 is the open work.
 
-Once a device reaches rung 3, `qShadowLatch` blocks the climb back **forever**,
-across matches. The comment promises "the pixel-ratio rungs above still give the
-device its quality back" — but rung 3 is the only shadowless rung, so the escape
-hatch it describes does not exist. Worse, the adapter samples straight through
-the 30–45 s world build with no `started` gate, so one bad stretch at load
-strands a good phone at ~11% of native for the whole session.
-
-Fix: gate the adapter on `started`; add a shadowless high-pixel-ratio rung so
-the latch has somewhere to climb to, or clear the latch between matches. Then
-re-check with `shippedlook` at each rung.
-
-### 2. The people are Lego, and the fix is silhouette, not faces
-The owner: *"I'd want them more alive/high detail. Not like actual faces. But
-not Lego blocks."* He is describing a real, specific thing.
-
-Measured in `life.ts`: **`CapsuleGeometry` appears zero times.** Limbs and
-torsos are `BoxGeometry`; heads are `SphereGeometry(r, 8, 6)` — eight segments.
-A person merges majority-box, so it stays on the faceted material even after the
-auto flat/smooth split landed. Boxes with hard facets at 30–60 px is exactly the
-Lego read.
-
-What actually fixes it, in order of effect per unit of cost:
-
-- **Capsules for limbs and torso.** A capsule is barely more expensive than a
-  box and has a rounded silhouette that smooth-shades correctly. This is the
-  single biggest change available.
-- **Taper and a neck.** Shoulders wider than hips, forearm thinner than upper
-  arm, a short neck between head and torso. Three ratios, no new geometry.
-- **Head to 12–16 segments.** At the size a crowd is read, 8 is a visible
-  polygon; 12–16 is not, and heads are a small share of crowd triangles.
-- **Secondary motion.** "Alive" is mostly animation, not polygons: arm swing
-  phase-offset from the legs, a small head bob on the step cycle, a per-person
-  idle sway with a random phase so a standing crowd is not a frozen diorama, and
-  a lean into turns. Cheap, and it is what separates a crowd from a prop shelf.
-- **Do NOT add faces.** The owner is explicit and correct: at this camera
-  distance a face becomes noise, and a stylised headless-silhouette crowd reads
-  as premium. Hair shape, hat and outfit silhouette carry identity.
-
-Budget honestly: Game Day already carries a ~390 MB heap, 84% of it vertex
-buffers, and the crowd is instanced heavily. Measure the heap before and after
-(`qa/heap.mjs`) and keep the distance gate that already exists.
-
-### 3. Finish the material pass
-Per-vertex specular works; coverage was the problem. Maple went 5.3% → 76.1%
-glossy this session by registering the autumn canopy. Pirate (28%) and Lantern
-(34%, but only 6.8% *strong*) have the same shape of gap. Use `glossgap.mjs` to
-find where each world's surface area actually is before registering anything —
-counting registry entries answers the wrong question.
-
-Watch the collision trap: the gloss registry is global, keyed by raw colour,
-written by five modules at import time, last-write-wins by import order. It now
-warns on conflicts. Main Street's `FAIR_C` and Game Day's `GOLD` are the same
-hex, and adding one silently demoted every gold surface in the stadium.
-
-**Do not** try to make the ground read as different materials via roughness.
-Measured dead: 0.02% of pixels change between roughness 0.97 and 0.45, because
-the island floor is one flat horizontal plane whose specular lobe never points
-at this camera. It needs normal *variation*. The verified road/grass mask is in
-`island.ts` at neutral values for whoever does that.
-
-### 4. The first thirty seconds
-The splash and first-run flow are on the table and they matter more than any
-shader. Specifically:
-
-- The menu art is heavily occluded by its own chrome — roughly 40% of the splash
-  visible in the owner's screenshot.
-- Cold boot is a 30–45 s blocking stretch. That is the single worst thing in the
-  product and it is also what strands the quality ladder (see #1). Profile it
-  (`qa/_bootgl.mjs` established it is ~99% ordinary JavaScript, not GPU), then
-  stream or defer the world build so the first frame arrives fast and the rest
-  fills in.
-- A child's first thirty seconds should be: tap, see the void, eat something,
-  feel it. Anything between tap and first bite is a leak.
-
-### 5. Fun, not just fidelity
-The match is now a genuine contest — all four worlds finish 1st or 2nd against a
-child driver, and the win condition is one comparison against a per-world par.
-Do not retune the difficulty controller without reading the nine failed attempts
-recorded in `docs/OVERNIGHT.md`; the band is a controller that absorbs anything
-fed into its inputs, and only a change to the controller itself has ever worked.
-
-Where the fun headroom actually is: the last 30 seconds of a match has no shape,
-world events fire but are not felt, and the family rivals have arcs the player
-never notices. Those are design problems, not rendering ones.
+1. ~~Quality ladder one-way door~~ — FIXED (02386f2). The latch now lives in
+   applyQuality (wantShadows = q.shadows && !qShadowLatch), the adapter is
+   gated on `started`, and qa/ladder.mjs proves menu-gate / recovery / demote
+   against the shipped adapter with a negative control.
+2. ~~The people are Lego~~ — FIXED in three layers, each found by photograph:
+   the crowd's hair crown 12x4 -> 16x8 + loaf feet + 9x6 hands (24a678f); the
+   vehicles' rounded boxes were creased because computeVertexNormals ran on
+   per-face duplicated corners — welded (4e8e648); the diner's two welded-in
+   people were flat-shaded by their own building's merge — split (ab6f0cb).
+   One unresolved: a solo campus lawn figure that reads boxy; every builder
+   checks out smooth on paper. Needs a controlled crop, not a guess.
+3. ~~First thirty seconds~~ — the boot breathes: checkShaderErrors off
+   (?shaderlog restores; no measured sandbox win, honestly recorded), module
+   seams + createIsland/populate sliced at district boundaries. Ten stage
+   labels paint on a cold boot where zero could before (b4de2ff, b52b17b).
+   The SPLASH is already good — photographed 2026-08-12; do not redesign it.
+4. ~~Material pass~~ — Pirate 28->87% glossy, Lantern 34->74%, strong
+   fractions untouched (e0a3fd8). PAPER stays matte, lit-lantern hexes are
+   unlit-material no-ops, AO-darkened shades inherit their source's gloss.
+5. FUN, still open. Shipped so far: the final-ten countdown ritual (4e8e648)
+   and far-rival speech routed to the ticker under the speaker's name
+   (09d3fc0) — fifteen speech triggers used to play to an empty camera.
+   Remaining, unbuilt: world BEATS that change the world rather than the
+   banner (does TREASURE FEAST look like anything?), the fun audit's five
+   unbuilt findings (first-60-seconds, moment-vs-celebration mismatches,
+   unfinished-in-motion, the fourth-play reason, six-year-old readthrough),
+   and the coin economy dead-end at ~30 matches (docs/OVERNIGHT.md §4).
 
 ---
 
