@@ -2752,7 +2752,7 @@ const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
     icon: '🏈', title: 'Kickoff!', sub: 'the ball is in the air',
     news: 'And we are under way. The ball is in the air and so, apparently, is the parking lot.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xc4342f, flash: 'rgba(196,52,47,0.26)',
-    icon: '🥁', title: 'The band is on the field!', sub: 'nobody told them about you',
+    icon: '🥁', title: 'The band is on the field!', sub: 'nobody told them about you', cue: 'bandfield',
     news: 'The marching band has taken the field. They have not been told. They are playing anyway.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.26)',
     icon: '🌭', title: 'Concession rush!', sub: 'everybody wants a hot dog',
@@ -6577,7 +6577,7 @@ function animate() {
           // finding: beats announced things that weren't happening). The
           // parade starts marching, the goat gets loose beside the player,
           // the chests land, the tower starts to thump.
-          if (bt.cue === 'parade' || bt.cue === 'goat') life.cue(bt.cue, voidState.x, voidState.z);
+          if (bt.cue === 'parade' || bt.cue === 'goat' || bt.cue === 'bandfield') life.cue(bt.cue, voidState.x, voidState.z);
           else if (bt.cue === 'treasure') spawnBeatTreasure();
           else if (bt.cue === 'drum') {
             drumCueT = bt.dur; drumThump = 0;

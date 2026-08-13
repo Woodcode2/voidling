@@ -3911,6 +3911,62 @@ export function createLife(
       gdPlace(wx, wy, 'bowl', roll < 0.5 ? 'fan' : roll < 0.7 ? 'vendor' : roll < 0.85 ? 'steward' : 'superfan',
         { tether: 20, speed: rand(1.1, 1.8) });
     }
+
+    // ══ THE BAND TAKES THE FIELD — when its BEAT says so ═══════════════════
+    // Beat 2's banner is "The band is on the field!" and until now nothing
+    // entered anything: the band existed as a parked kit prop and two campus
+    // wanderers. This is Maple's one-mover column driver on the bowl's own
+    // concourse ring: a drum major and eight shako plumes assembled at the
+    // gate, motionless, until the 'bandfield' cue fires — then the column
+    // marches the ring for the rest of the match, eatable like everybody
+    // else. Positions are written every frame even while parked, or the
+    // wanderers underneath would dissolve the formation.
+    {
+      const COLUMN2 = ['cheer', 'bandkid', 'bandkid', 'bandkid', 'bandkid',
+        'bandkid', 'bandkid', 'bandkid', 'bandkid'] as const;
+      const T0 = 0.5;              // the gate — the south mouth of the ring
+      const TSP = 0.011;           // rank spacing along the ring
+      const at3 = (t: number): [number, number] => {
+        const pp = GD.pathPointAt(GD.CONCOURSE, ((t % 1) + 1) % 1);
+        return g3([pp.x, pp.y]);
+      };
+      const bandM: THREE.Object3D[] = [];
+      for (let i = 0; i < COLUMN2.length; i++) {
+        const [x, z] = at3(T0 - i * TSP);
+        const p = makeCast(COLUMN2[i], DRESS.bowl);
+        p.name = `bandCol${i}`;   // QA handle: the beat probe asserts the column moves
+        const rec = addWanderer(p, x, z, 400, rand(0.6, 1.1), 18, 2.4, DRESS.bowl,
+          undefined, COLUMN2[i] === 'cheer' ? 'cheer' : 'band');
+        if (rec) bandM.push(rec.mesh);
+      }
+      if (bandM.length) {
+        let bt = T0, marching = false;
+        cues.push((n) => {
+          if (n === 'bandfield') marching = true;
+          else if (n === 'match') { marching = false; bt = T0; }
+        });
+        movers.push({
+          mesh: bandM[0],
+          update(dt, _tm, vx, vz, vR) {
+            // 0.006/s measured out at ~2.7 u/s on this ring — a march, not
+            // the 5.5 u/s jog the first dial produced
+            if (marching) bt += dt * 0.006;
+            for (let i = 0; i < bandM.length; i++) {
+              const m = bandM[i];
+              if (eaten(m)) continue;
+              // a marcher the void has reached drops out and runs — their
+              // wanderer already has the panic, we simply stop steering them
+              if (Math.hypot(m.position.x - vx, m.position.z - vz) < vR + 20) continue;
+              const [x, z] = at3(bt - i * TSP);
+              const [xa, za] = at3(bt - i * TSP + 0.004);
+              const dx = xa - x, dz = za - z;
+              m.position.x = x; m.position.z = z;
+              if (dx || dz) m.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+            }
+          },
+        });
+      }
+    }
   }
 
   // pond ducks — "the ducks are rowdy" is finally TRUE, and they PARADE:
