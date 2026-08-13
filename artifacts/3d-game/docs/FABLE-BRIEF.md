@@ -121,14 +121,21 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
 4. ~~Material pass~~ — Pirate 28->87% glossy, Lantern 34->74%, strong
    fractions untouched (e0a3fd8). PAPER stays matte, lit-lantern hexes are
    unlit-material no-ops, AO-darkened shades inherit their source's gloss.
-5. FUN, still open. Shipped so far: the final-ten countdown ritual (4e8e648)
-   and far-rival speech routed to the ticker under the speaker's name
-   (09d3fc0) — fifteen speech triggers used to play to an empty camera.
-   Remaining, unbuilt: world BEATS that change the world rather than the
-   banner (does TREASURE FEAST look like anything?), the fun audit's five
-   unbuilt findings (first-60-seconds, moment-vs-celebration mismatches,
-   unfinished-in-motion, the fourth-play reason, six-year-old readthrough),
-   and the coin economy dead-end at ~30 matches (docs/OVERNIGHT.md §4).
+5. FUN, largely built 2026-08-13 via a 27-agent verified audit (journal in
+   the session workflow dir). Shipped: the final-ten countdown (4e8e648),
+   far-rival ticker routing (09d3fc0), the ghost-hand teach (ef196a4,
+   2cf76f5), the crown/lost-crown duel + win/lose audio + evolve-fanfare
+   reservation + 12 readthrough copy fixes (470d68f — the crown was
+   measured DEAD before this; crownprobe.mjs is the instrument), and four
+   world-reactive beats: parade gated to its banner, a real edible gilded
+   PRIZE GOAT, treasure hunts that drop chests, a drum tower that drums
+   (0c3fc89). Economy curve implemented per the owner's spec (§4 resolved).
+   Remaining from the audit, confirmed-unbuilt: gameday's band-on-field
+   beat, form-loss feedback ("BONK" reads like a nibble), first-runner-
+   caught moment, and the fourth-play hooks (same-day quest refresh,
+   sticker-book absence on zero-find end screens, unvisited worlds are the
+   quietest picker cards — owner's PRICES curve stands, surface progress
+   not prices).
 
 ### RETRACTION 2026-08-13, first-60-seconds: "the match runs behind the
 tutorial card" was a PROBE ARTIFACT, not a bug. The probe (firstrun.mjs)
