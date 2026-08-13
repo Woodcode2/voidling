@@ -3823,6 +3823,7 @@ pwBtns[1].addEventListener('click', fireCollapse);
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
 const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
+const handEl = el('hand');   // the ghost hand — the wordless drag lesson
 let guideStep = 0, guideT = 0, presenceT = 0;
 let introT = 0, outroT = 0;
 // how far the opening shot's subject currently sits from the void (see COPY.hero)
@@ -6855,8 +6856,17 @@ function animate() {
   // saying it again. The gap is the whole message.
   if (firstRun && started && !ended && guideStep === 1 && !nomArmed && dragNags < 3 && guideT <= 0) {
     dragNagT -= dt;
-    if (dragNagT <= 0) { showGuide('<b>DRAG</b> anywhere to move!', 5); dragNagT = 3; dragNags++; }
+    if (dragNagT <= 0) { showGuide('<b>DRAG</b> to move — eat & <b>GROW</b>!', 5); dragNagT = 3; dragNags++; }
   }
+  // THE GHOST HAND — the wordless half of the drag lesson (hole.io's teach: a
+  // hand that PERFORMS the gesture over the live game rather than a sentence
+  // describing it — the pill asks a six-year-old to read; this doesn't).
+  // Declarative on purpose: it is on exactly while the lesson is unlearned —
+  // from the frame the controls go live (dragTaught) to the first real drag
+  // (nomArmed) — so no path out of a match can strand it on screen. Unlike the
+  // pill it does not stop at three repeats: it is quiet, and it is the only
+  // instruction a pre-reader can follow at all.
+  handEl.classList.toggle('show', firstRun && started && !ended && dragTaught && !nomArmed);
   // …and NOT UNTIL THEY CAN MOVE. This fires on any frame the guide is idle,
   // which includes the gaps between the drag lesson's repeats — so a child who
   // had not yet worked out the control was being told "that one is BIGGER than
@@ -7028,7 +7038,7 @@ function animate() {
       if (introT <= 0 && firstRun && !dragTaught) {
         // controls are live THIS frame — now the instruction is true
         dragTaught = true; guideStep = 1;
-        showGuide('<b>DRAG</b> anywhere to move!', 6);
+        showGuide('<b>DRAG</b> to move — eat & <b>GROW</b>!', 6);
         dragNagT = 3;   // the repeat waits its gap too, not just the ones after it
       }
       const k2 = Math.max(0, introT / COPY.introLen);

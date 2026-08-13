@@ -126,6 +126,28 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    unfinished-in-motion, the fourth-play reason, six-year-old readthrough),
    and the coin economy dead-end at ~30 matches (docs/OVERNIGHT.md §4).
 
+### RETRACTION 2026-08-13, first-60-seconds: "the match runs behind the
+tutorial card" was a PROBE ARTIFACT, not a bug. The probe (firstrun.mjs)
+cleared storage, so the first-launch autoplay put it straight into a match —
+then it JS-clicked #btnPlay and a world card, both display:none at that
+moment. A finger cannot tap invisible buttons. The real flows are clean:
+first launch is zero-tap autoplay with in-game guidance; session two shows
+the tut card BEFORE startFresh and only LET'S EAT starts the match. What the
+investigation did surface (owner concurred, same day): the drag lesson was
+all TEXT — archaic against hole.io's animated-hand teach. Replaced with the
+ghost hand — at the owner's direction, hole.io's exact form: a white glove
+tracing a solid ∞ ribbon (lemniscate, hand keyframes sampled from the same
+curve so the fingertip rides ON the ribbon), on from controls-live to first
+real drag (#hand, handEl toggle), plus the same demo inside the tut card.
+The old probe's "FIRST BITE at t=23.1s" number was ALSO an artifact:
+__matchState().ate is an object ({you, family} percentages), so its
+`.ate > 0` check was NaN>0 forever and the number was a swallowed timeout.
+The true picture, measured by firstrun2.mjs (which only performs gestures a
+child can, and uses score as the bite signal): the suction well feeds a
+stationary void — score 23 before ANY input at t=2.4 — and the first
+drag-driven bite lands within a tenth of a game-second of the drag.
+Tap-to-first-bite is ~0: bites begin before the first tap.
+
 ---
 
 ## TRAPS THAT HAVE ALREADY COST WRONG CONCLUSIONS

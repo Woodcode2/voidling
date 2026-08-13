@@ -160,6 +160,57 @@
       #guide.show { opacity: 1; transform: translate(-50%, 0); }
       #guide b { color: #7ef2a0; }
       body.menu #guide { display: none; }
+      /* ── THE GHOST HAND ─────────────────────────────────────────────────
+         The drag lesson used to be a sentence, which asks a six-year-old to
+         READ before they may play. This is the hypercasual-standard teach
+         (hole.io's own): a cartoon hand performs the actual gesture over the
+         live game — press, ripple, drag along a dotted arc — looping until
+         the child does it, and vanishing the instant they do. No words, no
+         button, nothing to dismiss. The pill above it stays for readers and
+         parents; the hand is the lesson. */
+      #hand { position: fixed; left: 50%; top: 50%; width: min(320px, 66vw);
+        transform: translate(-50%, -8%); z-index: 8; pointer-events: none; display: none; }
+      #hand.show { display: block; }
+      body.menu #hand { display: none; }
+      #hand svg, #tut .tHand svg { display: block; width: 100%; height: auto; overflow: visible;
+        filter: drop-shadow(0 6px 14px rgba(0,0,0,0.45)); }
+      #tut .tHand { width: 210px; margin: 2px auto 0; }
+      /* the ∞ ribbon (owner's reference: hole.io's teach) — a solid white
+         figure-8 the hand traces round and round. Drawn as a 32-point
+         polyline sampled from the same lemniscate the hand's keyframes are
+         sampled from, so the fingertip rides ON the ribbon, never beside it. */
+      .hTrailU { stroke: #1c0d38; stroke-width: 25; fill: none; opacity: 0.3;
+        stroke-linejoin: round; stroke-linecap: round; }
+      .hTrail { stroke: #fff; stroke-width: 18; fill: none; opacity: 0.9;
+        stroke-linejoin: round; stroke-linecap: round;
+        animation: hTrailPulse 3.8s ease-in-out infinite; }
+      @keyframes hTrailPulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 0.95; } }
+      /* the hand group is authored with the FINGERTIP at (0,0): translate puts
+         the touch point itself on the lemniscate. x=160+120sin(t),
+         y=105-45sin(2t), sampled every π/8; linear timing between samples. */
+      .handG { transform-origin: 0 0; animation: handMove 3.8s linear infinite; }
+      @keyframes handMove {
+        0%     { transform: translate(160px, 105px) scale(0.92); }
+        6.25%  { transform: translate(206px, 73px)  scale(0.92); }
+        12.5%  { transform: translate(245px, 60px)  scale(0.92); }
+        18.75% { transform: translate(271px, 73px)  scale(0.92); }
+        25%    { transform: translate(280px, 105px) scale(0.92); }
+        31.25% { transform: translate(271px, 137px) scale(0.92); }
+        37.5%  { transform: translate(245px, 150px) scale(0.92); }
+        43.75% { transform: translate(206px, 137px) scale(0.92); }
+        50%    { transform: translate(160px, 105px) scale(0.92); }
+        56.25% { transform: translate(114px, 73px)  scale(0.92); }
+        62.5%  { transform: translate(75px, 60px)   scale(0.92); }
+        68.75% { transform: translate(49px, 73px)   scale(0.92); }
+        75%    { transform: translate(40px, 105px)  scale(0.92); }
+        81.25% { transform: translate(49px, 137px)  scale(0.92); }
+        87.5%  { transform: translate(75px, 150px)  scale(0.92); }
+        93.75% { transform: translate(114px, 137px) scale(0.92); }
+        100%   { transform: translate(160px, 105px) scale(0.92); }
+      }
+      /* the glow under the fingertip — the finger is "down" the whole loop */
+      .hTouch { animation: hTouch 1.9s ease-in-out infinite; }
+      @keyframes hTouch { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.55; } }
       /* hunger / power meter */
       #hunger { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
         width: 260px; height: 16px; border-radius: 9px; background: rgba(16,8,30,0.55); overflow: hidden;
@@ -1337,6 +1388,32 @@
     </div>
     <div id="evolve"><div class="big"></div><div class="sm">EVOLVED</div></div>
     <div id="guide"></div>
+    <!-- the ghost hand: a looping press-and-drag demo over the live game.
+         Shown by the drag lesson, hidden by the first real drag — see the
+         handEl toggle in prototype3d.ts. The same SVG appears again inside
+         #tut; they can never be on screen at the same time (the card is the
+         session-two teach, the hand is the first-launch teach). -->
+    <div id="hand">
+      <svg viewBox="0 0 320 210">
+        <path class="hTrailU" d="M160 105 L183 88 L206 73 L227 63 L245 60 L260 63 L271 73 L278 88 L280 105 L278 122 L271 137 L260 147 L245 150 L227 147 L206 137 L183 122 L160 105 L137 88 L114 73 L93 63 L75 60 L60 63 L49 73 L42 88 L40 105 L42 122 L49 137 L60 147 L75 150 L93 147 L114 137 L137 122 Z" />
+        <path class="hTrail" d="M160 105 L183 88 L206 73 L227 63 L245 60 L260 63 L271 73 L278 88 L280 105 L278 122 L271 137 L260 147 L245 150 L227 147 L206 137 L183 122 L160 105 L137 88 L114 73 L93 63 L75 60 L60 63 L49 73 L42 88 L40 105 L42 122 L49 137 L60 147 L75 150 L93 147 L114 137 L137 122 Z" />
+        <g class="handG">
+          <circle class="hTouch" cx="0" cy="4" r="17" fill="#fff" />
+          <!-- outline pass, then fill-only pass: the second erases the
+               interior strokes so three primitives read as one glove -->
+          <g stroke="#1c0d38" stroke-width="4.5" fill="#fff" stroke-linejoin="round">
+            <circle cx="9" cy="47" r="17" />
+            <ellipse cx="-9" cy="42" rx="7.5" ry="11" transform="rotate(-28 -9 42)" />
+            <rect x="-7" y="1" width="15" height="37" rx="7.5" />
+          </g>
+          <g fill="#fff">
+            <circle cx="9" cy="47" r="17" />
+            <ellipse cx="-9" cy="42" rx="7.5" ry="11" transform="rotate(-28 -9 42)" />
+            <rect x="-7" y="1" width="15" height="37" rx="7.5" />
+          </g>
+        </g>
+      </svg>
+    </div>
     <button id="btnQuit" title="home">⌂</button>
     <div id="titlecard">
       <!-- all three are filled from WORLD_COPY before the card is ever shown;
@@ -1596,7 +1673,28 @@
       <div class="card">
         <div class="tEmoji"><svg width="64" height="64" viewBox="0 0 100 100"><defs><radialGradient id="tvg" cx="38%" cy="34%"><stop offset="0%" stop-color="#a562f2"/><stop offset="60%" stop-color="#7030c0"/><stop offset="100%" stop-color="#1c0930"/></radialGradient></defs><circle cx="50" cy="50" r="46" fill="url(#tvg)"/><circle cx="38" cy="45" r="11" fill="#fff"/><circle cx="62" cy="45" r="11" fill="#fff"/><circle cx="40" cy="47" r="6" fill="#160a30"/><circle cx="64" cy="47" r="6" fill="#160a30"/><circle cx="38" cy="43" r="2.4" fill="#fff"/><circle cx="62" cy="43" r="2.4" fill="#fff"/><ellipse cx="25" cy="59" rx="6.5" ry="4" fill="#ff7da8" opacity="0.6"/><ellipse cx="75" cy="59" rx="6.5" ry="4" fill="#ff7da8" opacity="0.6"/><path d="M41 63 Q50 72 59 63" stroke="#1a0b33" stroke-width="3.6" fill="none" stroke-linecap="round"/></svg> ✨</div>
         <div class="tTitle">DRAG TO MOVE</div>
-        <div class="tBody">Drag anywhere to steer your void.<br>Eat anything <b>smaller than you</b> — grow from a speck into a <b>WORLD ENDER</b>.</div>
+        <!-- the card DEMONSTRATES the gesture — same ghost hand as the
+             first-launch overlay, so a pre-reader learns it without the text -->
+        <div class="tHand">
+          <svg viewBox="0 0 320 210">
+            <path class="hTrailU" d="M160 105 L183 88 L206 73 L227 63 L245 60 L260 63 L271 73 L278 88 L280 105 L278 122 L271 137 L260 147 L245 150 L227 147 L206 137 L183 122 L160 105 L137 88 L114 73 L93 63 L75 60 L60 63 L49 73 L42 88 L40 105 L42 122 L49 137 L60 147 L75 150 L93 147 L114 137 L137 122 Z" />
+            <path class="hTrail" d="M160 105 L183 88 L206 73 L227 63 L245 60 L260 63 L271 73 L278 88 L280 105 L278 122 L271 137 L260 147 L245 150 L227 147 L206 137 L183 122 L160 105 L137 88 L114 73 L93 63 L75 60 L60 63 L49 73 L42 88 L40 105 L42 122 L49 137 L60 147 L75 150 L93 147 L114 137 L137 122 Z" />
+            <g class="handG">
+              <circle class="hTouch" cx="0" cy="4" r="17" fill="#fff" />
+              <g stroke="#1c0d38" stroke-width="4.5" fill="#fff" stroke-linejoin="round">
+                <circle cx="9" cy="47" r="17" />
+                <ellipse cx="-9" cy="42" rx="7.5" ry="11" transform="rotate(-28 -9 42)" />
+                <rect x="-7" y="1" width="15" height="37" rx="7.5" />
+              </g>
+              <g fill="#fff">
+                <circle cx="9" cy="47" r="17" />
+                <ellipse cx="-9" cy="42" rx="7.5" ry="11" transform="rotate(-28 -9 42)" />
+                <rect x="-7" y="1" width="15" height="37" rx="7.5" />
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="tBody">Eat anything <b>smaller than you</b> — grow from a speck into a <b>WORLD ENDER</b>.</div>
         <div class="tBody dim">Watch the <b>void family</b> — eat them when you're bigger… and <b>RUN</b> when you're not!</div>
         <button id="btnGotIt">LET'S EAT</button>
       </div>
