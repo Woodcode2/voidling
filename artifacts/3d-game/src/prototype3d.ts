@@ -4101,6 +4101,14 @@ function launchWorld() {
   // place the danger loop ("eat the family when bigger, RUN when not") lives
   if (!localStorage.getItem('voidTut')) {
     track('tutorial_view', {});
+    // NO LESSON TWICE (owner: "I don't want duplicity"). The card's ∞ demo
+    // and the in-game ghost hand can never be on screen together — the hand
+    // needs firstRun (voidPlayed unset), the card needs the menu (voidPlayed
+    // set) — but a child who already performed the drag in match one would
+    // still be re-taught it here. voidFirstNom is written at the first
+    // drag-driven bite, so it is proof the gesture is learned: with it set,
+    // the card keeps only what it alone teaches — the danger loop.
+    tutEl.classList.toggle('knows', !!localStorage.getItem('voidFirstNom'));
     tutEl.classList.add('show');
     // …AND DROP THE COVER, because this return skips withWorldReady() and
     // withWorldReady() is the only thing that ever releases a 'pack' hold.

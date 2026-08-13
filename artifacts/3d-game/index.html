@@ -175,6 +175,9 @@
       #hand svg, #tut .tHand svg { display: block; width: 100%; height: auto; overflow: visible;
         filter: drop-shadow(0 6px 14px rgba(0,0,0,0.45)); }
       #tut .tHand { width: 210px; margin: 2px auto 0; }
+      /* a child who has already dragged and eaten (voidFirstNom) is not
+         re-taught the gesture — the card keeps only the danger lesson */
+      #tut.knows .tHand { display: none; }
       /* the ∞ ribbon (owner's reference: hole.io's teach) — a solid white
          figure-8 the hand traces round and round. Drawn as a 32-point
          polyline sampled from the same lemniscate the hand's keyframes are
