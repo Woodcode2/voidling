@@ -955,7 +955,11 @@ export function makeDrumTower(): THREE.Group {
       glow.push(part(new THREE.CylinderGeometry(0.4, 0.34, 0.5, 8), k % 2 ? G_RED : G_AMBER,
         sx * W * 0.62, y - 0.5, sz * W * 0.62));
     }
-  return lit(solid, glow);
+  const g = lit(solid, glow);
+  // named so the drum BEAT can find it: "The drum has started" now points at
+  // a tower that visibly thumps — see the beat cue in prototype3d.ts
+  g.name = 'drumTower';
+  return g;
 }
 
 /** THE SHRINE HALL (honden). What the stone stair has been climbing toward the

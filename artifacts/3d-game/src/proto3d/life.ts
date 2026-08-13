@@ -345,6 +345,12 @@ export interface Life {
    *  Fed from the match loop off the same devoured/form signal the newsroom
    *  uses for its tier, so the street and the broadcast escalate together. */
   tension(v: number): void;
+  /** The match spine's line into the world: an authored BEAT fires and the
+   *  world is told, so the banner and the street agree. 'match' resets every
+   *  set piece for a fresh run (called from beginMatch/resetMatch, AFTER the
+   *  edible-restore loop, which un-hides everything). x/z carry the void's
+   *  position for pieces that must spawn where the child is looking. */
+  cue(name: string, x?: number, z?: number): void;
 }
 
 // ── mesh factories ─────────────────────────────────────────────────────────────
@@ -1654,6 +1660,35 @@ function makeDog(): THREE.Group {
   ]));
   return g;   // nose +X, like every vehicle in the kit
 }
+// THE FAIR GOAT. Until now it existed as text: a beat titled "The goat is
+// loose!", a fair pool bragging "that goat won a ribbon", a panic line
+// shouting GET THE GOAT — and nothing in the world to look at. Cream coat,
+// dark socks, swept-back horns, and the blue ribbon it won, still pinned on.
+function makeGoat(): THREE.Group {
+  const c = 0xe8e2d0, dk = 0x8a7a62;
+  const g = grp1(mergedProp([
+    part(MG.sphS, c, 0, 0.74, 0, 0, 0, 0, 1.30, 0.82, 0.68),                 // body
+    part(MG.sphS, c, 0.62, 1.08, 0, 0, 0, 0, 0.54, 0.60, 0.46),              // head
+    part(MG.box, dk, 0.92, 0.94, 0, 0, 0, 0, 0.30, 0.30, 0.24),              // muzzle
+    part(MG.box, dk, 0.96, 0.68, 0, 0, 0, 0, 0.10, 0.24, 0.10),              // the beard
+    part(MG.cone, dk, 0.46, 1.44, 0.13, 0, 0, -0.6, 0.11, 0.40, 0.11),       // horns, swept back
+    part(MG.cone, dk, 0.46, 1.44, -0.13, 0, 0, -0.6, 0.11, 0.40, 0.11),
+    part(MG.box, c, 0.54, 1.22, 0.22, 0, 0, 0.5, 0.12, 0.26, 0.09),          // ears out sideways
+    part(MG.box, c, 0.54, 1.22, -0.22, 0, 0, 0.5, 0.12, 0.26, 0.09),
+    part(MG.box, dk, -0.70, 1.00, 0, 0, 0, 0.6, 0.10, 0.24, 0.10),           // tail UP — always
+    part(MG.cyl6, dk, 0.36, 0.26, 0.24, 0, 0, 0, 0.15, 0.54, 0.15),          // dark socks
+    part(MG.cyl6, dk, 0.36, 0.26, -0.24, 0, 0, 0, 0.15, 0.54, 0.15),
+    part(MG.cyl6, dk, -0.38, 0.26, 0.24, 0, 0, 0, 0.15, 0.54, 0.15),
+    part(MG.cyl6, dk, -0.38, 0.26, -0.24, 0, 0, 0, 0.15, 0.54, 0.15),
+    part(MG.box, 0x3f7ac4, 0.30, 1.06, 0.30, 0, 0, 0, 0.16, 0.24, 0.05),     // the ribbon
+  ]));
+  // BIG. The beat fires in the finale, when the child is a WORLD ENDER and
+  // the camera is a hundred units up — a dog-sized goat is a speck at that
+  // zoom. A prize goat the size of a pony is legible from the finale camera
+  // and, frankly, funnier.
+  g.scale.setScalar(2.1);
+  return g;   // nose +X, like the dog
+}
 // A BIKE with a kid already on it — the kid is a real cast member parented to
 // the frame, so it animates and eats exactly like anybody else.
 function makeBike(col: number): THREE.Group {
@@ -1998,6 +2033,9 @@ export function createLife(
   say: Say,
 ): Life {
   const movers: Mover[] = [];
+  // beat-cue listeners — set pieces register here so the match spine can
+  // start them (see Life.cue). Every listener also handles 'match' (reset).
+  const cues: ((name: string, x?: number, z?: number) => void)[] = [];
   // ── THE OPENING IS CALM ────────────────────────────────────────────────
   // A ped flees when the void is inside `vR + fear`, and fear is 18-20 units
   // against a 0.9-unit void — so on a crowded world the match opens with
@@ -4314,12 +4352,24 @@ export function createLife(
         if (marchers.length) {
           let pt = 0;
           const PSPD = 0.022;
+          // THE PARADE WAITS FOR ITS BEAT. It used to march from 0:00, so the
+          // 110s "Town parade!" banner announced something that had been
+          // happening the whole match — the beat was an echo, not an event.
+          // Until the cue fires the column stands assembled at the end of the
+          // street (positions still written every frame, or the wanderers
+          // underneath would wander the formation apart), and when the banner
+          // goes up the street visibly starts to march under it.
+          let paradeGo = false;
+          cues.push((n) => {
+            if (n === 'parade') paradeGo = true;
+            else if (n === 'match') { paradeGo = false; pt = 0; }
+          });
           // ONE mover drives the whole column — twelve people for the price of
           // one update, and no follow chain to concertina at the turnaround
           movers.push({
             mesh: marchers[0],
             update(dt, _tm, vx, vz, vR) {
-              pt += dt * PSPD;
+              if (paradeGo) pt += dt * PSPD;
               for (let i = 0; i < marchers.length; i++) {
                 const m = marchers[i];
                 if (eaten(m)) continue;
@@ -4445,6 +4495,69 @@ export function createLife(
       setShadow(dog); scene.add(dog); addEdible(dog, 1.2);
       // the dog is AHEAD of the walker, because it always is
       follow(rec.mesh, dog, 2.0, 9, true);
+    }
+
+    // ══ 6a. THE FAIR GOAT ══════════════════════════════════════════════════
+    // The finale beat is titled "The goat is loose!" and until now the goat
+    // was text — a banner, a fair brag, a panic line, and nothing to look at.
+    // It is built and registered here, hidden; the 'goat' cue (fired by the
+    // finale beat) drops it ~24 units from the void, where it dashes and hops
+    // between waypoints for the whole x3 window. It is a mover, it is
+    // EDIBLE, and it is gilded — the golden goat is the finale's chase prize.
+    {
+      const goat = makeGoat();
+      const gh = zoneCentre('fair', 'main', 'burb');
+      // home on the fairground, NOT the origin: addEdible snapshots home from
+      // this position, and an origin home is the parked-locomotive trap the
+      // restore loop's own comment documents
+      goat.position.set(gh?.x ?? 0, 0, gh?.z ?? 0);
+      goat.visible = false;
+      goat.userData.mover = true; goat.userData.ptsMult = 2;
+      goat.userData.qk = 'goat';
+      goat.userData.coin = 25; goat.userData.gild = true;
+      goat.add(contactShadow(1.4));
+      setShadow(goat); scene.add(goat); addEdible(goat, 1.6);
+      let ax = 0, az = 0, tx = 0, tz = 0, dashT = 0, hopT = 0, loose = false;
+      const land = (x: number, z: number) => biomeAt(x, z) !== null;
+      cues.push((n, cx, cz) => {
+        if (n === 'match') { loose = false; goat.visible = false; return; }
+        if (n !== 'goat') return;
+        const bx = cx ?? goat.position.x, bz = cz ?? goat.position.z;
+        for (let i = 0; i < 12; i++) {
+          const a = Math.random() * Math.PI * 2, d = 20 + Math.random() * 10;
+          const x = bx + Math.cos(a) * d, z = bz + Math.sin(a) * d;
+          if (!land(x, z)) continue;
+          ax = x; az = z; tx = x; tz = z; dashT = 0;
+          goat.position.set(x, 0, z); goat.visible = true; loose = true;
+          return;
+        }
+      });
+      movers.push({
+        mesh: goat,
+        update(dt) {
+          if (!loose || eaten(goat)) return;
+          dashT -= dt;
+          if (dashT <= 0) {
+            // a new dash every second or so, anchored to where it got loose —
+            // the goat runs AROUND, it does not emigrate
+            dashT = 0.9 + rand(0, 1.1);
+            for (let i = 0; i < 8; i++) {
+              const a = Math.random() * Math.PI * 2, d = 8 + Math.random() * 14;
+              const x = ax + Math.cos(a) * d, z = az + Math.sin(a) * d;
+              if (land(x, z)) { tx = x; tz = z; break; }
+            }
+          }
+          const dx = tx - goat.position.x, dz = tz - goat.position.z;
+          const d = Math.hypot(dx, dz);
+          if (d > 0.4) {
+            const k = Math.min(1, 8.5 * dt / d);
+            goat.position.x += dx * k; goat.position.z += dz * k;
+            goat.rotation.y = -Math.atan2(dz, dx);   // nose +X, like the dog
+            hopT += dt * 11;
+            goat.position.y = Math.abs(Math.sin(hopT)) * 0.55;   // goats bounce
+          } else goat.position.y = Math.max(0, goat.position.y - dt * 3);
+        },
+      });
     }
 
     // ══ 6b. WORKING THE SQUARE ═════════════════════════════════════════════
@@ -5135,6 +5248,7 @@ export function createLife(
       return { near, total: movers.length };
     },
     calm(sec) { calmT = sec; },   // SET, not max — Infinity has to be clearable
+    cue(name, x, z) { for (const f of cues) f(name, x, z); },
     tension(v) { tense = Math.max(0, Math.min(1, v)); },
   };
 }

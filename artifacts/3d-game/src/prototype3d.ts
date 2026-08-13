@@ -17,7 +17,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, type WorldId } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, part, mergedProp, type WorldId } from './proto3d/island';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { HATS, HAT_BY_ID, hatLine, type Hat } from './proto3d/hats';
@@ -2657,7 +2657,15 @@ let feverCol = 0xffd23f, feverPulseT = 0;
 // Measured before: beat 1 fired at 32.1-32.2s, beat 2 at 95.0-95.5s and beat 3
 // at 150.1-151.4s across ELEVEN matches on both worlds. Same island, same
 // spawn, same cast, same script, to the tenth of a second.
-const MAPLE_BEATS = [
+// `cue` is the beat's line INTO THE WORLD (life.cue / the handlers in the
+// beat-fire block): the fun audit's standing finding was that beats changed
+// the banner and nothing else — "does TREASURE FEAST look like anything?"
+interface MatchBeat {
+  at: number; dur: number; mult: number; fired: boolean; base: number;
+  col: number; flash: string; icon: string; title: string; sub: string;
+  news: string; cue?: string;
+}
+const MAPLE_BEATS: MatchBeat[] = [
   { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
     icon: '🎺', title: 'Band practice', sub: 'they only know one song',
     news: 'The marching band is out. They know one song. Here it comes.' },
@@ -2665,10 +2673,10 @@ const MAPLE_BEATS = [
     icon: '🐕', title: 'Dog off the lead!', sub: 'six people are chasing it',
     news: 'A dog is loose on Main Street. Six people are chasing it. It thinks this is a game.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    icon: '📣', title: 'Town parade!', sub: 'everybody is on Main Street',
+    icon: '📣', title: 'Town parade!', sub: 'everybody is on Main Street', cue: 'parade',
     news: 'The parade has started. The mayor calls it a scheduling matter.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
-    icon: '🐐', title: 'The goat is loose!', sub: 'nobody is even chasing it',
+    icon: '🐐', title: 'The goat is loose!', sub: 'nobody is even chasing it', cue: 'goat',
     news: 'The goat is out again. Nobody is chasing it. Everybody is watching.' },
 ];
 // PIRATE BAY runs the same three-beat spine, themed to the resort
@@ -2683,7 +2691,7 @@ const PIRATE_BEATS: typeof MAPLE_BEATS = [
     icon: '🪩', title: 'Dance party!', sub: 'the whole bay is moving',
     news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
-    icon: '🏴‍☠️', title: 'Treasure hunt!', sub: 'the map is still wrong',
+    icon: '🏴‍☠️', title: 'Treasure hunt!', sub: 'the map is still wrong', cue: 'treasure',
     news: 'The treasure hunt has begun. The map is still wrong.' },
 ];
 // GAME DAY runs the clock of an actual football game, which is the whole
@@ -2716,7 +2724,7 @@ const LANTERN_BEATS: typeof MAPLE_BEATS = [
     icon: '🍡', title: 'Everything is free!', sub: 'they insist. they keep insisting',
     news: 'Every stall on Lantern Row has waived its prices for the guest in the purple.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0x8ad4ff, flash: 'rgba(138,212,255,0.26)',
-    icon: '🥁', title: 'The drum has started', sub: 'nobody ordered the drum',
+    icon: '🥁', title: 'The drum has started', sub: 'nobody ordered the drum', cue: 'drum',
     news: 'The drum tower has begun. It is only ever struck for two reasons and this is not the other one.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd489, flash: 'rgba(255,212,137,0.32)',
     icon: '♨️', title: 'The bathhouse is open!', sub: 'they are calling you up',
@@ -2743,6 +2751,7 @@ const MEAL_NAME: Record<string, string> = pickedWorld === 'gameday' ? {
  *  newsroom's own matcher looks for actually appear in the string. */
 function mealOf(e: Edible): string {
   const u = e.mesh.userData as Record<string, unknown>;
+  if (u.qk === 'goat') return 'the PRIZE GOAT';   // the finale's star, by name
   if (u.qk === 'car') return 'a parked car';
   if (u.afloat) return e.radius > 4 ? 'a whole SHIP' : 'somebody\'s boat';
   if (u.mover) {
@@ -3915,6 +3924,11 @@ function beginMatch(solo = false) {
   // into a match (menu PLAY, solo, the debug autostart) and only one of them
   // went through that hook, so most matches shipped with no treasure at all
   gildTreasure();
+  // every beat set piece back to its pre-cue state (parade parked, goat
+  // hidden, drum quiet). AFTER the restore loop un-hides everything —
+  // resetMatch ends by calling into here, so this covers both entry paths.
+  life.cue('match');
+  drumCueT = 0; clearBeatLoot();
   feverMult = 1; feverT = 0; lastR = voidling.radius; matchEaten = 0; signedOn = false;
   // ── THE HERO WAS ASLEEP BEFORE THE MATCH BEGAN ────────────────────────────
   // `sleepy` fires at `tClock - lastInput > 8`, and tClock is WALL time since
@@ -4655,6 +4669,63 @@ function gildTreasure() {
   }
 }
 
+// ── THE TREASURE HUNT DROPS TREASURE ────────────────────────────────────────
+// The standing audit question — "does TREASURE FEAST look like anything?" —
+// had the honest answer NO: the beat fired the generic banner/ring/sting
+// stack and changed nothing in the world. Now the hunt is a hunt: a dozen
+// gold-trimmed chests land around the player for the length of the x3
+// window, each gilded (sparkle + ✦ on eat, same as gildTreasure's props),
+// and whatever is left un-eaten puffs away when the window closes.
+let beatLoot: Edible[] = [];
+function makeLootChest(): THREE.Group {
+  const WOOD = 0x6a4a2a, GOLD_T = 0xf0b429, COINS = 0xffe08a;
+  const g = new THREE.Group();
+  g.add(mergedProp([
+    part(new THREE.BoxGeometry(1.05, 0.52, 0.72), WOOD, 0, 0.26, 0),
+    part(new THREE.BoxGeometry(1.13, 0.2, 0.8), GOLD_T, 0, 0.6, 0),          // the lid, thrown open
+    part(new THREE.BoxGeometry(0.14, 0.56, 0.76), GOLD_T, -0.34, 0.28, 0),   // straps
+    part(new THREE.BoxGeometry(0.14, 0.56, 0.76), GOLD_T, 0.34, 0.28, 0),
+    part(new THREE.BoxGeometry(0.18, 0.2, 0.08), COINS, 0, 0.34, 0.38),      // the lock plate
+    part(new THREE.SphereGeometry(0.16, 8, 6), COINS, -0.18, 0.74, 0.05),    // spilling gold
+    part(new THREE.SphereGeometry(0.13, 8, 6), COINS, 0.16, 0.72, -0.08),
+    part(new THREE.SphereGeometry(0.11, 8, 6), COINS, 0.02, 0.76, 0.14),
+  ]));
+  return g;
+}
+function spawnBeatTreasure() {
+  clearBeatLoot();   // a rematch's second hunt starts clean
+  let placed = 0;
+  for (let i = 0; i < 48 && placed < 12; i++) {
+    const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 26;
+    const x = voidState.x + Math.cos(a) * d, z = voidState.z + Math.sin(a) * d;
+    if (!insideIsland3(x, z) || inLagoon3(x, z)) continue;
+    const ch = makeLootChest();
+    ch.position.set(x, 0, z);
+    ch.rotation.y = Math.random() * Math.PI * 2;
+    ch.userData.coin = 10; ch.userData.gild = true;
+    scene.add(ch);
+    addEdible(ch, 0.55);
+    beatLoot.push(edibles[edibles.length - 1]);
+    fx.ring(x, z, 0xffd23f, 2.4, 0.6);
+    placed++;
+  }
+}
+function clearBeatLoot() {
+  for (const e of beatLoot) {
+    if (!e.eaten && e.mesh.visible) spawnPuff(e.mesh.position.x, 0.6, e.mesh.position.z, 6);
+    e.eaten = true; e.mesh.visible = false;
+    // retired, or the rematch restore loop resurrects every leftover chest
+    e.mesh.userData.retired = true;
+    scene.remove(e.mesh);
+  }
+  beatLoot = [];
+}
+// ── THE DRUM BEAT POINTS AT THE DRUM ────────────────────────────────────────
+// Lantern Night's tower was built FOR its beat and never drummed. During the
+// window the tower thumps in time with the fever pulse and the pulse ring
+// beats out from the TOWER, not the void — a child hears "the drum has
+// started", looks up, and the tallest lit thing in the valley is moving.
+let drumRef: THREE.Object3D | null = null, drumBaseScale = 1, drumCueT = 0, drumThump = 0;
 function resetMatch() {
   joyRelease();   // PLAY AGAIN can be tapped and HELD — see joyRelease
   resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); signedOn = false;   // memory + the sign-on are per-match
@@ -6420,6 +6491,19 @@ function animate() {
           fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
           fx.flash(bt.flash, 0.35);
       audio.matchBeat(bt.title);   // ice cream hour / dance party / treasure hunt each get their own sting
+          // …and the WORLD is told, not just the banner (the audit's standing
+          // finding: beats announced things that weren't happening). The
+          // parade starts marching, the goat gets loose beside the player,
+          // the chests land, the tower starts to thump.
+          if (bt.cue === 'parade' || bt.cue === 'goat') life.cue(bt.cue, voidState.x, voidState.z);
+          else if (bt.cue === 'treasure') spawnBeatTreasure();
+          else if (bt.cue === 'drum') {
+            drumCueT = bt.dur; drumThump = 0;
+            if (!drumRef) {
+              drumRef = scene.getObjectByName('drumTower') ?? null;
+              if (drumRef) drumBaseScale = drumRef.scale.x;
+            }
+          }
         }
       }
       if (feverT > 0) {
@@ -6434,13 +6518,32 @@ function animate() {
         if (feverPulseT <= 0) {
           feverPulseT = 1.7;
           fx.ring(voidState.x, voidState.z, feverCol, voidling.radius * 3.0, 1.1);
+          // the drum beat's pulse comes FROM THE DRUM: the ring beats out of
+          // the tower in the same rhythm, and the tower thumps with it
+          if (drumCueT > 0 && drumRef && drumRef.visible && !drumRef.userData.eaten) {
+            fx.ring(drumRef.position.x, drumRef.position.z, feverCol, 10, 1.1);
+            drumThump = 1;
+          }
         }
         // …and NOTHING is announced when it ends. "Rush over. Keep eating!"
         // called every one of the twelve beats a "Rush" (only one of them is
         // named that), and spending a full hero card to tell a child that a
         // good thing has stopped is the opposite of a reward. The multiplier
         // badge leaving the screen is the signal.
-        if (feverT <= 0) feverMult = 1;
+        if (feverT <= 0) {
+          feverMult = 1;
+          if (beatLoot.length) clearBeatLoot();   // leftover chests puff away
+        }
+      }
+      // the tower's thump — a quick swell about its own base scale, skipped
+      // the moment the eat animation owns the mesh
+      if (drumCueT > 0) {
+        drumCueT -= dt;
+        if (drumRef && drumRef.visible && !drumRef.userData.eaten) {
+          drumThump = Math.max(0, drumThump - dt * 3.2);
+          drumRef.scale.setScalar(drumBaseScale * (1 + 0.05 * Math.sin(Math.min(1, drumThump) * Math.PI)));
+          if (drumCueT <= 0) drumRef.scale.setScalar(drumBaseScale);
+        }
       }
     }
     if (introT > 0) { const dk = Math.pow(0.9, dt * 60); velX *= dk; velZ *= dk; }
