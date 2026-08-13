@@ -38,7 +38,11 @@ export interface Rivals {
   onJoin?: (name: string, color: number, x: number, z: number, arch: Arch) => void;
   onRivalEaten?: (name: string, pts: number, x: number, z: number, r: number, marquee: boolean) => void; // you swallowed one
   onPlayerBitten?: (name: string, hit: RivalHit) => void; // one bit YOU
-  onSpeak?: (x: number, z: number, line: string) => void; // personality bubbles
+  // `name` rides along so the caller can attribute a line it cannot show as a
+  // bubble — a rival speaking from across the island is out of frame, and a
+  // bubble at their world position plays to nobody. See rivals.onSpeak in
+  // prototype3d.ts, which routes far speech to the ticker under the name.
+  onSpeak?: (x: number, z: number, line: string, name: string) => void;
   onCharge?: (name: string, x: number, z: number) => void;   // the BULLY winds up a lunge
   onNearMiss?: (name: string, x: number, z: number) => void; // …and it whiffs. the retellable beat.
   onStuffed?: (name: string, x: number, z: number) => void;  // the threat turns into the MEAL
@@ -833,7 +837,7 @@ export function createRivals(
             rv.campX = rv.x; rv.campZ = rv.z; rv.campT = 0;
             rv.group.visible = rv.halo.visible = true;
             api.onJoin?.(rv.name, rv.color, rv.x, rv.z, rv.arch);
-            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch), rv.name);
             rv.speakCd = rand(6, 10);
           } else continue;   // not on the island yet
         }
@@ -866,7 +870,7 @@ export function createRivals(
             if (!rv.stuffedSaid) {
               rv.stuffedSaid = true; rv.cst = 0;
               api.onStuffed?.(rv.name, rv.x, rv.z);
-              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].stuffed ?? RIVAL_VOICE[rv.name].taunt));
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].stuffed ?? RIVAL_VOICE[rv.name].taunt), rv.name);
               rv.speakCd = rand(8, 12);
             }
           }
@@ -898,7 +902,7 @@ export function createRivals(
             const rr = rand(45, 80);   // near the player — a grumpy tiny rival re-entering IS a story
             [rv.x, rv.z] = placeOnLand(px + Math.cos(a2) * rr, pz + Math.sin(a2) * rr, rv.r);
             rv.group.visible = rv.halo.visible = true; rv.pulse = 1;
-            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn));
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].respawn), rv.name);
           } else continue;
         }
         rv.biteCd = Math.max(0, rv.biteCd - dt);
@@ -911,7 +915,7 @@ export function createRivals(
           const sx2 = rv.tgt.mesh.position.x - px, sz2 = rv.tgt.mesh.position.z - pz;
           if (Math.hypot(sx2, sz2) < pr + 5 && rv.speakCd <= 0) {
             rv.speakCd = rand(6, 10);
-            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].steal));
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].steal), rv.name);
           }
           rv.tgt = null;
         }
@@ -948,17 +952,17 @@ export function createRivals(
         }
         if (fleeing && rv.arch === 'COWARD' && rv.speakCd <= 0 && dp < fleeReach * 0.6) {
           rv.speakCd = rand(9, 14);
-          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch), rv.name);
         }
         if (fleeing && dp < pr * 1.05) rv.closeCall = true;   // almost swallowed…
         if (rv.closeCall && dp > pr * 1.8) {                   // …and wriggled free
           rv.closeCall = false;
-          if (rv.speakCd <= 0) { rv.speakCd = 8; api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].escape)); }
+          if (rv.speakCd <= 0) { rv.speakCd = 8; api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].escape), rv.name); }
         }
         // drive-by size chirps — every close pass becomes a beat
         if (rv.speakCd <= 0 && dp < pr + rv.r + 6) {
-          if (rv.r > pr * 1.15) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearBig)); }
-          else if (rv.r < pr * 0.85) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearSmall)); }
+          if (rv.r > pr * 1.15) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearBig), rv.name); }
+          else if (rv.r < pr * 0.85) { rv.speakCd = rand(12, 16); api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].nearSmall), rv.name); }
         }
         // ── SWING-BY VISITS: occasionally a family member breaks off, rolls
         // over to say hi, then goes back to its own business. Rarer now
@@ -976,7 +980,7 @@ export function createRivals(
           if (dp < pr + rv.r + 9) {   // arrived: deliver the line, hang out beat
             rv.visiting = false; rv.visitT = rand(45, 90);
             rv.speakCd = rand(10, 14);
-            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].visit));
+            api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].visit), rv.name);
             rv.retarget = 0;   // pick a snack right away (near the player now)
           }
         }
@@ -1070,13 +1074,13 @@ export function createRivals(
             // "watch me eat something HUGE" — said only when it really is huge
             if (rv.arch === 'SHOWOFF' && best.radius > 2.2 && best.radius > rv.lockR * 1.15 && rv.speakCd <= 0) {
               rv.lockR = best.radius; rv.speakCd = rand(10, 16);
-              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch), rv.name);
             }
           } else if (rv.arch === 'COPYCAT') {
             rv.tx = ax + rand(-18, 18); rv.tz = az + rand(-18, 18); rv.tgt = null;
             if (rv.speakCd <= 0 && dp < 90) {
               rv.speakCd = rand(12, 18);
-              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch));
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].arch), rv.name);
             }
           } else {
             // idle wander sweeps their OWN turf, and the turf itself drifts —
@@ -1104,7 +1108,7 @@ export function createRivals(
             if (rv.ctim <= 0 && dp < 95 && dp > rv.r * 0.9) {
               rv.cst = 1; rv.ctim = 0.85; rv.missPend = false;
               api.onCharge?.(rv.name, rv.x, rv.z);
-              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].charge ?? RIVAL_VOICE[rv.name].taunt));
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].charge ?? RIVAL_VOICE[rv.name].taunt), rv.name);
               rv.speakCd = rand(6, 9);
             }
           } else if (rv.cst === 1 && rv.ctim <= 0) { rv.cst = 2; rv.ctim = 2.6; }
@@ -1263,7 +1267,7 @@ export function createRivals(
             ? Math.round(400 + rv.r * 180 + looted + rv.stolen)
             : Math.round(100 + rv.r * 40);
           if (marquee) { rv.score -= looted; rv.stolen = 0; }
-          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten));
+          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten), rv.name);
           rv.halo.visible = false;
           rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null; rv.cst = 0;
           api.onRivalEaten?.(rv.name, pts, rv.x, rv.z, rv.r, marquee);
@@ -1301,7 +1305,7 @@ export function createRivals(
             rv.cst = 3; rv.ctim = 2.2;
           }
           if (steal > 0) { rv.score += steal; rv.stolen += steal; }
-          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].bite));
+          api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].bite), rv.name);
           api.onPlayerBitten?.(rv.name, { shrink: heavyBite ? 0.85 : 0.90, steal, hunter: heavyBite });
         }
 
@@ -1541,7 +1545,7 @@ export function createRivals(
             if (bm2?.uniforms?.uWobble) bm2.uniforms.uWobble.value = Math.min(1, (bm2.uniforms.uWobble.value as number) + 0.6);
             if (e.radius > rv.r * 0.55 && rv.speakCd <= 0) {   // a BIG bite earns a taunt
               rv.speakCd = rand(9, 16);
-              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].taunt));
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].taunt), rv.name);
             }
           }
         }

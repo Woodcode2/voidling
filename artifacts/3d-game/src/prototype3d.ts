@@ -1712,10 +1712,20 @@ rivals.onJoin = (name, color, x, z, arch) => {
   fx.ring(x, z, color, 22, 0.8);
   audio.alert();
 };
-// the family SPEAKS — personality bubbles over rival voids
+// the family SPEAKS — and the player actually hears it now. A bubble at the
+// rival's WORLD position is invisible whenever the rival is out of frame,
+// which for lane-driven rivals eating their own districts is most of the
+// match: all fifteen speech triggers in rivals.ts — arch moments, steals,
+// respawns, gloats — were playing to nobody. Near, the bubble stays (it is
+// the better read when you can see the speaker). Far, the line goes to the
+// news ticker under the speaker's name, best-effort on purpose:
+// breakingNews drops when a real story is up, which is exactly the priority
+// ambient colour should have.
 const rivalBubblePos = new THREE.Vector3();
-rivals.onSpeak = (x, z, line) => {
-  bubbles.say(rivalBubblePos.set(x, 5, z), line, 'event');
+rivals.onSpeak = (x, z, line, name) => {
+  const d = Math.hypot(x - voidState.x, z - voidState.z);
+  if (d < 55) bubbles.say(rivalBubblePos.set(x, 5, z), line, 'event');
+  else breakingNews(`💬 ${name}: ${line}`);
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
@@ -3036,7 +3046,14 @@ function refreshHud() {
     // …the board prefixes the chaser's row with ⚡, so match on the bare name
     const rv = passer && !passer.me ? rivals.list.find((r) => passer.name.endsWith(r.name)) : undefined;
     if (rv && RIVAL_VOICE[rv.name]) {
-      bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)], 'event');
+      // same routing as rivals.onSpeak: a brag you cannot see is not a brag.
+      // Getting passed is the one rival event a child must FEEL, so far-away
+      // passers land on the ticker under their name instead of playing to
+      // an empty camera.
+      const brag = RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)];
+      const dp = Math.hypot(rv.x - voidState.x, rv.z - voidState.z);
+      if (dp < 55) bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), brag, 'event');
+      else breakingNews(`💬 ${rv.name}: ${brag}`);
       rv.pulse = 1;
     }
   }
