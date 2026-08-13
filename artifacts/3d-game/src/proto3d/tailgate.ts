@@ -66,6 +66,9 @@ const SMOKE = 0xd7d3cc;
 registerGloss([
   [ALU, 0.72], [STEEL, 0.62], [GOLD, 0.50], [GOLD_L, 0.42], [CHAR, 0.18],
   [0x33414f, 0.78], [0x3d4c5c, 0.78], [0x9fd0e0, 0.70], [0xbfe6f2, 0.70],
+  // the campus statue's bronze — this hex exists nowhere else in the game,
+  // and a bronze that doesn't catch the 4pm sun is just brown
+  [0x8a6a3a, 0.55],
 ], 'tailgate');
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -1131,7 +1134,17 @@ export function makeBandRig(): THREE.Group {
 }
 
 /** A CAMPUS STATUE on a plinth. Old Campus had brick halls and nothing to
- *  meet anybody by. */
+ *  meet anybody by.
+ *
+ *  THE BOXY LAWN FIGURE, FOUND. The people-are-Lego audit cleared every
+ *  CROWD builder and still left one boxy figure standing on a campus lawn —
+ *  because this is not a crowd person, it is a prop, and its bronze was five
+ *  raw boxes. Planted eight times across the district, so it read as "a
+ *  person" in any wide shot. The figure is now the same silhouette in
+ *  rounded parts (capsules for torso and limbs, a disc for the brim) and is
+ *  merged SEPARATELY so it shades smooth while the plinth stays flat —
+ *  the same split the diner's welded-in people needed. Masonry is boxes;
+ *  people are not, even bronze ones. */
 export function makeStatue(): THREE.Group {
   const p: G[] = [
     part(new THREE.BoxGeometry(2.0, 0.4, 2.0), CONC_D, 0, 0.2, 0),
@@ -1141,14 +1154,18 @@ export function makeStatue(): THREE.Group {
   ];
   // the figure: bronze, mid-stride, holding a ball out in front of it
   const BR = 0x8a6a3a;
-  p.push(part(new THREE.BoxGeometry(0.6, 1.1, 0.42), BR, 0, 2.72, 0));
-  p.push(part(new THREE.SphereGeometry(0.28, 10, 8), BR, 0, 3.46, 0));
-  p.push(part(new THREE.BoxGeometry(0.44, 0.12, 0.5), BR, 0.08, 3.6, 0));     // the helmet's brim
-  p.push(part(new THREE.BoxGeometry(0.2, 0.9, 0.2), BR, -0.18, 1.85, 0.16, 0.3));
-  p.push(part(new THREE.BoxGeometry(0.2, 0.9, 0.2), BR, 0.22, 1.9, -0.16, -0.2));
-  p.push(part(new THREE.BoxGeometry(0.18, 0.8, 0.18), BR, 0.42, 2.9, 0.2, 0, 0, -0.9));
-  p.push(part(new THREE.SphereGeometry(0.22, 10, 8), BR, 0.92, 3.2, 0.24, 0, 0, 0, 1.35, 1, 1));
-  return finish(p);
+  const f: G[] = [
+    part(new THREE.CapsuleGeometry(0.30, 0.55, 6, 12), BR, 0, 2.72, 0, 0, 0, 0, 1, 1, 0.72),
+    part(new THREE.SphereGeometry(0.28, 12, 9), BR, 0, 3.46, 0),
+    part(new THREE.CylinderGeometry(0.32, 0.34, 0.11, 12), BR, 0.08, 3.6, 0),  // the helmet's brim
+    part(new THREE.CapsuleGeometry(0.11, 0.68, 5, 10), BR, -0.18, 1.85, 0.16, 0.3),
+    part(new THREE.CapsuleGeometry(0.11, 0.68, 5, 10), BR, 0.22, 1.9, -0.16, -0.2),
+    part(new THREE.CapsuleGeometry(0.09, 0.62, 5, 10), BR, 0.42, 2.9, 0.2, 0, 0, -0.9),
+    part(new THREE.SphereGeometry(0.22, 12, 9), BR, 0.92, 3.2, 0.24, 0, 0, 0, 1.35, 1, 1),
+  ];
+  const g = finish(p);
+  g.add(mergedProp(f, PROP_SMOOTH_MAT));
+  return g;
 }
 
 /** A SATELLITE RIG: the dish, the mast and the awning it lives under. RV Row

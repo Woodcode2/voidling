@@ -107,8 +107,12 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    vehicles' rounded boxes were creased because computeVertexNormals ran on
    per-face duplicated corners — welded (4e8e648); the diner's two welded-in
    people were flat-shaded by their own building's merge — split (ab6f0cb).
-   One unresolved: a solo campus lawn figure that reads boxy; every builder
-   checks out smooth on paper. Needs a controlled crop, not a guess.
+   The last one is CLOSED: the "solo campus lawn figure" was never a crowd
+   person — it was GAME DAY's quad statue (tailgate.ts makeStatue), whose
+   bronze was five raw boxes, planted eight times. Every crowd builder
+   checked out smooth because the figure wasn't crowd. Rebuilt in capsules
+   with its own smooth merge (masonry stays flat), bronze registered at
+   0.55 gloss; controlled crop in qa/out/statue_rounded.png.
 3. ~~First thirty seconds~~ — the boot breathes: checkShaderErrors off
    (?shaderlog restores; no measured sandbox win, honestly recorded), module
    seams + createIsland/populate sliced at district boundaries. Ten stage
