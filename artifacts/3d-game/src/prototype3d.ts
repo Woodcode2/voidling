@@ -1791,6 +1791,7 @@ rivals.onPlayerBitten = (name, hit) => {
   // you to the bottom of the form you are in — one rung down the ladder, with
   // the form name on the HUD changing to prove it — and the shallow nibble
   // keeps its percentage. START_R is the floor: a VOIDLING cannot go lower.
+  let demoted = false;
   if (hit.hunter) {
     const st = stageFor(voidling.radius);
     const down = Math.max(START_R, (FORM_MIN[Math.max(0, st - 1)] || START_R) * 1.02);
@@ -1799,6 +1800,7 @@ rivals.onPlayerBitten = (name, hit) => {
       curStage = stageFor(voidling.radius);
       voidling.setStage(VISUAL_STAGE[curStage] ?? 0);
       audio.setMusicStage(VISUAL_STAGE[curStage] ?? 0);
+      demoted = curStage < st;
     }
   } else {
     voidling.setRadius(Math.max(START_R, voidling.radius * hit.shrink));
@@ -1812,8 +1814,21 @@ rivals.onPlayerBitten = (name, hit) => {
   // camera kicks, the void shrinks and a float rises off it. A full-width
   // announcement on top of that is the third telling of the same event, and
   // over a match it is the single biggest source of HUD clutter.
+  //
+  // …but a DEMOTION is not a nibble, and it read as one: the bite that costs
+  // a whole form — the game's single biggest setback — showed the same float
+  // as a shallow graze, and the only proof was the HUD form label quietly
+  // changing at the next repaint. Within the no-banner rule, the float now
+  // NAMES the cost and the growth bar visibly gives the pip back (the same
+  // pop it plays on the way up, in its red 'down' dress).
   floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
-  bubbles.float(floatPos, hit.hunter ? 'BONK!! 💫' : 'OOF!! 💫', true);
+  bubbles.float(floatPos, demoted ? `BONK!! back to ${FORMS[curStage]}!! 💫`
+    : hit.hunter ? 'BONK!! 💫' : 'OOF!! 💫', true);
+  if (demoted) {
+    growthEl.classList.remove('pop', 'down'); void growthEl.offsetWidth;
+    growthEl.classList.add('pop', 'down');
+    setTimeout(() => growthEl.classList.remove('pop', 'down'), 420);
+  }
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
   if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
   buzz(hit.hunter ? 90 : 50);
@@ -2594,13 +2609,17 @@ const quests: Quest[] = (() => {
     return id;
   };
   const ids = [draw(EASY_Q, daySeed), draw(MED_Q, daySeed >>> 2), draw(HARD_Q, daySeed >>> 4)];   // independent indices — the same seed produced only 3 boards ever
-  const saved = localStorage.getItem('voidQuestDay') === today
-    ? JSON.parse(localStorage.getItem('voidQuestState') || '{}') : {};
+  const sameDay = localStorage.getItem('voidQuestDay') === today;
+  const saved = sameDay ? JSON.parse(localStorage.getItem('voidQuestState') || '{}') : {};
+  // encore chips earned earlier TODAY come back on reload; a new day sweeps them
+  const encIds: string[] = sameDay ? JSON.parse(localStorage.getItem('voidQuestEncoreIds') || '[]') : [];
+  if (!sameDay) { localStorage.setItem('voidQuestEncoreIds', '[]'); localStorage.setItem('voidQuestEncoreN', '0'); }
   localStorage.setItem('voidQuestDay', today);
-  return ids.map((id) => {
+  const build = (id: string, encore: boolean) => {
     const t = QUEST_POOL.find((q) => q.id === id) ?? QUEST_POOL[0];   // belt-and-braces: never render an undefined chip
-    return { ...t, count: saved[id]?.c ?? 0, done: saved[id]?.d ?? false };
-  });
+    return { ...t, reward: encore ? 10 : t.reward, count: saved[id]?.c ?? 0, done: saved[id]?.d ?? false };
+  };
+  return [...ids.map((i) => build(i, false)), ...encIds.map((i) => build(i, true))];
 })();
 function saveQuests() {
   const s: Record<string, { c: number; d: boolean }> = {};
@@ -2617,11 +2636,41 @@ function renderQuests() {
     (q.done ? '<span class="qc">✓</span>' : `<span class="qc">${q.count}/${q.target}</span>`) +
     `<div class="qb"><div style="width:${Math.min(100, Math.round((q.count / q.target) * 100))}%"></div></div></div>`).join('');
 }
+// ── THE BOARD NEVER SAYS STOP ───────────────────────────────────────────────
+// Quests are drawn once per calendar day and the targets are small, so the
+// board was typically all-checkmarks by match 2-3 — and from then on the
+// TODAY panel literally told the child to come back tomorrow. Play 4 in one
+// sitting started with zero open quests and an instruction to leave. When
+// the board clears, an ENCORE chip is drawn from today's unused pool ids
+// (smaller reward, 10✦) — questEvent() iterates the array by kind, so the
+// new chip counts with zero extra plumbing. Powers-gated and world-
+// impossible quests are excluded (POWERS_ON is false; pirate has no cars or
+// houses; cabanas exist nowhere else).
+function addEncoreQuest() {
+  const onBoard = new Set(quests.map((q) => q.id));
+  const banned = new Set(['gulp', 'collapse', 'solo',
+    ...(pickedWorld === 'pirate' ? ['cars', 'houses'] : ['cabanas'])]);
+  const free = QUEST_POOL.filter((q) => !onBoard.has(q.id) && !banned.has(q.id));
+  if (!free.length) return;   // pool exhausted: the cleared board stands
+  const n = Number(localStorage.getItem('voidQuestEncoreN') || 0);
+  const t = free[n % free.length];
+  quests.push({ ...t, reward: 10, count: 0, done: false });
+  localStorage.setItem('voidQuestEncoreN', String(n + 1));
+  const ids = JSON.parse(localStorage.getItem('voidQuestEncoreIds') || '[]') as string[];
+  ids.push(t.id);
+  localStorage.setItem('voidQuestEncoreIds', JSON.stringify(ids));
+  announce('⭐ BONUS QUEST!');
+}
 function questComplete(q: Quest) {
   q.done = true; addCoins(q.reward);
   announce(`QUEST DONE! +${q.reward}✦`);
   audio.ready();   // the chime — evolve() is the growth fanfare, not a jingle
-  if (quests.every((x) => x.done)) { addCoins(25); announce('ALL QUESTS CLEAR! +25✦ BONUS'); }
+  if (quests.every((x) => x.done)) {
+    // the daily +25 pays once, on the AUTHORED board — encores are their own
+    // (smaller) reward, not a lever that mints the clear bonus repeatedly
+    if (quests.length === 3) { addCoins(25); announce('ALL QUESTS CLEAR! +25✦ BONUS'); }
+    addEncoreQuest();
+  }
   renderQuests(); saveQuests();
 }
 function questEvent(kind: string, n = 1) {
@@ -3596,7 +3645,10 @@ function endMatch() {
           + `<span class="eqt">${said}</span>`
           + `<span class="eqn">${q.done ? '✓' : `${Math.min(q.count, q.target)}/${q.target}`}</span></div>`;
       }).join('')
-        + (open2.length ? '' : '<div class="eqh" style="color:#7ef2a0">ALL DONE — COME BACK TOMORROW</div>');
+        // "COME BACK TOMORROW" told a child mid-sitting to stop playing; with
+        // encores the board refills on clear, so all-done is only ever the
+        // exhausted-pool case — celebrate it without an instruction to leave
+        + (open2.length ? '' : '<div class="eqh" style="color:#7ef2a0">⭐ EVERY QUEST DONE — WOW!</div>');
     }
     const g = nextGoal();
     const nx = el('endNext');
@@ -3645,7 +3697,7 @@ function endMatch() {
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
 // once-per-match milestone banners (hole.io celebrates the firsts)
-const moments = { firstBuilding: false, firstCar: false, firstRival: false, half: false, last30: false };
+const moments = { firstBuilding: false, firstCar: false, firstRunner: false, half: false, last30: false };
 // the last final-countdown second already shown, so each of 10..1 pops once
 let countTick = 0;
 const floatPos = new THREE.Vector3();
@@ -3827,6 +3879,15 @@ function capture(e: Edible, giveHunger = true) {
   if (comboMult >= 2) questEvent('combo');
   if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
+  // catching the first RUNNER — the top thrill on the hole.io list — had no
+  // moment, and the 1.5x chase bonus was paid in silence. Chase framing on
+  // purpose: the content rule that no line may say a person was eaten stands.
+  // (The goat and cars carry qk tags, so this fires on plain wanderers only.)
+  if (e.mesh.userData.mover && !qk && !moments.firstRunner) {
+    moments.firstRunner = true;
+    announce('🏃 FIRST RUNNER CAUGHT! things that run pay extra');
+    audio.voice('yum'); buzz(25);
+  }
   // no COPY row for this one: 'rv' is tagged on RV Row and nowhere else, so it
   // can only ever fire on GAME DAY. It should still sound like the booth.
   if (qk === 'rv' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🚐 A WHOLE MOTORHOME! Gone.'); breakingNews('A whole MOTORHOME, Bill. Somebody was living in that until Sunday.'); }
@@ -4342,7 +4403,14 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
     // shown anywhere a player looks BEFORE a match, so "play again" could not
     // become "beat 12,045".
     const bestEl = c.querySelector('.wBest') as HTMLElement | null;
-    if (bestEl) { const b = worldBest(id); bestEl.textContent = b ? `★ BEST ${b.toLocaleString()}` : ''; }
+    if (bestEl) {
+      const b = worldBest(id);
+      // a never-played world used to render an EMPTY badge — visually quieter
+      // than the world just played, on the card whose whole job is to invite.
+      // The cheapest fourth-play novelty is the other three worlds; say so.
+      bestEl.textContent = b ? `★ BEST ${b.toLocaleString()}`
+        : `✨ NEW PLACE · ${totalCount(id as WorldId) - foundCount(id as WorldId)} SECRETS`;
+    }
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
       track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld });
@@ -4429,8 +4497,22 @@ function stickerFace(st: Sticker, px: number): string {
 function renderFinds(): void {
   const box = el('endFinds');
   const got = runFinds();
-  box.classList.toggle('show', got.length > 0);
-  if (!got.length) { box.innerHTML = ''; return; }
+  // A NO-FIND RUN STILL POINTS AT THE HUNT. This used to hide the whole
+  // block, so a child whose fourth play found nothing (the near-spawn
+  // commons are eaten by then; unfound curios sit in far districts) ended
+  // the match with zero mention the hunt exists — the hints lived only
+  // inside the book overlay. One line, the cheapest unfound sticker's own
+  // hint, and the case is never empty.
+  if (!got.length) {
+    const miss = STICKERS_BY_WORLD(pickedWorld).find((s) => !hasSticker(s.id));
+    box.classList.toggle('show', !!miss);
+    box.innerHTML = miss
+      ? `<div class="fLbl">🔍 STILL HIDING · ${miss.where.toUpperCase()}</div>`
+        + `<div class="fMore">“${miss.hint}”</div>`
+      : '';
+    return;
+  }
+  box.classList.add('show');
   // AT MOST THREE CARDS. Each one is a ~64px row on a screen that was already
   // 848px of content in an 844px viewport with none of them — measured, five
   // finds put it at 1,207px and pushed PLAY AGAIN completely off. The count in
