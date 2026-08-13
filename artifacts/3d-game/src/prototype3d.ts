@@ -6704,13 +6704,20 @@ function animate() {
       // PERCEIVED speed is constant: world speed rides the camera distance, so
       // a WORLD ENDER crosses its screen exactly as fast as a hatchling does.
       // Joystick: full speed at ~58% thumb extension (hole.io feel), linear below.
-      // …and the ramp opens out to match. A real deadzone (10 px, so a resting
-      // thumb is genuinely at rest) and full speed at the RIM — 64 px, where
-      // the ring the player can actually see already is — instead of at 36 px
-      // in the middle of nowhere. The analog band goes from 32 px to 54, half
-      // a ring now means half speed rather than a hair under full, and full
-      // deflection is finally a thing the drawn ring tells you about.
-      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.156) / 0.844, 0, 1) : 1;
+      //
+      // THE RAMP WENT TO THE RIM AND THE OWNER FELT IT. An earlier pass moved
+      // full speed out to 64 px ("half a ring means half speed") — tidy on
+      // paper, and measured on the thumb it is the whole "keep dragging to
+      // keep the momentum" complaint: a thumb naturally rests and wobbles at
+      // 40-55 px, which under the rim ramp is a 42% speed tax (held at 45 px:
+      // 10.4 u/s against 15.6 at the rim — joyfeel.mjs). The instinctive cure
+      // is pushing further out; every push past the 1.7x follow drags the
+      // base toward the bezel, and eventually the finger runs off the glass.
+      // Full speed now lands at mag 0.58 (37 px, the original design note),
+      // so the resting thumb IS full throttle and the ring means "past here
+      // is always full", which is what hole.io's stick does. Deadzone stays
+      // 10 px so a resting touch is genuinely at rest.
+      const jm = joy.active ? THREE.MathUtils.clamp((joy.mag - 0.156) / (0.58 - 0.156), 0, 1) : 1;
       // The 58 cap bound at camDist 181 — a radius ABOVE the WORLD ENDER
       // threshold — after which world speed stopped rising while the camera
       // kept pulling back. Measured: 440-470 screen px/s up to r=6, then 291
