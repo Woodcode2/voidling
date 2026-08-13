@@ -130,12 +130,16 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    world-reactive beats: parade gated to its banner, a real edible gilded
    PRIZE GOAT, treasure hunts that drop chests, a drum tower that drums
    (0c3fc89). Economy curve implemented per the owner's spec (§4 resolved).
-   Remaining from the audit, confirmed-unbuilt: gameday's band-on-field
-   beat, form-loss feedback ("BONK" reads like a nibble), first-runner-
-   caught moment, and the fourth-play hooks (same-day quest refresh,
-   sticker-book absence on zero-find end screens, unvisited worlds are the
-   quietest picker cards — owner's PRICES curve stands, surface progress
-   not prices).
+   The audit backlog is now FULLY BUILT (0d03359, 4e64d69): the band
+   marches the concourse ring on its beat (parked 0.00u drift pre-cue, 74u
+   travel in-window, march pace measured and halved from a jog), the
+   demotion float names the lost form + red growth-bar pop, FIRST RUNNER
+   CAUGHT moment, encore quests refill the cleared daily board (the panel
+   no longer says COME BACK TOMORROW mid-sitting), zero-find whistles show
+   the cheapest unfound sticker's hint, and unvisited world cards read
+   "NEW PLACE · 12 SECRETS". Owner's PRICES curve untouched throughout.
+   Also owner-reported and fixed same day: the joystick's resting-thumb
+   speed tax (joyfeel.mjs, 2fd4f84).
 
 ### RETRACTION 2026-08-13, first-60-seconds: "the match runs behind the
 tutorial card" was a PROBE ARTIFACT, not a bug. The probe (firstrun.mjs)
