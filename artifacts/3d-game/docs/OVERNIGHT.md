@@ -314,10 +314,12 @@ does not get the same scrutiny. In rough value order:
   unfinished in motion, the reason to play a fourth time, and reading it as a
   six-year-old. Re-run it if the file is gone.
 
-### 4. THE REASON TO PLAY AGAIN
-Coins dead-end at ~30 matches: 16,450✦ of voids at ~550/match, and hats are
-real money by the owner's explicit call. After that the currency is inert.
-Something must want buying at match 40.
+### 4. THE REASON TO PLAY AGAIN — RESOLVED 2026-08-13, owner's call
+The coin curve now doubles per step: first three skins in a child's first
+evening, top four cost 30+ matches EACH, total 174,400✦ ≈ 317 matches at the
+measured 550/match. The table and its arithmetic live on PRICES in
+prototype3d.ts. nextGoal() keeps pointing the results screen at the cheapest
+unowned skin, so there is a stated goal from match 1 to match ~300.
 
 ### 5. STILL OPEN, SMALLER
 - Mouth sits left of the eye midline at size; body silhouette goes lumpy.

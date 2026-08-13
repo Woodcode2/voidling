@@ -3225,9 +3225,30 @@ const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250,
 // inside a single match — a first session should end with a purchase — and the
 // whole set around thirty matches at 550✦, which is a collection rather than
 // an afternoon.
+// ── THE COIN CURVE IS A RUNWAY, NOT A CHECKLIST ────────────────────────────
+// The old table totalled 16,450 at roughly 550 a match — every void owned by
+// match 30, and from then on the currency was inert: the biggest retention
+// hole in the game (docs/OVERNIGHT.md section 4). The owner's call, verbatim:
+// "a few void skins fairly cheap, but they ramp up quickly where you need more
+// than 30 games."
+//
+// So the curve doubles per step. The first three land in a child's first
+// evening — buying something on day one is what teaches the shop exists — and
+// the top four each cost MORE THAN 30 MATCHES on their own, which makes every
+// one of them a real goal the results screen's nextGoal() can point at for
+// weeks. Matches-at-550 per skin, and the cumulative runway:
+//
+//   toxic    150  (0.3)   sunset   350  (0.9 cum)   ocean    800  (2.4 cum)
+//   candy  1,800  (3.3)   honey  3,800  (7)         lagoon 7,500  (14)
+//   neon  17,000  (31)    lemon 28,000  (51)        silver 45,000 (82)
+//   chilli 70,000 (127)   — total 174,400, about 317 matches of play.
+//
+// Owned skins are a localStorage set keyed by id; repricing never touches
+// ownership. Coins and skins stay coin-only (hats are real money — the
+// owner's standing rule); nothing here is an IAP, so APPSTORE.md is unmoved.
 const PRICES: Record<string, number> = {
-  classic: 0, toxic: 150, sunset: 300, ocean: 500, candy: 800, honey: 1100,
-  lagoon: 1500, neon: 2000, lemon: 2600, silver: 3300, chilli: 4200,
+  classic: 0, toxic: 150, sunset: 350, ocean: 800, candy: 1800, honey: 3800,
+  lagoon: 7500, neon: 17000, lemon: 28000, silver: 45000, chilli: 70000,
 };
 /** THE NEXT THING TO CHASE. The results screen stated an outcome and offered a
  *  button; it never stated a goal, which is the moment a child decides whether
@@ -5199,7 +5220,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       pr.className = 'pr' + (has ? ' owned' : '');
       pr.textContent = equipped === s.id ? 'EQUIPPED' : has ? 'OWNED'
         : s.cash ? `💎 ${iapPrice(s.id) ?? `$${s.cash.toFixed(2)}`}`
-        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${cost}`;
+        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${cost.toLocaleString('en-US')}`;
       // …and HOW FAR ALONG, which is what turns a price list into a collection
       const bar = card.querySelector('.skBar > i') as HTMLElement | null;
       if (bar) bar.style.width = `${Math.min(100, cost ? (coins / cost) * 100 : 0)}%`;
@@ -5304,7 +5325,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       // to take payment, so it points at the App Store rather than pretending.
       : s.cash ? (iapAvailable() ? `💎 BUY · ${priceOf(s)}` : `💎 ${priceOf(s)} · ON THE APP STORE`)
       : s.streak ? `🔥 PLAY ${s.streak} DAYS IN A ROW`
-      : `BUY · ✦ ${PRICES[s.id]}`;
+      : `BUY · ✦ ${PRICES[s.id].toLocaleString('en-US')}`;
   };
   const openPreview = (s: Skin) => {
     prevSkin = s;
@@ -5440,7 +5461,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       } else {
         // how far short, and how often — the coin economy's only real feedback
         track('skin_short', { skin: s.id, price: PRICES[s.id], coins, short: PRICES[s.id] - coins });
-        spAct.textContent = `NEED ${PRICES[s.id] - coins}✦ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return;
+        spAct.textContent = `NEED ${(PRICES[s.id] - coins).toLocaleString('en-US')}✦ MORE!`; audio.hit(); setTimeout(refreshPreview, 1400); return;
       }
     }
     equipSkin(s);
