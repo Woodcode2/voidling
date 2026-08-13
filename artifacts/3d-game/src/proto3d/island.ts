@@ -2596,6 +2596,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   top.position.y = 0; top.receiveShadow = true;
   scene.add(top);
 
+  await breathe('Carving the coast…');
   // cliff wall skirt (thickness): vertical wall from y=0 down to y=-DEPTH
   {
     const DEPTH = 9;
@@ -6264,6 +6265,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     console.info(`[maple] country fill: ${filled} verge props, ${bigTrees} mature trees, ${outbuildings} outbuildings`);
   }
 
+  await breathe('Wilding the verges…');
   // ── the coast fringe ──────────────────────────────────────────────────────
   // The band between the block grid and the cliff. North and west it is scrub
   // and boulders, east it is pine, south it is the lake shore.
