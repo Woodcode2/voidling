@@ -6265,7 +6265,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     console.info(`[maple] country fill: ${filled} verge props, ${bigTrees} mature trees, ${outbuildings} outbuildings`);
   }
 
-  await breathe('Wilding the verges…');
+  await breathe('Growing the wildflowers…');
   // ── the coast fringe ──────────────────────────────────────────────────────
   // The band between the block grid and the cliff. North and west it is scrub
   // and boulders, east it is pine, south it is the lake shore.

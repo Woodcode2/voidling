@@ -27,7 +27,8 @@ export interface Audio3D {
   collapse(): void;                // COLLAPSE boom
   evolve(): void;                  // form-up fanfare
   voice(kind: 'happy' | 'yum' | 'scared' | 'hurt' | 'sleepy'): void;   // the void's cute coos
-  win(): void;                     // end-of-match warm sting
+  win(): void;                     // end-of-match warm sting — 1st place only
+  lose(): void;                    // "aww — next time": soft, major, no dread
   hit(): void;                     // took a shot
   alert(): void;                   // defense wave banner
   bigEat(): void;                  // crunching a building
@@ -3284,6 +3285,13 @@ export function createAudio(): Audio3D {
       if (sample('win_warm.wav', 0.55)) return;
       const seq = [523.25, 659.25, 783.99, 1046.5];
       seq.forEach((f, i) => tone(f, f, 0.3, 'triangle', 0.2, i * 0.12));
+    },
+    lose() {
+      // the mirror of win()'s rising four: two falling triangle notes landing
+      // a major third apart — "aww, next time", never a minor-key sting (the
+      // no-dread rule). Soft enough that the results panel stays the event.
+      tone(659.25, 659.25, 0.38, 'triangle', 0.13);
+      tone(523.25, 523.25, 0.55, 'triangle', 0.11, 0.2);
     },
     hit() {
       tone(140, 60, 0.16, 'square', 0.16);

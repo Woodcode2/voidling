@@ -149,7 +149,10 @@ export const RIVAL_VOICE: Record<string, {
     visit: ['a VISIT from greatness', 'we feast TOGETHER, kid', 'the gala is SATURDAY', 'family!! DRAMATIC hug!!'],
     arch: ['I am CHASING you, dear', 'race you, darling!', 'I want that snack TOO', 'faster, darling! FASTER!'],
     charge: ['ACT TWO: I CHARGE!!', 'HERE I COME, DARLING!!', 'CHAAARGE!! dramatically!!', 'coming through, DARLING!!'],
-    stuffed: ['ohh… I am SO full…', 'too full… to chase… ugh', 'do NOT eat me. I mean it', 'I regret… everything…'],
+    // no reverse psychology in the stuffed pool: this state is the designed
+    // pivot where the predator becomes the prize, and "do NOT eat me" was a
+    // literal instruction not to — at the exact moment the game wants attack
+    stuffed: ['ohh… I am SO full…', 'too full… to chase… ugh', 'I cannot run!! TOO FULL!!', 'I regret… everything…'],
   },
   DOZER: {
     taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],

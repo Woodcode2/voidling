@@ -922,9 +922,15 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     // town-hall meeting whose crowd shouts "move to adjourn? DENIED." and
     // "ADJOURNED!! ADJOURNED!!". The newsroom register is plain sentences with
     // a full stop and one joke — see newsroom_maple.ts.
-    heroCue: '🏛️ THE TOWN HALL IS IN REACH — GO!',
+    // BANNER WORDS A SIX-YEAR-OLD OWNS. "In reach" is a spatial idiom — a
+    // child reads "I can walk there", not "I can eat it now"; the ticker
+    // echo already had the concrete phrasing, but the banner is the surface
+    // they act on. And "ADJOURNED" is a courtroom word: the meeting joke
+    // survives as MEETING OVER, which is what adjourned means to the row of
+    // people shouting it.
+    heroCue: '🏛️ YOU CAN EAT THE TOWN HALL NOW — GO!',
     heroCueNews: 'It is big enough for the town hall. The meeting has gone quiet.',
-    heroGone: '🏛️ TOWN HALL: ADJOURNED.',
+    heroGone: '🏛️ TOWN HALL: EATEN! MEETING OVER.',
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
@@ -944,7 +950,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     rivalFullNews: 'The other one has stopped moving. It looks full. Extremely full.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
     winTitles: ['RESORT: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'ALL-INCLUSIVE, LITERALLY', 'CHOMPION OF THE BAY'],
-    heroCue: '🏨 THE ROYAL MARINER IS IN REACH — GO!',
+    heroCue: '🏨 YOU CAN EAT THE ROYAL MARINER NOW — GO!',
     heroCueNews: 'It is big enough for the Royal Mariner. The concierge has gone quiet.',
     heroGone: '🏨 THE ROYAL MARINER IS GONE. ALL FIVE STARS.',
   },
@@ -975,7 +981,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     rivalFullNews: 'The second one has stopped moving. Bill calls that a slow start.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
     winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
-    heroCue: '🏟️ THE STADIUM IS IN REACH — GO!',
+    heroCue: '🏟️ YOU CAN EAT THE STADIUM NOW — GO!',
     heroCueNews: 'It is big enough for the stadium. Hank has stopped describing it.',
     heroGone: '🏟️ THE STADIUM IS GONE. ALL OF IT.',
   },
@@ -999,9 +1005,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     winSub: 'the whole market belongs to the void', place: 'the market',
     winTitles: ['MARKET: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
                 'THE GUEST HAS FINISHED', 'HONOURED, AND ALSO ENORMOUS'],
-    heroCue: '🏮 THE BATHHOUSE IS IN REACH — GO!',
+    heroCue: '🏮 YOU CAN EAT THE BATHHOUSE NOW — GO!',
     heroCueNews: 'It is big enough for the bathhouse. The PA is still reading the hours.',
-    heroGone: '🏮 THE BATHHOUSE IS GONE. SIX HUNDRED YEARS, DRY.',
+    heroGone: '🏮 THE BATHHOUSE IS GONE. ALL SLURPED UP.',
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -2533,7 +2539,10 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   // the flagship world. Measured: Maple cleared 3/3 and 2/3, Pirate 1/3, 1/3, 0/3.
   { id: 'cabanas', icon: '⛱️', label: 'Beach Party: eat 4 cabanas', target: 4, reward: 25, kind: 'cabana' },
   { id: 'gold', icon: '✦', label: 'Treasure Hunter: find 4 golden things', target: 4, reward: 25, kind: 'gild' },
-  { id: 'rival', icon: '⚡', label: 'Out-Gobbler: out-gobble a rival', target: 1, reward: 30, kind: 'rival' },
+  // "out-gobble" was a coined comparative a six-year-old can't parse — and it
+  // misstated the quest: questEvent('rival') fires on EATING a rival, not on
+  // out-scoring one. Say the action.
+  { id: 'rival', icon: '⚡', label: 'Void Eater: eat a rival void', target: 1, reward: 30, kind: 'rival' },
   { id: 'big', icon: '🏨', label: 'Big Fish: eat 3 LANDMARK buildings', target: 3, reward: 25, kind: 'big' },
 ];
 // EASY and MED both contained 'cars' and 'combo', so roughly one day in seven
@@ -2611,7 +2620,7 @@ function renderQuests() {
 function questComplete(q: Quest) {
   q.done = true; addCoins(q.reward);
   announce(`QUEST DONE! +${q.reward}✦`);
-  audio.evolve();
+  audio.ready();   // the chime — evolve() is the growth fanfare, not a jingle
   if (quests.every((x) => x.done)) { addCoins(25); announce('ALL QUESTS CLEAR! +25✦ BONUS'); }
   renderQuests(); saveQuests();
 }
@@ -2994,6 +3003,10 @@ let lastRankBrag = -99;
 // SETTLE before saying anything, so what gets announced is the state the
 // player is actually in.
 let rankHold = 0, shownRank = 0, announcedRank = 0, lastLeadBrag = -99;
+// the reign latch: crownLive means "we told the child they are in front and
+// have not yet told them otherwise". everBehind arms the crown — the pre-join
+// minute where the player leads five empty slots must not crown them.
+let crownLive = false, everBehind = false;
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 function refreshHud() {
@@ -3015,15 +3028,26 @@ function refreshHud() {
   if (myRank === shownRank) rankHold += 0.2; else { rankHold = 0; shownRank = myRank; }
   const settled = rankHold >= 1.4 && shownRank !== announcedRank;
   let ledJust = false;   // …so an ordinary overtake does not also fire below
+  if (settled && shownRank > 1) everBehind = true;   // arms the crown (see below)
   // ── FIRST PLACE GETS ITS OWN MOMENT, AND ITS OWN BUDGET ─────────────────
   // Its own cooldown, because a traded lead in the last thirty seconds is the
   // most exciting thing that can happen in a match and it must not be silenced
   // by an ordinary overtake forty seconds earlier. No holdBanner and no ×1
   // badge: the banner was measured at a 39% duty cycle and holdBanner is
   // reserved for EVOLVED and the hero prop, which is a decision worth keeping.
-  if (started && !ended && settled && shownRank === 1 && prevRank > 1
+  //
+  // MEASURED DEAD 2026-08-13 (crownprobe.mjs: eight settled crossings into
+  // 1st, zero crowns — every 👑 in the log was the small generic card below).
+  // Two causes: `prevRank > 1` cannot survive the settle delay, because
+  // prevRank is re-assigned to myRank every 5Hz tick and settle comes 1.4s
+  // after the change; and the generic brag fired on the raw transition tick
+  // and wrote announcedRank, de-arming `settled` before the crown could see
+  // it. The reign latch replaces both: crownLive means the crown is worn,
+  // everBehind means it was ever contested, and the generic brag no longer
+  // announces arrivals at 1st at all — the crown owns them.
+  if (started && !ended && settled && shownRank === 1 && !crownLive && everBehind
       && tClock - lastLeadBrag > 6) {
-    lastLeadBrag = tClock; announcedRank = shownRank;
+    lastLeadBrag = tClock; announcedRank = shownRank; crownLive = true;
     const chased = (rows[1]?.name ?? 'the family').replace('⚡ ', '');
     announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
       + `YOU ARE IN FRONT!<span class="bSub">${esc(chased)} is behind you</span></span></div>`);
@@ -3032,10 +3056,29 @@ function refreshHud() {
     audio.voice('happy'); buzz(70);
     ledJust = true;
   }
+  // ── AND LOSING IT IS THE MIRROR, NOT A FOOTNOTE ──────────────────────────
+  // Taking 1st is a four-channel event; losing it was, at most, a speech
+  // bubble from a possibly-offscreen rival — a child who held the lead for
+  // two minutes discovered the loss at the results screen and felt cheated
+  // by the panel, not beaten by a rival. The mirror shares the crown's own
+  // 6s budget so a traded lead can never be starved by ordinary rank noise,
+  // and it names the taker so the last thirty seconds become a chase.
+  if (!ledJust && started && !ended && settled && shownRank > 1 && crownLive
+      && tClock - lastLeadBrag > 6) {
+    lastLeadBrag = tClock; announcedRank = shownRank; crownLive = false;
+    const taker = (rows[0]?.name ?? 'the family').replace('⚡ ', '');
+    announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
+      + `${esc(taker)} TOOK THE LEAD!<span class="bSub">get it back!</span></span></div>`);
+    fx.flash('rgba(255,82,64,0.20)', 0.35);
+    audio.alert(); buzz(60);
+    ledJust = true;
+  }
   // …and the SAME cooldown as its mirror branch below, which had one all along.
   // Without it, a player whose score sits inside a rival's band flip-flops and
-  // fires the identical brag twice within a second.
-  if (!ledJust && started && !ended && prevRank > 0 && myRank < prevRank
+  // fires the identical brag twice within a second. Arrivals at 1st are the
+  // crown's alone now (myRank > 1): announcing them here is what killed the
+  // crown, and "you passed X" is the wrong size for "you are winning".
+  if (!ledJust && started && !ended && prevRank > 0 && myRank < prevRank && myRank > 1
       && tClock - lastRankBrag > 12) {
     lastRankBrag = tClock; announcedRank = shownRank;
     // the board prefixes the chaser with ⚡; the sentence should not
@@ -3402,12 +3445,18 @@ function endMatch() {
   ended = true;
   localStorage.setItem('voidPlayed', '1');
   audio.stopMusic();
-  audio.win();
+  // the whistle's SOUND is chosen below, once the result is known — this
+  // called audio.win() unconditionally, so a child who finished 5th read
+  // "OUT-NOMMED!" while the island cheered for them, and first place owned
+  // nothing. The ear and the headline have to agree.
   bumpStreak();
   if (soloMode) {
     // SOLO RUN: the goal is the island itself — beat your best %
     const best = Number(localStorage.getItem('voidBestPct') || 0);
     const newBest = devouredPct > best;
+    // no opponent means no defeat: a new best gets the cheer, anything else
+    // gets the soft chime — never the "aww" notes, there is nobody to lose to
+    if (newBest) audio.win(); else audio.ready();
     if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
     const gain2 = 8 + (newBest ? 8 : 0);
     xp += gain2; localStorage.setItem('voidXP', String(xp)); renderRank();
@@ -3435,6 +3484,10 @@ function endMatch() {
       .map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   const myRank = rows.findIndex((r) => r.me) + 1;
+  // first place OWNS the cheer — with eyes closed a child can tell whether
+  // they won, which is what makes them want the cheer back next match. The
+  // loss sting is two soft falling notes, gentle by the no-dread rule.
+  if (myRank === 1) audio.win(); else audio.lose();
   // everyone leaves with something; winning is 5x last place, not infinity-x
   const today = new Date().toDateString();
   // The score term was min(60, score/50) — SATURATED at 3,000 points, which a
@@ -3472,7 +3525,11 @@ function endMatch() {
   const wk = weekKey();
   localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
   const WIN_TITLES = COPY.winTitles;
-  const LOSE_TITLES = ['STILL HUNGRY!', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'THE ISLAND SURVIVED. RUDE.', 'SNACK-SIZED THIS TIME'];
+  // no engine words ("island" is the codebase's word for a landmass, not the
+  // child's — they just lost in a town, a resort, a stadium or a market),
+  // and no deadpan irony at the lowest moment: "RUDE." read literally at six
+  // is "who was rude — me?"
+  const LOSE_TITLES = ['STILL HUNGRY!', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'STILL SO MUCH LEFT TO EAT!', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
   celebrateEnd(reward, gain, myRank === 1 ? COPY.winSub : `${rows[0].name} devoured the most`, myRank === 1);
@@ -3503,8 +3560,10 @@ function endMatch() {
       // about you, it answers the question the match actually posed (did I
       // out-eat the family), and against six voids it sits in a range a child
       // can read. EATEN, right beside it, still gives the raw count.
-      `<div class="es"><i>YOUR SHARE</i><b>${devAllN ? Math.round((devMineN / devAllN) * 100) : 0}%</b></div>` +
-      `<div class="es"><i>EATEN</i><b>${matchEaten}</b></div>` +
+      // "share" at six is the verb from preschool, and % beside a bare count
+      // read as the same number twice — label both tiles with what they count
+      `<div class="es"><i>YOU ATE</i><b>${devAllN ? Math.round((devMineN / devAllN) * 100) : 0}% OF IT</b></div>` +
+      `<div class="es"><i>BITES</i><b>${matchEaten}</b></div>` +
       `<div class="es"><i>BIGGEST</i><b>${FORMS[curStage]}</b></div>` +
       `<div class="es${isPb ? ' pb' : ''}"><i>${isPb ? 'NEW BEST!' : 'YOUR BEST'}</i><b>${Math.round(isPb ? playerScore : pb)}</b></div>`;
     // the rank row: tier, level, the bar, and a LEVEL UP! beat when it moved
@@ -3999,7 +4058,7 @@ const preloadP = requestedReady((done, total) => {
 // behaviour for something that appears a minute into a match.
 const LOAD_TIPS = [
   'tip: eat the little stuff first — cones, hydrants, mailboxes',
-  'tip: cars count as people-sized once you evolve',
+  'tip: EVOLVE once — then cars are snacks',
   'tip: get CLOSE — small stuff gets sucked right in',
   'tip: rival voids can eat YOU — check the leaderboard sizes',
   // …was 'the downtown towers are the biggest meal on the island', which is
@@ -4013,7 +4072,7 @@ const LOAD_TIPS = [
   'tip: crowds are snacks — and they run, which is worth extra',
   'tip: eat a rival and they respawn tiny — and grumpy',
   'tip: the landmark in the middle is dessert. save room.',
-  'tip: quests pay VOID POINTS — check mid-match',
+  'tip: finish quests to win ✦',
   'tip: BITSY is the smallest — the easiest one in the family to catch',
 ];
 // who is currently holding the load cover up. 'boot' is released by the first
@@ -4673,6 +4732,9 @@ function resetMatch() {
   gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
+  // the whole rank-announce machine restarts with the match, or a rematch
+  // opens with a stale crown to lose and a stale announcedRank to suppress
+  crownLive = false; everBehind = false; shownRank = 0; announcedRank = 0; rankHold = 0;
   feastR = 0;     // the ceiling a rival bought you does not carry into the next match
   for (const k in moments) (moments as Record<string, boolean>)[k] = false;
   countTick = 0;
@@ -4780,9 +4842,11 @@ const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: nu
   { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000 },
   { ic: '🍽️', nm: 'Big Appetite', ds: 'eat 500 things', cur: () => stats.eaten, max: 500 },
   { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000 },
-  { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'out-gobble a family member', cur: () => stats.rivals ?? 0, max: 1 },
-  { ic: '🏅', nm: 'Family Champion', ds: 'out-gobble 10 family members', cur: () => stats.rivals ?? 0, max: 10 },
-  { ic: '🔥', nm: 'Combo King', ds: 'hit a x2.5 combo', cur: () => stats.combo ?? 0, max: 25 },
+  { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'eat a family member', cur: () => stats.rivals ?? 0, max: 1 },
+  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10 },
+  // the bar counts bites-in-a-row, so the words do too — and the old promise
+  // ("x2.5") was a number the combo curve can no longer reach (caps at x2.2)
+  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25 },
   { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25 },
 ];
 function renderTrophies() {
@@ -6199,11 +6263,16 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     // the preview.
     if (ownedHats.has(h.id)) {
       wearHat(wornHat === h.id ? null : h.id);
-      audio.evolve(); refreshHats();
+      // the soft chime, NOT the evolve fanfare: the fanfare fired on every
+      // hat tap, every quest and every beat — 8-12 times a session against
+      // 3-4 real evolutions — so the one sound that means "I got BIGGER"
+      // meant nothing by match two. evolve() is reserved for growth and the
+      // rare unlock moments; everything else chimes.
+      audio.ready(); refreshHats();
       track('hat_wear', { hat: h.id, on: wornHat === h.id });
       return;
     }
-    if (h.tier === 'free') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.evolve(); refreshHats(); return; }
+    if (h.tier === 'free') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.ready(); refreshHats(); return; }
     const pr = hatCards.get(h.id)?.querySelector('.hp') as HTMLElement | undefined;
     const usd = h.usd ?? 0;
     // ── CHECK THE PLATFORM BEFORE THE GATE, NOT AFTER IT ──────────────────
@@ -6344,7 +6413,10 @@ function animate() {
           // empty — most of it was an echo. The banner owns the beat; the
           // newsroom keeps its own thread, and it has 400+ lines that were
           // never getting a turn.
-          audio.evolve(); buzz(35);
+          // no evolve() here: it stacked on top of matchBeat()'s own sting in
+          // the same frame, two fanfares for one banner — the beat's sting is
+          // the beat's sound
+          buzz(35);
           fx.ring(voidState.x, voidState.z, bt.col, voidling.radius * 6, 0.9);
           fx.flash(bt.flash, 0.35);
       audio.matchBeat(bt.title);   // ice cream hour / dance party / treasure hunt each get their own sting
