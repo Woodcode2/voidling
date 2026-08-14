@@ -61,12 +61,25 @@ await page.evaluate(() => {
   const S = window.__shaderStats, scene = window.__scene;
   const changes = [];
   window.__matRec = changes;
-  const seen = new Map();   // material.uuid -> signature
-  // THE SIGNATURE IS THE PROGRAM KEY, APPROXIMATED. three.js decides a
-  // material needs a different program from roughly these inputs; if the
-  // signature moves, a new link is expected. version covers needsUpdate.
+  const seen = new Map();   // "material.uuid|objectKind" -> signature
+  let versionChurn = 0;     // needsUpdate traffic, counted but NOT recorded
+  const vseen = new Map();
+  // THE SIGNATURE IS THE PROGRAM KEY, APPROXIMATED — and it contains ONLY
+  // things three.js actually keys a program on.
+  //
+  // Two things are deliberately NOT in it, because the first run of this probe
+  // put them in and filled its whole 500-entry budget with noise before the
+  // evolution frame ever arrived:
+  //  - m.version. A version bump (needsUpdate) makes the renderer re-derive
+  //    the program PARAMETERS, but programs are cached by key, so identical
+  //    parameters return the cached program and nothing links. Counted below
+  //    as churn instead, because a material invalidating itself twice per
+  //    frame is a real (separate) waste.
+  //  - object-level flags keyed per material. A MeshBasicMaterial here is
+  //    SHARED between an InstancedMesh and a plain Mesh, so a per-uuid record
+  //    flip-flopped inst/- every single traversal. The key now includes the
+  //    object kind, so the two uses are tracked apart instead of fighting.
   const sig = (m, o) => [
-    m.version,
     m.map ? 'map' : '-',
     m.alphaMap ? 'aMap' : '-',
     m.envMap ? 'env' : '-',
@@ -86,22 +99,29 @@ await page.evaluate(() => {
       scene.traverse((o) => {
         const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
         for (const m of mats) {
+          const kind = o.isInstancedMesh ? 'inst' : o.isPoints ? 'pts' : o.isSprite ? 'spr' : 'mesh';
+          const key = m.uuid + '|' + kind;
           const s = sig(m, o);
-          const prev = seen.get(m.uuid);
-          if (prev === undefined) { seen.set(m.uuid, s); continue; }
-          if (prev !== s && changes.length < 500) {
+          const prev = seen.get(key);
+          if (prev === undefined) { seen.set(key, s); }
+          else if (prev !== s && changes.length < 2000) {
             changes.push({
               frame: S.frame,
               what: `${o.type}/${m.type}${m.name ? ' "' + m.name + '"' : ''}${o.name ? ' obj:"' + o.name + '"' : ''}`,
               from: prev, to: s,
             });
-            seen.set(m.uuid, s);
+            seen.set(key, s);
           }
+          // needsUpdate churn, tracked apart from the program key
+          const pv = vseen.get(key);
+          if (pv !== undefined && pv !== m.version) versionChurn++;
+          vseen.set(key, m.version);
         }
       });
     } catch { /* never break the game being measured */ }
   };
   window.__matScan = scan;
+  window.__matChurn = () => versionChurn;
   scan();   // baseline
 });
 
@@ -145,13 +165,15 @@ const out = await page.evaluate(() => {
   return {
     linkFrames,
     totalChanges: ch.length,
+    churn: window.__matChurn(),
+    frames: window.__rec.d.length,
     atLinks: ch.filter((c) => near.has(c.frame)).slice(0, 25),
     sample: ch.slice(0, 10),
   };
 });
 
 console.log(`frames that linked: ${JSON.stringify(out.linkFrames)}`);
-console.log(`material changes recorded: ${out.totalChanges}`);
+console.log(`material param changes: ${out.totalChanges} | needsUpdate churn: ${out.churn} over ${out.frames} frames`);
 console.log('── material changes ON or JUST BEFORE a linking frame ──');
 for (const c of out.atLinks) {
   console.log(`  f${c.frame}  ${c.what}`);
