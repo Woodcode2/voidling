@@ -1696,6 +1696,10 @@ _dbg.__voidSheet = async (ids: string[]) => {
   return out;
 };
 _dbg.__life = life;
+// QA: fire a named rival bubble at the void's feet — the comms redesign's
+// speaker chip is chance-gated in live play (rival within 55u while talking)
+_dbg.__sayChip = (t: string, n: string, c: string) =>
+  bubbles.say(new THREE.Vector3(voidState.x, 5, voidState.z), t, 'rival', { name: n, color: c });
 _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // 3-5 family members per match, randomly cast — you never know who's coming
 // FIELD SIZE IS NOT THE LEVER — attempt seven, retracted. Cutting 3-5 rivals to
@@ -1737,9 +1741,17 @@ rivals.onJoin = (name, color, x, z, arch) => {
 // breakingNews drops when a real story is up, which is exactly the priority
 // ambient colour should have.
 const rivalBubblePos = new THREE.Vector3();
+// the family speaks WITH THEIR NAME ON IT (comms redesign): the bubble
+// carries a chip in the rival's leaderboard colour, so their lines read as
+// conversation from a character the child already knows — visibly a
+// different class of thing from the crowd's anonymous texture
+const rivalChip = (name: string) => {
+  const rv = rivals.list.find((r) => r.name === name);
+  return { name, color: rv ? `#${rv.color.toString(16).padStart(6, '0')}` : undefined };
+};
 rivals.onSpeak = (x, z, line, name) => {
   const d = Math.hypot(x - voidState.x, z - voidState.z);
-  if (d < 55) bubbles.say(rivalBubblePos.set(x, 5, z), line, 'event');
+  if (d < 55) bubbles.say(rivalBubblePos.set(x, 5, z), line, 'rival', rivalChip(name));
   else breakingNews(`💬 ${name}: ${line}`);
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
@@ -2913,7 +2925,9 @@ function breakingNews(h: string) {
   // 78-character ticker clip — all three hero cues ran to 84, 88 and 89 and
   // reached the card unclipped. Everything on the ticker gets the same width.
   newsQueue.push(h.length > 78 ? h.slice(0, h.lastIndexOf(' ', 78)).trim() : h);
-  newsCd = Math.min(newsCd, 2.5);
+  // 2.5 let a busy minute machine-gun the ticker; 4s is the fastest a jumped
+  // story may follow the previous one (comms redesign: one feed, breathing)
+  newsCd = Math.min(newsCd, 4.0);
 }
 const newsSeen: string[] = [];
 // Both worlds now have their own newsroom module — ./proto3d/newsroom for
@@ -3167,7 +3181,7 @@ function refreshHud() {
       // an empty camera.
       const brag = RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)];
       const dp = Math.hypot(rv.x - voidState.x, rv.z - voidState.z);
-      if (dp < 55) bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), brag, 'event');
+      if (dp < 55) bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), brag, 'rival', rivalChip(rv.name));
       else breakingNews(`💬 ${rv.name}: ${brag}`);
       rv.pulse = 1;
     }

@@ -3,10 +3,20 @@
 // exactly like the 2D game. A small pool keeps it readable (global cap).
 import * as THREE from 'three';
 
-export type BubbleKind = 'ambient' | 'panic' | 'event';
+// 'rival' is the FAMILY's kind, and it is not the same thing as 'event':
+// the diagnosis that forced the split found both slots held by town-hall
+// set-piece barks ("Point of order! POINT of order!") wearing the event
+// class — the crowd shouting in the family's voice, starving actual rival
+// speech of slots. 'event' is crowd EMPHASIS; 'rival' is a CHARACTER.
+export type BubbleKind = 'ambient' | 'panic' | 'event' | 'rival';
 
 export interface Bubbles {
-  say(pos: THREE.Vector3, text: string, kind: BubbleKind): void;
+  /** `opts.name`/`opts.color` put a SPEAKER CHIP on the bubble — the rival's
+   *  name in their leaderboard colour. This is the comms redesign's spine
+   *  (owner: three text streams read as one busy soup): the family's lines
+   *  are IDENTIFIED conversation, the crowd's are anonymous texture, and the
+   *  two are visually different classes at a glance. */
+  say(pos: THREE.Vector3, text: string, kind: BubbleKind, opts?: { name?: string; color?: string }): void;
   float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
   update(dt: number): void;
   /** Clear every live bubble and floater. Called at match reset. */
@@ -108,6 +118,14 @@ const style = document.createElement('style');
     .vb.panic::after { border-top-color: #ffe1e6; }
     .vb.event { background: #efe4ff; color: #4a2a80; border-color: #cbb0ff; }
     .vb.event::after { border-top-color: #efe4ff; }
+    /* the crowd is TEXTURE, not content: smaller and quieter than the family */
+    .vb.panic, .vb:not(.event) { font-size: 12.5px; padding: 5px 9px; }
+    /* the speaker chip: the rival's name in their leaderboard colour, so a
+       child knows WHO is talking from across the island */
+    .vb .vbN { display: block; font-size: 10px; font-weight: 900; letter-spacing: 1.2px;
+      margin: -1px 0 2px; text-transform: uppercase; }
+    .vb .vbN i { font-style: normal; display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
     .vb.show { opacity: 1; }
     .vf {
       position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
@@ -147,8 +165,19 @@ const style = document.createElement('style');
   const v = new THREE.Vector3();
 
   return {
-    say(pos, text, kind) {
+    say(pos, text, kind, opts) {
       text = sentence(text);
+      // ── THE TEMPORAL RULES (comms redesign) ─────────────────────────────
+      // Three voices share one screen, so two rules keep them from talking
+      // over each other. 1: while a hero card owns the centre, the crowd —
+      // set-piece 'event' barks included — holds its tongue; family lines
+      // still land, drama continues. 2: while the FAMILY is speaking, the
+      // crowd waits — gossip never outranks a rival hunting you.
+      if (kind !== 'rival') {
+        const ban = document.getElementById('banner');
+        if (ban && ban.classList.contains('show')) return;
+        if (slots.some((s) => s.active && s.el.classList.contains('rival'))) return;
+      }
       // whole-island zoom doesn't need street gossip — but FAMILY lines
       // ('event') must survive the big-void camera pull-back, or the rivals go
       // silent exactly when the drama happens
@@ -160,11 +189,14 @@ const style = document.createElement('style');
       // camera.position.y is the reliable proxy for zoom here — the rig orbits
       // the void, so its absolute position is not the view distance
       const camD = Math.max(40, camera.position.y);
-      const gate = kind === 'event' ? 460 : Math.max(BUBBLE_MAX_CAMD, camD * 2.4);
+      // the long gate belongs to the FAMILY — their drama must survive the
+      // big-void pull-back. Crowd emphasis rides the camera like the rest.
+      const gate = kind === 'rival' ? 460 : Math.max(BUBBLE_MAX_CAMD, camD * 2.4);
       if (camera.position.distanceTo(pos) > gate) return;
       // dedupe: never show the same line twice at once (panicked crowds all
-      // pull from the same pool)
-      if (slots.some((s) => s.active && s.el.textContent === text)) return;
+      // pull from the same pool). Compares the raw LINE, not textContent —
+      // the speaker chip is part of textContent now.
+      if (slots.some((s) => s.active && s.el.dataset.line === text)) return;
       // pile-up guard: cap panic chatter, and reject a bubble whose anchor
       // lands within 60px of one already on screen
       if (kind === 'panic' && slots.filter((s) => s.active && s.el.classList.contains('panic')).length >= 2) return;
@@ -172,20 +204,48 @@ const style = document.createElement('style');
       const nx = (v.x * 0.5 + 0.5) * window.innerWidth, ny = (-v.y * 0.5 + 0.5) * window.innerHeight;
       // de-collide against the RENDERED box, not the anchor point. A flat 60px
       // radius let two 236px-wide bubbles sit on top of each other, which is
-      // exactly what the phone screenshots caught.
+      // exactly what the phone screenshots caught. A rival only yields to
+      // another RIVAL — a crowd bubble in its way is about to be evicted.
       for (const s of slots) {
         if (!s.active) continue;
+        if (kind === 'rival' && !s.el.classList.contains('rival')) continue;
         const r = s.el.getBoundingClientRect();
         if (!r.width) continue;
         if (nx > r.left - 14 && nx < r.right + 14 && ny > r.top - 30 && ny < r.bottom + 30) return;
       }
-      const slot = slots.find((s) => !s.active);
+      let slot = slots.find((s) => !s.active);
+      // FAMILY OUTRANKS GOSSIP, structurally: with the pool full of crowd
+      // lines, a rival line evicts the oldest one rather than being refused —
+      // this is the fix for the diagnosed slot-starvation above.
+      if (!slot && kind === 'rival') {
+        slot = slots.filter((s) => !s.el.classList.contains('rival'))
+          .sort((a, b) => a.until - b.until)[0];
+        if (slot) { slot.el.classList.remove('show'); delete slot.el.dataset.line; }
+      }
       if (!slot) return; // at cap — keep it readable
       slot.active = true;
       slot.pos.copy(pos);
-      slot.until = clock + (kind === 'panic' ? 2.6 : 4.2);
-      slot.el.textContent = text;
-      slot.el.className = `vb ${kind === 'ambient' ? '' : kind}`.trim();
+      // crowd texture fades a beat sooner than it used to — it is seasoning,
+      // and 4.2s of seasoning was reading as a fourth text channel
+      slot.until = clock + (kind === 'panic' ? 2.6 : kind === 'ambient' ? 3.4 : 4.2);
+      // rival renders in the event palette PLUS its own marker class — the
+      // class is what the temporal rules and the eviction test read
+      const cls = kind === 'ambient' ? '' : kind === 'rival' ? 'event rival' : kind;
+      slot.el.dataset.line = text;
+      slot.el.textContent = '';
+      if (opts?.name) {
+        // the speaker chip: dot in the rival's colour + their name, above the line
+        const tag = document.createElement('span');
+        tag.className = 'vbN';
+        const dot = document.createElement('i');
+        dot.style.background = opts.color ?? '#b875ff';
+        tag.appendChild(dot);
+        tag.appendChild(document.createTextNode(opts.name));
+        if (opts.color) tag.style.color = opts.color;
+        slot.el.appendChild(tag);
+      }
+      slot.el.appendChild(document.createTextNode(text));
+      slot.el.className = `vb ${cls}`.trim();
       slot.el.style.visibility = 'visible';
       // force reflow then show for the fade-in
       void slot.el.offsetWidth;
@@ -210,6 +270,7 @@ const style = document.createElement('style');
         sl.el.classList.remove('show');
         sl.el.style.visibility = '';
         sl.el.textContent = '';
+        delete sl.el.dataset.line;   // or dedupe rejects this line next match
       }
       for (const f of floats) {
         f.active = false; f.until = 0;
@@ -222,6 +283,18 @@ const style = document.createElement('style');
       // 8.4s on a 30fps phone and 2.1s on a 120Hz one, where a child cannot
       // finish reading it. Bubbles now age in seconds like everything else.
       clock += dt;
+      // the banner's arrival also RETIRES crowd bubbles already up — the
+      // spawn gate alone left them living out their 3.4s beside the hero
+      // card (measured: 29 of 180 samples co-visible). 0.6s of grace, no
+      // pop-out; family lines stay, as everywhere else in these rules.
+      {
+        const ban = document.getElementById('banner');
+        if (ban && ban.classList.contains('show')) {
+          for (const s of slots) {
+            if (s.active && !s.el.classList.contains('rival')) s.until = Math.min(s.until, clock + 0.6);
+          }
+        }
+      }
       const w = window.innerWidth, h = window.innerHeight;
       for (const s of slots) {
         if (!s.active) continue;
