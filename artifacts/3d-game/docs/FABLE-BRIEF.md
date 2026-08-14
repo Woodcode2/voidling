@@ -228,13 +228,39 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    sprites (void3d.ts:1375, :1416) are the sprite half. No traversal can
    warm a material that has not been constructed.
 
-   THE NEXT STEP, NAMED: force those lazy constructions during boot (call
-   the paths that build shMesh/wallMesh and the evolve sprites once behind
-   the cover), THEN compile. Verify with qa/shaderstall.mjs and accept it
-   only if "after boot" drops from 9 toward 0 — that is the number both
-   failed attempts refused to move, and it is the only one that matters.
-   Do not accept a frame-delta improvement as proof: frame 262 read 1545,
-   2480 and 1248ms across three runs of the SAME code.
+   FOUR ATTEMPTS NOW, ALL REVERTED, AND THE ELIMINATIONS ARE THE ASSET.
+   The "lazy construction" step named above was itself tested and is dead.
+   In order, each one killing a mechanism rather than fixing anything:
+   (1) renderer.compile() at boot — no change (9 after boot, 8 on frame);
+   compile() walks VISIBLE objects. (2) Reveal every hidden object, compile,
+   re-hide — no change; kills "they are hidden". (3) qa/evoadds.mjs then
+   measured ZERO objects added to the scene after boot, which kills "they
+   are constructed at evolution" outright — including the shMesh/wallMesh
+   theory this brief previously named as the next step. qa/evomat.mjs
+   measured ZERO material parameter changes all match, which kills "the
+   material becomes a different material". (4) Render at the widest game
+   framing, then a full render with FRUSTUM CULLING DISABLED over the whole
+   island with the shadow box at its cap — still no change. That kills
+   "never drawn, never linked".
+
+   WHAT THAT LEAVES, AND IT IS NOT THE SCENE. prototype3d.ts:732/:745 —
+   `bloomOn` is set PER QUALITY RUNG, and the adaptive ladder changes rungs
+   mid-match. The frame therefore renders either through the EffectComposer
+   (:7865) or directly, and three.js keys programs partly on render-target
+   state: the first frame drawn through the OTHER path needs new programs
+   for the same materials, in one batch. Every failed attempt warmed the
+   SCENE; the scene was never the variable. It also means the tie to
+   evolution may be COINCIDENCE — the ladder's demote timing and the first
+   evolution both land near t=13 under swiftshader.
+
+   MEASURE BEFORE FIXING (the lesson of four reverts): wrap
+   gl.bindFramebuffer in the probe and count render-target binds per frame.
+   If the path flips on the linking frame, warm BOTH paths at boot — render
+   once with bloom on and once with it off — rather than warming the scene
+   again. Accept only if qa/shaderstall.mjs "after boot" falls from 9 toward
+   0; all four failures left it at exactly 9. Frame 262 has measured 1248,
+   1545, 1805, 2158 and 2480ms across runs of IDENTICAL code, so a
+   frame-delta improvement is not evidence of anything.
 
    ALSO STILL OPEN: the other spike (frame 3-10, ~1.3-1.5s, radius 0.9-1.0)
    links ZERO shaders. Different cause in the opening seconds, unexamined.
