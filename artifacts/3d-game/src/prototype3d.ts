@@ -7112,10 +7112,20 @@ function animate() {
       if (dm > 1.5) { const spd = 14 * Math.min(1, dm / 10); tvx = (ddx / dm) * spd; tvz = (ddz / dm) * spd; }
     }
     const wgt = THREE.MathUtils.clamp((voidling.radius - 0.9) / 5.1, 0, 1);
-    const k = Math.min(1, dt * (driving ? 11 - 3.5 * wgt : 4.5));   // 91ms snappy tiny → 133ms weighty huge
+    // ── THE HERO IS PART OF THE WORLD (dtw, not dt) ─────────────────────────
+    // hitStop() drops the world time-scale to 6% for 55-105ms on a marquee
+    // bite — the whole point being that the game holds its breath on the
+    // moments it is about. Everything read dtw for it: the void's own
+    // animation, the crowd, the family, the drain spiral, the rings, the
+    // camera shake. Everything except the player's own movement, which
+    // integrated raw dt — so the hero sailed on at full speed through his own
+    // impact frames, which is the one place the effect had to land. Input is
+    // still sampled in real time; it is the RESPONSE that slows, so a bite
+    // that stops the world stops you in it too.
+    const k = Math.min(1, dtw * (driving ? 11 - 3.5 * wgt : 4.5));   // 91ms snappy tiny → 133ms weighty huge
     velX += (tvx - velX) * k;
     velZ += (tvz - velZ) * k;
-    const nx = voidState.x + velX * dt, nz = voidState.z + velZ * dt;
+    const nx = voidState.x + velX * dtw, nz = voidState.z + velZ * dtw;
     // ── INVISIBLE WALL at the coast ──────────────────────────────────────────
     // The old per-axis accept/reject (hard velX = 0) made the void SHUDDER on
     // the waterline: rejected frame kills the speed, the joystick instantly
