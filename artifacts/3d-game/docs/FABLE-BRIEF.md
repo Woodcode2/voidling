@@ -190,15 +190,37 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    sub-pixel at WORLD ENDER (now scaled to a reference distance, so every
    authored number means the same kick at every size).
 
+   Round 2 shipped two more: the void's MAW no longer snaps half-shut when
+   a small bite lands inside a big bite's envelope (chomp() overwrote
+   mouthMax outright — a cone eaten 0.3s after a house halved the opening
+   in one frame, on the action the game is made of), and a BANNER can no
+   longer hard-cut one that is still being read (paintBanner restarts a
+   2.4s animation; every banner now reserves 1.9s and collisions use the
+   queue that already existed for the evolve card).
+
    STILL OPEN, verified but not yet built: hit-stop never applies to the
    player (the world slows on a marquee bite, the hero keeps integrating
-   raw dt); the banner hard-cuts a banner mid-read; the void's mouth snaps
-   half-shut when a small bite lands inside a big bite's open envelope;
-   several frame-rate-dependent constants (velocity smoothing, dead-end
-   bleed, joystick heading blend) that make the game feel different on a
-   120Hz phone than the 60Hz it was tuned at; and the adaptive-quality
+   raw dt) — the strongest remaining one, because it fires on exactly the
+   moments the game is about; several frame-rate-dependent constants
+   (velocity smoothing, dead-end bleed) that make the game feel different
+   on a 120Hz phone than the 60Hz it was tuned at; and the adaptive-quality
    ladder measuring fps from the CLAMPED dt, which is how a stuttering
    phone can look fine to the demotion logic.
+
+   REFUTED, do not re-report: both "joystick heading smoothing is not
+   rate-corrected" findings (2248/2249) cited lines that do not contain the
+   claimed code; the growth-bar metre label (real, but below the
+   player-feel bar); two per-frame closure findings in the player wall and
+   rival loops (real allocations, not perceptible cost).
+
+   A PROCESS NOTE FOR WHOEVER RUNS THE NEXT AUDIT. Verification subagents
+   here ran their own Playwright probes and twice WROTE INSTRUMENTATION
+   INTO src/prototype3d.ts (a `_WS` counter block and a `__wallStats`
+   window hook). Both were caught by `git status` going dirty after a clean
+   commit and reverted; nothing reached a build. Check the tree before
+   every build and commit when agents are running, and remember their
+   browsers also saturate the CPU — a frame-time measurement taken while
+   they run is measuring them, not the game.
 
 ### RETRACTION 2026-08-13, first-60-seconds: "the match runs behind the
 tutorial card" was a PROBE ARTIFACT, not a bug. The probe (firstrun.mjs)
