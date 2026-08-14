@@ -190,6 +190,26 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    sub-pixel at WORLD ENDER (now scaled to a reference distance, so every
    authored number means the same kick at every size).
 
+   WHAT THE INSTRUMENT ACTUALLY SAID, AND WHAT IT DID NOT. Before: 813
+   frames, median 458ms, 12 hitches (1.5%). After: 807 frames, median
+   540ms, 4 hitches (0.5%). The hitch RATE — the only metric normalised
+   inside its own run — improved 3x. The MEDIAN ROSE 18%, and that is not
+   a regression claim either way, because the two runs are not controlled
+   for scene load: the void grows at a different rate every match, and a
+   bigger void pulls the camera back over more visible geometry. At n=1 a
+   side, on swiftshader, neither number is bankable. THE FIXES STAND ON
+   MECHANISM — a forced synchronous layout per bubble per frame, ~966
+   closures per frame, and three 60Hz DOM writes, all removed, all
+   verifiable by reading the diff — NOT on this measurement. Anyone
+   re-running it should control for final radius before comparing medians.
+
+   THE CLUSTER THAT SURVIVED. Both runs put their worst frames in the same
+   place: frames ~180-236, which the mark table locates at t=10-13s. That
+   is the FIRST EVOLUTION (body rebuild + zoom step + confetti + banner in
+   one frame), it is unrelated to anything fixed here, and it is the next
+   thing to hunt — a child is being told "you got bigger!" and the game
+   answers with its worst stutter of the match.
+
    Round 2 shipped two more: the void's MAW no longer snaps half-shut when
    a small bite lands inside a big bite's envelope (chomp() overwrote
    mouthMax outright — a cone eaten 0.3s after a house halved the opening
