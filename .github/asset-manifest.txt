@@ -1,35 +1,21 @@
-# ── MUSIC: one track per world ────────────────────────────────────────────
-# First line is the destination directory. Every line after is one asset:
-#     slot<space>URL<space>licence text to end of line
-#
-# Paste a DIRECT FILE URL (ends .mp3 / .m4a / .ogg), not a page URL. Pushing
-# this file on any branch except main runs .github/workflows/fetch-assets.yml,
-# which downloads each one, transcodes m4a -> mp3, names it for its slot and
-# writes CREDITS.txt beside it. A 404 fails the job rather than passing quietly.
-#
-# LICENCE RULE, and it is not negotiable for a children's App Store title:
-# CC0, Public Domain, Pixabay Licence or Kenney only. No CC-BY-SA, no
-# "free for non-commercial", no YouTube Audio Library rips. The licence text
-# you put on the line is the record that answers a rights query later.
-#
-# WHAT EACH SLOT NEEDS TO SOUND LIKE (from public/assets/music/README.md):
-#   maple    sleepy American small town, autumn, county fair. Warm, unhurried,
-#            a bit brass-band.
-#   pirate   five-star tropical resort cosplaying as a pirate hideout. Steel
-#            drums, ukulele, holiday shuffle.
-#   gameday  college football Saturday. Drumline, brass stabs, crowd energy.
-#   lantern  a spirit night market. Koto/shakuhachi colour, lantern-lit,
-#            gentle and a little uncanny.
-#
-# Then verify: node qa/music.mjs — it loads each world in a browser and reports
-# whether the RECORDING or the synth is playing, which is the only check that
-# catches a file that downloaded fine and does not decode.
-#
-# Uncomment and fill. Delete the lines you are not using — an empty URL is a
-# hard error, by design.
-#
-# maple    https://…/track.mp3    Pixabay Licence — <title> by <artist>
-# pirate   https://…/track.mp3    CC0 1.0 — <title> by <artist>
-# gameday  https://…/track.mp3    CC0 1.0 — <title> by <artist>
-# lantern  https://…/track.mp3    CC0 1.0 — <title> by <artist>
-artifacts/3d-game/public/assets/music
+artifacts/3d-game/public/assets/stickers
+# ── SEASONAL STICKER ART: 16 cards, four sets (events.ts seasons) ─────────
+# Same pipeline as the permanent 48: generated on flat chroma green
+# (RGB 0,177,64) so the colorkey pass below cuts a die-cut sticker with
+# alpha, downscaled to 512 webp. Ids match src/game/stickers.ts exactly.
+prize-pumpkin	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100333_5551db08-287b-4fd7-ae9d-7b6492ca33ba.png	Generated for VOIDLING, owned by the project
+scarecrow-dave	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100216_7d2d4df5-f482-4dde-b566-abbd32b446a9.png	Generated for VOIDLING, owned by the project
+cider-barrel	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100216_04f9b9c9-e888-4e01-ad8b-95638a1e4531.png	Generated for VOIDLING, owned by the project
+leaf-pile	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100216_25e7dba6-3d89-4d3c-a7b8-89dc07ea4ba9.png	Generated for VOIDLING, owned by the project
+tiny-yacht	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100216_438acb8b-8389-49ed-97ac-82e8b8b57b81.png	Generated for VOIDLING, owned by the project
+race-buoy	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100216_dec9496c-0436-4c33-85da-c1837da5f353.png	Generated for VOIDLING, owned by the project
+regatta-cup	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100251_69faa1f4-9e7a-46dc-8239-14eae4a17aa2.png	Generated for VOIDLING, owned by the project
+signal-flags	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100251_93da2c2e-9f6b-41e7-8d7e-36fb05e249ab.png	Generated for VOIDLING, owned by the project
+welcome-banner	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100251_d7a99164-f679-4cb3-a62d-e722a16da210.png	Generated for VOIDLING, owned by the project
+float-tiger	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100333_952e3920-c1db-45ff-adf8-4580aae06b12.png	Generated for VOIDLING, owned by the project
+crown-cooler	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100333_75d3be3e-d654-484f-b745-728a26910809.png	Generated for VOIDLING, owned by the project
+spare-tuba	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100450_1046a16a-ea51-454a-880a-1faede1e87e4.png	Generated for VOIDLING, owned by the project
+moon-rabbit	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100450_4bc8e6bb-8b5e-4255-8c61-8819ba3eeb74.png	Generated for VOIDLING, owned by the project
+mooncake-tower	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100450_09e3b38b-dc60-4790-9625-9626266515a9.png	Generated for VOIDLING, owned by the project
+wish-lantern	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100450_46d3eb67-c877-4a37-9644-679f56a81660.png	Generated for VOIDLING, owned by the project
+moon-mirror	https://d8j0ntlcm91z4.cloudfront.net/user_3EwRtVVfLRGyTM8pDPFQxKcCmqS/hf_20260814_100526_493edd9e-c49f-4f53-9b05-dd41ce90a5de.png	Generated for VOIDLING, owned by the project
