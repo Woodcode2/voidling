@@ -519,7 +519,15 @@ const RIG = {
   /** the key, paid back after the fill measurement */
   sunI: LIGHT.sunI * 1.31,
   /** flat across worlds on purpose — the per-world hemiI in the table was
-   *  never once applied at construction, and every world was tuned without it */
+   *  never once applied at construction, and every world was tuned without it.
+   *
+   *  A lantern-only +55% floor was TRIED here and RETRACTED same-day (LADDER
+   *  teardown, 2026-08-13): Lantern fails the 120px thumb test (murk), but
+   *  the A/B measured the lift at +0.4 mean luminance and -1.1pt dark-pixel
+   *  share — nothing. The murk is albedo-bound: the night ground is authored
+   *  near-black, and a brighter floor times dark paint is still dark. The
+   *  real fix is a ground-bake albedo pass in island.ts (art decision, M),
+   *  not a light rig number. lantern_thumb_ab.png holds the measurement. */
   hemiI: 0.22,
   exposure: 1.0,
 };
@@ -3487,10 +3495,17 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false) 
   }
   const b = endSub.querySelector('.endCnt') as HTMLElement;
   const t0 = performance.now();
+  // the count-up TICKS now (LADDER action #2): Stumble Guys ends even a loss
+  // on an audible "I got something" tally, and ours was silent — eight soft
+  // rising pops across the 900ms count make the payout a ceremony instead of
+  // a label. The stats tiles cascade in below on the same beat (CSS stagger).
+  let lastChunk = -1;
   const tick = () => {
     if (!ended || !b.isConnected) return;
     const k = Math.min(1, (performance.now() - t0) / 900);
     b.textContent = `+${Math.round(coins * (k * (2 - k)))}✦`;   // ease-out count-up
+    const chunk = Math.floor(k * 8);
+    if (coins > 0 && chunk > lastChunk) { lastChunk = chunk; audio.pop(3 + chunk); }
     if (k < 1) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

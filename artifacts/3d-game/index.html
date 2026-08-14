@@ -626,7 +626,19 @@
       #end .list { min-width: 260px; }
       #endStats { display: flex; gap: 10px; margin: 18px 0 4px; flex-wrap: wrap; justify-content: center; }
       #endStats .es { background: rgba(255,255,255,0.07); border: 1.5px solid rgba(201,166,255,0.28);
-        border-radius: 12px; padding: 8px 14px; min-width: 84px; }
+        border-radius: 12px; padding: 8px 14px; min-width: 84px;
+        /* the tally CASCADE (LADDER action #2): tiles land one at a time on
+           the coin count-up's beat, so the results screen reads as a payout
+           ceremony rather than a form. innerHTML rewrite restarts it each match. */
+        opacity: 0; animation: esIn 0.34s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+      #endStats .es:nth-child(1) { animation-delay: 0.15s; }
+      #endStats .es:nth-child(2) { animation-delay: 0.32s; }
+      #endStats .es:nth-child(3) { animation-delay: 0.49s; }
+      #endStats .es:nth-child(4) { animation-delay: 0.66s; }
+      #endStats .es:nth-child(5) { animation-delay: 0.83s; }
+      #endStats .es:nth-child(n+6) { animation-delay: 0.98s; }
+      @keyframes esIn { from { opacity: 0; transform: translateY(9px) scale(0.94); }
+        to { opacity: 1; transform: none; } }
       #endStats .es i { display: block; font-style: normal; font-size: 10.5px; font-weight: 800;
         letter-spacing: 1.4px; color: #c9a6ff; margin-bottom: 2px; }
       #endStats .es b { font-size: 20px; font-weight: 900; }
