@@ -38,7 +38,32 @@ await page.addInitScript(() => {
     if (gl && (type === 'webgl2' || type === 'webgl') && !gl.__wrapped) {
       gl.__wrapped = true;
       const link = gl.linkProgram.bind(gl);
-      gl.linkProgram = (p) => { S.links++; S.events.push(S.frame); return link(p); };
+      // NAME THE PROGRAM, do not just count it. three.js stamps every shader
+      // with `#define SHADER_NAME <MaterialName>` plus the define block that
+      // makes this variant distinct, so the source itself says which material
+      // compiled and why it is a separate program. Without this the probe can
+      // prove a stall exists and never say what to precompile — which is
+      // exactly how a plausible fix (renderer.compile at boot) got built and
+      // shipped nothing: the materials were not in the scene to be compiled.
+      gl.linkProgram = (p) => {
+        S.links++;
+        let name = '?', defs = '';
+        try {
+          for (const sh of gl.getAttachedShaders(p) || []) {
+            const src = gl.getShaderSource(sh) || '';
+            const m = src.match(/#define SHADER_NAME ([^\n]+)/);
+            if (m) name = m[1].trim();
+            if (!defs) {
+              defs = (src.match(/#define \w+/g) || [])
+                .map((d) => d.replace('#define ', ''))
+                .filter((d) => d !== 'SHADER_NAME' && !/^(GL|PI|EPSILON|RECIPROCAL)/.test(d))
+                .slice(0, 8).join(',');
+            }
+          }
+        } catch { /* a driver that will not introspect still counts */ }
+        S.events.push({ frame: S.frame, name, defs });
+        return link(p);
+      };
     }
     return gl;
   };
@@ -93,6 +118,8 @@ const out = await page.evaluate(() => {
   return {
     median: Math.round(med),
     totalLinks: window.__shaderStats.links,
+    lateProgs: window.__shaderStats.events.filter((e) => e && e.frame > 0)
+      .map((e) => `f${e.frame} ${e.name} [${e.defs}]`),
     linksAfterBoot: links.reduce((a, b) => a + b, 0),
     spikeCount: spikes.length,
     spikesWithLinks: spikes.filter((x) => x.links > 0).length,
@@ -105,6 +132,10 @@ console.log(`spikes ${out.spikeCount}, of which linked a shader: ${out.spikesWit
 console.log('frame  delta   radius  links  spike');
 for (const x of out.rows) {
   console.log(`${String(x.i).padStart(5)} ${String(x.ms).padStart(6)}ms ${String(x.r).padStart(7)} ${String(x.links).padStart(6)}  ${x.spike ? 'SPIKE' : ''}`);
+}
+if (out.lateProgs?.length) {
+  console.log('── programs linked AFTER the first frame (the ones to precompile) ──');
+  for (const l of out.lateProgs) console.log('  ' + l);
 }
 console.log(out.spikesWithLinks > 0
   ? 'VERDICT: shader linking lands on stuttering frames — precompile is worth building'
