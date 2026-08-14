@@ -203,12 +203,41 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    verifiable by reading the diff — NOT on this measurement. Anyone
    re-running it should control for final radius before comparing medians.
 
-   THE CLUSTER THAT SURVIVED. Both runs put their worst frames in the same
-   place: frames ~180-236, which the mark table locates at t=10-13s. That
-   is the FIRST EVOLUTION (body rebuild + zoom step + confetti + banner in
-   one frame), it is unrelated to anything fixed here, and it is the next
-   thing to hunt — a child is being told "you got bigger!" and the game
-   answers with its worst stutter of the match.
+   THE CLUSTER THAT SURVIVED, AND WHAT IT TURNED OUT TO BE. Both runs put
+   their worst frames at t=10-13s. Chased it down three instruments deep:
+   qa/evohitch.mjs (V8 profiler over that window) showed the top JS self
+   time was getProgramParameter — the call that blocks while a GL program
+   links — and qa/shaderstall.mjs (wraps the live GL context, counts and
+   NAMES linkProgram) closed it: 47-49 programs link over a match, 9 after
+   boot, and EIGHT OF THOSE NINE land in the single evolution frame. Their
+   defines identify them: USE_SIZEATTENUATION (points/particles),
+   USE_INSTANCING, three USE_MAP variants. A GL program is not linked until
+   its material is first DRAWN, so effects that only appear at evolution
+   compile at the moment they fire. Mobile drivers do the same thing on the
+   same thread that is trying to hold 60fps.
+
+   TWO FIXES TRIED, BOTH REVERTED, AND THE REASON IS THE USEFUL PART.
+   (1) renderer.compile(scene, camera) behind the boot cover: no change,
+   still 9 after boot, still 8 on the frame. compile() walks VISIBLE
+   objects and the effects sit visible=false. (2) Reveal every hidden
+   object, compile, re-hide: ALSO no change. Which rules out "hidden" as
+   the explanation and leaves the real one — those meshes DO NOT EXIST at
+   boot. Confirmed by reading: prototype3d.ts:2065 `if (!shMesh) shMesh =
+   new THREE.InstancedMesh(...)` and :2407 `if (!wallMesh) wallMesh = new
+   THREE.InstancedMesh(...)` are built on first use, and the void's own
+   sprites (void3d.ts:1375, :1416) are the sprite half. No traversal can
+   warm a material that has not been constructed.
+
+   THE NEXT STEP, NAMED: force those lazy constructions during boot (call
+   the paths that build shMesh/wallMesh and the evolve sprites once behind
+   the cover), THEN compile. Verify with qa/shaderstall.mjs and accept it
+   only if "after boot" drops from 9 toward 0 — that is the number both
+   failed attempts refused to move, and it is the only one that matters.
+   Do not accept a frame-delta improvement as proof: frame 262 read 1545,
+   2480 and 1248ms across three runs of the SAME code.
+
+   ALSO STILL OPEN: the other spike (frame 3-10, ~1.3-1.5s, radius 0.9-1.0)
+   links ZERO shaders. Different cause in the opening seconds, unexamined.
 
    Round 2 shipped two more: the void's MAW no longer snaps half-shut when
    a small bite lands inside a big bite's envelope (chomp() overwrote
