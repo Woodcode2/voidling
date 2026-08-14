@@ -28,6 +28,18 @@ interface Slot {
   pos: THREE.Vector3;
   until: number;
   active: boolean;
+  /** MEASURED ONCE, AT SPAWN. update() used to read offsetWidth/offsetHeight
+   *  per slot per frame, interleaved with style.left/top writes on the slot
+   *  before it — a write-then-read-then-write chain that forces a synchronous
+   *  layout mid-rAF, every frame, for the whole match. A bubble's text never
+   *  changes after say(), so its box never changes: measure it there and do
+   *  pure arithmetic in the loop. */
+  w: number;
+  h: number;
+  /** last painted position + visibility, so a still bubble writes no DOM */
+  lx: number;
+  ly: number;
+  vis: number;   // -1 unknown, 0 hidden, 1 visible
 }
 
 // Was a flat 150. The camera pulls back to 300 at WORLD ENDER, so every
@@ -148,7 +160,7 @@ const style = document.createElement('style');
     const el = document.createElement('div');
     el.className = 'vb';
     document.body.appendChild(el);
-    slots.push({ el, pos: new THREE.Vector3(), until: 0, active: false });
+    slots.push({ el, pos: new THREE.Vector3(), until: 0, active: false, w: 0, h: 0, lx: -1, ly: -1, vis: -1 });
   }
 
   // floater pool (score popups / EAT! flair)
@@ -157,12 +169,16 @@ const style = document.createElement('style');
     const el = document.createElement('div');
     el.className = 'vf';
     document.body.appendChild(el);
-    floats.push({ el, pos: new THREE.Vector3(), until: 0, active: false });
+    floats.push({ el, pos: new THREE.Vector3(), until: 0, active: false, w: 0, h: 0, lx: -1, ly: -1, vis: -1 });
   }
   let fHead = 0;
 
   let clock = 0;
   const v = new THREE.Vector3();
+  // HUD rect scratch, filled once per update() and reused — see the read/write
+  // split in update(). Fixed-size arrays with a live count, so no allocation.
+  const hudR: DOMRect[] = []; let hudN = 0;
+  const bandR: DOMRect[] = []; let bandN = 0;
 
   return {
     say(pos, text, kind, opts) {
@@ -247,8 +263,12 @@ const style = document.createElement('style');
       slot.el.appendChild(document.createTextNode(text));
       slot.el.className = `vb ${cls}`.trim();
       slot.el.style.visibility = 'visible';
-      // force reflow then show for the fade-in
-      void slot.el.offsetWidth;
+      slot.vis = 1;
+      // force reflow then show for the fade-in — and take the ONE measurement
+      // this bubble will ever need while we are already paying for the layout
+      slot.w = slot.el.offsetWidth;
+      slot.h = slot.el.offsetHeight;
+      slot.lx = -1; slot.ly = -1;   // position is stale; next update() repaints
       slot.el.classList.add('show');
     },
     float(pos, text, big = false) {
@@ -270,12 +290,14 @@ const style = document.createElement('style');
         sl.el.classList.remove('show');
         sl.el.style.visibility = '';
         sl.el.textContent = '';
+        sl.vis = -1; sl.lx = -1; sl.ly = -1;   // cached paint state dies with the bubble
         delete sl.el.dataset.line;   // or dedupe rejects this line next match
       }
       for (const f of floats) {
         f.active = false; f.until = 0;
         f.el.classList.remove('show');
         f.el.textContent = '';
+        f.lx = -1; f.ly = -1;
       }
     },
     update(dt: number) {
@@ -296,6 +318,30 @@ const style = document.createElement('style');
         }
       }
       const w = window.innerWidth, h = window.innerHeight;
+      // ── ONE READ PHASE, THEN ONE WRITE PHASE ────────────────────────────
+      // The HUD rects are the same for every slot, so they are read ONCE per
+      // update() instead of once per slot — and every read happens before the
+      // first style write of the frame, so the browser can serve them from the
+      // layout it already has. Interleaving them with writes (the old shape)
+      // forced a synchronous relayout per bubble per frame, in the busy street
+      // scenes that can least afford it.
+      hudN = 0;
+      for (const id of HUD_AVOID) {
+        const el2 = document.getElementById(id);
+        const r = el2?.getBoundingClientRect();
+        if (!r || !r.width) continue;
+        hudR[hudN++] = r;
+      }
+      bandN = 0;
+      for (const id of HUD_BANDS) {
+        const el2 = document.getElementById(id);
+        if (!el2) continue;
+        const cs = getComputedStyle(el2);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.06) continue;
+        const r = el2.getBoundingClientRect();
+        if (!r.height) continue;
+        bandR[bandN++] = r;
+      }
       for (const s of slots) {
         if (!s.active) continue;
         if (clock > s.until) {
@@ -303,13 +349,24 @@ const style = document.createElement('style');
           continue;
         }
         v.copy(s.pos).project(camera);
-        if (v.z > 1) { s.el.style.visibility = 'hidden'; continue; }  // behind camera
-        s.el.style.visibility = 'visible';
+        if (v.z > 1) {                                    // behind camera
+          if (s.vis !== 0) { s.el.style.visibility = 'hidden'; s.vis = 0; }
+          continue;
+        }
+        if (s.vis !== 1) { s.el.style.visibility = 'visible'; s.vis = 1; }
+        // SAFETY NET for the cached box: if say() measured 0 (the element was
+        // not laid out yet — a bubble spawned in the same tick the page was
+        // still resolving, or a webfont that had not landed), take the
+        // measurement once, here, where the element is definitely on screen.
+        // Never per-frame: a zero only ever happens on the first frame of a
+        // bubble's life, and the whole point of the cache is that the box of a
+        // bubble whose text never changes cannot change either.
+        if (!s.w) { s.w = s.el.offsetWidth; s.h = s.el.offsetHeight; }
         // clamp so the whole box stays on screen — and cope with a box wider
         // than the screen rather than producing an inverted range, which is
         // what pushed a bubble half off the left edge
-        const halfW = Math.min(s.el.offsetWidth / 2 + 8, w / 2);
-        const halfH = s.el.offsetHeight + 6;
+        const halfW = Math.min(s.w / 2 + 8, w / 2);
+        const halfH = s.h + 6;
         const x = Math.min(w - halfW, Math.max(halfW, (v.x * 0.5 + 0.5) * w));
         // …and the same on the vertical: the bubble is anchored by its BOTTOM
         // (translate -100%), so an anchor near the top of the screen put the
@@ -331,51 +388,56 @@ const style = document.createElement('style');
         // A bubble is anchored by its BOTTOM edge, so its box is
         // [y - offsetHeight, y].
         const dodge = (rTop: number, rBot: number) => {
-          if (y <= rTop - 4 || y - s.el.offsetHeight >= rBot + 4) return;
-          const above = rTop - s.el.offsetHeight - 10;
-          const below = rBot + s.el.offsetHeight + 10;
+          if (y <= rTop - 4 || y - s.h >= rBot + 4) return;
+          const above = rTop - s.h - 10;
+          const below = rBot + s.h + 10;
           y = above >= top ? above : Math.min(h - 26, below);
         };
-        for (const id of HUD_AVOID) {
-          const el2 = document.getElementById(id);
-          const r = el2?.getBoundingClientRect();
-          if (!el2 || !r || !r.width) continue;
+        for (let i = 0; i < hudN; i++) {
+          const r = hudR[i];
           if (Math.abs(x - (r.left + r.width / 2)) < halfW + r.width / 2 - 4) dodge(r.top, r.bottom);
         }
         // …and the hero-message bands, which is what caught the owner's
         // screenshot: "BAKE SALE RUSH! everything is DOUBLE!" drawn straight
         // across "our gas is two cents cheaper."
-        for (const id of HUD_BANDS) {
-          const el2 = document.getElementById(id);
-          if (!el2) continue;
-          const cs = getComputedStyle(el2);
-          if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.06) continue;
-          const r = el2.getBoundingClientRect();
-          if (!r.height) continue;
-          dodge(r.top, r.bottom);
-        }
+        for (let i = 0; i < bandN; i++) dodge(bandR[i].top, bandR[i].bottom);
         // …and never on top of another bubble: the spawn-time de-collision
         // does not survive two anchors both leaving the viewport and clamping
         // to the same coordinate, which measured as one bubble 100% hidden.
+        //
+        // Compared against the other slot's COMPUTED box (its cached size and
+        // the position it was laid out at this frame) rather than a live
+        // getBoundingClientRect — same geometry, no forced layout. Slots are
+        // resolved in order, so an earlier slot's lx/ly is already this
+        // frame's; a later one still holds last frame's, which moves at most a
+        // few pixels and cannot flip an overlap that the 6px margin does not
+        // already absorb.
         let clash = false;
         for (const o of slots) {
-          if (o === s || !o.active || o.el.style.visibility === 'hidden') continue;
-          const r = o.el.getBoundingClientRect();
-          if (!r.width) continue;
-          if (Math.abs(x - (r.left + r.width / 2)) < (halfW + r.width / 2 - 6)
-            && Math.abs(y - r.bottom) < (s.el.offsetHeight + r.height) * 0.5 - 4) { clash = true; break; }
+          if (o === s || !o.active || o.vis !== 1 || o.lx < 0) continue;
+          if (Math.abs(x - o.lx) < (halfW + o.w / 2 - 6)
+            && Math.abs(y - o.ly) < (s.h + o.h) * 0.5 - 4) { clash = true; break; }
         }
-        if (clash) { s.el.style.visibility = 'hidden'; continue; }
-        s.el.style.left = `${x}px`;
-        s.el.style.top = `${y}px`;
+        if (clash) { if (s.vis !== 0) { s.el.style.visibility = 'hidden'; s.vis = 0; } continue; }
+        // sub-pixel jitter is invisible; skipping it keeps a parked bubble
+        // from dirtying layout every frame while the void stands still
+        if (Math.abs(x - s.lx) > 0.5 || Math.abs(y - s.ly) > 0.5) {
+          s.lx = x; s.ly = y;
+          s.el.style.left = `${x}px`;
+          s.el.style.top = `${y}px`;
+        }
       }
       for (const f of floats) {
         if (!f.active) continue;
         if (clock > f.until) { f.active = false; f.el.classList.remove('go'); continue; }
         v.copy(f.pos).project(camera);
         if (v.z > 1) continue;
-        f.el.style.left = `${(v.x * 0.5 + 0.5) * w}px`;
-        f.el.style.top = `${(-v.y * 0.5 + 0.5) * h}px`;
+        const fx2 = (v.x * 0.5 + 0.5) * w, fy2 = (-v.y * 0.5 + 0.5) * h;
+        if (Math.abs(fx2 - f.lx) > 0.5 || Math.abs(fy2 - f.ly) > 0.5) {
+          f.lx = fx2; f.ly = fy2;
+          f.el.style.left = `${fx2}px`;
+          f.el.style.top = `${fy2}px`;
+        }
       }
     },
   };

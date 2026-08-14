@@ -6,7 +6,14 @@ export interface Fx {
   ring(x: number, z: number, color: number, maxR: number, dur?: number): void;
   flash(color: string, alpha?: number): void;
   shake(amt: number): void;
-  update(dt: number): THREE.Vector3;   // returns a camera-shake offset to add
+  /** `camDist` is the camera's current distance from the void. Shake is
+   *  authored in SCREEN terms — a bite should kick the picture by the same
+   *  visible amount at every size — but the offset is applied in world units,
+   *  and the follow distance travels from ~26 at spawn to ~340 at WORLD ENDER.
+   *  Without this the same shake(11) is a viewport-whipping lurch on a hatchling
+   *  and literally sub-pixel on a colossus. Scaled here, once, so every call
+   *  site keeps its authored number and means the same thing at both ends. */
+  update(dt: number, camDist?: number): THREE.Vector3;   // returns a camera-shake offset to add
 }
 
 // ── REDUCE MOTION ───────────────────────────────────────────────────────────
@@ -66,6 +73,9 @@ export function createFx(scene: THREE.Scene): Fx {
 
   let shakeAmt = 0;
   const shakeVec = new THREE.Vector3();
+  // The camera distance every shake() call in the game was tuned against —
+  // roughly the early-form follow distance, where 11/9/6 were chosen by eye.
+  const SHAKE_REF_DIST = 60;
 
   return {
     ring(x, z, color, maxR, dur = 0.6) {
@@ -87,7 +97,7 @@ export function createFx(scene: THREE.Scene): Fx {
     // information the rest of the frame does not already show, and translating
     // the viewpoint is the part that actually provokes motion sickness.
     shake(amt) { if (!reduceMotion()) shakeAmt = Math.max(shakeAmt, amt); },
-    update(dt) {
+    update(dt, camDist = SHAKE_REF_DIST) {
       for (const r of rings) {
         if (!r.mesh.visible) continue;
         r.t += dt;
@@ -98,9 +108,13 @@ export function createFx(scene: THREE.Scene): Fx {
         r.mat.opacity = (1 - k) * 0.8;
       }
       if (flashT > 0) { flashT -= dt; if (flashT <= 0) flashEl.style.opacity = '0'; }
-      // decaying shake
+      // decaying shake, in SCREEN terms (see the interface note on camDist):
+      // the authored amount is multiplied by how far the camera currently sits
+      // from the reference distance the numbers were tuned at, so shake(11)
+      // kicks the same fraction of the frame at every form.
       if (shakeAmt > 0.001) {
-        shakeVec.set((Math.random() - 0.5) * shakeAmt, (Math.random() - 0.5) * shakeAmt * 0.6, (Math.random() - 0.5) * shakeAmt);
+        const s = shakeAmt * (camDist / SHAKE_REF_DIST);
+        shakeVec.set((Math.random() - 0.5) * s, (Math.random() - 0.5) * s * 0.6, (Math.random() - 0.5) * s);
         shakeAmt *= Math.pow(0.001, dt);   // fast decay
         if (shakeAmt < 0.05) shakeAmt = 0;
       } else shakeVec.set(0, 0, 0);

@@ -140,7 +140,7 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    "NEW PLACE · 12 SECRETS". Owner's PRICES curve untouched throughout.
    Also owner-reported and fixed same day: the joystick's resting-thumb
    speed tax (joyfeel.mjs, 2fd4f84).
-6. SEASONS, built 2026-08-14 (src/game/events.ts) — LADDER action #5,
+6. SEASONS, built 2026-08-14 (src/game/seasons.ts) — LADDER action #5,
    Subway Surfers' cadence at our scale. Four dated windows, one per world,
    recurring yearly, checked against the device clock at boot (no server):
    MOON FESTIVAL (lantern, Feb 5–21), THE GREAT REGATTA (pirate, Jul
@@ -163,6 +163,42 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    yours. The four season accents (#ffe9a8 moon, #35d6ff regatta,
    #6f8bff homecoming, #ff9a2e harvest) are the palette to brief an icon
    set from.
+7. FLUIDITY, first pass 2026-08-14 — the owner's standing bar ("I need the
+   play to feel beautifully fluid"). Hunted with a six-lens agent audit
+   (allocations / DOM / camera / timestep / easing / input), every finding
+   adversarially verified before it was allowed to be true; three were
+   REFUTED on the player-feel test and left alone, which is the point of
+   the verify pass. Baseline instrument: qa hitchprobe (frame-time
+   distribution over a real 42-game-second circling match; swiftshader
+   makes absolute fps meaningless, so the honest reading is RATIOS —
+   frames above 2.5x median — and WHERE in the match they land).
+
+   Shipped: bubbles.update() no longer forces a synchronous layout per
+   bubble per frame (bubble box measured once at say(), HUD rects read
+   once per update instead of once per slot, writes buffered, sub-pixel
+   moves skipped) — it was write→read→write per slot, the single biggest
+   steady-state DOM tax in play; the crowd's `stand` land-test closure
+   hoisted out of the per-frame path (~966 walkers in Lantern Night, the
+   highest-count per-frame allocation in the game); the clock chip, the
+   leaderboard and the growth bar all change-detected instead of rewritten
+   every frame; and TWO CAMERA BUGS: shake was being added to the same
+   vector the follow spring smoothed, so a kick compounded and then bled
+   out as a half-second drift (the follow position now lives in camFollow
+   and shake is applied on the way to the GPU, stateless), and shake
+   amplitude was in WORLD units against a camera distance that travels
+   26→340, so shake(11) whipped the frame at spawn and was literally
+   sub-pixel at WORLD ENDER (now scaled to a reference distance, so every
+   authored number means the same kick at every size).
+
+   STILL OPEN, verified but not yet built: hit-stop never applies to the
+   player (the world slows on a marquee bite, the hero keeps integrating
+   raw dt); the banner hard-cuts a banner mid-read; the void's mouth snaps
+   half-shut when a small bite lands inside a big bite's open envelope;
+   several frame-rate-dependent constants (velocity smoothing, dead-end
+   bleed, joystick heading blend) that make the game feel different on a
+   120Hz phone than the 60Hz it was tuned at; and the adaptive-quality
+   ladder measuring fps from the CLAMPED dt, which is how a stuttering
+   phone can look fine to the demotion logic.
 
 ### RETRACTION 2026-08-13, first-60-seconds: "the match runs behind the
 tutorial card" was a PROBE ARTIFACT, not a bug. The probe (firstrun.mjs)

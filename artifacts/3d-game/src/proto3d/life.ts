@@ -2462,6 +2462,15 @@ export function createLife(
     // They can still WANDER in later — by then the player has moved.
     if (nearSpawn(hx, hz)) return;
     let ang = rand(0, Math.PI * 2), hop = 0, fled = false, slideT = 0;
+    // MARGIN TEST, HOISTED. The step must keep the WHOLE body on land, not just
+    // the center — a ped standing with its center on the cliff lip reads broken.
+    // This lived inside update(), so every walking person in the world built a
+    // fresh closure every frame: Lantern Night carries ~966 of them, which made
+    // this the highest-count per-frame allocation in the game. It only ever
+    // captured `ang`, which lives out here, so hoisting is behaviour-identical
+    // and turns a per-frame cost into a per-spawn one.
+    const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !wet(px, pz, 0)
+      && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
     let greetCd = rand(0, 5);   // LANTERN NIGHT: when this spirit last offered you something
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.userData.mover = true;    // steers itself — the magnet must never grab it
@@ -2549,17 +2558,17 @@ export function createLife(
             const hd = Math.hypot(mesh.position.x - hx, mesh.position.z - hz);
             if (hd > tether) ang = Math.atan2(hz - mesh.position.z, hx - mesh.position.x);
             // contagion: a fresh scream nearby sends this ped scurrying too
-            for (const pg of (calmT > 0 ? [] : panicPings)) {
+            // (the calm window skips the loop outright — it used to build a
+            // throwaway empty array per idle ped per frame to iterate nothing,
+            // and calm(4) runs at every match start, while GLBs are still
+            // streaming and the frame can least afford the churn)
+            if (calmT <= 0) for (const pg of panicPings) {
               if (pingClock - pg.t > 1.5) continue;
               const pdx = mesh.position.x - pg.x, pdz = mesh.position.z - pg.z;
               if (pdx * pdx + pdz * pdz < 625) { ang = Math.atan2(pdz, pdx); spd = base * 2.4; hop = Math.max(hop, 0.3); break; }
             }
           }
         }
-        // margin test: the step must keep the WHOLE body on land, not just the
-        // center — a ped standing with its center on the cliff lip reads broken
-        const stand = (px: number, pz: number) => !!biomeAt(px, pz) && !wet(px, pz, 0)
-          && !!biomeAt(px + Math.cos(ang) * 2, pz + Math.sin(ang) * 2);
         let nx = mesh.position.x + Math.cos(ang) * spd * dt, nz = mesh.position.z + Math.sin(ang) * spd * dt;
         if (!stand(nx, nz)) {
           // blocked (coast/water): slide sideways and COMMIT to it for half a

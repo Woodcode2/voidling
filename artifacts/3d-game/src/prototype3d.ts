@@ -23,7 +23,7 @@ import { createBubbles } from './proto3d/bubbles';
 import { HATS, HAT_BY_ID, hatLine, type Hat } from './proto3d/hats';
 import { buildHat } from './proto3d/hatgeo';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
-import { createFx, reduceMotion, setReduceMotion } from './proto3d/fx';
+import { createFx, reduceMotion, setReduceMotion, type Fx } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS, VOID, type Skin } from './proto3d/palette';
 import { buildGallery, updateLodBias, requestedReady } from './proto3d/assets3d';
@@ -1244,6 +1244,13 @@ const _dbg = new Proxy(_dbgStore, {
   __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number; tense: number;
     ate: { you: number; family: number };
     rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
+  // QA: speak a chip bubble in a named rival's voice (comms redesign)
+  __sayChip: (text: string, name: string, color?: string) => void;
+  // QA: the live season and the beat table it repaints (seasons.ts)
+  __season: SeasonEvent | null;
+  __beats: MatchBeat[];
+  // QA: the juice kit, for firing shake/ring/flash from a harness
+  __fx: Fx;
 };
 // QA counters: what the family actually DID to the player over a match
 const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0 };
@@ -1335,6 +1342,7 @@ _dbg.__warpVoid = (x: number, z: number) => {
   voidling.group.position.set(x, voidling.group.position.y, z);
   // and drag the camera with it rather than letting it lerp across the valley
   camera.position.set(x + camOffset.x * camDist, camOffset.y * camDist, z + camOffset.z * camDist);
+  camFollow.copy(camera.position);   // the spring teleports too, or it dollies back across the valley
   camera.lookAt(x, voidling.radius * 0.5, z);
   camera.updateMatrixWorld();
 };
@@ -1780,6 +1788,12 @@ _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 await bootStage('Waking the void family…');
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
 const fx = createFx(scene);
+/** QA: the juice kit itself, so a harness can fire a shake or a ring on demand
+ *  and measure what the camera does with it — the shake-residue probe uses this
+ *  to prove the follow spring never keeps a kick (see camFollow). Assigned HERE
+ *  rather than beside the other hooks 500 lines up, because `fx` does not exist
+ *  until this line and a hook that reads it earlier is a module-init crash. */
+_dbg.__fx = fx;
 const FAMILY_TITLE: Record<string, string> = {
   WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
 };
@@ -2599,6 +2613,9 @@ let wanderT = 0; const wander = new THREE.Vector3(voidState.x, 0, voidState.z);
 const clock = new THREE.Clock();
 const prev = { x: voidState.x, z: voidState.z };
 const tmpV = new THREE.Vector3();
+/** The camera's SMOOTHED FOLLOW POSITION, kept separate from camera.position
+ *  so the per-frame shake offset is never fed back into the spring. */
+const camFollow = new THREE.Vector3();
 const fwdTmp = new THREE.Vector3(), rightTmp = new THREE.Vector3();
 let velX = 0, velZ = 0;   // smoothed velocity — kills the boxy/jerky feel
 
@@ -3167,6 +3184,15 @@ let rankHold = 0, shownRank = 0, announcedRank = 0, lastLeadBrag = -99;
 let crownLive = false, everBehind = false;
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
+// ── PAINT CACHES ────────────────────────────────────────────────────────────
+// Both of these guard a DOM write that used to run unconditionally. Declared
+// HERE, above refreshHud, and not beside the other match state a few hundred
+// lines down: `let` is in the temporal dead zone until its own line runs, and
+// refreshHud is called during boot — reading them from further down the module
+// would be a module-init crash, which is exactly how MAPLE_DIST bit this file
+// once already.
+let lastTimerText = '';   // clock chip: the string ticks 1x/s, the loop runs 60x/s
+let lastBoardHtml = '';   // leaderboard: 5Hz rebuild, but usually identical
 function refreshHud() {
   const R = voidling.radius;
   // leaderboard: player + rivals, ranked by score
@@ -3272,10 +3298,16 @@ function refreshHud() {
   // was hiding two thirds of the field. With the cast filtered to arrivals this
   // is at most six rows, and each one is a name a child recognises.
   const shown = rows;
-  boardEl.innerHTML = shown.map((r) => {
+  // …and only actually WRITE it when it differs. innerHTML tears down and
+  // rebuilds every row element — 6 rows, ~24 nodes — and this runs at 5Hz all
+  // match, overwhelmingly with identical content: scores only move when
+  // somebody eats, and the order changes rarer still. One string compare
+  // replaces the rebuild on the common tick.
+  const boardHtml = shown.map((r) => {
     const i = rows.indexOf(r);
     return `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`;
   }).join('');
+  if (boardHtml !== lastBoardHtml) { lastBoardHtml = boardHtml; boardEl.innerHTML = boardHtml; }
   // COUNT-based, not mass-based: summed radius made the meter dead air (an
   // hour of snacking read 0% because towers own the mass). One prop = one
   // tick, so a kid sees the number move in the first minute — and Solo's
@@ -3342,9 +3374,20 @@ function paintGrowth(r: number) {
       gTrackEl.appendChild(pip);
     }
   }
-  gMEl.textContent = `${Math.round(r * 1.6)}m`;
-  gFillEl.style.width = `${(formProgress(r) * 100).toFixed(2)}%`;
+  // Both of these ran unconditionally every frame. The metre label changes a
+  // few dozen times a MATCH and the bar width only while growing, so the
+  // guards turn a permanent 60Hz pair of style/layout invalidations into a
+  // write on the frames that actually differ. (The bar keeps `width` rather
+  // than switching to a compositor transform: .gFill carries a 3-stop gradient
+  // and a travelling sheen, and scaleX would squeeze both — a visual change to
+  // an element the owner has already signed off, for a cost that is now
+  // change-gated anyway.)
+  const gm = `${Math.round(r * 1.6)}m`;
+  if (gm !== lastGm) { lastGm = gm; gMEl.textContent = gm; }
+  const gw = `${(formProgress(r) * 100).toFixed(2)}%`;
+  if (gw !== lastGw) { lastGw = gw; gFillEl.style.width = gw; }
 }
+let lastGm = '', lastGw = '';
 
 // rank ladder (hole.io placement points: 20/10/5/2/1) + daily streak
 let xp = Number(localStorage.getItem('voidXP') || 0);
@@ -6758,7 +6801,15 @@ function animate() {
       presenceT = 0.55 - curStage * 0.08;
       spawnSuck(1 + curStage, voidling.radius * 1.9);
     }
-    timerEl.textContent = fmtTime(matchClock);
+    // CHANGE-DETECTED. textContent replaces the text node even when the string
+    // is identical, so this dirtied the clock chip's layout 60x/s to show a
+    // value that ticks once a second — the last unguarded per-frame DOM write
+    // in the loop, against the file's own convention (the countdown numeral has
+    // countTick, the HUD has hudCd).
+    {
+      const ts = fmtTime(matchClock);
+      if (ts !== lastTimerText) { lastTimerText = ts; timerEl.textContent = ts; }
+    }
     // ── AUTHORED MATCH BEATS ────────────────────────────────────────────────
     // A 3-minute match needs a RHYTHM, not just ambience. Three scheduled
     // events with real scoring stakes give every run the same shape, so a kid
@@ -7581,7 +7632,17 @@ function animate() {
     const lookZ = voidState.z + lookVZ * 0.10 * lookK + introHZ;
     tmpV.copy(camOffset).multiplyScalar(camDist);
     tmpV.x += lookX; tmpV.z += lookZ;
-    camera.position.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
+    // ── THE FOLLOW POSITION IS ITS OWN STATE, AND SHAKE NEVER TOUCHES IT ────
+    // This used to lerp camera.position directly — the same vector the shake
+    // offset was added to at render time. So every shaken frame fed its own
+    // kick back in as the next frame's starting point: the shake compounded
+    // while it lasted, and then, because the lerp only closes ~8% of the gap
+    // per frame, the accumulated offset BLED OUT as a slow drift back to true
+    // over the following half-second. A bite was not a kick, it was a kick
+    // plus a lingering wander. Smoothing camFollow instead makes shake
+    // stateless: it is added on the way to the GPU and gone next frame.
+    camFollow.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
+    camera.position.copy(camFollow);
     camera.lookAt(lookX, R * 0.5, lookZ);
     camera.updateMatrixWorld();
     // (the SIZE chip that used to be projected here is gone — the growth bar
@@ -7770,7 +7831,10 @@ function animate() {
     // stays down. One owner, no flash of the game underneath.
     coverRelease('boot');
   }
-  const shakeOff = fx.update(dtw);
+  // camDist rides along so shake is screen-relative, not world-relative — see
+  // the note on Fx.update. Added to camera.position AFTER the follow spring has
+  // written it (camFollow owns the smoothed state), so the kick never persists.
+  const shakeOff = fx.update(dtw, camDist);
   camera.position.add(shakeOff);
   // GOLDEN HOUR IS OUT. Dimming the sky and sun over the last 45s read as the
   // world randomly "turning to night" — confusing mid-match, and a kids' game
@@ -7799,6 +7863,7 @@ else if (TOPDOWN) { camera.position.set(0, 1120, 0.001); camera.lookAt(0, 0, 0);
 else {
   camera.position.copy(camOffset).multiplyScalar(camDist).add(new THREE.Vector3(voidState.x, 0, voidState.z));
   camera.lookAt(voidState.x, voidling.radius * 0.5, voidState.z);
+  camFollow.copy(camera.position);   // seed the follow spring, or frame 1 swoops in from the origin
 }
 // the debug API goes live only now — see the note on _dbg's declaration
 _dbgLive = true;
