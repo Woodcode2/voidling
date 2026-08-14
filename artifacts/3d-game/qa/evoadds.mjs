@@ -50,7 +50,16 @@ await page.addInitScript(() => {
   };
 });
 
-await page.goto(URL);
+// PROVE THE PAGE IS ALIVE BEFORE WAITING ON IT. Two runs of this probe hung
+// for ~50 and ~30 minutes with an empty log, and the cause was NOT the game:
+// the vite preview server had died mid-run (it exits on signal 144 in this
+// sandbox), so goto() got nothing and waitForFunction sat on a blank page.
+// A dead server and a broken game look identical from inside a hang, so check
+// the server first and say which one it is.
+const resp = await page.goto(URL).catch((e) => { throw new Error(`server unreachable at ${URL}: ${e.message}`); });
+if (!resp || !resp.ok()) throw new Error(`server returned ${resp ? resp.status() : 'nothing'} at ${URL} — start the preview first`);
+await page.waitForFunction(() => !!document.querySelector('canvas'), undefined, { timeout: 60000 })
+  .catch(() => { throw new Error('no canvas after 60s — the page loaded but the game never started'); });
 await page.waitForFunction(() => window.__matchState && window.__matchState().t > 1, undefined, { timeout: 180000 });
 
 // patch AFTER boot: everything that exists now is warm, so anything recorded
