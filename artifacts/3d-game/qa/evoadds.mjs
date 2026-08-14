@@ -27,6 +27,12 @@ const UNTIL = Number(process.env.ADDS_UNTIL || 16);
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });
 const page = await ctx.newPage();
+// A PROBE THAT HANGS TELLS YOU NOTHING. The first run of this file sat for
+// fifty minutes at idle load with an empty log — the page had thrown, the
+// match clock stopped advancing, and waitForFunction simply waited out its
+// timeout. Any instrument that can stall must say why.
+page.on('pageerror', (e) => console.log('PAGE ERROR: ' + e.message));
+page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE ERROR: ' + m.text().slice(0, 200)); });
 
 // count links per frame exactly as qa/shaderstall.mjs does, so the two agree
 await page.addInitScript(() => {
@@ -59,22 +65,22 @@ await page.evaluate(() => {
     const custom = Array.isArray(m) ? m.some((x) => x.isShaderMaterial) : !!(m && m.isShaderMaterial);
     return `${o.type}/${mat}${custom ? '(custom)' : ''}${o.name ? ' "' + o.name + '"' : ''}`;
   };
+  // RECORD, NEVER INTERFERE. three.js calls add() from inside its own
+  // internals, and the first version of this patch could throw from describe()
+  // — which does not show up as a probe error, it shows up as a dead game and
+  // an instrument that waits forever. Cap the log too: an unbounded array on a
+  // hot path is its own way of killing the thing being measured.
   const origAdd = T.Object3D.prototype.add;
   T.Object3D.prototype.add = function (...objs) {
-    for (const o of objs) {
-      if (o && o.isObject3D) adds.push({ frame: S.frame, what: describe(o), parent: this.name || this.type });
-    }
+    try {
+      for (const o of objs) {
+        if (o && o.isObject3D && adds.length < 4000) {
+          adds.push({ frame: S.frame, what: describe(o), parent: this.name || this.type });
+        }
+      }
+    } catch { /* recording must never break the thing being recorded */ }
     return origAdd.apply(this, objs);
   };
-  // …and catch materials swapped onto meshes that were already parented, which
-  // links a new program without any add() ever happening
-  const swaps = [];
-  window.__swapRec = swaps;
-  const origVis = Object.getOwnPropertyDescriptor(T.Object3D.prototype, 'visible');
-  if (!origVis) {
-    let vTracked = new WeakSet();
-    window.__vTracked = vTracked;
-  }
 });
 
 await page.evaluate(() => {
@@ -107,7 +113,7 @@ await page.evaluate(() => {
   }, 40);
 });
 
-await page.waitForFunction((u) => window.__matchState && window.__matchState().t > u, UNTIL, { timeout: 900000 });
+await page.waitForFunction((u) => window.__matchState && window.__matchState().t > u, UNTIL, { timeout: 480000 });
 
 const out = await page.evaluate(() => {
   const { d, links } = window.__rec;
