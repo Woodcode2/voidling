@@ -639,6 +639,33 @@
       #endStats .es:nth-child(n+6) { animation-delay: 0.98s; }
       @keyframes esIn { from { opacity: 0; transform: translateY(9px) scale(0.94); }
         to { opacity: 1; transform: none; } }
+      /* ── VOID DROPS ─────────────────────────────────────────────────────
+         The orb wobbles (want), swells while held (anticipation), and bursts
+         (payoff). The charge ring is a conic fill driven by --dc from JS. */
+      #drop { display: none; margin: 14px 0 4px; text-align: center; }
+      #drop.show { display: block; animation: esIn 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) 1s backwards; }
+      .dropOrb { position: relative; width: 86px; height: 86px; margin: 0 auto;
+        border-radius: 50%; cursor: pointer; user-select: none; -webkit-user-select: none;
+        background: radial-gradient(circle at 34% 30%, #a562f2 0%, #6a30b8 55%, #2a1150 100%);
+        box-shadow: 0 6px 22px rgba(120, 60, 220, 0.5), inset 0 -6px 14px rgba(0,0,0,0.35);
+        display: flex; align-items: center; justify-content: center;
+        animation: dropWob 2.1s ease-in-out infinite; touch-action: none; }
+      .dropGift { font-size: 40px; pointer-events: none; }
+      @keyframes dropWob { 0%, 100% { transform: rotate(-4deg) scale(1); }
+        50% { transform: rotate(4deg) scale(1.05); } }
+      .dropRing { position: absolute; inset: -7px; border-radius: 50%; pointer-events: none;
+        background: conic-gradient(#ffd23f calc(var(--dc, 0) * 360deg), rgba(255,255,255,0.14) 0);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4px)); }
+      #drop.charging .dropOrb { animation: dropShake 0.14s linear infinite; }
+      @keyframes dropShake { 0% { transform: rotate(-3deg) scale(1.1); }
+        50% { transform: rotate(3deg) scale(1.13); } 100% { transform: rotate(-3deg) scale(1.1); } }
+      #drop.burst .dropOrb { animation: dropBurst 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) forwards; }
+      @keyframes dropBurst { 40% { transform: scale(1.35); opacity: 1; }
+        100% { transform: scale(2.1); opacity: 0; } }
+      .dropLbl { margin-top: 8px; font-size: 13px; font-weight: 900; letter-spacing: 1px;
+        color: #ffd88a; }
+      #drop.burst .dropLbl { font-size: 22px; color: #ffd23f; }
       #endStats .es i { display: block; font-style: normal; font-size: 10.5px; font-weight: 800;
         letter-spacing: 1.4px; color: #c9a6ff; margin-bottom: 2px; }
       #endStats .es b { font-size: 20px; font-weight: 900; }
@@ -1731,6 +1758,15 @@
       <!-- the run's own numbers, and the next thing to chase. The screen used
            to state an outcome and offer a button; it never stated a goal. -->
       <div id="endStats"></div>
+      <!-- VOID DROPS — the daily reveal ritual (LADDER action #4). Supercell's
+           GDC record: a capped, earned, tap-to-reveal reward on the screen you
+           cannot miss is what fixed their retention. De-gambled for 4+: three
+           drops a day, FIXED escalating values, earned by finishing a match,
+           opened with a press-and-hold ceremony. No odds, no purchase link. -->
+      <div id="drop">
+        <div class="dropOrb" id="dropOrb"><span class="dropGift">🎁</span><div class="dropRing"></div></div>
+        <div class="dropLbl" id="dropLbl">VOID DROP · hold to open!</div>
+      </div>
       <!-- TODAY'S QUESTS, with words on them. They existed as three unlabelled
            emoji chips floating in the menu's margin and read as debug output;
            this is where a child is deciding whether to press PLAY AGAIN. -->

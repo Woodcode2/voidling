@@ -3478,7 +3478,84 @@ function unlockStreakSkins(n: number): void {
 }
 // the end screen is THE retention moment — the reward has to land as a beat,
 // not a gray sub-line: warm sting, coins visibly counting up, rows sliding in
+// ── VOID DROPS — the daily reveal ritual (LADDER action #4) ────────────────
+// Supercell's GDC 2024 record is the source: deterministic progression alone
+// lost them retention, and what fixed it was a capped, earned, tap-to-reveal
+// reward on a screen the player cannot miss. De-gambled for a 4+ kids title:
+// finishing a match earns a drop (three a day), the VALUES ARE FIXED and
+// escalate through the day (no odds, no gacha shape, no purchase link), and
+// the anticipation lives in the CEREMONY — a press-and-hold charge with a
+// ring that fills, then the burst. The third drop being the big one is the
+// "one more match" whisper, made of arithmetic instead of chance.
+const DROP_VAL = [40, 60, 100];
+let dropCharge = 0, dropRaf = 0, dropOpen = false;
+function offerDrop() {
+  const dropEl = el('drop'), orb = el('dropOrb'), lbl = el('dropLbl');
+  const today = new Date().toDateString();
+  if (localStorage.getItem('voidDropDay') !== today) {
+    localStorage.setItem('voidDropDay', today);
+    localStorage.setItem('voidDropN', '0');
+  }
+  const n = Number(localStorage.getItem('voidDropN') || 0);
+  dropEl.classList.remove('charging', 'burst');
+  dropCharge = 0; dropOpen = false;
+  (orb.querySelector('.dropRing') as HTMLElement)?.style.setProperty('--dc', '0');
+  if (n >= DROP_VAL.length) { dropEl.classList.remove('show'); return; }
+  lbl.textContent = `VOID DROP ${n + 1} of ${DROP_VAL.length} · hold to open!`;
+  dropEl.classList.add('show');
+  const ring = orb.querySelector('.dropRing') as HTMLElement;
+  let lastStep = -1, lastT = 0;
+  const pump = (tm: number) => {
+    if (!ended || dropOpen) return;
+    const dt2 = lastT ? Math.min(0.05, (tm - lastT) / 1000) : 0;
+    lastT = tm;
+    const charging = dropEl.classList.contains('charging');
+    dropCharge = Math.max(0, Math.min(1, dropCharge + (charging ? dt2 / 1.1 : -dt2 * 2)));
+    ring?.style.setProperty('--dc', String(dropCharge));
+    // rising pops at the quarter marks — the same anticipation audio the
+    // countdown ritual uses, aimed upward instead of down
+    const step = Math.floor(dropCharge * 4);
+    if (charging && step > lastStep) { lastStep = step; audio.pop(4 + step); buzz(12); }
+    if (!charging) lastStep = Math.floor(dropCharge * 4) - 1;
+    if (dropCharge >= 1) { openDrop(n); return; }
+    dropRaf = requestAnimationFrame(pump);
+  };
+  const start = (ev: Event) => { ev.preventDefault();
+    if (dropOpen) return;
+    dropEl.classList.add('charging'); lastT = 0;
+    cancelAnimationFrame(dropRaf); dropRaf = requestAnimationFrame(pump); };
+  const stop = () => dropEl.classList.remove('charging');
+  orb.onpointerdown = start; orb.onpointerup = stop;
+  orb.onpointerleave = stop; orb.onpointercancel = stop;
+}
+function openDrop(n: number) {
+  if (dropOpen) return;
+  dropOpen = true;
+  const dropEl = el('drop'), lbl = el('dropLbl');
+  localStorage.setItem('voidDropN', String(n + 1));
+  const pay = DROP_VAL[n];
+  addCoins(pay);
+  dropEl.classList.remove('charging');
+  dropEl.classList.add('burst');
+  lbl.textContent = n + 1 < DROP_VAL.length
+    ? `+${pay}✦!  next drop after your next match`
+    : `+${pay}✦!  the BIG one — more tomorrow`;
+  audio.ready(); buzz(50);
+  // the same falling sparks the champion screen uses — a payout is a party
+  for (let i = 0; i < 14; i++) {
+    const sp = document.createElement('span');
+    sp.className = 'endConf';
+    sp.textContent = i % 3 ? '✦' : '●';
+    sp.style.left = `${28 + Math.random() * 44}%`;
+    sp.style.color = ['#ffd23f', '#b875ff', '#7ef2a0'][i % 3];
+    sp.style.animationDelay = `${Math.random() * 0.4}s`;
+    endEl.appendChild(sp);
+    setTimeout(() => sp.remove(), 3200);
+  }
+  track('drop_open', { n: n + 1, pay });
+}
 function celebrateEnd(coins: number, xpGain: number, lead: string, won = false) {
+  offerDrop();
   endSub.innerHTML = `${lead}<br><b class="endCnt">+0✦</b> · +${xpGain} XP`;
   if (won) {
     // champion confetti: two dozen falling sparks over the end screen
