@@ -34,6 +34,7 @@ import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from '.
 import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
 import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
+import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
@@ -1109,6 +1110,73 @@ function placeStickersOnce(): void {
   if (_stickersPlaced) return;
   _stickersPlaced = true;
   placeStickers();
+  scatterSeasonProps();
+}
+
+// ══ THE SEASON'S LITTER (events.ts) ═══════════════════════════════════════
+// While a world's season runs, forty-odd themed snacks are scattered across
+// its districts — pumpkins for HARVEST WEEK, bunting for the regatta,
+// pennants for homecoming, moon lanterns for the festival. All of them are
+// edible at spawn size (r 0.55 against a 0.9 starting void), because the
+// season should taste different in the first ten seconds, not just look
+// different from the menu. Random placement, deliberately: these are litter,
+// not secrets — the hunt system is the stickers, and those stay seeded.
+function makeSeasonProp(ev: SeasonEvent, i: number): THREE.Object3D {
+  const sph = () => new THREE.SphereGeometry(0.5, 8, 6);
+  const cyl = () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
+  const cone = () => new THREE.ConeGeometry(0.5, 1, 5);
+  const g = new THREE.Group();
+  if (ev.id === 'harvest') {
+    // a pumpkin, in three sizes so a verge of them reads as a crop not a print
+    const s = 0.85 + (i % 3) * 0.22;
+    g.add(mergedProp([
+      part(sph(), 0xff8c2a, 0, 0.36 * s, 0, 0, 0, 0, 1.1 * s, 0.78 * s, 1.1 * s),
+      part(cyl(), 0x5f8a3c, 0, 0.78 * s, 0, 0, 0, 0.25, 0.12, 0.34, 0.12),
+    ]));
+  } else if (ev.id === 'regatta') {
+    // a bunting pole: three little signal flags up a mast
+    const FLAG = [0x35d6ff, 0xffd23f, 0xff5d7e];
+    g.add(mergedProp([
+      part(cyl(), 0xc9b18a, 0, 1.2, 0, 0, 0, 0, 0.14, 2.4, 0.14),
+      part(cone(), FLAG[i % 3], 0.26, 2.1, 0, 0, 0, -Math.PI / 2, 0.52, 0.30, 0.07),
+      part(cone(), FLAG[(i + 1) % 3], 0.24, 1.72, 0, 0, 0, -Math.PI / 2, 0.46, 0.27, 0.07),
+      part(cone(), FLAG[(i + 2) % 3], 0.22, 1.36, 0, 0, 0, -Math.PI / 2, 0.40, 0.24, 0.07),
+    ]));
+  } else if (ev.id === 'homecoming') {
+    // a yard pennant, alternating the two school colours down a street
+    const col = i % 2 ? 0xf0b429 : 0x6f8bff;
+    g.add(mergedProp([
+      part(cyl(), 0xd8d2c4, 0, 0.95, 0, 0, 0, 0, 0.12, 1.9, 0.12),
+      part(cone(), col, 0.42, 1.62, 0, 0, 0, -Math.PI / 2, 0.95, 0.36, 0.07),
+    ]));
+  } else {
+    // moonfest: a warm little moon lantern on a stand
+    g.add(mergedProp([
+      part(cyl(), 0x8a4a2f, 0, 0.14, 0, 0, 0, 0, 0.42, 0.28, 0.42),
+      part(sph(), 0xffe9a8, 0, 0.66, 0, 0, 0, 0, 0.92, 0.98, 0.92),
+      part(cyl(), 0x8a4a2f, 0, 1.16, 0, 0, 0, 0, 0.34, 0.12, 0.34),
+    ]));
+  }
+  return g;
+}
+function scatterSeasonProps(): void {
+  if (!seasonNow) return;
+  let placed = 0;
+  // same sampling envelope as the sticker placer: the whole island, not the
+  // middle of it. validateWorld sweeps anything that lands on asphalt.
+  for (let i = 0; i < 4000 && placed < 44; i++) {
+    const x = (Math.random() - 0.5) * 560, z = (Math.random() - 0.5) * 560;
+    if (!insideIsland3(x, z)) continue;
+    if (inDeepWater3(x, z, 3)) continue;
+    if (Math.hypot(x - island.spawn.x, z - island.spawn.z) < 18) continue;
+    const p = makeSeasonProp(seasonNow, placed);
+    p.position.set(x, 0, z);
+    p.rotation.y = Math.random() * Math.PI * 2;
+    p.userData.seasonProp = true;
+    scene.add(p);
+    addEdible(p, 0.55);
+    placed++;
+  }
 }
 // dev/QA introspection hooks (harmless in prod; no gameplay reads these).
 // __edibles + __insideIsland3 + __validateWorld power the placement auditor:
@@ -2802,6 +2870,16 @@ const LANTERN_BEATS: typeof MAPLE_BEATS = [
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS
     : pickedWorld === 'lantern' ? LANTERN_BEATS : MAPLE_BEATS;
+// ── THE SEASONAL REPAINT (events.ts) ─────────────────────────────────────────
+// While this world's season runs, every beat card, fever ring and screen
+// flash wears the season's colour instead of its own. Wholesale on purpose:
+// four distinct beat colours read as "normal play" 351 days a year, so ONE
+// colour everywhere for a fortnight is exactly what makes the fortnight feel
+// like an occasion. The beats' titles, cues and timings never change.
+const seasonNow: SeasonEvent | null = eventForWorld(pickedWorld);
+if (seasonNow) for (const b of BEATS) { b.col = seasonNow.accent; b.flash = seasonNow.flash; }
+_dbg.__season = seasonNow;
+_dbg.__beats = BEATS;
 const MEAL_NAME: Record<string, string> = pickedWorld === 'gameday' ? {
   // GAME DAY names its own meals: 'a parked car' for a pickup with the tailgate
   // down is the wrong noun, and newsroom_gameday's matcher already looks for
@@ -4517,6 +4595,15 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
       bestEl.textContent = b ? `★ BEST ${b.toLocaleString()}`
         : `✨ NEW PLACE · ${totalCount(id as WorldId) - foundCount(id as WorldId)} SECRETS`;
     }
+    // in season? the poster says so — accent chip, top corner, with the date
+    const ev = eventForWorld(id);
+    if (ev) {
+      const chip = document.createElement('div');
+      chip.className = 'wEvent';
+      chip.style.setProperty('--evc', `#${ev.accent.toString(16).padStart(6, '0')}`);
+      chip.textContent = `${ev.icon} ${ev.name} · ${eventEndLabel(ev)}`;
+      c.appendChild(chip);
+    }
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
       track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld });
@@ -4527,6 +4614,27 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
       location.href = location.pathname;
     });
   });
+}
+// ── the season ribbon on the menu ────────────────────────────────────────────
+// One tap from the splash to the world in season. If a different world is in
+// season than the one built, the tap is a world switch — same reload path as
+// the picker card, so the child lands playing, not back on the splash.
+{
+  const rib = el('eventRibbon');
+  const ev = liveEvents()[0] ?? null;
+  if (rib && ev) {
+    rib.style.setProperty('--evc', `#${ev.accent.toString(16).padStart(6, '0')}`);
+    rib.innerHTML = `${ev.icon} ${ev.name} — ${WORLD_NAMES[ev.world]}`
+      + `<em>${ev.line.toUpperCase()} · ${eventEndLabel(ev)}</em>`;
+    rib.classList.add('show');
+    rib.addEventListener('click', () => {
+      track('event_ribbon', { id: ev.id, world: ev.world, from: pickedWorld });
+      if (ev.world === pickedWorld) { launchWorld(); return; }
+      localStorage.setItem('voidWorld', ev.world);
+      localStorage.setItem('voidAutoPlay', '1');
+      location.href = location.pathname;
+    });
+  }
 }
 // locked world teasers wiggle on tap — and show what they are, desaturated,
 // because a child should be able to see what they are waiting for

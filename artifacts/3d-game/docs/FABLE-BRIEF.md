@@ -140,6 +140,29 @@ Each keeps a one-paragraph record with its commit; item 5 is the open work.
    "NEW PLACE · 12 SECRETS". Owner's PRICES curve untouched throughout.
    Also owner-reported and fixed same day: the joystick's resting-thumb
    speed tax (joyfeel.mjs, 2fd4f84).
+6. SEASONS, built 2026-08-14 (src/game/events.ts) — LADDER action #5,
+   Subway Surfers' cadence at our scale. Four dated windows, one per world,
+   recurring yearly, checked against the device clock at boot (no server):
+   MOON FESTIVAL (lantern, Feb 5–21), THE GREAT REGATTA (pirate, Jul
+   11–27), HOMECOMING (gameday, Sep 4–20), HARVEST WEEK (maple, Oct 17 –
+   Nov 2). While live: the world's four beats + fever rings repaint to the
+   season's accent, ~44 themed edible props scatter the districts
+   (pumpkins / bunting / pennants / moon lanterns), four seasonal stickers
+   hide in real districts (visible in the book only while live or once
+   found — found is forever, and windows recur so nothing is ever lost),
+   and the menu + world-picker grow dated ribbons. A date, never a
+   countdown — no in-match timers, nothing gated, shop untouched.
+
+   OWNER-SIDE, THE ICON HALF: Subway's sharpest trick is that the APP ICON
+   changes with the season, so the phone's home screen advertises novelty
+   before the app opens. iOS supports this via alternate icons:
+   Xcode assets (one icon set per season) + a call to
+   UIApplication.setAlternateIconName('harvest') when a window opens —
+   the code hook is trivial once the wrapper exists, but the four icon
+   assets and the Xcode listing work are App Store Connect side, so it is
+   yours. The four season accents (#ffe9a8 moon, #35d6ff regatta,
+   #6f8bff homecoming, #ff9a2e harvest) are the palette to brief an icon
+   set from.
 
 ### RETRACTION 2026-08-13, first-60-seconds: "the match runs behind the
 tutorial card" was a PROBE ARTIFACT, not a bug. The probe (firstrun.mjs)

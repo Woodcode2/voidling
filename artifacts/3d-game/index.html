@@ -1011,6 +1011,31 @@
         background: linear-gradient(180deg, #ff5d7e, #ff2450); box-shadow: 0 7px 0 #b8163a, 0 14px 30px rgba(0,0,0,0.45); }
       #btnPlay:active { transform: translateY(4px); box-shadow: 0 3px 0 #b8163a; }
       #btnPlay span { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; opacity: 0.85; margin-top: 3px; }
+      /* ── the season ribbon ── a pill under PLAY, painted in the season's
+         accent (set inline as --evc by prototype3d), with a slow light sweep
+         so it reads as an occasion rather than another button. Hidden 351
+         days a year; the menu column loses nothing when no season runs. */
+      #eventRibbon { display: none; position: relative; overflow: hidden; margin-top: 10px;
+        padding: 9px 22px; border-radius: 999px; font-size: 12.5px; font-weight: 900; letter-spacing: 1.2px;
+        color: #1c0930; background: var(--evc, #ffd23f);
+        background: linear-gradient(180deg, var(--evc, #ffd23f), color-mix(in srgb, var(--evc, #ffd23f) 72%, #000));
+        box-shadow: 0 4px 0 rgba(0,0,0,0.35);
+        box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 22px color-mix(in srgb, var(--evc, #ffd23f) 55%, transparent); }
+      #eventRibbon.show { display: inline-block; }
+      #eventRibbon em { display: block; font-style: normal; font-size: 9.5px; font-weight: 800;
+        letter-spacing: 1.6px; opacity: 0.75; margin-top: 2px; }
+      #eventRibbon::after { content: ''; position: absolute; inset: 0;
+        background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%);
+        transform: translateX(-110%); animation: evSweep 3.4s ease-in-out infinite; }
+      @keyframes evSweep { 0%, 55% { transform: translateX(-110%); } 85%, 100% { transform: translateX(110%); } }
+      #eventRibbon:active { transform: scale(0.96); }
+      /* the same season, announced on its world's poster in the picker */
+      .wEvent { position: absolute; top: 10px; right: 10px; z-index: 2; padding: 5px 11px; border-radius: 999px;
+        font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #1c0930;
+        background: var(--evc, #ffd23f); box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.45), 0 0 14px color-mix(in srgb, var(--evc, #ffd23f) 60%, transparent);
+        animation: evPulse 2.2s ease-in-out infinite; }
+      @keyframes evPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
       /* WRAP. The row is 474px of content with nowrap, and
          document.scrollWidth === innerWidth, so there was nothing to scroll to
          — SCRAPBOOK measured 61% / 66% / 82% visible and TOP VOIDS 57% / 63% /
@@ -1503,6 +1528,9 @@
         <path d="M87 122 Q101 136 115 122" stroke="#1a0b33" stroke-width="5.5" fill="none" stroke-linecap="round"/>
       </svg></div>
       <button id="btnPlay">PLAY</button>
+      <!-- the season ribbon: only exists while a world is in season (events.ts).
+           A date, never a countdown — the pull is the repaint, not a timer. -->
+      <button id="eventRibbon"></button>
       <div class="navRow">
         <button class="navCard" id="btnBook"><i>📗</i>SCRAPBOOK<em id="bookCount"></em></button>
         <button class="navCard" id="btnShop"><i>🛍️</i>SHOP</button>

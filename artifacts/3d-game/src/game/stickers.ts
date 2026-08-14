@@ -25,8 +25,15 @@
 //  you rolled. That matters at 4+: no loot box has ever gone near this file
 //  and none ever will.
 //
-//  NOTHING HERE EXPIRES. No timers, no seasons, nothing is ever removed, and
-//  a sticker you have found stays found. The honest version of a collection.
+//  NOTHING FOUND EVER EXPIRES. A sticker you have found stays found — through
+//  resets, reinstalls and every future change to the save format. The one
+//  refinement since that promise was first written: SEASONAL stickers exist
+//  now (events.ts), and they are hidden in the world only while their season
+//  runs. The promise holds where it matters — a found seasonal sticker is
+//  yours forever and shows in the book year-round — and the seasons recur
+//  yearly, so an unfound one is never lost, only waiting for its month.
+
+import { isEventLive } from './seasons';
 
 export type StickerTier = 'common' | 'rare' | 'legendary';
 
@@ -43,6 +50,10 @@ export interface Sticker {
   /** the clue, in the newsroom's own voice. This is the Where's-Waldo half. */
   hint: string;
   tier: StickerTier;
+  /** SEASONAL GATE. Set to a SeasonEvent id and this sticker is only placed —
+   *  and only shown as a gap in the book — while that season runs. Absent on
+   *  the permanent forty-eight. Once found it behaves like any other sticker. */
+  event?: string;
   /** WHAT THE CARD SHOWS. The name is a joke; a generator needs an object.
    *  "Gus's Missing Sandwich" has to become "a triangular deli sandwich on a
    *  small white plate" or the set comes back as forty-eight interpretations
@@ -223,8 +234,78 @@ const LANTERN: Sticker[] = [
     art: 'one woven straw sandal with a fabric thong' },
 ];
 
-export const STICKERS: Sticker[] = [...MAPLE, ...PIRATE, ...GAMEDAY, ...LANTERN];
-export const STICKERS_BY_WORLD = (w: string): Sticker[] => STICKERS.filter((s) => s.world === w);
+// ── THE SEASONAL SETS — four per season, live only while it runs ──────────
+// Same rules as the permanent sets: named things the town would talk about,
+// hidden in real districts, tier = distance not dice. One legendary each.
+const HARVEST: Sticker[] = [
+  { id: 'prize-pumpkin', world: 'maple', event: 'harvest', name: 'The Prize Pumpkin', where: 'The Farm', biome: 'farm',
+    hint: 'Pearl calls it a personal best. The scale calls it a structural matter.', tier: 'rare',
+    art: 'one enormous orange pumpkin with a prize rosette ribbon pinned to it' },
+  { id: 'scarecrow-dave', world: 'maple', event: 'harvest', name: 'Scarecrow Dave', where: 'The Fairgrounds', biome: 'fair',
+    hint: 'Third at the scarecrow contest. There were three.', tier: 'common',
+    art: 'a friendly scarecrow with a straw hat, mounted on a wooden pole' },
+  { id: 'cider-barrel', world: 'maple', event: 'harvest', name: 'The Cider Barrel', where: 'Main Street', biome: 'mainst',
+    hint: 'Tapped at noon. Empty by five past. Refilled without comment.', tier: 'common',
+    art: 'a wooden cider barrel with a small brass tap and a tin cup on top' },
+  { id: 'leaf-pile', world: 'maple', event: 'harvest', name: 'The Forbidden Leaf Pile', where: 'Maple Heights', biome: 'burb',
+    hint: 'Raked for three days. Do not jump in it. Everybody has jumped in it.', tier: 'legendary',
+    art: 'a huge neat pile of orange and red autumn leaves' },
+];
+const REGATTA: Sticker[] = [
+  { id: 'tiny-yacht', world: 'pirate', event: 'regatta', name: 'The Smallest Yacht', where: 'The Port', biome: 'port',
+    hint: 'Registered as a yacht. It is a bathtub with a sail.', tier: 'rare',
+    art: 'a tiny bathtub boat with one proud white sail' },
+  { id: 'race-buoy', world: 'pirate', event: 'regatta', name: 'Buoy Number One', where: 'The Beach', biome: 'beach',
+    hint: 'The whole race turns here. It has drifted onto the sand.', tier: 'common',
+    art: 'a striped red and white race buoy with a small flag on top' },
+  { id: 'regatta-cup', world: 'pirate', event: 'regatta', name: 'The Regatta Cup', where: 'The Resort', biome: 'resort',
+    hint: 'Engraved with every winner since records began, which was recently.', tier: 'legendary',
+    art: 'a large silver two-handled trophy cup with a sailboat engraved on it' },
+  { id: 'signal-flags', world: 'pirate', event: 'regatta', name: 'The Signal Flags', where: 'The Bazaar', biome: 'market',
+    hint: 'Spell something rude in nautical. The harbour master is dealing with it.', tier: 'common',
+    art: 'a string of colourful triangular nautical signal flags between two poles' },
+];
+const HOMECOMING: Sticker[] = [
+  { id: 'welcome-banner', world: 'gameday', event: 'homecoming', name: 'The WELCOME BACK Banner', where: 'The Campus', biome: 'campus',
+    hint: 'Painted by the freshmen. BACK is backwards.', tier: 'common',
+    art: 'a painted fabric banner reading WELCOME BACK strung between two poles' },
+  { id: 'float-tiger', world: 'gameday', event: 'homecoming', name: 'The Papier-Mâché Tiger', where: 'Frat Row', biome: 'greek',
+    hint: 'The parade float\'s crown jewel. It has already lost an ear.', tier: 'rare',
+    art: 'a large papier-mache tiger head on a decorated parade float base' },
+  { id: 'crown-cooler', world: 'gameday', event: 'homecoming', name: 'The Homecoming Crown', where: 'The North Lot', biome: 'lot',
+    hint: 'Last seen on the cooler in row C. The cooler wears it well.', tier: 'legendary',
+    art: 'a sparkling homecoming crown sitting on top of a portable drinks cooler' },
+  { id: 'spare-tuba', world: 'gameday', event: 'homecoming', name: 'The Spare Tuba', where: 'The Practice Field', biome: 'practice',
+    hint: 'In case of tuba emergency. There has never not been one.', tier: 'common',
+    art: 'a big brass sousaphone standing upright on the grass' },
+];
+const MOONFEST: Sticker[] = [
+  { id: 'moon-rabbit', world: 'lantern', event: 'moonfest', name: 'The Moon Rabbit', where: 'The Night Garden', biome: 'nightgarden',
+    hint: 'Arrived for the festival. Refuses to confirm anything.', tier: 'legendary',
+    art: 'a small white rabbit sitting upright beneath a round paper moon' },
+  { id: 'mooncake-tower', world: 'lantern', event: 'moonfest', name: 'The Mooncake Tower', where: 'Lantern Row', biome: 'stalls',
+    hint: 'Stacked thirteen high. Ponta has been asked to stand elsewhere.', tier: 'common',
+    art: 'a tall stack of golden mooncakes on a red lacquer plate' },
+  { id: 'wish-lantern', world: 'lantern', event: 'moonfest', name: 'The First Wish Lantern', where: 'The Moon Bridge', biome: 'moonbridge',
+    hint: 'Released at moonrise. Came straight back. It likes it here.', tier: 'rare',
+    art: 'a glowing paper sky lantern resting on a wooden bridge railing' },
+  { id: 'moon-mirror', world: 'lantern', event: 'moonfest', name: 'The Moon In The Water', where: 'The Hot Spring', biome: 'onsen',
+    hint: 'The far pool holds it steady. Please do not splash the moon.', tier: 'common',
+    art: 'a full moon reflected in a small round dark pool ringed with stones' },
+];
+
+export const STICKERS: Sticker[] = [
+  ...MAPLE, ...PIRATE, ...GAMEDAY, ...LANTERN,
+  ...HARVEST, ...REGATTA, ...HOMECOMING, ...MOONFEST,
+];
+// VISIBILITY IS THE ONE RULE, APPLIED IN ONE PLACE. A seasonal sticker exists
+// — to the placer, the book grid, every count and every hint — while its
+// season runs, or forever once found. Every caller goes through here, so the
+// book can never show a gap that points at a thing that is not in the world.
+const visible = (s: Sticker): boolean =>
+  !s.event || load().has(s.id) || isEventLive(s.event);
+export const STICKERS_BY_WORLD = (w: string): Sticker[] =>
+  STICKERS.filter((s) => s.world === w && visible(s));
 export const STICKER_BY_ID = new Map(STICKERS.map((s) => [s.id, s]));
 
 /** How many points a find is worth, and how loud the moment is. */
@@ -252,10 +333,12 @@ function save(): void {
 }
 
 export const hasSticker = (id: string): boolean => load().has(id);
+// counts use the same visibility rule as the grid, or the book's "12 of 52"
+// footer would demand seasonal stickers in the middle of March
 export const foundCount = (world?: string): number =>
-  (world ? STICKERS_BY_WORLD(world) : STICKERS).filter((s) => load().has(s.id)).length;
+  (world ? STICKERS_BY_WORLD(world) : STICKERS.filter(visible)).filter((s) => load().has(s.id)).length;
 export const totalCount = (world?: string): number =>
-  (world ? STICKERS_BY_WORLD(world) : STICKERS).length;
+  (world ? STICKERS_BY_WORLD(world) : STICKERS.filter(visible)).length;
 
 /** Record a find. Returns the Sticker if it was NEW, null if already had. */
 export function collect(id: string): Sticker | null {
