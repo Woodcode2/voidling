@@ -2466,9 +2466,18 @@ function cardHtml(text: string): string {
   const body = m ? m[2] : text;
   return `<div class="bCard">${ico ? `<span class="bIco">${ico}</span>` : ''}<span class="bTx">${esc(body)}</span></div>`;
 }
+/** The bnr animation is 2.4s (index.html): ~1.9s of that is the card arriving
+ *  and holding, the rest is its exit. Reserving that window here is what stops
+ *  a new message from HARD-CUTTING one that is still being read — the class
+ *  dance below restarts the animation from frame zero, so a colliding message
+ *  used to blink the card to opacity 0 and re-pop it mid-sentence. The queue in
+ *  announceHtml already existed and already keeps only the newest message; it
+ *  was simply never armed for ordinary banners, only for the evolve card. */
+const BANNER_READ = 1.9;
 function paintBanner(html: string) {
   bannerEl.innerHTML = html;
   bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+  bannerFree = Math.max(bannerFree, tClock + BANNER_READ);
 }
 function announce(text: string) { announceHtml(cardHtml(text)); }
 function announceHtml(html: string) {

@@ -1608,7 +1608,18 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const g = Math.min(1, Math.max(0.12, k));
       const want = 0.18 + 0.30 * g;                 // 0.22 -> 0.48 of a second
       const wide = 0.42 + 0.58 * g;                 // 0.47 -> 1.00 of the jaw
-      if (mouthT < want) { mouthT = want; mouthMax = wide; }
+      // A RETRIGGER MAY EXTEND THE MAW, NEVER SHRINK IT. This used to
+      // overwrite mouthMax outright, so a small bite landing inside a big
+      // bite's envelope SNAPPED the jaw half shut mid-animation: eat a house
+      // (mouthT 0.48, mouthMax 1.0), and 0.3s later — with the maw still
+      // rendering fully open, because the render clamps at mouthT * 8 — a
+      // traffic cone (want 0.216, wide 0.49) would set mouthMax to 0.49 and
+      // halve the opening in one frame. On the one action the whole game is
+      // made of, roughly fifty times a match. The current opening is now the
+      // floor: a small bite buys more time open, and nothing else.
+      const cur = mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0;
+      if (mouthT < want) mouthT = want;
+      mouthMax = Math.max(wide, cur);
       wobble = Math.min(1, wobble + 0.30 + 0.55 * g);
     },
     /** Kick the growth spring directly — an absorbed meal should shove the
