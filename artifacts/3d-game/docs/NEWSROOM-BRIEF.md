@@ -1,6 +1,7 @@
 # THE NEWSROOM BRIEF — the town has a voice, and it is not the void's
 
-**Status:** open mandate. Owner-set, 2026-08-15, after a phone playtest.
+**Status:** BUILT. Owner-set 2026-08-15 after a phone playtest; delivered the
+same day. All five deliverables shipped — see **WHAT SHIPPED** at the foot.
 **Read this before touching any newsroom, bubble or banner code.**
 
 ---
@@ -160,3 +161,84 @@ the council is denying there is a hole. Then the water tower goes and the paper
 loses its composure about the water tower specifically. By the end the Bugle is
 publishing in all caps and the town is still, somehow, filing copy. At no point
 does a purple ball appear to be writing the newspaper.
+
+---
+
+# WHAT SHIPPED
+
+## The five deliverables
+
+1. **The routing bug is dead.** `rivals.onSpeak` and the rank-up brag path both
+   lost their `else breakingNews(...)` fallback. A family member too far away to
+   carry a bubble is now SILENT. Nothing else changed about family speech — they
+   talk constantly when near, so nothing was lost, and the rank-change hero
+   banner already carried the brag.
+2. **A four-phase arc, in `src/proto3d/newsroom_arc.ts`.** Driven by
+   `max(devouredPct-progress, clock-progress)` exactly as specified, with three
+   independent guarantees that it never reverses: a HIGH-WATER MARK on the
+   driver (the inputs themselves can fall), the form ladder demoted from a term
+   to a FLOOR, and ONE STEP PER CARD so a fast eater climbs a rung per headline
+   instead of teleporting to PANIC. Phases 1-3 reuse the existing tier pools —
+   those are written, voice-checked and style-metered, and re-authoring them to
+   fit a new shape would have thrown away good work. Only MORNING is new.
+3. **MORNING pools, ~28 lines per world**, inside each newsroom module so they
+   inherit the anti-repeat memory and the ticker clip. No `{tokens}` — morning
+   must not depend on match state — and no greeting, because the sign-on already
+   said it. The void is not mentioned, hinted at, or obliquely referenced.
+4. **Reactive lines, in `src/proto3d/newsroom_react.ts`.** 108 templates across
+   four triggers × four worlds: a named landmark eaten, each of the four match
+   beats, a form change, and a rival eaten. All four fire through ONE funnel
+   (`townReacts`) with ONE shared 11-second cooldown, because the reason this
+   feature had been rebuilt more than once is that every call site had invented
+   its own rules.
+5. **`qa/newsarc.mjs`**, six sections, 25 assertions, PASS on all four worlds.
+   And `qa/newsstyle.mjs` extended to meter MORNING and the reactive pools.
+
+## Three decisions worth knowing about
+
+**The beat reaction is deliberately late.** The brief asked for the town to
+react to the band; the obvious implementation — hand the newsroom `bt.news` when
+the beat fires — is the exact bug that was removed earlier this year, when five
+of eight headlines in a measured Maple match were the beat card the player had
+just read. So the banner still owns the beat, and eight seconds later the paper
+reports the beat WALKING INTO THE VOID. Different event, different joke.
+
+**Maple's morning has no bake sale.** The brief's example line for MORNING is
+"bake sales", and `newsroom_maple.ts` bans pies and bake sales permanently under
+its rule 5 — a house rule that exists because that one gag had eaten the feed
+once already. The house rule wins. The pool draws from the approved list in that
+same rule instead: a very large zucchini, the library's one computer, a raccoon
+in the vending machine, a trampoline up a tree.
+
+**A reactive line preempts the arc but still advances it.** The card printed is
+the reaction; the phase still steps and still supplies the brand chip. So the
+water tower going is reported under whatever badge the town has earned, and the
+next scheduled card picks up exactly where the story was.
+
+## What the probe measured
+
+`node qa/newsarc.mjs` (and `ARC_WORLD=pirate|gameday|lantern`):
+
+- phases `0 0 0 1 1 1 2 2 2 3 3 3 3 3` — in order, never skipping, never
+  reversing, morning owning the first two cards
+- the brand chip escalating with it (`📰 THE BUGLE` → `⚠️ BUGLE ALERT` →
+  `🚨 BUGLE EXTRA`)
+- 14 distinct lines from 14 cards; zero `💬` chips; zero family names
+- 14/14 cards measured **on screen** — a real bounding box, inside the viewport,
+  opaque, on a 430×932 phone
+- a real landmark eaten through the real eat path, named in full:
+  *"Pike Hollow still has theirs. The Second-Biggest Ball of Twine is gone."*
+- PLAY AGAIN returning the arc to phase 0, 0 cards, high-water 0.00
+
+Two probe faults were found and fixed rather than worked around, and both are
+written up in the file: the card's CSS animation clock stalls while the game
+holds the main thread under swiftshader (so the probe waits on the animation's
+own timeline, not on wall clock), and the first draft of the landmark assertion
+passed on the hero-cue headline the probe had triggered itself.
+
+One COPY fault was found by the probe on a live card and fixed in the source:
+the subject clip was truncating *"The Second-Biggest Ball of Twine"* to *"The
+Second-Biggest Ball of"*. A landmark line whose whole job is to name the
+landmark must never be the thing that cuts it in half, so the budget now runs
+the other way — the subject is never clipped and the TEMPLATES are held short
+enough to fit one, checked at worst-case fill by `qa/newsstyle.mjs`.

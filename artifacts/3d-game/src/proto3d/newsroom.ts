@@ -99,6 +99,11 @@ export interface NewsCtx {
   // start reading them.
   rivalName?: string;
   rivalLead?: number;
+  /** PHASE 0. The resort is having an ordinary morning and nothing has
+   *  happened yet. Set by the arc driver (newsroom_arc.ts) for the first
+   *  couple of cards of every match; when it is true, `tier` and every live
+   *  token are ignored and the station reads the MORNING pool. */
+  morning?: boolean;
 }
 
 /** Per-tier ticker brand. The station gets progressively less relaxed. */
@@ -129,6 +134,46 @@ const SIGN_ON: string[] = [
   'Good morning, Pirate Bay! Two pools, one parrot, one new water slide.',
   'Good morning, Pirate Bay! Cressida Vane gave the toast five stars.',
   'Good morning, Pirate Bay! Last night\'s conga line stopped at six.',
+];
+
+// ── BEAT 1b · MORNING ─────────────────────────────────────────────────────────
+// THE ORDINARY MORNING. The sign-on says good morning once; this is the rest of
+// breakfast. Nothing in this pool knows a void exists — not as a hole, a water
+// feature, a new pool or a rumour — because BEAT 2's flat denial is only funny
+// once a child has seen the day it is denying. See the same note in
+// newsroom_maple.ts; the rule is identical in all four worlds.
+//
+// No {tokens}: morning must not depend on match state. No greeting: the sign-on
+// already said it. Mostly one sentence.
+const MORNING: string[] = [
+  'The treasure map is wrong again. Nigel has drawn a new wrong one.',
+  'Barnaby the parrot has learned the entire breakfast menu by heart.',
+  'The cannon fires beach balls at eleven. Not ten. The sign is wrong.',
+  'Lounger nine has been booked by the same guest for eleven years.',
+  'Mrs Fenwick-Hyde would like a word with somebody about the sea.',
+  'Cressida Vane has awarded four stars to a mango and left a note.',
+  'The water slide queue is the second-longest thing on the island.',
+  'Lost property: one violin, one enormous hat and one flip-flop.',
+  'Maisie, aged seven, has named a seagull and is now feeding it.',
+  'The Gilded Lagoon across the bay has two parrots. We have Barnaby.',
+  'Sandcastle judging is at three. Guests should bring their own bucket.',
+  'DJ Coconut says one more hour. He has been saying that since Tuesday.',
+  'The pudding buffet has been given a small buffet of its very own.',
+  'Staff have said "arrr" forty times and it is not yet nine o\'clock.',
+  'A guest has asked the front desk to turn the sun down a little.',
+  'Last night\'s conga line has finally come to a stop near the docks.',
+  'Nigel would like it known that he is simply a man named Nigel.',
+  'Towels are available at the towel hut, which is where towels are.',
+  'Capt. Roger has upgraded a guest to a room he has not built yet.',
+  'The parrot repeated a complaint word for word and it was correct.',
+  'The morning shanty is at eleven and nobody knows who moved it.',
+  'Room service delivered nine hundred ice creams before breakfast.',
+  'A guest has dug up the buried treasure. The treasure was a spade.',
+  'The bazaar has a new stall. It sells hats for the enormous hat.',
+  'The jungle path is open today. Take water. Take the other path.',
+  'Smugglers Cove is lovely and nobody has smuggled a single thing.',
+  'The pool is heated, the sea is not, and management stands by both.',
+  'Snorkel hire is half price and Barnaby has opinions about that.',
 ];
 
 /** Ticker-friendly district names, used to fill {D}. Longest is 14 chars. */
@@ -846,6 +891,17 @@ function usable(t: string, ctx: NewsCtx): boolean {
 
 const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
 
+/** Draw from a pool that carries no {tokens} — the sign-on and MORNING. Same
+ *  anti-repeat memory as everything else, and the same hard ticker clip. */
+function drawPlain(pool: string[], rnd: () => number): string {
+  const fresh = pool.filter((l) => !rawHistory.includes(l));
+  const src = fresh.length ? fresh : pool;
+  const raw = src[Math.floor(rnd() * src.length) % src.length] ?? pool[0];
+  const out = clip(raw, TICKER_MAX);
+  remember(raw, out);
+  return out;
+}
+
 /**
  * One fully-formed headline, ready to drop straight into the ticker.
  *
@@ -872,6 +928,9 @@ export function pickNews(ctx: NewsCtx, rnd: () => number = Math.random): string 
     remember(raw0, out0);
     return out0;
   }
+
+  // BEAT 1b. Still morning: the ordinary day, no void, no live state.
+  if (ctx.morning) return drawPlain(MORNING, rnd);
 
   const districtPool = ctx.district ? BY_DIST[ctx.district][tier].filter((t) => usable(t, ctx)) : [];
   const mealPool = BY_MEAL[mealKind(ctx.lastMeal)][tier].filter((t) => usable(t, ctx));
@@ -935,7 +994,7 @@ export function pickNews(ctx: NewsCtx, rnd: () => number = Math.random): string 
 export function newsLineCount(): number {
   const all: Pools[] = [PORT, MARKET, RESORT, PARTY, JUNGLE, COVE, BEACH, GENERAL, LIVE,
     MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL];
-  return SIGN_ON.length + SIGN_OFF.length
+  return SIGN_ON.length + MORNING.length + SIGN_OFF.length
     + all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
 }
 
@@ -948,6 +1007,7 @@ export function newsLineCount(): number {
 export function newsAudit(): { beat: 1 | 2 | 3 | 4 | 5; pool: string; line: string }[] {
   const out: { beat: 1 | 2 | 3 | 4 | 5; pool: string; line: string }[] = [];
   for (const line of SIGN_ON) out.push({ beat: 1, pool: 'SIGN_ON', line });
+  for (const line of MORNING) out.push({ beat: 1, pool: 'MORNING', line });
   const pools: [string, Pools][] = [
     ['PORT', PORT], ['MARKET', MARKET], ['RESORT', RESORT], ['PARTY', PARTY],
     ['JUNGLE', JUNGLE], ['COVE', COVE], ['BEACH', BEACH], ['GENERAL', GENERAL],

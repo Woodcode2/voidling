@@ -110,6 +110,11 @@ export interface GamedayCtx {
   // start reading them.
   rivalName?: string;
   rivalLead?: number;
+  /** PHASE 0. Pre-game. Nobody in the booth has seen anything yet. Set by the
+   *  arc driver (newsroom_arc.ts) for the first couple of cards of every match;
+   *  when it is true, `tier` and every live token are ignored and the booth
+   *  reads the MORNING pool. */
+  morning?: boolean;
 }
 
 /** Per-tier ticker brand. The booth does not leave, it just changes badge. */
@@ -139,6 +144,48 @@ const SIGN_ON: string[] = [
   'Good morning, Marston! The band is under the north stand, warming up.',
   'Good morning, Marston! Sixty two degrees, no wind and one small cloud.',
   'Good morning, Marston! The lemonade stand on the corner is open.',
+];
+
+// ── BEAT 1b · MORNING ─────────────────────────────────────────────────────────
+// PRE-GAME, and nobody has seen anything. The sign-on greets Marston once; this
+// is the rest of the pre-game show — two professionals filling airtime with the
+// weather, the attendance and somebody's casserole. Not one line here knows a
+// void exists, because BEAT 2 (which slides into "a thing in the north lot that
+// is not on the depth chart") is only funny once a child has heard the booth
+// being completely ordinary. Same rule in all four worlds.
+//
+// No {tokens}: morning must not depend on match state. No greeting: the sign-on
+// already said it. Mostly one sentence. And no score, ever — see the two-teams
+// note at the top of this file.
+const MORNING: string[] = [
+  'The lot opened at six and the lot has been full since seven.',
+  'Ernie lit grill nine on Thursday and Ernie has not left grill nine.',
+  'Bill Ordway has a new notebook, a new pen and nothing to write yet.',
+  'Doreen\'s casserole is halfway up the aisle and gaining on row K.',
+  'Buckley the squirrel is out early, waving at cars that are parked.',
+  'Dwight is up his ladder. Still no blimp, folks. Dwight is the blimp.',
+  'The grass has been mown into stripes and somebody is very proud.',
+  'Coach Duffy started chewing that gum at the coin toss on Tuesday.',
+  'Somebody has parked a sofa in row D of the north lot again.',
+  'The band is under the north stand and has one cadence ready.',
+  'Sixty two degrees, no wind, one small cloud with no plans.',
+  'The chain crew have measured the chains. The chains are correct.',
+  'Marla Beam is about to get a word with somebody about the weather.',
+  'The PA is asking about a blue sedan in row B for the ninth time.',
+  'Both benches carried the water carts out together. Nice to see.',
+  'Deb in the truck says we are on in thirty. Deb is always right.',
+  'The waffle stand has run out of waffles and it is not yet ten.',
+  'A steward has found nine sets of keys and one very small shoe.',
+  'RV Row has been here since Wednesday and intends to stay to Monday.',
+  'Hank Prewitt is calling his thirty first season out of this booth.',
+  'The lemonade stand on the corner has a queue around the fence.',
+  'Somebody\'s dog is wearing a jersey and is enjoying the attention.',
+  'The tree line is full of folks who did not want to pay for a seat.',
+  'Old Campus has rung its bell eleven times. It is ten o\'clock.',
+  'Ernie says the sausages are ready. Ernie said that an hour ago.',
+  'The practice field is empty and the sprinklers are running anyway.',
+  'Frat Row has built something out of chairs and will not explain it.',
+  'The gates open in ten minutes and the gates opened an hour ago.',
 ];
 
 /** Ticker-friendly district names, used to fill {D}. Longest is 18 chars. */
@@ -1079,6 +1126,17 @@ function usable(t: string, ctx: GamedayCtx): boolean {
 
 const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
 
+/** Draw from a pool that carries no {tokens} — the sign-on and MORNING. Same
+ *  anti-repeat memory as everything else, and the same hard ticker clip. */
+function drawPlain(pool: string[], rnd: () => number): string {
+  const fresh = pool.filter((l) => !rawHistory.includes(l));
+  const src = fresh.length ? fresh : pool;
+  const raw = src[Math.floor(rnd() * src.length) % src.length] ?? pool[0];
+  const out = clip(raw, TICKER_MAX);
+  remember(raw, out);
+  return out;
+}
+
 /**
  * One fully-formed headline, ready to drop straight into the ticker.
  *
@@ -1105,6 +1163,9 @@ export function pickGamedayNews(ctx: GamedayCtx, rnd: () => number = Math.random
     remember(raw0, out0);
     return out0;
   }
+
+  // BEAT 1b. Still pre-game: nobody in this booth has seen anything yet.
+  if (ctx.morning) return drawPlain(MORNING, rnd);
 
   const districtPool = ctx.district ? BY_DIST[ctx.district][tier].filter((t) => usable(t, ctx)) : [];
   const mealPool = BY_MEAL[gamedayMealKind(ctx.lastMeal)][tier].filter((t) => usable(t, ctx));
@@ -1168,7 +1229,7 @@ export function pickGamedayNews(ctx: GamedayCtx, rnd: () => number = Math.random
 export function gamedayLineCount(): number {
   const all: Pools[] = [BOWL, PLAZA, LOT, RVPARK, GREEK, CAMPUS, PRACTICE, WOODS, GENERAL, LIVE,
     MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL];
-  return SIGN_ON.length + SIGN_OFF.length
+  return SIGN_ON.length + MORNING.length + SIGN_OFF.length
     + all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
 }
 
@@ -1188,6 +1249,7 @@ export function gamedayVoiceLineCount(): number {
 export function gamedayAudit(): { beat: 1 | 2 | 3 | 4 | 5; pool: string; line: string }[] {
   const out: { beat: 1 | 2 | 3 | 4 | 5; pool: string; line: string }[] = [];
   for (const line of SIGN_ON) out.push({ beat: 1, pool: 'SIGN_ON', line });
+  for (const line of MORNING) out.push({ beat: 1, pool: 'MORNING', line });
   const pools: [string, Pools][] = [
     ['BOWL', BOWL], ['PLAZA', PLAZA], ['LOT', LOT], ['RVPARK', RVPARK], ['GREEK', GREEK],
     ['CAMPUS', CAMPUS], ['PRACTICE', PRACTICE], ['WOODS', WOODS],

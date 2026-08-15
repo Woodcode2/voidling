@@ -31,6 +31,8 @@ import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './p
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
 import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from './proto3d/newsroom_lantern';
+import { arcPhase, resetArc, arcState } from './proto3d/newsroom_arc';
+import { reactLine, resetReact, type ReactIn } from './proto3d/newsroom_react';
 import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
 import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
@@ -875,6 +877,18 @@ interface WorldCopy {
   heroCue: string | null;
   heroCueNews: string | null;
   heroGone: string | null;
+  /** THE HERO LANDMARK'S NAME, as the paper would print it.
+   *
+   *  The brief's list of landmarks a town should react to opens with "the water
+   *  tower, the town hall, the clock tower, the great gate, the bathhouse" —
+   *  and three of those five are hero props, the single biggest thing in their
+   *  world. They raised a full-screen banner and the newspaper said NOTHING,
+   *  which is the one moment in a match where silence is least defensible.
+   *
+   *  Title Case, and with its article, because it lands at the head of a
+   *  sentence in half the landmark templates — exactly like a sticker name,
+   *  which is the other source of {X}. `null` on a world with no hero prop. */
+  heroName: string | null;
   /** THE REACTIVE ONE-SHOTS, per world. `breakingNews()` jumps the newsroom
    *  queue when the player causes a big beat, and until now three of those
    *  beats were hard-coded generic strings that fired in ALL FOUR worlds.
@@ -883,7 +897,12 @@ interface WorldCopy {
    *  printing "It ate a house. A WHOLE house. We have questions." That is the
    *  same class of leak as the stadium banner above, and the same fix. */
   houseNews: string;      // the first building goes
-  rivalGoneNews: string;  // one void has eaten the other
+  // `rivalGoneNews` USED TO LIVE HERE and does not any more. One void eating
+  // another is a REACTION, not a fixed string, and it now draws from a pool in
+  // newsroom_react.ts through the same cooldown as the landmark, beat and
+  // evolve reactions — so a marquee kill and a water tower going ten seconds
+  // apart cannot print two cards over each other. All four original lines were
+  // moved into those pools verbatim; nothing was thrown away.
   rivalFullNews: string;  // …and the survivor has slowed right down
 }
 const WORLD_COPY: Record<WorldId, WorldCopy> = {
@@ -900,7 +919,6 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     ender: '🌑 WORLD ENDER! The town is OVER.',
     enderNews: 'MAPLE FALLS has GONE!! The clock is still nine minutes fast.',
     houseNews: 'A whole house has gone. Town hall will discuss it for four hours.',
-    rivalGoneNews: 'One void has eaten the other. There is one left, and it is bigger.',
     rivalFullNews: 'The second void has stopped moving. It looks full. It looks slow.',
     winSub: 'the whole town belongs to the void', place: 'the town',
     winTitles: ['TOWN: DELICIOUS', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'VOID SWEET VOID', 'CHOMPION OF MAPLE FALLS'],
@@ -941,6 +959,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     heroCue: '🏛️ YOU CAN EAT THE TOWN HALL NOW — GO!',
     heroCueNews: 'It is big enough for the town hall. The meeting has gone quiet.',
     heroGone: '🏛️ TOWN HALL: EATEN! MEETING OVER.',
+    heroName: 'The Town Hall',
   },
   pirate: {
     n: 2, icon: '🏴‍☠️', sub: 'the resort is packed · eat the party',
@@ -956,13 +975,13 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     ender: '🌑 WORLD ENDER! The resort is OVER.',
     enderNews: 'PIRATE BAY is CANCELLED!! It was lovely while it lasted.',
     houseNews: 'A whole villa, gone in one go. Do book early for next year.',
-    rivalGoneNews: 'One of them has eaten the other. There is one left. Rather large.',
     rivalFullNews: 'The other one has stopped moving. It looks full. Extremely full.',
     winSub: 'the whole resort belongs to the void', place: 'the resort',
     winTitles: ['RESORT: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'ALL-INCLUSIVE, LITERALLY', 'CHOMPION OF THE BAY'],
     heroCue: '🏨 YOU CAN EAT THE ROYAL MARINER NOW — GO!',
     heroCueNews: 'It is big enough for the Royal Mariner. The concierge has gone quiet.',
     heroGone: '🏨 THE ROYAL MARINER IS GONE. ALL FIVE STARS.',
+    heroName: 'The Royal Mariner',
   },
   gameday: {
     n: 3, icon: '🏈', sub: 'the whole town turned out · eat the tailgate',
@@ -987,13 +1006,13 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     ender: '🌑 WORLD ENDER! The stadium is OVER.',
     enderNews: 'MARSTON has GONE!! Hank Prewitt is still calling it, play by play.',
     houseNews: 'Bill, that was a HOUSE. Straight down the middle, and no flag.',
-    rivalGoneNews: 'One took the other, Bill. One left on the field, and it is bigger.',
     rivalFullNews: 'The second one has stopped moving. Bill calls that a slow start.',
     winSub: 'the whole of Marston belongs to the void', place: 'the town',
     winTitles: ['FINAL: VOID, EVERYBODY ELSE 0', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS', 'THAT IS A GAME', 'CHOMPION OF MARSTON'],
     heroCue: '🏟️ YOU CAN EAT THE STADIUM NOW — GO!',
     heroCueNews: 'It is big enough for the stadium. Hank has stopped describing it.',
     heroGone: '🏟️ THE STADIUM IS GONE. ALL OF IT.',
+    heroName: 'The Stadium',
   },
   lantern: {
     n: 4, icon: '🏮', sub: 'the spirits think you are a guest · eat the market',
@@ -1010,7 +1029,6 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     ender: '🌑 WORLD ENDER! The market is OVER.',
     enderNews: 'THE MARKET HAS GONE. The bathhouse thanks you for visiting.',
     houseNews: 'A guest has taken a whole house. We hope it was to their liking.',
-    rivalGoneNews: 'There is one guest tonight. The guest list has been updated.',
     rivalFullNews: 'The other guest has stopped. We think the other guest is full.',
     winSub: 'the whole market belongs to the void', place: 'the market',
     winTitles: ['MARKET: DEVOURED', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
@@ -1018,6 +1036,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     heroCue: '🏮 YOU CAN EAT THE BATHHOUSE NOW — GO!',
     heroCueNews: 'It is big enough for the bathhouse. The PA is still reading the hours.',
     heroGone: '🏮 THE BATHHOUSE IS GONE. ALL SLURPED UP.',
+    heroName: 'The Bathhouse',
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -1264,6 +1283,14 @@ const _dbg = new Proxy(_dbgStore, {
   __beats: MatchBeat[];
   // QA: the juice kit, for firing shake/ring/flash from a harness
   __fx: Fx;
+  // QA: the newsroom arc — every card that reached the screen this match, and
+  // where the four-phase story currently stands (newsroom_arc.ts)
+  __newsArc: () => {
+    log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
+    arc: { phase: number; cards: number; high: number };
+    reactCd: number; pending: string | null; pendingIn: number;
+    queue: string[]; live: boolean;
+  };
 };
 // QA counters: what the family actually DID to the player over a match
 const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0 };
@@ -1278,6 +1305,17 @@ _dbg.__renderBloom = () => { ensureComposer().render(); };
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
+// QA: every card that reached the screen this match, plus where the arc stands.
+// qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
+// proves the code ran, the box proves a child could read it.
+// reactCd/queue are here because "the paper did not react" has four possible
+// causes — the cooldown, a full queue, a spent pool, and a dead match — and a
+// probe that cannot tell them apart reports a mystery instead of a diagnosis.
+_dbg.__newsArc = () => ({
+  log: newsLog.slice(), arc: arcState(),
+  reactCd: Math.max(0, reactCd), pending: pendingReact, pendingIn: Math.max(0, pendingReactT),
+  queue: newsQueue.slice(), live: started && !ended,
+});
 _dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
 _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: district centroid sweeps
 // QA: the third term of the containment rule, so a harness can reproduce
@@ -1845,9 +1883,19 @@ const rivalChip = (name: string) => {
   return { name, color: rv ? `#${rv.color.toString(16).padStart(6, '0')}` : undefined };
 };
 rivals.onSpeak = (x, z, line, name) => {
+  // ── A VOID NEVER SPEAKS IN THE NEWSPAPER ────────────────────────────────
+  // This used to fall back to breakingNews(`💬 ${name}: ${line}`) when the
+  // speaker was too far to carry a bubble — so THE BUGLE, a small-town paper,
+  // printed a giant purple hole's dialogue. The owner read his own game on a
+  // phone and could not tell whether the news was the town or the void. It was
+  // the void. Every rewrite of the newsroom COPY missed it, because the problem
+  // was never the copy; it was this one line of routing.
+  //
+  // The town and the family are different voices with different lanes, and the
+  // fix is silence, not relocation: a family member you cannot see is a family
+  // member you do not hear. They speak constantly when near, so nothing is lost.
   const d = Math.hypot(x - voidState.x, z - voidState.z);
   if (d < 55) bubbles.say(rivalBubblePos.set(x, 5, z), line, 'rival', rivalChip(name));
-  else breakingNews(`💬 ${name}: ${line}`);
 };
 // hole-vs-hole danger: rivals are PLAYERS now, not decoration
 rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
@@ -1870,7 +1918,11 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   announceHtml(marquee
     ? `<div class="bCard"><span class="bIco">🏆</span><span class="bTx">You beat the chaser!<span class="bSub">${name} is out</span></span><span class="bMul">+${pts}</span></div>`
     : `<div class="bCard"><span class="bIco">🍽️</span><span class="bTx">You ate ${esc(name)}!<span class="bSub">${esc(FAMILY_TITLE[name] ?? 'a rival')} is out</span></span><span class="bMul">+${pts}</span></div>`);
-  if (marquee) { breakingNews(COPY.rivalGoneNews); addCoins(35); }
+  // …and the town notices a second hole vanishing, without ever learning that
+  // it had a name. COPY.rivalGoneNews was one string per world; this is a pool,
+  // through the same cooldown as every other reaction, so a marquee kill and a
+  // landmark going in the same ten seconds cannot double-print.
+  if (marquee) { townReacts({ kind: 'rivalGone' }); addCoins(35); }
   // real PAYOFF: the rival spirals in (rivals.ts), the void gapes wide, and a
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
@@ -3056,6 +3108,37 @@ function breakingNews(h: string) {
   // story may follow the previous one (comms redesign: one feed, breathing)
   newsCd = Math.min(newsCd, 4.0);
 }
+// ── THE TOWN REACTS ─────────────────────────────────────────────────────────
+// One funnel for every reactive headline, because the reason this feature has
+// been rebuilt more than once is that four different call sites each invented
+// their own rules. Everything routes through here now: it picks the line in the
+// world's own voice (newsroom_react.ts), it enforces the ONE shared cooldown,
+// and it is the only thing besides the queue that may call breakingNews.
+//
+// THE COOLDOWN IS THE WHOLE POINT. Landmarks, four beats, six form changes and
+// a rival being eaten can all land inside twenty seconds of a good run; without
+// a floor between them the newspaper becomes a stream and the scheduled arc
+// never gets a card. 11s is the shortest gap that still leaves the 5.6s card
+// fully read before the next one is queued.
+let reactCd = 0;
+// …and the beat reaction is DELIBERATELY LATE. The banner announces the beat;
+// the paper reports the beat walking into the void, which is a different event
+// and needs the banner to have landed first. Handing the newsroom bt.news in
+// the same frame is what produced five echo headlines out of eight in a
+// measured Maple match — see the beat-fire block.
+let pendingReact: string | null = null, pendingReactT = 0;
+function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
+  if (!started || ended) return;
+  if (reactCd > 0) return;
+  const line = reactLine({ ...inp, world: pickedWorld });
+  if (!line) return;              // the pool is spent — silence beats a repeat
+  reactCd = 11;
+  if (delay > 0) { pendingReact = line; pendingReactT = delay; }
+  else breakingNews(line);
+}
+/** QA: every card that reached the screen this match, with the phase it was
+ *  drawn at. Read by qa/newsarc.mjs. */
+const newsLog: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[] = [];
 const newsSeen: string[] = [];
 // Both worlds now have their own newsroom module — ./proto3d/newsroom for
 // PIRATE BAY RESORT and ./proto3d/newsroom_maple for MAPLE FALLS. What used to
@@ -3087,25 +3170,44 @@ function fillHeadline(t: string): string {
     .replace('{S}', String(Math.max(1, Math.ceil(matchClock))));
 }
 function showNews() {
-  // tier rides BOTH the meter and the player's form: a WORLD ENDER flattening
-  // downtown must never get "spelling bee ends in a 14-way tie"
-  // DENIAL has to last long enough to be a joke. It flipped to tier 1 at 5%
-  // devoured and tier 2 at 18%, which is one or two headlines — the town went
-  // from "there is no void" to "goodbye forever" before the player had eaten a
-  // street. The arc is: refuse to admit it, then panic, then read the weather
-  // from a field. Widened, and the form ladder now has six rungs so DEVOURER
-  // rather than GOBBLER is what starts the panic.
-  const formTier = curStage <= 2 ? 0 : curStage <= 3 ? 1 : 2;
-  const pctTier = devouredPct < 10 ? 0 : devouredPct < 30 ? 1 : 2;
-  const tier = Math.min(2, Math.max(pctTier, formTier)) as 0 | 1 | 2;
+  // ── THE ARC DRIVES THE CARD ───────────────────────────────────────────────
+  // This used to be a MOOD: `max(pctTier, formTier)` recomputed from scratch on
+  // every card, three rungs, no beginning. A mood drifts, it can go backwards
+  // (devouredPct is recomputed against initialMass and a late GLB registering
+  // revises that denominator DOWN), and it has no morning — the first card
+  // after the greeting was already a mayor denying a void the child had not yet
+  // been given a reason to care about.
+  //
+  // newsroom_arc.ts replaces it with a STORY: morning, doubt, alarm, panic, in
+  // that order, one step per card, never reversing, driven by whichever of
+  // "how much is gone" and "how far through the clock" is further along. The
+  // form ladder survives as a FLOOR inside it, so a WORLD ENDER flattening
+  // downtown still never gets "spelling bee ends in a 14-way tie".
+  //
   // …and the SIGN-ON must be the first thing anyone hears. The newsroom
   // guarantees it returns the greeting on its first call, but `queue.shift() ??`
   // short-circuits — so a breaking-news one-shot fired in the opening seconds
   // would jump the queue and the station would never say good morning.
   if (!signedOn) { signedOn = true; newsQueue.length = 0; }
+  // A REACTIVE LINE PREEMPTS THE ARC WITHOUT DERAILING IT. The queued line is
+  // printed instead of a scheduled one, but the arc still advances a step and
+  // still supplies the brand chip — so the water tower going gets reported
+  // under whatever badge the town has earned, and the next scheduled card picks
+  // up exactly where the story was.
+  const queued = newsQueue.shift();
+  const arc = arcPhase({
+    devouredPct, elapsed: matchElapsed(), matchLen, stage: curStage,
+  });
+  const tier = arc.tier;
+  const morning = arc.phase === 0;
   const PB = pickedWorld === 'pirate';
   let h: string, brand: string;
-  if (pickedWorld === 'lantern') {
+  if (queued !== undefined) {
+    h = queued;
+    brand = (pickedWorld === 'lantern' ? LANTERN_BRAND
+      : pickedWorld === 'gameday' ? GAMEDAY_BRAND
+        : PB ? PB_BRAND : MAPLE_BRAND)[tier];
+  } else if (pickedWorld === 'lantern') {
     // LANTERN NIGHT is not a newsroom either — it is the market's PUBLIC
     // ADDRESS, a recorded courtesy system that has run the same announcements
     // for six hundred years and has no mechanism for noticing anything. It
@@ -3116,8 +3218,8 @@ function showNews() {
     // 2 is a person who has taken the microphone — with the recording still
     // audible underneath, because a recording does not stop for an emergency.
     const ld = String(island.biomeAt(voidState.x, voidState.z)) as LnDist;
-    h = newsQueue.shift() ?? pickLanternNews({
-      tier, district: (LN_DISTS.includes(ld) ? ld : null), lastMeal, devouredPct,
+    h = pickLanternNews({
+      tier, morning, district: (LN_DISTS.includes(ld) ? ld : null), lastMeal, devouredPct,
       form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
     });
     brand = LANTERN_BRAND[tier];
@@ -3130,8 +3232,8 @@ function showNews() {
     // they have not seen before, and tier 2 is two professionals calling the
     // end of the world because that is the job. 464 headlines.
     const gd = GAMEDAY_DIST[String(island.biomeAt(voidState.x, voidState.z))] ?? null;
-    h = newsQueue.shift() ?? pickGamedayNews({
-      tier, district: gd, lastMeal, devouredPct,
+    h = pickGamedayNews({
+      tier, morning, district: gd, lastMeal, devouredPct,
       form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
     });
     brand = GAMEDAY_BRAND[tier];
@@ -3144,8 +3246,8 @@ function showNews() {
     const lead = rivals.list.length
       ? Math.max(...rivals.list.map((r) => r.score)) - playerScore : 0;
     const top = rivals.list.slice().sort((a, b) => b.score - a.score)[0];
-    h = newsQueue.shift() ?? pickNews({
-      tier, district: (dist as PBDist | null), lastMeal, devouredPct,
+    h = pickNews({
+      tier, morning, district: (dist as PBDist | null), lastMeal, devouredPct,
       form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
       rivalName: top?.name ?? 'CHOMPZILLA', rivalLead: lead,
     });
@@ -3161,8 +3263,8 @@ function showNews() {
     const lead2 = rivals.list.length
       ? Math.max(...rivals.list.map((r) => r.score)) - playerScore : 0;
     const top2 = rivals.list.slice().sort((a, b) => b.score - a.score)[0];
-    h = newsQueue.shift() ?? pickMapleNews({
-      tier, district: md, lastMeal, devouredPct,
+    h = pickMapleNews({
+      tier, morning, district: md, lastMeal, devouredPct,
       form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
       rivalName: top2?.name ?? 'CHOMPZILLA', rivalLead: lead2,
     });
@@ -3172,6 +3274,12 @@ function showNews() {
   newsEl.className = tier === 2 ? 'panic' : tier === 1 ? 'worried' : '';
   newsEl.classList.remove('show'); void (newsEl as HTMLElement).offsetWidth; newsEl.classList.add('show');
   audio.ready();   // a soft chime so headlines register even mid-chomp
+  // THE RECORD qa/newsarc.mjs READS. Written here, after the card is painted,
+  // so it can only contain lines that actually went to screen. The probe still
+  // checks #news's own bounding box separately — a log entry is evidence the
+  // code ran, not evidence a child saw anything.
+  newsLog.push({ t: Math.round(matchElapsed()), phase: arc.phase, tier, react: queued !== undefined, brand, text: h });
+  if (newsLog.length > 80) newsLog.shift();
 }
 
 const GATE_GREY = new THREE.Color(0x6b6b7a);
@@ -3311,14 +3419,18 @@ function refreshHud() {
     // …the board prefixes the chaser's row with ⚡, so match on the bare name
     const rv = passer && !passer.me ? rivals.list.find((r) => passer.name.endsWith(r.name)) : undefined;
     if (rv && RIVAL_VOICE[rv.name]) {
-      // same routing as rivals.onSpeak: a brag you cannot see is not a brag.
-      // Getting passed is the one rival event a child must FEEL, so far-away
-      // passers land on the ticker under their name instead of playing to
-      // an empty camera.
+      // same routing as rivals.onSpeak, and the same correction: a brag you
+      // cannot see is not a brag, but it is NOT news either. This used to put
+      // the passer's line in the newspaper when they were far away, on the
+      // reasoning that getting passed is the one rival event a child must
+      // FEEL. The feeling is real; the lane was wrong. The rank change already
+      // has its own hero banner ("X TOOK THE LEAD!") which fires from the
+      // rank machine a beat later — that is the town-free channel built for
+      // exactly this. So a distant brag is simply not spoken, and the banner
+      // still lands.
       const brag = RIVAL_VOICE[rv.name].rankUp[Math.floor(Math.random() * 3)];
       const dp = Math.hypot(rv.x - voidState.x, rv.z - voidState.z);
       if (dp < 55) bubbles.say(rivalBubblePos.set(rv.x, 5, rv.z), brag, 'rival', rivalChip(rv.name));
-      else breakingNews(`💬 ${rv.name}: ${brag}`);
       rv.pulse = 1;
     }
   }
@@ -4067,7 +4179,14 @@ function capture(e: Edible, giveHunger = true) {
       fx.ring(e.mesh.position.x, e.mesh.position.z, 0xffd25a, 14, 0.7);
       spawnPuff(e.mesh.position.x, 1.2, e.mesh.position.z, 14);
       buzz(30);
-      breakingNews(`${got.name} has gone. It was ${got.where.toLowerCase()} the whole time.`);
+      // A NAMED THING GOING IS THE OWNER'S HEADLINE. "When the void absorbs key
+      // buildings or events like a band it should say something funny to that."
+      // The sticker props ARE the named things — the water tower, ferris wheel
+      // car nine, the ball of twine — and they were reported by one hard-coded
+      // template ("X has gone. It was Y the whole time.") fired identically in
+      // all four worlds, in none of their voices, every single time. Now the
+      // Bugle sounds like the Bugle and the resort PA sounds like the resort.
+      townReacts({ kind: 'landmark', subject: got.name });
       // FIRST ONE EVER. Nothing else in the game says the Scrapbook exists, so
       // without this a child gets a nice banner, never opens the menu card,
       // and never learns there are forty seven more.
@@ -5165,6 +5284,13 @@ let drumRef: THREE.Object3D | null = null, drumBaseScale = 1, drumCueT = 0, drum
 function resetMatch() {
   joyRelease();   // PLAY AGAIN can be tapped and HELD — see joyRelease
   resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); signedOn = false;   // memory + the sign-on are per-match
+  // …and the story starts at morning again, with nothing said and nothing
+  // pending. resetArc() is what makes "the arc never reverses" survive a PLAY
+  // AGAIN: without it the high-water mark from the last match would still be at
+  // PANIC and the new one would open there.
+  resetArc(); resetReact();
+  reactCd = 0; pendingReact = null; pendingReactT = 0;
+  newsLog.length = 0;
   // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
   // Proven with an isolation test, not inferred: a uniquely-tagged banner
   // planted on the menu, left for ten seconds (the animation is 2.2s), then a
@@ -6927,14 +7053,19 @@ function animate() {
           feverMult = bt.mult; feverT = bt.dur;
           feverCol = bt.col; feverPulseT = 0.9;
           announceBeat(bt.icon, bt.title, bt.sub, bt.mult);
-          // …and the newsroom is NOT told. It used to be handed bt.news the
-          // same frame, so two seconds after "The band is on the field!" the
-          // ticker said "The marching band has taken the field." Captured on
-          // Maple: five of eight headlines in a whole match were the beat text
-          // the player had just read on a card. That is why the news felt
-          // empty — most of it was an echo. The banner owns the beat; the
-          // newsroom keeps its own thread, and it has 400+ lines that were
-          // never getting a turn.
+          // …and the newsroom is STILL not handed bt.news. It used to be, in
+          // the same frame, so two seconds after "The band is on the field!"
+          // the ticker said "The marching band has taken the field." Captured
+          // on Maple: five of eight headlines in a whole match were the beat
+          // text the player had just read on a card. That is why the news felt
+          // empty — most of it was an echo. The banner owns the beat.
+          //
+          // What the newsroom gets instead, eight seconds later, is the town
+          // reacting to the beat MEETING THE VOID: the band marches into the
+          // thing on Elm Street and keeps playing. That is the owner's ask
+          // ("events like a band"), it is a different event from the banner,
+          // and the delay is what keeps it from reading as an echo.
+          townReacts({ kind: 'beat', beat: BEATS.indexOf(bt) }, 8);
           // no evolve() here: it stacked on top of matchBeat()'s own sting in
           // the same frame, two fanfares for one banner — the beat's sting is
           // the beat's sound
@@ -7802,6 +7933,15 @@ function animate() {
       holdBanner(2.4);   // this card owns the screen while it plays
     }
     audio.evolve();
+    // THE TOWN NOTICES. A form change is the most visible thing that happens to
+    // the void and until now the only acknowledgement was a HUD card with the
+    // word EVOLVED on it. A paper insisting it is the same size as before is
+    // funnier, and it is the same joke the whole newsroom is built on.
+    // From GOBBLER up. VOIDLING->MUNCHER lands in the first few seconds, under
+    // the title card and before the town has finished saying good morning, and
+    // MUNCHER->GOBBLER is not far behind it; reacting to either would spend the
+    // shared cooldown on the least interesting growth in the match.
+    if (curStage >= 2) townReacts({ kind: 'evolve', form: FORMS[curStage] });
     track('evolve', { form: curStage, name: FORMS[curStage], sec: elapsed() });
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
     audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);   // the soundtrack escalates too
@@ -7867,7 +8007,21 @@ function animate() {
       // congratulation for something a rival had just taken off the board —
       // on every hero world, including the one the copy was written for.
       // byPlayer is already tracked for the DEVOURED meter's you-vs-family split.
-      if (heroProp.mesh.userData.byPlayer) { announce(COPY.heroGone); audio.voice('happy'); buzz(120); }
+      if (heroProp.mesh.userData.byPlayer) {
+        announce(COPY.heroGone); audio.voice('happy'); buzz(120);
+        // …and the paper covers it, six seconds behind the banner. Same shape
+        // as the beat reaction and for the same reason: the banner owns the
+        // moment, the newspaper covers the aftermath. This is the biggest thing
+        // in the world going and until now the newsroom did not mention it.
+        if (COPY.heroName) townReacts({ kind: 'landmark', subject: COPY.heroName }, 6);
+      }
+    }
+    // the town's reflexes: one shared cooldown, and the beat reaction waiting
+    // out its delay so it lands after the banner rather than under it
+    if (reactCd > 0) reactCd -= dt;
+    if (pendingReactT > 0) {
+      pendingReactT -= dt;
+      if (pendingReactT <= 0 && pendingReact) { breakingNews(pendingReact); pendingReact = null; }
     }
     newsCd -= dt;
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen

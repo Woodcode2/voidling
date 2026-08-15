@@ -98,6 +98,11 @@ export interface MapleCtx {
   // start reading them.
   rivalName?: string;
   rivalLead?: number;
+  /** PHASE 0. The town is having an ordinary day and has not noticed anything.
+   *  Set by the arc driver (newsroom_arc.ts) for the first couple of cards of
+   *  every match; when it is true, `tier` and every live token are ignored and
+   *  the paper prints the MORNING pool. See the note on MORNING below. */
+  morning?: boolean;
 }
 
 /** Per-tier ticker brand. The Bugle escalates. The Bugle has WAITED for this. */
@@ -128,6 +133,61 @@ const SIGN_ON: string[] = [
   'Good morning, Maple Falls! Wendell says the shop opens when it opens.',
   'Good morning, Maple Falls! The ball of twine is still the second biggest.',
   'Good morning, Maple Falls! Deb Hollis has news about a mailbox.',
+];
+
+// ── BEAT 1b · MORNING ─────────────────────────────────────────────────────────
+// THE ORDINARY DAY, and it is the most important pool in the file.
+//
+// The sign-on says good morning ONCE. Everything after it used to be BEAT 2, in
+// which a mayor is already denying a void — so the town went from hello to
+// cover-up in a single card and a child never learned what normal looks like.
+// Denial is only funny if you have seen the thing being denied AND the ordinary
+// day it is interrupting. MORNING is that day: two or three cards of small-town
+// nonsense in which the void does not exist, is not hinted at, and is not
+// obliquely referenced. That is what every later beat lands against.
+//
+// RULES, in addition to the house style above:
+//   · The void is not mentioned. Not as a hole, a puddle, a drain or a rumour.
+//   · No {tokens}. Like the sign-on, morning must not depend on match state —
+//     a "3% devoured" number in a bake-sale line breaks the whole conceit.
+//   · No greeting. The sign-on already said it; a second good morning reads as
+//     the paper starting over.
+//   · Mostly ONE sentence. Two is allowed and metered (see qa/newsstyle).
+//
+// AND NO BAKE SALES. The brief's example line for this pool is "a bake sale",
+// which this file bans outright and permanently — rule 5, the retired pie gag.
+// The house rule wins: it exists because one bit had eaten the feed once
+// already. The list of approved ordinary-day subjects is in that same rule and
+// every line below comes off it.
+const MORNING: string[] = [
+  'The goat is on the school roof. Nobody has established how.',
+  'Pearl has grown a marrow that will not fit through her own door.',
+  'Dale has measured his lawn and found it two inches too long.',
+  'Biscuit opened the library door and let himself in again.',
+  'The town clock is nine minutes fast and the council likes it that way.',
+  'Pike Hollow got a roundabout. We will not be discussing it further.',
+  'Day 3,281 of Marge and the parking meter. Twenty five cents an hour.',
+  'The library has one computer and there is a list to use it.',
+  'Gus has changed the special. The special is the same as before.',
+  'One ferris wheel car has been stuck at the top since Tuesday.',
+  'A raccoon has moved into the snack machine at the high school.',
+  'The second-biggest ball of twine has been dusted for the season.',
+  'Somebody has parked a trampoline up an elm on Pine Road.',
+  'Tater, aged nine, has drawn a map of the town. It is better than ours.',
+  'The Otters play Friday. The Otters lose Friday. It is a tradition.',
+  'Wendell says the hardware shop opens when the hardware shop opens.',
+  'Carla Webb has now edited this paper for nineteen years running.',
+  'The marching band knows one song and will play it again on Saturday.',
+  'Mayor Dinkle has opened a bench. There was a ribbon and everything.',
+  'A library book from 1974 has been returned with no note attached.',
+  'The corn maze is open. Norm went in during October and stayed.',
+  'A trailer of hay tipped on the county road. The horses are delighted.',
+  'Deb Hollis reports that her mailbox has moved four feet to the east.',
+  'The diner has a new stool and Gus will not say which one it is.',
+  'The fair opens at ten. The gate says nine. Trust the fair, not the gate.',
+  'Somebody left a casserole dish on the bandstand with no name on it.',
+  'The lake is flat, the boats are out, and nobody has caught anything.',
+  'Every dog on Elm Street barked at nine and then stopped at once.',
 ];
 
 /** Ticker-friendly district names, used to fill {D}. Longest is 15 chars. */
@@ -1078,6 +1138,18 @@ function usable(t: string, ctx: MapleCtx): boolean {
 
 const clampTier = (t: number): NewsTier => (t <= 0 ? 0 : t >= 2 ? 2 : 1);
 
+/** Draw from a pool that carries no {tokens} — the sign-on and MORNING. Same
+ *  anti-repeat memory as everything else, so "the goat is on the school roof"
+ *  cannot open two cards running, and the same hard ticker clip. */
+function drawPlain(pool: string[], rnd: () => number): string {
+  const fresh = pool.filter((l) => !rawHistory.includes(l));
+  const src = fresh.length ? fresh : pool;
+  const raw = src[Math.floor(rnd() * src.length) % src.length] ?? pool[0];
+  const out = clip(raw, TICKER_MAX);
+  remember(raw, out);
+  return out;
+}
+
 /**
  * One fully-formed headline, ready to drop straight into the ticker.
  *
@@ -1104,6 +1176,9 @@ export function pickMapleNews(ctx: MapleCtx, rnd: () => number = Math.random): s
     remember(raw0, out0);
     return out0;
   }
+
+  // BEAT 1b. Still morning: the ordinary day, no void, no live state.
+  if (ctx.morning) return drawPlain(MORNING, rnd);
 
   const districtPool = ctx.district ? BY_DIST[ctx.district][tier].filter((t) => usable(t, ctx)) : [];
   const mealPool = BY_MEAL[mapleMealKind(ctx.lastMeal)][tier].filter((t) => usable(t, ctx));
@@ -1167,7 +1242,7 @@ export function pickMapleNews(ctx: MapleCtx, rnd: () => number = Math.random): s
 export function mapleLineCount(): number {
   const all: Pools[] = [MAINST, FAIR, SCHOOL, FARM, LAKE, WOODS, STRIP, BURB, CIVIC, GENERAL, LIVE,
     MEAL_HOUSE, MEAL_CAR, MEAL_BIG, MEAL_SMALL];
-  return SIGN_ON.length + SIGN_OFF.length
+  return SIGN_ON.length + MORNING.length + SIGN_OFF.length
     + all.reduce((n, p) => n + p[0].length + p[1].length + p[2].length, 0);
 }
 
@@ -1187,6 +1262,7 @@ export function mapleVoiceLineCount(): number {
 export function mapleAudit(): { beat: 1 | 2 | 3 | 4 | 5; pool: string; line: string }[] {
   const out: { beat: 1 | 2 | 3 | 4 | 5; pool: string; line: string }[] = [];
   for (const line of SIGN_ON) out.push({ beat: 1, pool: 'SIGN_ON', line });
+  for (const line of MORNING) out.push({ beat: 1, pool: 'MORNING', line });
   const pools: [string, Pools][] = [
     ['MAINST', MAINST], ['FAIR', FAIR], ['SCHOOL', SCHOOL], ['FARM', FARM], ['LAKE', LAKE],
     ['WOODS', WOODS], ['STRIP', STRIP], ['BURB', BURB], ['CIVIC', CIVIC],

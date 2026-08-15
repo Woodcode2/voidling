@@ -12,26 +12,47 @@
 // Those failures are expected and correct, and a probe that counts them as
 // errors would cry wolf on every run. Everything else same-origin is a real
 // regression. They are reported separately and only the second kind fails.
+//
+// THE SECOND EXEMPTION, and it is the same shape: /assets/music/<world>.mp3 is
+// a DROP-IN SLOT, not a shipped asset. audio3d.ts documents the contract — "the
+// presence of the file is the switch: drop /assets/music/<world>.mp3 into
+// public/ and that world plays it; leave it out and the world keeps its synth
+// score" — so on a build with no licensed track the 404 IS the mechanism
+// working, and the fallback it triggers is the shipping behaviour.
+//
+// This was found by smoking the last pushed commit to check whether a newsroom
+// change had broken something: baseline and candidate failed identically, one
+// 404 each, on `maple.mp3`. So the gate had been red for every build regardless
+// of content, which is the state in which a smoke gate stops meaning anything.
+// Exempted rather than silenced: a 404 on a music slot is listed, and a 404 on
+// anything else under /assets/ still fails the run.
 import { chromium } from 'playwright';
 
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4177';
 const CDN = /\/assets\/(hf|hf3d)\//;
+const MUSIC_SLOT = /\/assets\/music\/(maple|pirate|gameday|lantern|theme)\.mp3$/;
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
 
-const cdnFail = [], realFail = [], ok = [], consoleErr = [];
-p.on('requestfailed', r => (CDN.test(r.url()) ? cdnFail : realFail).push(r.url()));
+const cdnFail = [], realFail = [], slotMiss = [], ok = [], consoleErr = [];
+const bucket = (u) => (CDN.test(u) ? cdnFail : MUSIC_SLOT.test(u) ? slotMiss : realFail);
+p.on('requestfailed', r => bucket(r.url()).push(r.url()));
 p.on('response', r => {
   const u = r.url();
-  if (r.status() >= 400) { (CDN.test(u) ? cdnFail : realFail).push(`${r.status()} ${u}`); }
+  if (r.status() >= 400) { bucket(u).push(`${r.status()} ${u}`); }
   else if (/\/assets\//.test(u) && !CDN.test(u)) ok.push(u);
 });
 // A blocked CDN asset ALSO surfaces as a console error, so the same exemption
 // has to apply here or the probe reports 41 failures on a perfectly good build
 // — which is exactly what it did the first time it ran.
+// …and a missing music slot surfaces the same way. Chromium reports it as a
+// bare "Failed to load resource: 404" with no URL in the message text, so it
+// cannot be matched on the path — it is recognised by there being a music-slot
+// 404 in the request log and exactly that many unattributable 404 console
+// lines. Narrow on purpose: any other 404 still lands in consoleErr.
 p.on('console', m => {
   if (m.type() !== 'error') return;
   const t = m.text();
@@ -102,11 +123,27 @@ console.log(`\n  SMOKE — ${WORLD} @ :${PORT}`);
 console.log(`   match t=${st.t.toFixed(1)}s  radius ${r0.toFixed(2)} -> ${st.r.toFixed(2)}  consumed ${st.eaten} props  devoured ${st.devouredPct}%  score ${Math.round(st.score)}`);
 console.log(`   same-origin /assets/ served OK : ${uniq(ok).length}`);
 console.log(`   CDN-blocked (EXPECTED here)    : ${uniq(cdnFail).length}`);
+console.log(`   music slot empty (EXPECTED)    : ${uniq(slotMiss).length}`);
+for (const f of uniq(slotMiss)) console.log('      ' + f + '  → synth score, by design');
 console.log(`   real failures                  : ${uniq(realFail).length}`);
 for (const f of uniq(realFail).slice(0, 20)) console.log('      ' + f);
-if (consoleErr.length) {
-  console.log(`   console errors: ${consoleErr.length}`);
-  for (const e of uniq(consoleErr).slice(0, 10)) console.log('      ' + e);
+// Drop exactly as many unattributable 404 console lines as there are 404s
+// already accounted for in the two EXPECTED buckets, and no more. Both buckets
+// echo into the console as a bare "Failed to load resource: 404" with no URL in
+// the text, so they cannot be matched by path — only counted. The existing
+// console exemption above covers 403/Forbidden/ERR_BLOCKED, which is what a
+// real CDN block looks like; served from a plain static server the same asset
+// is simply absent and arrives as a 404 instead, which is why this second pass
+// exists. If a REAL asset 404s, `realFail` is non-empty and fails the run on
+// its own, and its console line survives here to be printed.
+let echo = uniq([...cdnFail, ...slotMiss]).filter((u) => /^404 /.test(u)).length;
+const shownErr = consoleErr.filter((t) => {
+  if (echo > 0 && /Failed to load resource.*\b404\b/.test(t)) { echo--; return false; }
+  return true;
+});
+if (shownErr.length) {
+  console.log(`   console errors: ${shownErr.length}`);
+  for (const e of uniq(shownErr).slice(0, 10)) console.log('      ' + e);
 }
 console.log(`   audio graph: ${audio.present ? 'present, ctx=' + audio.ctx : 'MISSING'}`);
 
@@ -115,6 +152,6 @@ if (uniq(realFail).length) fails.push(`${uniq(realFail).length} same-origin asse
 if (st.r <= r0) fails.push('the void did not grow');
 if (st.eaten < 20) fails.push(`only ${st.eaten} eaten in 25 match-seconds`);
 if (!audio.present) fails.push('audio graph missing');
-if (consoleErr.length) fails.push(`${consoleErr.length} console errors`);
+if (shownErr.length) fails.push(`${shownErr.length} console errors`);
 console.log('\n  ' + (fails.length ? 'FAIL — ' + fails.join('; ') : 'PASS — boots, loads, grows, eats, and makes sound') + '\n');
 process.exit(fails.length ? 1 : 0);

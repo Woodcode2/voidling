@@ -63,6 +63,11 @@ export interface LanternCtx {
   // name. Declared so the shared call site type-checks; never read.
   rivalName?: string;
   rivalLead?: number;
+  /** PHASE 0. The market is open and the guest has not arrived. Set by the arc
+   *  driver (newsroom_arc.ts) for the first couple of cards of every match;
+   *  when it is true, `tier` and every live token are ignored and the PA reads
+   *  the MORNING pool. */
+  morning?: boolean;
 }
 
 /** Per-tier badge. The station does not change — its composure does. */
@@ -90,6 +95,50 @@ const SIGN_ON: string[] = [
   'Good evening, night market! Six hundred years open. No trouble yet.',
   'Good evening, night market! Ponta ate nine of his own dumplings. Nine.',
   'Good evening, night market! The koi are asleep. They have had a long year.',
+];
+
+// ── the morning ────────────────────────────────────────────────────────────
+// PHASE 0, and in this world it is an EVENING — the market opening, before the
+// guest has arrived. That distinction matters here more than anywhere: tier 0
+// is already welcoming a round purple guest at the gate, so without this pool
+// the very first thing after the sign-on is the void being handed a dumpling.
+// A child never sees the market simply being a market.
+//
+// The PA cannot deny the void — denial requires having considered it — so its
+// morning is not a cover-up like the other three. It is the recording playing
+// to an ordinary crowd: the lamps, the boats, the hours, the koi. The joke that
+// follows lands because nothing at all changes in the delivery once the void
+// turns up.
+//
+// No {tokens}: morning must not depend on match state. No greeting: the sign-on
+// already said it. Mostly one sentence.
+const MORNING: string[] = [
+  'The Warden has lit nine hundred lanterns and one of them upside down.',
+  'Ponta has sold his first dumpling of the night and would like a photograph.',
+  'Yuki sold out of fox masks before the gate was even open.',
+  'Kasa the umbrella is up. It is a clear night. Kasa is aware of this.',
+  'Eleven Bowls has all eleven bowls tonight, which is a record for it.',
+  'Madam Yuzu has scrubbed the bathhouse stair twice and is not finished.',
+  'The boats are out on the canal and the lanterns are on the boats.',
+  'Six hundred years the market has been open and it has never once shut.',
+  'The teahouse has forty cups and one favourite. Everybody knows which.',
+  'Please count the gates on your way in. There are twelve. There always are.',
+  'The koi are asleep and the night garden asks that they stay that way.',
+  'Somebody has left a paper fan on the moon bridge for the third night.',
+  'Ponta ate nine of his own dumplings before selling any. This is the record.',
+  'The drum tower is quiet. The drum tower is nearly always quiet.',
+  'The offering box at the shrine has one coin in it and a small stone.',
+  'Tea is on at the terrace and the terrace is entirely full already.',
+  'Lost so far tonight: one sandal, one small boat and one paper crane.',
+  'The hot spring is exactly as hot as it was last year, says Madam Yuzu.',
+  'A lantern has come loose on the bamboo path and is drifting nicely.',
+  'The great gate has been repainted and nobody can tell which parts.',
+  'Yuki says the fox masks come back in tomorrow. Yuki says that nightly.',
+  'The bathhouse has lit every window on the third floor for no reason.',
+  'The Warden lights the lamps. The Warden has always lit the lamps.',
+  'There is a queue at Eleven Bowls and Eleven Bowls is delighted about it.',
+  'The canal is still and the moon is in it, which is the usual arrangement.',
+  'A child has bought a mask, a dumpling and a lantern, in that order.',
 ];
 
 // ── TIER 0 · THE PA ────────────────────────────────────────────────────────
@@ -342,7 +391,7 @@ export function resetLanternNews(): void {
 /** How many distinct lines this world can say, for the census the other
  *  newsrooms report. Counted rather than asserted. */
 export function lanternNewsCount(): number {
-  let n = SIGN_ON.length + SIGN_OFF.length;
+  let n = SIGN_ON.length + MORNING.length + SIGN_OFF.length;
   for (const g of GENERAL) n += g.length;
   for (const d of BY_DIST) for (const k of Object.keys(d)) n += d[k as LnDist].length;
   return n;
@@ -394,6 +443,15 @@ export function pickLanternNews(ctx: LanternCtx, rnd: () => number = Math.random
   if (!signedOn) {
     signedOn = true;
     return clip(SIGN_ON[Math.floor(rnd() * SIGN_ON.length)], TICKER_MAX);
+  }
+  // PHASE 0. Still the ordinary evening: no guest, no live state, no tokens.
+  if (ctx.morning) {
+    const fresh = MORNING.filter((l) => !recent.includes(l));
+    const src = fresh.length ? fresh : MORNING;
+    const line = src[Math.floor(rnd() * src.length) % src.length] ?? MORNING[0];
+    recent.push(line);
+    if (recent.length > 6) recent.shift();
+    return clip(line, TICKER_MAX);
   }
   const tier = Math.max(0, Math.min(2, ctx.tier)) as NewsTier;
   // ONCE, AND LAST. tier 2 can start as early as 18% devoured, far too soon for
