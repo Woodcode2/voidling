@@ -230,11 +230,39 @@ next scheduled card picks up exactly where the story was.
   *"Pike Hollow still has theirs. The Second-Biggest Ball of Twine is gone."*
 - PLAY AGAIN returning the arc to phase 0, 0 cards, high-water 0.00
 
-Two probe faults were found and fixed rather than worked around, and both are
-written up in the file: the card's CSS animation clock stalls while the game
-holds the main thread under swiftshader (so the probe waits on the animation's
-own timeline, not on wall clock), and the first draft of the landmark assertion
-passed on the hero-cue headline the probe had triggered itself.
+Probe faults found and fixed rather than worked around, all written up in the
+file: the card's CSS animation clock stalls while the game holds the main thread
+under swiftshader (so the probe waits on the animation's own timeline, not on
+wall clock); the first draft of the landmark assertion passed on the hero-cue
+headline the probe had triggered itself; and the world-switch chain below.
+
+### The `?len=` trap, and a limitation this run still carries
+
+`DEBUG_HARNESS` (prototype3d.ts:2612) is set by `?len=` and does SIX things, not
+one. Two of them broke the probe outright — it suppresses the daily reward card
+(:5603) and auto-starts the match (:5811) — which meant the first version was
+watching a match the query string had started, with a modal removed from under
+it that a real player would have seen. Then a picker world switch reloads via
+`location.href = location.pathname` (:4869), dropping `?len=`, so on the far
+side the daily card reappears and the autoplay path correctly parks on
+`pendingLaunch` waiting for a tap no robot makes. That looked exactly like a
+dead game and was reported as one; it was not. See the retraction in `2e06f0c`.
+
+**And two more that the current runs still sit inside.** With `DEBUG_HARNESS`
+true the void SELF-DRIVES when input pauses (:7331) and AUTO-FIRES powers every
+2.5-4.2s (:7544). Neither can affect the arc's order properties — morning first,
+never reversing, never skipping — because those are invariant to how fast the
+driver climbs. But auto-fired powers change WHAT gets eaten, which changes
+`lastMeal`, which changes which meal pool the newsroom draws from. So "no
+repeats in a match" and the landmark reaction are verified under a slightly
+hungrier run than a child's.
+
+The fix is to drop `?len=` and pass only `?w=<world>`: that makes the world under
+test the BUILT world, so tapping its card in the picker takes the no-reload
+branch (`if (id === pickedWorld) { launchWorld(); return; }`, :4871) — a genuine
+child gesture, no reload, no DEBUG_HARNESS, daily card claimed the way a child
+claims it. Match length comes back as the default 180, which is fine because the
+probe now asks the game (`__newsArc().len`) instead of assuming.
 
 One COPY fault was found by the probe on a live card and fixed in the source:
 the subject clip was truncating *"The Second-Biggest Ball of Twine"* to *"The
