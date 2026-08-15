@@ -1028,7 +1028,19 @@ const COPY = WORLD_COPY[pickedWorld];
   const tl = document.querySelector('#titlecard .lvl'); if (tl) tl.textContent = `LEVEL ${COPY.n}`;
   const ts = document.querySelector('#titlecard .sub');
   if (ts) ts.textContent = COPY.sub;
-  const ln = document.querySelector('#loadScr .lName'); if (ln) ln.textContent = nm;
+  // ── THE LOADING SCREEN DOES NOT NAME A WORLD THE PLAYER HAS NOT PICKED ────
+  // This printed "MAPLE FALLS" on the boot screen, before the splash. On a
+  // FIRST launch that is honest — the game autoplays straight into Maple. On
+  // every launch after, the menu is about to offer four worlds, so announcing
+  // one of them first reads as "you are going here", and the owner reported
+  // exactly that confusion off a phone. The build is the same either way; only
+  // the promise differs. So: name the world only when the player is genuinely
+  // being taken there without choosing (first launch, or a picker tap that
+  // reloads with voidAutoPlay set). Otherwise the brand carries the screen.
+  const goingStraightIn = !localStorage.getItem('voidPlayed')
+    || localStorage.getItem('voidAutoPlay') === '1';
+  const ln = document.querySelector('#loadScr .lName');
+  if (ln) ln.textContent = goingStraightIn ? nm : 'THE CUTE WORLD ENDER';
 }
 // ── THE BOOT BREATHES ──────────────────────────────────────────────────────
 // The world build was ONE unbroken main-thread block — 17 s in the sandbox,
