@@ -1932,7 +1932,11 @@ rivals.onPlayerBitten = (name, hit) => {
     setTimeout(() => growthEl.classList.remove('pop', 'down'), 420);
   }
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
-  if (hit.hunter) { fx.shake(11); fx.flash('rgba(255,43,60,0.4)', 0.5); }
+  // …and none here either. A hunter bite is frequent once the family turns on
+  // you, so it was the other half of the periodic shaking. The red wash and
+  // the 90ms buzz already say "you are being attacked" without moving the
+  // camera the player is steering by.
+  if (hit.hunter) fx.flash('rgba(255,43,60,0.4)', 0.5);
   buzz(hit.hunter ? 90 : 50);
   track(hit.hunter ? 'caught' : 'nibbled', {
     name, sec: elapsed(), form: curStage, stolen: Math.round(hit.steal),
@@ -1956,7 +1960,13 @@ rivals.onNearMiss = (name, x, z) => {
   floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
   bubbles.float(floatPos, 'NEAR MISS!! 😤', true);
   fx.ring(x, z, 0xffffff, 30, 0.5); fx.ring(voidState.x, voidState.z, 0x7ef2a0, voidling.radius * 4, 0.55);
-  fx.shake(6); fx.flash('rgba(126,242,160,0.22)', 0.3);
+  // NO SHAKE HERE. A near miss happens whenever a family member passes close,
+  // which is constantly while you are driving around them — owner on a real
+  // phone: "when you start moving the screen shakes once in a while. Get rid
+  // of that", confirmed on two worlds. The moment still reads loudly: two
+  // rings, a green wash, the NEAR MISS!! float, a sting and a buzz. Shaking
+  // the camera for a routine event is what made it feel like a fault.
+  fx.flash('rgba(126,242,160,0.22)', 0.3);
   audio.ready(); buzz(45);
   addCoins(5);   // dodging is a SKILL — pay it
 };
@@ -5410,7 +5420,14 @@ renderRank();
     const modal = el('daily');
     // each day is a PRIZE, not a table cell: claimed days stamp a green tick,
     // today's cell is a big bouncing gift, day 7 is the gold treasure chest
-    const ICON = ['🪙', '🪙', '💰', '💰', '💎', '💎', '🏆'];
+    // ONE CURRENCY, AND THE ICONS MUST NOT IMPLY TWO. Every cell pays ✦ voids —
+    // there is no second currency anywhere in the game (voidCoins is the only
+    // balance; hats are the only real money). But days 5 and 6 carried 💎, and
+    // the owner read the card as "diamonds and stuff", which is exactly what a
+    // six-year-old would conclude too. The ladder now escalates within ONE
+    // idea — a coin, a pile, a star, the trophy — so bigger plainly means more
+    // of the same thing.
+    const ICON = ['🪙', '🪙', '💰', '💰', '🌟', '🌟', '🏆'];
     // LIFETIME day numbers, not day-of-week. On the morning after a child
     // finished day 7 for 300 coins, the card reset to a cell labelled "DAY 1"
     // paying 60 — the single most important morning in the whole retention

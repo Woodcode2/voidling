@@ -887,7 +887,8 @@
         filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); animation: giftWiggle 2.2s ease-in-out infinite; }
       #daily .dTitle { font-size: 25px; font-weight: 900; letter-spacing: 3px; color: #ffd25a;
         text-shadow: 0 0 18px rgba(255,210,90,0.6), 0 2px 4px rgba(0,0,0,0.5); }
-      #daily .dStreak { font-size: 12px; font-weight: 900; letter-spacing: 1.5px; color: #ffb8d8; margin: 4px 0 14px; }
+      #daily .dStreak { font-size: 12.5px; font-weight: 900; letter-spacing: 1.5px; color: #ffe3f0; margin: 4px 0 14px;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
       #dailyGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
       #dailyGrid .dCell { position: relative; border-radius: 15px; padding: 9px 3px 7px;
         background: linear-gradient(170deg, rgba(255,255,255,0.13), rgba(255,255,255,0.04));
@@ -899,11 +900,21 @@
          quarters of the legible minimum. It costs nothing to fix: .dCard is
          min(370px, 100vw - 20px) with 16px side padding, so four columns get
          ~67px of inner width and "DAY 28" at 11px needs about 46. */
-      #dailyGrid .dCell b { display: block; font-size: 11px; letter-spacing: 1px; color: #b9a4e8; font-weight: 900; }
+      /* …and WHITE, not lilac. #b9a4e8 on this card measured about 3.4:1 against
+         its own background — under the 4.5:1 anyone would ask for, and it read
+         as greyed-out/disabled to the owner on a real phone, on the very first
+         screen of the app. A day label is not secondary information: it is the
+         thing the card exists to say. Near-white with a soft dark shadow lifts
+         it off the translucent panel without shouting over the gold amount. */
+      #dailyGrid .dCell b { display: block; font-size: 11px; letter-spacing: 1px; color: #fff; font-weight: 900;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.55); }
       #dailyGrid .dIcon { display: block; font-size: 21px; line-height: 1.25; }
-      #dailyGrid .dAmt { display: block; font-size: 13px; font-weight: 900; color: #fff; }
+      #dailyGrid .dAmt { display: block; font-size: 13px; font-weight: 900; color: #fff;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.55); }
       #dailyGrid .dAmt i { font-style: normal; font-size: 10px; color: #ffd25a; margin-left: 1px; }
-      #dailyGrid .dCell.past { opacity: 0.5; }
+      /* 0.5 was invisible-adjacent on a phone in daylight. A claimed day should
+         read as DONE, not as missing — it still carries a green tick. */
+      #dailyGrid .dCell.past { opacity: 0.72; }
       #dailyGrid .dCell.past .dAmt { color: #7ef2a0; }
       #dailyGrid .dCell.mega { border-color: rgba(255,210,90,0.55);
         background: linear-gradient(170deg, rgba(255,210,90,0.22), rgba(255,140,60,0.08)); }

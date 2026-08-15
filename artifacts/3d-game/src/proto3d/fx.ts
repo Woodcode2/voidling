@@ -113,7 +113,14 @@ export function createFx(scene: THREE.Scene): Fx {
       // from the reference distance the numbers were tuned at, so shake(11)
       // kicks the same fraction of the frame at every form.
       if (shakeAmt > 0.001) {
-        const s = shakeAmt * (camDist / SHAKE_REF_DIST);
+        // CLAMPED AT 1, AND THE CLAMP IS THE POINT. Scaling by camera distance
+        // fixes shake going sub-pixel when the camera is far out — but it also
+        // AMPLIFIED it as the void grew (camDist runs 26 -> 340, so a bite at
+        // full size kicked several times harder than the authored number). The
+        // owner felt exactly that on a phone within a day of it shipping. So
+        // the factor may only ever reduce: far out, shake is its authored
+        // strength; up close, gently less. Never more than was asked for.
+        const s = shakeAmt * Math.min(1, camDist / SHAKE_REF_DIST);
         shakeVec.set((Math.random() - 0.5) * s, (Math.random() - 0.5) * s * 0.6, (Math.random() - 0.5) * s);
         shakeAmt *= Math.pow(0.001, dt);   // fast decay
         if (shakeAmt < 0.05) shakeAmt = 0;
