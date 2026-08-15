@@ -1288,7 +1288,7 @@ const _dbg = new Proxy(_dbgStore, {
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
-    reactCd: number; pending: string | null; pendingIn: number;
+    reactCd: number; reactHardCd: number; pending: string[]; pendingIn: number;
     queue: string[]; live: boolean; len: number; world: string;
   };
 };
@@ -1313,7 +1313,8 @@ _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the l
 // probe that cannot tell them apart reports a mystery instead of a diagnosis.
 _dbg.__newsArc = () => ({
   log: newsLog.slice(), arc: arcState(),
-  reactCd: Math.max(0, reactCd), pending: pendingReact, pendingIn: Math.max(0, pendingReactT),
+  reactCd: Math.max(0, reactCd), reactHardCd: Math.max(0, reactHardCd),
+  pending: pendingReact.map((p) => p.line), pendingIn: pendingReact.length ? Math.max(0, pendingReact[0].at) : 0,
   queue: newsQueue.slice(), live: started && !ended,
   // WHICH WORLD IS ACTUALLY BUILT. Not the same as localStorage voidWorld:
   // `?w=` wins over it at :306-308 and setWorld() does not write it back, so a
@@ -3124,29 +3125,68 @@ function breakingNews(h: string) {
 // One funnel for every reactive headline, because the reason this feature has
 // been rebuilt more than once is that four different call sites each invented
 // their own rules. Everything routes through here now: it picks the line in the
-// world's own voice (newsroom_react.ts), it enforces the ONE shared cooldown,
-// and it is the only thing besides the queue that may call breakingNews.
+// world's own voice (newsroom_react.ts), it enforces the floors below, and it is
+// the only thing besides the queue that may call breakingNews.
 //
-// THE COOLDOWN IS THE WHOLE POINT. Landmarks, four beats, six form changes and
-// a rival being eaten can all land inside twenty seconds of a good run; without
-// a floor between them the newspaper becomes a stream and the scheduled arc
-// never gets a card. 11s is the shortest gap that still leaves the 5.6s card
-// fully read before the next one is queued.
-let reactCd = 0;
+// TWO FLOORS, NOT ONE — AND THE REASON IS A BUG THIS SHIPPED WITH.
+//
+// The first version had a single 11-second cooldown shared by all four reaction
+// kinds, first come first served. qa/newsarc.mjs caught what that does: on
+// Pirate Bay the void evolved, the evolve reaction took the cooldown, the player
+// ate a NAMED LANDMARK a moment later, and the paper said nothing about it. The
+// owner's ask put landmarks first — "when the void absorbs key buildings or
+// events like a band it should say something funny to that" — so a form change
+// silencing a landmark has the priority exactly backwards. A void changing shape
+// is already a full-screen card, three rings and a sound; the water tower going
+// is the thing only the newspaper can report.
+//
+//   HARD floor, 4s, everything.        Nothing may machine-gun the ticker. 4 is
+//                                      the house number: breakingNews already
+//                                      clamps newsCd to 4.0 for the same reason.
+//   SOFT floor, 11s, evolve + beat.    These are the routine ones — six form
+//                                      changes and four beats a match — and they
+//                                      are what the original cooldown was really
+//                                      written to space out.
+//
+// So a landmark or a rival going is never starved by the void changing shape,
+// and the feed still breathes. Both floors are reset by ANY reaction, so two
+// landmarks ten seconds apart still cannot crowd the scheduled arc out.
+const REACT_HARD = 4, REACT_SOFT = 11;
+let reactHardCd = 0, reactCd = 0;
 // …and the beat reaction is DELIBERATELY LATE. The banner announces the beat;
 // the paper reports the beat walking into the void, which is a different event
 // and needs the banner to have landed first. Handing the newsroom bt.news in
 // the same frame is what produced five echo headlines out of eight in a
 // measured Maple match — see the beat-fire block.
-let pendingReact: string | null = null, pendingReactT = 0;
+//
+// A QUEUE, not a single slot: the hero landmark also files late (6s), so an
+// urgent line arriving while a beat is still waiting used to overwrite it and
+// the beat was never reported at all.
+const pendingReact: { line: string; at: number }[] = [];
 function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
   if (!started || ended) return;
-  if (reactCd > 0) return;
+  // A NAMED THING GOING OUTRANKS THE VOID CHANGING SHAPE. See the two floors.
+  const urgent = inp.kind === 'landmark' || inp.kind === 'rivalGone';
+  if (reactHardCd > 0) return;
+  if (!urgent && reactCd > 0) return;
   const line = reactLine({ ...inp, world: pickedWorld });
   if (!line) return;              // the pool is spent — silence beats a repeat
-  reactCd = 11;
-  if (delay > 0) { pendingReact = line; pendingReactT = delay; }
-  else breakingNews(line);
+  // THE TWO FLOORS START AT DIFFERENT MOMENTS, on purpose.
+  //   SOFT starts now, at the DECISION, so a run of routine events cannot all
+  //   decide to file within a few seconds of each other.
+  //   HARD starts when the line actually PRINTS (below, and in the pending
+  //   flush), because it exists to space CARDS on screen — and a beat reaction
+  //   decided now does not reach the ticker for another eight seconds. Starting
+  //   it here would let a landmark at t=5 print ahead of a beat line due at
+  //   t=8, putting two cards three seconds apart.
+  reactCd = REACT_SOFT;
+  if (delay > 0) pendingReact.push({ line, at: delay });
+  else fileReaction(line);
+}
+/** print a reaction and start the card-spacing floor from the moment it lands */
+function fileReaction(line: string): void {
+  reactHardCd = REACT_HARD;
+  breakingNews(line);
 }
 /** QA: every card that reached the screen this match, with the phase it was
  *  drawn at. Read by qa/newsarc.mjs. */
@@ -5301,7 +5341,7 @@ function resetMatch() {
   // AGAIN: without it the high-water mark from the last match would still be at
   // PANIC and the new one would open there.
   resetArc(); resetReact();
-  reactCd = 0; pendingReact = null; pendingReactT = 0;
+  reactCd = 0; reactHardCd = 0; pendingReact.length = 0;
   newsLog.length = 0;
   // ── NOTHING FROM THE LAST MATCH MAY SPEAK IN THIS ONE ─────────────────────
   // Proven with an isolation test, not inferred: a uniquely-tagged banner
@@ -8028,12 +8068,13 @@ function animate() {
         if (COPY.heroName) townReacts({ kind: 'landmark', subject: COPY.heroName }, 6);
       }
     }
-    // the town's reflexes: one shared cooldown, and the beat reaction waiting
-    // out its delay so it lands after the banner rather than under it
+    // the town's reflexes: both floors run down, and any late reaction waits out
+    // its own delay so it lands after the banner rather than under it
+    if (reactHardCd > 0) reactHardCd -= dt;
     if (reactCd > 0) reactCd -= dt;
-    if (pendingReactT > 0) {
-      pendingReactT -= dt;
-      if (pendingReactT <= 0 && pendingReact) { breakingNews(pendingReact); pendingReact = null; }
+    for (let i = pendingReact.length - 1; i >= 0; i--) {
+      pendingReact[i].at -= dt;
+      if (pendingReact[i].at <= 0) { fileReaction(pendingReact[i].line); pendingReact.splice(i, 1); }
     }
     newsCd -= dt;
     // BREATHING ROOM: a headline every 14-20s meant the card was on screen
