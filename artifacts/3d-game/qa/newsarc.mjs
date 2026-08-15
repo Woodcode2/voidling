@@ -336,19 +336,41 @@ if (!target) {
   // Waiting is honest: it is the same wait a player gets.
   const cd0 = await page.evaluate(() => window.__newsArc());
   console.log(`     waiting out the reaction cooldown (${cd0.reactCd.toFixed(1)}s, queue ${cd0.queue.length}, live ${cd0.live})`);
+  // BOTH floors and nothing in flight. A landmark is urgent and clears only the
+  // hard floor, but waiting for the soft one too means the check starts from a
+  // genuinely quiet newsroom rather than from the middle of somebody else's
+  // story — so a failure here means the landmark was refused, not queued.
   await page.waitForFunction(() => {
     const s = window.__newsArc();
-    return s.reactCd <= 0 && s.queue.length === 0;
+    return s.reactCd <= 0 && s.reactHardCd <= 0 && s.queue.length === 0 && s.pending.length === 0;
   }, undefined, { timeout: 300000 }).catch(() => {});
   const before = await page.evaluate(() => window.__newsArc().log.length);
   // …and stay UNDER the hero-cue threshold while doing it. Maple's town hall
   // is r6.5 and the cue fires at voidR >= 6.5/1.11 = 5.86, so a flat "at least
   // 6" — which is what the first draft used — trips the finale on the way past
   // and puts a second reactive line in the queue ahead of this one.
-  await page.evaluate((t) => {
-    window.__setVoidR(Math.min(5.4, Math.max(1.4, t.r * 2.5)));
-    window.__warpVoid(t.x, t.z);
-  }, target);
+  //
+  // NEVER SHRINK THE VOID. `__setVoidR` assigns `curStage = stageFor(r)`
+  // DIRECTLY, with no never-downgrade guard — so dropping a grown void onto a
+  // small prop knocks its form down several rungs, and re-growing then re-fires
+  // every one of those evolutions. Each evolve reaction takes a slot in the
+  // newsroom's reaction floors, and the landmark line this section exists to
+  // check is starved before it is ever picked.
+  //
+  // That is precisely how Pirate Bay failed while Maple and Game Day passed:
+  // Lounger Nine is small, so the fitted radius was 1.4 against a void that had
+  // grown past 5, while Maple's ball of twine fitted 3.75 and Game Day's
+  // mustard higher still. The probe was manufacturing the starvation it then
+  // reported as a missing headline.
+  const fitted = Math.min(5.4, Math.max(1.4, target.r * 2.5));
+  const grew = await page.evaluate((a) => {
+    const cur = window.__matchState().r;
+    const to = Math.max(cur, a);        // fit the prop, or stay as we are
+    window.__setVoidR(to);
+    return { from: cur, to };
+  }, fitted);
+  console.log(`     radius ${grew.from.toFixed(2)} -> ${grew.to.toFixed(2)} (prop fits at ${fitted.toFixed(2)})`);
+  await page.evaluate((t) => window.__warpVoid(t.x, t.z), target);
   // …and wait for the EAT, not for a timer. The reaction is queued by the eat
   // handler and printed by a later card, so both have to happen.
   const ate = await page.waitForFunction((sid) => {
@@ -358,14 +380,24 @@ if (!target) {
   ok(ate, `the void ate the landmark (${target.sid})`);
   // up to three cards, because breakingNews holds a short queue and the
   // landmark line can sit behind one other story
-  let hit = null, onScreen = false;
+  let hit = null, onScreen = false, fresh = [];
   for (let i = 0; i < 3 && !hit; i++) {
     const c = await card();
-    const fresh = await page.evaluate((n) => window.__newsArc().log.slice(n), before);
+    fresh = await page.evaluate((n) => window.__newsArc().log.slice(n), before);
     hit = fresh.find((e) => e.react && e.text.includes(name.slice(0, 18)));
     if (hit) onScreen = c.onScreen;
   }
   ok(!!hit, `the paper named it${hit ? ` — "${hit.text}"` : ` — nothing in the feed mentions "${name}"`}`);
+  // A FAILURE SHOULD BE A DIAGNOSIS. The first version reported only what it
+  // did NOT find, which cost a whole round trip to answer the obvious next
+  // question: what did the paper say instead, and was it even allowed to speak?
+  if (!hit) {
+    const st = await page.evaluate(() => window.__newsArc());
+    console.log(`       floors at check: hard=${st.reactHardCd.toFixed(1)}s soft=${st.reactCd.toFixed(1)}s`
+      + `  pending=${JSON.stringify(st.pending)}  queue=${st.queue.length}`);
+    console.log(`       the feed since the eat (${fresh.length} cards):`);
+    for (const e of fresh) console.log(`         ${e.react ? 'REACT' : '  arc'} p${e.phase} "${e.text}"`);
+  }
   ok(!hit || onScreen, 'and that card was on screen too');
   // the old behaviour, which this replaces: one template, all four worlds
   ok(!hit || !/the whole time\.$/.test(hit.text),

@@ -215,20 +215,70 @@ the reaction; the phase still steps and still supplies the brand chip. So the
 water tower going is reported under whatever badge the town has earned, and the
 next scheduled card picks up exactly where the story was.
 
-## What the probe measured
+## What the probe measured — all four worlds
 
-`node qa/newsarc.mjs` (and `ARC_WORLD=pirate|gameday|lantern`):
+`node qa/newsarc.mjs` (and `ARC_WORLD=pirate|gameday|lantern`).
 
-- phases `0 0 0 1 1 1 2 2 2 3 3 3 3 3` — in order, never skipping, never
-  reversing, morning owning the first two cards
-- the brand chip escalating with it (`📰 THE BUGLE` → `⚠️ BUGLE ALERT` →
-  `🚨 BUGLE EXTRA`)
-- 14 distinct lines from 14 cards; zero `💬` chips; zero family names
-- 14/14 cards measured **on screen** — a real bounding box, inside the viewport,
-  opaque, on a 430×932 phone
-- a real landmark eaten through the real eat path, named in full:
-  *"Pike Hollow still has theirs. The Second-Biggest Ball of Twine is gone."*
-- PLAY AGAIN returning the arc to phase 0, 0 cards, high-water 0.00
+**Every world produced the identical phase ladder**, which is the owner's ask
+stated as a measurement rather than an intention:
+
+```
+maple    0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
+pirate   0 0 0 1 1 1 2 2 2 3 3 3 3 3   25/26 — section E, see below
+gameday  0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
+lantern  0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
+```
+
+Pirate's re-run against the two fixes below is IN FLIGHT and this table will say
+26/26 when it has actually returned one. It does not say so yet, because a
+result written before it is measured is the thing this whole file exists to
+stop.
+
+In order, never skipping a rung, never reversing, morning owning the first two
+cards, and the brand chip escalating alongside in each world's own livery:
+
+| world | calm | worried | panic |
+|---|---|---|---|
+| Maple Falls | 📰 THE BUGLE | ⚠️ BUGLE ALERT | 🚨 BUGLE EXTRA |
+| Pirate Bay | 🏴‍☠️ BAY RADIO | ⚠️ RESORT UPDATE | 🚨 ALL HANDS |
+| Game Day | 🏈 GAME DAY LIVE | ⚠️ BOOTH ALERT | 🚨 STILL ON AIR |
+| Lantern Night | 🏮 MARKET COURTESY | 📜 MANAGEMENT NOTICE | 🥁 THE DRUM TOWER |
+
+Per world, every run: 14 distinct lines from 14 cards; zero `💬` chips; zero
+family names; 14/14 cards measured **on screen** — a real bounding box, inside
+the viewport, opaque, on a 430×932 phone; and PLAY AGAIN returning the arc to
+phase 0, 0 cards, high-water 0.00.
+
+And a real landmark eaten through the real eat path, named in full, in each
+world's own voice — which is the owner's second ask, working:
+
+- Maple — *"Gus watched The Second-Biggest Ball of Twine go. Gus has notes."*
+- Game Day — *"Bill has the rulebook out on The Good Mustard."*
+- Lantern — *"The One Upside-Down Lantern has been accepted, with thanks."*
+- Pirate — pending the re-run; this is the one that failed, see below.
+
+### The one failure, and the design error under it
+
+Pirate Bay failed section E on the first pass: the void ate Lounger Nine and the
+paper never mentioned it. Two causes, and they were worth separating.
+
+**The probe was manufacturing the failure it reported.** It fits the void to the
+target prop, and `__setVoidR` assigns `curStage = stageFor(r)` directly with no
+never-downgrade guard. Lounger Nine is small, so the fitted radius was 1.4
+against a void that had grown past 5 — knocking its form down several rungs.
+Re-growing re-fired every one of those evolutions, and each evolve reaction took
+the cooldown the landmark line needed. Maple and Game Day passed because their
+targets are bigger and the drop was small or absent. The probe now never shrinks.
+
+**But underneath it was a real error worth fixing on its own merits.** A single
+11-second cooldown, shared first-come-first-served, meant a form change could
+silence a landmark — and that is backwards. The void evolving already gets a
+full-screen card, three rings and a sound; the water tower going is the one
+thing only the newspaper can report, and the owner's ask named landmarks first.
+There are now two floors: 4s hard on everything so nothing machine-guns the
+ticker, 11s soft on `evolve` and `beat` only. `landmark` and `rivalGone` clear
+the hard floor alone and can never be starved. See the note above `townReacts`
+for why the two floors start at different moments.
 
 Probe faults found and fixed rather than worked around, all written up in the
 file: the card's CSS animation clock stalls while the game holds the main thread
