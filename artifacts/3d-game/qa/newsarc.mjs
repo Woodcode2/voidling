@@ -89,42 +89,74 @@ await ctx.addInitScript(() => {
 });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('  PAGE ERROR: ' + e.message));
-const resp = await page.goto(`${BASE}?len=150`);
+// ── HOW THIS PROBE REACHES ITS WORLD, AND WHY NOT THROUGH THE PICKER ──────
+//
+// `?w=<world>` selects the world at module init (prototype3d.ts:306-308) and
+// `?len=` sets DEBUG_HARNESS (:2606), which auto-starts the match (:5805). One
+// page load, straight into a live match in the world under test.
+//
+// THE FIRST VERSION TAPPED THE PICKER, and it cost hours. It worked on Maple
+// and hung forever on the other three, and the reason is a four-link chain that
+// is worth writing down because every link is invisible on its own:
+//
+//   1. `?len=150` makes DEBUG_HARNESS true, which SUPPRESSES the daily reward
+//      card (:5597 `&& !DEBUG_HARNESS`). So the claim loop below found nothing
+//      to claim, broke on iteration 0, and never wrote `voidDailyLast`.
+//   2. It also auto-starts the match at :5805 — so on Maple the probe was
+//      measuring a match that the QUERY STRING had started, not the picker tap.
+//   3. Tapping a world that is not the built one reloads via
+//      `location.href = location.pathname` (:4869), which DROPS the query
+//      string. DEBUG_HARNESS flips false.
+//   4. The daily card therefore appears for the first time on load 2, and the
+//      autoplay pickup (:4929) correctly refuses to start a match underneath a
+//      full-screen modal: `pendingLaunch = true; coverRelease('pack'); return`.
+//      `closeDaily()` is the only thing that clears that, and it is reachable
+//      only from a tap — so with nobody tapping, the game waits forever.
+//
+// A CHILD IS NEVER STUCK THERE: they see their reward, tap it, and the match
+// starts. The observation that looked like a dead game — t frozen at exactly 0
+// with the picker closed and no loading screen — was `__matchState().t`
+// returning `started ? matchElapsed() : 0` (:1415), i.e. a hard zero meaning
+// "no match has begun", not a stalled clock. Read that field carefully.
+//
+// Picker navigation is qa/unlocks.mjs's job and it is covered there with
+// child-only gestures. This file's subject is the newsroom, so it takes the
+// documented direct route and spends its time on headlines.
+const resp = await page.goto(`${BASE}?w=${WORLD}&len=150`);
 if (!resp || !resp.ok()) { console.log(`server ${resp ? resp.status() : 'down'} at ${BASE}`); process.exit(1); }
-await page.waitForFunction(() => '__season' in window, undefined, { timeout: 180000 });
-
-// CLAIM THE DAILY FIRST, because a child does — #daily is a full-screen overlay
-// ABOVE the world picker, and skipping it means every "tap" below lands on the
-// reward card instead of a world card. Diagnosed once already in qa/unlocks.mjs
-// with elementFromPoint; not diagnosed twice.
+await page.waitForFunction(() => '__season' in window, undefined, { timeout: 300000 });
+// …and claim the daily anyway if it somehow appears. Cheap, and the failure it
+// prevents is silent: a full-screen modal over everything this probe measures.
 for (let i = 0; i < 12; i++) {
   const up = await page.evaluate(() => !!document.getElementById('daily')?.classList.contains('show'));
   if (!up) break;
   await page.evaluate(() => document.getElementById('dailyClaim')?.click());
   await page.waitForTimeout(900);
 }
-await page.evaluate(() => document.getElementById('btnPlay').click());
-await page.waitForTimeout(500);
-// THE CARD HAS TO BE OPEN BEFORE THE TAP MEANS ANYTHING. All four are unlocked
-// in the init script above, but a locked card refuses the tap by design
-// (qa/unlocks.mjs) and the failure would look identical to a slow world.
-const locked = await page.evaluate((w) =>
-  !!document.querySelector(`.wCard[data-world="${w}"]`)?.classList.contains('locked'), WORLD);
-ok(!locked, `${WORLD} is open on the picker`);
-await page.click(`.wCard[data-world="${WORLD}"]`, { force: true });
-// …and WAIT LONG ENOUGH FOR THE HEAVIEST WORLD. 180s was fine for Maple and
-// timed out on Pirate Bay, which builds more geometry — and a bare timeout at
-// this line says nothing about whether the tap missed, the world was still
-// loading, or the match had started and stalled. Say which.
+const built = await page.evaluate(() => window.__newsArc().world);
+ok(built === WORLD, `the world under test is ${WORLD} (built: ${built})`);
+// …and say where it got to if the match never starts, so a timeout is a
+// diagnosis rather than a mystery.
 const tick = setInterval(async () => {
   try {
-    const s = await page.evaluate(() => ({
-      t: window.__matchState ? Math.round(window.__matchState().t * 10) / 10 : null,
-      world: localStorage.getItem('voidWorld'),
-      picker: !!document.getElementById('worlds')?.classList.contains('show'),
-      load: !!document.getElementById('loadScr')?.classList.contains('show'),
-    }));
-    console.log(`     …t=${s.t} world=${s.world} picker=${s.picker} loading=${s.load}`);
+    const s = await page.evaluate(() => {
+      // THE LOADING SCREEN HAS TWO CLASSES, and reading only one of them is how
+      // this ticker lied. #loadScr is `.boot` on first paint (index.html:1710,
+      // CSS `#loadScr.boot { display: flex }`) and `.show` when raised later —
+      // so a check for `.show` alone reports "not loading" while the boot
+      // curtain is still covering the screen, which is exactly what it did on
+      // Pirate Bay for ten minutes. Read the COMPUTED DISPLAY: it cannot be
+      // wrong about whether the player is looking at a curtain.
+      const ls = document.getElementById('loadScr');
+      return {
+        t: window.__matchState ? Math.round(window.__matchState().t * 10) / 10 : null,
+        world: localStorage.getItem('voidWorld'),
+        picker: !!document.getElementById('worlds')?.classList.contains('show'),
+        load: ls ? getComputedStyle(ls).display !== 'none' : false,
+        cls: ls ? ls.className : 'MISSING',
+      };
+    });
+    console.log(`     …t=${s.t} world=${s.world} picker=${s.picker} loading=${s.load} (${s.cls})`);
   } catch { /* page may be closing */ }
 }, 30000);
 await page.waitForFunction(() => window.__matchState && window.__matchState().t > 1, undefined, { timeout: 600000 })
@@ -201,7 +233,14 @@ async function card() {
 // player sees, which is the right density for checking ORDER.
 console.log('A. the arc runs forward, and morning comes first');
 const seen = [];
-const MATCH = 150;
+// ASK THE GAME HOW LONG THIS MATCH IS. Do not assume the ?len= above survived:
+// switching world from the picker reloads with `location.href =
+// location.pathname`, which drops the query string, so a run that changed world
+// is on the default 180 while this file thinks it is on 150. Every clock target
+// below is a fraction of this number, so getting it wrong quietly mis-aims the
+// whole arc sweep.
+const MATCH = await page.evaluate(() => window.__newsArc().len);
+console.log(`     match length ${MATCH}s`);
 for (let i = 0; i < 14; i++) {
   const c = await card();
   if (!c.entry) { ok(false, 'the newsroom logged nothing'); break; }

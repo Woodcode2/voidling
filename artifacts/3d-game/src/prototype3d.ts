@@ -1289,7 +1289,7 @@ const _dbg = new Proxy(_dbgStore, {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
     reactCd: number; pending: string | null; pendingIn: number;
-    queue: string[]; live: boolean;
+    queue: string[]; live: boolean; len: number; world: string;
   };
 };
 // QA counters: what the family actually DID to the player over a match
@@ -1315,6 +1315,18 @@ _dbg.__newsArc = () => ({
   log: newsLog.slice(), arc: arcState(),
   reactCd: Math.max(0, reactCd), pending: pendingReact, pendingIn: Math.max(0, pendingReactT),
   queue: newsQueue.slice(), live: started && !ended,
+  // WHICH WORLD IS ACTUALLY BUILT. Not the same as localStorage voidWorld:
+  // `?w=` wins over it at :306-308 and setWorld() does not write it back, so a
+  // probe reading the storage key can be told the wrong world with a straight
+  // face. Every newsroom voice is per-world, so this is the field that says
+  // whose voice the assertions below are judging.
+  world: pickedWorld,
+  // …and THIS MATCH'S length, which a probe must never assume. Solo is 120,
+  // ?len= overrides — and a world switch from the picker reloads via
+  // `location.href = location.pathname`, which DROPS the query string, so a
+  // probe that set ?len=150 and then changed world is silently running a 180s
+  // match. The arc's clock term is a fraction of this number; get it from here.
+  len: matchLen,
 });
 _dbg.__voidState = () => ({ x: voidState.x, z: voidState.z, r: voidling.radius });   // QA: containment tests
 _dbg.__biomeAt = (x: number, z: number) => island.biomeAt(x, z);   // QA: district centroid sweeps
