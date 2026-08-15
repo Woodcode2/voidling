@@ -224,15 +224,10 @@ stated as a measurement rather than an intention:
 
 ```
 maple    0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
-pirate   0 0 0 1 1 1 2 2 2 3 3 3 3 3   25/26 — section E, see below
+pirate   0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26  (25/26 first pass — see below)
 gameday  0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
 lantern  0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
 ```
-
-Pirate's re-run against the two fixes below is IN FLIGHT and this table will say
-26/26 when it has actually returned one. It does not say so yet, because a
-result written before it is measured is the thing this whole file exists to
-stop.
 
 In order, never skipping a rung, never reversing, morning owning the first two
 cards, and the brand chip escalating alongside in each world's own livery:
@@ -255,30 +250,57 @@ world's own voice — which is the owner's second ask, working:
 - Maple — *"Gus watched The Second-Biggest Ball of Twine go. Gus has notes."*
 - Game Day — *"Bill has the rulebook out on The Good Mustard."*
 - Lantern — *"The One Upside-Down Lantern has been accepted, with thanks."*
-- Pirate — pending the re-run; this is the one that failed, see below.
+- Pirate — *"Five clear stars for the gap where Lounger Nine was."*
 
-### The one failure, and the design error under it
+### The one failure — and a retracted explanation
 
 Pirate Bay failed section E on the first pass: the void ate Lounger Nine and the
-paper never mentioned it. Two causes, and they were worth separating.
+paper never mentioned it. It passes now. **The reason it passes is not the reason
+I first gave, and the correction is the useful part.**
 
-**The probe was manufacturing the failure it reported.** It fits the void to the
-target prop, and `__setVoidR` assigns `curStage = stageFor(r)` directly with no
-never-downgrade guard. Lounger Nine is small, so the fitted radius was 1.4
-against a void that had grown past 5 — knocking its form down several rungs.
-Re-growing re-fired every one of those evolutions, and each evolve reaction took
-the cooldown the landmark line needed. Maple and Game Day passed because their
-targets are bigger and the drop was small or absent. The probe now never shrinks.
+**RETRACTED.** I diagnosed the probe as shrinking the void — fitting it to a
+small prop, knocking `curStage` down several rungs with `__setVoidR`'s direct
+assignment, and re-firing evolutions that ate the cooldown. I changed the probe
+to take `max(current, fitted)` and wrote that mechanism into two commit messages
+and this file.
 
-**But underneath it was a real error worth fixing on its own merits.** A single
-11-second cooldown, shared first-come-first-served, meant a form change could
-silence a landmark — and that is backwards. The void evolving already gets a
-full-screen card, three rings and a sound; the water tower going is the one
-thing only the newspaper can report, and the owner's ask named landmarks first.
-There are now two floors: 4s hard on everything so nothing machine-guns the
-ticker, 11s soft on `evolve` and `beat` only. `landmark` and `rivalGone` clear
-the hard floor alone and can never be starved. See the note above `townReacts`
-for why the two floors start at different moments.
+Then I made the probe PRINT the radii, and the log refuted it:
+
+```
+radius 0.90 -> 2.38 (prop fits at 2.38)
+```
+
+The void was at 0.90, not the 5-plus the story required. Old formula
+`min(5.4, max(1.4, 2.38))` = 2.38; new formula `max(0.90, 2.38)` = 2.38.
+**Identical.** The probe change was a no-op for this run, so it cannot be what
+fixed Pirate, and the shrink cannot have caused the original failure — the first
+run had the same target and the same starting radius. The lesson is the one this
+session kept re-teaching: a plausible mechanism adopted without an instrument is
+just a story, and it survives exactly until you measure it.
+
+**What DID fix it is not proven.** The only other change is the two-floor
+priority below, and the most plausible mechanism is that the warp put a second
+sticker prop in reach a moment before Lounger Nine, so the first landmark took
+the single shared cooldown and the second was refused — which is precisely what
+two floors fix. But one run cannot separate "the priority change fixed it" from
+"the original failure was intermittent". The discriminating test is to revert the
+priority change and re-run Pirate; it has not been run. If it ever recurs, the
+probe now dumps both floors, the pending queue and every card printed since the
+eat, so the next occurrence names its own cause.
+
+**The design error stands on its own merits regardless.** A single 11-second
+cooldown, shared first-come-first-served, let a form change silence a landmark —
+and that is backwards. The void evolving already gets a full-screen card, three
+rings and a sound; the water tower going is the one thing only the newspaper can
+report, and the owner's ask named landmarks first. There are now two floors: 4s
+hard on everything so nothing machine-guns the ticker, 11s soft on `evolve` and
+`beat` only. `landmark` and `rivalGone` clear the hard floor alone and can never
+be starved. See the note above `townReacts` for why the two start at different
+moments.
+
+Never-shrinking also stays, not as the fix it was billed as, but as a correct
+guard for the runs where the void HAS grown past its target — which is most of
+them once a match is under way. It just was not this one.
 
 Probe faults found and fixed rather than worked around, all written up in the
 file: the card's CSS animation clock stalls while the game holds the main thread
