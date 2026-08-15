@@ -35,6 +35,7 @@ import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curi
 import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
+import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
@@ -3896,8 +3897,41 @@ function endMatch() {
         // exhausted-pool case — celebrate it without an instruction to leave
         + (open2.length ? '' : '<div class="eqh" style="color:#7ef2a0">⭐ EVERY QUEST DONE — WOW!</div>');
     }
-    const g = nextGoal();
+    // ══ A WHOLE NEW WORLD ═══════════════════════════════════════════════════
+    // Finishing a match opens the next world (game/unlocks.ts). This is the
+    // ONLY thing on the end screen that outranks the skin nudge, so it takes
+    // the slot outright rather than queueing below it: a new world is a bigger
+    // prize than any progress bar, and a child who just earned one should not
+    // have to read past "86✦ to the TOXIC skin" to find out.
+    const opened = completeWorld(pickedWorld);
     const nx = el('endNext');
+    if (opened) {
+      track('world_unlocked', { world: opened, after: pickedWorld, total: unlockedCount() });
+      nx.innerHTML = `<div class="unlockCard">🔓 <b>NEW WORLD!</b><span>${WORLD_LABEL[opened]} is open</span>`
+        + `<button id="endGoWorld" class="goShop">TAKE ME THERE →</button></div>`;
+      const gw = document.getElementById('endGoWorld');
+      if (gw) gw.addEventListener('click', () => {
+        track('world_pick', { pick: opened, from: pickedWorld, rebuild: true, via: 'unlock' });
+        localStorage.setItem('voidWorld', opened);
+        localStorage.setItem('voidAutoPlay', '1');
+        location.href = location.pathname;
+      });
+      // the same falling sparks a payout and a championship use — a new world
+      // is at least as big a moment as either
+      audio.win(); buzz(70);
+      for (let i = 0; i < 16; i++) {
+        const sp = document.createElement('span');
+        sp.className = 'endConf';
+        sp.textContent = i % 3 ? '✦' : '⭐';
+        sp.style.left = `${24 + Math.random() * 52}%`;
+        sp.style.color = ['#ffd23f', '#b875ff', '#7ef2a0'][i % 3];
+        sp.style.animationDelay = `${Math.random() * 0.4}s`;
+        endEl.appendChild(sp);
+        setTimeout(() => sp.remove(), 3200);
+      }
+      return;   // the skin nudge waits for a match that did not just open a world
+    }
+    const g = nextGoal();
     if (g) {
       const k = Math.min(1, g.have / g.need);
       // It said UNLOCKED when the skin was merely AFFORDABLE — the shop card
@@ -4666,8 +4700,36 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
       chip.textContent = `${ev.icon} ${ev.name} · ${eventEndLabel(ev)}`;
       c.appendChild(chip);
     }
+    // ── LOCKED, AND IT SAYS WHY ─────────────────────────────────────────────
+    // A world opens by FINISHING the one before it (game/unlocks.ts explains
+    // the choice). The card stays fully visible and keeps its poster — the art
+    // is the advertisement for what is next — but it desaturates, loses its
+    // PLAY chip, and states the one thing that opens it. A padlock with no
+    // sentence is a broken button; a padlock with a sentence is a goal.
+    const gate = gateFor(id);
+    c.classList.toggle('locked', !!gate);
+    if (gate && bestEl) bestEl.textContent = `🔒 FINISH ${WORLD_LABEL[gate]}`;
     c.classList.toggle('sel', id === pickedWorld);
     c.addEventListener('click', () => {
+      // …and tapping a locked one is never silent. It shakes, says the
+      // sentence out loud in the guide pill, and records the tap — a locked
+      // card nobody taps is a world nobody wants, which is worth knowing.
+      const g = gateFor(id);
+      if (g) {
+        track('world_locked_tap', { pick: id, needs: g });
+        // THE ANSWER GOES ON THE CARD THEY TAPPED, not in the guide pill.
+        // showGuide() was the obvious call and it is the wrong one here: #guide
+        // is z-index 7, the picker is a full-screen overlay above it, and the
+        // pill's auto-hide timer only ticks inside a live match — so the
+        // explanation was written to an element the child could not see and
+        // which would never clear. Caught by qa/unlocks.mjs asserting the text
+        // actually reached the player rather than that the function was called.
+        c.classList.remove('shake', 'why'); void (c as HTMLElement).offsetWidth;
+        c.classList.add('shake', 'why');
+        setTimeout(() => c.classList.remove('why'), 1600);
+        audio.alert(); buzz(30);
+        return;
+      }
       track('world_pick', { pick: id, from: pickedWorld, rebuild: id !== pickedWorld });
       if (id === pickedWorld) { launchWorld(); return; }   // already built: just go
       // a different world needs the island rebuilt, so come back playing
@@ -4683,7 +4745,11 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
 // the picker card, so the child lands playing, not back on the splash.
 {
   const rib = el('eventRibbon');
-  const ev = liveEvents()[0] ?? null;
+  // …but never advertise a world the player cannot enter yet. A season ribbon
+  // is a one-tap invitation; pointing it at a locked world would turn the
+  // splash's brightest element into a refusal. It comes back on its own the
+  // moment that world is earned, which is a better second impression anyway.
+  const ev = liveEvents().find((e) => isUnlocked(e.world)) ?? null;
   if (rib && ev) {
     rib.style.setProperty('--evc', `#${ev.accent.toString(16).padStart(6, '0')}`);
     rib.innerHTML = `${ev.icon} ${ev.name} — ${WORLD_NAMES[ev.world]}`

@@ -1040,6 +1040,27 @@
         transform: translateX(-110%); animation: evSweep 3.4s ease-in-out infinite; }
       @keyframes evSweep { 0%, 55% { transform: translateX(-110%); } 85%, 100% { transform: translateX(110%); } }
       #eventRibbon:active { transform: scale(0.96); }
+      /* ── A LOCKED WORLD (game/unlocks.ts) ──────────────────────────────────
+         Visible, legible, and obviously not-yet-yours. The poster stays — it
+         is the advertisement for the next world — but drained of colour, with
+         the PLAY chip gone and the reason in its place. Distinct from .lock,
+         which is the FROST PEAKS "world 5 does not exist yet" teaser. */
+      #worlds .wCard.locked .wArt { filter: saturate(0.28) brightness(0.62); }
+      #worlds .wCard.locked .wGo { display: none; }
+      #worlds .wCard.locked b { color: #cbb8ee; }
+      #worlds .wCard.locked .wBest { color: #ffd25a; font-weight: 900; transition: transform 0.18s, color 0.18s; }
+      /* tapped a locked world: the requirement it already carries flashes and
+         grows, so the answer arrives where the finger is */
+      #worlds .wCard.locked.why .wBest { color: #fff; transform: scale(1.22);
+        text-shadow: 0 0 12px rgba(255,210,90,0.9); }
+      /* the celebration in the end screen's nudge slot */
+      #endNext .unlockCard { display: flex; flex-direction: column; align-items: center; gap: 3px;
+        padding: 9px 14px 11px; border-radius: 16px;
+        background: linear-gradient(170deg, rgba(255,210,90,0.26), rgba(184,117,255,0.16));
+        border: 2px solid rgba(255,210,90,0.6); box-shadow: 0 0 22px rgba(255,210,90,0.35); }
+      #endNext .unlockCard b { font-size: 15px; letter-spacing: 1.4px; color: #fff;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+      #endNext .unlockCard span { font-size: 12px; font-weight: 800; letter-spacing: 0.8px; color: #ffe9a8; }
       /* the same season, announced on its world's poster in the picker */
       .wEvent { position: absolute; top: 10px; right: 10px; z-index: 2; padding: 5px 11px; border-radius: 999px;
         font-size: 10px; font-weight: 900; letter-spacing: 1px; color: #1c0930;
