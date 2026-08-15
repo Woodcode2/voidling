@@ -91,10 +91,39 @@ Exposed from `src/prototype3d.ts` (QA only, safe to call any time):
 
 ## Traps these probes learned the hard way
 
+- **`?len=` IS NOT A HARMLESS KNOB — it changes the game's behaviour twice.**
+  `DEBUG_HARNESS` is `_qd.has('at') || _qd.has('r') || _qd.has('len') || ...`
+  (prototype3d.ts:2606), and it both **suppresses the daily reward card**
+  (:5597) and **auto-starts the match** (:5805). So a probe that passes `?len=`
+  is not observing the normal launch path at all — it is watching a match the
+  query string started, with a modal that a real player would have seen removed
+  from under it. Cost hours in `qa/newsarc.mjs`; the full chain is in that
+  file's header.
+- **A world switch from the picker RELOADS and drops the query string.**
+  `location.href = location.pathname` (prototype3d.ts:4869). Every `?` param
+  you set — `len`, `w`, `walls` — is gone on the other side, and with `len` goes
+  `DEBUG_HARNESS`, so the daily card reappears and the autoplay path parks on
+  `pendingLaunch` waiting for a tap nobody makes. Reach a world with
+  `?w=<world>` instead, or re-claim the daily after the reload.
+- **`__matchState().t` is `started ? matchElapsed() : 0`** (prototype3d.ts:1415).
+  A hard zero means NO MATCH HAS BEGUN — it is not a stalled frame clock, and
+  reading it as one produced a confident, wrong diagnosis that `animate()` was
+  throwing. If you want to know whether the loop is alive, look at something the
+  loop writes unconditionally.
+- **`setWorld()` does not write localStorage.** `?w=` beats `voidWorld`
+  (prototype3d.ts:306-308), so the storage key can name a different world from
+  the one actually built. Ask the game (`__newsArc().world`), not the key.
+- **`#loadScr` has TWO showing classes** — `.boot` on first paint
+  (index.html:1710) and `.show` when raised later. Checking one reports "not
+  loading" while the curtain is up. Read `getComputedStyle(el).display`.
 - **The software renderer is ~1/9 to 1/40 real time.** Never report a wall-clock
   timing from here as a device number. Sample against `__matchState().t`, not
   `Date.now()`. Setting `__renderer.render = () => {}` makes the sim run at its
   proper rate when you do not need pixels.
+- **A CSS animation's clock stalls when the main thread is busy.** The news card
+  reaches full opacity 9% into a 5.6s keyframe — half a second on a phone. Under
+  swiftshader `getAnimations()[0].currentTime` was still 0 after 1.5s of wall
+  clock. Sleeping longer is a guess; wait on the element's own timeline.
 - **`preserveDrawingBuffer` is off.** `drawImage()` from the live WebGL canvas
   returns an empty buffer — it once reported a scene luminance of 0.000 for
   three worlds. Screenshot, then decode the PNG in-page as a data URL.
