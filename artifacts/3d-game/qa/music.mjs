@@ -54,7 +54,10 @@ for (const w of list) {
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   await p.click('#btnPlay'); await p.waitForTimeout(1200);
   await p.click(`#worldRow .wCard[data-world="${w}"]`);
-  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 600000 });
+  // 900s, not 600. Pirate Bay builds the most geometry of the four and times out
+  // at ten minutes under swiftshader — which kills the whole run, so the three
+  // worlds queued behind it never get measured either.
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 900000 });
 
   // Count what the synth builds, at four sizes. One number at the start of a
   // match is not enough: every score is written to open sparse and fill out as
@@ -79,8 +82,21 @@ for (const w of list) {
   }
   const bed = rates[0] * 3;
 
-  const ok = hits.filter((h) => h.real);
-  const miss = hits.filter((h) => !h.real);
+  // THE WORLD'S OWN SLOT, NOT WHATEVER LOADED FIRST. This probe reaches a world
+  // by walking the menu, and the menu now has a theme of its own
+  // (/assets/music/menu.mp3, added when the splash finally got music). So the
+  // first real audio hit is the MENU track, and reporting that made a healthy
+  // Maple print "RECORDING (menu.mp3)" — which reads like the wrong track is
+  // playing in the match when nothing of the sort is happening.
+  //
+  // Verified with a timestamped request log either side of match start:
+  //     menu.mp3   200 audio/mpeg 4526592  (menu phase)
+  //     maple.mp3  200 audio/mpeg 2647353  (match phase)
+  // Right file, right phase. The instrument was the only thing that was wrong.
+  const isMenu = (h) => /\/menu\.mp3$/.test(h.url);
+  const ok = hits.filter((h) => h.real && !isMenu(h));
+  const miss = hits.filter((h) => !h.real && !isMenu(h));
+  const menuHit = hits.find((h) => h.real && isMenu(h));
   const rate = Math.round(bed / 3);
   const slot = ok.length ? ok[0].url.split('/').pop() : null;
   // the synth also builds voices for crunches and stings, so this is a rate
@@ -95,6 +111,9 @@ for (const w of list) {
   // at the moment they are deciding whether this world sounds good.
   if (!slot && rates[0] < 8) { bad++; console.log(`${w.padEnd(8)} ${verdict}\n         ← ${rates[0]}/s at spawn is a hole; the other worlds run 15 to 44`); }
   else console.log(`${w.padEnd(8)} ${verdict}`);
+  // …and say so when the menu theme was picked up on the way in, so its absence
+  // is visible too — a silent splash is a regression nobody would otherwise see.
+  if (menuHit) console.log(`         menu theme loaded on the way in (${menuHit.len} bytes)`);
   for (const h of miss) {
     console.log(`         no track at ${h.url.split('/').pop()} — ${h.status} ${h.ct || '?'} ${h.len} bytes`);
   }
