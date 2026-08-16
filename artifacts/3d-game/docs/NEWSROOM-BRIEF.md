@@ -224,10 +224,20 @@ stated as a measurement rather than an intention:
 
 ```
 maple    0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
-pirate   0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26  (25/26 first pass — see below)
+pirate   0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
 gameday  0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
 lantern  0 0 0 1 1 1 2 2 2 3 3 3 3 3   PASS 26/26
 ```
+
+All four re-run against the FINAL build, after the deferral fix below. The
+earlier greens were against a build that had since changed, and carrying those
+forward would have been the same mistake as trusting the suite that passed while
+bug 4 was live.
+
+The landmark line differs run to run, which is the anti-repeat memory doing its
+job — Maple's ball of twine has come back as *"Gus watched … Gus has notes."*,
+*"Pike Hollow still has theirs."* and *"Marge did not move an inch when …"*
+across three runs of the same assertion.
 
 In order, never skipping a rung, never reversing, morning owning the first two
 cards, and the brand chip escalating alongside in each world's own livery:
@@ -247,10 +257,10 @@ phase 0, 0 cards, high-water 0.00.
 And a real landmark eaten through the real eat path, named in full, in each
 world's own voice — which is the owner's second ask, working:
 
-- Maple — *"Gus watched The Second-Biggest Ball of Twine go. Gus has notes."*
+- Maple — *"Marge did not move an inch when The Second-Biggest Ball of Twine went."*
+- Pirate — *"Do book Lounger Nine early for next year. Very early."*
 - Game Day — *"Bill has the rulebook out on The Good Mustard."*
-- Lantern — *"The One Upside-Down Lantern has been accepted, with thanks."*
-- Pirate — *"Five clear stars for the gap where Lounger Nine was."*
+- Lantern — *"Guests looking for The One Upside-Down Lantern should look elsewhere."*
 
 ### The one failure — and a retracted explanation
 
