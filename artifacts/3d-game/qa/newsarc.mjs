@@ -371,13 +371,36 @@ if (!target) {
   }, fitted);
   console.log(`     radius ${grew.from.toFixed(2)} -> ${grew.to.toFixed(2)} (prop fits at ${fitted.toFixed(2)})`);
   await page.evaluate((t) => window.__warpVoid(t.x, t.z), target);
-  // …and wait for the EAT, not for a timer. The reaction is queued by the eat
-  // handler and printed by a later card, so both have to happen.
+  // …and wait for the PLAYER to eat it, not merely for it to vanish.
+  //
+  // THIS IS WHAT MADE THIS SECTION FLAKY, and it took three wrong diagnoses to
+  // find. Rivals eat props too: `e.mesh.userData.eaten` goes true whoever took
+  // it, and only the PLAYER's eat handler sets `byPlayer` (prototype3d.ts:4332)
+  // and collects the sticker (:4224) — which is what fires the landmark
+  // reaction. So when a rival got there first, no reaction was ever DUE, and a
+  // probe waiting on `eaten` alone reported the newsroom as silent about a
+  // landmark the player never ate. Intermittent by construction, because it
+  // depends on where five rivals happen to be.
+  //
+  // Measured on Pirate Bay with scratchpad/ediag.mjs: three sticker props went
+  // in — lounger-nine, antique-compass, flip-flop — with the reaction cooldown
+  // at 0.0 and NOT ONE reactive line in the feed. That is the signature of
+  // rivals eating them, and it is almost certainly what the original Pirate
+  // failure was, rather than the shrink I first blamed or the priority change
+  // I then credited.
   const ate = await page.waitForFunction((sid) => {
     const list = window.__edibles || [];
-    return list.some((e) => e.mesh?.userData?.sticker === sid && e.mesh.userData.eaten);
+    return list.some((e) => e.mesh?.userData?.sticker === sid
+      && e.mesh.userData.eaten && e.mesh.userData.byPlayer);
   }, target.sid, { timeout: 120000 }).then(() => true).catch(() => false);
-  ok(ate, `the void ate the landmark (${target.sid})`);
+  if (!ate) {
+    const who = await page.evaluate((sid) => {
+      const e = (window.__edibles || []).find((x) => x.mesh?.userData?.sticker === sid);
+      return e ? { eaten: !!e.mesh.userData.eaten, byPlayer: !!e.mesh.userData.byPlayer } : null;
+    }, target.sid);
+    console.log(`       ${JSON.stringify(who)} — eaten-but-not-byPlayer means a RIVAL took it`);
+  }
+  ok(ate, `the PLAYER ate the landmark (${target.sid})`);
   // up to three cards, because breakingNews holds a short queue and the
   // landmark line can sit behind one other story
   let hit = null, onScreen = false, fresh = [];

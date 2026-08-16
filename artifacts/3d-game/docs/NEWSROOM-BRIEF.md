@@ -278,15 +278,35 @@ run had the same target and the same starting radius. The lesson is the one this
 session kept re-teaching: a plausible mechanism adopted without an instrument is
 just a story, and it survives exactly until you measure it.
 
-**What DID fix it is not proven.** The only other change is the two-floor
-priority below, and the most plausible mechanism is that the warp put a second
-sticker prop in reach a moment before Lounger Nine, so the first landmark took
-the single shared cooldown and the second was refused — which is precisely what
-two floors fix. But one run cannot separate "the priority change fixed it" from
-"the original failure was intermittent". The discriminating test is to revert the
-priority change and re-run Pirate; it has not been run. If it ever recurs, the
-probe now dumps both floors, the pending queue and every card printed since the
-eat, so the next occurrence names its own cause.
+**AND THEN THE ACTUAL CAUSE, measured.** I next credited the two-floor priority
+change. That was also unproven, so I went and instrumented it —
+`scratchpad/ediag.mjs` on Pirate Bay — and the answer was neither of my stories:
+
+```
+stickers eaten so far: ["lounger-nine","antique-compass","flip-flop"]
+AT EAT: reactCd 0.0  pending []  queue []
+  card 1..4:  every one a scheduled arc card, NOT ONE reactive line
+```
+
+Three landmark props gone, the cooldown at zero, nothing blocking anything — and
+no reaction, because **no reaction was ever due**. The landmark reaction hangs
+off sticker collection (`:4224`), which lives in the PLAYER's eat handler — the
+same function that sets `byPlayer` at `:4332`. Rivals eat props through a path
+that marks `eaten` and never collects a sticker. A rival had taken them.
+
+So the original Pirate failure was almost certainly a rival eating Lounger Nine,
+with the probe waiting on `eaten` alone and never asking WHO. Intermittent by
+construction, since it depends on where five rivals happen to be — which is why
+Maple, Game Day and Lantern passed the identical assertion. The probe now waits
+for `eaten && byPlayer` and prints both flags on failure.
+
+Three confident explanations, three refutations, one measurement. The pattern is
+the finding: **a plausible mechanism adopted without an instrument is a story,
+and it survives exactly until somebody prints a number.**
+
+That a rival eating a landmark produces no news at all is a separate question —
+possibly a gap, possibly correct, and it is written up as its own task rather
+than decided here.
 
 **The design error stands on its own merits regardless.** A single 11-second
 cooldown, shared first-come-first-served, let a form change silence a landmark —
