@@ -8154,7 +8154,16 @@ function animate() {
   // The audio side is idempotent: startMenuMusic() returns immediately if a
   // match owns the music, and does nothing at all when there is no menu.mp3 —
   // which is today, so this is silent until a track lands.
-  const onMenu = document.body.classList.contains('menu');
+  // …AND THE RESULTS SCREEN COUNTS AS FRONT-OF-HOUSE. endMatch() fades the
+  // match track out over 1.2s and shows #end, but it does NOT set body.menu —
+  // so keying on that class alone left the results card playing in SILENCE
+  // until the child tapped HOME. A game does not go quiet at the moment it is
+  // telling you how you did; the theme comes back up under the score, and then
+  // runs unbroken into the menu because this flag stays true across that tap.
+  //
+  // It fades in over 1.2s from near silence, so the win/lose sting still owns
+  // the first beat of the card rather than being stepped on.
+  const onMenu = document.body.classList.contains('menu') || endEl.classList.contains('show');
   if (onMenu !== menuThemeOn) {
     menuThemeOn = onMenu;
     if (onMenu) audio.startMenuMusic(); else audio.stopMenuMusic();
