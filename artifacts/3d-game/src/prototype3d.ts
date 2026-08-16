@@ -3167,7 +3167,34 @@ function townReacts(inp: Omit<ReactIn, 'world'>, delay = 0): void {
   if (!started || ended) return;
   // A NAMED THING GOING OUTRANKS THE VOID CHANGING SHAPE. See the two floors.
   const urgent = inp.kind === 'landmark' || inp.kind === 'rivalGone';
-  if (reactHardCd > 0) return;
+  // AN URGENT LINE IS NEVER DROPPED, ONLY DELAYED — and getting this wrong is
+  // what the two-floor change still left behind. qa/newsarc.mjs caught it on
+  // Pirate Bay with the dump that made it legible:
+  //
+  //     ok   the PLAYER ate a landmark (lounger-nine)
+  //     FAIL the paper named it
+  //          floors at check: hard=2.5s soft=9.5s
+  //          REACT p3 "Maisie says her friend got bigger. Maisie is entirely correct."
+  //
+  // That REACT line is the EVOLVE pool. The void grew, the town reported the
+  // growth, and 1.5 seconds later the player ate a named landmark — which was
+  // refused, because the 4-second card-spacing floor was still running and a
+  // blocked reaction simply returned. The most newsworthy thing that can happen
+  // was thrown away to protect the spacing of a line about the void getting
+  // bigger.
+  //
+  // Spacing and priority are different problems and deserve different answers.
+  // The hard floor still governs WHEN a card may appear — but an urgent line
+  // now WAITS for it instead of dying at it, so the landmark lands a moment
+  // later and the paper still says what a child just watched happen.
+  if (reactHardCd > 0) {
+    if (!urgent) return;
+    const line = reactLine({ ...inp, world: pickedWorld });
+    if (!line) return;
+    reactCd = REACT_SOFT;
+    pendingReact.push({ line, at: reactHardCd + 0.1 });
+    return;
+  }
   if (!urgent && reactCd > 0) return;
   const line = reactLine({ ...inp, world: pickedWorld });
   if (!line) return;              // the pool is spent — silence beats a repeat
