@@ -31,6 +31,14 @@ let bad = 0;
 for (const w of list) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 } });
   const hits = [];
+  // ── ONE WORLD FAILING MUST NOT TAKE THE OTHERS DOWN ──────────────────────
+  // This loop used to let an exception escape, so a single world that never
+  // reached a live match killed the process and the worlds queued behind it
+  // were never measured at all. That is how a run reported one line and a
+  // stack trace, which reads like "three worlds are broken" when in fact three
+  // worlds were never asked. A probe that cannot finish cannot be trusted to
+  // have covered anything.
+  try {
   // A 200 IS NOT A FILE. The preview server — and most static hosts — answer an
   // unknown path with the SPA's index.html at 200, so a missing maple.mp3 comes
   // back "successful" as 25 KB of HTML. It only counts as a track if the server
@@ -47,6 +55,14 @@ for (const w of list) {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidMute', '0');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
+    // EVERY WORLD OPEN. Worlds now unlock by finishing the one before
+    // (src/game/unlocks.ts), so on a fresh profile only Maple is playable and
+    // a tap on any other card is REFUSED BY DESIGN — the match never starts and
+    // this probe waits out its whole timeout on a game that is working
+    // perfectly. That is what made Pirate look like a 15-minute hang, and it is
+    // why raising the timeout to 900s changed nothing: the wait was never going
+    // to end. Maple passed throughout only because world 1 is never locked.
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
   } catch { /* private mode */ } });
   await p.goto(`http://127.0.0.1:4177/?w=${w}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
@@ -54,9 +70,12 @@ for (const w of list) {
     .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
   await p.click('#btnPlay'); await p.waitForTimeout(1200);
   await p.click(`#worldRow .wCard[data-world="${w}"]`);
-  // 900s, not 600. Pirate Bay builds the most geometry of the four and times out
-  // at ten minutes under swiftshader — which kills the whole run, so the three
-  // worlds queued behind it never get measured either.
+  // RETRACTED, and worth keeping so nobody re-learns it: this comment used to
+  // blame the Pirate Bay timeout on swiftshader being slow, and raising the
+  // limit from 600s to 900s changed nothing — because the wait was never going
+  // to end. The card was LOCKED (see voidUnlocked above) and a locked card
+  // refuses the tap by design. The generous timeout stays for the genuinely
+  // slow worlds; it was simply never the cause.
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 900000 });
 
   // Count what the synth builds, at four sizes. One number at the start of a
@@ -117,7 +136,12 @@ for (const w of list) {
   for (const h of miss) {
     console.log(`         no track at ${h.url.split('/').pop()} — ${h.status} ${h.ct || '?'} ${h.len} bytes`);
   }
-  await p.close();
+  } catch (e) {
+    bad++;
+    console.log(`${w.padEnd(8)} COULD NOT MEASURE — ${String(e).split('\n')[0].slice(0, 120)}`);
+  } finally {
+    await p.close().catch(() => {});
+  }
 }
 await b.close();
 
