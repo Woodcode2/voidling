@@ -305,16 +305,21 @@ ok(!mismatch, `the painted card matches the record${mismatch ? `\n      log:    
 // Find a real sticker prop, put the void on top of it at a size that can eat
 // it, and let the REAL eat path run. No hooks, no forced headline.
 console.log('E. eating a named landmark makes the paper say so');
-const target = await page.evaluate(() => {
+/** The next landmark nobody has eaten yet, skipping any we already attempted.
+ *  There is a retry because a RIVAL can take the one we picked — see the
+ *  byPlayer note below — and that is not the newsroom's fault. */
+const tried = [];
+const nextTarget = () => page.evaluate((skip) => {
   const list = window.__edibles || [];
   for (const e of list) {
     const sid = e.mesh?.userData?.sticker;
-    if (sid && !e.mesh.userData.eaten && e.mesh.visible) {
+    if (sid && !skip.includes(sid) && !e.mesh.userData.eaten && e.mesh.visible) {
       return { x: e.mesh.position.x, z: e.mesh.position.z, r: e.radius, sid };
     }
   }
   return null;
-});
+}, tried);
+let target = await nextTarget();
 if (!target) {
   ok(false, 'no sticker prop is placed in this world — nothing to eat');
 } else {
@@ -325,7 +330,7 @@ if (!target) {
   // the 5.86 radius that puts Maple's town hall in reach. Two reactive lines
   // were in the queue and it read the wrong one. Every landmark template
   // carries {X}, so the eaten thing's own name is the evidence.
-  const name = STICKER_NAME[target.sid] ?? '';
+  let name = STICKER_NAME[target.sid] ?? '';
   ok(!!name, `the target has a printable name (${target.sid} -> "${name}")`);
   // LET THE TOWN FINISH TALKING FIRST. Every reaction shares one 11-second
   // cooldown, and section A rushed the clock through all four match beats, each
@@ -350,57 +355,68 @@ if (!target) {
   // 6" — which is what the first draft used — trips the finale on the way past
   // and puts a second reactive line in the queue ahead of this one.
   //
-  // NEVER SHRINK THE VOID. `__setVoidR` assigns `curStage = stageFor(r)`
-  // DIRECTLY, with no never-downgrade guard — so dropping a grown void onto a
-  // small prop knocks its form down several rungs, and re-growing then re-fires
-  // every one of those evolutions. Each evolve reaction takes a slot in the
-  // newsroom's reaction floors, and the landmark line this section exists to
-  // check is starved before it is ever picked.
+  // THE PLAYER HAS TO BE THE ONE WHO EATS IT, and that is what made this
+  // section flaky through three wrong diagnoses.
   //
-  // That is precisely how Pirate Bay failed while Maple and Game Day passed:
-  // Lounger Nine is small, so the fitted radius was 1.4 against a void that had
-  // grown past 5, while Maple's ball of twine fitted 3.75 and Game Day's
-  // mustard higher still. The probe was manufacturing the starvation it then
-  // reported as a missing headline.
-  const fitted = Math.min(5.4, Math.max(1.4, target.r * 2.5));
-  const grew = await page.evaluate((a) => {
-    const cur = window.__matchState().r;
-    const to = Math.max(cur, a);        // fit the prop, or stay as we are
-    window.__setVoidR(to);
-    return { from: cur, to };
-  }, fitted);
-  console.log(`     radius ${grew.from.toFixed(2)} -> ${grew.to.toFixed(2)} (prop fits at ${fitted.toFixed(2)})`);
-  await page.evaluate((t) => window.__warpVoid(t.x, t.z), target);
-  // …and wait for the PLAYER to eat it, not merely for it to vanish.
+  // Rivals eat props too. `e.mesh.userData.eaten` goes true whoever took it,
+  // but only the PLAYER's eat handler sets `byPlayer` (prototype3d.ts:4332) and
+  // collects the sticker (:4224) — and the sticker collection is what fires the
+  // landmark reaction. So when a rival got there first, NO REACTION WAS EVER
+  // DUE, and a probe waiting on `eaten` alone reported the newsroom as silent
+  // about a landmark the player never ate.
   //
-  // THIS IS WHAT MADE THIS SECTION FLAKY, and it took three wrong diagnoses to
-  // find. Rivals eat props too: `e.mesh.userData.eaten` goes true whoever took
-  // it, and only the PLAYER's eat handler sets `byPlayer` (prototype3d.ts:4332)
-  // and collects the sticker (:4224) — which is what fires the landmark
-  // reaction. So when a rival got there first, no reaction was ever DUE, and a
-  // probe waiting on `eaten` alone reported the newsroom as silent about a
-  // landmark the player never ate. Intermittent by construction, because it
-  // depends on where five rivals happen to be.
+  // Measured with scratchpad/ediag.mjs on Pirate Bay: three sticker props went
+  // in — lounger-nine, antique-compass, flip-flop — with both reaction floors
+  // at 0.0, nothing queued, and NOT ONE reactive line in four following cards.
+  // That is the signature of rivals eating them, and it is almost certainly
+  // what the original Pirate failure was. It is intermittent by construction,
+  // because it depends on where five rivals happen to be — which is exactly why
+  // Maple, Game Day and Lantern passed the identical assertion.
   //
-  // Measured on Pirate Bay with scratchpad/ediag.mjs: three sticker props went
-  // in — lounger-nine, antique-compass, flip-flop — with the reaction cooldown
-  // at 0.0 and NOT ONE reactive line in the feed. That is the signature of
-  // rivals eating them, and it is almost certainly what the original Pirate
-  // failure was, rather than the shrink I first blamed or the priority change
-  // I then credited.
-  const ate = await page.waitForFunction((sid) => {
-    const list = window.__edibles || [];
-    return list.some((e) => e.mesh?.userData?.sticker === sid
-      && e.mesh.userData.eaten && e.mesh.userData.byPlayer);
-  }, target.sid, { timeout: 120000 }).then(() => true).catch(() => false);
-  if (!ate) {
-    const who = await page.evaluate((sid) => {
-      const e = (window.__edibles || []).find((x) => x.mesh?.userData?.sticker === sid);
-      return e ? { eaten: !!e.mesh.userData.eaten, byPlayer: !!e.mesh.userData.byPlayer } : null;
-    }, target.sid);
-    console.log(`       ${JSON.stringify(who)} — eaten-but-not-byPlayer means a RIVAL took it`);
+  // So: try up to three landmarks. Losing one to a rival is the game working,
+  // not the newsroom failing, and a probe that cannot tell those apart is worse
+  // than no probe.
+  //
+  // (An earlier draft of this comment blamed a SHRINK — the probe fitting the
+  // void to a small prop, dropping curStage and re-firing evolutions that ate
+  // the cooldown. The radius line below refuted it: 0.90 -> 2.38, a growth, and
+  // the old and new formulas give the identical number. The `max(cur, fitted)`
+  // is kept as a correct guard for runs where the void HAS grown past its
+  // target, not as the fix it was briefly billed as.)
+  let ate = false;
+  for (let attempt = 0; attempt < 3 && target && !ate; attempt++) {
+    tried.push(target.sid);
+    // …and stay UNDER the hero-cue threshold. Maple's town hall is r6.5 and the
+    // cue fires at voidR >= 6.5/1.11 = 5.86, so a flat "at least 6" — the first
+    // draft — trips the finale on the way past and puts a second reactive line
+    // in the queue ahead of this one.
+    const fitted = Math.min(5.4, Math.max(1.4, target.r * 2.5));
+    const grew = await page.evaluate((a) => {
+      const cur = window.__matchState().r;
+      const to = Math.max(cur, a);        // fit the prop, or stay as we are
+      window.__setVoidR(to);
+      return { from: cur, to };
+    }, fitted);
+    console.log(`     ${target.sid}: radius ${grew.from.toFixed(2)} -> ${grew.to.toFixed(2)}`
+      + ` (prop fits at ${fitted.toFixed(2)})`);
+    await page.evaluate((t) => window.__warpVoid(t.x, t.z), target);
+    ate = await page.waitForFunction((sid) => {
+      const list = window.__edibles || [];
+      return list.some((e) => e.mesh?.userData?.sticker === sid
+        && e.mesh.userData.eaten && e.mesh.userData.byPlayer);
+    }, target.sid, { timeout: 120000 }).then(() => true).catch(() => false);
+    if (!ate) {
+      const who = await page.evaluate((sid) => {
+        const e = (window.__edibles || []).find((x) => x.mesh?.userData?.sticker === sid);
+        return e ? { eaten: !!e.mesh.userData.eaten, byPlayer: !!e.mesh.userData.byPlayer } : null;
+      }, target.sid);
+      console.log(`       ${JSON.stringify(who)} — eaten without byPlayer means a RIVAL took it; trying another`);
+      const next = await nextTarget();
+      if (next) { target = next; name = STICKER_NAME[next.sid] ?? ''; }
+      else break;
+    }
   }
-  ok(ate, `the PLAYER ate the landmark (${target.sid})`);
+  ok(ate, `the PLAYER ate a landmark (${target ? target.sid : 'none left'})`);
   // up to three cards, because breakingNews holds a short queue and the
   // landmark line can sit behind one other story
   let hit = null, onScreen = false, fresh = [];
