@@ -31,7 +31,11 @@ import { chromium } from 'playwright';
 const WORLD = process.argv[2] || 'maple';
 const PORT = process.argv[3] || '4177';
 const CDN = /\/assets\/(hf|hf3d)\//;
-const MUSIC_SLOT = /\/assets\/music\/(maple|pirate|gameday|lantern|theme)\.mp3$/;
+// `menu` joins the four worlds here: it is the splash/picker theme and it is
+// the same optional drop-in contract — absent means quiet, exactly as the menu
+// has always been, not broken. Leaving it out of this list is what turned a
+// by-design 404 into a red smoke run the moment the slot was wired.
+const MUSIC_SLOT = /\/assets\/music\/(maple|pirate|gameday|lantern|theme|menu)\.mp3$/;
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

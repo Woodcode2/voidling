@@ -3401,6 +3401,9 @@ let rankHold = 0, shownRank = 0, announcedRank = 0, lastLeadBrag = -99;
 // have not yet told them otherwise". everBehind arms the crown — the pre-join
 // minute where the player leads five empty slots must not crown them.
 let crownLive = false, everBehind = false;
+// whether the menu theme is currently running, so the sync in animate() only
+// acts on a real transition rather than calling into the audio engine every frame
+let menuThemeOn = false;
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 // ── PAINT CACHES ────────────────────────────────────────────────────────────
@@ -8139,6 +8142,23 @@ function animate() {
   const gOn = started && !ended && !paused;
   growthEl.classList.toggle('off', !gOn);
   if (gOn) paintGrowth(R);
+
+  // ── THE MENU THEME FOLLOWS THE MENU ─────────────────────────────────────
+  // Driven off `body.menu` rather than wired into each screen, because the menu
+  // is raised from FIVE places already — the splash, HOME on the end screen,
+  // QUIT from the pause sheet, the shop door on the end screen, and the
+  // first-launch path — and a sixth added later would silently miss a
+  // hand-wired call. `body.menu` is the one invariant every one of them sets,
+  // so syncing to it cannot be forgotten. One classList read per frame.
+  //
+  // The audio side is idempotent: startMenuMusic() returns immediately if a
+  // match owns the music, and does nothing at all when there is no menu.mp3 —
+  // which is today, so this is silent until a track lands.
+  const onMenu = document.body.classList.contains('menu');
+  if (onMenu !== menuThemeOn) {
+    menuThemeOn = onMenu;
+    if (onMenu) audio.startMenuMusic(); else audio.stopMenuMusic();
+  }
 
   pumpBanner();   // anything the evolve card held back gets its turn now
 

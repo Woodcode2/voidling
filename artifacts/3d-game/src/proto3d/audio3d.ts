@@ -36,6 +36,8 @@ export interface Audio3D {
   startMusic(): void;              // the match loop — tempo + layers ride the stage
   setMusicStage(n: number): void;
   stopMusic(): void;
+  startMenuMusic(): void;          // the splash/picker/shop theme — /assets/music/menu.mp3
+  stopMenuMusic(): void;
   setZone(zone: string | null): void;   // player's current district — drives the place layer
   matchBeat(kind: string): void;        // authored match beat (happy hour / dance party / feast)
   jingle(): void;                       // quote MAPLE FALLS' municipal jingle (no-op in the bay)
@@ -96,6 +98,14 @@ export function createAudio(): Audio3D {
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
     for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+    // …AND THE MENU THEME, which could not legally have started before now.
+    // The game asks for it as soon as the splash appears, but that is usually
+    // before any gesture exists, so ensure() returned null and the request only
+    // set `wanted`. This is the first moment a browser will let it sound, so it
+    // starts on the child's very first touch rather than never.
+    if (menuCh.wanted && !menuCh.buf && !menuCh.bad && !themeCh.wanted) {
+      playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* no file: quiet */ });
+    }
   };
   window.addEventListener('pointerdown', unlock, { passive: true });
   window.addEventListener('keydown', unlock);
@@ -162,18 +172,34 @@ export function createAudio(): Audio3D {
   // <audio loop> hard-reset audibly at the seam. We decode once and run a
   // scheduled EQUAL-POWER CROSSFADE loop — each pass fades in over the tail of
   // the previous one, so the theme never stops or snaps.
-  let themeBuf: AudioBuffer | null = null;
-  let themeBad = false, themeLoading = false, themeWanted = false;
-  let themeGain: GainNode | null = null;
-  let themeTimer: ReturnType<typeof setTimeout> | null = null;
-  let themeSrcs: AudioBufferSourceNode[] = [];
+  //
+  // TWO CHANNELS RUN THIS, not one. The match track has always used it; the
+  // MENU theme now uses it too, and they are separate instances rather than a
+  // second copy of the code, because the seam maths here is the part that took
+  // tuning and a drifting duplicate of it would be a bug waiting to happen.
+  // Two instances also make the one rule that matters enforceable in one place:
+  // the menu and the match must never be audible together.
+  interface LoopChan {
+    buf: AudioBuffer | null;
+    bad: boolean; loading: boolean; wanted: boolean;
+    gain: GainNode | null;
+    timer: ReturnType<typeof setTimeout> | null;
+    srcs: AudioBufferSourceNode[];
+    vol: number;
+  }
+  const mkChan = (vol: number): LoopChan =>
+    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol });
+  // 0.4 is the match track's long-standing level. The menu sits a little under
+  // it: it plays against no gameplay bed at all, so the same number reads loud.
+  const themeCh = mkChan(0.4);
+  const menuCh = mkChan(0.34);
   const THEME_FADE = 1.6;   // seconds of overlap at the seam
-  function startThemeLoop(c: AudioContext, buf: AudioBuffer) {
-    stopThemeLoop(0);
-    if (!themeGain) { themeGain = c.createGain(); themeGain.connect(master!); }
-    themeGain.gain.cancelScheduledValues(c.currentTime);
-    themeGain.gain.setValueAtTime(0.0001, c.currentTime);
-    themeGain.gain.exponentialRampToValueAtTime(0.4, c.currentTime + 1.2);
+  function startLoop(ch: LoopChan, c: AudioContext, buf: AudioBuffer) {
+    stopLoop(ch, 0);
+    if (!ch.gain) { if (!master) return; ch.gain = c.createGain(); ch.gain.connect(master); }
+    ch.gain.gain.cancelScheduledValues(c.currentTime);
+    ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
+    ch.gain.gain.exponentialRampToValueAtTime(ch.vol, c.currentTime + 1.2);
     const period = Math.max(4, buf.duration - THEME_FADE);
     const playPass = (when: number) => {
       const src = c.createBufferSource(); src.buffer = buf;
@@ -183,32 +209,57 @@ export function createAudio(): Audio3D {
       g.gain.linearRampToValueAtTime(1, when + THEME_FADE);
       g.gain.setValueAtTime(1, when + period);
       g.gain.linearRampToValueAtTime(0.0001, when + buf.duration);
-      src.connect(g); g.connect(themeGain!);
+      src.connect(g); g.connect(ch.gain!);
       src.start(when); src.stop(when + buf.duration + 0.1);
-      themeSrcs.push(src);
-      if (themeSrcs.length > 3) themeSrcs.shift();
+      ch.srcs.push(src);
+      if (ch.srcs.length > 3) ch.srcs.shift();
     };
     let next = c.currentTime + 0.05;
     playPass(next);
     const arm = () => {
       next += period;
       playPass(next);   // scheduled ahead on the audio clock — sample-accurate
-      themeTimer = setTimeout(arm, Math.max(500, (next - c.currentTime - 2.5) * 1000));
+      ch.timer = setTimeout(arm, Math.max(500, (next - c.currentTime - 2.5) * 1000));
     };
-    themeTimer = setTimeout(arm, Math.max(500, (period - 2.5) * 1000));
+    ch.timer = setTimeout(arm, Math.max(500, (period - 2.5) * 1000));
   }
-  function stopThemeLoop(fade: number) {
-    if (themeTimer) { clearTimeout(themeTimer); themeTimer = null; }
-    if (ctx && themeGain && fade > 0) {
-      themeGain.gain.cancelScheduledValues(ctx.currentTime);
-      themeGain.gain.setValueAtTime(themeGain.gain.value, ctx.currentTime);
-      themeGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + fade);
-      const olds = themeSrcs; themeSrcs = [];
+  function stopLoop(ch: LoopChan, fade: number) {
+    if (ch.timer) { clearTimeout(ch.timer); ch.timer = null; }
+    if (ctx && ch.gain && fade > 0) {
+      ch.gain.gain.cancelScheduledValues(ctx.currentTime);
+      ch.gain.gain.setValueAtTime(ch.gain.gain.value, ctx.currentTime);
+      ch.gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + fade);
+      const olds = ch.srcs; ch.srcs = [];
       setTimeout(() => olds.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } }), fade * 1000 + 60);
     } else {
-      themeSrcs.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } });
-      themeSrcs = [];
+      ch.srcs.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } });
+      ch.srcs = [];
     }
+  }
+  /** Load a channel's track once and play it. `urls` are tried in order and the
+   *  first that decodes wins; if none does, `onNone` runs (the match falls back
+   *  to its synth score, the menu simply stays quiet as it does today). */
+  function playTrack(ch: LoopChan, urls: string[], onNone: () => void) {
+    ch.wanted = true;
+    const c = ensure();
+    if (!c || ch.bad) { onNone(); return; }
+    if (ch.buf) { startLoop(ch, c, ch.buf); return; }
+    if (ch.loading) return;
+    ch.loading = true;
+    (async () => {
+      for (const u of urls) {
+        try {
+          const r = await fetch(u);
+          if (!r.ok) continue;
+          const buf = await c.decodeAudioData(await r.arrayBuffer());
+          ch.buf = buf;
+          if (ch.wanted) startLoop(ch, c, buf);
+          return;
+        } catch { /* next candidate */ }
+      }
+      ch.bad = true;
+      if (ch.wanted) onNone();
+    })();
   }
   function startSynth() {
     const c = ensure(); if (!c || !master) return;
@@ -2990,34 +3041,42 @@ export function createAudio(): Audio3D {
         ? ['/assets/music/theme.mp3', '/assets/music/maple.mp3']
         : [`/assets/music/${slot}.mp3`];
 
-      themeWanted = true;
-      const c = ensure();
-      if (!c || themeBad) { synth(); return; }
-      if (themeBuf) { startThemeLoop(c, themeBuf); return; }
-      if (!themeLoading) {
-        themeLoading = true;
-        // try each candidate in order; the first that decodes wins, and if none
-        // does we are simply a world with no recording yet
-        (async () => {
-          for (const u of urls) {
-            try {
-              const r = await fetch(u);
-              if (!r.ok) continue;
-              const buf = await c.decodeAudioData(await r.arrayBuffer());
-              themeBuf = buf;
-              if (themeWanted) startThemeLoop(c, buf);
-              return;
-            } catch { /* next candidate */ }
-          }
-          themeBad = true;
-          if (themeWanted) synth();
-        })();
-      }
-      // NOTE: do NOT also start the synth here as a stopgap. startThemeLoop()
-      // does not silence a running score — there is no shared stop — so the two
-      // would play over each other for the life of the match. The fetch fails
-      // fast when there is no file (a 404 is one round trip), which is the case
-      // for every world today, so the synth still comes up effectively at once.
+      // THE MENU THEME STANDS DOWN THE MOMENT A MATCH BEGINS. Two tracks over
+      // each other is the one failure this whole two-channel split exists to
+      // make impossible, and the match is what the child is here for.
+      menuCh.wanted = false;
+      stopLoop(menuCh, 0.6);
+      playTrack(themeCh, urls, synth);
+      // NOTE: do NOT also start the synth as a stopgap. startLoop() does not
+      // silence a running score — there is no shared stop — so the two would
+      // play over each other for the life of the match. The fetch fails fast
+      // when there is no file (a 404 is one round trip), which is the case for
+      // every world today, so the synth still comes up effectively at once.
+    },
+    // ── THE MENU THEME ────────────────────────────────────────────────────
+    // The first thing anybody hears, and until now there was NOTHING here:
+    // startMusic() has always been match-only, and theme.mp3 — which
+    // docs/AUDIO-SOURCING.md calls "the menu" — is actually MAPLE's match track
+    // behind a localStorage flag. The splash, the world picker, the shop and
+    // the sticker book all played in silence.
+    //
+    // Same drop-in contract as the worlds: put a file at
+    // /assets/music/menu.mp3 and it plays; leave it out and the menu is exactly
+    // as quiet as it is today. There is deliberately NO synth fallback here —
+    // the menu has never had a score to fall back to, and inventing one is a
+    // different job from wiring the slot.
+    //
+    // AUTOPLAY: a browser will not start audio before a gesture, so this cannot
+    // sound on page load however it is called. The caller re-arms it from the
+    // context-unlock handler, which makes the theme begin on the child's very
+    // first touch — in practice the daily reward card or PLAY.
+    startMenuMusic() {
+      if (themeCh.wanted) return;   // a match owns the music; never talk over it
+      playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* quiet, as today */ });
+    },
+    stopMenuMusic() {
+      menuCh.wanted = false;
+      stopLoop(menuCh, 0.6);
     },
     setMusicStage(n) { musStage = n; },
     // The town's own eight notes, on demand — for a menu, a results screen, a
@@ -3137,8 +3196,8 @@ export function createAudio(): Audio3D {
       stopTown(1.2);
       stopGameday(1.2);
       stopLantern(1.2);
-      themeWanted = false;
-      stopThemeLoop(1.2);
+      themeCh.wanted = false;
+      stopLoop(themeCh, 1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
       if (ctx && musGain) {
         musGain.gain.cancelScheduledValues(ctx.currentTime);
