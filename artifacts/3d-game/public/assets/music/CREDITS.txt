@@ -1,0 +1,21 @@
+# VOIDLING — music credits and licence record
+#
+# One line per shipped track: slot, source URL, licence. This file is what
+# answers a rights query in two years' time, and it is the difference between
+# "we licensed this" and "we think we found it somewhere".
+#
+# ACCEPT: Pixabay Content Licence, CC0, Public Domain, Kenney, Mixkit, Sonniss.
+# REJECT: CC-BY (attribution is an enforceable obligation), CC-BY-NC (bars
+#         commercial release), CC-BY-SA (incompatible with a closed binary).
+#
+# slot | title | artist | source URL | licence
+# ---------------------------------------------------------------------------
+# (empty — every world is on its hand-written synth score today)
+
+# REMOVED 2026-08-16: theme.mp3, 1.4 MB, no licence record, inherited from the
+# legacy 2D game. It shipped in the bundle (public/ is copied wholesale into
+# dist/) whether or not the voidTheme=1 flag was set, which made it an unbacked
+# rights claim in a 4+ release. Byte-identical copy remains at
+# legacy-2d/assets/music/track_1.mp3 (md5 e3f47fa79279e67b943200d3e2693cb2);
+# legacy-2d/ is NOT part of the build, so nothing unlicensed ships now.
+# Recoverable from git history if provenance is ever established.
