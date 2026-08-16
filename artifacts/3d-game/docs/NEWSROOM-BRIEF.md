@@ -278,9 +278,49 @@ run had the same target and the same starting radius. The lesson is the one this
 session kept re-teaching: a plausible mechanism adopted without an instrument is
 just a story, and it survives exactly until you measure it.
 
-**AND THEN THE ACTUAL CAUSE, measured.** I next credited the two-floor priority
-change. That was also unproven, so I went and instrumented it —
-`scratchpad/ediag.mjs` on Pirate Bay — and the answer was neither of my stories:
+**FOUR EXPLANATIONS, THREE REFUTED, ONE MEASURED.** What follows is the whole
+chase, kept because the pattern is more useful than any single answer: every
+story was plausible, every one was cheap to test, and every one collapsed the
+moment an instrument was pointed at it.
+
+| # | I said | what refuted it |
+|---|---|---|
+| 1 | `animate()` throws on frame 1 | `__matchState().t` is `started ? … : 0` — a hard zero means no match began, not a dead loop |
+| 2 | the probe SHRINKS the void | its own radius log: `0.90 -> 2.38`, a growth, and both formulas give the identical number |
+| 3 | a RIVAL ate the landmark | the next dump: `ok the PLAYER ate a landmark (lounger-nine)` |
+| 4 | **an evolve took the slot and the landmark was DROPPED** | **confirmed by the dump — and fixed** |
+
+The fourth is the real one, and #1 had the right instinct with the wrong
+mechanism. `__setVoidR` sets `frozenR`, and `frozenR` disables the growth RATE
+LIMITER and caps (`:7286-7301`) while eating still grows the void
+unconditionally (`:4179`). So the void balloons after the warp, crosses a form
+threshold, and the evolve reaction files immediately before the landmark:
+
+```
+ok   the PLAYER ate a landmark (lounger-nine)
+FAIL the paper named it
+     floors at check: hard=2.5s soft=9.5s
+     REACT p3 "Maisie says her friend got bigger. Maisie is entirely correct."
+```
+
+**The bug that exposed: spacing was being enforced by discarding.** The two
+floors got the priority right, but both answers to "a floor is running" were
+still `return`. So the most newsworthy thing that can happen was thrown away to
+protect the spacing of a line about the void getting bigger. An urgent line now
+WAITS out the remainder of the hard floor and files — never dropped, only
+delayed. Confirmed:
+
+```
+ok   the paper named it — "Do book Lounger Nine early for next year. Very early."
+```
+
+Note what the four-world PASS did NOT prove: all four passed while that bug was
+live, because the timing it needs — an evolve immediately before a landmark — is
+narrow. **A green suite is evidence, not proof.**
+
+**The earlier instrumented step, kept for the record.**
+`scratchpad/ediag.mjs` on Pirate Bay produced this, which is what killed story 3
+as a general explanation while briefly looking like the answer:
 
 ```
 stickers eaten so far: ["lounger-nine","antique-compass","flip-flop"]
