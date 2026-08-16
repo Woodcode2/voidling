@@ -417,6 +417,22 @@ if (!target) {
     }
   }
   ok(ate, `the PLAYER ate a landmark (${target ? target.sid : 'none left'})`);
+  // LET THE DEFERRED LINE COME DUE FIRST, and mind which clock it is on.
+  //
+  // An urgent reaction blocked by the card-spacing floor is no longer dropped —
+  // it waits out the remainder and then files (see townReacts). That wait is in
+  // GAME seconds, and the game advances at most 0.05s per frame; card() waits on
+  // the CSS animation clock, which is WALL time. So three cards went by while
+  // the hard floor moved 0.1s, and the probe reported a missing headline that
+  // was sitting right there in `pending`:
+  //
+  //     pending=["Do book Lounger Nine early for next year. Very early."]
+  //
+  // The two clocks differ by 10-30x here. Wait on the thing itself.
+  await page.waitForFunction(() => {
+    const s = window.__newsArc();
+    return s.pending.length === 0;
+  }, undefined, { timeout: 180000 }).catch(() => {});
   // up to three cards, because breakingNews holds a short queue and the
   // landmark line can sit behind one other story
   let hit = null, onScreen = false, fresh = [];
