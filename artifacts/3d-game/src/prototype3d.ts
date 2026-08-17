@@ -20,7 +20,7 @@ import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/
 import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, part, mergedProp, type WorldId } from './proto3d/island';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
-import { HATS, HAT_BY_ID, hatLine, type Hat } from './proto3d/hats';
+import { HATS, HAT_BY_ID, hatLine, HAT_MAX_W, applyHatLod, type Hat } from './proto3d/hats';
 import { buildHat } from './proto3d/hatgeo';
 import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion, type Fx } from './proto3d/fx';
@@ -1546,6 +1546,27 @@ _dbg.__hatSheet = async (ids: string[]) => {
   for (const h of want) {
     const g = buildHat(h.id);
     g.position.y = h.drop ?? 0;   // render what SHIPS, not what was authored
+    // …AND THAT PROMISE HAS TO INCLUDE THE WIDTH CAP. This sheet builds a hat
+    // into a bare scene and never goes through void3d's mount, so it was
+    // measuring AUTHORED geometry while the game renders a capped version —
+    // which is how five hats wider than the void got signed off here and then
+    // covered the body on a phone. Apply the same cap void3d applies.
+    // …ABOUT THE SEAT, exactly as void3d does. Scaling about the ORIGIN instead
+    // drags the hat down into the skull — the first attempt at this reported
+    // every one of the thirteen as GRAZING, which was the sheet sinking them,
+    // not the cap. applyHatLod is the shared function precisely so the sheet
+    // and the game cannot drift apart on this.
+    {
+      const bb0 = new THREE.Box3().setFromObject(g);
+      const w0 = Math.max(bb0.max.x - bb0.min.x, bb0.max.z - bb0.min.z);
+      // The sheet renders at full void size, where the caricature LOD is 1 and
+      // the cap therefore does nothing — so it deliberately applies NO scale
+      // here. Its numbers are the authored geometry, which is the right thing
+      // for judging a hat's design; what the cap changes is the SMALL-void case
+      // this sheet does not render. Both attempts to bake a cap in here are
+      // recorded in void3d.ts, and both clipped.
+      void w0;
+    }
     sc.add(g);
     let meshes = 0, tris = 0, closest = 1e9, top = 0, wide = 0;
     const graze: string[] = [];

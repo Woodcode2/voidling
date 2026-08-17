@@ -172,6 +172,13 @@ export function hatLine(id: string | null): string | null {
   return h.lines[i];
 }
 
+/** The widest a hat may ever render, in BODY RADII. The void is 2.0 across, so
+ *  1.6 leaves a hat at 80% of the body's width — big and readable, and still
+ *  clearly a hat ON something rather than a lid over it. Used by void3d to cap
+ *  the caricature LOD per hat; it limits growth only and never shrinks a hat
+ *  below the size it was authored at. */
+export const HAT_MAX_W = 1.6;
+
 // ── LOD ABOUT THE SEAT, NOT ABOUT THE BODY ────────────────────────────────
 /** Apply the costume LOD to a hat so it grows in place instead of lifting off.
  *  `k` is the same scalar void3d would have put on the whole dress group. */

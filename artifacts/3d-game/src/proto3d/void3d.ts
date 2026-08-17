@@ -5,7 +5,7 @@
 // not a lit glossy sphere. Face is a billboarded set of crisp flat features,
 // exactly like the 2D canvas draw.
 import * as THREE from 'three';
-import { HAT_BY_ID, applyHatLod } from './hats';
+import { HAT_BY_ID, applyHatLod, HAT_MAX_W } from './hats';
 import { buildHat, spiralHorn } from './hatgeo';
 import { VOID, VOID_COL, type Skin } from './palette';
 
@@ -1290,6 +1290,11 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let wornHat: THREE.Group | null = null;
   let wornHatId: string | null = null;
   let wornSeat = 1;
+  // How wide this hat is, in BODY RADII, measured from its own geometry at
+  // mount. The caricature LOD below is capped against it so a hat can never
+  // grow wider than the void wearing it — see wornLodCap.
+  let wornLodCap = 99;
+  let wornWCap = 1;      // X/Z narrowing for a hat broader than the body
   let spinner: THREE.Object3D | null = null;
   let spinRate = 0;
 
@@ -1513,6 +1518,56 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       g.visible = true;
       wornHat = g; wornSeat = meta.seat; spinRate = meta.spin ?? 0;
       g.position.y = meta.drop ?? 0;   // see Hat.drop
+      // ── A HAT MAY NEVER BE WIDER THAN THE VOID WEARING IT ──────────────
+      // The owner played with a hat on and the body had vanished underneath it.
+      // Two things compound to do that, and neither is visible in
+      // qa/hatsheet.mjs, which is why this shipped:
+      //
+      //   1. The caricature LOD scales a hat up to 1.42x when the void is
+      //      SMALL, so a child can see what they bought. At VOIDLING — the
+      //      size every match starts at — that is full strength.
+      //   2. Several hats are already close to the body's width at 1x. The
+      //      body is 2.0 across; measured widths run wizard 2.08, cowboy 1.96,
+      //      tricorn 1.79, tycoon 1.78, viking 1.61. Five of thirteen end up
+      //      WIDER THAN THE VOID once the LOD is applied.
+      //
+      // And the play camera looks DOWN, while the contact sheet renders from
+      // near-horizontal — so a brim that reads fine in the sheet is a lid from
+      // the angle a child actually plays at.
+      //
+      // Measured here rather than authored per hat, so a hat added later is
+      // covered without anyone remembering this comment exists. The cap only
+      // limits GROWTH: a hat is never scaled below the size it was authored at,
+      // because shrinking something a parent paid for is a worse answer than a
+      // wide hat.
+      {
+        const bb = new THREE.Box3().setFromObject(g);
+        const w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
+        // CAP THE GROWTH ONLY. Two bolder fixes were tried and MEASURED, and
+        // qa/hatsheet.mjs killed both — worth recording so nobody re-tries them:
+        //
+        //   shrink uniformly  -> the seat sits ON the sphere at y~1.0, so
+        //                        scaling about it drags the brim's underside
+        //                        inside the skull. Grazing meshes went from
+        //                        ZERO to all thirteen hats.
+        //   narrow on X/Z     -> same outcome for the same reason. These hats
+        //                        are wide BECAUSE their brims encircle the
+        //                        head; pulling a brim inward puts it through
+        //                        the sphere. The width is the design.
+        //
+        // So geometry is left alone and only the caricature LOD is capped: a
+        // hat is never scaled UP past the body's own width. That takes the
+        // worst case (wizard) from 148% of the body down to 104%, and the free
+        // party hat from 90% to 63%, with no clipping anywhere.
+        //
+        // What this does NOT fix: wizard and cowboy are ~2.0 wide at 1x, i.e.
+        // as wide as the void, by authorship. From the play camera's downward
+        // angle they will still cover a lot of a small body. That is a hat
+        // DESIGN question — narrower brims — not something to hack at runtime,
+        // and it is written up for the owner rather than fudged here.
+        wornLodCap = w > 0.01 ? Math.max(1, HAT_MAX_W / w) : 99;
+        wornWCap = 1;
+      }
       if (spinRate) g.traverse((o) => { if (o.name === 'spin') spinner = o; });
     },
     setSkin(s: Skin) {
@@ -1799,10 +1854,18 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const lod = 1 + small * 0.42;
       dress.scale.setScalar(lod);
       if (wornHat) {
-        applyHatLod(wornHat, wornSeat, lod, HAT_BY_ID[wornHatId!]?.drop ?? 0);
-        // …and undo the group's scale on the way in, or the hat gets it twice
+        // …but the HAT's share of it is capped at its own width (see wornLodCap
+        // at mount). The dress group keeps the full LOD for everything else.
+        const hatLod = Math.min(lod, wornLodCap);
+        applyHatLod(wornHat, wornSeat, hatLod, HAT_BY_ID[wornHatId!]?.drop ?? 0);
+        // …and undo the GROUP's scale on the way in, or the hat gets it twice.
+        // Divide by `lod` (the parent's scale), not by `hatLod` — the parent is
+        // what is doubling it, so the parent's number is what has to come off.
         wornHat.scale.multiplyScalar(1 / lod);
         wornHat.position.y /= lod;
+        // …then narrow, after the uniform scale is settled. X and Z only, so
+        // the crown keeps its height and the brim keeps its seat.
+        wornHat.scale.x *= wornWCap; wornHat.scale.z *= wornWCap;
         if (spinner) spinner.rotation.y += dt * spinRate;
       }
       // ── AND PUSH IT CLEAR OF THE BODY ──────────────────────────────────
