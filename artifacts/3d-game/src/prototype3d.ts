@@ -1285,6 +1285,7 @@ const _dbg = new Proxy(_dbgStore, {
   __fx: Fx;
   // QA: the newsroom arc — every card that reached the screen this match, and
   // where the four-phase story currently stands (newsroom_arc.ts)
+  __music: () => ReturnType<typeof audio.musicState>;
   __newsArc: () => {
     log: { t: number; phase: number; tier: number; react: boolean; brand: string; text: string }[];
     arc: { phase: number; cards: number; high: number };
@@ -1305,6 +1306,11 @@ _dbg.__renderBloom = () => { ensureComposer().render(); };
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
+// QA: what the MUSIC ENGINE is actually doing. qa/music.mjs judged a world by
+// "the slot was requested and the synth is quiet" — and a track that loads but
+// never starts is exactly that, so total silence read as RECORDING. This is the
+// state that decides whether a sound reaches a child.
+_dbg.__music = () => audio.musicState();
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.

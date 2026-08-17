@@ -43,6 +43,17 @@ export interface Audio3D {
   jingle(): void;                       // quote MAPLE FALLS' municipal jingle (no-op in the bay)
   setMuted(m: boolean): void;      // settings toggle (App Store expects one)
   isMuted(): boolean;
+  /** QA: what the music engine is ACTUALLY doing. qa/music.mjs could only see
+   *  that a file was requested and that the synth was quiet — and a track that
+   *  loads but never starts is exactly that, so total silence reported as
+   *  "RECORDING". This reports the state that decides whether a sound reaches
+   *  a child: is the context running, did the buffer decode, is the gain up,
+   *  are there scheduled sources. */
+  musicState(): {
+    ctx: string; muted: boolean; masterGain: number;
+    theme: { wanted: boolean; loading: boolean; bad: boolean; dur: number; gain: number; srcs: number };
+    menu: { wanted: boolean; loading: boolean; bad: boolean; dur: number; gain: number; srcs: number };
+  };
 }
 
 export function createAudio(): Audio3D {
@@ -3085,6 +3096,20 @@ export function createAudio(): Audio3D {
     jingle() {
       const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern()) return;
       jingleQuote(c.currentTime + 0.02, 0.1);
+    },
+    musicState() {
+      const snap = (ch: LoopChan) => ({
+        wanted: ch.wanted, loading: ch.loading, bad: ch.bad,
+        dur: ch.buf ? Math.round(ch.buf.duration) : 0,
+        gain: ch.gain ? Math.round(ch.gain.gain.value * 1000) / 1000 : -1,
+        srcs: ch.srcs.length,
+      });
+      return {
+        ctx: ctx ? ctx.state : 'none',
+        muted,
+        masterGain: master ? Math.round(master.gain.value * 1000) / 1000 : -1,
+        theme: snap(themeCh), menu: snap(menuCh),
+      };
     },
     setMuted(m: boolean) {
       muted = m;
