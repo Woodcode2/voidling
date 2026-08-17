@@ -41,6 +41,9 @@ export interface Audio3D {
   setZone(zone: string | null): void;   // player's current district — drives the place layer
   matchBeat(kind: string): void;        // authored match beat (happy hour / dance party / feast)
   jingle(): void;                       // quote MAPLE FALLS' municipal jingle (no-op in the bay)
+  /** Restart the match track if it wants to be playing and nothing is. Safe to
+   *  call on a timer; a no-op in the normal case. */
+  ensureMusic(): void;
   setMuted(m: boolean): void;      // settings toggle (App Store expects one)
   isMuted(): boolean;
   /** QA: what the music engine is ACTUALLY doing. qa/music.mjs could only see
@@ -3131,6 +3134,30 @@ export function createAudio(): Audio3D {
     jingle() {
       const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern()) return;
       jingleQuote(c.currentTime + 0.02, 0.1);
+    },
+    // ── THE WATCHDOG ──────────────────────────────────────────────────────
+    // A match must never play in silence, and I could not reproduce the owner's
+    // silent phone in any environment available here — headless Chromium keeps
+    // its AudioContext `running` without a gesture, so the one condition most
+    // likely to cause this is the one that cannot be tested locally.
+    //
+    // Rather than guess a fifth time, this asks the only question that matters,
+    // every couple of seconds, from the state itself: the match wants music and
+    // NOTHING IS SCHEDULED. That is true for every cause — a fetch that never
+    // fired, a decode that failed, a loop scheduled against a frozen clock, a
+    // stop that raced a start — so the repair does not need to know which.
+    //
+    // Cheap by construction: it returns on the first check in the normal case
+    // (srcs is non-empty for the life of a match), and it cannot fight the
+    // engine because every branch is the same call the engine would make.
+    ensureMusic() {
+      if (!themeCh.wanted) return;              // no match owns the music
+      const c = ensure();
+      if (!c || c.state !== 'running') return;  // suspended: needs a gesture, not a retry
+      if (themeCh.srcs.length) return;          // already playing
+      if (themeCh.buf) { startLoop(themeCh, c, themeCh.buf); return; }
+      if (themeCh.bad) { themeSynth?.(); return; }
+      if (!themeCh.loading && themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.());
     },
     musicState() {
       const snap = (ch: LoopChan) => ({

@@ -3410,6 +3410,7 @@ let crownLive = false, everBehind = false;
 // whether the menu theme is currently running, so the sync in animate() only
 // acts on a real transition rather than calling into the audio engine every frame
 let menuThemeOn = false;
+let musicCd = 0;      // watchdog tick for audio.ensureMusic()
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 // ── PAINT CACHES ────────────────────────────────────────────────────────────
@@ -8169,6 +8170,15 @@ function animate() {
   //
   // It fades in over 1.2s from near silence, so the win/lose sting still owns
   // the first beat of the card rather than being stepped on.
+  // ── A MATCH NEVER PLAYS IN SILENCE ──────────────────────────────────────
+  // The owner reported no music on a real phone while every probe here said the
+  // track was loaded and playing — and headless Chromium cannot reproduce it,
+  // because it keeps its AudioContext running without a gesture. So rather than
+  // guess at the mechanism again, the engine checks its own output twice a
+  // second-ish and repairs whatever it finds wrong. See audio.ensureMusic().
+  musicCd -= dt;
+  if (musicCd <= 0) { musicCd = 2; if (started && !ended) audio.ensureMusic(); }
+
   const onMenu = document.body.classList.contains('menu') || endEl.classList.contains('show');
   if (onMenu !== menuThemeOn) {
     menuThemeOn = onMenu;
