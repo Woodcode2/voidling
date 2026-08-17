@@ -105,17 +105,46 @@ export function createAudio(): Audio3D {
     return ctx;
   }
   const unlock = () => {
+    // WAS THE CLOCK FROZEN? This has to be read BEFORE ensure() resumes it.
+    const wasCold = !ctx || ctx.state !== 'running';
     ensure();
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
     for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
-    // …AND THE MENU THEME, which could not legally have started before now.
-    // The game asks for it as soon as the splash appears, but that is usually
-    // before any gesture exists, so ensure() returned null and the request only
-    // set `wanted`. This is the first moment a browser will let it sound, so it
-    // starts on the child's very first touch rather than never.
-    if (menuCh.wanted && !menuCh.buf && !menuCh.bad && !themeCh.wanted) {
-      playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* no file: quiet */ });
+    if (!wasCold || !ctx) return;   // already running: every later tap is a no-op
+
+    // ── ANYTHING SCHEDULED AGAINST A FROZEN CLOCK IS REBUILT HERE ──────────
+    // The owner played Pirate Bay on a phone and heard nothing, and this is the
+    // gap that best explains it. Switching world from the picker RELOADS the
+    // page (`location.href = location.pathname`), and the new page has NO USER
+    // GESTURE on it — so a browser keeps its AudioContext suspended. The match
+    // then starts anyway: startMusic() runs, the track fetches and decodes, and
+    // startLoop() schedules its sources and its crossfade envelope against an
+    // audio clock that IS NOT MOVING. The setTimeout chain that arms each pass
+    // runs on WALL time regardless, so by the time a child finally touches the
+    // screen the two clocks disagree by however long they looked at it, and
+    // what was scheduled is no longer what should be playing.
+    //
+    // MAPLE NEVER HITS THIS. It is the built world, so its card takes the
+    // no-reload branch and the tap that chose it already unlocked audio. Every
+    // other world switches by reloading — which is exactly the set the owner
+    // reported: menu theme fine, Pirate Bay silent.
+    //
+    // So on the first gesture, rebuild rather than hope: re-arm a fetch that
+    // never happened, restart a loop that was scheduled cold, and fall back to
+    // the synth if the world simply has no recording. Gated on `wasCold`, so
+    // this runs once at the transition and not on every tap of the match —
+    // and it re-arms again if the context is suspended a second time, which is
+    // what backgrounding the app on a phone does.
+    if (themeCh.wanted) {
+      if (themeCh.buf) startLoop(themeCh, ctx, themeCh.buf);
+      else if (!themeCh.bad && themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.());
+      else themeSynth?.();
+      return;                       // a match owns the music; never both
+    }
+    if (menuCh.wanted) {
+      if (menuCh.buf) startLoop(menuCh, ctx, menuCh.buf);
+      else if (!menuCh.bad) playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* no file: quiet */ });
     }
   };
   window.addEventListener('pointerdown', unlock, { passive: true });
@@ -203,6 +232,11 @@ export function createAudio(): Audio3D {
   // 0.4 is the match track's long-standing level. The menu sits a little under
   // it: it plays against no gameplay bed at all, so the same number reads loud.
   const themeCh = mkChan(0.4);
+  // …remembered so the unlock handler can re-arm the MATCH track too. Without
+  // these it could only ever retry the menu, and a world reached by the
+  // reloading picker path had nothing to retry with.
+  let themeUrls: string[] = [];
+  let themeSynth: (() => void) | null = null;
   const menuCh = mkChan(0.34);
   const THEME_FADE = 1.6;   // seconds of overlap at the seam
   function startLoop(ch: LoopChan, c: AudioContext, buf: AudioBuffer) {
@@ -3057,6 +3091,7 @@ export function createAudio(): Audio3D {
       // make impossible, and the match is what the child is here for.
       menuCh.wanted = false;
       stopLoop(menuCh, 0.6);
+      themeUrls = urls; themeSynth = synth;   // so unlock() can re-arm this world
       playTrack(themeCh, urls, synth);
       // NOTE: do NOT also start the synth as a stopgap. startLoop() does not
       // silence a running score — there is no shared stop — so the two would
