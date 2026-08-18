@@ -54,8 +54,8 @@ export interface Audio3D {
    *  are there scheduled sources. */
   musicState(): {
     ctx: string; muted: boolean; masterGain: number;
-    theme: { wanted: boolean; loading: boolean; bad: boolean; dur: number; gain: number; srcs: number };
-    menu: { wanted: boolean; loading: boolean; bad: boolean; dur: number; gain: number; srcs: number };
+    theme: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number };
+    menu: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number };
   };
 }
 
@@ -229,9 +229,17 @@ export function createAudio(): Audio3D {
     timer: ReturnType<typeof setTimeout> | null;
     srcs: AudioBufferSourceNode[];
     vol: number;
+    /** TRUE when this loop was scheduled against a clock that was not running.
+     *  Everything WebAudio schedules — source start times, the crossfade
+     *  envelope — is on the audio clock, and a suspended clock does not move.
+     *  So a loop started cold has a full set of `srcs` and makes no sound, and
+     *  is indistinguishable from a healthy one by any count. This flag is that
+     *  distinction, and without it the watchdog is blind to the exact failure
+     *  it exists to catch. */
+    cold: boolean;
   }
   const mkChan = (vol: number): LoopChan =>
-    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol });
+    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol, cold: false });
   // 0.4 is the match track's long-standing level. The menu sits a little under
   // it: it plays against no gameplay bed at all, so the same number reads loud.
   const themeCh = mkChan(0.4);
@@ -244,6 +252,9 @@ export function createAudio(): Audio3D {
   const THEME_FADE = 1.6;   // seconds of overlap at the seam
   function startLoop(ch: LoopChan, c: AudioContext, buf: AudioBuffer) {
     stopLoop(ch, 0);
+    // Remember whether this schedule is being laid down on a moving clock. If
+    // it is not, ensureMusic() rebuilds it the moment the clock starts.
+    ch.cold = c.state !== 'running';
     if (!ch.gain) { if (!master) return; ch.gain = c.createGain(); ch.gain.connect(master); }
     ch.gain.gain.cancelScheduledValues(c.currentTime);
     ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
@@ -3151,17 +3162,35 @@ export function createAudio(): Audio3D {
     // (srcs is non-empty for the life of a match), and it cannot fight the
     // engine because every branch is the same call the engine would make.
     ensureMusic() {
-      if (!themeCh.wanted) return;              // no match owns the music
       const c = ensure();
       if (!c || c.state !== 'running') return;  // suspended: needs a gesture, not a retry
-      if (themeCh.srcs.length) return;          // already playing
-      if (themeCh.buf) { startLoop(themeCh, c, themeCh.buf); return; }
-      if (themeCh.bad) { themeSynth?.(); return; }
-      if (!themeCh.loading && themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.());
+      const ch = themeCh.wanted ? themeCh : menuCh.wanted ? menuCh : null;
+      if (!ch) return;                          // nothing wants to be playing
+      // ── THE CASE THAT WAS INVISIBLE ────────────────────────────────────
+      // The owner: "others don't seem to work at start but ... sometimes when
+      // I pause the game then go back in, the sfx and music works." That is the
+      // whole diagnosis. Pausing and resuming tears the music down and starts
+      // it again ON A RUNNING CLOCK, which is why it fixes itself.
+      //
+      // The first watchdog could not see this, because it treated a non-empty
+      // `srcs` as proof of playback — and a loop scheduled while the context
+      // was suspended has a full set of sources and makes no sound at all. It
+      // checked the one signal the failure leaves intact. `cold` is the signal
+      // that actually distinguishes them.
+      if (ch.cold && ch.buf) { startLoop(ch, c, ch.buf); return; }
+      if (ch.srcs.length) return;               // genuinely playing
+      if (ch.buf) { startLoop(ch, c, ch.buf); return; }
+      if (ch === themeCh) {
+        if (themeCh.bad) { themeSynth?.(); return; }
+        if (!themeCh.loading && themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.());
+      } else if (!menuCh.loading && !menuCh.bad) {
+        playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* no file: quiet */ });
+      }
     },
     musicState() {
       const snap = (ch: LoopChan) => ({
         wanted: ch.wanted, loading: ch.loading, bad: ch.bad,
+        cold: ch.cold,
         dur: ch.buf ? Math.round(ch.buf.duration) : 0,
         gain: ch.gain ? Math.round(ch.gain.gain.value * 1000) / 1000 : -1,
         srcs: ch.srcs.length,
