@@ -172,12 +172,67 @@ export function hatLine(id: string | null): string | null {
   return h.lines[i];
 }
 
-/** The widest a hat may ever render, in BODY RADII. The void is 2.0 across, so
- *  1.6 leaves a hat at 80% of the body's width — big and readable, and still
- *  clearly a hat ON something rather than a lid over it. Used by void3d to cap
- *  the caricature LOD per hat; it limits growth only and never shrinks a hat
- *  below the size it was authored at. */
-export const HAT_MAX_W = 1.6;
+/** The widest a hat may ever render, in BODY RADII — the units the hat meshes
+ *  are authored in, where the void is 2.0 across. A HARD invariant: void3d
+ *  takes min(LOD, HAT_MAX_W / authored width), so a hat wider than this is
+ *  scaled DOWN, and no LOD, void size or camera angle can push it past.
+ *
+ *  Read from the geometry, the shipped hats are 2.6-4.0 across against a body
+ *  of 2.0 — the wizard's brim alone is 202% of the void's diameter. That is
+ *  the whole of the owner's "the hat is covering the entire body", and it is
+ *  not something a runtime tweak can hide; either the meshes get narrower or
+ *  they get scaled. 2.2 (110% of the body's width) is the compromise: still
+ *  unmistakably a big cartoon hat, still leaves the void readable underneath
+ *  from the play camera. Tuned against measured occlusion, not by eye. */
+export const HAT_MAX_W = 2.2;
+
+// ── WHERE A HAT SITS IS A SCREEN QUESTION, NOT A WORLD ONE ────────────────
+//
+// The owner's report was "the hat is covering the entire body… especially as
+// you get larger", and the measurement agreed: from the real play camera a
+// worn hat hid 74–97% of the void at radius 8. Two earlier fixes aimed at the
+// wrong axis — cap the width, then narrow it — and neither could have worked,
+// because the problem is not how WIDE the hat is. It is WHERE THE TOP OF A
+// SPHERE LANDS ON SCREEN when the lens is above it.
+//
+// Put the camera at elevation `e` above the void's centre and the top pole
+// projects to cos(e) of the way up the disc. At spawn the camera sits at ~46°,
+// so the pole is 0.69 of the radius up — near the top, clear of the face. But
+// the camera STEEPENS as the void grows (prototype3d: camOffset lerps toward
+// near-top-down at R=8) and by 66° the pole has slid to 0.41 — dead centre of
+// the visible disc, right on top of the eyes. A hat seated there is a lid, and
+// no amount of trimming its brim changes that, because the brim is a disc
+// whose own screen extent GROWS as the camera steepens: ±r·sin(e).
+//
+// So the hat does not sit at the pole. It rides the skull to wherever the pole
+// USED to be on screen, and leans with it. Roll the seat back by an angle φ
+// about the body's centre and its height up the disc is exactly cos(φ − e) —
+// which means picking a screen height and solving for the lean:
+//
+//     φ = e − acos(HAT_RIM)
+//
+// φ tracks the camera, so the hat holds the same place in frame at every size,
+// which is the property the two earlier fixes could not have had at any value.
+// The seat stays on the near hemisphere (its depth is sin(e − φ) > 0), so the
+// hat is never behind the void — it reads in three-quarter profile against the
+// sky, which is a better look at something a parent paid for than a lid.
+
+/** How far up the void's silhouette the seat should sit, as a fraction of the
+ *  body radius, measured in SCREEN space. 1.0 would be the very top edge —
+ *  0.92 keeps the hat visibly ON the head with the brim clear of the face. */
+export const HAT_RIM = 0.92;
+/** Lean is clamped: a floor so a shallow camera still gets a little tip rather
+ *  than a flat-on-top pancake, and a ceiling so no camera angle can roll a hat
+ *  round the back of the skull. */
+export const HAT_LEAN_MIN = 0.12;
+export const HAT_LEAN_MAX = 0.90;
+
+/** The lean, in radians, for a camera at elevation `elev` (radians) above the
+ *  void's centre. See the note above for the derivation. */
+export function hatLean(elev: number): number {
+  const arc = Math.acos(Math.min(1, Math.max(-1, HAT_RIM)));
+  return Math.min(HAT_LEAN_MAX, Math.max(HAT_LEAN_MIN, elev - arc));
+}
 
 // ── LOD ABOUT THE SEAT, NOT ABOUT THE BODY ────────────────────────────────
 /** Apply the costume LOD to a hat so it grows in place instead of lifting off.

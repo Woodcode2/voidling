@@ -1255,6 +1255,8 @@ const _dbg = new Proxy(_dbgStore, {
   __skinsGranted?: (ids: string[]) => void;
   __celebrateSkins?: (skins: Skin[]) => void;
   __grantHats: (ids: string[]) => void;
+  __setHat: (id: string | null) => void;
+  __voidGroup: () => THREE.Group;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
@@ -1311,6 +1313,17 @@ _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the l
 // never starts is exactly that, so total silence read as RECORDING. This is the
 // state that decides whether a sound reaches a child.
 _dbg.__music = () => audio.musicState();
+// QA: put a hat on the live void. Needed to measure OCCLUSION from the play
+// camera — the thing qa/hatsheet.mjs cannot see, because it renders a hat alone
+// in a bare scene from near-horizontal angles while the game looks DOWN at a
+// hat sitting on a sphere. See scratchpad hatocc.
+_dbg.__setHat = (id: string | null) => voidling.setHat(id);
+// …and the scene node it lands in, so a probe can ask WHERE a hat ended up
+// rather than inferring it from pixels. Occlusion is measured from the play
+// camera (scratchpad hatocc), but "84% hidden" does not say whether the lean
+// was applied and too small or never applied at all, and that distinction cost
+// a whole round of wrong tuning.
+_dbg.__voidGroup = () => voidling.group;
 // QA: every card that reached the screen this match, plus where the arc stands.
 // qa/newsarc.mjs asserts on this AND on #news's own bounding box — the log
 // proves the code ran, the box proves a child could read it.
@@ -8198,7 +8211,10 @@ function animate() {
   // guess at the mechanism again, the engine checks its own output twice a
   // second-ish and repairs whatever it finds wrong. See audio.ensureMusic().
   musicCd -= dt;
-  if (musicCd <= 0) { musicCd = 2; if (started && !ended) audio.ensureMusic(); }
+  // …and NOT only during a match. ensureMusic() picks whichever channel wants
+  // to be playing, so the menu theme gets the same repair — a splash that came
+  // up on a suspended context is the same bug wearing a different hat.
+  if (musicCd <= 0) { musicCd = 2; audio.ensureMusic(); }
 
   const onMenu = document.body.classList.contains('menu') || endEl.classList.contains('show');
   if (onMenu !== menuThemeOn) {

@@ -5,7 +5,7 @@
 // not a lit glossy sphere. Face is a billboarded set of crisp flat features,
 // exactly like the 2D canvas draw.
 import * as THREE from 'three';
-import { HAT_BY_ID, applyHatLod, HAT_MAX_W } from './hats';
+import { HAT_BY_ID, applyHatLod, HAT_MAX_W, hatLean } from './hats';
 import { buildHat, spiralHorn } from './hatgeo';
 import { VOID, VOID_COL, type Skin } from './palette';
 
@@ -1294,7 +1294,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // mount. The caricature LOD below is capped against it so a hat can never
   // grow wider than the void wearing it — see wornLodCap.
   let wornLodCap = 99;
-  let wornWCap = 1;      // X/Z narrowing for a hat broader than the body
+  const hatW: Record<string, number> = {};   // authored width, in body radii
   let spinner: THREE.Object3D | null = null;
   let spinRate = 0;
 
@@ -1512,7 +1512,32 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       let g = hats[id];
       if (!g) {
         g = buildHat(id);
+        g.name = 'hat:' + id;   // QA: the occlusion/placement probes find it by this
         g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+        // ── MEASURE IT BEFORE IT HAS A PARENT ──────────────────────────────
+        // This is the only moment the hat's own size can be read cleanly: it
+        // is at the origin with an identity transform and nothing above it, so
+        // setFromObject returns the AUTHORED box in body radii — the units the
+        // body is 2.0 across in, and the units HAT_MAX_W is written in.
+        //
+        // The previous version measured AFTER `dress.add(g)`, which made the
+        // number meaningless three ways over and is why a cap that reads
+        // perfectly sensible has never actually capped anything:
+        //   • it is a WORLD box, so it carried bob's radius and dress's LOD —
+        //     i.e. the answer depended on how big the void happened to be at
+        //     the instant the player equipped the hat;
+        //   • dress YAWS to face the camera, and a world AABB of a yawed box
+        //     is inflated by up to 41% — a 4.04 brim measured 5.52;
+        //   • so `max(1, HAT_MAX_W / w)` was almost always < 1, clamped to 1,
+        //     and the cap silently became "no cap at all".
+        // Measured properly, the wizard's brim is 4.04 across against a body
+        // of 2.0 — 202% — which is the owner's "it's covering the entire body"
+        // in one number, and no amount of repositioning can fix a hat that is
+        // twice as wide as the head it is on.
+        {
+          const bb = new THREE.Box3().setFromObject(g);
+          hatW[id] = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
+        }
         dress.add(g); hats[id] = g;
       }
       g.visible = true;
@@ -1520,54 +1545,30 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       g.position.y = meta.drop ?? 0;   // see Hat.drop
       // ── A HAT MAY NEVER BE WIDER THAN THE VOID WEARING IT ──────────────
       // The owner played with a hat on and the body had vanished underneath it.
-      // Two things compound to do that, and neither is visible in
-      // qa/hatsheet.mjs, which is why this shipped:
       //
-      //   1. The caricature LOD scales a hat up to 1.42x when the void is
-      //      SMALL, so a child can see what they bought. At VOIDLING — the
-      //      size every match starts at — that is full strength.
-      //   2. Several hats are already close to the body's width at 1x. The
-      //      body is 2.0 across; measured widths run wizard 2.08, cowboy 1.96,
-      //      tricorn 1.79, tycoon 1.78, viking 1.61. Five of thirteen end up
-      //      WIDER THAN THE VOID once the LOD is applied.
+      // The cap is a hard invariant, not a nudge: whatever the caricature LOD
+      // would like to do, the hat's rendered width is at most HAT_MAX_W body
+      // radii. `min(lod, cap)` in animate does that in one line, and because
+      // `cap` may be BELOW 1 for an over-wide hat, it shrinks as well as
+      // limits growth. That is a change of policy from the version this
+      // replaces, which refused to shrink anything — a defensible instinct
+      // (nobody wants a hat a parent paid for made smaller) that measured out
+      // badly: at the play camera the widest hats were hiding 84-89% of the
+      // void, and a hat you cannot see the character under is worth less than
+      // a smaller one you can.
       //
-      // And the play camera looks DOWN, while the contact sheet renders from
-      // near-horizontal — so a brim that reads fine in the sheet is a lid from
-      // the angle a child actually plays at.
-      //
-      // Measured here rather than authored per hat, so a hat added later is
-      // covered without anyone remembering this comment exists. The cap only
-      // limits GROWTH: a hat is never scaled below the size it was authored at,
-      // because shrinking something a parent paid for is a worse answer than a
-      // wide hat.
-      {
-        const bb = new THREE.Box3().setFromObject(g);
-        const w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
-        // CAP THE GROWTH ONLY. Two bolder fixes were tried and MEASURED, and
-        // qa/hatsheet.mjs killed both — worth recording so nobody re-tries them:
-        //
-        //   shrink uniformly  -> the seat sits ON the sphere at y~1.0, so
-        //                        scaling about it drags the brim's underside
-        //                        inside the skull. Grazing meshes went from
-        //                        ZERO to all thirteen hats.
-        //   narrow on X/Z     -> same outcome for the same reason. These hats
-        //                        are wide BECAUSE their brims encircle the
-        //                        head; pulling a brim inward puts it through
-        //                        the sphere. The width is the design.
-        //
-        // So geometry is left alone and only the caricature LOD is capped: a
-        // hat is never scaled UP past the body's own width. That takes the
-        // worst case (wizard) from 148% of the body down to 104%, and the free
-        // party hat from 90% to 63%, with no clipping anywhere.
-        //
-        // What this does NOT fix: wizard and cowboy are ~2.0 wide at 1x, i.e.
-        // as wide as the void, by authorship. From the play camera's downward
-        // angle they will still cover a lot of a small body. That is a hat
-        // DESIGN question — narrower brims — not something to hack at runtime,
-        // and it is written up for the owner rather than fudged here.
-        wornLodCap = w > 0.01 ? Math.max(1, HAT_MAX_W / w) : 99;
-        wornWCap = 1;
-      }
+      // Two bolder fixes were tried and MEASURED, and both are dead ends worth
+      // recording so nobody re-tries them:
+      //   narrow on X/Z only -> the brims encircle the head, so pulling one
+      //                         inward puts it THROUGH the skull. The width is
+      //                         the design; the only safe shrink is uniform
+      //                         and about the seat, which is what applyHatLod
+      //                         already does.
+      //   reposition alone   -> see the lean in animate. It moves the hat to
+      //                         the top of the silhouette, which is necessary
+      //                         and is not sufficient: a brim 2.02x the body's
+      //                         diameter covers the void from anywhere.
+      wornLodCap = hatW[id] > 0.01 ? HAT_MAX_W / hatW[id] : 99;
       if (spinRate) g.traverse((o) => { if (o.name === 'spin') spinner = o; });
     },
     setSkin(s: Skin) {
@@ -1863,9 +1864,35 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         // what is doubling it, so the parent's number is what has to come off.
         wornHat.scale.multiplyScalar(1 / lod);
         wornHat.position.y /= lod;
-        // …then narrow, after the uniform scale is settled. X and Z only, so
-        // the crown keeps its height and the brim keeps its seat.
-        wornHat.scale.x *= wornWCap; wornHat.scale.z *= wornWCap;
+        // ── ROLL IT UP THE SKULL TO MEET THE CAMERA ────────────────────────
+        // Measured, because "the hat covers the body" turned out to be a
+        // different axis from the two I chased first. Occlusion from the REAL
+        // play camera (scratchpad hatocc): at r=8 every hat hid 74-97% of the
+        // void — propeller 97%, tricorn 96%, cowboy 94%. Capping the width
+        // could not touch that and neither could a fixed lean, because the
+        // camera does not hold still: it steepens from ~46° to ~66° as the
+        // void grows, and that alone walks the top of a sphere from the top of
+        // the disc down to its middle. See the derivation in hats.ts.
+        //
+        // So the lean is solved from the LIVE camera elevation every frame,
+        // and the hat holds the same height in frame at every size.
+        const cdx = camera.position.x - group.position.x;
+        const cdy = camera.position.y - group.position.y;
+        const cdz = camera.position.z - group.position.z;
+        const lean = hatLean(Math.atan2(cdy, Math.hypot(cdx, cdz) || 1e-4));
+        // Rotate the hat about the BODY'S CENTRE, not about its own origin —
+        // position and rotation together, or the seat leaves the skull. The
+        // object transform is p + R·S·local, so applying R to p carries the
+        // seat (which applyHatLod pinned at y≈seat) round the same arc:
+        //   seat' = R·(0, p.y + k·seat, 0)
+        // i.e. the contact point slides along the sphere and stays on it.
+        // ABSOLUTE, never `-=`: this runs every frame, and an earlier
+        // compounding subtract walked the hat clean off the back of the void,
+        // which the occlusion probe caught as hats "revealing" MORE body than
+        // bare because they had flown out of shot entirely.
+        const py = wornHat.position.y;
+        wornHat.rotation.x = -lean;
+        wornHat.position.set(0, py * Math.cos(lean), -py * Math.sin(lean));
         if (spinner) spinner.rotation.y += dt * spinRate;
       }
       // ── AND PUSH IT CLEAR OF THE BODY ──────────────────────────────────
