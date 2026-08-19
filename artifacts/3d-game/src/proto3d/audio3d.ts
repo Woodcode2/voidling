@@ -59,6 +59,7 @@ export interface Audio3D {
    *  are there scheduled sources. */
   musicState(): {
     ctx: string; muted: boolean; masterGain: number;
+    synth: boolean;
     theme: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number };
     menu: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number };
   };
@@ -118,7 +119,17 @@ export function createAudio(): Audio3D {
         });
       } catch { return null; }
     }
-    if (ctx.state === 'suspended') {
+    // ── EVERY STATE THAT IS NOT 'running' IS A STATE TO RESUME FROM ────────
+    // This used to read `=== 'suspended'`, and it was the only ctx.resume() in
+    // the whole source tree. iOS Safari has a state the spec does not:
+    // 'interrupted', entered on an incoming call, on Siri, on another app
+    // taking the audio session, and on the phone locking. From there this fell
+    // straight through to `return ctx` without ever asking to resume, and
+    // repairMusic() bails on anything that is not 'running' — so the context
+    // was wedged for the rest of the session and nothing in the codebase would
+    // ever have tried again. resume() on a running context is a no-op that
+    // resolves, so widening the gate is safe from every state.
+    if ((ctx.state as string) !== 'running') {
       // RESUME IS A PROMISE, AND THE NEXT LINE IS STILL SUSPENDED. Every
       // caller of ensure() that went straight on to schedule something was
       // scheduling on a stopped clock — including unlock(), the one function
@@ -159,6 +170,10 @@ export function createAudio(): Audio3D {
     window.addEventListener(ev, unlock, { capture: true, passive: true });
   }
   window.addEventListener('keydown', unlock, { capture: true });
+  // …and returning to the foreground, which is the ONLY exit from iOS's
+  // 'interrupted' that involves no touch at all: a child who takes a call
+  // mid-match comes back to the game without necessarily tapping anything.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) unlock(); });
 
   // helpers
   function tone(freq0: number, freq1: number, dur: number, type: OscillatorType, vol: number, when = 0) {
@@ -278,6 +293,9 @@ export function createAudio(): Audio3D {
     // honest answer to "is anything playing", which it never was before.
     if (c.state !== 'running') { ch.cold = true; return; }
     ch.cold = false;
+    // the recording is here; hand over from the bed across the same 1.2s the
+    // gain below fades UP over, so it reads as one score arriving, not two
+    synthStop(1.2);
     if (!ch.gain) { if (!master) return; ch.gain = c.createGain(); ch.gain.connect(master); }
     ch.gain.gain.cancelScheduledValues(c.currentTime);
     ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
@@ -358,11 +376,11 @@ export function createAudio(): Audio3D {
   // until the match begins, which is the second half of the owner's report:
   // "when you click maple falls there's a massive delay". The delay was the
   // download, started at the worst possible moment.
-  function preload(ch: LoopChan, urls: string[]) {
+  function preload(ch: LoopChan, urls: string[]): Promise<void> | undefined {
     const c = ensure();
-    if (!c || ch.buf || ch.loading || ch.bad) return;
+    if (!c || ch.buf || ch.loading || ch.bad) return undefined;
     ch.loading = true;
-    (async () => {
+    return (async () => {
       for (const u of urls) {
         try {
           const r = await fetch(u);
@@ -394,10 +412,59 @@ export function createAudio(): Audio3D {
   // coming back from the lock screen.
   function reviveCh(ch: LoopChan, c: AudioContext) {
     if (ch.buf) { if (ch.cold || !ch.srcs.length) startLoop(ch, c, ch.buf); return; }
-    if (ch.bad) { if (ch === themeCh) themeSynth?.(); return; }
+    // Getting here means the channel wants music and has none. For a match that
+    // is a silent match, so the bed comes up NOW — no grace period, because we
+    // are already in the state the grace period exists to detect.
+    synthCover();                                 // menu or match: never silent
+    if (ch.bad) return;                           // no recording: the bed is the score
     if (ch.loading) return;                       // in flight; its own tail starts it
-    if (ch === themeCh) { if (themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.()); }
+    if (ch === themeCh) { if (themeUrls.length) playTrack(themeCh, themeUrls, () => synthCover()); }
     else playTrack(menuCh, [MENU_URL], () => { /* no file: quiet, as designed */ });
+  }
+  // ── A MATCH IS NEVER SILENT WHILE IT WAITS FOR A DOWNLOAD ────────────────
+  // startMusic() passes the world's hand-written synth score into playTrack as
+  // `onNone`, and onNone runs on exactly one condition: every URL failed. The
+  // note there justified having no stopgap with "the fetch fails fast when
+  // there is no file (a 404 is one round trip), which is the case for every
+  // world today". That premise died the day the five recordings shipped. The
+  // fetch no longer 404s — it SUCCEEDS, slowly — so the bed became unreachable
+  // and the match plays in complete silence from the whistle until decode
+  // resolves. That is the owner's "massive delay", and the delay was audible
+  // as nothing at all rather than as a score coming up.
+  //
+  // The same note's real objection — "startLoop() does not silence a running
+  // score, there is no shared stop" — was simply wrong: stopTown, stopTropical,
+  // stopGameday and stopLantern all exist and stopMusic() calls all four.
+  //
+  // So the bed covers the gap and the recording displaces it, which is what a
+  // game with a loading screen does. `synthOn` is the interlock: the start
+  // functions reset their step counter and re-ramp their gain, so calling one
+  // twice restarts the bed from the top, and repairMusic may fire often.
+  let synthOn = false;
+  /** The hand-written bed for whichever world this session is on. */
+  const worldSynth = () => (isPirate() ? startTropical
+    : isGameday() ? startGameday
+      : isLantern() ? startLantern : startTown);
+  /** Bring the bed up, unless a recording beat it to it. */
+  function synthCover() {
+    const c = ctx;
+    if (synthOn || !c || c.state !== 'running') return;
+    if (themeCh.srcs.length || menuCh.srcs.length) return;   // a record is playing
+    // themeSynth is only set once a match has armed; before that — on the
+    // splash — fall back to this world's own bed. THE MENU HAS NEVER HAD A
+    // SCORE TO FALL BACK ON, which was defensible while the menu had no track
+    // at all and is not now: menu.mp3 is 2.2 MB, and on a cold first launch
+    // over cellular that is several seconds of the owner's "music at the
+    // splash screen not loading". The world's bed is the same music family
+    // and it is replaced the moment the recording lands.
+    const bed = themeSynth ?? worldSynth();
+    synthOn = true;
+    bed();
+  }
+  function synthStop(fade: number) {
+    if (!synthOn) return;
+    synthOn = false;
+    stopTropical(fade); stopTown(fade); stopGameday(fade); stopLantern(fade);
   }
   function repairMusic() {
     const c = ctx;
@@ -3191,8 +3258,14 @@ export function createAudio(): Audio3D {
       // make impossible, and the match is what the child is here for.
       menuCh.wanted = false;
       stopLoop(menuCh, 0.6);
-      themeUrls = urls; themeSynth = synth;   // so unlock() can re-arm this world
-      playTrack(themeCh, urls, synth);
+      themeUrls = urls; themeSynth = synth;   // so a repair can re-arm this world
+      playTrack(themeCh, urls, () => synthCover());
+      // ── AND COVER THE DOWNLOAD, AFTER A BEAT ──────────────────────────────
+      // 400ms of grace, so a warm cache never hears the bed at all: on a second
+      // launch the decoded buffer is already in hand and startLoop runs inside
+      // this frame. Only a genuinely cold start gets the bed, which is exactly
+      // when the alternative is a silent whistle.
+      setTimeout(() => synthCover(), 400);
       // NOTE: do NOT also start the synth as a stopgap. startLoop() does not
       // silence a running score — there is no shared stop — so the two would
       // play over each other for the life of the match. The fetch fails fast
@@ -3218,7 +3291,10 @@ export function createAudio(): Audio3D {
     // first touch — in practice the daily reward card or PLAY.
     startMenuMusic() {
       if (themeCh.wanted) return;   // a match owns the music; never talk over it
-      playTrack(menuCh, [MENU_URL], () => { /* quiet, as today */ });
+      playTrack(menuCh, [MENU_URL], () => synthCover());
+      // …and the same 400ms grace the match gets: a warm cache starts the real
+      // menu theme inside this frame and never hears the bed.
+      setTimeout(() => synthCover(), 400);
     },
     stopMenuMusic() {
       menuCh.wanted = false;
@@ -3248,19 +3324,29 @@ export function createAudio(): Audio3D {
     // (srcs is non-empty for the life of a match), and it cannot fight the
     // engine because every branch is the same call the engine would make.
     ensureMusic() {
-      // Now a thin backstop over the real mechanism. The repair itself is
-      // driven by the AudioContext's statechange event (see ensure()), which
-      // fires wherever the resume came from and needs no loop to be running.
+      // Now a thin backstop over the real mechanism, which is the
+      // AudioContext's statechange event (see ensure()) — event-driven, so it
+      // fires wherever the resume came from and at any frame rate.
       //
-      // RETRACTED, and kept here because it cost two rounds: this used to BE
-      // the mechanism, polled from animate() every two seconds. It never ran.
-      // animate() does not reach that line before a match starts, so at the
-      // splash — the exact place the owner heard silence — the watchdog was
-      // never called at all. Proved by hand: after the first tap the menu
-      // channel read cold=true through a dozen periods, and one manual call
-      // repaired it instantly. The poll stays because it costs nothing and
-      // covers a resume that somehow raises no event; it is no longer trusted
-      // to be the thing that works.
+      // RETRACTED, in full, because it was asserted in a commit message and is
+      // wrong: "animate() does not reach this line before a match starts, so
+      // at the splash the watchdog was never called at all." It does reach it.
+      // The line sits at depth 1 of animate() with no early return above it.
+      //
+      // What I actually measured was a swiftshader artifact generalised into a
+      // claim about the game. `musicCd` is decremented by `dt`, and dt is
+      // CLAMPED to 0.05 — so the period is 40 FRAMES, not 2 seconds. Counted
+      // directly: 0 calls in 40 s over 37 frames at 0.9 fps, i.e. one call
+      // every ~44 s in the harness. On a 60 fps phone the same code fires
+      // every 2 s exactly as intended. The repair was reaching the owner's
+      // phone; it simply had nothing to do, because reviveCh returned early
+      // while the download was still in flight (see the cover, above) — which
+      // is also the real reason pausing "fixed" it: the pause was never
+      // causal, it was twenty more seconds of downloading.
+      //
+      // The clamped-dt period is a bug in its own right and is fixed at the
+      // call site: a stuttering phone must not stretch a 2-second watchdog
+      // into minutes.
       repairMusic();
     },
     // ── HAVE THE TRACK IN MEMORY BEFORE ANYONE ASKS FOR IT ────────────────
@@ -3273,15 +3359,28 @@ export function createAudio(): Audio3D {
     // for the same connection, and the one that is needed in two seconds must
     // not queue behind the one needed in twenty.
     preloadMusic() {
-      preload(menuCh, [MENU_URL]);
       const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : 'maple';
       const urls = slot === 'maple' && LICENSED_THEME
         ? ['/assets/music/theme.mp3', '/assets/music/maple.mp3']
         : [`/assets/music/${slot}.mp3`];
-      // …and the world's own track behind it, so "join a match" is not "start
-      // a download". Two seconds of head start on the menu track is enough to
-      // keep the splash from going quiet while this runs.
-      setTimeout(() => preload(themeCh, urls), 2000);
+      // ── WHICH ONE IS ACTUALLY GOING TO BE HEARD ON THIS PAGE ─────────────
+      // The world picker switches world by writing voidAutoPlay and reloading,
+      // and the page that comes back goes STRAIGHT into a match — the menu
+      // theme is never heard on it at all. Downloading the menu track first
+      // there is spending the connection on the one file nobody will hear,
+      // while the one they are about to hear waits behind it.
+      //
+      // (The 2000ms stagger this replaces was worse than useless on that path:
+      // launchWorld fires on the first frame after module evaluation, so
+      // startMusic → playTrack had already begun the world fetch ~1.98s before
+      // the timer would have, and the timer then found `loading` set and did
+      // nothing. A guessed wall-clock delay cannot sequence two downloads;
+      // chaining off the first one's settle can.)
+      let straightIn = false;
+      try { straightIn = localStorage.getItem('voidAutoPlay') === '1'; } catch { /* storage blocked */ }
+      const first = straightIn ? () => preload(themeCh, urls) : () => preload(menuCh, [MENU_URL]);
+      const second = straightIn ? () => preload(menuCh, [MENU_URL]) : () => preload(themeCh, urls);
+      void first()?.then(second, second);
     },
     musicState() {
       const snap = (ch: LoopChan) => ({
@@ -3293,6 +3392,9 @@ export function createAudio(): Audio3D {
       });
       return {
         ctx: ctx ? ctx.state : 'none',
+        // is the hand-written bed up? The one state that decides whether a
+        // recording arriving means a handover or two scores at once.
+        synth: synthOn,
         muted,
         masterGain: master ? Math.round(master.gain.value * 1000) / 1000 : -1,
         theme: snap(themeCh), menu: snap(menuCh),
@@ -3404,6 +3506,7 @@ export function createAudio(): Audio3D {
       }
     },
     stopMusic() {
+      synthOn = false;
       stopTropical(1.2);
       stopTown(1.2);
       stopGameday(1.2);

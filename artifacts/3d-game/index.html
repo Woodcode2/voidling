@@ -8,17 +8,50 @@
     <link rel="icon" type="image/png" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="apple-touch-icon" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="manifest" href="/manifest.json">
-    <!-- THE MENU THEME, STARTED BEFORE THE BUNDLE IS EVEN PARSED.
-         The first thing a child hears is the first thing that should be on the
-         wire. Without this the request waits for the JS to download, parse and
-         reach audio.preloadMusic(), which on a phone is seconds of head start
-         thrown away on the one asset whose whole job is to be there at t=0.
-         `as="fetch"` (not "audio") because the engine reads it with fetch() and
-         decodeAudioData, not an <audio> element — the wrong `as` gets the file
-         downloaded twice and warns in the console. crossorigin matches the
-         fetch's default CORS mode so the preload and the fetch share one
-         cache entry instead of racing for two. -->
-    <link rel="preload" as="fetch" crossorigin href="/assets/music/menu.mp3">
+    <!-- ── THE MUSIC IS ON THE WIRE BEFORE THE BUNDLE IS PARSED ──────────────
+         The first thing a child hears should be the first thing requested. Left
+         to the engine, the menu theme waits for the bundle to download, parse
+         and reach audio.preloadMusic(), and the WORLD's track waits for the
+         island to finish building on top of that — which on the picker's
+         reload path is the entire boot, spent not fetching the one file the
+         next ten seconds depend on.
+
+         Which of the two goes first is not fixed, because it depends on which
+         one this page will actually play. The picker switches world by writing
+         voidAutoPlay and reloading, and the page that comes back goes straight
+         into a match without ever sounding the menu theme — so on that page the
+         world track leads and the menu track follows at low priority. On a
+         normal launch it is the other way round.
+
+         `as="fetch"` and `crossorigin` (not `as="audio"`) because the engine
+         reads these with fetch() + decodeAudioData rather than an <audio>
+         element; the wrong `as`, or a mismatched CORS mode, gets the file
+         downloaded twice instead of shared with the engine's own request.
+
+         Wrapped in try/catch and appended rather than written statically: a
+         preload is an optimisation, and a bare localStorage read throws under
+         iOS "Block All Cookies", which must never be the thing that stops the
+         game booting. -->
+    <script>
+      (function () {
+        try {
+          var w = new URLSearchParams(location.search).get('w'), auto = false;
+          try {
+            if (!w) w = localStorage.getItem('voidWorld');
+            auto = localStorage.getItem('voidAutoPlay') === '1';
+          } catch (e) { /* storage blocked: fall through on defaults */ }
+          if (['maple', 'pirate', 'gameday', 'lantern'].indexOf(w) < 0) w = 'maple';
+          var order = auto ? [w, 'menu'] : ['menu', w];
+          for (var i = 0; i < order.length; i++) {
+            var l = document.createElement('link');
+            l.rel = 'preload'; l.as = 'fetch'; l.crossOrigin = '';
+            l.href = '/assets/music/' + order[i] + '.mp3';
+            if (i) l.setAttribute('fetchpriority', 'low');
+            document.head.appendChild(l);
+          }
+        } catch (e) { /* never let an optimisation break boot */ }
+      })();
+    </script>
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none;
         overscroll-behavior: none;

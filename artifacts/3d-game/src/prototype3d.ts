@@ -308,6 +308,31 @@ const _wantWorld = new URLSearchParams(location.search).get('w')
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
 setWorld(pickedWorld);
 
+// ── AUDIO COMES UP BEFORE THE ISLAND, AND THAT ORDER IS THE POINT ──────────
+// This used to sit ~1800 lines further down, which put it AFTER all five of
+// this module's top-level awaits (`await bootStage(...)` and `await
+// createIsland(...)`). createAudio() is where the gesture listeners are
+// registered and where the AudioContext is constructed, so for the whole
+// duration of the loading screen — the longest, most tap-prone stretch of the
+// session — there was no unlock handler on the page at all. Every touch a
+// bored child made while the island built was dispatched into a window that
+// was not listening, and spent.
+//
+// It also put preloadMusic() behind the same awaits, so neither track began
+// decoding during the one part of boot that is actually long.
+//
+// createAudio() takes no arguments and reads only the world id, which
+// setWorld() has just established on the line above, so this is the earliest
+// point it CAN run. Everything downstream that closes over `audio` is a
+// callback invoked later, so nothing moves into a temporal-dead-zone.
+const audio = createAudio();
+// …and start the downloads. Decoding needs no running clock — only playing
+// does — so the menu theme and this world's track are fetched and decoded
+// while the island is still being raised, and are in memory before anything
+// asks for them. "When you click maple falls there's a massive delay": the
+// delay was the download, and it began at the worst possible moment.
+audio.preloadMusic();
+
 // ── WHAT FIRST PLACE IS WORTH, PER WORLD ────────────────────────────────────
 // The family's ladder is anchored to an ABSOLUTE score rather than to a
 // fraction of the player's, because a target defined as a fraction of the
@@ -2093,15 +2118,6 @@ rivals.onStuffed = (name) => {
   breakingNews(COPY.rivalFullNews);
   audio.ready();
 };
-const audio = createAudio();
-// ── START THE DOWNLOAD NOW, NOT WHEN THE MUSIC IS WANTED ──────────────────
-// "When you click maple falls there's a massive delay" — the delay was the
-// download, and it began at the worst possible moment, because the world's
-// track was not requested until the match started. Decoding audio needs no
-// running clock, only playing does, so both the menu theme and this world's
-// track are fetched and decoded during the splash and are sitting in memory
-// by the time anything asks for them.
-audio.preloadMusic();
 // QA: drive the score's stage directly, so a harness can audit each world's
 // arrangement at every rung without playing four matches to reach them
 (window as unknown as { __audio: typeof audio }).__audio = audio;
@@ -3452,7 +3468,7 @@ let crownLive = false, everBehind = false;
 // whether the menu theme is currently running, so the sync in animate() only
 // acts on a real transition rather than calling into the audio engine every frame
 let menuThemeOn = false;
-let musicCd = 0;      // watchdog tick for audio.ensureMusic()
+let musicCd = 0;      // performance.now() of the last audio.ensureMusic() tick
 let stallT = 0;     // seconds spent driving into something that will not move
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 // ── PAINT CACHES ────────────────────────────────────────────────────────────
@@ -8218,11 +8234,17 @@ function animate() {
   // because it keeps its AudioContext running without a gesture. So rather than
   // guess at the mechanism again, the engine checks its own output twice a
   // second-ish and repairs whatever it finds wrong. See audio.ensureMusic().
-  musicCd -= dt;
-  // …and NOT only during a match. ensureMusic() picks whichever channel wants
-  // to be playing, so the menu theme gets the same repair — a splash that came
-  // up on a suspended context is the same bug wearing a different hat.
-  if (musicCd <= 0) { musicCd = 2; audio.ensureMusic(); }
+  // ── WALL TIME, NOT FRAME TIME ─────────────────────────────────────────
+  // This used to count down in `dt`, and dt is CLAMPED to 0.05 — so "every two
+  // seconds" was really "every forty frames", and a device that stutters
+  // stretched the watchdog out in exact proportion to how badly it was
+  // struggling. Counted directly in the harness at 0.9 fps: zero calls in
+  // forty seconds, i.e. one every ~44 s, on a check whose whole purpose is to
+  // notice something within a couple of seconds. (Same shape as the adaptive
+  // quality ladder reading fps from clamped dt — that one is still open.)
+  //
+  // A watchdog must not slow down when the thing it watches gets worse.
+  if (performance.now() - musicCd > 2000) { musicCd = performance.now(); audio.ensureMusic(); }
 
   const onMenu = document.body.classList.contains('menu') || endEl.classList.contains('show');
   if (onMenu !== menuThemeOn) {

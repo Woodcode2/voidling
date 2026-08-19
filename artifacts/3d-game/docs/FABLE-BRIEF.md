@@ -59,7 +59,7 @@ mobile titles and is right to.
 | probe | answers |
 |---|---|
 | `qa/smoke.mjs` | boots, loads, grows, eats, makes sound |
-| `qa/autoplay.mjs` | **does music actually START?** — see the warning below |
+| `qa/autoplay.mjs` | **does music actually START?** — plus `--slow` (is the wait audible as silence?) and `--interrupt` (does a phone call wedge audio forever?). See the warning below |
 | `qa/ab.mjs` | N matches, mean + sd — the only trustworthy difficulty read |
 | `qa/shippedlook.mjs` | **what the CANVAS shows** |
 | `qa/glosscov.mjs` / `glossgap.mjs` | specular coverage, and where a world's area is |
