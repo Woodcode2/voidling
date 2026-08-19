@@ -333,6 +333,60 @@ const audio = createAudio();
 // delay was the download, and it began at the worst possible moment.
 audio.preloadMusic();
 
+// ── ?audio=1 — THE AUDIO ENGINE, ON THE DEVICE, IN THE OWNER'S HAND ────────
+// Three rounds of music fixes have measured correct in every environment
+// reachable from here and still failed on the owner's phone. That gap is not a
+// missing idea, it is a missing observation: no probe has ever reported what
+// this engine did on THAT hardware. A phone cannot be attached to a debugger
+// and "it still doesn't work" is not a measurement.
+//
+// So this puts the engine's live state and its event log on the screen, plus
+// two buttons that split the fault in one tap:
+//
+//   TEST TONE  — can this page make ANY sound? If this is silent, the fault is
+//                the context, the in-game mute, or the phone's ring/silent
+//                switch (which mutes WebAudio in Safari and nothing else), and
+//                no amount of music-engine work will ever be heard.
+//   RESTART    — force the repair by hand. If this fixes it, the trigger is
+//                wrong and the engine is fine; if it does not, it is the engine.
+//
+// Costs nothing when the flag is absent: the block does not run at all.
+if (location.search.includes('audio')) (() => {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:0;top:0;z-index:99999;max-width:100vw;'
+    + 'background:rgba(6,4,16,.92);color:#cfc6ff;font:11px/1.35 ui-monospace,Menlo,monospace;'
+    + 'padding:6px 8px;white-space:pre-wrap;pointer-events:none;max-height:62vh;overflow:hidden';
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:0;bottom:0;z-index:99999;display:flex;gap:8px;padding:8px';
+  const mk = (label: string, fn: () => void) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = 'font:600 13px/1 ui-monospace,monospace;padding:12px 14px;border-radius:10px;'
+      + 'border:1px solid #6b53d6;background:#1a1030;color:#e8e2ff';
+    // pointerdown, not click: it is the same gesture the engine's own unlock
+    // listener sees, so a tap here tests the real path rather than a later one
+    b.addEventListener('pointerdown', fn);
+    return b;
+  };
+  bar.appendChild(mk('TEST TONE', () => audio.testTone()));
+  bar.appendChild(mk('RESTART MUSIC', () => audio.ensureMusic()));
+  bar.appendChild(mk('UNMUTE', () => audio.setMuted(false)));
+  document.body.appendChild(box); document.body.appendChild(bar);
+  const ch = (c: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number }) =>
+    `w${c.wanted ? 1 : 0} load${c.loading ? 1 : 0} bad${c.bad ? 1 : 0} cold${c.cold ? 1 : 0} `
+    + `buf${c.dur}s gain${c.gain} srcs${c.srcs}`;
+  setInterval(() => {
+    const m = audio.musicState();
+    box.textContent = [
+      `ctx ${m.ctx}   master ${m.masterGain}   muted ${m.muted}   synth ${m.synth}`,
+      `theme ${ch(m.theme)}`,
+      `menu  ${ch(m.menu)}`,
+      '',
+      ...audio.musicLog().slice(-16),
+    ].join('\n');
+  }, 400);
+})();
+
 // ── WHAT FIRST PLACE IS WORTH, PER WORLD ────────────────────────────────────
 // The family's ladder is anchored to an ABSOLUTE score rather than to a
 // fraction of the player's, because a target defined as a fraction of the

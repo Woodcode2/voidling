@@ -44,6 +44,10 @@ export interface Audio3D {
   /** Restart the match track if it wants to be playing and nothing is. Safe to
    *  call on a timer; a no-op in the normal case. */
   ensureMusic(): void;
+  /** Ordered log of what the audio engine actually did (?audio=1 shows it). */
+  musicLog(): string[];
+  /** Fire an unmistakable tone through master — "can this page make a sound?" */
+  testTone(): void;
   /** Download and decode the menu theme and the current world's track NOW,
    *  without playing either. Decoding needs no running clock, so this can run
    *  during the splash and take the network out of the path between the first
@@ -97,6 +101,60 @@ export function createAudio(): Audio3D {
   // band buses come up underneath it.
   const MASTER_VOL = 0.62;
 
+  // ── WHAT ACTUALLY HAPPENED, IN ORDER, ON THE DEVICE IT HAPPENED ON ───────
+  // Three rounds of fixes have measured correct in every environment reachable
+  // from a build machine and still failed on the owner's phone. The gap is not
+  // a missing idea, it is a missing observation: nothing has ever reported what
+  // this engine did on THAT hardware. Every state transition that could bear on
+  // whether a sound comes out is recorded here, and ?audio=1 puts it on screen.
+  // Forty lines is a whole session's worth of audio history and about 3 KB.
+  const evLog: string[] = [];
+  let lastEv = '';
+  let lastEvN = 0;
+  const logEv = (s: string) => {
+    // COLLAPSE REPEATS. ensure() is called by every single sound effect, so a
+    // busy match fires a resume promise dozens of times a second and the log
+    // fills with one line — pushing the twelve that matter off the top of a
+    // phone screen. A diagnostic that scrolls its own evidence away is no
+    // better than no diagnostic.
+    if (s === lastEv) {
+      lastEvN++;
+      evLog[evLog.length - 1] = `${(performance.now() / 1000).toFixed(1)}s ${s}  (x${lastEvN})`;
+      return;
+    }
+    lastEv = s; lastEvN = 1;
+    evLog.push(`${(performance.now() / 1000).toFixed(1)}s ${s}`);
+    if (evLog.length > 40) evLog.shift();
+  };
+
+  // ── THE iOS UNLOCK, WHICH IS NOT resume() ────────────────────────────────
+  // On iOS Safari a resumed context can report `running` and still produce no
+  // sound. The platform wants a source STARTED inside the gesture before it
+  // will really open the output; every audio library on the web carries some
+  // version of this, and this engine never had one. It is the one failure mode
+  // that matches the owner's report exactly — every number correct, nothing
+  // audible — and it is invisible to any probe that reads state.
+  //
+  // It also guards a regression I introduced this session: preloadMusic() now
+  // calls ensure() at boot, so the AudioContext is CONSTRUCTED with no user
+  // activation, where before it was usually first built inside a tap. That is
+  // precisely the case iOS treats worst.
+  //
+  // One frame of silence, connected straight to destination, started at zero.
+  // Costs nothing, cannot be heard, and is the difference between a context
+  // that says it is running and one that is.
+  let primed = false;
+  function primeOutput(c: AudioContext) {
+    if (primed) return;
+    try {
+      const b = c.createBuffer(1, 1, 22050);
+      const src = c.createBufferSource();
+      src.buffer = b; src.connect(c.destination); src.start(0);
+      primed = true;
+      logEv('output primed (silent buffer inside gesture)');
+    } catch (e) { logEv(`prime FAILED ${String(e).slice(0, 40)}`); }
+  }
+
   function ensure(): Ctx | null {
     if (!ctx) {
       try {
@@ -108,6 +166,7 @@ export function createAudio(): Audio3D {
         lim.threshold.value = -6; lim.knee.value = 6; lim.ratio.value = 12;
         lim.attack.value = 0.003; lim.release.value = 0.14;
         master.connect(lim); lim.connect(ctx.destination);
+        logEv(`ctx created, state=${ctx.state}, rate=${ctx.sampleRate}, muted=${muted}`);
         // ── THE SIGNAL NOTHING CAN MISS ──────────────────────────────────
         // Every route to a running clock ends here: the first touch, the pause
         // sheet closing, a phone unlocking, the tab coming back to the front.
@@ -115,6 +174,7 @@ export function createAudio(): Audio3D {
         // to remember to ask, and no frame loop has to be running for it to
         // work — which is precisely what defeated the previous fix.
         ctx.addEventListener('statechange', () => {
+          logEv(`statechange -> ${ctx ? ctx.state : 'gone'}`);
           if (ctx && ctx.state === 'running') repairMusic();
         });
       } catch { return null; }
@@ -136,13 +196,19 @@ export function createAudio(): Audio3D {
       // whose whole job was to fix that. Nothing here may assume otherwise;
       // the repair rides the promise and the statechange event, never the
       // return value.
+      const was = ctx.state as string;
       void ctx.resume().then(
-        () => { if (ctx && ctx.state === 'running') repairMusic(); },
-        () => { /* refused outside a gesture — the next touch will do it */ },
+        () => {
+          if (!ctx) return;
+          if ((ctx.state as string) !== was) logEv(`resume ${was} -> ${ctx.state}`);
+          if (ctx.state === 'running') repairMusic();
+        },
+        (e) => { logEv(`resume REFUSED from ${was}: ${String(e).slice(0, 40)}`); },
       );
     }
     return ctx;
   }
+  let gestures = 0;
   const unlock = () => {
     // ── ALL THIS DOES IS ASK, AND WARM THE SAMPLES ─────────────────────────
     // It used to read the clock state, call ensure(), and then immediately
@@ -155,7 +221,12 @@ export function createAudio(): Audio3D {
     // The repair now hangs off the context's statechange event and off the
     // resume promise (see ensure()), so this function has no timing to get
     // wrong. It only has to make sure a context EXISTS to be resumed.
-    ensure();
+    const c = ensure();
+    gestures++;
+    // SYNCHRONOUSLY, INSIDE THE GESTURE. Not in the resume() callback — by then
+    // the activation is spent and iOS will not accept it. See primeOutput.
+    if (c) primeOutput(c);
+    logEv(`gesture, ctx=${c ? c.state : 'none'}`);
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
     for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
@@ -291,8 +362,9 @@ export function createAudio(): Audio3D {
     // NOTHING, and let the context's own statechange event start it properly
     // the instant the clock is real. `srcs.length === 0` while cold is then an
     // honest answer to "is anything playing", which it never was before.
-    if (c.state !== 'running') { ch.cold = true; return; }
+    if (c.state !== 'running') { ch.cold = true; logEv(`startLoop REFUSED, clock ${c.state}`); return; }
     ch.cold = false;
+    logEv(`startLoop ${ch === themeCh ? 'theme' : 'menu'} ${Math.round(buf.duration)}s vol=${ch.vol}`);
     // the recording is here; hand over from the bed across the same 1.2s the
     // gain below fades UP over, so it reads as one score arriving, not two
     synthStop(1.2);
@@ -353,6 +425,7 @@ export function createAudio(): Audio3D {
           if (!r.ok) continue;
           const buf = await c.decodeAudioData(await r.arrayBuffer());
           ch.buf = buf;
+          logEv(`decoded ${u.split('/').pop()} ${Math.round(buf.duration)}s`);
           // CLEAR THE FLAG. It used to be set and never unset on the success
           // path, so a channel that had loaded perfectly still read
           // `loading: true` for the rest of the session — which meant every
@@ -386,6 +459,7 @@ export function createAudio(): Audio3D {
           const r = await fetch(u);
           if (!r.ok) continue;
           ch.buf = await c.decodeAudioData(await r.arrayBuffer());
+          logEv(`preloaded ${u.split('/').pop()} ${Math.round(ch.buf.duration)}s`);
           ch.loading = false;
           // it may have been asked for while we were fetching
           if (ch.wanted) startLoop(ch, c, ch.buf);
@@ -459,11 +533,13 @@ export function createAudio(): Audio3D {
     // and it is replaced the moment the recording lands.
     const bed = themeSynth ?? worldSynth();
     synthOn = true;
+    logEv('synth bed up (cover)');
     bed();
   }
   function synthStop(fade: number) {
     if (!synthOn) return;
     synthOn = false;
+    logEv('synth bed down (handover)');
     stopTropical(fade); stopTown(fade); stopGameday(fade); stopLantern(fade);
   }
   function repairMusic() {
@@ -3382,6 +3458,26 @@ export function createAudio(): Audio3D {
       const second = straightIn ? () => preload(menuCh, [MENU_URL]) : () => preload(themeCh, urls);
       void first()?.then(second, second);
     },
+    /** Ordered log of everything the audio engine did this session. The
+     *  ?audio=1 overlay shows it; it exists because a phone cannot be attached
+     *  to a debugger and "it doesn't work" is not a measurement. */
+    musicLog() { return evLog.slice(); },
+    /** A plainly audible 0.6s tone straight through master. The single most
+     *  useful question on a device: can this page make ANY sound at all? If
+     *  this is silent the fault is the context, the mute toggle or the phone's
+     *  ring switch; if it sounds and the music does not, the fault is ours. */
+    testTone() {
+      const c = ensure(); if (!c || !master) { logEv('testTone: no context'); return; }
+      primeOutput(c);
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(660, c.currentTime);
+      g.gain.setValueAtTime(0.0001, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.5, c.currentTime + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.6);
+      o.connect(g); g.connect(master);
+      o.start(); o.stop(c.currentTime + 0.65);
+      logEv(`testTone fired, ctx=${c.state} master=${master.gain.value.toFixed(2)}`);
+    },
     musicState() {
       const snap = (ch: LoopChan) => ({
         wanted: ch.wanted, loading: ch.loading, bad: ch.bad,
@@ -3401,6 +3497,7 @@ export function createAudio(): Audio3D {
       };
     },
     setMuted(m: boolean) {
+      logEv(`setMuted(${m})`);
       muted = m;
       lsSet('voidMute', m ? '1' : '0');
       if (master && ctx) {
