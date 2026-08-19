@@ -8,6 +8,17 @@
     <link rel="icon" type="image/png" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="apple-touch-icon" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="manifest" href="/manifest.json">
+    <!-- THE MENU THEME, STARTED BEFORE THE BUNDLE IS EVEN PARSED.
+         The first thing a child hears is the first thing that should be on the
+         wire. Without this the request waits for the JS to download, parse and
+         reach audio.preloadMusic(), which on a phone is seconds of head start
+         thrown away on the one asset whose whole job is to be there at t=0.
+         `as="fetch"` (not "audio") because the engine reads it with fetch() and
+         decodeAudioData, not an <audio> element — the wrong `as` gets the file
+         downloaded twice and warns in the console. crossorigin matches the
+         fetch's default CORS mode so the preload and the fetch share one
+         cache entry instead of racing for two. -->
+    <link rel="preload" as="fetch" crossorigin href="/assets/music/menu.mp3">
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0821; touch-action: none;
         overscroll-behavior: none;

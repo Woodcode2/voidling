@@ -59,6 +59,7 @@ mobile titles and is right to.
 | probe | answers |
 |---|---|
 | `qa/smoke.mjs` | boots, loads, grows, eats, makes sound |
+| `qa/autoplay.mjs` | **does music actually START?** — see the warning below |
 | `qa/ab.mjs` | N matches, mean + sd — the only trustworthy difficulty read |
 | `qa/shippedlook.mjs` | **what the CANVAS shows** |
 | `qa/glosscov.mjs` / `glossgap.mjs` | specular coverage, and where a world's area is |
@@ -66,6 +67,21 @@ mobile titles and is right to.
 | `qa/grounding.mjs` | is the hero standing on the floor |
 | `qa/facewrap.mjs` | the face's wrap onto the sphere |
 | `qa/groundsurf.mjs` | the ground's road/grass material mask |
+
+### `qa/music.mjs` CANNOT TELL YOU WHETHER ANYTHING MADE A SOUND
+
+It launches Chromium with `--autoplay-policy=no-user-gesture-required`, so the
+page gets a RUNNING AudioContext from the first frame. Everything it reports —
+the file fetched, decoded, a loop scheduled — is true of a build that is
+totally silent on a phone, and for four rounds it printed `RECORDING` while the
+owner heard nothing. It answers "is the right track wired to the right world",
+and that is all it has ever answered.
+
+`qa/autoplay.mjs` is the one that answers "does a child hear music". It enforces
+the gesture rule in the page (dropping the flag is not enough — headless
+Chromium reports `running` at every autoplay-policy setting there is), and it
+measures the two things that actually failed: sources scheduled against a
+suspended clock, and the seconds between wanting music and hearing it.
 
 **Read this or you will repeat the most expensive mistake in the project.**
 Every colour probe except `shippedlook` measures by calling `renderer.render()`

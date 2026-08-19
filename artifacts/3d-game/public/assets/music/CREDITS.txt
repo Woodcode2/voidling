@@ -10,7 +10,34 @@
 #
 # slot | title | artist | source URL | licence
 # ---------------------------------------------------------------------------
-# (empty — every world is on its hand-written synth score today)
+#
+# menu    | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+# maple   | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+# pirate  | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+# gameday | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+# lantern | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+#
+# ── OPEN, AND IT BLOCKS SUBMISSION ─────────────────────────────────────────
+# The five tracks above SHIP. They arrived through the GitHub web uploader
+# (commit 80d70c3, "Add files via upload"), which carries no provenance, and
+# this file was never updated — it still claimed every world was on its synth
+# score while five recordings were in the bundle. That is the exact failure
+# the header of this file exists to prevent, and it is worse than an empty
+# record because an empty record is honest.
+#
+# Nothing here questions the licence: the owner selected them from the ACCEPT
+# list above and the Pixabay Content Licence needs no attribution. What is
+# missing is the EVIDENCE — the page each file came from. Only the person who
+# downloaded them can supply that, and it takes five links.
+#
+# ── 2026-08-19: RE-ENCODED, 256 kbps -> 128 kbps ──────────────────────────
+# Not an edit to the works, a transport change: 22.9 MB -> 11.5 MB, which on a
+# phone is the difference between hearing the menu theme and waiting for it.
+# Durations are unchanged to within 30 ms (LAME encoder padding) and mean
+# levels within 0.5 dB, measured with volumedetect either side. At 128 kbps
+# stereo through a phone speaker this is transparent for background music; the
+# 256 kbps originals are recoverable from git history at commit 80d70c3 if the
+# owner would rather trade the load time back.
 
 # REMOVED 2026-08-16: theme.mp3, 1.4 MB, no licence record, inherited from the
 # legacy 2D game. It shipped in the bundle (public/ is copied wholesale into

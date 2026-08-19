@@ -44,6 +44,11 @@ export interface Audio3D {
   /** Restart the match track if it wants to be playing and nothing is. Safe to
    *  call on a timer; a no-op in the normal case. */
   ensureMusic(): void;
+  /** Download and decode the menu theme and the current world's track NOW,
+   *  without playing either. Decoding needs no running clock, so this can run
+   *  during the splash and take the network out of the path between the first
+   *  touch and the first note. */
+  preloadMusic(): void;
   setMuted(m: boolean): void;      // settings toggle (App Store expects one)
   isMuted(): boolean;
   /** QA: what the music engine is ACTUALLY doing. qa/music.mjs could only see
@@ -102,56 +107,58 @@ export function createAudio(): Audio3D {
         lim.threshold.value = -6; lim.knee.value = 6; lim.ratio.value = 12;
         lim.attack.value = 0.003; lim.release.value = 0.14;
         master.connect(lim); lim.connect(ctx.destination);
+        // ── THE SIGNAL NOTHING CAN MISS ──────────────────────────────────
+        // Every route to a running clock ends here: the first touch, the pause
+        // sheet closing, a phone unlocking, the tab coming back to the front.
+        // Hanging the repair off the context's own state means no caller has
+        // to remember to ask, and no frame loop has to be running for it to
+        // work — which is precisely what defeated the previous fix.
+        ctx.addEventListener('statechange', () => {
+          if (ctx && ctx.state === 'running') repairMusic();
+        });
       } catch { return null; }
     }
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (ctx.state === 'suspended') {
+      // RESUME IS A PROMISE, AND THE NEXT LINE IS STILL SUSPENDED. Every
+      // caller of ensure() that went straight on to schedule something was
+      // scheduling on a stopped clock — including unlock(), the one function
+      // whose whole job was to fix that. Nothing here may assume otherwise;
+      // the repair rides the promise and the statechange event, never the
+      // return value.
+      void ctx.resume().then(
+        () => { if (ctx && ctx.state === 'running') repairMusic(); },
+        () => { /* refused outside a gesture — the next touch will do it */ },
+      );
+    }
     return ctx;
   }
   const unlock = () => {
-    // WAS THE CLOCK FROZEN? This has to be read BEFORE ensure() resumes it.
-    const wasCold = !ctx || ctx.state !== 'running';
+    // ── ALL THIS DOES IS ASK, AND WARM THE SAMPLES ─────────────────────────
+    // It used to read the clock state, call ensure(), and then immediately
+    // rebuild every loop — on the line after a resume() that had not finished.
+    // ctx.resume() is a PROMISE. On the next statement the context is still
+    // suspended, so the "repair" laid down another dead schedule and set cold
+    // straight back to true. Measured: the menu channel came out of the first
+    // tap with cold=true and stayed that way indefinitely.
+    //
+    // The repair now hangs off the context's statechange event and off the
+    // resume promise (see ensure()), so this function has no timing to get
+    // wrong. It only has to make sure a context EXISTS to be resumed.
     ensure();
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
     for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
-    if (!wasCold || !ctx) return;   // already running: every later tap is a no-op
-
-    // ── ANYTHING SCHEDULED AGAINST A FROZEN CLOCK IS REBUILT HERE ──────────
-    // The owner played Pirate Bay on a phone and heard nothing, and this is the
-    // gap that best explains it. Switching world from the picker RELOADS the
-    // page (`location.href = location.pathname`), and the new page has NO USER
-    // GESTURE on it — so a browser keeps its AudioContext suspended. The match
-    // then starts anyway: startMusic() runs, the track fetches and decodes, and
-    // startLoop() schedules its sources and its crossfade envelope against an
-    // audio clock that IS NOT MOVING. The setTimeout chain that arms each pass
-    // runs on WALL time regardless, so by the time a child finally touches the
-    // screen the two clocks disagree by however long they looked at it, and
-    // what was scheduled is no longer what should be playing.
-    //
-    // MAPLE NEVER HITS THIS. It is the built world, so its card takes the
-    // no-reload branch and the tap that chose it already unlocked audio. Every
-    // other world switches by reloading — which is exactly the set the owner
-    // reported: menu theme fine, Pirate Bay silent.
-    //
-    // So on the first gesture, rebuild rather than hope: re-arm a fetch that
-    // never happened, restart a loop that was scheduled cold, and fall back to
-    // the synth if the world simply has no recording. Gated on `wasCold`, so
-    // this runs once at the transition and not on every tap of the match —
-    // and it re-arms again if the context is suspended a second time, which is
-    // what backgrounding the app on a phone does.
-    if (themeCh.wanted) {
-      if (themeCh.buf) startLoop(themeCh, ctx, themeCh.buf);
-      else if (!themeCh.bad && themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.());
-      else themeSynth?.();
-      return;                       // a match owns the music; never both
-    }
-    if (menuCh.wanted) {
-      if (menuCh.buf) startLoop(menuCh, ctx, menuCh.buf);
-      else if (!menuCh.bad) playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* no file: quiet */ });
-    }
   };
-  window.addEventListener('pointerdown', unlock, { passive: true });
-  window.addEventListener('keydown', unlock);
+  // ── EVERY WAY A CHILD CAN TOUCH THIS GAME COUNTS AS THE GESTURE ──────────
+  // Capture phase, on window, so nothing downstream can stop the event before
+  // it arrives: a splash card that calls stopPropagation, an overlay that eats
+  // pointer events, a button that only ever produces a click. `pointerdown`
+  // alone is not enough — a keyboard or assistive activation raises click
+  // without it, and that child gets a silent game.
+  for (const ev of ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'click']) {
+    window.addEventListener(ev, unlock, { capture: true, passive: true });
+  }
+  window.addEventListener('keydown', unlock, { capture: true });
 
   // helpers
   function tone(freq0: number, freq1: number, dur: number, type: OscillatorType, vol: number, when = 0) {
@@ -249,12 +256,28 @@ export function createAudio(): Audio3D {
   let themeUrls: string[] = [];
   let themeSynth: (() => void) | null = null;
   const menuCh = mkChan(0.34);
+  const MENU_URL = '/assets/music/menu.mp3';
   const THEME_FADE = 1.6;   // seconds of overlap at the seam
   function startLoop(ch: LoopChan, c: AudioContext, buf: AudioBuffer) {
     stopLoop(ch, 0);
-    // Remember whether this schedule is being laid down on a moving clock. If
-    // it is not, ensureMusic() rebuilds it the moment the clock starts.
-    ch.cold = c.state !== 'running';
+    // ── NOTHING IS SCHEDULED AGAINST A CLOCK THAT IS NOT MOVING ───────────
+    // The previous version went ahead and scheduled anyway, recording `cold`
+    // so a watchdog could rebuild it later. That was worse than useless twice
+    // over. It produced a channel with a full `srcs` array, a set gain and no
+    // sound — the exact state that has fooled every probe and every reading of
+    // this file for four rounds. And the sources it left behind are not inert:
+    // they are scheduled at clock times that are ALREADY IN THE PAST by the
+    // time a child finally touches the screen, so when the context resumes
+    // they all fire at once, on top of each other, out of step with the
+    // crossfade timers that were counting in wall-clock milliseconds the whole
+    // while. That is the owner's "either has a delay or sometimes ... works".
+    //
+    // So: refuse. Mark the channel cold, keep the decoded buffer, schedule
+    // NOTHING, and let the context's own statechange event start it properly
+    // the instant the clock is real. `srcs.length === 0` while cold is then an
+    // honest answer to "is anything playing", which it never was before.
+    if (c.state !== 'running') { ch.cold = true; return; }
+    ch.cold = false;
     if (!ch.gain) { if (!master) return; ch.gain = c.createGain(); ch.gain.connect(master); }
     ch.gain.gain.cancelScheduledValues(c.currentTime);
     ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
@@ -312,13 +335,76 @@ export function createAudio(): Audio3D {
           if (!r.ok) continue;
           const buf = await c.decodeAudioData(await r.arrayBuffer());
           ch.buf = buf;
+          // CLEAR THE FLAG. It used to be set and never unset on the success
+          // path, so a channel that had loaded perfectly still read
+          // `loading: true` for the rest of the session — which meant every
+          // repair path guarded on `!ch.loading` silently declined to touch
+          // it, forever. A latch nobody releases is a repair nobody runs.
+          ch.loading = false;
           if (ch.wanted) startLoop(ch, c, buf);
           return;
         } catch { /* next candidate */ }
       }
+      ch.loading = false;
       ch.bad = true;
       if (ch.wanted) onNone();
     })();
+  }
+
+  // ── FETCH AND DECODE WITHOUT PLAYING ──────────────────────────────────────
+  // Decoding is legal on a SUSPENDED context — the clock has to move to sound,
+  // not to decode — so the whole download and decode can be over before the
+  // child's first touch. Without this the world's track is not even requested
+  // until the match begins, which is the second half of the owner's report:
+  // "when you click maple falls there's a massive delay". The delay was the
+  // download, started at the worst possible moment.
+  function preload(ch: LoopChan, urls: string[]) {
+    const c = ensure();
+    if (!c || ch.buf || ch.loading || ch.bad) return;
+    ch.loading = true;
+    (async () => {
+      for (const u of urls) {
+        try {
+          const r = await fetch(u);
+          if (!r.ok) continue;
+          ch.buf = await c.decodeAudioData(await r.arrayBuffer());
+          ch.loading = false;
+          // it may have been asked for while we were fetching
+          if (ch.wanted) startLoop(ch, c, ch.buf);
+          return;
+        } catch { /* next candidate */ }
+      }
+      ch.loading = false; ch.bad = true;
+    })();
+  }
+
+  // ── THE REPAIR, AND WHERE IT IS TRIGGERED FROM ────────────────────────────
+  // Everything above conspires to leave exactly one question: the clock has
+  // just started moving — is what should be playing, playing? This answers it,
+  // and it is driven by the AudioContext's OWN statechange event rather than
+  // by a timer.
+  //
+  // That distinction is the whole fix. The previous attempt polled from the
+  // frame loop, and the frame loop does not reach that line before a match
+  // starts — proved by hand: after the first tap the menu channel sat at
+  // cold=true through a dozen watchdog periods, and calling ensureMusic() from
+  // the console repaired it instantly. A poll that cannot run where the bug
+  // lives is not a backstop, it is decoration. statechange fires wherever the
+  // resume came from: the first touch, the pause sheet closing, the phone
+  // coming back from the lock screen.
+  function reviveCh(ch: LoopChan, c: AudioContext) {
+    if (ch.buf) { if (ch.cold || !ch.srcs.length) startLoop(ch, c, ch.buf); return; }
+    if (ch.bad) { if (ch === themeCh) themeSynth?.(); return; }
+    if (ch.loading) return;                       // in flight; its own tail starts it
+    if (ch === themeCh) { if (themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.()); }
+    else playTrack(menuCh, [MENU_URL], () => { /* no file: quiet, as designed */ });
+  }
+  function repairMusic() {
+    const c = ctx;
+    if (!c || c.state !== 'running' || !master) return;
+    // a match owns the music; the menu never talks over it
+    if (themeCh.wanted) reviveCh(themeCh, c);
+    else if (menuCh.wanted) reviveCh(menuCh, c);
   }
   function startSynth() {
     const c = ensure(); if (!c || !master) return;
@@ -3132,7 +3218,7 @@ export function createAudio(): Audio3D {
     // first touch — in practice the daily reward card or PLAY.
     startMenuMusic() {
       if (themeCh.wanted) return;   // a match owns the music; never talk over it
-      playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* quiet, as today */ });
+      playTrack(menuCh, [MENU_URL], () => { /* quiet, as today */ });
     },
     stopMenuMusic() {
       menuCh.wanted = false;
@@ -3162,30 +3248,40 @@ export function createAudio(): Audio3D {
     // (srcs is non-empty for the life of a match), and it cannot fight the
     // engine because every branch is the same call the engine would make.
     ensureMusic() {
-      const c = ensure();
-      if (!c || c.state !== 'running') return;  // suspended: needs a gesture, not a retry
-      const ch = themeCh.wanted ? themeCh : menuCh.wanted ? menuCh : null;
-      if (!ch) return;                          // nothing wants to be playing
-      // ── THE CASE THAT WAS INVISIBLE ────────────────────────────────────
-      // The owner: "others don't seem to work at start but ... sometimes when
-      // I pause the game then go back in, the sfx and music works." That is the
-      // whole diagnosis. Pausing and resuming tears the music down and starts
-      // it again ON A RUNNING CLOCK, which is why it fixes itself.
+      // Now a thin backstop over the real mechanism. The repair itself is
+      // driven by the AudioContext's statechange event (see ensure()), which
+      // fires wherever the resume came from and needs no loop to be running.
       //
-      // The first watchdog could not see this, because it treated a non-empty
-      // `srcs` as proof of playback — and a loop scheduled while the context
-      // was suspended has a full set of sources and makes no sound at all. It
-      // checked the one signal the failure leaves intact. `cold` is the signal
-      // that actually distinguishes them.
-      if (ch.cold && ch.buf) { startLoop(ch, c, ch.buf); return; }
-      if (ch.srcs.length) return;               // genuinely playing
-      if (ch.buf) { startLoop(ch, c, ch.buf); return; }
-      if (ch === themeCh) {
-        if (themeCh.bad) { themeSynth?.(); return; }
-        if (!themeCh.loading && themeUrls.length) playTrack(themeCh, themeUrls, () => themeSynth?.());
-      } else if (!menuCh.loading && !menuCh.bad) {
-        playTrack(menuCh, ['/assets/music/menu.mp3'], () => { /* no file: quiet */ });
-      }
+      // RETRACTED, and kept here because it cost two rounds: this used to BE
+      // the mechanism, polled from animate() every two seconds. It never ran.
+      // animate() does not reach that line before a match starts, so at the
+      // splash — the exact place the owner heard silence — the watchdog was
+      // never called at all. Proved by hand: after the first tap the menu
+      // channel read cold=true through a dozen periods, and one manual call
+      // repaired it instantly. The poll stays because it costs nothing and
+      // covers a resume that somehow raises no event; it is no longer trusted
+      // to be the thing that works.
+      repairMusic();
+    },
+    // ── HAVE THE TRACK IN MEMORY BEFORE ANYONE ASKS FOR IT ────────────────
+    // Called at boot. Decoding does not need a running clock, so the menu
+    // theme and the world the player is about to enter can both be downloaded
+    // and decoded during the splash — and then start on the first touch with
+    // no network in the way at all.
+    //
+    // The menu goes first and the world follows, deliberately: they compete
+    // for the same connection, and the one that is needed in two seconds must
+    // not queue behind the one needed in twenty.
+    preloadMusic() {
+      preload(menuCh, [MENU_URL]);
+      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : 'maple';
+      const urls = slot === 'maple' && LICENSED_THEME
+        ? ['/assets/music/theme.mp3', '/assets/music/maple.mp3']
+        : [`/assets/music/${slot}.mp3`];
+      // …and the world's own track behind it, so "join a match" is not "start
+      // a download". Two seconds of head start on the menu track is enough to
+      // keep the splash from going quiet while this runs.
+      setTimeout(() => preload(themeCh, urls), 2000);
     },
     musicState() {
       const snap = (ch: LoopChan) => ({

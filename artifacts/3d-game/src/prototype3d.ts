@@ -2094,6 +2094,14 @@ rivals.onStuffed = (name) => {
   audio.ready();
 };
 const audio = createAudio();
+// ── START THE DOWNLOAD NOW, NOT WHEN THE MUSIC IS WANTED ──────────────────
+// "When you click maple falls there's a massive delay" — the delay was the
+// download, and it began at the worst possible moment, because the world's
+// track was not requested until the match started. Decoding audio needs no
+// running clock, only playing does, so both the menu theme and this world's
+// track are fetched and decoded during the splash and are sitting in memory
+// by the time anything asks for them.
+audio.preloadMusic();
 // QA: drive the score's stage directly, so a harness can audit each world's
 // arrangement at every rung without playing four matches to reach them
 (window as unknown as { __audio: typeof audio }).__audio = audio;
