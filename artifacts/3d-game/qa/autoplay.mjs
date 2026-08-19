@@ -72,6 +72,9 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader',
     '--autoplay-policy=document-user-activation-required'] });
 const p = await b.newPage({ viewport: { width: 430, height: 932 } });
+// an exception inside a gesture handler dies silently otherwise — and a dead
+// tap handler looks exactly like a music bug
+p.on('pageerror', (e) => { console.log('  PAGEERROR ' + String(e).slice(0, 160)); fails0.push('page error: ' + String(e).slice(0, 80)); });
 
 const net = [];
 p.on('response', (r) => {
@@ -160,7 +163,11 @@ await p.addInitScript(() => {
     try { st = this.context.state; len = this.buffer ? this.buffer.duration : 0; } catch { /* detached */ }
     // a music loop is seconds long; one-shots are a fraction of one. Only the
     // long buffers are the score, and only they matter to this question.
-    if (len > 5) log.push({ t: Date.now(), state: st, dur: Math.round(len) });
+    // `gestured` distinguishes the poison case (scheduled on a clock nothing
+    // is about to start) from the sanctioned one (scheduled inside a gesture
+    // whose resume is already in flight — the engine does this on purpose so
+    // the tap and the first note share a frame).
+    if (len > 5) log.push({ t: Date.now(), state: st, gestured, dur: Math.round(len) });
     return S.apply(this, a);
   };
 });
@@ -169,7 +176,7 @@ const T0 = Date.now();
 const ms = () => `${((Date.now() - T0) / 1000).toFixed(1)}s`;
 const state = () => p.evaluate(() => {
   const m = window.__music ? window.__music() : null;
-  return { ctx: m?.ctx ?? null, synth: m?.synth ?? null, theme: m?.theme ?? null, menu: m?.menu ?? null,
+  return { ctx: m?.ctx ?? null, synth: m?.synth ?? null, media: m?.media ?? null, theme: m?.theme ?? null, menu: m?.menu ?? null,
     starts: window.__startLog.map((s) => ({ ...s })) };
 });
 
@@ -194,18 +201,49 @@ console.log(`         menu   ${dump(s.menu)}`);
 console.log(`         theme  ${dump(s.theme)}`);
 const preTouch = s.starts.length;
 
-// ── 2. THE FIRST TOUCH ───────────────────────────────────────────────────────
-// PLAY is the first thing a child taps. From this instant, music is owed.
+// ── 2. THE FIRST TOUCH IS THE GATE, AND IT IS A CONTRACT ─────────────────────
+// TAP TO BEGIN exists precisely so this moment is guaranteed: the tap is a
+// trusted gesture, the buffer decoded during the splash, and the score starts
+// inside the same frame. The brief's number is ≤150ms from tap to first
+// audible sample ON A DEVICE; this harness runs on swiftshader at a fraction
+// of real time, so the gate here is 500ms with the true latency printed for
+// the record. A missing gate is itself a failure: if this overlay is not up,
+// some path to the game no longer promises a first touch.
+if (!(await p.$('#tapGate.show'))) {
+  console.log('  THE GATE IS NOT UP — no guaranteed first touch on this path');
+  fails0.push('tap gate missing on a human path');
+}
 const tPlay = Date.now();
-await p.click('#btnPlay');
-let menuHeard = null;
-for (let i = 0; i < 60; i++) {
-  await p.waitForTimeout(250);
+if (await p.$('#tapGate.show')) await p.click('#tapGate');
+else await p.click('#btnPlay');
+// TWO CLOCKS, MEASURED APART. `menuSched` is the APP's obligation — the tap
+// must schedule the score inside the gesture, and that is what the 150ms spec
+// governs. `menuHeard` adds the platform's resume round-trip on top; on a
+// device that is tens of milliseconds, but on swiftshader the promise queues
+// behind one-second frames, so gating on it here would fail builds for the
+// harness's slowness — the exact mistake retraction #1 documents.
+let menuSched = null, menuHeard = null;
+for (let i = 0; i < 80; i++) {
+  await p.waitForTimeout(i < 12 ? 50 : 250);
   s = await state();
+  if (menuSched === null && s.menu?.srcs > 0 && !s.menu?.cold) menuSched = Date.now() - tPlay;
   if (s.ctx === 'running' && s.menu?.srcs > 0 && !s.menu?.cold) { menuHeard = Date.now() - tPlay; break; }
 }
+// The REAL tap→schedule latency, from the engine's own event log — in-page
+// timestamps, immune to this probe's evaluate() round-trips, which queue
+// behind whole frames when the machine is loaded and were being reported as
+// if they were the app's latency. (This probe already made that class of
+// mistake once today; the log is the ruler now.)
+{
+  const lg = await p.evaluate(() => window.__audio.musicLog());
+  const ts = (line) => parseFloat(lg.find((l) => l.includes(line))?.match(/^([\d.]+)s/)?.[1] ?? 'NaN');
+  const g = ts('gesture, ctx='), st = ts('startLoop menu');
+  if (!Number.isNaN(g) && !Number.isNaN(st)) menuSched = Math.max(0, Math.round((st - g) * 1000));
+}
 console.log(`  ${ms().padStart(6)} after first tap        ctx=${s.ctx}`
-  + `  → ${menuHeard === null ? 'NEVER BECAME AUDIBLE' : `audible ${(menuHeard / 1000).toFixed(1)}s after the tap`}`);
+  + `  → ${menuHeard === null ? 'NEVER BECAME AUDIBLE' : `scheduled ${menuSched}ms, audible ${(menuHeard / 1000).toFixed(1)}s after the tap`}`);
+console.log(`         media session: ${s.media ? 'promoted (mute switch defeated)' : 'NOT promoted'}`);
+if (!s.media && !SLOW) fails0.push('the silent media element is not playing after the gesture — the iPhone mute switch will silence the game');
 console.log(`         menu   ${dump(s.menu)}`);
 console.log(`         theme  ${dump(s.theme)}`);
 
@@ -223,6 +261,7 @@ if (SLOW) {
 }
 
 // ── 3. JOINING A MATCH ───────────────────────────────────────────────────────
+await p.click('#btnPlay'); await p.waitForTimeout(900);
 const tCard = Date.now();
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 600000 });
@@ -288,9 +327,9 @@ if (INTERRUPT && themeHeard !== null) {
 }
 
 // ── 4. WHAT WAS SCHEDULED AGAINST A DEAD CLOCK ───────────────────────────────
-const cold = s.starts.filter((x) => x.state !== 'running');
+const cold = s.starts.filter((x) => x.state !== 'running' && !x.gestured);
 console.log(`\n  music sources scheduled       : ${s.starts.length}  (${preTouch} of them before any touch)`);
-console.log(`  …of those, against a SUSPENDED clock: ${cold.length}`
+console.log(`  …of those, on a DEAD clock (no gesture pending): ${cold.length}`
   + (cold.length ? '   ← every one of these is silent' : ''));
 for (const n of net) console.log(`  network  ${n.name.padEnd(14)} ${n.status}  at ${((n.at - T0) / 1000).toFixed(1)}s`);
 
@@ -299,7 +338,9 @@ await b.close();
 const fails = [...fails0];
 if (!SLOW) {
   if (menuHeard === null) fails.push('the menu theme never became audible after the first tap');
-  else if (menuHeard > 2500) fails.push(`menu theme took ${(menuHeard / 1000).toFixed(1)}s after the first tap`);
+  // the app's half of the 150ms budget: the tap must schedule the score.
+  // 500ms in the harness absorbs the probe's own 50ms polling and page IPC.
+  else if (menuSched > 250) fails.push(`gate tap took ${menuSched}ms to schedule the score (spec: inside the gesture)`);
 }
 if (!SLOW) {
   if (themeHeard === null) fails.push('the match theme never became audible');

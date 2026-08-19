@@ -1039,6 +1039,34 @@
          because #loadScr was only raised AFTER PLAY was pressed and so could
          never cover the initial build. It covers it now, and the module takes
          it down when the world is ready. */
+      /* ── THE GATE — one guaranteed gesture before anything needs sound ──
+         Browsers do not allow audio before a user touch, on any platform, so
+         the only way to PROMISE music at a known moment is to promise a touch
+         at a known moment. This is that promise: full-bleed over the splash
+         art (fresh load) or the idling world (world-switch reload), it is the
+         first thing a child can touch, and the score starts inside that tap.
+         z-55: above the menu (10) and the daily card (45), beneath the load
+         cover (60), so it is revealed by the cover's own fade — the loading
+         screen resolves INTO "tap to begin", which is the shipped-game shape.
+         A veil, not a wall: the art stays visible through a soft vignette. */
+      #tapGate { position: fixed; inset: 0; z-index: 55; display: none; flex-direction: column;
+        align-items: center; justify-content: flex-end; padding-bottom: 16vh; box-sizing: border-box;
+        background: radial-gradient(ellipse at 50% 38%, rgba(13,8,33,0) 42%, rgba(13,8,33,0.62) 100%);
+        cursor: pointer; -webkit-tap-highlight-color: transparent; }
+      #tapGate.show { display: flex; }
+      /* ONE call to action at a time. While the gate is up, the menu's own
+         chrome stands down — a child shown TAP TO BEGIN floating over a
+         glowing PLAY button that refuses their tap has been given two
+         instructions and one lie. */
+      body.gated #btnPlay, body.gated .navRow, body.gated #btnSettings { opacity: 0.22; transition: opacity 0.3s; }
+      #tapGate .gPill { font-size: 17px; font-weight: 900; letter-spacing: 3px; color: #fff;
+        padding: 15px 34px; border-radius: 999px; background: rgba(30,16,58,0.78);
+        border: 2px solid rgba(184,117,255,0.55); text-shadow: 0 0 18px #b875ff;
+        animation: gatePulse 1.6s ease-in-out infinite; }
+      #tapGate .gHint { margin-top: 12px; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #9a86c8; }
+      @keyframes gatePulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 22px rgba(184,117,255,0.25); }
+        50% { transform: scale(1.05); box-shadow: 0 0 34px rgba(184,117,255,0.55); } }
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
         justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
         background:
@@ -1748,6 +1776,12 @@
         <button id="spAct"></button>
         <button id="spClose">✕</button>
       </div>
+    </div>
+
+    <!-- ── the gate: the one guaranteed touch — see the CSS note above ── -->
+    <div id="tapGate">
+      <div class="gPill">TAP TO BEGIN</div>
+      <div class="gHint">&nbsp;</div>
     </div>
 
     <!-- ── loading screen: PLAY waits here until the asset pack is resident ── -->

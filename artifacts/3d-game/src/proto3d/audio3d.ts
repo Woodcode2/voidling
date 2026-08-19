@@ -17,6 +17,13 @@
 //
 // Neither score can hear the other; they share only the voice helpers.
 import { worldId } from './island';
+// Loop regions per track — a JSON row, not an engine edit, for the next track
+// the owner drops in. `loopStart` is where passes 2..n re-enter, in seconds
+// AFTER the shipped trim: an opening stinger plays once, on entry, and never
+// again. Game Day is the case that forced this: its first 1.5s sits 20 dB
+// above the body of the track (measured, qa/trackprofile.mjs), and the old
+// whole-buffer crossfade re-fired that hit every three and a half minutes.
+import MUSIC_MANIFEST from './music-manifest.json';
 
 type Ctx = AudioContext;
 
@@ -64,14 +71,24 @@ export interface Audio3D {
   musicState(): {
     ctx: string; muted: boolean; masterGain: number;
     synth: boolean;
-    theme: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number };
-    menu: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number };
+    /** TRUE when the silent media element is playing — i.e. the page holds
+     *  the Playback audio session and the iPhone mute switch cannot mute it */
+    media: boolean;
+    theme: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number; starts: number };
+    menu: { wanted: boolean; loading: boolean; bad: boolean; cold: boolean; dur: number; gain: number; srcs: number; starts: number };
   };
 }
 
 export function createAudio(): Audio3D {
   let ctx: Ctx | null = null;
   let master: GainNode | null = null;
+  // ── ONE BUS FOR EVERYTHING THAT IS SCORE ─────────────────────────────────
+  // The recordings, the synth beds and their zone/ambience layers all join
+  // master through this single gain, so "make room for a sting" is one ramp
+  // in one place. One-shots (chomps, fanfares, voices) stay on master — a
+  // duck that ducked the thing it was making room FOR would be a volume bug
+  // with extra steps.
+  let musicBus: GainNode | null = null;
   // persisted mute — a parent hitting mute expects it to STAY muted tomorrow
   // Guarded: with storage blocked (iOS "Block All Cookies", a kiosk profile, an
   // iframe) a bare read throws, and this module is imported during boot — so
@@ -143,6 +160,50 @@ export function createAudio(): Audio3D {
   // One frame of silence, connected straight to destination, started at zero.
   // Costs nothing, cannot be heard, and is the difference between a context
   // that says it is running and one that is.
+  // ── THE RING/SILENT SWITCH, DEFEATED ────────────────────────────────────
+  // The brief said the iPhone's mute switch "cannot be fixed — must be
+  // detected". That was WRONG, and the correction matters more than the
+  // original claim: the switch silences WebAudio in Safari, but it does NOT
+  // silence HTMLMediaElement playback — media takes the Playback audio
+  // session, and once ANY media element is playing, WebAudio routes through
+  // that session and sounds with the switch on. Keeping a looping, silent,
+  // inline <audio> element alive is therefore the difference between "the
+  // game is mysteriously mute for every child whose phone is on silent" —
+  // which is MOST phones, most of the time — and the game behaving like the
+  // native titles it is competing with. This is the mechanism unmute.js has
+  // shipped to thousands of web games; it is not a hack, it is the platform's
+  // only sanctioned way to say "this page is a media app".
+  //
+  // Given how the owner's reports read — every number correct, nothing
+  // audible, on an iPhone — this is the strongest single candidate for the
+  // whole saga.
+  //
+  // The element pauses when the page hides: holding the audio session in the
+  // background would silence the child's podcast half an hour after they
+  // stopped playing, and that is a one-star review with a changelog.
+  let mediaEl: HTMLAudioElement | null = null;
+  const SILENT_WAV = 'data:audio/wav;base64,UklGRiwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQgAAAAAAAAAAAAAAA==';
+  function promoteSession() {
+    try {
+      if (!mediaEl) {
+        mediaEl = new Audio(SILENT_WAV);
+        mediaEl.loop = true;
+        (mediaEl as HTMLAudioElement & { playsInline: boolean }).playsInline = true;
+        mediaEl.setAttribute('playsinline', '');
+        document.addEventListener('visibilitychange', () => {
+          if (mediaEl && document.hidden) mediaEl.pause();
+          // resume happens in unlock(), inside a real gesture — play() from a
+          // bare visibility event is exactly what iOS refuses
+        });
+      }
+      if (mediaEl.paused) {
+        void mediaEl.play().then(
+          () => logEv('session promoted (silent media playing — mute switch defeated)'),
+          (e) => logEv(`session promote refused: ${String(e).slice(0, 44)}`));
+      }
+    } catch (e) { logEv(`session promote failed: ${String(e).slice(0, 40)}`); }
+  }
+
   let primed = false;
   function primeOutput(c: AudioContext) {
     if (primed) return;
@@ -166,6 +227,7 @@ export function createAudio(): Audio3D {
         lim.threshold.value = -6; lim.knee.value = 6; lim.ratio.value = 12;
         lim.attack.value = 0.003; lim.release.value = 0.14;
         master.connect(lim); lim.connect(ctx.destination);
+        musicBus = ctx.createGain(); musicBus.connect(master);
         logEv(`ctx created, state=${ctx.state}, rate=${ctx.sampleRate}, muted=${muted}`);
         // ── THE SIGNAL NOTHING CAN MISS ──────────────────────────────────
         // Every route to a running clock ends here: the first touch, the pause
@@ -209,6 +271,9 @@ export function createAudio(): Audio3D {
     return ctx;
   }
   let gestures = 0;
+  // wall-clock moment of the last trusted gesture — the optimistic-scheduling
+  // window in startLoop keys off it
+  let lastGestureAt = -1e9;
   const unlock = () => {
     // ── ALL THIS DOES IS ASK, AND WARM THE SAMPLES ─────────────────────────
     // It used to read the clock state, call ensure(), and then immediately
@@ -223,9 +288,11 @@ export function createAudio(): Audio3D {
     // wrong. It only has to make sure a context EXISTS to be resumed.
     const c = ensure();
     gestures++;
+    lastGestureAt = performance.now();
     // SYNCHRONOUSLY, INSIDE THE GESTURE. Not in the resume() callback — by then
     // the activation is spent and iOS will not accept it. See primeOutput.
     if (c) primeOutput(c);
+    promoteSession();
     logEv(`gesture, ctx=${c ? c.state : 'none'}`);
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
@@ -330,9 +397,21 @@ export function createAudio(): Audio3D {
      *  distinction, and without it the watchdog is blind to the exact failure
      *  it exists to catch. */
     cold: boolean;
+    /** loop re-entry point (seconds) from the manifest; 0 = loop the whole
+     *  buffer. Set beside `buf` at decode, from the URL that actually won. */
+    loop: number;
+    /** how many times a loop has been STARTED this session — the continuity
+     *  probe (qa/journey.mjs) reads this: a menu theme that is one continuous
+     *  piece across splash → picker → shop → book starts exactly once. */
+    starts: number;
   }
   const mkChan = (vol: number): LoopChan =>
-    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol, cold: false });
+    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol, cold: false, loop: 0, starts: 0 });
+  const loopFor = (url: string): number => {
+    const stem = (url.split('/').pop() ?? '').replace(/\.\w+$/, '');
+    const row = (MUSIC_MANIFEST as Record<string, { loopStart?: number }>)[stem];
+    return row?.loopStart ?? 0;
+  };
   // 0.4 is the match track's long-standing level. The menu sits a little under
   // it: it plays against no gameplay bed at all, so the same number reads loud.
   const themeCh = mkChan(0.4);
@@ -362,38 +441,73 @@ export function createAudio(): Audio3D {
     // NOTHING, and let the context's own statechange event start it properly
     // the instant the clock is real. `srcs.length === 0` while cold is then an
     // honest answer to "is anything playing", which it never was before.
-    if (c.state !== 'running') { ch.cold = true; logEv(`startLoop REFUSED, clock ${c.state}`); return; }
+    if (c.state !== 'running' && performance.now() - lastGestureAt > 1500) {
+      ch.cold = true; logEv(`startLoop REFUSED, clock ${c.state}, no gesture pending`); return;
+    }
+    // ── WITHIN 1.5s OF A GESTURE, SCHEDULE WITHOUT WAITING ────────────────
+    // resume() is a promise, and on a struggling main thread its resolution —
+    // and the statechange event behind it — queue behind whole frames. Waiting
+    // for 'running' before scheduling put that queueing time between the tap
+    // and the first note. But a schedule laid down on a clock that a
+    // just-fired resume is about to start is SAFE: the clock has not advanced,
+    // so nothing scheduled at currentTime+0.03 can be in the past when it
+    // starts moving, and the next crossfade pass is a minute away — the
+    // pileup that made cold scheduling poisonous needs minutes of frozen
+    // clock, which the 1.5s window cannot produce. If the resume is refused
+    // after all, the statechange repair rebuilds from scratch, exactly as it
+    // would have.
+    if (c.state !== 'running') logEv('startLoop optimistic (resume in flight)');
     ch.cold = false;
     logEv(`startLoop ${ch === themeCh ? 'theme' : 'menu'} ${Math.round(buf.duration)}s vol=${ch.vol}`);
     // the recording is here; hand over from the bed across the same 1.2s the
     // gain below fades UP over, so it reads as one score arriving, not two
     synthStop(1.2);
-    if (!ch.gain) { if (!master) return; ch.gain = c.createGain(); ch.gain.connect(master); }
+    if (!ch.gain) { if (!master || !musicBus) return; ch.gain = c.createGain(); ch.gain.connect(musicBus); }
+    ch.starts++;
+    // ── THE CHANNEL COMES UP FAST, AND THE FIRST PASS IS INSTANT ──────────
+    // Two ramps used to sit between "the music started" and "you can hear it":
+    // the channel gain eased up over 1.2s AND the first pass faded in over the
+    // full 1.6s crossfade window — so a tap produced roughly three seconds of
+    // near-silence before the score reached level. That was engine-made head
+    // silence stacked on top of the head silence in the files themselves, and
+    // together they are the owner's "the music isn't loading": it was loading,
+    // and then it whispered. The crossfade-in belongs to LOOP SEAMS, where the
+    // outgoing pass covers it; the first pass has nothing covering it and
+    // plays at level from its first sample (a 30ms ramp kills the click).
     ch.gain.gain.cancelScheduledValues(c.currentTime);
     ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
-    ch.gain.gain.exponentialRampToValueAtTime(ch.vol, c.currentTime + 1.2);
-    const period = Math.max(4, buf.duration - THEME_FADE);
-    const playPass = (when: number) => {
+    ch.gain.gain.exponentialRampToValueAtTime(ch.vol, c.currentTime + 0.25);
+    // Where passes 2..n re-enter. Guarded: a manifest row deeper than the
+    // buffer (wrong file in the slot, stale row) must not wedge the loop.
+    const lp = ch.loop > 0.05 && ch.loop < buf.duration - 8 ? ch.loop : 0;
+    const playPass = (when: number, offset: number, first: boolean): number => {
+      const seg = Math.max(4, buf.duration - offset);   // audible length of this pass
       const src = c.createBufferSource(); src.buffer = buf;
       const g = c.createGain();
-      // equal-power-ish ramps across the overlap window
-      g.gain.setValueAtTime(0.0001, when);
-      g.gain.linearRampToValueAtTime(1, when + THEME_FADE);
-      g.gain.setValueAtTime(1, when + period);
-      g.gain.linearRampToValueAtTime(0.0001, when + buf.duration);
+      if (first) {
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.linearRampToValueAtTime(1, when + 0.03);
+      } else {
+        // equal-power-ish ramp across the overlap; the outgoing pass covers it
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.linearRampToValueAtTime(1, when + THEME_FADE);
+      }
+      g.gain.setValueAtTime(1, when + seg - THEME_FADE);
+      g.gain.linearRampToValueAtTime(0.0001, when + seg);
       src.connect(g); g.connect(ch.gain!);
-      src.start(when); src.stop(when + buf.duration + 0.1);
+      src.start(when, offset); src.stop(when + seg + 0.1);
       ch.srcs.push(src);
       if (ch.srcs.length > 3) ch.srcs.shift();
+      return seg;
     };
-    let next = c.currentTime + 0.05;
-    playPass(next);
+    let next = c.currentTime + 0.03;
+    let seg = playPass(next, 0, true);   // pass 1: the intro, from the top
     const arm = () => {
-      next += period;
-      playPass(next);   // scheduled ahead on the audio clock — sample-accurate
+      next += seg - THEME_FADE;
+      seg = playPass(next, lp, false);   // scheduled ahead on the audio clock — sample-accurate
       ch.timer = setTimeout(arm, Math.max(500, (next - c.currentTime - 2.5) * 1000));
     };
-    ch.timer = setTimeout(arm, Math.max(500, (period - 2.5) * 1000));
+    ch.timer = setTimeout(arm, Math.max(500, (seg - THEME_FADE - 2.5) * 1000));
   }
   function stopLoop(ch: LoopChan, fade: number) {
     if (ch.timer) { clearTimeout(ch.timer); ch.timer = null; }
@@ -415,6 +529,12 @@ export function createAudio(): Audio3D {
     ch.wanted = true;
     const c = ensure();
     if (!c || ch.bad) { onNone(); return; }
+    // ALREADY PLAYING IS DONE. Without this, two callers asking for the same
+    // channel is an audible restart: the gate starts the menu theme inside
+    // the tap, the body.menu sync asks again a frame later, and the piece
+    // jumped back to bar one. qa/journey.mjs counts starts; it caught this
+    // as starts=2 on a walk where the theme should be one continuous piece.
+    if (ch.srcs.length && !ch.cold) return;
     if (ch.buf) { startLoop(ch, c, ch.buf); return; }
     if (ch.loading) return;
     ch.loading = true;
@@ -425,7 +545,8 @@ export function createAudio(): Audio3D {
           if (!r.ok) continue;
           const buf = await c.decodeAudioData(await r.arrayBuffer());
           ch.buf = buf;
-          logEv(`decoded ${u.split('/').pop()} ${Math.round(buf.duration)}s`);
+          ch.loop = loopFor(u);
+          logEv(`decoded ${u.split('/').pop()} ${Math.round(buf.duration)}s loop@${ch.loop}`);
           // CLEAR THE FLAG. It used to be set and never unset on the success
           // path, so a channel that had loaded perfectly still read
           // `loading: true` for the rest of the session — which meant every
@@ -459,7 +580,8 @@ export function createAudio(): Audio3D {
           const r = await fetch(u);
           if (!r.ok) continue;
           ch.buf = await c.decodeAudioData(await r.arrayBuffer());
-          logEv(`preloaded ${u.split('/').pop()} ${Math.round(ch.buf.duration)}s`);
+          ch.loop = loopFor(u);
+          logEv(`preloaded ${u.split('/').pop()} ${Math.round(ch.buf.duration)}s loop@${ch.loop}`);
           ch.loading = false;
           // it may have been asked for while we were fetching
           if (ch.wanted) startLoop(ch, c, ch.buf);
@@ -514,6 +636,26 @@ export function createAudio(): Audio3D {
   // game with a loading screen does. `synthOn` is the interlock: the start
   // functions reset their step counter and re-ramp their gain, so calling one
   // twice restarts the bed from the top, and repairMusic may fire often.
+  // ── DUCKING — the score steps back for the moments that matter ──────────
+  // -6 dB, 120ms in, 400ms out: enough that the evolve fanfare and the win
+  // sting own their beat, gentle enough to read as the music making room
+  // rather than a volume knob. Overlapping cues extend the hold instead of
+  // stacking ramps into a staircase.
+  // (duckMusic, not duck — Maple Falls has a pond, the pond has ducks, and
+  // duck() is already the sound one of them makes. This codebase.)
+  let duckUntil = 0;
+  function duckMusic(db = 6, hold = 0.3) {
+    const c = ctx; if (!c || !musicBus) return;
+    const g = musicBus.gain, t = c.currentTime;
+    const floor = Math.pow(10, -db / 20);
+    duckUntil = Math.max(duckUntil, t + 0.12 + hold);
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(floor, t + 0.12);
+    g.setValueAtTime(floor, duckUntil);
+    g.linearRampToValueAtTime(1, duckUntil + 0.4);
+  }
+
   let synthOn = false;
   /** The hand-written bed for whichever world this session is on. */
   const worldSynth = () => (isPirate() ? startTropical
@@ -584,8 +726,8 @@ export function createAudio(): Audio3D {
     const wet = c.createGain(); wet.gain.value = 0.24;
     const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 1600;
     bus.connect(warm);
-    warm.connect(dry); dry.connect(master!);
-    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
+    warm.connect(dry); dry.connect(musicBus!);
+    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(musicBus!);
     delay.connect(fb); fb.connect(delay);
     return bus;
   }
@@ -1083,8 +1225,8 @@ export function createAudio(): Audio3D {
     const wet = c.createGain(); wet.gain.value = 0.15;
     const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 2400;
     bus.connect(warm);
-    warm.connect(dry); dry.connect(master!);
-    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
+    warm.connect(dry); dry.connect(musicBus!);
+    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(musicBus!);
     delay.connect(fb); fb.connect(delay);
     return bus;
   }
@@ -1179,7 +1321,7 @@ export function createAudio(): Audio3D {
   function zoneLayer(c: AudioContext, id: ZoneId): ZoneLayer {
     let z = zones[id];
     if (!z) {
-      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(musicBus!);
       z = { g, vol: ZONE_VOL[id], on: false, until: 0 };
       zones[id] = z;
       buildBed(c, id, g);
@@ -1416,7 +1558,7 @@ export function createAudio(): Audio3D {
   function startTropical() {
     const c = ensure(); if (!c || !master) return;
     if (!pirBus) pirBus = buildBandBus(c);
-    if (!ambGain) { ambGain = c.createGain(); ambGain.gain.value = 0.0001; ambGain.connect(master); }
+    if (!ambGain) { ambGain = c.createGain(); ambGain.gain.value = 0.0001; ambGain.connect(musicBus!); }
     pirRunning = true;
     ramp(ambGain.gain, 0.34, c.currentTime, 1.6);
     pirStep = 0; pirNextT = c.currentTime + 0.12; ambNextT = 0;
@@ -1873,8 +2015,8 @@ export function createAudio(): Audio3D {
     const wet = c.createGain(); wet.gain.value = 0.12;
     const wetTone = c.createBiquadFilter(); wetTone.type = 'lowpass'; wetTone.frequency.value = 2100;
     bus.connect(warm);
-    warm.connect(dry); dry.connect(master!);
-    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(master!);
+    warm.connect(dry); dry.connect(musicBus!);
+    warm.connect(delay); delay.connect(wetTone); wetTone.connect(wet); wet.connect(musicBus!);
     delay.connect(fb); fb.connect(delay);
     return bus;
   }
@@ -1957,7 +2099,7 @@ export function createAudio(): Audio3D {
   function mZoneLayer(c: AudioContext, id: MZoneId): ZoneLayer {
     let z = mzones[id];
     if (!z) {
-      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(musicBus!);
       z = { g, vol: MZONE_VOL[id], on: false, until: 0 };
       mzones[id] = z;
       buildMBed(c, id, g);
@@ -2159,7 +2301,7 @@ export function createAudio(): Audio3D {
   function startTown() {
     const c = ensure(); if (!c || !master) return;
     if (!mapBus) mapBus = buildTownBus(c);
-    if (!mapAmb) { mapAmb = c.createGain(); mapAmb.gain.value = 0.0001; mapAmb.connect(master); }
+    if (!mapAmb) { mapAmb = c.createGain(); mapAmb.gain.value = 0.0001; mapAmb.connect(musicBus!); }
     mapRunning = true;
     ramp(mapAmb.gain, 0.36, c.currentTime, 1.6);
     mapStep = 0; mapNextT = c.currentTime + 0.12;
@@ -2420,7 +2562,7 @@ export function createAudio(): Audio3D {
   function gZoneLayer(c: AudioContext, id: GZoneId): ZoneLayer {
     let z = gzones[id];
     if (!z) {
-      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(musicBus!);
       z = { g, vol: GZONE_VOL[id], on: false, until: 0 };
       gzones[id] = z;
       buildGBed(c, id, g);
@@ -2512,8 +2654,8 @@ export function createAudio(): Audio3D {
     const dly = c.createDelay(1.2); dly.delayTime.value = 0.26;
     const fb = c.createGain(); fb.gain.value = 0.22;
     const wet = c.createGain(); wet.gain.value = 0.3;
-    bus.connect(air); air.connect(master!);
-    air.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(master!);
+    bus.connect(air); air.connect(musicBus!);
+    air.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(musicBus!);
     return bus;
   }
 
@@ -2708,7 +2850,7 @@ export function createAudio(): Audio3D {
   function startGameday() {
     const c = ensure(); if (!c || !master) return;
     if (!gdBus) gdBus = buildGDBus(c);
-    if (!gdAmb) { gdAmb = c.createGain(); gdAmb.gain.value = 0.0001; gdAmb.connect(master); }
+    if (!gdAmb) { gdAmb = c.createGain(); gdAmb.gain.value = 0.0001; gdAmb.connect(musicBus!); }
     gdRunning = true;
     ramp(gdAmb.gain, 0.4, c.currentTime, 1.6);
     gdStep = 0; gdNextT = c.currentTime + 0.12;
@@ -2964,8 +3106,8 @@ export function createAudio(): Audio3D {
     const dly = c.createDelay(1.0); dly.delayTime.value = 0.19;
     const fb = c.createGain(); fb.gain.value = 0.3;
     const wet = c.createGain(); wet.gain.value = 0.26;
-    bus.connect(air); air.connect(master!);
-    air.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(master!);
+    bus.connect(air); air.connect(musicBus!);
+    air.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(musicBus!);
     return bus;
   }
 
@@ -3037,7 +3179,7 @@ export function createAudio(): Audio3D {
   function startLantern() {
     const c = ensure(); if (!c || !master) return;
     if (!lnBus) lnBus = buildLnBus(c);
-    if (!lnAmb) { lnAmb = c.createGain(); lnAmb.gain.value = 0.0001; lnAmb.connect(master); }
+    if (!lnAmb) { lnAmb = c.createGain(); lnAmb.gain.value = 0.0001; lnAmb.connect(musicBus!); }
     lnRunning = true;
     ramp(lnBus.gain, 0.5, c.currentTime, 2.2);
     ramp(lnAmb.gain, 0.42, c.currentTime, 1.8);
@@ -3137,7 +3279,7 @@ export function createAudio(): Audio3D {
   function lZoneLayer(c: AudioContext, id: LZoneId): ZoneLayer {
     let z = lzones[id];
     if (!z) {
-      const g = c.createGain(); g.gain.value = 0.0001; g.connect(master!);
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(musicBus!);
       z = { g, vol: LZONE_VOL[id], on: false, until: 0 };
       lzones[id] = z;
       buildLBed(c, id, g);
@@ -3485,9 +3627,11 @@ export function createAudio(): Audio3D {
         dur: ch.buf ? Math.round(ch.buf.duration) : 0,
         gain: ch.gain ? Math.round(ch.gain.gain.value * 1000) / 1000 : -1,
         srcs: ch.srcs.length,
+        starts: ch.starts,
       });
       return {
         ctx: ctx ? ctx.state : 'none',
+        media: !!mediaEl && !mediaEl.paused,
         // is the hand-written bed up? The one state that decides whether a
         // recording arriving means a handover or two scores at once.
         synth: synthOn,
@@ -3711,6 +3855,7 @@ export function createAudio(): Audio3D {
       tone(60, 46, 1.1, 'triangle', 0.3, 0.05);
     },
     evolve() {
+      duckMusic(6, 1.2);   // the fanfare owns this beat; the score makes room
       // the resort answers in steel pans instead — same beat, different island
       if (isPirate()) { pirateEvolve(); return; }
       if (isGameday()) { gamedayEvolve(); return; }
@@ -3731,6 +3876,7 @@ export function createAudio(): Audio3D {
       else if (kind === 'sleepy') { tone(340, 300, 0.55, 'sine', 0.045); }
     },
     win() {
+      duckMusic(7, 1.8);   // the win sting is the loudest thing in the match, on purpose
       if (isPirate()) {
         // last orders: the whole band plays the hook's big answer out, lands
         // on home, and the room goes up. The match ends on a singalong.
@@ -3758,6 +3904,7 @@ export function createAudio(): Audio3D {
       seq.forEach((f, i) => tone(f, f, 0.3, 'triangle', 0.2, i * 0.12));
     },
     lose() {
+      duckMusic(5, 1.2);
       // the mirror of win()'s rising four: two falling triangle notes landing
       // a major third apart — "aww, next time", never a minor-key sting (the
       // no-dread rule). Soft enough that the results panel stays the event.

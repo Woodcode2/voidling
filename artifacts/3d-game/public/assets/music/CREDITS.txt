@@ -30,6 +30,19 @@
 # missing is the EVIDENCE — the page each file came from. Only the person who
 # downloaded them can supply that, and it takes five links.
 #
+# ── 2026-08-19 (second pass): TRIMMED, LEVELLED, RE-MASTERED FROM ORIGINALS ─
+# Processed from the 256 kbps originals (commit 80d70c3), one lossy generation,
+# replacing the earlier straight 128 kbps re-encode. Per track:
+#   trim head silence (menu 0.62s, maple 0.56s, gameday 0.54s, pirate 0.16s,
+#   lantern 0.15s), 15 ms anti-click fade-in, loudness to -16 LUFS integrated
+#   (gain: menu -2.3 dB, maple +3.5, pirate -3.8, gameday -0.6, lantern +0.6),
+#   true-peak limited so the mp3 encoder's overshoot lands <= -1.0 dBTP,
+#   then libmp3lame 128 kbps.
+# Measured after (qa/trackprofile.mjs --gate): head silence 0 ms on all five,
+# -16.4 to -16.8 LUFS (was a 7.4 LU spread), true peak -1.8 to -5.3 dBTP.
+# The works are unchanged as music: trims removed only dead air, and the gain
+# is linear with limiting engaging on isolated peaks (LRA 2.1-6.1 throughout).
+#
 # ── 2026-08-19: RE-ENCODED, 256 kbps -> 128 kbps ──────────────────────────
 # Not an edit to the works, a transport change: 22.9 MB -> 11.5 MB, which on a
 # phone is the difference between hearing the menu theme and waiting for it.

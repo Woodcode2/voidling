@@ -74,6 +74,9 @@ await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloa
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach(e => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+// the tap gate is the first thing a human touches now — the probe is a human
+const gate = await p.$('#tapGate.show');
+if (gate) { await p.click('#tapGate'); await p.waitForTimeout(350); }
 await p.click('#btnPlay'); await p.waitForTimeout(1400);
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });

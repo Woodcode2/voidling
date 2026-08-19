@@ -182,6 +182,16 @@ evidence and instead make the reload survivable: hand the audio state across in
 **Done when:** switching world does not reload, or `qa/autoplay.mjs` shows
 music continuous across the switch.
 
+**Resolution (executed):** rebuilt-in-place was assessed and declined with
+evidence: the world is baked into module evaluation (`setWorld` runs before
+five top-level awaits and the whole island builds during import), so in-place
+switching is a rearchitecture of the module's boot, not a fix. The shipped
+answer is the survivable reload: the new page preloads its own world's track
+from `<head>` before the bundle parses, lands on **TAP TO PLAY**, and the tap
+is the gesture that starts a scored match. `qa/switch.mjs` walks the owner's
+exact path and gates on it — including the deadlock it caught on first run,
+where the loading cover sat over the gate forever.
+
 ### 4. Never a silent frame — layered fallback
 
 Order of preference at every instant: the recording, else the synth bed, else
@@ -236,9 +246,15 @@ Regression-test each, in `qa/`:
 - incoming call / Siri / lock → `'interrupted'` → return (covered today, keep it)
 - background 60 s → foreground
 - headphones unplugged mid-match (iOS suspends the route)
-- silent switch flipped on (cannot be fixed — must be *detected* and surfaced
-  as a one-time in-game hint, because otherwise it is indistinguishable from a
-  bug and has probably already cost this project days)
+- silent switch flipped on — **the brief was WRONG that this cannot be fixed.**
+  The switch silences WebAudio in Safari but not HTMLMediaElement playback;
+  keeping a looping silent inline `<audio>` element alive (started inside a
+  gesture) takes the Playback audio session, and WebAudio then routes through
+  it and sounds with the switch on. This is the mechanism unmute.js ships to
+  thousands of web games, it is now implemented (`promoteSession` in
+  audio3d.ts), and it is the strongest single candidate for the owner's whole
+  saga. It pauses when the page hides so the game never holds the audio
+  session in the background. `musicState().media` reports it; ?audio=1 shows it
 - low power mode
 - a second tab of the game
 
@@ -266,6 +282,10 @@ limiter, and the ducking is audible in a rendered capture.
 | `?audio=1` | the live engine and its event log, on a real device |
 | `qa/music.mjs` | which file is wired to which world — **and nothing else** |
 | `qa/smoke.mjs` | boots, loads, grows, eats, makes sound. Run before every push |
+| `qa/trackprofile.mjs` | head/tail silence, loudness, true peak, ramp, proposed manifest row for ANY audio file. `--gate` enforces the task-5 spec |
+| `qa/journey.mjs` | the continuity walk: always a score, never two, menu theme starts once across the whole front of house |
+| `qa/switch.mjs` | the world-switch reload, end to end — the owner's exact reported path |
+| `qa/fallback.mjs` | a 404 slot and an undecodable file both land on the synth bed, audibly |
 
 **`qa/music.mjs` cannot tell you whether anything made a sound.** It launches
 Chromium with `--autoplay-policy=no-user-gesture-required`, so the page gets a
@@ -328,6 +348,34 @@ Inherited from `docs/FABLE-BRIEF.md` — read them there — plus, for this work
 - Do not open a pull request unless asked.
 
 ---
+
+## EXECUTION LEDGER — 2026-08-19
+
+What the first execution pass shipped, so nobody re-does or re-trusts it blind:
+
+| task | state | evidence |
+|---|---|---|
+| 1 gate | **shipped** | `#tapGate`, both boot paths; tap→schedule measured from the in-page log; menu chrome stands down while gated |
+| 2 director | **partial** | continuity + single-score asserted by `qa/journey.mjs`; the formal state-machine object was NOT built — the existing channel model plus idempotent `playTrack` met the probe's contract first |
+| 3 reload | **survivable, not killed** | see the resolution note under task 3; `qa/switch.mjs` gates the owner's exact path |
+| 4 fallback | **shipped** | `qa/fallback.mjs`: 404 and undecodable both land on the bed |
+| 5 audio | **shipped** | re-mastered from 256k originals: heads 0ms, −16.4..−16.8 LUFS, TP ≤ −1.4 dBTP; Game Day's stinger plays once (`music-manifest.json` loopStart 4.0); `qa/trackprofile.mjs --gate` green |
+| 6 phone | **partial** | interrupted + mute-switch defeat shipped and probed; background-60s, low-power and second-tab probes NOT built |
+| 7 mix | **partial** | one duckable music bus, ducks under evolve/win/lose; the rendered-capture verification and a phone-speaker balance pass were NOT done |
+
+Engine defects found and fixed during execution, none visible before it:
+
+- the first pass of every loop faded in over the full 1.6s crossfade window, on
+  top of a 1.2s channel ramp — three seconds of engine-made head silence
+  stacked on the files' own. The crossfade-in now belongs only to loop seams.
+- `playTrack` was not idempotent: the gate and the `body.menu` sync both asking
+  for the menu theme restarted it a frame apart (journey caught starts=2).
+- the reload path's loading cover was held above the gate it was waiting on —
+  a permanent hang on every world switch (`qa/switch.mjs` caught it as an
+  untappable gate).
+- within 1.5s of a gesture, `startLoop` now schedules against a not-yet-running
+  clock on purpose — the resume from that same gesture is in flight, and
+  waiting for its promise put whole frames between the tap and the first note.
 
 ## DEFINITION OF DONE
 

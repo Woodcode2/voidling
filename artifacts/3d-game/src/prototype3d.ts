@@ -378,7 +378,7 @@ if (location.search.includes('audio')) (() => {
   setInterval(() => {
     const m = audio.musicState();
     box.textContent = [
-      `ctx ${m.ctx}   master ${m.masterGain}   muted ${m.muted}   synth ${m.synth}`,
+      `ctx ${m.ctx}   master ${m.masterGain}   muted ${m.muted}   synth ${m.synth}   media ${m.media ? 'ON' : 'off'}`,
       `theme ${ch(m.theme)}`,
       `menu  ${ch(m.menu)}`,
       '',
@@ -5107,6 +5107,37 @@ document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('clic
   track('world_locked_tap', { card: (c as HTMLElement).dataset.name || c.textContent?.trim().slice(0, 24) });
   c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
 }));
+// ── THE GATE — every session begins with a touch we can PROMISE ────────────
+// The audio engine has been rebuilt five times to survive starting without a
+// gesture, and every one of those rebuilds was working around the same hole:
+// nobody could say WHEN the first touch would come. This closes the hole from
+// the design side. The gate is armed on both boot paths; the tap is a real,
+// trusted gesture, so the capture-phase unlock listeners fire, the context
+// resumes, the output primes, the media session promotes — and the score
+// starts inside the same frame, from a buffer that decoded during the wait.
+//
+// Suppressed for the debug harness (?len= etc. auto-start matches with no
+// human present) and the debug viewers. Every human path goes through it.
+// (#tapGate, not #gate — #gate is the PARENTAL gate, the grown-up
+// multiplication check, and colliding with a 4+ compliance feature is how a
+// music fix fails App Review.)
+const tapGateEl = el('tapGate');
+function armGate(label: string, onTap: () => void) {
+  if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { onTap(); return; }
+  (tapGateEl.querySelector('.gPill') as HTMLElement).textContent = label;
+  tapGateEl.classList.add('show');
+  document.body.classList.add('gated');   // the menu's own chrome stands down
+  tapGateEl.addEventListener('pointerdown', () => {
+    // fade, do not snap: the tap is the beat the music lands on, and a 260ms
+    // dissolve reads as the game answering the touch
+    tapGateEl.style.transition = 'opacity 0.26s ease';
+    tapGateEl.style.opacity = '0';
+    document.body.classList.remove('gated');
+    setTimeout(() => { tapGateEl.classList.remove('show'); tapGateEl.style.opacity = ''; tapGateEl.style.transition = ''; }, 280);
+    onTap();
+  }, { once: true });
+}
+
 // a world switch reloads the page to rebuild the island; pick up where the tap
 // left off rather than dumping the player back on the splash they just left
 if (localStorage.getItem('voidAutoPlay') === '1') {
@@ -5118,8 +5149,22 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   // back. Measured on the real reload path: 12ms of the game visible, then 1.4
   // seconds of load screen. Taking the hold synchronously makes the ordering
   // irrelevant: there is never a moment when nobody is holding it.
-  if (!packReady) coverHold('pack');
-  requestAnimationFrame(() => {
+  // The reload burned the last page's user activation, so this page cannot
+  // legally make a sound until it is touched — which used to mean the match
+  // auto-started in silence and the first joystick contact was the real
+  // unlock, seconds in. Now the touch comes FIRST: the world idles under the
+  // gate, the tap is the gesture, and launch begins with its score already
+  // decoded (the head preload fetched this world's track before the bundle).
+  //
+  // The pack hold moves INSIDE the tap. It used to be claimed here,
+  // synchronously, to win an ordering race against animate()'s first frame —
+  // but that was when launch was also here. With launch behind the gate, a
+  // hold taken now keeps the z-60 loading cover over the z-55 gate FOREVER:
+  // a child staring at a loading screen that is secretly waiting to be
+  // tapped. qa/switch.mjs found it as an untappable gate; a phone would have
+  // found it as the game hanging on every world switch.
+  armGate('TAP TO PLAY', () => requestAnimationFrame(() => {
+    if (!packReady) coverHold('pack');
     // THE DAILY CARD GOES FIRST. It is built further down this same module
     // evaluation, so by the time this frame runs it is already on screen — and
     // launching under it starts a three-minute timed match behind a full-screen
@@ -5133,7 +5178,12 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
       return;
     }
     launchWorld();
-  });
+  }));
+} else if (!DEBUG_HARNESS) {
+  // Fresh load: the splash is next. The tap starts the menu theme inside the
+  // gesture — startMenuMusic is idempotent, so the body.menu sync a frame
+  // later is a no-op rather than a restart.
+  armGate('TAP TO BEGIN', () => { audio.startMenuMusic(); audio.ensureMusic(); });
 }
 el('btnShop').addEventListener('click', () => {
   track('shop_view', { coins, from: 'menu' });

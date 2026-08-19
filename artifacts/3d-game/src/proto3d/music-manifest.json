@@ -1,0 +1,7 @@
+{
+  "menu":    { "loopStart": 0 },
+  "maple":   { "loopStart": 0 },
+  "pirate":  { "loopStart": 0 },
+  "gameday": { "loopStart": 4.0 },
+  "lantern": { "loopStart": 0 }
+}
