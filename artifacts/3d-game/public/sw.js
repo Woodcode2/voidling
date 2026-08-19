@@ -101,6 +101,21 @@ self.addEventListener('fetch', (event) => {
       // Stable-named: ASK FIRST, every time. The HTTP cache still does the real
       // work (this is a conditional request, not a full download), and the cache
       // below is only the offline fallback.
+      //
+      // …and "the HTTP cache does the real work" is only true if the ORIGIN
+      // says so. It did not for the music: Vite fingerprints what it builds, so
+      // those files are already immutable, but everything copied verbatim out
+      // of public/ keeps a stable name and took Vercel's revalidate-always
+      // default — so every launch paid at least a round trip before a note
+      // could sound, and a cold HTTP cache paid the whole 1.3-3.3 MB again.
+      // vercel.json now sends max-age=604800 + stale-while-revalidate for
+      // /assets/music/, which turns the second launch into a disk hit.
+      //
+      // A WEEK, NOT A YEAR, and the reason is this exact branch: the names are
+      // stable, so `immutable` would pin a returning player to whatever bytes
+      // they first got — which would have been a real problem the day the five
+      // tracks were re-encoded from 256 to 128 kbps in place. Anything longer
+      // needs the filenames to carry a hash first.
       try {
         const res = await fetch(req);
         if (res && res.status === 200) cache.put(req, res.clone());
