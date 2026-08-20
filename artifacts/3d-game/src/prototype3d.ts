@@ -5284,6 +5284,14 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   // a child staring at a loading screen that is secretly waiting to be
   // tapped. qa/switch.mjs found it as an untappable gate; a phone would have
   // found it as the game hanging on every world switch.
+  // THE GATE SHOWS THE WORLD, NOT THE MENU. The owner tapped a world card,
+  // the page rebuilt, and TAP TO PLAY appeared over the SAME SPLASH he had
+  // just left — ghosted PLAY button and all — which reads as the menu asking
+  // twice, not as a ready-check. The splash's job on this page is over: hide
+  // it now, so what sits under the gate is the island he chose, idling. The
+  // tap then reads as "ready? go" — which is what it is.
+  el('menu').style.display = 'none';
+  document.body.classList.remove('menu');
   armGate('TAP TO PLAY', () => requestAnimationFrame(() => {
     if (!packReady) coverHold('pack');
     // THE DAILY CARD GOES FIRST. It is built further down this same module
