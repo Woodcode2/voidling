@@ -399,6 +399,22 @@ instrument and the owner disagree, the instrument is the suspect.
 
 ---
 
+## EXECUTION LEDGER — 2026-08-20
+
+| item | state | what shipped |
+|---|---|---|
+| 1 stutter | **partial — instrument + 3 causes fixed** | `?perf=1` overlay (frame histogram, 1%/0.1% lows, hitch counters, per-class update rates vs render rate); task #40 fixed (ladder now measures UNCLAMPED wall dt); task #41 CLOSED with a live trap — three renders every transparent DoubleSide material twice per frame with a needsUpdate on each side-swap, and the halo rings (closed tori, DoubleSide for nothing) were the whole mystery: 4 version bumps + 2 extra draws per frame, now 0; crowd stagger split into two bands so the visible band steps at half rate (half the leap) instead of a quadruple jump every fourth frame. STILL OPEN: #37/#38 link storms, #39 120Hz constants, and the owner's `?perf=1` screenshot is the arbiter of what remains |
+| 2 two taps | **shipped** | fresh load has NO gate — the tap on PLAY is the gesture (`repairMusic()` runs synchronously inside `unlock()`); the reload path keeps TAP TO PLAY, which is load-bearing there; probes now FAIL if a gate ever reappears on the fresh path |
+| 3 results | **shipped** | the `.burst` class collision renamed away; the card is a scrollable body + STATIC footer outside the scrollport (sticky was pinning against the padding edge and hoisting the row mid-card); footer solid with a fade apron above; the drop receipt folds away after 2.6s; confetti shrunk 22→15px; `qa/endlayout.mjs` gates zero overlaps at three sizes with drop-open + insets simulated |
+| 4 hats | **shipped** | root cause at TITAN was NOT the lean clamp (it never saturates — 0.741 needed vs 0.90 max, computed): the hat was a child of the jelly — non-uniform squash + velocity tilt SHEARED it every moving frame, and every previous measurement was of an IDLE void. The hat now hangs off the rig root and follows rigidly (size, yaw, lean, squashed head height). Verified moving at r3/16 |
+| 5 pirate | **shipped** | containment margin TAPERS past R=8 (6.4 peak → 3.2 floor): a TITAN needs a 6.4u corridor and the narrowest authored walkway is 6.5u; predicate extracted to `coastSolid()` shared by movement, ?walls and probes (`__solidAt`); `qa/traverse.mjs` gates reach-of-walkable = 100% at r=1..27 on all four worlds |
+| 6 pause | **shipped** | RUMBLE shows an honest inert state + "in the App Store version" on devices with no vibration API (pause + settings sheets); BIG MOTION toggle now also governs the CSS animations via body.calm (it reached exactly two things before); LEAVE THE MATCH arms first (TAP AGAIN TO LEAVE, 3s); subtexts under RUMBLE and BIG MOTION |
+
+Investigation notes: the six-angle adversarial sweep completed 4/6 (hats and
+stutter investigators died on a session limit and were done inline); the
+pirate finding that the margin comment was "verified against Maple's corridors
+and never Pirate's" is retraction-class and now lives in coastMargin's comment.
+
 ## DEFINITION OF DONE
 
 A child opens the game, taps once, and is playing. The rivals and the town move

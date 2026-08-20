@@ -293,6 +293,11 @@ export function createAudio(): Audio3D {
     // the activation is spent and iOS will not accept it. See primeOutput.
     if (c) primeOutput(c);
     promoteSession();
+    // …and start whatever wants to be playing NOW, inside this gesture, on the
+    // optimistic path — not whenever the resume promise gets a turn on the
+    // main thread. This is what makes the very first tap of a session — PLAY,
+    // a nav card, anywhere — the moment the music starts.
+    repairMusic();
     logEv(`gesture, ctx=${c ? c.state : 'none'}`);
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
@@ -686,7 +691,13 @@ export function createAudio(): Audio3D {
   }
   function repairMusic() {
     const c = ctx;
-    if (!c || c.state !== 'running' || !master) return;
+    if (!c || !master) return;
+    // 'running', OR inside the optimistic window of a gesture whose resume is
+    // in flight — startLoop schedules safely in that window (see its note), so
+    // the FIRST tap can start the score without a dedicated gate overlay. This
+    // is what let the TAP TO BEGIN screen come back out of the fresh-load
+    // path: the tap the child was already going to make is the gesture.
+    if (c.state !== 'running' && performance.now() - lastGestureAt > 1500) return;
     // a match owns the music; the menu never talks over it
     if (themeCh.wanted) reviveCh(themeCh, c);
     else if (menuCh.wanted) reviveCh(menuCh, c);

@@ -43,11 +43,18 @@ export function reduceMotion(): boolean {
     let saved: string | null = null;
     try { saved = localStorage.getItem('voidMotion'); } catch { /* private mode */ }
     _reduce = saved === null ? osReduce() : saved === '0';
+    document.body.classList.toggle('calm', _reduce);
   }
   return _reduce;
 }
 export function setReduceMotion(on: boolean) {
   _reduce = on;
+  // The toggle is AUTHORITATIVE for CSS too. Before this class the switch
+  // governed exactly two things — camera shake and the flash cap — while every
+  // pulsing CSS animation answered only to the OS media query, which the
+  // toggle cannot reach. A control that calms a third of the motion teaches a
+  // parent it is broken.
+  document.body.classList.toggle('calm', on);
   try { localStorage.setItem('voidMotion', on ? '0' : '1'); } catch { /* private mode */ }
 }
 

@@ -201,21 +201,20 @@ console.log(`         menu   ${dump(s.menu)}`);
 console.log(`         theme  ${dump(s.theme)}`);
 const preTouch = s.starts.length;
 
-// ── 2. THE FIRST TOUCH IS THE GATE, AND IT IS A CONTRACT ─────────────────────
-// TAP TO BEGIN exists precisely so this moment is guaranteed: the tap is a
-// trusted gesture, the buffer decoded during the splash, and the score starts
-// inside the same frame. The brief's number is ≤150ms from tap to first
-// audible sample ON A DEVICE; this harness runs on swiftshader at a fraction
-// of real time, so the gate here is 500ms with the true latency printed for
-// the record. A missing gate is itself a failure: if this overlay is not up,
-// some path to the game no longer promises a first touch.
-if (!(await p.$('#tapGate.show'))) {
-  console.log('  THE GATE IS NOT UP — no guaranteed first touch on this path');
-  fails0.push('tap gate missing on a human path');
+// ── 2. THE FIRST TOUCH IS PLAY, AND IT IS STILL THE CONTRACT ─────────────────
+// The TAP TO BEGIN overlay was tried here and RETIRED from this path — the
+// owner caught it the day it shipped ("two to begin then you have a begin
+// right after"). The audio contract survives it: the unlock listeners are
+// capture-phase on window, and unlock() runs repairMusic() synchronously
+// inside the gesture, so the tap on PLAY — the tap a child makes anyway — is
+// the moment the score starts. A gate REAPPEARING on this path is the two-tap
+// regression coming back, and this probe fails on it.
+if (await p.$('#tapGate.show')) {
+  console.log('  A GATE IS UP ON THE FRESH-LOAD PATH — the two-tap regression is back');
+  fails0.push('tap gate present on the fresh-load path');
 }
 const tPlay = Date.now();
-if (await p.$('#tapGate.show')) await p.click('#tapGate');
-else await p.click('#btnPlay');
+await p.click('#btnPlay');
 // TWO CLOCKS, MEASURED APART. `menuSched` is the APP's obligation — the tap
 // must schedule the score inside the gesture, and that is what the 150ms spec
 // governs. `menuHeard` adds the platform's resume round-trip on top; on a
@@ -261,7 +260,7 @@ if (SLOW) {
 }
 
 // ── 3. JOINING A MATCH ───────────────────────────────────────────────────────
-await p.click('#btnPlay'); await p.waitForTimeout(900);
+// (the first tap already opened the picker — one tap, one thing)
 const tCard = Date.now();
 await p.click(`#worldRow .wCard[data-world="${WORLD}"]`);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 600000 });

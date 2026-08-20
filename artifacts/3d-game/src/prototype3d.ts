@@ -333,6 +333,69 @@ const audio = createAudio();
 // delay was the download, and it began at the worst possible moment.
 audio.preloadMusic();
 
+// ── ?perf=1 — FRAME PACING, ON THE DEVICE, IN THE OWNER'S HAND ─────────────
+// "Sometimes or most often items or voids move the pause move then pause."
+// That sentence cannot be investigated from this sandbox: swiftshader renders
+// at ~1fps and any timing taken here is the harness's, not the game's. This
+// overlay is the instrument the sandbox cannot be — live, on the phone:
+//
+//   • a frame-time histogram with the 1% / 0.1% lows. The MEAN is useless for
+//     stutter; the tail is the entire complaint.
+//   • hitch counters (>33ms, >50ms) since match start.
+//   • per-entity-class UPDATE rates against the render rate. An entity class
+//     updating at a fraction of the render rate without interpolation looks
+//     exactly like "move, pause, move, pause" at any frame rate — and no
+//     frame-rate work will ever fix it. This row is what tells the two
+//     apart, and nothing else on this list can.
+//   • the quality ladder's level and the fps it BELIEVES, next to the truth.
+//
+// Costs nothing without the flag: perfFrame is a counter bump behind a
+// boolean, and the ring buffer is not even allocated.
+const PERF = location.search.includes('perf');
+const perfBeats: Record<string, number> = {};
+/** Entity systems call this once per UPDATE PASS of a class (not per entity),
+ *  so the overlay can compare each class's update rate to the render rate. */
+const perfBeat = PERF ? (k: string) => { perfBeats[k] = (perfBeats[k] ?? 0) + 1; } : () => {};
+(window as unknown as { __perfBeat: (k: string) => void }).__perfBeat = perfBeat;
+let perfDts: number[] | null = null;
+let perfHitch33 = 0, perfHitch50 = 0, perfFrames = 0;
+function perfFrame(dtRaw: number) {
+  if (!PERF) return;
+  if (!perfDts) perfDts = [];
+  perfFrames++;
+  perfDts.push(dtRaw);
+  if (perfDts.length > 1200) perfDts.shift();
+  if (dtRaw > 0.05) perfHitch50++;
+  else if (dtRaw > 0.033) perfHitch33++;
+}
+if (PERF) (() => {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;right:0;top:0;z-index:99999;max-width:62vw;'
+    + 'background:rgba(6,4,16,.92);color:#cfe8c6;font:11px/1.4 ui-monospace,Menlo,monospace;'
+    + 'padding:6px 8px;white-space:pre;pointer-events:none;text-align:right';
+  document.body.appendChild(box);
+  let lastBeats: Record<string, number> = {}; let lastAt = performance.now();
+  setInterval(() => {
+    if (!perfDts || perfDts.length < 30) { box.textContent = 'collecting…'; return; }
+    const a = [...perfDts].sort((x, y) => x - y);
+    const ms = (v: number) => (v * 1000).toFixed(1);
+    const pct = (p: number) => a[Math.min(a.length - 1, Math.floor(a.length * p))];
+    const now = performance.now(); const secs = (now - lastAt) / 1000;
+    const fps = Math.round(a.length / a.reduce((x, y) => x + y, 0));
+    const rows = Object.keys(perfBeats).map((k) => {
+      const rate = ((perfBeats[k] - (lastBeats[k] ?? 0)) / secs).toFixed(0);
+      return `${k.padStart(8)} ${rate}/s`;
+    });
+    lastBeats = { ...perfBeats }; lastAt = now;
+    box.textContent = [
+      `frame med ${ms(pct(0.5))}  p90 ${ms(pct(0.9))}  1% ${ms(pct(0.99))}  0.1% ${ms(pct(0.999))} ms`,
+      `fps ${fps}   hitches >33ms ${perfHitch33}  >50ms ${perfHitch50}   frames ${perfFrames}`,
+      `quality L${qLevel}${qPinned !== null ? ' (pinned)' : ''}  ladder-believed ${qAccT > 0 ? Math.round(qAccN / qAccT) : '-'} fps`,
+      ...rows,
+    ].join('\n');
+  }, 500);
+})();
+
 // ── ?audio=1 — THE AUDIO ENGINE, ON THE DEVICE, IN THE OWNER'S HAND ────────
 // Three rounds of music fixes have measured correct in every environment
 // reachable from here and still failed on the owner's phone. That gap is not a
@@ -469,6 +532,48 @@ const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerH
 let camDist = 50;
 let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
+
+// ── HOW MUCH BODY MUST BE ON LAND, BY SIZE ─────────────────────────────────
+// The containment ring: the void's centre must stay this far inside the
+// coastline. Three regimes, and the third is the owner's Pirate Bay report.
+//
+// A SMALL void is held tight to the shore — with no ring it visibly floats
+// over the sea. The capped growth (min(0.75R, 4+0.15R)) was tuned for that,
+// and its comment claimed "a big one is allowed to span… R=16 goes 13.2->7.6"
+// — verified against MAPLE's 16u and 25u stretches and never against Pirate's.
+// Measured by replicating bay.ts verbatim: Pirate's promenade isthmus at the
+// bay mouth is 15.0 units of land, and the capped margin still needs
+// 2m = 15.2u at R=16 and 18.5u at VOID TITAN — the island's main path SEVERS
+// at exactly the size the owner screenshotted himself wedged at. Nothing that
+// blocks there can be eaten (it is water), which is the genre's promise
+// inverted: getting big made the world say no.
+//
+// So past R=8 the ring TAPERS BACK DOWN. A giant hole overhanging the
+// coastline at its rim is not a bug, it is the fantasy — a hole does not
+// balance on a walkway. At the floor (R>=16) the margin is 3.2, so a TITAN
+// needs a 6.4u corridor: every authored walkway on all four islands passes,
+// including Pirate's 6.5u pier tongue.
+//   R=2 -> 2.7 (unchanged)   R=8 -> 6.4 (the old cap, unchanged)
+//   R=16 -> 3.2              R=27 -> 3.2
+function coastMargin(R0: number): number {
+  const grown = Math.min(R0 * 0.75, 4 + R0 * 0.15);
+  const taper = THREE.MathUtils.clamp((R0 - 8) / 8, 0, 1);
+  return grown * (1 - taper) + 2.0 * taper + 1.2;
+}
+/** The containment predicate at radius R, THE one the hero moves by. Movement,
+ *  the ?walls painter and qa/traverse.mjs all call this same function — a
+ *  probe that replicates the rule instead of asking it will drift the day the
+ *  rule changes, and this rule has now been wrong twice for exactly that
+ *  reason (tuned against Maple's corridors, never Pirate's). */
+function coastSolid(R0: number): (x: number, z: number) => boolean {
+  const m = coastMargin(R0);
+  const d45 = m * 0.7071;
+  return (x: number, z: number) => !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
+    && insideIsland3(x + m, z) && insideIsland3(x - m, z)
+    && insideIsland3(x, z + m) && insideIsland3(x, z - m)
+    && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
+    && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
+}
 const TOPDOWN = location.search.includes('top');
 const SHOW_WALLS = location.search.includes('walls');   // ?walls=1 — see the containment boundary
 const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the GLB pack
@@ -1335,6 +1440,7 @@ const _dbg = new Proxy(_dbgStore, {
   __celebrateSkins?: (skins: Skin[]) => void;
   __grantHats: (ids: string[]) => void;
   __setHat: (id: string | null) => void;
+  __solidAt: (x: number, z: number, r: number) => boolean;
   __voidGroup: () => THREE.Group;
   __news: () => void;
   __setSkin: (s: Record<string, unknown>) => void;
@@ -1397,6 +1503,9 @@ _dbg.__music = () => audio.musicState();
 // in a bare scene from near-horizontal angles while the game looks DOWN at a
 // hat sitting on a sphere. See scratchpad hatocc.
 _dbg.__setHat = (id: string | null) => voidling.setHat(id);
+// QA: the containment predicate at an arbitrary radius — qa/traverse.mjs asks
+// the game its own rule instead of replicating the geometry
+_dbg.__solidAt = (x: number, z: number, r: number) => coastSolid(r)(x, z);
 // …and the scene node it lands in, so a probe can ask WHERE a hat ended up
 // rather than inferring it from pixels. Occlusion is measured from the play
 // camera (scratchpad hatocc), but "84% hidden" does not say whether the lean
@@ -2622,15 +2731,10 @@ function paintWalls() {
   wallCd -= 1 / 60;
   if (wallCd > 0) return;
   wallCd = 0.33;
-  // the movement rule, verbatim — see the containment block in animate()
+  // the movement rule, verbatim — the SAME function the hero moves by
   const R0 = voidling.radius;
-  const m = Math.min(R0 * 0.75, 4 + R0 * 0.15) + 1.2;
-  const d45 = m * 0.7071;
-  const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
-    && insideIsland3(x + m, z) && insideIsland3(x - m, z)
-    && insideIsland3(x, z + m) && insideIsland3(x, z - m)
-    && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
-    && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
+  const m = coastMargin(R0);
+  const solid = coastSolid(R0);
   const ox = Math.round(voidState.x / WALL_STEP) * WALL_STEP;
   const oz = Math.round(voidState.z / WALL_STEP) * WALL_STEP;
   let n = 0;
@@ -3977,7 +4081,7 @@ function offerDrop() {
     localStorage.setItem('voidDropN', '0');
   }
   const n = Number(localStorage.getItem('voidDropN') || 0);
-  dropEl.classList.remove('charging', 'burst');
+  dropEl.classList.remove('charging', 'opened');
   dropCharge = 0; dropOpen = false;
   (orb.querySelector('.dropRing') as HTMLElement)?.style.setProperty('--dc', '0');
   if (n >= DROP_VAL.length) { dropEl.classList.remove('show'); return; }
@@ -4016,7 +4120,9 @@ function openDrop(n: number) {
   const pay = DROP_VAL[n];
   addCoins(pay);
   dropEl.classList.remove('charging');
-  dropEl.classList.add('burst');
+  // 'opened', not 'burst' — the shop's generic .burst sparkle rule captured
+  // that name and stretched this element over the whole card. See index.html.
+  dropEl.classList.add('opened');
   lbl.textContent = n + 1 < DROP_VAL.length
     ? `+${pay}✦!  next drop after your next match`
     : `+${pay}✦!  the BIG one — more tomorrow`;
@@ -4033,6 +4139,21 @@ function openDrop(n: number) {
     setTimeout(() => sp.remove(), 3200);
   }
   track('drop_open', { n: n + 1, pay });
+  // ── THE RECEIPT DOES NOT MOVE IN. The payout line gets its moment, then
+  // the whole block folds away, giving the card back the 90px the spent orb
+  // was squatting on. Without this the label ALSO persisted into the NEXT
+  // match's results — only offerDrop ever removed the class.
+  setTimeout(() => {
+    if (!ended) return;                     // a rematch already rebuilt the card
+    dropEl.style.transition = 'opacity 0.5s ease, max-height 0.5s ease';
+    dropEl.style.overflow = 'hidden';
+    dropEl.style.maxHeight = `${dropEl.offsetHeight}px`;
+    requestAnimationFrame(() => { dropEl.style.opacity = '0'; dropEl.style.maxHeight = '0'; });
+    setTimeout(() => {
+      dropEl.classList.remove('show', 'opened');
+      dropEl.style.cssText = '';
+    }, 550);
+  }, 2600);
 }
 function celebrateEnd(coins: number, xpGain: number, lead: string, won = false) {
   offerDrop();
@@ -5179,12 +5300,19 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
     }
     launchWorld();
   }));
-} else if (!DEBUG_HARNESS) {
-  // Fresh load: the splash is next. The tap starts the menu theme inside the
-  // gesture — startMenuMusic is idempotent, so the body.menu sync a frame
-  // later is a no-op rather than a restart.
-  armGate('TAP TO BEGIN', () => { audio.startMenuMusic(); audio.ensureMusic(); });
 }
+// FRESH LOAD HAS NO GATE ANY MORE — the owner caught it as a regression the
+// day it shipped: "it's showing two to begin then you have a begin right
+// after." He was right. The unlock listeners are capture-phase on window, so
+// the tap on PLAY — a tap the child makes anyway, moments later — is exactly
+// as good a gesture as a dedicated overlay, and repairMusic() now runs
+// synchronously inside it (audio3d.ts unlock), so the menu theme starts on
+// that same tap. The overlay bought nothing on this path but a second tap and
+// a screen that exists for the engine's convenience.
+//
+// The RELOAD path keeps its gate, because that page auto-starts a live match
+// with no tap at all — there, the gate is the difference between a match that
+// begins scored and one that begins silent. One path needs it; one never did.
 el('btnShop').addEventListener('click', () => {
   track('shop_view', { coins, from: 'menu' });
   shopEl.classList.add('show');
@@ -5651,12 +5779,26 @@ el('btnHome').addEventListener('click', () => {
   // 0x0 during a match. A parent who needed quiet had to end the run.
   const pauseEl = el('pause');
   const pSnd = el('pauseSound'), pHap = el('pauseHaptics'), pMot = el('pauseMotion');
+  // Can this DEVICE rumble at all? Native builds go through Capacitor
+  // Haptics; a browser needs navigator.vibrate, which iOS Safari has never
+  // implemented. On a device where neither exists the row used to sit there
+  // saying ON while doing nothing — a control that lies, on precisely the
+  // phone the owner playtests with. It now shows as inert with an honest
+  // subtext instead of hiding: the feature is real in the App Store build,
+  // and a parent deserves to know it exists rather than wonder why it left.
+  const canRumble = Capacitor.isNativePlatform() || 'vibrate' in navigator;
   const paintPause = () => {
     const sOff = audio.isMuted();
     pSnd.classList.toggle('off', sOff);
     pSnd.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
-    pHap.classList.toggle('off', !hapticsOn);
-    pHap.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    if (!canRumble) {
+      pHap.classList.add('dead');
+      pHap.querySelector('b')!.textContent = '—';
+      el('pauseHapticsSub').textContent = 'in the App Store version';
+    } else {
+      pHap.classList.toggle('off', !hapticsOn);
+      pHap.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    }
     const bigMotion = !reduceMotion();
     pMot.classList.toggle('off', !bigMotion);
     pMot.querySelector('b')!.textContent = bigMotion ? 'ON' : 'OFF';
@@ -5664,6 +5806,7 @@ el('btnHome').addEventListener('click', () => {
   const resume = () => { paused = false; pauseEl.classList.remove('show'); clock.getDelta(); };
   pSnd.addEventListener('click', () => { audio.setMuted(!audio.isMuted()); paintPause(); });
   pHap.addEventListener('click', () => {
+    if (!canRumble) return;   // inert row: the subtext already says why
     hapticsOn = !hapticsOn;
     localStorage.setItem('voidHaptics', hapticsOn ? '1' : '0');
     paintPause(); if (hapticsOn) buzz(30);
@@ -5702,7 +5845,26 @@ el('btnHome').addEventListener('click', () => {
     menuEl.style.display = '';
     renderRank();
   };
-  el('pauseQuit').addEventListener('click', doQuit);
+  // ── ONE STRAY TAP MUST NOT EAT A RUN ────────────────────────────────────
+  // The in-game HOME button has always armed first ("LEAVE?") for exactly
+  // this reason, and the pause sheet's quit lost that in the refactor that
+  // created it: a child reaching for KEEP PLAYING and landing 40px low binned
+  // a three-minute match. Same pattern here: first tap arms for 3s, second
+  // tap leaves, anything else disarms.
+  {
+    const pq = el('pauseQuit');
+    let quitArm = 0;
+    const disarm = () => { quitArm = 0; pq.textContent = 'LEAVE THE MATCH'; pq.classList.remove('arm'); };
+    pq.addEventListener('click', () => {
+      if (performance.now() < quitArm) { disarm(); doQuit(); return; }
+      quitArm = performance.now() + 3000;
+      pq.textContent = 'TAP AGAIN TO LEAVE';
+      pq.classList.add('arm');
+      setTimeout(() => { if (performance.now() >= quitArm) disarm(); }, 3100);
+    });
+    // KEEP PLAYING, or closing the sheet any other way, always disarms
+    el('pauseResume').addEventListener('click', disarm);
+  }
 }
 document.querySelectorAll('.backBtn').forEach((b) => b.addEventListener('click', () => el((b as HTMLElement).dataset.close!).classList.remove('show')));
 
@@ -5952,8 +6114,15 @@ renderRank();
     const sOff = audio.isMuted();
     sndRow.classList.toggle('off', sOff);
     sndRow.querySelector('b')!.textContent = sOff ? 'OFF' : 'ON';
-    hapRow.classList.toggle('off', !hapticsOn);
-    hapRow.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    // same capability gate as the pause sheet: never show ON for a rumble
+    // this device cannot produce (iOS Safari has no navigator.vibrate)
+    if (!(Capacitor.isNativePlatform() || 'vibrate' in navigator)) {
+      hapRow.classList.add('dead');
+      hapRow.querySelector('b')!.textContent = '—';
+    } else {
+      hapRow.classList.toggle('off', !hapticsOn);
+      hapRow.querySelector('b')!.textContent = hapticsOn ? 'ON' : 'OFF';
+    }
     // BIG MOTION rather than "reduce motion": the row reads as the thing being
     // turned off, like SOUND and RUMBLE above it, so a parent does not have to
     // reason about a double negative to work out which way is calmer.
@@ -7261,7 +7430,16 @@ function hitStop(sec: number) {
 }
 function animate() {
   tickFrame();
-  const dt = Math.min(0.05, clock.getDelta());
+  // dtRaw is WALL time and dt is SIMULATION time, and the difference is the
+  // whole reason both exist. The clamp keeps physics stable through a long
+  // frame — but anything that MEASURES the device (the quality ladder, the
+  // perf overlay) must see the real delta, or a hitch disappears into the
+  // clamp and the instrument reports a healthy phone. That is task #40, and
+  // it is the retraction-list mistake ("a harness artifact generalised…")
+  // built directly into the shipping game.
+  const dtRaw = clock.getDelta();
+  const dt = Math.min(0.05, dtRaw);
+  perfFrame(dtRaw);
   let dtw = dt;
   if (outroT > 0) { outroT -= dt; if (outroT <= 0) endMatch(); else dtw = dt * 0.3; }
   stopCd = Math.max(0, stopCd - dt);
@@ -7615,27 +7793,13 @@ function animate() {
     // OUTWARD half of the velocity is cancelled (tangential sliding survives),
     // and a void that grows past the shore is eased back in instead of stuck.
     {
-      // HOW MUCH BODY MUST BE ON LAND. A linear R*0.75 meant a WORLD ENDER
-      // needed 26 units of clear corridor — and the island's narrowest
-      // walkable stretches measure 16 and 25 units, so the late game was
-      // physically unable to cross its own map and pinned against the sand
-      // spits. A small void is still held tight to the shore (it would look
-      // like it was floating otherwise); a big one is allowed to span, because
-      // a giant hole bridging an isthmus is exactly what the fantasy looks
-      // like. R=2 unchanged at 2.7; R=16 goes 13.2 -> 7.6.
       const R0 = voidling.radius;
-      const m = Math.min(R0 * 0.75, 4 + R0 * 0.15) + 1.2;
+      const m = coastMargin(R0);
       // biomeAt calls Maple's pond, river and lagoon dry land — they are all
-      // inside the coastline. A live run drove from the spawn to 0.95 units off
-      // the exact centre of the pond in 8 seconds with zero blocked frames.
-      // The diagonals leaked too: 0.4% to 1.7% of accepted cells put the body
-      // over water on a diagonal, which the cars have guarded against for ages.
-      const d45 = m * 0.7071;
-      const solid = (x: number, z: number) => !!island.biomeAt(x, z) && !inDeepWater3(x, z, m)
-        && insideIsland3(x + m, z) && insideIsland3(x - m, z)
-        && insideIsland3(x, z + m) && insideIsland3(x, z - m)
-        && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
-        && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
+      // inside the coastline; the diagonals are in the predicate because they
+      // leaked (0.4-1.7% of accepted cells put the body over water on a
+      // diagonal, which the cars have guarded against for ages).
+      const solid = coastSolid(R0);
       // WHICH WAY IS LAND? The old version assumed "away from the island
       // centre", which is only true for a blob with water on the outside.
       // Pirate Bay has water INSIDE it: standing on the resort's inner shore,
@@ -7838,6 +8002,7 @@ function animate() {
   const gS = 3 * Math.max(1, Math.min(96, 16 * (camDist / 50)));
   const gX = (camOffset.z * vx - camOffset.x * vz) / (gFl * gS);   // screen right
   const gY = (-camOffset.x * vx - camOffset.z * vz) / (gFl * gS);  // screen up
+  perfBeat('hero');
   voidling.update(dtw, { t: tClock, x: voidState.x, z: voidState.z, vx, vz,
     lookX: THREE.MathUtils.clamp(gX, -1, 1), lookY: THREE.MathUtils.clamp(gY, -1, 1) });
   // ── HOW FAR THE CROWD MATTERS ──────────────────────────────────────────
@@ -7854,6 +8019,7 @@ function animate() {
   // off entirely: the camera is 300 units up and looking at the whole map.
   const crowdGate = introT > 0 ? Infinity : camDist * 2.2 + 90;
   _dbg.__crowdGate = crowdGate;
+  perfBeat('crowd');
   life.update(dtw, tClock, voidState.x, voidState.z, R, crowdGate);
   // the family races on the SAME terms as the player now, so it needs the same
   // three numbers: the clock it is pacing against, the score its rubber band
@@ -7864,6 +8030,7 @@ function animate() {
   // snapshotted. The ambient town (life.update, above) deliberately keeps
   // running — the world behind the score card should still look alive.
   if (!ended && !paused) {
+    perfBeat('rivals');
     rivals.update(dtw, started && !soloMode ? matchElapsed() : 0, voidState.x, voidState.z, R,
       { matchLen, playerScore, fever: feverMult, par: WORLD_PAR[pickedWorld] });   // solo: the family never joins
   }
@@ -8373,7 +8540,10 @@ function animate() {
   // was permanent. Nothing the player is not looking at is worth demoting
   // for; the accumulator is reset at match start so this window's samples
   // never count.
-  qAccT += dt; qAccN++; qCd -= dt;
+  // UNCLAMPED wall time, task #40: with `dt` here, a frame of 200ms counted
+  // as 0.05s, so a stuttering device measured FASTER than it ran and the
+  // ladder never demoted. The stutter-detector was blind to stutter.
+  qAccT += dtRaw; qAccN++; qCd -= dt;
   if (qPinned === null && started && qCd <= 0 && qAccT > 0) {
     const avg = qAccN / qAccT; qAccN = 0; qAccT = 0;
     if (avg < 46 && qLevel < QUALITY.length - 1) { qLevel++; applyQuality(); qCd = 4; }

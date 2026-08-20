@@ -5,7 +5,7 @@
 // not a lit glossy sphere. Face is a billboarded set of crisp flat features,
 // exactly like the 2D canvas draw.
 import * as THREE from 'three';
-import { HAT_BY_ID, applyHatLod, HAT_MAX_W, hatLean } from './hats';
+import { HAT_BY_ID, HAT_MAX_W, hatLean } from './hats';
 import { buildHat, spiralHorn } from './hatgeo';
 import { VOID, VOID_COL, type Skin } from './palette';
 
@@ -1294,6 +1294,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // mount. The caricature LOD below is capped against it so a hat can never
   // grow wider than the void wearing it — see wornLodCap.
   let wornLodCap = 99;
+  let hatSquash = 1;     // bob's current vertical squash, for the rigid hat follow
   const hatW: Record<string, number> = {};   // authored width, in body radii
   let spinner: THREE.Object3D | null = null;
   let spinRate = 0;
@@ -1323,12 +1324,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   group.add(rings);
   const ringMats: THREE.MeshBasicMaterial[] = [];
   {
-    const rm = new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    // FrontSide, and it is a measured fix, not a style choice: a TORUS is a
+    // closed surface, so DoubleSide cannot show anything FrontSide hides —
+    // but three renders every transparent DoubleSide material in TWO passes,
+    // setting material.needsUpdate on each side-swap, every frame. Trapped
+    // live: these two rings were the entire "a material sets needsUpdate
+    // ~twice per frame, all match" mystery (task #41) — 4 version bumps and
+    // 2 extra draw calls per frame, all match, for faces that face inward.
+    const rm = new THREE.MeshBasicMaterial({ color: VOID.glow, transparent: true, opacity: 0, depthWrite: false, side: THREE.FrontSide });
     const rg = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.03, 8, 96), rm);
     rg.rotation.x = Math.PI / 2 - 0.5;
     rings.add(rg); ringMats.push(rm);
     // faint companion band just outside — subtle depth, same crispness
-    const rm2 = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    const rm2 = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.FrontSide });
     const rg2 = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.014, 8, 96), rm2);
     rg2.rotation.x = Math.PI / 2 - 0.5;
     rings.add(rg2); ringMats.push(rm2);
@@ -1538,7 +1546,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
           const bb = new THREE.Box3().setFromObject(g);
           hatW[id] = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
         }
-        dress.add(g); hats[id] = g;
+        // ── THE HAT DOES NOT LIVE ON THE JELLY ─────────────────────────────
+        // It used to be a child of dress, under bob — and bob is the SQUASH:
+        // non-uniform scale (dispR*lat, dispR*squash, dispR*lat) plus a
+        // velocity tilt of up to ±0.11 rad on two axes. A rotated child under
+        // a non-uniform parent scale is a SHEAR, so every frame the void was
+        // moving, the hat's cone smeared sideways and its brim ellipse slid
+        // across the face — worst at TITAN sizes where the same radians are
+        // hundreds of pixels. Every previous hat measurement was taken on an
+        // IDLE void (squash=1, no tilt), which is why three rounds of fixes
+        // kept passing while the owner, who plays moving, kept being right.
+        // The hat now hangs off the rig ROOT and follows the head rigidly:
+        // a hat sits on a creature; it does not wobble like one.
+        group.add(g); hats[id] = g;
       }
       g.visible = true;
       wornHat = g; wornSeat = meta.seat; spinRate = meta.spin ?? 0;
@@ -1773,6 +1793,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const lat = uniformK - breathe;
       squash *= uniformK;
       bob.scale.set(dispR * lat, dispR * squash, dispR * lat);
+      hatSquash = squash;   // the hat rides the head's height, rigidly
       bob.rotation.z = THREE.MathUtils.clamp(-s.vx / 520, -0.11, 0.11);
       bob.rotation.x = THREE.MathUtils.clamp(s.vz / 520, -0.11, 0.11);
       // feed the travel direction to the vertex shader in the body's own space
@@ -1855,44 +1876,28 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const lod = 1 + small * 0.42;
       dress.scale.setScalar(lod);
       if (wornHat) {
-        // …but the HAT's share of it is capped at its own width (see wornLodCap
-        // at mount). The dress group keeps the full LOD for everything else.
+        // …the HAT's share of the caricature LOD is capped at its own width
+        // (wornLodCap, measured at mount from the AUTHORED geometry).
         const hatLod = Math.min(lod, wornLodCap);
-        applyHatLod(wornHat, wornSeat, hatLod, HAT_BY_ID[wornHatId!]?.drop ?? 0);
-        // …and undo the GROUP's scale on the way in, or the hat gets it twice.
-        // Divide by `lod` (the parent's scale), not by `hatLod` — the parent is
-        // what is doubling it, so the parent's number is what has to come off.
-        wornHat.scale.multiplyScalar(1 / lod);
-        wornHat.position.y /= lod;
-        // ── ROLL IT UP THE SKULL TO MEET THE CAMERA ────────────────────────
-        // Measured, because "the hat covers the body" turned out to be a
-        // different axis from the two I chased first. Occlusion from the REAL
-        // play camera (scratchpad hatocc): at r=8 every hat hid 74-97% of the
-        // void — propeller 97%, tricorn 96%, cowboy 94%. Capping the width
-        // could not touch that and neither could a fixed lean, because the
-        // camera does not hold still: it steepens from ~46° to ~66° as the
-        // void grows, and that alone walks the top of a sphere from the top of
-        // the disc down to its middle. See the derivation in hats.ts.
-        //
-        // So the lean is solved from the LIVE camera elevation every frame,
-        // and the hat holds the same height in frame at every size.
-        const cdx = camera.position.x - group.position.x;
-        const cdy = camera.position.y - group.position.y;
-        const cdz = camera.position.z - group.position.z;
-        const lean = hatLean(Math.atan2(cdy, Math.hypot(cdx, cdz) || 1e-4));
-        // Rotate the hat about the BODY'S CENTRE, not about its own origin —
-        // position and rotation together, or the seat leaves the skull. The
-        // object transform is p + R·S·local, so applying R to p carries the
-        // seat (which applyHatLod pinned at y≈seat) round the same arc:
-        //   seat' = R·(0, p.y + k·seat, 0)
-        // i.e. the contact point slides along the sphere and stays on it.
-        // ABSOLUTE, never `-=`: this runs every frame, and an earlier
-        // compounding subtract walked the hat clean off the back of the void,
-        // which the occlusion probe caught as hats "revealing" MORE body than
-        // bare because they had flown out of shot entirely.
-        const py = wornHat.position.y;
+        const meta = HAT_BY_ID[wornHatId!];
+        // Rigid follow (see the note at mount): the hat is a child of the
+        // unscaled rig root, so none of bob's squash, breathe, or velocity
+        // tilt can shear it. It takes the body's SIZE (dispR), the camera
+        // yaw the face uses, the camera-tracked lean, and rides the head's
+        // squashed height — attached, never deformed.
+        const py = wornSeat * (1 - hatLod) + (meta?.drop ?? 0) * hatLod;
+        const lean = hatLean(Math.atan2(
+          camera.position.y - group.position.y,
+          Math.hypot(camera.position.x - group.position.x, camera.position.z - group.position.z) || 1e-4));
+        wornHat.rotation.order = 'YXZ';
+        wornHat.rotation.y = dress.rotation.y;
         wornHat.rotation.x = -lean;
-        wornHat.position.set(0, py * Math.cos(lean), -py * Math.sin(lean));
+        wornHat.scale.setScalar(dispR * hatLod);
+        const zRoll = -py * Math.sin(lean) * dispR;
+        wornHat.position.set(
+          zRoll * Math.sin(dress.rotation.y),
+          py * Math.cos(lean) * dispR * hatSquash,
+          zRoll * Math.cos(dress.rotation.y));
         if (spinner) spinner.rotation.y += dt * spinRate;
       }
       // ── AND PUSH IT CLEAR OF THE BODY ──────────────────────────────────

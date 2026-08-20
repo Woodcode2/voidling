@@ -5241,9 +5241,24 @@ export function createLife(
         const o = m.mesh;
         if (o && gate < Infinity) {
           const dx = o.position.x - vx, dz = o.position.z - vz;
-          if (dx * dx + dz * dz > g2) {
-            if (((i + farPhase) & 3) !== 0) continue;
-            m.update(dt * 4, t, vx, vz, vR);
+          const d2 = dx * dx + dz * dz;
+          if (d2 > g2) {
+            // TWO BANDS, because the single quarter-rate band was visible:
+            // a mover advanced by one frame in four takes a QUADRUPLE step
+            // after three frozen frames — which on screen is precisely the
+            // owner's "items move, pause, move, pause". Movers just past the
+            // gate (the ones that can still be on screen) now run every OTHER
+            // frame with dt*2 — half the leap, twice the smoothness — and only
+            // the genuinely distant (2x the gate, reliably off screen) keep
+            // the cheap quarter rate. The average advance rate is unchanged
+            // in both bands, so timers and respawns still behave.
+            if (d2 > g2 * 4) {
+              if (((i + farPhase) & 3) !== 0) continue;
+              m.update(dt * 4, t, vx, vz, vR);
+            } else {
+              if (((i + farPhase) & 1) !== 0) continue;
+              m.update(dt * 2, t, vx, vz, vR);
+            }
             continue;
           }
         }

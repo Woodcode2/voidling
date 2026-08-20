@@ -54,11 +54,10 @@ const step = async (label, fn) => {
   return m;
 };
 
-// the gate is the first touch; music is owed from here on
-if (await p.$('#tapGate.show')) await p.click('#tapGate');
-else fails.push('tap gate missing — no guaranteed first touch');
-await step('gate tapped');
-await step('picker', () => p.click('#btnPlay'));
+// the first touch is PLAY — no gate on the fresh path (the two-tap overlay was
+// retired; a gate here would itself be the regression)
+if (await p.$('#tapGate.show')) fails.push('tap gate present on the fresh-load path');
+await step('first tap (PLAY)', () => p.click('#btnPlay'));
 await p.keyboard.press('Escape').catch(() => {});
 await step('back to splash', () => p.evaluate(() => document.getElementById('worlds')?.classList.remove('show')));
 await step('shop', () => p.click('#btnShop'));

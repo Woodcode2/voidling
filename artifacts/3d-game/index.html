@@ -644,20 +644,33 @@
          on top of it. Reserving the strip costs nothing when the card fits,
          because the first child takes an auto top margin and centres; it only
          applies in the overflow case, which is the case that collided. */
-      #end { overflow-y: auto; padding: calc(54px + env(safe-area-inset-top,0px)) 0 calc(20px + env(safe-area-inset-bottom,0px)); }
-      #end.show > *:first-child { margin-block-start: auto; }
+      /* Bottom padding reserves the PINNED ROW'S FULL RENDERED HEIGHT (~130px
+         + the home indicator). It was 20px, so on any card taller than the
+         screen — which is every real results card — the quest list's last
+         94px sat behind PLAY AGAIN, showing through the gradient's transparent
+         half. Measured at 430x932: #btnAgain covered 36px of "eat 6 cars". */
+      #end { overflow: hidden; padding: calc(54px + env(safe-area-inset-top,0px)) 0 0; }
+      #endScroll { flex: 1 1 auto; min-height: 0; width: 100%; overflow-y: auto;
+        display: flex; flex-direction: column; align-items: center; padding-bottom: 10px; }
+      #end.show #endScroll > *:first-child { margin-block-start: auto; }
       /* …but NOT the button row, which pins itself instead — an auto bottom
          margin on a sticky element pushes it out of its own scrollport. */
-      #end.show > *:last-child:not(.endGo) { margin-block-end: auto; }
+      #end.show #endScroll > *:last-child { margin-block-end: auto; }
       /* PINNED. margin-top:auto puts it at the end of the flex content when the
          screen is short enough to centre; sticky holds it against the bottom of
          the scrollport when it is not. The gradient is so the last stat card
          slides under it rather than colliding with it. */
-      .endGo { position: sticky; bottom: 0; z-index: 2; width: 100%;
+      .endGo { position: relative; z-index: 2; width: 100%; flex: 0 0 auto;
         display: flex; flex-direction: column; align-items: center;
-        margin-block-start: auto;
         padding: 14px 0 calc(10px + env(safe-area-inset-bottom,0px));
-        background: linear-gradient(to top, rgba(13,8,33,0.98) 55%, rgba(13,8,33,0)); }
+        background: rgba(13,8,33,0.98); }
+      /* the fade lives ABOVE the row, not inside it: the row itself is solid,
+         so no scroll position can ever show text through the buttons — which
+         is precisely how the owner's "items don't line up" screenshot read.
+         The 28px apron above is where content dims before it slides under. */
+      .endGo::before { content: ''; position: absolute; left: 0; right: 0; top: -28px; height: 28px;
+        pointer-events: none;
+        background: linear-gradient(to top, rgba(13,8,33,0.98), rgba(13,8,33,0)); }
       .endGo #btnAgain { margin-top: 0; }
       /* "#2 · OUT-NOMMED!" broke across two lines with the hyphen mid-word, and
          "CHOMPION OF THE ISLE" measured 390px on a 390px phone */
@@ -710,12 +723,19 @@
       #drop.charging .dropOrb { animation: dropShake 0.14s linear infinite; }
       @keyframes dropShake { 0% { transform: rotate(-3deg) scale(1.1); }
         50% { transform: rotate(3deg) scale(1.13); } 100% { transform: rotate(-3deg) scale(1.1); } }
-      #drop.burst .dropOrb { animation: dropBurst 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) forwards; }
+      /* `opened`, NOT `burst`. The shop's buy-sparkle container defines a
+         generic `.burst { position: absolute; inset: 0; }`, and when this
+         element carried the same class name that rule CAPTURED IT — yanked
+         #drop out of the flow, stretched it over the whole results card, and
+         printed its 22px payout label clean across the headline. That is the
+         owner's "+60 line over MARKET: DEVOURED" screenshot, one selector
+         collision wide. Two features may never share a state class name. */
+      #drop.opened .dropOrb { animation: dropBurst 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) forwards; }
       @keyframes dropBurst { 40% { transform: scale(1.35); opacity: 1; }
         100% { transform: scale(2.1); opacity: 0; } }
       .dropLbl { margin-top: 5px; font-size: 12px; font-weight: 900; letter-spacing: 1px;
         color: #ffd88a; }
-      #drop.burst .dropLbl { font-size: 22px; color: #ffd23f; }
+      #drop.opened .dropLbl { font-size: 22px; color: #ffd23f; }
       #endStats .es i { display: block; font-style: normal; font-size: 10.5px; font-weight: 800;
         letter-spacing: 1.4px; color: #c9a6ff; margin-bottom: 2px; }
       #endStats .es b { font-size: 20px; font-weight: 900; }
@@ -760,7 +780,9 @@
       #end .sub .endCnt { color: #ffd23f; font-weight: 900; display: inline-block; min-width: 3.2em; text-align: left; }
       #end.show #btnAgain { animation: againPulse 1.6s ease-in-out 1.2s infinite; }
       @keyframes againPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-      .endConf { position: absolute; top: -30px; font-size: 22px; pointer-events: none;
+      /* 15px, was 22 — the payout confetti was landing ON the stat tiles at
+         tile-text size and reading as broken layout rather than celebration */
+      .endConf { position: absolute; top: -30px; font-size: 15px; pointer-events: none;
         animation: confFall 2.6s ease-in forwards; }
       @keyframes confFall {
         0% { transform: translateY(0) rotate(0); opacity: 0; }
@@ -1200,6 +1222,10 @@
       #settings .setCard, #gate .setCard { width: min(330px, calc(100vw - 32px)); box-sizing: border-box; border-radius: 24px; text-align: center; padding: 24px 18px 20px;
         background: linear-gradient(160deg, #3a1a6e 0%, #241048 55%, #1a0b33 100%);
         border: 2.5px solid rgba(201,166,255,0.5); box-shadow: 0 0 40px rgba(154,92,255,0.45); }
+      .setSub { display: block; font-style: normal; font-size: 10.5px; font-weight: 700;
+        letter-spacing: 0.4px; color: #9a86c8; margin-top: 2px; text-align: left; }
+      .setRow.dead { opacity: 0.55; }
+      .setRow.dead b { color: #9a86c8; }
       #settings .setTitle, #gate .setTitle { font-size: 21px; font-weight: 900; letter-spacing: 3px; color: #fff; margin-bottom: 16px; }
       #settings .setRow { display: flex; width: 100%; align-items: center; justify-content: space-between;
         font-family: inherit; font-size: 15px; font-weight: 900; letter-spacing: 1px; color: #e8dcff;
@@ -1381,6 +1407,9 @@
         border-radius: 13px; padding: 13px; cursor: pointer; box-shadow: 0 4px 0 #c98d00; }
       /* the parental gate's DECLINE was 290x32. A grown-up saying no needs at
          least as big a target as one saying yes. */
+      /* the armed state of the pause sheet's quit: unmistakably a warning,
+         still small next to KEEP PLAYING */
+      #pauseQuit.arm { color: #ff8a9c; }
       .gateCancel { width: 100%; min-height: 44px; margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 800;
         letter-spacing: 1.2px; color: #c9a6ff; background: none; border: none; cursor: pointer; padding: 8px; }
       #shopLegal { font-size: 11px; font-weight: 700; line-height: 1.5; color: rgba(201,166,255,0.6);
@@ -1524,6 +1553,22 @@
          these rules, which is the trade for keeping it a two-line change; the
          switch governs the flash and the shake, which are the ones that matter
          in play. */
+      /* body.calm mirrors the OS query: the in-game BIG MOTION toggle sets it
+         (fx.ts setReduceMotion), so the switch a parent can actually find
+         governs the SAME set of animations the OS preference does. Before
+         this, the toggle reached exactly two things — camera shake and the
+         flash cap — and every CSS pulse ignored it. */
+      body.calm #growth .gFill, body.calm #end.show #btnAgain, body.calm #gift .gRay,
+      body.calm #gift .gBox, body.calm #dailyGrid .dCell.now,
+      body.calm #dailyGrid .dCell.now::after, body.calm #btnAgain, body.calm #shopFloat,
+      body.calm #skinPrev .spCard, body.calm #daily .dCard, body.calm .skCard .rib,
+      body.calm .skCard.bought, body.calm .burst > i, body.calm #shopWallet.bump,
+      body.calm .skCard.isnew::before, body.calm #skinPrev.win .spWin,
+      body.calm .gPill {
+        animation: none !important;
+      }
+      body.calm .burst { display: none !important; }
+      body.calm #growth .gFill { background-size: 100% 100%; }
       @media (prefers-reduced-motion: reduce) {
         #growth .gFill, #end.show #btnAgain, #gift .gRay, #gift .gBox,
         #dailyGrid .dCell.now, #dailyGrid .dCell.now::after, #btnAgain,
@@ -1658,7 +1703,7 @@
       <div class="setCard">
         <div class="setTitle">SETTINGS</div>
         <button class="setRow" id="setSound"><span>🔊 SOUND</span><b>ON</b></button>
-        <button class="setRow" id="setHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
+        <button class="setRow" id="setHaptics"><span>📳 RUMBLE<i class="setSub">phone vibration · in the App Store version</i></span><b>ON</b></button>
         <button class="setRow" id="setMotion"><span>🎢 BIG MOTION</span><b>ON</b></button>
         <!-- Kids-category apps must not send data to a third party without
              consent. This is default OFF and the row itself is behind the
@@ -1693,8 +1738,8 @@
       <div class="setCard">
         <div class="setTitle">PAUSED</div>
         <button class="setRow" id="pauseSound"><span>🔊 SOUND</span><b>ON</b></button>
-        <button class="setRow" id="pauseHaptics"><span>📳 RUMBLE</span><b>ON</b></button>
-        <button class="setRow" id="pauseMotion"><span>🎢 BIG MOTION</span><b>ON</b></button>
+        <button class="setRow" id="pauseHaptics"><span>📳 RUMBLE<i class="setSub" id="pauseHapticsSub">phone vibration</i></span><b>ON</b></button>
+        <button class="setRow" id="pauseMotion"><span>🎢 BIG MOTION<i class="setSub">screen shake &amp; flashes</i></span><b>ON</b></button>
         <button id="pauseResume">▶ KEEP PLAYING</button>
         <button id="pauseQuit" class="gateCancel">LEAVE THE MATCH</button>
       </div>
@@ -1891,6 +1936,16 @@
     </div>
 
     <div id="end">
+      <!-- TWO PARTS, AND THE FOOTER IS NOT IN THE SCROLLPORT. The previous
+           structure was one scrolling column with a position:sticky button
+           row, and sticky earned its keep badly twice: with a small bottom
+           padding the overflowing quest list showed through the row's
+           gradient (the owner's pile-up screenshot), and with a large one
+           Chromium pinned the row against the PADDING edge, hoisting it into
+           the middle of the card with content visible beneath it. A footer
+           that must never share pixels with content should not live in the
+           same scroll context as the content. -->
+      <div id="endScroll">
       <div class="hd" id="endHd">TIME!</div>
       <div class="sub" id="endSub"></div>
       <div class="list" id="endList"></div>
@@ -1931,6 +1986,7 @@
            visible; with TWO finds it is 1,012px and both are at 0%, on every
            iPhone Apple sells. The run a child most wants to repeat is exactly
            the run whose PLAY AGAIN button they cannot see. -->
+      </div>
       <div class="endGo">
         <button id="btnAgain">PLAY AGAIN</button>
         <button id="btnHome">HOME</button>
