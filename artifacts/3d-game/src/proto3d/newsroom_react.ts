@@ -355,9 +355,87 @@ export interface ReactIn {
   subject?: string;
   /** which beat fired, 0-3, for `beat` */
   beat?: number;
+  /** the beat's stable id, for `beat` — the matchdeck deals MIDDLE beats from
+   *  a pool, so slot index no longer says WHICH event fired. When the id names
+   *  a pool in MID_REACT below, that pool wins; the slot index stays as the
+   *  fallback for the opener and the finale, which never move. */
+  beatId?: string;
   /** the new form, for `evolve` */
   form?: string;
 }
+
+// ── THE MIDDLE-BEAT POOLS, BY ID ────────────────────────────────────────────
+// The matchdeck (src/game/matchdeck.ts) deals a match its two MIDDLE beats
+// from a pool of four per world, so "slot 1" and "slot 2" stopped naming an
+// event. These pools are keyed by the beat's stable id instead. The first two
+// per world ARE the shipped tuple entries, by reference — one source of truth,
+// and reactAudit() keeps metering them through the tuple as before. The last
+// two are the pool beats that only exist here.
+//
+// Same contract as every pool in this file: the town reacting to the beat
+// MEETING THE VOID, eight seconds after the banner — never an echo of it.
+export const MID_REACT: Record<string, string[]> = {
+  'maple.dog': BY_WORLD.maple.beat[1],
+  'maple.parade': BY_WORLD.maple.beat[2],
+  'maple.bake': [
+    'The bake sale table went in with all nine pies still on it.',
+    'Marge sold a pie to the hole. Marge says a sale is a sale.',
+    'The prize sponge is gone and Pearl is taking it extremely well.',
+  ],
+  'maple.tractor': [
+    'Old Hutchins has driven the tractor round the hole four times, waving.',
+    'The tractor pull has been redirected. The tractor had other ideas.',
+    'Dale flagged the tractor down at the edge. The trailer did not stop.',
+  ],
+  'pirate.parrot': BY_WORLD.pirate.beat[1],
+  'pirate.dance': BY_WORLD.pirate.beat[2],
+  'pirate.limbo': [
+    'The limbo line has bent itself around the thing by the tiki bar.',
+    'The limbo champion went under the bar and did not come back up.',
+    'The bar is now at ankle height and so, apparently, is the beach.',
+  ],
+  'pirate.crab': [
+    'Crab number six has run straight in. The bookmaker is delighted.',
+    'The derby has been re-routed. The crabs have not been informed.',
+    'Number six is gone and the crowd is calling it a photo finish.',
+  ],
+  'gameday.bandfield': BY_WORLD.gameday.beat[1],
+  'gameday.dogs': BY_WORLD.gameday.beat[2],
+  'gameday.wave': [
+    'The wave has reached section C. Section C is no longer attending.',
+    'The wave went round the stadium twice and into the hole once.',
+    'Statistically the wave is now the fastest thing on the field.',
+  ],
+  'gameday.mascot': [
+    'A mascot has run straight in. The head came off on the way down.',
+    'The mascot race is down to two. Neither of them can see the hole.',
+    'The eagle is gone. The eagle was in the lead. Tough break.',
+  ],
+  'lantern.free': BY_WORLD.lantern.beat[1],
+  'lantern.drum': BY_WORLD.lantern.beat[2],
+  'lantern.masks': [
+    'A masked figure bowed to the guest in the purple. The guest ate the mask.',
+    'The mask parade has circled it once, out of respect, and once to check.',
+    'Somebody offered it a mask. It is now wearing the whole seller.',
+  ],
+  'lantern.wishes': [
+    'A wish paper drifted in. The market has decided it was granted.',
+    'Half the wishes on the long wall now mention the guest by name.',
+    'The wish about "a bigger appetite for the festival" has been withdrawn.',
+  ],
+  'powder.lake': BY_WORLD.powder.beat[1],
+  'powder.contest': BY_WORLD.powder.beat[2],
+  'powder.cocoa': [
+    'The hot chocolate queue has re-formed in a ring around the hole.',
+    'A full mug went in. The lodge is calling it a donation.',
+    'Norm says the hole takes its cocoa with nothing in it. Everything, technically.',
+  ],
+  'powder.snowball': [
+    'Every snowball on the green is being thrown at the same target. None have landed.',
+    'The snowball fight has declared the hole ineligible. It keeps winning.',
+    'A direct hit was recorded at noon. The snowball has not been returned.',
+  ],
+};
 
 /**
  * One reactive headline, ready for breakingNews() — or null when this world has
@@ -375,7 +453,7 @@ export function reactLine(inp: ReactIn, rnd: () => number = Math.random): string
   if (inp.kind === 'landmark') pool = w.landmark;
   else if (inp.kind === 'evolve') pool = w.evolve;
   else if (inp.kind === 'rivalGone') pool = w.rivalGone;
-  else pool = w.beat[Math.max(0, Math.min(3, inp.beat ?? 0))];
+  else pool = (inp.beatId && MID_REACT[inp.beatId]) || w.beat[Math.max(0, Math.min(3, inp.beat ?? 0))];
 
   const fresh = pool.filter((t) => !said.includes(t));
   if (!fresh.length) return null;

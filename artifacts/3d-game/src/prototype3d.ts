@@ -49,6 +49,7 @@ import { STICKERS_BY_WORLD, STICKERS, collectInRun, hasSticker, TIER_POINTS,
   runFinds, clearRun, foundCount, totalCount, type Sticker } from './game/stickers';
 import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './game/seasons';
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
+import { bumpMatch, deal, type Deal } from './game/matchdeck';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
 const PW_DISTS: string[] = ['village', 'lake', 'pinewood', 'piste', 'lodge', 'rim'];
@@ -760,13 +761,62 @@ const RIG = {
  *  wants 0.55, and which one is up depends on whether a download finished.
  *  Whoever sets scene.background sets its intensity with it. Measured with
  *  qa/_sky.mjs, which fails on 0.55 -> 1 and passes when the sky holds. */
+// ── THE HOUR — time of day, dealt per match (AAA-BRIEF §4.5) ────────────────
+// "Same lighting" was the audit's third identical-match finding. Each world
+// authors up to three HOURS — index 0 is ALWAYS the shipped rig, so match 1
+// of a fresh profile (and every probe) is lit exactly as tuned. The other two
+// move only what setDusk already owns (lamps, windows, facades), the key's
+// intensity, and the key's warmth — never the hemisphere or the sky, which
+// carry each world's authored identity. Lantern deliberately has ONE hour:
+// the night IS that world, and "the day but darker" is the exact failure its
+// rig comment warns against.
+let hourSunK = 1;
+const HOUR_WARM = new THREE.Color(1.0, 0.72, 0.42);
+const HOUR_COOL = new THREE.Color(0.88, 0.94, 1.0);
+interface WorldHour { name: string; dusk: number; sunK: number; warm: number }
+const HOURS: Record<WorldId, WorldHour[]> = {
+  maple: [
+    { name: 'noon', dusk: 0, sunK: 1, warm: 0 },
+    { name: 'golden hour', dusk: 0.55, sunK: 0.84, warm: 0.5 },
+    { name: 'bright morning', dusk: 0, sunK: 1.1, warm: -0.25 },
+  ],
+  pirate: [
+    { name: 'high sun', dusk: 0, sunK: 1, warm: 0 },
+    { name: 'sunset', dusk: 0.6, sunK: 0.82, warm: 0.55 },
+    { name: 'morning tide', dusk: 0, sunK: 1.1, warm: -0.25 },
+  ],
+  gameday: [
+    { name: 'kickoff light', dusk: 0.45, sunK: 1, warm: 0 },
+    { name: 'under the floodlights', dusk: 0.95, sunK: 0.62, warm: 0.25 },
+    { name: 'early gates', dusk: 0.1, sunK: 1.12, warm: -0.12 },
+  ],
+  lantern: [
+    { name: 'lantern night', dusk: 1.0, sunK: 1, warm: 0 },
+  ],
+  powder: [
+    { name: 'blue dusk', dusk: 0.85, sunK: 1, warm: 0 },
+    { name: 'last light', dusk: 1.0, sunK: 0.8, warm: 0.3 },
+    { name: 'cold bright morning', dusk: 0.55, sunK: 1.14, warm: -0.12 },
+  ],
+};
 function applyLightRig(): void {
-  sun.intensity = RIG.sunI;
+  sun.intensity = RIG.sunI * hourSunK;
   hemi.intensity = RIG.hemiI;
   // the fill rides the same dimmer as the key, so a world that dims at dusk
-  // does not end up lit only from behind
-  fill.intensity = LIGHT.fillI * (RIG.sunI / WORLD_LIGHT[pickedWorld].sunI);
+  // does not end up lit only from behind — and it rides the HOUR with it
+  fill.intensity = LIGHT.fillI * hourSunK * (RIG.sunI / WORLD_LIGHT[pickedWorld].sunI);
   renderer.toneMappingExposure = RIG.exposure;
+}
+/** Light the running match for its dealt hour. Runs AFTER resetMatch's own
+ *  light reset (beginMatch is the tail of every entry path), so hour 0 is a
+ *  no-op by construction — the shipped rig, untouched. */
+function applyHour(h: WorldHour): void {
+  hourSunK = h.sunK;
+  sun.color.copy(SUN_DAY);
+  if (h.warm > 0) sun.color.lerp(HOUR_WARM, h.warm);
+  else if (h.warm < 0) sun.color.lerp(HOUR_COOL, -h.warm);
+  island.setDusk(h.dusk);
+  applyLightRig();
 }
 const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, RIG.hemiI);
 scene.add(hemi);
@@ -1524,6 +1574,8 @@ const _dbg = new Proxy(_dbgStore, {
   // QA: the live season and the beat table it repaints (seasons.ts)
   __season: SeasonEvent | null;
   __beats: MatchBeat[];
+  /** the matchdeck's hand for the running match — qa/vary.mjs reads it */
+  __deal: Deal;
   // QA: the juice kit, for firing shake/ring/flash from a harness
   __fx: Fx;
   // QA: the newsroom arc — every card that reached the screen this match, and
@@ -3232,16 +3284,19 @@ interface MatchBeat {
   at: number; dur: number; mult: number; fired: boolean; base: number;
   col: number; flash: string; icon: string; title: string; sub: string;
   news: string; cue?: string;
+  /** stable id for MIDDLE beats — the matchdeck deals them from a pool, so
+   *  the newsroom's react pools key on this, not on the slot (MID_REACT). */
+  id?: string;
 }
 const MAPLE_BEATS: MatchBeat[] = [
   { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.3)',
     icon: '🎺', title: 'Band practice', sub: 'they only know one song',
     news: 'The marching band is out. They know one song. Here it comes.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0x5ee8d8, flash: 'rgba(94,232,216,0.26)',
-    icon: '🐕', title: 'Dog off the lead!', sub: 'six people are chasing it',
+    id: 'maple.dog', icon: '🐕', title: 'Dog off the lead!', sub: 'six people are chasing it',
     news: 'A dog is loose on Main Street. Six people are chasing it. It thinks this is a game.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    icon: '📣', title: 'Town parade!', sub: 'everybody is on Main Street', cue: 'parade',
+    id: 'maple.parade', icon: '📣', title: 'Town parade!', sub: 'everybody is on Main Street', cue: 'parade',
     news: 'The parade has started. The mayor calls it a scheduling matter.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xb875ff, flash: 'rgba(184,117,255,0.32)',
     icon: '🐐', title: 'The goat is loose!', sub: 'nobody is even chasing it', cue: 'goat',
@@ -3253,10 +3308,10 @@ const PIRATE_BEATS: typeof MAPLE_BEATS = [
     icon: '🍦', title: 'Ice cream hour!', sub: 'the hut is very pleased',
     news: 'Ice cream hour has been declared. The ice cream hut is delighted.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffa63f, flash: 'rgba(255,166,63,0.26)',
-    icon: '🦜', title: 'The parrot escaped!', sub: 'it knows the whole menu',
+    id: 'pirate.parrot', icon: '🦜', title: 'The parrot escaped!', sub: 'it knows the whole menu',
     news: 'The resort parrot is loose. It has learned the breakfast menu and will not stop.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff2fa0, flash: 'rgba(255,47,160,0.28)',
-    icon: '🪩', title: 'Dance party!', sub: 'the whole bay is moving',
+    id: 'pirate.dance', icon: '🪩', title: 'Dance party!', sub: 'the whole bay is moving',
     news: 'DJ Coconut has dropped the big one. The floor is shaking.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.32)',
     icon: '🏴‍☠️', title: 'Treasure hunt!', sub: 'the map is still wrong', cue: 'treasure',
@@ -3271,10 +3326,10 @@ const GAMEDAY_BEATS: typeof MAPLE_BEATS = [
     icon: '🏈', title: 'Kickoff!', sub: 'the ball is in the air',
     news: 'And we are under way. The ball is in the air and so, apparently, is the parking lot.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xc4342f, flash: 'rgba(196,52,47,0.26)',
-    icon: '🥁', title: 'The band is on the field!', sub: 'nobody told them about you', cue: 'bandfield',
+    id: 'gameday.bandfield', icon: '🥁', title: 'The band is on the field!', sub: 'nobody told them about you', cue: 'bandfield',
     news: 'The marching band has taken the field. They have not been told. They are playing anyway.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.26)',
-    icon: '🌭', title: 'Concession rush!', sub: 'everybody wants a hot dog',
+    id: 'gameday.dogs', icon: '🌭', title: 'Concession rush!', sub: 'everybody wants a hot dog',
     news: 'Everybody has gone for a hot dog at once. The queue is now the largest thing here.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x2aa9a0, flash: 'rgba(42,169,160,0.30)',
     icon: '📣', title: 'Fourth quarter!', sub: 'the stadium is on its feet',
@@ -3289,10 +3344,10 @@ const LANTERN_BEATS: typeof MAPLE_BEATS = [
     icon: '🏮', title: 'The lanterns are lit!', sub: 'every one of them, for you',
     news: 'The lanterns have all been lit at once. The market says this is in your honour.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xff5a4a, flash: 'rgba(255,90,74,0.26)',
-    icon: '🍡', title: 'Everything is free!', sub: 'they insist. they keep insisting',
+    id: 'lantern.free', icon: '🍡', title: 'Everything is free!', sub: 'they insist. they keep insisting',
     news: 'Every stall on Lantern Row has waived its prices for the guest in the purple.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0x8ad4ff, flash: 'rgba(138,212,255,0.26)',
-    icon: '🥁', title: 'The drum has started', sub: 'nobody ordered the drum', cue: 'drum',
+    id: 'lantern.drum', icon: '🥁', title: 'The drum has started', sub: 'nobody ordered the drum', cue: 'drum',
     news: 'The drum tower has begun. It is only ever struck for two reasons and this is not the other one.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffd489, flash: 'rgba(255,212,137,0.32)',
     icon: '♨️', title: 'The bathhouse is open!', sub: 'they are calling you up',
@@ -3306,10 +3361,10 @@ const POWDER_BEATS: typeof MAPLE_BEATS = [
     icon: '🛷', title: 'Sled hour!', sub: 'the hill is fully booked',
     news: 'Sledding has commenced on the Home Run. The queue is longer than the run.' },
   { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.26)',
-    icon: '⛸️', title: 'Lake hour!', sub: 'everyone on the ice at once',
+    id: 'powder.lake', icon: '⛸️', title: 'Lake hour!', sub: 'everyone on the ice at once',
     news: 'The frozen lake has been declared open. The lake has not been consulted.' },
   { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
-    icon: '☃️', title: 'Snowman contest!', sub: 'Chairman Frost defends his title', cue: 'contest',
+    id: 'powder.contest', icon: '☃️', title: 'Snowman contest!', sub: 'Chairman Frost defends his title', cue: 'contest',
     news: 'The snowman contest has begun. The reigning champion is a snowman.' },
   { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffffff, flash: 'rgba(230,240,255,0.34)',
     icon: '🏔️', title: 'AVALANCHE!!', sub: 'the mountain is coming to you', cue: 'avalanche',
@@ -3319,6 +3374,74 @@ const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS
     : pickedWorld === 'lantern' ? LANTERN_BEATS
       : pickedWorld === 'powder' ? POWDER_BEATS : MAPLE_BEATS;
+// ── THE MIDDLE-BEAT POOL — match 2 is not match 1 (AAA-BRIEF §4.5) ──────────
+// The opener and the finale never move: the opener sets the world's tone and
+// the finale is its signature set piece (the goat, the treasure, the fourth
+// quarter, the bathhouse, the avalanche). The two MIDDLE slots are dealt per
+// match from a pool of four — the two shipped middles above plus two more per
+// world — by src/game/matchdeck.ts, whose cycle guarantees consecutive
+// matches change BOTH slots. Match 1 of a fresh profile always deals the
+// shipped pair, so the tuned first impression (and every probe baseline)
+// is untouched.
+//
+// The new beats are cue-less, like two of the four shipped beats in every
+// world: banner, multiplier, sting, ring, news line and a MID_REACT pool in
+// newsroom_react.ts. A world set-piece cue for each is future work, recorded
+// in the ledger.
+const MID_66 = { at: 66, dur: 16, mult: 2, fired: false, base: 0 };
+const MID_110 = { at: 110, dur: 18, mult: 2, fired: false, base: 0 };
+const MID_POOL: Record<WorldId, MatchBeat[]> = {
+  maple: [MAPLE_BEATS[1], MAPLE_BEATS[2],
+    { ...MID_66, id: 'maple.bake', col: 0xffb85e, flash: 'rgba(255,184,94,0.26)',
+      icon: '🥧', title: 'Bake sale!', sub: 'the table is not load-bearing',
+      news: 'The bake sale has opened outside the town hall. The table has concerns.' },
+    { ...MID_110, id: 'maple.tractor', col: 0x8fd64e, flash: 'rgba(143,214,78,0.26)',
+      icon: '🚜', title: 'Tractor day!', sub: 'Old Hutchins is driving it',
+      news: 'Old Hutchins has brought the tractor to town. The town was not consulted.' }],
+  pirate: [PIRATE_BEATS[1], PIRATE_BEATS[2],
+    { ...MID_66, id: 'pirate.limbo', col: 0xffe14a, flash: 'rgba(255,225,74,0.26)',
+      icon: '🕺', title: 'Limbo contest!', sub: 'the bar keeps getting lower',
+      news: 'A limbo contest has broken out at the tiki bar. The bar keeps getting lower.' },
+    { ...MID_110, id: 'pirate.crab', col: 0xff7a5e, flash: 'rgba(255,122,94,0.26)',
+      icon: '🦀', title: 'Crab derby!', sub: 'number six is the fast one',
+      news: 'The crab derby is under way on the beach. Number six is heavily favoured.' }],
+  gameday: [GAMEDAY_BEATS[1], GAMEDAY_BEATS[2],
+    { ...MID_66, id: 'gameday.wave', col: 0x6ec1ff, flash: 'rgba(110,193,255,0.26)',
+      icon: '🙌', title: 'The wave!', sub: 'the whole stadium at once',
+      news: 'The crowd has started the wave. It is currently travelling faster than the game.' },
+    { ...MID_110, id: 'gameday.mascot', col: 0xb875ff, flash: 'rgba(184,117,255,0.26)',
+      icon: '🦅', title: 'Mascot race!', sub: 'none of them can see',
+      news: 'The mascots are racing the length of the lot. None of them can see out of their heads.' }],
+  lantern: [LANTERN_BEATS[1], LANTERN_BEATS[2],
+    { ...MID_66, id: 'lantern.masks', col: 0xff8ab5, flash: 'rgba(255,138,181,0.26)',
+      icon: '🎭', title: 'The mask parade!', sub: 'everyone is somebody else tonight',
+      news: 'The mask sellers have sold out. Everyone at the market is somebody else tonight.' },
+    { ...MID_110, id: 'lantern.wishes', col: 0x9fd8ff, flash: 'rgba(159,216,255,0.26)',
+      icon: '🎐', title: 'The wishes are out!', sub: 'every one of them, handwritten',
+      news: 'The wish papers have gone up on the long wall. Several mention the guest in the purple.' }],
+  powder: [POWDER_BEATS[1], POWDER_BEATS[2],
+    { ...MID_66, id: 'powder.cocoa', col: 0xd8905e, flash: 'rgba(216,144,94,0.26)',
+      icon: '☕', title: 'Hot chocolate hour!', sub: 'the lodge is pouring',
+      news: 'The lodge has declared hot chocolate hour. The queue formed before the announcement finished.' },
+    { ...MID_110, id: 'powder.snowball', col: 0xeaf4ff, flash: 'rgba(234,244,255,0.30)',
+      icon: '🧤', title: 'Snowball fight!!', sub: 'everyone is a target',
+      news: 'A snowball fight has broken out by the school. There are no teams and no rules.' }],
+};
+/** Deal the two middle slots for this match. Clones out of the pool so the
+ *  jitter block's at/base/fired mutations never touch a pool entry, and the
+ *  slot's OWN timing is what the dealt beat inherits — a beat dealt into the
+ *  110 slot runs at 110 whichever slot it was authored in. */
+function dealMids(d: Deal): void {
+  const pool = MID_POOL[pickedWorld];
+  const slots: [number, { at: number; dur: number }][] = [[1, MID_66], [2, MID_110]];
+  slots.forEach(([slot, tm], k) => {
+    const src = pool[d.mid[k]];
+    BEATS[slot] = { ...src, at: tm.at, dur: tm.dur, base: 0, fired: false };
+    if (seasonNow) { BEATS[slot].col = seasonNow.accent; BEATS[slot].flash = seasonNow.flash; }
+  });
+  _dbg.__beats = BEATS;
+  _dbg.__deal = d;
+}
 // ── THE SEASONAL REPAINT (events.ts) ─────────────────────────────────────────
 // While this world's season runs, every beat card, fever ring and screen
 // flash wears the season's colour instead of its own. Wholesale on purpose:
@@ -4915,6 +5038,16 @@ function beginMatch(solo = false) {
   soloMode = solo;
   matchLen = solo ? 120 : MATCH_LEN;
   matchClock = matchLen;
+  // THE DEAL. Which two middle beats, and which hour — the matchdeck cycles
+  // both so a rematch never replays the match before it, and match 1 of a
+  // fresh profile always deals the shipped baseline (see matchdeck.ts for
+  // both rules). The spawn is NOT dealt: FIXED START above is the owner's
+  // recorded call and it stands.
+  {
+    const hand = deal(bumpMatch(pickedWorld), HOURS[pickedWorld].length);
+    dealMids(hand);
+    applyHour(HOURS[pickedWorld][hand.hour]);
+  }
   // NO TWO MATCHES ON THE SAME SCHEDULE. Each beat keeps its authored slot as a
   // base and moves +-6s around it, so the arc is recognisable but never
   // recited. Clamped so the finale never lands late enough to be a cutscene.
@@ -5959,8 +6092,9 @@ function resetMatch() {
   countTick = 0;
   renderQuests();
   ended = false;
-  // colours and dusk reset per match; the four INTENSITIES come from the one
-  // rig, so a replay is lit exactly like the first match (see RIG above)
+  // colours and dusk reset to the shipped rig here, and then beginMatch DEALS
+  // the hour on top (applyHour) — so hour 0 is exactly this reset, and a
+  // rematch is relit by its hand, not by whatever the last match left behind
   sun.color.copy(SUN_DAY); hemi.color.copy(HEMI_DAY); island.setDusk(LIGHT.dusk);
   applyLightRig(); outroT = 0;
   el('end').classList.remove('show');
@@ -7701,7 +7835,7 @@ function animate() {
           // thing on Elm Street and keeps playing. That is the owner's ask
           // ("events like a band"), it is a different event from the banner,
           // and the delay is what keeps it from reading as an echo.
-          townReacts({ kind: 'beat', beat: BEATS.indexOf(bt) }, 8);
+          townReacts({ kind: 'beat', beat: BEATS.indexOf(bt), beatId: bt.id }, 8);
           // no evolve() here: it stacked on top of matchBeat()'s own sting in
           // the same frame, two fanfares for one banner — the beat's sting is
           // the beat's sound

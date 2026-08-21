@@ -1101,3 +1101,41 @@ GATE       qa/ab.mjs 5 powder child — the same instrument that caught it.
   and dropping a real file in later flips the world to it with no code
   change — so the 404 on powder is designed, not a defect. qa/switch.mjs
   confirms: the request goes out, the match is scored by the bed.
+
+### Match 2 is not match 1 — REPETITION — closes absence #4 (the brief's highest-value change)
+MEASURED   a rematch replayed the match before it exactly: same island, same
+           fixed spawn, same four beats in the same slots, same lighting.
+           Only the ±6s schedule jitter differed — recognisable as "the same
+           match" by the second play, which is when a child decides whether
+           there is more game in the box.
+CHANGED    src/game/matchdeck.ts — a per-world match counter (localStorage)
+           and a dealt hand: the two MIDDLE beats come from a pool of four
+           per world (the two shipped middles + two new — bake sale/tractor
+           day, limbo/crab derby, the wave/mascot race, mask parade/wish
+           wall, hot chocolate hour/snowball fight), and an HOUR relights
+           the match (3 authored hours per world; key intensity + warmth +
+           the existing setDusk ramps only — the hemisphere and sky keep
+           each world's identity; Lantern authors exactly ONE hour because
+           the night IS that world). Two rules are load-bearing: match 1 of
+           a fresh profile ALWAYS deals the shipped baseline (the owner's
+           "consistency is key" spawn call stands — the spawn never varies,
+           and every probe keeps measuring the tuned baseline), and the
+           deal is a CYCLE, not a roll — consecutive matches change BOTH
+           middle slots, all four middles appear within any two matches.
+           The newsroom reacts by beat ID now (MID_REACT), not slot index,
+           so the town has fresh lines for every dealt beat. Opener and
+           finale never move: they are the world's tone and signature.
+NOW        qa/vary.mjs across all five worlds: match 0 deals the shipped
+           pair at hour 0 (bit-identical baseline), matches 1–2 change both
+           middle slots and the hour, the key light provably moves with the
+           hour, single-hour Lantern never varies, opener/finale pinned.
+GATE       qa/vary.mjs (new). PROBE TRAP RECORDED: its first version keyed
+           the sun on castShadow — under swiftshader the quality ladder has
+           demoted shadows off by the first frame, so it read intensity 0
+           everywhere and blamed the game. The key is found as the
+           brightest directional instead.
+DEFERRED   the four new pool beats are cue-less (banner, sting, mult, news,
+           react pool — no world set-piece choreography), exactly like two
+           of the four shipped beats in every world. A cue each (the
+           tractor drives the road, the mascots race the lot) is future
+           work; the beats read as events without them.
