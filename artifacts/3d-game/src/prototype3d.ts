@@ -441,7 +441,7 @@ if (location.search.includes('audio')) (() => {
   setInterval(() => {
     const m = audio.musicState();
     box.textContent = [
-      `ctx ${m.ctx}   master ${m.masterGain}   muted ${m.muted}   synth ${m.synth}   media ${m.media ? 'ON' : 'off'}`,
+      `ctx ${m.ctx}   master ${m.masterGain}   bus ${m.bus}   muted ${m.muted}   synth ${m.synth}   media ${m.media ? 'ON' : 'off'}`,
       `theme ${ch(m.theme)}`,
       `menu  ${ch(m.menu)}`,
       '',
@@ -5247,6 +5247,7 @@ function armGate(label: string, onTap: () => void) {
   if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { onTap(); return; }
   (tapGateEl.querySelector('.gPill') as HTMLElement).textContent = label;
   tapGateEl.classList.add('show');
+  tapGateEl.classList.add('armed');   // the pre-arm GETTING READY… state ends here
   document.body.classList.add('gated');   // the menu's own chrome stands down
   tapGateEl.addEventListener('pointerdown', () => {
     // fade, do not snap: the tap is the beat the music lands on, and a 260ms
@@ -5292,22 +5293,49 @@ if (localStorage.getItem('voidAutoPlay') === '1') {
   // tap then reads as "ready? go" — which is what it is.
   el('menu').style.display = 'none';
   document.body.classList.remove('menu');
-  armGate('TAP TO PLAY', () => requestAnimationFrame(() => {
-    if (!packReady) coverHold('pack');
-    // THE DAILY CARD GOES FIRST. It is built further down this same module
-    // evaluation, so by the time this frame runs it is already on screen — and
-    // launching under it starts a three-minute timed match behind a full-screen
-    // modal that eats every pointer event. Drop the cover too (it is z-60
-    // against the card's z-45, so the child would be looking at a loading
-    // screen with their reward hidden behind it) and let closeDaily() start
-    // the match once the card is done.
-    if (el('daily').classList.contains('show')) {
-      pendingLaunch = true;
-      coverRelease('pack');
-      return;
-    }
-    launchWorld();
-  }));
+  // ── THE TAP MUST NEVER LEAD TO A LOADING SCREEN ─────────────────────────
+  // This used to arm immediately and let the tap take a coverHold('pack') if
+  // the asset preload had not settled — so a child looked at their island,
+  // read TAP TO PLAY, tapped, and watched a loading screen snap OVER the
+  // world they were just shown, in silence (nothing is `wanted` yet on this
+  // page), before the world came back with the countdown and the score. The
+  // owner named it exactly: "it loads the void then when you hit play it's
+  // almost like resetting it". World → tap → cover → world again IS a reset,
+  // perceptually, whatever the engine thinks it is doing.
+  //
+  // So the wait moves to the only honest place for it: BEFORE the invitation.
+  // The gate comes up unarmed reading GETTING READY… over the idling island,
+  // arms into TAP TO PLAY when the pack settles (same 12s cap as
+  // withWorldReady, same "stragglers pop in" contract on the slow path), and
+  // from that moment the tap has exactly one meaning: countdown, with the
+  // score landing on the same beat. No cover can ever follow it — launchWorld
+  // takes withWorldReady's fast path by construction.
+  const gateT0 = performance.now();
+  tapGateEl.classList.remove('armed');
+  (tapGateEl.querySelector('.gPill') as HTMLElement).textContent = 'GETTING READY…';
+  if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW) {
+    tapGateEl.classList.add('show');
+    document.body.classList.add('gated');
+  }
+  Promise.race([preloadP, new Promise((r) => setTimeout(r, 12000))]).then(() => {
+    packReady = true;
+    track('gate_ready', { ms: Math.round(performance.now() - gateT0) });
+    armGate('TAP TO PLAY', () => requestAnimationFrame(() => {
+      // THE DAILY CARD GOES FIRST. It is built further down this same module
+      // evaluation, so by the time this frame runs it is already on screen —
+      // and launching under it starts a three-minute timed match behind a
+      // full-screen modal that eats every pointer event. Let closeDaily()
+      // start the match once the card is done. (coverRelease for a hold
+      // nobody took is a Set delete and a size check — kept so a straggling
+      // boot hold can never wedge the card.)
+      if (el('daily').classList.contains('show')) {
+        pendingLaunch = true;
+        coverRelease('pack');
+        return;
+      }
+      launchWorld();
+    }));
+  });
 }
 // FRESH LOAD HAS NO GATE ANY MORE — the owner caught it as a regression the
 // day it shipped: "it's showing two to begin then you have a begin right
@@ -8025,7 +8053,25 @@ function animate() {
   // frame, and a gate tight enough to be visible is a gate that will be
   // noticed for the wrong reason. During the establishing shot the gate is
   // off entirely: the camera is 300 units up and looking at the whole map.
-  const crowdGate = introT > 0 ? Infinity : camDist * 2.2 + 90;
+  //
+  // ── AND THE BAY SEES FARTHER THAN THE GATE ─────────────────────────────
+  // The owner, after the two-band stagger shipped: "on pirate bay … there's
+  // item lag. Maple seems dialed now." Same policy on both worlds, so the
+  // difference is the populations, and a census (qa/moverbands.mjs) finds it:
+  // at every void size roughly HALF of Pirate Bay's movers sit in the
+  // half-rate band (157–201 of 337) — against Maple, where that band drains
+  // from 211 to 5 as the void grows. The bay's movers are boats and jet skis
+  // on OPEN WATER: nothing occludes the middle distance, so the half-rate
+  // band is in plain sight, and a fast hull advancing every other frame
+  // against glass-smooth water is exactly "item lag". Maple's mid-distance
+  // walkers are behind buildings; its band was never visible.
+  //
+  // So the bay's full-rate gate is doubled. Affordable by the same census:
+  // its full-rate population is the LOWEST in the game (119–211), and
+  // swallowing the whole visible band lands it at ~280–340 updates a frame —
+  // still under the 384 the owner just called dialed on Maple.
+  const crowdGate = (introT > 0 ? Infinity : camDist * 2.2 + 90)
+    * (pickedWorld === 'pirate' ? 2 : 1);
   _dbg.__crowdGate = crowdGate;
   perfBeat('crowd');
   life.update(dtw, tClock, voidState.x, voidState.z, R, crowdGate);
@@ -8523,9 +8569,27 @@ function animate() {
   // quality ladder reading fps from clamped dt — that one is still open.)
   //
   // A watchdog must not slow down when the thing it watches gets worse.
-  if (performance.now() - musicCd > 2000) { musicCd = performance.now(); audio.ensureMusic(); }
-
   const onMenu = document.body.classList.contains('menu') || endEl.classList.contains('show');
+  if (performance.now() - musicCd > 2000) {
+    musicCd = performance.now();
+    audio.ensureMusic();
+    // ── LEVEL, NOT JUST EDGE ────────────────────────────────────────────────
+    // The block below fires start/stop on the TRANSITION, and a transition is
+    // a single frame: if startMenuMusic() lands in a bad instant — the context
+    // interrupted by a call at the exact moment the results card raises, an
+    // exception downstream, any transient at all — `menuCh.wanted` never goes
+    // true, and repairMusic() only revives channels that are wanted. One
+    // missed edge is then silence for the rest of the session, which matches
+    // the one report ("back on menu the main music doesn't start again") that
+    // no harness walk reproduces: qa/aftermatch.mjs takes every exit from a
+    // match and the theme comes home each time, because nothing here can
+    // produce the bad instant. So the watchdog restates the DESIRED state at
+    // its own cadence: front-of-house wants the menu theme. startMenuMusic()
+    // is idempotent (a playing channel returns before touching anything), so
+    // the restatement costs a guard check — and any missed edge heals in ≤2s.
+    if (onMenu) audio.startMenuMusic();
+  }
+
   if (onMenu !== menuThemeOn) {
     menuThemeOn = onMenu;
     if (onMenu) audio.startMenuMusic(); else audio.stopMenuMusic();

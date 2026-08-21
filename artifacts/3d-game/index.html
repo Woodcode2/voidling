@@ -1120,6 +1120,12 @@
         padding: 15px 34px; border-radius: 999px; background: rgba(30,16,58,0.78);
         border: 2px solid rgba(184,117,255,0.55); text-shadow: 0 0 18px #b875ff;
         animation: gatePulse 1.6s ease-in-out infinite; }
+      /* GETTING READY… — the gate before it arms. Quieter on purpose: the
+         pulse is an invitation to tap, and this state is not one. The pill
+         breathes back to life the instant armGate() flips it to TAP TO PLAY. */
+      #tapGate:not(.armed) { cursor: default; }
+      #tapGate:not(.armed) .gPill { opacity: 0.72; animation: none;
+        border-color: rgba(184,117,255,0.28); text-shadow: none; }
       #tapGate .gHint { margin-top: 12px; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #9a86c8; }
       @keyframes gatePulse {
         0%, 100% { transform: scale(1); box-shadow: 0 0 22px rgba(184,117,255,0.25); }

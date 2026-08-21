@@ -55,9 +55,11 @@ const trackHit = hits.find((h) => h.name === `${WORLD}.mp3` && h.at > tReload);
 console.log(`  ${WORLD}.mp3 requested ${trackHit ? ((trackHit.at - tReload) / 1000).toFixed(1) + 's after the card tap' : 'NEVER'}`);
 if (!trackHit) fails.push(`${WORLD}.mp3 never requested on the reloaded page`);
 
-// TAP TO PLAY is the contract: the match must NOT be running yet
+// TAP TO PLAY is the contract: the match must NOT be running yet.
+// `.armed` — the gate first shows GETTING READY… and only invites the tap
+// once the pack has settled; a tap before that is deliberately inert.
 const early = await p.evaluate(() => (window.__matchState?.().t ?? 0));
-await p.waitForSelector('#tapGate.show', { timeout: 400000 });
+await p.waitForSelector('#tapGate.show.armed', { timeout: 400000 });
 console.log(`  gate up (match t=${early.toFixed(1)} — ${early > 0.5 ? 'MATCH STARTED WITHOUT A TOUCH' : 'holding for the touch'})`);
 if (early > 0.5) fails.push('the match started before the gate tap');
 await p.click('#tapGate');

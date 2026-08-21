@@ -464,12 +464,15 @@ export function createAudio(): Audio3D {
     if (c.state !== 'running') logEv('startLoop optimistic (resume in flight)');
     ch.cold = false;
     logEv(`startLoop ${ch === themeCh ? 'theme' : 'menu'} ${Math.round(buf.duration)}s vol=${ch.vol}`);
-    // the recording is here; hand over from the bed across the same 1.2s the
-    // gain below fades UP over, so it reads as one score arriving, not two
+    // was the hand-written bed audibly up when the recording landed? Decides
+    // the channel envelope below: a handover wants a short crossfade, a cold
+    // start wants NOTHING between the tap and the first note.
+    const hadBed = synthOn;
+    // the recording is here; the bed hands over across its own 1.2s fade
     synthStop(1.2);
     if (!ch.gain) { if (!master || !musicBus) return; ch.gain = c.createGain(); ch.gain.connect(musicBus); }
     ch.starts++;
-    // ── THE CHANNEL COMES UP FAST, AND THE FIRST PASS IS INSTANT ──────────
+    // ── NOTHING BETWEEN THE TAP AND THE FIRST NOTE ────────────────────────
     // Two ramps used to sit between "the music started" and "you can hear it":
     // the channel gain eased up over 1.2s AND the first pass faded in over the
     // full 1.6s crossfade window — so a tap produced roughly three seconds of
@@ -479,9 +482,22 @@ export function createAudio(): Audio3D {
     // and then it whispered. The crossfade-in belongs to LOOP SEAMS, where the
     // outgoing pass covers it; the first pass has nothing covering it and
     // plays at level from its first sample (a 30ms ramp kills the click).
+    //
+    // The channel ramp that replaced them (0.25s) was still redundant on a
+    // cold start: every call here rides on stopLoop(ch, 0), so nothing on
+    // this channel is audible when the envelope begins — pass 1's own 30ms
+    // ramp is the whole anti-click story. On an iPhone that 0.25s stacked on
+    // resume latency is the owner's "music is slightly delayed": tap, beat,
+    // music. So the channel now comes up INSTANTLY unless the synth bed was
+    // mid-air, where an instant arrival would pop over the bed's 1.2s fade —
+    // that one case keeps a short crossfade.
     ch.gain.gain.cancelScheduledValues(c.currentTime);
-    ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
-    ch.gain.gain.exponentialRampToValueAtTime(ch.vol, c.currentTime + 0.25);
+    if (hadBed) {
+      ch.gain.gain.setValueAtTime(0.0001, c.currentTime);
+      ch.gain.gain.exponentialRampToValueAtTime(ch.vol, c.currentTime + 0.25);
+    } else {
+      ch.gain.gain.setValueAtTime(ch.vol, c.currentTime);
+    }
     // Where passes 2..n re-enter. Guarded: a manifest row deeper than the
     // buffer (wrong file in the slot, stale row) must not wedge the loop.
     const lp = ch.loop > 0.05 && ch.loop < buf.duration - 8 ? ch.loop : 0;
@@ -3520,6 +3536,12 @@ export function createAudio(): Audio3D {
     // first touch — in practice the daily reward card or PLAY.
     startMenuMusic() {
       if (themeCh.wanted) return;   // a match owns the music; never talk over it
+      // already audibly up: nothing to do. This makes the call safe to RESTATE
+      // — the watchdog now asks for the menu theme at level, every 2s of
+      // front-of-house, precisely so a single missed transition cannot mean
+      // silence for the rest of the session. Without this guard each
+      // restatement would arm another cover timer for no reason.
+      if (menuCh.srcs.length && !menuCh.cold) return;
       playTrack(menuCh, [MENU_URL], () => synthCover());
       // …and the same 400ms grace the match gets: a warm cache starts the real
       // menu theme inside this frame and never hears the bed.
@@ -3646,6 +3668,11 @@ export function createAudio(): Audio3D {
         // is the hand-written bed up? The one state that decides whether a
         // recording arriving means a handover or two scores at once.
         synth: synthOn,
+        // the shared music bus — the node duckMusic() schedules on. Every
+        // channel reads healthy while this sits at a duck floor, so a probe
+        // (or the ?audio=1 overlay on a phone) that cannot see it cannot tell
+        // "playing" from "playing into a strangled bus".
+        bus: musicBus ? Math.round(musicBus.gain.value * 1000) / 1000 : -1,
         muted,
         masterGain: master ? Math.round(master.gain.value * 1000) / 1000 : -1,
         theme: snap(themeCh), menu: snap(menuCh),
