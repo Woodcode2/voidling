@@ -13,7 +13,16 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 // entry bundled the brand font — single cheapest "top-10 app" lift
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+// ── THE WEIGHT LADDER IS MADE OF FACES THAT EXIST ──────────────────────────
+// Fredoka ships 300/400/500/600/700 — there is no 800 or 900 anywhere in the
+// family. The CSS used to ask for 800 (26 declarations) and 900 (83), and the
+// browser answered by SYNTHESISING them: smearing the 700 face wider, which
+// renders differently per OS and is part of what read as "not crisp". The
+// hierarchy is restated on four REAL faces — 700 display / 600 strong /
+// 500 medium / 400 body — and font-synthesis is off in the stylesheet, so a
+// weight the family cannot serve now falls back honestly instead of faking.
 import '@fontsource/fredoka/400.css';
+import '@fontsource/fredoka/500.css';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';

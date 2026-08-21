@@ -959,3 +959,20 @@ Maple hung forever on a locked card (the qa/music.mjs trap, again). Seeded.
 postpipe's disc-saturation metric now excludes near-black pixels — the pit
 divides (mx−mn)/mx by readback noise — and a whole-frame mean|ΔRGB| check
 (≤4/255) carries the anti-wash contract instead.
+
+### The weight ladder is made of faces that exist — UI — closes absence #5
+MEASURED   130 font-weight declarations: 83×900, 26×800, 17×700, 4×600 —
+           against loaded faces 400/600/700. Fredoka has no 800/900 in the
+           family; the browser SYNTHESISED them from 700, differently per
+           OS. Plus 33 sub-12px declarations, nav labels at 10px, the shop
+           CTA at 9px, and <b> computing 'bolder'→900 in settings rows.
+CHANGED    imported the real 500 face; remapped 900/800→700, 700→600,
+           600→500 (four real levels preserved, not collapsed to one);
+           font-synthesis: none; b,strong pinned to 700; sizes floored —
+           reading text ≥12px, decorative micro-marks ≥11px; named fixes:
+           nav labels 12px, picker card copy 12px, TAP TO BUY 9→12px.
+NOW        computed-style walk over menu/picker/shop/settings: every weight
+           ∈ {400,500,600,700}, no text under 11px.
+GATE       qa/uisystem.mjs (new) — walks COMPUTED styles, so it catches
+           TS-generated markup the CSS sweep cannot see; it caught three
+           violations on its first run. endlayout + navfit still PASS.
