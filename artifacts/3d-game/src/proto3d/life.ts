@@ -5065,7 +5065,7 @@ export function createLife(
         }
         const logs = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.8, 8), new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 1 }));
         logs.position.y = 0.4; decor(logs, x, z, 2);
-        const flame = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3, 7), new THREE.MeshStandardMaterial({ color: 0xff8a3a, emissive: 0xff5a1a, emissiveIntensity: 1.2, roughness: 0.6 }));
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(1.3, 3, 7), new THREE.MeshStandardMaterial({ color: 0xff8a3a, emissive: 0xff5a1a, emissiveIntensity: 1.8, roughness: 0.6 }));
         flame.position.set(x, 2, z); scene.add(flame);
         for (let i = 0; i < 5; i++) {
           const a = Math.PI * 2 * (i / 5);

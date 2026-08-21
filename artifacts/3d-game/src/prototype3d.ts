@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 // brand type: the shipping page used system-ui while only the retired React
 // entry bundled the brand font — single cheapest "top-10 app" lift
 import { Capacitor } from '@capacitor/core';
@@ -147,66 +148,53 @@ function ensureComposer(): EffectComposer {
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    // ── MEASURED AGAINST THE CHARACTER, NOT AGAINST THE SCENE ───────────
-    // The owner, repeatedly: "Sometimes that light purple wash is still showing
-    // rather than our crisp dark one." Bloom is the wash. Drawing the SAME
-    // frozen frame twice — once straight to the canvas, once through this
-    // composer — and measuring the void's own disc:
+    // ── THE WASH IS SOLVED, AND TWO OLD MEASUREMENTS ARE RETRACTED ────────
+    // This block used to carry the numbers that switched post off at every
+    // rung: the composer cost the hero ~0.20 saturation with bloom at ZERO,
+    // and OutputPass — the documented fix — made it WORSE (-0.232). Both
+    // measurements were real. Both attributed the loss to the wrong thing,
+    // and qa/postpipe.mjs re-measured the whole question on HEAD:
     //
-    //   gameday   bloom off 0.702 sat / 0.526 val  ->  bloom on 0.503 / 0.660
-    //   lantern   bloom off 0.689 / 0.550          ->  bloom on 0.528 / 0.662
+    //   The wash was THE VOID'S OWN SHADER. At the time of those readings his
+    //   body was a raw ShaderMaterial with no tonemapping/colorspace chunks —
+    //   so on the DIRECT path his pixels bypassed ACES entirely, while the
+    //   composer path pushed them through the tone map on the way out. The two
+    //   paths disagreed BY EXACTLY HIS GRADE, and every number pinned it on
+    //   the composer. His shader has since been repaired to include the
+    //   chunks (the face rebuild), and postpipe now measures the same frame
+    //   both ways at Δsat 0.022 — the wash is gone, and it was never the
+    //   composer's, which is why strength 0.42 -> 0.16 "did not move at all".
     //
-    // He loses 0.16-0.20 saturation and gains 0.11-0.13 value: several times
-    // larger than every other colour effect measured on this character, and it
-    // is the direction he was reported in — lighter and less purple. Because
-    // bloomOn is set per QUALITY RUNG, the adapter walking the ladder also
-    // flips him between washed and crisp mid-match, which is the "switching"
-    // half of the report.
+    // WHY THE CHAIN STILL CHANGES (three r185, verified in its source):
+    // rendering into ANY render target forces NoToneMapping, so RenderPass
+    // fills the composer's buffer LINEAR — no ACES, no grade. The old chain
+    // only looked right by ACCIDENT: UnrealBloomPass-as-last-pass copies the
+    // base to screen through an internal MeshBasicMaterial, and THAT draw,
+    // being to-screen, applies the tone map. Any other terminal pass — SSAO,
+    // vignette, a LUT — would have shipped the linear wash again. So the
+    // encode now happens ON PURPOSE, exactly once, in the OutputPass below,
+    // and bloom composites in linear where addition is physically meaningful.
     //
-    // THRESHOLD CANNOT FIX IT. His peak luminance is 1.000 — the white sclera
-    // and the specular dots in his eyes blow out — and 0.5-0.6% of his pixels
-    // clear 0.92, against a world peak of 0.984-1.000. There is no cut that
-    // keeps the lanterns and drops him: he blooms HIMSELF, and the blur smears
-    // that light straight back across his face.
-    //
-    // So strength comes down until he survives it. Lanterns and neon still
-    // lift, because they are broad areas of near-white rather than a handful of
-    // blown pixels — they just lift less. The proper fix is selective bloom on
-    // a layer mask (second pass + composite shader); if the glow is ever worth
-    // that cost, that is the direction, not a bigger number here.
-    0.34,   // strength — a lift, not a bath
+    // ── THE THRESHOLD IS IN LINEAR NOW, AND THAT CHANGES WHO GLOWS ────────
+    // 0.94 was tuned against tone-mapped sRGB. In the linear buffer the same
+    // number catches most of a bright frame — that is what the old "-0.232"
+    // OutputPass attempt actually shipped, a bath. In linear the right cut is
+    // ABOVE 1.0: diffuse surfaces cannot exceed their illumination (~1.0),
+    // while real emitters (emissiveIntensity up to 2.0, 48 materials) sit
+    // well past it. This is also what finally beats "he blooms HIMSELF": the
+    // void's blown sclera peaks AT 1.0, under the cut, while the lanterns
+    // clear it — the separation no sRGB threshold could make. postpipe.mjs
+    // asserts he survives (sat loss ≤ 0.05 with the glow on).
+    0.5,    // strength — bloom rolls through ACES now, which compresses it
     0.42,   // radius — tighter, so what does bleed stays local to its source
-    0.94,   // threshold: above diffuse white, so only real light sources bleed
+    1.05,   // threshold: LINEAR — above diffuse white, below every emitter
   );
   composer.addPass(bloomPass);
-  // ── THE MISSING PASS THAT WAS WASHING THE WHOLE FRAME ────────────────────
-  // Without an OutputPass the composer's chain applies the sRGB transform a
-  // second time on its way to the screen, which lifts midtones and drains
-  // chroma. Measured on the void's own disc, the SAME frozen frame drawn both
-  // ways, with bloom strength forced to ZERO so it could contribute nothing:
-  //
-  //   world     direct render        through the composer
-  //   maple     0.589 sat / 0.539    0.392 / 0.662
-  //   pirate    0.672 / 0.549        0.492 / 0.664
-  //   gameday   0.686 / 0.544        0.475 / 0.667
-  //   lantern   0.683 / 0.508        0.465 / 0.624
-  //
-  // A loss of about 0.20 saturation and a gain of 0.12 value on every world,
-  // with the glow contributing nothing. So this was never "bloom is too
-  // strong" — I lowered the strength from 0.42 to 0.16 first and the numbers
-  // did not move at all, which is what sent me to test zero.
-  //
-  // Adding an OutputPass, the documented fix for exactly this, made it WORSE
-  // (-0.232): the chain is already over-encoding and that adds another. The
-  // right repair is to get the composer's render target and the output encode
-  // agreeing exactly once, and that is a change worth making carefully with the
-  // instrument above, not at the end of a long night.
-  //
-  // Until then this whole path is switched OFF at every quality rung, because
-  // it explains the SWITCHING as well as the wash: bloomOn is set per rung, so
-  // the adapter walking the ladder moved the entire frame between two different
-  // colour pipelines mid-match. The owner saw both halves — "sometimes that
-  // light purple wash is still showing rather than our crisp dark one".
+  // Tone map + grade + sRGB encode, exactly once, at the end of the chain.
+  // OutputPass honours CustomToneMapping (it compiles the same patched
+  // tonemapping_pars_fragment chunk, so the ACES + toe + split + chroma grade
+  // rides along) — verified against OutputPass.js in the installed dep.
+  composer.addPass(new OutputPass());
   return composer;
 }
 let shadowFrame = 0;
@@ -878,8 +866,13 @@ function fadeOccluders(dt: number): void {
 // renders straight to the canvas. The player gets ONE look, the crisp one, and
 // a full-screen pass back on every device.
 const QUALITY = [
-  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048, bloom: false },
-  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024, bloom: false },
+  // bloom is back ON at the top of the ladder. The wash that switched it off
+  // everywhere was the void's own chunk-less shader, since repaired — the
+  // full story and the retraction live at ensureComposer(), and
+  // qa/postpipe.mjs holds the contract on every world: composed-at-zero
+  // equals direct within 0.02, and the hero survives the glow within 0.05.
+  { pr: 2.0, prSmall: 2.0, shadows: true, shSize: 2048, bloom: true },
+  { pr: 1.6, prSmall: 1.6, shadows: true, shSize: 1024, bloom: true },
   // BLOOM GOES BEFORE RESOLUTION DOES. A composer costs a full-screen pass and
   // a mip chain every frame, and a blurry-but-smooth frame beats a sharp-but-
   // stuttering one on a phone — so the ladder drops the glow one rung before it
@@ -1450,6 +1443,7 @@ const _dbg = new Proxy(_dbgStore, {
   __setVoidR: (r: number) => void;
   __pinQuality: (n: number | null) => void;
   __renderBloom: () => void;
+  __composer: () => unknown;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
@@ -1490,6 +1484,11 @@ _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer
  *  Bloom's effect on the character is the largest colour effect in the game, so
  *  it needs to be measurable on demand rather than by lucky timing. */
 _dbg.__renderBloom = () => { ensureComposer().render(); };
+// QA: the composer itself, so qa/postpipe.mjs can force bloom strength to zero
+// for the equivalence assertion (direct and composed frames must agree when the
+// glow contributes nothing) — the measurement that caught the missing-encode
+// wash and the one that keeps it from coming back.
+_dbg.__composer = () => ensureComposer();
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)

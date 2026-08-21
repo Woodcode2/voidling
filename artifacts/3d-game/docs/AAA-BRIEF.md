@@ -885,3 +885,77 @@ Stated so you do not over-trust it:
 - **This brief deliberately does not name a world five.** The owner asked for
   your research to make that call, and a candidate list here would have made
   you an executor of someone else's idea.
+
+---
+
+### LEDGER ENTRIES
+
+### The performance budget (written before the first frame was spent)
+
+| tier | device class | target | ceiling |
+|---|---|---|---|
+| A | iPhone 13+ / ProMotion | 60 fps held (never sync to 120 — §4.2's constants are 60-tuned) | rungs 0–1, bloom ON |
+| B | iPhone 11 / SE2 | 60 fps, dips to 45 under the finale | rungs 1–2, bloom rung-1 only |
+| C | hand-me-down iPad / A10 | 30 fps stable | rungs 2–3, no bloom, no shadows at 3 |
+| memory | all | ≤ 450 MB JS heap worst world (Game Day today: ~446) — nothing in this brief may raise a world's peak | |
+| boot | all | cold start to interactive ≤ 6 s on tier B | |
+| dist | all | ≤ 45 MB (today ~41) | |
+
+Bloom's cost is one full-screen pass + mip chain on rungs 0–1 only; the ladder
+already drops it before it drops resolution, and qa/ladder.mjs proves the walk
+still works. Anything that later violates these numbers reverts first and
+argues after.
+
+### OutputPass + linear threshold + HDR emitters — VISUAL — closes absence #5 (and re-opens nothing)
+MEASURED   qa/postpipe.mjs (new): composed-at-zero vs direct on the hero disc,
+           per world. Pre-fix: the chain had no OutputPass; equivalence held
+           only by ACCIDENT (UnrealBloom's internal copy applies the tone map
+           when it is the last pass). qa/_hdrprobe.mjs: frame peak 1.381
+           linear, 64 px over threshold on LANTERN — the world designed
+           around light sources had almost none in HDR, because every glow
+           surface rides PROP_GLOW_MAT (MeshBasicMaterial, output ≤ 1.0 by
+           construction) and the art was authored SDR.
+CHANGED    OutputPass terminal (tone map + grade + encode exactly once, in
+           the pass that honours CustomToneMapping); bloom threshold 0.94
+           sRGB → 1.05 LINEAR, strength 0.5; PROP_GLOW_MAT colour boost 1.75
+           (one line lifts every glow prop in four worlds into HDR); dusk
+           ramps raised (lamps 2.4 peak, windows 1.45); flames/festival lamps
+           1.6–1.8; bloom ON at rungs 0–1.
+NOW        all four worlds: equivalence Δsat ≤ 0.009, frame mean|ΔRGB| ≤
+           1.22/255 (historical wash ~30); hero survives glow (worst 0.025,
+           pirate, real light spill); lantern 562 px over threshold and glow
+           budget 0.012 with p99 0.648→0.791 — the lanterns HALO now
+           (screenshot qa/out/shippedlook/lantern_aaa1.png); maple daylight
+           budget 0.0004 — restrained, as authored.
+GATE       qa/postpipe.mjs --gate, all four worlds. Fails pre-fix (no
+           OutputPass → any non-bloom terminal pass ships linear; SDR
+           emitters → glow budget 0 on lantern).
+
+RETRACTION, recorded where the wrong version lived: the two measurements that
+switched post off ("composer costs 0.20 sat at bloom zero", "OutputPass made
+it worse, -0.232") were both REAL and both misattributed. The wash was the
+void's own chunk-less shader diverging between paths — repaired since by the
+face rebuild — and both old numbers are stale. The full story is in
+ensureComposer()'s comment.
+
+### The sky is a dome, and every world owns its own sky and air — VISUAL — closes absences #3/#5
+MEASURED   scene.background.mapping was UVMapping (screen-locked viewport
+           quad): the camera pulls 50→340 units and the sky never moved.
+           One nebula PNG + one fog colour (palette space 0x0d0821) served
+           all four worlds.
+CHANGED    equirect mapping on the loaded painting; 2:1 centre-crop done in
+           canvas at load (repo bytes untouched); SKY_MOOD — an exhaustive
+           Record<WorldId, {hue, sat, fog, bgI}> so the compiler demands a
+           row from world five — tints the one painting per world
+           (maple violet / pirate sea-teal / gameday magenta dusk / lantern
+           deep indigo) and gives each world its own fog colour.
+NOW        postpipe: dome=true ×4, sky means [130,152,100] / [153,161,146] /
+           [79,37,32] / [32,29,32] — four skies from one asset.
+GATE       qa/postpipe.mjs asserts background mapping is equirect (fails on
+           UVMapping regression) on every world.
+
+PROBE REPAIR: qa/shippedlook.mjs never seeded voidUnlocked, so any world but
+Maple hung forever on a locked card (the qa/music.mjs trap, again). Seeded.
+postpipe's disc-saturation metric now excludes near-black pixels — the pit
+divides (mx−mn)/mx by readback noise — and a whole-frame mean|ΔRGB| check
+(≤4/255) carries the anti-wash contract instead.

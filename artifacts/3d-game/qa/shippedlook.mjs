@@ -36,6 +36,11 @@ await p.addInitScript(() => {
     localStorage.setItem('voidPlayed', '1');
     localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
+    // worlds unlock by finishing the one before; a fresh profile has only
+    // Maple, so a locked card refuses the tap BY DESIGN and the probe hangs
+    // waiting for a match that can never start — the exact qa/music.mjs trap
+    // recorded in FABLE-BRIEF. Seed all four.
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
   } catch { }
 });
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

@@ -526,13 +526,50 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   })();
   scene.background = skyCanvas;
   scene.backgroundIntensity = 1.0;
-  scene.fog = new THREE.Fog(WORLD.space, 420, 1500);   // wide, so big-void pull-back views stay clear
+  // ── EVERY WORLD OWNS ITS OWN SKY AND ITS OWN AIR ─────────────────────────
+  // One nebula PNG and one fog colour used to serve all four worlds — the
+  // purest form of the uniformity that reads as cheap (AAA-BRIEF §2.5): four
+  // different lighting rigs under literally the same heavens. Exhaustive
+  // record on purpose: the compiler demands a row from every future world.
+  //   hue/sat   a canvas-filter tint applied to the shared painting at load —
+  //             four authored skies from one asset, no new downloads
+  //   fog       the world's own air, replacing the one shared `space` colour;
+  //             near/far kept wide so big-void pull-back views stay clear
+  //   bgI       how loud the sky is against this world's exposure
+  const SKY_MOOD: Record<WorldId, { hue: number; sat: number; fog: number; bgI: number }> = {
+    maple:   { hue: 0,    sat: 1.0,  fog: 0x1b1038, bgI: 0.55 },   // the reference violet, dusty
+    pirate:  { hue: 145,  sat: 0.85, fog: 0x0e2237, bgI: 0.60 },   // swung to sea-teal, daylit
+    gameday: { hue: -50,  sat: 1.05, fog: 0x241120, bgI: 0.50 },   // toward magenta dusk over the lot
+    lantern: { hue: 25,   sat: 1.15, fog: 0x10142e, bgI: 0.38 },   // deeper indigo, the darkest air
+  };
+  const MOOD = SKY_MOOD[WORLD_ID];
+  scene.fog = new THREE.Fog(MOOD.fog, 420, 1500);
   // Higgsfield-painted nebula sky — swaps in when it loads (the painted sky
-  // above stays if it does not)
+  // above stays if it does not).
   new THREE.TextureLoader().load('/assets/hf/hf_20260717_021720_8d012b94-ca33-49d6-9db7-237b607fe3da.png', (skyTex) => {
-    skyTex.colorSpace = THREE.SRGBColorSpace;
-    scene.background = skyTex;
-    scene.backgroundIntensity = 0.55;   // deep rich nebula, not washed lavender
+    // THE SKY IS A DOME, NOT A STICKER. Without `.mapping` three renders a
+    // background texture as a screen-locked viewport quad — the camera swung
+    // and pulled from ~50 to 340 units across a match and the sky never
+    // moved a pixel, the loudest "free web game" signal in the frame. The
+    // canvas fallback above always had the correct mapping, so the sky was a
+    // dome for the first few hundred milliseconds and became a wallpaper the
+    // moment the real painting arrived. Equirect mapping restores parallax;
+    // the per-world hue swing is baked here once at load, off the hot path.
+    // …and cropped to exactly 2:1 on the way (the painting is 3168×1344,
+    // 2.36:1, and an off-ratio equirect stretches the projection). Cropping
+    // here instead of re-encoding the asset keeps the repo bytes untouched.
+    const src = skyTex.image as HTMLImageElement;
+    const outW = Math.min(src.width, src.height * 2);
+    const c2 = document.createElement('canvas');
+    c2.width = outW; c2.height = src.height;
+    const g3 = c2.getContext('2d')!;
+    if (MOOD.hue !== 0 || MOOD.sat !== 1) g3.filter = `hue-rotate(${MOOD.hue}deg) saturate(${MOOD.sat})`;
+    g3.drawImage(src, (src.width - outW) / 2, 0, outW, src.height, 0, 0, outW, src.height);
+    const t = new THREE.CanvasTexture(c2);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    scene.background = t;
+    scene.backgroundIntensity = MOOD.bgI;
   });
 
     // ── THE STARFIELD ──────────────────────────────────────────────────────────
@@ -2849,10 +2886,15 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     biomeAt,
     W: SCALE,
     setDusk(k) {
-      // golden hour: every streetlamp, house window and TOWER FACADE lights up
-      lampHeadMat.emissiveIntensity = 0.8 + k * 1.0;
-      winGlassMatShared.emissiveIntensity = 0.25 + k * 0.75;
-      sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.5; });
+      // golden hour: every streetlamp, house window and TOWER FACADE lights up.
+      // The peaks sit deliberately ABOVE 1.0 — the post chain thresholds bloom
+      // in LINEAR at 1.05 (see ensureComposer), so a lamp at full dusk (2.4)
+      // genuinely glows while a daylight lamp (0.9) is just a bright sphere.
+      // Before this the ramp topped out at 1.8/1.0/0.5 and only the lamp heads
+      // ever crossed the line, by a whisker, on the world built around light.
+      lampHeadMat.emissiveIntensity = 0.9 + k * 1.5;
+      winGlassMatShared.emissiveIntensity = 0.25 + k * 1.2;
+      sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.9; });
     },
     skyTex: skyCanvas,
     update(dt, t) {
@@ -3374,7 +3416,23 @@ export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0
 }
 // unlit accent material: anything merged with this ignores the lighting, which
 // is the only way a neon strip reads as neon on the dark dance floor
-export const PROP_GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true });
+// ── THE GAME'S LIGHT SOURCES LIVE IN HDR NOW ───────────────────────────────
+// Every glow surface in all four worlds rides this one material — the paper
+// lanterns, the stall interiors, the dance rig — and MeshBasicMaterial is
+// unlit: its output is the vertex colour, which cannot exceed 1.0. Measured
+// (qa/_hdrprobe.mjs): the lantern-market frame peaked at 1.381 linear with 64
+// pixels over the bloom threshold, because the art was authored SDR — a
+// "light source" and a white wall were the same number, and no threshold can
+// separate them. `color` multiplies vertexColors, so raising it past white
+// lifts every glow prop into HDR: the paper clears the linear bloom cut
+// (1.05) and halos, while diffuse surfaces — which cannot exceed their
+// illumination — stay under it. The tone map compresses the core back into
+// range on every rung, composer or not, so the unbloomed look shifts only
+// slightly brighter; the HALO carries the hue, which is what "lit from
+// within" reads as. 1.75 is measured, not chosen: high enough that amber
+// paper (luminance ~0.7) clears the cut, low enough that the ACES'd core
+// keeps its colour instead of blowing to white.
+export const PROP_GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.75, 1.75, 1.75) });
 // ── CONTACT SHADING, BAKED INTO THE COLOUR THAT IS ALREADY THERE ───────────
 // Measured: aoMap covers 0% of the scene on all four worlds, while 80-94% of
 // every world's triangles ride one of two vertex-coloured materials. So the
@@ -4231,7 +4289,7 @@ function makeLighthouseFB(): THREE.Group {
   }
   const cab = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 1.6, 10), std(0x2c3a52, 0.4));
   cab.position.y = 14; g.add(cab);
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffd25a, emissiveIntensity: 0.9 }));
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffd25a, emissiveIntensity: 1.7 }));
   lamp.position.y = 14; g.add(lamp);
   const cap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.2, 10), std(0xff5a4d)); cap.position.y = 15.4; g.add(cap);
   return g;
@@ -4287,9 +4345,9 @@ function makeCampfireFB(): THREE.Group {
     const st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), std(0x9aa3b2, 1));
     st.position.set(Math.cos(a) * 0.9, 0.2, Math.sin(a) * 0.9); g.add(st);
   }
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 7), new THREE.MeshStandardMaterial({ color: 0xff9a3a, emissive: 0xff7a2a, emissiveIntensity: 0.8 }));
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 7), new THREE.MeshStandardMaterial({ color: 0xff9a3a, emissive: 0xff7a2a, emissiveIntensity: 1.6 }));
   flame.position.y = 0.8; g.add(flame);
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.6, 6), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffd25a, emissiveIntensity: 1 }));
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.6, 6), new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffd25a, emissiveIntensity: 1.7 }));
   tip.position.y = 1.35; g.add(tip);
   return g;
 }
