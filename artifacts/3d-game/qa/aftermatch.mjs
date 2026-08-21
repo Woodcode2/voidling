@@ -39,7 +39,7 @@ await p.addInitScript(() => { try {
   localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
   localStorage.setItem('voidMute', '0');
   localStorage.setItem('voidDailyLast', new Date().toDateString());
-  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
+  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
 } catch { /* private mode */ } });
 
 await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });

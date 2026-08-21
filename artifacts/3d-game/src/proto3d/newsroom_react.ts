@@ -47,7 +47,7 @@
 //  {X} is the only token, it is the named thing, and only `landmark` has it.
 //  {F} is the form name, and only `evolve` has it.
 
-export type ReactWorld = 'maple' | 'pirate' | 'gameday' | 'lantern';
+export type ReactWorld = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
 export type ReactKind = 'landmark' | 'beat' | 'evolve' | 'rivalGone';
 
 /** The ticker is one line on a phone. Same number the four newsrooms use. */
@@ -287,8 +287,52 @@ const LANTERN: WorldReact = {
   ],
 };
 
+// ── POWDER PASS · THE VALLEY BULLETIN ─────────────────────────────────────
+// The school-closures desk: bureaucratic understatement against total
+// catastrophe. The reader has been on since 5am and will not be hurried.
+const POWDER: WorldReact = {
+  landmark: [
+    '{X} has been removed from the piste map. The piste map is next.',
+    '{X} is gone. The council will revisit the matter in spring.',
+    'We have lost {X}. The closure list has been amended accordingly.',
+    '{X} was there at the 7am bulletin. The 8am bulletin differs.',
+  ],
+  beat: [
+    [ // sled hour
+      'Sledding continues despite the hole. Some sledding continues INTO the hole.',
+      'The sled queue has shortened considerably. The bulletin will not say why.',
+      'A toboggan has set a new speed record. The record ends at the hole.',
+    ],
+    [ // lake hour
+      'Skating on the lake is suspended. The lake is also, partly, suspended.',
+      'The ice remains thick. The ice also remains fewer places than before.',
+      'Norm reports excellent fishing conditions and one enormous new neighbour.',
+    ],
+    [ // snowman contest
+      'The snowman contest is down to fewer entrants than registered.',
+      'Chairman Frost has retained his title by remaining in one piece.',
+      'Judging is delayed. Several entries have been, in the official term, unentered.',
+    ],
+    [ // avalanche
+      'The mountain has let go. The hole has been advised. The hole seems pleased.',
+      'An avalanche is proceeding down the Home Run. So is everything else.',
+      'The bulletin notes that the valley is now arriving all at once.',
+    ],
+  ],
+  evolve: [
+    'The hole is now classified {F}. The classification office has closed early.',
+    'Officials confirm the hole has reached {F} status. Officials are leaving.',
+    'The hole has been upgraded to {F}. The grit budget has not.',
+  ],
+  rivalGone: [
+    'One hole has absorbed the other. The closure list is simpler now.',
+    'The valley is down to a single hole. The bulletin calls this progress.',
+    'Two holes went up the Home Run. One came back. It looks satisfied.',
+  ],
+};
+
 const BY_WORLD: Record<ReactWorld, WorldReact> = {
-  maple: MAPLE, pirate: PIRATE, gameday: GAMEDAY, lantern: LANTERN,
+  maple: MAPLE, pirate: PIRATE, gameday: GAMEDAY, lantern: LANTERN, powder: POWDER,
 };
 
 /** Everything said this match, so a landmark line cannot land twice. Cleared

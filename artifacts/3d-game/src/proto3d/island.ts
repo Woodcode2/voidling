@@ -13,12 +13,15 @@ import { glb, spawnBalloon, setBalloonHook, contactShadow, shouldCast } from './
 import * as BAY from './bay';
 import * as GD from './gameday';
 import * as LN from './lantern';
+import * as PW from './powder';
+import * as AL from './alpine';
 import * as NM from './nightmarket';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
 import * as MS from './mainstreet';   // MAPLE FALLS prop kit + its seeded RNG
 
 export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' | 'beach' | 'zoo' | 'airport' | 'military'
+  | 'village' | 'lake' | 'pinewood' | 'piste' | 'lodge' | 'rim'   // POWDER PASS — all new words, no boundary renames
   // ── MAPLE FALLS (world 1): a small town mid-county-fair. `downtown`
   // is MAIN STREET, `plaza` is THE SQUARE, `cozy` is the (now small) suburb,
   // `beach` is LAKESIDE and `forest` is PINE WOODS — the names are kept
@@ -53,7 +56,7 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
 // the union only because ./life still compares against them; nothing in
 // MAPLE_PLAN uses them and the bake + populate branches are gone.
-export type WorldId = 'maple' | 'pirate' | 'gameday' | 'lantern';
+export type WorldId = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
 
 export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
 export interface Island {
@@ -146,7 +149,15 @@ export function setWorld(id: WorldId): void {
   // GAME DAY does not use the 6x6 block PLAN at all — its districts are
   // polygon regions sited by geography, the way Pirate Bay's are, so the grid
   // it carries is only there to satisfy callers that index PLAN blindly.
-  PLAN = id === 'pirate' ? PIRATE_PLAN : id === 'gameday' ? GAMEDAY_PLAN : MAPLE_PLAN;
+  // EXHAUSTIVE, so the compiler demands a row from world six — the ternary
+  // chain this replaces is the silent-maple-fallback pattern that once had
+  // GAME DAY announcing that MAPLE FALLS had been eaten (AAA-BRIEF §5.5).
+  const PLANS: Record<WorldId, Biome[][]> = {
+    maple: MAPLE_PLAN, pirate: PIRATE_PLAN, gameday: GAMEDAY_PLAN,
+    lantern: MAPLE_PLAN,   // region-based; the grid only satisfies blind indexers
+    powder: GAMEDAY_PLAN,  // same: powder is region-based (see pwRegionAt)
+  };
+  PLAN = PLANS[id];
 }
 export const worldId = (): WorldId => WORLD_ID;
 setWorld('maple');   // default until the menu says otherwise
@@ -218,6 +229,7 @@ export const MAPLE_SPAWN: [number, number] = [6469, 5240];
 export function spawn3(): { x: number; z: number } {
   if (WORLD_ID === 'gameday') return { x: w(GD.GD_SPAWN[0]), z: w(GD.GD_SPAWN[1]) };
   if (WORLD_ID === 'lantern') return { x: w(LN.LN_SPAWN[0]), z: w(LN.LN_SPAWN[1]) };
+  if (WORLD_ID === 'powder') return { x: w(PW.PW_SPAWN[0]), z: w(PW.PW_SPAWN[1]) };
   return WORLD_ID === 'pirate'
     ? { x: w(6950), z: w(10560) }
     : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };
@@ -312,7 +324,8 @@ const silPoly = (): [number, number][] =>
   (WORLD_ID === 'pirate' ? BAY.LAND_SMOOTH
     : WORLD_ID === 'gameday' ? GD.GD_LAND_SMOOTH
       : WORLD_ID === 'lantern' ? LN.LN_LAND_SMOOTH
-        : MAPLE_SIL);
+        : WORLD_ID === 'powder' ? PW.PW_LAND_SMOOTH
+          : MAPLE_SIL);
 const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
 /** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
  *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
@@ -328,6 +341,7 @@ function insideIslandWorld(wx: number, wy: number): boolean {
   if (WORLD_ID === 'pirate') return BAY.onBayLand(wx, wy);
   if (WORLD_ID === 'gameday') return GD.onGameDayLand(wx, wy);
   if (WORLD_ID === 'lantern') return LN.onLanternLand(wx, wy);
+  if (WORLD_ID === 'powder') return PW.onPowderLand(wx, wy);
   let inside = false;
   // indexed, not destructured — see the note on pointInPoly in bay.ts. Same
   // answers, 10x cheaper, and this runs thousands of times a frame.
@@ -339,6 +353,12 @@ function insideIslandWorld(wx: number, wy: number): boolean {
   return inside;
 }
 export const insideIsland3 = (x3: number, z3: number) => insideIslandWorld(x3 / SCALE + CX, z3 / SCALE + CZ);
+/** POWDER PASS: is this 3D point on ICE (the frozen lake or the gritted
+ *  road)? The physics reads it every frame to drop the steering convergence
+ *  — ice is momentum, the first world where the CONTROL FEEL itself changes.
+ *  False everywhere else, so the other four worlds cannot pay for it. */
+export const onIce3 = (x3: number, z3: number): boolean =>
+  WORLD_ID === 'powder' && PW.onIce(x3 / SCALE + CX, z3 / SCALE + CZ);
 // lagoon membership (with a margin): roads, props and cars must never wade in
 export function inLagoon3(x3: number, z3: number, margin = 120): boolean {
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
@@ -378,6 +398,10 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
   // market" — the exact bug, correctly reasoned about, one world too late.
   // A new-world guard should have been a sweep of the existing ones.
   if (WORLD_ID === 'gameday') return false;
+  // POWDER PASS: the lake is ICE — walkable ground painted as water, exactly
+  // the lantern-canal design. Falling through to Maple's pond here is the
+  // gameday bug again, and this time the sweep happened when the world landed.
+  if (WORLD_ID === 'powder') return false;
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -398,6 +422,7 @@ export function inDeepWater3(x3: number, z3: number, margin = 0): boolean {
   if (WORLD_ID === 'pirate') return false;
   if (WORLD_ID === 'lantern') return false;     // the canal is shallow — see inWater3
   if (WORLD_ID === 'gameday') return false;     // no water on the plateau — see inWater3
+  if (WORLD_ID === 'powder') return false;      // the lake is ice — see inWater3
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -541,6 +566,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     pirate:  { hue: 145,  sat: 0.85, fog: 0x0e2237, bgI: 0.60 },   // swung to sea-teal, daylit
     gameday: { hue: -50,  sat: 1.05, fog: 0x241120, bgI: 0.50 },   // toward magenta dusk over the lot
     lantern: { hue: 25,   sat: 1.15, fog: 0x10142e, bgI: 0.38 },   // deeper indigo, the darkest air
+    // the poster set this look, not the other way round: blue winter dusk,
+    // aurora greens in the sky, warm windows against the snow
+    powder:  { hue: 95,   sat: 1.1,  fog: 0x1a2742, bgI: 0.46 },
   };
   const MOOD = SKY_MOOD[WORLD_ID];
   scene.fog = new THREE.Fog(MOOD.fog, 420, 1500);
@@ -693,6 +721,107 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     g.fillStyle = Math.random() < 0.5 ? 'rgba(120,201,78,0.16)' : 'rgba(255,255,255,0.035)';
     const x = Math.random() * TEX, y = Math.random() * TEX, r = rand(2, 6);
     g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+
+  // ══ POWDER PASS BAKE ═══════════════════════════════════════════════════
+  // Snow is the easiest ground in the game to get wrong: flat white reads as
+  // a blank canvas, not a place. Three things carry it — BLUE shadow (snow
+  // in dusk light is never white), the lake's cracked teal (the poster's
+  // centrepiece), and the worn tracks of a village that was mid-snow-day
+  // when the void arrived: a gritted road, a trampled piste, sled lines.
+  if (WORLD_ID === 'powder') {
+    const ppath = (pts: PW.Pt[], close = false) => {
+      g.beginPath();
+      g.moveTo(pxW(pts[0][0]), pyW(pts[0][1]));
+      for (const [x, y] of pts) g.lineTo(pxW(x), pyW(y));
+      if (close) g.closePath();
+    };
+    const PU = (pxW(1000) - pxW(0)) / 1000;   // canvas px per world unit
+
+    // 1. BASE — dusk snow: pale blue-white, never pure white
+    g.fillStyle = '#dfe7f6'; g.fillRect(0, 0, TEX, TEX);
+    for (let i = 0; i < 3600; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX;
+      g.fillStyle = Math.random() < 0.6 ? 'rgba(150,175,220,0.10)' : 'rgba(255,255,255,0.16)';
+      g.beginPath(); g.arc(x, y, rand(3, 10), 0, Math.PI * 2); g.fill();
+    }
+    // 2. RIM SHADE — the mountain walls throw the bowl's edge into blue
+    {
+      const ring = PW.PW_LAND_SMOOTH;
+      ppath(ring as PW.Pt[], true);
+      g.save();
+      g.clip();
+      g.strokeStyle = 'rgba(92,116,176,0.34)';
+      g.lineWidth = 900 * PU;
+      ppath(ring as PW.Pt[], true); g.stroke();
+      g.strokeStyle = 'rgba(92,116,176,0.22)';
+      g.lineWidth = 1700 * PU;
+      ppath(ring as PW.Pt[], true); g.stroke();
+      g.restore();
+    }
+    // 3. THE PINEWOOD floor — needled snow, a touch green-grey
+    {
+      const wood = PW.PW_REGIONS.find((r) => r.id === 'pinewood');
+      if (wood) { ppath(wood.poly, true); g.fillStyle = 'rgba(118,142,132,0.30)'; g.fill(); }
+    }
+    // 4. THE HOME RUN — trampled piste, faintly darker, with sled lines
+    ppath(PW.PISTE);
+    g.strokeStyle = 'rgba(178,194,226,0.55)'; g.lineWidth = PW.PISTE_HALF * 2 * PU;
+    g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke();
+    for (let i = -2; i <= 2; i++) {
+      g.strokeStyle = 'rgba(130,150,196,0.30)'; g.lineWidth = 3;
+      g.save(); g.translate(i * 60 * PU, 0); ppath(PW.PISTE); g.stroke(); g.restore();
+    }
+    // 5. THE GRIT ROAD — Old Bess's route, brown-grey over the white
+    ppath(PW.GRIT);
+    g.strokeStyle = '#9a938c'; g.lineWidth = PW.GRIT_HALF * 2 * PU; g.stroke();
+    ppath(PW.GRIT);
+    g.strokeStyle = 'rgba(122,110,96,0.5)'; g.lineWidth = PW.GRIT_HALF * 1.2 * PU; g.stroke();
+    // 6. THE LAKE — the poster's cracked teal ice
+    {
+      const L = PW.LAKE;
+      g.save();
+      g.translate(pxW(L.cx), pyW(L.cy));
+      g.scale(L.rx * PU, L.ry * PU);
+      const grd = g.createRadialGradient(0, 0, 0.15, 0, 0, 1);
+      grd.addColorStop(0, '#8fd0e8');
+      grd.addColorStop(0.72, '#5fa8cf');
+      grd.addColorStop(1, '#cfdff0');
+      g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2);
+      g.fillStyle = grd; g.fill();
+      g.restore();
+      // cracks: pale jagged polylines radiating off-centre, like the poster
+      g.strokeStyle = 'rgba(226,244,252,0.75)'; g.lineWidth = 3.5; g.lineCap = 'round';
+      for (let c2 = 0; c2 < 9; c2++) {
+        const a0 = (c2 / 9) * Math.PI * 2 + rand(-0.3, 0.3);
+        let cx2 = pxW(L.cx) + Math.cos(a0) * L.rx * PU * rand(0.05, 0.25);
+        let cy2 = pyW(L.cy) + Math.sin(a0) * L.ry * PU * rand(0.05, 0.25);
+        g.beginPath(); g.moveTo(cx2, cy2);
+        let ang = a0;
+        for (let seg = 0; seg < 5; seg++) {
+          ang += rand(-0.55, 0.55);
+          cx2 += Math.cos(ang) * L.rx * PU * rand(0.1, 0.22);
+          cy2 += Math.sin(ang) * L.ry * PU * rand(0.1, 0.22);
+          g.lineTo(cx2, cy2);
+        }
+        g.stroke();
+      }
+    }
+    // 7. THE VILLAGE floor — packed snow, warmed by the windows above it
+    {
+      const vil = PW.PW_REGIONS.find((r) => r.id === 'village');
+      if (vil) { ppath(vil.poly, true); g.fillStyle = 'rgba(226,214,206,0.28)'; g.fill(); }
+    }
+    // 8. THE LODGE apron — swept stone
+    {
+      const L = PW.LODGE;
+      g.save();
+      g.translate(pxW(L.cx), pyW(L.cy));
+      g.scale(L.rx * PU * 0.8, L.ry * PU * 0.8);
+      g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(150,150,164,0.42)'; g.fill();
+      g.restore();
+    }
   }
 
   // ══ PIRATE BAY BAKE ═══════════════════════════════════════════════════
@@ -1526,6 +1655,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     cozy: null, fancy: null, downtown: WORLD.pavement, plaza: null,
     park: WORLD.park, forest: WORLD.forest, beach: WORLD.sand, zoo: WORLD.zooGround,
     airport: 0xd9dbe6, military: 0x8f9576,
+    // ── POWDER PASS ground: null — the powder bake paints its regions
+    // directly (rim shade, piste, grit road, lake); block fills are maple's
+    village: null, lake: null, pinewood: null, piste: null, lodge: null, rim: null,
     fair: 0xc8b98a,      // trampled fairground earth
     farm: 0xc7ab5c,      // ripe crop; pasture + tilled strips painted over it
     campus: 0x8fd06a,    // athletic turf
@@ -2518,6 +2650,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // sun, so it has almost no baked lighting variation of its own to hide
     // behind — every bit of surface interest has to come from here.
     lantern: [0.30, 0.30, 0.34, 7],
+    // snow: nearly grainless — fresh powder is the smoothest ground in the
+    // game, and the bake's own blue shadowing carries the variation
+    powder:  [0.20, 0.06, 0.00, 9],
   };
   const [gFine, gMid, gCoarse, gRep] = GRAIN[WORLD_ID];
   const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.97 });
@@ -2852,6 +2987,11 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       // 'plaza' and 'campus' are below.
       return d === 'gate' ? 'torii' : d === 'bridge' ? 'moonbridge'
         : d === 'garden' ? 'nightgarden' : (d as Biome | null);
+    }
+    if (WORLD_ID === 'powder') {
+      // powder.ts's district ids are all new words in the shared union — no
+      // translation needed at the boundary, first world to manage it
+      return PW.pwRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ) as Biome | null;
     }
     if (WORLD_ID === 'gameday') {
       const d = GD.gdRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ);
@@ -4445,6 +4585,105 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     scene.add(mesh); addEdible(mesh, r);
   };
+
+  // ══ POWDER PASS: a snow day, and everyone is out in it ═══════════════════
+  // Same model as LANTERN NIGHT below — polygon regions, the shared spatial
+  // hash, authored landmarks reserved BEFORE the scatter runs. The difference
+  // is that this world is a BOWL around a lake, so the composition is
+  // concentric: the lodge looks down the piste, the village looks at the
+  // lake, and everything else is scattered snow-day debris — sleds, snowmen,
+  // drifts — the way a real village looks by 10am on a closure day.
+  if (WORLD_ID === 'powder') {
+    const P3 = (p2: PW.Pt): [number, number] => [w(p2[0]), w(p2[1])];
+    PW.resetPlacement();
+    const drop = (mesh: THREE.Object3D, p2: PW.Pt, r: number, rotY?: number, force = false, qk?: string) => {
+      if (!force && !PW.spotOpen(p2[0], p2[1], r * 20)) return;
+      const [x3, z3] = P3(p2);
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      if (qk) mesh.userData.qk = qk;
+      place(mesh, x3, z3, r);
+      PW.claimSpot(p2[0], p2[1], r * 20);
+    };
+    const REG = (id: PW.PwBiome) => PW.PW_REGIONS.find((r2) => r2.id === id)!;
+    const rnd2 = Math.random;
+
+    await breathe('Shovelling the drive…');
+    // 1. THE LODGE — the hero meal, force-placed, facing down the Home Run
+    {
+      const lodge = AL.makeLodge();
+      drop(lodge, [PW.LODGE.cx, PW.LODGE.cy], 10.5, PW.pwFacingLodge(PW.LODGE.cx, PW.LODGE.cy + 2000) + Math.PI, true, 'lodge');
+      PW.claimSpot(PW.LODGE.cx, PW.LODGE.cy, PW.LODGE.rx * 0.8);
+    }
+    // 2. THE VILLAGE — chalets ring the shore and every one FACES THE LAKE,
+    //    which is what makes a bowl read as a place rather than a scatter
+    for (const p2 of PW.scatterInRegion(REG('village'), 24, rnd2, 150)) {
+      const face = Math.atan2(PW.LAKE.cx - p2[0], PW.LAKE.cy - p2[1]);
+      drop(AL.makeChalet(), p2, 3.6, face, false, 'chalet');
+    }
+    // …and the village's small stuff — the between-chalets clutter that makes
+    // a district read dense from the picker's first frame
+    for (const p2 of PW.scatterInRegion(REG('village'), 40, rnd2, 90)) {
+      const kind = rnd2();
+      const mesh = kind < 0.3 ? AL.makeSnowman() : kind < 0.55 ? AL.makeSled()
+        : kind < 0.72 ? AL.makeLogPile() : kind < 0.88 ? AL.makeSkiRack() : AL.makeSnowballStack();
+      drop(mesh, p2, kind < 0.3 ? 1.0 : 0.6, rnd2() * Math.PI * 2, false, kind < 0.3 ? 'snowman' : undefined);
+    }
+    // …the square: bell tower + rink + the contest's snowman cluster
+    {
+      const vil = REG('village');
+      const cx = vil.poly.reduce((a, q) => a + q[0], 0) / vil.poly.length;
+      const cy = vil.poly.reduce((a, q) => a + q[1], 0) / vil.poly.length;
+      drop(AL.makeBellTower(), [cx, cy], 4.4, 0, true);
+      drop(AL.makeRink(), [cx + 260, cy + 160], 2.2, 0, true);
+      for (const p2 of PW.clusterAt(cx - 300, cy - 220, 5, 220, rnd2))
+        drop(AL.makeSnowman(), p2, 1.0, rnd2() * Math.PI * 2, false, 'snowman');
+    }
+    await breathe('Waxing the sleds…');
+    // 3. THE PINEWOOD — the forest carries the west slope; drifts between
+    for (const p2 of PW.scatterInRegion(REG('pinewood'), 200, rnd2, 80))
+      drop(AL.makePine(), p2, 1.7 + rnd2() * 0.8, rnd2() * Math.PI * 2, false, 'pine');
+    for (const p2 of PW.scatterInRegion(REG('pinewood'), 26, rnd2, 120))
+      drop(AL.makeDrift(), p2, 0.95, rnd2() * Math.PI * 2, false, 'drift');
+    // 4. THE HOME RUN — the lift line up to the lodge, signs, and the deep
+    //    drifts that pack the SNOW SHELL (see prototype3d's eatRatioNow)
+    for (const py of PW.liftPylons()) drop(AL.makeLiftPylon(), [py.x, py.y], 2.2, py.ang, true, 'lift');
+    for (let i = 0; i < 8; i++) {
+      const pp = PW.pistePoint(0.08 + i * 0.11);
+      const side = i % 2 ? 1 : -1;
+      const off = PW.PISTE_HALF + 120;
+      drop(AL.makeSignpost(), [pp.x + Math.cos(pp.ang + Math.PI / 2) * off * side, pp.y + Math.sin(pp.ang + Math.PI / 2) * off * side], 0.55, -pp.ang, false, 'sign');
+    }
+    for (const p2 of PW.scatterInRegion(REG('piste'), 18, rnd2, 120))
+      drop(AL.makeDrift(), p2, 0.95, rnd2() * Math.PI * 2, false, 'drift');
+    for (const p2 of PW.scatterInRegion(REG('piste'), 8, rnd2, 150))
+      drop(AL.makeSnowballStack(), p2, 0.6, rnd2() * Math.PI * 2, false, 'snowballs');
+    await breathe('Gritting the road…');
+    // 5. THE LAKE SHORE — Norm's hut out on the ice, sleds and racks at the
+    //    village edge, snowmen where the kids got to first
+    drop(AL.makeChalet(3.4, 2.8), [PW.LAKE.cx - PW.LAKE.rx * 0.45, PW.LAKE.cy - PW.LAKE.ry * 0.3], 2.0, 0.6, true, 'hut');
+    for (const p2 of PW.clusterAt(PW.LAKE.cx + PW.LAKE.rx * 0.7, PW.LAKE.cy + PW.LAKE.ry * 0.6, 6, 320, rnd2)) {
+      const kind = rnd2();
+      drop(kind < 0.4 ? AL.makeSled() : kind < 0.7 ? AL.makeSkiRack() : AL.makeSnowman(), p2, kind < 0.4 ? 0.55 : 1.0, rnd2() * Math.PI * 2);
+    }
+    // 6. SNOW-DAY DEBRIS everywhere the regions left open: sleds, log piles,
+    //    fences, lone pines, and the drifts that fuel the shell
+    // …a snack ring near spawn: the first three seconds must have food in
+    //    them (the FTUE lesson — a first meal within one thumb-drag)
+    for (const p2 of PW.clusterAt(PW.PW_SPAWN[0] + 300, PW.PW_SPAWN[1] - 200, 8, 380, rnd2)) {
+      const kind = rnd2();
+      drop(kind < 0.5 ? AL.makeSled() : kind < 0.8 ? AL.makeSnowballStack() : AL.makeSnowman(), p2,
+        kind < 0.5 ? 0.55 : kind < 0.8 ? 0.6 : 1.0, rnd2() * Math.PI * 2);
+    }
+    for (const p2 of PW.scatterLand(110, rnd2, 110)) {
+      const kind = rnd2();
+      const mesh = kind < 0.28 ? AL.makeSled() : kind < 0.5 ? AL.makeLogPile()
+        : kind < 0.68 ? AL.makeFence(4 + rnd2() * 5) : kind < 0.86 ? AL.makePine() : AL.makeDrift();
+      drop(mesh, p2, kind < 0.28 ? 0.55 : kind < 0.5 ? 0.9 : kind < 0.68 ? 0.8 : kind < 0.86 ? 1.8 : 0.95,
+        rnd2() * Math.PI * 2, false, kind >= 0.86 ? 'drift' : undefined);
+    }
+    await breathe('Lighting the windows…');
+    return;   // POWDER PASS is fully populated — the Maple grid pass must not run
+  }
 
   // ══ LANTERN NIGHT: a spirit market, and it is open ════════════════════
   // Same model as GAME DAY below — polygon regions, the shared spatial hash,

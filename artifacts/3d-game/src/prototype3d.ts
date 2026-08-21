@@ -27,7 +27,7 @@ import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createVoid, makeVoidBody, applySkinToBody, type Mood } from './proto3d/void3d';
-import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, setWorld, setMeshFade, part, mergedProp, type WorldId } from './proto3d/island';
+import { createIsland, ROAD_CENTERS_3D, insideIsland3, inLagoon3, inDeepWater3, onIce3, setWorld, setMeshFade, part, mergedProp, type WorldId } from './proto3d/island';
 import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { HATS, HAT_BY_ID, hatLine, HAT_MAX_W, applyHatLod, type Hat } from './proto3d/hats';
@@ -41,6 +41,7 @@ import { pickNews, resetNews, BRAND as PB_BRAND, type Dist as PBDist } from './p
 import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './proto3d/newsroom_maple';
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
 import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from './proto3d/newsroom_lantern';
+import { pickPowderNews, resetPowderNews, POWDER_BRAND, type PwDist } from './proto3d/newsroom_powder';
 import { arcPhase, resetArc, arcState } from './proto3d/newsroom_arc';
 import { reactLine, resetReact, type ReactIn } from './proto3d/newsroom_react';
 import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
@@ -50,6 +51,7 @@ import { liveEvents, eventForWorld, eventEndLabel, type SeasonEvent } from './ga
 import { isUnlocked, gateFor, completeWorld, WORLD_LABEL, unlockedCount, type WorldKey } from './game/unlocks';
 // the district ids this world's newsroom knows, so a biome from another world
 // can never be handed to it as a key
+const PW_DISTS: string[] = ['village', 'lake', 'pinewood', 'piste', 'lodge', 'rim'];
 const LN_DISTS: string[] = ['torii', 'stalls', 'canal', 'teahouse', 'shrine',
   'moonbridge', 'nightgarden', 'bathhouse', 'onsen', 'bamboo'];
 import {
@@ -294,12 +296,12 @@ document.body.insertBefore(renderer.domElement, document.body.firstChild);
 // ── WHICH WORLD ───────────────────────────────────────────────────────────
 // Resolved before anything else, because the light rig, the ground bake and
 // the prop kit all branch on it.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT' };
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS' };
 // A ternary chain resolved exactly two worlds, so a third could never be
 // picked however the picker was wired. Validate against the real list instead,
 // which also means an unknown ?w= on a shared link lands on Maple rather than
 // on a world that does not exist.
-const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday', 'lantern'];
+const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
 const _wantWorld = new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple';
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
@@ -500,6 +502,11 @@ const WORLD_PAR: Record<string, number> = {
   pirate: 105000,    // child mean 142,755 uncontested — nearly 2x Maple's scale
   gameday: 175000,   // verified: mean 198,446 (sd 61,657), wins 4/5
   lantern: 150000,   // child mean 199,791 uncontested; 0.75 of it, as Maple sits
+  // PLACEHOLDER pending qa/ab.mjs measurement (the AAA-BRIEF forbids guessing
+  // par and it is right — but a missing row is a coin flip at 0). Seeded from
+  // lantern's number because the two valleys have comparable prop density;
+  // the measured pass replaces it. Ledger records the follow-up.
+  powder: 150000,
 };
 
 
@@ -686,6 +693,17 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   lantern: { sun: 0xbfd4ff, sunI: 0.42, hemiSky: 0x141a3a, hemiGround: 0x6a4a3c, hemiI: 1.05,
              off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.34,
              fill: 0x6a8cff, fillI: 0.46, fillOff: [52, 40, -60] },
+  // ── POWDER PASS: blue winter dusk, and the SNOW is the fill ─────────────
+  // Between lantern's night and the three daylight rigs: a low cold key (the
+  // last of the light coming over the west wall) at real strength, because
+  // snow needs directional shading or it reads as paper — but the ground
+  // bounce does the work no other world gets: hemiGround is BRIGHT and blue
+  // (snow reflects most of what hits it), so shadows fill with sky instead
+  // of going black, which is exactly what a snowfield at dusk does. dusk at
+  // 0.85 lights every chalet window against the blue — the poster's read.
+  powder:  { sun: 0xd8e6ff, sunI: 1.15, hemiSky: 0x2a3c66, hemiGround: 0x9db6d8, hemiI: 0.9,
+             off: [-62, 78, 30], dusk: 0.85, normalBias: 0.15, exposure: 1.18,
+             fill: 0x7aa0e0, fillI: 0.5, fillOff: [58, 44, -60] },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 
@@ -1232,6 +1250,28 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     heroCueNews: 'It is big enough for the bathhouse. The PA is still reading the hours.',
     heroGone: '🏮 THE BATHHOUSE IS GONE. ALL SLURPED UP.',
     heroName: 'The Bathhouse',
+  },
+  powder: {
+    n: 5, icon: '❄️', sub: 'school is shut · the valley slides · eat it all',
+    // the closures desk reads its list at a measured pace and will not be
+    // hurried by anything, including the end of the valley
+    newsGap: [15, 7], signOn: 5,
+    // THE LODGE, in 3D: powder.ts authors it at world (6100, 2350)
+    hero: [(6100 - 6000) * 0.05, (2350 - 6000) * 0.05],
+    // an open slope, not a corridor: the shot holds the lodge on its hill and
+    // pulls DOWN the Home Run to the lake — travel over open white
+    introLen: 3.5,
+    ender: '🏔️ WORLD ENDER! The valley is CLOSED.',
+    enderNews: 'THE VALLEY IS NOW A HOLE. Grit stocks were not the issue in the end.',
+    houseNews: 'A chalet has left. The booking stands. The chalet does not.',
+    rivalFullNews: 'The other hole has stopped sliding. Officials are calling it "full".',
+    winSub: 'the whole valley belongs to the void', place: 'the valley',
+    winTitles: ['VALLEY: DEVOURED', 'SCHOOL STAYS SHUT', 'BURP OF CHAMPIONS',
+                'PISTE OFF THE MAP', 'FROSTY, AND ALSO ENORMOUS'],
+    heroCue: '🏔️ YOU CAN EAT THE LODGE NOW — GO!',
+    heroCueNews: 'It is big enough for the Lodge. The hot chocolate is still on the counter.',
+    heroGone: '🏔️ THE LODGE IS GONE. ALL SLURPED UP.',
+    heroName: 'The Lodge',
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -3055,8 +3095,10 @@ const EASY_Q = ['snack', 'gold', 'combo'];
 // houses. That fixes the board and, at the same time, the FIRST CAR and FIRST
 // BUILDING moments and the newsroom's meal names, all of which were dead here
 // for the same reason.
-const MED_Q = pickedWorld === 'pirate' ? ['evolve', 'combo', 'gold'] : ['cars', 'evolve', 'combo'];
-const HARD_Q = pickedWorld === 'pirate' ? ['cabanas', 'rival', 'big'] : ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
+const MED_Q = pickedWorld === 'pirate' ? ['evolve', 'combo', 'gold']
+  : pickedWorld === 'powder' ? ['evolve', 'combo', 'gold'] : ['cars', 'evolve', 'combo'];
+const HARD_Q = pickedWorld === 'pirate' ? ['cabanas', 'rival', 'big']
+  : pickedWorld === 'powder' ? ['houses', 'rival', 'big'] : ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   // uint32 hash (imul + >>>0). The old float reduce blew past 2^53, and the
@@ -3254,9 +3296,27 @@ const LANTERN_BEATS: typeof MAPLE_BEATS = [
     icon: '♨️', title: 'The bathhouse is open!', sub: 'they are calling you up',
     news: 'The bathhouse has opened its doors and lit every window. It is the last thing standing.' },
 ];
+// POWDER PASS runs the same spine at the valley's own pace; the closer is
+// THE AVALANCHE — the only finale in the game where the food comes to YOU
+// (the piste's props ride a white wall down the Home Run; see life.ts's cue).
+const POWDER_BEATS: typeof MAPLE_BEATS = [
+  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xbfe4ff, flash: 'rgba(191,228,255,0.28)',
+    icon: '🛷', title: 'Sled hour!', sub: 'the hill is fully booked',
+    news: 'Sledding has commenced on the Home Run. The queue is longer than the run.' },
+  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xffd23f, flash: 'rgba(255,210,90,0.26)',
+    icon: '⛸️', title: 'Lake hour!', sub: 'everyone on the ice at once',
+    news: 'The frozen lake has been declared open. The lake has not been consulted.' },
+  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xff5d7e, flash: 'rgba(255,93,126,0.28)',
+    icon: '☃️', title: 'Snowman contest!', sub: 'Chairman Frost defends his title', cue: 'contest',
+    news: 'The snowman contest has begun. The reigning champion is a snowman.' },
+  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0xffffff, flash: 'rgba(230,240,255,0.34)',
+    icon: '🏔️', title: 'AVALANCHE!!', sub: 'the mountain is coming to you', cue: 'avalanche',
+    news: 'The mountain has let go. The village is advised to be somewhere else.' },
+];
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS
-    : pickedWorld === 'lantern' ? LANTERN_BEATS : MAPLE_BEATS;
+    : pickedWorld === 'lantern' ? LANTERN_BEATS
+      : pickedWorld === 'powder' ? POWDER_BEATS : MAPLE_BEATS;
 // ── THE SEASONAL REPAINT (events.ts) ─────────────────────────────────────────
 // While this world's season runs, every beat card, fever ring and screen
 // flash wears the season's colour instead of its own. Wholesale on purpose:
@@ -3317,6 +3377,9 @@ function mealOf(e: Edible): string {
 const mealBySize = (r: number) =>
   r > 5 ? 'an entire BUILDING' : r > 2.5 ? 'something big' : r > 1.2 ? 'a mailbox' : 'a snack';
 const DISTRICT: Record<string, string> = {
+  // POWDER PASS
+  village: 'THE VILLAGE', lake: 'THE FROZEN LAKE', pinewood: 'THE PINEWOOD',
+  piste: 'THE HOME RUN', lodge: 'THE LODGE', rim: 'THE HIGH SHOULDER',
   cozy: 'MAPLE HEIGHTS', fancy: 'FANCY HILLS', downtown: 'DOWNTOWN', plaza: 'THE PLAZA',
   park: 'THE PARK', forest: 'PINE WOODS', beach: 'LAKESIDE',
   // MAPLE FALLS re-zone: without these four, a quarter of the island's
@@ -3557,8 +3620,20 @@ function showNews() {
   if (queued !== undefined) {
     h = queued;
     brand = (pickedWorld === 'lantern' ? LANTERN_BRAND
-      : pickedWorld === 'gameday' ? GAMEDAY_BRAND
-        : PB ? PB_BRAND : MAPLE_BRAND)[tier];
+      : pickedWorld === 'powder' ? POWDER_BRAND
+        : pickedWorld === 'gameday' ? GAMEDAY_BRAND
+          : PB ? PB_BRAND : MAPLE_BRAND)[tier];
+  } else if (pickedWorld === 'powder') {
+    // POWDER PASS is THE VALLEY BULLETIN: local radio, the school-closures
+    // desk, reading its list at a measured pace since 5am. The comic engine
+    // is bureaucratic understatement against total catastrophe — the arc goes
+    // from grit-lorry updates to a closure list with exactly one item on it.
+    const pd = String(island.biomeAt(voidState.x, voidState.z)) as PwDist;
+    h = pickPowderNews({
+      tier, morning, district: (PW_DISTS.includes(pd) ? pd : null), lastMeal, devouredPct,
+      form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
+    });
+    brand = POWDER_BRAND[tier];
   } else if (pickedWorld === 'lantern') {
     // LANTERN NIGHT is not a newsroom either — it is the market's PUBLIC
     // ADDRESS, a recorded courtesy system that has run the same announcements
@@ -4473,6 +4548,15 @@ function endMatch() {
 
 // devour one edible: spiral it in, grow, score (2D combo model), charge hunger
 let combo = 0, comboT = 0, chompCd = 0;
+// ── POWDER PASS: THE SNOW SHELL ────────────────────────────────────────────
+// Carving through a snowdrift packs a white shell on the void, and while it
+// holds the void eats ONE SIZE CLASS UP (EAT_RATIO 1.11 -> 1.61). This is the
+// first growth in the game earned by DRIVING rather than eating — the drift
+// is worth almost nothing as food; it is worth six seconds of appetite. The
+// too-big grey-out reads the same gate, so the child SEES the world light up
+// as edible the moment the shell packs on.
+let shellT = 0;
+const eatRatioNow = () => EAT_RATIO * (shellT > 0 ? 1.45 : 1);
 // once-per-match milestone banners (hole.io celebrates the firsts)
 const moments = { firstBuilding: false, firstCar: false, firstRunner: false, half: false, last30: false };
 // the last final-countdown second already shown, so each of 10..1 pops once
@@ -4497,6 +4581,17 @@ function capture(e: Edible, giveHunger = true) {
   // HOW BIG WAS THAT, RELATIVE TO ME? Everything below is graded by it, which
   // is the whole point: one number separates a landmark from a traffic cone.
   const bite = THREE.MathUtils.clamp(e.radius / Math.max(0.4, voidling.radius), 0.12, 1);
+  // a drift packs the SNOW SHELL instead of feeding: announce it the first
+  // time each armed window, ring in the world's own white
+  if (e.mesh.userData.qk === 'drift' && pickedWorld === 'powder') {
+    const was = shellT > 0;
+    shellT = 6;
+    if (!was) {
+      announce('❄️ SNOW SHELL!! eat the BIG stuff!');
+      fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.5, 0.8);
+      audio.ready(); buzz(30);
+    }
+  }
   voidling.setRadius(growRadius(voidling.radius, e.radius));   // area-based growth
   // …and the blob LUNGES past its new size rather than easing to it
   voidling.impulse(Math.min(2.2, e.radius * 0.9));
@@ -4942,6 +5037,14 @@ const LOAD_TIPS = [
   'tip: finish quests to win ✦',
   'tip: BITSY is the smallest — the easiest one in the family to catch',
 ];
+// POWDER PASS teaches its own two verbs on the way in — the ice and the
+// shell are new rules, and the loading screen is the one place a rule can
+// be read before it is felt
+if (pickedWorld === 'powder') LOAD_TIPS.push(
+  'tip: ICE is slippery — drift and carve into the big stuff',
+  'tip: carve through a SNOWDRIFT — the snow shell lets you eat BIGGER',
+  'tip: when the avalanche comes, stand in its way. really.',
+);
 // who is currently holding the load cover up. 'boot' is released by the first
 // rendered frame; 'pack' by the asset preload finishing.
 const coverHeld = new Set<string>(['boot']);
@@ -5156,6 +5259,12 @@ const CARD_ART: Record<string, string> = {
   // hf_20260802_020637_ab38aed8-5041-4109-83be-23acf11175a6.png.
   lantern: '/assets/hf/hf_20260802_020636_0bc97a9d-a168-4667-bf5d-76ac9418bff1.png',
   frost: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
+  // POWDER PASS ships the painting that was made for it before it existed:
+  // the FROST PEAKS teaser poster — alpine village, chairlift, frozen lake,
+  // the void peeking out of a snowbank — was painted as a locked-world tease
+  // and is exactly this world. The poster set the art direction, not the
+  // other way round: blue winter dusk, aurora sky, warm windows on snow.
+  powder: '/assets/hf/hf_20260730_000329_762b5f44-3c3d-4030-8429-099f02691b5e.png',
 };
 // A CARD IS NEVER BLANK. This set the background and hoped: if the file 404s —
 // which is exactly what every /assets/hf path does inside an iOS bundle that
@@ -5168,6 +5277,7 @@ const CARD_FALLBACK: Record<string, string> = {
   pirate: 'radial-gradient(ellipse at 50% 34%, #ffd9a0 0%, #d98f4a 40%, #1a3352 100%)',
   gameday: 'radial-gradient(ellipse at 50% 34%, #f0b429 0%, #c4342f 42%, #241030 100%)',
   frost: 'radial-gradient(ellipse at 50% 34%, #cfe9ff 0%, #5a8fd0 42%, #17203f 100%)',
+  powder: 'radial-gradient(ellipse at 50% 34%, #cfe9ff 0%, #5a8fd0 42%, #17203f 100%)',
   // lantern amber falling into an indigo night — the level's own two colours,
   // so a card that never loads its poster still says the right thing
   lantern: 'radial-gradient(ellipse at 50% 38%, #ffbe6a 0%, #d1452f 34%, #241436 68%, #0e1226 100%)',
@@ -5480,7 +5590,7 @@ let bookWorld: WorldId = pickedWorld;
 function renderBook(): void {
   const tabs = el('bookTabs'), grid = el('bookGrid'), foot = el('bookFoot');
   const NAMES: Record<WorldId, string> = { maple: '🍁 MAPLE FALLS', pirate: '🏴‍☠️ PIRATE BAY',
-    gameday: '🏈 GAME DAY', lantern: '🏮 LANTERN NIGHT' };
+    gameday: '🏈 GAME DAY', lantern: '🏮 LANTERN NIGHT', powder: '❄️ POWDER PASS' };
   tabs.innerHTML = (Object.keys(NAMES) as WorldId[]).map((w) =>
     `<button data-w="${w}" class="${w === bookWorld ? 'on' : ''}">${NAMES[w]} `
     + `${foundCount(w)}/${totalCount(w)}</button>`).join('');
@@ -5757,7 +5867,7 @@ function clearBeatLoot() {
 let drumRef: THREE.Object3D | null = null, drumBaseScale = 1, drumCueT = 0, drumThump = 0;
 function resetMatch() {
   joyRelease();   // PLAY AGAIN can be tapped and HELD — see joyRelease
-  resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); signedOn = false;   // memory + the sign-on are per-match
+  resetNews(); resetMapleNews(); resetGamedayNews(); resetLanternNews(); resetPowderNews(); signedOn = false;   // memory + the sign-on are per-match
   // …and the story starts at morning again, with nothing said and nothing
   // pending. resetArc() is what makes "the arc never reverses" survive a PLAY
   // AGAIN: without it the high-water mark from the last match would still be at
@@ -7876,7 +7986,14 @@ function animate() {
     // and drain all run on dtw — and the void you are steering never does.
     // Theory said the hero is part of the world; the thumb says the hero is
     // the player. The thumb wins.
-    const k = Math.min(1, dt * (driving ? 11 - 3.5 * wgt : 4.5));   // 91ms snappy tiny → 133ms weighty huge
+    // ── ICE IS MOMENTUM (POWDER PASS) ───────────────────────────────────
+    // On the frozen lake and the gritted road the velocity chases the stick
+    // ~4x slower: you keep going, you overshoot, you learn to carve. The one
+    // verb this game has is steering, and this is the first world that
+    // changes it. onIce3 is hard-false on every other world.
+    if (shellT > 0) shellT -= dt;
+    const iceK = onIce3(voidState.x, voidState.z) ? 0.26 : 1;
+    const k = Math.min(1, dt * (driving ? 11 - 3.5 * wgt : 4.5) * iceK);   // 91ms snappy tiny → 133ms weighty huge
     velX += (tvx - velX) * k;
     velZ += (tvz - velZ) * k;
     const nx = voidState.x + velX * dt, nz = voidState.z + velZ * dt;
@@ -8016,7 +8133,7 @@ function animate() {
       if (e.eaten || !e.mesh.visible) continue;
       const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
       if (dx * dx + dz * dz > reach * reach) continue;
-      const tooBig = e.radius > Rg * EAT_RATIO;
+      const tooBig = e.radius > Rg * eatRatioNow();
       if (tooBig === e.mesh.userData.gated) continue;   // no per-frame churn: only on the transition
       e.mesh.userData.gated = tooBig;
       e.mesh.traverse((o) => {
@@ -8261,7 +8378,7 @@ function animate() {
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
     const reach = R * 2.0 + e.radius * 2.4;
-    const inWell = d < reach && e.radius < 2.5 && (!e.mesh.userData.mover || e.radius < 0.9) && e.radius <= R * EAT_RATIO;
+    const inWell = d < reach && e.radius < 2.5 && (!e.mesh.userData.mover || e.radius < 0.9) && e.radius <= R * eatRatioNow();
     // spring-back runs FIRST, unconditionally: if a rival bite shrank us while
     // this prop was displaced, the old size-gated flow stranded it on the
     // asphalt forever — displaced props ALWAYS walk home when out of the well
@@ -8274,7 +8391,7 @@ function animate() {
         e.mesh.rotation.z *= 1 - k2;
       }
     }
-    if (e.radius > R * EAT_RATIO) {
+    if (e.radius > R * eatRatioNow()) {
       // too big to eat yet — 2D rule: you pass through, it SHAKES (no weird block)
       if (d < R + e.radius * 0.7 && !(e.mesh.userData.shakeT > 0)) e.mesh.userData.shakeT = 0.45;
       continue;

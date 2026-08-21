@@ -27,7 +27,7 @@ import { chromium } from 'playwright';
 
 const PORT = process.argv[2] || '4177';
 const args = process.argv.slice(3);
-const WORLDS = args.length ? args : ['maple', 'pirate', 'gameday', 'lantern'];
+const WORLDS = args.length ? args : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
 const RADII = [1, 4, 8, 16, 27];
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -41,7 +41,7 @@ for (const w of WORLDS) {
       localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
       localStorage.setItem('voidMute', '1');
       localStorage.setItem('voidDailyLast', new Date().toDateString());
-      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
     } catch { /* private */ } });
     await p.goto(`http://127.0.0.1:${PORT}/?w=${w}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
     await p.waitForFunction(() => !!window.__voidState && !!window.__solidAt, null, { timeout: 400000 });

@@ -40,6 +40,7 @@ for (let i = 0; i < N; i++) {
       localStorage.setItem('voidPlayed', '1');
       localStorage.setItem('voidTut', '1');
       localStorage.setItem('voidDailyLast', new Date().toDateString());
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
     } catch { }
   });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

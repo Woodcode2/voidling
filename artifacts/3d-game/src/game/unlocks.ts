@@ -25,14 +25,14 @@
 //  players existed, and taking a world away from a child who was in it
 //  yesterday would be the worst possible way to introduce progression.
 
-export type WorldKey = 'maple' | 'pirate' | 'gameday' | 'lantern';
+export type WorldKey = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
 
 /** The order they open in. Maple is world 1 and is always open. */
-export const WORLD_ORDER: WorldKey[] = ['maple', 'pirate', 'gameday', 'lantern'];
+export const WORLD_ORDER: WorldKey[] = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
 
 /** Display names, for the "finish X to unlock" line on a locked card. */
 export const WORLD_LABEL: Record<WorldKey, string> = {
-  maple: 'MAPLE FALLS', pirate: 'PIRATE BAY', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT',
+  maple: 'MAPLE FALLS', pirate: 'PIRATE BAY', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS',
 };
 
 const KEY = 'voidUnlocked';

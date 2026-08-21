@@ -40,7 +40,7 @@ await p.addInitScript(() => {
     // Maple, so a locked card refuses the tap BY DESIGN and the probe hangs
     // waiting for a match that can never start — the exact qa/music.mjs trap
     // recorded in FABLE-BRIEF. Seed all four.
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
   } catch { }
 });
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

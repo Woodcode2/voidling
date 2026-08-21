@@ -40,7 +40,7 @@ export type StickerTier = 'common' | 'rare' | 'legendary';
 export interface Sticker {
   /** stable id — this is the save key and the art filename. Never rename. */
   id: string;
-  world: 'maple' | 'pirate' | 'gameday' | 'lantern';
+  world: 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
   /** what the child is told they found */
   name: string;
   /** which district it hides in — shown in the book as the hunting ground */
@@ -234,6 +234,50 @@ const LANTERN: Sticker[] = [
     art: 'one woven straw sandal with a fabric thong' },
 ];
 
+// ── POWDER PASS ───────────────────────────────────────────────────────────
+// Same rules as the other four: NAMED things the valley would actually talk
+// about, hidden in real districts, tier by how far off the beaten run they
+// sit. The voice is the school-closures desk: dignity, lost equipment, and
+// administrative composure.
+const POWDER: Sticker[] = [
+  { id: 'closure-board', world: 'powder', name: 'The Closure Board', where: 'The Village', biome: 'village',
+    hint: 'Every school in the valley, listed. The list has never been longer.', tier: 'common',
+    art: 'a wooden notice board crammed with paper closure notices, snow on top' },
+  { id: 'champion-snowman', world: 'powder', name: 'Chairman Frost', where: 'The Village', biome: 'village',
+    hint: 'Three winters running. The carrot is ceremonial.', tier: 'rare',
+    art: 'a grand three-ball snowman with a top hat, medal ribbon and carrot' },
+  { id: 'lost-mitten', world: 'powder', name: 'The Lost Mitten', where: 'The Frozen Lake', biome: 'lake',
+    hint: 'Red, left hand, mentioned on the radio every morning since November.', tier: 'common',
+    art: 'one small red knitted mitten lying on cracked blue ice' },
+  { id: 'grit-lorry', world: 'powder', name: 'Old Bess', where: 'The Home Run', biome: 'piste',
+    hint: 'The gritter. She has a name, a route, and opinions about both.', tier: 'rare',
+    art: 'a chunky orange grit lorry with a snow plough and a name painted on the door' },
+  { id: 'frozen-fountain', world: 'powder', name: 'The Paused Fountain', where: 'The Village', biome: 'village',
+    hint: 'Froze mid-splash in November. The council minutes say "revisit in spring".', tier: 'rare',
+    art: 'a small stone fountain frozen solid mid-spray, icicles like glass' },
+  { id: 'ski-instructor-hat', world: 'powder', name: "Instructor Bo's Bobble", where: 'The High Shoulder', biome: 'rim',
+    hint: 'The bobble hat that has taught more children to snowplough than Bo has.', tier: 'common',
+    art: 'a huge striped bobble hat planted upright in deep snow' },
+  { id: 'lift-chair-nine', world: 'powder', name: 'Chair Nine', where: 'The Home Run', biome: 'piste',
+    hint: 'Squeaks. Has always squeaked. The lift operator says it adds character.', tier: 'common',
+    art: 'a two-seat chairlift chair hanging from its cable, one seat dusted with snow' },
+  { id: 'hot-choc-summit', world: 'powder', name: 'The Last Hot Chocolate', where: 'The Lodge', biome: 'lodge',
+    hint: 'Made at 7am. Still on the counter. Still, somehow, warm.', tier: 'legendary',
+    art: 'a steaming mug of hot chocolate with marshmallows on a timber counter' },
+  { id: 'pinecone-king', world: 'powder', name: 'The Pinecone King', where: 'The Pinewood', biome: 'pinewood',
+    hint: 'The biggest cone in the wood. The squirrels have formed a committee.', tier: 'rare',
+    art: 'an enormous pinecone on a snowy stump, small paw prints circling it' },
+  { id: 'sled-record', world: 'powder', name: 'The Record Sled', where: 'The Home Run', biome: 'piste',
+    hint: 'Fastest run down the Home Run, 1987. Nobody has dared since.', tier: 'legendary',
+    art: 'a vintage red wooden sled mounted on a little plinth with a brass plaque' },
+  { id: 'ice-fish-hut', world: 'powder', name: "Norm's Office", where: 'The Frozen Lake', biome: 'lake',
+    hint: 'An ice-fishing hut. Norm has caught one fish. He keeps the hours anyway.', tier: 'common',
+    art: 'a tiny wooden ice-fishing hut with a stove pipe, warm light in the window' },
+  { id: 'aurora-jar', world: 'powder', name: 'The Aurora In A Jar', where: 'The High Shoulder', biome: 'rim',
+    hint: 'A jam jar on a fence post that catches the lights. Nobody moves it.', tier: 'legendary',
+    art: 'a glass jam jar on a snowy fence post glowing green and violet inside' },
+];
+
 // ── THE SEASONAL SETS — four per season, live only while it runs ──────────
 // Same rules as the permanent sets: named things the town would talk about,
 // hidden in real districts, tier = distance not dice. One legendary each.
@@ -295,7 +339,7 @@ const MOONFEST: Sticker[] = [
 ];
 
 export const STICKERS: Sticker[] = [
-  ...MAPLE, ...PIRATE, ...GAMEDAY, ...LANTERN,
+  ...MAPLE, ...PIRATE, ...GAMEDAY, ...LANTERN, ...POWDER,
   ...HARVEST, ...REGATTA, ...HOMECOMING, ...MOONFEST,
 ];
 // VISIBILITY IS THE ONE RULE, APPLIED IN ONE PLACE. A seasonal sticker exists

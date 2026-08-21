@@ -40,7 +40,7 @@
             if (!w) w = localStorage.getItem('voidWorld');
             auto = localStorage.getItem('voidAutoPlay') === '1';
           } catch (e) { /* storage blocked: fall through on defaults */ }
-          if (['maple', 'pirate', 'gameday', 'lantern'].indexOf(w) < 0) w = 'maple';
+          if (['maple', 'pirate', 'gameday', 'lantern', 'powder'].indexOf(w) < 0) w = 'maple';
           var order = auto ? [w, 'menu'] : ['menu', w];
           for (var i = 0; i < order.length; i++) {
             var l = document.createElement('link');
@@ -1858,6 +1858,11 @@
         <div class="wCard" data-world="lantern">
           <div class="wArt"></div><div class="wNum">WORLD 4</div>
           <div class="wBody"><b>LANTERN NIGHT</b><span>YOU ARE THEIR GUEST</span>
+            <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
+        </div>
+        <div class="wCard" data-world="powder">
+          <div class="wArt"></div><div class="wNum">WORLD 5</div>
+          <div class="wBody"><b>POWDER PASS</b><span>SCHOOL'S SHUT. SLIDE.</span>
             <div class="wBest"></div><div class="wGo">▶ PLAY</div></div>
         </div>
       </div>

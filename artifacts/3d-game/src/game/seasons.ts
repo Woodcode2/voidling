@@ -30,7 +30,7 @@
 export interface SeasonEvent {
   /** stable id — sticker gating and telemetry key on it. Never rename. */
   id: string;
-  world: 'maple' | 'pirate' | 'gameday' | 'lantern';
+  world: 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
   /** the season's name, shouted the way the worlds shout */
   name: string;
   icon: string;
@@ -63,6 +63,11 @@ export const EVENTS: SeasonEvent[] = [
   { id: 'harvest', world: 'maple', name: 'HARVEST WEEK', icon: '🎃',
     from: [10, 17], to: [11, 2], accent: 0xff9a2e, flash: 'rgba(255,154,46,0.30)',
     line: 'the pumpkins have won' },
+  // the valley owns the year's end: the first real December season, and the
+  // one the wrap-the-new-year branch below was waiting for. School is shut.
+  { id: 'snowday', world: 'powder', name: 'SNOW DAY', icon: '❄️',
+    from: [12, 18], to: [1, 4], accent: 0xbfe4ff, flash: 'rgba(191,228,255,0.30)',
+    line: 'all schools closed. all sledding mandatory.' },
 ];
 
 const EVENT_BY_ID = new Map(EVENTS.map((e) => [e.id, e]));

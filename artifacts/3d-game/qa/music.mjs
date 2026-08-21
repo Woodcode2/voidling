@@ -62,7 +62,7 @@ for (const w of list) {
     // perfectly. That is what made Pirate look like a 15-minute hang, and it is
     // why raising the timeout to 900s changed nothing: the wait was never going
     // to end. Maple passed throughout only because world 1 is never locked.
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
   } catch { /* private mode */ } });
   await p.goto(`http://127.0.0.1:4177/?w=${w}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

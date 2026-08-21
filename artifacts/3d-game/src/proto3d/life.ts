@@ -17,6 +17,8 @@ import { glb, vehicleGlb, contactShadow } from './assets3d';
 import * as BAY from './bay';
 import * as GD from './gameday';
 import * as LN from './lantern';
+import * as PW from './powder';
+import * as AL from './alpine';
 // MAPLE FALLS speaks for itself: newsroom_maple exports its townsfolk voices in
 // exactly the shape of the VOICE_AMBIENT / VOICE_PANIC pools below, keyed by
 // the same voice ids the cast carries (politician, protester, gossip, farmer,
@@ -2114,6 +2116,38 @@ export function createLife(
       'towels on the bench, honoured guest', 'six hundred years and still warm',
       'no, no — stay as long as you like'],
   };
+  // ── POWDER PASS chatter: THE VALLEY'S OWN VOICES ─────────────────────────
+  // Same rule that saved the tanuki from shouting "MY LOUNGER!!": nothing
+  // here shares a literal with another world, so a fall-through cannot pass
+  // silently. Snow-day register — everyone is delighted to be out, and the
+  // panic is about equipment and dignity, never danger.
+  const PW_AMBIENT: Record<string, string[]> = {
+    village: ['no school!! NO SCHOOL!!', 'the gritter has done our road twice. showing off.',
+      'hot chocolate first. then everything else.', 'mind the icicles. classic icicles.',
+      'chairman frost is looking well', 'somebody built a fifth snowman overnight'],
+    lake: ['the ice is fine. the ice is FINE.', 'norm caught one fish in 1994',
+      'skate LEFT. everyone skates left.', 'my mitten!! it slid!!', 'the cracks sing when it gets cold'],
+    pinewood: ['the snow slides off the pines all at once. wait for it.',
+      'a pinecone the size of a dog out there', 'quietest place in the valley', 'fresh tracks!!'],
+    piste: ['the Home Run is FAST today', 'lean back!! LEAN BACK!!',
+      'chair nine squeaks. adds character.', 'race you to the bottom', 'sled queue is an hour. worth it.'],
+    lodge: ['the lodge cocoa is famous in three valleys', 'the fire has been lit since october',
+      'boots OFF at the door', 'best view in the valley, if you climb for it'],
+    rim: ['the aurora was out last night', 'you can see the whole bowl from up here',
+      'the high shoulder wind bites', 'somebody left a jam jar on the fence again'],
+  };
+  const PW_PANIC: Record<string, string[]> = {
+    village: ['THE CHALET!! we had a BOOKING!!', 'the closure list has a new entry!!',
+      'grab the sled and GO', 'not the notice board!!'],
+    lake: ['the lake is DRAINING UPHILL!!', 'norm!! out of the hut, norm!!',
+      'skate FASTER!!', 'that crack was not the cold!!'],
+    pinewood: ['the pines are LEAVING!!', 'the committee has abandoned the cone!!', 'fresh tracks. VERY fresh.'],
+    piste: ['clear the run!! CLEAR THE RUN!!', 'chair nine has stopped squeaking. chair nine has stopped EXISTING.',
+      'that is not a mogul!!', 'the lift queue has dispersed. vertically.'],
+    lodge: ['save the cocoa!!', 'the fire is out and so is the FLOOR!!', 'boots on. BOOTS ON. GO.'],
+    rim: ['down!! everyone DOWN the shoulder!!', 'the jar has seen everything!!'],
+  };
+
   const LN_AMBIENT: Record<string, string[]> = {
     stalls: ['six hundred years I have run this stall', 'the fox stall undercuts me. always.',
       'somebody is eating a LOT tonight', 'my sauce. my own sauce.', 'busy! busy tonight!',
@@ -3788,6 +3822,171 @@ export function createLife(
     }
   }
 
+  // ══ POWDER PASS: a valley on a snow day ═══════════════════════════════════
+  // The crowd is DELIBERATELY modest — ~360 people against Lantern's ~970,
+  // because the perf budget (AAA-BRIEF §7) caps a new world at Game Day's
+  // frame bill and the movers here (skaters, sledders, the lift) are more
+  // visible per head than a market crowd. Nearly half are children: it is a
+  // snow day, that is who is out.
+  if (worldId() === 'powder') {
+    const pwRegion = (id: PW.PwBiome) => PW.PW_REGIONS.find((r) => r.id === id)!;
+    const pwPlace = (wx: number, wy: number, id: PW.PwBiome,
+                     o?: { kid?: boolean; tether?: number; speed?: number }) => {
+      const p = o?.kid ? makeCast('kid', id) : makePerson(id);
+      const [x, z] = g3([wx, wy]);
+      addWanderer(p, x, z, o?.tether ?? 9, o?.speed ?? rand(0.8, 1.6),
+        16, o?.kid ? 1.9 : 2.4, id, undefined, undefined);
+    };
+    const PW_CAST: [PW.PwBiome, number, number][] = [
+      ['village', 90, 20],     // the square, the road, everyone's front step
+      ['lake', 105, 22],       // the lake carries the level — skaters below too
+      ['pinewood', 26, 30],    // a few walkers under the pines
+      ['piste', 68, 24],       // the sled queue and the sledding
+      ['lodge', 38, 24],       // arrivals, cocoa-holders
+    ];
+    for (const [id, n, clear] of PW_CAST) {
+      const r = pwRegion(id);
+      if (!r) continue;
+      for (const [wx, wy] of PW.scatterInRegion(r, n, Math.random, clear))
+        pwPlace(wx, wy, id, { kid: Math.random() < 0.45 });
+    }
+    // the HIGH SHOULDER is the rim band, not a polygon (powder.ts's own note:
+    // never scatterInRegion into it) — stragglers coming down for the day
+    for (const [wx, wy] of PW.scatterLand(30, Math.random, 40, [0, 600]))
+      pwPlace(wx, wy, 'rim', { tether: 26, speed: rand(1.0, 1.8), kid: Math.random() < 0.3 });
+
+    // ── SKATERS: the lake's signature. They LOOP — long oval orbits at real
+    // speed, which against the stagger's usual amble is what makes the ice
+    // read as ice from the first frame.
+    for (let i = 0; i < 10; i++) {
+      const p = i % 2 ? makeCast('kid', 'lake') : makePerson('lake');
+      const a0 = rand(0, Math.PI * 2);
+      const orx = PW.LAKE.rx * rand(0.3, 0.72), ory = PW.LAKE.ry * rand(0.3, 0.72);
+      const spd2 = rand(0.5, 0.9);
+      const [cx3, cz3] = g3([PW.LAKE.cx, PW.LAKE.cy]);
+      let a = a0;
+      p.userData.mover = true;
+      const [sx, sz] = g3([PW.LAKE.cx + Math.cos(a0) * orx, PW.LAKE.cy + Math.sin(a0) * ory]);
+      p.position.set(sx, 0, sz);
+      scene.add(p); addEdible(p, 0.62);
+      movers.push({ mesh: p, update(dt2, _tm, vx, vz, vR) {
+        if (eaten(p)) return;
+        // skate away from the void when it looms; otherwise carve the oval
+        const dx2 = p.position.x - vx, dz2 = p.position.z - vz;
+        if (Math.hypot(dx2, dz2) < vR + 9) { a += dt2 * spd2 * 2.2; } else a += dt2 * spd2;
+        const tx = cx3 + Math.cos(a) * orx * 0.05 * 20, tz = cz3 + Math.sin(a) * ory * 0.05 * 20;
+        p.position.x += (tx - p.position.x) * Math.min(1, dt2 * 3.2);
+        p.position.z += (tz - p.position.z) * Math.min(1, dt2 * 3.2);
+        p.rotation.y = -a;
+      } });
+    }
+
+    // ── OLD BESS, the gritter, on her route — named in the sticker book,
+    // mentioned by the radio, and the biggest ordinary meal on the road
+    {
+      const bess = AL.makeGritter();
+      bess.userData.mover = true; bess.userData.qk = 'gritter'; bess.userData.ptsMult = 1.5;
+      let t = 0.3, d = 1;
+      const at = (tt: number) => PW.pathPointAt(PW.GRIT, tt);
+      const p0 = at(t); const [bx, bz] = g3([p0.x, p0.y]);
+      bess.position.set(bx, 0, bz);
+      scene.add(bess); addEdible(bess, 2.6);
+      movers.push({ mesh: bess, update(dt2, _tm, vx, vz, vR) {
+        if (eaten(bess)) return;
+        // the road is OPEN — bounce at the ends, never wrap (the buggy lesson)
+        t += d * 0.02 * dt2;
+        if (t >= 1) { t = 1; d = -1; } else if (t <= 0) { t = 0; d = 1; }
+        const pp = at(t);
+        const [x3, z3] = g3([pp.x, pp.y]);
+        bess.position.set(x3, 0, z3);
+        bess.rotation.y = -pp.ang + (d < 0 ? Math.PI : 0);
+        // the void looming makes her floor it for the far end
+        if (Math.hypot(x3 - vx, z3 - vz) < vR + 22) t += d * 0.02 * dt2 * 2.0;
+      } });
+    }
+    // ── THE LIFT: chairs riding the cable up the Home Run and back. The
+    // pylons are placed by island.ts; the chairs are movers on the same
+    // authored line, seated at cable height (alpine.ts hangs the chair from
+    // its grip — sink 2.9 per its doc comment).
+    for (let i = 0; i < 6; i++) {
+      const chair = AL.makeLiftChair();
+      const dir = i % 2 ? 1 : -1;          // alternate directions = both cables
+      let t = (i / 6) % 1;
+      chair.userData.mover = true; chair.userData.qk = 'lift';
+      scene.add(chair); addEdible(chair, 1.1);
+      movers.push({ mesh: chair, update(dt2) {
+        if (eaten(chair)) return;
+        t += dir * dt2 * 0.016;
+        if (t > 1) t -= 1; if (t < 0) t += 1;
+        const pp = PW.pistePoint(t);
+        const [x3, z3] = g3([pp.x, pp.y]);
+        // offset each cable to its own side of the pylon crossarm
+        const side = dir * 1.6;
+        chair.position.set(x3 + Math.cos(pp.ang + Math.PI / 2) * side * 0.05 * 20, 5.8 - 2.9, z3 + Math.sin(pp.ang + Math.PI / 2) * side * 0.05 * 20);
+        chair.rotation.y = -pp.ang + (dir < 0 ? Math.PI : 0);
+      } });
+    }
+    // ── SLEDDERS: kids bombing the Home Run top to bottom, forever. The
+    // downhill leg is fast and the walk back up is slow, which is the whole
+    // rhythm of a sledding hill compressed into a loop.
+    for (let i = 0; i < 6; i++) {
+      const sled = AL.makeSled();
+      const kid = makeCast('kid', 'piste');
+      kid.position.y = 0.32; sled.add(kid);
+      let t = rand(0.1, 0.9); let downhill = Math.random() < 0.7;
+      const lane = rand(-140, 140);
+      sled.userData.mover = true; sled.userData.qk = 'sledkid';
+      scene.add(sled); addEdible(sled, 0.85);
+      movers.push({ mesh: sled, update(dt2) {
+        if (eaten(sled)) return;
+        t += (downhill ? 1 : -1) * dt2 * (downhill ? 0.045 : 0.012);
+        if (t >= 0.98) { t = 0.98; downhill = false; }
+        if (t <= 0.04) { t = 0.04; downhill = true; }
+        const pp = PW.pistePoint(t);
+        const [x3, z3] = g3([pp.x + Math.cos(pp.ang + Math.PI / 2) * lane, pp.y + Math.sin(pp.ang + Math.PI / 2) * lane]);
+        sled.position.set(x3, 0, z3);
+        sled.rotation.y = -pp.ang + (downhill ? 0 : Math.PI);
+      } });
+    }
+
+    // ── THE AVALANCHE — the finale cue. The mountain lets go and the piste
+    // delivers: a stream of giant snowballs rides down the Home Run for the
+    // last act, each one edible, each one worth eating. The only finale in
+    // the game where the food comes to the player.
+    {
+      const balls: { m: THREE.Object3D; t: number; lane: number; spd: number; on: boolean }[] = [];
+      let armed = false;
+      cues.push((n) => {
+        if (n !== 'avalanche' || armed) return;
+        armed = true;
+        for (let i = 0; i < 22; i++) {
+          const r = rand(0.8, 2.2);
+          const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8),
+            new THREE.MeshStandardMaterial({ color: 0xf4f7ff, roughness: 0.9 }));
+          m.userData.mover = true; m.userData.qk = 'snowball'; m.userData.ptsMult = 1.4;
+          const pp = PW.pistePoint(0.02);
+          const [x3, z3] = g3([pp.x, pp.y]);
+          m.position.set(x3, r, z3);
+          scene.add(m); addEdible(m, r);
+          balls.push({ m, t: 0.02 - i * 0.035, lane: rand(-220, 220), spd: rand(0.05, 0.075), on: true });
+        }
+      });
+      movers.push({ mesh: null as unknown as THREE.Object3D, update(dt2) {
+        if (!armed) return;
+        for (const b of balls) {
+          if (!b.on || eaten(b.m)) continue;
+          b.t += dt2 * b.spd;
+          if (b.t < 0.02) continue;          // staggered release off the top
+          if (b.t >= 1) { b.on = false; b.m.visible = false; continue; }
+          const pp = PW.pistePoint(b.t);
+          const [x3, z3] = g3([pp.x + Math.cos(pp.ang + Math.PI / 2) * b.lane, pp.y + Math.sin(pp.ang + Math.PI / 2) * b.lane]);
+          b.m.position.set(x3, b.m.position.y, z3);
+          b.m.rotation.x += dt2 * 4;
+        }
+      } });
+    }
+  }
+
   if (worldId() === 'gameday') {
     const gdRegion = (id: GD.GdBiome) => GD.GD_REGIONS.find((r) => r.id === id)!;
     // island.ts renames three districts on the way out; `dress` and the AMBIENT
@@ -5284,8 +5483,8 @@ export function createLife(
           // spirit market falling through to them would have a tanuki saying
           // "MY LOUNGER!!". Nothing here shares a literal with another world
           // precisely so that fall-through cannot happen silently.
-          const AMB = WID === 'lantern' ? LN_AMBIENT : AMBIENT;
-          const PAN = WID === 'lantern' ? LN_PANIC : PANIC;
+          const AMB = WID === 'lantern' ? LN_AMBIENT : WID === 'powder' ? PW_AMBIENT : AMBIENT;
+          const PAN = WID === 'lantern' ? LN_PANIC : WID === 'powder' ? PW_PANIC : PANIC;
           // …and on LANTERN NIGHT there is a third state between them. The
           // scream roll is the same; what it reaches for changes. In the wary
           // band a spirit who has decided to speak up says something uneasy
@@ -5295,8 +5494,8 @@ export function createLife(
           const pool = scream
             ? (panPool(p.voice)
               || (lnWary ? (LN_WARY[p.biome] || LN_WARY.stalls) : null)
-              || PAN[p.biome] || PAN.stalls || PANIC.generic)
-            : (ambPool(p.voice) || AMB[p.biome] || AMB.stalls || AMBIENT.cozy);
+              || PAN[p.biome] || (WID === 'powder' ? PW_PANIC.village : PAN.stalls) || PANIC.generic)
+            : (ambPool(p.voice) || AMB[p.biome] || (WID === 'powder' ? PW_AMBIENT.village : AMB.stalls) || AMBIENT.cozy);
           cpos.set(p.mesh.position.x, 5, p.mesh.position.z);
           // a wary line is not a scream and must not be styled as one — the
           // bubble's panic styling is red and shaking, which would undo the

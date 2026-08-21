@@ -71,6 +71,9 @@ export interface Audio3D {
   musicState(): {
     ctx: string; muted: boolean; masterGain: number;
     synth: boolean;
+    /** the shared music bus gain — the node duckMusic() schedules on; a duck
+     *  that never recovers hides behind healthy channel numbers without it */
+    bus: number;
     /** TRUE when the silent media element is playing — i.e. the page holds
      *  the Playback audio session and the iPhone mute switch cannot mute it */
     media: boolean;
@@ -681,7 +684,8 @@ export function createAudio(): Audio3D {
   /** The hand-written bed for whichever world this session is on. */
   const worldSynth = () => (isPirate() ? startTropical
     : isGameday() ? startGameday
-      : isLantern() ? startLantern : startTown);
+      : isLantern() ? startLantern
+        : isPowder() ? startPowderScore : startTown);
   /** Bring the bed up, unless a recording beat it to it. */
   function synthCover() {
     const c = ctx;
@@ -703,7 +707,7 @@ export function createAudio(): Audio3D {
     if (!synthOn) return;
     synthOn = false;
     logEv('synth bed down (handover)');
-    stopTropical(fade); stopTown(fade); stopGameday(fade); stopLantern(fade);
+    stopTropical(fade); stopTown(fade); stopGameday(fade); stopLantern(fade); stopPowder(fade);
   }
   function repairMusic() {
     const c = ctx;
@@ -3465,6 +3469,131 @@ export function createAudio(): Audio3D {
     clack(master, t + 2.1, 0.07);
   }
 
+
+  // ═══ POWDER PASS — the fifth score ═══════════════════════════════════════
+  // A snow-day dusk: a music box over sleigh bells, with a low warm pad under
+  // it — the sound of a village that has cancelled everything and is pleased
+  // about it. Deliberately COMPACT next to the four incumbents (no per-zone
+  // ambience mixer yet — recorded in the AAA-BRIEF ledger as an honest gap):
+  // one bus, one scheduler, the same musStage escalation contract as the rest.
+  //   stage 0   music box alone, sparse — the valley holding its breath
+  //   stage 1+  sleigh bells pick up the off-beats
+  //   stage 2+  the pad swells, the box doubles at the octave
+  //   stage 3+  bells on every beat, a low drum — the avalanche is coming
+  const isPowder = () => worldId() === 'powder';
+  let pwBus: GainNode | null = null;
+  let pwTimer: ReturnType<typeof setInterval> | null = null;
+  let pwStep = 0, pwNextT = 0, pwRunning = false;
+  // D major pentatonic, high register — the icy music-box row
+  const PW_ROW = [587.33, 659.25, 739.99, 880.0, 987.77, 1174.66];
+  const pwDeg = (i: number) => PW_ROW[((i % PW_ROW.length) + PW_ROW.length) % PW_ROW.length];
+  /** one music-box note: triangle with a fast bright decay + a sine an octave
+   *  up at low level — reads as celesta on a phone speaker */
+  function pwBox(freq: number, t: number, vol = 0.16) {
+    const c = ctx; if (!c || !pwBus) return;
+    for (const [f, v, d] of [[freq, vol, 0.9], [freq * 2, vol * 0.28, 0.5]] as const) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(pwBus);
+      o.start(t); o.stop(t + d + 0.05);
+    }
+  }
+  /** sleigh bells: a short burst of bright filtered noise, band-passed high */
+  function pwBells(t: number, vol = 0.10) {
+    const c = ctx; if (!c || !pwBus) return;
+    const len = Math.floor(c.sampleRate * 0.09);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.value = 5200; f.Q.value = 1.2;
+    const g = c.createGain(); g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(pwBus);
+    src.start(t);
+  }
+  /** the pad: two detuned sines a fifth apart, slow swell, held a bar */
+  function pwPad(rootHz: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || !pwBus) return;
+    for (const f of [rootHz, rootHz * 1.4983, rootHz * 1.007]) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + dur * 0.35);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(pwBus);
+      o.start(t); o.stop(t + dur + 0.05);
+    }
+  }
+  /** a soft low drum — felt, not heard; the avalanche pulse at full stage */
+  function pwDrum(t: number, vol = 0.20) {
+    const c = ctx; if (!c || !pwBus) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.16);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g); g.connect(pwBus);
+    o.start(t); o.stop(t + 0.35);
+  }
+  // the tune: a 16-step music-box phrase that rises and falls — authored, not
+  // random, so a child can hum it by match three
+  const PW_TUNE = [0, 2, 4, 5, 4, 2, 0, -1, 0, 2, 4, 7, 5, 4, 2, 1];
+  function pwSchedule() {
+    const c = ctx; if (!c || !pwRunning) return;
+    const BEAT = 60 / (96 + musStage * 8) / 2;   // 8ths at 96..128 bpm
+    while (pwNextT < c.currentTime + 0.65) {
+      const t = pwNextT, st = pwStep;
+      const bar8 = st % 8, deg = PW_TUNE[st % PW_TUNE.length];
+      // the box plays on beats 0/2/4/6 at stage 0, filling in as stages rise
+      if (bar8 % 2 === 0 || musStage >= 2) pwBox(pwDeg(deg), t, 0.15);
+      if (musStage >= 2 && bar8 % 4 === 0) pwBox(pwDeg(deg) * 2, t, 0.05);
+      if (musStage >= 1 && bar8 % 2 === 1) pwBells(t, 0.07 + musStage * 0.015);
+      if (musStage >= 3 && bar8 % 2 === 0) pwBells(t, 0.05);
+      if (st % 16 === 0) pwPad(146.83, t, BEAT * 16, 0.05 + musStage * 0.012);
+      if (musStage >= 3 && bar8 % 4 === 0) pwDrum(t, 0.16);
+      pwNextT += BEAT; pwStep++;
+    }
+  }
+  function startPowderScore() {
+    const c = ensure(); if (!c || !master) return;
+    if (!pwBus) {
+      pwBus = c.createGain(); pwBus.gain.value = 0.0001;
+      // a touch of air: one short feedback delay, wet and quiet — snowfields
+      // are the quietest place a child has ever stood, and the reverb says so
+      const dly = c.createDelay(0.5); dly.delayTime.value = 0.22;
+      const fb = c.createGain(); fb.gain.value = 0.28;
+      const wet = c.createGain(); wet.gain.value = 0.18;
+      pwBus.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet);
+      wet.connect(musicBus!); pwBus.connect(musicBus!);
+    }
+    pwRunning = true;
+    ramp(pwBus.gain, 0.5, c.currentTime, 1.8);
+    pwStep = 0; pwNextT = c.currentTime + 0.1;
+    if (pwTimer) clearInterval(pwTimer);
+    pwTimer = setInterval(pwSchedule, 110);
+  }
+  function stopPowder(fade: number) {
+    pwRunning = false;
+    if (pwTimer) { clearInterval(pwTimer); pwTimer = null; }
+    const c = ctx; if (!c || !pwBus) return;
+    ramp(pwBus.gain, 0, c.currentTime, fade);
+  }
+  /** the evolution answer: a rising music-box run with a bell flourish */
+  function powderEvolve() {
+    const c = ensure(); if (!c) return;
+    if (!pwBus) startPowderScore();
+    const t = c.currentTime + 0.02;
+    [0, 2, 4, 5, 7].forEach((d, i) => pwBox(pwDeg(d), t + i * 0.07, 0.17));
+    pwBells(t + 0.38, 0.13); pwBells(t + 0.5, 0.10);
+    pwDrum(t + 0.5, 0.2);
+  }
+
   return {
     startMusic() {
       // prefetch the recorded kit so the very first gulp is the real sample.
@@ -3490,8 +3619,9 @@ export function createAudio(): Audio3D {
       const synth = isPirate() ? startTropical
         : isGameday() ? startGameday
         : isLantern() ? startLantern
+        : isPowder() ? startPowderScore
         : startTown;
-      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : 'maple';
+      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : isPowder() ? 'powder' : 'maple';
       // theme.mp3 stays as Maple's legacy name so an existing drop-in keeps
       // working; the opt-in flag now only forces that older path.
       const urls = slot === 'maple' && LICENSED_THEME
@@ -3556,7 +3686,7 @@ export function createAudio(): Audio3D {
     // shop, anywhere the theme wants stating out loud. Silent in the bay,
     // which has a hook of its own and does not need this one.
     jingle() {
-      const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern()) return;
+      const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern() || isPowder()) return;
       jingleQuote(c.currentTime + 0.02, 0.1);
     },
     // ── THE WATCHDOG ──────────────────────────────────────────────────────
@@ -3610,7 +3740,7 @@ export function createAudio(): Audio3D {
     // for the same connection, and the one that is needed in two seconds must
     // not queue behind the one needed in twenty.
     preloadMusic() {
-      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : 'maple';
+      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : isPowder() ? 'powder' : 'maple';
       const urls = slot === 'maple' && LICENSED_THEME
         ? ['/assets/music/theme.mp3', '/assets/music/maple.mp3']
         : [`/assets/music/${slot}.mp3`];
@@ -3790,6 +3920,7 @@ export function createAudio(): Audio3D {
       stopTown(1.2);
       stopGameday(1.2);
       stopLantern(1.2);
+      stopPowder(1.2);
       themeCh.wanted = false;
       stopLoop(themeCh, 1.2);
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
@@ -3898,6 +4029,7 @@ export function createAudio(): Audio3D {
       if (isPirate()) { pirateEvolve(); return; }
       if (isGameday()) { gamedayEvolve(); return; }
       if (isLantern()) { lanternEvolve(); return; }
+      if (isPowder()) { powderEvolve(); return; }
       mapleEvolve();
     },
     voice(kind) {

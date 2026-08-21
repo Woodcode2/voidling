@@ -33,7 +33,7 @@ for (const [W, H] of SIZES) {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidMute', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
     // the drop must be OFFERABLE: fresh day, zero opened
     localStorage.setItem('voidDropDay', new Date().toDateString());
     localStorage.setItem('voidDropN', '0');
