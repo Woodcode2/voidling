@@ -4681,6 +4681,64 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(mesh, p2, kind < 0.28 ? 0.55 : kind < 0.5 ? 0.9 : kind < 0.68 ? 0.8 : kind < 0.86 ? 1.8 : 0.95,
         rnd2() * Math.PI * 2, false, kind >= 0.86 ? 'drift' : undefined);
     }
+    await breathe('Rolling the small snowballs…');
+    // 7. THE HOOVER ECONOMY. The census that forced this (qa/_edcount.mjs):
+    //    the first cut shipped 843 edibles against Maple's 5,790 and only 208
+    //    small ones against ~2,600 — the child driver starved (mean scores in
+    //    the low thousands against six figures) because a hole.io match IS
+    //    thousands of small meals. Snow lumps are the world's coins: a scaled
+    //    drift (four merged spheres, one draw call), everywhere, cheap.
+    //    Placed straight through place() — lumps may crowd; that is what
+    //    snow does.
+    {
+      const lump = () => { const m = AL.makeDrift(); m.scale.setScalar(0.32 + rnd2() * 0.22); return m; };
+      for (const p2 of PW.scatterLand(2400, rnd2, 0)) {
+        const [x3, z3] = P3(p2);
+        const m = lump(); m.rotation.y = rnd2() * Math.PI * 2;
+        place(m, x3, z3, 0.34 + rnd2() * 0.14);
+      }
+      for (const p2 of PW.scatterInRegion(REG('village'), 160, rnd2, 0)) {
+        const [x3, z3] = P3(p2);
+        const kind = rnd2();
+        const m = kind < 0.5 ? lump() : kind < 0.8 ? AL.makeSnowballStack() : AL.makeSled();
+        m.rotation.y = rnd2() * Math.PI * 2;
+        place(m, x3, z3, kind < 0.5 ? 0.4 : kind < 0.8 ? 0.6 : 0.55);
+      }
+      for (const p2 of PW.scatterInRegion(REG('piste'), 220, rnd2, 0)) {
+        const [x3, z3] = P3(p2);
+        const kind = rnd2();
+        const m = kind < 0.6 ? lump() : kind < 0.85 ? AL.makeSnowballStack() : AL.makeSled();
+        m.rotation.y = rnd2() * Math.PI * 2;
+        place(m, x3, z3, kind < 0.6 ? 0.4 : 0.6);
+      }
+      for (const p2 of PW.scatterInRegion(REG('lake'), 200, rnd2, 0)) {
+        const [x3, z3] = P3(p2);
+        const m = rnd2() < 0.75 ? lump() : AL.makeSled();
+        m.rotation.y = rnd2() * Math.PI * 2;
+        place(m, x3, z3, 0.42);
+      }
+      for (const p2 of PW.scatterInRegion(REG('pinewood'), 320, rnd2, 0)) {
+        const [x3, z3] = P3(p2);
+        const kind = rnd2();
+        const m = kind < 0.55 ? lump() : kind < 0.9 ? AL.makePine(2.6 + rnd2() * 2) : AL.makeLogPile();
+        m.rotation.y = rnd2() * Math.PI * 2;
+        place(m, x3, z3, kind < 0.55 ? 0.38 : kind < 0.9 ? 1.1 : 0.9);
+      }
+      for (const p2 of PW.scatterInRegion(REG('lodge'), 90, rnd2, 0)) {
+        const [x3, z3] = P3(p2);
+        const m = rnd2() < 0.7 ? lump() : AL.makeSkiRack();
+        m.rotation.y = rnd2() * Math.PI * 2;
+        place(m, x3, z3, rnd2() < 0.7 ? 0.4 : 0.85);
+      }
+    }
+    // 8. MID-SIZE FILL: the tier between a lump and a chalet was 610 thin
+    for (const p2 of PW.scatterLand(320, rnd2, 60)) {
+      const kind = rnd2();
+      const mesh = kind < 0.5 ? AL.makePine(3 + rnd2() * 3) : kind < 0.72 ? AL.makeSnowman()
+        : kind < 0.88 ? AL.makeDrift() : AL.makeLogPile();
+      drop(mesh, p2, kind < 0.5 ? 1.3 : kind < 0.72 ? 1.0 : kind < 0.88 ? 0.95 : 0.9,
+        rnd2() * Math.PI * 2, false, kind >= 0.72 && kind < 0.88 ? 'drift' : undefined);
+    }
     await breathe('Lighting the windows…');
     return;   // POWDER PASS is fully populated — the Maple grid pass must not run
   }

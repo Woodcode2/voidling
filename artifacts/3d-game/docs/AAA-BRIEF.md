@@ -1001,3 +1001,103 @@ NOW        qa/juice.mjs: one forced size-class-up bite through the real
 GATE       qa/juice.mjs (new) — forces the event via _dbg.__eatNearest and
            counts channels from STATE (works at sandbox fps). Contract ≥3
            of 4. Fails pre-fix: the lens channel could never fire.
+
+### WORLD FIVE: POWDER PASS — the §5 mandate — a mountain village on a snow day
+SCORED     against the §5 rubric (MECHANICAL ×3 / APPEAL ×2 / THUMB-STOP ×2 /
+           BUILD ×2 / RISK ×1). Two finalists survived the hard vetoes (no
+           terrain height, no real water, no networking, no downloaded
+           assets) and were scored in full; the longlist (toy box, candy,
+           jungle, dino dig, harbour, carnival, museum, space port) was
+           narrowed before scoring by the vetoes and by overlap with the
+           four shipped worlds.
+
+| candidate | Mech | Appeal | Pop | Build | Risk | weighted /60 |
+|---|---|---|---|---|---|---|
+| **POWDER PASS** — a mountain village on a snow day | 5 | 5 | 5 | 5 | 3 | **48** |
+| THE TOY BOX — a bedroom floor at 20× scale | 4 | 5 | 5 | 5 | 2 | 44 |
+
+           Powder wins on MECHANICAL — the only candidate whose theme IS a
+           mechanic three ways (ICE momentum, SNOW SHELL eat-up, AVALANCHE
+           finale) instead of a reskin. EVIDENCE HONESTY: winter's
+           kid-appeal here rests on contrast arithmetic (a purple hero on
+           blue-white snow is the strongest figure-ground any of our five
+           worlds can offer) and on hole.io's own catalogue leaving winter
+           untouched — white space, not external data. No child has seen
+           it. The named risk was real and was prototyped first: the snow
+           bake commits to blue shadow + warm windows or the world dies
+           washed-out at thumbnail size.
+CHANGED    src/proto3d/powder.ts (land: valley bowl, walkable ICE lake —
+           the lantern-canal lesson says water you can cross beats water
+           that walls — gritted road, PISTE, lift line), alpine.ts (16
+           prop factories, windows/doors on PROP_GLOW_MAT so the village
+           blooms at dusk), newsroom_powder.ts (THE VALLEY BULLETIN, 226
+           headlines), a stage-escalating music-box score in audio3d.ts,
+           ~360 villagers + skaters + sledders + Old Bess the gritter +
+           lift chairs in life.ts, and the 44-touchpoint integration
+           contract swept by definition-of-done grep (85 integration hits
+           outside powder's own modules; lantern's 217 is the codebase's
+           teaching example, not the bar). Mechanics: iceK 0.26 on velocity
+           convergence over lake+grit; SNOW SHELL = 6s ×1.45 eat-ratio off
+           drift props, announced; AVALANCHE = 22 snowballs down the PISTE
+           at beat four. Unlocks/seasons/stickers rows; FROST PEAKS poster
+           is the card art.
+NOW        traverse 100% reach at all 5 radii; postpipe PASS (equivalence,
+           hero-survives-glow, equirect dome, SKY_MOOD row hue 95 / fog
+           0x1a2742); a full short match runs sign-on → TIME! with the
+           Bulletin live; moverbands 388 movers, 277–317 full-rate at play
+           camera — under Maple's 384 budget. Screenshot
+           qa/out/shippedlook/powder_pw4-dense.png.
+GATE       every existing world gate now enumerates powder (the compiler
+           demanded 7 missing Record rows; the probes demanded the
+           voidUnlocked seed — the locked-card trap's third occurrence).
+
+### The hoover economy — POWDER — the par run caught starvation before a child did
+MEASURED   qa/ab.mjs (child driver) on the first-shipped bake: scores
+           403–3,253 vs ~100k on every other world. Cause measured, not
+           guessed: qa/_edcount.mjs counted 843 edibles (208 small) vs
+           Maple's 5,790 (2,605 small). The world was authored scenic —
+           props placed like a diorama — and the genre's core loop is a
+           hoover, not a gallery.
+CHANGED    two density sections in the powder populate: ~2,400 snow lumps
+           (makeDrift scaled ×0.32–0.54 — the small class the child mows
+           through), per-region small fills (village 160 / piste 220 /
+           lake 200 / pinewood 320 / lodge 90), and a 320-piece mid-size
+           fill. One python edit silently no-opped on a mismatched needle
+           and was caught by grep, redone with an asserted anchor — the
+           unconditional-print replace is now a recorded trap.
+NOW        qa/_edcount.mjs: 4,536 edibles (3,588 small / 922 mid / 26
+           big) vs Maple 5,803. traverse still 100% at all radii.
+           Par MEASURED on the dense bake: child mean 60,946 (54,443 /
+           54,297 / 91,269 / 50,368 / 54,354), wins 3/5, worst place 2nd
+           — the never-below-3rd floor holds. WORLD_PAR.powder = 45,000,
+           0.75 of the mean as Maple and Lantern sit. CAVEAT recorded in
+           the code: the runs were measured with the 150k placeholder
+           feeding the rival lane, so a convergence pass re-measures
+           after this lands.
+GATE       qa/ab.mjs 5 powder child — the same instrument that caught it.
+
+### WAIVED, deliberately, with reasons — recorded so silence never reads as "done"
+- **String table (§6 Phase 1 item 4)**: not extracted. All four shipped
+  worlds inline their copy at the use site, and the newsroom modules that
+  hold most of the words are already per-world files. Extracting ~2,000
+  strings into a table serves localisation we have not planned, and would
+  touch every system in the repo in one diff. Follows the lantern
+  precedent; reopen when a second language is real.
+- **Per-zone audio mixer for powder**: the compact stage-escalating score
+  ships instead. Zones (village/lake/piste) would want ducking rules that
+  the four shipped worlds also lack; building it for one world makes
+  powder the odd one, not the standard.
+- **The 'contest' life cue is a no-op on powder**: snowmen are pre-placed
+  set dressing, not a spawned contest. The cue dispatch tolerates the
+  no-op by design.
+- **Unlock migration**: a save that owns all four prior worlds does NOT
+  auto-own powder — the player ceremony-unlocks it by finishing Lantern
+  once. Deliberate: the unlock IS the content.
+- **assets/music/powder.mp3 does not exist, by design**: the synth score
+  is powder's score until the owner supplies a licensed track (the music
+  pipeline's owner-supplies-tracks rule; provenance tracker #46).
+  PRESENCE OF THE FILE IS THE SWITCH (audio3d's own words): the engine
+  probes /assets/music/powder.mp3 on boot, the 404 selects the synth,
+  and dropping a real file in later flips the world to it with no code
+  change — so the 404 on powder is designed, not a defect. qa/switch.mjs
+  confirms: the request goes out, the match is scored by the bed.

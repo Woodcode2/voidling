@@ -68,6 +68,13 @@ mobile titles and is right to.
 | `qa/grounding.mjs` | is the hero standing on the floor |
 | `qa/facewrap.mjs` | the face's wrap onto the sphere |
 | `qa/groundsurf.mjs` | the ground's road/grass material mask |
+| `qa/postpipe.mjs` | the post chain's colour contract: composed ≡ direct on the hero disc, hero survives glow, glow budget, sky is a DOME (equirect, not a screen quad) — `--gate` across all five worlds |
+| `qa/uisystem.mjs` | COMPUTED font weights/sizes over menu/picker/shop/settings — catches TS-painted violations a CSS sweep cannot see |
+| `qa/juice.mjs` | one forced size-class-up bite answers on ≥3 of 4 feel channels (lens kick, hit-stop, sparks, haptic) — state-based, works at sandbox fps |
+| `qa/traverse.mjs` | can a void of EVERY size still cross its island — flood-fill of the game's own `__solidAt`, reach ≥97% |
+| `qa/moverbands.mjs` | who sits in the choppy half-rate band per world at a play camera — a census, not a timing |
+| `qa/aftermatch.mjs` | menu music restarts after TIME! at menu level |
+| `qa/_edcount.mjs` | edibles per size class per world — the hoover economy (powder shipped scenic at 843 vs Maple's 5,790; this is the instrument that caught it) |
 
 ### `qa/music.mjs` CANNOT TELL YOU WHETHER ANYTHING MADE A SOUND
 
@@ -102,7 +109,12 @@ virtual frame rates with rendering stubbed), `qa/shading.mjs` (flat/smooth
 split per world). Two probe traps found since: a watch window shorter than
 sandbox game-time reports a working feature as broken (game time runs on frame
 count here — ten game-seconds is ~100 wall-seconds), and any concurrent build
-or second Chromium instance eats a probe's budget. One more code trap with
+or second Chromium instance eats a probe's budget. Two more since: every
+probe that reaches a match MUST seed `voidUnlocked` with ALL worlds — a locked
+card refuses the tap BY DESIGN and the probe hangs forever (three separate
+probes have now hit this); and a python `replace()` edit that prints "done"
+unconditionally is not an edit — `assert s.count(OLD) == 1` before every
+replace, then grep the file after. One more code trap with
 teeth: the boot now yields at seams, so anything reachable from window during
 boot must not touch consts declared later — the debug API stages on a
 buffering proxy and attaches atomically at end of module for exactly this

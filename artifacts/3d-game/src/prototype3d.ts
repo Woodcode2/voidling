@@ -502,11 +502,13 @@ const WORLD_PAR: Record<string, number> = {
   pirate: 105000,    // child mean 142,755 uncontested — nearly 2x Maple's scale
   gameday: 175000,   // verified: mean 198,446 (sd 61,657), wins 4/5
   lantern: 150000,   // child mean 199,791 uncontested; 0.75 of it, as Maple sits
-  // PLACEHOLDER pending qa/ab.mjs measurement (the AAA-BRIEF forbids guessing
-  // par and it is right — but a missing row is a coin flip at 0). Seeded from
-  // lantern's number because the two valleys have comparable prop density;
-  // the measured pass replaces it. Ledger records the follow-up.
-  powder: 150000,
+  // verified: child mean 60,946 (sd ~15.9k, one 91k outlier), wins 3/5, worst
+  // place 2nd — measured on the DENSE bake (the sparse one starved the child at
+  // 403-3,253 and qa/_edcount.mjs found why: 843 edibles vs Maple's 5,790).
+  // 0.75 of the mean, as Maple and Lantern sit. CAVEAT: measured with the old
+  // 150k placeholder feeding the rival lane (leader/lane mean 80%) — par moving
+  // down eases the lane, so a convergence pass re-measures after this lands.
+  powder: 45000,
 };
 
 
