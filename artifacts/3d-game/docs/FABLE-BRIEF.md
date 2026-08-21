@@ -76,6 +76,7 @@ mobile titles and is right to.
 | `qa/aftermatch.mjs` | menu music restarts after TIME! at menu level |
 | `qa/_edcount.mjs` | edibles per size class per world — the hoover economy (powder shipped scenic at 843 vs Maple's 5,790; this is the instrument that caught it) |
 | `qa/vary.mjs` | match 2 ≠ match 1: the dealt middle beats + hour differ between consecutive matches, and match 0 IS the shipped baseline every other probe measures |
+| `qa/econ.mjs` | the economy's promises: the daily cliff stays dead, trophy/level bounties pay exactly once, the bundle is on the shelf |
 
 ### `qa/music.mjs` CANNOT TELL YOU WHETHER ANYTHING MADE A SOUND
 

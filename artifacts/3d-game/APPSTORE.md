@@ -111,10 +111,25 @@ game; Capacitor wraps it in a native shell.
 ## In-App Purchases (App Store Connect setup)
 
 The client uses cordova-plugin-purchase (StoreKit). `initIAP()` registers
-`Object.values(IAP_PRODUCTS)` at boot — **SEVENTEEN products, not five**: the
-five legendary voids AND the twelve paid hats. Create every one of them as a
-**Non-Consumable** in App Store Connect with ids that match EXACTLY. The bridge
-is `src/proto3d/store3d.ts`; the shop wiring is in `src/prototype3d.ts`.
+`Object.values(IAP_PRODUCTS)` at boot — **EIGHTEEN products**: the
+five legendary voids, the twelve paid hats, AND the everything bundle. Create
+every one of them as a **Non-Consumable** in App Store Connect with ids that
+match EXACTLY. The bridge is `src/proto3d/store3d.ts`; the shop wiring is in
+`src/prototype3d.ts`.
+
+### The bundle — one product, the whole wardrobe
+
+| product id | display name | price | grants |
+|---|---|---|---|
+| com.voidling.bundle.everything | The Whole Wardrobe | $9.99 † | all five legendary voids + all twelve hats, forever |
+
+† **The price is the owner's decision** — $9.99 is the client's working number
+(catalogue value $54.83 à la carte; the point is one parental gate and one
+decision instead of seventeen). Set the real tier in App Store Connect; the
+client shows StoreKit's localized price wherever the store is live, so nothing
+in code needs to change with the tier. The grant is client-side: the purchase
+callback expands `everything` into every cash skin and every hat id, and
+RESTORE PURCHASES rebuilds it the same way on a new device.
 
 THIS SECTION USED TO SAY FIVE, and listed only the `com.voidling.skin.*` ids —
 the word "hat" did not appear in this file at all. A human following it would
@@ -171,7 +186,7 @@ ladder is ever cut, cut it here and not on the voids.
 
 What still needs a human with the Apple account:
 
-1. Create all SEVENTEEN non-consumables above, each at the price listed, with a
+1. Create all EIGHTEEN non-consumables above, each at the price listed, with a
    localized display name, description, and a review screenshot (`store/07-skins.png`
    covers the voids; the hat card art renders from geometry, so a shop capture
    works for those too). If any already exist at an older price, edit the tier —

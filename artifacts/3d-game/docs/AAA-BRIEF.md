@@ -1139,3 +1139,43 @@ DEFERRED   the four new pool beats are cue-less (banner, sting, mult, news,
            of the four shipped beats in every world. A cue each (the
            tractor drives the road, the mascots race the lot) is future
            work; the beats read as events without them.
+
+### The cliff is dead, the ladder pays, and the shop has one honest door — MONEY/REPEAT — closes absences #4/#6 (§4.4 items 1+4, §4.5 item 4)
+MEASURED   Missing one day reset the week multiplier to 1: a week-4 day-7
+           child came back from a birthday party to 90✦ where yesterday
+           paid 570✦ — a 6.3× loss-aversion penalty (the audit's 11.7× was
+           measured against the pre-rebuild table; the mechanism was the
+           same). The top-form trophy was off by one — it paid at COLOSSUS
+           (FORMS[4]) while calling itself the final form — and WORLD
+           ENDER and VOID TITAN, the two forms a child actually chases,
+           had no trophy at all. No trophy and no level-up paid anything.
+           Seventeen one-off SKUs, no bundle: a parent buying the catalogue
+           cleared twelve separate parental gates.
+CHANGED    Missing a day now steps the week ladder down ONE rung (never to
+           the bottom) and the day number rides voidDailyLife, a monotone
+           lifetime claim counter, so it can never go backwards. Trophies:
+           Colossus/World Ender/Void Titan each exist at their true form
+           index, every trophy carries a ✦ bounty (10–150, scaling with
+           depth), payTrophies() pays each exactly once at match end —
+           existing profiles get their back catalogue in one lump — and
+           level-ups pay 15+5×level on both match paths. The results
+           count-up shows the real total and the lead line names the
+           trophy. THE BUNDLE: com.voidling.bundle.everything, one
+           non-consumable that fans out to every cash skin + every hat in
+           the one callback purchase and restore share; a full-width
+           banner opens the LEGENDARY tier. PRICE IS THE OWNER'S CALL —
+           $9.99 is the client's working number, APPSTORE.md carries the
+           note and the eighteenth product row.
+NOW        qa/econ.mjs: the seeded week-4/missed-2-days player claims
+           145✦ (was 90) at DAY 28 (never DAY 1 again); a loaded profile's
+           first match pays all 17 bounties (+810✦) exactly once and a
+           rematch pays none of them twice; the bundle banner renders with
+           its price. qa/iapdoc.mjs: 18 products, doc and client agree.
+GATE       qa/econ.mjs (new) + qa/iapdoc.mjs.
+DEFERRED   from §4.4: the second endless coin sink (recolours) — recolouring
+           the HERO touches the owner-approved purple identity, so it needs
+           the owner's eye, not a unilateral pass; earn-rate rebalance and
+           the economy-as-JSON extraction ride with it. §4.5's dead-system
+           reconnect (notifications, Game Center), ratings prompt and cloud
+           save are Capacitor-shell work — they wire up when the store
+           submission (tracker #9) assembles the shell.

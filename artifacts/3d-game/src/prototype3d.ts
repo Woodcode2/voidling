@@ -1538,6 +1538,8 @@ const _dbg = new Proxy(_dbgStore, {
   __previewVoid?: (s: Skin) => void;
   __previewStop?: () => void;
   __shopMirror?: () => void;
+  /** repaint the bundle banner after a grant lands (set by the shop block) */
+  __paintBundle?: () => void;
   __shopTab?: () => void;
   __skinsGranted?: (ids: string[]) => void;
   __celebrateSkins?: (skins: Skin[]) => void;
@@ -4460,16 +4462,24 @@ function endMatch() {
     // gets the soft chime — never the "aww" notes, there is nobody to lose to
     if (newBest) audio.win(); else audio.ready();
     if (newBest) localStorage.setItem('voidBestPct', String(devouredPct));
+    const lvl2Before = rankInfo(xp).lvl;
     const gain2 = 8 + (newBest ? 8 : 0);
     xp += gain2; localStorage.setItem('voidXP', String(xp)); renderRank();
+    const lvl2To = rankInfo(xp).lvl > lvl2Before ? rankInfo(xp).lvl : 0;
     const reward2 = Math.max(5, Math.min(80, Math.round(devouredPct * 0.8))) + (newBest ? 20 : 0);
     addCoins(reward2);
     if (devouredPct >= 40) questEvent('solo40');
     endHd.textContent = `${devouredPct}% DEVOURED`;
-    celebrateEnd(reward2, gain2, newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`);
+    // solo pays the same ladder — stats first, so this run's trophies count
+    stats.matches++; stats.bestForm = Math.max(stats.bestForm, curStage); saveStats();
+    const troPay2 = payTrophies();
+    const lvlPay2 = lvl2To ? 15 + 5 * lvl2To : 0;
+    if (lvlPay2) addCoins(lvlPay2);
+    celebrateEnd(reward2 + troPay2.coins + lvlPay2, gain2,
+      troPay2.count ? `🏆 ${troPay2.last.toUpperCase()} EARNED!`
+        : newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`);
     endList.innerHTML = '';
     endEl.classList.add('show');
-    stats.matches++; saveStats();
     countMatch();
     track('match_end', {
       solo: true, sec: elapsed(), score: Math.round(playerScore),
@@ -4524,6 +4534,13 @@ function endMatch() {
   stats.best = Math.max(stats.best, Math.round(playerScore));
   stats.bestForm = Math.max(stats.bestForm, curStage);
   saveStats();
+  // THE LADDER PAYS (AAA-BRIEF §4.5 item 4). Trophies earned this match (and
+  // any back catalogue an existing profile is owed) plus a level-up bounty,
+  // folded into the same count-up the match reward runs — one ceremony, one
+  // number, and it is the real total that entered the wallet.
+  const troPay = payTrophies();
+  const lvlPay = leveledTo ? 15 + 5 * leveledTo : 0;
+  if (lvlPay) addCoins(lvlPay);
   const wk = weekKey();
   localStorage.setItem(wk, String(Math.max(Number(localStorage.getItem(wk) || 0), Math.round(playerScore))));
   const WIN_TITLES = COPY.winTitles;
@@ -4534,7 +4551,14 @@ function endMatch() {
   const LOSE_TITLES = ['STILL HUNGRY!', 'OUT-NOMMED!', 'SO CLOSE TO DELICIOUS', 'STILL SO MUCH LEFT TO EAT!', 'SNACK-SIZED THIS TIME'];
   endHd.textContent = myRank === 1 ? WIN_TITLES[Math.floor(Math.random() * WIN_TITLES.length)]
     : `#${myRank} · ${LOSE_TITLES[Math.floor(Math.random() * LOSE_TITLES.length)]}`;
-  celebrateEnd(reward, gain, myRank === 1 ? COPY.winSub : `${rows[0].name} devoured the most`, myRank === 1);
+  {
+    // the lead line names the biggest thing that just happened beyond the
+    // placement: a trophy beats a level, and the placement line is the default
+    const lead = troPay.count ? `🏆 ${troPay.last.toUpperCase()} EARNED!`
+      : leveledTo ? `⬆️ LEVEL ${leveledTo}!`
+        : myRank === 1 ? COPY.winSub : `${rows[0].name} devoured the most`;
+    celebrateEnd(reward + troPay.coins + lvlPay, gain, lead, myRank === 1);
+  }
   // THE RUN'S OWN NUMBERS. % DEVOURED was shown in Solo and nowhere else — the
   // figure a child watched climb for three minutes simply vanished at the
   // whistle — and nothing on the screen compared this run to their best.
@@ -6217,25 +6241,53 @@ const saveStats = () => localStorage.setItem('voidStats', JSON.stringify(stats))
 // Trophies span DIFFERENT axes (forms, wins, scores, appetite, the family,
 // combos, loyalty) and every one carries live progress — a kid can see
 // "812 / 5000" and keep chasing instead of staring at a grey square.
-const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: number }[] = [
-  { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', cur: () => stats.eaten, max: 1 },
-  { ic: '😋', nm: 'Muncher', ds: 'reach MUNCHER form', cur: () => stats.bestForm, max: 1 },
-  { ic: '🌀', nm: 'Gobbler', ds: 'reach GOBBLER form', cur: () => stats.bestForm, max: 2 },
-  { ic: '🕳️', nm: 'Devourer', ds: 'reach DEVOURER form', cur: () => stats.bestForm, max: 3 },
-  { ic: '🪐', nm: 'World Ender', ds: 'reach the final form', cur: () => stats.bestForm, max: 4 },
-  { ic: '👑', nm: 'Champion', ds: 'win a match', cur: () => stats.wins, max: 1 },
-  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10 },
-  { ic: '💯', nm: 'Century', ds: 'score 2,500 in a run', cur: () => stats.best, max: 2500 },
-  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000 },
-  { ic: '🍽️', nm: 'Big Appetite', ds: 'eat 500 things', cur: () => stats.eaten, max: 500 },
-  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000 },
-  { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'eat a family member', cur: () => stats.rivals ?? 0, max: 1 },
-  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10 },
+// THE TOP-FORM TROPHY WAS OFF BY ONE, AND THE LADDER TOPPED OUT EARLY. The
+// old 'World Ender' row paid at max:4 — which is COLOSSUS in FORMS — while
+// calling itself the final form, and the two forms a child actually chases
+// (WORLD ENDER at 5, VOID TITAN at 6) had no trophy at all. AAA-BRIEF §4.5.
+//
+// AND THE LADDER PAYS NOW (`pay`, in ✦): a trophy that grants nothing is a
+// label. Bounties scale with how deep in the game the trophy lives — the two
+// new top forms are the biggest single payouts in the coin economy, because
+// they are the two hardest true things a child can do here.
+const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: number; pay: number }[] = [
+  { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', cur: () => stats.eaten, max: 1, pay: 10 },
+  { ic: '😋', nm: 'Muncher', ds: 'reach MUNCHER form', cur: () => stats.bestForm, max: 1, pay: 10 },
+  { ic: '🌀', nm: 'Gobbler', ds: 'reach GOBBLER form', cur: () => stats.bestForm, max: 2, pay: 15 },
+  { ic: '🕳️', nm: 'Devourer', ds: 'reach DEVOURER form', cur: () => stats.bestForm, max: 3, pay: 25 },
+  { ic: '🪐', nm: 'Colossus', ds: 'reach COLOSSUS form', cur: () => stats.bestForm, max: 4, pay: 40 },
+  { ic: '🌍', nm: 'World Ender', ds: 'reach WORLD ENDER form', cur: () => stats.bestForm, max: 5, pay: 75 },
+  { ic: '🌑', nm: 'Void Titan', ds: 'reach the true final form', cur: () => stats.bestForm, max: 6, pay: 150 },
+  { ic: '👑', nm: 'Champion', ds: 'win a match', cur: () => stats.wins, max: 1, pay: 30 },
+  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10, pay: 75 },
+  { ic: '💯', nm: 'Century', ds: 'score 2,500 in a run', cur: () => stats.best, max: 2500, pay: 15 },
+  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000, pay: 40 },
+  { ic: '🍽️', nm: 'Big Appetite', ds: 'eat 500 things', cur: () => stats.eaten, max: 500, pay: 25 },
+  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000, pay: 100 },
+  { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'eat a family member', cur: () => stats.rivals ?? 0, max: 1, pay: 25 },
+  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10, pay: 75 },
   // the bar counts bites-in-a-row, so the words do too — and the old promise
   // ("x2.5") was a number the combo curve can no longer reach (caps at x2.2)
-  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25 },
-  { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25 },
+  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25, pay: 40 },
+  { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25, pay: 60 },
 ];
+// Pays every earned-but-unpaid trophy exactly once, keyed by name in
+// voidTrophyPaid. Called at the end of every match, after saveStats() — and
+// existing profiles get their back catalogue in one lump the first match
+// after this ships, which is a better surprise than pretending they were
+// paid all along. Returns what it paid so the results screen can say so.
+function payTrophies(): { count: number; coins: number; last: string } {
+  let paid: string[];
+  try { paid = JSON.parse(localStorage.getItem('voidTrophyPaid') || '[]') as string[]; }
+  catch { paid = []; }
+  const due = TROPHIES.filter((t) => t.cur() >= t.max && !paid.includes(t.nm));
+  if (!due.length) return { count: 0, coins: 0, last: '' };
+  const total = due.reduce((a, t) => a + t.pay, 0);
+  addCoins(total);
+  localStorage.setItem('voidTrophyPaid', JSON.stringify([...paid, ...due.map((t) => t.nm)]));
+  track('trophy_pay', { count: due.length, coins: total, names: due.map((t) => t.nm).join(',') });
+  return { count: due.length, coins: total, last: due[due.length - 1].nm };
+}
 function renderTrophies() {
   el('statsRow').innerHTML = [
     { v: stats.matches, l: 'MATCHES' }, { v: stats.wins, l: 'WINS' },
@@ -6248,7 +6300,7 @@ function renderTrophies() {
     return `<div class="tr ${done ? 'got' : ''}"><div class="ic">${t.ic}</div>` +
       `<div class="nm">${t.nm}</div><div class="ds">${t.ds}</div>` +
       (done ? '<div class="trDone">✓ EARNED</div>'
-        : `<div class="trBar"><div style="width:${pct}%"></div></div><div class="trCnt">${Math.min(c, t.max)} / ${t.max}</div>`) +
+        : `<div class="trBar"><div style="width:${pct}%"></div></div><div class="trCnt">${Math.min(c, t.max)} / ${t.max} · +${t.pay}✦</div>`) +
       '</div>';
   }).join('');
   el('trophyCount').textContent = `${got} / ${TROPHIES.length} EARNED`;
@@ -6348,9 +6400,17 @@ renderRank();
     const prevDay = Number(localStorage.getItem('voidDailyDay') || 0);
     // day 0-6 inside the week; finishing 6 rolls the week over
     const day = kept ? (prevDay + 1) % 7 : 0;
+    // THE CLIFF IS DEAD (AAA-BRIEF §4.4 item 4). A missed day used to reset
+    // the week multiplier to 1 — a week-4 child came back to 90✦ where
+    // yesterday paid 570✦, a 6.3× loss-aversion penalty pointed at a
+    // six-year-old for having a birthday party. Missing now steps the ladder
+    // down ONE rung and restarts the seven-day cycle there: reward returning,
+    // never punish missing. The streak count still resets — that is what
+    // "consecutive" means and the streak skins already earned stay earned —
+    // but the MONEY only ever dips gently.
     const week = kept
       ? Number(localStorage.getItem('voidDailyWeek') || 1) + (prevDay === 6 ? 1 : 0)
-      : 1;
+      : Math.max(1, Number(localStorage.getItem('voidDailyWeek') || 1) - 1);
     // ONE STREAK, NOT TWO. `voidStreak` (bumped when a match ends) and
     // `voidDailyStreak` (bumped when the calendar is claimed) counted the same
     // idea separately and drifted apart: measured, the calendar header read
@@ -6393,10 +6453,15 @@ renderRank();
     // (they have to; that is what a calendar is) but the number never goes
     // backwards, so day 8 is day 8 and the WEEK 2 header explains why the
     // prizes are bigger this time round.
-    const dayNo = (week - 1) * 7;
+    // voidDailyLife counts CLAIMS, monotone for the life of the profile — the
+    // week number can now step down after a miss, so (week-1)*7 would re-show
+    // day numbers a child has already seen, and "the number never goes
+    // backwards" is this card's oldest promise. Seeded once from the old
+    // arithmetic for existing installs.
+    const life = Number(localStorage.getItem('voidDailyLife') || (week - 1) * 7 + day);
     el('dailyGrid').innerHTML = DAILY.map((_amt, i) =>
       `<div class="dCell ${i < day ? 'past' : i === day ? 'now' : ''} ${i === 6 ? 'mega' : ''}">` +
-      `<b>DAY ${dayNo + i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
+      `<b>DAY ${life - day + i + 1}</b><span class="dIcon">${i < day ? '✅' : i === day ? '🎁' : ICON[i]}</span>` +
       `<span class="dAmt">${amount(i)}<i>✦</i></span></div>`).join('');
     // the streak is the LIFETIME consecutive-day count, and the week is stated,
     // so the card is different on day 8 from how it was on day 7
@@ -6416,6 +6481,7 @@ renderRank();
     (el('dailyClaim') as HTMLButtonElement).onclick = () => {
       addCoins(amount(day));
       localStorage.setItem('voidDailyLast', today);
+      localStorage.setItem('voidDailyLife', String(life + 1));
       localStorage.setItem('voidDailyDay', String(day));
       localStorage.setItem('voidDailyWeek', String(week));
       localStorage.setItem('voidDailyStreak', String(streak));
@@ -6944,7 +7010,19 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // StoreKit hands ownership back here — from a fresh purchase, and from
   // RESTORE PURCHASES, which App Review requires and which a child who got a
   // new iPad genuinely needs.
-  initIAP((ids) => {
+  initIAP((rawIds) => {
+    // THE BUNDLE FANS OUT HERE. 'everything' is one product in StoreKit and
+    // every cash skin plus every paid hat in the game — expanding it in the
+    // one callback both purchase AND restore come through means a new iPad
+    // gets the whole bundle back from one RESTORE tap.
+    let ids = rawIds;
+    if (ids.includes('everything')) {
+      localStorage.setItem('voidBundle', '1');
+      ids = [...new Set([...ids.filter((id) => id !== 'everything'),
+        ...SKINS.filter((sk) => sk.cash).map((sk) => sk.id),
+        ...HATS.filter((h) => h.usd).map((h) => h.id)])];
+      _dbg.__paintBundle?.();
+    }
     // TWO WARDROBES NOW. StoreKit hands back product ids and does not care
     // which slot they belong to, so route by id — a purchased hat landing in
     // voidSkinsOwned would be a skin the shop cannot show and a hat the child
@@ -6992,6 +7070,56 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     });
   }
 
+  // ── THE BUNDLE BANNER (AAA-BRIEF §4.4 item 1) ──────────────────────────
+  // One SKU, everything, forever: the sentence a parent wants to hear and ONE
+  // parental gate instead of seventeen. It opens the LEGENDARY tier — the
+  // tier a child scrolls INTO — and the à-la-carte cards keep selling below
+  // it. Owner sets the real price in App Store Connect; $9.99 is the client's
+  // working number and APPSTORE.md carries the note.
+  const BUNDLE_USD = 9.99;
+  const bundleOwned = () => localStorage.getItem('voidBundle') === '1';
+  let bundleEl: HTMLElement | null = null;
+  const paintBundle = () => {
+    if (!bundleEl) return;
+    const pr = bundleEl.querySelector('.pr') as HTMLElement;
+    bundleEl.classList.toggle('owned', bundleOwned());
+    pr.textContent = bundleOwned() ? '✓ YOURS FOREVER'
+      : `💎 ${iapPrice('everything') ?? `$${BUNDLE_USD.toFixed(2)}`}`;
+  };
+  _dbg.__paintBundle = paintBundle;
+  const buildBundle = () => {
+    bundleEl = document.createElement('div');
+    bundleEl.className = 'skCard bundle';
+    bundleEl.innerHTML = '<div class="rib">EVERYTHING</div>'
+      + '<div class="nm">THE WHOLE WARDROBE</div>'
+      + '<div class="ds">every legendary void + every hat · forever · one price</div>'
+      + '<div class="pr"></div>';
+    bundleEl.addEventListener('click', () => {
+      if (bundleOwned()) { audio.ready(); return; }
+      track('bundle_tap', { coins, lvl: rankInfo(xp).lvl, played: stats.matches });
+      if (!iapAvailable()) {
+        const pr = bundleEl!.querySelector('.pr') as HTMLElement;
+        pr.textContent = '👀 COMING TO THE APP STORE!';
+        audio.ready();
+        setTimeout(paintBundle, 2000);
+        return;
+      }
+      askGrownUp(() => {
+        void iapPurchase('everything', BUNDLE_USD).then((res) => {
+          const pr = bundleEl!.querySelector('.pr') as HTMLElement;
+          if (res === 'started') { pr.textContent = 'CONFIRM IN THE APP STORE…'; return; }
+          if (res === 'granted') { audio.evolve(); buzz(70); paintBundle(); refresh(); return; }
+          pr.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!'
+            : res === 'not_ready' ? 'THE STORE IS BUSY — TRY AGAIN'
+            : 'COULD NOT BUY — TRY AGAIN';
+          audio.hit();
+          setTimeout(paintBundle, 2000);
+        });
+      });
+    });
+    grid.appendChild(bundleEl);
+    paintBundle();
+  };
   let lastTier = -1;
   for (const s of SORTED) {
     const tier = tierOf(s);
@@ -7000,6 +7128,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       const hd = document.createElement('div');
       hd.innerHTML = TIER_HEAD[tier];
       grid.appendChild(hd.firstElementChild!);
+      if (tier === 2) buildBundle();
     }
     const card = document.createElement('div');
     // the ribbon marks the ONE tier that is different in kind. It used to key
