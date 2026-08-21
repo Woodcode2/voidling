@@ -6,6 +6,13 @@ export interface Fx {
   ring(x: number, z: number, color: number, maxR: number, dur?: number): void;
   flash(color: string, alpha?: number): void;
   shake(amt: number): void;
+  /** DIRECTED shake — a recoil along the impact vector rather than white
+   *  noise. (dx, dz) is the world-space direction the hit came FROM (the
+   *  eaten thing relative to the void); the camera kicks away from it and
+   *  springs back. Undirected shake() reads as a malfunction because nothing
+   *  in nature vibrates isotropically; a kick reads as a hit because
+   *  everything does. Same reduce-motion gate, same screen-space scaling. */
+  kick(dx: number, dz: number, amt: number): void;
   /** `camDist` is the camera's current distance from the void. Shake is
    *  authored in SCREEN terms — a bite should kick the picture by the same
    *  visible amount at every size — but the offset is applied in world units,
@@ -79,6 +86,7 @@ export function createFx(scene: THREE.Scene): Fx {
   let flashT = 0;
 
   let shakeAmt = 0;
+  let kickAmt = 0, kickX = 0, kickZ = 0, kickAge = 0;
   const shakeVec = new THREE.Vector3();
   // The camera distance every shake() call in the game was tuned against —
   // roughly the early-form follow distance, where 11/9/6 were chosen by eye.
@@ -104,6 +112,12 @@ export function createFx(scene: THREE.Scene): Fx {
     // information the rest of the frame does not already show, and translating
     // the viewpoint is the part that actually provokes motion sickness.
     shake(amt) { if (!reduceMotion()) shakeAmt = Math.max(shakeAmt, amt); },
+    kick(dx, dz, amt) {
+      if (reduceMotion()) return;
+      const l = Math.hypot(dx, dz);
+      if (l < 1e-4 || amt <= kickAmt) return;   // a bigger kick owns the vector
+      kickX = dx / l; kickZ = dz / l; kickAmt = amt; kickAge = 0;
+    },
     update(dt, camDist = SHAKE_REF_DIST) {
       for (const r of rings) {
         if (!r.mesh.visible) continue;
@@ -132,6 +146,16 @@ export function createFx(scene: THREE.Scene): Fx {
         shakeAmt *= Math.pow(0.001, dt);   // fast decay
         if (shakeAmt < 0.05) shakeAmt = 0;
       } else shakeVec.set(0, 0, 0);
+      // the directed kick rides ON TOP of any noise shake: a damped
+      // one-cycle recoil away from the impact, sprung back through zero —
+      // amplitude in the same screen terms as shake, on the same clamp
+      if (kickAmt > 0.001) {
+        kickAge += dt;
+        const env = Math.exp(-kickAge * 11) * Math.sin(kickAge * 24);
+        const s2 = kickAmt * Math.min(1, camDist / SHAKE_REF_DIST) * env;
+        shakeVec.x -= kickX * s2; shakeVec.z -= kickZ * s2;
+        if (kickAge > 0.5) kickAmt = 0;
+      }
       return shakeVec;
     },
   };

@@ -1445,6 +1445,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let stage = 0, ringFade = 0;
   let moveAmt = 0, blinkT = 3.4, blink = 0, blinkN = 0;   // blink cadence is authored, not rolled
   let mouthT = 0, mouthMax = 0;    // open-mouth envelope
+  // age of the CURRENT bite, counting up — drives the anticipation spring.
+  // mouthT alone counts down, and min(1, mouthT*8) reaches 1 on the trigger
+  // frame: the maw popped from closed to fully open in ONE frame, on the
+  // single most-repeated action in the game (AAA-BRIEF absence #2 — no
+  // anticipation, no settle). The envelope in the render (see `mo`) uses this
+  // to part the jaw for ~45ms, spring open, overshoot ~10% and settle.
+  let mouthAge = 1;
   let stretchT = 0;                // rocket stretch pulse
   let inhaleT = 0;                 // collapse inhale->burst envelope
   let evolveT = 0;                 // evolution celebration pop
@@ -1694,6 +1701,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // made of, roughly fifty times a match. The current opening is now the
       // floor: a small bite buys more time open, and nothing else.
       const cur = mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0;
+      // the wind-up only plays from a CLOSED mouth — a hoover spree must not
+      // re-anticipate mid-chew, that would read as stutter
+      if (cur < 0.05) mouthAge = 0;
       if (mouthT < want) mouthT = want;
       mouthMax = Math.max(wide, cur);
       wobble = Math.min(1, wobble + 0.30 + 0.55 * g);
@@ -1705,9 +1715,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       // one meal's worth of kick, never a chain of them summed
       dispV = Math.min(dispV, 2.6);
     },
-    animGulp() { mouthT = 0.6; mouthMax = 1; wobble = 1; },
-    animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); },
-    animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; },
+    // the set-piece anims are REACTIONS, not bites — they skip the wind-up
+    animGulp() { mouthT = 0.6; mouthMax = 1; wobble = 1; mouthAge = 0.3; },
+    animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); mouthAge = Math.max(mouthAge, 0.3); },
+    animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; mouthAge = 0.3; },
     update(dt, s) {
       bodyMat.uniforms.uTime.value = s.t;
 
@@ -1911,9 +1922,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const envelope = Math.max(lat, squash) * (1 + along) * (1 + wobble * 0.075);
       face.translateZ(dispR * Math.max(0.04, envelope - 1 + 0.05));
 
-      // mouth: maw scales in while open, smile hides
-      if (mouthT > 0) mouthT -= dt;
-      const mo = Math.max(mouthT > 0 ? mouthMax * Math.min(1, mouthT * 8) : 0, mp.maw);
+      // mouth: maw scales in while open, smile hides. Three phases instead of
+      // the old single-frame pop: ~45ms of wind-up (the jaw barely parts —
+      // the anticipation every polished eat animation has), a spring open
+      // with ~10% overshoot at ~220ms, settled by ~400ms; the existing
+      // mouthT*8 term stays as the CLOSING ease so the jaw never snaps shut.
+      if (mouthT > 0) { mouthT -= dt; mouthAge += dt; }
+      let openEnv = 1;
+      if (mouthAge < 0.045) openEnv = (mouthAge / 0.045) * 0.12;
+      else {
+        const t2 = mouthAge - 0.045;
+        openEnv = 1 - 0.88 * Math.exp(-t2 * 10) * Math.cos(t2 * 14);
+      }
+      const mo = Math.max(mouthT > 0 ? mouthMax * openEnv * Math.min(1, mouthT * 8) : 0, mp.maw);
       maw.scale.setScalar(Math.max(0.001, mo));
       mouth.visible = mo < 0.25;
       // FANGS grow in over GOBBLER→WORLD ENDER — the void's face itself levels up

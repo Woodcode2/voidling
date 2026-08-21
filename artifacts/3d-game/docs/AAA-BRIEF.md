@@ -976,3 +976,28 @@ NOW        computed-style walk over menu/picker/shop/settings: every weight
 GATE       qa/uisystem.mjs (new) — walks COMPUTED styles, so it catches
            TS-generated markup the CSS sweep cannot see; it caught three
            violations on its first run. endlayout + navfit still PASS.
+
+### The camera has a voice, the mouth winds up, the sparks fade — FLUIDITY — closes absences #1 and #2
+MEASURED   camera.fov: one write in the codebase (construction). Mouth: mo
+           reached full open on the trigger frame (min(1, mouthT*8) = 1 at
+           mouthT=0.22+). Look-ahead: 2.5-unit clamp tuned at spawn = 2.7%
+           of half-screen by WORLD ENDER. Particles: blink-out at full
+           brightness (shared PointsMaterial, no per-particle alpha).
+CHANGED    fovKick — a widening lens punch decaying on WALL time (survives
+           hit-stop), fired on size-class-up eats (2.5+3.5×bite), rival
+           eats (6°) and evolutions (5° + a 7% camDist pop the follow lerp
+           eases home). fx.kick(dx,dz,amt) — a DIRECTED one-cycle recoil
+           along the impact vector, riding on top of noise shake, same
+           reduce-motion gate and screen-space clamp. Mouth: mouthAge drives
+           a 45ms wind-up → spring open → ~10% overshoot at 220ms → settle;
+           mouthT*8 kept as the closing ease; set-piece anims skip the
+           wind-up. Look-ahead gain AND clamp scale with camDist (≥1×, so
+           spawn feel untouched). Particle colour fades to black over the
+           final 180ms — additive blending makes black an alpha fade, no
+           shader change.
+NOW        qa/juice.mjs: one forced size-class-up bite through the real
+           capture() path answers on 4/4 channels (lens fov 36.5, hit-stop
+           0.084s, +16 sparks, haptic).
+GATE       qa/juice.mjs (new) — forces the event via _dbg.__eatNearest and
+           counts channels from STATE (works at sandbox fps). Contract ≥3
+           of 4. Fails pre-fix: the lens channel could never fire.

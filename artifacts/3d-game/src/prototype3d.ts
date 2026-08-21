@@ -527,6 +527,15 @@ const scene = new THREE.Scene();
 }
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);
 let camDist = 50;
+// ── THE CAMERA'S VOICE ─────────────────────────────────────────────────────
+// camera.fov was a literal 32, set once at construction and never written
+// again — no event in a three-minute match reached the lens (AAA-BRIEF §4.2,
+// verified). fovKick is a transient WIDENING (the impact-absorb punch every
+// runner uses) that decays on wall time so it survives hit-stop; it fires on
+// the three events that earn it: a size-class-up eat, eating a rival, and
+// evolution. Gated by reduce-motion like every other kick.
+let fovKick = 0;
+const camPunch = (deg: number) => { if (!reduceMotion()) fovKick = Math.max(fovKick, deg); };
 let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 
@@ -1453,6 +1462,8 @@ const _dbg = new Proxy(_dbgStore, {
   __pinQuality: (n: number | null) => void;
   __renderBloom: () => void;
   __composer: () => unknown;
+  __juiceState: () => { fov: number; fovKick: number; stop: number; puffs: number; buzzes: number };
+  __eatNearest: (rel: number) => { r: number; R: number } | null;
   __quality: () => { level: number; pinned: number | null; shadows: boolean; shSize: number; pr: number };
   __warpVoid: (x: number, z: number) => void;
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
@@ -1498,6 +1509,29 @@ _dbg.__renderBloom = () => { ensureComposer().render(); };
 // glow contributes nothing) — the measurement that caught the missing-encode
 // wash and the one that keeps it from coming back.
 _dbg.__composer = () => ensureComposer();
+// QA: the juice contract (qa/juice.mjs). A polished game answers a big event
+// on several channels within a beat; this exposes the channels so a probe can
+// force an event and count the answers — at any frame rate, because it reads
+// STATE, not timing.
+_dbg.__juiceState = () => ({
+  fov: camera.fov, fovKick, stop: stopT,
+  puffs: puffLife.reduce((n, l) => n + (l > 0 ? 1 : 0), 0),
+  buzzes: buzzN,
+});
+// QA: force-eat the nearest edible at least `rel` of the void's radius —
+// drives the REAL capture() path (hit-stop, lens punch, kick, particles,
+// audio, haptics), not a simulation of it.
+_dbg.__eatNearest = (rel: number) => {
+  const R = voidling.radius;
+  let best: Edible | null = null, bd = 1e9;
+  for (const e of edibles) {
+    if (e.eaten || !e.mesh.visible || e.radius < R * rel || e.radius > R) continue;
+    const d = Math.hypot(e.mesh.position.x - voidState.x, e.mesh.position.z - voidState.z);
+    if (d < bd) { bd = d; best = e; }
+  }
+  if (best) capture(best);
+  return best ? { r: best.radius, R } : null;
+};
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
@@ -2180,6 +2214,7 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.2, 0.9);   // …and where it went
   fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3, 0.7);
   fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3); fx.flash('rgba(184,117,255,0.35)', 0.6);
+  camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
   bubbles.float(floatPos, `${FAMILY_TITLE[name] ?? ''} ${name} DEVOURED! +${pts}`, true);
   audio.bigEat();
@@ -2454,6 +2489,11 @@ function bakeContactShadows(): void {
 // the compensation goes rather than getting quieter for a third time.
 
 const puffVel: THREE.Vector3[] = []; const puffLife: number[] = [];
+// each spark's colour AT SPAWN — the update loop fades the live colour toward
+// black over the final 180ms, and under additive blending black IS invisible,
+// so this is a per-particle alpha fade without a custom shader. Sparks used to
+// blink out at full brightness, which is a hard "amateur" read (absence #2).
+const puffBase = new Float32Array(PUFF * 3);
 for (let i = 0; i < PUFF; i++) { puffVel.push(new THREE.Vector3()); puffLife.push(0); puffPos[i * 3 + 1] = -999; }
 let puffHead = 0;
 /** THE COLOUR A PROP IS, averaged from its own vertex colours and cached on
@@ -2494,6 +2534,7 @@ function spawnPuff(x: number, y: number, z: number, n: number, col?: THREE.Color
     // a little per-spark variation so a burst is not one flat colour chip
     const j = 0.86 + Math.random() * 0.28;
     puffCol[i * 3] = c.r * j; puffCol[i * 3 + 1] = c.g * j; puffCol[i * 3 + 2] = c.b * j;
+    puffBase[i * 3] = puffCol[i * 3]; puffBase[i * 3 + 1] = puffCol[i * 3 + 1]; puffBase[i * 3 + 2] = puffCol[i * 3 + 2];
     const a = Math.random() * Math.PI * 2, up = rand(2, 8);
     puffVel[i].set(Math.cos(a) * rand(3, 9), up, Math.sin(a) * rand(3, 9));
     puffLife[i] = rand(0.35, 0.7);
@@ -2818,8 +2859,10 @@ function pumpBanner() {
 let buzzGate = 0, hadGesture = false;
 window.addEventListener('pointerdown', () => { hadGesture = true; }, { once: true });
 let hapticsOn = localStorage.getItem('voidHaptics') !== '0';
+let buzzN = 0;   // QA: qa/juice.mjs counts haptic fires as one of the response channels
 function buzz(ms: number) {
   if (!hapticsOn) return;
+  buzzN++;
   const now = performance.now();
   if (ms < 20 && now < buzzGate) return;   // ticks are rate-limited; big hits always land
   buzzGate = now + 70;
@@ -4459,7 +4502,14 @@ function capture(e: Edible, giveHunger = true) {
   voidling.impulse(Math.min(2.2, e.radius * 0.9));
   // THE WORLD STOPS for a big one. Gated at 0.55 so it is a landmark event,
   // never a hoover spree, and hitStop() carries its own cooldown as well.
-  if (bite > 0.55) hitStop(0.055 + 0.05 * bite);
+  if (bite > 0.55) {
+    hitStop(0.055 + 0.05 * bite);
+    // …and the camera answers on two more channels: a lens punch and a
+    // directed recoil along the vector the meal came from. Layered responses
+    // a few frames apart are what read as one THICK event (absence #1).
+    camPunch(2.5 + 3.5 * bite);
+    fx.kick(dx, dz, 5 + 7 * bite);
+  }
   combo++; comboT = 1.6;
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
   // ── THE COMBO IS WHY NOBODY CAN CATCH THE PLAYER ──────────────────────────
@@ -4646,6 +4696,7 @@ function spawnSuck(n: number, reach: number) {
     const inSpd = r0 / rand(0.28, 0.42);
     puffVel[i].set(-Math.cos(a) * inSpd, (cy - puffPos[i * 3 + 1]) * 2, -Math.sin(a) * inSpd);
     puffLife[i] = rand(0.25, 0.4);
+    puffBase[i * 3] = puffCol[i * 3]; puffBase[i * 3 + 1] = puffCol[i * 3 + 1]; puffBase[i * 3 + 2] = puffCol[i * 3 + 2];
   }
 }
 
@@ -8268,9 +8319,14 @@ function animate() {
   for (let i = 0; i < PUFF; i++) if (puffLife[i] > 0) {
     puffLife[i] -= dt; puffVel[i].y -= dt * 14;
     puffPos[i * 3] += puffVel[i].x * dt; puffPos[i * 3 + 1] += puffVel[i].y * dt; puffPos[i * 3 + 2] += puffVel[i].z * dt;
+    // fade the last 180ms to black — under additive blending that is an alpha
+    // fade, so no spark ever blinks out at full brightness again
+    const f = Math.min(1, puffLife[i] / 0.18);
+    puffCol[i * 3] = puffBase[i * 3] * f; puffCol[i * 3 + 1] = puffBase[i * 3 + 1] * f; puffCol[i * 3 + 2] = puffBase[i * 3 + 2] * f;
     if (puffLife[i] <= 0) puffPos[i * 3 + 1] = -999;
   }
   pa.needsUpdate = true;
+  (puffGeo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
 
   // camera — the 2D game's zoom-band model: within a form the void keeps a
   // constant (small!) on-screen size; each evolution zooms the world out a
@@ -8355,10 +8411,19 @@ function animate() {
     // after smoothing is metres of look-target movement in a few frames, and
     // that still reads as the camera lurching whenever you touch the water.
     // Two and a half units is as far as the camera is ever allowed to lead.
-    const lookL = Math.hypot(lookVX, lookVZ) * 0.10;
-    const lookK = lookL > 2.5 ? 2.5 / lookL : 1;
-    const lookX = voidState.x + lookVX * 0.10 * lookK + introHX;
-    const lookZ = voidState.z + lookVZ * 0.10 * lookK + introHZ;
+    // …and the lead scales with the CAMERA, not the world: 0.10s of velocity
+    // clamped at 2.5 units was tuned at the spawn follow distance, and by
+    // WORLD ENDER (camDist 340) the same 2.5 units had collapsed from 11% of
+    // the half-screen to 2.7% — the lead vanished exactly when the world
+    // scrolls fastest. Scaling both the gain and the clamp by camDist keeps
+    // the lead a constant fraction of the FRAME at every size. Never below
+    // 1x, so the tuned feel at spawn is untouched.
+    const leadScale = Math.max(1, camDist / 60);
+    const lookL = Math.hypot(lookVX, lookVZ) * 0.10 * leadScale;
+    const lookCap = 2.5 * leadScale;
+    const lookK = lookL > lookCap ? lookCap / lookL : 1;
+    const lookX = voidState.x + lookVX * 0.10 * leadScale * lookK + introHX;
+    const lookZ = voidState.z + lookVZ * 0.10 * leadScale * lookK + introHZ;
     tmpV.copy(camOffset).multiplyScalar(camDist);
     tmpV.x += lookX; tmpV.z += lookZ;
     // ── THE FOLLOW POSITION IS ITS OWN STATE, AND SHAKE NEVER TOUCHES IT ────
@@ -8373,6 +8438,15 @@ function animate() {
     camFollow.lerp(tmpV, 1 - Math.exp(-5.0 * dt));
     camera.position.copy(camFollow);
     camera.lookAt(lookX, R * 0.5, lookZ);
+    // the lens punch: widen, then spring home on WALL time (a punch that
+    // freezes with hit-stop reads as a glitch, not an impact)
+    if (fovKick > 0.02) {
+      camera.fov = 32 + fovKick;
+      fovKick *= Math.pow(0.002, dtRaw);
+      camera.updateProjectionMatrix();
+    } else if (camera.fov !== 32) {
+      fovKick = 0; camera.fov = 32; camera.updateProjectionMatrix();
+    }
     camera.updateMatrixWorld();
     // (the SIZE chip that used to be projected here is gone — the growth bar
     // on the floor carries the form name and the metres now, and it does not
@@ -8413,6 +8487,11 @@ function animate() {
       holdBanner(2.4);   // this card owns the screen while it plays
     }
     audio.evolve();
+    // the LENS marks the evolution too: a punch plus a 7% distance pop that
+    // the follow lerp eases home over the next second — the world exhales.
+    // The final-form moment used to be ~8x weaker than a rival bite; this
+    // puts every form change on the same three channels as the big eats.
+    camPunch(5); camDist *= 1.07;
     // THE TOWN NOTICES. A form change is the most visible thing that happens to
     // the void and until now the only acknowledgement was a HUD card with the
     // word EVOLVED on it. A paper insisting it is the same size as before is
