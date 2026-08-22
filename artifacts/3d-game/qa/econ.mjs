@@ -93,12 +93,13 @@ const fails = [];
     gems: Number(localStorage.getItem('voidGems') || 0),
     lead: document.getElementById('endSub')?.textContent ?? '',
   }));
-  // the full back catalogue at seeded stats: all 17 bounties = 810✦ + 18💎
-  // (+1💎 more if this run happened to be the day's first win)
+  // the full back catalogue at seeded stats: all 17 bounties = 810✦ + 10💎
+  // (+1💎 more if this run happened to be the day's first win). The lump was
+  // 18 for one commit; the owner's pacing call ("too easy") cut it to 10.
   console.log(`  trophies paid: ${r.paid.length}/17  wallet 1000 → ${r.coins}  gems 0 → ${r.gems}  lead="${r.lead.slice(0, 60)}"`);
   if (r.paid.length !== 17) fails.push(`expected all 17 trophies paid, got ${r.paid.length}`);
   if (r.coins < 1810) fails.push(`wallet ${r.coins} — the 810✦ back catalogue did not land`);
-  if (r.gems < 18 || r.gems > 19) fails.push(`gems ${r.gems} — the 18💎 back catalogue did not land (or double-paid)`);
+  if (r.gems < 10 || r.gems > 11) fails.push(`gems ${r.gems} — the 10💎 back catalogue did not land (or double-paid)`);
   if (!r.lead.includes('🏆')) fails.push('results lead does not name the trophy');
 
   // a SECOND match must pay the catalogue exactly once — nothing new due
@@ -139,8 +140,40 @@ const fails = [];
   console.log(`  gem shelf: tier=${shelf.gemTier} aurora="${shelf.auroraPr}" chip=${shelf.chipShown} (${shelf.chipN}💎) bundleGone=${shelf.bundleGone}`);
   if (!shelf.gemTier) fails.push('no GEMS tier header in the shop');
   if (!shelf.bundleGone) fails.push('the vetoed bundle banner still renders');
-  if (!/💎 10/.test(shelf.auroraPr)) fails.push(`Aurora price reads "${shelf.auroraPr}"`);
-  if (!shelf.chipShown || Number(shelf.chipN) < 18) fails.push(`gem chip hidden or empty (${shelf.chipN})`);
+  if (!/💎 25/.test(shelf.auroraPr)) fails.push(`Aurora price reads "${shelf.auroraPr}"`);
+  if (!shelf.chipShown || Number(shelf.chipN) < 10) fails.push(`gem chip hidden or empty (${shelf.chipN})`);
+
+  // ── 4. a gem hat is buyable from play money, with no gate in the way ─────
+  // Seed a rich gem wallet, open HATS, tap the chef card: it must grant,
+  // deduct exactly its price, and never open the parental gate (the gate
+  // pauses everything on a maths question — a soft-currency spend that hits
+  // it would time out right here).
+  await p.evaluate(() => { localStorage.setItem('voidGems', '100'); });
+  await p.reload({ waitUntil: 'domcontentloaded' });
+  await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+  await p.evaluate(() => document.querySelectorAll('.show')
+    .forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
+  await p.click('#btnShop'); await p.waitForTimeout(500);
+  await p.click('.shopTab[data-tab="hats"]'); await p.waitForTimeout(500);
+  const hat = await p.evaluate(() => {
+    const card = document.querySelector('#hatGrid canvas[id="hatcv_chef"]')?.closest('.hatCard');
+    if (!card) return { found: false };
+    const before = Number(localStorage.getItem('voidGems') || 0);
+    card.click();
+    return {
+      found: true, before,
+      after: Number(localStorage.getItem('voidGems') || 0),
+      owned: (JSON.parse(localStorage.getItem('voidHatsOwned') || '[]')).includes('chef'),
+      gateUp: !!document.querySelector('#gate.show'),
+    };
+  });
+  console.log(`  gem hat: found=${hat.found} owned=${hat.owned} gems ${hat.before}→${hat.after} gate=${hat.gateUp}`);
+  if (!hat.found) fails.push('chef hat card missing from the hats tab');
+  else {
+    if (!hat.owned) fails.push('gem hat tap did not grant');
+    if (hat.before - hat.after !== 35) fails.push(`gem hat deducted ${hat.before - hat.after}, price is 35`);
+    if (hat.gateUp) fails.push('a SOFT-currency spend opened the parental gate');
+  }
   await p.close();
 }
 

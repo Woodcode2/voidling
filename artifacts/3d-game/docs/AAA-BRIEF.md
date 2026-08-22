@@ -1210,3 +1210,57 @@ NOT DONE YET, deliberately: gem prices on ~6 hats (dual acquisition —
            gem packs for money are Consumable IAPs that wait for the store
            shell and the owner's explicit go; earn-rate tuning waits for
            real play data from the owner's household.
+
+### The pacing pass: the economy is a calendar now — MONEY/REPEAT — owner's call ("too easy and doesn't make sense")
+MEASURED   the model (all pacing below derives from it): a regular kid —
+           3 matches/day at the child driver's ~60k mean, 2nd place, one
+           win, the daily claim at steady multiplier, the quest board —
+           earns ~990✦/day (~700 in week one) and ~8💎/week (7 first
+           wins + the day-7 chest). Against that: the old ladder handed
+           over FIVE skins in nine days, and the 18💎 trophy lump bought
+           half the gem shelf on day one. The owner's feel and the
+           arithmetic agree.
+CHANGED    coin ladder reshaped (first skin day ONE — the joy must exist —
+           then ~weekly through the middle, long chases at the top);
+           trophy gem lump 18 → 10, weighted to the true summits; gem
+           colourways 25/25/40; SIX HATS EARNABLE for gems (chef, cowboy,
+           bobble, flower, space, propeller at 25–50💎 — closes §4.4
+           item 6's "the paid slot" critique) with their StoreKit
+           registrations PARKED, not deleted; the fancy six stay money-
+           only, per the owner's split. Gem spends never touch the
+           parental gate and a shortfall NEVER routes toward a payment
+           sheet — that funnel is the dark pattern the Kids Category
+           exists to stop, and qa/econ.mjs asserts the gate stays down.
+
+           the calendar, from the model (days of regular play):
+           | rung | price | lands |
+           |---|---|---|
+           | Toxic | 200✦ | day 1 |
+           | Sunset | 800✦ | day 2 |
+           | Ocean | 2,000✦ | day 4 |
+           | Candy | 4,500✦ | day 9 |
+           | Honey | 9,000✦ | ~day 17 |
+           | Lagoon | 16,000✦ | ~day 33 |
+           | Neon | 26,000✦ | ~day 60 |
+           | Lemon | 40,000✦ | ~day 100 |
+           | Silver | 58,000✦ | ~day 158 |
+           | Chilli | 80,000✦ | ~day 240 |
+           gems: first colourway ≈ 2½ weeks; each next goal 3–6 weeks;
+           the full 310💎 catalogue ≈ nine months of daily play. The
+           coin lane pays constantly underneath, so a session always
+           moves SOMETHING — the gem lane is where wanting lives.
+NOW        qa/econ.mjs re-tuned and extended: 10💎 lump exactly once,
+           Aurora at 💎 25, and the new fourth contract — a gem hat
+           grants from play money, deducts exactly its price, and never
+           raises the parental gate.
+GATE       qa/econ.mjs + qa/iapdoc.mjs (17 products, six hat
+           registrations documented as parked).
+HONESTY    the model is a MODEL — 3/day and one win daily are assumptions,
+           not telemetry. The owner's household is the first real data;
+           earn rates are one-line retunes when it arrives. And the ad
+           revenue this pacing serves has a compliance wall to clear
+           first: Apple's Kids Category bars behavioural ad networks
+           (hole.io itself ships OUTSIDE Kids for this reason) — kid-safe
+           networks exist, and the category choice is the owner's
+           decision to make at submission time, recorded here so nobody
+           discovers it in review.

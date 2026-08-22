@@ -4206,9 +4206,18 @@ const XP_SPANS = [20, 30, 40, 50, 60, 75, 90, 105, 120, 140, 160, 190, 220, 250,
 // Owned skins are a localStorage set keyed by id; repricing never touches
 // ownership. Coins and skins stay coin-only (hats are real money — the
 // owner's standing rule); nothing here is an IAP, so APPSTORE.md is unmoved.
+// THE LADDER IS PACED AGAINST A MEASURED DAY, not a feeling. The model — a
+// regular kid: 3 matches/day at ~60k (the child driver's mean), 2nd place,
+// one win, the daily claim at steady multiplier, the quest board — earns
+// ~990✦/day (~700 in week one). The owner's read on the old ladder ("too
+// easy and doesn't make sense") is what the arithmetic said too: five skins
+// fell in nine days. This shape lands the first skin on DAY ONE (the joy has
+// to exist), the second in two, then roughly weekly through the middle, and
+// the last three are the long chases a kid narrates at school. Full ladder
+// ≈ 240 days of regular play. Retuned 2026-08-22 by the owner's call.
 const PRICES: Record<string, number> = {
-  classic: 0, toxic: 150, sunset: 350, ocean: 800, candy: 1800, honey: 3800,
-  lagoon: 7500, neon: 17000, lemon: 28000, silver: 45000, chilli: 70000,
+  classic: 0, toxic: 200, sunset: 800, ocean: 2000, candy: 4500, honey: 9000,
+  lagoon: 16000, neon: 26000, lemon: 40000, silver: 58000, chilli: 80000,
 };
 /** THE NEXT THING TO CHASE. The results screen stated an outcome and offered a
  *  button; it never stated a goal, which is the moment a child decides whether
@@ -6272,19 +6281,19 @@ const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: nu
   { ic: '🌀', nm: 'Gobbler', ds: 'reach GOBBLER form', cur: () => stats.bestForm, max: 2, pay: 15 },
   { ic: '🕳️', nm: 'Devourer', ds: 'reach DEVOURER form', cur: () => stats.bestForm, max: 3, pay: 25 },
   { ic: '🪐', nm: 'Colossus', ds: 'reach COLOSSUS form', cur: () => stats.bestForm, max: 4, pay: 40, gem: 1 },
-  { ic: '🌍', nm: 'World Ender', ds: 'reach WORLD ENDER form', cur: () => stats.bestForm, max: 5, pay: 75, gem: 3 },
-  { ic: '🌑', nm: 'Void Titan', ds: 'reach the true final form', cur: () => stats.bestForm, max: 6, pay: 150, gem: 5 },
+  { ic: '🌍', nm: 'World Ender', ds: 'reach WORLD ENDER form', cur: () => stats.bestForm, max: 5, pay: 75, gem: 2 },
+  { ic: '🌑', nm: 'Void Titan', ds: 'reach the true final form', cur: () => stats.bestForm, max: 6, pay: 150, gem: 3 },
   { ic: '👑', nm: 'Champion', ds: 'win a match', cur: () => stats.wins, max: 1, pay: 30 },
-  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10, pay: 75, gem: 2 },
+  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10, pay: 75, gem: 1 },
   { ic: '💯', nm: 'Century', ds: 'score 2,500 in a run', cur: () => stats.best, max: 2500, pay: 15 },
-  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000, pay: 40, gem: 1 },
+  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000, pay: 40 },
   { ic: '🍽️', nm: 'Big Appetite', ds: 'eat 500 things', cur: () => stats.eaten, max: 500, pay: 25 },
-  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000, pay: 100, gem: 2 },
+  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000, pay: 100, gem: 1 },
   { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'eat a family member', cur: () => stats.rivals ?? 0, max: 1, pay: 25 },
-  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10, pay: 75, gem: 2 },
+  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10, pay: 75, gem: 1 },
   // the bar counts bites-in-a-row, so the words do too — and the old promise
   // ("x2.5") was a number the combo curve can no longer reach (caps at x2.2)
-  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25, pay: 40, gem: 1 },
+  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25, pay: 40 },
   { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25, pay: 60, gem: 1 },
 ];
 // Pays every earned-but-unpaid trophy exactly once, keyed by name in
@@ -7741,6 +7750,9 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     if (wornHat === h.id) return 'WEARING';
     if (ownedHats.has(h.id)) return 'WEAR IT';
     if (h.tier === 'free') return 'FREE';
+    // the earnable half: a gem hat is bought from the wallet a kid FILLS BY
+    // PLAYING, so it never routes near a payment sheet or a parental gate
+    if (h.gems) return `💎 ${h.gems}`;
     // …and say so on the card too, the way the skin cards do
     const p2 = iapPrice(h.id) ?? `$${(h.usd ?? 0).toFixed(2)}`;
     return iapAvailable() ? `${p2}` : `${p2} · ON THE APP STORE`;
@@ -7798,6 +7810,24 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     }
     if (h.tier === 'free') { ownedHats.add(h.id); saveHats(); wearHat(h.id); audio.ready(); refreshHats(); return; }
     const pr = hatCards.get(h.id)?.querySelector('.hp') as HTMLElement | undefined;
+    // ── GEM HATS: soft currency, no gate — the same contract as coin skins.
+    // Short? Say the gap and stop; NEVER fall through toward the money path —
+    // a shortfall that funnels a child at a payment sheet is the exact dark
+    // pattern the Kids Category (rightly) rejects.
+    if (h.gems) {
+      if (gems >= h.gems) {
+        track('hat_buy_gems', { hat: h.id, price: h.gems, left: gems - h.gems, played: stats.matches });
+        addGems(-h.gems);
+        ownedHats.add(h.id); saveHats(); wearHat(h.id);
+        audio.evolve(); buzz(70); refreshHats();
+      } else {
+        track('hat_short_gems', { hat: h.id, price: h.gems, gems, short: h.gems - gems });
+        if (pr) pr.textContent = `NEED ${h.gems - gems}💎 MORE`;
+        audio.hit();
+        setTimeout(refreshHats, 1800);
+      }
+      return;
+    }
     const usd = h.usd ?? 0;
     // ── CHECK THE PLATFORM BEFORE THE GATE, NOT AFTER IT ──────────────────
     // The skin path has done this since it shipped and this one never did: it

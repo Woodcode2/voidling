@@ -53,6 +53,10 @@ export interface Hat {
    *  IAP_PRODUCTS[id]; this is what the card shows before StoreKit's localized
    *  price lands, and the two must be kept in step by a human. */
   usd?: number;
+  /** 💎 price. A hat with `gems` is sold by the CLIENT for gems — the owner's
+   *  earnable half of the wardrobe — and its StoreKit registration stays
+   *  parked (see APPSTORE.md). The fancy half stays money-only. */
+  gems?: number;
   /** y at which the hat meets the head — the point its LOD scales about */
   seat: number;
   /** a mesh named 'spin' inside it turns; propellers, mostly */
@@ -78,13 +82,13 @@ export const HATS: Hat[] = [
   { id: 'party', name: 'Party Hat', blurb: 'every void deserves a party', tier: 'free',
     seat: 1.02, drop: -0.12, accent: 0xff6fae },
 
-  { id: 'chef', name: 'Chef Toque', blurb: 'the town is the menu', tier: 'plus', usd: 1.99,
+  { id: 'chef', name: 'Chef Toque', blurb: 'the town is the menu', tier: 'plus', usd: 1.99, gems: 35,
     seat: 1.00, drop: -0.02, accent: 0xfdf6e8 },
-  { id: 'cowboy', name: 'Ten-Gallon', blurb: 'this town ain’t big enough', tier: 'plus', usd: 1.99,
+  { id: 'cowboy', name: 'Ten-Gallon', blurb: 'this town ain’t big enough', tier: 'plus', usd: 1.99, gems: 35,
     seat: 0.90, accent: 0xc79350 },
-  { id: 'bobble', name: 'Bobble Beanie', blurb: 'cosy little world-ender', tier: 'plus', usd: 1.99,
+  { id: 'bobble', name: 'Bobble Beanie', blurb: 'cosy little world-ender', tier: 'plus', usd: 1.99, gems: 25,
     seat: 0.98, accent: 0xd8453f },
-  { id: 'flower', name: 'Flower Crown', blurb: 'eats gently, smells lovely', tier: 'plus', usd: 1.99,
+  { id: 'flower', name: 'Flower Crown', blurb: 'eats gently, smells lovely', tier: 'plus', usd: 1.99, gems: 25,
     seat: 1.04, accent: 0xff8ac0 },
 
   { id: 'wizard', name: 'Star Wizard', blurb: 'the hat knows things', tier: 'plus', usd: 2.99,
@@ -93,9 +97,9 @@ export const HATS: Hat[] = [
     seat: 1.04, accent: 0x2a2430 },
   { id: 'viking', name: 'Viking Helm', blurb: 'horns first, questions later', tier: 'plus', usd: 2.99,
     seat: 0.96, drop: -0.09, accent: 0xc8ccd2 },
-  { id: 'space', name: 'Space Helmet', blurb: 'for eating other planets', tier: 'plus', usd: 2.99,
+  { id: 'space', name: 'Space Helmet', blurb: 'for eating other planets', tier: 'plus', usd: 2.99, gems: 50,
     seat: 0.60, drop: -0.09, accent: 0x8ad4ff },
-  { id: 'propeller', name: 'Propeller Cap', blurb: 'it really spins', tier: 'plus', usd: 2.99,
+  { id: 'propeller', name: 'Propeller Cap', blurb: 'it really spins', tier: 'plus', usd: 2.99, gems: 50,
     seat: 0.98, spin: 3.4, accent: 0x35d6f0 },
 
   // ── LEGENDARY ────────────────────────────────────────────────────────────

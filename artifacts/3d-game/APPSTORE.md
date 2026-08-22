@@ -145,6 +145,16 @@ Archmage and Mecha-Void were cut: Archmage's blue-violet measured weighted dE
 byte-identical to a coin skin's, so a parent would have paid $5.99 for a colour
 their child already had.
 
+### Hats — twelve registered; the client sells six for gems
+
+**Six of the twelve are sold by the CLIENT for the in-game gem currency**
+(chef, cowboy, bobble, flower, space, propeller — the owner's earnable half of
+the wardrobe) and their StoreKit registrations are PARKED: keep the products
+registered exactly as listed so the ids stay reserved and a future pricing
+decision needs no review of this file, but the client never opens a payment
+sheet for them today. The other six (wizard, tricorn, viking, crown, horn,
+tycoon) are money-only, as before.
+
 ### Hats — twelve, four price points
 
 Any hat goes on any void, which is why they are a second slot rather than more

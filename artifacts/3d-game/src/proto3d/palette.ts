@@ -203,12 +203,16 @@ export const SKINS: Skin[] = [
   // ── GEM COLOURWAYS (owner's two-currency design) ─────────────────────────
   // Coins buy the everyday looks above; GEMS — the rare currency earned from
   // deep trophies, the day-7 chest and the first win of the day — buy these.
+  // PACING (owner: "take the gem pacing realistic"): supply is ~8💎/week for
+  // a kid who plays daily, plus a 10💎 one-time trophy lump — so a 25💎 look
+  // is about three weeks of showing up and the 40💎 crown of the shelf is
+  // over a month. Rare has to cost something or it is not rare.
   // The base void stays purple (classic, free, untouched): a colourway is a
   // look a child chose, never a replacement for the character. Palette-only
   // by design — pattern art (`tex`) joins when the owner supplies it.
-  { id: 'aurora', name: 'Aurora', abyss: 0x041420, inner: 0x0c4d5a, mid: 0x18a880, rim: 0x7dffd0, glow: 0xb8ffe4, gems: 10 },
-  { id: 'glacier', name: 'Glacier', abyss: 0x0a1428, inner: 0x1e4a7a, mid: 0x4a90d0, rim: 0xcfeaff, glow: 0xffffff, gems: 10 },
-  { id: 'nova', name: 'Nova', abyss: 0x1c0a20, inner: 0x5a1a6a, mid: 0xb03aa0, rim: 0xffd25a, glow: 0xffeba0, gems: 14 },
+  { id: 'aurora', name: 'Aurora', abyss: 0x041420, inner: 0x0c4d5a, mid: 0x18a880, rim: 0x7dffd0, glow: 0xb8ffe4, gems: 25 },
+  { id: 'glacier', name: 'Glacier', abyss: 0x0a1428, inner: 0x1e4a7a, mid: 0x4a90d0, rim: 0xcfeaff, glow: 0xffffff, gems: 25 },
+  { id: 'nova', name: 'Nova', abyss: 0x1c0a20, inner: 0x5a1a6a, mid: 0xb03aa0, rim: 0xffd25a, glow: 0xffeba0, gems: 40 },
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
   // EMBER IS FIRE, NOT TOFFEE. Measured on the rendered cards, ember/honey were
   // the closest pair in the entire catalogue at 2.4 mean per-pixel — closer
