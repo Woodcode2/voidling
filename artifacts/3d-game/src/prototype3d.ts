@@ -545,6 +545,7 @@ let camDist = 50;
 // the three events that earn it: a size-class-up eat, eating a rival, and
 // evolution. Gated by reduce-motion like every other kick.
 let fovKick = 0;
+let kitCd = 0;   // wall-time cooldown for the whole landmark kit (see capture)
 const camPunch = (deg: number) => { if (!reduceMotion()) fovKick = Math.max(fovKick, deg); };
 let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
@@ -4773,14 +4774,32 @@ function capture(e: Edible, giveHunger = true) {
   voidling.impulse(Math.min(2.2, e.radius * 0.9));
   // THE WORLD STOPS for a big one. Gated at 0.55 so it is a landmark event,
   // never a hoover spree, and hitStop() carries its own cooldown as well.
-  if (bite > 0.55) {
-    hitStop(0.055 + 0.05 * bite);
-    // …and the camera answers on two more channels: a lens punch and a
-    // directed recoil along the vector the meal came from. Layered responses
-    // a few frames apart are what read as one THICK event (absence #1).
-    camPunch(2.5 + 3.5 * bite);
-    fx.kick(dx, dz, 5 + 7 * bite);
-    _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
+  // MEASURED, NOT ASSUMED (qa/_kickrate.mjs, child driver, 60s of play):
+  // the ratio gate alone fired this kit 141 times/min on Lantern — 2.3
+  // shakes a SECOND, the owner's "screen is shaking a ton" — because at
+  // small radius in the densest market half of everything is bite > 0.55.
+  // Maple ran 33/min, which is why nobody reported it there first. Landmark
+  // now means all three of: a big RELATIVE bite, a big ABSOLUTE meal (a
+  // stall, a person — never a soup bowl at toddler size), and at least 0.9s
+  // of wall time since the last one. hitStop rides the same gate: its own
+  // 0.35s cooldown still allowed a rubber-band stutter at hoover pace.
+  if (bite > 0.55 && e.radius > 0.85) {
+    if (kitCd <= 0) {
+      kitCd = 0.9;
+      hitStop(0.055 + 0.05 * bite);
+      // …and the camera answers on two more channels: a lens punch and a
+      // directed recoil along the vector the meal came from. Layered responses
+      // a few frames apart are what read as one THICK event (absence #1).
+      camPunch(2.5 + 3.5 * bite);
+      fx.kick(dx, dz, 5 + 7 * bite);
+      _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
+    } else {
+      // a qualifying bite DURING the refractory refreshes it: the landmark is
+      // the START of a feast, not every course of it. A fixed cooldown alone
+      // still measured 35/min on Lantern (one shake every 1.7s through a
+      // hoover run); with the refresh the kit re-arms only after a real pause.
+      kitCd = Math.max(kitCd, 0.6);
+    }
   }
   combo++; comboT = 1.6;
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
@@ -8849,7 +8868,8 @@ function animate() {
     camera.lookAt(lookX, R * 0.5, lookZ);
     // the lens punch: widen, then spring home on WALL time (a punch that
     // freezes with hit-stop reads as a glitch, not an impact)
-    if (fovKick > 0.02) {
+    if (kitCd > 0) kitCd -= dtRaw;
+  if (fovKick > 0.02) {
       camera.fov = 32 + fovKick;
       fovKick *= Math.pow(0.002, dtRaw);
       camera.updateProjectionMatrix();
