@@ -16,6 +16,12 @@
 # pirate  | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
 # gameday | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
 # lantern | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+# powder  | (title not recorded) | (artist not recorded) | SOURCE URL MISSING | owner states Pixabay
+#           uploaded 2026-08-22 (commit f5cd853); no ID3 tags in the file.
+#           Re-mastered in-repo to the house spec (-16 LUFS, -1.5 dBTP,
+#           128kbps 44.1kHz stereo) from the 256kbps original, which arrived
+#           at -8.8 LUFS with a +1.0 dBTP clip — qa/trackprofile.mjs --gate
+#           passes all six. The owner has been asked for the Pixabay page URL.
 #
 # ── OPEN, AND IT BLOCKS SUBMISSION ─────────────────────────────────────────
 # The five tracks above SHIP. They arrived through the GitHub web uploader
