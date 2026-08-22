@@ -4,7 +4,7 @@
 //
 // Three questions, measured, never asserted:
 //  1. How big is a rival's SMILE on a phone, in device pixels, at the moment
-//     CHOMPZILLA is charging the player? (the whole finding rests on the child
+//     NIBBLES is charging the player? (the whole finding rests on the child
 //     being able to READ that mouth)
 //  2. Does anything on the hunter's face move when she hunts? (the finding says
 //     only `fleeing` moves it; rivals.ts:1394 also has rv.cst===1 -> 1.2)
@@ -94,7 +94,7 @@ while (true) {
   const s = await sample();
   if (s.t > UNTIL) break;
   if (s.t !== last) { log.push(s); last = s.t; }
-  const z = s.rivals.find((r) => r.name === 'CHOMPZILLA');
+  const z = s.rivals.find((r) => r.name === 'NIBBLES');
   // photograph a charge: hunting, close, on screen
   if (z && z.hunt && z.d < 55 && z.onScreen && shots < 6) {
     shots++;
@@ -104,7 +104,7 @@ while (true) {
 }
 
 // ── what actually moved on the hunter's face over the whole match ────────────
-const zRows = log.flatMap((s) => s.rivals.filter((r) => r.name === 'CHOMPZILLA').map((r) => ({ t: s.t, ...r })));
+const zRows = log.flatMap((s) => s.rivals.filter((r) => r.name === 'NIBBLES').map((r) => ({ t: s.t, ...r })));
 const uniq = (k) => [...new Set(zRows.map((r) => r[k]))];
 console.log('samples:', log.length, 'chompzilla rows:', zRows.length);
 console.log('smile scale.y values seen :', uniq('smileSy').join(', '));
@@ -118,12 +118,12 @@ const near = zRows.filter((r) => r.onScreen && r.d < 60);
 near.sort((a, b) => a.smilePx - b.smilePx);
 if (near.length) {
   const q = (f) => near[Math.floor(f * (near.length - 1))].smilePx;
-  console.log(`SMILE WIDTH on screen, CHOMPZILLA within 60u and on camera (n=${near.length}, device px @dpr3):`);
+  console.log(`SMILE WIDTH on screen, NIBBLES within 60u and on camera (n=${near.length}, device px @dpr3):`);
   console.log(`  min ${q(0)}  p25 ${q(0.25)}  median ${q(0.5)}  p75 ${q(0.75)}  max ${q(1)}`);
   console.log(`  in CSS px (÷3): median ${(q(0.5) / 3).toFixed(1)}  max ${(q(1) / 3).toFixed(1)}`);
 }
 const allOn = zRows.filter((r) => r.onScreen);
-console.log(`CHOMPZILLA on screen at all: ${allOn.length}/${zRows.length} samples`);
+console.log(`NIBBLES on screen at all: ${allOn.length}/${zRows.length} samples`);
 console.log('shots written:', shots);
 fs.writeFileSync(`qa-out/rf-face2/${WORLD}.json`, JSON.stringify(log, null, 1));
 await b.close();

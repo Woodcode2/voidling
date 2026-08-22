@@ -2231,7 +2231,7 @@ const fx = createFx(scene);
  *  until this line and a hook that reads it earlier is a module-init crash. */
 _dbg.__fx = fx;
 const FAMILY_TITLE: Record<string, string> = {
-  WOBBLES: 'Cousin', GLITZ: 'Uncle', BITSY: 'Baby', CHOMPZILLA: 'Auntie', DOZER: 'Grandpa',
+  JELLY: 'Cousin', BIGSHOT: 'Uncle', ECHO: 'Baby', NIBBLES: 'Auntie', GRUMPS: 'Grandpa',
 };
 // each family member's ARCHETYPE, named on arrival — a kid should be told what
 // to watch for once, then be able to read it off the screen forever after
@@ -2839,7 +2839,7 @@ const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.qu
 let prevHunger = 0;
 
 /** A rival has arrived. Was: pink 30px text reading
- *  "🌀 Cousin WOBBLES joined — 😱 runs from everything", which is a sentence
+ *  "🌀 Cousin JELLY joined — 😱 runs from everything", which is a sentence
  *  with two emoji in it and reads like a chat log. Now it is a card with the
  *  rival's own colour on it, their name at card size, and what they DO on a
  *  second line — the same shape a fighting game uses to say who just walked in. */
@@ -3063,7 +3063,7 @@ let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0
 // the hunt window, which ends at matchLen * 0.55, closes 40s early in match
 // terms; every rival scheduled during the pause joins on the single resume
 // frame, stacking one audio.alert() sting per arrival; and past ~99s of
-// accumulated pause CHOMPZILLA is stuffed the instant play resumes, skipping
+// accumulated pause NIBBLES is stuffed the instant play resumes, skipping
 // the whole predator act while the HUD still reads nearly three minutes.
 // ?fast diverged the two by 6x for an entire match, which quietly made every
 // harness run with that flag see a family that barely joined.
@@ -3825,7 +3825,7 @@ function showNews() {
     h = pickNews({
       tier, morning, district: (dist as PBDist | null), lastMeal, devouredPct,
       form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
-      rivalName: top?.name ?? 'CHOMPZILLA', rivalLead: lead,
+      rivalName: top?.name ?? 'NIBBLES', rivalLead: lead,
     });
     brand = PB_BRAND[tier];
   } else {
@@ -3842,7 +3842,7 @@ function showNews() {
     h = pickMapleNews({
       tier, morning, district: md, lastMeal, devouredPct,
       form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
-      rivalName: top2?.name ?? 'CHOMPZILLA', rivalLead: lead2,
+      rivalName: top2?.name ?? 'NIBBLES', rivalLead: lead2,
     });
     brand = MAPLE_BRAND[tier];
   }
@@ -4788,21 +4788,22 @@ function capture(e: Edible, giveHunger = true) {
   // stall, a person — never a soup bowl at toddler size), and at least 0.9s
   // of wall time since the last one. hitStop rides the same gate: its own
   // 0.35s cooldown still allowed a rubber-band stutter at hoover pace.
-  if (bite > 0.55 && e.radius > 0.85) {
+  // ROUND TWO OF THE DIAL (owner: "the shake is still happening for every
+  // level... it's bad"): the first pass cut the RATE 141→19/min on Lantern
+  // and the owner still felt it — so amplitude and cadence both halve. A
+  // landmark is now a big bite of something genuinely large (absolute floor
+  // 1.1), at most every 1.6 seconds, at half the old punch. The lens
+  // (camPunch) counts as shake too: rapid FOV pumping reads as wobble even
+  // with the camera still. A qualifying bite during the refractory refreshes
+  // it — the landmark is the START of a feast, never every course of it.
+  if (bite > 0.55 && e.radius > 1.1) {
     if (kitCd <= 0) {
-      kitCd = 0.9;
+      kitCd = 1.6;
       hitStop(0.055 + 0.05 * bite);
-      // …and the camera answers on two more channels: a lens punch and a
-      // directed recoil along the vector the meal came from. Layered responses
-      // a few frames apart are what read as one THICK event (absence #1).
-      camPunch(2.5 + 3.5 * bite);
-      fx.kick(dx, dz, 5 + 7 * bite);
+      camPunch(1.2 + 1.8 * bite);
+      fx.kick(dx, dz, 2.5 + 3.5 * bite);
       _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
     } else {
-      // a qualifying bite DURING the refractory refreshes it: the landmark is
-      // the START of a feast, not every course of it. A fixed cooldown alone
-      // still measured 35/min on Lantern (one shake every 1.7s through a
-      // hoover run); with the refresh the kit re-arms only after a real pause.
       kitCd = Math.max(kitCd, 0.6);
     }
   }
@@ -5246,7 +5247,7 @@ const LOAD_TIPS = [
   'tip: eat a rival and they respawn tiny — and grumpy',
   'tip: the landmark in the middle is dessert. save room.',
   'tip: finish quests to win ✦',
-  'tip: BITSY is the smallest — the easiest one in the family to catch',
+  'tip: ECHO is the smallest — the easiest one in the family to catch',
 ];
 // POWDER PASS teaches its own two verbs on the way in — the ice and the
 // shell are new rules, and the loading screen is the one place a rule can
@@ -6092,8 +6093,8 @@ function resetMatch() {
   // match launched — peak opacity 1.00 at 330ms, with the planted text. The
   // cause is that `body.menu #banner { display:none }` cancels the CSS
   // animation, and restoring display restarts it from 0%. Natural captures
-  // included "🍰 CHOMPZILLA is TOO FULL to chase — now is your chance!" at
-  // t=0.1s of a match CHOMPZILLA had not joined, and "QUEST DONE! +15✦" over a
+  // included "🍰 NIBBLES is TOO FULL to chase — now is your chance!" at
+  // t=0.1s of a match NIBBLES had not joined, and "QUEST DONE! +15✦" over a
   // 2:57 clock and a score of 10. Neither resetMatch() nor beginMatch() cleared
   // the text, the .show class, the queue or the hold timer — all four.
   bannerEl.classList.remove('show', 'fam');
@@ -6359,7 +6360,7 @@ function renderTrophies() {
   }).join('');
   el('trophyCount').textContent = `${got} / ${TROPHIES.length} EARNED`;
 }
-el('btnTrophies').addEventListener('click', () => { renderTrophies(); el('trophies').classList.add('show'); });
+el('btnTrophies').addEventListener('click', () => { renderRank(); renderTrophies(); el('trophies').classList.add('show'); });
 
 // ── top voids of the week (local weekly board, seeded with the family) ──────
 function weekKey() { const d = new Date(); const on = new Date(d.getFullYear(), 0, 1); return `voidWeek-${d.getFullYear()}-${Math.ceil((((d.getTime() - on.getTime()) / 86400000) + on.getDay() + 1) / 7)}`; }
@@ -6380,7 +6381,7 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
   //
   // The anchor is now FROZEN on the first view of each week. The rivals are a
   // fixed ladder for those seven days, so beating your Tuesday score genuinely
-  // overtakes WOBBLES on Wednesday — and the anchor is seeded from the player's
+  // overtakes JELLY on Wednesday — and the anchor is seeded from the player's
   // best, so a new child still opens mid-table rather than at the bottom.
   const aKey = weekKey() + '-anchor';
   let anchor = Number(localStorage.getItem(aKey) || 0);
@@ -6392,9 +6393,9 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
   // reachable inside one week
   const mul = [1.42, 1.19, 1.02, 0.88, 0.72, 0.55, 0.34];
   const seeds = [
-    { name: 'CHOMPZILLA', color: 0x7ed57a }, { name: 'BITSY', color: 0xff9a3a },
-    { name: 'GLITZ', color: 0xff6fb0 }, { name: 'DOZER', color: 0x4d8ff0 },
-    { name: 'WOBBLES', color: 0x2fd8c0 }, { name: 'B1G-B1TE', color: 0xd85a5a },
+    { name: 'NIBBLES', color: 0x7ed57a }, { name: 'ECHO', color: 0xff9a3a },
+    { name: 'BIGSHOT', color: 0xff6fb0 }, { name: 'GRUMPS', color: 0x4d8ff0 },
+    { name: 'JELLY', color: 0x2fd8c0 }, { name: 'B1G-B1TE', color: 0xd85a5a },
     { name: 'snackrat', color: 0xb98cff },
   ].map((s, i) => ({ ...s, score: Math.round((anchor * mul[i]) / 5) * 5 }));
   const rows = [...seeds, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
@@ -8793,6 +8794,13 @@ function animate() {
       if (introT <= 0 && firstRun && !dragTaught) {
         // controls are live THIS frame — now the instruction is true
         dragTaught = true; guideStep = 1;
+        // THE WELCOME (owner's ask): before the lesson, one of the family
+        // greets a brand-new kid — a five-second hello that makes the first
+        // ten seconds a story instead of a tutorial. Two banner cards riding
+        // the existing queue (BANNER_READ paces them), never blocking play:
+        // the kid can drag mid-sentence and nothing waits on the cards.
+        announceHtml(cardHtml('👋 Auntie NIBBLES: "ooooh… this planet looks DELICIOUS!"'));
+        setTimeout(() => announce('🍽️ eat everything SMALLER than you — and have fun!!'), 3000);
         showGuide('<b>DRAG</b> to move — eat & <b>GROW</b>!', 6);
         dragNagT = 3;   // the repeat waits its gap too, not just the ones after it
       }

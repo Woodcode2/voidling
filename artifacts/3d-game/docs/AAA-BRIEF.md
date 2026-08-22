@@ -1298,3 +1298,33 @@ INSTRUMENT REPAIR, the round's second find: postpipe's disc VAL metric
            with no colour change (frame-level diff held at 0.2-0.6/255
            throughout — the tell). val has its own denominator now;
            three consecutive runs read Δval 0.003-0.005.
+
+### The five-item owner round: calm camera, punctual music, air for the art, a welcome, and real names
+MEASURED   Shake (round two — "still happening for every level... it's bad"):
+           even at 19/min the kit read as constant. Music: qa/_startlag.mjs
+           clocked tap→score at 314/934/1067/3061ms across four identical
+           starts — the recording always came, sometimes after 3s of
+           silence, and the synth bed NEVER engaged on the menu→PLAY path.
+           Mechanism: synthCover() counted the menu theme's still-fading
+           sources (stopLoop's 0.6s ramp outlives the 400ms cover grace) as
+           "a record is playing" and stood down; the match then waited on
+           raw decode. The reload path has no fading menu — which is
+           exactly why qa/switch.mjs never caught it.
+CHANGED    Kit halved and slowed: amplitudes cut ~50% (camPunch 1.2+1.8·bite,
+           kick 2.5+3.5·bite), refractory 0.9→1.6s, absolute floor 0.85→1.1.
+           synthCover now ignores a channel that no longer WANTS to play, so
+           the bed covers the download on every path. The rank chip left the
+           splash for the trophy room (the key art breathes — owner's call).
+           First run: Auntie NIBBLES greets the child ("this planet looks
+           DELICIOUS!") before the drag lesson — two banner cards, never
+           blocking play. THE FAMILY RENAMED (owner: the old names are
+           lame): NIBBLES the bully (the sweetest name on the scariest
+           void), BIGSHOT the showoff, JELLY the coward, ECHO the copycat,
+           GRUMPS the hoarder — every name says its game and all fit the
+           leaderboard untruncated.
+NOW        kit rate 12/min Lantern / 9/min Maple at half strength (from the
+           owner-reported 141/33). tap→score 1711/1740/1862/1866ms on the
+           harness — a 10× spread collapsed to 1.09× — and the bed engages
+           whenever decode outruns it on real hardware. smoke, juice 4/4,
+           aftermatch all PASS.
+GATE       qa/_kickrate.mjs, qa/_startlag.mjs (new), aftermatch.

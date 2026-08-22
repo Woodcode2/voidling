@@ -22,7 +22,7 @@ export interface RivalCtx { matchLen: number; playerScore: number; fever: number
 export interface RivalHit { shrink: number; steal: number; hunter: boolean; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean;
   // QA readouts: which rung of the ladder this one is running, and how long
-  // since it last swallowed anything. Both exist because "why is DOZER on 47
+  // since it last swallowed anything. Both exist because "why is GRUMPS on 47
   // points" cost five wrong guesses to answer without them.
   lane?: number; dry?: number; full?: boolean; }
 export interface Rivals {
@@ -52,8 +52,8 @@ export interface Rivals {
 /** Fisher-Yates. `.sort(() => Math.random() - 0.5)` is not a shuffle: it hands
  *  a non-transitive comparator to an implementation-defined sort, and the
  *  result is strongly biased. Measured on V8 over 100,000 trials, the cast
- *  draw dropped GLITZ 9.4% of the time and DOZER 31.3% — so GLITZ played 91%
- *  of matches and DOZER 69%, on the one system that gives a match its variety. */
+ *  draw dropped BIGSHOT 9.4% of the time and GRUMPS 31.3% — so BIGSHOT played 91%
+ *  of matches and GRUMPS 69%, on the one system that gives a match its variety. */
 function shuffle<T>(a: T[]): T[] {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -62,22 +62,31 @@ function shuffle<T>(a: T[]): T[] {
   return a;
 }
 
-const NAMES = ['WOBBLES', 'GLITZ', 'BITSY', 'CHOMPZILLA', 'DOZER'];
+// THE FAMILY, RENAMED (owner: "Chompzilla and void family names... are lame").
+// Every name SAYS its game, in a six-year-old's own vocabulary, and the irony
+// lands where it should: the apex predator of the family is called NIBBLES.
+//   NIBBLES  (Auntie)  BULLY   — hunts YOU. the sweetest name on the scariest void.
+//   BIGSHOT  (Uncle)   SHOWOFF — crosses the island for the biggest thing on it.
+//   JELLY    (Cousin)  COWARD  — wobbly, scared of everything, delicious-sounding.
+//   ECHO     (Baby)    COPYCAT — does whatever you just did.
+//   GRUMPS   (Grandpa) HOARDER — found his spot. is not leaving his spot.
+// All ≤7 characters, which also un-truncates the live leaderboard rows.
+const NAMES = ['JELLY', 'BIGSHOT', 'ECHO', 'NIBBLES', 'GRUMPS'];
 const FIRST_LANE: Record<string, number> = {
-  CHOMPZILLA: 0, GLITZ: 1, BITSY: 2, WOBBLES: 3, DOZER: 4,
+  NIBBLES: 0, BIGSHOT: 1, ECHO: 2, JELLY: 3, GRUMPS: 4,
 };
 // ── ARCHETYPES ───────────────────────────────────────────────────────────────
 // The family used to path to food and back — five different faces running one
 // brain. Every member now plays a game a child can NAME after watching it for
 // ten seconds, and the archetype is FIXED to the name so it is learnable:
-//   BULLY   CHOMPZILLA  hunts YOU. charges, bites, gloats. the threat.
-//   COWARD  WOBBLES     bolts from anything bigger. wide berth, jittery.
-//   SHOWOFF GLITZ       crosses the whole island for the biggest landmark.
-//   COPYCAT BITSY       drives your own route about 7 seconds behind you.
-//   HOARDER DOZER       camps one district and never leaves it.
+//   BULLY   NIBBLES  hunts YOU. charges, bites, gloats. the threat.
+//   COWARD  JELLY     bolts from anything bigger. wide berth, jittery.
+//   SHOWOFF BIGSHOT       crosses the whole island for the biggest landmark.
+//   COPYCAT ECHO       drives your own route about 7 seconds behind you.
+//   HOARDER GRUMPS       camps one district and never leaves it.
 export type Arch = 'BULLY' | 'COWARD' | 'SHOWOFF' | 'COPYCAT' | 'HOARDER';
 export const ARCH_OF: Record<string, Arch> = {
-  CHOMPZILLA: 'BULLY', WOBBLES: 'COWARD', GLITZ: 'SHOWOFF', BITSY: 'COPYCAT', DOZER: 'HOARDER',
+  NIBBLES: 'BULLY', JELLY: 'COWARD', BIGSHOT: 'SHOWOFF', ECHO: 'COPYCAT', GRUMPS: 'HOARDER',
 };
 // cruising speed IS characterisation: Grandpa ambles, the bully drives
 const ARCH_SPD: Record<Arch, number> = {
@@ -97,7 +106,7 @@ export const RIVAL_VOICE: Record<string, {
   charge?: string[];    // BULLY only: the wind-up before a lunge
   stuffed?: string[];   // BULLY only: the turn from threat into marquee meal
 }> = {
-  WOBBLES: {
+  JELLY: {
     taunt: ['sorry!! but also: yum!!', 'I ate it?? I ATE IT!', "don't be mad don't be mad", 'oh no. am I winning??', 'was that ok to eat??', 'eek! I mean. NOM!'],
     respawn: ['I KNEW this would happen', 'ow. told you. OW.', 'respawning. nervously.', "is it safe?? it's not."],
     eaten: ['called it.', "it's dark in here??", 'worst. day. EVER.'],
@@ -110,7 +119,7 @@ export const RIVAL_VOICE: Record<string, {
     visit: ['hi!! just checking on you', 'you look bigger?? EEP', 'stay safe ok?? ok bye!!', 'I brought moral support'],
     arch: ['RUNNING AWAY NOW!!', 'nope nope nope nope NOPE', 'I choose: not that!!', 'scattering!! like a bird!!'],
   },
-  GLITZ: {
+  BIGSHOT: {
     taunt: ['no photos, please', 'skill. pure skill.', 'the crowd goes WILD', "bet you can't do THAT", 'flawless. as usual.', 'top THAT, superstar'],
     respawn: ['I meant to do that', 'nobody saw that. good.', 'a fluke. obviously.', 'my glow!! ruined!!'],
     eaten: ["unfair!! I'm the STAR", 'my fans will hear of this', 'rude AND jealous'],
@@ -123,11 +132,11 @@ export const RIVAL_VOICE: Record<string, {
     visit: ['came to bless your day', 'you may admire me. go.', 'we are SO photogenic', 'twinning!! sort of.'],
     arch: ['that one. the BIG one.', 'only landmarks, darling', 'watch me eat something HUGE', 'small snacks are for YOU'],
   },
-  BITSY: {
+  ECHO: {
     taunt: ['nom nom nom hehe', 'I did a WINNING!', 'big bite! BIGGEST bite!', 'dat one was YUMMY', 'me first! ME FIRST!', 'look!! I ate a house!!'],
     respawn: ['owie.', 'I want a do-over!!', 'not fair!! *sniff*', 'nap. then REMATCH.'],
-    eaten: ['waaaAAAH!!', "you're a MEANIE", "I'm telling CHOMPZILLA"],
-    steal: ['MINE! dat was MINE!!', 'gimme it BACK!!', "I'm telling DOZER!!"],
+    eaten: ['waaaAAAH!!', "you're a MEANIE", "I'm telling NIBBLES"],
+    steal: ['MINE! dat was MINE!!', 'gimme it BACK!!', "I'm telling GRUMPS!!"],
     escape: ["can't catch meee!", 'hehehe too wiggly!', 'nyoom nyoom nyoom!'],
     bite: ['CHOMP! hehehe', 'you taste like grape', 'oopsie chompsie!'],
     nearBig: ["I'm da BIG kid now!", 'look how BIG I got!!', 'fear my tiny might!!'],
@@ -136,14 +145,14 @@ export const RIVAL_VOICE: Record<string, {
     visit: ['HI HI HI HI HI!!', 'watcha eating?? can I??', "tag!! you're it!! hehe", 'I missed you SO much'],
     arch: ['I go where YOU go!!', 'copying you!! hehehe', 'me too!! me too!! me TOO', 'following!! following!!'],
   },
-  CHOMPZILLA: {
+  NIBBLES: {
     taunt: ['BEHOLD: dinner AND a show', 'a FEAST worthy of ME', 'the island? MY stage.', 'gasp. magnificent. me.', 'act two: I DEVOUR', "applause. I'll wait."],
     respawn: ['the AUDACITY!!', 'I shall RETURN!! *swish*', 'my villain origin story', 'curtain?? ALREADY??'],
     eaten: ['a TRAGEDY in one act', 'the drama!! the DRAMA!!', 'eaten?! by an AMATEUR?!'],
     steal: ['STOP!! THIEF!! DRAMA!!', 'my dinner!! MY SCENE!!', 'you DARE upstage me?!'],
     escape: ['DENIED! crowd goes wild', 'you missed! DRAMATIC!', 'the plot THICKENS!!'],
     bite: ['a taste of VICTORY!!', 'consider that ACT ONE', 'delicious foreshadowing'],
-    nearBig: ['tremble, tiny snack!!', 'bow before CHOMPZILLA', 'the stage is MINE now'],
+    nearBig: ['tremble, tiny snack!!', 'bow before NIBBLES', 'the stage is MINE now'],
     nearSmall: ["spare me!! I'm FAMOUS", 'not the GLOW!!', 'exit!! stage LEFT!!'],
     rankUp: ['the LEAD is my destiny', 'a STAR is reborn!!', 'weep, understudy!!'],
     visit: ['a VISIT from greatness', 'we feast TOGETHER, kid', 'the gala is SATURDAY', 'family!! DRAMATIC hug!!'],
@@ -154,7 +163,7 @@ export const RIVAL_VOICE: Record<string, {
     // literal instruction not to — at the exact moment the game wants attack
     stuffed: ['ohh… I am SO full…', 'too full… to chase… ugh', 'I cannot run!! TOO FULL!!', 'I regret… everything…'],
   },
-  DOZER: {
+  GRUMPS: {
     taunt: ['huh? oh. I ate that.', '*yawn* …delicious', 'winning is exhausting', 'five more bites…', 'zzz… crunch… zzz', 'oops. swallowed a bus.'],
     respawn: ['best nap ever', "wake me when it's safe", 'ugh. mornings.', 'snooze… then chomp'],
     eaten: ['finally, a nap', 'cozy in here, actually', 'zzzzz…'],
@@ -213,8 +222,8 @@ const EAT_RATIO = 1.11, R_CAP = 12, START_R = 0.9, LAW_RATE = 0.025;
 //   4th   3769 /  3954 /  3440 /  3763   sd  5%
 //   5th   1992 /  2128 /  2519 /  2457   sd 10%
 // Five separated rungs, worst spread 10%, against a second place that used to
-// swing fifteenfold. A different sibling led all four matches — CHOMPZILLA,
-// WOBBLES, GLITZ, GLITZ — so the variety lives in the cast while the
+// swing fifteenfold. A different sibling led all four matches — NIBBLES,
+// JELLY, BIGSHOT, BIGSHOT — so the variety lives in the cast while the
 // difficulty stays learnable, which is the whole point.
 const LANE_FINAL = [1.00, 0.68, 0.46, 0.31, 0.20];   // fractions of the top lane
 const FIELD_TOP = 16000;        // LEGACY fallback only — see laneWant and PAR below
@@ -324,20 +333,20 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
   // (skipped when a legendary skin brings its own 3D accessory — no double hats)
   const bmat = (c2: number) => new THREE.MeshBasicMaterial({ color: c2 });
   if (sk.acc) { /* legendary accessory IS the look */ }
-  else if (idx % 5 === 0) {   // WOBBLES: sweat drop at the temple
+  else if (idx % 5 === 0) {   // JELLY: sweat drop at the temple
     const drop = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.9, depthWrite: false }));
     drop.scale.set(1, 1.5, 1); drop.position.set(0.5, 0.72, 0.5); group.add(drop);
-  } else if (idx % 5 === 1) {   // GLITZ: star shades (billboard with the eyes)
+  } else if (idx % 5 === 1) {   // BIGSHOT: star shades (billboard with the eyes)
     for (const sx of [-0.32, 0.32]) {
       const lens = new THREE.Mesh(new THREE.CircleGeometry(0.15, 16), new THREE.MeshBasicMaterial({ color: 0x140a26, depthTest: false, depthWrite: false }));
       lens.position.set(sx, 0.1, 1.03); lens.renderOrder = 7; eyes.add(lens);
     }
     const bridge = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.03), new THREE.MeshBasicMaterial({ color: 0x140a26, depthTest: false, depthWrite: false }));
     bridge.position.set(0, 0.12, 1.03); bridge.renderOrder = 7; eyes.add(bridge);
-  } else if (idx % 5 === 2) {   // BITSY: single baby hair curl
+  } else if (idx % 5 === 2) {   // ECHO: single baby hair curl
     const curl = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.035, 8, 14, Math.PI * 1.4), bmat(new THREE.Color(color).multiplyScalar(0.7).getHex()));
     curl.position.set(0, 1.02, 0); curl.rotation.set(0.4, 0, 0.3); group.add(curl);
-  } else if (idx % 5 === 3) {   // CHOMPZILLA: rakishly tilted gold crown
+  } else if (idx % 5 === 3) {   // NIBBLES: rakishly tilted gold crown
     const crown = new THREE.Group();
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.13, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd34d, side: THREE.DoubleSide }));
     crown.add(band);
@@ -347,7 +356,7 @@ function makeRivalMesh(sk: Skin, idx = 0): { group: THREE.Group; eyes: THREE.Gro
       spike.position.set(Math.cos(a) * 0.15, 0.11, Math.sin(a) * 0.15); crown.add(spike);
     }
     crown.position.set(0.12, 0.96, 0.1); crown.rotation.z = -0.3; group.add(crown);
-  } else {   // DOZER: floppy nightcap + pom-pom
+  } else {   // GRUMPS: floppy nightcap + pom-pom
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 12), bmat(0x4d6bff));
     cap.position.set(0, 1.0, 0); cap.rotation.z = 0.7; group.add(cap);
     const pom = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bmat(0xffffff));
@@ -412,11 +421,11 @@ export function createRivals(
   // NAME, permanently: the body, the voice and the archetype never separate.
   const FAMILY_SKIN: Record<string, string> = {
     // Five paid characters, five family members, one each — and the casting
-    // now says something. DOZER the HOARDER is the dragon: an ancient thing
-    // dozing on a pile of treasure. WOBBLES the COWARD is the ninja, because a
+    // now says something. GRUMPS the HOARDER is the dragon: an ancient thing
+    // dozing on a pile of treasure. JELLY the COWARD is the ninja, because a
     // nervous ninja hiding behind things is funnier than a brave one.
-    WOBBLES: 'shadowninja', GLITZ: 'univoid', BITSY: 'rexling',
-    CHOMPZILLA: 'kingvoid', DOZER: 'drako',
+    JELLY: 'shadowninja', BIGSHOT: 'univoid', ECHO: 'rexling',
+    NIBBLES: 'kingvoid', GRUMPS: 'drako',
   };
   const skinFor = (nm: string): Skin =>
     SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];
@@ -447,7 +456,7 @@ export function createRivals(
       hx: Math.cos(ang) * 130, hz: Math.sin(ang) * 130 });
   });
 
-  // WHO SHOWS UP is a roll of the dice — with one fixed point. CHOMPZILLA is
+  // WHO SHOWS UP is a roll of the dice — with one fixed point. NIBBLES is
   // ALWAYS at the table, because she is the match's threat and, later, its
   // marquee meal; a match where the danger simply failed to be cast is a match
   // with no story. The other 2-4 seats are shuffled.
@@ -463,8 +472,8 @@ export function createRivals(
     //
     // The roll belongs here, where the match starts.
     count = 3 + Math.floor(Math.random() * 3);
-    const others = shuffle(NAMES.filter((n) => n !== 'CHOMPZILLA'));
-    const picked = ['CHOMPZILLA', ...others.slice(0, Math.max(2, count - 1))];
+    const others = shuffle(NAMES.filter((n) => n !== 'NIBBLES'));
+    const picked = ['NIBBLES', ...others.slice(0, Math.max(2, count - 1))];
     // ── JOIN TIMES ────────────────────────────────────────────────────────
     // The last seat used to open as late as 165s of a 180s match: a family
     // member who arrives with fifteen seconds left is a cutscene, not a rival.
@@ -478,7 +487,7 @@ export function createRivals(
     picked.forEach((nm, i) => {
       const rv = roster.find((r) => r.name === nm)!;
       rv.cast = true;
-      rv.joinAt = nm === 'CHOMPZILLA' ? rand(7, 13) * k : slots[i];
+      rv.joinAt = nm === 'NIBBLES' ? rand(7, 13) * k : slots[i];
     });
     rivals.length = 0;
     for (const rv of roster) if (rv.cast) rivals.push(rv);
@@ -486,7 +495,7 @@ export function createRivals(
   reroll();
 
   // ── the player's breadcrumb trail ──────────────────────────────────────────
-  // Sampled every third of a second. BITSY the COPYCAT drives down it about
+  // Sampled every third of a second. ECHO the COPYCAT drives down it about
   // seven seconds behind you, which is the single most legible AI behaviour in
   // the game: a child watches once and says "she's copying me".
   const trail: { x: number; z: number }[] = [];
@@ -682,7 +691,7 @@ export function createRivals(
       const fever = ctx?.fever ?? 1;
       const par = ctx?.par;
       // ── THE HUNT WINDOW ─────────────────────────────────────────────────
-      // CHOMPZILLA is a genuine predator for the first 55% of the match — she
+      // NIBBLES is a genuine predator for the first 55% of the match — she
       // spawns near you at 1.5x your size and charges. After that she is
       // STUFFED: she stops growing while your finale surge runs, and turns
       // into the best thing on the island to eat. One rival, two acts.
@@ -1053,7 +1062,7 @@ export function createRivals(
             // unmistakably "following your footprints" but leaves her the
             // things you drove straight past.
             // …and if the footprints stop paying she forages for herself.
-            // Measured: against a player who parked, BITSY went 79.9 seconds
+            // Measured: against a player who parked, ECHO went 79.9 seconds
             // without swallowing anything, because the patch four seconds
             // behind a stationary void is a patch she already stripped.
             const back = Math.max(0, trail.length - 1 - 12);
@@ -1222,7 +1231,7 @@ export function createRivals(
           // body-fit ring grows with it — so a spot that was fine at 0.9 can
           // become impossible at 1.6, and then every step is refused no matter
           // where the target is. The loop just runs forever: stall, retarget,
-          // still pinned, stall. Traced on DOZER, who is slowest and therefore
+          // still pinned, stall. Traced on GRUMPS, who is slowest and therefore
           // most likely to still be in a tight spot when he grows: score frozen
           // at 99 and radius at 1.6 from t=46 to the whistle, three matches
           // running. Joins and respawns already spiral out to somewhere the
@@ -1484,7 +1493,7 @@ export function createRivals(
         // timer rather than by driving over it. The props really are removed —
         // this is not fake score, it is the same island getting eaten by
         // somebody else, which is exactly the loss a child can understand and
-        // point at: CHOMPZILLA cleared the fairground while you did Main Street.
+        // point at: NIBBLES cleared the fairground while you did Main Street.
         //
         // It only runs when: the rival is behind its lane (so it can never
         // overshoot into a rout), the player is more than 150 units away (so a

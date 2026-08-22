@@ -690,7 +690,14 @@ export function createAudio(): Audio3D {
   function synthCover() {
     const c = ctx;
     if (synthOn || !c || c.state !== 'running') return;
-    if (themeCh.srcs.length || menuCh.srcs.length) return;   // a record is playing
+    // A record is playing — but only a channel that WANTS to play counts. At
+    // match start the menu theme is still FADING (stopLoop's 0.6s ramp holds
+    // its srcs alive past the 400ms cover grace), and counting that corpse
+    // meant the bed never covered the menu→PLAY path at all: the match sat
+    // silent until the recording decoded — 0.3s warm, 3s cold, the owner's
+    // "music doesn't always start the moment you play". Measured by
+    // qa/_startlag.mjs: 314/934/1067/3061ms with zero bed engagements.
+    if (themeCh.srcs.length || (menuCh.wanted && menuCh.srcs.length)) return;
     // themeSynth is only set once a match has armed; before that — on the
     // splash — fall back to this world's own bed. THE MENU HAS NEVER HAD A
     // SCORE TO FALL BACK ON, which was defensible while the menu had no track
