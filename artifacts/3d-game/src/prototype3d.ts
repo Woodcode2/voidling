@@ -1576,6 +1576,8 @@ const _dbg = new Proxy(_dbgStore, {
   __beats: MatchBeat[];
   /** the matchdeck's hand for the running match — qa/vary.mjs reads it */
   __deal: Deal;
+  /** count of camera-kit firings (lens punch + recoil) — the shake census */
+  __kickN?: number;
   // QA: the juice kit, for firing shake/ring/flash from a harness
   __fx: Fx;
   // QA: the newsroom arc — every card that reached the screen this match, and
@@ -4778,6 +4780,7 @@ function capture(e: Edible, giveHunger = true) {
     // a few frames apart are what read as one THICK event (absence #1).
     camPunch(2.5 + 3.5 * bite);
     fx.kick(dx, dz, 5 + 7 * bite);
+    _dbg.__kickN = (_dbg.__kickN ?? 0) + 1;   // instrumentation: qa/_kickrate.mjs
   }
   combo++; comboT = 1.6;
   if (combo > (stats.combo ?? 0)) { stats.combo = combo; saveStats(); }
