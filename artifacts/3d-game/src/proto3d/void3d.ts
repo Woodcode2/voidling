@@ -916,7 +916,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   const mouth = new THREE.Group();
   let mouthRim: THREE.MeshBasicMaterial | null = null;      // the lip itself
   // ── NO FANGS ────────────────────────────────────────────────────────────
-  // Two little teeth used to drop into the smile from GOBBLER on, as a per-form
+  // Two little teeth used to drop into the smile from GOBBLIN on, as a per-form
   // read that survives at eighteen pixels. The owner's verdict: "Why do the
   // voids have teeth? Doesn't make sense." He is right, and for a better reason
   // than legibility. This character is a HOLE with a face — a hole has no
@@ -1937,7 +1937,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       const mo = Math.max(mouthT > 0 ? mouthMax * openEnv * Math.min(1, mouthT * 8) : 0, mp.maw);
       maw.scale.setScalar(Math.max(0.001, mo));
       mouth.visible = mo < 0.25;
-      // FANGS grow in over GOBBLER→WORLD ENDER — the void's face itself levels up
+      // FANGS grow in over GOBBLIN→WORLD ENDER — the void's face itself levels up
       fangGrow += (THREE.MathUtils.clamp((stage - 1.2) * 0.75, 0, 1) - fangGrow) * Math.min(1, dt * 3);
       for (const f of fangs) { f.visible = fangGrow > 0.02; f.scale.set(0.72 * fangGrow, fangGrow, 1); }
 

@@ -100,7 +100,7 @@ export interface GamedayCtx {
   district: GdDist | null;   // where the player currently is (null if unknown)
   lastMeal: string;          // e.g. "a pickup truck", "a whole HOUSE"
   devouredPct: number;       // 0..100
-  form: string;              // e.g. 'VOIDLING' | 'GOBBLER' | 'DEVOURER'
+  form: string;              // e.g. 'VOIDLING' | 'GOBBLIN' | 'CHOMPOSAURUS'
   secondsLeft: number;
   // ── ACCEPTED AND DELIBERATELY IGNORED ──────────────────────────────────────
   // The call site still hands us the rival scoreboard. The booth has no use for

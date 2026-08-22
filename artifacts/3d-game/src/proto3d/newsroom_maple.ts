@@ -88,7 +88,7 @@ export interface MapleCtx {
   district: MapleDist | null;   // where the player currently is (null if unknown)
   lastMeal: string;             // e.g. "a mailbox", "a whole HOUSE"
   devouredPct: number;          // 0..100
-  form: string;                 // e.g. 'VOIDLING' | 'GOBBLER' | 'DEVOURER'
+  form: string;                 // e.g. 'VOIDLING' | 'GOBBLIN' | 'CHOMPOSAURUS'
   secondsLeft: number;
   // ── ACCEPTED AND DELIBERATELY IGNORED ──────────────────────────────────────
   // The call site still hands us the rival scoreboard. The paper has no use for

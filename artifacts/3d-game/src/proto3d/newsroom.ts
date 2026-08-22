@@ -89,7 +89,7 @@ export interface NewsCtx {
   district: Dist | null;   // where the player currently is (null if unknown)
   lastMeal: string;        // e.g. "a parked car", "a whole HOUSE"
   devouredPct: number;     // 0..100
-  form: string;            // e.g. 'VOIDLING' | 'GOBBLER' | 'DEVOURER' | 'WORLD ENDER'
+  form: string;            // e.g. 'VOIDLING' | 'GOBBLIN' | 'CHOMPOSAURUS' | 'WORLD ENDER'
   secondsLeft: number;
   // ── ACCEPTED AND DELIBERATELY IGNORED ──────────────────────────────────────
   // The call site still hands us the rival scoreboard. The newsroom no longer

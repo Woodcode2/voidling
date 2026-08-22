@@ -104,7 +104,7 @@ export function createDefense(scene: THREE.Scene, fx: Fx, biomeAt: (x: number, z
     setPhase(n) {
       if (n <= phase) return null;
       phase = n;
-      // the city lets a little void be — trouble starts at GOBBLER.
+      // the city lets a little void be — trouble starts at GOBBLIN.
       // Pirate Bay has no army: the same escalation, told as resort security,
       // then the harbour watch, then the coastguard.
       const PB = worldId() === 'pirate';

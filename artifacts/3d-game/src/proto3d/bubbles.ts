@@ -43,7 +43,7 @@ interface Slot {
 }
 
 // Was a flat 150. The camera pulls back to 300 at WORLD ENDER, so every
-// ambient and panic line was rejected from roughly GOBBLER onward — the island
+// ambient and panic line was rejected from roughly GOBBLIN onward — the island
 // went silent exactly as the player became big enough to enjoy it. Measured:
 // 2 unique lines per 10s in the BUSIEST district at camDist 155, 1 at 202.
 // The gate now rides the camera so the talking distance scales with the view.
@@ -198,7 +198,7 @@ const style = document.createElement('style');
       // ('event') must survive the big-void camera pull-back, or the rivals go
       // silent exactly when the drama happens
       // Ride the camera. A flat 150 rejected every street line from roughly
-      // GOBBLER onward, because camDist reaches 300 at WORLD ENDER — the island
+      // GOBBLIN onward, because camDist reaches 300 at WORLD ENDER — the island
       // fell silent exactly when the player got big enough to enjoy it.
       // Measured before this: 2 unique lines per 10s in the BUSIEST district at
       // camDist 155, and 1 at 202.

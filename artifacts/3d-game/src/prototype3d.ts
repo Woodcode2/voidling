@@ -3003,11 +3003,19 @@ let autoFireCd = 3;
 // on a perfect run, so 13.5 is only crossed on feastR — you get here by eating
 // the family, or you do not get here. It is the one line on the results screen
 // that cannot be earned by turning up.
-const FORMS = ['VOIDLING', 'MUNCHER', 'GOBBLER', 'DEVOURER', 'COLOSSUS', 'WORLD ENDER', 'VOID TITAN'];
+// THE LADDER OF PICTURES (owner: "refine those names to make them awesome").
+// The old middle — MUNCHER, GOBBLER, DEVOURER — was one picture ("eater")
+// through a thesaurus three times. Each rung is a different THING now, and
+// the things get bigger: baby → munchkin → little monster → dinosaur →
+// giant → planet-eater → cosmos. VOIDLING is the game's name and WORLD
+// ENDER is the splash tagline; both are brand and neither moves. Renaming
+// the three middle trophies re-awards them once on existing saves (the paid
+// ledger keys on trophy name) — a few coins, reads as a small gift.
+const FORMS = ['VOIDLING', 'MUNCHKIN', 'GOBBLIN', 'CHOMPOSAURUS', 'COLOSSUS', 'WORLD ENDER', 'VOID TITAN'];
 // 2D thresholds 18/32/50/78/110 world-px, mapped through the 0.05 world scale
 const FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5];
 // the void renderer and the soundtrack both ship five visual tiers. COLOSSUS
-// wears DEVOURER's dressing — it IS a huge devourer — so the top tier stays
+// wears CHOMPOSAURUS's dressing — it IS a huge devourer — so the top tier stays
 // unique to WORLD ENDER and arriving there looks like something.
 const VISUAL_STAGE = [0, 1, 2, 3, 3, 4, 4];   // TITAN wears WORLD ENDER's dressing, at scale
 const stageFor = (r: number) => { let s = 0; for (let i = 0; i < FORM_MIN.length; i++) if (r >= FORM_MIN[i]) s = i; return s; };
@@ -3036,8 +3044,8 @@ const R_CAP = 18;                       // was 12 (2D MAX_RADIUS 240 · 0.05)
 // headroom bought by eating rivals, in world units, spent against lawCap
 let feastR = 0;
 const FEAST_PER_RIVAL = 1.25;           // five rivals eaten = the full +6
-// Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHER ~23s,
-// GOBBLER ~53s, DEVOURER ~100s, WORLD ENDER ~153s on a strong run.
+// Pacing: evolutions should be EARNED milestones. law cap ≈ MUNCHKIN ~23s,
+// GOBBLIN ~53s, CHOMPOSAURUS ~100s, WORLD ENDER ~153s on a strong run.
 const LAW_RATE = 0.025;   // evolutions are EARNED — slower clock, same 2D shape
 let lastR = 0.9;          // previous frame's radius — the growth RATE limiter
 const growRadius = (R: number, eR: number) => {
@@ -3140,7 +3148,7 @@ const QUEST_POOL: Omit<Quest, 'count' | 'done'>[] = [
   { id: 'collapse', icon: '💥', label: 'Supernova: use COLLAPSE', target: 1, reward: 20, kind: 'collapse' },
   { id: 'cars', icon: '🚗', label: 'Rush Hour: eat 6 cars', target: 6, reward: 20, kind: 'car' },
   { id: 'combo', icon: '🔥', label: 'Combo Chef: hit a ×2.0 combo', target: 1, reward: 20, kind: 'combo' },
-  { id: 'evolve', icon: '🕳️', label: 'Evolve to DEVOURER', target: 1, reward: 25, kind: 'devourer' },
+  { id: 'evolve', icon: '🕳️', label: 'Evolve to CHOMPOSAURUS', target: 1, reward: 25, kind: 'devourer' },
   { id: 'solo', icon: '🏝️', label: 'Islander: 40% in a Solo Run', target: 1, reward: 20, kind: 'solo40' },
   { id: 'houses', icon: '🏠', label: 'Roof Raider: eat 3 houses', target: 3, reward: 25, kind: 'house' },
   // PER-WORLD. Houses only exist in Maple's cozy/fancy biomes and Pirate Bay's
@@ -3294,7 +3302,7 @@ let feverCol = 0xffd23f, feverPulseT = 0;
 // three-beat spine, told as election night.
 // THE MID-MATCH HOLE. The spine was three beats at 32 / 95 / 150 with durations
 // 15 / 18 / 30, which leaves 47s->95s and 113s->150s with no beat, no
-// multiplier and — because DEVOURER->COLOSSUS has a median 52-second gap —
+// multiplier and — because CHOMPOSAURUS->COLOSSUS has a median 52-second gap —
 // usually no evolution either. That is 47 seconds and 37 seconds of a
 // three-minute match where nothing is scheduled to happen. A fourth beat fills
 // the larger hole and the rest re-space around it.
@@ -3559,7 +3567,7 @@ let devouredPct = 0, newsCd = COPY.signOn;
  *  does: a WORLD ENDER standing on an untouched suburb is still an emergency,
  *  and so is a VOIDLING that has quietly eaten a third of the map. */
 function tension(): number {
-  const byForm = THREE.MathUtils.clamp((curStage - 1.4) / 2.6, 0, 1);   // MUNCHER ~0, COLOSSUS 1
+  const byForm = THREE.MathUtils.clamp((curStage - 1.4) / 2.6, 0, 1);   // MUNCHKIN ~0, COLOSSUS 1
   const byPct = THREE.MathUtils.clamp((devouredPct - 6) / 26, 0, 1);    // 6% ~0, 32% 1
   return Math.max(byForm, byPct);
 }
@@ -4070,7 +4078,7 @@ function refreshHud() {
 // Growth is AREA-based: growRadius does R² += 0.5·eR²·k, so the currency the
 // player is feeding the void is R², not R. The bar was linear in R, which
 // means an identical prop moved it less and less the further into a form you
-// got — measured across the DEVOURER band (3.6→5.5), one 1-unit prop moved it
+// got — measured across the CHOMPOSAURUS band (3.6→5.5), one 1-unit prop moved it
 // 1.8% at the bottom and 1.0% at the top, a 45% falloff for eating exactly the
 // same thing. On the R² axis the same two bites read 1.4% and 1.2%, and what
 // is left is the intended `diminish` term rather than an artefact of the axis.
@@ -6314,9 +6322,9 @@ const saveStats = () => localStorage.setItem('voidStats', JSON.stringify(stats))
 // they are the two hardest true things a child can do here.
 const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: number; pay: number; gem?: number }[] = [
   { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', cur: () => stats.eaten, max: 1, pay: 10 },
-  { ic: '😋', nm: 'Muncher', ds: 'reach MUNCHER form', cur: () => stats.bestForm, max: 1, pay: 10 },
-  { ic: '🌀', nm: 'Gobbler', ds: 'reach GOBBLER form', cur: () => stats.bestForm, max: 2, pay: 15 },
-  { ic: '🕳️', nm: 'Devourer', ds: 'reach DEVOURER form', cur: () => stats.bestForm, max: 3, pay: 25 },
+  { ic: '😋', nm: 'Munchkin', ds: 'reach MUNCHKIN form', cur: () => stats.bestForm, max: 1, pay: 10 },
+  { ic: '🌀', nm: 'Gobblin', ds: 'reach GOBBLIN form', cur: () => stats.bestForm, max: 2, pay: 15 },
+  { ic: '🕳️', nm: 'Chomposaurus', ds: 'reach CHOMPOSAURUS form', cur: () => stats.bestForm, max: 3, pay: 25 },
   { ic: '🪐', nm: 'Colossus', ds: 'reach COLOSSUS form', cur: () => stats.bestForm, max: 4, pay: 40, gem: 1 },
   { ic: '🌍', nm: 'World Ender', ds: 'reach WORLD ENDER form', cur: () => stats.bestForm, max: 5, pay: 75, gem: 2 },
   { ic: '🌑', nm: 'Void Titan', ds: 'reach the true final form', cur: () => stats.bestForm, max: 6, pay: 150, gem: 3 },
@@ -8200,8 +8208,8 @@ function animate() {
       // …and the SURGE half of the floor has to be earned too. It had no pace
       // term, so it pulled an idle player's radius up unconditionally: a run
       // with the pointer parked at dead centre, six props eaten and 328 points
-      // was awarded MUNCHER, then GOBBLER, then DEVOURER, and the results
-      // screen told it "BIGGEST: DEVOURER". WORLD ENDER fired inside a
+      // was awarded MUNCHKIN, then GOBBLIN, then CHOMPOSAURUS, and the results
+      // screen told it "BIGGEST: CHOMPOSAURUS". WORLD ENDER fired inside a
       // seven-second window across a SEVEN-FOLD spread in final score. The
       // ceiling was already pace-scaled; the floor underneath it was not, so
       // the floor decided the outcome and skill did nothing.
@@ -8947,13 +8955,13 @@ function animate() {
     // the void and until now the only acknowledgement was a HUD card with the
     // word EVOLVED on it. A paper insisting it is the same size as before is
     // funnier, and it is the same joke the whole newsroom is built on.
-    // From GOBBLER up. VOIDLING->MUNCHER lands in the first few seconds, under
+    // From GOBBLIN up. VOIDLING->MUNCHKIN lands in the first few seconds, under
     // the title card and before the town has finished saying good morning, and
-    // MUNCHER->GOBBLER is not far behind it; reacting to either would spend the
+    // MUNCHKIN->GOBBLIN is not far behind it; reacting to either would spend the
     // shared cooldown on the least interesting growth in the match.
     if (curStage >= 2) townReacts({ kind: 'evolve', form: FORMS[curStage] });
     track('evolve', { form: curStage, name: FORMS[curStage], sec: elapsed() });
-    fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLER quest
+    fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLIN quest
     audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);   // the soundtrack escalates too
     buzz(45);
     // …and the last rung gets a whole moment of its own. Three rings, a white
