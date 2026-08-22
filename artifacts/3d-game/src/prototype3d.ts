@@ -694,9 +694,14 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // first frame; there is no golden hour to wait for here.
   // Exposure runs high (1.34) so the lantern pools bloom out toward white
   // while the shadows still have somewhere to go.
-  lantern: { sun: 0xbfd4ff, sunI: 0.42, hemiSky: 0x141a3a, hemiGround: 0x6a4a3c, hemiI: 1.05,
-             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.34,
-             fill: 0x6a8cff, fillI: 0.46, fillOff: [52, 40, -60] },
+  // MEASURED (qa/out/shippedlook + the luminance histogram): the owner's "so
+  // dark, not crisp" was 26% of the frame under 25/255 — a quarter of the
+  // screen crushed to black, villagers as silhouettes — vs 3-6% on Powder.
+  // The lift lives in the AMBIENT terms (moonlight hemi + fill), never the
+  // lamps: night stays the identity, the floor stops being a void.
+  lantern: { sun: 0xbfd4ff, sunI: 0.55, hemiSky: 0x2c3766, hemiGround: 0x7a5844, hemiI: 1.75,
+             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.42,
+             fill: 0x6a8cff, fillI: 0.72, fillOff: [52, 40, -60] },
   // ── POWDER PASS: blue winter dusk, and the SNOW is the fill ─────────────
   // Between lantern's night and the three daylight rigs: a low cold key (the
   // last of the light coming over the west wall) at real strength, because

@@ -1264,3 +1264,37 @@ HONESTY    the model is a MODEL — 3/day and one win daily are assumptions,
            networks exist, and the category choice is the owner's
            decision to make at submission time, recorded here so nobody
            discovers it in review.
+
+### Lantern stops shaking and steps out of the dark — FLUIDITY/VISUAL — owner playtest round
+MEASURED   "The screen is shaking a ton. Lantern level shakes." —
+           qa/_kickrate.mjs (new; ab's child driver, 60 game-seconds):
+           the landmark kit fired 141/min on Lantern — 2.3 shakes a
+           second — vs 33/min on Maple, because its only gate was
+           bite > 0.55 and bite is a RATIO: at small radius in the
+           densest market, half of everything qualifies.
+           "The level is so dark as well. Not crisp" — the luminance
+           histogram of the shipped frame: 26% of Lantern's pixels under
+           25/255 (p10 = 11) vs 2.6% on Powder. A quarter of the screen
+           was crushed black; villagers were silhouettes.
+CHANGED    Landmark now means all three of: big relative bite, big
+           ABSOLUTE meal (e.radius > 0.85), and a 0.9s refractory that
+           qualifying bites REFRESH — the kit marks the START of a feast
+           and re-arms only after a real pause. hitStop rides the same
+           gate. Lantern's rig: the lift lives in the AMBIENT terms only
+           (hemi 1.05→1.75 with a moonlit sky colour, fill 0.46→0.72,
+           moon key 0.42→0.55, exposure 1.34→1.42, fog/sky a step less
+           black) — the lamps stay the stars of the night.
+NOW        kit rate 141 → 19/min on Lantern (33 → 22 Maple, run noise);
+           qa/juice.mjs still 4/4 on a forced landmark. Crushed-black
+           15.6-17.3% across two shots (p10 11→~20) — still the darkest
+           world by design; the eyeball check shows warm lamp pools,
+           readable villagers, red stalls that read red. postpipe PASS.
+GATE       qa/_kickrate.mjs + the luminance ruler (/tmp lum.py, by hand).
+INSTRUMENT REPAIR, the round's second find: postpipe's disc VAL metric
+           divided sum(all pixels) by count(BRIGHT pixels) — when the
+           sat metric gained its near-black exclusion, val's denominator
+           was accidentally switched with it, so pixels drifting across
+           the 0.06 boundary between captures swung Δval 0.000→0.040
+           with no colour change (frame-level diff held at 0.2-0.6/255
+           throughout — the tell). val has its own denominator now;
+           three consecutive runs read Δval 0.003-0.005.

@@ -565,7 +565,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     maple:   { hue: 0,    sat: 1.0,  fog: 0x1b1038, bgI: 0.55 },   // the reference violet, dusty
     pirate:  { hue: 145,  sat: 0.85, fog: 0x0e2237, bgI: 0.60 },   // swung to sea-teal, daylit
     gameday: { hue: -50,  sat: 1.05, fog: 0x241120, bgI: 0.50 },   // toward magenta dusk over the lot
-    lantern: { hue: 25,   sat: 1.15, fog: 0x10142e, bgI: 0.38 },   // deeper indigo, the darkest air
+    lantern: { hue: 25,   sat: 1.15, fog: 0x171d40, bgI: 0.46 },   // indigo night — dark, never black (see WORLD_LIGHT's histogram note)
     // the poster set this look, not the other way round: blue winter dusk,
     // aurora greens in the sky, warm windows against the snow
     powder:  { hue: 95,   sat: 1.1,  fog: 0x1a2742, bgI: 0.46 },

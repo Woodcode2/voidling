@@ -69,7 +69,7 @@ const out = await p.evaluate(() => {
   const cx = Math.round((proj.x * 0.5 + 0.5) * W), cy = Math.round((-proj.y * 0.5 + 0.5) * H);
   const discR = Math.max(18, Math.min(90, Math.round(v.r * 14)));
   const stats = (d) => {
-    let n = 0, sSum = 0, vSum = 0; const lums = [];
+    let n = 0, nAll = 0, sSum = 0, vSum = 0; const lums = [];
     for (let y = 0; y < H; y += 3) for (let x = 0; x < W; x += 3) {
       const k = (y * W + x) * 4, r = d[k] / 255, g2 = d[k + 1] / 255, b2 = d[k + 2] / 255;
       lums.push(0.2126 * r + 0.7152 * g2 + 0.0722 * b2);
@@ -89,9 +89,15 @@ const out = await p.evaluate(() => {
       // contract on three worlds while the frame-level diff stayed ≤0.6% —
       // the frame check below is what still guards the historical wash.)
       if (mx >= 0.06) { sSum += mx === 0 ? 0 : (mx - mn) / mx; n++; }
-      vSum += mx;
+      vSum += mx; nAll++;
     }
-    return { sat: +(sSum / Math.max(1, n)).toFixed(3), val: +(vSum / Math.max(1, n)).toFixed(3),
+    // val divides by ALL disc pixels, sat by the bright ones only. When the
+    // sat exclusion was added, val's denominator was accidentally switched to
+    // the EXCLUDED count — so val = sum(all)/count(bright), and any pixel
+    // drifting across the 0.06 boundary between the two captures moved the
+    // metric with no colour change at all. Measured: Δval 0.040/0.037/0.000
+    // across three identical runs while frame mean|ΔRGB| held at 0.2-0.6/255.
+    return { sat: +(sSum / Math.max(1, n)).toFixed(3), val: +(vSum / Math.max(1, nAll)).toFixed(3),
       p99: +(lums[Math.floor(lums.length * 0.99)]).toFixed(3) };
   };
   // frame-level agreement: mean |ΔRGB| per sampled pixel between two reads.
