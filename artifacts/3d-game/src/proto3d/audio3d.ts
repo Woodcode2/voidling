@@ -4057,8 +4057,13 @@ export function createAudio(): Audio3D {
         const c = ensure(); if (c) yoHo(c.currentTime + 0.1);
       }
       if (sample('eaten_deep.wav', 0.55)) return;
-      noise(0.22, 0.3, 900, 180);
-      tone(160, 70, 0.24, 'sine', 0.24);
+      // THE OWNER'S "8-bit thud". With eaten_deep.wav absent (no SFX files
+      // yet), this fallback fired a punchy 160Hz sine drop + noise burst on
+      // every big swallow — a drum hit in all but name, unsynced with any
+      // track by nature, and on Lantern's sparse score it read as "those
+      // damn drums". The swallow is a soft dark WHOOSH now: filtered noise
+      // only, longer and quieter, no tonal thump to mistake for percussion.
+      noise(0.34, 0.14, 480, 120);
     },
     gulp() {
       noise(0.4, 0.34, 2200, 220);

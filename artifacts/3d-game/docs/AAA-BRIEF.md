@@ -1351,3 +1351,31 @@ NOW        qa/_twoscores.mjs 0/50; tap→score 890-1700ms and tightening as
            lens channel is dead BY THE OWNER'S ORDER and the contract's ≥3
            holds on sparks + hit-pause + haptics.
 GATE       qa/_twoscores.mjs (new), qa/_startlag.mjs, juice.
+
+### The 8-bit thud, the greeting, the pre-filled meter, and the jumpy ice — owner round
+MEASURED   "Still hearing those damn drums… it's this thud sound, like an
+           8-bit sfx." Convicted: NOT music — with eaten_deep.wav absent
+           (no SFX files yet), every big swallow played the synth fallback:
+           a punchy 160Hz sine drop + noise burst — a drum hit in all but
+           name, exposed by Lantern's sparse track. "Weird pull… people
+           gravitating towards you": DESIGNED — Lantern's guest act
+           (life.ts): in act one the market walks TOWARD the honoured
+           guest, wary from tense 0.42, rout past 0.74. Reported to the
+           owner as designed; his call whether it stays. "Meter half full
+           at start": arithmetic — the first form rung measured from r=0,
+           a size the void can never be, so the bar sat 39% full at spawn
+           (1²/1.6²). No items were feeding it. "Powder items jumpy":
+           moverbands — 97 movers in the visible-chop half-rate band at
+           play camera, and powder's signature movers (skaters, sledders,
+           lift chairs) are FAST — chop visibility scales with speed ×
+           update interval.
+CHANGED    the swallow fallback is a soft dark whoosh (filtered noise only,
+           longer, quieter — no tonal thump); the meter's first rung
+           measures from the true spawn size (bar starts EMPTY, a shrunk
+           void shows an honest 0%); Mover.fast exempts the ~22 fast
+           powder movers from the stagger bands (cost: nothing
+           measurable — the bands exist for 900-walker crowds).
+NOW        smoke PASS; the swallow no longer registers as percussion by
+           construction (no oscillator in the voice); spawn meter 0%.
+GATE       qa/moverbands.mjs (distance census — the fast flag lives in the
+           update loop it deliberately does not model), qa/smoke.mjs.

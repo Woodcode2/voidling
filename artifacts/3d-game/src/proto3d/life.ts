@@ -332,7 +332,15 @@ const VOICE_PANIC: Record<string, string[]> = {
 
 // mesh is nullable in practice: the train mover is pushed on every world but
 // only BUILT on Maple, so it reports null on the other three. See the gate.
-interface Mover { mesh: THREE.Object3D | null; update(dt: number, t: number, vx: number, vz: number, vR: number): void; }
+interface Mover {
+  mesh: THREE.Object3D | null;
+  /** fast movers are EXEMPT from the stagger bands: chop visibility scales
+   *  with speed × update interval, so a skater at half rate jumps twice a
+   *  walker's stutter — the owner's "powder items are jumpy". The fast fleet
+   *  is ~22 bodies; full-rating them costs nothing measurable. */
+  fast?: boolean;
+  update(dt: number, t: number, vx: number, vz: number, vR: number): void;
+}
 export interface Life {
   /** `gate` = world-units past which a mover updates on a stagger instead of
    *  every frame. Omit for the old behaviour (everything, every frame). */
@@ -3869,7 +3877,7 @@ export function createLife(
       const [sx, sz] = g3([PW.LAKE.cx + Math.cos(a0) * orx, PW.LAKE.cy + Math.sin(a0) * ory]);
       p.position.set(sx, 0, sz);
       scene.add(p); addEdible(p, 0.62);
-      movers.push({ mesh: p, update(dt2, _tm, vx, vz, vR) {
+      movers.push({ mesh: p, fast: true, update(dt2, _tm, vx, vz, vR) {
         if (eaten(p)) return;
         // skate away from the void when it looms; otherwise carve the oval
         const dx2 = p.position.x - vx, dz2 = p.position.z - vz;
@@ -3914,7 +3922,7 @@ export function createLife(
       let t = (i / 6) % 1;
       chair.userData.mover = true; chair.userData.qk = 'lift';
       scene.add(chair); addEdible(chair, 1.1);
-      movers.push({ mesh: chair, update(dt2) {
+      movers.push({ mesh: chair, fast: true, update(dt2) {
         if (eaten(chair)) return;
         t += dir * dt2 * 0.016;
         if (t > 1) t -= 1; if (t < 0) t += 1;
@@ -3937,7 +3945,7 @@ export function createLife(
       const lane = rand(-140, 140);
       sled.userData.mover = true; sled.userData.qk = 'sledkid';
       scene.add(sled); addEdible(sled, 0.85);
-      movers.push({ mesh: sled, update(dt2) {
+      movers.push({ mesh: sled, fast: true, update(dt2) {
         if (eaten(sled)) return;
         t += (downhill ? 1 : -1) * dt2 * (downhill ? 0.045 : 0.012);
         if (t >= 0.98) { t = 0.98; downhill = false; }
@@ -5438,7 +5446,7 @@ export function createLife(
       for (let i = 0; i < movers.length; i++) {
         const m = movers[i];
         const o = m.mesh;
-        if (o && gate < Infinity) {
+        if (o && gate < Infinity && !m.fast) {
           const dx = o.position.x - vx, dz = o.position.z - vz;
           const d2 = dx * dx + dz * dz;
           if (d2 > g2) {

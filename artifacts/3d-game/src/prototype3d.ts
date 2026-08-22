@@ -4076,7 +4076,14 @@ function refreshHud() {
 // is left is the intended `diminish` term rather than an artefact of the axis.
 const formProgress = (r: number) => {
   const st = stageFor(r);
-  const lo = FORM_MIN[st], hi = FORM_MIN[st + 1] ?? R_CAP;
+  // The first rung measured from r=0 — a size the void can never be (START_R
+  // is the floor) — so the bar sat at 39% full at spawn before a single bite.
+  // The owner read it as items pre-feeding the meter; it was the denominator.
+  // Every rung now measures from the largest of its threshold and the size a
+  // void actually starts at (spawn r=1.0 — START_R 0.9 is the SHRINK floor,
+  // below the start line): the bar begins EMPTY, as a bar should, and a void
+  // shrunk under 1.0 shows an honest 0%.
+  const lo = Math.max(FORM_MIN[st], 1), hi = FORM_MIN[st + 1] ?? R_CAP;
   return THREE.MathUtils.clamp((r * r - lo * lo) / Math.max(1e-4, hi * hi - lo * lo), 0, 1);
 };
 // the pips: every form still ahead, drawn on the track once per evolution
