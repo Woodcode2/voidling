@@ -116,7 +116,12 @@ probe that reaches a match MUST seed `voidUnlocked` with ALL worlds — a locked
 card refuses the tap BY DESIGN and the probe hangs forever (three separate
 probes have now hit this); and a python `replace()` edit that prints "done"
 unconditionally is not an edit — `assert s.count(OLD) == 1` before every
-replace, then grep the file after. One more code trap with
+replace, then grep the file after. And a harness trap: a wait loop of the
+form `until ! pgrep -f 'qa/econ'` NEVER exits — the pattern matches the
+loop's own command line, so it waits on itself forever (seven zombie waits
+accumulated in one session before this was noticed). Bracket a character
+(`pgrep -f 'qa/[e]con'`) or match the node binary, and read the probe's
+VERDICT from its log file, never from process existence. One more code trap with
 teeth: the boot now yields at seams, so anything reachable from window during
 boot must not touch consts declared later — the debug API stages on a
 buffering proxy and attaches atomically at end of module for exactly this
