@@ -1328,3 +1328,26 @@ NOW        kit rate 12/min Lantern / 9/min Maple at half strength (from the
            whenever decode outruns it on real hardware. smoke, juice 4/4,
            aftermatch all PASS.
 GATE       qa/_kickrate.mjs, qa/_startlag.mjs (new), aftermatch.
+
+### Zero shake, and the bridge loses its drum kit — owner's calls, both absolute
+OWNER      "Shake is still happening. I don't want any shake. 0." / "I'm
+           hearing drums sort of not synced. I don't want those drums."
+CHANGED    Every camera-motion channel is OFF AT THE SOURCE: fx.kick (the
+           directed recoil), fx.shake (noise), camPunch (the lens punch —
+           FOV pumping reads as wobble too). Call sites stay; one line per
+           channel restores any of them if ever asked. hitStop (the brief
+           time-freeze) remains — it moves nothing. THE DRUMS: measured
+           first (qa/_twoscores.mjs — 0/50 steady-state overlap samples),
+           which ruled out a handover leak and convicted the COVER itself:
+           the bridge that plays while a recording decodes was the world's
+           full synth score, taiko and all, unsynced with the incoming
+           track by construction. The cover is now a drumless root-and-
+           fifth pad — no tempo, no percussion, cannot clash with any
+           recording. The full synth score keeps its one real job: the
+           permanent fallback when a world has no track file (the 404
+           path), which is how future worlds still ship with music.
+NOW        qa/_twoscores.mjs 0/50; tap→score 890-1700ms and tightening as
+           the cache warms (no 3s outliers); smoke PASS; juice 3/4 — the
+           lens channel is dead BY THE OWNER'S ORDER and the contract's ≥3
+           holds on sparks + hit-pause + haptics.
+GATE       qa/_twoscores.mjs (new), qa/_startlag.mjs, juice.

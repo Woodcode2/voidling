@@ -638,7 +638,7 @@ export function createAudio(): Audio3D {
     synthCover();                                 // menu or match: never silent
     if (ch.bad) return;                           // no recording: the bed is the score
     if (ch.loading) return;                       // in flight; its own tail starts it
-    if (ch === themeCh) { if (themeUrls.length) playTrack(themeCh, themeUrls, () => synthCover()); }
+    if (ch === themeCh) { if (themeUrls.length) playTrack(themeCh, themeUrls, () => synthCover('score')); }
     else playTrack(menuCh, [MENU_URL], () => { /* no file: quiet, as designed */ });
   }
   // ── A MATCH IS NEVER SILENT WHILE IT WAITS FOR A DOWNLOAD ────────────────
@@ -687,7 +687,42 @@ export function createAudio(): Audio3D {
       : isLantern() ? startLantern
         : isPowder() ? startPowderScore : startTown);
   /** Bring the bed up, unless a recording beat it to it. */
-  function synthCover() {
+  // ── THE COVER PAD ─────────────────────────────────────────────────────────
+  // The owner, on Lantern: "We have the music I provided then I'm hearing
+  // drums sort of not synced." Those drums were the COVER: the bridge that
+  // plays while a recording decodes used to be the world's full synth score —
+  // taiko and all — handing over to the track seconds later, out of sync by
+  // construction. A bridge should not have a drum kit. The cover is now this:
+  // one soft root-and-fifth pad, no tempo, no percussion — it cannot clash
+  // with any recording, and it still means "the music is coming" instead of
+  // silence. The FULL synth score keeps its real job: the permanent fallback
+  // when a world has no track file at all (playTrack's 404 path).
+  let padNodes: { o: OscillatorNode[]; g: GainNode } | null = null;
+  function startPad(c: AudioContext) {
+    if (padNodes || !musicBus) return;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.11, c.currentTime + 1.4);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+    g.connect(lp); lp.connect(musicBus);
+    const o = [146.83, 220.0, 293.66].map((f, i) => {   // D3 · A3 · D4
+      const osc = c.createOscillator(); osc.type = 'triangle';
+      osc.frequency.value = f; osc.detune.value = (i - 1) * 4;
+      osc.connect(g); osc.start();
+      return osc;
+    });
+    padNodes = { o, g };
+  }
+  function stopPad(fade: number) {
+    const c = ctx;
+    if (!padNodes || !c) return;
+    const p = padNodes; padNodes = null;
+    p.g.gain.cancelScheduledValues(c.currentTime);
+    p.g.gain.setValueAtTime(Math.max(0.0001, p.g.gain.value), c.currentTime);
+    p.g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + Math.max(0.05, fade));
+    for (const osc of p.o) osc.stop(c.currentTime + Math.max(0.05, fade) + 0.1);
+  }
+  function synthCover(kind: 'pad' | 'score' = 'pad') {
     const c = ctx;
     if (synthOn || !c || c.state !== 'running') return;
     // A record is playing — but only a channel that WANTS to play counts. At
@@ -705,15 +740,23 @@ export function createAudio(): Audio3D {
     // over cellular that is several seconds of the owner's "music at the
     // splash screen not loading". The world's bed is the same music family
     // and it is replaced the moment the recording lands.
+    if (kind === 'pad') {
+      if (!musGain) musGain = buildMusicBus(c);
+      synthOn = true;
+      logEv('cover pad up (drumless)');
+      startPad(c);
+      return;
+    }
     const bed = themeSynth ?? worldSynth();
     synthOn = true;
-    logEv('synth bed up (cover)');
+    logEv('synth bed up (no track file — the world score is the score)');
     bed();
   }
   function synthStop(fade: number) {
     if (!synthOn) return;
     synthOn = false;
     logEv('synth bed down (handover)');
+    stopPad(fade);
     stopTropical(fade); stopTown(fade); stopGameday(fade); stopLantern(fade); stopPowder(fade);
   }
   function repairMusic() {
@@ -3641,7 +3684,7 @@ export function createAudio(): Audio3D {
       menuCh.wanted = false;
       stopLoop(menuCh, 0.6);
       themeUrls = urls; themeSynth = synth;   // so a repair can re-arm this world
-      playTrack(themeCh, urls, () => synthCover());
+      playTrack(themeCh, urls, () => synthCover('score'));
       // ── AND COVER THE DOWNLOAD, AFTER A BEAT ──────────────────────────────
       // 400ms of grace, so a warm cache never hears the bed at all: on a second
       // launch the decoded buffer is already in hand and startLoop runs inside

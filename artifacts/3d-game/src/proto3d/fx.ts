@@ -111,12 +111,14 @@ export function createFx(scene: THREE.Scene): Fx {
     // …and camera shake goes entirely. Unlike the flash it carries no
     // information the rest of the frame does not already show, and translating
     // the viewpoint is the part that actually provokes motion sickness.
-    shake(amt) { if (!reduceMotion()) shakeAmt = Math.max(shakeAmt, amt); },
+    shake(amt) { void amt; },   // OFF — the owner's zero-shake call (see kick below)
     kick(dx, dz, amt) {
-      if (reduceMotion()) return;
-      const l = Math.hypot(dx, dz);
-      if (l < 1e-4 || amt <= kickAmt) return;   // a bigger kick owns the vector
-      kickX = dx / l; kickZ = dz / l; kickAmt = amt; kickAge = 0;
+      // THE OWNER'S CALL, absolute: "I don't want any shake. 0." Two rounds
+      // of dialling (141→19→12/min, amplitudes halved) still read as shake
+      // on his phone, and the camera's steadiness matters more than any
+      // juice theory. The directed recoil is OFF at the source — call sites
+      // stay, so one line here brings it back if he ever asks.
+      void dx; void dz; void amt;
     },
     update(dt, camDist = SHAKE_REF_DIST) {
       for (const r of rings) {

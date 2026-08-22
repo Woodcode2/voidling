@@ -546,7 +546,9 @@ let camDist = 50;
 // evolution. Gated by reduce-motion like every other kick.
 let fovKick = 0;
 let kitCd = 0;   // wall-time cooldown for the whole landmark kit (see capture)
-const camPunch = (deg: number) => { if (!reduceMotion()) fovKick = Math.max(fovKick, deg); };
+// OFF — the owner's zero-shake call covers the lens too: rapid FOV pumping
+// reads as wobble even with the camera position pinned. One line restores it.
+const camPunch = (deg: number) => { void deg; };
 let lookVX = 0, lookVZ = 0, camPrevX = 0, camPrevZ = 0;   // camera lookahead, smoothed off real motion
 const camOffset = new THREE.Vector3(0.62, 0.92, 0.62).normalize();
 
