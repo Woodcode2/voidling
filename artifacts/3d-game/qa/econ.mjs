@@ -16,9 +16,12 @@
 //      profile), runs one match to TIME!, and asserts the wallet moved by at
 //      least the full back catalogue and the results lead says 🏆.
 //
-//   3. THE BUNDLE CARD EXISTS. One SKU, whole wardrobe, one parental gate —
-//      the banner must render in the shop and carry a price (web build shows
-//      the USD fallback; StoreKit repaints it on device).
+//   3. GEMS ARE REAL AND RARE. The owner's two-currency design: deep
+//      trophies pay 💎 alongside ✦ (18 gems across the full back catalogue),
+//      the gem colourways render priced in their own shop tier, and the gem
+//      chip appears once a balance exists. (The everything-bundle this
+//      section used to check was REMOVED by the owner's decision — its
+//      absence is now part of the contract.)
 import { chromium } from 'playwright';
 
 const PORT = process.argv[2] || '4177';
@@ -87,41 +90,60 @@ const fails = [];
   const r = await p.evaluate(() => ({
     paid: JSON.parse(localStorage.getItem('voidTrophyPaid') || '[]'),
     coins: Number(localStorage.getItem('voidCoins') || 0),
+    gems: Number(localStorage.getItem('voidGems') || 0),
     lead: document.getElementById('endSub')?.textContent ?? '',
   }));
-  // the full back catalogue at seeded stats: all 17 bounties = 810✦
-  console.log(`  trophies paid: ${r.paid.length}/17  wallet 1000 → ${r.coins}  lead="${r.lead.slice(0, 60)}"`);
+  // the full back catalogue at seeded stats: all 17 bounties = 810✦ + 18💎
+  // (+1💎 more if this run happened to be the day's first win)
+  console.log(`  trophies paid: ${r.paid.length}/17  wallet 1000 → ${r.coins}  gems 0 → ${r.gems}  lead="${r.lead.slice(0, 60)}"`);
   if (r.paid.length !== 17) fails.push(`expected all 17 trophies paid, got ${r.paid.length}`);
   if (r.coins < 1810) fails.push(`wallet ${r.coins} — the 810✦ back catalogue did not land`);
+  if (r.gems < 18 || r.gems > 19) fails.push(`gems ${r.gems} — the 18💎 back catalogue did not land (or double-paid)`);
   if (!r.lead.includes('🏆')) fails.push('results lead does not name the trophy');
 
   // a SECOND match must pay the catalogue exactly once — nothing new due
   await p.click('#btnAgain');
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 3, null, { timeout: 900000 });
-  const before2 = await p.evaluate(() => Number(localStorage.getItem('voidCoins') || 0));
+  const before2 = await p.evaluate(() => ({
+    coins: Number(localStorage.getItem('voidCoins') || 0),
+    gems: Number(localStorage.getItem('voidGems') || 0),
+  }));
   await p.evaluate(() => window.__rushClock(0.05));
   await p.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 120000 });
   const after2 = await p.evaluate(() => ({
     coins: Number(localStorage.getItem('voidCoins') || 0),
+    gems: Number(localStorage.getItem('voidGems') || 0),
     paid: JSON.parse(localStorage.getItem('voidTrophyPaid') || '[]').length,
   }));
-  console.log(`  rematch: paid stays ${after2.paid}/17, wallet +${after2.coins - before2} (match reward only)`);
+  console.log(`  rematch: paid stays ${after2.paid}/17, wallet +${after2.coins - before2.coins}, gems +${after2.gems - before2.gems}`);
   if (after2.paid !== 17) fails.push('voidTrophyPaid changed size on a rematch');
-  if (after2.coins - before2 > 600) fails.push(`rematch paid ${after2.coins - before2}✦ — bounties double-paid`);
+  if (after2.coins - before2.coins > 600) fails.push(`rematch paid ${after2.coins - before2.coins}✦ — bounties double-paid`);
+  if (after2.gems - before2.gems > 1) fails.push(`rematch paid ${after2.gems - before2.gems}💎 — gem bounties double-paid`);
 
-  // ── 3. the bundle banner ─────────────────────────────────────────────────
+  // ── 3. the gem shelf ─────────────────────────────────────────────────────
   await p.click('#btnHome'); await p.waitForTimeout(800);
   await p.click('#btnShop'); await p.waitForTimeout(600);
-  const bundle = await p.evaluate(() => {
-    const c = document.querySelector('#shopGrid .skCard.bundle');
-    return c ? { pr: c.querySelector('.pr')?.textContent ?? '' } : null;
+  const shelf = await p.evaluate(() => {
+    const tiers = [...document.querySelectorAll('#shopGrid .shopTier')].map((t) => t.textContent ?? '');
+    const aurora = [...document.querySelectorAll('#shopGrid .skCard')]
+      .find((c) => c.querySelector('.nm')?.textContent === 'Aurora');
+    const chip = document.getElementById('shopGems');
+    return {
+      gemTier: tiers.some((t) => t.includes('GEMS')),
+      bundleGone: !document.querySelector('#shopGrid .skCard.bundle'),
+      auroraPr: aurora?.querySelector('.pr')?.textContent ?? 'CARD MISSING',
+      chipShown: !!chip && chip.style.display !== 'none',
+      chipN: document.getElementById('shopGemsN')?.textContent ?? '',
+    };
   });
-  console.log(`  bundle card: ${bundle ? `present, pr="${bundle.pr}"` : 'MISSING'}`);
-  if (!bundle) fails.push('bundle banner missing from the shop');
-  else if (!/\$9\.99|COMING/.test(bundle.pr)) fails.push(`bundle price reads "${bundle.pr}"`);
+  console.log(`  gem shelf: tier=${shelf.gemTier} aurora="${shelf.auroraPr}" chip=${shelf.chipShown} (${shelf.chipN}💎) bundleGone=${shelf.bundleGone}`);
+  if (!shelf.gemTier) fails.push('no GEMS tier header in the shop');
+  if (!shelf.bundleGone) fails.push('the vetoed bundle banner still renders');
+  if (!/💎 10/.test(shelf.auroraPr)) fails.push(`Aurora price reads "${shelf.auroraPr}"`);
+  if (!shelf.chipShown || Number(shelf.chipN) < 18) fails.push(`gem chip hidden or empty (${shelf.chipN})`);
   await p.close();
 }
 
 await b.close();
-console.log('\n  ' + (fails.length ? 'FAIL — ' + fails.join('; ') : 'PASS — the cliff is dead, the ladder pays once, and the bundle is on the shelf') + '\n');
+console.log('\n  ' + (fails.length ? 'FAIL — ' + fails.join('; ') : 'PASS — the cliff is dead, the ladder pays once, and gems are real, rare, and spendable') + '\n');
 process.exit(fails.length ? 1 : 0);

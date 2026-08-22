@@ -152,6 +152,7 @@ export interface Skin {
   char?: SkinChar;                                 // legendary: full character rig
   cash?: number;                                   // legendary: USD price
   streak?: number;                                 // unlock by daily play streak
+  gems?: number;                                   // premium colourway: 💎 price
 }
 export const SKINS: Skin[] = [
   { id: 'classic', name: 'Classic', abyss: 0x050308, inner: 0x241055, mid: 0x5f2ab4, rim: 0xa96bff, glow: 0xb98cff },
@@ -199,6 +200,15 @@ export const SKINS: Skin[] = [
   { id: 'lemon', name: 'Lemon', abyss: 0x2e2703, inner: 0x8a7410, mid: 0xf0dc46, rim: 0xfffaa8, glow: 0xfffdd0 },
   { id: 'silver', name: 'Silver', abyss: 0x101218, inner: 0x3a414d, mid: 0x8e98a6, rim: 0xe6eef8, glow: 0xf6fbff },
   { id: 'chilli', name: 'Chilli', abyss: 0x2c060e, inner: 0x820f22, mid: 0xe0243f, rim: 0xff7089, glow: 0xffa0b0 },
+  // ── GEM COLOURWAYS (owner's two-currency design) ─────────────────────────
+  // Coins buy the everyday looks above; GEMS — the rare currency earned from
+  // deep trophies, the day-7 chest and the first win of the day — buy these.
+  // The base void stays purple (classic, free, untouched): a colourway is a
+  // look a child chose, never a replacement for the character. Palette-only
+  // by design — pattern art (`tex`) joins when the owner supplies it.
+  { id: 'aurora', name: 'Aurora', abyss: 0x041420, inner: 0x0c4d5a, mid: 0x18a880, rim: 0x7dffd0, glow: 0xb8ffe4, gems: 10 },
+  { id: 'glacier', name: 'Glacier', abyss: 0x0a1428, inner: 0x1e4a7a, mid: 0x4a90d0, rim: 0xcfeaff, glow: 0xffffff, gems: 10 },
+  { id: 'nova', name: 'Nova', abyss: 0x1c0a20, inner: 0x5a1a6a, mid: 0xb03aa0, rim: 0xffd25a, glow: 0xffeba0, gems: 14 },
   // 🔥 STREAK — come back daily to unlock (resets if you miss a day)
   // EMBER IS FIRE, NOT TOFFEE. Measured on the rendered cards, ember/honey were
   // the closest pair in the entire catalogue at 2.4 mean per-pixel — closer

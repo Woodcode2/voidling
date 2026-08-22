@@ -33,13 +33,11 @@ import { track } from './telemetry';
  *  before it can take a penny. Until that is done a tap returns 'not_ready'
  *  on device — which the shop renders honestly rather than as "coming soon". */
 export const IAP_PRODUCTS: Record<string, string> = {
-  // THE BUNDLE (AAA-BRIEF §4.4 item 1): everything, forever, one price — one
-  // parental gate and one decision instead of seventeen. The grant is routed
-  // by the caller (prototype3d's initIAP callback expands 'everything' into
-  // every cash skin and every hat), so this file stays id-in, id-out.
-  // PRICE IS THE OWNER'S CALL — $9.99 is the working number in the client and
-  // in APPSTORE.md; App Store Connect is where it becomes real.
-  everything: 'com.voidling.bundle.everything',
+  // NO BUNDLE, BY THE OWNER'S CALL. The AAA-BRIEF proposed an everything-
+  // forever SKU and it shipped for one commit; the owner vetoed it — "I don't
+  // like the idea of everything free forever" — and the catalogue went back
+  // to à la carte. The economy's breadth comes from the two-currency design
+  // (coins + gems) in prototype3d.ts instead. Recorded in the brief's ledger.
   univoid: 'com.voidling.skin.univoid',
   rexling: 'com.voidling.skin.rexling',
   kingvoid: 'com.voidling.skin.kingvoid',

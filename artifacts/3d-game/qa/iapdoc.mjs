@@ -28,7 +28,12 @@ const code = [...block.matchAll(/(\w+):\s*'(com\.voidling\.[a-z]+\.[a-z]+)'/g)]
   .map((m) => ({ key: m[1], id: m[2] }));
 
 // ── what the doc tells a human to create ───────────────────────────────────
-const documented = new Set([...doc.matchAll(/com\.voidling\.[a-z]+\.[a-z]+/g)].map((m) => m[0]));
+// A line that says "do not create" names an id precisely so a human WON'T
+// make it (the owner-vetoed bundle lives on such a line) — that is a warning,
+// not a listing, and it must not count as a documented product.
+const documented = new Set(doc.split('\n')
+  .filter((line) => !/do not create/i.test(line))
+  .flatMap((line) => [...line.matchAll(/com\.voidling\.[a-z]+\.[a-z]+/g)].map((m) => m[0])));
 
 const fail = [];
 const missing = code.filter((c) => !documented.has(c.id));

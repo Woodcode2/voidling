@@ -1538,8 +1538,6 @@ const _dbg = new Proxy(_dbgStore, {
   __previewVoid?: (s: Skin) => void;
   __previewStop?: () => void;
   __shopMirror?: () => void;
-  /** repaint the bundle banner after a grant lands (set by the shop block) */
-  __paintBundle?: () => void;
   __shopTab?: () => void;
   __skinsGranted?: (ids: string[]) => void;
   __celebrateSkins?: (skins: Skin[]) => void;
@@ -3105,6 +3103,22 @@ function addCoins(n: number) {
   for (const f of coinWatchers) f(coins);
 }
 addCoins(0);
+// ── GEMS: the second currency, by the owner's design ────────────────────────
+// Coins are the everyday wallet; 💎 gems are RARE — deep trophies, the day-7
+// chest, the first win of the day — and they buy the premium colourways
+// (palette.ts gem skins; awesome hats join next). The daily card's old "one
+// currency" rule was right for its era (two counters implying two currencies
+// with only one real one was a lie); two currencies that both exist is not
+// that bug. 💎 is the GEM mark everywhere now — cash cards show a plain
+// dollar price. No gem is purchasable for money yet: that is a consumable
+// IAP decision that waits for the store shell and the owner.
+let gems = Number(localStorage.getItem('voidGems') || 0);
+const gemWatchers: ((n: number) => void)[] = [];
+function addGems(n: number) {
+  gems += n;
+  localStorage.setItem('voidGems', String(gems));
+  for (const f of gemWatchers) f(gems);
+}
 
 // ── DAILY QUESTS: 3 drawn per day (1 easy / 1 medium / 1 hard), progress
 // persists across matches, +25✦ for clearing the board — three stacking
@@ -4408,9 +4422,9 @@ function openDrop(n: number) {
     }, 550);
   }, 2600);
 }
-function celebrateEnd(coins: number, xpGain: number, lead: string, won = false) {
+function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, gemGain = 0) {
   offerDrop();
-  endSub.innerHTML = `${lead}<br><b class="endCnt">+0✦</b> · +${xpGain} XP`;
+  endSub.innerHTML = `${lead}<br><b class="endCnt">+0✦</b>${gemGain ? ` · +${gemGain}💎` : ''} · +${xpGain} XP`;
   if (won) {
     // champion confetti: two dozen falling sparks over the end screen
     for (let i = 0; i < 24; i++) {
@@ -4477,7 +4491,7 @@ function endMatch() {
     if (lvlPay2) addCoins(lvlPay2);
     celebrateEnd(reward2 + troPay2.coins + lvlPay2, gain2,
       troPay2.count ? `🏆 ${troPay2.last.toUpperCase()} EARNED!`
-        : newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`);
+        : newBest ? 'NEW BEST!!' : `best: ${Math.max(best, devouredPct)}%`, false, troPay2.gems);
     endList.innerHTML = '';
     endEl.classList.add('show');
     countMatch();
@@ -4511,8 +4525,10 @@ function endMatch() {
   // one enormous run out-earn a week of ordinary ones.
   const scoreCoins = Math.floor(60 * Math.log10(1 + playerScore / 500) / Math.log10(7));
   let reward = ([50, 35, 25, 15, 10][myRank - 1] ?? 10) + Math.min(300, scoreCoins);
+  let gemGain = 0;
   if (myRank === 1 && localStorage.getItem('voidFirstWinDay') !== today) {
     localStorage.setItem('voidFirstWinDay', today); reward += 50;
+    gemGain += 1; addGems(1);   // the day's first win is a gem — the rare loop
   }
   addCoins(reward);
   // …and XP saturated at 4,000, crossed at about the same moment
@@ -4557,7 +4573,7 @@ function endMatch() {
     const lead = troPay.count ? `🏆 ${troPay.last.toUpperCase()} EARNED!`
       : leveledTo ? `⬆️ LEVEL ${leveledTo}!`
         : myRank === 1 ? COPY.winSub : `${rows[0].name} devoured the most`;
-    celebrateEnd(reward + troPay.coins + lvlPay, gain, lead, myRank === 1);
+    celebrateEnd(reward + troPay.coins + lvlPay, gain, lead, myRank === 1, gemGain + troPay.gems);
   }
   // THE RUN'S OWN NUMBERS. % DEVOURED was shown in Solo and nowhere else — the
   // figure a child watched climb for three minutes simply vanished at the
@@ -6250,43 +6266,45 @@ const saveStats = () => localStorage.setItem('voidStats', JSON.stringify(stats))
 // label. Bounties scale with how deep in the game the trophy lives — the two
 // new top forms are the biggest single payouts in the coin economy, because
 // they are the two hardest true things a child can do here.
-const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: number; pay: number }[] = [
+const TROPHIES: { ic: string; nm: string; ds: string; cur: () => number; max: number; pay: number; gem?: number }[] = [
   { ic: '🍩', nm: 'First Bite', ds: 'eat your first snack', cur: () => stats.eaten, max: 1, pay: 10 },
   { ic: '😋', nm: 'Muncher', ds: 'reach MUNCHER form', cur: () => stats.bestForm, max: 1, pay: 10 },
   { ic: '🌀', nm: 'Gobbler', ds: 'reach GOBBLER form', cur: () => stats.bestForm, max: 2, pay: 15 },
   { ic: '🕳️', nm: 'Devourer', ds: 'reach DEVOURER form', cur: () => stats.bestForm, max: 3, pay: 25 },
-  { ic: '🪐', nm: 'Colossus', ds: 'reach COLOSSUS form', cur: () => stats.bestForm, max: 4, pay: 40 },
-  { ic: '🌍', nm: 'World Ender', ds: 'reach WORLD ENDER form', cur: () => stats.bestForm, max: 5, pay: 75 },
-  { ic: '🌑', nm: 'Void Titan', ds: 'reach the true final form', cur: () => stats.bestForm, max: 6, pay: 150 },
+  { ic: '🪐', nm: 'Colossus', ds: 'reach COLOSSUS form', cur: () => stats.bestForm, max: 4, pay: 40, gem: 1 },
+  { ic: '🌍', nm: 'World Ender', ds: 'reach WORLD ENDER form', cur: () => stats.bestForm, max: 5, pay: 75, gem: 3 },
+  { ic: '🌑', nm: 'Void Titan', ds: 'reach the true final form', cur: () => stats.bestForm, max: 6, pay: 150, gem: 5 },
   { ic: '👑', nm: 'Champion', ds: 'win a match', cur: () => stats.wins, max: 1, pay: 30 },
-  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10, pay: 75 },
+  { ic: '🏰', nm: 'Dynasty', ds: 'win 10 matches', cur: () => stats.wins, max: 10, pay: 75, gem: 2 },
   { ic: '💯', nm: 'Century', ds: 'score 2,500 in a run', cur: () => stats.best, max: 2500, pay: 15 },
-  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000, pay: 40 },
+  { ic: '🚀', nm: 'Moon Shot', ds: 'score 15,000 in a run', cur: () => stats.best, max: 15000, pay: 40, gem: 1 },
   { ic: '🍽️', nm: 'Big Appetite', ds: 'eat 500 things', cur: () => stats.eaten, max: 500, pay: 25 },
-  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000, pay: 100 },
+  { ic: '🌌', nm: 'Bottomless', ds: 'eat 5,000 things', cur: () => stats.eaten, max: 5000, pay: 100, gem: 2 },
   { ic: '⚡', nm: 'Bigger Than Auntie', ds: 'eat a family member', cur: () => stats.rivals ?? 0, max: 1, pay: 25 },
-  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10, pay: 75 },
+  { ic: '🏅', nm: 'Family Champion', ds: 'eat 10 family members', cur: () => stats.rivals ?? 0, max: 10, pay: 75, gem: 2 },
   // the bar counts bites-in-a-row, so the words do too — and the old promise
   // ("x2.5") was a number the combo curve can no longer reach (caps at x2.2)
-  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25, pay: 40 },
-  { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25, pay: 60 },
+  { ic: '🔥', nm: 'Combo King', ds: 'eat 25 things in a row', cur: () => stats.combo ?? 0, max: 25, pay: 40, gem: 1 },
+  { ic: '📅', nm: 'Regular', ds: 'play 25 matches', cur: () => stats.matches, max: 25, pay: 60, gem: 1 },
 ];
 // Pays every earned-but-unpaid trophy exactly once, keyed by name in
 // voidTrophyPaid. Called at the end of every match, after saveStats() — and
 // existing profiles get their back catalogue in one lump the first match
 // after this ships, which is a better surprise than pretending they were
 // paid all along. Returns what it paid so the results screen can say so.
-function payTrophies(): { count: number; coins: number; last: string } {
+function payTrophies(): { count: number; coins: number; gems: number; last: string } {
   let paid: string[];
   try { paid = JSON.parse(localStorage.getItem('voidTrophyPaid') || '[]') as string[]; }
   catch { paid = []; }
   const due = TROPHIES.filter((t) => t.cur() >= t.max && !paid.includes(t.nm));
-  if (!due.length) return { count: 0, coins: 0, last: '' };
+  if (!due.length) return { count: 0, coins: 0, gems: 0, last: '' };
   const total = due.reduce((a, t) => a + t.pay, 0);
+  const gemTotal = due.reduce((a, t) => a + (t.gem ?? 0), 0);
   addCoins(total);
+  if (gemTotal) addGems(gemTotal);
   localStorage.setItem('voidTrophyPaid', JSON.stringify([...paid, ...due.map((t) => t.nm)]));
-  track('trophy_pay', { count: due.length, coins: total, names: due.map((t) => t.nm).join(',') });
-  return { count: due.length, coins: total, last: due[due.length - 1].nm };
+  track('trophy_pay', { count: due.length, coins: total, gems: gemTotal, names: due.map((t) => t.nm).join(',') });
+  return { count: due.length, coins: total, gems: gemTotal, last: due[due.length - 1].nm };
 }
 function renderTrophies() {
   el('statsRow').innerHTML = [
@@ -6300,7 +6318,7 @@ function renderTrophies() {
     return `<div class="tr ${done ? 'got' : ''}"><div class="ic">${t.ic}</div>` +
       `<div class="nm">${t.nm}</div><div class="ds">${t.ds}</div>` +
       (done ? '<div class="trDone">✓ EARNED</div>'
-        : `<div class="trBar"><div style="width:${pct}%"></div></div><div class="trCnt">${Math.min(c, t.max)} / ${t.max} · +${t.pay}✦</div>`) +
+        : `<div class="trBar"><div style="width:${pct}%"></div></div><div class="trCnt">${Math.min(c, t.max)} / ${t.max} · +${t.pay}✦${t.gem ? ` +${t.gem}💎` : ''}</div>`) +
       '</div>';
   }).join('');
   el('trophyCount').textContent = `${got} / ${TROPHIES.length} EARNED`;
@@ -6438,13 +6456,13 @@ renderRank();
     const modal = el('daily');
     // each day is a PRIZE, not a table cell: claimed days stamp a green tick,
     // today's cell is a big bouncing gift, day 7 is the gold treasure chest
-    // ONE CURRENCY, AND THE ICONS MUST NOT IMPLY TWO. Every cell pays ✦ voids —
-    // there is no second currency anywhere in the game (voidCoins is the only
-    // balance; hats are the only real money). But days 5 and 6 carried 💎, and
-    // the owner read the card as "diamonds and stuff", which is exactly what a
-    // six-year-old would conclude too. The ladder now escalates within ONE
-    // idea — a coin, a pile, a star, the trophy — so bigger plainly means more
-    // of the same thing.
+    // THE ICONS MUST NOT LIE ABOUT CURRENCIES. The first version of this rule
+    // said "one currency" because there WAS one and days 5–6 wore 💎 anyway —
+    // the owner read "diamonds and stuff" where only coins existed. Gems are
+    // REAL now (the owner's two-currency design: voidGems, spent on premium
+    // colourways), so the rule's current form: every CELL pays ✦ and says so
+    // in one escalating idea, and 💎 appears exactly where a gem is actually
+    // paid — the day-7 chest, labelled +1💎 on the claim button.
     const ICON = ['🪙', '🪙', '💰', '💰', '🌟', '🌟', '🏆'];
     // LIFETIME day numbers, not day-of-week. On the morning after a child
     // finished day 7 for 300 coins, the card reset to a cell labelled "DAY 1"
@@ -6477,9 +6495,11 @@ renderRank();
       pendingLaunch = false;
       launchWorld();
     };
-    (el('dailyClaim') as HTMLButtonElement).innerHTML = `CLAIM ${amount(day)}<i>✦</i>`;
+    (el('dailyClaim') as HTMLButtonElement).innerHTML =
+      `CLAIM ${amount(day)}<i>✦</i>${day === 6 ? ' +1💎' : ''}`;
     (el('dailyClaim') as HTMLButtonElement).onclick = () => {
       addCoins(amount(day));
+      if (day === 6) addGems(1);   // the chest: the week's loyalty pays a gem
       localStorage.setItem('voidDailyLast', today);
       localStorage.setItem('voidDailyLife', String(life + 1));
       localStorage.setItem('voidDailyDay', String(day));
@@ -6691,14 +6711,22 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     refresh();
   };
   const walletEl = document.getElementById('shopWalletN');
+  const gemsEl = document.getElementById('shopGemsN');
   let walletShown = coins, walletRaf = 0;
   const paintWallet = (bump = false) => {
     if (!walletEl) return;
     walletShown = coins;
     walletEl.textContent = String(coins);
+    if (gemsEl) {
+      gemsEl.textContent = String(gems);
+      // the gem chip only takes space once the child has ever held a gem —
+      // a zero-balance premium currency on day one is just a locked door
+      gemsEl.parentElement!.style.display = gems > 0 ? '' : 'none';
+    }
     const w = walletEl.parentElement;
     if (bump && w) { w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); }
   };
+  gemWatchers.push(() => paintWallet(true));
   /** Count the wallet down instead of teleporting it. A number that jumps has
    *  not told a six-year-old that THEY SPENT THAT — one that runs down has. */
   const tweenWallet = (from: number) => {
@@ -6752,18 +6780,23 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       const cost = PRICES[s.id] ?? 0;
       // AFFORDABLE IS A STATE. Without it the shop asks a six-year-old to hold
       // a four-digit wallet in their head and compare it to thirteen prices.
-      const can = !has && !s.cash && !s.streak && cost > 0 && coins >= cost;
+      // Gem cards run the same state off the gem wallet.
+      const can = !has && !s.cash && !s.streak
+        && (s.gems ? gems >= s.gems : cost > 0 && coins >= cost);
       card.classList.toggle('equip', equipped === s.id);
       card.classList.toggle('locked', !has);
       card.classList.toggle('owned', has);
       card.classList.toggle('can', can);
       pr.className = 'pr' + (has ? ' owned' : '');
+      // 💎 is the GEM mark now, so a cash card shows its plain dollar price —
+      // a dollar figure is the one money symbol a parent never misreads
       pr.textContent = equipped === s.id ? 'EQUIPPED' : has ? 'OWNED'
-        : s.cash ? `💎 ${iapPrice(s.id) ?? `$${s.cash.toFixed(2)}`}`
-        : s.streak ? `🔥 ${s.streak}-DAY STREAK` : `✦ ${cost.toLocaleString('en-US')}`;
+        : s.cash ? `${iapPrice(s.id) ?? `$${s.cash.toFixed(2)}`}`
+        : s.streak ? `🔥 ${s.streak}-DAY STREAK`
+        : s.gems ? `💎 ${s.gems}` : `✦ ${cost.toLocaleString('en-US')}`;
       // …and HOW FAR ALONG, which is what turns a price list into a collection
       const bar = card.querySelector('.skBar > i') as HTMLElement | null;
-      if (bar) bar.style.width = `${Math.min(100, cost ? (coins / cost) * 100 : 0)}%`;
+      if (bar) bar.style.width = `${Math.min(100, s.gems ? (gems / s.gems) * 100 : cost ? (coins / cost) * 100 : 0)}%`;
     }
   };
   // AFTER the definition, not before it. A `() => refresh()` thunk registered
@@ -6801,10 +6834,13 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // two real classes — colour, and character. Now there are two, plus the free
   // streak rewards, which had been sorting under a header that said SPEND
   // COINS above two cards that cannot be bought with coins.
-  const tierOf = (s: Skin) => (s.cash ? 2 : s.streak ? 1 : 0);
+  // coins → gems → streak → legendary: the everyday ladder first, then the
+  // rare-currency looks a child EARNS, then the loyalty gifts, then the money
+  const tierOf = (s: Skin) => (s.cash ? 3 : s.streak ? 2 : s.gems ? 1 : 0);
   const SORTED = [...SKINS].sort((a, b) => tierOf(a) - tierOf(b));
   const TIER_HEAD = [
     '<div class="shopTier">🎨 COINS <span>A NEW LOOK FOR YOUR VOID</span></div>',
+    '<div class="shopTier">💎 GEMS <span>RARE LOOKS — TROPHIES & FIRST WINS PAY GEMS</span></div>',
     '<div class="shopTier">🔥 COME BACK <span>FREE — PLAY EVERY DAY</span></div>',
     `<div class="shopTier gold">✨ LEGENDARY <span>${iapAvailable() ? 'A WHOLE NEW CHARACTER' : 'COMING SOON ON iPHONE'}</span></div>`,
   ];
@@ -6863,8 +6899,9 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       // The legendary tier took no money and said COMING SOON. It now says
       // what it costs, and on iOS it charges. On the open web there is no way
       // to take payment, so it points at the App Store rather than pretending.
-      : s.cash ? (iapAvailable() ? `💎 BUY · ${priceOf(s)}` : `💎 ${priceOf(s)} · ON THE APP STORE`)
+      : s.cash ? (iapAvailable() ? `BUY · ${priceOf(s)}` : `${priceOf(s)} · ON THE APP STORE`)
       : s.streak ? `🔥 PLAY ${s.streak} DAYS IN A ROW`
+      : s.gems ? `BUY · 💎 ${s.gems}`
       : `BUY · ✦ ${PRICES[s.id].toLocaleString('en-US')}`;
   };
   const openPreview = (s: Skin) => {
@@ -6879,7 +6916,8 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     prevEl.classList.remove('win');   // showUnlock() puts it back; a plain look never has it
     el('spName').textContent = s.name;
     el('spTier').textContent = s.cash ? 'LEGENDARY · A WHOLE NEW CHARACTER'
-      : s.streak ? 'COME BACK · FREE' : 'COINS · A NEW LOOK';
+      : s.streak ? 'COME BACK · FREE'
+      : s.gems ? 'GEMS · A RARE LOOK' : 'COINS · A NEW LOOK';
     refreshPreview();
     _dbg.__previewVoid?.(s);
     prevEl.classList.add('show');
@@ -6981,6 +7019,25 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       });
       return;
     }
+    if (s.gems && !owned.has(s.id)) {
+      if (gems >= s.gems) {
+        track('skin_buy_gems', { skin: s.id, price: s.gems, left: gems - s.gems, played: stats.matches });
+        addGems(-s.gems);
+        owned.add(s.id);
+        localStorage.setItem('voidSkinsOwned', JSON.stringify([...owned]));
+        celebrate(s);
+        audio.evolve();
+        buzz(70);
+        setTimeout(() => audio.voice('happy'), 260);
+        equipSkin(s);
+        refreshPreview();
+      } else {
+        track('skin_short_gems', { skin: s.id, price: s.gems, gems, short: s.gems - gems });
+        spAct.textContent = `NEED ${s.gems - gems}💎 MORE — trophies and first wins!`;
+        audio.hit(); setTimeout(refreshPreview, 1800);
+      }
+      return;
+    }
     if (!owned.has(s.id)) {
       if (coins >= PRICES[s.id]) {
         track('skin_buy', { skin: s.id, price: PRICES[s.id], left: coins - PRICES[s.id], played: stats.matches });
@@ -7010,19 +7067,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
   // StoreKit hands ownership back here — from a fresh purchase, and from
   // RESTORE PURCHASES, which App Review requires and which a child who got a
   // new iPad genuinely needs.
-  initIAP((rawIds) => {
-    // THE BUNDLE FANS OUT HERE. 'everything' is one product in StoreKit and
-    // every cash skin plus every paid hat in the game — expanding it in the
-    // one callback both purchase AND restore come through means a new iPad
-    // gets the whole bundle back from one RESTORE tap.
-    let ids = rawIds;
-    if (ids.includes('everything')) {
-      localStorage.setItem('voidBundle', '1');
-      ids = [...new Set([...ids.filter((id) => id !== 'everything'),
-        ...SKINS.filter((sk) => sk.cash).map((sk) => sk.id),
-        ...HATS.filter((h) => h.usd).map((h) => h.id)])];
-      _dbg.__paintBundle?.();
-    }
+  initIAP((ids) => {
     // TWO WARDROBES NOW. StoreKit hands back product ids and does not care
     // which slot they belong to, so route by id — a purchased hat landing in
     // voidSkinsOwned would be a skin the shop cannot show and a hat the child
@@ -7070,56 +7115,6 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     });
   }
 
-  // ── THE BUNDLE BANNER (AAA-BRIEF §4.4 item 1) ──────────────────────────
-  // One SKU, everything, forever: the sentence a parent wants to hear and ONE
-  // parental gate instead of seventeen. It opens the LEGENDARY tier — the
-  // tier a child scrolls INTO — and the à-la-carte cards keep selling below
-  // it. Owner sets the real price in App Store Connect; $9.99 is the client's
-  // working number and APPSTORE.md carries the note.
-  const BUNDLE_USD = 9.99;
-  const bundleOwned = () => localStorage.getItem('voidBundle') === '1';
-  let bundleEl: HTMLElement | null = null;
-  const paintBundle = () => {
-    if (!bundleEl) return;
-    const pr = bundleEl.querySelector('.pr') as HTMLElement;
-    bundleEl.classList.toggle('owned', bundleOwned());
-    pr.textContent = bundleOwned() ? '✓ YOURS FOREVER'
-      : `💎 ${iapPrice('everything') ?? `$${BUNDLE_USD.toFixed(2)}`}`;
-  };
-  _dbg.__paintBundle = paintBundle;
-  const buildBundle = () => {
-    bundleEl = document.createElement('div');
-    bundleEl.className = 'skCard bundle';
-    bundleEl.innerHTML = '<div class="rib">EVERYTHING</div>'
-      + '<div class="nm">THE WHOLE WARDROBE</div>'
-      + '<div class="ds">every legendary void + every hat · forever · one price</div>'
-      + '<div class="pr"></div>';
-    bundleEl.addEventListener('click', () => {
-      if (bundleOwned()) { audio.ready(); return; }
-      track('bundle_tap', { coins, lvl: rankInfo(xp).lvl, played: stats.matches });
-      if (!iapAvailable()) {
-        const pr = bundleEl!.querySelector('.pr') as HTMLElement;
-        pr.textContent = '👀 COMING TO THE APP STORE!';
-        audio.ready();
-        setTimeout(paintBundle, 2000);
-        return;
-      }
-      askGrownUp(() => {
-        void iapPurchase('everything', BUNDLE_USD).then((res) => {
-          const pr = bundleEl!.querySelector('.pr') as HTMLElement;
-          if (res === 'started') { pr.textContent = 'CONFIRM IN THE APP STORE…'; return; }
-          if (res === 'granted') { audio.evolve(); buzz(70); paintBundle(); refresh(); return; }
-          pr.textContent = res === 'unavailable' ? '👀 COMING TO THE APP STORE!'
-            : res === 'not_ready' ? 'THE STORE IS BUSY — TRY AGAIN'
-            : 'COULD NOT BUY — TRY AGAIN';
-          audio.hit();
-          setTimeout(paintBundle, 2000);
-        });
-      });
-    });
-    grid.appendChild(bundleEl);
-    paintBundle();
-  };
   let lastTier = -1;
   for (const s of SORTED) {
     const tier = tierOf(s);
@@ -7128,7 +7123,6 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
       const hd = document.createElement('div');
       hd.innerHTML = TIER_HEAD[tier];
       grid.appendChild(hd.firstElementChild!);
-      if (tier === 2) buildBundle();
     }
     const card = document.createElement('div');
     // the ribbon marks the ONE tier that is different in kind. It used to key
@@ -7749,7 +7743,7 @@ if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'
     if (h.tier === 'free') return 'FREE';
     // …and say so on the card too, the way the skin cards do
     const p2 = iapPrice(h.id) ?? `$${(h.usd ?? 0).toFixed(2)}`;
-    return iapAvailable() ? `💎 ${p2}` : `💎 ${p2} · ON THE APP STORE`;
+    return iapAvailable() ? `${p2}` : `${p2} · ON THE APP STORE`;
   };
   const refreshHats = () => {
     const th = document.getElementById('tabHats');

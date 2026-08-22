@@ -1179,3 +1179,34 @@ DEFERRED   from §4.4: the second endless coin sink (recolours) — recolouring
            reconnect (notifications, Game Center), ratings prompt and cloud
            save are Capacitor-shell work — they wire up when the store
            submission (tracker #9) assembles the shell.
+
+### The owner redesigned the money, and the owner is right to — MONEY — supersedes part of the previous entry
+OWNER'S CALL, verbatim: "I don't like the idea of everything free
+forever." / "The void base is purple then coins can buy different colors
+or patterns. Maybe eventually they can spend real money in fancier ones
+as well as hats?" / "We need to dial in currency. Coins for baseline
+basic stuff and gems maybe for awesome hats or colors and patterns?"
+CHANGED    THE BUNDLE IS GONE — product, grant expansion, banner, CSS,
+           APPSTORE.md row (back to 17; the doc now carries a do-not-create
+           line for the bundle id, and qa/iapdoc.mjs learned that a
+           do-not-create line is a warning, not a listing). GEMS exist:
+           voidGems, earned only in play — deep trophies carry 💎 bounties
+           (Colossus 1 / World Ender 3 / Void Titan 5 / Dynasty, Bottomless,
+           Family Champion 2 / Moon Shot, Combo King, Regular 1 = 18 across
+           the catalogue), the day-7 chest pays +1💎, the day's first win
+           pays +1💎. Three gem colourways open the sink (Aurora 10 /
+           Glacier 10 / Nova 14 — palette-only, the purple base untouched,
+           patterns join when the owner supplies art) in their own GEMS
+           shop tier between COINS and COME BACK. 💎 is the gem mark
+           everywhere; cash cards show a plain dollar price now. The gem
+           chip hides until the first gem exists — a zero-balance premium
+           currency on day one is just a locked door.
+NOW        qa/econ.mjs (rewritten for the design): 17 trophies pay 810✦ +
+           18💎 exactly once, rematch pays neither twice, the GEMS tier
+           renders with Aurora at 💎 10, the chip shows the balance, and
+           the bundle's absence is asserted. iapdoc 17/17.
+NOT DONE YET, deliberately: gem prices on ~6 hats (dual acquisition —
+           serves §4.4 item 6 "half the hats earnable") is the next round;
+           gem packs for money are Consumable IAPs that wait for the store
+           shell and the owner's explicit go; earn-rate tuning waits for
+           real play data from the owner's household.
