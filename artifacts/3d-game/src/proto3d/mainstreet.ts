@@ -133,6 +133,12 @@ const INK = 0x241f2e;
 // times and no authored placement moves.
 const SHIRTS = [0xff7a5a, 0x5ec8d8, 0xffd23f, 0x8fa9d8, 0xf06fb0, 0x7ed57a, 0xf2f4f8, 0x9a6fb0] as const;
 const SKIN = [0xf4c9a0, 0xe0a878, 0xc98a5a, 0xffd9b0] as const;
+// Hair and shoes for the static townsfolk. NOT drawn from the seeded stream —
+// see personParts: they are hashed from what the person already is, because a
+// third seeded draw in that function would move every authored placement in
+// Maple Falls that comes after it.
+const HAIRC = [0x2e2018, 0x4a3324, 0x6b4a2e, 0x8a5a34, 0xb98a4a, 0xd8bc84, 0x8a8a92, 0x3a2a2a] as const;
+const SHOES = [0x241f2e, 0x2e2a34, 0x4a3a30, 0x1f2430] as const;
 const DENIM = [0x40567a, 0x5a6070, 0x8a6a4a, 0x2f3a52] as const;
 
 type G = THREE.BufferGeometry;
@@ -279,15 +285,106 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // life.ts does not use boxes at all: hips and chest are cylinders, the
   // shoulders are a sphere yoke, the limbs are tapered tubes. That silhouette is
   // the thing that reads as a person. Same primitives here, same proportions.
-  out.push(part(cyl(0.155 * S, 0.175 * S, 0.86 * S, 10), leg, x - 0.17 * S, 0.43 * S, z, 0, ry, 0));
-  out.push(part(cyl(0.155 * S, 0.175 * S, 0.86 * S, 10), leg, x + 0.17 * S, 0.43 * S, z, 0, ry, 0));
-  out.push(part(cyl(0.30 * S, 0.26 * S, 0.30 * S, 14), leg, x, 0.96 * S, z, 0, ry, 0));          // hips
-  out.push(part(cyl(0.40 * S, 0.31 * S, 0.82 * S, 14), shirt, x, 1.44 * S, z, 0, ry, 0));        // chest
-  out.push(part(sph(0.40 * S, 14, 10), shirt, x, 1.78 * S, z));                                  // shoulder yoke
-  out.push(part(cyl(0.10 * S, 0.115 * S, 0.74 * S, 9), shirt, x - 0.44 * S, 1.42 * S, z, 0, ry, 0));
-  out.push(part(cyl(0.10 * S, 0.115 * S, 0.74 * S, 9), shirt, x + 0.44 * S, 1.42 * S, z, 0, ry, 0));
-  out.push(part(cyl(0.13 * S, 0.13 * S, 0.16 * S, 10), skin, x, 1.98 * S, z));                   // neck
-  out.push(part(sph(0.36 * S, 16, 11), skin, x, 2.22 * S, z));
+  // ── THE PERSON'S OWN FRAME ──────────────────────────────────────────────
+  // Limbs were positioned along WORLD X — `x - 0.44 * S` — regardless of which
+  // way the person faces. That was invisible while every part was radially
+  // symmetric: a cylinder looks the same from all sides, so nobody could tell
+  // the arms were not at the person's sides. It stops being invisible the
+  // moment anything on this body has a FRONT, which a face and a pair of shoes
+  // both do. makeTownsfolk turns people through a full circle (mr(0, 2pi)), so
+  // a third of the town had its arms where its chest should be.
+  const fwdX = Math.sin(ry), fwdZ = Math.cos(ry);
+  const rgtX = Math.cos(ry), rgtZ = -Math.sin(ry);
+  const at = (r: number, f: number) => [x + rgtX * r + fwdX * f, z + rgtZ * r + fwdZ * f] as const;
+
+  // ── PER-PERSON VARIATION, WITHOUT TOUCHING THE SEEDED STREAM ─────────────
+  // The contract above this function is absolute: exactly two seeded draws,
+  // mpick(SKIN) then mpick(DENIM), in that order. A third would shift every
+  // authored placement in Maple Falls after it. So variation is HASHED from
+  // what this person already is — where they stand, which way they look, what
+  // they are wearing — which costs no draw and is identical every load.
+  //
+  // And it has to be hashed from more than position: makeProtester and
+  // makeTownsfolk both build at the origin and are placed afterwards, so x and
+  // z are 0 for most of the town and a position-only hash would give every one
+  // of them the same hair.
+  const h1 = Math.sin(x * 12.9898 + z * 4.1414 + shirt * 0.00073 + ry * 7.233) * 43758.5453;
+  const h2 = Math.sin(x * 39.3468 + z * 11.135 + shirt * 0.00031 + ry * 2.717) * 24634.6345;
+  const v1 = h1 - Math.floor(h1), v2 = h2 - Math.floor(h2);
+  const hairCol = HAIRC[Math.floor(v1 * HAIRC.length) % HAIRC.length];
+  const shoeCol = SHOES[Math.floor(v2 * SHOES.length) % SHOES.length];
+  // a hand's width of height either way, so a crowd is not one production run
+  const T = S * (0.94 + v2 * 0.12);
+
+  const [lgxL, lgzL] = at(-0.17 * T, 0), [lgxR, lgzR] = at(0.17 * T, 0);
+  out.push(part(cyl(0.155 * T, 0.175 * T, 0.86 * T, 10), leg, lgxL, 0.43 * T, lgzL, 0, ry, 0));
+  out.push(part(cyl(0.155 * T, 0.175 * T, 0.86 * T, 10), leg, lgxR, 0.43 * T, lgzR, 0, ry, 0));
+  // ── SHOES ── two dark cylinders ending flat on the pavement is a chess
+  // piece. life.ts calls its feet "loaves" and the note there is the same one:
+  // at spawn distance a pair of hard rectangles under each person was "the
+  // second-loudest Lego tell after the hair". A squashed sphere, longer along
+  // the way the person is pointing, is a rounded toe box.
+  for (const [fx, fz] of [at(-0.17 * T, 0.05 * T), at(0.17 * T, 0.05 * T)])
+    out.push(part(sph(0.155 * T, 8, 6), shoeCol, fx, 0.085 * T, fz, 0, ry, 0, 1, 0.56, 1.42));
+  out.push(part(cyl(0.30 * T, 0.26 * T, 0.30 * T, 14), leg, x, 0.96 * T, z, 0, ry, 0));          // hips
+  out.push(part(cyl(0.40 * T, 0.31 * T, 0.82 * T, 14), shirt, x, 1.44 * T, z, 0, ry, 0));        // chest
+  out.push(part(sph(0.40 * T, 14, 10), shirt, x, 1.78 * T, z));                                  // shoulder yoke
+  // ── ARMS, AND WHY THEY ARE AIMED RATHER THAN PLACED ─────────────────────
+  // Every townsperson in the game stood in the identical rigid A-pose: two
+  // vertical cylinders, dead straight, exactly the same on all of them. Once
+  // there are twenty in a frame that is the loudest remaining cheap tell —
+  // uniformity, absence #5 — and it is the cheapest one to fix, because an arm
+  // that hangs three degrees differently costs nothing but an angle.
+  //
+  // part() rotates the geometry about its OWN centre and then translates, in
+  // the order rotateX -> rotateY -> rotateZ. A vertical cylinder is unchanged
+  // by rotateY, so the reachable orientations are rotateX then rotateZ, which
+  // between them can aim +Y anywhere. Solving for a wanted direction d:
+  //     rotateX(rx) : (0,1,0) -> (0, cos rx, sin rx)
+  //     rotateZ(rz) : -> (-cos rx sin rz, cos rx cos rz, sin rx)
+  // so rx = asin(dz) and rz = atan2(-dx, dy). The shoulder is the pivot, so
+  // the cylinder's centre goes half a limb along d from the shoulder — which
+  // is the part that keeps the arm attached to the body instead of hinging
+  // about its own middle.
+  const armAt = (side: number) => {
+    // spread out from the body, and a little fore or aft. Hashed per person
+    // AND per side, so nobody stands perfectly symmetrical either.
+    const hs = Math.sin(x * 7.77 + z * 3.31 + shirt * 0.00017 + ry * 5.1 + side * 19.7) * 15731.7;
+    const w = hs - Math.floor(hs);
+    const sa = (0.06 + w * 0.20) * side;          // outward
+    const sb = (v1 - 0.5) * 0.34 + (w - 0.5) * 0.18;  // fore/aft
+    const dx = rgtX * sa + fwdX * sb, dz = rgtZ * sa + fwdZ * sb;
+    const dy = -Math.sqrt(Math.max(0.05, 1 - dx * dx - dz * dz));
+    const rx = Math.asin(Math.max(-1, Math.min(1, dz)));
+    const rz = Math.atan2(-dx, dy);
+    const [shx, shz] = at(side * 0.42 * T, 0);
+    const shy = 1.79 * T;
+    return { rx, rz, cx: shx + dx * 0.37 * T, cy: shy + dy * 0.37 * T, cz: shz + dz * 0.37 * T,
+      hx: shx + dx * 0.80 * T, hy: shy + dy * 0.80 * T, hz: shz + dz * 0.80 * T };
+  };
+  for (const side of [-1, 1]) {
+    const a = armAt(side);
+    out.push(part(cyl(0.10 * T, 0.115 * T, 0.74 * T, 9), shirt, a.cx, a.cy, a.cz, a.rx, 0, a.rz));
+    // ── HANDS ── the sleeve ended in a flat disc at the wrist and nothing
+    // after it. The eye tracks the end of an arm; give it something to find.
+    out.push(part(sph(0.115 * T, 7, 5), skin, a.hx, a.hy, a.hz));
+  }
+  out.push(part(cyl(0.13 * T, 0.13 * T, 0.16 * T, 10), skin, x, 1.98 * T, z));                   // neck
+  out.push(part(sph(0.36 * T, 16, 11), skin, x, 2.22 * T, z));
+  // ── HAIR ── a bare skin-coloured ball is the loudest cheap tell on a person,
+  // and every static townsperson in the game had one. life.ts's crowd carries
+  // nine hairstyles and this carried none, which is most of why the two read as
+  // different quality standing side by side.
+  //
+  // A CAP, not a ball: centred well above the head's own centre and pushed
+  // back, so it covers the crown and the back and leaves the face. The
+  // arithmetic is checked against the eyes rather than eyeballed — at the eyes'
+  // forward offset the cap's lower edge sits at 2.307 T and the eyes at 2.25 T,
+  // so they clear it by about a twentieth of a head.
+  {
+    const [hxc, hzc] = at(0, -0.05 * T);
+    out.push(part(sph(0.38 * T, 12, 8), hairCol, hxc, 2.42 * T, hzc, 0, ry, 0, 1, 0.55, 1));
+  }
   // ── A FACE ── life.ts's walking crowd got eyes in the same pass as this; the
   // static townsfolk need them for the same reason and more so, because these
   // are the ones standing still on a path while the void rolls past. The play
@@ -306,19 +403,37 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
     const fwdX = Math.sin(ry), fwdZ = Math.cos(ry);
     const rgtX = Math.cos(ry), rgtZ = -Math.sin(ry);
     for (const side of [-1, 1]) {
-      // Tucked in laterally on purpose: at +/-0.145 across with a 0.105 radius
-      // the whites cleared the 0.36 skull and read as two warts on the side of
-      // the head from behind — which is most of the time, because the crowd
-      // walks away from a camera that follows the void. +/-0.125 with 0.095
-      // keeps them inside the skull's own silhouette from the side and still
-      // proud of it from the front, which is the only angle they are for.
-      const ex = x + rgtX * side * 0.125 * S + fwdX * 0.30 * S;
-      const ez = z + rgtZ * side * 0.125 * S + fwdZ * 0.30 * S;
-      out.push(part(sph(0.095 * S, 9, 7), WHITE, ex, 2.26 * S, ez));
-      out.push(part(sph(0.058 * S, 8, 6), INK, ex + fwdX * 0.055 * S, 2.25 * S, ez + fwdZ * 0.055 * S));
+      // NO WHITE. THE WHITE WAS THE WHOLE MISTAKE.
+      //
+      // The first version gave every townsperson a white sclera with a dark
+      // pupil, the way the hero's face is built. Photographed at four angles
+      // (qa/personsheet.mjs) it is unmistakable: two pale spheres bulging out
+      // of a 0.36 skull, reading as golf balls glued to the sides of the head.
+      // The owner's word for it was "eyes that pop out", and he is right.
+      //
+      // The arithmetic says why. The white sat 0.462 units from the head centre
+      // with a 0.134 radius, on a 0.508 skull — 17% of the head's radius proud
+      // of its own surface — and it was PALE, so every one of those bulges
+      // broke the silhouette in a bright colour. A townsperson is 30 screen
+      // pixels tall. At 30 pixels there is no room for an eyeball; there is
+      // room for a MARK.
+      //
+      // So: two dark dots, and nothing else. Dark cannot read as a lump against
+      // a lit head, and the numbers keep them inside the skull from every angle
+      // but the front — centre 0.302 out on a 0.36 radius with a 0.07 dot, so
+      // 3% proud of the surface where a drawn eye should be, and 0.195 of
+      // lateral extent against a 0.36 silhouette, so invisible from the side
+      // and hidden by the skull from behind. Which is how a face works.
+      const ex = x + rgtX * side * 0.125 * T + fwdX * 0.27 * T;
+      const ez = z + rgtZ * side * 0.125 * T + fwdZ * 0.27 * T;
+      out.push(part(sph(0.07 * T, 9, 7), INK, ex, 2.25 * T, ez));
     }
   }
-  if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 14), hat, x, 2.52 * S, z));
+  // T, NOT S. The per-person height jitter scales the whole body, and the hat
+  // and the eyes were left on the un-jittered S when it was added — so a
+  // slightly short townsperson wore their hat floating above their head with
+  // daylight under the brim, which is exactly how it photographed.
+  if (hat !== undefined) out.push(part(cyl(0.34 * T, 0.42 * T, 0.22 * T, 14), hat, x, 2.52 * T, z));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1527,11 +1642,46 @@ export function makeMapleTree(): THREE.Mesh {
   // The town's namesake tree was seven 20-face icosahedra, flat-shaded — a pile
   // of orange rocks at gameplay distance. Spheres keep the clustered-canopy
   // silhouette and shade smoothly. See PROP_SMOOTH_MAT in island.ts.
+  //
+  // AND THEN IT WAS SEVEN BALLOONS. Spheres fixed the rocks and introduced the
+  // opposite problem: six lobes of radius 1.5-2.1 on a canopy only 4 units
+  // across means every lobe is nearly as big as the tree, so the eye resolves
+  // each one separately and the whole thing reads as a bunch of inflated
+  // balls. Photographed over the fountain plaza it is the largest object in
+  // the frame and the least convincing thing in the game.
+  //
+  // What makes a stylised canopy read as leaves is not fewer, bigger, smoother
+  // lobes — it is MORE, SMALLER, and tonally separated, so the silhouette
+  // breaks up and the underside goes dark. Thirteen lobes now: six mains, six
+  // satellites hung lower and further out in a darker tone, and a crown. The
+  // outer-lower ring is what gives a canopy its weight; without it a tree is
+  // lit evenly all round and floats.
+  //
+  // THE SEEDED STREAM IS UNTOUCHED, and that is a hard constraint rather than
+  // a nicety: this function is called 603 times while Maple Falls is being
+  // populated, and mainstreet.ts's own contract note says a changed draw count
+  // "would shift every subsequent authored placement". So it still draws
+  // exactly one mpick and then, per lobe, exactly four mr() in the same order
+  // and the same ranges as before — captured into variables and reused, rather
+  // than re-rolled. The extra lobes are ARITHMETIC on values already drawn.
+  const dark = new THREE.Color(leaf).multiplyScalar(0.74).getHex();
+  const lit = new THREE.Color(leaf).multiplyScalar(1.16).getHex();
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
-    p.push(part(new THREE.SphereGeometry(mr(1.5, 2.1), 12, 9), i % 2 ? leaf : LEAF_HERO,
-      Math.cos(a) * mr(1.1, 1.9), mr(5.2, 6.6), Math.sin(a) * mr(1.1, 1.9)));
+    const rr = mr(1.5, 2.1);          // draw 1 — was the lobe radius
+    const radA = mr(1.1, 1.9);        // draw 2 — was the x ring radius
+    const yy = mr(5.2, 6.6);          // draw 3 — was the height
+    const radB = mr(1.1, 1.9);        // draw 4 — was the z ring radius
+    // MAIN: two thirds the old radius, pushed a little further out, so the
+    // canopy keeps its width while no single lobe owns it
+    p.push(part(new THREE.SphereGeometry(rr * 0.66, 10, 8), i % 2 ? leaf : LEAF_HERO,
+      Math.cos(a) * radA * 1.28, yy, Math.sin(a) * radB * 1.28));
+    // SATELLITE: lower, further out, darker — the underside of a canopy
+    const b = a + 0.62;
+    p.push(part(new THREE.SphereGeometry(rr * 0.44, 8, 6), dark,
+      Math.cos(b) * radA * 1.55, yy - 0.95, Math.sin(b) * radB * 1.55));
   }
-  p.push(part(new THREE.SphereGeometry(2.3, 13, 10), leaf, 0, 6.6, 0));
+  // the crown catches the sky, so it is the light tone
+  p.push(part(new THREE.SphereGeometry(1.55, 11, 9), lit, 0, 7.0, 0));
   return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }

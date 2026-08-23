@@ -2607,10 +2607,23 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     for (const pt of sil3) g.lineTo(px(pt.x), py(pt.y));
     g.closePath(); g.clip();
     for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
-      // leaves fall everywhere, but they LIE where nobody sweeps: thick on the
-      // grass, thin on a paved block where the town has been over it.
+      // ── LEAVES GO ON GRASS. ONLY ON GRASS. ────────────────────────────────
+      // The first version put a thinner scatter on the paved blocks too, on
+      // the reasoning that leaves blow onto paths and nobody sweeps a whole
+      // town. That reasoning is fine and the RESULT was not: warm translucent
+      // blobs on a pale cream plaza do not read as leaves, they read as
+      // STAINS — spilled coffee, or something a dog did. Photographed at 2x
+      // over the fountain plaza and it is the first thing the eye finds.
+      //
+      // The difference is contrast. On grass a warm patch is a colour the eye
+      // already expects from a tree above it. On pale stone the same patch is
+      // the only dirty thing in the frame, and dirt is what it becomes.
+      // So: grass only, and fewer of them there too — the first pass put 26-40
+      // piles in every block, which on the open lawns beside the square was a
+      // rash rather than a drift.
       const grassy = GRASSY.includes(PLAN[gy][gx]);
-      const piles = grassy ? 26 + Math.floor(dr() * 14) : 7 + Math.floor(dr() * 6);
+      if (!grassy) continue;
+      const piles = 9 + Math.floor(dr() * 7);
       const cxB = blockCenter(gx), cyB = blockCenter(gy);
       const x0 = pxW(cxB - BLOCK_SIZE / 2), y0 = pyW(cyB - BLOCK_SIZE / 2);
       const bw = pxW(cxB + BLOCK_SIZE / 2) - x0, bh = pyW(cyB + BLOCK_SIZE / 2) - y0;
@@ -2623,7 +2636,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
           // two uniforms averaged: dense in the middle, frayed at the rim
           const ox = (dr() + dr() - 1) * R, oy = (dr() + dr() - 1) * R;
           g.fillStyle = i % 3 === 0 ? LEAF[Math.floor(dr() * LEAF.length)] : col;
-          g.globalAlpha = drange(0.16, 0.34);
+          g.globalAlpha = drange(0.10, 0.22);   // was 0.16-0.34: a tint, not a spill
           const lw = drange(0.5, 1.15) * U;
           g.beginPath();
           g.ellipse(dx + ox, dy + oy, lw, lw * drange(0.55, 0.9), dr() * Math.PI, 0, Math.PI * 2);

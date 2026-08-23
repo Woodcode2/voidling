@@ -1132,9 +1132,20 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   // uniformity tell (absence #5) in the one place it is most visible.
   //
   // Skipped under sunglasses, which already sit at z 0.46 and would hide them.
-  if (!o?.glasses) for (const ex of [-0.20, 0.20]) {
-    hp.push(pc(B.dot, WHITE, ex, 0.06, 0.375, 0.26, 0.30, 0.20));
-    hp.push(pc(B.dot, INK, ex, 0.05, 0.435, 0.15, 0.17, 0.10));
+  // NO WHITE — see the long note in mainstreet.ts personParts. The first
+  // version built these the way the HERO's face is built, with a white sclera
+  // and a pupil, and at the size a crowd person actually occupies on screen
+  // that is two pale bulges on the sides of a skull. The hero can carry a
+  // sclera because it is a metre wide in frame and its eyes are the whole
+  // design; a townsperson thirty pixels tall can carry a MARK.
+  //
+  // Head here is an ellipsoid, 0.53 x 0.56 x 0.495, so the placement is
+  // checked against that rather than against a sphere: at x 0.185 the surface
+  // sits at z 0.459, and a 0.08 dot centred at z 0.40 ends at 0.48 — two
+  // hundredths proud, which is a drawn eye. Lateral extent 0.265 against a
+  // 0.53 silhouette, so it cannot be seen from the side at all.
+  if (!o?.glasses) for (const ex of [-0.185, 0.185]) {
+    hp.push(pc(B.dot, INK, ex, 0.075, 0.40, 0.16, 0.18, 0.12));
   }
   if (o?.glasses) hp.push(pc(B.box, INK, 0, 0.08, 0.46, 0.58, 0.10, 0.13));
   if (o?.eyepatch) hp.push(pc(B.box, 0x1a1620, -0.18, 0.11, 0.46, 0.23, 0.19, 0.09));
