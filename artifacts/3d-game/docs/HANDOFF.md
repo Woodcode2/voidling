@@ -1,22 +1,39 @@
-# VOIDLING — engineering handoff
+# THE CUTE WORLD ENDER — engineering handoff
 
-Written to survive a context reset. If you are picking this up cold, read this
-file, then `qa/README.md`, then start measuring before you change anything.
+Written to survive a context reset. If you are picking this up cold: read this
+file top to bottom, then `docs/FABLE-BRIEF.md` (instruments + traps), then
+`docs/AAA-BRIEF.md` §7 (the ledger — every change with its measurement).
+**Measure before you change anything.**
+
+Last updated: 2026-08-23, at commit `0dd4fb6` on `main`.
 
 ---
 
 ## 1. What this is
 
-**VOIDLING — "the cute world ender".** A hole.io-style 3D game for children
-aged roughly 6–11. You are a small purple void with a face. You roll around a
-world swallowing things, you get bigger, everything you swallow makes you
-bigger still, and in three minutes you eat an entire town.
+A hole.io-style 3D game for children aged roughly 6–11. You are a small purple
+void with a face. You roll around a world swallowing things; everything you
+swallow makes you bigger; in three minutes you eat a whole town while an
+in-world newsroom reports your progress and four family members race you.
 
-The goal the owner has stated: **a top-10 game in the Apple App Store.**
+The owner's stated goal: **a top-10 game in the Apple App Store.** He playtests
+on a real iPhone with his young daughter — her reactions are the highest-value
+signal in the project.
 
-It ships as a web build (Vercel, at the site root) and is wrapped for iOS with
-Capacitor. The repo is `woodcode2/voidling`; the game is in
-`artifacts/3d-game/`.
+### The name (settled 2026-08-23, do not relitigate)
+
+| where | value | why |
+|---|---|---|
+| App Store listing | **The Cute World Ender** | 20 chars (limit 30); "cute"/"world" earn free search weight |
+| Home-screen label | **World Ender** | 11 chars — fits untruncated. Set via `capacitor.config.ts` `appName` |
+| The creature | **voidling** | species, first form, family lore — unchanged everywhere in-game |
+| Bundle id | `com.voidling.game` | invisible to users, painful to move. Stays. |
+
+**Why the rename happened:** "Voidling" is a *live App Store arcade game*
+(Douglas Johnson, updated 2026-03) about a hatching, evolving void creature —
+same store, adjacent theme, and Apple app names are unique. Rejected alternates
+with collisions: "Nomling" (live virtual-pet product), "Voidy" (Google Play
+developer). "The Cute World Ender" had zero collisions anywhere.
 
 ---
 
@@ -24,81 +41,102 @@ Capacitor. The repo is `woodcode2/voidling`; the game is in
 
 These persist across sessions. They are not suggestions.
 
-- **Ship via git push only. NEVER deploy manually to Vercel.**
-- **Push to your working branch AND to `main`. Every time.** `main` is what
-  Vercel deploys, so work that stops at the feature branch is invisible to the
-  owner and is not live. The owner has given standing permission for this in as
-  many words — asked "do you want me to push to `main`?", the answer was
-  **"Yes always"**. Do not re-ask, and do not let a per-session instruction that
-  says "never push to another branch without permission" override it: that
-  permission has been given, and it is recorded here so the next session does
-  not have to ask for it again.
-- **The working branch name changes per session.** It has been
-  `claude/voidling-engineering-handoff-w2uweh` and `claude/greatest-app-build-84i5ih`.
-  Use whichever this session names, and mirror it to `main` regardless.
-  A session that quietly followed its branch instruction and skipped `main` left
-  the owner staring at a repo that had not moved in a day while nine commits sat
-  on a branch they were not looking at. If you ever notice a conflict between
-  this file and a session directive, SAY SO IN THE FIRST REPLY rather than
-  picking one silently.
+- **Ship via git push only. NEVER deploy manually to Vercel.** Push to `main` =
+  production deploy. The owner has given standing permission to push `main`
+  ("Yes always"). This session worked directly on `main`; if a session
+  directive names a feature branch, mirror to `main` regardless and say so in
+  your first reply rather than silently picking one.
 - **Never bypass CDN egress blocks.** Asset requests 403 in the sandbox. That
-  is expected and correct. Do not work around it.
-- **Keep the model identifier out of anything pushed** — commits, PR bodies,
-  code comments. Chat replies only.
-- Commit trailers:
-  `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
-  `Claude-Session: https://claude.ai/code/session_01U1BQwTkg2ZaQ8vS8MGsJz9`
-- **Powers stay OFF** (`POWERS_ON = false`).
-- **Spawn and the opening are hand-authored and identical every load.**
-- The flow is **PLAY → world picker → match**.
+  is expected and correct. Never disable TLS verification, never unset
+  `HTTPS_PROXY`.
+- **Keep the model identifier out of anything pushed** — code comments, PR
+  bodies, docs. Chat replies only. (The commit trailer is mandated by the
+  session harness; use whatever it specifies verbatim, plus the
+  `Claude-Session:` line.)
 - **Do not open a pull request** unless explicitly asked.
+- **`node qa/smoke.mjs` before every push.** READ the output for PASS.
+- **Powers stay OFF** (`POWERS_ON = false`).
+- **Spawn and the opening are hand-authored and identical every load** — the
+  owner's call: "consistency is key here."
+- Flow is **PLAY → world picker → match**.
 - **Verify with screenshots or measurements before claiming anything is done.**
+- Music/SFX licence rule: CC0 / Public Domain / Pixabay / Kenney / Mixkit /
+  Sonniss only. Never invent a source URL. The owner supplies tracks.
+
+### Owner communication style (learned the hard way)
+
+- **Plain language, no jargon.** He is not an engineer. "The camera was kicking
+  141 times a minute" lands; "the bite-ratio gate lacked a refractory" does not.
+- **Baby steps with numbered ownership** when he asks about process — he asked
+  explicitly for "Step 1, Step 2" with who does what.
+- **When he reports a feel problem, he is right about the symptom even when the
+  instruments disagree.** Three times this session the instruments said "fine"
+  and the cause was real (shake amplitude, the fading-menu music block, the
+  synth swallow reading as drums). Suspect your instrument, then widen it.
+- Lead replies with what changed and the measured before→after. He reads
+  numbers happily; he does not read code.
 
 ---
 
 ## 3. Tech stack
 
-- **Three.js 0.185.1**, TypeScript, Vite. No game engine.
-- **Capacitor** for the iOS shell (`ios/`, `capacitor.config.ts`).
-- **Supabase** edge function for telemetry (`telemetry.ts`); harnesses stub it.
+- **Three.js 0.185.1**, TypeScript, Vite. No game engine, no React in the game
+  (`index.html` holds all HUD markup + CSS; a retired React shell exists in
+  `src/App.tsx` etc. and is not the game).
+- **Capacitor 8** for the iOS shell (`ios/`, `capacitor.config.ts`).
+- **Supabase** edge function for telemetry; every harness stubs
+  `**/functions/v1/ingest-events`.
 - **Playwright + Chromium** at `/opt/pw-browsers/chromium` for all QA.
-  Flags: `--use-gl=angle --use-angle=swiftshader --no-sandbox`.
-- Generated art (skins, posters, sky) is fetched at runtime from a CDN through
-  a `vercel.json` rewrite. **Nothing is vendored into the repo**;
-  `scripts/vendor-assets.mjs` pulls it down for an iOS build.
+  Flags: `--no-sandbox --use-gl=angle --use-angle=swiftshader`.
+- **Vercel** deploy, project `voidling-3d-game`
+  (`prj_ze1DPbXacEkmrZfk3x5ZckmzMwr0`, team `team_ByRJQ00dRUtDHwQcg6YSELTz`),
+  production alias `voidling-3d-game-ruby.vercel.app`. Push to `main` → build →
+  READY in ~2 min. Verify with the Vercel MCP `list_deployments`; the sandbox
+  cannot curl the production domain (egress).
+- Repo `woodcode2/voidling`; **the game is `artifacts/3d-game/`** — every
+  command below runs from there.
 
 ### Commands
 
 ```bash
-npm run build            # vite build  — RUN FROM artifacts/3d-game
+npx vite build                     # RUN FROM artifacts/3d-game
 npx tsc --noEmit -p tsconfig.json
-npx vite preview --port 4177 --host 127.0.0.1
-node qa/pace.mjs maple,gameday
-pnpm build:ios           # vendor-assets && build && check-assets && cap sync
-npm run shoot:store      # 8 App Store screenshots; refuses without the art
+node qa/smoke.mjs                  # the pre-push gate
+node qa/<probe>.mjs 4177 [args]
+pnpm build:ios                     # vendor-assets && build && cap sync (needs network)
+npm run shoot:store                # App Store screenshots
 ```
 
-> **Watch the working directory.** `npm run build` from the repo root runs the
-> workspace build and fails. It must run from `artifacts/3d-game`. This has
-> silently produced stale measurements more than once.
+**The preview server dies constantly.** Keep it alive as a background task:
+
+```bash
+while true; do npx vite preview --port 4177 --strictPort >/tmp/claude-0/preview.log 2>&1; sleep 2; done
+```
+
+Run it with `run_in_background: true` from the Bash tool. A plain `&` gets
+reaped with the tool call. Probes fail with `ERR_CONNECTION_REFUSED` when it is
+down — check `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4177/`
+before diagnosing anything else.
 
 ---
 
 ## 4. Code map
 
-Everything lives in `artifacts/3d-game/`.
-
-| file | lines | what |
-|---|---|---|
-| `src/proto3d/island.ts` | 5.8k | **The big one.** Ground bake, sky, starfield, coastline, and the populate block for every world. Each world's block ends in an explicit `return` — the Maple grid pass at the foot is unguarded and will otherwise leak into your level. |
-| `src/proto3d/life.ts` | 5.0k | Crowds: people, movement, flee/greet behaviour, all spoken lines. |
-| `src/prototype3d.ts` | 4.2k | Match loop, HUD, camera, growth law, beats, rivals, debug hooks. |
-| `src/proto3d/audio3d.ts` | 3.2k | Four separate synthesised scores. No samples for music. |
-| `src/proto3d/void3d.ts` | 1.5k | The hero: body, face rig, moods, rings, skins. |
-| `mainstreet.ts` `bay.ts` `tailgate.ts` `lantern.ts` | | Per-world geometry + region polygons. |
-| `luxe.ts` `nightmarket.ts` | | Per-world prop kits. |
-| `newsroom*.ts` | | Per-world headline pools. |
-| `index.html` | | All CSS and HUD markup. Not a React app. |
+| file | what |
+|---|---|
+| `src/prototype3d.ts` (~8.9k lines) | Match loop, HUD, camera, growth law, beats, forms, trophies, economy, shop, daily, rivals wiring, debug hooks |
+| `src/proto3d/island.ts` (~6.6k) | Ground bake, sky, coastline, and the populate block per world. **Each world's block ends in an explicit `return`** — the Maple grid pass at the foot is unguarded and leaks otherwise |
+| `src/proto3d/life.ts` (~5.5k) | Crowds: people, movers, flee/greet behaviour, all spoken lines, per-world set pieces |
+| `src/proto3d/audio3d.ts` (~4.2k) | Five synth scores + the recorded-track player, channels, crossfades, the cover pad |
+| `src/proto3d/void3d.ts` | The hero: body, face rig, moods, rings, skins |
+| `src/proto3d/rivals.ts` | The family: archetypes, lanes, join times |
+| `mainstreet.ts` `bay.ts` `gameday.ts` `lantern.ts` `powder.ts` | Per-world land + region polygons |
+| `luxe.ts` `nightmarket.ts` `alpine.ts` | Per-world prop kits |
+| `newsroom_*.ts` | Per-world headline pools; `newsroom_react.ts` = reactions |
+| `src/game/matchdeck.ts` | Per-match variation deal (middle beats + hour) |
+| `src/game/{unlocks,seasons,stickers}.ts` | World unlock ladder, seasonal events, sticker book |
+| `src/proto3d/store3d.ts` | StoreKit bridge (17 products) |
+| `index.html` | All CSS + HUD markup |
 
 ### The coordinate system
 
@@ -106,264 +144,247 @@ Everything lives in `artifacts/3d-game/`.
 Level files author in world units; the renderer works in 3D units.
 
 **Screen-up is not north.** `camOffset = (0.62, 0.92, 0.62)`, so the ground
-direction away from the camera is `(-1,-1)/√2` — x and y decrease *equally*.
-To put something *d* units straight up-screen from the void, offset by
-`d/√2` in **both** axes. Three attempts at a hero shot missed by moving due
-north before this was worked out.
+direction away from camera is `(-1,-1)/√2` — x and y decrease *equally*. To put
+something *d* units straight up-screen, offset by `d/√2` in **both** axes.
 
 ### Growth
 
 `growRadius(R, eR) = min(12, sqrt(R² + 0.5·eR²·rookie·diminish))` — area-based,
-so **R² is the correct progress axis**. `R_CAP = 12`. Something is edible when
-its radius `< voidR * 0.92`.
+so **R² is the correct progress axis**. `R_CAP = 12`, `START_R = 0.9`.
+Edible when radius `< voidR * 0.92`.
+
+`FORM_MIN = [0, 1.6, 2.5, 3.6, 5.5, 8.0, 13.5]` — and `formProgress()` measures
+each rung from `max(FORM_MIN[st], START_R)`, not from 0. (It measured from 0
+until 2026-08-23 and showed 39% full at spawn.)
 
 ### Containment
 
 `solid(x,z)` = `biomeAt()` truthy AND `!inDeepWater3()` AND eight
 `insideIsland3()` probes at margin `m = min(R*0.75, 4+R*0.15) + 1.2`.
-An interior cell that fails this is an invisible wall — `qa/pockets.mjs` finds
-them all.
+`qa/traverse.mjs` proves every size can still cross every island (≥97% reach).
 
 ---
 
-## 5. The four worlds
+## 5. The five worlds
 
-| # | world | theme | density (obj/100u²) | hero landmark |
+| # | world | theme | par | hero landmark |
 |---|---|---|---|---|
-| 1 | **MAPLE FALLS** 🍁 | sleepy autumn town | 2.31 | none (biggest is a 6.5 town hall) |
-| 2 | **PIRATE BAY** 🏴‍☠️ | pirate island that now takes tourists | 3.11 | The Royal Mariner, r10 |
-| 3 | **GAME DAY** 🏈 | college football Saturday | 3.80 | the stadium, r11 |
-| 4 | **LANTERN NIGHT** 🏮 | spirit night market | 4.85 | the bathhouse, r11 |
+| 1 | **MAPLE FALLS** 🍁 | sleepy autumn town | 80,000 | town hall |
+| 2 | **PIRATE BAY** 🏴‍☠️ | pirate island turned resort | 105,000 | The Royal Mariner |
+| 3 | **GAME DAY** 🏈 | college football Saturday | 175,000 | the stadium |
+| 4 | **LANTERN NIGHT** 🏮 | spirit night market | 150,000 | the bathhouse |
+| 5 | **POWDER PASS** ❄️ | mountain village on a snow day | 45,000 | The Lodge |
 
-Maple is what a first-ever launch drops you into (no menu on run one — that is
-deliberate, "the menu earns its place from session two").
+Worlds unlock by *finishing* the one before. Maple is the first-ever launch
+(no menu on run one — deliberate).
 
-**Lantern Night's one idea:** the spirits think the void is a guest. For the
-first act they walk *toward* it (+82% net movement), freeze in the middle
-(+1%), and flee in the third (−67%). The score says the same thing in the
-scale — it opens on **yo** (bright pentatonic) and bends to **in** (two
-degrees flattened, measured at exactly −100 cents) as tension climbs.
+**Lantern's one idea:** the spirits think the void is a guest — act one they
+walk *toward* it, act two they freeze and stare, act three they flee. The owner
+reported this as "a weird pull"; it was explained as designed and **he has not
+yet said whether to keep it. Open question.**
 
----
-
-## 6. Current state — what is measured
-
-Last full pass (commit `78408d8`):
-
-```
-                     late-game eats/sec        final score
-  MAPLE FALLS        26.3 → 26.5  ^              222,999
-  PIRATE BAY         30.1 → 27.7  ^              256,586
-  GAME DAY           30.5 → 32.1  ^              326,319
-  LANTERN NIGHT      28.5 → 40.0  ^              304,234
-```
-
-All four accelerate to the whistle. Maple and Pirate did not before this pass
-(they finished at 6.9 and 3.9 eats/sec, on 82,902 and 110,841).
-
-Other verified numbers: all four worlds validate clean; zero interior pockets
-on every map; ground detail energy 0.042–0.052 mid-band across all four (none
-reads flat); Maple 323 draw calls, Game Day 550, Lantern 514; newsroom shows
-15–17 headlines a match with **zero repeats within a run**.
-
-**Three second-match bugs are fixed** (`qa/rematch.mjs`, both tests verified
-against a reverted build so they are known to have power):
-
-- **The ghost train.** Maple Falls' commuter train rebuilds itself six seconds
-  after being swallowed. The consumed group stayed in `edibles`, and
-  `resetMatch` restored it to its remembered home — `(0,0,0)`, because
-  `addEdible` snapshots `home` and the replacement was registered before the
-  rail placed it. That is world 6000, the central crossroads. Every match after
-  the first opened with a dead four-car locomotive in the middle of town, on the
-  world the store screenshots come from. Fixed with a general `userData.retired`
-  guard plus registering the new train on the rail. Reverting the fix puts the
-  ghost back at exactly `(0.0, 0.0)`.
-- **The rival clock.** The family was scheduled off `tClock - startT` — wall
-  time, which keeps running while the pause sheet is up — while everything else
-  in the match uses the visible countdown. Any pause slid the rivals forward:
-  the hunt window closed early, rivals scheduled during the pause all joined on
-  the resume frame, and past ~99s the hunter was stuffed before play resumed.
-  `?fast` diverged the two 6× for a whole match, quietly making every harness
-  run with that flag see a family that barely joined. Now one named
-  `matchElapsed()` shared by all four call sites. Measured drift across a 3s
-  pause: 1.566s before, 0s after.
-- **The finale cue was Game Day's on every world.** `heroProp` resolves as the
-  largest edible in whatever world is loaded, but the three cue strings were
-  hard-coded, so Pirate Bay's Royal Mariner and Lantern Night's bathhouse both
-  announced "🏟️ THE STADIUM IS IN REACH" and a headline naming Hank, Game Day's
-  commentator, at the biggest moment of the match. Moved into `WORLD_COPY` so
-  the compiler names any world left out. The "GONE" banner also fired when a
-  *rival* ate the hero prop — now gated on `byPlayer`, which was already tracked.
-
-**Four accessibility fixes**, all confirmed in the built output: `#evolve` got
-the stroke its three sibling hero messages already had (its `.sm` line was 16px
-untreated over arbitrary bright terrain); `#btnHome` and `.goShop` raised to the
-44pt floor — `#btnHome` measured at 44.0px, and it sits 12px under a pulsing
-PLAY AGAIN, so a low-landing tap started an unwanted match; the smallest text in
-the app raised from 8.5px to 11px (it carried "DAY 8" on the returning-player
-card, which is the entire point of a deliberate retention fix); and reduce-motion
-support, which the game had none of. That last one is JS, not CSS — the flash is
-an inline style and the shake is a WebGL camera offset, so the
-`prefers-reduced-motion` block in `src/ui.css` never applied to this game and in
-any case belongs to the retired React shell. Defaults to the OS setting and is
-overridable in Settings and the pause sheet as **BIG MOTION** (phrased so a
-parent is not reasoning about a double negative). Verified: label reads ON under
-`no-preference` and OFF under `reduce`.
-
-**The shipped payload was 207 MB and is now 6.5 MB.** `public/assets` held
-200 MB of art for the **retired 2D game**, and Vite copies `publicDir` wholesale
-into the build output — nothing has to reference a file for it to ship. Because
-`capacitor.config.ts` reads `webDir: 'dist'`, `public/` looked unrelated to the
-iOS binary while being 205 MB of the 207 MB `dist/`.
-
-Measured by extracting the `/assets/…` **path literals** from the emitted bundle
-(the authoritative test — a reference that resolves at runtime must appear as a
-path). The 3D game uses exactly four things out of `public/assets`: the whole
-`audio/` directory (reached by the one dynamic path in the bundle,
-`fetch("/assets/audio/" + name)`), `music/theme.mp3`, and the two
-`splash_hero` webps. The other 138 files had zero references. They are moved to
-`legacy-2d/`, not deleted, because `vite.config.ts` deliberately keeps the 2D
-game's *source* for a possible revival — see `legacy-2d/README.md`.
-
-Verified rather than assumed: `qa/smoke.mjs` on all four worlds against the new
-build — zero same-origin asset failures, radius 0.90→~1.98, 121–144 props
-consumed in 25 match-seconds, audio graph present — statistically identical to
-the same probe against the 207 MB build (136 props). All four still validate
-clean, with byte-identical placement-sweep output.
-
-**The crowd's recency guard is proved** (`qa/fresh.mjs`, 100k draws per pool
-size against the shipped `window.__pickFresh`). At the median shipped pool
-(n=6) it turns a 16.84% chance of hearing a line twice in a row into 0.05% —
-358× fewer — and a 42.30% chance of repeating inside its own memory into 0.18%.
-It wins at every shipped pool size (n=2…22).
-
-It also did **not** buy that with a skewed distribution, which is the way this
-fix could have traded one defect for a worse one: the guard measures *flatter*
-than uniform sampling in almost every row (0.6% vs 1.8% at n=6, 1.0% vs 3.8%
-at n=22). Anti-clustering pushes toward even usage, not away from it.
-
-Two things that result does not say. Min gap is 1 in every guarded row — the
-eight retries can all miss, and that *is* the 0.05%; it is a strong
-probabilistic guarantee, not a hard one. And at n=2 the ring holds 1, so the
-four two-line pools now alternate ABAB near-strictly — probably better than
-random doubling for a pool of two, but a behaviour change, not a free win.
-
-The reason the earlier end-to-end attempt could not settle this: a match draws
-~100 lines across **112 dialogue pools** (min 2, median 6, max 22), so no single
-pool is sampled enough times in one run to have a distribution at all. Counting
-repeats across a whole match is a blunt instrument for a per-pool guarantee.
+**Powder's three verbs:** ICE (momentum on the lake, `iceK 0.26`), SNOW SHELL
+(6s ×1.45 eat-ratio from drift props), AVALANCHE (22 snowballs down the piste
+at beat four). It shipped scenic at 843 edibles and starved the child driver
+(403–3,253 vs ~100k); the "hoover economy" density pass took it to 4,536.
 
 ---
 
-## 7. Open work
+## 6. Systems that exist (and their rules)
 
-**Needs a Mac** (the owner has access):
-- `pnpm build:ios` — 52 assets to vendor, needs network.
-- `npm run shoot:store` — writes `store/01..08`, deletes the retired 2D
-  images. The script is verified end to end; only the art gate blocks it here.
-  **The existing `store/*.png` are from the retired 2D game — Guideline 2.3.3
-  is what the last submission was rejected for.**
+**Match variation** (`matchdeck.ts`): every match deals two MIDDLE beats from a
+pool of four per world, plus an HOUR (3 lighting variants per world; Lantern
+has exactly one — the night *is* that world). **Match 1 of a fresh profile
+always deals the shipped baseline** — the tuned first impression, and what
+every probe measures. The deal is a *cycle*, not a roll: consecutive matches
+change both middle slots. Gate: `qa/vary.mjs`.
 
-**Needs the owner's ears (nothing here can hear audio):**
-- **The four music slots are empty.** `public/assets/music/{maple,pirate,
-  gameday,lantern}.mp3` — drop a file in and that world plays it; no flag, no
-  code change. Every world falls back to its own synth score today and none of
-  them is silent (`node qa/music.mjs` proves which is playing, at spawn, mid
-  and full size). The dev container's egress proxy blocks every music library,
-  so a session cannot fetch or audition a track. `public/assets/music/README.md`
-  has the licence rule, a per-slot shortlist with links, and both landing
-  routes — by hand, or by manifest through `.github/workflows/fetch-assets.yml`.
-- **GAME DAY's opening is the sparsest score in the game** at 9 voices/sec
-  against 15, 27 and 35. It was 4 before the stage-0 rudiment went in. The
-  number says it is no longer a hole; only an ear can say it is good.
-- **`theme.mp3` has no licence record.** 1.4 MB, in `public/`, therefore in the
-  shipping bundle, gated behind `voidTheme=1` so nothing plays it. It came from
-  the legacy 2D game. Establish where it came from or take it out of `public/`.
+**The economy** (owner-designed, 2026-08-22):
+- **No bundle SKU.** One shipped for a single commit and the owner vetoed it
+  ("I don't like the idea of everything free forever"). `APPSTORE.md` carries a
+  do-not-create line for the id.
+- **Coins (✦)** = everyday. Ladder paced against a modelled ~990✦/day regular
+  kid: first skin day 1, then ~weekly, top rung ~day 240.
+- **Gems (💎)** = rare, earned only in play: deep trophies (10 total across the
+  catalogue), the day-7 chest (+1), the day's first win (+1) ≈ 8/week. Spend on
+  3 premium colourways (25/25/40) and **6 earnable hats** (25–50) whose
+  StoreKit registrations are *parked, not deleted*.
+- **Gem spends never touch the parental gate, and a shortfall never routes
+  toward a payment sheet.** `qa/econ.mjs` asserts this.
+- The daily streak **cliff is dead**: a missed day steps the week ladder down
+  one rung, never to the bottom; day numbers are monotone (`voidDailyLife`).
+- Trophies pay bounties exactly once (`voidTrophyPaid`, keyed by name — renaming
+  a trophy re-awards it once, which is acceptable and reads as a gift).
 
-**Product gaps:**
-- **No failure state.** You cannot lose. This is a real design question and
-  it is the owner's call, not an engineering one.
-- **No localisation layer.** All copy is inline English.
-- Privacy policy contact is the owner's personal email.
+**Forms ladder** (renamed 2026-08-23):
+`VOIDLING → MUNCHKIN → GOBBLIN → CHOMPOSAURUS → COLOSSUS → WORLD ENDER → VOID TITAN`
+— a ladder of *pictures* (baby → munchkin → monster → dinosaur → giant →
+planet-eater → cosmos), not thesaurus entries for "eater".
 
-**Unresolved / worth re-checking:**
-- **Layout determinism.** `island.ts` says Maple is deterministic. Measured
-  layouts agree to within 0.1% but not exactly — and that residue cannot be
-  separated from CDN-blocked async prop loading in this sandbox. Re-run
-  `qa/determ.mjs` somewhere the CDN resolves.
-- **Two candidate posters** for Lantern Night exist
-  (`hf_20260802_020636_0bc97a9d…` is wired, `hf_20260802_020637_ab38aed8…` is
-  the alternate). Neither can be viewed here. The owner should pick.
+**The family** (renamed 2026-08-23) — every name says its game, all ≤7 chars so
+the leaderboard doesn't truncate:
+NIBBLES (Auntie, BULLY — hunts you; sweetest name on the scariest void),
+BIGSHOT (Uncle, SHOWOFF), JELLY (Cousin, COWARD), ECHO (Baby, COPYCAT),
+GRUMPS (Grandpa, HOARDER).
 
----
+**Camera motion is ZERO by owner order** (2026-08-23, absolute: "I don't want
+any shake. 0."). `fx.kick`, `fx.shake` and `camPunch` are all no-ops at the
+source; call sites remain, so one line each restores them. `hitStop` stays (a
+time-freeze moves nothing). `qa/juice.mjs` therefore reads 3/4 by design.
 
-## 8. The QA kit
+**Audio**: six recorded tracks ship (menu + 5 worlds), all mastered to the house
+spec (−16 LUFS ±1, ≤−1 dBTP, 128kbps/44.1k) — `qa/trackprofile.mjs --gate`.
+Presence of `public/assets/music/<world>.mp3` is the entire switch; absent = the
+world's synth score. While a track decodes, a **drumless cover pad** bridges
+(one root-and-fifth swell). The full synth score is now *only* the 404 fallback
+— it used to be the cover, which is what the owner heard as unsynced drums.
 
-`artifacts/3d-game/qa/` — sixteen probes. Two are new and neither needs a
-browser to be useful: `newsstyle.mjs` is a static check that makes the four
-newsrooms' HOUSE STYLE boxes enforceable instead of aspirational (at most 45%
-two-sentence lines, at least 35% single-sentence, real questions present, the
-punctuation ladder per beat, the six-token vocabulary, 78 characters at
-worst-case token fill, and no article in front of {D} — 25 of the 34 district
-names bring their own). `music.mjs` answers which score each world is actually
-playing, which nothing could answer before, because both failure modes are
-silent: an empty slot falls back to the synth and so does a file that
-downloads fine and will not decode.
-
-**The lesson those two encode: render the card, do not read the pool.** Every
-newsroom bug this week was invisible in the source and obvious on screen — "It
-ate a guest", "and a truck, in motion was gone", "There is no the tailgate to
-stay with", a hero cue eight characters past the ticker width. `qa/_news.mjs
-<world>` fires headlines at each tier and prints them.
-
-The rest: `pace.mjs` is the
-important one: it found that the two worlds a child plays first were the two
-whose matches died in the last forty seconds. Also `sizes`/`dens` for "it feels
-empty" as a number, `pockets` for invisible walls, `contrast2` for HUD
-legibility, `ground` for texture-vs-lighting, `replay` for whether run 20
-differs from run 2, `lnsound` for whether a score that compiles actually makes
-a sound, and `fresh` for whether the crowd's recency guard does anything.
-
-`fresh.mjs` is the one to copy the *shape* of when a per-unit guarantee needs
-proving. It drives the shipped function through a QA hook rather than a copy of
-it, it checks its own metrics against two oracles with known answers before
-trusting them (uniform must give 1/n and mean gap n; round-robin must give 0
-and exactly n), and it reports the number that would reveal the fix having
-made things worse alongside the one that shows it working.
-
-Setup: `npm i -D playwright`, then build, then `npx vite preview --port 4177`.
-If Playwright is a global install, ESM will not find it —
-`ln -sfn /opt/node22/lib/node_modules/playwright node_modules/playwright`.
-
-**Traps, all learned the hard way:**
-- The software renderer is 1/9 to 1/40 real time — never quote a wall clock.
-  Sample against `__matchState().t`.
-- `preserveDrawingBuffer` is off, so reading the live WebGL canvas returns
-  black. Screenshot, then decode the PNG in-page.
-- `glb()` registers props asynchronously — anything fingerprinting the world
-  early counts a different one each run.
-- A whole-set hash flips on ONE prop; it cannot measure degree.
-- A box mean cannot see a text outline.
-- Do not rebuild while a determinism or replay probe is running.
+**FTUE**: on the very first match, Auntie NIBBLES greets the child ("ooooh…
+this planet looks DELICIOUS!") then "eat everything SMALLER than you", then the
+existing drag lesson. Banner cards on the existing queue; never blocks play.
 
 ---
 
-## 9. How to work on this
+## 7. The QA kit
 
-The thing that has repeatedly worked: **measure, change, re-measure, and
-believe the number over the intuition.** In one session the measurements
-overturned four confident wrong answers —
+`artifacts/3d-game/qa/` — 107 named probes plus ~340 `_`-prefixed
+investigation scripts (throwaways, kept as evidence). The ones that matter now:
 
-- a size cliff that turned out not to be costing any pace;
-- a "bug" in the first-run flow that was documented design;
-- an eyebrow whose defect was resolution, not shape;
-- an environment-map "upgrade" that made the control world 15% darker, with
-  "no world's exposure moves" already written into the file next to it.
+| probe | answers |
+|---|---|
+| `smoke.mjs` | boots, loads, grows, eats, makes sound. **Pre-push gate.** |
+| `ab.mjs [n] [world] [driver] [port]` | N matches, mean + sd — the only trustworthy difficulty read |
+| `traverse.mjs [port] [worlds…]` | can every size cross every island (≥97% reach) |
+| `postpipe.mjs <world> --gate` | colour pipeline: composed ≡ direct, hero survives glow, sky is a dome. **World is argv[2]** — `--gate` alone boots a world literally named "--gate" |
+| `uisystem.mjs` | computed font weights/sizes (catches TS-painted markup) |
+| `juice.mjs` | feel channels answering a forced bite (≥3 of 4; lens is dead by order) |
+| `vary.mjs [port] [worlds…]` | match 2 ≠ match 1, and match 0 is the baseline |
+| `econ.mjs` | cliff dead, bounties pay once, gem shelf, gem hat, no gate on soft spend |
+| `iapdoc.mjs` | APPSTORE.md and the client agree on every product id/price |
+| `trackprofile.mjs --gate` | every track in spec (needs `FFMPEG_BIN=…`) |
+| `moverbands.mjs` | who sits in the choppy half-rate band per world |
+| `aftermatch.mjs` | the menu theme comes home after TIME!, both exits |
+| `switch.mjs <world> <port>` | world-switch reload → gate → scored match |
+| `shippedlook.mjs <port> <world> <tag>` | what the CANVAS shows (screenshot) |
+| `_kickrate.mjs <world> <secs>` | camera-kit firings per minute |
+| `_startlag.mjs` | tap → score latency across repeated starts |
+| `_twoscores.mjs` | two scores playing at once? |
+| `_edcount.mjs` | edibles per size class per world (the hoover economy) |
+| `_pwtrack.mjs` | browser-side track ruler for sandboxes without ffmpeg |
 
-Equally: **two of the audit's most useful results were "change nothing"** —
-ground detail across the worlds, and Pirate Bay's theme, both of which looked
-wrong and measured fine.
+**ffmpeg is not installed.** Install it into the scratchpad when needed:
+`npm i ffmpeg-static` there, then
+`FFMPEG_BIN=<scratchpad>/node_modules/ffmpeg-static/ffmpeg node qa/trackprofile.mjs --gate`.
 
-When a probe and your expectation disagree, suspect the probe first (see the
-trap list above and in `qa/README.md`) — but once the probe is sound, take the
-number.
+### Traps — every one of these has cost a session
+
+1. **The cwd trap.** Background Bash resets to `/home/user/voidling`. Every
+   backgrounded probe needs an explicit
+   `cd /home/user/voidling/artifacts/3d-game && …`. Symptom: `Cannot find
+   module '/home/user/voidling/qa/smoke.mjs'`.
+2. **Self-matching pgrep.** `until ! pgrep -f 'qa/econ'; do …` never exits — the
+   pattern matches the wait loop's own command line. Bracket a character
+   (`qa/[e]con`) and read the probe's verdict from its **log file**, never from
+   process existence.
+3. **Probes must seed `voidUnlocked`** with all five worlds, or a locked card
+   refuses the tap BY DESIGN and the probe hangs forever. Four probes have hit
+   this.
+4. **Python `replace()` edits that print "done" unconditionally are not
+   edits.** `assert s.count(OLD) == 1` before every replace, then grep after.
+5. **Zombie Chromium** at 189% CPU starves later probes into 400s timeouts.
+   `pgrep -f 'chrome-linux/chrome'` and kill before diagnosing a hang.
+6. **The sandbox renders ~1 fps under swiftshader.** NEVER quote harness frame
+   timing as the game's. Sample against `__matchState().t`.
+7. `preserveDrawingBuffer` is off — reading the live canvas returns black.
+   Screenshot, then decode the PNG in-page.
+8. `glb()` registers props asynchronously — anything fingerprinting the world
+   early counts a different one each run.
+9. Do not rebuild while a determinism or replay probe is running.
+10. **Suspect the instrument when it disagrees with the owner.** Two instrument
+    bugs were found *this session alone* (postpipe's val denominator; the
+    kick-rate census measuring firings but not amplitude).
+
+---
+
+## 8. Where the launch stands
+
+**Consensus reached with the owner: go live now, keep building after.** Nothing
+structural is missing.
+
+| step | owner | status |
+|---|---|---|
+| 1 | Apple Developer enrollment ($99/yr, **as an individual**, 1–3 days) | **owner — not started** |
+| 2 | Borrow a Mac (2–3 hrs first time) | owner — not started |
+| 3 | Finish the iOS shell so the Mac session is open-Xcode-and-build | **next agent** |
+| 4 | First build to his iPhone via cable | owner + Mac |
+| 5 | App Store Connect listing (agent writes every word; owner pastes + banking) | agent then owner |
+| 6 | Refresh `store/*.png` screenshots under the new name | **next agent** |
+| 7 | Archive, upload, age rating, submit | owner + Mac |
+
+**Enrollment decision, reasoned through with him:** individual now (fast, no
+D-U-N-S), *not* his federal Canadian corp SolarLead Inc. (D-U-N-S adds ~2
+weeks; the seller line would publicly read "SolarLead Inc." on a kids' game;
+provincial registration still open). Apps transfer between accounts later if
+revenue justifies a corporate wrapper.
+
+**Still owed by the agent before submission:**
+- **Kids-privacy telemetry audit** — make the store build collect nothing
+  identifying by default. Promised to the owner; the one exposure worth
+  respecting.
+- Trademark sanity check on "The Cute World Ender" (searches found nothing;
+  a registry check would firm it up).
+- Store copy: description, subtitle, keywords, privacy-policy page.
+
+**Owner's open decision:** Kids Category vs regular 4+ listing. Kids Category
+= curated shelf but permanently bars nearly all ad networks; regular 4+ keeps
+the ad door open (his stated long-term plan) — the recommendation given was
+**regular 4+**, and he has not confirmed.
+
+---
+
+## 9. Open items
+
+**Owed by the owner:**
+- **Pixabay page URLs for all six music tracks.** `CREDITS.txt` says "owner
+  states Pixabay" six times with no links. Blocks submission paperwork only,
+  not the build.
+- **SFX picks** — the three files `eaten_deep.wav` / `evolve_epic.wav` /
+  `win_warm.wav` (Kenney packs: Music Jingles, Impact Sounds, Digital Audio; or
+  Pixabay "gulp"/"power up"/"win jingle"). He tried and disliked the first
+  batch — "let's figure this out later". Until then the synth fallbacks play
+  (the swallow one is now a soft whoosh, not a thud).
+- Whether Lantern's greeting act stays.
+- Kids Category vs 4+.
+
+**Tracker items still open** (see the task list): #9 store submission, #26
+palette sweep at real screen sizes, #37/#38 shader stalls, #39 frame-rate
+dependent constants at 120Hz ProMotion, #45 rival-eats-landmark news, #46 music
+provenance, #47 decoded-PCM memory (~50–80 MB per loaded track).
+
+**AAA-BRIEF work not done:** the second endless coin sink (recolours — deferred
+because it touches the owner-approved purple identity), earn-rate rebalance
+pending real telemetry, economy-as-JSON extraction, and the Capacitor-shell
+items (notifications, Game Center, ratings prompt, cloud save) which wire up
+when the shell assembles. Phase 2 remainder: clay-system landing, destinations
+animate in/out, HUD layout owner, kill backdrop-filter blurs over canvas, stop
+rendering behind opaque overlays, menu→match choreography.
+
+---
+
+## 10. How to work on this
+
+**Measure, change, re-measure, and believe the number over the intuition** —
+with the one amendment this session added: **when the owner's phone disagrees
+with the instrument, widen the instrument.** The shake round is the case study:
+the census counted *firings* and said 19/min was fine; the owner still felt it,
+because amplitude and the lens channel were never in the count. Two rounds of
+honest measurement still landed on the wrong answer until he said "zero", which
+was the right answer all along.
+
+Write the ledger entry (`docs/AAA-BRIEF.md` §7) as you go: MEASURED / CHANGED /
+NOW / GATE, plus retractions, loudly. Six retractions live in these briefs
+because the wrong version is always persuasive.
+
+Every fix this project has shipped went: build the instrument first, fail it on
+the old build, then fix. If a change cannot be measured, the probe is the first
+deliverable.
