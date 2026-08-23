@@ -624,6 +624,50 @@ export function makeParkingMeter(): THREE.Mesh {
   ]);
 }
 
+/** LETTERING, AT THE SCALE THE CAMERA ACTUALLY RESOLVES.
+ *
+ *  Every sign in this game was a coloured board with ONE fat white bar on it,
+ *  and at play distance a single bar does not read as writing — it reads as a
+ *  label nobody got round to printing. Three visible in the owner's phone photo
+ *  of Maple Falls, all blank, which is a large part of what "the items look
+ *  bare minimum" means.
+ *
+ *  The bake cannot carry real glyphs (the ground texture already proved the
+ *  texel budget: ~4.7 per 3D unit), and a CanvasTexture per sign would be a
+ *  draw call per sign. But a sign board is ~100 screen pixels wide at the play
+ *  camera, and at that size ROWS OF DIFFERENT LENGTHS are what the eye reads as
+ *  text — which is exactly how every stylised game of this kind draws a sign.
+ *  Extra boxes on a mesh that is already merged: no new material, no new draw
+ *  call, ~6 triangles a row.
+ *
+ *  RATIO is a fixed table, not a random draw. mainstreet.ts:252 records that
+ *  adding a seeded draw "would shift every subsequent authored placement in
+ *  Maple Falls", and an unseeded one would reshuffle every sign in town on
+ *  every load. `variant` walks the table so two signs side by side do not read
+ *  as the same sign, and it comes from the caller's own side/index.
+ */
+function signLines(x: number, y: number, z: number, w: number, h: number,
+                   col: number, rows: number, variant = 0, rz = 0): G[] {
+  // no two adjacent rows the same length: equal bars read as a barcode
+  const RATIO = [0.94, 0.62, 0.82, 0.50, 0.88, 0.70];
+  const step = h / rows;
+  const bar = Math.min(step * 0.5, h * 0.26);
+  const out: G[] = [];
+  // rz TILTS THE WHOLE BLOCK, not each bar. part() composes scale -> rotate ->
+  // translate, so a bar given rz spins about its own centre and then lands
+  // wherever it is told; the rows have to be laid out along the TILTED axis
+  // too, or a tilted placard gets level lines of text on it. (Rotating the
+  // geometry after part() has already translated it spins it about the world
+  // origin and throws it across the map, which is what the first version did.)
+  const cos = Math.cos(rz), sin = Math.sin(rz);
+  for (let i = 0; i < rows; i++) {
+    const r = RATIO[Math.abs(i + variant) % RATIO.length];
+    const dy = h / 2 - step * (i + 0.5);
+    out.push(part(box(w * r, bar, 0.1), col, x - dy * sin, y + dy * cos, z, 0, 0, rz));
+  }
+  return out;
+}
+
 /** A FAIR SIGN on a verge — "THE FAIR, THIS WAY". There are hundreds of these.
  *  That is the point: a town that has committed to an event. */
 export function makeLawnSign(side: number): THREE.Mesh {
@@ -632,11 +676,11 @@ export function makeLawnSign(side: number): THREE.Mesh {
     part(box(0.06, 0.9, 0.06), 0xd8d8d8, -0.34, 0.45, 0),
     part(box(0.06, 0.9, 0.06), 0xd8d8d8, 0.34, 0.45, 0),
     part(box(1.05, 0.72, 0.07), c, 0, 1.16, 0),
-    part(box(0.78, 0.2, 0.1), WHITE, 0, 1.30, 0.02),                   // the banner line
+    ...signLines(0, 1.32, 0.02, 0.84, 0.34, WHITE, 2, side),           // "THE FAIR"
     // a rosette, where the candidate's office used to be printed
-    part(new THREE.CircleGeometry(0.15, 12), WHITE, -0.28, 1.02, 0.03),
-    part(new THREE.CircleGeometry(0.09, 10), c, -0.28, 1.02, 0.04),
-    part(box(0.34, 0.09, 0.1), WHITE, 0.16, 1.02, 0.02),               // "THIS WAY"
+    part(new THREE.CircleGeometry(0.15, 12), WHITE, -0.28, 1.02, 0.035),
+    part(new THREE.CircleGeometry(0.09, 10), c, -0.28, 1.02, 0.045),
+    ...signLines(0.18, 1.02, 0.02, 0.42, 0.20, WHITE, 2, side + 3),    // "THIS WAY"
   ]);
 }
 
@@ -648,8 +692,8 @@ export function makeBigSign(side: number): THREE.Mesh {
     part(box(0.22, 2.6, 0.22), DARKWOOD, -1.7, 1.3, 0),
     part(box(0.22, 2.6, 0.22), DARKWOOD, 1.7, 1.3, 0),
     part(box(4.4, 2.4, 0.16), c, 0, 2.9, 0),
-    part(box(3.4, 0.7, 0.2), WHITE, 0, 3.2, 0.05),
-    part(box(2, 0.34, 0.2), WHITE, -0.6, 2.4, 0.05),
+    ...signLines(0, 3.30, 0.05, 3.5, 0.86, WHITE, 2, side),            // the headline
+    ...signLines(0, 2.42, 0.05, 3.1, 0.62, WHITE, 3, side + 2),        // the small print
     part(box(4.6, 0.2, 0.26), WHITE, 0, 4.15, 0),
   ]);
 }
@@ -661,8 +705,9 @@ export function makeProtester(side: number): THREE.Mesh {
   personParts(p, 0, 0, mpick(SHIRTS), 0);
   p.push(part(box(0.12, 2.2, 0.12), WOOD, 0.5, 1.6, 0.2, 0, 0, -0.22));
   p.push(part(box(1.5, 1.05, 0.1), side ? BLUE : RED, 0.9, 3.2, 0.2, 0, 0, -0.22));
-  p.push(part(box(1.1, 0.22, 0.14), WHITE, 0.92, 3.35, 0.24, 0, 0, -0.22));
-  p.push(part(box(0.7, 0.16, 0.14), WHITE, 0.85, 3.02, 0.24, 0, 0, -0.22));
+  // a placard nobody wrote on is a placard nobody is protesting with. The board
+  // carries a -0.22 rad tilt, so the lettering takes the same one.
+  p.push(...signLines(0.9, 3.2, 0.245, 1.24, 0.74, WHITE, 3, side, -0.22));
   return mergedProp(p, PROP_SMOOTH_MAT);   // a face is not architecture
 }
 
