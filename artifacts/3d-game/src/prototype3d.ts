@@ -1557,6 +1557,8 @@ const _dbg = new Proxy(_dbgStore, {
   __setSkin: (s: Record<string, unknown>) => void;
   __voidState: () => { x: number; z: number; r: number };
   __biomeAt: (x: number, z: number) => string | null;
+  __questPools: () => { world: string; easy: string[]; med: string[]; hard: string[];
+    houseLike: string[]; spec: { id: string; kind: string; target: number }[] };
   __rushClock: (to: number) => void;
   __setVoidR: (r: number) => void;
   __pinQuality: (n: number | null) => void;
@@ -3184,10 +3186,70 @@ const EASY_Q = ['snack', 'gold', 'combo'];
 // houses. That fixes the board and, at the same time, the FIRST CAR and FIRST
 // BUILDING moments and the newsroom's meal names, all of which were dead here
 // for the same reason.
-const MED_Q = pickedWorld === 'pirate' ? ['evolve', 'combo', 'gold']
-  : pickedWorld === 'powder' ? ['evolve', 'combo', 'gold'] : ['cars', 'evolve', 'combo'];
-const HARD_Q = pickedWorld === 'pirate' ? ['cabanas', 'rival', 'big']
-  : pickedWorld === 'powder' ? ['houses', 'rival', 'big'] : ['houses', 'rival', 'big'];   // easy rotates daily; 'solo' retired with the menu button
+// ── THE POOLS ARE A TABLE NOW, AND THAT IS THE POINT ────────────────────────
+// This is the THIRD time a world has been handed a quest it cannot possibly
+// serve. The comments above record the first two: Maple's board drawing 'cars'
+// and 'houses' before Game Day's food trucks and frat houses were tagged, and
+// 'cabanas' sitting in both of Pirate's lists. Each was fixed by editing a
+// ternary, and each time the next world reopened it — because a nested ternary
+// cannot be checked against anything, so nothing did.
+//
+// Found by replaying the shipped day-seed draw over 365 days:
+//     LANTERN NIGHT   149/365 days carry 'cars'   — the level has ZERO cars.
+//                     Every qk = 'car' in the repo is Maple, Pirate's buggies,
+//                     or Game Day's food trucks. A night market has no traffic
+//                     and should not have any; the pool was simply wrong.
+//     POWDER PASS     234/365 days carry a dead HARD chip — 'houses' (the block
+//                     tags chalet/lodge/hut and never 'house') and 'big' (which
+//                     wants THREE objects of radius >= 6 and the level has
+//                     exactly one, the Lodge at 10.5).
+// Two days in five on Lantern, and nearly two in three on Powder, a child spent
+// three minutes being shown a chip that could not move. The quest board is the
+// come-back-tomorrow hook and it is on screen in every match and on every
+// results card.
+//
+// 'houses' on Powder is fixed properly, in the world rather than the pool: a
+// chalet IS a house, and the alias below makes it count — which also lights the
+// FIRST BUILDING moment that has been dead there for the same reason. 'cars' on
+// Lantern and 'big' on Powder are removed, because those are honest absences:
+// there are no cars at a night market, and a village with one landmark cannot
+// serve a three-landmark quest.
+//
+// A table can be checked. qa/questable.mjs now replays a year of draws against
+// what each world actually tags and fails if any world can be shown a chip it
+// cannot clear. That is what stops a fourth round of this.
+const MED_BY_WORLD: Record<string, string[]> = {
+  maple:   ['cars', 'evolve', 'combo'],
+  gameday: ['cars', 'evolve', 'combo'],
+  pirate:  ['evolve', 'combo', 'gold'],
+  powder:  ['evolve', 'combo', 'gold'],
+  lantern: ['evolve', 'combo', 'gold'],
+};
+const HARD_BY_WORLD: Record<string, string[]> = {
+  maple:   ['houses', 'rival', 'big'],
+  gameday: ['houses', 'rival', 'big'],
+  lantern: ['houses', 'rival', 'big'],
+  pirate:  ['cabanas', 'rival', 'big'],
+  powder:  ['houses', 'rival'],
+};
+const MED_Q = MED_BY_WORLD[pickedWorld] ?? MED_BY_WORLD.maple;
+const HARD_Q = HARD_BY_WORLD[pickedWorld] ?? HARD_BY_WORLD.maple;   // easy rotates daily; 'solo' retired with the menu button
+// ── WHAT COUNTS AS SOMEBODY'S HOUSE, IN ONE PLACE ──────────────────────────
+// Declared here rather than inline in the eat handler because qa/questable.mjs
+// needs the SAME list: a probe that keeps its own copy of this is a probe that
+// can pass while the game fails, which it briefly did. It reads this one.
+// A motorhome is somebody's house for the week. A chalet is one outright, and
+// so is the Lodge and the ice-fishing hut — Powder Pass tags them 'chalet',
+// 'lodge' and 'hut', which is why 'houses' was uncompletable there and FIRST
+// BUILDING never fired on that world either.
+const HOUSE_LIKE = ['house', 'rv', 'chalet', 'lodge', 'hut'];
+
+// The three pools this world can draw from, published for qa/questable.mjs.
+// The probe replays a year of day-seeds against them and against what the world
+// actually tags, so a pool and a level can never quietly disagree again.
+_dbg.__questPools = () => ({ world: pickedWorld, easy: EASY_Q, med: MED_Q, hard: HARD_Q,
+  houseLike: HOUSE_LIKE,
+  spec: QUEST_POOL.map((q) => ({ id: q.id, kind: q.kind, target: q.target })) });
 const quests: Quest[] = (() => {
   const today = new Date().toDateString();
   // uint32 hash (imul + >>>0). The old float reduce blew past 2^53, and the
@@ -4979,11 +5041,17 @@ function capture(e: Edible, giveHunger = true) {
   if (e.mesh.userData.gild) questEvent('gild');
   if (e.radius >= 2.6 && e.radius <= 3.4) questEvent('cabana');
   if (qk) questEvent(qk);
-  // a motorhome is somebody's house for the week — it counts for Roof Raider,
-  // which is what makes the 'houses' chip completable in RV Row
-  if (qk === 'rv') questEvent('house');
+  // ── WHAT COUNTS AS SOMEBODY'S HOUSE ───────────────────────────────────────
+  // A motorhome is somebody's house for the week, which is what makes the
+  // 'houses' chip completable in RV Row. A CHALET is somebody's house outright,
+  // and so is the Lodge and so is the ice-fishing hut — but Powder Pass tags
+  // them 'chalet', 'lodge' and 'hut', so 'houses' was uncompletable on that
+  // world and FIRST BUILDING never fired there either. One list, used by both,
+  // so the two can never drift apart again.
+  const houseLike = !!qk && HOUSE_LIKE.includes(qk);
+  if (houseLike && qk !== 'house') questEvent('house');
   if (comboMult >= 2) questEvent('combo');
-  if (qk === 'house' && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews); }
+  if (houseLike && !moments.firstBuilding) { moments.firstBuilding = true; announce('🏠 FIRST BUILDING! Crunch.'); breakingNews(COPY.houseNews); }
   if (qk === 'car' && !moments.firstCar) { moments.firstCar = true; announce('🚗 FIRST CAR! Tastes like vroom.'); }
   // catching the first RUNNER — the top thrill on the hole.io list — had no
   // moment, and the 1.5x chase bonus was paid in silence. Chase framing on
