@@ -1403,3 +1403,84 @@ CHANGED    store name THE CUTE WORLD ENDER (20 chars, fits the 30 limit and
 NOW        uisystem PASS (the new lockup's faces and sizes are real),
            smoke PASS, screenshot qa/out/menu_rename.png.
 GATE       qa/uisystem.mjs, qa/smoke.mjs.
+
+### The town was stamped from one mould — VISUAL — closes absence #5 (uniformity)
+
+The owner photographed Maple Falls on his iPhone mid-match and said: *"the
+quality of people and items look bare minimum here"*, and asked what a level
+looks like at first glance when a child picks it. He is right, and it measures.
+
+MEASURED   `qa/variety.mjs`, written before anything was changed and failed on
+           the build before this one. **Maple Falls: 5,782 props, 5,043 of them
+           — 87% — at exactly 0 radians.** Every flower bed, every planter, all
+           603 maple trees and all 564 bushes turned the same way. `makeBush`
+           was ONE sphere half-sunk into the ground while `makeTree` twenty
+           lines above it clustered four; both appear in the same photo.
+           `personParts` in mainstreet.ts drew shirts from a pool containing
+           `0xc98a5a`, which is also the third entry of `SKIN` — a townsperson
+           who drew that pair came out one solid tan from scalp to shoe, which
+           is what the 3x crop shows: a brown blob with no neck, no shoulder
+           line and no arms, because every edge that says *person* is a value
+           change and there were none. And the crowd has **no faces at all** —
+           `makePerson`'s own comment has promised "skull, hair, hat, face"
+           since it was written and there has never been a single eye in this
+           game's population, while the hero it is eaten by is a face with
+           eyebrows, blush and a mouth.
+
+           **Why this survived every previous pass:** `qa/ground.mjs` reports
+           Maple as *"has texture at play distance"* and it is not wrong — it
+           high-passes the frame and the shader speckle is genuinely there. It
+           measures GRAIN. Nothing in the kit measured SAMENESS, so the one
+           complaint the owner could see had no instrument. Add the instrument
+           and the number is 87%.
+
+CHANGED    Four things, each small.
+           1. A prop with no front is turned by a hash of its own position, in
+              `place()` — the single funnel every prop in every world goes
+              through. Builders tag themselves with `noFront()`; anything with
+              a door, a face, a screen or a direction stays untagged and keeps
+              the facing its call site authored. The angle is HASHED, not
+              drawn: mainstreet.ts:252 warns a draw from the seeded stream
+              "would shift every subsequent authored placement in Maple Falls",
+              and the town must be identical every load. A position hash costs
+              no draw and shifts nothing.
+           2. `makeBush` is three lobes, two-tone off one base, merged to the
+              same single draw call it already cost, inside the old silhouette.
+           3. Faces. Two eyes welded into the head mesh that already exists, on
+              both the walking crowd (life.ts) and the static townsfolk
+              (mainstreet.ts) — no extra draw calls. Tucked laterally so the
+              whites stay inside the skull's silhouette from behind, which is
+              most of the time, and proud of it from the front, which is the
+              only angle they are for.
+           4. The shirt that was also a skin tone is now a plum. Same COUNT of
+              entries, so `mpick` draws the same number of times.
+           And the lawn: Maple's grass was flat colour with the base mottling
+           overpainted by the opaque biome block fills. Large tonal patches now
+           go down under the districts, and LEAF DRIFTS go down last of all —
+           they have to be last, because the first attempt sat beside the lawn
+           tone and THE SQUARE repainted over it 280 lines later, so the one
+           district the match opens in was the one that got no leaves.
+
+NOW        Facing: **87% -> 25%** sharing one angle. Biggest single form holds
+           12% of the town. Ground mean held at 0.622 against 0.623 before, so
+           the warm paint did not blow the level's exposure the way island.ts
+           has done twice before. Before and after, same camera:
+           `qa/out/shippedlook/maple_firstlook.png` -> `maple_faces2.png`.
+
+GATE       `qa/variety.mjs` — fails on `56a5481`, passes here.
+
+RETRACTION, made the same hour the probe was written and before it gated
+anything. Its first FORM bar was `distinct forms / prop count >= 12%`. That
+ratio FALLS as a town grows even when the town gets richer: Maple scores 6.6%
+with 394 distinct forms; a hamlet with 30 forms across 100 props scores 30% and
+is plainly the poorer place. It was measuring size and calling it sameness, and
+it would have failed any large world forever. Replaced with the share held by
+the single most repeated form, which is comparable across towns of any size.
+
+AND A SECOND RETRACTION, same pass. The leaf litter first painted individual
+leaves at 0.16–0.34 units — the size of a real maple leaf at this game's scale.
+The bake carries 3072px across ~650 3D units, **4.7 texels per unit**, so a real
+leaf is ONE TEXEL and invisible at every camera distance. That is not a tuning
+problem but a representable-object problem: this bake cannot hold a leaf. It can
+hold a DRIFT, so drifts are what it paints. Anyone reaching for finer ground
+detail here should check the texel budget before spending the day.

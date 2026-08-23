@@ -1112,6 +1112,30 @@ function makePerson(biome?: string, colOverride?: number, o?: PersonOpts): THREE
   const hk: Hat | null = (o && o.hat !== undefined) ? o.hat
     : (fit.hat && Math.random() < (fit.hatOdds ?? 0.4) ? fit.hat : null);
   if (hk) hatParts(hp, hk, o?.hatCol ?? pick([0xf6e3b8, 0xff6f91, 0xffffff, 0xe8604d, 0x4da3ff]));
+  // ── THE FACE ── the comment at the head of this block has promised "skull,
+  // hair, hat, face" since the crowd was written, and there has never been a
+  // single eye in this game's entire population. Every townsperson is a bare
+  // ball with a hair cap.
+  //
+  // That is half of what the owner meant by "the quality of people and items
+  // look bare minimum". The HERO is a face — a big one, with eyebrows, blush
+  // and a mouth — and it spends three minutes eating a town of blanks. The play
+  // camera sits at 46 degrees above the ground (camOffset 0.62, 0.92, 0.62), so
+  // anyone walking TOWARD the void shows the whole front of their head, and
+  // there was nothing on it.
+  //
+  // Two eyes, welded into the head mesh that already exists: no extra draw
+  // call, ~120 triangles on a mesh built to carry them ("this is the surface
+  // the play camera spends all its time looking at, so it gets the vertex
+  // budget" — the same comment). Deliberately large and close-set, because the
+  // void's are, and a crowd drawn to a different chart than its hero is the
+  // uniformity tell (absence #5) in the one place it is most visible.
+  //
+  // Skipped under sunglasses, which already sit at z 0.46 and would hide them.
+  if (!o?.glasses) for (const ex of [-0.20, 0.20]) {
+    hp.push(pc(B.dot, WHITE, ex, 0.06, 0.375, 0.26, 0.30, 0.20));
+    hp.push(pc(B.dot, INK, ex, 0.05, 0.435, 0.15, 0.17, 0.10));
+  }
   if (o?.glasses) hp.push(pc(B.box, INK, 0, 0.08, 0.46, 0.58, 0.10, 0.13));
   if (o?.eyepatch) hp.push(pc(B.box, 0x1a1620, -0.18, 0.11, 0.46, 0.23, 0.19, 0.09));
   if (o?.headphones) {

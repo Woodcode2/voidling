@@ -1747,6 +1747,74 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   }
   // forest gets a darker dappling; downtown a plaza tint already via pavement
 
+  // ══ THE LAWN WAS ONE FLAT GREEN ═════════════════════════════════════════
+  // The owner photographed Maple Falls and said the world looked bare. The
+  // props were half of it (see place() and makeBush). This is the other half,
+  // and it is the larger one: grass is most of the frame.
+  //
+  // TWO THINGS WERE WRONG.
+  //
+  // First, a bug. The base grass at the top of this bake lays down 4,000 soft
+  // blobs of mottling — and then the biome block fills above OVERPAINT it with
+  // an opaque fillRect. `park` and `forest` carry a colour, so every park block
+  // in the town had its variation erased by the very next pass. The match opens
+  // on a green. That green was the flattest surface in the level.
+  //
+  // Second, a scale error that made the existing mottle invisible anyway. This
+  // bake is 3072px across the whole island, roughly 9 canvas texels per 3D
+  // unit, while the play camera shows about 103 screen pixels per 3D unit —
+  // the ground texture is magnified about ELEVEN TIMES on screen. The base
+  // mottle's 2-6px blobs land as 20-60px smudges at 3% coverage and 0.16 alpha,
+  // which is nothing. Anything meant to be SEEN here has to be authored at the
+  // patch scale, not the grain scale. Grain is what the shader detail layer is
+  // for, and qa/ground.mjs already confirms that layer is present and working —
+  // which is exactly why the flatness never got caught. Grain was measured;
+  // composition never was.
+  //
+  // So: large tonal patches, and leaf litter in DRIFTS. Maple Falls is an
+  // autumn town and there was not one fallen leaf on its lawns. Drifts rather
+  // than an even scatter, because at 11x magnification an even scatter is just
+  // noise while a drift keeps its shape — and because that is what leaves
+  // actually do.
+  //
+  // THE MEAN IS HELD DELIBERATELY. island.ts has made the opposite mistake
+  // twice already — the additive night pools, then the mottle tile that blew
+  // the level out to white — so the warm-up and cool-down passes are matched in
+  // count and alpha, and qa/ground.mjs's reported mean is the check.
+  //
+  // DETERMINISM: its own mulberry32 on a fixed seed. Not Math.random (the town
+  // would differ every load) and NOT the shared seeded stream, because
+  // mainstreet.ts:252 warns that a draw taken from that "would shift every
+  // subsequent authored placement in Maple Falls".
+  if (WORLD_ID === 'maple') {
+    let _ls = 0x9a5cff;
+    const lr = () => {
+      _ls |= 0; _ls = (_ls + 0x6D2B79F5) | 0;
+      let t = Math.imul(_ls ^ (_ls >>> 15), 1 | _ls);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const lrange = (a: number, b: number) => a + lr() * (b - a);
+    const GRASSY: Biome[] = ['cozy', 'fancy', 'plaza', 'park', 'forest'];
+    for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+      if (!GRASSY.includes(PLAN[gy][gx])) continue;
+      const cxB = blockCenter(gx), cyB = blockCenter(gy);
+      const x0 = pxW(cxB - BLOCK_SIZE / 2), y0 = pyW(cyB - BLOCK_SIZE / 2);
+      const bw = pxW(cxB + BLOCK_SIZE / 2) - x0, bh = pyW(cyB + BLOCK_SIZE / 2) - y0;
+      g.save(); g.beginPath(); g.rect(x0, y0, bw, bh); g.clip();
+      // 1. TONE — mown and worn. Matched pairs so the block's mean does not move.
+      for (let i = 0; i < 26; i++) {
+        for (const up of [true, false]) {
+          g.fillStyle = up ? 'rgba(178,214,112,0.15)' : 'rgba(78,124,60,0.15)';
+          g.beginPath();
+          g.arc(x0 + lr() * bw, y0 + lr() * bh, lrange(bw * 0.07, bw * 0.22), 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+      g.restore();
+    }
+  }
+
   if (WORLD_ID === 'maple') {
   // roads — sidewalk band first, asphalt over it, crisp edge lines, dashes
   const roadPx = pxW(ROAD_CENTERS[1]) - pxW(ROAD_CENTERS[1] - 110);
@@ -2496,6 +2564,77 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   }   // ← end of the Maple-only ground detail (roads, blocks, districts)
 
   await breathe('Painting the streets…');
+  // ══ LEAF LITTER — MAPLE FALLS ═══════════════════════════════════════════
+  // An autumn town with not one fallen leaf on it. This is the last thing
+  // painted into the bake, and it has to be, because the first attempt went in
+  // beside the lawn tone at the top of the maple block and THE SQUARE repainted
+  // straight over it 280 lines later — so the one district the match actually
+  // opens in was the one district that got no leaves. Photographed to be sure
+  // (qa/_dumpbake.mjs writes the bake out; the drifts were there in the
+  // residential blocks and absent from the square).
+  //
+  // AND THE FIRST VERSION PAINTED THE WRONG OBJECT. It drew individual leaves
+  // at 0.16-0.34 units, which is roughly the size of a real maple leaf at this
+  // game's scale. This bake carries 3072px across ~650 3D units — 4.7 texels
+  // per unit — so a real leaf is ONE TEXEL, sub-pixel after filtering, and
+  // invisible at any camera distance. That is not a tuning problem, it is a
+  // representable-object problem: the bake cannot hold a leaf.
+  //
+  // It can hold a DRIFT. So that is what this paints: piles 3-7 units across,
+  // built from overlapping lobes so the edge frays instead of ending on a disc,
+  // gathered where leaves gather. At the play camera a drift is a couple of
+  // hundred screen pixels, which is the scale the eye reads as leaf litter
+  // anyway — nobody sees individual leaves from forty feet up either.
+  //
+  // Mean held on purpose: qa/ground.mjs reported 0.623 before any of this and
+  // the warm paint is kept sparse enough to leave it there. island.ts has blown
+  // this level's exposure out twice before by stacking alpha.
+  if (WORLD_ID === 'maple') {
+    let _ds = 0x1eaf5;
+    const dr = () => {
+      _ds |= 0; _ds = (_ds + 0x6D2B79F5) | 0;
+      let t = Math.imul(_ds ^ (_ds >>> 15), 1 | _ds);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const drange = (a: number, b: number) => a + dr() * (b - a);
+    const U = TEX / W3;                       // canvas px per 3D unit
+    const LEAF = ['#c4622c', '#d98a34', '#b03f2a', '#e0a63c', '#a86b30'];
+    const GRASSY: Biome[] = ['cozy', 'fancy', 'plaza', 'park', 'forest'];
+    g.save();
+    g.beginPath();
+    g.moveTo(px(sil3[0].x), py(sil3[0].y));
+    for (const pt of sil3) g.lineTo(px(pt.x), py(pt.y));
+    g.closePath(); g.clip();
+    for (let gy = 0; gy < 6; gy++) for (let gx = 0; gx < 6; gx++) {
+      // leaves fall everywhere, but they LIE where nobody sweeps: thick on the
+      // grass, thin on a paved block where the town has been over it.
+      const grassy = GRASSY.includes(PLAN[gy][gx]);
+      const piles = grassy ? 26 + Math.floor(dr() * 14) : 7 + Math.floor(dr() * 6);
+      const cxB = blockCenter(gx), cyB = blockCenter(gy);
+      const x0 = pxW(cxB - BLOCK_SIZE / 2), y0 = pyW(cyB - BLOCK_SIZE / 2);
+      const bw = pxW(cxB + BLOCK_SIZE / 2) - x0, bh = pyW(cyB + BLOCK_SIZE / 2) - y0;
+      for (let d = 0; d < piles; d++) {
+        const dx = x0 + dr() * bw, dy = y0 + dr() * bh;
+        const R = drange(1.6, 3.6) * U;        // the drift's own radius, in 3D units
+        const lobes = 6 + Math.floor(dr() * 9);
+        const col = LEAF[Math.floor(dr() * LEAF.length)];
+        for (let i = 0; i < lobes; i++) {
+          // two uniforms averaged: dense in the middle, frayed at the rim
+          const ox = (dr() + dr() - 1) * R, oy = (dr() + dr() - 1) * R;
+          g.fillStyle = i % 3 === 0 ? LEAF[Math.floor(dr() * LEAF.length)] : col;
+          g.globalAlpha = drange(0.16, 0.34);
+          const lw = drange(0.5, 1.15) * U;
+          g.beginPath();
+          g.ellipse(dx + ox, dy + oy, lw, lw * drange(0.55, 0.9), dr() * Math.PI, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+    }
+    g.globalAlpha = 1;
+    g.restore();
+  }
+
   const groundTex = new THREE.CanvasTexture(cv);
   // 16 on phones too. At 4, ground receding from the camera turned to mush —
   // the boardwalk planks and lane lines at the top of the screen were the

@@ -123,7 +123,15 @@ const NEON_PINK = 0xff6fae, NEON_CYAN = 0x74f0ff, NEON_GOLD = 0xffd85e;
 const ASPHALT = 0x5a6070, TARMAC = 0x7d8494;
 const SHOP_WALL = [0xe4c4a0, 0xc9d8e2, 0xf0d2cc, 0xd8e0c4, 0xe8dcc0, 0xcdc2dc] as const;
 const AWNING = [0xd8392f, 0x1fa8a0, 0x3f7a4e, 0xe0a83a, 0x4d7de8, 0xd8586f] as const;
-const SHIRTS = [0xff7a5a, 0x5ec8d8, 0xffd23f, 0x8fa9d8, 0xf06fb0, 0x7ed57a, 0xf2f4f8, 0xc98a5a] as const;
+const INK = 0x241f2e;
+// 0xc98a5a WAS IN HERE, AND IT IS ALSO THE THIRD ENTRY OF SKIN BELOW. A
+// townsperson who drew that shirt against that skin came out one solid tan from
+// scalp to shoe — photographed in Maple Falls at 3x and it is a brown blob, no
+// neck, no shoulder line, no arms, because every edge that says "person" is a
+// value change and there were none. Replaced with a plum that sits clear of
+// every skin tone. Same COUNT of entries, so mpick draws the same number of
+// times and no authored placement moves.
+const SHIRTS = [0xff7a5a, 0x5ec8d8, 0xffd23f, 0x8fa9d8, 0xf06fb0, 0x7ed57a, 0xf2f4f8, 0x9a6fb0] as const;
 const SKIN = [0xf4c9a0, 0xe0a878, 0xc98a5a, 0xffd9b0] as const;
 const DENIM = [0x40567a, 0x5a6070, 0x8a6a4a, 0x2f3a52] as const;
 
@@ -280,6 +288,36 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   out.push(part(cyl(0.10 * S, 0.115 * S, 0.74 * S, 9), shirt, x + 0.44 * S, 1.42 * S, z, 0, ry, 0));
   out.push(part(cyl(0.13 * S, 0.13 * S, 0.16 * S, 10), skin, x, 1.98 * S, z));                   // neck
   out.push(part(sph(0.36 * S, 16, 11), skin, x, 2.22 * S, z));
+  // ── A FACE ── life.ts's walking crowd got eyes in the same pass as this; the
+  // static townsfolk need them for the same reason and more so, because these
+  // are the ones standing still on a path while the void rolls past. The play
+  // camera is 46 degrees above the ground, so the front of a head is in shot
+  // whenever a person is turned anywhere but straight away.
+  //
+  // Placed in the person's own facing (ry), because unlike every other part
+  // here a face is not radially symmetric: `fwd` is the way they are looking
+  // and `rgt` is across their shoulders. Two parts each, merged into the mesh
+  // this function already returns, so the cost is triangles and not draw calls.
+  //
+  // DETERMINISM: no mpick, no mrnd, no mchance. The two seeded draws at the top
+  // of this function are still the only two, in the same order, which is the
+  // contract every authored placement in Maple Falls downstream depends on.
+  {
+    const fwdX = Math.sin(ry), fwdZ = Math.cos(ry);
+    const rgtX = Math.cos(ry), rgtZ = -Math.sin(ry);
+    for (const side of [-1, 1]) {
+      // Tucked in laterally on purpose: at +/-0.145 across with a 0.105 radius
+      // the whites cleared the 0.36 skull and read as two warts on the side of
+      // the head from behind — which is most of the time, because the crowd
+      // walks away from a camera that follows the void. +/-0.125 with 0.095
+      // keeps them inside the skull's own silhouette from the side and still
+      // proud of it from the front, which is the only angle they are for.
+      const ex = x + rgtX * side * 0.125 * S + fwdX * 0.30 * S;
+      const ez = z + rgtZ * side * 0.125 * S + fwdZ * 0.30 * S;
+      out.push(part(sph(0.095 * S, 9, 7), WHITE, ex, 2.26 * S, ez));
+      out.push(part(sph(0.058 * S, 8, 6), INK, ex + fwdX * 0.055 * S, 2.25 * S, ez + fwdZ * 0.055 * S));
+    }
+  }
   if (hat !== undefined) out.push(part(cyl(0.34 * S, 0.42 * S, 0.22 * S, 14), hat, x, 2.52 * S, z));
 }
 
