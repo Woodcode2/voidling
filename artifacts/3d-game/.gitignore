@@ -7,3 +7,6 @@ qa-out/
 # committed by a `git add -A` earlier in this project's life, once as roughly
 # 400 files. One pattern instead of naming them one at a time as they appear.
 dist-*/
+
+# Gate reports — regenerated on every run, never worth a diff
+qa/out/gate/
