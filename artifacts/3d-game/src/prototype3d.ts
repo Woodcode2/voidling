@@ -1337,7 +1337,7 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
 const COPY = WORLD_COPY[pickedWorld];
 {
   const nm = WORLD_NAMES[pickedWorld];
-  document.title = `VOIDLING · ${nm} (3D)`;
+  document.title = `WORLD ENDER · ${nm}`;
   const tc = document.querySelector('#titlecard .name'); if (tc) tc.textContent = nm;
   const tl = document.querySelector('#titlecard .lvl'); if (tl) tl.textContent = `LEVEL ${COPY.n}`;
   const ts = document.querySelector('#titlecard .sub');
@@ -3007,8 +3007,9 @@ let autoFireCd = 3;
 // The old middle — MUNCHER, GOBBLER, DEVOURER — was one picture ("eater")
 // through a thesaurus three times. Each rung is a different THING now, and
 // the things get bigger: baby → munchkin → little monster → dinosaur →
-// giant → planet-eater → cosmos. VOIDLING is the game's name and WORLD
-// ENDER is the splash tagline; both are brand and neither moves. Renaming
+// giant → planet-eater → cosmos. VOIDLING is the species and first form
+// (the app itself ships as THE CUTE WORLD ENDER — a live App Store game
+// already owns "Voidling"); both words are brand and neither moves. Renaming
 // the three middle trophies re-awards them once on existing saves (the paid
 // ledger keys on trophy name) — a few coins, reads as a small gift.
 const FORMS = ['VOIDLING', 'MUNCHKIN', 'GOBBLIN', 'CHOMPOSAURUS', 'COLOSSUS', 'WORLD ENDER', 'VOID TITAN'];

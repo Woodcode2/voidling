@@ -1379,3 +1379,27 @@ NOW        smoke PASS; the swallow no longer registers as percussion by
            construction (no oscillator in the voice); spawn meter 0%.
 GATE       qa/moverbands.mjs (distance census — the fast flag lives in the
            update loop it deliberately does not model), qa/smoke.mjs.
+
+### The app is THE CUTE WORLD ENDER; the voidlings are the stars — owner's launch call
+MEASURED   name-collision research before submission: "Voidling" is a LIVE
+           App Store arcade game (Douglas Johnson, updated 2026-03) about a
+           hatching, evolving void creature — same store, adjacent theme,
+           and Apple names are unique. An itch.io jam game holds the name
+           too. "Nomling" (vetted alternate) is a live virtual-pet product;
+           "Voidy" is a Google Play developer. "The Cute World Ender" — our
+           own tagline — had ZERO collisions anywhere.
+CHANGED    store name THE CUTE WORLD ENDER (20 chars, fits the 30 limit and
+           carries "cute" + "world" as free search terms); home-screen
+           label World Ender (11 chars, untruncated — verified against a
+           rendered home-screen mockup with the real icon; the full name
+           chops to "The Cute W…"). Splash: two-beat lockup — THE CUTE
+           small in pink over WORLD ENDER at logo scale — with STARRING
+           THE VOIDLINGS beneath: the species, the family, the first form
+           and every line of in-world copy keep the word. Swept: splash,
+           loading screen, settings note, document.title, manifest,
+           capacitor appName, APPSTORE.md (with the research recorded).
+           appId com.voidling.game unchanged — bundle ids are invisible
+           and painful to move.
+NOW        uisystem PASS (the new lockup's faces and sizes are real),
+           smoke PASS, screenshot qa/out/menu_rename.png.
+GATE       qa/uisystem.mjs, qa/smoke.mjs.

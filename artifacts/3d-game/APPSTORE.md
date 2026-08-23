@@ -1,4 +1,12 @@
-# VOIDLING — App Store shipping guide
+# THE CUTE WORLD ENDER — App Store shipping guide
+
+> **THE NAME (2026-08-23).** "Voidling" is a live App Store arcade game
+> already (Voidling by Douglas Johnson, updated 2026) — Apple names are
+> unique, so the app ships as **THE CUTE WORLD ENDER** (store name, ≤30
+> chars) with home-screen label **World Ender** (fits untruncated; set via
+> Capacitor appName). "Voidling" remains the SPECIES and first form inside
+> the game — no in-world copy changes. Searches found no registered
+> trademark on the phrase; the full four-word name had zero collisions.
 
 Everything in this folder is ready for an iOS submission. The web build is the
 game; Capacitor wraps it in a native shell.
@@ -287,12 +295,12 @@ In Xcode:
 1. Select the **App** target → Signing & Capabilities → pick your team.
 2. Product → Archive → Distribute App → App Store Connect → Upload.
 3. In App Store Connect: create the app (bundle id `com.voidling.game`,
-   name **VOIDLING**), attach the uploaded build, add the `store/` screenshots,
+   name **The Cute World Ender**), attach the uploaded build, add the `store/` screenshots,
    fill in metadata, submit for review.
 
 ## Suggested store metadata
 
-- **Name**: VOIDLING
+- **Name**: The Cute World Ender
 - **Subtitle**: The cute world ender
 - **Keywords**: hole, black hole, eat, city, arcade, casual, devour, grow, void
   - the bare token `io` is gone. On its own it is not a word a player searches,

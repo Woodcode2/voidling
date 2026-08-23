@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0d0821">
-    <title>VOIDLING · The cute world ender</title>
+    <title>The Cute World Ender</title>
     <link rel="icon" type="image/png" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="apple-touch-icon" href="/assets/hf/hf_20260723_155631_dc81db62-1752-493e-8453-8ec7835481ee.png">
     <link rel="manifest" href="/manifest.json">
@@ -894,8 +894,12 @@
           #btnPlay { padding: 14px 64px; }
       }
       #menuOrb { display: none; }
-      #menu .logo { font-size: clamp(52px, 9vw, 84px); font-weight: 700; letter-spacing: 3px; color: #fff;
-        text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
+      #menu .logo { font-size: clamp(40px, 8vw, 68px); font-weight: 700; letter-spacing: 2px; color: #fff;
+        line-height: 1.02; text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
+      /* "THE CUTE" rides above at half scale — one name, two beats */
+      #menu .logo i { display: block; font-style: normal; font-size: 0.44em;
+        letter-spacing: 8px; color: #ffd9f2; margin-bottom: 2px;
+        text-shadow: 0 0 18px rgba(255,150,220,0.8), 0 2px 8px rgba(0,0,0,0.65); }
       #menu .tag { font-size: clamp(11px, 1.6vw, 15px); font-weight: 700; letter-spacing: 7px; color: #ffffff; margin-top: 2px;
         text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
       #menu .spacer { flex: 1; }   /* the key-art hero shows through here */
@@ -1162,7 +1166,8 @@
          rendered frame, so the island build is covered rather than hidden
          behind a menu whose button cannot answer yet */
       #loadScr.boot { display: flex; }
-      #loadScr .lLogo { font-size: 30px; font-weight: 700; letter-spacing: 3px; color: #fff; text-shadow: 0 0 24px #b875ff; }
+      #loadScr .lLogo { font-size: 26px; font-weight: 700; letter-spacing: 3px; color: #fff; line-height: 1.05; text-align: center; text-shadow: 0 0 24px #b875ff; }
+      #loadScr .lLogo i { display: block; font-style: normal; font-size: 12px; letter-spacing: 7px; color: #ffd9f2; }
       #loadScr .lName { font-size: 14px; letter-spacing: 6px; color: #ffd23f; font-weight: 700; }
       .lBarWrap { width: min(340px, 72vw); height: 14px; border-radius: 9px; background: rgba(255,255,255,0.12);
         border: 2px solid rgba(168,123,255,0.4); overflow: hidden; }
@@ -1726,8 +1731,13 @@
 
     <!-- ── start menu: full splash key art, opaque (not the live game) ── -->
     <div id="menu">
-      <div class="logo">VOIDLING</div>
-      <div class="tag">THE CUTE WORLD ENDER</div>
+      <!-- THE NAME (owner's launch call): "Voidling" is a live App Store
+           game already (Douglas Johnson, 2026), so the app is THE CUTE WORLD
+           ENDER — our own tagline, promoted — and the voidlings stay the
+           STARS: the species, the family and the first form keep the word.
+           Two lines so the four-word name lands at logo scale on a phone. -->
+      <div class="logo"><i>THE CUTE</i>WORLD ENDER</div>
+      <div class="tag">STARRING THE VOIDLINGS</div>
       <div class="spacer"></div>
       <div id="menuOrb"><svg viewBox="0 0 200 200" width="100%" height="100%">
         <defs>
@@ -1783,7 +1793,7 @@
              parental gate, so a child cannot switch it on. -->
         <button class="setRow" id="setStats"><span>📊 ANONYMOUS STATS</span><b>OFF</b></button>
         <button class="setRow" id="setPrivacy"><span>🔒 PRIVACY POLICY</span><b>›</b></button>
-        <div class="setNote">VOIDLING · the cute world ender<br>made for kids who like snacks 🍩</div>
+        <div class="setNote">THE CUTE WORLD ENDER · starring the voidlings<br>made for kids who like snacks 🍩</div>
         <button id="setClose">DONE</button>
       </div>
     </div>
@@ -1909,7 +1919,7 @@
 
     <!-- ── loading screen: PLAY waits here until the asset pack is resident ── -->
     <div id="loadScr" class="boot">
-      <div class="lLogo">VOIDLING</div>
+      <div class="lLogo"><i>THE CUTE</i>WORLD ENDER</div>
       <!-- LEFT EMPTY ON PURPOSE. #loadScr.boot paints before the module runs,
            so whatever is written here is the literal first frame of the app —
            and it said MAPLE ISLE, a world this game has not had since the
