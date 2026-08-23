@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  THE PRIVACY MANIFEST.
+
+	  Apple requires this file, and its answers become the public privacy
+	  label on a game for six-year-olds. Everything below was read out of
+	  the source rather than assumed:
+
+	    src/game/analytics.ts   the ONLY non-relative fetch in the bundle,
+	                            to one Supabase edge function. The payload is
+	                            {session_id, app_version, platform, events[]}.
+	                            user_id is absent; the legacy vd_uid key is
+	                            actively deleted on load; logEvent returns
+	                            early when consent is off.
+	    src/proto3d/telemetry.ts  adds a coarse hardware tier only —
+	                            hardwareConcurrency and deviceMemory, both
+	                            buckets, neither an identifier.
+
+	  There is no ad SDK, no third-party analytics, no crash reporter, no
+	  remote config, no IDFA, no device id, no randomUUID and no crypto call
+	  anywhere in src/. The session id is per-session and is not persisted
+	  across launches, so it cannot follow a child between sessions.
+
+	  NSPrivacyTracking is false and NSPrivacyTrackingDomains is empty
+	  because nothing here is used for tracking as Apple defines it: the data
+	  is never linked to identity and never leaves for an ad network.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<dict>
+			<!--
+			  Gameplay counters and a coarse device tier, used only to tell
+			  whether a level is too hard and whether the game runs on a
+			  given class of phone. Not linked to identity; not used to
+			  track. Collected only when the grown-up switch is on.
+			-->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!--
+			  UserDefaults. Capacitor's own preferences layer and the WKWebView
+			  bridge both touch it; the game's own saves are localStorage,
+			  which WebKit backs with its own store. CA92.1 is the
+			  "app's own data" reason and is the correct one here.
+			-->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

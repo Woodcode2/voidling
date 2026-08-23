@@ -346,6 +346,46 @@ In Xcode:
   needs. We adopt Kids-Category-grade behaviour voluntarily and say so in the
   copy, which is worth more than the badge.
 
+## App Privacy — the answers, question by question
+
+**App Store Connect will not let you submit until this section is answered, and
+the answers become the public privacy label.** It is a separate screen from the
+age-rating questionnaire above and it is easy to miss; the Xcode steps in this
+document used to end at "Archive" and never mention it.
+
+**Do not answer "No, we do not collect data."** It is the intuitive answer,
+because the switch is off until a grown-up turns it on — but the binary
+demonstrably contains a POST to a server, and a privacy label that contradicts
+the binary is a Guideline 5.1.1(vi) finding. On a children's app that is the
+worst possible thing to be found under-disclosing.
+
+Answer it like this:
+
+| App Store Connect asks | Answer | Why |
+|---|---|---|
+| Do you or your third-party partners collect data from this app? | **Yes** | One optional POST to our own Supabase function. |
+| Which data types? | **Diagnostics → Other Diagnostic Data** only | Gameplay counters and a coarse device tier. Nothing else is sent. |
+| Contact info / Identifiers / Purchases / Location / Contacts / User Content / Search / Browsing / Health / Financial / Sensitive | **None of them** | There is no user id, no IDFA, no device id, no location, no free text. The only text box in the app is the parental gate's number pad, which never leaves the device. |
+| Is Other Diagnostic Data linked to the user's identity? | **No** | There is no identity to link it to. The session id is minted per launch and never written to storage. |
+| Is it used for tracking? | **No** | It never leaves for an ad network and is never joined to anything. |
+| What is it used for? | **App Functionality** | Telling whether a level is too hard and whether the game runs on a class of phone. |
+
+Three supporting facts, each checkable in the source, in case review asks:
+
+- **One external host.** `src/game/analytics.ts` holds the only non-relative
+  `fetch()` in the bundle. No ad SDK, no third-party analytics, no crash
+  reporter, no remote config.
+- **No persistent identifier.** An earlier build minted a `vd_uid` into
+  localStorage; it was removed, and the key is now actively deleted on load so
+  an install that already has one stops sending it. Under COPPA a persistent
+  identifier collected from a child *is* personal information.
+- **Off by default.** `logEvent()` returns early unless a grown-up has switched
+  analytics on in settings.
+
+`ios/App/App/PrivacyInfo.xcprivacy` declares the same thing to Apple's tooling
+and is in the App target's Resources build phase. `node qa/privacy.mjs` fails
+the build if any of the above stops being true.
+
 ## TestFlight
 
 After the first upload, add internal testers in App Store Connect →

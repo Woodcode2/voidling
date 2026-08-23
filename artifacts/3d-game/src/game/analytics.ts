@@ -2,7 +2,11 @@
 // Batched client → Supabase edge function (ingest-events) → vd_events table.
 // Design: never block gameplay, never throw, drop silently when offline.
 //   • events queue in memory, flush every 12s / 20 events / on tab-hide (beacon)
-//   • anonymous stable user id + per-boot session id
+//   • NO user id at all — a per-boot session id that is never persisted
+//     (this header used to say "anonymous stable user id", which the code
+//     below stopped being true about when vd_uid was removed; a stale comment
+//     on the one file a privacy reviewer reads is worse than no comment)
+//   • off by default — logEvent() returns early unless a grown-up switched it on
 //   • first_open fired exactly once per install (localStorage marker)
 
 const INGEST_URL = 'https://uzkzuxwykajzoicuxhic.supabase.co/functions/v1/ingest-events';

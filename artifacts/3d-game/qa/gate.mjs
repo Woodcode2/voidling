@@ -84,6 +84,18 @@ const SUITE = [
     cmd: ['node', 'qa/iapdoc.mjs'], verdict: re(/agree on every product id and price/, /NOT IN THE DOC|NOT REGISTERED|disagree/),
     why: 'APPSTORE.md and the client agree on every product id and price — a mismatch is a rejected binary' },
 
+  { id: 'privacy', tier: 'money', profiles: ['push', 'live'], timeout: 60,
+    cmd: ['node', 'qa/privacy.mjs'], verdict: pf,
+    why: 'nothing identifying leaves a six-year-old\'s phone, and the privacy manifest ships and says so' },
+
+  { id: 'iosname', tier: 'money', profiles: ['push', 'live'], timeout: 30,
+    cmd: ['node', 'qa/iosname.mjs'], verdict: pf,
+    why: 'the iOS home-screen label matches capacitor.config.ts — cap sync never fixes this one' },
+
+  { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1200,
+    cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,
+    why: 'over a year of draws, no world can show a daily chip a child cannot clear' },
+
   { id: 'juice', tier: 'feel', profiles: ['live', 'art'], timeout: 420,
     cmd: ['node', 'qa/juice.mjs', PORT], verdict: pf,
     why: 'a bite is answered on at least three channels, not one' },
