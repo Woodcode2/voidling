@@ -14,6 +14,13 @@ import * as THREE from 'three';
 import { part, mergedProp } from './island';
 import { registerGloss } from './gloss';
 
+/** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
+ *  hash of its own position, because 87% of Maple Falls sat at exactly 0
+ *  radians and read as stamped. Anything with a door, a face, a screen or a
+ *  direction must NOT be tagged — it keeps the facing its call site authored. */
+const noFront = <T extends THREE.Object3D>(m: T): T => { m.userData.spin = 1; return m; };
+
+
 type G = THREE.BufferGeometry;
 
 // ── palette ───────────────────────────────────────────────────────────────
@@ -685,7 +692,7 @@ export function makePalmLux(): THREE.Group {
     p.push(part(new THREE.SphereGeometry(0.11, 6, 5), i % 3 ? GOLD_B : 0xfff0b8,
       Math.sin(lean) * 3.4 * t + Math.cos(a) * 0.34, 0.5 + t * 6.6, Math.sin(a) * 0.34));
   }
-  return finish(p);
+  return noFront(finish(p));
 }
 
 /** Marble mermaid fountain, ~9 across, ~8 tall. */
@@ -1194,7 +1201,7 @@ export function makeChampagneBucket(): THREE.Group {
   p.push(part(new THREE.CylinderGeometry(0.15, 0.17, 0.72, 8), 0x2c4a3a, 0.12, 1.12, 0, 0, 0, 0.3));
   p.push(part(new THREE.CylinderGeometry(0.07, 0.11, 0.36, 7), 0x2c4a3a, 0.28, 1.6, 0, 0, 0, 0.3));
   p.push(part(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 8), GOLD_B, 0.35, 1.78, 0, 0, 0, 0.3));
-  return finish(p);
+  return noFront(finish(p));
 }
 
 /** Rolled spa towels on a teak shelf, ~1.5 wide. */
@@ -1207,7 +1214,7 @@ export function makeRolledTowels(): THREE.Group {
   for (let i = 0; i < 3; i++) p.push(part(new THREE.CylinderGeometry(0.2, 0.2, 0.72, 10), cols[i], -0.46 + i * 0.46, 0.35, 0, Math.PI / 2));
   for (let i = 0; i < 2; i++) p.push(part(new THREE.CylinderGeometry(0.2, 0.2, 0.72, 10), i ? IVORY : CREAM, -0.23 + i * 0.46, 0.73, 0, Math.PI / 2));
   for (const bx of [-0.23, 0.23]) p.push(part(new THREE.TorusGeometry(0.21, 0.03, 4, 10), GOLD, bx, 0.73, 0, 0, Math.PI / 2));
-  return finish(p);
+  return noFront(finish(p));
 }
 
 /** Teak-and-linen sun lounger with a side table, ~2.8 long. */
@@ -1247,7 +1254,7 @@ export function makeCoconutDrink(): THREE.Group {
     part(new THREE.ConeGeometry(0.16, 0.12, 8), BLUSH, -0.18, 0.9, -0.06),
     part(new THREE.SphereGeometry(0.06, 6, 5), 0xe0483a, 0.16, 0.6, -0.06),
   ];
-  return finish(p);
+  return noFront(finish(p));
 }
 
 /** Gold rope bollard with a draped rope, ~1.7 tall, rope reaching ~2 along +X. */
@@ -1262,7 +1269,7 @@ export function makeRopeBollard(): THREE.Group {
   // a rope drooping away toward +X
   p.push(rope([0.08, 1.24, 0], [0.9, 0.92, 0], 0x8a2440, 0.07, 5));
   p.push(rope([0.9, 0.92, 0], [1.75, 1.04, 0], 0x8a2440, 0.07, 5));
-  return finish(p);
+  return noFront(finish(p));
 }
 
 /** Monogrammed steamer trunk, ~2 long. */
@@ -1297,7 +1304,7 @@ export function makePotPlant(): THREE.Group {
     const a = i * 1.6;
     p.push(part(new THREE.SphereGeometry(0.11, 6, 5), i % 2 ? BLUSH : IVORY, Math.cos(a) * 0.44, 1.32 + (i % 2) * 0.3, Math.sin(a) * 0.44));
   }
-  return finish(p);
+  return noFront(finish(p));
 }
 
 // ══ MANIFEST ═════════════════════════════════════════════════════════════

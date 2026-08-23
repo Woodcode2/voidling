@@ -266,6 +266,21 @@ const LAGOON = { x: 3675, y: 10307, rx: 832, ry: 608 };
 const WATERFALL: [number, number] = [9800, 10150];
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+// A DETERMINISTIC ANGLE FROM A POSITION. Two constraints meet here and both are
+// recorded elsewhere in this project: the town must look identical every load
+// (the owner's call — "consistency is key here"), and mainstreet.ts:252 warns
+// that adding a draw to the seeded stream "would shift every subsequent
+// authored placement in Maple Falls". A hash of the coordinates satisfies both:
+// it takes nothing from the stream, and the same prop in the same spot gets the
+// same angle forever.
+const spinFor = (x: number, z: number): number => {
+  const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+  return (s - Math.floor(s)) * Math.PI * 2;
+};
+// Tag for a prop with NO FRONT — a bush, a boulder, a flower bed. Everything
+// with a door, a face, a screen or a direction stays untagged and keeps the
+// facing its call site authored.
+const noFront = <T extends THREE.Object3D>(m: T): T => { m.userData.spin = 1; return m; };
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
 // MAPLE FALLS is HAND-BUILT and the owner asked for the same crisp town every
 // single load: its bake and its populate run off the seeded stream in
@@ -3709,7 +3724,7 @@ function makeTree(): THREE.Group {
     part(new THREE.SphereGeometry(R0 * 0.62, 12, 9), light, -R0 * 0.5, 5.6, -R0 * 0.25),
     part(new THREE.SphereGeometry(R0 * 0.5, 11, 8), base, 0.2, 6.4, 0.2),
   ], PROP_SMOOTH_MAT));
-  return grp;
+  return noFront(grp);
 }
 function makePine(): THREE.Group {
   // 7 segments put a 107-pixel straight edge across the widest tier. 14 halves
@@ -3718,7 +3733,7 @@ function makePine(): THREE.Group {
   const parts = [part(new THREE.CylinderGeometry(0.5, 0.7, 2.4, 9), PROPS.trunk, 0, 1.2, 0)];
   for (let i = 0; i < 3; i++) parts.push(part(new THREE.ConeGeometry(3.2 - i * 0.7, 3, 14), PROPS.pine, 0, 3 + i * 2.1, 0));
   const grp = new THREE.Group(); grp.add(mergedProp(parts, PROP_SMOOTH_MAT));
-  return grp;
+  return noFront(grp);
 }
 // ══ PIRATE BAY prop kit ═══════════════════════════════════════════════════
 // A tiki bar, a dance speaker stack, a market stall, a treasure chest, a
@@ -4027,7 +4042,7 @@ function makeBarrel(): THREE.Group {
     part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x2e2a34, 0, 0.55, 0, Math.PI / 2),
     part(new THREE.TorusGeometry(0.88, 0.09, 6, 14), 0x2e2a34, 0, 1.65, 0, Math.PI / 2),
   ];
-  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return noFront(g);
 }
 function makeCannon(): THREE.Group {
   const parts = [
@@ -4127,18 +4142,39 @@ function makePalm(): THREE.Group {
   for (const a2 of [0.5, 2.6])
     parts.push(part(new THREE.SphereGeometry(0.26, 8, 6), 0x8a6a4a,
       0.6 + Math.cos(a2) * 0.5, 5.8, Math.sin(a2) * 0.5));
-  const grp = new THREE.Group(); grp.add(mergedProp(parts)); return grp;
+  const grp = new THREE.Group(); grp.add(mergedProp(parts)); return noFront(grp);
 }
 
 function makeBush(): THREE.Mesh {
-  // a 20-face icosahedron, flat-shaded, is a rock. These are meant to be soft.
-  const b = new THREE.Mesh(new THREE.SphereGeometry(rand(1.4, 2.1), 12, 8),
-    stdMat(pick(WORLD_ID === 'gameday'
-      // scrub under a fall tree line: still mostly green, going over at the
-      // tips. All-amber bushes made the rim read as one flat orange band.
-      ? [0x6a9a4a, 0x8a9a3a, 0xb8823a, 0x7a8f3a, 0xa8622f]
-      : [0x6cc86e, 0x5db06a, 0x7ed57a]), 0.95, false));
-  b.position.y = 1; b.scale.y = 0.7; return b;
+  // ONE SPHERE IS JELLY, and the answer was already twenty lines up.
+  //
+  // makeTree() builds its canopy from four clustered spheres and reads as
+  // foliage. This was ONE sphere, half sunk into the ground so it domed — and
+  // in the owner's phone photo of Maple Falls the two sit in the same frame,
+  // which is exactly where the difference shows: the tree is a plant and the
+  // bush beside it is a blob of green jelly. Counted with qa/variety.mjs: 564
+  // of them in Maple Falls alone, the second-most-repeated prop in the game.
+  //
+  // Three lobes now, two-tone off one base the way makeTree does it, merged to
+  // the SAME single draw call the one-sphere version cost. ~192 triangles ->
+  // ~430; at 564 bushes that is ~134k in a town that already carries millions.
+  //
+  // The lobes stay INSIDE the old silhouette — main lobe at 0.80R, everything
+  // half-buried exactly as before — so no eat range, spacing or collision
+  // radius moves. This is a change of shape, not of size.
+  const base = pick(WORLD_ID === 'gameday'
+    // scrub under a fall tree line: still mostly green, going over at the
+    // tips. All-amber bushes made the rim read as one flat orange band.
+    ? [0x6a9a4a, 0x8a9a3a, 0xb8823a, 0x7a8f3a, 0xa8622f]
+    : [0x6cc86e, 0x5db06a, 0x7ed57a]);
+  const dark = new THREE.Color(base).multiplyScalar(0.80).getHex();
+  const light = new THREE.Color(base).multiplyScalar(1.16).getHex();
+  const R = rand(1.4, 2.1);
+  return noFront(mergedProp([
+    part(new THREE.SphereGeometry(R * 0.80, 12, 8), base, 0, R * 0.05, 0, 0, 0, 0, 1, 0.78, 1),
+    part(new THREE.SphereGeometry(R * 0.58, 10, 7), dark, -R * 0.44, R * 0.02, R * 0.26, 0, 0, 0, 1, 0.72, 1),
+    part(new THREE.SphereGeometry(R * 0.52, 10, 7), light, R * 0.42, R * 0.16, -R * 0.22, 0, 0, 0, 1, 0.74, 1),
+  ], PROP_SMOOTH_MAT));
 }
 function makeMailbox(): THREE.Group {
   const g = new THREE.Group();
@@ -4185,7 +4221,7 @@ function makeCone(): THREE.Group {
     part(new THREE.ConeGeometry(0.6, 1.5, 10), 0xff7a2a, 0, 0.75, 0),
     part(new THREE.CylinderGeometry(0.42, 0.5, 0.3, 10), 0xffffff, 0, 0.7, 0),
   ]));
-  return g;
+  return noFront(g);
 }
 function makeHydrant(): THREE.Group {
   // was EIGHT draw calls per hydrant — now one
@@ -4201,7 +4237,7 @@ function makeHydrant(): THREE.Group {
     parts.push(part(new THREE.CylinderGeometry(0.18, 0.18, 0.1, 6), L, sd * 0.66, 0.78, 0, 0, 0, Math.PI / 2));
   }
   const g = new THREE.Group(); g.add(mergedProp(parts));
-  return g;
+  return noFront(g);
 }
 function makeTrash(): THREE.Group {
   const g = new THREE.Group();
@@ -4209,14 +4245,14 @@ function makeTrash(): THREE.Group {
     part(new THREE.CylinderGeometry(0.5, 0.42, 1.3, 10), pick([0x4d9a5e, 0x4d74a8, 0x6b7280]), 0, 0.65, 0),
     part(new THREE.CylinderGeometry(0.56, 0.56, 0.2, 10), 0x555c68, 0, 1.35, 0),
   ]));
-  return g;
+  return noFront(g);
 }
 function makeFlowers(): THREE.Group {
   const parts = [part(new THREE.IcosahedronGeometry(0.7, 0), 0x5db06a, 0, 0.5, 0, 0, 0, 0, 1, 0.7, 1)];
   for (let i = 0; i < 5; i++)
     parts.push(part(new THREE.SphereGeometry(0.16, 6, 5), pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]), rand(-0.5, 0.5), 0.8, rand(-0.5, 0.5)));
   const g = new THREE.Group(); g.add(mergedProp(parts));
-  return g;
+  return noFront(g);
 }
 function makeCoins(): THREE.Group {
   const g = new THREE.Group();
@@ -4228,7 +4264,7 @@ function makeCoins(): THREE.Group {
     c.rotation.y = rand(0, Math.PI); g.add(c);
   }
   g.userData.coin = 5;   // flat wallet value — every pile visibly pays
-  return g;
+  return noFront(g);
 }
 // shared lamp-head material: ONE emissive uniform lights every streetlamp on
 // the island at dusk (see setDusk)
@@ -4259,7 +4295,7 @@ function makeShell(): THREE.Group {
   const sh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2),
     stdMat(pick([0xffd9e8, 0xfff0d8, 0xe8f0ff]), 0.55, true));
   sh.scale.set(1, 0.55, 0.85); g.add(sh);
-  return g;
+  return noFront(g);
 }
 function makeMushroom(): THREE.Group {
   const g = new THREE.Group();
@@ -4271,13 +4307,13 @@ function makeMushroom(): THREE.Group {
   capM.position.y = 0.48; capM.scale.y = 0.7; g.add(capM);
   const dot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 5), stdMat(0xffffff, 1));
   dot.position.set(0.16, 0.72, 0.14); g.add(dot);
-  return g;
+  return noFront(g);
 }
 function makeGolfball(): THREE.Group {
   const g = new THREE.Group();
   const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), stdMat(0xffffff, 0.35));
   b.position.y = 0.3; g.add(b);
-  return g;
+  return noFront(g);
 }
 // ── MAPLE FALLS' snack vocabulary ─────────────────────────────────────────
 // Same idea, this island's nouns: pumpkins in the fields, shells on the lake
@@ -4319,7 +4355,7 @@ function makeReeds(): THREE.Group {
       pick([0x4faa5a, 0x67b25c, 0x7ec96e]), rx, h / 2, rz, 0, 0, rand(-0.15, 0.15)));
     if (i < 2) parts.push(part(new THREE.CapsuleGeometry(0.07, 0.24, 3, 6), 0x9a7a5a, rx, h + 0.1, rz));
   }
-  const g = new THREE.Group(); g.add(mergedProp(parts)); return g;
+  const g = new THREE.Group(); g.add(mergedProp(parts)); return noFront(g);
 }
 
 // ── civic/retail stand-ins (offline dev + far LOD) — downtown must NEVER show
@@ -4468,7 +4504,7 @@ function makeRocksFB(): THREE.Group {
     const r = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.6, 1.2), 0), std(pick([0x6b5f6e, 0x7a6c78]), 1));
     r.position.set(rand(-1, 1), rand(0.3, 0.5), rand(-1, 1)); r.rotation.set(rand(0, 3), rand(0, 3), 0); g.add(r);
   }
-  return g;
+  return noFront(g);
 }
 function makeTentFB(): THREE.Group {
   const g = new THREE.Group();
@@ -4569,6 +4605,14 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     if (!insideIsland3(x3, z3)) return;   // never place props off the coastline
     if (inLagoon3(x3, z3, 40)) return;    // …or IN the lagoon
     mesh.position.set(x3, 0, z3);
+    // A PROP WITH NO FRONT HAS NO REASON TO FACE NORTH. Measured on the pre-fix
+    // build with qa/variety.mjs: 5,043 of Maple Falls' 5,782 props sat at
+    // exactly 0 radians — 87% of the town stamped at one angle. That is what
+    // the owner's phone photo shows as "bare minimum": two flower beds
+    // identical down to their orientation, and 603 maple trees behind them all
+    // turned the same way. Builders with no front tag themselves via noFront();
+    // an explicit rotY from a call site still wins, because it is checked first.
+    if (mesh.userData.spin && Math.abs(mesh.rotation.y) < 1e-6) mesh.rotation.y = spinFor(x3, z3);
     // shadow diet: tiny street props don't cast (hundreds of them; their shadows
     // are sub-pixel anyway) — a big chunk of the shadow pass for free
     // …and the bar is 4, not 2.5. Anything thinner than that resolves to one or

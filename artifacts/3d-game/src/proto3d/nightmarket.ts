@@ -33,6 +33,13 @@ import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT, PROP_SMOOTH_MAT } from './island';
 import { registerGloss } from './gloss';
 
+/** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
+ *  hash of its own position, because 87% of Maple Falls sat at exactly 0
+ *  radians and read as stamped. Anything with a door, a face, a screen or a
+ *  direction must NOT be tagged — it keeps the facing its call site authored. */
+const noFront = <T extends THREE.Object3D>(m: T): T => { m.userData.spin = 1; return m; };
+
+
 type G = THREE.BufferGeometry;
 
 // ── palette ───────────────────────────────────────────────────────────────
@@ -294,7 +301,7 @@ export function makeMarketCrate(): THREE.Object3D {
     for (let i = 0; i < 4; i++)
       p.push(part(new THREE.CylinderGeometry(0.34 * k, 0.3 * k, 0.16 * k, 10), PAPER, 0, 0.09 * k + i * 0.17 * k, 0));
   }
-  return mergedProp(p);
+  return noFront(mergedProp(p));
 }
 
 /** A goldfish scooping tank: a shallow lit pool on trestles. Glows upward,
@@ -358,7 +365,7 @@ export function makeBamboo(): THREE.Object3D {
       p.push(part(new THREE.BoxGeometry(1.5, 0.05, 0.22), GREEN_L,
         x + rnd(-0.6, 0.6), h * rnd(0.72, 0.95), z + rnd(-0.6, 0.6), 0, rnd(0, 6.28), rnd(-0.4, 0.4)));
   }
-  return mergedProp(p, PROP_SMOOTH_MAT);
+  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }
 
 /** The teahouse: a low cedar building with a deep eave, paper screens lit from
@@ -689,7 +696,7 @@ export function makeCoalTub(): THREE.Group {
   for (let i = 0; i < 3; i++)
     glow.push(part(new THREE.SphereGeometry(0.07 * k, 5, 4), G_WARM,
       rnd(-0.25, 0.25) * k, 0.66 * k, rnd(-0.25, 0.25) * k));
-  return lit(solid, glow);
+  return noFront(lit(solid, glow));
 }
 
 /** A rack of small wooden prayer plaques, hung five deep and swinging. The
@@ -723,7 +730,7 @@ export function makeSakeBarrels(): THREE.Object3D {
       p.push(part(new THREE.TorusGeometry(0.44, 0.045, 4, 10), TIMBER_D, x, 0.43 + row * 0.9, 0.2, 0, 0, 0));
     }
   }
-  return mergedProp(p);
+  return noFront(mergedProp(p));
 }
 
 /** An open paper umbrella, leaned against nothing in particular. Two of these
@@ -773,7 +780,7 @@ export function makeMossRock(): THREE.Object3D {
   if (Math.random() < 0.35)
     p.push(part(new THREE.DodecahedronGeometry(k * 0.45, 0), STONE,
       k * rnd(0.7, 1.1), k * 0.24, k * rnd(-0.6, 0.6), rnd(0, 3), rnd(0, 3), rnd(0, 3)));
-  return mergedProp(p);
+  return noFront(mergedProp(p));
 }
 
 /** A clump of ferns. Ground cover for the rim — low, wide and dark, which is
@@ -787,7 +794,7 @@ export function makeFernClump(): THREE.Object3D {
       Math.cos(a) * L * 0.42, rnd(0.25, 0.5), Math.sin(a) * L * 0.42,
       0, -a, rnd(-0.5, -0.2)));
   }
-  return mergedProp(p, PROP_SMOOTH_MAT);
+  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }
 
 /** A weathered path marker: a squared post with a carved face, half sunk.
@@ -853,7 +860,7 @@ export function makePotPlant(): THREE.Object3D {
       p.push(part(new THREE.BoxGeometry(0.5 * k, 0.04, 0.16 * k), GREEN_L,
         rnd(-0.2, 0.2), 0.9 * k + i * 0.15 * k, rnd(-0.2, 0.2), 0, rnd(0, 6.28), rnd(-0.4, 0.4)));
   }
-  return mergedProp(p);
+  return noFront(mergedProp(p));
 }
 
 /** A low square stair lantern, the kind set into the edge of a step run.

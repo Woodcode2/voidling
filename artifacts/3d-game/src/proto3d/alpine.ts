@@ -53,6 +53,13 @@ import * as THREE from 'three';
 import { part, mergedProp, PROP_GLOW_MAT, PROP_SMOOTH_MAT } from './island';
 import { registerGloss } from './gloss';
 
+/** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
+ *  hash of its own position, because 87% of Maple Falls sat at exactly 0
+ *  radians and read as stamped. Anything with a door, a face, a screen or a
+ *  direction must NOT be tagged — it keeps the facing its call site authored. */
+const noFront = <T extends THREE.Object3D>(m: T): T => { m.userData.spin = 1; return m; };
+
+
 type G = THREE.BufferGeometry;
 
 // ── palette ───────────────────────────────────────────────────────────────
@@ -368,7 +375,7 @@ export function makePine(h = rnd(4.5, 8.5)): THREE.Object3D {
   // the topmost snow, a blob rather than a point — points don't hold snow,
   // but every pine in a photograph of a snowfall has one anyway
   p.push(part(new THREE.SphereGeometry(h * 0.06, 6, 5), SNOW, 0, h * 1.0, 0, 0, 0, 0, 1, 0.8, 1));
-  return mergedProp(p);
+  return noFront(mergedProp(p));
 }
 
 /** A snowdrift: the deep-snow mound the void carves through, so it is the
@@ -386,7 +393,7 @@ export function makeDrift(): THREE.Object3D {
   p.push(part(new THREE.SphereGeometry(0.7 * k, 7, 5), SNOW, 0.8 * k, 0.2 * k, 0.5 * k, 0, rnd(0, 3), 0, 1.2, 0.5, 1));
   p.push(part(new THREE.SphereGeometry(0.55 * k, 7, 5), SNOW, -0.5 * k, 0.34 * k, -0.6 * k, 0, rnd(0, 3), 0, 1, 0.6, 1));
   p.push(part(new THREE.SphereGeometry(0.95 * k, 8, 6), SNOW_D, -0.55 * k, 0.16 * k, 0.1 * k, 0, rnd(0, 3), 0, 1.35, 0.42, 1));
-  return mergedProp(p, PROP_SMOOTH_MAT);
+  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }
 
 // ── the villagers' handiwork ──────────────────────────────────────────────
@@ -445,7 +452,7 @@ export function makeSnowballStack(): THREE.Object3D {
   // one loose ball that rolled, in shadow colour where it sits in the pile's lee
   if (Math.random() < 0.6)
     p.push(part(new THREE.SphereGeometry(r * 0.8, 6, 5), SNOW_D, -0.55 * k, r * 0.8, 0.4 * k));
-  return mergedProp(p, PROP_SMOOTH_MAT);
+  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }
 
 /** The red runner sled, parked nose-up the way sleds are abandoned. The
@@ -642,7 +649,7 @@ export function makeLogPile(): THREE.Object3D {
     p.push(part(new THREE.CylinderGeometry(0.27, 0.27, 0.05, 8), CUT, L / 2, y, z, 0, 0, Math.PI / 2));
   }
   p.push(part(new THREE.BoxGeometry(L * 0.9, 0.16, 1.1), SNOW, 0, 1.68, 0));
-  return mergedProp(p);
+  return noFront(mergedProp(p));
 }
 
 /** A run of post-and-rail fence. `len` is along X. Every post leans its own

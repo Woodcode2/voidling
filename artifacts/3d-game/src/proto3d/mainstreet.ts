@@ -17,6 +17,13 @@ import { part, mergedProp, PROP_SMOOTH_MAT } from './island';
 import { registerGloss } from './gloss';
 import { roundedBox } from './life';
 
+/** A prop with NO FRONT. island.ts's place() turns anything tagged here by a
+ *  hash of its own position, because 87% of Maple Falls sat at exactly 0
+ *  radians and read as stamped. Anything with a door, a face, a screen or a
+ *  direction must NOT be tagged — it keeps the facing its call site authored. */
+const noFront = <T extends THREE.Object3D>(m: T): T => { m.userData.spin = 1; return m; };
+
+
 // ── determinism ────────────────────────────────────────────────────────────
 // "Consistency is key here. Always the same for every load." Maple Falls is
 // authored, so its scatter passes, colour picks and jitter all come off one
@@ -745,7 +752,7 @@ export function makeHayBales(): THREE.Mesh {
     p.push(part(cyl(0.85, 0.85, 1.9, 10), HAY, x + (row ? 1 : 0), y, mr(-0.2, 0.2), 0, 0, Math.PI / 2));
     p.push(part(cyl(0.86, 0.86, 0.2, 10), 0xc0a860, x + (row ? 1 : 0), y, 0, 0, 0, Math.PI / 2));
   }
-  return M(p);
+  return noFront(M(p));
 }
 
 /** THE TICKET BOOTH. Cash only. Has been "back in 5" since 1994. */
@@ -897,12 +904,12 @@ export function makeCornRow(len = 8): THREE.Mesh {
 /** A PUMPKIN. The patch is a few dozen of these. */
 export function makePumpkin(): THREE.Mesh {
   const r = mr(0.4, 0.72);
-  return M([
+  return noFront(M([
     part(sph(r, 9, 7), PUMPKIN, 0, r * 0.78, 0, 0, 0, 0, 1, 0.78, 1),
     part(sph(r * 0.86, 9, 7), 0xd8641a, 0, r * 0.78, 0, 0, 0, 0, 1.06, 0.72, 1.06),
     part(cyl(0.09, 0.13, 0.4, 5), 0x5a7a3a, 0, r * 1.4, 0),
     part(box(0.5, 0.08, 0.16), 0x6a9a3a, r * 0.9, r * 0.3, 0, 0, mr(0, 3), 0.2),
-  ]);
+  ]));
 }
 
 /** THE SCARECROW. Wearing a Dinkle shirt, because the farm has views. */
@@ -1213,7 +1220,7 @@ export function makeBallOfTwine(): THREE.Mesh {
   p.push(part(box(0.5, 5, 0.5), STEEL, 16, 2.5, 3));
   p.push(part(box(2.8, 1.8, 0.3), NEON_GOLD, 16, 6, 3));
   p.push(part(box(2.2, 0.7, 0.2), 0x2c2438, 16, 6.2, 3.2));
-  return M(p);
+  return noFront(M(p));
 }
 
 /** A BILLBOARD. Whatever is on it, somebody has already complained. */
@@ -1360,12 +1367,12 @@ export function makeParkGrill(): THREE.Mesh {
 
 /** A LIFE-RING POST at the water's edge. */
 export function makeLifeRing(): THREE.Mesh {
-  return M([
+  return noFront(M([
     part(cyl(0.13, 0.16, 2.4, 6), WHITE, 0, 1.2, 0),
     part(new THREE.TorusGeometry(0.62, 0.2, 7, 14), 0xff5a2a, 0, 2.1, 0.2, Math.PI / 2, 0, 0),
     part(new THREE.TorusGeometry(0.62, 0.21, 7, 14), WHITE, 0, 2.1, 0.2, Math.PI / 2, 0, 0, 1, 1, 0.45),
     part(box(0.7, 0.5, 0.1), RED, 0, 3, 0),
-  ]);
+  ]));
 }
 
 /** A CANOE RACK — four hulls on a frame. */
@@ -1399,7 +1406,7 @@ export function makePlanter(): THREE.Mesh {
     p.push(part(sph(0.2, 6, 5), mpick([0xff6fb0, 0xffd23f, RED, 0xa87bff, WHITE]), mr(-0.4, 0.4), mr(1.2, 1.5), mr(-0.4, 0.4)));
   }
   p.push(part(sph(0.55, 8, 6), GRASSY, 0, 1.15, 0, 0, 0, 0, 1, 0.5, 1));
-  return M(p);
+  return noFront(M(p));
 }
 
 /** A PICKUP TRUCK, parked. Half the vehicles in Maple Falls are this. */
@@ -1443,5 +1450,5 @@ export function makeMapleTree(): THREE.Mesh {
       Math.cos(a) * mr(1.1, 1.9), mr(5.2, 6.6), Math.sin(a) * mr(1.1, 1.9)));
   }
   p.push(part(new THREE.SphereGeometry(2.3, 13, 10), leaf, 0, 6.6, 0));
-  return mergedProp(p, PROP_SMOOTH_MAT);
+  return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }
