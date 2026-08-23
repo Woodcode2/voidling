@@ -17,3 +17,11 @@ qa/out/shippedlook/maple_afterspin.png
 qa/out/shippedlook/maple_drifts.png
 qa/out/shippedlook/maple_faces.png
 qa/out/shippedlook/maple_leaves.png
+
+# The studio's evidence pack — rebuilt on demand by qa/lookbook.mjs, and large.
+# The character sheet in particular is four full-resolution frames per run.
+# Evidence for a decision belongs in a commit message or a ledger entry; the
+# pixels themselves are reproducible, so they do not belong in history.
+qa/out/person/
+qa/out/shippedlook/*_look.png
+qa/out/shippedlook/maple_trees.png
