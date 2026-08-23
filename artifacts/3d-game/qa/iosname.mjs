@@ -46,6 +46,46 @@ if (display && display.length > 12)
 if (display && /voidling/i.test(display))
   fails.push(`CFBundleDisplayName is "${display}" — Voidling is a different, live App Store game`);
 
+// ── AND EVERY OTHER SURFACE THAT NAMES THE PRODUCT ──────────────────────────
+// The rename swept index.html, the manifest and APPSTORE.md, and missed
+// public/privacy.html — which is not a stray doc: prototype3d.ts renders it
+// INSIDE THE APP, on the Settings path APPSTORE.md says a reviewer is most
+// likely to tap. A reviewer opening a listing called "The Cute World Ender"
+// landed on a policy headed "VOIDLING — Privacy Policy", which is a DIFFERENT
+// developer's live App Store game. That is the textbook 5.1.1 "your privacy
+// policy does not appear to apply to your app".
+//
+// Checked by LOCATION, not by free text, because the species word is correct
+// and must stay: index.html's form label reads VOIDLING because that is the
+// first rung of the ladder, and the splash reads STARRING THE VOIDLINGS
+// because that is what they are. Only the places that name the PRODUCT are
+// checked, so the two can never be confused.
+const PRODUCT = 'The Cute World Ender';
+const surfaces = [
+  ['index.html', /<title>([^<]*)<\/title>/, 'index.html <title>'],
+  ['public/privacy.html', /<title>([^<]*)<\/title>/, 'privacy policy <title>'],
+  ['public/privacy.html', /<h1>([^<]*)<\/h1>/, 'privacy policy <h1>'],
+  ['public/privacy.html', /<footer>([^<]*)<\/footer>/, 'privacy policy footer'],
+  ['public/manifest.json', /"name"\s*:\s*"([^"]*)"/, 'manifest name'],
+];
+for (const [file, re, label] of surfaces) {
+  let txt;
+  try { txt = readFileSync(file, 'utf8'); } catch { fails.push(`${label}: ${file} is missing`); continue; }
+  const m = txt.match(re);
+  if (!m) { fails.push(`${label}: not found in ${file}`); continue; }
+  // Two rules, and the order matters. The species word is CORRECT and must
+  // survive — the footer says "you are a voidling" and should. What must never
+  // happen is the app being NAMED Voidling, which is what a leading occurrence
+  // means, and what carrying no product name at all means.
+  if (/^\s*voidling/i.test(m[1]))
+    fails.push(`${label} names the app "${m[1].trim()}" — Voidling is a different, live App Store game`);
+  else if (!m[1].includes(PRODUCT))
+    fails.push(`${label} reads "${m[1].trim()}" and does not carry the product name`);
+}
+const manifestShort = (readFileSync('public/manifest.json', 'utf8').match(/"short_name"\s*:\s*"([^"]*)"/) || [])[1];
+if (manifestShort && appName && manifestShort !== appName)
+  fails.push(`manifest short_name "${manifestShort}" disagrees with config appName "${appName}"`);
+
 console.log(`\n  config appName          ${appName || '(missing)'}`);
 console.log(`  Info.plist display name ${display || '(missing)'}`);
 console.log(`  bundle id               ${appId || '(missing)'}   (invisible to users; stays)`);

@@ -1,15 +1,41 @@
 // Static sweep: no player-facing string may contain the retired vocabulary.
-import { readFileSync } from 'fs';
-// EVERY file that can put words in front of a child. This listed six and missed
-// the two newest newsrooms — 1,486 lines of headlines for GAME DAY and LANTERN
-// NIGHT that no safety pass had ever read — plus the skin names and the IAP
-// copy. A scanner with a stale file list reports CLEAN about the files it was
-// told about, which is the most reassuring way to be wrong.
-const FILES = ['src/prototype3d.ts','src/proto3d/rivals.ts','src/proto3d/life.ts',
-  'src/proto3d/newsroom.ts','src/proto3d/newsroom_maple.ts',
-  'src/proto3d/newsroom_gameday.ts','src/proto3d/newsroom_lantern.ts',
-  'src/proto3d/palette.ts','src/proto3d/store3d.ts','src/proto3d/bubbles.ts',
-  'index.html'];
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+// ── THE FILE LIST WENT STALE FOR THE THIRD TIME, SO THERE ISN'T ONE ─────────
+//
+// The note that used to sit here said it best about its own predecessor: "a
+// scanner with a stale file list reports CLEAN about the files it was told
+// about, which is the most reassuring way to be wrong." It then listed eleven
+// files by hand — and by the time POWDER PASS and the reactive newsroom
+// shipped it was blind again. Verified: the hand list covered 11 of 146
+// candidate files, and a live hit sat in one it could not see —
+// newsroom_react.ts, whose pirate.limbo pool fires eight seconds after the
+// limbo beat in world two.
+//
+// So it walks the tree instead. A file cannot be forgotten if nobody has to
+// remember it.
+//
+// RETIRED, and reported rather than hidden: src/game/engine.ts, src/game/world.ts
+// and everything under src/ui|components are the 2D game and the React shell.
+// They are NOT in the bundle — vite's rollup input is index.html alone, and
+// `grep "happy hour" dist/assets/main-*.js` returns nothing while the strings
+// are plainly in world.ts. Hits there are printed as NOTES and do not fail the
+// run, because failing on copy that cannot reach a child is how a gate gets
+// switched off. If the shell is ever revived, the notes are already there.
+const RETIRED = /^src\/(ui|components|pages|hooks)\/|^src\/(App|main)\.tsx$|^src\/game\/(engine|world)\.ts$/;
+const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+  const p = join(d, e.name);
+  return e.isDirectory() ? walk(p) : (/\.(ts|tsx|html)$/.test(e.name) ? [p] : []);
+});
+const FILES = [...walk('src'), 'index.html'];
+// A FLOOR, so a bad glob or a moved directory cannot quietly shrink the sweep
+// back to the state this rewrite exists to fix.
+const FLOOR = 60;
+if (FILES.length < FLOOR) {
+  console.log(`\nSCAN ABORTED — resolved only ${FILES.length} files, floor is ${FLOOR}.`);
+  console.log('Something moved. This is not a CLEAN result.');
+  process.exit(2);
+}
 const BAD = [
   ['alcohol', /\b(happy hour|tiki bar|rum|champagne|the good drink|adults pool|swim-up bar)\b/i],
   ['gambling', /\bhigh roller\b/i],
@@ -25,18 +51,27 @@ const BAD = [
   ['missing child', /lost child at/i],
   ['adult jargon', /\b(HOA|recused|oat milk|pay grade|my agent said|my lawyer)\b/],
 ];
-let bad = 0;
+let bad = 0, noted = 0;
 for (const f of FILES) {
+  const retired = RETIRED.test(f);
   const lines = readFileSync(f, 'utf8').split('\n');
   lines.forEach((l, i) => {
     if (/^\s*(\/\/|\*|\/\*)/.test(l)) return;   // comments are not player-facing
+    // …and a trailing comment on a code line is not player-facing either. This
+    // is why audio3d.ts:49 read as an alcohol hit: `// authored match beat
+    // (happy hour / dance party)` is a note to an engineer, not a headline.
+    const code = l.split('//')[0];
     for (const [why, re] of BAD) {
-      if (re.test(l)) { console.log(`  ${why.padEnd(22)} ${f}:${i + 1}  ${l.trim().slice(0, 96)}`); bad++; }
+      if (re.test(code)) {
+        console.log(`  ${retired ? 'note ' : 'HIT  '} ${why.padEnd(22)} ${f}:${i + 1}  ${l.trim().slice(0, 90)}`);
+        if (retired) noted++; else bad++;
+      }
     }
   });
 }
+if (noted) console.log(`\n${noted} note(s) in the retired 2D game / React shell — not in the bundle, not a failure.`);
 console.log(bad === 0
-  ? `\nCLEAN — no retired vocabulary in any player-facing string (${FILES.length} files).`
+  ? `\nCLEAN — no retired vocabulary in any player-facing string (${FILES.length} files swept).`
   : `\n${bad} REMAINING`);
 // EXIT NON-ZERO ON A HIT. This only ever printed, so `npm run safety` succeeded
 // whatever it found — a gate that cannot fail is a report, and reports get

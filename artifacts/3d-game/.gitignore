@@ -13,3 +13,7 @@ qa/out/gate/
 
 # Probe screenshots and bake dumps — evidence for one session, regenerated on demand
 qa/out/bake/
+qa/out/shippedlook/maple_afterspin.png
+qa/out/shippedlook/maple_drifts.png
+qa/out/shippedlook/maple_faces.png
+qa/out/shippedlook/maple_leaves.png

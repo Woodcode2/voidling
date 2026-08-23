@@ -390,7 +390,7 @@ export const MID_REACT: Record<string, string[]> = {
   'pirate.parrot': BY_WORLD.pirate.beat[1],
   'pirate.dance': BY_WORLD.pirate.beat[2],
   'pirate.limbo': [
-    'The limbo line has bent itself around the thing by the tiki bar.',
+    'The limbo line has bent itself around the thing by the beach hut.',
     'The limbo champion went under the bar and did not come back up.',
     'The bar is now at ankle height and so, apparently, is the beach.',
   ],

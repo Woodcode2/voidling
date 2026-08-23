@@ -3498,7 +3498,7 @@ const MID_POOL: Record<WorldId, MatchBeat[]> = {
   pirate: [PIRATE_BEATS[1], PIRATE_BEATS[2],
     { ...MID_66, id: 'pirate.limbo', col: 0xffe14a, flash: 'rgba(255,225,74,0.26)',
       icon: '🕺', title: 'Limbo contest!', sub: 'the bar keeps getting lower',
-      news: 'A limbo contest has broken out at the tiki bar. The bar keeps getting lower.' },
+      news: 'A limbo contest has broken out on the beach. The bar keeps getting lower.' },
     { ...MID_110, id: 'pirate.crab', col: 0xff7a5e, flash: 'rgba(255,122,94,0.26)',
       icon: '🦀', title: 'Crab derby!', sub: 'number six is the fast one',
       news: 'The crab derby is under way on the beach. Number six is heavily favoured.' }],

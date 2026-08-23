@@ -47,13 +47,22 @@ game; Capacitor wraps it in a native shell.
   platform generated in `ios/` (SwiftPM, no CocoaPods needed), portrait-only,
   status bar hidden, haptics + status-bar plugins installed.
 
-- **Audio** — 30 layered WAV SFX (`public/assets/audio/`) + 3 intensity-tiered
-  music tracks (`public/assets/music/track_1..3.mp3`, chill → groove → epic,
-  crossfading on evolution). Synth engine remains as offline fallback.
+- **Audio** — 30 layered WAV SFX (`public/assets/audio/`) + **six** recorded
+  tracks: one per world plus the menu theme (`public/assets/music/{menu,maple,
+  pirate,gameday,lantern,powder}.mp3`), all mastered to the house spec
+  (−16 LUFS ±1, ≤−1 dBTP). Presence of the file is the entire switch; absent
+  means that world plays its synth score, which remains the fallback.
+  (This said "3 intensity-tiered tracks, `track_1..3.mp3`". No such file has
+  existed for months.)
 
-- **Preview video** — `store/preview.mp4` (1080x1920 H.264, 30s, music bed),
-  auto-transcoded by CI from `store/preview-raw.webm`. Upload to the App
-  Preview slot above the screenshots.
+- **Preview video** — **DO NOT UPLOAD.** `store/preview.mp4` exists and is
+  footage of the RETIRED 2D game. This bullet used to end with an instruction
+  to put it in the App Preview slot — fourteen lines after the block above
+  tells you that same file is a Guideline 2.3.3 rejection. A deliverables list
+  that contradicts itself gets followed at the point it is actionable, so the
+  instruction is gone rather than merely qualified.
+  An App Preview is optional. Ship the screenshots alone until a real capture
+  of the 3D game exists.
 - **Analytics** — OFF BY DEFAULT, and behind a parental gate. Batched client
   (`src/game/analytics.ts`, 3D wrapper `src/proto3d/telemetry.ts`) → Supabase
   edge function `ingest-events` → `vd_events` table (project
@@ -301,7 +310,12 @@ In Xcode:
 ## Suggested store metadata
 
 - **Name**: The Cute World Ender
-- **Subtitle**: The cute world ender
+- **Subtitle**: Eat the whole town in 3 mins
+  - 28 of the 30 allowed. It used to repeat the Name in different case, which
+    spends the second-most-valuable search field in the listing on words that
+    already rank from the first. This one adds "eat", "town" and "3 mins" —
+    the verb, the object and the session length, which is the question a parent
+    in the store is actually asking.
 - **Keywords**: hole, black hole, eat, city, arcade, casual, devour, grow, void
   - the bare token `io` is gone. On its own it is not a word a player searches,
     it exists only to ride the `.io` genre suffix, and 4.1 of the Review
@@ -311,11 +325,13 @@ In Xcode:
 - **Description opener**: "Feed a tiny void until it swallows the whole town.
   Outgrow your rivals, dodge the ones bigger than you, and end the world —
   adorably." Then: 3-minute matches, three to five rival voids to outgrow,
-  **four worlds** — Maple Falls, Pirate Bay, Game Day and Lantern Night —
-  six evolution forms, rare & legendary skins, trophies and ranks.
-  (This said "two worlds" and "five rival voids". There are four worlds, and
-  the cast is `3 + rand(0..2)`. Understating the app is not a 2.3.1 finding the
-  way overstating it is, but it sells three quarters of the content short.)
+  **five worlds** — Maple Falls, Pirate Bay, Game Day, Lantern Night and
+  Powder Pass — six evolution forms, rare & legendary skins, trophies and ranks.
+  (This said "two worlds", then "four worlds", each time a world late. The
+  source of truth is `WORLD_ORDER` in `src/game/unlocks.ts` and it has five
+  entries. Understating the app is not a 2.3.1 finding the way overstating it
+  is, but this block is pasted straight into App Store Connect and it was
+  selling a fifth of the game to nobody.)
   Do NOT mention mutations — they are not in this build. Store copy that
   describes absent features is Guideline 2.3.1. SOLO RUN *is* now in the build
   (it was coded, wired and hidden behind an inline display:none) and may be

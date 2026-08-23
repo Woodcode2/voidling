@@ -97,7 +97,58 @@ if (documented.has('com.voidling.hat.party') || code.some((c) => c.id.endsWith('
   fail.push('the free Party Hat is listed as a purchasable product');
 }
 
+// ── AND THE REST OF WHAT THE DOC CLAIMS ─────────────────────────────────────
+// APPSTORE.md is not reference material: the "Suggested store metadata" block
+// is pasted verbatim into App Store Connect, and the build block is followed
+// command by command by an owner who is not an engineer. Every drift in it is
+// a drift in the listing or in what he does on the Mac.
+//
+// It has drifted three times that we know of. It described "3 intensity-tiered
+// tracks, track_1..3.mp3" when the game had shipped six named ones for months.
+// It said "four worlds" and named four, when WORLD_ORDER has had five since
+// POWDER PASS. And a "Preview video — upload this" bullet sat fourteen lines
+// below a block calling that same file a Guideline 2.3.3 rejection.
+//
+// The IAP half of this file exists because prices drift. So does everything
+// else in the document, and this is the same check pointed at the rest of it.
+{
+  const doc = fs.readFileSync('APPSTORE.md', 'utf8');
+
+  // 1. THE WORLD COUNT, against the source of truth rather than against prose.
+  const order = fs.readFileSync('src/game/unlocks.ts', 'utf8')
+    .match(/WORLD_ORDER[^=]*=\s*\[([^\]]*)\]/);
+  const nWorlds = order ? (order[1].match(/'/g) || []).length / 2 : 0;
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  const claim = doc.match(/\*\*(zero|one|two|three|four|five|six|seven) worlds\*\*/i);
+  if (!claim) fail.push('APPSTORE.md no longer states a world count for the listing copy');
+  else if (claim[1].toLowerCase() !== WORDS[nWorlds])
+    fail.push(`store copy says "${claim[1]} worlds", WORLD_ORDER has ${nWorlds}`);
+  else console.log(`store copy and WORLD_ORDER agree: ${WORDS[nWorlds]} worlds`);
+
+  // 2. EVERY ASSET PATH THE DOC NAMES MUST EXIST. Brace-expanded paths are
+  //    expanded first, because that is how the audio line is written.
+  const expand = (path) => {
+    const m = path.match(/^(.*)\{([^}]*)\}(.*)$/);
+    return m ? m[2].split(',').map((v) => `${m[1]}${v.trim()}${m[3]}`) : [path];
+  };
+  let checkedPaths = 0;
+  for (const m of doc.matchAll(/`((?:public|store|src|ios|scripts|analytics)\/[^`\s]+)`/g)) {
+    const raw = m[1];
+    if (/[*?]|\.\./.test(raw)) continue;                    // globs and relative hops are not claims
+    for (const path of expand(raw.replace(/\s+/g, ''))) {
+      if (/\{|\}/.test(path)) continue;
+      checkedPaths++;
+      if (!fs.existsSync(path)) fail.push(`APPSTORE.md names ${path}, which does not exist`);
+    }
+  }
+  console.log(`checked ${checkedPaths} asset path(s) named in APPSTORE.md`);
+
+  // 3. THE DOCUMENT MUST NOT TELL HIM TO UPLOAD THE THING IT CALLS A REJECTION.
+  if (/Upload to the App\s*\n?\s*Preview slot/i.test(doc) && /DO NOT UPLOAD|do not upload the existing file/i.test(doc))
+    fail.push('APPSTORE.md both forbids and instructs uploading the preview video');
+}
+
 console.log(fail.length
   ? `\nFAIL (${fail.length}): ${fail.join(' | ')}`
-  : '\nAPPSTORE.md and the client agree on every product id and price');
+  : '\nAPPSTORE.md and the client agree on every product id, price, world count and asset path');
 process.exit(fail.length ? 1 : 0);

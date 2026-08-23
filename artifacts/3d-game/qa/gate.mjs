@@ -81,8 +81,12 @@ const SUITE = [
     why: 'the streak cliff stays dead, bounties pay once, and a gem spend never touches the parental gate' },
 
   { id: 'iapdoc', tier: 'money', profiles: ['push', 'live'], timeout: 60,
-    cmd: ['node', 'qa/iapdoc.mjs'], verdict: re(/agree on every product id and price/, /NOT IN THE DOC|NOT REGISTERED|disagree/),
-    why: 'APPSTORE.md and the client agree on every product id and price — a mismatch is a rejected binary' },
+    cmd: ['node', 'qa/iapdoc.mjs'], verdict: re(/APPSTORE\.md and the client agree on every/, /^FAIL \(\d+\)|NOT IN THE DOC|NOT REGISTERED/m),
+    why: 'APPSTORE.md and the client agree on every product id, price, world count and asset path — the doc is pasted into App Store Connect' },
+
+  { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
+    cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
+    why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
 
   { id: 'privacy', tier: 'money', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'qa/privacy.mjs'], verdict: pf,

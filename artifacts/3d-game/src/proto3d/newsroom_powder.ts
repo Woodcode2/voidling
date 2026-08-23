@@ -263,7 +263,7 @@ const T1_GENERAL = [
   'Vern reports {M} gone and his gritting route with it.',
 ];
 const T1_BY_DIST: Record<PwDist, string[]> = {
-  village: ['Three chalets are now two chalets. The desk will recount at noon.',
+  village: ['Three chalets are now two chalets. The desk will count again at noon.',
     'The village is walking uphill in good order, cocoa first.',
     'Chalet bookings are being honoured at a different altitude.'],
   lake: ['The lake has developed a shore where the middle used to be.',
