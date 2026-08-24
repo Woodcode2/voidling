@@ -118,11 +118,18 @@ const polyArea = (h) => {
 // which is how the first two versions of this file went wrong. Both are
 // surfaces landing at exactly zero; whether the tree one is acceptable is a
 // judgement for the studio, not a number for me to pick.
-const MIN_AREA = 1200;   // device px at 3x — about 12 x 11 css px
+// …and it is expressed in CSS pixels, not device pixels, because the frames
+// this reads come at different scales: the store set is 1290 wide at 3x and
+// qa/out/shippedlook is 860 wide at 2x. A bar written in device pixels silently
+// halves its sensitivity on the smaller frames — the same wheel that measures
+// 1785 px in a store shot is about 790 in a lookbook one, and would have walked
+// straight under a fixed 1200. That is the same class of bug as the threshold
+// itself: an instrument quietly reporting less than it should.
+const MIN_AREA_CSS = 133;   // css px^2 — about 12 x 11, smaller than a fingertip
 const MIN_SOLIDITY = 0.95;   // area over convex-hull area; see the measurements above
 // The HUD is drawn in HTML over the game and is legitimately near-black in
 // places. Only the play area is under test.
-const TOP = 620, BOTTOM_PAD = 240;
+const TOP_CSS = 207, BOTTOM_PAD_CSS = 80;
 
 const args = process.argv.slice(2);
 const files = args.length ? args
@@ -131,7 +138,11 @@ const files = args.length ? args
 let worst = [];
 for (const f of files) {
   const p = PNG.sync.read(readFileSync(f));
-  const W = p.width, H = p.height, y0 = TOP, y1 = H - BOTTOM_PAD;
+  // 430 css px is the reference viewport every probe in this repo shoots at.
+  const scale = p.width / 430;
+  const MIN_AREA = Math.max(60, Math.round(MIN_AREA_CSS * scale * scale));
+  const W = p.width, H = p.height;
+  const y0 = Math.round(TOP_CSS * scale), y1 = H - Math.round(BOTTOM_PAD_CSS * scale);
   const seen = new Uint8Array(W * H);
   const isB = (x, y) => { const i = (y * W + x) * 4; return p.data[i] === 0 && p.data[i + 1] === 0 && p.data[i + 2] === 0; };
   const blobs = [];
