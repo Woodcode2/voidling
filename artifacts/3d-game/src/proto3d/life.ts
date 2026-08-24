@@ -711,18 +711,44 @@ function hatParts(out: Geo[], kind: Hat, col: number): void {
   }
 }
 
+// ── THE CROWN IS THE FACE THE CAMERA ACTUALLY SEES ───────────────────────
+// The play camera sits at camOffset (0.62, 0.92, 0.62) — 46 degrees above the
+// ground — so the top of a walking person's head is the single biggest surface
+// of them on screen. Every hair shell here topped out BELOW the skull it was
+// meant to cover:
+//
+//   skull   pc(B.sph, skin, 0, 0, 0.01, 1.06, 1.12, 0.99)  -> top 0.56
+//   crown   y 0.05, yscale 0.98                            -> top 0.54
+//   curly   y 0.04, yscale 0.90                            -> top 0.49
+//   buzz    y 0.03, yscale 0.66                            -> top 0.36
+//
+// B.hemi is a sphere sector to 0.56*PI, so its top is at +0.5 of its own
+// radius. Both shells are 16 segments and nearly coincident, so the skull did
+// not read as a neat bald patch — it read as a jagged pale star punched through
+// the hair. TEAM MOVERS measured the up-facing scalp bare at 28.8% for the six
+// shared styles, 50.1% for curly and 100% for buzz (qa/_headcover.mjs).
+//
+// This is the exact failure that created the studio: hair authored and checked
+// in a front elevation, in the one view the game never uses. The STATIC
+// townsperson's crown was fixed in 69784f9 because qa/personsheet.mjs could
+// photograph it; the walking crowd was never looked at.
+//
+// Each shell now clears the skull by about 0.04, which is enough that two
+// 16-segment spheres do not interpenetrate into a rim of triangles.
 function hairParts(out: Geo[], style: Hair, col: number): void {
   if (style === 'bald') return;
-  if (style === 'buzz') { out.push(pc(B.hemi, col, 0, 0.03, -0.02, 1.09, 0.66, 1.09)); return; }
+  // 1.10, not 0.66: a buzz cut is hair over the WHOLE scalp, just very short,
+  // so it stays tight to the skull in x/z and simply has to reach the top of it.
+  if (style === 'buzz') { out.push(pc(B.hemi, col, 0, 0.03, -0.02, 1.09, 1.10, 1.09)); return; }
   if (style === 'curly') {   // lumpy crown — the most distinctive top-down read
-    out.push(pc(B.hemi, col, 0, 0.04, -0.02, 1.08, 0.90, 1.08));
+    out.push(pc(B.hemi, col, 0, 0.04, -0.02, 1.08, 1.12, 1.08));
     for (let i = 0; i < 5; i++) {
       const a = i * 1.2566;
       out.push(pc(B.dot, col, Math.sin(a) * 0.35, 0.28 + (i % 2) * 0.11, Math.cos(a) * 0.35 - 0.03, 0.38));
     }
     return;
   }
-  out.push(pc(B.hemi, col, 0, 0.05, -0.02, 1.14, 0.98, 1.14));   // shared crown
+  out.push(pc(B.hemi, col, 0, 0.05, -0.02, 1.14, 1.10, 1.14));   // shared crown
   if (style === 'bob') out.push(pc(B.flare, col, 0, -0.16, -0.03, 1.24, 0.48, 1.24));
   else if (style === 'long') out.push(pc(B.box, col, 0, -0.38, -0.30, 0.70, 0.86, 0.34));
   else if (style === 'bun') out.push(pc(B.sphS, col, 0, 0.34, -0.30, 0.44));

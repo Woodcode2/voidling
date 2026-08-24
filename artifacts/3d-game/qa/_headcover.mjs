@@ -3,13 +3,34 @@
 // translates by x,y,z (UNSCALED head-pivot units) and scales the base primitive.
 // B.sph / B.dot / B.hemi are all radius-0.5 spheres; B.hemi is truncated at
 // phiLength = PI*0.56 (100.8 degrees from the north pole).
-const skull = { c: [0, 0, 0.01],  a: [1.06*0.5, 1.12*0.5, 0.99*0.5] };          // life.ts:1109
-const crown = { c: [0, 0.05, -0.02], a: [1.14*0.5, 0.98*0.5, 1.14*0.5], phi: Math.PI*0.56 }; // life.ts:711
+// ── READ THE NUMBERS FROM life.ts, DO NOT TRANSCRIBE THEM ────────────────
+// This file first carried the geometry as literals copied out of life.ts. That
+// makes it a snapshot, not a measurement: the hair was raised to cover the
+// skull and this probe went on reporting 28.8% bare, because it was still
+// describing the build it was written against. Exactly what qa/_zgrade.mjs did
+// when it kept modelling a tone curve that had already been replaced.
+//
+// It parses the real call sites now, so it cannot say anything about a build
+// that no longer exists.
+import { readFileSync } from 'node:fs';
+const SRC = readFileSync('src/proto3d/life.ts', 'utf8');
+/** Pull `pc(BASE, colour, x, y, z, sx, sy, sz)` out of the line matching `re`. */
+function shell(re, label, phi = Math.PI * 0.56) {
+  const m = SRC.match(re);
+  if (!m) throw new Error(`_headcover: could not find ${label} in life.ts — the call site moved, `
+    + `and a probe that silently skips what it cannot find is worse than none`);
+  const n = m[1].split(',').map((x) => parseFloat(x.trim()));
+  if (n.length < 6 || n.some(Number.isNaN)) throw new Error(`_headcover: ${label} did not parse: ${m[1]}`);
+  const [x, y, z, sx, sy, sz] = n;
+  return { c: [x, y, z], a: [sx * 0.5, sy * 0.5, sz * 0.5], phi };
+}
+const skull = shell(/pc\(B\.sph,\s*skin,\s*([^)]*)\)/, 'skull', Math.PI);
+const crown = shell(/pc\(B\.hemi,\s*col,\s*([^)]*)\)\);\s*\/\/ shared crown/, 'shared crown');
 const S = {
-  cap:    { c: [0, 0.14, -0.02], a: [1.17*0.5, 0.94*0.5, 1.17*0.5], phi: Math.PI*0.56 },  // life.ts:668
-  buzz:   { c: [0, 0.03, -0.02], a: [1.09*0.5, 0.66*0.5, 1.09*0.5], phi: Math.PI*0.56 },  // life.ts:703
-  curly:  { c: [0, 0.04, -0.02], a: [1.08*0.5, 0.90*0.5, 1.08*0.5], phi: Math.PI*0.56 },  // life.ts:705
-  beanie: { c: [0, 0.10, 0],     a: [1.16*0.5, 1.18*0.5, 1.16*0.5], phi: Math.PI*0.56 },  // life.ts:698
+  cap:    shell(/kind === 'cap'[\s\S]{0,400}?pc\(B\.hemi,\s*col,\s*([^)]*)\)/, 'cap'),
+  buzz:   shell(/style === 'buzz'[\s\S]{0,200}?pc\(B\.hemi,\s*col,\s*([^)]*)\)/, 'buzz'),
+  curly:  shell(/style === 'curly'[\s\S]{0,400}?pc\(B\.hemi,\s*col,\s*([^)]*)\)/, 'curly'),
+  beanie: shell(/beanie: dome[\s\S]{0,200}?pc\(B\.hemi,\s*col,\s*([^)]*)\)/, 'beanie'),
 };
 // curly adds five lumps on the crown — model them, they are real coverage
 const curlyDots = [];

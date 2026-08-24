@@ -1050,6 +1050,10 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // The body's key light, copied from the fragment shader so the face and the
   // body cannot drift apart. If that vector changes, change it here too.
   const FACE_L = new THREE.Vector3(-0.40, 0.60, 0.69).normalize();
+  /** The eye outline's authored ink, converted from sRGB ONCE by three itself.
+   *  See the note where it is used — passing the hex bytes to setRGB treats
+   *  them as linear and renders a lavender ring instead of a dark boundary. */
+  const EYE_INK = new THREE.Color(0x2a1f45);
   const maw = new THREE.Group(); maw.position.set(0, -0.3, 0); maw.scale.setScalar(0.001);
   // wrapped once (it never moves, only scales), then nudged 0.02 forward. The
   // gape and the closed mouth overlap for one mood step and the gape has to win
@@ -1928,8 +1932,21 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         // the sclera and pupil are textured white, so the tint IS the light;
         // the outline is authored 0x2a1f45 and keeps its own hue
         (e.white.material as THREE.MeshBasicMaterial).color.setScalar(k);
-        (e.outline.material as THREE.MeshBasicMaterial).color.setRGB(
-          0x2a / 255 * k, 0x1f / 255 * k, 0x45 / 255 * k);
+        // ── THIS WAS setRGB WITH sRGB LITERALS, WHICH IS A DIFFERENT COLOUR ──
+        // ColorManagement is ON in three r185, so Color.setRGB takes values in
+        // the WORKING space — linear — unless it is told otherwise. It was
+        // being handed 0x2a/255, 0x1f/255, 0x45/255: sRGB-encoded numbers,
+        // interpreted as linear. The authored ink 0x2a1f45 is rgb(42,31,69);
+        // what actually rendered was rgb(113,98,142), a light lavender, and the
+        // "dark boundary" round the hero's eye measured 1.13:1 against his own
+        // body where it was meant to sit at 3.15:1.
+        //
+        // EYE_INK is built from the hex once, so three does the sRGB->linear
+        // conversion properly, and multiplyScalar then scales in linear, which
+        // is what a light multiplier physically is. Same trap as the tree fix
+        // that had to be retracted (see shade()/tint() in island.ts) — third
+        // time this colour space has bitten this repo.
+        (e.outline.material as THREE.MeshBasicMaterial).color.copy(EYE_INK).multiplyScalar(k);
       }
       // …and the costume follows the face round the orb. Yaw only: a crown
       // must stay on top of the head, not tip toward the lens.
