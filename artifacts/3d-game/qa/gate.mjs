@@ -123,6 +123,14 @@ const SUITE = [
     cmd: ['node', 'qa/evolveonce.mjs', PORT, 'maple'], verdict: pf,
     why: 'a child who is eaten and climbs back is not congratulated for it, and still gets their form back' },
 
+  // The moment a child plays for. The gesture was a SHRINK for the whole of
+  // this game's life — -12.3% at 0.15s against +4.6% at 0.47s — while the HUD
+  // card scaled UP. Pure maths on the live expression, so it costs nothing and
+  // cannot be fooled by which frame a slow renderer happened to sample.
+  { id: 'evolvepop', tier: 'feel', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/evolvepop.mjs'], verdict: pf,
+    why: 'evolving reads as getting BIGGER — the pop dominates the wind-up and lands with the sound' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },

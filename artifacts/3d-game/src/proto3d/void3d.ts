@@ -1863,9 +1863,34 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         const ph = 1 - Math.max(0, inhaleT) / 0.9;
         uniformK += ph < 0.62 ? -0.24 * (ph / 0.62) : -0.24 + 0.42 * ((ph - 0.62) / 0.38);
       }
-      if (evolveT > 0) {            // EVOLVED! celebratory double-bounce
+      if (evolveT > 0) {            // EVOLVED! anticipate, then POP
         evolveT -= dt;
-        uniformK += Math.sin(Math.max(0, evolveT) / 0.7 * Math.PI * 2) * 0.16 * (evolveT / 0.7);
+        // ── THIS PLAYED BACKWARDS FOR THE WHOLE OF THE GAME'S LIFE ──────────
+        // It was `sin(evolveT / 0.7 * 2PI) * 0.16 * (evolveT / 0.7)`. evolveT
+        // counts DOWN from 0.7, so that sine starts on its DOWNSTROKE:
+        // evaluated frame by frame it reaches −12.3% at t = 0.15 s and only
+        // +4.6% at t = 0.47 s. The shrink was 2.6x the pop and came first, and
+        // uniformK multiplies both `lat` and `squash` below, so it is a pure
+        // uniform size change — not squash-and-stretch.
+        //
+        // A six-year-old's entire read of "I evolved" is I GOT BIGGER. The
+        // biggest thing her void did at that moment was get twelve per cent
+        // SMALLER, while #evolve.show's own @keyframes scaled the HUD card UP
+        // to 1.05. The card grew and the hero shrank.
+        //
+        // Now: 85 ms of anticipation to −6.9%, then an overshoot peaking at
+        // +16.1% at 0.20 s, decaying out. Growth is 2.35x the shrink where it
+        // used to be 0.37x. `fade` is applied to both branches so the curve is
+        // continuous at the handover and lands exactly on zero at 0.7 —
+        // evolveT stops being applied there, and a residual would pop.
+        // Same one expression, same evolveT = 0.7, no new state.
+        // Measured by qa/evolvepop.mjs.
+        const u0 = 0.7 - Math.max(0, evolveT);
+        const fade = 1 - u0 / 0.7;
+        uniformK += (u0 < 0.085
+          ? -0.07 * (u0 / 0.085)
+          : -0.07 * Math.exp(-(u0 - 0.085) * 10)
+            + 0.44 * Math.exp(-(u0 - 0.085) * 4.0) * Math.sin((u0 - 0.085) * 9.6)) * fade;
       }
       const lat = uniformK - breathe;
       squash *= uniformK;
