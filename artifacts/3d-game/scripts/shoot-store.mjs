@@ -138,6 +138,26 @@ const SEED = () => {
   localStorage.setItem('voidStreak', '6');
   localStorage.setItem('voidDailyLast', new Date().toDateString());   // no reward modal
   localStorage.setItem('voidStats', JSON.stringify({ matches: 24, wins: 9, best: 141000, bestForm: 5, eaten: 3100, rivals: 7, combo: 22 }));
+  // ── AND THE WORLDS MUST BE UNLOCKED, OR THIS SCRIPT EATS THE SCREENSHOTS ──
+  // This is the single most expensive missing line in the repo. The block above
+  // purges every PNG in store/ before shooting — deliberately, and for a good
+  // reason recorded there — and then enterMatch() taps the world cards for
+  // LANTERN, GAME DAY and PIRATE BAY. Worlds unlock by finishing the one
+  // before, so on the fresh profile this seed creates, all three are LOCKED and
+  // the card refuses the tap BY DESIGN. The click resolves (the element is
+  // there and clickable, it just does nothing), the waitForFunction that
+  // follows it waits out its full two minutes, and the run dies having already
+  // emptied the folder.
+  //
+  // Net effect: `npm run shoot:store` deletes all eight App Store screenshots
+  // and produces none. The screenshots are a submission blocker — the current
+  // set is from before the rename and shows a VOIDLING wordmark, which is the
+  // same Guideline 2.3.3 finding that got the previous attempt rejected — so
+  // the one tool that can fix the blocker was itself destroying the evidence.
+  //
+  // docs/HANDOFF.md lists this as trap #3 and notes four probes had hit it.
+  // This is the fifth, and the only one where hitting it cost the artefact.
+  localStorage.setItem('voidUnlocked', JSON.stringify(['maple', 'pirate', 'gameday', 'lantern', 'powder']));
 };
 await page.addInitScript(SEED);
 
@@ -186,6 +206,20 @@ const autoplay = () => page.evaluate(() => {
 const stopPlay = () => page.evaluate(() => { window.__shootStop = true; });
 /** Start a match on a named world from wherever we are. */
 const enterMatch = async (world) => {
+  // Refuse to tap a card the profile cannot open, rather than clicking it and
+  // waiting out a two-minute timeout for a match that was never going to start.
+  const locked = await page.evaluate((w) => {
+    const card = document.querySelector(`#worldRow .wCard[data-world="${w}"]`);
+    if (!card) return 'missing';
+    // The class is `lock`, NOT `locked`. Written as `locked` first, which would
+    // have matched nothing and made this guard a decoration — the same mistake
+    // that had just been found in qa/personsheet.mjs's HUD selector list, made
+    // again within the hour. Verified against index.html:967,973,1097
+    // (`.wCard.lock`) before this line was kept.
+    return card.classList.contains('lock') ? 'locked' : '';
+  }, world);
+  if (locked) throw new Error(
+    `world card "${world}" is ${locked} — the seed did not unlock it, and every screenshot in store/ has already been purged. See the voidUnlocked note in SEED().`);
   await page.click(`#worldRow .wCard[data-world="${world}"]`);
   await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2,
     null, { timeout: 120000 });
