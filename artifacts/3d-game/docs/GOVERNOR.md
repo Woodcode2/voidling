@@ -62,9 +62,9 @@ wrong) · **PENDING** (not yet measured — do not act on it).
 | 2 | Powder Pass is the world where he grins; the other four are where he does not | **REFUTED** | Backwards. Powder was the worst (90% grinless), Pirate the only clean world (0%). The board's Powder frame caught a `frenzy` beat |
 | 3 | The gape should be reshaped landscape (`mawDark` 1.34×0.92, `tongue` 1.50×0.70) and the threshold raised to 0.55 | **REFUTED** as a fix | The gape being taller than wide is right for a full gulp. It read as a nostril only because a mood parked it at quarter scale forever. Reshaping would have hidden the state bug |
 | 4 | `maple_look.png` findings citing flower-bed facets / a twelve-lobe canopy are stale | **CONFIRMED** by the board itself | Frame shot 08-23 23:21; the fixes landed in `207e2cb` at 08-24 00:47. Those findings are void |
-| 5 | Exposure, shadow character and palette do not cohere across the five worlds — "three renderers, not one" | **PENDING** | No instrument yet. Needs a cross-world exposure/shadow probe before anything is changed |
-| 6 | Game Day renders the fire truck's cab-top and body-side as the same flat red — two channels on the floor | **PENDING** | Checkable statically against the truck's part colours; not yet done |
-| 7 | Lantern Night's bottom third carries no material information | **PENDING** | `qa/ground.mjs` may already cover this; check before building anything new |
+| 5 | Exposure, shadow character and palette do not cohere across the five worlds — "three renderers, not one" | **PENDING — OWNER CALL, NOT A BUG** | The spread is authored. `WORLD_LIGHT.sunI` runs 0.55 (lantern) → 2.55 (gameday) on purpose, and `prototype3d.ts:720` records that every world was tuned against match 1 with that spread in place. Whether the range is too wide is a taste judgement for the owner. **Do not "fix" this with a probe.** |
+| 6 | Game Day renders a truck's cab-top and body-side as the same flat red | **PARTLY CONFIRMED, cause not yet established** | The geometry half holds: `tailgate.ts:288-291` paints body, cab and bonnet all one `col` (`CRIM = 0xc4342f`), so separation depends entirely on the light. Game Day also has the strongest sun in the game (2.55, ×1.31 = 3.34), which is where clipping would come from. NOT yet measured — needs a probe that samples an up-face against a side-face on the same prop. The board's phrase "two channels on the floor" is the wrong diagnosis either way: crimson's failure mode here is one channel on the CEILING |
+| 7 | Lantern Night's bottom third carries no material information | **PENDING** | `qa/ground.mjs` may already cover this; check before building anything new. Note the standing retraction: a Lantern-only light lift was tried and measured at +0.4 mean luminance — nothing. The murk is albedo-bound, so a rig change is not the fix |
 
 ### Standing from earlier rounds
 
@@ -110,6 +110,31 @@ comma-joined string (`unlocks.ts:39`). Nothing matched, every world but Maple
 stayed locked, and Maple looked fine throughout because `read()` force-adds it.
 Three failed screenshot runs were spent on the wrong hypothesis. **The world
 that always works is the world that hides the bug** — check the others first.
+
+---
+
+## HANDS OFF — deliberate decisions a future round will want to "fix"
+
+Each of these looks like a bug from the outside. Each is a decision with a
+measurement behind it. Any change needs the owner, not a board.
+
+- **The light rig is flat where the table looks per-world.** `RIG` pins
+  `hemiI` to 0.22 and `exposure` to 1.0 for every world. The per-world `hemiI`
+  and `exposure` columns in `WORLD_LIGHT` are **inert** — they were never
+  applied at construction, and every world in this game was tuned without
+  them. `prototype3d.ts:720` has the full measurement. Applying them would
+  move all five worlds off every screenshot and palette argument in the repo.
+- **Lantern's murk is albedo, not lighting.** A Lantern-only +55% floor was
+  tried and retracted the same day; the A/B measured +0.4 mean luminance and
+  −1.1pt dark-pixel share. The night ground is authored near-black.
+- **Camera shake is zero.** Absolute owner order.
+- **Powers are off** (`POWERS_ON = false`).
+- **Spawn and the opening hand are hand-authored** and identical every load.
+- **Splash art and the world-picker posters are APPROVED.** Do not change them.
+- **Seeded draws are load-bearing.** `mrnd()`/`mr()`/`mpick()`/`mchance()` are
+  one mulberry32 stream; adding or removing a single draw shifts every
+  subsequent authored placement in Maple Falls (`mainstreet.ts:252`). A visual
+  fix that changes the number of seeded draws is not the same fix.
 
 ---
 

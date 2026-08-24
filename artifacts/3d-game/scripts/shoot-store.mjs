@@ -98,6 +98,27 @@ const EXPECTED = ['01-menu.png', '02-worlds.png', '03-devouring.png',
 // The old set moves to store/.previous/ instead. The folder is still
 // unmistakably empty-or-complete, which is the property that mattered, and a
 // failed run now costs nothing.
+//
+// …AND MOVING THEM ASIDE IS STILL TOO EARLY IF THE SERVER IS NOT THERE. The
+// next run after that note was written pointed at the default port while the
+// preview was on another one, so it filed all eight images under .previous/
+// and then died on ERR_CONNECTION_REFUSED before shooting a pixel. Establish
+// that the thing we are photographing exists FIRST. One request costs nothing
+// and the alternative is an empty store/ every time somebody mistypes a port.
+{
+  let ok = false, why = '';
+  try {
+    const r = await fetch(`${URL}/`, { signal: AbortSignal.timeout(8000) });
+    ok = r.ok; why = `HTTP ${r.status}`;
+  } catch (e) { why = e?.message || String(e); }
+  if (!ok) {
+    console.error(`No preview server at ${URL} — ${why}\n`
+      + `  start one:  npm run build && npx vite preview --port ${(URL.match(/:(\d+)/) || [, '4173'])[1]}\n`
+      + `  or point this at yours:  SHOOT_URL=http://127.0.0.1:<port> npm run shoot:store\n`
+      + `Nothing was touched: store/ still holds the previous set.`);
+    process.exit(2);
+  }
+}
 {
   fs.mkdirSync(OUT, { recursive: true });
   const prev = path.join(OUT, '.previous');
