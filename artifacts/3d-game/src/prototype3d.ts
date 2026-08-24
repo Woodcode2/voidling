@@ -1593,6 +1593,8 @@ const _dbg = new Proxy(_dbgStore, {
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean };
+  __stages: () => { cur: number; best: number; ceremonies: number };
+  __bite: (hunter?: boolean) => void;
   __pinMouth: (shut: boolean) => void;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
@@ -1725,6 +1727,15 @@ _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m 
 // a world actually SHOWS is to sample it while that world plays.
 // qa/faceparity.mjs polls this across all five worlds.
 _dbg.__faceState = () => voidling.faceState();
+// QA: how many EVOLVED ceremonies have played, and the two stage counters
+// behind them. A demotion walks curStage back; bestStage does not move, so the
+// ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.
+_dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCeremonies });
+// QA: take a bite, through the REAL handler rather than a copy of it. A
+// hunter's bite is the only thing in the game that walks a form back, and
+// nothing else can reproduce the bug it used to cause.
+_dbg.__bite = (hunter = true) =>
+  rivals.onPlayerBitten?.('QA', { shrink: hunter ? 0.85 : 0.90, steal: 0, hunter });
 // QA/capture: hold the jaw shut so a framed shot shows the hero's MOOD rather
 // than whatever he happened to be swallowing. See void3d.ts pinMouth().
 _dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
@@ -3094,6 +3105,28 @@ const MATCH_LEN = Number(_q.get('len')) || 180;                // 3:00 — tight
 const clockSpeed = _q.has('fast') ? 6 : 1;                     // ?fast to speed the clock
 const bigStart = Number(_q.get('r')) || 0;                     // ?r=N debug: start big
 let matchClock = MATCH_LEN, matchLen = MATCH_LEN, ended = false, playerScore = 0, curStage = 0;
+// ── THE CEREMONY IS A HIGH-WATER MARK, THE FORM IS NOT ─────────────────────
+// curStage tracks the form the void IS. It is walked back by hand when a
+// hunter connects (see onPlayerBitten) so the HUD label, the music stage and
+// the growth bar all tell the truth about the setback — and that is correct.
+//
+// What was not correct is that the growth loop fires the whole EVOLVED
+// ceremony on `ns > curStage`, so the moment the score floor handed the radius
+// back the child was congratulated for recovering from being eaten: the
+// EVOLVED card, audio.evolve(), a camera punch, a 45ms buzz, a track('evolve')
+// in the analytics funnel, and from GOBBLIN up a newsroom headline
+// congratulating the void on growing about one second after it was devoured.
+// Punishment, dressed as a reward, roughly sixteen milliseconds after the BONK.
+//
+// bestStage is the highest form reached THIS MATCH. The ceremony fires on it;
+// every piece of state above still follows curStage. It cannot change a
+// radius, a score, a clamp or a frame. qa/evolveonce.mjs gates it.
+let bestStage = 0;
+/** How many EVOLVED ceremonies have played this match. QA only — the bug this
+ *  counts is invisible from the outside precisely because the ceremony looks
+ *  identical whether it is earned or is congratulating a child on recovering
+ *  from being eaten. See qa/evolveonce.mjs. */
+let evolveCeremonies = 0;
 // ── HOW LONG THE MATCH HAS BEEN RUNNING ────────────────────────────────────
 // There are two clocks in this file and they are not interchangeable. `tClock`
 // is wall time: it advances every frame, forever, including while the pause
@@ -6272,7 +6305,8 @@ function resetMatch() {
   // matchLen further down, so pass the length it is ABOUT to choose — reading
   // the live one here would scale the new match's joins to the old match's clock.
   rivals.reset(soloMode ? 120 : MATCH_LEN);
-  curStage = 0; voidling.setStage(0); voidling.setRadius(START_R);
+  curStage = 0; bestStage = 0; evolveCeremonies = 0;
+  voidling.setStage(0); voidling.setRadius(START_R);
   // FIXED START, deliberately. A replay review argued for randomising this —
   // every match opening on the same twenty seconds is real repetition — but the
   // owner's call is that the opening must be hand-authored and identical every
@@ -9039,6 +9073,11 @@ function animate() {
   const ns = stageFor(voidling.radius);
   if (ns > curStage) {
     curStage = ns;
+    // Recovering to a form you have already reached is not an evolution. See
+    // bestStage above — everything below this line is ceremony.
+    if (ns > bestStage) {
+    bestStage = ns;
+    evolveCeremonies++;
     // the bar takes the beat too — the pips retire one at a time and the whole
     // strip swells, so an evolution is visible at the bottom of the screen and
     // not only in the middle of it
@@ -9069,7 +9108,6 @@ function animate() {
     if (curStage >= 2) townReacts({ kind: 'evolve', form: FORMS[curStage] });
     track('evolve', { form: curStage, name: FORMS[curStage], sec: elapsed() });
     fx.ring(voidState.x, voidState.z, 0xc9a6ff, R * 5, 0.8);   // GOBBLIN quest
-    audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);   // the soundtrack escalates too
     buzz(45);
     // …and the last rung gets a whole moment of its own. Three rings, a white
     // flash, a long shake and its own headline: you are not meant to see this
@@ -9083,6 +9121,11 @@ function animate() {
       breakingNews(COPY.enderNews);
       buzz(120);
     }
+    }
+    // …but the SOUNDTRACK follows the form itself, not the ceremony. A child
+    // who is demoted and climbs back should hear the music come back with
+    // them; only the congratulations are once-per-match.
+    audio.setMusicStage(VISUAL_STAGE[curStage] ?? 4);
   }
   // NEVER downgrade: the growth-law clamp can pull radius back under a form
   // threshold the frame after evolving — re-announcing the same form forever
