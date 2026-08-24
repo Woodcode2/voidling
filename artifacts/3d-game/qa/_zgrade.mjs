@@ -14,7 +14,12 @@ export function grade(hex, k) {
   let c = mul(IN, lin).map(fit);
   c = mul(OUT, c).map(v => Math.min(1, Math.max(0, v)));
   const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-  c = c.map(v => Math.max(0, (v - 0.014) / (1 - 0.014)));
+  // MUST TRACK prototype3d.ts's CustomToneMapping. It was the hard per-channel
+  // clip `max(0, (v - 0.014) / (1 - 0.014))` and the shader is now a
+  // compressing toe — a simulator that models the previous build is worse than
+  // no simulator, because everything downstream of it reads as measurement.
+  const TOE = 0.014;
+  c = c.map(v => v * v / (v + TOE) * (1 + TOE));
   const cool = [0.96, 0.99, 1.06], warm = [1.05, 1.005, 0.95], t = ss(0.18, 0.78, l);
   c = c.map((v, i) => v * (cool[i] + (warm[i] - cool[i]) * t));
   c = c.map(v => l + 1.07 * (v - l));
