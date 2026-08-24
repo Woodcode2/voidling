@@ -25,3 +25,8 @@ qa/out/shippedlook/maple_leaves.png
 qa/out/person/
 qa/out/shippedlook/*_look.png
 qa/out/shippedlook/maple_trees.png
+
+# Every shippedlook frame is a probe artefact. The two the ledger cites are
+# already tracked; new ones are evidence for a moment, not for history.
+qa/out/shippedlook/maple_tone.png
+qa/out/lookbook.json
