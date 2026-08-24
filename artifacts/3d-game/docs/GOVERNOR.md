@@ -77,6 +77,23 @@ Maple is bit-identical. Every world loses its dead blacks and regains hue in
 shadow, and none moves more than 9% in exposure. `qa/blackprops.mjs` goes from
 5 crushed prop faces to 0.
 
+**The Game Day fix, modelled but NOT shipped.** `CRIM` is `0xc4342f`
+(`tailgate.ts:27`) and the file calls it "the dominant colour of the whole
+world". Through the soft-toe grade, a lit truck face at k=1.5 renders
+`(202,0,8)` — a red that *cannot* show shading, because two of its channels
+have nowhere to go. Raising G and B by 8% (`0xc4453f`) leaves R untouched at
+every exposure and gives it back:
+
+| exposure | `0xc4342f` today | `0xc4453f` |
+|---|---|---|
+| k=0.9 | (157,0,0) | (158,6,13) |
+| k=1.5 | (202,0,8) | (202,44,39) |
+| k=2.2 | (230,43,32) | (229,76,63) |
+
+Not applied. Changing a world's dominant colour is a style decision, and
+stacking it on top of the toe change before anyone has seen either would make
+both unreviewable. It is a one-token change when someone wants it.
+
 **Game Day is the exception and it is not fixed:** 84.7% of its red pixels
 still have two channels at zero. That is ACES itself pushing G and B toward
 zero for a highly saturated red at moderate exposure, not the toe. A separate
