@@ -130,6 +130,15 @@ for those two worlds are indicative only.
 
 ---
 
+### Round 3 — 2026-08-24
+
+| # | Claim | Status | Evidence |
+|---|-------|--------|----------|
+| 12 | The grade's toe deletes colour channels rather than darkening them | **CONFIRMED, FIXED** | 83.6% of Game Day's red-dominant pixels had G and B at exactly 0; Lantern's TIMBER (a warm brown) rendered `rgb(33,0,0)`. Replaced the per-channel clip with a compressing toe. Highlights moved ≤4/255 |
+| 13 | The Maple food truck's wheels render as holes, and `qa/blackprops.mjs` passed the frame | **CONFIRMED, FIXED** | TEAM MOVERS. 1785 and 1698 device px against a 2000px bar I had guessed. `CAR_TYRE` 0x20242c → 0x2a2e38 (alpine's CHAR). Maple now measures 0.00% pure-black pixels |
+| 14 | "338 paper lanterns each show the camera a black lid" | **REFUTED as stated** | The shipped post-toe frame has 19 pure-black blobs ≥12px in the whole play area, largest 178px (~6×6 css px) — not 338 lids. The lid COLOUR (`0x1e1e26`) really is the darkest CHAR in the game and grades to L0.0 at Lantern's key, so the concern is sound; the count is not |
+| 15 | "The finale building is still a black diamond with orange piping, and the ledger reads as though it did close" | **CONFIRMED — AND MY LEDGER WAS WRONG** | I looked. The bathhouse roof is a near-black navy with bright orange piping and **no tonal separation between its six tiers** — a flat silhouette with lines drawn on it. It is not literally `rgb(0,0,0)` any more, and that is exactly how it slipped past: `qa/blackprops.mjs` tests for pure zero, so the toe fix lifting the surface OFF zero was enough to pass it. "Not literally zero" is not "renders as a material". I measured the thing I could measure instead of the thing that matters |
+
 ## THE RETRACTIONS
 
 Kept because a studio that hides its own errors is worth nothing.
@@ -196,6 +205,23 @@ Kept because a studio that hides its own errors is worth nothing.
     having none, and it is worse than any of the nine retractions above, all of
     which were honest measurements of the wrong thing. **Rule 3 now reads: a
     number in a comment must be one you actually ran.**
+
+9. **`qa/blackprops.mjs`'s area bar, three times.** 2000 device px, guessed
+   rather than derived, let the food truck's wheels through at 1785. And the
+   bar was in DEVICE pixels, so the same defect measured ~790 in a 2x lookbook
+   frame and the probe went half-blind depending on which folder you pointed it
+   at. It is 1200 css px² now, against the 430-wide reference viewport, with
+   its one known limit written into the header rather than tuned around.
+
+10. **"No pure black" is not "no holes".** `blackprops` tests for `rgb(0,0,0)`.
+   The soft toe lifted the bathhouse roof off zero, the probe went green, and I
+   wrote in this ledger that the finale building was closed. It is not: it is a
+   near-black navy with six tiers that carry no tonal separation at all, so it
+   still reads as a flat silhouette with orange lines on it. TEAM STATIC said
+   so and I had to go and look before I believed them. The measure this needs
+   is not "is it zero" but "does a large face carry any tonal variation" —
+   which is the same question behind the Game Day flat-red finding, and neither
+   is answered by a black-pixel census.
 
 And one that is not a metric but belongs here: **the `voidUnlocked` seed.** I
 wrote it as `JSON.stringify([...])` in the first probe of the session and copied
