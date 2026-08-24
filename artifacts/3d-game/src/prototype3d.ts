@@ -5619,7 +5619,13 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
       // than the world just played, on the card whose whole job is to invite.
       // The cheapest fourth-play novelty is the other three worlds; say so.
       bestEl.textContent = b ? `★ BEST ${b.toLocaleString()}`
-        : `✨ NEW PLACE · ${totalCount(id as WorldId) - foundCount(id as WorldId)} SECRETS`;
+        // SHORTER THAN IT WAS, and the length was not cosmetic: `NEW PLACE ·
+        // 12 SECRETS` is about 197px of letter-spaced 12px type in a box about
+        // 165px wide, so it wrapped on every card and shoved the title off the
+        // scrim (see .wBest in index.html). "NEW PLACE" was also the weaker
+        // half — the card already says WORLD 5 in its own chip and shows a
+        // poster nobody has played. The secrets are the invitation.
+        : `✨ ${totalCount(id as WorldId) - foundCount(id as WorldId)} SECRETS`;
     }
     // in season? the poster says so — accent chip, top corner, with the date
     const ev = eventForWorld(id);

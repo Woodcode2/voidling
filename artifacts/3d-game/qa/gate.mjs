@@ -102,6 +102,15 @@ const SUITE = [
     cmd: ['node', 'qa/faceparity.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'the hero wears the same face in all five worlds, and no mood deletes his grin' },
 
+  // The screen the owner asked about by name — "when people first pick a level,
+  // how does the level look at first glance?" — and the one where a single
+  // overlooked min-height made every world's name unreadable. Measures rendered
+  // ink contrast, so it can see a text halo; a backdrop-only bar could only ever
+  // be satisfied by darkening posters that are APPROVED.
+  { id: 'pickerfit', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
+    cmd: ['node', 'qa/pickerfit.mjs', PORT], verdict: pf,
+    why: 'a six-year-old can read every world name and tagline on the picker, whatever poster is behind it' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
