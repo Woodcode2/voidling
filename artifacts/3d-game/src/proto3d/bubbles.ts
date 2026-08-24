@@ -18,7 +18,9 @@ export interface Bubbles {
    *  two are visually different classes at a glance. */
   say(pos: THREE.Vector3, text: string, kind: BubbleKind, opts?: { name?: string; color?: string }): void;
   float(pos: THREE.Vector3, text: string, big?: boolean): void;   // rising score/juice text
-  update(dt: number): void;
+  /** `hero` is the void's world position and radius. Pass it and no bubble
+   *  will be drawn across his face. See the note at HERO_PAD. */
+  update(dt: number, hero?: { pos: THREE.Vector3; r: number }): void;
   /** Clear every live bubble and floater. Called at match reset. */
   reset(): void;
 }
@@ -69,7 +71,25 @@ const HUD_TOP = 206;
  *  caught "BAKE SALE RUSH! everything is DOUBLE!" drawn straight across "our
  *  gas is two cents cheaper." — the earlier pass only guarded the always-on
  *  panels, and those three are exactly the ones that arrive without warning. */
+// NOTE: 'form' has no element in this build — index.html has no #form — so
+// this list has in practice only ever dodged the guide pill. Unknown ids are
+// skipped by design (see above), which is why nobody noticed.
 const HUD_AVOID = ['form', 'guide'];
+// ── AND THE ONE THING ON SCREEN THAT MUST NEVER BE COVERED ────────────────
+// Every entry above is a DOM id, and the hero is a 3D object, so the mascot —
+// the single strongest identity asset in the product — was the only thing here
+// with no rule protecting it. Worse, the crowd nearest the void is the crowd
+// most likely to be talking, so the bubbles that spawn are precisely the ones
+// anchored closest to him. store/03-devouring.png went to the App Store with an
+// ambient line straight across his chin.
+//
+// Measured with qa/bubbleclear.mjs: at r=7 a bubble covers his FACE in 3% of
+// Maple frames, and Game Day reaches 5% with a worst case of 24% of the face
+// behind one line. The face box is the upper-middle of the disc — 0.62 of its
+// width, from 0.76 above centre to 0.36 below — because a bubble clipping the
+// bottom of a ten-metre void is unavoidable and fine, and one across his eyes
+// is not.
+const HERO_PAD = 6;
 /** Full-bleed centred text that arrives without warning. These are dodged as
  *  horizontal BANDS — their element box spans the whole screen, so an x-overlap
  *  test would always match — and only while they are actually on screen. */
@@ -177,6 +197,8 @@ const style = document.createElement('style');
   const v = new THREE.Vector3();
   // HUD rect scratch, filled once per update() and reused — see the read/write
   // split in update(). Fixed-size arrays with a live count, so no allocation.
+  const heroBox = { top: 0, bottom: 0, left: 0, right: 0, on: false };
+  const heroV = new THREE.Vector3(), heroR = new THREE.Vector3();
   const hudR: DOMRect[] = []; let hudN = 0;
   const bandR: DOMRect[] = []; let bandN = 0;
 
@@ -300,7 +322,30 @@ const style = document.createElement('style');
         f.lx = -1; f.ly = -1;
       }
     },
-    update(dt: number) {
+    update(dt: number, hero?: { pos: THREE.Vector3; r: number }) {
+      // Project the hero once per frame, exactly as the clamp projects each
+      // bubble, so the box is in the same pixel space as their rects.
+      heroBox.on = false;
+      if (hero) {
+        heroV.copy(hero.pos).project(camera);
+        if (heroV.z < 1) {
+          const w = window.innerWidth, h = window.innerHeight;
+          const cx = (heroV.x * 0.5 + 0.5) * w, cy = (-heroV.y * 0.5 + 0.5) * h;
+          // screen radius, measured rather than assumed: a point one world
+          // radius to the camera's right, projected, gives the pixel scale.
+          camera.getWorldDirection(heroR);
+          heroR.cross(camera.up).normalize().multiplyScalar(hero.r);
+          heroR.add(hero.pos).project(camera);
+          const rx = Math.abs((heroR.x * 0.5 + 0.5) * w - cx);
+          if (rx > 4) {
+            heroBox.left = cx - rx * 0.62 - HERO_PAD;
+            heroBox.right = cx + rx * 0.62 + HERO_PAD;
+            heroBox.top = cy - rx * 0.76 - HERO_PAD;
+            heroBox.bottom = cy + rx * 0.36 + HERO_PAD;
+            heroBox.on = true;
+          }
+        }
+      }
       // was a hard 1/60 per FRAME, so a "4.2s" bubble was really 252 frames:
       // 8.4s on a 30fps phone and 2.1s on a 120Hz one, where a child cannot
       // finish reading it. Bubbles now age in seconds like everything else.
@@ -401,6 +446,12 @@ const style = document.createElement('style');
         // screenshot: "BAKE SALE RUSH! everything is DOUBLE!" drawn straight
         // across "our gas is two cents cheaper."
         for (let i = 0; i < bandN; i++) dodge(bandR[i].top, bandR[i].bottom);
+        // …and off the hero's face. Same dodge as a HUD panel: the bubble goes
+        // above his head or below him, never across him. Only when it actually
+        // overlaps horizontally, so a line spoken across the street from him is
+        // left exactly where it was.
+        if (heroBox.on
+          && x + halfW > heroBox.left && x - halfW < heroBox.right) dodge(heroBox.top, heroBox.bottom);
         // …and never on top of another bubble: the spawn-time de-collision
         // does not survive two anchors both leaving the viewport and clamping
         // to the same coordinate, which measured as one bubble 100% hidden.

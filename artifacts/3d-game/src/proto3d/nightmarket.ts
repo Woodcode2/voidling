@@ -51,16 +51,28 @@ type G = THREE.BufferGeometry;
 const VERM = 0xc1382e;       // vermilion: torii, lantern paper, shrine timber
 const VERM_D = 0x8e2620;     // shadowed vermilion
 const TIMBER = 0x6b4a33;     // stall frames, decking, boat hulls
-const TIMBER_D = 0x4a3324;   // undersides and shadowed timber
+const TIMBER_D = 0x5a3e2c;   // undersides and shadowed timber (was 0x4a3324 — ΔE 3.0)
 const CEDAR = 0x7d5a3e;      // the teahouse and bathhouse boards, warmer
-const CEDAR_D = 0x55402d;
-const TILE = 0x2e3440;       // roof tiles, near-black slate blue
-const TILE_D = 0x222834;
+// ── THESE FIVE COULD NOT SHOW A SHAPE ────────────────────────────────────
+// qa/formsep.mjs grades every palette colour at a lit angle and a shaded one
+// under its own world's key and measures CIE76 ΔE between them. Lantern Night
+// had eight colours under a bar of 6 — five of them here — which means a prop
+// painted in one has its top and its side render as the SAME colour and
+// therefore has no form at all. That is the bathhouse roof reading as a black
+// diamond with orange piping, and it is the crate lids reading as holes.
+//
+// Every lift below is the MINIMUM that reaches ΔE 7 with the hue held and the
+// dark variant still darker than its base. The world stays night: the lifted
+// colours render at displayed luminance 7 to 11 on a LIT face, which is dark
+// by any measure — they were at 0, which is not dark, it is absent.
+const CEDAR_D = 0x5a4430;   // was 0x55402d — ΔE 5.5, no form
+const TILE = 0x3e4656;       // roof tiles, near-black slate blue (was 0x2e3440 — ΔE 1.4)
+const TILE_D = 0x384255;    // was 0x222834 — ΔE 0.8
 const STONE = 0x6a6a76;      // granite: lanterns, steps, bases
 const STONE_D = 0x4c4c58;
 const ROPE = 0xb8a074;       // straw rope, matting, tatami
 const PAPER = 0xd8cdb6;      // unlit paper, screens, banners
-const CHAR = 0x1e1e26;       // ironwork, wire, tyres of the world
+const CHAR = 0x434355;       // ironwork, wire, tyres (was 0x1e1e26 — ΔE 0.0, the darkest CHAR in the game by a wide margin)
 const GREEN = 0x2f5a3a;      // bamboo, hedges, moss
 const GREEN_L = 0x467a4c;
 const WATER = 0x1a3a52;      // the canal, where a prop has to sit in it

@@ -8804,7 +8804,10 @@ function animate() {
       }
     }
   }
-  bubbles.update(dt);
+  // …and hand it the hero, so nothing is drawn across his face. bubbles.ts
+  // dodges HUD panels by DOM id and he is a 3D object, so he was the one thing
+  // on screen with no rule protecting him. qa/bubbleclear.mjs measures it.
+  bubbles.update(dt, { pos: voidling.group.position, r: voidling.radius });
   const cy = voidling.group.position.y;
 
   for (const e of edibles) {
