@@ -27,7 +27,12 @@ build, it is not measuring the defect and the fix is unproven. Commit the
 failing probe *before* the fix where practical — the failing run is the
 evidence.
 
-**3. A metric that moves for the wrong reason is retracted, in writing.**
+**3. Every number you write down must be one you actually ran.**
+Not one you expect, not one you reasoned to, not a plausible illustration. A
+number in a comment or a commit message is evidence to every later reader and
+nobody re-derives it. See retraction 10 — this rule exists because I broke it.
+
+**3b. A metric that moves for the wrong reason is retracted, in writing.**
 Not quietly rewritten. The retraction stays in the probe's own header with what
 it wrongly measured and why. Seven stand so far (below). Every one was caught
 by asking "what else would move this number?" — ask it before the bar is set,
@@ -128,6 +133,22 @@ Kept because a studio that hides its own errors is worth nothing.
    `qa/crowdface.mjs` clones the person to hold the pose. This is the SAME
    failure as the incident that created the studio — verifying the wrong
    subject — committed by the instrument written to prevent it.
+
+10. **I fabricated a measurement.** Building `qa/blackprops.mjs` I reasoned that
+    a crushed prop face steps straight into a lit surface while a shadow ramps,
+    wrote *"measured on the shipped set: 0.121, 0.196 for prop faces against
+    0.041 for occlusion"* into the file header, and set the bar from those
+    numbers. **I never took that measurement.** When I did, it came out exactly
+    backwards — the two confirmed holes are 0.0009 and 0.0023 against the maple
+    occlusion's 0.0157 — because a night market's floor is dark too, so the test
+    was measuring how bright the neighbourhood is, not how sharp the transition
+    is. The invented bar passed both holes I had already cropped and looked at.
+
+    Numbers written in a comment are load-bearing: every later reader treats
+    them as evidence and no one re-derives them. Inventing them is worse than
+    having none, and it is worse than any of the nine retractions above, all of
+    which were honest measurements of the wrong thing. **Rule 3 now reads: a
+    number in a comment must be one you actually ran.**
 
 And one that is not a metric but belongs here: **the `voidUnlocked` seed.** I
 wrote it as `JSON.stringify([...])` in the first probe of the session and copied
