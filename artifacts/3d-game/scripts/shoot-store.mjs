@@ -98,6 +98,31 @@ const EXPECTED = ['01-menu.png', '02-worlds.png', '03-devouring.png',
 // The old set moves to store/.previous/ instead. The folder is still
 // unmistakably empty-or-complete, which is the property that mattered, and a
 // failed run now costs nothing.
+// ── A RUN THAT CANNOT SURVIVE BEING INTERRUPTED CAN NEVER FINISH HERE ──────
+// Eight screenshots take about twenty-five minutes on a software renderer, and
+// the container this runs in reclaims itself on a shorter clock than that. The
+// run before this one died after three images with nothing to show for the
+// other twenty minutes, which is the third time this script has cost a whole
+// session and produced nothing.
+//
+//   SHOOT_ONLY=04,05,06     shoot exactly these, leave the rest alone
+//   SHOOT_RESUME=1          shoot whatever store/ is still missing
+//
+// Under either, the old set is NOT moved aside — a partial run is topping up a
+// set, not replacing one, and moving the survivors out would defeat the point.
+const ONLY = (process.env.SHOOT_ONLY || '').split(',').map((x) => x.trim()).filter(Boolean);
+const RESUME = process.env.SHOOT_RESUME === '1';
+const PARTIAL = ONLY.length > 0 || RESUME;
+const have = () => { try { return new Set(fs.readdirSync(OUT).filter((f) => f.endsWith('.png')).map((f) => f.slice(0, 2))); } catch { return new Set(); } };
+const HAVE = have();
+/** Should segment `n` ("01".."08") run? A segment that shoots several images
+ *  runs if ANY of them is wanted. */
+const want = (...ns) => ns.some((n) => {
+  if (ONLY.length) return ONLY.includes(n);
+  if (RESUME) return !HAVE.has(n);
+  return true;
+});
+
 //
 // …AND MOVING THEM ASIDE IS STILL TOO EARLY IF THE SERVER IS NOT THERE. The
 // next run after that note was written pointed at the default port while the
@@ -122,7 +147,17 @@ const EXPECTED = ['01-menu.png', '02-worlds.png', '03-devouring.png',
 {
   fs.mkdirSync(OUT, { recursive: true });
   const prev = path.join(OUT, '.previous');
-  const gone = fs.readdirSync(OUT).filter((f) => f.toLowerCase().endsWith('.png'));
+  const gone = PARTIAL ? [] : fs.readdirSync(OUT).filter((f) => f.toLowerCase().endsWith('.png'));
+  if (PARTIAL) {
+    const todo = ['01', '02', '03', '04', '05', '06', '07', '08'].filter((n) => want(n));
+    if (!todo.length) {
+      console.log(ONLY.length
+        ? `nothing to shoot — SHOOT_ONLY=${ONLY.join(',')} names no known segment (01..08)`
+        : 'nothing to shoot — store/ already holds every image');
+      process.exit(0);
+    }
+    console.log(`partial run: shooting ${todo.join(', ')} (store/ keeps the rest)`);
+  }
   if (gone.length) {
     fs.rmSync(prev, { recursive: true, force: true });
     fs.mkdirSync(prev, { recursive: true });
@@ -208,18 +243,20 @@ await page.addInitScript(SEED);
 console.log(`shooting ${VIEW.width * SCALE}x${VIEW.height * SCALE} from ${URL}\n`);
 
 // ── 01 · the menu ───────────────────────────────────────────────────────────
-await boot();
-await settle(3500);
-await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
-  if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
-}));
-await settle(1200);
-await shot('01-menu.png');
+if (want('01', '02')) {
+  await boot();
+  await settle(3500);
+  await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
+    if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
+  }));
+  await settle(1200);
+  if (want('01')) await shot('01-menu.png');
 
-// ── 02 · the world picker ───────────────────────────────────────────────────
-await page.click('#btnPlay');
-await settle(1800);
-await shot('02-worlds.png');
+  // ── 02 · the world picker ─────────────────────────────────────────────────
+  await page.click('#btnPlay');
+  await settle(1800);
+  if (want('02')) await shot('02-worlds.png');
+}
 
 // Drive the void at whatever is nearest, so a match photographs mid-devour
 // with debris in the air rather than as a ball standing still in a street.
@@ -326,21 +363,24 @@ const toPicker = async () => {
 };
 
 // ── 03 · a match, mid-devour ────────────────────────────────────────────────
-await enterMatch('maple');
+if (want('03')) {
+  await toPicker();
+  await enterMatch('maple');
 // a photogenic size — big enough to look powerful, small enough that the town
 // still reads around it
 await growTo(3.4);
 await page.evaluate(() => window.__news());     // a headline in frame sells the world
 await settle(900);
-await shot('03-devouring.png');
-await stopPlay();
+  await shot('03-devouring.png');
+  await stopPlay();
+}
 
 // ── 04 · LANTERN NIGHT, the market street ───────────────────────────────────
 // The newest world and the best-looking frame in the game: a corridor of lit
 // stalls with the lantern strings overhead. __warpVoid rather than autoplay,
 // because a hero image should be framed and not hoped for — the auto-driver
 // ends up wherever the food is, which on a market street is usually a gap.
-{
+if (want('04', '05')) {
   const w = (v) => (v - 6000) * 0.05;
   await toPicker();
   await enterMatch('lantern');
@@ -395,7 +435,7 @@ await stopPlay();
   // stall roofs, umbrellas, crates and a crowd around a hero small enough to
   // be standing IN a market rather than in front of one.
   await frame(3.4, 6050, 7800);
-  await shot('04-lantern-market.png');
+  if (want('04')) await shot('04-lantern-market.png');
 
   // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
   // The finale, at the size a player reaches it, with its eave lines lit.
@@ -416,12 +456,12 @@ await stopPlay();
   // all six storeys in frame with headroom, the golden pool at the base, the
   // finial clear of the timer, and the hero at its feet.
   await frame(10.0, 6704, 2924);
-  await shot('05-lantern-bathhouse.png');
+  if (want('05')) await shot('05-lantern-bathhouse.png');
   await page.evaluate(() => window.__setMood(null));   // hand the face back
 }
 
 // ── 06 · GAME DAY, the bowl ─────────────────────────────────────────────────
-{
+if (want('06')) {
   await toPicker();
   await enterMatch('gameday');
   await growTo(5.0);
@@ -441,6 +481,7 @@ await stopPlay();
 // because on device isNative() is true and this tier reads "A WHOLE NEW
 // CHARACTER" with real prices. The flag only affects what is DISPLAYED here;
 // nothing is purchased or granted during a capture.
+if (want('07')) {
 await boot('?iapmock=1');
 await settle(3000);
 await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
@@ -462,16 +503,20 @@ await page.evaluate(() => document.querySelector('#shopGrid .skCard.legend')
   ?.scrollIntoView({ block: 'center' }));
 await settle(1200);
 await shot('07-skins.png');
+}
 
 // ── 08 · the results screen ─────────────────────────────────────────────────
-await page.evaluate(() => document.getElementById('shop')?.classList.remove('show'));
-await page.click('#btnPlay');
-await settle(900);
-await enterMatch('pirate');
-await page.evaluate(() => { window.__setVoidR(7.5); window.__rushClock(0.3); });
-await page.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 120000 });
-await settle(2600);   // let the coin count-up and the rows finish sliding in
-await shot('08-results.png');
+// toPicker() rather than leaning on 07's page, so this segment stands alone
+// when SHOOT_ONLY / SHOOT_RESUME skips the shop.
+if (want('08')) {
+  await page.evaluate(() => document.getElementById('shop')?.classList.remove('show'));
+  await toPicker();
+  await enterMatch('pirate');
+  await page.evaluate(() => { window.__setVoidR(7.5); window.__rushClock(0.3); });
+  await page.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 120000 });
+  await settle(2600);   // let the coin count-up and the rows finish sliding in
+  await shot('08-results.png');
+}
 
 // ── the folder must contain THIS run, or obviously nothing ──────────────────
 // The stale 2D images used to be removed here, at the end, after all eight
@@ -486,7 +531,10 @@ await shot('08-results.png');
 // plausible-looking mixture. This is the completeness check for the other half.
 {
   const missing = EXPECTED.filter((f) => !fs.existsSync(path.join(OUT, f)));
-  if (missing.length) {
+  if (missing.length && PARTIAL) {
+    console.log(`\npartial run finished. store/ is still missing ${missing.length}: ${missing.join(', ')}`);
+    console.log(`  finish it with:  SHOOT_RESUME=1 SHOOT_URL=${URL} npm run shoot:store`);
+  } else if (missing.length) {
     console.error(`\nINCOMPLETE: ${missing.length} of ${EXPECTED.length} shots are missing:`);
     for (const f of missing) console.error('  ' + f);
     console.error('DO NOT UPLOAD store/. Fix the failure and re-run.');
