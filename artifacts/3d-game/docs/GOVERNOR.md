@@ -1,0 +1,121 @@
+# THE GOVERNOR
+
+*"You ensure this stays on track and consistent. Make this AAA governor."*
+— the owner, 2026-08-24
+
+`docs/STUDIO.md` is the studio's charter: eight teams, each with a veto on its
+own surface. This file is the other half — what the studio's output is worth,
+and how a claim becomes a change.
+
+The studio is an **instrument, not an oracle.** It has been wrong. On its second
+round it named the right defect and got its distribution exactly backwards. A
+board that is never checked is a board that ships its mistakes.
+
+---
+
+## THE STANDING RULES
+
+**1. No claim ships as a fact until it has been measured.**
+A studio finding is a lead. It goes in the ledger below as PENDING and stays
+there until a probe or a source read either confirms or refutes it. "Eighteen
+agents said so" is not evidence; neither is "the art director was confident".
+
+**2. Every fix needs a probe that FAILS before it.**
+Not a screenshot, not a luminance mean, not an eyeball. A number with a bar and
+a stated reason for that bar. If the probe cannot be made to fail on the broken
+build, it is not measuring the defect and the fix is unproven. Commit the
+failing probe *before* the fix where practical — the failing run is the
+evidence.
+
+**3. A metric that moves for the wrong reason is retracted, in writing.**
+Not quietly rewritten. The retraction stays in the probe's own header with what
+it wrongly measured and why. Seven stand so far (below). Every one was caught
+by asking "what else would move this number?" — ask it before the bar is set,
+not after it fails a build.
+
+**4. Verify from the front.**
+The two failures that created the studio were both verified from an angle where
+the defect was invisible: eyes checked from behind, ground checked away from the
+plaza. Check the surface a child actually looks at, in the state they see it.
+
+**5. Prefer the smallest fix that removes the CAUSE.**
+When the board proposes compensating geometry for what turns out to be a state
+bug, take the state fix and leave the geometry alone. A compensation hides the
+cause and survives the next regression.
+
+**6. Nothing that leaves this container is unrecorded.**
+Subagent output lives in ephemeral `/tmp`. Extract and commit a round's verbatim
+record before acting on any of it.
+
+---
+
+## THE LEDGER
+
+Status: **CONFIRMED** (measured, fixed) · **REFUTED** (measured, claim was
+wrong) · **PENDING** (not yet measured — do not act on it).
+
+### Round 2 — 2026-08-24
+
+| # | Claim | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | The hero's grin is deleted by the `hungry` mood — `MOODS.hungry.maw` 0.26 against a `mouth.visible` threshold of 0.25 | **CONFIRMED** | `qa/faceparity.mjs`; no smile for 78% of a Maple match, 90% of Powder. Fixed in `e1f3d20`, now 0% in all five worlds |
+| 2 | Powder Pass is the world where he grins; the other four are where he does not | **REFUTED** | Backwards. Powder was the worst (90% grinless), Pirate the only clean world (0%). The board's Powder frame caught a `frenzy` beat |
+| 3 | The gape should be reshaped landscape (`mawDark` 1.34×0.92, `tongue` 1.50×0.70) and the threshold raised to 0.55 | **REFUTED** as a fix | The gape being taller than wide is right for a full gulp. It read as a nostril only because a mood parked it at quarter scale forever. Reshaping would have hidden the state bug |
+| 4 | `maple_look.png` findings citing flower-bed facets / a twelve-lobe canopy are stale | **CONFIRMED** by the board itself | Frame shot 08-23 23:21; the fixes landed in `207e2cb` at 08-24 00:47. Those findings are void |
+| 5 | Exposure, shadow character and palette do not cohere across the five worlds — "three renderers, not one" | **PENDING** | No instrument yet. Needs a cross-world exposure/shadow probe before anything is changed |
+| 6 | Game Day renders the fire truck's cab-top and body-side as the same flat red — two channels on the floor | **PENDING** | Checkable statically against the truck's part colours; not yet done |
+| 7 | Lantern Night's bottom third carries no material information | **PENDING** | `qa/ground.mjs` may already cover this; check before building anything new |
+
+### Standing from earlier rounds
+
+| # | Claim | Status | Evidence |
+|---|-------|--------|----------|
+| 8 | Daily quests are unclearable on Lantern (149 days/yr) and Powder (234 days/yr) | **CONFIRMED** | `qa/questable.mjs` |
+| 9 | `npm run safety` was green while blind to 135 of 146 files | **CONFIRMED** | `scripts/safety-scan.mjs` rewritten to walk the tree |
+| 10 | iOS home-screen label read `VOIDLING`; `PrivacyInfo.xcprivacy` was absent | **CONFIRMED** | Both were App Store submission blockers. `qa/iosname.mjs`, `qa/privacy.mjs` |
+| 11 | The determinism probe is red on this branch | **REFUTED** as a regression | A/B'd against the parent commit in a worktree — fails identically. Pre-existing, not introduced here |
+
+---
+
+## THE RETRACTIONS
+
+Kept because a studio that hides its own errors is worth nothing.
+
+1. **White-sclera eyes** — added to every person and verified against a crop of
+   a person seen *from behind*. The white sat 17% proud of the skull in a pale
+   colour. The owner's screenshot caught it. → `qa/personsheet.mjs`, four angles.
+2. **Leaf drifts** — verified by luminance mean (held at 0.622) while nobody
+   looked at the plaza, where they read as spilled coffee. → restricted to
+   grass, ⅓ the count, half the alpha.
+3. **`multiplyScalar` colour space** — `ColorManagement.enabled` is true in
+   three r185, so scaling a `THREE.Color` operates in LINEAR space and the
+   displayed ratio is k^(1/2.2). This invalidated my own tree fix. → `shade()`
+   and `tint()` in `island.ts`.
+4. **`qa/variety.mjs` FORM bar** — `distinct forms / prop count >= 0.12` falls
+   as a town grows richer. It was measuring SIZE. → top-form SHARE, which is
+   comparable across towns of any size.
+5. **`qa/normals.mjs` first version** — a 40%-flat runtime bar failed 18
+   correct forms. → static classifier plus a hand-reviewed faceted census.
+6. **`qa/questable.mjs` first version** — kept its own copy of `HOUSE_LIKE` and
+   flagged evolve/gold falsely. → reads the pools from the client.
+7. **`qa/faceparity.mjs` spread bar** — a spread on RAW grin share, which falls
+   with how much there is to eat. Read Maple 23% against Lantern 81% and called
+   prop density a character defect. Same mistake as #4. → the RESTING face
+   only, using the rig's own `mouthT`.
+
+And one that is not a metric but belongs here: **the `voidUnlocked` seed.** I
+wrote it as `JSON.stringify([...])` in the first probe of the session and copied
+that line into seven more files including the store shooter. The key is a
+comma-joined string (`unlocks.ts:39`). Nothing matched, every world but Maple
+stayed locked, and Maple looked fine throughout because `read()` force-adds it.
+Three failed screenshot runs were spent on the wrong hypothesis. **The world
+that always works is the world that hides the bug** — check the others first.
+
+---
+
+## WHAT THE GATE NOW HOLDS
+
+`qa/gate.mjs`. Silence is a FAIL: a step that prints no verdict did not reach a
+conclusion, and a probe that cannot conclude is not evidence of anything.
+
+Run `node qa/gate.mjs --profile=push` before every push and READ the output.
