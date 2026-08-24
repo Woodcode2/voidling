@@ -33,6 +33,7 @@
 // Exit 0 only if every required step passed. Anything else is non-zero, and the
 // report says which step and what it printed.
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import { mkdirSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -259,7 +260,29 @@ const run = (step) => new Promise(res => {
   c.on('close', (code) => {
     clearTimeout(timer);
     const ms = Date.now() - t0;
-    if (killed) return res({ ...step, ok: false, why_not: `timed out after ${step.timeout}s`, out, ms });
+    if (killed) {
+      // ── A TIMEOUT IS NOT A FAILING PROBE, AND SAYING SO MATTERS ───────────
+      // smoke:maple passes in about 325s against a 420s budget. Run the gate
+      // while eighteen studio subagents are competing for four cores and it
+      // crosses 420 without anything being wrong with the game — a RED that
+      // means "this machine was busy", printed identically to a RED that means
+      // "the game is broken". A gate whose reds cannot be told apart is a gate
+      // people learn to re-run rather than read, which is the whole failure
+      // mode this file exists to prevent.
+      //
+      // So the load at kill time is recorded next to the verdict. It stays a
+      // FAIL — silence is failure, and a probe that did not finish did not
+      // reach a conclusion — but the reader is told which kind of red it is
+      // and what to do about it.
+      let load = '';
+      try {
+        const [m1] = os.loadavg();
+        const n = os.cpus().length || 1;
+        load = ` — load ${m1.toFixed(1)} on ${n} core(s)`
+          + (m1 > n * 1.5 ? `, i.e. the machine was oversubscribed; re-run this step on a quiet box before believing it` : '');
+      } catch { /* loadavg is not available everywhere */ }
+      return res({ ...step, ok: false, why_not: `timed out after ${step.timeout}s${load}`, out, ms });
+    }
     let ok, why_not = '';
     if (step.verdict.kind === 'exit') {
       ok = code === 0;
