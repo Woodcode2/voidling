@@ -60,10 +60,11 @@ wrong) · **PENDING** (not yet measured — do not act on it).
 |---|-------|--------|----------|
 | 1 | The hero's grin is deleted by the `hungry` mood — `MOODS.hungry.maw` 0.26 against a `mouth.visible` threshold of 0.25 | **CONFIRMED** | `qa/faceparity.mjs`; no smile for 78% of a Maple match, 90% of Powder. Fixed in `e1f3d20`, now 0% in all five worlds |
 | 2 | Powder Pass is the world where he grins; the other four are where he does not | **REFUTED** | Backwards. Powder was the worst (90% grinless), Pirate the only clean world (0%). The board's Powder frame caught a `frenzy` beat |
-| 3 | The gape should be reshaped landscape (`mawDark` 1.34×0.92, `tongue` 1.50×0.70) and the threshold raised to 0.55 | **REFUTED** as a fix | The gape being taller than wide is right for a full gulp. It read as a nostril only because a mood parked it at quarter scale forever. Reshaping would have hidden the state bug |
+| 3 | The gape should be reshaped landscape (`mawDark` 1.34×0.92, `tongue` 1.50×0.70) and the threshold raised to 0.55 | **REFUTED as a fix, REOPENED on shape** | Refusing it as *the* fix was right — the mood bug was real and reshaping would have masked it. But I refused the shape change by reasoning ("portrait is correct for a full gulp") and then looked at a rendered crop of shot 04: at ordinary BITE scale the maw is a tall dark oval with the tongue low in it and it reads as a gasp, not a chomp. The board's eye beat my arithmetic. Shape is reopened and needs a rendered scale sweep, not another argument |
 | 4 | `maple_look.png` findings citing flower-bed facets / a twelve-lobe canopy are stale | **CONFIRMED** by the board itself | Frame shot 08-23 23:21; the fixes landed in `207e2cb` at 08-24 00:47. Those findings are void |
 | 5 | Exposure, shadow character and palette do not cohere across the five worlds — "three renderers, not one" | **PENDING — OWNER CALL, NOT A BUG** | The spread is authored. `WORLD_LIGHT.sunI` runs 0.55 (lantern) → 2.55 (gameday) on purpose, and `prototype3d.ts:720` records that every world was tuned against match 1 with that spread in place. Whether the range is too wide is a taste judgement for the owner. **Do not "fix" this with a probe.** |
 | 6 | Game Day renders a truck's cab-top and body-side as the same flat red | **PARTLY CONFIRMED, cause not yet established** | The geometry half holds: `tailgate.ts:288-291` paints body, cab and bonnet all one `col` (`CRIM = 0xc4342f`), so separation depends entirely on the light. Game Day also has the strongest sun in the game (2.55, ×1.31 = 3.34), which is where clipping would come from. NOT yet measured — needs a probe that samples an up-face against a side-face on the same prop. The board's phrase "two channels on the floor" is the wrong diagnosis either way: crimson's failure mode here is one channel on the CEILING |
+| 3b | **NEW, found while re-shooting the store set.** In a dense world the hero is mid-bite in *almost every frame*, so the grin is almost never on screen during play — and the bite gape is a tall dark oval that reads as a gasp | **CONFIRMED, UNFIXED** | `qa/faceparity.mjs` raw grin share: Maple 28%, Powder 48%, against Lantern 76%. In the Lantern market framing spot the shooter could not find a single non-biting frame in 20 seconds. This is NOT the mood bug fixed in `e1f3d20` — it is the bite envelope's duty cycle: `chomp()` re-triggers before the previous gape closes. Needs an art decision on gape SHAPE (see #3) and possibly on the retrigger floor. **Do not change the retrigger without the owner** — `chomp()` fires ~50× a match and its retrigger rule already has one fix in it |
 | 7 | Lantern Night's bottom third carries no material information | **PENDING** | `qa/ground.mjs` may already cover this; check before building anything new. Note the standing retraction: a Lantern-only light lift was tried and measured at +0.4 mean luminance — nothing. The murk is albedo-bound, so a rig change is not the fix |
 
 ### Standing from earlier rounds
@@ -102,6 +103,17 @@ Kept because a studio that hides its own errors is worth nothing.
    with how much there is to eat. Read Maple 23% against Lantern 81% and called
    prop density a character defect. Same mistake as #4. → the RESTING face
    only, using the rig's own `mouthT`.
+
+8. **"Resting-grin 100%" is not "the hero looks right".** `qa/faceparity.mjs`
+   deliberately excludes mid-bite frames, because a grin hidden by a bite is
+   correct. That carve-out is sound for the invariant it tests and useless for
+   predicting a PHOTOGRAPH: the store shooter parks the hero in a crowded
+   market where he eats continuously, so every frame it could take was a bite
+   frame, and shot 04 went out as two enormous eyes and a hole while the probe
+   read 100%. A probe that passes and a frame that fails are not in conflict —
+   they are measuring different things, and I read the first as covering the
+   second. The shooter now holds the shutter until `faceState().smile` is
+   true and says so loudly if it never comes.
 
 And one that is not a metric but belongs here: **the `voidUnlocked` seed.** I
 wrote it as `JSON.stringify([...])` in the first probe of the session and copied

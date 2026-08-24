@@ -242,6 +242,77 @@ await page.addInitScript(SEED);
 
 console.log(`shooting ${VIEW.width * SCALE}x${VIEW.height * SCALE} from ${URL}\n`);
 
+/** Hold the shutter until the hero is wearing his face.
+ *
+ *  THE HERO IS THE PRODUCT AND HIS MOUTH IS DRIVEN BY GAMEPLAY, NOT BY THE
+ *  MOOD PIN. __setMood('frenzy') fixes the eyes, brows and blush; it does
+ *  nothing about the gape, which is scaled by the BITE envelope. Park him in a
+ *  lantern market and he eats continuously, so at the shutter he is mid-chomp
+ *  — and a chomp is a dark portrait oval with the tongue low in it. Shot 04 of
+ *  the previous set went out like that: two enormous eyes and a hole. It reads
+ *  as a gasp, not a grin, and it is the frame Apple would have put on the
+ *  listing.
+ *
+ *  The rig knows the difference (void3d.ts faceState), so ask it. Bites are
+ *  short and intermittent even in a crowded street, so a gap always comes; if
+ *  one has not come inside the budget, that is a finding and not something to
+ *  photograph over. */
+//  ── AND WAITING FOR THE GAP IS NOT THE ANSWER, WHICH COST A FRAME ───────
+//  The first version of this simply waited up to 20s for `smile` to come true.
+//  It got the grin and destroyed the photograph: twenty seconds parked in a
+//  lantern market with the magnet on is twenty seconds of EATING, and 04 came
+//  out as a beautifully smiling hero in an empty purple lot with the entire
+//  street already swallowed. Waiting for the mouth to close means waiting while
+//  he eats the set.
+//
+//  So the jaw is PINNED for the shutter (__pinMouth, void3d.ts) and released
+//  straight after. The pin blocks chomp/gulp/dash from retriggering the gape,
+//  which makes the face show its mood — the thing the mood pin was always
+//  meant to control — and makes the frame deterministic instead of a race.
+const grinning = async (label, ms = 4000) => {
+  await page.evaluate(() => window.__pinMouth?.(true));
+  try {
+    await page.waitForFunction(() => window.__faceState?.().smile === true, null,
+      { timeout: ms, polling: 80 });
+    return true;
+  } catch {
+    const f = await page.evaluate(() => window.__faceState?.() ?? null);
+    console.log(`  (!) ${label}: jaw pinned shut and the grin still did not come `
+      + `in ${ms / 1000}s — shooting anyway, CHECK THIS FRAME. faceState=${JSON.stringify(f)}`);
+    return false;
+  }
+};
+/** Hand the jaw back. Every grinning() must be followed by one of these before
+ *  the hero is expected to eat anything again. */
+const unpin = async () => { await page.evaluate(() => window.__pinMouth?.(false)); };
+/** Click a menu control by dispatching the DOM click directly.
+ *
+ *  page.click() runs Playwright's actionability checks, and under a software
+ *  renderer those time out on a button that is provably fine: the run before
+ *  this one died on #btnPlay with "visible, enabled and stable … done
+ *  scrolling", and elementFromPoint at the button's own centre returned the
+ *  button. Nothing was covering it. What actually happens is that the 1290x2796
+ *  capture immediately before leaves the compositor pegged, the page drops to
+ *  about a frame a second, and the 30s hit-test budget expires against a main
+ *  thread that is busy rather than a control that is blocked.
+ *
+ *  These are plain <button>s with click handlers and this is a scripted capture
+ *  of a page we wrote, so the actionability check buys nothing here. It is the
+ *  same call the other eighty-five probes in qa/ make.
+ *
+ *  NOT for #tapGate — that listens for pointerdown, which a DOM .click() does
+ *  not fire. That one stays a real Playwright click. */
+const tap = async (sel) => {
+  await page.waitForSelector(sel, { state: 'attached', timeout: 120000 });
+  const ok = await page.evaluate((q) => {
+    const el = document.querySelector(q);
+    if (!el) return false;
+    el.click();
+    return true;
+  }, sel);
+  if (!ok) throw new Error(`tap("${sel}") found nothing to click`);
+};
+
 // ── 01 · the menu ───────────────────────────────────────────────────────────
 if (want('01', '02')) {
   await boot();
@@ -253,7 +324,7 @@ if (want('01', '02')) {
   if (want('01')) await shot('01-menu.png');
 
   // ── 02 · the world picker ─────────────────────────────────────────────────
-  await page.click('#btnPlay');
+  await tap('#btnPlay');
   await settle(1800);
   if (want('02')) await shot('02-worlds.png');
 }
@@ -301,7 +372,7 @@ const enterMatch = async (world) => {
   }, world);
   if (locked) throw new Error(
     `world card "${world}" is ${locked} — the seed did not unlock it, and store/'s previous set has already been moved aside. See the voidUnlocked note in SEED().`);
-  await page.click(`#worldRow .wCard[data-world="${world}"]`);
+  await tap(`#worldRow .wCard[data-world="${world}"]`);
   // ── A WORLD SWITCH IS A RELOAD, AND IT LANDS ON A GATE ────────────────────
   // Tapping another world's card reloads the page. The reload does not drop the
   // child straight into a match: it lands on TAP TO PLAY, and the tap is the
@@ -358,7 +429,7 @@ const toPicker = async () => {
   await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
     if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
   }));
-  await page.click('#btnPlay');
+  await tap('#btnPlay');
   await settle(1400);
 };
 
@@ -370,8 +441,10 @@ if (want('03')) {
 // still reads around it
 await growTo(3.4);
 await page.evaluate(() => window.__news());     // a headline in frame sells the world
-await settle(900);
+  await settle(900);
+  await grinning('03-devouring');
   await shot('03-devouring.png');
+  await unpin();
   await stopPlay();
 }
 
@@ -435,7 +508,7 @@ if (want('04', '05')) {
   // stall roofs, umbrellas, crates and a crowd around a hero small enough to
   // be standing IN a market rather than in front of one.
   await frame(3.4, 6050, 7800);
-  if (want('04')) await shot('04-lantern-market.png');
+  if (want('04')) { await grinning('04-lantern-market'); await shot('04-lantern-market.png'); await unpin(); }
 
   // ── 05 · LANTERN NIGHT, the bathhouse ─────────────────────────────────────
   // The finale, at the size a player reaches it, with its eave lines lit.
@@ -456,7 +529,7 @@ if (want('04', '05')) {
   // all six storeys in frame with headroom, the golden pool at the base, the
   // finial clear of the timer, and the hero at its feet.
   await frame(10.0, 6704, 2924);
-  if (want('05')) await shot('05-lantern-bathhouse.png');
+  if (want('05')) { await grinning('05-lantern-bathhouse'); await shot('05-lantern-bathhouse.png'); await unpin(); }
   await page.evaluate(() => window.__setMood(null));   // hand the face back
 }
 
@@ -467,7 +540,9 @@ if (want('06')) {
   await growTo(5.0);
   await page.evaluate(() => window.__news());
   await settle(900);
+  await grinning('06-gameday');
   await shot('06-gameday.png');
+  await unpin();
   await stopPlay();
 }
 
@@ -487,7 +562,7 @@ await settle(3000);
 await page.evaluate(() => document.querySelectorAll('.show').forEach((e) => {
   if (['daily', 'gift'].includes(e.id)) e.classList.remove('show');
 }));
-await page.click('#btnShop');
+await tap('#btnShop');
 // WAIT FOR THE CARDS, DO NOT GUESS AT THEM. Every card is a live render, painted
 // across animation frames on a per-frame budget, and each one now solves its own
 // framing from the alpha it draws — so the grid fills in over rather more frames

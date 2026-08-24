@@ -40,6 +40,13 @@ export interface Void3D {
    *  own visibility — the one feature a child reads first — and `maw` is the
    *  gape's current scale. See qa/faceparity.mjs. */
   faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean };
+  /** QA/capture: hold the jaw shut so the face shows its MOOD and nothing else.
+   *  The gape is driven by eating, not by mood, so a hero parked anywhere with
+   *  food in reach is mid-bite in almost every frame and cannot be
+   *  photographed wearing his own smile. Pinning is the only deterministic way
+   *  to take that picture; waiting for a gap means waiting while he eats the
+   *  set. See scripts/shoot-store.mjs. Never set from gameplay. */
+  pinMouth(shut: boolean): void;
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -1470,6 +1477,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let stage = 0, ringFade = 0;
   let moveAmt = 0, blinkT = 3.4, blink = 0, blinkN = 0;   // blink cadence is authored, not rolled
   let mouthT = 0, mouthMax = 0;    // open-mouth envelope
+  let mouthPinShut = false;        // QA/capture only — see pinMouth()
   // age of the CURRENT bite, counting up — drives the anticipation spring.
   // mouthT alone counts down, and min(1, mouthT*8) reaches 1 on the trigger
   // frame: the maw popped from closed to fully open in ONE frame, on the
@@ -1506,6 +1514,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
+    pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     setFaceWrap(v) {
       // clamped short of 1: a full wrap seats the cheeks exactly ON the surface
       // and they depth-fight the body they are painted on. 0.9 keeps a margin.
@@ -1714,6 +1723,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // hotel as for a hydrant — about fifty times a match, on the one action the
     // whole game is made of. `k` is the meal's size relative to the void.
     chomp(k = 0.3) {
+      if (mouthPinShut) return;
       const g = Math.min(1, Math.max(0.12, k));
       const want = 0.18 + 0.30 * g;                 // 0.22 -> 0.48 of a second
       const wide = 0.42 + 0.58 * g;                 // 0.47 -> 1.00 of the jaw
@@ -1742,9 +1752,9 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       dispV = Math.min(dispV, 2.6);
     },
     // the set-piece anims are REACTIONS, not bites — they skip the wind-up
-    animGulp() { mouthT = 0.6; mouthMax = 1; wobble = 1; mouthAge = 0.3; },
-    animDash() { stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); mouthAge = Math.max(mouthAge, 0.3); },
-    animCollapse() { inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; mouthAge = 0.3; },
+    animGulp() { if (mouthPinShut) return; mouthT = 0.6; mouthMax = 1; wobble = 1; mouthAge = 0.3; },
+    animDash() { if (mouthPinShut) return; stretchT = 0.5; mouthT = Math.max(mouthT, 0.4); mouthMax = 0.8; wobble = Math.min(1, wobble + 0.4); mouthAge = Math.max(mouthAge, 0.3); },
+    animCollapse() { if (mouthPinShut) return; inhaleT = 0.9; mouthT = 0.9; mouthMax = 1; wobble = 1; mouthAge = 0.3; },
     update(dt, s) {
       bodyMat.uniforms.uTime.value = s.t;
 

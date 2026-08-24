@@ -1571,6 +1571,7 @@ const _dbg = new Proxy(_dbgStore, {
   __inDeepWater3: (x: number, z: number, m: number) => boolean;
   __setMood: (m: string | null) => void;
   __faceState: () => { mood: string; maw: number; smile: boolean; biting: boolean };
+  __pinMouth: (shut: boolean) => void;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
@@ -1702,6 +1703,9 @@ _dbg.__setMood = (m: string | null) => { moodPin = m; if (m) voidling.setMood(m 
 // a world actually SHOWS is to sample it while that world plays.
 // qa/faceparity.mjs polls this across all five worlds.
 _dbg.__faceState = () => voidling.faceState();
+// QA/capture: hold the jaw shut so a framed shot shows the hero's MOOD rather
+// than whatever he happened to be swallowing. See void3d.ts pinMouth().
+_dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
 // How far the face is seated onto the sphere, 0..0.9. A look knob — see
 // FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
 // frame at several values and the choice can be made from pictures.
