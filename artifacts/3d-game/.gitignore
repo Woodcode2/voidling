@@ -33,3 +33,9 @@ qa/out/lookbook.json
 
 # shoot:store moves the previous set here rather than deleting it
 store/.previous/
+
+# TEAM MOVERS' character sheets — 4.3M of probe frames per run. Same rule as
+# every other qa/out subtree: the ledger cites one frame, not every attempt.
+qa/out/moverface/
+qa/out/crowdface/
+qa/_scratch/

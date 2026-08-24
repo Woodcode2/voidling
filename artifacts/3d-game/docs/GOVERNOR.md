@@ -115,6 +115,20 @@ Kept because a studio that hides its own errors is worth nothing.
    second. The shooter now holds the shutter until `faceState().smile` is
    true and says so loudly if it never comes.
 
+9. **`qa/personsheet.mjs` has never photographed a walking person.** Found by
+   TEAM MOVERS in round 3 and verified from source. `life.ts:2534` takes the
+   person's collision radius as its seventh argument; every walking adult is
+   registered at **2.4** and every child at **1.9** (`life.ts:2946`, `:4066`).
+   `personsheet.mjs:112` rejects anything above **1.6**. So the character sheet
+   built specifically to stop another white-eyeball incident has only ever
+   caught `mainstreet.ts` STATICS — the crowd's face has never been looked at.
+   Its second bug compounds it: setting `mesh.rotation.y` on a mover does
+   nothing, because `addWanderer`'s update rewrites the heading every frame, so
+   a mover would turn away before the shutter even if one were selected.
+   `qa/crowdface.mjs` clones the person to hold the pose. This is the SAME
+   failure as the incident that created the studio — verifying the wrong
+   subject — committed by the instrument written to prevent it.
+
 And one that is not a metric but belongs here: **the `voidUnlocked` seed.** I
 wrote it as `JSON.stringify([...])` in the first probe of the session and copied
 that line into seven more files including the store shooter. The key is a
