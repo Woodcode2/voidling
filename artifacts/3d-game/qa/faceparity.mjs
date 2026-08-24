@@ -96,8 +96,21 @@ const MAX_REST_GRIN_SPREAD = 0.35;   // resting-face grin share, across worlds
 // frames" in three worlds, because at that scale it never got past the opening
 // calm hold. If a bar here ever needs a real stretch of play, it must wait on
 // __matchState().t like that probe now does.
-const SAMPLES = 120;
-const SAMPLE_MS = 100;
+// ── AND THEN IT FLAKED THE GATE, EXACTLY AS THAT NOTE PREDICTED ──────────
+// It did. Powder Pass came back "0/120 idle — the hero was mid-bite in all 120
+// sampled frames", which is the self-check doing its job and refusing to report
+// a resting face it never saw. The cause is the window: under swiftshader the
+// match clock runs ~14x slower than wall (qa/_clockrate.mjs), so 12 seconds of
+// sampling is under a second of match, and inside one second a hero who happens
+// to be chewing never stops. Nothing was wrong with the game.
+//
+// A gate step that fails on which second it started is a gate step people learn
+// to re-run, so this now waits for match second 8 and samples across 14 match
+// seconds — long enough that idle frames are not a coin flip. Same fix
+// qa/bubbleclear.mjs needed for the same reason.
+const START_AT = 8;      // match seconds — past the opening calm
+const SPAN = 14;         // match seconds to sample across
+const SAMPLE_MS = 120;   // wall
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -151,9 +164,13 @@ for (const wid of WORLDS) {
     requestAnimationFrame(tick);
   });
 
+  await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) > t, START_AT,
+    { timeout: 900000, polling: 250 });
+  const until = await p.evaluate(() => window.__matchState().t) + SPAN;
   const moods = new Map();
   let grin = 0, moodHidden = 0, n = 0, rest = 0, restGrin = 0;
-  for (let i = 0; i < SAMPLES; i++) {
+  for (;;) {
+    if (await p.evaluate(() => window.__matchState().t) >= until) break;
     const s = await p.evaluate(() => window.__faceState());
     n++;
     if (s.smile) grin++;
@@ -201,7 +218,9 @@ if (rated.length >= 2) {
 for (const r of rows) {
   if (r.restShare === null) {
     fails.push(`${r.wid}: the hero was mid-bite in all ${r.rest === 0 ? SAMPLES : r.rest} sampled frames, `
-      + `so he has no resting face here to compare — that is its own finding`);
+      + `so he has no resting face here to compare. That is either a hero who genuinely never `
+      + `stops chewing, or a sampling window too short to catch a gap — check the idle count `
+      + `before reading anything into it`);
   }
 }
 

@@ -95,11 +95,11 @@ const SUITE = [
   // because a mood table entry, not face code, was what deleted the smile.
   // push profile runs two worlds (the measured best and worst); live runs all
   // five. See docs/STUDIO-ROUND-2.md.
-  { id: 'faceparity', tier: 'art', profiles: ['push', 'art'], timeout: 900,
+  { id: 'faceparity', tier: 'art', profiles: ['push', 'art'], timeout: 1800,
     cmd: ['node', 'qa/faceparity.mjs', PORT, 'pirate', 'powder'], verdict: pf,
     why: 'the hero wears the same face in every world, and no mood deletes his grin' },
 
-  { id: 'faceparity:all', tier: 'art', profiles: ['live'], timeout: 2400,
+  { id: 'faceparity:all', tier: 'art', profiles: ['live'], timeout: 4200,
     cmd: ['node', 'qa/faceparity.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'the hero wears the same face in all five worlds, and no mood deletes his grin' },
 
