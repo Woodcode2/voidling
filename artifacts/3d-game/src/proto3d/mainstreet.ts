@@ -13,7 +13,7 @@
 //   • no Math.random(). The town is hand-built and the same every load —
 //     use mrnd()/mr()/mpick(), which run off a fixed seed.
 import * as THREE from 'three';
-import { part, mergedProp, PROP_SMOOTH_MAT } from './island';
+import { part, mergedProp, PROP_SMOOTH_MAT, shade, tint } from './island';
 import { registerGloss } from './gloss';
 import { roundedBox } from './life';
 
@@ -1664,24 +1664,56 @@ export function makeMapleTree(): THREE.Mesh {
   // exactly one mpick and then, per lobe, exactly four mr() in the same order
   // and the same ranges as before — captured into variables and reused, rather
   // than re-rolled. The extra lobes are ARITHMETIC on values already drawn.
-  const dark = new THREE.Color(leaf).multiplyScalar(0.74).getHex();
-  const lit = new THREE.Color(leaf).multiplyScalar(1.16).getHex();
+  // ── THE CANOPY WAS BUILT UPSIDE DOWN, AND ITS TONES DID NOTHING ─────────
+  // TEAM STATIC, studio round 1, on the previous version of this fix — and both
+  // halves check out.
+  //
+  // FIRST, the tones were nearly identical. multiplyScalar on a THREE.Color is
+  // a LINEAR operation under three's colour management, so x0.74 displays as
+  // 0.87 and x1.16 displays as 1.07 and clips. Both accents sat inside a tenth
+  // of a stop of the base. island.ts now exports shade()/tint(), which work in
+  // the space the eye sees; see the note there for the measured numbers.
+  //
+  // SECOND, and worse: the satellites were pushed FURTHER OUT than the mains
+  // (1.55 against 1.28 on the same ring radius), so they did not break the
+  // silhouette up — they added six more cusps to it. Twelve equal circles
+  // instead of six. The comment claimed they gave the canopy an underside;
+  // geometrically they were widening the outline with more of the same shape.
+  //
+  // Animal Crossing's canopies never resolve into lobes, and the rule is the
+  // inverse of what was here: a DARK MASS carrying small LIGHT accents on top,
+  // not light lobes with dark trim on the outside. So the six big lobes are the
+  // dark mass and form the silhouette, the satellites are pulled IN and UP as
+  // highlights that never touch the outline, and the crown is the lightest
+  // thing because it is what the sky hits.
+  //
+  // THE SEEDED STREAM IS STILL EXACTLY ONE mpick AND FOUR mr() PER LOBE, in the
+  // same order and ranges. This runs 603 times while Maple is populated.
+  // Tuned by eye against the render, once, after shade()/tint() made the
+  // numbers mean what they say. At 0.70/0.34 the separation was real and TOO
+  // strong: an autumn orange scaled to 70% is a brown, and a crown lifted a
+  // third of the way to white reads as cream sitting on mud. These are the
+  // numbers where the canopy has depth and is still the colour of a maple.
+  const dark = shade(leaf, 0.80);
+  const lit = tint(leaf, 0.15);
+  const heroDark = shade(LEAF_HERO, 0.84);
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
     const rr = mr(1.5, 2.1);          // draw 1 — was the lobe radius
     const radA = mr(1.1, 1.9);        // draw 2 — was the x ring radius
     const yy = mr(5.2, 6.6);          // draw 3 — was the height
     const radB = mr(1.1, 1.9);        // draw 4 — was the z ring radius
-    // MAIN: two thirds the old radius, pushed a little further out, so the
-    // canopy keeps its width while no single lobe owns it
-    p.push(part(new THREE.SphereGeometry(rr * 0.66, 10, 8), i % 2 ? leaf : LEAF_HERO,
-      Math.cos(a) * radA * 1.28, yy, Math.sin(a) * radB * 1.28));
-    // SATELLITE: lower, further out, darker — the underside of a canopy
+    // THE MASS: the big lobes, in the dark tone. These and only these make the
+    // silhouette, so there are six cusps in the outline and not twelve.
+    p.push(part(new THREE.SphereGeometry(rr * 0.74, 10, 8), i % 2 ? dark : heroDark,
+      Math.cos(a) * radA * 1.12, yy, Math.sin(a) * radB * 1.12));
+    // THE ACCENT: small, pulled INSIDE the mass and lifted, in the light tone.
+    // Inside, so it can never widen the outline.
     const b = a + 0.62;
-    p.push(part(new THREE.SphereGeometry(rr * 0.44, 8, 6), dark,
-      Math.cos(b) * radA * 1.55, yy - 0.95, Math.sin(b) * radB * 1.55));
+    p.push(part(new THREE.SphereGeometry(rr * 0.34, 8, 6), lit,
+      Math.cos(b) * radA * 0.62, yy + 0.70, Math.sin(b) * radB * 0.62));
   }
-  // the crown catches the sky, so it is the light tone
-  p.push(part(new THREE.SphereGeometry(1.55, 11, 9), lit, 0, 7.0, 0));
+  // the crown catches the sky, so it is the lightest thing on the tree
+  p.push(part(new THREE.SphereGeometry(1.35, 11, 9), tint(leaf, 0.22), 0, 7.1, 0));
   return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }

@@ -3675,6 +3675,41 @@ const _pc = new THREE.Color();
 // good — which is exactly why the flat/smooth decision has been made by hand,
 // per factory, in six files, and got it wrong for most of the game.
 const ROUND_GEO = /^(Cylinder|Cone|Sphere|Torus|Lathe|Capsule|Tube)/;
+// ── TONE, IN THE SPACE THE EYE ACTUALLY SEES ────────────────────────────────
+// `new THREE.Color(hex).multiplyScalar(0.74).getHex()` does NOT darken by 26%.
+// three r185 ships ColorManagement.enabled = true, so setHex() converts sRGB to
+// LINEAR, multiplyScalar scales the linear value, and getHex() converts back —
+// and the round trip through the transfer curve eats most of the change.
+// Measured with qa/_colortest.mjs against the real three build:
+//
+//     multiplyScalar(0.74)  ->  displayed 0.87    (intended 0.74)
+//     multiplyScalar(0.80)  ->  displayed 0.90
+//     multiplyScalar(0.70)  ->  displayed 0.85
+//     multiplyScalar(1.16)  ->  displayed 1.07, and it CLIPS on bright channels
+//
+// So every two-tone prop in this game has been roughly half as separated as its
+// code claims, which is why a canopy built as "a dark mass with light accents"
+// photographs as one flat orange mass with twelve equal highlights. Found by
+// TEAM STATIC on the studio's first round and verified here before use.
+//
+// shade() scales the DISPLAYED channels, so shade(c, 0.74) really is 26% darker.
+// tint() lifts toward white instead of scaling up, because scaling a bright
+// channel past 255 clips to white and turns a highlight into a hole.
+export const shade = (hex: number, k: number): number => {
+  const ch = (sh: number) => {
+    const v = Math.round(((hex >> sh) & 255) * k);
+    return v < 0 ? 0 : v > 255 ? 255 : v;
+  };
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+};
+export const tint = (hex: number, t: number): number => {
+  const ch = (sh: number) => {
+    const v = (hex >> sh) & 255;
+    return Math.round(v + (255 - v) * t);
+  };
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+};
+
 export function part(geo: THREE.BufferGeometry, col: number, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy?: number, sz?: number): THREE.BufferGeometry {
   const wasRound = ROUND_GEO.test(geo.type);
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -3862,8 +3897,8 @@ function makeTree(): THREE.Group {
   // clustered two-tone canopy like the 2D tree sprites — reads lush, not
   // "gumdrop". ONE merged mesh, ONE draw call (was 5).
   const base = pick(foliagePool());
-  const dark = new THREE.Color(base).multiplyScalar(0.7).getHex();
-  const light = new THREE.Color(base).multiplyScalar(1.28).getHex();
+  const dark = shade(base, 0.70);          // really 30% down now — see shade()
+  const light = tint(base, 0.26);
   const R0 = rand(2.2, 2.9);
   const grp = new THREE.Group();
   // spheres, not icosahedra: same silhouette and cost, smooth normals through
@@ -4319,8 +4354,8 @@ function makeBush(): THREE.Mesh {
     // tips. All-amber bushes made the rim read as one flat orange band.
     ? [0x6a9a4a, 0x8a9a3a, 0xb8823a, 0x7a8f3a, 0xa8622f]
     : [0x6cc86e, 0x5db06a, 0x7ed57a]);
-  const dark = new THREE.Color(base).multiplyScalar(0.80).getHex();
-  const light = new THREE.Color(base).multiplyScalar(1.16).getHex();
+  const dark = shade(base, 0.76);
+  const light = tint(base, 0.20);
   const R = rand(1.4, 2.1);
   return noFront(mergedProp([
     part(new THREE.SphereGeometry(R * 0.80, 12, 8), base, 0, R * 0.05, 0, 0, 0, 0, 1, 0.78, 1),
@@ -4400,9 +4435,36 @@ function makeTrash(): THREE.Group {
   return noFront(g);
 }
 function makeFlowers(): THREE.Group {
-  const parts = [part(new THREE.IcosahedronGeometry(0.7, 0), 0x5db06a, 0, 0.5, 0, 0, 0, 0, 1, 0.7, 1)];
-  for (let i = 0; i < 5; i++)
-    parts.push(part(new THREE.SphereGeometry(0.16, 6, 5), pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]), rand(-0.5, 0.5), 0.8, rand(-0.5, 0.5)));
+  // ── A GREEN D20 WITH GUMBALLS ON IT ───────────────────────────────────────
+  // The mound was IcosahedronGeometry(0.7, 0): twenty flat triangles, each
+  // catching its own tone. This is the most-placed small prop in Maple Falls —
+  // nine of eleven biome pools, double-weighted in cozy and park, plus six
+  // direct scatter loops — and it is the exact pathology this file has already
+  // condemned twice in writing ("ONE SPHERE IS JELLY", "a pile of orange
+  // rocks"), left standing in the prop that appears most.
+  //
+  // AND THE MATERIAL VOTE HID IT. mergedProp picks flat or smooth by counting
+  // how many parts are round, and ROUND_GEO does not list Icosahedron — so the
+  // mound counted as flat while the five blossoms counted as round, 5/6 cleared
+  // ROUND_SHARE, and the whole prop was assigned PROP_SMOOTH_MAT. Polyhedron
+  // geometry carries per-face normals that toNonIndexed() preserves, so it
+  // rendered faceted ON the smooth material. Any probe that reads the material
+  // rather than the normals reports this prop as smooth. It is not.
+  //
+  // A squashed sphere matches ROUND_GEO, keeps the classifier honest, and
+  // shades. The blossoms get stems and are seated ON the dome instead of at a
+  // fixed y = 0.8, which is what left the outer ones hanging in the air with
+  // daylight under them.
+  const R = 0.7, H = 0.7;
+  const parts = [part(new THREE.SphereGeometry(R, 9, 6), 0x5db06a, 0, 0.5, 0, 0, 0, 0, 1, H, 1)];
+  for (let i = 0; i < 5; i++) {
+    const bx = rand(-0.46, 0.46), bz = rand(-0.46, 0.46);
+    const d = Math.min(0.99, Math.hypot(bx, bz) / R);
+    const top = 0.5 + H * R * Math.sqrt(1 - d * d);      // the dome's own surface here
+    const col = pick([0xff6fb0, 0xffd23f, 0xff5a4d, 0xa87bff, 0xffffff]);
+    parts.push(part(new THREE.CylinderGeometry(0.022, 0.032, 0.26, 4), 0x4a8f52, bx, top + 0.10, bz));
+    parts.push(part(new THREE.SphereGeometry(0.15, 6, 5), col, bx, top + 0.25, bz));
+  }
   const g = new THREE.Group(); g.add(mergedProp(parts));
   return noFront(g);
 }

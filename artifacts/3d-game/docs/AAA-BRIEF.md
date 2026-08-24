@@ -1484,3 +1484,79 @@ leaf is ONE TEXEL and invisible at every camera distance. That is not a tuning
 problem but a representable-object problem: this bake cannot hold a leaf. It can
 hold a DRIFT, so drifts are what it paints. Anyone reaching for finer ground
 detail here should check the texel budget before spending the day.
+
+### multiplyScalar was never darkening anything — VISUAL — closes absence #5
+
+Found by TEAM STATIC on the studio's first round, verified by the governor
+before use, and it invalidated a fix this ledger had already recorded as landed.
+
+MEASURED   `new THREE.Color(hex).multiplyScalar(0.74).getHex()` does not darken
+           by 26%. three r185 ships `ColorManagement.enabled = true`, so
+           `setHex` converts sRGB to LINEAR, the multiply scales the linear
+           value, and `getHex` converts back — and the round trip through the
+           transfer curve eats most of it. Measured against the real three
+           build with `qa/_colortest.mjs`:
+
+               x0.74  ->  displayed 0.87        x1.16  ->  displayed 1.07, clips
+               x0.80  ->  displayed 0.90        x1.28  ->  displayed 1.12, clips
+
+           So every two-tone prop in this game has been roughly half as
+           separated as its code claims, for as long as the pattern has existed.
+           It is why the maple canopy — rebuilt one commit earlier as "a dark
+           mass with light accents" — photographed as one flat orange mass with
+           twelve equal highlights. The geometry landed; the tones never did.
+
+           And a second, structural error in the same builder: the satellites
+           were pushed FURTHER OUT than the mains (1.55 against 1.28 on the same
+           ring radius), so they did not break the silhouette up — they added
+           six more cusps to it. Twelve equal circles instead of six.
+
+CHANGED    island.ts exports `shade(hex, k)` and `tint(hex, t)`, which work on
+           the displayed channels, so `shade(c, 0.8)` really is 20% down; tint
+           lifts toward white rather than scaling up, because scaling a bright
+           channel past 255 clips a highlight into a hole. Applied to makeTree,
+           makeBush and makeMapleTree.
+           The maple canopy is rebuilt to Animal Crossing's rule rather than its
+           inverse: the six BIG lobes carry the dark tone and are the only thing
+           in the silhouette, the accents are small, light, and pulled INSIDE
+           the mass where they cannot widen the outline, and the crown is the
+           lightest thing because it is what the sky hits. Seeded draws
+           unchanged — one mpick and four mr() per lobe, same order, same
+           ranges, because this runs 603 times while Maple is populated.
+
+           And makeFlowers stopped being a green d20 with gumballs on it. Its
+           mound was `IcosahedronGeometry(0.7, 0)` — twenty flat faces — on the
+           most-placed small prop in the town: nine of eleven biome pools,
+           double-weighted in cozy and park, plus six direct scatter loops.
+           A squashed sphere now, with stems, and the blossoms seated on the
+           dome's own surface instead of a fixed y that left the outer ones
+           hanging in the air.
+
+NOW        Screenshots, same camera: qa/out/shippedlook/maple_tone2.png against
+           maple_trees.png. The canopy has a dark mass and a lit crown that are
+           visibly different colours; before, they were inside a tenth of a stop.
+
+GATE       `qa/normals.mjs`, and the honest version of it is the second one.
+
+RETRACTION, and it is about the gate rather than the game. TEAM STATIC proposed
+measuring, at runtime, the share of triangles per prop whose vertex normals
+agree, failing anything above 40% flat. Built it, ran it, and it failed EIGHTEEN
+forms on Maple — almost all correct, because a prop earns the smooth material at
+HALF its parts being round, so a barrel with a boxy lid is legitimately about
+50% flat triangles. The bar mistook the design for the defect. A runtime share
+cannot separate "flat because a box is meant to be flat" from "flat because a
+dome is secretly a polyhedron", and that distinction is the entire bug.
+
+The shipped gate is static instead: every geometry type used in the prop kits
+must be explicitly classified round or flat, so a new type cannot arrive
+unclassified — plus a reviewed CENSUS of every remaining faceted-polyhedron use,
+because classification alone would not have caught makeFlowers either
+(Icosahedron is legitimately faceted; using it as a MOUND was the defect, and no
+list of type names can tell a crystal from a dome). A new use fails until a
+human looks at it, which is the moment somebody finally asks the question.
+
+The census earned itself on its first run: five "palms" in luxe.ts were potted
+plant FOLIAGE built from icosahedra — the same defect as makeFlowers, in Pirate
+Bay, never noticed. Spheres now. The first version of the budget table was
+GUESSED, which is the opposite of its purpose; the numbers there now come from
+opening every one of the twenty-two remaining sites.

@@ -11,6 +11,14 @@
 //    • keep each prop under ~140 parts
 // ══════════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
+// FOLIAGE IS NOT A CRYSTAL. Five potted plants in this file grew their leaves
+// from IcosahedronGeometry — a twenty-face solid with per-face normals, used as
+// a rounded green mass. It is the same defect makeFlowers had in island.ts: the
+// prop takes the SMOOTH material by vote (mergedProp counts round parts, and
+// the polyhedron family is not in ROUND_GEO) and then renders hard-faceted
+// anyway, because toNonIndexed() preserves the split normals. Spheres now.
+// qa/normals.mjs keeps a census of every remaining faceted-polyhedron use so a
+// new one has to be justified as a rock or a crystal before it can ship.
 import { part, mergedProp } from './island';
 import { registerGloss } from './gloss';
 
@@ -470,7 +478,7 @@ export function makeSpaPavilion(): THREE.Group {
   p.push(part(new THREE.CylinderGeometry(0.62, 0.62, 0.1, 12), AQUA, -3.2, 1.42, 0));
   for (const oz of [-3.6, 3.6]) {
     p.push(part(new THREE.CylinderGeometry(0.34, 0.26, 0.6, 9), IVORY, 3.4, 1.2, oz));
-    p.push(part(new THREE.IcosahedronGeometry(0.42, 0), PALM, 3.4, 1.7, oz));
+    p.push(part(new THREE.SphereGeometry(0.42, 9, 7), PALM, 3.4, 1.7, oz, 0, 0, 0, 1, 0.86, 1));
     p.push(part(new THREE.SphereGeometry(0.15, 7, 6), BLUSH, 3.4, 2.02, oz));
   }
   return finish(p);
@@ -650,8 +658,8 @@ export function makeYachtClub(): THREE.Group {
   for (const [px, pz] of [[9.6, -5.2], [9.6, 5.2], [-9.6, -5.2], [-9.6, 5.2]] as [number, number][]) {
     p.push(part(new THREE.CylinderGeometry(0.62, 0.5, 1.0, 10), IVORY, px, 1.2, pz));
     p.push(part(new THREE.TorusGeometry(0.62, 0.08, 5, 12), GOLD, px, 1.62, pz, Math.PI / 2));
-    p.push(part(new THREE.IcosahedronGeometry(0.85, 0), PALM, px, 2.3, pz));
-    p.push(part(new THREE.IcosahedronGeometry(0.55, 0), PALM_L, px, 3.0, pz));
+    p.push(part(new THREE.SphereGeometry(0.85, 10, 8), PALM, px, 2.3, pz, 0, 0, 0, 1, 0.84, 1));
+    p.push(part(new THREE.SphereGeometry(0.55, 9, 7), PALM_L, px, 3.0, pz, 0, 0, 0, 1, 0.88, 1));
   }
   return finish(p);
 }
@@ -1297,8 +1305,8 @@ export function makePotPlant(): THREE.Group {
     part(new THREE.TorusGeometry(0.42, 0.06, 5, 12), GOLD, 0, 0.68, 0, Math.PI / 2),
     part(new THREE.CylinderGeometry(0.36, 0.36, 0.08, 10), 0x5a4632, 0, 0.72, 0),
     part(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 6), TEAK_D, 0, 0.95, 0),
-    part(new THREE.IcosahedronGeometry(0.5, 0), PALM, 0, 1.35, 0),
-    part(new THREE.IcosahedronGeometry(0.34, 0), PALM_L, 0, 1.82, 0),
+    part(new THREE.SphereGeometry(0.5, 9, 7), PALM, 0, 1.35, 0, 0, 0, 0, 1, 0.86, 1),
+    part(new THREE.SphereGeometry(0.34, 8, 6), PALM_L, 0, 1.82, 0, 0, 0, 0, 1, 0.88, 1),
   ];
   for (let i = 0; i < 4; i++) {
     const a = i * 1.6;

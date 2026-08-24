@@ -84,6 +84,10 @@ const SUITE = [
     cmd: ['node', 'qa/iapdoc.mjs'], verdict: re(/APPSTORE\.md and the client agree on every/, /^FAIL \(\d+\)|NOT IN THE DOC|NOT REGISTERED/m),
     why: 'APPSTORE.md and the client agree on every product id, price, world count and asset path — the doc is pasted into App Store Connect' },
 
+  { id: 'normals', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 60,
+    cmd: ['node', 'qa/normals.mjs'], verdict: pf,
+    why: 'every geometry type is classified round or flat, and no unreviewed faceted form has appeared' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
