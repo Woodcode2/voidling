@@ -1274,8 +1274,19 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // DINO SNOUT: a blunt jaw pushing out of the face, with nostrils + teeth
     mk('snout', (g) => {
       const skinM = new THREE.MeshStandardMaterial({ color: 0x55b850, roughness: 0.55 });
+      // ── A SNOUT COMES OUT OF THE FACE, NOT THE BELLY ──────────────────
+      // This sat at y -0.56 against a mouth at -0.26 (mouth.position, above):
+      // 0.30 below the mouth it is meant to be part of, which on a unit body
+      // is fifteen per cent of the diameter. Rendered at play size it read as
+      // a bib — a brighter-green lump with a hard edge across the underside —
+      // and this is a card labelled LEGENDARY at $2.99.
+      //
+      // -0.44 is the highest it can go: the jaw's half-height is 0.46*0.58 =
+      // 0.267, the eye whites are SCL_R 0.21 centred at y 0.06 so their lower
+      // edge is -0.15, and -0.44 + 0.267 = -0.173 clears that. TEAM MOVERS
+      // proposed -0.34, which would have pushed the jaw THROUGH the eyes.
       const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 12), skinM);
-      jaw.scale.set(0.78, 0.58, 1.0); jaw.position.set(0, -0.56, 0.8); g.add(jaw);
+      jaw.scale.set(0.78, 0.58, 1.0); jaw.position.set(0, -0.44, 0.8); g.add(jaw);
       // NO TEETH. Two hundred lines up, mkFang builds fangs and deliberately
       // never adds them, for a reason recorded there: a fang is the one detail
       // that tips this character from cute toward predatory, in a game for
@@ -1287,14 +1298,34 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     // DRAGON MUZZLE: longer, with brow ridges and warm nostril glow
     mk('muzzle', (g) => {
       const skinM = new THREE.MeshStandardMaterial({ color: 0x2394a8, roughness: 0.5 });
-      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.34, 0.62, 12), skinM);
-      snout.rotation.x = Math.PI / 2; snout.position.set(0, -0.5, 0.88); g.add(snout);
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10), skinM);
-      tip.position.set(0, -0.5, 1.16); g.add(tip);
+      // ── AND THIS ONE HAD TO BE SLIMMED BEFORE IT COULD BE RAISED ──────
+      // Same fault as the dino jaw — seated at y -0.5 against a mouth at -0.26
+      // — but it could not simply move up. At a base radius of 0.34 its top
+      // was already at -0.16, a hundredth clear of the eye whites' lower edge
+      // at -0.15, so ANY raise drove it through the eyes. TEAM MOVERS proposed
+      // -0.30 for it, which would have buried them.
+      //
+      // So the muzzle gets thinner as well as higher, which is also what makes
+      // it read as a muzzle: at 0.34 it was as wide as it was long and, hung
+      // below the face, it looked like a pipe coming out of the underside.
+      // 0.26 at the base puts its top at -0.16 from a seat of -0.42, and the
+      // tip and nostrils come back so it protrudes 0.31 radii past the body
+      // rather than 0.46 — a snout should break the silhouette FORWARD; it
+      // must not hang downward.
+      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 0.56, 12), skinM);
+      snout.rotation.x = Math.PI / 2; snout.position.set(0, -0.42, 0.85); g.add(snout);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10), skinM);
+      tip.position.set(0, -0.42, 1.08); g.add(tip);
       const glow = new THREE.MeshStandardMaterial({ color: 0xffb054, emissive: 0xff7a2a, emissiveIntensity: 1.2 });
-      for (const sx of [-0.08, 0.08]) {
-        const n = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), glow);
-        n.position.set(sx, -0.46, 1.3); g.add(n);
+      // …and the nostrils sit ON the tip, not inside it. The first pass at this
+      // shortened the muzzle and left them at z 1.19 while the tip sphere
+      // (centre 1.08, r 0.18) reaches 1.26 — so the glow was swallowed whole
+      // and the card lost the two warm dots that were most of the dragon's
+      // character. Rendered side by side, that made Drako's card WORSE than
+      // the belly-seated original even though the seating was better.
+      for (const sx of [-0.07, 0.07]) {
+        const n = new THREE.Mesh(new THREE.SphereGeometry(0.048, 8, 6), glow);
+        n.position.set(sx, -0.38, 1.26); g.add(n);
       }
     });
     // MANE: a soft ruff of tufts around the crown — reads as FUR from above
