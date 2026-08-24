@@ -409,7 +409,17 @@ const enterMatch = async (world) => {
     const g = document.getElementById('tapGate');
     return !!g && g.classList.contains('show') && g.classList.contains('armed');
   });
-  if (gated) await page.click('#tapGate');
+  // NOT page.click(): the same actionability stall that killed #btnPlay kills
+  // this too — "visible, enabled and stable … done scrolling", then thirty
+  // seconds of a main thread too busy to answer the hit test. And NOT tap()
+  // either, because the gate listens for POINTERDOWN (prototype3d.ts) and a
+  // DOM .click() does not fire one. Dispatch the real event.
+  if (gated) {
+    await page.evaluate(() => {
+      const g = document.getElementById('tapGate');
+      g?.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, bubbles: true }));
+    });
+  }
   await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2,
     null, { timeout: 400000 });
 };
