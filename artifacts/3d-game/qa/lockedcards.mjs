@@ -27,6 +27,7 @@
 // FIRST sight of this screen is two live cards and three locked ones — not the
 // all-unlocked view every other probe seeds.
 import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4177';
 
@@ -71,6 +72,10 @@ const cards = await p.evaluate(() => [...document.querySelectorAll('#worldRow .w
     box: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } };
 }));
 const shot = await p.screenshot({ type: 'png' });
+// Keep the frame. The numbers below say whether the posters are separable;
+// only the picture says whether they still read as LOCKED.
+mkdirSync('qa/out/locked', { recursive: true });
+writeFileSync('qa/out/locked/picker.png', shot);
 await b.close();
 
 const { PNG } = await import('pngjs');

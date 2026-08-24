@@ -1245,7 +1245,25 @@
          is the advertisement for the next world — but drained of colour, with
          the PLAY chip gone and the reason in its place. Distinct from .lock,
          which is the FROST PEAKS "world 5 does not exist yet" teaser. */
-      #worlds .wCard.locked .wArt { filter: saturate(0.28) brightness(0.62); }
+      /* ── THE LOCKED ART IS AN ADVERTISEMENT, NOT A TOMBSTONE ────────────
+         unlocks.ts states the intent in its own words: "LOCKED IS NOT HIDDEN.
+         The picker still shows every world, desaturated … The art is the
+         advertisement for the next one."
+
+         saturate(0.28) brightness(0.62) was running that advertisement at a
+         fifth of its colour. Measured on the real picker in the state a new
+         player is actually in — two unlocked, three locked
+         (qa/lockedcards.mjs): locked posters came out at chroma 3.5-6.2
+         against 21.5-26.2 for the open ones, and the minimum pairwise squint
+         deltaE across the five collapsed from 15.8 to 6.1. Four of the five
+         worlds sat within 10.3 of each other: interchangeable grey rectangles.
+         The world whose NAME is its lanterns showed unlit grey baubles, and
+         the snow world went from 40% bright pixels to 0.8%.
+
+         "Not yours yet" still lands three other ways with no help from the
+         filter: the PLAY chip is gone, the title goes lavender, and the badge
+         says what opens it. */
+      #worlds .wCard.locked .wArt { filter: saturate(0.62) brightness(0.85); }
       #worlds .wCard.locked .wGo { display: none; }
       #worlds .wCard.locked b { color: #cbb8ee; }
       #worlds .wCard.locked .wBest { color: #ffd25a; font-weight: 700; transition: transform 0.18s, color 0.18s; }

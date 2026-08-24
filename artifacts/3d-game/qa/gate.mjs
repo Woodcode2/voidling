@@ -131,6 +131,14 @@ const SUITE = [
     cmd: ['node', 'qa/evolvepop.mjs'], verdict: pf,
     why: 'evolving reads as getting BIGGER — the pop dominates the wind-up and lands with the sound' },
 
+  // unlocks.ts calls the locked art "the advertisement for the next one", and
+  // the filter was running that advertisement at a fifth of its colour. Opens
+  // the picker in the state a real new player is in — two unlocked, three
+  // locked — because every other probe here seeds all five and cannot see it.
+  { id: 'lockedcards', tier: 'ui', profiles: ['push', 'live', 'art'], timeout: 300,
+    cmd: ['node', 'qa/lockedcards.mjs', PORT], verdict: pf,
+    why: 'a child can still tell the locked worlds apart — the art keeps selling the next one' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
