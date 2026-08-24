@@ -59,6 +59,36 @@ record before acting on any of it.
 Status: **CONFIRMED** (measured, fixed) · **REFUTED** (measured, claim was
 wrong) · **PENDING** (not yet measured — do not act on it).
 
+### The grade's toe — measured 2026-08-24, all five worlds
+
+`prototype3d.ts:270` clipped per channel. Replaced with a compressing toe.
+Every number below is from rendered frames, not modelled.
+
+| world | mean luminance | near-black share | red pixels with G=B=0 |
+|-------|----------------|------------------|-----------------------|
+| Maple Falls | 0.2865 → 0.2865 | 1.0% → 1.0% | 49.0% → (unmeasured) |
+| Pirate Bay | 0.2691 → 0.2883 | 4.3% → 2.0% | 7.7% → **0.0%** |
+| Game Day | 0.1202 → 0.1220 | 4.7% → **1.2%** | 83.6% → 84.7% |
+| Lantern (market) | 0.0670 → 0.0679 | 6.8% → 5.1% | 65.6% → **1.8%** |
+| Lantern (bathhouse) | 0.0602 → 0.0658 | 13.0% → **3.4%** | — |
+| Powder Pass | 0.1984 → 0.1906 | 2.6% → **0.9%** | 31.3% → 4.4% |
+
+Maple is bit-identical. Every world loses its dead blacks and regains hue in
+shadow, and none moves more than 9% in exposure. `qa/blackprops.mjs` goes from
+5 crushed prop faces to 0.
+
+**Game Day is the exception and it is not fixed:** 84.7% of its red pixels
+still have two channels at zero. That is ACES itself pushing G and B toward
+zero for a highly saturated red at moderate exposure, not the toe. A separate
+problem needing a separate answer — most likely desaturating `CRIM` slightly
+at source rather than touching the tone curve again.
+
+CAVEAT, stated because the numbers look cleaner than they are: the Pirate and
+Powder "before" frames come from an earlier commit, so their compositions are
+not identical and their mean-luminance deltas include framing variance. The
+near-black and channel-loss figures are robust to that; the exposure figures
+for those two worlds are indicative only.
+
 ### Round 2 — 2026-08-24
 
 | # | Claim | Status | Evidence |
