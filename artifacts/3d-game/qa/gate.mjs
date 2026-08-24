@@ -112,6 +112,17 @@ const SUITE = [
     cmd: ['node', 'qa/pickerfit.mjs', PORT], verdict: pf,
     why: 'a six-year-old can read every world name and tagline on the picker, whatever poster is behind it' },
 
+  // The one event the whole difficulty curve is built around. A hunter's bite
+  // used to be followed about a second later by the EVOLVED card, the sound,
+  // the buzz and a newsroom headline congratulating the child on growing —
+  // punishment dressed as a reward, and it inflated every evolve number the
+  // game reported about itself. Plays a real match, takes a real bite through
+  // the real handler, and checks the form comes back while the ceremony does
+  // not. live only: it needs a genuine two-form climb, which is minutes.
+  { id: 'evolveonce', tier: 'feel', profiles: ['live'], timeout: 1200,
+    cmd: ['node', 'qa/evolveonce.mjs', PORT, 'maple'], verdict: pf,
+    why: 'a child who is eaten and climbs back is not congratulated for it, and still gets their form back' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
