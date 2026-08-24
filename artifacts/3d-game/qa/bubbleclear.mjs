@@ -1,0 +1,161 @@
+// DO SPEECH BUBBLES GET DRAWN OVER THE HERO'S FACE? — the mascot-clear probe.
+//
+//   node qa/bubbleclear.mjs [port] [worlds...]
+//
+// bubbles.ts is careful about almost everything. It de-collides bubbles against
+// each other by rendered box (:222), refuses the top HUD strip (:386), dodges
+// named HUD panels by their real rect (:396), dodges the full-bleed hero-message
+// bands (:402), and hides a bubble outright rather than let one sit on another
+// (:418). Every one of those was added after a screenshot caught something.
+//
+// The void himself is on none of those lists, because every entry is a DOM id
+// (HUD_AVOID, HUD_BANDS at :73 and :76) and the hero is a 3D object. So the one
+// thing on screen that must never be covered is the only thing with no rule
+// protecting it — and the crowd nearest the void is exactly the crowd most
+// likely to be talking, so the bubbles that spawn are the ones anchored closest
+// to him.
+//
+// Caught in store/03-devouring.png, shot for the App Store: two ambient lines
+// over the hero, one straight across his chin.
+//
+// ── WHAT IT MEASURES ─────────────────────────────────────────────────────
+// Per frame, the hero's projected screen disc against every VISIBLE bubble's
+// rect, and reports the share of sampled frames in which any bubble covers his
+// FACE — not his whole disc. A bubble clipping the bottom of a ten-metre void
+// is fine and unavoidable; one across his eyes and mouth is the defect. The
+// face sits in the upper-middle of the disc and is roughly 62% of its width
+// (void3d.ts builds the features inside a unit-sphere face), so that is the
+// rectangle under test.
+//
+// TRAP: voidUnlocked is a COMMA-JOINED STRING (unlocks.ts:39), not JSON.
+// TRAP: a parked void is not representative — the crowd only talks near the
+// player, so the probe drives with the same nearest-edible autopilot the perf
+// probes use.
+import { chromium } from 'playwright';
+
+const PORT = process.argv[2] || '4177';
+const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'gameday', 'lantern'];
+
+// THE BAR. Not zero: a bubble may legitimately be mid-fade as the hero moves
+// under it, and a rule that forbids a single overlapping frame would forbid
+// motion. But this is the mascot, and the number that matters is how often a
+// child looking at their own character sees words on his face.
+const MAX_FACE_COVER = 0.03;   // at most 3% of frames
+
+const SAMPLES = 90, SAMPLE_MS = 120;
+
+const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
+  args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+
+const rows = [];
+for (const wid of WORLDS) {
+  const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
+  await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
+  await p.addInitScript(() => { try {
+    localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
+    localStorage.setItem('voidDailyLast', new Date().toDateString());
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+  } catch {} });
+  await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+  await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
+  await p.evaluate(() => document.getElementById('btnPlay').click());
+  await p.waitForSelector(`#worldRow .wCard[data-world="${wid}"]`, { state: 'visible', timeout: 400000 });
+  await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), wid);
+  await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+
+  await p.evaluate(() => {
+    const cv = document.querySelector('canvas');
+    const cx = innerWidth / 2, cy = innerHeight / 2;
+    cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true }));
+    const tick = () => {
+      const vs = window.__voidState();
+      let best = null, bd = 1e9;
+      for (const e of window.__edibles) {
+        if (e.eaten || !e.mesh?.visible || e.radius > vs.r * 0.92) continue;
+        const dx = e.mesh.position.x - vs.x, dz = e.mesh.position.z - vs.z;
+        const d = dx * dx + dz * dz;
+        if (d < bd) { bd = d; best = { dx, dz }; }
+      }
+      if (best) {
+        const m = Math.hypot(best.dx, best.dz) || 1;
+        dispatchEvent(new PointerEvent('pointermove', { pointerId: 1,
+          clientX: cx + best.dx / m * 110, clientY: cy + best.dz / m * 110, bubbles: true }));
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  let n = 0, anyBubble = 0, faceHit = 0, discHit = 0, worst = 0, worstText = '';
+  for (let i = 0; i < SAMPLES; i++) {
+    const s = await p.evaluate(() => {
+      const THREE = window.__THREE, cam = window.__cam;
+      const g = window.__voidGroup?.();
+      if (!g || !cam) return null;
+      const vs = window.__voidState();
+      const c = new THREE.Vector3(); g.getWorldPosition(c);
+      const p0 = c.clone().project(cam);
+      const cx = (p0.x * 0.5 + 0.5) * innerWidth, cy = (-p0.y * 0.5 + 0.5) * innerHeight;
+      // screen radius, measured rather than guessed: project a point one world
+      // radius to the camera's right and take the pixel distance.
+      const right = new THREE.Vector3(); cam.getWorldDirection(right);
+      right.cross(cam.up).normalize().multiplyScalar(vs.r);
+      const p1 = c.clone().add(right).project(cam);
+      const rx = Math.abs((p1.x * 0.5 + 0.5) * innerWidth - cx) || 1;
+      // the FACE, not the whole ball: features live in the upper-middle of the
+      // disc. 0.62 of the width, and the band from 12% to 68% of its height.
+      const face = { left: cx - rx * 0.62, right: cx + rx * 0.62,
+        top: cy - rx * 0.76, bottom: cy + rx * 0.36 };
+      const disc = { left: cx - rx, right: cx + rx, top: cy - rx, bottom: cy + rx };
+      const over = (a, r) => {
+        const w = Math.min(a.right, r.right) - Math.max(a.left, r.left);
+        const h = Math.min(a.bottom, r.bottom) - Math.max(a.top, r.top);
+        return w > 0 && h > 0 ? (w * h) / Math.max(1, (a.right - a.left) * (a.bottom - a.top)) : 0;
+      };
+      let bubbles = 0, faceCover = 0, discCover = 0, text = '';
+      for (const el of document.querySelectorAll('.vb')) {
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.15) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 2) continue;
+        bubbles++;
+        const f = over(face, r);
+        if (f > faceCover) { faceCover = f; text = (el.textContent || '').trim().slice(0, 44); }
+        discCover = Math.max(discCover, over(disc, r));
+      }
+      return { bubbles, faceCover, discCover, text };
+    });
+    if (s) {
+      n++;
+      if (s.bubbles) anyBubble++;
+      if (s.faceCover > 0.02) faceHit++;
+      if (s.discCover > 0.02) discHit++;
+      if (s.faceCover > worst) { worst = s.faceCover; worstText = s.text; }
+    }
+    await p.waitForTimeout(SAMPLE_MS);
+  }
+  rows.push({ wid, n, anyBubble, faceHit, discHit, worst, worstText });
+  console.log(`  ${wid.padEnd(9)} bubbles up ${(anyBubble / n * 100).toFixed(0).padStart(3)}% of frames   `
+    + `FACE covered ${(faceHit / n * 100).toFixed(0).padStart(3)}%   disc ${(discHit / n * 100).toFixed(0).padStart(3)}%   `
+    + `worst ${(worst * 100).toFixed(0)}%${worstText ? ` ("${worstText}")` : ''}`);
+  await p.close();
+}
+await b.close();
+
+const fails = rows.filter((r) => r.faceHit / r.n > MAX_FACE_COVER);
+console.log('');
+if (fails.length) {
+  for (const r of fails) {
+    console.log(`  · ${r.wid}: a speech bubble covered the hero's FACE in `
+      + `${(r.faceHit / r.n * 100).toFixed(0)}% of frames (bar ${MAX_FACE_COVER * 100}%), `
+      + `worst ${(r.worst * 100).toFixed(0)}% of the face behind "${r.worstText}". `
+      + `bubbles.ts dodges HUD panels and other bubbles by rect but has no rule for the void — `
+      + `HUD_AVOID and HUD_BANDS are DOM ids and he is a 3D object`);
+  }
+  console.log(`\nFAIL — the mascot is not clear of the chatter (${fails.length} world(s))`);
+  process.exit(1);
+}
+console.log(`PASS — across ${rows.length} world(s) no world covered the hero's face in more than `
+  + `${MAX_FACE_COVER * 100}% of frames (worst `
+  + `${Math.max(...rows.map((r) => r.faceHit / r.n * 100)).toFixed(0)}%)`);
