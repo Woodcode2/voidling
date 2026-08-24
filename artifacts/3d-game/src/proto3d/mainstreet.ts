@@ -382,8 +382,16 @@ function personParts(out: G[], x: number, z: number, shirt: number, ry = 0, hat?
   // forward offset the cap's lower edge sits at 2.307 T and the eyes at 2.25 T,
   // so they clear it by about a twentieth of a head.
   {
+    // ── AND IT MUST NOT OVERHANG THE SKULL ────────────────────────────────
+    // The first cap was sph(0.38T) at 2.42T. At that height the skull's own
+    // radius is sqrt(0.36^2 - 0.20^2) = 0.299T, so the cap stood 0.081T proud —
+    // 27% wider than the head it sits on — and read as a moulded bowl helmet
+    // with a rim rather than as hair. It was also tessellated 12x8 against a
+    // 16x11 skull, so the coarser silhouette was the one on the outside.
+    // TEAM MOTION found it in the character sheet, which is what the sheet is
+    // for. Narrower, seated lower, and at least as smooth as the head.
     const [hxc, hzc] = at(0, -0.05 * T);
-    out.push(part(sph(0.38 * T, 12, 8), hairCol, hxc, 2.42 * T, hzc, 0, ry, 0, 1, 0.55, 1));
+    out.push(part(sph(0.355 * T, 16, 9), hairCol, hxc, 2.40 * T, hzc, 0, ry, 0, 1, 0.58, 1));
   }
   // ── A FACE ── life.ts's walking crowd got eyes in the same pass as this; the
   // static townsfolk need them for the same reason and more so, because these

@@ -61,8 +61,39 @@ await p.waitForFunction(() => {
   return performance.now() - (window.__stableSince || 0) > 2500;
 }, null, { timeout: 300000, polling: 250 });
 
-// hide the HUD so nothing overlaps the subjects
-await p.addStyleTag({ content: '#hud,#quests,#news,#bubbles,.banner,#joy,#topbar,#formbar{opacity:0 !important}' });
+// ── HIDE THE HUD, AND THIS SELECTOR LIST WAS A LIE ─────────────────────────
+// The first version read:
+//   '#hud,#quests,#news,#bubbles,.banner,#joy,#topbar,#formbar'
+// and index.html has no #hud, no #bubbles, no #topbar and no #formbar, while
+// `banner` is an ID and was matched as a class. So FOUR of the eight selectors
+// hit nothing, the HUD was never hidden, and every character sheet this probe
+// produced carried the timer, the score chip and the growth bar across the
+// subjects — including one speech bubble sitting on their feet. Caught by TEAM
+// MOTION reading the sheets, not by the person who wrote the probe and then
+// looked at the sheets four times.
+//
+// Verified against index.html: these ids all exist. Bubbles are .vb/.vf/.vbN
+// from bubbles.ts:161,170,255.
+const HUD_SEL = '#timer,#board,#coins,#quests,#growth,#banner,#count,#news,'
+  + '#hungerlbl,#hunger,#joy,#powers,#guide,#btnQuit,.vb,.vf,.vbN';
+await p.addStyleTag({ content: `${HUD_SEL}{opacity:0 !important}` });
+// And prove it worked, rather than trusting a selector list twice — which is
+// exactly the mistake the list above documents.
+//
+// "Visible" has to mean ACTUALLY DRAWN, not "opacity is not zero". An element
+// that is display:none still computes opacity 1, and the first version of this
+// check counted those and cried wolf about a clean sheet. Something is on
+// screen only if it has a layout box AND is not transparent AND is not hidden.
+const stillVisible = await p.evaluate((sel) => [...document.querySelectorAll(sel)]
+  .filter((e) => {
+    const cs = getComputedStyle(e);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return false;
+    const r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  })
+  .map((e) => e.id || e.className), HUD_SEL);
+if (stillVisible.length)
+  console.log(`  ! HUD still on screen, the sheet is dirty: ${stillVisible.join(', ')}`);
 
 for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['side', Math.PI * 0.5], ['back', Math.PI]]) {
   const found = await p.evaluate(({ turn }) => {
@@ -110,7 +141,21 @@ for (const [tag, turn] of [['front', 0], ['threequarter', Math.PI * 0.25], ['sid
   }, { turn });
   await p.waitForTimeout(900);
   await p.screenshot({ path: `${OUT}/${WORLD}_${tag}.png` });
-  console.log(`  ${tag.padEnd(13)} ${found.length} people  verts ${found.map(f => f.verts).join(',')}`);
+  // ── THE TIGHT CROPS THIS HEADER HAS ALWAYS PROMISED ──────────────────────
+  // "one tight crop per person" was in the header from the first version and
+  // the loop never wrote one — the only close-ups on disk were hand-cropped
+  // afterwards. A probe whose header describes output it does not produce is
+  // the same class of thing as a selector list that matches nothing.
+  // Playwright's own clip is used rather than a PNG library, so this needs no
+  // dependency the repo does not already have.
+  let n = 0;
+  for (const f of found) {
+    const w = 190, h = 210;
+    const x = Math.round(Math.max(0, Math.min(430 - w, f.sx - w / 2)));
+    const y = Math.round(Math.max(0, Math.min(932 - h, f.sy - h * 0.62)));
+    await p.screenshot({ path: `${OUT}/${WORLD}_${tag}_${n++}.png`, clip: { x, y, width: w, height: h } });
+  }
+  console.log(`  ${tag.padEnd(13)} ${found.length} people  ${n} crop(s)  verts ${found.map(f => f.verts).join(',')}`);
 }
 await b.close();
 console.log(`\n  wrote ${OUT}/${WORLD}_{front,threequarter,side,back}.png\n`);
