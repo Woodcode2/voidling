@@ -269,14 +269,21 @@ console.log(`shooting ${VIEW.width * SCALE}x${VIEW.height * SCALE} from ${URL}\n
 //  straight after. The pin blocks chomp/gulp/dash from retriggering the gape,
 //  which makes the face show its mood — the thing the mood pin was always
 //  meant to control — and makes the frame deterministic instead of a race.
-const grinning = async (label, ms = 4000) => {
+const grinning = async (label, ms = 10000) => {
   await page.evaluate(() => window.__pinMouth?.(true));
   try {
     await page.waitForFunction(() => window.__faceState?.().smile === true, null,
       { timeout: ms, polling: 80 });
     return true;
   } catch {
+    // ONE MORE LOOK BEFORE CRYING WOLF. Under swiftshader a single heavy frame
+    // blocks the main thread for seconds and every queued waitForFunction poll
+    // lands after it, so the wait can expire on a face that was fine the whole
+    // time. 06 warned exactly that way on a frame whose faceState read
+    // {smile:true, biting:false}. A warning that fires when nothing is wrong is
+    // a warning nobody reads, so re-check once and only shout if it is real.
     const f = await page.evaluate(() => window.__faceState?.() ?? null);
+    if (f?.smile === true) return true;
     console.log(`  (!) ${label}: jaw pinned shut and the grin still did not come `
       + `in ${ms / 1000}s — shooting anyway, CHECK THIS FRAME. faceState=${JSON.stringify(f)}`);
     return false;
