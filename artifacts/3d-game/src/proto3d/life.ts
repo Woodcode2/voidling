@@ -432,7 +432,20 @@ const carBodyMat = (c: number) => {
 const CAR_GLASS = new THREE.MeshStandardMaterial({ color: 0x2c3a4e, roughness: 0.12, metalness: 0.4 });
 const CAR_HL = new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffe9a8, emissiveIntensity: 0.7, roughness: 0.3 });
 const CAR_TL = new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0xd82a2a, emissiveIntensity: 0.55, roughness: 0.3 });
-const CAR_TYRE = new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.9 });
+// ── A TYRE IS DARK. A TYRE IS NOT A HOLE. ────────────────────────────────
+// 0x20242c renders at displayed luminance 5.3 on a LIT face in Maple and at
+// exactly rgb(0,0,0) on a shaded one, so the food truck's wheels came out as
+// flat black ellipses with no rim, no hub and no gradient, cut into a pale
+// road. TEAM MOVERS found them in store/03-devouring.png; qa/blackprops.mjs
+// had passed that frame because they measure 1785 and 1698 device px against
+// a 2000px bar I had guessed rather than derived.
+//
+// 0x2a2e38 is not a new colour: it is alpine.ts's CHAR, already described in
+// that file as "coal, ironwork, tyres". Every other world's near-black sits at
+// 0x2a-0x2c and only this one was down at 0x20. It reads L16.8 lit and keeps a
+// gradient in shadow, which is the whole difference between a dark object and
+// a missing one.
+const CAR_TYRE = new THREE.MeshStandardMaterial({ color: 0x2a2e38, roughness: 0.9 });
 const CAR_HUB = new THREE.MeshStandardMaterial({ color: 0xc9cdd6, roughness: 0.4, metalness: 0.5 });
 function makeCar(): THREE.Group {
   const g = new THREE.Group();

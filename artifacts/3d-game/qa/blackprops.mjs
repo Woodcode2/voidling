@@ -97,7 +97,28 @@ const polyArea = (h) => {
   return Math.abs(a) / 2;
 };
 
-const MIN_AREA = 2000;   // device px at 3x — about 15 css px square, i.e. visible
+// ── THIRD RETRACTION: THE AREA BAR GAVE A FALSE PASS ─────────────────────
+// This was 2000 device px, justified as "about 15 css px square, i.e.
+// visible". TEAM MOVERS then found the Maple food truck's wheels rendering as
+// pure rgb(0,0,0) ellipses with no shading at all — flat holes in a bright pale
+// road — and this probe had reported PASS on that exact frame. They measure
+// 1785 and 1698 px. The bar was 2000.
+//
+// A defect does not become acceptable at fourteen css pixels instead of
+// fifteen, and 2000 was never derived from anything except my own guess at
+// where "visible" starts. 1200 device px at 3x is roughly 12 x 11 css px —
+// smaller than a fingertip target, larger than any speck a person would forgive
+// — and it catches wheels.
+//
+// KNOWN LIMIT, stated rather than tuned around: at 1200 this also catches a
+// 1298px occlusion under a maple canopy (36x61 at 1214,952 in 03-devouring),
+// which reads as depth under a tree rather than a hole. Solidity cannot
+// separate those two — a trunk shadow is convex as well. Moving the bar to
+// 1500 would hide it, and would be fitting the bar to the answer I wanted,
+// which is how the first two versions of this file went wrong. Both are
+// surfaces landing at exactly zero; whether the tree one is acceptable is a
+// judgement for the studio, not a number for me to pick.
+const MIN_AREA = 1200;   // device px at 3x — about 12 x 11 css px
 const MIN_SOLIDITY = 0.95;   // area over convex-hull area; see the measurements above
 // The HUD is drawn in HTML over the game and is legitimately near-black in
 // places. Only the play area is under test.
