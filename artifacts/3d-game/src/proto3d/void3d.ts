@@ -47,6 +47,10 @@ export interface Void3D {
    *  to take that picture; waiting for a gap means waiting while he eats the
    *  set. See scripts/shoot-store.mjs. Never set from gameplay. */
   pinMouth(shut: boolean): void;
+  /** QA/capture: hold the gape at a fixed opening so the mouth can be
+   *  photographed at every size instead of caught mid-animation. 0 releases.
+   *  See qa/gapesheet.mjs. Never call from gameplay. */
+  pinGape(v: number): void;
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -1051,14 +1055,29 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   // gape and the closed mouth overlap for one mood step and the gape has to win
   // it — same reason it used to sit at 1.01 against the mouth's 1.0.
   wrapOnce(maw, 0, -0.3, 0.02);
-  const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1, 1.15, 1);
-  const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.09, 0.01); tongue.scale.set(1.15, 0.7, 1);
+  // ── THE OPEN MOUTH IS WIDER THAN THE CLOSED ONE, NOT NARROWER ───────────
+  // mawDark was scale(1, 1.15) — a circle stretched TALLER than it is wide.
+  // Against the closed grin, which is CircleGeometry(0.178, 40, 0, PI) at
+  // scale(1.34, 0.76) and therefore 0.477 wide, the fully open mouth measured
+  // 0.400: SIXTEEN PER CENT NARROWER than the smile it replaces, and three and
+  // a half times taller. A mouth that gets narrower as it opens is a gasp.
+  // qa/out/gape/before/gape-0p35.png is that face at an ordinary bite — a
+  // small round hole narrower than the hero's own eyes.
+  //
+  // 1.34 is not a new number: it is the closed grin's own x-stretch, so the
+  // open mouth is now the same shape family as the closed one rather than an
+  // unrelated egg. TEAM HERO filed this as a blocker in round 3 and the board
+  // proposed it in round 2, where I refused it by arithmetic. The arithmetic
+  // was against an eye, and the eye was right.
+  const mawDark = flat(0.2, 0x2a0e2e); mawDark.scale.set(1.34, 0.86, 1);
+  const tongue = flat(0.12, 0xff6f91); tongue.position.set(0, -0.07, 0.01); tongue.scale.set(1.5, 0.66, 1);
   tongue.renderOrder = 1;
   maw.add(mawDark); maw.add(tongue);
   {
     // the gape gets its own, bigger set — hanging down from the upper lip
-    const a = mkFang(maw, -0.098, 0.142, 0.072); a.rotation.z = -Math.PI / 2;
-    const b = mkFang(maw, 0.098, 0.142, 0.072); b.rotation.z = -Math.PI / 2;
+    // …and they move out with the wider gape, or they sit in the middle of it
+    const a = mkFang(maw, -0.132, 0.118, 0.072); a.rotation.z = -Math.PI / 2;
+    const b = mkFang(maw, 0.132, 0.118, 0.072); b.rotation.z = -Math.PI / 2;
   }
   face.add(maw);
 
@@ -1515,6 +1534,13 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
+    pinGape(v) {
+      if (v <= 0) { mouthT = 0; mouthMax = 0; return; }
+      mouthPinShut = false;
+      // past the wind-up and past the spring, so openEnv is 1 and the render
+      // shows exactly `v` rather than a frame of the easing
+      mouthAge = 5; mouthT = 999; mouthMax = v;
+    },
     setFaceWrap(v) {
       // clamped short of 1: a full wrap seats the cheeks exactly ON the surface
       // and they depth-fight the body they are painted on. 0.9 keeps a margin.
@@ -1971,7 +1997,18 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         openEnv = 1 - 0.88 * Math.exp(-t2 * 10) * Math.cos(t2 * 14);
       }
       const mo = Math.max(mouthT > 0 ? mouthMax * openEnv * Math.min(1, mouthT * 8) : 0, mp.maw);
-      maw.scale.setScalar(Math.max(0.001, mo));
+      // ── A MOUTH OPENS BY GETTING TALLER, NOT BY GETTING BIGGER ──────────
+      // setScalar(mo) grew the gape uniformly out of nothing, so at any partial
+      // opening it was a small dot — and the mouth appeared to SHRINK at the
+      // moment of a bite, because it was replacing a 0.477-wide grin with
+      // something a fraction of that. Real mouths hold their width and drop the
+      // jaw. The width floor of 0.89 is where the gape measures 0.477 across,
+      // exactly the closed grin's width, so the swap at the threshold is
+      // seamless instead of a jump.
+      maw.scale.set(Math.max(0.89, mo), Math.max(0.001, mo), 1);
+      // …and the gape is not drawn at all while the grin is: below the
+      // threshold it would be a thin dark line lying across the smile.
+      maw.visible = mo >= MOUTH_HIDES_AT;
       // THE CLIFF. Above this the gape has swallowed the smile and drawing both
       // is just z-fighting two mouths. Below it they nest and read as one open
       // grin. It was a bare 0.25 for a year, and because nothing named it, a

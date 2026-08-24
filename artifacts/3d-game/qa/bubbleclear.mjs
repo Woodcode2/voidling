@@ -61,9 +61,62 @@ const SAMPLE_MS = 150;   // wall
 // A run that never sees a bubble has not tested anything. Say so instead of
 // passing.
 const MIN_BUBBLE_FRAMES = 12;
+// ── AND SAMPLE THE SIZE WHERE IT ACTUALLY COLLIDES ───────────────────────
+// The first honest run of this probe reported 0% face coverage in all three
+// worlds — while store/03-devouring.png, shot at radius 3.4, has an ambient
+// line straight across the hero's chin. Both are true. A void a metre across
+// occupies a small disc and a bubble anchored to a nearby NPC clears it easily;
+// the same bubble at COLOSSUS covers his face, because the disc grew and the
+// anchor did not move. Overlap risk is a function of screen radius, and playing
+// from the start only ever samples the smallest one.
+//
+// So each world is measured twice: as it plays, and again pinned at a size a
+// child reaches in the back half of every match.
+const BIG_R = 7;
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+
+/** One sample: the hero's projected face and disc against every VISIBLE bubble.
+ *  Declared once and reused by both sampling windows — it was inlined in the
+ *  loop, and adding the second window duplicated it. */
+const SAMPLE_FN = () => {
+      const THREE = window.__THREE, cam = window.__cam;
+      const g = window.__voidGroup?.();
+      if (!g || !cam) return null;
+      const vs = window.__voidState();
+      const c = new THREE.Vector3(); g.getWorldPosition(c);
+      const p0 = c.clone().project(cam);
+      const cx = (p0.x * 0.5 + 0.5) * innerWidth, cy = (-p0.y * 0.5 + 0.5) * innerHeight;
+      // screen radius, measured rather than guessed: project a point one world
+      // radius to the camera's right and take the pixel distance.
+      const right = new THREE.Vector3(); cam.getWorldDirection(right);
+      right.cross(cam.up).normalize().multiplyScalar(vs.r);
+      const p1 = c.clone().add(right).project(cam);
+      const rx = Math.abs((p1.x * 0.5 + 0.5) * innerWidth - cx) || 1;
+      // the FACE, not the whole ball: features live in the upper-middle of the
+      // disc. 0.62 of the width, and the band from 12% to 68% of its height.
+      const face = { left: cx - rx * 0.62, right: cx + rx * 0.62,
+        top: cy - rx * 0.76, bottom: cy + rx * 0.36 };
+      const disc = { left: cx - rx, right: cx + rx, top: cy - rx, bottom: cy + rx };
+      const over = (a, r) => {
+        const w = Math.min(a.right, r.right) - Math.max(a.left, r.left);
+        const h = Math.min(a.bottom, r.bottom) - Math.max(a.top, r.top);
+        return w > 0 && h > 0 ? (w * h) / Math.max(1, (a.right - a.left) * (a.bottom - a.top)) : 0;
+      };
+      let bubbles = 0, faceCover = 0, discCover = 0, text = '';
+      for (const el of document.querySelectorAll('.vb')) {
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.15) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 2) continue;
+        bubbles++;
+        const f = over(face, r);
+        if (f > faceCover) { faceCover = f; text = (el.textContent || '').trim().slice(0, 44); }
+        discCover = Math.max(discCover, over(disc, r));
+      }
+      return { bubbles, faceCover, discCover, text };
+    };
 
 const rows = [];
 for (const wid of WORLDS) {
@@ -111,43 +164,7 @@ for (const wid of WORLDS) {
   let n = 0, anyBubble = 0, faceHit = 0, discHit = 0, worst = 0, worstText = '';
   for (;;) {
     if (await p.evaluate(() => window.__matchState().t) >= until) break;
-    const s = await p.evaluate(() => {
-      const THREE = window.__THREE, cam = window.__cam;
-      const g = window.__voidGroup?.();
-      if (!g || !cam) return null;
-      const vs = window.__voidState();
-      const c = new THREE.Vector3(); g.getWorldPosition(c);
-      const p0 = c.clone().project(cam);
-      const cx = (p0.x * 0.5 + 0.5) * innerWidth, cy = (-p0.y * 0.5 + 0.5) * innerHeight;
-      // screen radius, measured rather than guessed: project a point one world
-      // radius to the camera's right and take the pixel distance.
-      const right = new THREE.Vector3(); cam.getWorldDirection(right);
-      right.cross(cam.up).normalize().multiplyScalar(vs.r);
-      const p1 = c.clone().add(right).project(cam);
-      const rx = Math.abs((p1.x * 0.5 + 0.5) * innerWidth - cx) || 1;
-      // the FACE, not the whole ball: features live in the upper-middle of the
-      // disc. 0.62 of the width, and the band from 12% to 68% of its height.
-      const face = { left: cx - rx * 0.62, right: cx + rx * 0.62,
-        top: cy - rx * 0.76, bottom: cy + rx * 0.36 };
-      const disc = { left: cx - rx, right: cx + rx, top: cy - rx, bottom: cy + rx };
-      const over = (a, r) => {
-        const w = Math.min(a.right, r.right) - Math.max(a.left, r.left);
-        const h = Math.min(a.bottom, r.bottom) - Math.max(a.top, r.top);
-        return w > 0 && h > 0 ? (w * h) / Math.max(1, (a.right - a.left) * (a.bottom - a.top)) : 0;
-      };
-      let bubbles = 0, faceCover = 0, discCover = 0, text = '';
-      for (const el of document.querySelectorAll('.vb')) {
-        const cs = getComputedStyle(el);
-        if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.15) continue;
-        const r = el.getBoundingClientRect();
-        if (r.width < 2) continue;
-        bubbles++;
-        const f = over(face, r);
-        if (f > faceCover) { faceCover = f; text = (el.textContent || '').trim().slice(0, 44); }
-        discCover = Math.max(discCover, over(disc, r));
-      }
-      return { bubbles, faceCover, discCover, text };
-    });
+    const s = await p.evaluate(SAMPLE_FN);
     if (s) {
       n++;
       if (s.bubbles) anyBubble++;
@@ -157,10 +174,37 @@ for (const wid of WORLDS) {
     }
     await p.waitForTimeout(SAMPLE_MS);
   }
-  rows.push({ wid, n, anyBubble, faceHit, discHit, worst, worstText });
-  console.log(`  ${wid.padEnd(9)} bubbles up ${(anyBubble / n * 100).toFixed(0).padStart(3)}% of frames   `
-    + `FACE covered ${(faceHit / n * 100).toFixed(0).padStart(3)}%   disc ${(discHit / n * 100).toFixed(0).padStart(3)}%   `
+  console.log(`  ${wid.padEnd(9)} small  bubbles up ${(anyBubble / n * 100).toFixed(0).padStart(3)}%   `
+    + `FACE ${(faceHit / n * 100).toFixed(0).padStart(3)}%   disc ${(discHit / n * 100).toFixed(0).padStart(3)}%   `
     + `worst ${(worst * 100).toFixed(0)}%${worstText ? ` ("${worstText}")` : ''}`);
+
+  // …and again at the size where the disc is big enough to be in the way
+  await p.evaluate((r) => window.__setVoidR(r), BIG_R);
+  await p.waitForTimeout(1200);
+  const until2 = await p.evaluate(() => window.__matchState().t) + SPAN;
+  let n2 = 0, any2 = 0, face2 = 0, disc2 = 0, worst2 = 0, worstText2 = '';
+  for (;;) {
+    if (await p.evaluate(() => window.__matchState().t) >= until2) break;
+    const s = await p.evaluate(SAMPLE_FN);
+    if (s) {
+      n2++;
+      if (s.bubbles) any2++;
+      if (s.faceCover > 0.02) face2++;
+      if (s.discCover > 0.02) disc2++;
+      if (s.faceCover > worst2) { worst2 = s.faceCover; worstText2 = s.text; }
+    }
+    await p.waitForTimeout(SAMPLE_MS);
+  }
+  console.log(`  ${wid.padEnd(9)} r=${BIG_R}    bubbles up ${(any2 / Math.max(1, n2) * 100).toFixed(0).padStart(3)}%   `
+    + `FACE ${(face2 / Math.max(1, n2) * 100).toFixed(0).padStart(3)}%   disc ${(disc2 / Math.max(1, n2) * 100).toFixed(0).padStart(3)}%   `
+    + `worst ${(worst2 * 100).toFixed(0)}%${worstText2 ? ` ("${worstText2}")` : ''}`);
+
+  // the gate reads the WORST of the two sizes: a hero covered only when he is
+  // big is still a hero covered, and big is most of the back half of a match.
+  const pick = (face2 / Math.max(1, n2)) > (faceHit / n)
+    ? { n: n2, anyBubble: any2, faceHit: face2, discHit: disc2, worst: worst2, worstText: worstText2, at: `r=${BIG_R}` }
+    : { n, anyBubble, faceHit, discHit, worst, worstText, at: 'as played' };
+  rows.push({ wid, ...pick, anyBubble: anyBubble + any2 });
   await p.close();
 }
 await b.close();

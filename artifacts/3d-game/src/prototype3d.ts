@@ -1596,6 +1596,7 @@ const _dbg = new Proxy(_dbgStore, {
   __stages: () => { cur: number; best: number; ceremonies: number };
   __bite: (hunter?: boolean) => void;
   __pinMouth: (shut: boolean) => void;
+  __pinGape: (v: number) => void;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
@@ -1739,6 +1740,10 @@ _dbg.__bite = (hunter = true) =>
 // QA/capture: hold the jaw shut so a framed shot shows the hero's MOOD rather
 // than whatever he happened to be swallowing. See void3d.ts pinMouth().
 _dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
+// QA: hold the gape at a fixed opening — qa/gapesheet.mjs photographs the mouth
+// at every size, which is the only way to settle a shape argument with a
+// picture instead of arithmetic.
+_dbg.__pinGape = (v: number) => voidling.pinGape(v);
 // How far the face is seated onto the sphere, 0..0.9. A look knob — see
 // FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
 // frame at several values and the choice can be made from pictures.
