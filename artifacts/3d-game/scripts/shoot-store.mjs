@@ -84,11 +84,30 @@ const EXPECTED = ['01-menu.png', '02-worlds.png', '03-devouring.png',
 // is Guideline 2.3.3, which is what the previous submission was rejected for.
 // Losing a good previous set to a failed re-run costs one command. Shipping a
 // mixture costs a review cycle.
+//
+// AND IT MOVES THEM RATHER THAN DELETING THEM. The reasoning above is right —
+// a half-replaced folder is worse than an empty one — but the first version
+// called unlinkSync, and it ran BEFORE the browser had even launched. Proved
+// the hard way: a run on a machine where CHROME_PATH was unset purged all eight
+// App Store screenshots and then failed at chromium.launch, three lines later,
+// on an environment problem that had nothing to do with the game. The set was
+// only recoverable because it happens to be committed.
+//
+// A tool whose first act is to destroy its own output, before it has
+// established that it can produce any, is not a tool anybody should run twice.
+// The old set moves to store/.previous/ instead. The folder is still
+// unmistakably empty-or-complete, which is the property that mattered, and a
+// failed run now costs nothing.
 {
   fs.mkdirSync(OUT, { recursive: true });
+  const prev = path.join(OUT, '.previous');
   const gone = fs.readdirSync(OUT).filter((f) => f.toLowerCase().endsWith('.png'));
-  for (const f of gone) fs.unlinkSync(path.join(OUT, f));
-  if (gone.length) console.log(`cleared ${gone.length} old screenshot(s) from store/ before shooting`);
+  if (gone.length) {
+    fs.rmSync(prev, { recursive: true, force: true });
+    fs.mkdirSync(prev, { recursive: true });
+    for (const f of gone) fs.renameSync(path.join(OUT, f), path.join(prev, f));
+    console.log(`moved ${gone.length} old screenshot(s) to store/.previous/ before shooting`);
+  }
 }
 
 // Playwright drives the capture. It is imported AFTER the asset check so the
@@ -107,7 +126,11 @@ const VIEW = { width: 430, height: 932 };
 const SCALE = 3;
 
 const browser = await chromium.launch({
-  executablePath: process.env.CHROME_PATH || undefined,
+  // Every probe in qa/ pins this path; this script alone fell back to
+  // Playwright's bundled headless shell, which is not installed here, so it
+  // launched nothing and failed after the purge had already run. Same default
+  // as the rest of the kit now, still overridable.
+  executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox'],
 });
 const page = await browser.newPage({ viewport: VIEW, deviceScaleFactor: SCALE, isMobile: true, hasTouch: true });
@@ -157,7 +180,7 @@ const SEED = () => {
   //
   // docs/HANDOFF.md lists this as trap #3 and notes four probes had hit it.
   // This is the fifth, and the only one where hitting it cost the artefact.
-  localStorage.setItem('voidUnlocked', JSON.stringify(['maple', 'pirate', 'gameday', 'lantern', 'powder']));
+  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
 };
 await page.addInitScript(SEED);
 
@@ -219,8 +242,22 @@ const enterMatch = async (world) => {
     return card.classList.contains('lock') ? 'locked' : '';
   }, world);
   if (locked) throw new Error(
-    `world card "${world}" is ${locked} — the seed did not unlock it, and every screenshot in store/ has already been purged. See the voidUnlocked note in SEED().`);
+    `world card "${world}" is ${locked} — the seed did not unlock it, and store/'s previous set has already been moved aside. See the voidUnlocked note in SEED().`);
   await page.click(`#worldRow .wCard[data-world="${world}"]`);
+  // ── A WORLD SWITCH IS A RELOAD, AND IT LANDS ON A GATE ────────────────────
+  // Tapping another world's card reloads the page. The reload does not drop the
+  // child straight into a match: it lands on TAP TO PLAY, and the tap is the
+  // thing that starts the clock. This function used to click the card and then
+  // wait two minutes for a match clock that was never going to advance, which
+  // is why the run died after three of eight screenshots with LANTERN.
+  //
+  // The gate also ARMS separately from appearing — it shows GETTING READY…
+  // while the asset pack settles and a tap before that is deliberately inert,
+  // so waiting for `.show` alone and tapping would be a coin flip on a slow
+  // machine. qa/switch.mjs walks this same path and is the reference.
+  await page.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+  await page.waitForSelector('#tapGate.show.armed', { timeout: 400000 });
+  await page.click('#tapGate');
   await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2,
     null, { timeout: 120000 });
 };

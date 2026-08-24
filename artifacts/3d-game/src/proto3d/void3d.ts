@@ -35,6 +35,11 @@ export interface Void3D {
    *  quality setting — see FACE_WRAP. Exposed so it can be swept and compared
    *  side by side (qa/facewrap.mjs) instead of argued about. */
   setFaceWrap(v: number): void;
+  /** What the face is DOING this frame, for probes that must measure the
+   *  expression rather than describe it. `smile` is the open kawaii grin's
+   *  own visibility — the one feature a child reads first — and `maw` is the
+   *  gape's current scale. See qa/faceparity.mjs. */
+  faceState(): { mood: Mood; maw: number; smile: boolean };
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -1480,6 +1485,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       body.castShadow = false;
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
+    faceState() { return { mood, maw: mp.maw, smile: mouth.visible }; },
     setFaceWrap(v) {
       // clamped short of 1: a full wrap seats the cheeks exactly ON the surface
       // and they depth-fight the body they are painted on. 0.9 keeps a margin.

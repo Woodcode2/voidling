@@ -27,8 +27,12 @@
 //
 //   node qa/variety.mjs [port] [worlds...]
 //
-// TRAP, and it has cost four probes: seed voidUnlocked with all five worlds or
-// a locked card refuses the tap BY DESIGN and this hangs forever.
+// TRAP, and it cost this probe its first three runs: voidUnlocked is a
+// COMMA-JOINED STRING (`unlocks.ts:39` — `raw.split(',')`), not JSON. Seeding
+// it with JSON.stringify([...]) parses to `["maple"`, `"pirate"`, … — quotes
+// and brackets baked into every entry — so not one of them matches and every
+// world but Maple stays locked. Maple looks fine because read() force-adds it,
+// which is exactly what makes the bug invisible.
 // TRAP: glb() registers props asynchronously, so the count must be STABLE
 // before anything is counted, exactly as qa/determ.mjs does it.
 import { chromium } from 'playwright';
@@ -70,7 +74,7 @@ for (const wid of WORLDS) {
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', JSON.stringify(['maple', 'pirate', 'gameday', 'lantern', 'powder']));
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
   } catch {} });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

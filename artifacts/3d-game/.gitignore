@@ -30,3 +30,6 @@ qa/out/shippedlook/maple_trees.png
 # already tracked; new ones are evidence for a moment, not for history.
 qa/out/shippedlook/maple_tone.png
 qa/out/lookbook.json
+
+# shoot:store moves the previous set here rather than deleting it
+store/.previous/
