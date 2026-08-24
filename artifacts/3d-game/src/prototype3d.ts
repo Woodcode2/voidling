@@ -267,7 +267,29 @@ vec3 CustomToneMapping( vec3 color ) {
   color = clamp( color, 0.0, 1.0 );
   // ── the grade ──
   float l = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
-  color = max( vec3( 0.0 ), ( color - 0.014 ) / ( 1.0 - 0.014 ) );   // toe
+  // ── THE TOE COMPRESSES, IT DOES NOT CLIP ────────────────────────────────
+  // This was max(0, (color - 0.014) / (1 - 0.014)), applied PER CHANNEL, and
+  // a hard per-channel clip does not pull blacks down — it deletes whatever
+  // channel arrives under the threshold. Measured on the shipped build:
+  // Lantern Night's TIMBER (0x6b4a33, a warm brown) rendered rgb(33,0,0) —
+  // pure red, no green, no blue. So did most of the world. Nobody authored a
+  // monochrome level; the grade did that on its own.
+  //
+  // Worse, when every channel of a face lands under the threshold the whole
+  // face goes to zero AT ONCE, so it loses its shading as well as its hue and
+  // reads as a hole in the render rather than a dark object. That is the
+  // bathhouse roof — the game's finale building — and the market crate lids.
+  // qa/blackprops.mjs measures it.
+  //
+  // c*c/(c+T) is the same curve everywhere that matters and never reaches zero
+  // from a non-zero input. Modelled against the shipped toe: WHITE, GOLD and
+  // CRIM at play exposures move by at most 4/255, PAPER 137 -> 138, ROPE
+  // 96 -> 97 — the authored look is intact — while TIMBER goes (33,0,0) ->
+  // (39,12,0) and the bathhouse roof (0,0,34) -> (11,20,40). Shadows get their
+  // hue back and keep their gradient. The (1+T) factor pins the top end so
+  // white stays white.
+  const float TOE = 0.014;
+  color = color * color / ( color + TOE ) * ( 1.0 + TOE );   // toe
   vec3 cool = vec3( 0.96, 0.99, 1.06 );
   vec3 warm = vec3( 1.05, 1.005, 0.95 );
   color *= mix( cool, warm, smoothstep( 0.18, 0.78, l ) );           // split tone
