@@ -88,6 +88,20 @@ const SUITE = [
     cmd: ['node', 'qa/normals.mjs'], verdict: pf,
     why: 'every geometry type is classified round or flat, and no unreviewed faceted form has appeared' },
 
+  // The hero's face is the strongest identity asset in the product and the one
+  // element that must not vary by level. It varied by 65 points of grin-share
+  // before qa/faceparity.mjs existed, and nothing in this gate could see it —
+  // because a mood table entry, not face code, was what deleted the smile.
+  // push profile runs two worlds (the measured best and worst); live runs all
+  // five. See docs/STUDIO-ROUND-2.md.
+  { id: 'faceparity', tier: 'art', profiles: ['push', 'art'], timeout: 900,
+    cmd: ['node', 'qa/faceparity.mjs', PORT, 'pirate', 'powder'], verdict: pf,
+    why: 'the hero wears the same face in every world, and no mood deletes his grin' },
+
+  { id: 'faceparity:all', tier: 'art', profiles: ['live'], timeout: 2400,
+    cmd: ['node', 'qa/faceparity.mjs', PORT, ...WORLDS], verdict: pf,
+    why: 'the hero wears the same face in all five worlds, and no mood deletes his grin' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },

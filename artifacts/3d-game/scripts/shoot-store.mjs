@@ -255,11 +255,27 @@ const enterMatch = async (world) => {
   // while the asset pack settles and a tap before that is deliberately inert,
   // so waiting for `.show` alone and tapping would be a coin flip on a slow
   // machine. qa/switch.mjs walks this same path and is the reference.
+  //
+  // …BUT ONLY WHEN THE CARD IS A DIFFERENT WORLD. Picking the world already
+  // loaded is not a switch, so there is no reload and no gate — the match just
+  // starts. Waiting unconditionally for `#tapGate.show.armed` therefore hung
+  // the very first call (`enterMatch('maple')`) for the full timeout and took
+  // the run down after two of eight images. Race the two outcomes instead of
+  // assuming either.
   await page.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-  await page.waitForSelector('#tapGate.show.armed', { timeout: 400000 });
-  await page.click('#tapGate');
+  await page.waitForFunction(() => {
+    const g = document.getElementById('tapGate');
+    const armed = !!g && g.classList.contains('show') && g.classList.contains('armed');
+    const running = !!window.__matchState && window.__matchState().t > 0.2;
+    return armed || running;
+  }, null, { timeout: 400000 });
+  const gated = await page.evaluate(() => {
+    const g = document.getElementById('tapGate');
+    return !!g && g.classList.contains('show') && g.classList.contains('armed');
+  });
+  if (gated) await page.click('#tapGate');
   await page.waitForFunction(() => window.__matchState && window.__matchState().t > 0.2,
-    null, { timeout: 120000 });
+    null, { timeout: 400000 });
 };
 /** Grow to `r` by actually playing, and if the machine is too slow to get
  *  there in time, set it. The dry run of this script on a software renderer

@@ -1,0 +1,13 @@
+  maple     grin  22%   mood-hidden  78%   [hungry 100%]
+  pirate    grin  75%   mood-hidden   0%   [cruise 87%, hungry 13%]
+  gameday   grin  51%   mood-hidden  49%   [hungry 73%, cruise 28%]
+  lantern   grin  66%   mood-hidden  29%   [hungry 51%, cruise 49%]
+  powder    grin  10%   mood-hidden  90%   [hungry 100%]
+
+  · maple: the mood engine closed the hero's grin for 78% of the match (bar 20%) — void3d.ts MOODS.hungry.maw sits above the mouth.visible threshold, so there is no smile while food is in the well
+  · gameday: the mood engine closed the hero's grin for 49% of the match (bar 20%) — void3d.ts MOODS.hungry.maw sits above the mouth.visible threshold, so there is no smile while food is in the well
+  · lantern: the mood engine closed the hero's grin for 29% of the match (bar 20%) — void3d.ts MOODS.hungry.maw sits above the mouth.visible threshold, so there is no smile while food is in the well
+  · powder: the mood engine closed the hero's grin for 90% of the match (bar 20%) — void3d.ts MOODS.hungry.maw sits above the mouth.visible threshold, so there is no smile while food is in the well
+  · the hero wears a different face per world: he grins 75% of the time in pirate and 10% in powder — a spread of 65 points (bar 35). Prop density is choosing the character's expression
+
+FAIL — the hero's face is not the same character in every world (5 finding(s))

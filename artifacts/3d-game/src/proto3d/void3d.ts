@@ -39,7 +39,7 @@ export interface Void3D {
    *  expression rather than describe it. `smile` is the open kawaii grin's
    *  own visibility — the one feature a child reads first — and `maw` is the
    *  gape's current scale. See qa/faceparity.mjs. */
-  faceState(): { mood: Mood; maw: number; smile: boolean };
+  faceState(): { mood: Mood; maw: number; smile: boolean; biting: boolean };
   chomp(k?: number): void;             // quick mouth-open bite (on eat)
   animGulp(): void;          // big gape + hold (GULP)
   animDash(): void;          // stretch pulse (ROCKET BITE)
@@ -1166,9 +1166,29 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
   let moodT = 0;
   let stageBoost = 1;   // pupil boost from evolution stage (was set directly)
   const mp = { lid: 1, pupil: 1, wide: 1, smile: 1, mouthY: 1, smirk: 0, brow: 0, browAng: 0, browY: 0.4, maw: 0, blush: 0.5, sweat: 0, zzz: 0, bounce: 0, shut: 0 };
+  // See the note at its use in the frame loop: any mood whose `maw` reaches
+  // this has no smile, regardless of what its `smile` says.
+  const MOUTH_HIDES_AT = 0.25;
   const MOODS: Record<Mood, Partial<typeof mp>> = {
     cruise:  {},
-    hungry:  { pupil: 1.28, smile: 1.1, maw: 0.26, brow: 0.85, browAng: 0.12, browY: 0.45, blush: 0.6 },
+    // ── HUNGRY ASKED FOR A BIGGER GRIN AND GOT NO GRIN AT ALL ───────────
+    // This line used to read `maw: 0.26`, and one line of it fought the other:
+    // `smile: 1.1` says "grin, 10% wider than usual", while `maw: 0.26` sits a
+    // single hundredth above MOUTH_HIDES_AT below — so the grin was switched
+    // off outright and all that remained was a gape scaled to a quarter, which
+    // is TALLER THAN IT IS WIDE and reads as a nostril, not a mouth.
+    //
+    // That mattered far more than it looks, because `hungry` is not a rare
+    // state: prototype3d.ts re-arms it whenever ANY edible sits inside 85% of
+    // the magnet reach, and it decays 0.45s later. In a town it never lapses.
+    // Measured before this change (qa/faceparity.mjs): the hero had no smile
+    // for 78% of a Maple Falls match and 52% of Powder Pass.
+    //
+    // 0.12 is not a new number — it is exactly what `frenzy` has always used,
+    // so "a grin with a slight parting" is a look this game already ships and
+    // nobody has ever objected to. It is also far enough under the cliff that
+    // the mood lerp cannot flicker across it, which 0.26 was never safe from.
+    hungry:  { pupil: 1.28, smile: 1.1, maw: 0.12, brow: 0.85, browAng: 0.12, browY: 0.45, blush: 0.6 },
     frenzy:  { pupil: 1.35, smile: 1.42, wide: 1.05, blush: 0.85, brow: 0.85, browAng: 0.18, browY: 0.47, maw: 0.12, bounce: 1 },
     scared:  { wide: 1.16, pupil: 0.55, smile: 0.85, mouthY: -0.65, brow: 1, browAng: -0.5, browY: 0.43, sweat: 1, blush: 0.3 },
     hurt:    { lid: 0.3, mouthY: -0.8, smile: 0.8, brow: 1, browAng: -0.6, browY: 0.38, sweat: 1, blush: 0.35 },
@@ -1485,7 +1505,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       body.castShadow = false;
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
-    faceState() { return { mood, maw: mp.maw, smile: mouth.visible }; },
+    faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
     setFaceWrap(v) {
       // clamped short of 1: a full wrap seats the cheeks exactly ON the surface
       // and they depth-fight the body they are painted on. 0.9 keeps a margin.
@@ -1942,7 +1962,14 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       }
       const mo = Math.max(mouthT > 0 ? mouthMax * openEnv * Math.min(1, mouthT * 8) : 0, mp.maw);
       maw.scale.setScalar(Math.max(0.001, mo));
-      mouth.visible = mo < 0.25;
+      // THE CLIFF. Above this the gape has swallowed the smile and drawing both
+      // is just z-fighting two mouths. Below it they nest and read as one open
+      // grin. It was a bare 0.25 for a year, and because nothing named it, a
+      // mood was tuned to maw 0.26 and deleted the hero's face in four worlds
+      // out of five without anyone editing a line of face code. If you are
+      // adding a mood: a `maw` at or above this constant means YOUR MOOD HAS NO
+      // SMILE, whatever its `smile` value says. qa/faceparity.mjs enforces it.
+      mouth.visible = mo < MOUTH_HIDES_AT;
       // FANGS grow in over GOBBLIN→WORLD ENDER — the void's face itself levels up
       fangGrow += (THREE.MathUtils.clamp((stage - 1.2) * 0.75, 0, 1) - fangGrow) * Math.min(1, dt * 3);
       for (const f of fangs) { f.visible = fangGrow > 0.02; f.scale.set(0.72 * fangGrow, fangGrow, 1); }

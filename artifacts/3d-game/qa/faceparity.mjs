@@ -64,7 +64,23 @@ const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 
 // levels and not others. Both numbers are deliberately generous — this is a
 // floor under a character, not a tuning target.
 const MAX_MOOD_HIDDEN = 0.20;   // at most 20% of a match with the grin closed by mood alone
-const MAX_GRIN_SPREAD = 0.35;   // the grin's share may not differ across worlds by more than this
+//
+// ── RETRACTION, made the hour this probe was written, before it gated a push ──
+// The second bar started life as a spread on RAW grin share and it was
+// measuring the wrong quantity. A grin is legitimately hidden while the hero
+// is mid-bite — you cannot smile and gape at once — so raw grin share falls
+// with how much there is to eat. On the first clean run after the mood fix it
+// read Maple 23% and Lantern 81% and called that "a different face per world",
+// when what actually differs is that Maple Falls is dense and Lantern Night is
+// not. It was measuring PROP DENSITY and calling it character drift, which is
+// the same structural mistake qa/variety.mjs already had to retract once.
+//
+// The invariant that actually matters is about the RESTING face: whatever the
+// hero happens to be chewing, when he is NOT chewing he must be the same
+// character in every world. So the spread is computed over non-biting frames
+// only, and `biting` comes from the rig itself (mouthT > 0) rather than being
+// inferred from the gape, which cannot distinguish a bite from a mood.
+const MAX_REST_GRIN_SPREAD = 0.35;   // resting-face grin share, across worlds
 
 const SAMPLES = 120;            // at 10Hz — twelve seconds of play per world
 const SAMPLE_MS = 100;
@@ -122,19 +138,25 @@ for (const wid of WORLDS) {
   });
 
   const moods = new Map();
-  let grin = 0, moodHidden = 0, n = 0;
+  let grin = 0, moodHidden = 0, n = 0, rest = 0, restGrin = 0;
   for (let i = 0; i < SAMPLES; i++) {
     const s = await p.evaluate(() => window.__faceState());
     n++;
     if (s.smile) grin++;
+    if (!s.biting) { rest++; if (s.smile) restGrin++; }
     if (!s.smile && s.maw >= 0.25) moodHidden++;
     moods.set(s.mood, (moods.get(s.mood) || 0) + 1);
     await p.waitForTimeout(SAMPLE_MS);
   }
   const top = [...moods.entries()].sort((a, c) => c[1] - a[1]).slice(0, 3)
     .map(([m, c]) => `${m} ${Math.round(c / n * 100)}%`).join(', ');
-  rows.push({ wid, grin: grin / n, moodHidden: moodHidden / n, top });
+  // A world where the hero never stops chewing has no resting face to compare;
+  // say so rather than dividing by zero and reporting a confident 0%.
+  const restShare = rest ? restGrin / rest : null;
+  rows.push({ wid, grin: grin / n, moodHidden: moodHidden / n, rest, restShare, top });
   console.log(`  ${wid.padEnd(9)} grin ${(grin / n * 100).toFixed(0).padStart(3)}%   `
+    + `resting-grin ${restShare === null ? ' n/a' : (restShare * 100).toFixed(0).padStart(3) + '%'}`
+    + ` (${rest}/${n} idle)   `
     + `mood-hidden ${(moodHidden / n * 100).toFixed(0).padStart(3)}%   [${top}]`);
   await p.close();
 }
@@ -148,13 +170,25 @@ for (const r of rows) {
       + `mouth.visible threshold, so there is no smile while food is in the well`);
   }
 }
-const grins = rows.map(r => r.grin);
-const spread = Math.max(...grins) - Math.min(...grins);
-if (spread > MAX_GRIN_SPREAD) {
-  const hi = rows.find(r => r.grin === Math.max(...grins)), lo = rows.find(r => r.grin === Math.min(...grins));
-  fails.push(`the hero wears a different face per world: he grins ${(hi.grin * 100).toFixed(0)}% of the time in `
-    + `${hi.wid} and ${(lo.grin * 100).toFixed(0)}% in ${lo.wid} — a spread of ${(spread * 100).toFixed(0)} points `
-    + `(bar ${MAX_GRIN_SPREAD * 100}). Prop density is choosing the character's expression`);
+const rated = rows.filter(r => r.restShare !== null);
+let spread = 0;
+if (rated.length >= 2) {
+  const vals = rated.map(r => r.restShare);
+  spread = Math.max(...vals) - Math.min(...vals);
+  if (spread > MAX_REST_GRIN_SPREAD) {
+    const hi = rated.find(r => r.restShare === Math.max(...vals));
+    const lo = rated.find(r => r.restShare === Math.min(...vals));
+    fails.push(`the hero's RESTING face differs by world: with nothing in his mouth he grins `
+      + `${(hi.restShare * 100).toFixed(0)}% of the time in ${hi.wid} and ${(lo.restShare * 100).toFixed(0)}% in `
+      + `${lo.wid} — a spread of ${(spread * 100).toFixed(0)} points (bar ${MAX_REST_GRIN_SPREAD * 100}). `
+      + `Which level a child picks is choosing the character's expression`);
+  }
+}
+for (const r of rows) {
+  if (r.restShare === null) {
+    fails.push(`${r.wid}: the hero was mid-bite in all ${r.rest === 0 ? SAMPLES : r.rest} sampled frames, `
+      + `so he has no resting face here to compare — that is its own finding`);
+  }
 }
 
 console.log('');
@@ -163,6 +197,6 @@ if (fails.length) {
   console.log(`\nFAIL — the hero's face is not the same character in every world (${fails.length} finding(s))`);
   process.exit(1);
 }
-console.log(`PASS — one face in all ${rows.length} world(s): grin spread ${(spread * 100).toFixed(0)} pts `
-  + `(bar ${MAX_GRIN_SPREAD * 100}), worst mood-hidden share `
+console.log(`PASS — one face in all ${rows.length} world(s): resting-grin spread ${(spread * 100).toFixed(0)} pts `
+  + `(bar ${MAX_REST_GRIN_SPREAD * 100}), worst mood-hidden share `
   + `${(Math.max(...rows.map(r => r.moodHidden)) * 100).toFixed(0)}% (bar ${MAX_MOOD_HIDDEN * 100}%)`);
