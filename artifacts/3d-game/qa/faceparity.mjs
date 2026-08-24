@@ -82,7 +82,21 @@ const MAX_MOOD_HIDDEN = 0.20;   // at most 20% of a match with the grin closed b
 // inferred from the gape, which cannot distinguish a bite from a mood.
 const MAX_REST_GRIN_SPREAD = 0.35;   // resting-face grin share, across worlds
 
-const SAMPLES = 120;            // at 10Hz — twelve seconds of play per world
+// ── WHAT THIS WINDOW ACTUALLY COVERS, STATED ─────────────────────────────
+// 120 samples at 10Hz is twelve seconds of WALL time, and under swiftshader the
+// match clock runs about 14x slower than that (measured: qa/_clockrate.mjs), so
+// this is well under a second of match time. That is fine for what the two bars
+// here test — MOOD-HIDDEN is a per-frame property of the rig and the mood
+// engine re-evaluates every frame — and it is NOT enough to characterise
+// anything that needs a stretch of gameplay. The raw grin share printed
+// alongside is therefore reportage, not a gated number, and it is deliberately
+// not what either bar reads.
+//
+// qa/bubbleclear.mjs sampled the same way and reported "bubbles up 0% of
+// frames" in three worlds, because at that scale it never got past the opening
+// calm hold. If a bar here ever needs a real stretch of play, it must wait on
+// __matchState().t like that probe now does.
+const SAMPLES = 120;
 const SAMPLE_MS = 100;
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',

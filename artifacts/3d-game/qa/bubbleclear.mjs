@@ -42,7 +42,25 @@ const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 
 // child looking at their own character sees words on his face.
 const MAX_FACE_COVER = 0.03;   // at most 3% of frames
 
-const SAMPLES = 90, SAMPLE_MS = 120;
+// ── SAMPLE THE MATCH CLOCK, NOT THE WALL CLOCK ───────────────────────────
+// The first version of this probe sampled 90 times at 120ms and reported
+// "bubbles up 0% of frames" in all three worlds — a PASS on no data, which is
+// the exact failure this repo already retracted once ("a probe that passes on
+// no data is worse than no probe") and which I then wrote again.
+//
+// Measured with qa/_clockrate.mjs: under swiftshader the match clock advances
+// 14.3x SLOWER than wall time, because dt is clamped per frame and the software
+// renderer only manages a frame or two a second. So 11 seconds of wall clock is
+// about 0.8 seconds of match — still inside the opening calm hold (life.ts sets
+// calmT so the town can introduce itself before anybody panics). The crowd had
+// not started talking yet. In a further 15 s of wall time the same page showed
+// 192 bubble-frames, so there was never any shortage of them to measure.
+const START_AT = 8;      // match seconds — past the calm hold
+const SPAN = 12;         // match seconds to sample across
+const SAMPLE_MS = 150;   // wall
+// A run that never sees a bubble has not tested anything. Say so instead of
+// passing.
+const MIN_BUBBLE_FRAMES = 12;
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -87,8 +105,12 @@ for (const wid of WORLDS) {
     requestAnimationFrame(tick);
   });
 
+  await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) > t, START_AT,
+    { timeout: 900000, polling: 250 });
+  const until = await p.evaluate(() => window.__matchState().t) + SPAN;
   let n = 0, anyBubble = 0, faceHit = 0, discHit = 0, worst = 0, worstText = '';
-  for (let i = 0; i < SAMPLES; i++) {
+  for (;;) {
+    if (await p.evaluate(() => window.__matchState().t) >= until) break;
     const s = await p.evaluate(() => {
       const THREE = window.__THREE, cam = window.__cam;
       const g = window.__voidGroup?.();
@@ -143,8 +165,20 @@ for (const wid of WORLDS) {
 }
 await b.close();
 
-const fails = rows.filter((r) => r.faceHit / r.n > MAX_FACE_COVER);
 console.log('');
+// SELF-CHECK FIRST. This probe cannot say anything about a world it never saw a
+// bubble in, and it must never report that silence as a clean result.
+const blind = rows.filter((r) => r.anyBubble < MIN_BUBBLE_FRAMES);
+if (blind.length) {
+  for (const r of blind) {
+    console.log(`  · ${r.wid}: only ${r.anyBubble} of ${r.n} sampled frames had any bubble on screen `
+      + `(need ${MIN_BUBBLE_FRAMES}). This run never reached the state it exists to test — `
+      + `do not read anything from it`);
+  }
+  console.log(`\nFAIL — ${blind.length} world(s) produced no data`);
+  process.exit(1);
+}
+const fails = rows.filter((r) => r.faceHit / r.n > MAX_FACE_COVER);
 if (fails.length) {
   for (const r of fails) {
     console.log(`  · ${r.wid}: a speech bubble covered the hero's FACE in `
