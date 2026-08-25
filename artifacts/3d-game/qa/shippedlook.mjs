@@ -69,6 +69,28 @@ await p.evaluate(() => {
 await p.evaluate(() => window.__pinQuality(0));
 await p.evaluate(() => window.__setVoidR(4));
 await p.waitForTimeout(3400);   // evolution burst, see qa/heroface.mjs
+// ── PIN THE FACE, OR PHOTOGRAPH A DIFFERENT CHARACTER IN EVERY WORLD ──────
+// The studio reviewed a pack in which the mascot wore a small round gasp in
+// Maple, Pirate, Game Day and Lantern and a wide grin with a tongue in Powder.
+// Four alarmed, one delighted, one game. Eight teams looked at those five
+// frames and only TEAM HERO's skeptic noticed.
+//
+// It is not a rendering bug. The gape is driven by EATING, not by mood, so a
+// hero parked anywhere with food in reach is mid-bite in almost every frame —
+// which world he happens to be caught chewing in is luck. void3d.ts:54 says so
+// and shipped the fix: "Pinning is the only deterministic way to take that
+// picture; waiting for a gap means waiting while he eats the set." The
+// lookbook, which is the studio's whole evidence base, never called it.
+//
+// Held shut and set to cruise, so every world photographs the SAME character
+// wearing his resting grin, and a difference between two frames is a
+// difference in the world rather than in his lunch.
+await p.evaluate(() => {
+  window.__setMood?.('cruise');
+  window.__pinMouth?.(true);
+  window.__calm?.();          // and no leftover evolve ribbons across the shot
+});
+await p.waitForTimeout(600);
 
 const box = await p.evaluate(() => {
   const THREE = window.__THREE, cam = window.__cam;
