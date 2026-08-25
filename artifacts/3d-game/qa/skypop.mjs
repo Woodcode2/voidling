@@ -191,7 +191,31 @@ for (const wid of WORLDS) {
       halo.material.map.colorSpace = keptCS;
       halo.material.map.needsUpdate = true; halo.material.needsUpdate = true;
     }
-    return { atSpawn, atCoast, noHalo, srgbHalo, foundHalo: !!halo, edge };
+    // ── ARE THE PLANETS ACTUALLY ON SCREEN? ───────────────────────────────
+    // The sky mask cannot answer this. A planet is a Sprite — geometry, not
+    // background — and at 0.95 opacity its pixels barely move when the
+    // background changes, so the mask EXCLUDES them by construction. Adding
+    // planets and watching the sky share fall would be the wrong reading of
+    // the right number.
+    //
+    // So they get their own A/B: hide every sprite, shoot, show them, shoot,
+    // count the pixels that changed. That is the only claim worth making about
+    // a planet nobody has photographed — that a child can see it.
+    const planets = [];
+    S.traverse((o) => { if (o.isSprite) planets.push(o); });
+    let planetPct = 0;
+    if (planets.length) {
+      planets.forEach((o) => { o.visible = false; });
+      const off = await shot();
+      planets.forEach((o) => { o.visible = true; });
+      const on = await shot();
+      let m2 = 0;
+      const n2 = off.data.length / 4;
+      for (let i = 0; i < n2; i++) if (d3(off, on, i) > 24) m2++;
+      planetPct = 100 * m2 / n2;
+    }
+    return { atSpawn, atCoast, noHalo, srgbHalo, foundHalo: !!halo, edge,
+      planets: planets.length, planetPct };
   });
 
   if (r.atCoast.maxMove < 50) {
@@ -208,6 +232,8 @@ for (const wid of WORLDS) {
   if (r.noHalo) console.log(line('halo hidden', r.noHalo));
   if (r.srgbHalo) console.log(line('halo as sRGB', r.srgbHalo));
   if (!r.foundHalo) console.log('    (no additive halo plane found at y=-3 — it has moved or gone)');
+  console.log(`    ${String(r.planets)} planet sprite(s) in the scene, covering `
+    + `${r.planetPct.toFixed(1)}% of the frame at the coast`);
   rows.push({ wid, R, ...r });
   await p.close();
   }
