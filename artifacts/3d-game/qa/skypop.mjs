@@ -224,16 +224,45 @@ for (const wid of WORLDS) {
     // count the pixels that changed. That is the only claim worth making about
     // a planet nobody has photographed — that a child can see it.
     const planets = [];
-    S.traverse((o) => { if (o.isSprite) planets.push(o); });
+    // ── AND IT HAS TO BE THE PLANETS, NOT EVERY SPRITE ──────────────────
+    // `if (o.isSprite)` collected 25 objects and reported "25 planet sprites
+    // covering 25.2% of the frame". There are two. The other twenty-three are
+    // the hero's own decorations, parented into his Group at scale ~0 to ~2 —
+    // hiding them and diffing counts the VOID as planet, and 25.2% was mostly
+    // him. A number that flatters the change is exactly the kind to distrust.
+    //
+    // The planets are identified by what they are: a 512px painted map (the
+    // canvas paint() builds), parented straight to the Scene rather than to a
+    // character, and scaled in tens of world units rather than ones.
+    S.traverse((o) => {
+      if (!o.isSprite) return;
+      if ((o.material?.map?.image?.width ?? 0) !== 512) return;
+      if (o.parent !== S) return;
+      if (o.scale.x < 20) return;
+      planets.push(o);
+    });
+    // ── AND IT IS AN A-B-A, FOR THE SAME REASON THE SKY MASK IS ─────────
+    // A single hide-and-diff counts every pixel that changed between two
+    // shots, and the shots are three rAF frames apart, so the void, the
+    // rivals, the crowd and the leaves have all moved. It reported 41.5% for
+    // TWO planets right after reporting 25.2% for a set that contained them —
+    // a subset covering more than its superset, which is arithmetically
+    // impossible and was pure motion.
+    //
+    // Visible, hidden, visible: a planet pixel changes both times and returns
+    // to where it started. A moving leaf does not come back on cue.
     let planetPct = 0;
     if (planets.length) {
+      const on1 = await shot();
       planets.forEach((o) => { o.visible = false; });
       const off = await shot();
       planets.forEach((o) => { o.visible = true; });
-      const on = await shot();
+      const on2 = await shot();
       let m2 = 0;
       const n2 = off.data.length / 4;
-      for (let i = 0; i < n2; i++) if (d3(off, on, i) > 24) m2++;
+      for (let i = 0; i < n2; i++) {
+        if (d3(on1, off, i) > 30 && d3(off, on2, i) > 30 && d3(on1, on2, i) < 20) m2++;
+      }
       planetPct = 100 * m2 / n2;
     }
     return { atSpawn, atCoast, noHalo, srgbHalo, foundHalo: !!halo, edge,
