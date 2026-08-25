@@ -588,14 +588,35 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   //   fog       the world's own air, replacing the one shared `space` colour;
   //             near/far kept wide so big-void pull-back views stay clear
   //   bgI       how loud the sky is against this world's exposure
-  const SKY_MOOD: Record<WorldId, { hue: number; sat: number; fog: number; bgI: number }> = {
-    maple:   { hue: 0,    sat: 1.0,  fog: 0x1b1038, bgI: 0.55 },   // the reference violet, dusty
-    pirate:  { hue: 145,  sat: 0.85, fog: 0x0e2237, bgI: 0.60 },   // swung to sea-teal, daylit
-    gameday: { hue: -50,  sat: 1.05, fog: 0x241120, bgI: 0.50 },   // toward magenta dusk over the lot
-    lantern: { hue: 25,   sat: 1.15, fog: 0x171d40, bgI: 0.46 },   // indigo night — dark, never black (see WORLD_LIGHT's histogram note)
+  // ── AND THE HUE ROTATION DID NOT DO WHAT ITS COMMENTS SAID ───────────────
+  // The old rows read `hue: 145 // swung to sea-teal` and `hue: 95 // aurora
+  // greens`. Photographed, Pirate's sky was dark BROWN and Powder's was dark
+  // MAGENTA — verified by eye at qa/out/space/ before this change, and both are
+  // plainly wrong against their own posters.
+  //
+  // The cause is that CSS `hue-rotate` is not an HSL rotation. It is the SVG
+  // luminance-preserving linear matrix, and on a base as saturated as this
+  // painting's violet it drives a channel negative, which the 8-bit canvas
+  // clamps to zero: 83% of Pirate's pixels and 78% of Game Day's came out of
+  // the matrix with a channel simply deleted. That is why they landed on hues
+  // nobody chose, and no choice of angle avoids it.
+  //
+  // So the tint is a canvas 'color' composite instead: it takes hue and
+  // saturation from the fill and LUMINOSITY from the painting underneath, which
+  // is exactly the operation "four authored skies from one asset" was always
+  // reaching for. The nebula keeps its structure and takes the world's colour.
+  // Alpha under 1 leaves some of the original hue variation alive, which is how
+  // Powder keeps a hint of aurora rather than becoming one flat blue.
+  const SKY_MOOD: Record<WorldId, { tint: string; tintA: number; fog: number; bgI: number }> = {
+    maple:   { tint: '#7a4ad6', tintA: 0.00, fog: 0x1b1038, bgI: 0.55 },   // the reference violet — untouched
+    pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
+    gameday: { tint: '#c0407f', tintA: 0.75, fog: 0x241120, bgI: 0.50 },   // magenta dusk over the lot
+    lantern: { tint: '#3f45a8', tintA: 0.70, fog: 0x171d40, bgI: 0.46 },   // deep indigo night
     // the poster set this look, not the other way round: blue winter dusk,
-    // aurora greens in the sky, warm windows against the snow
-    powder:  { hue: 95,   sat: 1.1,  fog: 0x1a2742, bgI: 0.46 },
+    // aurora greens in the sky, warm windows against the snow. 0.62 so the
+    // painting's own greens survive the tint as aurora rather than being
+    // flattened into one blue.
+    powder:  { tint: '#4a7fd0', tintA: 0.62, fog: 0x1a2742, bgI: 0.46 },
   };
   const MOOD = SKY_MOOD[WORLD_ID];
   scene.fog = new THREE.Fog(MOOD.fog, 420, 1500);
@@ -618,8 +639,17 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const c2 = document.createElement('canvas');
     c2.width = outW; c2.height = src.height;
     const g3 = c2.getContext('2d')!;
-    if (MOOD.hue !== 0 || MOOD.sat !== 1) g3.filter = `hue-rotate(${MOOD.hue}deg) saturate(${MOOD.sat})`;
     g3.drawImage(src, (src.width - outW) / 2, 0, outW, src.height, 0, 0, outW, src.height);
+    // hue and saturation from the fill, luminosity from the painting — see the
+    // note on SKY_MOOD above for why this is not a hue-rotate any more
+    if (MOOD.tintA > 0) {
+      g3.globalCompositeOperation = 'color';
+      g3.globalAlpha = MOOD.tintA;
+      g3.fillStyle = MOOD.tint;
+      g3.fillRect(0, 0, outW, src.height);
+      g3.globalAlpha = 1;
+      g3.globalCompositeOperation = 'source-over';
+    }
     const t = new THREE.CanvasTexture(c2);
     t.colorSpace = THREE.SRGBColorSpace;
     t.mapping = THREE.EquirectangularReflectionMapping;
@@ -638,7 +668,11 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // colour, per-star twinkle phase and rate. PointsMaterial cannot vary size
   // per point, which is why it looked like this.
   {
-    const N = 1500;
+    // 5000, not 1500. The visible band is about 15 degrees wide by 32 tall —
+    // roughly 1.2% of the sphere — so 1500 stars put about seventeen on screen,
+    // which photographs as a handful of specks rather than as a sky. One draw
+    // call either way.
+    const N = 5000;
     const pos = new Float32Array(N * 3);
     const col = new Float32Array(N * 3);
     const siz = new Float32Array(N);
@@ -754,30 +788,64 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   {
     type Body = { d: number; el: number; az: number; size: number; hue: string;
       dark: string; ring?: string; bands?: number; glow: string };
+    // ── WHERE THE CAMERA ACTUALLY LOOKS ────────────────────────────────────
+    // The first placement scattered these around the compass and photographed
+    // an empty sky. The camera's view azimuth is not free: camOffset keeps its
+    // x and z equal at every void size (0.62/0.62 at spawn, 0.45/0.45 at VOID
+    // TITAN), so the rig sits on the 45-degree diagonal and always looks back
+    // along 225 degrees. And in portrait the horizontal field is about 15
+    // degrees. So the window a planet can occupy is 225 +/- 7 degrees — a slot,
+    // not a sky. Everything below is placed in it.
+    //
+    // AND THE SIZES ARE SET AGAINST THE PORTRAIT FRAME, NOT THE LENS. The
+    // first set was authored for the 32-degree VERTICAL field and made discs of
+    // 18-20 degrees, which sounded bold. A phone held upright has a HORIZONTAL
+    // field of about 15 degrees — 2*atan(tan(16deg) * 430/932) — so an
+    // 18-degree planet does not sit in the sky, it IS the sky: measured at
+    // 58.3% of the frame, wall to wall. These are 7-8 degrees for the giants
+    // and 2-3 for the moons, which reads as a body in the distance rather than
+    // as a backdrop. Photographed at qa/out/space/ before and after.
+    //
+    // AND THE PAIR IS SPREAD TO OPPOSITE CORNERS OF THE WINDOW. Whether a
+    // given patch of sky is on screen depends on where the coast is relative to
+    // the rig, which changes as a child moves around the island — so a body
+    // parked in the middle of the window is behind the island as often as not.
+    // One high and to one side, one low and to the other, so the sky has
+    // something in it from more of the shoreline. This is a placement that
+    // wants measuring across several positions, not one screenshot; the planet
+    // A/B in qa/skypop.mjs is what does that.
+    //
+    // Elevation is the free axis, and it is where the variety goes. At the
+    // sizes where space is actually on screen the camera is at its steepest and
+    // the visible band runs about -50 to -81 degrees, so these sit between -57
+    // and -75: below the island's edge, which is the only place you can see
+    // past it from up here.
+    const AZ = 3.927;   // 225 degrees, the direction the rig always faces
     const SKIES: Record<WorldId, Body[]> = {
       // a warm amber giant low over the maples, and one small cold moon
       maple: [
-        { d: 760, el: -41, az: 0.62, size: 300, hue: '#f0a85a', dark: '#2a1330', bands: 5, glow: '#ffcf8a' },
-        { d: 620, el: -55, az: 2.9, size: 96, hue: '#cfd6ff', dark: '#1a1b3a', glow: '#aab4ff' },
+        { d: 760, el: -56, az: AZ - 0.11, size: 116, hue: '#f0a85a', dark: '#2a1330', bands: 5, glow: '#ffcf8a' },
+        { d: 620, el: -76, az: AZ + 0.11, size: 34, hue: '#cfd6ff', dark: '#1a1b3a', glow: '#aab4ff' },
       ],
-      // a banded teal world with a ring, sitting out over the open water
+      // a banded teal world with a ring, out over the open water
       pirate: [
-        { d: 820, el: -38, az: 1.9, size: 340, hue: '#5fd8c8', dark: '#0b2a3a', ring: '#bff3ea', bands: 4, glow: '#8ff0e2' },
+        { d: 820, el: -57, az: AZ + 0.11, size: 143, hue: '#5fd8c8', dark: '#0b2a3a', ring: '#bff3ea', bands: 4, glow: '#8ff0e2' },
+        { d: 660, el: -76, az: AZ - 0.11, size: 32, hue: '#ffe6a8', dark: '#3a2a10', glow: '#fff0c8' },
       ],
-      // a hot magenta dusk giant, big and close, over the parking lot
+      // a hot magenta dusk giant over the parking lot, and a pale companion
       gameday: [
-        { d: 700, el: -44, az: 4.1, size: 310, hue: '#ff7ac0', dark: '#3a0f38', bands: 6, glow: '#ffb0dc' },
-        { d: 900, el: -34, az: 5.6, size: 110, hue: '#ffd9a0', dark: '#332012', glow: '#ffe9c8' },
+        { d: 700, el: -56, az: AZ + 0.11, size: 115, hue: '#ff7ac0', dark: '#3a0f38', bands: 6, glow: '#ffb0dc' },
+        { d: 900, el: -77, az: AZ - 0.11, size: 49, hue: '#ffd9a0', dark: '#332012', glow: '#ffe9c8' },
       ],
-      // a red lantern of a moon, and a distant pale companion
+      // a red lantern of a moon, and a distant violet companion
       lantern: [
-        { d: 640, el: -47, az: 3.4, size: 260, hue: '#ff8a6a', dark: '#2b0d1e', glow: '#ffb79c' },
-        { d: 880, el: -36, az: 0.9, size: 130, hue: '#c9a6ff', dark: '#1d1440', glow: '#e0c9ff' },
+        { d: 640, el: -56, az: AZ - 0.11, size: 98, hue: '#ff8a6a', dark: '#2b0d1e', glow: '#ffb79c' },
+        { d: 880, el: -76, az: AZ + 0.11, size: 58, hue: '#c9a6ff', dark: '#1d1440', glow: '#e0c9ff' },
       ],
       // an ice world with a bright ring, to match the aurora the poster set
       powder: [
-        { d: 780, el: -43, az: 5.0, size: 330, hue: '#bfe6ff', dark: '#122844', ring: '#eaf7ff', bands: 3, glow: '#dff2ff' },
-        { d: 660, el: -58, az: 2.2, size: 90, hue: '#9fe8d0', dark: '#0f2e2a', glow: '#c8f4e6' },
+        { d: 780, el: -57, az: AZ + 0.11, size: 136, hue: '#bfe6ff', dark: '#122844', ring: '#eaf7ff', bands: 3, glow: '#dff2ff' },
+        { d: 660, el: -76, az: AZ - 0.11, size: 32, hue: '#9fe8d0', dark: '#0f2e2a', glow: '#c8f4e6' },
       ],
     };
     const paint = (bd: Body) => {
@@ -837,7 +905,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     };
     for (const bd of SKIES[WORLD_ID] ?? []) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: paint(bd), transparent: true, depthWrite: false, fog: false, opacity: 0.95,
+        map: paint(bd), transparent: true, depthWrite: false, fog: false,
       }));
       const e = bd.el * Math.PI / 180;
       sp.position.set(Math.cos(e) * Math.cos(bd.az) * bd.d, Math.sin(e) * bd.d,
@@ -885,8 +953,8 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
     const grd = g.createRadialGradient(256, 256, 211, 256, 256, 256);
-    grd.addColorStop(0, 'rgba(168,123,255,0.30)');
-    grd.addColorStop(0.55, 'rgba(123,79,224,0.14)');
+    grd.addColorStop(0, 'rgba(168,123,255,0.16)');
+    grd.addColorStop(0.55, 'rgba(123,79,224,0.06)');
     grd.addColorStop(1, 'rgba(123,79,224,0)');
     g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
     const tex = new THREE.CanvasTexture(cv);
