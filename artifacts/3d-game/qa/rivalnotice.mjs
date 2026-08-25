@@ -79,18 +79,50 @@ for (const wid of WORLDS) {
     requestAnimationFrame(tick);
   });
 
+  // ── SAMPLE THE GATE, NOT JUST THE OUTCOME ────────────────────────────────
+  // The first version of this probe reported "NaN looks" and left me guessing
+  // at four different causes for twenty minutes. A count on its own cannot tell
+  // "the look is throttled correctly" from "the look can never fire" — and
+  // those want opposite fixes. So it samples the CONDITIONS too, off the real
+  // rival list, every half second of match time:
+  //
+  //   OPPORTUNITY — the share of samples where at least one non-hunter rival
+  //   satisfies the whole gate (bigger by 1.2x, inside 62 units, outside its
+  //   own radius). If that is near zero the gate is unreachable and no amount
+  //   of cooldown tuning matters. If it is high and the rate is still zero,
+  //   the throttle is the problem instead.
   const t0 = await p.evaluate(() => window.__matchState().t);
-  const n0 = await p.evaluate(() => window.__matchState().ev.notices ?? 0);
+  const n0 = await p.evaluate(() => window.__matchState().ev.notices);
+  if (!Number.isFinite(n0)) {
+    console.log(`FAIL — __matchState().ev.notices is ${JSON.stringify(n0)}, not a number. `
+      + `The counter this probe reads has moved or was never initialised; every rate below `
+      + `would be fiction.`);
+    process.exit(2);
+  }
+  await p.evaluate(() => {
+    window.__oppN = 0; window.__oppHit = 0;
+    window.__oppTick = setInterval(() => {
+      const v = window.__voidState(); const st = window.__matchState();
+      window.__oppN++;
+      const hit = st.rivals.some((r) => r.joined && !r.hunt && r.r > v.r * 1.2
+        && Math.hypot(r.x - v.x, r.z - v.z) < 62 && Math.hypot(r.x - v.x, r.z - v.z) > r.r * 0.9);
+      if (hit) window.__oppHit++;
+    }, 500);
+  });
   await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) >= t, t0 + SAMPLE_MATCH_SECONDS,
     { timeout: 1500000, polling: 400 });
   const t1 = await p.evaluate(() => window.__matchState().t);
   const r = await p.evaluate(() => window.__matchState().ev);
+  const opp = await p.evaluate(() => { clearInterval(window.__oppTick);
+    return { n: window.__oppN, hit: window.__oppHit }; });
 
   const mins = (t1 - t0) / 60;
   const perMin = (r.notices - n0) / Math.max(1e-6, mins);
-  rows.push({ wid, perMin, span: t1 - t0, charges: r.charges, bites: r.bites });
+  rows.push({ wid, perMin, span: t1 - t0, charges: r.charges, bites: r.bites,
+    opp: opp.n ? 100 * opp.hit / opp.n : 0 });
   console.log(`  ${wid.padEnd(9)} ${(r.notices - n0)} looks over ${(t1 - t0).toFixed(0)}s of match `
-    + `= ${perMin.toFixed(1)}/min   (bully charges ${r.charges}, bites ${r.bites})`);
+    + `= ${perMin.toFixed(1)}/min   (gate open ${(opp.n ? 100 * opp.hit / opp.n : 0).toFixed(0)}% of the time, `
+    + `bully charges ${r.charges}, bites ${r.bites})`);
   await p.close();
 }
 await b.close();
@@ -100,7 +132,12 @@ const fails = [];
 for (const r of rows) {
   if (r.perMin < MIN_PER_MIN) {
     fails.push(`${r.wid}: only ${r.perMin.toFixed(1)} looks a minute (floor ${MIN_PER_MIN}). `
-      + `The family is still furniture — nothing about the other voids changed for the player`);
+      + `The family is still furniture — nothing about the other voids changed for the player. `
+      + (r.opp < 5
+        ? `The gate was open only ${r.opp.toFixed(0)}% of the time, so this is REACH, not throttle: `
+          + `a rival that big is never that close. Widen the distance or soften the size gap.`
+        : `The gate was open ${r.opp.toFixed(0)}% of the time, so the opportunity is there and the `
+          + `THROTTLE is eating it — the cooldown or the never-two-at-once rule is too strict.`));
   }
   if (r.perMin > MAX_PER_MIN) {
     fails.push(`${r.wid}: ${r.perMin.toFixed(1)} looks a minute (ceiling ${MAX_PER_MIN}). `
