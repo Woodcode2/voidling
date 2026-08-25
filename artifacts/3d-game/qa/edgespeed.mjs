@@ -84,12 +84,22 @@ for (const wid of WORLDS) {
     const iv = setInterval(drive, 60); drive();
 
     let peak = 0, peakR = 0, n = 0, atEdge = 0, capAt = 0;
-    let px = vs0.x, pz = vs0.z, last = performance.now();
+    let px = vs0.x, pz = vs0.z, last = window.__matchState().t;
     await new Promise((res) => {
       const tick = () => {
         const vs = window.__voidState();
-        const now = performance.now();
-        const dt = Math.max(1e-3, (now - last) / 1000); last = now;
+        // ── DIVIDE BY THE GAME'S CLOCK, NOT THE WALL'S ───────────────────
+        // The first version of this used performance.now() deltas between rAF
+        // callbacks. The game does not move by wall time — it moves by its own
+        // dt — and under a software renderer the two disagree wildly, so a
+        // single pair of rAFs firing close together turned one ordinary step
+        // into a huge spurious peak. It reported 4.29x and then 2.58x on
+        // changes that could not have produced either number. Governor rule 4,
+        // written after four probes made this mistake, made by a fifth.
+        const now = window.__matchState().t;
+        const dt = now - last;
+        if (dt < 1e-4) { requestAnimationFrame(tick); return; }   // same frame, no data
+        last = now;
         const sp = Math.hypot(vs.x - px, vs.z - pz) / dt;
         px = vs.x; pz = vs.z;
         // The speed HE can steer at, derived the way the game derives it.
