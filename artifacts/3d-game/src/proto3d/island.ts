@@ -62,7 +62,7 @@ export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
 export interface Island {
   spawn: { x: number; z: number };
   biomeAt(x: number, z: number): Biome | null;
-  update(dt: number, t: number): void;
+  update(dt: number, t: number, cam?: THREE.Camera): void;
   setDusk(k: number): void;   // 0 = midday, 1 = full golden hour
   W: number;  // 3D world helper (world units -> 3D)
   /** This world's own painted sky, equirectangular. Handed back so the
@@ -467,6 +467,18 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
 
   // the star shader's clock — ticked from update() so the field scintillates
   let starMatRef: THREE.ShaderMaterial | null = null;
+  // ── THE SKY TRAVELS WITH THE CAMERA ──────────────────────────────────────
+  // Stars and planets are CELESTIAL: they should not parallax as a void slides
+  // across an island a few hundred units wide, and they must not fall out of
+  // the frustum when it does. The camera's far plane is 1000 (prototype3d.ts's
+  // PerspectiveCamera), the camera itself sits up to ~500 units from the origin
+  // at VOID TITAN pull-back, and these bodies are 340-900 out — so a
+  // world-fixed sky is clipped from half the island. Re-centring them on the
+  // camera each frame fixes both at once: fixed direction, fixed distance, no
+  // parallax, never clipped. It is what a skybox does, with depth still on so
+  // the island occludes what is behind it.
+  const skyBodies: { o: THREE.Object3D; dir: THREE.Vector3; d: number }[] = [];
+  let starField: THREE.Points | null = null;
     // ── space backdrop ─────────────────────────────────────────────────────────
   // WHAT WAS HERE: scene.background = one flat colour, and a painted nebula
   // that swaps in from a CDN when it loads. Which means the sky is a SINGLE
@@ -709,7 +721,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
           gl_FragColor = vec4(vCol, a);
         }`,
     });
-    scene.add(new THREE.Points(g, starMatRef));
+    starField = new THREE.Points(g, starMatRef);
+    starField.frustumCulled = false;   // its bounding sphere is centred where it no longer is
+    scene.add(starField);
   }
 
   // ── PLANETS ────────────────────────────────────────────────────────────────
@@ -752,7 +766,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       ],
       // a hot magenta dusk giant, big and close, over the parking lot
       gameday: [
-        { d: 700, el: -44, az: 4.1, size: 380, hue: '#ff7ac0', dark: '#3a0f38', bands: 6, glow: '#ffb0dc' },
+        { d: 700, el: -44, az: 4.1, size: 310, hue: '#ff7ac0', dark: '#3a0f38', bands: 6, glow: '#ffb0dc' },
         { d: 900, el: -34, az: 5.6, size: 110, hue: '#ffd9a0', dark: '#332012', glow: '#ffe9c8' },
       ],
       // a red lantern of a moon, and a distant pale companion
@@ -830,6 +844,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
         Math.cos(e) * Math.sin(bd.az) * bd.d);
       sp.scale.set(bd.size, bd.size, 1);
       sp.renderOrder = -1;   // behind the island's own transparent work
+      skyBodies.push({ o: sp, dir: sp.position.clone().normalize(), d: bd.d });
       scene.add(sp);
     }
   }
@@ -3378,8 +3393,13 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       sideMatCache.forEach((m) => { m.emissiveIntensity = k * 0.9; });
     },
     skyTex: skyCanvas,
-    update(dt, t) {
+    update(dt, t, cam) {
       if (starMatRef) starMatRef.uniforms.uTime.value = t;
+      // re-centre the celestial layer on the camera — see skyBodies above
+      if (cam) {
+        if (starField) starField.position.copy(cam.position);
+        for (const sb of skyBodies) sb.o.position.copy(cam.position).addScaledVector(sb.dir, sb.d);
+      }
       if (bayWater) (bayWater.material as THREE.ShaderMaterial).uniforms.uTime.value = t;
       wfTex.offset.y = (wfTex.offset.y - dt * 1.6) % 1;
       (spray.material as THREE.MeshBasicMaterial).opacity = 0.42 + Math.sin(t * 3) * 0.08;

@@ -8162,7 +8162,7 @@ function animate() {
   if (stopT > 0) { stopT = Math.max(0, stopT - dt); dtw *= 0.06; }
   tClock += dt;
   if (_revalQueue.length && tClock >= _revalQueue[0]) { _revalQueue.shift(); validateWorld(); bakeContactShadows(); }
-  island.update(dt, tClock);
+  island.update(dt, tClock, camera);
   // the curios turn and catch the light — the glint is what the eye finds
   for (const c of curios) if (c.mesh.visible) animateCurio(c.mesh, tClock, c.seed);
 
