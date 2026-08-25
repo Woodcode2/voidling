@@ -1344,9 +1344,9 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     // pulls DOWN the Home Run to the lake — travel over open white
     introLen: 3.5,
     ender: '🏔️ WORLD ENDER! The valley is CLOSED.',
-    enderNews: 'THE VALLEY IS NOW A HOLE. Grit stocks were not the issue in the end.',
+    enderNews: 'THE VALLEY IS NOW A VOID. Grit stocks were not the issue in the end.',
     houseNews: 'A chalet has left. The booking stands. The chalet does not.',
-    rivalFullNews: 'The other hole has stopped sliding. Officials are calling it "full".',
+    rivalFullNews: 'The other void has stopped sliding. Officials are calling it "full".',
     winSub: 'the whole valley belongs to the void', place: 'the valley',
     winTitles: ['VALLEY: DEVOURED', 'SCHOOL STAYS SHUT', 'BURP OF CHAMPIONS',
                 'PISTE OFF THE MAP', 'FROSTY, AND ALSO ENORMOUS'],

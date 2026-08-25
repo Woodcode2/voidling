@@ -109,7 +109,7 @@ const MAPLE: WorldReact = {
       'The trombone section has gone and the song has not.',
     ],
     [ // 1 · dog off the lead
-      'Biscuit ran round the hole twice and then took a sandwich.',
+      'Biscuit ran round the void twice and then took a sandwich.',
       'Six people chasing one dog have all stopped at the same spot.',
       'The dog will not go near it and the dog is being sensible.',
     ],
@@ -121,7 +121,7 @@ const MAPLE: WorldReact = {
     [ // 3 · the goat
       'The goat walked to the edge, looked in, and walked away.',
       'The goat has stopped running for the first time in years.',
-      'Everybody is watching the goat and nobody is watching the hole.',
+      'Everybody is watching the goat and nobody is watching the void.',
     ],
   ],
   evolve: [
@@ -133,8 +133,8 @@ const MAPLE: WorldReact = {
   ],
   rivalGone: [
     'One void has eaten the other. There is one left, and it is bigger.',
-    'One hole has gone into the other hole. Nobody has an explanation.',
-    'We are down to a single hole and it has had a very good morning.',
+    'One void has gone into the other void. Nobody has an explanation.',
+    'We are down to a single void and it has had a very good morning.',
   ],
 };
 
@@ -154,7 +154,7 @@ const PIRATE: WorldReact = {
   ],
   beat: [
     [ // 0 · ice cream hour
-      'Ice cream hour continues beside a hole and the queue has not moved.',
+      'Ice cream hour continues beside a void and the queue has not moved.',
       'Nine hundred ice creams served and exactly one has been dropped.',
       'The ice cream hut is now the closest building to the thing.',
     ],
@@ -166,7 +166,7 @@ const PIRATE: WorldReact = {
     [ // 2 · dance party
       'The dance floor has gone. DJ Coconut says one more hour anyway.',
       'The conga line went round it and came back four guests shorter.',
-      'Dance Cove is now Dance Hole. Management prefers the old name.',
+      'Dance Cove is now Dance Void. Management prefers the old name.',
     ],
     [ // 3 · treasure hunt
       'A guest has found the treasure and lost the beach it was under.',
@@ -184,7 +184,7 @@ const PIRATE: WorldReact = {
   rivalGone: [
     'One of them has eaten the other. There is one left. Rather large.',
     'One of them has taken the other. Do enjoy the rest of your stay.',
-    'The bay is down to a single hole and it looks extremely pleased.',
+    'The bay is down to a single void and it looks extremely pleased.',
   ],
 };
 
@@ -299,9 +299,9 @@ const POWDER: WorldReact = {
   ],
   beat: [
     [ // sled hour
-      'Sledding continues despite the hole. Some sledding continues INTO the hole.',
+      'Sledding continues despite the void. Some sledding continues INTO the void.',
       'The sled queue has shortened considerably. The bulletin will not say why.',
-      'A toboggan has set a new speed record. The record ends at the hole.',
+      'A toboggan has set a new speed record. The record ends at the void.',
     ],
     [ // lake hour
       'Skating on the lake is suspended. The lake is also, partly, suspended.',
@@ -314,20 +314,20 @@ const POWDER: WorldReact = {
       'Judging is delayed. Several entries have been, in the official term, unentered.',
     ],
     [ // avalanche
-      'The mountain has let go. The hole has been advised. The hole seems pleased.',
+      'The mountain has let go. The void has been advised. The void seems pleased.',
       'An avalanche is proceeding down the Home Run. So is everything else.',
       'The bulletin notes that the valley is now arriving all at once.',
     ],
   ],
   evolve: [
-    'The hole is now classified {F}. The classification office has closed early.',
-    'Officials confirm the hole has reached {F} status. Officials are leaving.',
-    'The hole has been upgraded to {F}. The grit budget has not.',
+    'The void is now classified {F}. The classification office has closed early.',
+    'Officials confirm the void has reached {F} status. Officials are leaving.',
+    'The void has been upgraded to {F}. The grit budget has not.',
   ],
   rivalGone: [
-    'One hole has absorbed the other. The closure list is simpler now.',
-    'The valley is down to a single hole. The bulletin calls this progress.',
-    'Two holes went up the Home Run. One came back. It looks satisfied.',
+    'One void has absorbed the other. The closure list is simpler now.',
+    'The valley is down to a single void. The bulletin calls this progress.',
+    'Two voids went up the Home Run. One came back. It looks satisfied.',
   ],
 };
 
@@ -379,11 +379,11 @@ export const MID_REACT: Record<string, string[]> = {
   'maple.parade': BY_WORLD.maple.beat[2],
   'maple.bake': [
     'The bake sale table went in with all nine pies still on it.',
-    'Marge sold a pie to the hole. Marge says a sale is a sale.',
+    'Marge sold a pie to the void. Marge says a sale is a sale.',
     'The prize sponge is gone and Pearl is taking it extremely well.',
   ],
   'maple.tractor': [
-    'Old Hutchins has driven the tractor round the hole four times, waving.',
+    'Old Hutchins has driven the tractor round the void four times, waving.',
     'The tractor pull has been redirected. The tractor had other ideas.',
     'Dale flagged the tractor down at the edge. The trailer did not stop.',
   ],
@@ -403,12 +403,12 @@ export const MID_REACT: Record<string, string[]> = {
   'gameday.dogs': BY_WORLD.gameday.beat[2],
   'gameday.wave': [
     'The wave has reached section C. Section C is no longer attending.',
-    'The wave went round the stadium twice and into the hole once.',
+    'The wave went round the stadium twice and into the void once.',
     'Statistically the wave is now the fastest thing on the field.',
   ],
   'gameday.mascot': [
     'A mascot has run straight in. The head came off on the way down.',
-    'The mascot race is down to two. Neither of them can see the hole.',
+    'The mascot race is down to two. Neither of them can see the void.',
     'The eagle is gone. The eagle was in the lead. Tough break.',
   ],
   'lantern.free': BY_WORLD.lantern.beat[1],
@@ -426,13 +426,13 @@ export const MID_REACT: Record<string, string[]> = {
   'powder.lake': BY_WORLD.powder.beat[1],
   'powder.contest': BY_WORLD.powder.beat[2],
   'powder.cocoa': [
-    'The hot chocolate queue has re-formed in a ring around the hole.',
+    'The hot chocolate queue has re-formed in a ring around the void.',
     'A full mug went in. The lodge is calling it a donation.',
-    'Norm says the hole takes its cocoa with nothing in it. Everything, technically.',
+    'Norm says the void takes its cocoa with nothing in it. Everything, technically.',
   ],
   'powder.snowball': [
     'Every snowball on the green is being thrown at the same target. None have landed.',
-    'The snowball fight has declared the hole ineligible. It keeps winning.',
+    'The snowball fight has declared the void ineligible. It keeps winning.',
     'A direct hit was recorded at noon. The snowball has not been returned.',
   ],
 };

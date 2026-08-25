@@ -2243,7 +2243,7 @@ export function createLife(
     teahouse: ['the guest has had eleven pots', 'we are running low on cups',
       'the terrace was here before the market', 'do not look down'],
     moonbridge: ['the bridge is fine. the bridge is FINE.', 'it creaked. it has never creaked.'],
-    nightgarden: ['the koi have left', 'the pond is a hole now', 'three hundred years. a hole.'],
+    nightgarden: ['the koi have left', 'the pond is a void now', 'three hundred years. a void.'],
     bathhouse: ['the guest in the purple has had eleven', 'management has been informed',
       'we are out of the big towels', 'nobody has seen the third floor'],
     bamboo: ['it is very dark out here now', 'the lights are going out one by one'],

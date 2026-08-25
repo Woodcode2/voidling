@@ -51,6 +51,34 @@ const BAD = [
   ['missing child', /lost child at/i],
   ['adult jargon', /\b(HOA|recused|oat milk|pay grade|my agent said|my lawyer)\b/],
 ];
+// ── "THE HOLE" ──────────────────────────────────────────────────────────────
+// The owner played the last world and said: "the news keeps referencing the
+// hole. It's the void." He was right seventy-four times, across six newsrooms,
+// a rival-news line, a night-garden bark and a hat's boast. The sweep that
+// fixed it was a one-off, and a one-off does not hold: `hole` is the obvious
+// synonym, so the next person writing a headline reaches for it again.
+//
+// This is an ALLOW-LIST, not a ban, because `hole` is a real word and two gags
+// need it — Norm's fishing hole on the Powder lake (the joke is precisely
+// fishing-hole-versus-void) and the Maple mayor insisting there is no hole and
+// please stay away from the void. Everything else fails. Reword a sanctioned
+// line and it fails too, on purpose: the sanction is for the joke, not for the
+// file, and a reworded joke deserves a second look.
+//
+// SCOPE, stated rather than assumed. It reads STRING LITERALS in .ts/.tsx
+// only. That is what keeps `const hole = new CylinderGeometry(...)` in
+// tailgate.ts and a `hole.io` note to an engineer from reading as copy. It
+// therefore does NOT cover index.html — prose apostrophes there ("kids'
+// games") open string literals that never close, and a check that cries wolf
+// is a check somebody switches off. index.html's occurrences are all inside
+// CSS comment blocks today; if player copy ever moves into it, widen this.
+const HOLE_OK = [
+  /fishing holes?\b/i,
+  /there is no hole and please stay away from the void/i,
+];
+const STRLIT = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
+let holeOkHits = 0;
+
 let bad = 0, noted = 0;
 for (const f of FILES) {
   const retired = RETIRED.test(f);
@@ -67,8 +95,20 @@ for (const f of FILES) {
         if (retired) noted++; else bad++;
       }
     }
+    if (/\.tsx?$/.test(f)) {
+      STRLIT.lastIndex = 0;
+      let m;
+      while ((m = STRLIT.exec(code))) {
+        const str = (m[1] ?? m[2] ?? m[3] ?? '').replace(/hole\.io/gi, '');
+        if (!/\bholes?\b/i.test(str)) continue;
+        if (HOLE_OK.some((ok) => ok.test(str))) { holeOkHits++; continue; }
+        console.log(`  ${retired ? 'note ' : 'HIT  '} ${'the void is not a hole'.padEnd(22)} ${f}:${i + 1}  ${str.trim().slice(0, 90)}`);
+        if (retired) noted++; else bad++;
+      }
+    }
   });
 }
+if (holeOkHits === 0) console.log('\nNOTE — the `hole` allow-list matched nothing. Either the gags were cut (delete HOLE_OK) or the scan has gone blind.');
 if (noted) console.log(`\n${noted} note(s) in the retired 2D game / React shell — not in the bundle, not a failure.`);
 console.log(bad === 0
   ? `\nCLEAN — no retired vocabulary in any player-facing string (${FILES.length} files swept).`

@@ -535,7 +535,7 @@ const GENERAL: Pools = [[
   'Bill has written one word down and has covered it with his hand.',
   'A foam finger at gate C is currently larger than the child holding it.',
   'The north lot is fine and has never in its life been finer.',
-  'Is that a hole by the horseshoe pit? The stewards are calling it shade.',
+  'Is that a void by the horseshoe pit? The stewards are calling it shade.',
   'Site twenty two has a doorbell, a rug and two lamps, outdoors.',
   'The middle school choir sang two songs and got the biggest cheer.',
   'A steward has put a traffic cone next to it, and that is the plan.',

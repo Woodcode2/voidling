@@ -114,7 +114,7 @@ export const HATS: Hat[] = [
       'bring me... the whole street',
       'a king does not snack. a king FEASTS.',
       'kneel. then get eaten.',
-      'my kingdom is a hole. it is a good hole.',
+      'my kingdom is a void. it is a good void.',
     ] },
 
   // ── THE COPY HAD TO BE REWRITTEN, AND THE RULE WAS ALREADY WRITTEN DOWN ──

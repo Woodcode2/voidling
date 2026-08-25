@@ -148,39 +148,39 @@ const MORNING: string[] = [
 // weather, or a drift with opinions, or a shadow. Not one exclamation mark:
 // doubt is delivered flat, and the flatness IS the joke.
 const T0_GENERAL = [
-  'The resort wishes to stress that the hole is not on the piste map.',
+  'The resort wishes to stress that the void is not on the piste map.',
   'A large round patch has appeared on the snow. Vern is sending grit.',
-  'The council has classified the hole as weather.',
+  'The council has classified the void as weather.',
   'Norm reports his fishing hole has been joined by a much bigger one.',
   'A purple something crossed the Home Run at nine. The groomer will fix it.',
-  'The hole is thought to be a drift that has gone the other way.',
+  'The void is thought to be a drift that has gone the other way.',
   'Grete rang down to ask if the valley looks different. It looks fine.',
   'Three sleds are missing. Sleds are always missing. This is not news.',
   'Franz says something ate a slalom gate. Franz has had a long week.',
-  'The bulletin will not use the word hole. The patch, then, is spreading.',
-  'An expert has explained the hole as a shadow cast by nothing much.',
+  'The bulletin will not use the word void. The patch, then, is spreading.',
+  'An expert has explained the void as a shadow cast by nothing much.',
   'A snowman has left the contest early. Snowmen do not do that.',
-  'Mrs. Tannen asks if school is shut because of the hole. No. It is snow.',
+  'Mrs. Tannen asks if school is shut because of the void. No. It is snow.',
   'The chairlift swung over something purple. Maintenance found smooth snow.',
   'Vern gritted around the patch this morning. The grit has not come back.',
-  'The lost blue mitten has been found, briefly, at the edge of the hole.',
+  'The lost blue mitten has been found, briefly, at the edge of the void.',
   'A chalet reports its garden gnome missing, along with the garden.',
   'The tourist office asks visitors to enjoy the valley in the usual order.',
-  'Skaters describe a new hole in the lake ice. Norm denies drilling it.',
+  'Skaters describe a purple patch in the lake ice. Norm denies drilling it.',
   'The piste map has been reprinted without comment and without one piste.',
   'Whatever is out on the snow, it is tidying the snow as it goes.',
-  'The council will discuss the hole in spring, under any other business.',
-  'A witness says the hole slid uphill. The desk notes that holes do not.',
+  'The council will discuss the void in spring, under any other business.',
+  'A witness says the void slid uphill. The desk notes that voids do not.',
   'Sled hire reports one toboggan returned on time and nine returned nowhere.',
   'The bulletin has received four calls about a purple thing. And a fifth.',
   'The snowplough went to move the patch along. The patch moved the plough.',
-  'Officials measured the hole at eleven. It measured differently at noon.',
-  'Whose toboggan is parked at the edge of the hole, and why is it leaning in?',
+  'Officials measured the void at eleven. It measured differently at noon.',
+  'Whose toboggan is parked at the edge of the void, and why is it leaning in?',
   'Grit stocks remain ample, and this remains the official position.',
   'A pine has gone from the pinewood, roots and all. Pines do not go that way.',
   'The resort reminds guests that the mountain is entirely safe, broadly.',
   // ── live state, read off the closure list. See the note above TOKENS. ──
-  'The hole was last seen near {M}. Vern has been told.',
+  'The void was last seen near {M}. Vern has been told.',
   'Callers in {D} report a purple visitor. The desk reports calm.',
   'An early tally suggests {P} percent of the valley is mislaid.',
   'Witnesses call it a {F}. The desk calls it a drift with opinions.',
@@ -229,10 +229,10 @@ const T1_GENERAL = [
   'Please move uphill at your convenience. Your convenience is now.',
   'The snowman contest is postponed. The entrants are asked to run.',
   'Franz has counted his beginners twice. All present. All uphill.',
-  'The hole has been upgraded from weather to a closure.',
+  'The void has been upgraded from weather to a closure.',
   'The lake ice is fine, reports Norm, from the half of the lake still iced.',
-  'The word hole is now in use at this station.',
-  'Chalets are advised to lock their doors and stop being near the hole.',
+  'The word void is now in use at this station.',
+  'Chalets are advised to lock their doors and stop being near the void.',
   'The piste map is being reprinted hourly and thinner each time.',
   'Advice from the council: uphill. Further advice: keep going.',
   'The grit budget has been doubled. The road it was for has halved.',
@@ -247,7 +247,7 @@ const T1_GENERAL = [
   'The pinewood is down to half its pines and none of its log piles.',
   'Grete has been asked to stay put. Grete has been given the cocoa.',
   'The Home Run is now a home walk. Walk it uphill.',
-  'Can a hole climb? The council says no. The council is climbing anyway.',
+  'Can a void climb? The council says no. The council is climbing anyway.',
   'The village is asked to gather at the lodge and to bring the cat.',
   'A lift chair has landed in a pine. Both passengers climbed down cross.',
   'Grit does not work on it, Vern reports. Vern gritted it anyway.',
@@ -256,9 +256,9 @@ const T1_GENERAL = [
   'Added to the closure list: {M}.',
   'Update from {D}: no further updates from {D}.',
   '{P} percent of the valley is now a matter for spring.',
-  'The hole is registered as a {F}. The registry has moved uphill.',
+  'The void is registered as a {F}. The registry has moved uphill.',
   'Roughly {R} percent of the valley remains open. Uphill parts, mostly.',
-  'The hole is in {D}. Do not be in {D}.',
+  'The void is in {D}. Do not be in {D}.',
   'Witnesses saw {M} go. The desk saw the paperwork go.',
   'Vern reports {M} gone and his gritting route with it.',
 ];
@@ -305,7 +305,7 @@ const T2_GENERAL = [
   'Mrs. Tannen is at the top taking a register. Everyone answers.',
   'The Home Run has run home!! Use the pinewood side. What is left of it.',
   'Chairman Frost is on the plough roof, riding uphill, still champion.',
-  'The hole ate the transmitter mast. This is going out by shouting.',
+  'The void ate the transmitter mast. This is going out by shouting.',
   'Snow is still falling!! There is less and less for it to land on.',
   'The grit is gone. The road under the grit is gone. Vern is fine.',
   'Take the High Shoulder path and count the children as you go.',
@@ -318,7 +318,7 @@ const T2_GENERAL = [
   'Do not stop to build anything. The snowmen understand.',
   'Weather next: snow, onto nothing in particular.',
   'The valley is now mostly view.',
-  'Whoever is uphill of the hole, stay uphill of the hole.',
+  'Whoever is uphill of the void, stay uphill of the void.',
   'The last chalet is going!! Its window boxes are already up here with us.',
   // ── live state, read off what is left of the list ──
   '{P} percent of the valley is gone. Read the list, then climb.',
@@ -347,7 +347,7 @@ const T2_BY_DIST: Record<PwDist, string[]> = {
     'It is at the lodge steps. The steps are optional now. Out.',
     'A hundred winters the lodge stood. It will not see lunch.'],
   rim: ['Keep to the High Shoulder and keep climbing.',
-    'You are high enough when you can see the whole hole. Higher, then.',
+    'You are high enough when you can see all of the void. Higher, then.',
     'Nearly at the top. The valley is nearly not a valley. Keep on.'],
 };
 
@@ -414,7 +414,7 @@ function fill(t: string, c: PowderCtx): string {
     .replace(/\{D\}/g, DIST_NAME[c.district ?? 'village'])
     .replace(/\{P\}/g, String(pct))
     .replace(/\{R\}/g, String(100 - pct))
-    .replace(/\{F\}/g, clip(c.form || 'hole', 14))
+    .replace(/\{F\}/g, clip(c.form || 'void', 14))
     .replace(/\{S\}/g, String(Math.max(1, Math.ceil(c.secondsLeft))));
 }
 
