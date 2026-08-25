@@ -1139,7 +1139,7 @@ export function createRivals(
         // Bigger than you, close enough to matter, and off cooldown: stop, turn
         // to face you, hold it for a beat. Deliberately narrow so the island
         // never turns into five voids staring at you at once:
-        //   · it needs a real size gap (the same 1.2x that lets them bite)
+        //   · it needs a size the family can actually REACH — see below
         //   · it needs you INSIDE 62 units, which is about two of your own
         //     diameters at match start — close enough that you chose to be there
         //   · one look per rival every 9-16 seconds, and never two at once
@@ -1174,10 +1174,40 @@ export function createRivals(
         // to eat you" — which is the honest version, because it cannot eat you.
         // Making one that genuinely CAN is a balance change to a measured
         // number and belongs with the owner, not with me.
+        // ── 0.75x, AND THE NUMBER IS MEASURED, NOT CHOSEN ──────────────────
+        // This gate has been wrong twice, both times because I picked the
+        // threshold by reasoning about what SHOULD be true instead of asking
+        // what is.
+        //
+        // First it was `pr * 1.2`, copied from the bite gate on the logic that
+        // a void which can eat you is the one worth fearing. Measured: the gate
+        // was open 0% of a match in two worlds, and the look never fired once.
+        // The cap above makes 1.2x arithmetically impossible for a non-hunter —
+        // hardCap IS softCap for them, and the two escapes that lift it are
+        // both inside `if (isHunter)`.
+        //
+        // Then 0.85x, which was closer and still a guess. Also 0%.
+        //
+        // So qa/rivalnotice.mjs was made to report the size DISTRIBUTION of
+        // every joined family member at every sample, rather than one extremum.
+        // Maple, 45 match-seconds:
+        //
+        //     <0.5x  0%   0.5-0.65  0%   0.65-0.75  6%   0.75-0.85  94%   0.85x+  0%
+        //
+        // The family lives at 0.75-0.85 of the player, which is the softCap's
+        // 0.80x floor with the easing either side of it. That is not a bug —
+        // it is the number that keeps them catchable and makes VOID TITAN's
+        // feast work. 0.75x is where they are, so 0.75x is where the gate goes.
+        //
+        // ONE THING TO BE STRAIGHT ABOUT: the owner asked for "any void that's
+        // larger". A void at 0.78x is not larger, it is a peer — and at play
+        // size a child cannot tell 0.78 from 1.1 at a glance, so it reads as
+        // one. Making it literally true means raising the family's cap, which
+        // is a measured balance number, and that is his call and not mine.
         if (!isHunter && rv.joined && rv.eye <= 0) {
           rv.eyeCd -= dt;
           const others = rivals.some((o) => o !== rv && o.eye > 0);
-          if (rv.eyeCd <= 0 && !others && rv.r > pr * 0.85 && dp < 62 && dp > rv.r * 0.9) {
+          if (rv.eyeCd <= 0 && !others && rv.r > pr * 0.75 && dp < 62 && dp > rv.r * 0.9) {
             rv.eye = 1.25; rv.eyeCd = rand(9, 16);
             api.onNotice?.(rv.name, rv.x, rv.z, rv.color);
             // …and they say something. The taunt pool is already written in

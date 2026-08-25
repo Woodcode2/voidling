@@ -26,6 +26,25 @@
 // So the bar is a band, per minute of MATCH time, not wall time (the match
 // clock runs ~14x slower under the software renderer — qa/_clockrate.mjs).
 import { chromium } from 'playwright';
+import { readFileSync } from 'fs';
+
+// ── READ THE THRESHOLD OFF THE SOURCE, DO NOT CARRY A COPY ────────────────
+// This probe's decomposition hard-coded 0.85 while the shipped gate moved to
+// 0.75, and the result was a run that printed "whole gate 0% of the time"
+// directly above "PASS — 2.7 looks a minute". Both lines were produced by the
+// same probe in the same second and they contradicted each other; the verdict
+// happened to be the right one, which is worse than if it had been wrong,
+// because nothing would have made anybody look.
+//
+// Governor rule 4: a probe must read the thing itself. It parses the live gate
+// and throws if the call site has moved, rather than describing the build it
+// was written against.
+const SRC = readFileSync('src/proto3d/rivals.ts', 'utf8');
+const GATE = SRC.match(/rv\.eyeCd <= 0 && !others && rv\.r > pr \* ([\d.]+) && dp < (\d+)/);
+if (!GATE) throw new Error('the look gate in rivals.ts no longer matches the shape this probe parses — '
+  + 'it cannot report on a condition it cannot find');
+const SIZE = Number(GATE[1]), REACH = Number(GATE[2]);
+console.log(`  (gate read from rivals.ts: bigger than ${SIZE}x, inside ${REACH}u)`);
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'pirate'];
@@ -118,9 +137,10 @@ for (const wid of WORLDS) {
   // measurement that stops exactly where the question starts. Each term is
   // counted on its own, plus the best value seen for each, so a near miss is
   // visible as a near miss rather than as a zero.
-  await p.evaluate(() => {
+  await p.evaluate(({ SIZE, REACH }) => {
+    window.__SIZE = SIZE; window.__REACH = REACH;
     window.__opp = { n: 0, all: 0, joined: 0, big: 0, near: 0, bigAndNear: 0,
-      maxRatio: 0, minDist: 1e9 };
+      maxRatio: 0, minDist: 1e9, ratioAt: null, hist: [0, 0, 0, 0, 0] };
     window.__oppTick = setInterval(() => {
       const v = window.__voidState(); const st = window.__matchState();
       const o = window.__opp; o.n++;
@@ -129,16 +149,29 @@ for (const wid of WORLDS) {
       const live = fam.filter((r) => r.joined);
       for (const r of live) {
         const d = Math.hypot(r.x - v.x, r.z - v.z);
-        o.maxRatio = Math.max(o.maxRatio, r.r / v.r);
+        const ratio = r.r / v.r;
+        // ── KEEP THE CONTEXT OF THE MAXIMUM, NOT JUST THE MAXIMUM ─────────
+        // A previous run printed "biggest family member was 1.47x" beside
+        // "someone 0.85x+ 0% of the time", which cannot both be true of the
+        // same samples. A bare extremum is unfalsifiable: there is no way to
+        // tell a real moment from a bookkeeping slip. Recording the radii and
+        // the clock at which it happened makes the claim checkable.
+        if (ratio > o.maxRatio) { o.maxRatio = ratio; o.ratioAt = { vr: v.r, rr: r.r, t: st.t, name: r.name }; }
         o.minDist = Math.min(o.minDist, d);
       }
-      if (live.some((r) => r.r > v.r * 0.85)) o.big++;
-      if (live.some((r) => Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.near++;
-      if (live.some((r) => r.r > v.r * 0.85 && Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.bigAndNear++;
-      if (live.some((r) => r.r > v.r * 0.85 && Math.hypot(r.x - v.x, r.z - v.z) < 62
+      // and the whole distribution, so the threshold is chosen off the shape
+      // rather than off one lucky frame
+      for (const r of live) {
+        const q = r.r / v.r;
+        o.hist[q >= 0.85 ? 4 : q >= 0.75 ? 3 : q >= 0.65 ? 2 : q >= 0.5 ? 1 : 0]++;
+      }
+      if (live.some((r) => r.r > v.r * window.__SIZE)) o.big++;
+      if (live.some((r) => Math.hypot(r.x - v.x, r.z - v.z) < window.__REACH)) o.near++;
+      if (live.some((r) => r.r > v.r * window.__SIZE && Math.hypot(r.x - v.x, r.z - v.z) < window.__REACH)) o.bigAndNear++;
+      if (live.some((r) => r.r > v.r * window.__SIZE && Math.hypot(r.x - v.x, r.z - v.z) < window.__REACH
         && Math.hypot(r.x - v.x, r.z - v.z) > r.r * 0.9)) o.all++;
     }, 500);
-  });
+  }, { SIZE, REACH });
   await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) >= t, t0 + SAMPLE_MATCH_SECONDS,
     { timeout: 1500000, polling: 400 });
   const t1 = await p.evaluate(() => window.__matchState().t);
@@ -154,10 +187,16 @@ for (const wid of WORLDS) {
   console.log(`  ${wid.padEnd(9)} ${(r.notices - n0)} looks over ${(t1 - t0).toFixed(0)}s of match `
     + `= ${perMin.toFixed(1)}/min   (bully charges ${r.charges}, bites ${r.bites})`);
   console.log(`            family joined ${pc('joined').toFixed(0)}%  |  `
-    + `someone 0.85x+ ${pc('big').toFixed(0)}%  |  someone inside 62u ${pc('near').toFixed(0)}%  |  `
+    + `someone ${SIZE}x+ ${pc('big').toFixed(0)}%  |  someone inside ${REACH}u ${pc('near').toFixed(0)}%  |  `
     + `both ${pc('bigAndNear').toFixed(0)}%  |  whole gate ${pc('all').toFixed(0)}%`);
-  console.log(`            best seen: biggest family member was ${o.maxRatio.toFixed(2)}x your radius, `
-    + `nearest came within ${o.minDist > 1e8 ? 'never' : o.minDist.toFixed(0) + 'u'}`);
+  const H = o.hist, HT = H.reduce((a, x) => a + x, 0) || 1;
+  console.log(`            best seen: biggest family member was ${o.maxRatio.toFixed(2)}x your radius`
+    + (o.ratioAt ? ` (${o.ratioAt.name} at r=${o.ratioAt.rr.toFixed(2)} against your ${o.ratioAt.vr.toFixed(2)}, t=${o.ratioAt.t.toFixed(0)}s)` : '')
+    + `, nearest came within ${o.minDist > 1e8 ? 'never' : o.minDist.toFixed(0) + 'u'}`);
+  console.log(`            size distribution of every joined family member, every sample: `
+    + `<0.5x ${(100 * H[0] / HT).toFixed(0)}%  0.5-0.65 ${(100 * H[1] / HT).toFixed(0)}%  `
+    + `0.65-0.75 ${(100 * H[2] / HT).toFixed(0)}%  0.75-0.85 ${(100 * H[3] / HT).toFixed(0)}%  `
+    + `0.85x+ ${(100 * H[4] / HT).toFixed(0)}%`);
   await p.close();
 }
 await b.close();
