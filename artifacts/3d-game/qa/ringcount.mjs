@@ -32,6 +32,13 @@ import { readFileSync } from 'fs';
 const PORT = process.argv[2] || '4177';
 const WORLD = process.argv[3] || 'maple';
 const SPAN = Number(process.argv[4] || 100);   // match-seconds to sample
+// ── AND WHERE THE SAMPLE STARTS IS NOT A DETAIL ──────────────────────────
+// The beat windows are authored at roughly 30 / 66 / 110 / 148 seconds and run
+// 14-32 seconds each, and the fever-eat ring — the site this probe was written
+// to weigh — fires ONLY inside them. A sample that starts at t=6 and runs 25
+// seconds sees no fever at all and reports the game as calm. Start late enough
+// to land inside a window, or the census is of a different game.
+const START = Number(process.argv[5] || 24);
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
@@ -48,7 +55,7 @@ await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });
 await p.evaluate(() => document.getElementById('btnPlay').click());
 await p.waitForSelector(`#worldRow .wCard[data-world="${WORLD}"]`, { state: 'visible', timeout: 400000 });
 await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), WORLD);
-await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 400000 });
+await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) > t, START, { timeout: 400000 });
 
 // WRAP THE REAL RING. __fx is the live juice kit, not a copy, so every site
 // that a child can actually reach lands here.
@@ -143,7 +150,8 @@ const rows = [...by.entries()].map(([site, e]) => {
 
 const total = log.length / mins;
 const away = log.filter((r) => r.away).length / mins;
-console.log(`\n${WORLD} — ${log.length} rings over ${(t1 - t0).toFixed(0)}s of match, score ${eaten}\n`);
+console.log(`\n${WORLD} — ${log.length} rings over ${(t1 - t0).toFixed(0)}s of match `
+  + `(t=${t0.toFixed(0)} to ${t1.toFixed(0)}), score ${eaten}\n`);
 console.log(`  ${'rings/min'.padStart(9)}  ${'away'.padStart(5)}  ${'r'.padStart(5)}  site`);
 for (const r of rows) {
   console.log(`  ${r.perMin.toFixed(1).padStart(9)}  ${r.awayPct.toFixed(0).padStart(4)}%  ${String(r.rMed ?? '').padStart(5)}  ${r.site}`);
