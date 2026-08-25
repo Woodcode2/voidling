@@ -164,6 +164,68 @@ for those two worlds are indicative only.
 | 16 | Lantern Night has 8 palette colours that cannot show a shape | **CONFIRMED, 5 FIXED** | `qa/formsep.mjs`. The five owned by `nightmarket.ts` — CEDAR_D, TILE, TILE_D, TIMBER_D, CHAR — are lifted by the minimum that reaches ΔE 7 with hue held and every dark variant still darker than its base; Lantern drops 8 → 3. The world stays night: lifted colours render at luminance 7–11 on a lit face, where they were at 0. The remaining three (CASE, PLINTH in shared modules, BLACK_L on a hat) are untouched — they measure fine under four brighter keys and changing four working worlds to fix one needs the owner |
 | 17 | The reshot Lantern frames prove the lift worked | **NOT ESTABLISHED** | I compared the same pixel window in the before and after frames and got a tonal spread of 40.4 → 14.5, which looks like a regression. It is not evidence either way: the shoot is not pixel-deterministic, the two frames have different compositions, and the window covers different content in each. The controlled evidence is the ΔE table, which is deterministic and does not depend on framing. I am not claiming the picture improved |
 
+### The family cannot be a threat — CONFIRMED 2026-08-25, two worlds
+
+The owner: "It seems only 1 void is ever hostile." He is describing a hard
+ceiling, not a tuning miss.
+
+`rivals.ts` caps every non-hunter at
+`softCap = max(min(START_R + 0.02t, 1.6), pr * 0.80)`. `hardCap` IS `softCap`
+for them — the two escapes that lift it, `want * 1.04` and `stuffCap`, are both
+inside `if (isHunter)` — and it is clamped every frame. The bite gate and my
+look gate both wanted `rv.r > pr * 1.2`, which needs `1.6 > 1.2 * pr`, i.e. a
+player still under radius 1.333. They join at 0.62x and grow slowly; the player
+passes 1.333 inside ten seconds.
+
+`qa/rivalnotice.mjs` sampled the condition twice a second: **gate open 0% of
+the time in Maple and Pirate, zero looks in both.** The look now tests 0.85x,
+which the cap can deliver.
+
+**PENDING and an owner call:** he asked for "any void that's larger". That
+requires raising the cap, which is a measured balance number the VOID TITAN
+feast depends on. Not mine to move.
+
+### The sky was being flattened by a plane in the ground — CONFIRMED 2026-08-25
+
+A real shipped frame (`qa/out/person/maple_side_2.png`) measures **#5c4987,
+saturation 0.460, luminance range 0.008, 0.0% true black.** A range of eight
+thousandths is a flat fill, not a sky.
+
+The painted asset is innocent: on its own it is saturation 0.754, range 0.463,
+25% true black. The flattening was an additive violet plane 1207 units across
+at `y = -3`, depth-tested so it shows *only* past the coastline. Tested by
+hiding and restoring it in the live scene, at the coast with a big void:
+
+| | saturation | range | true black |
+|---|---|---|---|
+| as shipped | 0.485 | 0.294 | 1% |
+| halo hidden | 0.862 | 0.063 | **95%** |
+| after the fixes | 0.695 | 0.681 | 1% |
+
+Its `CanvasTexture` carried no colour space (three defaults to `NoColorSpace`),
+so sRGB bytes reached the shader as linear — 1.7x red, 2.4x green.
+
+Note the third row: saturation and range recovered, **dark did not**, because
+at 1.35x the plane still finished past the edge of the visible band. That is
+why it is 1.15x now, and why `dark` is the number to watch, not `sat`.
+
+### 1500 stars, none of them on screen — CONFIRMED 2026-08-25
+
+`ph = rand(0.15, Math.PI * 0.6)` stops 18 degrees ABOVE level, and a 0.7
+y-squash with a -40 offset flattened the rest into a disc over the island. This
+camera is pitched 46 degrees down at spawn and 65 by VOID TITAN on a 32-degree
+lens, so the highest thing on screen is ~27 degrees BELOW horizontal and the
+horizon is never in frame. Zero of 1500 in frame at every size a match passes
+through. The magnitude curve, four colour temperatures and two-sine twinkle
+were all authored with care and had never been seen once.
+
+### A child never sees space at all — CONFIRMED 2026-08-25, PENDING an owner call
+
+At real spawn size the sky is **0.0% of the frame**, at the spawn and standing
+directly on the coast alike. At radius 10 by a coastline it is 44%. Space is
+structurally a late-game reveal. Fixing that is the camera, the island size, or
+a decision to sell space where a child does look — not an art change.
+
 ## THE RETRACTIONS
 
 Kept because a studio that hides its own errors is worth nothing.
@@ -183,6 +245,29 @@ Kept because a studio that hides its own errors is worth nothing.
    comparable across towns of any size.
 5. **`qa/normals.mjs` first version** — a 40%-flat runtime bar failed 18
    correct forms. → static classifier plus a hand-reviewed faceted census.
+6. **"Any rival bigger than you can bite you"** — written into the owner's own
+   answer sheet for his question "can other voids eat him or just that one?".
+   A true description of the gate and a false one of the game: the family's
+   size cap makes 1.2x unreachable. → the honest answer is "in practice, just
+   that one", and the look gate moved to a threshold the cap can reach.
+7. **A look gate copied from the bite gate** — `rv.r > pr * 1.2`, shipped with
+   the message "Now the big ones notice you." It did nothing at all, in either
+   world measured. → 0.85x, and `qa/rivalnotice.mjs` now samples the GATE and
+   not just the outcome, so a zero says whether it is reach or throttle.
+8. **`qa/skypop.mjs` read a stale frame** — `__renderBloom()` then a canvas
+   read returns the last COMPOSITED frame, because the renderer carries
+   `preserveDrawingBuffer: false`. Measured 0/765 response that way against
+   484/765 through rAF. Its own self-check caught it and refused to report.
+9. **`qa/skypop.mjs` blamed `__solidAt` for its own assumption** — it found the
+   coast by walking outward from the island centre and taking the first cell
+   that was not land, then threw "never left the land walking 600 units" on
+   Pirate Bay, which has water in the middle of it. A failure message that
+   names the wrong cause is worse than a bare failure. → scans inward from 600
+   units and takes the first cell that IS land, on eight azimuths.
+10. **Planets that would have been clipped away** — caught by arithmetic before
+   anyone looked, not by the probe: far plane 1000, camera up to ~500 from the
+   origin, bodies at 640-900, so on the far side of the island they are simply
+   not drawn. → the whole celestial layer re-centres on the camera each frame.
 6. **`qa/questable.mjs` first version** — kept its own copy of `HOUSE_LIKE` and
    flagged evolve/gold falsely. → reads the pools from the client.
 7. **`qa/faceparity.mjs` spread bar** — a spread on RAW grin share, which falls
