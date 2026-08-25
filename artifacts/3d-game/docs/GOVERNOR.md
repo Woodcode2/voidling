@@ -38,17 +38,39 @@ it wrongly measured and why. Seven stand so far (below). Every one was caught
 by asking "what else would move this number?" — ask it before the bar is set,
 not after it fails a build.
 
-**4. Verify from the front.**
+**4. A probe must read the thing itself, and on the thing's own clock.**
+Two failure modes have now cost six instruments between them, and both look
+like a passing test.
+
+*The snapshot.* A probe that carries its own copy of what it measures —
+geometry transcribed into a constant, a tone curve reimplemented, a rendered
+frame cached in a scratchpad — is describing the build it was written against,
+forever. `qa/_zgrade.mjs` modelled a toe that had been replaced hours earlier.
+`qa/_headcover.mjs` reported 28.8% bare scalp after the hair was raised.
+`qa/_distinct.mjs` could not see a CSS change at all. Parse the real source or
+render the real page, and **throw** if the call site has moved — silently
+skipping what you cannot find is the same bug wearing a hat.
+
+*The wrong clock.* Under a software renderer the match clock runs about
+**14x slower than wall time** (`qa/_clockrate.mjs`). Anything sampled for
+"twelve seconds" is under a second of gameplay. `qa/bubbleclear.mjs` reported
+"bubbles up 0% of frames" in three worlds — a PASS on no data — because it
+never got past the opening calm hold. `qa/faceparity.mjs` then flaked the gate
+on the identical fault, in a file whose own header already described it. If a
+bar needs a stretch of play, wait on `__matchState().t` and sample across MATCH
+seconds.
+
+**5. Verify from the front.**
 The two failures that created the studio were both verified from an angle where
 the defect was invisible: eyes checked from behind, ground checked away from the
 plaza. Check the surface a child actually looks at, in the state they see it.
 
-**5. Prefer the smallest fix that removes the CAUSE.**
+**6. Prefer the smallest fix that removes the CAUSE.**
 When the board proposes compensating geometry for what turns out to be a state
 bug, take the state fix and leave the geometry alone. A compensation hides the
 cause and survives the next regression.
 
-**6. Nothing that leaves this container is unrecorded.**
+**7. Nothing that leaves this container is unrecorded.**
 Subagent output lives in ephemeral `/tmp`. Extract and commit a round's verbatim
 record before acting on any of it.
 
