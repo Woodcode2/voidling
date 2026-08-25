@@ -50,9 +50,22 @@ await p.waitForSelector(`#worldRow .wCard[data-world="${WORLD}"]`, { state: 'vis
 await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`).click(), WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 6, null, { timeout: 400000 });
 
-// WRAP THE REAL RING. __fx is the live juice kit, not a copy, so every one of
-// the twenty-eight sites lands here — including defense.ts, which is handed the
-// same object. Throw rather than measure nothing if the hook is gone.
+// WRAP THE REAL RING. __fx is the live juice kit, not a copy, so every site
+// that a child can actually reach lands here.
+//
+// CORRECTION to this comment's first version, which said "including defense.ts,
+// which is handed the same object". It is not: `defense.ts` is imported by
+// nothing (`grep -rn "from './defense'" src/` is empty), and prototype3d.ts
+// records the removal — "NO DEFENCE LAYER … Removed outright rather than
+// re-themed." Its ring cannot fire. Nor can the three in `fireGulp` and
+// `fireCollapse`, which early-return on `POWERS_ON === false`.
+//
+// So: 28 lines carrying 30 call expressions, of which 4 are unreachable and 26
+// can be met. That is the number this probe is measuring against, and it is
+// stated here rather than trusted, because the count in the first draft was
+// wrong in the direction that flatters the game.
+//
+// Throw rather than measure nothing if the hook is gone.
 await p.evaluate(() => {
   if (!window.__fx || typeof window.__fx.ring !== 'function') throw new Error('__fx.ring is gone — this probe measures nothing');
   const orig = window.__fx.ring.bind(window.__fx);

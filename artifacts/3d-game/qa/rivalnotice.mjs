@@ -99,30 +99,54 @@ for (const wid of WORLDS) {
       + `would be fiction.`);
     process.exit(2);
   }
+  // …and it DECOMPOSES the conjunction, because the first run of this reported
+  // "gate open 0% of the time" and left me with two incompatible readings and
+  // no way to choose: nobody is ever big enough, or nobody is ever close
+  // enough. Those want opposite repairs — one softens the size ratio, the other
+  // widens the radius — so a conjunction that only reports its AND is a
+  // measurement that stops exactly where the question starts. Each term is
+  // counted on its own, plus the best value seen for each, so a near miss is
+  // visible as a near miss rather than as a zero.
   await p.evaluate(() => {
-    window.__oppN = 0; window.__oppHit = 0;
+    window.__opp = { n: 0, all: 0, joined: 0, big: 0, near: 0, bigAndNear: 0,
+      maxRatio: 0, minDist: 1e9 };
     window.__oppTick = setInterval(() => {
       const v = window.__voidState(); const st = window.__matchState();
-      window.__oppN++;
-      const hit = st.rivals.some((r) => r.joined && !r.hunt && r.r > v.r * 1.2
-        && Math.hypot(r.x - v.x, r.z - v.z) < 62 && Math.hypot(r.x - v.x, r.z - v.z) > r.r * 0.9);
-      if (hit) window.__oppHit++;
+      const o = window.__opp; o.n++;
+      const fam = st.rivals.filter((r) => !r.hunt);
+      if (fam.some((r) => r.joined)) o.joined++;
+      const live = fam.filter((r) => r.joined);
+      for (const r of live) {
+        const d = Math.hypot(r.x - v.x, r.z - v.z);
+        o.maxRatio = Math.max(o.maxRatio, r.r / v.r);
+        o.minDist = Math.min(o.minDist, d);
+      }
+      if (live.some((r) => r.r > v.r * 1.2)) o.big++;
+      if (live.some((r) => Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.near++;
+      if (live.some((r) => r.r > v.r * 1.2 && Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.bigAndNear++;
+      if (live.some((r) => r.r > v.r * 1.2 && Math.hypot(r.x - v.x, r.z - v.z) < 62
+        && Math.hypot(r.x - v.x, r.z - v.z) > r.r * 0.9)) o.all++;
     }, 500);
   });
   await p.waitForFunction((t) => (window.__matchState?.().t ?? 0) >= t, t0 + SAMPLE_MATCH_SECONDS,
     { timeout: 1500000, polling: 400 });
   const t1 = await p.evaluate(() => window.__matchState().t);
   const r = await p.evaluate(() => window.__matchState().ev);
-  const opp = await p.evaluate(() => { clearInterval(window.__oppTick);
-    return { n: window.__oppN, hit: window.__oppHit }; });
+  const o = await p.evaluate(() => { clearInterval(window.__oppTick); return window.__opp; });
+  const pc = (k) => o.n ? 100 * o[k] / o.n : 0;
+  const opp = { n: o.n, hit: o.all };
 
   const mins = (t1 - t0) / 60;
   const perMin = (r.notices - n0) / Math.max(1e-6, mins);
   rows.push({ wid, perMin, span: t1 - t0, charges: r.charges, bites: r.bites,
     opp: opp.n ? 100 * opp.hit / opp.n : 0 });
   console.log(`  ${wid.padEnd(9)} ${(r.notices - n0)} looks over ${(t1 - t0).toFixed(0)}s of match `
-    + `= ${perMin.toFixed(1)}/min   (gate open ${(opp.n ? 100 * opp.hit / opp.n : 0).toFixed(0)}% of the time, `
-    + `bully charges ${r.charges}, bites ${r.bites})`);
+    + `= ${perMin.toFixed(1)}/min   (bully charges ${r.charges}, bites ${r.bites})`);
+  console.log(`            family joined ${pc('joined').toFixed(0)}%  |  `
+    + `someone 1.2x bigger ${pc('big').toFixed(0)}%  |  someone inside 62u ${pc('near').toFixed(0)}%  |  `
+    + `both ${pc('bigAndNear').toFixed(0)}%  |  whole gate ${pc('all').toFixed(0)}%`);
+  console.log(`            best seen: biggest family member was ${o.maxRatio.toFixed(2)}x your radius, `
+    + `nearest came within ${o.minDist > 1e8 ? 'never' : o.minDist.toFixed(0) + 'u'}`);
   await p.close();
 }
 await b.close();

@@ -615,6 +615,12 @@ function coastSolid(R0: number): (x: number, z: number) => boolean {
     && insideIsland3(x + d45, z + d45) && insideIsland3(x - d45, z - d45)
     && insideIsland3(x + d45, z - d45) && insideIsland3(x - d45, z + d45);
 }
+/** THE STEERING CAP, in one place. `Math.min(96, 16 * (camDist / 50))` was
+ *  written out at three call sites — the input block, the shore recovery and
+ *  the hero's gaze — and the shore recovery exists BECAUSE two of those three
+ *  had drifted out of agreement with each other. A number that three pieces of
+ *  physics have to share is not a literal, it is a function. */
+function steerCap(camDist: number): number { return Math.min(96, 16 * (camDist / 50)); }
 const TOPDOWN = location.search.includes('top');
 const SHOW_WALLS = location.search.includes('walls');   // ?walls=1 — see the containment boundary
 const ASSETVIEW = location.search.includes('assets');   // ?debug gallery of the GLB pack
@@ -8452,7 +8458,7 @@ function animate() {
       const cd = introT > 0
         ? Math.min(camDist, Math.min(340, Math.max(26, 38 * Math.pow(voidling.radius / 0.9, 0.82))))
         : camDist;
-      const speed = Math.min(96, 16 * (cd / 50)) * jm;
+      const speed = steerCap(cd) * jm;
       tvx = (rightTmp.x * inX - fwdTmp.x * inY) * speed;
       tvz = (rightTmp.z * inX - fwdTmp.z * inY) * speed;
     } else if ((!started || DEBUG_HARNESS) && tClock - lastInput > 4) {
@@ -8510,6 +8516,11 @@ function animate() {
     // OUTWARD half of the velocity is cancelled (tangential sliding survives),
     // and a void that grows past the shore is eased back in instead of stuck.
     {
+      // where he was before ANY of this frame's movers ran — the clamp at the
+      // bottom of this block is measured from here, not from `prev`, so a
+      // spawn or a dash outside the block is never mistaken for the shore
+      // throwing him.
+      const preX = voidState.x, preZ = voidState.z;
       const R0 = voidling.radius;
       const m = coastMargin(R0);
       // biomeAt calls Maple's pond, river and lagoon dry land — they are all
@@ -8538,7 +8549,7 @@ function animate() {
       // same expression the input block uses, so the recovery still out-pushes
       // him — it has to, or he can hold himself out over the water against it —
       // but by a margin he can feel as firmness rather than as being thrown.
-      const ownSpeed = Math.min(96, 16 * (camDist / 50));
+      const ownSpeed = steerCap(camDist);
       const swimSpeed = Math.max(ownSpeed * 1.25, 14);
       // WHICH WAY IS LAND? The old version assumed "away from the island
       // centre", which is only true for a blob with water on the outside.
@@ -8663,6 +8674,38 @@ function animate() {
           }
         }
       }
+      // ── ONE INVARIANT, AFTER EVERY MOVER, BECAUSE THE SHORE HAS FOUR ──────
+      // The recovery has been wrong three times and the fault was the same
+      // shape every time: two of its movers ran in the same frame and their
+      // displacements ADDED. The integrator has already stepped him, the stall
+      // breaker walks him inland, the heading sweep takes a legal bearing at
+      // full speed, and the swim-back sets a velocity the next frame carries.
+      // Each is individually reasonable. Fixing them pairwise is how the last
+      // attempt turned 23 u/s into 239: removing one mover removed the
+      // recovery with it.
+      //
+      // So this removes nothing. It states the rule the owner actually asked
+      // for — "sometimes you speed up" — as a single clamp on this block's
+      // TOTAL displacement, after every mover has had its say. However future
+      // work stacks another mover in here, a child cannot be moved faster than
+      // a little over his own steering speed.
+      //
+      // 1.35x rather than 1.0, because the recovery has to out-push a thumb
+      // held into the water — otherwise he can hold himself out over the bay
+      // against it, which is the bug the authoritative swim-back exists to fix.
+      // The floor of 14 keeps a spawn-sized void recoverable at all. Velocity
+      // is scaled by the same factor so the next frame does not simply re-spend
+      // what this one refused.
+      {
+        const cap = Math.max(steerCap(camDist) * 1.35, 14) * dt;
+        const step = Math.hypot(voidState.x - preX, voidState.z - preZ);
+        if (step > cap && step > 1e-6) {
+          const k = cap / step;
+          voidState.x = preX + (voidState.x - preX) * k;
+          voidState.z = preZ + (voidState.z - preZ) * k;
+          velX *= k; velZ *= k;
+        }
+      }
     }
   }
   const vx = (voidState.x - prev.x) / Math.max(1e-4, dt);
@@ -8763,7 +8806,7 @@ function animate() {
   // every size. 3x reproduces the small void's current, un-complained-about
   // gaze (0.33 at full stick) at r=1 and at r=12 alike.
   const gFl = Math.hypot(camOffset.x, camOffset.z) || 1;
-  const gS = 3 * Math.max(1, Math.min(96, 16 * (camDist / 50)));
+  const gS = 3 * Math.max(1, steerCap(camDist));
   const gX = (camOffset.z * vx - camOffset.x * vz) / (gFl * gS);   // screen right
   const gY = (-camOffset.x * vx - camOffset.z * vz) / (gFl * gS);  // screen up
   perfBeat('hero');
