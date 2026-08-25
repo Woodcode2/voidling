@@ -633,9 +633,29 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const pha = new Float32Array(N);
     const c3 = new THREE.Color();
     for (let i = 0; i < N; i++) {
-      const r = rand(340, 620), th = rand(0, Math.PI * 2), ph = rand(0.15, Math.PI * 0.6);
+      // ── AND THE WHOLE FIELD WAS OUTSIDE THE FRUSTUM ──────────────────────
+      // Everything below this line — the magnitude curve, the colour
+      // temperatures, the two-sine twinkle — was authored carefully and had
+      // never been seen. `ph` ran to `Math.PI * 0.6`, which stops 18 degrees
+      // ABOVE level, and the `* 0.7` squash with the `- 40` offset flattened
+      // what was left into a disc hanging over the island.
+      //
+      // The camera in this game only ever looks DOWN: pitched 46 degrees at
+      // spawn and 65 by VOID TITAN, on a 32-degree lens, so the highest thing
+      // on screen is about 27 degrees BELOW the horizontal and the lowest is
+      // about 81 below. The horizon is never in frame in any world at any size.
+      // Projected against the real frustum at real game states, the old
+      // distribution put ZERO of 1500 stars on screen at every size a match
+      // actually passes through.
+      //
+      // So the shell is a shell again — no squash, no offset — and `ph` runs
+      // past level to 171 degrees, which lays stars through the entire band the
+      // camera can see. They sit below and beside the island, which is also the
+      // truthful arrangement: this is a rock floating in space, and you should
+      // be able to look over its edge and see stars underneath it.
+      const r = rand(340, 620), th = rand(0, Math.PI * 2), ph = rand(0.15, Math.PI * 0.95);
       pos[i * 3] = Math.cos(th) * Math.sin(ph) * r;
-      pos[i * 3 + 1] = Math.cos(ph) * r * 0.7 - 40;
+      pos[i * 3 + 1] = Math.cos(ph) * r;
       pos[i * 3 + 2] = Math.sin(th) * Math.sin(ph) * r;
       // MAGNITUDE: a power curve, so most stars are faint and a handful blaze.
       // Uniform sizes are what made the old field read as noise.
@@ -692,18 +712,172 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     scene.add(new THREE.Points(g, starMatRef));
   }
 
-  // violet energy halo bleeding off the island edge (additive radial gradient)
+  // ── PLANETS ────────────────────────────────────────────────────────────────
+  // The owner: "Would be cool to see some planets or something. Something
+  // different for each level maybe."
+  //
+  // WHERE THEY CAN GO IS NOT A TASTE QUESTION. The camera is pitched 46 degrees
+  // down at spawn and 65 by VOID TITAN, on a 32-degree lens, so the visible
+  // elevation band runs from about -27 degrees at the top of the frame to about
+  // -81 at the bottom. The horizon is never on screen. A planet placed level
+  // with the island, or above it, is geometry nobody will ever see — so these
+  // sit BELOW and BESIDE, between -34 and -62 degrees, which is also the honest
+  // arrangement for a rock floating in space.
+  //
+  // SPRITES, NOT SPHERES. At 600-900 units a lit sphere and a painted disc are
+  // indistinguishable, and a sphere would need its own light: the scene's sun
+  // is aimed at the island, so a real sphere out here would be lit from the
+  // wrong side or not at all. Painting the terminator into the texture puts the
+  // light exactly where the art wants it, costs one draw call, and lets a ring
+  // be painted in the same pass instead of modelled.
+  //
+  // `fog: false` for the same reason the background carries it: fog is the
+  // island's air, and these are not in it. Without it Powder's planet turns
+  // the fog's slate blue at exactly the distance it sits.
+  //
+  // Authored, not seeded — `rand()` here is Math.random, so a seeded planet
+  // would move every load. Every number below is a decision.
+  {
+    type Body = { d: number; el: number; az: number; size: number; hue: string;
+      dark: string; ring?: string; bands?: number; glow: string };
+    const SKIES: Record<WorldId, Body[]> = {
+      // a warm amber giant low over the maples, and one small cold moon
+      maple: [
+        { d: 760, el: -41, az: 0.62, size: 300, hue: '#f0a85a', dark: '#2a1330', bands: 5, glow: '#ffcf8a' },
+        { d: 620, el: -55, az: 2.9, size: 96, hue: '#cfd6ff', dark: '#1a1b3a', glow: '#aab4ff' },
+      ],
+      // a banded teal world with a ring, sitting out over the open water
+      pirate: [
+        { d: 820, el: -38, az: 1.9, size: 340, hue: '#5fd8c8', dark: '#0b2a3a', ring: '#bff3ea', bands: 4, glow: '#8ff0e2' },
+      ],
+      // a hot magenta dusk giant, big and close, over the parking lot
+      gameday: [
+        { d: 700, el: -44, az: 4.1, size: 380, hue: '#ff7ac0', dark: '#3a0f38', bands: 6, glow: '#ffb0dc' },
+        { d: 900, el: -34, az: 5.6, size: 110, hue: '#ffd9a0', dark: '#332012', glow: '#ffe9c8' },
+      ],
+      // a red lantern of a moon, and a distant pale companion
+      lantern: [
+        { d: 640, el: -47, az: 3.4, size: 260, hue: '#ff8a6a', dark: '#2b0d1e', glow: '#ffb79c' },
+        { d: 880, el: -36, az: 0.9, size: 130, hue: '#c9a6ff', dark: '#1d1440', glow: '#e0c9ff' },
+      ],
+      // an ice world with a bright ring, to match the aurora the poster set
+      powder: [
+        { d: 780, el: -43, az: 5.0, size: 330, hue: '#bfe6ff', dark: '#122844', ring: '#eaf7ff', bands: 3, glow: '#dff2ff' },
+        { d: 660, el: -58, az: 2.2, size: 90, hue: '#9fe8d0', dark: '#0f2e2a', glow: '#c8f4e6' },
+      ],
+    };
+    const paint = (bd: Body) => {
+      const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+      const g = c.getContext('2d')!;
+      const R = S * 0.40, cx = S / 2, cy = S / 2;
+      // the ring goes down FIRST for its back half, then again after the disc
+      const ringPass = (front: boolean) => {
+        if (!bd.ring) return;
+        g.save(); g.translate(cx, cy); g.rotate(-0.34); g.scale(1, 0.26);
+        for (let k = 0; k < 3; k++) {
+          g.beginPath();
+          g.arc(0, 0, R * (1.34 + k * 0.15), front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2);
+          g.lineWidth = R * (0.10 - k * 0.022);
+          g.strokeStyle = bd.ring + (front ? 'cc' : '77');
+          g.stroke();
+        }
+        g.restore();
+      };
+      ringPass(false);
+      // the body: lit from upper-left, falling to a dark limb — a terminator
+      // painted rather than lit, so the light is where the art put it
+      const lit = g.createRadialGradient(cx - R * 0.42, cy - R * 0.40, R * 0.06, cx, cy, R);
+      lit.addColorStop(0, bd.hue);
+      lit.addColorStop(0.58, bd.hue);
+      lit.addColorStop(1, bd.dark);
+      g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.closePath();
+      g.save(); g.clip();
+      g.fillStyle = lit; g.fillRect(0, 0, S, S);
+      // BANDS. Clipped to the disc and squashed, so they curve with the body
+      // instead of reading as stripes on a sticker.
+      if (bd.bands) {
+        g.globalAlpha = 0.16; g.globalCompositeOperation = 'overlay';
+        for (let k = 0; k < bd.bands; k++) {
+          const t = (k + 0.5) / bd.bands;
+          g.fillStyle = k % 2 ? bd.dark : '#ffffff';
+          g.beginPath();
+          g.ellipse(cx, cy - R + t * R * 2, R * 1.05, R * (0.10 + 0.05 * Math.sin(t * 3.1)), 0, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+      }
+      g.restore();
+      ringPass(true);
+      // ATMOSPHERE. A thin outer glow, additive, which is what separates a
+      // planet from a coloured circle at this size.
+      const at = g.createRadialGradient(cx, cy, R * 0.92, cx, cy, R * 1.16);
+      at.addColorStop(0, bd.glow + '00');
+      at.addColorStop(0.35, bd.glow + '55');
+      at.addColorStop(1, bd.glow + '00');
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = at; g.beginPath(); g.arc(cx, cy, R * 1.16, 0, Math.PI * 2); g.fill();
+      g.globalCompositeOperation = 'source-over';
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;   // sRGB bytes in a canvas; say so
+      return t;
+    };
+    for (const bd of SKIES[WORLD_ID] ?? []) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: paint(bd), transparent: true, depthWrite: false, fog: false, opacity: 0.95,
+      }));
+      const e = bd.el * Math.PI / 180;
+      sp.position.set(Math.cos(e) * Math.cos(bd.az) * bd.d, Math.sin(e) * bd.d,
+        Math.cos(e) * Math.sin(bd.az) * bd.d);
+      sp.scale.set(bd.size, bd.size, 1);
+      sp.renderOrder = -1;   // behind the island's own transparent work
+      scene.add(sp);
+    }
+  }
+
+  // ── THE VIOLET HALO, WHICH WAS EATING SPACE ────────────────────────────────
+  // The owner: "the background of the space/galaxy is like this weird faded
+  // color. It should pop. It doesn't give me the illusion this is in space."
+  // This plane was most of it, and the measurement is unambiguous. At the coast
+  // with a big void, sky is 44% of the frame; qa/skypop.mjs read it three ways
+  // in the same session, by hiding and restoring the plane in the live scene:
+  //
+  //     as shipped     sat 0.485   luminance range 0.294   1% true black
+  //     halo hidden    sat 0.862   luminance range 0.063   95% true black
+  //
+  // A wash that turns a 95%-black sky into a 1%-black one is not a rim light,
+  // it is a lid. Two things were wrong with it.
+  //
+  // THE COLOUR SPACE. `new THREE.CanvasTexture(cv)` sets none, and three's
+  // Texture constructor defaults to NoColorSpace, so `rgba(168,123,255)` was
+  // handed to the shader as LINEAR (0.659, 0.482, 1.000) with no sRGB decode —
+  // 1.7x too much red and 2.4x too much green, added on top of a sky whose own
+  // value is around 0.01. This repo already has this exact bug written up at
+  // the shade()/tint() helpers below: "the round trip through the transfer
+  // curve eats most of the change". Same trap, different direction.
+  //
+  // THE REACH. The plane was 2.1x the island — about 1207 units — with full
+  // alpha out to ~283 units, and the coast is at ~272. So it covered the whole
+  // of the only region where space is ever on screen. It is now 1.35x with the
+  // inner stop pulled out, so full alpha ends AT the coast and the falloff is
+  // done a little past it: an edge glow on the island rather than a fog over
+  // the sky behind it.
+  //
+  // It is tightened rather than deleted deliberately. palette.ts calls it "wide
+  // violet energy halo off the island edge" and it is the 3D descendant of the
+  // 2D game's sticker rim — it is what stops the island reading as a flat
+  // cutout pasted on a flat sky. The job was never to remove it.
   {
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
-    const grd = g.createRadialGradient(256, 256, 120, 256, 256, 256);
+    const grd = g.createRadialGradient(256, 256, 182, 256, 256, 256);
     grd.addColorStop(0, 'rgba(168,123,255,0.30)');
     grd.addColorStop(0.55, 'rgba(123,79,224,0.14)');
     grd.addColorStop(1, 'rgba(123,79,224,0)');
     g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
     const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;   // see above — this was the 1.7-2.4x
     const halo = new THREE.Mesh(
-      new THREE.PlaneGeometry(Math.max(W3, H3) * 2.1, Math.max(W3, H3) * 2.1),
+      new THREE.PlaneGeometry(Math.max(W3, H3) * 1.35, Math.max(W3, H3) * 1.35),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     halo.rotation.x = -Math.PI / 2; halo.position.y = -3;
