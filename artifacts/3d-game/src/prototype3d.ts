@@ -1597,6 +1597,7 @@ const _dbg = new Proxy(_dbgStore, {
   __bite: (hunter?: boolean) => void;
   __pinMouth: (shut: boolean) => void;
   __pinGape: (v: number) => void;
+  __calm: () => void;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
@@ -1744,6 +1745,8 @@ _dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
 // at every size, which is the only way to settle a shape argument with a
 // picture instead of arithmetic.
 _dbg.__pinGape = (v: number) => voidling.pinGape(v);
+// QA/capture: end any celebration instantly — see void3d.ts calm().
+_dbg.__calm = () => voidling.calm();
 // How far the face is seated onto the sphere, 0..0.9. A look knob — see
 // FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
 // frame at several values and the choice can be made from pictures.
@@ -9086,6 +9089,10 @@ function animate() {
     if (ns > bestStage) {
     bestStage = ns;
     evolveCeremonies++;
+    // THE BODY REACTS HERE, and only here. It used to ride setStage's
+    // `n > stage`, which is a DRESSING change — and VISUAL_STAGE collapses
+    // seven forms onto five, so the finale evolution never triggered it.
+    voidling.celebrate();
     // the bar takes the beat too — the pips retire one at a time and the whole
     // strip swells, so an evolution is visible at the bottom of the screen and
     // not only in the middle of it

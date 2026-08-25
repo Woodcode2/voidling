@@ -270,6 +270,13 @@ console.log(`shooting ${VIEW.width * SCALE}x${VIEW.height * SCALE} from ${URL}\n
 //  which makes the face show its mood — the thing the mood pin was always
 //  meant to control — and makes the frame deterministic instead of a race.
 const grinning = async (label, ms = 10000) => {
+  // …and end any celebration first. ringBurst decays at dt * 0.55 — 1.8 s of
+  // GAME time — and under swiftshader the match clock runs about 14x slower
+  // than wall, so a burst fired by growTo's sizing call was still going nearly
+  // half a minute later. store/03-devouring.png and store/06-gameday.png both
+  // went to the App Store wearing evolve ribbons and orbit sparkles as if they
+  // were the hero's permanent look.
+  await page.evaluate(() => window.__calm?.());
   await page.evaluate(() => window.__pinMouth?.(true));
   try {
     await page.waitForFunction(() => window.__faceState?.().smile === true, null,

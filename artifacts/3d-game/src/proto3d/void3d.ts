@@ -25,6 +25,17 @@ export interface Void3D {
   /** Kick the growth spring — an absorbed meal shoves the blob. */
   impulse(v: number): void;
   setStage(n: number): void;
+  /** The evolution's BODY reaction — the pop, the jelly slosh and the ring
+   *  flare. Deliberately NOT part of setStage: see the note there. Fire it
+   *  from the one place that decides an evolution has happened. */
+  celebrate(): void;
+  /** QA/capture: end any celebration instantly. ringBurst decays at dt * 0.55,
+   *  i.e. 1.8 seconds of GAME time — which under a software renderer running a
+   *  frame or two a second is nearly half a minute of wall clock, so a burst
+   *  fired while a harness was setting up outlives every shutter. Two of the
+   *  eight App Store screenshots carried evolve ribbons for exactly that
+   *  reason. Never call from gameplay. */
+  calm(): void;
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   /** Wear a hat, or null for none. Independent of the skin — see hats.ts. */
   setHat(id: string | null): void;
@@ -1567,6 +1578,8 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
       body.castShadow = false;
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
+    celebrate() { evolveT = 0.7; wobble = 1; ringBurst = 1; },
+    calm() { evolveT = 0; wobble = 0; ringBurst = 0; },
     faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },
     pinGape(v) {
@@ -1590,9 +1603,23 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
         ringBurst = 0;
       }
       if (n > stage) {
-        evolveT = 0.7;   // celebratory pop on every evolution
-        wobble = 1;      // full-body jelly slosh — the form-change feels physical
-        ringBurst = 1;   // ring + orbit stars flare outward
+        // ── THE CELEBRATION DOES NOT LIVE HERE ANY MORE ────────────────────
+        // evolveT, wobble and ringBurst used to fire from inside this branch,
+        // and that coupled the hero's REACTION to a change of DRESSING. The
+        // two are not the same thing: VISUAL_STAGE is [0,1,2,3,3,4,4] against
+        // seven FORMS, so CHOMPOSAURUS->COLOSSUS maps 3->3 and WORLD
+        // ENDER->VOID TITAN maps 4->4. `n > stage` was false for both, and
+        // TWO OF THE SIX EVOLUTIONS — including the finale — gave the void no
+        // pop, no slosh and no ribbon. The card printed, the paper printed,
+        // the screen flashed white and the phone buzzed for 120ms, and the
+        // character itself did not move a muscle.
+        //
+        // It went the other way too: __setVoidR calls setStage, so the store
+        // shooter's sizing call fired a 1.8s celebration and two of the eight
+        // App Store screenshots carried evolve ribbons as if they were the
+        // hero's permanent look. And a child bitten back a form and climbing
+        // out of it got a silent ring flare for reaching a form she already
+        // had.
         bodyMat.uniforms.uStage.value = n;
         // each form gets a stronger presence: pupils grow (2D rule), rim/glow
         // intensify; WORLD ENDER becomes a living galaxy (auto nebula wrap)
