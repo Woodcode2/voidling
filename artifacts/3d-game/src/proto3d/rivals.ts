@@ -1146,10 +1146,38 @@ export function createRivals(
         // No pursuit. No charge. Walking into one still costs the ordinary 10%
         // that has always been there. The whole job is to make a child steer
         // around a big void instead of through it.
+        // ── AND THE FIRST VERSION OF THIS GATE COULD NEVER OPEN ─────────────
+        // It read `rv.r > pr * 1.2`, copied from the BITE threshold on the
+        // reasoning that a look should come from something that could eat you.
+        // Measured across two worlds: zero looks, gate open 0% of the time.
+        //
+        // Not tight. Unreachable — and the source proves it. softCap above is
+        // `max(min(START_R + 0.02t, 1.6), pr * 0.80)`, hardCap is softCap for
+        // every non-hunter (the `want * 1.04` and `stuffCap` escapes are both
+        // inside `if (isHunter)`), and it is clamped every frame. For a family
+        // member to clear 1.2x the player you need 1.6 > 1.2 * pr, i.e. a
+        // player still under radius 1.333 — and they join at 0.62x and grow
+        // slowly, while the player passes 1.333 inside the first ten seconds.
+        // It cannot happen.
+        //
+        // WHICH ALSO ANSWERS THE OWNER'S OTHER QUESTION, and corrects the
+        // answer I gave him. He asked "can other voids eat him or just that
+        // one?" and I wrote up the bite gate — the same 1.2x — as "anyone more
+        // than 1.2x your radius, not one specific void". True of the gate,
+        // false of the game: the cap makes it unreachable, so in practice it IS
+        // just that one.
+        //
+        // 0.85, then, which the cap CAN deliver: a family member at its ceiling
+        // sits at 0.80x you, and one still riding the 1.6 clock term is larger
+        // than you while you are small. At that size it reads as a peer on
+        // screen, and the beat it takes is "sizing you up" rather than "about
+        // to eat you" — which is the honest version, because it cannot eat you.
+        // Making one that genuinely CAN is a balance change to a measured
+        // number and belongs with the owner, not with me.
         if (!isHunter && rv.joined && rv.eye <= 0) {
           rv.eyeCd -= dt;
           const others = rivals.some((o) => o !== rv && o.eye > 0);
-          if (rv.eyeCd <= 0 && !others && rv.r > pr * 1.2 && dp < 62 && dp > rv.r * 0.9) {
+          if (rv.eyeCd <= 0 && !others && rv.r > pr * 0.85 && dp < 62 && dp > rv.r * 0.9) {
             rv.eye = 1.25; rv.eyeCd = rand(9, 16);
             api.onNotice?.(rv.name, rv.x, rv.z, rv.color);
             // …and they say something. The taunt pool is already written in

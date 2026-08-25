@@ -87,7 +87,7 @@ for (const wid of WORLDS) {
   // rival list, every half second of match time:
   //
   //   OPPORTUNITY — the share of samples where at least one non-hunter rival
-  //   satisfies the whole gate (bigger by 1.2x, inside 62 units, outside its
+  //   satisfies the whole gate (the same 0.85x the look uses, inside 62 units, outside its
   //   own radius). If that is near zero the gate is unreachable and no amount
   //   of cooldown tuning matters. If it is high and the rate is still zero,
   //   the throttle is the problem instead.
@@ -121,10 +121,10 @@ for (const wid of WORLDS) {
         o.maxRatio = Math.max(o.maxRatio, r.r / v.r);
         o.minDist = Math.min(o.minDist, d);
       }
-      if (live.some((r) => r.r > v.r * 1.2)) o.big++;
+      if (live.some((r) => r.r > v.r * 0.85)) o.big++;
       if (live.some((r) => Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.near++;
-      if (live.some((r) => r.r > v.r * 1.2 && Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.bigAndNear++;
-      if (live.some((r) => r.r > v.r * 1.2 && Math.hypot(r.x - v.x, r.z - v.z) < 62
+      if (live.some((r) => r.r > v.r * 0.85 && Math.hypot(r.x - v.x, r.z - v.z) < 62)) o.bigAndNear++;
+      if (live.some((r) => r.r > v.r * 0.85 && Math.hypot(r.x - v.x, r.z - v.z) < 62
         && Math.hypot(r.x - v.x, r.z - v.z) > r.r * 0.9)) o.all++;
     }, 500);
   });
@@ -143,7 +143,7 @@ for (const wid of WORLDS) {
   console.log(`  ${wid.padEnd(9)} ${(r.notices - n0)} looks over ${(t1 - t0).toFixed(0)}s of match `
     + `= ${perMin.toFixed(1)}/min   (bully charges ${r.charges}, bites ${r.bites})`);
   console.log(`            family joined ${pc('joined').toFixed(0)}%  |  `
-    + `someone 1.2x bigger ${pc('big').toFixed(0)}%  |  someone inside 62u ${pc('near').toFixed(0)}%  |  `
+    + `someone 0.85x+ ${pc('big').toFixed(0)}%  |  someone inside 62u ${pc('near').toFixed(0)}%  |  `
     + `both ${pc('bigAndNear').toFixed(0)}%  |  whole gate ${pc('all').toFixed(0)}%`);
   console.log(`            best seen: biggest family member was ${o.maxRatio.toFixed(2)}x your radius, `
     + `nearest came within ${o.minDist > 1e8 ? 'never' : o.minDist.toFixed(0) + 'u'}`);
