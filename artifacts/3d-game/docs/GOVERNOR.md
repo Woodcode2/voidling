@@ -274,6 +274,19 @@ Kept because a studio that hides its own errors is worth nothing.
    with how much there is to eat. Read Maple 23% against Lantern 81% and called
    prop density a character defect. Same mistake as #4. → the RESTING face
    only, using the rig's own `mouthT`.
+11. **I accused a good commit of lying.** `8ce4252`'s message opens "d3e3f3b
+   describes an A-B-A planet test and a tagged identification in
+   qa/skypop.mjs. Neither was in the commit." Both were. What had happened is
+   that a container restart rewound my LOCAL branch two commits, so
+   `git show HEAD:...` was reading a stale file, and I read "the fix is absent
+   from HEAD" as "the fix was never committed" without checking `origin`. The
+   rebase conflict is what exposed it: the remote side of the conflict was the
+   very code I said did not exist.
+   The lesson is narrower than "check before accusing". It is that after a
+   restart, LOCAL refs are not evidence about what was pushed — only `origin`
+   is, and it costs one `git fetch` to ask. The message stands uncorrected in
+   the log with this retraction on top, because amending it away would hide
+   exactly the kind of error this file exists to keep.
 
 8. **"Resting-grin 100%" is not "the hero looks right".** `qa/faceparity.mjs`
    deliberately excludes mid-bite frames, because a grin hidden by a bite is
