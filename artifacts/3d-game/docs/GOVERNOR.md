@@ -272,6 +272,12 @@ measurement behind it. Any change needs the owner, not a board.
 - **Lantern's murk is albedo, not lighting.** A Lantern-only +55% floor was
   tried and retracted the same day; the A/B measured +0.4 mean luminance and
   −1.1pt dark-pixel share. The night ground is authored near-black.
+- **The fear face is approved.** `MOODS.scared` in `void3d.ts` — the wide
+  sclera and the shrunk grey pupil that read, at play size, as the whole
+  character going pale. I twice proposed darkening the pupil to make it read
+  as fear rather than as a colour change. The owner, shown it, said: "I like
+  when the void gets nervous. That face is solid." What he wanted changed was
+  who triggers it, not how it looks. Do not touch the eyes.
 - **Camera shake is zero.** Absolute owner order.
 - **Powers are off** (`POWERS_ON = false`).
 - **Spawn and the opening hand are hand-authored** and identical every load.
