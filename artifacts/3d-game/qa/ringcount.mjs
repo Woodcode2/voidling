@@ -42,7 +42,19 @@ const START = Number(process.argv[5] || 24);
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
-const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
+// ── A SMALL VIEWPORT, AND WHY THAT IS NOT CHEATING ───────────────────────
+// The match clock advances by `dt` per FRAME and `dt` is capped at 0.05
+// (prototype3d.ts), so match time runs at framerate * 0.05 — which is the whole
+// of the measured ~14x slowdown under the software renderer. Fewer pixels means
+// more frames means a faster clock, with every piece of game logic advancing by
+// exactly the same dt it always did. Nothing about the rates below changes.
+//
+// `?fast` would NOT be safe here and is deliberately not used: clockSpeed only
+// scales matchClock, while the player still moves at wall-frame speed, so at
+// clockSpeed 6 he covers a sixth of the ground per match-second and eats a
+// sixth as much. That would report the per-eat rings as six times rarer than
+// they are — a confident number about a game nobody plays.
+const p = await b.newPage({ viewport: { width: 320, height: 640 }, deviceScaleFactor: 1 });
 await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try {
   localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
@@ -129,6 +141,7 @@ if (!log.length) { console.log('FAIL — zero rings in the whole sample. The wra
 // under test, so a moved site cannot be reported under its old description.
 let src = '';
 try { src = readFileSync(new URL(bundle).pathname.replace(/^\//, 'dist/'), 'utf8'); } catch { /* named by colour instead */ }
+const srcLines = src.split('\n');
 
 const mins = (t1 - t0) / 60;
 const by = new Map();
@@ -139,10 +152,16 @@ for (const r of log) {
   by.set(k, e);
 }
 const rows = [...by.entries()].map(([site, e]) => {
+  // NAME THE SITE by slicing the shipped bundle at the line and column the
+  // stack gave. The first version sliced the WHOLE FILE at the column, which on
+  // a minified bundle — one enormous line — landed in the middle of three's
+  // shader source and named every ring after a fragment of the iridescence
+  // chunk. Line first, then column within it.
   let name = '';
   if (src) {
-    const col = Number(site.split(':')[1]);
-    if (col > 0 && col < src.length) name = src.slice(Math.max(0, col - 90), col + 10).replace(/\s+/g, ' ').slice(-84);
+    const [ln, col] = site.split(':').map(Number);
+    const line = srcLines[ln - 1];
+    if (line && col > 0) name = line.slice(Math.max(0, col - 96), col).replace(/\s+/g, ' ').slice(-88);
   }
   return { site, perMin: e.n / mins, n: e.n, awayPct: 100 * e.away / e.n,
     rMed: e.rs.sort((a, x) => a - x)[e.rs.length >> 1], name };

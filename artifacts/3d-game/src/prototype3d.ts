@@ -2313,7 +2313,10 @@ const ARCH_TAG: Record<string, string> = {
 };
 rivals.onJoin = (name, color, x, z, arch) => {
   announceJoin(name, color, FAMILY_TITLE[name] ?? 'Cousin', (ARCH_TAG[arch] ?? '').replace(/^\S+\s*/, ''));
-  fx.ring(x, z, color, 22, 0.8);
+  // (no ring on a join. It was drawn at the rival's own turf, up to 165 units
+  // off and usually nowhere near the screen, while the banner and the alert
+  // that actually tell the player were on it. A ring nobody sees still costs a
+  // slot in a twelve-ring pool.)
   audio.alert();
 };
 // the family SPEAKS — and the player actually hears it now. A bubble at the
@@ -2379,9 +2382,11 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   // shockwave stack fires at BOTH ends of the meal — the marquee play LANDS
   voidling.animGulp();
   fx.ring(rx, rz, 0xffffff, rr * 5 + 8, 0.8);        // where the family member was…
-  fx.ring(rx, rz, 0xffe08a, rr * 3.4 + 6, 0.65);
+  // (the second ring at the corpse and the second at the player are gone. Four
+  // rings for one kill, inside a stack that already has two screen flashes, a
+  // camera punch, a full-screen card, a float, two sounds and an 80ms buzz. One
+  // at each end keeps "where it was, where it went" at half the spectacle.)
   fx.ring(voidState.x, voidState.z, 0xffffff, voidling.radius * 4.2, 0.9);   // …and where it went
-  fx.ring(voidState.x, voidState.z, 0xb875ff, voidling.radius * 3, 0.7);
   fx.shake(9); fx.flash('rgba(255,224,138,0.4)', 0.3); fx.flash('rgba(184,117,255,0.35)', 0.6);
   camPunch(6); fx.kick(rx - voidState.x, rz - voidState.z, 9);
   floatPos.set(rx, rr + 5, rz);
@@ -5024,7 +5029,20 @@ function capture(e: Edible, giveHunger = true) {
   // during a beat window every bite answers in the beat's colour — the doubled
   // value is FELT at the exact moment and place it is earned. Small and short:
   // this fires on every eat, and a beat window is when eats come fastest.
-  if (feverMult > 1) fx.ring(e.mesh.position.x, e.mesh.position.z, feverCol, Math.max(1.6, e.radius * 2.2), 0.4);
+  // ── THE RING THAT WAS THE COMPLAINT ─────────────────────────────────────
+  // `if (feverMult > 1) fx.ring(e.mesh.position, …)` sat here: one ring at the
+  // corpse of every prop swallowed inside a beat window, and beat windows cover
+  // eighty of a match's hundred and eighty seconds by design, timed for when
+  // eating is densest. Measured — qa/ringcount.mjs, Maple, t=24 to 50, a span
+  // chosen to cross the first window — 110.7 rings a minute from THIS LINE, 88%
+  // of them landing away from the void. The owner, playing it: "when you eat or
+  // get combos you keep seeing rings pop up behind you."
+  //
+  // The comment defending it argued the doubled value should be "FELT at the
+  // exact moment and place it is earned". It still is: the score floater below
+  // carries the multiplied number, at that prop, at that instant, and the
+  // multiplier badge is on the HUD for the whole window. This was a third
+  // channel on a message already sent twice.
   // ── A FIND ────────────────────────────────────────────────────────────
   // Loud, and immediately: this is the only thing in the game a child keeps.
   const sid = e.mesh.userData.sticker as string | undefined;
@@ -5074,7 +5092,10 @@ function capture(e: Edible, giveHunger = true) {
     audio.voice('yum');
     // …and the shockwave ring takes the prop's colour too, instead of the
     // house violet it used whatever it had just flattened
-    fx.ring(e.mesh.position.x, e.mesh.position.z, tint.getHex(), e.radius * 3, 0.45);
+    // …and the ring that was here went with it: 39.2 a minute, 94% of them away
+    // from the void. The dust IS the shockwave — tinted with what went in, sized
+    // by the bite — and it does not outlive the moment by half a second on the
+    // floor behind a moving player.
     spawnPuff(e.mesh.position.x, 0.5, e.mesh.position.z, e.radius > 4 ? 10 : 6, tint);
   }
   voidling.chomp(bite);   // graded by how big that was relative to us
@@ -6250,9 +6271,14 @@ function spawnBeatTreasure() {
     scene.add(ch);
     addEdible(ch, 0.55);
     beatLoot.push(edibles[edibles.length - 1]);
-    fx.ring(x, z, 0xffd23f, 2.4, 0.6);
     placed++;
   }
+  // NO RING PER CHEST. There were twelve, one per placed chest, fired in a
+  // single frame — and fx.ts's ring pool is exactly twelve. That one loop
+  // wrapped the whole pool and silently deleted every other live ring,
+  // including the beat ring fired ten lines earlier in the same frame. One ring
+  // at the player marks the drop without erasing the rest of the moment.
+  if (placed) fx.ring(voidState.x, voidState.z, 0xffd23f, 44, 0.7);
 }
 function clearBeatLoot() {
   for (const e of beatLoot) {
@@ -8243,12 +8269,18 @@ function animate() {
         // full-screen card was rightly deleted for.
         feverPulseT -= dt;
         if (feverPulseT <= 0) {
-          feverPulseT = 1.7;
+          // 3.0, not 1.7 — that was about 47 a match. It is the only thing in
+          // the world that says the window is still live, so it stays; but now
+          // that the per-eat ring is gone it no longer has to compete with a
+          // hundred and ten a minute to be noticed.
+          feverPulseT = 3.0;
           fx.ring(voidState.x, voidState.z, feverCol, voidling.radius * 3.0, 1.1);
           // the drum beat's pulse comes FROM THE DRUM: the ring beats out of
           // the tower in the same rhythm, and the tower thumps with it
           if (drumCueT > 0 && drumRef && drumRef.visible && !drumRef.userData.eaten) {
-            fx.ring(drumRef.position.x, drumRef.position.z, feverCol, 10, 1.1);
+            // (the ring that fired here is gone — it doubled the pulse above on
+            // the same frame, at a tower the player is usually not standing at.
+            // The thump is the tower's own beat and reads better alone.)
             drumThump = 1;
           }
         }
@@ -9241,7 +9273,8 @@ function animate() {
     // every match.
     if (curStage === FORMS.length - 1) {
       fx.ring(voidState.x, voidState.z, 0xffffff, R * 9, 1.2);
-      fx.ring(voidState.x, voidState.z, 0xffd23f, R * 6.5, 1.0);
+      // (a third ring fired here. voidling.celebrate() already sets the
+      // character's own ringBurst on this frame, so it was four.)
       fx.flash('#ffffff', 0.55);
       fx.shake(1.1);
       announce(COPY.ender);
