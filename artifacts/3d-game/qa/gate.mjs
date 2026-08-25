@@ -139,6 +139,37 @@ const SUITE = [
     cmd: ['node', 'qa/lockedcards.mjs', PORT], verdict: pf,
     why: 'a child can still tell the locked worlds apart — the art keeps selling the next one' },
 
+  // ── THE QUALITY TIER ─────────────────────────────────────────────────────
+  // The owner, after playing a build: "Get a team also on quality."
+  //
+  // The eight studio teams review SURFACES — is this drawn well. Every one of
+  // the six things he reported that day was BEHAVIOUR instead: a collision
+  // response that accelerates, an effect that fires too often, a word in a
+  // string, a family that never reacts to you. Nothing in the gate could see
+  // any of them, which is why he found them and it did not.
+  //
+  // So the ninth team is not a review meeting, it is this tier. Each step is an
+  // instrument with a band at BOTH ends, because every one of these can fail in
+  // two directions and the owner named both directions himself: too little and
+  // nothing changed, too much and it is a shit show for a six-year-old.
+  //
+  // It runs as its own profile until each instrument has a green reading, then
+  // its steps join push and live. A gate step that has never passed is not
+  // protection, it is a blocked pipeline — so they are promoted on evidence,
+  // one at a time, and this comment records which are still on probation:
+  //   · edgespeed    ON PROBATION — last read 1.78x against a 1.35x bar
+  //   · rivalnotice  ON PROBATION — last read 0.0/min in maple, gate open 0%
+  //   · ringcount    not a gate step yet; it is a census with no bar, and the
+  //                  bar has to come from a measured normal minute, not a guess
+  //   · skypop       not a gate step yet; same reason
+  { id: 'edgespeed', tier: 'quality', profiles: ['quality'], timeout: 2400,
+    cmd: ['node', 'qa/edgespeed.mjs', PORT, 'pirate', 'maple'], verdict: pf,
+    why: 'the shore stops, turns or bleeds you off — it never launches you (owner item 3)' },
+
+  { id: 'rivalnotice', tier: 'quality', profiles: ['quality'], timeout: 2400,
+    cmd: ['node', 'qa/rivalnotice.mjs', PORT, 'maple', 'pirate'], verdict: pf,
+    why: 'a bigger void reacts to you often enough to notice and rarely enough not to swarm (owner item 1)' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
