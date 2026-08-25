@@ -224,34 +224,20 @@ for (const wid of WORLDS) {
     // count the pixels that changed. That is the only claim worth making about
     // a planet nobody has photographed — that a child can see it.
     const planets = [];
-    // ── AND IT HAS TO BE THE PLANETS, NOT EVERY SPRITE ──────────────────
-    // `if (o.isSprite)` collected 25 objects and reported "25 planet sprites
-    // covering 25.2% of the frame". There are two. The other twenty-three are
-    // the hero's own decorations, parented into his Group at scale ~0 to ~2 —
-    // hiding them and diffing counts the VOID as planet, and 25.2% was mostly
-    // him. A number that flatters the change is exactly the kind to distrust.
-    //
-    // The planets are identified by what they are: a 512px painted map (the
-    // canvas paint() builds), parented straight to the Scene rather than to a
-    // character, and scaled in tens of world units rather than ones.
-    S.traverse((o) => {
-      if (!o.isSprite) return;
-      if ((o.material?.map?.image?.width ?? 0) !== 512) return;
-      if (o.parent !== S) return;
-      if (o.scale.x < 20) return;
-      planets.push(o);
-    });
-    // ── AND IT IS AN A-B-A, FOR THE SAME REASON THE SKY MASK IS ─────────
-    // A single hide-and-diff counts every pixel that changed between two
-    // shots, and the shots are three rAF frames apart, so the void, the
-    // rivals, the crowd and the leaves have all moved. It reported 41.5% for
-    // TWO planets right after reporting 25.2% for a set that contained them —
-    // a subset covering more than its superset, which is arithmetically
-    // impossible and was pure motion.
-    //
-    // Visible, hidden, visible: a planet pixel changes both times and returns
-    // to where it started. A moving leaf does not come back on cue.
+    // island.ts tags them. Collecting every Sprite gathered 25 objects in Maple
+    // and reported "25 planet sprites covering 25.2% of the frame"; two are
+    // planets and the rest are the hero's own decorations, so hiding them
+    // counted the VOID as planet.
+    S.traverse((o) => { if (o.isSprite && o.userData?.planet) planets.push(o); });
     let planetPct = 0;
+    // AND IT IS AN A-B-A, for the same reason the sky mask is. A single
+    // hide-and-diff counts every pixel that changed between two shots, and the
+    // shots are three rAF frames apart, so the void, the rivals and the crowd
+    // have all moved. It reported 41.5% for TWO planets straight after
+    // reporting 25.2% for a set that contained them — a subset covering more
+    // than its superset, which is arithmetically impossible and was pure
+    // motion. Visible, hidden, visible: a planet pixel changes both times and
+    // returns to where it started; a moving leaf does not come back on cue.
     if (planets.length) {
       const on1 = await shot();
       planets.forEach((o) => { o.visible = false; });

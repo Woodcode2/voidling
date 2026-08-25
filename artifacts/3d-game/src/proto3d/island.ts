@@ -610,7 +610,14 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   const SKY_MOOD: Record<WorldId, { tint: string; tintA: number; fog: number; bgI: number }> = {
     maple:   { tint: '#7a4ad6', tintA: 0.00, fog: 0x1b1038, bgI: 0.55 },   // the reference violet — untouched
     pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
-    gameday: { tint: '#c0407f', tintA: 0.75, fog: 0x241120, bgI: 0.50 },   // magenta dusk over the lot
+    // GAME DAY WAS THE ONE WORLD NOBODY PHOTOGRAPHED, and it was the worst of
+    // the five: flat bright magenta at the coast with not one star in it.
+    // Measured against Maple at the same camera — true black 1% against 25%,
+    // and with the halo hidden 11% against 44%. The starfield is ADDITIVE, so a
+    // sky that never reaches black cannot show a star: the points were there
+    // and drowned. 0.34, and a tint pulled down in lightness so the same
+    // painting lands where the other four do.
+    gameday: { tint: '#7a2b52', tintA: 0.70, fog: 0x241120, bgI: 0.34 },   // magenta dusk over the lot
     lantern: { tint: '#3f45a8', tintA: 0.70, fog: 0x171d40, bgI: 0.46 },   // deep indigo night
     // the poster set this look, not the other way round: blue winter dusk,
     // aurora greens in the sky, warm windows against the snow. 0.62 so the
@@ -839,7 +846,11 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       ],
       // a red lantern of a moon, and a distant violet companion
       lantern: [
-        { d: 640, el: -56, az: AZ - 0.11, size: 98, hue: '#ff8a6a', dark: '#2b0d1e', glow: '#ffb79c' },
+        // #ff8a6a photographed as a salmon balloon. At that lightness the
+        // painted terminator has nowhere to fall to, so the disc reads flat and
+        // lit from nowhere. A deeper body in the same hue keeps the lantern red
+        // and gives the shading somewhere to go.
+        { d: 640, el: -56, az: AZ - 0.11, size: 98, hue: '#c9563f', dark: '#1e0713', glow: '#e8836a' },
         { d: 880, el: -76, az: AZ + 0.11, size: 58, hue: '#c9a6ff', dark: '#1d1440', glow: '#e0c9ff' },
       ],
       // an ice world with a bright ring, to match the aurora the poster set
@@ -912,6 +923,12 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
         Math.cos(e) * Math.sin(bd.az) * bd.d);
       sp.scale.set(bd.size, bd.size, 1);
       sp.renderOrder = -1;   // behind the island's own transparent work
+      // TAGGED, so a probe never has to guess which sprites these are. The
+      // heuristic it replaces — a 512px map, parented to the Scene, scaled past
+      // 20 — found 2 in Maple and 25 in Game Day, whose stadium carries sprites
+      // matching all three. Art identified by its shape eventually collides
+      // with other art the same shape; a tag cannot.
+      sp.userData.planet = true;
       skyBodies.push({ o: sp, dir: sp.position.clone().normalize(), d: bd.d });
       scene.add(sp);
     }
