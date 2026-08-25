@@ -39,7 +39,18 @@ const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/o
 
 const rows = [];
 for (const wid of WORLDS) {
-  const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
+  // A SMALL VIEWPORT, ON PURPOSE. The match clock advances by `dt` per FRAME and
+  // `dt` is capped at 0.05 (prototype3d.ts), so match time runs at framerate *
+  // 0.05 — which is the whole of the measured ~14x slowdown under the software
+  // renderer. Fewer pixels means more frames means a faster clock, with every
+  // piece of game logic advancing by exactly the same dt it always did. It buys
+  // wall time and changes nothing that is measured here.
+  //
+  // `?fast` is deliberately NOT used: clockSpeed scales matchClock only, while
+  // the player still moves at wall-frame speed, so the game it measures is one
+  // where you cover a sixth of the ground per match-second. That is a confident
+  // number about a game nobody plays.
+  const p = await b.newPage({ viewport: { width: 320, height: 640 }, deviceScaleFactor: 1 });
   await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');

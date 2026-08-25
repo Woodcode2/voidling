@@ -46,7 +46,18 @@ const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/o
 
 const rows = [];
 for (const wid of WORLDS) {
-  const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
+  // A SMALL VIEWPORT, ON PURPOSE. The match clock advances by `dt` per FRAME and
+  // `dt` is capped at 0.05 (prototype3d.ts), so match time runs at framerate *
+  // 0.05 — which is the whole of the measured ~14x slowdown under the software
+  // renderer. Fewer pixels means more frames means a faster clock, with every
+  // piece of game logic advancing by exactly the same dt it always did. It buys
+  // wall time and changes nothing that is measured here.
+  //
+  // `?fast` is deliberately NOT used: clockSpeed scales matchClock only, while
+  // the player still moves at wall-frame speed, so the game it measures is one
+  // where you cover a sixth of the ground per match-second. That is a confident
+  // number about a game nobody plays.
+  const p = await b.newPage({ viewport: { width: 320, height: 640 }, deviceScaleFactor: 1 });
   await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
@@ -83,24 +94,35 @@ for (const wid of WORLDS) {
       { pointerId: 1, clientX: cx + dx * 110, clientY: cy + dz * 110, bubbles: true }));
     const iv = setInterval(drive, 60); drive();
 
-    let peak = 0, peakR = 0, n = 0, atEdge = 0, capAt = 0;
+    // ── MEASURE OVER A WINDOW, NOT A FRAME ──────────────────────────────
+    // Sampling one rAF against the next and dividing looks right and is not.
+    // The probe's callback and the game's update are both on rAF, and under a
+    // software renderer their order is not stable: one sample can read the
+    // clock BEFORE the frame's update and the next AFTER it. That yields a dt
+    // near zero across a position delta of a whole frame, and a single
+    // interleaving accident becomes the reported peak. It reported 16.64x
+    // against a clamp that the bundle provably contains and that cannot let a
+    // single frame past 1.35x — so the number was about the sampler, not the
+    // shore.
+    //
+    // Accumulating to a 0.25s window of MATCH time fixes it without hiding
+    // anything: a genuine launch lasts many frames and still shows, while an
+    // ordering artifact is averaged into the window it belongs to. The peak
+    // window's own dt and distance are kept so a surprising number can be
+    // interrogated instead of believed.
+    const WIN = 0.25;
+    let peak = 0, peakR = 0, n = 0, atEdge = 0, capAt = 0, peakDt = 0, peakDist = 0;
     let px = vs0.x, pz = vs0.z, last = window.__matchState().t;
+    let accD = 0, accT = 0, accNear = false, accCap = 0;
     await new Promise((res) => {
       const tick = () => {
         const vs = window.__voidState();
-        // ── DIVIDE BY THE GAME'S CLOCK, NOT THE WALL'S ───────────────────
-        // The first version of this used performance.now() deltas between rAF
-        // callbacks. The game does not move by wall time — it moves by its own
-        // dt — and under a software renderer the two disagree wildly, so a
-        // single pair of rAFs firing close together turned one ordinary step
-        // into a huge spurious peak. It reported 4.29x and then 2.58x on
-        // changes that could not have produced either number. Governor rule 4,
-        // written after four probes made this mistake, made by a fifth.
         const now = window.__matchState().t;
         const dt = now - last;
         if (dt < 1e-4) { requestAnimationFrame(tick); return; }   // same frame, no data
         last = now;
-        const sp = Math.hypot(vs.x - px, vs.z - pz) / dt;
+        accD += Math.hypot(vs.x - px, vs.z - pz);
+        accT += dt;
         px = vs.x; pz = vs.z;
         // ── AND READ THE REAL camDist, DO NOT RECONSTRUCT IT ─────────────
         // This first derived the cap from the radius, on the reasoning that
@@ -110,24 +132,30 @@ for (const wid of WORLDS) {
         // player could actually steer at 51, and every ratio this printed was
         // inflated by roughly four. Reconstructing a value the code owns is the
         // snapshot fault in a different coat.
-        const cap = Math.min(96, 16 * (window.__matchState().camDist / 50));
+        accCap = Math.min(96, 16 * (window.__matchState().camDist / 50));
         n++;
         const R = vs.r * 1.2;
-        const near = !window.__solidAt(vs.x + R, vs.z, vs.r) || !window.__solidAt(vs.x - R, vs.z, vs.r)
-          || !window.__solidAt(vs.x, vs.z + R, vs.r) || !window.__solidAt(vs.x, vs.z - R, vs.r);
-        if (near) { atEdge++; if (sp / cap > peakR) { peakR = sp / cap; peak = sp; capAt = cap; } }
+        if (!window.__solidAt(vs.x + R, vs.z, vs.r) || !window.__solidAt(vs.x - R, vs.z, vs.r)
+          || !window.__solidAt(vs.x, vs.z + R, vs.r) || !window.__solidAt(vs.x, vs.z - R, vs.r)) accNear = true;
+        if (accT >= WIN) {
+          const sp = accD / accT;
+          if (accNear) { atEdge++; if (sp / accCap > peakR) {
+            peakR = sp / accCap; peak = sp; capAt = accCap; peakDt = accT; peakDist = accD; } }
+          accD = 0; accT = 0; accNear = false;
+        }
         if (n < FR) requestAnimationFrame(tick); else res();
       };
       requestAnimationFrame(tick);
     });
     clearInterval(iv);
-    return { ok: true, peak, peakR, capAt, n, atEdge };
+    return { ok: true, peak, peakR, capAt, n, atEdge, peakDt, peakDist };
   }, FRAMES);
 
   if (!r.ok) { console.log(`  ${wid.padEnd(9)} SKIPPED — ${r.why}`); rows.push({ wid, skipped: true }); }
   else {
-    console.log(`  ${wid.padEnd(9)} ${r.atEdge}/${r.n} frames at the shore   peak ${r.peak.toFixed(1)} u/s `
-      + `against a steering cap of ${r.capAt.toFixed(1)} = ${r.peakR.toFixed(2)}x`);
+    console.log(`  ${wid.padEnd(9)} ${r.atEdge} windows at the shore over ${r.n} frames   `
+      + `peak ${r.peak.toFixed(1)} u/s against a steering cap of ${r.capAt.toFixed(1)} = ${r.peakR.toFixed(2)}x`
+      + `   (that window: ${r.peakDist.toFixed(1)}u in ${r.peakDt.toFixed(3)}s of match)`);
     rows.push({ wid, ...r });
   }
   await p.close();
@@ -137,6 +165,9 @@ await b.close();
 // SELF-CHECK. A run that never put the void against a boundary tested nothing,
 // and must not report that silence as a pass — the mistake qa/bubbleclear.mjs
 // made in three worlds at once.
+// atEdge counts WINDOWS now, not frames — about five frames each — so the
+// floor comes down with it. Twenty windows is five seconds of match against
+// the shore, which is still far more than an accident.
 const judged = rows.filter((r) => !r.skipped && r.atEdge > 20);
 console.log('');
 if (!judged.length) {
