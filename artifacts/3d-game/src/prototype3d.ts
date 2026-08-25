@@ -1826,6 +1826,12 @@ _dbg.__matchState = () => ({
   band: rivals.bandStat(),   // QA: is the lane multiplier pinned at its clamp?
   fever: feverMult,          // QA: is a beat window live right now?
   t: started ? matchElapsed() : 0, clock: matchClock, score: playerScore, r: voidling.radius, ev: rivalEv,
+  // QA: the camera distance the STEERING actually reads. The player's top speed
+  // is min(96, 16 * camDist / 50), and camDist is not recoverable from the
+  // radius — it lags, it eases, and it is still falling from 300 during the
+  // intro. qa/edgespeed.mjs reconstructed it from the radius and got a cap four
+  // times too low, which inflated every ratio it reported.
+  camDist,
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
     joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting,
@@ -8495,6 +8501,29 @@ function animate() {
       // leaked (0.4-1.7% of accepted cells put the body over water on a
       // diagonal, which the cars have guarded against for ages).
       const solid = coastSolid(R0);
+      // ── THE SHORE MAY NOT BE FASTER THAN THE PLAYER ──────────────────────
+      // Every recovery below used to be a flat constant — 62 u/s to swim back,
+      // 34 u/s to break a stall — and both were tuned against a BIG void, whose
+      // steering reaches 96. A void at match start steers at about 12-16, so
+      // touching water launched him at four to five times his own top speed.
+      // Measured on Pirate Bay (qa/edgespeed.mjs): 61.3 u/s against a steering
+      // cap of 14.3, a ratio of 4.29. The owner, on a real device: "when you're
+      // at the border edge and hit it, like say the lake in pirate, it glitches
+      // out and sometimes you speed up." That is this.
+      //
+      // Worse than the shove itself is what follows it. Setting velX outright
+      // does not just move him this frame: the steering blend `velX += (tvx -
+      // velX) * k` then eases that 62 back down over the next several frames
+      // while his thumb is asking for 14, so he GLIDES away from the shore at
+      // three or four times his own speed. That is the other half of "glitches
+      // out".
+      //
+      // Both are now derived from the speed he can actually steer at, using the
+      // same expression the input block uses, so the recovery still out-pushes
+      // him — it has to, or he can hold himself out over the water against it —
+      // but by a margin he can feel as firmness rather than as being thrown.
+      const ownSpeed = Math.min(96, 16 * (camDist / 50));
+      const swimSpeed = Math.max(ownSpeed * 1.25, 14);
       // WHICH WAY IS LAND? The old version assumed "away from the island
       // centre", which is only true for a blob with water on the outside.
       // Pirate Bay has water INSIDE it: standing on the resort's inner shore,
@@ -8540,16 +8569,34 @@ function animate() {
       // exclusive. The trigger is ACTUAL IMMOBILITY; the "leaning on a wall is
       // legitimate" case is now handled by the heading sweep below succeeding,
       // not by disabling the timer.
+      // Set when the breaker moves him, so the recovery below does not move him
+      // AGAIN in the same frame — see the note there.
+      let stallNudged = false;
       if (driving && Math.hypot(voidState.x - prev.x, voidState.z - prev.z) < 0.02 * Math.max(0.4, dt * 60)) {
         stallT += dt;
         if (stallT > 0.7) {
           const ld = landDir(voidState.x, voidState.z) ?? [-voidState.x, -voidState.z];
           const L = Math.hypot(ld[0], ld[1]) || 1;
-          voidState.x += (ld[0] / L) * dt * 34; voidState.z += (ld[1] / L) * dt * 34;
+          const walk = Math.max(ownSpeed * 0.8, 11);   // was a flat 34
+          voidState.x += (ld[0] / L) * dt * walk; voidState.z += (ld[1] / L) * dt * walk;
+          stallNudged = true;
           if (stallT > 2.2) stallT = 0;
         }
       } else stallT = 0;
       if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
+      // ── AND THIS MUST NOT BE SKIPPED, WHICH COST A MEASUREMENT ───────────
+      // The stall breaker above also walks him inland, so `else if
+      // (!stallNudged)` looked like the obvious way to stop the two stacking:
+      // measured 23.3 u/s against a steering speed of 12.8, the breaker's 11
+      // plus the sweep's 16.
+      //
+      // It made it TEN TIMES WORSE — 239.3 u/s. Skipping this block does not
+      // just skip a second nudge: it skips the heading sweep and the swim-back
+      // entirely, so a void over water is never redirected and never bled off.
+      // velX keeps its illegal heading, the breaker inches him along, and when
+      // he finally reaches a legal cell the whole accumulated velocity lands at
+      // once. The stack was worth about 10 u/s; not recovering at all was worth
+      // 225. Reverted, and left written down so nobody tries it again.
       else {
         // THE HEADING SWEEP. Two previous attempts projected the velocity onto
         // a guessed wall normal. Both guesses are quantised — the 16-spoke ring
@@ -8589,8 +8636,14 @@ function animate() {
         if (!solid(voidState.x, voidState.z)) {
           const ld = landDir(voidState.x, voidState.z);
           if (ld) {
-            velX = ld[0] * 62; velZ = ld[1] * 62;
-            voidState.x += velX * dt; voidState.z += velZ * dt;
+            // …and it sets the VELOCITY ONLY. It used to set velX and then also
+            // add velX * dt to the position — but the main integrator a few
+            // lines up has already moved him this frame, so the recovery landed
+            // a SECOND displacement on top of it. Measured after the constant
+            // was scaled: still 2.79x his steering speed, because 18 u/s
+            // applied twice reads as 36. Setting the velocity is enough; the
+            // next frame's integrator carries it, once.
+            velX = ld[0] * swimSpeed; velZ = ld[1] * swimSpeed;
           }
         }
       }

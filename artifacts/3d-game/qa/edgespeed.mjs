@@ -102,13 +102,15 @@ for (const wid of WORLDS) {
         last = now;
         const sp = Math.hypot(vs.x - px, vs.z - pz) / dt;
         px = vs.x; pz = vs.z;
-        // The speed HE can steer at, derived the way the game derives it.
-        // __matchState does not expose camDist, so rather than add a hook this
-        // reuses the settled-camera expression prototype3d.ts itself falls back
-        // to, then the same speed formula. Same numbers, no new surface, and
-        // nothing that can drift out of date behind a hook nobody updates.
-        const cd = Math.min(340, Math.max(26, 38 * Math.pow(vs.r / 0.9, 0.82)));
-        const cap = Math.min(96, 16 * (cd / 50));
+        // ── AND READ THE REAL camDist, DO NOT RECONSTRUCT IT ─────────────
+        // This first derived the cap from the radius, on the reasoning that
+        // adding a hook was one more thing to drift. That was wrong twice over:
+        // camDist LAGS the radius, it eases, and after the intro the steering
+        // reads it live — so the reconstruction returned about 13 u/s where the
+        // player could actually steer at 51, and every ratio this printed was
+        // inflated by roughly four. Reconstructing a value the code owns is the
+        // snapshot fault in a different coat.
+        const cap = Math.min(96, 16 * (window.__matchState().camDist / 50));
         n++;
         const R = vs.r * 1.2;
         const near = !window.__solidAt(vs.x + R, vs.z, vs.r) || !window.__solidAt(vs.x - R, vs.z, vs.r)
