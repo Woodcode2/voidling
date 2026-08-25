@@ -44,6 +44,11 @@ export interface Rivals {
   // prototype3d.ts, which routes far speech to the ticker under the name.
   onSpeak?: (x: number, z: number, line: string, name: string) => void;
   onCharge?: (name: string, x: number, z: number) => void;   // the BULLY winds up a lunge
+  /** A rival bigger than you has NOTICED you and is holding a look. Not a
+   *  charge and not a threat to dodge — the cue for it must stay quieter than
+   *  onCharge's, or the two stop meaning different things. See rivals.onNotice
+   *  in prototype3d.ts. */
+  onNotice?: (name: string, x: number, z: number, color: number) => void;
   onNearMiss?: (name: string, x: number, z: number) => void; // …and it whiffs. the retellable beat.
   onStuffed?: (name: string, x: number, z: number) => void;  // the threat turns into the MEAL
   reset(matchLen?: number): void;                        // instant rematch
@@ -396,6 +401,20 @@ export function createRivals(
     raw: number;
     // BULLY: the charge state machine (0 prowl, 1 wind-up, 2 lunge, 3 recover)
     cst: number; ctim: number; missPend: boolean; missCd: number; stolen: number; stuffedSaid: boolean; stuffCap: number;
+    // ── THE LOOK ─────────────────────────────────────────────────────────
+    // Every void bigger than you CAN bite you — the bite gate is
+    // `rv.r > pr * 1.2`, not "is this the bully" — but only the BULLY ever
+    // came at you, so the other four read as scenery with teeth nobody
+    // believes in. The owner: "It seems only 1 void is ever hostile … there
+    // should be some sense of like I need to be on my toes somewhat. Again a
+    // kids game right."
+    //
+    // So the rest of the family NOTICES. A big one that finds you close by
+    // stops what it is doing, turns to face you, and holds for a beat. It does
+    // not pursue, it does not charge, and it cannot start a chase — if you
+    // walk into it you get the ordinary 10% bite that has always been there.
+    // It is a LOOK, and a look is enough to make a child steer around someone.
+    eye: number; eyeCd: number;
     // SHOWOFF: the radius of the landmark it is currently crossing the map for
     lockR: number;
     // HOARDER: the district it has decided is its
@@ -447,6 +466,7 @@ export function createRivals(
       vx: 0, vz: 0, biteCd: 0, respawnT: 0, speakCd: rand(4, 10), tgt: null, closeCall: false,
       visitT: rand(30, 70), visiting: false, dyingT: 0, panic: 0,
       combo: 0, comboT: 0, raw: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
+      eye: 0, eyeCd: rand(4, 12),
       stolen: 0, stuffedSaid: false, stuffCap: 0, lockR: 0,
       campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0,
       roll: new THREE.Quaternion(),
@@ -661,6 +681,7 @@ export function createRivals(
         rv.joined = false; rv.respawnT = 0; rv.biteCd = 0; rv.stall = 0; rv.pulse = 0;
         rv.visitT = rand(14, 30); rv.visiting = false; rv.dyingT = 0;
         rv.combo = 0; rv.comboT = 0; rv.raw = 0; rv.cst = 0; rv.ctim = rand(6, 10);
+        rv.eye = 0; rv.eyeCd = rand(4, 12);
         rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false; rv.stuffCap = 0;
         rv.lockR = 0; rv.tgt = null; rv.dry = 0; rv.full = false;
         rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
@@ -1114,6 +1135,42 @@ export function createRivals(
         // the lunge, and only then does she come. Two seconds of warning is
         // what turns "the game shrank me" into "she CHARGED and I DODGED",
         // which is the sentence a seven-year-old repeats at dinner.
+        // ── THE LOOK, for everyone who is NOT the threat ────────────────────
+        // Bigger than you, close enough to matter, and off cooldown: stop, turn
+        // to face you, hold it for a beat. Deliberately narrow so the island
+        // never turns into five voids staring at you at once:
+        //   · it needs a real size gap (the same 1.2x that lets them bite)
+        //   · it needs you INSIDE 62 units, which is about two of your own
+        //     diameters at match start — close enough that you chose to be there
+        //   · one look per rival every 9-16 seconds, and never two at once
+        // No pursuit. No charge. Walking into one still costs the ordinary 10%
+        // that has always been there. The whole job is to make a child steer
+        // around a big void instead of through it.
+        if (!isHunter && rv.joined && rv.eye <= 0) {
+          rv.eyeCd -= dt;
+          const others = rivals.some((o) => o !== rv && o.eye > 0);
+          if (rv.eyeCd <= 0 && !others && rv.r > pr * 1.2 && dp < 62 && dp > rv.r * 0.9) {
+            rv.eye = 1.25; rv.eyeCd = rand(9, 16);
+            api.onNotice?.(rv.name, rv.x, rv.z, rv.color);
+            // …and they say something. The taunt pool is already written in
+            // their own voice, which is what stops this reading as a system
+            // event rather than a character noticing you.
+            if (rv.speakCd <= 0) {
+              api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].taunt), rv.name);
+              rv.speakCd = rand(7, 11);
+            }
+          }
+        }
+        if (rv.eye > 0) {
+          // A LOOK IS A PAUSE. Dropping the target is the whole behaviour: a
+          // rival that keeps grazing while "noticing" you reads as a bug rather
+          // than a beat, and stopping is legible from across the island at the
+          // size these are drawn. It deliberately does NOT turn to face you —
+          // that would need rival orientation, which nothing else here touches,
+          // and a stop plus a ring already says it.
+          rv.eye -= dt;
+          rv.tgt = null;
+        }
         if (isHunter && hunting) {
           rv.ctim -= dt; rv.missCd = Math.max(0, rv.missCd - dt);
           if (rv.cst === 0) {

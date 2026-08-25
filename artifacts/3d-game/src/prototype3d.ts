@@ -1629,7 +1629,7 @@ const _dbg = new Proxy(_dbgStore, {
   };
 };
 // QA counters: what the family actually DID to the player over a match
-const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0 };
+const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0, notices: 0 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 /** QA: draw one frame THROUGH the bloom composer, synchronously.
  *  Without this a probe has to re-enable the game's own rAF and hope to read
@@ -2466,6 +2466,22 @@ rivals.onCharge = (name, x, z) => {
   // often enough to read as the game shouting the same sentence all match.
   fx.ring(x, z, 0xff2b3c, 26, 0.6); fx.flash('rgba(255,43,60,0.16)', 0.35);
   audio.alert(); audio.voice('scared'); buzz(35);
+};
+// ── A BIG ONE HAS NOTICED YOU ──────────────────────────────────────────────
+// Every void bigger than you has always been able to bite — the gate is
+// `rv.r > pr * 1.2`, not "is this the bully" — but only the bully ever came at
+// you, so the other four read as scenery. The owner: "It seems only 1 void is
+// ever hostile … there should be some sense of like I need to be on my toes
+// somewhat. Again a kids game right."
+//
+// This is the quiet half of that. The rival stops and holds a look; here it
+// gets ONE ring in its own colour and nothing else. Explicitly NOT what
+// onCharge does — no red, no screen flash, no alert sting, no rumble — because
+// the moment those two cues look alike the charge stops meaning "dodge NOW".
+// A child should read this as "that one saw me", not as an attack.
+rivals.onNotice = (name, x, z, color) => {
+  rivalEv.notices++;   // QA: qa/rivalnotice.mjs reads this through __matchState().ev
+  fx.ring(x, z, color, 22, 0.45);
 };
 rivals.onNearMiss = (name, x, z) => {
   rivalEv.nearMiss++;
