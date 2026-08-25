@@ -159,11 +159,33 @@ for (const wid of WORLDS) {
     // predicate itself says we have left the land, then stand a little inside
     // that. It asks __solidAt — the SAME function the hero moves by — rather
     // than carrying its own idea of where the coast is.
+    // ── FINDING THE OUTER COAST ───────────────────────────────────────────
+    // The first version walked OUTWARD from the island centre and took the
+    // first cell that was not land. That works on a blob and fails on Pirate
+    // Bay, which has water INSIDE it: the scan stopped at the bay, and when the
+    // centre itself was wet it stopped at zero and threw "never left the land",
+    // which is the opposite of what had happened. A probe whose failure message
+    // names the wrong cause is worse than one that just fails.
+    //
+    // So it scans INWARD instead, from 600 units back toward the centre, and
+    // takes the first cell that IS land. That is the outer coast by
+    // construction, whatever the island has in the middle of it. Several
+    // azimuths, nearest coast wins, and it asks __solidAt — the same predicate
+    // the hero moves by — rather than carrying its own idea of the shoreline.
     const v0 = window.__voidState();
-    let edge = 0;
-    for (let x = 0; x < 600; x += 4) { if (!window.__solidAt(x, 0, v0.r)) { edge = x; break; } }
-    if (!edge) throw new Error('never left the land walking 600 units — __solidAt has moved');
-    window.__warpVoid(edge - 12, 0);
+    let edge = 0, eaz = 0;
+    for (let a = 0; a < 8; a++) {
+      const az = a * Math.PI / 4, cs = Math.cos(az), sn = Math.sin(az);
+      for (let d = 600; d > 20; d -= 4) {
+        if (window.__solidAt(cs * d, sn * d, v0.r)) {
+          if (!edge || d < edge) { edge = d; eaz = az; }
+          break;
+        }
+      }
+    }
+    if (!edge) throw new Error('no land found on any of 8 rays out to 600 units — '
+      + '__solidAt has moved or this world is not loaded');
+    window.__warpVoid(Math.cos(eaz) * (edge - 14), Math.sin(eaz) * (edge - 14));
     const atCoast = await census();
 
     // ── AND THE CAUSAL TEST ───────────────────────────────────────────────
@@ -226,7 +248,7 @@ for (const wid of WORLDS) {
   const line = (lbl, c) => `    ${lbl.padEnd(16)} share ${c.share.toFixed(1).padStart(5)}%  `
     + `rgb(${c.rgb.join(',')})`.padEnd(18) + `  sat ${c.sat.toFixed(3)}  range ${c.range.toFixed(3)}  `
     + `dark ${c.dark.toFixed(0).padStart(3)}%`;
-  console.log(`  ${wid}${R ? ` @ r=${R}` : ' @ real spawn size'}  (coast at x=${r.edge})`);
+  console.log(`  ${wid}${R ? ` @ r=${R}` : ' @ real spawn size'}  (nearest outer coast ${r.edge}u from centre)`);
   console.log(line(R ? 'mid-island' : 'at spawn', r.atSpawn));
   console.log(line('at the coast', r.atCoast));
   if (r.noHalo) console.log(line('halo hidden', r.noHalo));

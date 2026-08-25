@@ -869,7 +869,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   {
     const cv = document.createElement('canvas'); cv.width = cv.height = 512;
     const g = cv.getContext('2d')!;
-    const grd = g.createRadialGradient(256, 256, 182, 256, 256, 256);
+    const grd = g.createRadialGradient(256, 256, 211, 256, 256, 256);
     grd.addColorStop(0, 'rgba(168,123,255,0.30)');
     grd.addColorStop(0.55, 'rgba(123,79,224,0.14)');
     grd.addColorStop(1, 'rgba(123,79,224,0)');
@@ -877,7 +877,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;   // see above — this was the 1.7-2.4x
     const halo = new THREE.Mesh(
-      new THREE.PlaneGeometry(Math.max(W3, H3) * 1.35, Math.max(W3, H3) * 1.35),
+      new THREE.PlaneGeometry(Math.max(W3, H3) * 1.15, Math.max(W3, H3) * 1.15),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     halo.rotation.x = -Math.PI / 2; halo.position.y = -3;
