@@ -63,12 +63,26 @@ if (n < 20) { console.log(`ABORTED — hashed only ${n} source files. Something 
 console.log(`\n  PACK FRESHNESS — ${n} source files hash to ${now}\n`);
 const bad = [];
 for (const w of WORLDS) {
-  let shot = null, has = false;
-  try { statSync(join(PACK, `${w}_look.png`)); has = true; } catch { /* reported */ }
-  try { shot = readFileSync(join(PACK, `${w}_look.src`), 'utf8').trim(); } catch { /* reported */ }
-  const ok = has && shot === now;
+  // The stamp is two fields now: <source digest> <sha256 of the PNG itself>.
+  // The one-field version was defeated without anyone lying: a container
+  // restart reverted the untracked frames to an August 23 snapshot while the
+  // committed stamps survived, and this probe said PASS over pixels three
+  // days stale. Both halves must hold — the stamp names THIS source, and the
+  // frame on disk is THE frame the stamp was written beside.
+  let stamp = null, imgHash = null;
+  try { imgHash = createHash('sha256').update(readFileSync(join(PACK, `${w}_look.png`))).digest('hex').slice(0, 16); } catch { /* reported */ }
+  try { stamp = readFileSync(join(PACK, `${w}_look.src`), 'utf8').trim(); } catch { /* reported */ }
+  const parts = stamp ? stamp.split(/\s+/) : [];
+  const srcPart = parts[0] ?? null, imgPart = parts[1] ?? null;
+  const ok = imgHash !== null && srcPart === now && imgPart === imgHash;
   if (!ok) bad.push(w);
-  console.log(`    ${w.padEnd(9)} ${!has ? 'NO FRAME' : shot === null ? `unstamped (shot before this check existed)` : shot === now ? shot : `${shot}  != ${now}  STALE`}`);
+  const why = imgHash === null ? 'NO FRAME'
+    : stamp === null ? 'unstamped'
+    : srcPart !== now ? `${srcPart}  != ${now}  STALE SOURCE`
+    : imgPart === null ? 'one-field stamp — predates the image-hash check'
+    : imgPart !== imgHash ? 'stamp/image MISMATCH — the frame on disk is not the frame that was stamped'
+    : srcPart;
+  console.log(`    ${w.padEnd(9)} ${why}`);
 }
 console.log('');
 if (bad.length) {

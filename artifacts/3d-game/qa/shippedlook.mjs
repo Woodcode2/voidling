@@ -138,8 +138,15 @@ const box = await p.evaluate(() => {
   };
 });
 const path = `${OUT}/${WORLD}_${TAG}.png`;
-// stamp the frame with the source it was taken from — see srcDigest above
-try { writeFileSync(`${OUT}/${WORLD}_${TAG}.src`, srcDigest()); } catch { /* not fatal to a shot */ }
+// stamp the frame with the source it was taken from AND the frame's own hash.
+// The one-field stamp diverged in the worst way: a container restart reverted
+// the untracked PNGs to an old snapshot while the committed stamps survived,
+// and qa/packfresh.mjs said PASS over three-day-old pixels. A stamp that does
+// not identify the image it describes is a claim about nothing.
+try {
+  const img = createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 16);
+  writeFileSync(`${OUT}/${WORLD}_${TAG}.src`, srcDigest() + ' ' + img);
+} catch { /* not fatal to a shot */ }
 await p.screenshot({ path });
 await b.close();
 

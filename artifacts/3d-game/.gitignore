@@ -23,7 +23,10 @@ qa/out/shippedlook/maple_leaves.png
 # Evidence for a decision belongs in a commit message or a ledger entry; the
 # pixels themselves are reproducible, so they do not belong in history.
 qa/out/person/
-qa/out/shippedlook/*_look.png
+# qa/out/shippedlook/*_look.png was ignored here — the studio's entire
+# canonical evidence pack lived untracked, died with every container restart,
+# and silently reverted to an August 23 snapshot while the committed .src
+# stamps kept saying it was fresh. The pack is evidence; it ships in the repo.
 qa/out/shippedlook/maple_trees.png
 
 # Every shippedlook frame is a probe artefact. The two the ledger cites are
