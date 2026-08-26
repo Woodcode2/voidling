@@ -81,6 +81,45 @@ And above them:
 
 ---
 
+## The implementation arm — CREWS
+
+*"Build the right teams to implement everything you suggested."* — the owner,
+2026-08-26.
+
+The nine teams REVIEW. For their first three rounds, every confirmed finding
+then waited for the governor to implement it serially, which made one person
+the bottleneck on a board the studio could fill faster than he could drain.
+
+The evolution is the pipeline that already worked once (the chalet, the stall,
+the snowman — 2026-08-26): for each confirmed finding, a **crew** is spun up
+that produces an EXACT PATCH against HEAD — file, lines, replacement code,
+seeded-draw accounting, triangle cost — and an independent **skeptic** whose
+only job is to kill that patch by reading the real files at the cited lines.
+Verdicts are SOUND / SOUND WITH CORRECTIONS / KILLED. The governor lands only
+the survivors, applies the skeptic's corrections, builds once, reshoots the
+pack once, and every gate runs before main moves.
+
+The record so far, which is why the skeptic phase is not optional:
+
+- the chalet crew's patch shipped nearly verbatim — after its skeptic killed a
+  door hood that was occluded at every camera pitch the game has, and caught a
+  window offset that reaches zero overlap at roof pitch 31.8°
+- the planter fix the review proposed was measured to be a NO-OP (52.5% of the
+  barrel shaded before, 50.0% after); the crew process replaced it with the
+  hoops that actually fixed it
+- the snowman fix the review proposed would have cut accent pixels 79% on half
+  the population; the skeptic's measurement shrank it to one number
+
+**Crew constraints are hard, and the skeptic checks each by reading code:**
+1. The camera looks down 46–65°: identity lives on horizontal surfaces.
+2. Seeded draws (`mrnd`/`mr`/`mpick`/`mchance`) are one stream: a patch adds
+   exactly as many draws as it removes, in the same order. Changing a draw's
+   candidate list is stream-safe; changing the count is not.
+3. One mesh: no new draw calls, materials, or textures.
+4. `qa/roundlod.mjs` is a ratchet: no new single-digit spheres.
+5. Triangle costs are stated, in tens not hundreds; Game Day is near its
+   memory ceiling.
+
 ## The four rules
 
 **1. LOOK AT THE PIXELS.** No team may report on a surface it has not seen
