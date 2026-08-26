@@ -170,6 +170,10 @@ const SUITE = [
     cmd: ['node', 'qa/rivalnotice.mjs', PORT, 'maple', 'pirate'], verdict: pf,
     why: 'a bigger void reacts to you often enough to notice and rarely enough not to swarm (owner item 1)' },
 
+  { id: 'packfresh', tier: 'art', profiles: ['art'], timeout: 30,
+    cmd: ['node', 'qa/packfresh.mjs'], verdict: pf,
+    why: 'the studio pack is a photograph of THIS source — two rounds were spent on a build that no longer existed' },
+
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
     why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 154 and visible every run' },

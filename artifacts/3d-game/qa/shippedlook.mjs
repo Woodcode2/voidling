@@ -17,11 +17,43 @@
 //
 //   node qa/shippedlook.mjs [port] [world] [tag]
 import { chromium } from 'playwright';
+import { readdirSync, readFileSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { join } from 'path';
+
+// ── A FRAME RECORDS WHAT IT IS A PHOTOGRAPH OF ────────────────────────────
+// qa/packfresh.mjs first compared file mtimes and I defeated it with `touch`
+// in the same minute I wrote it. Worse, mtime cannot see an uncommitted edit,
+// which is most of what changes during a working session — exactly the window
+// in which somebody reshoots, keeps working, and hands out the pack. A digest
+// of the source cannot be bumped and cannot be faked by saving a file.
+const srcDigest = () => {
+  const h = createHash('sha256');
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) {
+      const q = join(d, e.name);
+      if (e.isDirectory()) { walk(q); continue; }
+      if (!/\.(ts|tsx)$/.test(e.name)) continue;
+      h.update(e.name); h.update(readFileSync(q));
+    }
+  };
+  walk('src');
+  return h.digest('hex').slice(0, 16);
+};
 import { mkdirSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4173';
 const WORLD = process.argv[3] || 'maple';
-const TAG = process.argv[4] || 'run';
+// ── ONE FILENAME PER WORLD, OR THE STALE SHOT OUTLIVES THE RESHOOT ────────
+// The default was 'run'. docs/STUDIO.md points teams at <world>_look.png, so a
+// reshoot wrote a SECOND set beside the old one and left the pack the teams
+// actually read untouched — 46 hours and six island.ts commits stale. Two
+// consecutive studio rounds were spent on a build that no longer existed, and
+// the commit meant to fix it ("reshot at HEAD") only added more filenames.
+// TEAM STATIC came within one paragraph of filing a blocker on a defect fixed
+// 85 minutes after its photograph. A tag that varies lets a stale frame
+// survive; the canonical shot overwrites itself.
+const TAG = process.argv[4] || 'look';
 const OUT = 'qa/out/shippedlook';
 mkdirSync(OUT, { recursive: true });
 
@@ -106,6 +138,8 @@ const box = await p.evaluate(() => {
   };
 });
 const path = `${OUT}/${WORLD}_${TAG}.png`;
+// stamp the frame with the source it was taken from — see srcDigest above
+try { writeFileSync(`${OUT}/${WORLD}_${TAG}.src`, srcDigest()); } catch { /* not fatal to a shot */ }
 await p.screenshot({ path });
 await b.close();
 
