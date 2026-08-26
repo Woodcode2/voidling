@@ -226,6 +226,77 @@ directly on the coast alike. At radius 10 by a coastline it is 44%. Space is
 structurally a late-game reveal. Fixing that is the camera, the island size, or
 a decision to sell space where a child does look — not an art change.
 
+### Three media in one frame — CONFIRMED 2026-08-26, magnitude REDUCED
+
+Art direction's first complete verdict, on the first pack that was current when
+it was handed over. The finding is real and I verified every part of it in code:
+
+    the world      PROP_SMOOTH_MAT / PROP_SHARED_MAT   roughness 0.85, no env map
+    the people     PEOPLE_MAT                          roughness 0.82
+    the hero       void3d.ts:378-387                   five specular lobes + fresnel
+    the shop hats  hatgeo.ts:241,253                   roughness 0.22, metalness 0.88
+
+So the rendering budget runs in inverse proportion to screen area: the shop item
+is chrome, the hero is a painted illustration, and the town — most of every
+frame — is matte.
+
+**But the magnitude was cherry-picked.** The verdict claimed the hero carries
+"5 to 35 times the tonal information per unit area of any surface in the
+world", comparing its brightest hero patch against its flattest world patch.
+Measured median-to-median over every edge-free 16x16 patch in all five frames:
+
+| world | hero sd | world sd | ratio |
+|---|---|---|---|
+| maple | 0.0165 | 0.0064 | 2.6x |
+| pirate | 0.0117 | 0.0064 | 1.8x |
+| gameday | 0.0117 | 0.0049 | 2.4x |
+| lantern | 0.0120 | 0.0061 | 2.0x |
+| powder | 0.0124 | 0.0034 | 3.7x |
+
+**1.8x to 3.7x, not 5x to 35x.** The world's own p90 (0.030-0.049) is higher
+than the hero's median, so the world is not uniformly flat either.
+
+### The proposed fix does not work — REFUTED 2026-08-26 by experiment
+
+The remedy offered was one number on one line, twice: move the two shared prop
+materials from roughness 0.85 to 0.55 and "let the sun lay a broad highlight
+across the top of every sphere, cylinder and cone in the game". Zero draw
+calls, zero triangles. It is a good-sounding fix from a correct diagnosis.
+
+Run and photographed rather than argued:
+
+    maple    world sd 0.0064 -> 0.0069   (+8%)   frame mean +0.2%
+    gameday  world sd 0.0049 -> 0.0051   (+4%)   frame mean -6.2%
+
+Four to eight per cent is not the difference between matte and formed. The
+reason is in the rig rather than the material: there is ONE directional light
+and `scene.environment` is RoomEnvironment at intensity 0.15, so a GGX lobe at
+0.55 has almost nothing to reflect. Reverted; the pack was reshot back to the
+0.85 build.
+
+**The finding stands and the lever is elsewhere.** Putting form on a matte
+sphere in this scene means the light rig or an environment map, both of which
+are on the HANDS OFF list and both of which move every screenshot in the repo.
+That is an owner call, not a material tweak.
+
+### Game Day's red has two luminance levels — CONFIRMED 2026-08-26
+
+1,325 pure-red interior patches in the Game Day frame: **median 2 distinct
+luminance levels out of 256**, and the flattest are a single level. Not low
+contrast, a fill.
+
+The cause is not clipping at the top — 0.0% of red pixels have R at 254 or
+above. It is the bottom: the most common values are rgb(168,0,0), rgb(158,0,0),
+rgb(173,0,0), with **green and blue at exactly zero**. A surface with one live
+channel cannot carry a cool shadow or a warm highlight, so all its shading
+collapses into a single-channel ramp.
+
+The authored albedos are not the problem — `tailgate.ts` reds are rgb(196,52,47)
+and rgb(146,37,32), with green and blue plainly present. Something between the
+albedo and the frame is crushing them. This is the same class as the toe bug
+retired on 2026-08-24, which turned Lantern's TIMBER into rgb(33,0,0), and it is
+NOT yet explained. PENDING, and it is the most concrete art defect on the board.
+
 ## THE RETRACTIONS
 
 Kept because a studio that hides its own errors is worth nothing.
