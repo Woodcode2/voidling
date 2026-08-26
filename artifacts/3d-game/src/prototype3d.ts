@@ -254,6 +254,31 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 // the game fails to compile. Replace the stub; do not append to the chunk.
 THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
   'vec3 CustomToneMapping( vec3 color ) { return color; }', `
+// ── THE GAMUT GUARD ───────────────────────────────────────────────────────
+// The ACES output matrix drives a channel NEGATIVE for saturated colours, and
+// clamp() then deletes it — a per-channel clip, the exact class this file
+// already outlaws in the toe comment below. Measured on the shipped build:
+// Game Day's CRIM (0xc4342f, the colour the whole world is made of) rendered
+// rgb(168,0,0) — green and blue exactly zero on 33,860 pixels of one frame —
+// and GOLD ships with a dead blue, the greens and teals with a dead red. A
+// surface with one live channel cannot show a cool shadow or a warm highlight.
+//
+// Modelled offline before touching this (the sweep is in the commit): at dim
+// light the intermediate clamp kills the channel; at brighter light it
+// survives ACES and the chroma push kills it instead — l + (0-l)*1.07 is
+// negative. So the guard runs at BOTH clamp sites.
+//
+// It compresses chroma toward luminance just enough to lift the most negative
+// channel to a small positive value — hue-preserving, and the 1.15 knee keeps
+// it off exactly-zero so shading survives quantisation. Pixels already in
+// gamut return unchanged on the first line: everything else in the frame is
+// bit-identical.
+vec3 gamutGuard( vec3 color ) {
+  float mn = min( color.r, min( color.g, color.b ) );
+  if ( mn >= 0.0 ) return color;
+  float l = max( dot( max( color, vec3( 0.0 ) ), vec3( 0.2126, 0.7152, 0.0722 ) ), 1e-4 );
+  return l + ( color - l ) * ( l / ( l - mn * 1.15 ) );
+}
 vec3 CustomToneMapping( vec3 color ) {
   color *= toneMappingExposure;
   // ACES, exactly as three implements it, so the base look does not move
@@ -264,7 +289,7 @@ vec3 CustomToneMapping( vec3 color ) {
   color = ACESInputMat * color;
   color = RRTAndODTFit( color );
   color = ACESOutputMat * color;
-  color = clamp( color, 0.0, 1.0 );
+  color = min( gamutGuard( color ), vec3( 1.0 ) );   // guard, then cap the top
   // ── the grade ──
   float l = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
   // ── THE TOE COMPRESSES, IT DOES NOT CLIP ────────────────────────────────
@@ -294,7 +319,7 @@ vec3 CustomToneMapping( vec3 color ) {
   vec3 warm = vec3( 1.05, 1.005, 0.95 );
   color *= mix( cool, warm, smoothstep( 0.18, 0.78, l ) );           // split tone
   color = mix( vec3( l ), color, 1.07 );                             // chroma back
-  return clamp( color, 0.0, 1.0 );
+  return clamp( gamutGuard( color ), 0.0, 1.0 );     // the push can re-break gamut
 }
 `);
 renderer.toneMapping = THREE.CustomToneMapping;

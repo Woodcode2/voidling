@@ -170,6 +170,10 @@ const SUITE = [
     cmd: ['node', 'qa/rivalnotice.mjs', PORT, 'maple', 'pirate'], verdict: pf,
     why: 'a bigger void reacts to you often enough to notice and rarely enough not to swarm (owner item 1)' },
 
+  { id: 'gamutzero', tier: 'art', profiles: ['art'], timeout: 30,
+    cmd: ['node', 'qa/gamutzero.mjs'], verdict: pf,
+    why: 'no chromatic surface loses colour channels to the grade — Game Day rendered rgb(168,0,0) out of 0xc4342f' },
+
   { id: 'packfresh', tier: 'art', profiles: ['art'], timeout: 30,
     cmd: ['node', 'qa/packfresh.mjs'], verdict: pf,
     why: 'the studio pack is a photograph of THIS source — two rounds were spent on a build that no longer existed' },
