@@ -1097,6 +1097,25 @@ export function makeMarketShed(): THREE.Group {
     solid.push(part(new THREE.BoxGeometry(BW * 0.86, 0.9, 0.7), TIMBER, x, 0.45, D * 0.4));
     solid.push(part(new THREE.BoxGeometry(BW * 0.9, 0.14, 0.85), CEDAR, x, 0.95, D * 0.4));
     glow.push(part(new THREE.BoxGeometry(BW * 0.7, 0.9, 0.1), i % 2 ? G_PAPER : G_AMBER, x, 1.8, -D * 0.2));
+    // ── GOODS WITH VOLUME, WHICH IS THE WHOLE DIFFERENCE ────────────────────
+    // TEAM STATIC: "a market stall whose goods are a flat orange rectangle."
+    // Correct, and it is this prop — makeMarketShed, six per Lantern Night —
+    // not makeStall, which is dropped once. The rectangle is the lit panel
+    // above: 0.1 units thick, standing in for a whole stall's worth of stock.
+    //
+    // Odyssey's night markets are the bar and the difference is not lighting,
+    // it is that every counter carries MODELLED goods — fruit, pots, lamps —
+    // that cast their own little shadows and break the counter's straight
+    // edge. The camera looks under the canopy's front lip at 46 degrees, so
+    // the counter top is exactly where a child's eye already is.
+    //
+    // Indexed off the bay, not sampled: no new randomness in a factory that
+    // already varies by bays and griddle chance.
+    for (let j = 0; j < 3; j++)
+      solid.push(part(new THREE.BoxGeometry(0.34 - j * 0.05, 0.24 + j * 0.06, 0.34),
+        [ROPE, VERM_D, CEDAR][j], x - BW * 0.26 + j * BW * 0.26, 1.14 + j * 0.03, D * 0.4));
+    solid.push(part(new THREE.CylinderGeometry(0.19, 0.16, 0.16, 12), PAPER,
+      x + BW * 0.3, 1.10, D * 0.4));
     if (Math.random() < 0.5)
       glow.push(part(new THREE.BoxGeometry(BW * 0.4, 0.1, 0.6), G_GRIDDLE, x, 1.04, D * 0.4));
     glow.push(part(new THREE.CylinderGeometry(0.26, 0.32, 0.42, 8), G_RED, x, H - 0.3, D * 0.42));
