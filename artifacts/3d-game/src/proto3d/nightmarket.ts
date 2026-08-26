@@ -222,9 +222,26 @@ export function makeStall(): THREE.Group {
   // corner posts
   for (const sx of [-1, 1]) for (const sz of [-1, 1])
     solid.push(part(new THREE.BoxGeometry(0.14, h, 0.14), TIMBER_D, sx * (wD / 2 - 0.1), h / 2, sz * (dD / 2 - 0.1)));
-  // the canopy: a shallow ridge with a striped valance
+  // ── THE CANOPY IS THE WHOLE STALL, AS FAR AS THIS CAMERA IS CONCERNED ────
+  // It spans wD*1.15 by dD*1.2 — the entire footprint — and everything this
+  // prop has to say sits UNDER it: the counter, the crates, the griddle, the
+  // lit back wall, the steam, both lanterns. From 46 to 65 degrees above, which
+  // is the only range the game has, a yatai was one flat vermilion rectangle.
+  // TEAM STATIC filed it as "the goods are a flat orange rectangle"; the goods
+  // are fine, it was the roof over them.
+  //
+  // So the roof carries the identity instead. Awnings in a real night market
+  // are striped, and a stripe is the one pattern that survives being seen from
+  // directly above at any distance. Alternating bands across the ridge, the
+  // pale ones in PAPER so they catch the key that the vermilion swallows.
   solid.push(part(new THREE.BoxGeometry(wD * 1.15, 0.16, dD * 1.2), VERM, 0, h, 0));
   solid.push(part(new THREE.BoxGeometry(wD * 1.17, 0.09, dD * 1.22), VERM_D, 0, h - 0.1, 0));
+  for (let i = 0; i < 5; i++) {
+    if (i % 2) continue;                       // every other band stays vermilion
+    const t = (i + 0.5) / 5;
+    solid.push(part(new THREE.BoxGeometry(wD * 1.15 / 5 * 0.86, 0.05, dD * 1.2),
+      PAPER, -wD * 0.575 + wD * 1.15 * t, h + 0.10, 0));
+  }
   // the valance: six bold bands hanging off the front edge, tall enough to
   // read at the play camera instead of a 0.34 sliver nobody could see
   for (let i = 0; i < 6; i++) {
@@ -242,10 +259,18 @@ export function makeStall(): THREE.Group {
   // steam is a solid, not a glow — a glowing cloud reads as fire
   solid.push(part(new THREE.SphereGeometry(0.34, 6, 5), PAPER, wD * 0.16, 1.6, 0, 0, 0, 0, 1, 0.7, 1));
   solid.push(part(new THREE.SphereGeometry(0.26, 6, 5), PAPER, wD * 0.16 + 0.2, 2.05, 0.1, 0, 0, 0, 1, 0.7, 1));
-  // a lantern on the front post
+  // ── THE LANTERN HUNG INSIDE THE ROOF IT WAS MEANT TO ADVERTISE ───────────
+  // It sat at (wD/2 - 0.1, dD/2 - 0.1), and the canopy above reaches wD*0.575
+  // by dD*0.6 — so the one warm red thing on the stall was directly under the
+  // slab, invisible from every camera angle the game has. Moved outboard of the
+  // canopy edge on both axes, where it clears the roof and reads as a lit
+  // lantern hanging off the corner of a market stall.
   const lr = 0.34;
-  glow.push(part(new THREE.CylinderGeometry(lr * 0.74, lr, 0.42, 8), G_RED, wD / 2 - 0.1, h - 0.5, dD / 2 - 0.1));
-  glow.push(part(new THREE.CylinderGeometry(lr, lr * 0.74, 0.42, 8), G_RED, wD / 2 - 0.1, h - 0.92, dD / 2 - 0.1));
+  const lx = wD * 0.575 + lr * 0.9, lz = dD * 0.6 + lr * 0.9;
+  glow.push(part(new THREE.CylinderGeometry(lr * 0.74, lr, 0.42, 8), G_RED, lx, h - 0.5, lz));
+  glow.push(part(new THREE.CylinderGeometry(lr, lr * 0.74, 0.42, 8), G_RED, lx, h - 0.92, lz));
+  // a cord up to the canopy corner, so it hangs FROM something
+  solid.push(part(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 5), TIMBER_D, lx, h - 0.14, lz));
   // stock: crates and bowls on the counter
   for (let i = 0; i < 3; i++)
     solid.push(part(new THREE.BoxGeometry(0.4, 0.3, 0.4), pick([ROPE, TIMBER_D, VERM_D]),
