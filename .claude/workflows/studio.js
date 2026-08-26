@@ -342,6 +342,59 @@ Judge specifically:
   - Does a swallow sound different at radius 1 and radius 10? Should it?
   - The seams again: menu to match, TIME!, results, the walk back.
   - What is the single highest-value audio change, and what would it cost?` },
+
+  // ── THE NINTH TEAM ──────────────────────────────────────────────────────
+  // The owner, after playing a build: "Get a team also on quality."
+  //
+  // The eight above own SURFACES, and the evidence that this is not enough is
+  // unambiguous. The owner's own list of six — the white face, who can eat
+  // him, the edge that launches you, the rings behind you, the news calling
+  // him "the hole", space not looking like space — is five parts behaviour and
+  // words to one part art. NOT ONE of the six was found by a surface team, and
+  // several had been in the game for weeks under a studio with veto power.
+  //
+  // A team that reviews pictures cannot find a collision response that
+  // accelerates, an effect firing 186 times a minute, or a newsroom calling
+  // the protagonist by the wrong noun 74 times.
+  { key: 'play', name: 'TEAM PLAY',
+    images: ['qa/out/shippedlook/maple_look.png', 'qa/out/shippedlook/powder_look.png'],
+    brief: `YOU OWN WHAT IT IS LIKE TO PLAY THIS, not what it looks like. You are the
+only team here that is not allowed to file an art finding, and the only one
+required to file behaviour.
+
+Files: src/prototype3d.ts (the match loop, input, collision, fx firing rates),
+src/proto3d/rivals.ts (the family), src/proto3d/newsroom*.ts (every word a child
+reads), src/proto3d/fx.ts.
+
+YOUR BAR IS A SIX-YEAR-OLD'S PATIENCE, and the titles that respect it: hole.io
+for the swallow loop's honesty, Donut County for never punishing curiosity,
+Animal Crossing for text that is always kind and never repeats itself into
+noise.
+
+WHY YOU EXIST, stated so you do not drift into art. The owner played a build
+and reported six things. Five were behaviour or words: a face that reads as a
+colour change, a rival system where only one void is ever hostile, an island
+edge that ACCELERATES you on contact, rings appearing behind the player 140
+times a minute, and a newsroom calling the protagonist "the hole" 74 times.
+Eight surface teams with veto power had passed all of it. That is the gap you
+close.
+
+Judge specifically, and MEASURE rather than read where a probe exists:
+  - RATES. How many times a minute does anything fire at the player — rings,
+    banners, voice lines, screen flashes, buzzes? qa/ringcount.mjs counts rings
+    per match-minute and reports how many land AWAY from the void, which is
+    the owner's actual complaint. Anything above a couple a minute that is not
+    a milestone is noise.
+  - REPETITION. A child plays the same world ten times. What do they hear or
+    read twice in one match? Three times? The newsroom pools, the rival taunts,
+    the banner copy.
+  - PUNISHMENT. What happens when a child does the wrong thing — walks into a
+    wall, gets bitten, runs out of time? Is any of it silent, unexplained, or
+    worse than the mistake deserved?
+  - THE THING THAT CANNOT BE UNSEEN. One sentence: after ten minutes of play,
+    what would a child's parent complain about?
+
+Do not file "the trees look flat". That is TEAM STATIC's and it is not yours.` },
 ]
 
 phase('Review')

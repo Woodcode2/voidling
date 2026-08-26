@@ -47,6 +47,30 @@ NO-SHIP blocks — the fix is found, not argued away.
 | **UI** | HUD, menus, type, layout, safe areas, taps, flow | `index.html`, HUD code in `prototype3d.ts` |
 | **CHOREOGRAPHY** | timing: anticipation, settle, transitions, how many channels answer an action | `prototype3d.ts` match loop and fx |
 | **AUDIO** | score, SFX, mix, the cover pad, what a world sounds like | `audio3d.ts` |
+| **PLAY** | what it is like to PLAY this: firing rates, repetition, punishment, the words a child reads. The only team forbidden to file an art finding | `prototype3d.ts` match loop, `rivals.ts`, `newsroom*.ts`, `fx.ts` |
+
+### Why there is a ninth team
+
+*"Get a team also on quality."* — the owner, 2026-08-25, after playing a build.
+
+The first eight own SURFACES, and the evidence that this is not enough is not an
+argument, it is a list. The owner's own six items were:
+
+1. the void "turns whitish" when about to be eaten — a mood tell that does not read
+2. can other voids eat him, and is there a penalty — a rule nobody could tell
+3. the island edge glitches and sometimes speeds you up — a collision response
+4. rings keep popping up behind you — an effect firing 186 times a minute
+5. the news keeps calling him "the hole" — 74 strings
+6. space does not look like space — the only one of the six that is art
+
+**Five of six were behaviour or words. Not one was found by a surface team**, and
+several had been in the game for weeks under a studio that already had veto
+power. A team that reviews pictures cannot find a collision response that
+accelerates, an effect firing three times a second, or a newsroom calling the
+protagonist by the wrong noun seventy-four times.
+
+TEAM PLAY closes that gap, and its brief forbids it an art finding precisely so
+it does not drift back into the comfortable half of the job.
 
 And above them:
 
