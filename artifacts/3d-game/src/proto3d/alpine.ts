@@ -157,26 +157,57 @@ function lit(solid: G[], glow: G[]): THREE.Group {
  *  is the version that survives that ordering.
  *  Returns the ridge height. */
 function capRoof(solid: G[], w: number, d: number, eaveY: number, rise: number,
-  over = 1.1, body: number = TIMBER): number {
+  over = 1.1, body: number = TIMBER, roof: number = SLATE, glow?: G[]): number {
   const half = d / 2 + over * 0.5;             // eave half-span in z
   const slope = Math.hypot(half, rise);
   const pitch = Math.atan2(rise, half);
   for (const sz of [-1, 1]) {
     // the slate, ridge to eave
-    solid.push(part(new THREE.BoxGeometry(w + over * 2, 0.16, slope * 1.02), SLATE,
+    solid.push(part(new THREE.BoxGeometry(w + over * 2, 0.16, slope * 1.02), roof,
       0, eaveY + rise / 2, sz * half / 2, sz * pitch, 0, 0));
-    // the cap: thicker, shorter along the slope, biased toward the ridge —
-    // snow slides, and what it leaves bare is the bottom edge
-    solid.push(part(new THREE.BoxGeometry(w + over * 2 + 0.24, 0.36, slope * 0.72), SNOW,
+    // ── THE CAP USED TO BE WIDER THAN THE ROOF IT SAT ON ──────────────────
+    // It was `w + over * 2 + 0.24` against a slate of `w + over * 2` — 0.12
+    // PROUD at each gable verge. So the roof colour survived only where the cap
+    // is short along the slope, which is the eave, and that single navy line at
+    // the bottom edge was the whole of what a top-down camera could see of this
+    // house. Both verges were buried under snow that overhung them.
+    //
+    // Inset 0.45 a side now, so the border runs all the way round. New Horizons
+    // keeps its winter snow short on every edge of a roof for exactly this
+    // reason: it is the difference between one dark line and a frame.
+    solid.push(part(new THREE.BoxGeometry(w + over * 2 - 0.9, 0.36, slope * 0.72), SNOW,
       0, eaveY + rise * 0.62 + 0.22, sz * half * 0.38, sz * pitch, 0, 0));
   }
-  // the cornice on the ridge
-  solid.push(part(new THREE.CylinderGeometry(0.3, 0.3, w + over * 2, 8), SNOW,
+  // The cornice was SNOW on SNOW and therefore invisible — and after the inset
+  // above it would have overhung the cap and capped the new border in white at
+  // both ridge corners. In the roof's own colour it reads as a ridge for the
+  // first time, at no triangle cost.
+  solid.push(part(new THREE.CylinderGeometry(0.3, 0.3, w + over * 2, 8), roof,
     0, eaveY + rise + 0.16, 0, 0, 0, Math.PI / 2));
   // gable boards, one each end
   for (const sx of [-1, 1])
     solid.push(part(new THREE.ConeGeometry(half * 0.94, rise * 0.98, 4), body,
       sx * (w / 2 - 0.06), eaveY + rise * 0.49, 0, 0, 0, 0, 0.12, 1, 1));
+  // ── THE ROOF LIGHT ────────────────────────────────────────────────────────
+  // The one warm thing on the surface the camera owns. Every other window on
+  // this house is on a wall — about 15% of its pixels, ambient-lit — and the
+  // camera never drops below 46 degrees. This lies IN the slope plane and rides
+  // PROP_GLOW_MAT, so it does not depend on where the key is pointing.
+  //
+  // The offsets are divided by cos(pitch) because they are measured along the
+  // roof's NORMAL, not vertically. Left vertical, the pane's overlap with its
+  // own curb is 0.20*cos(p) - 0.17, which is 0.019 at the village pitch and
+  // reaches ZERO at pitch 31.8 — a future caller with a shallower roof would
+  // float the glass off its frame. This is the skeptic's catch, not mine.
+  if (glow) for (const sz of [-1, 1]) {
+    const cp = Math.cos(pitch);
+    const lw = w * 0.24, ll = slope * 0.30;
+    const ly = eaveY + rise * 0.55, lz = sz * half * 0.45;
+    solid.push(part(new THREE.BoxGeometry(lw, 0.24, ll), roof,
+      w * 0.14, ly + 0.46 / cp, lz, sz * pitch, 0, 0));
+    glow.push(part(new THREE.BoxGeometry(lw * 0.74, 0.10, ll * 0.70), G_WINDOW,
+      w * 0.14, ly + 0.66 / cp, lz, sz * pitch, 0, 0));
+  }
   return eaveY + rise;
 }
 
@@ -200,9 +231,27 @@ function chimney(solid: G[], x: number, topY: number, z = 0, k = 1): void {
  *  two or three variants down a lane; the default is the mid-size house.
  *  Snow sits on every sill, because the sills are horizontal and it snowed
  *  all night — the kit's rule is that anything flat carries white. */
+const CHALET_ROOFS = [RED_D, TEAL, PINE_D, SLATE] as const;
+
 export function makeChalet(w = rnd(6.2, 8.6), d = rnd(4.8, 6.4)): THREE.Group {
   const solid: G[] = [], glow: G[] = [];
   const H = 2.9;                                   // wall height to the eave
+  // ── THE ROOF IS THE FACE ────────────────────────────────────────────────
+  // Every chalet's slate was the same hard-coded SLATE, so from 46 degrees
+  // above, the village was two dozen identical white slabs with identical grey
+  // edges. New Horizons puts a house's identity colour on its ROOF precisely
+  // because that is the face its camera can see; this kit shipped the snow half
+  // of that idea without the colour half.
+  //
+  // SLATE stays in the set so a quarter of the village keeps an unpainted roof
+  // and it reads as a village rather than as bunting. All four are already in
+  // the palette and already in the gloss table above: no new colour, no new
+  // material, no new draw call.
+  //
+  // DETERMINISM: derived from `w`, which the default argument has already
+  // sampled — no mrnd/mr/mpick/mchance and no Math.random added or removed, in
+  // either the seeded stream or the unseeded one.
+  const ID = CHALET_ROOFS[Math.floor(w * 5) % CHALET_ROOFS.length];
   // plinth and body
   solid.push(part(new THREE.BoxGeometry(w * 1.04, 0.7, d * 1.04), STONE_D, 0, 0.35, 0));
   solid.push(part(new THREE.BoxGeometry(w, H, d), TIMBER, 0, 0.7 + H / 2, 0));
@@ -229,7 +278,7 @@ export function makeChalet(w = rnd(6.2, 8.6), d = rnd(4.8, 6.4)): THREE.Group {
   solid.push(part(new THREE.BoxGeometry(0.9, 0.22, 1.56), SNOW, w / 2 + 0.28, 2.78, 0, 0, 0, -0.2));
   glow.push(part(new THREE.BoxGeometry(0.12, 0.5, 0.5), G_WINDOW, w / 2 - 0.02, 0.7 + H + d * 0.16, 0));
   // roof + chimney, offset so the smoke never rises through the ridge roll
-  const ridge = capRoof(solid, w, d, 0.7 + H, d * 0.52);
+  const ridge = capRoof(solid, w, d, 0.7 + H, d * 0.52, 1.1, TIMBER, ID, glow);
   chimney(solid, -w * 0.22, ridge + 0.4, d * 0.16, 0.85);
   return lit(solid, glow);
 }
