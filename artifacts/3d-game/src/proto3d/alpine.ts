@@ -474,7 +474,25 @@ export function makeSnowman(): THREE.Group {
   solid.push(part(new THREE.BoxGeometry(0.16 * k, 0.5 * k, 0.06 * k), knit, (wob + 0.2) * k, 1.4 * k, 0.26 * k, 0, 0, -0.3));
   // hat: half wear a coal-black topper, half a bobble in the other accent
   if (Math.random() < 0.5) {
-    solid.push(part(new THREE.CylinderGeometry(0.36 * k, 0.36 * k, 0.05 * k, 10), CHAR, wob * 2 * k, 2.14 * k, 0.02 * k));
+    // ── THE BRIM OVERHUNG THE FACE IT SAT ABOVE ─────────────────────────────
+    // TEAM STATIC filed this as "the face is 100% occluded by a brimless black
+    // cylinder". Two of those three words are wrong — there IS a brim, and the
+    // face is not always hidden — but the shape of the complaint is right.
+    //
+    // Measured over 36 yaws: a topper snowman's eyes reach the camera in 54% of
+    // drops at spawn pitch and 49% at VOID TITAN, against 68% for the bobble
+    // variant. So the hat costs about fourteen points and the rest is the yaw.
+    // The mechanism is one number: the brim was r=0.36 over a head of r=0.32,
+    // so it overhung the skull by 0.04 and the eyes at x=0.27 needed 0.09 of
+    // sightline clearance — more than a 65-degree camera can give across the
+    // 0.18 between eye and brim. At 0.30 it needs 0.03 and clears at every
+    // pitch the game has.
+    //
+    // Deliberately NOT the fix that was proposed to me, which deleted both hat
+    // branches. The skeptic measured that: it would cut accent pixels 79% on
+    // half the population, because the bobble variant is not broken. One
+    // number moves; the character keeps its hat.
+    solid.push(part(new THREE.CylinderGeometry(0.30 * k, 0.30 * k, 0.05 * k, 10), CHAR, wob * 2 * k, 2.14 * k, 0.02 * k));
     solid.push(part(new THREE.CylinderGeometry(0.22 * k, 0.24 * k, 0.34 * k, 9), CHAR, wob * 2 * k, 2.32 * k, 0.02 * k));
   } else {
     const wool = pick([RED, TEAL, GOLD].filter(c => c !== knit));
