@@ -1607,6 +1607,21 @@ export function makePlanter(): THREE.Mesh {
   const p: G[] = [
     part(cyl(0.62, 0.5, 1.1, 10), mpick([0x8c5a4a, 0x3f7a4e, WOOD]), 0, 0.55, 0),
     part(cyl(0.66, 0.66, 0.14, 10), CREAM, 0, 1.08, 0),
+    // ── TWO HOOPS, BECAUSE A BARREL WALL IS A VERTICAL CYLINDER ────────────
+    // Measured on the shipped frame: this barrel photographs at lum 4-17
+    // against an authored albedo near 101 — six per cent of its own colour —
+    // and three planters drawing three DIFFERENT colours all came out the same
+    // black. It is not the contact AO (that multiplier is 0.91 at the barrel's
+    // midpoint); it is that a vertical wall under this rig faces away from the
+    // key and receives ambient only, and the camera looks down at 46 degrees so
+    // the wall is most of what it sees.
+    //
+    // Horizontal bands catch the key where the wall cannot. Two of them read as
+    // a barrel at any luminance and break one black field into three. Fixed
+    // colour and fixed position — no mpick, no mr — so the seeded stream is
+    // untouched, and they merge into the same mesh: no draw call, no material.
+    part(cyl(0.655, 0.60, 0.10, 10), CREAM, 0, 0.28, 0),
+    part(cyl(0.635, 0.565, 0.10, 10), CREAM, 0, 0.76, 0),
   ];
   for (let i = 0; i < 6; i++) {
     p.push(part(sph(0.2, 6, 5), mpick([0xff6fb0, 0xffd23f, RED, 0xa87bff, WHITE]), mr(-0.4, 0.4), mr(1.2, 1.5), mr(-0.4, 0.4)));

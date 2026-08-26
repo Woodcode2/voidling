@@ -4093,7 +4093,25 @@ function bakeContactAO(geo: THREE.BufferGeometry): void {
   const base = bb.min.y;
   const h = bb.max.y - base;
   if (h < 0.05) return;                 // a decal has no base to shade
-  const band = h * AO_FRAC;
+  // ── THE BAND IS A CONTACT SHADOW, SO IT IS CAPPED IN WORLD UNITS ────────
+  // It was `h * AO_FRAC` off the BOUNDING BOX, and a bounding box is not a
+  // body. A contact shadow has a physical size — it is where the object meets
+  // the ground — and that size does not grow because the object grew a flower
+  // or a banner. Uncapped, a prop whose box reaches 4 units gets a 1.36-unit
+  // gradient climbing its side, which is not shading, it is a paint job.
+  //
+  // WHAT THIS DOES NOT FIX, stated because I nearly claimed it did. TEAM STATIC
+  // filed makePlanter as a blocker — the barrel photographs at lum 4-17 against
+  // an authored albedo near 101 — and proposed this cap at 0.55 as the class
+  // fix. For that prop it is a NO-OP: its box reaches 1.7, so the band was
+  // 0.578 and the cap takes it to 0.550, from 52.5% of the barrel to 50.0%.
+  // Worse, the AO multiplier at the barrel's own midpoint is 0.91 — a nine per
+  // cent darkening — which cannot turn 101 into 4. The dominant cause is the
+  // other half of their finding: a vertical cylinder wall facing away from the
+  // key light and receiving ambient only. The barrel's hoops in mainstreet.ts
+  // are what answers that. This cap is worth keeping on its own merits and is
+  // not the reason the planter reads.
+  const band = Math.min(h * AO_FRAC, 0.55);
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i) - base;
     if (y >= band) continue;
