@@ -170,6 +170,10 @@ const SUITE = [
     cmd: ['node', 'qa/rivalnotice.mjs', PORT, 'maple', 'pirate'], verdict: pf,
     why: 'a bigger void reacts to you often enough to notice and rarely enough not to swarm (owner item 1)' },
 
+  { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,
+    why: 'no NEW round thing ships under the 14x10 bar island.ts states — the debt is frozen at 154 and visible every run' },
+
   { id: 'safety', tier: 'words', profiles: ['push', 'live'], timeout: 60,
     cmd: ['node', 'scripts/safety-scan.mjs'], verdict: exitCode,
     why: 'no retired vocabulary in any string a child can read — the 4+ rating depends on it' },
