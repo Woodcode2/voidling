@@ -1656,7 +1656,10 @@ export function makePickup(): THREE.Mesh {
 
 /** A ROADSIDE MAPLE — the town's namesake, in autumn colour. */
 export function makeMapleTree(): THREE.Mesh {
-  const leaf = mpick([LEAF_A, LEAF_B, LEAF_C, LEAF_D] as const);
+  // LEAF_HERO joins the pool instead of being painted onto every second lobe of
+  // every tree — warm variety lives ACROSS trees now, one hue per tree. A
+  // longer mpick list changes the value drawn, never the count of draws.
+  const leaf = mpick([LEAF_A, LEAF_B, LEAF_C, LEAF_D, LEAF_HERO] as const);
   const p: G[] = [
     part(cyl(0.44, 0.66, 4, 7), BARK, 0, 2, 0),
     part(cyl(0.3, 0.34, 1.8, 6), BARK, 0.7, 4.2, 0, 0, 0, -0.5),
@@ -1703,40 +1706,58 @@ export function makeMapleTree(): THREE.Mesh {
   // instead of six. The comment claimed they gave the canopy an underside;
   // geometrically they were widening the outline with more of the same shape.
   //
-  // Animal Crossing's canopies never resolve into lobes, and the rule is the
-  // inverse of what was here: a DARK MASS carrying small LIGHT accents on top,
-  // not light lobes with dark trim on the outside. So the six big lobes are the
-  // dark mass and form the silhouette, the satellites are pulled IN and UP as
-  // highlights that never touch the outline, and the crown is the lightest
-  // thing because it is what the sky hits.
+  // Animal Crossing's canopies never resolve into lobes, and art direction's
+  // round-3 mass rule says why ours still did: every lobe boundary here was a
+  // HUE edge (half the mains wore LEAF_HERO regardless of the tree's own
+  // leaf), and the crown sat proud of the mains as a separate lit ball —
+  // twelve oranges and a scoop of cream. The rule, stated: (a) every sphere
+  // in one mass shares ONE HUE and varies only in VALUE; (b) every sphere
+  // except the largest keeps its CENTRE inside the largest, so it can bulge
+  // the outline but can never stand clear of the mass as its own lit ball.
+  // island.ts makeTree already obeys both, and it is the tree that reads as
+  // one canopy.
   //
-  // THE SEEDED STREAM IS STILL EXACTLY ONE mpick AND FOUR mr() PER LOBE, in the
-  // same order and ranges. This runs 603 times while Maple is populated.
-  // Tuned by eye against the render, once, after shade()/tint() made the
-  // numbers mean what they say. At 0.70/0.34 the separation was real and TOO
-  // strong: an autumn orange scaled to 70% is a brown, and a crown lifted a
-  // third of the way to white reads as cream sitting on mud. These are the
-  // numbers where the canopy has depth and is still the colour of a maple.
-  const dark = shade(leaf, 0.80);
-  const lit = tint(leaf, 0.15);
-  const heroDark = shade(LEAF_HERO, 0.84);
+  // So the CROWN is now the mass: the one largest sphere, in the tree's own
+  // hue, owning the whole lit top the 46-65 degree camera actually reads. The
+  // six lobes go under and outside it in two darker VALUES of the same hue —
+  // worst case (radA 1.9, yy 5.2, rr 2.1) their centres sit 2.04 from the
+  // crown centre and their zeniths 2.15, both inside CR 2.25, while their
+  // flanks reach 3.04 — so they weight the underside and break the outline
+  // low without one of them ever surfacing on top. The dapples sink into the
+  // crown's SHOULDER (31-56 degrees elevation, never the apex), centres at
+  // CR - 0.55*r, so each shows a bump of 0.45*r and stays more than half
+  // buried — the island reference tree's own worst satellite is 0.44*r.
+  //
+  // THE SEEDED STREAM IS STILL EXACTLY ONE mpick AND FOUR mr() PER LOBE, in
+  // the same order and the SAME RANGES — every new shape is arithmetic on
+  // values already drawn. Verified by the crews skeptic: 25 consumptions
+  // before, 25 after, ranges byte-identical.
+  const dark = shade(leaf, 0.80);   // the under-mass — 20% down, same hue
+  const dim = shade(leaf, 0.90);    // its alternate — VALUE steps, no hue edges
+  const lit = tint(leaf, 0.15);     // sun dapple — lifted, not cream
+  const CY = 6.1, CR = 2.25;        // the crown mass every other sphere hides in
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
-    const rr = mr(1.5, 2.1);          // draw 1 — was the lobe radius
-    const radA = mr(1.1, 1.9);        // draw 2 — was the x ring radius
-    const yy = mr(5.2, 6.6);          // draw 3 — was the height
-    const radB = mr(1.1, 1.9);        // draw 4 — was the z ring radius
-    // THE MASS: the big lobes, in the dark tone. These and only these make the
-    // silhouette, so there are six cusps in the outline and not twelve.
-    p.push(part(new THREE.SphereGeometry(rr * 0.74, 10, 8), i % 2 ? dark : heroDark,
-      Math.cos(a) * radA * 1.12, yy, Math.sin(a) * radB * 1.12));
-    // THE ACCENT: small, pulled INSIDE the mass and lifted, in the light tone.
-    // Inside, so it can never widen the outline.
-    const b = a + 0.62;
-    p.push(part(new THREE.SphereGeometry(rr * 0.34, 8, 6), lit,
-      Math.cos(b) * radA * 0.62, yy + 0.70, Math.sin(b) * radB * 0.62));
+    const rr = mr(1.5, 2.1);          // draw 1 — lobe radius
+    const radA = mr(1.1, 1.9);        // draw 2 — x ring radius
+    const yy = mr(5.2, 6.6);          // draw 3 — height
+    const radB = mr(1.1, 1.9);        // draw 4 — z ring radius
+    // UNDER-MASS: centre and zenith inside the crown, flank outside it —
+    // bulges the outline low and dark, never surfaces on the lit top.
+    p.push(part(new THREE.SphereGeometry(rr * 0.74, 10, 8), i % 2 ? dark : dim,
+      Math.cos(a) * radA * 0.78, yy - 0.5, Math.sin(a) * radB * 0.78));
+    // DAPPLE: sunk into the crown's shoulder, over half buried, same hue.
+    const r2 = rr * 0.34;
+    const b = a + 0.62 + (radB - 1.5) * 0.4;
+    const el = 0.55 + (yy - 5.2) * 0.30;
+    const d = CR - r2 * 0.55;
+    p.push(part(new THREE.SphereGeometry(r2, 8, 6), lit,
+      Math.cos(b) * Math.cos(el) * d, CY + Math.sin(el) * d, Math.sin(b) * Math.cos(el) * d));
   }
-  // the crown catches the sky, so it is the lightest thing on the tree
-  p.push(part(new THREE.SphereGeometry(1.35, 11, 9), tint(leaf, 0.22), 0, 7.1, 0));
+  // THE MASS ITSELF: one sphere owns the silhouette and the entire lit top.
+  // 14x10 because it is now the one curve the camera reads on 603 trees —
+  // and `leaf` raw is the registered gloss hex, so the 0.14 canopy sheen
+  // finally lands on the surface it was priced for.
+  p.push(part(new THREE.SphereGeometry(CR, 14, 10), leaf, 0, CY, 0));
   return noFront(mergedProp(p, PROP_SMOOTH_MAT));
 }

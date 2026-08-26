@@ -985,7 +985,18 @@ function fadeOccluders(dt: number): void {
   const step = FO_RATE * Math.min(dt, 0.05);
   for (const m of _foFading) {
     const cur = (m.userData.fade as number) ?? 1;
-    setMeshFade(m, Math.max(0.28, cur - step));
+    // 0.62, not 0.28. At 0.28 the Bayer keep-mask is 5/16 pixels — on white
+    // snow that is a black-and-red halftone print, the only visible pixel
+    // pattern in five worlds (art direction round 3, verified at the pixel).
+    // At 0.62 it keeps 10/16: a 62%-solid ghost, while the hero still shows
+    // through 6/16 of an occluder's pixels, so the fade's contract holds.
+    // 0.62 sits strictly between Bayer steps .5625 and .625 — no equality
+    // edge. The crews skeptic KILLED the companion change here (a cone-taper
+    // on the shield reach): its motivating scenario was geometrically
+    // impossible, and the constant cylinder is the accidental compensation
+    // that keeps 11.5-unit lift pylons fading when they truly cross the
+    // sight line. The reach stays as it is, deliberately.
+    setMeshFade(m, Math.max(0.62, cur - step));
   }
   for (const m of _foPrev) {
     if (_foFading.has(m)) continue;
