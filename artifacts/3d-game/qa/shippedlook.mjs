@@ -143,11 +143,16 @@ const path = `${OUT}/${WORLD}_${TAG}.png`;
 // the untracked PNGs to an old snapshot while the committed stamps survived,
 // and qa/packfresh.mjs said PASS over three-day-old pixels. A stamp that does
 // not identify the image it describes is a claim about nothing.
+// …and the stamp is written AFTER the screenshot, not before. The first
+// version of the two-field stamp hashed the file at `path` before
+// p.screenshot() had replaced it — so it stamped the PREVIOUS frame, and
+// qa/packfresh.mjs reported stamp/image MISMATCH on all five worlds within
+// minutes of the check existing. The gate caught its own writer.
+await p.screenshot({ path });
 try {
   const img = createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 16);
   writeFileSync(`${OUT}/${WORLD}_${TAG}.src`, srcDigest() + ' ' + img);
 } catch { /* not fatal to a shot */ }
-await p.screenshot({ path });
 await b.close();
 
 // measure the void disc out of the PNG — the canvas, as shipped
