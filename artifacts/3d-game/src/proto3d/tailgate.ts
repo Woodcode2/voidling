@@ -866,7 +866,7 @@ export function makePennantString(): THREE.Group {
 /** A football on the grass, ~0.7 long. On PROP_SMOOTH_MAT — it is a ball. */
 export function makeFootball(): THREE.Group {
   const p: G[] = [
-    part(new THREE.SphereGeometry(0.2, 14, 10), 0x8a4a2a, 0, 0.2, 0, 0, 0, 0, 1.6, 1.0, 1.0),
+    part(new THREE.SphereGeometry(0.2, 10, 8), 0x8a4a2a, 0, 0.2, 0, 0, 0, 0, 1.6, 1.0, 1.0),
     part(new THREE.ConeGeometry(0.13, 0.16, 8), 0x8a4a2a, 0.34, 0.2, 0, 0, 0, -Math.PI / 2),
     part(new THREE.ConeGeometry(0.13, 0.16, 8), 0x8a4a2a, -0.34, 0.2, 0, 0, 0, Math.PI / 2),
     part(new THREE.CylinderGeometry(0.185, 0.185, 0.04, 12), WHITE, 0.15, 0.2, 0, 0, 0, Math.PI / 2),
@@ -880,7 +880,7 @@ export function makeFootball(): THREE.Group {
 export function makeHelmetProp(): THREE.Group {
   const shell = pick([CRIM, CRIM, CRIM, GOLD, TEAL]);
   const p: G[] = [
-    part(new THREE.SphereGeometry(0.5, 14, 10), shell, 0, 0.5, 0, 0, 0, 0, 1.12, 1.0, 1.04),
+    part(new THREE.SphereGeometry(0.5, 10, 8), shell, 0, 0.5, 0, 0, 0, 0, 1.12, 1.0, 1.04),
     part(new THREE.SphereGeometry(0.13, 10, 8), shell === GOLD ? CRIM : GOLD, 0, 0.98, 0, 0, 0, 0, 3.6, 0.45, 1.0),
     part(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 10), CHAR, 0, 0.5, 0.52, Math.PI / 2),
     part(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 10), CHAR, 0, 0.5, -0.52, Math.PI / 2),

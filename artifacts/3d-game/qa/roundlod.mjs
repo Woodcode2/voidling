@@ -48,6 +48,17 @@ import { join } from 'path';
 // the ratchet's own baseline, on its first day.
 const BASELINE = 154;
 
+// THE SPEND — the same counted calls, priced instead of judged:
+// 2*W*(H-1) summed per call SITE (not per instance; the probe cannot see
+// spawn loops). It ratchets DOWN like BASELINE and for the same reason:
+// triangles harvested from over-tessellated spheres can otherwise be
+// quietly given back. RAISING it has exactly one legitimate case — paying
+// under-bar debt down (8x6 -> 14x10) costs triangles by design — and it
+// happens in the same commit that lowers BASELINE, with the arithmetic in
+// the commit message. 39018 = 39242 measured on the pre-harvest tree,
+// minus 224: two 14x10 -> 10x8 (tailgate.ts:869,883).
+const TRI_BASELINE = 39018;
+
 const DIR = 'src/proto3d';
 const files = readdirSync(DIR).filter((f) => f.endsWith('.ts'));
 if (files.length < 10) {
@@ -57,6 +68,7 @@ if (files.length < 10) {
 
 const hits = [];
 let total = 0;
+let spend = 0;
 for (const f of files) {
   const src = readFileSync(join(DIR, f), 'utf8');
   src.split('\n').forEach((line, i) => {
@@ -64,6 +76,7 @@ for (const f of files) {
     for (const m of line.matchAll(/SphereGeometry\(\s*([^,()]+),\s*(\d+)\s*,\s*(\d+)\s*\)/g)) {
       total++;
       const w = Number(m[2]), h = Number(m[3]);
+      spend += 2 * w * (h - 1);
       if (w < 10 && h < 10) hits.push({ f, line: i + 1, w, h, r: m[1].trim().slice(0, 18) });
     }
   });
@@ -84,6 +97,18 @@ for (const [f, n] of [...byFile.entries()].sort((a, b) => b[1] - a[1])) {
   console.log(`    ${String(n).padStart(4)}  ${f}`);
 }
 console.log('');
+console.log(`  site spend: ${spend} triangles at 2*W*(H-1) per counted call (sites, not instances).`);
+
+if (spend > TRI_BASELINE) {
+  console.log(`FAIL — the sphere spend grew: ${spend} against a recorded ${TRI_BASELINE}.`);
+  console.log('  Either a harvested sphere was quietly restored, or new/raised tessellation');
+  console.log('  shipped unpriced. Paying under-bar debt down IS the legitimate raise — do it');
+  console.log('  in the commit that lowers BASELINE, arithmetic in the message.');
+  process.exit(1);
+}
+if (spend < TRI_BASELINE) {
+  console.log(`  the spend FELL, ${TRI_BASELINE} -> ${spend}. Lower TRI_BASELINE to ${spend}.`);
+}
 
 if (hits.length > BASELINE) {
   console.log(`FAIL — the debt grew: ${hits.length} against a recorded ${BASELINE}.`);
