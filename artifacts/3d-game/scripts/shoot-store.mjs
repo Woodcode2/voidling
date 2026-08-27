@@ -3,12 +3,12 @@
 //
 // WHY THIS SCRIPT AND NOT A HUMAN WITH A SIMULATOR
 // -----------------------------------------------
-// The five images in store/ are of the RETIRED 2D game — SOLO RUN button,
+// The eight images in store/ are of the RETIRED 2D game — SOLO RUN button,
 // DAILY BITE, a flat 2D void, a build stamp reading "v31 · final pass". None of
 // that is in the game. Shipping screenshots that do not match the app is
 // Guideline 2.3.3, and 2.3.3 is what the previous submission was rejected for.
 // Re-shooting by hand is exactly the kind of chore that gets skipped, so it is
-// a script: one command, same five shots, same framing, every time the game
+// a script: one command, same eight shots, same framing, every time the game
 // changes.
 //
 // IT REFUSES TO RUN WITHOUT THE ART. Every generated image and mesh is fetched
@@ -382,7 +382,11 @@ const enterMatch = async (world) => {
     // that had just been found in qa/personsheet.mjs's HUD selector list, made
     // again within the hour. Verified against index.html:967,973,1097
     // (`.wCard.lock`) before this line was kept.
-    return card.classList.contains('lock') ? 'locked' : '';
+    // 'locked', not 'lock': the live tree's only writer of a world card's lock
+    // state is prototype3d.ts:5818 setting class 'locked' (styled at
+    // index.html:1266-1272). This tested a class the game never sets, so every
+    // card read as unlocked and the picker shot skipped the lock styling.
+    return card.classList.contains('locked') ? 'locked' : '';
   }, world);
   if (locked) throw new Error(
     `world card "${world}" is ${locked} — the seed did not unlock it, and store/'s previous set has already been moved aside. See the voidUnlocked note in SEED().`);
@@ -612,7 +616,9 @@ if (want('08')) {
   await toPicker();
   await enterMatch('pirate');
   await page.evaluate(() => { window.__setVoidR(7.5); window.__rushClock(0.3); });
-  await page.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 120000 });
+  // 400s like the other match-path waits: the harness clock runs 14-40x slow,
+  // and this one 120s wait killed the run on the eighth shot with seven on disk.
+  await page.waitForFunction(() => document.getElementById('end')?.classList.contains('show'), null, { timeout: 400000 });
   await settle(2600);   // let the coin count-up and the rows finish sliding in
   await shot('08-results.png');
 }
