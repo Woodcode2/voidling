@@ -412,9 +412,14 @@ export function createAudio(): Audio3D {
      *  probe (qa/journey.mjs) reads this: a menu theme that is one continuous
      *  piece across splash → picker → shop → book starts exactly once. */
     starts: number;
+    /** bumped by releaseBuf(): a fetch/decode begun under an older era
+     *  discards its result instead of resurrecting a buffer that was just
+     *  released — without this, a quit during the download re-leaks the
+     *  track the moment the decode resolves. */
+    era: number;
   }
   const mkChan = (vol: number): LoopChan =>
-    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol, cold: false, loop: 0, starts: 0 });
+    ({ buf: null, bad: false, loading: false, wanted: false, gain: null, timer: null, srcs: [], vol, cold: false, loop: 0, starts: 0, era: 0 });
   const loopFor = (url: string): number => {
     const stem = (url.split('/').pop() ?? '').replace(/\.\w+$/, '');
     const row = (MUSIC_MANIFEST as Record<string, { loopStart?: number }>)[stem];
@@ -546,6 +551,19 @@ export function createAudio(): Audio3D {
       ch.srcs = [];
     }
   }
+  /** Drop a channel's decoded track so its ~50-80 MB of PCM becomes
+   *  collectable. Playing sources hold their own reference to the AudioBuffer,
+   *  so calling this mid-fade never cuts audio — the memory goes once the
+   *  fade's sources are collected. The era bump makes any in-flight
+   *  fetch/decode for this channel discard its result (see playTrack/preload).
+   *  `bad`, `loop` and `starts` are deliberately untouched: release is about
+   *  memory, not forgetting what the channel learned. */
+  function releaseBuf(ch: LoopChan, name: string) {
+    ch.era++;
+    if (!ch.buf) return;
+    logEv(`released ${name} buffer (${Math.round(ch.buf.duration)}s PCM)`);
+    ch.buf = null;
+  }
   /** Load a channel's track once and play it. `urls` are tried in order and the
    *  first that decodes wins; if none does, `onNone` runs (the match falls back
    *  to its synth score, the menu simply stays quiet as it does today). */
@@ -562,12 +580,16 @@ export function createAudio(): Audio3D {
     if (ch.buf) { startLoop(ch, c, ch.buf); return; }
     if (ch.loading) return;
     ch.loading = true;
+    const era = ch.era;
     (async () => {
       for (const u of urls) {
         try {
           const r = await fetch(u);
           if (!r.ok) continue;
           const buf = await c.decodeAudioData(await r.arrayBuffer());
+          // released while this was in flight: drop the result rather than
+          // re-leaking it; loading clears so the next ask can fetch fresh.
+          if (ch.era !== era) { ch.loading = false; logEv(`stale decode dropped ${u.split('/').pop()}`); return; }
           ch.buf = buf;
           ch.loop = loopFor(u);
           logEv(`decoded ${u.split('/').pop()} ${Math.round(buf.duration)}s loop@${ch.loop}`);
@@ -598,12 +620,17 @@ export function createAudio(): Audio3D {
     const c = ensure();
     if (!c || ch.buf || ch.loading || ch.bad) return undefined;
     ch.loading = true;
+    const era = ch.era;
     return (async () => {
       for (const u of urls) {
         try {
           const r = await fetch(u);
           if (!r.ok) continue;
-          ch.buf = await c.decodeAudioData(await r.arrayBuffer());
+          const buf = await c.decodeAudioData(await r.arrayBuffer());
+          // same stale-era discard as playTrack: a release during this fetch
+          // must not be undone by its own tail.
+          if (ch.era !== era) { ch.loading = false; logEv(`stale preload dropped ${u.split('/').pop()}`); return; }
+          ch.buf = buf;
           ch.loop = loopFor(u);
           logEv(`preloaded ${u.split('/').pop()} ${Math.round(ch.buf.duration)}s loop@${ch.loop}`);
           ch.loading = false;
@@ -3683,6 +3710,14 @@ export function createAudio(): Audio3D {
       // make impossible, and the match is what the child is here for.
       menuCh.wanted = false;
       stopLoop(menuCh, 0.6);
+      // …and give its decoded PCM back for the match — but ONLY if the menu
+      // ever audibly started (starts > 0). starts === 0 covers the straight-in
+      // page AND the child whose very first gesture is PLAY before the cold
+      // context can start a loop: in both, the preloaded menu buffer is the
+      // designed warm quit — the first trip back to the menu starts instantly
+      // from it — so it stays. The skeptic's correction, kept verbatim: this
+      // errs toward today's residency, never past it.
+      if (menuCh.starts > 0) releaseBuf(menuCh, 'menu');
       themeUrls = urls; themeSynth = synth;   // so a repair can re-arm this world
       playTrack(themeCh, urls, () => synthCover('score'));
       // ── AND COVER THE DOWNLOAD, AFTER A BEAT ──────────────────────────────
@@ -3973,6 +4008,14 @@ export function createAudio(): Audio3D {
       stopPowder(1.2);
       themeCh.wanted = false;
       stopLoop(themeCh, 1.2);
+      // post-whistle: give the decoded match track back. The fading sources
+      // hold their own reference, so the 1.2s tail plays out untouched. A
+      // rematch re-fetches from the HTTP cache and re-decodes — on a slow
+      // device that is up to 1-3 SECONDS on the drumless cover pad (the
+      // repo's own handover measurements: 314/934/1067/3061 ms), not "a
+      // fraction of a second", and that price is accepted in exchange for
+      // not holding two albums of PCM through every match.
+      releaseBuf(themeCh, 'theme');
       if (musTimer) { clearInterval(musTimer); musTimer = null; }
       if (ctx && musGain) {
         musGain.gain.cancelScheduledValues(ctx.currentTime);
