@@ -747,8 +747,13 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // rig above, because the light is coming from the lanterns at street level.
   // dusk 1.0 lights every window, sign and paper lantern in the level from the
   // first frame; there is no golden hour to wait for here.
-  // Exposure runs high (1.34) so the lantern pools bloom out toward white
-  // while the shadows still have somewhere to go.
+  // Exposure runs high so the lantern pools bloom out toward white while the
+  // shadows still have somewhere to go. DRIFT, recorded at RUNG 1 (2026-08-26):
+  // this comment said 1.34 while the value below holds 1.42 — and NEITHER had
+  // ever reached the renderer, because RIG pinned exposure to a literal 1.0
+  // from the day the rig landed. 1.42 is what the unlock ships to the
+  // photograph; +42% is the largest exposure move in this repo's history, so
+  // if the pack rejects Lantern the corrective is THIS VALUE, not the rig.
   // MEASURED (qa/out/shippedlook + the luminance histogram): the owner's "so
   // dark, not crisp" was 26% of the frame under 25/255 — a quarter of the
   // screen crushed to black, villagers as silhouettes — vs 3-6% on Powder.
@@ -773,9 +778,10 @@ const LIGHT = WORLD_LIGHT[pickedWorld];
 
 // ── ONE RIG, APPLIED IN ONE PLACE ──────────────────────────────────────────
 // THE GAME WAS LIT DIFFERENTLY ON EVERY MATCH AFTER THE FIRST, in all four
-// worlds, and had been for as long as resetMatch has existed. The rig is built
+// worlds, and had been for as long as resetMatch has existed. The rig WAS built
 // here from three numbers that are not in WORLD_LIGHT — a hemisphere pinned at
-// 0.22, the key paid back by 1.31, exposure at 1.0 — and `scene
+// 0.22, the key paid back by 1.31, exposure at 1.0 (exposure has since been
+// handed to the table — owner decision 1, 2026-08-26; see RIG.exposure) — and `scene
 // .backgroundIntensity` was never set here at all, so it sat at three's
 // default of 1. resetMatch() then wrote the RAW table values over all four.
 //
@@ -805,7 +811,19 @@ const RIG = {
    *  real fix is a ground-bake albedo pass in island.ts (art decision, M),
    *  not a light rig number. lantern_thumb_ab.png holds the measurement. */
   hemiI: 0.22,
-  exposure: 1.0,
+  /** UNLOCKED 2026-08-26 (owner decision 1, RUNG 1 of the ladder): the
+   *  per-world exposure column in WORLD_LIGHT finally reaches the renderer.
+   *  Table values on the day of the unlock: maple 1.0 and pirate 1.0 (both
+   *  bit-identical by construction — the literal this replaced was 1.0),
+   *  gameday 1.12, powder 1.18, lantern 1.42 (see the DRIFT note on the
+   *  lantern entry). applyLightRig() is the only writer a player can see:
+   *  the renderer-construction default (toneMappingExposure = 1.0, set where
+   *  the renderer is built) is overwritten by beginMatch's applyHour before
+   *  the first play frame, and the menu covering the interim is opaque. RIG
+   *  is const and a world change is always a full reload, so match 1 and
+   *  match 2 stay identical — qa/lightdrift.mjs reads it live, and
+   *  qa/rigexposure.mjs asserts table == renderer, per world. */
+  exposure: LIGHT.exposure,
 };
 /** The ONLY place these three are written. Called at boot and on every reset.
  *
