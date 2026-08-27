@@ -278,3 +278,26 @@ at :9595)` with `(TOPDOWN and ASSETVIEW, defined at prototype3d.ts:649/:651,
 debug cameras at :9163-9166)` (risk 6). prototype3d.ts has moved three
 commits since the world landed — re-verify these cites against HEAD when the
 patch lands, per round rule 2.
+
+---
+
+## GOVERNOR'S LANDING NOTE — 2026-08-27
+
+Landed with all seven corrections applied. Evidence:
+
+- `qa/snowyaw.mjs` BEFORE (patch reverted, rebuilt): **15 snowmen, 9 outside
+  315±60°, exit 1**. AFTER: **91 snowmen, 0 outside, top 5° bucket 9% across
+  26 buckets, no duplicates, exit 0**. N rises 15 → 91 because patches 4-6 tag
+  three sites that never carried one.
+- The rendered sign check (`qa/out/shippedlook/powder_snowyaw.png`): three
+  snowmen in frame, all three showing carrot, buttons and hat-front. Zero
+  back-turned, which was the pass condition fixed in advance.
+
+**A second sample is recorded here rather than discarded quietly.** The shoot
+ran twice; the second frame landed where no snowmen were in frame at all. That
+is a null sample — it judges nothing either way — and it was NOT kept as the
+evidence frame, because a photograph of no snowmen cannot show a face or a
+back. The committed frame is the one with subjects in it. The statistical
+weight sits with the census (91 measured) and the photograph carries only the
+sign, which is exactly the division of labour the skeptic's C3/C4 corrections
+called for.
