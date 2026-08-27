@@ -5890,17 +5890,13 @@ const worldBest = (id: string) => Number(localStorage.getItem(`voidBest_${id}`) 
     });
   }
 }
-// locked world teasers wiggle on tap — and show what they are, desaturated,
-// because a child should be able to see what they are waiting for
-document.querySelectorAll('.wCard.lock').forEach((c) => {
-  const art = c.querySelector('.wArt') as HTMLElement | null;
-  if (art) paintWorldCard(art, 'frost');
-});
-document.querySelectorAll('.wCard.lock').forEach((c) => c.addEventListener('click', () => {
-  // demand signal for world 3: a locked card nobody taps is a world nobody wants
-  track('world_locked_tap', { card: (c as HTMLElement).dataset.name || c.textContent?.trim().slice(0, 24) });
-  c.classList.remove('shake'); void (c as HTMLElement).offsetWidth; c.classList.add('shake');
-}));
+// The FROST PEAKS ".lock" teaser loops lived here until 2026-08-27: two
+// querySelectorAll('.wCard.lock') passes over a class no markup has carried
+// since the rename to '.locked' (round-1b store skeptic, defect 1 — the same
+// rename that broke the store shoot's lock guard). The world_locked_tap
+// demand signal died with the rename and never fired again; re-pointing it
+// at '.locked' is a telemetry decision, not a cleanup, so it is recorded
+// here as a lead rather than smuggled in.
 // ── THE GATE — every session begins with a touch we can PROMISE ────────────
 // The audio engine has been rebuilt five times to survive starting without a
 // gesture, and every one of those rebuilds was working around the same hole:

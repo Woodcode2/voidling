@@ -1006,14 +1006,11 @@
         box-shadow: 0 4px 0 #c98d00; opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
       /* every unlocked card launches on tap, so every unlocked card says so */
       .wCard[data-world] .wGo { opacity: 1; transform: none; }
-      .wCard.lock .wGo { display: none; }
       .wLock { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.4px; color: #e6d8ff;
         background: rgba(13,8,33,0.6); border-radius: 10px; padding: 6px 14px;
         text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
       /* the locked poster is DESATURATED, not hidden — a child should be able to
          see what they are waiting for */
-      #worlds .wCard.lock .wArt { filter: saturate(0.5) brightness(0.78); }
-      #worlds .wCard.lock { opacity: 1; filter: none; }
       /* the selected world gets the gold frame it always had, on the poster */
       #worlds .wCard.sel { box-shadow: 0 0 0 3px #ffd23f, 0 10px 30px rgba(0,0,0,0.5); }
       /* in-game home button */
@@ -1136,7 +1133,6 @@
       .wCard b { font-size: 12px; letter-spacing: 0.4px; font-weight: 700; }
       .wCard span { font-size: 11px; opacity: 0.65; letter-spacing: 1.4px; font-weight: 600; }
       .wCard.sel { border-color: #ffd23f; background: rgba(123,79,224,0.55); box-shadow: 0 0 18px rgba(184,117,255,0.4); }
-      .wCard.lock { filter: saturate(0.35); opacity: 0.72; }
       .wCard.shake { animation: wshake 0.4s; }
       @keyframes wshake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
       @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: none; } }
@@ -1243,8 +1239,9 @@
       /* ── A LOCKED WORLD (game/unlocks.ts) ──────────────────────────────────
          Visible, legible, and obviously not-yet-yours. The poster stays — it
          is the advertisement for the next world — but drained of colour, with
-         the PLAY chip gone and the reason in its place. Distinct from .lock,
-         which is the FROST PEAKS "world 5 does not exist yet" teaser. */
+         the PLAY chip gone and the reason in its place. (The retired FROST
+         PEAKS teaser used a separate .lock class; its dead CSS and no-op
+         JS loops were removed 2026-08-27 — round-1b store skeptic.) */
       /* ── THE LOCKED ART IS AN ADVERTISEMENT, NOT A TOMBSTONE ────────────
          unlocks.ts states the intent in its own words: "LOCKED IS NOT HIDDEN.
          The picker still shows every world, desaturated … The art is the
