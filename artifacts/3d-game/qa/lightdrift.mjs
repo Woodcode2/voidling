@@ -46,7 +46,7 @@ for (const wid of (process.argv[2] || 'maple').split(',')) {
   console.log(`\n══ ${wid.toUpperCase()} ══`);
   console.log(`  match 1  sun ${first.sun.i} ${first.sun.c}   hemi ${first.hemi.i} sky ${first.hemi.sky} gnd ${first.hemi.gnd}   exposure ${first.exposure}   key:fill ${kf(first)}`);
   console.log(`  match 2  sun ${second.sun.i} ${second.sun.c}   hemi ${second.hemi.i} sky ${second.hemi.sky} gnd ${second.hemi.gnd}   exposure ${second.exposure}   key:fill ${kf(second)}`);
-  const drift = first.sun.i !== second.sun.i || first.hemi.i !== second.hemi.i;
+  const drift = first.sun.i !== second.sun.i || first.hemi.i !== second.hemi.i || first.exposure !== second.exposure;
   console.log(drift
     ? `  >>> RIG CHANGED: sun ${first.sun.i} -> ${second.sun.i} (${((second.sun.i/first.sun.i-1)*100).toFixed(0)}%), hemi ${first.hemi.i} -> ${second.hemi.i} (${((second.hemi.i/first.hemi.i-1)*100).toFixed(0)}%), key:fill ${kf(first)} -> ${kf(second)}`
     : `  rig identical across matches`);
