@@ -432,6 +432,10 @@ that always works is the world that hides the bug** — check the others first.
 Each of these looks like a bug from the outside. Each is a decision with a
 measurement behind it. Any change needs the owner, not a board.
 
+- **UNLOCKED 2026-08-26 by the owner's decision 1** ("Yes make this crisp and
+  the best possible game visually") — the light-rig entry below is no longer
+  hands-off. The measurements it cites are still true and still binding on HOW
+  a change lands: propose, refute, A/B photograph, every gate green.
 - **The light rig is flat where the table looks per-world.** `RIG` pins
   `hemiI` to 0.22 and `exposure` to 1.0 for every world. The per-world `hemiI`
   and `exposure` columns in `WORLD_LIGHT` are **inert** — they were never
