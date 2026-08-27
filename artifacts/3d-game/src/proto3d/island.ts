@@ -5161,6 +5161,22 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     };
     const REG = (id: PW.PwBiome) => PW.PW_REGIONS.find((r2) => r2.id === id)!;
     const rnd2 = Math.random;
+    // ── SNOWMAN YAW — owner decision 3, 2026-08-26: "sure" ────────────────
+    // The face is built on local +X (alpine.ts:461-464). rotation.y = t sends
+    // local +X to world (cos t, 0, -sin t), and the camera rides the hero at
+    // camOffset (0.62, 0.92, 0.62) (prototype3d.ts:600) whose x equals z at
+    // every zoom (:9231) — fixed azimuth, so "toward the lens" is the constant
+    // world direction (+1, 0, +1)/sqrt2 from every prop, all match long.
+    // cos t = -sin t = sqrt(1/2) gives t = -PI/4 dead-on (verified against
+    // this repo's three: applyQuaternion measures dot 1.000000; the signpost
+    // at :5209 and the dress yaw at void3d.ts:2041 agree). +/-60deg of jitter
+    // keeps every face inside the arc the eyes actually reach the camera from
+    // (alpine.ts:482-489: 54%/68% of a 36-yaw sweep = arcs of ~+/-97/122deg)
+    // while no two snowmen share a yaw. ONE rnd2() draw, exactly like the
+    // uniform spin this replaces at each site, so the Math.random sequence
+    // downstream of every call site is unchanged. qa/snowyaw.mjs reads the
+    // tagged census live and FAILED on the uniform-spin build.
+    const snowmanYaw = () => -Math.PI / 4 + (rnd2() - 0.5) * (Math.PI * 2 / 3);
 
     await breathe('Shovelling the drive…');
     // 1. THE LODGE — the hero meal, force-placed, facing down the Home Run
@@ -5181,7 +5197,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const kind = rnd2();
       const mesh = kind < 0.3 ? AL.makeSnowman() : kind < 0.55 ? AL.makeSled()
         : kind < 0.72 ? AL.makeLogPile() : kind < 0.88 ? AL.makeSkiRack() : AL.makeSnowballStack();
-      drop(mesh, p2, kind < 0.3 ? 1.0 : 0.6, rnd2() * Math.PI * 2, false, kind < 0.3 ? 'snowman' : undefined);
+      drop(mesh, p2, kind < 0.3 ? 1.0 : 0.6, kind < 0.3 ? snowmanYaw() : rnd2() * Math.PI * 2, false, kind < 0.3 ? 'snowman' : undefined);
     }
     // …the square: bell tower + rink + the contest's snowman cluster
     {
@@ -5191,7 +5207,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(AL.makeBellTower(), [cx, cy], 4.4, 0, true);
       drop(AL.makeRink(), [cx + 260, cy + 160], 2.2, 0, true);
       for (const p2 of PW.clusterAt(cx - 300, cy - 220, 5, 220, rnd2))
-        drop(AL.makeSnowman(), p2, 1.0, rnd2() * Math.PI * 2, false, 'snowman');
+        drop(AL.makeSnowman(), p2, 1.0, snowmanYaw(), false, 'snowman');
     }
     await breathe('Waxing the sleds…');
     // 3. THE PINEWOOD — the forest carries the west slope; drifts between
@@ -5218,7 +5234,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     drop(AL.makeChalet(3.4, 2.8), [PW.LAKE.cx - PW.LAKE.rx * 0.45, PW.LAKE.cy - PW.LAKE.ry * 0.3], 2.0, 0.6, true, 'hut');
     for (const p2 of PW.clusterAt(PW.LAKE.cx + PW.LAKE.rx * 0.7, PW.LAKE.cy + PW.LAKE.ry * 0.6, 6, 320, rnd2)) {
       const kind = rnd2();
-      drop(kind < 0.4 ? AL.makeSled() : kind < 0.7 ? AL.makeSkiRack() : AL.makeSnowman(), p2, kind < 0.4 ? 0.55 : 1.0, rnd2() * Math.PI * 2);
+      drop(kind < 0.4 ? AL.makeSled() : kind < 0.7 ? AL.makeSkiRack() : AL.makeSnowman(), p2, kind < 0.4 ? 0.55 : 1.0,
+        kind < 0.7 ? rnd2() * Math.PI * 2 : snowmanYaw(), false, kind < 0.7 ? undefined : 'snowman');
     }
     // 6. SNOW-DAY DEBRIS everywhere the regions left open: sleds, log piles,
     //    fences, lone pines, and the drifts that fuel the shell
@@ -5227,7 +5244,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     for (const p2 of PW.clusterAt(PW.PW_SPAWN[0] + 300, PW.PW_SPAWN[1] - 200, 8, 380, rnd2)) {
       const kind = rnd2();
       drop(kind < 0.5 ? AL.makeSled() : kind < 0.8 ? AL.makeSnowballStack() : AL.makeSnowman(), p2,
-        kind < 0.5 ? 0.55 : kind < 0.8 ? 0.6 : 1.0, rnd2() * Math.PI * 2);
+        kind < 0.5 ? 0.55 : kind < 0.8 ? 0.6 : 1.0, kind < 0.8 ? rnd2() * Math.PI * 2 : snowmanYaw(),
+        false, kind < 0.8 ? undefined : 'snowman');
     }
     for (const p2 of PW.scatterLand(110, rnd2, 110)) {
       const kind = rnd2();
@@ -5292,7 +5310,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const mesh = kind < 0.5 ? AL.makePine(3 + rnd2() * 3) : kind < 0.72 ? AL.makeSnowman()
         : kind < 0.88 ? AL.makeDrift() : AL.makeLogPile();
       drop(mesh, p2, kind < 0.5 ? 1.3 : kind < 0.72 ? 1.0 : kind < 0.88 ? 0.95 : 0.9,
-        rnd2() * Math.PI * 2, false, kind >= 0.72 && kind < 0.88 ? 'drift' : undefined);
+        kind >= 0.5 && kind < 0.72 ? snowmanYaw() : rnd2() * Math.PI * 2, false,
+        kind >= 0.72 && kind < 0.88 ? 'drift' : kind >= 0.5 && kind < 0.72 ? 'snowman' : undefined);
     }
     await breathe('Lighting the windows…');
     return;   // POWDER PASS is fully populated — the Maple grid pass must not run
