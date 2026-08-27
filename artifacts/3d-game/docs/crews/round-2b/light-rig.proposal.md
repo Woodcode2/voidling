@@ -195,3 +195,26 @@ crew) at land time and is subject to the skeptic like everything else. RUNGs 2
 and 3 (GLOSS_ENV 6.5; gradient PMREM environment with K-parity kill gate) were
 in the proposal's title and the committed brief but their patch bodies did not
 survive; they re-derive after RUNG 1's photographs.
+
+---
+
+## draws (restored per the skeptic's Correction 6)
+
+Zero. The three hunks are two comment edits and one property-initializer
+change (`1.0` → `LIGHT.exposure`); none calls mrnd/mr/mpick/mchance or
+Math.random, so the Maple mulberry32 stream position is untouched.
+
+## triangles
+
+Zero. No geometry, no materials, no draw calls.
+
+## probe
+
+qa/rigexposure.mjs (completed text in the skeptic's verdict, Correction 4):
+parses per-world expectations from the real source, throws if the
+`const WORLD_LIGHT` anchor moves, measures renderer.toneMappingExposure live
+per world with the match clock running, exits non-zero on any mismatch. Must
+be landed and observed to FAIL on the pre-rung build (gameday/powder/lantern)
+before the hunks land. qa/lightdrift.mjs (with Correction 5) covers
+match-1/match-2 exposure parity; qa/shippedlook.mjs photographs all five
+worlds for the ladder's accept/reject, Lantern judged first.
