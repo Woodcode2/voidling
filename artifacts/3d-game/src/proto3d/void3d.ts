@@ -36,6 +36,10 @@ export interface Void3D {
    *  eight App Store screenshots carried evolve ribbons for exactly that
    *  reason. Never call from gameplay. */
   calm(): void;
+  /** A small jelly slosh for a physical knock — the shore, a bounce. Reuses
+   *  the eat-wobble's own amplitude and decay so it can never invent a new
+   *  motion; it is the body acknowledging contact, not a celebration. */
+  bump(): void;
   setSkin(s: Skin): void;    // recolour body/glow/halo/rings to a skin
   /** Wear a hat, or null for none. Independent of the skin — see hats.ts. */
   setHat(id: string | null): void;
@@ -1579,6 +1583,7 @@ export function createVoid(scene: THREE.Scene, camera: THREE.Camera): Void3D {
     },
     setMood(m) { if (m !== mood) { mood = m; moodT = 0; } },
     celebrate() { evolveT = 0.7; wobble = 1; ringBurst = 1; },
+    bump() { wobble = Math.min(1, wobble + 0.42); },
     calm() { evolveT = 0; wobble = 0; ringBurst = 0; },
     faceState() { return { mood, maw: mp.maw, smile: mouth.visible, biting: mouthT > 0 }; },
     pinMouth(shut) { mouthPinShut = shut; if (shut) { mouthT = 0; mouthMax = 0; mouthAge = 0; } },

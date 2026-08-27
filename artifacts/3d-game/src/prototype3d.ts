@@ -1640,6 +1640,8 @@ const _dbg = new Proxy(_dbgStore, {
   __pinMouth: (shut: boolean) => void;
   __pinGape: (v: number) => void;
   __calm: () => void;
+  /** how many times the shore answered a push this match — qa reads this */
+  __wallCues: () => number;
   __faceWrap: (v: number) => void;
   __groundSurf: (road: number, grass: number, debug?: number) => void;
   __pickFresh: <T>(arr: T[]) => T;
@@ -1789,6 +1791,11 @@ _dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
 _dbg.__pinGape = (v: number) => voidling.pinGape(v);
 // QA/capture: end any celebration instantly — see void3d.ts calm().
 _dbg.__calm = () => voidling.calm();
+// QA: how many times the shore has answered a push this match — the wall cue
+// is a feel change, and a feel change still needs a number an instrument can
+// read. qa/edgespeed.mjs drives into the shore for 900 frames; >0 proves the
+// cue fires, and a count near the frame count would prove the throttle broke.
+_dbg.__wallCues = () => wallCueN;
 // How far the face is seated onto the sphere, 0..0.9. A look knob — see
 // FACE_WRAP in void3d.ts. Exposed so qa/facewrap.mjs can render the same
 // frame at several values and the choice can be made from pictures.
@@ -4118,6 +4125,23 @@ let crownLive = false, everBehind = false;
 let menuThemeOn = false;
 let musicCd = 0;      // performance.now() of the last audio.ensureMusic() tick
 let stallT = 0;     // seconds spent driving into something that will not move
+// ── THE WALL SAYS SOMETHING NOW ─────────────────────────────────────────────
+// TEAM PLAY's maiden review, its one headline: wall contact was the only place
+// this game punished a six-year-old with TOTAL SILENCE — no sound, no motion,
+// no acknowledgment, while every other "no" in the game (a bite, the buzzer)
+// answers in at least two channels. Worse, the collision footprint begins
+// while the body still appears over land, so the refusal read as the game
+// breaking rather than a wall existing.
+//
+// The cue fires on the TRANSITION into contact only — free last frame, refused
+// now, pushing at real speed — then stays quiet while leaning, because a firm
+// wall is its own message and a nag every second is the ring mistake again.
+// One soft deep pop (the eat-pop at its lowest pitch), a 10ms buzz, and the
+// body's own jelly slosh via bump(). No ring, no flash, no camera motion.
+let wasAtWall = false;
+let wallCueCd = 0;
+let wallCueN = 0;   // QA: read via __wallCues — a feel cue still needs a number
+
 let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 // ── PAINT CACHES ────────────────────────────────────────────────────────────
 // Both of these guard a DOM write that used to run unconditionally. Declared
@@ -8678,7 +8702,7 @@ function animate() {
           if (stallT > 2.2) stallT = 0;
         }
       } else stallT = 0;
-      if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; }
+      if (solid(nx, nz)) { voidState.x = nx; voidState.z = nz; wasAtWall = false; }
       // ── AND THIS MUST NOT BE SKIPPED, WHICH COST A MEASUREMENT ───────────
       // The stall breaker above also walks him inland, so `else if
       // (!stallNudged)` looked like the obvious way to stop the two stacking:
@@ -8693,6 +8717,14 @@ function animate() {
       // once. The stack was worth about 10 u/s; not recovering at all was worth
       // 225. Reverted, and left written down so nobody tries it again.
       else {
+        // the wall speaks once, on arrival — see wasAtWall at its declaration
+        wallCueCd = Math.max(0, wallCueCd - dt);
+        if (driving && !wasAtWall && wallCueCd <= 0
+          && Math.hypot(velX, velZ) > ownSpeed * 0.35) {
+          wallCueCd = 0.6; wallCueN++;
+          voidling.bump(); audio.pop(0, 2.2, voidling.radius); buzz(10);
+        }
+        wasAtWall = true;
         // THE HEADING SWEEP. Two previous attempts projected the velocity onto
         // a guessed wall normal. Both guesses are quantised — the 16-spoke ring
         // to 22.5 degrees, the four-probe finite difference to one of eight
