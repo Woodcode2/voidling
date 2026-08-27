@@ -297,6 +297,74 @@ albedo and the frame is crushing them. This is the same class as the toe bug
 retired on 2026-08-24, which turned Lantern's TIMBER into rgb(33,0,0), and it is
 NOT yet explained. PENDING, and it is the most concrete art defect on the board.
 
+### The light rig's exposure column was inert for eleven days — CONFIRMED and FIXED 2026-08-27
+
+`WORLD_LIGHT` has carried a per-world `exposure` value since the rig landed on
+2026-08-16 (`589e31e`). `RIG` pinned the renderer to a literal `1.0` in that
+same commit, and `renderer.toneMappingExposure = RIG.exposure` is the only
+write a player can ever see. So the column never reached a frame. Lantern's
+value was retuned 1.34 → 1.42 on 2026-08-22 (`db428a3`) and that commit folded
+"exposure 1.42" into a measured improvement the inert column cannot have
+contributed to. **Two authored values, one retune, and a measurement claim, all
+against a number the renderer never read.**
+
+Owner decision 1 unlocked the rig. RUNG 1 landed `exposure: LIGHT.exposure`.
+`qa/rigexposure.mjs` — which parses its expectations out of the real source, so
+it cannot rot into a snapshot — measured the before and after:
+
+```
+  BEFORE  PASS maple 1/1 · PASS pirate 1/1 · FAIL gameday 1.12/1.0
+          FAIL lantern 1.42/1.0 · FAIL powder 1.18/1.0        exit 1
+  AFTER   PASS all five, table == renderer                    exit 0
+```
+
+Maple and pirate are unchanged BY CONSTRUCTION (their table value is 1.0, the
+literal it replaced was 1.0) and so serve as the ladder's control group in
+every photograph from here on.
+
+**The lesson worth keeping: a value nobody reads is not a setting, it is a
+comment.** Three separate documents cited these numbers as if they were live.
+Nothing in the repo could tell the difference until a probe asked the renderer
+directly. Where a config value matters, prove the consumer reads it.
+
+### Two thirds of the snowmen faced away from the player — CONFIRMED and FIXED 2026-08-27
+
+The brief said Powder's snowmen shared a fixed facing. They did not: every drop
+site already spun them `rnd2() * PI * 2`. **A uniform spin on a fixed-azimuth
+camera IS the defect** — the camera never moves off 225°, so two thirds of a
+circle points a snowman's face at the hillside. Measured, `qa/snowyaw.mjs`:
+9 of 15 tagged snowmen outside the camera arc before, 0 of 91 after (N rises
+because the fix tags three sites that never carried one), across 26 buckets
+with no two alike.
+
+The crew corrected the governor's own brief before it corrected the code. That
+is the CREWS pipeline working as designed, and it is worth saying plainly: the
+brief was wrong because I wrote down a diagnosis I had not measured.
+
+### The balloon was never out of frame — KILLED 2026-08-27
+
+A crew proposed cheapening the Maple balloon's envelope and gores, arguing they
+sit above the camera's frustum and cannot be seen. The skeptic killed both
+patches on one fact: **the argument assumed a camera follow distance of 40
+units when the real range is 26–340.** The gore poke-through geometry the crew
+derived was correct, and is not what killed it. Any refile stands on
+photographs framed at R 2.5–12, with the frustum claim retracted.
+
+Recorded because it is the same failure mode as the 1500 stars and the planet
+coverage: **an invisibility claim reasoned from one camera position, when the
+camera has a range.** That is now three times. Any future "it cannot be seen"
+claim states the radius range it holds over, or it is not a claim.
+
+### The sphere debt has a price as well as a count — 2026-08-27
+
+`qa/roundlod.mjs` ratcheted the NUMBER of under-bar spheres (154, down only).
+That count could not see a 14×10 helmet, so 254 Game Day props carried a
+canopy-grade tessellation invisibly. The probe now also ratchets SPEND —
+Σ 2·W·(H−1) over the same counted calls — landed alone and observed failing
+(39,242 against 39,018) before the harvest that fixed it. 28,448 triangles per
+Game Day scene, ~3.16 MB, with silhouette error 2.7× and 7.4× BELOW the bar
+the repo already accepts on a tree.
+
 ## THE RETRACTIONS
 
 Kept because a studio that hides its own errors is worth nothing.
