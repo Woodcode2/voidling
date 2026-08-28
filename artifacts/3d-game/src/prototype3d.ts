@@ -6524,6 +6524,22 @@ function resetMatch() {
   voidState.x = island.spawn.x; voidState.z = island.spawn.z;
   gildTreasure();
   velX = 0; velZ = 0; camDist = 50;
+  // ── THE OPENING SHOT USED TO START FROM WHERE THE LAST ONE ENDED ─────────
+  // camFollow is the smoothed position the camera actually renders from, and
+  // nothing reset it here, so intro frame 1 of match 2 began from wherever
+  // match 1 left the camera — 227 units up after a big void, against 75 on a
+  // cold start. Measured in Lantern: pitch 11.88 on match 1 and 29.48 on match
+  // 2, a 17.6-degree difference in the optical axis of the first frame a child
+  // sees, with the horizon in one and not the other. camOffset is a mutable
+  // module vector rewritten every frame from `steep` and carries the same way,
+  // so both are reset. __warpVoid already does exactly this two lines apart
+  // (:1908) and boot does it at :9692; the match start was the one place that
+  // did not. "Spawn and the opening hand are hand-authored and identical every
+  // load" (GOVERNOR.md, HANDS OFF) has to include the camera.
+  camOffset.set(0.62, 0.92, 0.62).normalize();
+  camFollow.set(voidState.x + camOffset.x * camDist,
+                camOffset.y * camDist,
+                voidState.z + camOffset.z * camDist);
   playerScore = 0; hunger = 0; combo = 0; prevRank = 0; chompCd = 0; newsCd = COPY.signOn;
   // the whole rank-announce machine restarts with the match, or a rematch
   // opens with a stale crown to lose and a stale announcedRank to suppress

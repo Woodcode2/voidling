@@ -693,10 +693,28 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       // ABOVE level, and the `* 0.7` squash with the `- 40` offset flattened
       // what was left into a disc hanging over the island.
       //
-      // The camera in this game only ever looks DOWN: pitched 46 degrees at
-      // spawn and 65 by VOID TITAN, on a 32-degree lens, so the highest thing
-      // on screen is about 27 degrees BELOW the horizontal and the lowest is
-      // about 81 below. The horizon is never in frame in any world at any size.
+      // THE STEADY-STATE camera in this game only ever looks DOWN: pitched 46
+      // degrees at spawn and 65 by VOID TITAN, on a 32-degree lens, so the
+      // highest thing on screen is about 30 degrees BELOW the horizontal and
+      // the lowest is about 81 below. ("About 27" stood here and in the
+      // PLANETS note below and was wrong by three degrees: measured on the
+      // settled frames in qa/out/opening/, the frame top is -29.88 to -29.90
+      // in all five worlds at spawn radius.)
+      //
+      // THIS SENTENCE USED TO END "The horizon is never in frame in any world
+      // at any size." That is true of steady-state play and FALSE of the shot
+      // the match opens on, and it stood here, in the PLANETS note below and
+      // in the owner's answer sheet until somebody stepped the establishing
+      // shot frame by frame. Intro frame 1 sits at pitch 11.9 in Lantern, 13.1
+      // in Pirate, 15.2 in Game Day, 15.3 in Powder and 46.2 in Maple, which
+      // has no landmark to pan from — so in FOUR worlds of five the top of the
+      // frame is 0.7 to 4.1 degrees ABOVE the horizon, and in those four the
+      // horizon is on screen for the first ~0.06-0.08 seconds of the match. The
+      // band the INTRO shows is +4 to -28 degrees; the steady-state band
+      // described above is -30 to -81. A claim about what can be seen in this
+      // game has to say which of the two cameras it means, and over what radius
+      // range. Frames and numbers:
+      // docs/crews/round-3/opening-beat.proposal.md, qa/out/opening/.
       // Projected against the real frustum at real game states, the old
       // distribution put ZERO of 1500 stars on screen at every size a match
       // actually passes through.
@@ -771,13 +789,30 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // The owner: "Would be cool to see some planets or something. Something
   // different for each level maybe."
   //
-  // WHERE THEY CAN GO IS NOT A TASTE QUESTION. The camera is pitched 46 degrees
-  // down at spawn and 65 by VOID TITAN, on a 32-degree lens, so the visible
-  // elevation band runs from about -27 degrees at the top of the frame to about
-  // -81 at the bottom. The horizon is never on screen. A planet placed level
-  // with the island, or above it, is geometry nobody will ever see — so these
-  // sit BELOW and BESIDE, between -34 and -62 degrees, which is also the honest
-  // arrangement for a rock floating in space.
+  // WHERE THEY CAN GO IS NOT A TASTE QUESTION, AND THE ANSWER HAS TWO CAMERAS.
+  // In STEADY-STATE play the camera is pitched 46 degrees down at spawn and 65
+  // by VOID TITAN, on a 32-degree lens, so the visible elevation band runs from
+  // about -30 degrees at the top of the frame (measured -29.9; the "-27" this
+  // line used to carry is a third error nobody caught) to about -81 at the
+  // bottom, and the horizon is not on screen at any radius a match passes
+  // through. A planet placed level with the island, or above it, is geometry
+  // nobody will ever see IN PLAY — so these sit BELOW and BESIDE, between -56
+  // and -77 degrees. THAT RANGE IS WRITTEN DOWN THREE TIMES IN THIS FILE AND NO
+  // TWO AGREED: this line said "-34 and -62", which describes nothing in the
+  // file; the note at :827 says "-57 and -75", which is a degree or two out;
+  // the SKIES table is the authority and it runs -56 to -77.
+  //
+  // THE INTRO IS A DIFFERENT CAMERA AND NONE OF THIS IS ON SCREEN IN IT. The
+  // establishing shot opens at pitch 11.9-15.3 along azimuth 178-192, not 225,
+  // so its frame covers +4 to -28 degrees of elevation inside a 15-degree
+  // azimuth slot that misses the planet slot entirely. Projected through the
+  // real camera at intro frame 1: ZERO of the eight planets in the four worlds
+  // that have an establishing pan are on screen — NDC x -3.2 to -6.5, NDC y
+  // -3.8 to -11.6, three to six frame-widths to the side and four to twelve
+  // frame-heights below — while 28 to 41 of the 5000 stars are inside the
+  // frustum. Maple's giant IS in the frustum and is behind the island, whose
+  // opening frame contains no sky at all. Measured in
+  // docs/crews/round-3/opening-beat.proposal.md.
   //
   // SPRITES, NOT SPHERES. At 600-900 units a lit sphere and a painted disc are
   // indistinguishable, and a sphere would need its own light: the scene's sun
