@@ -24,7 +24,9 @@
 //     and no sRGB encode. src/prototype3d.ts:1099-1112 already says so — "no
 //     probe that renders its own frame can see this" — and this probe was one
 //     of them. On one settled Powder frame the two buffers disagree by a
-//     factor of 103 on any-channel >= 250 and by 0.19 on mean luminance. Every
+//     factor of 103 on any-channel >= 250 and by 0.19 on mean luminance —
+//     measured by the skeptic of docs/crews/round-3/powder-form.verdict.md
+//     §0, and quoted here as his, not as mine. Every
 //     number this file printed before 2026-08-28 is withdrawn. It now renders
 //     to `null` and reads the DEFAULT FRAMEBUFFER with `gl.readPixels`, inside
 //     the same evaluate, so the codes are the codes a phone shows.
@@ -67,8 +69,12 @@
 //   disc        the contact disc's darkening: pixels, mean, peak, p50, and the
 //               centroid's distance from the hero's centre in his own radii
 //   world       the darkening every OTHER caster in the same frame achieves —
-//               shadow map on against off, disc hidden in both. This is the
-//               bar, and it is measured in the frame rather than asserted.
+//               the shadow term on against off, disc hidden in both. This is
+//               the bar, and it is measured in the frame rather than asserted.
+//               Turned off through `light.shadow.intensity`, which is a plain
+//               UNIFORM; `renderer.shadowMap.enabled` is a program-cache-key
+//               define that nothing re-checks mid-frame, so toggling it would
+//               have changed no pixels and set the bar to zero.
 //   hero-cast   what the hero's own body would put on the ground if it cast:
 //               `body.castShadow` flipped on IN THE PAGE for one render and
 //               put back. A MEASUREMENT, not a change — nothing on disk moves.
@@ -386,6 +392,17 @@ try {
     if (!m.q.shadows) {
       fail(`${WORLD} r=${rr} — the renderer's shadow map is DISABLED at rung ${m.q.pinned} (level ${m.q.level}). `
         + `A shadow probe on a rung with no shadows measures zero and would report it as an answer.`);
+    }
+    // ── THE INSTRUMENT'S OWN SELF-CHECK ─────────────────────────────────
+    // If the shadow toggle moved nothing, the bar is zero and EVERYTHING
+    // passes. That is what a broken instrument looks like from the outside,
+    // and it is how the first run of this measurement reported "castShadow
+    // changes exactly zero pixels". A world where 0.1% of the frame is not in
+    // some cast shadow is not a world this probe can set a bar in.
+    if (m.world.n / (m.W * m.H) < 0.001) {
+      fail(`${WORLD} r=${rr} — turning the shadow term off changed only ${m.world.n} px `
+        + `(${(m.world.n / (m.W * m.H) * 100).toFixed(4)}% of the frame) across ${m.lights} shadow-casting light(s). `
+        + `Either this spot has no casters in frame or the toggle did not take; the bar cannot be set from it. Nothing reported.`);
     }
     rows.push({ rr, ...m });
     const f = (v, w = 6, d = 1) => v.toFixed(d).padStart(w);

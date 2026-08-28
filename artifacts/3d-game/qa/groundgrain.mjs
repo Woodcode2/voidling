@@ -55,9 +55,10 @@
 // agreement — it means three implementations compute the same thing.)
 //
 // The obvious bar is "the lowest shipped world", 0.0113. IT IS THE WRONG BAR
-// and no ground-grain change reaches it: the strongest weights anyone measured
-// — Lantern's own [0.30,0.30,0.34,7] — land Powder at 0.0095 on the canvas,
-// and the reason is that the other four frames get most of their tile variance
+// and no ground-grain change reaches it: the strongest weights anyone has
+// measured — Lantern's own [0.30,0.30,0.34,7] — land Powder at 0.0095 on the
+// canvas (not my run; the skeptic's, verdict.md §1.2, quoted as his), and the
+// reason is that the other four frames get most of their tile variance
 // from CONTENT: a boardwalk, a canal, eleven truck rows, a town square. Grain
 // cannot manufacture a boardwalk and must not be asked to. So the bar is HALF
 // the lowest shipped world, 0.0060 — a value the defect fails by roughly 2x
