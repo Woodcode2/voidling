@@ -386,3 +386,55 @@ node qa/rivalswing.mjs pirate 4177     # x1 post-patch (PASS)
 node qa/evolveonce.mjs 4177 maple      # PASS
 node qa/rivalnotice.mjs 4177 maple     # PASS, 2.7/min
 ```
+
+---
+
+## THE GOVERNOR'S LANDING RUN — 2026-08-28, after both verifier bugs were fixed
+
+The verifier returned **BROKEN** on the first landing. Both bugs are fixed
+(B-1 `form: !(isHunter && !hunting)`; B-2 the mercy now outlasts the demote
+hold at 6.0s), the false comment is corrected in place rather than deleted,
+and `qa/rivalswing.mjs` was re-run against the rebuilt bundle:
+
+```
+  surges fired               1
+  size-lead changes (3% hys) 2 in the stretch (t>=99s), 3 over the whole match
+                             — t=43.9->player, t=107.8->family, t=125.2->player
+  larger->eatable arcs       1 — GRUMPS (>1.2x @108.8s, eatable @128.8s)
+  who closed the arc         player r 3.50 -> 5.87 across the surge = 1.67x
+                             (>=1.51x means the player ate past the pin;
+                              below, the sag handed it back)
+  the surged rival           GRUMPS peaked at 1.258x the player at t=108.8s,
+                             r 4.46 against a pin of 3.50 x 1.26 = 4.42
+  family held the size lead  16.9s in the stretch
+  still surging at the end   no
+
+  DOES A FORM LOSS STICK?
+  bite at t=59.89s: r 2.583 -> 1.632, form 2 -> 1
+  bite +0.5s: r 1.640  form 1
+  bite +3.0s: r 1.644  form 1
+  half the 0.951-unit drop was back after 5.91 match seconds     <- B6a
+  the FORM stayed lost for 6.81 match seconds                    <- B6b
+                                                    (321 frames traced)
+
+  THE KID-MERCY RAILS
+  demotions: 1 total, 0 the game fired
+  bites: 1   family prop bites: 22
+
+RIVALSWING: PASS — the match swings, the swing completes, the form loss
+sticks, and the mercy rails held
+```
+
+**Why the "who closed the arc" line is the one that matters.** The owner asked
+for "if they're larger you go and consume and come back right" — a loop the
+player closes by EATING, not a lead that expires on a timer. The killed probe
+could not tell those apart; this one can, and it measured 1.67x against a
+1.51x threshold. GRUMPS did not simply sag back under the player: the player
+grew past the pin and took it. That is the owner's sentence, delivered and
+measured rather than asserted.
+
+**And the form loss is real for the first time.** Before C-C it lasted about
+sixteen milliseconds — the score floor handed the radius straight back, which
+is why `qa/evolveonce.mjs` had to suppress the EVOLVED ceremony rather than
+the recovery. It now lasts 6.81 match seconds across 321 traced frames: long
+enough for a child to see the level go, and short enough that nobody is stuck.
