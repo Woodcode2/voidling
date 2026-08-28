@@ -24,8 +24,39 @@ type G = THREE.BufferGeometry;
 // ── palette ───────────────────────────────────────────────────────────────
 // Autumn: warm, saturated, low sun. Deliberately warmer than Maple Isle's
 // midday green and nowhere near Pirate Bay's white sand.
-const CRIM = 0xc4342f;       // HOME_A — the dominant colour of the whole world
-const CRIM_D = 0x922520;     // shadowed crimson, undersides and trim
+// ── WHY THIS CRIMSON IS NOT 0xc4342f ──────────────────────────────────────
+// The old value has a LINEAR green/red ratio of 0.0622. Below roughly 0.08 —
+// measured on the real compiled shader at a rendered red of 177, where 84.4%
+// of this world's crimson lands — the chroma push drives green negative and
+// the gamut guard re-anchors it, so the channel stops describing the SURFACE
+// and starts describing the pixel's BRIGHTNESS. A truck's lit cab-top and its
+// shadowed body-side then render as the same flat red. That knee is not a
+// fixed constant: it sits near 0.09 at R=150 and 0.06 at R=200, and this
+// crimson recovers its green on its own above R~205. It is a MID-TONE defect,
+// which is why it survived a tone-curve fix that solved the shadows.
+//
+// Skeptic's A/B, composition-pinned inside one synchronous render with the
+// restore proved bit-identical: this hex takes formless red from 79.36% of
+// reddish pixels to 1.13%, and the guard-floor share from 77.60% to 0.31%. On
+// the quantity the ledger's finding is actually about — how many DISTINCT red
+// values a frame can hold — it is the best of the three candidates tested:
+// 8,455 against the old value's 7,371. It moves 1.69% of pixels by 8/255 or
+// more (mean |d| 0.89), so it is a repair, not a restyle.
+//
+// This exact value was modelled in docs/GOVERNOR.md on 2026-08-24 and
+// deliberately left unshipped, because changing a world's dominant colour is
+// the owner's call and not the studio's. He made it on 2026-08-28, after
+// being shown what each candidate measured. A crew's alternative (0xc44c2f)
+// was KILLED: it does not add a channel, it swaps which one is dead — green
+// recovers while blue pins at 1 — and it REDUCES the distinct-value count
+// below what shipped.
+const CRIM = 0xc4453f;       // HOME_A — the dominant colour of the whole world
+// Not chosen — DERIVED. The shipped shadow was CRIM scaled by 0.5225 in linear
+// (per channel 0.5207 / 0.5387 / 0.5081, recomputed here from the old pair).
+// This is the new CRIM at that same scale, so the shadow keeps exactly the
+// relationship the author gave it. Its own g/r lands at 0.1069, clear of the
+// knee, where the old shadow sat at 0.0644 and was equally dead.
+const CRIM_D = 0x92312d;     // shadowed crimson, undersides and trim
 const GOLD = 0xf0b429;       // HOME_B
 const GOLD_L = 0xffd45e;     // lit gold, lamps and glowing panels
 const TEAL = 0x2aa9a0;       // AWAY — used sparingly, roughly one part in five
