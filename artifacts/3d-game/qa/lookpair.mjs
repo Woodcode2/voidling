@@ -258,6 +258,34 @@ try {
   p.setDefaultNavigationTimeout(600000);
   p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
+  // ── PIN THE DICE, OPTIONALLY ────────────────────────────────────────────
+  // This probe pins the CAMERA and the void's POSITION, which is what it was
+  // written for. It does NOT pin the WORLD: four of the five worlds build
+  // themselves on Math.random (only Maple runs the seeded mulberry32 stream),
+  // so two runs against two builds hold different vehicles in different
+  // places, and a colour or lighting judgement across that pair is confounded
+  // by content as well as by the build. That confound was found the honest
+  // way — a three-way crimson shoot whose frames could not settle the
+  // question they were taken for.
+  //
+  // With SEED=<n> in the environment, Math.random is replaced before any page
+  // script runs by a mulberry32 on that seed, so the world generates
+  // IDENTICALLY on every run and two builds differ by the build alone. It is
+  // opt-in because a seeded Math.random is not what a player gets: it freezes
+  // the family's wander and every other unseeded roll, so a frame shot this
+  // way is a fair COMPARISON and not a fair sample of the game.
+  const SEED = process.env.SEED ? Number(process.env.SEED) : null;
+  if (SEED !== null) {
+    await p.addInitScript((seed) => {
+      let a = (seed >>> 0) + 0x6D2B79F5;
+      Math.random = () => {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }, SEED);
+  }
   await p.addInitScript(() => {
     try {
       localStorage.clear();
