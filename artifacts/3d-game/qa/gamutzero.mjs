@@ -272,12 +272,12 @@ console.log('');
 console.log(`  palette floor QMIN ${QMIN.toFixed(5)} — set by ${QWHO}, of ${NCOL} constants`);
 console.log(`  source ${srcDigest()}`);
 console.log('');
-let fail = 0;
+let fail = 0, missing = 0;
 for (const w of WORLDS) {
   const path = `qa/out/shippedlook/${w}_${TAG}.png`;
   let png;
   try { png = PNG.sync.read(readFileSync(path)); }
-  catch { console.log(`  ${w.padEnd(9)} NO FRAME — run qa/shippedlook.mjs first`); fail++; continue; }
+  catch { console.log(`  ${w.padEnd(9)} NO FRAME — run qa/shippedlook.mjs first`); missing++; continue; }
   let stamp = '(unstamped)';
   try { stamp = readFileSync(path.replace(/\.png$/, '.src'), 'utf8').trim().split(' ')[0]; } catch { }
   const { rho, med: domMed } = shadingDepth(png);
@@ -298,10 +298,14 @@ for (const w of WORLDS) {
   if (top) console.log(`            crushed most: ${top}`);
 }
 console.log('');
+// A failure message that names the wrong cause is worse than a bare failure
+// (GOVERNOR retraction 9). A world with no frame is not a world over the bar,
+// and the version this replaces counted the two together.
+if (missing) console.log(`FAIL — ${missing} world(s) have no frame at tag '${TAG}' — shoot the pack (qa/shippedlook.mjs) before reading this probe.`);
 if (fail) {
   console.log(`FAIL — ${fail} world(s) above ${BAR}% of lit chromatic pixels carrying a channel`);
   console.log(`       the light cannot move by one code. Those channels are constants,`);
   console.log(`       and a constant channel cannot carry a cool shadow or a warm highlight.`);
-  process.exit(1);
 }
+if (fail || missing) process.exit(1);
 console.log(`PASS — every world's colour channels can carry the light that falls on them (bar ${BAR}%).`);
