@@ -365,6 +365,47 @@ canopy-grade tessellation invisibly. The probe now also ratchets SPEND —
 Game Day scene, ~3.16 MB, with silhouette error 2.7× and 7.4× BELOW the bar
 the repo already accepts on a tree.
 
+### THE HORIZON IS ON SCREEN, AND THREE FILES SAY IT NEVER IS — CONFIRMED 2026-08-28
+
+The single most-repeated premise in this repo is false for the first second of
+every match. Measured off `__cam.getWorldDirection()` every rendered frame of
+the real establishing shot, against `dist/` on a running preview, with no patch
+applied:
+
+| world | pitch at the opening beat | frame band | peak pitch | reaches 46.4 deg at |
+|---|---|---|---|---|
+| **lantern** | **11.8 deg** | **-4.2 ... -27.8** | 57.0 deg | introT 1.02s |
+| **powder** | **15.3 deg** | **-0.7 ... -31.3** | 56.4 deg | introT 1.00s |
+| maple | 46.2 deg | -30.2 ... -62.2 | 46.3 deg | fixed throughout |
+
+**The optical axis swings 45 degrees during a 3.5-second shot**, and at the
+opening beat the top of the Lantern frame sits 4.2 degrees ABOVE the horizon.
+The camera is 75 units up, not the 217 a fixed-pitch model predicts — a factor
+of 2.9.
+
+`island.ts:707`, `island.ts:772` and `docs/OWNER-2026-08-25.md` all state the
+horizon is never on screen in any world at any size. So does every crew brief
+the governor has written, because **I propagated the claim without measuring
+it.** It is true of the STEADY-STATE gameplay camera and false of the intro,
+and nobody had separated those two things.
+
+This killed the spawn-sky proposal (decision 4), whose entire model of what a
+child sees at spawn was built on the fixed band. It also means:
+
+- every "it cannot be seen" argument in this repo that cited the band is
+  unsound for the first second of a match, on top of the range problem already
+  recorded below (a claim must state its RADIUS range; it must now also state
+  whether it holds during the intro);
+- the opening beat — the first frame of the game, the one a child judges it on
+  and the one a store video opens with — has never been art-directed against
+  what it actually shows;
+- the three source statements must be corrected in place, not deleted.
+
+**The rule this earns: a premise repeated in three files is not thereby true.**
+The more often a claim is restated, the less likely anyone is to re-derive it.
+Measure the load-bearing ones on a schedule, especially the ones you find
+yourself typing into briefs.
+
 ## THE RETRACTIONS
 
 Kept because a studio that hides its own errors is worth nothing.
