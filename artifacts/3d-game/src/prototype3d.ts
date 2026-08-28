@@ -759,8 +759,33 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   // screen crushed to black, villagers as silhouettes — vs 3-6% on Powder.
   // The lift lives in the AMBIENT terms (moonlight hemi + fill), never the
   // lamps: night stays the identity, the floor stops being a void.
+  //
+  // 1.42 -> 1.24, RULED 2026-08-28 after the photographs (docs/crews/round-2b/
+  // rung1-ruling.md). Two independent derivations converge on the same band:
+  //
+  //  (1) THE MASCOT IS ONE COLOUR, AND 1.42 BROKE THAT. Measured across the
+  //      matched pack, he was rgb(119-122, 62-66, 199-200) in ALL FIVE worlds
+  //      — max pairwise CIE76 dE 2.49, zero pairs over the repo's own MIN_DE 6
+  //      (qa/formsep.mjs). At 1.42 Lantern renders him (148,85,220): 9.61 dE
+  //      from maple, 16x the 0.61 dE control noise, three of ten pairs over the
+  //      bar. His response is world-INDEPENDENT (~0.22 dE per exposure point),
+  //      so this is a ceiling on the whole column, not a Lantern quirk: the
+  //      MIN_DE 6 crossing sits at 1.26-1.27, and one noise unit of margin
+  //      gives 1.24. Game Day's 1.12 and Powder's 1.18 are inside it.
+  //  (2) NIGHT IS A FLOOR, NOT A MEAN. At 1.42 deep black (Ylin<0.02) fell
+  //      23.41% -> 3.78% of frame, against maple 5.38% and pirate 7.17% — the
+  //      NIGHT world held less true black than either DAYLIGHT world. Holding
+  //      more than the highest daylight world (Game Day 8.32%) needs <= ~1.24.
+  //
+  // 1.34 — the number this comment used to carry, and the number the first art
+  // director asked for — is outside both derivations and still leaves the hero
+  // ~7.5 dE from maple, over the bar. And the retune is a reconciliation, not a
+  // rescue: ACES gives the shoulder nothing and the toe everything (hot pixels
+  // grew 0.28% -> 1.08% while their MEDIAN luminance FELL 0.759 -> 0.579), so
+  // exposure can only ever deliver haze where the authored intent is
+  // incandescence. Blooming lamps are an emissive and albedo problem.
   lantern: { sun: 0xbfd4ff, sunI: 0.55, hemiSky: 0x2c3766, hemiGround: 0x7a5844, hemiI: 1.75,
-             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.42,
+             off: [-30, 96, 46], dusk: 1.0, normalBias: 0.14, exposure: 1.24,
              fill: 0x6a8cff, fillI: 0.72, fillOff: [52, 40, -60] },
   // ── POWDER PASS: blue winter dusk, and the SNOW is the fill ─────────────
   // Between lantern's night and the three daylight rigs: a low cold key (the
@@ -1691,7 +1716,7 @@ const _dbg = new Proxy(_dbgStore, {
   };
 };
 // QA counters: what the family actually DID to the player over a match
-const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0, notices: 0 };
+const rivalEv = { bites: 0, hunterBites: 0, stolen: 0, charges: 0, nearMiss: 0, eaten: 0, marquee: 0, notices: 0, surges: 0, dems: 0 };
 _dbg.__scene = scene; _dbg.__cam = camera; _dbg.__THREE = THREE; _dbg.__renderer = renderer;
 /** QA: draw one frame THROUGH the bloom composer, synchronously.
  *  Without this a probe has to re-enable the game's own rAF and hope to read
@@ -1795,11 +1820,13 @@ _dbg.__faceState = () => voidling.faceState();
 // behind them. A demotion walks curStage back; bestStage does not move, so the
 // ceremony cannot re-fire on the way home. qa/evolveonce.mjs reads this.
 _dbg.__stages = () => ({ cur: curStage, best: bestStage, ceremonies: evolveCeremonies });
-// QA: take a bite, through the REAL handler rather than a copy of it. A
-// hunter's bite is the only thing in the game that walks a form back, and
-// nothing else can reproduce the bug it used to cause.
+// QA: take a bite, through the REAL handler rather than a copy of it. A FORM
+// bite is the only thing in the game that walks a form back, and nothing else
+// can reproduce the bug it used to cause. form rides hunter here so existing
+// probes keep their exact behaviour: __bite(true) demotes (qa/evolveonce.mjs),
+// __bite(false) is the legacy percentage nibble.
 _dbg.__bite = (hunter = true) =>
-  rivals.onPlayerBitten?.('QA', { shrink: hunter ? 0.85 : 0.90, steal: 0, hunter });
+  rivals.onPlayerBitten?.('QA', { shrink: hunter ? 0.85 : 0.90, steal: 0, hunter, form: hunter });
 // QA/capture: hold the jaw shut so a framed shot shows the hero's MOOD rather
 // than whatever he happened to be swallowing. See void3d.ts pinMouth().
 _dbg.__pinMouth = (shut: boolean) => voidling.pinMouth(shut);
@@ -1902,7 +1929,8 @@ _dbg.__matchState = () => ({
   ate: { you: devPlayerPct, family: devFamilyPct },
   rivals: rivals.list.map((r) => ({ name: r.name, score: r.score, r: r.r, x: r.x, z: r.z,
     joined: !!r.joined, arch: r.arch ?? '', hunt: !!r.hunting,
-    lane: r.lane ?? -1, dry: Math.round((r.dry ?? 0) * 10) / 10, full: !!r.full })),
+    lane: r.lane ?? -1, dry: Math.round((r.dry ?? 0) * 10) / 10, full: !!r.full,
+    surge: !!r.surge })),
 });
 // build stamp: tiny, menu-only — every screenshot identifies its build
 //
@@ -2458,11 +2486,27 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
 // ── the void's EMOTIONS: game state resolves to a mood every frame ──────────
 let hungryT = -99, hurtUntil = 0, smugUntil = 0, prevMood: Mood = 'cruise';
 let biteMercy = 0;   // global mercy: two big rivals overlapping must not chain-bite
+// THE DEMOTE HOLD. tClock until which the score floor may not undo a form loss.
+// Without it a demotion lives ONE FRAME: the floor (growth law, below) is a
+// pure function of playerScore and lawCap, and a bite moves neither by more
+// than a few per cent, so the radius — and with it curStage — is handed
+// straight back on the next frame. qa/evolveonce.mjs's own header records the
+// interval: "about sixteen milliseconds". That is why that probe had to
+// suppress the EVOLVED ceremony rather than the recovery.
+// A level loss nobody can see is not "more punishing then 10 percent loss"
+// (the owner, decision 2) — it is less.
+let demoteHold = 0;
 rivals.onPlayerBitten = (name, hit) => {
   if (tClock < biteMercy) return;
-  // MERCY FRAMES. Longer after the hunter connects, so a caught player gets a
-  // clear, visible moment to drive away instead of being chain-bitten.
-  biteMercy = tClock + (hit.hunter ? 3.2 : 2.5);
+  // MERCY FRAMES. Longest after a FORM bite — the game's biggest setback buys
+  // the clearest, most visible moment to drive away instead of being
+  // chain-bitten. (Was 3.2s keyed on hit.hunter; every strictly-larger bite is
+  // a form bite now — owner decision 2 — and all of them get the full window.)
+  // 6.0 on a form bite, not 4.0: the demote hold keeps the player at 0.918 for six
+  // match seconds, during which softCap's absolute term (1.6) puts the ENTIRE family
+  // over the 1.2x bite gate. Nothing may bite a child while the game is deliberately
+  // holding them small — the mercy has to outlast the hold that creates the exposure.
+  biteMercy = tClock + (hit.form ? 6.0 : 2.5);
   rivalEv.bites++; if (hit.hunter) rivalEv.hunterBites++; rivalEv.stolen += hit.steal;
   hurtUntil = tClock + (hit.hunter ? 1.3 : 0.9); audio.voice('hurt');
   // THE COST. The old flat 12% shrink was silently refunded by the score floor
@@ -2473,12 +2517,17 @@ rivals.onPlayerBitten = (name, hit) => {
   // is a point you win back by eating her later.
   // A LEVEL. Not a percentage. A 15% shrink is a number the player cannot see
   // and the growth law hands most of it back within seconds; being eaten should
-  // cost the thing the whole game is about. The hunter's connecting bite drops
-  // you to the bottom of the form you are in — one rung down the ladder, with
-  // the form name on the HUD changing to prove it — and the shallow nibble
-  // keeps its percentage. START_R is the floor: a VOIDLING cannot go lower.
+  // cost the thing the whole game is about. ANY strictly-larger void's
+  // connecting bite drops you to the bottom of the form you are in — one rung
+  // down the ladder, with the form name on the HUD changing to prove it.
+  // rivals.ts can only fire a bite through its rv.r > pr * 1.2 gate, and the
+  // owner priced that bite (decision 2): "more punishing then 10 percent loss.
+  // Like a level loss." The non-form nibble keeps its percentage — today only
+  // the QA __bite hook can send one. START_R is the floor: a VOIDLING cannot
+  // go lower, so there is no rung below the first and no spiral out of the
+  // bottom of the ladder.
   let demoted = false;
-  if (hit.hunter) {
+  if (hit.form) {
     const st = stageFor(voidling.radius);
     const down = Math.max(START_R, (FORM_MIN[Math.max(0, st - 1)] || START_R) * 1.02);
     voidling.setRadius(Math.max(START_R, Math.min(voidling.radius * hit.shrink, down)));
@@ -2487,6 +2536,14 @@ rivals.onPlayerBitten = (name, hit) => {
       voidling.setStage(VISUAL_STAGE[curStage] ?? 0);
       audio.setMusicStage(VISUAL_STAGE[curStage] ?? 0);
       demoted = curStage < st;
+      // …and HOLD it. Six seconds of match clock in which the score floor may
+      // not lift the radius back. Eating still grows you — growRadius and the
+      // rate limiter are untouched — so the way out is the owner's own
+      // sentence, go and consume; and the hold expires by itself, so no child
+      // is ever stuck under it. Six is the smallest number that survives a
+      // 0.5s sampler with margin; it is a starting value, not a measured one,
+      // and the first landing run is what sets it.
+      if (demoted) { demoteHold = tClock + 6; rivalEv.dems++; }
     }
   } else {
     voidling.setRadius(Math.max(START_R, voidling.radius * hit.shrink));
@@ -2509,20 +2566,20 @@ rivals.onPlayerBitten = (name, hit) => {
   // pop it plays on the way up, in its red 'down' dress).
   floatPos.set(voidState.x, voidling.radius + 5, voidState.z);
   bubbles.float(floatPos, demoted ? `BONK!! back to ${FORMS[curStage]}!! 💫`
-    : hit.hunter ? 'BONK!! 💫' : 'OOF!! 💫', true);
+    : hit.form ? 'BONK!! 💫' : 'OOF!! 💫', true);
   if (demoted) {
     growthEl.classList.remove('pop', 'down'); void growthEl.offsetWidth;
     growthEl.classList.add('pop', 'down');
     setTimeout(() => growthEl.classList.remove('pop', 'down'), 420);
   }
   audio.hit(); fx.flash('rgba(154,92,255,0.3)', 0.4);
-  // …and none here either. A hunter bite is frequent once the family turns on
+  // …and none here either. A form bite is frequent once the family turns on
   // you, so it was the other half of the periodic shaking. The red wash and
   // the 90ms buzz already say "you are being attacked" without moving the
   // camera the player is steering by.
-  if (hit.hunter) fx.flash('rgba(255,43,60,0.4)', 0.5);
-  buzz(hit.hunter ? 90 : 50);
-  track(hit.hunter ? 'caught' : 'nibbled', {
+  if (hit.form) fx.flash('rgba(255,43,60,0.4)', 0.5);
+  buzz(hit.form ? 90 : 50);
+  track(hit.form ? 'caught' : 'nibbled', {
     name, sec: elapsed(), form: curStage, stolen: Math.round(hit.steal),
   });
 };
@@ -2554,6 +2611,19 @@ rivals.onCharge = (name, x, z) => {
 rivals.onNotice = (name, x, z, color) => {
   rivalEv.notices++;   // QA: qa/rivalnotice.mjs reads this through __matchState().ev
   fx.ring(x, z, color, 22, 0.45);
+};
+// ── A SIBLING HAS GROWN LARGER THAN YOU ────────────────────────────────────
+// THE SURGE (owner decision 2): for the next stretch this rival can genuinely
+// take a form off you, and eating your way past it is the counterplay. The cue
+// sits between onNotice's whisper and onCharge's siren, and deliberately
+// closer to the whisper: one ring in the rival's OWN colour (bigger than the
+// look's 22, no red — red means "dodge NOW" and belongs to the charge alone),
+// and a card that teaches the whole loop in six words. No sting, no shake, no
+// rumble: a surged rival never pursues, so nothing is coming at the child.
+rivals.onSurge = (name, x, z, color) => {
+  rivalEv.surges++;   // QA: qa/rivalswing.mjs reads this through __matchState().ev
+  fx.ring(x, z, color, 34, 0.6);
+  announceHtml(`<div class="bCard"><span class="bIco">📢</span><span class="bTx">${esc(name)} grew BIGGER than you<span class="bSub">eat up, then eat THEM</span></span></div>`);
 };
 rivals.onNearMiss = (name, x, z) => {
   rivalEv.nearMiss++;
@@ -8497,7 +8567,15 @@ function animate() {
       // ceiling was already pace-scaled; the floor underneath it was not, so
       // the floor decided the outcome and skill did nothing.
       const scoreFloor = Math.min(lawCap, START_R * (1 + Math.pow(playerScore / 974, 0.57)) + surgeT * surgeT * 2.6 * pace);
-      if (!frozenR && voidling.radius < scoreFloor) voidling.setRadius(scoreFloor);
+      // …AND IT MAY NOT UNDO A FORM LOSS. See demoteHold beside biteMercy.
+      // Measured from source, a par run at 60s: lawCap 3.06, raw floor 4.18,
+      // so scoreFloor IS lawCap and the player's radius sits pinned exactly on
+      // it — which means a demotion to FORM_MIN[st-1]*1.02 was restored on the
+      // next frame and curStage climbed straight back at the stageFor() call
+      // in the frame loop. Suppressing the floor for six seconds is what turns
+      // "like a level loss" from a thing that is announced into a thing that
+      // happens.
+      if (!frozenR && voidling.radius < scoreFloor && tClock >= demoteHold) voidling.setRadius(scoreFloor);
     }
   }
 

@@ -18,13 +18,20 @@ export interface RivalEdible { mesh: THREE.Object3D; radius: number; }
 // lapses. A single global constant is what made the ladder decorative — see
 // laneWant.
 export interface RivalCtx { matchLen: number; playerScore: number; fever: number; par?: number; }
-// what a rival COSTS you when it catches you — the HUD reports both halves
-export interface RivalHit { shrink: number; steal: number; hunter: boolean; }
+// what a rival COSTS you when it catches you — the HUD reports both halves.
+// `form` is the owner's price (decision 2, 2026-08-26: "more punishing then 10
+// percent loss. Like a level loss"): true means the handler walks the player
+// one rung down the form ladder; false is the legacy percentage nibble, which
+// only the QA __bite hook can still send.
+export interface RivalHit { shrink: number; steal: number; hunter: boolean; form: boolean; }
 export interface Rival { name: string; color: number; score: number; x: number; z: number; r: number; pulse?: number; arch?: string; hunting?: boolean; joined?: boolean;
   // QA readouts: which rung of the ladder this one is running, and how long
   // since it last swallowed anything. Both exist because "why is GRUMPS on 47
   // points" cost five wrong guesses to answer without them.
-  lane?: number; dry?: number; full?: boolean; }
+  lane?: number; dry?: number; full?: boolean;
+  // QA: is THE SURGE (owner decision 2) holding this rival above the player
+  // right now? qa/rivalswing.mjs attributes size-lead crossings with it.
+  surge?: boolean; }
 export interface Rivals {
   list: Rival[];
   /** QA: how many props the family has taken off-screen this match. */
@@ -51,6 +58,11 @@ export interface Rivals {
   onNotice?: (name: string, x: number, z: number, color: number) => void;
   onNearMiss?: (name: string, x: number, z: number) => void; // …and it whiffs. the retellable beat.
   onStuffed?: (name: string, x: number, z: number) => void;  // the threat turns into the MEAL
+  /** THE SURGE (owner decision 2): a sibling has grown LARGER than the player
+   *  and will hold it for a beat before sagging back. Like onNotice, the cue
+   *  for this must stay quieter than onCharge's — it is "be on your toes",
+   *  not "dodge NOW". See rivals.onSurge in prototype3d.ts. */
+  onSurge?: (name: string, x: number, z: number, color: number) => void;
   reset(matchLen?: number): void;                        // instant rematch
 }
 
@@ -401,6 +413,11 @@ export function createRivals(
     raw: number;
     // BULLY: the charge state machine (0 prowl, 1 wind-up, 2 lunge, 3 recover)
     cst: number; ctim: number; missPend: boolean; missCd: number; stolen: number; stuffedSaid: boolean; stuffCap: number;
+    // THE SURGE (owner decision 2). surgeR is the pinned target radius while a
+    // surge runs (0 = not surging) — absolute, fixed at surge start, so a
+    // player who goes and consumes can outgrow it; surgeT is the hold time
+    // left before it sags.
+    surgeR: number; surgeT: number;
     // ── THE LOOK ─────────────────────────────────────────────────────────
     // Every void bigger than you CAN bite you — the bite gate is
     // `rv.r > pr * 1.2`, not "is this the bully" — but only the BULLY ever
@@ -411,9 +428,10 @@ export function createRivals(
     //
     // So the rest of the family NOTICES. A big one that finds you close by
     // stops what it is doing, turns to face you, and holds for a beat. It does
-    // not pursue, it does not charge, and it cannot start a chase — if you
-    // walk into it you get the ordinary 10% bite that has always been there.
-    // It is a LOOK, and a look is enough to make a child steer around someone.
+    // not pursue, it does not charge, and it cannot start a chase — but since
+    // owner decision 2 (2026-08-26), walking into one that is strictly larger
+    // costs A FORM, not the old 10%, so the look is the warning for something
+    // real. It is a LOOK, and it is enough to make a child steer around someone.
     eye: number; eyeCd: number;
     // SHOWOFF: the radius of the landmark it is currently crossing the map for
     lockR: number;
@@ -423,6 +441,10 @@ export function createRivals(
   }
   let grazeN = 0;   // QA: larder bites this match (see api.grazeCount)
   let bandSum = 0, bandMax = 0, bandPinned = 0, bandN = 0;   // QA: see bandStat
+  // THE SURGE's clock: seconds until the next surge MAY start. It only counts
+  // down while no surge is running and the window is open, so the 26-40s gap
+  // it is refilled with is measured from the moment the previous surge CLEARS.
+  let surgeCd = rand(4, 12);
   const roster: R[] = [];        // one per NAME — built once, skins fixed forever
   const rivals: R[] = [];        // THIS match's cast (api.list points at it)
   const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
@@ -468,6 +490,7 @@ export function createRivals(
       combo: 0, comboT: 0, raw: 0, cst: 0, ctim: rand(6, 10), missPend: false, missCd: 0,
       eye: 0, eyeCd: rand(4, 12),
       stolen: 0, stuffedSaid: false, stuffCap: 0, lockR: 0,
+      surgeR: 0, surgeT: 0,
       campX: Math.cos(ang) * 130, campZ: Math.sin(ang) * 130, campT: 0,
       roll: new THREE.Quaternion(),
       // HOME TURF: each family member forages their OWN corner of the island.
@@ -673,6 +696,7 @@ export function createRivals(
       // half-buried spinning house on lot #1 of every rematch)
       shrinking.length = 0; grazeN = 0;
       bandSum = 0; bandMax = 0; bandPinned = 0; bandN = 0;
+      surgeCd = rand(4, 12);
       trail.length = 0; trailT = 0;
       roster.forEach((rv, i) => {
         const ang = (i / roster.length) * Math.PI * 2 + rand(0, Math.PI * 2);
@@ -683,6 +707,7 @@ export function createRivals(
         rv.combo = 0; rv.comboT = 0; rv.raw = 0; rv.cst = 0; rv.ctim = rand(6, 10);
         rv.eye = 0; rv.eyeCd = rand(4, 12);
         rv.missPend = false; rv.missCd = 0; rv.stolen = 0; rv.stuffedSaid = false; rv.stuffCap = 0;
+        rv.surgeR = 0; rv.surgeT = 0; rv.surge = false;
         rv.lockR = 0; rv.tgt = null; rv.dry = 0; rv.full = false;
         rv.speakCd = rand(4, 10); rv.ph = rand(0, 6);
         rv.roll.identity(); rv.body.quaternion.identity();
@@ -838,6 +863,95 @@ export function createRivals(
       // 0.78 had, and the crumb floor below — not this number — was always the
       // real lever on whether the family can score.
       const softCap = Math.max(Math.min(START_R + 0.02 * _t, 1.6), pr * 0.80);
+      // ── THE SURGE: the family finally gets to be LARGER ──────────────────
+      // Owner decision 2, verbatim: "yes, however there needs to be a way
+      // where if they're larger you go and consume and come back right. It
+      // should be back and forth." softCap above pins every non-hunter at
+      // 0.80x the player — measured, 94% of family samples at 0.75-0.85x and
+      // 0% above 0.85x, bite gate open 0% of two worlds (see the 0.75x note at
+      // the look gate below). This is the bounded escape: ONE sibling at a
+      // time, in the middle half of the match, is grown to 1.26x the player's
+      // size AT THAT MOMENT — an absolute pin, fixed at surge start, NOT a
+      // tracking multiplier. The pin is the counterplay: go and consume, grow
+      // past a rival that cannot follow, come back and eat it. After a 12-18s
+      // hold it sags 3.5%/s back under softCap, so the surge always ends
+      // EATABLE even for a player who ate nothing. 1.26 clears the bite gate's
+      // 1.2 with margin (a sibling's red ring finally tells the truth) and
+      // stays under the hunter's 1.5x hunt loom — she remains the apex.
+      //
+      // Size is AUTHORED by easing, exactly like the hunter's `want` below —
+      // a surge that waits for organic eating is a gate that never opens,
+      // which is the failure the look gate shipped twice.
+      //
+      // ONE THING THE PROPOSAL CLAIMED AND THE SKEPTIC KILLED, recorded here
+      // so nobody re-derives it from the comment: eating PROPS cannot close
+      // the gap. The player's radius is pinned at lawCap by the score floor,
+      // and props move lawCap only through `pace` (<=+8% above par). The one
+      // term that lifts the law is `feastR` — 0.69 units per sibling swallowed,
+      // released at 0.11 units/s — so the counterplay inside a hold is "eat two
+      // of your other siblings", and outside it the sag is what returns the
+      // lead. The last surge clears by ~72-79% of the clock either way.
+      //
+      // Kid-mercy, explicit (owner: "no shit show of every void attacking"):
+      //   · one surge at a time; never started while the hunter is HUNTING
+      //   · BULLY excluded (she has her own act); COPYCAT excluded — the one
+      //     archetype whose errand FOLLOWS the player, and a bigger-than-you
+      //     void on your footprints is a pursuit
+      //   · a surged rival never pursues: visits are off (see `sociable`), it
+      //     forages where it stands, bigger
+      //   · starts 40-200 units out — never inside biting range, never off
+      //     the far coast where the growth plays to nobody
+      //   · not in the finale: VOID TITAN's feast needs the family eatable
+      //     (qa/titan.mjs measured that dependency)
+      //   · ONE connecting bite ends the hold (see the bite block), so a
+      //     surge can never take two forms
+      // …AND NOT WHILE THE HUNT IS RUNNING. The `cst >= 1` guard below blocks
+      // only the 5.15s of a 26-39s charge cycle in which she is already
+      // committed — about 15% of frames — so under the first draft the FIRST
+      // surge of every match (47-55s, against a hunt that ends at 55% of the
+      // clock) ran straight through her charges. biteMercy is a SINGLE GLOBAL
+      // 4.0s window (prototype3d.ts:2460), so two voids that can both take a
+      // form means a child can lose two forms four seconds apart. The owner
+      // ruled that out in the same breath as he asked for the tension: "I
+      // don't want to create this shit show of every void attacking you."
+      // She owns the first half; the surge owns the stretch after she is
+      // stuffed, which is also the stretch where the finale law is opening and
+      // "come back and eat it" is a thing a player can actually do.
+      // CORRECTED after the landing was measured: this sentence was false as
+      // first written. Ending the hunt stops her CHARGING, not her being big —
+      // she stayed over the form-bite gate for ~21s of this very stretch, 10.4
+      // of them overlapping a live surge. The bite dispatch below now denies
+      // her a form once the hunt is over, which is what makes "one form-taker
+      // at a time" true rather than merely promised.
+      const surgeOpen = _t > matchLen * 0.55 && _t < matchLen * 0.72 && !hunting;
+      const anySurge = rivals.some((r) => r.surgeR > 0);
+      if (surgeOpen && !anySurge
+        && !rivals.some((r) => r.arch === 'BULLY' && r.hunting && r.cst >= 1)) {
+        surgeCd -= dt;
+        if (surgeCd <= 0) {
+          let sPick: R | null = null, sD = Infinity;
+          for (const c of rivals) {
+            if (!c.joined || c.dyingT > 0 || c.respawnT > 0) continue;
+            if (c.arch === 'BULLY' || c.arch === 'COPYCAT') continue;
+            const d = Math.hypot(c.x - px, c.z - pz);
+            if (d < 40 || d > 200) continue;
+            if (d < sD) { sD = d; sPick = c; }
+          }
+          if (sPick) {
+            sPick.surgeR = Math.min(R_CAP, Math.max(sPick.r, pr * 1.26));
+            sPick.surgeT = rand(12, 18);
+            sPick.visiting = false; sPick.visitT = Math.max(sPick.visitT, 25); sPick.tgt = null;
+            api.onSurge?.(sPick.name, sPick.x, sPick.z, sPick.color);
+            // the nearBig pool was written for exactly this moment and has
+            // been waiting for a trigger that can reach it
+            api.onSpeak?.(sPick.x, sPick.z, pickLine(RIVAL_VOICE[sPick.name].nearBig), sPick.name);
+            sPick.speakCd = rand(8, 12);
+            surgeCd = rand(26, 40);   // gap to the NEXT surge, counted after this one clears
+          } else surgeCd = 4;   // nobody in the 40-200 band right now — ask again
+          // shortly. This retry costs one Math.random per 4s of an open window
+          // and nothing else; it can never fire a surge it did not pick.
+        }
+      }
       for (const rv of rivals) {
         const isHunter = rv.arch === 'BULLY';
         rv.hunting = isHunter && hunting && rv.joined;   // HUD + QA read this
@@ -907,7 +1021,26 @@ export function createRivals(
               rv.speakCd = rand(8, 12);
             }
           }
+        } else if (rv.surgeR > 0) {
+          // THE SURGE (scheduler above). Two acts, the same shape as the
+          // hunter's: ease up to the pinned target, hold, then sag back under
+          // the cap. This is the third hardCap escape and the first one
+          // outside `if (isHunter)` — the exact line the round-2 brief names.
+          if (rv.surgeT > 0) {
+            rv.surgeT -= dt;
+            rv.r += (rv.surgeR - rv.r) * Math.min(1, dt * 0.55);   // grow, don't pop
+            hardCap = rv.surgeR * 1.02;
+          } else {
+            // 3.5%/s: from 1.26x down through the swallow line (1/1.2 =
+            // 0.8333) to the 0.80x floor in about 13 seconds. A player who
+            // went and consumed crosses it sooner; a player who ate nothing
+            // still gets the lead handed back. Either way it ends EATABLE.
+            rv.surgeR *= 1 - dt * 0.035;
+            if (rv.surgeR <= softCap) rv.surgeR = 0;
+            else hardCap = rv.surgeR;
+          }
         }
+        rv.surge = rv.surgeR > 0;   // QA: __matchState reads this per frame
         if (rv.r > hardCap) rv.r = hardCap;
         // being devoured: a visible SUCK-IN — the rival spirals into the
         // player's pit, shrinking, before it winks out. Cause and effect a kid
@@ -1003,8 +1136,11 @@ export function createRivals(
         // a moment, not the default state of the family.
         rv.visitT -= dt;
         if (rv.visiting && fleeing) rv.visiting = false;   // visit's off — you got scary
-        // the HOARDER does not travel and the BULLY is not paying a social call
-        const sociable = rv.arch !== 'HOARDER' && !(rv.arch === 'BULLY' && hunting);
+        // the HOARDER does not travel, the BULLY is not paying a social call —
+        // and a SURGED rival must never beeline to the player: while it is the
+        // one thing on the island that can take a form off them, an approach
+        // is a pursuit, and pursuit belongs to the hunter alone (kid-mercy).
+        const sociable = rv.arch !== 'HOARDER' && !(rv.arch === 'BULLY' && hunting) && !(rv.surgeR > 0);
         if (sociable && !rv.visiting && !fleeing && rv.visitT <= 0 && dp > 60 && !anyVisiting()) {
           rv.visiting = true; rv.tgt = null;
         }
@@ -1143,9 +1279,13 @@ export function createRivals(
         //   · it needs you INSIDE 62 units, which is about two of your own
         //     diameters at match start — close enough that you chose to be there
         //   · one look per rival every 9-16 seconds, and never two at once
-        // No pursuit. No charge. Walking into one still costs the ordinary 10%
-        // that has always been there. The whole job is to make a child steer
-        // around a big void instead of through it.
+        // No pursuit. No charge. And walking into one usually costs NOTHING:
+        // this gate opens at 0.75x, the bite gate at 1.2x, and 94% of the
+        // family lives at 0.75-0.85x (the distribution below). The exception
+        // is THE SURGE — a sibling held above 1.2x can bite, and since owner
+        // decision 2 that bite costs a form. So the look is a peer sizing you
+        // up, except during a surge, when it is the real warning. The whole
+        // job is to make a child steer around a big void instead of through it.
         // ── AND THE FIRST VERSION OF THIS GATE COULD NEVER OPEN ─────────────
         // It read `rv.r > pr * 1.2`, copied from the BITE threshold on the
         // reasoning that a look should come from something that could eat you.
@@ -1390,10 +1530,23 @@ export function createRivals(
           // ending a kid replays for.
           const marquee = isHunter && !hunting;
           const looted = marquee ? Math.round(rv.score * 0.5) : 0;
+          // THE COMEBACK EDGE (owner decision 2: "give them an edge to win").
+          // A sibling that surged and bit pays its banked steal BACK when
+          // eaten, plus a flat revenge bounty — the same contract the hunter
+          // has always had, at sibling scale. The marquee arithmetic is
+          // untouched: it was measured and it already includes rv.stolen.
+          // The bounty rides `rv.stolen > 0` and NOT a "this one bit you" flag,
+          // because rivals.ts fires onPlayerBitten unconditionally and the
+          // handler's first line is `if (tClock < biteMercy) return` — a flag
+          // set here would be true for bites the player never took, and a
+          // bounty payable for nothing. rv.stolen > 0 is true of exactly the
+          // rivals a revenge bounty is for and adds no new state.
           const pts = marquee
             ? Math.round(400 + rv.r * 180 + looted + rv.stolen)
-            : Math.round(100 + rv.r * 40);
+            : Math.round(100 + rv.r * 40 + rv.stolen + (rv.stolen > 0 ? 150 : 0));
           if (marquee) { rv.score -= looted; rv.stolen = 0; }
+          else if (rv.stolen > 0) { rv.score = Math.max(0, rv.score - rv.stolen); rv.stolen = 0; }
+          rv.surgeR = 0; rv.surgeT = 0;   // a devoured rival respawns small, never mid-surge
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].eaten), rv.name);
           rv.halo.visible = false;
           rv.dyingT = 0.55; rv.visiting = false; rv.tgt = null; rv.cst = 0;
@@ -1422,9 +1575,26 @@ export function createRivals(
           // hurts, because she banks what she takes and you can win it all back
           // by eating her later. Shrink alone can be refunded by the growth law;
           // points cannot, so this is a cost the leaderboard actually shows.
+          //
+          // …and it costs A FORM. Every bite this gate can fire is from a void
+          // strictly larger than the player (the gate itself is rv.r > pr*1.2)
+          // and the owner priced that bite: "more punishing then 10 percent
+          // loss. Like a level loss" (decision 2). form:true sends the handler
+          // in prototype3d.ts down the demotion path for every biter — the
+          // hunter keeps her heavier steal, a surged sibling banks a smaller
+          // one, and both are paid back through the eaten branch above. The
+          // demotion only outlives the frame because of the demote hold beside
+          // biteMercy; without it the score floor refunds the radius, and with
+          // it the form, on the very next frame.
           const heavyBite = isHunter && hunting;
-          const steal = heavyBite ? Math.min(1200, Math.round(pScore * 0.08)) : 0;
-          rv.biteCd = heavyBite ? 12 : 9; rv.pulse = 1;
+          const steal = heavyBite ? Math.min(1200, Math.round(pScore * 0.08))
+            : rv.surgeR > 0 ? Math.min(600, Math.round(pScore * 0.05)) : 0;
+          // every form bite carries the hunter's long cooldown (kid-mercy:
+          // the same void cannot take two forms inside twelve seconds)
+          rv.biteCd = 12; rv.pulse = 1;
+          // KID-MERCY: one bite ends a surge's hold on the spot — it starts
+          // sagging toward the comeback meal, so a surge never costs two forms
+          if (rv.surgeT > 0) rv.surgeT = 0;
           rv.missPend = false;   // she connected: this was no near miss
           if (heavyBite) {
             // she got what she came for: break off, wallow, and leave a long
@@ -1433,7 +1603,15 @@ export function createRivals(
           }
           if (steal > 0) { rv.score += steal; rv.stolen += steal; }
           api.onSpeak?.(rv.x, rv.z, pickLine(RIVAL_VOICE[rv.name].bite), rv.name);
-          api.onPlayerBitten?.(rv.name, { shrink: heavyBite ? 0.85 : 0.90, steal, hunter: heavyBite });
+          // form: NOT for the stuffed hunter's contact bite. After huntEnd she stops
+          // CHARGING, not being big: her ceiling decays 0.3%/s from pr*1.5 while the
+          // player's law grows 0.025/s, so she sits over the bite gate for ~21s of the
+          // surge stretch — measured 10.4 match seconds OVERLAPPING a live surge, two
+          // form-takers with one global 4s mercy between them. That is the shape the
+          // owner ruled out, and the surge window's own comment promised it could not
+          // happen. Her contact bite goes back to the percentage nibble it always was
+          // (steal is already 0 for her — heavyBite requires hunting).
+          api.onPlayerBitten?.(rv.name, { shrink: 0.85, steal, hunter: heavyBite, form: !(isHunter && !hunting) });
         }
 
         // ── eat nearby food -> grow by area + score ON THE PLAYER'S TERMS ─────
