@@ -34,7 +34,43 @@
 // bathhouse roof off zero, and the probe went green over a building that still
 // reads as a silhouette. Ask what a fix DOES before writing the test for it.
 //
-// MEASURED_TODAY_BLOCK
+// MEASURED 2026-08-28. Every number here was run on frames shot into the real
+// page — the CANVAS, not a render target, because three@0.185.1 refuses the
+// graded tone map when the destination is a render target. Three agents were
+// editing src/ during the shoot, so each frame carries its own stamp and the
+// probe prints it; Game Day's row was shot off a bundle pinned by route
+// interception to HEAD's crimson (0xc4453f / 0x92312d), and the other four
+// worlds contain none of the constants that were moving.
+//
+//   THE FIVE-WORLD PACK              the retracted predicate     this probe
+//     maple                                0.09%  ok              9.91%  FAIL
+//     pirate                               0.00%  ok              3.32%  FAIL
+//     gameday                              0.02%  ok             17.33%  FAIL
+//     lantern                              0.00%  ok              0.00%  ok
+//     powder                               0.00%  ok              0.76%  ok
+//
+//   The retracted predicate PASSES every world of today's build, exit 0. (Four
+//   of those frames come from one sweep and Game Day's from its own shoot
+//   minutes later; the sweep's Game Day attempt died when a concurrent rebuild
+//   replaced the hashed bundle while the page was loading it.)
+//
+//   AND THE FACT THAT SETTLES IT. Two Game Day builds off ONE compiled bundle
+//   (raw 752e50e7), served into the same page by route interception, same shot
+//   procedure, exposure 1.12 read back off the renderer both times:
+//
+//     shipped                              0.02%  ok             17.33%  FAIL
+//     the two per-channel crushers off     0.00%  ok              0.10%  ok
+//
+//   The retracted predicate separates a build carrying the defect from one
+//   without it by TWO HUNDREDTHS OF A POINT — it cannot tell them apart. This
+//   probe separates them by 173x.
+//
+//   What the defect looks like on the frame the retracted predicate passed:
+//   70,210 pixels of EXACTLY rgb(5,139,120), one triple over a ninth of the lit
+//   chromatic frame — a teal whose red is pinned at 5 where its own albedo
+//   (0x2aa9a0, tailgate.ts TEAL = life.ts GD_AWAY) puts it at 33, beside a green
+//   of 139. And 17,552 pixels of rgb(208,153,4): GOLD's blue at 4 where the
+//   albedo puts it at 34. Neither surface is dark. Neither channel is zero.
 //
 // The DEAD-CHANNEL column the old version printed (`zeros >= 1`, unbarred) is
 // retracted with the bar it sat beside: it is the same quantity one step
@@ -46,8 +82,9 @@
 // the same commit as the guard). It is cited as the same MISTAKE, not as the
 // same instrument. And the reading that went with it — that Lantern's TIMBER at
 // (39,12,0) was "barely alive" — is withdrawn: under the sensitivity model
-// below, a green at code 12 in that world is moved by more than a code by its
-// own light. It is alive. The toe was a real fix; this probe is not the
+// below, at the rho this probe measures on Lantern today (0.0875 on a dominant
+// median of 91), a channel at code 12 is moved 1.97 codes by that world's own
+// light. It is alive. The toe was a real fix; this probe is not the
 // instrument that can resolve how much of one, and does not claim to be.
 //
 // ── WHAT REPLACES IT ──────────────────────────────────────────────────────
@@ -83,50 +120,84 @@
 // floor is therefore a lower bound on what the ART asks for and not a statement
 // about any one pixel. What carries the finding is the per-albedo check: under
 // the key alone, hue-preserving, GOLD at a rendered R of 208 puts blue at 19,
-// and it renders at 4. Pirate's rig is near-neutral (sun 0xfff2d8) and its teal
-// renders its red at 5 against an albedo that puts it at 37. Those surfaces are
-// not being crushed by the light.
+// and it renders at 4. And where the key runs the OTHER way it makes no
+// difference: Pirate's sun is 0xfff2d8, linear r/g 1.1262, which would put its
+// teal's red at 40 where a neutral illuminant puts it at 37 — and it renders at
+// 5. Those surfaces are not being crushed by the light.
 //
-// THE TWO FLOORS ARE NOT CO-EQUAL, and an earlier draft of this probe oversold
-// them as agreeing derivations. Numerically the conjunction IS the palette
-// floor: on the packs measured, min(info, palette) differs from the palette
-// clause alone by fractions of a point and changes no verdict, and on Powder
-// the information floor never binds at all. The information floor is kept as an
-// independent second opinion and as a cap where the palette floor rises with
-// the dominant channel — not because the census rests on it.
+// AN EARLIER DRAFT OVERSOLD THESE AS AGREEING DERIVATIONS, and its skeptic
+// then measured the conjunction against the palette clause alone, found a
+// difference of fractions of a point, and concluded the information floor was
+// decoration. That was true of the POWER-LAW floor it was measured against —
+// about twice too high, and therefore almost never the smaller of the two. With
+// sens() the information floor lands at 6-9 codes in four of the five worlds,
+// below the palette floor across most of the mid-tones, and it does half the
+// work. Measured today, each clause alone against the conjunction:
+//
+//              conjunction   palette only   info only
+//     maple        9.91          10.32         9.91
+//     pirate       3.32           3.55         3.32
+//     gameday     17.33          31.31        17.33
+//     lantern      0.00           0.00         0.00
+//     powder       0.76           0.76         3.24  FAIL
+//
+// Neither clause is decoration and neither alone is the test. The information
+// floor is what keeps Game Day's number honest; the palette clause is the only
+// thing standing between Powder's pastels and a false FAIL, because Powder's
+// snow gives rho 0.023 and a floor of 34 codes. A channel is condemned only
+// when quantisation says the light cannot move it AND no authored colour
+// explains its level.
 //
 // LIT is 128/255 on the dominant channel: at or above half the display's code
 // range the surface is taking key light and "it is dark" is not an available
 // explanation. The frame is sampled at EVERY illumination level above that,
-// because CRIM's green is non-monotonic in light (it recovers above R~205) and
-// an instrument that samples one exposure lands on one side of that V and
-// reports the other side's answer — the fault that blinded qa/formsep.mjs.
+// because CRIM's green is non-monotonic in light — docs/crews/round-3/
+// gameday-red.verdict.md measured it recovering only above a rendered R of
+// about 205 — and an instrument that samples one exposure lands on one side of
+// that V and reports the other side's answer, which is the fault that verdict
+// found in qa/formsep.mjs.
 //
-// THE BAR is 1.5% of lit chromatic pixels carrying a dead channel; the
-// derivation is in BAR_NOTE below, against a build with the defect provably
-// absent. A reading near the bar is NOT a verdict: this metric reads a
-// photograph and inherits the shoot's framing variance, which on Game Day is
-// large. Read a single reading between the clean band and ~4% as "unresolved,
-// reshoot", and do not ratchet this number.
+// THE BAR is 1.5% of lit chromatic pixels carrying a dead channel, and it is
+// placed against a build where the defect is provably ABSENT: the two
+// per-channel crushers neutralised in the tone-map chunk (TOE 0.014 -> 0.0002
+// and the chroma push 1.07 -> 1.00), patched into the compiled bundle and
+// served into the real page. That is a NEGATIVE CONTROL, not a proposed fix —
+// removing the toe would undo the 2026-08-24 change — and its only job is to
+// prove that green is reachable, so that a green reading means something. It
+// measures 0.10%, fifteen times under the bar, against 17.33% for the same
+// world as shipped. Across the two packs read today no world lands between
+// 0.76% and 3.32%, so the bar sits in an empty band.
+//
+// That band is a property of these packs and NOT of builds near the bar, and a
+// reading near 1.5% is not a verdict. This metric reads a photograph: two
+// shoots of the SAME build ten minutes apart measured 17.33% and 22.43% on Game
+// Day. Read anything between the clean band and ~4% as "unresolved, reshoot" —
+// and do not ratchet this number, because a ratchet on a framing-bound metric
+// fails the next honest reshoot.
 //
 // KNOWN LIMITS, written here rather than tuned around:
-//   * The Lantern verdict is sensitive to LIT: its crushed surfaces sit in a
-//     narrow 96-128 band, so the probe prints the LIT-96 census unbarred on
-//     every run and Lantern's mid-band stays an open lead, not a claim.
+//   * The Lantern verdict is sensitive to LIT, and to the shoot. On the
+//     canonical pack it reads 0.63% at LIT 128 and 2.58% at 96; on a frame shot
+//     today, 0.00% and 0.00%. Some of its crushed surfaces sit in the 96-128
+//     band and how many are on screen is a framing question. The probe prints
+//     the LIT-96 census unbarred on every run so the number is not lost, and
+//     Lantern's mid-band stays an open lead, not a claim.
 //   * QMIN is set by the SINGLE most saturated constant in the world modules,
 //     so authoring one colour more saturated than it lowers the floor for every
 //     surface in the game. The probe names the constant that set it on every
 //     run; if that name changes, the bar changed with it.
-//   * bay.ts and palette.ts contribute nothing — Pirate Bay declares no
-//     `NAME = 0xrrggbb` constants at all (its surfaces borrow from island.ts,
-//     life.ts and luxe.ts) and palette.ts uses object-property form. So Pirate
-//     is judged against a floor set by Powder's ORANGE_D. Widening the scan
+//   * bay.ts and palette.ts contribute nothing to QMIN. bay.ts holds not one
+//     hex literal — it is Pirate Bay's geometry, and that world's surface
+//     colours come from the shared modules — and palette.ts uses object-
+//     property form, which this scan does not read. So Pirate is judged against
+//     a floor set by Powder's ORANGE_D. Reading the object-property palettes
 //     correctly is the first thing to do to this probe.
 //   * A channel pinned HIGH is not caught. The test condemns a channel the
 //     light cannot move; a build that pinned a weak channel at a fixed multiple
 //     of luminance large enough to ramp would pass, with its hue a luminance
-//     echo. That build does not exist here (the guard's multiple lands at codes
-//     0-2 after the toe) and catching it needs a cross-surface hue test.
+//     echo. That build is not this one: the channels condemned today sit at
+//     codes 0-8 in Maple, Pirate and Game Day, and 0-13 in Powder where the
+//     floor is higher. Catching it would need a cross-surface hue test.
 //   * It does not gate on frame staleness. qa/packfresh.mjs owns that; this
 //     probe prints each frame's own stamp for the record.
 import { readFileSync, readdirSync } from 'fs';

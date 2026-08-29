@@ -3,8 +3,8 @@
 // The void's body does NOT cast into the shadow map (void3d.ts:605 and :1582).
 // Everything grounding him rests on one thing: the contact disc, a soft dark
 // circle on the floor at 1.52x his radius. This renders the identical frame
-// several times over — disc shown and hidden, shadow map on and off, the hero
-// casting and not — and DIFFERENCES them. The difference IS the shadow, with
+// several times over — disc shown and hidden, the shadow term on and off, the
+// hero casting and not — and DIFFERENCES them. The difference IS the shadow, with
 // no assumption about where it lands, how big it is, or what colour the ground
 // under it happens to be.
 //
@@ -102,9 +102,26 @@
 // them:
 //  · The proposal's second limb — "peak >= two thirds of the world's p90" —
 //    ALREADY PASSES on the corrected instrument (peak 43.0 against a required
-//    35.7 on the skeptic's settled Powder frame). It was only failing in the
-//    un-graded buffer. It is printed as `peak/worldP90` and NOT gated; a limb
-//    that reds for the buffer it was measured in is not evidence.
+//    35.7 on the skeptic's settled Powder frame; 42.0 against 35.8 on my own
+//    first run of this file). It was only failing in the un-graded buffer. It
+//    is printed beside the gate and NOT gated; a limb that reds for the buffer
+//    it was measured in is not evidence.
+//
+// ── THIS FILE'S OWN FIRST HONEST RUN, so a later reader has a baseline ────
+// Powder, THE VILLAGE, rung 0, settled, src digest 161bef70db4c7405 (HEAD plus
+// the Powder grain and bake patches of docs/crews/round-3/powder-form.landing.md):
+//
+//     r     camDist  pitch   disc p50   world p50   hero-if-he-cast p50   centroid
+//     1.5    57.8    45.9°     14.0       52.8         53.5 (101%)          1.52
+//     4     129.6    51.9°     12.9       46.9         53.6 (114%)          1.46
+//
+// The game draws a 46.9-code shadow under a snowman and a 12.9-code haze under
+// its mascot, in the same frame, from the same light: a factor of 3.6. Both
+// radii FAIL the bar. And note the last column, because it is what stops the
+// obvious fix: the hero's own cast shadow would land at the world's own depth
+// — it is the same shadow map — but its centre of mass sits ~1.5 of his radii
+// outside him, and it is WORSE at spawn size than at r = 4, which is the
+// opposite of what the size-gate argument assumed.
 //  · The proposal's first limb — "where the hero casts, his p50 within 20% of
 //    the world's" — cannot be gated, because THE HERO NEVER CASTS. There is no
 //    `CAST_R` in the source and no crew has landed one. `hero-cast` is printed

@@ -61,9 +61,25 @@
 // reason is that the other four frames get most of their tile variance
 // from CONTENT: a boardwalk, a canal, eleven truck rows, a town square. Grain
 // cannot manufacture a boardwalk and must not be asked to. So the bar is HALF
-// the lowest shipped world, 0.0060 — a value the defect fails by roughly 2x
-// and the ground itself can actually reach. The rest of the gap to 0.0113 is
-// content, and it is a different piece of work.
+// the lowest shipped world, 0.0060 — a value the defect fails by 1.6x and the
+// ground itself can actually reach. The rest of the gap to 0.0113 is content,
+// and it is a different piece of work.
+//
+// ── AND THE SAME THING MEASURED LIVE, BY THIS PROBE ───────────────────────
+// The table above is off PNGs. These are runs of this file, rung 0, r = 4,
+// camera settled at camDist 129.1, THE VILLAGE / THE SQUARE / THE RESORT:
+//
+//     powder  0.0037   0.61x the bar   flat 52.1%   <- FAILS, and it is the
+//                                                      whole reason this file
+//                                                      exists
+//     maple   0.0131   2.19x           flat 14.8%
+//     pirate  0.0133   2.21x           flat 38.5%
+//
+// Live and pack do not agree cell for cell — maple reads 0.0131 live against
+// 0.0172 on the pack, pirate 0.0133 against 0.0113 — so a live number is not a
+// pack number and this bar is stated against BOTH. Game Day and Lantern have
+// not been run live; they are the two highest on the pack (0.0360, 0.0203) and
+// I expect them clear, which is not the same as having measured them.
 //
 // ── ONE LIMB, NOT TWO, AND WHY — this bar was filed with a false positive ──
 // docs/crews/round-3/powder-form.proposal.md §9.1 proposed a second gated
@@ -90,7 +106,7 @@
 //  · It measures the WHOLE FRAME, so prop density inflates it and a world
 //    could pass on props alone. Powder is measured at THE VILLAGE, the
 //    highest-density district it has (powder.ts:196, density 1.5), and still
-//    fails by 2x, so the confound cannot explain the result — but the stronger
+//    fails by 1.6x, so the confound cannot explain the result — but the stronger
 //    version hides every prop (`o.userData.fade !== undefined`, the selector
 //    qa/_grainab.mjs already uses) and needs a five-world baseline of its own.
 //    Build that version if this bar is ever argued with.
