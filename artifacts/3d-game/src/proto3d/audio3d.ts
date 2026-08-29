@@ -304,7 +304,7 @@ export function createAudio(): Audio3D {
     logEv(`gesture, ctx=${c ? c.state : 'none'}`);
     // decode the recorded kit on the FIRST gesture — the first gulp of the
     // first match must already be the real sample, not the synth stand-in
-    for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+    for (const n of ['evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
   };
   // ── EVERY WAY A CHILD CAN TOUCH THIS GAME COUNTS AS THE GESTURE ──────────
   // Capture phase, on window, so nothing downstream can stop the event before
@@ -1926,7 +1926,16 @@ export function createAudio(): Audio3D {
     nEnv(fxFor(dest, 'snare'), t, 0.07, vol, 0.0015);
     if (body) dTone(dest, t, 0.05, 'triangle', vol * 0.3, 195, 160, 0, 0.002);
   }
+  /** A RECORDING IS PLAYING, so nothing percussive may join it. A drum written
+   *  for our own score cannot be in time with a recording it has never heard;
+   *  that is the owner's "not synced", and it is a property of the arrangement,
+   *  not a bug in the scheduler. Consulted by the VOICES rather than by their
+   *  callers, so a new sting cannot reintroduce the defect by finding a fresh
+   *  route to master. */
+  const recordingLive = () => themeCh.srcs.length > 0 || menuCh.srcs.length > 0;
+
   function bDrum(dest: AudioNode, t: number, vol: number) {
+    if (dest === master && recordingLive()) return;   // see recordingLive, by taiko
     dTone(dest, t, 0.22, 'sine', vol, 92, 48, 0, 0.005);
   }
   function crash(dest: AudioNode, t: number, vol: number) {
@@ -3131,6 +3140,10 @@ export function createAudio(): Audio3D {
   /** TAIKO. The big drum: a low sine dropping fast — that pitch drop is what
    *  the ear reads as a large struck skin — with the skin's own slap on top. */
   function taiko(dest: AudioNode, t: number, vol: number, big = true) {
+    // Stings only. The world SCORES play into lnBus/pwBus/gdBus and only ever
+    // run on the 404 fallback path, where there is no recording to clash with;
+    // gating those would silence the fallback score for no reason.
+    if (dest === master && recordingLive()) return;
     dTone(dest, t, big ? 0.5 : 0.3, 'sine', vol, big ? 128 : 190, big ? 52 : 88, 0, 0.002);
     nEnv(fxFor(dest, 'skin'), t, big ? 0.12 : 0.07, vol * 0.55, 0.001);
   }
@@ -3676,7 +3689,7 @@ export function createAudio(): Audio3D {
       // prefetch the recorded kit so the very first gulp is the real sample.
       // (This used to sit AFTER the pirate early-return, so the resort was the
       // one world that never warmed it.)
-      for (const n of ['eaten_deep.wav', 'evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
+      for (const n of ['evolve_epic.wav', 'win_warm.wav']) sample(n, 0);
 
       // ── EVERY WORLD'S OWN SCORE, AND EVERY WORLD'S OWN TRACK SLOT ─────────
       // Each world has a hand-written synthesised score, and each is the right
@@ -4099,7 +4112,18 @@ export function createAudio(): Audio3D {
       if (isPirate() && ++bigEatCount % 5 === 2) {
         const c = ensure(); if (c) yoHo(c.currentTime + 0.1);
       }
-      if (sample('eaten_deep.wav', 0.55)) return;
+      // THE SAMPLE IS GONE, AND THE COMMENT BELOW WAS WRONG WHEN IT WAS
+      // WRITTEN. `if (sample('eaten_deep.wav', 0.55)) return;` stood here and
+      // took this path on every big swallow: the file has been in the repo,
+      // one unchanged 79,424-byte blob, since 2026-08-16 — present on the very
+      // day the fix that declared it "absent" was written, present in dist/
+      // today, and pre-decoded on the child's first gesture, so the whoosh
+      // below had never once played. The owner has now reported the drum
+      // twice; both times the fix repaired the fallback and left the sample
+      // that was actually sounding. The file stays on disk, unreferenced, so
+      // an approved swallow can be dropped straight back in — and replacing
+      // the ASSET rather than the path is his call, not the studio's
+      // (HANDOFF.md:351: he "tried and disliked the first batch").
       // THE OWNER'S "8-bit thud". With eaten_deep.wav absent (no SFX files
       // yet), this fallback fired a punchy 160Hz sine drop + noise burst on
       // every big swallow — a drum hit in all but name, unsynced with any
