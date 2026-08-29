@@ -86,7 +86,7 @@ function shuffle<T>(a: T[]): T[] {
 //   BIGSHOT  (Uncle)   SHOWOFF — crosses the island for the biggest thing on it.
 //   JELLY    (Cousin)  COWARD  — wobbly, scared of everything, delicious-sounding.
 //   ECHO     (Baby)    COPYCAT — does whatever you just did.
-//   GRUMPS   (Grandpa) HOARDER — found his spot. is not leaving his spot.
+//   GRUMPS   (Grandpa) HOARDER — half everyone's speed. gets there when he gets there.
 // All ≤7 characters, which also un-truncates the live leaderboard rows.
 const NAMES = ['JELLY', 'BIGSHOT', 'ECHO', 'NIBBLES', 'GRUMPS'];
 const FIRST_LANE: Record<string, number> = {
@@ -100,7 +100,11 @@ const FIRST_LANE: Record<string, number> = {
 //   COWARD  JELLY     bolts from anything bigger. wide berth, jittery.
 //   SHOWOFF BIGSHOT       crosses the whole island for the biggest landmark.
 //   COPYCAT ECHO       drives your own route about 7 seconds behind you.
-//   HOARDER GRUMPS       camps one district and never leaves it.
+//   HOARDER GRUMPS       works a drifting patch at HALF everyone else's cruising
+//                        speed. (Not "camps one district": the camp is gone —
+//                        see the five attempts recorded at the target picker.
+//                        A comment that describes a behaviour the code does not
+//                        implement is how a costume gets cast against the truth.)
 export type Arch = 'BULLY' | 'COWARD' | 'SHOWOFF' | 'COPYCAT' | 'HOARDER';
 export const ARCH_OF: Record<string, Arch> = {
   NIBBLES: 'BULLY', JELLY: 'COWARD', BIGSHOT: 'SHOWOFF', ECHO: 'COPYCAT', GRUMPS: 'HOARDER',
@@ -460,13 +464,117 @@ export function createRivals(
   // hat on Baby Bitsy — and now that behaviour is keyed to the name, it would
   // have put the bully's brain in the coward's body. One rival object per
   // NAME, permanently: the body, the voice and the archetype never separate.
+  // ── THE CASTING, RE-DEALT (round 4, after the void-cast verdict) ────────
+  // The previous deal put three of the five in somebody else's body: a SHADOW
+  // NINJA called JELLY who runs away from everything, a T-REX called ECHO who
+  // is the baby, and a DRAGON called GRUMPS who ambles at half everyone's
+  // speed. That disagreement is what "the void names seem lame" was pointing
+  // at — a name only sounds like somebody when the picture agrees with it, and
+  // no rewrite of the word list can fix a picture that contradicts it. The
+  // names are fine and they stay; the costumes move.
+  //
+  // The rule the deal is made on, because it outranks the joke: HOW DANGEROUS
+  // A COSTUME LOOKS MUST TRACK HOW DANGEROUS THE SIBLING IS. The costume is on
+  // screen for the whole match and a six-year-old reads a picture before it
+  // reads a ring, so the fiercest body has to be on the only one that can eat
+  // you and the softest on the one a child is supposed to chase.
+  //
+  //   NIBBLES  BULLY   → drako        the only sibling that hunts, charges and
+  //                                   bites now wears the only costume that
+  //                                   looks like it might: wings, gold horns,
+  //                                   a muzzle. The sweetest name in the family
+  //                                   on the fiercest body is the same joke it
+  //                                   always was — finally told with a picture.
+  //   BIGSHOT  SHOWOFF → kingvoid     a gold crown is "I am the biggest deal on
+  //                                   this island", and crossing the whole map
+  //                                   to be seen at the biggest thing on it is
+  //                                   literally his target rule. BIGSHOT and a
+  //                                   crown are one joke twice.
+  //   JELLY    COWARD  → univoid      the harmless one a child is meant to
+  //                                   CHASE now LOOKS harmless: pastel, soft
+  //                                   ears, pink glow, sparkles. A sweet-food
+  //                                   name gets a sweet body. And she bolts
+  //                                   from 4.5x further out than anyone else,
+  //                                   so she is the sibling you must name from
+  //                                   across a street — which is exactly what
+  //                                   the horn is for. It is the one accessory
+  //                                   in the family that changes the OUTLINE
+  //                                   rather than decorating the top of the
+  //                                   skull, and the only one that still reads
+  //                                   at a third of a screen away.
+  //   ECHO     COPYCAT → shadowninja  the skin is called SHADOW, and a shadow
+  //                                   is exactly what a copycat is: the dark
+  //                                   one always behind you, driving the route
+  //                                   you drove four seconds ago. Name, costume
+  //                                   and behaviour finally say one thing.
+  //   GRUMPS   HOARDER → rexling      a row of plates down a scaly back and two
+  //                                   brow horns — a slow plated grazer, not a
+  //                                   runner — on the one who moves at half
+  //                                   everyone else's speed. The old lizard who
+  //                                   will not get off his lawn.
+  //
+  // ZERO TRIANGLES, ZERO DRAW CALLS, ZERO SEEDED DRAWS. The SET of skins built
+  // is unchanged, so this is a permutation of five strings and nothing else:
+  // the same five accessories, the same five bodies, the same meshes in a
+  // different order. qa/ringmeaning.mjs holds that as an invariant — FAMILY_SKIN
+  // must stay a bijection onto the skins carrying `acc` — so a future re-deal
+  // cannot quietly drop a costume or double one up. And rivals.ts makes no
+  // seeded draws at all (grep mrnd/mr/mpick/mchance here: 0), so nothing here
+  // can move an authored Maple placement.
+  //
+  // WHAT THIS CANNOT FIX FROM IN HERE: the shop still sells GRUMPS's costume
+  // under the name "Rexling", which says little-rex where the sibling says old.
+  // That name lives in palette.ts and renaming a $2.99 character is the owner's
+  // call, not a casting one.
   const FAMILY_SKIN: Record<string, string> = {
-    // Five paid characters, five family members, one each — and the casting
-    // now says something. GRUMPS the HOARDER is the dragon: an ancient thing
-    // dozing on a pile of treasure. JELLY the COWARD is the ninja, because a
-    // nervous ninja hiding behind things is funnier than a brave one.
-    JELLY: 'shadowninja', BIGSHOT: 'univoid', ECHO: 'rexling',
-    NIBBLES: 'kingvoid', GRUMPS: 'drako',
+    JELLY: 'univoid', BIGSHOT: 'kingvoid', ECHO: 'shadowninja',
+    NIBBLES: 'drako', GRUMPS: 'rexling',
+  };
+  // ── THE FAMILY'S OWN COLOUR — AND WHY IT IS NOT THE SKIN'S ANY MORE ─────
+  // A sibling's colour is its identity everywhere a child meets it: the ground
+  // ring in the neutral band (the fair fight, below), the LOOK ring, the SURGE
+  // ring, the join banner, the leaderboard row and the chip on its speech
+  // bubble. It used to be `sk.rim` — taken straight off the SHOP palette, which
+  // was authored to match five product cards and had never once been measured
+  // against the four things this ring MEANS.
+  //
+  // Measured in CIE Lab on qa/formsep.mjs's own convention, whose bar for
+  // "these two are the same colour" is ΔE 6:
+  //
+  //   JELLY   #ff4d5e   ΔE  3.1 from DANGER red  — the COWARD wore RUN. Her ring
+  //                                                was red when she was dangerous
+  //                                                and red when she was not, so
+  //                                                the channel said nothing at all
+  //                                                about the one sibling a child
+  //                                                is supposed to chase.
+  //   NIBBLES #ffd25a   ΔE 11.3 from PRIZE gold  — and in the neutral band, which
+  //                                                is exactly when you CANNOT yet
+  //                                                eat her. Two golds, adjacent
+  //                                                meanings, opposite instructions.
+  //   ECHO    #8ef07a   ΔE 16.6 from SAFE green
+  //
+  // These five are authored HERE, beside the cue colours they have to stay away
+  // from, against both constraints at once: ΔE >= 42.2 from every cue colour and
+  // ΔE >= 41.6 from each other — about seven times the ΔE 6 floor on both. They
+  // are also deliberately all COOL, so "not red, not gold, not green" reads as
+  // the fair fight before a child has learned which sibling is which, and none
+  // of them is near white either (ΔE >= 44.0), because white at a rival's feet
+  // is already the NEAR MISS flash.
+  //
+  //   JELLY   #ff8fd0  bubblegum — the unicorn's own pink glow
+  //   BIGSHOT #b96bff  amethyst — the gems set in the crown he wears
+  //   ECHO    #1ac6ff  electric blue, the one colour that reads off a black body
+  //   NIBBLES #5ee8d8  the dragon's own teal
+  //   GRUMPS  #9ea0fa  faded periwinkle. Not green: green is SAFE and the whole
+  //                    point of this table is that a costume colour may not be a
+  //                    meaning colour, even when the costume is green.
+  //
+  // qa/ringmeaning.mjs re-measures both bars from this table and from the halo
+  // block's own literals, and photographs the real ring to check that the render
+  // pipeline has not compressed the difference away.
+  const FAMILY_INK: Record<string, number> = {
+    JELLY: 0xff8fd0, BIGSHOT: 0xb96bff, ECHO: 0x1ac6ff,
+    NIBBLES: 0x5ee8d8, GRUMPS: 0x9ea0fa,
   };
   const skinFor = (nm: string): Skin =>
     SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];
@@ -476,7 +584,7 @@ export function createRivals(
     scene.add(group); scene.add(halo);
     group.visible = halo.visible = false;   // hidden until they join the feast
     const ang = (i / NAMES.length) * Math.PI * 2 + 0.6;
-    roster.push({ name: nm, arch: ARCH_OF[nm], color: sk.rim, score: 0, r: START_R,
+    roster.push({ name: nm, arch: ARCH_OF[nm], color: FAMILY_INK[nm], score: 0, r: START_R,
       group, body: group.children[0] as THREE.Mesh, eyes, halo,
       x: Math.cos(ang) * 150, z: Math.sin(ang) * 150, tx: 0, tz: 0, retarget: 0, graze: 0,
       joinAt: 9e9, joined: false, cast: false, stall: 0, stuckN: 0, ph: rand(0, 6), pulse: 0,
