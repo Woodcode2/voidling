@@ -115,9 +115,13 @@
       html, body, canvas, #joy, #joyNub {
         -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
       #timer {
-        /* a clear lane: the board owns the left, so the clock centres in what
-           is left rather than in the whole screen */
-        position: fixed; top: max(12px, calc(12px + env(safe-area-inset-top, 0px))); left: 42vw; right: 8px; text-align: center; z-index: 5;
+        /* The leaderboard used to own the left, so the clock centred in what
+           was left rather than in the whole screen. The board was deleted
+           2026-08-29 (owner: "The scoreboard on the top left seems useless"),
+           so the lane is gone and the clock centres properly — leaving 42vw
+           would have parked it 12% off-centre for a reason that no longer
+           exists. */
+        position: fixed; top: max(12px, calc(12px + env(safe-area-inset-top, 0px))); left: 0; right: 0; text-align: center; z-index: 5;
         color: #fff; font-size: clamp(26px, 8vw, 40px); font-weight: 700; letter-spacing: 1px;
         /* every neighbour in the top band has a backing pill; the timer had a
            single soft blur, and its urgency colour #ff8a8a measured 1.02:1
@@ -147,30 +151,6 @@
          siblings on the island the board grew to six rows and overlapped the
          news card by 2,460 square pixels, carving away its gold border and
          rounded corner. Six rows now fit exactly; a seventh would scroll. */
-      #board { position: fixed; top: max(10px, calc(10px + env(safe-area-inset-top, 0px))); left: calc(10px + env(safe-area-inset-left, 0px)); z-index: 7; pointer-events: none;
-        max-width: 38vw; max-height: 152px; overflow: hidden;
-        /* ── PANEL OPACITY, and why these three numbers moved ──────────────
-           Measured across MAPLE FALLS, GAME DAY and LANTERN NIGHT: the game's
-           three most-glanced chips were all light text on a HALF-TRANSPARENT
-           panel, which means their contrast is not a property of the chip at
-           all — it is a property of whatever the world happens to put behind
-           them. Composite rgba(16,8,30,0.5) over Maple's ground (luminance
-           0.65) and the panel lands at 0.34; white on that is 4.0:1, and the
-           coin chip's #ffe08a on its own 0.55 panel was 2.45:1. Both under the
-           4.5:1 floor, and both worst on the BRIGHTEST world, which is exactly
-           backwards from where anyone would look for the problem.
-           At 0.88 the panel is 0.12 whatever is behind it, and the chip has
-           the same contrast on a night market as on a beach. The blur is what
-           keeps it from reading as a solid box. */
-        background: rgba(16,8,30,0.88); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(7px); }
-      /* the 😈 hunter marker wrapped onto its own line, which grew the board by
-         a whole row and pushed "You" straight into the DEVOURED chip */
-      #board .row { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;
-        color: #fff; padding: 1px 0; white-space: nowrap; }
-      #board .row.me { color: #ffe89a; }
-      #board .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
-      #board .nm { flex: 1; min-width: 60px; max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
-      #board .sc { font-variant-numeric: tabular-nums; opacity: 0.9; }
       /* ── THE GROWTH BAR ────────────────────────────────────────────────
          It used to be a 4px sliver inside a chip that was JS-projected under
          the void every frame. Three things were wrong with that and a room of
@@ -458,6 +438,22 @@
         background: rgba(201,166,255,0.55); box-shadow: 0 0 14px rgba(172,108,255,0.5);
         transform: translate(-50%, -50%); pointer-events: none; display: none; }
       /* coins + quests */
+      /* The panel-opacity measurement below was taken on the leaderboard,
+         which was deleted 2026-08-29. It is kept here because #coins and
+         #btnQuit use the same rgba(16,8,30,0.88) it produced. */
+      /* ── PANEL OPACITY, and why these three numbers moved ──────────────
+         Measured across MAPLE FALLS, GAME DAY and LANTERN NIGHT: the game's
+         three most-glanced chips were all light text on a HALF-TRANSPARENT
+         panel, which means their contrast is not a property of the chip at
+         all — it is a property of whatever the world happens to put behind
+         them. Composite rgba(16,8,30,0.5) over Maple's ground (luminance
+         0.65) and the panel lands at 0.34; white on that is 4.0:1, and the
+         coin chip's #ffe08a on its own 0.55 panel was 2.45:1. Both under the
+         4.5:1 floor, and both worst on the BRIGHTEST world, which is exactly
+         backwards from where anyone would look for the problem.
+         At 0.88 the panel is 0.12 whatever is behind it, and the chip has
+         the same contrast on a night market as on a beach. The blur is what
+         keeps it from reading as a solid box. */
       #coins { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 5; pointer-events: none;
         background: rgba(16,8,30,0.88); border-radius: 11px; padding: 6px 11px; backdrop-filter: blur(7px);
         color: #ffe08a; font-size: 14px; font-weight: 700; }
@@ -1632,7 +1628,7 @@
       /* ── first-run tutorial ── */
 
       /* hide gameplay HUD while in the menu */
-      body.menu #timer, body.menu #board, body.menu #growth,
+      body.menu #timer, body.menu #growth,
       body.menu #hunger, body.menu #hungerlbl, body.menu #powers, body.menu #banner { display: none; }
       /* …and it has no business sitting over a results card or a shop sheet */
       body.ovl #growth { display: none; }
@@ -1707,7 +1703,6 @@
   </head>
   <body class="menu">
     <div id="timer">3:00</div>
-    <div id="board"></div>
     <div id="coins">✦ 0</div>
     <div id="quests"></div>
     <!-- built once by the module; NOTHING here is ever re-templated -->

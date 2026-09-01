@@ -7,7 +7,9 @@
 // not evidence that a solo match starts.
 //
 // The observable difference between solo and a normal run is not cosmetic:
-// solo is 120s instead of 180s, the rival leaderboard is hidden, and no rivals
+// solo is 120s instead of 180s and no rivals join. The two leaderboard
+// assertions were cut 2026-08-29 with the board itself — they hard-dereferenced
+// getComputedStyle(#board) and would throw on a null the moment it was deleted.
 // are scheduled. This checks all three, then reloads to prove the setting
 // survived, which is the part the old button never did.
 import { chromium } from 'playwright';
@@ -57,7 +59,6 @@ async function play(flip) {
     // reported a bug that did not exist.
     return { clock: Math.round(m.clock),
       rivals: m.rivals.filter((r) => r.joined).length, roster: m.rivals.length,
-      board: getComputedStyle(document.getElementById('board')).display,
       stored: localStorage.getItem('voidSolo') };
   });
   return { before, after, ...st };
@@ -68,7 +69,6 @@ const off = await play(false);
 check('default is rivals-on', off.before === false && off.after === false, `chip on=${off.after}`);
 check('normal run is the 3:00 match', off.clock > 150, `clock=${off.clock}s`);
 check('normal run lets rivals join', off.rivals > 0, `${off.rivals} joined of ${off.roster}`);
-check('leaderboard visible in normal run', off.board !== 'none', `board display=${off.board}`);
 
 // flip it on, mid-session
 await boot();
@@ -76,7 +76,6 @@ const on = await play(true);
 check('toggle turns on', on.after === true, `chip on=${on.after}, stored=${on.stored}`);
 check('solo run is the 2:00 match', on.clock <= 120, `clock=${on.clock}s`);
 check('solo lets none join', on.rivals === 0, `${on.rivals} joined of ${on.roster}`);
-check('leaderboard hidden in solo', on.board === 'none', `board display=${on.board}`);
 check('setting written to storage', on.stored === '1', `voidSolo=${on.stored}`);
 
 // …and the thing the old button could never do: survive a reload

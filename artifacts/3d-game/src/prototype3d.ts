@@ -3041,7 +3041,7 @@ window.addEventListener('resize', () => {
 
 // ── match state + HUD ─────────────────────────────────────────────────────────
 const el = (id: string) => document.getElementById(id)!;
-const timerEl = el('timer'), boardEl = el('board');
+const timerEl = el('timer');
 // THE GROWTH BAR's nodes, resolved ONCE. The old chip was re-templated through
 // innerHTML five times a second, which is why its progress bar could not
 // animate: the fill element it was transitioning was a different element every
@@ -4239,19 +4239,19 @@ let prevRank = 0;   // 0 = unset; rank-change drama needs a baseline first
 // would be a module-init crash, which is exactly how MAPLE_DIST bit this file
 // once already.
 let lastTimerText = '';   // clock chip: the string ticks 1x/s, the loop runs 60x/s
-let lastBoardHtml = '';   // leaderboard: 5Hz rebuild, but usually identical
 function refreshHud() {
   const R = voidling.radius;
-  // leaderboard: player + rivals, ranked by score
-  // the chaser is FLAGGED on the board: when a name has a ⚡ next to it, that
-  // is the one on the island that can eat you right now
+  // the ranking, still computed: it feeds the rival's brag bubble and the end
+  // screen. The ⚡ chaser marker was removed with the board it was drawn on —
+  // who can eat you right now is said by the ground halo turning red, in world
+  // space, with no reading at all.
   // ONLY WHO IS ACTUALLY ON THE ISLAND. rivals.list is this match's whole cast,
   // including the two or three who have not walked in yet, so the board was
   // ranking the player against voids that did not exist — and the end screen
   // listed every one of them, which is the "ton of voids" at the whistle.
   const rows = [{ name: 'You', color: PLAYER_COLOR, score: playerScore, me: true },
     ...rivals.list.filter((r) => r.joined)
-      .map((r) => ({ name: r.hunting ? `⚡ ${r.name}` : r.name, color: r.color, score: r.score, me: false }))]
+      .map((r) => ({ name: r.name, color: r.color, score: r.score, me: false }))]
     .sort((a, b) => b.score - a.score);
   // overtaking is DRAMA — celebrate every rank gained (hole.io's rank swings)
   const myRank = rows.findIndex((r) => r.me) + 1;
@@ -4279,7 +4279,7 @@ function refreshHud() {
   if (started && !ended && settled && shownRank === 1 && !crownLive && everBehind
       && tClock - lastLeadBrag > 6) {
     lastLeadBrag = tClock; announcedRank = shownRank; crownLive = true;
-    const chased = (rows[1]?.name ?? 'the family').replace('⚡ ', '');
+    const chased = (rows[1]?.name ?? 'the family');
     announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
       + `YOU ARE IN FRONT!<span class="bSub">${esc(chased)} is behind you</span></span></div>`);
     fx.ring(voidState.x, voidState.z, 0xffd23f, voidling.radius * 6, 0.9);
@@ -4297,7 +4297,7 @@ function refreshHud() {
   if (!ledJust && started && !ended && settled && shownRank > 1 && crownLive
       && tClock - lastLeadBrag > 6) {
     lastLeadBrag = tClock; announcedRank = shownRank; crownLive = false;
-    const taker = (rows[0]?.name ?? 'the family').replace('⚡ ', '');
+    const taker = (rows[0]?.name ?? 'the family');
     announceHtml(`<div class="bCard"><span class="bIco">👑</span><span class="bTx">`
       + `${esc(taker)} TOOK THE LEAD!<span class="bSub">get it back!</span></span></div>`);
     fx.flash('rgba(255,82,64,0.20)', 0.35);
@@ -4313,7 +4313,7 @@ function refreshHud() {
       && tClock - lastRankBrag > 12) {
     lastRankBrag = tClock; announcedRank = shownRank;
     // the board prefixes the chaser with ⚡; the sentence should not
-    announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival').replace('⚡ ', '')}!`);
+    announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival')}!`);
     audio.ready(); buzz(20);
   }
   // refreshHud runs 5x/s and rank oscillates, so this fired 18 times in one
@@ -4348,17 +4348,27 @@ function refreshHud() {
   // in line with who's joining later" and "isn't updating". It was updating; it
   // was hiding two thirds of the field. With the cast filtered to arrivals this
   // is at most six rows, and each one is a name a child recognises.
-  const shown = rows;
-  // …and only actually WRITE it when it differs. innerHTML tears down and
-  // rebuilds every row element — 6 rows, ~24 nodes — and this runs at 5Hz all
-  // match, overwhelmingly with identical content: scores only move when
-  // somebody eats, and the order changes rarer still. One string compare
-  // replaces the rebuild on the common tick.
-  const boardHtml = shown.map((r) => {
-    const i = rows.indexOf(r);
-    return `<div class="row ${r.me ? 'me' : ''}"><span>${i + 1}</span><span class="dot" style="background:#${r.color.toString(16).padStart(6, '0')}"></span><span class="nm">${r.name}</span><span class="sc">${Math.round(r.score)}</span></div>`;
-  }).join('');
-  if (boardHtml !== lastBoardHtml) { lastBoardHtml = boardHtml; boardEl.innerHTML = boardHtml; }
+  // THE LEADERBOARD IS GONE (owner, 2026-08-29: "The scoreboard on the top
+  // left seems useless — like we know sort of who's winning by size. At the
+  // end we can reflect scores.").
+  //
+  // His reason is FALSE and the removal is still right, which is worth
+  // separating. Measured over 786 frames of a real Maple match
+  // (qa/sizerank.mjs): size order disagrees with score order in 99.9% of
+  // frames, the player's own rank read off size is wrong in 99.7%, and in one
+  // frame in five the player is WINNING and is the fourth-biggest void on the
+  // island. The family's radii are pinned to a shared clock — softCap's
+  // min(START_R + 0.02t, 1.6) — so two siblings 2.3x apart on score render the
+  // same size to two decimal places. Size cannot rank anybody.
+  //
+  // The board goes anyway, for reasons that survive that: it is a six-row
+  // numeric table at 13px in a game rated 4+, it is the only in-match display
+  // of a raw score a child cannot act on, and the danger it marked with a
+  // lightning bolt is already said better by the ground halo — in world space,
+  // in colour, with no reading at all.
+  //
+  // `rows` and `myRank` stay: the rank machine feeds the rival's brag bubble,
+  // which is family speech, and family speech is the channel he is keeping.
   // COUNT-based, not mass-based: summed radius made the meter dead air (an
   // hour of snacking read 0% because towers own the mass). One prop = one
   // tick, so a kid sees the number move in the first minute — and Solo's
@@ -5533,7 +5543,6 @@ function beginMatch(solo = false) {
   localStorage.setItem('voidPlayed', '1');
   document.body.classList.remove('menu');
   menuEl.style.display = 'none';
-  boardEl.style.display = solo ? 'none' : '';
   // RESTART the card animation. classList.add on an element that already has
   // the class is a no-op, so `cardFade 4.2s forwards` played on match 1 and
   // never again — and PLAY AGAIN is how children actually start matches.
