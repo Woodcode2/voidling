@@ -2952,7 +2952,7 @@ function joySet(cx: number, cy: number) {
   // A REAL STEER, not a stray tap. Arms the FIRST NOM celebration so the party
   // belongs to a bite the child aimed at, not to the void drifting into a
   // postbox on the auto-started first launch.
-  if (!nomArmed && joy.mag > 0.25) nomArmed = true;
+  if (joy.mag > 0.25) { dragDone = true; if (!nomArmed) nomArmed = true; }
   // a real drive, which is what arms the edge rescue and settles ownership
   if (joy.mag > 0.12) joy.moved = true;
   joyNubEl.style.left = `${joy.ax + dx * k}px`; joyNubEl.style.top = `${joy.ay + dy * k}px`;
@@ -5410,6 +5410,18 @@ let introShadow: boolean | null = null;
 let paused = false;        // the pause sheet is up: the whole match holds still
 let firstRun = false;      // this child has never seen a match before
 let dragTaught = false;    // the DRAG pill has been shown for this match
+// MAPLE IS THE INTRO LEVEL FOR EVERYONE, EVERY TIME (owner, 2026-08-29: "Maple
+// isle should always be sort of that intro level… on a fresh start it shows it
+// but once you have history it gets rid of it"). The ghost hand used to hang
+// off firstRun, which means "has never played", so it vanished for good about
+// one second into the first match a child ever played — voidPlayed is written
+// at match START. These three flags separate the three things firstRun was
+// doing at once, because flipping firstRun alone does NOT bring the hand back:
+// the hand also needs !nomArmed, and nomArmed starts TRUE for a returning
+// player so the once-in-a-lifetime FIRST NOM party cannot fire on drift.
+let teachDrag = false;     // this match should show the wordless lesson
+let dragDone = false;      // a real drag has happened THIS match
+let controlsLive = false;  // the intro is over and a drag would actually move
 let dragNagT = 0;          // cooldown before the drag lesson repeats
 let dragNags = 0;          // how many times it has repeated (capped at 3)
 let nomArmed = true;       // the FIRST NOM party may fire (see beginMatch)
@@ -5539,6 +5551,10 @@ function beginMatch(solo = false) {
   // the screen does not respond. It is now queued and fires the moment the
   // controls are actually live.
   firstRun = firstEver;
+  // Maple teaches every time; every other world teaches only a brand-new child.
+  teachDrag = firstEver || pickedWorld === 'maple';
+  dragDone = false;
+  controlsLive = false;
   dragTaught = false;
   dragNagT = 0; dragNags = 0;   // the drag lesson gets its repeats back each match
   nomArmed = !firstEver;   // see onEat: the FIRST NOM party waits for a real drag
@@ -9088,7 +9104,13 @@ function animate() {
   // (nomArmed) — so no path out of a match can strand it on screen. Unlike the
   // pill it does not stop at three repeats: it is quiet, and it is the only
   // instruction a pre-reader can follow at all.
-  handEl.classList.toggle('show', firstRun && started && !ended && dragTaught && !nomArmed);
+  // teachDrag/controlsLive/dragDone, NOT firstRun/dragTaught/nomArmed: the hand
+  // must run on Maple for a returning child, and must still vanish the instant
+  // they drag. The welcome banners, the DRAG pill, the FIRST NOM party and the
+  // danger beats stay on firstRun — those are once-in-a-lifetime moments, and
+  // replaying them every Maple match would turn the intro level into a
+  // permanent tutorial. The owner asked for the hand, not the lecture.
+  handEl.classList.toggle('show', teachDrag && started && !ended && controlsLive && !dragDone);
   // …and NOT UNTIL THEY CAN MOVE. This fires on any frame the guide is idle,
   // which includes the gaps between the drag lesson's repeats — so a child who
   // had not yet worked out the control was being told "that one is BIGGER than
@@ -9265,6 +9287,7 @@ function animate() {
       if (introT <= 0 && introShadow !== null) {
         renderer.shadowMap.enabled = introShadow; sun.castShadow = introShadow; introShadow = null;
       }
+      if (introT <= 0) controlsLive = true;
       if (introT <= 0 && firstRun && !dragTaught) {
         // controls are live THIS frame — now the instruction is true
         dragTaught = true; guideStep = 1;
