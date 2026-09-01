@@ -2389,19 +2389,21 @@ _dbg.__fx = fx;
 const FAMILY_TITLE: Record<string, string> = {
   JELLY: 'Cousin', BIGSHOT: 'Uncle', ECHO: 'Baby', NIBBLES: 'Auntie', GRUMPS: 'Grandpa',
 };
-// each family member's ARCHETYPE, named on arrival — a kid should be told what
-// to watch for once, then be able to read it off the screen forever after
-const ARCH_TAG: Record<string, string> = {
-  BULLY: '⚡ she CHASES you', COWARD: '😱 runs from everything',
-  SHOWOFF: '✨ only eats big stuff', COPYCAT: '👣 copies your route',
-  // …no longer "camps one spot": the camp was deleted when it turned out to be
-  // what was pinning him (rivals.ts records the five attempts). A join banner
-  // that teaches a behaviour the code does not implement is worse than no
-  // banner — the child watches for it and it never happens.
-  HOARDER: '😴 slow and steady',
-};
+// THE ARCHETYPE TAGS WENT WITH THE JOIN CARD (2026-08-29). They were the one
+// thing that card said which a halo cannot: a one-line teach naming what to
+// watch each sibling for. That teach is now unhoused, and it is recorded here
+// rather than lost — if it comes back it belongs in the world (a bubble from
+// the sibling itself, in its own voice, once) and not in a modal over the game.
 rivals.onJoin = (name, color, x, z, arch) => {
-  announceJoin(name, color, FAMILY_TITLE[name] ?? 'Cousin', (ARCH_TAG[arch] ?? '').replace(/^\S+\s*/, ''));
+  // NO CARD ON A JOIN (owner, 2026-08-29: the HUD "gets so cluttered it's
+  // distracting… do we remove the void window — when they talk it's just chat
+  // bubbles?"). The void walks into the world wearing its own colour with a
+  // ground halo under it and audio.alert() on top; the card's extra payload
+  // was the archetype line, which is a TEACH, not news. And the card actively
+  // gagged the channel he is keeping: while a banner is up, bubbles.say()
+  // DISCARDS every crowd and event bubble rather than queueing it, and the
+  // banner's measured duty cycle is 39% — so a large share of the town's
+  // silence was the family announcing itself.
   // (no ring on a join. It was drawn at the rival's own turf, up to 165 units
   // off and usually nowhere near the screen, while the banner and the alert
   // that actually tell the player were on it. A ring nobody sees still costs a
@@ -2459,9 +2461,9 @@ rivals.onRivalEaten = (name, pts, rx, rz, rr, marquee) => {
   track('ate_rival', { name, pts: Math.round(pts), marquee: !!marquee, sec: elapsed() });
   // the stuffed hunter is the MARQUEE meal: it hands back everything she bit
   // off you plus half her score, so it has to land like the ending it is
-  announceHtml(marquee
-    ? `<div class="bCard"><span class="bIco">🏆</span><span class="bTx">You beat the chaser!<span class="bSub">${name} is out</span></span><span class="bMul">+${pts}</span></div>`
-    : `<div class="bCard"><span class="bIco">🍽️</span><span class="bTx">You ate ${esc(name)}!<span class="bSub">${esc(FAMILY_TITLE[name] ?? 'a rival')} is out</span></span><span class="bMul">+${pts}</span></div>`);
+  // No card: bubbles.float() at the kill site already says the name, the title
+  // and the points where the child is actually looking, under two rings, two
+  // flashes, a camera punch, audio.bigEat() and an 80ms buzz.
   // …and the town notices a second hole vanishing, without ever learning that
   // it had a name. COPY.rivalGoneNews was one string per world; this is a pool,
   // through the same cooldown as every other reaction, so a marquee kill and a
@@ -2623,7 +2625,9 @@ rivals.onNotice = (name, x, z, color) => {
 rivals.onSurge = (name, x, z, color) => {
   rivalEv.surges++;   // QA: qa/rivalswing.mjs reads this through __matchState().ev
   fx.ring(x, z, color, 34, 0.6);
-  announceHtml(`<div class="bCard"><span class="bIco">📢</span><span class="bTx">${esc(name)} grew BIGGER than you<span class="bSub">eat up, then eat THEM</span></span></div>`);
+  // No card: the rival's ground halo is RED for the entire surge (rivals.ts
+  // sets 0xff5560 above EAT_RATIO, and a surge pins it at 1.26x), and onSurge
+  // already fires its own ring in that rival's colour.
 };
 rivals.onNearMiss = (name, x, z) => {
   rivalEv.nearMiss++;
@@ -2641,7 +2645,8 @@ rivals.onNearMiss = (name, x, z) => {
   addCoins(5);   // dodging is a SKILL — pay it
 };
 rivals.onStuffed = (name) => {
-  announceHtml(`<div class="bCard"><span class="bIco">🍰</span><span class="bTx">${esc(name)} is too full<span class="bSub">now is your chance</span></span></div>`);
+  // No card: the halo turns GOLD and pulses, breakingNews already puts it in
+  // the town lane, and audio.ready() marks the moment.
   breakingNews(COPY.rivalFullNews);
   audio.ready();
 };
@@ -3062,13 +3067,6 @@ let prevHunger = 0;
  *  with two emoji in it and reads like a chat log. Now it is a card with the
  *  rival's own colour on it, their name at card size, and what they DO on a
  *  second line — the same shape a fighting game uses to say who just walked in. */
-function announceJoin(name: string, color: number, title: string, tag: string) {
-  const hex = '#' + color.toString(16).padStart(6, '0');
-  announceHtml(
-    `<div class="bCard"><span class="bDot" style="background:${hex};color:${hex}"></span>`
-    + `<span class="bTx">${esc(title)} ${esc(name)}<span class="bSub">${esc(tag)}</span></span></div>`,
-  );
-}
 /** A scripted beat. The multiplier is a BADGE, not a clause — "Everything is
  *  DOUBLE!" was two thirds of the sentence and the least interesting third. */
 function announceBeat(icon: string, title: string, sub: string, mult: number) {
@@ -9305,7 +9303,12 @@ function animate() {
         // ten seconds a story instead of a tutorial. Two banner cards riding
         // the existing queue (BANNER_READ paces them), never blocking play:
         // the kid can drag mid-sentence and nothing waits on the cards.
-        announceHtml(cardHtml('👋 Auntie NIBBLES: "ooooh… this planet looks DELICIOUS!"'));
+        // The welcome card is gone with the rest of the void window. It was the
+        // ONE card with no world-space twin — NIBBLES joins at t=7-13s and is
+        // not on the island when this fires, so it cannot become a bubble
+        // without moving her join time, which is a balance number. The
+        // instruction three seconds behind it still opens the game, and an
+        // instruction outranks flavour for a child who has never played.
         setTimeout(() => announce('🍽️ eat everything SMALLER than you — and have fun!!'), 3000);
         showGuide('<b>DRAG</b> to move — eat & <b>GROW</b>!', 6);
         dragNagT = 3;   // the repeat waits its gap too, not just the ones after it
