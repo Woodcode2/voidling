@@ -1956,7 +1956,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('stamp')) {
 // board — on a screen whose whole job is to look like a real leaderboard. The
 // comment two lines up already said "and NOT on the shop or the worlds screen":
 // a fix that missed a case. 'pause' and 'policy' are new and belong here too.
-const OVERLAYS = ['worlds', 'shop', 'daily', 'tut', 'settings', 'trophies', 'skinPrev',
+const OVERLAYS = ['worlds', 'shop', 'daily', 'settings', 'trophies', 'skinPrev',
   'topvoids', 'pause', 'policy', 'gate'];
   const vis = () => {
     const overlaid = OVERLAYS.some((id) => document.getElementById(id)?.classList.contains('show'));
@@ -5396,7 +5396,7 @@ pwBtns[1].addEventListener('click', fireCollapse);
 
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
-const menuEl = el('menu'), shopEl = el('shop'), tutEl = el('tut');
+const menuEl = el('menu'), shopEl = el('shop');
 const handEl = el('hand');   // the ghost hand — the wordless drag lesson
 let guideStep = 0, guideT = 0, presenceT = 0;
 let introT = 0, outroT = 0;
@@ -5696,37 +5696,28 @@ function launchWorld() {
   menuEl.style.display = 'none';
   // one-time teach card before the first menu-launched match: it's the only
   // place the danger loop ("eat the family when bigger, RUN when not") lives
-  if (!localStorage.getItem('voidTut')) {
-    track('tutorial_view', {});
-    // NO LESSON TWICE (owner: "I don't want duplicity"). The card's ∞ demo
-    // and the in-game ghost hand can never be on screen together — the hand
-    // needs firstRun (voidPlayed unset), the card needs the menu (voidPlayed
-    // set) — but a child who already performed the drag in match one would
-    // still be re-taught it here. voidFirstNom is written at the first
-    // drag-driven bite, so it is proof the gesture is learned: with it set,
-    // the card keeps only what it alone teaches — the danger loop.
-    tutEl.classList.toggle('knows', !!localStorage.getItem('voidFirstNom'));
-    tutEl.classList.add('show');
-    // …AND DROP THE COVER, because this return skips withWorldReady() and
-    // withWorldReady() is the only thing that ever releases a 'pack' hold.
-    //
-    // The world-switch path takes that hold synchronously before calling in
-    // here (see the autoplay block at the bottom of this file), so on the one
-    // journey that combines the two — session two, where voidPlayed is set but
-    // voidTut is not, because first launch calls beginMatch() directly and only
-    // the card's own button writes voidTut — the child picked a world and got a
-    // loading screen frozen at 100% for ever. #loadScr is z-index 60 and #tut
-    // is 12, so the card asking them to tap was UNDERNEATH the cover, with the
-    // menu already hidden. There was no way out of it at all.
-    //
-    // This is the same bug withWorldReady's own comment describes fixing on the
-    // fast path: "nobody ever released it". The teach card was the other door
-    // into it. Releasing is safe for a hold nobody took — a Set delete and a
-    // size check — and the card is its own full-screen scrim, so nothing
-    // half-built shows through while it is up.
-    coverRelease('pack');
-    return;
-  }
+  // THE "DRAG TO MOVE" CARD IS GONE (owner, 2026-08-29: "I also see the old
+  // version pop up at the next level where it was like a popup to tell you to
+  // move. That must be old code.").
+  //
+  // It was not dead, and that is worse. First launch calls beginMatch()
+  // directly and ONLY this card's own button ever wrote voidTut, so EVERY
+  // child arrived at session two with the key unset, and the first world they
+  // picked raised a full-screen modal headed DRAG TO MOVE. If they had already
+  // dragged, `.knows` hid the card's figure-8 — but not that headline, which
+  // was hardcoded — so what survived was a wall of text instructing a child in
+  // the one thing the game already knew they could do.
+  //
+  // It also cost a third tap to start a match in session two: the world card,
+  // the audio gate, and LET'S EAT. And it was the second door into the
+  // unexitable-app bug — this early return skipped withWorldReady(), the only
+  // thing that releases a 'pack' cover hold, so the card the child had to tap
+  // sat underneath a frozen 100% loading screen with the menu already hidden.
+  // qa/tutstrand.mjs exists because of that. The coverRelease('pack') patch and
+  // its twenty-line comment go with the card that needed them.
+  //
+  // The wordless ghost hand teaches the same gesture over the live game and is
+  // the teach the owner actually asked to keep.
   withWorldReady(() => startFresh(soloOn()));
 }
 // ── SOLO IS A SETTING NOW, NOT A SECOND FRONT DOOR ────────────────────────
@@ -5755,12 +5746,6 @@ const soloOn = () => localStorage.getItem('voidSolo') === '1';
     track('solo_toggle', { on });
   });
 }
-el('btnGotIt').addEventListener('click', () => {
-  track('tutorial_done', {});
-  localStorage.setItem('voidTut', '1');
-  tutEl.classList.remove('show');
-  withWorldReady(() => startFresh(soloOn()));
-});
 // FIRST LAUNCH: no menu — splash straight into the game with in-game guidance
 // (hole.io's onboarding). The menu earns its place from session two.
 if (!DEBUG_HARNESS && !TOPDOWN && !ASSETVIEW && !localStorage.getItem('voidPlayed')) {
@@ -7060,7 +7045,7 @@ function askGrownUp(then: () => void): void {
 
 // EXPLICIT debug params only skip the menu — arbitrary query strings on shared
 // links (?utm_source=…) must land on the real splash like any player
-if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { localStorage.setItem('voidTut', '1'); beginMatch(); }
+if (DEBUG_HARNESS || TOPDOWN || ASSETVIEW) { beginMatch(); }
 
 // skin SHOP — earn coins in matches, spend them on skins (LoL soft-currency
 // model, same as the 2D shop); owned + equipped persist across sessions
