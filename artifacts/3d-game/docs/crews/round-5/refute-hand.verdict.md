@@ -57,3 +57,15 @@ C2 — `qa/mapleteach.mjs`: add a third leg after the Maple pointer run, same se
 
 ## What stays owed
 The three browser probes in `hand_refute.mjs` (stay / intro / ladder) and a verbatim re-run of `qa/mapleteach.mjs`, on a quiet box. Until they run, kill shots 2 and 3 are source claims, and this verdict is provisional under Rule 1.
+
+## Governor's browser run (2026-09-02 14:52-14:56 UTC, quiet box, GPU lock held, :4177 = HEAD 59d53cd build)
+`node qa/mapleteach.mjs` (the shipped probe, verbatim), exit 0:
+```
+  MAPLE  with history: hand SHOWN, after a drag: gone
+  PIRATE with history: hand absent
+MAPLETEACH: PASS — Maple teaches every time, the drag ends it, and no other world nags
+```
+This is the verbatim re-run the skeptic listed as owed. Kill shots 2 and 3 (the
+hand during the intro; the first-run ladder) remain source-level claims — the
+skeptic's stay/intro/ladder probes were never run. C1 (keyboard steer counts as
+the drag) and C2 (its probe leg) land with the round-5 batch.
