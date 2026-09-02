@@ -55,4 +55,4 @@ Thumbs.db
 f_[a-z].txt
 
 # workflow-runtime worktrees (per-agent isolated checkouts) — never commit
-.claude/worktrees/
+**/.claude/worktrees/
