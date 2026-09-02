@@ -59,3 +59,19 @@ The first crew was killed by a container restart at ~21:35 while running the SEE
 the AFTER died with the browser). Its WIP patch (`placement.wip.patch`, island.ts +93/-28, prototype3d.ts +116)
 applied cleanly to HEAD 4c8a743 in this worktree (`git apply --check` then `git apply`, exit 0). Judging it before
 building; measurements below are appended as they land.
+
+### 21:43 UTC — instrument fix (qa/placement.mjs) and the SEED=7 BEFORE row for Maple
+- The v2 probe threw `ReferenceError: DECK_BAND is not defined` on every world with a deck road (pirate) or any
+  polyline road (gameday/lantern/powder): the constant was declared in Node scope (line 96) but read inside the
+  in-page `auditFn` (line 272). Maple has no polyline roads so the first crew's Maple runs never hit it.
+  Fixed by passing it through `D` like the other bars (lines 167 and 400). `node --check` clean. MAIN copy updated.
+- Maple BEFORE at SEED=7 (first crew's run, the final v2 probe, unpatched :4177), command
+  `SEED=7 node qa/placement.mjs maple 4177 --json=/tmp/crew-placement/s7-before-maple.json --shots=... --pick=inside:2,overlap:2,road:1,door:1`:
+
+| world | props | road | water | offisland | float | inside | under(info) | overlap | roadend | door | bench | sunk(info) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| maple (SEED=7, before) | 5443 | 14 | 0 | 1 | 0 | 184 | 93 | 192 | 0 | 5 | 3 | 171 |
+
+  (overlap 192 here vs 451 in the 21:12 table: between those runs the first crew split solid-through-anything
+  `overlap` (FAIL) from clutter-touching-clutter `clutter` (info) — see probe line ~309. The 21:12 table is superseded
+  by the SEED=7 rows as they land below.)

@@ -164,7 +164,7 @@ function worldData(wid) {
 // geometry on the live meshes; nothing is transcribed from the source except
 // the bars above and the road data parsed from it.
 const auditFn = (D) => {
-  const { ROAD_LIP, FLOAT_TOL, SUNK_TOL, OVERLAP_TOL, DOOR_CLEAR, BENCH_NEAR, GROUND_H } = D;
+  const { ROAD_LIP, FLOAT_TOL, SUNK_TOL, OVERLAP_TOL, DOOR_CLEAR, BENCH_NEAR, GROUND_H, DECK_BAND } = D;
   const THREE = window.__THREE;
   const segDist = (px, pz, ax, az, bx, bz) => {
     const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
@@ -397,7 +397,7 @@ for (const wid of WORLDS) {
   const t0 = Date.now();
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
-  const res = await p.evaluate(auditFn, Object.assign({}, D, { ROAD_LIP, FLOAT_TOL, SUNK_TOL, OVERLAP_TOL, DOOR_CLEAR, BENCH_NEAR, GROUND_H }));
+  const res = await p.evaluate(auditFn, Object.assign({}, D, { ROAD_LIP, FLOAT_TOL, SUNK_TOL, OVERLAP_TOL, DOOR_CLEAR, BENCH_NEAR, GROUND_H, DECK_BAND }));
   if (wid === 'maple' && res.benches === 0) { console.log(JSON.stringify(res.dbgBench)); throw new Error('placement.mjs: bench fingerprint found no benches on Maple — makeBench changed; fix the fingerprint'); }
   results[wid] = res;
   const rows = [];
