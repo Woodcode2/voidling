@@ -33,6 +33,16 @@ owed. Your job is to KILL it if it deserves to die. Read the commit's diff
 (git show <sha>) and the real files on disk, not the commit message's account
 of them. A verdict that trusts the message is not a verdict.
 
+INCREMENTAL RECORD — the previous launch of this round lost fifteen agents to
+the account session limit with NOTHING on disk, because every crew planned to
+write its file at the end. So: create your output file in MAIN (the path
+above) within your first ten minutes, headed "# DRAFT — in progress (<key>)"
+with the required sections as empty headings, and APPEND to it every time you
+finish a measurement, a shot or a finding — numbers and commands as you get
+them, not at the end. Replace the DRAFT header with the final one only when
+you are done. If you are cut off, what is on disk is the record; a plan in
+your head is not.
+
 Verdicts: SOUND (you tried to kill it and failed — say what you tried),
 SOUND WITH CORRECTIONS (each correction verbatim and mechanically applicable),
 or KILLED (the specific fact, with the command or file:line that proves it).

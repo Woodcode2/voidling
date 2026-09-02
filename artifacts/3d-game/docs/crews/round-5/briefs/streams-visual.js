@@ -72,6 +72,16 @@ WHERE FILES GO (absolute paths in MAIN — the governor commits from there):
   new probes     ${MAIN}/qa/<name>.mjs (NEW files only; copy into your worktree to run them)
 Nothing else in MAIN.
 
+INCREMENTAL RECORD — the previous launch of this round lost fifteen agents to
+the account session limit with NOTHING on disk, because every crew planned to
+write its file at the end. So: create your output file in MAIN (the path
+above) within your first ten minutes, headed "# DRAFT — in progress (<key>)"
+with the required sections as empty headings, and APPEND to it every time you
+finish a measurement, a shot or a finding — numbers and commands as you get
+them, not at the end. Replace the DRAFT header with the final one only when
+you are done. If you are cut off, what is on disk is the record; a plan in
+your head is not.
+
 THE PROPOSAL FORMAT (the governor lands from it mechanically, so it must be
 exact): "# PROPOSAL: <key>" / "## The owner's words" / "## What I measured"
 (numbers + the commands) / "## What is wrong" (each item with file:line and the

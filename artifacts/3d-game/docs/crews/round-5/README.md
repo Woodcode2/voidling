@@ -39,3 +39,15 @@ The governor lands only hunk groups a skeptic ruled SOUND or SOUND WITH
 CORRECTIONS (corrections applied verbatim), one group at a time, each with the
 probe that fails before it, then the gate on a quiet box before main moves.
 KILLED groups are recorded here, never hidden.
+
+## Launch log
+- **2026-09-02 00:20 UTC — first launch, all three workflows at once.** Every
+  one of the 15 agents died at the account's session limit ("resets 3:40am
+  UTC") after 1.24M subagent tokens and 338 tool uses, with NOTHING on disk:
+  each crew had planned to write its file at the end. Recorded here because
+  it is the most expensive nothing this studio has produced.
+- **03:49 UTC — relaunch, sequentially** (refute-six → streams-visual →
+  streams-content) so the burn stays inside the window, with a new rule in
+  every brief: create the output file within ten minutes as a DRAFT and append
+  each finding as it lands. If the limit cuts a crew off again, the draft is
+  the record.
