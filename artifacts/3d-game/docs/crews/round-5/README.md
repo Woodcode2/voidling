@@ -87,3 +87,6 @@ KILLED groups are recorded here, never hidden.
   evidence); hand SOUND WITH CORRECTIONS (shipped probe passes; the skeptic's own
   stay/intro/ladder probes never ran); board — the skeptic died before writing the final
   header, but its measured run and C1-C7 are complete; read as SOUND WITH CORRECTIONS.
+- **15:34-15:53 UTC — gate:** `node qa/gate.mjs --profile=push --port=4177` on a quiet
+  box (load 3.0 at start, GPU lock held): **PASS, 14/14, every step reached its own
+  conclusion.** main fast-forwarded to this commit.
