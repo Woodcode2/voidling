@@ -235,7 +235,26 @@ where it should read the canvas?`,
   },
   {
     key: 'placement', port: 4181, sport: 4201,
-    crew: `STREAM A (first half) — PLACEMENT: every object earns the spot it is
+    crew: `CONTINUATION — READ THIS FIRST. A previous crew ran this lane for 50 minutes and
+was killed by a container restart. Its work survived and is committed in MAIN:
+- the DRAFT proposal at MAIN/docs/crews/round-5/placement.proposal.md — read it in
+  full; it holds the instrument design (v1 retired, v2 ground footprints), the
+  BEFORE table for all five worlds, and the causes grouped by prop class;
+- the instrument, MAIN/qa/placement.mjs (v2, 35 KB, takes [world|all] [port]
+  [--json=path]) — reuse it, do not rewrite it;
+- four before-shots in MAIN/docs/crews/round-5/shots/placement-before-*.png;
+- its UNFINISHED source patch, MAIN/docs/crews/round-5/placement.wip.patch
+  (island.ts +93/-28, prototype3d.ts +116): apply it in YOUR worktree with
+  git apply, read it, and judge it — it is a starting point, not a verdict.
+It was killed while running the BEFORE/AFTER audits and shots at SEED=7 for all
+worlds. Continue from there: finish or amend the patch, build, run the AFTER
+audit on all five worlds at SEED=7, take the after-shots of the same offenders,
+and write the hunk groups into the SAME proposal file (append; keep its record;
+replace the DRAFT header only when done). Append to the proposal after EVERY
+measurement — the container restarts without warning and the governor sweeps
+the file into git every 10 minutes.
+
+STREAM A (first half) — PLACEMENT: every object earns the spot it is
 standing on. The owner, verbatim: "Sometimes in certain levels the items may
 be misplaced — you have trees on roads, the road may not be finished, item
 placement isn't dialled in. That needs to get fixed. Every item needs a
