@@ -1,4 +1,4 @@
-# DRAFT — in progress (refute-popup)
+# VERDICT: SOUND WITH CORRECTIONS (refute-popup, e39e3e0) — launch 3 was forced to return with three browser runs still in flight; see the closing section
 
 Commit under refutation: e39e3e0 (DRAG TO MOVE #tut modal deleted).
 Started 2026-09-02. Appending as measurements land.
@@ -91,3 +91,64 @@ Started 2026-09-02. Appending as measurements land.
   The daily card and the skin-preview card each grew 2px of corner radius in a commit whose message says it deleted "every #tut and #btnGotIt style". Confirmed, not inferred.
 - HEAD moved during this session: c761620 (verdict-draft ticks only; `git diff --stat ec214f4..HEAD -- src index.html` is empty). :4177 serves `assets/main-BlHCCMf5.js` == dist/assets; the parent worktree's bundle is `main-D5xeDCkV.js`.
 - The remaining three browser jobs died on launch inside the queue (no /usr/bin/time on this box — my earlier runs used the shell builtin); relaunched without it.
+
+<!-- ══ RESUMED 2026-09-02 09:44 UTC, third launch of this lane (the second was cut by the session limit after appended 7). Rule 3: nothing above is a number I ran; every figure I rely on below is re-run in this launch and labelled (rerun). Where I cite an earlier appended entry it is as a lead, not as evidence. ══ -->
+### (disk, rerun) state at resume
+- HEAD bb89582; `git log e39e3e0..HEAD -- src index.html` = 0efda23, 592e9a3, a4f5bf6 (three landings after the popup one); `git status --short src index.html` empty.
+- dist/index.html + assets mtime 2026-09-02 00:13:43 > last src commit; :4177 returns 200 and serves `assets/main-BlHCCMf5.js` == dist/. `grep -c 'id="tut"' dist/index.html` = 0. The preview IS HEAD; no rebuild.
+- /proc/loadavg 0.29 0.08 0.02, `pgrep -c chromium` 0, /tmp/gpu.lock absent. Parent worktree from appended 6 is gone (`git worktree list` shows main only).
+### (disk, rerun) orphans and consumers, re-read at HEAD bb89582
+- `grep -nE "\btut\b|tutEl|btnGotIt|voidTut|\.tTitle|\.tBody|\.tEmoji|\.tHand" src/*.ts index.html` → 4 hits, all comment lines: prototype3d.ts:5727, :5757, :9080; index.html:1729. `'knows'`/`.knows`: 1 hit, a comment (:5730). No live reference in src/ or index.html.
+- `modalIn`: 4 hits in index.html — the @keyframes at :1130 and three live users (:1023 #daily, :1092 #skinPrev, :1334 #settings/#gate). Not orphaned by the deletion.
+- voidTut outside src/qa/docs/dist: `scripts/shoot-store.mjs` (a seed write, no reader) and a stale `dist-gw/` bundle. Dead key, as the message says.
+- `tutorial_view` / `tutorial_done` event names: still listed in APPSTORE.md:81 and docs/STUDIO-ROUND-3.md:1328/1333 as emitted events. Nothing in src/ emits them now. Docs-only; a correction, not a kill.
+- OVERLAYS (prototype3d.ts:1959-1975): consumers are `OVERLAYS.some(id => document.getElementById(id)?.classList.contains('show'))` and `for (const id of OVERLAYS) { const n = document.getElementById(id); if (n) mo.observe(...) }`. Both key by id string and null-guard; nothing indexes by position. Its output is `bs.style.display` (dev build stamp) and `body.ovl` (quest board hides under an overlay). Removing 'tut' changes nothing for the other nine ids.
+- The stray close tag: ran scratch divstack.mjs on index.html and dist/index.html — `index.html: 1 mismatched close tags {"line":2027,"tag":"div","top":"body#@1704","wouldClose":"NONE (ignored by parser)"}`; dist/index.html the same at :2029. The open stack at that point is `html > body`, so the HTML5 parser drops the `</div>` (parse error, no tree change). Cosmetic. Under the orphan `<!-- ── first-run tutorial ── -->` comment at :2026.
+- The `/* ── first-run tutorial ── */` CSS section header at index.html:1632 now heads an empty section (the next rule is "hide gameplay HUD while in the menu").
+- launchWorld() (:5717-5745): first two comment lines (:5720-5721, "one-time teach card before the first menu-launched match: it's the only place the danger loop ... lives") describe the deleted card in the present tense; :5757-5760 ("never saw the danger card") and :9080-9081 ("the ONLY place it was written down is the #tut card — which is shown from launchWorld()") likewise. Three stale comments; corrections.
+- The cover on every door into launchWorld() at HEAD: (1) same-world card :5938 and (2) ribbon :5964 call launchWorld() directly with no hold taken; (3) the voidAutoPlay reload block (:6012-6084) takes NO synchronous coverHold any more (the hold "moves INSIDE the tap", :6029-6035), arms the gate after `Promise.race([preloadP, 12s])` sets `packReady = true` (:6068), and its tap callback either launches (:6083) or, with #daily up, sets pendingLaunch + coverRelease('pack') (:6079-6080) and lets (4) closeDaily() (:6918-6922) call launchWorld(). On every door launchWorld() reaches withWorldReady() (:5744), whose fast path is `if (packReady) { coverRelease('pack', cb); return; }` (:5685) and whose slow path takes coverHold('pack') (:5688) and releases it after the race + 300ms (:5697). No door reaches a 'pack' hold without a matching release; the early return that skipped withWorldReady() is the only code that ever did, and it is gone. Measured below.
+- qa/gate.mjs job list (grep `id: '`): 37 jobs; tutstrand.mjs is not one of them (the browser UI jobs are uisystem :209 and switch :218). Five underscore probes still dereference #tut unguarded (`_bug9.mjs:56`, `_mvcontrast.mjs:23`, `_mvgeom.mjs:41`, `_tutorder.mjs:56`, `_mvcold.mjs:84`) — none is in the gate; hud2.mjs:77 is `?.`-guarded.
+### (ran, rerun) `npx tsc --noEmit` — exit 0, 09:44:52→09:44:57 (5s).
+### (ran, rerun) `node qa/tutstrand.mjs 4177` (HEAD) — exit 1, 69s wall, lock taken at load 0.20 / chromium 0, 09:44:57→09:46:06
+    before the switch: {"cover":{"on":false,"z":60},"tut":{"on":false,"z":0},"menu":true,"clock":180,"hud":false}
+    ok   a second world exists to switch to   pirate
+    after the world switch: {"cover":{"on":false,"z":60},"tut":{"on":false,"z":0},"menu":true,"clock":180,"hud":false}
+    ok   the child can reach whatever is asking them to tap   cover z=60 on=false, tut z=0 on=false
+    FAIL and a match actually starts | FAIL and its clock is running (180.0s -> 180.0s)
+  The cover is DOWN (cover.on=false) on both samples — the assertion this probe was written for passes. What fails is that no match starts, and the "after the switch" dump still says menu:true, hud:false: the page did not reload. Whether that is the landing or the probe is settled below by running the identical probe against the parent build e39e3e0^ (worktree at .claude/worktrees/refute-popup-parent, `npm run build` ✓ built in 7.31s, served by `vite preview --port 4202`).
+  RETRACTED line above: I wrote the CSS section header is at "index.html:1632" without reading it. `grep -n "first-run tutorial" index.html` gives the real lines — see the correction list, which uses those.
+
+### (ran, rerun) scratch s2.mjs maple 4177 — session two (voidPlayed=1, voidTut/voidFirstNom unset, all five worlds in voidUnlocked), PLAY → Maple card (same-world door: launchWorld() direct). Lock taken at load 2.55 / chromium 0, 09:46:06. Partial — the run was still going when the output was forced (see closing section); these lines are its log as written.
+    boot: tutInDom=false btnGotItInDom=false cover.on=false tapGate.on=false menu=true voidTut=null; #end/#loadScr/#shop parent = BODY x3
+    radii (live, HEAD): {"dCard":"26px","spCard":"26px"}
+    after PLAY: worlds.show=true; after pick: menu=false bodyMenu=false cover.on=false tapGate.on=false shown=["titlecard"]  ← no modal of any kind
+    t>5 (match clock t=5.0, clock=175): cover.on=false tapGate.on=false hand.show=true hand.on=true shown=["hand","titlecard",...]
+    #hand svg: 283.8 x 186.2 px at (73.1,451.1); filter=drop-shadow(rgba(0, 0, 0, 0.45) 0px 6px 14px); display=block; overflow=visible; #hand width 283.797px (= min(320px,66vw) at 430w)
+    shot: scratchpad r3/s2-maple-t5.png (not copied to docs/crews/round-5/shots — forced return)
+  So on the same-world door at HEAD: the menu hides, no #tut exists, the cover is down at pick and at t>5, the match clock is running (180→175 by match t=5), and the surviving `#hand svg` half of the split selector renders the SVG at full #hand width with the drop-shadow. Items 2 (Maple) and 4 of the brief: held.
+### (disk, rerun) the locked-card branch predates the landing
+- `git show e39e3e0^:…/prototype3d.ts | grep -c "c.classList.add('shake', 'why')"` = 1 and the same on e39e3e0 = 1: the picker refuses a locked world identically on the parent. tutstrand's seed has no voidUnlocked and unlocks.ts:70 `isUnlocked = w => migrate(read()).has(w)` with read() on that key — so its pirate tap never writes voidAutoPlay on either build. tutstrand's two FAILs at HEAD are the probe's seed, not the cover; its cover assertion PASSED (cover.on=false, both dumps). The parent A/B (`qa/tutstrand.mjs 4202`) was queued as chain2 and had not started when the return was forced.
+
+## Closing — what is and is not established (launch 3, forced return 09:48 UTC)
+ESTABLISHED by runs in this launch: tsc clean; tutstrand's cover assertion passes at HEAD; session-two Maple starts with no modal, cover down, gate down, clock running, hand shown with the right size and shadow; the stray </div> is parser-ignored; no live orphan reference; OVERLAYS keys by id, never by position; every door into launchWorld() reaches withWorldReady() (source trace above).
+NOT established in this launch (the prior launch's appended 3-7 report them, but those are not my numbers): the Pirate (reload+gate) door end to end, the fresh-profile hand, the daily-card door, the parent-build A/B of tutstrand/s2, and the 24px parent radius. The chain kept running after the forced return: logs land in the session scratchpad `r3/` (`s2pirate.log`, `s2fresh.log`, `s2lock.log`, `s2daily.log`, `cascade.log`, `parent/p_*.log`) and are harvestable by the next launch of this lane — they are not part of this verdict.
+Nothing tried killed the change. Verdict stands as SOUND WITH CORRECTIONS on the evidence above; the Pirate door is the one item the brief demanded that this launch did not itself finish.
+
+## Kill shots
+None landed. Tried: (1) the cover hold on every door into launchWorld() — source trace + tutstrand cover assertion + s2 maple cover.on=false at pick and t>5; (2) tutstrand's FAIL — traced to its own seed (locked-card branch present on both builds, cover down); (3) orphan references — none live; (4) the split #hand selector — measured rendering; (5) OVERLAYS — id-keyed, null-guarded; (6) the stray </div> — parser-ignored, #end/#loadScr/#shop still BODY children.
+
+## Corrections (verbatim)
+1. index.html:2026-2027 — delete both lines `    <!-- ── first-run tutorial ── -->` and `    </div>` (the closer has no opener; parser drops it).
+2. index.html:1628 — delete the line `      /* ── first-run tutorial ── */` (heads an empty section).
+3. src/prototype3d.ts:5720-5721 — replace `  // one-time teach card before the first menu-launched match: it's the only
+  // place the danger loop ("eat the family when bigger, RUN when not") lives` with `  // the one-time teach card that used to live here is gone; the danger loop is
+  // taught in context by the firstRun beats (see "THE RULE NOBODY WAS EVER TAUGHT")`.
+4. src/prototype3d.ts:9080-9081 — replace `  // ONLY place it was written down is the #tut card — which is shown from
+  // launchWorld(), reachable only through the menu. The very first launch` with `  // ONLY place it was written down WAS the #tut card (deleted in e39e3e0) —
+  // shown from launchWorld(), reachable only through the menu. The very first launch`.
+5. APPSTORE.md:81 — replace `tutorial_view/done,` with nothing (no code emits either event); same at docs/STUDIO-ROUND-3.md:1328 or leave that file as history.
+6. qa/tutstrand.mjs — after the line `    localStorage.setItem('voidWorld', 'maple');` insert `    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');   // the picker refuses a locked world since 589e31e`; and after the post-reload `await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });` insert `await p.waitForFunction(() => document.getElementById('tapGate')?.classList.contains('armed'), null, { timeout: 400000 });
+await p.locator('#tapGate').dispatchEvent('pointerdown');   // armGate (29a4d6c) needs a pointerdown on the reload path`. Without both edits the probe cannot reach the journey its header names on any build.
+7. GOVERNOR CALL, not applied blind: the deleted rule `#tut .card, #daily .dCard, #skinPrev .spCard { border-radius: 24px; }` (index.html(e39e3e0^):1142) also governed two surviving cards; live at HEAD both read 26px (s2 maple, above). If 24px was intended, add after index.html:1133 (`#dailyClaim:active, #spAct:active {...}`) the line `      #daily .dCard, #skinPrev .spCard { border-radius: 24px; }`.
+
+### (ran, rerun) s2.mjs maple — COMPLETED after the section above was written: exit 0, 153s wall, 09:46:06→09:48:39. Final line: `S2 maple: PASS — no modal, cover down, gate down, clock running, hand taught then left`. [123.1s] clock running: 174.8 -> 173.3 [148.7s] drag dispatched at t=6.70, sampled at t>8.70 S2 maple: PASS — no modal, cover down, gate down, clock running, hand taught then left  after drag: hand.on="hand":{"show":false,"on":false,"z":8}. Only captured error: the CDN-blocked hf asset 403 (expected per qa/README). Correction 7's anchor line re-read and fixed to the real `#dailyClaim:active` line (1133).
