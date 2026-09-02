@@ -78,8 +78,7 @@ game; Capacitor wraps it in a native shell.
   third party. The cost is real: D1/D7 retention can no longer be computed,
   because measuring it means recognising the same child across launches.
 
-  Events: day_open, app_open, device, play_tap, world_pick, tutorial_view/done,
-  load_wait, match_start, evolve, caught, ate_rival, match_end, match_quit,
+  Events: day_open, app_open, device, play_tap, world_pick,   load_wait, match_start, evolve, caught, ate_rival, match_end, match_quit,
   shop_view, skin_view, skin_buy, skin_short, legendary_tap, gate_pass,
   gate_cancel, purchase_intent/complete, session_end. match_end and match_quit
   carry fps + worst-second fps, so a quit spike can be checked against the

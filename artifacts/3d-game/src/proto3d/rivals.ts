@@ -105,6 +105,10 @@ const FIRST_LANE: Record<string, number> = {
 //                        see the five attempts recorded at the target picker.
 //                        A comment that describes a behaviour the code does not
 //                        implement is how a costume gets cast against the truth.)
+export const FAMILY_INK: Record<string, number> = {
+  JELLY: 0xff8fd0, BIGSHOT: 0xff2ad4, ECHO: 0x1ac6ff,
+  NIBBLES: 0x5ee8d8, GRUMPS: 0x9ea0fa,
+};
 export type Arch = 'BULLY' | 'COWARD' | 'SHOWOFF' | 'COPYCAT' | 'HOARDER';
 export const ARCH_OF: Record<string, Arch> = {
   NIBBLES: 'BULLY', JELLY: 'COWARD', BIGSHOT: 'SHOWOFF', ECHO: 'COPYCAT', GRUMPS: 'HOARDER',
@@ -562,7 +566,12 @@ export function createRivals(
   // is already the NEAR MISS flash.
   //
   //   JELLY   #ff8fd0  bubblegum — the unicorn's own pink glow
-  //   BIGSHOT #b96bff  amethyst — the gems set in the crown he wears
+  //   BIGSHOT #ff2ad4  stage-light magenta. NOT the amethyst violet this first
+  //                    tried (#b96bff): that was ΔE 4.9 from the hero's own rim
+  //                    (#a96bff) and 11.9 from PLAYER_COLOR — the sixth void on
+  //                    the island, whose dot sits beside BIGSHOT's on every
+  //                    results list. Violet is the hero's family; nobody else
+  //                    wears it. (round 5, refute-family)
   //   ECHO    #1ac6ff  electric blue, the one colour that reads off a black body
   //   NIBBLES #5ee8d8  the dragon's own teal
   //   GRUMPS  #9ea0fa  faded periwinkle. Not green: green is SAFE and the whole
@@ -572,10 +581,9 @@ export function createRivals(
   // qa/ringmeaning.mjs re-measures both bars from this table and from the halo
   // block's own literals, and photographs the real ring to check that the render
   // pipeline has not compressed the difference away.
-  const FAMILY_INK: Record<string, number> = {
-    JELLY: 0xff8fd0, BIGSHOT: 0xb96bff, ECHO: 0x1ac6ff,
-    NIBBLES: 0x5ee8d8, GRUMPS: 0x9ea0fa,
-  };
+  // (the table itself is module-scope and exported — see FAMILY_INK above —
+  // because the menu's TOP VOIDS board in prototype3d.ts names the same five
+  // siblings and must not carry a second copy of their colours.)
   const skinFor = (nm: string): Skin =>
     SKINS.find((s) => s.id === FAMILY_SKIN[nm]) ?? SKINS.filter((s) => s.acc)[0];
   NAMES.forEach((nm, i) => {

@@ -166,6 +166,8 @@ const SUITE = [
     cmd: ['node', 'qa/edgespeed.mjs', PORT, 'pirate', 'maple'], verdict: pf,
     why: 'the shore stops, turns or bleeds you off — it never launches you (owner item 3)' },
 
+  { id: 'ringmeaning', tier: 'quality', profiles: ['quality'], timeout: 900,
+    cmd: ['node', 'qa/ringmeaning.mjs', PORT], verdict: pf },
   { id: 'rivalnotice', tier: 'quality', profiles: ['quality'], timeout: 2400,
     cmd: ['node', 'qa/rivalnotice.mjs', PORT, 'maple', 'pirate'], verdict: pf,
     why: 'a bigger void reacts to you often enough to notice and rarely enough not to swarm (owner item 1)' },

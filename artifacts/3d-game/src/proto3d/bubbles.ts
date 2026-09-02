@@ -213,7 +213,7 @@ const style = document.createElement('style');
       // crowd waits — gossip never outranks a rival hunting you.
       if (kind !== 'rival') {
         const ban = document.getElementById('banner');
-        if (ban && ban.classList.contains('show')) return;
+        if (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06) return;
         if (slots.some((s) => s.active && s.el.classList.contains('rival'))) return;
       }
       // whole-island zoom doesn't need street gossip — but FAMILY lines
@@ -356,7 +356,7 @@ const style = document.createElement('style');
       // pop-out; family lines stay, as everywhere else in these rules.
       {
         const ban = document.getElementById('banner');
-        if (ban && ban.classList.contains('show')) {
+        if (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06) {
           for (const s of slots) {
             if (s.active && !s.el.classList.contains('rival')) s.until = Math.min(s.until, clock + 0.6);
           }

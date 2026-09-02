@@ -138,19 +138,6 @@
          (weighted points) while the chip showed "19 EATEN" (a raw count). Two
          different scores for one activity, an inch apart, for a seven-year-old.
          The count still appears on the results screen, where it is the story. */
-      /* the score column and the centred timer occupied the same band: "You 948"
-         drawn straight through "0:00" at 390px */
-      /* …and it must not grow DOWN into the meter. With five rivals the player's
-         own row is the 5th or 6th line, which is exactly where the centred
-         EATEN pill sits — so "You" was covered whenever the player was 4th or
-         worse, which is most of the first two minutes. The board is capped and
-         the player's row is pinned visible inside it. */
-      /* THE CAP THE COMMENT ALREADY PROMISED. The note below says "the board is
-         capped and the player's row is pinned visible inside it" — there was no
-         cap anywhere in the file (one max-height, on #skinPrev). With all five
-         siblings on the island the board grew to six rows and overlapped the
-         news card by 2,460 square pixels, carving away its gold border and
-         rounded corner. Six rows now fit exactly; a seventh would scroll. */
       /* ── THE GROWTH BAR ────────────────────────────────────────────────
          It used to be a 4px sliver inside a chip that was JS-projected under
          the void every frame. Three things were wrong with that and a room of
@@ -392,9 +379,6 @@
         background: linear-gradient(180deg, #ffd25a, #f0a91e); color: #3a2408;
         font-size: 15px; font-weight: 700; letter-spacing: 0.3px;
         box-shadow: 0 2px 0 rgba(0,0,0,0.28); }
-      /* a rival arriving: their own colour, on the card */
-      #banner .bDot { flex: none; width: 15px; height: 15px; border-radius: 50%;
-        box-shadow: 0 0 12px currentColor; }
       #banner.show { animation: bnr 2.4s cubic-bezier(0.2, 1.5, 0.4, 1) forwards; }
       @keyframes bnr {
         0%   { opacity: 0; transform: translateY(-14px) scale(0.86); }
@@ -1625,7 +1609,6 @@
       .skCard .rib.epicRib { background: linear-gradient(90deg, #7a4fe0, #a87bff); color: #fff; }
       .skCard.legend .pr { color: #ffd25a; }
 
-      /* ── first-run tutorial ── */
 
       /* hide gameplay HUD while in the menu */
       body.menu #timer, body.menu #growth,
@@ -2023,8 +2006,6 @@
         ask a grown-up before you buy.</div>
     </div>
 
-    <!-- ── first-run tutorial ── -->
-    </div>
 
     <div id="end">
       <!-- TWO PARTS, AND THE FOOTER IS NOT IN THE SCROLLPORT. The previous

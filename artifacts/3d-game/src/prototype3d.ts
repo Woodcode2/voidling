@@ -32,7 +32,7 @@ import { createLife, pickFresh, type Life } from './proto3d/life';
 import { createBubbles } from './proto3d/bubbles';
 import { HATS, HAT_BY_ID, hatLine, HAT_MAX_W, applyHatLod, type Hat } from './proto3d/hats';
 import { buildHat } from './proto3d/hatgeo';
-import { createRivals, RIVAL_VOICE } from './proto3d/rivals';
+import { createRivals, RIVAL_VOICE, FAMILY_INK } from './proto3d/rivals';
 import { createFx, reduceMotion, setReduceMotion, type Fx } from './proto3d/fx';
 import { createAudio } from './proto3d/audio3d';
 import { SKINS, VOID, type Skin } from './proto3d/palette';
@@ -2402,8 +2402,11 @@ rivals.onJoin = (name, color, x, z, arch) => {
   // was the archetype line, which is a TEACH, not news. And the card actively
   // gagged the channel he is keeping: while a banner is up, bubbles.say()
   // DISCARDS every crowd and event bubble rather than queueing it, and the
-  // banner's measured duty cycle is 39% — so a large share of the town's
-  // silence was the family announcing itself.
+  // banner's duty cycle was believed to be 39% — UNMEASURED; refute-cards
+  // (2026-09-02) measured the visible card at 26.9-28.9% and found bubbles.ts
+  // gating on #banner's `show` class, which was never removed after the first
+  // paint, so the town was silent from the first card to the whistle regardless
+  // (fixed in bubbles.ts: the gate now reads the banner's computed opacity).
   // (no ring on a join. It was drawn at the rival's own turf, up to 165 units
   // off and usually nowhere near the screen, while the banner and the alert
   // that actually tell the player were on it. A ring nobody sees still costs a
@@ -2625,9 +2628,10 @@ rivals.onNotice = (name, x, z, color) => {
 rivals.onSurge = (name, x, z, color) => {
   rivalEv.surges++;   // QA: qa/rivalswing.mjs reads this through __matchState().ev
   fx.ring(x, z, color, 34, 0.6);
-  // No card: the rival's ground halo is RED for the entire surge (rivals.ts
-  // sets 0xff5560 above EAT_RATIO, and a surge pins it at 1.26x), and onSurge
-  // already fires its own ring in that rival's colour.
+  // No card. The halo is NOT a twin at this moment: at onSurge the rival is
+  // smaller than the player (green ring) and turns red ~1 s later as it grows
+  // (0.55/s toward 1.26x); measured 2026-09-02 (refute-cards) red-and-on-screen
+  // 2.8% of a 23 s surge. The onSurge ring in the rival's colour is the whole cue.
 };
 rivals.onNearMiss = (name, x, z) => {
   rivalEv.nearMiss++;
@@ -2645,8 +2649,10 @@ rivals.onNearMiss = (name, x, z) => {
   addCoins(5);   // dodging is a SKILL — pay it
 };
 rivals.onStuffed = (name) => {
-  // No card: the halo turns GOLD and pulses, breakingNews already puts it in
-  // the town lane, and audio.ready() marks the moment.
+  // No card. At this moment her halo is RED (she is ~1.5x you); GOLD comes only
+  // once you outgrow her (measured +41 s, natural run, refute-cards 2026-09-02).
+  // "Too full" lands here through her own stuffed line (rivals.ts, if within 55)
+  // and breakingNews below; audio.ready() marks the moment.
   breakingNews(COPY.rivalFullNews);
   audio.ready();
 };
@@ -3036,7 +3042,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) joyRe
 
 const keys = new Set<string>();
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-window.addEventListener('keydown', (e) => { if (started && MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; } });
+window.addEventListener('keydown', (e) => { if (started && MOVE_KEYS.includes(e.code)) { keys.add(e.code); lastInput = tClock; dragDone = true; } });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());   // Cmd-Tab mid-hold must not leave the void driving itself
 window.addEventListener('resize', () => {
@@ -3062,11 +3068,6 @@ const evolveEl = el('evolve'), endEl = el('end'), endHd = el('endHd'), endSub = 
 const bannerEl = el('banner'), hungerEl = el('hunger'), hungerFill = hungerEl.querySelector('.fill') as HTMLElement;
 let prevHunger = 0;
 
-/** A rival has arrived. Was: pink 30px text reading
- *  "🌀 Cousin JELLY joined — 😱 runs from everything", which is a sentence
- *  with two emoji in it and reads like a chat log. Now it is a card with the
- *  rival's own colour on it, their name at card size, and what they DO on a
- *  second line — the same shape a fighting game uses to say who just walked in. */
 /** A scripted beat. The multiplier is a BADGE, not a clause — "Everything is
  *  DOUBLE!" was two thirds of the sentence and the least interesting third. */
 function announceBeat(icon: string, title: string, sub: string, mult: number) {
@@ -3126,6 +3127,8 @@ function paintWalls() {
 // block — so the word EVOLVED, at the single biggest reward moment in the
 // game, was covered 100% of the time on every device. Instrumented over a live
 // match the banner alone ran a 39% duty cycle, one impression every 5.6
+// (UNMEASURED when written — refute-cards 2026-09-02 measured the visible card
+// at 26.9-28.9% and the class-based bubble gag at 100% of the match)
 // seconds, so even the ordinary evolutions collided with it about half the
 // time. The evolve card now owns the screen for its animation, and anything
 // the banner wants to say during that window QUEUES rather than talks over it.
@@ -4263,6 +4266,7 @@ function refreshHud() {
   // most exciting thing that can happen in a match and it must not be silenced
   // by an ordinary overtake forty seconds earlier. No holdBanner and no ×1
   // badge: the banner was measured at a 39% duty cycle and holdBanner is
+  // (that 39% was never measured — refute-cards 2026-09-02: visible card 26.9-28.9%)
   // reserved for EVOLVED and the hero prop, which is a decision worth keeping.
   //
   // MEASURED DEAD 2026-08-13 (crownprobe.mjs: eight settled crossings into
@@ -4310,7 +4314,6 @@ function refreshHud() {
   if (!ledJust && started && !ended && prevRank > 0 && myRank < prevRank && myRank > 1
       && tClock - lastRankBrag > 12) {
     lastRankBrag = tClock; announcedRank = shownRank;
-    // the board prefixes the chaser with ⚡; the sentence should not
     announce(`👑 you passed ${(rows[myRank]?.name ?? 'a rival')}!`);
     audio.ready(); buzz(20);
   }
@@ -4321,7 +4324,7 @@ function refreshHud() {
     lastRankBrag = tClock;
     // a rival just passed YOU — they get to brag about it
     const passer = rows[myRank - 2];
-    // …the board prefixes the chaser's row with ⚡, so match on the bare name
+    // rows carry the bare name; endsWith is the tolerant match left from the ⚡ era
     const rv = passer && !passer.me ? rivals.list.find((r) => passer.name.endsWith(r.name)) : undefined;
     if (rv && RIVAL_VOICE[rv.name]) {
       // same routing as rivals.onSpeak, and the same correction: a brag you
@@ -4351,13 +4354,15 @@ function refreshHud() {
   // end we can reflect scores.").
   //
   // His reason is FALSE and the removal is still right, which is worth
-  // separating. Measured over 786 frames of a real Maple match
-  // (qa/sizerank.mjs): size order disagrees with score order in 99.9% of
-  // frames, the player's own rank read off size is wrong in 99.7%, and in one
-  // frame in five the player is WINNING and is the fourth-biggest void on the
-  // island. The family's radii are pinned to a shared clock — softCap's
-  // min(START_R + 0.02t, 1.6) — so two siblings 2.3x apart on score render the
-  // same size to two decimal places. Size cannot rank anybody.
+  // separating. Measured over 1,399 distinct match-clock frames of a real
+  // Maple match (qa/sizerank.mjs, refute-board, 2026-09-02 — the earlier
+  // "786 frames / 99.7%" figures had no probe on disk behind them): the
+  // player's own rank read off size is wrong in 40.2% of frames, size cannot
+  // strictly order the field in 73.2% (ties between differently-scored voids
+  // in 18.9% of pairs), and in every frame the player was winning the hunter
+  // looked bigger. The family's radii are pinned to a shared clock — softCap's
+  // min(START_R + 0.02t, 1.6) — so three siblings 3.3x apart on score render
+  // the same size to two decimal places. Size cannot rank anybody.
   //
   // The board goes anyway, for reasons that survive that: it is a six-row
   // numeric table at 13px in a game rated 4+, it is the only in-match display
@@ -5613,7 +5618,7 @@ const LOAD_TIPS = [
   'tip: eat the little stuff first — cones, hydrants, mailboxes',
   'tip: EVOLVE once — then cars are snacks',
   'tip: get CLOSE — small stuff gets sucked right in',
-  'tip: rival voids can eat YOU — check the leaderboard sizes',
+  'tip: rival voids can eat YOU — a RED ring means run',
   // …was 'the downtown towers are the biggest meal on the island', which is
   // Maple's skyline and nobody else's. The biggest meal is a different
   // object on each world, so the tip names the thing rather than the place.
@@ -5717,8 +5722,8 @@ let pendingLaunch = false;
 function launchWorld() {
   el('worlds').classList.remove('show');
   menuEl.style.display = 'none';
-  // one-time teach card before the first menu-launched match: it's the only
-  // place the danger loop ("eat the family when bigger, RUN when not") lives
+  // the one-time teach card that used to live here is gone; the danger loop is
+  // taught in context by the firstRun beats (see "THE RULE NOBODY WAS EVER TAUGHT")
   // THE "DRAG TO MOVE" CARD IS GONE (owner, 2026-08-29: "I also see the old
   // version pop up at the next level where it was like a popup to tell you to
   // move. That must be old code.").
@@ -6781,9 +6786,9 @@ function weeklyBoard(): { name: string; score: number; color: number; me?: boole
   // reachable inside one week
   const mul = [1.42, 1.19, 1.02, 0.88, 0.72, 0.55, 0.34];
   const seeds = [
-    { name: 'NIBBLES', color: 0x7ed57a }, { name: 'ECHO', color: 0xff9a3a },
-    { name: 'BIGSHOT', color: 0xff6fb0 }, { name: 'GRUMPS', color: 0x4d8ff0 },
-    { name: 'JELLY', color: 0x2fd8c0 }, { name: 'B1G-B1TE', color: 0xd85a5a },
+    { name: 'NIBBLES', color: FAMILY_INK.NIBBLES }, { name: 'ECHO', color: FAMILY_INK.ECHO },
+    { name: 'BIGSHOT', color: FAMILY_INK.BIGSHOT }, { name: 'GRUMPS', color: FAMILY_INK.GRUMPS },
+    { name: 'JELLY', color: FAMILY_INK.JELLY }, { name: 'B1G-B1TE', color: 0xd85a5a },
     { name: 'snackrat', color: 0xb98cff },
   ].map((s, i) => ({ ...s, score: Math.round((anchor * mul[i]) / 5) * 5 }));
   const rows = [...seeds, { name: 'You', score: mine, color: 0x9a5cff, me: true }];
@@ -9077,8 +9082,8 @@ function animate() {
   }
   // ── THE RULE NOBODY WAS EVER TAUGHT ────────────────────────────────────────
   // "A bigger void eats you" is the entire danger half of the game, and the
-  // ONLY place it was written down is the #tut card — which is shown from
-  // launchWorld(), reachable only through the menu. The very first launch
+  // ONLY place it was written down WAS the #tut card (deleted in e39e3e0) —
+  // shown from launchWorld(), reachable only through the menu. The very first launch
   // bypasses the menu and drops straight into a live match, so a brand-new
   // child never saw it, while a rival was already charging them with a screen
   // shake and a red flash. The three guide beats that do fire cover moving,

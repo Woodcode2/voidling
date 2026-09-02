@@ -367,6 +367,9 @@ if (AUTHORED_ONLY) {
     // owner spends the next ten frames standing on it, which is 920 of 1180
     // candidate pixels thrown out as scene motion — measured, that exact run.
     const away = st0.rivals.filter((r) => r.joined && r.arch !== 'COPYCAT' && r.arch !== 'BULLY');
+    // …and not the HOARDER first: he works a drifting patch around the very
+    // spot his ring was frozen and parks his body on it (run #1, 2026-09-02).
+    away.sort((a, b) => (a.arch === 'HOARDER') - (b.arch === 'HOARDER'));
     const NAME = (away[0] ?? st0.rivals.find((r) => r.joined)).name;
     const liveRival = () => window.__matchState().rivals.find((r) => r.name === NAME);
     const haloNear = (rv) => {
@@ -617,7 +620,21 @@ if (AUTHORED_ONLY) {
       }
       console.log(`  RENDERED  worst sibling-vs-meaning pair on screen: ${worstRend.a}/${worstRend.b} at `
         + `ΔE ${worstRend.re.toFixed(1)} rendered (${worstRend.au.toFixed(1)} authored), floor ${FLOOR}`);
-      if (rhoMin.rho < RHO_ASSUMED) {
+      // INSTRUMENT SELF-CHECK (round 5, refute-family): two colours authored >= BAR
+      // apart cannot land within FLOOR of each other through a monotone pipeline.
+      // When they do, the shoot photographed something other than the ring — a
+      // sibling parked on its own frozen ring (measured 2026-09-02: GRUMPS's
+      // rexling body turned all five inks into rgb(59-66,110-131,44-77), rho 0.01,
+      // while the median-only stability gate passed at 9 with p90 173) — and no
+      // rho from that frame is evidence about the pipeline. Say so; do not tell
+      // the reader to re-derive BAR from it.
+      const collapsed = ratios.filter((r) => r.au >= BAR && r.re < FLOOR);
+      if (collapsed.length) {
+        fails++;
+        console.log(`  RENDERED  INSTRUMENT FAILURE — ${collapsed.length} pair(s) authored >= ΔE ${BAR} apart rendered `
+          + `under ΔE ${FLOOR} (${collapsed.slice(0, 3).map((r) => `${r.a}/${r.b} ${r.au.toFixed(1)}→${r.re.toFixed(1)}`).join(', ')}). `
+          + `Something other than the ring was photographed (mask p90 drift ${dP90}/255); no rho here is about the pipeline. Re-run.`);
+      } else if (rhoMin.rho < RHO_ASSUMED) {
         fails++;
         console.log(`  RENDERED  FAIL — the pipeline compresses harder than the bar assumed `
           + `(${rhoMin.rho.toFixed(2)} < ${RHO_ASSUMED}). The authored bar of ΔE ${BAR} no longer guarantees `

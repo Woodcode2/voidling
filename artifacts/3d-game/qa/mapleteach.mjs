@@ -23,7 +23,7 @@ const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 
-const run = async (world) => {
+const run = async (world, via = 'pointer') => {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
   p.setDefaultTimeout(600000);
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
@@ -49,27 +49,36 @@ const run = async (world) => {
   // controls are live, which is after introLen (2.2-3.6s depending on world).
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5);
   const shown = await p.evaluate(() => document.getElementById('hand')?.classList.contains('show') ?? false);
-  // now DRAG, and it must leave
-  await p.evaluate(() => {
-    const cv = document.querySelector('canvas');
-    cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 215, clientY: 500, bubbles: true }));
-    cv.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 300, clientY: 560, bubbles: true }));
-  });
+  // now DRAG — or, on the third leg, STEER WITH A KEY (refute-hand C1/C2: a
+  // keyboard steer is a drag the hand must also count) — and it must leave
+  if (via === 'keys') {
+    await p.keyboard.down('KeyD');
+  } else {
+    await p.evaluate(() => {
+      const cv = document.querySelector('canvas');
+      cv.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 215, clientY: 500, bubbles: true }));
+      cv.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 300, clientY: 560, bubbles: true }));
+    });
+  }
   await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 7);
   const after = await p.evaluate(() => document.getElementById('hand')?.classList.contains('show') ?? false);
+  if (via === 'keys') await p.keyboard.up('KeyD');
   await p.close();
   return { shown, after };
 };
 
 const maple = await run('maple');
 const pirate = await run('pirate');
+const mapleKeys = await run('maple', 'keys');
 await b.close();
 
 console.log(`  MAPLE  with history: hand ${maple.shown ? 'SHOWN' : 'absent'}, after a drag: ${maple.after ? 'still up' : 'gone'}`);
 console.log(`  PIRATE with history: hand ${pirate.shown ? 'SHOWN' : 'absent'}`);
+console.log(`  MAPLE  with history, keyboard steer: hand ${mapleKeys.shown ? 'SHOWN' : 'absent'}, after KeyD: ${mapleKeys.after ? 'still up' : 'gone'}`);
 const bad = [];
 if (!maple.shown) bad.push('Maple did not teach a returning child — the owner asked for exactly this');
 if (maple.after) bad.push('the hand did not leave after a real drag — a lesson that will not go away');
+if (mapleKeys.after) bad.push('the hand did not leave after a keyboard steer (refute-hand C1)');
 if (pirate.shown) bad.push('Pirate taught too; only Maple is the intro level');
 console.log(bad.length ? 'MAPLETEACH: FAIL — ' + bad.join('; ')
   : 'MAPLETEACH: PASS — Maple teaches every time, the drag ends it, and no other world nags');
