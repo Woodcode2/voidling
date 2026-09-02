@@ -152,3 +152,18 @@ await p.locator('#tapGate').dispatchEvent('pointerdown');   // armGate (29a4d6c)
 7. GOVERNOR CALL, not applied blind: the deleted rule `#tut .card, #daily .dCard, #skinPrev .spCard { border-radius: 24px; }` (index.html(e39e3e0^):1142) also governed two surviving cards; live at HEAD both read 26px (s2 maple, above). If 24px was intended, add after index.html:1133 (`#dailyClaim:active, #spAct:active {...}`) the line `      #daily .dCard, #skinPrev .spCard { border-radius: 24px; }`.
 
 ### (ran, rerun) s2.mjs maple — COMPLETED after the section above was written: exit 0, 153s wall, 09:46:06→09:48:39. Final line: `S2 maple: PASS — no modal, cover down, gate down, clock running, hand taught then left`. [123.1s] clock running: 174.8 -> 173.3 [148.7s] drag dispatched at t=6.70, sampled at t>8.70 S2 maple: PASS — no modal, cover down, gate down, clock running, hand taught then left  after drag: hand.on="hand":{"show":false,"on":false,"z":8}. Only captured error: the CDN-blocked hf asset 403 (expected per qa/README). Correction 7's anchor line re-read and fixed to the real `#dailyClaim:active` line (1133).
+
+## Governor's browser run (2026-09-02 14:57-14:58 UTC, quiet box, GPU lock held, :4177 = HEAD build)
+Correction 6 applied to `qa/tutstrand.mjs` (voidUnlocked in the seed; a pointerdown on #tapGate after the
+reload; default port 4173→4177, which had sent a run of mine to a dead port). Then the probe verbatim, exit 0:
+```
+    {"cover":{"on":false,"z":60},"tut":{"on":false,"z":0},"menu":true,"clock":180,"hud":false}
+  ok   a second world exists to switch to   pirate
+after the world switch: {"cover":{"on":false,"z":60},"tut":{"on":false,"z":0},"menu":false,"clock":180,"hud":true}
+  ok   the child can reach whatever is asking them to tap   cover z=60 on=false, tut z=0 on=false
+  ok   and a match actually starts   {"cover":{"on":false,"z":60},"tut":{"on":false,"z":0},"menu":false,"clock":179.85459999999995,"hud":true}
+  ok   and its clock is running, not frozen behind a cover   179.9s -> 179.7s
+no dead end
+```
+The Pirate door — a world switch, a full reload, the tap gate — starts a match with the cover down and the
+clock running on the landed build. This is the item the skeptic's forced return left open.

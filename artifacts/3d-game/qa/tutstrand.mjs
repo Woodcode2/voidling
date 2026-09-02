@@ -26,7 +26,7 @@
 //   node qa/tutstrand.mjs [port]
 import { chromium } from 'playwright';
 
-const PORT = process.argv[2] || '4173';
+const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage({ viewport: { width: 420, height: 860 } });
@@ -43,6 +43,7 @@ await p.addInitScript(() => {
     localStorage.setItem('voidDailyLast', new Date().toDateString());
     localStorage.removeItem('voidTut');                  // …and never wrote this
     localStorage.setItem('voidWorld', 'maple');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');   // the picker refuses a locked world since 589e31e (refute-popup, correction 6)
   }
 });
 await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
@@ -96,6 +97,7 @@ ok(!!picked, 'a second world exists to switch to', String(picked));
 // the switch reloads the page; wait for the new document to come up
 await p.waitForTimeout(2500);
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+await p.locator('#tapGate').dispatchEvent('pointerdown');   // armGate (29a4d6c) needs a pointerdown on the reload path (refute-popup, correction 6)
 
 // Give it a genuinely generous run at loading. The pack wait is capped at 12s
 // inside withWorldReady, so anything still covered well past that is not slow,
