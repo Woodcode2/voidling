@@ -52,3 +52,10 @@ Grouped by prop class (python over the JSON, /tmp/crew-placement/before-all.json
 - LANTERN overlap 192: stalls (9.2-12.2 wide) on a 230-world (11.5-unit) pitch (island.ts:5556 `stallSlots(Math.random, 230, 30)`) overlap by up to 3.5; water 355 is 16 canal boats + 150 float lanterns placed ON the canal by design (island.ts:5608-5618) and untagged — plus 9 stalls whose footprint reaches into the channel at bends.
 - POWDER overlap 951: 24 chalets scattered in the village with NO separation option (island.ts:5343 `scatterInRegion(REG('village'), 24, rnd2, 150)` — `drop`'s burial test lets chalets 3.2 units apart through, and a chalet is 6.2-8.6 wide); the rest is snow-day clutter (drifts, snowballs) against each other and pines. water 612 is the 'lake' region's authored clutter on the ice (by design) plus pines rooted in the ice.
 - The `offisland` prop at (-248.3,131.8) in maple/gameday/powder is the ferris wheel (prototype3d.ts:3495) — placed after the boot sweep, culled by the 8 s sweep with a puff; the player never reaches it.
+
+### 21:40 UTC — CONTINUATION (second crew, worktree wf_92bcb5f4-e68-1)
+The first crew was killed by a container restart at ~21:35 while running the SEED=7 BEFORE/AFTER pair
+(`/tmp/crew-placement/pair.sh`; maple BEFORE at :4177 completed → `/tmp/crew-placement/s7-before-maple.json`,
+the AFTER died with the browser). Its WIP patch (`placement.wip.patch`, island.ts +93/-28, prototype3d.ts +116)
+applied cleanly to HEAD 4c8a743 in this worktree (`git apply --check` then `git apply`, exit 0). Judging it before
+building; measurements below are appended as they land.
