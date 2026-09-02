@@ -53,3 +53,6 @@ Thumbs.db
 .hook.mjs
 .ts-resolve.mjs
 f_[a-z].txt
+
+# workflow-runtime worktrees (per-agent isolated checkouts) — never commit
+.claude/worktrees/
