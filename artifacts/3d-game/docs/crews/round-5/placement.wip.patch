@@ -1,0 +1,369 @@
+diff --git a/artifacts/3d-game/src/proto3d/island.ts b/artifacts/3d-game/src/proto3d/island.ts
+index 3419a0f..1fefec6 100644
+--- a/artifacts/3d-game/src/proto3d/island.ts
++++ b/artifacts/3d-game/src/proto3d/island.ts
+@@ -5339,9 +5339,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     }
+     // 2. THE VILLAGE — chalets ring the shore and every one FACES THE LAKE,
+     //    which is what makes a bowl read as a place rather than a scatter
+-    for (const p2 of PW.scatterInRegion(REG('village'), 24, rnd2, 150)) {
++    // Separated by the chalet's real half-diagonal (8.6 x 6.4 -> 5.4), not its
++    // 3.6 eat radius: with no `sep` at all the scatter let chalets fall 3.2
++    // units apart (drop()'s burial test is the only gate) and qa/placement.mjs
++    // measured 6+ chalet-through-chalet footprints in the village on the
++    // unpatched build, the worst 5.4 units deep. `force` because the scatter
++    // has already claimed the site at 5.4 and drop()'s own-claim skip only
++    // matches an equal radius.
++    for (const p2 of PW.scatterInRegion(REG('village'), 24, rnd2, 150, { sep: 5.4 })) {
+       const face = Math.atan2(PW.LAKE.cx - p2[0], PW.LAKE.cy - p2[1]);
+-      drop(AL.makeChalet(), p2, 3.6, face, false, 'chalet');
++      drop(AL.makeChalet(), p2, 3.6, face, true, 'chalet');
+     }
+     // …and the village's small stuff — the between-chalets clutter that makes
+     // a district read dense from the picker's first frame
+@@ -5497,10 +5504,17 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+      *  drop() then asks spotOpen() about it at `r`, and spotOpen only exempts
+      *  an EXACT-match claim — so a prop read its own claim as an obstacle and
+      *  refused to exist. */
++    // `sep` is the ground a prop RESERVES, in 3D units; it defaults to the eat
++    // radius, which is right for a lantern and wrong for a shed: a market shed
++    // is 12.2 x 3.6 on the ground (half-diagonal 6.4) and reserved 3.4, so
++    // qa/placement.mjs measured 7+5+5 shed-through-shed footprints on the
++    // unpatched build. When sep differs from r the drop is forced, because the
++    // scatter has already claimed the site and drop()'s own-claim skip only
++    // matches an equal radius.
+     const plant = (id: LN.LnBiome, n: number, clear: number, r: number,
+-                   make: () => THREE.Object3D, face = false, qk?: string) => {
+-      for (const p2 of LN.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
+-        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, false, qk);
++                   make: () => THREE.Object3D, face = false, qk?: string, sep = r) => {
++      for (const p2 of LN.scatterInRegion(REG(id), n, Math.random, clear, { sep }))
++        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, sep !== r, qk);
+     };
+     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
+                        band?: [number, number]) => {
+@@ -5597,8 +5611,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     // band against GAME DAY's 895, which is why a late match here fell flat:
+     // past a certain size there was simply nothing the right shape to eat.
+     // A covered row is what a market street is actually built from anyway.
+-    plant('stalls', 76, 46, 3.4, NM.makeMarketShed, false, 'house');
+-    plant('teahouse', 30, 50, 3.4, NM.makeMarketShed, false, 'house');
++    plant('stalls', 76, 46, 3.4, NM.makeMarketShed, false, 'house', 7.5);
++    plant('teahouse', 30, 50, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+     plant('stalls', 26, 60, 1.4, NM.makeKoiFlag);
+ 
+     // ── THE CANAL ─────────────────────────────────────────────────────────
+@@ -5609,13 +5623,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+       for (let k = 0; k < 16; k++) {
+         const t = 0.05 + (k / 16) * 0.9;
+         const p = LN.canalPoint(t);
+-        drop(NM.makeCanalBoat(), [p.x, p.y], 2.2, p.ang);
++        const boat = NM.makeCanalBoat(); boat.userData.afloat = true;   // ON the water by design (qa/placement.mjs reads the tag)
++        drop(boat, [p.x, p.y], 2.2, p.ang);
+       }
+       for (let k = 0; k < 150; k++) {
+         const t = Math.random();
+         const p = LN.canalPoint(t);
+         const off = (Math.random() - 0.5) * 220;
+-        drop(NM.makeFloatLantern(), [p.x + Math.cos(p.ang + 1.57) * off, p.y + Math.sin(p.ang + 1.57) * off], 0.5);
++        const fl = NM.makeFloatLantern(); fl.userData.afloat = true;
++        drop(fl, [p.x + Math.cos(p.ang + 1.57) * off, p.y + Math.sin(p.ang + 1.57) * off], 0.5);
+       }
+     }
+ 
+@@ -5642,8 +5658,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('bathhouse', 22, 44, 1.6, NM.makeSakeBarrels);
+     // storehouses: the 4-to-6 rung, and a run of dull white boxes is what
+     // stops a skyline of lanterns reading as one texture
+-    plant('bathhouse', 22, 74, 4.6, NM.makeKura, false, 'house');
+-    plant('bathhouse', 26, 54, 3.4, NM.makeMarketShed, false, 'house');
++    plant('bathhouse', 22, 74, 4.6, NM.makeKura, false, 'house', 6.5);
++    plant('bathhouse', 26, 54, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+ 
+     // ── THE MOON BRIDGE ───────────────────────────────────────────────────
+     // Six props over 5,210u². The bridge is the level's pinch and its fourth
+@@ -5655,7 +5671,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('bridge', 26, 24, 0.6, NM.makePotPlant);
+     plant('bridge', 20, 28, 1.0, NM.makeUmbrella);
+     plant('bridge', 12, 46, 2.0, NM.makeFoodCart, false, 'house');
+-    plant('bridge', 10, 56, 3.4, NM.makeMarketShed, false, 'house');
++    plant('bridge', 10, 56, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+ 
+     // ── THE SHRINE STEPS ──────────────────────────────────────────────────
+     // Cool, dim and evenly spaced against the market's warm clutter: one bank
+@@ -5669,8 +5685,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('shrine', 30, 30, 1.6, NM.makeSakeBarrels);
+     plant('shrine', 24, 30, 1.2, NM.makeWishRack);
+     plant('shrine', 60, 20, 0.5, NM.makeStepLantern);
+-    plant('shrine', 14, 82, 4.6, NM.makeKura, false, 'house');
+-    plant('shrine', 20, 56, 3.4, NM.makeMarketShed, false, 'house');
++    plant('shrine', 14, 82, 4.6, NM.makeKura, false, 'house', 6.5);
++    plant('shrine', 20, 56, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+     // the torii run: nose to tail up the west stair, which is the one place in
+     // the level with a repeating tunnel
+     {
+@@ -5684,7 +5700,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     }
+ 
+     // ── THE TEAHOUSE TERRACE ──────────────────────────────────────────────
+-    plant('teahouse', 16, 130, 4.2, NM.makeTeahouse, true, 'house');
++    plant('teahouse', 16, 130, 4.2, NM.makeTeahouse, true, 'house', 6.5);
+     plant('teahouse', 54, 30, 1.0, () => NM.makeLantern(0xfff0d2, 1.1));
+     plant('teahouse', 44, 28, 0.9, NM.makeMarketCrate);
+     plant('teahouse', 80, 20, 0.6, NM.makeSkewerTray);
+@@ -5701,7 +5717,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('garden', 36, 24, 0.6, NM.makePotPlant);
+     plant('garden', 34, 22, 0.55, NM.makeJizo);
+     plant('garden', 30, 20, 0.5, NM.makeStepLantern);
+-    plant('garden', 18, 62, 3.4, NM.makeMarketShed, false, 'house');
++    plant('garden', 18, 62, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+ 
+     // ── THE GREAT GATE ────────────────────────────────────────────────────
+     // The apron stays the emptiest floor in the level — a child's first three
+@@ -5712,7 +5728,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('gate', 22, 30, 0.5, NM.makeStepLantern);
+     plant('gate', 18, 32, 0.55, NM.makeJizo);
+     plant('gate', 14, 34, 0.8, NM.makeLuggage);
+-    plant('gate', 8, 96, 4.6, NM.makeKura, false, 'house');
++    plant('gate', 8, 96, 4.6, NM.makeKura, false, 'house', 6.5);
+ 
+     // ── THE HOT SPRING ────────────────────────────────────────────────────
+     // Authored, not scattered. Five pools stepping DOWN the shoulder, because
+@@ -5807,10 +5823,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+      *  pass whose two numbers happened to match at 3.0. Which is exactly what
+      *  the top-down render showed — a busy lot ringed by empty districts.
+      */
++    // `sep` reserves ground in 3D units and defaults to the eat radius; a frat
++    // house is 17.6 x 9.6 on the ground (half-diagonal 10) and reserved 7, so
++    // qa/placement.mjs measured frat houses 4.45 units through each other on
++    // the unpatched build. sep != r forces the drop (the scatter already holds
++    // the claim; drop()'s own-claim skip only matches an equal radius).
+     const plant = (id: GD.GdBiome, n: number, clear: number, r: number,
+-                   make: () => THREE.Object3D, face = false, qk?: string) => {
+-      for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
+-        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, false, qk);
++                   make: () => THREE.Object3D, face = false, qk?: string, sep = r) => {
++      for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep }))
++        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, sep !== r, qk);
+     };
+     /** …and the same for the ground between the districts. */
+     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
+@@ -5859,12 +5880,24 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     // parking rows with alternating headings — real lots park back to back,
+     // and one shared heading reads as a car transporter. Every third slot is
+     // a canopy or an RV instead of a truck so the rows have silhouette.
++    // NOSE-IN, NOT END-TO-END. `face = s.ang` yawed every vehicle ALONG its
++    // row: the truck body is 5.9+ units long on local x (tailgate.ts:319) and
++    // the RV 12.2, on a 7.9-8.75-unit pitch — so trucks sat bumper to bumper
++    // and every RV drove through both neighbours. Measured 2026-09-02 by
++    // qa/placement.mjs on the unpatched build: 28 truck-truck, 10 truck-RV and
++    // 9 RV-RV footprint interpenetrations, photographed as one solid mass of
++    // RV roofs. A quarter turn parks them nose-in like every stadium lot, the
++    // 3.2-wide flank along the row and the tailgate on the aisle where the
++    // party is. Same draw count, same slots. The extra claim is the vehicle's
++    // real half-length, so the aisle scatter that follows keeps its grills
++    // off the bonnets (a truck claimed 3 units and reaches 4; an RV claimed
++    // 4.2 and reaches 6.1).
+     for (const [i, s] of GD.lotSlots(Math.random).entries()) {
+       const p2: GD.Pt = [s.x, s.y];
+       const face = s.ang;
+       if (i % 7 === 3) drop(TG.makeCanopy(), p2, 2.4, face);
+-      else if (i % 11 === 5) drop(TG.makeRV(), p2, 4.2, face, false, 'rv');
+-      else drop(TG.makeTailgateTruck(), p2, 3.0, face, false, 'car');
++      else if (i % 11 === 5) { drop(TG.makeRV(), p2, 4.2, face + Math.PI / 2, false, 'rv'); GD.claimSpot(s.x, s.y, 130); }
++      else { drop(TG.makeTailgateTruck(), p2, 3.0, face + Math.PI / 2, false, 'car'); GD.claimSpot(s.x, s.y, 90); }
+     }
+     // …and the party BETWEEN the rows, which is the whole point of an aisle.
+     //
+@@ -5935,7 +5968,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('rvpark', 34, 30, 0.8, TG.makeTrashBarrel);
+ 
+     // ── FRAT ROW ──────────────────────────────────────────────────────────
+-    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true, 'house');
++    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true, 'house', 11);
+     plant('greek', 44, 46, 1.5, TG.makePorchSofa);
+     plant('greek', 70, 36, 1.2, TG.makeBanner);
+     plant('greek', 110, 26, 0.7, TG.makeFoldingChair);
+@@ -5948,7 +5981,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     plant('greek', 20, 50, 1.8, TG.makeBandRig);
+ 
+     // ── OLD CAMPUS ────────────────────────────────────────────────────────
+-    plant('campus', 22, 160, 8.0, TG.makeBrickHall, false, 'house');
++    plant('campus', 22, 160, 8.0, TG.makeBrickHall, false, 'house', 11);
+     plant('campus', 8, 90, 1.6, TG.makeStatue);
+     plant('campus', 55, 40, 1.2, TG.makeBanner);
+     plant('campus', 70, 32, 0.8, TG.makeTrashBarrel);
+@@ -6284,7 +6317,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
+     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
+     for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
+-    for (const p2 of spread('port', 4, 90, 3)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
++    for (const p2 of spread('port', 4, 90, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2), true);   // sep 5 = a 6x6 hut's half-diagonal + margin; forced past drop()'s own-claim test
+     // makeShopBox was a bare grey cube — 24 of them across two districts were the
+     // first thing your eye landed on. Real dockside furniture instead.
+     for (const p2 of spread('port', 10, 40, 1.4)) drop(LUXE.makeRopeBollard(), p2, 1.4, rand(0, Math.PI * 2));
+@@ -6292,7 +6325,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+     for (const p2 of spread('port', 3, 90, 2.6)) drop(LUXE.makeAnchorMonument(), p2, 2.6, rand(0, Math.PI * 2));
+ 
+     // ── OLD TOWN: a huddle of thatch houses and market clutter on the bluff
+-    for (const p2 of spread('oldtown', 24, 55, 3)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
++    for (const p2 of spread('oldtown', 24, 55, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2), true);   // qa/placement.mjs: 21 hut-through-hut footprints at sep 3
+     for (const p2 of spread('oldtown', 18, 40, 1.3)) drop(makeBarrel(), p2, 1.3);
+     landmark(makeFort(), [5400, 2050], 9, 0.3, 280);               // the fort on the bluff
+     for (const p2 of spread('oldtown', 12, 55, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
+@@ -7180,8 +7213,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+   for (const [wx, wy] of [[4290, 3400], [7710, 6800], [6000, 9200], [2580, 5600]] as [number, number][]) {
+     const cx4 = w(wx), cz4 = w(wy);
+     if (!insideIsland3(cx4, cz4) || inMapleWater(wx, wy, 1)) continue;
+-    for (let k = 0; k < 4; k++) place(makeCone(), cx4 + (k - 1.5) * 2.4, cz4 + 4.6, 0.7);
+-    place(MS.makeNoticeBoard(), cx4, cz4 + 6.6, 1.0);
++    // tagged: these stand on the asphalt ON PURPOSE, and qa/placement.mjs
++    // exempts 'roadworks' from its trees-on-roads count for that reason
++    for (let k = 0; k < 4; k++) { const cone = makeCone(); cone.userData.qk = 'roadworks'; place(cone, cx4 + (k - 1.5) * 2.4, cz4 + 4.6, 0.7); }
++    const barrier = MS.makeNoticeBoard(); barrier.userData.qk = 'roadworks';
++    place(barrier, cx4, cz4 + 6.6, 1.0);
+   }
+   for (const rc of roads3) {
+     let li = 0;
+@@ -7250,6 +7286,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
+       if (ROAD_CENTERS.some((c) => Math.abs(rx - c) < 200)) continue;
+       for (const side of [-1, 1]) {
+         const rail = makeFenceRun(13, 0xf4f6fa);
++        rail.userData.qk = 'bridge';   // a railing on the road EDGE is the bridge — exempt in qa/placement.mjs
+         place(rail, w(rx), w(rcW) + side * 4.6, 1.6);
+       }
+     }
+diff --git a/artifacts/3d-game/src/prototype3d.ts b/artifacts/3d-game/src/prototype3d.ts
+index b49eb59..a0cdead 100644
+--- a/artifacts/3d-game/src/prototype3d.ts
++++ b/artifacts/3d-game/src/prototype3d.ts
+@@ -6206,6 +6206,115 @@ function paintBookChip(): void {
+ }
+ paintBookChip();
+ 
++// ── NOTHING STANDS INSIDE A BUILDING, AND NO TWO SOLIDS SHARE THE SAME GROUND ─
++// Measured 2026-09-02 by qa/placement.mjs on the unpatched build: 189 props
++// standing INSIDE another prop's solid geometry on Maple Falls (trees through
++// barns — the country fill reserves a barn at its 5.2 eat radius while the
++// mesh is 8.3 half-wide, and trees placed by place() never reserve ground at
++// all), 72 on Pirate Bay, 38 on Game Day, 34 on Lantern Night, 45 on Powder
++// Pass; and building-class footprints driven through each other on every
++// world (Game Day's RV park photographed as one solid mass of roofs). Every
++// placement pass in island.ts reserves ground by EAT radius, which is a
++// gameplay number and not a footprint. This pass reads the footprint.
++//
++// It is DRAW-FREE — it runs after every seeded draw has been consumed, so
++// Maple's mulberry32 stream is untouched — and it only ever RETIRES. A prop
++// whose footprint centre sits inside another prop's solid geometry (a ray at
++// knee and chest height, both faces on, crosses that geometry an odd number
++// of times — an open bandstand or a porch counts as air) is retired. Two
++// SOLIDS whose own-frame footprints interpenetrate by more than SOLID_LIP
++// along every separating axis lose the one placed LATER, because the earlier
++// one is the authored site the later scatter fell on. Trees, bushes and rocks
++// carry userData.spin (no front) and are never solids: their box is their
++// canopy, and a canopy touching a canopy is a forest.
++const SOLID_LIP = 1.0;
++function settleFootprints(): number[] {
++  interface Foot { i: number; px: number; pz: number; c: number; s: number; lx0: number; lx1: number; lz0: number; lz1: number; cx: number; cz: number; rOut: number; solid: boolean; }
++  const feet: Foot[] = [];
++  const box = new THREE.Box3();
++  // the contact-shadow disc (assets3d.ts contactShadow: rotated flat, y=0.045)
++  // is not footprint — it is r*1.1 wide and would fatten every small prop
++  const isDisc = (o: THREE.Object3D) => (o as THREE.Mesh).isMesh && Math.abs(o.rotation.x + Math.PI / 2) < 1e-4 && Math.abs(o.position.y - 0.045) < 1e-3;
++  for (let i = 0; i < edibles.length; i++) {
++    const e = edibles[i], m = e.mesh, ud = m.userData;
++    if (ud.mover || ud.afloat) continue;
++    // the prop's OWN-FRAME box: un-yaw, measure, re-yaw
++    const ry = m.rotation.y;
++    m.rotation.y = 0; m.updateMatrixWorld(true);
++    box.makeEmpty();
++    m.traverse((o) => { if ((o as THREE.Mesh).isMesh && !isDisc(o)) box.expandByObject(o); });
++    m.rotation.y = ry; m.updateMatrixWorld(true);
++    if (box.isEmpty()) continue;
++    const px = m.position.x, pz = m.position.z;
++    const lx0 = box.min.x - px, lx1 = box.max.x - px, lz0 = box.min.z - pz, lz1 = box.max.z - pz;
++    if (lx1 - lx0 < 0.05 || lz1 - lz0 < 0.05) continue;
++    const c = Math.cos(ry), s = Math.sin(ry);
++    const mx = (lx0 + lx1) / 2, mz = (lz0 + lz1) / 2;
++    const h = box.max.y - Math.min(0, box.min.y);
++    feet.push({ i, px, pz, c, s, lx0, lx1, lz0, lz1, cx: px + mx * c + mz * s, cz: pz - mx * s + mz * c,
++      rOut: Math.hypot(lx1 - lx0, lz1 - lz0) / 2,
++      solid: e.radius >= 2 && !ud.spin && h >= 2 && Math.min(lx1 - lx0, lz1 - lz0) >= 2.4 });
++  }
++  const CELL = 12, grid = new Map<number, Foot[]>();
++  const key = (ix: number, iz: number) => ix * 100003 + iz;
++  const cells = (f: Foot, fn: (k: number) => void) => {
++    for (let ix = Math.floor((f.cx - f.rOut) / CELL); ix <= Math.floor((f.cx + f.rOut) / CELL); ix++)
++      for (let iz = Math.floor((f.cz - f.rOut) / CELL); iz <= Math.floor((f.cz + f.rOut) / CELL); iz++) fn(key(ix, iz));
++  };
++  for (const f of feet) if (f.solid) cells(f, (k) => { const b = grid.get(k); if (b) b.push(f); else grid.set(k, [f]); });
++  // world point -> inside q's own-frame footprint, shrunk by m
++  const inRect = (q: Foot, x: number, z: number, m: number): boolean => {
++    const dx = x - q.px, dz = z - q.pz, lx = dx * q.c - dz * q.s, lz = dx * q.s + dz * q.c;
++    return lx > q.lx0 + m && lx < q.lx1 - m && lz > q.lz0 + m && lz < q.lz1 - m;
++  };
++  const corners = (q: Foot): [number, number][] => {
++    const W = (x: number, z: number): [number, number] => [q.px + x * q.c + z * q.s, q.pz - x * q.s + z * q.c];
++    return [W(q.lx0, q.lz0), W(q.lx1, q.lz0), W(q.lx1, q.lz1), W(q.lx0, q.lz1)];
++  };
++  // separating-axis penetration of two yawed rectangles; 0 = apart
++  const satDepth = (a: Foot, b: Foot): number => {
++    const ca = corners(a), cb = corners(b); let best = Infinity;
++    for (const r of [a, b]) for (const [ux, uz] of [[r.c, -r.s], [r.s, r.c]]) {
++      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
++      for (const [x, z] of ca) { const t = x * ux + z * uz; if (t < a0) a0 = t; if (t > a1) a1 = t; }
++      for (const [x, z] of cb) { const t = x * ux + z * uz; if (t < b0) b0 = t; if (t > b1) b1 = t; }
++      const o = Math.min(a1, b1) - Math.max(a0, b0); if (o <= 0) return 0; if (o < best) best = o;
++    }
++    return best;
++  };
++  const ray = new THREE.Raycaster(), DIR_X = new THREE.Vector3(1, 0, 0), origin = new THREE.Vector3();
++  const solidAt = (q: Foot, x: number, z: number, y: number): boolean => {
++    const mesh = edibles[q.i].mesh;
++    const flipped: [THREE.Material, THREE.Side][] = [];
++    mesh.traverse((o) => {
++      const mm = (o as THREE.Mesh).material; if (!mm) return;
++      for (const mat of Array.isArray(mm) ? mm : [mm]) if (mat.side !== THREE.DoubleSide) { flipped.push([mat, mat.side]); mat.side = THREE.DoubleSide; }
++    });
++    origin.set(x, y, z); ray.set(origin, DIR_X); ray.near = 0; ray.far = q.rOut * 2 + 4;
++    const n = ray.intersectObject(mesh, true).filter((hit) => !isDisc(hit.object)).length;
++    for (const [mat, side] of flipped) mat.side = side;
++    return n % 2 === 1;
++  };
++  const dead = new Set<number>();
++  const later = (a: Foot, b: Foot) => (a.i > b.i ? a.i : b.i);
++  for (const f of feet) {
++    if (dead.has(f.i)) continue;
++    const seen = new Set<Foot>();
++    cells(f, (k) => {
++      if (dead.has(f.i)) return;
++      for (const q of grid.get(k) || []) {
++        if (q === f || seen.has(q) || dead.has(q.i)) continue; seen.add(q);
++        if (Math.hypot(q.cx - f.cx, q.cz - f.cz) > q.rOut + f.rOut) continue;
++        if (inRect(q, f.cx, f.cz, 0.15) && (solidAt(q, f.cx, f.cz, 0.6) || solidAt(q, f.cx, f.cz, 1.4))) {
++          dead.add(f.solid ? later(f, q) : f.i); if (dead.has(f.i)) return; continue;
++        }
++        if (f.solid && satDepth(f, q) > SOLID_LIP) { dead.add(later(f, q)); if (dead.has(f.i)) return; }
++      }
++    });
++  }
++  return [...dead];
++}
++
+ function validateWorld() {
+   let moved = 0;
+   const cull: number[] = [];
+@@ -6291,6 +6400,13 @@ function validateWorld() {
+       moved++;
+     }
+   }
++  // …and, once, everything standing inside something else (settleFootprints
++  // above). Indices are into the same un-spliced list; the retire loop below
++  // walks them from the top so each splice leaves the lower ones valid.
++  if (!_validated) {
++    for (const i of settleFootprints()) if (!cull.includes(i)) cull.push(i);
++    cull.sort((a, b) => a - b);
++  }
+   // retire the unfixable entirely — out of the scene AND the mass ledger, so
+   // %devoured stays honest
+   for (let k = cull.length - 1; k >= 0; k--) {
