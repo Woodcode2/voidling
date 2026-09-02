@@ -353,6 +353,11 @@ the ad door open (his stated long-term plan) — the recommendation given was
   Pixabay "gulp"/"power up"/"win jingle"). He tried and disliked the first
   batch — "let's figure this out later". Until then the synth fallbacks play
   (the swallow one is now a soft whoosh, not a thud).
+  RETRACTED 2026-09-02 (refute-drum): "the swallow one is now a soft whoosh" was
+  false from the day it was written — eaten_deep.wav was present, decoded on the
+  first gesture, and `sample()` returned before the whoosh line; measured on the
+  pre-702a3e4 build: one 1.8 s buffer at −20.4 dBFS, +14.1 dB over the Lantern
+  recording. The whoosh plays for the first time as of 702a3e4.
 - Whether Lantern's greeting act stays.
 - Kids Category vs 4+.
 

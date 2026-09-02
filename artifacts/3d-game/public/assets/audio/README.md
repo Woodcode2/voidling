@@ -6,7 +6,7 @@ synth voice — sound never goes silent either way (`audio3d.ts`, `sample()`).
 
 | file | fires when | search for |
 |---|---|---|
-| `eaten_deep.wav` | swallowing something big | deep whoosh, swallow, gulp, soft impact, sub drop |
+| `eaten_deep.wav` | UNWIRED since 702a3e4 — the file in this slot is a kick drum (73 % of its energy under 120 Hz, peak −0.9 dBFS) and played at +14 dB over the Lantern recording on every big swallow. The swallow is the synth whoosh until the owner approves a replacement; re-wiring is one `sample()` line in `bigEat()`. | deep whoosh, swallow, gulp — no sub drop, nothing under 120 Hz |
 | `evolve_epic.wav` | evolving to the next form | power up, level up, magic sparkle, riser, transform |
 | `win_warm.wav` | winning a match | success, fanfare, win jingle, celebration |
 

@@ -2,8 +2,9 @@
 //
 //   node qa/_wav.mjs <port>
 //
-// bigEat(), win() and MAPLE's evolve() all try sample() FIRST and return if the
-// buffer is resident (audio3d.ts:3224, :3284, :1124) — so the synth versions
+// win() and MAPLE's evolve() try sample() FIRST and return if the buffer is
+// resident; bigEat() no longer does (702a3e4 — eaten_deep.wav is a kick drum
+// and is unwired; refute-drum measured it at +14 dB over the recording) — so the synth versions
 // qa/_oneshot.mjs renders are the FALLBACK, not the shipping sound. This
 // decodes the real files, applies the same gain the caller passes and the same
 // MASTER_VOL 0.62, and measures them on the phone-speaker basis.

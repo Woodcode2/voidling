@@ -1,4 +1,4 @@
-// The HUD is laid out in vw units (#timer left:42vw, #board max-width:38vw,
+// The HUD is laid out in vw units (#timer left:0/right:0 since the board went,
 // #growth min(92vw,460px)). Does it still hold together on an iPad, which the
 // App Store requires? Measures the same elements at four device sizes.
 import { chromium } from 'playwright';

@@ -59,7 +59,7 @@ const R = await p.evaluate(async () => {
     const pre = await drive();
     window.move(CX, 8);                                   // up over the top HUD band
     await waitF(20);
-    document.getElementById('board').dispatchEvent(new PointerEvent('pointerup', {
+    document.getElementById('timer').dispatchEvent(new PointerEvent('pointerup', {
       pointerId: 1, clientX: CX, clientY: 8, bubbles: true, pointerType: 'touch' }));
     await waitF(90);
     rec('pointerup released over a HUD element', `pre ${pre.toFixed(2)}`, speed(40), await canRecover());

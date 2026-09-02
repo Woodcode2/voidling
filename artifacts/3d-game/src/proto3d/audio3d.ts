@@ -753,8 +753,10 @@ export function createAudio(): Audio3D {
     const c = ctx;
     if (synthOn || !c || c.state !== 'running') return;
     // A record is playing — but only a channel that WANTS to play counts. At
-    // match start the menu theme is still FADING (stopLoop's 0.6s ramp holds
-    // its srcs alive past the 400ms cover grace), and counting that corpse
+    // match start the menu theme is still FADING (stopLoop(ch, fade) empties its
+    // srcs at ONCE — see :547 — while the recording rings for `fade` seconds,
+    // so every srcs-based test, recordingLive() included, reads "nothing
+    // playing" during that tail; measured, refute-drum), and counting that corpse
     // meant the bed never covered the menu→PLAY path at all: the match sat
     // silent until the recording decoded — 0.3s warm, 3s cold, the owner's
     // "music doesn't always start the moment you play". Measured by
@@ -1922,10 +1924,6 @@ export function createAudio(): Audio3D {
   function brush(dest: AudioNode, t: number, vol: number) {      // wire brush swish
     nEnv(fxFor(dest, 'brush'), t, 0.14, vol, 0.035);
   }
-  function mSnare(dest: AudioNode, t: number, vol: number, body = true) {
-    nEnv(fxFor(dest, 'snare'), t, 0.07, vol, 0.0015);
-    if (body) dTone(dest, t, 0.05, 'triangle', vol * 0.3, 195, 160, 0, 0.002);
-  }
   /** A RECORDING IS PLAYING, so nothing percussive may join it. A drum written
    *  for our own score cannot be in time with a recording it has never heard;
    *  that is the owner's "not synced", and it is a property of the arrangement,
@@ -1933,7 +1931,11 @@ export function createAudio(): Audio3D {
    *  callers, so a new sting cannot reintroduce the defect by finding a fresh
    *  route to master. */
   const recordingLive = () => themeCh.srcs.length > 0 || menuCh.srcs.length > 0;
-
+  function mSnare(dest: AudioNode, t: number, vol: number, body = true) {
+    if (dest === master && recordingLive()) return;   // a drum — see recordingLive
+    nEnv(fxFor(dest, 'snare'), t, 0.07, vol, 0.0015);
+    if (body) dTone(dest, t, 0.05, 'triangle', vol * 0.3, 195, 160, 0, 0.002);
+  }
   function bDrum(dest: AudioNode, t: number, vol: number) {
     if (dest === master && recordingLive()) return;   // see recordingLive, by taiko
     dTone(dest, t, 0.22, 'sine', vol, 92, 48, 0, 0.005);
@@ -3140,9 +3142,14 @@ export function createAudio(): Audio3D {
   /** TAIKO. The big drum: a low sine dropping fast — that pitch drop is what
    *  the ear reads as a large struck skin — with the skin's own slap on top. */
   function taiko(dest: AudioNode, t: number, vol: number, big = true) {
-    // Stings only. The world SCORES play into lnBus/pwBus/gdBus and only ever
-    // run on the 404 fallback path, where there is no recording to clash with;
-    // gating those would silence the fallback score for no reason.
+    // Stings only. The world SCORES play into their own buses (lnBus/gdBus/
+    // mapBus/pwBus → musicBus), never `master`, so this test cannot reach
+    // them. It would not matter if it could: on the 404 fallback path
+    // theme.bad is set and srcs stays empty, so recordingLive() is FALSE
+    // whenever a fallback score is what is playing (measured: refute-drum,
+    // NOMP3 run). NOTE pwBus does NOT run only on the fallback path —
+    // powderEvolve() starts the Powder scheduler under a recording; see
+    // ensurePwBus.
     if (dest === master && recordingLive()) return;
     dTone(dest, t, big ? 0.5 : 0.3, 'sine', vol, big ? 128 : 190, big ? 52 : 88, 0, 0.002);
     nEnv(fxFor(dest, 'skin'), t, big ? 0.12 : 0.07, vol * 0.55, 0.001);
@@ -3150,6 +3157,7 @@ export function createAudio(): Audio3D {
   /** SHIME. The small rope-tuned drum that keeps the actual time. Tight, high,
    *  and it is the pulse the feet follow. */
   function shime(dest: AudioNode, t: number, vol: number) {
+    if (dest === master && recordingLive()) return;   // a drum — see recordingLive
     dTone(dest, t, 0.09, 'sine', vol * 0.7, 640, 380, 0, 0.001);
     nEnv(fxFor(dest, 'shime'), t, 0.05, vol, 0.001);
   }
@@ -3621,6 +3629,8 @@ export function createAudio(): Audio3D {
   /** a soft low drum — felt, not heard; the avalanche pulse at full stage */
   function pwDrum(t: number, vol = 0.20) {
     const c = ctx; if (!c || !pwBus) return;
+    if (recordingLive()) return;   // a drum — see recordingLive. Cannot touch the
+                                   // fallback score: recordingLive() is false there.
     const o = c.createOscillator(), g = c.createGain();
     o.type = 'sine';
     o.frequency.setValueAtTime(120, t);
@@ -3650,20 +3660,28 @@ export function createAudio(): Audio3D {
       pwNextT += BEAT; pwStep++;
     }
   }
+  /** The Powder bus, built on demand and parked at silence (0.0001): the score
+   *  ramps it up when it starts; a one-shot that needs it lifts it itself.
+   *  Extracted from startPowderScore so an evolution can reach the bus without
+   *  starting the whole scheduler under a recording (refute-drum POWDER run:
+   *  32 score voices in 8 s with the recording live). */
+  function ensurePwBus(c: AudioContext): GainNode {
+    if (pwBus) return pwBus;
+    pwBus = c.createGain(); pwBus.gain.value = 0.0001;
+    // a touch of air: one short feedback delay, wet and quiet — snowfields
+    // are the quietest place a child has ever stood, and the reverb says so
+    const dly = c.createDelay(0.5); dly.delayTime.value = 0.22;
+    const fb = c.createGain(); fb.gain.value = 0.28;
+    const wet = c.createGain(); wet.gain.value = 0.18;
+    pwBus.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet);
+    wet.connect(musicBus!); pwBus.connect(musicBus!);
+    return pwBus;
+  }
   function startPowderScore() {
     const c = ensure(); if (!c || !master) return;
-    if (!pwBus) {
-      pwBus = c.createGain(); pwBus.gain.value = 0.0001;
-      // a touch of air: one short feedback delay, wet and quiet — snowfields
-      // are the quietest place a child has ever stood, and the reverb says so
-      const dly = c.createDelay(0.5); dly.delayTime.value = 0.22;
-      const fb = c.createGain(); fb.gain.value = 0.28;
-      const wet = c.createGain(); wet.gain.value = 0.18;
-      pwBus.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet);
-      wet.connect(musicBus!); pwBus.connect(musicBus!);
-    }
+    ensurePwBus(c);
     pwRunning = true;
-    ramp(pwBus.gain, 0.5, c.currentTime, 1.8);
+    ramp(pwBus!.gain, 0.5, c.currentTime, 1.8);
     pwStep = 0; pwNextT = c.currentTime + 0.1;
     if (pwTimer) clearInterval(pwTimer);
     pwTimer = setInterval(pwSchedule, 110);
@@ -3677,8 +3695,11 @@ export function createAudio(): Audio3D {
   /** the evolution answer: a rising music-box run with a bell flourish */
   function powderEvolve() {
     const c = ensure(); if (!c) return;
-    if (!pwBus) startPowderScore();
+    const bus = ensurePwBus(c);
     const t = c.currentTime + 0.02;
+    // under a recording the bus is parked at silence: lift it for the
+    // flourish and put it back, WITHOUT starting the scheduler
+    if (!pwRunning) { ramp(bus.gain, 0.5, t, 0.05); ramp(bus.gain, 0.0001, t + 1.0, 0.8); }
     [0, 2, 4, 5, 7].forEach((d, i) => pwBox(pwDeg(d), t + i * 0.07, 0.17));
     pwBells(t + 0.38, 0.13); pwBells(t + 0.5, 0.10);
     pwDrum(t + 0.5, 0.2);

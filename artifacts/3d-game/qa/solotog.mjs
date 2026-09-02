@@ -10,7 +10,7 @@
 // solo is 120s instead of 180s and no rivals join. The two leaderboard
 // assertions were cut 2026-08-29 with the board itself — they hard-dereferenced
 // getComputedStyle(#board) and would throw on a null the moment it was deleted.
-// are scheduled. This checks all three, then reloads to prove the setting
+// are scheduled. This checks both, then reloads to prove the setting
 // survived, which is the part the old button never did.
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || '4177';

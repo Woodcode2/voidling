@@ -577,3 +577,14 @@ measurement behind it. Any change needs the owner, not a board.
 conclusion, and a probe that cannot conclude is not evidence of anything.
 
 Run `node qa/gate.mjs --profile=push` before every push and READ the output.
+
+## Retraction — 2026-09-02, the governor's own pwDrum ruling (refute-drum)
+702a3e4's commit message says pwBus "runs solely on the 404 fallback path" and
+that the crew's pwDrum guard "would have silenced Powder's fallback score".
+Both false, measured by the drum skeptic on the live build: powderEvolve()
+started the whole Powder scheduler under a recording (32 bus voices in the 8 s
+after an evolution with powder.mp3 playing), and on the 404 path theme.srcs is
+empty so recordingLive() is false and the guard could never have touched the
+fallback score. The crew's F3 was right; the governor's correction of it was
+wrong, and shipped for a day. Landed as the skeptic specified: ensurePwBus,
+the pwDrum guard, and the powderEvolve lift-and-park.

@@ -1377,6 +1377,12 @@ CHANGED    the swallow fallback is a soft dark whoosh (filtered noise only,
            measurable — the bands exist for 900-walker crowds).
 NOW        smoke PASS; the swallow no longer registers as percussion by
            construction (no oscillator in the voice); spawn meter 0%.
+RETRACTED  2026-09-02 (refute-drum). "with eaten_deep.wav absent" — the file was
+           present and tracked (79,424 bytes, since 589e31e, 2026-08-16) when this
+           was written, and the fallback described under CHANGED never executed.
+           NOW should have read: every big swallow plays a recorded kick drum at
+           +14 dB over the recording. Corrected by 702a3e4; probe: qa/drumover.mjs
+           (specified in docs/crews/round-5/refute-drum.verdict.md, not yet landed).
 GATE       qa/moverbands.mjs (distance census — the fast flag lives in the
            update loop it deliberately does not model), qa/smoke.mjs.
 
