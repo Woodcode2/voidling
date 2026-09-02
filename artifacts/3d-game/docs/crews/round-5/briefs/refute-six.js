@@ -63,39 +63,9 @@ const VERDICT = {
 
 phase('Refute')
 
+// family: verdict complete on disk (SOUND WITH CORRECTIONS, 04:15 UTC) — its agent died at the
+// session limit AFTER writing, so it is dropped here rather than re-run.
 const jobs = [
-  {
-    key: 'family', sha: 'e0f7e13',
-    brief: `THE LANDING: src/proto3d/rivals.ts — FAMILY_SKIN re-dealt so name,
-costume and behaviour agree (JELLY:univoid, BIGSHOT:kingvoid, ECHO:shadowninja,
-NIBBLES:drako, GRUMPS:rexling), and a new FAMILY_INK table replacing sk.rim as
-each sibling's identity colour, because JELLY's ring sat dE 3.1 from the DANGER
-red. The commit claims: worst sibling-to-meaning distance 3.1 -> 42.2 authored,
-26.3 rendered; sibling-to-sibling >= 41.6; qa/ringmeaning.mjs fails before and
-passes after.
-
-KILL IT ON:
-1. RENDERED, NOT AUTHORED. Shoot a real match (canvas, not render target) with
-   rivals in frame and measure the actual halo pixels in CIE Lab against the
-   real DANGER/PRIZE/SAFE/WHITE cue pixels. The ACES path is compressive and
-   pulls colours together; if the rendered margin is under the repo's dE 7
-   bar for ANY sibling in ANY branch of the ring logic (rivals.ts ~:1904-1922
-   and the onNotice / onSurge / join-dot / bubble-chip consumers), that is a
-   kill. Run qa/ringmeaning.mjs yourself.
-2. EVERY CONSUMER OF rv.color. The commit says FAMILY_INK reaches the halo, the
-   look ring, the surge ring, the join dot, the leaderboard dot and the bubble
-   chip. grep every read of .color on a rival and confirm none still reads
-   sk.rim. One missed consumer is a sibling wearing two colours.
-3. THE COSTUME RE-DEAL'S BLAST RADIUS. The skins are $2.99 shop products with
-   names (palette.ts). Does any code path assume NIBBLES wears kingvoid — the
-   store, the skin-preview sheet, telemetry, an end-screen line, a probe
-   asserting on a literal? grep qa/ for skin names and sibling names.
-4. THE VERDICT SAID "NIBBLES PASSES, DO NOT BREAK IT" and the implementer moved
-   her anyway, with an argument. Is the argument right — is there really no
-   deal that keeps NIBBLES:kingvoid and fixes the other three?
-Also run qa/rivalswing.mjs (the surge probe) — rivals.ts changed and that
-probe guards the kid-mercy rails.`,
-  },
   {
     key: 'drum', sha: '702a3e4',
     brief: `THE LANDING: src/proto3d/audio3d.ts — the owner's "drum that was fixed

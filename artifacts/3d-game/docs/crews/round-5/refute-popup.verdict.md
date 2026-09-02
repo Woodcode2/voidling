@@ -59,3 +59,35 @@ Started 2026-09-02. Appending as measurements land.
     #end/#loadScr/#shop parent = BODY x3; page errors: none real (2x 403 hf asset)
     shots: qa-out/s2-pirate-gate.png, qa-out/s2-pirate-t5.png
   NOTE on my own Maple run above: the "hand did not leave" line is a PROBE BUG — the post-drag wait (t > 6.5) was already true at dispatch (t=6.7), so the sample preceded any frame. Re-run with a real wait follows.
+
+<!-- appended 4: Maple rerun with the wait fixed -->
+### (ran) scratch s2.mjs maple 4177 — RERUN, post-drag wait now `t > tDrag + 2.0`. 259s wall. exit 0.
+    t>5: cover.on=false tapGate.on=false menu=false hand.show=true hand.on=true clock=174.9 tutInDom=false
+    #hand svg: 283.8 x 186.2 px; filter=drop-shadow(rgba(0, 0, 0, 0.45) 0px 6px 14px); overflow=visible
+    clock running: 174.7 -> 173.2
+    drag dispatched at t=6.83, sampled at t>8.83: hand.show=false hand.on=false  (the earlier "did not leave" was my wait bug; retracted)
+    #end/#loadScr/#shop parent = BODY x3
+  Looked at qa-out/s2-maple-t5.png: white ∞ ribbon with its dark under-stroke, white glove with a visible soft shadow, centred on the void at 2:55 on the clock. The surviving `#hand svg` rule renders.
+### (ran) scratch s2.mjs fresh 4177 — CUT OFF by the 10-minute call limit with loadavg 9.75 (another job on the box); no numbers. Re-attempt below if load allows.
+
+<!-- appended 5: the collateral CSS deletion, and the gate -->
+### (disk) A deletion the message does not own
+- The diff removes the WHOLE line index.html(e39e3e0^):1142 `#tut .card, #daily .dCard, #skinPrev .spCard { border-radius: 24px; }` — three selectors, one of them #tut's. `#daily .dCard` (HEAD :1026) and `#skinPrev .spCard` (HEAD :1093) each carry their own `border-radius: 26px`, same specificity (1,1,0), EARLIER in the sheet — so the deleted later rule was the one winning. Before: 24px on both cards; after: 26px. Two surfaces the commit did not name changed by 2px. Introduced by 589e31e (2026-08-16); its message says nothing about the radius. Live computed numbers pending (cascade.mjs, queued behind the GPU lock).
+- qa/uisystem.mjs asserts nothing about radii (grep radius|24px|dCard|spCard: 0 hits), so no probe catches this.
+### (disk) The gate
+- qa/gate.mjs runs qa/switch.mjs (:218) and qa/uisystem.mjs (:209); it does NOT run tutstrand.mjs, worldswitch.mjs or mapleteach.mjs. tutstrand's staleness cannot block the gate.
+### GPU lock
+- Runs 1-5 above (tutstrand, s2 maple x2, s2lock, s2 pirate) were made WITHOUT the round-5 `mkdir /tmp/gpu.lock` protocol — I read the README after them; each was launched with `pgrep -c chromium` = 0 and 1-min load 2.4-5.9 (recorded per run above). The remaining run takes the lock.
+
+<!-- appended 6: parent build + queue -->
+### (built) parent for A/B
+- `git worktree add --detach /home/user/voidling/.claude/worktrees/refute-popup-parent e39e3e0^` (gitignored path), node_modules symlinked, `nice -n 19 npm run build` in its artifacts/3d-game -> `✓ built in 6.76s`, bundle `main-D5xeDCkV.js`; its dist/index.html carries `id="tut"` (1 hit). Main's :4177 dist is untouched (`main-` bundle differs; checked below when the A/B runs).
+- Queued under the GPU lock (held by another crew since 04:57:48 UTC; my first two 10-minute-capped waiters were replaced by one Monitor'd queue at 05:02): cascade.mjs (card radii on both stylesheets), s2.mjs fresh (hand on a cleared profile), ab.mjs PARENT (session two on the parent build, served to the same URL by a playwright route — no second server), s2daily.mjs (the daily-card door into launchWorld at HEAD).
+
+<!-- appended 7: the cascade, measured -->
+### (ran) scratch cascade.mjs — each build's <style> blocks loaded into a bare page, computed border-radius read. GPU lock held 05:04:07-05:04:08, load 3.58.
+    PARENT e39e3e0^: {"dCard":"24px","spCard":"24px"}
+    HEAD:            {"dCard":"26px","spCard":"26px"}
+  The daily card and the skin-preview card each grew 2px of corner radius in a commit whose message says it deleted "every #tut and #btnGotIt style". Confirmed, not inferred.
+- HEAD moved during this session: c761620 (verdict-draft ticks only; `git diff --stat ec214f4..HEAD -- src index.html` is empty). :4177 serves `assets/main-BlHCCMf5.js` == dist/assets; the parent worktree's bundle is `main-D5xeDCkV.js`.
+- The remaining three browser jobs died on launch inside the queue (no /usr/bin/time on this box — my earlier runs used the shell builtin); relaunched without it.

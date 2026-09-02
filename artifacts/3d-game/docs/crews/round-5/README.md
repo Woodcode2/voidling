@@ -51,3 +51,14 @@ KILLED groups are recorded here, never hidden.
   every brief: create the output file within ten minutes as a DRAFT and append
   each finding as it lands. If the limit cuts a crew off again, the draft is
   the record.
+- **03:49–05:04 UTC — refute-six relaunch.** Hit the limit again ("resets
+  8:40am UTC") after 806k subagent tokens. This time the record survived:
+  `refute-family` COMPLETE on disk (SOUND WITH CORRECTIONS, 4 corrections;
+  its agent died after writing, before returning), `refute-drum` COMPLETE and
+  returned (SOUND WITH CORRECTIONS, 7 corrections — including a KILL of the
+  governor's own pwDrum correction: the premise "pwBus runs only on the 404
+  fallback path" measured false on Powder with the recording live; the crew's
+  F3 was right), `refute-popup` a partial DRAFT, hand/board/cards not started.
+  The streams were held at the owner's request (44% of the window at 04:18).
+  Next: at the 08:40 reset, resume refute-six for the four remaining lanes
+  only (family dropped from the jobs list, drum replays from cache).

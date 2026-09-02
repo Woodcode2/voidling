@@ -8,8 +8,9 @@ the island (BIGSHOT's ink is the hero's own violet, ΔE 4.9), a seventh consumer
 (the weekly board), the rendered half of the commit's evidence rests on a probe that failed three of three
 runs today for instrument reasons and twice told its reader to loosen the bar, and one number in the commit
 message ("rendered worst 26.3") has no run behind it. Four corrections, each verbatim and typechecked or
-syntax-checked where code. Rendered numbers from my own instrument are appended below when the GPU lock
-frees (another lane holds it as of 04:14).
+syntax-checked where code. The rendered numbers are mine, from an instrument that re-projects the ring
+before every shot: worst sibling-to-meaning on screen **31.3** (NIBBLES vs the near-miss WHITE, over the
+palest ground in Maple), closest sibling pair **25.5** (ECHO/NIBBLES), rho median 0.80 — nothing under 7.
 
 Commit under refutation: `e0f7e13` — FAMILY_SKIN re-dealt, FAMILY_INK added, `roster.push` colour
 `sk.rim` → `FAMILY_INK[nm]`. HEAD at start `301a8be`; `dist/` built 00:13 UTC from `0efda23`, the last
@@ -29,6 +30,10 @@ given beside them. Times are UTC.
 | 04:01–04:09 | `node qa/ringmeaning.mjs 4177` rendered run #2, lock held | **exit 1 — a second, different instrument failure.** JELLY's ring at NDC 0.07,0.24, scale 1.80: mask attempts 38 / 71 / 64 px of 766 projected (702 "too dim": neither the white nor the black reference ring moved the band's pixels by 25), so the ring the probe froze was not where it photographed. No colour was measured. Caveat: overlapped 04:03–04:06 by a second browser I launched by mistake (a `node -e "import(...)"` syntax check executed a scratch probe; killed by pid) — contention can slow a shoot, it cannot make a white ring invisible. Two runs, two failure modes, on top of the six the landing already lists: the rendered pass of this probe does not conclude reliably enough to be evidence either way (GOVERNOR: silence is a FAIL, and so is a probe that cannot conclude). |
 | 04:09–04:12 | `node qa/rivalswing.mjs maple 4177`, lock held, sole browser (profile check at 04:12:32), rendering disabled by the probe | **PASS, exit 0.** 353 samples over 180.5 s. Surges 1; lead changes 2 in the stretch (t=105.1→family, 125.6→player), 6 whole-match; larger→eatable arc JELLY >1.2x @107.7 s, eatable @126.6 s; player closed it (r 3.00→4.89 = 1.63x ≥ 1.51x); surged rival JELLY peaked 1.255x at t=111.7 s against pin 3.77; forced bite at t=75.61 s r 2.106→0.918 form 1→0, form stayed lost 6.01 match s (467 frames traced); demotions 1 total / 0 game-fired; bites 1, family prop bites 15. The kid-mercy rails hold on the build under refutation. |
 | (00:20, first launch) | `scratchpad/ringmeaning.run1.log` — a rendered run left in the shared scratchpad by the crew that died at the session limit, same build | exit 1, the same failure as my run #1: GRUMPS's ring, 424 px mask, stability median 0 / p90 1 (a static frame), and all nine colours rendered to one green — SAFE and ECHO at ΔE **0.0** rendered against 83.7 authored — followed by the same "pipeline compresses… re-derive BAR" verdict. Not my run, so not my number; it is the third time today the instrument printed that sentence about a frame that was not of the ring. |
+| 04:26–04:33 | `scratchpad/ringshot.mjs` v1 — my own instrument: a ring of the halo's exact material around the PINNED player, band projected once, lock held | Collapsed like the others (all inks → rgb(175,165,137), 1598 of 2870 band px rejected as motion). Same disease, so I stopped and diagnosed instead of re-running. |
+| 04:34–04:37 | `scratchpad/ringdiag.mjs` — four full-frame shots 1.5 match s apart with the game's state dumped beside each (`scratchpad/diag/diag0-3.png`) | **The cause.** With the radius pinned at 1.9 and the hero fixed at (23.5,−38.0), the camera went (45,33,−16) → (57,50,−4) → (60,54,−2) → (58,51,−4) across the four shots: the follow distance is eased toward its target at 1.6/s (`prototype3d.ts:9341`) and was still travelling ~20 u after the pin; NIBBLES, the bully, was standing at **0 u** from the player at t=22.1 (she joins on top of you and prowls your block); `#hand` (the figure-8 tutorial, live since `a4f5bf6`) and `#titlecard` were up over the canvas. Every ring instrument today — the repo's probe (whose header says "the radius is pinned, so camDist is a constant"), the crew's 00:20 run and my v1 — projected its band once and then photographed where the ring used to be. |
+| 04:43–04:56 | `scratchpad/ringshot2.mjs` v2 — re-projects the band from the live camera before every shot; OFF→COLOUR→OFF per colour; `#hand`/`#titlecard` hidden; halo material then fx material (`fx.ts:74`, additive, α 0.5, radius 7) | Camera stable at (57.7,50.8,−3.8) from the third shot on; zero collapsed pairs; masks 950–1316 px of ~1912. Table below. Two rows contaminated and marked: WIND-UP (shot first, camera moved 10.8 u) and NIBBLES (866 px motion-rejected, grey median). |
+| 04:57–05:03 | `scratchpad/ringshot3.mjs` — the two contaminated rows re-shot: NIBBLES ×3, WHITE ×2, WIND-UP ×2, SAFE ×1 | First shot of the run garbage again (camera moved 12.3 u — this is now a rule: the first colour after the pin is never valid). Then NIBBLES_b/NIBBLES_c rgb(101,193,177)/(100,193,177), ΔE **0.2** apart; WIND-UP_a/_b ΔE 1.6; WHITE_a/_b 0.0; SAFE identical to v2's (91,193,115). NIBBLES/WHITE **31.3**, NIBBLES/SAFE 34.5, NIBBLES/WIND-UP 103.4. The 15.4 in v2 was a mover, not the ring. |
 | ~03:59 | `scratchpad/de.mjs` — CIE76 on `qa/ringmeaning.mjs`'s own `lab()` (copied verbatim) | tables in the kill shots below |
 | ~04:00 | `scratchpad/search.mjs`, `search2.mjs` — grid search of sRGB (step 2–3) for a BIGSHOT ink ≥25 from cues, white, the other four inks AND the hero's violets | no violet/purple hue clears the hero set; best families magenta (`#ff00ff` 41.9), tan (`#b6885c` 51.5), green (forbidden by the commit's own "not green" rule). Chosen `#ff2ad4`, see correction A. |
 | ~04:01 | real `qa/ringmeaning.mjs --authored` on a scratch copy of `rivals.ts` with BIGSHOT `0xff2ad4` | PASS; MEANING worst unchanged 42.2, IDENTITY worst unchanged 41.6; BIGSHOT nearest cue DANGER 72.3 |
@@ -112,12 +117,27 @@ consumers split in two: the DOM ones (bubble chip `bubbles.ts:279-282`, the lead
 dots) paint the hex directly — no tone mapping — so their rendered margins ARE the authored ones. The WebGL
 ones are the NEUTRAL halo branch (`rivals.ts:2030`, MeshBasicMaterial α 0.85) and the fx LOOK/SURGE rings
 (`fx.ts:74`, additive). The repo's own instrument for the halo failed twice on this box for instrument reasons
-(run #1: an occluder; run #2: mask starved) and measured nothing. My own instrument (`scratchpad/ringshot.mjs`,
-same materials, ring around the pinned player, canvas screenshots): RENDERED-PENDING. The landing's two
-recorded runs of the repo's probe (36.0 and 34.6 rendered worst, rho min 0.62/0.65) are the governor's
-numbers, not mine, and are cited as such. **No sibling in any branch is under 7 rendered on any number that
-exists** — the only branch that carries a sibling colour is NEUTRAL, and the cue branches are literals the
-commit did not touch. Not a kill.
+(run #1: an occluder; run #2: mask starved) and measured nothing. My own instrument, once it re-projected per shot
+(`ringshot2`/`ringshot3`, halo material, canvas screenshots, Maple's pale plaza pavement — the ground that
+lifts every colour hardest — camera stable, stable medians only):
+
+| sibling | WIND-UP | PRIZE | SAFE | DANGER | WHITE | worst |
+|---|---|---|---|---|---|---|
+| JELLY `#ff8fd0` → rgb(203,135,173) | 67.3 (67) | 87.3 (102) | 88.1 (121) | 49.2 (49) | 39.5 (59) | WHITE **39.5** |
+| BIGSHOT `#b96bff` → rgb(154,103,205) | 98.3 (109) | 124.9 (149) | 116.7 (153) | 82.1 (93) | 70.3 (94) | WHITE 70.3 |
+| ECHO `#1ac6ff` → rgb(38,173,201) | 111.6 (129) | 95.4 (117) | 59.0 (84) | 93.4 (111) | 39.5 (51) | WHITE 39.5 |
+| NIBBLES `#5ee8d8` → rgb(101,193,177) | 103.8 (130) | 74.0 (90) | 34.5 (42) | 87.0 (114) | 31.3 (44) | WHITE **31.3** |
+| GRUMPS `#9ea0fa` → rgb(132,146,200) | 94.8 (107) | 100.1 (122) | 81.6 (114) | 76.2 (88) | 39.7 (58) | WHITE 39.7 |
+| BIGSHOT_FIX `#ff2ad4` → rgb(206,65,178) | 83.4 (84) | 125.2 (143) | 130.2 (166) | 70.9 (72) | 81.9 (104) | DANGER 70.9 |
+
+Rendered cue pixels: WIND-UP rgb(207,63,26), PRIZE (202,179,35), SAFE (91,193,115), DANGER (206,89,65),
+WHITE (202,203,196). Sibling pairs rendered: ECHO/NIBBLES **25.5**, JELLY/GRUMPS 31.3, ECHO/GRUMPS 33.6,
+BIGSHOT/GRUMPS 37.0, JELLY/BIGSHOT 38.7, the rest ≥ 50. `#ff2ad4` vs the four others ≥ 42.9. rho over 55
+pairs: min 0.60, median 0.80, max 1.00 — which is also what the landing's two runs measured (0.62/0.65,
+median 0.81/0.83) on a different ring over different ground, so the governor's rho was right even though
+his probe cannot be made to repeat it today. The additive LOOK/SURGE material is a different story and is
+recorded below, but it is not this commit's. **Nothing a child sees in the NEUTRAL branch is under 7; the
+smallest rendered margin is 31.3, four and a half times the floor.** Not a kill.
 
 **2. Every consumer of `rv.color`.** Tried to find one that still reads `sk.rim`: none (the six the commit
 lists all read `rv.color`, which is `FAMILY_INK[nm]` at `rivals.ts:587`; the two residual `sk.rim` reads are
@@ -144,9 +164,9 @@ drako's is 89.9. Not a kill; the record should say the argument was incomplete (
 (the surge and mercy code is untouched by the diff), and the probe agrees. Not a kill.
 
 **6. The commit's own evidence.** "qa/ringmeaning.mjs fails before and passes after" is true of the authored
-half (the landing shows the failing run; I reproduce the passing one). The rendered half is fragile enough
-that it failed 2 of 2 runs today for two different instrument reasons and, in one of them, printed a
-confident instruction to loosen the bar. And "rendered worst 26.3" in the message has no run behind it in
+half (the landing shows the failing run; I reproduce the passing one). The rendered half failed 3 of 3 runs
+today for one diagnosed reason (the camera is not where the probe assumes — correction C) and, in two of
+them, printed a confident instruction to loosen the bar. And "rendered worst 26.3" in the message has no run behind it in
 any record. Rule 3 and 3b; corrections C and D.
 
 ## Corrections (verbatim)
@@ -234,12 +254,25 @@ with
     { name: 'JELLY', color: FAMILY_INK.JELLY }, { name: 'B1G-B1TE', color: 0xd85a5a },
 ```
 
-### C. The probe can blame the pipeline for an occluder — `qa/ringmeaning.mjs`
+### C. The probe photographs where the ring was, and blames the pipeline — `qa/ringmeaning.mjs`
 
-Run #1 above: five inks authored ≥ 41.6 apart rendered within ΔE 0.6 of each other, the median-only stability
-gate passed (median 9, p90 173), and the probe printed `FAIL — the pipeline compresses harder than the bar
-assumed (0.01 < 0.5) … Re-derive BAR from this rho.` A reader who followed that instruction would have
-loosened the bar against a photograph of a dinosaur. Rule 3b. In `qa/ringmeaning.mjs` replace the line
+Three runs today (mine ×2, the crew's at 00:20) and none measured a ring. The cause is measured, not
+guessed (`ringdiag`, 04:34): the probe's own premise — "the radius is pinned, so camDist is a constant"
+(`qa/ringmeaning.mjs`, the `__reAim` comment) — is false. `camDist` is eased toward its target at 1.6/s
+(`prototype3d.ts:9341`) and was still travelling ~20 u when every shoot started; the band is projected once
+from the frozen transform and never again; the first colour of every run fires while the camera moves 10–12 u.
+On top of that the bully joins on top of the player and stands at 0 u, the HOARDER walks back onto his own
+frozen ring, and `#hand` sits over the canvas on Maple since `a4f5bf6`. Run #1 then printed `FAIL — the
+pipeline compresses harder than the bar assumed (0.01 < 0.5) … Re-derive BAR from this rho.` about five inks
+that had rendered within ΔE 0.6 of each other — a photograph of a dinosaur. Rule 3b.
+
+Two mechanical edits. First, re-project before every shot instead of once: in `qa/ringmeaning.mjs` the band
+`px` is computed inside the freeze block from `FX, FY, FZ, FS` and the camera at that instant; move that
+loop into a function `window.__band = () => { … same loop, reading window.__cam now … }` and call it from
+`shoot()` after `__reAim()` so `target.px`, `CLIP` and the mask are rebuilt per colour, with the OFF frames
+bracketing each colour rather than the whole shoot (the shape of `scratchpad/ringshot2.mjs`, which
+measured every colour on the first try after v1 had failed the same way as the probe). Second, until that
+lands, make the failure say what it is: replace the line
 
 ```
       if (rhoMin.rho < RHO_ASSUMED) {
@@ -287,7 +320,19 @@ with
 ```
   (format copied from the `rivalnotice` entry at `qa/gate.mjs:169-170`; `pf` is the file's PASS/FAIL verdict.)
 
-### Not corrections — recorded for the owner
+### Not corrections — recorded for the owner and the ledger
+
+- **The LOOK and SURGE rings cannot carry a colour over pale ground, and never could.** `fx.ring` is
+  additive (`fx.ts:74`) at ≤ 0.8 opacity falling to 0 over the flight. Measured (`ringshot2`, fx material,
+  α 0.5, radius 7, same pavement, camera stable): every colour renders to a pale wash — WIND-UP rgb(199,184,128),
+  PRIZE (214,203,145), SAFE (186,209,161), DANGER (215,185,150), WHITE (214,208,194), JELLY (214,192,181),
+  BIGSHOT (198,180,197), ECHO (180,202,195), NIBBLES (187,209,183), GRUMPS (194,186,195). The cues collapse
+  among themselves — WIND-UP/PRIZE **6.8** rendered against 84 authored — before any sibling does: sibling vs
+  WHITE 7.7 (JELLY), 11.5 (ECHO), 12.4 (NIBBLES), 14.2 (GRUMPS), 19.0 (BIGSHOT); BIGSHOT/GRUMPS **5.8**. rho
+  median 0.25. `prototype3d.ts:2625-2628` promises "one ring in the rival's OWN colour"; over pavement the
+  material cannot keep that promise for any ink, including the old rims, and the commit did not touch it.
+  It is the material, not the table: fix it (normal blending, as the halo) or stop calling the look ring a
+  colour cue. PENDING, owner/governor; it moves every ring in the game and belongs with ledger #11.
 
 - `palette.ts:263` shadowninja's rim `#ff4d5e` (ΔE 3.1 from DANGER) and glow `#ff7a8a` now light ECHO's body.
   The ring says blue, the body says RUN. The commit did not open `palette.ts` and should not have; but the body
