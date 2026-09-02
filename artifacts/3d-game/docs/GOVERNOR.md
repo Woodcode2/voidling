@@ -588,3 +588,19 @@ empty so recordingLive() is false and the guard could never have touched the
 fallback score. The crew's F3 was right; the governor's correction of it was
 wrong, and shipped for a day. Landed as the skeptic specified: ensurePwBus,
 the pwDrum guard, and the powderEvolve lift-and-park.
+
+## Retractions — 2026-09-02, round 5 (the six refutations)
+- **e0f7e13's message says "rendered worst 26.3".** No run behind it exists
+  anywhere in docs/. The recorded rendered runs are 36.0 (GRUMPS's ring) and
+  34.6 (ECHO's) in docs/crews/round-4/family-fix.landing.md. A rule-3 miss by
+  the governor: the number was written from memory of a run, not from a run.
+- **592e9a3's source comment cited qa/sizerank.mjs, which did not exist,** and
+  five numbers (786 frames, 99.9%, 99.7%, one frame in five) that nobody can
+  find a run for. The board skeptic wrote and ran the probe: 1,399 frames,
+  rank read off size wrong in 40.2%, size unable to strictly order the field in
+  73.2%. The removal was right; its stated evidence was not evidence. The probe
+  now exists as qa/sizerank.mjs and the comment carries its numbers.
+- **The "39% banner duty cycle" repeated in three comments was never measured.**
+  Visible-card duty measured 26.9-28.9%; and the gag it justified was total —
+  bubbles.say() read a class the banner never dropped, so the crowd was silent
+  from the first card to the whistle of every match. Fixed in a1d8b1a.

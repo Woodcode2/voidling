@@ -72,3 +72,18 @@ KILLED groups are recorded here, never hidden.
   the only copy, restored at 14:45 UTC. Anything the board and cards skeptics
   appended after the 11:16 sweep is lost. Owner's standing instruction at 86%:
   let the agents finish, save the data, launch nothing.
+
+## Landing log (2026-09-02)
+- `59d53cd` drum corrections 1-6 + NEW 8 (the governor's own pwDrum ruling retracted).
+- `4a06853` qa/sizerank.mjs (the board skeptic's probe); hand verdict gets its browser run.
+- `73ab2d4` qa/tutstrand.mjs reaches its journey again; the Pirate door proven on the landed build.
+- `a1d8b1a` the batch: cards C1-C3, C5, half of C4; family A, B, C (verbatim parts), D;
+  hand C1, C2; popup 1-5; board C1, C3, C4, C7. bannergag FAIL→PASS (0→7 crowd bubbles).
+- **Still owed:** qa/drumover.mjs (drum 7, specified in full); the ringmeaning `__band`
+  re-projection refactor (family C, described not written); popup 7 (the 24px card
+  radius — a governor call, left at 26px); two C4 comment lines whose text the
+  skeptic quoted from the wrong lines; rivals.ts:1675 / prototype3d.ts:9303, :2409-2411.
+- **Verdict status:** family, drum, popup, cards SOUND WITH CORRECTIONS (all with browser
+  evidence); hand SOUND WITH CORRECTIONS (shipped probe passes; the skeptic's own
+  stay/intro/ladder probes never ran); board — the skeptic died before writing the final
+  header, but its measured run and C1-C7 are complete; read as SOUND WITH CORRECTIONS.
