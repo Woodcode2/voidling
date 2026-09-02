@@ -62,3 +62,13 @@ KILLED groups are recorded here, never hidden.
   The streams were held at the owner's request (44% of the window at 04:18).
   Next: at the 08:40 reset, resume refute-six for the four remaining lanes
   only (family dropped from the jobs list, drum replays from cache).
+- **09:41 UTC — third launch (resume, four lanes).** Drum re-ran because the
+  family entry was dropped from the FRONT of the jobs list (prefix cache lost —
+  never edit the front of a resumed job list). Popup and hand finished
+  PROVISIONAL (no browser: the box was contended for their whole window);
+  drum's third run finished with a structured result; board and cards died at
+  the session limit ("resets 2:40pm UTC") mid-draft. The container then
+  restarted and reverted the checkout to an old commit; the remote branch was
+  the only copy, restored at 14:45 UTC. Anything the board and cards skeptics
+  appended after the 11:16 sweep is lost. Owner's standing instruction at 86%:
+  let the agents finish, save the data, launch nothing.
