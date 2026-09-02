@@ -240,3 +240,22 @@ C7. (PENDING the run) src/prototype3d.ts:4353-4360 — the five transcribed numb
     await p.screenshot({ path: `${SHOTS}/board-skeptic-end.png` });
     console.log('\npage errors:', errs.length ? errs : 'none');
     await b.close();
+
+## (append 5) MEASURED — scratchpad/refute_board.mjs, Maple, 430x932, insets 59/34, run 10:45:51-10:5x UTC
+Per distinct `__matchState().t` frame, t = 20.00 … 60.00, chase-nearest driver (player finished r3.15 / 10,100 pts — a strong player, the side the crew's caveat 3 did not cover):
+```
+  distinct frames                                   1399  (joined rivals: 2 in 269 frames, 3 in 178, 4 in 952)
+  player's rank read off size wrong                 40.2% of frames   (crew/commit: 99.7%)
+  score rank -> size rank                           2->2 59.8% · 1->2 39.8% · 2->1 0.4% · 2->5 0.1%   (1->4: never; crew: 19.8%)
+  strict pair inversions                            5.9% of 11,395 pairs (crew: 41.5% of 4,674)
+  size-ties between differently-scored voids        18.9% of pairs
+  frames where size cannot STRICTLY order the field 73.2%  (tie-aware; my stable-sort "order differs" figure of 40.2% is tie-blind and understated)
+  non-hunter family SIZE spread max/min             median 1.0000, p90 1.0775; within 2% of one size in 74.2% of frames
+  non-hunter family SCORE spread max/min            median 3.21x
+  hunter bigger than the player                     99.6% of frames; player leading on score 39.8%; leading AND hunter bigger 39.8%
+  player is the biggest void                        0.4% of frames
+  final frame t=60: You 10100 r3.15 | BIGSHOT 9048 r2.50 | ECHO 5508 r2.50 | NIBBLES 11485 r3.06 (hunting) | GRUMPS 2707 r2.50
+```
+Reading: three siblings 3.3x apart on score, identical size to two decimals — pinned on `pr * 0.80` (3.15 × 0.80 = 2.52). And in every frame the player was winning, the hunter looked bigger: a child reading size would have named NIBBLES the leader in 40% of the match when she was not. Size does not rank; the commit's CONCLUSION stands on an independent run with a different driver. Its NUMBERS do not: 99.7% / 19.8% / "fourth-biggest" are that crew's weak driver's numbers, not the game's, and there is no probe on disk that produced them.
+
+HUD frame (render restored, t=60.5): #timer glyph run x 180..250, centre 215.0 = screen centre 215; top 71 = 12 + 59 inset — clears the notch. #coins x 366..418 y 71..100; #btnQuit x 374..418 y 115..159. Glyph-vs-#coins overlap 0 px², glyph-vs-#btnQuit 0 px². The timer's BOX (left:0;right:0 → 430 wide) overlaps #coins' box by 1,508 px² = 100% of the coin chip, so box-measuring probes (qa/_bug9.mjs:18-21, qa/_mvhud.mjs pairwise `ov`) will now report timer∩coins. Shot: docs/crews/round-5/shots/board-skeptic-hud.png.
