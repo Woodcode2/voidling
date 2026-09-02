@@ -1,0 +1,27 @@
+START 21:48:42 timeout 900 node qa/placement.mjs powder 4177 --json=/tmp/crew-placement/s7-before-powder.json --shots=/tmp/crew-placement/shots-s7 --tag=before --pick=overlap:2,inside:1,water:1
+
+══ POWDER ══  4143 static props (0 benches, 0 houses w/ doors), audited in 13s  FAIL
+   category      n  verdict  worst
+   road          12  FAIL  #1748 prop r=0.46 foot=2.6x2.1 h=1.0 at (94.2,12.4) [1.54] | #1482 prop r=0.45 foot=2.2x2.1 h=0.9 at (62.3,91.1) [1.39] | #2792 prop r=0.37 foot=2.1x1.8 h=0.8 at (108.5,93.2) [1.24]
+   water         20  FAIL  #73 pine r=2.03 foot=2.4x2.4 h=4.8 at (-90.6,50.7) | #81 pine r=1.9 foot=3.0x3.0 h=6.1 at (-69.3,68.7) | #91 pine r=1.84 foot=4.0x4.0 h=8.2 at (-89.5,42.0)
+   offisland      2  FAIL  #2759 prop r=0.38 foot=1.7x1.5 h=0.6 at (-117.6,-133.5) | #4142 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)
+   overhang      36  info  #602 prop r=0.45 foot=1.3x1.2 h=0.5 at (-107.5,-154.9) [2] | #633 prop r=0.43 foot=1.8x1.5 h=0.7 at (8.8,228.9) [2] | #661 prop r=0.38 foot=1.8x1.4 h=0.7 at (146.7,14.7) [2]
+   float          0  ok    
+   sunk        2430  info  #476 prop r=0.43 foot=2.0x1.7 h=0.8 at (60.3,-202.2) top 0.60 min -0.22 [0.22] | #511 prop r=0.38 foot=2.1x1.7 h=0.8 at (-7.3,-240.1) top 0.59 min -0.22 [0.22] | #518 prop r=0.41 foot=2.2x1.8 h=0.8 at (68.2,187.9) top 0.59 min -0.22 [0.22]
+   inside        31  FAIL  #2988 prop r=0.6 foot=1.2x1.0 h=0.8 at (43.9,177.5) INSIDE #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3) [2.9] | #1115 prop r=0.46 foot=2.2x1.8 h=0.8 at (-7.8,112.0) INSIDE #21 chalet r=3.6 foot=11.1x6.7 h=9.9 at (-8.0,110.9) [2.27] | #2519 prop r=0.45 foot=1.9x1.6 h=0.7 at (61.0,182.7) INSIDE #14 chalet r=3.6 foot=9.3x6.2 h=9.6 at (60.9,183.8) [2.02]
+   under         11  info  #2851 prop r=0.4 foot=1.3x1.0 h=0.5 at (45.7,176.8) under #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3) [1.82] | #949 prop r=0.47 foot=2.1x1.6 h=0.8 at (50.3,53.8) under #8 chalet r=3.6 foot=9.6x6.1 h=9.5 at (50.2,55.2) [1.62] | #2956 prop r=0.55 foot=2.7x0.7 h=0.5 at (45.9,178.1) under #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3) [1.55]
+   overlap       32  FAIL  #10 chalet r=3.6 foot=8.6x5.7 h=9.2 at (43.2,125.8) x #64 prop r=2.2 foot=11.5x10.5 h=0.8 at (50.4,125.3) [3.6] | #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3) x #22 chalet r=3.6 foot=10.0x5.8 h=9.3 at (39.1,182.5) [2.71] | #12 chalet r=3.6 foot=9.9x5.7 h=9.2 at (49.8,192.1) x #4051 drift r=0.95 foot=4.5x4.6 h=1.8 at (46.9,189.4) [2.12]
+   clutter      929  info  #1770 prop r=0.47 foot=2.9x2.6 h=1.1 at (141.2,-56.4) x #4034 drift r=0.95 foot=4.8x4.5 h=1.8 at (141.9,-56.4) [2.6] | #233 pine r=1.72 foot=3.8x3.8 h=7.9 at (-73.0,122.7) x #282 drift r=0.95 foot=3.8x2.8 h=1.4 at (-71.3,122.5) [2.48] | #416 prop r=1.8 foot=3.6x3.6 h=7.4 at (73.9,169.3) x #1206 prop r=0.36 foot=2.4x2.4 h=0.9 at (73.6,169.3) [2.39]
+   roadend        0  ok    GRIT end 0 at (17.5,77.5) joins LAKE | GRIT end 1 at (47.5,-10.0) joins PISTE
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste         20  info  #284 lift r=2.2 foot=2.4x2.4 h=11.6 at (43.4,-22.3) [13] | #285 lift r=2.2 foot=2.4x2.4 h=11.6 at (35.2,-47.0) [13] | #286 lift r=2.2 foot=2.4x2.4 h=11.6 at (26.9,-71.7) [13]
+   ice          573  info  #260 drift r=0.95 foot=3.0x2.4 h=1.2 at (-82.1,63.1) | #262 drift r=0.95 foot=2.7x2.2 h=1.1 at (-88.5,31.9) | #264 drift r=0.95 foot=3.6x3.0 h=1.3 at (-83.8,57.3)
+   shot /tmp/crew-placement/shots-s7/before-powder-overlap-0.png  <- #10 chalet r=3.6 foot=8.6x5.7 h=9.2 at (43.2,125.8) x #64 prop r=2.2 foot=11.5x10.5 h=0.8 at (50.4,125.3)  (screen 215,369)
+   shot /tmp/crew-placement/shots-s7/before-powder-overlap-1.png  <- #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3) x #22 chalet r=3.6 foot=10.0x5.8 h=9.3 at (39.1,182.5)  (screen 217,380)
+   shot /tmp/crew-placement/shots-s7/before-powder-inside-0.png  <- #2988 prop r=0.6 foot=1.2x1.0 h=0.8 at (43.9,177.5) INSIDE #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3)  (screen 215,403)
+   shot /tmp/crew-placement/shots-s7/before-powder-water-0.png  <- #73 pine r=2.03 foot=2.4x2.4 h=4.8 at (-90.6,50.7)  (screen 215,390)
+
+PLACEMENT FAIL — powder  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+EXIT 1 21:50:05

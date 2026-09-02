@@ -1,0 +1,28 @@
+START 21:50:25 timeout 900 node qa/placement.mjs pirate 4177 --json=/tmp/crew-placement/s7-before-pirate.json --shots=/tmp/crew-placement/shots-s7 --tag=before --pick=overlap:2,inside:1,roadend:1
+
+══ PIRATE ══  3519 static props (24 benches, 0 houses w/ doors), audited in 14s  FAIL
+   category      n  verdict  worst
+   road          16  FAIL  #2410 prop r=1.4 foot=2.0x1.8 h=1.3 at (129.8,-48.0) [5.24] | #3491 bench r=2.4 foot=3.0x1.0 h=2.0 at (7.9,197.4) [5.16] | #3513 bldg r=4 foot=71.4x1.4 h=12.6 at (-92.0,-45.0) [5.08]
+   water          0  ok    
+   offisland      9  FAIL  #338 bldg r=4.8 foot=5.2x6.2 h=7.8 at (83.2,241.7) | #364 bldg r=4.8 foot=4.2x7.1 h=6.4 at (-150.5,-212.0) | #397 bldg r=4.8 foot=7.2x5.8 h=7.5 at (-63.7,195.2)
+   overhang      82  info  #321 bldg r=4.4 foot=1.4x1.4 h=13.1 at (106.1,-197.5) [2] | #347 bldg r=4.8 foot=4.5x6.1 h=4.9 at (-126.3,146.3) [2] | #365 bldg r=4.8 foot=7.3x5.1 h=7.1 at (-204.4,-102.8) [2]
+   float          0  ok    
+   sunk         486  info  #1228 prop r=0.5 foot=1.0x0.8 h=0.3 at (-81.1,161.7) top 0.28 min 0.00 | #1229 prop r=0.5 foot=1.0x0.8 h=0.3 at (40.5,-241.9) top 0.28 min 0.00 | #1230 prop r=0.5 foot=1.0x0.8 h=0.3 at (-181.7,30.4) top 0.28 min 0.00
+   inside        77  FAIL  #2865 bldg r=2.6 foot=0.8x0.8 h=7.5 at (-85.1,-84.4) INSIDE #2915 bldg r=9 foot=20.0x20.3 h=23.4 at (-84.9,-89.9) [4.47] | #2280 prop r=1.3 foot=1.9x1.9 h=2.2 at (-38.6,-199.2) INSIDE #2285 bldg r=9 foot=23.8x25.0 h=27.5 at (-30.0,-197.5) [3.09] | #2323 prop r=0.7 foot=1.4x1.4 h=1.3 at (-27.5,-189.0) INSIDE #2285 bldg r=9 foot=23.8x25.0 h=27.5 at (-30.0,-197.5) [3.01]
+   under         47  info  #3016 prop r=0.6 foot=0.8x0.8 h=0.8 at (-123.5,15.8) under #3514 bldg r=5 foot=11.6x9.8 h=10.4 at (-124.5,16.3) [3.77] | #3019 prop r=0.6 foot=0.8x0.8 h=0.8 at (-124.9,14.9) under #3514 bldg r=5 foot=11.6x9.8 h=10.4 at (-124.5,16.3) [3.44] | #2427 prop r=1.4 foot=2.0x1.8 h=1.3 at (174.8,13.1) under #2389 bldg r=3 foot=6.4x6.4 h=6.9 at (173.4,12.0) [1.37]
+   overlap      194  FAIL  #433 bldg r=5.6 foot=8.7x8.6 h=11.5 at (178.8,-17.7) x #2045 bldg r=5.5 foot=14.4x10.0 h=4.3 at (171.2,-19.7) [4.23] | #2420 bldg r=5.5 foot=14.4x10.0 h=4.3 at (152.7,14.9) x #2473 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5) [4.2] | #2364 bldg r=3 foot=6.4x6.4 h=6.9 at (152.3,-91.4) x #2534 prop r=2.2 foot=8.3x8.3 h=2.6 at (153.4,-95.7) [3.66]
+   clutter       78  info  #1589 prop r=2.4 foot=2.0x2.4 h=1.8 at (-44.0,185.9) x #3503 prop r=2.4 foot=3.5x2.4 h=2.4 at (-45.0,185.4) [1.96] | #857 prop r=1.6 foot=2.8x2.4 h=1.8 at (-177.6,-135.5) x #1846 bldg r=2.6 foot=2.2x4.7 h=6.4 at (-177.5,-138.0) [1.51] | #831 prop r=1.6 foot=3.4x2.8 h=2.2 at (-182.9,-164.6) x #1002 prop r=1.6 foot=3.7x3.1 h=2.4 at (-185.1,-163.0) [1.35]
+   roadend        4  FAIL  PROMENADE end 0 at (5.0,-210.0) joins NOTHING | PROMENADE end 1 at (40.0,214.0) joins NOTHING | TRAIL end 0 at (10.0,-125.0) joins NOTHING | TRAIL end 1 at (-130.0,130.0) joins NOTHING
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   ice            0  info  
+   shot /tmp/crew-placement/shots-s7/before-pirate-overlap-0.png  <- #433 bldg r=5.6 foot=8.7x8.6 h=11.5 at (178.8,-17.7) x #2045 bldg r=5.5 foot=14.4x10.0 h=4.3 at (171.2,-19.7)  (screen 232,351)
+   shot /tmp/crew-placement/shots-s7/before-pirate-overlap-1.png  <- #2420 bldg r=5.5 foot=14.4x10.0 h=4.3 at (152.7,14.9) x #2473 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5)  (screen 216,374)
+   shot /tmp/crew-placement/shots-s7/before-pirate-inside-0.png  <- #2865 bldg r=2.6 foot=0.8x0.8 h=7.5 at (-85.1,-84.4) INSIDE #2915 bldg r=9 foot=20.0x20.3 h=23.4 at (-84.9,-89.9)  (screen 219,388)
+   shot /tmp/crew-placement/shots-s7/before-pirate-roadend-0.png  <- PROMENADE end 0 at (5.0,-210.0) joins NOTHING  (screen 208,401)
+
+PLACEMENT FAIL — pirate  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+EXIT 1 21:51:52
+ALLDONE

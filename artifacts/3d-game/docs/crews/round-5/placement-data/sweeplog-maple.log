@@ -1,0 +1,13 @@
+START 21:56:33 timeout 600 node qa/_sweeplog.mjs maple 4181
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+page.waitForFunction: Timeout 400000ms exceeded.
+    at /home/user/voidling/.claude/worktrees/wf_92bcb5f4-e68-1/artifacts/3d-game/qa/_sweeplog.mjs:19:9 {
+  log: [],
+  name: 'TimeoutError'
+}
+
+Node.js v22.22.2
+EXIT 1 22:03:30

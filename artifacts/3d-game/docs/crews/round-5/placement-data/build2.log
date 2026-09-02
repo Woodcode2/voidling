@@ -1,0 +1,39 @@
+
+> @workspace/3d-game@0.0.0 build
+> vite build --config vite.config.ts
+
+vite v7.3.5 building client environment for production...
+transforming...
+✓ 66 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/assets/fredoka-hebrew-700-normal-DBqnFHCe.woff2      5.01 kB
+dist/assets/fredoka-hebrew-400-normal-CT3eDt6U.woff2      5.06 kB
+dist/assets/fredoka-hebrew-500-normal-DdMTjgiE.woff2      5.15 kB
+dist/assets/fredoka-hebrew-600-normal-CTBxhdlE.woff2      5.19 kB
+dist/assets/fredoka-hebrew-700-normal-DiqR04Vd.woff       6.48 kB
+dist/assets/fredoka-hebrew-400-normal-S03uWvSu.woff       6.48 kB
+dist/assets/fredoka-hebrew-500-normal-BtShCMVp.woff       6.48 kB
+dist/assets/fredoka-hebrew-600-normal-BiVDObXj.woff       6.48 kB
+dist/assets/fredoka-latin-700-normal-BOIZVyIN.woff2      15.90 kB
+dist/assets/fredoka-latin-400-normal-17JuUzdy.woff2      16.08 kB
+dist/assets/fredoka-latin-500-normal-B0JifZgm.woff2      16.25 kB
+dist/assets/fredoka-latin-600-normal-C4zohCW5.woff2      16.47 kB
+dist/assets/fredoka-latin-700-normal-C8FeHd3X.woff       19.81 kB
+dist/assets/fredoka-latin-400-normal-DbXSrOeS.woff       20.12 kB
+dist/assets/fredoka-latin-500-normal-BL692wg7.woff       20.18 kB
+dist/assets/fredoka-latin-600-normal-CcrEjrB4.woff       20.38 kB
+dist/index.html                                         149.09 kB │ gzip:  42.79 kB
+dist/assets/main-DfCs9MsT.css                            37.02 kB │ gzip:  23.78 kB
+dist/assets/web-BZEVbtjp.js                               0.98 kB │ gzip:   0.50 kB
+dist/assets/hats-qk0XU_U3.js                              2.74 kB │ gzip:   1.32 kB
+dist/assets/void3d-Bwu5pXTP.js                           53.08 kB │ gzip:  20.76 kB
+dist/assets/hatgeo-fabE4HCT.js                          400.29 kB │ gzip: 110.08 kB
+dist/assets/main-3b7ZGB__.js                          1,298.20 kB │ gzip: 415.15 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.08s
+BUILD EXIT 0

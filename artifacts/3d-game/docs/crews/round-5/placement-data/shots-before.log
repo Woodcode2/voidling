@@ -1,0 +1,131 @@
+START 21:16:46 /tmp/crew-placement/shots-before.sh 4177 before
+
+══ MAPLE ══  5442 static props (40 benches, 70 houses w/ doors), audited in 18s  FAIL
+   category      n  verdict  worst
+   road          14  FAIL  #2519 prop r=1 foot=3.2x0.2 h=4.4 at (-85.5,-123.4) [3.2] | #2524 prop r=1 foot=3.2x0.2 h=4.4 at (85.5,46.6) [3.2] | #2529 prop r=1 foot=3.2x0.2 h=4.4 at (0.0,166.6) [3.2]
+   water          0  ok    
+   offisland      1  FAIL  #5348 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)
+   overhang       3  info  #1218 bldg r=4.2 foot=20.1x4.0 h=5.4 at (-65.0,271.5) [2] | #1355 prop r=0.77 foot=1.4x1.4 h=1.3 at (-194.1,-230.0) [2] | #1655 prop r=0.82 foot=1.4x1.4 h=1.3 at (245.2,-116.7) [2]
+   float          0  ok    
+   sunk         171  info  #5437 prop r=2 foot=4.0x4.0 h=0.8 at (-42.8,-213.8) top 0.40 min -0.40 [0.4] | #2368 prop r=0.77 foot=1.0x0.9 h=0.3 at (-188.7,210.0) top 0.28 min 0.00 | #2370 prop r=0.69 foot=1.0x0.9 h=0.3 at (-206.9,212.7) top 0.28 min 0.00
+   inside       189  FAIL  #3924 bldg r=2.8 foot=1.4x1.4 h=8.7 at (40.4,-60.3) INSIDE #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8) [5.75] | #1833 prop r=0.66 foot=1.2x1.3 h=1.6 at (48.0,-64.5) INSIDE #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8) [5.47] | #2803 prop r=1.8 foot=0.5x0.3 h=1.5 at (136.3,148.2) INSIDE #5269 bldg r=5.2 foot=16.0x11.5 h=14.4 at (136.0,148.0) [5.43]
+   under         88  info  #1594 prop r=0.81 foot=1.0x0.1 h=1.5 at (63.5,-151.0) under #703 bldg r=5.5 foot=25.1x16.6 h=27.9 at (64.0,-148.7) [5.86] | #5410 prop r=1.2 foot=1.8x0.1 h=1.9 at (41.3,-59.3) under #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8) [5.05] | #5411 prop r=1.2 foot=1.8x0.1 h=1.9 at (44.3,-59.3) under #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8) [5.05]
+   overlap      457  FAIL  #114 prop r=2.4 foot=5.8x3.6 h=3.3 at (-47.8,34.3) x #5421 bldg r=6 foot=13.1x4.8 h=8.1 at (-42.8,35.2) [3.37] | #115 prop r=2.4 foot=5.8x3.6 h=3.3 at (-37.8,34.3) x #5421 bldg r=6 foot=13.1x4.8 h=8.1 at (-42.8,35.2) [3.37] | #360 house r=3.2 foot=6.8x6.9 h=5.8 at (-118.3,99.6) x #5307 bldg r=5.2 foot=16.0x11.5 h=14.4 at (-125.1,106.0) [2.84]
+   roadend        0  ok    
+   door           3  FAIL  #197 house r=3.2 foot=6.9x7.6 h=5.7 at (-118.3,-14.1): doorstep blocked by #4384 prop r=2 foot=2.4x2.8 h=1.8 at (-118.8,-10.1) [1] | #213 house r=3.2 foot=6.2x6.3 h=6.0 at (-156.9,-59.3): doorstep blocked by #178 prop r=1.6 foot=3.1x2.6 h=2.0 at (-160.0,-61.0) [1] | #475 house r=3.2 foot=6.0x6.8 h=6.9 at (-71.4,128.3): doorstep blocked by #3604 prop r=0.9 foot=1.2x1.3 h=1.7 at (-75.6,127.3) [1]
+   bench          3  FAIL  #25 bench r=2.4 foot=3.0x1.0 h=2.0 at (57.8,-15.5) faces #2 bldg r=4 foot=9.8x10.0 h=3.9 at (61.5,-16.0) 1.2u in front [1.8] | #918 bench r=1.6 foot=3.0x1.0 h=2.0 at (139.1,154.9) faces #917 prop r=1.6 foot=3.3x2.8 h=2.2 at (139.4,158.1) 2u in front [1] | #24 bench r=2.4 foot=3.0x1.0 h=2.0 at (57.8,-28.5) faces #3125 prop r=1.4 foot=3.4x2.8 h=2.2 at (54.8,-29.9) 2.8u in front [0.2]
+   benchaway     13  info  #880 bench r=1.6 foot=3.0x1.0 h=2.0 at (132.8,9.3) back to road z=0 (dot -1.00, 9.3u off) [1] | #940 bench r=1.6 foot=3.0x1.0 h=2.0 at (233.7,93.8) back to road z=86 (dot -1.00, 8.3u off) [1] | #1247 bench r=2.4 foot=3.0x1.0 h=2.0 at (-227.3,179.1) back to road z=171 (dot -1.00, 8.1u off) [1]
+   piste          0  info  
+   shot /tmp/crew-placement/shots-before/before-maple-road-0.png  <- #2519 prop r=1 foot=3.2x0.2 h=4.4 at (-85.5,-123.4)  (screen 216,357)
+   shot /tmp/crew-placement/shots-before/before-maple-road-1.png  <- #2524 prop r=1 foot=3.2x0.2 h=4.4 at (85.5,46.6)  (screen 215,363)
+   shot /tmp/crew-placement/shots-before/before-maple-inside-0.png  <- #3924 bldg r=2.8 foot=1.4x1.4 h=8.7 at (40.4,-60.3) INSIDE #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8)  (screen 214,391)
+   shot /tmp/crew-placement/shots-before/before-maple-inside-1.png  <- #1833 prop r=0.66 foot=1.2x1.3 h=1.6 at (48.0,-64.5) INSIDE #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8)  (screen 215,410)
+   shot /tmp/crew-placement/shots-before/before-maple-overlap-0.png  <- #114 prop r=2.4 foot=5.8x3.6 h=3.3 at (-47.8,34.3) x #5421 bldg r=6 foot=13.1x4.8 h=8.1 at (-42.8,35.2)  (screen 218,416)
+   shot /tmp/crew-placement/shots-before/before-maple-overlap-1.png  <- #115 prop r=2.4 foot=5.8x3.6 h=3.3 at (-37.8,34.3) x #5421 bldg r=6 foot=13.1x4.8 h=8.1 at (-42.8,35.2)  (screen 215,420)
+   shot /tmp/crew-placement/shots-before/before-maple-door-0.png  <- #197 house r=3.2 foot=6.9x7.6 h=5.7 at (-118.3,-14.1): doorstep blocked by #4384 prop r=2 foot=2.4x2.8 h=1.8 at (-118.8,-10.1)  (screen 216,426)
+   shot /tmp/crew-placement/shots-before/before-maple-bench-0.png  <- #25 bench r=2.4 foot=3.0x1.0 h=2.0 at (57.8,-15.5) faces #2 bldg r=4 foot=9.8x10.0 h=3.9 at (61.5,-16.0) 1.2u in front  (screen 212,428)
+   shot /tmp/crew-placement/shots-before/before-maple-offisland-0.png  <- #5348 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)  (screen 230,431)
+
+PLACEMENT FAIL — maple  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+
+══ PIRATE ══  3505 static props (24 benches, 0 houses w/ doors), audited in 16s  FAIL
+   category      n  verdict  worst
+   road         112  FAIL  #2397 prop r=1.4 foot=2.0x1.8 h=1.3 at (129.8,-48.0) [8.74] | #3477 bench r=2.4 foot=3.0x1.0 h=2.0 at (7.9,197.4) [8.66] | #2408 prop r=1.4 foot=2.0x1.8 h=1.3 at (137.3,22.0) [8.45]
+   water          0  ok    
+   offisland      3  FAIL  #375 bldg r=4.8 foot=5.6x4.2 h=5.7 at (-188.1,50.2) | #386 bldg r=4.8 foot=5.1x3.8 h=6.2 at (-182.6,62.4) | #443 prop r=0.9 foot=0.5x0.9 h=1.7 at (-67.7,192.1)
+   overhang      79  info  #307 bldg r=4.4 foot=1.4x1.4 h=13.1 at (76.0,99.3) [2] | #320 bldg r=4.8 foot=4.9x5.0 h=5.2 at (-42.3,204.7) [2] | #353 bldg r=4.8 foot=5.1x6.0 h=6.0 at (124.6,107.4) [2]
+   float          0  ok    
+   sunk         486  info  #1219 prop r=0.5 foot=1.0x0.8 h=0.3 at (-78.8,-244.1) top 0.28 min 0.00 | #1220 prop r=0.5 foot=1.0x0.9 h=0.3 at (168.1,198.1) top 0.28 min 0.00 | #1221 prop r=0.5 foot=1.0x0.9 h=0.3 at (-53.7,185.3) top 0.28 min 0.00
+   inside        74  FAIL  #3495 prop r=2.4 foot=3.6x2.2 h=2.4 at (157.2,25.6) INSIDE #2459 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5) [4.53] | #2094 prop r=1.4 foot=2.5x1.6 h=2.1 at (42.4,-132.8) INSIDE #2128 bldg r=7.5 foot=31.2x15.6 h=17.5 at (41.7,-128.8) [3.77] | #2315 prop r=0.7 foot=1.4x1.4 h=1.4 at (-32.0,-205.5) INSIDE #2273 bldg r=9 foot=23.8x25.0 h=27.5 at (-30.0,-197.5) [3.67]
+   under         47  info  #215 bldg r=4.4 foot=1.4x1.4 h=13.1 at (-124.1,15.2) under #3499 bldg r=5 foot=11.6x9.8 h=10.4 at (-124.5,16.3) [3.74] | #3490 prop r=2.4 foot=2.0x3.5 h=1.5 at (125.9,-101.3) under #2374 bldg r=3 foot=6.4x6.4 h=6.9 at (125.2,-99.7) [1.5] | #2412 prop r=1.4 foot=2.0x1.8 h=1.3 at (174.8,13.1) under #2378 bldg r=3 foot=6.4x6.4 h=6.9 at (175.7,11.0) [0.91]
+   overlap      295  FAIL  #2354 bldg r=3 foot=6.4x6.4 h=6.9 at (147.9,23.0) x #2459 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5) [4.11] | #2365 bldg r=3 foot=6.4x6.4 h=6.9 at (158.9,-88.5) x #2531 prop r=2.2 foot=8.3x8.3 h=2.6 at (162.8,-86.5) [4.1] | #2356 bldg r=3 foot=6.4x6.4 h=6.9 at (154.4,17.9) x #2459 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5) [4.04]
+   roadend        4  FAIL  PROMENADE end 0 at (5.0,-210.0) joins NOTHING | PROMENADE end 1 at (40.0,214.0) joins NOTHING | TRAIL end 0 at (10.0,-125.0) joins NOTHING | TRAIL end 1 at (-130.0,130.0) joins NOTHING
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   shot /tmp/crew-placement/shots-before/before-pirate-road-0.png  <- #2397 prop r=1.4 foot=2.0x1.8 h=1.3 at (129.8,-48.0)  (screen 209,387)
+   shot /tmp/crew-placement/shots-before/before-pirate-road-1.png  <- #3477 bench r=2.4 foot=3.0x1.0 h=2.0 at (7.9,197.4)  (screen 218,394)
+   shot /tmp/crew-placement/shots-before/before-pirate-roadend-0.png  <- PROMENADE end 0 at (5.0,-210.0) joins NOTHING  (screen 205,413)
+   shot /tmp/crew-placement/shots-before/before-pirate-roadend-1.png  <- PROMENADE end 1 at (40.0,214.0) joins NOTHING  (screen 221,405)
+   shot /tmp/crew-placement/shots-before/before-pirate-roadend-2.png  <- TRAIL end 0 at (10.0,-125.0) joins NOTHING  (screen 206,419)
+   shot /tmp/crew-placement/shots-before/before-pirate-roadend-3.png  <- TRAIL end 1 at (-130.0,130.0) joins NOTHING  (screen 221,416)
+   shot /tmp/crew-placement/shots-before/before-pirate-inside-0.png  <- #3495 prop r=2.4 foot=3.6x2.2 h=2.4 at (157.2,25.6) INSIDE #2459 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5)  (screen 203,414)
+   shot /tmp/crew-placement/shots-before/before-pirate-overlap-0.png  <- #2354 bldg r=3 foot=6.4x6.4 h=6.9 at (147.9,23.0) x #2459 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5)  (screen 215,419)
+   shot /tmp/crew-placement/shots-before/before-pirate-overlap-1.png  <- #2365 bldg r=3 foot=6.4x6.4 h=6.9 at (158.9,-88.5) x #2531 prop r=2.2 foot=8.3x8.3 h=2.6 at (162.8,-86.5)  (screen 213,425)
+
+PLACEMENT FAIL — pirate  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+
+══ GAMEDAY ══  6064 static props (0 benches, 0 houses w/ doors), audited in 37s  FAIL
+   category      n  verdict  worst
+   road           1  FAIL  #5739 prop r=1 foot=3.5x2.9 h=2.2 at (91.3,-176.0) [0.62]
+   water          0  ok    
+   offisland      1  FAIL  #6063 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)
+   overhang      44  info  #4939 prop r=1 foot=3.3x2.7 h=2.1 at (179.9,72.0) [2] | #5065 prop r=1.4 foot=3.6x2.9 h=2.7 at (174.6,126.7) [2] | #5376 prop r=1.2 foot=0.2x4.0 h=3.2 at (-31.4,-253.8) [2]
+   float          0  ok    
+   sunk         222  info  #1146 prop r=0.5 foot=0.8x0.4 h=0.4 at (-17.1,174.1) top 0.42 min -0.00 | #1147 prop r=0.5 foot=0.8x0.4 h=0.4 at (5.7,180.5) top 0.42 min -0.00 | #1148 prop r=0.5 foot=0.8x0.4 h=0.4 at (52.7,192.0) top 0.42 min -0.00
+   inside        39  FAIL  #1467 prop r=0.6 foot=1.3x1.2 h=1.0 at (-35.4,76.6) INSIDE #73 rv r=4.2 foot=12.2x6.6 h=5.2 at (-35.8,79.2) [0.66] | #1005 prop r=1 foot=0.7x0.7 h=5.6 at (62.1,102.2) INSIDE #106 rv r=4.2 foot=12.2x6.6 h=5.2 at (63.8,99.2) [-0.2] | #2305 prop r=1.6 foot=3.0x1.1 h=1.5 at (-116.0,106.2) INSIDE #1940 rv r=4.2 foot=12.2x6.6 h=5.2 at (-112.3,107.1) [-0.5]
+   under        162  info  #1152 prop r=0.5 foot=0.8x0.4 h=0.4 at (-24.7,99.9) under #95 rv r=4.2 foot=12.2x6.6 h=5.2 at (-27.1,98.6) [0.52] | #5230 prop r=0.9 foot=1.7x1.2 h=1.2 at (-174.0,119.6) under #1959 rv r=4.2 foot=12.2x6.6 h=5.2 at (-171.2,119.8) [0.5] | #1207 prop r=0.5 foot=0.8x0.4 h=0.4 at (53.9,78.5) under #84 rv r=4.2 foot=12.2x6.6 h=5.2 at (56.0,80.5) [0.36]
+   overlap      572  FAIL  #1929 rv r=4.2 foot=12.2x6.6 h=5.2 at (-112.3,121.6) x #1936 rv r=4.2 foot=12.2x6.6 h=5.2 at (-114.3,114.5) [4.92] | #1924 rv r=4.2 foot=12.2x6.6 h=5.2 at (-137.0,163.8) x #1942 rv r=4.2 foot=12.2x6.6 h=5.2 at (-133.3,171.0) [4.1] | #2895 house r=8 foot=17.6x9.6 h=9.9 at (172.6,-33.4) x #2904 house r=8 foot=17.6x9.6 h=9.9 at (186.3,-30.8) [3.88]
+   roadend        0  ok    
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   shot /tmp/crew-placement/shots-before/before-gameday-overlap-0.png  <- #1929 rv r=4.2 foot=12.2x6.6 h=5.2 at (-112.3,121.6) x #1936 rv r=4.2 foot=12.2x6.6 h=5.2 at (-114.3,114.5)  (screen 217,353)
+   shot /tmp/crew-placement/shots-before/before-gameday-overlap-1.png  <- #1924 rv r=4.2 foot=12.2x6.6 h=5.2 at (-137.0,163.8) x #1942 rv r=4.2 foot=12.2x6.6 h=5.2 at (-133.3,171.0)  (screen 218,366)
+   shot /tmp/crew-placement/shots-before/before-gameday-inside-0.png  <- #1467 prop r=0.6 foot=1.3x1.2 h=1.0 at (-35.4,76.6) INSIDE #73 rv r=4.2 foot=12.2x6.6 h=5.2 at (-35.8,79.2)  (screen 213,394)
+   shot /tmp/crew-placement/shots-before/before-gameday-road-0.png  <- #5739 prop r=1 foot=3.5x2.9 h=2.2 at (91.3,-176.0)  (screen 204,395)
+
+PLACEMENT FAIL — gameday  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+
+══ LANTERN ══  4509 static props (0 benches, 0 houses w/ doors), audited in 17s  FAIL
+   category      n  verdict  worst
+   road          23  FAIL  #973 house r=3.4 foot=12.2x3.6 h=4.2 at (54.2,209.8) [2.45] | #942 house r=3.4 foot=12.2x3.6 h=4.2 at (62.4,55.4) [2.35] | #36 house r=2.4 foot=4.0x2.7 h=2.9 at (30.1,40.4) [2.22]
+   water        381  FAIL  #162 prop r=0.9 foot=1.3x1.0 h=0.9 at (11.1,189.7) [7.5] | #485 prop r=0.6 foot=0.9x0.7 h=0.4 at (10.5,159.9) [7.5] | #543 prop r=0.6 foot=1.0x0.7 h=0.4 at (11.3,157.3) [7.5]
+   offisland      5  FAIL  #3636 bldg r=2.6 foot=1.6x2.2 h=9.6 at (-54.7,-233.0) | #3746 bldg r=2.6 foot=2.0x2.1 h=9.3 at (-124.5,71.1) | #3774 bldg r=2.6 foot=1.6x1.6 h=10.5 at (150.7,135.8)
+   overhang      37  info  #1005 house r=3.4 foot=12.2x3.6 h=4.2 at (127.6,51.9) [2] | #3564 bldg r=2.6 foot=2.0x2.7 h=9.9 at (-121.3,-74.8) [2] | #3670 bldg r=2.6 foot=1.3x2.2 h=10.4 at (125.3,-84.0) [2]
+   float          0  ok    
+   sunk         465  info  #4207 prop r=0.9 foot=2.5x2.3 h=0.6 at (121.7,162.7) top 0.59 min -0.01 [0.01] | #485 prop r=0.6 foot=0.9x0.7 h=0.4 at (10.5,159.9) top 0.38 min -0.00 | #486 prop r=0.6 foot=1.1x0.8 h=0.5 at (10.3,172.6) top 0.45 min 0.00
+   inside        34  FAIL  #1740 prop r=1.4 foot=0.2x0.2 h=6.9 at (89.1,-165.2) INSIDE #3368 bldg r=4.14 foot=10.6x10.9 h=4.8 at (92.9,-168.8) [0.02] | #787 prop r=0.7 foot=0.8x0.8 h=0.6 at (85.1,87.5) INSIDE #2515 house r=4.2 foot=7.3x7.1 h=4.9 at (87.0,90.6) [-0.11] | #3383 prop r=1.6 foot=3.2x1.0 h=0.9 at (98.3,-167.5) INSIDE #3368 bldg r=4.14 foot=10.6x10.9 h=4.8 at (92.9,-168.8) [-0.18]
+   under        118  info  #3997 prop r=1.1 foot=2.8x2.3 h=2.4 at (103.0,-185.1) under #3367 bldg r=4.86 foot=12.9x12.3 h=4.9 at (104.0,-190.8) [0.36] | #3404 prop r=0.9 foot=0.8x0.8 h=1.2 at (102.0,-125.9) under #3371 bldg r=2.52 foot=7.4x7.3 h=5.4 at (103.2,-128.9) [0.32] | #1431 prop r=0.5 foot=0.5x0.5 h=0.8 at (87.3,-142.9) under #3370 bldg r=3.06 foot=8.4x8.7 h=5.2 at (90.8,-141.1) [0.24]
+   overlap      185  FAIL  #1807 house r=3.4 foot=12.2x3.6 h=4.2 at (89.1,-169.3) x #3368 bldg r=4.14 foot=10.6x10.9 h=4.8 at (92.9,-168.8) [3.62] | #1794 house r=3.4 foot=12.2x3.6 h=4.2 at (81.6,-160.8) x #1798 house r=3.4 foot=12.2x3.6 h=4.2 at (75.1,-160.7) [3.51] | #953 house r=3.4 foot=12.2x3.6 h=4.2 at (62.3,152.3) x #961 house r=3.4 foot=12.2x3.6 h=4.2 at (69.4,152.8) [3.11]
+   roadend        0  ok    MARKET end 0 at (41.0,210.0) joins coast | MARKET end 1 at (40.5,-133.0) joins BATHHOUSE
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   shot /tmp/crew-placement/shots-before/before-lantern-road-0.png  <- #973 house r=3.4 foot=12.2x3.6 h=4.2 at (54.2,209.8)  (screen 215,375)
+   shot /tmp/crew-placement/shots-before/before-lantern-water-0.png  <- #162 prop r=0.9 foot=1.3x1.0 h=0.9 at (11.1,189.7)  (screen 215,417)
+   shot /tmp/crew-placement/shots-before/before-lantern-water-1.png  <- #485 prop r=0.6 foot=0.9x0.7 h=0.4 at (10.5,159.9)  (screen 214,429)
+   shot /tmp/crew-placement/shots-before/before-lantern-overlap-0.png  <- #1807 house r=3.4 foot=12.2x3.6 h=4.2 at (89.1,-169.3) x #3368 bldg r=4.14 foot=10.6x10.9 h=4.8 at (92.9,-168.8)  (screen 207,430)
+   shot /tmp/crew-placement/shots-before/before-lantern-overlap-1.png  <- #1794 house r=3.4 foot=12.2x3.6 h=4.2 at (81.6,-160.8) x #1798 house r=3.4 foot=12.2x3.6 h=4.2 at (75.1,-160.7)  (screen 216,430)
+   shot /tmp/crew-placement/shots-before/before-lantern-inside-0.png  <- #1740 prop r=1.4 foot=0.2x0.2 h=6.9 at (89.1,-165.2) INSIDE #3368 bldg r=4.14 foot=10.6x10.9 h=4.8 at (92.9,-168.8)  (screen 214,432)
+
+PLACEMENT FAIL — lantern  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+
+══ POWDER ══  4141 static props (0 benches, 0 houses w/ doors), audited in 13s  FAIL
+   category      n  verdict  worst
+   road           7  FAIL  #1954 prop r=0.43 foot=2.6x2.1 h=1.0 at (99.0,101.4) [1.07] | #614 prop r=0.47 foot=2.4x2.0 h=0.9 at (114.7,80.2) [0.75] | #860 prop r=0.44 foot=1.9x1.6 h=0.7 at (96.1,48.0) [0.73]
+   water        608  FAIL  #41 prop r=0.6 foot=1.2x1.1 h=0.9 at (17.7,54.8) | #45 snowman r=1 foot=1.3x1.3 h=2.8 at (35.9,37.4) | #84 pine r=1.94 foot=2.4x2.4 h=4.8 at (-90.4,22.3)
+   offisland      1  FAIL  #4140 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)
+   overhang      39  info  #438 prop r=0.9 foot=2.1x1.8 h=1.8 at (114.8,148.7) [2] | #967 prop r=0.35 foot=1.5x1.1 h=0.6 at (65.3,206.1) [2] | #1480 prop r=0.41 foot=1.9x1.6 h=0.7 at (146.4,-2.7) [2]
+   float          0  ok    
+   sunk        2486  info  #493 prop r=0.37 foot=2.2x2.1 h=0.8 at (16.3,89.8) top 0.60 min -0.22 [0.22] | #561 prop r=0.42 foot=2.0x1.7 h=0.8 at (75.5,-110.1) top 0.60 min -0.22 [0.22] | #566 prop r=0.39 foot=2.1x1.6 h=0.8 at (139.4,-15.1) top 0.60 min -0.22 [0.22]
+   inside        36  FAIL  #1270 prop r=0.38 foot=2.3x1.8 h=0.9 at (12.5,108.2) INSIDE #11 chalet r=3.6 foot=9.4x6.3 h=9.6 at (12.7,108.1) [2.9] | #813 prop r=0.4 foot=1.3x1.3 h=0.5 at (28.3,103.1) INSIDE #18 chalet r=3.6 foot=10.1x5.6 h=9.1 at (29.1,103.6) [1.85] | #2605 prop r=0.35 foot=1.4x1.2 h=0.5 at (47.7,70.9) INSIDE #1 chalet r=3.6 foot=10.7x5.5 h=9.1 at (47.2,70.0) [1.71]
+   under          6  info  #944 prop r=0.43 foot=1.3x1.3 h=0.5 at (61.2,37.6) under #16 chalet r=3.6 foot=9.5x6.8 h=9.9 at (60.5,38.3) [2.4] | #2974 prop r=0.6 foot=0.7x0.8 h=0.7 at (75.4,119.8) under #5 chalet r=3.6 foot=9.5x6.7 h=9.9 at (75.3,121.3) [1.88] | #1462 prop r=0.46 foot=2.1x2.0 h=0.8 at (76.2,119.9) under #5 chalet r=3.6 foot=9.5x6.7 h=9.9 at (75.3,121.3) [1.67]
+   overlap      981  FAIL  #20 chalet r=3.6 foot=8.8x5.9 h=9.3 at (-9.3,119.9) x #21 chalet r=3.6 foot=9.2x6.7 h=9.9 at (-13.3,120.9) [5.05] | #10 chalet r=3.6 foot=10.0x5.3 h=8.9 at (57.5,125.3) x #63 prop r=2.2 foot=11.6x10.6 h=0.8 at (50.5,125.3) [4.23] | #8 chalet r=3.6 foot=10.6x5.5 h=9.1 at (-31.1,180.5) x #22 chalet r=3.6 foot=9.3x6.3 h=9.6 at (-34.7,182.9) [3.36]
+   roadend        0  ok    GRIT end 0 at (17.5,77.5) joins LAKE | GRIT end 1 at (47.5,-10.0) joins PISTE
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste         20  info  #285 lift r=2.2 foot=2.4x2.4 h=11.6 at (43.4,-22.3) [13] | #286 lift r=2.2 foot=2.4x2.4 h=11.6 at (35.2,-47.0) [13] | #287 lift r=2.2 foot=2.4x2.4 h=11.6 at (26.9,-71.7) [13]
+   shot /tmp/crew-placement/shots-before/before-powder-water-0.png  <- #41 prop r=0.6 foot=1.2x1.1 h=0.9 at (17.7,54.8)  (screen 213,381)
+   shot /tmp/crew-placement/shots-before/before-powder-water-1.png  <- #45 snowman r=1 foot=1.3x1.3 h=2.8 at (35.9,37.4)  (screen 214,381)
+   shot /tmp/crew-placement/shots-before/before-powder-overlap-0.png  <- #20 chalet r=3.6 foot=8.8x5.9 h=9.3 at (-9.3,119.9) x #21 chalet r=3.6 foot=9.2x6.7 h=9.9 at (-13.3,120.9)  (screen 217,386)
+   shot /tmp/crew-placement/shots-before/before-powder-overlap-1.png  <- #10 chalet r=3.6 foot=10.0x5.3 h=8.9 at (57.5,125.3) x #63 prop r=2.2 foot=11.6x10.6 h=0.8 at (50.5,125.3)  (screen 213,387)
+   shot /tmp/crew-placement/shots-before/before-powder-inside-0.png  <- #1270 prop r=0.38 foot=2.3x1.8 h=0.9 at (12.5,108.2) INSIDE #11 chalet r=3.6 foot=9.4x6.3 h=9.6 at (12.7,108.1)  (screen 215,411)
+   shot /tmp/crew-placement/shots-before/before-powder-road-0.png  <- #1954 prop r=0.43 foot=2.6x2.1 h=1.0 at (99.0,101.4)  (screen 214,415)
+
+PLACEMENT FAIL — powder  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
+EXIT 1 21:27:58

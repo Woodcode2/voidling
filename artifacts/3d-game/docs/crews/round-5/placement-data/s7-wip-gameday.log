@@ -1,0 +1,137 @@
+START 21:54:58 timeout 900 node qa/placement.mjs gameday 4181 --json=/tmp/crew-placement/s7-wip-gameday.json --shots=/tmp/crew-placement/shots-s7 --tag=wip --pick=overlap:2,inside:1 --spots=/tmp/crew-placement/s7-before-gameday.json
+
+══ GAMEDAY ══  5950 static props (0 benches, 0 houses w/ doors), audited in 35s  FAIL
+   category      n  verdict  worst
+   road           0  ok    
+   water          0  ok    
+   offisland      3  FAIL  #5109 prop r=0.9 foot=1.7x1.2 h=1.2 at (153.4,179.9) | #5111 prop r=0.9 foot=1.7x1.2 h=1.2 at (144.7,188.3) | #5949 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)
+   overhang      59  info  #4903 prop r=1 foot=3.2x2.7 h=2.1 at (174.5,129.2) [2] | #5140 prop r=0.9 foot=1.7x1.2 h=1.2 at (-213.9,98.8) [2] | #5265 prop r=0.7 foot=0.9x1.0 h=1.4 at (-197.3,-119.9) [2]
+   float          0  ok    
+   sunk         222  info  #1145 prop r=0.5 foot=0.8x0.4 h=0.4 at (24.7,105.2) top 0.42 min -0.00 | #1146 prop r=0.5 foot=0.8x0.4 h=0.4 at (-33.4,70.8) top 0.42 min -0.00 | #1147 prop r=0.5 foot=0.8x0.4 h=0.4 at (45.8,89.3) top 0.42 min -0.00
+   inside        24  FAIL  #2335 prop r=1 foot=0.7x0.7 h=5.6 at (-130.0,69.9) INSIDE #1939 rv r=4.2 foot=12.2x6.6 h=5.2 at (-132.0,66.9) [-0.29] | #2021 prop r=0.7 foot=0.9x1.0 h=1.4 at (-89.4,151.1) INSIDE #1932 rv r=4.2 foot=12.2x6.6 h=5.2 at (-90.2,147.6) [-0.34] | #5024 prop r=0.8 foot=1.4x1.0 h=1.6 at (-119.6,140.2) INSIDE #1923 rv r=4.2 foot=12.2x6.6 h=5.2 at (-122.4,136.4) [-1.41]
+   under         67  info  #2062 prop r=0.7 foot=0.9x1.0 h=1.4 at (-133.6,69.6) under #1939 rv r=4.2 foot=12.2x6.6 h=5.2 at (-132.0,66.9) [0.19] | #2173 prop r=1.8 foot=5.3x1.5 h=3.8 at (-127.9,84.4) under #1934 rv r=4.2 foot=12.2x6.6 h=5.2 at (-126.0,81.6) [-0.1] | #2385 prop r=0.8 foot=1.4x1.0 h=1.6 at (-91.9,175.5) under #1949 rv r=4.2 foot=12.2x6.6 h=5.2 at (-90.9,172.2) [-0.11]
+   overlap      196  FAIL  #1914 rv r=4.2 foot=12.2x6.6 h=5.2 at (-124.7,69.6) x #1918 rv r=4.2 foot=12.2x6.6 h=5.2 at (-120.9,75.9) [4.98] | #1935 rv r=4.2 foot=12.2x6.6 h=5.2 at (-151.6,31.7) x #1946 rv r=4.2 foot=12.2x6.6 h=5.2 at (-147.2,37.6) [4.96] | #1906 rv r=4.2 foot=12.2x6.6 h=5.2 at (-102.2,134.4) x #1938 rv r=4.2 foot=12.2x6.6 h=5.2 at (-100.7,142.4) [4.21]
+   clutter      298  info  #4838 prop r=1 foot=3.9x3.2 h=2.5 at (-177.2,-139.3) x #4909 prop r=1 foot=3.6x3.0 h=2.3 at (-178.9,-139.9) [2.37] | #4887 prop r=1 foot=3.8x3.2 h=2.5 at (-209.1,-27.4) x #4901 prop r=1 foot=3.9x3.2 h=2.5 at (-211.3,-26.7) [2.23] | #4798 prop r=1 foot=4.0x3.3 h=2.6 at (-57.6,239.6) x #4926 prop r=1 foot=3.1x2.6 h=2.0 at (-56.0,238.7) [2.14]
+   roadend        0  ok    
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   ice            0  info  
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+page.screenshot: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /opt/pw-browsers/chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --use-gl=angle --use-angle=swiftshader --user-data-dir=/tmp/playwright_chromiumdev_profile-EZOKy5 --remote-debugging-pipe --no-startup-window
+<launched> pid=3848
+[pid=3848][err] [3848:3862:0902/215459.523075:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=3848][err] [3848:3862:0902/215459.529479:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3862:0902/215459.530220:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=3848][err] [3848:3862:0902/215459.530276:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=3848][err] [3848:3862:0902/215459.551522:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3848:0902/215459.565457:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=3848][err] [3848:3862:0902/215459.565894:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3862:0902/215459.565920:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3862:0902/215459.565930:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3862:0902/215459.565934:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3862:0902/215459.565937:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=3848][err] [3848:3848:0902/215459.573921:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=3848][err] [3848:3848:0902/215459.579252:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=3848][err] [3848:3848:0902/215459.579318:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=3848][err] [3848:3862:0902/215459.580824:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=3848][err] [3848:3862:0902/215459.580842:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=3848][err] [3848:3848:0902/215459.581360:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: unknown error type: 
+[pid=3848][err] [3879:3909:0902/215504.574068:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215504.574295:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215504.575151:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215504.575263:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215505.415349:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215505.416040:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215505.471729:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215505.474206:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215505.879839:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215506.683894:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215506.811970:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215506.875692:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215506.890779:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215507.042970:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215508.771356:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215508.797473:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215508.954117:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215509.046979:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215511.610995:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215511.648081:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215511.823725:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215511.969341:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215512.145753:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215513.339462:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215516.004867:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215516.119062:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215516.236320:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215516.311799:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215518.016774:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215519.246139:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215521.306599:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215522.748817:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215522.845227:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215523.566584:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215523.602285:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215524.234919:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215525.498273:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215527.523410:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215532.918003:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215533.200687:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215533.634389:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215533.880147:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215534.700998:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215534.841307:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+[pid=3848][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+[pid=3848][err] ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+[pid=3848][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+[pid=3848][err] ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+[pid=3848][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+[pid=3848][err] ALSA lib conf.c:5727:(snd_config_expand) Evaluate error: No such file or directory
+[pid=3848][err] ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+[pid=3848][err] [3942:3942:0902/215535.855412:ERROR:media/audio/alsa/alsa_util.cc:204] PcmOpen: default,No such file or directory
+[pid=3848][err] ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+[pid=3848][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+[pid=3848][err] ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+[pid=3848][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+[pid=3848][err] ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+[pid=3848][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+[pid=3848][err] ALSA lib conf.c:5727:(snd_config_expand) Evaluate error: No such file or directory
+[pid=3848][err] ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+[pid=3848][err] [3942:3942:0902/215535.855485:ERROR:media/audio/alsa/alsa_util.cc:204] PcmOpen: plug:default,No such file or directory
+[pid=3848][err] [3879:3909:0902/215540.156490:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215540.964368:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215547.363164:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215548.022730:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215549.291516:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215550.178257:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215550.745062:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215555.149204:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215556.430096:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215601.307886:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=3848][err] [3879:3909:0902/215608.908647:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215611.150652:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215612.853309:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=3848][err] [3879:3909:0902/215612.939375:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+Call log:
+[2m  - taking page screenshot[22m
+[2m  - waiting for fonts to load...[22m
+[2m  - fonts loaded[22m
+
+    at /home/user/voidling/.claude/worktrees/wf_92bcb5f4-e68-1/artifacts/3d-game/qa/placement.mjs:451:17 {
+  log: [
+    '  - taking page screenshot',
+    '  - waiting for fonts to load...',
+    '  - fonts loaded'
+  ]
+}
+
+Node.js v22.22.2
+EXIT 1 21:56:20
