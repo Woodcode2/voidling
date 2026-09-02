@@ -1,15 +1,197 @@
-# DRAFT — in progress (refute-drum)
+# VERDICT: SOUND WITH CORRECTIONS — refute-drum, commit 702a3e4
 
-Commit under refutation: 702a3e4 (Lantern drum / eaten_deep.wav / recordingLive gate).
-Started 2026-09-02. Appended incrementally; if this header still says DRAFT the record is partial.
+**Refuter:** the skeptic for lane `drum` (round 5, `refute-six`). Filed 2026-09-02. No tracked file edited; this is the only file written. HEAD `301a8be`; `src/proto3d/audio3d.ts` is unchanged since `702a3e4` (`git log 702a3e4..HEAD -- src/proto3d/audio3d.ts` is empty); `dist/` (Sep 2 00:13) is newer than every file under `src/`, and :4177 serves `assets/main-BlHCCMf5.js`, the file in `dist/` — so every "after" number below is this commit's build.
+
+**The one-paragraph ruling.** The landing removes exactly what it says it removes, and I proved it with the probe it shipped without: on the parent build a big swallow constructs one 1.8 s recorded buffer at **-20.4 dBFS, +14.1 dB over the Lantern recording's mean**, and `alert()` constructs **12 taiko strokes to master** over that recording; on this build the swallow is one 0.34 s filtered-noise buffer at ≈-27 dBFS (alone) / within the music's own window range (over the track), and every taiko and bass-drum voice to master is **0** while a recording plays and **unchanged (12 / 9 / 3 / 1) on the 404 path** where the gate must not fire. `recordingLive()` is true on the real path from the first frame (`theme.srcs = 1` in four recording runs), false on the fallback path (`srcs = 0`, `bad = true`). Two sentences the commit asserts are false and measured false, and they are what the corrections fix: (1) "a new sting cannot route around it and still be a drum" — two EXISTING drum voices already do: `shime` (5 strokes per notice sting, measured on Lantern under the recording) and `mSnare` (6- and 10-stroke rolls on Game Day under `gameday.mp3`); (2) "pwBus … runs solely on the 404 fallback path where there is no recording to clash with" — the first Powder evolution starts the whole Powder scheduler (and its drum) under `powder.mp3`, 32 bus voices in 8 s of free play with the recording live, and the governor's stated objection to the crew's pwDrum guard (that it would silence the fallback score) is impossible, because the predicate is false whenever the fallback score is what is playing. Not a kill: the code that landed is right and provably better; its comment at `:3143-3145` and two of its message's claims are wrong, and the fix is incomplete by the rule it adopted. Corrections are verbatim below. `tsc --noEmit` exit 0 (run by me).
 
 ## What I ran
 
+All on this box, one browser at a time, GPU lock (`mkdir /tmp/gpu.lock`) held for each run and released after, load < 4 at each launch (3.62 / 3.73 / 3.76 / 3.85 / 3.91 / 3.86). Swiftshader, 430×932. Nothing sampled on wall time is reported as a match number; the free-play windows are labelled "wall" and used only to show that nothing spontaneous fired. Logs: `scratchpad/{live,LIVE2,PARENT,NOMP3,POWDER,GAMEDAY}.log`, chain output `scratchpad/chain.out`.
+
+1. **`git show 702a3e4`** — one file, +27/−3. Read in full; then every function it touches or names read on disk at HEAD (below).
+2. **Parent build for A/B.** `git worktree add --detach .claude/worktrees/refute-drum-parent 702a3e4^` (gitignored path, `node_modules` symlinked), `npm run build` in its `artifacts/3d-game` → exit 0, `✓ built in 5.75s`; its bundle names `eaten_deep.wav` 3×, the live bundle 0×. Served to the SAME page URL by a playwright `route()` from that dist — no second server.
+3. **`scratchpad/drumprobe.mjs`** (scratch, not landed) — hooks `AudioNode.prototype.connect` (records the graph; splices an `AnalyserNode` fftSize 32768 = 0.74 s in front of `destination`), `createOscillator` / `createBufferSource`, `AudioParam.{setValueAtTime,exponentialRampToValueAtTime,linearRampToValueAtTime}` (records every voice's frequency schedule as the engine wrote it), and `start` on BOTH `AudioScheduledSourceNode` and `AudioBufferSourceNode` (the second is its own override — run 1 missed every buffer voice because of it; declared and re-run). Route: master = the GainNode feeding the DynamicsCompressor that feeds destination; musicBus = the lowest-id GainNode feeding master; `@master` = reaches master without passing musicBus. Fingerprints from the engine's own schedules: taiko sine 128→52 / 190→88, bDrum sine 92→48, shime sine 640→380, snare body triangle 195→160, pwDrum sine 120→48, pop-sub sine 52→30, sample = 1.7–1.9 s buffer, whoosh = 0.34 s non-loop buffer.
+   Boot: `?w=<world>`, wait `__voidState`, dismiss daily/gift, `#btnPlay`, the world card, wait `__matchState().t > 0.2`, then wait until `__music()` shows the recording (or, with `--nomp3`, the synth bed). Then: 45-window music-only baseline; 6 s wall free play; fire `bigEat` ×3, `alert`, `evolve` (+ 8 s wall after), `matchBeat` for each authored banner; count voices per fingerprint and route, max 0.74 s-window RMS per fire, `__music()` before/after every fire; finally `stopMusic()` → read `theme.srcs` at once, RMS over the next 0.7 s, `alert()` inside that tail.
+   Runs: **LIVE** (:4177, hook bug → buffer counts void, oscillator counts kept) · **LIVE2** (:4177, hooks fixed) · **PARENT** (worktree dist) · **NOMP3** (:4177 with `lantern.mp3` → 404) · **POWDER** (:4177, `?w=powder`) · **GAMEDAY** (:4177, `?w=gameday`).
+4. **`scratchpad/wavstat.mjs`** — RIFF parse + radix-2 FFT energy share below 120 Hz on the shipped `.wav`s (whole file and first 0.5 s).
+5. **`nice -n 19 npx tsc --noEmit`** → exit 0.
+6. `git log --all --diff-filter=A -- '*eaten_deep.wav'`, `git cat-file -s` at a3b3ba2 / 7bad24c / 702a3e4^ / HEAD → 79424 each; `curl :4177/assets/audio/eaten_deep.wav` → `200 79424`.
+
+### The numbers (every one from the logs named above)
+| | PARENT (before) | LIVE2 (after) | NOMP3 (after, 404) | POWDER (after) | GAMEDAY (after) |
+|---|---|---|---|---|---|
+| `__music()` at match start | theme.srcs 1, synth false | srcs 1, synth false | srcs 0, bad true, **synth true** | srcs 1 | srcs 1 |
+| music-only mean / max, dBFS | -34.5 / -30.0 | -34.8 / -30.1 | -32.4 / -29.5 | -30.6 / -29.4 | -42.1 / -40.6 |
+| `bigEat()` voices | **1 × 1.8 s sample @master** | 1 × 0.34 s whoosh @master | 1 × whoosh | 1 × whoosh | 1 × whoosh |
+| `bigEat()` max window, dBFS | **-20.4 / -20.1 / -19.9** | -31.2 / -31.4 / (-25.3 contaminated) | -30.0 / -31.9 | -28.7 / -28.7 | -28.1 (pop in window) / **-26.6** |
+| `alert()` TAIKO@master | **12** | **0** | 12 | — (Powder: squares) | — (squares) |
+| `evolve()` TAIKO / BDRUM @master | 1 / — | 0 / — | 1 / — | 0 / 0 (+ **PWDRUM@bus 1**, score starts) | 0 / **0** (+ snare 1) |
+| gate sting ×2 TAIKO | 3, 3 | 0, 0 | 3, 3 | | |
+| notice sting TAIKO / **SHIME** @master | 1 / **5** | 0 / **5** | 1 / 5 | | |
+| bathhouse sting TAIKO | 9 | 0 | 9 | | |
+| Game Day band-on / fourth-quarter BDRUM, snare | | | | | 0, **6** / 0, **10** |
+| 8 s wall after `evolve()`, spontaneous voices | 0 | 0 | 240 (@bus, the synth score) | **32 @bus (Powder score under the recording)** | 0 |
+| `stopMusic()`: theme.srcs at once / tail RMS / taikos from `alert()` in the tail | 0 / -31.6…-41.1 / 12 | 0 / -30.8…-37.3 / 12 | 0 / — / 12 | 0 / — / 0 | 0 / — / 0 |
+
 ## What I checked on disk
+
+Everything below is HEAD, read by me, line numbers from `src/proto3d/audio3d.ts` unless stated.
+
+- **The diff vs. the message.** The diff is: two prewarm lists lose `'eaten_deep.wav'` (`:307`, `:3692`); `recordingLive` declared at `:1935` above `bDrum` (`:1937`); one early return in `bDrum` (`:1938`) and one in `taiko` (`:3146`); the `sample()` line at the swallow site replaced by a 12-line comment (`:4115-4126`), the old "absent" comment kept beneath it (`:4127-4132`); the whoosh `noise(0.34, 0.14, 480, 120)` at `:4133` unchanged. No probe, no doc, no README, no ledger entry. The message's "the file's size and history … present in dist/ today … pre-decoded on the child's first gesture": all true on disk and (the pre-decode) measured in PARENT's boot voices (`SAMPLE1.8@master ×4` at gain 0 before the match — the prewarm `sample(n, 0)` STARTS the buffer silently when it is already decoded; harmless, noted).
+- **`recordingLive` ≡ `__music().theme.srcs > 0 || menu.srcs > 0`** (`musicState()` `:3893` reports `ch.srcs.length` verbatim), so the probe reads the predicate itself. `srcs` is written in exactly three places: `startLoop` pushes pass 1 synchronously and each armed pass, cap 3, ended sources never removed (`:528-529`); `stopLoop` empties it (`:547`, `:551`); nothing else. `releaseBuf` (`:561`) touches `buf`/`era` only; `playTrack`/`preload` only reach `srcs` through `startLoop`, and the era guard (`:592`, `:632`) drops a stale decode before that call. `startLoop` REFUSES on a stopped clock (`:458-460`) and pushes nothing — so `srcs = 0` while cold, which is also silent. The 404 path sets `bad = true` and never calls `startLoop` (`:604-606`) → `srcs = 0` → the gate is open for the synth score, whose own taikos go to `lnAmb`/`lnBus` (`:3451`, `:3484`, `:3508` via `dest = lnAmb`; `:3270-3271` `lnBus`) and are never `dest === master` anyway. Consistent with the commit, and measured consistent (NOMP3).
+- **The one window the predicate misses:** `stopLoop(ch, fade > 0)` empties `srcs` IMMEDIATELY and stops the old sources `fade` seconds later (`:543-548`). For 1.2 s after `stopMusic()` (`:4023`) and 0.6 s after the menu stands down at match start (`:3725`) the recording is audible and `recordingLive()` is false — measured: tail RMS at music level, 12 taikos constructible. Nothing the game schedules today lands a drum there on Lantern (`win()` `:4170` and `lose()` `:4198` carry no drum voice; rivals do not `alert()` after TIME). A limit, recorded; not a kill.
+- **Every drum voice and where it routes** (`grep -n -E "bDrum\(|taiko\(|pwDrum\(|shime\(|mSnare\(|nHit\(|clack\("`): the table in the record below. Gated: `taiko`, `bDrum`. Not gated and written to master: `shime` (lnNoticeSting ×5, `:3538`), `mSnare` (bandLand `:2450`, recallSting ×7 `:2487`, landslideFanfare `:2501`/`:2514`, gamedayEvolve `:2998`, bandOnSting ×6 `:3015`, fourthQuarterSting ×10 `:3033`), `nHit` (concessionSting ×5 `:3026`), `clack`/`geta`, `pop()`'s 52→30 sub (`:4109`, flagged by the crew, not proposed). `pwDrum` → `pwBus` only (`:3622-3634`) — true; "pwBus runs solely on the 404 path" — false: `powderEvolve()` `:3678-3685` → `if (!pwBus) startPowderScore();` `:3680` builds the bus, sets `pwRunning`, ramps the bus to 0.5 and starts `setInterval(pwSchedule, 110)` (`:3653-3670`) on the first evolution of any Powder match, recording or not; `synthOn` is never set on that path so `synthStop()` (`:790`) cannot stop it. This is the crew's F3 / `docs/STUDIO-ROUND-3.md:7267`, which the commit did not land and whose absence the commit's pwDrum reasoning silently assumes.
+- **Readers of `eaten_deep.wav` other than the two prewarm lists.** `src/game/audio.ts:71,:483` — the OLD 2D engine; importers `src/ui/UILayer.tsx`, `src/ui/DebugPanel.tsx`, `src/game/{world,events,engine}.ts`; `index.html:2086` has one entry, `/src/prototype3d.ts`, whose `./game/*` imports are `stickers, seasons, unlocks, matchdeck` only; `grep -o eaten_deep dist/assets/*.js` → nothing. Dead in the bundle. `public/assets/audio/README.md:9` (shipped verbatim as `dist/assets/audio/README.md:9`) still lists the slot as live — false since this commit. `qa/_wav.mjs:5-7,:19` — scratch probe, header now false. `dist-gw/` — Aug 17 scratch build, gitignored, unserved. No service worker / manifest / preload list (`find . -name 'sw.js' -o -name '*.webmanifest' -o -name 'manifest*.json'`, outside `node_modules` → nothing). `docs/HANDOFF.md:351-355` and `docs/AAA-BRIEF.md:1357` still carry the false statements the crew's §7 listed as owed.
+- **The asset** — `wavstat.mjs`: `eaten_deep.wav` 22050 Hz mono 1.800 s, peak -0.9 dBFS, RMS -17.1 dBFS, **73.2 % of energy below 120 Hz** (72.3 % in the first 0.5 s), centroid 127 Hz, half its energy under 55 Hz; `win_warm` 0.0 %, `evolve_epic` 39.4 %, `gulp_1` 0.0 %. A kick/thud by any reading — the crew's characterisation holds; their **93.8 %** does not (a naive DFT at 30 log-spaced bins is not an energy integral; it over-weights the dense low bins), and neither does round 3's 88.7 %. This changes the crew's LEG A bar (80 %): under a correct integral the file passes it. Corrected in the probe below.
+- **The gate today** (`qa/gate.mjs:245`): the `audio` tier is one step, `trackprofile`, which measures MP3 files on disk; `aftermatch.mjs:58-59` and `_twoscores.mjs:29` test `synthOn`, which a sample on master or a taiko on master cannot move. The crew's "no probe has ever counted a voice at the output of a live match" is true on disk; `qa/lnsound.mjs` renders the SYNTH bed in an OfflineAudioContext (its header), not the live output.
 
 ## Kill shots
 
+Each is a shot I took; the ones that missed are recorded with what I tried.
+
+1. **LANDED — "the gate lives where a drum is MADE … a new sting cannot route around it and still be a drum."** Two existing drum voices route around it today. `shime()` (`:3152`, "the small rope-tuned drum that keeps the actual time"): `matchBeat("the drum tower starts")` on Lantern with `theme.srcs = 1` constructed **5 × sine 640→380 + noise @master** on this build (LIVE2, also PARENT and NOMP3: 5/5/5) — and `lnNoticeSting` is also the fall-through for every banner string the regexes at `:3980-3984` do not match. `mSnare()` (`:1925`): Game Day under `gameday.mp3`, "the band takes the field" → **6 snare strokes @master**, "fourth quarter" → **10**, `evolve()` → 1, with the bass drum that sat under them removed (BDRUM 0 in all three). The commit's own rule ("nothing percussive may join a recording", `:1929-1934`) is what these fail. Fix: correction 1.
+2. **LANDED — the governor's pwDrum correction, both halves.** Premise: "pwBus … runs solely on the 404 fallback path where there is no recording to clash with." Measured on Powder with `powder.mp3` playing (`theme.srcs = 1`, `synth = false`): `evolve()` → `PWDRUM@bus` 1 and the Powder score STARTS — **32 bus voices in the next 8 s wall** of free play with the recording live (music-box triangles, pads), and from `musStage ≥ 3` the scheduler's `pwDrum(t, 0.16)` every fourth 8th (`:3649`) joins them. Consequence: "gating it would have silenced Powder's fallback score" — impossible: on the fallback path `theme.bad = true, srcs = 0` (NOMP3: `srcs 0, synth true`) so `recordingLive()` is false and the guard passes; the crew's `if (recordingLive()) return;` in `pwDrum` could never have touched the fallback score. The in-code comment at `:3143-3145` states the false premise. Fix: corrections 2 and 3.
+3. **MISSED — "recordingLive() is never true on the real path / fires when it should not."** Four recording runs (Lantern ×2, Powder, Game Day): `theme.srcs = 1` at the first sample and 1/1 before and after every fire, `starts = 1`, `cold = false`; taiko/bDrum to master 12 → 0, 9 → 0, 3 → 0, 1 → 0. 404 run: `srcs = 0`, `bad = true`, `synth = true`, every sting keeps its drums (12 / 9 / 3 / 1) and the score's own drums keep constructing (`TAIKO@bus` 6 + 8 + 11, `SHIME@bus` 15 + 21 + 27). The tail window (1.2 s after `stopMusic`, 0.6 s after the menu stands down) is the only gap and nothing lands a drum in it.
+4. **MISSED — "with the sample gone the swallow is silent."** One voice per `bigEat()`, a 0.34 s buffer through `BiquadFilter → Gain → master`, in every after-run (1/1/1 on Lantern, Powder, Game Day; 1/1/1 on the 404 path). Level alone ≈ **-26.6 dBFS** max window (Game Day, music at -42.1): ~7 dB under the old sample and about at Lantern's music level (mean -34.8 / max -30.1), so over Lantern's track it measures inside the music's own window range (-31.2 / -31.4). It plays; it is not a separate event a child would notice. Whether the swallow should be audible over the recording is a design question this commit did not claim to answer; recorded, not a kill.
+5. **MISSED — "a third reader still plays the file."** None live (above). Two documents and one scratch header are now false; corrections 4-6.
+6. **PARTIAL — "which of the three sources did the owner hear?"** Measured on the parent build with the recording playing: the sample at **-20.4 dBFS, +14.1 dB over the music mean** on every big swallow, and the taiko at **-23.7 dBFS, +10.8 dB**, twelve strokes per family arrival or bully charge. Both were audible and both were "the drum"; the commit is right to remove both. The 404 fallback score was NOT in play: in every run against the shipped bundle the mp3 resolved and `synth = false`; it plays only when the file 404s (NOMP3), which is not the app the owner runs. The crew's measurement stands in direction and magnitude (+12.4 dB / 36 taikos in 20 s vs my +14.1 dB / 12 per `alert()`); their spectral number does not (93.8 % → 73.2 %).
+7. **MISSED — "tsc is not clean."** Exit 0.
+
 ## Corrections (verbatim)
+
+Each is mechanically applicable; line numbers are HEAD `301a8be`.
+
+**1. Gate the two remaining drum voices, and move `recordingLive` above the first of them (the governor's own TDZ rule).** In `src/proto3d/audio3d.ts`, delete the block at `:1929-1935` (the six-line doc comment beginning `/** A RECORDING IS PLAYING` through `const recordingLive = () => themeCh.srcs.length > 0 || menuCh.srcs.length > 0;`) and re-insert it verbatim immediately ABOVE `function mSnare` at `:1925`. Then:
+```diff
+   function mSnare(dest: AudioNode, t: number, vol: number, body = true) {
++    if (dest === master && recordingLive()) return;   // a drum — see recordingLive
+     nEnv(fxFor(dest, 'snare'), t, 0.07, vol, 0.0015);
+     if (body) dTone(dest, t, 0.05, 'triangle', vol * 0.3, 195, 160, 0, 0.002);
+   }
+```
+```diff
+   function shime(dest: AudioNode, t: number, vol: number) {
++    if (dest === master && recordingLive()) return;   // a drum — see recordingLive
+     dTone(dest, t, 0.09, 'sine', vol * 0.7, 640, 380, 0, 0.001);
+     nEnv(fxFor(dest, 'shime'), t, 0.05, vol, 0.001);
+   }
+```
+Probe that fails before it: `drumprobe.mjs` LIVE2 `matchBeat("the drum tower starts")` → SHIME@master 5; GAMEDAY "fourth quarter" → snare 10. Expected after: 0 and 0; NOMP3 unchanged (5, and Game Day's fallback score untouched because its snares go to `gdBus`, `:2877` region). What the child loses: the five-stroke pattern under the market's gong, and the snare line under the brass — the same trade the commit already made for the taiko.
+
+**2. Correct the false comment in `taiko()` in place** (`:3143-3145`):
+```diff
+-    // Stings only. The world SCORES play into lnBus/pwBus/gdBus and only ever
+-    // run on the 404 fallback path, where there is no recording to clash with;
+-    // gating those would silence the fallback score for no reason.
++    // Stings only. The world SCORES play into their own buses (lnBus/gdBus/
++    // mapBus/pwBus → musicBus), never `master`, so this test cannot reach
++    // them. It would not matter if it could: on the 404 fallback path
++    // theme.bad is set and srcs stays empty, so recordingLive() is FALSE
++    // whenever a fallback score is what is playing (measured: refute-drum,
++    // NOMP3 run). NOTE pwBus does NOT run only on the fallback path —
++    // powderEvolve() starts the Powder scheduler under a recording; see
++    // ensurePwBus.
+```
+
+**3. Land the crew's F3 and its pwDrum guard, which the commit's reasoning presumed.** Replace `:3653-3663` (the `if (!pwBus) { … }` block inside `startPowderScore`) and `:3678-3685` (`powderEvolve`) as follows; `ramp` is `:953`.
+```diff
++  /** The Powder bus, built on demand and parked at silence (0.0001): the score
++   *  ramps it up when it starts; a one-shot that needs it lifts it itself.
++   *  Extracted from startPowderScore so an evolution can reach the bus without
++   *  starting the whole scheduler under a recording (STUDIO-ROUND-3.md:7267,
++   *  refute-drum POWDER run: 32 score voices in 8 s with the recording live). */
++  function ensurePwBus(c: AudioContext): GainNode {
++    if (pwBus) return pwBus;
++    pwBus = c.createGain(); pwBus.gain.value = 0.0001;
++    // a touch of air: one short feedback delay, wet and quiet — snowfields
++    // are the quietest place a child has ever stood, and the reverb says so
++    const dly = c.createDelay(0.5); dly.delayTime.value = 0.22;
++    const fb = c.createGain(); fb.gain.value = 0.28;
++    const wet = c.createGain(); wet.gain.value = 0.18;
++    pwBus.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet);
++    wet.connect(musicBus!); pwBus.connect(musicBus!);
++    return pwBus;
++  }
+   function startPowderScore() {
+     const c = ensure(); if (!c || !master) return;
+-    if (!pwBus) {
+-      pwBus = c.createGain(); pwBus.gain.value = 0.0001;
+-      // a touch of air: one short feedback delay, wet and quiet — snowfields
+-      // are the quietest place a child has ever stood, and the reverb says so
+-      const dly = c.createDelay(0.5); dly.delayTime.value = 0.22;
+-      const fb = c.createGain(); fb.gain.value = 0.28;
+-      const wet = c.createGain(); wet.gain.value = 0.18;
+-      pwBus.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet);
+-      wet.connect(musicBus!); pwBus.connect(musicBus!);
+-    }
++    ensurePwBus(c);
+     pwRunning = true;
+-    ramp(pwBus.gain, 0.5, c.currentTime, 1.8);
++    ramp(pwBus!.gain, 0.5, c.currentTime, 1.8);
+```
+```diff
+   function pwDrum(t: number, vol = 0.20) {
+     const c = ctx; if (!c || !pwBus) return;
++    if (recordingLive()) return;   // a drum — see recordingLive. Cannot touch the
++                                   // fallback score: recordingLive() is false there.
+```
+```diff
+   function powderEvolve() {
+     const c = ensure(); if (!c) return;
+-    if (!pwBus) startPowderScore();
++    const bus = ensurePwBus(c);
+     const t = c.currentTime + 0.02;
++    // under a recording the bus is parked at silence: lift it for the
++    // flourish and put it back, WITHOUT starting the scheduler
++    if (!pwRunning) { ramp(bus.gain, 0.5, t, 0.05); ramp(bus.gain, 0.0001, t + 1.0, 0.8); }
+     [0, 2, 4, 5, 7].forEach((d, i) => pwBox(pwDeg(d), t + i * 0.07, 0.17));
+```
+Probe that fails before it: POWDER run, "AFTER evolve, 8 s wall: voices = 32 @bus, theme.srcs = 1". Expected after: the evolve flourish's own voices only (the 5 pwBox + 2 pwBells, no pwDrum), then 0 in the following 8 s. NOMP3-style run on Powder (`--world=powder --nomp3`): the score and its pwDrum unchanged.
+
+**4. The shipped SFX manifest, `public/assets/audio/README.md:9`** (copied into `dist/`):
+```diff
+-| `eaten_deep.wav` | swallowing something big | deep whoosh, swallow, gulp, soft impact, sub drop |
++| `eaten_deep.wav` | UNWIRED since 702a3e4 — the file in this slot is a kick drum (73 % of its energy under 120 Hz, peak −0.9 dBFS) and played at +14 dB over the Lantern recording on every big swallow. The swallow is the synth whoosh until the owner approves a replacement; re-wiring is one `sample()` line in `bigEat()`. | deep whoosh, swallow, gulp — no sub drop, nothing under 120 Hz |
+```
+
+**5. Ledger retractions, appended (not rewritten) — the crew's §7, still owed after the landing.** Append to `docs/HANDOFF.md` after line 355:
+```
+  RETRACTED 2026-09-02 (refute-drum): "the swallow one is now a soft whoosh" was
+  false from the day it was written — eaten_deep.wav was present, decoded on the
+  first gesture, and `sample()` returned before the whoosh line; measured on the
+  pre-702a3e4 build: one 1.8 s buffer at −20.4 dBFS, +14.1 dB over the Lantern
+  recording. The whoosh plays for the first time as of 702a3e4.
+```
+and to `docs/AAA-BRIEF.md` after line 1379 (the end of that entry):
+```
+RETRACTED  2026-09-02 (refute-drum). "with eaten_deep.wav absent" — the file was
+           present and tracked (79,424 bytes, since 589e31e, 2026-08-16) when this
+           was written, and the fallback described under CHANGED never executed.
+           NOW should have read: every big swallow plays a recorded kick drum at
+           +14 dB over the recording. Corrected by 702a3e4; probe: qa/drumover.mjs.
+```
+And for `docs/GOVERNOR.md`'s retractions list, the governor's own entry (his file; text supplied): *"702a3e4's message says pwBus 'runs solely on the 404 fallback path' and that the crew's pwDrum guard 'would have silenced Powder's fallback score'. Both false: powderEvolve() starts the Powder score under a recording (measured, refute-drum), and recordingLive() is false whenever a fallback score plays, so the guard could not have touched it. The correction I made to the proposal was wrong; the proposal was right."*
+
+**6. `qa/_wav.mjs:5-7`** header: replace "bigEat(), win() and MAPLE's evolve() all try sample() FIRST and return if the buffer is resident (audio3d.ts:3224, :3284, :1124)" with "win() and MAPLE's evolve() try sample() FIRST and return if the buffer is resident; bigEat() no longer does (702a3e4 — eaten_deep.wav is a kick drum and is unwired)". Scratch file; a false header is still a false statement in the repo.
+
+**7. The probe the crew specified, written as a proposal — `qa/drumover.mjs`.** Registration for `qa/gate.mjs` beside `:245`:
+```js
+  { id: 'drumover', tier: 'audio', profiles: ['push', 'live'], timeout: 1500,
+    cmd: ['node', 'qa/drumover.mjs', PORT, 'lantern'], verdict: pf,
+    why: 'nothing percussive plays on top of a recording the owner supplied' },
+```
+Bars, each with a measured before/after and a stated reason:
+- **LEG A — the sample.** Parse every `sample('<name>.wav'` call site out of `src/proto3d/audio3d.ts`; throw if zero. Decode each in-page; energy share below 120 Hz by FFT integral on the decoded `AudioBuffer`. **BAR: no sample with > 60 % below 120 Hz may be triggered while a recording plays.** Reason: 60 sits between the kick (73.2 %) and the riser (`evolve_epic` 39.4 %); the crew's 80 % passes the kick under a correct measurement. Before: `bigEat` → `eaten_deep` 73.2 % → FAIL. After: no sample at the swallow → PASS.
+- **LEG B — the sting.** Fingerprints parsed from the source, throw if the parse fails: `taiko`'s `dTone` literals (128/190/52/88), `bDrum`'s (92/48), `shime`'s (640/380), `mSnare`'s body (195/160), `pwDrum`'s (120/48). With `__music().theme.srcs > 0` asserted at every fire, fire `bigEat`, `alert`, `evolve`, and `matchBeat` for each authored banner (the four Lantern strings above; Game Day's four; the world's own), count drum-fingerprint voices whose gain connects DIRECTLY to master (not via musicBus). **BAR: 0.** Before: 12 / 1 / 3 / 3 / 1+5 / 9. After this commit: 0 / 0 / 0 / 0 / 0+**5** / 0 → still FAIL until correction 1.
+- **LEG C — the rate, on the match clock.** ≥ 20 MATCH seconds (`__matchState().t`) of free play; every 500 ms wall assert `theme.srcs > 0` (FAIL, not zero, if it is not) and count spontaneous leg-A samples and leg-B voices to master. **BAR: 0.** Before: 36 taikos / 20 s (crew), 12 per family arrival.
+- **LEG C′ — the 404 path, the guard against the gate firing wrongly.** Boot once more with the world's mp3 routed to 404; assert `synth === true` and `theme.srcs === 0`; fire `alert()` and assert taiko-to-master == the count parsed from `lnLastSting` (12); assert the score's own drums keep constructing (`@bus` count > 0 over 6 s wall). A drum gate that silences the fallback score is a FAIL.
+- **LEG D — the level, reported not gated.** Analyser fftSize 32768 before destination; max window RMS per fire against the music-only baseline. `evolve()` ducks the music by design, so no bar.
+- **Wrong-reason guards, each an explicit FAIL:** recording never started; match clock did not advance; fingerprint parse found nothing; analyser baseline below -60 dBFS (the probe cannot claim silence it cannot hear); `pgrep -c chromium` is 0 on this box while chrome is running — use the GPU lock and `pgrep -c chrome`.
+The scratch implementation that produced every number in this file is `scratchpad/drumprobe.mjs`; its instrumentation block (connect / createOscillator / createBufferSource / AudioParam / both `start` overrides / analyser splice / route classification) is the reference for the landed probe. Its two bugs, found and fixed during this refutation — `AudioBufferSourceNode.prototype.start` must be hooked separately, and `page.evaluate(fn, arg)` must forward the banner string — are the kind the landed file must not repeat: both produced plausible zeros.
+
+---
+
+## Incremental record (appended as measured; the DRAFT header was replaced by the verdict above when the last run finished)
 
 <!-- appended 1: on-disk reads, before any probe -->
 ### On-disk, read at HEAD 301a8be (audio3d.ts unchanged since 702a3e4: `git log 702a3e4..HEAD -- src/proto3d/audio3d.ts` is empty)
@@ -89,3 +271,45 @@ Harness: swiftshader, 430x932, GPU lock held, load 3.62 at launch. Match clock m
 | `pwDrum` `:3622` | "a soft low drum" | sine 120→48 | via pwBus (see the Powder section) | NO, by the governor's decision |
 | `pop()` sub `:4109` | 52→30 sine on every bite > depth 0.35 | sine | master | NO (flagged by the crew, not proposed) |
 Every world with a recording (`public/assets/music/`: maple, pirate, gameday, lantern, powder, menu — all present) therefore still has ungated percussion on master: on Lantern the five-stroke shime pattern inside `lnNoticeSting` (fired by `matchBeat` for "drum/tower/start" banners AND as the fall-through for any unmatched banner, `:3982-3984`); on Game Day a six-stroke and a ten-stroke snare roll with the bass drum removed from under them. The commit's sentence "a new sting cannot route around it and still be a drum" is true only for the two voices it gated; two existing drum voices already route around it. Measured for Lantern in run 2 (shime count per banner) — Game Day queued as run 5.
+
+<!-- appended 7: LIVE run 2 (hook fixed; this is the record for the whoosh) -->
+### Run 2 — live build on :4177, Lantern, recording playing (`--tag=LIVE2`, log `scratchpad/LIVE2.log`)
+Boot: match clock moving 5.9 s wall after the tap; `theme.srcs:1 starts:1 dur:146`, `synth:false`. Boot voices now include the two 146 s TRACK buffers (`TRACK@bus` ×2 = pass 1 and the pre-armed pass 2) — the hook sees buffers now. Baseline music-only (45 windows): **mean -34.8 dBFS, max -30.1**.
+- **`bigEat()` → exactly ONE voice: a 0.34 s non-loop buffer, chain `BiquadFilter → Gain → master → DynamicsCompressor → destination`.** That is `noise(0.34, 0.14, 480, 120)` (`:4133`) — the whoosh — reaching the output. No 1.8 s buffer, no oscillator. Three fires: 1/1/1 voices.
+- **How loud the whoosh is over the music**: max output window during bigEat = **-31.2 / -31.4 dBFS** (third fire -25.3, contaminated: fired while the bathhouse sting's koto was still ringing) against a music-only mean of -34.8 and a music-only MAX of -30.1. So the swallow adds ≤ 3.6 dB over the music's mean and does not exceed the music's own loudest window. Not silent; not audible as a separate event either, at this harness's MASTER_VOL 0.62. The commit and the crew both said the whoosh "plays for the first time" — it does; neither said it would be heard. Its level ALONE is measured in run 3 (silence after stopMusic).
+- `alert()`: 7 voices, TAIKO@master **0** (kane 4 partials, clack square + its 2 noise bursts). `evolve()`: 24 voices, TAIKO **0**. Recording live 1/1 before/after every fire.
+- `matchBeat("the lanterns are lit")` → lnGateSting: 12 voices, TAIKO 0, 2 clack squares. `("free tonight, they insist")` → same. `("the bathhouse doors open")` → lnBathhouseSting: 26 voices, TAIKO 0 (its 9 taikos gone; koto/kane/suzu/shaku stay).
+- **`matchBeat("the drum tower starts")` → lnNoticeSting: 24 voices, TAIKO 0, `SHIME@master` = 5.** Five drum strokes (sine 640→380 + a noise burst each, `:3153-3154`) on top of the recording, ungated — measured, not read.
+- TAIL again: `theme.srcs` 1→0 the instant `stopMusic()` is called; the output over the next 0.7 s measured -30.8…-37.3 dBFS, i.e. AT music level (the 1.2 s fade has barely begun) — and `alert()` inside it constructed **12 TAIKO@master**. The predicate says "no recording" while the recording is at full level for up to 1.2 s after every match end and 0.6 s after the menu stands down at match start. Nothing the game schedules today lands a drum in those windows on Lantern (`win()`/`lose()` carry no drum, rivals do not `alert()` after TIME), so it is a limit of the predicate, not an audible defect.
+- Free play: 6 s wall before the fires and 8 s wall after evolve → 0 spontaneous voices (nothing was eaten, nobody arrived) — consistent with the crew's `bites: 0` windows; the rate leg needs MATCH seconds, which is the probe proposal's job.
+- Harness note for the brief: `pgrep -c chromium` returned 0 on this box while two `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` GPU processes were running (`ps aux`, 04:04 UTC). The process name is `chrome`; `pgrep -c chrome` is the check that works. The GPU lock (`mkdir /tmp/gpu.lock`) and the load check did the real work here. Two other agents' browsers were observed running concurrently (04:01 and 04:03 GPU processes) with the lock held by one of them.
+
+<!-- appended 8: runs 3-6 -->
+### Run 3 — the PARENT build (702a3e4^ = e0f7e13), Lantern, recording playing (`--tag=PARENT --dist=<worktree>/dist`, log `scratchpad/PARENT.log`)
+Same page URL, same harness; the worktree's dist served by `route()`. `theme.srcs:1`, `synth:false`. Boot voices: `SAMPLE1.8@master ×4` — the four prewarm `sample('eaten_deep.wav', 0)` calls found the buffer ALREADY DECODED and started it at gain 0 before the match began. "Pre-decoded on the child's first gesture": measured true.
+- **`bigEat()` → ONE voice: a 1.8 s buffer, `Gain → master → limiter → destination`. Max output window -20.4 / -20.1 / -19.9 dBFS against a music-only mean of -34.5 (max -30.0): +14.1 dB over the music, +9.6 dB over the music's loudest window.** The crew's +12.4 dB is the same finding on a different night. No 0.34 s buffer — the whoosh never constructed. The commit's central claim is measured true on the build it replaced.
+- `alert()` → **TAIKO@master = 12**, max window -23.7 dBFS (+10.8 dB over the music). `evolve()` → 1. `matchBeat` lanterns-lit → 3, free/insist → 3, drum tower → 1 (+ 5 shime), bathhouse → **9**.
+- Free play (6 s + 8 s wall): 0 spontaneous voices in both builds — nothing joined and nothing was eaten in those windows; the rate leg is the probe's job.
+
+### A/B, same harness, same night
+| entry point | PARENT (before) | LIVE2 (after) | NOMP3 (after, mp3 → 404) |
+|---|---|---|---|
+| `bigEat()` voices | 1 × 1.8 s sample @master, -20.4 dBFS | 1 × 0.34 s whoosh @master, -31.2 dBFS | 1 × 0.34 s whoosh |
+| `alert()` TAIKO@master | 12 | **0** | 12 (correct: no recording) |
+| `evolve()` TAIKO@master | 1 | 0 | 1 |
+| gate sting ("the lanterns are lit") | 3 | 0 | 3 |
+| gate sting ("free tonight, they insist") | 3 | 0 | 3 |
+| notice sting ("the drum tower starts") TAIKO / SHIME | 1 / **5** | 0 / **5** | 1 / 5 |
+| bathhouse sting TAIKO | 9 | 0 | 9 |
+| music-only mean, dBFS | -34.5 | -34.8 | -32.4 (synth score) |
+The probe FAILS on the parent and PASSES on the commit for every voice the commit gated (rule 2 satisfied by this refutation, not by the landing — the landing shipped without one). It FAILS on both for shime.
+
+### Run 4 — the 404 path (`--tag=NOMP3 --nomp3`: `lantern.mp3` routed to 404 on the live build)
+`theme:{bad:true, srcs:0, starts:0}`, `synth:true` — the hand-written Lantern score is up (its own voices all `@bus`: 6 TAIKO@bus and 15 SHIME@bus at boot, 8 and 21 more in 6 s of free play — the score's drums are untouched by the gate, as the commit says). Every sting keeps its drums: `alert()` → 12 TAIKO@master, bathhouse → 9. **The gate does not fire where there is no recording.** The "fires when it should not" kill fails.
+
+### Run 5 — Powder, `powder.mp3` playing (`--tag=POWDER --world=powder`)
+`theme:{srcs:1, dur:224}`, `synth:false`, music-only mean -30.6 dBFS. `evolve()` → 31 voices including **`PWDRUM@bus` ×1** and 14 music-box triangles/pads `@bus`; **the following 8 s wall of free play constructed 32 more `@bus` voices (pwBox/pwPad triangles and sines) with `theme.srcs=1 synth=false`** — the Powder scheduler is running under the recording, exactly as `:3680` reads. The commit's "pwBus … runs solely on the 404 fallback path where there is no recording to clash with" is measured false. (`matchBeat` on Powder fell through to Maple's stings — `SNAREBODY@master` ×1 each — an ungated snare over `powder.mp3`.)
+
+### Run 6 — Game Day, `gameday.mp3` playing (`--tag=GAMEDAY --world=gameday`)
+`theme:{srcs:1, dur:203}`, music-only mean -42.1 dBFS (a quiet stretch of the track). `evolve()` → BDRUM@master **0** (gated; `:2997` has one) but `SNAREBODY@master` 1 + 3 noise bursts; "the band takes the field" → BDRUM 0, **6 snare strokes** (2 bodies + noise) @master; "fourth quarter" → BDRUM 0, **10 snare strokes** @master, max window -20.6 dBFS (+21 dB over this stretch of the music — the whole sting: brass, sousa, roar, snares); "kickoff" → BDRUM 0, whistle + brass + roar. So bDrum's gate works on Game Day, and the marching-snare rolls it was written to sit under play on, over the recording, ungated.
+- The whoosh with the music quiet: bigEat → 1 voice, max window **-26.6 dBFS** (second fire, no pop in the window) against -42.1 music: the whoosh ALONE sits near -27 dBFS in a 0.74 s window — about 7 dB under the old sample's -20 and at Lantern's music level (-34.8 mean / -30.1 max). Not silent; not a separate event over Lantern's track at this MASTER_VOL.
