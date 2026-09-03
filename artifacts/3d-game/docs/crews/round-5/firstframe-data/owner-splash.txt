@@ -1,0 +1,4 @@
+# the owner's own frame, docs/owner-2026-08-29-splash.png (iPhone 440x956@3, Safari with toolbar) — node qa/_ownersplash.mjs
+  THE CUTE     glyph px 4257 (mean 228,197,235)  behind px 15351 (mean 137,85,187)  contrast glyph-median vs behind: p10 1.72:1 (brightest tenth of the behind)  median 3.46:1  vs darkest tenth 7.84:1
+  WORLD ENDER  glyph px 17604 (mean 254,253,254)  behind px 24606 (mean 110,69,163)  contrast glyph-median vs behind: p10 3.34:1 (brightest tenth of the behind)  median 7.02:1  vs darkest tenth 12.68:1
+  yellow line  glyph px 0 (mean NaN,NaN,NaN)  behind px 43860 (mean 81,59,81)  contrast glyph-median vs behind: p10 NaN:1 (brightest tenth of the behind)  median NaN:1  vs darkest tenth NaN:1
