@@ -214,6 +214,18 @@ for (const { WORLD, v } of RUNS) {
   const t0 = await p.evaluate(() => window.__matchState?.().t ?? -1);
   console.log(`  after the card: t=${t0.toFixed(2)}`);
   const L = INTRO_LEN[WORLD];
+  // THE CARD'S LENGTH, READ FROM THE DOM. Its fade is a CSS animation on WALL
+  // time and the match clock here runs 14-40x slow, so no screenshot in this
+  // pack can show the card against the shot — every sampled frame reads
+  // opacity 0 because 4 wall-seconds pass inside half a match-second. The
+  // relationship is still checkable: the duration must be the world's own
+  // introLen plus the 0.45 s hand-over, so the card leaves with the shot.
+  const cardDur = await p.evaluate(() => { const el = document.getElementById('titlecard'); return el ? parseFloat(getComputedStyle(el).animationDuration) : -1; });
+  const wantDur = +(L + 0.45).toFixed(2);
+  rec.cardDur = cardDur; rec.cardWant = wantDur;
+  console.log(`  title card: animation ${cardDur}s against introLen ${L} + 0.45 = ${wantDur}s`);
+  if (Math.abs(cardDur - wantDur) > 0.06) { fails++; console.log(`  FAIL-LINE ${WORLD}: the title card runs ${cardDur}s over a ${L}s shot — it outlives the move`); }
+
   // wait on the page's own frames, not on a polling interval: resolve the
   // first rAF whose match time has reached tt
   const waitT = (tt) => p.evaluate((tt) => new Promise((res) => { const f = () => { const t = window.__matchState?.().t ?? 0; if (t >= tt) res(t); else requestAnimationFrame(f); }; f(); }), tt);
