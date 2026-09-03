@@ -1,0 +1,8 @@
+
+══ PIRATE ══  introLen 2.2s
+  u1     t=0.1 R=0.9 camDist=158 Lspace=19.2  [size 197.24137931034485 d 839: view 0 occ null pxR 288 at (-625,2096) L null range - off] [size 44.13793103448276 d 689: view 0 occ null pxR 121 at (-619,3770) L null range - off]
+  u05    t=1.13 R=0.9 camDist=216 Lspace=161.5  [size 197.24137931034485 d 820: view 0 occ null pxR 239 at (1156,1110) L null range - off] [size 44.13793103448276 d 657: view 0 occ null pxR 65 at (588,1451) L null range - off]
+  u0     t=2.51 R=0.9 camDist=39 Lspace=152.3  [size 197.24137931034485 d 820: view 0.76 occ 1 pxR 200 at (330,782) L 81.6 range 174 CUT-FRAME+HIDDEN-ISLAND] [size 44.13793103448276 d 660: view 0 occ null pxR 63 at (173,1398) L null range - off]
+  far    t=6.23 R=8.2 camDist=232 Lspace=91.2  [size 197.24137931034485 d 820: view 0.86 occ 1 pxR 198 at (313,239) L 194.3 range 146.6 CUT-FRAME+HIDDEN-ISLAND] [size 44.13793103448276 d 660: view 1 occ 1 pxR 55 at (171,780) L 191.2 range 196.4 HIDDEN-ISLAND]
+  coast  t=7.67 R=9.23 camDist=250 Lspace=0  [size 197.24137931034485 d 821: view 0.86 occ 1 pxR 198 at (317,235) L 165.1 range 167.6 CUT-FRAME+HIDDEN-ISLAND] [size 44.13793103448276 d 660: view 1 occ 1 pxR 55 at (173,776) L 80.8 range 70.6 HIDDEN-ISLAND]
+SKYCUT: FAIL — pirate: a body is cut in 3 frame(s): u0(size 197.24137931034485, CUT-FRAME+HIDDEN-ISLAND), far(size 197.24137931034485, CUT-FRAME+HIDDEN-ISLAND), coast(size 197.24137931034485, CUT-FRAME+HIDDEN-ISLAND)
