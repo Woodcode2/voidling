@@ -46,12 +46,31 @@ space along the top edge. Every frame is screenshot (`shots/sky/`).
    disc at 56° below the horizon and ~250 px wide can only ever show as the sliver
    that clears the coast, and that sliver is the DARK limb (the terminator is
    painted upper-left; the coast reveals the lower/left of the disc).
-3. **A flat edge on the small body's underside (Lantern far frame)** — cause not yet
-   named; the coast-sample frames are being taken to read it at size.
+3. **The disc is flat — a sticker, not a sphere.** The coast frames
+   (shots/sky/lantern-coast.png, powder-coast.png) show the big bodies at size:
+   a uniform pink disc and a uniform white one, each with a wide soft glow and no
+   visible terminator. paint()'s ramp held the full hue to 0.58 R and fell to
+   `dark` only at the rim, and ACES compressed what was left. This is the
+   "faded, not crisp, not real" — not luminance against space (space is a rich
+   violet with stars in these frames) but the absence of shading on the body.
+   Fix at the source in 6f24377: a small bright core, the hue to 0.42, a mid-tone
+   by 0.74, the dark limb from there. Measured by qa/skycut.mjs `Lrange` (the
+   luminance range along the lit-to-dark diameter) before/after — owed below.
+4. **The flat edge on Lantern's small body (far frame)** — not reproduced in the
+   coast frame at size; left open. The probe's own occlusion column was wrong
+   in the first pass (rays cast from the camera's LOCAL position; fixed in
+   ee23904 to the world position), so the "HIDDEN-ISLAND" readings above are
+   retracted as measurements — the frames are the evidence.
+
+**Photographed:** powder-coast.png — the ring's arcs end in straight cuts at the
+sprite's square, exactly the owner's "like an image was half cut and put on
+there". That frame is the finding.
 
 ## The patch
 (appended per hunk as each is measured)
-- H1 ring fit — island.ts paint()/DISC_FIT — landed at source 37192a7, after-run owed.
+- H1 ring fit — island.ts paint()/DISC_FIT — landed at source 37192a7; after-run owed.
+- H2 terminator — island.ts paint() lit ramp — landed at source 6f24377; after-run owed
+  (bar: Lrange on a visible big body rises from the before figure; FLAT flag clears).
 
 ## What I could not verify yet
 The coast frames (all five worlds), the flat-edge cause, the FADED measurement in
