@@ -5344,6 +5344,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     const drop = (mesh: THREE.Object3D, p2: PW.Pt, r: number, rotY?: number, force = false, qk?: string) => {
       if (qk === 'pine' && onIce(p2, r)) return;
       if (!force && !PW.spotOpen(p2[0], p2[1], r * 20)) return;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
@@ -5535,6 +5536,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     LN.resetPlacement();
     const drop = (mesh: THREE.Object3D, p2: LN.Pt, r: number, rotY?: number, force = false, qk?: string) => {
       if (!force && !LN.spotOpen(p2[0], p2[1], r * 20)) return;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
@@ -5840,6 +5842,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // zero tagged cars and zero tagged houses.
     const drop = (mesh: THREE.Object3D, p2: GD.Pt, r: number, rotY?: number, force = false, qk?: string) => {
       if (!force && !GD.spotOpen(p2[0], p2[1], r * 20)) return;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       if (qk) mesh.userData.qk = qk;
@@ -6110,6 +6113,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // bay's prop intersections. A drop onto occupied ground is now refused.
     const drop = (mesh: THREE.Object3D, p2: [number, number], r: number, rotY?: number, force = false) => {
       if (!force && !BAY.spotOpen(p2[0], p2[1], r * 20)) return;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
       place(mesh, x3, z3, r);

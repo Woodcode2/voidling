@@ -6327,7 +6327,20 @@ function settleFootprints(): number[] {
     return n % 2 === 1;
   };
   const dead = new Set<number>();
-  const later = (a: Foot, b: Foot) => (a.i > b.i ? a.i : b.i);
+  // WHICH OF A CLASHING PAIR GOES. Later-dropped loses, because the later drop
+  // is the one that landed on top of an existing thing — EXCEPT against an
+  // AUTHORED LANDMARK, which is never the one retired however late it went
+  // down. Pirate Bay scatters its resort palms (island.ts:6406) BEFORE it drops
+  // the Royal Mariner (:6408), so on the tie-break the hotel lost: seven of
+  // Pirate's thirteen r>=7 props — the hotel, the fort, the lighthouse and four
+  // more — were retired at match start, and the establishing shot held its
+  // first quarter on the empty sand where the hotel used to be
+  // (qa/_bigprops.mjs, qa/_heroprop.mjs, docs/crews/round-5/firstframe/).
+  const authored = (i: number) => !!edibles[i].mesh.userData.authored;
+  const later = (a: Foot, b: Foot) => {
+    if (authored(a.i) !== authored(b.i)) return authored(a.i) ? b.i : a.i;
+    return a.i > b.i ? a.i : b.i;
+  };
   settleStat.inside = settleStat.through = settleStat.doorstep = 0; settleStat.feet = feet.length;
   for (const f of feet) {
     if (dead.has(f.i)) continue;

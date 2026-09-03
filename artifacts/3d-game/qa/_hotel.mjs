@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
+const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
+p.on('console', (m) => { const t = m.text(); if (/landmark|illegal|pirate/i.test(t)) console.log('  [console]', t.slice(0, 160)); });
+await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
+await p.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch {} let s = 7; Math.random = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
+await p.goto('http://127.0.0.1:4177/?w=pirate', { waitUntil: 'domcontentloaded', timeout: 300000 });
+await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
+console.log('  before the match (built, not validated):', JSON.stringify(await p.evaluate(() => window.__edibles.filter((e) => e.radius >= 7).map((e) => ({ r: +e.radius.toFixed(1), x: Math.round(e.mesh.position.x), z: Math.round(e.mesh.position.z), vis: e.mesh.visible, par: !!e.mesh.parent })))));
+await p.evaluate(() => document.getElementById('btnPlay')?.click());
+await p.waitForTimeout(1200);
+await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="pirate"]')?.click());
+await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.2, null, { timeout: 400000 });
+console.log('  after the match started:      ', JSON.stringify(await p.evaluate(() => window.__edibles.filter((e) => e.radius >= 7).map((e) => ({ r: +e.radius.toFixed(1), x: Math.round(e.mesh.position.x), z: Math.round(e.mesh.position.z), vis: e.mesh.visible, par: !!e.mesh.parent })))));
+await b.close();
