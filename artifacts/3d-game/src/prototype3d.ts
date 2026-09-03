@@ -587,7 +587,7 @@ const scene = new THREE.Scene();
 // builds can be measured apart, with a K-parity kill gate: if any world's
 // median tonal K (qa/kmetric.mjs on qa/lookpair.mjs frames) moves more than
 // 4% of its before value, this rung dies and ENV_MODE goes back to 'room'.
-let ENV_MODE = 'gradient' as 'room' | 'gradient';
+let ENV_MODE = 'room' as 'room' | 'gradient';
 const ENV_GAIN = 1.0;   // gradient level, tuned to the room box's mean radiance by the K gate
 {
   const pmrem = new THREE.PMREMGenerator(renderer);

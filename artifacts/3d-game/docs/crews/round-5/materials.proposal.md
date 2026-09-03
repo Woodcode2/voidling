@@ -46,7 +46,26 @@ Rulings fixed in advance:
   (products, not scenery), palette.ts UI reds, and defense.ts:34's UI bar.
 
 ## What I measured
-(appended as measurements land)
+
+**RUNG 3 (gradient environment, ENV_GAIN 1.0, intensity 0.15) — KILLED by the pre-registered
+gate, 13:23 UTC.** Build bafc316 on :4177, SEED=7, rivals hidden at the shutter
+(`HIDE_RIVALS=1`, lookpair.mjs), `node qa/_matverdict.mjs rung3`:
+
+| world  | K before → rung3 | dK     | Y05/Y95 before → rung3 | mascot dE |
+|--------|------------------|--------|------------------------|-----------|
+| maple  | 128 → 115        | −10.2% | 33/185 → 19/174        | 0.7 |
+| pirate | 111 → 88         | −20.7% | 16/189 → 16/178        | 1.5 |
+
+The gate was 4% of the before K. Two worlds were enough to decide it; gameday, lantern and
+powder were not shot for rung 3 (the loop was stopped mid-gameday to free the GPU for the
+before/rung2 re-takes) — recorded as not measured, not as passing. The shadows fell hardest
+(Maple Y05 33 → 19): the RoomEnvironment box was carrying a large share of the diffuse fill
+at intensity 0.15, and a neutral gradient at gain 1.0 carries far less. `ENV_MODE` is back to
+`'room'` in this commit. Owed, not done: calibrate ENV_GAIN to the room box's mean
+irradiance (analytically, from the two PMREMs) before any rung-3b attempt; that attempt
+needs its own pre-registration and its own five-world run.
+
+(rung 2 and the albedo lifts: appended as measurements land)
 
 ## What is wrong
 
