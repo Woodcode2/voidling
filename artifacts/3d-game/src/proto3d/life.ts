@@ -5608,7 +5608,14 @@ export function createLife(
       }
       return { near, total: movers.length };
     },
-    calm(sec) { calmT = sec; },   // SET, not max — Infinity has to be clearable
+    // SET, not max — Infinity has to be clearable. The AMBIENT chatter waits
+    // too: chatCd starts at 2 s, so the first crowd line landed at 2.0 match-s
+    // on every world — inside the establishing shot on all five, from a camera
+    // 50-100 units up where the speaker is a speck (the frames in
+    // docs/crews/round-5/shots/firstframe/ show it under the title card).
+    // Infinity is not written into chatCd: endMatch calls calm(Infinity) and a
+    // permanent cooldown would silence the crowd for every later match.
+    calm(sec) { calmT = sec; if (Number.isFinite(sec)) chatCd = Math.max(chatCd, sec); },
     cue(name, x, z) { for (const f of cues) f(name, x, z); },
     tension(v) { tense = Math.max(0, Math.min(1, v)); },
   };

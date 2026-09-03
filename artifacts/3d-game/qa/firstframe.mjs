@@ -158,12 +158,16 @@ for (const { WORLD, v } of RUNS) {
   // menu now paint the same lockup in the same place (that is the fix — one
   // frame across the crossfade), so leaving the menu behind makes the
   // glyph/no-glyph difference vanish and the measurement reads zero pixels.
-  await p.evaluate(() => document.querySelector('#loadScr')?.classList.add('show'));
+  // FORCE it up: the module can clear .boot and set an inline display before we
+  // get here, and a class the element's own inline style beats leaves us
+  // measuring a blank screen (0 glyph pixels at 393x700, 2026-09-03).
+  await p.evaluate(() => { const ls = document.querySelector('#loadScr'); if (!ls) return; ls.dataset.ffDisp = ls.style.display; ls.classList.add('show'); ls.style.display = 'flex'; ls.style.opacity = '1'; });
   await freeze(p, '#loadScr');
+  await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   rec.contrast.push(await contrast(p, '#loadScr .lLogo i', 'boot THE CUTE'));
   rec.contrast.push(await contrast(p, '#loadScr .lName', 'boot lName'));
   await thaw(p);
-  await p.evaluate(() => document.querySelector('#loadScr')?.classList.remove('show'));
+  await p.evaluate(() => { const ls = document.querySelector('#loadScr'); if (!ls) return; ls.classList.remove('show'); ls.style.display = ls.dataset.ffDisp || ''; ls.style.opacity = ''; delete ls.dataset.ffDisp; });
   // 2. THE MENU SPLASH — key art on its feathered layer, the logo over it.
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));

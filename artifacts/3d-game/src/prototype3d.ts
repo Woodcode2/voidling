@@ -4853,6 +4853,7 @@ function celebrateEnd(coins: number, xpGain: number, lead: string, won = false, 
 }
 
 function endMatch() {
+  document.body.classList.remove('intro');
   // the crowd stops fleeing behind the results panel — the world back there
   // should look alive, not mid-evacuation with nothing chasing it
   life.calm(Infinity);
@@ -5441,6 +5442,9 @@ pwBtns[1].addEventListener('click', fireCollapse);
 
 // ── game shell: start menu → (tutorial) → match → end → play again ──────────
 let started = false, startT = 0, soloMode = false, titleUntil = 0;
+// the ghost hand's own beat: the lesson lands AFTER the card has gone, not in
+// the same frame the controls go live (the MK8D order — card, settle, teach)
+let handHold = 0;
 const menuEl = el('menu'), shopEl = el('shop');
 const handEl = el('hand');   // the ghost hand — the wordless drag lesson
 let guideStep = 0, guideT = 0, presenceT = 0;
@@ -5520,7 +5524,9 @@ function beginMatch(solo = false) {
   // skipped. Four seconds is the title card plus a beat: long enough to hear
   // two or three people talking about the pie/the rub/the tide, short enough
   // that the first thing the player DOES still causes a scream.
-  life.calm(4);
+  // …and the crowd holds until the child is on the ground: the opening move
+  // plus a beat, not a flat four seconds that Lantern's 3.6 s shot outlives.
+  life.calm(COPY.introLen + 1.2);
   // GLBs stream in for a while after start — re-sweep twice so props that
   // finished loading (and finally have real footprints) also get validated
   _revalQueue = [tClock + 8, tClock + 22];
@@ -5584,8 +5590,16 @@ function beginMatch(solo = false) {
   // Measured: peak opacity 1.00 on the first match, 0.00 on the second. Same
   // remove/reflow/add the evolve card already uses correctly.
   const tcEl = el('titlecard');
+  // THE CARD LEAVES WITH THE SHOT. cardFade is 4.2 s of WALL clock against an
+  // opening move of COPY.introLen (2.2-3.6 s): on a phone the name was still at
+  // full opacity 0.8 s after the controls went live, over the void and the drag
+  // hand. Driving the duration from introLen keeps the animation's own shape
+  // (in at 14%, hold to 72%, out by 100%) and lands the fade 0.45 s after the
+  // hands — card, then camera settle, then lesson, which is the order every
+  // shipped opening uses (docs/crews/round-5/firstframe/review-choreo.md).
+  tcEl.style.animationDuration = (COPY.introLen + 0.45).toFixed(2) + 's';
   tcEl.classList.remove('show'); void tcEl.offsetWidth; tcEl.classList.add('show');
-  titleUntil = tClock + 4.6;
+  titleUntil = tClock + COPY.introLen + 0.45;
   audio.startMusic(); audio.setMusicStage(0);
   introT = COPY.introLen;   // orbital reveal: the world's landmark, then dive to the tiny void
   // THE FIRST INSTRUCTION USED TO ARRIVE WHILE THE CONTROLS WERE OFF. This
@@ -5594,6 +5608,7 @@ function beginMatch(solo = false) {
   // A six-year-old obeys the first thing they are told, drags, and learns that
   // the screen does not respond. It is now queued and fires the moment the
   // controls are actually live.
+  document.body.classList.add('intro');   // the HUD arrives with the hands
   firstRun = firstEver;
   // Maple teaches every time; every other world teaches only a brand-new child.
   teachDrag = firstEver || pickedWorld === 'maple';
@@ -8556,6 +8571,7 @@ function animate() {
 
   if (started && !ended && !paused) {
     matchClock -= dtw * clockSpeed;
+    if (handHold > 0) handHold -= dt;
     if (guideT > 0) { guideT -= dt; if (guideT <= 0) guideEl().classList.remove('show'); }
     // PRESENCE: a big void is an EVENT — ambient suction sparkles from stage 2,
     // a low rolling rumble while moving fast from stage 3
@@ -9311,7 +9327,7 @@ function animate() {
   // danger beats stay on firstRun — those are once-in-a-lifetime moments, and
   // replaying them every Maple match would turn the intro level into a
   // permanent tutorial. The owner asked for the hand, not the lecture.
-  handEl.classList.toggle('show', teachDrag && started && !ended && controlsLive && !dragDone);
+  handEl.classList.toggle('show', teachDrag && started && !ended && controlsLive && handHold <= 0 && !dragDone);
   // …and NOT UNTIL THEY CAN MOVE. This fires on any frame the guide is idle,
   // which includes the gaps between the drag lesson's repeats — so a child who
   // had not yet worked out the control was being told "that one is BIGGER than
@@ -9488,7 +9504,7 @@ function animate() {
       if (introT <= 0 && introShadow !== null) {
         renderer.shadowMap.enabled = introShadow; sun.castShadow = introShadow; introShadow = null;
       }
-      if (introT <= 0) controlsLive = true;
+      if (introT <= 0) { controlsLive = true; document.body.classList.remove('intro'); handHold = 0.45; }
       if (introT <= 0 && firstRun && !dragTaught) {
         // controls are live THIS frame — now the instruction is true
         dragTaught = true; guideStep = 1;

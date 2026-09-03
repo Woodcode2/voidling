@@ -540,10 +540,18 @@
          eat the island" is the ONLY place on the entire first-run path that
          tells a child what the game is, and it was invisible. A soft radial
          scrim costs one gradient and darkens nothing at the edges. */
+      /* THE CARD SITS IN THE UPPER THIRD, NOT ON THE SUBJECT. Centred, it landed
+         on the exact pixels the dive delivers: the void arrives at the screen
+         centre and the DRAG hand's loop is drawn there too, so the world's name
+         printed across the hero's face and the lesson at hand-over (every
+         cinematographer in docs/crews/round-5/firstframe/ filed it, and the
+         skeptics kept it). 21vh clears the clock above and the void, the hand,
+         the bubbles and the growth bar below at every phone in the pack. */
       #titlecard { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; pointer-events: none; text-align: center; color: #fff;
+        align-items: center; justify-content: flex-start; padding-top: 21vh; box-sizing: border-box;
+        pointer-events: none; text-align: center; color: #fff;
         opacity: 0;
-        background: radial-gradient(ellipse 78% 34% at 50% 50%, rgba(9,5,20,0.72) 0%,
+        background: radial-gradient(ellipse 78% 30% at 50% 28%, rgba(9,5,20,0.72) 0%,
                                     rgba(9,5,20,0.55) 45%, rgba(9,5,20,0) 78%); }
       #titlecard.show { animation: cardFade 4.2s ease forwards; }
       #titlecard .lvl { font-size: 15px; font-weight: 700; letter-spacing: 6px; opacity: 0.95; color: #d9c2ff;
@@ -1219,6 +1227,13 @@
         #menu .logo i, #loadScr .lLogo i { margin-bottom: 0; }
         #menu .tag, #loadScr .lName { font-size: 10px; letter-spacing: 5px; margin-top: 1px; }
       }
+      /* THE HUD ARRIVES WITH THE HANDS, not before them. The clock, the coin
+         chip, the home button and the growth bar were live over the whole
+         establishing shot — a running 3:00 and an empty progress bar stamped
+         on the one frame an ad opens on. body.intro is set for exactly the
+         length of the opening move (prototype3d.ts, the intro tick). */
+      #timer, #coins, #growth, #btnQuit { transition: opacity 0.35s ease; }
+      body.intro #timer, body.intro #coins, body.intro #growth, body.intro #btnQuit { opacity: 0; }
       #menu button { font-family: inherit; cursor: pointer; border: none; color: #fff; }
       #btnPlay { font-size: 24px; font-weight: 700; letter-spacing: 3px; padding: 16px 76px; border-radius: var(--r-md);
         background: linear-gradient(180deg, #ff5d7e, #ff2450);
