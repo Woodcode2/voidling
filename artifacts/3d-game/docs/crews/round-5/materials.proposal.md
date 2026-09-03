@@ -65,7 +65,58 @@ at intensity 0.15, and a neutral gradient at gain 1.0 carries far less. `ENV_MOD
 irradiance (analytically, from the two PMREMs) before any rung-3b attempt; that attempt
 needs its own pre-registration and its own five-world run.
 
-(rung 2 and the albedo lifts: appended as measurements land)
+**A confound found and removed before any ruling: the family.** Lantern's first before/rung2
+pair read K 50 → 47 ("−6%") with NIBBLES and his red ring beside the hero in the before frame
+only — and rung 2 cannot darken anything by construction (`radiance *= 1 + 6.5·vGloss`).
+`qa/lookpair.mjs` gained `HIDE_RIVALS=1` (the family's body groups and halos hidden at the
+shutter, count printed). Every pair below is rival-free on both sides; where a half had been
+shot with a rival in it, it was re-taken on the same build (`qa/_matretake.sh`, worktrees
+`before-main` at a4456c3 on :4181 and `rung2` at 8233067 on :4182) and the original kept beside
+it as `*.withrivals.*`. Lantern re-read 47 → 47.
+
+**RUNG 2 (`GLOSS_ENV` 5.0 → 6.5) — STAYS.** `node qa/_matverdict.mjs rung2`, SEED=7, rivals hidden:
+
+| world   | K before → rung2 | dK    | Y05/Y95 before → rung2 | C before → rung2 | mascot dE |
+|---------|------------------|-------|------------------------|------------------|-----------|
+| maple   | 128 → 130        | +1.6% | 34/185 → 35/185        | 60.6 → 60.2      | 0.6 |
+| pirate  | 110 → 111        | +0.9% | 16/189 → 16/189        | 73.6 → 72.5      | see hero re-take |
+| gameday | 63 → 63          | 0.0%  | 12/172 → 12/171        | 48.7 → 48.7      | 1.4 |
+| lantern | 47 → 47          | 0.0%  | 16/129 → 15/129        | 22.5 → 22.7      | 1.0 |
+| powder  | 152 → 152        | 0.0%  | 45/177 → 47/177        | 38.9 → 38.9      | see hero re-take |
+
+Tone, range and chroma are still within a frame of the before build; that is what a
+specular-only term should do. The picture (Maple's car, `qa/_redcrop.mjs … 520 1480 300 200`,
+before vs rung2): a slightly fuller sheen along the roof and bonnet, no white smear. It is a
+subtle change at play distance — the record says so rather than claiming more. It stays because
+it is the specified value and it costs nothing measurable. The first pirate and powder rung-2
+hero swatches read 68,66,107 and 83,63,131 — desaturated, not the mascot (kept as
+`*.hero.firstrun.log`); the swatch was re-taken on the rung-2 worktree, value below.
+
+**Albedo lifts (13 reds, 24 sites, six files; commit b6040cc) — measured as tag `after`
+(rung 2 + lifts, :4177), SEED=7, rivals hidden:**
+
+| world   | K before → after | dK    | Y05/Y95 before → after | mascot dE |
+|---------|------------------|-------|------------------------|-----------|
+| maple   | 128 → 133        | +3.9% | 34/185 → 42/185        | 0.4 |
+| pirate  | 110 → 111        | +0.9% | 16/189 → 16/189        | 0.0 |
+| gameday | 63 → 63          | 0.0%  | 12/172 → 12/171        | 1.4 |
+| lantern | 47 → 47          | 0.0%  | 16/129 → 16/129        | 1.2 |
+| powder  | 152 → 152        | 0.0%  | 45/177 → 47/177        | 2.1 |
+
+The mascot holds on every world (bar 6). Maple's +3.9% with Y05 34 → 42 is the whole plaza
+reading brighter, not the lifted reds — the environment code path is byte-identical to main's
+for `ENV_MODE = 'room'` (checked by diff). A noise-floor control (Maple before shot twice more
+on main's build, rivals hidden) is recorded below; the number is not read until it is.
+
+**Did the lifted reds gain shading?** Whole-frame red-pixel luminance spread barely moves
+(`qa/_redcrop.mjs`, P95−P5: maple 75 → 75, pirate 64 → 61, gameday 34 → 34, lantern 128 → 125,
+powder 67 → 63) because most red pixels in a frame are autumn canopy, hull planks and Game Day's
+crimson, none of which were touched. On the lifted surfaces themselves — Lantern's stall
+awnings (`#c1382e`, crop 560 360 200 140): red-pixel P5/P50 28/28 → 35/36, P95 155 → 155. The
+shaded side of the stripes now sits above black-red instead of on it; the lit side is unchanged.
+That is the CRIM effect, small by design (ratio 0.10, hue kept). The census probe
+(`qa/albedo.mjs`) passes with 11 unlit or meaning colours allowed by name and site, and is in
+the gate (push, live, quality).
 
 ## What is wrong
 
