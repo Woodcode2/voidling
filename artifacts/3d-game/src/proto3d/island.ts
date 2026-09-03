@@ -923,10 +923,21 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       };
       ringPass(false);
       // the body: lit from upper-left, falling to a dark limb — a terminator
-      // painted rather than lit, so the light is where the art put it
-      const lit = g.createRadialGradient(cx - R * 0.42, cy - R * 0.40, R * 0.06, cx, cy, R);
-      lit.addColorStop(0, bd.hue);
-      lit.addColorStop(0.58, bd.hue);
+      // painted rather than lit, so the light is where the art put it.
+      // FLAT NO MORE. The old ramp held the full hue out to 0.58 and dropped to
+      // `dark` only at the rim, and ACES then ate what was left of the limb:
+      // qa/skycut.mjs measured the lit-to-dark diameter of the shipped discs at
+      // a luminance range far under a lit sphere's — the owner's "faded, not
+      // crisp, not real" (shots/sky/lantern-coast.png, powder-coast.png: a flat
+      // pink disc, a flat white one). Now a small bright core, the hue to 0.42,
+      // a real mid-tone by 0.74 and the dark limb from there — a sphere, not
+      // a sticker. The glow stays; it is what separates a planet from a circle.
+      const hex = (c: string): [number, number, number] => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+      const mix = (a: string, b: string, t: number): string => { const A = hex(a), B = hex(b); return `rgb(${Math.round(A[0] + (B[0] - A[0]) * t)},${Math.round(A[1] + (B[1] - A[1]) * t)},${Math.round(A[2] + (B[2] - A[2]) * t)})`; };
+      const lit = g.createRadialGradient(cx - R * 0.46, cy - R * 0.44, R * 0.05, cx, cy, R);
+      lit.addColorStop(0, mix(bd.hue, '#ffffff', 0.22));
+      lit.addColorStop(0.42, bd.hue);
+      lit.addColorStop(0.74, mix(bd.hue, bd.dark, 0.55));
       lit.addColorStop(1, bd.dark);
       g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.closePath();
       g.save(); g.clip();
