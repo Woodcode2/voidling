@@ -19,7 +19,7 @@ await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
 await p.evaluate(() => document.getElementById('btnPlay')?.click());
 await p.waitForTimeout(1500);
-await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="' + WORLD + '"]')?.click());
+await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), WORLD);
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 2.5, null, { timeout: 400000 });
 await p.addStyleTag({ content: '#joy,#joyNub,.bub{display:none !important}' });
 console.log('   r     mean RGB        hex       sat     val');
