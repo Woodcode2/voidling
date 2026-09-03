@@ -297,10 +297,13 @@ export function spotOpen(x: number, y: number, rWorld: number): boolean {
     if (!bucket) continue;
     for (const c of bucket) {
       const dx = c.x - x, dy = c.y - y;
-      // the scatter passes claim their points as they sample them, so a prop
-      // asking about the spot the scatter just handed it finds ITSELF sitting
-      // there and refuses to exist. An exact-match claim is your own.
-      if (dx === 0 && dy === 0 && c.r === rWorld) continue;
+      // An exact-position claim is your own WHATEVER its radius: the scatter
+      // passes claim their points at `sep` (the ground a prop reserves) while
+      // drop() asks at the eat radius, and the two are not the same number for
+      // a shed or a chalet. Matching on radius made every sep != r drop refuse
+      // to exist, which is why round 5's crew forced its drops past this test —
+      // and lost the burial check with it (Powder: 12 more props inside chalets).
+      if (dx === 0 && dy === 0) continue;
       const need = Math.max((c.r + rWorld) * 0.45, Math.max(c.r, rWorld) * 0.62);
       if (dx * dx + dy * dy < need * need) return false;
     }

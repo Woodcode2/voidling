@@ -5355,12 +5355,12 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // 3.6 eat radius: with no `sep` at all the scatter let chalets fall 3.2
     // units apart (drop()'s burial test is the only gate) and qa/placement.mjs
     // measured 6+ chalet-through-chalet footprints in the village on the
-    // unpatched build, the worst 5.4 units deep. `force` because the scatter
-    // has already claimed the site at 5.4 and drop()'s own-claim skip only
-    // matches an equal radius.
+    // unpatched build, the worst 5.4 units deep. (spotOpen's own-claim rule is
+    // position-based since round 5, so the drop is NOT forced: it keeps the
+    // burial test.)
     for (const p2 of PW.scatterInRegion(REG('village'), 24, rnd2, 150, { sep: 5.4 })) {
       const face = Math.atan2(PW.LAKE.cx - p2[0], PW.LAKE.cy - p2[1]);
-      drop(AL.makeChalet(), p2, 3.6, face, true, 'chalet');
+      drop(AL.makeChalet(), p2, 3.6, face, false, 'chalet');
     }
     // …and the village's small stuff — the between-chalets clutter that makes
     // a district read dense from the picker's first frame
@@ -5531,7 +5531,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     const plant = (id: LN.LnBiome, n: number, clear: number, r: number,
                    make: () => THREE.Object3D, face = false, qk?: string, sep = r) => {
       for (const p2 of LN.scatterInRegion(REG(id), n, Math.random, clear, { sep }))
-        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, sep !== r, qk);
+        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, false, qk);
     };
     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
                        band?: [number, number]) => {
@@ -5848,7 +5848,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     const plant = (id: GD.GdBiome, n: number, clear: number, r: number,
                    make: () => THREE.Object3D, face = false, qk?: string, sep = r) => {
       for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep }))
-        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, sep !== r, qk);
+        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, false, qk);
     };
     /** …and the same for the ground between the districts. */
     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
@@ -6334,7 +6334,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
     for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
-    for (const p2 of spread('port', 4, 90, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2), true);   // sep 5 = a 6x6 hut's half-diagonal + margin; forced past drop()'s own-claim test
+    for (const p2 of spread('port', 4, 90, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));   // sep 5 = a 6x6 hut's half-diagonal + margin; forced past drop()'s own-claim test
     // makeShopBox was a bare grey cube — 24 of them across two districts were the
     // first thing your eye landed on. Real dockside furniture instead.
     for (const p2 of spread('port', 10, 40, 1.4)) drop(LUXE.makeRopeBollard(), p2, 1.4, rand(0, Math.PI * 2));
@@ -6342,7 +6342,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     for (const p2 of spread('port', 3, 90, 2.6)) drop(LUXE.makeAnchorMonument(), p2, 2.6, rand(0, Math.PI * 2));
 
     // ── OLD TOWN: a huddle of thatch houses and market clutter on the bluff
-    for (const p2 of spread('oldtown', 24, 55, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2), true);   // qa/placement.mjs: 21 hut-through-hut footprints at sep 3
+    for (const p2 of spread('oldtown', 24, 55, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));   // qa/placement.mjs: 21 hut-through-hut footprints at sep 3
     for (const p2 of spread('oldtown', 18, 40, 1.3)) drop(makeBarrel(), p2, 1.3);
     landmark(makeFort(), [5400, 2050], 9, 0.3, 280);               // the fort on the bluff
     for (const p2 of spread('oldtown', 12, 55, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));

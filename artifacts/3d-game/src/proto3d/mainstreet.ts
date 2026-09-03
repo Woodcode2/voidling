@@ -81,7 +81,7 @@ export function spotOpen(x: number, y: number, rWorld: number): boolean {
     if (!b) continue;
     for (const c of b) {
       const dx = c.x - x, dy = c.y - y;
-      if (dx === 0 && dy === 0 && c.r === rWorld) continue;   // your own claim
+      if (dx === 0 && dy === 0) continue;   // your own claim, whatever its radius (see bay.ts spotOpen)
       const need = Math.max((c.r + rWorld) * 0.45, Math.max(c.r, rWorld) * 0.62);
       if (dx * dx + dy * dy < need * need) return false;
     }
