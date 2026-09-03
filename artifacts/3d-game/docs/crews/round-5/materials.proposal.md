@@ -181,7 +181,9 @@ the gate (push, live, quality).
 - **Rival appetite before the shutter.** `HIDE_RIVALS` hides bodies, not eating. A lookpair
   mode that keeps the family unjoined for the whole shot is owed; until then a pair's prop
   counts must match (they are printed) or the pair is re-shot.
-- **The gate** — its line is appended below when it finishes.
+- **The gate:** `node qa/gate.mjs --profile=push --port=4177` on the after build, 14:46-15:00 UTC,
+  GPU lock held: **PASS, 16/16, every step reached its own conclusion** (the 16th is the new
+  `albedo` guard; log in `materials-data/gate-materials.log`). main fast-forwarded to this commit.
 
 ## Owed
 - rung-3b pre-registration with a calibrated ENV_GAIN, or removal of the gradient code.

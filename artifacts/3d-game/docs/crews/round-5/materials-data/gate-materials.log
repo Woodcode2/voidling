@@ -1,0 +1,28 @@
+== gate push profile on :4177 (after build b6040cc src) 14:46:33
+
+  GATE — profile "push" — 16 step(s) on :4177
+
+   · typecheck          pass    3s
+   · smoke:maple        pass  215s
+   · econ               pass  161s
+   · iapdoc             pass    0s
+   · normals            pass    0s
+   · faceparity         pass  355s
+   · pickerfit          pass   24s
+   · evolvepop          pass    0s
+   · lockedcards        pass   30s
+   · skyfit             pass    0s
+   · albedo             pass    0s
+   · roundlod           pass    0s
+   · safety             pass    0s
+   · privacy            pass    0s
+   · iosname            pass    0s
+   · uisystem           pass   20s
+
+  GATE PASS — 16 step(s), every one reached its own conclusion
+  report: qa/out/gate/report.md
+
+gate exit 0
+GATEDONE
+
+[exited with code 0]

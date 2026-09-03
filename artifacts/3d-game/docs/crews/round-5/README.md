@@ -128,4 +128,7 @@ KILLED groups are recorded here, never hidden.
   ring in one half of a pair (Lantern "−6%" → 47 → 47 once `HIDE_RIVALS=1` hid the family
   at the shutter) and a rival's appetite (Maple "+3.9%" was one canopy eaten before the
   shutter; noise floor on one build K ±0, re-shot 128 → 128). Verdict SOUND WITH
-  CORRECTIONS. Gate line below.
+  CORRECTIONS.
+- **14:46-15:00 UTC — gate on the materials build:** `node qa/gate.mjs --profile=push --port=4177`
+  on a quiet box: **PASS, 16/16** (the 16th is the new `albedo` guard; log in
+  `materials-data/gate-materials.log`). main fast-forwarded to this commit.
