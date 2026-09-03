@@ -1,0 +1,10 @@
+# The authored-landmark fix (f6c210b), measured on Pirate Bay — qa/placement.mjs pirate 4177
+# pre-fix build (f6c210b~1) vs post-fix, same probe, same session:
+#   metric      before  after
+#   road            14      20
+#   inside           1      0
+#   under           19      23
+#   overlap         72      58
+#   clutter         65      69
+#   roadend          1      1
+# and r>=7 props surviving the boot passes: 6 of 13 before, 13 of 13 after (qa/_bigprops.mjs)
