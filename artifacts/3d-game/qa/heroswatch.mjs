@@ -7,18 +7,19 @@
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || '4173';
 const RADII = (process.argv[3] || '1.25,3').split(',').map(Number);
+const WORLD = process.argv[4] || 'maple';   // round 5: the mascot's constancy is measured ACROSS worlds
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 2 });
 await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('voidPlayed','1');
   localStorage.setItem('voidTut','1'); localStorage.setItem('voidDailyLast', new Date().toDateString()); } catch {} });
-await p.goto(`http://127.0.0.1:${PORT}/?w=maple`, { waitUntil: 'domcontentloaded', timeout: 300000 });
+await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily','gift'].includes(e.id)) e.classList.remove('show'); }));
 await p.evaluate(() => document.getElementById('btnPlay')?.click());
 await p.waitForTimeout(1500);
-await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="maple"]')?.click());
+await p.evaluate(() => document.querySelector('#worldRow .wCard[data-world="' + WORLD + '"]')?.click());
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 2.5, null, { timeout: 400000 });
 await p.addStyleTag({ content: '#joy,#joyNub,.bub{display:none !important}' });
 console.log('   r     mean RGB        hex       sat     val');
