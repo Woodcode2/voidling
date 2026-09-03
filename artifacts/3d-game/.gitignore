@@ -47,3 +47,4 @@ qa/_scratch/
 # frame of each lives in docs/crews/round-5/shots/materials/, same rule.
 qa/out/lookpair/*_before.*
 qa/out/lookpair/*_rung[0-9].*
+qa/out/lookpair/*_after.*
