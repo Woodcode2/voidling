@@ -1,0 +1,8 @@
+
+══ LANTERN ══  introLen 3.6s
+  u1     t=0.1 R=0.9 camDist=146 Lspace=7  [size 135.17241379310346 d 658: view 0 occ null pxR 267 at (-735,2258) L null range - off] [size 80 d 904: view 0 occ null pxR 153 at (-221,3490) L null range - off]
+  u05    t=1.83 R=0.9 camDist=201 Lspace=38.5  [size 135.17241379310346 d 642: view 0 occ null pxR 182 at (783,571) L null range - off] [size 80 d 880: view 0 occ null pxR 82 at (557,1167) L null range - off]
+  u0     t=3.93 R=0.9 camDist=38 Lspace=2.2  [size 135.17241379310346 d 640: view 0.84 occ 1 pxR 175 at (114,759) L 52.8 range 71.1 CUT-FRAME+HIDDEN-ISLAND] [size 80 d 880: view 0 occ null pxR 85 at (265,1410) L null range - off]
+  far    t=7.66 R=8.28 camDist=233 Lspace=37.9  [size 135.17241379310346 d 640: view 0.86 occ 1 pxR 174 at (114,210) L 77.9 range 83.4 CUT-FRAME+HIDDEN-ISLAND] [size 80 d 880: view 1 occ 1 pxR 75 at (259,781) L 168.1 range 168.2 HIDDEN-ISLAND]
+  coast  t=9.25 R=8.4 camDist=236 Lspace=3.6  [size 135.17241379310346 d 640: view 0.86 occ 1 pxR 174 at (118,200) L 111.9 range 128.6 CUT-FRAME+HIDDEN-ISLAND] [size 80 d 880: view 1 occ 1 pxR 75 at (261,772) L 21.3 range 18.5 HIDDEN-ISLAND+FLAT]
+SKYCUT: FAIL — lantern: a body is cut in 3 frame(s): u0(size 135.17241379310346, CUT-FRAME+HIDDEN-ISLAND), far(size 135.17241379310346, CUT-FRAME+HIDDEN-ISLAND), coast(size 135.17241379310346, CUT-FRAME+HIDDEN-ISLAND)
