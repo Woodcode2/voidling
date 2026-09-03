@@ -1426,7 +1426,7 @@ function buildPropeller(): THREE.Group {
   // free on the clearance rule where a squash would be fatal, and a stretched
   // cap is tall enough to read as worn while its rim stays high enough to clear
   // the brows on a tilt of 0.20 rather than 0.55.
-  const RED = 0xf0392f, YEL = 0xffd334, BLU = 0x2f86f0, GRN = 0x33c65c;
+  const RED = 0xf05346, YEL = 0xffd334, BLU = 0x2f86f0, GRN = 0x33c65c;
   const CREAM = 0xfff4e2, STEEL = 0xdbe2ec;
   const DR = 1.22, DP = 1.20, KY = 1.24, TILT = 0.20;
 
@@ -1545,7 +1545,7 @@ function buildTricorn(): THREE.Group {
   // glued to a disc, it is a deformation — so the brim here is a single closed
   // lathe whose vertices are lifted by (1 + cos(3*theta)), which raises three
   // sides and leaves three points hanging between them. That is the hat.
-  const BLACK = 0x252231, BLACK_L = 0x39344a, GOLD = 0xffc21f, BONE = 0xfff4e2, RED = 0xd8302f;
+  const BLACK = 0x252231, BLACK_L = 0x39344a, GOLD = 0xffc21f, BONE = 0xfff4e2, RED = 0xd84a49;
 
   // ── THE CROWN ───────────────────────────────────────────────────────────
   // Stretched on Y, the beanie's trick: |p|^2 = x^2 + z^2 + (k*y)^2 only grows

@@ -838,7 +838,7 @@ function propParts(out: Geo[], kind: Prop, s: number): void {
 // BODY PIVOT space: origin at the hip line; `sy` is the local shoulder height.
 function parrotParts(out: Geo[], side: number, sy: number): void {
   const x = side * 0.50;
-  out.push(pc(B.sphS, 0xe8342a, x, sy + 0.32, -0.02, 0.34, 0.42, 0.30));
+  out.push(pc(B.sphS, 0xe85042, x, sy + 0.32, -0.02, 0.34, 0.42, 0.30));
   out.push(pc(B.dot, 0xffd23f, x, sy + 0.53, 0.05, 0.21));
   out.push(pc(B.dot, 0x2e2a2a, x, sy + 0.50, 0.16, 0.11, 0.11, 0.18));
   out.push(pc(B.cone, 0x2fd8a0, x, sy + 0.16, -0.24, 0.15, 0.34, 0.15, -0.55));
@@ -850,7 +850,7 @@ function parrotParts(out: Geo[], side: number, sy: number): void {
 // the same district still look like two people from directly overhead.
 // GAME DAY's, straight out of docs/GAMEDAY.md. Home crimson and gold, visitors
 // in teal, and crimson dominates roughly 4:1 wherever these are drawn from.
-const GD_HOME_A = 0xc4342f;   // crimson
+const GD_HOME_A = 0xc4453f;   // crimson
 const GD_GOLD = 0xf0b429;     // gold
 const GD_AWAY = 0x2aa9a0;     // visitor teal
 interface Fit {
@@ -859,7 +859,7 @@ interface Fit {
   wear?: Wear[]; shoe?: Shoe[]; fun?: boolean;   // fun = dyed hair shows up here
 }
 const LN_INK = 0x241c2e;      // the near-black every spirit is trimmed with
-const LN_VERM = 0xc1382e;     // shrine and stall vermilion
+const LN_VERM = 0xc14136;     // shrine and stall vermilion
 const LN_INDIGO = 0x2a3a6a;   // the market's working blue
 const LN_MOSS = 0x3f6a48;
 const LN_PLUM = 0x5a2f52;
@@ -878,7 +878,7 @@ const OUTFIT: Record<string, Fit> = {
     wear: ['uniform', 'open'], shoe: ['boot'] },
   torii: { shirt: [LN_VERM, LN_PAPER, LN_INK], pants: [LN_INK, 0x33283f],
     wear: ['uniform', 'uniform', 'tee'], shoe: ['shoe'] },
-  shrine: { shirt: [LN_PAPER, LN_VERM, LN_PAPER], pants: [LN_VERM, 0x8e2620],
+  shrine: { shirt: [LN_PAPER, LN_VERM, LN_PAPER], pants: [LN_VERM, 0x8e2e27],
     wear: ['uniform'], shoe: ['shoe'] },
   teahouse: { shirt: [LN_PLUM, LN_GOLD, LN_PAPER, LN_INDIGO], pants: [LN_INK, 0x33283f],
     wear: ['uniform', 'open'], shoe: ['shoe'] },
@@ -1280,8 +1280,8 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
       });
     case 'lifeguard':
       return makePerson(dress, undefined, {
-        shirt: 0xe8342a, pants: 0xe8342a, accent: WHITE, wear: 'tank', shoe: 'bare',
-        pattern: 'plain', hat: 'visor', hatCol: 0xe8342a,
+        shirt: 0xe85042, pants: 0xe85042, accent: WHITE, wear: 'tank', shoe: 'bare',
+        pattern: 'plain', hat: 'visor', hatCol: 0xe85042,
         glasses: true, prop: Math.random() < 0.4 ? 'ball' : undefined,
       });
     case 'spa':
@@ -1318,11 +1318,11 @@ function makeCast(role: Role, dress: string, side?: number): THREE.Group {
     case 'pirate':   // costumed staff committing hard to the bit
       return makePerson(dress, undefined, {
         shirt: pick([0x8a2a3a, 0x2a4a6a, 0x6a3a7a, 0x2e2a3a]), pants: pick([0x3a2a24, 0x24202c]),
-        accent: pick([WHITE, GOLD, 0xd83a3a]),
+        accent: pick([WHITE, GOLD, 0xd84a4a]),
         wear: pick(['open', 'open', 'tee'] as Wear[]), shoe: 'boot',
         pattern: pick(['stripe', 'sash', 'sash'] as Pattern[]),
         hair: pick(['long', 'long', 'braids', 'pony'] as Hair[]),
-        hat: Math.random() < 0.62 ? 'tricorn' : 'bandana', hatCol: pick([0xd83a3a, 0x2a2a34, 0x8a2a3a]),
+        hat: Math.random() < 0.62 ? 'tricorn' : 'bandana', hatCol: pick([0xd84a4a, 0x2a2a34, 0x8a2a3a]),
         eyepatch: Math.random() < 0.55, parrot: Math.random() < 0.45,
       });
     case 'dj':
@@ -1526,7 +1526,7 @@ function makeBuggy(): THREE.Group {
 function makeParrot(): THREE.Group {
   // a fat tropical parrot: scarlet body, gold head, teal wings, big beak
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 10), mat(0xe8342a, 0.75));
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 10), mat(0xe85042, 0.75));
   body.scale.set(1, 1.2, 0.9); body.position.y = 0.7; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), mat(0xffd23f, 0.7));
   head.position.set(0, 1.24, 0.06); g.add(head);

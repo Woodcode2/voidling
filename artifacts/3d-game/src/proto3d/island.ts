@@ -4890,7 +4890,7 @@ function makeCone(): THREE.Group {
 }
 function makeHydrant(): THREE.Group {
   // was EIGHT draw calls per hydrant — now one
-  const R = 0xe23b2e, L = 0xf0f2f6;
+  const R = 0xe24e3e, L = 0xf0f2f6;
   const parts = [
     part(new THREE.CylinderGeometry(0.52, 0.56, 0.18, 8), R, 0, 0.09, 0),
     part(new THREE.CylinderGeometry(0.4, 0.45, 1.1, 8), R, 0, 0.68, 0),
@@ -6701,7 +6701,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const fp = new THREE.Group();
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 9, 6), new THREE.MeshStandardMaterial({ color: 0xc8cdd8, metalness: 0.5, roughness: 0.4 }));
       pole.position.y = 4.5; fp.add(pole);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.4), new THREE.MeshStandardMaterial({ color: s < 0 ? 0x2f4a7a : 0xd8392f, side: THREE.DoubleSide, roughness: 0.8 }));
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.4), new THREE.MeshStandardMaterial({ color: s < 0 ? 0x2f4a7a : 0xd84a3e, side: THREE.DoubleSide, roughness: 0.8 }));
       flag.position.set(s * 1.25, 8, 0); fp.add(flag);
       drop(fp, SQ_CX + s * 400, 4830, 1.2);
     }

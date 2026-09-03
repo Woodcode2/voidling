@@ -122,7 +122,7 @@ const STEEL = 0xb9c1cc, DARKSTEEL = 0x6f7684, GLASS = 0x9fd0e8, NIGHTGLASS = 0x3
 const NEON_PINK = 0xff6fae, NEON_CYAN = 0x74f0ff, NEON_GOLD = 0xffd85e;
 const ASPHALT = 0x5a6070, TARMAC = 0x7d8494;
 const SHOP_WALL = [0xe4c4a0, 0xc9d8e2, 0xf0d2cc, 0xd8e0c4, 0xe8dcc0, 0xcdc2dc] as const;
-const AWNING = [0xd8392f, 0x1fa8a0, 0x3f7a4e, 0xe0a83a, 0x4d7de8, 0xd8586f] as const;
+const AWNING = [0xd84a3e, 0x1fa8a0, 0x3f7a4e, 0xe0a83a, 0x4d7de8, 0xd8586f] as const;
 const INK = 0x241f2e;
 // 0xc98a5a WAS IN HERE, AND IT IS ALSO THE THIRD ENTRY OF SKIN BELOW. A
 // townsperson who drew that shirt against that skin came out one solid tan from
@@ -165,7 +165,7 @@ const ROOF_TAR = 0x4e5560, ROOF_DUCT = 0xaeb6c2, ROOF_VENT = 0x8b93a0;
 // ── THE AUTUMN CANOPY, WHICH IS HALF OF MAPLE FALLS ───────────────────────
 // Named, not inline, because they are registered below and a gloss table that
 // points at loose hex literals rots the first time a leaf colour is tweaked.
-const LEAF_A = 0xe86a2a, LEAF_B = 0xd8392f, LEAF_C = 0xe8a83a, LEAF_D = 0xc9502a;
+const LEAF_A = 0xe86a2a, LEAF_B = 0xd84a3e, LEAF_C = 0xe8a83a, LEAF_D = 0xc9502a;
 const LEAF_HERO = 0xe8903a;              // the one every second canopy ball wears
 const BARK = 0x7a5a3e;
 
@@ -1166,7 +1166,7 @@ export function makeFarmStand(): THREE.Mesh {
     part(box(3.4, 0.8, 0.14), CREAM, 0, 3.5, -0.9),
   ];
   for (let i = 0; i < 6; i++) {
-    p.push(part(sph(mr(0.2, 0.34), 7, 6), mpick([PUMPKIN, CORN, 0xd8392f, 0x5db06a, 0x9a2a3a]), mr(-1.6, 1.6), 1.55, mr(-0.5, 0.5)));
+    p.push(part(sph(mr(0.2, 0.34), 7, 6), mpick([PUMPKIN, CORN, 0xd84a3e, 0x5db06a, 0x9a2a3a]), mr(-1.6, 1.6), 1.55, mr(-0.5, 0.5)));
   }
   return M(p);
 }
@@ -1250,9 +1250,9 @@ export function makeScoreboard(): THREE.Mesh {
     part(box(7.2, 0.9, 0.2), NEON_GOLD, 0, 9.4, 0.4),
     part(box(2.4, 1.6, 0.2), 0x1a1420, -1.9, 7.4, 0.4),
     part(box(2.4, 1.6, 0.2), 0x1a1420, 1.9, 7.4, 0.4),
-    part(box(0.4, 1.2, 0.24), 0xff4d3a, -2.4, 7.4, 0.46),
-    part(box(0.4, 1.2, 0.24), 0xff4d3a, 1.4, 7.4, 0.46),
-    part(box(0.4, 1.2, 0.24), 0xff4d3a, 2.4, 7.4, 0.46),
+    part(box(0.4, 1.2, 0.24), 0xff5944, -2.4, 7.4, 0.46),
+    part(box(0.4, 1.2, 0.24), 0xff5944, 1.4, 7.4, 0.46),
+    part(box(0.4, 1.2, 0.24), 0xff5944, 2.4, 7.4, 0.46),
     part(box(6.6, 0.7, 0.22), CREAM, 0, 5.5, 0.4),
   ]);
 }

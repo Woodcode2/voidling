@@ -48,8 +48,8 @@ type G = THREE.BufferGeometry;
 // what you actually see is its silhouette against a lit ground. The GLOWS are
 // the only saturated colours in the level, and they are the only thing the eye
 // is ever asked to follow.
-const VERM = 0xc1382e;       // vermilion: torii, lantern paper, shrine timber
-const VERM_D = 0x8e2620;     // shadowed vermilion
+const VERM = 0xc14136;       // vermilion: torii, lantern paper, shrine timber
+const VERM_D = 0x8e2e27;     // shadowed vermilion
 const TIMBER = 0x6b4a33;     // stall frames, decking, boat hulls
 const TIMBER_D = 0x5a3e2c;   // undersides and shadowed timber (was 0x4a3324 — ΔE 3.0)
 const CEDAR = 0x7d5a3e;      // the teahouse and bathhouse boards, warmer
