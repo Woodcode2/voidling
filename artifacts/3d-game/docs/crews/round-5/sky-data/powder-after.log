@@ -1,0 +1,8 @@
+
+══ POWDER ══  introLen 3.5s
+  u1     t=0.1 R=0.9 camDist=129 Lspace=7.5  [size 187.58620689655174 d 800: view 0 occ null pxR 251 at (-261,1770) L null range - off] [size 44.13793103448276 d 688: view 0 occ null pxR 100 at (-301,3072) L null range - off]
+  u05    t=1.78 R=0.9 camDist=150 Lspace=46.5  [size 187.58620689655174 d 781: view 0 occ null pxR 206 at (742,638) L null range - off] [size 44.13793103448276 d 658: view 0 occ null pxR 59 at (386,1107) L null range - off]
+  u0     t=3.82 R=0.9 camDist=38 Lspace=36.8  [size 187.58620689655174 d 780: view 0.76 occ 1 pxR 200 at (315,788) L 162.8 range 169.7 CUT-FRAME+HIDDEN-ISLAND] [size 44.13793103448276 d 660: view 0 occ null pxR 63 at (166,1410) L null range - off]
+  far    t=7.52 R=8.1 camDist=229 Lspace=102.1  [size 187.58620689655174 d 780: view 0.86 occ 1 pxR 198 at (313,238) L 126.9 range 25.1 CUT-FRAME+HIDDEN-ISLAND+FLAT] [size 44.13793103448276 d 660: view 1 occ 1 pxR 55 at (171,780) L 161.8 range 34.1 HIDDEN-ISLAND+FLAT]
+  coast  t=8.92 R=8.12 camDist=230 Lspace=1.5  [size 187.58620689655174 d 780: view 0.86 occ 1 pxR 198 at (316,231) L 200.5 range 193.3 CUT-FRAME+HIDDEN-ISLAND] [size 44.13793103448276 d 660: view 1 occ 1 pxR 55 at (172,772) L 132 range 8.1 HIDDEN-ISLAND+FLAT]
+SKYCUT: FAIL — powder: a body is cut in 3 frame(s): u0(size 187.58620689655174, CUT-FRAME+HIDDEN-ISLAND), far(size 187.58620689655174, CUT-FRAME+HIDDEN-ISLAND+FLAT), coast(size 187.58620689655174, CUT-FRAME+HIDDEN-ISLAND)
