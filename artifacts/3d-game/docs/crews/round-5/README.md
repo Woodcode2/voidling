@@ -110,3 +110,6 @@ KILLED groups are recorded here, never hidden.
   had no terminator. Both fixed at the source (37192a7, 6f24377), measured after
   (ring whole; shading range 93→122, 105→126, 71→109), guarded by `qa/skyfit.mjs`
   in the push gate. Verdict in `sky.proposal.md`; gate then main.
+- **10:38-10:50 UTC — gate on the sky build:** `node qa/gate.mjs --profile=push --port=4177`
+  on a quiet box: **PASS, 15/15** (the 15th is the new `skyfit` guard; a first run
+  had failed only on that guard's verdict-line format). main fast-forwarded to c760bb3.
