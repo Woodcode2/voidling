@@ -99,3 +99,6 @@ KILLED groups are recorded here, never hidden.
   the boot sweep and missed 278 retirements on Maple). Paired SEED=7 table on all five
   worlds in `placement.proposal.md` §4; verdict SOUND WITH CORRECTIONS in §5. Landed on
   the branch at 942ce70; gate then main.
+- **02:33-02:50 UTC — gate on the placement build:** `node qa/gate.mjs --profile=push --port=4177`
+  on a quiet box: **PASS, 14/14, every step reached its own conclusion** (log in
+  `placement-data/gate-placement.log`). main fast-forwarded to this commit.
