@@ -25,5 +25,5 @@ const ringReach = (ringBase + (ringN - 1) * ringStep + lineW / 2) * DISC_R, glow
 const rows = [['ring', ringReach], ['glow', glowReach]];
 let bad = 0;
 for (const [k, v] of rows) { const ok = v <= 0.5; if (!ok) bad++; console.log(`  ${k.padEnd(5)} reaches ${v.toFixed(3)} S of a 0.500 S half-canvas  ${ok ? 'ok' : 'CUT'}`); }
-console.log(bad ? `SKYFIT: FAIL — ${bad} element(s) run off the sprite's canvas (DISC_R ${DISC_R})` : `SKYFIT: PASS — disc, ring and glow all inside the sprite's canvas (DISC_R ${DISC_R})`);
+console.log(bad ? `FAIL — skyfit: ${bad} element(s) run off the sprite's canvas (DISC_R ${DISC_R})` : `PASS — skyfit: disc, ring and glow all inside the sprite's canvas (DISC_R ${DISC_R})`);
 process.exit(bad ? 1 : 0);
