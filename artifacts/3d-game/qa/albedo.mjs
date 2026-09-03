@@ -35,10 +35,31 @@ for (const f of files) {
     }
   });
 }
+// ALLOWED under the bar, each with the reason it is not a lit surface. A colour
+// that is never shaded by the light cannot fail to shade: emissives, the DANGER
+// ring (its meaning is its hue — "a RED ring means run"), flashes and overlays,
+// the void's own palette gradients. Every entry names its site so a new site
+// using the same hex on a prop is NOT covered — the census reports the site.
+const ALLOW = {
+  'ff0000': 'defense.ts:34 emissive of the defence bar',
+  'ff3b3b': 'defense.ts:34 base under a 1.0-intensity emissive — the emissive is the look',
+  'd82a2a': 'life.ts:434 CAR_TL tail-light emissive',
+  'ff4d4d': 'life.ts:434 CAR_TL tail-light base under its emissive',
+  'ff3a2e': 'hatgeo.ts:1328 LAMP emissive',
+  'ff3a24': 'hatgeo.ts:1405 lamp emissive',
+  'ff2b3c': 'prototype3d.ts:2628 + rivals.ts:2029 the DANGER ring — a meaning colour',
+  'ff2a44': 'prototype3d.ts:3120 a MeshBasic overlay, unlit by construction',
+  'c4342f': 'prototype3d.ts:3690 a flash colour (life.ts:853 was lifted)',
+  'e03c10': 'palette.ts:230 Ember — the void palette gradient, not a lit surface',
+  'e0243f': 'palette.ts:202 Chilli — the void palette gradient, not a lit surface',
+};
 const rows = [...seen.values()].sort((a, b) => a.ratio - b.ratio);
-const bad = rows.filter((e) => e.ratio < BAR);
+const under = rows.filter((e) => e.ratio < BAR);
+const allowed = under.filter((e) => ALLOW[e.hex] && e.sites.every((st) => ALLOW[e.hex].includes(st.split(':')[0])));
+const bad = under.filter((e) => !allowed.includes(e));
 console.log(`  ${rows.length} distinct saturated colours (dominant > 0.25 linear) at ${rows.reduce((n, e) => n + e.sites.length, 0)} sites; bar ${BAR}`);
 console.log('  hex      second/dominant   sites');
 for (const e of (ALL ? rows : bad)) console.log(`  #${e.hex}  ${e.ratio.toFixed(3).padStart(6)}            ${e.sites.length} ${e.sites.slice(0, 4).join(' ')}${e.sites.length > 4 ? ' …' : ''}`);
-console.log(bad.length ? `FAIL — albedo: ${bad.length} colour(s) under the ${BAR} bar cannot shade` : `PASS — albedo: every saturated colour keeps its secondary channels above ${BAR}`);
+for (const e of allowed) console.log(`  allowed #${e.hex} ${e.ratio.toFixed(3)} — ${ALLOW[e.hex]}`);
+console.log(bad.length ? `FAIL — albedo: ${bad.length} colour(s) under the ${BAR} bar cannot shade` : `PASS — albedo: every saturated colour on a lit surface keeps its second channel above ${BAR} (${allowed.length} unlit/meaning colours allowed by name)`);
 process.exit(bad.length ? 1 : 0);
