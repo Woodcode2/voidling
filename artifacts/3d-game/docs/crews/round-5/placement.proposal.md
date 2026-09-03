@@ -75,3 +75,56 @@ building; measurements below are appended as they land.
   (overlap 192 here vs 451 in the 21:12 table: between those runs the first crew split solid-through-anything
   `overlap` (FAIL) from clutter-touching-clutter `clutter` (info) — see probe line ~309. The 21:12 table is superseded
   by the SEED=7 rows as they land below.)
+
+---
+
+## Governor's continuation (2026-09-03 01:46-02:10 UTC) — measured, not inherited
+
+Two crews ran this lane and both were killed by container restarts (21:33 and
+~22:05 UTC); their instrument, before-table, four before-shots and unfinished
+patch were rescued from the dead worktrees and are in git. The governor
+finished the measurement himself, token-cautious, and acted as the skeptic.
+Everything below was run on this box; commands and files are named.
+
+### 1. The crew's after-table was taken at the wrong moment
+`qa/placement.mjs` censused the world right after `__voidState` appeared — before
+any match starts, i.e. BEFORE `validateWorld()` (the boot sweep that nudges props
+off roads, culls off-island strays and, with this patch, retires footprints).
+`qa/_settlestat.mjs maple 4177` (SEED=7, match started) printed what the sweep
+actually did on the patched build:
+
+```
+maple   settle {inside:170, through:94, doorstep:13, feet:5453, ms:253}  edibles 5516
+        [world] placement sweep: 56 nudged off roads, 278 retired (170 inside a solid, 94 through another, 13 on a doorstep; settle 253ms over 5453 footprints)
+gameday settle {inside:24,  through:28, doorstep:0,  feet:5971, ms:87}   edibles 6417
+        [world] placement sweep: 0 nudged off roads, 53 retired (24 inside a solid, 28 through another; settle 87ms over 5971 footprints)
+```
+So the crew's "Maple: inside 184 → 186" was true of the raw scatter and false of
+the world a child plays: 278 props are gone by the time the intro ends. The
+auditor now calls `__validateWorld()` before its census (commit 942ce70) and the
+paired table below is taken that way on BOTH builds.
+
+Cost of the settle pass: 253 ms on Maple, 87 ms on Game Day, at match start
+(inside `beginMatch` → `validateWorld`). That is a one-off hitch before the first
+match frame; it does not recur (`_validated`). Recorded, not yet moved to the
+loading screen — see "owed".
+
+### 2. Forcing the drops lost the burial test (KILLED that part; corrected)
+The crew forced every `sep != r` drop past `spotOpen()` because the own-claim
+exemption matched on radius (`c.r === rWorld`) and a scatter claim at `sep`
+never equals a drop at the eat radius. Forcing also skips drop()'s burial test:
+Powder measured inside 31 → 43 at SEED=7 (12 more small props under chalets).
+Correction landed in 942ce70: `spotOpen` in bay.ts and mainstreet.ts treats an
+exact-position claim as your own whatever its radius; the `force` flags on the
+chalets, the Lantern/Game Day `plant()` sheds, and the Pirate huts are removed.
+
+### 3. What the raw-scatter table (crew's method, SEED=7) still established
+Lantern water 378 → 3 (the canal exclusion), inside 36 → 3, overlap 107 → 14;
+Game Day inside 44 → 24, overlap 279 → 196 (the RV mass is gone: shots
+`placement-s7/before-gameday-overlap-0.png` vs `wip-gameday-overlap-0.png`);
+Powder water 20 → 0 (no pine on the ice), road 12 → 1; Pirate roadend 4 → 1,
+offisland 9 → 4, overlap 194 → 171. These are scatter-time changes and survive
+the timing correction.
+
+### 4. The paired table after validateWorld (SEED=7; before = main 4c8a743 on :4181, after = 942ce70 on :4177)
+(appended per world by the audit loop — `placement-data/s7v-before-*.json`, `s7v-after-*.json`, logs beside them)
