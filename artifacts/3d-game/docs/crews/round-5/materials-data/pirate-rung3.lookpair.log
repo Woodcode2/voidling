@@ -1,0 +1,17 @@
+  settle t=4.22 off=0.000 dpos=   -   camDist=38.0 dcam=   -   r=4.000 still=0/6 warps=1 reasserts=0
+  settle t=5.76 off=0.000 dpos=0.000 camDist=122.6 dcam=1.762 r=4.000 still=0/6 warps=1 reasserts=2
+  settle t=7.26 off=0.000 dpos=0.000 camDist=128.5 dcam=0.160 r=4.000 still=0/6 warps=1 reasserts=3
+  settle t=8.76 off=0.000 dpos=0.000 camDist=129.1 dcam=0.014 r=4.000 still=6/6 warps=1 reasserts=3
+  spot   THE RESORT — the Royal Mariner up the strip
+  ground (145.38, -96.62) solid=yes biome=resort
+  landed (145.38, -96.62)  Δ0.000u after 1 warp(s), 3 radius re-assert(s)
+  hero   r=4.000 (wanted 4; drifted to 4.000 before the shutter reset)  mood=cruise maw=0.000 smile=true biting=false
+  props  114 edibles in frame, biggest r=5.60
+  hidden 0 rival object(s) at the shutter (HIDE_RIVALS=1)
+  family 0 rival(s) in frame
+  lens   camDist=129.1  void at (215, 450) r=52 css px
+  rung   0 pinned=0 pr=2 shadows=true
+  rings  12 eat-ring meshes hidden in the shutter tick (fx.ts's pool)
+  frame  860x1864  luminance 0.000..0.912 mean 0.3787 (descriptive)
+  stamp  d6ae8db5542ea6a7 059bdcde15cad3dd
+  VERDICT PASS pirate shot at the fixed spot — t=10.43 match s, camDist 129.1, Δ0.000u off the mark, 114 props and 0 rival(s) in frame → qa/out/lookpair/pirate_rung3.png
