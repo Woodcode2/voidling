@@ -23,6 +23,8 @@ import { PNG } from 'pngjs';
 const WORLD = process.argv[2] || 'maple', PORT = process.argv[3] || '4177';
 const flag = (k) => { const a = process.argv.find((s) => s.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : null; };
 const JSON_OUT = flag('json'), SHOTS = flag('shots');
+// the DISC is a fraction of the sprite quad: 2 * DISC_R (island.ts) — 0.58 since round 5, 0.80 before
+const DISC = Number(flag('disc') || 0.58);
 const INTRO = { maple: 2.2, pirate: 2.2, gameday: 3.4, lantern: 3.6, powder: 3.5 }[WORLD] ?? 3.0;
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
@@ -43,7 +45,7 @@ await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 0.03, null, { t
 // hide the HUD so the canvas is the whole picture
 await p.evaluate(() => { const cv = document.querySelector('canvas'); for (const el of Array.from(document.body.children)) if (el !== cv) el.style.visibility = 'hidden'; });
 
-const measure = () => {
+const measure = (DISC) => {
   const THREE = window.__THREE, cam = window.__cam, scene = window.__scene;
   const W = innerWidth, H = innerHeight;
   cam.updateMatrixWorld(true); const camPos = cam.getWorldPosition(new THREE.Vector3());   // WORLD position: camPos is local and lied (occ 1 on visible planets)
@@ -58,7 +60,8 @@ const measure = () => {
     const C = sp.getWorldPosition(new THREE.Vector3()), s = sp.scale.x;
     const dist = C.distanceTo(camPos);
     const pts = [C.clone()];
-    for (const rr of [0.5, 1.0]) for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; pts.push(C.clone().addScaledVector(right, rr * s / 2 * Math.cos(a)).addScaledVector(up, rr * s / 2 * Math.sin(a))); }
+    const rd = s / 2 * DISC;   // the disc's radius, not the quad's
+    for (const rr of [0.5, 0.97]) for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; pts.push(C.clone().addScaledVector(right, rr * rd * Math.cos(a)).addScaledVector(up, rr * rd * Math.sin(a))); }
     let inView = 0, occ = 0, minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
     const dir = new THREE.Vector3();
     for (const P of pts) {
@@ -83,7 +86,7 @@ const measure = () => {
 const lum = (png, x0, y0, w, h) => { let s = 0, n = 0; for (let y = Math.max(0, y0); y < Math.min(png.height, y0 + h); y++) for (let x = Math.max(0, x0); x < Math.min(png.width, x0 + w); x++) { const i = (y * png.width + x) * 4; s += 0.2126 * png.data[i] + 0.7152 * png.data[i + 1] + 0.0722 * png.data[i + 2]; n++; } return n ? s / n : 0; };
 const samples = [];
 const take = async (label) => {
-  const m = await p.evaluate(measure);
+  const m = await p.evaluate(measure, DISC);
   let png = null;
   if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); const file = `${SHOTS}/${WORLD}-${label}.png`; await p.screenshot({ path: file }); png = PNG.sync.read(fs.readFileSync(file)); }
   let Lspace = null;
@@ -96,11 +99,11 @@ const take = async (label) => {
     if (png && bd.viewFrac > 0.5 && bd.pxR > 8) { const Ls = []; for (let k = -3; k <= 3; k++) { const x = Math.round(bd.cx + k * bd.pxR * 0.8 / 3 * 0.7071), y = Math.round(bd.cy + k * bd.pxR * 0.8 / 3 * 0.7071); if (x >= 2 && y >= 2 && x < png.width - 2 && y < png.height - 2) Ls.push(lum(png, x - 2, y - 2, 5, 5)); } if (Ls.length >= 5) { bd.Lrange = +(Math.max(...Ls) - Math.min(...Ls)).toFixed(1); bd.Lprofile = Ls.map((v) => Math.round(v)); } }
     const flags = [];
     if (bd.viewFrac > 0.1 && bd.viewFrac < 0.9) flags.push('CUT-FRAME');
-    if (bd.viewFrac > 0.1 && bd.occFrac !== null && bd.occFrac > 0.1 && bd.occFrac < 0.9) flags.push('CUT-ISLAND');
-    if (bd.viewFrac > 0.1 && bd.occFrac !== null && bd.occFrac >= 0.9) flags.push('HIDDEN-ISLAND');
+    // the occlusion column stays in the JSON but flags nothing: it read 1.0 on
+    // planets plainly in the sky (retracted, sky.proposal.md — the frames decide)
     if (bd.viewFrac === 0) flags.push('off');
-    if (bd.Lrange !== undefined && bd.Lrange < 45) flags.push('FLAT');
-    if (bd.Lplanet !== null && bd.viewFrac > 0.5 && bd.occFrac < 0.5 && (bd.Lplanet < 90 || (Lspace !== null && bd.Lplanet < 2.5 * Lspace))) flags.push('FADED');
+    if (bd.Lrange !== undefined && bd.Lplanet !== null && bd.Lplanet > 60 && bd.Lrange < 45) flags.push('FLAT');
+    if (bd.Lplanet !== null && bd.viewFrac > 0.5 && bd.Lplanet > 60 && Lspace !== null && bd.Lplanet < 2.5 * Lspace) flags.push('FADED');
     bd.flags = flags;
   }
   samples.push({ label, ...m, Lspace });

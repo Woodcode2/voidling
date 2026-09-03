@@ -166,6 +166,9 @@ const SUITE = [
     cmd: ['node', 'qa/edgespeed.mjs', PORT, 'pirate', 'maple'], verdict: pf,
     why: 'the shore stops, turns or bleeds you off — it never launches you (owner item 3)' },
 
+  { id: 'skyfit', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 30,
+    cmd: ['node', 'qa/skyfit.mjs'], verdict: pf,
+    why: 'the planet, its ring and its glow all fit the sprite canvas — the half-cut planet (round 5)' },
   { id: 'ringmeaning', tier: 'quality', profiles: ['quality'], timeout: 900,
     cmd: ['node', 'qa/ringmeaning.mjs', PORT], verdict: pf },
   { id: 'rivalnotice', tier: 'quality', profiles: ['quality'], timeout: 2400,
