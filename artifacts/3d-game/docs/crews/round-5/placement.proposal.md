@@ -1,4 +1,4 @@
-# DRAFT — in progress (placement)
+# PROPOSAL: placement — SOUND WITH CORRECTIONS (governor as skeptic, 2026-09-03 02:40 UTC)
 
 Crew: placement (Stream A, first half). Worktree wf_4583cfd9-6a7-1. Started 2026-09-02 20:51 UTC.
 
@@ -128,3 +128,66 @@ the timing correction.
 
 ### 4. The paired table after validateWorld (SEED=7; before = main 4c8a743 on :4181, after = 942ce70 on :4177)
 (appended per world by the audit loop — `placement-data/s7v-before-*.json`, `s7v-after-*.json`, logs beside them)
+
+| world | props | road | water | offisland | inside | under | overlap | roadend | door | bench |
+|---|---|---|---|---|---|---|---|---|---|---|
+| maple before | 5441 | 0 | 0 | 0 | 186 | 87 | 193 | 0 | 5 | 3 |
+| maple after | 5265 | 0 | 1 | 0 | **3** | 72 | **116** | 0 | **0** | 4 |
+| gameday before | 6069 | 0 | 0 | 0 | 44 | 151 | 279 | 0 | 0 | 0 |
+| gameday after | 5902 | 0 | 0 | 2 | **1** | 57 | **163** | 0 | 0 | 0 |
+| lantern before | 4506 | 0 | 378 | 2 | 36 | 126 | 107 | 0 | 0 | 0 |
+| lantern after | 4344 | 0 | **5** | 2 | **0** | 9 | **19** | 0 | 0 | 0 |
+| powder before | 4142 | 12 | 20 | 1 | 31 | 11 | 32 | 0 | 0 | 0 |
+| powder after | 4047 | **1** | **0** | 1 | **0** | 6 | 29 | 0 | 0 | 0 |
+| pirate before | 3519 | 59 | 0 | 10 | 75 | 47 | 193 | 1 | 0 | 0 |
+| pirate after | 3361 | **15** | 0 | 5 | **1** | 29 | **49** | 1 | 0 | 0 |
+
+Commands: `SEED=7 node qa/placement.mjs <world> 4181|4177 --json=… --shots=… --pick=… [--spots=…]`,
+logs and JSON in `placement-data/s7v-*`, shots in `shots/placement-s7v/` (each after-shot is
+taken at the before run's offender coordinates). Every number above is from those runs.
+
+### 5. Verdict — SOUND WITH CORRECTIONS (the two corrections are landed in 942ce70)
+Per hunk group, ruled on the paired table:
+- **Pirate trail and promenade ends (bay.ts + the bake order)** — SOUND. Trail joins the
+  promenade and the tideline; roadend 4 → 1 on the raw scatter. The one remaining open
+  end is the promenade's south end, stopped 16 units short of the hand-authored spawn
+  by the crew's recorded decision (HANDS OFF: the spawn). Left as is.
+- **Powder: no pine on the ice, chalet sep 5.4, snow lumps clear of the road** — SOUND
+  after correction (un-forced): water 20 → 0, road 12 → 1, inside 31 → 0.
+- **Lantern: sep for sheds/kura/teahouses, canal exclusion, afloat tags** — SOUND after
+  correction: water 378 → 5, inside 36 → 0, overlap 107 → 19.
+- **Game Day: lot vehicles nose-in with real claims, sep for frat houses / halls** — SOUND
+  after correction: inside 44 → 1, overlap 279 → 163; the RV mass photographed as one
+  roof is gone. Residue: two 1.7×1.2 props off-island at census time — GLB props whose
+  model had not streamed when the sweep ran (validateWorld skips an un-streamed
+  wrapper and re-checks it on its next call, at match start). Unverified for these two.
+- **Pirate huts sep 5** — SOUND after correction: inside 75 → 1, overlap 193 → 49.
+- **Maple roadworks/bridge tags** — SOUND; instrument exemptions only, no placement change.
+- **settleFootprints() (prototype3d.ts, +116)** — SOUND, with two facts the crew did not
+  have: it is the whole Maple result (inside 186 → 3, doorsteps 5 → 0, overlap 193 → 116
+  come from it, nothing else in the patch touches Maple's placement), and it costs
+  253 ms on Maple / 87 ms on Game Day at match start, once. That hitch is OWED to the
+  loading screen (below), not a reason to hold the pass: a child sees a town hall with
+  no tree in it (shots/placement-s7v/before-maple-inside-0.png vs after-maple-inside-0.png).
+- **The auditor, qa/placement.mjs** — SOUND with the governor's correction (census after
+  `__validateWorld()`); registered nowhere yet — gate registration is owed, see below.
+
+### 6. Residue (recorded, not hidden)
+Maple: 3 inside (a 3.5×2.9 prop in a 21×10 building the parity ray missed; a 1.0×0.1
+sign in a 1.3×1.3 post), 4 benches facing a planter 1.2 u ahead, 1 small prop nudged onto
+the pond. Game Day: the two off-island GLB props above; 163 overlaps left in the lot rows
+(trucks 3.2 wide on a 7.9 pitch still touch at the bumpers by the 0.35 bar). Lantern: 5
+on water, 19 overlaps. Powder: 29 overlaps, mostly chalet-vs-yard-clutter (11×10 flat
+props under chalets — footprint by design, h 0.8). Pirate: 15 road (promenade furniture
+inside the deck band the auditor now allows at 3.5; the rest are old-town props), 5
+off-island buildings (the fort/lighthouse landmarks the coast smoothing left over the
+water, pre-existing: 10 before), 49 overlaps.
+
+### 7. Owed after this lands
+- Move settleFootprints() to the island-ready hook (the loading screen) and keep the
+  match-start call for un-streamed GLBs only: removes the 253 ms hitch.
+- Register `qa/placement.mjs` in `qa/gate.mjs` (quality tier, per-world bars at the
+  after-numbers above so a regression fails).
+- The two Game Day off-island GLB props: confirm the match-start re-check culls them.
+- Powder's remaining 29 and Game Day's 163 overlaps are pitch questions (lot rows, chalet
+  yards), not bugs — a design pass, not a sweep.
