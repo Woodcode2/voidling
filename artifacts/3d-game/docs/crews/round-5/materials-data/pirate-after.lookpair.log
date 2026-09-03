@@ -1,0 +1,18 @@
+  settle t=4.23 off=0.000 dpos=   -   camDist=40.1 dcam=   -   r=4.000 still=0/6 warps=1 reasserts=0
+  settle t=5.76 off=0.000 dpos=0.000 camDist=124.2 dcam=1.342 r=4.000 still=0/6 warps=1 reasserts=4
+  settle t=7.26 off=0.000 dpos=0.000 camDist=129.0 dcam=0.134 r=4.015 still=0/6 warps=1 reasserts=4
+  settle t=8.76 off=0.000 dpos=0.000 camDist=129.5 dcam=0.012 r=4.015 still=6/6 warps=1 reasserts=4
+  spot   THE RESORT — the Royal Mariner up the strip
+  ground (145.38, -96.62) solid=yes biome=resort
+  landed (145.38, -96.62)  Δ0.000u after 1 warp(s), 4 radius re-assert(s)
+  hero   r=4.000 (wanted 4; drifted to 4.015 before the shutter reset)  mood=cruise maw=0.000 smile=true biting=false
+  props  108 edibles in frame, biggest r=5.60
+  hidden 2 rival object(s) at the shutter (HIDE_RIVALS=1)
+  family 1 rival(s) in frame: NIBBLES r5.9
+  lens   camDist=129.5  void at (215, 450) r=51 css px
+  rung   0 pinned=0 pr=2 shadows=true
+  rings  12 eat-ring meshes hidden in the shutter tick (fx.ts's pool)
+  frame  860x1864  luminance 0.000..0.936 mean 0.4455 (descriptive)
+  stamp  212710ac86827ebf dd9617428f80e719
+  VERDICT PASS pirate shot at the fixed spot — t=10.41 match s, camDist 129.5, Δ0.000u off the mark, 108 props and 1 rival(s) in frame → qa/out/lookpair/pirate_after.png
+  NOTE   a rival is in this frame and this probe cannot pin one. If the other half of the pair does not have the same rivals in the same places, the difference between the two frames is not only the build — re-shoot until they agree, or read around them.
