@@ -1,0 +1,7 @@
+
+══ POWDER ══  introLen 3.5s
+  u1     t=0.12 R=0.9 camDist=146 Lspace=6.6  [size 136 d 787: view 0 occ null pxR 172 at (-154,1558) L null off] [size 32 d 671: view 0 occ null pxR 66 at (-168,2656) L null off]
+  u05    t=1.76 R=0.9 camDist=153 Lspace=67.4  [size 136 d 781: view 0 occ null pxR 149 at (732,637) L null off] [size 32 d 658: view 0 occ null pxR 43 at (382,1109) L null off]
+  u0     t=3.81 R=0.9 camDist=38 Lspace=46.9  [size 136 d 780: view 0.88 occ 1 pxR 145 at (315,788) L 162.8 CUT-FRAME+HIDDEN-ISLAND] [size 32 d 660: view 0 occ null pxR 46 at (166,1410) L null off]
+  far    t=7.5 R=8.1 camDist=229 Lspace=110.8  [size 136 d 780: view 0.9 occ 1 pxR 143 at (313,238) L 126.9 HIDDEN-ISLAND] [size 32 d 660: view 1 occ 1 pxR 40 at (171,780) L 162 HIDDEN-ISLAND]
+SKYCUT: FAIL — powder: a body is cut in 1 frame(s): u0(size 136, CUT-FRAME+HIDDEN-ISLAND)
