@@ -1,0 +1,125 @@
+{
+ "world": "gameday",
+ "introLen": 3.4,
+ "seed": 7,
+ "view": {
+  "width": 430,
+  "height": 932,
+  "dpr": 2
+ },
+ "shots": [
+  {
+   "moment": "gameday_u100",
+   "u": 0.98,
+   "tWanted": 0.06,
+   "tPage": 0.35,
+   "tCanvas": 0.62
+  },
+  {
+   "moment": "gameday_u75",
+   "u": 0.75,
+   "tWanted": 0.85,
+   "tPage": 1.14,
+   "tCanvas": 1.42
+  },
+  {
+   "moment": "gameday_u50",
+   "u": 0.5,
+   "tWanted": 1.7,
+   "tPage": 2.01,
+   "tCanvas": 2.21
+  },
+  {
+   "moment": "gameday_u25",
+   "u": 0.25,
+   "tWanted": 2.55,
+   "tPage": 2.84,
+   "tCanvas": 3.12
+  },
+  {
+   "moment": "gameday_u0",
+   "u": 0,
+   "tWanted": 3.4,
+   "tPage": 3.79,
+   "tCanvas": 4.03
+  },
+  {
+   "moment": "gameday_settled",
+   "u": 0,
+   "tWanted": 4.4,
+   "tPage": 4.72,
+   "tCanvas": 4.98
+  }
+ ],
+ "contrast": [
+  {
+   "label": "boot THE CUTE",
+   "text": "THE CUTE",
+   "css": "rgb(255, 217, 242)",
+   "size": "12px",
+   "glyphPx": 954,
+   "p10": 7.04,
+   "median": 10.23,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    53,
+    26,
+    96
+   ]
+  },
+  {
+   "label": "boot lName",
+   "missing": true
+  },
+  {
+   "label": "menu THE CUTE",
+   "text": "THE CUTE",
+   "css": "rgb(255, 217, 242)",
+   "size": "17.6px",
+   "glyphPx": 2186,
+   "p10": 6.74,
+   "median": 10.25,
+   "under3": 0,
+   "under45": 2,
+   "behind": [
+    54,
+    29,
+    89
+   ]
+  },
+  {
+   "label": "menu logo",
+   "text": "THE CUTEWORLD ENDER",
+   "css": "rgb(255, 255, 255)",
+   "size": "40px",
+   "glyphPx": 21678,
+   "p10": 10.99,
+   "median": 14.51,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    48,
+    27,
+    78
+   ]
+  },
+  {
+   "label": "menu tag",
+   "text": "STARRING THE VOIDLINGS",
+   "css": "rgb(255, 255, 255)",
+   "size": "11px",
+   "glyphPx": 2387,
+   "p10": 7.68,
+   "median": 13.19,
+   "under3": 0,
+   "under45": 1,
+   "behind": [
+    56,
+    32,
+    94
+   ]
+  }
+ ],
+ "bootName": "THE CUTE WORLD ENDER"
+}

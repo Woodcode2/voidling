@@ -1,0 +1,125 @@
+{
+ "world": "maple",
+ "introLen": 2.2,
+ "seed": 7,
+ "view": {
+  "width": 430,
+  "height": 932,
+  "dpr": 2
+ },
+ "shots": [
+  {
+   "moment": "maple_u100",
+   "u": 0.97,
+   "tWanted": 0.06,
+   "tPage": 0.4,
+   "tCanvas": 0.63
+  },
+  {
+   "moment": "maple_u75",
+   "u": 0.75,
+   "tWanted": 0.55,
+   "tPage": 0.88,
+   "tCanvas": 1.08
+  },
+  {
+   "moment": "maple_u50",
+   "u": 0.5,
+   "tWanted": 1.1,
+   "tPage": 1.37,
+   "tCanvas": 1.65
+  },
+  {
+   "moment": "maple_u25",
+   "u": 0.25,
+   "tWanted": 1.65,
+   "tPage": 1.93,
+   "tCanvas": 2.31
+  },
+  {
+   "moment": "maple_u0",
+   "u": 0,
+   "tWanted": 2.2,
+   "tPage": 2.59,
+   "tCanvas": 2.82
+  },
+  {
+   "moment": "maple_settled",
+   "u": 0,
+   "tWanted": 3.2,
+   "tPage": 3.55,
+   "tCanvas": 3.81
+  }
+ ],
+ "contrast": [
+  {
+   "label": "boot THE CUTE",
+   "text": "THE CUTE",
+   "css": "rgb(255, 217, 242)",
+   "size": "12px",
+   "glyphPx": 954,
+   "p10": 7.04,
+   "median": 10.23,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    53,
+    26,
+    96
+   ]
+  },
+  {
+   "label": "boot lName",
+   "missing": true
+  },
+  {
+   "label": "menu THE CUTE",
+   "text": "THE CUTE",
+   "css": "rgb(255, 217, 242)",
+   "size": "17.6px",
+   "glyphPx": 2186,
+   "p10": 6.74,
+   "median": 10.25,
+   "under3": 0,
+   "under45": 2,
+   "behind": [
+    54,
+    29,
+    89
+   ]
+  },
+  {
+   "label": "menu logo",
+   "text": "THE CUTEWORLD ENDER",
+   "css": "rgb(255, 255, 255)",
+   "size": "40px",
+   "glyphPx": 21678,
+   "p10": 10.99,
+   "median": 14.51,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    48,
+    27,
+    78
+   ]
+  },
+  {
+   "label": "menu tag",
+   "text": "STARRING THE VOIDLINGS",
+   "css": "rgb(255, 255, 255)",
+   "size": "11px",
+   "glyphPx": 2387,
+   "p10": 7.68,
+   "median": 13.19,
+   "under3": 0,
+   "under45": 1,
+   "behind": [
+    56,
+    32,
+    94
+   ]
+  }
+ ],
+ "bootName": "THE CUTE WORLD ENDER"
+}
