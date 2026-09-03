@@ -113,3 +113,19 @@ KILLED groups are recorded here, never hidden.
 - **10:38-10:50 UTC — gate on the sky build:** `node qa/gate.mjs --profile=push --port=4177`
   on a quiet box: **PASS, 15/15** (the 15th is the new `skyfit` guard; a first run
   had failed only on that guard's verdict-line format). main fast-forwarded to c760bb3.
+- **2026-09-03 11:40-14:50 UTC — materials and light (Stream B), governor-run.** No
+  agent. Three builds shot at SEED=7 on one fixed spot per world (`qa/lookpair.mjs`),
+  K = median Rec.709 luminance (`qa/kmetric.mjs`), the mascot's mean colour at r=3
+  (`qa/heroswatch.mjs`), rulings pre-registered before the numbers existed
+  (`materials.proposal.md` §Pre-registration). **RUNG 2** (`GLOSS_ENV` 6.5) stays: K
+  within 1.6% of before on all five worlds, mascot dE ≤ 1.5, a subtle sheen at play
+  distance. **RUNG 3** (neutral gradient environment, gain 1.0) killed by its own 4% gate:
+  Maple K 128 → 115 (−10.2%), Pirate 111 → 88 (−20.7%); `ENV_MODE` back to `'room'`.
+  **13 saturated reds** lifted to a 0.10 second/dominant ratio (24 sites, six files),
+  measured as `after`: K parity on every world, mascot dE ≤ 2.1; `qa/albedo.mjs` in the
+  push gate with 11 unlit/meaning colours allowed by name and site. Two measurement traps
+  found and recorded, confounded frames kept beside the clean ones: a rival's body and
+  ring in one half of a pair (Lantern "−6%" → 47 → 47 once `HIDE_RIVALS=1` hid the family
+  at the shutter) and a rival's appetite (Maple "+3.9%" was one canopy eaten before the
+  shutter; noise floor on one build K ±0, re-shot 128 → 128). Verdict SOUND WITH
+  CORRECTIONS. Gate line below.

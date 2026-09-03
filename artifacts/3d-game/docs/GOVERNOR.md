@@ -625,3 +625,26 @@ the pwDrum guard, and the powderEvolve lift-and-park.
 - **A probe column that contradicts the picture is retracted, not explained.** The
   sky probe's island-occlusion column read 1.0 on planets plainly in the sky, twice,
   after a fix. It flags nothing now.
+
+## Ledger — 2026-09-03, materials and light (round 5, Stream B)
+
+- **Pre-register the ruling, then take the number.** The rung-3 kill gate (4% of each
+  world's before K) and the mascot bar (dE 6) were written into the proposal before any
+  rung frame existed. Rung 3 died at −10.2% and −20.7% with nothing to argue about;
+  a gate written after seeing 10% would have found a reason for 10%.
+- **A light-rig comparison measures light, not who walked past.** Lantern's first pair
+  read −6% on a rung that cannot darken anything; the before frame had NIBBLES and his
+  red ring beside the hero. `qa/lookpair.mjs HIDE_RIVALS=1` hides the family at the
+  shutter and prints the count; every pair in the record is rival-free on both sides,
+  with the confounded original kept as `*.withrivals.*`.
+- **Hiding a rival does not take away his appetite.** Maple's after frame read +3.9%
+  because a corner canopy was eaten before the shutter (78 → 76 props). The prop count
+  is printed in every PASS line; a pair whose counts differ is re-shot, not read.
+- **Measure the noise floor before reading a gate that tight.** Three shots of one build
+  gave K 128/128/128, Y05 34/34/35. Without that, +3.9% under a 4% gate is a coin toss;
+  with it, it is a finding to trace (`qa/_pxdiff.mjs` found the tree in one call).
+- **A probe that returns a plausible number can still be measuring the wrong thing.**
+  Two rung-2 hero swatches returned desaturated colours (sat 0.39/0.52) — not the
+  mascot. Kept as `*.hero.firstrun.log`, re-taken on the same build, cause owed.
+- **Two worlds can decide a kill; they cannot decide a pass.** Rung 3 was stopped after
+  two worlds failed; the other three are recorded as not measured, not as passing.
