@@ -72,6 +72,34 @@ there". That frame is the finding.
 - H2 terminator — island.ts paint() lit ramp — landed at source 6f24377; after-run owed
   (bar: Lrange on a visible big body rises from the before figure; FLAT flag clears).
 
+## After-run (build of 6f24377 on :4177; shots/sky-after/, sky-data/*-after.*)
+**H1 (ring fit):** powder-coast.png and pirate-coast.png, before vs after — the ring's
+arcs now sweep the whole way round; the straight cuts at the sprite's square are
+gone. `qa/skyfit.mjs` (source arithmetic) FAILS on main's island.ts (ring reaches
+0.676 S of a 0.500 S half-canvas) and PASSES on this one (0.490 S).
+**H2 (terminator):** luminance along the lit-to-dark diagonal of the big body's disc,
+same 114 px screen radius, same coast frame, before → after:
+
+| world | before range | after range | frame |
+|---|---|---|---|
+| Powder (pale ice, ringed) | 93 | 122 | a soft white ball with a faint limb → a visible limb |
+| Pirate (teal, ringed) | 105 | 126 | banded disc → banded sphere with a dark lower-right |
+| Lantern (red) | 71 | 109 | a flat pink disc → a bright core and a dark limb (lantern-coast.png) |
+
+Space itself in these frames is a rich violet with stars — "faded" was the disc,
+not the sky. The measurement script is in this file's history (offline pngjs over
+the committed frames; the in-probe `Lrange` sampled the quad, not the disc, in
+this run and is superseded by the table).
+
+## Residue
+- Powder's body is pale by design (#bfe6ff on #122844): the new ramp gives it a
+  limb but it still reads soft; a deeper `dark` for that body is an art call.
+- The flat edge on Lantern's small body in the far frame: not reproduced at
+  size; open.
+- The probe's occlusion column (rays vs island geometry) reads 1.0 on planets
+  plainly in the sky even from the camera's world position — retracted as a
+  measurement; the frames are the evidence. Left in the JSON, not in any verdict.
+
 ## What I could not verify yet
 The coast frames (all five worlds), the flat-edge cause, the FADED measurement in
 a frame where a body is actually visible, and the after-run of H1.
