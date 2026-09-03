@@ -1,0 +1,26 @@
+
+══ MAPLE ══  5265 static props (39 benches, 70 houses w/ doors), audited in 26s  FAIL
+   category      n  verdict  worst
+   road           0  ok    
+   water          1  FAIL  #1856 prop r=0.55 foot=1.2x1.1 h=0.4 at (114.1,-36.4)
+   offisland      0  ok    
+   overhang       4  info  #1192 bldg r=4.2 foot=20.1x4.0 h=5.4 at (-65.0,271.5) [2] | #1080 prop r=1.6 foot=2.8x2.3 h=1.8 at (-205.8,-212.2) [1] | #1217 prop r=1.8 foot=4.4x3.6 h=1.6 at (130.0,250.0) [1]
+   float          0  ok    
+   sunk         165  info  #2305 prop r=0.71 foot=1.0x0.9 h=0.3 at (-191.1,197.4) top 0.28 min 0.00 | #2306 prop r=0.66 foot=1.0x0.9 h=0.3 at (-199.5,192.2) top 0.28 min 0.00 | #2307 prop r=0.79 foot=1.0x0.9 h=0.3 at (-208.8,185.2) top 0.28 min 0.00
+   inside         3  FAIL  #3433 prop r=1.4 foot=3.5x2.9 h=2.3 at (-215.9,129.3) INSIDE #894 bldg r=4.5 foot=21.3x10.0 h=8.6 at (-215.8,127.9) [3.59] | #1768 prop r=0.66 foot=1.0x0.1 h=1.5 at (-46.8,-29.8) INSIDE #3841 bldg r=2.6 foot=1.3x1.3 h=8.4 at (-47.0,-29.8) [0.37] | #2502 prop r=0.55 foot=1.0x0.1 h=1.5 at (-141.0,-162.4) INSIDE #3693 bldg r=2.6 foot=1.3x1.3 h=8.4 at (-140.8,-162.6) [0.35]
+   under         72  info  #5239 prop r=1.2 foot=1.8x0.1 h=1.9 at (41.3,-59.3) under #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8) [5.05] | #5240 prop r=1.2 foot=1.8x0.1 h=1.9 at (44.3,-59.3) under #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8) [5.05] | #2284 prop r=0.79 foot=1.4x1.4 h=1.4 at (212.0,115.3) under #781 bldg r=6 foot=26.0x13.9 h=15.3 at (213.8,113.7) [4.6]
+   overlap      116  FAIL  #3980 prop r=1.4 foot=4.0x3.3 h=2.6 at (-203.1,206.0) x #5227 prop r=2.4 foot=3.4x3.1 h=2.3 at (-202.4,206.6) [3.02] | #3582 prop r=1.4 foot=3.6x3.0 h=2.3 at (-200.9,206.5) x #5227 prop r=2.4 foot=3.4x3.1 h=2.3 at (-202.4,206.6) [2.52] | #1263 prop r=1.8 foot=4.4x3.6 h=1.6 at (-37.0,197.4) x #5126 bldg r=5.2 foot=16.0x11.5 h=14.4 at (-45.2,192.7) [2.4]
+   clutter      266  info  #1263 prop r=1.8 foot=4.4x3.6 h=1.6 at (-37.0,197.4) x #5231 prop r=2.4 foot=3.3x2.4 h=1.2 at (-36.9,197.2) [2.42] | #1740 prop r=0.77 foot=3.8x3.1 h=2.5 at (-134.9,-28.6) x #4247 prop r=1.4 foot=3.7x3.1 h=2.4 at (-136.7,-28.5) [2.38] | #238 prop r=1.6 foot=3.7x3.1 h=2.4 at (-121.8,-45.8) x #3414 prop r=2 foot=3.3x2.7 h=1.7 at (-120.7,-46.8) [2.37]
+   roadend        0  ok    
+   door           0  ok    
+   bench          4  FAIL  #1311 bench r=2.4 foot=3.0x1.0 h=2.0 at (114.7,179.1) faces #1319 prop r=1.8 foot=4.4x3.6 h=1.6 at (115.4,179.2) 1.2u in front [1.8] | #1338 bench r=2.4 foot=3.0x1.0 h=2.0 at (200.2,179.1) faces #1342 prop r=1.8 foot=4.4x3.6 h=1.6 at (198.8,179.7) 1.2u in front [1.8] | #863 bench r=1.6 foot=3.0x1.0 h=2.0 at (139.1,154.9) faces #862 prop r=1.6 foot=3.7x3.1 h=2.4 at (139.4,158.1) 2u in front [1]
+   benchaway     13  info  #825 bench r=1.6 foot=3.0x1.0 h=2.0 at (132.8,9.3) back to road z=0 (dot -1.00, 9.3u off) [1] | #885 bench r=1.6 foot=3.0x1.0 h=2.0 at (233.7,93.8) back to road z=86 (dot -1.00, 8.3u off) [1] | #1221 bench r=2.4 foot=3.0x1.0 h=2.0 at (-227.3,179.1) back to road z=171 (dot -1.00, 8.1u off) [1]
+   piste          0  info  
+   ice            0  info  
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-maple-inside-0.png  <- #3924 bldg r=2.8 foot=1.4x1.4 h=8.7 at (40.4,-60.3) INSIDE #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8)  (screen 214,377)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-maple-inside-1.png  <- #1833 prop r=0.66 foot=1.2x1.3 h=1.6 at (48.0,-64.5) INSIDE #0 bldg r=6.5 foot=22.0x21.5 h=19.4 at (42.8,-64.8)  (screen 215,408)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-maple-overlap-0.png  <- #150 prop r=2.4 foot=5.8x3.6 h=3.3 at (37.8,34.3) x #5420 bldg r=6 foot=13.1x4.8 h=8.1 at (42.8,35.2)  (screen 217,415)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-maple-overlap-1.png  <- #151 prop r=2.4 foot=5.8x3.6 h=3.3 at (47.8,34.3) x #5420 bldg r=6 foot=13.1x4.8 h=8.1 at (42.8,35.2)  (screen 215,420)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-maple-door-0.png  <- #272 house r=3.2 foot=6.5x7.1 h=5.9 at (-138.3,71.4): doorstep blocked by #5289 bldg r=5.2 foot=16.0x11.5 h=14.4 at (-130.8,70.1)  (screen 223,424)
+
+PLACEMENT FAIL — maple  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
