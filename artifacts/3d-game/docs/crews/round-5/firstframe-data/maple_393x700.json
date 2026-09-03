@@ -1,0 +1,82 @@
+{
+ "world": "maple",
+ "introLen": 2.2,
+ "seed": 7,
+ "view": {
+  "width": 393,
+  "height": 700,
+  "dpr": 3
+ },
+ "shots": [],
+ "contrast": [
+  {
+   "label": "boot THE CUTE",
+   "text": "THE CUTE",
+   "css": "rgb(255, 217, 242)",
+   "size": "12px",
+   "glyphPx": 2338,
+   "p10": 1.82,
+   "median": 4.01,
+   "under3": 28,
+   "under45": 65,
+   "behind": [
+    132,
+    69,
+    174
+   ]
+  },
+  {
+   "label": "boot lName",
+   "missing": true
+  },
+  {
+   "label": "menu THE CUTE",
+   "text": "THE CUTE",
+   "css": "rgb(255, 217, 242)",
+   "size": "17.6px",
+   "glyphPx": 4974,
+   "p10": 8.78,
+   "median": 10.36,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    54,
+    29,
+    89
+   ]
+  },
+  {
+   "label": "menu logo",
+   "text": "THE CUTEWORLD ENDER",
+   "css": "rgb(255, 255, 255)",
+   "size": "40px",
+   "glyphPx": 47932,
+   "p10": 11.34,
+   "median": 14.54,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    48,
+    27,
+    78
+   ]
+  },
+  {
+   "label": "menu tag",
+   "text": "STARRING THE VOIDLINGS",
+   "css": "rgb(255, 255, 255)",
+   "size": "11px",
+   "glyphPx": 5910,
+   "p10": 3.8,
+   "median": 11.78,
+   "under3": 8,
+   "under45": 14,
+   "behind": [
+    73,
+    51,
+    114
+   ]
+  }
+ ],
+ "bootName": "THE CUTE WORLD ENDER"
+}
