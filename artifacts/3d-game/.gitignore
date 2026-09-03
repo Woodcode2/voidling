@@ -48,3 +48,4 @@ qa/_scratch/
 qa/out/lookpair/*_before.*
 qa/out/lookpair/*_rung[0-9].*
 qa/out/lookpair/*_after.*
+qa/out/lookpair/*_before[0-9].*
