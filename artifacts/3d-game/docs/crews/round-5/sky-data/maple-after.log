@@ -1,0 +1,8 @@
+
+══ MAPLE ══  introLen 2.2s
+  u1     t=0.1 R=0.9 camDist=141 Lspace=59.9  [size 160 d 798: view 0.9 occ 1 pxR 165 at (119,737) L 183.1 range 164 HIDDEN-ISLAND] [size 46.896551724137936 d 654: view 0 occ null pxR 66 at (262,1338) L null range - off]
+  u05    t=1.14 R=0.9 camDist=122 Lspace=34.3  [size 160 d 754: view 0.86 occ 1 pxR 176 at (113,753) L 159.9 range 157.7 CUT-FRAME+HIDDEN-ISLAND] [size 46.896551724137936 d 614: view 0 occ null pxR 72 at (265,1410) L null range - off]
+  u0     t=2.51 R=0.97 camDist=39 Lspace=63.1  [size 160 d 760: view 0.84 occ 1 pxR 174 at (113,761) L 164 range 1.4 CUT-FRAME+HIDDEN-ISLAND+FLAT] [size 46.896551724137936 d 620: view 0 occ null pxR 71 at (265,1412) L null range - off]
+  far    t=6.21 R=8.7 camDist=243 Lspace=93  [size 160 d 760: view 0.86 occ 1 pxR 173 at (114,210) L 115.1 range 69 CUT-FRAME+HIDDEN-ISLAND] [size 46.896551724137936 d 620: view 1 occ 1 pxR 63 at (259,781) L 157.6 range 113.4 HIDDEN-ISLAND]
+  coast  t=7.63 R=8.97 camDist=248 Lspace=0.1  [size 160 d 760: view 0.86 occ 1 pxR 174 at (112,203) L 165.1 range 178.7 CUT-FRAME+HIDDEN-ISLAND] [size 46.896551724137936 d 620: view 1 occ 1 pxR 63 at (258,773) L 126.8 range 63.4 HIDDEN-ISLAND]
+SKYCUT: FAIL — maple: a body is cut in 4 frame(s): u05(size 160, CUT-FRAME+HIDDEN-ISLAND), u0(size 160, CUT-FRAME+HIDDEN-ISLAND+FLAT), far(size 160, CUT-FRAME+HIDDEN-ISLAND), coast(size 160, CUT-FRAME+HIDDEN-ISLAND)
