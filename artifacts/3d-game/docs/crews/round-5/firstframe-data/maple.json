@@ -5,50 +5,111 @@
  "view": {
   "width": 430,
   "height": 932,
-  "dpr": 2
+  "dpr": 2,
+  "tag": ""
  },
  "shots": [
   {
    "moment": "maple_u100",
    "u": 0.97,
    "tWanted": 0.06,
-   "tPage": 0.4,
-   "tCanvas": 0.63
+   "tPage": 0.34,
+   "tCanvas": 0.61,
+   "card": 0,
+   "hand": false,
+   "guide": false,
+   "banner": 0,
+   "bubbles": 0,
+   "timer": "3:00",
+   "size": "VOIDLING1m NEXT MUNCHKIN",
+   "intro": true,
+   "clock": 179.7,
+   "hudOp": 0
   },
   {
    "moment": "maple_u75",
    "u": 0.75,
    "tWanted": 0.55,
-   "tPage": 0.88,
-   "tCanvas": 1.08
+   "tPage": 0.84,
+   "tCanvas": 1.11,
+   "card": 0,
+   "hand": false,
+   "guide": false,
+   "banner": 0,
+   "bubbles": 0,
+   "timer": "3:00",
+   "size": "VOIDLING2m NEXT MUNCHKIN",
+   "intro": true,
+   "clock": 179.2,
+   "hudOp": 0
   },
   {
    "moment": "maple_u50",
    "u": 0.5,
    "tWanted": 1.1,
-   "tPage": 1.37,
-   "tCanvas": 1.65
+   "tPage": 1.39,
+   "tCanvas": 1.63,
+   "card": 0,
+   "hand": false,
+   "guide": false,
+   "banner": 0,
+   "bubbles": 0,
+   "timer": "2:59",
+   "size": "VOIDLING2m NEXT MUNCHKIN",
+   "intro": true,
+   "clock": 178.6,
+   "hudOp": 0
   },
   {
    "moment": "maple_u25",
    "u": 0.25,
    "tWanted": 1.65,
-   "tPage": 1.93,
-   "tCanvas": 2.31
+   "tPage": 1.9,
+   "tCanvas": 2.14,
+   "card": 0,
+   "hand": false,
+   "guide": false,
+   "banner": 0,
+   "bubbles": 0,
+   "timer": "2:59",
+   "size": "VOIDLING2m NEXT MUNCHKIN",
+   "intro": true,
+   "clock": 178.1,
+   "hudOp": 0
   },
   {
    "moment": "maple_u0",
    "u": 0,
    "tWanted": 2.2,
-   "tPage": 2.59,
-   "tCanvas": 2.82
+   "tPage": 2.53,
+   "tCanvas": 2.83,
+   "card": 0,
+   "hand": false,
+   "guide": false,
+   "banner": 0,
+   "bubbles": 0,
+   "timer": "2:58",
+   "size": "VOIDLING2m NEXT MUNCHKIN",
+   "intro": false,
+   "clock": 177.5,
+   "hudOp": 1
   },
   {
    "moment": "maple_settled",
    "u": 0,
    "tWanted": 3.2,
-   "tPage": 3.55,
-   "tCanvas": 3.81
+   "tPage": 3.5,
+   "tCanvas": 3.73,
+   "card": 0,
+   "hand": true,
+   "guide": false,
+   "banner": 0,
+   "bubbles": 2,
+   "timer": "2:57",
+   "size": "VOIDLING2m NEXT MUNCHKIN",
+   "intro": false,
+   "clock": 176.5,
+   "hudOp": 1
   }
  ],
  "contrast": [
@@ -56,21 +117,33 @@
    "label": "boot THE CUTE",
    "text": "THE CUTE",
    "css": "rgb(255, 217, 242)",
-   "size": "12px",
-   "glyphPx": 954,
-   "p10": 7.04,
-   "median": 10.23,
+   "size": "17.6px",
+   "glyphPx": 2159,
+   "p10": 7.85,
+   "median": 11.43,
    "under3": 0,
    "under45": 0,
    "behind": [
-    53,
-    26,
-    96
+    42,
+    21,
+    81
    ]
   },
   {
    "label": "boot lName",
-   "missing": true
+   "text": "STARRING THE VOIDLINGS",
+   "css": "rgb(255, 255, 255)",
+   "size": "11px",
+   "glyphPx": 2370,
+   "p10": 7.37,
+   "median": 14.82,
+   "under3": 0,
+   "under45": 1,
+   "behind": [
+    45,
+    27,
+    88
+   ]
   },
   {
    "label": "menu THE CUTE",
@@ -121,5 +194,14 @@
    ]
   }
  ],
- "bootName": "THE CUTE WORLD ENDER"
+ "loaderPcts": [
+  "22%",
+  "42%",
+  "58%",
+  "100%"
+ ],
+ "bootName": "STARRING THE VOIDLINGS",
+ "doubled": false,
+ "cardDur": 2.65,
+ "cardWant": 2.65
 }

@@ -5,7 +5,8 @@
  "view": {
   "width": 440,
   "height": 814,
-  "dpr": 3
+  "dpr": 3,
+  "tag": "_440x814"
  },
  "shots": [],
  "contrast": [
@@ -13,36 +14,48 @@
    "label": "boot THE CUTE",
    "text": "THE CUTE",
    "css": "rgb(255, 217, 242)",
-   "size": "12px",
-   "glyphPx": 2245,
-   "p10": 3.51,
-   "median": 7.01,
-   "under3": 7,
-   "under45": 15,
+   "size": "17.6px",
+   "glyphPx": 4840,
+   "p10": 10.26,
+   "median": 11.45,
+   "under3": 0,
+   "under45": 0,
    "behind": [
-    89,
-    45,
-    137
+    42,
+    21,
+    81
    ]
   },
   {
    "label": "boot lName",
-   "missing": true
+   "text": "STARRING THE VOIDLINGS",
+   "css": "rgb(255, 255, 255)",
+   "size": "11px",
+   "glyphPx": 5369,
+   "p10": 12.28,
+   "median": 16.24,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    37,
+    19,
+    74
+   ]
   },
   {
    "label": "menu THE CUTE",
    "text": "THE CUTE",
    "css": "rgb(255, 217, 242)",
    "size": "17.6px",
-   "glyphPx": 4856,
-   "p10": 9.06,
-   "median": 10.41,
+   "glyphPx": 4852,
+   "p10": 8.87,
+   "median": 10.35,
    "under3": 0,
    "under45": 1,
    "behind": [
-    54,
-    29,
-    89
+    53,
+    28,
+    88
    ]
   },
   {
@@ -50,15 +63,15 @@
    "text": "THE CUTEWORLD ENDER",
    "css": "rgb(255, 255, 255)",
    "size": "40px",
-   "glyphPx": 47848,
-   "p10": 11.33,
-   "median": 14.45,
+   "glyphPx": 47824,
+   "p10": 11.47,
+   "median": 14.72,
    "under3": 0,
    "under45": 0,
    "behind": [
-    49,
-    27,
-    79
+    47,
+    26,
+    76
    ]
   },
   {
@@ -66,17 +79,24 @@
    "text": "STARRING THE VOIDLINGS",
    "css": "rgb(255, 255, 255)",
    "size": "11px",
-   "glyphPx": 5419,
-   "p10": 9.01,
-   "median": 12.89,
+   "glyphPx": 5416,
+   "p10": 9.81,
+   "median": 13.2,
    "under3": 0,
    "under45": 1,
    "behind": [
     57,
-    34,
-    99
+    32,
+    93
    ]
   }
  ],
- "bootName": "THE CUTE WORLD ENDER"
+ "loaderPcts": [
+  "22%",
+  "42%",
+  "58%",
+  "100%"
+ ],
+ "bootName": "STARRING THE VOIDLINGS",
+ "doubled": false
 }

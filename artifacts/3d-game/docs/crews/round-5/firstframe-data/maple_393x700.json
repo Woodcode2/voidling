@@ -5,7 +5,8 @@
  "view": {
   "width": 393,
   "height": 700,
-  "dpr": 3
+  "dpr": 3,
+  "tag": "_393x700"
  },
  "shots": [],
  "contrast": [
@@ -13,70 +14,83 @@
    "label": "boot THE CUTE",
    "text": "THE CUTE",
    "css": "rgb(255, 217, 242)",
-   "size": "12px",
-   "glyphPx": 2338,
-   "p10": 1.82,
-   "median": 4.01,
-   "under3": 28,
-   "under45": 65,
+   "size": "14.96px",
+   "glyphPx": 3479,
+   "p10": 9.88,
+   "median": 11.07,
+   "under3": 0,
+   "under45": 0,
    "behind": [
-    132,
-    69,
-    174
+    43,
+    22,
+    83
    ]
   },
   {
    "label": "boot lName",
-   "missing": true
+   "text": "STARRING THE VOIDLINGS",
+   "css": "rgb(255, 255, 255)",
+   "size": "10px",
+   "glyphPx": 4354,
+   "p10": 9.41,
+   "median": 16.03,
+   "under3": 0,
+   "under45": 0,
+   "behind": [
+    38,
+    19,
+    77
+   ]
   },
   {
    "label": "menu THE CUTE",
    "text": "THE CUTE",
    "css": "rgb(255, 217, 242)",
-   "size": "17.6px",
-   "glyphPx": 4974,
-   "p10": 8.78,
-   "median": 10.36,
+   "size": "14.96px",
+   "glyphPx": 3504,
+   "p10": 8.54,
+   "median": 10.01,
    "under3": 0,
-   "under45": 0,
+   "under45": 1,
    "behind": [
-    54,
+    55,
     29,
-    89
+    90
    ]
   },
   {
    "label": "menu logo",
    "text": "THE CUTEWORLD ENDER",
    "css": "rgb(255, 255, 255)",
-   "size": "40px",
-   "glyphPx": 47932,
-   "p10": 11.34,
-   "median": 14.54,
+   "size": "34px",
+   "glyphPx": 34647,
+   "p10": 11.19,
+   "median": 14.72,
    "under3": 0,
    "under45": 0,
    "behind": [
-    48,
-    27,
-    78
+    47,
+    26,
+    77
    ]
   },
   {
    "label": "menu tag",
    "text": "STARRING THE VOIDLINGS",
    "css": "rgb(255, 255, 255)",
-   "size": "11px",
-   "glyphPx": 5910,
-   "p10": 3.8,
-   "median": 11.78,
-   "under3": 8,
-   "under45": 14,
+   "size": "10px",
+   "glyphPx": 4427,
+   "p10": 7.41,
+   "median": 13.06,
+   "under3": 0,
+   "under45": 2,
    "behind": [
-    73,
-    51,
-    114
+    58,
+    32,
+    94
    ]
   }
  ],
- "bootName": "THE CUTE WORLD ENDER"
+ "bootName": "STARRING THE VOIDLINGS",
+ "doubled": false
 }
