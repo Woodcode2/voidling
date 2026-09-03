@@ -1,0 +1,25 @@
+
+══ POWDER ══  4093 static props (0 benches, 0 houses w/ doors), audited in 20s  FAIL
+   category      n  verdict  worst
+   road           1  FAIL  #320 prop r=0.55 foot=3.0x0.8 h=0.6 at (43.0,82.2) [0.26]
+   water          0  ok    
+   offisland      2  FAIL  #2543 prop r=0.41 foot=1.5x1.1 h=0.6 at (-117.6,-133.4) | #4092 bldg r=5.6 foot=3.5x0.8 h=14.9 at (-248.3,131.8)
+   overhang      36  info  #445 prop r=0.42 foot=2.3x1.6 h=0.8 at (8.8,228.9) [2] | #472 prop r=0.43 foot=1.4x1.2 h=0.6 at (146.7,14.8) [2] | #494 prop r=0.37 foot=1.1x0.8 h=0.4 at (143.7,54.1) [2]
+   float          0  ok    
+   sunk        2483  info  #453 prop r=0.35 foot=2.2x1.9 h=0.8 at (103.6,-168.6) top 0.60 min -0.22 [0.22] | #467 prop r=0.41 foot=2.2x1.7 h=0.8 at (-2.8,225.0) top 0.59 min -0.22 [0.22] | #511 prop r=0.46 foot=2.1x1.8 h=0.8 at (-79.4,-103.0) top 0.59 min -0.22 [0.22]
+   inside        43  FAIL  #2160 prop r=0.48 foot=1.1x0.9 h=0.4 at (-22.9,112.5) INSIDE #14 chalet r=3.6 foot=10.4x6.8 h=10.0 at (-23.7,112.9) [2.49] | #2876 prop r=0.4 foot=2.1x1.6 h=0.8 at (-22.2,181.5) INSIDE #16 chalet r=3.6 foot=8.6x6.1 h=9.5 at (-22.9,181.0) [2.26] | #924 prop r=0.45 foot=2.0x1.8 h=0.8 at (-7.8,112.0) INSIDE #20 chalet r=3.6 foot=8.6x5.7 h=9.2 at (-8.1,110.9) [1.78]
+   under          6  info  #1632 prop r=0.48 foot=2.0x1.6 h=0.8 at (55.7,20.8) under #6 chalet r=3.6 foot=10.1x6.4 h=9.7 at (55.7,23.1) [0.99] | #2908 prop r=0.6 foot=0.8x0.8 h=0.7 at (28.9,133.4) under #15 chalet r=3.6 foot=10.6x6.3 h=9.6 at (27.5,135.2) [0.84] | #2874 prop r=0.4 foot=1.2x1.0 h=0.5 at (80.8,46.6) under #4 chalet r=3.6 foot=10.9x6.3 h=9.6 at (79.0,48.6) [0.44]
+   overlap       31  FAIL  #10 chalet r=3.6 foot=9.6x6.2 h=9.5 at (43.2,125.8) x #63 prop r=2.2 foot=11.2x10.2 h=0.8 at (50.4,125.3) [4.1] | #2 chalet r=3.6 foot=9.1x6.6 h=9.8 at (65.1,146.0) x #3990 drift r=0.95 foot=4.9x4.5 h=1.8 at (71.2,145.8) [1.88] | #24 chalet r=3.6 foot=9.1x5.4 h=9.0 at (-45.6,141.8) x #164 pine r=2.19 foot=3.3x3.3 h=6.7 at (-41.2,144.5) [1.75]
+   clutter      887  info  #169 pine r=2.08 foot=3.0x3.0 h=6.2 at (-104.0,109.2) x #258 drift r=0.95 foot=5.5x4.4 h=2.1 at (-103.5,110.8) [2.98] | #262 drift r=0.95 foot=2.9x2.8 h=1.2 at (-68.8,-63.3) x #4046 drift r=0.95 foot=5.7x4.7 h=2.1 at (-70.2,-62.1) [2.83] | #108 pine r=2.19 foot=3.9x3.9 h=8.1 at (-97.8,58.4) x #242 drift r=0.95 foot=4.6x4.3 h=1.7 at (-98.5,56.3) [2.66]
+   roadend        0  ok    GRIT end 0 at (17.5,77.5) joins LAKE | GRIT end 1 at (47.5,-10.0) joins PISTE
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste         12  info  #266 lift r=2.2 foot=2.4x2.4 h=11.6 at (43.4,-22.3) [13] | #267 lift r=2.2 foot=2.4x2.4 h=11.6 at (35.2,-47.0) [13] | #268 lift r=2.2 foot=2.4x2.4 h=11.6 at (26.9,-71.7) [13]
+   ice          553  info  #27 prop r=0.6 foot=1.0x0.8 h=0.7 at (33.7,43.7) | #50 prop r=0.6 foot=2.0x1.8 h=1.8 at (23.2,54.7) | #282 drift r=0.95 foot=5.4x4.0 h=2.1 at (-24.1,-19.0)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7/wip-powder-overlap-0.png  <- #10 chalet r=3.6 foot=8.6x5.7 h=9.2 at (43.2,125.8) x #64 prop r=2.2 foot=11.5x10.5 h=0.8 at (50.4,125.3)  (screen 215,369)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7/wip-powder-overlap-1.png  <- #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3) x #22 chalet r=3.6 foot=10.0x5.8 h=9.3 at (39.1,182.5)  (screen 216,385)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7/wip-powder-inside-0.png  <- #2988 prop r=0.6 foot=1.2x1.0 h=0.8 at (43.9,177.5) INSIDE #13 chalet r=3.6 foot=9.1x6.7 h=9.9 at (44.3,177.3)  (screen 215,406)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7/wip-powder-water-0.png  <- #73 pine r=2.03 foot=2.4x2.4 h=4.8 at (-90.6,50.7)  (screen 215,396)
+
+PLACEMENT FAIL — powder  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
