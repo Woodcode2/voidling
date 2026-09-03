@@ -148,3 +148,20 @@ KILLED groups are recorded here, never hidden.
   and the workflow journal went with it; a continuation script
   (`briefs/firstframe-continue.workflow.js`) refutes the recorded seven from disk and runs
   the rest (20:37 UTC).
+- **2026-09-03 20:30-23:5x UTC — the first frame (Stream D), governor-finished.** The studio's
+  continuation refuted five of the eight reviews and then ran out of usage credits; the
+  governor refuted the other three himself (every cited line opened) and implemented. What the
+  pixels found first: **Pirate Bay's establishing shot held its opening quarter on a hotel that
+  no longer existed.** `qa/_bigprops.mjs` says six of Pirate's thirteen r≥7 props were retired
+  the instant a match started — the Royal Mariner, the fort, the lighthouse and four more —
+  because this round's own settle pass retires whichever of a clashing pair was dropped later
+  and Pirate scatters its palms before it drops its landmarks. Authored landmarks are now
+  spared (f6c210b): 13 of 13 survive, at a cost of four footprint overlaps (paired SEED=7).
+  Then the owner's two splash complaints, both measured before and after against the real
+  pixels behind the glyphs: **"THE CUTE" 3.51:1 → 10.50:1 at 440×814, 1.09:1 → 8.16:1 at
+  375×667** (his own frame measured 1.72:1), and the loader no longer prints the game's name
+  twice. And the opening: the HUD is dark for the length of the move on all five worlds
+  (census, hud 0 → 1 at u0), the title card rides the upper third and its length is now each
+  world's own `introLen + 0.45` (2.65 / 2.65 / 3.85 / 4.05 / 3.95 s), the ghost hand waits a
+  beat, nobody speaks over the shot, and the loading bar shows five values instead of one.
+  Verdict and the six things deliberately not done: `firstframe.proposal.md`.

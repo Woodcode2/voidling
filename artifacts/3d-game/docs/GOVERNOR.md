@@ -648,3 +648,31 @@ the pwDrum guard, and the powderEvolve lift-and-park.
   mascot. Kept as `*.hero.firstrun.log`, re-taken on the same build, cause owed.
 - **Two worlds can decide a kill; they cannot decide a pass.** Rung 3 was stopped after
   two worlds failed; the other three are recorded as not measured, not as passing.
+
+## Ledger — 2026-09-03, the first frame (round 5, Stream D)
+
+- **A fix that deletes evidence hides its own cost.** The settle pass retires the later of
+  two clashing props, and on Pirate that was the authored landmark: seven of them, including
+  the one the establishing shot is aimed at. Every placement counter got better while the
+  island quietly lost its hotel. A retire rule needs a rank, not just an order.
+- **The pixels found it; no counter could.** Five placement audits had run on Pirate and all
+  of them measured what remained. It took a cinematographer looking at the first frame and
+  asking where the hotel was.
+- **Measure the screen the owner holds, not the one the rig defaults to.** Every splash line
+  passed at 430×932 and 440×956. The same lines failed at 440×814, 430×740, 393×700 and
+  375×667 — and iOS Safari resolves `vh` to the large viewport, so his phone was worse than
+  any render we had. A viewport is a measurement condition, not a detail.
+- **Two screenshots are only a difference if nothing else moved between them.** The contrast
+  probe hid a line and re-shot; the world canvas renders behind both screens and the attract
+  void wanders, so at 393×700 the "pixels behind the glyphs" came back foliage green. Freeze
+  the screen you are measuring, and treat zero glyph pixels as a broken measurement rather
+  than a pass.
+- **Never rebuild while a probe is running.** A rebuild mid-run changes what the next page
+  load gets, and the numbers in one log then come from two builds.
+- **A wall-clock animation cannot be photographed against a slow match clock.** Four seconds
+  of CSS pass inside half a match-second under the software renderer, so every frame in the
+  pack reads the card as already gone. Check that relationship from the DOM instead, and say
+  in the record that the picture cannot show it.
+- **One gate at the surface beats four at the sources.** The crowd was held by a cooldown, and
+  the worlds' authored set pieces walked straight past it. `body.intro` at the bubble layer
+  closes every path at once.
