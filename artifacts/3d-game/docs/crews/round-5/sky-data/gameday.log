@@ -1,7 +1,8 @@
 
 ══ GAMEDAY ══  introLen 3.4s
   u1     t=0.1 R=0.9 camDist=131 Lspace=3.5  [size 115 d 720: view 0 occ null pxR 171 at (-306,1754) L null off] [size 49 d 928: view 0 occ null pxR 83 at (-269,3121) L null off]
-  u05    t=1.74 R=0.98 camDist=152 Lspace=48.1  [size 115 d 701: view 0 occ null pxR 142 at (795,639) L null off] [size 49 d 898: view 0 occ null pxR 48 at (386,1157) L null off]
-  u0     t=3.72 R=1.05 camDist=39 Lspace=36.5  [size 115 d 700: view 0.9 occ 1 pxR 136 at (318,761) L 72.5 HIDDEN-ISLAND] [size 49 d 900: view 0 occ null pxR 52 at (169,1450) L null off]
-  far    t=7.48 R=9.17 camDist=252 Lspace=51.2  [size 115 d 700: view 0.9 occ 1 pxR 135 at (316,210) L 105.7 HIDDEN-ISLAND] [size 49 d 900: view 1 occ 1 pxR 45 at (174,810) L 75 HIDDEN-ISLAND]
+  u05    t=1.74 R=0.98 camDist=152 Lspace=51.1  [size 115 d 701: view 0 occ null pxR 142 at (793,639) L null off] [size 49 d 898: view 0 occ null pxR 48 at (386,1157) L null off]
+  u0     t=3.72 R=1.05 camDist=39 Lspace=33.9  [size 115 d 700: view 0.9 occ 1 pxR 136 at (318,761) L 73.7 HIDDEN-ISLAND] [size 49 d 900: view 0 occ null pxR 52 at (169,1450) L null off]
+  far    t=7.46 R=9.17 camDist=252 Lspace=49.6  [size 115 d 700: view 0.9 occ 1 pxR 135 at (316,210) L 55.3 HIDDEN-ISLAND] [size 49 d 900: view 1 occ 1 pxR 45 at (174,810) L 71.3 HIDDEN-ISLAND]
+  coast  t=9.01 R=9.63 camDist=262 Lspace=0  [size 115 d 700: view 0.9 occ 1 pxR 135 at (320,203) L 139.8 HIDDEN-ISLAND] [size 49 d 900: view 1 occ 1 pxR 45 at (175,803) L 112.7 HIDDEN-ISLAND]
 SKYCUT: PASS — gameday: no body is cut in any sampled frame
