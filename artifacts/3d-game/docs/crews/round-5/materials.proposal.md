@@ -1,4 +1,4 @@
-# DRAFT — in progress (materials, Stream B) — governor-run, 2026-09-03
+# VERDICT: SOUND WITH CORRECTIONS — materials and light (Stream B), governor-run, 2026-09-03
 
 Owner: "The items need to be better, to be blunt. Better shading. More realistic."
 Brief §2B: RUNG 2 (`GLOSS_ENV` 5.0 → 6.5, island.ts), RUNG 3 (a neutral vertical-gradient
@@ -115,7 +115,7 @@ on main's build, rivals hidden) settles it:
 | before3     | main  | 128 | 35  | 80 |
 | rung2       | 8233067 | 130 | 35 | 78 |
 | after       | b6040cc | 133 | 42 | 76 |
-| after2      | b6040cc | (see below) | | |
+| after2      | b6040cc | 128 | 34  | 78 |
 
 The noise floor of the shot on one build is K ±0 and Y05 ±1 — a 4% gate is meaningful.
 `qa/_pxdiff.mjs maple_rung2 maple_after` then says where the after frame differs: 6.6% of
@@ -126,6 +126,9 @@ corner, where a dark-green canopy covers 51% of a 260×280 crop in every other M
 is gone, and the frame counts 76 edibles against 78-80. A rival ate it before the shutter.
 `HIDE_RIVALS` hides the family at the shutter; it does not take away their appetite in the
 ten match-seconds before it. Maple's "+3.9%" is one missing tree, not the lifts.
+Shot again on the same build with the tree in place (after2, 78 props, canopy 51% of the
+corner), Maple reads K 128, Y05 34 — exactly the before build. The after table's Maple row is
+therefore 128 → 128 (0.0%), and the first after frame is kept as the record of the confound.
 
 **Did the lifted reds gain shading?** Whole-frame red-pixel luminance spread barely moves
 (`qa/_redcrop.mjs`, P95−P5: maple 75 → 75, pirate 64 → 61, gameday 34 → 34, lantern 128 → 125,
@@ -139,6 +142,51 @@ the gate (push, live, quality).
 
 ## What is wrong
 
-## The patch
+- The brief's standing lever for material quality was two rungs; one of them (RUNG 3, the
+  gradient environment) does not survive its own gate at the specified gain — the room box was
+  quietly carrying much of the diffuse fill. The record now says so with numbers instead of
+  leaving the rung "specified and never landed".
+- Thirteen authored reds sat under the CRIM bar and could not shade; Game Day's was the one
+  found by complaint. Now found by search, with a probe in the gate so the next one is found
+  before a child sees it.
+- The measurement itself had two traps this stream walked into and out of: the family
+  (a rival's body and ring in one half of a pair moved K by 6% on Lantern; a rival's appetite
+  removed a canopy and moved K by 4% on Maple) and a hero swatch that twice read something
+  that was not the mascot. Both are recorded with the confounded frames kept beside the clean
+  ones.
+
+## The patch (all on the branch; main after the gate)
+
+- `src/proto3d/island.ts` `GLOSS_ENV = 6.5` (RUNG 2) — stays.
+- `src/prototype3d.ts` RUNG 3 behind `ENV_MODE`, left at `'room'` after the kill; the gradient
+  code stays for a pre-registered rung-3b with a calibrated gain, or is removed when that is
+  declined.
+- 24 colour literals in `nightmarket.ts`, `life.ts`, `alpine.ts`, `mainstreet.ts`, `island.ts`,
+  `hatgeo.ts` — second channel to 0.10 of the dominant, hue kept.
+- `qa/albedo.mjs` (census, allowlist by name and site, in the gate); `qa/lookpair.mjs`
+  `HIDE_RIVALS=1`; `qa/kmetric.mjs`, `qa/heroswatch.mjs`, `qa/_matverdict.mjs`,
+  `qa/_matbefore.sh`, `qa/_matretake.sh`, `qa/_sbs.mjs`, `qa/_redcrop.mjs`, `qa/_pxdiff.mjs`.
 
 ## What I could not verify
+
+- **"More realistic" as the owner sees it.** Rung 2 is a subtle sheen at play distance and the
+  lifts are a shaded side that is no longer black-red. Neither is a transformation, and I have
+  not shot the option set the brief asked for ("shoot options and let him choose") — that is
+  the honest next step if he wants more than better-made: a rung-3b at a calibrated gain
+  (analytic, from the two PMREMs), a second directional fill, or a per-world exposure nudge
+  under the mascot's 1.26 ceiling, each measured the same way.
+- **Rung 3 on gameday, lantern and powder** — not shot; the kill was decided on two worlds.
+- **Which props carry `aGloss`** — I judged rung 2 on the car because it is the largest glossy
+  surface in Maple's frame, not from a census of glossy vertices.
+- **Rival appetite before the shutter.** `HIDE_RIVALS` hides bodies, not eating. A lookpair
+  mode that keeps the family unjoined for the whole shot is owed; until then a pair's prop
+  counts must match (they are printed) or the pair is re-shot.
+- **The gate** — its line is appended below when it finishes.
+
+## Owed
+- rung-3b pre-registration with a calibrated ENV_GAIN, or removal of the gradient code.
+- lookpair: a no-family mode (unjoined for the shot), and the family count in the PASS line
+  already exists — make a mismatch a WARN.
+- heroswatch: why two rung-2 runs read a desaturated non-mascot colour (the swatch's own
+  pinning), so it cannot happen silently in a gate step.
+- an `aGloss` census so rung judgements name the glossy props.
