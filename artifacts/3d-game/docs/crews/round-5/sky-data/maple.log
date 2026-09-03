@@ -1,7 +1,8 @@
 
 ══ MAPLE ══  introLen 2.2s
   u1     t=0.1 R=0.9 camDist=141 Lspace=59.9  [size 116 d 798: view 0.98 occ 1 pxR 120 at (119,737) L 183.1 HIDDEN-ISLAND] [size 34 d 654: view 0 occ null pxR 48 at (262,1338) L null off]
-  u05    t=1.13 R=0.9 camDist=123 Lspace=35.4  [size 116 d 754: view 0.94 occ 1 pxR 127 at (113,753) L 159.9 HIDDEN-ISLAND] [size 34 d 614: view 0 occ null pxR 52 at (265,1410) L null off]
-  u0     t=2.52 R=0.97 camDist=39 Lspace=63.1  [size 116 d 760: view 0.94 occ 1 pxR 126 at (113,761) L 164 HIDDEN-ISLAND] [size 34 d 620: view 0 occ null pxR 52 at (265,1412) L null off]
-  far    t=6.25 R=8.7 camDist=243 Lspace=85.5  [size 116 d 760: view 0.94 occ 1 pxR 126 at (114,210) L 110.7 HIDDEN-ISLAND] [size 34 d 620: view 1 occ 1 pxR 45 at (259,781) L 143.4 HIDDEN-ISLAND]
+  u05    t=1.14 R=0.9 camDist=122 Lspace=33.7  [size 116 d 754: view 0.94 occ 1 pxR 127 at (113,753) L 159.9 HIDDEN-ISLAND] [size 34 d 614: view 0 occ null pxR 52 at (265,1410) L null off]
+  u0     t=2.52 R=0.97 camDist=39 Lspace=63.5  [size 116 d 760: view 0.94 occ 1 pxR 126 at (113,761) L 164 HIDDEN-ISLAND] [size 34 d 620: view 0 occ null pxR 52 at (265,1412) L null off]
+  far    t=6.21 R=8.65 camDist=242 Lspace=86.5  [size 116 d 760: view 0.94 occ 1 pxR 126 at (114,210) L 114.6 HIDDEN-ISLAND] [size 34 d 620: view 1 occ 1 pxR 45 at (259,781) L 146.2 HIDDEN-ISLAND]
+  coast  t=7.59 R=8.92 camDist=247 Lspace=0.1  [size 116 d 760: view 0.94 occ 1 pxR 126 at (112,202) L 163.2 HIDDEN-ISLAND] [size 34 d 620: view 1 occ 1 pxR 45 at (258,772) L 99.3 HIDDEN-ISLAND]
 SKYCUT: PASS — maple: no body is cut in any sampled frame
