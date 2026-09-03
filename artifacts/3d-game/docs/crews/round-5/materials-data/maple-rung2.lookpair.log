@@ -2,3 +2,17 @@
   settle t=5.73 off=0.000 dpos=0.000 camDist=123.3 dcam=1.589 r=4.000 still=0/6 warps=1 reasserts=3
   settle t=7.23 off=0.000 dpos=0.000 camDist=128.7 dcam=0.122 r=4.000 still=0/6 warps=1 reasserts=4
   settle t=8.73 off=0.000 dpos=0.000 camDist=129.1 dcam=0.006 r=4.000 still=6/6 warps=1 reasserts=5
+  settle t=10.23 off=0.000 dpos=0.000 camDist=129.2 dcam=0.011 r=4.000 still=3/6 warps=1 reasserts=6
+  spot   THE SQUARE — the town hall up the green
+  ground (61.13, -49.62) solid=yes biome=plaza
+  landed (61.13, -49.62)  Δ0.000u after 1 warp(s), 6 radius re-assert(s)
+  hero   r=4.000 (wanted 4; drifted to 4.000 before the shutter reset)  mood=cruise maw=0.000 smile=true biting=false
+  props  80 edibles in frame, biggest r=6.50
+  family 1 rival(s) in frame: NIBBLES r5.9
+  lens   camDist=129.1  void at (215, 450) r=52 css px
+  rung   0 pinned=0 pr=2 shadows=true
+  rings  12 eat-ring meshes hidden in the shutter tick (fx.ts's pool)
+  frame  860x1864  luminance 0.000..0.995 mean 0.4688 (descriptive)
+  stamp  9ca2af0480031d58 181ab737ee7b40b5
+  VERDICT PASS maple shot at the fixed spot — t=10.68 match s, camDist 129.1, Δ0.000u off the mark, 80 props and 1 rival(s) in frame → qa/out/lookpair/maple_rung2.png
+  NOTE   a rival is in this frame and this probe cannot pin one. If the other half of the pair does not have the same rivals in the same places, the difference between the two frames is not only the build — re-shoot until they agree, or read around them.
