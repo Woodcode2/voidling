@@ -1434,6 +1434,9 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // largest surface in the level and the muddiest colour in it. A luxury
     // boardwalk is pale, edged and repetitive.
     g.lineCap = 'round'; g.lineJoin = 'round';
+    // the jungle trail goes down FIRST: it starts on the promenade's centreline
+    // (bay.ts TRAIL[0]) and the deck must cover its round cap, not the reverse
+    opath(BAY.TRAIL); g.strokeStyle = 'rgba(206,178,124,0.8)'; g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
     opath(BAY.PROMENADE); g.strokeStyle = '#fdf3de'; g.lineWidth = pxW(BAY.PROM_HALF * 2 + 150) - pxW(0); g.stroke();
     opath(BAY.PROMENADE); g.strokeStyle = '#efe0c2'; g.lineWidth = pxW(BAY.PROM_HALF * 2) - pxW(0); g.stroke();
     g.strokeStyle = 'rgba(198,176,138,0.55)'; g.lineWidth = Math.max(1, pxW(9) - pxW(0));
@@ -1471,8 +1474,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
         g.stroke();
       }
     }
-    // 7. the jungle trail
-    opath(BAY.TRAIL); g.strokeStyle = 'rgba(206,178,124,0.8)'; g.lineWidth = pxW(BAY.TRAIL_HALF * 2) - pxW(0); g.stroke();
+    // 7. (the jungle trail is painted above, under the boardwalk)
   }
 
   // ══ LANTERN NIGHT BAKE ════════════════════════════════════════════════
@@ -5303,7 +5305,17 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   if (WORLD_ID === 'powder') {
     const P3 = (p2: PW.Pt): [number, number] => [w(p2[0]), w(p2[1])];
     PW.resetPlacement();
+    // NO TREE GROWS OUT OF A FROZEN LAKE. The 'pinewood' polygon overlaps the
+    // LAKE ellipse, and qa/placement.mjs (2026-09-02, SEED=7) counted 20
+    // tagged pines rooted in the ice. Skaters' clutter on the ice is the
+    // 'lake' district by design and goes through the same drop() untouched;
+    // only a pine is refused, by its own radius inside the ellipse.
+    const onIce = (p2: PW.Pt, r: number) => {
+      const m = r * 20, dx = (p2[0] - PW.LAKE.cx) / (PW.LAKE.rx + m), dy = (p2[1] - PW.LAKE.cy) / (PW.LAKE.ry + m);
+      return dx * dx + dy * dy < 1;
+    };
     const drop = (mesh: THREE.Object3D, p2: PW.Pt, r: number, rotY?: number, force = false, qk?: string) => {
+      if (qk === 'pine' && onIce(p2, r)) return;
       if (!force && !PW.spotOpen(p2[0], p2[1], r * 20)) return;
       const [x3, z3] = P3(p2);
       if (rotY !== undefined) mesh.rotation.y = rotY;
@@ -5339,9 +5351,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     // 2. THE VILLAGE — chalets ring the shore and every one FACES THE LAKE,
     //    which is what makes a bowl read as a place rather than a scatter
-    for (const p2 of PW.scatterInRegion(REG('village'), 24, rnd2, 150)) {
+    // Separated by the chalet's real half-diagonal (8.6 x 6.4 -> 5.4), not its
+    // 3.6 eat radius: with no `sep` at all the scatter let chalets fall 3.2
+    // units apart (drop()'s burial test is the only gate) and qa/placement.mjs
+    // measured 6+ chalet-through-chalet footprints in the village on the
+    // unpatched build, the worst 5.4 units deep. `force` because the scatter
+    // has already claimed the site at 5.4 and drop()'s own-claim skip only
+    // matches an equal radius.
+    for (const p2 of PW.scatterInRegion(REG('village'), 24, rnd2, 150, { sep: 5.4 })) {
       const face = Math.atan2(PW.LAKE.cx - p2[0], PW.LAKE.cy - p2[1]);
-      drop(AL.makeChalet(), p2, 3.6, face, false, 'chalet');
+      drop(AL.makeChalet(), p2, 3.6, face, true, 'chalet');
     }
     // …and the village's small stuff — the between-chalets clutter that makes
     // a district read dense from the picker's first frame
@@ -5404,7 +5423,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       const mesh = kind < 0.28 ? AL.makeSled() : kind < 0.5 ? AL.makeLogPile()
         : kind < 0.68 ? AL.makeFence(4 + rnd2() * 5) : kind < 0.86 ? AL.makePine() : AL.makeDrift();
       drop(mesh, p2, kind < 0.28 ? 0.55 : kind < 0.5 ? 0.9 : kind < 0.68 ? 0.8 : kind < 0.86 ? 1.8 : 0.95,
-        rnd2() * Math.PI * 2, false, kind >= 0.86 ? 'drift' : undefined);
+        rnd2() * Math.PI * 2, false, kind >= 0.86 ? 'drift' : kind >= 0.68 ? 'pine' : undefined);
     }
     await breathe('Rolling the small snowballs…');
     // 7. THE HOOVER ECONOMY. The census that forced this (qa/_edcount.mjs):
@@ -5417,12 +5436,16 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //    snow does.
     {
       const lump = () => { const m = AL.makeDrift(); m.scale.setScalar(0.32 + rnd2() * 0.22); return m; };
-      for (const p2 of PW.scatterLand(2400, rnd2, 0)) {
+      // clear 26 (1.3 units, a lump's own half-width) keeps the snow off the
+      // grit: at clear 0 qa/placement.mjs measured 12 lumps up to 1.5 units
+      // onto the plowed road (2026-09-02, SEED=7). The count is unchanged —
+      // rejection sampling fills the 2400 from the rest of the plateau.
+      for (const p2 of PW.scatterLand(2400, rnd2, 26)) {
         const [x3, z3] = P3(p2);
         const m = lump(); m.rotation.y = rnd2() * Math.PI * 2;
         place(m, x3, z3, 0.34 + rnd2() * 0.14);
       }
-      for (const p2 of PW.scatterInRegion(REG('village'), 160, rnd2, 0)) {
+      for (const p2 of PW.scatterInRegion(REG('village'), 160, rnd2, 26)) {
         const [x3, z3] = P3(p2);
         const kind = rnd2();
         const m = kind < 0.5 ? lump() : kind < 0.8 ? AL.makeSnowballStack() : AL.makeSled();
@@ -5445,6 +5468,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       for (const p2 of PW.scatterInRegion(REG('pinewood'), 320, rnd2, 0)) {
         const [x3, z3] = P3(p2);
         const kind = rnd2();
+        if (kind >= 0.55 && kind < 0.9 && onIce(p2, 1.1)) continue;   // a pine, on the ice — see onIce()
         const m = kind < 0.55 ? lump() : kind < 0.9 ? AL.makePine(2.6 + rnd2() * 2) : AL.makeLogPile();
         m.rotation.y = rnd2() * Math.PI * 2;
         place(m, x3, z3, kind < 0.55 ? 0.38 : kind < 0.9 ? 1.1 : 0.9);
@@ -5463,7 +5487,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         : kind < 0.88 ? AL.makeDrift() : AL.makeLogPile();
       drop(mesh, p2, kind < 0.5 ? 1.3 : kind < 0.72 ? 1.0 : kind < 0.88 ? 0.95 : 0.9,
         kind >= 0.5 && kind < 0.72 ? snowmanYaw() : rnd2() * Math.PI * 2, false,
-        kind >= 0.72 && kind < 0.88 ? 'drift' : kind >= 0.5 && kind < 0.72 ? 'snowman' : undefined);
+        kind >= 0.72 && kind < 0.88 ? 'drift' : kind >= 0.5 && kind < 0.72 ? 'snowman' : kind < 0.5 ? 'pine' : undefined);
     }
     await breathe('Lighting the windows…');
     return;   // POWDER PASS is fully populated — the Maple grid pass must not run
@@ -5497,10 +5521,17 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
      *  drop() then asks spotOpen() about it at `r`, and spotOpen only exempts
      *  an EXACT-match claim — so a prop read its own claim as an obstacle and
      *  refused to exist. */
+    // `sep` is the ground a prop RESERVES, in 3D units; it defaults to the eat
+    // radius, which is right for a lantern and wrong for a shed: a market shed
+    // is 12.2 x 3.6 on the ground (half-diagonal 6.4) and reserved 3.4, so
+    // qa/placement.mjs measured 7+5+5 shed-through-shed footprints on the
+    // unpatched build. When sep differs from r the drop is forced, because the
+    // scatter has already claimed the site and drop()'s own-claim skip only
+    // matches an equal radius.
     const plant = (id: LN.LnBiome, n: number, clear: number, r: number,
-                   make: () => THREE.Object3D, face = false, qk?: string) => {
-      for (const p2 of LN.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
-        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, false, qk);
+                   make: () => THREE.Object3D, face = false, qk?: string, sep = r) => {
+      for (const p2 of LN.scatterInRegion(REG(id), n, Math.random, clear, { sep }))
+        drop(make(), p2, r, face ? LN.lnFacingBathhouse(p2[0], p2[1]) : undefined, sep !== r, qk);
     };
     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
                        band?: [number, number]) => {
@@ -5597,8 +5628,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // band against GAME DAY's 895, which is why a late match here fell flat:
     // past a certain size there was simply nothing the right shape to eat.
     // A covered row is what a market street is actually built from anyway.
-    plant('stalls', 76, 46, 3.4, NM.makeMarketShed, false, 'house');
-    plant('teahouse', 30, 50, 3.4, NM.makeMarketShed, false, 'house');
+    plant('stalls', 76, 46, 3.4, NM.makeMarketShed, false, 'house', 7.5);
+    plant('teahouse', 30, 50, 3.4, NM.makeMarketShed, false, 'house', 7.5);
     plant('stalls', 26, 60, 1.4, NM.makeKoiFlag);
 
     // ── THE CANAL ─────────────────────────────────────────────────────────
@@ -5609,13 +5640,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       for (let k = 0; k < 16; k++) {
         const t = 0.05 + (k / 16) * 0.9;
         const p = LN.canalPoint(t);
-        drop(NM.makeCanalBoat(), [p.x, p.y], 2.2, p.ang);
+        const boat = NM.makeCanalBoat(); boat.userData.afloat = true;   // ON the water by design (qa/placement.mjs reads the tag)
+        drop(boat, [p.x, p.y], 2.2, p.ang);
       }
       for (let k = 0; k < 150; k++) {
         const t = Math.random();
         const p = LN.canalPoint(t);
         const off = (Math.random() - 0.5) * 220;
-        drop(NM.makeFloatLantern(), [p.x + Math.cos(p.ang + 1.57) * off, p.y + Math.sin(p.ang + 1.57) * off], 0.5);
+        const fl = NM.makeFloatLantern(); fl.userData.afloat = true;
+        drop(fl, [p.x + Math.cos(p.ang + 1.57) * off, p.y + Math.sin(p.ang + 1.57) * off], 0.5);
       }
     }
 
@@ -5642,8 +5675,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('bathhouse', 22, 44, 1.6, NM.makeSakeBarrels);
     // storehouses: the 4-to-6 rung, and a run of dull white boxes is what
     // stops a skyline of lanterns reading as one texture
-    plant('bathhouse', 22, 74, 4.6, NM.makeKura, false, 'house');
-    plant('bathhouse', 26, 54, 3.4, NM.makeMarketShed, false, 'house');
+    plant('bathhouse', 22, 74, 4.6, NM.makeKura, false, 'house', 6.5);
+    plant('bathhouse', 26, 54, 3.4, NM.makeMarketShed, false, 'house', 7.5);
 
     // ── THE MOON BRIDGE ───────────────────────────────────────────────────
     // Six props over 5,210u². The bridge is the level's pinch and its fourth
@@ -5655,7 +5688,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('bridge', 26, 24, 0.6, NM.makePotPlant);
     plant('bridge', 20, 28, 1.0, NM.makeUmbrella);
     plant('bridge', 12, 46, 2.0, NM.makeFoodCart, false, 'house');
-    plant('bridge', 10, 56, 3.4, NM.makeMarketShed, false, 'house');
+    plant('bridge', 10, 56, 3.4, NM.makeMarketShed, false, 'house', 7.5);
 
     // ── THE SHRINE STEPS ──────────────────────────────────────────────────
     // Cool, dim and evenly spaced against the market's warm clutter: one bank
@@ -5669,8 +5702,8 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('shrine', 30, 30, 1.6, NM.makeSakeBarrels);
     plant('shrine', 24, 30, 1.2, NM.makeWishRack);
     plant('shrine', 60, 20, 0.5, NM.makeStepLantern);
-    plant('shrine', 14, 82, 4.6, NM.makeKura, false, 'house');
-    plant('shrine', 20, 56, 3.4, NM.makeMarketShed, false, 'house');
+    plant('shrine', 14, 82, 4.6, NM.makeKura, false, 'house', 6.5);
+    plant('shrine', 20, 56, 3.4, NM.makeMarketShed, false, 'house', 7.5);
     // the torii run: nose to tail up the west stair, which is the one place in
     // the level with a repeating tunnel
     {
@@ -5684,7 +5717,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
 
     // ── THE TEAHOUSE TERRACE ──────────────────────────────────────────────
-    plant('teahouse', 16, 130, 4.2, NM.makeTeahouse, true, 'house');
+    plant('teahouse', 16, 130, 4.2, NM.makeTeahouse, true, 'house', 6.5);
     plant('teahouse', 54, 30, 1.0, () => NM.makeLantern(0xfff0d2, 1.1));
     plant('teahouse', 44, 28, 0.9, NM.makeMarketCrate);
     plant('teahouse', 80, 20, 0.6, NM.makeSkewerTray);
@@ -5701,7 +5734,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('garden', 36, 24, 0.6, NM.makePotPlant);
     plant('garden', 34, 22, 0.55, NM.makeJizo);
     plant('garden', 30, 20, 0.5, NM.makeStepLantern);
-    plant('garden', 18, 62, 3.4, NM.makeMarketShed, false, 'house');
+    plant('garden', 18, 62, 3.4, NM.makeMarketShed, false, 'house', 7.5);
 
     // ── THE GREAT GATE ────────────────────────────────────────────────────
     // The apron stays the emptiest floor in the level — a child's first three
@@ -5712,7 +5745,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('gate', 22, 30, 0.5, NM.makeStepLantern);
     plant('gate', 18, 32, 0.55, NM.makeJizo);
     plant('gate', 14, 34, 0.8, NM.makeLuggage);
-    plant('gate', 8, 96, 4.6, NM.makeKura, false, 'house');
+    plant('gate', 8, 96, 4.6, NM.makeKura, false, 'house', 6.5);
 
     // ── THE HOT SPRING ────────────────────────────────────────────────────
     // Authored, not scattered. Five pools stepping DOWN the shoulder, because
@@ -5807,10 +5840,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
      *  pass whose two numbers happened to match at 3.0. Which is exactly what
      *  the top-down render showed — a busy lot ringed by empty districts.
      */
+    // `sep` reserves ground in 3D units and defaults to the eat radius; a frat
+    // house is 17.6 x 9.6 on the ground (half-diagonal 10) and reserved 7, so
+    // qa/placement.mjs measured frat houses 4.45 units through each other on
+    // the unpatched build. sep != r forces the drop (the scatter already holds
+    // the claim; drop()'s own-claim skip only matches an equal radius).
     const plant = (id: GD.GdBiome, n: number, clear: number, r: number,
-                   make: () => THREE.Object3D, face = false, qk?: string) => {
-      for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep: r }))
-        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, false, qk);
+                   make: () => THREE.Object3D, face = false, qk?: string, sep = r) => {
+      for (const p2 of GD.scatterInRegion(REG(id), n, Math.random, clear, { sep }))
+        drop(make(), p2, r, face ? GD.gdFacingStadium(p2[0], p2[1]) : undefined, sep !== r, qk);
     };
     /** …and the same for the ground between the districts. */
     const plantLand = (n: number, clear: number, r: number, make: () => THREE.Object3D,
@@ -5859,12 +5897,24 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // parking rows with alternating headings — real lots park back to back,
     // and one shared heading reads as a car transporter. Every third slot is
     // a canopy or an RV instead of a truck so the rows have silhouette.
+    // NOSE-IN, NOT END-TO-END. `face = s.ang` yawed every vehicle ALONG its
+    // row: the truck body is 5.9+ units long on local x (tailgate.ts:319) and
+    // the RV 12.2, on a 7.9-8.75-unit pitch — so trucks sat bumper to bumper
+    // and every RV drove through both neighbours. Measured 2026-09-02 by
+    // qa/placement.mjs on the unpatched build: 28 truck-truck, 10 truck-RV and
+    // 9 RV-RV footprint interpenetrations, photographed as one solid mass of
+    // RV roofs. A quarter turn parks them nose-in like every stadium lot, the
+    // 3.2-wide flank along the row and the tailgate on the aisle where the
+    // party is. Same draw count, same slots. The extra claim is the vehicle's
+    // real half-length, so the aisle scatter that follows keeps its grills
+    // off the bonnets (a truck claimed 3 units and reaches 4; an RV claimed
+    // 4.2 and reaches 6.1).
     for (const [i, s] of GD.lotSlots(Math.random).entries()) {
       const p2: GD.Pt = [s.x, s.y];
       const face = s.ang;
       if (i % 7 === 3) drop(TG.makeCanopy(), p2, 2.4, face);
-      else if (i % 11 === 5) drop(TG.makeRV(), p2, 4.2, face, false, 'rv');
-      else drop(TG.makeTailgateTruck(), p2, 3.0, face, false, 'car');
+      else if (i % 11 === 5) { drop(TG.makeRV(), p2, 4.2, face + Math.PI / 2, false, 'rv'); GD.claimSpot(s.x, s.y, 130); }
+      else { drop(TG.makeTailgateTruck(), p2, 3.0, face + Math.PI / 2, false, 'car'); GD.claimSpot(s.x, s.y, 90); }
     }
     // …and the party BETWEEN the rows, which is the whole point of an aisle.
     //
@@ -5935,7 +5985,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('rvpark', 34, 30, 0.8, TG.makeTrashBarrel);
 
     // ── FRAT ROW ──────────────────────────────────────────────────────────
-    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true, 'house');
+    plant('greek', 24, 140, 7.0, TG.makeFratHouse, true, 'house', 11);
     plant('greek', 44, 46, 1.5, TG.makePorchSofa);
     plant('greek', 70, 36, 1.2, TG.makeBanner);
     plant('greek', 110, 26, 0.7, TG.makeFoldingChair);
@@ -5948,7 +5998,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     plant('greek', 20, 50, 1.8, TG.makeBandRig);
 
     // ── OLD CAMPUS ────────────────────────────────────────────────────────
-    plant('campus', 22, 160, 8.0, TG.makeBrickHall, false, 'house');
+    plant('campus', 22, 160, 8.0, TG.makeBrickHall, false, 'house', 11);
     plant('campus', 8, 90, 1.6, TG.makeStatue);
     plant('campus', 55, 40, 1.2, TG.makeBanner);
     plant('campus', 70, 32, 0.8, TG.makeTrashBarrel);
@@ -6284,7 +6334,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     dropGlb('lighthouse', [8150, 2500], 6.5, 19, makeLighthouseFB);
     landmark(makeWarehouse(), [6850, 3450], 7.5, 0.5, 260);        // the cargo shed + crane
     for (const p2 of spread('port', 6, 60, 2)) drop(makeCannon(), p2, 2, rand(0, Math.PI * 2));
-    for (const p2 of spread('port', 4, 90, 3)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
+    for (const p2 of spread('port', 4, 90, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2), true);   // sep 5 = a 6x6 hut's half-diagonal + margin; forced past drop()'s own-claim test
     // makeShopBox was a bare grey cube — 24 of them across two districts were the
     // first thing your eye landed on. Real dockside furniture instead.
     for (const p2 of spread('port', 10, 40, 1.4)) drop(LUXE.makeRopeBollard(), p2, 1.4, rand(0, Math.PI * 2));
@@ -6292,7 +6342,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     for (const p2 of spread('port', 3, 90, 2.6)) drop(LUXE.makeAnchorMonument(), p2, 2.6, rand(0, Math.PI * 2));
 
     // ── OLD TOWN: a huddle of thatch houses and market clutter on the bluff
-    for (const p2 of spread('oldtown', 24, 55, 3)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2));
+    for (const p2 of spread('oldtown', 24, 55, 5)) drop(makeThatchHut(), p2, 3, rand(0, Math.PI * 2), true);   // qa/placement.mjs: 21 hut-through-hut footprints at sep 3
     for (const p2 of spread('oldtown', 18, 40, 1.3)) drop(makeBarrel(), p2, 1.3);
     landmark(makeFort(), [5400, 2050], 9, 0.3, 280);               // the fort on the bluff
     for (const p2 of spread('oldtown', 12, 55, 2.6)) dropGlb('palm', p2, 2.6, rand(6.5, 9), makePalm, rand(0, Math.PI * 2));
@@ -7180,8 +7230,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   for (const [wx, wy] of [[4290, 3400], [7710, 6800], [6000, 9200], [2580, 5600]] as [number, number][]) {
     const cx4 = w(wx), cz4 = w(wy);
     if (!insideIsland3(cx4, cz4) || inMapleWater(wx, wy, 1)) continue;
-    for (let k = 0; k < 4; k++) place(makeCone(), cx4 + (k - 1.5) * 2.4, cz4 + 4.6, 0.7);
-    place(MS.makeNoticeBoard(), cx4, cz4 + 6.6, 1.0);
+    // tagged: these stand on the asphalt ON PURPOSE, and qa/placement.mjs
+    // exempts 'roadworks' from its trees-on-roads count for that reason
+    for (let k = 0; k < 4; k++) { const cone = makeCone(); cone.userData.qk = 'roadworks'; place(cone, cx4 + (k - 1.5) * 2.4, cz4 + 4.6, 0.7); }
+    const barrier = MS.makeNoticeBoard(); barrier.userData.qk = 'roadworks';
+    place(barrier, cx4, cz4 + 6.6, 1.0);
   }
   for (const rc of roads3) {
     let li = 0;
@@ -7250,6 +7303,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       if (ROAD_CENTERS.some((c) => Math.abs(rx - c) < 200)) continue;
       for (const side of [-1, 1]) {
         const rail = makeFenceRun(13, 0xf4f6fa);
+        rail.userData.qk = 'bridge';   // a railing on the road EDGE is the bridge — exempt in qa/placement.mjs
         place(rail, w(rx), w(rcW) + side * 4.6, 1.6);
       }
     }

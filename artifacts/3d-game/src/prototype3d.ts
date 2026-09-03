@@ -1644,7 +1644,7 @@ const _dbg = new Proxy(_dbgStore, {
   },
 }) as unknown as {
   __scene: THREE.Scene; __cam: THREE.Camera; __THREE: typeof THREE; __renderer: THREE.WebGLRenderer;
-  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void;
+  __edibles: Edible[]; __insideIsland3: (x: number, z: number) => boolean; __validateWorld: () => void; __settle: () => { inside: number; through: number; doorstep: number; feet: number; ms: number };
   __life: Life; __moverStats: (gate: number) => { near: number; total: number }; __crowdGate: number;
   __hatSheet: (ids: string[]) => Promise<unknown>;
   __voidSheet: (ids: string[]) => Promise<unknown>;
@@ -1754,6 +1754,7 @@ _dbg.__eatNearest = (rel: number) => {
   return best ? { r: best.radius, R } : null;
 };
 _dbg.__edibles = edibles; _dbg.__insideIsland3 = insideIsland3; _dbg.__validateWorld = () => validateWorld();
+_dbg.__settle = () => ({ ...settleStat });   // QA: what the footprint settle retired at the boot sweep, and its cost (qa/placement.mjs)
 
 _dbg.__news = () => showNews();   // QA: fire a headline on demand (audits the live templates)
 // QA: what the MUSIC ENGINE is actually doing. qa/music.mjs judged a world by
@@ -6206,6 +6207,143 @@ function paintBookChip(): void {
 }
 paintBookChip();
 
+// ── NOTHING STANDS INSIDE A BUILDING, AND NO TWO SOLIDS SHARE THE SAME GROUND ─
+// Measured 2026-09-02 by qa/placement.mjs on the unpatched build: 189 props
+// standing INSIDE another prop's solid geometry on Maple Falls (trees through
+// barns — the country fill reserves a barn at its 5.2 eat radius while the
+// mesh is 8.3 half-wide, and trees placed by place() never reserve ground at
+// all), 72 on Pirate Bay, 38 on Game Day, 34 on Lantern Night, 45 on Powder
+// Pass; and building-class footprints driven through each other on every
+// world (Game Day's RV park photographed as one solid mass of roofs). Every
+// placement pass in island.ts reserves ground by EAT radius, which is a
+// gameplay number and not a footprint. This pass reads the footprint.
+//
+// It is DRAW-FREE — it runs after every seeded draw has been consumed, so
+// Maple's mulberry32 stream is untouched — and it only ever RETIRES. A prop
+// whose footprint centre sits inside another prop's solid geometry (a ray at
+// knee and chest height, both faces on, crosses that geometry an odd number
+// of times — an open bandstand or a porch counts as air) is retired. Two
+// SOLIDS whose own-frame footprints interpenetrate by more than SOLID_LIP
+// along every separating axis lose the one placed LATER, because the earlier
+// one is the authored site the later scatter fell on. Trees, bushes and rocks
+// carry userData.spin (no front) and are never solids: their box is their
+// canopy, and a canopy touching a canopy is a forest.
+const SOLID_LIP = 1.0;
+const DOORSTEP = 1.6;   // qa/placement.mjs DOOR_CLEAR: a person needs this much clear ground in front of a door
+/** what the last settle pass did, for the auditor (_dbg.__settle): counts by reason and its own clock */
+const settleStat = { inside: 0, through: 0, doorstep: 0, feet: 0, ms: 0 };
+function settleFootprints(): number[] {
+  interface Foot { i: number; px: number; pz: number; c: number; s: number; lx0: number; lx1: number; lz0: number; lz1: number; cx: number; cz: number; rOut: number; solid: boolean; }
+  const t0 = performance.now();
+  const feet: Foot[] = [];
+  const box = new THREE.Box3();
+  // the contact-shadow disc (assets3d.ts contactShadow: rotated flat, y=0.045)
+  // is not footprint — it is r*1.1 wide and would fatten every small prop
+  const isDisc = (o: THREE.Object3D) => (o as THREE.Mesh).isMesh && Math.abs(o.rotation.x + Math.PI / 2) < 1e-4 && Math.abs(o.position.y - 0.045) < 1e-3;
+  for (let i = 0; i < edibles.length; i++) {
+    const e = edibles[i], m = e.mesh, ud = m.userData;
+    if (ud.mover || ud.afloat) continue;
+    // the prop's OWN-FRAME box: un-yaw, measure, re-yaw
+    const ry = m.rotation.y;
+    m.rotation.y = 0; m.updateMatrixWorld(true);
+    box.makeEmpty();
+    m.traverse((o) => { if ((o as THREE.Mesh).isMesh && !isDisc(o)) box.expandByObject(o); });
+    m.rotation.y = ry; m.updateMatrixWorld(true);
+    if (box.isEmpty()) continue;
+    const px = m.position.x, pz = m.position.z;
+    const lx0 = box.min.x - px, lx1 = box.max.x - px, lz0 = box.min.z - pz, lz1 = box.max.z - pz;
+    if (lx1 - lx0 < 0.05 || lz1 - lz0 < 0.05) continue;
+    const c = Math.cos(ry), s = Math.sin(ry);
+    const mx = (lx0 + lx1) / 2, mz = (lz0 + lz1) / 2;
+    const h = box.max.y - Math.min(0, box.min.y);
+    feet.push({ i, px, pz, c, s, lx0, lx1, lz0, lz1, cx: px + mx * c + mz * s, cz: pz - mx * s + mz * c,
+      rOut: Math.hypot(lx1 - lx0, lz1 - lz0) / 2,
+      solid: e.radius >= 2 && !ud.spin && h >= 2 && Math.min(lx1 - lx0, lz1 - lz0) >= 2.4 });
+  }
+  const CELL = 12, grid = new Map<number, Foot[]>();
+  const key = (ix: number, iz: number) => ix * 100003 + iz;
+  const cells = (f: Foot, fn: (k: number) => void) => {
+    for (let ix = Math.floor((f.cx - f.rOut) / CELL); ix <= Math.floor((f.cx + f.rOut) / CELL); ix++)
+      for (let iz = Math.floor((f.cz - f.rOut) / CELL); iz <= Math.floor((f.cz + f.rOut) / CELL); iz++) fn(key(ix, iz));
+  };
+  for (const f of feet) if (f.solid) cells(f, (k) => { const b = grid.get(k); if (b) b.push(f); else grid.set(k, [f]); });
+  // world point -> inside q's own-frame footprint, shrunk by m
+  const inRect = (q: Foot, x: number, z: number, m: number): boolean => {
+    const dx = x - q.px, dz = z - q.pz, lx = dx * q.c - dz * q.s, lz = dx * q.s + dz * q.c;
+    return lx > q.lx0 + m && lx < q.lx1 - m && lz > q.lz0 + m && lz < q.lz1 - m;
+  };
+  const corners = (q: Foot): [number, number][] => {
+    const W = (x: number, z: number): [number, number] => [q.px + x * q.c + z * q.s, q.pz - x * q.s + z * q.c];
+    return [W(q.lx0, q.lz0), W(q.lx1, q.lz0), W(q.lx1, q.lz1), W(q.lx0, q.lz1)];
+  };
+  // separating-axis penetration of two yawed rectangles; 0 = apart
+  const satDepth = (a: Foot, b: Foot): number => {
+    const ca = corners(a), cb = corners(b); let best = Infinity;
+    for (const r of [a, b]) for (const [ux, uz] of [[r.c, -r.s], [r.s, r.c]]) {
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+      for (const [x, z] of ca) { const t = x * ux + z * uz; if (t < a0) a0 = t; if (t > a1) a1 = t; }
+      for (const [x, z] of cb) { const t = x * ux + z * uz; if (t < b0) b0 = t; if (t > b1) b1 = t; }
+      const o = Math.min(a1, b1) - Math.max(a0, b0); if (o <= 0) return 0; if (o < best) best = o;
+    }
+    return best;
+  };
+  const ray = new THREE.Raycaster(), DIR_X = new THREE.Vector3(1, 0, 0), origin = new THREE.Vector3();
+  const solidAt = (q: Foot, x: number, z: number, y: number): boolean => {
+    const mesh = edibles[q.i].mesh;
+    const flipped: [THREE.Material, THREE.Side][] = [];
+    mesh.traverse((o) => {
+      const mm = (o as THREE.Mesh).material; if (!mm) return;
+      for (const mat of Array.isArray(mm) ? mm : [mm]) if (mat.side !== THREE.DoubleSide) { flipped.push([mat, mat.side]); mat.side = THREE.DoubleSide; }
+    });
+    origin.set(x, y, z); ray.set(origin, DIR_X); ray.near = 0; ray.far = q.rOut * 2 + 4;
+    const n = ray.intersectObject(mesh, true).filter((hit) => !isDisc(hit.object)).length;
+    for (const [mat, side] of flipped) mat.side = side;
+    return n % 2 === 1;
+  };
+  const dead = new Set<number>();
+  const later = (a: Foot, b: Foot) => (a.i > b.i ? a.i : b.i);
+  settleStat.inside = settleStat.through = settleStat.doorstep = 0; settleStat.feet = feet.length;
+  for (const f of feet) {
+    if (dead.has(f.i)) continue;
+    const seen = new Set<Foot>();
+    cells(f, (k) => {
+      if (dead.has(f.i)) return;
+      for (const q of grid.get(k) || []) {
+        if (q === f || seen.has(q) || dead.has(q.i)) continue; seen.add(q);
+        if (Math.hypot(q.cx - f.cx, q.cz - f.cz) > q.rOut + f.rOut) continue;
+        if (inRect(q, f.cx, f.cz, 0.15) && (solidAt(q, f.cx, f.cz, 0.6) || solidAt(q, f.cx, f.cz, 1.4))) {
+          dead.add(f.solid ? later(f, q) : f.i); settleStat.inside++; if (dead.has(f.i)) return; continue;
+        }
+        if (f.solid && satDepth(f, q) > SOLID_LIP) { dead.add(later(f, q)); settleStat.through++; if (dead.has(f.i)) return; }
+      }
+    });
+  }
+  // …AND A DOOR OPENS ONTO GROUND. A house (island.ts makeHouse, door on local
+  // +z, the 1.2x1.3-scaled door group) whose doorstep — DOORSTEP units out
+  // from the door — lies inside another prop's footprint loses that prop
+  // (or, between two solids, the later of the two). Maple's lot dressing put
+  // flower beds and planters on 4 of 70 doorsteps and the country fill put a
+  // barn on a fifth (qa/placement.mjs 2026-09-02).
+  const doorPos = new THREE.Vector3();
+  for (const f of feet) {
+    if (dead.has(f.i)) continue;
+    const m = edibles[f.i].mesh; if (m.userData.qk !== 'house') continue;
+    let door: THREE.Object3D | null = null;
+    for (const c of m.children) if ((c as THREE.Group).isGroup && Math.abs(c.scale.x - 1.2) < 1e-6 && Math.abs(c.scale.y - 1.3) < 1e-6) door = c;
+    if (!door) continue;
+    door.getWorldPosition(doorPos);
+    const fx = doorPos.x + f.s * DOORSTEP, fz = doorPos.z + f.c * DOORSTEP;
+    for (const q of feet) {
+      if (q === f || dead.has(q.i) || Math.hypot(q.cx - fx, q.cz - fz) > q.rOut) continue;
+      if (!inRect(q, fx, fz, 0)) continue;
+      dead.add(q.solid ? later(f, q) : q.i); settleStat.doorstep++;
+      if (dead.has(f.i)) break;
+    }
+  }
+  settleStat.ms = Math.round(performance.now() - t0);
+  return [...dead];
+}
+
 function validateWorld() {
   let moved = 0;
   const cull: number[] = [];
@@ -6291,6 +6429,13 @@ function validateWorld() {
       moved++;
     }
   }
+  // …and, once, everything standing inside something else (settleFootprints
+  // above). Indices are into the same un-spliced list; the retire loop below
+  // walks them from the top so each splice leaves the lower ones valid.
+  if (!_validated) {
+    for (const i of settleFootprints()) if (!cull.includes(i)) cull.push(i);
+    cull.sort((a, b) => a - b);
+  }
   // retire the unfixable entirely — out of the scene AND the mass ledger, so
   // %devoured stays honest
   for (let k = cull.length - 1; k >= 0; k--) {
@@ -6358,7 +6503,7 @@ function validateWorld() {
       }
     }
   }
-  if ((moved || cull.length || cleared) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired, ${cleared} cleared from the spawn shot`);
+  if ((moved || cull.length || cleared) && !_validated) console.info(`[world] placement sweep: ${moved} nudged off roads, ${cull.length} retired (${settleStat.inside} inside a solid, ${settleStat.through} through another, ${settleStat.doorstep} on a doorstep; settle ${settleStat.ms}ms over ${settleStat.feet} footprints), ${cleared} cleared from the spawn shot`);
   _validated = true;
 }
 

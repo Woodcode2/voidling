@@ -240,6 +240,14 @@ export function lnPlaceable(wx: number, wy: number, clear = 40): boolean {
   if (!onLanternLand(wx, wy)) return false;
   if (inBathhouse(wx, wy)) return false;
   if (distToPath(wx, wy, MARKET) < MARKET_HALF + clear) return false;
+  // …and NOT IN THE CANAL. This test kept props off the market street and
+  // said nothing about the water: qa/placement.mjs (2026-09-02, SEED=7)
+  // measured 378 props standing in the channel — 212 of them not boats or
+  // float lanterns but sheds, crates and lanterns the district scatters
+  // dropped through the bank because every district polygon crosses it.
+  // The boats and float lanterns are placed on canalPoint() through drop(),
+  // which never asks this function, so they are unaffected.
+  if (distToPath(wx, wy, CANAL) < CANAL_HALF + clear) return false;
   return true;
 }
 

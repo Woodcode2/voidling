@@ -79,12 +79,27 @@ export const BAY_REGIONS: BayRegion[] = [
 // It now stops on the district's north edge, which reaches it without
 // bulldozing it. (6300,9600 is off the land entirely — the coast moved when
 // the bay's south lobe was reshaped — so that node went too.)
+// ROADS END AT SOMETHING. qa/placement.mjs measured all four open ends of this
+// island's two paths ending in open sand (2026-09-02: the boardwalk's north
+// end 55 units from the nearest coast, the trail's start 45 units from
+// anything). The north end now runs out to the north beach — (5985,900) is
+// 10.5 units inside the smoothed coast, so the deck's rounded cap stops on the
+// sand and the last plank is at the water. The south end is NOT extended: the
+// spawn is hand-authored at (6950,10560) and the deck stopping 16 units short
+// of it is the decision recorded below.
 export const PROMENADE: Pt[] = [
-  [6100, 1800], [6600, 1900], [7300, 2900], [7900, 3900], [8600, 4900], [8800, 6100],
+  [5985, 900], [6100, 1800], [6600, 1900], [7300, 2900], [7900, 3900], [8600, 4900], [8800, 6100],
   [8500, 7300], [7900, 8300], [7100, 9000], [6100, 10050], [6800, 10280],
 ];
+// The trail now STARTS at the boardwalk — (7050,2550) sits on the promenade's
+// centreline, so the dirt runs out from under the deck's edge like a spur off
+// a main road (the bake paints the trail first, so the planks cover its cap)
+// — clears the warehouse by 677 (its 260 clearance + 130 half-width need 390),
+// and ENDS at the tideline: the old last point sat 8.7 units from the
+// smoothed coast on a heading parallel to it, so a 7.5-unit hook turns the
+// last few metres to the water instead of stopping in the parasol row.
 export const TRAIL: Pt[] = [
-  [6200, 3500], [5000, 4200], [4000, 5200], [3200, 6200], [2700, 7400], [3400, 8600],
+  [7050, 2550], [6200, 3500], [5000, 4200], [4000, 5200], [3200, 6200], [2700, 7400], [3400, 8600], [3300, 8690],
 ];
 // 300 made a 30-unit-wide boardwalk: fifteen times wider than the player at
 // the start of a match, and still wider than a WORLD ENDER. It dominated every
