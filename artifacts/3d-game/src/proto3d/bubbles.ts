@@ -212,6 +212,14 @@ const style = document.createElement('style');
       // still land, drama continues. 2: while the FAMILY is speaking, the
       // crowd waits — gossip never outranks a rival hunting you.
       if (kind !== 'rival') {
+        // 0: NOBODY TALKS OVER THE ESTABLISHING SHOT. body.intro is set for
+        // exactly the length of the opening move (prototype3d.ts). The crowd's
+        // ambient cooldown is held by life.calm(), but the worlds' authored
+        // set pieces call say() on their own timers and were landing at 1.16 s
+        // on Game Day and 2.12 s on Pirate Bay — a bubble in the second frame
+        // of a cinematic, from a camera where the speaker is a speck
+        // (docs/crews/round-5/firstframe-data/, the bub column).
+        if (document.body.classList.contains('intro')) return;
         const ban = document.getElementById('banner');
         if (ban && ban.classList.contains('show') && Number(getComputedStyle(ban).opacity) > 0.06) return;
         if (slots.some((s) => s.active && s.el.classList.contains('rival'))) return;
