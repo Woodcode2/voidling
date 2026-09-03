@@ -1,0 +1,18 @@
+  settle t=4.24 off=0.000 dpos=   -   camDist=40.3 dcam=   -   r=4.000 still=0/6 warps=1 reasserts=0
+  settle t=5.80 off=0.000 dpos=0.000 camDist=124.7 dcam=1.204 r=4.000 still=0/6 warps=1 reasserts=2
+  settle t=7.30 off=0.000 dpos=0.000 camDist=128.7 dcam=0.109 r=4.000 still=0/6 warps=1 reasserts=3
+  settle t=8.84 off=0.000 dpos=0.000 camDist=129.1 dcam=0.009 r=4.000 still=7/6 warps=1 reasserts=4
+  settle t=10.34 off=0.000 dpos=0.000 camDist=129.1 dcam=0.006 r=4.000 still=5/6 warps=1 reasserts=5
+  spot   THE SQUARE — the town hall up the green
+  ground (61.13, -49.62) solid=yes biome=plaza
+  landed (61.13, -49.62)  Δ0.000u after 1 warp(s), 5 radius re-assert(s)
+  hero   r=4.000 (wanted 4; drifted to 4.000 before the shutter reset)  mood=cruise maw=0.000 smile=true biting=false
+  props  80 edibles in frame, biggest r=6.50
+  hidden 0 rival object(s) at the shutter (HIDE_RIVALS=1)
+  family 0 rival(s) in frame
+  lens   camDist=129.1  void at (215, 450) r=52 css px
+  rung   0 pinned=0 pr=2 shadows=true
+  rings  12 eat-ring meshes hidden in the shutter tick (fx.ts's pool)
+  frame  860x1864  luminance 0.000..0.998 mean 0.4785 (descriptive)
+  stamp  212710ac86827ebf f66cea386fb6cdc4
+  VERDICT PASS maple shot at the fixed spot — t=10.49 match s, camDist 129.1, Δ0.000u off the mark, 80 props and 0 rival(s) in frame → qa/out/lookpair/maple_before3.png
