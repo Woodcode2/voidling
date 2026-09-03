@@ -23,16 +23,21 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 
-const PORT = process.argv[2] || '4177';
-const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+// Flags (the gate spawns argv, not env): --splash = the two screens only, at
+// every viewport in --views=WxH@d,... ; asserts the splash lines' contrast and
+// that the loader does not print the game's name twice.
+const FLAGS = process.argv.slice(2).filter((a) => a.startsWith('--'));
+const ARGS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const PORT = ARGS[0] || '4177';
+const WORLDS = ARGS.slice(1).length ? ARGS.slice(1) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const VIEWS_FLAG = (FLAGS.find((f) => f.startsWith('--views=')) || '').slice(8);
 const SEED = process.env.SEED ? Number(process.env.SEED) : null;
 const OUT = 'qa/out/firstframe';
 // VIEW=430x932@2 (default; the lookbook's phone) — the owner's 2026-08-29
 // screenshot is 440x956@3. SPLASH_ONLY=1 shoots the loader and the menu only.
-const VIEW = (process.env.VIEW || '430x932@2').match(/(\d+)x(\d+)@([\d.]+)/);
-const VP = { width: +VIEW[1], height: +VIEW[2], dpr: +VIEW[3] };
-const SPLASH_ONLY = process.env.SPLASH_ONLY === '1';
-const VTAG = process.env.VIEW ? `_${VP.width}x${VP.height}` : '';
+const SPLASH_ONLY = process.env.SPLASH_ONLY === '1' || FLAGS.includes('--splash');
+const VIEWS = (VIEWS_FLAG || process.env.VIEW || '430x932@2').split(',').map((v) => { const m = v.match(/(\d+)x(\d+)@([\d.]+)/); return { width: +m[1], height: +m[2], dpr: +m[3], tag: (VIEWS_FLAG || process.env.VIEW) ? `_${m[1]}x${m[2]}` : '' }; });
+let VP = VIEWS[0], VTAG = VP.tag;
 mkdirSync(OUT, { recursive: true });
 // COPY.introLen per world, copied from prototype3d.ts WORLD_COPY (the table is
 // not on the debug surface). A wrong number here shows up as the "u" column
@@ -85,8 +90,10 @@ const shotPair = async (p, name, ms) => {
 };
 
 let fails = 0;
-for (const WORLD of WORLDS) {
-  console.log(`== ${WORLD} (introLen ${INTRO_LEN[WORLD]}s)`);
+const RUNS = SPLASH_ONLY ? VIEWS.map((v) => ({ WORLD: WORLDS[0], v })) : WORLDS.map((WORLD) => ({ WORLD, v: VIEWS[0] }));
+for (const { WORLD, v } of RUNS) {
+  VP = v; VTAG = v.tag;
+  console.log(`== ${WORLD} ${VP.width}x${VP.height}@${VP.dpr}${SPLASH_ONLY ? ' (splash only)' : ` (introLen ${INTRO_LEN[WORLD]}s)`}`);
   const rec = { world: WORLD, introLen: INTRO_LEN[WORLD], seed: SEED, view: VP, shots: [], contrast: [] };
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
   const p = await b.newPage({ viewport: { width: VP.width, height: VP.height }, deviceScaleFactor: VP.dpr });
@@ -108,8 +115,15 @@ for (const WORLD of WORLDS) {
   const bootTip = await p.evaluate(() => document.querySelector('#loadScr .lTip')?.textContent.trim());
   console.log(`  boot loader: lName "${bootName}"  tip "${bootTip}"`);
   rec.bootName = bootName;
+  const logoText = await p.evaluate(() => document.querySelector('#loadScr .lLogo')?.textContent.replace(/\s+/g, ' ').trim());
+  rec.doubled = !!bootName && !!logoText && bootName.replace(/\s+/g, '').toUpperCase() === logoText.replace(/\s+/g, '').toUpperCase();
+  if (rec.doubled) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height}: the loader prints the game's name twice — .lLogo "${logoText}" and .lName "${bootName}"`); }
+  // hold the loader on screen while its lines are measured — on a fast local
+  // load it can clear between two screenshots and the lines come back "missing"
+  await p.evaluate(() => document.querySelector('#loadScr')?.classList.add('show'));
   rec.contrast.push(await contrast(p, '#loadScr .lLogo i', 'boot THE CUTE'));
   rec.contrast.push(await contrast(p, '#loadScr .lName', 'boot lName'));
+  await p.evaluate(() => document.querySelector('#loadScr')?.classList.remove('show'));
   // 2. THE MENU SPLASH — key art on its feathered layer, the logo over it.
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
@@ -147,4 +161,5 @@ for (const WORLD of WORLDS) {
   writeFileSync(`${OUT}/${WORLD}.json`, JSON.stringify(rec, null, 1));
   for (const c of rec.contrast) { if (c.missing) continue; const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
 }
+if (fails) process.exitCode = 1;
 console.log(fails ? `FAIL — firstframe: ${fails} splash line(s) under their WCAG bar against the real pixels behind the glyphs` : `PASS — firstframe: every splash line clears its WCAG bar against the real pixels behind the glyphs; frames in ${OUT}/`);
