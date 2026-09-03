@@ -1,0 +1,25 @@
+
+══ LANTERN ══  4344 static props (0 benches, 0 houses w/ doors), audited in 18s  FAIL
+   category      n  verdict  worst
+   road           0  ok    
+   water          5  FAIL  #2 big r=4.2 foot=24.3x4.4 h=7.4 at (9.0,-7.0) [7.36] | #1 big r=5 foot=9.8x1.3 h=10.4 at (13.0,206.0) [6.08] | #0 big r=11 foot=35.1x28.0 h=32.3 at (14.0,-175.0) [1.5]
+   offisland      2  FAIL  #3507 bldg r=2.6 foot=1.5x1.5 h=7.9 at (82.3,-234.2) | #3563 bldg r=2.6 foot=2.1x2.7 h=10.7 at (-98.4,-2.7)
+   overhang      37  info  #3473 bldg r=2.6 foot=2.2x2.1 h=10.9 at (103.8,-24.3) [2] | #3497 bldg r=2.6 foot=1.8x1.8 h=10.6 at (107.7,-51.8) [2] | #3538 bldg r=2.6 foot=1.8x2.0 h=10.9 at (-108.3,-169.0) [2]
+   float          0  ok    
+   sunk         356  info  #4013 prop r=0.9 foot=2.2x2.7 h=0.7 at (-63.9,191.8) top 0.60 min -0.10 [0.1] | #485 prop r=0.6 foot=1.0x0.7 h=0.4 at (82.4,56.8) top 0.41 min -0.00 | #486 prop r=0.6 foot=1.1x0.8 h=0.5 at (71.7,15.4) top 0.47 min 0.00
+   inside         0  ok    
+   under          9  info  #1612 prop r=0.9 foot=1.0x0.9 h=0.8 at (89.4,-170.6) under #3203 bldg r=4.14 foot=10.7x11.2 h=4.9 at (93.0,-169.2) [1.48] | #3321 prop r=1.1 foot=1.8x1.7 h=1.5 at (105.1,-185.0) under #3202 bldg r=4.86 foot=13.0x12.7 h=4.8 at (103.9,-190.7) [0.46] | #1316 prop r=0.5 foot=0.5x0.5 h=0.8 at (90.4,-173.6) under #3203 bldg r=4.14 foot=10.7x11.2 h=4.9 at (93.0,-169.2) [0.2]
+   overlap       19  FAIL  #3204 bldg r=3.51 foot=9.4x9.1 h=5.3 at (109.0,-154.9) x #3315 prop r=1.1 foot=2.4x2.4 h=2.7 at (113.1,-157.3) [1.7] | #3203 bldg r=4.14 foot=10.7x11.2 h=4.9 at (93.0,-169.2) x #3289 bldg r=2.6 foot=1.5x1.8 h=10.9 at (91.3,-176.3) [1.07] | #3204 bldg r=3.51 foot=9.4x9.1 h=5.3 at (109.0,-154.9) x #3355 prop r=1.8 foot=5.1x0.9 h=3.1 at (104.2,-153.5) [0.9]
+   clutter       91  info  #3299 prop r=1.1 foot=3.7x2.7 h=3.1 at (118.3,-194.8) x #3320 prop r=1.1 foot=2.5x2.3 h=2.1 at (119.4,-196.0) [1.81] | #2868 prop r=1.1 foot=2.9x3.1 h=3.4 at (-33.8,-76.6) x #2958 prop r=0.9 foot=2.7x3.0 h=0.8 at (-32.1,-75.8) [1.69] | #3326 prop r=0.9 foot=2.3x2.2 h=0.7 at (106.3,-178.6) x #3345 prop r=0.9 foot=3.0x2.2 h=0.8 at (107.6,-178.5) [1.59]
+   roadend        0  ok    MARKET end 0 at (41.0,210.0) joins coast | MARKET end 1 at (40.5,-133.0) joins BATHHOUSE
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   ice            0  info  
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-lantern-overlap-0.png  <- #985 house r=3.4 foot=12.2x3.6 h=4.2 at (126.5,158.4) x #2506 house r=4.2 foot=8.3x6.6 h=4.9 at (119.6,160.1)  (screen 213,365)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-lantern-overlap-1.png  <- #990 house r=3.4 foot=12.2x3.6 h=4.2 at (98.4,84.8) x #2498 house r=4.2 foot=8.3x7.3 h=4.9 at (91.7,87.1)  (screen 214,391)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-lantern-inside-0.png  <- #3906 prop r=1 foot=1.0x1.0 h=2.2 at (102.7,-185.4) INSIDE #3354 bldg r=4.86 foot=12.3x12.4 h=5.0 at (103.8,-190.8)  (screen 210,414)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-lantern-water-0.png  <- #1039 prop r=2.2 foot=6.3x1.7 h=2.3 at (12.7,195.4)  (screen 223,411)
+
+PLACEMENT FAIL — lantern  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
