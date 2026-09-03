@@ -1,0 +1,310 @@
+{
+ "world": "gameday",
+ "introLen": 3.4,
+ "samples": [
+  {
+   "label": "u1",
+   "t": 0.1,
+   "R": 0.9,
+   "camY": 104,
+   "camDist": 131,
+   "bodies": [
+    {
+     "size": 158.6206896551724,
+     "d": 720,
+     "ndc": [
+      -2.421,
+      -2.762
+     ],
+     "cx": -305,
+     "cy": 1753,
+     "pxR": 236,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    },
+    {
+     "size": 67.58620689655173,
+     "d": 928,
+     "ndc": [
+      -2.249,
+      -5.693
+     ],
+     "cx": -268,
+     "cy": 3119,
+     "pxR": 115,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    }
+   ],
+   "Lspace": 3.5
+  },
+  {
+   "label": "u05",
+   "t": 1.74,
+   "R": 0.98,
+   "camY": 84,
+   "camDist": 152,
+   "bodies": [
+    {
+     "size": 158.6206896551724,
+     "d": 701,
+     "ndc": [
+      2.688,
+      -0.37
+     ],
+     "cx": 793,
+     "cy": 639,
+     "pxR": 196,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    },
+    {
+     "size": 67.58620689655173,
+     "d": 898,
+     "ndc": [
+      0.794,
+      -1.483
+     ],
+     "cx": 386,
+     "cy": 1157,
+     "pxR": 67,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    }
+   ],
+   "Lspace": 50.8
+  },
+  {
+   "label": "u0",
+   "t": 3.73,
+   "R": 1.05,
+   "camY": 29,
+   "camDist": 39,
+   "bodies": [
+    {
+     "size": 158.6206896551724,
+     "d": 700,
+     "ndc": [
+      0.477,
+      -0.633
+     ],
+     "cx": 318,
+     "cy": 761,
+     "pxR": 187,
+     "viewFrac": 0.8,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 62.4,
+     "Lrange": 68.7,
+     "Lprofile": [
+      61,
+      47,
+      75,
+      70,
+      6,
+      6,
+      8
+     ],
+     "flags": [
+      "CUT-FRAME",
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 67.58620689655173,
+     "d": 900,
+     "ndc": [
+      -0.216,
+      -2.111
+     ],
+     "cx": 169,
+     "cy": 1450,
+     "pxR": 71,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    }
+   ],
+   "Lspace": 49.3
+  },
+  {
+   "label": "far",
+   "t": 7.46,
+   "R": 9.22,
+   "camY": 231,
+   "camDist": 253,
+   "bodies": [
+    {
+     "size": 158.6206896551724,
+     "d": 700,
+     "ndc": [
+      0.471,
+      0.549
+     ],
+     "cx": 316,
+     "cy": 210,
+     "pxR": 187,
+     "viewFrac": 0.86,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 52.3,
+     "Lrange": 54,
+     "Lprofile": [
+      106,
+      67,
+      103,
+      52,
+      91,
+      60,
+      59
+     ],
+     "flags": [
+      "CUT-FRAME",
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 67.58620689655173,
+     "d": 900,
+     "ndc": [
+      -0.191,
+      -0.739
+     ],
+     "cx": 174,
+     "cy": 810,
+     "pxR": 62,
+     "viewFrac": 1,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 75.9,
+     "Lrange": 64.7,
+     "Lprofile": [
+      54,
+      62,
+      72,
+      82,
+      60,
+      58,
+      17
+     ],
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    }
+   ],
+   "Lspace": 54.1
+  },
+  {
+   "label": "coast",
+   "t": 9.16,
+   "R": 9.67,
+   "camY": 240,
+   "camDist": 263,
+   "bodies": [
+    {
+     "size": 158.6206896551724,
+     "d": 700,
+     "ndc": [
+      0.486,
+      0.565
+     ],
+     "cx": 320,
+     "cy": 203,
+     "pxR": 187,
+     "viewFrac": 0.86,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 142.1,
+     "Lrange": 156.2,
+     "Lprofile": [
+      0,
+      49,
+      156,
+      144,
+      67,
+      16,
+      4
+     ],
+     "flags": [
+      "CUT-FRAME",
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 67.58620689655173,
+     "d": 900,
+     "ndc": [
+      -0.184,
+      -0.722
+     ],
+     "cx": 175,
+     "cy": 803,
+     "pxR": 62,
+     "viewFrac": 1,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 112.8,
+     "Lrange": 0.6,
+     "Lprofile": [
+      113,
+      113,
+      113,
+      113,
+      113,
+      113,
+      113
+     ],
+     "flags": [
+      "HIDDEN-ISLAND",
+      "FLAT"
+     ]
+    }
+   ],
+   "Lspace": 0
+  }
+ ]
+}
