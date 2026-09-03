@@ -1,0 +1,138 @@
+
+══ GAMEDAY ══  5902 static props (0 benches, 0 houses w/ doors), audited in 54s  FAIL
+   category      n  verdict  worst
+   road           0  ok    
+   water          0  ok    
+   offisland      2  FAIL  #5064 prop r=0.9 foot=1.7x1.2 h=1.2 at (153.4,179.9) | #5066 prop r=0.9 foot=1.7x1.2 h=1.2 at (144.7,188.3)
+   overhang      59  info  #4859 prop r=1 foot=3.2x2.7 h=2.1 at (174.5,129.2) [2] | #5095 prop r=0.9 foot=1.7x1.2 h=1.2 at (-213.9,98.8) [2] | #5219 prop r=0.7 foot=0.9x1.0 h=1.4 at (-197.3,-119.9) [2]
+   float          0  ok    
+   sunk         222  info  #1139 prop r=0.5 foot=0.8x0.4 h=0.4 at (24.7,105.2) top 0.42 min -0.00 | #1140 prop r=0.5 foot=0.8x0.4 h=0.4 at (-33.4,70.8) top 0.42 min -0.00 | #1141 prop r=0.5 foot=0.8x0.4 h=0.4 at (45.8,89.3) top 0.42 min -0.00
+   inside         1  FAIL  #1109 prop r=0.8 foot=1.4x1.0 h=1.6 at (11.4,178.2) INSIDE #188 car r=3 foot=8.3x3.1 h=3.1 at (12.1,182.0) [-2.31]
+   under         57  info  #2135 prop r=1.8 foot=5.3x1.5 h=3.8 at (-127.9,84.4) under #1918 rv r=4.2 foot=12.2x6.6 h=5.2 at (-126.0,81.6) [-0.1] | #2345 prop r=0.8 foot=1.4x1.0 h=1.6 at (-91.9,175.5) under #1929 rv r=4.2 foot=12.2x6.6 h=5.2 at (-90.9,172.2) [-0.11] | #2160 prop r=1.4 foot=3.5x2.1 h=2.2 at (-76.7,185.9) under #1920 rv r=4.2 foot=12.2x6.6 h=5.2 at (-74.2,183.6) [-0.18]
+   overlap      163  FAIL  #1932 rv r=4.2 foot=12.2x6.6 h=5.2 at (-181.2,57.5) x #1958 prop r=1.9 foot=5.5x3.1 h=2.3 at (-176.9,62.7) [2.42] | #1924 rv r=4.2 foot=12.2x6.6 h=5.2 at (-83.8,167.8) x #5352 prop r=1.4 foot=3.6x2.9 h=2.7 at (-79.5,172.0) [2.2] | #1914 rv r=4.2 foot=12.2x6.6 h=5.2 at (-131.8,92.1) x #2182 prop r=1.4 foot=3.5x2.1 h=2.2 at (-128.9,97.4) [1.91]
+   clutter      299  info  #4794 prop r=1 foot=3.9x3.2 h=2.5 at (-177.2,-139.3) x #4865 prop r=1 foot=3.6x3.0 h=2.3 at (-178.9,-139.9) [2.37] | #4843 prop r=1 foot=3.8x3.2 h=2.5 at (-209.1,-27.4) x #4857 prop r=1 foot=3.9x3.2 h=2.5 at (-211.3,-26.7) [2.23] | #4754 prop r=1 foot=4.0x3.3 h=2.6 at (-57.6,239.6) x #4882 prop r=1 foot=3.1x2.6 h=2.0 at (-56.0,238.7) [2.14]
+   roadend        0  ok    
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   ice            0  info  
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-gameday-overlap-0.png  <- #2430 house r=7 foot=15.6x8.6 h=8.5 at (118.0,88.1) x #2431 house r=7 foot=15.6x8.6 h=8.5 at (116.6,99.6)  (screen 212,377)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-gameday-overlap-1.png  <- #2428 house r=7 foot=15.6x8.6 h=8.5 at (91.5,127.1) x #2435 house r=7 foot=15.6x8.6 h=8.5 at (92.1,138.6)  (screen 216,400)
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+page.waitForFunction: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /opt/pw-browsers/chromium --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --use-gl=angle --use-angle=swiftshader --user-data-dir=/tmp/playwright_chromiumdev_profile-BA0Egs --remote-debugging-pipe --no-startup-window
+<launched> pid=4065
+[pid=4065][err] [4065:4079:0903/021407.466264:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=4065][err] [4065:4079:0903/021407.472758:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4079:0903/021407.473975:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=4065][err] [4065:4079:0903/021407.474802:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=4065][err] [4065:4079:0903/021407.502685:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4065:0903/021407.521813:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=4065][err] [4065:4079:0903/021407.521963:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4079:0903/021407.521990:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4079:0903/021407.522004:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4079:0903/021407.522011:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4079:0903/021407.522017:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[pid=4065][err] [4065:4065:0903/021407.535773:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=4065][err] [4065:4065:0903/021407.539522:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=4065][err] [4065:4065:0903/021407.539573:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[pid=4065][err] [4065:4079:0903/021407.541350:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=4065][err] [4065:4079:0903/021407.541452:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[pid=4065][err] [4065:4065:0903/021407.543451:ERROR:dbus/object_proxy.cc:573] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: unknown error type: 
+[pid=4065][err] [4096:4128:0903/021412.541759:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021412.545838:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021412.546245:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021412.546526:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021413.414320:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021413.445075:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021413.457565:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021413.471537:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021413.807413:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021414.746921:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021414.787590:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021414.883363:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021414.885428:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021415.589696:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021416.658673:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021416.846813:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021416.874011:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021416.925142:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021419.424341:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021419.763261:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021420.073266:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021420.096478:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021420.120420:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021421.857922:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021424.367395:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021424.815102:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021424.967696:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021425.158033:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021426.539113:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021427.251495:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021429.623350:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021431.771502:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021431.839308:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021431.908494:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021432.544967:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021432.794350:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021433.482971:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021435.895514:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021441.783856:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021441.793692:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021441.923083:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021442.079799:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021442.441354:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021442.799483:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021448.726502:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021449.106656:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021456.863983:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021457.001881:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021458.767042:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021458.791556:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021458.976454:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021502.581992:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+[pid=4065][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+[pid=4065][err] ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+[pid=4065][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+[pid=4065][err] ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+[pid=4065][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+[pid=4065][err] ALSA lib conf.c:5727:(snd_config_expand) Evaluate error: No such file or directory
+[pid=4065][err] ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+[pid=4065][err] [4160:4160:0903/021503.947252:ERROR:media/audio/alsa/alsa_util.cc:204] PcmOpen: default,No such file or directory
+[pid=4065][err] ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+[pid=4065][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+[pid=4065][err] ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+[pid=4065][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+[pid=4065][err] ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+[pid=4065][err] ALSA lib conf.c:5204:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+[pid=4065][err] ALSA lib conf.c:5727:(snd_config_expand) Evaluate error: No such file or directory
+[pid=4065][err] ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+[pid=4065][err] [4160:4160:0903/021503.947370:ERROR:media/audio/alsa/alsa_util.cc:204] PcmOpen: plug:default,No such file or directory
+[pid=4065][err] [4096:4128:0903/021505.038911:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021509.221153:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021517.629497:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021518.118756:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021520.424294:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021522.999437:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021538.513083:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021544.855549:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -101
+[pid=4065][err] [4096:4128:0903/021549.215763:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021551.955326:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021552.588953:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065][err] [4096:4128:0903/021554.723481:ERROR:net/socket/ssl_client_socket_impl.cc:902] handshake failed; returned -1, SSL error code 1, net_error -202
+[pid=4065] <gracefully close start>
+[pid=4065] <forcefully close>
+[pid=4065] <kill>
+[pid=4065] <will force kill>
+    at /home/user/voidling/artifacts/3d-game/qa/placement.mjs:446:17 {
+  log: []
+}
+
+Node.js v22.22.2
