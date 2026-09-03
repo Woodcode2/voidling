@@ -1,0 +1,4 @@
+  settle t=4.22 off=0.000 dpos=   -   camDist=40.3 dcam=   -   r=4.000 still=0/6 warps=1 reasserts=0
+  settle t=5.73 off=0.000 dpos=0.000 camDist=123.3 dcam=1.589 r=4.000 still=0/6 warps=1 reasserts=3
+  settle t=7.23 off=0.000 dpos=0.000 camDist=128.7 dcam=0.122 r=4.000 still=0/6 warps=1 reasserts=4
+  settle t=8.73 off=0.000 dpos=0.000 camDist=129.1 dcam=0.006 r=4.000 still=6/6 warps=1 reasserts=5
