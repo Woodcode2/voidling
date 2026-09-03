@@ -54,20 +54,20 @@
   },
   {
    "label": "u05",
-   "t": 1.83,
+   "t": 1.85,
    "R": 0.9,
    "camY": 83,
-   "camDist": 200,
+   "camDist": 197,
    "bodies": [
     {
      "size": 98,
      "d": 642,
      "ndc": [
-      2.654,
-      -0.229
+      2.716,
+      -0.241
      ],
-     "cx": 786,
-     "cy": 573,
+     "cx": 799,
+     "cy": 579,
      "pxR": 132,
      "viewFrac": 0,
      "occFrac": null,
@@ -83,12 +83,12 @@
      "size": 58,
      "d": 880,
      "ndc": [
-      1.593,
-      -1.506
+      1.617,
+      -1.514
      ],
-     "cx": 558,
-     "cy": 1168,
-     "pxR": 59,
+     "cx": 563,
+     "cy": 1172,
+     "pxR": 60,
      "viewFrac": 0,
      "occFrac": null,
      "opacity": 1,
@@ -100,11 +100,11 @@
      ]
     }
    ],
-   "Lspace": 41.9
+   "Lspace": 35.6
   },
   {
    "label": "u0",
-   "t": 3.93,
+   "t": 3.92,
    "R": 0.9,
    "camY": 28,
    "camDist": 38,
@@ -113,8 +113,8 @@
      "size": 98,
      "d": 640,
      "ndc": [
-      -0.468,
-      -0.629
+      -0.467,
+      -0.628
      ],
      "cx": 114,
      "cy": 759,
@@ -124,7 +124,7 @@
      "opacity": 1,
      "depthTest": true,
      "blending": 1,
-     "Lplanet": 52.8,
+     "Lplanet": 52,
      "flags": [
       "HIDDEN-ISLAND"
      ]
@@ -154,9 +154,9 @@
   },
   {
    "label": "far",
-   "t": 7.67,
-   "R": 8.29,
-   "camY": 213,
+   "t": 7.66,
+   "R": 8.28,
+   "camY": 212,
    "camDist": 233,
    "bodies": [
     {
@@ -174,7 +174,7 @@
      "opacity": 1,
      "depthTest": true,
      "blending": 1,
-     "Lplanet": 78,
+     "Lplanet": 75.6,
      "flags": [
       "HIDDEN-ISLAND"
      ]
@@ -200,7 +200,57 @@
      ]
     }
    ],
-   "Lspace": 37.9
+   "Lspace": 35.8
+  },
+  {
+   "label": "coast",
+   "t": 9.38,
+   "R": 8.4,
+   "camY": 215,
+   "camDist": 236,
+   "bodies": [
+    {
+     "size": 98,
+     "d": 640,
+     "ndc": [
+      -0.454,
+      0.565
+     ],
+     "cx": 117,
+     "cy": 203,
+     "pxR": 126,
+     "viewFrac": 0.94,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 107.6,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 58,
+     "d": 880,
+     "ndc": [
+      0.212,
+      -0.661
+     ],
+     "cx": 261,
+     "cy": 774,
+     "pxR": 55,
+     "viewFrac": 1,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 21.6,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    }
+   ],
+   "Lspace": 3.6
   }
  ]
 }

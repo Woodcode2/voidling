@@ -1,7 +1,8 @@
 
 ══ LANTERN ══  introLen 3.6s
   u1     t=0.1 R=0.9 camDist=146 Lspace=7  [size 98 d 658: view 0 occ null pxR 194 at (-735,2258) L null off] [size 58 d 904: view 0 occ null pxR 111 at (-221,3490) L null off]
-  u05    t=1.83 R=0.9 camDist=200 Lspace=41.9  [size 98 d 642: view 0 occ null pxR 132 at (786,573) L null off] [size 58 d 880: view 0 occ null pxR 59 at (558,1168) L null off]
-  u0     t=3.93 R=0.9 camDist=38 Lspace=2.1  [size 98 d 640: view 0.94 occ 1 pxR 127 at (114,759) L 52.8 HIDDEN-ISLAND] [size 58 d 880: view 0 occ null pxR 62 at (265,1410) L null off]
-  far    t=7.67 R=8.29 camDist=233 Lspace=37.9  [size 98 d 640: view 0.94 occ 1 pxR 126 at (114,210) L 78 HIDDEN-ISLAND] [size 58 d 880: view 1 occ 1 pxR 55 at (259,781) L 169 HIDDEN-ISLAND]
+  u05    t=1.85 R=0.9 camDist=197 Lspace=35.6  [size 98 d 642: view 0 occ null pxR 132 at (799,579) L null off] [size 58 d 880: view 0 occ null pxR 60 at (563,1172) L null off]
+  u0     t=3.92 R=0.9 camDist=38 Lspace=2.1  [size 98 d 640: view 0.94 occ 1 pxR 127 at (114,759) L 52 HIDDEN-ISLAND] [size 58 d 880: view 0 occ null pxR 62 at (265,1410) L null off]
+  far    t=7.66 R=8.28 camDist=233 Lspace=35.8  [size 98 d 640: view 0.94 occ 1 pxR 126 at (114,210) L 75.6 HIDDEN-ISLAND] [size 58 d 880: view 1 occ 1 pxR 55 at (259,781) L 169 HIDDEN-ISLAND]
+  coast  t=9.38 R=8.4 camDist=236 Lspace=3.6  [size 98 d 640: view 0.94 occ 1 pxR 126 at (117,203) L 107.6 HIDDEN-ISLAND] [size 58 d 880: view 1 occ 1 pxR 55 at (261,774) L 21.6 HIDDEN-ISLAND]
 SKYCUT: PASS — lantern: no body is cut in any sampled frame
