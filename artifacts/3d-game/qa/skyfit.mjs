@@ -7,7 +7,14 @@
 // (docs/crews/round-5/shots/sky/powder-coast.png) when DISC_R was 0.40.
 //   node qa/skyfit.mjs [path-to-island.ts]      exit 1 = a cut
 import fs from 'fs';
-const src = fs.readFileSync(process.argv[2] || 'src/proto3d/island.ts', 'utf8');
+import { fileURLToPath } from 'url';
+// Resolve island.ts from THIS file, not the cwd: the gate spawns steps from
+// wherever it runs and hands every step the port as argv[2]. An argument that
+// is not a readable file is ignored.
+const here = fileURLToPath(new URL('../src/proto3d/island.ts', import.meta.url));
+const arg = process.argv[2];
+const path = arg && fs.existsSync(arg) && fs.statSync(arg).isFile() ? arg : here;
+const src = fs.readFileSync(path, 'utf8');
 const num = (re, what) => { const m = src.match(re); if (!m) throw new Error(`skyfit: cannot find ${what} in island.ts`); return Number(m[1]); };
 const DISC_R = num(/const DISC_R = ([0-9.]+)/, 'DISC_R');
 const ringBase = num(/R \* \(([0-9.]+) \+ k \* [0-9.]+\)/, 'ring base radius'), ringStep = num(/R \* \([0-9.]+ \+ k \* ([0-9.]+)\)/, 'ring step');
