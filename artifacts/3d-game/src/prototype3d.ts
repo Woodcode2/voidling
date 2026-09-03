@@ -577,9 +577,35 @@ const scene = new THREE.Scene();
 // away most of the specular that made the props read dimensional at all.
 // A neutral lit box is the right environment for a game lit by a sun it does
 // not draw.
+// RUNG 3 of the light ladder (round 5, Stream B): a purpose-built NEUTRAL
+// vertical-gradient environment through PMREMGenerator, in place of the grey
+// lit box — bright above, mid at the horizon, dark below, no colour — so a
+// highlight sits on TOP of a prop and the dark reflection underneath it, the
+// way a sky lights a toy. This is NOT the per-world painted-sky experiment the
+// comment above records as reverted (that one was violet and 15% darker on
+// Game Day); it is achromatic by construction. Behind a switch so the two
+// builds can be measured apart, with a K-parity kill gate: if any world's
+// median tonal K (qa/kmetric.mjs on qa/lookpair.mjs frames) moves more than
+// 4% of its before value, this rung dies and ENV_MODE goes back to 'room'.
+let ENV_MODE = 'room' as 'room' | 'gradient';
+const ENV_GAIN = 1.0;   // gradient level, tuned to the room box's mean radiance by the K gate
 {
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  if (ENV_MODE === 'gradient') {
+    const W = 64, H = 32, data = new Float32Array(W * H * 4);
+    for (let y = 0; y < H; y++) {
+      const up = (y + 0.5) / H;   // DataTexture row 0 is uv.y = 0 = the nadir; row H-1 the zenith
+      const k = ENV_GAIN * (up > 0.5 ? 0.45 + (up - 0.5) * 2 * 0.55 : 0.06 + up * 2 * 0.39);
+      for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; data[i] = k; data[i + 1] = k; data[i + 2] = k; data[i + 3] = 1; }
+    }
+    const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.LinearSRGBColorSpace;
+    tex.flipY = false; tex.needsUpdate = true;
+    scene.environment = pmrem.fromEquirectangular(tex).texture;
+  } else {
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  }
   scene.environmentIntensity = 0.15;   // specular sheen only — keep colours saturated
 }
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 1, 1000);

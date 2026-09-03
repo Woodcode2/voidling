@@ -4066,7 +4066,13 @@ const GLOSS_BODY = `
 //
 // `radiance` is three's name for the specular IBL contribution and it is in
 // scope right after lights_fragment_maps — the same chunk that adds it.
-const GLOSS_ENV = 5.0;
+// RUNG 2 of the light ladder (docs/CREWS-ROUND-2.md; landed round 5, Stream B):
+// 5.0 -> 6.5. The refuted roughness remedy established that under one
+// directional light the IBL specular term is the only specular signal a
+// glossy vertex gets; this raises it where it already exists. Matte vertices
+// (vGloss 0) are untouched by construction. Measured before/after in
+// docs/crews/round-5/materials.proposal.md.
+const GLOSS_ENV = 6.5;
 const GLOSS_RADIANCE = `
   radiance *= 1.0 + ${GLOSS_ENV.toFixed(1)} * vGloss;
 `;
