@@ -1487,7 +1487,12 @@ const COPY = WORLD_COPY[pickedWorld];
   const goingStraightIn = !localStorage.getItem('voidPlayed')
     || localStorage.getItem('voidAutoPlay') === '1';
   const ln = document.querySelector('#loadScr .lName');
-  if (ln) ln.textContent = goingStraightIn ? nm : 'THE CUTE WORLD ENDER';
+  // …and when the brand carries the screen, the line under the wordmark is the
+  // MENU'S TAG, not the game's name a second time: the loader printed
+  // "THE CUTE / WORLD ENDER" in white and "THE CUTE WORLD ENDER" in yellow
+  // directly beneath it, on every launch after the first, which is the owner's
+  // "the title appears twice in that frame" (docs/FABLE-LAUNCH-BRIEF.md §2D).
+  if (ln) { ln.textContent = goingStraightIn ? nm : 'STARRING THE VOIDLINGS'; ln.classList.toggle('world', goingStraightIn); }
 }
 // ── THE BOOT BREATHES ──────────────────────────────────────────────────────
 // The world build was ONE unbroken main-thread block — 17 s in the sandbox,

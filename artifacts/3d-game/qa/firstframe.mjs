@@ -60,6 +60,22 @@ const q = (arr, k) => arr.length ? arr[Math.floor(k * (arr.length - 1))] : 0;
 // of that difference (Y > 140), the glow is left out on purpose: a child reads
 // the letters, not the halo. Per glyph pixel: contrast between what the eye
 // gets (shot A) and what sits behind it (shot B).
+// The A/B pair below only isolates the glyphs if NOTHING ELSE moves between the
+// two screenshots. The world canvas renders behind both the loader (whose art
+// leaves gaps) and the menu (whose gradients carry alpha), and the attract-mode
+// void wanders: at 393x700 the "behind" mean came back 111,140,83 — foliage
+// green from the canvas, not the splash. So the screen being measured is the
+// only body child left visible while it is measured.
+const freeze = (p, keep) => p.evaluate((k) => {
+  const el = document.querySelector(k);
+  for (const c of Array.from(document.body.children)) {
+    if (c === el || c.contains(el)) continue;
+    c.dataset.ffFroze = c.style.visibility; c.style.visibility = 'hidden';
+  }
+}, keep);
+const thaw = (p) => p.evaluate(() => {
+  for (const c of Array.from(document.body.children)) if (c.dataset.ffFroze !== undefined) { c.style.visibility = c.dataset.ffFroze; delete c.dataset.ffFroze; }
+});
 async function contrast(p, sel, label) {
   const box = await p.evaluate((s) => { const el = document.querySelector(s); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, text: el.textContent.trim(), color: getComputedStyle(el).color, size: getComputedStyle(el).fontSize }; }, sel);
   if (!box || box.w < 2) return { label, missing: true };
@@ -138,9 +154,15 @@ for (const { WORLD, v } of RUNS) {
   if (rec.doubled) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height}: the loader prints the game's name twice — .lLogo "${logoText}" and .lName "${bootName}"`); }
   // hold the loader on screen while its lines are measured — on a fast local
   // load it can clear between two screenshots and the lines come back "missing"
+  // Hold the loader up and take the MENU out from behind it. The loader and the
+  // menu now paint the same lockup in the same place (that is the fix — one
+  // frame across the crossfade), so leaving the menu behind makes the
+  // glyph/no-glyph difference vanish and the measurement reads zero pixels.
   await p.evaluate(() => document.querySelector('#loadScr')?.classList.add('show'));
+  await freeze(p, '#loadScr');
   rec.contrast.push(await contrast(p, '#loadScr .lLogo i', 'boot THE CUTE'));
   rec.contrast.push(await contrast(p, '#loadScr .lName', 'boot lName'));
+  await thaw(p);
   await p.evaluate(() => document.querySelector('#loadScr')?.classList.remove('show'));
   // 2. THE MENU SPLASH — key art on its feathered layer, the logo over it.
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
@@ -148,10 +170,12 @@ for (const { WORLD, v } of RUNS) {
   await p.waitForFunction(() => !document.querySelector('#loadScr.show, #loadScr.boot'), null, { timeout: 300000 }).catch(() => { });
   await p.waitForTimeout(800);
   await p.screenshot({ path: `${OUT}/${WORLD}_menu${VTAG}.png` });
+  await freeze(p, '#menu');
   rec.contrast.push(await contrast(p, '#menu .logo i', 'menu THE CUTE'));
   rec.contrast.push(await contrast(p, '#menu .logo', 'menu logo'));
   rec.contrast.push(await contrast(p, '#menu .tag', 'menu tag'));
-  if (SPLASH_ONLY) { await b.close(); writeFileSync(`${OUT}/${WORLD}${VTAG}.json`, JSON.stringify(rec, null, 1)); for (const c of rec.contrast) { if (c.missing) continue; const large = parseFloat(c.size) >= 18.66; const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar`); } } continue; }
+  await thaw(p);
+  if (SPLASH_ONLY) { await b.close(); writeFileSync(`${OUT}/${WORLD}${VTAG}.json`, JSON.stringify(rec, null, 1)); for (const c of rec.contrast) { if (c.missing) continue; if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66; const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar`); } } continue; }
   // 3. PLAY → the picker → the world card → the intro. Loaded with ?w=<world>
   //    so the card click starts the match in THIS document: the plain path
   //    reloads the page on the card (the tap-gate note in the brief) and the
@@ -184,7 +208,7 @@ for (const { WORLD, v } of RUNS) {
   }
   await b.close();
   writeFileSync(`${OUT}/${WORLD}${FTAG}.json`, JSON.stringify(rec, null, 1));
-  for (const c of rec.contrast) { if (c.missing) continue; const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
+  for (const c of rec.contrast) { if (c.missing) continue; if (!c.glyphPx) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: no glyph pixels found — the measurement did not run`); continue; } const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
 }
 if (fails) process.exitCode = 1;
 console.log(fails ? `FAIL — firstframe: ${fails} splash line(s) under their WCAG bar against the real pixels behind the glyphs` : `PASS — firstframe: every splash line clears its WCAG bar against the real pixels behind the glyphs; frames in ${OUT}/`);

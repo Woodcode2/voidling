@@ -1164,8 +1164,21 @@
       @keyframes gatePulse {
         0%, 100% { transform: scale(1); box-shadow: 0 0 22px rgba(184,117,255,0.25); }
         50% { transform: scale(1.05); box-shadow: 0 0 34px rgba(184,117,255,0.55); } }
+      /* THE LOCKUP RIDES AT THE TOP, WHERE THE ART KEEPS SKY — and at the
+         menu's exact spec, so the crossfade from loader to menu moves nothing.
+         Bottom-anchored (justify-content:flex-end; padding-bottom:7vh) it sat
+         on the void's face on every short viewport: measured against the real
+         pixels behind the glyphs, "THE CUTE" read 3.51:1 at 440x814, 1.82:1 at
+         393x700 and 1.09:1 at 375x667 against a 4.5:1 bar, and 1.72:1 on the
+         owner's own phone (docs/owner-2026-08-29-splash.png; the numbers are in
+         docs/crews/round-5/firstframe-data/). Both screens place the art at
+         13vh from the top and its own top ~3% is empty sky, so a fixed-pixel
+         lockup at 6vh clears the skyline at every phone and gains room as
+         phones get taller. The bar cluster keeps the bottom (margin-top:auto
+         on the wrap). */
       #loadScr { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
-        justify-content: flex-end; padding-bottom: 7vh; box-sizing: border-box; gap: 13px;
+        justify-content: flex-start; padding: calc(6vh + env(safe-area-inset-top, 0px)) 16px calc(7vh + env(safe-area-inset-bottom, 0px));
+        box-sizing: border-box; gap: 13px;
         background:
           /* THE LOADING SCREEN WAS THE HALF-SIZE FILE, SCALED UP HARDER THAN THE
              MENU SCALES THE FULL ONE — 78vh of a 768px-wide image against the
@@ -1179,14 +1192,33 @@
          rendered frame, so the island build is covered rather than hidden
          behind a menu whose button cannot answer yet */
       #loadScr.boot { display: flex; }
-      #loadScr .lLogo { font-size: 26px; font-weight: 700; letter-spacing: 3px; color: #fff; line-height: 1.05; text-align: center; text-shadow: 0 0 24px #b875ff; }
-      #loadScr .lLogo i { display: block; font-style: normal; font-size: 12px; letter-spacing: 7px; color: #ffd9f2; }
-      #loadScr .lName { font-size: 14px; letter-spacing: 6px; color: #ffd23f; font-weight: 700; }
+      #loadScr .lLogo { font-size: clamp(40px, 8vw, 68px); font-weight: 700; letter-spacing: 2px; color: #fff;
+        line-height: 1.02; text-align: center; text-shadow: 0 0 34px rgba(147,80,232,0.9), 0 4px 12px rgba(0,0,0,0.65); }
+      #loadScr .lLogo i { display: block; font-style: normal; font-size: 0.44em; letter-spacing: 8px; color: #ffd9f2;
+        margin-bottom: 2px; text-shadow: 0 0 18px rgba(255,150,220,0.8), 0 2px 8px rgba(0,0,0,0.65); }
+      /* the line under the wordmark is the MENU'S TAG unless a world is being
+         entered — the name was printed twice, in white and then in yellow
+         (the owner's second complaint) */
+      #loadScr .lName { font-size: clamp(11px, 1.6vw, 15px); letter-spacing: 7px; color: #fff; font-weight: 700;
+        margin-top: 2px; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
+      #loadScr .lName.world { font-size: 14px; letter-spacing: 6px; color: #ffd23f; }
+      #loadScr .lBarWrap { margin-top: auto; }
       .lBarWrap { width: min(340px, 72vw); height: 14px; border-radius: 9px; background: rgba(255,255,255,0.12);
         border: 2px solid rgba(168,123,255,0.4); overflow: hidden; }
       #lBar { height: 100%; width: 0%; border-radius: 7px; background: linear-gradient(90deg, #7b4fe0, #b875ff, #ffd23f); transition: width 0.25s; }
       #lPct { color: #cbb2ff; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
       #loadScr .lTip { color: #9a86c8; font-size: 11.5px; max-width: 78vw; text-align: center; font-weight: 500; }
+      /* SHORT PHONES. The art is placed in vh on both screens and its skyline
+         reaches the type first on a 667-tall phone: STARRING THE VOIDLINGS
+         measured 1.16:1 at 375x667 and 3.8:1 at 393x700 against a 4.5:1 bar.
+         Tighten the block rather than shrink the art — the key art is
+         approved and must not move. */
+      @media (max-height: 720px) {
+        #menu, #loadScr { padding-top: calc(3vh + env(safe-area-inset-top, 0px)); }
+        #menu .logo, #loadScr .lLogo { line-height: 1; font-size: clamp(34px, 7.4vw, 68px); }
+        #menu .logo i, #loadScr .lLogo i { margin-bottom: 0; }
+        #menu .tag, #loadScr .lName { font-size: 10px; letter-spacing: 5px; margin-top: 1px; }
+      }
       #menu button { font-family: inherit; cursor: pointer; border: none; color: #fff; }
       #btnPlay { font-size: 24px; font-weight: 700; letter-spacing: 3px; padding: 16px 76px; border-radius: var(--r-md);
         background: linear-gradient(180deg, #ff5d7e, #ff2450);
@@ -1941,7 +1973,7 @@
       <div class="lName">&nbsp;</div>
       <div class="lBarWrap"><div id="lBar"></div></div>
       <div id="lPct">0%</div>
-      <div class="lTip">tip: eat the little stuff first — cones, hydrants, mailboxes</div>
+      <div class="lTip">Waking up…</div>
     </div>
 
     <!-- ── trophies ── -->
