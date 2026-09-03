@@ -1,0 +1,25 @@
+
+══ PIRATE ══  3361 static props (24 benches, 0 houses w/ doors), audited in 16s  FAIL
+   category      n  verdict  worst
+   road          15  FAIL  #2295 prop r=1.4 foot=2.0x1.8 h=1.3 at (129.8,-48.0) [5.24] | #3356 bldg r=4 foot=71.4x1.4 h=12.6 at (-92.0,-45.0) [5.08] | #3223 prop r=1.8 foot=1.2x1.2 h=3.7 at (-138.0,111.8) [5.03]
+   water          0  ok    
+   offisland      5  FAIL  #303 bldg r=4.8 foot=4.8x3.9 h=6.8 at (83.6,242.2) | #322 bldg r=4.8 foot=4.0x6.3 h=6.2 at (-149.6,-213.1) | #345 bldg r=4.8 foot=6.5x5.2 h=6.2 at (19.0,143.4)
+   overhang      65  info  #346 bldg r=4.8 foot=4.2x6.0 h=6.8 at (171.8,220.2) [2] | #364 bldg r=5.6 foot=8.7x8.6 h=10.6 at (104.5,240.2) [2] | #371 bldg r=5.6 foot=10.3x10.8 h=9.9 at (-77.1,185.8) [2]
+   float          0  ok    
+   sunk         481  info  #1155 prop r=0.5 foot=1.0x0.8 h=0.3 at (-123.3,125.2) top 0.28 min 0.00 | #1156 prop r=0.5 foot=1.0x0.8 h=0.3 at (73.7,-218.2) top 0.28 min 0.00 | #1157 prop r=0.5 foot=1.0x0.8 h=0.3 at (181.4,201.7) top 0.28 min 0.00
+   inside         1  FAIL  #1975 prop r=1.4 foot=2.0x1.8 h=1.3 at (171.1,-56.0) INSIDE #2288 bldg r=3 foot=6.4x6.4 h=6.9 at (169.1,-58.8) [-0.26]
+   under         29  info  #2774 bldg r=2.6 foot=0.8x0.8 h=7.5 at (-122.9,18.9) under #3357 bldg r=5 foot=11.6x9.8 h=10.4 at (-124.5,16.3) [1.79] | #2082 prop r=1.4 foot=2.1x0.8 h=1.7 at (40.9,-134.9) under #2053 bldg r=7.5 foot=31.2x15.6 h=17.5 at (41.7,-128.8) [1.73] | #2299 prop r=1.4 foot=2.0x1.8 h=1.3 at (167.3,-56.9) under #2288 bldg r=3 foot=6.4x6.4 h=6.9 at (169.1,-58.8) [0.59]
+   overlap       49  FAIL  #877 prop r=1.6 foot=3.0x2.5 h=1.9 at (-122.8,10.0) x #3357 bldg r=5 foot=11.6x9.8 h=10.4 at (-124.5,16.3) [1.76] | #1989 bldg r=2.6 foot=1.7x1.7 h=7.8 at (167.6,-64.8) x #3354 prop r=2.4 foot=3.5x2.8 h=2.3 at (167.3,-65.5) [1.7] | #2053 bldg r=7.5 foot=31.2x15.6 h=17.5 at (41.7,-128.8) x #2058 prop r=2 foot=3.1x2.2 h=2.2 at (46.3,-141.0) [1.32]
+   clutter       71  info  #825 prop r=1.6 foot=2.8x2.3 h=1.8 at (-91.0,159.7) x #3344 prop r=2.4 foot=3.4x2.1 h=1.2 at (-91.4,159.7) [2.11] | #2180 prop r=1.3 foot=1.9x1.9 h=2.2 at (13.7,-161.1) x #3358 prop r=2.2 foot=5.1x3.9 h=0.7 at (13.8,-162.3) [1.89] | #2825 prop r=1.6 foot=3.6x3.0 h=2.3 at (-141.0,-2.6) x #2839 prop r=1.6 foot=3.9x3.2 h=2.5 at (-143.6,-1.7) [1.45]
+   roadend        1  FAIL  PROMENADE end 1 at (40.0,214.0) joins NOTHING | PROMENADE end 0 at (-0.8,-255.0) joins coast | TRAIL end 0 at (52.5,-172.5) joins PROMENADE | TRAIL end 1 at (-135.0,134.5) joins coast
+   door           0  ok    
+   bench          0  ok    
+   benchaway      0  info  
+   piste          0  info  
+   ice            0  info  
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-pirate-overlap-0.png  <- #433 bldg r=5.6 foot=8.7x8.6 h=11.5 at (178.8,-17.7) x #2045 bldg r=5.5 foot=14.4x10.0 h=4.3 at (171.2,-19.7)  (screen 210,366)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-pirate-overlap-1.png  <- #2420 bldg r=5.5 foot=14.4x10.0 h=4.3 at (152.7,14.9) x #2473 bldg r=7.5 foot=21.0x13.0 h=8.0 at (157.5,27.5)  (screen 216,376)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-pirate-inside-0.png  <- #2865 bldg r=2.6 foot=0.8x0.8 h=7.5 at (-85.1,-84.4) INSIDE #2915 bldg r=9 foot=20.0x20.3 h=23.4 at (-84.9,-89.9)  (screen 218,399)
+   shot /home/user/voidling/artifacts/3d-game/docs/crews/round-5/shots/placement-s7v/after-pirate-roadend-0.png  <- PROMENADE end 1 at (40.0,214.0) joins NOTHING  (screen 218,409)
+
+PLACEMENT FAIL — pirate  (bars: road lip 0.25, float 0.3, buried top 0.6, overlap 0.35, door 1.6, ground 1)
