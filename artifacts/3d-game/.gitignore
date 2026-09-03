@@ -42,3 +42,8 @@ store/.previous/
 qa/out/moverface/
 qa/out/crowdface/
 qa/_scratch/
+
+# Stream B materials A/B frames (before/rung2/rung3 per world) — the cited
+# frame of each lives in docs/crews/round-5/shots/materials/, same rule.
+qa/out/lookpair/*_before.*
+qa/out/lookpair/*_rung[0-9].*
