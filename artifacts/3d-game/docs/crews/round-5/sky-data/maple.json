@@ -1,0 +1,206 @@
+{
+ "world": "maple",
+ "introLen": 2.2,
+ "samples": [
+  {
+   "label": "u1",
+   "t": 0.1,
+   "R": 0.9,
+   "camY": 102,
+   "camDist": 141,
+   "bodies": [
+    {
+     "size": 116,
+     "d": 798,
+     "ndc": [
+      -0.448,
+      -0.583
+     ],
+     "cx": 119,
+     "cy": 737,
+     "pxR": 120,
+     "viewFrac": 0.98,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 183.1,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 34,
+     "d": 654,
+     "ndc": [
+      0.217,
+      -1.87
+     ],
+     "cx": 262,
+     "cy": 1338,
+     "pxR": 48,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    }
+   ],
+   "Lspace": 59.9
+  },
+  {
+   "label": "u05",
+   "t": 1.13,
+   "R": 0.9,
+   "camY": 89,
+   "camDist": 123,
+   "bodies": [
+    {
+     "size": 116,
+     "d": 754,
+     "ndc": [
+      -0.476,
+      -0.616
+     ],
+     "cx": 113,
+     "cy": 753,
+     "pxR": 127,
+     "viewFrac": 0.94,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 159.9,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 34,
+     "d": 614,
+     "ndc": [
+      0.234,
+      -2.026
+     ],
+     "cx": 265,
+     "cy": 1410,
+     "pxR": 52,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    }
+   ],
+   "Lspace": 35.4
+  },
+  {
+   "label": "u0",
+   "t": 2.52,
+   "R": 0.97,
+   "camY": 28,
+   "camDist": 39,
+   "bodies": [
+    {
+     "size": 116,
+     "d": 760,
+     "ndc": [
+      -0.472,
+      -0.632
+     ],
+     "cx": 113,
+     "cy": 761,
+     "pxR": 126,
+     "viewFrac": 0.94,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 164,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 34,
+     "d": 620,
+     "ndc": [
+      0.232,
+      -2.03
+     ],
+     "cx": 265,
+     "cy": 1412,
+     "pxR": 52,
+     "viewFrac": 0,
+     "occFrac": null,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": null,
+     "flags": [
+      "off"
+     ]
+    }
+   ],
+   "Lspace": 63.1
+  },
+  {
+   "label": "far",
+   "t": 6.25,
+   "R": 8.7,
+   "camY": 221,
+   "camDist": 243,
+   "bodies": [
+    {
+     "size": 116,
+     "d": 760,
+     "ndc": [
+      -0.471,
+      0.55
+     ],
+     "cx": 114,
+     "cy": 210,
+     "pxR": 126,
+     "viewFrac": 0.94,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 110.7,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    },
+    {
+     "size": 34,
+     "d": 620,
+     "ndc": [
+      0.205,
+      -0.675
+     ],
+     "cx": 259,
+     "cy": 781,
+     "pxR": 45,
+     "viewFrac": 1,
+     "occFrac": 1,
+     "opacity": 1,
+     "depthTest": true,
+     "blending": 1,
+     "Lplanet": 143.4,
+     "flags": [
+      "HIDDEN-ISLAND"
+     ]
+    }
+   ],
+   "Lspace": 85.5
+  }
+ ]
+}
