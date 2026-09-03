@@ -1505,14 +1505,33 @@ const COPY = WORLD_COPY[pickedWorld];
 // which is why each label names what the player is actually waiting for.
 // The double-rAF is the guarantee that the label paints before the next chunk
 // starts; a single rAF only schedules it.
-const bootStage = (label: string): Promise<void> => {
+// …AND THE BAR MOVES WITH THEM. It was written only by the asset pack's
+// progress callback, which starts AFTER the island exists, so a child watched
+// "0%" under an unmoving bar for the whole build — the owner's own screenshot
+// (docs/owner-2026-08-29-splash.png) reads 0% under "Waking the void family…",
+// which is the LAST stage. A number that does not change is the "is it frozen?"
+// signal every shipped loader avoids. The stages own 0-60 and the pack 60-100
+// (see the preload callback below); both are latched monotonic.
+let bootPct = 0;
+const bootBar = (pct: number) => {
+  if (pct <= bootPct) return;
+  bootPct = pct;
+  const bar = document.getElementById('lBar'), lab = document.getElementById('lPct');
+  if (bar) bar.style.width = pct + '%';
+  if (lab) lab.textContent = pct + '%';
+};
+const bootStage = (label: string, pct = 0): Promise<void> => {
   const tip = document.querySelector('#loadScr .lTip');
   if (tip) tip.textContent = label;
+  if (pct) bootBar(pct);
   return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 };
-await bootStage('Raising the island…');
-const island = await createIsland(scene, addEdible, bootStage);
-await bootStage('Opening the streets…');
+await bootStage('Raising the island…', 5);
+// the island's own fourteen seams (island.ts `breathe`) walk the bar from 6 to
+// 20 — that build is the longest stretch a child waits through
+let _islandSeam = 0;
+const island = await createIsland(scene, addEdible, (l) => bootStage(l, Math.min(20, 6 + Math.round(_islandSeam++ * 1.1))));
+await bootStage('Opening the streets…', 22);
 
 // ══ THE SCRAPBOOK, IN THE WORLD ═══════════════════════════════════════════
 // One hidden curio per sticker this world has, dropped in the district its
@@ -2006,7 +2025,7 @@ const OVERLAYS = ['worlds', 'shop', 'daily', 'settings', 'trophies', 'skinPrev',
   vis();
 }
 const bubbles = createBubbles(camera);
-await bootStage('Letting everyone in…');
+await bootStage('Letting everyone in…', 42);
 const life = createLife(scene, addEdible, island.biomeAt, bubbles.say);
 // QA: the crowd gate. `life` is exposed so qa/crowdgate.mjs can time
 // life.update() directly with the gate on and off, isolating the crowd from
@@ -2409,7 +2428,7 @@ _dbg.__moverStats = (gate: number) => life.moverStats(gate);
 // The older comment in rivals.ts about 3/4/5 rivals is about the ratio between
 // the player and the top rival, not about whether the race is winnable, and I
 // read it as support for a change it does not support.
-await bootStage('Waking the void family…');
+await bootStage('Waking the void family…', 58);
 const rivals = createRivals(scene, camera, edibles, island.biomeAt, 3 + Math.floor(Math.random() * 3));
 const fx = createFx(scene);
 /** QA: the juice kit itself, so a harness can fire a shake or a ring on demand
@@ -5641,7 +5660,7 @@ let loadFinal = false, loadPct = 0;
 // the world builders maintain by construction.
 const preloadP = requestedReady((done, total) => {
   if (loadFinal) return;
-  const pct = total > 0 ? Math.round((done / total) * 100) : 100;
+  const pct = 60 + (total > 0 ? Math.round((done / total) * 40) : 40);
   // belt and braces on the NaN: `NaN <= loadPct` is false, so an unguarded
   // divide-by-zero sails through the monotonic check and writes NaN% to the
   // bar. requestedReady no longer reports 0/0, and this could not print it

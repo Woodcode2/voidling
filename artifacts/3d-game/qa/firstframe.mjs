@@ -147,6 +147,21 @@ for (const { WORLD, v } of RUNS) {
   await p.screenshot({ path: `${OUT}/${WORLD}_boot${VTAG}.png` });
   const bootName = await p.evaluate(() => document.querySelector('#loadScr .lName')?.textContent.trim());
   const bootTip = await p.evaluate(() => document.querySelector('#loadScr .lTip')?.textContent.trim());
+  // THE BAR MOVES. Sample #lPct across the build: a loader that shows one value
+  // for the whole wait is the "is it frozen?" signal (the owner's own frame
+  // reads 0% under "Waking the void family…", the LAST stage).
+  const pcts = await p.evaluate(() => new Promise((res) => {
+    const seen = new Set(), t0 = performance.now();
+    const tick = () => {
+      const el = document.getElementById('lPct'); if (el) seen.add(el.textContent.trim());
+      const up = document.querySelector('#loadScr.show, #loadScr.boot');
+      if (!up || performance.now() - t0 > 60000) res([...seen]); else requestAnimationFrame(tick);
+    };
+    tick();
+  }));
+  rec.loaderPcts = pcts;
+  console.log(`  loader bar: ${pcts.length} distinct value(s) — ${pcts.join(' ')}`);
+  if (pcts.length < 3) { fails++; console.log(`  FAIL-LINE ${WORLD} ${VP.width}x${VP.height}: the loading bar showed ${pcts.length} value(s) for the whole build`); }
   console.log(`  boot loader: lName "${bootName}"  tip "${bootTip}"`);
   rec.bootName = bootName;
   const logoText = await p.evaluate(() => document.querySelector('#loadScr .lLogo')?.textContent.replace(/\s+/g, ' ').trim());
