@@ -17,7 +17,7 @@ await p.evaluate(() => window.__setVoidR?.(8));
 const t0 = await p.evaluate(() => window.__matchState().t);
 await p.waitForFunction((x) => (window.__matchState?.().t ?? 0) > x, t0 + 3.5, { timeout: 600000 });
 const r = await p.evaluate(() => {
-  const THREE = window.__THREE, cam = window.__cam, scene = window.__scene; cam.updateMatrixWorld(true);
+  const THREE = window.__THREE, cam = window.__cam, scene = window.__scene; cam.updateMatrixWorld(true); const camPos = cam.getWorldPosition(new THREE.Vector3());   // WORLD position: camPos is local and lied (occ 1 on visible planets)
   const up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1).normalize();
   const all = []; scene.traverse((o) => { if ((o.isMesh || o.isPoints) && !o.isSprite && o.visible) all.push(o); });
   const ray = new THREE.Raycaster(); const out = [];
@@ -25,13 +25,13 @@ const r = await p.evaluate(() => {
   scene.traverse((sp) => { if (!(sp.isSprite && sp.userData.planet)) return;
     const C = sp.getWorldPosition(new THREE.Vector3()), s = sp.scale.x;
     for (const [label, P] of [['centre', C.clone()], ['bottom', C.clone().addScaledVector(up, -s / 2 * 0.9)], ['top', C.clone().addScaledVector(up, s / 2 * 0.9)]]) {
-      const n = P.clone().project(cam); const dir = P.clone().sub(cam.position); const L = dir.length(); dir.normalize();
-      ray.set(cam.position, dir); ray.near = 0.5; ray.far = L;
+      const n = P.clone().project(cam); const dir = P.clone().sub(camPos); const L = dir.length(); dir.normalize();
+      ray.set(camPos, dir); ray.near = 0.5; ray.far = L;
       const hits = ray.intersectObjects(all, false).slice(0, 3);
       out.push(`size ${s} ${label}: ndc(${n.x.toFixed(2)},${n.y.toFixed(2)}) dist ${L.toFixed(0)} -> ` + (hits.length ? hits.map((h) => `${h.distance.toFixed(0)}u ${desc(h.object)}`).join(' | ') : 'NOTHING (visible)'));
     }
   });
-  return { camY: cam.position.y.toFixed(0), far: cam.far, out };
+  return { camY: camPos.y.toFixed(0), far: cam.far, out };
 });
 console.log(`${WORLD} far frame: camY ${r.camY}, camera far ${r.far}`); for (const l of r.out) console.log('  ' + l);
 await b.close();

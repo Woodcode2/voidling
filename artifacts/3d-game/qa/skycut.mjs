@@ -46,7 +46,7 @@ await p.evaluate(() => { const cv = document.querySelector('canvas'); for (const
 const measure = () => {
   const THREE = window.__THREE, cam = window.__cam, scene = window.__scene;
   const W = innerWidth, H = innerHeight;
-  cam.updateMatrixWorld(true);
+  cam.updateMatrixWorld(true); const camPos = cam.getWorldPosition(new THREE.Vector3());   // WORLD position: camPos is local and lied (occ 1 on visible planets)
   const bodies = [], meshes = [];
   const hero = window.__voidGroup?.();
   scene.traverse((o) => { if (o.isSprite && o.userData.planet) bodies.push(o); else if (o.isMesh && !o.isSprite && !o.isPoints && o.visible && (!hero || !hero.getObjectById(o.id))) meshes.push(o); });
@@ -56,7 +56,7 @@ const measure = () => {
   const out = [];
   for (const sp of bodies) {
     const C = sp.getWorldPosition(new THREE.Vector3()), s = sp.scale.x;
-    const dist = C.distanceTo(cam.position);
+    const dist = C.distanceTo(camPos);
     const pts = [C.clone()];
     for (const rr of [0.5, 1.0]) for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; pts.push(C.clone().addScaledVector(right, rr * s / 2 * Math.cos(a)).addScaledVector(up, rr * s / 2 * Math.sin(a))); }
     let inView = 0, occ = 0, minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
@@ -68,8 +68,8 @@ const measure = () => {
       minx = Math.min(minx, px); maxx = Math.max(maxx, px); miny = Math.min(miny, py); maxy = Math.max(maxy, py);
       if (!vis) continue;
       inView++;
-      dir.copy(P).sub(cam.position); const L = dir.length(); dir.normalize();
-      ray.set(cam.position, dir); ray.near = 0.5; ray.far = L - 1;
+      dir.copy(P).sub(camPos); const L = dir.length(); dir.normalize();
+      ray.set(camPos, dir); ray.near = 0.5; ray.far = L - 1;
       if (ray.intersectObjects(meshes, false).length) occ++;
     }
     const cN = C.clone().project(cam);
@@ -78,7 +78,7 @@ const measure = () => {
       opacity: sp.material.opacity, depthTest: sp.material.depthTest, blending: sp.material.blending });
   }
   const vs = window.__voidState(), ms = window.__matchState();
-  return { t: +ms.t.toFixed(2), R: +vs.r.toFixed(2), camY: Math.round(cam.position.y), camDist: Math.round(cam.position.distanceTo(new THREE.Vector3(vs.x, 0, vs.z))), bodies: out };
+  return { t: +ms.t.toFixed(2), R: +vs.r.toFixed(2), camY: Math.round(camPos.y), camDist: Math.round(camPos.distanceTo(new THREE.Vector3(vs.x, 0, vs.z))), bodies: out };
 };
 const lum = (png, x0, y0, w, h) => { let s = 0, n = 0; for (let y = Math.max(0, y0); y < Math.min(png.height, y0 + h); y++) for (let x = Math.max(0, x0); x < Math.min(png.width, x0 + w); x++) { const i = (y * png.width + x) * 4; s += 0.2126 * png.data[i] + 0.7152 * png.data[i + 1] + 0.0722 * png.data[i + 2]; n++; } return n ? s / n : 0; };
 const samples = [];
@@ -90,16 +90,21 @@ const take = async (label) => {
   if (png) { Lspace = 1e9; for (let x = 0; x + 20 <= png.width; x += 41) Lspace = Math.min(Lspace, lum(png, x, 8, 20, 20)); Lspace = +Lspace.toFixed(1); }
   for (const bd of m.bodies) {
     bd.Lplanet = png && bd.viewFrac > 0 ? +lum(png, bd.cx - 6, bd.cy - 6, 13, 13).toFixed(1) : null;
+    // SHADING RANGE: luminance along the lit-to-dark diameter (upper-left to
+    // lower-right, the way paint() lights the body). A sticker is flat; a lit
+    // sphere has a range. Sampled at 7 points inside 0.8 R.
+    if (png && bd.viewFrac > 0.5 && bd.pxR > 8) { const Ls = []; for (let k = -3; k <= 3; k++) { const x = Math.round(bd.cx + k * bd.pxR * 0.8 / 3 * 0.7071), y = Math.round(bd.cy + k * bd.pxR * 0.8 / 3 * 0.7071); if (x >= 2 && y >= 2 && x < png.width - 2 && y < png.height - 2) Ls.push(lum(png, x - 2, y - 2, 5, 5)); } if (Ls.length >= 5) { bd.Lrange = +(Math.max(...Ls) - Math.min(...Ls)).toFixed(1); bd.Lprofile = Ls.map((v) => Math.round(v)); } }
     const flags = [];
     if (bd.viewFrac > 0.1 && bd.viewFrac < 0.9) flags.push('CUT-FRAME');
     if (bd.viewFrac > 0.1 && bd.occFrac !== null && bd.occFrac > 0.1 && bd.occFrac < 0.9) flags.push('CUT-ISLAND');
     if (bd.viewFrac > 0.1 && bd.occFrac !== null && bd.occFrac >= 0.9) flags.push('HIDDEN-ISLAND');
     if (bd.viewFrac === 0) flags.push('off');
+    if (bd.Lrange !== undefined && bd.Lrange < 45) flags.push('FLAT');
     if (bd.Lplanet !== null && bd.viewFrac > 0.5 && bd.occFrac < 0.5 && (bd.Lplanet < 90 || (Lspace !== null && bd.Lplanet < 2.5 * Lspace))) flags.push('FADED');
     bd.flags = flags;
   }
   samples.push({ label, ...m, Lspace });
-  console.log(`  ${label.padEnd(6)} t=${m.t} R=${m.R} camDist=${m.camDist} Lspace=${Lspace}  ` + m.bodies.map((bd) => `[size ${bd.size} d ${bd.d}: view ${bd.viewFrac} occ ${bd.occFrac} pxR ${bd.pxR} at (${bd.cx},${bd.cy}) L ${bd.Lplanet} ${bd.flags.join('+') || 'clean'}]`).join(' '));
+  console.log(`  ${label.padEnd(6)} t=${m.t} R=${m.R} camDist=${m.camDist} Lspace=${Lspace}  ` + m.bodies.map((bd) => `[size ${bd.size} d ${bd.d}: view ${bd.viewFrac} occ ${bd.occFrac} pxR ${bd.pxR} at (${bd.cx},${bd.cy}) L ${bd.Lplanet} range ${bd.Lrange ?? '-'} ${bd.flags.join('+') || 'clean'}]`).join(' '));
 };
 console.log(`\n══ ${WORLD.toUpperCase()} ══  introLen ${INTRO}s`);
 await take('u1');
