@@ -894,10 +894,20 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
         { d: 660, el: -76, az: AZ - 0.11, size: 32, hue: '#9fe8d0', dark: '#0f2e2a', glow: '#c8f4e6' },
       ],
     };
+    // THE RING WAS CUT BY THE CANVAS. The disc is painted at R = 0.40 S, and the
+    // ring's three arcs run out to 1.64 R plus half a line — 274, 305 and 336 px
+    // on a 512 canvas whose half-width is 256. So on every ringed world (Pirate,
+    // Powder) the ring's far reaches were sliced flat by the sprite's own square,
+    // which is exactly what the owner saw: "like an image was half cut and put on
+    // there" (2026-09-03, qa/skycut.mjs). The disc now sits at R = 0.29 S so the
+    // widest ring arc ends at 0.49 S, inside the square with a margin, and the
+    // sprite is scaled by DISC_FIT so the body keeps the on-screen size the
+    // SKIES table was tuned for. S goes to 640 so the disc keeps its pixels.
+    const DISC_R = 0.29, DISC_FIT = 0.40 / DISC_R;
     const paint = (bd: Body) => {
-      const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+      const S = 640, c = document.createElement('canvas'); c.width = c.height = S;
       const g = c.getContext('2d')!;
-      const R = S * 0.40, cx = S / 2, cy = S / 2;
+      const R = S * DISC_R, cx = S / 2, cy = S / 2;
       // the ring goes down FIRST for its back half, then again after the disc
       const ringPass = (front: boolean) => {
         if (!bd.ring) return;
@@ -956,7 +966,7 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       const e = bd.el * Math.PI / 180;
       sp.position.set(Math.cos(e) * Math.cos(bd.az) * bd.d, Math.sin(e) * bd.d,
         Math.cos(e) * Math.sin(bd.az) * bd.d);
-      sp.scale.set(bd.size, bd.size, 1);
+      sp.scale.set(bd.size * DISC_FIT, bd.size * DISC_FIT, 1);   // see DISC_FIT: the disc, not the canvas, is bd.size
       sp.renderOrder = -1;   // behind the island's own transparent work
       // TAGGED, so a probe never has to guess which sprites these are. The
       // heuristic it replaces — a 512px map, parented to the Scene, scaled past
