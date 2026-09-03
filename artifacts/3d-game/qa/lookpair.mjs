@@ -104,6 +104,13 @@ const WORLD = process.argv[3] || 'maple';
 // and left the pack the teams actually read untouched for 46 hours. The
 // canonical shot overwrites itself.
 const TAG = process.argv[4] || 'look';
+// HIDE_RIVALS=1: the family is hidden at the shutter. A rival that wanders
+// into one half of a pair brings a body and a ring the other half lacks —
+// Lantern's before/rung2 pair of 2026-09-03 read K 50 → 47 (−6%) with NIBBLES
+// and his ring beside the hero in one frame only, and rung 2 cannot darken
+// anything by construction. A light-rig comparison measures light, not who
+// walked past; the count hidden is printed and the default is unchanged.
+const HIDE_RIVALS = process.env.HIDE_RIVALS === '1';
 const OUT = 'qa/out/lookpair';
 
 // ── THE PINS ──────────────────────────────────────────────────────────────
@@ -458,7 +465,7 @@ try {
   // ── VERIFY THE WARP TOOK, BEFORE THE SHUTTER, NOT AFTER ─────────────────
   // If he is not on the spot, the frame is a photograph of somewhere else and
   // every comparison drawn from it is worthless. Fail loudly instead.
-  const fin = await p.evaluate(({ x, z, r }) => {
+  const fin = await p.evaluate(({ x, z, r, hide }) => {
     const THREE = window.__THREE, cam = window.__cam;
     // THE LAST PINS AND THE READING HAPPEN IN THE SAME TICK, and that order was
     // learned the hard way. An earlier version re-asserted the radius and THEN
@@ -502,13 +509,25 @@ try {
       o.visible = false; rings++;
     }
     const vs = window.__voidState(), ms = window.__matchState();
+    // HIDE_RIVALS: every direct scene child parked on a rival's (x, z) — the
+    // body group sits at y≈r, its halo ring at y=0.14 (rivals.ts) — except
+    // anything on the hero's own spot.
+    let hidden = 0;
+    if (hide) for (const rv of ms.rivals) {
+      if (!rv.joined) continue;
+      for (const o of window.__scene.children) {
+        if (!o.visible || Math.hypot(o.position.x - rv.x, o.position.z - rv.z) > 2.5) continue;
+        if (Math.hypot(o.position.x - vs.x, o.position.z - vs.z) < 0.5) continue;
+        o.visible = false; hidden++;
+      }
+    }
     const wp = new THREE.Vector3(vs.x, vs.r, vs.z);
     const sp = wp.clone().project(cam);
     const camD = Math.max(1, cam.position.distanceTo(wp));
     return {
       x: vs.x, z: vs.z, r: vs.r, t: ms.t, camDist: ms.camDist, q: window.__quality(),
       off: Math.hypot(vs.x - x, vs.z - z),
-      dr: Math.abs(vs.r - r), drift, rings,
+      dr: Math.abs(vs.r - r), drift, rings, hidden,
       cx: (sp.x * 0.5 + 0.5) * innerWidth,
       cy: (1 - (sp.y * 0.5 + 0.5)) * innerHeight,
       pxR: (innerHeight / (2 * camD * Math.tan(cam.fov * Math.PI / 360))) * vs.r,
@@ -552,7 +571,7 @@ try {
         return { props, biggest };
       })(),
     };
-  }, { x: spot.x, z: spot.z, r: R });
+  }, { x: spot.x, z: spot.z, r: R, hide: HIDE_RIVALS });
   if (fin.off > POS_TOL || fin.dr > R_TOL || fin.q.pinned !== RUNG) {
     fail(`${WORLD} — the pins did not hold at the shutter: `
       + `wanted (${spot.x.toFixed(2)}, ${spot.z.toFixed(2)}) r${R} rung${RUNG}, `
@@ -634,6 +653,7 @@ try {
     + `mood=${fin.face?.mood ?? '?'} maw=${fin.face ? fin.face.maw.toFixed(3) : '?'} `
     + `smile=${fin.face?.smile} biting=${fin.face?.biting}`);
   console.log(`  props  ${fin.props} edibles in frame, biggest r=${fin.biggest.toFixed(2)}`);
+  if (HIDE_RIVALS) console.log(`  hidden ${fin.hidden} rival object(s) at the shutter (HIDE_RIVALS=1)`);
   console.log(`  family ${fin.family.length} rival(s) in frame${fin.family.length ? ': ' + fin.family.join(', ') : ''}`);
   console.log(`  lens   camDist=${fin.camDist.toFixed(1)}  void at (${fin.cx.toFixed(0)}, ${fin.cy.toFixed(0)}) r=${fin.pxR.toFixed(0)} css px`);
   console.log(`  rung   ${fin.q.level} pinned=${fin.q.pinned} pr=${fin.q.pr} shadows=${fin.q.shadows}`);
