@@ -31,6 +31,12 @@ const ARGS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = ARGS[0] || '4177';
 const WORLDS = ARGS.slice(1).length ? ARGS.slice(1) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
 const VIEWS_FLAG = (FLAGS.find((f) => f.startsWith('--views=')) || '').slice(8);
+// --first: the FIRST-EVER run — voidPlayed unset, so firstRun/teachDrag are true
+// and the DRAG pill, the welcome and the banner fire. The default pack shoots
+// a returning player (the choreography review's finding 5: the frame §2D asks
+// about had never been photographed). Frames are tagged _first.
+const FIRST = FLAGS.includes('--first');
+const FTAG = FIRST ? '_first' : '';
 const SEED = process.env.SEED ? Number(process.env.SEED) : null;
 const OUT = 'qa/out/firstframe';
 // VIEW=430x932@2 (default; the lookbook's phone) — the owner's 2026-08-29
@@ -76,16 +82,28 @@ async function contrast(p, sel, label) {
   return r;
 }
 
+// WHAT IS TALKING AT THIS MOMENT — the channel census the choreography team
+// asked for, read off the live DOM at the page shot: the card's computed
+// opacity (a wall-clock CSS animation), the hand, the guide pill, the banner,
+// the crowd's bubbles (.vb.show), the timer and the size label.
+const census = (p) => p.evaluate(() => {
+  const op = (id) => { const e = document.getElementById(id); return e ? +(+getComputedStyle(e).opacity).toFixed(2) : null; };
+  const ms = window.__matchState?.();
+  return { card: op('titlecard'), hand: !!document.querySelector('#hand.show'), guide: !!document.querySelector('#guide.show'), banner: op('banner'),
+    bubbles: document.querySelectorAll('.vb.show').length, timer: document.getElementById('timer')?.textContent.trim(), size: document.querySelector('#growth')?.textContent.replace(/\s+/g, ' ').trim().slice(0, 40),
+    intro: document.body.classList.contains('intro'), clock: ms ? +ms.clock.toFixed(1) : null, hudOp: op('timer') };
+});
 const shotPair = async (p, name, ms) => {
   await p.screenshot({ path: `${OUT}/${name}.png` });
   const t1 = await p.evaluate(() => window.__matchState?.().t ?? 0);
+  const ch = await census(p);
   // the canvas twin: hide everything that is not the canvas, shoot, restore
   await p.evaluate(() => { const cv = document.querySelector('canvas'); for (const el of Array.from(document.body.children)) if (el !== cv && !el.contains(cv)) { el.dataset.ffHid = el.style.display; el.style.display = 'none'; } });
   await p.screenshot({ path: `${OUT}/${name}_canvas.png` });
   await p.evaluate(() => { for (const el of Array.from(document.body.children)) if (el.dataset.ffHid !== undefined) { el.style.display = el.dataset.ffHid; delete el.dataset.ffHid; } });
   const t2 = await p.evaluate(() => window.__matchState?.().t ?? 0);
-  const rec = { moment: name, ...ms, tPage: +t1.toFixed(2), tCanvas: +t2.toFixed(2) };
-  console.log(`  shot ${name.padEnd(24)} page t=${rec.tPage}  canvas t=${rec.tCanvas}${ms.u !== undefined ? `  u=${ms.u}` : ''}`);
+  const rec = { moment: name, ...ms, tPage: +t1.toFixed(2), tCanvas: +t2.toFixed(2), ...ch };
+  console.log(`  shot ${name.padEnd(24)} page t=${rec.tPage}  canvas t=${rec.tCanvas}${ms.u !== undefined ? `  u=${ms.u}` : ''}  card ${ch.card}  hand ${ch.hand ? 1 : 0}  guide ${ch.guide ? 1 : 0}  banner ${ch.banner}  bubbles ${ch.bubbles}  timer ${ch.timer}  hud ${ch.hudOp}  clock ${ch.clock}`);
   return rec;
 };
 
@@ -99,10 +117,10 @@ for (const { WORLD, v } of RUNS) {
   const p = await b.newPage({ viewport: { width: VP.width, height: VP.height }, deviceScaleFactor: VP.dpr });
   p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
-  await p.addInitScript((seed) => {
-    try { localStorage.clear(); localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch { }
+  await p.addInitScript(({ seed, first }) => {
+    try { localStorage.clear(); if (!first) { localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); } localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch { }
     if (seed !== null) { let s = seed >>> 0; Math.random = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-  }, SEED);
+  }, { seed: SEED, first: FIRST });
   // 1. THE BOOT LOADER — the literal first frame of the app. Static markup with
   //    class="boot", painted before the module runs; shoot it the instant the
   //    document commits, then again once the module has filled .lName.
@@ -141,24 +159,31 @@ for (const { WORLD, v } of RUNS) {
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
-  await p.evaluate(() => document.getElementById('btnPlay')?.click());
-  await p.waitForTimeout(1400);
-  await p.screenshot({ path: `${OUT}/${WORLD}_picker.png` });
-  await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), WORLD);
+  // a first-ever launch may go straight into the world (goingStraightIn); a
+  // returning player gets the menu, PLAY, the picker and the card
+  const onMenu = await p.evaluate(() => { const m = document.getElementById('menu'); return !!m && getComputedStyle(m).display !== 'none' && (window.__matchState?.().t ?? 0) === 0; });
+  if (onMenu) {
+    await p.evaluate(() => document.getElementById('btnPlay')?.click());
+    await p.waitForTimeout(1400);
+    await p.screenshot({ path: `${OUT}/${WORLD}_picker${FTAG}.png` });
+    await p.evaluate((w) => document.querySelector(`#worldRow .wCard[data-world="${w}"]`)?.click(), WORLD);
+  } else console.log('  straight in: no menu (first-ever path)');
   const t0 = await p.evaluate(() => window.__matchState?.().t ?? -1);
   console.log(`  after the card: t=${t0.toFixed(2)}`);
   const L = INTRO_LEN[WORLD];
   // wait on the page's own frames, not on a polling interval: resolve the
   // first rAF whose match time has reached tt
   const waitT = (tt) => p.evaluate((tt) => new Promise((res) => { const f = () => { const t = window.__matchState?.().t ?? 0; if (t >= tt) res(t); else requestAnimationFrame(f); }; f(); }), tt);
-  const moments = [['u100', 0.06], ['u75', L * 0.25], ['u50', L * 0.5], ['u25', L * 0.75], ['u0', L], ['settled', L + 1.0]];
+  const moments = FIRST
+    ? [['u100', 0.06], ['u75', L * 0.25], ['u50', L * 0.5], ['u25', L * 0.75], ['u0', L], ['p05', L + 0.5], ['settled', L + 1.0], ['p2', L + 2.0], ['p3', L + 3.0], ['p4', L + 4.0]]
+    : [['u100', 0.06], ['u75', L * 0.25], ['u50', L * 0.5], ['u25', L * 0.75], ['u0', L], ['settled', L + 1.0]];
   for (const [name, t] of moments) {
     await waitT(t);
     const u = +Math.max(0, Math.min(1, 1 - t / L)).toFixed(2);
-    rec.shots.push(await shotPair(p, `${WORLD}_${name}`, { u, tWanted: +t.toFixed(2) }));
+    rec.shots.push(await shotPair(p, `${WORLD}_${name}${FTAG}`, { u, tWanted: +t.toFixed(2) }));
   }
   await b.close();
-  writeFileSync(`${OUT}/${WORLD}.json`, JSON.stringify(rec, null, 1));
+  writeFileSync(`${OUT}/${WORLD}${FTAG}.json`, JSON.stringify(rec, null, 1));
   for (const c of rec.contrast) { if (c.missing) continue; const large = parseFloat(c.size) >= 18.66 || (/CUTE|ENDER/.test(c.text) && parseFloat(c.size) >= 14); const bar = large ? 3 : 4.5; if (c.p10 < bar) { fails++; console.log(`  FAIL-LINE ${WORLD} ${c.label}: p10 ${c.p10}:1 under the ${bar}:1 bar (${large ? 'large' : 'body'} text)`); } }
 }
 if (fails) process.exitCode = 1;
