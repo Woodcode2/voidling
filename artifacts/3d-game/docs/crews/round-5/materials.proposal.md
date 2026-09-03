@@ -79,10 +79,10 @@ it as `*.withrivals.*`. Lantern re-read 47 → 47.
 | world   | K before → rung2 | dK    | Y05/Y95 before → rung2 | C before → rung2 | mascot dE |
 |---------|------------------|-------|------------------------|------------------|-----------|
 | maple   | 128 → 130        | +1.6% | 34/185 → 35/185        | 60.6 → 60.2      | 0.6 |
-| pirate  | 110 → 111        | +0.9% | 16/189 → 16/189        | 73.6 → 72.5      | see hero re-take |
+| pirate  | 110 → 111        | +0.9% | 16/189 → 16/189        | 73.6 → 72.5      | 1.5 (re-take) |
 | gameday | 63 → 63          | 0.0%  | 12/172 → 12/171        | 48.7 → 48.7      | 1.4 |
 | lantern | 47 → 47          | 0.0%  | 16/129 → 15/129        | 22.5 → 22.7      | 1.0 |
-| powder  | 152 → 152        | 0.0%  | 45/177 → 47/177        | 38.9 → 38.9      | see hero re-take |
+| powder  | 152 → 152        | 0.0%  | 45/177 → 47/177        | 38.9 → 38.9      | 0.6 (re-take) |
 
 Tone, range and chroma are still within a frame of the before build; that is what a
 specular-only term should do. The picture (Maple's car, `qa/_redcrop.mjs … 520 1480 300 200`,
@@ -90,7 +90,7 @@ before vs rung2): a slightly fuller sheen along the roof and bonnet, no white sm
 subtle change at play distance — the record says so rather than claiming more. It stays because
 it is the specified value and it costs nothing measurable. The first pirate and powder rung-2
 hero swatches read 68,66,107 and 83,63,131 — desaturated, not the mascot (kept as
-`*.hero.firstrun.log`); the swatch was re-taken on the rung-2 worktree, value below.
+`*.hero.firstrun.log`); re-taken on the rung-2 worktree they read 92,49,148 and 105,61,164 — dE 1.5 and 0.6 from before. The mascot is one colour across rung 2.
 
 **Albedo lifts (13 reds, 24 sites, six files; commit b6040cc) — measured as tag `after`
 (rung 2 + lifts, :4177), SEED=7, rivals hidden:**
@@ -106,7 +106,26 @@ hero swatches read 68,66,107 and 83,63,131 — desaturated, not the mascot (kept
 The mascot holds on every world (bar 6). Maple's +3.9% with Y05 34 → 42 is the whole plaza
 reading brighter, not the lifted reds — the environment code path is byte-identical to main's
 for `ENV_MODE = 'room'` (checked by diff). A noise-floor control (Maple before shot twice more
-on main's build, rivals hidden) is recorded below; the number is not read until it is.
+on main's build, rivals hidden) settles it:
+
+| Maple frame | build | K   | Y05 | props in frame |
+|-------------|-------|-----|-----|----------------|
+| before      | main  | 128 | 34  | 78 |
+| before2     | main  | 128 | 34  | 79 |
+| before3     | main  | 128 | 35  | 80 |
+| rung2       | 8233067 | 130 | 35 | 78 |
+| after       | b6040cc | 133 | 42 | 76 |
+| after2      | b6040cc | (see below) | | |
+
+The noise floor of the shot on one build is K ±0 and Y05 ±1 — a 4% gate is meaningful.
+`qa/_pxdiff.mjs maple_rung2 maple_after` then says where the after frame differs: 6.6% of
+pixels moved by more than 6 (4.9% up, mean +39), and only 4% of them had been red or orange —
+the lifted colours are not what moved. The moved pixels are one region: the frame's top-left
+corner, where a dark-green canopy covers 51% of a 260×280 crop in every other Maple frame
+(before ×3, both rung2 frames, both with-rivals originals) and 0% in the after frame — the tree
+is gone, and the frame counts 76 edibles against 78-80. A rival ate it before the shutter.
+`HIDE_RIVALS` hides the family at the shutter; it does not take away their appetite in the
+ten match-seconds before it. Maple's "+3.9%" is one missing tree, not the lifts.
 
 **Did the lifted reds gain shading?** Whole-frame red-pixel luminance spread barely moves
 (`qa/_redcrop.mjs`, P95−P5: maple 75 → 75, pirate 64 → 61, gameday 34 → 34, lantern 128 → 125,
