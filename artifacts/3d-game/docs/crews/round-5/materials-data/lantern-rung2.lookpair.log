@@ -1,1 +1,17 @@
   settle t=4.22 off=0.000 dpos=   -   camDist=38.0 dcam=   -   r=4.000 still=0/6 warps=1 reasserts=0
+  settle t=5.76 off=0.000 dpos=0.000 camDist=123.8 dcam=1.530 r=4.011 still=0/6 warps=1 reasserts=2
+  settle t=7.26 off=0.000 dpos=0.000 camDist=128.9 dcam=0.139 r=4.011 still=0/6 warps=1 reasserts=2
+  settle t=8.76 off=0.000 dpos=0.000 camDist=129.4 dcam=0.013 r=4.011 still=6/6 warps=1 reasserts=2
+  settle t=10.27 off=0.000 dpos=0.000 camDist=129.4 dcam=0.081 r=4.000 still=0/6 warps=1 reasserts=4
+  spot   LANTERN ROW — the market street, across the canal
+  ground (45.00, 80.00) solid=yes biome=stalls
+  landed (45.00, 80.00)  Δ0.000u after 1 warp(s), 4 radius re-assert(s)
+  hero   r=4.000 (wanted 4; drifted to 4.000 before the shutter reset)  mood=cruise maw=0.000 smile=true biting=false
+  props  143 edibles in frame, biggest r=2.40
+  family 0 rival(s) in frame
+  lens   camDist=129.2  void at (215, 450) r=52 css px
+  rung   0 pinned=0 pr=2 shadows=true
+  rings  12 eat-ring meshes hidden in the shutter tick (fx.ts's pool)
+  frame  860x1864  luminance 0.000..0.979 mean 0.2229 (descriptive)
+  stamp  9ca2af0480031d58 3135bf2564fe53e6
+  VERDICT PASS lantern shot at the fixed spot — t=11.47 match s, camDist 129.2, Δ0.000u off the mark, 143 props and 0 rival(s) in frame → qa/out/lookpair/lantern_rung2.png
