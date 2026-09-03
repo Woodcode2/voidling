@@ -1,0 +1,16 @@
+  settle t=4.23 off=0.000 dpos=   -   camDist=38.0 dcam=   -   r=4.000 still=0/6 warps=1 reasserts=0
+  settle t=5.75 off=0.000 dpos=0.000 camDist=121.3 dcam=2.150 r=4.004 still=0/6 warps=1 reasserts=1
+  settle t=7.25 off=0.000 dpos=0.000 camDist=128.6 dcam=0.210 r=4.008 still=0/6 warps=1 reasserts=1
+  settle t=8.75 off=0.000 dpos=0.000 camDist=129.3 dcam=0.019 r=4.008 still=5/6 warps=1 reasserts=1
+  spot   THE VILLAGE — chalets on the south-east shore
+  ground (40.00, 140.00) solid=yes biome=village
+  landed (40.00, 140.00)  Δ0.000u after 1 warp(s), 1 radius re-assert(s)
+  hero   r=4.000 (wanted 4; drifted to 4.008 before the shutter reset)  mood=cruise maw=0.000 smile=true biting=false
+  props  145 edibles in frame, biggest r=4.40
+  family 0 rival(s) in frame
+  lens   camDist=129.3  void at (215, 450) r=52 css px
+  rung   0 pinned=0 pr=2 shadows=true
+  rings  12 eat-ring meshes hidden in the shutter tick (fx.ts's pool)
+  frame  860x1864  luminance 0.000..0.951 mean 0.5572 (descriptive)
+  stamp  9ca2af0480031d58 610266ce0a4d3274
+  VERDICT PASS powder shot at the fixed spot — t=10.40 match s, camDist 129.3, Δ0.000u off the mark, 145 props and 0 rival(s) in frame → qa/out/lookpair/powder_before.png
