@@ -108,6 +108,14 @@ await p.waitForFunction((x) => (window.__matchState?.().t ?? 0) > x, INTRO + 0.3
 await p.evaluate(() => window.__setVoidR?.(8));
 const t0 = await p.evaluate(() => window.__matchState().t);
 await p.waitForFunction((x) => (window.__matchState?.().t ?? 0) > x, t0 + 3.5, { timeout: 600000 }); await take('far');
+// THE COAST. The bodies sit at the camera's own azimuth, below the horizon —
+// they are only ever on screen past the island's far edge, so stand the void
+// on the coast the camera looks toward (the -x,-z diagonal: camOffset is
+// (0.62,0.92,0.62), the camera sits at +x,+z and looks the other way) and
+// shoot outward. This is the frame the owner is describing.
+await p.evaluate(() => { let best = null; for (let r = 260; r > 20; r -= 4) { const x = -r * 0.7071, z = -r * 0.7071; if (window.__insideIsland3?.(x, z)) { best = [x, z]; break; } } if (best) window.__warpVoid?.(best[0], best[1]); window.__coastSpot = best; });
+const t1 = await p.evaluate(() => window.__matchState().t);
+await p.waitForFunction((x) => (window.__matchState?.().t ?? 0) > x, t1 + 1.2, { timeout: 600000 }); await take('coast');
 await b.close();
 const cut = samples.flatMap((s) => s.bodies.map((bd) => [s.label, bd])).filter(([, bd]) => bd.flags.some((f) => f.startsWith('CUT')));
 const faded = samples.flatMap((s) => s.bodies.map((bd) => [s.label, bd])).filter(([, bd]) => bd.flags.includes('FADED'));
