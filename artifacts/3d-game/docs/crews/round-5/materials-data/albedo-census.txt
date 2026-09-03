@@ -1,0 +1,170 @@
+  843 distinct saturated colours (dominant > 0.25 linear) at 1753 sites; bar 0.08
+  hex      weakest/dominant  sites
+  #ff0000   0.000            1 defense.ts:34
+  #d89400   0.000            1 hatgeo.ts:227
+  #8a4a00   0.000            1 hatgeo.ts:1334
+  #ffb412   0.006            1 hatgeo.ts:1057
+  #ff8a12   0.006            1 hatgeo.ts:1499
+  #e0b010   0.007            1 mainstreet.ts:1305
+  #e03c10   0.007            1 palette.ts:230
+  #8a4d06   0.007            1 hatgeo.ts:1201
+  #f5c518   0.010            2 mainstreet.ts:1301 mainstreet.ts:1302
+  #ff5a1a   0.010            1 life.ts:5349
+  #1ac6ff   0.010            1 rivals.ts:109
+  #ff6a1e   0.013            1 palette.ts:176
+  #ffc21f   0.014            2 hatgeo.ts:227 hatgeo.ts:1548
+  #d8641a   0.015            1 mainstreet.ts:1115
+  #b45c14   0.015            1 alpine.ts:93
+  #ff3a24   0.018            1 hatgeo.ts:1405
+  #a87614   0.018            1 island.ts:4951
+  #e07820   0.019            1 alpine.ts:92
+  #8a5f10   0.020            1 hatgeo.ts:617
+  #8a7410   0.020            1 palette.ts:200
+  #ef7a24   0.020            1 mainstreet.ts:120
+  #b87f1a   0.022            1 palette.ts:181
+  #ff8c2a   0.023            1 prototype3d.ts:1593
+  #ff2a44   0.023            1 prototype3d.ts:3120
+  #ffb42a   0.023            1 hatgeo.ts:993
+  #ff7a2a   0.023            3 island.ts:4886 island.ts:5216 void3d.ts:1334
+  #ff5a2a   0.023            1 mainstreet.ts:1578
+  #ff6a2a   0.023            1 nightmarket.ts:87
+  #ff2ad4   0.023            1 rivals.ts:109
+  #18a880   0.023            1 palette.ts:213
+  #e0243f   0.024            1 palette.ts:202
+  #ff2b3c   0.024            2 prototype3d.ts:2628 rivals.ts:2029
+  #f0b429   0.025            11 prototype3d.ts:1607 prototype3d.ts:3687 prototype3d.ts:6574 prototype3d.ts:9701 …
+  #ff2d55   0.026            2 hatgeo.ts:228 hatgeo.ts:266
+  #ffce2e   0.027            1 hatgeo.ts:1062
+  #ff9b2e   0.027            1 hatgeo.ts:1300
+  #ffb92e   0.027            1 hatgeo.ts:1328
+  #ff3a2e   0.027            1 hatgeo.ts:1328
+  #ffb02e   0.027            1 hatgeo.ts:1499
+  #ff2fa0   0.028            17 prototype3d.ts:3675 island.ts:4550 island.ts:4555 island.ts:4563 …
+  #2fa8ff   0.028            1 hatgeo.ts:228
+  #ff8a2f   0.028            1 hatgeo.ts:228
+  #1fb894   0.029            1 palette.ts:198
+  #e8342a   0.029            5 life.ts:841 life.ts:1283 life.ts:1283 life.ts:1284 …
+  #e8542a   0.029            1 life.ts:1552
+  #e86a2a   0.029            1 mainstreet.ts:168
+  #e8752a   0.029            1 tailgate.ts:78
+  #d426b0   0.029            1 palette.ts:199
+  #e8a02c   0.031            1 island.ts:4371
+  #2fd3f0   0.033            1 hatgeo.ts:155
+  #f0392f   0.033            1 hatgeo.ts:1429
+  #2f86f0   0.033            1 hatgeo.ts:1429
+  #1c8fa0   0.033            1 luxe.ts:375
+  #d82a2a   0.034            1 life.ts:434
+  #2ab8d8   0.034            4 life.ts:893 life.ts:901 life.ts:903 life.ts:1222
+  #d8862a   0.034            1 mainstreet.ts:927
+  #7a2ad8   0.034            1 void3d.ts:2443
+  #ffd334   0.034            1 hatgeo.ts:1429
+  #d9702b   0.035            1 island.ts:4371
+  #d98f2b   0.035            1 island.ts:4371
+  #1fa8a0   0.035            1 mainstreet.ts:125
+  #2fd8e8   0.035            10 life.ts:785 life.ts:972 life.ts:989 life.ts:1194 …
+  #dba32c   0.036            1 alpine.ts:89
+  #35d6ff   0.036            1 prototype3d.ts:1598
+  #e23b2e   0.036            1 island.ts:4893
+  #2f6fe0   0.038            1 life.ts:1222
+  #ff9838   0.040            1 hatgeo.ts:412
+  #38c8ff   0.040            1 hatgeo.ts:412
+  #c9812a   0.040            2 life.ts:2024 life.ts:2028
+  #c9502a   0.040            1 mainstreet.ts:168
+  #d83a2e   0.040            1 alpine.ts:86
+  #35d6f0   0.041            5 hats.ts:103 life.ts:602 life.ts:1114 life.ts:1221 …
+  #d8302f   0.041            1 hatgeo.ts:1548
+  #d8392f   0.041            4 island.ts:6704 mainstreet.ts:125 mainstreet.ts:168 mainstreet.ts:1169
+  #2fd8a0   0.041            2 life.ts:844 life.ts:1539
+  #2fb8d8   0.041            1 life.ts:1536
+  #2f6ad8   0.041            4 mainstreet.ts:618 mainstreet.ts:710 mainstreet.ts:734 mainstreet.ts:929
+  #2f9bd8   0.041            1 palette.ts:112
+  #2fd8c0   0.041            1 rivals.ts:207
+  #ffb03a   0.042            4 island.ts:4499 island.ts:4500 island.ts:4501 life.ts:776
+  #ff8a3a   0.042            13 island.ts:4529 island.ts:4593 island.ts:4606 island.ts:4680 …
+  #ff9a3a   0.042            6 island.ts:5216 island.ts:5253 island.ts:5278 life.ts:4271 …
+  #ff6a3a   0.042            1 life.ts:1546
+  #ff4d3a   0.042            3 mainstreet.ts:1253 mainstreet.ts:1254 mainstreet.ts:1255
+  #ffa53a   0.042            1 palette.ts:176
+  #ffcf3a   0.042            1 rivals.ts:2032
+  #b42636   0.042            1 hatgeo.ts:904
+  #2394a8   0.043            2 palette.ts:262 void3d.ts:1315
+  #a32a22   0.044            1 alpine.ts:87
+  #ff3b3b   0.044            1 defense.ts:34
+  #c0562a   0.044            1 life.ts:601
+  #2f6fd0   0.045            7 life.ts:915 life.ts:919 life.ts:921 life.ts:959 …
+  #2f6ad0   0.045            1 palette.ts:177
+  #ff8a3c   0.045            3 island.ts:5714 island.ts:5770 nightmarket.ts:82
+  #c4622c   0.046            1 island.ts:3007
+  #ff8a3d   0.047            1 prototype3d.ts:3693
+  #ff3d93   0.047            1 hatgeo.ts:155
+  #ff3d6e   0.047            2 hatgeo.ts:412 hatgeo.ts:412
+  #ffe23d   0.047            1 hatgeo.ts:412
+  #35e07a   0.048            1 hatgeo.ts:228
+  #f0a83a   0.049            2 mainstreet.ts:1434 mainstreet.ts:1450
+  #d98a34   0.049            1 island.ts:3007
+  #ffd23f   0.050            63 prototype3d.ts:1598 prototype3d.ts:3626 prototype3d.ts:3654 prototype3d.ts:3678 …
+  #ffa63f   0.050            1 prototype3d.ts:3672
+  #c7962f   0.050            1 hatgeo.ts:312
+  #b9892b   0.050            1 hatgeo.ts:326
+  #5f2ab4   0.051            2 palette.ts:28 palette.ts:158
+  #8a3c1e   0.051            1 hatgeo.ts:785
+  #c1382e   0.051            2 life.ts:862 nightmarket.ts:51
+  #ff8e40   0.051            1 alpine.ts:100
+  #c4342f   0.051            2 prototype3d.ts:3690 life.ts:853
+  #2f8fc4   0.051            1 hatgeo.ts:1345
+  #c4442f   0.051            1 island.ts:4371
+  #e8a83a   0.052            1 mainstreet.ts:168
+  #e8903a   0.052            1 mainstreet.ts:169
+  #e83a4a   0.052            2 void3d.ts:2419 void3d.ts:2423
+  #b03f2a   0.053            1 island.ts:3007
+  #8e2620   0.053            2 life.ts:881 nightmarket.ts:52
+  #7ec832   0.055            1 palette.ts:161
+  #f0a93e   0.055            1 hatgeo.ts:1196
+  #e23a48   0.056            1 hatgeo.ts:840
+  #e0483a   0.057            2 island.ts:4998 luxe.ts:1263
+  #e0a83a   0.057            2 mainstreet.ts:125 mainstreet.ts:629
+  #ff5a44   0.058            1 hatgeo.ts:1405
+  #2aa9a0   0.058            3 prototype3d.ts:3696 life.ts:855 tailgate.ts:62
+  #33c65c   0.059            1 hatgeo.ts:1429
+  #b5372e   0.059            1 mainstreet.ts:118
+  #b8552f   0.059            1 island.ts:4371
+  #2fb8a8   0.059            10 island.ts:4415 island.ts:4449 island.ts:4450 island.ts:4451 …
+  #ffb545   0.060            1 alpine.ts:101
+  #f5c542   0.060            1 hats.ts:137
+  #e0a63c   0.061            1 island.ts:3007
+  #8c2a22   0.061            1 mainstreet.ts:1002
+  #9c2f27   0.061            1 mainstreet.ts:1001
+  #2f9fb5   0.062            1 island.ts:612
+  #d88a3a   0.062            1 island.ts:4998
+  #d83a3a   0.062            2 life.ts:1321 life.ts:1325
+  #ffb347   0.063            4 life.ts:893 life.ts:901 life.ts:903 life.ts:1222
+  #d8443c   0.066            25 life.ts:767 life.ts:806 life.ts:831 life.ts:915 …
+  #cf6a3a   0.068            1 island.ts:4371
+  #ff5a4a   0.068            2 prototype3d.ts:3708 nightmarket.ts:84
+  #ffe14a   0.068            1 prototype3d.ts:3764
+  #ffd84a   0.068            1 hatgeo.ts:1056
+  #ffc24a   0.068            2 hatgeo.ts:1200 hatgeo.ts:1299
+  #ff8a4a   0.068            2 life.ts:1549 life.ts:1555
+  #ffc44a   0.068            1 luxe.ts:848
+  #ffb84a   0.068            1 palette.ts:181
+  #8a2440   0.069            3 luxe.ts:932 luxe.ts:1278 luxe.ts:1279
+  #e5a942   0.070            1 island.ts:1328
+  #f0dc46   0.070            1 palette.ts:200
+  #3830ad   0.071            1 hatgeo.ts:1050
+  #9a2a3a   0.072            2 mainstreet.ts:927 mainstreet.ts:1169
+  #2a8a9a   0.072            1 void3d.ts:2356
+  #d8453f   0.072            1 hats.ts:90
+  #3fc9d8   0.072            2 life.ts:1886 luxe.ts:46
+  #a8622f   0.073            1 island.ts:4833
+  #4de8ff   0.074            8 island.ts:4659 void3d.ts:906 void3d.ts:1374 void3d.ts:1374 …
+  #ff5a4d   0.074            8 island.ts:4942 island.ts:5035 island.ts:5143 island.ts:5155 …
+  #ff4d4d   0.074            1 life.ts:434
+  #4da3ff   0.074            5 life.ts:907 life.ts:910 life.ts:1153 life.ts:3725 …
+  #ff4d5e   0.074            2 palette.ts:263 palette.ts:263
+  #ffd34d   0.074            2 rivals.ts:376 rivals.ts:380
+  #4d6bff   0.074            1 rivals.ts:385
+  #a96c30   0.074            1 hatgeo.ts:714
+  #a86b30   0.075            1 island.ts:3007
+  #4ef0ff   0.076            6 island.ts:4550 island.ts:4561 island.ts:4563 island.ts:4593 …
+  #c4a03a   0.077            1 life.ts:899
+  #c4693a   0.077            9 life.ts:908 life.ts:917 life.ts:1116 life.ts:1370 …
