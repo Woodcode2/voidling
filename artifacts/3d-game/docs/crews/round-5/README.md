@@ -132,3 +132,19 @@ KILLED groups are recorded here, never hidden.
 - **14:46-15:00 UTC — gate on the materials build:** `node qa/gate.mjs --profile=push --port=4177`
   on a quiet box: **PASS, 16/16** (the 16th is the new `albedo` guard; log in
   `materials-data/gate-materials.log`). main fast-forwarded to this commit.
+- **2026-09-03 15:33-20:40 UTC — the first frame (Stream D), instrument then studio.**
+  `qa/firstframe.mjs` shoots the establishing shot across its swing (six moments per
+  world, page and canvas, match-time stamped) and the two screens before it at seven
+  viewports, measuring the "THE CUTE" line against the real pixels behind its glyphs.
+  The owner's complaint reproduced two ways before any review: on his own frame
+  (THE CUTE 3.46:1 median, 1.72:1 against the face's highlights; 12px text, bar 4.5:1)
+  and on our build at Safari-sized viewports (3.51:1 at 440x814, 1.82:1 at 393x700); the
+  doubled title is prototype3d.ts:1464 filling the loader's name line with the app's name.
+  The studio workflow (`briefs/firstframe.workflow.js`, 17 agents) reached 7 of 8 reviews
+  and then **hit the account session limit** (reset 19:50 UTC): the seven skeptics, the
+  hero review, art direction and the order of work never ran. The seven reviews survived
+  because each author pushed its own file the moment it was written (`qa/_record.sh`) —
+  the rule from the round-5 launch, now proven. The container restarted during the wait
+  and the workflow journal went with it; a continuation script
+  (`briefs/firstframe-continue.workflow.js`) refutes the recorded seven from disk and runs
+  the rest (20:37 UTC).
