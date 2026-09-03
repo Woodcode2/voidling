@@ -1,4 +1,4 @@
-# DRAFT — in progress (sky, Stream C) — governor-run, 2026-09-03
+# PROPOSAL: sky — SOUND (governor as skeptic, 2026-09-03 10:30 UTC): the half-cut planet was its own ring running off its canvas; the faded planet was a disc with no terminator
 
 ## The owner's words
 > The space behind the island — it's a vast improvement but there's still a lot
@@ -103,3 +103,21 @@ this run and is superseded by the table).
 ## What I could not verify yet
 The coast frames (all five worlds), the flat-edge cause, the FADED measurement in
 a frame where a body is actually visible, and the after-run of H1.
+
+## Verdict — SOUND, both hunks landed on the branch, gate next
+- **H1 ring fit (island.ts paint, DISC_R/DISC_FIT, 37192a7)** — SOUND. Mechanism named
+  by arithmetic and photographed before/after on both ringed worlds; on-screen disc
+  size unchanged by construction (the sprite scales by 0.40/0.29). Guarded in the push
+  gate by `qa/skyfit.mjs` (fails on main's source, passes on this one).
+- **H2 terminator (island.ts paint lit ramp, 6f24377)** — SOUND. Shading range on the
+  same disc radius up on all three bodies measured (93→122, 105→126, 71→109) and
+  visibly a sphere in lantern-coast.png. Powder stays soft (pale by design; residue).
+- **Instrument** — `qa/skycut.mjs` (quality tier only: ~4 min per world) and
+  `qa/_skyocc.mjs`; the occlusion column is retracted, the frames are the evidence.
+
+## Owed after this lands
+- Powder's body: a deeper `dark` (art call), measured by the same diagonal.
+- The flat edge on Lantern's small body in the far frame — reproduce at size or close.
+- A real occlusion measurement for the probe (read the depth buffer, not rays).
+- The establishing shot never has a body on screen (u=1, u=0.5: all five worlds) —
+  Stream D's question, recorded here so it is not lost.

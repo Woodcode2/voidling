@@ -102,3 +102,11 @@ KILLED groups are recorded here, never hidden.
 - **02:33-02:50 UTC — gate on the placement build:** `node qa/gate.mjs --profile=push --port=4177`
   on a quiet box: **PASS, 14/14, every step reached its own conclusion** (log in
   `placement-data/gate-placement.log`). main fast-forwarded to this commit.
+- **2026-09-03 09:50-10:30 UTC — sky (Stream C), governor-run.** No agent: the
+  instrument (`qa/skycut.mjs`, five camera moments incl. the coast, every frame
+  screenshot) found the bodies off-screen in the establishing shot and behind the
+  island in play, on screen only past the coast. The coast frames named it: the ring
+  ran off its own 512 canvas (arcs at 274-336 px vs a 256 px half-width) and the disc
+  had no terminator. Both fixed at the source (37192a7, 6f24377), measured after
+  (ring whole; shading range 93→122, 105→126, 71→109), guarded by `qa/skyfit.mjs`
+  in the push gate. Verdict in `sky.proposal.md`; gate then main.

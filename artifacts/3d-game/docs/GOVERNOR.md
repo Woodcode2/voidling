@@ -618,3 +618,10 @@ the pwDrum guard, and the powderEvolve lift-and-park.
 - **Containers live ~35 minutes when a crew is probing.** Four restarts in one lane; each
   killed the agent in flight. Anything that must survive is a file in git, committed by a
   loop that does not wait for the agent to finish.
+- **Take the owner literally, then photograph it.** "Like an image was half cut and
+  put on there" was a ring drawn past the edge of its own canvas — three lines of
+  arithmetic, invisible to every probe that measured luminance, visible in the first
+  coast frame. The instrument's job was to produce the frame; the frame did the rest.
+- **A probe column that contradicts the picture is retracted, not explained.** The
+  sky probe's island-occlusion column read 1.0 on planets plainly in the sky, twice,
+  after a fix. It flags nothing now.
