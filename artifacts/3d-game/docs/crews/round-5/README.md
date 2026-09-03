@@ -90,3 +90,12 @@ KILLED groups are recorded here, never hidden.
 - **15:34-15:53 UTC — gate:** `node qa/gate.mjs --profile=push --port=4177` on a quiet
   box (load 3.0 at start, GPU lock held): **PASS, 14/14, every step reached its own
   conclusion.** main fast-forwarded to this commit.
+- **2026-09-03 01:46-02:40 UTC — placement (Stream A1), finished by the governor.** Two
+  crews were killed by container restarts (~35-minute container lifetime when active;
+  four restarts in the run). Their instrument, before-table, shots and unfinished patch
+  were rescued from the dead worktrees. Governor corrections: `spotOpen` own-claim by
+  position (the crew's forced drops had lost the burial test — Powder inside 31 → 43);
+  the auditor censuses AFTER `__validateWorld()` (the crew's after-table was taken before
+  the boot sweep and missed 278 retirements on Maple). Paired SEED=7 table on all five
+  worlds in `placement.proposal.md` §4; verdict SOUND WITH CORRECTIONS in §5. Landed on
+  the branch at 942ce70; gate then main.

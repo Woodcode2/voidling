@@ -604,3 +604,17 @@ the pwDrum guard, and the powderEvolve lift-and-park.
   Visible-card duty measured 26.9-28.9%; and the gag it justified was total —
   bubbles.say() read a class the banner never dropped, so the crowd was silent
   from the first card to the whistle of every match. Fixed in a1d8b1a.
+
+## Ledger — 2026-09-03, placement (round 5)
+- **Measure the world a child plays, not the raw scatter.** The placement crew's
+  after-table was taken the moment `__voidState` appeared — before `validateWorld()`,
+  the boot sweep that nudges, culls and (now) retires. It read "Maple: inside 184 → 186"
+  for a patch that retires 278 props on Maple at match start. Rule 4 ("a probe reads the
+  thing itself, on the thing's own clock") has a corollary: the thing is the world after
+  every pass that runs before the first frame. `qa/placement.mjs` now calls
+  `__validateWorld()` before its census.
+- **A forced drop is a skipped test.** Forcing past `spotOpen()` to dodge a radius-matching
+  own-claim rule also skipped drop()'s burial test; the fix was the rule, not the force.
+- **Containers live ~35 minutes when a crew is probing.** Four restarts in one lane; each
+  killed the agent in flight. Anything that must survive is a file in git, committed by a
+  loop that does not wait for the agent to finish.
