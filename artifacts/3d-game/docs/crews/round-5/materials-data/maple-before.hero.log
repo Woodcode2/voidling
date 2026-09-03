@@ -1,0 +1,13 @@
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+page.evaluate: ReferenceError: WORLD is not defined
+    at eval (eval at evaluate (:311:30), <anonymous>:1:64)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+    at /home/user/voidling/artifacts/3d-game/qa/heroswatch.mjs:22:9 {
+  log: []
+}
+
+Node.js v22.22.2
