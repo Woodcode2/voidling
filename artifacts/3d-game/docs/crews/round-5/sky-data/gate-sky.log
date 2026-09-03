@@ -1,0 +1,22 @@
+
+  GATE — profile "push" — 15 step(s) on :4177
+
+   · typecheck          pass    3s
+   · smoke:maple        pass  203s
+   · econ               pass  150s
+   · iapdoc             pass    0s
+   · normals            pass    0s
+   · faceparity         pass  321s
+   · pickerfit          pass   23s
+   · evolvepop          pass    0s
+   · lockedcards        pass   26s
+   · skyfit             FAIL    0s  — no verdict printed (exit 0) — the probe did not reach its own conclusion
+   · roundlod           pass    0s
+   · safety             pass    0s
+   · privacy            pass    0s
+   · iosname            pass    0s
+   · uisystem           pass   20s
+
+  GATE FAIL — 1/15 step(s): skyfit
+  report: qa/out/gate/report.md
+
