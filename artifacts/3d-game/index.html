@@ -1221,10 +1221,20 @@
          measured 1.16:1 at 375x667 and 3.8:1 at 393x700 against a 4.5:1 bar.
          Tighten the block rather than shrink the art — the key art is
          approved and must not move. */
-      @media (max-height: 720px) {
+      /* The art is placed at 13vh and is 66vh tall on BOTH screens, so the sky
+         band above its skyline shrinks with the viewport while the lockup is
+         fixed pixels. Measured on the pack: at 6vh the block ends at 110 px on
+         an 814-tall phone and the art's top is at 106 — the second line lands
+         on the lit skyline (STARRING THE VOIDLINGS read 2.90:1 at 440x814 and
+         1.14:1 at 430x740 against a 4.5:1 bar). Raising the block is enough
+         down to ~720; below that the type shrinks as well. */
+      @media (max-height: 900px) {
         #menu, #loadScr { padding-top: calc(3vh + env(safe-area-inset-top, 0px)); }
-        #menu .logo, #loadScr .lLogo { line-height: 1; font-size: clamp(34px, 7.4vw, 68px); }
+        #menu .logo, #loadScr .lLogo { line-height: 1; }
         #menu .logo i, #loadScr .lLogo i { margin-bottom: 0; }
+      }
+      @media (max-height: 720px) {
+        #menu .logo, #loadScr .lLogo { font-size: clamp(34px, 7.4vw, 68px); }
         #menu .tag, #loadScr .lName { font-size: 10px; letter-spacing: 5px; margin-top: 1px; }
       }
       /* THE HUD ARRIVES WITH THE HANDS, not before them. The clock, the coin
