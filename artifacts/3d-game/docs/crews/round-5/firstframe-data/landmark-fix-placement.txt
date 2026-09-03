@@ -1,10 +1,21 @@
-# The authored-landmark fix (f6c210b), measured on Pirate Bay — qa/placement.mjs pirate 4177
-# pre-fix build (f6c210b~1) vs post-fix, same probe, same session:
-#   metric      before  after
-#   road            14      20
-#   inside           1      0
-#   under           19      23
-#   overlap         72      58
-#   clutter         65      69
-#   roadend          1      1
-# and r>=7 props surviving the boot passes: 6 of 13 before, 13 of 13 after (qa/_bigprops.mjs)
+# THE AUTHORED-LANDMARK FIX (f6c210b), measured on Pirate Bay.
+# RETRACTED: an earlier version of this file carried unseeded runs (inside 1->4,
+# overlap 72->62 and 72->58 on two runs of the same build). qa/placement.mjs
+# without SEED is not repeatable run to run, so those numbers compared noise.
+# The paired SEED=7 runs, same probe, same session, one build apart:
+#
+#   SEED=7 node qa/placement.mjs pirate 4177
+#   metric     pre-fix (f6c210b~1)   post-fix (f6c210b)
+#   road                15                15
+#   inside               1                 1
+#   under               30                31
+#   overlap             52                56
+#   clutter             77                71
+#   roadend              1                 1
+#
+# And the thing the fix is for — r>=7 props surviving the boot passes
+# (qa/_bigprops.mjs, SEED=7): 6 of 13 before, 13 of 13 after. The Royal Mariner
+# (r10 at 127,-115), the fort, the lighthouse and four more come back.
+# The cost is four more footprint overlaps against the restored landmarks and
+# one more prop standing under one; clutter falls by six. Residue for the
+# placement stream, recorded rather than hidden.
