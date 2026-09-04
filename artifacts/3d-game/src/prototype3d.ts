@@ -1926,7 +1926,10 @@ const _dbg = new Proxy(_dbgStore, {
   __spawn: () => { x: number; z: number };
   // QA: whole-match telemetry — player score/radius against every rival's, so a
   // harness can log the real race curve instead of scraping the HUD.
-  __matchState: () => { t: number; clock: number; score: number; r: number; ev: typeof rivalEv; graze: number; tense: number;
+  // QA: the third state on demand (qa/ascension.mjs bar A) — marks n balloons
+  // departed and returns how many it found to mark
+  __depart: (n: number) => number;
+  __matchState: () => { t: number; clock: number; devouredPct: number; initialMass: number; score: number; r: number; ev: typeof rivalEv; graze: number; tense: number;
     ate: { you: number; family: number };
     rivals: { name: string; score: number; r: number; x: number; z: number; joined: boolean; arch: string; hunt: boolean }[] };
   // QA: speak a chip bubble in a named rival's voice (comms redesign)
@@ -2147,7 +2150,21 @@ _dbg.__warpVoid = (x: number, z: number) => {
   camera.updateMatrixWorld();
 };
 // QA: one call returns the whole race — used to log score curves over a match
+// QA: the third state on demand. Marks n balloons departed the short way — no
+// telegraph, no flight — so qa/ascension.mjs bar A can watch the accounting
+// alone: devouredPct must not move, and the denominator must drop by n.
+_dbg.__depart = (n: number): number => {
+  let done = 0;
+  for (const e of edibles) {
+    if (done >= n) break;
+    const u = e.mesh.userData;
+    if (!u.balloon || u.departed || e.eaten || !e.mesh.visible) continue;
+    u.departed = true; e.mesh.position.y += 60; done++;
+  }
+  return done;
+};
 _dbg.__matchState = () => ({
+  devouredPct, initialMass: aliveMass,   // QA: the accounting the ascension must not break
   // QA: the crowd's mood driver, so a harness can measure how long LANTERN
   // NIGHT's three acts actually last in wall-clock instead of inferring them
   // from the radius curve.
@@ -3565,6 +3582,7 @@ let matchEaten = 0;   // props eaten THIS match — the results screen's own num
 let signedOn = false; // has the station said good morning yet this match?
 let _booted = false;  // has one frame actually rendered? (drops the boot cover)
 let initialMass = 0;                   // set once, after the world is built
+let aliveMass = 1;                     // initialMass less what has DEPARTED — the real denominator
 let hudCd = 0;
 
 const WANDER_R = 230;
@@ -4669,10 +4687,25 @@ function refreshHud() {
   // MINE vs THEIRS. This counted every prop eaten by ANYONE, so a player who
   // scored 31 points all match was told "85% DEVOURED" — the second-biggest
   // number on screen was mostly a report on what the family had done. Split it.
-  let consumed = 0, total = 0, mine = 0;
-  for (const e of edibles) { total++; if (e.eaten || !e.mesh.visible) { consumed++; if (e.mesh.userData.byPlayer) mine++; } }
-  if (total > initialMass) initialMass = total;   // async-loaded meshes keep registering after boot
-  devouredPct = Math.min(100, Math.round((consumed / Math.max(1, initialMass)) * 100));
+  // ── THE THIRD STATE ──────────────────────────────────────────────────────
+  // An edible was eaten or not, and `!mesh.visible` counted as eaten — which
+  // is right for a snowball that rolled off the piste and wrong for a balloon
+  // that LEFT. SKYLARK FIELD's whole rule is "get them before they go up", and
+  // a balloon that goes up must leave the numerator AND the denominator: not
+  // consumed, and not part of what there was to consume. Otherwise ninety
+  // departures credit the child with the sky (world6.design.md:106), and
+  // hiding them the other way makes 100% permanently unreachable and breaks the
+  // solo devour quest. `mesh.userData.departed` is that state; qa/ascension.mjs
+  // bar A holds it.
+  let consumed = 0, total = 0, mine = 0, departed = 0;
+  for (const e of edibles) {
+    if (e.mesh.userData.departed) { departed++; continue; }
+    total++;
+    if (e.eaten || !e.mesh.visible) { consumed++; if (e.mesh.userData.byPlayer) mine++; }
+  }
+  if (total + departed > initialMass) initialMass = total + departed;   // async-loaded meshes keep registering after boot
+  aliveMass = Math.max(1, initialMass - departed);
+  devouredPct = Math.min(100, Math.round((consumed / aliveMass) * 100));
   // …and the last of the island words. COPY.place is 'the island', 'the
   // resort' or 'the town' — the halfway banner is the one milestone that
   // names the place out loud, so it has to name the right one.
@@ -4683,7 +4716,7 @@ function refreshHud() {
   // Every playtest screenshot showed 0% — including the results panel of a
   // 948-point run. Lead with the COUNT, which is a number that moves on every
   // single bite, and keep the percentage as the meter underneath it.
-  const minePct = Math.min(100, Math.round((mine / Math.max(1, initialMass)) * 100));
+  const minePct = Math.min(100, Math.round((mine / aliveMass) * 100));
   devPlayerPct = minePct; devFamilyPct = Math.max(0, devouredPct - minePct);   // QA readout
   devMineN = mine; devAllN = consumed;
   const themPct = Math.max(0, devouredPct - minePct);
@@ -5383,6 +5416,7 @@ const moments = { firstBuilding: false, firstCar: false, firstRunner: false, hal
 let countTick = 0;
 const floatPos = new THREE.Vector3();
 function capture(e: Edible, giveHunger = true) {
+  if (e.mesh.userData.departed) return;   // the sky is not on the menu — third state (brief §3B)
   const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
   const d = Math.hypot(dx, dz) || 1;
   e.eaten = true; e.t = 0; e.orbit = Math.atan2(dz, dx);
@@ -5664,7 +5698,7 @@ function fireGulp() {
   hunger -= COST.gulp; powerCd = 0.5;
   const R = voidling.radius, reach = R * 8;
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible || e.radius > R * EAT_RATIO) continue;
+    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.radius > R * EAT_RATIO) continue;
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz); if (d > reach) continue;
     if ((dx / (d || 1)) * aim.x + (dz / (d || 1)) * aim.z > 0.2) capture(e, false);   // forward cone
@@ -5679,7 +5713,7 @@ function fireCollapse() {
   hunger -= COST.collapse; powerCd = 1.2;
   const R = voidling.radius, reach = R * 16;
   for (const e of edibles) {
-    if (e.eaten || !e.mesh.visible || e.radius > R * 2.5) continue;   // COLLAPSE devours even big things
+    if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.radius > R * 2.5) continue;   // COLLAPSE devours even big things
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     if (Math.hypot(dx, dz) < reach) capture(e, false);
   }
@@ -9184,7 +9218,7 @@ function animate() {
         let best: Edible | null = null, bd = Infinity;
         const Rh = voidling.radius;
         for (const e of edibles) {
-          if (e.eaten || !e.mesh.visible || e.radius > Rh * EAT_RATIO) continue;
+          if (e.eaten || !e.mesh.visible || e.mesh.userData.departed || e.radius > Rh * EAT_RATIO) continue;
           const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
           const d = dx * dx + dz * dz;
           if (d < bd) { bd = d; best = e; }
@@ -9700,7 +9734,7 @@ function animate() {
       }
       continue;
     }
-    if (!e.mesh.visible || e.mesh.userData.eaten) continue;   // a rival owns it — never double-eat
+    if (!e.mesh.visible || e.mesh.userData.eaten || e.mesh.userData.departed) continue;   // a rival owns it — never double-eat; a departed balloon is the sky's
     const dx = e.mesh.position.x - voidState.x, dz = e.mesh.position.z - voidState.z;
     const d = Math.hypot(dx, dz);
     const reach = R * 2.0 + e.radius * 2.4;

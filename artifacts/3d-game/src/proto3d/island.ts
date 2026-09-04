@@ -5614,6 +5614,15 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
   if (WORLD_ID === 'skylark') {
     const P3 = (p2: SK.Pt): [number, number] => [w(p2[0]), w(p2[1])];
     SK.resetPlacement();
+    // EVERY ENVELOPE CARRIES ITS PAPERS. `userData.balloon = { id, stage }` on
+    // each one, so the ascension can find them, the probe can count them, and
+    // a departure is attributable. stage: 0 bagged, 1 spilled, 2 cold,
+    // 3 standing, 4 the whale.
+    let balloonId = 0;
+    const tagBalloon = <T extends THREE.Object3D>(mesh: T, stage: number): T => {
+      mesh.userData.balloon = { id: balloonId++, stage };
+      return mesh;
+    };
     const drop = (mesh: THREE.Object3D, p2: SK.Pt, r: number, rotY?: number, force = false, qk?: string, claim?: number) => {
       const c = claim ?? r;
       // ── LEGALITY IS drop()'s JOB, NOT THE CALLER'S ────────────────────────
@@ -5685,7 +5694,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     //    down. She is 70 units nose to tail and the child can walk her whole
     //    length before they are big enough to eat any of her.
     {
-      const whale = SKF.skWhaleLying();
+      const whale = tagBalloon(SKF.skWhaleLying(), 4);
       drop(whale, [SK.LAUNCH.cx, SK.LAUNCH.cy], 18.0, layoutYaw(), true, 'big');
       SK.claimSpot(SK.LAUNCH.cx, SK.LAUNCH.cy, SK.LAUNCH.rx * 0.85);
     }
@@ -5775,9 +5784,9 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       // PASS ONE — every envelope, before any of the small kit exists
       for (const { p: p2, stage } of nodes) {
         const cols = env();
-        const mesh = stage === 0 ? SKF.skBalloonBagged(cols)
+        const mesh = tagBalloon(stage === 0 ? SKF.skBalloonBagged(cols)
           : stage === 1 ? SKF.skBalloonSpilled(cols)
-            : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
+            : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols), stage);
         // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
         const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
         // ── CLAIMS SIZED FOR THE RULE THAT ACTUALLY RUNS ────────────────────
@@ -5840,7 +5849,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         if (!SK.pointInPoly(p2[0], p2[1], R.poly) || !SK.skPlaceable(p2[0], p2[1], 40)) continue;
         drop(SKF.skTrailer(), p2, 2.0, layoutYaw(), false, 'car');
         const b: SK.Pt = [p2[0] + ux * 200, p2[1] + uy * 200];
-        drop(SKF.skBalloonBagged(env()), b, 1.4, layoutYaw(), false, 'big');
+        drop(tagBalloon(SKF.skBalloonBagged(env()), 0), b, 1.4, layoutYaw(), false, 'big');
       }
       drop(SKF.skTicketCaravan(), [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house', 4.2);
       // and the crews already rigging: envelopes spilled out on the wet grass,
@@ -5859,7 +5868,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       rig.forEach((p2, i) => {
         const cols = env();
         const stage = i % 2;
-        drop(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols),
+        drop(tagBalloon(stage === 0 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), stage + 1),
           p2, stage === 0 ? 5.2 : 4.6, layoutYaw(), false, 'big', stage === 0 ? 11.0 : 10.5);
       });
     }
@@ -5890,8 +5899,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     // = 11.7 buys it. sep matches so the scatter's own hash agrees with drop's.
     for (const p2 of SK.scatterInRegion(REG('tower'), 20, rnd2, 150, { sep: 9.0 })) {
       const cols = env();
-      drop(rnd2() < 0.5 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols),
-        p2, rnd2() < 0.5 ? 5.2 : 4.6, layoutYaw(), false, 'big', 9.0);
+      // ONE draw decides both the mesh and its radius. This drew twice, so a
+      // spilled envelope could carry a cold one's eat radius and vice versa.
+      const spilled = rnd2() < 0.5;
+      drop(tagBalloon(spilled ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols), spilled ? 1 : 2),
+        p2, spilled ? 5.2 : 4.6, layoutYaw(), false, 'big', 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50, { sep: 1.1 })) {
       const k = rnd2();
@@ -5962,7 +5974,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 16, rnd2, 150, { sep: 9.0 })) {
       const cols = env();
-      drop(SKF.skBalloonSpilled(cols), p2, 5.2, layoutYaw(), false, 'big', 9.0);
+      drop(tagBalloon(SKF.skBalloonSpilled(cols), 1), p2, 5.2, layoutYaw(), false, 'big', 9.0);
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40, { sep: 1.5 })) {
       const k = rnd2();

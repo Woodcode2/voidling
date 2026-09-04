@@ -455,7 +455,9 @@ export function createRivals(
   let surgeCd = rand(4, 12);
   const roster: R[] = [];        // one per NAME — built once, skins fixed forever
   const rivals: R[] = [];        // THIS match's cast (api.list points at it)
-  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible;
+  // …or DEPARTED: a balloon in the air is not on anybody's menu, and a rival
+  // chasing the ground under it is a rival chasing nothing
+  const eaten = (m: THREE.Object3D) => m.userData.eaten || !m.visible || m.userData.departed;
 
   // the family wears LEGENDARIES ONLY — the 3D-accessory hero skins (unicorn
   // horn, dino spikes, wizard hat, crown…). Aspirational: every family member
