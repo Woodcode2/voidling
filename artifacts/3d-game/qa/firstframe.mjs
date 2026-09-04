@@ -179,13 +179,25 @@ for (const { WORLD, v } of RUNS) {
   // FORCE it up: the module can clear .boot and set an inline display before we
   // get here, and a class the element's own inline style beats leaves us
   // measuring a blank screen (0 glyph pixels at 393x700, 2026-09-03).
-  await p.evaluate(() => { const ls = document.querySelector('#loadScr'); if (!ls) return; ls.dataset.ffDisp = ls.style.display; ls.classList.add('show'); ls.style.display = 'flex'; ls.style.opacity = '1'; });
+  const loaderUp = () => p.evaluate(() => {
+    const ls = document.querySelector('#loadScr'); if (!ls) return;
+    if (ls.dataset.ffDisp === undefined) ls.dataset.ffDisp = ls.style.display;
+    ls.classList.add('show');
+    ls.style.display = 'flex'; ls.style.visibility = 'visible'; ls.style.opacity = '1'; ls.style.zIndex = '9999';
+    for (let a = ls.parentElement; a && a !== document.documentElement; a = a.parentElement) a.style.visibility = 'visible';
+  });
+  await loaderUp();
   await freeze(p, '#loadScr');
   await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  rec.contrast.push(await contrast(p, '#loadScr .lLogo i', 'boot THE CUTE'));
-  rec.contrast.push(await contrast(p, '#loadScr .lName', 'boot lName'));
+  // one retry: a zero-glyph read means the screen was not actually up, and a
+  // broken measurement must not be reported as either a pass or a failure
+  for (const [sel, label] of [['#loadScr .lLogo i', 'boot THE CUTE'], ['#loadScr .lName', 'boot lName']]) {
+    let c = await contrast(p, sel, label);
+    if (!c.missing && !c.glyphPx) { await loaderUp(); await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); c = await contrast(p, sel, label); }
+    rec.contrast.push(c);
+  }
   await thaw(p);
-  await p.evaluate(() => { const ls = document.querySelector('#loadScr'); if (!ls) return; ls.classList.remove('show'); ls.style.display = ls.dataset.ffDisp || ''; ls.style.opacity = ''; delete ls.dataset.ffDisp; });
+  await p.evaluate(() => { const ls = document.querySelector('#loadScr'); if (!ls) return; ls.classList.remove('show'); ls.style.display = ls.dataset.ffDisp || ''; ls.style.visibility = ''; ls.style.opacity = ''; ls.style.zIndex = ''; delete ls.dataset.ffDisp; });
   // 2. THE MENU SPLASH — key art on its feathered layer, the logo over it.
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => { if (['daily', 'gift'].includes(e.id)) e.classList.remove('show'); }));
