@@ -5708,7 +5708,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
           // meal, and a field whose food is mostly grass is the trap Powder
           // fell into: measured, 0.6% of its edibles are large against Maple's
           // 8.1%, which is why it starved a child driver on points.
-          nodes.push({ p: p2, stage: n % 14 < 3 ? 0 : n % 14 < 7 ? 1 : n % 14 < 10 ? 2 : 3 });
+          nodes.push({ p: p2, stage: n % 14 < 2 ? 0 : n % 14 < 6 ? 1 : n % 14 < 9 ? 2 : 3 });
           n++;
         }
       }
@@ -5801,6 +5801,11 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
       drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
       drop(SKF.skFireTender(), [cx + 200, cy + 620], 1.8, layoutYaw() + Math.PI / 2, false, 'car');
     }
+    for (const p2 of SK.scatterInRegion(REG('tower'), 14, rnd2, 150, { sep: 6.0 })) {
+      const cols = env();
+      drop(rnd2() < 0.5 ? SKF.skBalloonSpilled(cols) : SKF.skBalloonCold(cols),
+        p2, rnd2() < 0.5 ? 5.2 : 4.6, layoutYaw(), false, 'big', 6.0);
+    }
     for (const p2 of SK.scatterInRegion(REG('tower'), 110, rnd2, 50, { sep: 1.1 })) {
       const k = rnd2();
       drop(k < 0.5 ? SKF.skPerimeterCone() : k < 0.8 ? SKF.skTaxiwaySign() : SKF.skTussock(),
@@ -5863,6 +5868,10 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
         if (!SK.skPlaceable(p2[0], p2[1], 40)) return;
         drop(mk(), p2, 2.1, layoutYaw() + Math.PI / 2, false, 'car');
       });
+    }
+    for (const p2 of SK.scatterInRegion(REG('breakfast'), 10, rnd2, 150, { sep: 6.0 })) {
+      const cols = env();
+      drop(SKF.skBalloonSpilled(cols), p2, 5.2, layoutYaw(), false, 'big', 6.0);
     }
     for (const p2 of SK.scatterInRegion(REG('breakfast'), 180, rnd2, 40, { sep: 1.5 })) {
       const k = rnd2();
@@ -5956,7 +5965,7 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
 
     // 9. THE ROUGH — the uncut grass in the three bites, dressed off distToEdge
     //    with a band rather than a polygon, exactly as Powder dresses its rim.
-    for (const p2 of SK.scatterLand(1500, rnd2, 24, [110, 1800])) {
+    for (const p2 of SK.scatterLand(1650, rnd2, 24, [110, 1800])) {
       const k = rnd2();
       const m = k < 0.42 ? SKF.skTussock() : k < 0.66 ? SKF.skWildflowerClump()
         : k < 0.82 ? SKF.skThistle() : k < 0.92 ? SKF.skFencePost() : SKF.skFenceRun();
