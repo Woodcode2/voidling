@@ -16,6 +16,7 @@ import * as LN from './lantern';
 import * as PW from './powder';
 import * as AL from './alpine';
 import * as SK from './skylark';
+import * as SKF from './skyfield';
 import * as NM from './nightmarket';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
@@ -5589,6 +5590,337 @@ async function populate(scene: THREE.Scene, addEdible: AddEdible,
     }
     await breathe('Lighting the windows…');
     return;   // POWDER PASS is fully populated — the Maple grid pass must not run
+  }
+
+  // ══ SKYLARK FIELD: a disused airfield, and this is the one morning ═══════
+  // Same model as POWDER PASS above — polygon regions, the shared spatial
+  // hash, authored landmarks reserved BEFORE the scatter runs.
+  //
+  // WHAT IS DIFFERENT HERE IS THAT THE COMPOSITION IS AUTHORED, NOT SCATTERED.
+  // Lantern learned that a market is a LINE and rejection sampling gives you a
+  // car boot sale. A balloon meet is worse: it is a FIELD OF ROWS. Crews park
+  // on a grid the organisers pegged out at four in the morning, and ninety
+  // envelopes dropped at random would read as litter, not as an event. So the
+  // launch field is laid out in rows by hand and only its small stuff is
+  // scattered.
+  //
+  // AND THE FOUR STAGES ARE HELD AT A RATIO. skyfield.ts authors a balloon as
+  // BAGGED, SPILLED, COLD or STANDING, and the field holds them near 5:4:3:2 —
+  // low, low, mid, tall. That ratio is the whole reason this world photographs:
+  // a field of upright envelopes at a camera looking down 46.4 degrees is a
+  // wall of opaque objects, and a field of flat gore-striped crescents on grey
+  // grass is the shot the poster sells. The standing ones are punctuation.
+  if (WORLD_ID === 'skylark') {
+    const P3 = (p2: SK.Pt): [number, number] => [w(p2[0]), w(p2[1])];
+    SK.resetPlacement();
+    const drop = (mesh: THREE.Object3D, p2: SK.Pt, r: number, rotY?: number, force = false, qk?: string) => {
+      if (!force && !SK.spotOpen(p2[0], p2[1], r * 20)) return;
+      if (force) mesh.userData.authored = true;   // a landmark: the settle pass may never retire it
+      const [x3, z3] = P3(p2);
+      if (rotY !== undefined) mesh.rotation.y = rotY;
+      if (qk) mesh.userData.qk = qk;
+      place(mesh, x3, z3, r);
+      SK.claimSpot(p2[0], p2[1], r * 20);
+    };
+    const REG = (id: SK.SkBiome) => SK.SK_REGIONS.find((r2) => r2.id === id)!;
+    const rnd2 = Math.random;
+    const pick = <T,>(a: T[]): T => a[Math.floor(rnd2() * a.length) % a.length];
+    /** an envelope colour triple, so ninety balloons are not ninety of one */
+    const env = () => pick(SKF.ENVELOPE);
+    /** THE FIELD FACES ONE WAY. Crews lay out along the runway heading, not at
+     *  random: a balloon meet is pegged out on a grid, and a scatter of yaws is
+     *  the single fastest way to make an authored field look accidental. 030 is
+     *  the main strip's heading, and +/-8 degrees of jitter keeps it human. */
+    const layoutYaw = () => (30 * Math.PI) / 180 + (rnd2() - 0.5) * 0.28;
+
+    await breathe('Pegging out the field…');
+
+    // 1. THE WHALE — the hero meal, force-placed on the launch circle, lying
+    //    down. She is 70 units nose to tail and the child can walk her whole
+    //    length before they are big enough to eat any of her.
+    {
+      const whale = SKF.skWhaleLying();
+      drop(whale, [SK.LAUNCH.cx, SK.LAUNCH.cy], 18.0, layoutYaw(), true, 'big');
+      SK.claimSpot(SK.LAUNCH.cx, SK.LAUNCH.cy, SK.LAUNCH.rx * 0.85);
+    }
+    // …and her precinct: the ground crew's kit ringing her, inside the circle,
+    // so eating her takes the circle out from under her rather than leaving a
+    // rind of surviving rope. Authored on the ring, not scattered.
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const rr = SK.LAUNCH.rx * 0.86;
+      const p2: SK.Pt = [SK.LAUNCH.cx + Math.cos(a) * rr, SK.LAUNCH.cy + Math.sin(a) * rr];
+      drop(SKF.skTetherPin(), p2, 0.34, 0, true, 'small');
+    }
+    for (const [dx, dy, mk] of [[-1450, 250, 0], [1400, -300, 1], [200, 1300, 2], [-300, -1250, 3]] as const) {
+      const p2: SK.Pt = [SK.LAUNCH.cx + dx, SK.LAUNCH.cy + dy];
+      const m = mk === 0 ? SKF.skInflatorFan() : mk === 1 ? SKF.skTrailer()
+        : mk === 2 ? SKF.skCylinderPair() : SKF.skCrownLine();
+      drop(m, p2, mk === 1 ? 2.0 : 0.9, layoutYaw(), false, mk === 1 ? 'car' : 'small');
+    }
+
+    // 2. THE LAUNCH FIELD — the hero district and the densest lawn in the game.
+    //    ROWS, pegged out along 030, four stages at 5:4:3:2. This is the one
+    //    place in the world where the composition is hand-authored.
+    {
+      const R = REG('launchfield');
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const [px, py] of R.poly) { minX = Math.min(minX, px); maxX = Math.max(maxX, px); minY = Math.min(minY, py); maxY = Math.max(maxY, py); }
+      // walk a grid along the runway heading and drop a balloon at every node
+      // that is legal — a grid, not a scatter, because crews park in rows
+      const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
+      const vx = -uy, vy = ux;
+      const cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5;
+      const PITCH_ALONG = 340, PITCH_ACROSS = 420;
+      let n = 0;
+      for (let i = -6; i <= 6; i++) {
+        for (let j = -5; j <= 5; j++) {
+          // stagger alternate rows, the way a real field is pegged
+          const along = i * PITCH_ALONG + (j % 2 ? PITCH_ALONG * 0.5 : 0);
+          const across = j * PITCH_ACROSS;
+          const p2: SK.Pt = [cx + ux * along + vx * across, cy + uy * along + vy * across];
+          if (!SK.pointInPoly(p2[0], p2[1], R.poly)) continue;
+          if (!SK.skPlaceable(p2[0], p2[1], 30)) continue;
+          // 5 : 4 : 3 : 2 — bagged, spilled, cold, standing
+          const roll = n % 14;
+          const stage = roll < 5 ? 0 : roll < 9 ? 1 : roll < 12 ? 2 : 3;
+          const cols = env();
+          const mesh = stage === 0 ? SKF.skBalloonBagged(cols)
+            : stage === 1 ? SKF.skBalloonSpilled(cols)
+              : stage === 2 ? SKF.skBalloonCold(cols) : SKF.skBalloonStanding(cols);
+          // ONE EDIBLE, ONE RADIUS — see skyfield.ts's header on fadeOccluders
+          const r = stage === 0 ? 1.4 : stage === 1 ? 5.2 : stage === 2 ? 4.6 : 4.8;
+          drop(mesh, p2, r, layoutYaw(), false, 'big');
+          n++;
+          // every balloon has a basket beside it, and a crewed one has its kit
+          if (stage >= 1) {
+            const off: SK.Pt = [p2[0] - vx * 150, p2[1] - vy * 150];
+            drop(SKF.skBasket(), off, 0.9, layoutYaw(), false, 'small');
+          }
+          if (stage >= 2) {
+            const off2: SK.Pt = [p2[0] + ux * 190, p2[1] + uy * 190];
+            drop(SKF.skInflatorFan(), off2, 0.8, layoutYaw() + Math.PI, false, 'small');
+          }
+          if (stage === 3) {
+            const off3: SK.Pt = [p2[0] - ux * 170, p2[1] - uy * 170];
+            drop(SKF.skCylinderPair(), off3, 0.6, rnd2() * Math.PI * 2, false, 'small');
+          }
+        }
+      }
+    }
+    // the launch field's own small stuff, scattered between the rows
+    for (const p2 of SK.scatterInRegion(REG('launchfield'), 90, rnd2, 40)) {
+      const k = rnd2();
+      const m = k < 0.34 ? SKF.skCrownLine() : k < 0.58 ? SKF.skTetherPin()
+        : k < 0.78 ? SKF.skCylinderPair() : SKF.skTussock();
+      drop(m, p2, k < 0.78 ? 0.55 : 0.35, rnd2() * Math.PI * 2, false, 'small');
+    }
+
+    await breathe('Filling the balloons…');
+
+    // 3. THE ARRIVALS FIELD — trailers nose-in on the wet grass, tailgates
+    //    down. The spawn is here and it looks straight up 03 at the whale, so
+    //    the trailers are laid in a row rather than scattered: this is the
+    //    first thing a child ever sees of this world.
+    {
+      const R = REG('arrivals');
+      const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
+      const vx = -uy, vy = ux;
+      let cx = 0, cy = 0;
+      for (const [px, py] of R.poly) { cx += px; cy += py; }
+      cx /= R.poly.length; cy /= R.poly.length;
+      for (let i = -4; i <= 4; i++) {
+        const p2: SK.Pt = [cx + vx * i * 300, cy + vy * i * 300];
+        if (!SK.pointInPoly(p2[0], p2[1], R.poly) || !SK.skPlaceable(p2[0], p2[1], 40)) continue;
+        drop(SKF.skTrailer(), p2, 2.0, layoutYaw(), false, 'car');
+        const b: SK.Pt = [p2[0] + ux * 200, p2[1] + uy * 200];
+        drop(SKF.skBalloonBagged(env()), b, 1.4, layoutYaw(), false, 'big');
+      }
+      drop(SKF.skTicketCaravan(), [cx + ux * 600, cy + uy * 600], 1.6, layoutYaw() + Math.PI / 2, false, 'house');
+    }
+    for (const p2 of SK.scatterInRegion(REG('arrivals'), 55, rnd2, 60)) {
+      const k = rnd2();
+      const m = k < 0.3 ? SKF.skBalloonBagged(env()) : k < 0.5 ? SKF.skBasket()
+        : k < 0.68 ? SKF.skCylinderPair() : k < 0.85 ? SKF.skTussock() : SKF.skSpectatorCar();
+      drop(m, p2, k < 0.3 ? 1.4 : k < 0.85 ? 0.6 : 1.7, layoutYaw(), false,
+        k < 0.3 ? 'big' : k < 0.85 ? 'small' : 'car');
+    }
+
+    // 4. THE TOWER — authored, because it is the one silhouette on the skyline
+    //    and Mr Pym broadcasts from its balcony.
+    {
+      const R = REG('tower');
+      let cx = 0, cy = 0;
+      for (const [px, py] of R.poly) { cx += px; cy += py; }
+      cx /= R.poly.length; cy /= R.poly.length;
+      drop(SKF.skControlTower(), [cx, cy], 4.2, SK.skFacingCircle(cx, cy), true, 'big');
+      drop(SKF.skMetHut(), [cx - 420, cy + 300], 0.8, rnd2() * Math.PI * 2, false, 'small');
+      drop(SKF.skBriefingCaravan(), [cx + 480, cy + 260], 2.0, layoutYaw(), false, 'house');
+      drop(SKF.skFlagpole(), [cx - 300, cy - 420], 0.5, 0, false, 'small');
+      drop(SKF.skWindsock(), [cx + 520, cy - 380], 0.5, 0, false, 'small');
+      drop(SKF.skFireTender(), [cx + 200, cy + 620], 1.8, layoutYaw() + Math.PI / 2, false, 'car');
+    }
+    for (const p2 of SK.scatterInRegion(REG('tower'), 30, rnd2, 60)) {
+      const k = rnd2();
+      drop(k < 0.5 ? SKF.skPerimeterCone() : k < 0.8 ? SKF.skTaxiwaySign() : SKF.skTussock(),
+        p2, 0.4, rnd2() * Math.PI * 2, false, 'small');
+    }
+
+    // 5. THE HANGARS — two sheds, doors half open, the Sunday flea market
+    //    running inside them.
+    {
+      const R = REG('hangars');
+      let cx = 0, cy = 0;
+      for (const [px, py] of R.poly) { cx += px; cy += py; }
+      cx /= R.poly.length; cy /= R.poly.length;
+      drop(SKF.skHangar(), [cx - 340, cy - 120], 5.5, layoutYaw() + Math.PI / 2, true, 'big');
+      drop(SKF.skHangar(), [cx + 380, cy + 160], 5.5, layoutYaw() + Math.PI / 2, true, 'big');
+    }
+    for (const p2 of SK.scatterInRegion(REG('hangars'), 60, rnd2, 45)) {
+      const k = rnd2();
+      const m = k < 0.34 ? SKF.skTrestleTable() : k < 0.52 ? SKF.skVintageTractor()
+        : k < 0.66 ? SKF.skModelPlaneStand() : k < 0.80 ? SKF.skRosetteWall()
+          : k < 0.92 ? SKF.skTeaUrn() : SKF.skStrawBale();
+      drop(m, p2, k >= 0.34 && k < 0.52 ? 1.5 : 0.8, layoutYaw(), false,
+        k >= 0.34 && k < 0.52 ? 'car' : 'small');
+    }
+
+    await breathe('Opening the bacon van…');
+
+    // 6. BREAKFAST ROW — the vans along the old taxiway spur, in a LINE,
+    //    because a row of food vans is a row and every errand in this world
+    //    ends at one of them.
+    {
+      const R = REG('breakfast');
+      const ux = Math.sin((30 * Math.PI) / 180), uy = -Math.cos((30 * Math.PI) / 180);
+      let cx = 0, cy = 0;
+      for (const [px, py] of R.poly) { cx += px; cy += py; }
+      cx /= R.poly.length; cy /= R.poly.length;
+      const vans = [
+        () => SKF.skBaconVan(0xe8e2d0, 0xd8443a),
+        () => SKF.skCoffeeHorsebox(),
+        () => SKF.skBaconVan(0x9fb6c8, 0x2f6fd0),
+        () => SKF.skDoughnutTrailer(),
+      ];
+      vans.forEach((mk, i) => {
+        const p2: SK.Pt = [cx + ux * (i - 1.5) * 320, cy + uy * (i - 1.5) * 320];
+        if (!SK.skPlaceable(p2[0], p2[1], 40)) return;
+        drop(mk(), p2, 2.1, layoutYaw() + Math.PI / 2, false, 'car');
+      });
+    }
+    for (const p2 of SK.scatterInRegion(REG('breakfast'), 70, rnd2, 40)) {
+      const k = rnd2();
+      const m = k < 0.34 ? SKF.skPicnicBench() : k < 0.60 ? SKF.skStrawBale()
+        : k < 0.76 ? SKF.skWheelieBin() : k < 0.90 ? SKF.skTussock() : SKF.skSpectatorCar();
+      drop(m, p2, k < 0.90 ? 0.75 : 1.7, layoutYaw(), false, k < 0.90 ? 'small' : 'car');
+    }
+
+    // 7. THE RUNWAYS THEMSELVES — nothing is scattered here (skPlaceable
+    //    refuses all three strips), so everything on the concrete is placed by
+    //    hand and by name: the numerals, the centreline, the edge lights and
+    //    the sheep who are on 09 every year and will not be moved.
+    for (const [name, pts, half] of [
+      ['03', SK.RWY03, SK.RWY03_HALF] as const,
+      ['09', SK.RWY09, SK.RWY09_HALF] as const,
+      ['15', SK.RWY15, SK.RWY15_HALF] as const,
+    ]) {
+      const [a, b] = [pts[0], pts[pts.length - 1]];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      const yaw = Math.atan2(ux, -uy);
+      // the two threshold numerals, at each end, reading up the strip
+      const recip = String((Number(name) + 18) % 36 || 36).padStart(2, '0');
+      const n1 = SKF.skThresholdNumerals(name, 2.4); n1.rotation.y = yaw;
+      place(n1, ...P3([a[0] + ux * 260, a[1] + uy * 260]), 3.2);
+      const n2 = SKF.skThresholdNumerals(recip, 2.4); n2.rotation.y = yaw + Math.PI;
+      place(n2, ...P3([b[0] - ux * 260, b[1] - uy * 260]), 3.2);
+      // the centreline, and the blue edge lights still on from the night
+      for (let d = 700; d < L - 700; d += 260) {
+        const dash = SKF.skCentrelineDash(); dash.rotation.y = yaw;
+        place(dash, ...P3([a[0] + ux * d, a[1] + uy * d]), 0.5);
+      }
+      for (let d = 400; d < L - 400; d += 520) {
+        for (const sgn of [-1, 1]) {
+          const p2: SK.Pt = [a[0] + ux * d - uy * sgn * half, a[1] + uy * d + ux * sgn * half];
+          place(SKF.skRunwayEdgeLight(), ...P3(p2), 0.3);
+        }
+      }
+      // THE SHEEP ARE ON THE RUNWAY. They are on it every year. place() rather
+      // than drop() because skPlaceable refuses the strip by design and the
+      // sheep are the joke that breaks the rule.
+      if (name === '09') {
+        for (let i = 0; i < 9; i++) {
+          const d = L * (0.32 + i * 0.045);
+          const off = (rnd2() - 0.5) * half * 1.2;
+          const p2: SK.Pt = [a[0] + ux * d - uy * off, a[1] + uy * d + ux * off];
+          const sh = SKF.skSheep(); sh.rotation.y = rnd2() * Math.PI * 2;
+          sh.userData.qk = 'small';
+          place(sh, ...P3(p2), 0.55);
+        }
+      }
+    }
+    // the painted launch ring
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      const p2: SK.Pt = [SK.LAUNCH.cx + Math.cos(a) * SK.LAUNCH.rx, SK.LAUNCH.cy + Math.sin(a) * SK.LAUNCH.ry];
+      const mk = SKF.skLaunchCircleMarker(); mk.rotation.y = a + Math.PI / 2;
+      place(mk, ...P3(p2), 0.4);
+    }
+
+    // 8. THE PERIMETER TRACK — marshals' cones and posts along the ring, and a
+    //    thin band of spectator cars on the grass verge outside it. This is
+    //    what draws the island's outline ON the island.
+    {
+      const T = SK.PERIMETER;
+      for (let i = 0; i < T.length - 1; i++) {
+        const [x1, y1] = T[i], [x2, y2] = T[i + 1];
+        for (const t of [0.25, 0.75]) {
+          const p2: SK.Pt = [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+          const m = t < 0.5 ? SKF.skPerimeterCone() : SKF.skMarshalPost();
+          const mm = m; mm.rotation.y = rnd2() * Math.PI * 2;
+          mm.userData.qk = 'small';
+          place(mm, ...P3(p2), 0.4);
+        }
+        // the spectator band, just outside the track, facing the field
+        if (i % 2 === 0) {
+          const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
+          const inx = 6000 - mx, iny = 6000 - my, il = Math.hypot(inx, iny) || 1;
+          const p2: SK.Pt = [mx - (inx / il) * 260, my - (iny / il) * 260];
+          if (SK.onSkylarkLand(p2[0], p2[1]) && SK.skPlaceable(p2[0], p2[1], 20)) {
+            drop(SKF.skSpectatorCar(pick([0x8ea3c4, 0xc4a08e, 0x9ec4a0, 0xd0d0c8])), p2, 1.7,
+              Math.atan2(inx, iny), false, 'car');
+          }
+        }
+      }
+    }
+
+    // 9. THE ROUGH — the uncut grass in the three bites, dressed off distToEdge
+    //    with a band rather than a polygon, exactly as Powder dresses its rim.
+    for (const p2 of SK.scatterLand(420, rnd2, 30, [120, 1500])) {
+      const k = rnd2();
+      const m = k < 0.42 ? SKF.skTussock() : k < 0.66 ? SKF.skWildflowerClump()
+        : k < 0.82 ? SKF.skThistle() : k < 0.92 ? SKF.skFencePost() : SKF.skFenceRun();
+      drop(m, p2, k < 0.92 ? 0.34 : 1.0, rnd2() * Math.PI * 2, false, 'small');
+    }
+    // …and the three things a child hunts for out there
+    for (const p2 of SK.scatterLand(14, rnd2, 40, [200, 1400])) {
+      drop(SKF.skSkylark(), p2, 0.30, rnd2() * Math.PI * 2, false, 'small');
+    }
+    for (const p2 of SK.scatterLand(3, rnd2, 60, [300, 1300])) {
+      drop(SKF.skHare(), p2, 0.35, rnd2() * Math.PI * 2, false, 'small');
+    }
+    for (const p2 of SK.scatterLand(2, rnd2, 60, [250, 1200])) {
+      drop(SKF.skCollapsedWindsockPole(), p2, 1.2, rnd2() * Math.PI * 2, false, 'small');
+    }
+    // the general field: more grass everywhere the rows are not
+    for (const p2 of SK.scatterLand(520, rnd2, 30)) {
+      const k = rnd2();
+      const m = k < 0.55 ? SKF.skTussock() : k < 0.85 ? SKF.skWildflowerClump() : SKF.skThistle();
+      drop(m, p2, 0.32, rnd2() * Math.PI * 2, false, 'small');
+    }
+
+    await breathe('Waiting for the wind to drop…');
+    return;   // SKYLARK FIELD is fully populated — the Maple grid pass must not run
   }
 
   // ══ LANTERN NIGHT: a spirit market, and it is open ════════════════════
