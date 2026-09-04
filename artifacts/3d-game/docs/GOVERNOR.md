@@ -701,3 +701,33 @@ the pwDrum guard, and the powderEvolve lift-and-park.
   fifteen judgements produced a good spine; the skeptic on the synthesis produced three
   defects that would each have shipped a visibly broken crowd. The verification, not the
   generation, is where the value was.
+
+## Ledger — 2026-09-04, the newsroom (round 5)
+
+- **The pools are not the paper.** Two probes already read this corpus and both called it
+  clean: one meters what the newsroom COULD say, the other meters the shape of the beats.
+  Neither can see what it actually said, in order, which is the only thing a child meets. The
+  instrument that records the SEQUENCE found a repeat inside one match, three pools carrying a
+  whole world, and — on a world nobody had touched — four cards in a row opening on the same
+  word. Measure the artifact the complaint is about.
+- **A bar registered before the measurement is the bar that gets to fail you.** The opener
+  bar was written into the probe before any world was run through it, so when it failed Game
+  Day rather than the two worlds this stream had rewritten, there was nothing to argue about.
+  A bar chosen after seeing the numbers is a description, not a bar.
+- **A summary line from your own script is not evidence.** "kept 208, cut 8, fixed 6" was
+  literally true while five of those six "fixes" had deleted the condemned line and inserted
+  nothing — a fix that only deletes still increments a fix counter. Check each ruling against
+  the artifact, one at a time, and let the check be a script somebody else could run.
+- **A world added to the game must be added to every meter.** The house-style probe shipped
+  with four worlds while the game shipped five. The newest newsroom was the one nobody
+  measured, and it was carrying seven lines that could never print in full — including the one
+  a judge called the best line in the codebase.
+- **A probe that has not run in this environment has not run.** The arc probe could not launch
+  a browser here at all. It was not failing; it had simply never been asked, because it sits in
+  a profile nobody runs on this box. "Green" only counts for the steps that executed.
+- **A header that describes a gap as a design will be believed.** Both thin worlds' files said
+  "this world has no LIVE pool and no per-meal pools … keep them", and everyone who read them,
+  including me, read intent. The census read the count. Write down what is MISSING as missing.
+- **Pair the runs, not just the builds.** The before feeds were 20 cards, my first after run
+  was 26, and the difference read as the ticker stalling on six draws — a phenomenon that never
+  happened. Same probe, same seed, same length, or it is not a comparison.

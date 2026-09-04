@@ -190,3 +190,30 @@ KILLED groups are recorded here, never hidden.
 - **06:40 UTC — gate on the purpose build:** `node qa/gate.mjs --profile=push --port=4177`
   on a quiet box: **PASS, 18/18** (the 18th is the new `purpose` step, all five worlds,
   1614s). main fast-forwarded to this commit.
+- **2026-09-04 08:00-11:48 UTC — the newsroom (round 5), the writing itself.** The owner: *"the
+  news is so bad. The style. The two sentences."* Two probes already read this corpus and both
+  called it clean, because both read POOLS. `qa/newsfeed.mjs` records the SEQUENCE a child
+  actually meets — brand, headline, in order, on a real match — and applies three bars a
+  sequence can fail that a pool cannot: **a repeat inside one match, a run of the same opening
+  word, a token reaching the child as braces.** It found Lantern Night repeating itself inside
+  twenty cards, and **both thin worlds airing from only three pools, because only three
+  existed**: `qa/_newscensus.mjs` put Lantern at 237 lines and Powder at 229 against Maple's
+  558, with NO per-meal pool and NO LIVE pool on either — an absence both files' headers
+  described as the design. **208 new lines** were written to each paper's own voice (the
+  market's courtesy announcement; the closures desk's list), cut down by a voice judge who
+  condemned seventeen by name and wrote the replacement for each, then wired in: the pickers
+  weight ~34% district / 22% what-it-just-ate / 28% live / 16% general, `usable()` finally
+  gates `{S}` on every pool rather than GENERAL alone, and the anti-repeat memory goes 6 → 14.
+  **The gate then failed on the step this stream added, on a world it never touched** — Game
+  Day aired *"The rulebook…", "The dog…", "The band…", "The smoker…"* back to back — so a drone
+  guard went into all five newsrooms and every world came back at a run of 2. Paired at
+  `--cards=20`: lantern 19 distinct with 1 repeat and 3 pools → **20 distinct, 0 repeats, 6
+  pools**; powder 3 pools → **6**, with more than a third of every feed now coming from copy
+  that did not exist that morning. Corpus 237 → 355 and 229 → 337. **Five corrections, four to
+  my own work**, in `newsroom.proposal.md` — chief among them an apply script that reported six
+  fixes while five of them had deleted the bad line and inserted nothing.
+- **11:48 UTC — gate on the newsroom build:** `node qa/gate.mjs --profile=push --port=4177` on a
+  quiet box: **PASS, 20/20**, 3,639s (the 19th and 20th are `newsfeed` at 284s and `newsstyle`
+  promoted from the live profile). The run before it was **FAIL, 1/20 — on `newsfeed`**, the
+  step this stream added, on Game Day, a world the stream never touched. main fast-forwarded to
+  this commit.

@@ -206,7 +206,9 @@ Two runs, and the first one earned its keep:
 
 - **run 1 — FAIL, 1/20 on `newsfeed`**, Game Day's four-card drone (above). Nineteen steps
   green, including `purpose` at 1633s and `splash` at 722s.
-- **run 2 — PENDING**, after the drone guard landed in all five newsrooms.
+- **run 2 — PASS, 20/20**, after the drone guard landed in all five newsrooms. 3,639s on a
+  quiet box: purpose 1639s, splash 702s, faceparity 440s, smoke:maple 279s, **newsfeed 284s**,
+  econ 201s, uisystem 25s, and eleven steps at or under a second.
 
 Two new steps in the words tier: `newsfeed` (the aired sequence, SEED pinned so a failure is reproducible rather than a
 story about a seed), and `newsstyle` **promoted from the live profile to push** — it is a
