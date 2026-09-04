@@ -1,0 +1,42 @@
+THE MAPLE FEED — 20 cards, SEED=7, in the order a child meets them
+==============================================================================
+[r 0.9] 📰 THE BUGLE
+         Good morning, Maple Falls! Dale has been mowing since six. It is Sunday.
+[r 0.9] 📰 THE BUGLE
+         Deb Hollis reports that her mailbox has moved four feet to the east.
+[r 0.9] 📰 THE BUGLE
+         The town clock is nine minutes fast and the council likes it that way.
+[r 0.9] 📰 THE BUGLE
+         Gus has changed the special. The special is the same as before.
+[r 0.9] 📰 THE BUGLE
+         Day 3,281 of Marge and the parking meter. Twenty five cents an hour.
+[r 1.4] 📰 THE BUGLE
+         The lake is flat, the boats are out, and nobody has caught anything.
+[r 1.4] 📰 THE BUGLE
+         The marching band knows one song and will play it again on Saturday.
+[r 2.2] 📰 THE BUGLE
+         Town records go back to 1841. An argument goes back to 1843.
+[r 2.2] 📰 THE BUGLE
+         A second void has opened. That is two. Town hall says two is normal.
+[r 3.2] 📰 THE BUGLE
+         The GOBBLIN is in the courthouse. The mayor sees a puddle.
+[r 3.2] 📰 THE BUGLE
+         Summer reading champion, eleven years running: Tater, aged nine.
+[r 3.2] 📰 THE BUGLE
+         That was a snack, which had been there since 1988.
+[r 4.4] ⚠️ BUGLE ALERT
+         It ate the swing set. The swings squeaked all the way down!
+[r 4.4] ⚠️ BUGLE ALERT
+         The 1974 book has been returned. After all this time.
+[r   6] 🚨 BUGLE EXTRA
+         The book from 1974 is safe. The library is not. Priorities.
+[r   6] 🚨 BUGLE EXTRA
+         Tater waved goodbye to the COLOSSUS. It waved something back.
+[r   8] 🚨 BUGLE EXTRA
+         Gone. All of the courthouse, and the meeting starts at four.
+[r   8] 🚨 BUGLE EXTRA
+         What is left? A meter, a mailbox and one very calm goat.
+[r  11] 🚨 BUGLE EXTRA
+         The bell rang at noon, eleven minutes early, right to the end.
+[r  11] 🚨 BUGLE EXTRA
+         Is the meter still standing? It is. Of course it is.
