@@ -111,7 +111,7 @@ const MORNING: string[] = [
   'Chairman of the meet reminds crews that the far hedge is not ours.',
   'A gull has taken something from the doughnut trailer.',
   'First light on the tower glazing, nineteen minutes before sunrise.',
-  'Old Bess the tractor is out. Old Bess is always out.',
+  'Old Meg the tractor is out. Old Meg is always out.',
   'Rosette board hung, thirty years of them.',
   'Crown lines out, mouths open, fans on, and this is the good bit.',
 ];
@@ -374,7 +374,7 @@ const MEAL_CAR: Pools = [[
 ], [
   'Another vehicle has gone. The spectator band is thinning nicely.',
   'It took {M}. The desk has stopped counting the vehicles.',
-  'Old Bess is fine. Old Bess is always fine.',
+  'Old Meg is fine. Old Meg is always fine.',
   'Retrieve crews have nothing to retrieve with!',
 ], [
   'All vehicles are clear of the field!! The desk confirms it.',
