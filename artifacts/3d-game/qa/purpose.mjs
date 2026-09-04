@@ -75,7 +75,7 @@ for (const WORLD of WORLDS) {
       if (o.userData.qk === 'car') return;           // vehicles are on rails by design
       if (!o.visible || !o.parent) return;
       people.push({ o, x0: o.position.x, z0: o.position.z, path: 0, px: o.position.x, pz: o.position.z,
-        home: 0, n: 0, ang: null, turn: 0, trail: [] });
+        home: 0, n: 0, ang: null, turn: 0, trail: [], vmin: Infinity });
     });
     // A JOURNEY needs no map of the town: leave, arrive, stay. Each person
     // carries the last place it settled; when it gets 15 units from that anchor
@@ -100,6 +100,14 @@ for (const WORLD of WORLDS) {
             q.ang = a;
           }
           q.px = x; q.pz = z;
+          // HOW CLOSE DID THE VOID GET? The errand is what a person does when
+          // the void is NOT near — flee, the panic contagion and the guest
+          // branch all outrank it by design — so a person who was hunted
+          // during the sample is not evidence about the errand. Recorded here,
+          // used to split the medians below.
+          const vs = window.__voidState();
+          const vd = Math.hypot(x - vs.x, z - vs.z) - vs.r;
+          if (vd < q.vmin) q.vmin = vd;
           if (Math.hypot(x - q.x0, z - q.z0) < 6) q.home++;
           q.n++;
           if (q.trail.length < 400 && q.n % 3 === 0) q.trail.push([Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
@@ -124,23 +132,29 @@ for (const WORLD of WORLDS) {
         net: +Math.hypot(q.px - q.x0, q.pz - q.z0).toFixed(2),
         home: q.n ? +(q.home / q.n).toFixed(3) : 1,
         turnPerS: q.n ? +(q.turn * 180 / Math.PI / Math.max(0.01, secs)).toFixed(1) : 0,
-        trips: q.trips || 0, trail: q.trail,
+        trips: q.trips || 0, vmin: +q.vmin.toFixed(1), trail: q.trail,
       })),
     };
   }, SECS);
 
   const moved = data.people.filter((q) => q.path > 0.2);
-  const drift = moved.map((q) => (q.path > 0 ? q.net / q.path : 0));
+  // the drift and turn medians are read off the people the void left alone:
+  // 45 units is the flee radius (fear 16-18) plus the contagion ring (25) plus
+  // the width of the panic wave. Journeys and the traveller share count the
+  // WHOLE crowd — being chased does not stop you having somewhere to be.
+  const calm = moved.filter((q) => q.vmin > 45);
+  const drift = calm.map((q) => (q.path > 0 ? q.net / q.path : 0));
   const rec = {
     world: WORLD, tag: TAG, seed: SEED, sampled: +data.secs.toFixed(1), people: data.people.length,
     moving: moved.length, still: +(1 - moved.length / Math.max(1, data.people.length)).toFixed(3),
     driftMedian: +med(drift).toFixed(3), driftP90: +[...drift].sort((a, c) => a - c)[Math.floor(0.9 * (drift.length - 1))]?.toFixed(3),
     homeMedian: +med(moved.map((q) => q.home)).toFixed(3),
-    turnMedian: +med(moved.map((q) => q.turnPerS)).toFixed(1),
+    turnMedian: +med(calm.map((q) => q.turnPerS)).toFixed(1),
+    calmPeople: calm.length, huntedPct: +(1 - calm.length / Math.max(1, moved.length)).toFixed(2),
     journeys: data.journeys, travellers: data.travellers,
     travellerPct: +(data.travellers / Math.max(1, moved.length)).toFixed(3),
   };
-  console.log(`  ${data.people.length} people, ${moved.length} moving  ·  drift median ${rec.driftMedian} (p90 ${rec.driftP90})  ·  ${(rec.homeMedian * 100).toFixed(0)}% of the sample within 6u of where they were born  ·  turning ${rec.turnMedian}°/s  ·  ${data.journeys} journey(s) by ${data.travellers} of ${moved.length} people (${(rec.travellerPct * 100).toFixed(0)}%)`);
+  console.log(`  ${data.people.length} people, ${moved.length} moving  ·  drift median ${rec.driftMedian} (p90 ${rec.driftP90})  ·  ${(rec.homeMedian * 100).toFixed(0)}% of the sample within 6u of where they were born  ·  turning ${rec.turnMedian}°/s (of the ${rec.calmPeople} the void never came near; ${(rec.huntedPct * 100).toFixed(0)}% were hunted)  ·  ${data.journeys} journey(s) by ${data.travellers} of ${moved.length} people (${(rec.travellerPct * 100).toFixed(0)}%)`);
 
   // THE PICTURE. Every trail, on a top-down plan, so the walk is visible.
   const S = 900, R = 260;   // world units across the frame

@@ -2637,20 +2637,39 @@ export function createLife(
       const hdx = hx - px, hdz = hz - pz;
       // HEADING PERSISTENCE is what makes consecutive legs chain rather than
       // cancel: a strict home-and-back ping-pong scores a drift of zero because
-      // the net displacement of a completed round trip is nothing.
+      // the net displacement of a completed round trip is nothing. Which is
+      // also why a failed search must NOT fall back to "walk home" — on Pirate
+      // Bay, where nearly every leg from the sand meets water, that produced
+      // exactly that ping-pong: 72 degrees/s of turning and a drift of 0.17.
       let a0 = ang + rand(-ERR.TURN, ERR.TURN);
-      if (hdx * hdx + hdz * hdz > leash2) a0 = Math.atan2(hdz, hdx) + rand(-0.6, 0.6);
-      for (let k = 0; k < 3; k++) {
-        const a = a0 + (k ? rand(-2.2, 2.2) : 0);
-        const L = leg! * rand(1 - ERR.SPREAD, 1 + ERR.SPREAD);
-        const tx = px + Math.cos(a) * L, tz = pz + Math.sin(a) * L;
+      if (blocked) a0 = ang + (rand(0, 1) < 0.5 ? 1.6 : -1.6);   // the slide already found a walkable side
+      else if (hdx * hdx + hdz * hdz > leash2) a0 = Math.atan2(hdz, hdx) + rand(-0.6, 0.6);
+      // Five candidates, fanning wider and SHORTENING as they go: a coastal
+      // person should take a short walk along the sand, not give up and go home.
+      for (let k = 0; k < 5; k++) {
+        const a = a0 + (k ? (k & 1 ? 1 : -1) * (0.9 + k * 0.45) : 0);
+        const L = leg! * rand(1 - ERR.SPREAD, 1 + ERR.SPREAD) * (k < 2 ? 1 : k < 4 ? 0.7 : 0.45);
+        const cx = Math.cos(a), cz = Math.sin(a);
+        const tx = px + cx * L, tz = pz + cz * L;
+        // WALK THE LEG BEFORE COMMITTING TO IT, at a third, two thirds and the
+        // end: an endpoint test alone accepts a leg from one headland to the
+        // next and then walks it through the bay. Three point-in-polygon tests
+        // once every ten seconds per person is cheaper than the slide-and-
+        // retarget the bad leg would otherwise cost every frame it grinds.
+        let ok = true;
+        for (let m = 1; m <= 2; m++) {
+          const fx = px + cx * L * (m / 3), fz = pz + cz * L * (m / 3);
+          if (!biomeAt(fx, fz) || wet(fx, fz, 2)) { ok = false; break; }
+        }
+        if (!ok) continue;
         if (!biomeAt(tx, tz) || wet(tx, tz, 4) || nearSpawn(tx, tz)) continue;
         gx = tx; gz = tz; ang = a; legT = L / pace * 2 + 4; reAim = ERR.REAIM;
         return;
       }
-      // nowhere to go: head home, which is by construction somewhere it can stand
-      gx = hx; gz = hz; ang = Math.atan2(hdz, hdx);
-      legT = Math.hypot(hdx, hdz) / pace * 2 + 4; reAim = ERR.REAIM;
+      // Boxed in on every side: stand where you are and try again shortly. The
+      // goal stays put, so the arrival test holds the person still rather than
+      // marching them across the only thing they cannot walk on.
+      gx = px; gz = pz; dwell = rand(1.5, 3.5); legT = 6; reAim = ERR.REAIM;
     };
     mesh.userData.ptsMult = 1.5;   // moving prey beats furniture of the same size
     mesh.userData.mover = true;    // steers itself — the magnet must never grab it
@@ -2748,7 +2767,7 @@ export function createLife(
               // the slide fallback firing IS the signal that this leg is
               // unwalkable — without this a walker grinds along a coastline for
               // the whole give-up timer at three biomeAt tests a frame
-              if (blocked) { blocked = false; dwell = rand(0.4, 1.2); retarget(); }
+              if (blocked) { dwell = rand(0.4, 1.2); retarget(); blocked = false; }
               else {
                 const gdx = gx - mesh.position.x, gdz = gz - mesh.position.z;
                 const d2 = gdx * gdx + gdz * gdz;
@@ -3208,7 +3227,7 @@ export function createLife(
         18, role === 'kid' ? 1.9 : 2.4, biome, undefined, VOICE_OF[role],
         // the front is a promenade: amenity to amenity, one stretch at a time.
         // The manager is posted behind his desk and stays there.
-        role === 'manager' ? 0 : 26);
+        role === 'manager' ? 0 : 22);
     };
     const CAST: [BAY.BayBiome, string, [Role, number][]][] = [
       // THE RESORT — the machine: guests being waited on, staff doing the waiting
@@ -3674,7 +3693,7 @@ export function createLife(
       const p = makeCast(role, 'market');
       if (role === 'kid') p.userData.dancer = { t: rand(0, 6), spin: 1, mode: 2 };
       addWanderer(p, x, z, role === 'kid' ? 34 : 30, role === 'kid' ? rand(6, 8.5) : rand(4, 6.5),
-        18, role === 'kid' ? 1.9 : 2.4, 'oldtown', undefined, VOICE_OF[role], 30);
+        18, role === 'kid' ? 1.9 : 2.4, 'oldtown', undefined, VOICE_OF[role], 24);
     }
 
     // ══ 4. DANCE COVE ═════════════════════════════════════════════════════
