@@ -42,6 +42,7 @@ import { pickMapleNews, resetMapleNews, MAPLE_BRAND, type MapleDist } from './pr
 import { pickGamedayNews, resetGamedayNews, GAMEDAY_BRAND, type GdDist } from './proto3d/newsroom_gameday';
 import { pickLanternNews, resetLanternNews, LANTERN_BRAND, type LnDist } from './proto3d/newsroom_lantern';
 import { pickPowderNews, resetPowderNews, POWDER_BRAND, type PwDist } from './proto3d/newsroom_powder';
+import { pickSkylarkNews, resetSkylarkNews, SKYLARK_BRAND, isSkDist } from './proto3d/newsroom_skylark';
 import { arcPhase, resetArc, arcState } from './proto3d/newsroom_arc';
 import { reactLine, resetReact, type ReactIn } from './proto3d/newsroom_react';
 import { makeCurio, animateCurio, CURIO_R, type CurioTier } from './proto3d/curio';
@@ -4255,7 +4256,25 @@ function showNews() {
     brand = (pickedWorld === 'lantern' ? LANTERN_BRAND
       : pickedWorld === 'powder' ? POWDER_BRAND
         : pickedWorld === 'gameday' ? GAMEDAY_BRAND
-          : PB ? PB_BRAND : MAPLE_BRAND)[tier];
+          : pickedWorld === 'skylark' ? SKYLARK_BRAND
+            : PB ? PB_BRAND : MAPLE_BRAND)[tier];
+  } else if (pickedWorld === 'skylark') {
+    // SKYLARK FIELD is a BALLOON MEET, and Mr Pym the Balloonmeister is the
+    // only voice on the field radio. His denial is the one shape none of the
+    // other five have: it is TECHNICAL. He has instruments, they are excellent,
+    // and they are answering the wrong question with total confidence. As the
+    // child eats, the field gets flatter, emptier and clearer — so his
+    // anemometer, his ceiling and his visibility all keep reporting that
+    // conditions are IMPROVING, and by his own criteria he is right. Tier 2 is
+    // not him panicking; it is him reading perfect flying weather over an empty
+    // field. The district ids come straight off skRegionAt with no translation
+    // table, because skylark.ts's region ids and SkDist are the same nine words.
+    const sd = String(island.biomeAt(voidState.x, voidState.z));
+    h = pickSkylarkNews({
+      tier, morning, district: (isSkDist(sd) ? sd : null), lastMeal, devouredPct,
+      form: FORMS[curStage] ?? 'VOIDLING', secondsLeft: Math.round(matchClock),
+    });
+    brand = SKYLARK_BRAND[tier];
   } else if (pickedWorld === 'powder') {
     // POWDER PASS is THE VALLEY BULLETIN: local radio, the school-closures
     // desk, reading its list at a measured pace since 5am. The comic engine

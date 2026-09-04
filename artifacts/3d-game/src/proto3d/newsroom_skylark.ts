@@ -92,16 +92,16 @@ const SIGN_ON: string[] = [
 // ── PHASE 0: the ordinary morning, before anything arrives ────────────────
 const MORNING: string[] = [
   'Crews are rigging on the launch field. Four people to a basket.',
-  'The fans are running. That is the loudest this field ever gets.',
+  'The fans are running, which is the loudest this field ever gets.',
   'A trailer has arrived late and been waved to the far end.',
   'Envelopes are coming out of their bags all down the row.',
   'The bacon van is open. The queue is already visible from the tower.',
   'Grete has laid her crown line out to the full thirty metres.',
   'Somebody has tested a burner. Everybody looked up.',
   'The sheep have been asked to move. The sheep have not moved.',
-  'Cloud base four thousand and lifting. Nothing in the notams.',
+  'Cloud base four thousand and lifting, with nothing in the notams.',
   'Franz cannot find his gloves. Franz has his gloves.',
-  'The flea market is open in hangar two. Tea is thirty pence.',
+  'The flea market is open in hangar two, and tea is thirty pence.',
   'The windsock is hanging straight down, which is the whole point.',
   'A dog has been round every basket on the field, once, politely.',
   'The model aircraft club is set up and has nothing to fly into.',
@@ -110,10 +110,10 @@ const MORNING: string[] = [
   'The met balloon is up. It is going straight up, which is ideal.',
   'Chairman of the meet reminds crews that the far hedge is not ours.',
   'A gull has taken something from the doughnut trailer.',
-  'First light on the tower glazing. Nineteen minutes to sunrise.',
+  'First light on the tower glazing, nineteen minutes before sunrise.',
   'Old Bess the tractor is out. Old Bess is always out.',
-  'The rosette board has been hung. Thirty years of them.',
-  'Crown lines out, mouths open, fans on. This is the good bit.',
+  'The rosette board has been hung, thirty years of them.',
+  'Crown lines out, mouths open, fans on, and this is the good bit.',
 ];
 
 // ── TIER 0 · DOUBT ─────────────────────────────────────────────────────────
@@ -124,23 +124,23 @@ const T0_GENERAL = [
   'The feature was not forecast. Conditions otherwise remain good.',
   'The desk is logging a surface obstruction of unusual colour.',
   'Nothing in this morning\'s notams mentions a violet feature.',
-  'Visibility unlimited. One obstruction, moving, low.',
+  'Visibility unlimited, with one obstruction, moving, low.',
   'The met balloon has been released again for a second opinion.',
   'A {F} has been observed on the launch field. Conditions are good.',
   'The instruments show nothing unusual. The instruments are excellent.',
-  'Wind still calm. The feature is not affecting the wind.',
+  'Wind still calm, the feature not affecting the wind.',
   'Crews are asked to note a moving obstruction and carry on rigging.',
   'The feature is round, violet and about {P} percent of the field wide.',
   'Cloud base unchanged. Surface wind unchanged. One new item.',
   'It ate {M}. That is a surface change, not a weather change.',
   'The desk has opened a new column on the form for this.',
-  'Is the feature forecast? No. Is it a problem? The desk thinks not.',
+  'Is the feature forecast? The desk thinks not.',
   'Grete reports the feature is nearer than it was. Noted, thank you.',
   'Conditions at {D} remain suitable for launch.',
   'The tower can see it from here and is not concerned.',
   'A second met balloon has confirmed the first met balloon.',
-  'It took {M} off the grass without slowing. Logged as removed.',
-  'The obstruction has no registration. The desk has asked twice.',
+  'It took {M} off the grass without slowing.',
+  'The obstruction has no registration, and the desk has asked twice.',
   'Nothing has changed except the number of things on the field.',
 ];
 
@@ -148,11 +148,11 @@ const T0_GENERAL = [
 // He believes it now, and it changes nothing, because his criteria have not
 // changed. The theory stops and the advice starts, in the same voice. One "!".
 const T1_GENERAL = [
-  'The feature is confirmed. The launch window is extended.',
+  'The feature is confirmed and the launch window is extended.',
   'Crews are asked to keep it on their left and continue.',
   'It has taken {M}. The desk has amended the plate.',
   'Revised: the obstruction is mobile, growing, and still not forecast.',
-  'Conditions remain within limits. The limits do not mention this.',
+  'Conditions remain within limits that do not mention this.',
   'The feature is now {P} percent of the field. Wind still calm.',
   'Launch is delayed for those affected. That is most of you.',
   'Mr Pym asks crews to rig away from it. Rig away from it, please.',
@@ -179,10 +179,10 @@ const T1_GENERAL = [
 const T2_GENERAL = [
   'Visibility unlimited in all directions!! Nothing is in the way.',
   'The desk reports the finest flying conditions in the meet\'s history.',
-  'Every obstruction has been removed from the field. Every one.',
+  'Every obstruction has been removed from the field, every one.',
   '{R} percent of the field remains and all of it is clear.',
   'Conditions are perfect!! There is nothing left to fly around.',
-  'The plate is now a blank sheet. That is technically ideal.',
+  'The plate is now a blank sheet, which is technically ideal.',
   '{S} seconds of the window remain!! Crews to the high ground.',
   'It ate {M}!! The obstruction count is falling rapidly.',
   'All crews to the far hedge, please. Bring nothing. Bring people.',
@@ -195,7 +195,7 @@ const T2_GENERAL = [
   'Nothing is obstructing anything!! The desk wishes to note that.',
   '{S} seconds!! Do not go back for a basket. Go to the hedge.',
   'The whale is airborne and so is nearly everybody else.',
-  'The last of {D} has gone. The desk logs conditions as excellent.',
+  'The last of {D} has gone, logged as excellent conditions.',
   'Everyone is accounted for and most of them are above us.',
 ];
 
@@ -353,7 +353,7 @@ const T2_BY_DIST: Record<SkDist, string[]> = {
 const MEAL_HOUSE: Pools = [[
   'A structure has been removed from the field. Conditions improve.',
   'The desk has struck one building off the plate.',
-  '{M} has gone. The desk notes the sightline is better for it.',
+  '{M} has gone, and the sightline is better for it.',
   'One less thing to fly around, which is the desk\'s whole job.',
 ], [
   'Another structure has gone. The plate is getting simpler!',
@@ -423,13 +423,13 @@ const BY_MEAL: Record<MealKind, Pools> = {
 //  Those SIX and no others. Never open a line with {D} or {M}: both arrive
 //  lower case and a sentence starts with a capital.
 const LIVE: Pools = [[
-  'The {F} at {D} has been logged as a surface obstruction.',
+  'The {F} at {D} is logged as a surface obstruction.',
   'A {F} is on the field and has not filed a flight plan.',
   'The desk is calling it a {F} and does not enjoy the word.',
   'Conditions at {D}: calm, clear, one {F}.',
   'The {F} is moving at walking pace and is not forecast.',
   '{P} percent of the field is now feature. Wind still calm.',
-  'A {F} has been offered a briefing. It did not attend.',
+  'A {F} has been offered a briefing and did not attend.',
   'The met balloon and the {F} are both violet. Unrelated.',
   'Passengers at {D} are asked not to approach the {F}.',
   'The desk has assigned the {F} no registration and no slot.',
@@ -450,7 +450,7 @@ const LIVE: Pools = [[
   'The {F} is {P} percent of the field!! Visibility unlimited.',
   '{S} seconds of the window remain!! Everybody to the hedge.',
   'It ate {M}!! The plate is nearly a blank sheet.',
-  'The {F} has cleared {D} entirely. Conditions there are perfect.',
+  'The {F} has cleared {D} entirely.',
   '{R} percent remains and the desk is standing on most of it.',
   'A {F} the size of the field is, technically, the field.',
   '{S} seconds!! Walk. Do not carry anything. Walk.',
@@ -503,6 +503,14 @@ export function resetSkylarkNews(): void {
   recent = [];
   openers.length = 0;
 }
+
+/** THE DISTRICT SET, DERIVED — never hand-typed. The other four worlds each
+ *  keep a literal list of district ids over in prototype3d.ts, and keeping one
+ *  of those in sync by hand is exactly what shipped a stale world list in
+ *  qa/newsstyle.mjs. This reads the pools themselves, so a district added to
+ *  T0_BY_DIST is a district the runtime will route to, with no second edit. */
+export const SK_DISTS: readonly string[] = Object.keys(T0_BY_DIST);
+export const isSkDist = (s: string): s is SkDist => SK_DISTS.includes(s);
 
 /** How many distinct lines this world can say. Counted rather than asserted. */
 export function skylarkNewsCount(): number {

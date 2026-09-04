@@ -31,14 +31,30 @@
 // per-district pools are the one gap: 767 lines, and the healthiest of the
 // bunch when measured (40-52% two-sentence against LIVE's 71%).
 import fs from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const DIR = new URL('../src/proto3d/', import.meta.url);
 // POWDER PASS was missing from this list for its whole life — the file shipped
 // with four worlds while the game shipped five, so the newest newsroom was the
 // one nobody metered. It is here now.
-const F = { maple: 'newsroom_maple.ts', pirate: 'newsroom.ts',
-  gameday: 'newsroom_gameday.ts', lantern: 'newsroom_lantern.ts',
-  powder: 'newsroom_powder.ts' };
+// EVERY WORLD'S NEWSROOM FILE, BY CONVENTION WITH ONE NAMED EXCEPTION.
+// This table used to be hand-typed, and hand-typed tables in qa/ have now gone
+// stale twice: it shipped with four worlds while the game had five, and the
+// second time the react list was derived but this one was not. So it is built
+// from ALL_WORLDS instead — newsroom_<world>.ts, except PIRATE BAY, which was
+// the first and simply got newsroom.ts — and a world with no file on disk
+// THROWS rather than being quietly skipped.
+const F = (() => {
+  const IRREGULAR = { pirate: 'newsroom.ts' };   // world 2 was written first
+  const out = {};
+  for (const w of ALL_WORLDS) {
+    const f = IRREGULAR[w] ?? `newsroom_${w}.ts`;
+    if (!fs.existsSync(new URL(`../src/proto3d/${f}`, import.meta.url)))
+      throw new Error(`newsstyle: ${w} is a world the game renders but src/proto3d/${f} does not exist — either it has no newsroom or this table needs the exception naming`);
+    out[w] = f;
+  }
+  return out;
+})();
 
 /** [start,end) of `const NAME ... = <literal>;` — bracket-matched, because a
  *  headline containing "];" would truncate any regex that tried this. */
@@ -104,7 +120,13 @@ for (const [w, f] of Object.entries(F)) {
   // consts; the other three share one `Pools` triple. All five have LIVE and
   // the four per-meal pools now — until round 5 the last two had neither, and
   // this branch used that absence as the reason to meter nothing but GENERAL.
-  const splitGeneral = w === 'lantern' || w === 'powder';
+  // DETECTED, NOT LISTED. This was `w === 'lantern' || w === 'powder'` — a
+  // third hand-typed world list in this one file, and it silently mis-read
+  // SKYLARK FIELD, which also splits its tiers: the probe followed the shared
+  // `GENERAL` triple, found a const holding three IDENTIFIERS and no string
+  // literals, and reported "tier0: empty pool" for a pool with 22 lines in it.
+  // A newsroom's shape is readable from its own source, so read it.
+  const splitGeneral = /^(?:export )?const T0_GENERAL\b/m.test(src);
   if (splitGeneral) for (let t = 0; t < 3; t++) beats.push([`tier${t}`, strs(grab(src, `T${t}_GENERAL`)), t]);
   for (const name of ['GENERAL', 'LIVE', 'MEAL_HOUSE', 'MEAL_CAR', 'MEAL_BIG', 'MEAL_SMALL']) {
     if (name === 'GENERAL' && splitGeneral) continue;
