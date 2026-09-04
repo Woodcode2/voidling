@@ -191,6 +191,14 @@ happened last time.
 
 ### 3A. THE LAND — reclaim the concrete, move the child, aim the camera
 
+> **DONE — commit `30730b1`, measured by `qa/skyland.mjs` (new, in the gate):**
+> placeable **41.0% → 61.5%** (bar 56); pieces **17 → 7**; largest piece
+> **35.6% → 51.0%** (bar 50 — the live runway still halves the island, by
+> design); spawn **meadow → arrivals**; whale **66.6° → 5.4°** off the camera
+> centreline, at 110 units. `airfield` §D and §F corrected to read `live:` off
+> the `RUNWAYS` literal; arrivals 97% free. Placement, edible count and the
+> first frame are re-measured in the browser once it is free.
+
 **Reclaim the concrete.** Measured sensitivity says this one change does more
 for the emptiness than any amount of scatter.
 
@@ -232,6 +240,38 @@ figures drive the scatter counts (count = density × usable area × k) or they a
 deleted. A number nobody reads is a lie waiting to be believed.
 
 ### 3B. THE SKY — the ascension, which is the level
+
+> **IN PROGRESS — resume point.** Commit `570d53b` lands the third state:
+> every envelope tagged `userData.balloon = { id, stage }`, `departed` leaves
+> both sides of `devouredPct`, `capture()` and every target loop refuse a
+> departed balloon, `window.__depart(n)` + `__matchState().devouredPct /
+> initialMass` for the probe. **Bar A is not yet measured in the browser**
+> (the GPU was held by the Powder avalanche proof, itself still unread). Next:
+> rebuild, restart the preview on 4177, `node qa/ascension.mjs 4177 skylark
+> --quick`, register `ascension` in `qa/gate.mjs` when A passes; then the
+> controller in `life.ts`'s skylark block (design below, revised).
+>
+> **Correction to this section's table.** The airborne targets (1:30 → 30,
+> 2:40 → 70, 3:00 → 90) are impossible under the section's own rule of one
+> departure every ≥ 6 s from 0:30: that rule caps departures at 11 by 1:30 and
+> 20 by 2:28. Both were mine. The rule stays — it is what makes "get them
+> before they go up" playable — and the numbers change: **field balloons
+> airborne (stages 1–4, y > 2): 0:30 ≥ 1, 1:00 ≥ 4, 1:30 ≥ 8, 2:28 ≥ 16,
+> 2:40 ≥ 18 + the whale, 3:00 ≥ 35** (the post-whale cascade lifts the rest of
+> the field minus the tethered eight, one new telegraph every 0.4 s). Distant
+> sprites count separately (stage 5) and never count as airborne. The sky
+> survey's finding governs the tiers: the play camera's ceiling over the child
+> is **12 u at spawn, 44 u at r4, 97 u at r8** — so the Lift tier cruises at
+> 12–16 u and climbs at ~0.15 u/s, the sky fills as the camera rises, and the
+> whale's lift gets a deliberate 4 s camera look-up (prototype3d.ts, off the
+> `whale` beat's own timer) — the one shot where the horizon is in frame.
+> `qa/ascension.mjs` bars B/C get these numbers in the next commit.
+>
+> **Survey claim disproven.** The sky survey reported the new arrivals polygon
+> yields 0 rig nodes at `skPlaceable(p, 130)`. Replayed (`qa/_skrig.mjs`,
+> SSR, the code's own centroid and grid): **16 nodes**; interior 91.7%
+> placeable at 130. The count that matters is the browser census after the
+> rebuild, still owed.
 
 This is the mechanic the design was built around and the build left out. It is
 specified here at the level of code shapes, because it touches the score.
@@ -576,6 +616,7 @@ These are not preferences.
 3. **The land** (3A) — reclaim, respawn, re-aim. Measure §G, §D, first frame.
 4. **The third state and the ascension** (3B) — lift tier only, with the
    telegraph, the eight that never leave, the shadow discs. Measure 1 and 2.
+   *Third state landed (`570d53b`), bar A unmeasured; controller not started.*
 5. **The whale stands and lifts** — beats 5 and 6 wired.
 6. **The low and high tiers, the distant sprites** — the sky fills. Measure 1.
 7. **The ground** (3C) — slab, kit, bank, row, stacks. Measure 9, 12.

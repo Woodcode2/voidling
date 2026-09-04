@@ -182,3 +182,13 @@ Recorded because a stream that reports only its successes is not evidence.
   that can read a field off the wrong object is not evidence about anything.
 - **I misread `index.html:43`** as the world router when it is the music
   preload. Corrected in the commit that fixed it.
+- **I wiped `prototype3d.ts` with a `perl -pi` whose `|` delimiter turned the
+  `||` in its own patterns into empty alternations** — every one of the
+  file's 10,300 lines got a 418-character prefix. The damage was a constant
+  prefix, so it was stripped exactly and the diff checked against the intended
+  46 lines before anything else happened; the four edits were redone with
+  literal string replacement. No trace reached a commit.
+- **The brief's §3B airborne table contradicted §3B's own 6-second rule**
+  (30 airborne by 1:30 needs a departure every 2 s). The rule stays, the
+  numbers are corrected in the brief, and `qa/ascension.mjs` will carry the
+  corrected bars — the probe was written to the wrong table.
