@@ -47,7 +47,7 @@
 //  {X} is the only token, it is the named thing, and only `landmark` has it.
 //  {F} is the form name, and only `evolve` has it.
 
-export type ReactWorld = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
+export type ReactWorld = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder' | 'skylark';
 export type ReactKind = 'landmark' | 'beat' | 'evolve' | 'rivalGone';
 
 /** The ticker is one line on a phone. Same number the four newsrooms use. */
@@ -331,8 +331,61 @@ const POWDER: WorldReact = {
   ],
 };
 
+// SKYLARK FIELD reacts in MR PYM's voice, and his denial is the one that is
+// wired to the player's own progress: he processes the void as CONDITIONS — a
+// meteorological feature and a surface obstruction — and files it under the only
+// headings the briefing form has. As the child eats, the field gets flatter and
+// emptier, so his instruments correctly report things IMPROVING. He never breaks
+// format and he never panics, because panicking is not one of the boxes.
+const SKYLARK: WorldReact = {
+  landmark: [
+    '{X} is no longer an obstruction.',
+    'Chart amended: {X} is no longer shown.',
+    'We have lost {X}. Conditions improve.',
+    '{X} was on the briefing. It is not now.',
+    'Obstruction {X} cleared. Thank you.',
+  ],
+  beat: [
+    [ // filling the balloons
+      'Inflation is under way. The desk can hear it from here.',
+      'Four crew to a basket, and the basket is winning.',
+      'A fan has been started. Another fan has been started.',
+      'The field is filling up nicely.',
+    ],
+    [ // burner test
+      'Burner checks complete. All eyebrows present and correct.',
+      'A burn has been heard. The sheep did not look up.',
+      'The flames are the only warm thing on this field.',
+      'Somebody has tested a burner twice.',
+    ],
+    [ // the sheep are on the runway
+      'The sheep are on 09. The sheep are always on 09.',
+      'Marshals report the sheep are aware and unmoved.',
+      'A sheep has crossed the centreline twice.',
+      'The sheep have right of way by long tradition.',
+    ],
+    [ // the whale goes up
+      'G-WAIL is standing. The whole field has stopped to look.',
+      'The whale has an eye and the eye is enormous.',
+      'Tether pins are coming out. Stand clear, please.',
+      'She is going, and ninety balloons are going with her.',
+    ],
+  ],
+  evolve: [
+    'The feature is now classified {F}.',
+    'Conditions have changed to {F}. Conditions remain good.',
+    'The desk has upgraded the feature to {F}.',
+  ],
+  rivalGone: [
+    'One feature has absorbed the other.',
+    'The field is down to a single feature. The desk calls that tidy.',
+    'Two features met over 27. One came back looking pleased.',
+  ],
+};
+
 const BY_WORLD: Record<ReactWorld, WorldReact> = {
   maple: MAPLE, pirate: PIRATE, gameday: GAMEDAY, lantern: LANTERN, powder: POWDER,
+  skylark: SKYLARK,
 };
 
 /** Everything said this match, so a landmark line cannot land twice. Cleared
@@ -422,6 +475,18 @@ export const MID_REACT: Record<string, string[]> = {
     'A wish paper drifted in. The market has decided it was granted.',
     'Half the wishes on the long wall now mention the guest by name.',
     'The wish about "a bigger appetite for the festival" has been withdrawn.',
+  ],
+  'skylark.burner': BY_WORLD.skylark.beat[1],
+  'skylark.sheep': BY_WORLD.skylark.beat[2],
+  'skylark.crown': [
+    'A crown line is out to its full thirty metres and held.',
+    'The line went slack. It has been retrieved.',
+    'Everybody is holding a rope and looking the same way.',
+  ],
+  'skylark.bacon': [
+    'The queue at the bacon van is visible from the tower.',
+    'Breakfast Row reports brisk trade and one missing bin.',
+    'A gull has taken something. The desk will not say what.',
   ],
   'powder.lake': BY_WORLD.powder.beat[1],
   'powder.contest': BY_WORLD.powder.beat[2],

@@ -56,7 +56,7 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
 // the union only because ./life still compares against them; nothing in
 // MAPLE_PLAN uses them and the bake + populate branches are gone.
-export type WorldId = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
+export type WorldId = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder' | 'skylark';
 
 export interface AddEdible { (mesh: THREE.Object3D, radius: number): void; }
 export interface Island {
@@ -156,6 +156,7 @@ export function setWorld(id: WorldId): void {
     maple: MAPLE_PLAN, pirate: PIRATE_PLAN, gameday: GAMEDAY_PLAN,
     lantern: MAPLE_PLAN,   // region-based; the grid only satisfies blind indexers
     powder: GAMEDAY_PLAN,  // same: powder is region-based (see pwRegionAt)
+    skylark: GAMEDAY_PLAN, // same again: skylark is region-based (see skRegionAt)
   };
   PLAN = PLANS[id];
 }
@@ -609,6 +610,15 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // Powder keeps a hint of aurora rather than becoming one flat blue.
   const SKY_MOOD: Record<WorldId, { tint: string; tintA: number; fog: number; bgI: number }> = {
     maple:   { tint: '#7a4ad6', tintA: 0.00, fog: 0x1b1038, bgI: 0.55 },   // the reference violet — untouched
+    // SKYLARK FIELD at first light. Periwinkle, because that is what the west
+    // half of a dawn sky is and it is the colour every shadow on the field
+    // takes — the same physics alpine.ts's blue-shadow rule runs on. Held at
+    // 0.58 between Maple's 0.55 and Powder's 0.62: brighter than a night world,
+    // short of a noon one, which is exactly what the half hour before sunrise
+    // is. The apricot in this world is a THIN band on the east horizon and it
+    // belongs to the light rig, not to the sky tint — the moment apricot
+    // spreads into the tint this becomes Game Day's golden hour.
+    skylark: { tint: '#6478c8', tintA: 0.62, fog: 0x232a52, bgI: 0.58 },   // periwinkle, half an hour before the sun
     pirate:  { tint: '#2f9fb5', tintA: 0.80, fog: 0x0e2237, bgI: 0.60 },   // sea-teal, daylit
     // GAME DAY WAS THE ONE WORLD NOBODY PHOTOGRAPHED, and it was the worst of
     // the five: flat bright magenta at the coast with not one star in it.
@@ -887,6 +897,15 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
         // and gives the shading somewhere to go.
         { d: 640, el: -56, az: AZ - 0.11, size: 98, hue: '#c9563f', dark: '#1e0713', glow: '#e8836a' },
         { d: 880, el: -76, az: AZ + 0.11, size: 58, hue: '#c9a6ff', dark: '#1d1440', glow: '#e0c9ff' },
+      ],
+      // a pale banded giant setting in the west as the sun comes up in the
+      // east, and one small apricot moon still up. The giant is deliberately
+      // the LOW-contrast body in the game's set: at dawn the sky itself is the
+      // brightest thing in frame, and a hot planet would fight the one thin
+      // warm band this world is allowed.
+      skylark: [
+        { d: 800, el: -58, az: AZ - 0.11, size: 124, hue: '#a9b8ee', dark: '#1b2044', bands: 4, glow: '#cdd8ff' },
+        { d: 680, el: -76, az: AZ + 0.11, size: 36, hue: '#ffcda0', dark: '#3a2416', glow: '#ffe3c4' },
       ],
       // an ice world with a bright ring, to match the aurora the poster set
       powder: [
@@ -3215,6 +3234,13 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
   // taken and multiplied by it.
   const GRAIN: Record<WorldId, [number, number, number, number]> = {
     maple:   [0.45, 0.08, 0.00, 9],
+    // SKYLARK FIELD is two surfaces and they want opposite things. Dewed grass
+    // at a low sun is all grain — it is the one ground in the game with real
+    // texture at arm's length. Concrete is nearly none, and a runway that
+    // sparkles reads as gravel. Mid layer high, coarse layer modest, and the
+    // fine layer kept off maple's 0.45 so the strips stay flat: the runways
+    // are the level's sightline and a sightline should be calm.
+    skylark: [0.38, 0.22, 0.12, 8],
     pirate:  [0.45, 0.08, 0.00, 9],
     gameday: [0.45, 0.08, 0.00, 9],
     // LANTERN NIGHT leans on the mid and coarse layers hard. Its floor is

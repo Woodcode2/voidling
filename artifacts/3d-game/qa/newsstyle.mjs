@@ -178,9 +178,18 @@ for (const [w, f] of Object.entries(F)) {
   const RIVALS = ['WOBBLES', 'GLITZ', 'BITSY', 'CHOMPZILLA', 'DOZER', 'NIBBLES'];
   console.log('\nreact');
   let n = 0, one = 0, two = 0;
-  // POWDER was missing here too, and newsroom_react.ts has had a POWDER pool
-  // since the world shipped. A pool nobody meters is a pool nobody read.
-  for (const w of ['MAPLE', 'PIRATE', 'GAMEDAY', 'LANTERN', 'POWDER']) {
+    // POWDER was missing here, and newsroom_react.ts had had a POWDER pool since
+  // that world shipped: a pool nobody meters is a pool nobody read. Adding it by
+  // hand fixed that one world and left the same trap armed for the next, so the
+  // list is now DERIVED from the ReactWorld union — the only place that knows
+  // how many worlds have reactive pools. SKYLARK FIELD was written, typechecked
+  // and still unmetered here until this line changed.
+  const REACT_WORLDS = (() => {
+    const m = /export type ReactWorld =([^;]+);/.exec(src);
+    if (!m) throw new Error('newsstyle: cannot read the ReactWorld union');
+    return [...m[1].matchAll(/'([a-z0-9]+)'/g)].map(([, id]) => id.toUpperCase());
+  })();
+  for (const w of REACT_WORLDS) {
     const pool = strs(grab(src, w));
     if (pool.length < 20) fail('react', w, `only ${pool.length} lines`, '');
     for (const line of pool) {

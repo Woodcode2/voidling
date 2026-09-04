@@ -344,12 +344,12 @@ document.body.insertBefore(renderer.domElement, document.body.firstChild);
 // ── WHICH WORLD ───────────────────────────────────────────────────────────
 // Resolved before anything else, because the light rig, the ground bake and
 // the prop kit all branch on it.
-const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS' };
+const WORLD_NAMES: Record<string, string> = { maple: 'MAPLE FALLS', pirate: 'PIRATE BAY RESORT', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS', skylark: 'SKYLARK FIELD' };
 // A ternary chain resolved exactly two worlds, so a third could never be
 // picked however the picker was wired. Validate against the real list instead,
 // which also means an unknown ?w= on a shared link lands on Maple rather than
 // on a world that does not exist.
-const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS: WorldId[] = ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
 const _wantWorld = new URLSearchParams(location.search).get('w')
   ?? localStorage.getItem('voidWorld') ?? 'maple';
 const pickedWorld: WorldId = (WORLDS as string[]).includes(_wantWorld) ? _wantWorld as WorldId : 'maple';
@@ -824,6 +824,34 @@ const WORLD_LIGHT: Record<WorldId, WorldLight> = {
   powder:  { sun: 0xd8e6ff, sunI: 1.15, hemiSky: 0x2a3c66, hemiGround: 0x9db6d8, hemiI: 0.9,
              off: [-62, 78, 30], dusk: 0.85, normalBias: 0.15, exposure: 1.18,
              fill: 0x7aa0e0, fillI: 0.5, fillOff: [58, 44, -60] },
+  // SKYLARK FIELD — first light, and the only rig in the game keyed from the EAST.
+  //
+  // THIS IS THE WORLD'S BIGGEST SINGLE IDEA AND IT IS ONE LINE. Every shipped
+  // rig keys from negative x: maple and pirate off [-55,95,42], gameday
+  // [-38,72,78], lantern [-30,96,46], powder [-62,78,30]. In five worlds the
+  // shadows have always raked the same way across the frame. Keying from
+  // [78,30,-46] rakes them the other way, on every object, in every shot — a
+  // whole-screen difference a stranger reads in the first second and no
+  // repaint can fake.
+  //
+  // It is also a LOW key: y=30 against everyone else's 72-96. The sun is not
+  // up yet, it is arriving, so the light comes across the field rather than
+  // down onto it and every mast, pole and standing envelope throws a shadow
+  // most of its own length. That is what half an hour before sunrise looks
+  // like and it is why the balloons read as objects sitting ON grass.
+  //
+  // hemiSky is periwinkle and hemiGround is wet grass, so the shadow side of
+  // everything is sky-coloured rather than grey — alpine.ts's blue-shadow rule,
+  // which is not a snow rule at all but a "the sky is the only other light"
+  // rule, and dawn is when it is most true. dusk 0.80 so the tower glazing,
+  // the van hatches, the runway edge lights still on from the night and every
+  // pilot flame are lit from frame one.
+  //
+  // exposure 1.15, and the ceiling is the mascot's: above ~1.26 he stops being
+  // one colour across the game, measured at 9.6 dE against a bar of 6.
+  skylark: { sun: 0xffc78e, sunI: 1.50, hemiSky: 0x9fb6e8, hemiGround: 0x6a7a68, hemiI: 1.05,
+             off: [78, 30, -46], dusk: 0.80, normalBias: 0.15, exposure: 1.15,
+             fill: 0x8fa8e4, fillI: 0.55, fillOff: [-70, 52, 40] },
 };
 const LIGHT = WORLD_LIGHT[pickedWorld];
 
@@ -927,6 +955,18 @@ const HOURS: Record<WorldId, WorldHour[]> = {
     { name: 'blue dusk', dusk: 0.85, sunK: 1, warm: 0 },
     { name: 'last light', dusk: 1.0, sunK: 0.8, warm: 0.3 },
     { name: 'cold bright morning', dusk: 0.55, sunK: 1.14, warm: -0.12 },
+  ],
+  // A BALLOON MEET IS A WEATHER STORY, so this world's hours are the three
+  // mornings a meet actually gets. Hour 0 is the shipped rig untouched, by
+  // construction.
+  skylark: [
+    { name: 'first light', dusk: 0.80, sunK: 1, warm: 0 },
+    // the sun clears the horizon mid-match: the one hour in the game that gets
+    // WARMER as it goes, because that is what sunrise does
+    { name: 'sun on the deck', dusk: 0.58, sunK: 1.18, warm: 0.26 },
+    // the morning the meet nearly got called off. Flatter, cooler, and the
+    // Balloonmeister's instruments have never been happier about it
+    { name: 'low cloud', dusk: 0.92, sunK: 0.78, warm: -0.16 },
   ],
 };
 function applyLightRig(): void {
@@ -1465,6 +1505,28 @@ const WORLD_COPY: Record<WorldId, WorldCopy> = {
     heroCueNews: 'It is big enough for the Lodge. The hot chocolate is still on the counter.',
     heroGone: '🏔️ THE LODGE IS GONE. ALL SLURPED UP.',
     heroName: 'The Lodge',
+  },
+  skylark: {
+    n: 6, icon: '🎈', sub: 'get them before they go up',
+    // Mr Pym reads a briefing at a briefing's pace and finishes it every time,
+    // including the wind, the cloud base and "have a good flight"
+    newsGap: [16, 8], signOn: 6,
+    // THE WHALE, in 3D: skylark.ts puts the launch circle at world (6107, 4349)
+    hero: [(6107 - 6000) * 0.05, (4349 - 6000) * 0.05],
+    // an open field, not a corridor: the shot holds the whale lying across the
+    // launch circle and pulls back down 03 over the grass toward the arrivals
+    introLen: 3.4,
+    ender: '🎈 WORLD ENDER! The field is CLEAR.',
+    enderNews: 'SKYLARK FIELD IS CLEAR IN ALL DIRECTIONS. Visibility unlimited. Conditions perfect.',
+    houseNews: 'A hangar has gone. The flea market has relocated to the grass.',
+    rivalFullNews: 'The second feature has stopped moving. It is now, technically, terrain.',
+    winSub: 'the whole field belongs to the void', place: 'the field',
+    winTitles: ['FIELD: CLEARED FOR TAKEOFF', 'YOU ATE. YOU WON.', 'BURP OF CHAMPIONS',
+                'NOTHING LEFT TO REPORT', 'CHOMPION OF SKYLARK FIELD'],
+    heroCue: '🐋 YOU CAN EAT THE WHALE NOW — GO!',
+    heroCueNews: 'It is big enough for the whale. The whale is inflating. Crews are asked to be brisk.',
+    heroGone: '🐋 THE WHALE IS GONE. ALL SLURPED UP.',
+    heroName: 'The Whale',
   },
 };
 const COPY = WORLD_COPY[pickedWorld];
@@ -3791,10 +3853,28 @@ const POWDER_BEATS: typeof MAPLE_BEATS = [
     icon: '🏔️', title: 'AVALANCHE!!', sub: 'the mountain is coming to you', cue: 'avalanche',
     news: 'The mountain has let go. The village is advised to be somewhere else.' },
 ];
+// SKYLARK FIELD's four, and the whole match is one morning: the crews arrive,
+// the burners light, the sheep are on the runway as they are every year, and
+// the whale goes up.
+const SKYLARK_BEATS: typeof MAPLE_BEATS = [
+  { at: 30, dur: 14, mult: 2, fired: false, base: 0, col: 0xffc78e, flash: 'rgba(255,199,142,0.26)',
+    icon: '🎈', title: 'Filling the balloons!', sub: 'four people and a very loud fan',
+    news: 'Inflation has begun across the launch field. The fans are the loudest thing here.' },
+  { at: 66, dur: 16, mult: 2, fired: false, base: 0, col: 0xff8a3d, flash: 'rgba(255,138,61,0.28)',
+    id: 'skylark.burner', icon: '🔥', title: 'Burner test!', sub: 'everyone\'s eyebrows are fine',
+    news: 'Burner checks are complete. The desk confirms all eyebrows present and correct.' },
+  { at: 110, dur: 18, mult: 2, fired: false, base: 0, col: 0xd9e4c8, flash: 'rgba(217,228,200,0.26)',
+    id: 'skylark.sheep', icon: '🐑', title: 'The sheep are on the runway!', sub: 'they are always on the runway', cue: 'sheep',
+    news: 'The sheep are on 09. The sheep are on 09 every year and will not be moved.' },
+  { at: 148, dur: 32, mult: 3, fired: false, base: 0, col: 0x4a7ad6, flash: 'rgba(74,122,214,0.34)',
+    icon: '🐋', title: 'THE WHALE IS GOING UP!!', sub: 'the whole field is going with her', cue: 'whale',
+    news: 'G-WAIL has been cleared to launch. The whole field is going up with her.' },
+];
 const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
   : pickedWorld === 'pirate' ? PIRATE_BEATS
     : pickedWorld === 'lantern' ? LANTERN_BEATS
-      : pickedWorld === 'powder' ? POWDER_BEATS : MAPLE_BEATS;
+      : pickedWorld === 'powder' ? POWDER_BEATS
+        : pickedWorld === 'skylark' ? SKYLARK_BEATS : MAPLE_BEATS;
 // ── THE MIDDLE-BEAT POOL — match 2 is not match 1 (AAA-BRIEF §4.5) ──────────
 // The opener and the finale never move: the opener sets the world's tone and
 // the finale is its signature set piece (the goat, the treasure, the fourth
@@ -3812,6 +3892,13 @@ const BEATS = pickedWorld === 'gameday' ? GAMEDAY_BEATS
 const MID_66 = { at: 66, dur: 16, mult: 2, fired: false, base: 0 };
 const MID_110 = { at: 110, dur: 18, mult: 2, fired: false, base: 0 };
 const MID_POOL: Record<WorldId, MatchBeat[]> = {
+  skylark: [SKYLARK_BEATS[1], SKYLARK_BEATS[2],
+    { ...MID_66, id: 'skylark.crown', col: 0xa9d4ff, flash: 'rgba(169,212,255,0.26)',
+      icon: '🪢', title: 'Crown lines out!', sub: 'thirty metres, and hold it',
+      news: 'Crown lines are out across the field. Hold them, please. Hold them.' },
+    { ...MID_110, id: 'skylark.bacon', col: 0xffb85e, flash: 'rgba(255,184,94,0.26)',
+      icon: '🥓', title: 'The bacon van is open!', sub: 'the queue is longer than the runway',
+      news: 'Breakfast Row is open. The desk notes the queue is visible from the tower.' }],
   maple: [MAPLE_BEATS[1], MAPLE_BEATS[2],
     { ...MID_66, id: 'maple.bake', col: 0xffb85e, flash: 'rgba(255,184,94,0.26)',
       icon: '🥧', title: 'Bake sale!', sub: 'the table is not load-bearing',
@@ -6273,7 +6360,7 @@ function renderFinds(): void {
 let bookWorld: WorldId = pickedWorld;
 function renderBook(): void {
   const tabs = el('bookTabs'), grid = el('bookGrid'), foot = el('bookFoot');
-  const NAMES: Record<WorldId, string> = { maple: '🍁 MAPLE FALLS', pirate: '🏴‍☠️ PIRATE BAY',
+  const NAMES: Record<WorldId, string> = { skylark: '🎈 SKYLARK FIELD', maple: '🍁 MAPLE FALLS', pirate: '🏴‍☠️ PIRATE BAY',
     gameday: '🏈 GAME DAY', lantern: '🏮 LANTERN NIGHT', powder: '❄️ POWDER PASS' };
   tabs.innerHTML = (Object.keys(NAMES) as WorldId[]).map((w) =>
     `<button data-w="${w}" class="${w === bookWorld ? 'on' : ''}">${NAMES[w]} `
