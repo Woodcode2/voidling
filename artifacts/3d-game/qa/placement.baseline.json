@@ -1,0 +1,25 @@
+{
+  "_README": [
+    "FROZEN PLACEMENT DEBT, measured 2026-09-04 on the build at 021ed02.",
+    "",
+    "These are the offenders Stream A1 measured, diagnosed and RECORDED but did",
+    "not clear. A1 fixed the bulk of it — Maple's overlap 451 -> 119, Pirate's",
+    "road 109 -> 16, Lantern's water 378 -> 3 — and the residue has sat unguarded",
+    "since, because qa/placement.mjs was in no gate profile at all.",
+    "",
+    "This file freezes the residue rather than blessing it. Every number here is a",
+    "CEILING: the audit fails the moment a category goes above it, so the debt can",
+    "shrink and can never grow. Clearing it is a stream of its own.",
+    "",
+    "A WORLD WITH NO ENTRY HERE HAS A CEILING OF ZERO ON EVERY CATEGORY. That is",
+    "the whole point of the file: SKYLARK FIELD is born perfect or it does not",
+    "board, and it cannot inherit one of these by accident.",
+    "",
+    "Lower a number whenever you fix something. Never raise one without the owner."
+  ],
+  "maple":   { "water": 1, "inside": 4, "overlap": 119, "bench": 4 },
+  "pirate":  { "road": 16, "offisland": 5, "inside": 1, "overlap": 53, "roadend": 1 },
+  "gameday": { "overlap": 164 },
+  "lantern": { "water": 3, "offisland": 4, "overlap": 14 },
+  "powder":  { "offisland": 1, "overlap": 25 }
+}

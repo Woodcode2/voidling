@@ -100,6 +100,21 @@ const KNOWN = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
 const SHOTS = flags.shots || null;
 const SHOTS_PER_CAT = Number(flags.n || 3);
 const JSON_OUT = flags.json || null;
+// ── THE CEILING ─────────────────────────────────────────────────────────────
+// Stream A1 measured this game's placement, fixed the bulk of it (Maple's
+// overlap 451 -> 119, Pirate's road 109 -> 16) and RECORDED the residue. What
+// nobody did was wire the probe into the gate, so for a week the residue has
+// been unguarded: nothing anywhere would have noticed it growing back.
+//
+// Clearing 415 offenders across five shipped worlds is a stream of its own and
+// not this one. So the residue is FROZEN instead — the same move roundlod makes
+// with its 154 round things ("the debt is frozen and visible every run"). Every
+// world gets a per-category ceiling it may not exceed, and a world with no entry
+// in the baseline has a ceiling of ZERO on every category.
+//
+// That second half is the point. A new world is born perfect or it does not
+// board: SKYLARK FIELD cannot inherit a single one of these.
+const CEILING = flags.ceiling ? JSON.parse(fs.readFileSync(flags.ceiling, 'utf8')) : null;
 const SRC = process.env.SRC ? new URL('file://' + path.resolve(process.env.SRC) + '/') : new URL('../src/', import.meta.url);
 
 // AND THE TWO LISTS MUST AGREE. KNOWN is what worldData() can describe; the
@@ -450,12 +465,17 @@ for (const wid of WORLDS) {
   for (const k of ALL_CATS) {
     const list = res.cats[k] || [];
     const n = k === 'roadend' ? list.filter((o) => !o.ok).length : list.length;
-    const fail = FAIL_CATS.includes(k) && n > 0;
+    // Without a baseline the bar is zero, which is the honest bar and the one a
+    // new world is held to. With one, the bar is what was already there.
+    const cap = CEILING ? Number((CEILING[wid] || {})[k] || 0) : 0;
+    const fail = FAIL_CATS.includes(k) && n > cap;
     if (fail) worldFail = true;
-    rows.push(`   ${k.padEnd(10)} ${String(n).padStart(5)}  ${fail ? 'FAIL' : FAIL_CATS.includes(k) ? 'ok  ' : 'info'}  ${list.slice(0, k === 'roadend' ? 8 : 3).map((o) => o.d + (o.depth && k !== 'roadend' ? ` [${o.depth}]` : '')).join(' | ')}`);
+    const mark = fail ? 'FAIL' : !FAIL_CATS.includes(k) ? 'info'
+      : n > 0 ? `held` : 'ok  ';
+    rows.push(`   ${k.padEnd(10)} ${String(n).padStart(5)}${CEILING && FAIL_CATS.includes(k) ? '/' + String(cap).padStart(3) : '    '}  ${mark}  ${list.slice(0, k === 'roadend' ? 8 : 3).map((o) => o.d + (o.depth && k !== 'roadend' ? ` [${o.depth}]` : '')).join(' | ')}`);
   }
   console.log(`\n══ ${wid.toUpperCase()} ══  ${res.n} static props (${res.benches} benches, ${res.houses} houses w/ doors), audited in ${((Date.now() - t0) / 1000).toFixed(0)}s  ${worldFail ? 'FAIL' : 'PASS'}`);
-  console.log('   category      n  verdict  worst');
+  console.log(CEILING ? '   category      n/cap  verdict  worst' : '   category      n  verdict  worst');
   for (const r of rows) console.log(r);
   if (worldFail) anyFail = true;
 
@@ -506,6 +526,15 @@ if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(results, null, 1));
 // matcher reads. It used to print "PLACEMENT PASS — ", which matches nothing,
 // and a step whose verdict cannot be parsed cannot be registered.
 console.log(`\nplacement bars: road lip ${ROAD_LIP}, float ${FLOAT_TOL}, buried top ${SUNK_TOL}, overlap ${OVERLAP_TOL}, door ${DOOR_CLEAR}, ground ${GROUND_H}`);
+// A WORLD MISSING FROM THE BASELINE IS NOT A PASS BY DEFAULT — it is a world
+// nobody has decided about. Ceilings are a deliberate act, so a new world must
+// be added to the file by hand, at zero, by somebody who looked.
+if (CEILING) {
+  const unlisted = WORLDS.filter((w) => !(w in CEILING));
+  if (unlisted.length) console.log(`\n   note: ${unlisted.join(', ')} ${unlisted.length > 1 ? 'are' : 'is'} not in the baseline, so the ceiling is zero everywhere — which is the bar for a new world.`);
+  const frozen = WORLDS.reduce((a, w) => a + Object.values(CEILING[w] || {}).reduce((b, n) => b + Number(n), 0), 0);
+  if (frozen) console.log(`   ${frozen} offender(s) held under a frozen ceiling from qa/placement.baseline.json — held, not fixed.`);
+}
 console.log(anyFail
   ? `FAIL — placement: ${WORLDS.join(',')} — props standing somewhere they did not earn`
   : `PASS — placement: ${WORLDS.join(',')} — every prop earns the spot it stands on`);
