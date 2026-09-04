@@ -81,11 +81,11 @@ const SUITE = [
     timeout: 420, cmd: ['node', 'qa/smoke.mjs', w, PORT], verdict: pf,
     why: `${w} boots, loads every same-origin asset, grows, eats, and makes a sound` })),
 
-  { id: 'traverse', tier: 'runs', profiles: ['live'], timeout: 900,
+  { id: 'traverse', tier: 'runs', profiles: ['live'], timeout: 1300,
     cmd: ['node', 'qa/traverse.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'every size of void can still cross every island — growing never severs the map' },
 
-  { id: 'vary', tier: 'runs', profiles: ['live'], timeout: 900,
+  { id: 'vary', tier: 'runs', profiles: ['live'], timeout: 1300,
     cmd: ['node', 'qa/vary.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'match 2 is not a replay of match 1, and match 1 is the tuned baseline' },
 
@@ -181,7 +181,14 @@ const SUITE = [
   { id: 'skyfit', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 30,
     cmd: ['node', 'qa/skyfit.mjs'], verdict: pf,
     why: 'the planet, its ring and its glow all fit the sprite canvas — the half-cut planet (round 5)' },
-  { id: 'purpose', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 2400,
+  // TIMEOUTS ON A PER-WORLD SWEEP ARE A FUNCTION OF THE WORLD COUNT, and these
+  // were all sized when the sweep was FIVE worlds. Deriving WORLDS from the
+  // WorldId union made every one of them 20% longer overnight, which is a step
+  // failing on the CLOCK rather than on quality — the least useful red there
+  // is. Raised with headroom, because swiftshader in this container runs the
+  // match clock at roughly a ninth of real time and the margin is what stops a
+  // slow box being reported as a broken game.
+  { id: 'purpose', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 3600,
     cmd: ['node', 'qa/purpose.mjs', String(PORT), '--secs=30'],
     verdict: pf,
     why: 'the crowd has somewhere to be — a third of every world\'s moving people complete a journey (leave, arrive, stay) in thirty seconds, and the median person walks toward something rather than in circles (round 5, the owner\'s "every person moving, there\'s got to be a purpose behind that")' },
@@ -290,7 +297,7 @@ const SUITE = [
     cmd: ['node', 'qa/iosname.mjs'], verdict: pf,
     why: 'the iOS home-screen label matches capacitor.config.ts — cap sync never fixes this one' },
 
-  { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1200,
+  { id: 'questable', tier: 'money', profiles: ['live'], timeout: 1600,
     cmd: ['node', 'qa/questable.mjs', PORT, ...WORLDS], verdict: pf,
     why: 'over a year of draws, no world can show a daily chip a child cannot clear' },
 
