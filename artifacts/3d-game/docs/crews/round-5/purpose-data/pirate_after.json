@@ -1,0 +1,18 @@
+{
+ "world": "pirate",
+ "tag": "after",
+ "seed": 7,
+ "sampled": 30,
+ "people": 297,
+ "moving": 296,
+ "still": 0.003,
+ "driftMedian": 0.617,
+ "driftP90": 0.974,
+ "homeMedian": 0.303,
+ "turnMedian": 9.8,
+ "calmPeople": 230,
+ "huntedPct": 0.22,
+ "journeys": 389,
+ "travellers": 147,
+ "travellerPct": 0.497
+}

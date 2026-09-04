@@ -1,0 +1,16 @@
+== maple (30 match-seconds, tag before)
+  312 people, 305 moving  ·  drift median 0.094 (p90 0.174)  ·  16% of the sample within 6u of where they were born  ·  turning 104.7°/s (of the 278 the void never came near; 9% were hunted)  ·  63 journey(s) by 50 of 305 people (16%)
+  FAIL-LINE maple: 16% of moving people completed a journey, drift median 0.094 — nobody is going anywhere
+== pirate (30 match-seconds, tag before)
+  297 people, 296 moving  ·  drift median 0.085 (p90 0.164)  ·  19% of the sample within 6u of where they were born  ·  turning 103.9°/s (of the 231 the void never came near; 22% were hunted)  ·  90 journey(s) by 68 of 296 people (23%)
+  FAIL-LINE pirate: 23% of moving people completed a journey, drift median 0.085 — nobody is going anywhere
+== gameday (30 match-seconds, tag before)
+  501 people, 497 moving  ·  drift median 0.233 (p90 0.42)  ·  53% of the sample within 6u of where they were born  ·  turning 92.8°/s (of the 410 the void never came near; 18% were hunted)  ·  62 journey(s) by 47 of 497 people (10%)
+  FAIL-LINE gameday: 10% of moving people completed a journey, drift median 0.233 — nobody is going anywhere
+== lantern (30 match-seconds, tag before)
+  971 people, 971 moving  ·  drift median 0.238 (p90 0.475)  ·  84% of the sample within 6u of where they were born  ·  turning 91.9°/s (of the 886 the void never came near; 9% were hunted)  ·  66 journey(s) by 66 of 971 people (7%)
+  FAIL-LINE lantern: 7% of moving people completed a journey, drift median 0.238 — nobody is going anywhere
+== powder (30 match-seconds, tag before)
+  386 people, 386 moving  ·  drift median 0.173 (p90 0.352)  ·  55% of the sample within 6u of where they were born  ·  turning 95.1°/s (of the 335 the void never came near; 13% were hunted)  ·  35 journey(s) by 32 of 386 people (8%)
+  FAIL-LINE powder: 8% of moving people completed a journey, drift median 0.173 — nobody is going anywhere
+FAIL — purpose: 5 world(s) where the crowd has no destination

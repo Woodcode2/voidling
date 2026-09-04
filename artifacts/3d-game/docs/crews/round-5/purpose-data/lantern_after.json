@@ -1,0 +1,18 @@
+{
+ "world": "lantern",
+ "tag": "after",
+ "seed": 7,
+ "sampled": 30,
+ "people": 971,
+ "moving": 971,
+ "still": 0,
+ "driftMedian": 0.995,
+ "driftP90": 1,
+ "homeMedian": 0.48,
+ "turnMedian": 1.1,
+ "calmPeople": 881,
+ "huntedPct": 0.09,
+ "journeys": 629,
+ "travellers": 625,
+ "travellerPct": 0.644
+}

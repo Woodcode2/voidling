@@ -1,0 +1,18 @@
+{
+ "world": "gameday",
+ "tag": "after",
+ "seed": 7,
+ "sampled": 30,
+ "people": 497,
+ "moving": 493,
+ "still": 0.008,
+ "driftMedian": 0.954,
+ "driftP90": 0.999,
+ "homeMedian": 0.433,
+ "turnMedian": 2.2,
+ "calmPeople": 404,
+ "huntedPct": 0.18,
+ "journeys": 316,
+ "travellers": 259,
+ "travellerPct": 0.525
+}

@@ -1,0 +1,11 @@
+== maple (30 match-seconds, tag after)
+  317 people, 310 moving  ·  drift median 0.504 (p90 0.979)  ·  32% of the sample within 6u of where they were born  ·  turning 8.2°/s (of the 281 the void never came near; 9% were hunted)  ·  349 journey(s) by 159 of 310 people (51%)
+== pirate (30 match-seconds, tag after)
+  297 people, 296 moving  ·  drift median 0.617 (p90 0.974)  ·  30% of the sample within 6u of where they were born  ·  turning 9.8°/s (of the 230 the void never came near; 22% were hunted)  ·  389 journey(s) by 147 of 296 people (50%)
+== gameday (30 match-seconds, tag after)
+  497 people, 493 moving  ·  drift median 0.954 (p90 0.999)  ·  43% of the sample within 6u of where they were born  ·  turning 2.2°/s (of the 404 the void never came near; 18% were hunted)  ·  316 journey(s) by 259 of 493 people (53%)
+== lantern (30 match-seconds, tag after)
+  971 people, 971 moving  ·  drift median 0.995 (p90 1)  ·  48% of the sample within 6u of where they were born  ·  turning 1.1°/s (of the 881 the void never came near; 9% were hunted)  ·  629 journey(s) by 625 of 971 people (64%)
+== powder (30 match-seconds, tag after)
+  386 people, 386 moving  ·  drift median 0.984 (p90 1)  ·  31% of the sample within 6u of where they were born  ·  turning 1.7°/s (of the 331 the void never came near; 14% were hunted)  ·  450 journey(s) by 361 of 386 people (94%)
+PASS — purpose: every world's crowd arrives somewhere

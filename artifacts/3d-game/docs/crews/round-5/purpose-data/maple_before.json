@@ -3,14 +3,16 @@
  "tag": "before",
  "seed": 7,
  "sampled": 30,
- "people": 317,
- "moving": 310,
+ "people": 312,
+ "moving": 305,
  "still": 0.022,
- "driftMedian": 0.091,
- "driftP90": 0.178,
- "homeMedian": 0.168,
+ "driftMedian": 0.094,
+ "driftP90": 0.174,
+ "homeMedian": 0.16,
  "turnMedian": 104.7,
- "journeys": 66,
+ "calmPeople": 278,
+ "huntedPct": 0.09,
+ "journeys": 63,
  "travellers": 50,
- "travellerPct": 0.161
+ "travellerPct": 0.164
 }

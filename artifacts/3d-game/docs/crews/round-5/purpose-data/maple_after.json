@@ -1,0 +1,18 @@
+{
+ "world": "maple",
+ "tag": "after",
+ "seed": 7,
+ "sampled": 30,
+ "people": 317,
+ "moving": 310,
+ "still": 0.022,
+ "driftMedian": 0.504,
+ "driftP90": 0.979,
+ "homeMedian": 0.318,
+ "turnMedian": 8.2,
+ "calmPeople": 281,
+ "huntedPct": 0.09,
+ "journeys": 349,
+ "travellers": 159,
+ "travellerPct": 0.513
+}

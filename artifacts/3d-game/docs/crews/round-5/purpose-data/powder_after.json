@@ -1,0 +1,18 @@
+{
+ "world": "powder",
+ "tag": "after",
+ "seed": 7,
+ "sampled": 30,
+ "people": 386,
+ "moving": 386,
+ "still": 0,
+ "driftMedian": 0.984,
+ "driftP90": 1,
+ "homeMedian": 0.306,
+ "turnMedian": 1.7,
+ "calmPeople": 331,
+ "huntedPct": 0.14,
+ "journeys": 450,
+ "travellers": 361,
+ "travellerPct": 0.935
+}
