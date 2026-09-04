@@ -200,6 +200,29 @@ const SUITE = [
   // This one shipped: Powder Pass wore Lantern Night's moon lanterns for
   // eighteen days a year because nobody wrote a snow-day branch when the fifth
   // world arrived. Zero seconds, no browser, no port.
+  // THE OWNER'S SHARPEST COMPLAINT, FINALLY WIRED IN. "Sometimes in certain
+  // levels the items may be misplaced — you have trees on roads, the road may
+  // not be finished, item placement isn't dialled in." Stream A1 built the
+  // auditor for exactly that, measured the game, fixed the bulk of it — and
+  // nobody ever registered it. `grep -c placement qa/gate.mjs` was 0 for a
+  // week, so the residue A1 recorded has been sitting unguarded with nothing
+  // anywhere to notice it growing back.
+  //
+  // It runs against a FROZEN CEILING (qa/placement.baseline.json), not against
+  // zero: clearing 434 offenders across five shipped worlds is a stream of its
+  // own. The debt can shrink and can never grow. And a world with no entry in
+  // that file has a ceiling of ZERO on every category, which is how SKYLARK
+  // FIELD is held to being born perfect.
+  //
+  // SEED IS PINNED AND IT IS STILL NOT ENOUGH: two SEED=7 runs of this audit on
+  // one build gave maple overlap 113 and 116, pirate offisland 5 and 4. The
+  // four categories that drift carry +3 of headroom in the baseline and the
+  // file says so in its own header. A real regression is bigger than three.
+  { id: 'placement', tier: 'quality', profiles: ['push', 'live', 'quality'], timeout: 1800,
+    cmd: ['node', 'qa/placement.mjs', 'all', PORT, '--ceiling=qa/placement.baseline.json'],
+    env: { SEED: '7' }, verdict: pf,
+    why: 'every prop earns the spot it stands on — no tree on a road, no road ending in nothing, nothing inside a building or standing in the sea, measured against a frozen ceiling that can only go down' },
+
   { id: 'seasonprop', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/seasonprop.mjs'], verdict: pf,
     why: 'every limited-time season dresses its own world — no world wears another world\'s seasonal props' },
