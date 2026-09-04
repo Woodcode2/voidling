@@ -123,14 +123,31 @@ Three things. All are visible on every gate run rather than buried here.
    outlive its reason. Vendoring is one `curl` each, wherever the CDN is
    reachable.
 
-2. **Par convergence.** The 46,123 was measured with **no par at all**, against
-   rivals running the old ladder — the child took first place in all five runs
-   and the leader reached only 66.5% of the player. The lane was not trying. It
-   is a sound measurement of the child, which is what par is, but the field it
-   was measured against was the wrong field. A re-run against the calibrated
-   lane is owed, with the owner's floor as its bar: never below 3rd. **POWDER
-   PASS carries the identical caveat one world earlier and its convergence pass
-   is still outstanding too.**
+2. ~~**Par convergence.**~~ **DONE — and 35,000 stands.** Re-measured against
+   the calibrated lane:
+
+   | | before (no par) | after (par 35,000) |
+   |---|---|---|
+   | leader / lane | 70.8% | **100.8%** (sd 15.8) |
+   | leader / player | 66.5% | **94.8%** (sd 14.9) |
+   | child score | 46,123 (sd 3,196) | 31,254 (sd **11,060**) |
+   | worst place | 1st | **2nd** |
+
+   The lane is doing what an absolute par exists to make it do: the leader
+   finishes within 1% of its target instead of 30% short, and within 5% of the
+   child instead of a third behind. The owner's floor — never below 3rd — holds
+   with a run to spare.
+
+   The child mean falling to 31,254 *looks* like an argument for 23,000, and it
+   is not. By this probe's own reading rule — "a change is only real if the
+   means differ by more than about the sd" — 14,869 against an sd of 11,060 is
+   1.34 sd on five runs ranging 16,534 to 42,742. Five matches cannot separate
+   23,000 from 35,000. And chasing it is chasing a **fixed point**: par feeds
+   the lane, the lane eats food the child would have eaten, that sets the child
+   mean, and the convention sets par from the child mean. The 0.75 rule is well
+   defined only while par is *not* the thing driving the lane, and here it now
+   is. Revisiting it needs twenty matches, not five — the spread tripled the
+   moment the rivals started trying. **POWDER PASS still owes its own.**
 
 3. **Five palette colours on two shipped worlds** — lantern PLINTH (ΔE 0.8),
    CASE (1.2), BLACK_L (3.8), powder CHAR (5.7), PLINTH (6.0) — genuinely

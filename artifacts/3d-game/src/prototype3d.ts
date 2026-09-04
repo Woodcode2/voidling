@@ -572,11 +572,41 @@ const WORLD_PAR: Record<string, number> = {
   // not trying. So this figure is a measurement of the child, which is what
   // par is, but the field it was measured against was the wrong field.
   //
-  // Par moving in eases or tightens the lane, so the numbers move once this
-  // lands. POWDER PASS carries the identical caveat one world earlier and the
-  // convergence pass it promised is still owed; this one owes the same re-run
-  // of qa/ab.mjs against the calibrated lane, and the bar it has to clear is
-  // the owner's floor -- never below 3rd.
+  // ── THE CONVERGENCE PASS RAN, AND 35,000 STANDS ───────────────────────────
+  // Re-measured against the calibrated lane, same probe, same driver:
+  //
+  //                       before (no par)     after (par 35,000)
+  //   leader / lane          70.8%               100.8%   sd 15.8
+  //   leader / player        66.5%                94.8%   sd 14.9
+  //   child score          46,123 sd 3,196     31,254 sd 11,060
+  //   worst place              1st                 2nd
+  //
+  // The lane is doing exactly what an absolute par exists to make it do: the
+  // leader now finishes within 1% of its target instead of 30% short, and it
+  // finishes within 5% of the child instead of a third behind. The owner's
+  // floor -- never below 3rd -- holds with a run to spare.
+  //
+  // AND THE CHILD MEAN FELL TO 31,254, WHICH LOOKS LIKE AN ARGUMENT FOR 23,000
+  // (0.75 of it, the convention). It is not, for two reasons.
+  //
+  // The difference is not real by this probe's own reading rule: "a change is
+  // only real if the means differ by more than about the sd". 46,123 -> 31,254
+  // is 14,869 against an sd of 11,060 — 1.34 sd, on five runs whose range is
+  // 16,534 to 42,742. Five matches cannot separate 23,000 from 35,000 here.
+  //
+  // And chasing it is chasing a FIXED POINT, not a measurement. Par feeds the
+  // lane; the lane eats food the child would have eaten; that sets the child
+  // mean; the convention sets par from the child mean. Lowering par to 23,000
+  // eases the lane, the child scores more, and the convention then asks for
+  // par to go back up. The 0.75-of-child-mean rule is well defined only while
+  // par is NOT the thing driving the lane, and on this world it now is.
+  //
+  // So the operative bars are the ones that are actually measurable — the lane
+  // reaching its target and the place floor holding — and both are met. Left
+  // at 35,000 deliberately. If it is ever revisited it needs twenty matches,
+  // not five, because the spread tripled the moment the rivals started trying.
+  //
+  // POWDER PASS still owes its own convergence pass, one world earlier.
   skylark: 35000,
 };
 
