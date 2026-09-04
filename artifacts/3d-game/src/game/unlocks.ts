@@ -25,14 +25,20 @@
 //  players existed, and taking a world away from a child who was in it
 //  yesterday would be the worst possible way to introduce progression.
 
-export type WorldKey = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder';
+export type WorldKey = 'maple' | 'pirate' | 'gameday' | 'lantern' | 'powder' | 'skylark';
 
 /** The order they open in. Maple is world 1 and is always open. */
-export const WORLD_ORDER: WorldKey[] = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+// THIS LIST IS THE LADDER, AND A WORLD THAT IS NOT ON IT CAN NEVER OPEN.
+// completeWorld() returns null for the LAST entry ("no world after the last"),
+// so with SKYLARK FIELD missing, finishing POWDER PASS opened nothing and
+// isUnlocked('skylark') was false forever. World 6 was built, lit, populated,
+// given a crowd and a newsroom, and was unreachable by play.
+export const WORLD_ORDER: WorldKey[] = ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
 
 /** Display names, for the "finish X to unlock" line on a locked card. */
 export const WORLD_LABEL: Record<WorldKey, string> = {
   maple: 'MAPLE FALLS', pirate: 'PIRATE BAY', gameday: 'GAME DAY', lantern: 'LANTERN NIGHT', powder: 'POWDER PASS',
+  skylark: 'SKYLARK FIELD',
 };
 
 const KEY = 'voidUnlocked';
@@ -90,6 +96,6 @@ export function completeWorld(world: string): WorldKey | null {
   return next;
 }
 
-/** How many of the four are open — for the picker's header and telemetry. */
+/** How many of them are open — for the picker's header and telemetry. */
 export const unlockedCount = (): number =>
   WORLD_ORDER.filter((w) => migrate(read()).has(w)).length;

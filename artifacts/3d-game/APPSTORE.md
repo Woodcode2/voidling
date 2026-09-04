@@ -324,13 +324,16 @@ In Xcode:
 - **Description opener**: "Feed a tiny void until it swallows the whole town.
   Outgrow your rivals, dodge the ones bigger than you, and end the world —
   adorably." Then: 3-minute matches, three to five rival voids to outgrow,
-  **five worlds** — Maple Falls, Pirate Bay, Game Day, Lantern Night and
-  Powder Pass — six evolution forms, rare & legendary skins, trophies and ranks.
-  (This said "two worlds", then "four worlds", each time a world late. The
-  source of truth is `WORLD_ORDER` in `src/game/unlocks.ts` and it has five
-  entries. Understating the app is not a 2.3.1 finding the way overstating it
-  is, but this block is pasted straight into App Store Connect and it was
-  selling a fifth of the game to nobody.)
+  **six worlds** — Maple Falls, Pirate Bay, Game Day, Lantern Night, Powder
+  Pass and Skylark Field — six evolution forms, rare & legendary skins,
+  trophies and ranks.
+  (This said "two worlds", then "four worlds", then "five", each time a world
+  late. The source of truth is `WORLD_ORDER` in `src/game/unlocks.ts` and it
+  has six entries. Understating the app is not a 2.3.1 finding the way
+  overstating it is, but this block is pasted straight into App Store Connect
+  and it was selling a fifth of the game to nobody. qa/iapdoc.mjs compares the
+  two now, which is why this is the first time the count is right on the day
+  the world landed rather than a round later.)
   Do NOT mention mutations — they are not in this build. Store copy that
   describes absent features is Guideline 2.3.1. SOLO RUN *is* now in the build
   (it was coded, wired and hidden behind an inline display:none) and may be

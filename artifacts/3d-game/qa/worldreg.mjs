@@ -27,7 +27,8 @@
 import fs from 'node:fs';
 import { ALL_WORLDS } from './worlds.mjs';
 
-const FILES = ['src/prototype3d.ts', 'src/proto3d/island.ts', 'src/proto3d/life.ts'];
+const FILES = ['src/prototype3d.ts', 'src/proto3d/island.ts', 'src/proto3d/life.ts',
+  'src/game/unlocks.ts', 'src/game/stickers.ts', 'src/game/seasons.ts'];
 
 /** [start,end) of a declaration's initialiser, bracket-matched through strings,
  *  template literals and both comment forms — a table holding a headline with a
@@ -100,6 +101,76 @@ for (const f of FILES) {
       findings.push({ f, line, name: m[1], missing });
     }
   }
+}
+
+// ── TWO SHAPES THAT ARE NOT KEYED TABLES, AND BOTH GATE THE WHOLE GAME ─────
+// The keyed-table scan above misses an ORDERED LIST and a TYPE UNION, and
+// world 6 was missing from both:
+//
+//   WORLD_ORDER (src/game/unlocks.ts) IS THE UNLOCK LADDER. completeWorld()
+//   returns null for the last entry — "no world after the last" — so with
+//   skylark off the end, finishing POWDER PASS opened nothing and
+//   isUnlocked('skylark') was false forever. World 6 was built, lit, populated,
+//   given a crowd, a newsroom and twelve stickers, and could not be reached by
+//   PLAYING. Every probe that force-writes voidUnlocked sails straight past it.
+//
+//   The unions — WorldKey, Sticker.world, SeasonEvent.world — are what tsc
+//   checks new rows against, so a union missing a world turns "add world 6
+//   here" into a type error and quietly invites the next author to skip it.
+for (const f of FILES) {
+  if (!fs.existsSync(f)) continue;
+  const src = fs.readFileSync(f, 'utf8');
+  const clean = stripComments(src);
+
+  // an ordered list of world ids: ['maple', 'pirate', ...]
+  for (const m of clean.matchAll(/\[\s*'[a-z0-9]+'(?:\s*,\s*'[a-z0-9]+')*\s*,?\s*\]/g)) {
+    const ids = [...m[0].matchAll(/'([a-z0-9]+)'/g)].map(([, w]) => w);
+    if (!ids.every((w) => ALL_WORLDS.includes(w))) continue;
+    if (ids.length < ALL_WORLDS.length - 2) continue;
+    tables++;
+    const missing = ALL_WORLDS.filter((w) => !ids.includes(w));
+    if (missing.length) {
+      const line = src.slice(0, src.indexOf(m[0])).split('\n').length;
+      findings.push({ f, line, name: 'world list', missing });
+    }
+  }
+
+  // a type union of world ids: 'maple' | 'pirate' | ...
+  for (const m of clean.matchAll(/'[a-z0-9]+'(?:\s*\|\s*'[a-z0-9]+')+/g)) {
+    const ids = [...m[0].matchAll(/'([a-z0-9]+)'/g)].map(([, w]) => w);
+    if (!ids.every((w) => ALL_WORLDS.includes(w))) continue;
+    if (ids.length < ALL_WORLDS.length - 2) continue;
+    tables++;
+    const missing = ALL_WORLDS.filter((w) => !ids.includes(w));
+    if (missing.length) {
+      const line = src.slice(0, src.indexOf(m[0])).split('\n').length;
+      findings.push({ f, line, name: 'world union', missing });
+    }
+  }
+}
+
+// ── THE SCORE IS AN IF-CHAIN, WHICH NO TABLE SCAN CAN SEE ──────────────────
+// audio3d.ts picks a world's music with a chain that ENDS IN MAPLE:
+//
+//     isPirate() ? startTropical : isGameday() ? ... : isPowder() ? ... : startTown
+//
+// A world missing from it does not fail, it inherits — so SKYLARK FIELD, a
+// dawn balloon meet, played MAPLE FALLS's sleepy-autumn-town score, and the
+// music slot next to it meant a licensed skylark.mp3 dropped into public/
+// would have been ignored too. Nothing is keyed, nothing is a table, and every
+// probe stayed green.
+//
+// The check is deliberately crude — the world's own guard `isSkylark()` must
+// appear in the file — because the failure it catches is total absence, and
+// a chain that names a world is a chain somebody thought about.
+const AUDIO = 'src/proto3d/audio3d.ts';
+if (fs.existsSync(AUDIO)) {
+  const a = stripComments(fs.readFileSync(AUDIO, 'utf8'));
+  // maple is the terminal fallback by design and has no is-guard of its own
+  const named = ALL_WORLDS.filter((w) => w !== 'maple');
+  const missing = named.filter((w) => !new RegExp(`is${w[0].toUpperCase()}${w.slice(1)}\\s*\\(`).test(a));
+  tables++;
+  if (missing.length) findings.push({ f: AUDIO, line: 0, name: 'the score if-chain', missing });
 }
 
 // ── THE PICKER IS MARKUP, NOT CODE ─────────────────────────────────────────

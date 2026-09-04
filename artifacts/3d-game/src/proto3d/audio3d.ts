@@ -712,7 +712,8 @@ export function createAudio(): Audio3D {
   const worldSynth = () => (isPirate() ? startTropical
     : isGameday() ? startGameday
       : isLantern() ? startLantern
-        : isPowder() ? startPowderScore : startTown);
+        : isPowder() ? startPowderScore
+          : isSkylark() ? startSkylarkScore : startTown);
   /** Bring the bed up, unless a recording beat it to it. */
   // ── THE COVER PAD ─────────────────────────────────────────────────────────
   // The owner, on Lantern: "We have the music I provided then I'm hearing
@@ -787,6 +788,7 @@ export function createAudio(): Audio3D {
     logEv('synth bed down (handover)');
     stopPad(fade);
     stopTropical(fade); stopTown(fade); stopGameday(fade); stopLantern(fade); stopPowder(fade);
+    stopSkylark(fade);
   }
   function repairMusic() {
     const c = ctx;
@@ -3660,6 +3662,173 @@ export function createAudio(): Audio3D {
       pwNextT += BEAT; pwStep++;
     }
   }
+  // ── SKYLARK FIELD: THE BURNER SCORE ────────────────────────────────────────
+  // World 6 was falling through this chain to startTown, so a dawn balloon meet
+  // sounded exactly like a sleepy autumn town. It is the last of the five-way
+  // if-chains in this file that had never heard of it.
+  //
+  // WHAT A BALLOON MEET ACTUALLY SOUNDS LIKE, and it is the opposite of every
+  // other score here: it is a QUIET place punctuated by something enormous. A
+  // field at dawn has no wind by definition — you cannot fly if it does — so
+  // there is birdsong, sheep, people talking low, and then a burner fires and
+  // for four seconds it is the loudest thing for a mile. Then silence again.
+  //
+  // So the burner is the hook, not the beat. Powder's drum keeps time; this
+  // one INTERRUPTS. At stage 0 it fires about every four bars and the rest is
+  // held air; by stage 3 it is on the bar and the field is roaring, which is
+  // also the moment the child has eaten most of it.
+  //
+  // The tune only ever CLIMBS. Everything on this field goes up, so the phrase
+  // is an ascent that falls back a step and climbs again, on F major pentatonic
+  // — five notes that cannot make a wrong interval, which is the right choice
+  // for a score a six-year-old hears four hundred times.
+  const isSkylark = () => worldId() === 'skylark';
+  let skBus: GainNode | null = null;
+  let skTimer: ReturnType<typeof setInterval> | null = null;
+  let skStep = 0, skNextT = 0, skRunning = false;
+  const SK_ROW = [349.23, 392.0, 440.0, 523.25, 587.33, 698.46];   // F4 G4 A4 C5 D5 F5
+  const skDeg = (i: number) => SK_ROW[((i % SK_ROW.length) + SK_ROW.length) % SK_ROW.length];
+  /** the balloon note: a round sine bell with a soft triangle body under it —
+   *  warmer and slower than Powder's music box, because nothing here is brisk */
+  function skGlass(freq: number, t: number, vol = 0.15) {
+    const c = ctx; if (!c || !skBus) return;
+    for (const [ty, f, v, d] of [['sine', freq, vol, 1.6],
+      ['triangle', freq * 0.5, vol * 0.22, 1.1]] as const) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = ty; o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(skBus);
+      o.start(t); o.stop(t + d + 0.05);
+    }
+  }
+  /** THE BURNER. Low filtered noise with a fast attack and a long tail, plus a
+   *  body oscillator that sags — a roar, not a hiss. This is the sound the
+   *  world is remembered by, so it is the only voice here allowed to be big. */
+  function skBurner(t: number, vol = 0.20) {
+    const c = ctx; if (!c || !skBus) return;
+    const len = Math.floor(c.sampleRate * 0.75);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    // a roar swells and then falls away rather than clicking on: shape the
+    // noise itself so the envelope does not have to do all the work
+    for (let i = 0; i < len; i++) {
+      const x = i / len;
+      d[i] = (Math.random() * 2 - 1) * Math.min(1, x * 12) * (1 - x) ** 1.6;
+    }
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(1800, t);
+    f.frequency.exponentialRampToValueAtTime(420, t + 0.7);
+    f.Q.value = 0.7;
+    const g = c.createGain(); g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(skBus);
+    src.start(t);
+    // the body: what makes it a flame rather than a wave breaking
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(88, t);
+    o.frequency.exponentialRampToValueAtTime(54, t + 0.55);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(vol * 0.55, t + 0.05);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+    o.connect(lp); lp.connect(og); og.connect(skBus);
+    o.start(t); o.stop(t + 0.8);
+  }
+  /** the skylark itself: four quick rising chirps, high and thin. The bird the
+   *  field is named after sings before anybody has lit anything. */
+  function skLark(t: number, vol = 0.05) {
+    const c = ctx; if (!c || !skBus) return;
+    for (let i = 0; i < 4; i++) {
+      const o = c.createOscillator(), g = c.createGain();
+      const tt = t + i * 0.055;
+      o.type = 'sine';
+      o.frequency.setValueAtTime(1850 + i * 260, tt);
+      o.frequency.exponentialRampToValueAtTime(2500 + i * 300, tt + 0.045);
+      g.gain.setValueAtTime(0.0001, tt);
+      g.gain.exponentialRampToValueAtTime(vol, tt + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.05);
+      o.connect(g); g.connect(skBus);
+      o.start(tt); o.stop(tt + 0.08);
+    }
+  }
+  /** the still air: a wide slow pad, root and fifth with a little detune */
+  function skPad(rootHz: number, t: number, dur: number, vol: number) {
+    const c = ctx; if (!c || !skBus) return;
+    for (const f of [rootHz, rootHz * 1.4983, rootHz * 2.006, rootHz * 1.004]) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + dur * 0.45);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(skBus);
+      o.start(t); o.stop(t + dur + 0.05);
+    }
+  }
+  // 16 steps that climb, drop back one, and climb again — authored so a child
+  // can hum it, and it resolves onto the root at the top rather than the bottom
+  const SK_TUNE = [0, 1, 2, 3, 2, 3, 4, 5, 4, 3, 2, 3, 4, 5, 4, 2];
+  function skSchedule() {
+    const c = ctx; if (!c || !skRunning) return;
+    const BEAT = 60 / (76 + musStage * 8) / 2;   // 8ths at 76..100 bpm — unhurried
+    while (skNextT < c.currentTime + 0.65) {
+      const t = skNextT, st = skStep;
+      const bar8 = st % 8, deg = SK_TUNE[st % SK_TUNE.length];
+      // the balloon motif: sparse at first, filling in as the field empties
+      if (bar8 % 4 === 0 || musStage >= 1) skGlass(skDeg(deg), t, 0.15);
+      if (musStage >= 2 && bar8 % 4 === 2) skGlass(skDeg(deg) * 2, t, 0.05);
+      // THE BURNER INTERRUPTS. Every 4 bars, then 2, then every bar.
+      const every = musStage >= 3 ? 8 : musStage >= 2 ? 16 : 32;
+      if (st % every === 0) skBurner(t, 0.18 + musStage * 0.02);
+      // the lark sings in the gaps, and stops once the field is loud
+      if (musStage <= 1 && st % 24 === 12) skLark(t, 0.05);
+      if (st % 32 === 0) skPad(174.61, t, BEAT * 32, 0.055 + musStage * 0.010);
+      skNextT += BEAT; skStep++;
+    }
+  }
+  /** The Skylark bus, parked at silence like Powder's, so an evolution can
+   *  reach it without starting the scheduler under a recording. */
+  function ensureSkBus(c: AudioContext): GainNode {
+    if (skBus) return skBus;
+    skBus = c.createGain(); skBus.gain.value = 0.0001;
+    // an open field has no walls to bounce off, so the air is LONGER and much
+    // quieter than Powder's snowfield — a hint of distance, never a room
+    const dly = c.createDelay(0.8); dly.delayTime.value = 0.36;
+    const fb = c.createGain(); fb.gain.value = 0.22;
+    const wet = c.createGain(); wet.gain.value = 0.13;
+    skBus.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet);
+    wet.connect(musicBus!); skBus.connect(musicBus!);
+    return skBus;
+  }
+  function startSkylarkScore() {
+    const c = ensure(); if (!c || !master) return;
+    ensureSkBus(c);
+    skRunning = true;
+    ramp(skBus!.gain, 0.5, c.currentTime, 1.8);
+    skStep = 0; skNextT = c.currentTime + 0.1;
+    if (skTimer) clearInterval(skTimer);
+    skTimer = setInterval(skSchedule, 110);
+  }
+  function stopSkylark(fade: number) {
+    skRunning = false;
+    if (skTimer) { clearInterval(skTimer); skTimer = null; }
+    const c = ctx; if (!c || !skBus) return;
+    ramp(skBus.gain, 0, c.currentTime, fade);
+  }
+  /** the evolution answer: the phrase climbing clean out the top, and a burner
+   *  under it — which is exactly what a balloon standing up sounds like */
+  function skylarkEvolve() {
+    const c = ensure(); if (!c) return;
+    const bus = ensureSkBus(c);
+    const t = c.currentTime + 0.02;
+    if (!skRunning) { ramp(bus.gain, 0.5, t, 0.05); ramp(bus.gain, 0.0001, t + 1.4, 0.9); }
+    for (let i = 0; i < 6; i++) skGlass(skDeg(i) * (i > 3 ? 2 : 1), t + i * 0.085, 0.15);
+    skBurner(t + 0.10, 0.22);
+    skLark(t + 0.62, 0.06);
+  }
+
   /** The Powder bus, built on demand and parked at silence (0.0001): the score
    *  ramps it up when it starts; a one-shot that needs it lifts it itself.
    *  Extracted from startPowderScore so an evolution can reach the bus without
@@ -3731,8 +3900,10 @@ export function createAudio(): Audio3D {
         : isGameday() ? startGameday
         : isLantern() ? startLantern
         : isPowder() ? startPowderScore
+        : isSkylark() ? startSkylarkScore
         : startTown;
-      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : isPowder() ? 'powder' : 'maple';
+      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern'
+        : isPowder() ? 'powder' : isSkylark() ? 'skylark' : 'maple';
       // theme.mp3 stays as Maple's legacy name so an existing drop-in keeps
       // working; the opt-in flag now only forces that older path.
       const urls = slot === 'maple' && LICENSED_THEME
@@ -3805,7 +3976,8 @@ export function createAudio(): Audio3D {
     // shop, anywhere the theme wants stating out loud. Silent in the bay,
     // which has a hook of its own and does not need this one.
     jingle() {
-      const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern() || isPowder()) return;
+      const c = ensure(); if (!c || !master || isPirate() || isGameday() || isLantern()
+        || isPowder() || isSkylark()) return;
       jingleQuote(c.currentTime + 0.02, 0.1);
     },
     // ── THE WATCHDOG ──────────────────────────────────────────────────────
@@ -3859,7 +4031,8 @@ export function createAudio(): Audio3D {
     // for the same connection, and the one that is needed in two seconds must
     // not queue behind the one needed in twenty.
     preloadMusic() {
-      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern' : isPowder() ? 'powder' : 'maple';
+      const slot = isPirate() ? 'pirate' : isGameday() ? 'gameday' : isLantern() ? 'lantern'
+        : isPowder() ? 'powder' : isSkylark() ? 'skylark' : 'maple';
       const urls = slot === 'maple' && LICENSED_THEME
         ? ['/assets/music/theme.mp3', '/assets/music/maple.mp3']
         : [`/assets/music/${slot}.mp3`];
@@ -4040,6 +4213,7 @@ export function createAudio(): Audio3D {
       stopGameday(1.2);
       stopLantern(1.2);
       stopPowder(1.2);
+      stopSkylark(1.2);
       themeCh.wanted = false;
       stopLoop(themeCh, 1.2);
       // post-whistle: give the decoded match track back. The fading sources
@@ -4173,6 +4347,7 @@ export function createAudio(): Audio3D {
       if (isGameday()) { gamedayEvolve(); return; }
       if (isLantern()) { lanternEvolve(); return; }
       if (isPowder()) { powderEvolve(); return; }
+      if (isSkylark()) { skylarkEvolve(); return; }
       mapleEvolve();
     },
     voice(kind) {
