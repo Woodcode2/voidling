@@ -1,0 +1,15 @@
+{
+ "world": "gameday",
+ "tag": "before",
+ "seed": 7,
+ "sampled": 30,
+ "people": 501,
+ "moving": 497,
+ "still": 0.008,
+ "driftMedian": 0.222,
+ "driftP90": 0.401,
+ "homeMedian": 0.548,
+ "turnMedian": 92.5,
+ "targets": 42,
+ "arrivals": 7
+}

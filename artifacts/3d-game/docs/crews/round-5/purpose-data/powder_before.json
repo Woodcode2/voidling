@@ -1,0 +1,15 @@
+{
+ "world": "powder",
+ "tag": "before",
+ "seed": 7,
+ "sampled": 30,
+ "people": 386,
+ "moving": 386,
+ "still": 0,
+ "driftMedian": 0.161,
+ "driftP90": 0.326,
+ "homeMedian": 0.559,
+ "turnMedian": 95.7,
+ "targets": 0,
+ "arrivals": 0
+}

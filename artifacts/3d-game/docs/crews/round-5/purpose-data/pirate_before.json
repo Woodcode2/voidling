@@ -1,0 +1,15 @@
+{
+ "world": "pirate",
+ "tag": "before",
+ "seed": 7,
+ "sampled": 30,
+ "people": 297,
+ "moving": 296,
+ "still": 0.003,
+ "driftMedian": 0.087,
+ "driftP90": 0.18,
+ "homeMedian": 0.181,
+ "turnMedian": 106.1,
+ "targets": 0,
+ "arrivals": 0
+}

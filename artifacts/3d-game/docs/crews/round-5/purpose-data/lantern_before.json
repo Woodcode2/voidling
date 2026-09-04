@@ -1,0 +1,15 @@
+{
+ "world": "lantern",
+ "tag": "before",
+ "seed": 7,
+ "sampled": 30,
+ "people": 971,
+ "moving": 971,
+ "still": 0,
+ "driftMedian": 0.255,
+ "driftP90": 0.554,
+ "homeMedian": 0.832,
+ "turnMedian": 91.6,
+ "targets": 151,
+ "arrivals": 254
+}
