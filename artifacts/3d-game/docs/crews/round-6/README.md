@@ -95,3 +95,42 @@ an instrument that cannot see it:
   remembers.
 - `worldData()` at `qa/placement.mjs:125` has five `if`s, no default and no
   throw. Point it at an unknown world and it prints `road 0 ok` and PASSES.
+
+## Risk 1 — OCCLUSION — RETIRED 2026-09-04, from the source
+
+The design's own judge called this the risk that could sink the world: *"A
+twenty-metre standing envelope viewed at 225° down covers a lot of ground and
+can hide the child's own void — the single thing this game may never do."*
+
+It cannot, and the reason is a system that already ships.
+
+**The geometry.** `camOffset` is `(0.62, 0.92, 0.62).normalize()`
+(`prototype3d.ts:626`), which puts the camera **46.4° above horizontal**. An
+object of height *h* therefore hides `h / tan(46.4°)` = **0.95 h** of ground
+behind it. A 20-unit balloon hides 19 units.
+
+**The control.** The game already ships props that tall and taller — the
+placement audit measured Maple's `#0 bldg h=19.4` and Pirate Bay's
+`#2737 bldg h=23.4`. A balloon is not a new class of occluder; it is the same
+class as a barn.
+
+**The mechanism.** `fadeOccluders()` (`prototype3d.ts:1021`) walks every edible
+each frame, projects it onto the camera→hero axis, and dissolves anything within
+`voidling.radius * 1.35 + 1.2` of that axis down to a 62%-solid ghost, easing
+rather than snapping. Its own comment records it being tuned against *"11.5-unit
+lift pylons fading when they truly cross the sight line"*.
+
+**And participation is automatic.** `armFade()` is called inside `mergedProp()`
+(`island.ts:4361`) — the single function every prop kit in the game uses to build
+a merged mesh. A balloon built to the house rules is armed the moment it exists.
+It does not have to opt in; it would have to opt out.
+
+**What this leaves as a real requirement on the prop kit**, and it is the only
+one: *a standing balloon must be ONE edible with a radius that reflects its
+envelope.* If an envelope were built as several separate meshes, only the piece
+actually crossing the axis would ghost, and the child would see a balloon with a
+hole in it. One mesh, one radius, one fade.
+
+Still open, and a look question rather than a survival one: whether a
+twenty-unit envelope at 62% *reads well* when it ghosts. That needs the picture,
+and the picture needs a balloon.
