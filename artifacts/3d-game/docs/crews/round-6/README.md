@@ -189,3 +189,43 @@ tempting to hide:
   reproduced exactly. Those four categories carry +3 of headroom; the other
   eleven are exact. The headroom is an admission that the measurement is noisy,
   not permission for three more offenders.
+
+## Risk 2 — STARVATION — the evidence was stale, and the real bar is the SIZE MIX
+
+The design's fourth risk reads: *"Powder starved its child driver at 403–3,253
+points on the sparse bake, and `qa/_edcount.mjs` found why: 843 edibles against
+Maple's 5,790. A grass airfield is mostly grass."*
+
+Run today, on this build:
+
+```
+maple    total 5631   small 2503   mid 2674   big 454
+powder   total 4433   small 3520   mid  888   big  25
+lantern  total 5324   small 2498   mid 2763   big  63
+```
+
+**Powder is not at 843 and has not been for some time** — it carries 4,433. The
+number the risk rests on is superseded, and it would have set world 6's target
+against a world that no longer exists. Recorded rather than quietly dropped,
+because a risk argued from a stale measurement is exactly the kind of thing this
+round is supposed to catch.
+
+But the risk is still real, and measuring it properly says something more useful
+than the total does. **Powder is small-heavy: 3,520 small against 25 big.** That
+is why it starved on POINTS rather than on objects — a child eating four
+thousand tiny things scores less than a child eating four hundred large ones.
+Total count was never the bar. The size mix is.
+
+So SKYLARK FIELD's bar, set before its populate block is written:
+
+- **total ≥ 4,000**, in the band the five shipped worlds occupy
+- **big ≥ 100**, which is the number Powder misses by a mile and Maple clears at
+  454
+
+And the design happens to answer that on its own: ninety balloons are ninety
+LARGE meals lying in rows, plus the whale. A field of balloons is the opposite
+of a field of snowballs. The populate block has to deliver it, and the count
+above is the check.
+
+`qa/_edcount.mjs` now takes a port and a world list instead of a hardcoded three
+of five — the same hand-typed-list trap, found for the third time today.
