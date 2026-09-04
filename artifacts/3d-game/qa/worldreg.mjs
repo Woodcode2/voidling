@@ -82,8 +82,25 @@ for (const f of FILES) {
   }
 }
 
+// ── THE PICKER IS MARKUP, NOT CODE ─────────────────────────────────────────
+// index.html carries the world cards as five (now six) hand-written <div>s, and
+// this is the world list that MATTERS MOST: it is the surface. SKYLARK FIELD
+// had its land, kit, crowd, newsroom, lighting rig, WorldId entry and copy —
+// and no card. A child could not pick world 6, and no browser probe could
+// reach it either: qa/newsfeed.mjs and qa/purpose.mjs each clicked a selector
+// that matched nothing, then sat on a 400-600 second timeout and died. Two
+// probe failures whose real cause was a missing div.
+const HTML = 'index.html';
+if (fs.existsSync(HTML)) {
+  const html = fs.readFileSync(HTML, 'utf8');
+  const cards = new Set([...html.matchAll(/data-world="([a-z0-9]+)"/g)].map(([, w]) => w));
+  const missing = ALL_WORLDS.filter((w) => !cards.has(w));
+  if (missing.length) findings.push({ f: HTML, line: 0, name: '#worldRow cards', missing });
+  tables++;
+}
+
 console.log(`the game renders ${ALL_WORLDS.length} worlds: ${ALL_WORLDS.join(', ')}`);
-console.log(`found ${tables} per-world table(s) across ${FILES.length} files`);
+console.log(`found ${tables} per-world table(s) across ${FILES.length} files, plus the picker markup`);
 for (const x of findings) {
   console.log(`  ✗ ${x.f}:${x.line}  ${x.name} is missing ${x.missing.join(', ')}`);
 }
