@@ -676,3 +676,28 @@ the pwDrum guard, and the powderEvolve lift-and-park.
 - **One gate at the surface beats four at the sources.** The crowd was held by a cooldown, and
   the worlds' authored set pieces walked straight past it. `body.intro` at the bubble layer
   closes every path at once.
+
+## Ledger — 2026-09-04, purpose (round 5, Stream A2)
+
+- **Measure the complaint before designing the fix.** "It reads like a screensaver" became
+  drift 0.09, 104°/s of turning, and 16% of people ever going anywhere. Every design on the
+  panel then argued against a number instead of against a feeling.
+- **A metric that depends on how the world is tagged measures the tagging.** The first
+  version counted arrivals near props with a `qk` of stall/bench/table — values that exist
+  nowhere in the source. It read 254 arrivals on the world where 84% of people never leave
+  home. Journeys — leave, settle, hold — need no vocabulary from the thing being measured.
+- **Check that the before build is the before build.** I measured a "before" on a commit that
+  already contained the change and got a table showing it did nothing. Verify the absence of
+  the feature in the file you are about to build, not the position of the commit in the log.
+- **A subject that is being hunted is not evidence about its ordinary behaviour.** The drift
+  median on Pirate Bay read 0.21 across the whole crowd and 0.62 among the people the void
+  never came near — 22% of them were running for their lives. Split the population by what
+  happened to it, and say which half the number came from.
+- **The fallback is part of the design.** A failed destination search that walks the person
+  home produces a home-and-back ping-pong, whose net displacement over a completed round trip
+  is exactly zero — it scored worse than the random walk it replaced. A search that fails
+  should stand still and try again.
+- **A design panel is worth its cost when the skeptic reads the code.** Five designs and
+  fifteen judgements produced a good spine; the skeptic on the synthesis produced three
+  defects that would each have shipped a visibly broken crowd. The verification, not the
+  generation, is where the value was.

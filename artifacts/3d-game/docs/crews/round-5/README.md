@@ -169,3 +169,21 @@ KILLED groups are recorded here, never hidden.
   --profile=push --port=4177` on a quiet box: **PASS, 17/17** (the 17th is the new `splash`
   step, six phone viewports; its first run failed on its own sampler and was fixed, not
   loosened). main fast-forwarded to this commit.
+- **2026-09-04 01:30-06:00 UTC — purpose (Stream A2), the harder half of placement.** The
+  owner: "every chat bubble, every person moving, there's got to be a purpose behind that."
+  `qa/purpose.mjs` measured what a townsperson actually does: **7-23% of moving people ever
+  completed a journey in thirty seconds, the median walked eleven units for one unit of
+  progress, and everyone turned a full circle every three and a half seconds.** The pictures
+  are 300-970 scribbles, each tied to the spot that person was born on. A five-design panel
+  (three judges each: a child's eye, the engine at 966 movers, an author) chose the smallest
+  design — a destination is a POINT, not a prop — because the code settled it: Maple's 70
+  "destinations" are all houses in one three-block corner and nothing in `src/` tags a stall,
+  a bench or a table at all. **Its own skeptic then found three fatal defects in the chosen
+  patch** (arrival never scheduled the next leg, so the crowd would have frozen; a stored
+  pose mode of 0 falls into the dance branch; a pose set on arrival is never cleared when the
+  void interrupts, freezing the legs of somebody fleeing) — all three verified against the
+  source and fixed before anything was typed. After, paired on the same instrument with the
+  before build verified errand-free: **travellers 51/50/53/64/94%, drift 0.50/0.62/0.95/0.99/0.98,
+  turning down from ~100°/s to 1-10°/s**, and Maple's placement row bit-identical, so no
+  seeded draw was added. Verdict and four recorded corrections to my own work — including a
+  paired run that compared the same code to itself — in `purpose.proposal.md`.
