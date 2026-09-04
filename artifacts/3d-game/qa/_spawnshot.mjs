@@ -4,7 +4,7 @@
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || '4188';
 const OUT  = process.argv[3];
-const WORLDS = (process.argv[4] || 'maple,pirate,gameday,lantern,powder').split(',');
+const WORLDS = (process.argv[4] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const TT = parseFloat(process.argv[5] || '0.9');
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
   args: ['--no-sandbox','--use-gl=angle','--use-angle=swiftshader'] });
@@ -16,7 +16,7 @@ for (const w of WORLDS) {
     localStorage.setItem('voidPlayed','1'); localStorage.setItem('voidTut','1');
     localStorage.setItem('voidCoins','2400');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark');
     localStorage.setItem('voidWorld', world);
     localStorage.setItem('voidAutoPlay','1');
   } catch {} }, [w]);

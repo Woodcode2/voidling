@@ -18,8 +18,9 @@
 // playing means one 200 for the slot and a bed that has gone quiet; a synth
 // means a 404 (or a decode failure) and a bed constructing voices every second.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const ALL = ['maple', 'pirate', 'gameday', 'lantern'];
+const ALL = ALL_WORLDS;
 const worlds = process.argv.slice(2).filter((w) => ALL.includes(w));
 const list = worlds.length ? worlds : ALL;
 

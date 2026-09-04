@@ -3,7 +3,7 @@
 // window, not at the branded loading cover the markup was written to show.
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || 4188;
-for (const W of (process.argv[3] || 'maple,pirate,gameday,lantern').split(',')) {
+for (const W of (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',')) {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
     args: ['--use-gl=angle','--use-angle=swiftshader','--no-sandbox'] });
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

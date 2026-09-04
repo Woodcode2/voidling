@@ -36,7 +36,7 @@ const run = async (world, via = 'pointer') => {
     localStorage.setItem('voidDailyLast', new Date().toDateString());
     // comma-joined, NOT JSON — the seed shape that hid four worlds from seven
     // probes in a row (GOVERNOR.md, the voidUnlocked retraction).
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch { } });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${world}`, { waitUntil: 'domcontentloaded' });
   await p.waitForFunction(() => !!window.__voidState);

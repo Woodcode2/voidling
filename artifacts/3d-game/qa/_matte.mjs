@@ -3,7 +3,7 @@
 // specular highlight at all. Counts InstancedMesh by its instance count, which
 // matters here because the crowd and the parked cars are instanced.
 import { chromium } from 'playwright';
-const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of worlds) {

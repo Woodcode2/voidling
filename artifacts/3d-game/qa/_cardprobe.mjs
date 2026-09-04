@@ -11,7 +11,7 @@ await p.route('**/functions/v1/ingest-events', r=>r.fulfill({status:200,body:'{}
 await p.addInitScript(([w])=>{try{
   localStorage.setItem('voidPlayed','1');localStorage.setItem('voidTut','1');
   localStorage.setItem('voidDailyLast',new Date().toDateString());
-  localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder');
+  localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark');
   localStorage.setItem('voidWorld',w);localStorage.setItem('voidAutoPlay','1');
 }catch{}},[W]);
 await p.goto(`http://127.0.0.1:${PORT}/`,{waitUntil:'domcontentloaded',timeout:300000});

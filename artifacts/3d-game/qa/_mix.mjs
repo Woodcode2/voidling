@@ -12,8 +12,9 @@
 // one-shot fired in isolation via window.__audio. Everything post-limiter, i.e.
 // what a child's phone speaker gets.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const ALL = ['maple', 'pirate', 'gameday', 'lantern'];
+const ALL = ALL_WORLDS;
 const worlds = process.argv.slice(2).filter((w) => ALL.includes(w));
 const list = worlds.length ? worlds : ALL;
 const dB = (x) => (x <= 0 ? -Infinity : 20 * Math.log10(x));

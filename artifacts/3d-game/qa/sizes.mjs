@@ -3,7 +3,7 @@
 import { chromium } from 'playwright';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader'] });
-for (const wid of (process.argv[2]||'maple,pirate,gameday,lantern').split(',')) {
+for (const wid of (process.argv[2]||'maple,pirate,gameday,lantern,powder,skylark').split(',')) {
   const p = await b.newPage({ viewport:{width:430,height:932}, deviceScaleFactor:1 });
   await p.route('**/functions/v1/ingest-events', r=>r.fulfill({status:200,body:'{}'}));
   await p.addInitScript(()=>{try{localStorage.setItem('voidPlayed','1');localStorage.setItem('voidTut','1');

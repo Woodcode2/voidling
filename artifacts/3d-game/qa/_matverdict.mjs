@@ -2,6 +2,7 @@
 // and the mascot's mean colour per world, before vs a tag.
 //   node qa/_matverdict.mjs <tag> [gate=0.04]
 import fs from 'fs';
+import { ALL_WORLDS } from './worlds.mjs';
 const TAG = process.argv[2] || 'rung2', GATE = Number(process.argv[3] || 0.04);
 const D = 'docs/crews/round-5/materials-data';
 const J = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
@@ -11,7 +12,7 @@ const lab = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.04045 ? 
 const dE = (a, b) => { const A = lab(a), B = lab(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); };
 console.log(`  world     K before -> ${TAG}   dK%    Y05/Y95 before -> after      C before -> after   mascot dE`);
 let killed = 0;
-for (const w of ['maple', 'pirate', 'gameday', 'lantern', 'powder']) {
+for (const w of ALL_WORLDS) {
   const a = J(`${D}/${w}-before.json`), b = J(`${D}/${w}-${TAG}.json`);
   if (!a || !b) { console.log(`  ${w.padEnd(8)}  (missing ${!a ? 'before' : TAG})`); continue; }
   const dk = (b.K - a.K) / a.K; const kill = Math.abs(dk) > GATE; if (kill) killed++;

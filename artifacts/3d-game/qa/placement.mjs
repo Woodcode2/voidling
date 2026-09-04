@@ -73,6 +73,7 @@
 import fs from 'fs';
 import path from 'path';
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const argv = process.argv.slice(2);
 const flags = Object.fromEntries(argv.filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.slice(2).split('='); return [k, v ?? '1']; }));
@@ -84,14 +85,8 @@ const PORT = pos[1] || '4177';
 // a probe with its own hand-typed copy silently stops covering the newest one —
 // the world 6 contract found fifteen probes in exactly that state, each printing
 // a clean verdict about a game that had moved on.
-const ALL_WORLDS = (() => {
-  const src = fs.readFileSync(new URL('../src/proto3d/island.ts', import.meta.url), 'utf8');
-  const m = /export type WorldId =([^;]+);/.exec(src);
-  if (!m) throw new Error('placement: cannot read the WorldId union from src/proto3d/island.ts');
-  const ids = [...m[1].matchAll(/'([a-z0-9]+)'/g)].map(([, id]) => id);
-  if (!ids.length) throw new Error('placement: WorldId union parsed to nothing');
-  return ids;
-})();
+// (the derivation itself now lives in qa/worlds.mjs, where every probe and the
+// gate's own fan-out read it — this file had the only copy for one round.)
 const WORLDS = WORLD === 'all' ? ALL_WORLDS : [WORLD];
 /** The worlds worldData() below can actually describe. It lives up here rather
  *  than beside the chain because the startup assertion needs it, and a list that
@@ -480,7 +475,7 @@ for (const wid of WORLDS) {
     }, SEED);
   }
   await p.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
-    localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch { } });
+    localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark'); } catch { } });
   const t0 = Date.now();
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

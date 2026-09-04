@@ -17,9 +17,10 @@
 // instead of at a directory.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
-const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ALL_WORLDS;
 
 const run = (cmd, args, label) => new Promise((res) => {
   const t0 = Date.now();

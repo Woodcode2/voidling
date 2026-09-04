@@ -11,7 +11,7 @@
 // actually fires, so the claim is a number rather than an argument. A finale
 // that fires before halfway is noise; one that never fires is not a finale.
 import { chromium } from 'playwright';
-const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

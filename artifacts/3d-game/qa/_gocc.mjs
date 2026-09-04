@@ -8,7 +8,7 @@
 // scenery", plus what does the blocking. The void's own rig is excluded the
 // same way hero.mjs excludes it.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4231';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

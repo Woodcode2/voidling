@@ -3,9 +3,10 @@
 // legal ground too and report per-unit-area, plus the by-district split so I
 // know WHERE lantern is thin.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--use-gl=angle','--use-angle=swiftshader','--no-sandbox'] });
-const worlds = process.argv[2] ? process.argv[2].split(',') : ['maple','pirate','gameday','lantern'];
+const worlds = process.argv[2] ? process.argv[2].split(',') : ALL_WORLDS;
 for (const wid of worlds) {
   const p = await b.newPage({ viewport:{width:430,height:932}, deviceScaleFactor:1 });
   await p.route('**/functions/v1/ingest-events', r=>r.fulfill({status:200,body:'{}'}));

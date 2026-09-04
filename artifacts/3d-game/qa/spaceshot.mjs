@@ -13,10 +13,11 @@
 // nothing to photograph. This is the frame the art has to win.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
 const WORLDS = process.argv.slice(3).length ? process.argv.slice(3)
-  : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+  : ALL_WORLDS;
 fs.mkdirSync('qa/out/space', { recursive: true });
 
 const b = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/opt/pw-browsers/chromium',
@@ -29,7 +30,7 @@ for (const wid of WORLDS) {
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch {} });
   // ?r=10 sets DEBUG_HARNESS, which starts the match without the menu
   console.log(`  ${wid}: page open, loading…`);

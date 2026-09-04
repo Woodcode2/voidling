@@ -17,6 +17,7 @@
 //    node qa/unlocks.mjs
 //
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const BASE = process.env.HITCH_URL || 'http://localhost:4177/';
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader'] });
@@ -57,14 +58,14 @@ console.log('A. fresh profile — only Maple is open');
   const { ctx, page } = await session(seenPlayer);
   await page.evaluate(() => document.getElementById('btnPlay').click());
   await page.waitForTimeout(500);
-  const state = await page.evaluate(() => {
+  const state = await page.evaluate((worlds) => {
     const out = {};
-    for (const w of ['maple', 'pirate', 'gameday', 'lantern']) {
+    for (const w of worlds) {
       const c = document.querySelector(`.wCard[data-world="${w}"]`);
       out[w] = { locked: !!c?.classList.contains('locked'), best: c?.querySelector('.wBest')?.textContent ?? '' };
     }
     return out;
-  });
+  }, ALL_WORLDS);
   ok(!state.maple.locked, 'maple is playable');
   ok(state.pirate.locked, 'pirate is locked');
   ok(state.gameday.locked, 'gameday is locked');

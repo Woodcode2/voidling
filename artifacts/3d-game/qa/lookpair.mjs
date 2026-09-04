@@ -306,7 +306,7 @@ try {
       // the tap BY DESIGN, and the probe hangs forever waiting for a match
       // that cannot start. Maple looks fine throughout because read() force-adds
       // it, so the world that always works is the world that hides the bug.
-      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     } catch { }
   });
   // NO DEBUG-HARNESS QUERY PARAMS. prototype3d.ts:3178 turns DEBUG_HARNESS on

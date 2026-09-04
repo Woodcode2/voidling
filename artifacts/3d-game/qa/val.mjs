@@ -1,7 +1,8 @@
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium',
   args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader'] });
-for (const wid of ['maple','pirate','gameday','lantern']) {
+for (const wid of ALL_WORLDS) {
   const p = await b.newPage({ viewport:{width:430,height:932}, deviceScaleFactor:1 });
   const msgs = [];
   p.on('console', m => msgs.push(`${m.type()}: ${m.text().slice(0,220)}`));

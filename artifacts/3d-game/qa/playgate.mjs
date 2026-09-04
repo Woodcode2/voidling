@@ -9,11 +9,12 @@
 // for good reason — this is the exception, and the number here is a floor, not
 // a phone's number, because a phone's network is not this one.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 const PORT = process.argv[2] || '4188';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 console.log('world     PLAY -> first frame');
-for (const wid of ['maple', 'pirate', 'gameday', 'lantern']) {
+for (const wid of ALL_WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try {

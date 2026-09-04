@@ -58,6 +58,7 @@
 // TRAP: a profile with a best score shows `★ BEST n` instead, which is short and
 // hides the bug — so this deliberately seeds a FRESH profile.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
 
@@ -73,12 +74,14 @@ const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFa
 await p.route('**/functions/v1/ingest-events', r => r.fulfill({ status: 200, body: '{}' }));
 // FRESH profile on purpose — see the trap above. Worlds unlocked so every card
 // renders its full body rather than the locked one-liner.
-await p.addInitScript(() => { try {
+// the world list is an ARGUMENT, not a closure — addInitScript serialises this
+// function into the page, where a node-side binding would be a ReferenceError.
+await p.addInitScript((worlds) => { try {
   localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
   localStorage.setItem('voidDailyLast', new Date().toDateString());
-  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
-  for (const w of ['maple', 'pirate', 'gameday', 'lantern', 'powder']) localStorage.removeItem(`voidBest_${w}`);
-} catch {} });
+  localStorage.setItem('voidUnlocked', worlds.join(','));
+  for (const w of worlds) localStorage.removeItem(`voidBest_${w}`);
+} catch {} }, ALL_WORLDS);
 await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
 await p.waitForSelector('#btnPlay', { state: 'visible', timeout: 400000 });

@@ -257,7 +257,7 @@ try {
         // THE COMMA-JOINED SEED. unlocks.ts splits this on commas — written as
         // JSON.stringify([...]) nothing matches, every world but Maple stays
         // locked, and the probe waits forever for a match that cannot start.
-        localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+        localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
       } catch { }
     });
     // `?w=` only — no debug-harness params, or ATTRACT-DRIVE takes the wheel

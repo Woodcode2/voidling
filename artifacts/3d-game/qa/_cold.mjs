@@ -12,7 +12,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || 4188;
 const MODE = process.argv[4] || 'first';
 

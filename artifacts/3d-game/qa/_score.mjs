@@ -23,11 +23,12 @@
 // Writes raw PCM to the scratchpad for qa/_scoreanalyse.mjs.
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const OUT = process.env.SCRATCH || '/tmp/score';
 mkdirSync(OUT, { recursive: true });
 const WORLDS = process.argv.slice(2).length ? process.argv.slice(2)
-  : ['maple', 'pirate', 'gameday', 'lantern'];
+  : ALL_WORLDS;
 const SECS = 24;
 
 const b = await chromium.launch({

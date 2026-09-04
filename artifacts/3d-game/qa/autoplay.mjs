@@ -97,7 +97,7 @@ await p.addInitScript(() => {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidMute', '0');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch { /* private mode */ }
 
   // ── THE AUTOPLAY POLICY, ENFORCED HERE ───────────────────────────────────

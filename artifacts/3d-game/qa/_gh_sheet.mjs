@@ -5,8 +5,9 @@
 //   node qa/_gh_sheet.mjs
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const WORLDS = ['maple', 'pirate', 'gameday', 'lantern'];
+const WORLDS = ALL_WORLDS;
 const RADII = ['1.2', '3', '6', '9', '12'];
 const cells = [];
 for (const w of WORLDS) for (const r of RADII) {

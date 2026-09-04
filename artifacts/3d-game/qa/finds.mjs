@@ -34,7 +34,7 @@
 // the hunting, and would report a number no child will ever see.
 import { chromium } from 'playwright';
 
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const RUNS = +(process.argv[3] || 1);
 const POLICY = process.argv[4] || 'keen';
 const PORT = process.argv[5] || '4177';

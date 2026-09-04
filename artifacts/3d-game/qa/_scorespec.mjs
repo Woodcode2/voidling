@@ -17,6 +17,7 @@
 // third-octave-ish band levels so masking can be argued with numbers.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4244';
 const DUR = Number(process.argv[3] || 16);
@@ -127,7 +128,7 @@ const out = await p.evaluate(async ({ DUR }) => {
   }
 
   const res = { beds: [], oneShots: [] };
-  for (const w of ['maple', 'pirate', 'gameday', 'lantern']) {
+  for (const w of ALL_WORLDS) {
     for (const st of [0, 1, 2, 3, 4]) {
       res.beds.push({ w, st, ...(await render(w, st)) });
     }
@@ -146,7 +147,7 @@ for (const r of out.beds) {
   console.log(`${r.w.padEnd(9)} ${r.st}  ${F(r.rms)}   ${F(r.hp)}  ${F(r.peak)}    |${bs}${dHP}`);
 }
 console.log();
-for (const w of ['maple', 'pirate', 'gameday', 'lantern']) {
+for (const w of ALL_WORLDS) {
   const rows = out.beds.filter((r) => r.w === w);
   const s0 = rows[0].hp, s3 = rows[3].hp, s4 = rows[4].hp;
   console.log(`${w.padEnd(9)} stage0->3 above 450 Hz: ${(s3 - s0>=0?'+':'')}${(s3 - s0).toFixed(1)} dB   stage3->4: ${(s4 - s3>=0?'+':'')}${(s4 - s3).toFixed(1)} dB`);

@@ -6,7 +6,7 @@ await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, b
 await p.addInitScript(() => { try {
   localStorage.setItem('voidPlayed','1'); localStorage.setItem('voidTut','1');
   localStorage.setItem('voidMute','1'); localStorage.setItem('voidDailyLast', new Date().toDateString());
-  localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder');
+  localStorage.setItem('voidUnlocked','maple,pirate,gameday,lantern,powder,skylark');
   localStorage.setItem('voidMatchN', JSON.stringify({ maple: 1 }));
 } catch {} });
 await p.goto('http://127.0.0.1:4177/?w=maple', { waitUntil: 'domcontentloaded', timeout: 300000 });

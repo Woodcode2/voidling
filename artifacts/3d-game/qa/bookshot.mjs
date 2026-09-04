@@ -16,6 +16,7 @@
 // looks good" are different questions and only one of them is countable.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
 fs.mkdirSync('qa-out', { recursive: true });
@@ -50,7 +51,7 @@ if (!(await btn.count())) { console.error('FAIL: #btnBook is not in the DOM'); a
 await btn.click({ force: true });
 await p.waitForTimeout(800);
 
-const WORLDS = ['maple', 'pirate', 'gameday', 'lantern'];
+const WORLDS = ALL_WORLDS;
 let bad = 0;
 for (const w of WORLDS) {
   await p.evaluate((wid) => document.querySelector(`#bookTabs button[data-w="${wid}"]`)?.click(), w);

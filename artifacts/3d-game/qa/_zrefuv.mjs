@@ -2,7 +2,7 @@
 // is the UV attribute (which no prop material samples — none has a map), how
 // much is the index-free penalty, and the true InstancedMesh count.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || 4188;
 for (const w of WORLDS) {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',

@@ -1,7 +1,7 @@
 // REFUTATION PROBE: GLB placement census at boot AND across a real match.
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || 4177;
-const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const TARGET_T = Number(process.argv[4] || 0);   // match-clock seconds to run to
 
 for (const w of WORLDS) {

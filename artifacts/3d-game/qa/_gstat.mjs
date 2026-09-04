@@ -8,7 +8,7 @@
 // 2% of the saturated pixels. The HUD bands are cropped out so this measures
 // the GAME, not the chrome.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4231';
 const N = +(process.argv[4] || 10);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',

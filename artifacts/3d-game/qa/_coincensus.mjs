@@ -3,7 +3,7 @@
 // finds and the world's permanent COIN PILES, and reports the total wallet
 // value a player can pick up without ever finishing the match.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of WORLDS) {

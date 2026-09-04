@@ -74,7 +74,7 @@ for (const wid of WORLDS) {
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch {} });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

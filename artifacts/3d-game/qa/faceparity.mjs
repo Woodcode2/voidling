@@ -53,9 +53,10 @@
 // what is in the magnet well, so the probe has to PLAY. It steers with the same
 // nearest-edible autopilot the perf probes use.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
-const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ALL_WORLDS;
 
 // THE CONTRACT.
 //
@@ -122,7 +123,7 @@ for (const wid of WORLDS) {
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch {} });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

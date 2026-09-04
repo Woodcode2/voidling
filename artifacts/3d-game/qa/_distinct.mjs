@@ -2,8 +2,9 @@
 // convert to CIELAB, and take the mean per-cell deltaE between every pair.
 // This is "at thumbnail size, do these two cards look like different places?"
 import { PNG } from 'pngjs'; import { readFileSync } from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 const D='/tmp/claude-0/-home-user-voidling/2a240c97-4d5b-5823-ac36-95bed2f17b29/scratchpad/';
-const ks=['maple','pirate','gameday','lantern','powder'];
+const ks=ALL_WORLDS;
 const files={maple:'hf_20260801_130607_c92a52e5-8c1c-4a60-a566-ba19583fd532.png',
  pirate:'hf_20260801_130624_b1d4e117-1a45-4447-9bb8-e7f764565975.png',
  gameday:'hf_20260801_053403_0dc79112-b8fd-4304-9d15-8630620b2218.png',

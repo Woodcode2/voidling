@@ -7,6 +7,7 @@
 // look changes. `node qa/store.mjs [port]`.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
 const OUT = new URL('./out/store/', import.meta.url).pathname;
@@ -15,7 +16,7 @@ mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 
-for (const w of ['maple', 'pirate', 'gameday', 'lantern']) {
+for (const w of ALL_WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 });
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('voidPlayed', '1');

@@ -24,10 +24,11 @@
 //   radius-1 AREA instead and passed the exact broken rule the owner hit,
 //   because the severed resort side was only ~15% of the island.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
 const args = process.argv.slice(3);
-const WORLDS = args.length ? args : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = args.length ? args : ALL_WORLDS;
 const RADII = [1, 4, 8, 16, 27];
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
@@ -41,7 +42,7 @@ for (const w of WORLDS) {
       localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
       localStorage.setItem('voidMute', '1');
       localStorage.setItem('voidDailyLast', new Date().toDateString());
-      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     } catch { /* private */ } });
     await p.goto(`http://127.0.0.1:${PORT}/?w=${w}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
     await p.waitForFunction(() => !!window.__voidState && !!window.__solidAt, null, { timeout: 400000 });

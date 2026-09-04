@@ -211,7 +211,7 @@ await p.addInitScript(() => {
     // TRAP recorded in GOVERNOR.md: voidUnlocked is a COMMA-JOINED STRING
     // (unlocks.ts:39), not JSON. Maple works either way because read() force-
     // adds it, which is exactly how the bug stayed hidden for three runs.
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch { }
 });
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

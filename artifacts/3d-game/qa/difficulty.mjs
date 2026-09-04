@@ -22,7 +22,7 @@
 //   node qa/difficulty.mjs [worlds] [drivers] [port]
 import { chromium } from 'playwright';
 
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const DRIVERS = (process.argv[3] || 'expert,child,flail').split(',');
 const PORT = process.argv[4] || '4173';
 

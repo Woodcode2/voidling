@@ -7,7 +7,7 @@
 import { chromium } from 'playwright';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--no-sandbox'] });
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const RINGS = [40, 60, 80, 120, 160, 240, 9999];
 console.log('EAT_RATIO=1.11  START_R=0.9  void speed at start = 16 u/s (camDist 50)\n');
 for (const wid of WORLDS) {

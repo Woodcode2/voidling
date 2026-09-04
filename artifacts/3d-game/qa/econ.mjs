@@ -38,7 +38,7 @@ const fails = [];
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toDateString();
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidMute', '1');
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     // a week-4 day-7 player, three days silent — the exact child the old
     // code punished hardest
     localStorage.setItem('voidDailyLast', threeDaysAgo);
@@ -71,7 +71,7 @@ const fails = [];
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidMute', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     localStorage.setItem('voidCoins', '1000');
     // every trophy earned, none paid: the state every profile that predates
     // the bounty system is in on its first match after the update

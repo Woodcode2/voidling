@@ -17,7 +17,7 @@
 import { chromium } from 'playwright';
 
 const PORT = process.argv[2] || '4173';
-const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

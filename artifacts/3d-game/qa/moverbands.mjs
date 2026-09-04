@@ -14,12 +14,13 @@
 //           chop band; big here = the world that reads as "item lag")
 //   quart — beyond 2x gate (reliably off screen)
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 
-for (const world of ['maple', 'pirate', 'gameday', 'lantern', 'powder']) {
+for (const world of ALL_WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 } });
   p.on('pageerror', (e) => console.log('  PAGEERR ' + String(e).slice(0, 100)));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));

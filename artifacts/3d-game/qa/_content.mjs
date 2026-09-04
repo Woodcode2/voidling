@@ -7,7 +7,7 @@
 //   node qa/_content.mjs [worlds] > qa-out/content.json
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'fs';
-const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const worlds = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 const out = {};

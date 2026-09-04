@@ -36,9 +36,10 @@
 // TRAP: glb() registers props asynchronously, so the count must be STABLE
 // before anything is counted, exactly as qa/determ.mjs does it.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
-const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ALL_WORLDS;
 
 // THE CONTRACT, and the numbers are argued rather than picked:
 //   A prop with no front — a bush, a flower bed, a planter, a rock — has no
@@ -74,7 +75,7 @@ for (const wid of WORLDS) {
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch {} });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

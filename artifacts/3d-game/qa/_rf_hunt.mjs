@@ -16,7 +16,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const MODE = process.argv[3] || 'hunter';       // hunter | greedy
 const RUNS = Number(process.argv[4] || 1);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',

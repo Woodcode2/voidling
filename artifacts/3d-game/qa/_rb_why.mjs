@@ -4,11 +4,12 @@
 // Measured by timing when preloadP resolves relative to the first rAF, and by
 // counting how many pack meshes each world actually requests.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 const PORT = process.env.PORT || 4271;
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 
-for (const w of ['maple', 'pirate', 'gameday', 'lantern']) {
+for (const w of ALL_WORLDS) {
   const pg = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const reqs = [];
   pg.on('request', r => { if (/\.glb(\?|$)/i.test(r.url())) reqs.push(r.url().split('/').pop()); });

@@ -36,6 +36,7 @@ import { spawn } from 'node:child_process';
 import os from 'node:os';
 import { mkdirSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const args = process.argv.slice(2);
 const flag = (n, d) => { const a = args.find(x => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : d; };
@@ -43,7 +44,18 @@ const PORT = flag('port', '4177');
 const PROFILE = flag('profile', 'live');
 const ONLY = flag('only', '').split(',').filter(Boolean);
 const LIST = args.includes('--list');
-const WORLDS = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+// ── THE GATE'S OWN WORLD LIST WAS HAND-TYPED ────────────────────────────────
+// It said five worlds. SKYLARK FIELD is the sixth, and every per-world step the
+// gate fans out below — smoke, traverse, vary, faceparity, questable, postpipe,
+// switch, newsarc, hero — reads this line. So the gate would have run thirty-odd
+// green steps, none of which had ever loaded world 6, and reported PASS on it.
+// A gate that does not know how many worlds the game has is not a gate.
+//
+// Derived from island.ts's WorldId union now: the union the renderer switches
+// on, which tsc forces every dispatch in island.ts to handle, so it cannot
+// drift from what the game can actually draw. qa/worldlists.mjs guards the
+// remaining hand-typed copies scattered through the other probes.
+const WORLDS = ALL_WORLDS;
 
 // ── VERDICT RULES ────────────────────────────────────────────────────────────
 // pf     the house convention: a line of "  PASS — ..." and no "  FAIL — ..."
@@ -237,6 +249,10 @@ const SUITE = [
   { id: 'seasonprop', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/seasonprop.mjs'], verdict: pf,
     why: 'every limited-time season dresses its own world — no world wears another world\'s seasonal props' },
+
+  { id: 'worldlists', tier: 'build', profiles: ['push', 'live', 'art'], timeout: 30,
+    cmd: ['node', 'qa/worldlists.mjs'], verdict: pf,
+    why: 'no probe in qa/ believes in a game with fewer worlds than exist — the gate itself had a five-world list on the day world 6 shipped, and twenty-three probes were still frozen at world 4' },
 
   { id: 'roundlod', tier: 'art', profiles: ['push', 'live', 'art'], timeout: 30,
     cmd: ['node', 'qa/roundlod.mjs'], verdict: pf,

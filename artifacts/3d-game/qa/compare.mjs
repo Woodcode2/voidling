@@ -10,8 +10,9 @@
 // composited frame at phone size.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const ALL = ['maple', 'pirate', 'gameday', 'lantern'];
+const ALL = ALL_WORLDS;
 const list = process.argv.slice(2).filter((w) => ALL.includes(w));
 const worlds = list.length ? list : ALL;
 const PORT = '4177';

@@ -23,7 +23,7 @@ const p = await b.newPage({ viewport: { width: 320, height: 640 }, deviceScaleFa
 await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
 await p.addInitScript(() => { try {
   localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
-  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
 } catch {} });
 await p.goto(`http://127.0.0.1:${PORT}/?w=maple&r=4`, { waitUntil: 'domcontentloaded', timeout: 300000 });
 await p.waitForFunction(() => (window.__matchState?.().t ?? 0) > 5, null, { timeout: 400000 });

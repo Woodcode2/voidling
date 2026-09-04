@@ -1,7 +1,7 @@
 // SCRATCH — heap and GPU-resource footprint per world, at the MENU (before any
 // match), after a forced GC. This is the number iOS jetsam cares about.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || 4188;
 console.log('world     heapMB  arrayBufMB  geo   tex  prog  nodes  meshes  edibles  drawCalls  tris');
 for (const w of WORLDS) {

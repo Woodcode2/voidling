@@ -44,7 +44,7 @@ for (const world of WORLDS) {
       localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
       localStorage.setItem('voidMute', '1');
       localStorage.setItem('voidDailyLast', new Date().toDateString());
-      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
       localStorage.setItem('voidMatchN', seed);
     } catch { /* private */ } }, JSON.stringify({ [world]: k }));
     await p.goto(`http://127.0.0.1:${PORT}/?w=${world}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

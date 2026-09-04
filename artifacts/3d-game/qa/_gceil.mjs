@@ -10,7 +10,7 @@
 // emissive combinations actually exist, whether any material carries a
 // normal/ao/roughness map, and what fraction of the scene is unlit Basic.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4231';
 
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',

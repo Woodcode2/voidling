@@ -22,6 +22,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 // Flags (the gate spawns argv, not env): --splash = the two screens only, at
 // every viewport in --views=WxH@d,... ; asserts the splash lines' contrast and
@@ -29,7 +30,7 @@ import { PNG } from 'pngjs';
 const FLAGS = process.argv.slice(2).filter((a) => a.startsWith('--'));
 const ARGS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const PORT = ARGS[0] || '4177';
-const WORLDS = ARGS.slice(1).length ? ARGS.slice(1) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = ARGS.slice(1).length ? ARGS.slice(1) : ALL_WORLDS;
 const VIEWS_FLAG = (FLAGS.find((f) => f.startsWith('--views=')) || '').slice(8);
 // --first: the FIRST-EVER run — voidPlayed unset, so firstRun/teachDrag are true
 // and the DRAG pill, the welcome and the banner fire. The default pack shoots
@@ -134,7 +135,7 @@ for (const { WORLD, v } of RUNS) {
   p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript(({ seed, first }) => {
-    try { localStorage.clear(); if (!first) { localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); } localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch { }
+    try { localStorage.clear(); if (!first) { localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); } localStorage.setItem('voidDailyLast', new Date().toDateString()); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark'); } catch { }
     // THE BAR'S VALUES, COLLECTED FROM DOCUMENT START. Sampling from the probe
     // side begins after several awaits, and on a warm load the build can be
     // most of the way done by then — one run at 440x956 saw a single value and

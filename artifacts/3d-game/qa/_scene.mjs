@@ -7,7 +7,7 @@
 // gated mesh and never gives one back.
 import { chromium } from 'playwright';
 const PORT = process.env.PORT || 4177;
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of WORLDS) {

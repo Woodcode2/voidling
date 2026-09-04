@@ -28,8 +28,9 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { createHash } from 'crypto';
 import { join } from 'path';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const WORLDS = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = ALL_WORLDS;
 const PACK = 'qa/out/shippedlook';
 
 // ── WHY A DIGEST AND NOT A TIMESTAMP ──────────────────────────────────────

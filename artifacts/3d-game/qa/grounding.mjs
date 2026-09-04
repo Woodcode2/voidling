@@ -211,7 +211,7 @@ try {
       localStorage.setItem('voidDailyLast', new Date().toDateString());
       // comma-joined, not JSON — unlocks.ts splits on commas, and the JSON
       // form leaves every world but Maple locked and hangs the probe
-      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+      localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
     } catch { }
   });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

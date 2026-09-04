@@ -90,7 +90,7 @@ await ctx.addInitScript(() => {
     localStorage.setItem('voidTut', '1'); localStorage.setItem('voidBookSeen', '1');
     // every world open, so ARC_WORLD can point anywhere without playing three
     // matches to get there first
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch { /* private mode */ }
 });
 const page = await ctx.newPage();

@@ -4,7 +4,7 @@
 // which carries PERFCOUNT lines in island.ts and prototype3d.ts.
 import { chromium } from 'playwright';
 const PORT = process.env.PORT || 4179;
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of WORLDS) {

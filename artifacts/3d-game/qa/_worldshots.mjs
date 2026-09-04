@@ -11,7 +11,7 @@
 // It is restored, given a few frames to compose, shot, and stubbed again.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4177';
 const MARKS = [{ t: 5, tag: 'spawn' }, { t: 88, tag: 'mid' }, { t: 163, tag: 'late' }];
 fs.mkdirSync('qa-out/gw', { recursive: true });

@@ -5,7 +5,7 @@
 // frame callback time IS the game's per-frame JS.
 import { chromium } from 'playwright';
 const PORT = process.env.PORT || 4177;
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const UNTIL = +(process.argv[3] || 60);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

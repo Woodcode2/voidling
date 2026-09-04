@@ -33,7 +33,7 @@ const SEED = Number(process.env.SEED || 0);
 await p.addInitScript((seed) => { try {
   localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidFirstNom', '1');
   localStorage.setItem('voidMute', '1'); localStorage.setItem('voidDailyLast', new Date().toDateString());
-  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+  localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   if (seed) { let s = seed >>> 0; Math.random = () => { s += 0x6D2B79F5; let t = Math.imul(s ^ (s >>> 15), 1 | s); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 } catch {} }, SEED);
 await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

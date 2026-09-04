@@ -4,7 +4,7 @@
 // appetite, not the child's. userData.byPlayer is the real thing.
 // Runs to t=45 only, then closes: no need to burn a 180s software-rendered match.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const RUNS = Number(process.argv[3] || 3);
 const UNTIL = Number(process.argv[4] || 45);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',

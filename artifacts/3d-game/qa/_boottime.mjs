@@ -1,7 +1,7 @@
 // SCRATCH — boot phase timeline from the scratch _bt marks. N reps, MIN per
 // phase (this box is shared; min is the least-contended sample).
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || 4188;
 const REPS = +(process.argv[4] || 3);
 for (const w of WORLDS) {

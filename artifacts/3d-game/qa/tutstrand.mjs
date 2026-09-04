@@ -43,7 +43,7 @@ await p.addInitScript(() => {
     localStorage.setItem('voidDailyLast', new Date().toDateString());
     localStorage.removeItem('voidTut');                  // …and never wrote this
     localStorage.setItem('voidWorld', 'maple');
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');   // the picker refuses a locked world since 589e31e (refute-popup, correction 6)
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');   // the picker refuses a locked world since 589e31e (refute-popup, correction 6)
   }
 });
 await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });

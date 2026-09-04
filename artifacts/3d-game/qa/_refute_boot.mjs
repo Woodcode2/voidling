@@ -5,7 +5,7 @@
 // instead of quoted raw.
 import { chromium } from 'playwright';
 const PORT = process.argv[2] || 4177;
-const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const REPS = +(process.argv[4] || 3);
 
 const INIT = () => {

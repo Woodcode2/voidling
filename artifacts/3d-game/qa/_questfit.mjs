@@ -3,7 +3,7 @@
 // only; every other world gets the board that was authored for Maple, which
 // asks for CARS and HOUSES. Count the props each world actually tags.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
 for (const wid of WORLDS) {

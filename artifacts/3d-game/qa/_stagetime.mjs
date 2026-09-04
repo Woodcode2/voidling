@@ -11,7 +11,7 @@ import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4243';
-const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const RUNS = Number(process.argv[4] || 1);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });

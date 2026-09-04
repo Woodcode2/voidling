@@ -2,9 +2,10 @@
 // Drives the SHIPPED setMusicStage to 4 (WORLD ENDER's VISUAL_STAGE) on every
 // world and counts thrown exceptions out of the scheduler.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader'] });
-for (const wid of ['maple', 'pirate', 'gameday', 'lantern']) {
+for (const wid of ALL_WORLDS) {
   const p = await b.newPage({ viewport: { width: 430, height: 932 }, deviceScaleFactor: 1 });
   const errs = [];
   p.on('pageerror', e => errs.push(String(e).slice(0, 160)));

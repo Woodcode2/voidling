@@ -12,7 +12,7 @@
 // material luminance, area-weighted — which is the thing lighting can only
 // reveal, never create.
 import { chromium } from 'playwright';
-const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern').split(',');
+const WORLDS = (process.argv[2] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 const PORT = process.argv[3] || '4177';
 
 const DARK_HOUSE = ['8c4a3f', '2f5d52', '4a3f6b', '6b5330', '33506e'];

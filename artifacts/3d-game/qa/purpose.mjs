@@ -34,11 +34,12 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const A = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const F = process.argv.slice(2).filter((a) => a.startsWith('--'));
 const PORT = A[0] || '4177';
-const WORLDS = A.slice(1).length ? A.slice(1) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = A.slice(1).length ? A.slice(1) : ALL_WORLDS;
 const SECS = Number((F.find((f) => f.startsWith('--secs=')) || '--secs=45').slice(7));
 const SEED = process.env.SEED ? Number(process.env.SEED) : null;
 const TAG = (F.find((f) => f.startsWith('--tag=')) || '--tag=before').slice(6);
@@ -55,7 +56,7 @@ for (const WORLD of WORLDS) {
   p.on('pageerror', (e) => console.log(`  [pageerror] ${e.message.split('\n')[0]}`));
   await p.route('**/functions/v1/ingest-events', (r) => r.fulfill({ status: 200, body: '{}' }));
   await p.addInitScript((seed) => {
-    try { localStorage.clear(); localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch { }
+    try { localStorage.clear(); localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1'); localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark'); } catch { }
     if (seed !== null) { let s = seed >>> 0; Math.random = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   }, SEED);
   await p.goto(`http://127.0.0.1:${PORT}/?w=${WORLD}`, { waitUntil: 'domcontentloaded', timeout: 300000 });

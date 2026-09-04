@@ -204,8 +204,9 @@ import { readFileSync, readdirSync } from 'fs';
 import { createHash } from 'crypto';
 import { join } from 'path';
 import { PNG } from 'pngjs';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const WORLDS = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = ALL_WORLDS;
 const TAG    = process.argv[2] || 'look';
 const BAR    = 1.5;    // % of lit chromatic pixels with a channel that cannot carry the light
 const LIT    = 128;    // dominant channel: half the display's code range

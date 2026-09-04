@@ -18,8 +18,9 @@
 // playing means one 200 for the slot and a bed that has gone quiet; a synth
 // means a 404 (or a decode failure) and a bed constructing voices every second.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
-const ALL = ['maple', 'pirate', 'gameday', 'lantern'];
+const ALL = ALL_WORLDS;
 const worlds = process.argv.slice(2).filter((w) => ALL.includes(w));
 const list = worlds.length ? worlds : ALL;
 
@@ -62,7 +63,7 @@ for (const w of list) {
     // perfectly. That is what made Pirate look like a 15-minute hang, and it is
     // why raising the timeout to 900s changed nothing: the wait was never going
     // to end. Maple passed throughout only because world 1 is never locked.
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch { /* private mode */ } });
   await p.goto(`http://127.0.0.1:4177/?w=${w}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });

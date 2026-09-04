@@ -19,7 +19,7 @@ import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 
 const PORT = process.argv[2] || '4177';
-const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder').split(',');
+const WORLDS = (process.argv[3] || 'maple,pirate,gameday,lantern,powder,skylark').split(',');
 
 const src = readFileSync('src/prototype3d.ts', 'utf8');
 const at = src.indexOf('const WORLD_LIGHT');
@@ -44,7 +44,7 @@ for (const wid of WORLDS) {
     localStorage.setItem('voidDailyLast', new Date().toDateString());
     // comma-joined, NOT JSON.stringify — the seed shape that hid four worlds
     // from seven probes in a row (GOVERNOR.md, the voidUnlocked retraction)
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder'); } catch {} });
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark'); } catch {} });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState, null, { timeout: 400000 });
   await p.evaluate(() => document.querySelectorAll('.show').forEach((e) => {

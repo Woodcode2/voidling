@@ -32,9 +32,10 @@
 // hangs; and wait for the async glb props to settle or the count is a different
 // world every run.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 
 const PORT = process.argv[2] || '4177';
-const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const WORLDS = process.argv.slice(3).length ? process.argv.slice(3) : ALL_WORLDS;
 const DAYS = 365;
 
 // THE HOUSE ALIAS IS READ FROM THE CLIENT, NOT KEPT HERE. The first version of
@@ -60,7 +61,7 @@ for (const wid of WORLDS) {
   await p.addInitScript(() => { try {
     localStorage.setItem('voidPlayed', '1'); localStorage.setItem('voidTut', '1');
     localStorage.setItem('voidDailyLast', new Date().toDateString());
-    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder');
+    localStorage.setItem('voidUnlocked', 'maple,pirate,gameday,lantern,powder,skylark');
   } catch {} });
   await p.goto(`http://127.0.0.1:${PORT}/?w=${wid}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await p.waitForFunction(() => !!window.__voidState && !!window.__questPools, null, { timeout: 400000 });

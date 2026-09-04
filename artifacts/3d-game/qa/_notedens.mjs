@@ -4,16 +4,17 @@
 // so this counts oscillators + buffer sources constructed per rendered second
 // of bed at each stage, in the same hand-driven OfflineAudioContext harness.
 import { chromium } from 'playwright';
+import { ALL_WORLDS } from './worlds.mjs';
 const PORT = process.argv[2] || '4244';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
 const p = await b.newPage();
 await p.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
-const out = await p.evaluate(async () => {
+const out = await p.evaluate(async (ALL_WORLDS) => {
   const isl = await import('/src/proto3d/island.ts');
   const mod = await import('/src/proto3d/audio3d.ts');
   const SR = 48000, DUR = 24;
   const rows = [];
-  for (const w of ['maple', 'pirate', 'gameday', 'lantern']) {
+  for (const w of ALL_WORLDS) {
     for (const st of [0, 1, 2, 3, 4]) {
       isl.setWorld(w);
       const ctx = new OfflineAudioContext(1, SR * DUR, SR);
@@ -41,7 +42,7 @@ const out = await p.evaluate(async () => {
     }
   }
   return rows;
-});
+}, ALL_WORLDS);
 console.log('world     st  voices/sec');
 let prev = {};
 for (const r of out) {
