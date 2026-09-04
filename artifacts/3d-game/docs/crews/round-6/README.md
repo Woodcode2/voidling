@@ -134,3 +134,30 @@ hole in it. One mesh, one radius, one fade.
 Still open, and a look question rather than a survival one: whether a
 twenty-unit envelope at 62% *reads well* when it ghosts. That needs the picture,
 and the picture needs a balloon.
+
+## The contract's central claim, demonstrated rather than argued
+
+With the twelve compile-enforced tables filled and nothing else, `?w=skylark`
+booted — and the placement auditor, pointed at it, reported:
+
+```
+══ SKYLARK ══  5260 static props (39 benches, 70 houses w/ doors)
+```
+
+That is **Maple Falls's signature exactly**. A world with its own name, its own
+sky, its own light rig, its own beats and its own newspaper, rendering Maple's
+island, Maple's ground and Maple's 5,260 props. No error, no warning, nothing in
+the console. Precisely what `world6.contract.md` predicted on the strength of
+reading the source, now watched happening.
+
+Wiring the four silent dispatch sites — `silPoly`, `insideIslandWorld`,
+`spawn3`, `biomeAt`, plus the two water queries — changed it to:
+
+```
+══ SKYLARK ══  3455 static props   water 0 ok   offisland 0 ok   road 2417 FAIL
+```
+
+The island is its own shape now, nothing is standing in an invisible pond and
+nothing is standing in space. The 2,417 road hits are the next silent
+obligation and the biggest one: **the populate block**. Until SKYLARK FIELD has
+its own, props are scattered by a fallback that has never heard of a runway.

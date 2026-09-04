@@ -96,7 +96,7 @@ const WORLDS = WORLD === 'all' ? ALL_WORLDS : [WORLD];
 /** The worlds worldData() below can actually describe. It lives up here rather
  *  than beside the chain because the startup assertion needs it, and a list that
  *  is checked is worth more than a list that is adjacent. */
-const KNOWN = ['maple', 'pirate', 'gameday', 'lantern', 'powder'];
+const KNOWN = ['maple', 'pirate', 'gameday', 'lantern', 'powder', 'skylark'];
 const SHOTS = flags.shots || null;
 const SHOTS_PER_CAT = Number(flags.n || 3);
 const JSON_OUT = flags.json || null;
@@ -206,6 +206,29 @@ function worldData(wid) {
     // snowmen and drifts onto it by design, so a prop on it is info — a TREE
     // rooted in it (qk 'pine') is water
     for (const n of ['LODGE', 'LAKE']) { const e = ellipse(n, s); d.ellipses.push({ name: e.name, cx: w3(e.cx), cz: w3(e.cy), rx: w3len(e.rx), rz: w3len(e.ry), ice: n === 'LAKE' }); }
+  }
+  if (wid === 'skylark') {
+    const s = read('proto3d/skylark.ts');
+    // THREE STRIPS, AND THEY ARE NOT DECKS. A runway carries nothing by design —
+    // it is the level's one sightline, and skPlaceable() keeps scatter off all
+    // three — so unlike bay.ts's boardwalk or gameday.ts's concourse the bar
+    // here is the FULL half-width, not a core. Anything standing on the
+    // concrete is a defect, with two authored exceptions the world places by
+    // hand and tags: the threshold numerals and the edge lights.
+    for (const n of ['RWY03', 'RWY09', 'RWY15']) {
+      d.roads.push({ name: n, pts: P(pts(n, s)),
+        half: w3len(num(new RegExp(`export const ${n}_HALF = (\\d+);`), s, `${n}_HALF`)), kind: 'road' });
+    }
+    // the perimeter track is a CLOSED ring; its last point repeats its first, so
+    // distToPath closes the loop and there is no gap to hide a prop in
+    d.roads.push({ name: 'PERIMETER', pts: P(pts('PERIMETER', s)),
+      half: w3len(num(/export const PERIMETER_HALF = (\d+);/, s, 'PERIMETER_HALF')), kind: 'road' });
+    // THE LAUNCH CIRCLE is the whale's precinct and is authored, not scattered:
+    // her ground crew, fan trailer, tether pins and the commentary trestle are
+    // meant to be inside it, exactly as Powder's lake carries authored clutter
+    const m = /export const LAUNCH = \{ cx: (\d+), cy: (\d+), rx: (\d+), ry: (\d+) \}/.exec(s);
+    if (!m) throw new Error('placement: no LAUNCH in skylark.ts');
+    d.ellipses.push({ name: 'LAUNCH', cx: w3(+m[1]), cz: w3(+m[2]), rx: w3len(+m[3]), rz: w3len(+m[4]) });
   }
   if (!KNOWN.includes(wid)) {
     throw new Error(`placement: no roads, piers or precincts are defined for world "${wid}". ` +

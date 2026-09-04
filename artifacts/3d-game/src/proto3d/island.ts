@@ -15,6 +15,7 @@ import * as GD from './gameday';
 import * as LN from './lantern';
 import * as PW from './powder';
 import * as AL from './alpine';
+import * as SK from './skylark';
 import * as NM from './nightmarket';
 import * as TG from './tailgate';
 import * as LUXE from './luxe';
@@ -51,7 +52,13 @@ export type Biome = 'cozy' | 'fancy' | 'downtown' | 'plaza' | 'park' | 'forest' 
   // speed and panic pool off these strings, and a shared name drags one world's
   // cast into another's street. Every one of these is new.
   | 'torii' | 'stalls' | 'canal' | 'teahouse' | 'shrine' | 'moonbridge'
-  | 'nightgarden' | 'bathhouse' | 'onsen' | 'bamboo';
+  | 'nightgarden' | 'bathhouse' | 'onsen' | 'bamboo'
+  // ── SKYLARK FIELD (world 6): a disused airfield on the one morning a year a
+  // hundred balloons come to it. All nine are new words, so like Powder Pass
+  // there is no boundary rename — what skRegionAt says is what ./life and
+  // ./prototype3d key off, which is the only arrangement that cannot drift.
+  | 'circle' | 'runway' | 'perimeter' | 'launchfield' | 'arrivals'
+  | 'tower' | 'hangars' | 'breakfast' | 'meadow';
 // RETIRED on Maple: 'military' (the army base served a defence layer that was
 // deleted from the game), 'airport', 'zoo' and 'fancy'. The literals stay in
 // the union only because ./life still compares against them; nothing in
@@ -231,6 +238,7 @@ export function spawn3(): { x: number; z: number } {
   if (WORLD_ID === 'gameday') return { x: w(GD.GD_SPAWN[0]), z: w(GD.GD_SPAWN[1]) };
   if (WORLD_ID === 'lantern') return { x: w(LN.LN_SPAWN[0]), z: w(LN.LN_SPAWN[1]) };
   if (WORLD_ID === 'powder') return { x: w(PW.PW_SPAWN[0]), z: w(PW.PW_SPAWN[1]) };
+  if (WORLD_ID === 'skylark') return { x: w(SK.SK_SPAWN[0]), z: w(SK.SK_SPAWN[1]) };
   return WORLD_ID === 'pirate'
     ? { x: w(6950), z: w(10560) }
     : { x: w(MAPLE_SPAWN[0]), z: w(MAPLE_SPAWN[1]) };
@@ -341,7 +349,8 @@ const silPoly = (): [number, number][] =>
     : WORLD_ID === 'gameday' ? GD.GD_LAND_SMOOTH
       : WORLD_ID === 'lantern' ? LN.LN_LAND_SMOOTH
         : WORLD_ID === 'powder' ? PW.PW_LAND_SMOOTH
-          : MAPLE_SIL);
+          : WORLD_ID === 'skylark' ? SK.SK_LAND_SMOOTH
+            : MAPLE_SIL);
 const SIL_POLY = MAPLE_SIL;   // legacy alias for the maple-only helpers below
 /** THE ISLAND'S OUTLINE, in 3D coordinates, for whichever world is loaded.
  *  The minimap needs the real coastline — a circle would lie about Pirate Bay,
@@ -358,6 +367,7 @@ function insideIslandWorld(wx: number, wy: number): boolean {
   if (WORLD_ID === 'gameday') return GD.onGameDayLand(wx, wy);
   if (WORLD_ID === 'lantern') return LN.onLanternLand(wx, wy);
   if (WORLD_ID === 'powder') return PW.onPowderLand(wx, wy);
+  if (WORLD_ID === 'skylark') return SK.onSkylarkLand(wx, wy);
   let inside = false;
   // indexed, not destructured — see the note on pointInPoly in bay.ts. Same
   // answers, 10x cheaper, and this runs thousands of times a frame.
@@ -418,6 +428,11 @@ export function inWater3(x3: number, z3: number, margin = 0): boolean {
   // the lantern-canal design. Falling through to Maple's pond here is the
   // gameday bug again, and this time the sweep happened when the world landed.
   if (WORLD_ID === 'powder') return false;
+  // SKYLARK FIELD has no water of any kind. Falling through to Maple's pond and
+  // river here would put two invisible bodies of water on a grass airfield —
+  // the contract counts this as silent obligation A4 and it is the same bug
+  // gameday and powder each had to sweep when they landed.
+  if (WORLD_ID === 'skylark') return false;
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -439,6 +454,7 @@ export function inDeepWater3(x3: number, z3: number, margin = 0): boolean {
   if (WORLD_ID === 'lantern') return false;     // the canal is shallow — see inWater3
   if (WORLD_ID === 'gameday') return false;     // no water on the plateau — see inWater3
   if (WORLD_ID === 'powder') return false;      // the lake is ice — see inWater3
+  if (WORLD_ID === 'skylark') return false;     // no water on the airfield — see inWater3
   const wx = x3 / SCALE + CX, wy = z3 / SCALE + CZ;
   const mw = margin / SCALE;
   if (Math.hypot(wx - POND[0], wy - POND[1]) < POND[2] + mw) return true;
@@ -2097,6 +2113,26 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
     // ── POWDER PASS ground: null — the powder bake paints its regions
     // directly (rim shade, piste, grit road, lake); block fills are maple's
     village: null, lake: null, pinewood: null, piste: null, lodge: null, rim: null,
+    // ── SKYLARK FIELD ground. Two surfaces and the whole world's colour
+    // strategy is an INVERSION: every other world carries its identity in the
+    // ground, and this one drains its ground on purpose so that the only
+    // saturated colour in the frame is the ninety balloons the child is here to
+    // eat. Wet green-grey grass at about half a summer lawn, grey-lilac
+    // concrete, and the two kept a clear step apart in value so a runway reads
+    // as a hard edge across soft ground from the play camera.
+    //
+    // The three block-filled districts are the built ones. THE ROUGH is null
+    // because it is the whole island and a fill would flatten the coast; the
+    // launch field is null because it is grass like the rest and its interest
+    // is the ninety objects lying on it; and the launch circle is null because
+    // it is PAINTED — a white ring on the concrete, drawn in the bake.
+    runway: 0xa9a6b4,       // pale grey-lilac concrete, dew still on it
+    perimeter: 0x8e8a86,    // cracked tarmac, older and darker than the strips
+    arrivals: 0x76856a,     // the wet grass the trailers have parked on
+    tower: 0xb3b0a6,        // the apron slab in front of the tower
+    hangars: 0x9c988e,      // hangar standing, oil-darkened
+    breakfast: 0xa39d8c,    // the old taxiway spur the vans park along
+    launchfield: null, circle: null, meadow: null,
     fair: 0xc8b98a,      // trampled fairground earth
     farm: 0xc7ab5c,      // ripe crop; pasture + tilled strips painted over it
     campus: 0x8fd06a,    // athletic turf
@@ -3634,6 +3670,14 @@ export async function createIsland(scene: THREE.Scene, addEdible: AddEdible,
       // powder.ts's district ids are all new words in the shared union — no
       // translation needed at the boundary, first world to manage it
       return PW.pwRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ) as Biome | null;
+    }
+    if (WORLD_ID === 'skylark') {
+      // skylark.ts does the same, deliberately. THIS RETURN IS LOAD-BEARING FOR
+      // THE WHOLE CROWD: life.ts's addWanderer opens with a biomeAt() test and
+      // returns early on null, so a world with no branch here spawns nobody at
+      // all — silently, with no error, on a field that is supposed to hold
+      // three hundred and sixty people.
+      return SK.skRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ) as Biome | null;
     }
     if (WORLD_ID === 'gameday') {
       const d = GD.gdRegionAt(x3 / SCALE + CX, z3 / SCALE + CZ);
